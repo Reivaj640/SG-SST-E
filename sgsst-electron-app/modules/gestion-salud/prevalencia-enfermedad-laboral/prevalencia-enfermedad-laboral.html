@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>K+AIR - Prevalencia de Enfermedad Laboral</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<link rel="stylesheet" href="prevalencia-enfermedad-laboral.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<div class="prevalencia-container">
+
+<!-- ============================================================ -->
+<!-- HEADER — Card Pattern (k-section-card)                      -->
+<!-- ============================================================ -->
+<div class="k-section-card" style="padding:0; margin-bottom:1rem;">
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
+    <div style="display:flex; align-items:center; gap:0.75rem;">
+      <i class="fas fa-clipboard2-pulse" style="color:#174ea6; font-size:1.25rem;"></i>
+      <div>
+        <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Prevalencia de Enfermedad Laboral</h3>
+        <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Gestión de la Salud — 3.3.4 Prevalencia</p>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:0.75rem;">
+      <span class="k-section-card__company">
+        <i class="bi bi-building"></i>
+        <span id="header-company-text">—</span>
+      </span>
+      <div class="k-section-card__divider"></div>
+      <label style="font-size:0.75rem;color:#64748B;margin-right:4px;">Año:</label>
+      <select id="yearFilter" style="font-size:0.8rem;padding:2px 6px;border:1px solid #dee2e6;border-radius:4px;background:#ffffff;color:#212529;cursor:pointer;"></select>
+      <button id="btnCloneYear" title="Clonar a año siguiente" style="background:none;border:1px solid #dee2e6;border-radius:4px;padding:2px 8px;cursor:pointer;color:#5a6378;font-size:0.8rem;">
+        <i class="bi bi-copy"></i>
+      </button>
+      <div class="k-section-card__divider"></div>
+      <button class="header-action--ghost" id="btnRefrescar" title="Refrescar datos">
+        <i class="bi bi-arrow-clockwise"></i> Refrescar
+      </button>
+      <button class="header-back-btn" id="btn-back-module" title="Volver a Gestión de la Salud">
+        <i class="fas fa-arrow-left"></i> Volver
+      </button>
+    </div>
+  </div>
+</div>
+
+<main class="kair-container" id="app">
+<div class="k-main-content">
+
+<!-- ==================== SYNC BAR ==================== -->
+<div class="kair-sync-bar">
+<span class="kair-badge">
+<span class="kair-dot"></span>
+Vinculado a Excel de origen
+</span>
+<span class="kair-sync-info">
+      Los cambios se guardan directamente en <span id="syncFileName">—</span>
+      </span>
+</div>
+
+<!-- ==================== LOADING ==================== -->
+<div class="kair-loading" id="loadingSection">
+<div class="kair-spinner"></div>
+<p>Cargando indicadores...</p>
+</div>
+
+<!-- ==================== KPIs ==================== -->
+<section class="kair-kpis" id="kpiSection" style="display:none">
+<div class="kair-kpi">
+  <div class="kair-kpi-label">PREVALENCIA EL PROM.</div>
+  <div class="kair-kpi-value primary" id="kpiPrevalencia">-</div>
+  <div class="kair-kpi-sub">Por 100.000 trabajadores</div>
+</div>
+<div class="kair-kpi">
+  <div class="kair-kpi-label">TOTAL CASOS EL (AÑO)</div>
+  <div class="kair-kpi-value warning" id="kpiTotalEL">-</div>
+  <div class="kair-kpi-sub">Enfermedades laborales</div>
+</div>
+<div class="kair-kpi">
+  <div class="kair-kpi-label">TRABAJADORES PROM.</div>
+  <div class="kair-kpi-value primary" id="kpiTrabProm">-</div>
+  <div class="kair-kpi-sub">Promedio anual</div>
+</div>
+<div class="kair-kpi">
+  <div class="kair-kpi-label">META</div>
+  <div class="kair-kpi-value primary" id="kpiMeta">-</div>
+  <div class="kair-kpi-sub">Meta del indicador</div>
+</div>
+<div class="kair-kpi">
+  <div class="kair-kpi-label">ESTADO</div>
+  <div class="kair-kpi-value">
+    <span class="kair-status-badge" id="kpiEstado">-</span>
+  </div>
+  <div class="kair-kpi-sub">Evaluación</div>
+</div>
+</section>
+
+<!-- ==================== META SECTION ==================== -->
+<section class="kair-meta-section" id="metaSection" style="display:none">
+<div class="kair-meta-icon">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
+<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+</svg>
+</div>
+<div class="kair-meta-info">
+<div class="kair-meta-title">Meta del Indicador (Prevalencia EL)</div>
+<div class="kair-meta-subtitle">Objetivo anual definido para el indicador</div>
+</div>
+<div class="kair-meta-value-container">
+<div class="kair-meta-value" id="metaDisplay">-</div>
+<span class="kair-promedio-badge" id="promedioBadge">Prevalencia: -</span>
+</div>
+</section>
+
+<!-- ==================== CHART ==================== -->
+<section class="kair-chart-section" id="chartSection" style="display:none">
+<div class="kair-chart-header">
+<div>
+<h3 class="kair-chart-title">Prevalencia EL Mensual</h3>
+<p class="kair-chart-subtitle">Evolución mensual — (Casos EL / Trabajadores) × 100.000</p>
+</div>
+<div class="kair-chart-legend">
+<span class="kair-legend-item">
+<span class="kair-legend-color" style="background:#2563eb"></span> Prevalencia
+</span>
+<span class="kair-legend-item">
+<span class="kair-legend-line" style="border-color:#7c3aed"></span> Promedio
+</span>
+<span class="kair-legend-item">
+<span class="kair-legend-line" style="border-color:#28a745"></span> Meta
+</span>
+</div>
+</div>
+<div class="kair-chart-container">
+<canvas id="prevalenciaChart"></canvas>
+</div>
+<div class="kair-chart-summary" id="chartSummary" style="display:none"></div>
+</section>
+
+<!-- ==================== TABLE ==================== -->
+<section class="kair-table-section" id="tableSection" style="display:none">
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+  <div style="display:flex; align-items:center; gap:0.5rem;">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+      <polyline points="14 2 14 8 20 8"></polyline>
+      <line x1="16" y1="13" x2="8" y2="13"></line>
+      <line x1="16" y1="17" x2="8" y2="17"></line>
+    </svg>
+    <span style="font-size:0.875rem; font-weight:600; color:#1E293B;">Tabla de Prevalencia - Editable</span>
+  </div>
+  <span class="kair-edit-hint">Clic en un valor para editar</span>
+</div>
+<div class="kair-table-wrapper">
+<table class="kair-data-table" id="dataTable">
+<thead>
+<tr class="kair-table-header">
+  <th>Mes</th>
+  <th>Casos EL</th>
+  <th>Trabajadores</th>
+  <th>Prevalencia (x100.000)</th>
+  <th>Meta</th>
+  <th>Estado</th>
+</tr>
+</thead>
+<tbody id="tableBody">
+</tbody>
+<tfoot id="tableFoot">
+</tfoot>
+</table>
+</div>
+<div class="kair-table-footer-note">
+  <strong>Fórmula:</strong> (Casos nuevos y antiguos de EL / Promedio de Trabajadores) × 100.000
+</div>
+</section>
+
+<!-- ==================== METHODOLOGY ==================== -->
+<section class="kair-methodology-section" id="methodologySection" style="display:none">
+<div class="kair-methodology-header">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2">
+<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+<line x1="12" y1="9" x2="12" y2="13"/>
+<line x1="12" y1="17" x2="12.01" y2="17"/>
+</svg>
+<h3>Metodología</h3>
+</div>
+<div class="kair-methodology-content">
+<p><strong>Fuente:</strong> <span id="methodSources">SST / ARL y Gestión Humana</span></p>
+        <p><strong>Responsable:</strong> <span id="metResponsable">Responsable SGSST</span></p>
+        <p><strong>Frecuencia:</strong> <span id="metFrecuencia">Mensual / Anual</span></p>
+        <p><strong>Definición:</strong> (Casos nuevos y antiguos de EL / Promedio de Trabajadores) × 100.000</p>
+        <p><strong>Interpretación:</strong> Número de trabajadores con enfermedad laboral por cada 100.000 trabajadores — <span id="methodFileName">—</span></p>
+        <p style="margin-top:0.75rem;"><strong>Fuente normativa:</strong> Resolución 0312 de 2019 — Indicadores de Gestión en Seguridad y Salud en el Trabajo</p>
+</div>
+</section>
+
+<!-- ==================== ERROR ==================== -->
+<div class="kair-error" id="errorSection" style="display:none">
+<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#dc3545" stroke-width="2">
+<circle cx="12" cy="12" r="10"></circle>
+<line x1="12" y1="8" x2="12" y2="12"></line>
+<line x1="12" y1="16" x2="12.01" y2="16"></line>
+</svg>
+<p id="errorMessage">Error al cargar los datos</p>
+</div>
+
+</div>
+
+</main>
+
+<!-- ==================== TOAST CONTAINER ==================== -->
+<div id="toastContainer"></div>
+
+</div>
+
+<!-- ==================== SCRIPTS ==================== -->
+<script src="prevalencia-enfermedad-laboral.js"></script>
+</body>
+</html>

@@ -1,454 +1,92 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>K+AIR | Portal Programa de Capacitaciones</title>
-    <!-- Iconos -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Fuentes -->
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./modules/recursos/capacitaciones/cap-home.css">
 
-    <style>
-        /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-           SISTEMA VISUAL OFICIAL (K+AIR)
-           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-        :root {
-            --primary: #174ea6;
-            --primary-hover: #185abd;
-            --primary-light: #e8f0fe;
-            --success: #28a745;
-            --warning: #ffc107;
-            --danger: #dc3545;
-            --info: #17a2b8;
-            --text-dark: #212529;
-            --text-muted: #6c757d;
-            --bg-body: #f0f2f5;
-            --bg-card: #ffffff;
-            --border: #dee2e6;
-            --radius: 0.5rem;
-            --shadow-lg: 0 10px 25px rgba(0,0,0,0.05);
-        }
+<div class="cap-portal">
+  <div class="cap-portal__card">
 
-        * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
-
-        body {
-            font-family: 'Roboto', sans-serif;
-            background-color: var(--bg-body);
-            color: var(--text-dark);
-            font-size: 1rem;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        /* PORTAL CONTENEDOR PRINCIPAL */
-        .portal-container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 2rem;
-            overflow-y: auto;
-        }
-
-        .portal-card {
-            background: white;
-            width: 100%;
-            max-width: 1100px;
-            border-radius: var(--radius);
-            box-shadow: var(--shadow-lg);
-            padding: 3rem;
-            text-align: center;
-            animation: fadeIn 0.5s ease-out;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        @keyframes slideInRight {
-            from { 
-                opacity: 0; 
-                transform: translateX(100%); 
-            }
-            to { 
-                opacity: 1; 
-                transform: translateX(0); 
-            }
-        }
-
-        /* BARRA SUPERIOR INTERNA DEL PORTAL */
-        .portal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-            padding-bottom: 1.5rem;
-            border-bottom: 1px solid #f1f3f5;
-        }
-
-        .portal-logo {
-            font-family: 'Lexend', sans-serif;
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: var(--primary);
-        }
-
-        .back-btn-internal {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 16px;
-            font-size: 0.9rem;
-            color: var(--text-muted);
-            text-decoration: none;
-            cursor: pointer;
-            border-radius: 6px;
-            transition: all 0.2s;
-            background: #f8f9fa;
-            border: 1px solid var(--border);
-        }
-
-        .back-btn-internal:hover {
-            color: var(--primary);
-            background: var(--primary-light);
-            border-color: var(--primary);
-        }
-
-        .back-btn-internal i {
-            font-size: 0.85rem;
-        }
-
-        /* HERO SECTION */
-        .hero-title {
-            font-family: 'Lexend', sans-serif;
-            font-size: 2.5rem;
-            color: var(--text-dark);
-            margin-bottom: 0.5rem;
-        }
-
-        .hero-subtitle {
-            color: var(--text-muted);
-            font-size: 1.1rem;
-            margin-bottom: 2.5rem;
-            max-width: 650px;
-            margin-left: auto;
-            margin-right: auto;
-            line-height: 1.6;
-        }
-
-        /* STATUS PILL */
-        .status-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 6px 18px;
-            border-radius: 20px;
-            background: #d4edda;
-            color: #155724;
-            font-size: 0.85rem;
-            font-weight: 600;
-            margin-bottom: 2rem;
-        }
-
-        /* BOTÓN PRINCIPAL - ENTRADA AL CRONOGRAMA */
-        .main-action-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 12px;
-            padding: 1rem 3rem;
-            font-size: 1.1rem;
-            font-weight: 600;
-            background-color: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 50px;
-            cursor: pointer;
-            transition: all 0.3s;
-            box-shadow: 0 5px 15px rgba(23, 78, 166, 0.3);
-        }
-
-        .main-action-btn:hover {
-            background-color: var(--primary-hover);
-            transform: translateY(-3px);
-            box-shadow: 0 8px 20px rgba(23, 78, 166, 0.4);
-        }
-        .main-action-btn i { font-size: 1.3rem; }
-
-        /* SECCIÓN DE ACCIONES RÁPIDAS */
-        .quick-actions {
-            margin-top: 3.5rem;
-            text-align: left;
-        }
-
-        .quick-actions-title {
-            font-size: 1.1rem;
-            font-weight: 600;
-            margin-bottom: 1.5rem;
-            color: var(--text-dark);
-            border-bottom: 2px solid #f1f3f5;
-            padding-bottom: 0.5rem;
-            display: inline-block;
-        }
-
-        .actions-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 1.25rem;
-        }
-
-        .action-card {
-            background: #f8f9fa;
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 1.5rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-            text-align: left;
-        }
-
-        .action-card:hover {
-            border-color: var(--primary);
-            background: white;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
-            transform: translateY(-3px);
-        }
-
-        .action-icon {
-            width: 42px;
-            height: 42px;
-            border-radius: 8px;
-            background: white;
-            color: var(--primary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2rem;
-            margin-bottom: 1rem;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-
-        .action-title {
-            font-weight: 600;
-            font-size: 0.95rem;
-            margin-bottom: 0.25rem;
-            color: var(--text-dark);
-        }
-
-        .action-desc {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            line-height: 1.4;
-        }
-
-        /* COLORES ESPECIALES POR ACCIÓN */
-        .action-icon.success { color: var(--success); }
-        .action-icon.warning { color: var(--warning); }
-        .action-icon.danger { color: var(--danger); }
-        .action-icon.info { color: var(--info); }
-        .action-icon.muted { color: var(--text-muted); }
-
-        /* GRID PRINCIPAL DE ACCIONES */
-        .main-actions {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-
-        .main-action-card {
-            background: white;
-            border: 2px solid var(--border);
-            border-radius: var(--radius);
-            padding: 2rem;
-            cursor: pointer;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            gap: 1.25rem;
-            text-align: left;
-        }
-
-        .main-action-card:hover {
-            border-color: var(--primary);
-            box-shadow: 0 5px 20px rgba(23, 78, 166, 0.1);
-            transform: translateY(-2px);
-        }
-
-        .main-action-card.primary {
-            background: linear-gradient(135deg, var(--primary) 0%, #2d5dc7 100%);
-            border-color: var(--primary);
-            color: white;
-        }
-
-        .main-action-card.primary:hover {
-            box-shadow: 0 8px 25px rgba(23, 78, 166, 0.35);
-        }
-
-        .main-action-card.primary .action-title,
-        .main-action-card.primary .action-desc {
-            color: white;
-        }
-
-        .main-action-card.primary .action-icon {
-            background: rgba(255,255,255,0.2);
-            color: white;
-        }
-
-        .main-action-icon {
-            width: 50px;
-            height: 50px;
-            border-radius: 10px;
-            background: #f1f3f5;
-            color: var(--primary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.4rem;
-            flex-shrink: 0;
-        }
-
-        .main-action-content .action-title {
-            font-size: 1.05rem;
-            margin-bottom: 0.35rem;
-        }
-
-        .main-action-content .action-desc {
-            font-size: 0.85rem;
-        }
-
-        /* RESPONSIVE */
-        @media (max-width: 768px) {
-            .main-actions {
-                grid-template-columns: 1fr;
-            }
-            .hero-title {
-                font-size: 1.8rem;
-            }
-            .portal-card {
-                padding: 2rem 1.5rem;
-            }
-            .portal-header {
-                flex-direction: column;
-                gap: 1rem;
-            }
-        }
-    </style>
-</head>
-<body>
-
-    <!-- PORTAL CONTENT (SIN TOP BAR EXTERNO) -->
-    <div class="portal-container">
-        <div class="portal-card">
-
-            <!-- BARRA SUPERIOR INTERNA -->
-            <div class="portal-header">
-                <div class="portal-logo">K+<span>AIR</span></div>
-                <a class="back-btn-internal" onclick="goBackToModule()">
-                    <i class="fas fa-arrow-left"></i>
-                    <span>Volver al Menú</span>
-                </a>
-            </div>
-
-            <!-- STATUS PILL -->
-            <div class="status-pill">
-                <i class="fas fa-check-circle"></i> Año Activo: <span id="activeYear">2025</span>
-            </div>
-
-            <!-- HERO -->
-            <h1 class="hero-title">Programa de Capacitaciones Anual SST</h1>
-            <p class="hero-subtitle">
-                Bienvenido al módulo de gestión de capacitaciones. Desde aquí puedes acceder al cronograma de capacitaciones, gestionar la matriz de formación, generar informes de cumplimiento y administrar los registros del programa de formación del SG-SST.
-            </p>
-
-            <!-- ACCIONES PRINCIPALES -->
-            <div class="main-actions">
-
-                <!-- VER CRONOGRAMA DE CAPACITACIONES -->
-                <div class="main-action-card primary" onclick="enterCronograma()">
-                    <div class="main-action-icon">
-                        <i class="fas fa-calendar-alt"></i>
-                    </div>
-                    <div class="main-action-content">
-                        <div class="action-title">Ver Cronograma de Capacitaciones</div>
-                        <div class="action-desc">Acceder al listado completo de capacitaciones programadas y ejecutadas.</div>
-                    </div>
-                </div>
-
-                <!-- IMPORTAR DESDE EXCEL -->
-                <div class="main-action-card" onclick="importFromExcel()">
-                    <div class="main-action-icon" style="background: #e8f5e9; color: #28a745;">
-                        <i class="fas fa-file-excel"></i>
-                    </div>
-                    <div class="main-action-content">
-                        <div class="action-title">Importar desde Excel</div>
-                        <div class="action-desc">Cargar el cronograma de capacitaciones desde archivo Excel compatible.</div>
-                    </div>
-                </div>
-
-            </div>
-
-            <!-- GRID DE OPCIONES SECUNDARIAS -->
-            <div class="quick-actions">
-                <div class="quick-actions-title">Gestión y Configuración</div>
-
-                <div class="actions-grid">
-
-                    <!-- EXPORTAR CRONOGRAMA -->
-                    <div class="action-card" onclick="exportCronograma()">
-                        <div class="action-icon success"><i class="fas fa-file-export"></i></div>
-                        <div class="action-title">Exportar Cronograma</div>
-                        <div class="action-desc">Generar archivo Excel o PDF del cronograma de capacitaciones.</div>
-                    </div>
-
-                    <!-- MATRIZ DE FORMACIÓN -->
-                    <div class="action-card" onclick="openMatrizFormacion()">
-                        <div class="action-icon warning"><i class="fas fa-chalkboard-teacher"></i></div>
-                        <div class="action-title">Matriz de Formación</div>
-                        <div class="action-desc">Gestionar la matriz de formación por cargos y áreas.</div>
-                    </div>
-
-                    <!-- CLONAR CRONOGRAMA -->
-                    <div class="action-card" onclick="cloneCronograma()">
-                        <div class="action-icon"><i class="fas fa-copy"></i></div>
-                        <div class="action-title">Clonar Cronograma</div>
-                        <div class="action-desc">Crear un nuevo año tomando como base el cronograma actual.</div>
-                    </div>
-
-                    <!-- REGISTRO DE ASISTENCIA -->
-                    <div class="action-card" onclick="openRegistroAsistencia()">
-                        <div class="action-icon info"><i class="fas fa-clipboard-list"></i></div>
-                        <div class="action-title">Registro de Asistencia</div>
-                        <div class="action-desc">Gestionar listas de asistencia y seguimiento de participantes.</div>
-                    </div>
-
-                    <!-- INFORME DE CUMPLIMIENTO -->
-                    <div class="action-card" onclick="generateInformeCumplimiento()">
-                        <div class="action-icon danger"><i class="fas fa-file-pdf"></i></div>
-                        <div class="action-title">Informe de Cumplimiento</div>
-                        <div class="action-desc">Descargar reporte ejecutivo de cumplimiento del programa.</div>
-                    </div>
-
-                    <!-- CERTIFICADOS -->
-                    <div class="action-card" onclick="openCertificados()">
-                        <div class="action-icon muted"><i class="fas fa-certificate"></i></div>
-                        <div class="action-title">Certificados</div>
-                        <div class="action-desc">Generar y gestionar certificados de capacitación.</div>
-                    </div>
-
-                </div>
-            </div>
-
-        </div>
+    <div class="cap-portal__header">
+      <div class="cap-portal__logo">K+<span>AIR</span></div>
+      <a class="cap-portal__back-btn" onclick="goBackToModule()">
+        <i class="bi bi-arrow-left"></i>
+        <span>Volver al Menú</span>
+      </a>
     </div>
 
-    <script src="cap-home.js" onload="console.log('[cap-home.html] cap-home.js cargado'); initializePortal();" onerror="console.error('[cap-home.html] Error cargando cap-home.js')"></script>
-</body>
-</html>
+    <div class="cap-portal__status-pill">
+      <i class="bi bi-check-circle"></i> Año Activo: <span id="activeYear">2025</span>
+    </div>
+
+    <h1 class="cap-portal__hero-title">Programa de Capacitaciones Anual SST</h1>
+    <p class="cap-portal__hero-subtitle">
+      Bienvenido al módulo de gestión de capacitaciones. Desde aquí puedes acceder al cronograma de capacitaciones, gestionar la matriz de formación, generar informes de cumplimiento y administrar los registros del programa de formación del SG-SST.
+    </p>
+
+    <div class="cap-portal__main-actions">
+
+      <div class="cap-portal__main-action cap-portal__main-action--primary" onclick="enterCronograma()">
+        <div class="cap-portal__main-action-icon">
+          <i class="bi bi-calendar-event"></i>
+        </div>
+        <div class="cap-portal__main-action-content">
+          <div class="cap-portal__action-title">Ver Cronograma de Capacitaciones</div>
+          <div class="cap-portal__action-desc">Acceder al listado completo de capacitaciones programadas y ejecutadas.</div>
+        </div>
+      </div>
+
+      <div class="cap-portal__main-action" onclick="importFromExcel()">
+        <div class="cap-portal__main-action-icon cap-portal__main-action-icon--success">
+          <i class="bi bi-file-earmark-spreadsheet"></i>
+        </div>
+        <div class="cap-portal__main-action-content">
+          <div class="cap-portal__action-title">Importar desde Excel</div>
+          <div class="cap-portal__action-desc">Cargar el cronograma de capacitaciones desde archivo Excel compatible.</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="cap-portal__quick-actions">
+      <div class="cap-portal__quick-actions-title">Gestión y Configuración</div>
+
+      <div class="cap-portal__actions-grid">
+
+        <div class="cap-portal__action-card" onclick="exportCronograma()">
+          <div class="cap-portal__action-icon cap-portal__action-icon--success"><i class="bi bi-box-arrow-up"></i></div>
+          <div class="cap-portal__action-title">Exportar Cronograma</div>
+          <div class="cap-portal__action-desc">Generar archivo Excel o PDF del cronograma de capacitaciones.</div>
+        </div>
+
+        <div class="cap-portal__action-card" onclick="openMatrizFormacion()">
+          <div class="cap-portal__action-icon cap-portal__action-icon--warning"><i class="bi bi-easel"></i></div>
+          <div class="cap-portal__action-title">Matriz de Formación</div>
+          <div class="cap-portal__action-desc">Gestionar la matriz de formación por cargos y áreas.</div>
+        </div>
+
+        <div class="cap-portal__action-card" onclick="cloneCronograma()">
+          <div class="cap-portal__action-icon"><i class="bi bi-clipboard"></i></div>
+          <div class="cap-portal__action-title">Clonar Cronograma</div>
+          <div class="cap-portal__action-desc">Crear un nuevo año tomando como base el cronograma actual.</div>
+        </div>
+
+        <div class="cap-portal__action-card" onclick="openRegistroAsistencia()">
+          <div class="cap-portal__action-icon cap-portal__action-icon--info"><i class="bi bi-clipboard-check"></i></div>
+          <div class="cap-portal__action-title">Registro de Asistencia</div>
+          <div class="cap-portal__action-desc">Gestionar listas de asistencia y seguimiento de participantes.</div>
+        </div>
+
+        <div class="cap-portal__action-card" onclick="generateInformeCumplimiento()">
+          <div class="cap-portal__action-icon cap-portal__action-icon--danger"><i class="bi bi-file-earmark-pdf"></i></div>
+          <div class="cap-portal__action-title">Informe de Cumplimiento</div>
+          <div class="cap-portal__action-desc">Descargar reporte ejecutivo de cumplimiento del programa.</div>
+        </div>
+
+        <div class="cap-portal__action-card" onclick="openCertificados()">
+          <div class="cap-portal__action-icon cap-portal__action-icon--muted"><i class="bi bi-award"></i></div>
+          <div class="cap-portal__action-title">Certificados</div>
+          <div class="cap-portal__action-desc">Generar y gestionar certificados de capacitación.</div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>

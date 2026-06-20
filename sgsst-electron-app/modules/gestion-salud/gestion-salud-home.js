@@ -1,11 +1,20 @@
 // gestion-salud-home.js - Componente para el home del módulo "Gestión de la Salud"
 
+// Caché global para persistencia entre navegaciones de la misma sesión
+if (!window._saludHomeState) {
+    window._saludHomeState = {
+        cache: new Map(), // companyName -> data
+        lastUpdate: new Map() // companyName -> timestamp
+    };
+}
+
 class GestionSaludHome {
     constructor(container, moduleName, submodules) {
         this.container = container;
         this.moduleName = moduleName;
         this.submodules = submodules;
-        this.currentCompany = null;
+        this.currentCompany = this.getCurrentCompany();
+        this.widgets = {}; // Referencias a elementos de widgets para actualización reactiva
     }
 
     getCurrentCompany() {
@@ -14,7 +23,7 @@ class GestionSaludHome {
         if (window.currentModule && window.currentModule.company) return window.currentModule.company;
         const domCompany = document.getElementById('company-name');
         if (domCompany && domCompany.textContent && domCompany.textContent !== 'Empresa') return domCompany.textContent.trim();
-        return 'default_company';
+        return localStorage.getItem('currentCompanyName') || 'default_company';
     }
 
     async render() {
@@ -61,352 +70,713 @@ class GestionSaludHome {
         contentContainer.appendChild(mainArea);
         layout.appendChild(contentContainer);
         this.container.appendChild(layout);
+
+        // 3. Lanzar actualización en segundo plano (main.js ya tiene su propia caché de disco)
+        this.refreshStats();
     }
 
-    injectStyles() {
-        const styleId = 'k-air-gestion-salud-styles-v1';
-        const oldStyle = document.getElementById(styleId);
-        if (oldStyle) oldStyle.remove();
+    /**
+     * Refresca las estadísticas en segundo plano y actualiza los widgets existentes.
+     */
+    async refreshStats() {
+        const company = this.currentCompany;
+        console.log(`[SALUD] Refrescando estadísticas para ${company}...`);
 
-        const style = document.createElement('style');
-        style.id = styleId;
-        style.textContent = `
-            /* =========================================
-               1. SISTEMA VISUAL K+AIR (OFICIAL) - GESTIÓN DE LA SALUD
-               ========================================= */
-            .gestion-salud-home {
-                --k-primary: #174ea6;
-                --k-primary-hover: #185abd;
-                --k-primary-light: rgba(23, 78, 166, 0.1);
-                --k-success: #28a745;
-                --k-success-light: rgba(40, 167, 69, 0.1);
-                --k-warning: #ffc107;
-                --k-warning-light: rgba(255, 193, 7, 0.1);
-                --k-danger: #dc3545;
-                --k-danger-light: rgba(220, 53, 69, 0.1);
-                --k-info: #17a2b8;
-                --k-info-light: rgba(23, 162, 184, 0.1);
-                --k-bg-app: #f8f9fa;
-                --k-bg-card: #ffffff;
-                --k-border: #dee2e6;
-                --k-font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
-                --k-text-main: #212529;
-                --k-text-muted: #6c757d;
-                --k-radius-md: 0.375rem;
-                --k-radius-lg: 0.5rem;
-                --k-shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
-                --k-shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.08);
-                --k-header-height: 60px;
+        try {
+            // Ejecutar peticiones en paralelo (main.js responderá rápido gracias a su caché de archivos)
+      const [recursosResult, ausResult, accResult, examResult, segResult, remResult, indicadoresResult] = await Promise.all([
+        window.electronAPI.getRecursosStats(company),
+        window.electronAPI.getAusentismoStats(company, 'year'),
+        window.electronAPI.getAccidentesStats(company),
+        window.electronAPI.getExamenesStats(company),
+        window.electronAPI.getSaludSeguimientosStats(company),
+        window.electronAPI.getRemisionesStats(company),
+        window.electronAPI.getIndicadoresSaludStats(company)
+      ]);
 
-                font-family: var(--k-font-family);
-                color: var(--k-text-main);
-                background-color: var(--k-bg-app);
-                height: 100%;
-                display: flex;
-                flex-direction: column;
-                padding: 1.5rem;
-                overflow: hidden;
-            }
+      const newData = {
+        inducciones: recursosResult.success ? recursosResult.stats.inducciones : null,
+        ausentismo: ausResult.success ? ausResult.data : null,
+        accidentes: accResult.success ? accResult.data : null,
+        examenes: examResult.success ? examResult.data : null,
+        seguimientos: segResult.success ? segResult.data : null,
+        remisiones: remResult.success ? remResult.data : null,
+        indicadores: indicadoresResult.success ? indicadoresResult.data : null
+      };
 
-            /* Header & Botones */
-            .k-module-header {
-                background-color: var(--k-bg-card);
-                border-bottom: 1px solid var(--k-border);
-                padding: 0 1.5rem;
-                height: var(--k-header-height);
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                flex-shrink: 0;
-            }
+            // Guardar en caché de sesión
+            window._saludHomeState.cache.set(company, newData);
+            window._saludHomeState.lastUpdate.set(company, Date.now());
 
-            .k-module-title {
-                font-size: 1.25rem;
-                font-weight: 600;
-                color: var(--k-primary);
-                display: flex;
-                align-items: center;
-                gap: 0.75rem;
-            }
+            // Actualizar widgets si el componente sigue montado
+            this.updateWidgetsUI(newData);
 
-            .k-btn-ingresar {
-                background-color: var(--k-bg-card);
-                border: 1px solid var(--k-border);
-                color: var(--k-text-main);
-                padding: 0.5rem 1rem;
-                border-radius: var(--k-radius-md);
-                font-size: 0.9rem;
-                font-weight: 500;
-                cursor: pointer;
-                transition: all 0.2s ease;
-            }
-            .k-btn-ingresar:hover {
-                background-color: var(--k-primary-light);
-                border-color: var(--k-primary);
-                color: var(--k-primary);
-            }
-
-            /* Main Layout */
-            .main-area {
-                display: flex;
-                flex-direction: column;
-                gap: 1.5rem;
-                overflow-y: auto;
-                padding-right: 0.5rem;
-                width: 100%;
-            }
-
-            /* Grid de Widgets */
-            .widgets-container {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-                gap: 1rem;
-            }
-
-            /* Widget Base */
-            .widget {
-                background: var(--k-bg-card);
-                border: 1px solid var(--k-border);
-                border-radius: var(--k-radius-lg);
-                padding: 1rem;
-                display: flex;
-                flex-direction: column;
-                position: relative;
-                box-shadow: var(--k-shadow-sm);
-                transition: transform 0.2s ease;
-                min-height: 120px;
-            }
-            .widget:hover {
-                transform: translateY(-3px);
-                box-shadow: var(--k-shadow-md);
-            }
-            .widget h4 {
-                margin: 0 0 0.5rem 0;
-                font-size: 0.65rem;
-                color: var(--k-text-muted);
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-                font-weight: 600;
-            }
-            .widget-value {
-                font-size: 1.4rem;
-                font-weight: 700;
-                color: var(--k-text-main);
-                margin-bottom: 0.5rem;
-            }
-            .widget-description {
-                font-size: 0.65rem;
-                color: var(--k-text-muted);
-            }
-
-            /* Secciones de Gráficos y Listas */
-            .chart-container {
-                background: var(--k-bg-card);
-                border: 1px solid var(--k-border);
-                border-radius: var(--k-radius-lg);
-                padding: 1.5rem;
-                box-shadow: var(--k-shadow-sm);
-                min-height: 280px;
-                display: flex;
-                flex-direction: column;
-            }
-            .chart-container h3 {
-                margin-top: 0;
-                margin-bottom: 1rem;
-                font-size: 1.1rem;
-                color: var(--k-text-main);
-            }
-
-            .chart-lines {
-                flex: 1;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-            }
-            .chart-lines svg {
-                max-width: 100%;
-                height: auto;
-            }
-            .chart-labels {
-                display: flex;
-                justify-content: space-between;
-                width: 100%;
-                margin-top: 0.5rem;
-                font-size: 0.75rem;
-                color: var(--k-text-muted);
-            }
-            .chart-placeholder p {
-                color: var(--k-text-muted);
-                font-size: 0.9rem;
-                margin-bottom: 1rem;
-            }
-
-            .submodules-container {
-                background: var(--k-bg-card);
-                border: 1px solid var(--k-border);
-                border-radius: var(--k-radius-lg);
-                padding: 1.5rem;
-                box-shadow: var(--k-shadow-sm);
-            }
-            .submodules-container h3 {
-                margin-top: 0;
-                margin-bottom: 1rem;
-                font-size: 1.1rem;
-                color: var(--k-text-main);
-                padding-bottom: 1rem;
-                border-bottom: 1px solid var(--k-border);
-            }
-            .submodules-list {
-                display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-                gap: 1rem;
-            }
-            .submodule-item {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                padding: 1rem;
-                background-color: #fcfcfc;
-                border: 1px solid var(--k-border);
-                border-radius: var(--k-radius-md);
-                transition: all 0.2s ease;
-            }
-            .submodule-item:hover {
-                background-color: var(--k-primary-light);
-                border-color: var(--k-primary);
-                transform: translateX(5px);
-            }
-            .submodule-info { flex: 1; margin-right: 1rem; }
-            .submodule-name { font-weight: 600; color: var(--k-text-main); font-size: 0.95rem; }
-            .submodule-meta { font-size: 0.8rem; color: var(--k-text-muted); margin-top: 0.2rem; }
-            .btn-ingresar {
-                background-color: var(--k-primary);
-                color: white;
-                border: none;
-                padding: 0.5rem 1.25rem;
-                border-radius: var(--k-radius-md);
-                font-weight: 500;
-                cursor: pointer;
-                transition: background 0.2s;
-                white-space: nowrap;
-            }
-            .btn-ingresar:hover { background-color: var(--k-primary-hover); }
-
-            /* =========================================
-               TEMA OSCURO (MODO SYSTEM/DARK)
-               ========================================= */
-            [data-theme="dark"] .gestion-salud-home {
-                --k-primary: #4da6ff;
-                --k-primary-hover: #66b3ff;
-                --k-primary-light: rgba(77, 166, 255, 0.15);
-                --k-success: #5cb85c;
-                --k-success-light: rgba(92, 184, 92, 0.15);
-                --k-warning: #f0ad4e;
-                --k-warning-light: rgba(240, 173, 78, 0.15);
-                --k-danger: #d9534f;
-                --k-danger-light: rgba(217, 83, 79, 0.15);
-                --k-bg-app: #1a202c;
-                --k-bg-card: #2d3748;
-                --k-border: #4a5568;
-                --k-text-main: #e9ecef;
-                --k-text-muted: #adb5bd;
-                --k-shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.3);
-                --k-shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.4);
-            }
-
-            /* =========================================
-               TEMA OSCURO (DARK-LEGACY - PALETA NEGRO/GRIS)
-               ========================================= */
-            [data-theme="dark-legacy"] .gestion-salud-home {
-                --k-primary: #9e9e9e;
-                --k-primary-hover: #bdbdbd;
-                --k-primary-light: rgba(158, 158, 158, 0.15);
-                --k-success: #4caf50;
-                --k-success-light: rgba(76, 175, 80, 0.15);
-                --k-warning: #ff9800;
-                --k-warning-light: rgba(255, 152, 0, 0.15);
-                --k-danger: #f44336;
-                --k-danger-light: rgba(244, 67, 54, 0.15);
-                --k-bg-app: #121212;
-                --k-bg-card: #1e1e1e;
-                --k-border: #404040;
-                --k-text-main: #e0e0e0;
-                --k-text-muted: #a0a0a0;
-                --k-shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.6);
-                --k-shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.8);
-            }
-        `;
-        document.head.appendChild(style);
+        } catch (error) {
+            console.error('[SALUD] Error refrescando estadísticas:', error);
+        }
     }
 
-    renderMainArea(container) {
-        // Widgets con contadores específicos para Gestión de la Salud
+    updateWidgetsUI(data) {
+        if (!data) return;
+
+        // Actualizar Inducciones
+        if (data.inducciones && this.widgets.inducciones) {
+            this.widgets.inducciones.update(data.inducciones);
+        }
+        // Actualizar Ausentismo
+        if (data.ausentismo && this.widgets.ausentismo) {
+            this.widgets.ausentismo.update(data.ausentismo);
+        }
+        // Actualizar Accidentes
+        if (data.accidentes && this.widgets.accidentes) {
+            this.widgets.accidentes.update(data.accidentes);
+        }
+        // Actualizar Exámenes
+        if (data.examenes && this.widgets.examenes) {
+            this.widgets.examenes.update(data.examenes);
+        }
+        // Actualizar Seguimientos
+        if (data.seguimientos && this.widgets.seguimientos) {
+            this.widgets.seguimientos.update(data.seguimientos);
+        }
+        // Actualizar Remisiones
+        if (data.remisiones && this.widgets.remisiones) {
+            this.widgets.remisiones.update(data.remisiones);
+        }
+        // Actualizar gráfica de accidentes
+if (data.accidentes) {
+this.renderAccidentesChart(data.accidentes);
+}
+if (data.indicadores) {
+this.renderIndicesChart(data.indicadores);
+}
+    }
+
+    renderAccidentesChart(data) {
+        if (typeof Chart === 'undefined') return;
+        const canvas = document.getElementById('saludAccidentesChart');
+        if (!canvas) return;
+
+        const monthlyData = data && data.mensual ? data.mensual : Array(12).fill(0);
+        const labels = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+        
+        // Detectar mes actual para resaltar
+        const currentMonth = new Date().getMonth();
+        const barColors = monthlyData.map((count, i) => {
+            if (count === 0) return 'rgba(40, 167, 69, 0.5)';
+            return i === currentMonth ? 'rgba(23, 78, 166, 0.8)' : 'rgba(220, 53, 69, 0.7)';
+        });
+        const borderColors = monthlyData.map((count, i) => {
+            if (count === 0) return '#28a745';
+            return i === currentMonth ? '#174ea6' : '#dc3545';
+        });
+
+        const existingChart = Chart.getChart(canvas);
+        if (existingChart) existingChart.destroy();
+
+        new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Accidentes',
+                    data: monthlyData,
+                    backgroundColor: barColors,
+                    borderColor: borderColors,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => ` ${ctx.raw} accidente${ctx.raw !== 1 ? 's' : ''}`
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1, precision: 0 },
+                        title: { display: true, text: 'Cantidad', font: { size: 10 } }
+                    }
+                }
+            }
+});
+}
+
+renderIndicesChart(indicadores) {
+if (typeof Chart === 'undefined') return;
+const canvas = document.getElementById('saludIndicesChart');
+if (!canvas) return;
+
+const labels = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+const freqData = indicadores && indicadores.frecuenciaMensual
+  ? indicadores.frecuenciaMensual.map(m => m.indiceFrecuencia)
+  : Array(12).fill(0);
+const sevData = indicadores && indicadores.severidadMensual
+  ? indicadores.severidadMensual.map(m => m.indiceSeveridad)
+  : Array(12).fill(0);
+const mortData = indicadores && indicadores.eventosMortalesMensual
+  ? indicadores.eventosMortalesMensual.map(m => m.eventosMortales)
+  : Array(12).fill(0);
+
+const metaFrecuencia = indicadores && indicadores.config ? (indicadores.config.metaFrecuencia || 0) : 0;
+const metaSeveridad = indicadores && indicadores.config ? (indicadores.config.metaSeveridad || 0) : 0;
+
+const existingChart = Chart.getChart(canvas);
+if (existingChart) existingChart.destroy();
+
+const metaPlugin = {
+  id: 'metaLines',
+  afterDraw(chart) {
+    const ctx = chart.ctx;
+    const yAxis = chart.scales.y;
+    const xAxis = chart.scales.x;
+
+    if (metaFrecuencia > 0 && yAxis) {
+      const yPixel = yAxis.getPixelForValue(metaFrecuencia);
+      if (yPixel >= yAxis.top && yPixel <= yAxis.bottom) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.setLineDash([6, 4]);
+        ctx.strokeStyle = '#174ea6';
+        ctx.lineWidth = 1.5;
+        ctx.moveTo(xAxis.left, yPixel);
+        ctx.lineTo(xAxis.right, yPixel);
+        ctx.stroke();
+        ctx.fillStyle = '#174ea6';
+        ctx.font = '10px Segoe UI, Roboto, sans-serif';
+        ctx.fillText('Meta IF', xAxis.right - 40, yPixel - 4);
+        ctx.restore();
+      }
+    }
+
+    if (metaSeveridad > 0 && yAxis) {
+      const yPixel = yAxis.getPixelForValue(metaSeveridad);
+      if (yPixel >= yAxis.top && yPixel <= yAxis.bottom) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.setLineDash([6, 4]);
+        ctx.strokeStyle = '#b8860b';
+        ctx.lineWidth = 1.5;
+        ctx.moveTo(xAxis.left, yPixel);
+        ctx.lineTo(xAxis.right, yPixel);
+        ctx.stroke();
+        ctx.fillStyle = '#b8860b';
+        ctx.font = '10px Segoe UI, Roboto, sans-serif';
+        ctx.fillText('Meta IS', xAxis.right - 40, yPixel - 4);
+        ctx.restore();
+      }
+    }
+  }
+};
+
+new Chart(canvas, {
+  type: 'bar',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Índice Frecuencia (3.3.1)',
+        data: freqData,
+        backgroundColor: 'rgba(23, 78, 166, 0.7)',
+        borderColor: '#174ea6',
+        borderWidth: 1,
+        yAxisID: 'y',
+        order: 2
+      },
+      {
+        label: 'Índice Severidad (3.3.2)',
+        data: sevData,
+        backgroundColor: 'rgba(255, 193, 7, 0.7)',
+        borderColor: '#ffc107',
+        borderWidth: 1,
+        yAxisID: 'y',
+        order: 2
+      },
+      {
+        label: 'Mortalidad (3.3.3)',
+        data: mortData,
+        type: 'line',
+        borderColor: '#dc3545',
+        backgroundColor: 'rgba(220, 53, 69, 0.1)',
+        borderWidth: 2,
+        pointBackgroundColor: '#dc3545',
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        fill: true,
+        tension: 0.3,
+        yAxisID: 'y1',
+        order: 1
+      }
+    ]
+  },
+  plugins: [metaPlugin],
+  options: {
+    responsive: true,
+    maintainAspectRatio: true,
+    interaction: {
+      mode: 'index',
+      intersect: false
+    },
+    plugins: {
+      legend: {
+        display: true,
+        position: 'bottom',
+        labels: {
+          font: { size: 10 },
+          boxWidth: 12,
+          padding: 8
+        }
+      },
+      tooltip: {
+        callbacks: {
+          label: function(ctx) {
+            const label = ctx.dataset.label || '';
+            const value = ctx.raw;
+            if (ctx.dataset.yAxisID === 'y1') {
+              return ` ${label}: ${value} evento${value !== 1 ? 's' : ''}`;
+            }
+            return ` ${label}: ${value}`;
+          }
+        }
+      }
+    },
+    scales: {
+      y: {
+        type: 'linear',
+        position: 'left',
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: 'Índice (IF / IS)',
+          font: { size: 10 }
+        },
+        ticks: { font: { size: 9 } }
+      },
+      y1: {
+        type: 'linear',
+        position: 'right',
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: 'Eventos Mortales',
+          font: { size: 10 }
+        },
+        ticks: {
+          stepSize: 1,
+          precision: 0,
+          font: { size: 9 }
+        },
+        grid: {
+          drawOnChartArea: false
+        }
+      }
+    }
+  }
+});
+}
+
+renderMainArea(container) {
         const widgetsContainer = document.createElement('div');
         widgetsContainer.className = 'widgets-container';
 
-        const widget1 = this.createWidget('Exámenes Médicos', '128', '📅 15 pendientes');
-        const widget2 = this.createWidget('Accidentes Reportados', '3', '📉 2 menos que el mes pasado');
-        const widget3 = this.createWidget('Remisiones', '7', '↗ 1 nueva hoy');
+        // Obtener datos iniciales del caché de sesión si existen
+        const cachedData = window._saludHomeState.cache.get(this.currentCompany) || {};
 
-        // Nueva tarjeta de seguimientos médicos
-        const seguimientosWidget = this.createSeguimientosWidget();
+        // Crear widgets pasando datos cacheados para renderizado instantáneo
+        const examenesWidget = this.createExamenesWidget(cachedData.examenes);
+        const accidentesWidget = this.createAccidentesWidget(cachedData.accidentes);
+        const remisionesWidget = this.createRemisionesWidget(cachedData.remisiones);
+        const seguimientosWidget = this.createSeguimientosWidget(cachedData.seguimientos);
+        const ausentismoWidget = this.createAusentismoWidget(cachedData.ausentismo);
+        const induccionesWidget = this.createInduccionesWidget(cachedData.inducciones);
 
-        widgetsContainer.appendChild(widget1);
-        widgetsContainer.appendChild(widget2);
-        widgetsContainer.appendChild(widget3);
+        widgetsContainer.appendChild(examenesWidget);
+        widgetsContainer.appendChild(accidentesWidget);
+        widgetsContainer.appendChild(remisionesWidget);
         widgetsContainer.appendChild(seguimientosWidget);
+        widgetsContainer.appendChild(ausentismoWidget);
+        widgetsContainer.appendChild(induccionesWidget);
 
-        container.appendChild(widgetsContainer);
-        
-        // Gráfica (simulada)
-        const chartContainer = document.createElement('div');
-        chartContainer.className = 'chart-container';
-        chartContainer.innerHTML = `
-            <h3>Índice de Accidentabilidad</h3>
-            <div class="chart-placeholder">
-                <p>gráfica de líneas mostrando la tendencia mensual</p>
-                <div class="chart-lines">
-                    <svg width="100%" height="150">
-                        <polyline points="10,140 40,120 70,100 100,110 130,80 160,90 190,70" 
-                                  fill="none" stroke="#4CAF50" stroke-width="2"></polyline>
-                        <polyline points="10,130 40,110 70,90 100,100 130,70 160,80 190,60" 
-                                  fill="none" stroke="#2196F3" stroke-width="2" stroke-dasharray="5,5"></polyline>
-                    </svg>
-                    <div class="chart-labels">
-                        <span>Ene</span>
-                        <span>Feb</span>
-                        <span>Mar</span>
-                        <span>Abr</span>
-                        <span>May</span>
-                        <span>Jun</span>
-                        <span>Jul</span>
-                    </div>
-                </div>
-            </div>
-        `;
-        container.appendChild(chartContainer);
+container.appendChild(widgetsContainer);
+
+const chartsGrid = document.createElement('div');
+chartsGrid.className = 'charts-grid-salud';
+
+const chartContainer = document.createElement('div');
+chartContainer.className = 'chart-container';
+chartContainer.innerHTML = `
+<h3>Accidentes por Mes — ${new Date().getFullYear()}</h3>
+<div class="chart-placeholder" style="padding: 0.5rem 0;">
+<canvas id="saludAccidentesChart" style="max-height: 180px;"></canvas>
+</div>
+`;
+chartsGrid.appendChild(chartContainer);
+
+const indicesChartContainer = document.createElement('div');
+indicesChartContainer.className = 'chart-container';
+indicesChartContainer.innerHTML = `
+<h3>Índices de Accidentalidad — ${new Date().getFullYear()}</h3>
+<div class="chart-placeholder" style="padding: 0.5rem 0;">
+<canvas id="saludIndicesChart" style="max-height: 180px;"></canvas>
+</div>
+`;
+chartsGrid.appendChild(indicesChartContainer);
+
+container.appendChild(chartsGrid);
+
+setTimeout(() => {
+this.renderAccidentesChart(cachedData.accidentes || { mensual: Array(12).fill(0) });
+this.renderIndicesChart(cachedData.indicadores || null);
+}, 50);
         
         // Listado de submódulos
         const submodulesContainer = document.createElement('div');
         submodulesContainer.className = 'submodules-container';
-        
-        const submodulesTitle = document.createElement('h3');
-        submodulesTitle.textContent = 'Submódulos';
-        submodulesContainer.appendChild(submodulesTitle);
+        submodulesContainer.innerHTML = `<h3>Submódulos</h3>`;
         
         const submodulesList = document.createElement('div');
         submodulesList.className = 'submodules-list';
         
         this.submodules.forEach(submodule => {
-            const submoduleItem = this.renderSubmoduleItem(submodule);
-            submodulesList.appendChild(submoduleItem);
+            submodulesList.appendChild(this.renderSubmoduleItem(submodule));
         });
         
         submodulesContainer.appendChild(submodulesList);
         container.appendChild(submodulesContainer);
     }
-    
+
+    /**
+     * Widget de Seguimientos Médicos con Toggle Año/Mes
+     */
+    createSeguimientosWidget(initialData) {
+        const widget = document.createElement('div');
+        widget.className = 'widget k-budget-card';
+        
+        let currentMode = 'year';
+        let data = initialData;
+
+        const render = () => {
+            const displayData = data || { totalAnio: 0, realizadosAnio: 0, totalMes: 0, realizadosMes: 0, year: '—', mes: '—' };
+            const pendientes = currentMode === 'year' ? displayData.totalAnio : displayData.totalMes;
+            const realizados = currentMode === 'year' ? displayData.realizadosAnio : displayData.realizadosMes;
+            const badge = currentMode === 'year' ? displayData.year : (displayData.mes || '').substring(0,3);
+
+            widget.innerHTML = `
+                <div class="kb-header">
+                    <span class="kb-title">Seguimientos Médicos</span>
+                    <span class="kb-badge bg-primary" style="background-color: var(--k-primary) !important;">${badge}</span>
+                </div>
+                <div class="ausentismo-toggles">
+                    <button class="ausentismo-toggle ${currentMode==='year'?'active':''}" data-mode="year">Año</button>
+                    <button class="ausentismo-toggle ${currentMode==='month'?'active':''}" data-mode="month">Mes</button>
+                </div>
+                <div class="kb-amount" style="text-align:center;">
+                    <span>${pendientes}</span>
+                </div>
+<div style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:4px;">
+Casos pendientes (incapacidad > 15 días)
+                </div>
+                <div class="kb-footer">
+                    <div>
+                        <div class="kb-label">Pendientes</div>
+                        <div class="kb-value kb-rem">${pendientes}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div class="kb-label">Realizados</div>
+                        <div class="kb-value kb-exec">${realizados}</div>
+                    </div>
+                </div>
+            `;
+
+            // Re-asignar eventos de toggle
+            widget.querySelectorAll('.ausentismo-toggle').forEach(btn => {
+                btn.onclick = () => {
+                    currentMode = btn.dataset.mode;
+                    render();
+                };
+            });
+        };
+
+        this.widgets.seguimientos = {
+            update: (newData) => { data = newData; render(); }
+        };
+
+        render();
+        return widget;
+    }
+
+    /**
+     * Widget de Ausentismo con Toggle Año/Mes
+     */
+    createAusentismoWidget(initialData) {
+        const widget = document.createElement('div');
+        widget.className = 'widget k-budget-card';
+        
+        let currentMode = 'year';
+        let data = initialData;
+
+        const render = () => {
+            const displayData = data || { total: 0, mesActual: 0, year: '—', mes: '—' };
+            const value = currentMode === 'year' ? displayData.total : displayData.mesActual;
+            const badge = currentMode === 'year' ? displayData.year : (displayData.mes || '').substring(0,3);
+
+            widget.innerHTML = `
+                <div class="kb-header">
+                    <span class="kb-title">Ausentismo Médico</span>
+                    <span class="kb-badge bg-success">${badge}</span>
+                </div>
+                <div class="ausentismo-toggles">
+                    <button class="ausentismo-toggle ${currentMode==='year'?'active':''}" data-mode="year">Año</button>
+                    <button class="ausentismo-toggle ${currentMode==='month'?'active':''}" data-mode="month">Mes</button>
+                </div>
+                <div class="kb-amount" style="text-align:center;">
+                    <span>${value}</span>
+                </div>
+<div style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:4px;">
+Incapacidades registradas
+                </div>
+                <div class="kb-footer">
+                    <div>
+                        <div class="kb-label">Total Año</div>
+                        <div class="kb-value kb-exec">${displayData.total}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div class="kb-label">Mes Actual</div>
+                        <div class="kb-value kb-rem">${displayData.mesActual}</div>
+                    </div>
+                </div>
+            `;
+
+            widget.querySelectorAll('.ausentismo-toggle').forEach(btn => {
+                btn.onclick = () => {
+                    currentMode = btn.dataset.mode;
+                    render();
+                };
+            });
+        };
+
+        this.widgets.ausentismo = {
+            update: (newData) => { data = newData; render(); }
+        };
+
+        render();
+        return widget;
+    }
+
+    /**
+     * Widget de Exámenes Médicos con Toggle Año/Mes
+     */
+    createExamenesWidget(initialData) {
+        const widget = document.createElement('div');
+        widget.className = 'widget k-budget-card';
+        
+        let currentMode = 'year';
+        let data = initialData;
+
+        const render = () => {
+            const displayData = data || { totalYear: 0, mesActual: 0, year: '—', mes: '—' };
+            const value = currentMode === 'year' ? displayData.totalYear : displayData.mesActual;
+            const badge = currentMode === 'year' ? displayData.year : (displayData.mes || '').substring(0,3);
+
+            widget.innerHTML = `
+                <div class="kb-header">
+                    <span class="kb-title">Exámenes Médicos</span>
+                    <span class="kb-badge bg-success">${badge}</span>
+                </div>
+                <div class="ausentismo-toggles">
+                    <button class="ausentismo-toggle ${currentMode==='year'?'active':''}" data-mode="year">Año</button>
+                    <button class="ausentismo-toggle ${currentMode==='month'?'active':''}" data-mode="month">Mes</button>
+                </div>
+                <div class="kb-amount" style="text-align:center;">
+                    <span>${value}</span>
+                </div>
+<div style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:4px;">
+Evaluaciones médicas
+                </div>
+                <div class="kb-footer">
+                    <div>
+                        <div class="kb-label">Total Año</div>
+                        <div class="kb-value kb-exec">${displayData.totalYear}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div class="kb-label">Mes Actual</div>
+                        <div class="kb-value kb-rem">${displayData.mesActual}</div>
+                    </div>
+                </div>
+            `;
+
+            widget.querySelectorAll('.ausentismo-toggle').forEach(btn => {
+                btn.onclick = () => {
+                    currentMode = btn.dataset.mode;
+                    render();
+                };
+            });
+        };
+
+        this.widgets.examenes = {
+            update: (newData) => { data = newData; render(); }
+        };
+
+        render();
+        return widget;
+    }
+
+    /**
+     * Widget de Accidentes Reportados con Toggle Año/Mes
+     */
+    createAccidentesWidget(initialData) {
+        const widget = document.createElement('div');
+        widget.className = 'widget k-budget-card';
+        
+        let currentMode = 'year';
+        let data = initialData;
+
+        const render = () => {
+            const displayData = data || { totalYear: 0, mesActual: 0, year: '—', mes: '—' };
+            const value = currentMode === 'year' ? displayData.totalYear : displayData.mesActual;
+            const badge = currentMode === 'year' ? displayData.year : (displayData.mes || '').substring(0,3);
+
+            widget.innerHTML = `
+                <div class="kb-header">
+                    <span class="kb-title">Accidentes Reportados</span>
+                    <span class="kb-badge bg-danger">${badge}</span>
+                </div>
+                <div class="ausentismo-toggles">
+                    <button class="ausentismo-toggle ${currentMode==='year'?'active':''}" data-mode="year">Año</button>
+                    <button class="ausentismo-toggle ${currentMode==='month'?'active':''}" data-mode="month">Mes</button>
+                </div>
+                <div class="kb-amount" style="text-align:center;">
+                    <span>${value}</span>
+                </div>
+      <div style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:4px;">
+        Accidentes de Trabajo (A.T)
+      </div>
+                <div class="kb-footer">
+                    <div>
+                        <div class="kb-label">Total Año</div>
+                        <div class="kb-value kb-exec">${displayData.totalYear}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div class="kb-label">Mes Actual</div>
+                        <div class="kb-value kb-rem">${displayData.mesActual}</div>
+                    </div>
+                </div>
+            `;
+
+            widget.querySelectorAll('.ausentismo-toggle').forEach(btn => {
+                btn.onclick = () => {
+                    currentMode = btn.dataset.mode;
+                    render();
+                };
+            });
+        };
+
+        this.widgets.accidentes = {
+            update: (newData) => { data = newData; render(); }
+        };
+
+        render();
+        return widget;
+    }
+
+    /**
+     * Widget de Remisiones Médicas dinámico
+     */
+    createRemisionesWidget(initialData) {
+        const widget = document.createElement('div');
+        widget.className = 'widget k-budget-card';
+        
+        let data = initialData;
+
+        const render = () => {
+            const displayData = data || { total: 0, mesActual: 0, month: '—' };
+            
+            widget.innerHTML = `
+                <div class="kb-header">
+                    <span class="kb-title">Remisiones a EPS</span>
+                    <span class="kb-badge" style="background:#17a2b8;">TOTAL</span>
+                </div>
+<div class="kb-amount" style="text-align:center;">
+<span>${displayData.total}</span>
+                </div>
+<div style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:4px;">
+Control de remisiones y recomendaciones
+                </div>
+                <div class="kb-footer">
+                    <div>
+                        <div class="kb-label">Mes Actual</div>
+                        <div class="kb-value">${displayData.mesActual}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div class="kb-label">Estado</div>
+                        <div class="kb-value kb-exec">Al día</div>
+                    </div>
+                </div>
+            `;
+        };
+
+        this.widgets.remisiones = {
+            update: (newData) => { data = newData; render(); }
+        };
+
+        render();
+        return widget;
+    }
+
+    /**
+     * Widget de Inducciones (Integrado desde RecursosStats)
+     */
+    createInduccionesWidget(initialData) {
+        const widget = document.createElement('div');
+        widget.className = 'widget k-budget-card';
+        
+        let data = initialData;
+
+        const render = () => {
+            const displayData = data || { completadas: 0, pendientes: 0, porcentajeCompletado: 0 };
+            
+            widget.innerHTML = `
+                <div class="kb-header">
+                    <span class="kb-title">Inducciones SST</span>
+                    <span class="kb-badge bg-success">${displayData.porcentajeCompletado}%</span>
+                </div>
+                <div class="kb-amount" style="text-align:center;">
+                    <span>${displayData.completadas}</span>
+                </div>
+<div style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:4px;">
+Trabajadores con inducción al día
+                </div>
+                <div class="kb-progress-track" style="margin-bottom: 0.5rem;">
+                    <div class="kb-progress-bar" style="width: ${displayData.porcentajeCompletado}%"></div>
+                </div>
+                <div class="kb-footer">
+                    <div>
+                        <div class="kb-label">Completas</div>
+                        <div class="kb-value kb-exec">${displayData.completadas}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div class="kb-label">Pendientes</div>
+                        <div class="kb-value kb-rem">${displayData.pendientes}</div>
+                    </div>
+                </div>
+            `;
+        };
+
+        this.widgets.inducciones = {
+            update: (newData) => { data = newData; render(); }
+        };
+
+        render();
+        return widget;
+    }
+
     createWidget(title, value, description) {
         const widget = document.createElement('div');
         widget.className = 'widget';
@@ -418,391 +788,90 @@ class GestionSaludHome {
         return widget;
     }
 
-    // Función para crear el widget de seguimientos médicos
-    createSeguimientosWidget() {
-        const widget = document.createElement('div');
-        widget.className = 'widget';
-        widget.id = 'seguimientos-widget'; // Añadimos un ID para actualizarlo dinámicamente
-
-        // Inicialmente mostramos valores por defecto
-        widget.innerHTML = `
-            <h4>Seguimientos Médicos</h4>
-            <div class="widget-value">Cargando...</div>
-            <div class="widget-description">Iniciando...</div>
-        `;
-
-        // Cargar los datos reales
-        this.cargarDatosSeguimientos(widget);
-
-        return widget;
-    }
-
-    // Función para cargar los datos reales de seguimientos
-    async cargarDatosSeguimientos(widget) {
-        try {
-            // Para esta funcionalidad, vamos a usar la API existente de ausentismo
-            // para obtener los datos de seguimientos desde el archivo externo
-            if (window.electronAPI && typeof window.electronAPI.loadFollowUpData === 'function') {
-                // Obtener la empresa actual del contexto global
-                // Primero intentamos encontrar la empresa desde diferentes posibles fuentes
-                let currentCompany = null;
-
-                // Intentar obtener la empresa desde diferentes fuentes comunes
-                if (window.currentCompany) {
-                    currentCompany = window.currentCompany;
-                } else if (window.selectedCompany) {
-                    currentCompany = window.selectedCompany;
-                } else if (typeof getCurrentCompany === 'function') {
-                    currentCompany = getCurrentCompany();
-                } else if (document.querySelector('#company-name')) {
-                    currentCompany = document.querySelector('#company-name').textContent.trim();
-                } else if (window.location && window.location.href) {
-                    // Extraer empresa del URL si está presente
-                    const urlParams = new URLSearchParams(window.location.search);
-                    currentCompany = urlParams.get('company') || urlParams.get('empresa');
-                }
-
-                // Si no se encontró empresa, usar una por defecto
-                if (!currentCompany) {
-                    currentCompany = 'Tempoactiva';
-                }
-
-                // Primero obtener los datos de seguimientos
-                const followUpResult = await window.electronAPI.loadFollowUpData(currentCompany);
-
-                // Luego obtener los datos de ausentismo para complementar
-                const ausentismoResult = await window.electronAPI.readAusentismoData(currentCompany);
-
-                let totalPendientes = 0;
-                let totalRealizados = 0;
-
-                // Procesar datos de seguimientos - considerando casos individuales > 15 días O suma de casos > 15 días por empleado/año
-                if (followUpResult.success && followUpResult.followUps) {
-                    // Agrupar casos de ausentismo por empleado para verificar sumas
-                    const casosPorEmpleado = {};
-                    if (ausentismoResult.success && ausentismoResult.rows && ausentismoResult.rows.length > 0) {
-                        const headers = ausentismoResult.headers;
-                        const cedulaIndex = headers.findIndex(h => h && h.toString().toLowerCase().includes('cedula'));
-                        const diasIndex = headers.findIndex(h => h && h.toString().toLowerCase().includes('dias'));
-                        const fechaInicioIndex = headers.findIndex(h => h && h.toString().toLowerCase().includes('f. inicio'));
-                        const annoIndex = headers.findIndex(h => h && h.toString().toLowerCase().includes('año'));
-
-                        const currentYear = new Date().getFullYear();
-
-                        if (cedulaIndex !== -1) {
-                            for (const row of ausentismoResult.rows) {
-                                if (row[cedulaIndex] && diasIndex !== -1) {
-                                    const cedula = row[cedulaIndex].toString().replace(/,/g, '').replace(/\./g, '').replace(/\s/g, '');
-
-                                    // Verificar si es del año actual
-                                    let esDelAnnoActual = false;
-                                    if (annoIndex !== -1 && row[annoIndex]) {
-                                        const annoCelda = row[annoIndex].toString();
-                                        if (annoCelda.trim() === currentYear.toString()) {
-                                            esDelAnnoActual = true;
-                                        } else {
-                                            const annoNumero = parseInt(annoCelda);
-                                            if (!isNaN(annoNumero) && annoNumero === currentYear) {
-                                                esDelAnnoActual = true;
-                                            }
-                                        }
-                                    } else if (fechaInicioIndex !== -1 && row[fechaInicioIndex]) {
-                                        const fechaInicio = row[fechaInicioIndex];
-                                        let fechaInicioParseada = null;
-
-                                        if (typeof fechaInicio === 'string') {
-                                            if (fechaInicio.includes('-')) {
-                                                fechaInicioParseada = new Date(fechaInicio);
-                                            } else if (fechaInicio.includes('/')) {
-                                                const partes = fechaInicio.split('/');
-                                                if (partes.length === 3) {
-                                                    let [part1, part2, yearPart] = partes;
-                                                    if (yearPart.length === 2) {
-                                                        yearPart = '20' + yearPart;
-                                                    }
-                                                    const fecha1 = new Date(`${part1}/${part2}/${yearPart}`);
-                                                    const fecha2 = new Date(`${part2}/${part1}/${yearPart}`);
-
-                                                    if (!isNaN(fecha1.getTime())) {
-                                                        fechaInicioParseada = fecha1;
-                                                    } else if (!isNaN(fecha2.getTime())) {
-                                                        fechaInicioParseada = fecha2;
-                                                    }
-                                                }
-                                            }
-                                        } else if (fechaInicio instanceof Date) {
-                                            fechaInicioParseada = fechaInicio;
-                                        }
-
-                                        if (fechaInicioParseada && !isNaN(fechaInicioParseada.getTime())) {
-                                            if (fechaInicioParseada.getFullYear() === currentYear) {
-                                                esDelAnnoActual = true;
-                                            }
-                                        }
-                                    }
-
-                                    if (esDelAnnoActual && cedula) {
-                                        if (!casosPorEmpleado[cedula]) {
-                                            casosPorEmpleado[cedula] = [];
-                                        }
-
-                                        let diasNum = 0;
-                                        if (diasIndex !== -1 && row[diasIndex] !== null && row[diasIndex] !== undefined) {
-                                            const diasStr = row[diasIndex].toString();
-                                            diasNum = parseInt(diasStr.replace(/,/g, ''));
-                                            if (isNaN(diasNum)) diasNum = 0;
-                                        }
-
-                                        casosPorEmpleado[cedula].push({
-                                            dias: diasNum,
-                                            fechaInicio: row[fechaInicioIndex] || null
-                                        });
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Procesar cada empleado que tiene seguimiento
-                    for (const empId in followUpResult.followUps) {
-                        const followUps = followUpResult.followUps[empId];
-                        if (followUps && followUps.length > 0) {
-                            // Tomar el estado más reciente de cada empleado (el último registro)
-                            const sortedFollowUps = [...followUps].sort((a, b) => {
-                                const dateA = new Date(a["Fecha Seguimiento"] || 0);
-                                const dateB = new Date(b["Fecha Seguimiento"] || 0);
-                                return dateB - dateA; // Orden descendente, más reciente primero
-                            });
-
-                            const latestFollowUp = sortedFollowUps[0];
-                            const estado = latestFollowUp["Estado Caso"];
-
-                            // Verificar si el empleado tiene casos que sumen más de 15 días en el año actual
-                            let empleadoTieneMasDe15Dias = false;
-                            if (casosPorEmpleado[empId]) {
-                                // Sumar todos los días para este empleado en el año actual
-                                const totalDiasEmpleado = casosPorEmpleado[empId].reduce((sum, caso) => sum + caso.dias, 0);
-                                if (totalDiasEmpleado > 15) {
-                                    empleadoTieneMasDe15Dias = true;
-                                } else {
-                                    // También verificar si algún caso individual tiene más de 15 días
-                                    const casoIndividualMayor15 = casosPorEmpleado[empId].some(caso => caso.dias > 15);
-                                    if (casoIndividualMayor15) {
-                                        empleadoTieneMasDe15Dias = true;
-                                    }
-                                }
-                            }
-
-                            // Solo procesar si el empleado tiene casos que suman más de 15 días
-                            if (empleadoTieneMasDe15Dias) {
-                                // console.log(`[DEBUG] Procesando empleado con seguimiento: ${empId}, Último estado: ${estado}, Total días > 15`);
-
-                                if (estado && estado.toLowerCase() === 'recovered') {
-                                    totalRealizados++;
-                                    // console.log(`[DEBUG] Caso contado como realizado: ${estado}`);
-                                } else if (estado) {
-                                    // Considerar como pendiente/activo cualquier estado que no sea recovered
-                                    totalPendientes++;
-                                    // console.log(`[DEBUG] Caso contado como pendiente: ${estado}`);
-                                } else {
-                                    // console.log(`[DEBUG] Caso sin estado definido, contado como pendiente`);
-                                    totalPendientes++; // Por seguridad, contamos sin estado como pendiente
-                                }
-                            } else {
-                                // console.log(`[DEBUG] Empleado ${empId} tiene seguimiento pero casos <= 15 días en total, ignorado`);
-                            }
-                        }
-                    }
-                }
-
-                // Si también tenemos datos de ausentismo, verificar si hay casos sin seguimiento del año en curso y con más de 15 días
-                if (ausentismoResult.success && ausentismoResult.rows && ausentismoResult.rows.length > 0) {
-                    // Encontrar índices de columnas importantes
-                    const headers = ausentismoResult.headers;
-                    const cedulaIndex = headers.findIndex(h => h && h.toString().toLowerCase().includes('cedula'));
-                    const fechaInicioIndex = headers.findIndex(h => h && h.toString().toLowerCase().includes('f. inicio'));
-                    const fechaFinIndex = headers.findIndex(h => h && h.toString().toLowerCase().includes('f. fin'));
-                    const diasIndex = headers.findIndex(h => h && h.toString().toLowerCase().includes('dias'));
-                    const annoIndex = headers.findIndex(h => h && h.toString().toLowerCase().includes('año'));
-
-                    const currentYear = new Date().getFullYear();
-
-                    if (cedulaIndex !== -1) {
-                        // Contar casos del archivo principal que no tienen registro en el archivo de seguimientos Y que son del año en curso y con más de 15 días
-                        let casosSinSeguimiento = 0;
-                        for (const row of ausentismoResult.rows) {
-                            if (row[cedulaIndex]) {
-                                const cedula = row[cedulaIndex].toString().replace(/,/g, '').replace(/\./g, '').replace(/\s/g, '');
-
-                                // Verificar si es del año en curso
-                                let esDelAnnoActual = false;
-
-                                // Comprobar por año
-                                if (annoIndex !== -1 && row[annoIndex]) {
-                                    const annoCelda = row[annoIndex].toString();
-                                    if (annoCelda.trim() === currentYear.toString()) {
-                                        esDelAnnoActual = true;
-                                    } else {
-                                        // A veces el año puede ser un número decimal (por ejemplo 2025.0)
-                                        const annoNumero = parseInt(annoCelda);
-                                        if (!isNaN(annoNumero) && annoNumero === currentYear) {
-                                            esDelAnnoActual = true;
-                                        }
-                                    }
-                                }
-
-                                // Si no está en columna AÑO, comprobar por fecha de inicio
-                                if (!esDelAnnoActual && fechaInicioIndex !== -1 && row[fechaInicioIndex]) {
-                                    const fechaInicio = row[fechaInicioIndex];
-                                    let fechaInicioParseada = null;
-
-                                    if (typeof fechaInicio === 'string') {
-                                        if (fechaInicio.includes('-')) {
-                                            fechaInicioParseada = new Date(fechaInicio);
-                                        } else if (fechaInicio.includes('/')) {
-                                            const partes = fechaInicio.split('/');
-                                            if (partes.length === 3) {
-                                                let [part1, part2, yearPart] = partes;
-                                                if (yearPart.length === 2) {
-                                                    yearPart = '20' + yearPart;  // Asumir siglo 21
-                                                }
-                                                // Intentar ambos formatos MM/DD/YYYY y DD/MM/YYYY
-                                                const fecha1 = new Date(`${part1}/${part2}/${yearPart}`);
-                                                const fecha2 = new Date(`${part2}/${part1}/${yearPart}`);
-
-                                                if (!isNaN(fecha1.getTime())) {
-                                                    fechaInicioParseada = fecha1;
-                                                } else if (!isNaN(fecha2.getTime())) {
-                                                    fechaInicioParseada = fecha2;
-                                                }
-                                            }
-                                        } else {
-                                            // Intentar parsear como número (formato Excel de fecha serial)
-                                            const fechaNum = parseFloat(fechaInicio);
-                                            if (!isNaN(fechaNum) && fechaNum > 1) {
-                                                const excelDate = new Date((fechaNum - 25569) * 86400 * 1000);
-                                                fechaInicioParseada = excelDate;
-                                            }
-                                        }
-                                    } else if (fechaInicio instanceof Date) {
-                                        fechaInicioParseada = fechaInicio;
-                                    }
-
-                                    if (fechaInicioParseada && !isNaN(fechaInicioParseada.getTime())) {
-                                        if (fechaInicioParseada.getFullYear() === currentYear) {
-                                            esDelAnnoActual = true;
-                                        }
-                                    }
-                                }
-
-                                // Verificar si tiene más de 15 días de incapacidad
-                                let tieneMasDe15Dias = false;
-                                if (diasIndex !== -1 && row[diasIndex] !== null && row[diasIndex] !== undefined) {
-                                    const diasStr = row[diasIndex].toString();
-                                    const diasNum = parseInt(diasStr.replace(/,/g, '')); // Eliminar posibles comas
-                                    if (!isNaN(diasNum) && diasNum > 15) {
-                                        tieneMasDe15Dias = true;
-                                    }
-                                }
-
-                                // Si la cédula no está en followUpResult.followUps y es del año actual y tiene más de 15 días, es un caso sin seguimiento
-                                if (cedula && !followUpResult.followUps?.[cedula] && esDelAnnoActual && tieneMasDe15Dias) {
-                                    // Este caso está en el archivo principal, es del año actual, tiene más de 15 días, pero no tiene registro de seguimiento
-                                    // Lo contamos como pendiente (activo) ya que no sabemos su estado actual
-                                    casosSinSeguimiento++;
-                                    console.log(`[DEBUG] Caso sin seguimiento del año actual con más de 15 días encontrado: ${cedula}, Días: ${row[diasIndex]}`);
-                                } else if (cedula && !followUpResult.followUps?.[cedula] && esDelAnnoActual) {
-                                    // Caso sin seguimiento del año actual pero con <=15 días, ignorado
-                                } else if (cedula && !followUpResult.followUps?.[cedula]) {
-                                    // Caso sin seguimiento pero de otro año o con <=15 días, ignorado
-                                }
-                            }
-                        }
-                        totalPendientes += casosSinSeguimiento;
-                    }
-                }
-
-                console.log(`[DEBUG] Total pendientes (desde archivos principales y de seguimiento): ${totalPendientes}, Total realizados (desde archivos de seguimiento): ${totalRealizados}`);
-
-                // Actualizar el widget con los datos reales
-                this.actualizarWidgetSeguimientos(widget, totalPendientes, totalRealizados);
-            } else {
-                // Si la API no está disponible, mostrar valores por defecto
-                this.actualizarWidgetSeguimientos(widget, 0, 0);
-            }
-        } catch (error) {
-            console.error('Error al cargar datos de seguimientos:', error);
-            // En caso de error, mostrar mensaje de error pero sin romper el UI
-            this.actualizarWidgetSeguimientos(widget, 0, 0, 'Error al cargar datos');
-        }
-    }
-
-    // Función para actualizar el widget con los datos reales
-    actualizarWidgetSeguimientos(widget, pendientes, realizados, error = null) {
-        if (error) {
-            widget.innerHTML = `
-                <h4>Seguimientos Médicos</h4>
-                <div class="widget-value">Err</div>
-                <div class="widget-description">${error}</div>
-            `;
-        } else {
-            widget.innerHTML = `
-                <h4>Seguimientos Médicos</h4>
-                <div class="widget-value">${pendientes}</div>
-                <div class="widget-description">📅 ${realizados} realizados</div>
-            `;
-        }
-    }
-    
     renderSubmoduleItem(name) {
-        // Generar datos simulados para el submódulo
-        const lastAccess = this.getRandomLastAccess();
-        const timeSpent = this.getRandomTimeSpent();
-
         const submoduleItem = document.createElement('div');
         submoduleItem.className = 'submodule-item';
-
-        const submoduleInfo = document.createElement('div');
-        submoduleInfo.className = 'submodule-info';
-
-        const submoduleName = document.createElement('div');
-        submoduleName.className = 'submodule-name';
-        submoduleName.textContent = name;
-        submoduleInfo.appendChild(submoduleName);
-
-        const submoduleMeta = document.createElement('div');
-        submoduleMeta.className = 'submodule-meta';
-        submoduleMeta.textContent = `Último acceso: ${lastAccess} | Tiempo: ${timeSpent}`;
-        submoduleInfo.appendChild(submoduleMeta);
-
-        const button = document.createElement('button');
-        button.className = 'btn btn-primary btn-ingresar';
-        button.textContent = 'Ingresar';
-        button.addEventListener('click', () => {
-            console.log('[GESTION-SALUD-HOME] Click en submódulo:', name);
-            console.log('[GESTION-SALUD-HOME] this.container:', this.container);
-            console.log('[GESTION-SALUD-HOME] this.moduleName:', this.moduleName);
-            console.log('[GESTION-SALUD-HOME] typeof showSubmoduleContent:', typeof showSubmoduleContent);
-            showSubmoduleContent(this.container, this.moduleName, name);
-        });
-
-        submoduleItem.appendChild(submoduleInfo);
-        submoduleItem.appendChild(button);
-        
+        submoduleItem.innerHTML = `
+            <div class="submodule-info">
+                <div class="submodule-name">${name}</div>
+                <div class="submodule-meta">Gestión y registros asociados</div>
+            </div>
+            <button class="btn-ingresar">Ingresar</button>
+        `;
+        submoduleItem.querySelector('button').onclick = () => showSubmoduleContent(this.container, this.moduleName, name);
         return submoduleItem;
     }
-    
-    getRandomLastAccess() {
-        const days = ['Hace 1 día', 'Hace 2 días', 'Hace 3 días', 'Hace 1 semana', 'Hace 2 semanas'];
-        return days[Math.floor(Math.random() * days.length)];
-    }
-    
-    getRandomTimeSpent() {
-        const times = ['5 min', '15 min', '30 min', '1 hora', '2 horas'];
-        return times[Math.floor(Math.random() * times.length)];
-    }
-    
-    async renderSidebarPanel(container) {
+
+    injectStyles() {
+        const styleId = 'k-salud-home-optimized-styles';
+        if (document.getElementById(styleId)) return;
+
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = `
+.gestion-salud-home {
+--k-primary: #174ea6;
+--k-primary-light: #e8f0fe;
+--k-primary-hover: #1450a1;
+--k-success: #28a745;
+--k-danger: #dc3545;
+--k-bg-card: #ffffff;
+--k-bg-app: #f8f9fa;
+--k-border: #dee2e6;
+--k-text-main: #212529;
+--k-text-muted: #6c757d;
+--k-radius-md: 0.375rem;
+--k-radius-lg: 0.5rem;
+--k-shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
+--k-shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.08);
+--k-header-height: 60px;
+--k-font-family: inherit;
+padding: 1.5rem;
+background: var(--k-bg-app);
+height: 100%;
+overflow-y: auto;
+}
+            .widgets-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 0 !important; }
+            .widget { background: var(--k-bg-card); border: 1px solid var(--k-border); border-radius: var(--k-radius-lg); padding: 1rem; box-shadow: var(--k-shadow-sm); display: flex; flex-direction: column; min-height: 120px; transition: transform 0.2s ease; } .widget:hover { transform: translateY(-3px); box-shadow: var(--k-shadow-md); } .widget h4 { margin: 0 0 0.5rem 0; font-size: 0.65rem; color: var(--k-text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; } .widget-value { font-size: 1.4rem; font-weight: 700; color: var(--k-text-main); margin-bottom: 0.5rem; } .widget-description { font-size: 0.65rem; color: var(--k-text-muted); }
+            .k-budget-card .kb-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+            .k-budget-card .kb-title { font-size: 0.65rem; font-weight: 600; color: var(--k-text-muted); text-transform: uppercase; }
+            .k-budget-card .kb-badge { font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 1rem; color: white; background-color: var(--k-success); }
+            .k-budget-card .bg-success { background: var(--k-success) !important; }
+            .k-budget-card .bg-danger { background: var(--k-danger) !important; }
+            .k-budget-card .kb-amount { font-size: 1.4rem; font-weight: 700; color: var(--k-text-main); margin-bottom: 0.5rem; }
+            .k-budget-card .kb-footer { display: flex; justify-content: space-between; margin-top: auto; padding-top: 0.5rem; border-top: 1px solid #eee; }
+            .k-budget-card .kb-label { font-size: 0.6rem; color: var(--k-text-muted); text-transform: uppercase; }
+            .k-budget-card .kb-value { font-size: 0.6rem; font-weight: 600; }
+            .kb-exec { color: var(--k-success); }
+            .kb-rem { color: var(--k-primary); }
+            
+.kb-progress-track { width: 100%; height: 10px; background: #e9ecef; border-radius: 5px; overflow: hidden; margin-bottom: 0.5rem; position: relative; }
+.kb-progress-bar { height: 100%; width: 0%; border-radius: 5px; background-color: var(--k-success); transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s; }
+
+            .ausentismo-toggles { display: flex; gap: 4px; margin: 4px 0; background: #f1f3f4; padding: 3px; border-radius: 6px; }
+.ausentismo-toggle { flex: 1; border: none; background: transparent; font-size: 0.7rem; padding: 2px 6px; border-radius: var(--k-radius-md); cursor: pointer; color: var(--k-text-muted); transition: all 0.2s; }
+.ausentismo-toggle.active { background: white; color: var(--k-primary); box-shadow: var(--k-shadow-sm); font-weight: 600; }
+
+            .submodules-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+.submodule-item { display: flex; align-items: center; justify-content: space-between; padding: 1rem; background-color: #fcfcfc; border: 1px solid var(--k-border); border-radius: var(--k-radius-md); transition: all 0.2s ease; }
+.submodule-item:hover { background-color: var(--k-primary-light); border-color: var(--k-primary); transform: translateX(5px); }
+.btn-ingresar { background-color: var(--k-primary); color: white; border: none; padding: 0.5rem 1.25rem; border-radius: var(--k-radius-md); font-weight: 500; cursor: pointer; transition: background 0.2s; white-space: nowrap; }
+.btn-ingresar:hover { background-color: var(--k-primary-hover); }
+            
+            .main-area { display: flex; flex-direction: column; gap: 1rem; }
+.submodules-container { background: var(--k-bg-card); border: 1px solid var(--k-border); border-radius: var(--k-radius-lg); padding: 1.5rem; box-shadow: var(--k-shadow-sm); margin-top: 0 !important; }
+.submodules-container h3 { margin-top: 0; margin-bottom: 1rem; font-size: 1.1rem; font-weight: 600; color: var(--k-text-main); padding-bottom: 1rem; border-bottom: 1px solid var(--k-border); text-transform: uppercase; letter-spacing: 0.05em; }
+            .chart-container { background: var(--k-bg-card); border: 1px solid var(--k-border); border-radius: var(--k-radius-lg); padding: 1.5rem; box-shadow: var(--k-shadow-sm); min-height: 350px; display: flex; flex-direction: column; }
+.chart-container h3 { margin-top: 0; margin-bottom: 1rem; font-size: 1.1rem; font-weight: 600; color: var(--k-text-main); text-transform: uppercase; letter-spacing: 0.05em; }
+.charts-grid-salud { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 992px) { .charts-grid-salud { grid-template-columns: 1fr; } }
+
+/* ANULAR ESTILOS GLOBALES (styles.css) */
+.gestion-salud-home .widget { margin-bottom: 0 !important; padding: 1rem !important; }
+.gestion-salud-home .chart-container { margin-top: 0 !important; margin-bottom: 0 !important; }
+.gestion-salud-home .charts-grid-salud { margin-top: 0 !important; }
+`;
+        document.head.appendChild(style);
     }
 }
 

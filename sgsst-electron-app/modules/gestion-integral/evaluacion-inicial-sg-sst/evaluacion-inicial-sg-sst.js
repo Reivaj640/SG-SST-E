@@ -22,9 +22,10 @@ class EvaluacionInicialSgSst {
         this.findingsBase = {};
         this.dataBase = {};
         
-        // Datos de planes de acción
-        this.actionPlans = [];
-        this.actionPlanIdCounter = 1;
+// Datos de planes de acción
+this.actionPlans = [];
+this.actionPlanIdCounter = 1;
+this.lastScore = 0;
     }
 
     async render() {
@@ -37,107 +38,88 @@ class EvaluacionInicialSgSst {
         this.container.classList.add('k-module-container'); // Clase contenedora estándar
 
         const mainLayout = document.createElement('div');
-        mainLayout.className = 'k-module-layout';
+        mainLayout.className = 'k-module-layout ev-inicial-sgsst';
 
         mainLayout.innerHTML = `
-            <!-- 1. HEADER DEL MÓDULO (Patrón Estándar K+AIR) -->
-            <header class="k-module-header">
-                <div class="k-header-top">
-                    <div class="k-title-group">
-                        <button class="k-btn-back" id="btn-back-eval" title="Volver al panel principal">
-                            <i class="bi bi-arrow-left"></i>
-                        </button>
-                        <div class="k-title-text">
-                            <h2 class="k-main-title">Evaluación Inicial del SG-SST</h2>
-                            <span class="k-breadcrumb">Gestión Integral / 2.3.1 Evaluación Inicial</span>
-                        </div>
-                    </div>
+            <!-- 1. HEADER — Card k-section-card (tabs integrados) -->
+            <div class="k-section-card" style="padding:0; margin-bottom:1.5rem; flex-shrink:0; flex-grow:0;">
+              <!-- Fila 1: contenido principal -->
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
+                <div style="display:flex; align-items:center; gap:0.75rem;">
+                  <i class="bi bi-clipboard-pulse" style="color:#174ea6; font-size:1.25rem;"></i>
+                  <div>
+                    <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Evaluación Inicial del SG-SST</h3>
+                    <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Evaluación del cumplimiento normativo SG-SST.</p>
+                  </div>
                 </div>
+                <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+                  <select class="header-select" id="sourceSelect" onchange="window.currentEvaluacionInstance.updateSource()">
+                    <option value="ministerio">🏛️ Ministerio de Trabajo</option>
+                    <option value="arl">🛡️ Informe ARL</option>
+                  </select>
+                  <button class="header-action--outline" id="btn-change-pdf" onclick="window.currentEvaluacionInstance.showPdfSelectorModal()" title="Cambiar archivo PDF">
+                    <i class="bi bi-file-earmark-pdf"></i> Cambiar Archivo
+                  </button>
+                  <div id="loading-indicator" class="k-loading-badge" style="display:none;">
+                    <span class="spinner-border spinner-border-sm"></span> Procesando...
+                  </div>
+                  <div style="width:1px; height:24px; background:#dee2e6;"></div>
+                  <button class="header-back-btn" id="btn-back-eval" title="Volver al panel principal">
+                    <i class="bi bi-arrow-left"></i> Volver
+                  </button>
+                </div>
+              </div>
 
-                <!-- 2. NAVEGACIÓN (Tabs) -->
-                <nav class="k-module-nav">
-                    <button class="k-nav-item active" data-tab="dashboard" onclick="window.currentEvaluacionInstance.switchTab('dashboard')">
-                        <i class="bi bi-speedometer2"></i> Dashboard
-                    </button>
-                    <button class="k-nav-item" data-tab="hallazgos" onclick="window.currentEvaluacionInstance.switchTab('hallazgos')">
-                        <i class="bi bi-list-check"></i> Hallazgos
-                    </button>
-                    <button class="k-nav-item" data-tab="actions" onclick="window.currentEvaluacionInstance.switchTab('actions')">
-                        <i class="bi bi-clipboard-check"></i> Planes de Acción
-                    </button>
-                    <button class="k-nav-item" data-tab="history" onclick="window.currentEvaluacionInstance.switchTab('history')">
-                        <i class="bi bi-clock-history"></i> Historial
-                    </button>
-                </nav>
-            </header>
+              <!-- Fila 2: tabs (dentro del card) -->
+              <div class="evaluacion-tabs">
+                <button class="evaluacion-tab active" data-tab="dashboard" onclick="window.currentEvaluacionInstance.switchTab('dashboard')">
+                  <i class="bi bi-speedometer2"></i> Dashboard
+                </button>
+                <button class="evaluacion-tab" data-tab="hallazgos" onclick="window.currentEvaluacionInstance.switchTab('hallazgos')">
+                  <i class="bi bi-list-check"></i> Hallazgos
+                </button>
+                <button class="evaluacion-tab" data-tab="actions" onclick="window.currentEvaluacionInstance.switchTab('actions')">
+                  <i class="bi bi-clipboard-check"></i> Planes de Acción
+                </button>
+                <button class="evaluacion-tab" data-tab="history" onclick="window.currentEvaluacionInstance.switchTab('history')">
+                  <i class="bi bi-clock-history"></i> Historial
+                </button>
+              </div>
+            </div>
 
             <!-- 3. CONTENIDO SCROLLABLE -->
             <div class="k-module-content">
 
-                <!-- Panel de Control Interno -->
-                <div class="k-toolbar">
-                    <div class="k-toolbar-group">
-                        <label class="k-label-muted">Fuente de Datos:</label>
-                        <select class="k-select-sm" id="sourceSelect" onchange="window.currentEvaluacionInstance.updateSource()">
-                            <option value="ministerio">🏛️ Ministerio de Trabajo (Estándares Mínimos)</option>
-                            <option value="arl">🛡️ Informe ARL</option>
-                        </select>
-                        <button class="k-btn k-btn-sm k-btn-outline" id="btn-change-pdf" onclick="window.currentEvaluacionInstance.showPdfSelectorModal()" title="Cambiar archivo PDF">
-                            <i class="bi bi-file-earmark-pdf"></i> Cambiar Archivo
-                        </button>
-                    </div>
-                    <div id="loading-indicator" class="k-loading-badge" style="display:none;">
-                        <span class="spinner-border spinner-border-sm"></span> Procesando...
-                    </div>
-                </div>
-
                 <!-- VISTA: DASHBOARD -->
                 <section id="view-dashboard" class="k-view active">
 
-                    <!-- KPIs Principales -->
-                    <div class="k-grid-metrics">
-                        <div class="k-card k-card-metric">
-                            <div class="k-metric-header">
-                                <span>CUMPLIMIENTO</span>
-                                <i class="bi bi-pie-chart-fill text-primary"></i>
-                            </div>
-                            <div class="k-metric-body">
-                                <span class="k-value text-primary" id="kpi-score">0%</span>
-                                <span class="k-trend">Global</span>
-                            </div>
-                            <div class="k-mini-chart">
-                                <canvas id="gaugeKpi" height="40"></canvas>
-                            </div>
-                        </div>
-
-                        <div class="k-card k-card-metric">
-                            <div class="k-metric-header">
-                                <span>HALLAZGOS CRÍTICOS</span>
-                                <i class="bi bi-exclamation-triangle-fill text-danger"></i>
-                            </div>
-                            <div class="k-metric-body">
-                                <span class="k-value text-danger" id="kpi-gaps">0</span>
-                                <span class="k-trend">Items "No Cumple"</span>
-                            </div>
-                            <div class="k-mini-chart">
-                                <canvas id="bulletGaps" height="30"></canvas>
-                            </div>
-                        </div>
-
-                        <div class="k-card k-card-metric">
-                            <div class="k-metric-header">
-                                <span>PLANES PENDIENTES</span>
-                                <i class="bi bi-hourglass-split text-warning"></i>
-                            </div>
-                            <div class="k-metric-body">
-                                <span class="k-value text-warning" id="kpi-pending">0</span>
-                                <span class="k-trend">Acciones abiertas</span>
-                            </div>
-                            <div class="k-mini-chart">
-                                <canvas id="bulletPending" height="30"></canvas>
-                            </div>
-                        </div>
-                    </div>
+<!-- Franja de estadísticas compacta -->
+<div class="k-stats-ribbon">
+<div class="k-stats-ribbon__item">
+<span class="k-stats-ribbon__icon primary"><i class="bi bi-pie-chart-fill"></i></span>
+<div class="k-stats-ribbon__data">
+<span class="k-stats-ribbon__value" id="kpi-score">0%</span>
+<span class="k-stats-ribbon__label">Cumplimiento</span>
+</div>
+<span class="k-stats-ribbon__pct" id="kpi-score-pct">0%</span>
+</div>
+<div class="k-stats-ribbon__divider"></div>
+<div class="k-stats-ribbon__item">
+<span class="k-stats-ribbon__icon danger"><i class="bi bi-exclamation-triangle-fill"></i></span>
+<div class="k-stats-ribbon__data">
+<span class="k-stats-ribbon__value" id="kpi-gaps">0</span>
+<span class="k-stats-ribbon__label">Hallazgos Críticos</span>
+</div>
+</div>
+<div class="k-stats-ribbon__divider"></div>
+<div class="k-stats-ribbon__item">
+<span class="k-stats-ribbon__icon warning"><i class="bi bi-hourglass-split"></i></span>
+<div class="k-stats-ribbon__data">
+<span class="k-stats-ribbon__value" id="kpi-pending">0</span>
+<span class="k-stats-ribbon__label">Planes Pendientes</span>
+</div>
+</div>
+</div>
 
                     <!-- Gráficos Principales -->
                     <div class="k-grid-charts">
@@ -167,16 +149,18 @@ class EvaluacionInicialSgSst {
 
                     <!-- Tarjeta de Fuente -->
                     <div class="k-card k-card-source">
-                        <div class="k-source-info">
-                            <div class="k-source-icon"><i class="bi bi-file-earmark-pdf"></i></div>
-                            <div>
-                                <h4 id="source-title">Esperando archivo fuente...</h4>
-                                <p id="source-meta">El sistema buscará automáticamente informes en la carpeta.</p>
+                        <div class="k-card-body">
+                            <div class="k-source-info">
+                                <div class="k-source-icon"><i class="bi bi-file-earmark-pdf"></i></div>
+                                <div>
+                                    <h4 id="source-title">Esperando archivo fuente...</h4>
+                                    <p id="source-meta">El sistema buscará automáticamente informes en la carpeta.</p>
+                                </div>
                             </div>
+                            <button class="k-btn k-btn-outline" id="btn-view-pdf" style="display:none;">
+                                <i class="bi bi-eye"></i> Ver Documento
+                            </button>
                         </div>
-                        <button class="k-btn k-btn-outline" id="btn-view-pdf" style="display:none;">
-                            <i class="bi bi-eye"></i> Ver Documento
-                        </button>
                     </div>
                 </section>
 
@@ -280,7 +264,7 @@ class EvaluacionInicialSgSst {
         console.log('[EvaluacionInicialSgSst] switchTab() - Cambiando a pestaña:', tabId);
         
         // 1. Actualizar botones de navegación
-        const navItems = this.container.querySelectorAll('.k-nav-item');
+        const navItems = this.container.querySelectorAll('.evaluacion-tab');
         navItems.forEach(btn => {
             if (btn.dataset.tab === tabId) btn.classList.add('active');
             else btn.classList.remove('active');
@@ -304,7 +288,7 @@ class EvaluacionInicialSgSst {
             // Redibujar gráficos si se entra al dashboard para asegurar renderizado correcto
             if (tabId === 'dashboard' && this.currentFindings.length > 0) {
                 // Pequeño delay para que el canvas tenga dimensiones
-                setTimeout(() => this.updateDashboardWithRealData({ cumplimiento: parseInt(document.getElementById('kpi-score').textContent) }), 50);
+                setTimeout(() => this.updateDashboardWithRealData({ cumplimiento: this.lastScore || 0 }), 50);
             }
         } else {
             console.error('[EvaluacionInicialSgSst] switchTab() - Vista no encontrada:', `#view-${tabId}`);
@@ -332,12 +316,13 @@ class EvaluacionInicialSgSst {
         }
     }
 
-    async loadRealFiles() {
+    async loadRealFiles(forceShowModal = false) {
         try {
             console.log('[EvaluacionInicialSgSst] Cargando archivos desde:', this.submodulePath);
+            console.log('[EvaluacionInicialSgSst] forceShowModal:', forceShowModal);
             const filesResult = await window.electronAPI.readDirectory(this.submodulePath);
             console.log('[EvaluacionInicialSgSst] Resultado readDirectory:', filesResult);
-            
+
             if (!filesResult.success) throw new Error('Error de lectura');
 
             let allFiles = [...(filesResult.files || [])];
@@ -356,7 +341,7 @@ class EvaluacionInicialSgSst {
                         allFiles = allFiles.concat(subResult.files);
                         console.log('[EvaluacionInicialSgSst] Archivos agregados desde', sub, ':', subResult.files.length);
                     }
-                } catch (e) { 
+                } catch (e) {
                     console.log('[EvaluacionInicialSgSst] Subcarpeta no existe o error:', sub, e.message);
                 }
             }
@@ -372,7 +357,12 @@ class EvaluacionInicialSgSst {
             // Si hay múltiples PDFs, mostrar selector
             if (pdfFiles.length > 1) {
                 console.log('[EvaluacionInicialSgSst] Mostrando selector de PDFs');
-                this.showPdfSelector(pdfFiles);
+                if (forceShowModal) {
+                    // Forzar mostrar el modal incluso si ya hay uno cerrado
+                    this.showPdfSelectorModalWithFiles(pdfFiles);
+                } else {
+                    this.showPdfSelector(pdfFiles);
+                }
             } else if (pdfFiles.length === 1) {
                 // Si solo hay uno, procesarlo directamente
                 console.log('[EvaluacionInicialSgSst] Procesando único PDF encontrado');
@@ -386,11 +376,19 @@ class EvaluacionInicialSgSst {
                 if (metaEl) metaEl.textContent = `Archivo detectado en: ...${reportPdf.path.slice(-30)}`;
                 if (btnView) btnView.style.display = 'inline-flex';
 
+                // Si se forzó el modal pero solo hay 1 PDF, mostrar mensaje y procesar
+                if (forceShowModal) {
+                    this.showToast('Solo hay 1 PDF disponible. Procesando...', 'info');
+                }
                 await this.processPdfData(reportPdf.path);
             } else {
                 console.warn('[EvaluacionInicialSgSst] No se encontraron archivos PDF');
                 document.getElementById('source-title').textContent = "No se encontró informe estándar";
                 document.getElementById('source-meta').textContent = "Por favor cargue un archivo PDF de evaluación (0312).";
+                
+                if (forceShowModal) {
+                    this.showToast('No se encontraron archivos PDF en la carpeta.', 'warning');
+                }
             }
 
         } catch (e) {
@@ -400,18 +398,21 @@ class EvaluacionInicialSgSst {
     }
 
     showPdfSelector(pdfFiles) {
+        console.log('[EvaluacionInicialSgSst] showPdfSelector() - Iniciando con', pdfFiles.length, 'PDFs');
+        
         // Crear un modal estilo Copasst para seleccionar el PDF
         const modal = document.createElement('div');
         modal.className = 'k-file-selector-modal';
-  
+        console.log('[EvaluacionInicialSgSst] showPdfSelector() - Modal creado:', modal);
+
         // Agrupar PDFs por tipo
         const ministerioPdfs = pdfFiles.filter(f => f.path.toLowerCase().includes('ministerio'));
         const arlPdfs = pdfFiles.filter(f => f.path.toLowerCase().includes('arl'));
-        const otherPdfs = pdfFiles.filter(f => 
-            !f.path.toLowerCase().includes('ministerio') && 
+        const otherPdfs = pdfFiles.filter(f =>
+            !f.path.toLowerCase().includes('ministerio') &&
             !f.path.toLowerCase().includes('arl')
         );
-  
+
         let modalContent = `
             <div class="k-file-selector-content">
                 <div class="k-file-selector-header">
@@ -497,9 +498,12 @@ class EvaluacionInicialSgSst {
                 </div>
             </div>
         `;
-  
+
         modal.innerHTML = modalContent;
+        console.log('[EvaluacionInicialSgSst] showPdfSelector() - Contenido HTML asignado');
+        console.log('[EvaluacionInicialSgSst] showPdfSelector() - Adjuntando modal al document.body');
         document.body.appendChild(modal);
+        console.log('[EvaluacionInicialSgSst] showPdfSelector() - Modal adjuntado exitosamente');
         
         // Guardar referencia a los PDFs para usar en navigateToFolder
         this.pdfFilesCache = {
@@ -768,23 +772,30 @@ class EvaluacionInicialSgSst {
         `}).join('');
     }
 
-    updateDashboardWithRealData(metrics) {
-        if (!metrics) return;
+updateDashboardWithRealData(metrics) {
+if (!metrics) return;
 
-        // Actualizar Textos
-        const score = metrics.cumplimiento || 0;
-        const noCumplidos = metrics.noCumplidos || 0;
+// Actualizar Textos
+const score = metrics.cumplimiento || 0;
+const noCumplidos = metrics.noCumplidos || 0;
+const pendingCount = this.actionPlans.filter(p => p.estado !== 'completado').length;
 
-        const scoreEl = document.getElementById('kpi-score');
-        const gapsEl = document.getElementById('kpi-gaps');
-        const chartLabel = document.getElementById('chart-score-label');
+this.lastScore = score;
 
-        if (scoreEl) scoreEl.textContent = score + '%';
-        if (chartLabel) chartLabel.textContent = score + '%';
-        if (gapsEl) gapsEl.textContent = noCumplidos;
+const scoreEl = document.getElementById('kpi-score');
+const scorePctEl = document.getElementById('kpi-score-pct');
+const gapsEl = document.getElementById('kpi-gaps');
+const pendingEl = document.getElementById('kpi-pending');
+const chartLabel = document.getElementById('chart-score-label');
 
-        // Actualizar Gráficos
-        this.drawGauge(score);
+if (scoreEl) scoreEl.textContent = score + '%';
+if (scorePctEl) scorePctEl.textContent = score + '%';
+if (chartLabel) chartLabel.textContent = score + '%';
+if (gapsEl) gapsEl.textContent = noCumplidos;
+if (pendingEl) pendingEl.textContent = pendingCount;
+
+// Actualizar Gráficos
+this.drawGauge(score);
 
         // Simular PHVA si no hay datos detallados
         const phvaContainer = document.getElementById('phva-chart-container');
@@ -834,10 +845,22 @@ class EvaluacionInicialSgSst {
     }
     
     showPdfSelectorModal() {
-        console.log('[EvaluacionInicialSgSst] Abriendo modal de selección de PDFs');
+        console.log('[EvaluacionInicialSgSst] Abriendo modal de selección de PDFs (forzando)');
         
-        // Cargar archivos nuevamente y mostrar el modal
-        this.loadRealFiles();
+        // Cerrar cualquier modal existente primero
+        const existingModal = document.querySelector('.k-file-selector-modal');
+        if (existingModal) {
+            console.log('[EvaluacionInicialSgSst] Cerrando modal existente');
+            existingModal.remove();
+        }
+        
+        // Cargar archivos y forzar mostrar el modal
+        this.loadRealFiles(true);
+    }
+
+    showPdfSelectorModalWithFiles(pdfFiles) {
+        console.log('[EvaluacionInicialSgSst] Mostrando modal con', pdfFiles.length, 'PDFs');
+        this.showPdfSelector(pdfFiles);
     }
     
     // --- FUNCIONES PARA PLANES DE ACCIÓN ---
@@ -1795,25 +1818,19 @@ if (!document.getElementById('k-air-eval-styles')) {
         .k-module-container { height: 100%; width: 100%; background: var(--bg-body); font-family: 'Segoe UI', Roboto, sans-serif; overflow: hidden; }
         .k-module-layout { display: flex; flex-direction: column; height: 100%; }
 
-        /* HEADER */
-        .k-module-header { background: var(--bg-card); border-bottom: 1px solid var(--border); flex-shrink: 0; box-shadow: var(--shadow-sm); z-index: 10; }
-        .k-header-top { display: flex; align-items: center; justify-content: space-between; padding: 1rem 2rem; height: 70px; }
+        /* HEADER — Card k-section-card */
+        .k-section-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+        .header-back-btn { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.75rem; font-size: 0.8125rem; font-weight: 500; color: #5a6378; background: transparent; border: 1px solid #dee2e6; border-radius: 0.375rem; cursor: pointer; transition: all 0.15s ease; }
+        .header-back-btn:hover { background: #e8f0fe; color: #174ea6; border-color: #174ea6; }
+        .header-action--outline { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.75rem; font-size: 0.8125rem; font-weight: 500; color: #5a6378; background: transparent; border: 1px solid #dee2e6; border-radius: 0.375rem; cursor: pointer; transition: all 0.15s ease; }
+        .header-action--outline:hover { background: #f0f2f5; color: #1a1a2e; }
+        .header-select { padding: 0.375rem 0.75rem; border: 1px solid #dee2e6; border-radius: 0.375rem; font-size: 0.8125rem; font-weight: 500; color: #1E293B; background: #fff; cursor: pointer; }
 
-        .k-title-group { display: flex; align-items: center; gap: 1rem; }
-        .k-btn-back { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; background: white; border: 1px solid var(--border); border-radius: 8px; color: var(--text-dark); cursor: pointer; transition: 0.2s; }
-        .k-btn-back:hover { border-color: var(--primary); color: var(--primary); background: #f0f7ff; }
-
-        .k-title-text { display: flex; flex-direction: column; }
-        .k-main-title { margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--primary); font-family: 'Lexend', sans-serif; }
-        .k-breadcrumb { font-size: 0.8rem; color: var(--text-muted); font-weight: 500; }
-
-        .k-context-selector select { padding: 0.4rem 0.8rem; border: 1px solid var(--border); border-radius: 6px; font-weight: 600; color: var(--text-dark); cursor: pointer; }
-
-        /* NAVEGACIÓN TABS */
-        .k-module-nav { display: flex; padding: 0 2rem; gap: 2rem; border-top: 1px solid #f8f9fa; }
-        .k-nav-item { background: none; border: none; padding: 0.8rem 0; font-size: 0.9rem; font-weight: 600; color: var(--text-muted); border-bottom: 3px solid transparent; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 0.5rem; }
-        .k-nav-item:hover { color: var(--primary); }
-        .k-nav-item.active { color: var(--primary); border-bottom-color: var(--primary); }
+        /* TABS — dentro del card */
+        .evaluacion-tabs { display: flex; gap: 0; margin: 0 -1.5rem; padding: 0 1.5rem; border-top: 1px solid #dee2e6; overflow-x: auto; }
+        .evaluacion-tab { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.75rem 1rem; font-size: 0.875rem; font-weight: 500; color: #5a6378; background: transparent; border: none; border-bottom: 2px solid transparent; cursor: pointer; transition: color 0.15s ease, border-color 0.15s ease; white-space: nowrap; }
+        .evaluacion-tab:hover { color: #174ea6; }
+        .evaluacion-tab.active { color: #174ea6; font-weight: 600; border-bottom-color: #174ea6; }
 
         /* CONTENIDO */
         .k-module-content { flex: 1; overflow-y: auto; padding: 2rem; position: relative; }
@@ -1828,14 +1845,19 @@ if (!document.getElementById('k-air-eval-styles')) {
         .k-select-sm { padding: 0.3rem 0.6rem; border-radius: 4px; border: 1px solid var(--border); font-size: 0.9rem; }
         .k-loading-badge { font-size: 0.85rem; color: var(--primary); font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
 
-        /* METRICS GRID */
-        .k-grid-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem; }
-        .k-card-metric { padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; }
-        .k-metric-header { display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); letter-spacing: 0.5px; margin-bottom: 0.5rem; }
-        .k-metric-body { z-index: 2; }
-        .k-value { font-size: 2.2rem; font-weight: 700; line-height: 1; display: block; font-family: 'Teko', sans-serif; }
-        .k-trend { font-size: 0.85rem; color: var(--text-muted); }
-        .k-mini-chart { position: absolute; right: 1rem; bottom: 1rem; opacity: 0.5; }
+/* STATS RIBBON */
+.k-stats-ribbon { display: flex; align-items: center; gap: 0; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 0; margin-bottom: 1.5rem; box-shadow: var(--shadow-sm); overflow: hidden; }
+.k-stats-ribbon__item { display: flex; align-items: center; gap: 0.625rem; padding: 0.75rem 1.25rem; flex: 1; min-width: 0; }
+.k-stats-ribbon__icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.875rem; flex-shrink: 0; }
+.k-stats-ribbon__icon.primary { background: var(--primary-light); color: var(--primary); }
+.k-stats-ribbon__icon.danger { background: rgba(220, 53, 69, 0.1); color: var(--danger); }
+.k-stats-ribbon__icon.warning { background: rgba(255, 193, 7, 0.1); color: var(--warning); }
+.k-stats-ribbon__data { display: flex; flex-direction: column; min-width: 0; }
+.k-stats-ribbon__value { font-size: 1.25rem; font-weight: 700; color: var(--text-dark); line-height: 1.2; }
+.k-stats-ribbon__label { font-size: 0.6875rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+.k-stats-ribbon__pct { margin-left: auto; font-size: 0.75rem; font-weight: 600; color: var(--primary); background: var(--primary-light); padding: 0.125rem 0.5rem; border-radius: 10px; white-space: nowrap; flex-shrink: 0; }
+.k-stats-ribbon__divider { width: 1px; height: 32px; background: var(--border); flex-shrink: 0; }
+@media (max-width: 768px) { .k-stats-ribbon { flex-wrap: wrap; } .k-stats-ribbon__item { flex: 1 1 45%; } .k-stats-ribbon__divider { display: none; } }
 
         /* CHARTS GRID */
         .k-grid-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }

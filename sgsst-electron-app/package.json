@@ -1,6 +1,6 @@
 {
   "name": "sgsst-electron-app",
-  "version": "0.1.91",
+  "version": "0.1.103",
   "description": "Sistema de Gestión de Seguridad y Salud en el Trabajo",
   "main": "main.js",
   "author": "Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos.",
@@ -68,7 +68,7 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "assets/KIAR256.ico",
+      "icon": "assets/K+AIR-multires.ico",
       "artifactName": "${productName}-Setup-${version}.${ext}"
     },
     "nsis": {
@@ -84,12 +84,12 @@
     },
     "mac": {
       "target": "dmg",
-      "icon": "assets/KIAR256.ico",
+      "icon": "assets/K+AIR-multires.ico",
       "category": "public.app-category.business"
     },
     "linux": {
       "target": "AppImage",
-      "icon": "assets/KIAR256.ico",
+      "icon": "assets/K+AIR-multires.ico",
       "category": "Business"
     },
     "publish": [
@@ -118,6 +118,7 @@
     "body-parser": "^2.2.2",
     "core-util-is": "^1.0.3",
     "cors": "^2.8.6",
+    "docxtemplater": "^3.68.4",
     "electron-log": "^5.4.3",
     "electron-squirrel-startup": "^1.0.1",
     "electron-updater": "^6.6.2",
@@ -126,7 +127,10 @@
     "jquery": "^3.7.1",
     "jquery-ui-dist": "^1.13.3",
     "node-fetch": "^2.7.0",
+    "nodemailer": "^8.0.5",
+    "pdf-lib": "^1.17.1",
     "pdf-parse": "^2.4.5",
+    "pizzip": "^3.2.0",
     "request": "^2.88.2",
     "vanilla-calendar-pro": "^3.0.5",
     "xlsx": "^0.18.5"

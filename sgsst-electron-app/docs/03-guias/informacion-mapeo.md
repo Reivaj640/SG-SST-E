@@ -1,7 +1,8 @@
 # Información de Mapeo en Tarjetas de Empresas
 
-**Versión:** 1.0.0  
-**Última actualización:** 4 de marzo de 2026  
+**Versión:** 1.1.0
+**Última actualización:** 9 de junio de 2026
+**Estado:** ✅ Actualizado v0.1.99
 **Archivos:** `components/config/config-viewer.html`, `renderer.js`
 
 ---

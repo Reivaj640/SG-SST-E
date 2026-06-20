@@ -50,6 +50,9 @@ class RestriccionesMedicasComponent {
             case 'get-document-folders-request':
                 this.handleFolderRequest(event, 'getDocumentFolders');
                 break;
+            case 'get-documents-in-folder-request':
+                this.handleDocumentsInFolderRequest(event, 'getDocumentsInFolder');
+                break;
             case 'download-document-request':
                 this.handleDownloadRequest(event, 'downloadDocument');
                 break;
@@ -170,6 +173,35 @@ class RestriccionesMedicasComponent {
             }, '*');
         } catch (error) {
             console.error(`[restricciones-component.js][handleOpenPathRequest] Error al manejar la solicitud de apertura de ruta:`, error);
+            event.source.postMessage({
+                action: `${apiFunctionName}-response`,
+                requestId,
+                success: false,
+                error: error.message
+            }, '*');
+        }
+    }
+
+    async handleDocumentsInFolderRequest(event, apiFunctionName) {
+        const { requestId, payload } = event.data;
+        const folderPath = typeof payload === 'string' ? payload : (payload && payload.folderPath);
+        console.log(`[restricciones-component.js][handleDocumentsInFolderRequest] Solicitud recibida. requestId: ${requestId}, folderPath: ${folderPath}`);
+        try {
+            if (!window.electronAPI || typeof window.electronAPI[apiFunctionName] !== 'function') {
+                console.error(`[restricciones-component.js][handleDocumentsInFolderRequest] Error: electronAPI.${apiFunctionName} no está disponible.`);
+                throw new Error(`electronAPI.${apiFunctionName} no está disponible.`);
+            }
+            const result = await window.electronAPI[apiFunctionName](folderPath);
+            console.log(`[restricciones-component.js][handleDocumentsInFolderRequest] Respuesta para requestId ${requestId}: success=${result.success}`);
+            event.source.postMessage({
+                action: `${apiFunctionName}-response`,
+                requestId,
+                success: result.success,
+                files: result.files || result || [],
+                error: result.error
+            }, '*');
+        } catch (error) {
+            console.error(`[restricciones-component.js][handleDocumentsInFolderRequest] Error:`, error);
             event.source.postMessage({
                 action: `${apiFunctionName}-response`,
                 requestId,

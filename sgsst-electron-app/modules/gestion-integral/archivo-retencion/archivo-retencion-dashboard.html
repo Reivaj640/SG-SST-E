@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard — Gestión Documental</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        /* ── Variables (mismo sistema visual oficial K+AIR) ── */
+        :root {
+            --primary: #174ea6;
+            --primary-hover: #185abd;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --info: #17a2b8;
+            --text-dark: #212529;
+            --text-muted: #6c757d;
+            --bg-app: #f8f9fa;
+            --bg-card: #ffffff;
+            --border: #dee2e6;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
+            --radius-md: 0.5rem;
+            --radius-lg: 0.75rem;
+            --font: 'Segoe UI', Roboto, sans-serif;
+        }
+
+        [data-theme="dark"] {
+            --primary: #5a8fd4;
+            --primary-hover: #7aa8e3;
+            --text-dark: #f0f0f0;
+            --text-muted: #adb5bd;
+            --bg-app: #1a1d21;
+            --bg-card: #242830;
+            --border: #3d4250;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg-app);
+            color: var(--text-dark);
+            padding: 1.5rem;
+        }
+
+        /* ── Card Pattern (k-section-card) ── */
+        .k-section-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 1rem 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .k-section-card__title {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin: 0;
+            white-space: nowrap;
+        }
+
+        .k-section-card__title svg {
+            width: 20px;
+            height: 20px;
+            color: var(--primary);
+            flex-shrink: 0;
+        }
+
+        .k-section-card__subtitle {
+            font-size: 0.8125rem;
+            color: var(--text-muted);
+            font-weight: 400;
+            margin: 0;
+        }
+
+        /* ── Stats Ribbon ── */
+        .k-stats-ribbon {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 0;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow-sm);
+            overflow: hidden;
+        }
+
+        .k-stats-ribbon__item {
+            display: flex;
+            align-items: center;
+            gap: 0.625rem;
+            padding: 0.75rem 1.25rem;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .k-stats-ribbon__icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .k-stats-ribbon__icon svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .k-stats-ribbon__icon.primary {
+            background: rgba(23,78,166,.1);
+            color: var(--primary);
+        }
+
+        .k-stats-ribbon__icon.success {
+            background: rgba(40,167,69,.1);
+            color: var(--success);
+        }
+
+        .k-stats-ribbon__icon.warning {
+            background: rgba(255,193,7,.15);
+            color: #856404;
+        }
+
+        .k-stats-ribbon__icon.muted {
+            background: #f0f2f5;
+            color: var(--text-muted);
+        }
+
+        [data-theme="dark"] .k-stats-ribbon__icon.muted {
+            background: #3d4250;
+            color: #adb5bd;
+        }
+
+        .k-stats-ribbon__data {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .k-stats-ribbon__value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-dark);
+            line-height: 1.2;
+        }
+
+        .k-stats-ribbon__label {
+            font-size: 0.6875rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .k-stats-ribbon__divider {
+            width: 1px;
+            height: 32px;
+            background: var(--border);
+            flex-shrink: 0;
+        }
+
+        @media (max-width: 900px) {
+            .k-stats-ribbon { flex-wrap: wrap; }
+            .k-stats-ribbon__item { flex: 1 1 45%; }
+            .k-stats-ribbon__divider { display: none; }
+        }
+
+        /* ── Charts Grid ── */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        @media (max-width: 900px) {
+            .charts-grid { grid-template-columns: 1fr; }
+        }
+
+        .chart-card {
+            background: var(--bg-card);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-sm);
+            padding: 1.25rem;
+        }
+        .chart-card-wide {
+            grid-column: span 2;
+        }
+        @media (max-width: 900px) {
+            .chart-card-wide { grid-column: span 1; }
+        }
+
+        .chart-card h3 {
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--text-dark);
+        }
+        .chart-card canvas {
+            max-height: 280px;
+        }
+
+        /* ── Loading ── */
+        .loading-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 4rem 1rem;
+            color: var(--text-muted);
+        }
+        .spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 1rem;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="k-section-card">
+        <div style="display:flex; align-items:center; gap:0.75rem;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#174ea6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <div>
+                <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:var(--text-dark);">Dashboard — Gestión Documental</h3>
+                <p style="font-size:0.8125rem; color:var(--text-muted); margin:0.25rem 0 0 0;">Submódulo 2.5.1 · Archivo y Retención Documental del SG-SST</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="loading-state" class="loading-state">
+        <div class="spinner"></div>
+        <span>Cargando datos del listado maestro...</span>
+    </div>
+
+    <div id="dashboard-content" style="display:none;">
+        <!-- Stats Ribbon -->
+        <div class="k-stats-ribbon">
+            <div class="k-stats-ribbon__item">
+                <span class="k-stats-ribbon__icon primary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                </span>
+                <div class="k-stats-ribbon__data">
+                    <span class="k-stats-ribbon__value" id="kpi-total">—</span>
+                    <span class="k-stats-ribbon__label">Total Documentos</span>
+                </div>
+            </div>
+            <div class="k-stats-ribbon__divider"></div>
+            <div class="k-stats-ribbon__item">
+                <span class="k-stats-ribbon__icon success">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+                        <polyline points="22 4 12 14.01 9 11.01"/>
+                    </svg>
+                </span>
+                <div class="k-stats-ribbon__data">
+                    <span class="k-stats-ribbon__value" id="kpi-vigencia">—</span>
+                    <span class="k-stats-ribbon__label">% Vigentes</span>
+                </div>
+            </div>
+            <div class="k-stats-ribbon__divider"></div>
+            <div class="k-stats-ribbon__item">
+                <span class="k-stats-ribbon__icon warning">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+                        <path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/>
+                    </svg>
+                </span>
+                <div class="k-stats-ribbon__data">
+                    <span class="k-stats-ribbon__value" id="kpi-externos">—</span>
+                    <span class="k-stats-ribbon__label">Externos</span>
+                </div>
+            </div>
+            <div class="k-stats-ribbon__divider"></div>
+            <div class="k-stats-ribbon__item">
+                <span class="k-stats-ribbon__icon muted">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+                    </svg>
+                </span>
+                <div class="k-stats-ribbon__data">
+                    <span class="k-stats-ribbon__value" id="kpi-obsoletos">—</span>
+                    <span class="k-stats-ribbon__label">Obsoletos</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hidden elements for JS compatibility -->
+        <span id="kpi-vigentes-sub" style="display:none"></span>
+        <span id="kpi-sin-actualizar" style="display:none"></span>
+
+        <!-- Charts -->
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h3>📄 Documentos vs Registros</h3>
+                <canvas id="chartTipo"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>🏢 Interno vs Externo</h3>
+                <canvas id="chartOrigen"></canvas>
+            </div>
+            <div class="chart-card chart-card-wide">
+                <h3>📋 Estado de Disposición Final</h3>
+                <canvas id="chartDisposicion"></canvas>
+            </div>
+            <div class="chart-card chart-card-wide">
+                <h3>📅 Actualizaciones por Año</h3>
+                <canvas id="chartAnual"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script src="archivo-retencion-dashboard.js"></script>
+</body>
+</html>

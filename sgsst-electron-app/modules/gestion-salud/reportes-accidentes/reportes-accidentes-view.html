@@ -3,93 +3,336 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visualizador de Reportes de Accidentes</title>
+    <title>FURAT - Gestión de Reportes de Accidentes</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="reportes-accidentes-view.css">
 </head>
 <body>
-    <div class="document-viewer-wrapper">
-        <header>
-            <div class="logo">
-                <i class="fas fa-file-alt"></i>
-                <h1>Visualizador de Reportes de Accidentes</h1>
-            </div>
-            <div class="header-actions">
-                <button class="btn btn-secondary" id="backBtn">
-                    <i class="fas fa-arrow-left"></i>
-                    Volver
-                </button>
-                <button class="btn btn-primary" id="downloadBtn">
-                    <i class="fas fa-download"></i>
-                    Descargar
-                </button>
-                <button class="btn btn-secondary" id="printBtn">
-                    <i class="fas fa-print"></i>
-                    Imprimir
-                </button>
-            </div>
-        </header>
-        <div class="content">
-            <div class="sidebar">
-                <div class="navigation-controls">
-                    <button class="btn btn-secondary" id="upLevelBtn" title="Subir un nivel">
-                        <i class="fas fa-level-up-alt"></i>
-                        Subir Nivel
+    <div class="furat-app">
+        <!-- Header + Tabs + KPIs -->
+        <div class="k-section-card" style="padding:0; margin-bottom:1rem;">
+            <!-- Fila 1: contenido principal -->
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
+                <div style="display:flex; align-items:center; gap:0.75rem;">
+                    <i class="fas fa-shield-alt" style="color:#174ea6; font-size:1.25rem;"></i>
+                    <div>
+                        <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Reportes de Accidentes</h3>
+                        <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Gestión de la Salud — 3.2.1</p>
+                    </div>
+                </div>
+                <div style="display:flex; align-items:center; gap:0.75rem;">
+                    <span class="k-section-card__company">
+                        <i class="bi bi-building"></i>
+                        <span id="header-company-text">—</span>
+                    </span>
+                    <div class="k-section-card__divider"></div>
+                    <button class="header-back-btn" id="backBtn" title="Volver a Gestión de la Salud">
+                        <i class="fas fa-arrow-left"></i> Volver
                     </button>
                 </div>
-                <h3>Carpetas de Reportes</h3>
-                <div id="folderList">
-                    <!-- Las carpetas se cargarán dinámicamente -->
-                </div>
-                <h3 style="margin-top: 20px;">Documentos en Carpeta</h3>
-                <div id="documentList">
-                    <!-- Los documentos se cargarán dinámicamente aquí -->
-                </div>
             </div>
-            <div class="main-content">
-                <div class="document-info">
-                    <div class="document-title" id="documentTitle">Selecciona un reporte</div>
-                    <div class="document-actions">
-                        <div class="toolbar-group">
-                            <label for="zoomLevel">Zoom:</label>
-                            <select id="zoomLevel">
-                                <option value="auto">Auto</option>
-                                <option value="page-width">Ancho de página</option>
-                                <option value="page-height">Alto de página</option>
-                                <option value="50%">50%</option>
-                                <option value="75%">75%</option>
-                                <option value="100%">100%</option>
-                                <option value="125%">125%</option>
-                                <option value="150%">150%</option>
-                                <option value="200%">200%</option>
-                            </select>
-                        </div>
-                        <div class="toolbar-group">
-                            <label for="pageOrientation">Orientación:</label>
-                            <select id="pageOrientation">
-                                <option value="vertical">Vertical</option>
-                                <option value="horizontal">Horizontal</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-                <div class="document-viewer-container">
-                    <div class="loading" id="loadingDiv">
-                        <div class="spinner"></div>
-                        <p>Cargando reporte...</p>
-                    </div>
-                    <div id="viewerContainer" style="display: none;">
-                        <!-- El visor de documento se cargará aquí -->
-                    </div>
-                </div>
+            <!-- Fila 2: tabs integrados -->
+            <nav class="furat-tabs">
+                <button class="furat-tab furat-tab--active" data-view="dashboard">
+                    <i class="fas fa-chart-pie"></i>
+                    <span>Resumen</span>
+                </button>
+                <button class="furat-tab" data-view="library">
+                    <i class="fas fa-folder-open"></i>
+                    <span>Biblioteca</span>
+                </button>
+                <button class="furat-tab" data-view="viewer" id="tabViewer" style="display:none;">
+                    <i class="fas fa-file-pdf"></i>
+                    <span>Visor de Documento</span>
+                </button>
+            </nav>
+        </div>
+
+        <!-- KPIs -->
+        <div class="k-stats-ribbon" style="display:flex;gap:0;background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.06);padding:1rem 1.5rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem">
+            <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:.75rem">
+                <div style="width:40px;height:40px;border-radius:10px;background:rgba(23,78,166,.08);display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:#174ea6"><i class="fas fa-file-alt"></i></div>
+                <div style="display:flex;flex-direction:column"><span style="font-size:.75rem;color:#6c757d">Total FURAT</span><span style="font-size:1.5rem;font-weight:700;color:#212529" id="statTotal">—</span></div>
+            </div>
+            <div style="width:1px;height:40px;background:#dee2e6;margin:0 1rem"></div>
+            <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:.75rem">
+                <div style="width:40px;height:40px;border-radius:10px;background:rgba(23,162,184,.08);display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:#17a2b8"><i class="fas fa-calendar-alt"></i></div>
+                <div style="display:flex;flex-direction:column"><span style="font-size:.75rem;color:#6c757d" id="statYearLabel">Este Año</span><span style="font-size:1.5rem;font-weight:700;color:#212529" id="statCurrentYear">—</span></div>
+            </div>
+            <div style="width:1px;height:40px;background:#dee2e6;margin:0 1rem"></div>
+            <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:.75rem">
+                <div style="width:40px;height:40px;border-radius:10px;background:rgba(255,193,7,.1);display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:#b8860b"><i class="fas fa-calendar-day"></i></div>
+                <div style="display:flex;flex-direction:column"><span style="font-size:.75rem;color:#6c757d" id="statMonthLabel">Este Mes</span><span style="font-size:1.5rem;font-weight:700;color:#212529" id="statCurrentMonth">—</span></div>
+            </div>
+            <div style="width:1px;height:40px;background:#dee2e6;margin:0 1rem"></div>
+            <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:.75rem">
+                <div style="width:40px;height:40px;border-radius:10px;background:rgba(40,167,69,.08);display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:#28a745"><i class="fas fa-folder"></i></div>
+                <div style="display:flex;flex-direction:column"><span style="font-size:.75rem;color:#6c757d">Carpetas</span><span style="font-size:1.5rem;font-weight:700;color:#212529" id="statFolders">—</span></div>
             </div>
         </div>
-        <div class="notification" id="notification">
-            <i class="notification-icon fas fa-check-circle"></i>
-            <div class="notification-message">Operación completada con éxito</div>
+
+        <!-- MAIN -->
+        <main class="kair-container">
+            <div class="k-main-content">
+            <!-- DASHBOARD -->
+            <section class="furat-view furat-view--active" id="viewDashboard">
+                <div class="furat-dashboard">
+
+                    <div class="furat-dashboard__sections">
+                        <div class="furat-dashboard__section furat-dashboard__section--wide">
+                            <div class="furat-card">
+                                <div class="furat-card__header">
+                                    <h3><i class="fas fa-bar-chart"></i> Distribución por Año</h3>
+                                </div>
+                                <div class="furat-card__body">
+                                    <div class="furat-year-bars" id="yearBars">
+                                        <div class="furat-empty-state">
+                                            <i class="fas fa-chart-bar"></i>
+                                            <p>Cargando distribución por año...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="furat-dashboard__section">
+                            <div class="furat-card">
+                                <div class="furat-card__header">
+                                    <h3><i class="fas fa-clock"></i> Últimos Reportes</h3>
+                                </div>
+                                <div class="furat-card__body">
+                                    <div class="furat-recent-list" id="recentReports">
+                                        <div class="furat-empty-state">
+                                            <i class="fas fa-inbox"></i>
+                                            <p>Cargando reportes recientes...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- LIBRARY -->
+            <section class="furat-view" id="viewLibrary">
+                <div class="furat-library">
+                    <div class="furat-library__toolbar">
+                        <div class="furat-library__search">
+                            <div class="furat-search-box">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="searchInput" placeholder="Buscar reporte por nombre..." autocomplete="off">
+                                <button class="furat-search-box__clear" id="searchClear" style="display:none;">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="furat-library__filters">
+                            <div class="furat-filter-group">
+                                <label for="filterYear"><i class="fas fa-calendar"></i> Año</label>
+                                <select id="filterYear"><option value="">Todos</option></select>
+                            </div>
+                            <div class="furat-filter-group">
+                                <label for="filterMonth"><i class="fas fa-calendar-day"></i> Mes</label>
+                                <select id="filterMonth">
+                                    <option value="">Todos</option>
+                                    <option value="1">Enero</option><option value="2">Febrero</option>
+                                    <option value="3">Marzo</option><option value="4">Abril</option>
+                                    <option value="5">Mayo</option><option value="6">Junio</option>
+                                    <option value="7">Julio</option><option value="8">Agosto</option>
+                                    <option value="9">Septiembre</option><option value="10">Octubre</option>
+                                    <option value="11">Noviembre</option><option value="12">Diciembre</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="furat-library__breadcrumb" id="breadcrumb">
+                        <button class="furat-breadcrumb__root active" data-path="">
+                            <i class="fas fa-home"></i>
+                            <span>Todos los Reportes</span>
+                        </button>
+                    </div>
+
+                    <div class="furat-library__content">
+                        <div class="furat-folders-section" id="foldersSection" style="display:none;">
+                            <h4 class="furat-section-title" id="foldersSectionTitle">
+                                <i class="fas fa-folder"></i>
+                                <span>Carpetas</span>
+                            </h4>
+                            <div class="furat-folders-grid" id="folderList"></div>
+                        </div>
+
+                        <div class="furat-documents-section">
+                            <div class="furat-section-title-row">
+                                <h4 class="furat-section-title" id="docsSectionTitle">
+                                    <i class="fas fa-file-alt"></i>
+                                    <span>Reportes</span>
+                                    <span class="furat-badge" id="docsCount" style="display:none;">0</span>
+                                </h4>
+                                <div class="furat-section-actions">
+                                    <button class="furat-btn furat-btn--sm furat-btn--ghost" id="viewGridBtn" title="Vista cuadrícula">
+                                        <i class="fas fa-th-large"></i>
+                                    </button>
+                                    <button class="furat-btn furat-btn--sm furat-btn--ghost" id="viewListBtn" title="Vista lista">
+                                        <i class="fas fa-list"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="documentList" class="furat-docs-grid">
+                                <div class="furat-empty-state furat-empty-state--large">
+                                    <i class="fas fa-folder-open"></i>
+                                    <h3>Selecciona una carpeta</h3>
+                                    <p>Explora las carpetas para ver los reportes FURAT almacenados</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEWER -->
+            <section class="furat-view" id="viewViewer">
+                <div class="furat-viewer">
+                    <div class="furat-viewer__toolbar">
+                        <div class="furat-viewer__doc-info">
+                            <button class="furat-btn furat-btn--ghost furat-btn--sm" id="viewerBackBtn" title="Volver a biblioteca">
+                                <i class="fas fa-arrow-left"></i>
+                            </button>
+                            <div class="furat-viewer__doc-title" id="documentTitle">
+                                <i class="fas fa-file-pdf"></i>
+                                <span>Selecciona un reporte</span>
+                            </div>
+                        </div>
+                        <div class="furat-viewer__controls">
+                            <div class="furat-viewer__control-group">
+                                <label for="zoomLevel">Zoom:</label>
+                                <select id="zoomLevel">
+                                    <option value="auto">Auto</option>
+                                    <option value="page-width">Ancho de página</option>
+                                    <option value="page-height">Alto de página</option>
+                                    <option value="50%">50%</option><option value="75%">75%</option>
+                                    <option value="100%">100%</option><option value="125%">125%</option>
+                                    <option value="150%">150%</option><option value="200%">200%</option>
+                                </select>
+                            </div>
+                            <div class="furat-viewer__control-group">
+                                <label for="pageOrientation">Orientación:</label>
+                                <select id="pageOrientation">
+                                    <option value="vertical">Vertical</option>
+                                    <option value="horizontal">Horizontal</option>
+                                </select>
+                            </div>
+                            <div class="furat-viewer__action-buttons">
+                                <button class="furat-btn furat-btn--sm furat-btn--primary" id="downloadBtn" title="Descargar documento">
+                                    <i class="fas fa-download"></i>
+                                    <span>Descargar</span>
+                                </button>
+                                <button class="furat-btn furat-btn--sm furat-btn--outline" id="printBtn" title="Imprimir documento">
+                                    <i class="fas fa-print"></i>
+                                    <span>Imprimir</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="furat-viewer__container">
+                        <div class="furat-loading" id="loadingDiv">
+                            <div class="furat-spinner"></div>
+                            <p>Cargando reporte...</p>
+                        </div>
+                        <div id="viewerContainer" style="display: none;"></div>
+                        <div class="furat-viewer__empty" id="viewerEmpty">
+                            <div class="furat-viewer__empty-icon">
+                                <i class="fas fa-file-pdf"></i>
+                            </div>
+                            <h3>Vista previa del documento</h3>
+                            <p>Selecciona un reporte FURAT de la biblioteca para visualizarlo aquí</p>
+                            <button class="furat-btn furat-btn--primary" id="goToLibraryBtn">
+                                <i class="fas fa-folder-open"></i>
+                                Ir a Biblioteca
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            </div>
+        </main>
+
+        <!-- NOTIFICATION -->
+        <div class="furat-notification" id="notification">
+            <i class="furat-notification__icon fas fa-check-circle"></i>
+            <div class="furat-notification__message">Operación completada con éxito</div>
+        </div>
+
+        <!-- PREVIEW MODAL -->
+        <div id="previewModal" class="furat-preview-modal hidden">
+            <div class="furat-preview-modal__overlay" id="previewOverlay"></div>
+            <div class="furat-preview-modal__content">
+                <div class="furat-preview-modal__header">
+                    <div class="furat-preview-modal__title">
+                        <i class="fas fa-file-pdf" id="previewTitleIcon"></i>
+                        <span id="previewTitle">Previsualización</span>
+                    </div>
+                    <div class="furat-preview-modal__actions">
+                        <button class="furat-btn furat-btn--sm furat-btn--ghost" id="previewDownloadBtn" title="Descargar documento">
+                            <i class="fas fa-download"></i>
+                        </button>
+                        <button class="furat-preview-modal__close" id="closePreviewBtn" aria-label="Cerrar">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="furat-preview-modal__body" id="previewBody"></div>
+            </div>
         </div>
     </div>
+
+    <style>
+        .furat-preview-modal { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; }
+        .furat-preview-modal.hidden { display: none; }
+        .furat-preview-modal__overlay { position: absolute; inset: 0; background: rgba(0,0,0,.55); backdrop-filter: blur(2px); }
+        .furat-preview-modal__content {
+            position: relative; z-index: 1; display: flex; flex-direction: column;
+            width: 90vw; height: 88vh; max-width: 1120px;
+            background: var(--furat-bg-card); border-radius: var(--furat-radius-lg);
+            box-shadow: 0 24px 60px rgba(0,0,0,.35); overflow: hidden;
+        }
+        .furat-preview-modal__header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 18px; border-bottom: 1px solid var(--furat-border);
+            flex-shrink: 0; background: var(--furat-bg-card);
+        }
+        .furat-preview-modal__title {
+            display: flex; align-items: center; gap: 10px;
+            font-size: .9rem; font-weight: 500; color: var(--furat-text-primary);
+            overflow: hidden; min-width: 0;
+        }
+        .furat-preview-modal__title span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .furat-preview-modal__actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+        .furat-preview-modal__close {
+            width: 30px; height: 30px; border: none; border-radius: 50%;
+            background: transparent; cursor: pointer; color: var(--furat-text-secondary);
+            display: flex; align-items: center; justify-content: center; font-size: .9rem;
+            transition: background .15s, color .15s;
+        }
+        .furat-preview-modal__close:hover { background: var(--furat-danger-light, #fce8e8); color: var(--furat-danger, #dc3545); }
+        .furat-preview-modal__body {
+            flex: 1; overflow: hidden; display: flex;
+            flex-direction: column; align-items: center; justify-content: center;
+        }
+        .furat-preview-modal__body iframe { width: 100%; height: 100%; border: none; }
+        .furat-preview-modal__error { text-align: center; padding: 2.5rem 2rem; }
+        .furat-preview-modal__error-icon { font-size: 2.5rem; margin-bottom: 1rem; }
+        .furat-preview-modal__error h3 { margin: 0 0 .5rem; font-size: 1.1rem; color: var(--furat-text-primary); }
+        .furat-preview-modal__error p { font-size: .875rem; color: var(--furat-text-secondary); max-width: 460px; margin: .25rem auto; }
+        .furat-preview-modal__error-cmd {
+            background: var(--furat-bg-app); border: 1px solid var(--furat-border);
+            border-radius: 6px; padding: 8px 16px; font-family: monospace; font-size: .85rem;
+            color: var(--furat-text-primary); display: inline-block; margin: 8px 0;
+        }
+    </style>
+
     <script src="reportes-accidentes-viewer.js"></script>
 </body>
 </html>

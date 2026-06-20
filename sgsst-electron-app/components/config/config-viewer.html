@@ -837,6 +837,62 @@
             border-bottom: none;
         }
 
+        /* --- Estado de Actualizaciones --- */
+        .update-state {
+            width: 100%;
+        }
+
+        .update-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.6rem 0;
+            font-size: 0.9rem;
+            border-radius: var(--radius);
+        }
+
+        .update-status.checking {
+            color: var(--primary);
+        }
+
+        .update-status.success {
+            color: var(--success);
+        }
+
+        .update-status.info {
+            color: var(--primary);
+        }
+
+        .update-status.error {
+            color: var(--danger);
+        }
+
+        .update-progress-container {
+            margin-top: 0.5rem;
+        }
+
+        .update-progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e9ecef;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .update-progress-fill {
+            height: 100%;
+            background: var(--primary);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+
+        .update-progress-text {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-align: right;
+            margin-top: 0.25rem;
+        }
+
         /* --- Botones Generales --- */
         .btn {
             display: inline-flex;
@@ -1263,12 +1319,76 @@
                     <div class="info-card">
                         <h3>Información del Sistema</h3>
                         <div style="margin-top: 1rem;">
-                            <div class="system-diag-row"><span>Versión</span> <strong>2.4.0</strong></div>
-                            <div class="system-diag-row"><span>Build</span> <strong>2023.10.15</strong></div>
+                            <div class="system-diag-row"><span>Versión</span> <strong id="current-version">2.4.0</strong></div>
+                            <div class="system-diag-row"><span>Build</span> <strong id="build-date">2023.10.15</strong></div>
                             <div class="system-diag-row"><span>Licencia</span> <strong>Empresa</strong></div>
                             <div class="system-diag-row"><span>Electron</span> <strong>v27.0.0</strong></div>
                             <div class="system-diag-row"><span>Node</span> <strong>v18.16.0</strong></div>
                         </div>
+
+                        <!-- Sección de acceso directo en escritorio -->
+                        <div id="shortcut-section" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
+                            <h4 style="margin-top: 0; margin-bottom: 0.5rem;">Acceso Directo</h4>
+                            <p style="color: var(--text-muted, #6c757d); font-size: 0.9rem; margin: 0 0 0.75rem 0;">
+                                Crea un acceso directo en el escritorio para abrir K+AIR rápidamente.
+                            </p>
+                            <button id="btn-create-shortcut" class="btn btn-outline" style="width: 100%;">
+                                <i class="fas fa-link"></i> <span id="btn-shortcut-text">Crear acceso directo en escritorio</span>
+                            </button>
+                            <p id="shortcut-status" style="font-size: 0.85rem; margin-top: 0.5rem; margin-bottom: 0; display: none;"></p>
+                        </div>
+
+                        <!-- Sección de actualizaciones -->
+                        <div id="update-section" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
+                            <div id="update-idle" class="update-state">
+                                <button class="btn btn-outline" style="width: 100%;" onclick="checkForUpdates()">
+                                    <i class="fas fa-sync-alt"></i> Buscar Actualizaciones
+                                </button>
+                            </div>
+                            <div id="update-checking" class="update-state" style="display: none;">
+                                <div class="update-status checking">
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                    <span>Buscando actualizaciones...</span>
+                                </div>
+                            </div>
+                            <div id="update-not-available" class="update-state" style="display: none;">
+                                <div class="update-status success">
+                                    <i class="fas fa-check-circle"></i>
+                                    <span>Estás al día</span>
+                                </div>
+                            </div>
+                            <div id="update-available" class="update-state" style="display: none;">
+                                <div class="update-status info">
+                                    <i class="fas fa-download"></i>
+                                    <span id="update-available-text">Descargando...</span>
+                                </div>
+                                <div class="update-progress-container">
+                                    <div class="update-progress-bar">
+                                        <div class="update-progress-fill" id="update-progress-fill" style="width: 0%"></div>
+                                    </div>
+                                    <div class="update-progress-text" id="update-progress-text">0%</div>
+                                </div>
+                            </div>
+                            <div id="update-downloaded" class="update-state" style="display: none;">
+                                <div class="update-status success">
+                                    <i class="fas fa-check-circle"></i>
+                                    <span id="update-downloaded-text">Actualización lista</span>
+                                </div>
+                                <button class="btn btn-primary" style="width: 100%; margin-top: 0.75rem;" onclick="restartForUpdate()">
+                                    <i class="fas fa-redo"></i> Reiniciar e Instalar
+                                </button>
+                            </div>
+                            <div id="update-error" class="update-state" style="display: none;">
+                                <div class="update-status error">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    <span id="update-error-text">Error</span>
+                                </div>
+                                <button class="btn btn-outline" style="width: 100%; margin-top: 0.75rem;" onclick="checkForUpdates()">
+                                    <i class="fas fa-redo"></i> Reintentar
+                                </button>
+                            </div>
+                        </div>
+
                         <button class="btn btn-outline" style="width: 100%; margin-top: 1.5rem;" onclick="showThirdPartyLicenses()">Ver Licencias de Terceros</button>
                     </div>
 
@@ -3020,6 +3140,160 @@
         }
     }
 
+    /* ================= GESTIÓN DE ACCESO DIRECTO EN ESCRITORIO ================= */
+
+    // Crear acceso directo en el escritorio (autoUpdater no lo recrea tras updates)
+    async function createDesktopShortcut() {
+        const btn = document.getElementById('btn-create-shortcut');
+        const status = document.getElementById('shortcut-status');
+        const btnText = document.getElementById('btn-shortcut-text');
+
+        if (!electronAPI || typeof electronAPI.createDesktopShortcut !== 'function') {
+            if (status) {
+                status.textContent = 'Función no disponible en esta versión de la app.';
+                status.style.color = 'var(--danger-color, #dc3545)';
+                status.style.display = 'block';
+            }
+            return;
+        }
+
+        const originalText = btnText.textContent;
+        btn.disabled = true;
+        btnText.textContent = 'Creando...';
+
+        try {
+            const result = await electronAPI.createDesktopShortcut();
+            if (result.success) {
+                btnText.textContent = '✓ Acceso directo creado';
+                status.textContent = `Listo: ${result.path}`;
+                status.style.color = 'var(--success-color, #28a745)';
+                status.style.display = 'block';
+                setTimeout(() => {
+                    btnText.textContent = 'Re-crear acceso directo en escritorio';
+                    btn.disabled = false;
+                }, 3000);
+            } else {
+                throw new Error(result.error || 'Error desconocido');
+            }
+        } catch (error) {
+            btnText.textContent = originalText;
+            status.textContent = `Error: ${error.message}`;
+            status.style.color = 'var(--danger-color, #dc3545)';
+            status.style.display = 'block';
+            btn.disabled = false;
+        }
+    }
+
+    // Detectar si ya existe el shortcut al abrir el tab
+    async function detectExistingShortcut() {
+        if (!electronAPI || typeof electronAPI.checkDesktopShortcut !== 'function') return;
+
+        try {
+            const result = await electronAPI.checkDesktopShortcut();
+            if (result && result.exists) {
+                const btnText = document.getElementById('btn-shortcut-text');
+                const status = document.getElementById('shortcut-status');
+                if (btnText) btnText.textContent = 'Re-crear acceso directo en escritorio';
+                if (status) {
+                    status.textContent = `Acceso directo existente: ${result.path}`;
+                    status.style.color = 'var(--text-muted, #6c757d)';
+                    status.style.display = 'block';
+                }
+            }
+        } catch (err) {
+            // Silenciar errores de detección (no es crítico)
+        }
+    }
+
+    // Inicializar cuando se carga la sección
+    document.getElementById('btn-create-shortcut')?.addEventListener('click', createDesktopShortcut);
+    detectExistingShortcut();
+
+    /* ================= GESTIÓN DE ACTUALIZACIONES ================= */
+
+    // Función para verificar actualizaciones manualmente
+    async function checkForUpdates() {
+        if (!electronAPI || typeof electronAPI.checkForUpdatesManual !== 'function') {
+            showToast('Función de actualización no disponible', 'error');
+            return;
+        }
+
+        showUpdateState('checking');
+
+        try {
+            const result = await electronAPI.checkForUpdatesManual();
+            if (!result.success) {
+                showUpdateState('error');
+                document.getElementById('update-error-text').textContent =
+                    result.error?.message || 'Error al verificar actualizaciones';
+            }
+            // Los estados siguientes se actualizan via IPC events
+        } catch (error) {
+            showUpdateState('error');
+            document.getElementById('update-error-text').textContent = 'Error de conexión';
+        }
+    }
+
+    // Función para mostrar un estado específico
+    function showUpdateState(state) {
+        const states = ['idle', 'checking', 'not-available', 'available', 'downloaded', 'error'];
+        states.forEach(s => {
+            const el = document.getElementById(`update-${s}`);
+            if (el) el.style.display = s === state ? 'block' : 'none';
+        });
+    }
+
+    // Función para reiniciar la aplicación
+    function restartForUpdate() {
+        if (electronAPI && typeof electronAPI.restartApp === 'function') {
+            electronAPI.restartApp();
+        }
+    }
+
+    // Configurar listeners de eventos de actualización para la sección de configuraciones
+    function setupUpdateListeners() {
+        if (!electronAPI) return;
+
+        electronAPI.onUpdateChecking && electronAPI.onUpdateChecking(() => {
+            showUpdateState('checking');
+        });
+
+        electronAPI.onUpdateNotAvailable && electronAPI.onUpdateNotAvailable(() => {
+            showUpdateState('not-available');
+            setTimeout(() => showUpdateState('idle'), 4000);
+        });
+
+        electronAPI.onUpdateAvailable && electronAPI.onUpdateAvailable((info) => {
+            showUpdateState('available');
+            const version = info?.version || 'nueva';
+            document.getElementById('update-available-text').textContent =
+                `v${version} disponible - Descargando...`;
+        });
+
+        electronAPI.onUpdateProgress && electronAPI.onUpdateProgress((data) => {
+            const fill = document.getElementById('update-progress-fill');
+            const text = document.getElementById('update-progress-text');
+            if (fill) fill.style.width = `${data.percent}%`;
+            if (text) text.textContent = `${data.percent}% - ${data.speed || ''}`;
+        });
+
+        electronAPI.onUpdateDownloaded && electronAPI.onUpdateDownloaded((info) => {
+            showUpdateState('downloaded');
+            const version = info?.version || 'nueva';
+            document.getElementById('update-downloaded-text').textContent =
+                `v${version} lista para instalar`;
+        });
+
+        electronAPI.onUpdateError && electronAPI.onUpdateError((data) => {
+            showUpdateState('error');
+            document.getElementById('update-error-text').textContent =
+                data?.message || 'Error desconocido';
+        });
+    }
+
+    // Inicializar listeners cuando se carga la sección
+    setupUpdateListeners();
+
     // Función para aplicar el tema efectivo basado en la preferencia
     // MODO CLARO = ESTADO BASE (sin atributo data-theme)
     function applyEffectiveTheme(themePreference) {
@@ -3072,7 +3346,7 @@
             } else if (event.data && event.data.type === 'get-theme-response') {
                 // Respuesta del padre con el tema actual
                 const theme = event.data.theme;
-                const preference = event.data.preference || 'system';
+                const preference = event.data.preference || theme || 'system';
                 console.log('[ConfigViewer] Tema recibido del padre:', theme, 'Preferencia:', preference);
                 applyEffectiveTheme(preference);
                 // Actualizar el toggle UI

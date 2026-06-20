@@ -1,5 +1,9 @@
 # Configuración de OnlyOffice Document Server
 
+**Versión:** 1.0
+**Actualizado:** 9 de junio de 2026
+**Estado:** ✅ Actualizado v0.1.99
+
 Esta guía explica cómo configurar y ejecutar OnlyOffice Document Server para la aplicación SG-SST.
 
 ## Requisitos Previos

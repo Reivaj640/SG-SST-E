@@ -50,32 +50,21 @@
         <!-- SIDEBAR: NAVIGATION & FILES -->
         <aside class="sidebar">
             
-            <!-- BOTÓN DE REGRESO EN SIDEBAR -->
-            <div class="sidebar-header">
-                <button class="btn btn-ghost" id="goBackBtn" style="width:100%; justify-content:flex-start; padding-left:0;" disabled>
-                    <i class="fas fa-level-up-alt"></i> Volver a carpeta anterior
-                </button>
-            </div>
+  <!-- BOTÓN DE REGRESO EN SIDEBAR -->
+  <div class="sidebar-header">
+    <button class="btn btn-ghost" id="goBackBtn" style="width:100%; justify-content:flex-start; padding-left:0;" disabled>
+      <i class="fas fa-arrow-left"></i> Volver
+    </button>
+  </div>
 
-            <!-- Breadcrumb -->
-            <div class="breadcrumb-nav" id="breadcrumb">
-                <div class="crumb-item"><i class="fas fa-hdd"></i> Raíz</div>
-            </div>
+  <!-- Breadcrumb -->
+  <div class="breadcrumb-nav" id="breadcrumb">
+    <div class="crumb-item" onclick="resetToRoot()"><i class="fas fa-hdd"></i> Raíz</div>
+  </div>
 
-            <div class="list-header">
-                Carpetas
-            </div>
-            <div class="sidebar-content" id="folderList">
-                <!-- Populated by JS -->
-            </div>
-
-            <div class="list-header">
-                Documentos
-                <span id="docCount" style="font-weight: 400; text-transform: none; font-size:0.75rem;">0</span>
-            </div>
-            <div class="sidebar-content" id="fileList">
-                <!-- Populated by JS -->
-            </div>
+  <div class="sidebar-content" id="contentList">
+    <!-- Populated by renderContent(): folders + documents -->
+  </div>
         </aside>
 
         <!-- MAIN VIEWER AREA -->
@@ -117,47 +106,69 @@
 
     </div>
 
-    <!-- Notification System -->
-    <div class="notification" id="notification">
-        <i class="notification-icon fas fa-check-circle"></i>
-        <div class="notification-message">Operación completada con éxito</div>
+<!-- CONTEXT MENU: Archivos (Clic Derecho) -->
+  <div id="contextMenu" class="context-menu" style="display: none;">
+    <div class="context-menu-item" id="openFileBtn">
+      <i class="fas fa-external-link-alt"></i>
+      <span>Abrir archivo</span>
     </div>
-
-    <!-- CONTEXT MENU (Clic Derecho) -->
-    <div id="contextMenu" class="context-menu" style="display: none;">
-        <div class="context-menu-item" id="openFileBtn">
-            <i class="fas fa-external-link-alt"></i>
-            <span>Abrir archivo</span>
-        </div>
-        <div class="context-menu-divider"></div>
-        <div class="context-menu-item danger" id="deleteFileBtn">
-            <i class="fas fa-trash-alt"></i>
-            <span>Eliminar</span>
-        </div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item danger" id="deleteFileBtn">
+      <i class="fas fa-trash-alt"></i>
+      <span>Eliminar</span>
     </div>
+  </div>
 
-    <!-- CONFIRM MODAL -->
-    <div id="confirmModal" class="confirm-modal" style="display: none;">
-        <div class="confirm-modal-content">
-            <div class="confirm-modal-header">
-                <i class="fas fa-exclamation-triangle"></i>
-                <h3>¿Eliminar archivo?</h3>
-            </div>
-            <div class="confirm-modal-body">
-                <p>Estás a punto de eliminar:</p>
-                <p class="confirm-file-name" id="confirmFileName">nombre_archivo.pdf</p>
-                <p class="confirm-warning">⚠️ Esta acción no se puede deshacer.</p>
-            </div>
-            <div class="confirm-modal-footer">
-                <button class="btn btn-ghost" id="confirmCancelBtn">Cancelar</button>
-                <button class="btn btn-danger" id="confirmAcceptBtn">Eliminar</button>
-            </div>
-        </div>
+  <!-- CONTEXT MENU: Carpetas (Clic Derecho) -->
+  <div id="folderContextMenu" class="context-menu" style="display: none;">
+    <div class="context-menu-item" id="newSubfolderBtn">
+      <i class="fas fa-folder-plus"></i>
+      <span>Nueva carpeta</span>
     </div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item danger" id="deleteFolderBtn">
+      <i class="fas fa-trash-alt"></i>
+      <span>Eliminar carpeta</span>
+    </div>
+  </div>
 
-    <!-- TOAST CONTAINER -->
-    <div id="kToastContainer" class="k-toast-container"></div>
+  <!-- CONFIRM MODAL (Eliminar) -->
+  <div id="confirmModal" class="confirm-modal" style="display: none;">
+    <div class="confirm-modal-content">
+      <div class="confirm-modal-header">
+        <i class="fas fa-exclamation-triangle"></i>
+        <h3 id="confirmModalTitle">¿Eliminar?</h3>
+      </div>
+      <div class="confirm-modal-body">
+        <p id="confirmModalMessage">Estás a punto de eliminar:</p>
+        <p class="confirm-file-name" id="confirmFileName">nombre_archivo.pdf</p>
+        <p class="confirm-warning">⚠️ Esta acción no se puede deshacer.</p>
+      </div>
+      <div class="confirm-modal-footer">
+        <button class="btn btn-ghost" id="confirmCancelBtn">Cancelar</button>
+        <button class="btn btn-danger" id="confirmAcceptBtn">Eliminar</button>
+      </div>
+    </div>
+  </div>
 
-    <script src="copasst-viewer.js"></script>
+  <!-- NEW FOLDER MODAL -->
+  <div id="newFolderModal" class="confirm-modal" style="display: none;">
+    <div class="confirm-modal-content">
+      <div class="confirm-modal-header">
+        <i class="fas fa-folder-plus"></i>
+        <h3>Nueva carpeta</h3>
+      </div>
+      <div class="confirm-modal-body">
+        <p>Nombre de la carpeta:</p>
+        <input type="text" id="newFolderNameInput" class="new-folder-input" placeholder="Nombre de la carpeta" autofocus />
+      </div>
+      <div class="confirm-modal-footer">
+        <button class="btn btn-ghost" id="newFolderCancelBtn">Cancelar</button>
+        <button class="btn btn-primary" id="newFolderAcceptBtn">Crear</button>
+      </div>
+    </div>
+  </div>
+
+<script src="copasst-viewer.js"></script>
 </body>
 </html>

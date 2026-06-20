@@ -1,7 +1,7 @@
 # K+AIR - Sistema de Gestión SG-SST
 
-**Versión:** 0.1.93
-**Última actualización:** 25 de marzo de 2026
+**Versión:** 0.1.101
+**Última actualización:** 14 de junio de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
 ---
@@ -15,7 +15,7 @@
 - ✅ **Multi-empresa**: Gestión de múltiples empresas con una sola experiencia UX/UI
 - ✅ **Motor Normativo Inteligente**: Escenarios normativos basados en tamaño y riesgo
 - ✅ **7 Módulos Principales**: Recursos, Gestión Integral, Salud, Peligros, Amenazas, Verificación, Mejoramiento
-- ✅ **27+ Submódulos**: Cada uno con su propia lógica y vistas especializadas
+- ✅ **29+ Submódulos**: Cada uno con su propia lógica y vistas especializadas
 - ✅ **IA Integrada**: Análisis de accidentes con LLM (Mistral 3 3B)
 - ✅ **Seguimiento PRIC**: Gestión completa de casos de incapacidad y rehabilitación
 - ✅ **Calificación PCL Dual**: Secciones separadas para Calificación Regional y Nacional (14 campos)
@@ -55,15 +55,15 @@
 ├─────────────────────────────────────────────────────────┤
 │  RENDERER (Frontend)                                    │
 │  ├── index.html (Estructura principal)                  │
-│  ├── renderer.js (Lógica de UI - 3170 líneas)           │
+│  ├── renderer.js (Lógica de UI - 5869 líneas)           │
 │  ├── styles.css (Sistema Visual Oficial)                │
 │  └── modules/ (27 submódulos organizados)               │
 ├─────────────────────────────────────────────────────────┤
 │  PRELOAD (Puente Seguro)                                │
-│  └── preload.js (78 contratos IPC expuestos)            │
+│  └── preload.js (143 contratos IPC expuestos)           │
 ├─────────────────────────────────────────────────────────┤
 │  MAIN (Backend Electron)                                │
-│  └── main.js (78 handlers IPC - 4766 líneas)            │
+│  └── main.js (143 handlers IPC - 17254 líneas)          │
 ├─────────────────────────────────────────────────────────┤
 │  DATABASE                                                │
 │  └── SQLite (kair.db) en app.getPath('userData')         │
@@ -84,9 +84,9 @@
 | Archivo                  | Líneas | Propósito                  |
 |--------------------------|--------|----------------------------|
 | `index.html`             | 143    | Punto de entrada HTML      |
-| `main.js`                | 4766   | Proceso principal Electron |
-| `preload.js`             | ~180   | Puente IPC seguro          |
-| `renderer.js`            | 3170   | Lógica de renderizado      |
+| `main.js`                | 17254  | Proceso principal Electron |
+| `preload.js`             | 445    | Puente IPC seguro          |
+| `renderer.js`            | 5869   | Lógica de renderizado      |
 | `styles.css`             | ~2500  | Estilos globales           |
 | `development-styles.css` | ~500   | Estilos desarrollo         |
 | `package.json`           | 85     | Configuración npm          |
@@ -128,7 +128,9 @@ modules/
 │   ├── index.js
 │   ├── ausentismo/            # 3.3.6 Medición del ausentismo
 │   ├── evaluaciones-medicas/  # 3.1.4 Evaluaciones médicas
+│   ├── incidencia-enfermedad-laboral/ # 3.3.5 Incidencia de enf. laboral 🆕
 │   ├── investigacion-accidentes/ # 3.2.2 Investigación accidentes
+│   ├── prevalencia-enfermedad-laboral/ # 3.3.4 Prevalencia de enf. laboral 🆕
 │   ├── reportes-accidentes/   # 3.2.1 Reporte accidentes
 │   ├── restricciones-medicas/ # 3.1.6 Restricciones médicas
 │   └── sociodemografica/      # 3.1.1 Diagnóstico sociodemográfico
@@ -490,11 +492,11 @@ Menú Principal → 1.2.1 Programa de Capacitaciones
 | 2.1.1  | Política del SG-SST            | `politica-logic.js`, `viewer.js`, `onlyoffice-bridge.js` |
 | 2.2.1  | Objetivos SST                  | `objetivos-sst-logic.js`, `viewer.js`                    |
 | 2.3.1  | Evaluación Inicial SG-SST      | `evaluacion-inicial-sg-sst-logic.js`, `test.html`        |
-| 2.4.1  | Plan de Trabajo Anual          | `plan-trabajo-logic.js`, `plan-home.js`                  |
+| 2.4.1 | Plan de Trabajo Anual | `plan-trabajo-logic.js`, `plan-home.js`, `plan-home.html`, `plan-viewer.js`, `plan-view.html`, `plan-view.css` |
 | 2.5.1  | Archivo y Retención Documental | En `renderer.js`                                         |
 | 2.6.1  | Rendición de Cuentas           | `rendicion-logic.js`, `viewer.js`                        |
 
-### Módulo 3: Gestión de la Salud (6 submódulos)
+### Módulo 3: Gestión de la Salud (8 submódulos)
 
 | Código | Submódulo                    | Archivos Principales                                   |
 |--------|------------------------------|--------------------------------------------------------|
@@ -503,6 +505,8 @@ Menú Principal → 1.2.1 Programa de Capacitaciones
 | 3.1.6  | Restricciones Médicas        | `restricciones-medicas-logic.js`, `component.js`       |
 | 3.2.1  | Reporte de Accidentes        | `reportes-accidentes-logic.js`, `viewer.js`            |
 | 3.2.2  | Investigación de Accidentes  | `investigacion-accidentes-logic.js`, `handlers.js`  🤖|
+| 3.3.4  | Prevalencia de Enf. Laboral  | `prevalencia-enfermedad-laboral/` (4 archivos) 🆕      |
+| 3.3.5  | Incidencia de Enf. Laboral   | `incidencia-enfermedad-laboral/` (4 archivos) 🆕       |
 | 3.3.6  | Medición del Ausentismo      | `medicion-ausentismo.js`, `registrar-ausentismo.js`    |
 
 ### Módulos 4-7 (Resumen)
@@ -1189,6 +1193,82 @@ Este software es propietario y confidencial. No se permite la reproducción, dis
 
 ## 📝 Cambios Recientes
 
+### v0.1.100 - 11 Jun 2026 🆕
+
+#### Estandarización de Headers - Patrón k-section-card
+
+**1. Header Card Pattern** 🎯
+- Patrón canónico `k-section-card` para todos los módulos K+AIR
+- Reemplaza BEM `kair-header__*` legacy
+- Estructura: card → icon + title + subtitle + actions
+
+**2. Migración Masiva** 📋
+- 22 submódulos migrados (42 archivos)
+- Módulo 1: Presupuesto, COPASST, Comité, Capacitaciones, Inducciones
+- Módulo 2: Objetivos, Evaluación Inicial, Plan de Trabajo, Archivo, Rendición, Proveedores, Selección, Cambio
+- Módulo 3: Evaluaciones Médicas, Remisiones, Reportes, Investigación, Registro, Frecuencia, Severidad, Mortalidad
+
+**3. Beneficios** ✅
+- Tabs integrados dentro del card
+- Responsive: company oculta en mobile
+- Dark theme soportado
+- IDs preservados (compatibilidad JS)
+
+**Archivos Modificados:**
+
+| Módulo | Archivos |
+|--------|----------|
+| 1. Recursos | 10 archivos |
+| 2. Gestión Integral | 14 archivos |
+| 3. Gestión Salud | 18 archivos |
+| **Total** | **42 archivos** |
+
+---
+
+### v0.1.99 - 9 Jun 2026 🆕
+
+#### Módulo 2.4.1 - Plan de Trabajo Anual: Dashboard y Navegación
+
+**1. KPIs Estandarizados** 🆕
+- Migrado `.kpi-grid`/`.kpi-card` → `k-stats-ribbon` canónico (KPI Strip Enterprise v1.0)
+- Nomenclatura alineada a Capacitaciones: Programadas/Realizadas/Pendientes/Vencidas
+- KPI Avance % integrado como pill badge en primer item
+
+**2. Dashboard Reestructurado** 🎨
+- Eliminado page-header legacy
+- Tabs-header con empresa y periodo activo
+- Charts-grid 3x2 con 6 gráficas:
+  - Estado (bar) — Programadas vs Realizadas vs Pendientes vs Vencidas
+  - Progreso Mensual (line) — Evolución mes a mes
+  - Cumplimiento Trimestral (bar agrupado) — Q1-Q4 Programadas vs Ejecutadas
+  - Estado Mensual (stacked bar) — Distribución por mes
+  - Categoría (horizontal bar) — Cumplimiento por grupo padre (level===1)
+  - Radar Anual (radar) — Distribución 12 meses
+
+**3. Modal Selector de Periodo** 🆕
+- Cierra con botón X (esquina superior derecha)
+- Cierra con clic en fondo (patrón UX estándar)
+- Función `hidePeriodSelector()` expuesta en `window`
+
+**4. Navegación Corregida** 🔧
+- **Cronograma → Volver**: postMessage → renderer → `planPortalComponent.goBackToHome()` → portal home
+- **Portal Home → Volver al Menú**: `goBackToModule()` → `planPortalComponent.goBackToModuleHome()` → `destroy()` + `onBackToModuleHome()` → menú Gestión Integral
+- Patrón destroy consistente con COPASST (`window.planPortalComponent = null`, cleanup script, clear container)
+
+**5. Fix Visual** 🎨
+- Eliminado subrayado en hover/focus/active del botón "Volver al Menú" (`.back-btn-internal`)
+
+**Archivos Modificados:**
+| Archivo | Cambios |
+|---------|---------|
+| `plan-trabajo/plan-view.html` | Dashboard HTML con tabs-header, k-stats-ribbon, 6 chart-cards, canvas ids |
+| `plan-trabajo/plan-view.css` | ~1080 líneas, k-stats-ribbon, tabs-header BEM, charts-grid 3 cols, period-card__close |
+| `plan-trabajo/plan-viewer.js` | ~1573 líneas, 6 funciones render chart, updateKPIs(), hidePeriodSelector(), K_COLORS |
+| `plan-trabajo/plan-trabajo-logic.js` | `destroy()`, `goBackToModuleHome()`, `portalScript` ref |
+| `plan-trabajo/plan-home.js` | `goBackToModule()` → `planPortalComponent.goBackToModuleHome()` directo |
+| `plan-trabajo/plan-home.html` | `.back-btn-internal:hover/focus/active` text-decoration: none |
+| `renderer.js` | 2 handlers `back-to-module-request` con delegación `goBackToHome()` |
+
 ### v0.1.53 - 4 Mar 2026 🆕
 
 #### Módulo de Ausentismo - Mejoras en Tabla y Estadísticas
@@ -1398,9 +1478,9 @@ Se agregaron 4 columnas adicionales entre "Entidad" y "Descripción":
 
 ---
 
-**Última actualización:** 19 de marzo de 2026  
-**Versión del documento:** 2.4 (Optimización de Python y Recursos Locales - v0.1.83)  
-**Versión de la aplicación:** 0.1.83
+**Última actualización:** 11 de junio de 2026  
+**Versión del documento:** 2.5 (Estandarización de Headers - v0.1.100)  
+**Versión de la aplicación:** 0.1.100
 
 ---
 

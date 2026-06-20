@@ -1,0 +1,807 @@
+<!-- ============================================
+     K+AIR - Gestión del Cambio (2.11.1)
+     Vista Principal + Modal Wizard GI-FO-058/059
+     ============================================ -->
+
+<div class="kair-gc-container kair-gc-fade-in" id="kairGcDashboard">
+
+  <!-- ── Header + KPIs ────────────────────────────── -->
+  <div class="k-section-card" style="background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08);padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem">
+    <div style="display:flex;align-items:center;gap:.75rem">
+      <button class="header-back-btn" id="kairGcBackBtn" title="Volver al módulo" aria-label="Volver"><i class="bi bi-arrow-left"></i> Volver</button>
+      <div style="display:flex;flex-direction:column">
+        <span style="font-size:1.1rem;font-weight:600;color:#174ea6">Gestión del Cambio</span>
+        <span style="font-size:.8375rem;color:#6c757d;margin-top:2px">Gestión Integral — 2.11.1</span>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:.5rem">
+      <button class="header-action--primary" id="kairGcNewChangeBtn">+ Nuevo Cambio</button>
+    </div>
+  </div>
+
+  <div class="k-stats-ribbon" id="kairGcMetricsGrid" style="display:flex;gap:0;background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.06);padding:1rem 1.5rem;align-items:center;flex-wrap:wrap">
+    <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:.75rem">
+      <div style="width:40px;height:40px;border-radius:10px;background:#fff3cd;display:flex;align-items:center;justify-content:center;font-size:1.2rem">⏳</div>
+      <div style="display:flex;flex-direction:column"><span style="font-size:.75rem;color:#6c757d">Pendientes</span><span style="font-size:1.5rem;font-weight:700;color:#212529" id="kairGcMetricPending">—</span></div>
+    </div>
+    <div style="width:1px;height:40px;background:#dee2e6;margin:0 1rem"></div>
+    <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:.75rem">
+      <div style="width:40px;height:40px;border-radius:10px;background:#f8d7da;display:flex;align-items:center;justify-content:center;font-size:1.2rem">🔴</div>
+      <div style="display:flex;flex-direction:column"><span style="font-size:.75rem;color:#6c757d">Alto Riesgo</span><span style="font-size:1.5rem;font-weight:700;color:#212529" id="kairGcMetricHighRisk">—</span></div>
+    </div>
+    <div style="width:1px;height:40px;background:#dee2e6;margin:0 1rem"></div>
+    <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:.75rem">
+      <div style="width:40px;height:40px;border-radius:10px;background:#d4edda;display:flex;align-items:center;justify-content:center;font-size:1.2rem">🔄</div>
+      <div style="display:flex;flex-direction:column"><span style="font-size:.75rem;color:#6c757d">Activos</span><span style="font-size:1.5rem;font-weight:700;color:#212529" id="kairGcMetricActive">—</span></div>
+    </div>
+    <div style="width:1px;height:40px;background:#dee2e6;margin:0 1rem"></div>
+    <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:.75rem">
+      <div style="width:40px;height:40px;border-radius:10px;background:#e2e3e5;display:flex;align-items:center;justify-content:center;font-size:1.2rem">📅</div>
+      <div style="display:flex;flex-direction:column"><span style="font-size:.75rem;color:#6c757d">Este Mes</span><span style="font-size:1.5rem;font-weight:700;color:#212529" id="kairGcMetricMonth">—</span></div>
+    </div>
+  </div>
+
+  <!-- ── Pipeline de Estado ─────────────────────── -->
+  <div class="kair-gc-pipeline">
+    <div class="kair-gc-pipeline-stage" data-stage="solicitud">
+      <div class="kair-gc-pipeline-dot" aria-hidden="true"></div>
+      <div class="kair-gc-pipeline-info">
+        <div class="kair-gc-pipeline-label">Solicitud</div>
+        <div class="kair-gc-pipeline-count" id="kairGcPipeSolicitud">0</div>
+      </div>
+    </div>
+    <div class="kair-gc-pipeline-arrow" aria-hidden="true">›</div>
+    <div class="kair-gc-pipeline-stage" data-stage="evaluacion">
+      <div class="kair-gc-pipeline-dot" aria-hidden="true"></div>
+      <div class="kair-gc-pipeline-info">
+        <div class="kair-gc-pipeline-label">En Evaluación</div>
+        <div class="kair-gc-pipeline-count" id="kairGcPipeEvaluacion">0</div>
+      </div>
+    </div>
+    <div class="kair-gc-pipeline-arrow" aria-hidden="true">›</div>
+    <div class="kair-gc-pipeline-stage" data-stage="aprobado">
+      <div class="kair-gc-pipeline-dot" aria-hidden="true"></div>
+      <div class="kair-gc-pipeline-info">
+        <div class="kair-gc-pipeline-label">Aprobado</div>
+        <div class="kair-gc-pipeline-count" id="kairGcPipeAprobado">0</div>
+      </div>
+    </div>
+    <div class="kair-gc-pipeline-arrow" aria-hidden="true">›</div>
+    <div class="kair-gc-pipeline-stage" data-stage="ejecucion">
+      <div class="kair-gc-pipeline-dot" aria-hidden="true"></div>
+      <div class="kair-gc-pipeline-info">
+        <div class="kair-gc-pipeline-label">En Ejecución</div>
+        <div class="kair-gc-pipeline-count" id="kairGcPipeEjecucion">0</div>
+      </div>
+    </div>
+    <div class="kair-gc-pipeline-arrow" aria-hidden="true">›</div>
+    <div class="kair-gc-pipeline-stage" data-stage="cerrado">
+      <div class="kair-gc-pipeline-dot" aria-hidden="true"></div>
+      <div class="kair-gc-pipeline-info">
+        <div class="kair-gc-pipeline-label">Cerrado</div>
+        <div class="kair-gc-pipeline-count" id="kairGcPipeCerrado">0</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Tabla de Cambios ───────────────────────── -->
+  <div class="kair-gc-table-section">
+    <div class="kair-gc-toolbar">
+      <div class="kair-gc-toolbar-left">
+        <span class="kair-gc-section-title">Registro de Cambios</span>
+      </div>
+      <div class="kair-gc-toolbar-right">
+        <select class="kair-gc-filter-select" id="kairGcFilterEstado" aria-label="Filtrar por estado">
+          <option value="">Todos los Estados</option>
+          <option value="Pendiente">Pendiente</option>
+          <option value="En Evaluación">En Evaluación</option>
+          <option value="Aprobado">Aprobado</option>
+          <option value="En Ejecución">En Ejecución</option>
+          <option value="Cerrado">Cerrado</option>
+        </select>
+        <select class="kair-gc-filter-select" id="kairGcFilterRiesgo" aria-label="Filtrar por riesgo">
+          <option value="">Todos los Riesgos</option>
+          <option value="BAJO">Bajo</option>
+          <option value="MEDIO">Medio</option>
+          <option value="ALTO">Alto</option>
+        </select>
+      </div>
+    </div>
+    <div class="kair-gc-table-container">
+      <table class="kair-gc-table" id="kairGcChangesTable">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Fecha</th>
+            <th>Área Ejecutora</th>
+            <th>Tipo</th>
+            <th>Responsable</th>
+            <th>Riesgo</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="kairGcTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── Estado Vacío ───────────────────────────── -->
+  <div class="kair-gc-empty-state kair-gc-hidden" id="kairGcEmptyState">
+    <div class="kair-gc-empty-icon" aria-hidden="true">
+      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24"
+           fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
+        <rect width="6" height="4" x="9" y="3" rx="1"/>
+        <path d="M9 12h6M9 16h4"/>
+      </svg>
+    </div>
+    <h3 class="kair-gc-empty-title">No hay cambios registrados</h3>
+    <p class="kair-gc-empty-description">Registre un nuevo cambio con el botón "+ Nuevo Cambio". El formato sigue los estándares GI-FO-058 y GI-FO-059.</p>
+  </div>
+
+  <!-- ── Loading ────────────────────────────────── -->
+  <div class="kair-gc-loading kair-gc-hidden" id="kairGcLoading">
+    <div class="kair-gc-loading-spinner" aria-hidden="true"></div>
+    <p>Cargando datos...</p>
+  </div>
+
+</div><!-- /kairGcDashboard -->
+
+
+<!-- ══════════════════════════════════════════════
+     MODAL WIZARD — GI-FO-058 / GI-FO-059
+     ══════════════════════════════════════════════ -->
+<div class="kair-gc-modal-overlay" id="kairGcModalOverlay">
+  <div class="kair-gc-modal" id="kairGcModal">
+
+    <!-- Modal Header -->
+    <div class="kair-gc-modal-header">
+      <div class="kair-gc-modal-header-info">
+        <h3 class="kair-gc-modal-title" id="kairGcModalTitle">Nuevo Cambio</h3>
+        <p class="kair-gc-modal-subtitle" id="kairGcModalSubtitle">GI-FO-058 / GI-FO-059 · Gestión del Cambio</p>
+      </div>
+      <button class="kair-gc-modal-close" id="kairGcModalClose" title="Cerrar" aria-label="Cerrar modal">×</button>
+    </div>
+
+    <!-- Wizard Step Indicator -->
+    <div class="kair-gc-wizard-steps">
+      <div class="kair-gc-wizard-step kair-gc-step-active" data-step="1">
+        <div class="kair-gc-step-circle">1</div>
+        <div class="kair-gc-step-label">Identificación</div>
+      </div>
+      <div class="kair-gc-step-line"></div>
+      <div class="kair-gc-wizard-step" data-step="2">
+        <div class="kair-gc-step-circle">2</div>
+        <div class="kair-gc-step-label">Lista de Chequeo</div>
+      </div>
+      <div class="kair-gc-step-line"></div>
+      <div class="kair-gc-wizard-step" data-step="3">
+        <div class="kair-gc-step-circle">3</div>
+        <div class="kair-gc-step-label">Evaluación y Controles</div>
+      </div>
+      <div class="kair-gc-step-line"></div>
+      <div class="kair-gc-wizard-step" data-step="4">
+        <div class="kair-gc-step-circle">4</div>
+        <div class="kair-gc-step-label">Plan y Cierre</div>
+      </div>
+    </div>
+
+    <!-- Modal Body (form steps) -->
+    <div class="kair-gc-modal-body">
+      <form id="kairGcChangeForm" novalidate>
+
+        <!-- ══ PASO 1: Identificación ══════════════════ -->
+        <div class="kair-gc-step-panel kair-gc-step-active" id="kairGcStep1">
+
+          <div class="kair-gc-form-section">
+            <div class="kair-gc-form-section-header">
+              <div class="kair-gc-section-badge">GI-FO-059</div>
+              <h4 class="kair-gc-form-section-title">Identificación del Cambio</h4>
+            </div>
+            <div class="kair-gc-form-grid">
+              <div class="kair-gc-form-group">
+                <label class="kair-gc-form-label">Número del Cambio</label>
+                <input type="text" class="kair-gc-input" id="kairGcChangeId" readonly placeholder="Auto-generado">
+              </div>
+              <div class="kair-gc-form-group">
+                <label class="kair-gc-form-label">Fecha de Solicitud <span class="kair-gc-required">*</span></label>
+                <input type="date" class="kair-gc-input" id="kairGcChangeDate" required>
+              </div>
+              <div class="kair-gc-form-group">
+                <label class="kair-gc-form-label">Área Ejecutora <span class="kair-gc-required">*</span></label>
+                <select class="kair-gc-select" id="kairGcExecutingArea" required>
+                  <option value="">Seleccione...</option>
+                  <option value="Producción">Producción</option>
+                  <option value="RRHH">RRHH</option>
+                  <option value="Seguridad">Seguridad</option>
+                  <option value="Mantenimiento">Mantenimiento</option>
+                  <option value="Calidad">Calidad</option>
+                  <option value="Administración">Administración</option>
+                  <option value="Operaciones">Operaciones</option>
+                </select>
+              </div>
+              <div class="kair-gc-form-group">
+                <label class="kair-gc-form-label">Fecha Prevista de Implementación</label>
+                <input type="date" class="kair-gc-input" id="kairGcImplDate">
+              </div>
+              <div class="kair-gc-form-group">
+                <label class="kair-gc-form-label">Área Usuaria del Cambio</label>
+                <input type="text" class="kair-gc-input" id="kairGcUserArea" placeholder="Área que se beneficia">
+              </div>
+              <div class="kair-gc-form-group">
+                <label class="kair-gc-form-label">Responsable del Cambio <span class="kair-gc-required">*</span></label>
+                <input type="text" class="kair-gc-input" id="kairGcResponsible" required placeholder="Nombre completo">
+              </div>
+              <div class="kair-gc-form-group">
+                <label class="kair-gc-form-label">Cargo</label>
+                <input type="text" class="kair-gc-input" id="kairGcPosition" placeholder="Cargo del responsable">
+              </div>
+              <div class="kair-gc-form-group kair-gc-full-width">
+                <label class="kair-gc-form-label">Descripción Clara y Concreta del Cambio Propuesto <span class="kair-gc-required">*</span></label>
+                <textarea class="kair-gc-textarea" id="kairGcDescription" rows="3" required placeholder="Describa qué cambia, cómo y dónde"></textarea>
+              </div>
+              <div class="kair-gc-form-group kair-gc-full-width">
+                <label class="kair-gc-form-label">Justificación del Cambio <span class="kair-gc-required">*</span></label>
+                <textarea class="kair-gc-textarea" id="kairGcJustification" rows="3" required placeholder="¿Por qué es necesario este cambio?"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <div class="kair-gc-form-section">
+            <div class="kair-gc-form-section-header">
+              <div class="kair-gc-section-badge">Tipo</div>
+              <h4 class="kair-gc-form-section-title">Tipo de Cambio <span class="kair-gc-required">*</span></h4>
+            </div>
+            <div class="kair-gc-tipo-grid">
+              <label class="kair-gc-tipo-item">
+                <input type="checkbox" name="kairGcTipoCambio" value="Operativo">
+                <span class="kair-gc-tipo-label">Operativo</span>
+              </label>
+              <label class="kair-gc-tipo-item">
+                <input type="checkbox" name="kairGcTipoCambio" value="Organizacional">
+                <span class="kair-gc-tipo-label">Organizacional</span>
+              </label>
+              <label class="kair-gc-tipo-item">
+                <input type="checkbox" name="kairGcTipoCambio" value="Tecnológico">
+                <span class="kair-gc-tipo-label">Tecnológico</span>
+              </label>
+              <label class="kair-gc-tipo-item">
+                <input type="checkbox" name="kairGcTipoCambio" value="Locativo">
+                <span class="kair-gc-tipo-label">Locativo</span>
+              </label>
+              <label class="kair-gc-tipo-item">
+                <input type="checkbox" name="kairGcTipoCambio" value="Personal">
+                <span class="kair-gc-tipo-label">Personal</span>
+              </label>
+              <label class="kair-gc-tipo-item">
+                <input type="checkbox" name="kairGcTipoCambio" value="Temporal">
+                <span class="kair-gc-tipo-label">Temporal</span>
+              </label>
+              <label class="kair-gc-tipo-item">
+                <input type="checkbox" name="kairGcTipoCambio" value="Permanente">
+                <span class="kair-gc-tipo-label">Permanente</span>
+              </label>
+              <label class="kair-gc-tipo-item">
+                <input type="checkbox" name="kairGcTipoCambio" value="Emergencia">
+                <span class="kair-gc-tipo-label">Emergencia</span>
+              </label>
+            </div>
+          </div>
+
+        </div><!-- /kairGcStep1 -->
+
+        <!-- ══ PASO 2: Lista de Chequeo GI-FO-058 ═════ -->
+        <div class="kair-gc-step-panel" id="kairGcStep2">
+
+          <div class="kair-gc-form-section">
+            <div class="kair-gc-form-section-header">
+              <div class="kair-gc-section-badge kair-gc-badge-sst">GI-FO-058</div>
+              <h4 class="kair-gc-form-section-title">Lista de Chequeo — Evaluación Preliminar del Impacto en SST</h4>
+            </div>
+            <p class="kair-gc-form-hint">Para cada pregunta marque SI / NO / NA. Si la respuesta es SI, especifique el detalle e indique el responsable de gestión.</p>
+
+            <!-- Recursos Humanos -->
+            <div class="kair-gc-checklist-group">
+              <div class="kair-gc-checklist-group-header">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                Recursos Humanos
+              </div>
+              <div class="kair-gc-checklist-table-wrap">
+                <table class="kair-gc-checklist-table">
+                  <thead>
+                    <tr>
+                      <th class="kair-gc-col-num">#</th>
+                      <th>Pregunta</th>
+                      <th class="kair-gc-col-resp">SI</th>
+                      <th class="kair-gc-col-resp">NO</th>
+                      <th class="kair-gc-col-resp">NA</th>
+                      <th class="kair-gc-col-esp">En caso de SI, especifique</th>
+                      <th class="kair-gc-col-pers">Persona responsable</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="kair-gc-col-num">1</td>
+                      <td>¿El cambio implica modificación de funciones o tareas?</td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcRh1" value="SI"></td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcRh1" value="NO"></td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcRh1" value="NA"></td>
+                      <td><input type="text" class="kair-gc-input" id="kairGcRh1Esp" placeholder="Especifique..."></td>
+                      <td><input type="text" class="kair-gc-input" id="kairGcRh1Resp" placeholder="Responsable"></td>
+                    </tr>
+                    <tr>
+                      <td class="kair-gc-col-num">2</td>
+                      <td>¿Requiere capacitación previa al cambio?</td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcRh2" value="SI"></td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcRh2" value="NO"></td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcRh2" value="NA"></td>
+                      <td><input type="text" class="kair-gc-input" id="kairGcRh2Esp" placeholder="Especifique..."></td>
+                      <td><input type="text" class="kair-gc-input" id="kairGcRh2Resp" placeholder="Responsable"></td>
+                    </tr>
+                    <tr>
+                      <td class="kair-gc-col-num">3</td>
+                      <td>¿Afecta turnos, horarios o carga laboral?</td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcRh3" value="SI"></td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcRh3" value="NO"></td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcRh3" value="NA"></td>
+                      <td><input type="text" class="kair-gc-input" id="kairGcRh3Esp" placeholder="Especifique..."></td>
+                      <td><input type="text" class="kair-gc-input" id="kairGcRh3Resp" placeholder="Responsable"></td>
+                    </tr>
+                    <tr>
+                      <td class="kair-gc-col-num">4</td>
+                      <td>¿Involucra contratistas o terceros?</td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcRh4" value="SI"></td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcRh4" value="NO"></td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcRh4" value="NA"></td>
+                      <td><input type="text" class="kair-gc-input" id="kairGcRh4Esp" placeholder="Especifique..."></td>
+                      <td><input type="text" class="kair-gc-input" id="kairGcRh4Resp" placeholder="Responsable"></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Requisitos Legales -->
+            <div class="kair-gc-checklist-group">
+              <div class="kair-gc-checklist-group-header">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                Requisitos Legales
+              </div>
+              <div class="kair-gc-checklist-table-wrap">
+                <table class="kair-gc-checklist-table">
+                  <thead>
+                    <tr>
+                      <th class="kair-gc-col-num">#</th>
+                      <th>Pregunta</th>
+                      <th class="kair-gc-col-resp">SI</th>
+                      <th class="kair-gc-col-resp">NO</th>
+                      <th class="kair-gc-col-resp">NA</th>
+                      <th class="kair-gc-col-esp">En caso de SI, especifique</th>
+                      <th class="kair-gc-col-pers">Persona responsable</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="kair-gc-col-num">5</td>
+                      <td>¿El cambio genera nuevos requisitos legales aplicables?</td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcRl1" value="SI"></td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcRl1" value="NO"></td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcRl1" value="NA"></td>
+                      <td><input type="text" class="kair-gc-input" id="kairGcRl1Esp" placeholder="Especifique..."></td>
+                      <td><input type="text" class="kair-gc-input" id="kairGcRl1Resp" placeholder="Responsable"></td>
+                    </tr>
+                    <tr>
+                      <td class="kair-gc-col-num">6</td>
+                      <td>¿Requiere actualización de procedimientos del SG-SST?</td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcRl2" value="SI"></td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcRl2" value="NO"></td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcRl2" value="NA"></td>
+                      <td><input type="text" class="kair-gc-input" id="kairGcRl2Esp" placeholder="Especifique..."></td>
+                      <td><input type="text" class="kair-gc-input" id="kairGcRl2Resp" placeholder="Responsable"></td>
+                    </tr>
+                    <tr>
+                      <td class="kair-gc-col-num">7</td>
+                      <td>¿Requiere actualización de la matriz legal?</td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcRl3" value="SI"></td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcRl3" value="NO"></td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcRl3" value="NA"></td>
+                      <td><input type="text" class="kair-gc-input" id="kairGcRl3Esp" placeholder="Especifique..."></td>
+                      <td><input type="text" class="kair-gc-input" id="kairGcRl3Resp" placeholder="Responsable"></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Seguridad y Salud -->
+            <div class="kair-gc-checklist-group">
+              <div class="kair-gc-checklist-group-header">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                Seguridad y Salud en el Trabajo
+              </div>
+              <div class="kair-gc-checklist-table-wrap">
+                <table class="kair-gc-checklist-table">
+                  <thead>
+                    <tr>
+                      <th class="kair-gc-col-num">#</th>
+                      <th>Pregunta</th>
+                      <th class="kair-gc-col-resp">SI</th>
+                      <th class="kair-gc-col-resp">NO</th>
+                      <th class="kair-gc-col-resp">NA</th>
+                      <th class="kair-gc-col-esp">En caso de SI, especifique</th>
+                      <th class="kair-gc-col-pers">Persona responsable</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="kair-gc-col-num">8</td>
+                      <td>¿El cambio introduce nuevos peligros?</td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcSst1" value="SI"></td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcSst1" value="NO"></td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcSst1" value="NA"></td>
+                      <td><input type="text" class="kair-gc-input" id="kairGcSst1Esp" placeholder="Especifique..."></td>
+                      <td><input type="text" class="kair-gc-input" id="kairGcSst1Resp" placeholder="Responsable"></td>
+                    </tr>
+                    <tr>
+                      <td class="kair-gc-col-num">9</td>
+                      <td>¿Modifica riesgos existentes?</td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcSst2" value="SI"></td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcSst2" value="NO"></td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcSst2" value="NA"></td>
+                      <td><input type="text" class="kair-gc-input" id="kairGcSst2Esp" placeholder="Especifique..."></td>
+                      <td><input type="text" class="kair-gc-input" id="kairGcSst2Resp" placeholder="Responsable"></td>
+                    </tr>
+                    <tr>
+                      <td class="kair-gc-col-num">10</td>
+                      <td>¿Incrementa el nivel de riesgo actual?</td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcSst3" value="SI"></td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcSst3" value="NO"></td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcSst3" value="NA"></td>
+                      <td><input type="text" class="kair-gc-input" id="kairGcSst3Esp" placeholder="Especifique..."></td>
+                      <td><input type="text" class="kair-gc-input" id="kairGcSst3Resp" placeholder="Responsable"></td>
+                    </tr>
+                    <tr>
+                      <td class="kair-gc-col-num">11</td>
+                      <td>¿Requiere controles adicionales?</td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcSst4" value="SI"></td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcSst4" value="NO"></td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcSst4" value="NA"></td>
+                      <td><input type="text" class="kair-gc-input" id="kairGcSst4Esp" placeholder="Especifique..."></td>
+                      <td><input type="text" class="kair-gc-input" id="kairGcSst4Resp" placeholder="Responsable"></td>
+                    </tr>
+                    <tr>
+                      <td class="kair-gc-col-num">12</td>
+                      <td>¿Requiere EPP adicional o diferente?</td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcSst5" value="SI"></td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcSst5" value="NO"></td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcSst5" value="NA"></td>
+                      <td><input type="text" class="kair-gc-input" id="kairGcSst5Esp" placeholder="Especifique..."></td>
+                      <td><input type="text" class="kair-gc-input" id="kairGcSst5Resp" placeholder="Responsable"></td>
+                    </tr>
+                    <tr>
+                      <td class="kair-gc-col-num">13</td>
+                      <td>¿Requiere actualización obligatoria de la matriz de peligros?</td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcSst6" value="SI"></td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcSst6" value="NO"></td>
+                      <td class="kair-gc-col-resp"><input type="radio" name="kairGcSst6" value="NA"></td>
+                      <td><input type="text" class="kair-gc-input" id="kairGcSst6Esp" placeholder="Especifique..."></td>
+                      <td><input type="text" class="kair-gc-input" id="kairGcSst6Resp" placeholder="Responsable"></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Decisión sobre el cambio (GI-FO-058) -->
+          <div class="kair-gc-form-section">
+            <div class="kair-gc-form-section-header">
+              <div class="kair-gc-section-badge">Decisión</div>
+              <h4 class="kair-gc-form-section-title">Decisión sobre el Cambio</h4>
+            </div>
+            <div class="kair-gc-decision-group">
+              <label class="kair-gc-decision-item">
+                <input type="radio" name="kairGcDecision" value="aprobado">
+                <span class="kair-gc-decision-label kair-gc-decision-ok">
+                  <strong>Aprobado para ejecución</strong>
+                  <small>El cambio puede ejecutarse según lo planificado</small>
+                </span>
+              </label>
+              <label class="kair-gc-decision-item">
+                <input type="radio" name="kairGcDecision" value="aprobado_con_acciones">
+                <span class="kair-gc-decision-label kair-gc-decision-warn">
+                  <strong>Aprobado con acciones previas obligatorias</strong>
+                  <small>Requiere completar las acciones antes de ejecutar</small>
+                </span>
+              </label>
+              <label class="kair-gc-decision-item">
+                <input type="radio" name="kairGcDecision" value="no_aprobado">
+                <span class="kair-gc-decision-label kair-gc-decision-no">
+                  <strong>Cambio NO aprobado</strong>
+                  <small>No se autoriza la ejecución del cambio</small>
+                </span>
+              </label>
+            </div>
+            <div class="kair-gc-form-group kair-gc-mt-2">
+              <label class="kair-gc-form-label">Acciones requeridas antes de la ejecución</label>
+              <textarea class="kair-gc-textarea" id="kairGcAccionesRequeridas" rows="2" placeholder="Describa las acciones necesarias si aplica..."></textarea>
+            </div>
+          </div>
+
+        </div><!-- /kairGcStep2 -->
+
+        <!-- ══ PASO 3: Evaluación y Controles ═════════ -->
+        <div class="kair-gc-step-panel" id="kairGcStep3">
+
+          <!-- Evaluación de Impacto -->
+          <div class="kair-gc-form-section">
+            <div class="kair-gc-form-section-header">
+              <div class="kair-gc-section-badge">GI-FO-059</div>
+              <h4 class="kair-gc-form-section-title">Evaluación del Impacto</h4>
+            </div>
+            <div class="kair-gc-checklist-table-wrap">
+              <table class="kair-gc-checklist-table">
+                <thead>
+                  <tr>
+                    <th class="kair-gc-col-num">#</th>
+                    <th>Identificación de peligros y evaluación de riesgos</th>
+                    <th class="kair-gc-col-resp">SI</th>
+                    <th class="kair-gc-col-resp">NO</th>
+                    <th class="kair-gc-col-esp">Peligro afectado</th>
+                    <th class="kair-gc-col-date">Fecha act. matriz</th>
+                    <th class="kair-gc-col-pers">Firma verifica</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="kair-gc-col-num">1</td>
+                    <td>¿El cambio introduce nuevos peligros?</td>
+                    <td class="kair-gc-col-resp"><input type="radio" name="kairGcNewHazards" value="SI" id="kairGcNewHazardsYes"></td>
+                    <td class="kair-gc-col-resp"><input type="radio" name="kairGcNewHazards" value="NO" id="kairGcNewHazardsNo"></td>
+                    <td><input type="text" class="kair-gc-input" id="kairGcNewHazardsDesc" placeholder="Especifique el peligro"></td>
+                    <td><input type="date" class="kair-gc-input" id="kairGcHazard1MatrizDate"></td>
+                    <td><input type="text" class="kair-gc-input" id="kairGcHazard1Firma" placeholder="Firma"></td>
+                  </tr>
+                  <tr>
+                    <td class="kair-gc-col-num">2</td>
+                    <td>¿Modifica riesgos existentes?</td>
+                    <td class="kair-gc-col-resp"><input type="radio" name="kairGcModRisks" value="SI" id="kairGcModRisksYes"></td>
+                    <td class="kair-gc-col-resp"><input type="radio" name="kairGcModRisks" value="NO" id="kairGcModRisksNo"></td>
+                    <td><input type="text" class="kair-gc-input" id="kairGcModRisksDesc" placeholder="Especifique el riesgo"></td>
+                    <td><input type="date" class="kair-gc-input" id="kairGcRisk2MatrizDate"></td>
+                    <td><input type="text" class="kair-gc-input" id="kairGcRisk2Firma" placeholder="Firma"></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="kair-gc-form-grid kair-gc-mt-2">
+              <div class="kair-gc-form-group">
+                <label class="kair-gc-form-label">Nivel de Riesgo ANTES del cambio</label>
+                <select class="kair-gc-select" id="kairGcRiskBefore">
+                  <option value="">Seleccione...</option>
+                  <option value="Bajo">Bajo</option>
+                  <option value="Medio">Medio</option>
+                  <option value="Alto">Alto</option>
+                </select>
+              </div>
+              <div class="kair-gc-form-group">
+                <label class="kair-gc-form-label">Nivel de Riesgo DESPUÉS del cambio</label>
+                <select class="kair-gc-select" id="kairGcRiskAfter">
+                  <option value="">Seleccione...</option>
+                  <option value="Bajo">Bajo</option>
+                  <option value="Medio">Medio</option>
+                  <option value="Alto">Alto</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Controles Definidos -->
+          <div class="kair-gc-form-section">
+            <div class="kair-gc-form-section-header">
+              <div class="kair-gc-section-badge">Controles</div>
+              <h4 class="kair-gc-form-section-title">Controles Definidos — Jerarquía de Control</h4>
+            </div>
+            <p class="kair-gc-form-hint">Los controles deberán implementarse antes de la ejecución del cambio.</p>
+            <div class="kair-gc-controls-grid">
+              <div class="kair-gc-control-row">
+                <div class="kair-gc-control-label kair-gc-ctrl-elim">Eliminación</div>
+                <div class="kair-gc-control-fields">
+                  <input type="text" class="kair-gc-input" id="kairGcCtrlElimDesc" placeholder="Descripción del control">
+                  <input type="text" class="kair-gc-input" id="kairGcCtrlElimResp" placeholder="Responsable">
+                  <input type="date" class="kair-gc-input" id="kairGcCtrlElimDate" title="Fecha implementación">
+                </div>
+              </div>
+              <div class="kair-gc-control-row">
+                <div class="kair-gc-control-label kair-gc-ctrl-sust">Sustitución</div>
+                <div class="kair-gc-control-fields">
+                  <input type="text" class="kair-gc-input" id="kairGcCtrlSubDesc" placeholder="Descripción del control">
+                  <input type="text" class="kair-gc-input" id="kairGcCtrlSubResp" placeholder="Responsable">
+                  <input type="date" class="kair-gc-input" id="kairGcCtrlSubDate" title="Fecha implementación">
+                </div>
+              </div>
+              <div class="kair-gc-control-row">
+                <div class="kair-gc-control-label kair-gc-ctrl-ing">Ing. Ingeniería</div>
+                <div class="kair-gc-control-fields">
+                  <input type="text" class="kair-gc-input" id="kairGcCtrlEngDesc" placeholder="Descripción del control">
+                  <input type="text" class="kair-gc-input" id="kairGcCtrlEngResp" placeholder="Responsable">
+                  <input type="date" class="kair-gc-input" id="kairGcCtrlEngDate" title="Fecha implementación">
+                </div>
+              </div>
+              <div class="kair-gc-control-row">
+                <div class="kair-gc-control-label kair-gc-ctrl-adm">Administrativos</div>
+                <div class="kair-gc-control-fields">
+                  <input type="text" class="kair-gc-input" id="kairGcCtrlAdmDesc" placeholder="Descripción del control">
+                  <input type="text" class="kair-gc-input" id="kairGcCtrlAdmResp" placeholder="Responsable">
+                  <input type="date" class="kair-gc-input" id="kairGcCtrlAdmDate" title="Fecha implementación">
+                </div>
+              </div>
+              <div class="kair-gc-control-row">
+                <div class="kair-gc-control-label kair-gc-ctrl-epp">EPP</div>
+                <div class="kair-gc-control-fields">
+                  <input type="text" class="kair-gc-input" id="kairGcCtrlEppDesc" placeholder="Descripción del control">
+                  <input type="text" class="kair-gc-input" id="kairGcCtrlEppResp" placeholder="Responsable">
+                  <input type="date" class="kair-gc-input" id="kairGcCtrlEppDate" title="Fecha implementación">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Nivel de Riesgo Resultado -->
+          <div class="kair-gc-form-section kair-gc-risk-result-section">
+            <div class="kair-gc-form-section-header">
+              <div class="kair-gc-section-badge">Resultado</div>
+              <h4 class="kair-gc-form-section-title">Nivel de Riesgo del Cambio</h4>
+            </div>
+            <p class="kair-gc-form-hint">Los cambios de riesgo medio o alto requieren aprobación del Coordinador SST y Gerencia antes de ejecutarse.</p>
+            <div class="kair-gc-risk-selector">
+              <label class="kair-gc-risk-option kair-gc-risk-bajo">
+                <input type="radio" name="kairGcNivelRiesgo" value="BAJO">
+                <span>BAJO</span>
+              </label>
+              <label class="kair-gc-risk-option kair-gc-risk-medio">
+                <input type="radio" name="kairGcNivelRiesgo" value="MEDIO">
+                <span>MEDIO</span>
+              </label>
+              <label class="kair-gc-risk-option kair-gc-risk-alto">
+                <input type="radio" name="kairGcNivelRiesgo" value="ALTO">
+                <span>ALTO</span>
+              </label>
+            </div>
+          </div>
+
+        </div><!-- /kairGcStep3 -->
+
+        <!-- ══ PASO 4: Plan, Aprobaciones y Cierre ════ -->
+        <div class="kair-gc-step-panel" id="kairGcStep4">
+
+          <!-- Plan de Acción -->
+          <div class="kair-gc-form-section">
+            <div class="kair-gc-form-section-header">
+              <div class="kair-gc-section-badge">Plan</div>
+              <h4 class="kair-gc-form-section-title">Plan de Acción del Cambio</h4>
+            </div>
+            <div class="kair-gc-checklist-table-wrap">
+              <table class="kair-gc-checklist-table" id="kairGcActionPlanTable">
+                <thead>
+                  <tr>
+                    <th>Actividad</th>
+                    <th class="kair-gc-col-pers">Responsable</th>
+                    <th class="kair-gc-col-date">Fecha Inicio</th>
+                    <th class="kair-gc-col-date">Fecha Fin</th>
+                    <th class="kair-gc-col-estado">Estado</th>
+                    <th style="width:36px;"></th>
+                  </tr>
+                </thead>
+                <tbody id="kairGcActionPlanBody"></tbody>
+              </table>
+            </div>
+            <button type="button" class="kair-gc-btn kair-gc-btn-outline kair-gc-mt-1" id="kairGcAddActionRow">
+              + Agregar Actividad
+            </button>
+          </div>
+
+          <!-- Aprobaciones Obligatorias -->
+          <div class="kair-gc-form-section">
+            <div class="kair-gc-form-section-header">
+              <div class="kair-gc-section-badge kair-gc-badge-warn">Aprobaciones</div>
+              <h4 class="kair-gc-form-section-title">Aprobaciones Obligatorias</h4>
+            </div>
+            <p class="kair-gc-form-hint kair-gc-hint-danger">Sin estas aprobaciones el cambio no podrá ejecutarse.</p>
+            <div class="kair-gc-approval-grid">
+              <div class="kair-gc-approval-card">
+                <div class="kair-gc-approval-role">Responsable del Área Ejecutora</div>
+                <input type="date" class="kair-gc-input" id="kairGcApprovalAreaDate">
+                <input type="text" class="kair-gc-input" id="kairGcApprovalAreaSign" placeholder="Firma digital">
+              </div>
+              <div class="kair-gc-approval-card kair-gc-approval-required">
+                <div class="kair-gc-approval-role">Coordinador SST <span class="kair-gc-required">*</span></div>
+                <input type="date" class="kair-gc-input" id="kairGcApprovalSstDate">
+                <input type="text" class="kair-gc-input" id="kairGcApprovalSstSign" placeholder="Firma digital">
+              </div>
+              <div class="kair-gc-approval-card">
+                <div class="kair-gc-approval-role">Gerencia <small>(cuando aplique)</small></div>
+                <input type="date" class="kair-gc-input" id="kairGcApprovalMgmtDate">
+                <input type="text" class="kair-gc-input" id="kairGcApprovalMgmtSign" placeholder="Firma digital">
+              </div>
+            </div>
+          </div>
+
+          <!-- Ejecución y Seguimiento -->
+          <div class="kair-gc-form-section">
+            <div class="kair-gc-form-section-header">
+              <div class="kair-gc-section-badge">Ejecución</div>
+              <h4 class="kair-gc-form-section-title">Ejecución y Seguimiento</h4>
+            </div>
+            <div class="kair-gc-form-grid">
+              <div class="kair-gc-form-group">
+                <label class="kair-gc-form-label">Fecha Real de Ejecución</label>
+                <input type="date" class="kair-gc-input" id="kairGcExecDate">
+              </div>
+              <div class="kair-gc-form-group">
+                <label class="kair-gc-form-label">¿Controles implementados conforme a lo definido?</label>
+                <div class="kair-gc-radio-row">
+                  <label class="kair-gc-radio-item"><input type="radio" name="kairGcControlsImplemented" value="SI"> SI</label>
+                  <label class="kair-gc-radio-item"><input type="radio" name="kairGcControlsImplemented" value="NO"> NO</label>
+                </div>
+              </div>
+              <div class="kair-gc-form-group kair-gc-full-width">
+                <label class="kair-gc-form-label">Observaciones durante la Ejecución</label>
+                <textarea class="kair-gc-textarea" id="kairGcExecObs" rows="2" placeholder="Observaciones del proceso de ejecución..."></textarea>
+              </div>
+              <div class="kair-gc-form-group">
+                <label class="kair-gc-form-label">Fecha de Verificación</label>
+                <input type="date" class="kair-gc-input" id="kairGcVerifyDate">
+              </div>
+              <div class="kair-gc-form-group">
+                <label class="kair-gc-form-label">¿Los controles fueron eficaces?</label>
+                <div class="kair-gc-radio-row">
+                  <label class="kair-gc-radio-item"><input type="radio" name="kairGcControlsEffective" value="SI"> SI</label>
+                  <label class="kair-gc-radio-item"><input type="radio" name="kairGcControlsEffective" value="NO"> NO</label>
+                </div>
+              </div>
+              <div class="kair-gc-form-group kair-gc-full-width">
+                <label class="kair-gc-form-label">¿Se presentaron incidentes, actos o condiciones inseguras?</label>
+                <textarea class="kair-gc-textarea" id="kairGcIncidents" rows="2" placeholder="Describa si se presentaron incidentes..."></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- Cierre -->
+          <div class="kair-gc-form-section">
+            <div class="kair-gc-form-section-header">
+              <div class="kair-gc-section-badge kair-gc-badge-ok">Cierre</div>
+              <h4 class="kair-gc-form-section-title">Cierre del Cambio</h4>
+            </div>
+            <div class="kair-gc-form-grid">
+              <div class="kair-gc-form-group">
+                <label class="kair-gc-form-label">Fecha de Cierre</label>
+                <input type="date" class="kair-gc-input" id="kairGcCloseDate">
+              </div>
+              <div class="kair-gc-form-group kair-gc-full-width">
+                <label class="kair-gc-form-label">Conclusión del Coordinador de SST</label>
+                <textarea class="kair-gc-textarea" id="kairGcConclusion" rows="3" placeholder="Conclusión final sobre la eficacia del cambio..."></textarea>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /kairGcStep4 -->
+
+      </form>
+    </div><!-- /modal-body -->
+
+    <!-- Wizard Footer -->
+    <div class="kair-gc-modal-footer">
+      <button type="button" class="kair-gc-btn kair-gc-btn-ghost" id="kairGcCancelBtn">Cancelar</button>
+      <div class="kair-gc-wizard-nav">
+        <button type="button" class="kair-gc-btn kair-gc-btn-outline kair-gc-hidden" id="kairGcPrevBtn">← Anterior</button>
+        <span class="kair-gc-step-indicator" id="kairGcStepIndicator">Paso 1 de 4</span>
+        <button type="button" class="kair-gc-btn kair-gc-btn-primary" id="kairGcNextBtn">Siguiente →</button>
+        <button type="button" class="kair-gc-btn kair-gc-btn-success kair-gc-hidden" id="kairGcSaveBtn">Guardar Cambio</button>
+        <button type="button" class="kair-gc-btn kair-gc-btn-transition kair-gc-hidden" id="kairGcTransitionBtn">Avanzar Estado →</button>
+      </div>
+    </div>
+
+  </div><!-- /kairGcModal -->
+</div><!-- /kairGcModalOverlay -->

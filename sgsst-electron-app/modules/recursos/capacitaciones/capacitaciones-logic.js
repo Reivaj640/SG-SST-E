@@ -15,7 +15,11 @@ class CapacitacionesComponent {
         this.handleFileChange = null;
         this.availableSheets = [];
         this.chartInstance = null;
-        this._modalInBody = null; // ✏️ NUEVO — referencia al modal montado en body
+    this.typeChartInstance = null;
+ this._modalInBody = null;
+ this._confirmCallback = null;
+ this._confirmModalInBody = null;
+ this._isSaving = false;
     }
 
     render() {
@@ -34,7 +38,8 @@ class CapacitacionesComponent {
                     this.initializeCharts();
 
                     this.handleFileChange = () => {
-                        this.showNotification('Archivo modificado externamente. Recargando...', 'info');
+                        if (this._isSaving) return;
+                        window.KAIRToast.show('Archivo modificado externamente. Recargando...', 'info');
                         this.loadDataForYear(this.currentYear);
                     };
                     window.electronAPI.onIpcMessage('capacitaciones-file-changed', this.handleFileChange);
@@ -82,18 +87,40 @@ class CapacitacionesComponent {
             if (value) modal.style.setProperty(varName, value);
         });
 
-        this._modalInBody = modal;
-        document.body.appendChild(modal);
+ this._modalInBody = modal;
+  document.body.appendChild(modal);
+
+  const confirmModal = document.getElementById('confirmModal');
+  if (confirmModal) {
+   cssVars.forEach(varName => {
+    const value = computed.getPropertyValue(varName).trim();
+    if (value) confirmModal.style.setProperty(varName, value);
+   });
+   this._confirmModalInBody = confirmModal;
+   document.body.appendChild(confirmModal);
+  }
 
         console.log('[CapacitacionesComponent] Modal montado en document.body.');
     }
 
-    updateHeaderContext() {
-        const headerContext = document.getElementById('header-context-text');
-        if (headerContext) {
-            headerContext.textContent = `${this.currentCompany} / Recursos / Capacitaciones`;
-        }
+  updateHeaderContext() {
+    const companyText = document.getElementById('header-company-text');
+    if (companyText) {
+      companyText.textContent = this.currentCompany || '—';
     }
+  }
+
+  updateTabBadge() {
+    const badge = document.getElementById('badge-trainings');
+    if (!badge) return;
+    const pending = this.capacitaciones.filter(c => c.status === 'pending').length;
+    if (pending > 0) {
+      badge.textContent = pending;
+      badge.style.display = '';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
 
     destroy() {
         if (this.excelFilePath) {
@@ -102,24 +129,31 @@ class CapacitacionesComponent {
         if (this.handleFileChange) {
             window.electronAPI.removeIpcMessageListener('capacitaciones-file-changed', this.handleFileChange);
         }
-        if (this.chartInstance) {
-            this.chartInstance.destroy();
-        }
+  if (this.chartInstance) {
+    this.chartInstance.destroy();
+  }
+  if (this.typeChartInstance) {
+    this.typeChartInstance.destroy();
+  }
         // ✏️ NUEVO — remover modal del body al destruir el componente
         // evita que quede huérfano en el DOM si el usuario navega a otro módulo
-        if (this._modalInBody && this._modalInBody.parentNode === document.body) {
-            document.body.removeChild(this._modalInBody);
-            this._modalInBody = null;
-        }
+ if (this._modalInBody && this._modalInBody.parentNode === document.body) {
+  document.body.removeChild(this._modalInBody);
+  this._modalInBody = null;
+ }
+ if (this._confirmModalInBody && this._confirmModalInBody.parentNode === document.body) {
+  document.body.removeChild(this._confirmModalInBody);
+  this._confirmModalInBody = null;
+ }
     }
 
     initializeEventListeners() {
         // Navegación (Tabs)
-        document.querySelectorAll('.k-nav-item').forEach(item => {
-            item.addEventListener('click', () => {
-                this.switchView(item.getAttribute('data-view'));
-            });
-        });
+    document.querySelectorAll('.capacitaciones-tab').forEach(item => {
+      item.addEventListener('click', () => {
+        this.switchView(item.getAttribute('data-view'));
+      });
+    });
 
         // Botón Volver
         const backBtn = document.getElementById('btn-back-module');
@@ -137,22 +171,17 @@ class CapacitacionesComponent {
         });
         document.getElementById('btn-clear-filters')?.addEventListener('click', () => this.clearFilters());
 
-        // Botones de Acción del Dashboard
-        document.getElementById('btn-create-period')?.addEventListener('click', () => this.createNewPeriod());
+  // Botones de Acción del Dashboard
+  document.getElementById('btn-create-period')?.addEventListener('click', () => this.createNewPeriod());
+  document.getElementById('btn-create-period-header')?.addEventListener('click', () => this.createNewPeriod());
 
-        // Abrir modal en modo agregar
-        const openAddModal = () => this.openModal('add');
-        document.getElementById('btn-quick-add')?.addEventListener('click', openAddModal);
-        document.getElementById('btn-add-training')?.addEventListener('click', openAddModal);
+  // Abrir modal en modo agregar
+  const openAddModal = () => this.openModal('add');
+  document.getElementById('btn-add-training')?.addEventListener('click', openAddModal);
 
-        document.getElementById('btn-export-excel')?.addEventListener('click', () => this.exportToExcel());
+ document.getElementById('btn-export-excel')?.addEventListener('click', () => this.exportToExcel());
 
-        // Reportes — reemplaza el onclick inline previo
-        document.getElementById('btn-generate-report')?.addEventListener('click', () => {
-            this.showNotification('Generando reporte PDF...', 'info');
-        });
-
-        // Cerrar modales (funciona para el overlay único)
+ // Cerrar modales (funciona para el overlay único)
         document.querySelectorAll('.btn-close-modal').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -163,12 +192,14 @@ class CapacitacionesComponent {
 
         // Guardar (crea o actualiza según el estado del modal)
         document.getElementById('btn-save-training')?.addEventListener('click', () => this.saveTraining());
+
+ this.setupConfirmModal();
     }
 
     switchView(viewId) {
-        document.querySelectorAll('.k-nav-item').forEach(el => {
-            el.classList.toggle('active', el.getAttribute('data-view') === viewId);
-        });
+    document.querySelectorAll('.capacitaciones-tab').forEach(el => {
+      el.classList.toggle('active', el.getAttribute('data-view') === viewId);
+    });
         document.querySelectorAll('.k-view-section').forEach(el => el.classList.remove('active'));
 
         const targetSection = document.getElementById(`view-${viewId}`);
@@ -225,9 +256,72 @@ class CapacitacionesComponent {
         modal.classList.add('open');
     }
 
-    closeModals() {
-        document.querySelectorAll('.k-modal-overlay').forEach(el => el.classList.remove('open'));
-    }
+ closeModals() {
+  document.querySelectorAll('.k-modal-overlay').forEach(el => el.classList.remove('open'));
+ }
+
+ setupConfirmModal() {
+  const btnAccept = document.getElementById('btn-confirm-accept');
+  const btnCancel = document.getElementById('btn-confirm-cancel');
+  const confirmModal = document.getElementById('confirmModal');
+
+  if (btnAccept) btnAccept.addEventListener('click', () => this.acceptConfirm());
+  if (btnCancel) btnCancel.addEventListener('click', () => this.hideConfirmModal());
+  if (confirmModal) {
+   confirmModal.addEventListener('click', (e) => {
+    if (e.target === confirmModal) this.hideConfirmModal();
+   });
+  }
+  document.addEventListener('keydown', (e) => {
+   if (e.key === 'Escape' && confirmModal?.classList.contains('open')) {
+    this.hideConfirmModal();
+   }
+  });
+ }
+
+ showConfirmModal({ title, message, warning, acceptLabel, acceptIcon, onAccept }) {
+  const modal = document.getElementById('confirmModal');
+  if (!modal) return;
+
+  const titleEl = document.getElementById('confirm-title');
+  const iconEl = document.getElementById('confirm-icon');
+  const msgEl = document.getElementById('confirm-message');
+  const warnEl = document.getElementById('confirm-warning');
+  const labelEl = document.getElementById('confirm-accept-label');
+  const acceptBtn = document.getElementById('btn-confirm-accept');
+  const cancelBtn = document.getElementById('btn-confirm-cancel');
+
+  if (title) titleEl.childNodes[titleEl.childNodes.length - 1].textContent = ` ${title}`;
+  if (acceptIcon) iconEl.className = `bi ${acceptIcon}`;
+  if (message) msgEl.textContent = message;
+  if (warning) {
+   warnEl.textContent = warning;
+   warnEl.style.display = '';
+  } else {
+   warnEl.style.display = 'none';
+  }
+  if (acceptLabel) labelEl.textContent = acceptLabel;
+  if (acceptIcon && acceptBtn) {
+   const iconInBtn = acceptBtn.querySelector('i');
+   if (iconInBtn) iconInBtn.className = `bi ${acceptIcon}`;
+  }
+
+  this._confirmCallback = onAccept || null;
+  modal.classList.add('open');
+  if (cancelBtn) cancelBtn.focus();
+ }
+
+ hideConfirmModal() {
+  const modal = document.getElementById('confirmModal');
+  if (modal) modal.classList.remove('open');
+  this._confirmCallback = null;
+ }
+
+ acceptConfirm() {
+  const cb = this._confirmCallback;
+  this.hideConfirmModal();
+  if (cb) cb();
+ }
 
     // --- LÓGICA DE DATOS ---
 
@@ -271,7 +365,7 @@ class CapacitacionesComponent {
             });
 
             if (allExcelFiles.length === 0) {
-                this.showNotification('No se encontró archivo de capacitaciones.', 'info');
+                window.KAIRToast.show('No se encontró archivo de capacitaciones.', 'info');
                 return;
             }
 
@@ -283,7 +377,7 @@ class CapacitacionesComponent {
 
         } catch (error) {
             console.error('Error init:', error);
-            this.showNotification(`Error: ${error.message}`, 'danger');
+            window.KAIRToast.show(`Error: ${error.message}`, 'danger');
         }
     }
 
@@ -293,7 +387,7 @@ class CapacitacionesComponent {
 
         const sheetsResult = await window.electronAPI.getCapacitacionesSheets(this.excelFilePath);
         if (!sheetsResult.success) {
-            this.showNotification('Error al leer hojas del Excel.', 'warning');
+            window.KAIRToast.show('Error al leer hojas del Excel.', 'warning');
             return;
         }
 
@@ -336,7 +430,7 @@ class CapacitacionesComponent {
         ) || this.availableSheets.find(s => s.includes(year.toString()));
 
         if (!sheetName) {
-            this.showNotification(`No hay hoja para el año ${year}.`, 'warning');
+            window.KAIRToast.show(`No hay hoja para el año ${year}.`, 'warning');
             this.capacitaciones = [];
             this.applyFilters();
             return;
@@ -349,11 +443,11 @@ class CapacitacionesComponent {
             const { processedData, headers } = excelResult.data;
             this.capacitaciones = this.parseExcelDataToCapacitaciones(processedData, headers);
             this.applyFilters();
-            this.showNotification(`Datos del ${year} cargados.`, 'success');
+            window.KAIRToast.show(`Datos del ${year} cargados.`, 'success');
 
         } catch (error) {
             console.error('Error loadData:', error);
-            this.showNotification(`Error al cargar: ${error.message}`, 'danger');
+            window.KAIRToast.show(`Error al cargar: ${error.message}`, 'danger');
             this.capacitaciones = [];
             this.applyFilters();
         }
@@ -367,7 +461,7 @@ class CapacitacionesComponent {
         ) || this.availableSheets.find(s => s.includes(year.toString()));
 
         if (!sheetName) {
-            this.showNotification(`No hay hoja para el año ${year}.`, 'warning');
+            window.KAIRToast.show(`No hay hoja para el año ${year}.`, 'warning');
             return;
         }
 
@@ -392,12 +486,12 @@ class CapacitacionesComponent {
             })));
             console.groupEnd();
 
-            this.showNotification('Auditoría completada. Revisa la consola (F12).', 'info');
+            window.KAIRToast.show('Auditoría completada. Revisa la consola (F12).', 'info');
             return audit;
 
         } catch (error) {
             console.error('❌ [AUDIT] Error en auditoría:', error);
-            this.showNotification(`Error en auditoría: ${error.message}`, 'danger');
+            window.KAIRToast.show(`Error en auditoría: ${error.message}`, 'danger');
             return null;
         }
     }
@@ -458,23 +552,34 @@ class CapacitacionesComponent {
                 }
             }
 
-            if (fechaValue) {
-                if (typeof fechaValue === 'number' && fechaValue >= 1) {
-                    const utcDate   = new Date((fechaValue - 25569) * 86400 * 1000);
-                    const localDate = new Date(utcDate.getUTCFullYear(), utcDate.getUTCMonth(), utcDate.getUTCDate());
-                    fechaProgramada = `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}-${String(localDate.getDate()).padStart(2, '0')}`;
-                } else {
-                    const fechaStr  = String(fechaValue);
-                    let parsedDate  = new Date(fechaStr);
-                    if (isNaN(parsedDate.getTime())) {
-                        const parts = fechaStr.split('/');
-                        if (parts.length === 3) parsedDate = new Date(parts[2], parts[1] - 1, parts[0]);
-                    }
-                    if (!isNaN(parsedDate.getTime()) && parsedDate.getFullYear() >= 1900) {
-                        fechaProgramada = `${parsedDate.getFullYear()}-${String(parsedDate.getMonth() + 1).padStart(2, '0')}-${String(parsedDate.getDate()).padStart(2, '0')}`;
-                    }
-                }
-            }
+      if (fechaValue) {
+        if (typeof fechaValue === 'number' && fechaValue >= 1) {
+          const utcDate = new Date((fechaValue - 25569) * 86400 * 1000);
+          const localDate = new Date(utcDate.getUTCFullYear(), utcDate.getUTCMonth(), utcDate.getUTCDate());
+          fechaProgramada = `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}-${String(localDate.getDate()).padStart(2, '0')}`;
+        } else {
+          const fechaStr = String(fechaValue).trim();
+          let parsedDate = null;
+
+          const dmyMatch = fechaStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+          if (dmyMatch) {
+            parsedDate = new Date(parseInt(dmyMatch[3]), parseInt(dmyMatch[2]) - 1, parseInt(dmyMatch[1]));
+          }
+
+          const isoMatch = fechaStr.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+          if (!parsedDate && isoMatch) {
+            parsedDate = new Date(parseInt(isoMatch[1]), parseInt(isoMatch[2]) - 1, parseInt(isoMatch[3]));
+          }
+
+          if (!parsedDate) {
+            parsedDate = new Date(fechaStr);
+          }
+
+          if (parsedDate && !isNaN(parsedDate.getTime()) && parsedDate.getFullYear() >= 1900) {
+            fechaProgramada = `${parsedDate.getFullYear()}-${String(parsedDate.getMonth() + 1).padStart(2, '0')}-${String(parsedDate.getDate()).padStart(2, '0')}`;
+          }
+        }
+      }
 
             const instructor  = String(getCellValue(row[colInstructor]) || 'No especificado');
             const duracionNum = parseFloat(String(getCellValue(row[colDuracion])));
@@ -514,9 +619,10 @@ class CapacitacionesComponent {
             return !isNaN(f.getTime()) && (f.getMonth() + 1) == monthFilter;
         });
 
-        this.filteredCapacitaciones = filtered;
-        this.updateDashboardStats();
-        if (this.currentView === 'trainings') this.renderTable();
+    this.filteredCapacitaciones = filtered;
+    this.updateDashboardStats();
+    this.updateTabBadge();
+    if (this.currentView === 'trainings') this.renderTable();
         this.renderRecentList();
         this.updateCharts();
     }
@@ -527,24 +633,24 @@ class CapacitacionesComponent {
             if (el) el.value = '';
         });
         this.applyFilters();
-        this.showNotification('Filtros reseteados', 'info');
+        window.KAIRToast.show('Filtros reseteados', 'info');
     }
 
     // --- RENDERIZADO UI ---
 
-    updateDashboardStats() {
-        const total        = this.filteredCapacitaciones.length;
-        const completed    = this.filteredCapacitaciones.filter(c => c.estado === 'completed').length;
-        const pending      = this.filteredCapacitaciones.filter(c => c.estado === 'pending').length;
-        const participants = this.filteredCapacitaciones.reduce((sum, c) => sum + (parseInt(c.participantes) || 0), 0);
-        const progress     = total > 0 ? Math.round((completed / total) * 100) : 0;
+  updateDashboardStats() {
+    const total = this.filteredCapacitaciones.length;
+    const completed = this.filteredCapacitaciones.filter(c => c.estado === 'completed').length;
+    const pending = this.filteredCapacitaciones.filter(c => c.estado === 'pending').length;
+    const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-        document.getElementById('stat-total').textContent         = total;
-        document.getElementById('stat-completed').textContent     = completed;
-        document.getElementById('stat-pending').textContent       = pending;
-        document.getElementById('stat-participants').textContent  = participants;
-        document.getElementById('stat-progress-text').textContent = `${progress}% Completitud`;
-    }
+    document.getElementById('stat-total').textContent = total;
+    document.getElementById('stat-completed').textContent = completed;
+    document.getElementById('stat-pending').textContent = pending;
+    document.getElementById('stat-participants').textContent = 'N/D';
+    const progressEl = document.getElementById('stat-progress-text');
+    if (progressEl) progressEl.textContent = `${progress}%`;
+  }
 
     renderTable() {
         const tbody = document.getElementById('trainings-table-body');
@@ -565,31 +671,48 @@ class CapacitacionesComponent {
             tr.innerHTML = `
                 <td><strong>${item.nombre}</strong></td>
                 <td><span class="k-badge ${typeBadge}">${item.tipo.toUpperCase()}</span></td>
-                <td>${this.formatDate(item.fechaProgramada)}</td>
+			<td class="k-cell-date">${this.formatDate(item.fechaProgramada)}</td>
                 <td>${item.instructor}</td>
                 <td>${item.duracion}</td>
                 <td><span class="k-badge ${badgeClass}">${statusText}</span></td>
-                <td class="text-right">
-                    <button class="k-btn k-btn-outline k-btn-icon edit-btn" data-id="${item.id}" title="Editar">
-                        <i class="bi bi-pencil"></i>
-                    </button>
-                    ${item.estado === 'pending' ? `
-                    <button class="k-btn k-btn-outline k-btn-icon complete-btn"
-                            style="color:var(--k-success);border-color:var(--k-success);"
-                            data-id="${item.id}" title="Marcar como Realizada">
-                        <i class="bi bi-check-lg"></i>
-                    </button>` : ''}
-                </td>
+			<td class="text-right k-cell-actions"><div class="k-cell-actions__inner">
+          <button class="k-btn k-btn-outline k-btn-icon edit-btn" data-id="${item.id}" title="Editar">
+            <i class="bi bi-pencil"></i>
+          </button>
+          ${item.estado === 'pending' ? `
+          <button class="k-btn k-btn-outline k-btn-icon complete-btn"
+            style="color:var(--k-success);border-color:var(--k-success);"
+            data-id="${item.id}" title="Marcar como Realizada">
+            <i class="bi bi-check-lg"></i>
+          </button>` : `
+          <button class="k-btn k-btn-outline k-btn-icon revert-btn"
+            style="color:var(--k-warning,#ffc107);border-color:var(--k-warning,#ffc107);"
+            data-id="${item.id}" title="Revertir a Pendiente">
+            <i class="bi bi-arrow-counterclockwise"></i>
+          </button>`}
+          <button class="k-btn k-btn-outline k-btn-icon delete-btn"
+            style="color:var(--k-danger);border-color:var(--k-danger);"
+            data-id="${item.id}" title="Eliminar">
+            <i class="bi bi-trash"></i>
+          </button>
+        </div>
+        </td>
             `;
             tbody.appendChild(tr);
         });
 
-        tbody.querySelectorAll('.edit-btn').forEach(btn =>
-            btn.addEventListener('click', () => this.openModal('edit', parseInt(btn.dataset.id)))
-        );
-        tbody.querySelectorAll('.complete-btn').forEach(btn =>
-            btn.addEventListener('click', () => this.completeTraining(parseInt(btn.dataset.id)))
-        );
+    tbody.querySelectorAll('.edit-btn').forEach(btn =>
+      btn.addEventListener('click', () => this.openModal('edit', parseInt(btn.dataset.id)))
+    );
+    tbody.querySelectorAll('.complete-btn').forEach(btn =>
+      btn.addEventListener('click', () => this.completeTraining(parseInt(btn.dataset.id)))
+    );
+    tbody.querySelectorAll('.revert-btn').forEach(btn =>
+      btn.addEventListener('click', () => this.revertTraining(parseInt(btn.dataset.id)))
+    );
+    tbody.querySelectorAll('.delete-btn').forEach(btn =>
+      btn.addEventListener('click', () => this.deleteTraining(parseInt(btn.dataset.id)))
+    );
     }
 
     renderRecentList() {
@@ -626,7 +749,7 @@ class CapacitacionesComponent {
 
     async createNewPeriod() {
         if (!this.excelFilePath) {
-            this.showNotification('Error: No hay archivo cargado.', 'warning');
+            window.KAIRToast.show('Error: No hay archivo cargado.', 'warning');
             return;
         }
 
@@ -635,38 +758,44 @@ class CapacitacionesComponent {
             return m ? parseInt(m[0]) : 0;
         })) + 1;
 
-        const baseSheet = this.availableSheets.find(s => s.includes((nextYear - 1).toString())) || this.availableSheets[0];
+ const baseSheet = this.availableSheets.find(s => s.includes((nextYear - 1).toString())) || this.availableSheets[0];
 
-        if (!confirm(`¿Crear periodo ${nextYear} duplicando la hoja "${baseSheet}"?`)) return;
+  this.showConfirmModal({
+   title: 'Crear Nuevo Periodo',
+   message: `¿Crear periodo ${nextYear} duplicando la hoja "${baseSheet}"?`,
+   warning: 'Se creará una nueva hoja en el archivo Excel.',
+   acceptLabel: 'Crear Periodo',
+   acceptIcon: 'bi-calendar-plus',
+   onAccept: async () => {
+    window.KAIRToast.show(`Creando periodo ${nextYear}...`, 'info');
+    try {
+     const result = await window.electronAPI.duplicateCapacitacionesSheet({
+      filePath: this.excelFilePath,
+      currentSheetName: baseSheet,
+      newYear: nextYear
+     });
 
-        this.showNotification(`Creando periodo ${nextYear}...`, 'info');
+     if (!result?.success) throw new Error(result?.error || 'Error desconocido');
 
-        try {
-            const result = await window.electronAPI.duplicateCapacitacionesSheet({
-                filePath: this.excelFilePath,
-                currentSheetName: baseSheet,
-                newYear: nextYear
-            });
+     window.KAIRToast.show(`Periodo ${nextYear} creado.`, 'success');
 
-            if (!result?.success) throw new Error(result?.error || 'Error desconocido');
-
-            this.showNotification(`Periodo ${nextYear} creado.`, 'success');
-
-            const sheetsResult = await window.electronAPI.getCapacitacionesSheets(this.excelFilePath);
-            if (sheetsResult.success) {
-                this.availableSheets = sheetsResult.sheets.filter(s => typeof s === 'string');
-                await this._populateYearFilterFromSheets();
-                const yearFilter = document.getElementById('yearFilter');
-                if (yearFilter) {
-                    yearFilter.value = nextYear;
-                    yearFilter.dispatchEvent(new Event('change'));
-                }
-            }
-
-        } catch (error) {
-            console.error('Error creating period:', error);
-            this.showNotification(`Error: ${error.message}`, 'danger');
-        }
+     const sheetsResult = await window.electronAPI.getCapacitacionesSheets(this.excelFilePath);
+     if (sheetsResult.success) {
+      this.availableSheets = sheetsResult.sheets.filter(s => typeof s === 'string');
+      await this._populateYearFilterFromSheets();
+      const yearFilter = document.getElementById('yearFilter');
+      if (yearFilter) {
+       yearFilter.value = nextYear;
+       yearFilter.dispatchEvent(new Event('change'));
+      }
+     }
+    } catch (error) {
+     console.error('Error creating period:', error);
+     window.KAIRToast.show(`Error: ${error.message}`, 'danger');
+    }
+   }
+  });
+  return;
     }
 
     async saveTraining() {
@@ -686,7 +815,7 @@ class CapacitacionesComponent {
         const participants = parseInt(document.getElementById('trainingParticipants').value) || 0;
 
         if (!name || !newDate) {
-            this.showNotification('Nombre y Fecha son obligatorios.', 'warning');
+            window.KAIRToast.show('Nombre y Fecha son obligatorios.', 'warning');
             return;
         }
 
@@ -695,7 +824,7 @@ class CapacitacionesComponent {
         if (!isNaN(parsedDate.getTime()) && parsedDate.getFullYear() >= 1900) {
             fechaProgramada = `${parsedDate.getFullYear()}-${String(parsedDate.getMonth() + 1).padStart(2, '0')}-${String(parsedDate.getDate()).padStart(2, '0')}`;
         } else {
-            this.showNotification('La fecha ingresada no es válida.', 'warning');
+            window.KAIRToast.show('La fecha ingresada no es válida.', 'warning');
             return;
         }
 
@@ -715,7 +844,7 @@ class CapacitacionesComponent {
         this.closeModals();
         await this._saveDataToExcel();
         this.applyFilters();
-        this.showNotification('Capacitación creada.', 'success');
+        window.KAIRToast.show('Capacitación creada.', 'success');
     }
 
     async updateTraining() {
@@ -729,24 +858,29 @@ class CapacitacionesComponent {
         const date = document.getElementById('trainingDate').value;
 
         if (!name || !date) {
-            this.showNotification('Nombre y Fecha son obligatorios.', 'warning');
+            window.KAIRToast.show('Nombre y Fecha son obligatorios.', 'warning');
             return;
         }
 
-        this.capacitaciones[index] = {
-            ...this.capacitaciones[index],
-            nombre:          name,
-            tipo:            document.getElementById('trainingType').value,
-            fechaProgramada: date,
-            instructor:      document.getElementById('trainingInstructor').value,
-            duracion:        `${document.getElementById('trainingDuration').value} Horas`,
-            participantes:   parseInt(document.getElementById('trainingParticipants').value) || 0
-        };
+    const p = new Date(date.replace(/-/g, '/'));
+    const normalizedDate = (!isNaN(p.getTime()) && p.getFullYear() >= 1900)
+      ? `${p.getFullYear()}-${String(p.getMonth() + 1).padStart(2, '0')}-${String(p.getDate()).padStart(2, '0')}`
+      : date;
+
+    this.capacitaciones[index] = {
+      ...this.capacitaciones[index],
+      nombre: name,
+      tipo: document.getElementById('trainingType').value,
+      fechaProgramada: normalizedDate,
+      instructor: document.getElementById('trainingInstructor').value,
+      duracion: `${document.getElementById('trainingDuration').value} Horas`,
+      participantes: parseInt(document.getElementById('trainingParticipants').value) || 0
+    };
 
         this.closeModals();
         await this._saveDataToExcel();
         this.applyFilters();
-        this.showNotification('Capacitación actualizada.', 'success');
+        window.KAIRToast.show('Capacitación actualizada.', 'success');
     }
 
     async completeTraining(id) {
@@ -755,17 +889,47 @@ class CapacitacionesComponent {
         this.capacitaciones[index].estado = 'completed';
         await this._saveDataToExcel();
         this.applyFilters();
-        this.showNotification('¡Capacitación completada!', 'success');
+        window.KAIRToast.show('¡Capacitación completada!', 'success');
     }
+
+  async revertTraining(id) {
+    const index = this.capacitaciones.findIndex(c => c.id === id);
+    if (index === -1) return;
+    this.capacitaciones[index].estado = 'pending';
+    await this._saveDataToExcel();
+    this.applyFilters();
+    window.KAIRToast.show('Capacitación revertida a Pendiente.', 'warning');
+  }
+
+ async deleteTraining(id) {
+  const index = this.capacitaciones.findIndex(c => c.id === id);
+  if (index === -1) return;
+  const cap = this.capacitaciones[index];
+  this.showConfirmModal({
+   title: 'Eliminar Capacitación',
+   message: `¿Eliminar la capacitación "${cap.nombre}"?`,
+   warning: 'Esta acción no se puede deshacer.',
+   acceptLabel: 'Eliminar',
+   acceptIcon: 'bi-trash',
+   onAccept: async () => {
+    this.capacitaciones.splice(index, 1);
+    await this._saveDataToExcel();
+    this.applyFilters();
+    window.KAIRToast.show('Capacitación eliminada', 'success', { subtitle: `"${cap.nombre}" eliminada del registro` });
+   }
+  });
+  return;
+ }
 
     async _saveDataToExcel() {
         if (!this.excelFilePath) return;
         const sheetName = this.availableSheets.find(s => s.includes(this.currentYear.toString()));
         if (!sheetName) return;
 
+        this._isSaving = true;
         try {
             const sorted = [...this.capacitaciones].sort((a, b) => a.rowIndex - b.rowIndex);
-            this.showNotification('Guardando cambios en Excel...', 'info');
+            window.KAIRToast.show('Guardando cambios en Excel...', 'info');
 
             const result = await window.electronAPI.updateCapacitacionesExcel({
                 filePath: this.excelFilePath,
@@ -778,102 +942,140 @@ class CapacitacionesComponent {
             if (!result.success) throw new Error(result.error);
 
             await this.loadDataForYear(this.currentYear);
-            this.showNotification('Guardado exitoso.', 'success');
+            window.KAIRToast.show('Guardado exitoso.', 'success');
 
         } catch (error) {
             console.error('Save error:', error);
-            this.showNotification(`Error al guardar: ${error.message}`, 'danger');
+            window.KAIRToast.show(`Error al guardar: ${error.message}`, 'danger');
+        } finally {
+            this._isSaving = false;
         }
     }
 
     exportToExcel() {
-        this.showNotification('Exportando archivo... (Simulado)', 'info');
+        window.KAIRToast.show('Exportando archivo... (Simulado)', 'info');
     }
 
-    // --- GRÁFICOS ---
+  // --- GRÁFICOS ---
 
-    initializeCharts() {
-        const ctx = document.getElementById('trainingChart');
-        if (!ctx) { console.warn('[CHART] Canvas no encontrado.'); return; }
-        if (typeof Chart === 'undefined') { console.error('[CHART] Chart.js no cargado.'); return; }
+  initializeCharts() {
+    const isDark = this.container.getAttribute('data-theme') === 'dark';
+    const textColor = isDark ? '#adb5bd' : '#6c757d';
+    const gridColor = isDark ? '#3a3a4a' : '#f0f0f0';
 
-        if (this.chartInstance) this.chartInstance.destroy();
+    this.initializeTypeChart(isDark, textColor);
+    this.initializeBarChart(isDark, textColor, gridColor);
+  }
 
-        this.chartInstance = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'],
-                datasets: [
-                    { label: 'Completadas', data: Array(12).fill(0), backgroundColor: '#174ea6', borderRadius: 4 },
-                    { label: 'Programadas', data: Array(12).fill(0), backgroundColor: '#ffc107', borderRadius: 4 }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                resizeDelay: 200,
-                scales: {
-                    y: { beginAtZero: true, grid: { display: true, color: '#f0f0f0' } },
-                    x: { grid: { display: false } }
-                },
-                plugins: { legend: { position: 'bottom' } }
+  initializeBarChart(isDark, textColor, gridColor) {
+    const ctx = document.getElementById('trainingChart');
+    if (!ctx) { console.warn('[CHART] trainingChart canvas no encontrado.'); return; }
+    if (typeof Chart === 'undefined') { console.error('[CHART] Chart.js no cargado.'); return; }
+
+    if (this.chartInstance) this.chartInstance.destroy();
+
+    this.chartInstance = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'],
+        datasets: [
+          { label: 'Completadas', data: Array(12).fill(0), backgroundColor: '#174ea6', borderRadius: 4 },
+          { label: 'Pendientes', data: Array(12).fill(0), backgroundColor: '#ffc107', borderRadius: 4 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        resizeDelay: 200,
+        scales: {
+          y: { beginAtZero: true, grid: { display: true, color: gridColor }, ticks: { color: textColor } },
+          x: { grid: { display: false }, ticks: { color: textColor } }
+        },
+        plugins: { legend: { position: 'bottom', labels: { color: textColor } } }
+      }
+    });
+  }
+
+  initializeTypeChart(isDark, textColor) {
+    const ctx = document.getElementById('typeChart');
+    if (!ctx) { console.warn('[CHART] typeChart canvas no encontrado.'); return; }
+    if (typeof Chart === 'undefined') { console.error('[CHART] Chart.js no cargado.'); return; }
+
+    if (this.typeChartInstance) this.typeChartInstance.destroy();
+
+    const sstColor = '#174ea6';
+    const pypColor = '#17a2b8';
+
+    this.typeChartInstance = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['SST', 'PYP'],
+        datasets: [{
+          data: [0, 0],
+          backgroundColor: [sstColor, pypColor],
+          borderWidth: 0,
+          hoverOffset: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '65%',
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { color: textColor, padding: 16, usePointStyle: true, pointStyleWidth: 10 }
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                const value = context.parsed;
+                const pct = total > 0 ? Math.round((value / total) * 100) : 0;
+                return ` ${context.label}: ${value} (${pct}%)`;
+              }
             }
-        });
+          }
+        }
+      }
+    });
+  }
+
+  updateCharts() {
+    if (this.chartInstance) {
+      const completedData = Array(12).fill(0);
+      const pendingData = Array(12).fill(0);
+
+      this.filteredCapacitaciones.forEach(cap => {
+        const date = new Date(cap.fechaProgramada);
+        if (!isNaN(date.getTime())) {
+          const month = date.getMonth();
+          if (cap.estado === 'completed') completedData[month]++;
+          else pendingData[month]++;
+        }
+      });
+
+      this.chartInstance.data.datasets[0].data = completedData;
+      this.chartInstance.data.datasets[1].data = pendingData;
+      this.chartInstance.update();
     }
 
-    updateCharts() {
-        if (!this.chartInstance) return;
+    this.updateTypeChart();
+  }
 
-        const completedData = Array(12).fill(0);
-        const pendingData   = Array(12).fill(0);
+  updateTypeChart() {
+    if (!this.typeChartInstance) return;
 
-        this.filteredCapacitaciones.forEach(cap => {
-            const date = new Date(cap.fechaProgramada);
-            if (!isNaN(date.getTime())) {
-                const month = date.getMonth();
-                if (cap.estado === 'completed') completedData[month]++;
-                else pendingData[month]++;
-            }
-        });
+    const sstCount = this.filteredCapacitaciones.filter(c => c.tipo === 'sst').length;
+    const pypCount = this.filteredCapacitaciones.filter(c => c.tipo === 'pyp').length;
 
-        this.chartInstance.data.datasets[0].data = completedData;
-        this.chartInstance.data.datasets[1].data = pendingData;
-        this.chartInstance.update();
+    this.typeChartInstance.data.datasets[0].data = [sstCount, pypCount];
+        this.typeChartInstance.update();
     }
 
-    // --- UTILIDADES ---
+  // --- UTILIDADES ---
 
-    showNotification(message, type = 'info') {
-        const container = document.getElementById('toastContainer');
-        if (!container) return;
-
-        const toast = document.createElement('div');
-        toast.className = 'k-toast';
-
-        const typeMap = {
-            success: { color: 'var(--k-success)', icon: 'bi-check-circle-fill' },
-            danger:  { color: 'var(--k-danger)',  icon: 'bi-exclamation-circle-fill' },
-            warning: { color: 'var(--k-warning)', icon: 'bi-exclamation-triangle-fill' },
-            info:    { color: 'var(--k-primary)', icon: 'bi-info-circle-fill' }
-        };
-        const { color, icon } = typeMap[type] || typeMap.info;
-
-        toast.style.borderLeftColor = color;
-        toast.innerHTML = `
-            <i class="bi ${icon}" style="color:${color};font-size:1.2rem;flex-shrink:0;"></i>
-            <span>${message}</span>
-        `;
-
-        container.appendChild(toast);
-
-        setTimeout(() => {
-            toast.style.opacity = '0';
-            toast.style.transform = 'translateX(100%)';
-            setTimeout(() => toast.remove(), 300);
-        }, 4000);
-    }
-
-    formatDate(dateString) {
+  formatDate(dateString) {
         if (!dateString || dateString === 'No especificada') return '-';
         const date = new Date(dateString.replace(/-/g, '/'));
         return date.toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' });

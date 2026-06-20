@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Remisiones Médicas Ocupacionales</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="remisiones-view.css">
+</head>
+<body>
+
+<div class="rem-wrapper">
+
+    <!-- Header + KPIs -->
+    <div class="k-section-card" style="padding:0; margin-bottom:1rem;">
+        <!-- Fila 1: contenido principal -->
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
+            <div style="display:flex; align-items:center; gap:0.75rem;">
+                <i class="fas fa-file-medical" style="color:#174ea6; font-size:1.25rem;"></i>
+                <div>
+                    <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Ver Remisiones Médicas</h3>
+                    <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Gestión de la Salud — 3.1.6</p>
+                </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:0.75rem;">
+                <span class="k-section-card__company">
+                    <i class="bi bi-building"></i>
+                    <span id="header-company-text">—</span>
+                </span>
+                <div class="k-section-card__divider"></div>
+                <button class="header-back-btn" id="backBtn" title="Volver al módulo">
+                    <i class="fas fa-arrow-left"></i> Volver
+                </button>
+                <button class="header-action--ghost" id="refreshBtn" title="Actualizar">
+                    <i class="fas fa-sync-alt" id="refreshIcon"></i> Actualizar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="k-stats-ribbon" style="display:flex;gap:0;background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.06);padding:1rem 1.5rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem">
+        <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:.75rem">
+            <div style="width:40px;height:40px;border-radius:10px;background:rgba(23,78,166,.08);display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:#174ea6"><i class="fas fa-file-medical"></i></div>
+            <div style="display:flex;flex-direction:column"><span style="font-size:.75rem;color:#6c757d">Total Documentos</span><span style="font-size:1.5rem;font-weight:700;color:#212529" id="statTotal">0</span></div>
+        </div>
+        <div style="width:1px;height:40px;background:#dee2e6;margin:0 1rem"></div>
+        <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:.75rem">
+            <div style="width:40px;height:40px;border-radius:10px;background:rgba(255,193,7,.1);display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:#856404"><i class="fas fa-folder-open"></i></div>
+            <div style="display:flex;flex-direction:column"><span style="font-size:.75rem;color:#6c757d">Carpetas</span><span style="font-size:1.5rem;font-weight:700;color:#212529" id="statFolders">0</span></div>
+        </div>
+        <div style="width:1px;height:40px;background:#dee2e6;margin:0 1rem"></div>
+        <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:.75rem">
+            <div style="width:40px;height:40px;border-radius:10px;background:rgba(40,167,69,.08);display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:#28a745"><i class="fas fa-calendar-alt"></i></div>
+            <div style="display:flex;flex-direction:column"><span style="font-size:.75rem;color:#6c757d" id="statYearLabel">Este Año</span><span style="font-size:1.5rem;font-weight:700;color:#212529" id="statCurrentYear">0</span></div>
+        </div>
+    </div>
+
+        <!-- Contenido principal con scroll -->
+        <div class="rem-body">
+
+            <!-- Filtros por tipo de archivo -->
+            <div class="rem-filters">
+                <button class="rem-filter-btn active" data-filter="todos">
+                    <i class="fas fa-list"></i> Todos
+                </button>
+                <button class="rem-filter-btn" data-filter="pdf">
+                    <i class="fas fa-file-pdf"></i> PDF
+                </button>
+                <button class="rem-filter-btn" data-filter="word">
+                    <i class="fas fa-file-word"></i> Word
+                </button>
+                <button class="rem-filter-btn" data-filter="excel">
+                    <i class="fas fa-file-excel"></i> Excel
+                </button>
+            </div>
+
+            <!-- Barra de búsqueda -->
+            <div class="rem-search-bar">
+                <i class="fas fa-search rem-search-icon"></i>
+                <input type="text" id="searchInput" placeholder="Buscar por nombre de documento..." class="rem-search-input">
+                <button id="clearSearchBtn" class="rem-search-clear hidden" title="Limpiar búsqueda">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <!-- Lista de documentos agrupados por año -->
+            <div id="documentsList" class="rem-list">
+                <!-- Se llena dinámicamente -->
+            </div>
+
+        </div>
+
+        <!-- Modal de previsualización -->
+        <div id="previewModal" class="rem-modal hidden">
+            <div class="rem-modal-overlay" id="previewOverlay"></div>
+            <div class="rem-modal-content">
+                <div class="rem-modal-header">
+                    <h3 id="previewTitle">Previsualización</h3>
+                    <button id="closePreviewBtn" class="rem-modal-close" aria-label="Cerrar">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="rem-modal-body" id="previewBody">
+                    <!-- PDF iframe o loading -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast -->
+        <div id="toast" class="rem-toast" role="alert">
+            <div id="toastIcon" class="rem-toast-icon"></div>
+            <div class="rem-toast-content">
+                <p id="toastTitle" class="rem-toast-title"></p>
+                <p id="toastMessage" class="rem-toast-message"></p>
+            </div>
+            <button id="toastClose" class="rem-toast-close" aria-label="Cerrar">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+    </div>
+
+    <script src="remisiones-viewer.js"></script>
+</body>
+</html>

@@ -36,7 +36,7 @@ class Config:
         },
         "ASEL": {
             "investigaciones": "G:/Mi unidad/2. Trabajo/1. SG-SST/19. Asel S.A.S/3. Gestión de la Salud/3.2.2 Investigación de Accidentes, incidentes y Enfermedades/Investigaciones/2. Accidentes",
-            "plantilla": "G:/Mi unidad/2. Trabajo/1. SG-SST/19. Asel S.A.S/3. Gestión de la Salud/3.2.2 Investigación de Accidentes, incidentes y Enfermedades/Investigaciones/4. Procedimientos/GI-FO-020 INVESTIGACION.docx",
+            "plantilla": "G:/Mi unidad/2. Trabajo/1. SG-SST/19. Asel S.A.S/3. Gestión de la Salud/3.2.2 Investigación de Accidentes, incidentes y Enfermedades/Investigaciones/4. Procedimientos/A-FR-28 Investigación AT.docx",
         },
     }
 
@@ -470,6 +470,16 @@ def main():
             raise ValueError(f"No se encontró configuración para la empresa: {empresa}")
         template_path = Path(empresa_config.get("plantilla"))
         preferred_output_dir = empresa_config.get("investigaciones")
+
+        # Override de ruta de salida si el usuario la eligió desde el modal
+        user_output_dir = data.get("outputDir")
+        user_output_filename = data.get("outputFilename")
+        if user_output_dir:
+            preferred_output_dir = user_output_dir
+            logging.info(f"Output dir override desde modal: {preferred_output_dir}")
+        if user_output_filename:
+            logging.info(f"Output filename override desde modal: {user_output_filename}")
+
         if not template_path.exists():
             raise FileNotFoundError(f"Plantilla no encontrada en: {template_path}")
         if not preferred_output_dir:
@@ -505,8 +515,14 @@ def main():
         fecha = datetime.now().strftime("%Y%m%d")
 
         # Lógica para añadir contador si el archivo ya existe
-        base_filename = f"GI-FO-020_INVESTIGACION_{nombre_sanitizado}_{fecha}"
-        output_filename = f"{base_filename}.docx"
+        if user_output_filename:
+            output_filename = user_output_filename
+            if not output_filename.lower().endswith(".docx"):
+                output_filename += ".docx"
+            base_filename = output_filename.rsplit(".docx", 1)[0]
+        else:
+            base_filename = f"GI-FO-020_INVESTIGACION_{nombre_sanitizado}_{fecha}"
+            output_filename = f"{base_filename}.docx"
 
         # Para la comprobación, usamos una ruta normalizada que Path.exists() pueda manejar
         # La función de guardado se encargará del prefijo \\?\ si es necesario

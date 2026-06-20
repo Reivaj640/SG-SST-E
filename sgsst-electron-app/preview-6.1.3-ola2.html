@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Preview · K+AIR 6.1.3 · OLA 2 (List + Editor + Viewer)</title>
+<link rel="stylesheet" href="modules/verificacion/revision-alta-direccion/revision-alta-direccion-v2.css">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<style>
+  body { margin: 0; background: #f1f3f5; font-family: "Segoe UI", Roboto, sans-serif; }
+  .preview-banner {
+    background: #174ea6;
+    color: #fff;
+    padding: 14px 24px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .preview-banner strong { font-weight: 600; }
+  .preview-banner .pill {
+    background: rgba(255,255,255,0.2);
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .preview-nav {
+    background: #0f3a82;
+    padding: 12px 24px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .preview-nav button {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #fff;
+    padding: 8px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .preview-nav button:hover { background: rgba(255,255,255,0.2); }
+  .preview-nav button.is-active { background: #fff; color: #174ea6; font-weight: 600; }
+  .preview-shell {
+    max-width: 1400px;
+    margin: 0 auto;
+    background: #f8f9fa;
+    box-shadow: 0 0 24px rgba(0,0,0,0.06);
+  }
+  .preview-section { display: none; }
+  .preview-section.is-active { display: block; }
+</style>
+</head>
+<body>
+
+<div class="preview-banner">
+  <span class="pill">VISTA PREVIA · OLA 2</span>
+  <strong>K+AIR 6.1.3 · List + Editor + Viewer</strong>
+  <span>— Tres vistas nuevas: Listado (Patrón A), Editor 12 secciones (Patrón C), Visor imprimible del acta G-FO-006.</span>
+</div>
+
+<div class="preview-nav">
+  <span style="color:#fff; font-size:12px; padding: 8px 0;">Cambiar vista:</span>
+  <button class="is-active" data-target="list">1. Listado</button>
+  <button data-target="editor">2. Editor (12 secciones)</button>
+  <button data-target="viewer">3. Visor (acta imprimible)</button>
+</div>
+
+<div class="preview-shell">
+
+<!-- ======================
+     VISTA 1: LISTADO
+     ====================== -->
+<div class="preview-section is-active" id="sec-list">
+<div class="kair-rad-module">
+  <div class="kair-rad-toast-stack"></div>
+
+  <!-- Header -->
+  <header class="kair-rad-header">
+    <div class="kair-rad-header__bar">
+      <div class="kair-rad-header__left">
+        <button class="kair-rad-header__back">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <span class="kair-rad-header__pill--section">
+          <span class="dot"></span>6.1.3 · Revisión por la Alta Dirección
+        </span>
+      </div>
+      <div class="kair-rad-header__center">
+        <h1 class="kair-rad-header__title">Revisiones Gerenciales</h1>
+        <p class="kair-rad-header__subtitle">Ciclo anual del acta G-FO-006 con 12 secciones canónicas</p>
+      </div>
+      <div class="kair-rad-header__right">
+        <span class="kair-rad-header__company"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="1"/></svg> TEMPOSUM S.A.S.</span>
+        <span class="kair-rad-header__reference"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg> Procedimiento G-PR-001</span>
+        <button class="kair-rad-header__action kair-rad-header__action--primary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Nueva revisión</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Summary cards -->
+  <div class="kair-rad-summary-grid">
+    <div class="kair-rad-summary-card">
+      <div class="kair-rad-summary-card__label">Total</div>
+      <div class="kair-rad-summary-card__value">3</div>
+      <div class="kair-rad-summary-card__sub">revisiones registradas</div>
+    </div>
+    <div class="kair-rad-summary-card kair-rad-summary-card--success">
+      <div class="kair-rad-summary-card__label">Realizadas</div>
+      <div class="kair-rad-summary-card__value">2</div>
+      <div class="kair-rad-summary-card__sub kair-rad-summary-card__sub--success">actas cerradas</div>
+    </div>
+    <div class="kair-rad-summary-card kair-rad-summary-card--warning">
+      <div class="kair-rad-summary-card__label">En borrador</div>
+      <div class="kair-rad-summary-card__value">1</div>
+      <div class="kair-rad-summary-card__sub kair-rad-summary-card__sub--warning">en preparación</div>
+    </div>
+    <div class="kair-rad-summary-card kair-rad-summary-card--danger">
+      <div class="kair-rad-summary-card__label">Vencidas</div>
+      <div class="kair-rad-summary-card__value">0</div>
+      <div class="kair-rad-summary-card__sub">requieren atención</div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="kair-rad-tabs-bar">
+    <button class="kair-rad-tabs-bar__btn is-active">Todas <span class="kair-rad-tabs-bar__badge">3</span></button>
+    <button class="kair-rad-tabs-bar__btn">Realizadas <span class="kair-rad-tabs-bar__badge">2</span></button>
+    <button class="kair-rad-tabs-bar__btn">Borrador <span class="kair-rad-tabs-bar__badge">1</span></button>
+    <button class="kair-rad-tabs-bar__btn">Vencidas <span class="kair-rad-tabs-bar__badge">0</span></button>
+  </div>
+
+  <!-- Search row -->
+  <div class="kair-rad-search-row">
+    <div class="kair-rad-search">
+      <i class="bi bi-search kair-rad-search__icon"></i>
+      <input type="text" placeholder="Buscar por consecutivo, período, preside o empresa..." value="">
+    </div>
+    <span class="kair-rad-search-count">3 resultados</span>
+  </div>
+
+  <!-- Table -->
+  <div class="kair-rad-table-card" style="margin-top: var(--rad-s4);">
+    <table class="kair-rad-table kair-rad-table--9col">
+      <thead>
+        <tr>
+          <th>Consecutivo</th>
+          <th>Período</th>
+          <th>Empresa</th>
+          <th>Fecha realizada</th>
+          <th>Preside</th>
+          <th>Elabora</th>
+          <th>Estado</th>
+          <th style="min-width:160px">Progreso</th>
+          <th style="width:120px; text-align:right">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><div class="col-doc"><div class="col-doc-icon"><i class="bi bi-file-earmark-text"></i></div><div><div class="col-doc-id">RG-2024-01</div><div class="col-doc-sub">4 participantes</div></div></div></td>
+          <td><strong>2024</strong></td>
+          <td>TEMPOSUM S.A.S.</td>
+          <td>4 ene 2024</td>
+          <td>Sergina Orozco Hincapié</td>
+          <td>Javier Robles Fontalvo</td>
+          <td><span class="kair-rad-badge kair-rad-badge--success"><span class="dot"></span>Realizada</span></td>
+          <td><div class="kair-rad-table-progress"><div class="kair-rad-table-progress__bar"><div class="kair-rad-table-progress__fill kair-rad-table-progress__fill--success" style="width:100%"></div></div><span class="kair-rad-table-progress__label">100%</span></div></td>
+          <td><div class="cell-actions"><button class="kair-rad-icon-btn" title="Ver acta"><i class="bi bi-eye"></i></button><button class="kair-rad-icon-btn" title="Editar"><i class="bi bi-pencil"></i></button></div></td>
+        </tr>
+        <tr>
+          <td><div class="col-doc"><div class="col-doc-icon"><i class="bi bi-file-earmark-text"></i></div><div><div class="col-doc-id">RG-2025-01</div><div class="col-doc-sub">2 participantes</div></div></div></td>
+          <td><strong>2025</strong></td>
+          <td>TEMPOSUM S.A.S.</td>
+          <td>15 dic 2025</td>
+          <td>Sergina Orozco Hincapié</td>
+          <td>Javier Robles Fontalvo</td>
+          <td><span class="kair-rad-badge kair-rad-badge--info"><span class="dot"></span>Borrador</span></td>
+          <td><div class="kair-rad-table-progress"><div class="kair-rad-table-progress__bar"><div class="kair-rad-table-progress__fill kair-rad-table-progress__fill--warning" style="width:25%"></div></div><span class="kair-rad-table-progress__label">25%</span></div></td>
+          <td><div class="cell-actions"><button class="kair-rad-icon-btn" title="Ver acta"><i class="bi bi-eye"></i></button><button class="kair-rad-icon-btn" title="Editar"><i class="bi bi-pencil"></i></button></div></td>
+        </tr>
+        <tr>
+          <td><div class="col-doc"><div class="col-doc-icon"><i class="bi bi-file-earmark-text"></i></div><div><div class="col-doc-id">RG-2023-01</div><div class="col-doc-sub">3 participantes</div></div></div></td>
+          <td><strong>2023</strong></td>
+          <td>TEMPOSUM S.A.S.</td>
+          <td>12 ene 2023</td>
+          <td>Sergina Orozco Hincapié</td>
+          <td>Javier Robles Fontalvo</td>
+          <td><span class="kair-rad-badge kair-rad-badge--success"><span class="dot"></span>Realizada</span></td>
+          <td><div class="kair-rad-table-progress"><div class="kair-rad-table-progress__bar"><div class="kair-rad-table-progress__fill kair-rad-table-progress__fill--success" style="width:100%"></div></div><span class="kair-rad-table-progress__label">100%</span></div></td>
+          <td><div class="cell-actions"><button class="kair-rad-icon-btn" title="Ver acta"><i class="bi bi-eye"></i></button><button class="kair-rad-icon-btn" title="Editar"><i class="bi bi-pencil"></i></button></div></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</div>
+
+<!-- ======================
+     VISTA 2: EDITOR
+     ====================== -->
+<div class="preview-section" id="sec-editor">
+<div class="kair-rad-module">
+  <div class="kair-rad-toast-stack"></div>
+
+  <header class="kair-rad-header">
+    <div class="kair-rad-header__bar">
+      <div class="kair-rad-header__left">
+        <button class="kair-rad-header__back">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <span class="kair-rad-header__pill--section">
+          <span class="dot"></span>6.1.3 · Revisión por la Alta Dirección
+        </span>
+      </div>
+      <div class="kair-rad-header__center">
+        <h1 class="kair-rad-header__title">Revisión Gerencial RG-2025-01</h1>
+        <p class="kair-rad-header__subtitle">Editor del acta conforme al formato G-FO-006 Rev. 03</p>
+      </div>
+      <div class="kair-rad-header__right">
+        <span class="kair-rad-header__company"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="1"/></svg> TEMPOSUM S.A.S.</span>
+        <button class="kair-rad-header__action kair-rad-header__action--secondary"><i class="bi bi-download"></i> Exportar XLSX</button>
+        <button class="kair-rad-header__action kair-rad-header__action--success"><i class="bi bi-check-circle"></i> Guardar y ver acta</button>
+      </div>
+    </div>
+  </header>
+
+  <div style="margin: var(--rad-s4) var(--rad-s6) 0 var(--rad-s6);">
+    <div class="kair-rad-inline-counter">
+      <span class="kair-rad-badge kair-rad-badge--info"><span class="dot"></span>Editor · RG-2025-01</span>
+      <span>·</span>
+      <span>Período 2025</span>
+    </div>
+  </div>
+
+  <div class="kair-rad-editor" style="margin-top: var(--rad-s4);">
+    <div class="kair-rad-editor__main">
+      <!-- Tabs -->
+      <div class="kair-rad-editor-tabs">
+        <button class="kair-rad-editor-tab is-active"><span class="kair-rad-editor-tab__num">·</span><span>Generalidades</span></button>
+        <button class="kair-rad-editor-tab"><span class="kair-rad-editor-tab__num">1</span><span>Lectura del acta anterior</span></button>
+        <button class="kair-rad-editor-tab"><span class="kair-rad-editor-tab__num">2</span><span>Revisión de componentes…</span></button>
+        <button class="kair-rad-editor-tab"><span class="kair-rad-editor-tab__num">3</span><span>Auditorías internas</span></button>
+        <button class="kair-rad-editor-tab"><span class="kair-rad-editor-tab__num">4</span><span>Requisitos legales</span></button>
+        <button class="kair-rad-editor-tab"><span class="kair-rad-editor-tab__num">5</span><span>Participación y consulta</span></button>
+        <button class="kair-rad-editor-tab"><span class="kair-rad-editor-tab__num">6</span><span>Investigación de incidentes</span></button>
+        <button class="kair-rad-editor-tab"><span class="kair-rad-editor-tab__num">7</span><span>Acciones del acta anterior</span></button>
+        <button class="kair-rad-editor-tab"><span class="kair-rad-editor-tab__num">8</span><span>Cambios que afecten el SG-SST</span></button>
+        <button class="kair-rad-editor-tab"><span class="kair-rad-editor-tab__num">9</span><span>Resultados de supervisión</span></button>
+        <button class="kair-rad-editor-tab"><span class="kair-rad-editor-tab__num">10</span><span>Evaluación inicial</span></button>
+        <button class="kair-rad-editor-tab"><span class="kair-rad-editor-tab__num">11</span><span>Acciones prev./correctivas</span></button>
+        <button class="kair-rad-editor-tab"><span class="kair-rad-editor-tab__num">12</span><span>Conclusiones</span></button>
+      </div>
+
+      <!-- Progress -->
+      <div class="kair-rad-editor-progress">
+        <div>
+          <div class="kair-rad-editor-progress__title">Avance del acta G-FO-006</div>
+          <div class="kair-rad-editor-progress__pct">0% completado</div>
+        </div>
+        <div class="kair-rad-editor-progress__counts">
+          <span class="kair-rad-editor-progress__count"><strong>0</strong> completadas</span>
+          <span class="kair-rad-editor-progress__count"><strong style="color:#b08500">1</strong> en progreso</span>
+          <span class="kair-rad-editor-progress__count"><strong style="color:var(--rad-text-muted)">12</strong> pendientes</span>
+        </div>
+        <div class="kair-rad-editor-progress__bar"><div class="kair-rad-editor-progress__fill" style="width:0%"></div></div>
+      </div>
+
+      <!-- Section card: Generalidades -->
+      <div class="kair-rad-section-card">
+        <div class="kair-rad-section-card__head">
+          <div class="kair-rad-section-card__num"><i class="bi bi-card-text" style="font-size:1rem"></i></div>
+          <div class="kair-rad-section-card__title-wrap">
+            <h2 class="kair-rad-section-card__title">Acta de Revisión Gerencial</h2>
+            <p class="kair-rad-section-card__hint">Encabezado del acta G-FO-006 · Rev. 03</p>
+          </div>
+          <span class="kair-rad-section-card__status kair-rad-section-card__status--pending"><span class="dot"></span>Pendiente</span>
+        </div>
+
+        <div class="kair-rad-form-row">
+          <div class="kair-rad-field"><label>Consecutivo <span style="color:var(--rad-danger)">*</span></label><input type="text" value="RG-2025-01" required></div>
+          <div class="kair-rad-field"><label>Período <span style="color:var(--rad-danger)">*</span></label><input type="text" value="2025" required></div>
+          <div class="kair-rad-field"><label>Fecha Programada <span style="color:var(--rad-danger)">*</span></label><input type="date" value="2025-12-15"></div>
+        </div>
+        <div class="kair-rad-form-row kair-rad-form-row--2" style="margin-top: var(--rad-s3);">
+          <div class="kair-rad-field"><label>Fecha Realizada</label><input type="date" value=""></div>
+          <div class="kair-rad-field"><label>Lugar</label><input type="text" value="Sede Administrativa TEMPOSUM S.A.S."></div>
+        </div>
+        <div class="kair-rad-form-row kair-rad-form-row--2" style="margin-top: var(--rad-s3);">
+          <div class="kair-rad-field"><label>Preside <span style="color:var(--rad-danger)">*</span></label><input type="text" value="Sergina Orozco Hincapié"></div>
+          <div class="kair-rad-field"><label>Elabora <span style="color:var(--rad-danger)">*</span></label><input type="text" value="Javier Robles Fontalvo"></div>
+        </div>
+
+        <div class="kair-rad-inline-counter">
+          <i class="bi bi-people"></i> <strong>2</strong> participantes registrados (por la empresa e invitados)
+        </div>
+
+        <div class="kair-rad-section-card__head" style="margin-top: var(--rad-s6); border-top: 1px solid var(--rad-border); padding-top: var(--rad-s4); border-bottom: none;">
+          <div class="kair-rad-section-card__num">1</div>
+          <div class="kair-rad-section-card__title-wrap">
+            <h2 class="kair-rad-section-card__title">1. Lectura del acta anterior</h2>
+            <p class="kair-rad-section-card__hint">Se realiza la lectura del acta de revisión gerencial anterior y se verifican las acciones pendientes.</p>
+          </div>
+          <span class="kair-rad-section-card__status kair-rad-section-card__status--pending"><span class="dot"></span>Pendiente</span>
+        </div>
+
+        <div style="margin-top: var(--rad-s4);">
+          <div class="kair-rad-field">
+            <label>Contenido de la sección</label>
+            <textarea placeholder="Describe los hallazgos, análisis y conclusiones de la sección..." rows="4"></textarea>
+            <span class="kair-rad-field-note">Este texto se exportará al campo correspondiente del formato G-FO-006.</span>
+          </div>
+        </div>
+
+        <div class="kair-rad-subpoints">
+          <h4 class="kair-rad-subpoints__title">Sub-puntos a verificar</h4>
+          <div class="kair-rad-subpoint">
+            <div class="kair-rad-subpoint__head">
+              <span class="kair-rad-subpoint__label">Lectura del acta anterior RG-2024-01</span>
+              <div class="kair-rad-subpoint__states">
+                <button class="kair-rad-state-btn kair-rad-state-btn--success is-active">Cumple</button>
+                <button class="kair-rad-state-btn kair-rad-state-btn--warning">Parcial</button>
+                <button class="kair-rad-state-btn kair-rad-state-btn--danger">No cumple</button>
+                <button class="kair-rad-state-btn">Pendiente</button>
+              </div>
+            </div>
+            <textarea placeholder="Observaciones específicas de este sub-punto…" rows="2"></textarea>
+          </div>
+          <div class="kair-rad-subpoint">
+            <div class="kair-rad-subpoint__head">
+              <span class="kair-rad-subpoint__label">Verificación de acciones pendientes</span>
+              <div class="kair-rad-subpoint__states">
+                <button class="kair-rad-state-btn kair-rad-state-btn--success">Cumple</button>
+                <button class="kair-rad-state-btn kair-rad-state-btn--warning is-active">Parcial</button>
+                <button class="kair-rad-state-btn kair-rad-state-btn--danger">No cumple</button>
+                <button class="kair-rad-state-btn">Pendiente</button>
+              </div>
+            </div>
+            <textarea placeholder="Observaciones específicas de este sub-punto…" rows="2"></textarea>
+          </div>
+        </div>
+
+        <div class="kair-rad-section-footer">
+          <span class="kair-rad-section-footer__hint">Completa el contenido y sub-puntos antes de marcar como completada</span>
+          <div style="display:flex; gap:var(--rad-s2)">
+            <button class="kair-rad-header__action kair-rad-header__action--success"><i class="bi bi-check-circle"></i> Marcar completada</button>
+            <button class="kair-rad-header__action kair-rad-header__action--secondary">Siguiente <i class="bi bi-chevron-right"></i></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sticky footer -->
+      <div class="kair-rad-sticky-footer">
+        <div class="kair-rad-sticky-footer__hint">Completa el contenido y sub-puntos antes de marcar como completada.</div>
+        <div class="kair-rad-sticky-footer__actions">
+          <button class="kair-rad-header__action kair-rad-header__action--ghost"><i class="bi bi-x-lg"></i> Cancelar</button>
+          <button class="kair-rad-header__action kair-rad-header__action--secondary"><i class="bi bi-file-earmark"></i> Guardar borrador</button>
+          <button class="kair-rad-header__action kair-rad-header__action--primary"><i class="bi bi-check-circle"></i> Finalizar y ver acta</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="kair-rad-editor__sidebar">
+      <div class="kair-rad-side-card">
+        <h3 class="kair-rad-side-card__title">Secciones del acta</h3>
+        <div class="kair-rad-side-nav">
+          <button class="kair-rad-side-nav__item is-active"><span class="kair-rad-side-nav__num">·</span><span class="kair-rad-side-nav__label">Generalidades</span></button>
+          <button class="kair-rad-side-nav__item"><span class="kair-rad-side-nav__num">1</span><span class="kair-rad-side-nav__label">Lectura del acta anterior</span></button>
+          <button class="kair-rad-side-nav__item"><span class="kair-rad-side-nav__num">2</span><span class="kair-rad-side-nav__label">Componentes organizacionales</span></button>
+          <button class="kair-rad-side-nav__item"><span class="kair-rad-side-nav__num">3</span><span class="kair-rad-side-nav__label">Auditorías internas</span></button>
+          <button class="kair-rad-side-nav__item"><span class="kair-rad-side-nav__num">4</span><span class="kair-rad-side-nav__label">Requisitos legales</span></button>
+          <button class="kair-rad-side-nav__item"><span class="kair-rad-side-nav__num">5</span><span class="kair-rad-side-nav__label">Participación y consulta</span></button>
+          <button class="kair-rad-side-nav__item"><span class="kair-rad-side-nav__num">6</span><span class="kair-rad-side-nav__label">Investigación de incidentes</span></button>
+          <button class="kair-rad-side-nav__item"><span class="kair-rad-side-nav__num">7</span><span class="kair-rad-side-nav__label">Acciones del acta anterior</span></button>
+          <button class="kair-rad-side-nav__item"><span class="kair-rad-side-nav__num">8</span><span class="kair-rad-side-nav__label">Cambios que afecten el SG-SST</span></button>
+          <button class="kair-rad-side-nav__item"><span class="kair-rad-side-nav__num">9</span><span class="kair-rad-side-nav__label">Resultados de supervisión</span></button>
+          <button class="kair-rad-side-nav__item"><span class="kair-rad-side-nav__num">10</span><span class="kair-rad-side-nav__label">Evaluación inicial</span></button>
+          <button class="kair-rad-side-nav__item"><span class="kair-rad-side-nav__num">11</span><span class="kair-rad-side-nav__label">Acciones prev./correctivas</span></button>
+          <button class="kair-rad-side-nav__item"><span class="kair-rad-side-nav__num">12</span><span class="kair-rad-side-nav__label">Conclusiones</span></button>
+        </div>
+      </div>
+
+      <div class="kair-rad-side-card">
+        <h3 class="kair-rad-side-card__title">Actividad reciente</h3>
+        <div class="kair-rad-activity-item">
+          <div class="kair-rad-activity-item__dot"></div>
+          <div class="kair-rad-activity-item__body">
+            <p class="kair-rad-activity-item__title">Borrador de revisión creado</p>
+            <p class="kair-rad-activity-item__meta">17/06/2026, 09:49 a. m. · Javier Robles Fontalvo</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="kair-rad-side-card">
+        <h3 class="kair-rad-side-card__title">Participantes</h3>
+        <div class="kair-rad-participant-row">
+          <div class="kair-rad-participant-row__avatar">SO</div>
+          <div class="kair-rad-participant-row__body">
+            <p class="kair-rad-participant-row__name">Sergina Orozco Hincapié</p>
+            <p class="kair-rad-participant-row__role">Empresa</p>
+          </div>
+        </div>
+        <div class="kair-rad-participant-row">
+          <div class="kair-rad-participant-row__avatar">JR</div>
+          <div class="kair-rad-participant-row__body">
+            <p class="kair-rad-participant-row__name">Javier Robles Fontalvo</p>
+            <p class="kair-rad-participant-row__role">Empresa</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ======================
+     VISTA 3: VIEWER
+     ====================== -->
+<div class="preview-section" id="sec-viewer">
+<div class="kair-rad-module">
+  <div class="kair-rad-toast-stack"></div>
+
+  <header class="kair-rad-header">
+    <div class="kair-rad-header__bar">
+      <div class="kair-rad-header__left">
+        <button class="kair-rad-header__back">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <span class="kair-rad-header__pill--section">
+          <span class="dot"></span>6.1.3 · Revisión por la Alta Dirección
+        </span>
+      </div>
+      <div class="kair-rad-header__center">
+        <h1 class="kair-rad-header__title">Acta RG-2024-01</h1>
+        <p class="kair-rad-header__subtitle">Acta imprimible conforme a G-FO-006 Rev. 03</p>
+      </div>
+      <div class="kair-rad-header__right">
+        <span class="kair-rad-header__company"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="1"/></svg> TEMPOSUM S.A.S.</span>
+        <button class="kair-rad-header__action kair-rad-header__action--secondary"><i class="bi bi-download"></i> Exportar XLSX</button>
+        <button class="kair-rad-header__action kair-rad-header__action--primary"><i class="bi bi-printer"></i> Imprimir / PDF</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="kair-rad-viewer">
+    <article class="kair-rad-acta">
+      <div class="kair-rad-acta__head">
+        <div class="kair-rad-acta__head-l">
+          <div class="kair-rad-acta__logo">T+</div>
+          <div>
+            <p class="kair-rad-acta__company">TEMPOSUM S.A.S.</p>
+            <p class="kair-rad-acta__doc">Sistema de Gestión de Seguridad y Salud en el Trabajo</p>
+          </div>
+        </div>
+        <div class="kair-rad-acta__head-r">
+          <span class="kair-rad-acta__code">G-FO-006</span>
+          <p class="kair-rad-acta__rev">Rev. 03 · 30 de noviembre de 2025</p>
+        </div>
+      </div>
+
+      <h1 class="kair-rad-acta__title">Acta de Revisión Gerencial del SG-SST</h1>
+      <p class="kair-rad-acta__subtitle">Conforme al Decreto 1072 de 2015 · Art. 2.2.4.1.7 y Resolución 0312 de 2019</p>
+
+      <section class="kair-rad-acta__section">
+        <h2 class="kair-rad-acta__section-title">1. Generalidades</h2>
+        <div class="kair-rad-acta__grid">
+          <div class="kair-rad-acta__field"><span class="kair-rad-acta__label">Consecutivo</span><span class="kair-rad-acta__value">RG-2024-01</span></div>
+          <div class="kair-rad-acta__field"><span class="kair-rad-acta__label">Período</span><span class="kair-rad-acta__value">2024</span></div>
+          <div class="kair-rad-acta__field"><span class="kair-rad-acta__label">Fecha realizada</span><span class="kair-rad-acta__value">4 de enero de 2024</span></div>
+          <div class="kair-rad-acta__field"><span class="kair-rad-acta__label">Lugar</span><span class="kair-rad-acta__value">Sede Administrativa TEMPOSUM S.A.S.</span></div>
+          <div class="kair-rad-acta__field"><span class="kair-rad-acta__label">Preside</span><span class="kair-rad-acta__value">Sergina Orozco Hincapié</span></div>
+          <div class="kair-rad-acta__field"><span class="kair-rad-acta__label">Elabora</span><span class="kair-rad-acta__value">Javier Robles Fontalvo</span></div>
+        </div>
+      </section>
+
+      <section class="kair-rad-acta__section">
+        <h2 class="kair-rad-acta__section-title">2. Participantes</h2>
+        <div class="kair-rad-acta__participants">
+          <div class="kair-rad-acta__participant-block">
+            <h4>Por la empresa</h4>
+            <div class="kair-rad-participant-row"><div class="kair-rad-participant-row__avatar">SO</div><div class="kair-rad-participant-row__body"><p class="kair-rad-participant-row__name">Sergina Orozco Hincapié</p><p class="kair-rad-participant-row__role">Representante Legal / Gerente General</p></div></div>
+            <div class="kair-rad-participant-row"><div class="kair-rad-participant-row__avatar">JR</div><div class="kair-rad-participant-row__body"><p class="kair-rad-participant-row__name">Javier Robles Fontalvo</p><p class="kair-rad-participant-row__role">Coordinador SG-SST</p></div></div>
+            <div class="kair-rad-participant-row"><div class="kair-rad-participant-row__avatar">BR</div><div class="kair-rad-participant-row__body"><p class="kair-rad-participant-row__name">Berkis Romero Mercado</p><p class="kair-rad-participant-row__role">Profesional SG-SST</p></div></div>
+          </div>
+          <div class="kair-rad-acta__participant-block">
+            <h4>Invitados</h4>
+            <div class="kair-rad-participant-row"><div class="kair-rad-participant-row__avatar">BO</div><div class="kair-rad-participant-row__body"><p class="kair-rad-participant-row__name">Bernardo Ortiz Galindo</p><p class="kair-rad-participant-row__role">Presidente COPASST</p></div></div>
+            <div class="kair-rad-participant-row"><div class="kair-rad-participant-row__avatar">MR</div><div class="kair-rad-participant-row__body"><p class="kair-rad-participant-row__name">Lic. María Rodríguez</p><p class="kair-rad-participant-row__role">Coordinadora de Recursos Humanos</p></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="kair-rad-acta__section">
+        <h2 class="kair-rad-acta__section-title">3. Lectura del acta anterior</h2>
+        <div class="kair-rad-acta__content">Se realiza la lectura integral del acta de revisión gerencial anterior (RG-2024-01) verificando el cumplimiento de los compromisos y acciones derivados. Se confirma el cierre efectivo del 87% de las acciones propuestas en el periodo anterior.</div>
+        <ul class="kair-rad-acta__subpoints">
+          <li>Lectura del acta anterior RG-2024-01 <span class="state state--success">Cumple</span></li>
+          <li>Verificación de acciones pendientes <span class="state state--success">Cumple</span></li>
+        </ul>
+      </section>
+
+      <section class="kair-rad-acta__section">
+        <h2 class="kair-rad-acta__section-title">14. Conclusiones</h2>
+        <div class="kair-rad-acta__content">El Sistema de Gestión de Seguridad y Salud en el Trabajo de TEMPOSUM S.A.S. demuestra un nivel de madurez avanzado, con cumplimiento superior al 90% en los indicadores estructurales y de proceso. Se recomienda a la gerencia: (1) mantener el ritmo de inversión en programas preventivos, (2) fortalecer los mecanismos de evaluación de eficacia de acciones, (3) ampliar la cobertura del sistema a la nueva sede operativa.</div>
+      </section>
+
+      <section class="kair-rad-acta__section">
+        <h2 class="kair-rad-acta__section-title">15. Acciones tomadas</h2>
+        <table class="kair-rad-table" style="margin-top:var(--rad-s2)">
+          <thead><tr><th>#</th><th>Acción</th><th>Responsable</th><th>Fecha límite</th><th>Estado</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>Implementación del sistema de gestión de EPP digital</td><td>Ing. Carlos López</td><td>30 jun 2026</td><td><span class="kair-rad-badge kair-rad-badge--warning"><span class="dot"></span>En proceso</span></td></tr>
+            <tr><td>2</td><td>Actualización matriz de riesgo psicosocial</td><td>Lic. María Rodríguez</td><td>31 mar 2026</td><td><span class="kair-rad-badge kair-rad-badge--info"><span class="dot"></span>Pendiente</span></td></tr>
+            <tr><td>3</td><td>Capacitación en manejo de cargas críticas</td><td>Lic. María Rodríguez</td><td>30 abr 2026</td><td><span class="kair-rad-badge kair-rad-badge--success"><span class="dot"></span>Cumplido</span></td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <div class="kair-rad-acta__signatures">
+        <div class="kair-rad-acta__signature">
+          <div class="kair-rad-acta__signature-line">
+            <p class="kair-rad-acta__signature-name">Sergina Orozco Hincapié</p>
+            <p class="kair-rad-acta__signature-role">Gerente General · Representante Legal</p>
+          </div>
+        </div>
+        <div class="kair-rad-acta__signature">
+          <div class="kair-rad-acta__signature-line">
+            <p class="kair-rad-acta__signature-name">Javier Robles Fontalvo</p>
+            <p class="kair-rad-acta__signature-role">Coordinador SG-SST · Elaboró</p>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <div class="kair-rad-viewer-actions">
+      <button class="kair-rad-header__action kair-rad-header__action--ghost"><i class="bi bi-arrow-left"></i> Volver al listado</button>
+      <button class="kair-rad-header__action kair-rad-header__action--secondary"><i class="bi bi-download"></i> Exportar XLSX</button>
+      <button class="kair-rad-header__action kair-rad-header__action--primary"><i class="bi bi-printer"></i> Imprimir / Guardar PDF</button>
+    </div>
+  </div>
+</div>
+</div>
+
+</div>
+
+<script>
+  document.querySelectorAll('.preview-nav button').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var target = btn.getAttribute('data-target');
+      document.querySelectorAll('.preview-nav button').forEach(function(b) { b.classList.remove('is-active'); });
+      btn.classList.add('is-active');
+      document.querySelectorAll('.preview-section').forEach(function(s) { s.classList.remove('is-active'); });
+      document.getElementById('sec-' + target).classList.add('is-active');
+      window.scrollTo(0, 0);
+    });
+  });
+</script>
+
+</body>
+</html>

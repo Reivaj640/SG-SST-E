@@ -47,7 +47,7 @@ const ALL_SUBMODULES = {
     "2.7.1 Matriz de requisitos legales",
     "2.8.1 Mecanismos de comunicaciones",
     "2.9.1 Identificación y evaluación para la adquisición de bienes y servicios",
-    "2.10.1 Evaluación y seleción de proveedores y contratistas",
+    "2.10.1 Evaluación y selección de proveedores y contratistas",
     "2.11.1 Gestión del Cambio",
     "2.12.1 Equipos y Herramientas",
     "2.13.1 Elementos de Protección Personal",
@@ -134,7 +134,7 @@ const SUBMODULE_PERMISSION_MAP_UI = new Map([
   ['2.2.1 objetivos sst', 'gestion-integral.objetivos'],
   ['2.3.1 evaluacion inicial del sg-sst', 'gestion-integral.plan-trabajo'],
   ['2.4.1 plan de trabajo anual', 'gestion-integral.plan-trabajo'],
-  ['2.5.1 archivo y retencion documental del sg-sst', 'gestion-integral.plan-trabajo'],
+  ['2.5.1 archivo y retencion documental del sg-sst', 'gestion-integral.archivo-retencion'],
   ['2.6.1 rendicion de cuentas', 'gestion-integral.rendicion'],
   ['2.7.1 matriz de requisitos legales', 'gestion-integral.plan-trabajo'],
   ['2.8.1 mecanismos de comunicaciones', 'gestion-integral.plan-trabajo'],
@@ -154,7 +154,7 @@ const SUBMODULE_PERMISSION_MAP_UI = new Map([
   ['3.1.9 manejo de residuos', 'salud.sociodemografica'],
   ['3.2.1 reporte de los accidentes de trabajo', 'salud.reportes-accidentes'],
   ['3.2.2 investigacion de accidentes, indicentes y enfermedades', 'salud.investigacion-accidentes'],
-  ['3.2.3 registro y analisis estadistico de indicentes, accidentes de trabajo y enfermedades', 'salud.reportes-accidentes'],
+  ['3.2.3 registro y analisis estadistico de indicentes, accidentes de trabajo y enfermedades', 'salud.registro-estadistico'],
   ['3.3.1 frecuencia de la accidentalidad', 'salud.sociodemografica'],
   ['3.3.2 severidad de la accidentalidad', 'salud.sociodemografica'],
   ['3.3.3 proporcion de accidentes de trabajo mortales', 'salud.sociodemografica'],
@@ -450,7 +450,9 @@ let currentUser = null;
 let assignedCompanies = [];
 let companyRoleByKey = {};
 const AUTH_TOKEN_KEY = 'kair-auth-token';
+const LOG_BUFFER_MAX_SIZE = 500; // Límite para evitar memory leak en sesiones largas
 let logBuffer = []; // Búfer para almacenar los logs
+let logTextareaCached = null; // Cache del textarea para evitar querySelector en cada log
 let currentCalendarInstance = null; // Para mantener una referencia a la instancia del calendario
 let currentActiveComponent = null; // Para mantener una referencia al componente activo y poder destruirlo adecuadamente
 
@@ -580,14 +582,20 @@ function logMessage(message, level = 'INFO') {
   const timestamp = new Date().toLocaleTimeString();
   const formattedMessage = `[${timestamp}] [${level}] ${message}`;
 
-  // Guardar siempre en el búfer
+  // Guardar en búfer con eviction FIFO para evitar memory leak
   logBuffer.push(formattedMessage);
+  if (logBuffer.length > LOG_BUFFER_MAX_SIZE) {
+    logBuffer.splice(0, logBuffer.length - LOG_BUFFER_MAX_SIZE);
+  }
 
-  // Si el área de logs está visible, actualizarla en tiempo real
-  const logTextarea = document.querySelector('.log-area textarea');
-  if (logTextarea) {
-    logTextarea.value = logBuffer.join('\n');
-    logTextarea.scrollTop = logTextarea.scrollHeight; // Auto-scroll al final
+  // Solo actualizar el DOM si el textarea ya fue cacheado Y está visible.
+  // Evita querySelector + re-render completo en cada log cuando el panel no está abierto.
+  if (!logTextareaCached) {
+    logTextareaCached = document.querySelector('.log-area textarea');
+  }
+  if (logTextareaCached && logTextareaCached.offsetParent !== null) {
+    logTextareaCached.value = logBuffer.join('\n');
+    logTextareaCached.scrollTop = logTextareaCached.scrollHeight;
   }
 }
 
@@ -720,6 +728,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       // This prevents the renderer from trying to handle messages with an 'action' property.
       if (!type) {
         return;
+      }
+
+      // Delegar mensajes de EMO al componente evaluaciones-medicas-logic.js
+      // El componente ya tiene listeners para estos mensajes
+      if (type === 'emo-get-dashboard-data-request' || type === 'emo-get-library-data-request') {
+        console.log(`[RENDERER] Delegando mensaje EMO al componente: ${type} - NO procesando en renderer, permitiendo propagación`);
+        return; // IMPORTANTE: Este return permite que el evento se propague al componente
       }
 
       console.log('RENDERER: Message received from iframe:', { type, payload, requestId });
@@ -859,11 +874,35 @@ document.addEventListener('DOMContentLoaded', async () => {
                   // Volver al home principal
                   showHomePage();
                   return;
-              case 'back-to-module-request':
-                  // Volver al módulo actual
-                  console.log('RENDERER: Received back-to-module-request from iframe.');
-                  if (typeof currentModule !== 'undefined' && currentModule) {
-                      currentSubmodule = null;
+      case 'back-to-module-request':
+        if (window.copasstPortalComponent) {
+          console.log('[RENDERER] Delegando back-to-module al portal COPASST');
+          return;
+        }
+        if (window.comiteConvivenciaPortalComponent) {
+          console.log('[RENDERER] Delegando back-to-module al portal Comité de Convivencia');
+          return;
+        }
+            if (window.planPortalComponent) {
+              console.log('[RENDERER] Delegando back-to-module al portal Plan de Trabajo');
+              window.planPortalComponent.goBackToHome();
+              return;
+            }
+            // Volver al módulo actual
+            console.log('RENDERER: Received back-to-module-request from iframe.');
+            if (typeof currentModule !== 'undefined' && currentModule) {
+          currentSubmodule = null;
+          showModuleContent(currentModule);
+        } else {
+          showHomePage();
+        }
+        return;
+              case 'back-to-submodule-home':
+                  // Volver al home del submódulo actual (Evaluaciones Médicas 3.1.4)
+                  console.log('RENDERER: Received back-to-submodule-home from iframe.');
+                  if (typeof currentSubmodule !== 'undefined' && currentSubmodule) {
+                      showSubmoduleContent(currentSubmodule);
+                  } else if (typeof currentModule !== 'undefined' && currentModule) {
                       showModuleContent(currentModule);
                   } else {
                       showHomePage();
@@ -979,10 +1018,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                   apiCallFunction = window.electronAPI.processExcelData;
                   apiCallArgs = [payload];
                   break;
-              case 'update-plan-trabajo-excel-request':
-                  apiCallFunction = window.electronAPI.updatePlanTrabajoExcel;
-                  apiCallArgs = [payload];
-                  break;
+      case 'update-plan-trabajo-excel-request':
+        apiCallFunction = window.electronAPI.updatePlanTrabajoExcel;
+        apiCallArgs = [payload];
+        break;
+      case 'repair-plan-trabajo-excel-request':
+        apiCallFunction = window.electronAPI.repairPlanTrabajoExcel;
+        apiCallArgs = [payload];
+        break;
               case 'duplicate-budget-file-request':
                   apiCallFunction = window.electronAPI.duplicateBudgetFile;
                   apiCallArgs = [payload];
@@ -1023,7 +1066,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                   // Manejar solicitud para guardar archivo PDF temporalmente
                   apiCallFunction = window.electronAPI.saveTempPdfFile;
                   apiCallArgs = [payload.filename, payload.data];
-                  responseType = 'investigacion-accidentes-save-temp-pdf-file-request-response';
+                  responseType = 'investigacion-accidentes-save-temp-pdf-file-response';
                   break;
               case 'investigacion-accidentes-process-accident-pdf-request':
                   // Manejar solicitud para procesar PDF de accidente
@@ -1050,6 +1093,94 @@ document.addEventListener('DOMContentLoaded', async () => {
                   apiCallArgs = [payload];
                   responseType = 'investigacion-accidentes-generate-accident-report-request-response';
                   break;
+              case 'investigacion-accidentes-get-stats-request':
+                  // Manejar solicitud de estadísticas de investigaciones
+                  apiCallFunction = window.electronAPI.getInvestigacionStats;
+                  apiCallArgs = [payload.companyName];
+                  responseType = 'investigacion-accidentes-get-stats-response';
+                  break;
+              case 'investigacion-accidentes-list-investigations-request':
+                  // Manejar solicitud de lista de investigaciones
+                  apiCallFunction = window.electronAPI.listInvestigations;
+                  apiCallArgs = [payload.companyName, payload.filter];
+                  responseType = 'investigacion-accidentes-list-investigations-response';
+                  break;
+    case 'investigacion-accidentes-get-investigation-detail-request':
+      apiCallFunction = window.electronAPI.getInvestigationDetail;
+      apiCallArgs = [payload.companyName, payload.investigationName];
+      responseType = 'investigacion-accidentes-get-investigation-detail-response';
+      break;
+    case 'investigacion-accidentes-cross-reference-data-request':
+      apiCallFunction = window.electronAPI.getCrossReferenceData;
+      apiCallArgs = [payload.companyName];
+      responseType = 'investigacion-accidentes-cross-reference-data-response';
+      break;
+case 'investigacion-accidentes-read-directory-request':
+                    apiCallFunction = window.electronAPI.readDirectory;
+                    apiCallArgs = [payload.path];
+      responseType = 'investigacion-accidentes-read-directory-request-response';
+      break;
+    case 'investigacion-accidentes-create-folder-request':
+      apiCallFunction = window.electronAPI.createFolder;
+      apiCallArgs = [payload];
+      responseType = 'investigacion-accidentes-create-folder-request-response';
+      break;
+    case 'investigacion-accidentes-delete-folder-request':
+      apiCallFunction = window.electronAPI.deleteFolder;
+      apiCallArgs = [payload];
+      responseType = 'investigacion-accidentes-delete-folder-request-response';
+      break;
+    case 'investigacion-accidentes-delete-document-request':
+      apiCallFunction = window.electronAPI.deleteDocument;
+      apiCallArgs = [payload.filePath];
+      responseType = 'investigacion-accidentes-delete-document-request-response';
+      break;
+    case 'investigacion-accidentes-rename-item-request':
+      apiCallFunction = window.electronAPI.renameItem;
+      apiCallArgs = [payload];
+      responseType = 'investigacion-accidentes-rename-item-request-response';
+      break;
+    case 'investigacion-accidentes-select-directory-request':
+      apiCallFunction = window.electronAPI.selectDirectory;
+      apiCallArgs = [];
+      responseType = 'investigacion-accidentes-select-directory-request-response';
+      break;
+              case 'get-investigacion-stats-request':
+                  // Portal home solicita estadísticas de investigaciones
+                  // Extraer companyName de la URL del iframe (query param ?company=)
+                  try {
+                      const portalUrl = targetWindow.location ? targetWindow.location.href : '';
+                      const urlMatch = portalUrl.match(/[?&]company=([^&]+)/);
+                      const portalCompany = urlMatch ? decodeURIComponent(urlMatch[1]) : '';
+
+                      if (!portalCompany) {
+                          targetWindow.postMessage({
+                              type: responseType,
+      payload: { pendientes: 0, completadas: 0, total: 0 },
+      requestId: requestId
+    }, '*');
+    return;
+  }
+
+  const statsResult = await window.electronAPI.getInvestigacionStats(portalCompany);
+  const statsData = (statsResult && statsResult.data) ? statsResult.data : { pendientes: 0, completadas: 0, total: 0 };
+
+                      targetWindow.postMessage({
+                          type: 'get-investigacion-stats-response',
+                          payload: statsData,
+                          requestId: requestId
+                      }, '*');
+                      return; // Ya enviamos la respuesta manualmente
+                  } catch (e) {
+                      console.error('[RENDERER] Error en get-investigacion-stats:', e);
+                      targetWindow.postMessage({
+                          type: 'get-investigacion-stats-response',
+      payload: { pendientes: 0, completadas: 0, total: 0 },
+      requestId: requestId
+    }, '*');
+    return;
+  }
+  break;
               case 'iframe-debug-log':
                   // Logs de debug del iframe
                   const { message, data } = payload || {};
@@ -1077,6 +1208,27 @@ document.addEventListener('DOMContentLoaded', async () => {
                   console.log('[RENDERER] Ver estadísticas de ausentismo solicitada');
                   // El módulo se encarga de mostrar la vista de estadísticas
                   return;
+		case 'ct-search-request':
+			// Delegar al componente MedicionAusentismo — ya maneja este mensaje
+			// directamente como proxy entre el iframe y electronAPI.
+			// Si se procesa aquí también, se duplica la llamada IPC y la respuesta.
+			console.log(`[RENDERER] Delegando búsqueda de trabajadores al componente MedicionAusentismo: ${type}`);
+			return;
+
+              // ═══════════════════════════════════════════════════════════
+              // NOTA: Los mensajes de remisiones médicas (-request) y evaluaciones
+              // médicas (-request) NO deben manejarse aquí. Los bridges
+              // restricciones-medicas-logic.js y evaluaciones-medicas-logic.js ya
+              // los manejan correctamente a través de sus handlers de postMessage.
+              // Si se agregan aquí, se duplican las respuestas.
+              // ═══════════════════════════════════════════════════════════
+              
+              // Delegar al componente EvaluacionesMedicasComponent para mensajes EMO
+              case 'emo-get-dashboard-data-request':
+              case 'emo-get-library-data-request':
+                  console.log(`[RENDERER] Delegando mensaje EMO al componente: ${type} - no procesando`);
+                  break; // break permite que el evento continúe hacia otros listeners (el componente)
+
               default:
                   // Verificar si es un mensaje de respuesta (ya procesado), para evitar bucles
                   if (type.endsWith('-response')) {
@@ -1084,12 +1236,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                       return; // No responder a mensajes de respuesta para evitar bucles
                   }
 
-                  console.warn(`RENDERER: Unknown message type received from source: ${type}`);
-                  targetWindow.postMessage({
-                      type: responseType,
-                      payload: { success: false, error: `Unknown request type: ${type}` },
-                      requestId: requestId
-                  }, '*');
+                  // Mensaje no reconocido — ignorar silenciosamente.
+                  // Puede ser manejado por un componente wrapper (ej: ArchivoRetencionComponent, PoliticaComponent).
+                  console.warn(`RENDERER: Unknown message type, ignorando: ${type}`);
                   return;
           }
 
@@ -1124,12 +1273,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                   targetWindowClosed: targetWindow?.closed
               });
               
-              targetWindow.postMessage({
-                  type: responseType,
-                  success: result.success,
-                  payload: result,
-                  requestId: requestId
-              }, '*');
+      targetWindow.postMessage({
+        type: responseType,
+        success: result.success,
+        payload: result,
+        error: result.error || null,
+        requestId: requestId
+      }, '*');
               
               console.log('[DEBUG] Respuesta enviada a iframe');
           } catch (error) {
@@ -1159,11 +1309,13 @@ document.addEventListener('DOMContentLoaded', async () => {
           // Solo intentar enviar error si el targetWindow está disponible
           try {
               if (targetWindow && !targetWindow.closed) {
-                  targetWindow.postMessage({
-                      type: responseType,
-                      payload: { success: false, error: error.message || 'Error desconocido' },
-                      requestId: requestId
-                  }, '*');
+          targetWindow.postMessage({
+            type: responseType,
+            success: false,
+            error: { code: 'HANDLER_ERROR', message: error.message || 'Error desconocido' },
+            payload: { success: false, error: error.message || 'Error desconocido' },
+            requestId: requestId
+          }, '*');
               }
           } catch (e) {
               console.warn(`RENDERER: No se pudo enviar mensaje de error para ${type}`);
@@ -1197,6 +1349,46 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   // --- END: Collapsible Sidebar Logic ---
 
+// --- BEGIN: Collapsible Header Logic ---
+const appHeader = document.getElementById('app-header');
+const headerHoverZone = document.getElementById('header-hover-zone');
+if (appHeader) {
+  let headerHideTimeout = null;
+
+  function showHeader() {
+    if (headerHideTimeout) {
+      clearTimeout(headerHideTimeout);
+      headerHideTimeout = null;
+    }
+    appHeader.classList.add('app-header-hovering');
+    appHeader.classList.remove('app-header-collapsed');
+  }
+
+  function hideHeader() {
+    appHeader.classList.remove('app-header-hovering');
+    headerHideTimeout = setTimeout(() => {
+      if (!appHeader.classList.contains('app-header-hovering')) {
+        appHeader.classList.add('app-header-collapsed');
+      }
+    }, 500);
+  }
+
+  setTimeout(() => {
+    appHeader.classList.add('app-header-collapsed');
+  }, 5000);
+
+  appHeader.addEventListener('mouseenter', showHeader);
+  appHeader.addEventListener('mouseleave', hideHeader);
+
+  if (headerHoverZone) {
+    headerHoverZone.addEventListener('mouseenter', showHeader);
+    headerHoverZone.addEventListener('mouseleave', hideHeader);
+  }
+
+  console.log('Collapsible header logic initialized.');
+}
+// --- END: Collapsible Header Logic ---
+
   // Escuchar eventos de log desde el proceso principal
   if (window.electronAPI && window.electronAPI.onIpcMessage) {
     window.electronAPI.onIpcMessage('log-message', (message, level) => {
@@ -1210,21 +1402,128 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.log('[UPDATER] onUpdateAvailable disponible:', typeof window.electronAPI?.onUpdateAvailable);
     console.log('[UPDATER] updateNotifier disponible:', typeof window.updateNotifier);
     
+    // --- Header Update Button Elements ---
+    const headerUpdateBtn = document.getElementById('header-update-btn');
+    const headerUpdatePanel = document.getElementById('header-update-panel');
+    const headerUpdateText = document.getElementById('header-update-text');
+    const updateProgressFill = document.getElementById('update-progress-fill');
+    const updateProgressText = document.getElementById('update-progress-text');
+    const updateInstallBtn = document.getElementById('update-install-btn');
+
+    let headerUpdatePanelVisible = false;
+    let currentAppVersion = null;
+
+    // Toggle update panel when clicking the update button
+    // El botón solo es visible cuando hay update, así que el click siempre toggle del panel
+    if (headerUpdateBtn) {
+      headerUpdateBtn.addEventListener('click', () => {
+        headerUpdatePanelVisible = !headerUpdatePanelVisible;
+        if (headerUpdatePanel) {
+          headerUpdatePanel.style.display = headerUpdatePanelVisible ? 'flex' : 'none';
+        }
+      });
+    }
+
+    // Install button triggers restart
+    if (updateInstallBtn) {
+      updateInstallBtn.addEventListener('click', () => {
+        logMessage('Usuario solicitó reiniciar para instalar actualización', 'INFO');
+        window.electronAPI.restartApp && window.electronAPI.restartApp();
+      });
+    }
+
+    // Helper: Update header status (unifica los 4 estados visuales del botón)
+    // Estados: 'uptodate' | 'checking' | 'available' | 'ready'
+    // Comportamiento: el botón SOLO se muestra cuando hay update real (available/ready).
+    // Cuando está al día o buscando, queda oculto — sin indicador permanente.
+    function updateHeaderStatus(state, options = {}) {
+      if (!headerUpdateBtn || !headerUpdateText) return;
+
+      // Limpiar todas las clases de estado
+      headerUpdateBtn.classList.remove(
+        'header-update-uptodate',
+        'header-update-checking',
+        'header-update-available',
+        'header-update-ready'
+      );
+
+      switch (state) {
+        case 'uptodate':
+          // OCULTO: no hay update, no se muestra nada en el header
+          headerUpdateBtn.style.display = 'none';
+          if (headerUpdatePanel) {
+            headerUpdatePanel.style.display = 'none';
+            headerUpdatePanelVisible = false;
+          }
+          break;
+
+        case 'checking':
+          // OCULTO durante la búsqueda (solo se ve el botón si hay update real)
+          headerUpdateBtn.style.display = 'none';
+          break;
+
+        case 'available':
+          // VISIBLE: hay update, botón amarillo pulsante con versión
+          headerUpdateBtn.style.display = 'flex';
+          headerUpdateBtn.classList.add('header-update-available');
+          headerUpdateText.textContent = options.version ? `v${options.version}` : 'Update';
+          headerUpdateBtn.title = options.version
+            ? `Actualización v${options.version} disponible - Descargando...`
+            : 'Actualización disponible';
+          // Auto-abrir panel de descarga
+          if (headerUpdatePanel) {
+            headerUpdatePanel.style.display = 'flex';
+            headerUpdatePanelVisible = true;
+          }
+          if (updateProgressFill) updateProgressFill.style.width = '0%';
+          if (updateProgressText) updateProgressText.textContent = 'Descargando...';
+          if (updateInstallBtn) updateInstallBtn.style.display = 'none';
+          break;
+
+        case 'ready':
+          // VISIBLE: update listo, botón verde con botón "Actualizar"
+          headerUpdateBtn.style.display = 'flex';
+          headerUpdateBtn.classList.add('header-update-ready');
+          headerUpdateText.textContent = options.version ? `v${options.version}` : 'Listo';
+          headerUpdateBtn.title = options.version
+            ? `Actualización v${options.version} lista para instalar`
+            : 'Actualización lista';
+          if (updateProgressFill) updateProgressFill.style.width = '100%';
+          if (updateProgressText) updateProgressText.textContent = 'Descarga completa';
+          if (updateInstallBtn) updateInstallBtn.style.display = 'block';
+          break;
+      }
+    }
+
+    // Helper: Update progress in header (usado durante descarga)
+    function updateHeaderProgress(percent, speed) {
+      if (updateProgressFill) {
+        updateProgressFill.style.width = `${percent}%`;
+      }
+      if (updateProgressText) {
+        updateProgressText.textContent = `${percent}%${speed ? ' - ' + speed : ''}`;
+      }
+    }
+
+    // Wrappers de compatibilidad (para no romper otros call sites)
+    function showHeaderUpdateAvailable(version) { updateHeaderStatus('available', { version }); }
+    function showHeaderUpdateReady(version) { updateHeaderStatus('ready', { version }); }
+    function hideHeaderUpdatePanel() { updateHeaderStatus('uptodate'); }
+
     // Cuando comienza a buscar actualizaciones
+    // (Sin toast — solo actualizamos estado interno del header)
     window.electronAPI?.onUpdateChecking && window.electronAPI.onUpdateChecking(() => {
       console.log('[UPDATER] Evento recibido: update_checking');
       logMessage('Buscando actualizaciones...', 'INFO');
-      if (window.updateNotifier) {
-        window.updateNotifier.notifyChecking();
-      }
+      updateHeaderStatus('checking');
     });
 
     // Cuando hay una actualización disponible (comienza la descarga)
     window.electronAPI?.onUpdateAvailable && window.electronAPI.onUpdateAvailable((info) => {
       console.log('[UPDATER] Evento recibido: update_available', info);
       logMessage(`Actualización disponible: ${info ? info.version : 'nueva versión'}`, 'INFO');
-      if (window.updateNotifier && info && info.version) {
-        window.updateNotifier.notifyAvailable(info.version);
+      if (info && info.version) {
+        updateHeaderStatus('available', { version: info.version });
       }
     });
 
@@ -1232,16 +1531,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.electronAPI?.onUpdateNotAvailable && window.electronAPI.onUpdateNotAvailable((info) => {
       console.log('[UPDATER] Evento recibido: update_not_available', info);
       logMessage('No hay actualizaciones disponibles', 'INFO');
-      if (window.updateNotifier) {
-        window.updateNotifier.notifyNotAvailable();
-      }
+      // Volver al estado "al día" (oculta el botón)
+      updateHeaderStatus('uptodate', { version: info?.version || currentAppVersion });
     });
 
     // Progreso de descarga
     window.electronAPI?.onUpdateProgress && window.electronAPI.onUpdateProgress((data) => {
       console.log('[UPDATER] Evento recibido: update_progress', data);
-      if (window.updateNotifier && data) {
-        window.updateNotifier.updateProgress(data.percent, data.speed);
+      // Update header progress (la barra dentro del panel)
+      if (data && data.percent !== undefined) {
+        updateHeaderProgress(data.percent, data.speed);
       }
     });
 
@@ -1249,33 +1548,34 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.electronAPI?.onUpdateDownloaded && window.electronAPI.onUpdateDownloaded((info) => {
       console.log('[UPDATER] Evento recibido: update_downloaded', info);
       logMessage('Actualización descargada y lista para instalar', 'INFO');
-      
-      // Mostrar notificación moderna con botón de reinicio
       const version = info ? info.version : 'más reciente';
-      
-      if (window.updateNotifier) {
-        window.updateNotifier.notifyDownloaded(version, () => {
-          // Reiniciar la aplicación cuando el usuario hace clic en el botón
-          logMessage('Usuario solicitó reiniciar para instalar actualización', 'INFO');
-          window.electronAPI.restartApp && window.electronAPI.restartApp();
-        });
-      } else {
-        // Fallback a confirmación tradicional si el sistema de notificaciones no está disponible
-        const userResponse = confirm(`¡Actualización ${version} descargada! ¿Desea reiniciar la aplicación ahora para instalarla?`);
-        if (userResponse) {
-          window.electronAPI.restartApp && window.electronAPI.restartApp();
-        }
-      }
+      // Update header UI → estado "ready" (botón verde con botón Actualizar en panel)
+      updateHeaderStatus('ready', { version });
     });
 
     // Error en la actualización
     window.electronAPI?.onUpdateError && window.electronAPI.onUpdateError((data) => {
       console.log('[UPDATER] Evento recibido: update_error', data);
       logMessage(`Error de actualización: ${data ? data.message : 'error desconocido'}`, 'ERROR');
-      if (window.updateNotifier && data) {
-        window.updateNotifier.notifyError(data.message);
-      }
+      // Volver a estado oculto
+      updateHeaderStatus('uptodate', { version: currentAppVersion });
     });
+
+    // Inicializar header con la versión actual (estado "al día" hasta que llegue el primer check)
+    // Se hace DESPUÉS de definir updateHeaderStatus para evitar issues de hoisting en strict mode
+    if (window.electronAPI && window.electronAPI.getAppVersion) {
+      window.electronAPI.getAppVersion()
+        .then(version => {
+          currentAppVersion = version;
+          updateHeaderStatus('uptodate', { version });
+        })
+        .catch(err => {
+          console.warn('[UPDATER] No se pudo obtener la versión inicial:', err);
+          updateHeaderStatus('uptodate', {});
+        });
+    } else {
+      updateHeaderStatus('uptodate', {});
+    }
 
   } else {
     console.error('API de logging no disponible en window.electronAPI');
@@ -1516,18 +1816,222 @@ let activeSidebarButton = null;
 
 // --- Auth UI helpers ---
 function setAuthUIState(isAuthenticated) {
-  const sidebar = document.getElementById('sidebar');
-  const headerButtons = document.querySelectorAll('.header-btn');
+const sidebar = document.getElementById('sidebar');
+const appHeader = document.getElementById('app-header');
+const headerHoverZone = document.getElementById('header-hover-zone');
+const headerButtons = document.querySelectorAll('.header-btn');
 
-  if (sidebar) {
-    sidebar.style.display = isAuthenticated ? '' : 'none';
+if (sidebar) {
+sidebar.style.display = isAuthenticated ? '' : 'none';
+}
+
+if (appHeader) {
+appHeader.style.display = isAuthenticated ? '' : 'none';
+}
+
+if (headerHoverZone) {
+headerHoverZone.style.display = isAuthenticated ? '' : 'none';
+}
+
+headerButtons.forEach(btn => {
+btn.style.pointerEvents = isAuthenticated ? 'auto' : 'none';
+btn.style.opacity = isAuthenticated ? '1' : '0.4';
+});
+}
+
+// --- Controlador de Animación de Carga K+AIR ---
+
+class KairLoadingController {
+  constructor() {
+    this.progress = 0;
+    this.messageIndex = 0;
+    this.isComplete = false;
+    this.messages = [
+      { main: 'Iniciando...', sub: 'Cargando recursos' },
+      { main: 'Verificando credenciales', sub: 'Validando permisos' },
+      { main: 'Cargando configuración', sub: 'Sincronizando datos' },
+      { main: 'Preparando interfaz', sub: 'Cargando módulos' },
+      { main: 'Completando', sub: 'Verificando acceso' }
+    ];
+    this.messageEl = null;
+    this.submessageEl = null;
+    this.progressFill = null;
   }
 
-  headerButtons.forEach(btn => {
-    btn.style.pointerEvents = isAuthenticated ? 'auto' : 'none';
-    btn.style.opacity = isAuthenticated ? '1' : '0.4';
-  });
+  _getElements() {
+    if (!this.messageEl) {
+      this.messageEl = document.querySelector('.loading-message');
+      this.submessageEl = document.querySelector('.loading-submessage');
+      this.progressFill = document.querySelector('.progress-fill');
+      this.progressPercent = document.querySelector('.loading-progress-percent');
+    }
+    return { messageEl: this.messageEl, submessageEl: this.submessageEl, progressFill: this.progressFill, progressPercent: this.progressPercent };
+  }
+
+  setProgress(value) {
+    const { progressFill, progressPercent } = this._getElements();
+    if (progressFill) {
+      const target = Math.max(0, Math.min(100, Math.round(value)));
+      const startVal = parseInt(progressPercent?.textContent) || 0;
+      this.progress = target;
+      progressFill.style.width = `${target}%`;
+      if (progressPercent && startVal !== target) {
+        const startTime = performance.now();
+        const duration = 400;
+        const animate = (now) => {
+          const elapsed = now - startTime;
+          const t = Math.min(elapsed / duration, 1);
+          const displayed = Math.round(startVal + (target - startVal) * t);
+          progressPercent.textContent = `${displayed}%`;
+          if (t < 1) requestAnimationFrame(animate);
+        };
+        requestAnimationFrame(animate);
+      } else if (progressPercent) {
+        progressPercent.textContent = `${target}%`;
+      }
+    }
+  }
+
+  /**
+   * Versión SINCRONIZADA: hace que la barra y el texto avancen juntos
+   * con requestAnimationFrame, evitando el solapamiento de transiciones CSS.
+   * Se llama desde executeLoginTransition para que cada paso complete
+   * visualmente antes del siguiente.
+   * @param {number} target - valor objetivo 0-100
+   * @param {number} duration - duración en ms de la animación
+   * @returns {Promise<void>}
+   */
+  animateToProgress(target, duration = 600) {
+    const { progressFill, progressPercent } = this._getElements();
+    if (!progressFill) return Promise.resolve();
+    const startVal = this.progress || 0;
+    const endVal = Math.max(0, Math.min(100, Math.round(target)));
+    if (startVal === endVal) return Promise.resolve();
+    return new Promise(function(resolve) {
+      const startTime = performance.now();
+      const animate = function(now) {
+        const elapsed = now - startTime;
+        const t = Math.min(elapsed / duration, 1);
+        // Ease-out cubic para sensación profesional
+        const eased = 1 - Math.pow(1 - t, 3);
+        const current = Math.round(startVal + (endVal - startVal) * eased);
+        progressFill.style.width = current + '%';
+        if (progressPercent) progressPercent.textContent = current + '%';
+        if (t < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          // CRÍTICO: actualizar this.progress para que la siguiente llamada
+          // empiece desde donde terminamos, no desde 0.
+          this.progress = endVal;
+          resolve();
+        }
+      }.bind(this);
+      requestAnimationFrame(animate);
+    }.bind(this));
+  }
+
+  setMessage(main, sub) {
+    const { messageEl, submessageEl } = this._getElements();
+    setTimeout(() => {
+      if (messageEl) {
+        messageEl.textContent = main;
+        messageEl.style.opacity = '1';
+      }
+      if (submessageEl) {
+        submessageEl.textContent = sub;
+        submessageEl.style.opacity = '1';
+      }
+    }, 200);
+  }
+
+  advanceMessage() {
+    if (this.messageIndex < this.messages.length - 1) {
+      this.messageIndex++;
+      const msg = this.messages[this.messageIndex];
+      this.setMessage(msg.main, msg.sub);
+    }
+  }
+
+  updateMessage() {
+    const msg = this.messages[this.messageIndex];
+    this.setMessage(msg.main, msg.sub);
+  }
+
+  complete() {
+    if (this.isComplete) return;
+    this.isComplete = true;
+    const container = document.querySelector('.loading-container');
+    if (container) {
+      container.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+      container.style.opacity = '0';
+      container.style.transform = 'scale(0.98)';
+    }
+    window.dispatchEvent(new CustomEvent('kair-loading-complete'));
+  }
+
+  showError(message = 'Error al cargar. Intentelo de nuevo.') {
+    const { messageEl, progressFill } = this._getElements();
+    if (messageEl) {
+      messageEl.textContent = message;
+      messageEl.style.color = '#dc3545';
+    }
+    const { submessageEl } = this._getElements();
+    if (submessageEl) {
+      submessageEl.textContent = '';
+    }
+    document.querySelectorAll('.spinner-ring').forEach(el => {
+      el.style.animationPlayState = 'paused';
+    });
+    document.querySelectorAll('.accent-dot').forEach(el => {
+      el.style.animationPlayState = 'paused';
+    });
+    document.querySelectorAll('.particle').forEach(el => {
+      el.style.animationPlayState = 'paused';
+    });
+    if (progressFill) {
+      progressFill.style.background = '#dc3545';
+    }
+  }
+
+  reset() {
+    this.progress = 0;
+    this.messageIndex = 0;
+    this.isComplete = false;
+    this.setProgress(0);
+    this.updateMessage();
+    const container = document.querySelector('.loading-container');
+    if (container) {
+      container.style.opacity = '1';
+      container.style.transform = 'scale(1)';
+    }
+  }
+
+  startSimulation() {
+    this.updateMessage();
+    const steps = [
+      { delay: 400, target: 15 },
+      { delay: 800, target: 30 },
+      { delay: 600, target: 42 },
+      { delay: 1000, target: 55 },
+      { delay: 700, target: 65 },
+      { delay: 900, target: 78 },
+      { delay: 500, target: 88 },
+      { delay: 1200, target: 95 },
+      { delay: 800, target: 100 }
+    ];
+    let cumulativeDelay = 0;
+    steps.forEach(step => {
+      cumulativeDelay += step.delay;
+      setTimeout(() => {
+        this.setProgress(step.target);
+        this.advanceMessage();
+      }, cumulativeDelay);
+    });
+    setTimeout(() => this.complete(), cumulativeDelay + 500);
+  }
 }
+
+window.kairLoading = new KairLoadingController();
 
 // --- Funciones de Transición Login → Interfaz ---
 
@@ -1543,54 +2047,82 @@ function wait(ms) {
  */
 function createTransitionOverlay() {
   const overlay = document.createElement('div');
-  overlay.id = 'kair-transition-overlay';
-  overlay.className = 'kair-transition-overlay kair-transition-hidden';
+  overlay.className = 'loading-container';
   overlay.innerHTML = `
-    <!-- Ondas -->
-    <div class="kair-transition-ripple"></div>
-    <div class="kair-transition-ripple"></div>
-    <div class="kair-transition-ripple"></div>
+    <!-- Partículas flotantes -->
+    <div class="loading-particles">
+      <div class="particle"></div>
+      <div class="particle"></div>
+      <div class="particle"></div>
+      <div class="particle"></div>
+      <div class="particle"></div>
+      <div class="particle"></div>
+      <div class="particle"></div>
+      <div class="particle"></div>
+    </div>
 
-    <!-- Logo -->
-    <div class="kair-transition-logo-container">
-      <div class="kair-transition-logo">
-        <div class="kair-transition-logo-icon">K+</div>
-        <div class="kair-transition-logo-text">
-          <span class="kair-transition-logo-brand">K+AIR</span>
-          <span class="kair-transition-logo-tagline">SG-SST Colombia</span>
+    <!-- Tarjeta de carga -->
+    <div class="loading-card">
+      <!-- Logo con ícono oficial K+AIR -->
+      <div class="loading-logo-section">
+        <img class="loading-logo-icon" src="assets/KIAR256.ico" alt="K+AIR" onerror="this.style.display='none'">
+        <div class="loading-logo-text">
+          <span class="loading-logo-brand">K+AIR</span>
+          <span class="loading-logo-tagline">SG-SST COLOMBIA</span>
         </div>
+      </div>
+
+      <!-- Spinner -->
+      <div class="loading-spinner-section">
+        <div class="spinner-ring"></div>
+        <div class="spinner-ring"></div>
+      </div>
+
+      <!-- Mensajes -->
+      <div class="loading-message-section">
+        <div class="loading-message">Iniciando...</div>
+        <div class="loading-submessage">Cargando recursos</div>
+        <div class="accent-dots">
+          <div class="accent-dot accent-dot--yellow"></div>
+          <div class="accent-dot accent-dot--blue"></div>
+          <div class="accent-dot accent-dot--navy"></div>
+          <div class="accent-dot accent-dot--purple"></div>
+        </div>
+      </div>
+
+      <!-- Progreso -->
+      <div class="loading-progress-section">
+        <div class="loading-progress-bar">
+          <div class="progress-fill"></div>
+        </div>
+        <div class="loading-progress-percent">0%</div>
+      </div>
+
+      <!-- Éxito -->
+      <div class="loading-success" id="loading-success" style="display: none;">
+        <svg class="loading-success-icon" viewBox="0 0 52 52">
+          <circle class="loading-success-circle" cx="26" cy="26" r="25"/>
+          <path class="loading-success-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+        </svg>
+        <div class="loading-welcome">¡Bienvenido!</div>
+        <div class="loading-welcome-user" id="loading-welcome-user">Usuario</div>
       </div>
     </div>
 
-    <!-- Spinner -->
-    <div class="kair-transition-spinner-container" id="transition-spinner">
-      <div class="kair-transition-spinner"></div>
-      <div class="kair-transition-spinner-inner"></div>
-    </div>
-
-    <!-- Mensajes -->
-    <div class="kair-transition-message" id="transition-message">
-      Verificando credenciales<span class="kair-transition-dots"><span></span><span></span><span></span></span>
-    </div>
-    <div class="kair-transition-submessage" id="transition-submessage">
-      Preparando tu espacio de trabajo
-    </div>
-
-    <!-- Progreso -->
-    <div class="kair-transition-progress-container">
-      <div class="kair-transition-progress-bar" id="transition-progress-bar"></div>
-    </div>
-
-    <!-- Éxito -->
-    <div class="kair-transition-success" id="transition-success">
-      <svg class="kair-transition-success-icon" viewBox="0 0 52 52">
-        <circle class="kair-transition-success-circle" cx="26" cy="26" r="25"/>
-        <path class="kair-transition-success-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
-      </svg>
-      <div class="kair-transition-welcome">¡Bienvenido!</div>
-      <div class="kair-transition-welcome-user" id="transition-welcome-user">Usuario</div>
-    </div>
+    <!-- Footer -->
+    <div class="loading-footer-text">K+AIR v<span id="loading-ver">—</span> · Sistema de Gestión en Seguridad y Salud en el Trabajo</div>
   `;
+
+  // Inyectar versión de la app de forma asíncrona
+  if (window.electronAPI && window.electronAPI.getAppVersion) {
+    window.electronAPI.getAppVersion()
+      .then(v => {
+        const el = overlay.querySelector('#loading-ver');
+        if (el) el.textContent = v;
+      })
+      .catch(() => {});
+  }
+
   return overlay;
 }
 
@@ -1598,10 +2130,10 @@ function createTransitionOverlay() {
  * Actualiza el mensaje de transición
  */
 function updateTransitionMessage(main, sub) {
-  const messageEl = document.getElementById('transition-message');
-  const submessageEl = document.getElementById('transition-submessage');
+  const messageEl = document.querySelector('.loading-message');
+  const submessageEl = document.querySelector('.loading-submessage');
   if (messageEl) {
-    messageEl.innerHTML = `${main}<span class="kair-transition-dots"><span></span><span></span><span></span></span>`;
+    messageEl.textContent = main;
   }
   if (submessageEl) {
     submessageEl.textContent = sub;
@@ -1618,94 +2150,123 @@ async function executeLoginTransition(userName) {
   const overlay = createTransitionOverlay();
   document.body.appendChild(overlay);
 
-  // Forzar reflow
+  // Forzar reflow para que los estilos iniciales se apliquen antes de animar
   overlay.offsetHeight;
 
-  // 1. Fade out del login
-  if (authScreen) {
-    authScreen.style.transition = 'opacity 0.5s ease, transform 0.5s ease, filter 0.5s ease';
-    authScreen.style.opacity = '0';
-    authScreen.style.transform = 'translateY(-40px) scale(0.95)';
-    authScreen.style.filter = 'blur(4px)';
+  try {
+    // 1. Fade out del login
+    if (authScreen) {
+      authScreen.style.transition = 'opacity 0.5s ease, transform 0.5s ease, filter 0.5s ease';
+      authScreen.style.opacity = '0';
+      authScreen.style.transform = 'translateY(-40px) scale(0.95)';
+      authScreen.style.filter = 'blur(4px)';
+    }
+    await wait(500);
+
+    // 2. Ocultar login y mostrar overlay
+    if (authScreen) {
+      authScreen.style.display = 'none';
+    }
+    overlay.classList.remove('hidden');
+    await wait(150);
+
+    // 3. Secuencia SINCRONIZADA: cada paso espera a que la barra y el texto
+    // lleguen visualmente al target antes del siguiente. Sin solapamiento.
+    await window.kairLoading.animateToProgress(25, 600);
+    window.kairLoading.setMessage('Verificando credenciales', 'Validando permisos...');
+
+    await window.kairLoading.animateToProgress(55, 600);
+    window.kairLoading.setMessage('Cargando configuración', 'Sincronizando datos...');
+
+    await window.kairLoading.animateToProgress(80, 500);
+    window.kairLoading.setMessage('Preparando interfaz', 'Cargando módulos...');
+
+    await window.kairLoading.animateToProgress(100, 500);
+
+    // 4. Mostrar checkmark inmediatamente al llegar a 100%
+    const spinner = document.querySelector('.loading-spinner-section');
+    const progressSection = document.querySelector('.loading-progress-section');
+    const messageSection = document.querySelector('.loading-message-section');
+
+    if (spinner) spinner.style.display = 'none';
+    if (progressSection) progressSection.style.display = 'none';
+    if (messageSection) messageSection.style.display = 'none';
+
+    const welcomeUser = document.getElementById('loading-welcome-user');
+    if (welcomeUser) {
+      welcomeUser.textContent = userName || 'Usuario';
+    }
+    const successContainer = document.getElementById('loading-success');
+    if (successContainer) {
+      successContainer.style.display = 'flex';
+      successContainer.style.flexDirection = 'column';
+      successContainer.style.alignItems = 'center';
+    }
+
+    await wait(700);
+
+    // 5. Listener de completitud y limpieza del overlay
+    window.addEventListener('kair-loading-complete', function onComplete() {
+      window.removeEventListener('kair-loading-complete', onComplete);
+      overlay.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+      overlay.style.opacity = '0';
+      overlay.style.transform = 'scale(0.98)';
+      setTimeout(() => {
+        overlay.remove();
+        console.log('✅ Transición completada');
+      }, 400);
+    });
+
+    // 6. Ejecutar complete() para disparar evento
+    window.kairLoading.complete();
+  } catch (e) {
+    console.error('[LOGIN] Error durante la transición:', e);
+    if (overlay && overlay.parentNode) overlay.remove();
+    if (typeof window.kairLoading.showError === 'function') {
+      window.kairLoading.showError('Error durante la carga. Reintente.');
+    }
   }
-  await wait(500);
-
-  // 2. Ocultar login y mostrar overlay
-  if (authScreen) {
-    authScreen.style.display = 'none';
-  }
-  overlay.classList.remove('kair-transition-hidden');
-  await wait(300);
-
-  // 3. Secuencia de mensajes
-  updateTransitionMessage('Verificando credenciales', 'Validando permisos...');
-  document.getElementById('transition-progress-bar').style.width = '25%';
-  await wait(600);
-
-  updateTransitionMessage('Cargando configuración', 'Sincronizando datos...');
-  document.getElementById('transition-progress-bar').style.width = '50%';
-  await wait(500);
-
-  updateTransitionMessage('Preparando interfaz', 'Cargando módulos...');
-  document.getElementById('transition-progress-bar').style.width = '75%';
-  await wait(500);
-
-  updateTransitionMessage('Completando', 'Verificando permisos...');
-  document.getElementById('transition-progress-bar').style.width = '95%';
-  await wait(400);
-
-  // 4. Mostrar éxito
-  document.getElementById('transition-progress-bar').style.width = '100%';
-  await wait(200);
-
-  // Ocultar spinner y mensajes
-  const spinner = document.getElementById('transition-spinner');
-  const progressContainer = document.querySelector('.kair-transition-progress-container');
-  const message = document.getElementById('transition-message');
-  const submessage = document.getElementById('transition-submessage');
-
-  if (spinner) spinner.style.display = 'none';
-  if (progressContainer) progressContainer.style.display = 'none';
-  if (message) message.style.display = 'none';
-  if (submessage) submessage.style.display = 'none';
-
-  // Mostrar check de éxito
-  const welcomeUser = document.getElementById('transition-welcome-user');
-  if (welcomeUser) {
-    welcomeUser.textContent = userName || 'Usuario';
-  }
-  const successContainer = document.getElementById('transition-success');
-  if (successContainer) {
-    successContainer.classList.add('visible');
-  }
-
-  await wait(1200);
-
-  // 5. Fade out del overlay
-  overlay.classList.add('kair-transition-exiting');
-  await wait(400);
-
-  // 6. Limpiar overlay
-  overlay.remove();
-
-  console.log('✅ Transición completada');
 }
 
 // --- Fin Funciones de Transición ---
 
 function renderLoginScreen(errorMessage = '') {
-  currentCompany = null;
-  currentModule = null;
-  currentSubmodule = null;
+currentCompany = null;
+currentModule = null;
+currentSubmodule = null;
 
-  setAuthUIState(false);
-  contentArea.innerHTML = '';
+setAuthUIState(false);
+
+const mainContainer = document.querySelector('.main-container');
+if (mainContainer) mainContainer.classList.add('vanta-fullscreen');
+
+contentArea.innerHTML = '';
 
   const authScreen = document.createElement('div');
   authScreen.className = 'kair-auth-screen';
   authScreen.id = 'vanta-login-container';
   authScreen.innerHTML = `
-    <div class="kair-auth-card">
+    <div class="kair-splash-screen" id="kair-splash">
+      <div class="kair-splash-overlay"></div>
+      <div class="kair-splash-orb kair-splash-orb-1"></div>
+      <div class="kair-splash-orb kair-splash-orb-2"></div>
+      <div class="kair-splash-orb kair-splash-orb-3"></div>
+      <div class="kair-splash-polygon kair-splash-polygon-1"></div>
+      <div class="kair-splash-polygon kair-splash-polygon-2"></div>
+      <div class="kair-splash-particle"></div>
+      <div class="kair-splash-particle"></div>
+      <div class="kair-splash-particle"></div>
+      <div class="kair-splash-particle"></div>
+      <div class="kair-splash-particle"></div>
+      <div class="kair-splash-particle"></div>
+      <div class="kair-splash-logo-container" id="kair-splash-logo-btn">
+        <img class="kair-splash-logo" src="assets/KIAR256.ico" alt="K+AIR" />
+        <div class="kair-splash-logo-text">K+AIR</div>
+        <div class="kair-splash-logo-subtitle">SG-SST</div>
+      </div>
+      <div class="kair-splash-hint">Haz clic en el logo para continuar</div>
+    </div>
+    <div class="kair-auth-card" id="kair-auth-card">
       <div class="kair-auth-title">Ingreso a K+AIR</div>
       <div class="kair-auth-subtitle">Acceso seguro por usuario</div>
       <form id="kair-login-form" class="kair-auth-form">
@@ -1721,7 +2282,17 @@ function renderLoginScreen(errorMessage = '') {
           <div class="kair-auth-input-wrapper">
             <i class="kair-auth-input-icon fas fa-lock"></i>
             <input id="kair-login-pass" class="kair-auth-input kair-auth-input-with-icon" type="password" autocomplete="current-password" placeholder="••••••••" required />
+            <button type="button" class="kair-password-toggle" id="kair-password-toggle" tabindex="-1">
+              <i class="bi bi-eye-slash"></i>
+            </button>
           </div>
+        </div>
+        <div class="kair-auth-remember">
+          <label class="kair-auth-checkbox-label">
+            <input type="checkbox" id="kair-remember-me" class="kair-auth-checkbox" />
+            <span class="kair-auth-checkbox-custom"></span>
+            <span>Recordar mis datos</span>
+          </label>
         </div>
         <div class="kair-auth-error" id="kair-login-error">${errorMessage || ''}</div>
         <button class="kair-auth-button" type="submit" id="kair-login-button">Ingresar</button>
@@ -1731,6 +2302,19 @@ function renderLoginScreen(errorMessage = '') {
   `;
 
   contentArea.appendChild(authScreen);
+
+  // Splash Screen - Ocultar formulario inicialmente
+  const splashScreen = document.getElementById('kair-splash');
+  const authCard = document.getElementById('kair-auth-card');
+  authCard.classList.add('kair-auth-fade-out');
+
+  // Evento click en el logo del splash para mostrar el login
+  const splashLogoBtn = document.getElementById('kair-splash-logo-btn');
+  splashLogoBtn.addEventListener('click', function() {
+    splashScreen.classList.add('kair-splash-hidden');
+    authCard.classList.remove('kair-auth-fade-out');
+    authCard.classList.add('kair-auth-fade-in');
+  });
 
   // Aplicar Vanta.js al fondo del login (mismos tonos que selección de empresa)
   if (typeof VANTA !== 'undefined' && typeof VANTA.WAVES !== 'undefined') {
@@ -1762,6 +2346,31 @@ function renderLoginScreen(errorMessage = '') {
   const errorDiv = document.getElementById('kair-login-error');
   const emailInput = document.getElementById('kair-login-email');
   const passwordInput = document.getElementById('kair-login-pass');
+  const rememberCheckbox = document.getElementById('kair-remember-me');
+
+  const savedEmail = localStorage.getItem('kair_remembered_email');
+  const savedPassword = localStorage.getItem('kair_remembered_password');
+  if (savedEmail) {
+    emailInput.value = savedEmail;
+    if (savedPassword) {
+      passwordInput.value = savedPassword;
+      rememberCheckbox.checked = true;
+    }
+  }
+
+  const passwordToggle = document.getElementById('kair-password-toggle');
+  const passwordToggleIcon = passwordToggle.querySelector('i');
+  passwordToggle.addEventListener('click', function() {
+    if (passwordInput.type === 'password') {
+      passwordInput.type = 'text';
+      passwordToggleIcon.classList.remove('bi-eye-slash');
+      passwordToggleIcon.classList.add('bi-eye');
+    } else {
+      passwordInput.type = 'password';
+      passwordToggleIcon.classList.remove('bi-eye');
+      passwordToggleIcon.classList.add('bi-eye-slash');
+    }
+  });
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -1772,8 +2381,14 @@ function renderLoginScreen(errorMessage = '') {
     emailInput.classList.remove('kair-auth-input-error');
     passwordInput.classList.remove('kair-auth-input-error');
 
+    // Guard contra doble-submit: si ya hay un login en curso, ignorar
+    // clics/Enter adicionales. Esto evita que el IPC authLoginV1 se
+    // dispare múltiples veces y cause la "doble carga" que el usuario veía.
+    if (button.disabled) return;
+
     try {
       button.classList.add('kair-auth-button-loading');
+      button.disabled = true; // ← FIX: deshabilitar botón mientras login está en vuelo
 
       const result = await window.electronAPI.authLoginV1({ email, password });
 
@@ -1799,6 +2414,14 @@ function renderLoginScreen(errorMessage = '') {
       });
       localStorage.setItem(AUTH_TOKEN_KEY, authToken);
 
+      if (rememberCheckbox.checked) {
+        localStorage.setItem('kair_remembered_email', email);
+        localStorage.setItem('kair_remembered_password', password);
+      } else {
+        localStorage.removeItem('kair_remembered_email');
+        localStorage.removeItem('kair_remembered_password');
+      }
+
       // Extraer nombre del usuario para la transición
       const userName = email.split('@')[0].split('.')[0].charAt(0).toUpperCase() + email.split('@')[0].split('.')[0].slice(1);
 
@@ -1815,6 +2438,11 @@ function renderLoginScreen(errorMessage = '') {
       emailInput.classList.add('kair-auth-input-error');
       passwordInput.classList.add('kair-auth-input-error');
       console.error('Login error:', err);
+    } finally {
+      // Re-habilitar el botón siempre (éxito, error, o doble click).
+      // Si el login fue exitoso, el form se destruye durante la transición
+      // y este re-habilitar no tiene efecto visible.
+      button.disabled = false;
     }
   });
 
@@ -1899,7 +2527,9 @@ function createSidebarButtons(activeModules = null) {
     li.className = 'sidebar-menu-item';
 
     const button = document.createElement('button');
-    button.className = 'sidebar-menu-button';
+    /* "Gestión de Peligros y Riesgos" tiene la clase extra para permitir texto centrado
+       (es el único módulo cuyo nombre es demasiado largo para el layout lineal). */
+    button.className = 'sidebar-menu-button' + (item.name === 'Gestión de Peligros y Riesgos' ? ' sidebar-long-label' : '');
     button.textContent = item.name;
 
     button.addEventListener('click', () => {
@@ -1951,13 +2581,16 @@ async function showHomePage(overrideCompanies = null) {
   hideCalendar(contentArea);
   console.log('Showing home page...');
 
-  // --- OCULTAR SIDEBAR EN HOME PRINCIPAL ---
-  const sidebar = document.getElementById('sidebar');
-  if (sidebar) {
-    sidebar.classList.add('sidebar-hidden');
-  }
+// --- OCULTAR SIDEBAR EN HOME PRINCIPAL ---
+const sidebar = document.getElementById('sidebar');
+if (sidebar) {
+sidebar.classList.add('sidebar-hidden');
+}
 
-  // Cargar dinámicamente las empresas desde la configuración
+const mainContainerForHome = document.querySelector('.main-container');
+if (mainContainerForHome) mainContainerForHome.classList.add('vanta-fullscreen');
+
+// Cargar dinámicamente las empresas desde la configuración
   let dynamicCompanies = [];
   
   // === FUNCIÓN AUXILIAR PARA VERIFICAR SI ES ADMIN ===
@@ -2106,10 +2739,13 @@ async function showHomePage(overrideCompanies = null) {
 }
 
 async function selectCompany(companyName, buttonElement) {
-  console.log(`Selecting company: ${companyName}`);
-  currentCompany = companyName;
+console.log(`Selecting company: ${companyName}`);
+currentCompany = companyName;
 
-  // --- MOSTRAR SIDEBAR AL SELECCIONAR EMPRESA ---
+const mainContainerSel = document.querySelector('.main-container');
+if (mainContainerSel) mainContainerSel.classList.remove('vanta-fullscreen');
+
+// --- MOSTRAR SIDEBAR AL SELECCIONAR EMPRESA ---
   const sidebar = document.getElementById('sidebar');
   if (sidebar) {
     sidebar.classList.remove('sidebar-hidden');
@@ -2238,12 +2874,15 @@ function handleCompanyHome() {
 }
 
 async function handleLogout() {
-  console.log('Handling logout...');
-  currentCompany = null;
-  currentModule = null;
-  currentSubmodule = null; // Asegurar que también se resetea el submódulo
+console.log('Handling logout...');
+currentCompany = null;
+currentModule = null;
+currentSubmodule = null;
 
-  // Resetear UI
+const mainContainerLogout = document.querySelector('.main-container');
+if (mainContainerLogout) mainContainerLogout.classList.add('vanta-fullscreen');
+
+// Resetear UI
   if (companyNameElement) {
     companyNameElement.textContent = 'Empresa';
   }
@@ -2303,10 +2942,13 @@ async function handleLogout() {
 }
 
 function showCompanyHomePage() {
-  // ✅ LIMPIAR ESTADO
-  currentSubmodule = null;
-  
-  // ✅ LIMPIAR BOTÓN ACTIVO DEL SIDEBAR (estamos en dashboard, no en módulo)
+// ✅ LIMPIAR ESTADO
+currentSubmodule = null;
+
+const mainContainerDash = document.querySelector('.main-container');
+if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
+
+// ✅ LIMPIAR BOTÓN ACTIVO DEL SIDEBAR (estamos en dashboard, no en módulo)
   if (window.activeSidebarButton) {
     window.activeSidebarButton.classList.remove('active');
     window.activeSidebarButton = null;
@@ -2359,92 +3001,42 @@ function showCompanyHomePage() {
     overflow: hidden;
   `;
 
-  // --- HEADER ---
-  const header = document.createElement('header');
-  header.style.cssText = `
-    height: 70px;
-    border-bottom: 1px solid #e2e8f0;
-    padding: 0 30px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: white;
-    flex-shrink: 0;
-    z-index: 10;
-  `;
 
-  const headerLeft = document.createElement('div');
-  headerLeft.innerHTML = `
-    <h1 style="font-size: 20px; font-weight: 700; color: #1e293b; margin: 0;">${currentCompany}</h1>
-    <p style="font-size: 12px; color: #64748b; margin-top: 2px;" id="company-info-text">SG-SST · Cargando información...</p>
-  `;
 
-  const notifBtn = document.createElement('button');
-  notifBtn.id = 'notif-btn';
-  notifBtn.style.cssText = `
-    width: 40px; height: 40px; border-radius: 50%; border: 1px solid #e2e8f0;
-    background: white; cursor: pointer; position: relative; display: flex;
-    align-items: center; justify-content: center; font-size: 16px; color: #64748b;
-    transition: all 0.2s;
-  `;
-  notifBtn.innerHTML = `
-    <i class="fas fa-bell"></i>
-    <span id="notif-badge" style="position: absolute; top: -2px; right: -2px; width: 18px; height: 18px; background: #ef4444; color: white; border-radius: 50%; font-size: 10px; font-weight: 700; display: none; align-items: center; justify-content: center;">0</span>
-  `;
-  notifBtn.onmouseover = function() { this.style.background = '#174ea6'; this.style.color = 'white'; this.style.borderColor = '#174ea6'; };
-  notifBtn.onmouseout = function() { this.style.background = 'white'; this.style.color = '#64748b'; this.style.borderColor = '#e2e8f0'; };
+  // --- KPIs: k-stats-ribbon (estandar Capacitaciones/Inducciones) ---
+  const kpiRibbon = document.createElement('section');
+  kpiRibbon.className = 'k-stats-ribbon dashboard-kpi-ribbon';
+  kpiRibbon.style.cssText = 'margin: 20px 30px 0;';
 
-  header.appendChild(headerLeft);
-  const headerRight = document.createElement('div');
-  headerRight.style.cssText = 'display: flex; gap: 15px; align-items: center;';
-  headerRight.appendChild(notifBtn);
-  header.appendChild(headerRight);
-  dashboardContainer.appendChild(header);
-
-  // --- KPIs ---
-  const kpiRow = document.createElement('section');
-  kpiRow.style.cssText = `
-    padding: 20px 30px 10px;
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 15px;
-    background: #f8fafc;
-  `;
-
-  const kpiCards = [
-    { id: 'kpi-accidents', icon: 'fa-shield-alt', value: '-', label: 'Accidentes (Mes)', color: '#f59e0b' },
-    { id: 'kpi-pric', icon: 'fa-user-injured', value: '-', label: 'Casos PRIC Activos', color: '#174ea6' },
-    { id: 'kpi-overdue', icon: 'fa-calendar-times', value: '-', label: 'Documentos Vencidos', color: '#ef4444' },
-    { id: 'kpi-compliance', icon: 'fa-chart-line', value: '-%', label: 'Cumplimiento', color: '#10b981' }
+  const kpiItems = [
+    { id: 'kpi-accidents', icon: 'fa-shield-alt', label: 'Accidentes (Año)', colorClass: 'warning' },
+    { id: 'kpi-pric', icon: 'fa-user-injured', label: 'Casos PRIC Activos', colorClass: 'primary' },
+    { id: 'kpi-overdue', icon: 'fa-calendar-times', label: 'Documentos Vencidos', colorClass: 'danger' },
+    { id: 'kpi-compliance', icon: 'fa-chart-line', label: 'Plan de Trabajo', colorClass: 'success' }
   ];
 
-  kpiCards.forEach(kpi => {
-    const card = document.createElement('div');
-    card.id = kpi.id;
-    card.style.cssText = `
-      background: white;
-      padding: 15px;
-      border-radius: 8px;
-      border: 1px solid #e2e8f0;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      position: relative;
-      overflow: hidden;
-    `;
-    card.innerHTML = `
-      <div style="position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: ${kpi.color};"></div>
-      <div style="width: 42px; height: 42px; border-radius: 8px; background: #f1f5f9; color: #64748b; display: flex; align-items: center; justify-content: center; font-size: 18px;">
+  kpiItems.forEach((kpi, index) => {
+    const item = document.createElement('div');
+    item.className = 'k-stats-ribbon__item';
+    item.innerHTML = `
+      <span class="k-stats-ribbon__icon ${kpi.colorClass}">
         <i class="fas ${kpi.icon}"></i>
-      </div>
-      <div>
-        <h3 style="font-size: 20px; font-weight: 700; color: #1e293b; margin-bottom: 2px;">${kpi.value}</h3>
-        <span style="font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">${kpi.label}</span>
+      </span>
+      <div class="k-stats-ribbon__data">
+        <span class="k-stats-ribbon__value" id="${kpi.id}">-</span>
+        <span class="k-stats-ribbon__label">${kpi.label}</span>
       </div>
     `;
-    kpiRow.appendChild(card);
+    kpiRibbon.appendChild(item);
+
+    if (index < kpiItems.length - 1) {
+      const divider = document.createElement('div');
+      divider.className = 'k-stats-ribbon__divider';
+      kpiRibbon.appendChild(divider);
+    }
   });
-  dashboardContainer.appendChild(kpiRow);
+
+  dashboardContainer.appendChild(kpiRibbon);
 
   // --- MAIN GRID ---
   const mainGrid = document.createElement('div');
@@ -2452,6 +3044,7 @@ function showCompanyHomePage() {
     flex: 1;
     display: grid;
     grid-template-columns: 280px 1fr;
+    grid-template-rows: 1fr;
     gap: 20px;
     padding: 10px 30px 20px;
     min-height: 0;
@@ -2553,6 +3146,8 @@ function showCompanyHomePage() {
     border: 1px solid #e2e8f0;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
   `;
 
   const tasksHeader = document.createElement('div');
@@ -2613,11 +3208,9 @@ function showCompanyHomePage() {
 async function loadDashboardData() {
   console.log('🔍 [DASHBOARD] loadDashboardData INICIANDO para:', currentCompany);
 
-  const tasksContainer = document.getElementById('tasks-container');
-  const notifBadge = document.getElementById('notif-badge');
-  
-  console.log('🔍 [DASHBOARD] tasks-container:', tasksContainer);
-  console.log('🔍 [DASHBOARD] notif-badge:', notifBadge);
+    const tasksContainer = document.getElementById('tasks-container');
+
+    console.log('🔍 [DASHBOARD] tasks-container:', tasksContainer);
 
   try {
     console.log('🔍 [DASHBOARD] Llamando a window.electronAPI.getDashboardSummary...');
@@ -2637,46 +3230,22 @@ async function loadDashboardData() {
       console.log('🔍 [DASHBOARD] Module Status:', data.module_status);
       console.log('🔍 [DASHBOARD] Recursos Alerts:', data.kpis?.recursos_alerts);
 
-      // Actualizar KPIs (SOLO si los elementos existen en el DOM)
+      // Actualizar KPIs (k-stats-ribbon)
       const kpiAccidents = document.getElementById('kpi-accidents');
       const kpiPric = document.getElementById('kpi-pric');
       const kpiOverdue = document.getElementById('kpi-overdue');
       const kpiCompliance = document.getElementById('kpi-compliance');
-      
-      console.log('🔍 [DASHBOARD] Elementos KPI:', {
-        kpiAccidents: !!kpiAccidents,
-        kpiPric: !!kpiPric,
-        kpiOverdue: !!kpiOverdue,
-        kpiCompliance: !!kpiCompliance
-      });
 
-      if (kpiAccidents) {
-        console.log('🔍 [DASHBOARD] Actualizando kpi-accidents:', data.kpis.accidents_month || '0');
-        kpiAccidents.querySelector('h3').textContent = data.kpis.accidents_month || '0';
-      }
-      if (kpiPric) {
-        console.log('🔍 [DASHBOARD] Actualizando kpi-pric:', data.kpis.pric_active || '0');
-        kpiPric.querySelector('h3').textContent = data.kpis.pric_active || '0';
-      }
-      if (kpiOverdue) {
-        console.log('🔍 [DASHBOARD] Actualizando kpi-overdue:', data.kpis.overdue_docs || '0');
-        kpiOverdue.querySelector('h3').textContent = data.kpis.overdue_docs || '0';
-      }
-      if (kpiCompliance) {
-        console.log('🔍 [DASHBOARD] Actualizando kpi-compliance:', (data.kpis.compliance || '0') + '%');
-        kpiCompliance.querySelector('h3').textContent = (data.kpis.compliance || '0') + '%';
-      }
+      if (kpiAccidents) kpiAccidents.textContent = data.kpis.accidents_year || '0';
+      if (kpiPric) kpiPric.textContent = data.kpis.pric_active || '0';
+      if (kpiOverdue) kpiOverdue.textContent = data.kpis.overdue_docs || '0';
+      if (kpiCompliance) kpiCompliance.textContent = (data.kpis.compliance || '0') + '%';
 
       // Actualizar badge de notificaciones
-      const totalTasks = data.tasks ? data.tasks.length : 0;
-      console.log('🔍 [DASHBOARD] Total tasks:', totalTasks);
-      if (notifBadge) {
-        notifBadge.textContent = totalTasks;
-        notifBadge.style.display = totalTasks > 0 ? 'flex' : 'none';
-        console.log('🔍 [DASHBOARD] Badge actualizado:', totalTasks);
-      }
+        const totalTasks = data.tasks ? data.tasks.length : 0;
+        console.log('🔍 [DASHBOARD] Total tasks:', totalTasks);
 
-      // Renderizar tareas
+        // Renderizar tareas
       console.log('🔍 [DASHBOARD] Llamando a renderTasks()');
       renderTasks(data.tasks || []);
 
@@ -2684,15 +3253,9 @@ async function loadDashboardData() {
       const recursosAlerts = data.kpis?.recursos_alerts || 0;
       const gestionSaludAlerts = data.kpis?.gestion_salud_alerts || 0;
       console.log('🔍 [DASHBOARD] Llamando a updateModuleBadges con recursos_alerts:', recursosAlerts, 'gestion_salud_alerts:', gestionSaludAlerts);
-      updateModuleBadges(data.module_status || {}, recursosAlerts, gestionSaludAlerts);
+        updateModuleBadges(data.module_status || {}, recursosAlerts, gestionSaludAlerts);
 
-      // Actualizar información de la empresa en el header
-      const companyInfoText = document.getElementById('company-info-text');
-      if (companyInfoText && data.company_info) {
-        companyInfoText.textContent = `SG-SST · Riesgo ${data.company_info.risk || 'N/A'} · ${data.company_info.employees || 'N/A'} Colaboradores`;
-      }
-
-      console.log('🔍 [DASHBOARD] loadDashboardData COMPLETADO');
+        console.log('🔍 [DASHBOARD] loadDashboardData COMPLETADO');
 
     } else {
       console.error('[DASHBOARD] Error en respuesta:', response.error);
@@ -3020,8 +3583,8 @@ const MODULE_KEY_TO_BADGE_ID = {
   'recursos': 'module-badge-recursos',
   'gestion-salud': 'module-badge-gestión-de-la-salud',
   'gestion-integral': 'module-badge-gestión-integral',
-  'peligros': 'module-badge-peligros',
-  'amenazas': 'module-badge-amenazas',
+  'peligros': 'module-badge-gestión-de-peligros-y-riesgos',
+  'amenazas': 'module-badge-gestión-de-amenazas',
   'verificacion': 'module-badge-verificación',
   'mejoramiento': 'module-badge-mejoramiento'
 };
@@ -3085,15 +3648,28 @@ function getTagTextColor(priority) {
 }
 
 
-function showModuleContent(moduleName) {
-  console.log(`Showing content for module: ${moduleName}`);
-  // ✅ SOLUCIÓN TEMPORAL: No cambiar módulo si estamos en un submódulo
-    if (currentSubmodule) {
-        console.warn(`🚨 [showModuleContent] BLOQUEANDO cambio de módulo porque estamos en submódulo: "${currentSubmodule}"`);
-        return;
-    }
+let _showModuleContentLock = false;
 
-  currentModule = moduleName;
+function showModuleContent(moduleName) {
+// ✅ GUARD: Prevenir llamadas duplicadas desde handlers de mensajes solapados
+if (_showModuleContentLock) {
+console.warn(`[showModuleContent] BLOCKED duplicate call for "${moduleName}" (lock active)`);
+return;
+}
+_showModuleContentLock = true;
+Promise.resolve().then(() => { _showModuleContentLock = false; });
+
+console.log(`Showing content for module: ${moduleName}`);
+// ✅ SOLUCIÓN TEMPORAL: No cambiar módulo si estamos en un submódulo
+if (currentSubmodule) {
+console.warn(`🚨 [showModuleContent] BLOQUEANDO cambio de módulo porque estamos en submódulo: "${currentSubmodule}"`);
+return;
+}
+
+const mainContainerMod = document.querySelector('.main-container');
+if (mainContainerMod) mainContainerMod.classList.remove('vanta-fullscreen');
+
+currentModule = moduleName;
   // ✅ LIMPIAR ESTADO: Al cambiar de módulo, ya no estamos en un submódulo
   currentSubmodule = null;
   console.log(`🔍 [showModuleContent] currentModule actualizado a: ${currentModule}`);
@@ -3259,7 +3835,12 @@ function showModuleHome(container, moduleName) { // 'container' ya es el <div cl
     // (Este código permanece igual, solo se asegura de usar moduleContentContainer)
     if (moduleName === "Gestión Integral") {
         if (window.GestionIntegralHome) {
+            if (window.currentGestionIntegralHome?._removeFullscreenListener) {
+                console.log(`[CHART-DIAG] ═══ NAVIGATE AWAY — destroying old instance ═══`);
+                window.currentGestionIntegralHome._removeFullscreenListener();
+            }
             const gestionIntegralHome = new window.GestionIntegralHome(moduleContentContainer, moduleName, submodules);
+            window.currentGestionIntegralHome = gestionIntegralHome; // Referencia global para filtros
             gestionIntegralHome.render();
         } else {
             console.error('GestionIntegralHome component not found');
@@ -3373,10 +3954,13 @@ function showGenericModuleHome(container, moduleName, submodules) {
 
 
 function showSubmoduleContent(container, moduleName, submoduleName) {
-  // ✅ ACTUALIZAR ESTADO: Establecer que estamos en un submódulo
-  currentSubmodule = submoduleName;
+// ✅ ACTUALIZAR ESTADO: Establecer que estamos en un submódulo
+currentSubmodule = submoduleName;
 
-  // Inspeccionar el DOM antes de limpiar
+const mainContainerSub = document.querySelector('.main-container');
+if (mainContainerSub) mainContainerSub.classList.remove('vanta-fullscreen');
+
+// Inspeccionar el DOM antes de limpiar
   hideCalendar(); // No necesita argumento con la nueva implementación
 
   // ✅ Verificar que container no sea null
@@ -3407,6 +3991,7 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
   submoduleContentDiv.style.width = '100%';
   submoduleContentDiv.style.display = 'flex';
   submoduleContentDiv.style.flexDirection = 'column';
+  submoduleContentDiv.style.overflowY = 'auto';
   container.appendChild(submoduleContentDiv);
 
   try {
@@ -3443,13 +4028,18 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
         }
       }
 
-      if (ComponentConstructor) {
-        const component = new ComponentConstructor(...args);
-        // Guardar referencia al componente activo
-        currentActiveComponent = component;
-        component.render();
-        return component;
-      } else {
+    if (ComponentConstructor) {
+        try {
+            const component = new ComponentConstructor(...args);
+            currentActiveComponent = component;
+            component.render();
+            return component;
+        } catch (e) {
+            console.error('❌ Error al crear/renderizar componente:', e);
+            currentActiveComponent = null;
+            return null;
+        }
+    } else {
         console.error(`❌ Constructor de componente no encontrado`);
         return null;
       }
@@ -3542,14 +4132,14 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
 
     } else if (submoduleName === "1.1.8 Conformación de Comite de Convivencia") {
       if (window.ComiteConvivenciaComponent) {
-        const convivenciaComponent = new window.ComiteConvivenciaComponent(
-          submoduleContentDiv,
-          currentCompany,
-          moduleName,
-          submoduleName,
-          backToModuleCallback
-        );
-        convivenciaComponent.render();
+      const convivenciaComponent = new window.ComiteConvivenciaComponent(
+        submoduleContentDiv,
+        currentCompany,
+        moduleName,
+        submoduleName,
+        safeBackToModuleCallback
+      );
+      convivenciaComponent.render();
       } else {
         console.error('❌ ComiteConvivenciaComponent no encontrado');
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
@@ -3616,18 +4206,21 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
 
-    } else if (submoduleName === "2.1.1 Politica del SG-SST") {
-      createComponentSafely(window.PoliticaComponent,
-        submoduleContentDiv,
-        currentCompany,
-        moduleName,
-        submoduleName,
-        safeBackToModuleCallback // <-- USAR EL CALLBACK SEGURO
-      );
-      if (!window.PoliticaComponent) {
-        console.error('❌ PoliticaComponent no encontrado');
-        showDevelopmentMessage(submoduleContentDiv, submoduleName);
-      }
+} else if (submoduleName === "2.1.1 Politica del SG-SST") {
+if (window.PoliticaComponent) {
+const politicaComponent = new window.PoliticaComponent(
+submoduleContentDiv,
+currentCompany,
+moduleName,
+submoduleName,
+safeBackToModuleCallback
+);
+currentActiveComponent = politicaComponent;
+politicaComponent.render();
+} else {
+console.error('❌ PoliticaComponent no encontrado');
+showDevelopmentMessage(submoduleContentDiv, submoduleName);
+}
 
     } else if (submoduleName === "2.2.1 Objetivos SST") {
       createComponentSafely(window.ObjetivosSSTComponent,
@@ -3669,6 +4262,22 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
 
+    } else if (submoduleName === "2.5.1 Archivo y retención documental del SG-SST") {
+      if (window.ArchivoRetencionComponent) {
+        const archivoRetencionComponent = new window.ArchivoRetencionComponent(
+          submoduleContentDiv,
+          currentCompany,
+          moduleName,
+          submoduleName,
+          safeBackToModuleCallback
+        );
+        window.archivoRetencionInstance = archivoRetencionComponent; // ← referencia global
+        archivoRetencionComponent.render();
+      } else {
+        console.error('❌ ArchivoRetencionComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
     } else if (submoduleName === "2.6.1 Rendición de cuentas") {
       if (window.RendicionCuentasComponent) {
         const rendicionCuentasComponent = new window.RendicionCuentasComponent(
@@ -3684,15 +4293,44 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
 
-    } else if (submoduleName === "2.9.1 Identificación y evaluación para la adquisición de bienes y servicios") {
-      createComponentSafely(window.EvaluacionProveedores,
+ } else if (submoduleName === "2.9.1 Identificación y evaluación para la adquisición de bienes y servicios") {
+ createComponentSafely(window.EvaluacionProveedores,
+ submoduleContentDiv,
+ moduleName,
+ submoduleName,
+ safeBackToModuleCallback,
+ currentCompany
+ );
+      if (!window.EvaluacionProveedores) {
+        console.error('❌ EvaluacionProveedores no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
+    } else if (submoduleName === "2.10.1 Evaluación y selección de proveedores y contratistas") {
+      createComponentSafely(window.EvaluacionSeleccionComponent,
         submoduleContentDiv,
         moduleName,
         submoduleName,
-        safeBackToModuleCallback
+        safeBackToModuleCallback,
+        currentCompany
       );
-      if (!window.EvaluacionProveedores) {
-        console.error('❌ EvaluacionProveedores no encontrado');
+      if (!window.EvaluacionSeleccionComponent) {
+        console.error('❌ EvaluacionSeleccionComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
+    } else if (submoduleName === "2.11.1 Gestión del Cambio") {
+      if (window.GestionDelCambioComponent) {
+        const gestionCambioComponent = new window.GestionDelCambioComponent(
+          submoduleContentDiv,
+          currentCompany,
+          moduleName,
+          submoduleName,
+          safeBackToModuleCallback
+        );
+        gestionCambioComponent.render();
+      } else {
+        console.error('❌ GestionDelCambioComponent no encontrado');
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
 
@@ -3762,14 +4400,204 @@ function showSubmoduleContent(container, moduleName, submoduleName) {
     } else if (submoduleName === "3.2.2 Investigación de Accidentes, indicentes y Enfermedades") {
       showInvestigacionAccidentesContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
 
+    } else if (submoduleName === "3.2.3 Registro y analisis estadistico de indicentes, accidentes de trabajo y enfermedades") {
+      showRegistroEstadisticoContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
+
+    } else if (submoduleName === "3.3.1 Frecuencia de la accidentalidad") {
+      showFrecuenciaAccidentalidadContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
+
+    } else if (submoduleName === "3.3.2 Severidad de la accidentalidad") {
+      showSeveridadAccidentalidadContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
+
+    } else if (submoduleName === "3.3.3 Proporción de accidentes de trabajo mortales") {
+      showIndiceMortalidadContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
+
+    } else if (submoduleName === "3.3.4 Medición de la prevalencia de enfermedades laborales") {
+      showPrevalenciaContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
+
+    } else if (submoduleName === "3.3.5 Medición de la incidencia de enfermedades laborales") {
+      showIncidenciaContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
+
     } else if (submoduleName === "3.3.6 Medición del ausentismo por causa médica") {
       showMedicionAusentismoContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
 
     } else if (submoduleName === "Registrar Ausentismo") {
       showRegistrarAusentismoContent(submoduleContentDiv, currentCompany, moduleName, submoduleName);
 
-    } else if (submoduleName === "1.1.3 Asignación de Recursos") {
-      showAsignacionRecursosContent(submoduleContentDiv);
+} else if (submoduleName === "4.1.1 Metodologia IPEVR") {
+createComponentSafely(window.MetodologiaIpevrComponent,
+submoduleContentDiv,
+currentCompany,
+moduleName,
+submoduleName,
+safeBackToModuleCallback
+);
+if (!window.MetodologiaIpevrComponent) {
+console.error('❌ MetodologiaIpevrComponent no encontrado');
+showDevelopmentMessage(submoduleContentDiv, submoduleName);
+}
+
+} else if (submoduleName === "4.1.2 Identificación de Peligros") {
+createComponentSafely(window.IdentificacionPeligrosComponent,
+submoduleContentDiv,
+currentCompany,
+moduleName,
+submoduleName,
+safeBackToModuleCallback
+);
+if (!window.IdentificacionPeligrosComponent) {
+console.error('❌ IdentificacionPeligrosComponent no encontrado');
+showDevelopmentMessage(submoduleContentDiv, submoduleName);
+}
+
+} else if (submoduleName === "4.2.4 Realización de inspecciones sistematicas a las instalaciones, maquinas o equipos") {
+                createComponentSafely(window.InspeccionesComponent,
+                    submoduleContentDiv,
+                    currentCompany,
+                    moduleName,
+                    submoduleName,
+                    safeBackToModuleCallback
+                );
+if (!window.InspeccionesComponent) {
+console.error('❌ InspeccionesComponent no encontrado');
+showDevelopmentMessage(submoduleContentDiv, submoduleName);
+}
+
+ } else if (submoduleName === "4.2.5 Mantenimiento periodico de equipos, instalaciones herramientas") {
+createComponentSafely(window.MantenimientoComponent,
+ submoduleContentDiv,
+ currentCompany,
+ moduleName,
+ submoduleName,
+ safeBackToModuleCallback
+);
+if (!window.MantenimientoComponent) {
+ console.error('❌ MantenimientoComponent no encontrado');
+ showDevelopmentMessage(submoduleContentDiv, submoduleName);
+}
+
+} else if (submoduleName === "1.1.3 Asignación de Recursos") {
+  showAsignacionRecursosContent(submoduleContentDiv);
+
+} else if (submoduleName === "5.1.1 Plan de Prevención de Emergencias") {
+      createComponentSafely(window.PlanPrevencionComponent,
+        submoduleContentDiv,
+        currentCompany,
+        moduleName,
+        submoduleName,
+        safeBackToModuleCallback
+      );
+      if (!window.PlanPrevencionComponent) {
+        console.error('❌ PlanPrevencionComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
+} else if (submoduleName === "5.1.2 Examenes Medicos Brigadista") {
+      createComponentSafely(window.ExamenesBrigadistaComponent,
+        submoduleContentDiv,
+        currentCompany,
+        moduleName,
+        submoduleName,
+        safeBackToModuleCallback
+      );
+      if (!window.ExamenesBrigadistaComponent) {
+        console.error('❌ ExamenesBrigadistaComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
+} else if (submoduleName === "7.1.1 Acciones Preventivas y Correctivas") {
+      createComponentSafely(window.AccionesPcComponent,
+        submoduleContentDiv,
+        currentCompany,
+        moduleName,
+        submoduleName,
+        safeBackToModuleCallback
+      );
+      if (!window.AccionesPcComponent) {
+        console.error('❌ AccionesPcComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
+} else if (submoduleName === "7.1.2 Acciones de Mejora conforme a revisiones de la alta gerencia") {
+      createComponentSafely(window.AccionesMgComponent,
+        submoduleContentDiv,
+        currentCompany,
+        moduleName,
+        submoduleName,
+        safeBackToModuleCallback
+      );
+      if (!window.AccionesMgComponent) {
+        console.error('❌ AccionesMgComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
+} else if (submoduleName === "7.1.3 Acciones de Mejora con base en investigaciones de AT y EL") {
+      createComponentSafely(window.AccionesMaComponent,
+        submoduleContentDiv,
+        currentCompany,
+        moduleName,
+        submoduleName,
+        safeBackToModuleCallback
+      );
+      if (!window.AccionesMaComponent) {
+        console.error('❌ AccionesMaComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
+} else if (submoduleName === "7.1.4 Elaboración de Planes de Mejoramiento de medidas y acciones correctivas por autoridades y ARL") {
+      createComponentSafely(window.PlanesComponent,
+        submoduleContentDiv,
+        currentCompany,
+        moduleName,
+        submoduleName,
+        safeBackToModuleCallback
+      );
+      if (!window.PlanesComponent) {
+        console.error('❌ PlanesComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
+    } else if (submoduleName === "6.1.1 Definición de indicadores") {
+      createComponentSafely(
+        window.DefinicionIndicadoresComponent,
+        submoduleContentDiv,
+        currentCompany,
+        moduleName,
+        submoduleName,
+        safeBackToModuleCallback
+      );
+      if (!window.DefinicionIndicadoresComponent) {
+        console.error('❌ DefinicionIndicadoresComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
+    } else if (submoduleName === "6.1.2 Auditoria Anual") {
+      createComponentSafely(
+        window.AuditoriaAnualComponent,
+        submoduleContentDiv,
+        currentCompany,
+        moduleName,
+        submoduleName,
+        safeBackToModuleCallback
+      );
+      if (!window.AuditoriaAnualComponent) {
+        console.error('❌ AuditoriaAnualComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+
+    } else if (submoduleName === "6.1.3 Revisión de la alta Dirección") {
+      createComponentSafely(
+        window.RevisionAltaDireccionComponent,
+        submoduleContentDiv,
+        currentCompany,
+        moduleName,
+        submoduleName,
+        safeBackToModuleCallback
+      );
+      if (!window.RevisionAltaDireccionComponent) {
+        console.error('❌ RevisionAltaDireccionComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
 
     } else {
       // ------------------ Submódulos genéricos ------------------ //
@@ -3932,20 +4760,190 @@ function showEnviarRemisionContent(container) {
 }
 
 function showControlRemisionesContent(container) {
-  // Crear un título para esta sección
-  const title = document.createElement('h3');
-  title.textContent = 'Control de Remisiones';
-  container.appendChild(title);
+  container.innerHTML = '';
 
-  // Placeholder para la tabla de control de remisiones
-  const tablePlaceholder = document.createElement('div');
-  tablePlaceholder.className = 'control-remisiones-table';
-  tablePlaceholder.innerHTML = `
-    <p>Tabla de control de remisiones se cargará aquí.</p>
-    <p>Esta funcionalidad se conectará al backend Python para obtener los datos.</p>
-    <button class="btn">Refrescar</button>
+  // Agregar Bootstrap Icons si no existe
+  if (!document.querySelector('link[href*="bootstrap-icons"]')) {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css';
+    document.head.appendChild(link);
+  }
+
+  // Header System v2.0
+  const header = document.createElement('header');
+  header.className = 'kair-header';
+  header.style.cssText = 'background: #ffffff; border-bottom: 1px solid #dee2e6; position: sticky; top: 0; z-index: 100;';
+  header.innerHTML = `
+    <div style="display: flex; align-items: center; justify-content: flex-start; gap: 0.75rem; min-height: 52px; padding: 0 1.5rem;">
+      <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <button id="btnVolver" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; color: #5a6378; border-radius: 0.375rem; cursor: pointer;">
+          <i class="bi bi-arrow-left"></i>
+        </button>
+      </div>
+      <div style="width: 1px; height: 24px; background: #dee2e6;"></div>
+      <div style="display: flex; flex-direction: column; gap: 0.125rem;">
+        <h1 style="font-size: 1.25rem; font-weight: 600; color: #1a1a2e; margin: 0;">
+          <i class="fas fa-clipboard-check" style="color: #174ea6;"></i>
+          Control de Remisiones
+        </h1>
+        <ol style="display: flex; align-items: center; gap: 0.375rem; list-style: none; margin: 0; padding: 0; font-size: 0.8125rem; color: #5a6378;">
+          <li><a href="#" style="color: #5a6378; text-decoration: none;">Gestión de la Salud</a></li>
+          <li>›</li>
+          <li><a href="#" style="color: #5a6378; text-decoration: none;">3.1.6</a></li>
+          <li>›</li>
+          <li style="color: #174ea6; font-weight: 500;">3.1.6.1 Control de Remisiones</li>
+        </ol>
+      </div>
+      <div style="margin-left: auto; display: flex; align-items: center; gap: 0.75rem;">
+        <span style="display: flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem; color: #5a6378;">
+          <i class="bi bi-building"></i>
+          <span id="header-company-text">${currentCompany || '—'}</span>
+        </span>
+      </div>
+    </div>
   `;
-  container.appendChild(tablePlaceholder);
+  container.appendChild(header);
+
+  const backBtn = header.querySelector('#btnVolver');
+  backBtn.addEventListener('click', () => {
+    currentSubmodule = null;
+    showSubmoduleContent("3.1.6 Restricciones y recomendaciones médicas");
+  });
+
+  // Contenedor principal tipo card
+  const wrapper = document.createElement('div');
+  wrapper.className = 'control-remisiones-wrapper';
+  container.appendChild(wrapper);
+
+  // Función asíncrona para cargar y renderizar datos
+  const renderContent = async () => {
+    wrapper.innerHTML = '<p class="loading-msg">Cargando datos del archivo de control...</p>';
+
+    try {
+      const result = await window.electronAPI.getControlRemisionesData(currentCompany);
+
+      wrapper.innerHTML = '';
+
+      if (!result.success) {
+        wrapper.innerHTML = `
+          <div class="control-remisiones-error">
+            <i class="fas fa-exclamation-triangle"></i>
+            <h3>Error al cargar datos</h3>
+            <p>${result.error || 'Error desconocido'}</p>
+            <button class="btn btn-primary" onclick="this.parentElement.parentElement.innerHTML='<p class=\\'loading-msg\\'>Cargando...</p>'; window._loadControlRemisiones()">Reintentar</button>
+          </div>
+        `;
+        window._loadControlRemisiones = renderContent;
+        return;
+      }
+
+      if (!result.rows || result.rows.length === 0) {
+        wrapper.innerHTML = `
+          <div class="control-remisiones-empty">
+            <i class="fas fa-inbox"></i>
+            <h3>Sin registros</h3>
+            <p>El archivo de control no contiene registros aún.</p>
+            <p style="font-size:0.85rem;color:#888;margin-top:8px;">Genera una remisión desde "Enviar Remisiones" para agregar el primer registro.</p>
+          </div>
+        `;
+        return;
+      }
+
+      // Info superior
+      const infoBar = document.createElement('div');
+      infoBar.className = 'control-remisiones-info';
+      infoBar.innerHTML = `
+        <span><i class="fas fa-database"></i> <strong>${result.rows.length}</strong> registro(s)</span>
+        <span class="info-file" title="${result.filePath}"><i class="fas fa-file-excel"></i> ${result.filePath ? result.filePath.split(/[\\/]/).pop() : ''}</span>
+      `;
+      wrapper.appendChild(infoBar);
+
+      // Tabla con scroll
+      const tableContainer = document.createElement('div');
+      tableContainer.className = 'control-remisiones-table-container';
+
+      const table = document.createElement('table');
+      table.className = 'control-remisiones-table';
+
+      // Encabezados
+      const thead = document.createElement('thead');
+      const headerRow = document.createElement('tr');
+      if (result.headers && Array.isArray(result.headers)) {
+        result.headers.forEach(h => {
+          const th = document.createElement('th');
+          th.textContent = h || '';
+          th.style.position = 'sticky';
+          th.style.top = '0';
+          headerRow.appendChild(th);
+        });
+      }
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+
+      // Cuerpo
+      const tbody = document.createElement('tbody');
+      result.rows.forEach((row, ri) => {
+        const tr = document.createElement('tr');
+        if (ri % 2 === 0) tr.className = 'row-even';
+
+        if (Array.isArray(row)) {
+          row.forEach((cell, ci) => {
+            const td = document.createElement('td');
+            // Última columna: input editable
+            if (ci === row.length - 1) {
+              const input = document.createElement('input');
+              input.type = 'text';
+              input.value = cell != null ? String(cell) : '';
+              input.placeholder = 'Estado / Seguimiento';
+              input.dataset.rowIndex = ri;
+              input.dataset.colIndex = ci;
+              input.addEventListener('change', async (e) => {
+                try {
+                  const saveResult = await window.electronAPI.updateExcelCell(
+                    result.filePath,
+                    ri + 7 + 1,  // +7 encabezados +1 base-1 Excel
+                    ci + 1,
+                    e.target.value
+                  );
+                  if (saveResult.success) {
+                    input.style.borderColor = '#28a745';
+                    setTimeout(() => { input.style.borderColor = '#dee2e6'; }, 1500);
+                  }
+                } catch (err) {
+                  console.error('Error guardando celda:', err);
+                  input.style.borderColor = '#dc3545';
+                }
+              });
+              td.appendChild(input);
+            } else {
+              td.textContent = cell != null ? String(cell) : '';
+            }
+            tr.appendChild(td);
+          });
+        }
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+
+      tableContainer.appendChild(table);
+      wrapper.appendChild(tableContainer);
+
+    } catch (error) {
+      console.error('Error en Control de Remisiones:', error);
+      wrapper.innerHTML = `
+        <div class="control-remisiones-error">
+          <i class="fas fa-times-circle"></i>
+          <h3>Error crítico</h3>
+          <p>${error.message}</p>
+          <button class="btn btn-primary" onclick="window._loadControlRemisiones()">Reintentar</button>
+        </div>
+      `;
+      window._loadControlRemisiones = renderContent;
+    }
+  };
+
+  renderContent();
 }
 
 function showAsignacionRecursosContent(container) {
@@ -4013,6 +5011,330 @@ function showInvestigacionAccidentesContent(container, currentCompany, moduleNam
   }
 }
 
+function showRegistroEstadisticoContent(container, currentCompany, moduleName, submoduleName) {
+  container.innerHTML = '<p>Cargando registro estadístico...</p>';
+
+  const BASE = 'modules/gestion-salud/registro-estadistico/';
+
+  if (!document.querySelector(`link[href="${BASE}registro-estadistico.css"]`)) {
+    const cssLink = document.createElement('link');
+    cssLink.rel = 'stylesheet';
+    cssLink.href = BASE + 'registro-estadistico.css';
+    document.head.appendChild(cssLink);
+  }
+
+  fetch(BASE + 'registro-estadistico.html')
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.text();
+    })
+    .then(html => {
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      container.innerHTML = doc.body.innerHTML;
+
+      function loadModuleScript() {
+        const s = document.createElement('script');
+        s.src = BASE + 'registro-estadistico.js';
+        document.head.appendChild(s);
+      }
+
+      if (window.Chart) {
+        loadModuleScript();
+      } else {
+        const chartScript = document.createElement('script');
+        chartScript.src = 'https://cdn.jsdelivr.net/npm/chart.js@4';
+        chartScript.onload = loadModuleScript;
+        document.head.appendChild(chartScript);
+      }
+    })
+    .catch(error => {
+      console.error('Error al cargar registro-estadistico:', error);
+      showDevelopmentMessage(container, submoduleName);
+    });
+}
+
+function showFrecuenciaAccidentalidadContent(container, currentCompany, moduleName, submoduleName) {
+  console.log('%c[FrecuenciaAccidentalidad] ========== CARGANDO ==========', 'color: green; font-weight: bold; font-size: 14px;');
+  console.log('[FrecuenciaAccidentalidad] Empresa:', currentCompany);
+  console.log('[FrecuenciaAccidentalidad] Contenedor:', container ? 'EXISTS' : 'NULL');
+  container.innerHTML = '<p style="color: blue;">Cargando frecuencia de la accidentalidad... (v3)</p>';
+
+  const BASE = 'modules/gestion-salud/frecuencia-accidentalidad/';
+
+  // Cargar CSS si no está cargado
+  if (!document.querySelector(`link[href="${BASE}frecuencia-accidentalidad.css"]`)) {
+    const cssLink = document.createElement('link');
+    cssLink.rel = 'stylesheet';
+    cssLink.href = BASE + 'frecuencia-accidentalidad.css';
+    document.head.appendChild(cssLink);
+  }
+
+  // Cargar HTML y luego el script
+  fetch(BASE + 'frecuencia-accidentalidad.html')
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.text();
+    })
+    .then(html => {
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      container.innerHTML = doc.body.innerHTML;
+
+      // Guardar empresa seleccionada para que el módulo la use
+      localStorage.setItem('selectedCompany', currentCompany);
+
+      // Cargar el script del módulo con tag script (con cache-busting)
+      var ts = Date.now();
+      var scriptUrl = BASE + 'frecuencia-accidentalidad.js?_t=' + ts;
+      console.log('[FrecuenciaAccidentalidad] Cargando script tag:', scriptUrl);
+      
+      var s = document.createElement('script');
+      s.src = scriptUrl;
+      s.onload = function() {
+        console.log('[FrecuenciaAccidentalidad] Script cargado OK');
+      };
+      s.onerror = function(e) {
+        console.error('[FrecuenciaAccidentalidad] Error cargando script:', e);
+      };
+      document.body.appendChild(s);
+    })
+    .catch(error => {
+      console.error('[FrecuenciaAccidentalidad] Error al cargar:', error);
+      showDevelopmentMessage(container, submoduleName);
+    });
+}
+
+function showSeveridadAccidentalidadContent(container, currentCompany, moduleName, submoduleName) {
+  console.log('%c[SeveridadAccidentalidad] ========== CARGANDO ==========', 'color: green; font-weight: bold; font-size: 14px;');
+  console.log('[SeveridadAccidentalidad] Empresa:', currentCompany);
+  console.log('[SeveridadAccidentalidad] Contenedor:', container ? 'EXISTS' : 'NULL');
+  container.innerHTML = '<p style="color: blue;">Cargando severidad de la accidentalidad... (v1)</p>';
+
+  const BASE = 'modules/gestion-salud/severidad-accidentalidad/';
+
+  // Cargar CSS si no está cargado
+  if (!document.querySelector(`link[href="${BASE}severidad-accidentalidad.css"]`)) {
+    const cssLink = document.createElement('link');
+    cssLink.rel = 'stylesheet';
+    cssLink.href = BASE + 'severidad-accidentalidad.css';
+    document.head.appendChild(cssLink);
+  }
+
+  // Cargar HTML y luego el script
+  fetch(BASE + 'severidad-accidentalidad.html')
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.text();
+    })
+    .then(html => {
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      container.innerHTML = doc.body.innerHTML;
+
+      // Guardar empresa seleccionada para que el módulo la use
+      localStorage.setItem('selectedCompany', currentCompany);
+
+      // Cargar el script del módulo con tag script (con cache-busting)
+      var ts = Date.now();
+      var scriptUrl = BASE + 'severidad-accidentalidad.js?_t=' + ts;
+      console.log('[SeveridadAccidentalidad] Cargando script tag:', scriptUrl);
+
+      var s = document.createElement('script');
+      s.src = scriptUrl;
+      s.onload = function() {
+        console.log('[SeveridadAccidentalidad] Script cargado OK');
+      };
+      s.onerror = function(e) {
+        console.error('[SeveridadAccidentalidad] Error cargando script:', e);
+      };
+      document.body.appendChild(s);
+    })
+    .catch(error => {
+      console.error('[SeveridadAccidentalidad] Error al cargar:', error);
+      showDevelopmentMessage(container, submoduleName);
+    });
+}
+
+function showIndiceMortalidadContent(container, currentCompany, moduleName, submoduleName) {
+  console.log('[IndiceMortalidad] ✅ showIndiceMortalidadContent INICIADO');
+  console.log('[IndiceMortalidad] container:', container);
+  console.log('[IndiceMortalidad] currentCompany:', currentCompany);
+  console.log('[IndiceMortalidad] moduleName:', moduleName);
+  console.log('[IndiceMortalidad] submoduleName:', submoduleName);
+
+  const BASE = './modules/gestion-salud/indice-mortalidad/';
+  console.log('[IndiceMortalidad] Ruta BASE:', BASE);
+
+  // Cargar CSS si no está cargado
+  if (!document.querySelector(`link[href="${BASE}indice-mortalidad.css"]`)) {
+    const cssLink = document.createElement('link');
+    cssLink.rel = 'stylesheet';
+    cssLink.href = BASE + 'indice-mortalidad.css';
+    document.head.appendChild(cssLink);
+  }
+
+  // Cargar HTML y luego el script
+  const htmlUrl = BASE + 'indice-mortalidad.html';
+  console.log('[IndiceMortalidad] Intentando fetch:', htmlUrl);
+
+  fetch(htmlUrl)
+    .then(r => {
+      console.log('[IndiceMortalidad] Fetch response status:', r.status, r.ok ? 'OK' : 'FALLO');
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.text();
+    })
+    .then(html => {
+      // Parser el HTML completo
+      var parser = new DOMParser();
+      var doc = parser.parseFromString(html, 'text/html');
+      
+      // Mover todos los elementos del body al contenedor
+      var sourceBody = doc.body;
+      var elements = sourceBody.children;
+      while (elements.length > 0) {
+        container.appendChild(elements[0]);
+      }
+      
+      console.log('[IndiceMortalidad] HTML insertado, elementos移入');
+      console.log('[IndiceMortalidad] tableSection elemento:', !!container.querySelector('#tableSection'));
+      
+      // Cargar Chart.js si no está disponible
+      if (typeof Chart === 'undefined') {
+        console.log('[IndiceMortalidad] Cargando Chart.js...');
+        var chartScript = document.createElement('script');
+        chartScript.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+        chartScript.onload = function() { console.log('[IndiceMortalidad] Chart.js cargado OK'); };
+        chartScript.onerror = function(e) { console.error('[IndiceMortalidad] Error cargando Chart.js', e); };
+        document.head.appendChild(chartScript);
+      }
+
+      // Guardar empresa seleccionada para que el módulo la use
+      localStorage.setItem('selectedCompany', currentCompany);
+
+      // Cargar el script del módulo con tag script (con cache-busting)
+      var ts = Date.now();
+      var scriptUrl = BASE + 'indice-mortalidad.js?_t=' + ts;
+      console.log('[IndiceMortalidad] Cargando script tag:', scriptUrl);
+
+      var s = document.createElement('script');
+      s.src = scriptUrl;
+      s.onload = function() {
+        console.log('[IndiceMortalidad] Script cargado OK');
+      };
+      s.onerror = function(e) {
+        console.error('[IndiceMortalidad] Error cargando script:', e);
+      };
+      document.body.appendChild(s);
+    })
+    .catch(error => {
+      console.error('[IndiceMortalidad] Error al cargar:', error);
+      showDevelopmentMessage(container, submoduleName);
+    });
+}
+
+function showPrevalenciaContent(container, currentCompany, moduleName, submoduleName) {
+  console.log('[PrevalenciaEL] showPrevalenciaContent INICIADO');
+
+  const BASE = './modules/gestion-salud/prevalencia-enfermedad-laboral/';
+
+  // Cargar CSS si no está cargado
+  if (!document.querySelector(`link[href="${BASE}prevalencia-enfermedad-laboral.css"]`)) {
+    const cssLink = document.createElement('link');
+    cssLink.rel = 'stylesheet';
+    cssLink.href = BASE + 'prevalencia-enfermedad-laboral.css';
+    document.head.appendChild(cssLink);
+  }
+
+  // Cargar HTML y luego el script
+  const htmlUrl = BASE + 'prevalencia-enfermedad-laboral.html';
+
+  fetch(htmlUrl)
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.text();
+    })
+    .then(html => {
+      var parser = new DOMParser();
+      var doc = parser.parseFromString(html, 'text/html');
+
+      var sourceBody = doc.body;
+      var elements = sourceBody.children;
+      while (elements.length > 0) {
+        container.appendChild(elements[0]);
+      }
+
+      // Cargar Chart.js si no está disponible
+      if (typeof Chart === 'undefined') {
+        var chartScript = document.createElement('script');
+        chartScript.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+        document.head.appendChild(chartScript);
+      }
+
+      // Guardar empresa seleccionada para que el módulo la use
+      localStorage.setItem('selectedCompany', currentCompany);
+
+      // Cargar el script del módulo
+      var ts = Date.now();
+      var scriptUrl = BASE + 'prevalencia-enfermedad-laboral.js?_t=' + ts;
+
+      var s = document.createElement('script');
+      s.src = scriptUrl;
+      document.body.appendChild(s);
+    })
+    .catch(error => {
+      console.error('[PrevalenciaEL] Error al cargar:', error);
+      showDevelopmentMessage(container, submoduleName);
+    });
+}
+
+function showIncidenciaContent(container, currentCompany, moduleName, submoduleName) {
+  console.log('[IncidenciaEL] showIncidenciaContent INICIADO');
+
+  const BASE = './modules/gestion-salud/incidencia-enfermedad-laboral/';
+
+  if (!document.querySelector(`link[href="${BASE}incidencia-enfermedad-laboral.css"]`)) {
+    const cssLink = document.createElement('link');
+    cssLink.rel = 'stylesheet';
+    cssLink.href = BASE + 'incidencia-enfermedad-laboral.css';
+    document.head.appendChild(cssLink);
+  }
+
+  const htmlUrl = BASE + 'incidencia-enfermedad-laboral.html';
+
+  fetch(htmlUrl)
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.text();
+    })
+    .then(html => {
+      var parser = new DOMParser();
+      var doc = parser.parseFromString(html, 'text/html');
+
+      var sourceBody = doc.body;
+      var elements = sourceBody.children;
+      while (elements.length > 0) {
+        container.appendChild(elements[0]);
+      }
+
+      if (typeof Chart === 'undefined') {
+        var chartScript = document.createElement('script');
+        chartScript.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+        document.head.appendChild(chartScript);
+      }
+
+      localStorage.setItem('selectedCompany', currentCompany);
+
+      var ts = Date.now();
+      var scriptUrl = BASE + 'incidencia-enfermedad-laboral.js?_t=' + ts;
+
+      var s = document.createElement('script');
+      s.src = scriptUrl;
+      document.body.appendChild(s);
+    })
+    .catch(error => {
+      console.error('[IncidenciaEL] Error al cargar:', error);
+      showDevelopmentMessage(container, submoduleName);
+    });
+}
+
 function showMedicionAusentismoContent(container, currentCompany, moduleName, submoduleName) {
   // Crear una instancia del componente y renderizarlo
   if (typeof window.MedicionAusentismoComponent === 'function') {
@@ -4077,10 +5399,13 @@ function createModuleCard(title, description, onClick) {
    * Carga una vista de módulo HTML en el área de contenido principal
    * @param {string} viewPath - Ruta del archivo HTML a cargar
    */
-  function loadModuleViewInContentArea(viewPath) {
-    console.log('[RENDERER] Cargando vista de módulo:', viewPath);
-    
-    // Verificar que contentArea exista
+function loadModuleViewInContentArea(viewPath) {
+console.log('[RENDERER] Cargando vista de módulo:', viewPath);
+
+const mainContainerView = document.querySelector('.main-container');
+if (mainContainerView) mainContainerView.classList.remove('vanta-fullscreen');
+
+// Verificar que contentArea exista
     if (!contentArea) {
       console.error('contentArea is not defined or accessible in loadModuleViewInContentArea.');
       contentArea = document.getElementById('content-area');
@@ -4569,6 +5894,8 @@ ${error.stack}
   const logTextarea = logArea.querySelector('textarea');
   logTextarea.value = logBuffer.join('\n');
   logTextarea.scrollTop = logTextarea.scrollHeight;
+  // Actualizar cache para que logMessage() use este nuevo textarea
+  logTextareaCached = logTextarea;
 
   // Botón para asegurar configuración
   const saveButton = document.createElement('button');

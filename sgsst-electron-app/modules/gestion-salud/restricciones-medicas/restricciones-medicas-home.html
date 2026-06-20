@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K+AIR | Restricciones y Recomendaciones Médicas</title>
+    <!-- Iconos -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Fuentes -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+        /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+           SISTEMA VISUAL OFICIAL (K+AIR)
+           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+        :root {
+            --primary: #174ea6;
+            --primary-hover: #185abd;
+            --primary-light: #e8f0fe;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --info: #17a2b8;
+            --text-dark: #212529;
+            --text-muted: #6c757d;
+            --bg-body: #f0f2f5;
+            --bg-card: #ffffff;
+            --border: #dee2e6;
+            --radius: 0.5rem;
+            --shadow-lg: 0 10px 25px rgba(0,0,0,0.05);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-dark);
+            font-size: 1rem;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* PORTAL CONTENEDOR PRINCIPAL */
+        .portal-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 2rem;
+            overflow-y: auto;
+            min-height: 0;
+        }
+
+        .portal-card {
+            background: white;
+            width: 100%;
+            max-width: 1100px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-lg);
+            padding: 3rem;
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        /* Botón volver */
+        .back-btn-internal {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            font-size: 0.9rem;
+            color: #6c757d;
+            text-decoration: none;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            margin: 0 0 1.5rem 0;
+            width: auto;
+        }
+
+        .back-btn-internal:hover {
+            color: #174ea6;
+            background: #e8f0fe;
+            border-color: #174ea6;
+        }
+
+        .back-btn-internal i {
+            font-size: 0.85rem;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* BARRA SUPERIOR INTERNA DEL PORTAL */
+        .portal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid #f1f3f5;
+        }
+
+        .portal-logo {
+            font-family: 'Lexend', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .back-btn-internal {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            text-decoration: none;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+            background: #f8f9fa;
+            border: 1px solid var(--border);
+        }
+
+        .back-btn-internal:hover {
+            color: var(--primary);
+            background: var(--primary-light);
+            border-color: var(--primary);
+        }
+
+        .back-btn-internal i { font-size: 0.85rem; }
+
+        /* STATUS PILL */
+        .status-pill {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 18px;
+            border-radius: 20px;
+            background: #e8f0fe;
+            color: #174ea6;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 2rem;
+            align-self: center;
+        }
+
+        /* HERO SECTION */
+        .hero-title {
+            font-family: 'Lexend', sans-serif;
+            font-size: 2.2rem;
+            color: var(--text-dark);
+            margin-bottom: 0.5rem;
+        }
+
+        .hero-subtitle {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+            margin-bottom: 2.5rem;
+            max-width: 650px;
+            margin-left: auto;
+            margin-right: auto;
+            line-height: 1.6;
+        }
+
+        /* GRID PRINCIPAL DE ACCIONES */
+        .main-actions {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .main-action-card {
+            background: white;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            padding: 2rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+            text-align: left;
+        }
+
+        .main-action-card:hover {
+            border-color: var(--primary);
+            box-shadow: 0 5px 20px rgba(23, 78, 166, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .main-action-card.primary {
+            background: linear-gradient(135deg, var(--primary) 0%, #2d5dc7 100%);
+            border-color: var(--primary);
+            color: white;
+        }
+
+        .main-action-card.primary:hover {
+            box-shadow: 0 8px 25px rgba(23, 78, 166, 0.35);
+        }
+
+        .main-action-card.primary .action-title,
+        .main-action-card.primary .action-desc {
+            color: white;
+        }
+
+        .main-action-card.primary .main-action-icon {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+
+        .main-action-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 10px;
+            background: #f1f3f5;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            flex-shrink: 0;
+        }
+
+        .main-action-content .action-title {
+            font-weight: 600;
+            font-size: 1.05rem;
+            margin-bottom: 0.35rem;
+            color: var(--text-dark);
+        }
+
+        .main-action-content .action-desc {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        /* SECCIÓN DE ACCIONES RÁPIDAS */
+        .quick-actions {
+            margin-top: 3rem;
+            text-align: left;
+        }
+
+        .quick-actions-title {
+            font-size: 1.05rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            color: var(--text-dark);
+            border-bottom: 2px solid #f1f3f5;
+            padding-bottom: 0.5rem;
+            display: inline-block;
+        }
+
+        .actions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.25rem;
+        }
+
+        .action-card {
+            background: #f8f9fa;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            text-align: left;
+        }
+
+        .action-card:hover {
+            border-color: var(--primary);
+            background: white;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            transform: translateY(-3px);
+        }
+
+        .action-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 8px;
+            background: white;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .action-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+            margin-bottom: 0.25rem;
+            color: var(--text-dark);
+        }
+
+        .action-desc {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        /* COLORES POR TIPO */
+        .action-icon.success { color: var(--success); }
+        .action-icon.warning { color: var(--warning); }
+        .action-icon.danger  { color: var(--danger);  }
+        .action-icon.info    { color: var(--info);    }
+        .action-icon.muted   { color: var(--text-muted); }
+
+        /* RESPONSIVE */
+        @media (max-width: 768px) {
+            .main-actions {
+                grid-template-columns: 1fr;
+            }
+            .hero-title {
+                font-size: 1.8rem;
+            }
+            .portal-card {
+                padding: 2rem 1.5rem;
+            }
+            .portal-header {
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="portal-container">
+        <div class="portal-card">
+
+            <a class="back-btn-internal" onclick="rmGoBackToModule()">
+                <i class="fas fa-arrow-left"></i>
+                <span>Volver al Menú</span>
+            </a>
+
+            <!-- STATUS PILL -->
+            <div class="status-pill">
+                <i class="fas fa-notes-medical"></i>
+                Gestión de la Salud &nbsp;·&nbsp; 3.1.6
+            </div>
+
+            <!-- HERO -->
+            <h1 class="hero-title">Restricciones y Recomendaciones Médicas</h1>
+            <p class="hero-subtitle">
+                Gestiona las remisiones médicas ocupacionales: consulta historiales, genera nuevas remisiones
+                y realiza seguimiento al estado de las enviadas a trabajadores.
+            </p>
+
+            <!-- ACCIONES PRINCIPALES -->
+            <div class="main-actions">
+
+                <!-- VER REMISIONES MÉDICAS -->
+                <div class="main-action-card primary" onclick="rmEnterViewer()">
+                    <div class="main-action-icon">
+                        <i class="fas fa-file-medical-alt"></i>
+                    </div>
+                    <div class="main-action-content">
+                        <div class="action-title">Ver Remisiones Médicas</div>
+                        <div class="action-desc">Consultar el historial de remisiones y recomendaciones médicas emitidas.</div>
+                    </div>
+                </div>
+
+                <!-- ENVIAR REMISIONES -->
+                <div class="main-action-card" onclick="rmEnterSendRemisiones()">
+                    <div class="main-action-icon" style="background: #e8f5e9; color: #28a745;">
+                        <i class="fas fa-paper-plane"></i>
+                    </div>
+                    <div class="main-action-content">
+                        <div class="action-title">Enviar Remisiones</div>
+                        <div class="action-desc">Generar y enviar nuevas remisiones médicas por WhatsApp o correo electrónico.</div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ACCIONES SECUNDARIAS -->
+            <div class="quick-actions">
+                <div class="quick-actions-title">Herramientas y Seguimiento</div>
+
+                <div class="actions-grid">
+
+                    <!-- CONTROL DE REMISIONES -->
+                    <div class="action-card" onclick="rmEnterControlRemisiones()">
+                        <div class="action-icon info"><i class="fas fa-clipboard-check"></i></div>
+                        <div class="action-title">Control de Remisiones</div>
+                        <div class="action-desc">Seguimiento y gestión del estado de remisiones enviadas. Edición directa en tabla.</div>
+                    </div>
+
+                    <!-- ESTADÍSTICAS -->
+                    <div class="action-card" onclick="rmPlaceholder('Estadísticas')">
+                        <div class="action-icon success"><i class="fas fa-chart-bar"></i></div>
+                        <div class="action-title">Estadísticas de Remisiones</div>
+                        <div class="action-desc">Próximamente: gráficos y métricas de remisiones por período y trabajador.</div>
+                    </div>
+
+                    <!-- EXPORTAR INFORME -->
+                    <div class="action-card" onclick="rmPlaceholder('Exportar Informe')">
+                        <div class="action-icon warning"><i class="fas fa-file-export"></i></div>
+                        <div class="action-title">Exportar Informe</div>
+                        <div class="action-desc">Próximamente: generar reporte consolidado de remisiones en PDF o Excel.</div>
+                    </div>
+
+                    <!-- CONFIGURACIÓN -->
+                    <div class="action-card" onclick="rmPlaceholder('Configuración')">
+                        <div class="action-icon muted"><i class="fas fa-cog"></i></div>
+                        <div class="action-title">Configuración</div>
+                        <div class="action-desc">Próximamente: ajustar plantillas, contactos y parámetros de remisiones.</div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="./modules/gestion-salud/restricciones-medicas/restricciones-medicas-home.js"></script>
+</body>
+</html>

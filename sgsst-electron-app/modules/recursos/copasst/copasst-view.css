@@ -156,6 +156,20 @@ body {
 }
 .sidebar-content { flex: 1; overflow-y: auto; }
 
+.content-separator {
+  padding: 0.5rem 1rem 0.25rem 1rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  margin-top: 0.25rem;
+}
+
+.crumb-item.active { color: var(--text-dark); font-weight: 600; cursor: default; }
+.crumb-item.active:hover { text-decoration: none; }
+
 /* List Items (Folders/Files) */
 .list-item {
     display: flex;
@@ -492,8 +506,37 @@ iframe.pdf-viewer, iframe.excel-viewer {
 }
 
 .confirm-modal-footer .btn-danger:hover {
-    background: #c82333;
-    border-color: #bd2130;
+  background: #c82333;
+  border-color: #bd2130;
+}
+
+.new-folder-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-family: 'Roboto', sans-serif;
+  color: var(--text-dark);
+  transition: border-color 0.2s;
+  margin-top: 10px;
+}
+
+.new-folder-input:focus {
+  border-color: var(--primary);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.1);
+}
+
+.confirm-modal-footer .btn-primary {
+  background: var(--primary);
+  color: white;
+  border: 1px solid var(--primary);
+}
+
+.confirm-modal-footer .btn-primary:hover {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━

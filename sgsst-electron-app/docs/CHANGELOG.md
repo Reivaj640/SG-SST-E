@@ -5,6 +5,249 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.102] - 2026-06-17
+
+### Fixed
+- **🎬 Pantalla de carga de login — barra inicia en 0% y se anima continuo**
+  - Eliminada regla CSS conflictiva `.progress-fill { width: 50%; animation: progressAnimation 2s infinite; }` que anulaba el control por JavaScript sobre la barra de progreso del overlay
+  - `KairLoadingController.animateToProgress()` migrado a `requestAnimationFrame` con `this.progress` continuo (la siguiente llamada continúa desde el valor actual en vez de reiniciar a 0)
+  - `executeLoginTransition()` con secuencia sincronizada 0→25→55→80→100% — sin "saltos" entre fases
+  - `button.disabled = true` en submit del login (restaurado en `finally`) — anti double-click / double-submit
+  - `logBuffer` con eviction FIFO a 500 entradas (antes crecía sin tope → fuga de memoria)
+  - Cache de `logTextarea` en variable local (antes hacía `getElementById` en cada log)
+
+### Technical Details
+- **Archivos modificados (2):**
+  - `styles.css` — eliminada regla duplicada `.progress-fill` y keyframe `progressAnimation`
+  - `renderer.js` — `KairLoadingController.animateToProgress` con `requestAnimationFrame`, `executeLoginTransition` sincronizada, submit con `button.disabled`, `logBuffer` con FIFO
+
+## [0.1.101] - 2026-06-14
+
+### Added
+- **📊 Submódulo 3.3.4 Prevalencia de Enfermedad Laboral** 🆕
+- Componente completo con tabla editable, gráfico Chart.js, 5 KPIs
+- Fórmula: (Casos nuevos y antiguos de EL / Promedio de Trabajadores) × 100,000
+- Backend: `leerIndicadoresPrevalencia()`, `escribirEnExcelPrevalencia()`
+- IPC Handlers: `prevalencia:configurar-rutas`, `prevalencia:leer-indicadores`, `prevalencia:escribir-excel`
+- Namespace preload: `window.electronAPI.prevalencia`
+- CSS Scope: `.prevalencia-container` (124 selectores)
+
+- **📊 Submódulo 3.3.5 Incidencia de Enfermedad Laboral** 🆕
+- Componente completo con tabla editable, gráfico Chart.js, 5 KPIs
+- Fórmula: (Casos nuevos de EL / Promedio de Trabajadores) × 100,000
+- Meta: <5 por 100,000 trabajadores (Coordinador SST)
+- Backend: `leerIndicadoresIncidencia()`, `escribirEnExcelIncidencia()`
+- IPC Handlers: `incidencia:configurar-rutas`, `incidencia:leer-indicadores`, `incidencia:escribir-excel`
+- Namespace preload: `window.electronAPI.incidencia`
+- CSS Scope: `.incidencia-container` (124 selectores)
+
+- **🔗 Integración Automática con Objetivos SST**
+- Keywords `'prevalencia'` e `'incidencia'` se crean siempre en `calculateAutoResultados()`
+- Viewer muestra resultado calculado automáticamente (sin necesidad de "Agregar")
+
+### Changed
+- **`excel-bridge.js`** — `leerIndicadores()` ahora suma los 12 meses para `prevalenciaEL` e `incidenciaEL` (antes solo leía enero)
+- **`main.js`** — `calculateAutoResultados()` crea keywords `'prevalencia'` e `'incidencia'` sin condición `> 0`
+- **`preload.js`** — Agregados namespaces `prevalencia` e `incidencia`
+- **`renderer.js`** — Agregadas funciones `showPrevalenciaContent()` e `showIncidenciaContent()` con routing
+- **`prevalencia-enfermedad-laboral.js`** — API cambiada de `frecuenciaAccidentalidad` a `prevalencia`, estructura de datos actualizada
+
+### Technical Details
+- **Archivos creados (8):**
+  - `modules/gestion-salud/prevalencia-enfermedad-laboral/index.js`
+  - `modules/gestion-salud/prevalencia-enfermedad-laboral/prevalencia-enfermedad-laboral.{html,js,css}`
+  - `modules/gestion-salud/incidencia-enfermedad-laboral/index.js`
+  - `modules/gestion-salud/incidencia-enfermedad-laboral/incidencia-enfermedad-laboral.{html,js,css}`
+
+- **Archivos modificados (5):**
+  - `main/excel-bridge.js` — +4 funciones, +incidenciaEL en leerIndicadores, +exports
+  - `main.js` — +6 handlers IPC, mejorar calculateAutoResultados
+  - `preload.js` — +2 namespaces (prevalencia, incidencia)
+  - `renderer.js` — +showIncidenciaContent, +routing case 3.3.5
+  - `modules/gestion-salud/prevalencia-enfermedad-laboral/prevalencia-enfermedad-laboral.js` — API namespace fix
+
+---
+
+## [0.1.100] - 2026-06-11
+
+### Added
+- **🎯 Header Card Pattern (`k-section-card`)** 🆕
+- Patrón canónico de header para todos los módulos K+AIR
+- Estructura: card container → Fila 1 (icon + title + subtitle) + actions (company, dividers, buttons)
+- Clases: `.k-section-card`, `.header-back-btn`, `.header-action--ghost`, `.header-action--success`, `.k-section-card__company`, `.k-section-card__divider`
+- Responsive: flex-wrap en mobile, company oculta en breakpoints bajos
+- Dark theme: todos los componentes soportan `[data-theme="dark"]`
+- Loading states: `header-action--primary--loading`, `header-action--success--loading`
+
+- **📋 Migración Masiva de Headers** 🆕
+- 22 submódulos migrados de BEM `kair-header` a `k-section-card`
+- Módulo 1 (Recursos): Presupuesto Selector, COPASST Actas, Comité Actas, Capacitaciones, Inducciones
+- Módulo 2 (Gestión Integral): Objetivos, Evaluación Inicial, Plan de Trabajo, Archivo, Rendición, Proveedores, Selección, Cambio
+- Módulo 3 (Gestión Salud): Evaluaciones Médicas, Remisiones, Reportes, Investigación, Registro, Frecuencia, Severidad, Mortalidad
+
+### Changed
+- **Header System** — Eliminado BEM `kair-header__*` de 22 módulos, reemplazado por `k-section-card`
+- **CSS Consolidation** — Cada módulo ahora scope sus estilos card bajo su namespace (`.modulo .k-section-card`)
+- **Tabs Integration** — Módulos con tabs ahora los integran DENTRO del card (no como elemento separado)
+- **Responsive Patterns** — Todos los módulos migrados usan `flex-wrap: wrap` y `padding: 1rem` en mobile
+- **Print Styles** — Referencias `.kair-header` reemplazadas por `.k-section-card` en media queries de impresión
+
+### Fixed
+- **Header sticky en mobile** — Eliminado `position: sticky` del header BEM que causaba overlap en scroll
+- **Breadcrumb overflow** — Subtítulos reemplazan breadcrumb para mejor legibilidad en mobile
+- **Button consistency** — Todos los botones de acción usan mismas clases (ghost/success/primary)
+
+### Technical Details
+- **Archivos modificados (22 submódulos, 42 archivos):**
+  - `modules/recursos/presupuesto/presupuesto-selector.html`
+  - `modules/recursos/copasst/copasst-logic.js`
+  - `modules/recursos/comite-convivencia/comite-convivencia-logic.js`
+  - `modules/recursos/capacitaciones/capacitaciones-view.{html,css}`
+  - `modules/recursos/capacitaciones/capacitaciones-logic.js`
+  - `modules/recursos/inducciones/inducciones-view.{html,css}`
+  - `modules/recursos/inducciones/inducciones-logic.js`
+  - `modules/gestion-integral/objetivos-sst/objetivos-sst-view.html`
+  - `modules/gestion-integral/evaluacion-inicial-sg-sst/evaluacion-inicial-sg-sst.{js,css}`
+  - `modules/gestion-integral/plan-trabajo/plan-view.{html,css}`
+  - `modules/gestion-integral/plan-trabajo/plan-viewer.js`
+  - `modules/gestion-integral/archivo-retencion/index.html`
+  - `modules/gestion-integral/archivo-retencion/archivo-retencion-dashboard.html`
+  - `modules/gestion-integral/rendicion-cuentas/rendicion-cuentas.html`
+  - `modules/gestion-integral/rendicion-cuentas/rendicion-viewer.js`
+  - `modules/gestion-integral/evaluacion-proveedores/evaluacion-proveedores.{js,css}`
+  - `modules/gestion-integral/evaluacion-seleccion/evaluacion-seleccion-component.js`
+  - `modules/gestion-integral/evaluacion-seleccion/evaluacion-seleccion.css`
+  - `modules/gestion-integral/evaluacion-seleccion/dashboard.js`
+  - `modules/gestion-integral/gestion-del-cambio/gestion-cambio-view.{html,css}`
+  - `modules/gestion-salud/evaluaciones-medicas/evaluaciones-medicas-view.{html,css}`
+  - `modules/gestion-salud/evaluaciones-medicas/evaluaciones-view.html`
+  - `modules/gestion-salud/restricciones-medicas/remisiones-view.{html,css}`
+  - `modules/gestion-salud/reportes-accidentes/reportes-accidentes-view.{html,css}`
+  - `modules/gestion-salud/investigacion-accidentes/investigacion-accidentes-view.{html,css}`
+  - `modules/gestion-salud/investigacion-accidentes/investigaciones-view.{html,css}`
+  - `modules/gestion-salud/registro-estadistico/registro-estadistico.{html,css}`
+  - `modules/gestion-salud/frecuencia-accidentalidad/frecuencia-accidentalidad.{html,css}`
+  - `modules/gestion-salud/severidad-accidentalidad/severidad-accidentalidad.{html,css}`
+  - `modules/gestion-salud/indice-mortalidad/indice-mortalidad.{html,css}`
+
+- **Patrón de migración:**
+  1. Header BEM (`<header class="kair-header">`) → Card (`<div class="k-section-card">`)
+  2. Breadcrumb → Subtitle (`<p style="...">`)
+  3. Back button icon-only → Back button with text ("Volver")
+  4. Company chip → `.k-section-card__company`
+  5. Action buttons → `.header-action--ghost` / `.header-action--success`
+  6. CSS BEM eliminated, card styles added scoped under module namespace
+  7. Responsive: `flex-wrap: wrap`, company hidden, padding reduced
+  8. Print: `.kair-header` → `.k-section-card`
+
+- **IDs preservados en todos los módulos:** Ningún ID de elemento fue modificado, garantizando compatibilidad con JavaScript existente
+
+---
+
+## [0.1.99] - 2026-06-09
+
+### Added
+- **📊 Dashboard Plan de Trabajo 2.4.1** 🆕
+- KPIs estandarizados con `k-stats-ribbon` canónico (KPI Strip Enterprise v1.0)
+- Nomenclatura alineada a Capacitaciones: Programadas/Realizadas/Pendientes/Vencidas
+- KPI Avance % integrado como pill badge en primer item
+- Tabs-header con empresa y periodo activo (BEM `.k-tabs-header`)
+- Charts-grid 3x2 con 6 gráficas:
+  - **Estado** (bar) — Programadas vs Realizadas vs Pendientes vs Vencidas
+  - **Progreso Mensual** (line) — Evolución mes a mes
+  - **Cumplimiento Trimestral** (bar agrupado) — Q1-Q4 Programadas vs Ejecutadas
+  - **Estado Mensual** (stacked bar) — Distribución por mes
+  - **Categoría** (horizontal bar) — Cumplimiento por grupo padre (level===1)
+  - **Radar Anual** (radar) — Distribución 12 meses
+- Colores K+AIR canónicos (`K_COLORS = { primary, success, warning, danger, info, gray, text }`)
+
+- **🪟 Modal Selector de Periodo** 🆕
+- Cierra con botón X (esquina superior derecha, `.period-card__close`)
+- Cierra con clic en fondo (patrón UX estándar)
+- Función `hidePeriodSelector()` expuesta en `window`
+
+- **🧹 PlanTrabajoComponent.destroy()** 🆕
+- Patrón consistente con COPASST (`copasstPortalComponent.destroy()`)
+- Null refs: `window.planPortalComponent`, `window.planPortalContainer`
+- Cleanup: remueve script dinámico del DOM
+- Limpia container: `this.container.innerHTML = ''`
+
+- **🔄 goBackToModuleHome()** 🆕
+- Método directo sin postMessage (evita loop del renderer)
+- Llama `destroy()` + `onBackToModuleHome()` → navega a menú Gestión Integral
+- Separa flujos de navegación: portal home vs cronograma
+
+### Changed
+- **plan-trabajo/plan-view.html** — Dashboard HTML con tabs-header, k-stats-ribbon, 6 chart-cards, canvas ids actualizados
+- **plan-trabajo/plan-view.css** — ~1080 líneas, k-stats-ribbon, tabs-header BEM, charts-grid 3 cols, period-card__close
+- **plan-trabajo/plan-viewer.js** — ~1573 líneas, 6 funciones render chart, updateKPIs(), hidePeriodSelector(), K_COLORS
+- **plan-trabajo/plan-trabajo-logic.js** — `destroy()`, `goBackToModuleHome()`, `portalScript` ref almacenado desde `initPortalJS()`
+- **plan-trabajo/plan-home.js** — `goBackToModule()` → llamada directa a `planPortalComponent.goBackToModuleHome()` (antes: postMessage)
+- **plan-trabajo/plan-home.html** — `.back-btn-internal:hover/focus/active` con `text-decoration: none`
+- **renderer.js** — 2 handlers `back-to-module-request` (líneas ~878 y ~1202) con delegación `goBackToHome()` restaurada
+
+### Fixed
+- **Navegación "Volver" del cronograma** — Antes: postMessage `back-to-submodule-home` no funcionaba (requería 3 args). Ahora: postMessage → renderer → `planPortalComponent.goBackToHome()` → portal home
+- **Navegación "Volver al Menú" del portal home** — Antes: postMessage → renderer delegaba a `goBackToHome()` → recargaba el mismo home (loop). Ahora: llamada directa a `goBackToModuleHome()` → `destroy()` + `onBackToModuleHome()` → menú Gestión Integral
+- **Subrayado en botón "Volver al Menú"** — `text-decoration: none` en `:hover`, `:focus`, `:active` de `.back-btn-internal`
+
+### Technical Details
+- **Archivos modificados:**
+  - `modules/gestion-integral/plan-trabajo/plan-view.html` — Dashboard HTML
+  - `modules/gestion-integral/plan-trabajo/plan-view.css` — CSS completo (~1080 líneas)
+  - `modules/gestion-integral/plan-trabajo/plan-viewer.js` — JS completo (~1573 líneas)
+  - `modules/gestion-integral/plan-trabajo/plan-trabajo-logic.js` — Componente con `destroy()`, `goBackToModuleHome()`
+  - `modules/gestion-integral/plan-trabajo/plan-home.js` — Navegación directa
+  - `modules/gestion-integral/plan-trabajo/plan-home.html` — Fix subrayado
+  - `renderer.js` — 2 handlers de delegación restaurados
+
+- **Flujos de navegación:**
+  ```
+  Cronograma (iframe):
+    backBtn → postMessage('back-to-module-request')
+    → renderer → planPortalComponent.goBackToHome()
+    → recarga portal home ✓
+
+  Portal Home:
+    goBackToModule() → planPortalComponent.goBackToModuleHome()
+    → destroy() + onBackToModuleHome()
+    → menú Gestión Integral ✓
+  ```
+
+- **Contratos IPC:** Sin cambios (mismos handlers existentes)
+- **Backend:** Sin cambios (0 modificaciones en main.js)
+
+### Impacto
+- **UX:** Dashboard profesional con 6 gráficas y KPIs estandarizados
+- **Navegación:** 2 flujos claros y separados, sin loops ni estados atascados
+- **Consistencia:** Patrón destroy igual a COPASST y Comité de Convivencia
+- **Visual:** Botones de navegación sin subrayado espurio
+
+### Breaking Changes
+- **Ninguno** — Funcionalidad puramente aditiva y correctiva, contratos sin cambios
+
+---
+
+## [0.1.98] - 2026-06-04
+
+### Fixed
+- **Plan de Trabajo en actas COPASST** - Lee columna del mes anterior (norma COPASST), no del mes de la reunion
+- **Bug de mes en nombre de archivo** - `parseInt(data.fecha.split('-')[1])` reemplaza `new Date().getMonth()` (bug UTC-5 Colombia)
+- **Nombre de archivo guardado** - Eliminado "N°{actaNumber}" del nombre por defecto
+
+### Changed
+- **Autollenado de actas COPASST** - Plan de Trabajo referencia `previousMonthKey` + `planYearForPrevious` (transicion de ano)
+- **Texto de desarrollo items** - Formato multilinea con `\n`, numeracion, iconos ✓/⏱, agrupacion por estado
+- **Textarea auto-expandible** - `temaRows` calculado dinamicamente segun cantidad de `\n`
+- **Accidentalidad enriquecida** - Lee columnas `Nombre Completo`, `Identificacion`, `Fecha del incidente` con fallbacks
+- **Texto de accidentes** - Formato `Nombre — CC — Fecha DD/MM/YYYY` con numeracion
+
+### Added
+- Busqueda de Plan de Trabajo por `previousMonthYear` cuando el mes anterior cruza ano (Enero → Diciembre)
+- Campos `identificacion` y `fechaEvento` en `accidentData.persons` (aditivo, backward compatible)
+
+---
+
 ## [0.1.94] - 2026-03-26
 
 ### Added

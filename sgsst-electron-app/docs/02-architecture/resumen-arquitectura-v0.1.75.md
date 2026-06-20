@@ -1,8 +1,10 @@
-# 📊 Resumen de Arquitectura K+AIR v0.1.75
+# 📊 Resumen de Arquitectura K+AIR v0.1.99
 
-**Versión:** 1.0  
-**Actualizado:** 17 de marzo de 2026  
-**Estado:** ✅ Nuevo documento de referencia rápida
+**Versión:** 2.0
+**Actualizado:** 9 de junio de 2026
+**Estado:** ✅ Actualizado v0.1.99
+
+> **Nota:** Este resumen fue actualizado a v0.1.99. Para detalles completos ver [arquitectura-general.md](arquitectura-general.md).
 
 ---
 
@@ -12,13 +14,13 @@
 
 | Componente | Archivos | Líneas | Descripción |
 |------------|----------|--------|-------------|
-| **Proyecto JS total** | 162 | ~50,000+ | Todos los archivos JavaScript |
-| **main.js** | 1 | 7,852 | Proceso principal Electron |
-| **renderer.js** | 1 | 3,170 | Lógica de renderizado |
-| **preload.js** | 1 | ~180 | Puente IPC seguro |
+| **Proyecto JS total** | 175+ | ~65,000+ | Todos los archivos JavaScript |
+| **main.js** | 1 | 15,809 | Proceso principal Electron |
+| **renderer.js** | 1 | 5,785 | Lógica de renderizado |
+| **preload.js** | 1 | 420 | Puente IPC seguro |
 | **index.html** | 1 | 143 | Estructura principal |
 | **styles.css** | 1 | ~2,500 | Estilos globales |
-| **modules/** | 50+ | ~30,000+ | Todos los módulos |
+| **modules/** | 60+ | ~35,000+ | Todos los módulos |
 
 ### Handlers IPC
 
@@ -31,7 +33,7 @@
 | Archivos y Documentos | 11 | ✅ Normal |
 | Presupuesto | 4 | ✅ Normal |
 | Otros | 28 | ✅ Normal |
-| **TOTAL** | **78** | - |
+| **TOTAL** | **137** | - |
 
 ### Python Integration
 
@@ -42,7 +44,7 @@
 | `accident_report_generator.py` | Generación de DOCX | - |
 | `ausentismo_utils.py` | Utilidades de ausentismo | - |
 | `inducciones_sync.py` | Sincronización Google Forms | - |
-| **Total scripts** | **15+** | - |
+| **Total scripts** | **16+** | - |
 
 ---
 
@@ -52,15 +54,15 @@
 ┌───────────────────────────────────────────────────────────────┐
 │  CAPA 1: PRESENTACIÓN (Renderer Process)                      │
 │  ├── index.html (143 líneas)                                  │
-│  ├── renderer.js (3,170 líneas)                               │
-│  ├── styles.css (~2,500 líneas)                               │
-│  └── modules/ (27+ submódulos)                                │
+│ ├── renderer.js (5,785 líneas) │
+│ ├── styles.css (~2,500 líneas) │
+│ └── modules/ (44 submódulos) │
 ├───────────────────────────────────────────────────────────────┤
 │  CAPA 2: PUENTE SEGURO (Preload Script)                       │
-│  └── preload.js (~180 líneas, 78 contratos)                   │
+│ └── preload.js (420 líneas, 137 contratos) │
 ├───────────────────────────────────────────────────────────────┤
 │  CAPA 3: LÓGICA DE NEGOCIO (Main Process)                     │
-│  ├── main.js (7,852 líneas, 78 handlers)                      │
+│ ├── main.js (15,809 líneas, 137 handlers) │
 │  ├── handlers/ (investigacion_handlers.js, etc.)              │
 │  └── utils/ (utilidades varias)                               │
 ├───────────────────────────────────────────────────────────────┤
@@ -73,7 +75,7 @@
 │  ├── llm_server.py (Flask:5555)                               │
 │  ├── accident_processor.py                                    │
 │  ├── accident_report_generator.py                             │
-│  └── 12+ scripts adicionales                                  │
+│ └── 13+ scripts adicionales │
 └───────────────────────────────────────────────────────────────┘
 ```
 
@@ -86,9 +88,9 @@
 ```
 sgsst-electron-app/
 ├── index.html              # Punto de entrada
-├── main.js                 # Proceso principal (7,852 líneas)
-├── preload.js              # Puente IPC (78 contratos)
-├── renderer.js             # Renderizado (3,170 líneas)
+├── main.js # Proceso principal (15,809 líneas)
+├── preload.js # Puente IPC (137 contratos)
+├── renderer.js # Renderizado (5,785 líneas)
 ├── styles.css              # Estilos globales
 ├── development-styles.css  # Estilos desarrollo
 ├── package.json            # Configuración npm
@@ -98,11 +100,11 @@ sgsst-electron-app/
 └── icon-config.json        # Configuración de iconos
 ```
 
-### Módulos (50+ archivos)
+### Módulos (60+ archivos)
 
 ```
 modules/
-├── gestion-integral/           # Módulo 2 (6 submódulos)
+├── gestion-integral/ # Módulo 2 (7 submódulos)
 │   ├── gestion-integral-home.js
 │   ├── politica/
 │   ├── objetivos-sst/
@@ -111,7 +113,7 @@ modules/
 │   ├── rendicion-cuentas/
 │   └── evaluacion-proveedores/
 │
-├── recursos/                   # Módulo 1 (11 submódulos)
+├── recursos/ # Módulo 1 (12 submódulos)
 │   ├── recursos-home.js
 │   ├── responsable-sg/
 │   ├── roles-responsabilidades/
@@ -126,7 +128,7 @@ modules/
 │   ├── curso-virtual/
 │   └── manual-proveedores/
 │
-├── gestion-salud/              # Módulo 3 (6 submódulos)
+├── gestion-salud/ # Módulo 3 (7 submódulos)
 │   ├── gestion-salud-home.js
 │   ├── sociodemografica/
 │   ├── evaluaciones-medicas/
@@ -172,13 +174,13 @@ Portear/
 
 ```
 docs/
-├── 01-arquitectura/
+├── 02-architecture/
 │   ├── arquitectura-general.md
-│   ├── ipc-contratos.md           # 🆕 78 handlers documentados
+│ ├── ipc-contratos.md # 137 handlers documentados
 │   └── motor-normativo.md
 │
 ├── 02-modulos/
-│   ├── modulo-1-recursos.md       # 🆕 Actualizado v0.1.75
+│   ├── modulo-1-recursos.md # Actualizado v0.1.99
 │   ├── modulo-2-4-5-6-7-gestion-integral-y-restantes.md
 │   ├── modulo-3-gestion-salud.md
 │   ├── modulo-3-3-6-ausentismo.md     # 🆕 Nuevo (sistema dual)
@@ -288,7 +290,7 @@ CREATE TABLE sessions (
 
 ## 📊 Handlers IPC por Módulo
 
-### Módulo 1: Recursos (14 handlers)
+### Módulo 1: Recursos (24 handlers)
 
 | Handler | Función |
 |---------|---------|
@@ -307,7 +309,7 @@ CREATE TABLE sessions (
 | `generate-copasst-acta` | Generar acta DOCX |
 | `getConvivenciaActaData` | Datos para acta convivencia |
 
-### Módulo 3: Gestión de la Salud (25+ handlers)
+### Módulo 3: Gestión de la Salud (40+ handlers)
 
 | Handler | Función |
 |---------|---------|
@@ -390,10 +392,11 @@ CREATE TABLE sessions (
 | v0.1.50 | 4,766 | 3,170 | 55+ | 27 |
 | v0.1.70 | 6,500 | 3,170 | 65+ | 27 |
 | v0.1.75 | 7,852 | 3,170 | 78 | 27+ |
+| v0.1.99 | 15,809 | 5,785 | 137 | 44 |
 
 ---
 
-**Mantenido por:** Architecture Team  
-**Última actualización:** 17 de marzo de 2026  
-**Versión:** 1.0 (v0.1.75)  
-**Próxima revisión:** Al alcanzar v0.1.80
+**Mantenido por:** Architecture Team
+**Última actualización:** 9 de junio de 2026
+**Versión:** 2.0 (v0.1.99)
+**Próxima revisión:** Al alcanzar v0.2.00

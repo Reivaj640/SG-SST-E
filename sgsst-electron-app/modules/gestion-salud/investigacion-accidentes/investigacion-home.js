@@ -13,10 +13,10 @@ async function initializePortal() {
 async function loadStats() {
     try {
         const stats = await callParentAPI('get-investigacion-stats', {});
-        if (stats && stats.pendientes !== undefined) {
-            document.getElementById('investigacionesPendientes').textContent = stats.pendientes;
-            document.getElementById('investigacionesCompletadas').textContent = stats.completadas || 0;
-        }
+    if (stats && stats.pendientes !== undefined) {
+      document.getElementById('investigacionesPendientes').textContent = stats.pendientes;
+      document.getElementById('investigacionesCompletadas').textContent = stats.completadas || 0;
+    }
     } catch (error) {
         console.log('[investigacion-home] Error cargando estadísticas:', error.message);
     }

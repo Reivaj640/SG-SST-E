@@ -6,7 +6,7 @@ Este directorio contiene documentación sobre la arquitectura del sistema.
 
 ## 📋 Documentos Disponibles
 
-### [arquitectura-general.md](01-arquitectura/arquitectura-general.md) - ⚠️ POR MOVER
+### [arquitectura-general.md](arquitectura-general.md) - Arquitectura General
 **Tiempo de lectura:** 15 minutos
 
 **Contenido:**
@@ -17,18 +17,18 @@ Este directorio contiene documentación sobre la arquitectura del sistema.
 
 ---
 
-### [ipc-contracts.md](01-arquitectura/ipc-contracts.md) - ⚠️ POR MOVER
+### [ipc-contratos.md](ipc-contratos.md) - Contratos IPC
 **Tiempo de lectura:** 10 minutos
 
 **Contenido:**
-- **CRÍTICO:** Todos los 78 handlers IPC
+- **CRÍTICO:** Todos los 137+ handlers IPC
 - Formato de requests/responses
 - Ejemplos de uso
 - Contratos backend
 
 ---
 
-### [motor-normativo.md](01-arquitectura/motor-normativo.md) - ⚠️ POR MOVER
+### [motor-normativo.md](motor-normativo.md) - Motor Normativo
 **Tiempo de lectura:** 10 minutos
 
 **Contenido:**
@@ -58,12 +58,29 @@ Este directorio contiene documentación sobre la arquitectura del sistema.
 
 ---
 
-### [python-embedded.md](python-embedded.md) - ⚠️ POR CREAR
-**Contenido planeado:**
-- Python 3.11.9 empaquetado
+### [infraestructura-cross-cutting.md](infraestructura-cross-cutting.md) - Componentes Cross-Cutting
+**Tiempo de lectura:** 10 minutos
+
+**Contenido:**
+- ViewLoader (carga dinámica de vistas)
+- KAIRToast (notificaciones, 4 tipos)
+- UpdateNotificationManager (actualizaciones con progreso)
+- Auto-Update (6 eventos, doble registro)
+- Loading System (2 fases: ventana + overlay)
+- KPI Stats Ribbon (`.k-stats-ribbon` BEM, diseño canónico)
+- Header Card Pattern (`.k-section-card` v0.1.100, 22 módulos migrados)
+
+---
+
+### [python-embedded.md](python-embedded.md) - Python Empaquetado
+**Tiempo de lectura:** 8 minutos
+
+**Contenido:**
+- Python 3.11.9 empaquetado desde v0.1.80
 - Estructura de python-embed/
-- Paquetes incluidos
-- Scripts disponibles
+- Paquetes incluidos y excluidos
+- Comunicación con Main Process
+- Configuración para desarrollo local
 
 ---
 
@@ -71,8 +88,12 @@ Este directorio contiene documentación sobre la arquitectura del sistema.
 
 - **[START_HERE.md](../START_HERE.md)** - Punto de entrada principal
 - **[CONTEXT.md](../../CONTEXT.md)** - Contexto del proyecto
-- **[docs/03-modules/](../02-modulos/)** - Documentación de módulos
+- **[docs/02-modulos/](../02-modulos/)** - Documentación de módulos
+  - [Módulo 4: Gestión de Peligros](../02-modulos/modulo-4-gestion-peligros.md) - 10 submódulos
+  - [Módulo 5: Gestión de Amenazas](../02-modulos/modulo-5-gestion-amenazas.md) - 2 submódulos
+  - [Módulo 6: Verificación](../02-modulos/modulo-6-verificacion.md) - 4 submódulos
+  - [Módulo 7: Mejoramiento](../02-modulos/modulo-7-mejoramiento.md) - 4 submódulos
 
 ---
 
-**Última actualización:** 19 de marzo de 2026
+**Última actualización:** 9 de junio de 2026

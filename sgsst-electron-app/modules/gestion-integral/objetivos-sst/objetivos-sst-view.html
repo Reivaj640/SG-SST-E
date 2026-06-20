@@ -64,48 +64,52 @@
         }
 
         /* ═══════════════════════════════════════════════════════════════════════════
-           HEADER
+           HEADER — Card k-section-card
            ═══════════════════════════════════════════════════════════════════════════ */
-        .k-module-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0 1.5rem;
-            height: var(--k-header-height);
+        .k-section-card {
             background: var(--k-bg-card);
-            border-bottom: 1px solid var(--k-border);
-            box-shadow: var(--k-shadow-sm);
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-        }
-        .k-header-left { display: flex; align-items: center; gap: 1rem; }
-        .k-back-btn {
-            width: 36px; height: 36px;
             border: 1px solid var(--k-border);
-            border-radius: var(--k-radius-md);
-            background: var(--k-bg-card);
-            color: var(--k-text-muted);
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+        .header-back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.375rem 0.75rem;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            color: #5a6378;
+            background: transparent;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
             cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            transition: all 0.15s ease;
+            font-family: var(--k-font-family);
         }
-        .k-back-btn:hover { background: var(--k-primary-light); color: var(--k-primary); }
-        .k-header-title-group { display: flex; flex-direction: column; gap: 0.1rem; }
-        .k-header-main-title {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: var(--k-text-main);
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
+        .header-back-btn:hover {
+            background: #e8f0fe;
+            color: #174ea6;
+            border-color: #174ea6;
         }
-        .k-header-main-title i { color: var(--k-primary); }
-        .k-header-breadcrumb { display: flex; align-items: center; gap: 0.3rem; font-size: 0.7rem; color: var(--k-text-muted); }
-        .k-breadcrumb-item.active { color: var(--k-primary); font-weight: 500; }
-        .k-header-right { display: flex; align-items: center; gap: 0.75rem; }
-
+        .header-action--primary {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.375rem 0.75rem;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            color: #ffffff;
+            background: #174ea6;
+            border: none;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            font-family: var(--k-font-family);
+        }
+        .header-action--primary:hover {
+            background: #185abd;
+        }
         .k-sync-badge {
             display: inline-flex;
             align-items: center;
@@ -116,7 +120,8 @@
             border-radius: 2rem;
         }
         .k-sync-synced { background: var(--k-success-light); color: var(--k-success); }
-        .k-sync-pending { background: var(--k-warning-light); color: #856404; }
+        .k-sync-saving { background: var(--k-warning-light); color: #856404; }
+        .k-sync-error { background: var(--k-danger-light); color: var(--k-danger); }
 
         .k-btn {
             display: inline-flex;
@@ -149,37 +154,66 @@
             gap: 1rem;
         }
 
-        /* Stats Row */
-        .k-stats-row {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 0.75rem;
-        }
-        .k-stat-card {
-            display: flex;
-            align-items: center;
-            gap: 0.65rem;
-            padding: 0.65rem 0.85rem;
-            background: var(--k-bg-card);
-            border: 1px solid var(--k-border);
-            border-radius: var(--k-radius-lg);
-            box-shadow: var(--k-shadow-sm);
-        }
-        .k-stat-icon {
-            width: 36px; height: 36px;
-            border-radius: var(--k-radius-md);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1rem;
-        }
-        .k-stat-primary { background: var(--k-primary-light); color: var(--k-primary); }
-        .k-stat-success { background: var(--k-success-light); color: var(--k-success); }
-        .k-stat-danger { background: var(--k-danger-light); color: var(--k-danger); }
-        .k-stat-warning { background: var(--k-warning-light); color: #856404; }
-        .k-stat-info { background: var(--k-info-light); color: var(--k-info); }
-        .k-stat-value { font-size: 1.1rem; font-weight: 700; color: var(--k-text-main); }
-        .k-stat-label { font-size: 0.6rem; color: var(--k-text-muted); text-transform: uppercase; }
+/* =========================================
+   STATS RIBBON (compacto)
+   ========================================= */
+.k-stats-ribbon {
+display: flex;
+align-items: center;
+gap: 0;
+background: var(--k-bg-card);
+border: 1px solid var(--k-border);
+border-radius: var(--k-radius-lg);
+padding: 0;
+margin-bottom: 1.5rem;
+box-shadow: var(--k-shadow-sm);
+overflow: hidden;
+}
+.k-stats-ribbon__item {
+display: flex;
+align-items: center;
+gap: 0.625rem;
+padding: 0.75rem 1.25rem;
+flex: 1;
+min-width: 0;
+}
+.k-stats-ribbon__icon {
+width: 32px;
+height: 32px;
+border-radius: 50%;
+display: flex;
+align-items: center;
+justify-content: center;
+font-size: 0.875rem;
+flex-shrink: 0;
+}
+.k-stats-ribbon__icon.primary { background: var(--k-primary-light); color: var(--k-primary); }
+.k-stats-ribbon__icon.success { background: var(--k-success-light); color: var(--k-success); }
+.k-stats-ribbon__icon.danger { background: var(--k-danger-light); color: var(--k-danger); }
+.k-stats-ribbon__data {
+display: flex;
+flex-direction: column;
+min-width: 0;
+}
+.k-stats-ribbon__value {
+font-size: 1.25rem;
+font-weight: 700;
+color: var(--k-text-main);
+line-height: 1.2;
+}
+.k-stats-ribbon__label {
+font-size: 0.6875rem;
+color: var(--k-text-muted);
+text-transform: uppercase;
+letter-spacing: 0.5px;
+white-space: nowrap;
+}
+.k-stats-ribbon__divider {
+width: 1px;
+height: 32px;
+background: var(--k-border);
+flex-shrink: 0;
+}
 
         /* ═══════════════════════════════════════════════════════════════════════════
            LEYENDA DE COLORES (VINCULACIÓN)
@@ -551,6 +585,93 @@
             font-size: 0.7rem;
         }
 
+        .k-cell-resultado {
+            font-size: 0.68rem;
+            line-height: 1.3;
+            color: var(--k-text);
+            max-width: 140px;
+        }
+
+        .k-cell-resultado .resultado-text {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            margin-bottom: 4px;
+        }
+
+        .k-cell-resultado .resultado-porcentaje {
+            font-weight: 600;
+            font-size: 0.65rem;
+        }
+
+        .k-cell-resultado .resultado-porcentaje.bueno { color: var(--k-green); }
+        .k-cell-resultado .resultado-porcentaje.medio { color: var(--k-amber); }
+        .k-cell-resultado .resultado-porcentaje.malo  { color: var(--k-red); }
+
+        .k-cell-resultado .resultado-empty {
+            color: var(--k-text-muted);
+            font-style: italic;
+            font-size: 0.65rem;
+        }
+
+        .k-btn-add-resultado {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 2px 6px;
+            border-radius: var(--k-radius-sm);
+            border: 1px solid var(--k-border);
+            background: var(--k-bg-surface);
+            color: var(--k-text-muted);
+            font-size: 0.6rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .k-btn-add-resultado:hover {
+            background: var(--k-primary-subtle);
+            border-color: var(--k-primary);
+            color: var(--k-primary);
+        }
+
+        .k-res-auto {
+            background: #e3f2fd;
+            border-left: 2px solid #1976d2;
+            padding-left: 4px;
+        }
+
+        .k-res-manual {
+            background: #e8f5e9;
+            border-left: 2px solid #388e3c;
+            padding-left: 4px;
+        }
+
+        .k-res-badge {
+            font-size: 0.7rem;
+            margin-right: 2px;
+        }
+
+        .k-refresh-auto-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            border-radius: var(--k-radius-sm);
+            border: 1px solid var(--k-border);
+            background: var(--k-bg-surface);
+            color: var(--k-text-muted);
+            font-size: 0.65rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .k-refresh-auto-btn:hover {
+            background: var(--k-primary-subtle);
+            color: var(--k-primary);
+            border-color: var(--k-primary);
+        }
+
         .k-col-actions { text-align: center; width: 40px; }
 
         .k-btn-icon {
@@ -563,6 +684,205 @@
             cursor: pointer;
         }
         .k-btn-icon:hover { background: var(--k-bg-hover); color: var(--k-primary); }
+
+        /* ═══════════════════════════════════════════════════════════════
+           BADGE DE PRINCIPIO INTERACTIVO
+           ═══════════════════════════════════════════════════════════════ */
+        .k-principle-selector-btn {
+            display: inline-flex; align-items: center; gap: 0.25rem;
+            font-size: 0.6rem; font-weight: 600; padding: 0.15rem 0.45rem;
+            border-radius: 1rem; cursor: pointer; border: none;
+            transition: all 0.15s ease; width: fit-content; margin-bottom: 0.2rem;
+            outline: none; position: relative;
+        }
+        .k-principle-selector-btn:hover { filter: brightness(1.1); transform: scale(1.03); }
+        .k-psb-auto.k-psb-p1 { color: var(--k-p1); background: var(--k-p1-light); border: 1.5px dashed var(--k-p1); }
+        .k-psb-auto.k-psb-p2 { color: var(--k-p2); background: var(--k-p2-light); border: 1.5px dashed var(--k-p2); }
+        .k-psb-auto.k-psb-p3 { color: var(--k-p3); background: var(--k-p3-light); border: 1.5px dashed var(--k-p3); }
+        .k-psb-auto.k-psb-p4 { color: var(--k-p4); background: var(--k-p4-light); border: 1.5px dashed var(--k-p4); }
+        .k-psb-manual.k-psb-p1 { color: white; background: var(--k-p1); border: 1.5px solid var(--k-p1); }
+        .k-psb-manual.k-psb-p2 { color: white; background: var(--k-p2); border: 1.5px solid var(--k-p2); }
+        .k-psb-manual.k-psb-p3 { color: white; background: var(--k-p3); border: 1.5px solid var(--k-p3); }
+        .k-psb-manual.k-psb-p4 { color: white; background: var(--k-p4); border: 1.5px solid var(--k-p4); }
+        .k-confidence-dot { width: 5px; height: 5px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+        .k-conf-high   { background: var(--k-success); }
+        .k-conf-medium { background: var(--k-warning); }
+        .k-conf-low    { background: var(--k-danger); }
+
+        /* Panel izquierdo: contador de manuales */
+        .k-principle-stats { display: flex; gap: 0.4rem; align-items: center; }
+        .k-manual-count {
+            display: none; align-items: center; gap: 0.2rem;
+            font-size: 0.6rem; color: var(--k-warning); background: var(--k-warning-light);
+            padding: 0.1rem 0.35rem; border-radius: 1rem;
+        }
+        .k-manual-count.visible { display: inline-flex; }
+
+        /* Badge del sync: estados guardando y error */
+        .k-sync-saving { background: var(--k-warning-light); color: #856404; }
+        .k-sync-error  { background: var(--k-danger-light);  color: var(--k-danger); }
+        .k-spin { display: inline-block; animation: k-rotate 0.8s linear infinite; }
+        @keyframes k-rotate { to { transform: rotate(360deg); } }
+
+        /* ═══════════════════════════════════════════════════════════════
+           POPOVER DE SELECCIÓN DE PRINCIPIO
+           ═══════════════════════════════════════════════════════════════ */
+        .k-popover {
+            position: fixed; z-index: 9999;
+            background: var(--k-bg-card); border: 1px solid var(--k-border);
+            border-radius: var(--k-radius-lg); box-shadow: var(--k-shadow-md);
+            width: 300px; padding: 0; overflow: hidden;
+            animation: k-pop-in 0.15s ease;
+        }
+        @keyframes k-pop-in { from { opacity: 0; transform: translateY(-6px) scale(0.97); } }
+        .k-popover-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0.6rem 0.85rem; background: var(--k-bg-app);
+            border-bottom: 1px solid var(--k-border);
+        }
+        .k-popover-title { font-size: 0.75rem; font-weight: 600; color: var(--k-text-main); display: flex; align-items: center; gap: 0.35rem; }
+        .k-popover-title i { color: var(--k-primary); }
+        .k-popover-close {
+            width: 22px; height: 22px; border: none; background: transparent;
+            border-radius: var(--k-radius-sm); color: var(--k-text-muted); cursor: pointer;
+            display: flex; align-items: center; justify-content: center; font-size: 0.75rem;
+        }
+        .k-popover-close:hover { background: var(--k-bg-hover); color: var(--k-text-main); }
+        .k-popover-body { padding: 0.75rem 0.85rem; display: flex; flex-direction: column; gap: 0.6rem; }
+        .k-principle-chips { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+        .k-p-chip {
+            display: flex; align-items: center; gap: 0.4rem; padding: 0.5rem 0.6rem;
+            border-radius: var(--k-radius-md); border: 2px solid transparent;
+            cursor: pointer; transition: all 0.15s; position: relative;
+        }
+        .k-p-chip:hover { filter: brightness(0.95); transform: scale(1.02); }
+        .k-p-chip.active { border-color: currentColor; box-shadow: 0 0 0 1px currentColor inset; }
+        .k-p-chip .k-check { display: none; position: absolute; right: 5px; top: 5px; font-size: 0.6rem; }
+        .k-p-chip.active .k-check { display: block; }
+        .k-p-chip.chip-p1 { color: var(--k-p1); background: var(--k-p1-light); }
+        .k-p-chip.chip-p2 { color: var(--k-p2); background: var(--k-p2-light); }
+        .k-p-chip.chip-p3 { color: var(--k-p3); background: var(--k-p3-light); }
+        .k-p-chip.chip-p4 { color: var(--k-p4); background: var(--k-p4-light); }
+        .k-p-chip-icon {
+            width: 26px; height: 26px; border-radius: var(--k-radius-sm);
+            background: currentColor; display: flex; align-items: center; justify-content: center;
+            font-size: 0.7rem; flex-shrink: 0;
+        }
+        .k-p-chip-icon i { color: white; }
+        .k-p-chip-label { font-size: 0.65rem; font-weight: 600; line-height: 1.2; }
+        .k-popover-autoinfo {
+            display: flex; align-items: flex-start; gap: 0.4rem; padding: 0.45rem 0.55rem;
+            border-radius: var(--k-radius-md); font-size: 0.65rem;
+            background: var(--k-bg-app); border: 1px solid var(--k-border);
+        }
+        .k-autoinfo-icon { font-size: 0.75rem; flex-shrink: 0; margin-top: 0.05rem; }
+        .k-autoinfo-text { color: var(--k-text-secondary); line-height: 1.35; }
+        .k-autoinfo-text strong { color: var(--k-text-main); }
+        .k-confidence-bar { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.2rem; }
+        .k-confidence-bar-track { flex: 1; height: 4px; background: var(--k-border); border-radius: 2px; overflow: hidden; }
+        .k-confidence-bar-fill { height: 100%; border-radius: 2px; transition: width 0.3s; }
+        .k-conf-fill-high   { background: var(--k-success); width: 100%; }
+        .k-conf-fill-medium { background: var(--k-warning); width: 55%; }
+        .k-conf-fill-low    { background: var(--k-danger);  width: 20%; }
+        .k-confidence-label { font-size: 0.6rem; font-weight: 600; white-space: nowrap; }
+        .k-conf-label-high   { color: var(--k-success); }
+        .k-conf-label-medium { color: #856404; }
+        .k-conf-label-low    { color: var(--k-danger); }
+        .k-reset-auto-btn {
+            display: flex; align-items: center; gap: 0.35rem; padding: 0.4rem 0.6rem;
+            background: transparent; border: 1px dashed var(--k-border);
+            border-radius: var(--k-radius-md); color: var(--k-text-muted);
+            font-size: 0.65rem; cursor: pointer; transition: all 0.15s; width: 100%;
+        }
+        .k-reset-auto-btn:hover { background: var(--k-primary-light); color: var(--k-primary); border-color: var(--k-primary); }
+        .k-reset-auto-btn.hidden { display: none; }
+
+        /* ═══════════════════════════════════════════════════════════════
+           MODAL DE EDICIÓN DE INDICADOR
+           ═══════════════════════════════════════════════════════════════ */
+        .k-modal-backdrop {
+            position: fixed; inset: 0; z-index: 9990; background: rgba(0,0,0,0.45);
+            backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center;
+            padding: 1rem; animation: k-backdrop-in 0.18s ease;
+        }
+        .k-modal-backdrop.hidden { display: none; }
+        @keyframes k-backdrop-in { from { opacity: 0; } }
+        .k-modal {
+            background: var(--k-bg-card); border-radius: var(--k-radius-lg);
+            box-shadow: 0 1rem 2rem rgba(0,0,0,0.12); width: 100%; max-width: 580px;
+            overflow: hidden; animation: k-modal-in 0.2s cubic-bezier(0.34,1.56,0.64,1);
+            display: flex; flex-direction: column; max-height: 92vh;
+        }
+        @keyframes k-modal-in { from { opacity: 0; transform: translateY(20px) scale(0.97); } }
+        .k-modal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 1rem 1.25rem; border-bottom: 1px solid var(--k-border);
+            border-top: 4px solid var(--k-primary); background: var(--k-bg-card);
+        }
+        .k-modal-header.accent-p1 { border-top-color: var(--k-p1); }
+        .k-modal-header.accent-p2 { border-top-color: var(--k-p2); }
+        .k-modal-header.accent-p3 { border-top-color: var(--k-p3); }
+        .k-modal-header.accent-p4 { border-top-color: var(--k-p4); }
+        .k-modal-header-left { display: flex; align-items: center; gap: 0.75rem; }
+        .k-modal-icon {
+            width: 40px; height: 40px; border-radius: var(--k-radius-md);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.05rem; flex-shrink: 0;
+        }
+        .k-modal-icon.icon-p1 { background: var(--k-p1-light); color: var(--k-p1); }
+        .k-modal-icon.icon-p2 { background: var(--k-p2-light); color: var(--k-p2); }
+        .k-modal-icon.icon-p3 { background: var(--k-p3-light); color: var(--k-p3); }
+        .k-modal-icon.icon-p4 { background: var(--k-p4-light); color: var(--k-p4); }
+        .k-modal-title { font-size: 0.95rem; font-weight: 600; color: var(--k-text-main); line-height: 1.2; }
+        .k-modal-subtitle { font-size: 0.7rem; color: var(--k-text-muted); margin-top: 0.15rem; display: flex; align-items: center; gap: 0.3rem; }
+        .k-modal-principle-pill {
+            display: inline-flex; align-items: center; gap: 0.2rem;
+            padding: 0.08rem 0.35rem; border-radius: 1rem; font-size: 0.6rem; font-weight: 600;
+        }
+        .k-modal-principle-pill.pill-p1 { background: var(--k-p1-light); color: var(--k-p1); }
+        .k-modal-principle-pill.pill-p2 { background: var(--k-p2-light); color: var(--k-p2); }
+        .k-modal-principle-pill.pill-p3 { background: var(--k-p3-light); color: var(--k-p3); }
+        .k-modal-principle-pill.pill-p4 { background: var(--k-p4-light); color: var(--k-p4); }
+        .k-modal-close {
+            width: 30px; height: 30px; border: none; background: transparent;
+            border-radius: var(--k-radius-sm); color: var(--k-text-muted); cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.8rem; transition: all 0.15s; flex-shrink: 0;
+        }
+        .k-modal-close:hover { background: var(--k-bg-hover); color: var(--k-text-main); }
+        .k-modal-body { padding: 1.25rem; overflow-y: auto; flex: 1; display: flex; flex-direction: column; }
+        .k-form-section { display: flex; flex-direction: column; }
+        .k-form-section-label {
+            display: flex; align-items: center; gap: 0.35rem; font-size: 0.65rem; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.6px; color: var(--k-text-muted); padding: 0.6rem 0 0.55rem;
+        }
+        .k-form-section-label i { font-size: 0.8rem; color: var(--k-primary); }
+        .k-form-divider { border: none; border-top: 1px solid var(--k-border-light); margin: 0.5rem 0; }
+        .k-form-group { display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 0.7rem; }
+        .k-form-group:last-child { margin-bottom: 0; }
+        .k-form-row { display: grid; grid-template-columns: 1fr 130px; gap: 0.75rem; }
+        .k-form-label { font-size: 0.72rem; font-weight: 500; color: var(--k-text-secondary); display: flex; align-items: center; gap: 0.25rem; }
+        .k-required { color: var(--k-danger); font-size: 0.7rem; }
+        .k-form-control {
+            padding: 0.5rem 0.65rem; border: 1px solid var(--k-border);
+            border-radius: var(--k-radius-md); background: var(--k-bg-app);
+            color: var(--k-text-main); font-size: 0.8rem; font-family: var(--k-font-family);
+            transition: border-color 0.15s, box-shadow 0.15s; width: 100%;
+        }
+        .k-form-control:focus { outline: none; border-color: var(--k-primary); box-shadow: 0 0 0 3px var(--k-primary-light); background: var(--k-bg-card); }
+        .k-form-control.k-mono { font-family: 'SF Mono', 'Consolas', monospace; font-size: 0.75rem; }
+        textarea.k-form-control { resize: vertical; min-height: 62px; line-height: 1.5; }
+        select.k-form-control { cursor: pointer; }
+        .k-form-hint { font-size: 0.63rem; color: var(--k-text-muted); line-height: 1.4; display: flex; align-items: flex-start; gap: 0.2rem; }
+        .k-form-hint i { font-size: 0.7rem; flex-shrink: 0; margin-top: 0.05rem; }
+        .k-modal-footer {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0.85rem 1.25rem; border-top: 1px solid var(--k-border);
+            background: var(--k-bg-app); gap: 0.75rem; flex-shrink: 0;
+        }
+        .k-modal-footer-meta { display: flex; align-items: center; gap: 0.5rem; font-size: 0.7rem; color: var(--k-text-muted); }
+        .k-modal-footer-meta i { font-size: 0.8rem; }
+        .k-modal-footer-actions { display: flex; gap: 0.5rem; }
 
         /* Toast */
         .k-toast-container { position: fixed; bottom: 1rem; right: 1rem; z-index: 2000; }
@@ -584,33 +904,40 @@
         /* ═══════════════════════════════════════════════════════════════════════════
            TEMAS (DARK / DARK-LEGACY)
            ═══════════════════════════════════════════════════════════════════════════ */
-        [data-theme="dark"] body {
-            --k-primary: #4da6ff;
-            --k-primary-light: rgba(77, 166, 255, 0.15);
-            --k-success: #5cb85c;
-            --k-success-light: rgba(92, 184, 92, 0.15);
-            --k-warning: #f0ad4e;
-            --k-warning-light: rgba(240, 173, 78, 0.15);
-            --k-danger: #d9534f;
-            --k-danger-light: rgba(217, 83, 79, 0.15);
-            --k-info: #5bc0de;
-            --k-info-light: rgba(91, 192, 222, 0.15);
-            --k-p1: #ff6b6b;
-            --k-p1-light: rgba(255, 107, 107, 0.1);
-            --k-p2: #69db7c;
-            --k-p2-light: rgba(105, 219, 124, 0.1);
-            --k-p3: #b197fc;
-            --k-p3-light: rgba(177, 151, 252, 0.1);
-            --k-p4: #ffa94d;
-            --k-p4-light: rgba(255, 169, 77, 0.1);
-            --k-bg-app: #1a202c;
-            --k-bg-card: #2d3748;
-            --k-bg-hover: #3a4556;
-            --k-border: #4a5568;
-            --k-text-main: #e9ecef;
-            --k-text-secondary: #cbd5e0;
-            --k-text-muted: #a0aec0;
-        }
+[data-theme="dark"] body {
+--k-primary: #4da6ff;
+--k-primary-light: rgba(77, 166, 255, 0.15);
+--k-success: #5cb85c;
+--k-success-light: rgba(92, 184, 92, 0.15);
+--k-warning: #f0ad4e;
+--k-warning-light: rgba(240, 173, 78, 0.15);
+--k-danger: #d9534f;
+--k-danger-light: rgba(217, 83, 79, 0.15);
+--k-info: #5bc0de;
+--k-info-light: rgba(91, 192, 222, 0.15);
+--k-p1: #ff6b6b;
+--k-p1-light: rgba(255, 107, 107, 0.1);
+--k-p2: #69db7c;
+--k-p2-light: rgba(105, 219, 124, 0.1);
+--k-p3: #b197fc;
+--k-p3-light: rgba(177, 151, 252, 0.1);
+--k-p4: #ffa94d;
+--k-p4-light: rgba(255, 169, 77, 0.1);
+--k-bg-app: #1a202c;
+--k-bg-card: #2d3748;
+--k-bg-hover: #3a4556;
+--k-border: #4a5568;
+--k-text-main: #e9ecef;
+--k-text-secondary: #cbd5e0;
+--k-text-muted: #a0aec0;
+}
+[data-theme="dark"] .k-stats-ribbon { background: #1e1e2e; border-color: #3a3a4a; }
+[data-theme="dark"] .k-stats-ribbon__icon.primary { background: rgba(77, 166, 255, 0.15); color: var(--k-primary); }
+[data-theme="dark"] .k-stats-ribbon__icon.success { background: rgba(92, 184, 92, 0.15); color: var(--k-success); }
+[data-theme="dark"] .k-stats-ribbon__icon.danger { background: rgba(217, 83, 79, 0.15); color: var(--k-danger); }
+[data-theme="dark"] .k-stats-ribbon__value { color: #e0e0e0; }
+[data-theme="dark"] .k-stats-ribbon__label { color: #8a8a9a; }
+[data-theme="dark"] .k-stats-ribbon__divider { background: #3a3a4a; }
 
         [data-theme="dark-legacy"] body {
             --k-primary: #9e9e9e;
@@ -646,89 +973,75 @@
         @media (max-width: 1400px) {
             .k-split-layout { grid-template-columns: 340px 1fr; }
         }
-        @media (max-width: 1200px) {
-            .k-stats-row { grid-template-columns: repeat(3, 1fr); }
-            .k-split-layout { grid-template-columns: 1fr; }
-        }
-        @media (max-width: 768px) {
-            .k-module-header { flex-direction: column; height: auto; padding: 0.5rem 1rem; gap: 0.5rem; }
-            .k-header-left, .k-header-right { width: 100%; justify-content: space-between; }
-            .k-stats-row { grid-template-columns: repeat(2, 1fr); }
-            .k-main-content { padding: 0.75rem; }
-        }
+@media (max-width: 1200px) {
+.k-split-layout { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+.k-section-card { flex-wrap: wrap; gap: 0.75rem; padding: 1rem; }
+.k-stats-ribbon { flex-wrap: wrap; }
+.k-stats-ribbon__item { flex: 1 1 45%; }
+.k-stats-ribbon__divider { display: none; }
+.k-main-content { padding: 0.75rem; }
+}
     </style>
 </head>
 <body>
 
-    <!-- Header -->
-    <header class="k-module-header">
-        <div class="k-header-left">
-            <button class="k-back-btn" onclick="backToModule()"><i class="bi bi-arrow-left"></i></button>
-            <div class="k-header-title-group">
-                <div class="k-header-main-title">
-                    <i class="bi bi-bullseye"></i>
-                    Objetivos y Metas del SG-SST
-                </div>
-                <div class="k-header-breadcrumb">
-                    <span>Gestión Integral</span>
-                    <i class="bi bi-chevron-right"></i>
-                    <span class="k-breadcrumb-item active">2.2.1 Objetivos y Metas</span>
-                </div>
-            </div>
+    <!-- HEADER — Card k-section-card -->
+    <div class="k-section-card" style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem; margin-bottom:1.5rem; flex-shrink:0; flex-grow:0;">
+      <div style="display:flex; align-items:center; gap:0.75rem;">
+        <i class="bi bi-bullseye" style="color:#174ea6; font-size:1.25rem;"></i>
+        <div>
+          <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Objetivos y Metas del SG-SST</h3>
+          <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Política vinculada y objetivos estratégicos SG-SST.</p>
         </div>
-        <div class="k-header-right">
-            <span id="syncStatus" class="k-sync-badge k-sync-synced">
-                <i class="bi bi-check-circle-fill"></i>
-                Sincronizado
-            </span>
-            <button class="k-btn k-btn-primary" onclick="syncToExcel()">
-                <i class="bi bi-cloud-arrow-up"></i>
-                <span>Actualizar Excel</span>
-            </button>
-        </div>
-    </header>
+      </div>
+      <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+        <button class="k-refresh-auto-btn" onclick="refreshAutoResultados()" title="Recalcular resultados desde submódulos">
+          <i class="bi bi-arrow-clockwise"></i> Recalcular
+        </button>
+        <span id="syncStatus" class="k-sync-badge k-sync-synced">
+          <i class="bi bi-check-circle-fill"></i> Sincronizado
+        </span>
+        <div style="width:1px; height:24px; background:#dee2e6;"></div>
+        <button class="header-back-btn" onclick="backToModule()" title="Volver al módulo">
+          <i class="bi bi-arrow-left"></i> Volver
+        </button>
+        <button class="header-action--primary" onclick="syncToExcel()" title="Actualizar datos desde Excel">
+          <i class="bi bi-cloud-arrow-up"></i> Actualizar Excel
+        </button>
+      </div>
+    </div>
 
     <!-- Main Content -->
     <main class="k-main-content">
 
-        <!-- Stats Row -->
-        <div class="k-stats-row">
-            <div class="k-stat-card">
-                <div class="k-stat-icon k-stat-primary"><i class="bi bi-bullseye"></i></div>
-                <div>
-                    <div class="k-stat-value" id="stat-objectives">6</div>
-                    <div class="k-stat-label">Objetivos</div>
-                </div>
-            </div>
-            <div class="k-stat-card">
-                <div class="k-stat-icon k-stat-success"><i class="bi bi-list-check"></i></div>
-                <div>
-                    <div class="k-stat-value" id="stat-indicators">11</div>
-                    <div class="k-stat-label">Indicadores</div>
-                </div>
-            </div>
-            <div class="k-stat-card">
-                <div class="k-stat-icon k-stat-danger"><i class="bi bi-shield-check"></i></div>
-                <div>
-                    <div class="k-stat-value">5</div>
-                    <div class="k-stat-label">Seguridad</div>
-                </div>
-            </div>
-            <div class="k-stat-card">
-                <div class="k-stat-icon k-stat-warning"><i class="bi bi-clock"></i></div>
-                <div>
-                    <div class="k-stat-value">Mensual</div>
-                    <div class="k-stat-label">Frecuencia</div>
-                </div>
-            </div>
-            <div class="k-stat-card">
-                <div class="k-stat-icon k-stat-info"><i class="bi bi-file-earmark-excel"></i></div>
-                <div>
-                    <div class="k-stat-value" style="font-size: 0.7rem;">GI-FO-044</div>
-                    <div class="k-stat-label">Archivo</div>
-                </div>
-            </div>
-        </div>
+<!-- Franja de estadísticas compacta -->
+<div class="k-stats-ribbon">
+<div class="k-stats-ribbon__item">
+<span class="k-stats-ribbon__icon primary"><i class="bi bi-bullseye"></i></span>
+<div class="k-stats-ribbon__data">
+<span class="k-stats-ribbon__value" id="stat-objectives">0</span>
+<span class="k-stats-ribbon__label">Objetivos</span>
+</div>
+</div>
+<div class="k-stats-ribbon__divider"></div>
+<div class="k-stats-ribbon__item">
+<span class="k-stats-ribbon__icon success"><i class="bi bi-list-check"></i></span>
+<div class="k-stats-ribbon__data">
+<span class="k-stats-ribbon__value" id="stat-indicators">0</span>
+<span class="k-stats-ribbon__label">Indicadores</span>
+</div>
+</div>
+<div class="k-stats-ribbon__divider"></div>
+<div class="k-stats-ribbon__item">
+<span class="k-stats-ribbon__icon danger"><i class="bi bi-shield-check"></i></span>
+<div class="k-stats-ribbon__data">
+<span class="k-stats-ribbon__value" id="stat-security">0</span>
+<span class="k-stats-ribbon__label">Seguridad</span>
+</div>
+</div>
+</div>
 
         <!-- Leyenda -->
         <div class="k-legend-bar">
@@ -784,12 +1097,13 @@
                     <table class="k-data-table">
                         <thead>
                             <tr>
-                                <th style="width: 24%">Objetivo Estratégico</th>
-                                <th style="width: 20%">Indicador</th>
-                                <th style="width: 18%">Fórmula</th>
-                                <th style="width: 8%">Meta</th>
-                                <th style="width: 10%">Frecuencia</th>
-                                <th style="width: 14%">Responsable</th>
+                                <th style="width: 22%">Objetivo Estratégico</th>
+                                <th style="width: 18%">Indicador</th>
+                                <th style="width: 15%">Fórmula</th>
+                                <th style="width: 7%">Meta</th>
+                                <th style="width: 9%">Frecuencia</th>
+                                <th style="width: 12%">Responsable</th>
+                                <th style="width: 12%">Resultados</th>
                                 <th class="k-col-actions"></th>
                             </tr>
                         </thead>
@@ -805,6 +1119,234 @@
 
     <!-- Toast Container -->
     <div class="k-toast-container" id="toastContainer"></div>
+
+    <!-- Popover de Selección de Principio -->
+    <div class="k-popover" id="principlePopover" style="display:none;">
+        <div class="k-popover-header">
+            <div class="k-popover-title">
+                <i class="bi bi-shuffle"></i>
+                Cambiar Principio
+            </div>
+            <button class="k-popover-close" onclick="closePopover()">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <div class="k-popover-body">
+            <div class="k-principle-chips" id="popoverChips">
+                <!-- Generado por JS -->
+            </div>
+            <div class="k-popover-autoinfo">
+                <i class="bi bi-info-circle k-autoinfo-icon"></i>
+                <div class="k-autoinfo-text">
+                    <strong id="popoverAutoLabel">⚡ Auto-detectado</strong><br>
+                    <span id="popoverAutoDesc">Palabras clave detectadas: prevención, accidente.</span>
+                    <div class="k-confidence-bar">
+                        <div class="k-confidence-bar-track">
+                            <div class="k-confidence-bar-fill k-conf-fill-high" id="popoverConfFill"></div>
+                        </div>
+                        <span class="k-confidence-label k-conf-label-high" id="popoverConfLabel">Alta</span>
+                    </div>
+                </div>
+            </div>
+            <button class="k-reset-auto-btn" id="popoverResetBtn" onclick="resetToAutoFromUI()">
+                <i class="bi bi-arrow-counterclockwise"></i>
+                Restaurar Auto-detección
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal de Resultados -->
+    <div class="k-modal-backdrop hidden" id="resultadoModalBackdrop">
+        <div class="k-modal" id="resultadoModal">
+            <div class="k-modal-header accent-p3">
+                <div class="k-modal-header-left">
+                    <div class="k-modal-icon icon-p3">
+                        <i class="bi bi-clipboard-check"></i>
+                    </div>
+                    <div>
+                        <div class="k-modal-title">Registrar Resultado</div>
+                        <div class="k-modal-subtitle" id="resultadoObjective">Objetivo</div>
+                        <div class="k-modal-subtitle" id="resultadoIndicator" style="font-weight:600;margin-top:2px;">Indicador</div>
+                    </div>
+                </div>
+                <button class="k-modal-close" onclick="closeResultadoModal()">
+                    <i class="bi bi-lg"></i>
+                </button>
+            </div>
+            <div class="k-modal-body">
+                <div class="k-form-section">
+                    <div class="k-form-group">
+                        <label class="k-form-label">Fórmula</label>
+                        <input type="text" class="k-form-control" id="resultadoFormula" readonly style="background:#f8f9fa;font-size:0.75rem;">
+                    </div>
+                    <div class="k-form-group">
+                        <label class="k-form-label">Meta</label>
+                        <input type="text" class="k-form-control" id="resultadoGoal" readonly style="background:#f8f9fa;font-size:0.75rem;">
+                    </div>
+                    <div class="k-form-section-label">
+                        <i class="bi bi-pencil-square"></i> Resultado Obtenido
+                    </div>
+                    <div class="k-form-group">
+                        <label class="k-form-label">Descripción del resultado <span class="k-required">*</span></label>
+                        <textarea class="k-form-control" id="resultadoInput" rows="3"
+                            placeholder="Ej: IF promedio 0.50 (meta 5.0), 1 AT este año..."></textarea>
+                    </div>
+                    <div class="k-form-group">
+                        <label class="k-form-label">Porcentaje real de cumplimiento (%)</label>
+                        <input type="number" class="k-form-control" id="resultadoPorcentaje"
+                            min="0" max="100" placeholder="Ej: 80">
+                    </div>
+                </div>
+            </div>
+            <div class="k-modal-footer">
+                <div class="k-modal-footer-meta">
+                    <i class="bi bi-info-circle"></i> Este dato se guarda en JSON (Google Drive), no en el Excel
+                </div>
+                <div class="k-modal-footer-actions">
+                    <button class="k-btn k-btn-sm" onclick="closeResultadoModal()">Cancelar</button>
+                    <button class="k-btn k-btn-primary" onclick="saveResultadoModal()">
+                        <i class="bi bi-save"></i> Guardar Resultado
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Edición de Indicador -->
+    <div class="k-modal-backdrop hidden" id="editModalBackdrop">
+        <div class="k-modal" id="editModal">
+            <div class="k-modal-header accent-p1" id="editModalHeader">
+                <div class="k-modal-header-left">
+                    <div class="k-modal-icon icon-p1" id="editModalIcon">
+                        <i class="bi bi-clipboard-data"></i>
+                    </div>
+                    <div>
+                        <div class="k-modal-title">Editar Indicador</div>
+                        <div class="k-modal-subtitle" id="editModalSubtitle">
+                            Indicador 1 de 1
+                        </div>
+                    </div>
+                </div>
+                <button class="k-modal-close" onclick="closeEditModal()">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="k-modal-body">
+                <div class="k-form-section">
+                    <div class="k-form-section-label">
+                        <i class="bi bi-bullseye"></i>
+                        Objetivo Estratégico
+                    </div>
+                    <div class="k-form-group">
+                        <label class="k-form-label">
+                            Texto del objetivo <span class="k-required">*</span>
+                        </label>
+                        <textarea 
+                            class="k-form-control" 
+                            id="editObjective" 
+                            placeholder="Ej: Reducir la accidentalidad laboral en un 50% durante el año 2024..."
+                        ></textarea>
+                        <div class="k-form-hint" id="editObjectiveHint">
+                            <i class="bi bi-info-circle"></i>
+                            <span>Descripción que identifica este objetivo estratégico.</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <hr class="k-form-divider">
+                
+                <div class="k-form-section">
+                    <div class="k-form-section-label">
+                        <i class="bi bi-list-check"></i>
+                        Detalles del Indicador
+                    </div>
+                    
+                    <div class="k-form-group">
+                        <label class="k-form-label">
+                            Indicador <span class="k-required">*</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            class="k-form-control" 
+                            id="editIndicator" 
+                            placeholder="Ej: Tasa de accidentalidad"
+                        >
+                    </div>
+                    
+                    <div class="k-form-row">
+                        <div class="k-form-group">
+                            <label class="k-form-label">
+                                Fórmula <span class="k-required">*</span>
+                            </label>
+                            <input 
+                                type="text" 
+                                class="k-form-control k-mono" 
+                                id="editFormula" 
+                                placeholder="(N° accidentes / Horas hombre trabajadas) × 1.000.000"
+                            >
+                        </div>
+                        
+                        <div class="k-form-group">
+                            <label class="k-form-label">
+                                Meta <span class="k-required">*</span>
+                            </label>
+                            <input 
+                                type="text" 
+                                class="k-form-control" 
+                                id="editGoal" 
+                                placeholder="Ej: < 2.0"
+                            >
+                        </div>
+                    </div>
+                    
+                    <div class="k-form-row">
+                        <div class="k-form-group">
+                            <label class="k-form-label">
+                                Frecuencia <span class="k-required">*</span>
+                            </label>
+                            <select class="k-form-control" id="editFrequency">
+                                <option value="Diaria">Diaria</option>
+                                <option value="Semanal">Semanal</option>
+                                <option value="Quincenal">Quincenal</option>
+                                <option value="Mensual" selected>Mensual</option>
+                                <option value="Trimestral">Trimestral</option>
+                                <option value="Semestral">Semestral</option>
+                                <option value="Anual">Anual</option>
+                            </select>
+                        </div>
+                        
+                        <div class="k-form-group">
+                            <label class="k-form-label">
+                                Responsable <span class="k-required">*</span>
+                            </label>
+                            <input 
+                                type="text" 
+                                class="k-form-control" 
+                                id="editResponsible" 
+                                placeholder="Nombre del responsable"
+                            >
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="k-modal-footer">
+                <div class="k-modal-footer-meta" id="editModalMeta">
+                    <i class="bi bi-shuffle"></i>
+                    Principio auto-detectado · Prevención
+                </div>
+                <div class="k-modal-footer-actions">
+                    <button class="k-btn k-btn-sm" onclick="closeEditModal()">
+                        Cancelar
+                    </button>
+                    <button class="k-btn k-btn-primary" onclick="saveEditModal()">
+                        <i class="bi bi-save"></i>
+                        Guardar Cambios
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script src="./objetivos-sst-viewer.js"></script>
 </body>

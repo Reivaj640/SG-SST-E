@@ -1,0 +1,850 @@
+/* ============================================================
+K+AIR SG-SST - incidencia-enfermedad-laboral.css
+Submódulo 3.3.5 Incidencia de Enfermedad Laboral
+Sistema Visual Oficial K+AIR — Header System v2.0
+Scope: .incidencia-container (aislamiento total)
+============================================================ */
+
+/* =========================================
+1. CORE VISUAL SYSTEM (K+AIR)
+========================================= */
+.incidencia-container {
+--k-primary: #174ea6;
+--k-primary-hover: #185abd;
+--k-primary-light: rgba(23, 78, 166, 0.1);
+
+--k-success: #28a745;
+--k-success-light: rgba(40, 167, 69, 0.1);
+
+--k-warning: #ffc107;
+--k-warning-light: rgba(255, 193, 7, 0.1);
+
+--k-danger: #dc3545;
+--k-danger-light: rgba(220, 53, 69, 0.1);
+
+--k-info: #17a2b8;
+--k-info-light: rgba(23, 162, 184, 0.1);
+
+--k-bg-app: #f8f9fa;
+--k-bg-card: #ffffff;
+--k-border: #dee2e6;
+--k-border-light: #f3f4f6;
+
+--k-font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+--k-text-main: #2d3748;
+--k-text-sec: #6c757d;
+--k-text-muted: #9ca3af;
+
+--k-radius-md: 0.375rem;
+--k-radius-lg: 0.5rem;
+--k-shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
+--k-shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.08);
+--k-shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.12);
+
+--blue: #2563eb;
+--blue-soft: #dbeafe;
+--red: #dc2626;
+--red-soft: #fee2e2;
+--green: #16a34a;
+--green-soft: #dcfce7;
+--yellow: #f59e0b;
+--yellow-soft: #fef3c7;
+
+font-family: var(--k-font-family);
+  background-color: var(--k-bg-app);
+  color: var(--k-text-main);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* =========================================
+2. HEADER SYSTEM — Card Pattern (k-section-card)
+   Scope: .incidencia-container
+========================================= */
+
+.incidencia-container .k-section-card {
+  background: #ffffff;
+  border: 1px solid #dee2e6;
+  border-radius: 0.375rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  flex-shrink: 0;
+}
+
+.incidencia-container .header-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #5a6378;
+  background: transparent;
+  border: none;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  font-family: inherit;
+}
+
+.incidencia-container .header-back-btn:hover {
+  background: #e8f0fe;
+  color: #174ea6;
+}
+
+.incidencia-container .header-action--ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #5a6378;
+  background: transparent;
+  border: none;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  font-family: inherit;
+}
+
+.incidencia-container .header-action--ghost:hover:not(:disabled) {
+  background: #f0f2f5;
+  color: #1a1a2e;
+}
+
+.incidencia-container .header-action--success {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.875rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #ffffff;
+  background: #28a745;
+  border: 1px solid #28a745;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+  font-family: inherit;
+}
+
+.incidencia-container .header-action--success:hover {
+  background: #218838;
+  border-color: #218838;
+  box-shadow: 0 2px 4px rgba(40, 167, 69, 0.3);
+}
+
+.incidencia-container .header-action--success:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.incidencia-container .k-section-card__company {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: #5a6378;
+  white-space: nowrap;
+}
+
+.incidencia-container .k-section-card__company i {
+  font-size: 0.875rem;
+}
+
+.incidencia-container .k-section-card__divider {
+  width: 1px;
+  height: 24px;
+  background: #dee2e6;
+  flex-shrink: 0;
+}
+
+/* Dark Theme */
+[data-theme="dark"] .incidencia-container .k-section-card { background: #1e1e2f; border-color: #3a3a4d; }
+[data-theme="dark"] .incidencia-container .k-section-card h3 { color: #e0e0e0; }
+[data-theme="dark"] .incidencia-container .k-section-card p { color: #9e9e9e; }
+[data-theme="dark"] .incidencia-container .k-section-card__company { color: #9e9e9e; }
+[data-theme="dark"] .incidencia-container .k-section-card__divider { background: #3a3a4d; }
+[data-theme="dark"] .incidencia-container .header-back-btn { color: #9e9e9e; }
+[data-theme="dark"] .incidencia-container .header-back-btn:hover { background: #2a2a4d; color: #8ab4f8; }
+[data-theme="dark"] .incidencia-container .header-action--ghost { color: #9e9e9e; }
+[data-theme="dark"] .incidencia-container .header-action--ghost:hover:not(:disabled) { background: #2a2a3d; color: #e0e0e0; }
+
+/* Responsive — Card */
+@media (max-width: 768px) {
+.incidencia-container .k-section-card > div:first-child {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 1rem !important;
+}
+.incidencia-container .k-section-card__company {
+  display: none;
+}
+}
+
+/* =========================================
+3. LAYOUT & CONTAINER
+========================================= */
+
+.incidencia-container .kair-container {
+width: 100%;
+max-width: 1440px;
+margin: 0 auto;
+padding: 0;
+flex: 1;
+display: flex;
+flex-direction: column;
+overflow: hidden;
+}
+
+.incidencia-container .k-main-content {
+flex: 1;
+overflow-y: auto;
+padding: 1.25rem;
+}
+
+/* =========================================
+4. SYNC BAR
+========================================= */
+
+.incidencia-container .kair-sync-bar {
+display: flex;
+align-items: center;
+gap: 0.5rem;
+font-size: 0.75rem;
+color: var(--k-text-sec);
+margin-bottom: 1rem;
+}
+
+.incidencia-container .kair-badge {
+display: flex;
+align-items: center;
+gap: 0.375rem;
+}
+
+.incidencia-container .kair-dot {
+width: 8px;
+height: 8px;
+border-radius: 50%;
+background: var(--k-success);
+}
+
+.incidencia-container .kair-sync-info {
+color: var(--k-text-muted);
+}
+
+/* =========================================
+5. KPIs
+========================================= */
+
+.incidencia-container .kair-kpis {
+display: grid;
+grid-template-columns: repeat(5, 1fr);
+gap: 0.75rem;
+margin-bottom: 1.25rem;
+}
+
+@media (max-width: 1024px) {
+.incidencia-container .kair-kpis {
+  grid-template-columns: repeat(3, 1fr);
+}
+}
+
+@media (max-width: 640px) {
+.incidencia-container .kair-kpis {
+  grid-template-columns: repeat(2, 1fr);
+}
+}
+
+.incidencia-container .kair-kpi {
+background: var(--k-bg-card);
+border: 1px solid var(--k-border);
+border-radius: var(--k-radius-md);
+padding: 1rem;
+box-shadow: var(--k-shadow-sm);
+text-align: center;
+}
+
+.incidencia-container .kair-kpi-label {
+font-size: 0.6875rem;
+font-weight: 600;
+color: var(--k-text-sec);
+text-transform: uppercase;
+letter-spacing: 0.5px;
+margin-bottom: 0.5rem;
+}
+
+.incidencia-container .kair-kpi-value {
+font-size: 1.375rem;
+font-weight: 700;
+line-height: 1;
+margin-bottom: 0.375rem;
+}
+
+.incidencia-container .kair-kpi-value.primary {
+color: var(--blue);
+}
+
+.incidencia-container .kair-kpi-value.success {
+color: var(--green);
+}
+
+.incidencia-container .kair-kpi-value.warning {
+color: var(--yellow);
+}
+
+.incidencia-container .kair-kpi-value.danger {
+color: var(--red);
+}
+
+.incidencia-container .kair-kpi-sub {
+font-size: 0.625rem;
+color: var(--k-text-muted);
+}
+
+.incidencia-container .kair-status-badge {
+display: inline-block;
+padding: 0.25rem 0.625rem;
+border-radius: var(--k-radius-md);
+font-size: 0.6875rem;
+font-weight: 700;
+color: #fff;
+}
+
+/* =========================================
+6. META SECTION
+========================================= */
+
+.incidencia-container .kair-meta-section {
+display: flex;
+align-items: center;
+gap: 1rem;
+border: 1px solid var(--k-border);
+border-radius: var(--k-radius-md);
+padding: 1rem;
+background: var(--k-bg-card);
+margin-bottom: 1.25rem;
+box-shadow: var(--k-shadow-sm);
+}
+
+.incidencia-container .kair-meta-icon {
+display: flex;
+align-items: center;
+justify-content: center;
+width: 40px;
+height: 40px;
+border-radius: 8px;
+background: var(--blue-soft);
+flex-shrink: 0;
+}
+
+.incidencia-container .kair-meta-info {
+flex: 1;
+}
+
+.incidencia-container .kair-meta-title {
+font-size: 0.875rem;
+font-weight: 600;
+color: var(--k-text-main);
+}
+
+.incidencia-container .kair-meta-subtitle {
+font-size: 0.75rem;
+color: var(--k-text-muted);
+margin-top: 0.125rem;
+}
+
+.incidencia-container .kair-meta-value-container {
+text-align: right;
+}
+
+.incidencia-container .kair-meta-value {
+font-size: 1.25rem;
+font-weight: 700;
+color: var(--blue);
+}
+
+.incidencia-container .kair-promedio-badge {
+display: inline-flex;
+align-items: center;
+gap: 0.25rem;
+padding: 0.125rem 0.5rem;
+border-radius: 9999px;
+font-size: 0.6875rem;
+font-weight: 600;
+margin-top: 0.25rem;
+}
+
+/* =========================================
+7. CHART SECTION
+========================================= */
+
+.incidencia-container .kair-chart-section {
+border: 1px solid var(--k-border);
+border-radius: var(--k-radius-md);
+padding: 1.25rem;
+background: var(--k-bg-card);
+margin-bottom: 1.25rem;
+box-shadow: var(--k-shadow-sm);
+}
+
+.incidencia-container .kair-chart-header {
+display: flex;
+align-items: flex-start;
+justify-content: space-between;
+margin-bottom: 1rem;
+}
+
+.incidencia-container .kair-chart-title {
+font-size: 0.875rem;
+font-weight: 600;
+color: var(--k-text-main);
+}
+
+.incidencia-container .kair-chart-subtitle {
+font-size: 0.6875rem;
+color: var(--k-text-muted);
+}
+
+.incidencia-container .kair-chart-legend {
+display: flex;
+gap: 0.75rem;
+font-size: 0.6875rem;
+color: var(--k-text-muted);
+}
+
+.incidencia-container .kair-legend-item {
+display: flex;
+align-items: center;
+gap: 0.25rem;
+}
+
+.incidencia-container .kair-legend-color {
+display: inline-block;
+width: 12px;
+height: 8px;
+border-radius: 2px;
+}
+
+.incidencia-container .kair-legend-line {
+display: inline-block;
+width: 12px;
+border-top: 2px dashed;
+border-color: var(--blue);
+}
+
+.incidencia-container .kair-chart-container {
+min-height: 250px;
+height: auto;
+}
+
+/* =========================================
+8. TABLE SECTION
+========================================= */
+
+.incidencia-container .kair-table-section {
+border: 1px solid var(--k-border);
+border-radius: var(--k-radius-md);
+overflow: hidden;
+background: var(--k-bg-card);
+margin-bottom: 1.25rem;
+box-shadow: var(--k-shadow-sm);
+}
+
+.incidencia-container .kair-table-wrapper {
+overflow-x: auto;
+}
+
+.incidencia-container .kair-data-table {
+width: 100%;
+border-collapse: collapse;
+}
+
+.incidencia-container .kair-table-header {
+background: var(--k-primary);
+}
+
+.incidencia-container .kair-table-header th {
+padding: 0.75rem 1rem;
+font-size: 0.75rem;
+font-weight: 600;
+color: #fff;
+text-align: center;
+white-space: nowrap;
+}
+
+.incidencia-container .kair-table-header th:first-child {
+text-align: left;
+}
+
+.incidencia-container .kair-data-table tbody tr:nth-child(odd) {
+background: var(--k-bg-card);
+}
+
+.incidencia-container .kair-data-table tbody tr:nth-child(even) {
+background: var(--k-border-light);
+}
+
+.incidencia-container .kair-data-table td {
+padding: 0.625rem 1rem;
+font-size: 0.8125rem;
+border-bottom: 1px solid var(--k-border);
+text-align: center;
+}
+
+.incidencia-container .kair-data-table td:first-child {
+text-align: left;
+font-weight: 500;
+color: var(--k-text-sec);
+}
+
+.incidencia-container .kair-cell-editable {
+cursor: pointer;
+transition: opacity 0.15s;
+}
+
+.incidencia-container .kair-cell-editable:hover {
+opacity: 0.7;
+}
+
+.incidencia-container .kair-cell-value {
+padding: 0.125rem 0.5rem;
+border-radius: var(--k-radius-md);
+display: inline-block;
+}
+
+.incidencia-container .kair-edit-input {
+width: 80px;
+height: 32px;
+text-align: center;
+font-size: 0.875rem;
+border: 2px solid var(--k-primary);
+border-radius: var(--k-radius-md);
+outline: none;
+font-family: var(--k-font-family);
+}
+
+.incidencia-container .kair-table-total {
+background: #f3f4f6 !important;
+border-top: 2px solid var(--k-border);
+}
+
+.incidencia-container .kair-table-total td {
+font-weight: 700;
+color: var(--k-text-main);
+}
+
+.incidencia-container .kair-table-footer-note {
+padding: 0.75rem 1rem;
+font-size: 0.8125rem;
+color: #64748B;
+border-top: 1px solid #e5e7eb;
+}
+
+/* =========================================
+8.1 EDITABLE CELLS (patrón 3.3.1/3.3.2)
+========================================= */
+
+.incidencia-container .kair-editable {
+color: var(--k-primary);
+font-weight: 600;
+cursor: pointer;
+text-decoration: underline dotted var(--k-primary);
+padding: 0.25rem 0.5rem;
+border-radius: 4px;
+transition: background 0.2s;
+display: inline-block;
+min-width: 40px;
+}
+
+.incidencia-container .kair-editable:hover {
+background: rgba(23, 78, 166, 0.08);
+}
+
+.incidencia-container .kair-input {
+width: 70px;
+height: 32px;
+text-align: center;
+font-size: 0.875rem;
+font-weight: 600;
+border: 2px solid var(--k-primary);
+border-radius: var(--k-radius-md);
+outline: none;
+font-family: var(--k-font-family);
+color: var(--k-text-main);
+background: #ffffff;
+}
+
+.incidencia-container .kair-input:focus {
+box-shadow: 0 0 0 2px rgba(23, 78, 166, 0.2);
+}
+
+/* =========================================
+9. EDIT HINT
+========================================= */
+
+.incidencia-container .kair-edit-hint {
+font-size: 0.6875rem;
+color: var(--k-text-muted);
+margin-bottom: 1.25rem;
+}
+
+/* =========================================
+9.1 CHART SUMMARY
+========================================= */
+
+.incidencia-container .kair-chart-summary {
+text-align: center;
+font-size: 0.8125rem;
+color: var(--k-text-sec);
+margin-top: 0.75rem;
+padding: 0.625rem 1rem;
+background: var(--k-border-light);
+border-radius: var(--k-radius-md);
+border: 1px solid var(--k-border);
+font-weight: 500;
+}
+
+/* =========================================
+10. METHODOLOGY
+========================================= */
+
+.incidencia-container .kair-methodology-section {
+border: 1px solid var(--k-border);
+border-radius: var(--k-radius-md);
+padding: 1.25rem;
+background: var(--k-bg-card);
+margin-bottom: 1.25rem;
+box-shadow: var(--k-shadow-sm);
+}
+
+.incidencia-container .kair-methodology-header {
+display: flex;
+align-items: center;
+gap: 0.5rem;
+margin-bottom: 0.75rem;
+}
+
+.incidencia-container .kair-methodology-header h3 {
+font-size: 0.875rem;
+font-weight: 600;
+color: var(--k-text-main);
+}
+
+.incidencia-container .kair-methodology-content {
+background: var(--k-border-light);
+padding: 0.75rem;
+border-radius: var(--k-radius-md);
+}
+
+.incidencia-container .kair-methodology-content p {
+font-size: 0.75rem;
+color: var(--k-text-sec);
+margin-bottom: 0.5rem;
+}
+
+.incidencia-container .kair-methodology-content p:last-child {
+margin-bottom: 0;
+}
+
+.incidencia-container .kair-methodology-content strong {
+color: var(--k-text-main);
+}
+
+/* =========================================
+11. LOADING
+========================================= */
+
+.incidencia-container .kair-loading {
+display: flex;
+flex-direction: column;
+align-items: center;
+justify-content: center;
+padding: 6rem 0;
+gap: 0.75rem;
+}
+
+.incidencia-container .kair-spinner {
+width: 32px;
+height: 32px;
+border: 2px solid var(--k-border);
+border-top-color: var(--k-primary);
+border-radius: 50%;
+animation: kair-spin 1s linear infinite;
+}
+
+@keyframes kair-spin {
+to { transform: rotate(360deg); }
+}
+
+.incidencia-container .kair-loading p {
+color: var(--k-text-sec);
+font-size: 0.875rem;
+}
+
+/* =========================================
+12. ERROR
+========================================= */
+
+.incidencia-container .kair-error {
+display: flex;
+flex-direction: column;
+align-items: center;
+justify-content: center;
+padding: 6rem 0;
+gap: 0.75rem;
+}
+
+.incidencia-container .kair-error p {
+color: var(--k-danger);
+font-size: 0.875rem;
+}
+
+/* =========================================
+13. TOAST
+========================================= */
+
+.incidencia-container #toastContainer {
+position: fixed;
+top: 1rem;
+right: 1rem;
+z-index: 1000;
+display: flex;
+flex-direction: column;
+gap: 0.5rem;
+}
+
+.incidencia-container .kair-toast {
+padding: 0.75rem 1rem;
+border-radius: var(--k-radius-md);
+font-size: 0.875rem;
+font-weight: 500;
+color: #fff;
+animation: kair-slide-in 0.3s ease-out;
+box-shadow: var(--k-shadow-lg);
+}
+
+.incidencia-container .kair-toast.success {
+background: var(--k-success);
+}
+
+.incidencia-container .kair-toast.error {
+background: var(--k-danger);
+}
+
+.incidencia-container .kair-toast.warning {
+background: var(--k-warning);
+color: #000;
+}
+
+.incidencia-container .kair-toast.info {
+background: var(--k-primary);
+}
+
+@keyframes kair-slide-in {
+from {
+  transform: translateX(100%);
+  opacity: 0;
+}
+to {
+  transform: translateX(0);
+  opacity: 1;
+}
+}
+
+/* =========================================
+14. RESET (solo dentro del contenedor)
+========================================= */
+
+.incidencia-container *,
+.incidencia-container *::before,
+.incidencia-container *::after {
+box-sizing: border-box;
+}
+
+.incidencia-container body {
+font-family: var(--k-font-family);
+background: var(--k-bg-app);
+color: var(--k-text-main);
+line-height: 1.5;
+}
+
+/* =========================================
+15. RESPONSIVE BREAKPOINTS
+========================================= */
+
+@media (max-width: 768px) {
+.incidencia-container .kair-kpis {
+  grid-template-columns: repeat(2, 1fr);
+}
+.incidencia-container .k-section-card > div:first-child {
+  flex-wrap: wrap;
+  padding: 1rem !important;
+}
+.incidencia-container .k-section-card__company {
+  display: none;
+}
+.incidencia-container .kair-table-wrapper {
+  font-size: 0.75rem;
+}
+.incidencia-container .kair-chart-container {
+  min-height: 200px;
+}
+}
+
+@media (max-width: 480px) {
+.incidencia-container .kair-kpis {
+  grid-template-columns: 1fr;
+}
+.incidencia-container .kair-container {
+  padding: 0.75rem;
+}
+.incidencia-container .kair-chart-container {
+  min-height: 180px;
+}
+}
+
+@media (min-width: 1920px) {
+.incidencia-container .kair-container {
+  max-width: 1800px;
+  padding: 1.5rem 3rem;
+}
+.incidencia-container .kair-chart-container {
+  min-height: 350px;
+}
+.incidencia-container .kair-data-table {
+  font-size: 0.9rem;
+}
+.incidencia-container .kair-kpi-value {
+  font-size: 2rem;
+}
+.incidencia-container .kair-kpi-label {
+  font-size: 0.85rem;
+}
+}
+
+@media (min-width: 2560px) {
+.incidencia-container .kair-container {
+  max-width: 2400px;
+  padding: 2rem 4rem;
+}
+.incidencia-container .kair-kpis {
+  grid-template-columns: repeat(5, 1fr);
+}
+.incidencia-container .kair-chart-container {
+  min-height: 450px;
+}
+.incidencia-container .kair-data-table {
+  font-size: 0.95rem;
+}
+.incidencia-container .kair-kpi-value {
+  font-size: 2.25rem;
+}
+.incidencia-container .kair-kpi-label {
+  font-size: 0.9rem;
+}
+}

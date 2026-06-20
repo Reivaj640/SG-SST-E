@@ -12,8 +12,16 @@ class ObjetivosSSTComponent {
     }
 
     render() {
+        console.log('[objetivos-sst-logic.js][render] Iniciando renderizado del componente Objetivos SST');
+        console.log('[objetivos-sst-logic.js][render] companyName:', this.companyName);
+        console.log('[objetivos-sst-logic.js][render] moduleName:', this.moduleName);
+        console.log('[objetivos-sst-logic.js][render] submoduleName:', this.submoduleName);
+        
         this.container.innerHTML = ''; // Limpiar el contenedor
+        
+        // Registrar listener ANTES de crear el iframe
         window.addEventListener('message', this.handleIframeMessage);
+        console.log('[objetivos-sst-logic.js][render] Listener de mensajes registrado');
 
         const iframe = document.createElement('iframe');
         iframe.style.width = '100%';
@@ -23,34 +31,56 @@ class ObjetivosSSTComponent {
         // Pasar parámetros a la nueva interfaz a través de la URL
         const viewerUrl = `modules/gestion-integral/objetivos-sst/objetivos-sst-view.html?company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
         iframe.src = viewerUrl;
+        
+        console.log('[objetivos-sst-logic.js][render] Iframe creado con src:', viewerUrl);
 
         this.container.appendChild(iframe);
+        console.log('[objetivos-sst-logic.js][render] Iframe agregado al DOM');
     }
 
     handleIframeMessage(event) {
-        // Por seguridad, podrías verificar event.origin aquí si supieras el origen exacto del iframe
-        if (!event.data || !event.data.action) {
-            return; // Ignorar mensajes sin acción definida
+        if (!event.data) {
+            return;
         }
 
-        switch (event.data.action) {
-            case 'backToModule':
-                if (this.onBackToModuleHome) {
-                    this.onBackToModuleHome();
-                }
+        // Normalizar clave: aceptar tanto `type` (estándar) como `action` (legacy viewer)
+        const messageKey = event.data.type || event.data.action;
+        if (!messageKey) {
+            return;
+        }
+
+        console.log(`[objetivos-sst-logic.js][handleIframeMessage] Mensaje recibido del iframe:`, event.data);
+
+        switch (messageKey) {
+            case 'back-to-module-request':
+                console.log('[objetivos-sst-logic.js][handleIframeMessage] Acción: back-to-module-request');
                 break;
             case 'get-excel-path-request':
+                console.log('[objetivos-sst-logic.js][handleIframeMessage] Acción: get-excel-path-request');
                 this.handleGetExcelPathRequest(event);
                 break;
             case 'load-excel-data-request':
+                console.log('[objetivos-sst-logic.js][handleIframeMessage] Acción: load-excel-data-request');
                 this.handleLoadExcelDataRequest(event);
                 break;
             case 'save-excel-data-request':
+                console.log('[objetivos-sst-logic.js][handleIframeMessage] Acción: save-excel-data-request');
                 this.handleSaveExcelDataRequest(event);
                 break;
-            // Puedes añadir más casos para otras funcionalidades si es necesario
+            case 'load-resultados-request':
+                console.log('[objetivos-sst-logic.js][handleIframeMessage] Acción: load-resultados-request');
+                this.handleLoadResultadosRequest(event);
+                break;
+            case 'save-resultados-request':
+                console.log('[objetivos-sst-logic.js][handleIframeMessage] Acción: save-resultados-request');
+                this.handleSaveResultadosRequest(event);
+                break;
+            case 'load-auto-resultados-request':
+                console.log('[objetivos-sst-logic.js][handleIframeMessage] Acción: load-auto-resultados-request');
+                this.handleLoadAutoResultadosRequest(event);
+                break;
             default:
-                console.warn('Mensaje de iframe no reconocido:', event.data.action);
+                console.warn('[objetivos-sst-logic.js][handleIframeMessage] Mensaje no reconocido:', messageKey);
                 break;
         }
     }
@@ -152,10 +182,96 @@ class ObjetivosSSTComponent {
         }
     }
 
+    async handleLoadResultadosRequest(event) {
+        const { requestId, payload } = event.data;
+        const { excelFilePath } = payload;
+        console.log(`[objetivos-sst-logic.js][handleLoadResultadosRequest] Cargando resultados. requestId: ${requestId}`);
+
+        try {
+            if (!window.electronAPI || typeof window.electronAPI.getObjetivosResultados !== 'function') {
+                throw new Error('electronAPI.getObjetivosResultados no está disponible.');
+            }
+            const result = await window.electronAPI.getObjetivosResultados(excelFilePath);
+            event.source.postMessage({
+                action: 'load-resultados-response',
+                requestId,
+                success: result.success,
+                data: result.data,
+                error: result.error
+            }, '*');
+        } catch (error) {
+            console.error(`[objetivos-sst-logic.js][handleLoadResultadosRequest] Error:`, error);
+            event.source.postMessage({
+                action: 'load-resultados-response',
+                requestId,
+                success: false,
+                error: error.message
+            }, '*');
+        }
+    }
+
+    async handleSaveResultadosRequest(event) {
+        const { requestId, payload } = event.data;
+        const { excelFilePath, data } = payload;
+        console.log(`[objetivos-sst-logic.js][handleSaveResultadosRequest] Guardando resultados. requestId: ${requestId}`);
+
+        try {
+            if (!window.electronAPI || typeof window.electronAPI.saveObjetivosResultados !== 'function') {
+                throw new Error('electronAPI.saveObjetivosResultados no está disponible.');
+            }
+            const result = await window.electronAPI.saveObjetivosResultados(excelFilePath, data);
+            event.source.postMessage({
+                action: 'save-resultados-response',
+                requestId,
+                success: result.success,
+                error: result.error
+            }, '*');
+        } catch (error) {
+            console.error(`[objetivos-sst-logic.js][handleSaveResultadosRequest] Error:`, error);
+            event.source.postMessage({
+                action: 'save-resultados-response',
+                requestId,
+                success: false,
+                error: error.message
+            }, '*');
+        }
+    }
+
+    async handleLoadAutoResultadosRequest(event) {
+        const { requestId, payload } = event.data;
+        const companyName = payload?.companyName;
+        console.log(`[objetivos-sst-logic.js][handleLoadAutoResultadosRequest] Cargando auto-resultados. requestId: ${requestId}, company: ${companyName}`);
+
+        try {
+            if (!window.electronAPI || typeof window.electronAPI.getObjetivosResultadosAuto !== 'function') {
+                throw new Error('electronAPI.getObjetivosResultadosAuto no está disponible.');
+            }
+            const result = await window.electronAPI.getObjetivosResultadosAuto(companyName);
+            event.source.postMessage({
+                action: 'load-auto-resultados-response',
+                requestId,
+                success: result.success,
+                data: result.data,
+                error: result.error
+            }, '*');
+        } catch (error) {
+            console.error(`[objetivos-sst-logic.js][handleLoadAutoResultadosRequest] Error:`, error);
+            event.source.postMessage({
+                action: 'load-auto-resultados-response',
+                requestId,
+                success: false,
+                data: {},
+                error: error.message
+            }, '*');
+        }
+    }
+
     destroy() {
+        console.log('[objetivos-sst-logic.js][destroy] Limpiando listener de mensajes');
         // Limpiar el event listener cuando el componente se destruye
         window.removeEventListener('message', this.handleIframeMessage);
         this.container.innerHTML = '';
+        console.log('[objetivos-sst-logic.js][destroy] Componente destruido');
     }
 }
 

@@ -1,7 +1,7 @@
 # K+AIR - Contexto del Proyecto
 
-**Última actualización:** 25 de marzo de 2026
-**Versión actual:** 0.1.93
+**Última actualización:** 9 de junio de 2026
+**Versión actual:** 0.1.99
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 
 ---
@@ -125,7 +125,7 @@ modules/
 
 ---
 
-## 📊 Estado Actual (v0.1.90)
+## 📊 Estado Actual (v0.1.99)
 
 ### ✅ Funcionalidades Operativas
 
@@ -145,6 +145,10 @@ modules/
 - [x] **Espaciado Compacto en Módulo Recursos** - 75% menos espacio entre widgets y gráficas 🆕
 - [x] **Login Modernizado** - Animaciones, logo K+AIR, fondo Vanta.js, íconos en inputs 🆕
 - [x] **Transición Animada Login→Interfaz** - Overlay con spinner, mensajes, progreso y check de éxito 🆕
+- [x] **Autollenado Actas COPASST** - Plan de Trabajo (mes anterior), accidentalidad enriquecida, texto formateado 🆕
+- [x] **Dashboard Plan de Trabajo (2.4.1)** - KPIs k-stats-ribbon, 6 gráficas, tabs-header empresa+periodo 🆕
+- [x] **Navegación Plan de Trabajo** - 2 flujos separados (cronograma→home, portal→módulo), patrón destroy 🆕
+- [x] **Modal Selector de Periodo** - Cierre con X y clic en fondo 🆕
 
 ### ️ Limitaciones Temporales
 
@@ -152,7 +156,30 @@ modules/
   - **Razón:** Build de ~800 MB → ~450 MB, tiempo 15-25 min → 8-12 min
   - **Re-habilitar:** Eliminar `!Lib/site-packages/torch/**` de package.json
 
-### 🔧 Mejoras Recientes
+### 🔧 Mejores Recientes
+
+**v0.1.100 (11 de junio de 2026):**
+1. **Header Card Pattern (`k-section-card`)** - Patrón canónico de header para todos los módulos K+AIR
+2. **Migración Masiva de Headers** - 22 submódulos migrados de BEM `kair-header` a `k-section-card`
+3. **Tabs Integration** - Módulos con tabs ahora los integran DENTRO del card
+4. **Responsive Consistency** - `flex-wrap: wrap`, company oculta en mobile, padding reducido
+5. **IDs Preservados** - Ningún ID de elemento fue modificado, compatibilidad total con JS existente
+
+**v0.1.99 (9 de junio de 2026):**
+1. **Dashboard Plan de Trabajo 2.4.1** - KPIs `k-stats-ribbon` canónico, 6 gráficas (Estado, Progreso Mensual, Cumplimiento Trimestral, Estado Mensual, Categoría, Radar Anual)
+2. **Tabs-header empresa+periodo** - Reemplaza page-header legacy con BEM `.k-tabs-header`
+3. **Modal selector de periodo** - Cierra con botón X y clic en fondo (`hidePeriodSelector()`)
+4. **Navegación corregida** - Cronograma→Volver→portal home; Portal Home→Volver→menú Gestión Integral (patrón destroy)
+5. **`PlanTrabajoComponent.destroy()`** - Consistente con COPASST (null refs, cleanup script, clear container)
+6. **`goBackToModuleHome()`** - Método directo sin postMessage (evita loop del renderer)
+7. **Fix visual** - Eliminado subrayado en `.back-btn-internal:hover/focus/active`
+
+**v0.1.98 (4 de junio de 2026):**
+1. **Fix: Plan de Trabajo en actas COPASST** - Lee columna del mes anterior (norma COPASST)
+2. **Fix: Bug de mes en nombre de archivo** - Parseo directo `parseInt` vs `new Date()` (bug UTC-5)
+3. **Mejora: Texto formateado multilinea** - Numeración, iconos ✓/⏱, agrupación por estado
+4. **Mejora: Accidentalidad enriquecida** - Nombre completo, identificación, fecha DD/MM/YYYY
+5. **Fix: Nombre de archivo** - Eliminado "N°" del nombre por defecto
 
 **v0.1.90 (21 de marzo de 2026):**
 1. **Feature: Transición Animada Login→Interfaz** - Overlay con logo, spinner, mensajes y progreso
@@ -476,3 +503,4 @@ npx electron-builder --win --publish=always
 **Documento creado:** 19 de marzo de 2026  
 **Propósito:** Contexto unificado para IA y nuevos desarrolladores  
 **Mantenimiento:** Actualizar con cada cambio arquitectónico mayor
+$content

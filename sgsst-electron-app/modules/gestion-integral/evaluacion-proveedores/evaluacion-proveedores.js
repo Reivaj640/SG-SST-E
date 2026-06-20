@@ -17,18 +17,19 @@
     };
 
     class EvaluacionProveedores {
-        constructor(container, moduleName, submoduleTitle, backToModuleCallback) {
-            this.container = container;
-            this.moduleName = moduleName;
-            this.submoduleTitle = submoduleTitle;
-            this.backToModuleCallback = backToModuleCallback;
+  constructor(container, moduleName, submoduleTitle, backToModuleCallback, currentCompany) {
+    this.container = container;
+    this.moduleName = moduleName;
+    this.submoduleTitle = submoduleTitle;
+    this.backToModuleCallback = backToModuleCallback;
+    this.currentCompany = currentCompany || '';
 
-            // Estado del componente
-            this.suppliersData = [];
-            this.selectedFiles = [];
-            this.currentSupplier = null;
-            this.submodulePath = null;
-            this.companyName = null;
+    // Estado del componente
+    this.suppliersData = [];
+    this.selectedFiles = [];
+    this.currentSupplier = null;
+    this.submodulePath = null;
+    this.companyName = null;
 
             // Referencias DOM
             this.modal = null;
@@ -59,10 +60,11 @@
             // Inicializar eventos
             this.initEventListeners();
 
-            // Renderizar tabla inicial
-            this.renderTable(this.suppliersData);
-            this.updateMetrics();
-        }
+ // Renderizar tabla inicial
+  this.renderTable(this.suppliersData);
+  this.updateMetrics();
+  this.updateHeaderContext();
+ }
 
         /**
          * Carga la configuración desde el backend
@@ -70,7 +72,7 @@
         async loadConfig() {
             try {
                 // Intentar obtener la empresa desde window.currentCompany (set por renderer.js)
-                this.companyName = window.currentCompany || window.electronAPI.currentCompany || null;
+                this.companyName = this.currentCompany || window.currentCompany || window.electronAPI.currentCompany || null;
                 
                 // Si aún es null, intentar cargar desde config
                 if (!this.companyName) {
@@ -362,86 +364,121 @@
             mainLayout.className = 'ep-module-container';
             mainLayout.id = 'ep-list-view-container';
 
-            mainLayout.innerHTML = `
-                <!-- 1. Encabezado -->
-                <header class="ep-module-header">
-                    <div class="ep-header-content">
-                        <h1 class="ep-module-title">Identificación y Evaluación de Bienes y Servicios</h1>
-                        <p class="ep-module-subtitle">Submódulo 2.9.1 | Gestión de Proveedores, Evidencias y Calificación</p>
-                    </div>
-                    <button class="ep-btn-back-module" id="ep-btn-back-module" title="Volver al módulo principal">
-                        <i class="bi bi-arrow-left"></i> Volver
-                    </button>
-                </header>
+ mainLayout.innerHTML = `
+<!-- 1. Encabezado — Card Pattern (k-section-card) -->
+<div class="k-section-card" style="padding:0; margin-bottom:0;">
+  <!-- Fila 1: contenido principal -->
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
+    <div style="display:flex; align-items:center; gap:0.75rem;">
+      <i class="bi bi-box-seam" style="color:#174ea6; font-size:1.25rem;"></i>
+      <div>
+        <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Identificación y Evaluación de Bienes y Servicios</h3>
+        <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Gestión de proveedores y evaluación de bienes y servicios SG-SST.</p>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:0.75rem;">
+      <span class="k-section-card__company">
+        <i class="bi bi-building"></i>
+        <span id="ep-header-company">${this.companyName || ''}</span>
+      </span>
+      <div class="k-section-card__divider"></div>
+      <button class="header-back-btn" id="ep-btn-back-module" title="Volver al módulo principal">
+        <i class="fas fa-arrow-left"></i> Volver
+      </button>
+      <button class="header-action--ghost" id="ep-btn-export-header" title="Exportar">
+        <i class="bi bi-file-earmark-excel"></i> Exportar
+      </button>
+      <button class="header-action--ghost" id="ep-btn-new-provider-header" title="Nuevo Proveedor">
+        <i class="bi bi-plus-lg"></i> Nuevo
+      </button>
+    </div>
+  </div>
+</div>
 
-                <!-- 2. Métricas -->
-                <div class="ep-metrics-row">
-                    <div class="ep-metric-card" style="border-color: var(--ep-primary);">
-                        <div class="ep-metric-value" id="ep-total-suppliers">0</div>
-                        <div class="ep-metric-label">Total Evaluados</div>
-                    </div>
-                    <div class="ep-metric-card" style="border-color: var(--ep-success);">
-                        <div class="ep-metric-value" id="ep-approved-suppliers" style="color: var(--ep-success);">0</div>
-                        <div class="ep-metric-label">Aprobados</div>
-                    </div>
-                    <div class="ep-metric-card" style="border-color: var(--ep-warning);">
-                        <div class="ep-metric-value" id="ep-pending-suppliers" style="color: #b68b00;">0</div>
-                        <div class="ep-metric-label">Pendientes</div>
-                    </div>
-                    <div class="ep-metric-card" style="border-color: var(--ep-danger);">
-                        <div class="ep-metric-value" id="ep-rejected-suppliers" style="color: var(--ep-danger);">0</div>
-                        <div class="ep-metric-label">Rechazados</div>
-                    </div>
-                </div>
+<div class="ep-content-scroll">
+<!-- 2. Métricas — Stats Ribbon -->
+<div class="k-stats-ribbon">
+  <div class="k-stats-ribbon__item">
+    <span class="k-stats-ribbon__icon primary"><i class="bi bi-box-seam"></i></span>
+    <div class="k-stats-ribbon__data">
+      <span class="k-stats-ribbon__value" id="ep-total-suppliers">0</span>
+      <span class="k-stats-ribbon__label">Total Evaluados</span>
+    </div>
+  </div>
+  <div class="k-stats-ribbon__divider"></div>
+  <div class="k-stats-ribbon__item">
+    <span class="k-stats-ribbon__icon success"><i class="bi bi-check-circle"></i></span>
+    <div class="k-stats-ribbon__data">
+      <span class="k-stats-ribbon__value" id="ep-approved-suppliers">0</span>
+      <span class="k-stats-ribbon__label">Aprobados</span>
+    </div>
+  </div>
+  <div class="k-stats-ribbon__divider"></div>
+  <div class="k-stats-ribbon__item">
+    <span class="k-stats-ribbon__icon warning"><i class="bi bi-clock-history"></i></span>
+    <div class="k-stats-ribbon__data">
+      <span class="k-stats-ribbon__value" id="ep-pending-suppliers">0</span>
+      <span class="k-stats-ribbon__label">Pendientes</span>
+    </div>
+  </div>
+  <div class="k-stats-ribbon__divider"></div>
+  <div class="k-stats-ribbon__item">
+    <span class="k-stats-ribbon__icon muted"><i class="bi bi-x-circle"></i></span>
+    <div class="k-stats-ribbon__data">
+      <span class="k-stats-ribbon__value" id="ep-rejected-suppliers">0</span>
+      <span class="k-stats-ribbon__label">Rechazados</span>
+    </div>
+  </div>
+</div>
 
-                <!-- 3. Barra de Herramientas -->
-                <div class="ep-toolbar">
-                    <div class="ep-search-box">
-                        <input type="text" class="ep-form-control" placeholder="Buscar proveedor..." id="ep-search-input" style="width: 300px;">
-                        <select class="ep-form-control" id="ep-filter-status">
-                            <option value="all">Todos</option>
-                            <option value="Aprobado">Aprobado</option>
-                            <option value="Pendiente">Pendiente</option>
-                            <option value="Rechazado">Rechazado</option>
-                        </select>
-                    </div>
-                    <div style="display: flex; gap: 0.5rem; align-items: center;">
-                        <button class="ep-btn ep-btn-outline" id="ep-btn-criteria">
-                            <i class="bi bi-bar-chart"></i> Ver Escala
-                        </button>
-                        <button class="ep-btn ep-btn-outline" id="ep-btn-export">
-                            <i class="bi bi-file-earmark-excel"></i> Exportar
-                        </button>
-                        <button class="ep-btn ep-btn-primary" id="ep-btn-new-provider">
-                            <i class="bi bi-plus-lg"></i> Nuevo Proveedor
-                        </button>
-                    </div>
-                </div>
+<!-- 3. Barra de Herramientas -->
+<div class="ep-toolbar">
+<div class="ep-search-box">
+<input type="text" class="ep-form-control" placeholder="Buscar proveedor..." id="ep-search-input" style="width: 300px;">
+<select class="ep-form-control" id="ep-filter-status">
+<option value="all">Todos</option>
+<option value="Aprobado">Aprobado</option>
+<option value="Pendiente">Pendiente</option>
+<option value="Rechazado">Rechazado</option>
+</select>
+</div>
+<div style="display: flex; gap: 0.5rem; align-items: center;">
+<button class="ep-btn ep-btn-outline" id="ep-btn-criteria">
+<i class="bi bi-bar-chart"></i> Ver Escala
+</button>
+<button class="ep-btn ep-btn-outline" id="ep-btn-export">
+<i class="bi bi-file-earmark-excel"></i> Exportar
+</button>
+<button class="ep-btn ep-btn-primary" id="ep-btn-new-provider">
+<i class="bi bi-plus-lg"></i> Nuevo Proveedor
+</button>
+</div>
+</div>
 
-                <!-- 4. Tabla Principal -->
-                <div class="ep-data-table-container">
-                    <table class="ep-data-table">
-                        <thead>
-                            <tr>
-                                <th>Proveedor</th>
-                                <th>Tipo</th>
-                                <th>Objeto</th>
-                                <th>NIT</th>
-                                <th>Fecha</th>
-                                <th>Puntaje</th>
-                                <th>Estado</th>
-                                <th>Evidencias</th>
-                                <th style="text-align: right;">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody id="ep-suppliers-table-body">
-                            <!-- JS rellena esto -->
-                        </tbody>
-                    </table>
-                </div>
+<!-- 4. Tabla Principal -->
+<div class="ep-data-table-container">
+<table class="ep-data-table">
+<thead>
+<tr>
+<th>Proveedor</th>
+<th>Tipo</th>
+<th>Objeto</th>
+<th>NIT</th>
+<th>Fecha</th>
+<th>Puntaje</th>
+<th>Estado</th>
+<th>Evidencias</th>
+<th style="text-align: right;">Acciones</th>
+</tr>
+</thead>
+<tbody id="ep-suppliers-table-body">
+</tbody>
+</table>
+</div>
+</div><!-- fin .ep-content-scroll -->
 
-                <!-- MODAL DE EVALUACIÓN -->
-                <div class="ep-modal-overlay" id="ep-eval-modal">
+<!-- MODAL DE EVALUACIÓN -->
+<div class="ep-modal-overlay" id="ep-eval-modal">
                     <div class="ep-modal-content">
                         <div class="ep-modal-header">
                             <div>
@@ -766,10 +803,14 @@
         /**
          * Inicializa todos los event listeners
          */
-        initEventListeners() {
-            // Botones principales
-            document.getElementById('ep-btn-new-provider').addEventListener('click', () => this.openModal('new'));
-            document.getElementById('ep-btn-criteria').addEventListener('click', () => this.togglePanel());
+ initEventListeners() {
+ // Botones principales
+ document.getElementById('ep-btn-new-provider').addEventListener('click', () => this.openModal('new'));
+ document.getElementById('ep-btn-criteria').addEventListener('click', () => this.togglePanel());
+
+ // Header ghost buttons
+ document.getElementById('ep-btn-new-provider-header').addEventListener('click', () => this.openModal('new'));
+ document.getElementById('ep-btn-export-header').addEventListener('click', () => this.exportToExcel());
             
             // Botón Volver al Módulo Principal
             document.getElementById('ep-btn-back-module').addEventListener('click', () => {
@@ -934,18 +975,15 @@
 
                 console.log('[2.9.1][DETAIL] Mostrando vista de detalle para:', supplier.name);
 
-                // Ocultar elementos de la vista de lista
-                const listView = document.getElementById('ep-suppliers-table-body')?.closest('.ep-data-table-container')?.parentElement;
-                const metricsView = document.querySelector('.ep-metrics-row');
-                const toolbarView = document.querySelector('.ep-toolbar');
-                const headerView = document.querySelector('.ep-module-header');
+ // Ocultar elementos de la vista de lista
+  const contentScroll = this.container.querySelector('.ep-content-scroll');
+  if (contentScroll) contentScroll.style.display = 'none';
 
-                if (listView) listView.style.display = 'none';
-                if (metricsView) metricsView.style.display = 'none';
-                if (toolbarView) toolbarView.style.display = 'none';
-                if (headerView) headerView.style.display = 'none';
+  // Actualizar breadcrumb
+  const breadcrumbActive = this.container.querySelector('#ep-breadcrumb-active');
+  if (breadcrumbActive) breadcrumbActive.textContent = 'Ficha Técnica';
 
-                // Mostrar la vista de detalle
+  // Mostrar la vista de detalle
                 const detailView = document.getElementById('ep-detail-view');
                 if (detailView) {
                     detailView.style.display = 'block';
@@ -1135,19 +1173,16 @@
         /**
          * Vuelve a la vista de lista
          */
-        showListView() {
-            const listView = document.getElementById('ep-suppliers-table-body')?.closest('.ep-data-table-container')?.parentElement;
-            const metricsView = document.querySelector('.ep-metrics-row');
-            const toolbarView = document.querySelector('.ep-toolbar');
-            const headerView = document.querySelector('.ep-module-header');
-            const detailView = document.getElementById('ep-detail-view');
-            
-            if (detailView) detailView.style.display = 'none';
-            if (headerView) headerView.style.display = 'block';
-            if (metricsView) metricsView.style.display = 'grid';
-            if (toolbarView) toolbarView.style.display = 'flex';
-            if (listView) listView.style.display = 'block';
-        }
+ showListView() {
+  const contentScroll = this.container.querySelector('.ep-content-scroll');
+  const detailView = document.getElementById('ep-detail-view');
+
+  if (detailView) detailView.style.display = 'none';
+  if (contentScroll) contentScroll.style.display = 'block';
+
+  const breadcrumbActive = this.container.querySelector('#ep-breadcrumb-active');
+  if (breadcrumbActive) breadcrumbActive.textContent = 'Proveedores';
+ }
 
         /**
          * Actualiza las métricas del dashboard
@@ -1716,12 +1751,19 @@
                         }
                     }, 300);
                 }
-            }, 4000);
-        }
+ }, 4000);
+  }
 
-        /**
-         * Limpieza al destruir el componente
-         */
+  updateHeaderContext() {
+    const companyEl = this.container.querySelector('#ep-header-company');
+    if (companyEl && this.companyName) {
+      companyEl.textContent = this.companyName;
+    }
+  }
+
+  /**
+   * Limpieza al destruir el componente
+   */
         destroy() {
             window.currentEvaluacionProveedoresInstance = null;
             this.suppliersData = [];

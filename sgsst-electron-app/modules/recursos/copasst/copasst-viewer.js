@@ -85,8 +85,7 @@ function setupEventListeners() {
 
 // Configurar eventos de drag & drop
 function setupDragAndDrop() {
-    // Se configura dinámicamente en renderFolders() para cada carpeta
-    console.log('[Drag&Drop] Setup completado - se activará por carpeta');
+  console.log('[Drag&Drop] Setup completado - se activará por carpeta');
 }
 
 // Configurar drag & drop en una carpeta específica
@@ -139,7 +138,7 @@ function setupFolderDragAndDrop(folderElement, folderPath) {
         const files = e.dataTransfer.files;
 
         if (files.length === 0) {
-            showToast('No se detectaron archivos', 'warning');
+            window.KAIRToast.show('No se detectaron archivos', 'warning');
             return;
         }
 
@@ -166,7 +165,7 @@ function handleDragOver(e) {
 async function uploadFile(file, folderPath) {
     try {
         console.log(`[Drag&Drop] Subiendo archivo: ${file.name} a ${folderPath}`);
-        showToast(`Subiendo ${file.name}...`, 'info');
+        window.KAIRToast.show(`Subiendo ${file.name}...`, 'info');
 
         // 1. Convertir file a base64
         const base64Data = await fileToBase64(file);
@@ -175,7 +174,7 @@ async function uploadFile(file, folderPath) {
         const destinationPath = folderPath || currentFolderPath;
 
         if (!destinationPath) {
-            showToast('No hay una carpeta seleccionada', 'error');
+            window.KAIRToast.show('No hay una carpeta seleccionada', 'error');
             return;
         }
 
@@ -187,18 +186,16 @@ async function uploadFile(file, folderPath) {
         });
 
         // 4. Mostrar resultado
-        if (result.success) {
-            showToast(result.message || 'Archivo subido exitosamente', 'success');
-
-            // 5. Recargar lista de archivos
-            await loadDocuments(destinationPath);
+      if (result.success) {
+        window.KAIRToast.show(result.message || 'Archivo subido exitosamente', 'success');
+        await reloadCurrentContent();
         } else {
-            showToast(`Error: ${result.error}`, 'error');
+            window.KAIRToast.show(`Error: ${result.error}`, 'error');
         }
 
     } catch (error) {
         console.error('[Drag&Drop] Error al subir archivo:', error);
-        showToast(`Error al subir archivo: ${error.message}`, 'error');
+        window.KAIRToast.show(`Error al subir archivo: ${error.message}`, 'error');
     }
 }
 
@@ -217,45 +214,70 @@ function fileToBase64(file) {
 // ===============================
 
 let currentContextMenuDoc = null;
+let currentContextMenuFolder = null;
 
 // Mostrar menú contextual
 function showContextMenu(x, y, doc) {
-    const menu = document.getElementById('contextMenu');
-    if (!menu) return;
+  hideFolderContextMenu();
+  const menu = document.getElementById('contextMenu');
+  if (!menu) return;
 
-    currentContextMenuDoc = doc;
+  currentContextMenuDoc = doc;
 
-    // Posicionar menú
-    menu.style.display = 'block';
-    menu.style.left = `${x}px`;
-    menu.style.top = `${y}px`;
+  menu.style.display = 'block';
+  menu.style.left = `${x}px`;
+  menu.style.top = `${y}px`;
 
-    // Ajustar si se sale de la pantalla
-    const rect = menu.getBoundingClientRect();
-    if (rect.right > window.innerWidth) {
-        menu.style.left = `${window.innerWidth - rect.width - 10}px`;
-    }
-    if (rect.bottom > window.innerHeight) {
-        menu.style.top = `${window.innerHeight - rect.height - 10}px`;
-    }
-
-    console.log(`[ContextMenu] Mostrando menú para: ${doc.name}`);
+  const rect = menu.getBoundingClientRect();
+  if (rect.right > window.innerWidth) {
+    menu.style.left = `${window.innerWidth - rect.width - 10}px`;
+  }
+  if (rect.bottom > window.innerHeight) {
+    menu.style.top = `${window.innerHeight - rect.height - 10}px`;
+  }
 }
 
-// Ocultar menú contextual
 function hideContextMenu() {
-    const menu = document.getElementById('contextMenu');
-    if (menu) {
-        menu.style.display = 'none';
-    }
-    currentContextMenuDoc = null;
+  const menu = document.getElementById('contextMenu');
+  if (menu) {
+    menu.style.display = 'none';
+  }
+  currentContextMenuDoc = null;
+}
+
+function showFolderContextMenu(x, y, folder) {
+  hideContextMenu();
+  const menu = document.getElementById('folderContextMenu');
+  if (!menu) return;
+
+  currentContextMenuFolder = folder;
+
+  menu.style.display = 'block';
+  menu.style.left = `${x}px`;
+  menu.style.top = `${y}px`;
+
+  const rect = menu.getBoundingClientRect();
+  if (rect.right > window.innerWidth) {
+    menu.style.left = `${window.innerWidth - rect.width - 10}px`;
+  }
+  if (rect.bottom > window.innerHeight) {
+    menu.style.top = `${window.innerHeight - rect.height - 10}px`;
+  }
+}
+
+function hideFolderContextMenu() {
+  const menu = document.getElementById('folderContextMenu');
+  if (menu) {
+    menu.style.display = 'none';
+  }
+  currentContextMenuFolder = null;
 }
 
 // Eliminar documento
 async function deleteDocument() {
     if (!currentContextMenuDoc) {
         console.error('[ContextMenu] No hay documento seleccionado');
-        showToast('No hay archivo seleccionado', 'error');
+        window.KAIRToast.show('No hay archivo seleccionado', 'error');
         return;
     }
 
@@ -281,107 +303,212 @@ async function deleteDocument() {
 
             console.log('[ContextMenu] Resultado de eliminar:', result);
 
-            if (result.success) {
-                showToast('Archivo eliminado correctamente', 'success');
-                // Recargar lista de archivos
-                console.log('[ContextMenu] Recargando lista de archivos...');
-                await loadDocuments(currentFolderPath);
+      if (result.success) {
+        window.KAIRToast.show('Archivo eliminado correctamente', 'success');
+        await reloadCurrentContent();
             } else {
                 console.error('[ContextMenu] Error en respuesta:', result.error);
 
                 // Manejo específico para error EPERM (archivo en uso)
-                if (result.code === 'EPERM') {
-                    showToast(
-                        '⚠️ El archivo está abierto en otra aplicación.<br><strong>CIérralo e intenta nuevamente.</strong>',
-                        'warning',
-                        6000
-                    );
+if (result.code === 'EPERM') {
+			window.KAIRToast.show(
+				'El archivo está abierto en otra aplicación. Ciérralo e intenta nuevamente.',
+				'warning',
+				{ autoClose: 6000 }
+			);
                 } else if (result.code === 'ENOENT') {
-                    showToast('El archivo no existe. Puede que ya haya sido eliminado.', 'info');
+                    window.KAIRToast.show('El archivo no existe. Puede que ya haya sido eliminado.', 'info');
                 } else if (result.code === 'EACCES') {
-                    showToast('No tienes permisos para eliminar este archivo.', 'error');
+                    window.KAIRToast.show('No tienes permisos para eliminar este archivo.', 'error');
                 } else {
-                    showToast(`Error: ${result.error}`, 'error');
+                    window.KAIRToast.show(`Error: ${result.error}`, 'error');
                 }
             }
         } catch (error) {
             console.error('[ContextMenu] Error al eliminar:', error);
-            showToast(`Error al eliminar archivo: ${error.message}`, 'error');
+            window.KAIRToast.show(`Error al eliminar archivo: ${error.message}`, 'error');
         }
     });
+
+  hideFolderContextMenu();
 }
 
-// Setup de listeners para el menú contextual
+async function deleteFolder() {
+  if (!currentContextMenuFolder) {
+    window.KAIRToast.show('No hay carpeta seleccionada', 'error');
+    return;
+  }
+
+  const folder = currentContextMenuFolder;
+  hideFolderContextMenu();
+
+  const titleEl = document.getElementById('confirmModalTitle');
+  const msgEl = document.getElementById('confirmModalMessage');
+  if (titleEl) titleEl.textContent = '¿Eliminar carpeta?';
+  if (msgEl) msgEl.textContent = 'Se eliminará la carpeta y todo su contenido:';
+
+  showConfirmModal(folder.name, async () => {
+    try {
+      const result = await callParentAPI('delete-folder', { folderPath: folder.path });
+
+      if (result.success) {
+        window.KAIRToast.show('Carpeta eliminada correctamente', 'success');
+        await reloadCurrentContent();
+      } else {
+        if (result.code === 'ENOENT') {
+          window.KAIRToast.show('La carpeta no existe. Puede que ya haya sido eliminada.', 'info');
+          await reloadCurrentContent();
+        } else {
+          window.KAIRToast.show(`Error: ${result.error}`, 'error');
+        }
+      }
+    } catch (error) {
+      window.KAIRToast.show(`Error al eliminar carpeta: ${error.message}`, 'error');
+    }
+
+    if (titleEl) titleEl.textContent = '¿Eliminar?';
+    if (msgEl) msgEl.textContent = 'Estás a punto de eliminar:';
+  });
+}
+
+async function createSubfolder() {
+  if (!currentContextMenuFolder) {
+    window.KAIRToast.show('No hay carpeta seleccionada', 'error');
+    return;
+  }
+
+  const parentFolder = currentContextMenuFolder;
+  hideFolderContextMenu();
+
+  const modal = document.getElementById('newFolderModal');
+  const input = document.getElementById('newFolderNameInput');
+  if (!modal || !input) return;
+
+  input.value = '';
+  modal.style.display = 'flex';
+  setTimeout(() => input.focus(), 100);
+
+  const doCreate = async () => {
+    const folderName = input.value.trim();
+    if (!folderName) {
+      window.KAIRToast.show('El nombre no puede estar vacío', 'warning');
+      return;
+    }
+
+    modal.style.display = 'none';
+    cleanup();
+
+    try {
+      const result = await callParentAPI('create-folder', {
+        parentPath: parentFolder.path,
+        folderName: folderName
+      });
+
+      if (result.success) {
+        window.KAIRToast.show(`Carpeta "${folderName}" creada`, 'success');
+        await reloadCurrentContent();
+      } else {
+        window.KAIRToast.show(`Error: ${result.error}`, 'error');
+      }
+    } catch (error) {
+      window.KAIRToast.show(`Error al crear carpeta: ${error.message}`, 'error');
+    }
+  };
+
+  const doCancel = () => {
+    modal.style.display = 'none';
+    cleanup();
+  };
+
+  const onKeydown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      doCreate();
+    } else if (e.key === 'Escape') {
+      doCancel();
+    }
+  };
+
+  const onOverlayClick = (e) => {
+    if (e.target === modal) doCancel();
+  };
+
+  const cleanup = () => {
+    input.removeEventListener('keydown', onKeydown);
+    modal.removeEventListener('click', onOverlayClick);
+    document.getElementById('newFolderAcceptBtn').removeEventListener('click', doCreate);
+    document.getElementById('newFolderCancelBtn').removeEventListener('click', doCancel);
+  };
+
+  input.addEventListener('keydown', onKeydown);
+  modal.addEventListener('click', onOverlayClick);
+  document.getElementById('newFolderAcceptBtn').addEventListener('click', doCreate);
+  document.getElementById('newFolderCancelBtn').addEventListener('click', doCancel);
+}
+
+async function reloadCurrentContent() {
+  if (pathHistory.length === 0) {
+    await loadFolders();
+  } else {
+    try {
+      const result = await callParentAPI('get-documents-in-folder', currentFolderPath);
+      renderContent(result.folders || [], result.files || []);
+    } catch (error) {
+      window.KAIRToast.show(`Error al recargar: ${error.message}`, 'error');
+    }
+  }
+}
 function setupContextMenu() {
-    // Cerrar menú al hacer clic en cualquier parte
-    document.addEventListener('click', () => {
-        hideContextMenu();
-    });
+  document.addEventListener('click', () => {
+    hideContextMenu();
+    hideFolderContextMenu();
+  });
 
-    // Cerrar menú al presionar Escape
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            hideContextMenu();
-        }
-    });
-
-    // Setup del modal de confirmación
-    setupConfirmModal();
-
-    // Listener para el botón eliminar
-    const deleteBtn = document.getElementById('deleteFileBtn');
-    if (deleteBtn) {
-        deleteBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // Evitar que se cierre inmediatamente
-            deleteDocument();
-        });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      hideContextMenu();
+      hideFolderContextMenu();
     }
+  });
 
-    // Listener para el botón abrir archivo
-    const openBtn = document.getElementById('openFileBtn');
-    if (openBtn) {
-        openBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            openFile();
-        });
-    }
+  setupConfirmModal();
+
+  const deleteBtn = document.getElementById('deleteFileBtn');
+  if (deleteBtn) {
+    deleteBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteDocument();
+    });
+  }
+
+  const openBtn = document.getElementById('openFileBtn');
+  if (openBtn) {
+    openBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openFile();
+    });
+  }
+
+  const newSubfolderBtn = document.getElementById('newSubfolderBtn');
+  if (newSubfolderBtn) {
+    newSubfolderBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      createSubfolder();
+    });
+  }
+
+  const deleteFolderBtn = document.getElementById('deleteFolderBtn');
+  if (deleteFolderBtn) {
+    deleteFolderBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteFolder();
+    });
+  }
 }
 
 // ===============================
-// TOAST NOTIFICATIONS (K+AIR Modern Style)
+// TOAST NOTIFICATIONS: Usar window.KAIRToast global (assets/js/kair-toast.js)
 // ===============================
-
-function showToast(message, type = 'info', duration = 3000) {
-    const container = document.getElementById('kToastContainer');
-    if (!container) {
-        console.error('[Toast] Contenedor no encontrado');
-        return;
-    }
-
-    // Iconos por tipo
-    const icons = {
-        success: 'fa-check-circle',
-        error: 'fa-times-circle',
-        warning: 'fa-exclamation-circle',
-        info: 'fa-info-circle'
-    };
-
-    // Crear toast
-    const toast = document.createElement('div');
-    toast.className = `k-toast ${type}`;
-    toast.innerHTML = `
-        <i class="fas ${icons[type] || icons.info} k-toast-icon"></i>
-        <span class="k-toast-message">${message}</span>
-    `;
-
-    container.appendChild(toast);
-
-    // Auto-eliminar después del tiempo especificado
-    setTimeout(() => {
-        toast.classList.add('closing');
-        setTimeout(() => toast.remove(), 300);
-    }, duration);
-}
 
 // ===============================
 // CONFIRM MODAL (K+AIR Modern)
@@ -467,7 +594,7 @@ function setupConfirmModal() {
 async function openFile() {
     if (!currentContextMenuDoc) {
         console.error('[ContextMenu] No hay documento seleccionado');
-        showToast('No hay archivo seleccionado', 'error');
+        window.KAIRToast.show('No hay archivo seleccionado', 'error');
         return;
     }
 
@@ -481,179 +608,158 @@ async function openFile() {
         });
 
         if (!result.success) {
-            showToast(`Error al abrir archivo: ${result.error}`, 'error');
+            window.KAIRToast.show(`Error al abrir archivo: ${result.error}`, 'error');
         }
     } catch (error) {
         console.error('[ContextMenu] Error al abrir:', error);
-        showToast(`Error al abrir archivo: ${error.message}`, 'error');
+        window.KAIRToast.show(`Error al abrir archivo: ${error.message}`, 'error');
     }
 
     hideContextMenu();
 }
 
-// Cargar carpetas
 async function loadFolders() {
-    console.log('VIEWER: Iniciando loadFolders...');
-    showLoading();
+  showLoading();
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const companyName = urlParams.get('company');
-    const moduleName = urlParams.get('module');
-    const submoduleName = urlParams.get('submodule');
+  const urlParams = new URLSearchParams(window.location.search);
+  const companyName = urlParams.get('company');
+  const moduleName = urlParams.get('module');
+  const submoduleName = urlParams.get('submodule');
 
-    if (!companyName || !moduleName || !submoduleName) {
-        showNotification('Faltan parámetros en la URL', 'error');
-        hideLoading();
-        return;
-    }
+  if (!companyName || !moduleName || !submoduleName) {
+    window.KAIRToast.show('Faltan parámetros en la URL', 'error');
+    hideLoading();
+    return;
+  }
 
-    try {
-        const result = await callParentAPI('get-document-folders', { companyName, moduleName, submoduleName });
-        currentFolderPath = result.basePath; 
-        pathHistory = []; 
-        
-        updateNavigationState();
-        
-        renderFolders(result.folders);
-        renderDocuments(result.files); 
-    } catch (error) {
-        showNotification(`Error al cargar contenido: ${error.message}`, 'error');
-    } finally {
-        hideLoading();
-    }
+  try {
+    const result = await callParentAPI('get-document-folders', { companyName, moduleName, submoduleName });
+    currentFolderPath = result.basePath || result.path;
+    pathHistory = [];
+
+    updateNavigationState();
+    renderContent(result.folders || [], result.files || []);
+  } catch (error) {
+    window.KAIRToast.show(`Error al cargar contenido: ${error.message}`, 'error');
+  } finally {
+    hideLoading();
+  }
 }
 
-// Renderizar carpetas
-function renderFolders(folders) {
-    const folderList = document.getElementById('folderList');
-    folderList.innerHTML = '';
+function renderContent(folders, documents) {
+  const contentList = document.getElementById('contentList');
+  contentList.innerHTML = '';
 
-    if (!folders || folders.length === 0) {
-        folderList.innerHTML = '<div style="padding:1rem; color:#999; font-size:0.85rem;">No hay carpetas.</div>';
-        return;
-    }
+  const hasFolders = folders && folders.length > 0;
+  const hasDocuments = documents && documents.length > 0;
 
+  if (!hasFolders && !hasDocuments) {
+    contentList.innerHTML = '<div style="padding:1rem; color:#999; font-size:0.85rem;">Carpeta vacía.</div>';
+    return;
+  }
+
+  if (hasFolders) {
     folders.forEach(folder => {
-        const folderItem = document.createElement('div');
-        folderItem.className = 'list-item folder'; // Agregar clase 'folder' para drag & drop
-        folderItem.dataset.path = folder.path;
+      const folderItem = document.createElement('div');
+      folderItem.className = 'list-item folder';
+      folderItem.dataset.path = folder.path;
 
-        const iconDiv = document.createElement('div');
-        iconDiv.className = 'item-icon folder';
-        iconDiv.innerHTML = '<i class="fas fa-folder"></i>';
+      const iconDiv = document.createElement('div');
+      iconDiv.className = 'item-icon folder';
+      iconDiv.innerHTML = '<i class="fas fa-folder"></i>';
 
-        const infoDiv = document.createElement('div');
-        infoDiv.className = 'item-info';
+      const infoDiv = document.createElement('div');
+      infoDiv.className = 'item-info';
 
-        const nameDiv = document.createElement('div');
-        nameDiv.className = 'item-name';
-        nameDiv.textContent = folder.name;
+      const nameDiv = document.createElement('div');
+      nameDiv.className = 'item-name';
+      nameDiv.textContent = folder.name;
 
-        infoDiv.appendChild(nameDiv);
-        folderItem.appendChild(iconDiv);
-        folderItem.appendChild(infoDiv);
+      infoDiv.appendChild(nameDiv);
+      folderItem.appendChild(iconDiv);
+      folderItem.appendChild(infoDiv);
 
-        folderItem.addEventListener('click', () => {
-            selectFolder(folder.path);
-        });
+      folderItem.addEventListener('click', () => {
+        selectFolder(folder.path);
+      });
 
-        // Configurar drag & drop para esta carpeta específica
-        setupFolderDragAndDrop(folderItem, folder.path);
+      folderItem.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        showFolderContextMenu(e.clientX, e.clientY, folder);
+      });
 
-        folderList.appendChild(folderItem);
+      setupFolderDragAndDrop(folderItem, folder.path);
+
+      contentList.appendChild(folderItem);
     });
-}
+  }
 
-// Seleccionar carpeta
-async function selectFolder(path) {
-    try {
-        if (currentFolderPath !== path) {
-            pathHistory.push(currentFolderPath);
-        }
+  if (hasFolders && hasDocuments) {
+    const separator = document.createElement('div');
+    separator.className = 'content-separator';
+    separator.textContent = 'Documentos';
+    contentList.appendChild(separator);
+  }
 
-        currentFolderPath = path;
-
-        document.querySelectorAll('.list-item').forEach(item => {
-            item.classList.remove('active');
-        });
-
-        const selectedItem = document.querySelector(`[data-path="${path}"]`);
-        if (selectedItem) {
-            selectedItem.classList.add('active');
-        }
-
-        await loadDocuments(path);
-        updateNavigationState();
-
-    } catch (error) {
-        showNotification('Error al seleccionar carpeta', 'error');
-    }
-}
-
-// Cargar documentos
-async function loadDocuments(folderPath) {
-    try {
-        const result = await callParentAPI('get-documents-in-folder', folderPath);
-        renderDocuments(result.files); 
-    } catch (error) {
-        showNotification(`Error al cargar documentos: ${error.message}`, 'error');
-    }
-}
-
-// Renderizar documentos
-function renderDocuments(documents) {
-    const documentList = document.getElementById('fileList');
-    const docCount = document.getElementById('docCount');
-
-    documentList.innerHTML = '';
-
-    if (!documents || documents.length === 0) {
-        documentList.innerHTML = '<div style="padding:1rem; color:#999; font-size:0.85rem;">Carpeta vacía.</div>';
-        if(docCount) docCount.innerText = '0';
-        return;
-    }
-
-    if(docCount) docCount.innerText = documents.length;
-
+  if (hasDocuments) {
     documents.forEach(doc => {
-        const docItem = document.createElement('div');
-        docItem.className = 'list-item';
-        docItem.dataset.path = doc.path;
+      const docItem = document.createElement('div');
+      docItem.className = 'list-item';
+      docItem.dataset.path = doc.path;
 
-        const fileTypeInfo = getFileTypeInfo(doc.extension);
+      const fileTypeInfo = getFileTypeInfo(doc.extension);
 
-        const iconDiv = document.createElement('div');
-        iconDiv.className = `item-icon ${fileTypeInfo.className}`;
-        iconDiv.innerHTML = `<i class="fas ${fileTypeInfo.icon}"></i>`;
+      const iconDiv = document.createElement('div');
+      iconDiv.className = `item-icon ${fileTypeInfo.className}`;
+      iconDiv.innerHTML = `<i class="fas ${fileTypeInfo.icon}"></i>`;
 
-        const infoDiv = document.createElement('div');
-        infoDiv.className = 'item-info';
+      const infoDiv = document.createElement('div');
+      infoDiv.className = 'item-info';
 
-        const nameDiv = document.createElement('div');
-        nameDiv.className = 'item-name';
-        nameDiv.textContent = doc.name;
+      const nameDiv = document.createElement('div');
+      nameDiv.className = 'item-name';
+      nameDiv.textContent = doc.name;
 
-        const metaDiv = document.createElement('div');
-        metaDiv.className = 'item-meta';
-        metaDiv.innerHTML = `<span class="badge-type">${doc.extension.toUpperCase()}</span>`;
+      const metaDiv = document.createElement('div');
+      metaDiv.className = 'item-meta';
+      metaDiv.innerHTML = `<span class="badge-type">${doc.extension.toUpperCase()}</span>`;
 
-        infoDiv.appendChild(nameDiv);
-        infoDiv.appendChild(metaDiv);
-        docItem.appendChild(iconDiv);
-        docItem.appendChild(infoDiv);
+      infoDiv.appendChild(nameDiv);
+      infoDiv.appendChild(metaDiv);
+      docItem.appendChild(iconDiv);
+      docItem.appendChild(infoDiv);
 
-        docItem.addEventListener('click', () => {
-            selectDocument(doc);
-        });
+      docItem.addEventListener('click', () => {
+        selectDocument(doc);
+      });
 
-        // Agregar evento de clic derecho (context menu)
-        docItem.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            showContextMenu(e.clientX, e.clientY, doc);
-        });
+      docItem.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        showContextMenu(e.clientX, e.clientY, doc);
+      });
 
-        documentList.appendChild(docItem);
+      contentList.appendChild(docItem);
     });
+  }
+}
+
+async function selectFolder(folderPath) {
+  try {
+    if (currentFolderPath !== folderPath) {
+      pathHistory.push(currentFolderPath);
+    }
+
+    currentFolderPath = folderPath;
+    updateNavigationState();
+
+    showLoading();
+    const result = await callParentAPI('get-documents-in-folder', folderPath);
+    renderContent(result.folders || [], result.files || []);
+  } catch (error) {
+        window.KAIRToast.show('Error al seleccionar carpeta: ' + error.message, 'error');
+  } finally {
+    hideLoading();
+  }
 }
 
 function getFileTypeInfo(extension) {
@@ -701,7 +807,7 @@ async function selectDocument(doc) {
         }
 
     } catch (error) {
-        showNotification('Error al seleccionar documento: ' + error.message, 'error');
+        window.KAIRToast.show('Error al seleccionar documento: ' + error.message, 'error');
         hideLoading();
     }
 }
@@ -817,37 +923,71 @@ function enableDocActions(enable) {
 }
 
 function updateNavigationState() {
-    const backBtn = document.getElementById('goBackBtn');
-    if (backBtn) {
-        backBtn.disabled = pathHistory.length === 0;
-        backBtn.style.opacity = backBtn.disabled ? '0.5' : '1';
-        backBtn.style.cursor = backBtn.disabled ? 'not-allowed' : 'pointer';
-    }
+  const backBtn = document.getElementById('goBackBtn');
+  if (backBtn) {
+    backBtn.disabled = pathHistory.length === 0;
+    backBtn.style.opacity = backBtn.disabled ? '0.5' : '1';
+    backBtn.style.cursor = backBtn.disabled ? 'not-allowed' : 'pointer';
+  }
 
-    const breadcrumb = document.getElementById('breadcrumb');
-    let bcHTML = `<div class="crumb-item" onclick="resetToRoot()"><i class="fas fa-hdd"></i> Raíz</div>`;
-    
-    if (pathHistory.length > 0) {
-        const currentFolderName = currentFolderPath.split('\\').pop().split('/').pop(); 
-        bcHTML += `<div class="crumb-separator"><i class="fas fa-chevron-right"></i></div>`;
-        bcHTML += `<div class="crumb-item">${currentFolderName}</div>`;
-    }
-    
-    breadcrumb.innerHTML = bcHTML;
+  const breadcrumb = document.getElementById('breadcrumb');
+  let bcHTML = `<div class="crumb-item" onclick="resetToRoot()"><i class="fas fa-hdd"></i> Raíz</div>`;
+
+  if (pathHistory.length > 0) {
+    const allPaths = [...pathHistory, currentFolderPath];
+    allPaths.forEach((p, idx) => {
+      const name = p.split('\\').pop().split('/').pop();
+      bcHTML += `<div class="crumb-separator"><i class="fas fa-chevron-right"></i></div>`;
+      if (idx < allPaths.length - 1) {
+        bcHTML += `<div class="crumb-item" onclick="navigateToPathIndex(${idx})">${name}</div>`;
+      } else {
+        bcHTML += `<div class="crumb-item active">${name}</div>`;
+      }
+    });
+  }
+
+  breadcrumb.innerHTML = bcHTML;
+}
+
+async function navigateToPathIndex(targetIdx) {
+  const targetPath = pathHistory[targetIdx];
+  pathHistory = pathHistory.slice(0, targetIdx);
+  currentFolderPath = targetPath;
+  updateNavigationState();
+
+  try {
+    showLoading();
+    const result = await callParentAPI('get-documents-in-folder', targetPath);
+    renderContent(result.folders || [], result.files || []);
+  } catch (error) {
+    window.KAIRToast.show('Error al navegar', 'error');
+  } finally {
+    hideLoading();
+  }
 }
 
 async function resetToRoot() {
-    if (pathHistory.length > 0) {
-        loadFolders(); 
-    }
+  if (pathHistory.length > 0) {
+    loadFolders();
+  }
 }
 
 async function goUpLevel() {
-    if (pathHistory.length > 0) {
-        const previousPath = pathHistory.pop();
-        await selectFolder(previousPath);
-        updateNavigationState();
+  if (pathHistory.length > 0) {
+    const previousPath = pathHistory.pop();
+    currentFolderPath = previousPath;
+    updateNavigationState();
+
+    try {
+      showLoading();
+      const result = await callParentAPI('get-documents-in-folder', previousPath);
+      renderContent(result.folders || [], result.files || []);
+    } catch (error) {
+      window.KAIRToast.show('Error al retroceder', 'error');
+    } finally {
+      hideLoading();
     }
+  }
 }
 
 // Utilidades
@@ -861,31 +1001,13 @@ function hideLoading() {
     if(overlay) overlay.classList.remove('active');
 }
 
-function showNotification(message, type = 'success') {
-    const notification = document.getElementById('notification');
-    const messageDiv = notification.querySelector('.notification-message');
-    const icon = notification.querySelector('.notification-icon');
+// NOTIFICATION: Usar window.KAIRToast global (assets/js/kair-toast.js)
 
-    messageDiv.textContent = message;
-    notification.className = `notification ${type}`;
-    
-    let iconClass = 'fa-info-circle';
-    if(type === 'success') iconClass = 'fa-check-circle';
-    if(type === 'error') iconClass = 'fa-times-circle';
-    if(type === 'warning') iconClass = 'fa-exclamation-triangle';
-    
-    icon.className = `notification-icon fas ${iconClass}`;
-
-    notification.classList.add('show');
-    setTimeout(() => {
-        notification.classList.remove('show');
-    }, 3000);
-}
 
 async function downloadDocument() {
     if (currentDocument) {
         try {
-            showNotification('Preparando descarga...', 'info');
+            window.KAIRToast.show('Preparando descarga...', 'info');
             const result = await callParentAPI('download-document', currentDocument.path);
 
             if (result.success) {
@@ -907,12 +1029,12 @@ async function downloadDocument() {
                 document.body.removeChild(link);
                 URL.revokeObjectURL(url);
 
-                showNotification('Descarga completada', 'success');
+                window.KAIRToast.show('Descarga completada', 'success');
             } else {
-                showNotification(`Error: ${result.error}`, 'error');
+                window.KAIRToast.show(`Error: ${result.error}`, 'error');
             }
         } catch (error) {
-            showNotification(`Error: ${error.message}`, 'error');
+            window.KAIRToast.show(`Error: ${error.message}`, 'error');
         }
     }
 }
@@ -930,7 +1052,7 @@ function printDocument() {
 
 async function printConvertedDocument(filePath, extension) {
     try {
-        showNotification('Preparando impresión...', 'info');
+        window.KAIRToast.show('Preparando impresión...', 'info');
         let result = await callParentAPI('get-pdf-preview', { filePath: filePath }); 
         
         const ext = extension.toLowerCase();
@@ -952,7 +1074,7 @@ async function printConvertedDocument(filePath, extension) {
             printWindow.document.close();
         }
     } catch (error) {
-        showNotification('Error al imprimir', 'error');
+        window.KAIRToast.show('Error al imprimir', 'error');
     }
 }
 

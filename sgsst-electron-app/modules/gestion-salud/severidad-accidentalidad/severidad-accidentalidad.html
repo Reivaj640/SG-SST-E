@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>K+AIR - Severidad de la Accidentalidad</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="severidad-accidentalidad.css">
+</head>
+<body>
+
+<div class="severidad-container">
+
+  <!-- ============================================================ -->
+  <!-- HEADER — Card Pattern (k-section-card)                      -->
+  <!-- ============================================================ -->
+  <div class="k-section-card" style="padding:0; margin-bottom:1rem;">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
+      <div style="display:flex; align-items:center; gap:0.75rem;">
+        <i class="fas fa-heartbeat" style="color:#174ea6; font-size:1.25rem;"></i>
+        <div>
+          <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Severidad de la Accidentalidad</h3>
+          <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Gestión de la Salud — 3.3.2 Severidad</p>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:0.75rem;">
+        <span class="k-section-card__company">
+          <i class="bi bi-building"></i>
+          <span id="header-company-text">—</span>
+        </span>
+        <div class="k-section-card__divider"></div>
+        <label style="font-size:0.75rem;color:#64748B;margin-right:4px;">Año:</label>
+        <select id="yearFilter" style="font-size:0.8rem;padding:2px 6px;border:1px solid #dee2e6;border-radius:4px;background:#ffffff;color:#212529;cursor:pointer;"></select>
+        <button id="btnCloneYear" title="Clonar a año siguiente" style="background:none;border:1px solid #dee2e6;border-radius:4px;padding:2px 8px;cursor:pointer;color:#5a6378;font-size:0.8rem;">
+          <i class="bi bi-copy"></i>
+        </button>
+        <div class="k-section-card__divider"></div>
+        <button class="header-action--ghost" id="btnRefrescar" title="Refrescar datos">
+          <i class="bi bi-arrow-clockwise"></i> Refrescar
+        </button>
+        <button class="header-back-btn" id="btnVolver" title="Volver a Gestión de la Salud">
+          <i class="fas fa-arrow-left"></i> Volver
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <main class="kair-container" id="app">
+    <div class="k-main-content">
+
+    <!-- ==================== SYNC BAR ==================== -->
+    <div class="kair-sync-bar">
+      <span class="kair-badge">
+        <span class="kair-dot"></span>
+        Vinculado a Excel de origen
+      </span>
+<span class="kair-sync-info">
+      Los cambios se guardan directamente en <span id="syncFileName">—</span>
+      </span>
+    </div>
+
+    <!-- ==================== KPIs ==================== -->
+    <section class="kair-kpis" id="kpiSection">
+      <div class="kair-kpi">
+        <div class="kair-kpi-label">Índice Severidad Prom.</div>
+        <div class="kair-kpi-value primary" id="kpiIS">-</div>
+        <div class="kair-kpi-sub">Meta: <span id="kpiMeta">-</span></div>
+      </div>
+      <div class="kair-kpi">
+        <div class="kair-kpi-label">Días Perdidos Total</div>
+        <div class="kair-kpi-value warning" id="kpiDias">-</div>
+        <div class="kair-kpi-sub">Acumulado <span id="kpiYearLabel">2024</span></div>
+      </div>
+      <div class="kair-kpi">
+        <div class="kair-kpi-label">Trab. Promedio</div>
+        <div class="kair-kpi-value primary" id="kpiTrab">-</div>
+        <div class="kair-kpi-sub">Personal tempo.</div>
+      </div>
+      <div class="kair-kpi">
+        <div class="kair-kpi-label">Meses Exceden</div>
+        <div class="kair-kpi-value danger" id="kpiExceden">-</div>
+        <div class="kair-kpi-sub">Sobre meta</div>
+      </div>
+      <div class="kair-kpi">
+        <div class="kair-kpi-label">Mes Peor</div>
+        <div class="kair-kpi-value danger" id="kpiMesPeor">-</div>
+        <div class="kair-kpi-sub">Índice más alto</div>
+      </div>
+      <div class="kair-kpi">
+        <div class="kair-kpi-label">Meses sin AT</div>
+        <div class="kair-kpi-value success" id="kpiSinAT">-</div>
+        <div class="kair-kpi-sub">Cero accidentes</div>
+      </div>
+    </section>
+
+    <!-- ==================== TARGET CARD ==================== -->
+    <div class="kair-target-card" id="targetCard">
+      <div class="kair-target-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#174ea6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+      </div>
+      <div class="kair-target-info">
+        <div class="kair-target-label">Meta del Indicador (Índice de Severidad)</div>
+        <div class="kair-target-value" id="targetValue">0</div>
+      </div>
+      <div class="kair-target-badge" id="targetBadge">
+        Promedio: 0
+      </div>
+    </div>
+
+    <!-- ==================== CHART ==================== -->
+    <div class="kair-card">
+      <div class="kair-card-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="20" x2="18" y2="10"></line>
+          <line x1="12" y1="20" x2="12" y2="4"></line>
+          <line x1="6" y1="20" x2="6" y2="14"></line>
+        </svg>
+        Índice de Severidad Mensual
+        <span class="kair-badge" style="font-size: 0.65rem; padding: 2px 8px;">EXCEL ORIGEN</span>
+      </div>
+      <div class="kair-chart-container" id="chartContainer">
+        <div class="kair-loading">
+          <div class="kair-spinner"></div>
+          <p class="kair-loading-text">Cargando gráfico...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TABLE ==================== -->
+    <div class="kair-card">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+        <div class="kair-card-title">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+          </svg>
+          Tabla de Severidad - Editable
+        </div>
+        <span style="font-size: 0.8rem; color: var(--kair-text-sec);">
+          Clic en un valor para editar
+        </span>
+      </div>
+      <div class="kair-table-wrap">
+        <table class="kair-table" id="tablaSeveridad">
+          <thead>
+            <tr>
+              <th>Mes</th>
+              <th>Días Incapacidad</th>
+              <th>Días Cargados</th>
+              <th>Trabajadores</th>
+              <th>Índice Severidad</th>
+              <th>Meta</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="tablaBody"></tbody>
+          <tfoot id="tablaFoot"></tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- ==================== MONTH CARDS GRID ==================== -->
+    <h3 class="kair-section-title">Detalle por Mes</h3>
+    <div class="kair-month-cards-grid" id="monthCards">
+      <!-- Se llena dinámicamente -->
+    </div>
+
+    <!-- ==================== REFERENCE ==================== -->
+    <div class="kair-card kair-ref-card">
+      <div class="kair-ref-title">Referencia del Indicador</div>
+      <div class="kair-ref-grid">
+        <div><strong>Tipo:</strong> <span id="refType">RESULTADO</span></div>
+        <div><strong>Fórmula:</strong> <span id="refFormula">(Días Incap. + Días Cargados) / Trabajadores × 100</span></div>
+        <div><strong>Frecuencia:</strong> <span id="refFreq">MENSUAL</span></div>
+        <div><strong>Meta:</strong> <span id="refTarget">0</span></div>
+      </div>
+      <div class="kair-ref-calc">
+        <strong>Cálculo:</strong> Índice de Severidad = (Días Incapacidad + Días Cargados) / Trabajadores × 100
+      </div>
+    </div>
+
+    <!-- ==================== METHODOLOGY ==================== -->
+    <div class="kair-card">
+      <div class="kair-card-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+        </svg>
+        Metodología de Cálculo
+      </div>
+      <div class="kair-methodology">
+        <p><strong>Índice de Severidad (IS):</strong></p>
+        <p class="kair-method-formula">
+          IS = (Días Incapacidad + Días Cargados) / Trabajadores × 100
+        </p>
+        <p style="font-size: 0.8rem; color: var(--kair-text-sec); margin-top: 0.5rem;">
+          Resultado por cada 100 trabajadores (Resolución 0312 de 2019)
+        </p>
+        <p style="margin-top: 1rem;"><strong>Días Cargados (NTC 3701):</strong></p>
+        <p style="font-size: 0.8rem; color: var(--kair-text-sec); margin-top: 0.5rem;">
+          Muerte: 6,000 | Incapacidad Total Permanente: 6,000 | PCL Parcial: 6,000 × %PCL
+        </p>
+        <p style="margin-top: 1rem;"><strong>Flujo de datos bidireccional:</strong></p>
+        <p class="kair-method-formula">
+          Excel de origen (<span id="methodFileName">—</span>) ↔ Interfaz K+AIR - Sincronización directa
+        </p>
+        <p style="font-size: 0.8rem; color: var(--kair-text-sec); margin-top: 1rem;">
+          <strong>Fuentes:</strong> <span id="methodSources">—</span>. Resolución 0312 de 2019. NTC 3701.
+        </p>
+      </div>
+    </div>
+
+    </div>
+
+  </main>
+
+  <!-- ==================== TOAST CONTAINER ==================== -->
+  <div id="toastContainer"></div>
+
+</div>
+
+</body>
+</html>

@@ -27,13 +27,10 @@ Este directorio contiene guías para comenzar con K+AIR rápidamente.
 
 ---
 
-### [troubleshooting.md](troubleshooting.md) - ⚠️ POR CREAR
-**Contenido planeado:**
-- Problemas comunes de instalación
-- Errores de Python
-- Problemas de CDN/recursos
-- Errores de mapeo de directorios
-- FAQs
+### Solución de Problemas
+
+Para problemas comunes (instalación, Python, CDN, mapeo), consulta la
+**[sección 5 de instalacion-configuracion.md](../03-guias/instalacion-configuracion.md#5-solución-de-problemas)**.
 
 ---
 
@@ -45,4 +42,4 @@ Este directorio contiene guías para comenzar con K+AIR rápidamente.
 
 ---
 
-**Última actualización:** 19 de marzo de 2026
+**Última actualización:** 9 de junio de 2026

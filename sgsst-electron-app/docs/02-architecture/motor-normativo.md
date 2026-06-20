@@ -1,8 +1,8 @@
 # ⚖️ Motor Normativo K+AIR
 
-**Versión:** 1.0  
-**Actualizado:** 6 de marzo de 2026  
-**Estado:** ✅ Actualizado
+**Versión:** 1.1
+**Actualizado:** 9 de junio de 2026
+**Estado:** ✅ Actualizado v0.1.99
 
 ---
 
@@ -476,5 +476,5 @@ async function actualizarEscenarioEmpresa(empresa, nuevosDatos) {
 ---
 
 **Mantenido por:** Product Architect & Full-Stack Team  
-**Última actualización:** 6 de marzo de 2026  
-**Versión:** 0.1.70
+**Última actualización:** 9 de junio de 2026
+**Versión:** 0.1.99

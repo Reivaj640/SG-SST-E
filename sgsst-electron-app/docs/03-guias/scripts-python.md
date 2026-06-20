@@ -1,5 +1,9 @@
 # Scripts Python - Portear/src
 
+**Versión:** 1.0
+**Actualizado:** 9 de junio de 2026
+**Estado:** ✅ Actualizado v0.1.99
+
 ## Descripción General
 
 El directorio `Portear/src/` contiene todos los scripts Python utilizados por la aplicación K+AIR para procesamiento de documentos, generación de informes, y el servidor de inteligencia artificial.

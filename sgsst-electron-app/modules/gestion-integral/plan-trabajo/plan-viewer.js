@@ -17,6 +17,8 @@ let periodsData = {};
 let availableFilesMap = {}; // Mapa de { año: nombreArchivo }
 let currentCompany = null;
 let currentSubmodulePath = null;
+let _isSaving = false; // Guardia de concurrencia para evitar race conditions en guardado
+let _saveRetryTimer = null; // Timer para reintentar guardado cuando hay concurrencia
 
 // --- START: Refactored Communication Logic ---
 
@@ -165,7 +167,7 @@ async function findExcelFilesInDirectory(dirPath) {
             if (result.files && Array.isArray(result.files)) {
                 result.files.forEach(item => {
                     const ext = item.name.substring(item.name.lastIndexOf('.')).toLowerCase();
-                    if (excelExtensions.includes(ext)) {
+                    if (excelExtensions.includes(ext) && !item.name.startsWith('~$')) {
                         excelFiles.push({ name: item.name, path: item.path });
                     }
                 });
@@ -230,7 +232,14 @@ async function loadSpecificYearFile(fileName) {
             const result = await callParentAPI('read-excel-file', { filePath: filePathResult.path });
             if (result.success) {
                 const processedData = await processExcelData(result.data);
-                periodsData = processedData;
+                periodsData[currentPeriod] = processedData[currentPeriod] || [];
+                Object.keys(processedData).forEach(y => {
+                    if (y !== currentPeriod) {
+                        if (!periodsData[y] || periodsData[y].length === 0) {
+                            periodsData[y] = processedData[y];
+                        }
+                    }
+                });
                 renderTree();
                 renderGantt();
                 updateKPIs();
@@ -252,16 +261,18 @@ async function processExcelData(excelBuffer) {
                 period: currentPeriod
             });
 
-            if (result.success) {
-                const processedData = {};
-                // Asegurarnos de que el año seleccionado tenga datos, aunque los otros vengan vacíos
-                processedData[currentPeriod] = result.data[currentPeriod] || [];
-                // Preservar otros años si existieran en el objeto result.data
-                Object.keys(result.data).forEach(y => {
-                    if (!processedData[y]) processedData[y] = result.data[y];
-                });
-                return processedData;
-            }
+        if (result.success) {
+            const processedData = {};
+            processedData[currentPeriod] = result.data[currentPeriod] || [];
+            Object.keys(result.data).forEach(y => {
+                if (y !== currentPeriod && result.data[y] && result.data[y].length > 0) {
+                    if (!periodsData[y] || periodsData[y].length === 0) {
+                        processedData[y] = result.data[y];
+                    }
+                }
+            });
+            return processedData;
+        }
         }
         return { [currentPeriod]: [] };
     } catch (error) {
@@ -380,32 +391,53 @@ async function selectPeriod(year) {
 
 // Cargar un archivo específico seleccionado por el usuario
 async function loadSpecificYearFile(fileName) {
-    showLoading();
-    try {
-        const filePathResult = await callParentAPI('get-file-path', {
-            directory: currentSubmodulePath,
-            fileName: fileName
-        });
+  showLoading();
+  try {
+    const filePathResult = await callParentAPI('get-file-path', {
+      directory: currentSubmodulePath,
+      fileName: fileName
+    });
 
-        if (filePathResult.success) {
-            const result = await callParentAPI('read-excel-file', { filePath: filePathResult.path });
-            if (result.success) {
-                const processedData = await processExcelData(result.data);
-                periodsData = processedData;
-                renderTree();
-                renderGantt();
-                updateKPIs();
-            }
+      if (filePathResult.success) {
+        // Auto-repair B:C merge corruption BEFORE reading data
+        // This prevents displaying corrupted activity names
+        const repairResult = await callParentAPI('repair-plan-trabajo-excel', {
+          filePath: filePathResult.path
+        });
+        if (repairResult.success && (repairResult.unmergedCount > 0 || repairResult.restoredCount > 0)) {
+          console.log(`[loadSpecificYearFile] Auto-repair: ${repairResult.unmergedCount} merges removed, ${repairResult.restoredCount} values restored`);
         }
-    } catch (error) {
-        console.error('Error al cargar el archivo del año:', error);
-    } finally {
-        hideLoading();
-    }
+
+        const result = await callParentAPI('read-excel-file', { filePath: filePathResult.path });
+        if (result.success) {
+          const processedData = await processExcelData(result.data);
+          periodsData[currentPeriod] = processedData[currentPeriod] || [];
+          Object.keys(processedData).forEach(y => {
+            if (y !== currentPeriod) {
+              if (!periodsData[y] || periodsData[y].length === 0) {
+                periodsData[y] = processedData[y];
+              }
+            }
+          });
+
+          renderTree();
+          renderGantt();
+          updateKPIs();
+        }
+      }
+  } catch (error) {
+    console.error('Error al cargar el archivo del año:', error);
+  } finally {
+    hideLoading();
+  }
 }
 
 function showPeriodSelector() {
-    document.getElementById('periodSelector').style.display = 'flex';
+  document.getElementById('periodSelector').style.display = 'flex';
+}
+
+function hidePeriodSelector() {
+  document.getElementById('periodSelector').style.display = 'none';
 }
 
 async function clonePeriod() {
@@ -670,51 +702,117 @@ function selectActivity(id) {
         </button>
     `;
 
-    // Agregar evento para guardar cambios en responsable
-    document.getElementById('responsibleSelect').addEventListener('change', function() {
-        activity.responsible = this.value;
-    });
+	// Agregar evento para guardar cambios en responsable
+	document.getElementById('responsibleSelect').addEventListener('change', async function() {
+		activity.responsible = this.value;
+		await savePlanTrabajoToExcel();
+	});
 
-    // Agregar evento para guardar observaciones
-    document.getElementById('observationsText').addEventListener('blur', function() {
-        activity.observations = this.value;
-    });
+	// Agregar evento para guardar observaciones
+	document.getElementById('observationsText').addEventListener('blur', async function() {
+		activity.observations = this.value;
+		await savePlanTrabajoToExcel();
+	});
 }
 
-async function toggleMonthStatus(actId, monthIdx) {
-    const idx = periodsData[currentPeriod].findIndex(i => i.id === actId);
-    if(idx === -1) return;
-
-    const currentVal = periodsData[currentPeriod][idx].months[monthIdx];
-    let newVal = '';
-    if(currentVal === '') newVal = 'P';
-    else if(currentVal === 'P') newVal = 'C';
-    else newVal = '';
-
-    periodsData[currentPeriod][idx].months[monthIdx] = newVal;
-
-    // GUARDAR CAMBIOS EN EL ARCHIVO EXCEL
+async function savePlanTrabajoToExcel() {
+    if (_isSaving) {
+        console.warn('[savePlanTrabajoToExcel] Guardado en progreso, reintentando en 300ms');
+        if (_saveRetryTimer) clearTimeout(_saveRetryTimer);
+        return new Promise((resolve) => {
+            _saveRetryTimer = setTimeout(async () => {
+                const result = await savePlanTrabajoToExcel();
+                resolve(result);
+            }, 300);
+        });
+    }
+    _isSaving = true;
     try {
-        console.log('[toggleMonthStatus] Guardando cambios en Excel...');
-
         const result = await callParentAPI('update-plan-trabajo-excel', {
             filePath: `${currentSubmodulePath}/GI-FO-045 PLAN DE TRABAJO ANUAL ${currentPeriod} SST.xlsx`,
             periodsData: periodsData,
             period: currentPeriod
         });
-
-        if (result.success) {
-            console.log(`[toggleMonthStatus] ✅ Cambios guardados: ${result.updatedCount} celdas actualizadas`);
-        } else {
-            console.error(`[toggleMonthStatus] ❌ Error al guardar: ${result.error}`);
-            alert('Error al guardar los cambios. Intente nuevamente.');
+        if (result.success && result.updatedRowIndices) {
+            Object.keys(result.updatedRowIndices).forEach(actId => {
+                const idx = periodsData[currentPeriod].findIndex(i => String(i.id) === actId);
+                if (idx !== -1) {
+                    periodsData[currentPeriod][idx].rowIndex = result.updatedRowIndices[actId];
+                }
+            });
         }
+        if (result.success) {
+            const fileName = availableFilesMap[currentPeriod];
+            if (fileName) {
+                try {
+                    const filePathResult = await callParentAPI('get-file-path', {
+                        directory: currentSubmodulePath,
+                        fileName: fileName
+                    });
+                    if (filePathResult.success) {
+                        const readResult = await callParentAPI('read-excel-file', { filePath: filePathResult.path });
+                        if (readResult.success) {
+const freshData = await processExcelData(readResult.data);
+const freshItems = freshData[currentPeriod] || periodsData[currentPeriod];
+if (freshItems !== periodsData[currentPeriod]) {
+const oldData = periodsData[currentPeriod];
+const rowIndexToOldId = {};
+oldData.forEach(item => {
+if (item.rowIndex) rowIndexToOldId[item.rowIndex] = item.id;
+});
+            freshItems.forEach(item => {
+              if (rowIndexToOldId[item.rowIndex]) {
+                item.id = rowIndexToOldId[item.rowIndex];
+              }
+            // Preserve correct name from old data if fresh read lost it
+            // (edge case: B:C merge corruption where activity name in B was replaced)
+            const oldItem = oldData.find(o => o.rowIndex === item.rowIndex);
+            if (oldItem && oldItem.name && (!item.name || item.name.length < 2)) {
+              item.name = oldItem.name;
+            }
+            });
+periodsData[currentPeriod] = freshItems;
+}
+                        }
+                    }
+                } catch (reReadError) {
+                    console.warn('[savePlanTrabajoToExcel] No se pudo releer archivo post-save:', reReadError.message);
+                }
+            }
+        } else {
+            console.error('[savePlanTrabajoToExcel] Error:', result.error);
+        }
+        return result;
     } catch (error) {
-        console.error('[toggleMonthStatus] Error al guardar:', error);
+        console.error('[savePlanTrabajoToExcel] Error:', error);
+        return { success: false, error: error.message };
+    } finally {
+        _isSaving = false;
     }
+}
 
-    selectActivity(actId);
-    updateKPIs();
+async function toggleMonthStatus(actId, monthIdx) {
+	const idx = periodsData[currentPeriod].findIndex(i => i.id === actId);
+	if(idx === -1) return;
+
+	const currentVal = periodsData[currentPeriod][idx].months[monthIdx];
+	let newVal = '';
+	if(currentVal === '') newVal = 'P';
+	else if(currentVal === 'P') newVal = 'C';
+	else newVal = '';
+
+	periodsData[currentPeriod][idx].months[monthIdx] = newVal;
+
+	const result = await savePlanTrabajoToExcel();
+	if (result.success) {
+		console.log(`[toggleMonthStatus] ✅ Cambios guardados: ${result.updatedCount} celdas actualizadas`);
+	} else {
+		console.error(`[toggleMonthStatus] ❌ Error al guardar: ${result.error}`);
+		alert('Error al guardar los cambios. Intente nuevamente.');
+	}
+
+	selectActivity(actId);
+	updateKPIs();
 }
 
 function openEvidenceFolder(activityName, activityId) {
@@ -749,38 +847,43 @@ function closeCreateModal() {
 }
 
 function saveNewActivity() {
-    const name = document.getElementById('newActName').value;
-    const parentId = parseInt(document.getElementById('newActParent').value);
-    const resp = document.getElementById('newActResp').value;
+	const name = document.getElementById('newActName').value;
+	const parentId = parseInt(document.getElementById('newActParent').value);
+	const resp = document.getElementById('newActResp').value;
 
-    if(!name) {
-        alert("Ingrese un nombre");
-        return;
-    }
+	if(!name) {
+		alert("Ingrese un nombre");
+		return;
+	}
 
-    const parentIndex = periodsData[currentPeriod].findIndex(i => i.id === parentId);
-    if(parentIndex === -1) {
-        alert("Padre no encontrado");
-        return;
-    }
+	const parentIndex = periodsData[currentPeriod].findIndex(i => i.id === parentId);
+	if(parentIndex === -1) {
+		alert("Padre no encontrado");
+		return;
+	}
 
-    const newAct = {
-        id: Date.now(),
-        name: name,
-        level: 4,
-        type: 'activity',
-        responsible: resp,
-        months: new Array(12).fill(''),
-        observations: ''
-    };
+	const parentActivity = periodsData[currentPeriod][parentIndex];
+	const newRowIndex = parentActivity.rowIndex ? parentActivity.rowIndex + 1 : null;
 
-    periodsData[currentPeriod].splice(parentIndex + 1, 0, newAct);
+	const newAct = {
+		id: Date.now(),
+		rowIndex: newRowIndex,
+		name: name,
+		level: 4,
+		type: 'activity',
+		responsible: resp,
+		months: new Array(12).fill(''),
+		observations: ''
+	};
 
-    closeCreateModal();
-    renderTree();
-    renderGantt();
-    updateKPIs();
-    alert("Actividad creada exitosamente.");
+	periodsData[currentPeriod].splice(parentIndex + 1, 0, newAct);
+
+	closeCreateModal();
+	renderTree();
+	renderGantt();
+	updateKPIs();
+	savePlanTrabajoToExcel();
+	alert("Actividad creada exitosamente.");
 }
 
 function openDeleteModal(id) {
@@ -794,27 +897,28 @@ function closeDeleteModal() {
 }
 
 function confirmDelete() {
-    if(!deleteTargetId) return;
+	if(!deleteTargetId) return;
 
-    periodsData[currentPeriod] = periodsData[currentPeriod].filter(i => i.id !== deleteTargetId);
+	periodsData[currentPeriod] = periodsData[currentPeriod].filter(i => i.id !== deleteTargetId);
 
-    closeDeleteModal();
-    selectedActivityId = null;
+	closeDeleteModal();
+	selectedActivityId = null;
 
-    document.getElementById('inspectorContent').innerHTML = `
-        <div style="text-align: center; color: var(--text-muted); margin-top: 2rem;">
-            <i class="fas fa-mouse-pointer" style="font-size: 2rem; margin-bottom: 10px;"></i>
-            <p>Seleccione una actividad.</p>
-        </div>
-    `;
-    renderTree();
-    renderGantt();
-    updateKPIs();
+	document.getElementById('inspectorContent').innerHTML = `
+	<div style="text-align: center; color: var(--text-muted); margin-top: 2rem;">
+		<i class="fas fa-mouse-pointer" style="font-size: 2rem; margin-bottom: 10px;"></i>
+		<p>Seleccione una actividad.</p>
+	</div>
+	`;
+	renderTree();
+	renderGantt();
+	updateKPIs();
+	savePlanTrabajoToExcel();
 }
 
 /* --- UTILS --- */
 function switchMainView(view) {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.plan-tab').forEach(b => b.classList.remove('active'));
     document.querySelector(`button[onclick="switchMainView('${view}')"]`).classList.add('active');
     document.getElementById('view-dashboard').classList.remove('active');
     document.getElementById('view-plan').classList.remove('active');
@@ -824,8 +928,10 @@ function switchMainView(view) {
 // Variables para almacenar instancias de gráficos
 let chartStatus = null;
 let chartMonthlyProgress = null;
-let chartByResponsible = null;
+let chartQuarterly = null;
 let chartMonthlyStatus = null;
+let chartByCategory = null;
+let chartAnnualRadar = null;
 
 // Configuración global de Chart.js para aplicar el estilo K+AIR
 Chart.defaults.font.family = "'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif";
@@ -845,51 +951,49 @@ const K_COLORS = {
 
 // Actualizar KPIs
 function updateKPIs() {
-    const data = periodsData[currentPeriod];
-    const activities = data.filter(item => item.type === 'activity');
+const data = periodsData[currentPeriod];
+const activities = data.filter(item => item.type === 'activity');
 
-    // Total de actividades
-    document.getElementById('kpiTotal').textContent = activities.length;
+let totalMonths = 0;
+let completedMonths = 0;
+let scheduledCount = 0;
+let overdueCount = 0;
 
-    // Calcular avance general
-    let totalMonths = 0;
-    let completedMonths = 0;
-    let scheduledCount = 0;
-    let overdueCount = 0; // En este contexto, podríamos considerar como vencidas las que están programadas pero no completadas
+activities.forEach(activity => {
+activity.months.forEach(month => {
+if (month) {
+totalMonths++;
+if (month === 'C') {
+completedMonths++;
+} else if (month === 'P') {
+scheduledCount++;
+}
+}
+});
+});
 
-    activities.forEach(activity => {
-        activity.months.forEach(month => {
-            if (month) {
-                totalMonths++;
-                if (month === 'C') {
-                    completedMonths++;
-                } else if (month === 'P') {
-                    scheduledCount++;
-                }
-            }
-        });
-    });
+const progressPercentage = totalMonths > 0 ? Math.round((completedMonths / totalMonths) * 100) : 0;
+const pendingCount = scheduledCount;
 
-    const progressPercentage = totalMonths > 0 ? Math.round((completedMonths / totalMonths) * 100) : 0;
-    document.getElementById('kpiProgress').textContent = `${progressPercentage}%`;
-    document.getElementById('kpiScheduled').textContent = scheduledCount;
+document.getElementById('stat-total').textContent = activities.length;
+document.getElementById('stat-progress-text').textContent = `${progressPercentage}%`;
+document.getElementById('stat-completed').textContent = completedMonths;
+document.getElementById('stat-pending').textContent = pendingCount;
+document.getElementById('stat-overdue').textContent = overdueCount;
 
-    // Para calcular vencidas, necesitamos lógica adicional basada en fechas
-    // Por ahora, simplemente mostramos 0
-    document.getElementById('kpiOverdue').textContent = '0';
-
-    // Actualizar gráficos
-    updateCharts();
+updateCharts();
 }
 
 // Función para actualizar los gráficos
 function updateCharts() {
-    if (currentPeriod && periodsData[currentPeriod]) {
-        renderChartStatus();
-        renderChartMonthlyProgress();
-        renderChartByResponsible();
-        renderChartMonthlyStatus();
-    }
+if (currentPeriod && periodsData[currentPeriod]) {
+renderChartStatus();
+renderChartMonthlyProgress();
+renderChartQuarterly();
+renderChartMonthlyStatus();
+renderChartByCategory();
+renderChartAnnualRadar();
+}
 }
 
 // Gráfico: Actividades por Estado
@@ -1061,64 +1165,99 @@ function renderChartMonthlyProgress() {
     });
 }
 
-// Gráfico: Distribución por Responsable
-function renderChartByResponsible() {
-    const ctx = document.getElementById('chartByResponsible').getContext('2d');
+// Gráfico: Cumplimiento Trimestral
+function renderChartQuarterly() {
+const ctx = document.getElementById('chartQuarterly').getContext('2d');
 
-    // Destruir instancia anterior si existe
-    if (chartByResponsible) {
-        chartByResponsible.destroy();
-    }
+if (chartQuarterly) {
+chartQuarterly.destroy();
+}
 
-    const data = periodsData[currentPeriod];
-    const activities = data.filter(item => item.type === 'activity');
+const data = periodsData[currentPeriod];
+const activities = data.filter(item => item.type === 'activity');
 
-    // Agrupar actividades por responsable
-    const responsibleCount = {};
+const quarters = [
+{ label: 'Q1', months: [0, 1, 2] },
+{ label: 'Q2', months: [3, 4, 5] },
+{ label: 'Q3', months: [6, 7, 8] },
+{ label: 'Q4', months: [9, 10, 11] }
+];
 
-    activities.forEach(activity => {
-        const responsible = activity.responsible || 'Sin Asignar';
-        responsibleCount[responsible] = (responsibleCount[responsible] || 0) + 1;
-    });
+const planned = [];
+const executed = [];
 
-    const labels = Object.keys(responsibleCount);
-    const values = Object.values(responsibleCount);
+quarters.forEach(q => {
+let qPlanned = 0;
+let qExecuted = 0;
+activities.forEach(activity => {
+q.months.forEach(m => {
+if (activity.months && activity.months[m] === 'P') qPlanned++;
+if (activity.months && activity.months[m] === 'C') qExecuted++;
+});
+});
+planned.push(qPlanned);
+executed.push(qExecuted);
+});
 
-    // Generar paleta basada en el color primario y variaciones
-    const bgColors = labels.map((_, i) => {
-        const hues = [210, 150, 40, 340, 180]; // Azul, Verde, Naranja, Rojo, Cyan
-        const hue = hues[i % hues.length];
-        return `hsl(${hue}, 70%, 50%)`;
-    });
-
-    chartByResponsible = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: labels,
-            datasets: [{
-                data: values,
-                backgroundColor: bgColors,
-                borderWidth: 2,
-                borderColor: '#ffffff',
-                hoverOffset: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            cutout: '65%', // Más fino para estilo moderno
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        usePointStyle: true,
-                        padding: 20,
-                        font: { size: 11 }
-                    }
-                }
-            }
-        }
-    });
+chartQuarterly = new Chart(ctx, {
+type: 'bar',
+data: {
+labels: quarters.map(q => q.label),
+datasets: [
+{
+label: 'Programadas',
+data: planned,
+backgroundColor: K_COLORS.warning,
+borderRadius: 4,
+barPercentage: 0.7,
+categoryPercentage: 0.6
+},
+{
+label: 'Ejecutadas',
+data: executed,
+backgroundColor: K_COLORS.success,
+borderRadius: 4,
+barPercentage: 0.7,
+categoryPercentage: 0.6
+}
+]
+},
+options: {
+responsive: true,
+maintainAspectRatio: false,
+plugins: {
+legend: {
+position: 'bottom',
+labels: {
+usePointStyle: true,
+padding: 20,
+font: { size: 11 }
+}
+},
+tooltip: {
+callbacks: {
+afterBody: function(tooltipItems) {
+const idx = tooltipItems[0].dataIndex;
+const p = planned[idx];
+const e = executed[idx];
+const pct = p > 0 ? Math.round((e / p) * 100) : 0;
+return `Cumplimiento: ${pct}%`;
+}
+}
+}
+},
+scales: {
+x: {
+grid: { display: false }
+},
+y: {
+beginAtZero: true,
+ticks: { stepSize: 1 },
+grid: { color: 'rgba(0,0,0,0.06)' }
+}
+}
+}
+});
 }
 
 // Gráfico: Actividades por Mes y Estado
@@ -1195,6 +1334,177 @@ function renderChartMonthlyStatus() {
     });
 }
 
+// Gráfico: Cumplimiento por Categoría (Horizontal Bar)
+function renderChartByCategory() {
+const ctx = document.getElementById('chartByCategory').getContext('2d');
+
+if (chartByCategory) {
+chartByCategory.destroy();
+}
+
+const data = periodsData[currentPeriod];
+const groups = data.filter(item => item.type === 'header' && item.level === 1);
+
+const categories = [];
+const plannedCounts = [];
+const completedCounts = [];
+
+groups.forEach(group => {
+const groupIndex = data.indexOf(group);
+let childActivities = [];
+for (let i = groupIndex + 1; i < data.length; i++) {
+if (data[i].level <= group.level) break;
+if (data[i].type === 'activity') childActivities.push(data[i]);
+}
+
+let planned = 0;
+let completed = 0;
+childActivities.forEach(activity => {
+activity.months.forEach(month => {
+if (month === 'P') planned++;
+else if (month === 'C') completed++;
+});
+});
+
+if (childActivities.length > 0) {
+const shortName = group.name.length > 30 ? group.name.substring(0, 27) + '...' : group.name;
+categories.push(shortName);
+plannedCounts.push(planned);
+completedCounts.push(completed);
+}
+});
+
+chartByCategory = new Chart(ctx, {
+type: 'bar',
+data: {
+labels: categories,
+datasets: [
+{
+label: 'Ejecutadas',
+data: completedCounts,
+backgroundColor: K_COLORS.success,
+borderRadius: 2,
+barPercentage: 0.7,
+},
+{
+label: 'Programadas',
+data: plannedCounts,
+backgroundColor: K_COLORS.warning,
+borderRadius: 2,
+barPercentage: 0.7,
+}
+]
+},
+options: {
+indexAxis: 'y',
+responsive: true,
+maintainAspectRatio: false,
+plugins: {
+legend: {
+position: 'top',
+align: 'end',
+labels: { font: { size: 11 }, usePointStyle: true, padding: 12 }
+}
+},
+scales: {
+x: {
+stacked: false,
+beginAtZero: true,
+grid: { color: K_COLORS.gray, borderDash: [5, 5] },
+ticks: { precision: 0 }
+},
+y: {
+stacked: false,
+grid: { display: false },
+ticks: { font: { size: 10 } }
+}
+}
+}
+});
+}
+
+// Gráfico: Distribución Anual (Radar)
+function renderChartAnnualRadar() {
+const ctx = document.getElementById('chartAnnualRadar').getContext('2d');
+
+if (chartAnnualRadar) {
+chartAnnualRadar.destroy();
+}
+
+const data = periodsData[currentPeriod];
+const activities = data.filter(item => item.type === 'activity');
+
+const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const plannedPerMonth = new Array(12).fill(0);
+const completedPerMonth = new Array(12).fill(0);
+
+activities.forEach(activity => {
+activity.months.forEach((month, index) => {
+if (month === 'P') plannedPerMonth[index]++;
+else if (month === 'C') completedPerMonth[index]++;
+});
+});
+
+chartAnnualRadar = new Chart(ctx, {
+type: 'radar',
+data: {
+labels: months,
+datasets: [
+{
+label: 'Ejecutadas',
+data: completedPerMonth,
+backgroundColor: 'rgba(40, 167, 69, 0.15)',
+borderColor: K_COLORS.success,
+borderWidth: 2,
+pointBackgroundColor: '#fff',
+pointBorderColor: K_COLORS.success,
+pointBorderWidth: 2,
+pointRadius: 3,
+pointHoverRadius: 5,
+},
+{
+label: 'Programadas',
+data: plannedPerMonth,
+backgroundColor: 'rgba(255, 193, 7, 0.1)',
+borderColor: K_COLORS.warning,
+borderWidth: 2,
+pointBackgroundColor: '#fff',
+pointBorderColor: K_COLORS.warning,
+pointBorderWidth: 2,
+pointRadius: 3,
+pointHoverRadius: 5,
+}
+]
+},
+options: {
+responsive: true,
+maintainAspectRatio: false,
+plugins: {
+legend: {
+position: 'top',
+align: 'end',
+labels: { font: { size: 11 }, usePointStyle: true, padding: 12 }
+}
+},
+scales: {
+r: {
+beginAtZero: true,
+grid: { color: K_COLORS.gray },
+angleLines: { color: K_COLORS.gray },
+pointLabels: { font: { size: 11 }, color: '#6c757d' },
+ticks: {
+display: true,
+precision: 0,
+backdropColor: 'transparent',
+font: { size: 9 },
+color: '#adb5bd'
+}
+}
+}
+}
+});
+}
+
 // Cargar datos iniciales
 function loadInitialData() {
     // Esta función se llama después de que se haya establecido la comunicación con el padre
@@ -1255,6 +1565,7 @@ window.openDeleteModal = openDeleteModal;
 window.closeDeleteModal = closeDeleteModal;
 window.confirmDelete = confirmDelete;
 window.showPeriodSelector = showPeriodSelector;
+window.hidePeriodSelector = hidePeriodSelector;
 window.selectPeriod = selectPeriod;
 window.clonePeriod = clonePeriod;
 

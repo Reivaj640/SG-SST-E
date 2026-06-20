@@ -243,6 +243,15 @@ class RecursosHome {
                 font-weight: 700;
                 color: var(--k-text-main);
                 margin-bottom: 0.75rem;
+                text-align: center;
+            }
+
+            /* Descripción del widget (estilo estándar Gestión de la Salud) */
+            .kb-description {
+                font-size: 0.72rem;
+                color: var(--k-text-muted);
+                text-align: center;
+                margin-bottom: 4px;
             }
 
             /* Barra de Progreso - CORRECCIÓN VISUAL */
@@ -385,14 +394,14 @@ class RecursosHome {
                 margin-top: 0 !important;
             }
 
-            /* Layout Grid para los Gráficos - RESPONSIVE */
-            .charts-grid {
-                display: grid;
-                grid-template-columns: 2fr 1fr; /* 2/3 para Presupuesto, 1/3 para los otros apilados */
-                grid-template-rows: auto auto;
-                gap: 0.75rem;
-                margin-bottom: 0.5rem;
-            }
+/* Layout Grid para los Gráficos - RESPONSIVE */
+.charts-grid {
+display: grid;
+grid-template-columns: 1fr 1fr 1fr;
+grid-template-rows: auto;
+gap: 0.75rem;
+margin-bottom: 0.5rem;
+}
 
             .chart-card {
                 background: var(--k-bg-card);
@@ -403,8 +412,7 @@ class RecursosHome {
                 min-width: 0; /* Prevenir desbordamiento */
             }
 
-            /* El gráfico grande ocupa toda la primera fila si es desktop */
-            .chart-card.budget-chart { grid-column: 1 / -1; }
+
 
             .chart-title {
                 font-size: 1.1rem; font-weight: 600; color: var(--k-text-main);
@@ -415,7 +423,7 @@ class RecursosHome {
             .canvas-container {
                 position: relative;
                 width: 100%;
-                height: 300px; /* Altura base para desktop */
+                height: 260px; /* Altura base para desktop */
                 min-height: 200px;
             }
 
@@ -463,11 +471,10 @@ class RecursosHome {
                 --k-shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.8);
             }
 
-            @media (max-width: 992px) {
-                .charts-grid { grid-template-columns: 1fr; }
-                .chart-card.budget-chart { grid-column: auto; }
-                .canvas-container { height: 280px; }
-            }
+@media (max-width: 992px) {
+.charts-grid { grid-template-columns: 1fr; }
+.canvas-container { height: 240px; }
+}
 
             @media (max-width: 768px) {
                 .gestion-integral-home { padding: 1rem; }
@@ -523,7 +530,7 @@ class RecursosHome {
 
         // Gráfico Principal: Ejecución Presupuestal
         const budgetChartCard = document.createElement('div');
-        budgetChartCard.className = 'chart-card budget-chart';
+        budgetChartCard.className = 'chart-card';
         budgetChartCard.innerHTML = `
             <div class="chart-title">
                 <span>Ejecución Presupuestal (Acumulada)</span>
@@ -581,7 +588,7 @@ class RecursosHome {
 
             // Inicializar estructura base
             this.resourceStats = {
-                inducciones: { totalTrabajadores: 0, totalInducciones: 0, completadas: 0, pendientes: 0, porcentajeCompletado: 0, mensual: new Array(12).fill(0) },
+                inducciones: { totalTrabajadores: 0, totalInducciones: 0, completadas: 0, pendientes: 0, porcentajeCompletado: 0, mensual: new Array(12).fill(0), mensualApproved: new Array(12).fill(0) },
                 capacitaciones: { totalCapacitaciones: 0, programadas: 0, realizadas: 0, porcentajeCumplimiento: 0, mensual: { programadas: new Array(12).fill(0), realizadas: new Array(12).fill(0) } },
                 epps: { totalEPPs: 0, entregados: 0, pendientes: 0, stockActual: 0 },
                 copasst: { totalActas: 0, actaMesEnCurso: false, ultimoMesRegistrado: null, actasAnio: 0, estado: 'ok', alertas: [] },
@@ -1153,6 +1160,7 @@ class RecursosHome {
             </div>
 
             <div class="kb-amount" style="font-size: 1.4rem;">${completadas} / ${totalTrabajadores}</div>
+            <div class="kb-description">Trabajadores con inducción SST completada</div>
 
             <div class="kb-progress-track">
                 <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};"></div>
@@ -1230,6 +1238,7 @@ class RecursosHome {
             </div>
 
             <div class="kb-amount" style="font-size: 1.4rem;">${realizadas} / ${total}</div>
+            <div class="kb-description">Capacitaciones del plan anual ejecutadas</div>
 
             <div class="kb-progress-track">
                 <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};"></div>
@@ -1304,6 +1313,7 @@ class RecursosHome {
             </div>
 
             <div class="kb-amount" style="font-size: 1.4rem;">${reunionesRealizadas} / ${reunionesEsperadas}</div>
+            <div class="kb-description">Reuniones mensuales del COPASST</div>
 
             <div class="kb-progress-track">
                 <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};"></div>
@@ -1370,6 +1380,7 @@ class RecursosHome {
             </div>
 
             <div class="kb-amount" style="font-size: 1.4rem;">${reunionesRealizadas} / ${reunionesEsperadas}</div>
+            <div class="kb-description">Reuniones del Comité de Convivencia</div>
 
             <div class="kb-progress-track">
                 <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};"></div>
@@ -1448,6 +1459,7 @@ class RecursosHome {
             </div>
 
             <div class="kb-amount" style="font-size: 1.4rem;">${planillasRealizadas} / ${planillasEsperadas}</div>
+            <div class="kb-description">Planillas de afiliación al SSSI</div>
 
             <div class="kb-progress-track">
                 <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};"></div>
@@ -1576,6 +1588,7 @@ class RecursosHome {
             </div>
 
             <div class="kb-amount">${this.formatCurrency(total)}</div>
+            <div class="kb-description">Ejecución presupuestal del SG-SST</div>
 
             <div class="kb-progress-track">
                 <div class="kb-progress-bar" id="kb-bar-${Math.random()}" style="width: 0%;"></div>
@@ -1682,17 +1695,21 @@ class RecursosHome {
         };
     }
 
-    parseFormattedNumber(value) {
-        if (value === null || value === undefined || value === '') return 0;
-        if (typeof value === 'number') return value;
-        if (typeof value === 'object' && value.value !== undefined) return value.value;
-        if (typeof value === 'string') {
-            let clean = value.toString().replace(/\$/g, '').replace(/\s/g, '').replace(/,/g, '');
-            const parsed = parseFloat(clean);
-            return isNaN(parsed) ? 0 : parsed;
+parseFormattedNumber(value) {
+            if (value === null || value === undefined || value === '') return 0;
+            if (typeof value === 'number') return value;
+            if (typeof value === 'object' && value.value !== undefined) return value.value;
+            if (typeof value === 'string') {
+                let clean = value.toString()
+                    .replace(/\$/g, '')
+                    .replace(/\s/g, '')
+                    .replace(/\./g, '')
+                    .replace(/,/g, '.');
+                const parsed = parseFloat(clean);
+                return isNaN(parsed) ? 0 : parsed;
+            }
+            return 0;
         }
-        return 0;
-    }
 
     formatCurrency(amount) {
         return new Intl.NumberFormat('es-CO', {
@@ -1814,32 +1831,43 @@ class RecursosHome {
             });
         }
 
-        // 3. Induction Chart (Line: Tendencia)
-        const ctxInduction = document.getElementById('inductionChart');
-        if(ctxInduction && typeof Chart !== 'undefined') {
-            const iData = this.resourceStats?.inducciones?.mensual || new Array(12).fill(0);
+    // 3. Induction Chart (Line: Realizadas vs Aprobadas)
+    const ctxInduction = document.getElementById('inductionChart');
+    if(ctxInduction && typeof Chart !== 'undefined') {
+      const iData = this.resourceStats?.inducciones?.mensual || new Array(12).fill(0);
+      const iApproved = this.resourceStats?.inducciones?.mensualApproved || new Array(12).fill(0);
 
-            this.charts.induction = new Chart(ctxInduction, {
-                type: 'line',
-                data: {
-                    labels: labels12,
-                    datasets: [{
-                        label: 'Inducciones Acumuladas',
-                        data: iData,
-                        borderColor: '#ffc107',
-                        backgroundColor: 'rgba(255, 193, 7, 0.1)',
-                        fill: true,
-                        tension: 0.3
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true } }
-                }
-            });
+      this.charts.induction = new Chart(ctxInduction, {
+        type: 'line',
+        data: {
+          labels: labels12,
+          datasets: [
+            {
+              label: 'Realizadas',
+              data: iData,
+              borderColor: '#174ea6',
+              backgroundColor: 'rgba(23,78,166,0.1)',
+              fill: true,
+              tension: 0.4
+            },
+            {
+              label: 'Aprobadas',
+              data: iApproved,
+              borderColor: '#28a745',
+              backgroundColor: 'rgba(40,167,69,0.1)',
+              fill: true,
+              tension: 0.4
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom' } },
+          scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
         }
+      });
+    }
     }
 
     // Método para obtener datos específicos del dashboard de capacitaciones para la gráfica

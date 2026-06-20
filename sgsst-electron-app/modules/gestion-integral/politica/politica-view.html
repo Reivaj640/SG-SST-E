@@ -1,426 +1,140 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>K+AIR V2.0 | Espacio de Trabajo Documental</title>
-    <!-- CSP para permitir OnlyOffice en iframe -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:8080 http://localhost:3011 https://fonts.googleapis.com https://cdnjs.cloudflare.com data:; font-src 'self' 'unsafe-inline' data: https://fonts.gstatic.com https://fonts.googleapis.com http://localhost:8080 https://cdnjs.cloudflare.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:8080 http://localhost:3011 https://cdnjs.cloudflare.com; connect-src 'self' http://localhost:8080 http://localhost:3011; frame-src 'self' http://localhost:8080 http://localhost:3011; img-src 'self' data: https: http://localhost:8080; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com http://localhost:8080;">
-    <!-- Iconos y Fuentes -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Lexend:wght@500;600&display=swap" rel="stylesheet">
-
-    <style>
-        /*
-         * SISTEMA VISUAL K+AIR V2.0
-         * Evolución hacia interfaces más limpias y funcionales
-         */
-        :root {
-            --primary: #174ea6;
-            --primary-dark: #0d3b8e;
-            --primary-light: #e8f0fe;
-            --primary-subtle: #f5f9ff;
-            --success: #28a745;
-            --warning: #ffc107;
-            --danger: #dc3545;
-            --text-main: #1f2937;
-            --text-secondary: #6b7280;
-            --bg-body: #f3f4f6;
-            --bg-sidebar: #ffffff;
-            --border-color: #e5e7eb;
-            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-            --radius: 0.5rem;
-            --sidebar-width: 280px;
-            --header-height: 64px;
-        }
-
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            font-family: 'Inter', 'Segoe UI', sans-serif;
-            background-color: var(--bg-body);
-            color: var(--text-main);
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        /* --- HEADER MODERNO --- */
-        .app-header {
-            height: var(--header-height);
-            background: white;
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 1.5rem;
-            flex-shrink: 0;
-            z-index: 20;
-        }
-
-        .header-left { display: flex; align-items: center; gap: 1rem; }
-        .brand-box { display: flex; align-items: center; gap: 0.75rem; }
-        .app-logo {
-            width: 32px; height: 32px; background: var(--primary);
-            color: white; border-radius: 6px;
-            display: flex; align-items: center; justify-content: center; font-weight: bold;
-        }
-        .app-title { font-family: 'Lexend', sans-serif; font-size: 1.1rem; font-weight: 600; letter-spacing: -0.01em; }
-        .context-pill {
-            background: var(--primary-subtle); color: var(--primary);
-            font-size: 0.75rem; padding: 4px 10px; border-radius: 99px; font-weight: 600;
-            border: 1px solid rgba(23, 78, 166, 0.1);
-        }
-
-        /* --- LAYOUT PRINCIPAL --- */
-        .app-workspace {
-            display: flex;
-            flex: 1;
-            overflow: hidden;
-        }
-
-        /* --- SIDEBAR: NAVIGATOR --- */
-        .sidebar {
-            width: var(--sidebar-width);
-            background: var(--bg-sidebar);
-            border-right: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-            flex-shrink: 0;
-        }
-
-        .sidebar-nav {
-            padding: 1rem;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .nav-back-btn {
-            width: 100%;
-            padding: 0.6rem 1rem;
-            border: 1px solid var(--border-color);
-            background: white;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.85rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            transition: all 0.2s;
-        }
-        .nav-back-btn:hover:not(:disabled) { background: var(--bg-body); }
-        .nav-back-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-        .file-list-container {
-            flex: 1;
-            overflow-y: auto;
-            padding: 1rem;
-        }
-
-        .list-section-title {
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-secondary);
-            margin-bottom: 0.75rem;
-            margin-top: 1.25rem;
-        }
-        .list-section-title:first-child { margin-top: 0; }
-
-        .file-item {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 0.6rem 0.75rem;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.15s;
-            margin-bottom: 2px;
-        }
-        .file-item:hover { background: var(--bg-body); }
-        .file-item.active { background: var(--primary-light); }
-        .file-item.selected { background: var(--primary-subtle); border: 1px solid var(--primary); }
-
-        .file-icon {
-            width: 32px; height: 32px;
-            border-radius: 6px;
-            display: flex; align-items: center; justify-content: center;
-            background: #e5e7eb; color: var(--text-secondary);
-            flex-shrink: 0;
-        }
-        .icon-folder { background: #fef3c7; color: #d97706; }
-        .icon-pdf { background: #fee2e2; color: #dc2626; }
-        .icon-xls { background: #dcfce7; color: #16a34a; }
-        .icon-doc { background: #e0e7ff; color: #4f46e5; }
-
-        .file-info { flex: 1; min-width: 0; }
-        .file-name {
-            font-size: 0.85rem;
-            font-weight: 500;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .file-meta {
-            font-size: 0.7rem;
-            color: var(--text-secondary);
-        }
-
-        /* --- MAIN STAGE --- */
-        .main-stage {
-            flex: 1;
-            background: #e5e7eb;
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        .empty-state-wrapper {
-            position: absolute;
-            inset: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            background: var(--bg-body);
-        }
-
-        .empty-illustration {
-            width: 80px; height: 80px;
-            background: white;
-            border-radius: 16px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 2rem;
-            color: var(--primary);
-            box-shadow: var(--shadow-md);
-            margin-bottom: 1.5rem;
-        }
-
-        /* --- DOCUMENT WRAPPER --- */
-        .document-wrapper {
-            display: none;
-            flex-direction: column;
-            flex: 1;
-            background: #525659;
-            position: absolute;
-            inset: 0;
-            z-index: 5;
-        }
-        .document-wrapper.active { display: flex; }
-
-        /* --- TOOLBAR --- */
-        .doc-toolbar {
-            height: 48px;
-            background: #f9fafb;
-            border-bottom: 1px solid #e5e7eb;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 1rem;
-            flex-shrink: 0;
-        }
-        .doc-title-truncate {
-            font-weight: 500;
-            font-size: 0.9rem;
-            max-width: 400px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .toolbar-actions {
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-        }
-
-        .btn-icon {
-            width: 36px; height: 36px; border-radius: 6px; border: none;
-            background: transparent; color: var(--text-secondary);
-            cursor: pointer; display: flex; align-items: center; justify-content: center;
-            transition: all 0.2s; font-size: 1rem;
-        }
-        .btn-icon:hover { background: var(--bg-body); color: var(--primary); }
-        .btn-icon.active { background: var(--primary-light); color: var(--primary); }
-        .btn-icon:disabled { opacity: 0.3; cursor: not-allowed; }
-
-        .btn-primary-sm {
-            background: var(--primary); color: white; border: none;
-            padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.85rem; font-weight: 500;
-            cursor: pointer; display: flex; align-items: center; gap: 6px;
-            transition: background 0.2s;
-        }
-        .btn-primary-sm:hover { background: var(--primary-dark); }
-        .btn-primary-sm i { font-size: 0.8rem; }
-
-        /* --- EDITOR DE TEXTO (Feature Clave) --- */
-        .editor-layer {
-            flex: 1; background: white; display: none; flex-direction: column;
-            position: absolute; inset: 50px 0 0 0; z-index: 10;
-            animation: slideUp 0.3s ease-out;
-        }
-        .editor-layer.active { display: flex; }
-
-        .editor-toolbar {
-            padding: 0.5rem 1rem; background: #f9fafb; border-bottom: 1px solid var(--border-color);
-            display: flex; gap: 0.5rem; align-items: center;
-        }
-
-        .editor-canvas {
-            flex: 1; padding: 3rem 4rem; overflow-y: auto; outline: none;
-            font-size: 11pt; line-height: 1.5; color: #333;
-            background: #525659; /* Keep contrast */
-        }
-
-        /* Simulación de hoja de papel */
-        .paper-sheet {
-            background: white; min-height: 1000px; width: 100%; max-width: 800px;
-            margin: 2rem auto; padding: 3rem; box-shadow: var(--shadow-lg);
-            outline: none;
-        }
-
-        /* Iframe Viewer */
-        .viewer-frame {
-            width: 100%; height: 100%; border: none;
-            display: none;
-            flex: 1;
-            overflow: hidden;
-        }
-        .viewer-frame.active { display: flex; }
-
-        /* Toast Notification */
-        .toast {
-            position: fixed; bottom: 2rem; right: 2rem;
-            background: #1f2937; color: white; padding: 0.75rem 1.25rem;
-            border-radius: 8px; box-shadow: var(--shadow-lg);
-            display: flex; align-items: center; gap: 10px;
-            transform: translateY(150%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-            z-index: 100;
-        }
-        .toast.show { transform: translateY(0); }
-        .toast.success i { color: var(--success); }
-
-        @keyframes slideUp { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>K+AIR | Política del SG-SST</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="politica-view.css">
 </head>
 <body>
 
-    <!-- HEADER GLOBAL -->
-    <header class="app-header">
-        <div class="header-left">
-            <div class="brand-box">
-                <div class="app-logo">K+</div>
-                <div class="app-title">K+AIR</div>
-                <div class="context-pill">POLÍTICA SST</div>
-            </div>
-        </div>
-        <div class="header-right">
-            <!-- Contexto de Empresa (Traído de URL params en JS) -->
-            <span id="companyLabel" style="font-size: 0.85rem; color: var(--text-secondary); margin-right: 1rem;"></span>
-        </div>
-    </header>
+<header class="app-header">
+<div class="header-left">
+<button class="btn btn-ghost" id="backToModuleBtn" title="Regresar al módulo">
+<i class="fas fa-arrow-left"></i>
+<span style="margin-left:5px; font-weight:500;">Módulo</span>
+</button>
+<div class="app-title">Política del SG-SST</div>
+<span class="badge-mod">SG-SST</span>
+</div>
 
-    <!-- WORKSPACE -->
-    <div class="app-workspace">
+<div class="header-actions">
+<button class="btn btn-ghost" id="closeDocBtn" title="Cerrar documento / Volver a archivos" disabled style="opacity: 0.3;">
+<i class="fas fa-times"></i>
+<span style="font-size: 0.85rem; margin-left:4px;">Cerrar</span>
+</button>
 
-        <!-- SIDEBAR: NAVIGATOR -->
-        <aside class="sidebar">
-            <div class="sidebar-nav">
-                <button class="nav-back-btn" id="navUpBtn" disabled>
-                    <i class="fas fa-arrow-up"></i> Subir un nivel
-                </button>
-            </div>
+<div class="divider"></div>
 
-            <div class="file-list-container">
-                <!-- Carpetas -->
-                <div class="list-section-title">Carpetas</div>
-                <div id="folderList"></div>
+<button class="btn btn-ghost" id="downloadBtn" title="Descargar documento" disabled style="opacity: 0.3;">
+<i class="fas fa-download"></i>
+</button>
+<button class="btn btn-ghost" id="printBtn" title="Imprimir documento" disabled style="opacity: 0.3;">
+<i class="fas fa-print"></i>
+</button>
+</div>
+</header>
 
-                <!-- Archivos -->
-                <div class="list-section-title" style="display:flex; justify-content:space-between;">
-                    Documentos <span id="docCount" style="font-weight:400; color:var(--text-secondary);">0</span>
-                </div>
-                <div id="fileList"></div>
-            </div>
-        </aside>
+<div class="app-body">
 
-        <!-- MAIN STAGE -->
-        <main class="main-stage">
+<aside class="sidebar">
 
-            <!-- Empty State -->
-            <div class="empty-state-wrapper" id="emptyState">
-                <div class="empty-illustration">
-                    <i class="fas fa-folder-open"></i>
-                </div>
-                <h2 style="font-family: 'Lexend'; font-size: 1.5rem; margin-bottom: 0.5rem;">Explorador de Documentos</h2>
-                <p style="color: var(--text-secondary);">Seleccione un archivo para visualizar o editar en tiempo real.</p>
-            </div>
+<div class="sidebar-header">
+<button class="btn btn-ghost" id="goBackBtn" style="width:100%; justify-content:flex-start; padding-left:0;" disabled>
+<i class="fas fa-level-up-alt"></i> Volver a carpeta anterior
+</button>
+</div>
 
-            <!-- Document Wrapper (Visible when file selected) -->
-            <div class="document-wrapper" id="documentWrapper">
+<div class="breadcrumb-nav" id="breadcrumb">
+<div class="crumb-item"><i class="fas fa-hdd"></i> Raíz</div>
+</div>
 
-                <!-- Toolbar Superior -->
-                <div class="doc-toolbar">
-                    <div class="doc-title-truncate" id="currentDocTitle">DocumentoSeleccionado.docx</div>
+<div class="list-header">
+Carpetas
+</div>
+<div class="sidebar-content" id="folderList">
+</div>
 
-                    <div class="toolbar-actions">
-                        <!-- Botón Editar (Solo Word) -->
-                        <button class="btn-primary-sm" id="editModeBtn" style="display:none;">
-                            <i class="fas fa-pen"></i> Editar
-                        </button>
+<div class="list-header">
+Documentos
+<span id="docCount" style="font-weight: 400; text-transform: none; font-size:0.75rem;">0</span>
+</div>
+<div class="sidebar-content" id="fileList">
+</div>
+</aside>
 
-                        <!-- Controles Visuales -->
-                        <button class="btn-icon" id="zoomOutBtn" title="Reducir"><i class="fas fa-minus"></i></button>
-                        <button class="btn-icon" id="zoomInBtn" title="Aumentar"><i class="fas fa-plus"></i></button>
+<main class="viewer-stage">
 
-                        <div style="width:1px; height:20px; background:#e5e7eb; margin: 0 0.5rem;"></div>
+<div class="empty-state" id="emptyState">
+<div class="empty-icon"><i class="fas fa-folder-open"></i></div>
+<h2 class="empty-title">Explorador de Archivos</h2>
+<p class="empty-desc">Seleccione una carpeta del panel izquierdo para navegar o haga clic en un archivo para visualizarlo.</p>
+</div>
 
-                        <button class="btn-icon" id="downloadBtn" title="Descargar"><i class="fas fa-download"></i></button>
-                        <button class="btn-icon" id="closeDocBtn" title="Cerrar"><i class="fas fa-times"></i></button>
-                    </div>
-                </div>
+<div class="viewer-toolbar" id="toolbar">
+<div class="tool-group">
+<span id="docName" style="font-weight: 600; color: var(--text-dark); max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></span>
+</div>
+<div class="tool-group">
+<button class="btn btn-ghost" id="zoomOutBtn" title="Reducir Zoom"><i class="fas fa-minus"></i></button>
+<span id="zoomLevelDisplay" style="font-size: 0.9rem; width: 50px; text-align: center;">100%</span>
+<button class="btn btn-ghost" id="zoomInBtn" title="Aumentar Zoom"><i class="fas fa-plus"></i></button>
+<div class="divider"></div>
+<button class="btn btn-ghost" id="fitWidthBtn" title="Ajustar a ancho"><i class="fas fa-arrows-alt-h"></i></button>
+</div>
+</div>
 
-                <!-- Capa de Visualización (Iframe) -->
-                <div class="viewer-frame active" id="viewerContainer">
-                    <!-- Iframe inyectado vía JS -->
-                </div>
+<div class="viewer-content" id="viewerContainer" style="display: none;">
+</div>
 
-                <!-- Capa de Edición (Feature V2.0) -->
-                <div class="editor-layer" id="editorLayer">
-                    <!-- Barra de herramientas del Editor -->
-                    <div class="editor-toolbar">
-                        <button class="btn-icon" onclick="document.execCommand('bold')"><i class="fas fa-bold"></i></button>
-                        <button class="btn-icon" onclick="document.execCommand('italic')"><i class="fas fa-italic"></i></button>
-                        <button class="btn-icon" onclick="document.execCommand('underline')"><i class="fas fa-underline"></i></button>
-                        <div style="width:1px; height:20px; background:#e5e7eb; margin: 0 0.5rem;"></div>
-                        <button class="btn-icon" onclick="document.execCommand('justifyLeft')"><i class="fas fa-align-left"></i></button>
-                        <button class="btn-icon" onclick="document.execCommand('justifyCenter')"><i class="fas fa-align-center"></i></button>
-                        <div style="flex:1;"></div>
-                        <button class="btn-icon" onclick="cancelEditMode()" title="Cancelar"><i class="fas fa-times"></i></button>
-                        <button class="btn-primary-sm" onclick="saveDocumentChanges()">
-                            <i class="fas fa-save"></i> Guardar Cambios
-                        </button>
-                    </div>
-                    <!-- Área Editable -->
-                    <div class="editor-canvas" id="editableContent" contenteditable="true">
-                        <!-- Contenido editable -->
-                    </div>
-                </div>
-            </div>
-        </main>
-    </div>
+<div class="loading-overlay" id="loadingOverlay">
+<div class="spinner"></div>
+<p style="margin-top:10px; font-size: 0.9rem; font-weight: 500;">Cargando documento...</p>
+</div>
 
-    <!-- TOAST -->
-    <div class="toast" id="toast">
-        <i class="fas fa-check-circle"></i>
-        <span id="toastMsg">Operación exitosa</span>
-    </div>
+</main>
 
-    <!-- Scripts Externos -->
-    <script src="politica-viewer.js"></script>
+</div>
+
+<div class="notification" id="notification">
+<i class="notification-icon fas fa-check-circle"></i>
+<div class="notification-message">Operación completada con éxito</div>
+</div>
+
+<div id="contextMenu" class="context-menu" style="display: none;">
+<div class="context-menu-item" id="openFileBtn">
+<i class="fas fa-external-link-alt"></i>
+<span>Abrir archivo</span>
+</div>
+<div class="context-menu-divider"></div>
+<div class="context-menu-item danger" id="deleteFileBtn">
+<i class="fas fa-trash-alt"></i>
+<span>Eliminar</span>
+</div>
+</div>
+
+<div id="confirmModal" class="confirm-modal" style="display: none;">
+<div class="confirm-modal-content">
+<div class="confirm-modal-header">
+<i class="fas fa-exclamation-triangle"></i>
+<h3>¿Eliminar archivo?</h3>
+</div>
+<div class="confirm-modal-body">
+<p>Estás a punto de eliminar:</p>
+<p class="confirm-file-name" id="confirmFileName">nombre_archivo.pdf</p>
+<p class="confirm-warning">⚠️ Esta acción no se puede deshacer.</p>
+</div>
+<div class="confirm-modal-footer">
+<button class="btn btn-ghost" id="confirmCancelBtn">Cancelar</button>
+<button class="btn btn-danger" id="confirmAcceptBtn">Eliminar</button>
+</div>
+</div>
+</div>
+
+<div id="kToastContainer" class="k-toast-container"></div>
+
+<script src="politica-viewer.js"></script>
 </body>
 </html>

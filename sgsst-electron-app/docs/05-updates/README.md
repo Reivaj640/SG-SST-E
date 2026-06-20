@@ -6,6 +6,76 @@ Este directorio contiene la documentación detallada de cada versión de K+AIR.
 
 ## 📋 Versiones Disponibles
 
+### v0.1.102 - 17 de junio de 2026
+**[v0.1.102-fix-loading-bar-inicio-cero.md](v0.1.102-fix-loading-bar-inicio-cero.md)**
+
+**Cambios principales:**
+- ✅ Fix: Barra de carga ya no aparece a la mitad al iniciar (regla CSS en conflicto eliminada)
+- ✅ Fix: Transición de login es continua 0→100% sin "saltos" entre fases
+- ✅ Fix: Botón "Ingresar" se bloquea durante el submit (anti double-click)
+- ✅ Mejora: `logBuffer` con eviction FIFO (sin fuga de memoria)
+- ✅ Mejora: `animateToProgress` con estado continuo (continúa desde valor actual)
+
+**Impacto:**
+- UX: Carga de login se siente como una sola animación fluida (antes se percibía doble)
+- Robustez: Imposible enviar credenciales dos veces por clic rápido
+- Memoria: `logBuffer` con tope de 500 entradas (antes crecía sin límite)
+- CSS: Eliminada regla duplicada `.progress-fill` que anulaba control JS
+
+---
+
+### v0.1.101 - 14 de junio de 2026
+*Submódulos 3.3.4 Prevalencia y 3.3.5 Incidencia de Enfermedad Laboral*
+(ver [CHANGELOG.md](../CHANGELOG.md#0101---2026-06-14))
+
+**Cambios principales:**
+- ✅ Feature: Submódulo 3.3.4 Prevalencia de Enfermedad Laboral (tabla, gráfico, 5 KPIs)
+- ✅ Feature: Submódulo 3.3.5 Incidencia de Enfermedad Laboral (tabla, gráfico, 5 KPIs)
+- ✅ Feature: Integración automática con Objetivos SST (keywords `prevalencia` e `incidencia`)
+- ✅ Fix: `leerIndicadores()` suma los 12 meses (antes solo leía enero)
+
+**Impacto:**
+- Módulos nuevos: +2 submódulos funcionales en módulo 3 Gestión Salud
+- Cumplimiento normativo: Indicadores EL alineados con Res. 0312/2019
+
+---
+
+### v0.1.99 - 9 de junio de 2026
+**v0.1.99-dashboard-kpi-graficas.md** *(pendiente de crear)*
+
+**Cambios principales:**
+- ✅ Feature: Dashboard con 6 gráficas (barras, líneas, radar, doughnut, polar, barras apiladas)
+- ✅ Feature: KPI Strip Enterprise (.k-stats-ribbon) con 5 indicadores
+- ✅ Feature: Modal periodo con selector de rango y año
+- ✅ Feature: Navegación corregida (Home Empresa, destroy pattern)
+- ✅ Fix: Subrayado tabs-header eliminado
+- ✅ Fix: Plan Trabajo lee mes anterior (norma COPASST)
+
+**Impacto:**
+- Dashboard: 0 gráficas → 6 gráficas interactivas
+- KPIs: Sin indicadores → 5 indicadores clave en ribbon
+- UX: Navegación fluida entre módulos y dashboard
+- Normatividad: Cumplimiento Resolución 0312/2019
+
+---
+
+### v0.1.98 - 4 de junio de 2026
+**[v0.1.98-copasst-actas-autofill-mejoras.md](v0.1.98-copasst-actas-autofill-mejoras.md)**
+
+**Cambios principales:**
+- ✅ Fix: Plan de Trabajo lee mes anterior (norma COPASST)
+- ✅ Fix: Bug de mes en nombre de archivo (UTC-5 Colombia)
+- ✅ Mejora: Texto formateado multilinea con numeración e iconos ✓/⏱
+- ✅ Mejora: Accidentalidad enriquecida (nombre, CC, fecha DD/MM/YYYY)
+- ✅ Fix: Eliminado "N°" del nombre de archivo guardado
+
+**Impacto:**
+- Normatividad: Plan de Trabajo ahora revisa mes anterior (correcto per norma)
+- Datos visibles: +200% información en item de accidentalidad
+- Confiabilidad: Mes en filename 100% correcto (sin bug UTC)
+
+---
+
 ### v0.1.91 - 22 de marzo de 2026
 **[v0.1.91-navegacion-home-empresa.md](v0.1.91-navegacion-home-empresa.md)**
 
@@ -195,4 +265,4 @@ Cada archivo de actualización debe incluir:
 
 ---
 
-**Última actualización:** 21 de marzo de 2026
+**Última actualización:** 9 de junio de 2026

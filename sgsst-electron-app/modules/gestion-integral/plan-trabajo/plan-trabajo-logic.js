@@ -42,45 +42,72 @@ class PlanTrabajoComponent {
         }
     }
 
-    initPortalJS(portalContainer) {
-        // Hacer referencia al contenedor del portal
-        window.planPortalContainer = portalContainer;
-        window.planPortalComponent = this;
+  initPortalJS(portalContainer) {
+    // Hacer referencia al contenedor del portal
+    window.planPortalContainer = portalContainer;
+    window.planPortalComponent = this;
 
-        // Cargar el JS del portal dinámicamente
-        const script = document.createElement('script');
-        script.src = './modules/gestion-integral/plan-trabajo/plan-home.js';
-        script.onload = () => {
-            console.log('[PlanTrabajoComponent] plan-home.js cargado');
-        };
-        script.onerror = () => {
-            console.error('[PlanTrabajoComponent] Error cargando plan-home.js');
-            this.renderLegacyDesign();
-        };
-        document.body.appendChild(script);
-    }
+    // Cargar el JS del portal dinámicamente
+    const script = document.createElement('script');
+    script.src = './modules/gestion-integral/plan-trabajo/plan-home.js';
+    script.onload = () => {
+      console.log('[PlanTrabajoComponent] plan-home.js cargado');
+    };
+    script.onerror = () => {
+      console.error('[PlanTrabajoComponent] Error cargando plan-home.js');
+      this.renderLegacyDesign();
+    };
+    document.body.appendChild(script);
+    this.portalScript = script;
+  }
 
     /**
      * Método para entrar al cronograma (llamado desde plan-home.js)
      */
-    async enterCronograma() {
-        // Limpiar el contenedor y cargar el viewer
-        this.container.innerHTML = '';
+  async enterCronograma() {
+    this.container.innerHTML = '';
 
-        // Crear iframe para el visualizador de documentos
-        const iframe = document.createElement('iframe');
-        iframe.style.width = '100%';
-        iframe.style.height = '100vh';
-        iframe.style.border = 'none';
+    window.planPortalComponent = this;
 
-        // Pasar parámetros a la nueva interfaz a través de la URL
-        const viewerUrl = `./modules/gestion-integral/plan-trabajo/plan-view.html?company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
-        iframe.src = viewerUrl;
+    const iframe = document.createElement('iframe');
+    iframe.style.width = '100%';
+    iframe.style.height = '100vh';
+    iframe.style.border = 'none';
 
-        this.container.appendChild(iframe);
+    const viewerUrl = `./modules/gestion-integral/plan-trabajo/plan-view.html?company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
+    iframe.src = viewerUrl;
+
+    this.container.appendChild(iframe);
+  }
+
+  async goBackToHome() {
+    window.planPortalComponent = this;
+    this.container.innerHTML = '';
+    await this.loadPortalHome();
+  }
+
+  goBackToModuleHome() {
+    this.destroy();
+    if (this.onBackToModuleHome) {
+      this.onBackToModuleHome();
     }
+  }
 
-    /**
+  destroy() {
+    if (window.planPortalComponent === this) {
+      window.planPortalComponent = null;
+    }
+    if (window.planPortalContainer) {
+      window.planPortalContainer = null;
+    }
+    if (this.portalScript && this.portalScript.parentNode === document.body) {
+      document.body.removeChild(this.portalScript);
+      this.portalScript = null;
+    }
+    this.container.innerHTML = '';
+  }
+
+  /**
      * Método legacy (diseño original) como fallback
      */
     renderLegacyDesign() {

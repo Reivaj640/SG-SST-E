@@ -1,8 +1,8 @@
 # 👥 Módulo 1: Recursos
 
-**Versión:** 2.3
-**Actualizado:** 20 de marzo de 2026
-**Estado:** ✅ Actualizado v0.1.86
+**Versión:** 2.5
+**Actualizado:** 4 de junio de 2026
+**Estado:** ✅ Actualizado v0.1.99
 
 ---
 
@@ -20,6 +20,7 @@
 10. [1.2.1 Programa de Capacitación 🆕](#121-programa-de-capacitación)
 11. [1.2.2 Inducción y Reinducción 🆕](#122-inducción-y-reinducción)
 12. [1.2.3 Curso Virtual 50 Horas](#123-curso-virtual-50-horas)
+13. [1.2.4 Manual SST Proveedores](#124-manual-sst-proveedores)
 
 ---
 
@@ -44,6 +45,7 @@ El módulo de **Recursos** gestiona todos los aspectos relacionados con la asign
 | 1.2.1 | Programa de Capacitación | `capacitaciones-logic.js`, `capacitaciones-viewer.js`, `capacitaciones-portal-logic.js` 🆕 | ✅ |
 | 1.2.2 | Inducción y Reinducción | `inducciones-logic.js`, `inducciones-viewer.js` 🆕 | ✅ |
 | 1.2.3 | Curso Virtual 50 Horas | `curso-virtual-logic.js`, `viewer.js` | ✅ |
+| 1.2.4 | Manual SST Proveedores | `manual-proveedores-logic.js`, `manual-proveedores-viewer.js` 🆕 | ✅ |
 
 ### 1.3 Archivos del Módulo
 
@@ -342,7 +344,7 @@ Controla las actividades de trabajo de alto riesgo y los permisos requeridos.
 
 ### Descripción
 
-Gestiona la conformación y documentación del Comité Paritario de Seguridad y Salud en el Trabajo.
+Gestiona la conformación y documentación del Comité Paritario de Seguridad y Salud en el Trabajo. Incluye autollenado de actas de reunión mensual con datos del Plan de Trabajo y accidentalidad.
 
 ### Funcionalidades
 
@@ -351,12 +353,48 @@ Gestiona la conformación y documentación del Comité Paritario de Seguridad y 
 - ✅ Acta de elección
 - ✅ Integrantes principales y suplentes
 - ✅ Vigencia del comité
+- ✅ **Autollenado de actas de reunión** — Datos del Plan de Trabajo (mes anterior) y accidentalidad 🆕
+- ✅ **Texto formateado multilinea** — Numeración, iconos ✓/⏱, agrupación por estado 🆕
+- ✅ **Accidentalidad enriquecida** — Nombre completo, identificación, fecha DD/MM/YYYY 🆕
 
 ### Archivos
 
 - `modules/recursos/copasst/copasst-logic.js`
 - `modules/recursos/copasst/copasst-viewer.js`
 - `modules/recursos/copasst/copasst-view.html`
+
+### Autollenado de Actas (v0.1.98)
+
+El handler IPC `get-copasst-auto-fill-data` genera automáticamente:
+
+| Paso | Contenido | Fuente |
+|------|-----------|--------|
+| PASO 1 | Número de acta, fecha sugerida | `getActasByFileName()` |
+| PASO 2 | Mes objetivo | Cálculo desde fecha |
+| PASO 3 | Agenda estándar COPASST | Hardcodeado (norma) |
+| PASO 4 | Plan de Trabajo del **mes anterior** | `Plan de Trabajo {year}.xlsx` — columna `previousMonthKey` |
+| PASO 5 | Accidentalidad del mes anterior | `Accidentalidad.xlsx` — columnas `Nombre Completo`, `Identificación`, `Fecha del incidente` |
+| PASO 6 | Respuesta final consolidada | Todos los pasos |
+
+**Columnas de accidentalidad (con fallback):**
+
+| Columna principal | Fallback 1 | Fallback 2 |
+|-------------------|------------|------------|
+| `Nombre Completo` | `Nombre` | `Trabajador` |
+| `Identificación` | `Cédula` | — |
+
+**Formato de texto en desarrollo items:**
+
+```
+Plan de Trabajo del mes de Febrero 2026:
+ 1. Actividad A — ✓ Completado
+ 2. Actividad B — ⏱ Programado
+
+En el mes de Febrero 2026, Se presentó(ron) 1 accidente(s) de trabajo:
+ 1. Lilibeth Pérez — CC 22510033 — 15/02/2026
+```
+
+**Transición de año:** Si el acta es de Enero, el mes anterior es Diciembre del año previo. El sistema busca automáticamente en `Plan de Trabajo {previousYear}.xlsx`.
 
 ### Contratos IPC Relacionados
 
@@ -366,6 +404,11 @@ const actaData = await window.electronAPI.getActaData();
 
 // Generar acta de conformación
 const actaPath = await window.electronAPI.generateCopasstActa(changes);
+
+// Autollenado de acta de reunión (v0.1.98+)
+const autoFillData = await window.electronAPI['get-copasst-auto-fill-data']({
+  empresaPath, targetMonth, targetYear, submoduloPath
+});
 ```
 
 ---
@@ -585,7 +628,38 @@ Gestiona el curso virtual de 50 horas en seguridad y salud en el trabajo.
 
 ---
 
+## 1.2.4 Manual SST Proveedores
+
+### Descripción
+
+Gestiona el manual de seguridad y salud en el trabajo dirigido a proveedores y contratistas, cumpliendo con la obligación de informar sobre las políticas SST de la empresa.
+
+### Funcionalidades
+
+- ✅ Visualización del manual SST para proveedores
+- ✅ Registro de entrega a proveedores/contratistas
+- ✅ Control de versiones del manual
+- ✅ Firma de acuse de recibo
+
+### Archivos
+
+- `modules/recursos/manual-proveedores/manual-proveedores-logic.js`
+- `modules/recursos/manual-proveedores/manual-proveedores-viewer.js`
+- `modules/recursos/manual-proveedores/manual-proveedores-view.html`
+
+---
+
 ## 2. Cambios Recientes
+
+### Versión 0.1.99 (9 junio 2026)
+
+- ✅ Submódulo 1.2.4 Manual SST Proveedores documentado
+- ✅ Curso Virtual 50 Horas (1.2.3) documentado
+
+### Versión 0.1.98 (4 junio 2026)
+
+- ✅ Autollenado de actas COPASST (`get-copasst-auto-fill-data`)
+- ✅ Autollenado de actas Convivencia (`get-convivencia-auto-fill-data`)
 
 ### Versión 0.1.70 (6 marzo 2026)
 
@@ -600,5 +674,5 @@ Gestiona el curso virtual de 50 horas en seguridad y salud en el trabajo.
 ---
 
 **Mantenido por:** Product Architect & Full-Stack Team  
-**Última actualización:** 6 de marzo de 2026  
-**Versión:** 0.1.70
+**Última actualización:** 9 de junio de 2026  
+**Versión:** 0.1.99

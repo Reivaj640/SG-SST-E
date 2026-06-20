@@ -17,7 +17,33 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 
 // Importar handlers de investigación de accidentes
-require('./modules/gestion-salud/investigacion-accidentes/investigacion_handlers.js');
+const investigacionHandlers = require('./modules/gestion-salud/investigacion-accidentes/investigacion_handlers.js');
+const _findInvestigacionSubmodulePath = investigacionHandlers._findInvestigacionSubmodulePath;
+const _discoverInvestigations = investigacionHandlers._discoverInvestigations;
+const _isSamePerson = investigacionHandlers._isSamePerson;
+const _analyzeInvestigationState = investigacionHandlers._analyzeInvestigationState;
+const _extractYearFromPath = investigacionHandlers._extractYearFromPath;
+const _findReportesAccidentesSubmodulePath = investigacionHandlers._findReportesAccidentesSubmodulePath;
+
+// Importar handlers de Archivo y Retención Documental (Submódulo 2.5.1)
+const { registerArchivoRetencionHandlers } = require('./modules/gestion-integral/archivo-retencion/archivo-retencion-main');
+
+// Importar módulo de Frecuencia de la Accidentalidad (Submódulo 3.3.1)
+const excelBridge = require('./main/excel-bridge');
+
+// Importar handlers de Inspecciones Sistemáticas (Submódulo 4.2.4)
+const { registerInspeccionesHandlers } = require('./main/inspecciones-bridge');
+
+// Importar handlers de Mantenimiento Periódico (Submódulo 4.2.5)
+const { registerMantenimientoHandlers } = require('./main/mantenimiento-bridge');
+
+// Importar handlers de Identificación de Peligros (Submódulo 4.1.2)
+const { registerIdentificacionPeligrosHandlers } = require('./main/identificacion-peligros-bridge');
+
+// Importar handlers de Revisión por la Alta Dirección (Submódulo 6.1.3)
+const { registerRevisionAltaDireccionHandlers } = require('./main/revision-alta-direccion-bridge');
+// Importar handlers de Auditoría Anual (Submódulo 6.1.2) — F1 (2026-06-19)
+const { registerAuditoriaAnualHandlers } = require('./main/auditoria-anual-bridge');
 
 // Capturar promesas no manejadas globalmente
 process.on('unhandledRejection', (reason, promise) => {
@@ -49,6 +75,13 @@ autoUpdater.autoRunAppAfterInstall = true;
 autoUpdater.requestHeaders = {
   'Cache-Control': 'no-cache'
 };
+autoUpdater.timeout = 30000; // 30 segundos máximo de espera para respuesta de GitHub API
+
+// En modo desarrollo, forzar uso de dev-app-update.yml para que el updater funcione
+if (!app.isPackaged) {
+  autoUpdater.forceDevUpdateConfig = true;
+  console.log('[UPDATER] Modo desarrollo: forceDevUpdateConfig activado');
+}
 // ------------------------------------
 
 const execPromise = promisify(exec);
@@ -89,70 +122,97 @@ async function getEmbeddedPythonPath() {
 }
 
 async function findPython() {
-    console.log('[DEBUG] Starting Python path search');
+	console.log('[DEBUG] Starting Python path search');
 
-    // 1. Buscar en la variable de entorno PATH
-    console.log('[DEBUG] Searching for "python.exe" in system PATH');
-    try {
-        // En Windows, 'where' es el comando para encontrar un ejecutable en el PATH
-        const { stdout } = await execPromise('where python');
-        const potentialPaths = stdout.split(/\r?\n/).filter(p => p.endsWith('python.exe'));
+	// 1. Priorizar Python del proyecto (python-embed y .venv) antes que el del sistema
+	// Esto garantiza que se use el Python con todas las dependencias instaladas
+	const projectPythonPaths = [
+		path.join(__dirname, 'Portear', 'python-embed', 'python.exe'),
+		path.join(__dirname, 'Portear', '.venv', 'Scripts', 'python.exe')
+	];
 
-        for (const p of potentialPaths) {
-            const trimmedPath = p.trim();
-            if (trimmedPath && fs.existsSync(trimmedPath)) {
-                try {
-                    console.log(`[DEBUG] Testing Python executable from PATH: ${trimmedPath}`);
-                    await execFilePromise(trimmedPath, ['--version']);
-                    console.log(`[SUCCESS] Python found in PATH at: ${trimmedPath}`);
-                    return trimmedPath;
-                } catch (e) {
-                    console.warn(`[WARN] Path from PATH found but not executable: ${trimmedPath}. Error: ${e.message}`);
-                    continue;
-                }
-            }
-        }
-    } catch (e) {
-        console.log('[DEBUG] "where python" command failed or returned no results. Will check common paths.');
-    }
+	for (const p of projectPythonPaths) {
+		console.log(`[DEBUG] Checking project Python: ${p}`);
+		if (fs.existsSync(p)) {
+			try {
+				await execFilePromise(p, ['--version']);
+				console.log(`[SUCCESS] Project Python found at: ${p}`);
+				return p;
+			} catch (e) {
+				console.warn(`[WARN] Project Python found but not executable: ${p}. Error: ${e.message}`);
+				continue;
+			}
+		} else {
+			console.log(`[DEBUG] Project Python not found at: ${p}`);
+		}
+	}
 
-    // 2. Si no se encuentra en PATH, buscar en rutas comunes (fallback)
-    console.log('[DEBUG] Python not found in PATH, checking common installation directories.');
-    const username = os.userInfo().username;
-    console.log('[DEBUG] Current username:', username);
-    const commonPaths = [
-        path.join(__dirname, 'Portear', '.venv', 'Scripts', 'python.exe'), // Entorno virtual local
-        `C:\\Users\\${username}\\AppData\\Local\\Programs\\Python\\Python312\\python.exe`,
-        `C:\\Users\\${username}\\AppData\\Local\\Programs\\Python\\Python311\\python.exe`,
-        `C:\\Users\\${username}\\AppData\\Local\\Programs\\Python\\Python310\\python.exe`,
-        'C:\\Python312\\python.exe',
-        'C:\\Python311\\python.exe',
-        'C:\\Python310\\python.exe',
-        'C:\\Program Files\\Python312\\python.exe',
-        'C:\\Program Files\\Python311\\python.exe',
-        'C:\\Program Files\\Python310\\python.exe',
-        `C:\\Users\\${username}\\AppData\\Local\\Microsoft\\WindowsApps\\python.exe`,
-        `C:\\Users\\${username}\\AppData\\Local\\Microsoft\\WindowsApps\\python3.exe`
-    ];
+	// 2. Buscar en la variable de entorno PATH
+	console.log('[DEBUG] Searching for "python.exe" in system PATH');
+	try {
+		const { stdout } = await execPromise('where python');
+		const potentialPaths = stdout.split(/\r?\n/).filter(p => p.endsWith('python.exe'));
 
-    for (const p of commonPaths) {
-        console.log(`[DEBUG] Checking common path: ${p}`);
-        if (fs.existsSync(p)) {
-            try {
-                console.log(`[DEBUG] Testing Python executable: ${p}`);
-                await execFilePromise(p, ['--version']);
-                console.log(`[SUCCESS] Python found at: ${p}`);
-                return p;
-            } catch (e) {
-                console.warn(`[WARN] Path found but not executable: ${p}. Error: ${e.message}`);
-                continue;
-            }
-        } else {
-            console.log(`[DEBUG] Path does not exist: ${p}`);
-        }
-    }
+		for (const p of potentialPaths) {
+			const trimmedPath = p.trim();
+			if (trimmedPath && fs.existsSync(trimmedPath)) {
+				try {
+					console.log(`[DEBUG] Testing Python executable from PATH: ${trimmedPath}`);
+					await execFilePromise(trimmedPath, ['--version']);
+					console.log(`[SUCCESS] Python found in PATH at: ${trimmedPath}`);
+					return trimmedPath;
+				} catch (e) {
+					console.warn(`[WARN] Path from PATH found but not executable: ${trimmedPath}. Error: ${e.message}`);
+					continue;
+				}
+			}
+		}
+	} catch (e) {
+		console.log('[DEBUG] "where python" command failed or returned no results. Will check common paths.');
+	}
 
-    throw new Error('No se pudo encontrar un ejecutable de Python válido en el PATH del sistema ni en las rutas conocidas.');
+	// 3. Si no se encuentra en PATH, buscar en rutas comunes (fallback)
+	console.log('[DEBUG] Python not found in PATH, checking common installation directories.');
+	const username = os.userInfo().username;
+	console.log('[DEBUG] Current username:', username);
+	const commonPaths = [
+		`C:\\Users\\${username}\\AppData\\Local\\Programs\\Python\\Python314\\python.exe`,
+		`C:\\Users\\${username}\\AppData\\Local\\Programs\\Python\\Python313\\python.exe`,
+		`C:\\Users\\${username}\\AppData\\Local\\Programs\\Python\\Python312\\python.exe`,
+		`C:\\Users\\${username}\\AppData\\Local\\Programs\\Python\\Python311\\python.exe`,
+		`C:\\Users\\${username}\\AppData\\Local\\Programs\\Python\\Python310\\python.exe`,
+		'C:\\Python314\\python.exe',
+		'C:\\Python313\\python.exe',
+		'C:\\Python312\\python.exe',
+		'C:\\Python311\\python.exe',
+		'C:\\Python310\\python.exe',
+		'C:\\Program Files\\Python314\\python.exe',
+		'C:\\Program Files\\Python313\\python.exe',
+		'C:\\Program Files\\Python312\\python.exe',
+		'C:\\Program Files\\Python311\\python.exe',
+		'C:\\Program Files\\Python310\\python.exe',
+		`C:\\Users\\${username}\\AppData\\Local\\Microsoft\\WindowsApps\\python.exe`,
+		`C:\\Users\\${username}\\AppData\\Local\\Microsoft\\WindowsApps\\python3.exe`
+	];
+
+	for (const p of commonPaths) {
+		console.log(`[DEBUG] Checking common path: ${p}`);
+		if (fs.existsSync(p)) {
+			try {
+				console.log(`[DEBUG] Testing Python executable: ${p}`);
+				await execFilePromise(p, ['--version']);
+				console.log(`[SUCCESS] Python found at: ${p}`);
+				return p;
+			} catch (e) {
+				console.warn(`[WARN] Path found but not executable: ${p}. Error: ${e.message}`);
+				continue;
+			}
+		} else {
+			console.log(`[DEBUG] Path does not exist: ${p}`);
+		}
+	}
+
+	throw new Error('No se pudo encontrar un ejecutable de Python válido en el PATH del sistema ni en las rutas conocidas.');
 }
 
 async function getPython() {
@@ -176,10 +236,12 @@ async function getPython() {
     }
 
     // Usar Python empaquetado (producción) o buscar Python desde cero (desarrollo)
-    global.cachedPythonPath = await getEmbeddedPythonPath();
-    console.log('[DEBUG] New Python path cached:', global.cachedPythonPath);
-    return global.cachedPythonPath;
+	global.cachedPythonPath = await getEmbeddedPythonPath();
+	console.log('[DEBUG] New Python path cached:', global.cachedPythonPath);
+	return global.cachedPythonPath;
 }
+
+global.getPython = getPython;
 
 /**
  * Obtiene la ruta correcta para scripts de Python tanto en desarrollo como en app empaquetada.
@@ -200,6 +262,7 @@ function getPythonScriptPath(scriptName) {
 }
 
 let mainWindow;
+let loadingWindow = null;
 let isWindowCreated = false; // Variable para rastrear si la ventana ya ha sido creada
 
 // --- Función de Logging Centralizada ---
@@ -473,6 +536,16 @@ autoUpdater.on('update-downloaded', (info) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('update_downloaded', info);
   }
+
+  // Re-check 60s después: cubre el caso de releases encadenadas
+  // (ej: publicaste v0.1.103 mientras la app actualizaba a v0.1.102)
+  // Si encuentra una más nueva, se descargará sobre la pendiente antes del reinicio
+  setTimeout(() => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      sendLog('[UPDATER] Re-check post-install (60s) para detectar releases encadenadas', 'INFO');
+      checkForUpdatesSafe();
+    }
+  }, 60 * 1000);
 });
 
 // Errores
@@ -490,17 +563,43 @@ autoUpdater.on('error', (err) => {
     shouldRetry = true;
   }
   
-  // Detectar errores de red (HTTP2, conexión, etc.)
+  // Detectar timeout (30 segundos sin respuesta)
   if (err.message && (
-    err.message.includes('ERR_HTTP2_SERVER_REFUSED_STREAM') ||
-    err.message.includes('ERR_INTERNET_DISCONNECTED') ||
-    err.message.includes('ERR_NAME_NOT_RESOLVED') ||
+    err.message.includes('Timeout') ||
+    err.message.includes('timeout') ||
+    err.message.includes('ETIMEDOUT') ||
+    err.message.includes('ESOCKETTIMEDOUT')
+  )) {
+    sendLog('[UPDATER] Timeout detectado: el servidor no respondió a tiempo.', 'WARN');
+    errorMessage = 'Tiempo de espera agotado. El servidor de actualizaciones no respondió. Verifique su conexión a internet e intente de nuevo.';
+    shouldRetry = false;
+  }
+  
+  // Detectar errores de red (sin conexión, DNS, etc.)
+  if (err.message && (
+    err.message.includes('ERR_INTERNET_DISCONNECTED')
+  )) {
+    sendLog('[UPDATER] Sin conexión a internet detectada.', 'WARN');
+    errorMessage = 'No tiene conexión a internet. Verifique su red e intente de nuevo.';
+    shouldRetry = false;
+  }
+
+  if (err.message && (
+    err.message.includes('ERR_NAME_NOT_RESOLVED')
+  )) {
+    sendLog('[UPDATER] Error de DNS: no se pudo resolver el nombre del servidor.', 'WARN');
+    errorMessage = 'No se pudo resolver la dirección del servidor. Verifique su conexión DNS.';
+    shouldRetry = false;
+  }
+
+  if (err.message && (
     err.message.includes('ERR_CONNECTION_FAILED') ||
+    err.message.includes('ERR_CONNECTION_REFUSED') ||
     err.message.includes('net::ERR_')
   )) {
     sendLog('[UPDATER] Error de red detectado. No es crítico, la app funcionará normalmente.', 'WARN');
-    errorMessage = 'No se pudo verificar actualizaciones. La aplicación funcionará normalmente. Se reintentará más tarde.';
-    shouldRetry = false; // No reintentar inmediatamente para no saturar
+    errorMessage = 'No se pudo conectar con el servidor de actualizaciones. Verifique su conexión a internet.';
+    shouldRetry = false;
   }
   
   // Detectar errores de rate limiting de GitHub API
@@ -509,7 +608,7 @@ autoUpdater.on('error', (err) => {
     err.message.includes('rate limit')
   )) {
     sendLog('[UPDATER] Rate limit de GitHub API alcanzado. Se reintentará más tarde.', 'WARN');
-    errorMessage = 'Límite de verificaciones alcanzado. Se reintentará más tarde.';
+    errorMessage = 'Límite de verificaciones alcanzado. Espere unos minutos e intente de nuevo.';
     shouldRetry = false;
   }
 
@@ -530,8 +629,14 @@ autoUpdater.on('error', (err) => {
 function checkForUpdatesSafe() {
   try {
     sendLog('[UPDATER] checkForUpdatesSafe: Iniciando verificación...', 'INFO');
+
+    // Enviar evento de verificación manualmente para asegurar que la UI responda
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('update_checking');
+    }
+
     const result = autoUpdater.checkForUpdates();
-    
+
     // Manejar la promesa para evitar unhandled rejections
     if (result && typeof result.then === 'function') {
       result.catch((err) => {
@@ -539,16 +644,83 @@ function checkForUpdatesSafe() {
         // El error ya será manejado por el event listener 'error'
       });
     }
+
+    // Fallback: Si no se recibe ningún evento en 5 segundos, asumir que el check fue skipeado
+    setTimeout(() => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        sendLog('[UPDATER] Timeout de seguridad: verificando si el check fue completado...', 'DEBUG');
+        // El evento ya habría sido enviado por los listeners si el check fue exitoso
+      }
+    }, 5000);
   } catch (err) {
     sendLog(`[UPDATER] checkForUpdatesSafe: Error síncrono capturado: ${err.message}`, 'ERROR');
     // El error ya será manejado por el event listener 'error'
   }
 }
 
+// Smart polling: staggered checks para cubrir gaps entre releases
+// - Check inicial (al abrir la app)
+// - Re-check 1 min después (cubre releases publicadas durante el último check)
+// - Re-check 5 min después (cubre red lenta o rate limit en check inicial)
+// - Cada 6 horas (responsivo sin castigar la GitHub API: 60 req/h sin auth)
+function scheduleUpdateChecks() {
+  // Check 1: Inmediato
+  checkForUpdatesSafe();
+
+  // Check 2: 1 minuto después
+  setTimeout(() => {
+    sendLog('[UPDATER] Smart polling: re-check a 1 minuto', 'INFO');
+    checkForUpdatesSafe();
+  }, 60 * 1000);
+
+  // Check 3: 5 minutos después
+  setTimeout(() => {
+    sendLog('[UPDATER] Smart polling: re-check a 5 minutos', 'INFO');
+    checkForUpdatesSafe();
+  }, 5 * 60 * 1000);
+
+  // Check periódico: cada 6 horas
+  setInterval(() => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      sendLog('[UPDATER] Smart polling: verificación periódica cada 6h', 'INFO');
+      checkForUpdatesSafe();
+    }
+  }, 6 * 60 * 60 * 1000);
+}
+
 // Verificar si se está ejecutando con squirrel (instalador de Windows)
 if (require('electron-squirrel-startup')) {
   app.quit();
 }
+
+// Función para crear la ventana de carga (splash screen)
+const createLoadingWindow = () => {
+  loadingWindow = new BrowserWindow({
+    width: 500,
+    height: 600,
+    frame: false,
+    resizable: false,
+    center: true,
+    icon: path.join(__dirname, 'assets', 'K+AIR-multires.ico'),
+    webPreferences: {
+      preload: path.join(__dirname, 'loading', 'preload-loading.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+  loadingWindow.loadFile(path.join(__dirname, 'loading', 'loading.html'));
+  loadingWindow.on('closed', () => { loadingWindow = null; });
+
+  // Fallback: si el IPC nunca llega, mostrar mainWindow a los 10 segundos
+  setTimeout(() => {
+    if (loadingWindow && !loadingWindow.isDestroyed()) {
+      loadingWindow.close();
+    }
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+    }
+  }, 10000);
+};
 
 // Función para crear la ventana principal
 const createWindow = () => {
@@ -568,7 +740,8 @@ const createWindow = () => {
     height: 700, // Alto inicial 700 para que quepa en 768px con margen para barra de título
     minWidth: 1024, // Mínimo razonable para UI funcional
     minHeight: 650, // Permite uso en pantallas 1366x768
-    icon: path.join(__dirname, 'assets', 'KIAR256.ico'),
+    show: false, // Oculta hasta que loading screen complete
+    icon: path.join(__dirname, 'assets', 'K+AIR-multires.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -582,6 +755,35 @@ const createWindow = () => {
     console.log('[MAIN] Ventana principal cerrada, reseteando isWindowCreated...');
     mainWindow = null;
     isWindowCreated = false;
+  });
+
+  // Eventos de pantalla completa
+  mainWindow.on('enter-full-screen', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('fullscreen-changed', true);
+    }
+  });
+  mainWindow.on('leave-full-screen', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('fullscreen-changed', false);
+    }
+  });
+
+  // Eventos de maximizar/restaurar
+  mainWindow.on('maximize', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('fullscreen-changed', true);
+    }
+  });
+  mainWindow.on('unmaximize', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('fullscreen-changed', false);
+    }
+  });
+
+  // Consulta de estado maximizado (para inicialización de componentes)
+  ipcMain.handle('get-maximized-state', () => {
+    return mainWindow && !mainWindow.isDestroyed() ? mainWindow.isMaximized() : false;
   });
 
   // Cargar el archivo HTML principal
@@ -835,7 +1037,7 @@ ipcMain.handle('companies-sync-v1', async (event, payload = {}) => {
 
     const config = readConfigSync();
     const companyPaths = config.companyPaths || {};
-    companiesSyncInternal(localDb);
+    companiesSyncInternal();
     return { success: true, data: { count: Object.keys(companyPaths).length } };
   } catch (error) {
     console.error('[COMPANIES] Error en sync:', error);
@@ -1119,6 +1321,18 @@ ipcMain.handle('get-app-version', async () => {
   }
 });
 
+// Manejar la verificación manual de actualizaciones desde configuraciones
+ipcMain.handle('check-for-updates-manual', async () => {
+  try {
+    sendLog('[UPDATER] Solicitud manual de verificación de actualizaciones desde Configuraciones', 'INFO');
+    checkForUpdatesSafe();
+    return { success: true };
+  } catch (error) {
+    sendLog(`[UPDATER] Error en verificación manual: ${error.message}`, 'ERROR');
+    return { success: false, error: { code: 'UPDATE_CHECK_FAILED', message: error.message } };
+  }
+});
+
 // Manejar la obtención de la ruta de la aplicación
 ipcMain.handle('get-app-path', async () => {
   try {
@@ -1127,6 +1341,78 @@ ipcMain.handle('get-app-path', async () => {
   } catch (error) {
     console.error('Error getting app path:', error);
     return __dirname; // Valor por defecto en caso de error
+  }
+});
+
+// Crear acceso directo en el escritorio del usuario (Windows)
+// Nota: autoUpdater.quitAndInstall() NO recrea shortcuts, por eso este IPC existe
+ipcMain.handle('create-desktop-shortcut', async () => {
+  try {
+    if (process.platform !== 'win32') {
+      return { success: false, error: 'Esta función solo está disponible en Windows actualmente.' };
+    }
+
+    const desktopPath = app.getPath('desktop');
+    const shortcutPath = path.join(desktopPath, 'K+AIR.lnk');
+
+    // En producción: apunta al .exe instalado (C:\Program Files\K+AIR\K+AIR.exe)
+    // En desarrollo: apunta a electron.exe + ruta del proyecto
+    const target = process.execPath;
+    const args = app.isPackaged ? '' : `"${app.getAppPath()}"`;
+    const cwd = app.isPackaged ? path.dirname(target) : __dirname;
+
+    // Buscar icono multi-res: prod junto al .exe, dev en assets/
+    // Prioriza el multi-res porque se ve nítido a cualquier tamaño (16-256px)
+    let iconPath;
+    if (app.isPackaged) {
+      const candidates = [
+        path.join(path.dirname(process.execPath), 'resources', 'assets', 'K+AIR-multires.ico'),
+        path.join(path.dirname(process.execPath), 'assets', 'K+AIR-multires.ico'),
+        path.join(path.dirname(process.execPath), 'K+AIR-multires.ico'),
+        path.join(path.dirname(process.execPath), 'resources', 'assets', 'KIAR256.ico'),
+        path.join(path.dirname(process.execPath), 'assets', 'KIAR256.ico'),
+        path.join(path.dirname(process.execPath), 'KIAR256.ico'),
+        path.join(path.dirname(process.execPath), 'K+AIR.ico')
+      ];
+      iconPath = candidates.find(p => fs.existsSync(p)) || candidates[0];
+    } else {
+      const devCandidates = [
+        path.join(__dirname, 'assets', 'K+AIR-multires.ico'),
+        path.join(__dirname, 'assets', 'KIAR256.ico')
+      ];
+      iconPath = devCandidates.find(p => fs.existsSync(p)) || devCandidates[0];
+    }
+
+    // 'replace' sobreescribe si ya existe
+    shell.writeShortcutLink(shortcutPath, 'replace', {
+      target,
+      args,
+      cwd,
+      icon: iconPath,
+      iconIndex: 0,
+      description: 'K+AIR - Sistema de Gestión de Seguridad y Salud en el Trabajo',
+      appUserModelId: 'com.jrfsoluciones.sgsst'
+    });
+
+    sendLog(`[SHORTCUT] Acceso directo creado/actualizado: ${shortcutPath}`, 'INFO');
+    return { success: true, path: shortcutPath };
+  } catch (error) {
+    sendLog(`[SHORTCUT] Error creando acceso directo: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+// Verificar si ya existe el acceso directo en el escritorio
+ipcMain.handle('check-desktop-shortcut', async () => {
+  try {
+    if (process.platform !== 'win32') {
+      return { exists: false, path: null };
+    }
+    const shortcutPath = path.join(app.getPath('desktop'), 'K+AIR.lnk');
+    const exists = fs.existsSync(shortcutPath);
+    return { exists, path: exists ? shortcutPath : null };
+  } catch (error) {
+    return { exists: false, path: null, error: error.message };
   }
 });
 
@@ -1310,6 +1596,7 @@ async function getDashboardAlertas(rootPath, companyName) {
   const dashboard_data = {
     kpis: {
       accidents_month: 0,
+      accidents_year: 0,
       pric_active: 0,
       overdue_docs: 0,
       compliance: 0,
@@ -1389,7 +1676,13 @@ async function getDashboardAlertas(rootPath, companyName) {
     
     // Actualizar KPIs
     dashboard_data.kpis.overdue_docs = vencidas.length;
-    dashboard_data.kpis.compliance = capacitacionesStats.porcentajeCumplimiento;
+    
+    // ========================================================================
+    // 1b. PLAN DE TRABAJO - Calcular cumplimiento
+    // ========================================================================
+    const planTrabajoStats = await calculatePlanTrabajoStats(rootPath, currentYear);
+    dashboard_data.kpis.compliance = planTrabajoStats.porcentajeAvance;
+    sendLog(`[DASHBOARD] 📊 Plan de Trabajo: ${planTrabajoStats.porcentajeAvance}% (${planTrabajoStats.actividadesEjecutadas}/${planTrabajoStats.totalActividades})`, 'INFO');
 
     // REGLA DE ORO ACTUALIZADA: Alertas de recursos = Vencidas + Pendientes de gestión
     // Esto asegura que el badge del home coincida con lo que el usuario ve dentro del módulo.
@@ -1536,6 +1829,87 @@ async function getDashboardAlertas(rootPath, companyName) {
     }
 
     // ========================================================================
+    // 2.5 ACCIDENTES AÑO ACTUAL (Registro Estadístico 3.2.3)
+    // ========================================================================
+    try {
+      const gestionSaludDir = path.join(rootPath, '3. Gestión de la Salud');
+      if (!fs.existsSync(gestionSaludDir)) {
+        sendLog(`[DASHBOARD] ℹ️ Carpeta "3. Gestión de la Salud" no encontrada`, 'INFO');
+      } else {
+        const subDirs = fs.readdirSync(gestionSaludDir);
+        const registroDir = subDirs.find(d => d.startsWith('3.2.3'));
+        
+        if (!registroDir) {
+          sendLog(`[DASHBOARD] ℹ️ Subcarpeta 3.2.3 no encontrada en Gestión de la Salud`, 'INFO');
+        } else {
+          const registroPath = path.join(gestionSaludDir, registroDir);
+          const files = fs.readdirSync(registroPath);
+          const excelFile = files.find(f => f.toLowerCase().endsWith('.xlsx') && !f.startsWith('~$'));
+          
+          if (!excelFile) {
+            sendLog(`[DASHBOARD] ℹ️ No se encontró archivo Excel en ${registroDir}`, 'INFO');
+          } else {
+            const excelPath = path.join(registroPath, excelFile);
+            const workbook = xlsx.readFile(excelPath);
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const rawData = xlsx.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+
+            // Buscar fila de headers (como get-accidentes-stats)
+            let headerRowIdx = -1;
+            for (let i = 0; i < Math.min(10, rawData.length); i++) {
+              const row = rawData[i];
+              if (row && row.some(c => {
+                const s = String(c).trim().toLowerCase();
+                return s === 'ciudad' || s === 'año' || s === 'evento';
+              })) {
+                headerRowIdx = i;
+                break;
+              }
+            }
+            if (headerRowIdx === -1) headerRowIdx = 0;
+
+            const headers = rawData[headerRowIdx].map(h => 
+              String(h).trim().replace(/\r\n|\r|\n/g, '')
+            );
+            const idx = (name) => headers.findIndex(h => h.toLowerCase() === name.toLowerCase());
+
+            const iAnio = idx('Año');
+            const iFecha = idx('Fecha del incidente');
+            const iEvento = idx('Evento');
+
+            sendLog(`[DASHBOARD] 📋 Accidentes headers: Año=${iAnio}, Fecha=${iFecha}, Evento=${iEvento} (archivo: ${excelFile})`, 'INFO');
+
+            let count = 0;
+            for (let r = headerRowIdx + 1; r < rawData.length; r++) {
+              const row = rawData[r];
+              if (!row || row.length === 0) continue;
+
+              // Filtrar por año
+              if (iAnio >= 0) {
+                const anio = parseInt(row[iAnio]);
+                if (!anio || anio !== today.getFullYear()) continue;
+              }
+
+              // Filtrar por evento AT
+              if (iEvento >= 0) {
+                const evento = String(row[iEvento] || '').trim().toLowerCase();
+                if (evento !== 'at') continue;
+              }
+
+              count++;
+            }
+
+            dashboard_data.kpis.accidents_year = count;
+            sendLog(`[DASHBOARD] 📊 Accidentes año ${today.getFullYear()}: ${count} (fuente: ${excelFile})`, 'INFO');
+          }
+        }
+      }
+    } catch (error) {
+      sendLog(`[DASHBOARD] ⚠️ Error leyendo datos de accidentes: ${error.message}`, 'WARN');
+    }
+
+    // ========================================================================
     // 3. EPP - Usar calculateEppsStats
     // ========================================================================
     const eppsStats = await calculateEppsStats(rootPath);
@@ -1665,7 +2039,6 @@ async function getDashboardAlertas(rootPath, companyName) {
     // 6. VERIFICAR ACTAS COPASST Y COMITÉ DE CONVIVENCIA
     // ========================================================================
     const actasPath = path.join(rootPath, '1. Recursos');
-    const currentYear = new Date().getFullYear();
 
     // ------------------------------------------------------------------------
     // 6.1 VERIFICAR COPASST
@@ -2303,13 +2676,13 @@ ipcMain.handle('get-control-remisiones-data', async (event, companyName) => {
     const range = xlsx.utils.decode_range(worksheet['!ref']);
     sendLog(`[MAIN] Rango de datos en la hoja: ${worksheet['!ref']}`);
 
-    // Definir el rango para leer desde la fila 7 (índice 6 en base 0)
-    const startRow = 6; // Fila 7
+    // Definir el rango para leer desde la fila 1 (índice 0)
+    const startRow = 0; // Encabezados en fila 1 (índice 0)
     const endRow = range.e.r; // Última fila
 
-    // Crear un nuevo rango que comience desde la fila 7
+    // Crear un nuevo rango que comience desde la fila 1
     const newRange = {
-      s: { c: range.s.c, r: startRow }, // Comenzar desde la columna 0, fila 7
+      s: { c: range.s.c, r: startRow }, // Comenzar desde la columna 0, fila 1
       e: { c: range.e.c, r: endRow }    // Terminar en la última columna y fila
     };
 
@@ -2317,7 +2690,7 @@ ipcMain.handle('get-control-remisiones-data', async (event, companyName) => {
     const rangeStr = xlsx.utils.encode_range(newRange);
     sendLog(`[MAIN] Rango para lectura: ${rangeStr}`);
 
-    // Leer los datos desde la fila 7
+    // Leer los datos desde la fila 1
     const allData = xlsx.utils.sheet_to_json(worksheet, {
       header: 1,
       range: rangeStr
@@ -2337,9 +2710,9 @@ ipcMain.handle('get-control-remisiones-data', async (event, companyName) => {
         };
     }
 
-    // La primera fila ahora será los encabezados (fila 7 del Excel original)
-    const headers = allData[0]; // Fila 7 del Excel
-    const rows = allData.slice(1); // Filas 8 en adelante del Excel
+    // La primera fila son los encabezados (fila 1 del Excel)
+    const headers = allData[0]; // Fila 1 del Excel
+    const rows = allData.slice(1); // Filas 2 en adelante del Excel
 
     sendLog(`[MAIN] Encabezados encontrados: ${headers.length} columnas`);
     sendLog(`[MAIN] Datos de remisiones encontrados. Total filas: ${rows.length}`);
@@ -2468,35 +2841,67 @@ ipcMain.handle('map-directory', async (event, directoryPath) => {
 // Manejar lectura de contenido de directorio
 ipcMain.handle('read-directory', async (event, directoryPath) => {
   try {
+    if (directoryPath === 'DRIVES') {
+      const { execSync } = require('child_process');
+      const output = execSync('wmic logicaldisk get name,description', { encoding: 'utf8' });
+      const folders = [];
+      const lines = output.trim().split('\n').slice(1);
+      for (const line of lines) {
+        const match = line.trim().match(/^(.+?)\s+([A-Za-z]:)$/);
+        if (match) {
+          const description = match[1].trim();
+          const driveLetter = match[2].trim();
+          folders.push({
+            name: `${driveLetter}  ${description}`,
+            path: driveLetter + '\\',
+            isDrive: true,
+          });
+        }
+      }
+      folders.sort((a, b) => a.path.localeCompare(b.path));
+      console.log('Drives listed successfully');
+      return { success: true, path: 'DRIVES', files: [], folders: folders };
+    }
+
+    if (!directoryPath || directoryPath.trim() === '') {
+      directoryPath = app.getPath('home');
+    }
     console.log('Reading directory:', directoryPath);
     const items = await fsp.readdir(directoryPath, { withFileTypes: true });
 
     const files = [];
     const folders = [];
     for (const item of items) {
-      const itemPath = path.join(directoryPath, item.name);
-      if (item.isDirectory()) {
+      try {
+        const itemPath = path.join(directoryPath, item.name);
+        if (item.isDirectory()) {
           folders.push({
-              name: item.name,
-              path: itemPath,
-          });
-      } else {
-          const stats = await fsp.stat(itemPath);
-          files.push({
             name: item.name,
             path: itemPath,
-            size: stats.size,
-            modified: stats.mtime,
-            extension: path.extname(item.name).substring(1)
           });
+} else {
+const stats = await fsp.stat(itemPath);
+if (!item.name.startsWith('~$')) {
+files.push({
+name: item.name,
+path: itemPath,
+size: stats.size,
+modified: stats.mtime,
+extension: path.extname(item.name).substring(1)
+});
+}
+}
+      } catch (itemError) {
+        if (itemError.code === 'EPERM' || itemError.code === 'EACCES' || itemError.code === 'ENOENT') continue;
+        throw itemError;
       }
     }
 
     console.log('Directory read successfully');
-    return { success: true, files: files, folders: folders }; // Devolver objeto estructurado
+    return { success: true, path: directoryPath, files: files, folders: folders };
   } catch (error) {
     console.error('Error reading directory:', error);
-    return { success: false, error: error.message }; // Devolver objeto de error
+    return { success: false, error: error.message };
   }
 });
 
@@ -2754,8 +3159,56 @@ ipcMain.handle('process-excel-data', async (event, { buffer, company, period }) 
         for (let i = headerRowIndex + 1; i < rawData.length; i++) {
             const row = rawData[i];
             
-            // Obtener nombre de la actividad (columna B, índice 1)
-            const actividad = String(row[columnMap['actividad']] || '').trim();
+      // Obtener nombre de la actividad (columna B, índice 1)
+      let actividadRaw = row[columnMap['actividad']];
+      // Handle hyperlink objects: {text, hyperlink} or rich text arrays
+      if (typeof actividadRaw === 'object' && actividadRaw !== null) {
+        if (actividadRaw.text) {
+          actividadRaw = actividadRaw.text;
+        } else if (Array.isArray(actividadRaw.richText)) {
+          actividadRaw = actividadRaw.richText.map(r => r.text || '').join('');
+        } else {
+          actividadRaw = String(actividadRaw);
+        }
+      }
+      let actividad = String(actividadRaw || '').trim();
+
+      // Obtener responsable (columna C, índice 2)
+      let responsableRaw = row[columnMap['responsable']];
+      if (typeof responsableRaw === 'object' && responsableRaw !== null) {
+        if (responsableRaw.text) {
+          responsableRaw = responsableRaw.text;
+        } else {
+          responsableRaw = String(responsableRaw);
+        }
+      }
+      let responsable = String(responsableRaw || '').trim();
+
+      // Detect corrupted rows from B:C merge on activity rows.
+      // Two scenarios depending on which cell was the merge master:
+      //   Scenario A (2025 file): merge master = B (activity name)
+      //     → SheetJS reads B=activity name, C="" (empty)
+      //     → Activity name is preserved, but responsable is lost
+      //   Scenario B (2026 file): merge master = C (responsable)
+      //     → SheetJS reads B="Profesional SST", C="" (empty)
+      //     → Activity name is overwritten, responsable appears in B
+      const colACheck = String(row[columnMap['numero'] || 0] || '').trim();
+      const isActivityRow = colACheck !== '' && !isNaN(parseFloat(colACheck.replace(',', '.')));
+      const knownResponsables = ['Profesional SST', 'Auxiliar SST', 'Coordinador SST', 'ARL', 'Responsable SST'];
+      const bIsResponsable = knownResponsables.some(rv => actividad === rv);
+
+      if (isActivityRow && bIsResponsable && !responsable) {
+        // Scenario B: Column B shows the responsable value, C is empty
+        // The real activity name is lost — move B to responsable, mark for repair
+        responsable = actividad;
+        actividad = '';
+        sendLog(`[MAIN][WARN] Fila ${i + 1}: Columna B contiene responsable "${responsable}" (merge B:C master=C) — actividad perdida, requiere reparación`, 'WARN');
+      } else if (isActivityRow && !responsable && actividad.length > 2) {
+        // Scenario A: Column C is empty on an activity row, B has the correct activity name
+        // The responsable is lost — default to 'Profesional SST'
+        responsable = 'Profesional SST';
+        sendLog(`[MAIN][WARN] Fila ${i + 1}: Columna C vacía en fila de actividad (merge B:C master=B) - responsable default a "Profesional SST"`, 'WARN');
+      }
             
             // Saltar filas vacías o de totales
             if (!actividad || actividad.length < 2) continue;
@@ -2829,18 +3282,19 @@ ipcMain.handle('process-excel-data', async (event, { buffer, company, period }) 
                 row[columnMap['diciembre']] || ''
             ];
 
-            processedData[year].push({
-              id: i + 1,
-              name: actividad,
-              level: level,
-              type: type,
-              expanded: true,
-              responsible: row[columnMap['responsable']] || 'Profesional SST',
-              months: months,
-              observations: row[columnMap['observaciones']] || '',
-              avance: row[columnMap['avance']] || '',
-              estado: row[columnMap['estado']] || ''
-            });
+		processedData[year].push({
+					id: processedData[year].length + 1,
+					rowIndex: i + 1,
+					name: actividad,
+					level: level,
+					type: type,
+					expanded: true,
+      responsible: responsable || 'Profesional SST',
+					months: months,
+					observations: row[columnMap['observaciones']] || '',
+					avance: row[columnMap['avance']] || '',
+					estado: row[columnMap['estado']] || ''
+				});
         }
       }
     }
@@ -2968,115 +3422,369 @@ ipcMain.handle('update-plan-trabajo-excel', async (event, { filePath, periodsDat
     let updatedCount = 0;
     let notFoundCount = 0;
 
-    // === ACTUALIZAR FILA POR FILA ===
-    actividades.forEach((actividad, index) => {
-      // Validar que la actividad tenga la estructura esperada
-      if (!actividad || !actividad.name || !Array.isArray(actividad.months)) {
-        sendLog(`[UPDATE-PLAN][WARN] Actividad ${index} sin estructura válida, saltando`, 'WARN');
-        return;
-      }
+// === ACTUALIZAR FILA POR FILA (MATCHING DIRECTO POR rowIndex) ===
+	// Detectar última fila ocupada para insertar nuevas actividades
+	let lastUsedRow = START_ROW;
+	for (let r = worksheet.rowCount; r >= START_ROW; r--) {
+		const cellVal = worksheet.getRow(r).getCell(2).value;
+		if (cellVal) { lastUsedRow = r; break; }
+	}
 
-      let targetRow = null;
-      let foundRowIndex = -1;
+// Recolectar rowIndex de actividades existentes para detectar eliminadas
+const activeRowIndices = new Set();
+actividades.forEach(a => {
+  if (a.rowIndex && a.rowIndex >= START_ROW) activeRowIndices.add(a.rowIndex);
+});
 
-      // Estrategia 1: Buscar por índice relativo (asumiendo que el orden se mantiene)
-      const expectedRowIndex = START_ROW + index;
-      if (expectedRowIndex <= worksheet.rowCount) {
-        const row = worksheet.getRow(expectedRowIndex);
-        const excelActividad = row.getCell(2).value; // Columna B = ACTIVIDAD
-
-        // Verificar coincidencia parcial del nombre (primeros 20 caracteres)
-        if (excelActividad) {
-          const excelActStr = excelActividad.toString().substring(0, 30).toLowerCase();
-          const actNameStr = actividad.name.toString().substring(0, 30).toLowerCase();
-
-          if (excelActStr && actNameStr && (excelActStr.includes(actNameStr) || actNameStr.includes(excelActStr))) {
-            targetRow = row;
-            foundRowIndex = expectedRowIndex;
-            sendLog(`[UPDATE-PLAN][DEBUG] Fila ${expectedRowIndex}: Coincidencia por índice`, 'DEBUG');
+// ============================================================================
+// FIX: Remove erroneous B:C merges on activity rows
+// Some .xlsx files have horizontal B:C merges on activity rows (not just
+// section headers). This causes column B (ACTIVIDAD) to display the
+// column C (RESPONSABLE) value "Profesional SST", destroying the real
+// activity name. We unmerge these before writing.
+// ============================================================================
+      if (worksheet.model && worksheet.model.merges) {
+        const mergesToRemove = [];
+        const unmergedActivityRows = [];
+        const mergesToCheck = [...worksheet.model.merges];
+        mergesToCheck.forEach(mergeRange => {
+          const match = mergeRange.match(/^B(\d+):C(\d+)$/);
+          if (match && match[1] === match[2]) {
+            const row = parseInt(match[1]);
+            if (row >= START_ROW) {
+              const colA = worksheet.getRow(row).getCell(1).value;
+              if (typeof colA === 'number') {
+                mergesToRemove.push(mergeRange);
+                unmergedActivityRows.push(row);
+              }
+            }
           }
-        }
-      }
+        });
 
-      // Estrategia 2: Búsqueda lineal si no se encontró por índice
-      if (!targetRow) {
-        sendLog(`[UPDATE-PLAN][DEBUG] Buscando actividad "${actividad.name.substring(0, 40)}..." en toda la hoja`, 'DEBUG');
+        if (mergesToRemove.length > 0) {
+          sendLog(`[UPDATE-PLAN][FIX] Found ${mergesToRemove.length} erroneous B:C merges on activity rows, removing...`, 'INFO');
+          mergesToRemove.forEach(mergeRange => {
+            try {
+              worksheet.unMergeCells(mergeRange);
+              sendLog(`[UPDATE-PLAN][FIX] Removed erroneous merge: ${mergeRange}`, 'INFO');
+            } catch(e) {
+              sendLog(`[UPDATE-PLAN][WARN] Could not unmerge ${mergeRange}: ${e.message}`, 'WARN');
+            }
+          });
 
-        for (let searchRow = START_ROW; searchRow <= worksheet.rowCount; searchRow++) {
-          const searchRowObj = worksheet.getRow(searchRow);
-          const searchActividad = searchRowObj.getCell(2).value;
-
-          if (searchActividad) {
-            const searchActStr = searchActividad.toString().toLowerCase();
-            const actNameStr = actividad.name.toString().toLowerCase();
-
-            // Búsqueda por coincidencia parcial (al menos 20 caracteres)
-            if (searchActStr.length >= 20 && actNameStr.length >= 20) {
-              if (searchActStr.includes(actNameStr.substring(0, 20)) ||
-                  actNameStr.includes(searchActStr.substring(0, 20))) {
-                targetRow = searchRowObj;
-                foundRowIndex = searchRow;
-                sendLog(`[UPDATE-PLAN][DEBUG] Actividad encontrada en fila ${searchRow}`, 'DEBUG');
-                break;
+          // After unmerge, column C is null on those rows.
+          // Restore responsable for rows not covered by the actividades loop below.
+          for (const mergeRow of unmergedActivityRows) {
+            if (!activeRowIndices.has(mergeRow)) {
+              const row = worksheet.getRow(mergeRow);
+              const currentC = row.getCell(3).value;
+              if (!currentC) {
+                row.getCell(3).value = 'Profesional SST';
+                sendLog(`[UPDATE-PLAN][FIX] Fila ${mergeRow}: C restaurado a "Profesional SST" (post-unmerge, fila no en datos)`, 'INFO');
               }
             }
           }
         }
       }
 
-      // Si no se encontró la actividad, registrar y continuar
-      if (!targetRow) {
+actividades.forEach((actividad, index) => {
+		if (!actividad || !actividad.name || !Array.isArray(actividad.months)) {
+			sendLog(`[UPDATE-PLAN][WARN] Actividad ${index} sin estructura válida, saltando`, 'WARN');
+			return;
+		}
+
+		let targetRow;
+		let foundRowIndex;
+
+		// rowIndex es el número de fila Excel (1-based). Fallback: usar id si es un número de fila válido (compat con datos cargados antes del fix)
+		const effectiveRowIndex = actividad.rowIndex || (actividad.id >= START_ROW ? actividad.id : null);
+
+		if (effectiveRowIndex && effectiveRowIndex >= START_ROW && effectiveRowIndex <= worksheet.rowCount) {
+			// Actividad existente: usar rowIndex directamente
+			targetRow = worksheet.getRow(effectiveRowIndex);
+			foundRowIndex = effectiveRowIndex;
+
+      const excelActividadRaw = targetRow.getCell(2).value;
+      const excelActividad = (typeof excelActividadRaw === 'object' && excelActividadRaw !== null && excelActividadRaw.text)
+        ? excelActividadRaw.text
+        : excelActividadRaw;
+      if (!excelActividad) {
         notFoundCount++;
-        sendLog(`[UPDATE-PLAN][WARN] Actividad no encontrada: "${actividad.name.substring(0, 50)}..."`, 'WARN');
+        sendLog(`[UPDATE-PLAN][WARN] Fila ${actividad.rowIndex} vacía en columna B para: "${actividad.name.substring(0, 50)}"`, 'WARN');
         return;
       }
 
-      // === ACTUALIZAR SOLO COLUMNAS ESPECÍFICAS (D-O, P, Q) ===
-      // Columnas D-O (ENE-DIC) con P/C - SOLO si hay valor
-      const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-                     'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+      sendLog(`[UPDATE-PLAN][DEBUG] Fila ${foundRowIndex}: Match directo por rowIndex`, 'DEBUG');
+		} else {
+			// Actividad nueva: insertar al final del worksheet
+			lastUsedRow++;
+			foundRowIndex = lastUsedRow;
+			targetRow = worksheet.getRow(foundRowIndex);
 
-      meses.forEach((mes, idx) => {
-        const colIndex = idx + 4; // Columna D = 4 (1-based)
-        const valor = actividad.months && actividad.months[idx] ? actividad.months[idx] : null;
+			targetRow.getCell(1).value = actividad.name;
+			targetRow.getCell(2).value = actividad.name;
+			if (actividad.responsible) targetRow.getCell(3).value = actividad.responsible;
 
-        // Solo escribir si hay valor (P o C)
-        if (valor && (valor === 'P' || valor === 'C')) {
-          targetRow.getCell(colIndex).value = valor;
-        }
-      });
+			// Actualizar rowIndex en el objeto original para futuras escrituras
+			actividad.rowIndex = foundRowIndex;
+			sendLog(`[UPDATE-PLAN][DEBUG] Nueva actividad insertada en fila ${foundRowIndex}: "${actividad.name.substring(0, 50)}"`, 'DEBUG');
+		}
 
-      // ⚠️ NO actualizar columna P (% AVANCE) ni Q (ESTADO)
-      // El archivo Excel original tiene fórmulas compartidas en estas columnas
-      // que ExcelJS no puede preservar. Las fórmulas originales calcularán
-      // automáticamente los valores basándose en las columnas D-O (meses).
+// === ACTUALIZAR COLUMNAS D-O (ENE-DIC) CON P/C ===
+for (let idx = 0; idx < 12; idx++) {
+const colIndex = idx + 4;
+const valor = actividad.months[idx] || '';
+targetRow.getCell(colIndex).value = valor;
+}
 
-      updatedCount++;
-      const completadas = actividad.months ? actividad.months.filter(m => m === 'C').length : 0;
-      const programadas = actividad.months ? actividad.months.filter(m => m === 'P').length : 0;
-      sendLog(`[UPDATE-PLAN][DEBUG] Fila ${foundRowIndex}: Actualizado - ${completadas}C/${programadas}P (Fórmulas originales calculan % y Estado)`, 'DEBUG');
-    });
+    // === ACTUALIZAR RESPONSABLE (COLUMNA C) Y OBSERVACIONES (COLUMNA R) ===
+    if (actividad.responsible !== undefined) {
+      targetRow.getCell(3).value = actividad.responsible || null;
+    }
+    if (actividad.observations !== undefined && actividad.observations !== null) {
+      targetRow.getCell(18).value = actividad.observations;
+    }
 
-    sendLog(`[UPDATE-PLAN][MAIN] === RESUMEN DE ACTUALIZACIÓN ===`, 'INFO');
-    sendLog(`[UPDATE-PLAN][MAIN] Total actividades procesadas: ${actividades.length}`, 'INFO');
-    sendLog(`[UPDATE-PLAN][MAIN] Actualizadas exitosamente: ${updatedCount}`, 'INFO');
-    sendLog(`[UPDATE-PLAN][MAIN] No encontradas: ${notFoundCount}`, 'INFO');
+        // ⚠️ NO actualizar columna P (% AVANCE) ni Q (ESTADO)
+		// El archivo Excel original tiene fórmulas compartidas en estas columnas
+		// que ExcelJS no puede preservar. Las fórmulas originales calcularán
+		// automáticamente los valores basándose en las columnas D-O (meses).
 
-    // === GUARDAR ARCHIVO CON ExcelJS (PRESERVA FORMATO) ===
-    await workbook.xlsx.writeFile(filePath);
+		updatedCount++;
+		const completadas = actividad.months.filter(m => m === 'C').length;
+		const programadas = actividad.months.filter(m => m === 'P').length;
+		sendLog(`[UPDATE-PLAN][DEBUG] Fila ${foundRowIndex}: Actualizado - ${completadas}C/${programadas}P`, 'DEBUG');
+	});
 
-    sendLog(`[UPDATE-PLAN][MAIN] ✅ Archivo guardado exitosamente en: ${filePath}`, 'INFO');
+	// === LIMPIAR FILAS DE ACTIVIDADES ELIMINADAS ===
+	// Recorrer filas de datos y limpiar las que ya no están en actividades
+	const allLevel4Rows = [];
+	for (let r = START_ROW; r <= lastUsedRow; r++) {
+		const row = worksheet.getRow(r);
+		const colA = row.getCell(1).value;
+		const colB = row.getCell(2).value;
+		if (colB && !isNaN(parseFloat(String(colA || '').replace(',', '.')))) {
+			allLevel4Rows.push(r);
+		}
+	}
 
-    return {
-      success: true,
-      message: 'Archivo guardado exitosamente',
-      updatedCount: updatedCount,
-      notFoundCount: notFoundCount
-    };
+	let deletedCount = 0;
+	for (const rowNum of allLevel4Rows) {
+		if (!activeRowIndices.has(rowNum)) {
+			const row = worksheet.getRow(rowNum);
+			for (let c = 1; c <= 18; c++) {
+				row.getCell(c).value = null;
+			}
+			deletedCount++;
+			sendLog(`[UPDATE-PLAN][DEBUG] Fila ${rowNum}: Actividad eliminada, celdas limpiadas`, 'DEBUG');
+		}
+	}
+
+	sendLog(`[UPDATE-PLAN][MAIN] === RESUMEN DE ACTUALIZACIÓN ===`, 'INFO');
+	sendLog(`[UPDATE-PLAN][MAIN] Total actividades procesadas: ${actividades.length}`, 'INFO');
+	sendLog(`[UPDATE-PLAN][MAIN] Actualizadas exitosamente: ${updatedCount}`, 'INFO');
+	sendLog(`[UPDATE-PLAN][MAIN] No encontradas: ${notFoundCount}`, 'INFO');
+	sendLog(`[UPDATE-PLAN][MAIN] Eliminadas: ${deletedCount}`, 'INFO');
+
+	// === GUARDAR ARCHIVO CON ExcelJS (PRESERVA FORMATO) ===
+	await workbook.xlsx.writeFile(filePath);
+
+	sendLog(`[UPDATE-PLAN][MAIN] ✅ Archivo guardado exitosamente en: ${filePath}`, 'INFO');
+
+	// Devolver rowIndex actualizados para actividades nuevas
+	const updatedRowIndices = {};
+	actividades.forEach(a => {
+		if (a.rowIndex) updatedRowIndices[a.id] = a.rowIndex;
+	});
+
+	return {
+		success: true,
+		message: 'Archivo guardado exitosamente',
+		updatedCount: updatedCount,
+		notFoundCount: notFoundCount,
+		deletedCount: deletedCount,
+		updatedRowIndices: updatedRowIndices
+	};
 
   } catch (error) {
     sendLog(`[UPDATE-PLAN][ERROR] Error al actualizar Plan de Trabajo: ${error.message}`, 'ERROR');
     sendLog(`[UPDATE-PLAN][ERROR] Stack: ${error.stack}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+// ============================================================================
+// Handler para reparar archivo de Plan de Trabajo corrompido por merges B:C
+// Lee la plantilla .xls original y restaura los nombres de actividades perdidos
+// en column B del .xlsx, además de eliminar merges B:C erróneos en filas de
+// actividad.
+// ============================================================================
+ipcMain.handle('repair-plan-trabajo-excel', async (event, { filePath, templatePath }) => {
+  try {
+    sendLog(`[REPAIR-PLAN][MAIN] === INICIO REPARACIÓN PLAN DE TRABAJO ===`, 'INFO');
+    sendLog(`[REPAIR-PLAN][MAIN] Archivo: ${filePath}`, 'INFO');
+
+    // Resolve template path if not provided
+    if (!templatePath) {
+      const templateFile = path.join(__dirname, 'utils', 'GI-FO-045 PLAN DE TRABAJO ANUAL 2025 SST.xls');
+      try { await fsp.access(templateFile); templatePath = templateFile; } catch(e) {}
+    }
+    if (!templatePath) {
+      // Try to find any .xls template in utils/
+      const utilsDir = path.join(__dirname, 'utils');
+      try {
+        const files = await fsp.readdir(utilsDir);
+        const xlsFile = files.find(f => f.endsWith('.xls') && f.toUpperCase().includes('PLAN DE TRABAJO'));
+        if (xlsFile) templatePath = path.join(utilsDir, xlsFile);
+      } catch(e) {}
+    }
+    if (!templatePath) {
+      return { success: false, error: 'No se encontró la plantilla .xls original para restaurar los nombres de actividades' };
+    }
+    sendLog(`[REPAIR-PLAN][MAIN] Plantilla: ${templatePath}`, 'INFO');
+
+    // Step 1: Read template .xls with SheetJS to get original activity names
+    const templateWb = xlsx.readFile(templatePath);
+    let templateSheet = null;
+    for (const sheetName of templateWb.SheetNames) {
+      const normalizedName = sheetName.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      if (normalizedName.includes('PLAN DE TRABAJO')) {
+        templateSheet = templateWb.Sheets[sheetName];
+        break;
+      }
+    }
+    if (!templateSheet && templateWb.SheetNames.length > 0) {
+      templateSheet = templateWb.Sheets[templateWb.SheetNames[0]];
+    }
+    if (!templateSheet) {
+      return { success: false, error: 'No se encontró hoja en la plantilla' };
+    }
+
+    const templateData = xlsx.utils.sheet_to_json(templateSheet, { header: 1, defval: '', range: 0 });
+    sendLog(`[REPAIR-PLAN][MAIN] Plantilla leída: ${templateData.length} filas`, 'INFO');
+
+        // Build map: rowIndex (1-based) → { name, responsable } from template
+        const templateActivityMap = {};
+        for (let i = 0; i < templateData.length; i++) {
+            const row = templateData[i];
+            const colA = String(row[0] || '').trim();
+            const colB = String(row[1] || '').trim();
+            const colC = String(row[2] || '').trim();
+            if (colA && !isNaN(parseFloat(colA.replace(',', '.'))) && colB && colB.length > 2) {
+                templateActivityMap[i + 1] = { name: colB, responsable: colC };
+            }
+        }
+        sendLog(`[REPAIR-PLAN][MAIN] Actividades en plantilla: ${Object.keys(templateActivityMap).length}`, 'INFO');
+
+    // Step 2: Read the corrupted .xlsx with ExcelJS
+    const ExcelJS = require('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const fileBuffer = await fsp.readFile(filePath);
+    await workbook.xlsx.load(fileBuffer);
+
+    let worksheet = null;
+    for (const ws of workbook.worksheets) {
+      if (ws.name && ws.name.toUpperCase().includes('PLAN DE TRABAJO')) {
+        worksheet = ws;
+        break;
+      }
+    }
+    if (!worksheet && workbook.worksheets.length > 0) {
+      worksheet = workbook.worksheets[0];
+    }
+    if (!worksheet) {
+      return { success: false, error: 'No se encontró hoja en el archivo' };
+    }
+
+    const START_ROW = 9;
+    let unmergedCount = 0;
+    let restoredCount = 0;
+
+    // Step 3: Unmerge erroneous B:C merges on activity rows
+    if (worksheet.model && worksheet.model.merges) {
+      const mergesToRemove = [];
+      const mergesToCheck = [...worksheet.model.merges];
+      mergesToCheck.forEach(mergeRange => {
+        const match = mergeRange.match(/^B(\d+):C(\d+)$/);
+        if (match && match[1] === match[2]) {
+          const row = parseInt(match[1]);
+          if (row >= START_ROW) {
+            const colA = worksheet.getRow(row).getCell(1).value;
+            if (typeof colA === 'number') {
+              mergesToRemove.push(mergeRange);
+            }
+          }
+        }
+      });
+
+      mergesToRemove.forEach(mergeRange => {
+        try {
+          worksheet.unMergeCells(mergeRange);
+          unmergedCount++;
+          sendLog(`[REPAIR-PLAN][FIX] Merge eliminado: ${mergeRange}`, 'INFO');
+        } catch(e) {
+          sendLog(`[REPAIR-PLAN][WARN] Error al unmerge ${mergeRange}: ${e.message}`, 'WARN');
+        }
+      });
+    }
+
+        // Step 4: Restore activity names (B) and responsable (C) from template
+        // After unmerge, column B retains the activity name (merge master),
+        // but column C becomes null — the responsable is lost.
+        let restoredNames = 0;
+        let restoredResponsables = 0;
+        const responsableValues = ['Profesional SST', 'Auxiliar SST', 'Coordinador SST', 'ARL', 'Responsable SST'];
+        for (let r = START_ROW; r <= worksheet.rowCount; r++) {
+            const row = worksheet.getRow(r);
+            const colA = row.getCell(1).value;
+            if (typeof colA !== 'number') continue;
+
+            const currentB = row.getCell(2).value;
+            const currentBStr = (typeof currentB === 'object' && currentB !== null && currentB.text)
+                ? currentB.text : String(currentB || '');
+            const currentC = row.getCell(3).value;
+            const currentCStr = (typeof currentC === 'object' && currentC !== null && currentC.text)
+                ? currentC.text : String(currentC || '');
+
+            const templateInfo = templateActivityMap[r];
+
+            // Restore column B if corrupted (rare: B shows responsable value)
+            const isBCorrupted = responsableValues.some(rv => currentBStr.trim() === rv);
+            if (isBCorrupted && templateInfo) {
+                const isBHyperlink = typeof currentB === 'object' && currentB !== null && currentB.hyperlink;
+                if (!isBHyperlink) {
+                    row.getCell(2).value = templateInfo.name;
+                    restoredNames++;
+                    sendLog(`[REPAIR-PLAN][FIX] Fila ${r}: B restaurado de "${currentBStr}" a "${templateInfo.name.substring(0, 50)}"`, 'INFO');
+                }
+            }
+
+            // Restore column C (responsable) if empty after unmerge
+            if (!currentCStr.trim() && templateInfo && templateInfo.responsable) {
+                row.getCell(3).value = templateInfo.responsable;
+                restoredResponsables++;
+                sendLog(`[REPAIR-PLAN][FIX] Fila ${r}: C restaurado a "${templateInfo.responsable}"`, 'INFO');
+            }
+      }
+      restoredCount = restoredNames + restoredResponsables;
+
+      // Step 5: Save
+    await workbook.xlsx.writeFile(filePath);
+
+    sendLog(`[REPAIR-PLAN][MAIN] === RESUMEN REPARACIÓN ===`, 'INFO');
+    sendLog(`[REPAIR-PLAN][MAIN] Merges eliminados: ${unmergedCount}`, 'INFO');
+    sendLog(`[REPAIR-PLAN][MAIN] Nombres restaurados: ${restoredCount}`, 'INFO');
+    sendLog(`[REPAIR-PLAN][MAIN] ✅ Archivo reparado: ${filePath}`, 'INFO');
+
+    return {
+      success: true,
+      message: `Reparación completada: ${unmergedCount} merges eliminados, ${restoredCount} nombres restaurados`,
+      unmergedCount,
+      restoredCount
+    };
+  } catch (error) {
+    sendLog(`[REPAIR-PLAN][ERROR] Error al reparar: ${error.message}`, 'ERROR');
+    sendLog(`[REPAIR-PLAN][ERROR] Stack: ${error.stack}`, 'ERROR');
     return { success: false, error: error.message };
   }
 });
@@ -3113,27 +3821,32 @@ ipcMain.handle('update-capacitaciones-excel', async (event, { filePath, capacita
     });
 
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.readFile(filePath);
+    // Cargar como buffer evita el bug de ExcelJS donde readFile() devuelve 0 worksheets
+    // con ciertos archivos .xlsx/.xlsm generados por otras librerías (ej. SheetJS)
+    const fileBuffer = await fsp.readFile(filePath);
+    await workbook.xlsx.load(fileBuffer);
+
+    sendLog(`[UPDATE-CAP][MAIN] Worksheets encontradas por ExcelJS: ${workbook.worksheets.map(ws => ws.name).join(', ') || '(ninguna)'}`, 'INFO');
 
     let sheetName = requestedSheetName;
     let worksheet = sheetName ? workbook.getWorksheet(sheetName) : null;
 
-    // Añadir búsqueda tolerante por si hay discrepancias entre librerías (xlsx vs exceljs)
+    // Búsqueda tolerante por espacios extra
     if (!worksheet && sheetName) {
         const tolerantSheet = workbook.worksheets.find(ws => ws.name.trim() === sheetName.trim());
         if (tolerantSheet) {
             worksheet = tolerantSheet;
-            sendLog(`[WARN] Se encontró la hoja '${sheetName}' con una búsqueda tolerante (sin espacios extra).`, 'WARN');
+            sheetName = worksheet.name;
+            sendLog(`[WARN] Hoja encontrada con búsqueda tolerante: '${sheetName}'`, 'WARN');
         }
     }
 
+    // Búsqueda por año actual si todavía no encontramos la hoja
     if (!worksheet) {
-        if(sheetName) sendLog(`[WARN] La hoja solicitada '${sheetName}' sigue sin encontrarse. Buscando una alternativa por año.`, 'WARN');
+        if (sheetName) sendLog(`[WARN] Hoja '${sheetName}' no encontrada. Buscando alternativa por año.`, 'WARN');
         const currentYear = new Date().getFullYear().toString();
         const matrixPatternCurrent = new RegExp(`Matriz Cap\\.\\s*${currentYear}`, 'i');
-
         const foundSheet = workbook.worksheets.find(ws => matrixPatternCurrent.test(ws.name));
-
         if (foundSheet) {
             worksheet = foundSheet;
             sheetName = worksheet.name;
@@ -3141,7 +3854,7 @@ ipcMain.handle('update-capacitaciones-excel', async (event, { filePath, capacita
         } else if (workbook.worksheets.length > 0) {
             worksheet = workbook.worksheets[0];
             sheetName = worksheet.name;
-            sendLog(`[WARN] No se encontró hoja por año. Usando la primera hoja disponible como fallback: '${sheetName}'`, 'WARN');
+            sendLog(`[WARN] Usando primera hoja disponible como fallback: '${sheetName}'`, 'WARN');
         }
     }
 
@@ -3682,12 +4395,12 @@ ipcMain.handle('readPresupuestoData', async (event, filePath) => {
     // --- FIN DE LA CORRECCIÓN ---
 
     // Obtener todos los datos de la hoja usando el rango corregido
-    const allData = xlsx.utils.sheet_to_json(worksheet, {
-        header: 1,
-        raw: false,
-        defval: null,
-        range: correctedRangeStr // Usar el rango corregido aquí
-    });
+const allData = xlsx.utils.sheet_to_json(worksheet, {
+            header: 1,
+            raw: true,
+            defval: null,
+            range: correctedRangeStr
+        });
 
     // Extraer encabezados de la fila 9 (índice 8) y datos desde la fila 10 (índice 9 en adelante)
     const headers = allData[8] || []; // Fila 9 para encabezados (índice 8)
@@ -3746,53 +4459,34 @@ ipcMain.handle('readPresupuestoData', async (event, filePath) => {
       // Si encontramos "TOTAL AÑO" en cualquier celda de la fila (A o B), creamos la fila TOTAL AÑO con los totales acumulados
       if ((typeof firstCell === 'string' && firstCell.includes('TOTAL AÑO')) ||
           (typeof secondCell === 'string' && secondCell.includes('TOTAL AÑO'))) {
-        // FUNCIÓN DE FORMATEO - Agregar ANTES de crear el objeto TOTAL AÑO
-        function formatColombianDisplay(value) {
-          // Si el valor es 0 o vacío, retornar "$ -"
-          if (!value || value === 0) {
-            return ' $ -   ';
-          }
+function toNumericValue(value) {
+                    if (!value || value === 0) return 0;
+                    const num = typeof value === 'number' ? value : parseFloat(value);
+                    return isNaN(num) ? 0 : num;
+                }
 
-          // Asegurarse de que es un número
-          const num = typeof value === 'number' ? value : parseFloat(value);
-
-          if (isNaN(num)) {
-            return ' $ -   ';
-          }
-
-          // Formatear con comas como separador de miles (formato internacional) y sin decimales
-          // Este es el formato que se usa en tus archivos Excel: 13,407,464
-          const formatted = num.toLocaleString('en-US', {
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0
-          });
-
-          return ` $ ${formatted} `;
-        }
-
-        // Actualizar la fila TOTAL AÑO con los totales acumulados, formateados adecuadamente
-        const obj = {
-          id: typeof firstCell === 'string' && firstCell.includes('TOTAL AÑO') ? firstCell :
-              typeof secondCell === 'string' && secondCell.includes('TOTAL AÑO') ? secondCell : 'TOTAL AÑO',
-          detalle: 'TOTAL AÑO',  // Mostrar TOTAL AÑO en la columna de detalle
-          asignacion: formatColombianDisplay(totalAccumulators.asignacion),
-          ejecutado_acumulado: formatColombianDisplay(totalAccumulators.ejecutado_acumulado),
-          porcentaje_ejecutado: totalAccumulators.asignacion > 0
-            ? ((totalAccumulators.ejecutado_acumulado / totalAccumulators.asignacion) * 100).toFixed(2) + '%'
-            : '0,00%',
-          enero: formatColombianDisplay(totalAccumulators.enero),
-          febrero: formatColombianDisplay(totalAccumulators.febrero),
-          marzo: formatColombianDisplay(totalAccumulators.marzo),
-          abril: formatColombianDisplay(totalAccumulators.abril),
-          mayo: formatColombianDisplay(totalAccumulators.mayo),
-          junio: formatColombianDisplay(totalAccumulators.junio),
-          julio: formatColombianDisplay(totalAccumulators.julio),
-          agosto: formatColombianDisplay(totalAccumulators.agosto),
-          septiembre: formatColombianDisplay(totalAccumulators.septiembre),
-          octubre: formatColombianDisplay(totalAccumulators.octubre),
-          noviembre: formatColombianDisplay(totalAccumulators.noviembre),
-          diciembre: formatColombianDisplay(totalAccumulators.diciembre)
-        };
+                const obj = {
+                    id: typeof firstCell === 'string' && firstCell.includes('TOTAL AÑO') ? firstCell :
+                        typeof secondCell === 'string' && secondCell.includes('TOTAL AÑO') ? secondCell : 'TOTAL AÑO',
+                    detalle: 'TOTAL AÑO',
+                    asignacion: toNumericValue(totalAccumulators.asignacion),
+                    ejecutado_acumulado: toNumericValue(totalAccumulators.ejecutado_acumulado),
+                    porcentaje_ejecutado: totalAccumulators.asignacion > 0
+                        ? ((totalAccumulators.ejecutado_acumulado / totalAccumulators.asignacion) * 100).toFixed(2) + '%'
+                        : '0,00%',
+                    enero: toNumericValue(totalAccumulators.enero),
+                    febrero: toNumericValue(totalAccumulators.febrero),
+                    marzo: toNumericValue(totalAccumulators.marzo),
+                    abril: toNumericValue(totalAccumulators.abril),
+                    mayo: toNumericValue(totalAccumulators.mayo),
+                    junio: toNumericValue(totalAccumulators.junio),
+                    julio: toNumericValue(totalAccumulators.julio),
+                    agosto: toNumericValue(totalAccumulators.agosto),
+                    septiembre: toNumericValue(totalAccumulators.septiembre),
+                    octubre: toNumericValue(totalAccumulators.octubre),
+                    noviembre: toNumericValue(totalAccumulators.noviembre),
+                    diciembre: toNumericValue(totalAccumulators.diciembre)
+                };
         processedData.push(obj);
         sendLog(`[DEBUG] readPresupuestoData - Detectado TOTAL AÑO en fila ${i + dataStartIndex + 1}, deteniendo lectura`, 'DEBUG');
         break; // Detener el bucle para no incluir filas posteriores
@@ -3972,10 +4666,30 @@ ipcMain.handle('convertExcelToPdf', async (event, filePath) => {
 
 // --- Manejadores para el Visor de Documentos ---
 
-ipcMain.handle('get-excel-preview', async (event, filePath) => {
-  sendLog(`[MAIN][get-excel-preview] Solicitud recibida para filePath: ${filePath}`, 'INFO');
+ipcMain.handle('get-excel-preview', async (event, rawFilePath) => {
+    sendLog(`[MAIN][get-excel-preview] Solicitud recibida para filePath: ${rawFilePath}`, 'INFO');
 
-  let tempPdfPath = null; // Variable para el archivo temporal
+    // Normalizar ruta (igual que get-word-preview)
+    let filePath = typeof rawFilePath === 'string' ? rawFilePath : (rawFilePath?.filePath || '');
+    let prev = '';
+    while (filePath !== prev) {
+        prev = filePath;
+        try {
+            filePath = decodeURIComponent(filePath);
+        } catch (e) {
+            break;
+        }
+    }
+
+    const driveLetterMatch = filePath.match(/^([A-Za-z]):(.*)$/);
+    if (driveLetterMatch) {
+        filePath = driveLetterMatch[1] + ':' + driveLetterMatch[2];
+        filePath = filePath.replace(/\\/g, '\\').replace(/\//g, '\\');
+    }
+
+    sendLog(`[MAIN][get-excel-preview] Ruta normalizada: ${filePath}`, 'INFO');
+
+    let tempPdfPath = null;
 
   try {
     // 1. Verificar que el archivo es accesible
@@ -4217,36 +4931,54 @@ ipcMain.handle('load-objetivos-excel-data', async (event, filePath) => {
     }
 
     // Extraer los objetivos
-    // Según instrucciones: Titulos en fila 5 (índice 4). Datos inician desde fila 6 o 7.
-    // Asumiremos que los datos inician en la fila 7 (índice 6) porque la fila 6 suele ser la política o espacio.
-    // Mapeo solicitado:
-    // Objetivos (B) -> 1
-    // Indicadores (C) -> 2
-    // Formula (D) -> 3
-    // Meta (E) -> 4
-    // Frecuencia (F) -> 5
-    // Responsable (G) -> 6
+    // ESTRUCTURA DEL EXCEL:
+    // - Fila 5 (índice 4): Encabezados de columnas
+    // - Fila 6 (índice 5): Primer fila de datos
+    // Mapeo de columnas:
+    // B (índice 1): Objetivos estratégicos
+    // C (índice 2): Indicadores de gestión
+    // D (índice 3): Fórmula
+    // E (índice 4): Meta
+    // F (índice 5): Frecuencia
+    // G (índice 6): Responsable
+    // H (índice 7): Principle ID (1-4)
 
-    const startIndex = 6; // Fila 7 (índice 6)
+    const startIndex = 5; // Fila 6 (índice 5) - DONDE COMIENZAN LOS DATOS
     const objectivesData = [];
+
+    sendLog(`[MAIN][Objetivos] Iniciando lectura desde fila 6 (índice ${startIndex})`, 'INFO');
+    sendLog(`[MAIN][Objetivos] Total de filas en el Excel: ${jsonData.length}`, 'INFO');
 
     for (let i = startIndex; i < jsonData.length; i++) {
       const row = jsonData[i];
+      
+      // Debug: mostrar las primeras 3 filas encontradas
+      if (i < startIndex + 3) {
+        sendLog(`[MAIN][Objetivos] Fila ${i + 1}: ${JSON.stringify(row)}`, 'DEBUG');
+      }
+      
       // Verificar si existe el objetivo en la columna B (índice 1)
       if (row && row[1]) {
-        objectivesData.push({
-          id: objectivesData.length + 1,
-          objective: row[1] ? row[1].toString() : '',
-          indicator: row[2] ? row[2].toString() : '',
-          formula: row[3] ? row[3].toString() : '',
-          goal: row[4] ? row[4].toString() : '',
-          frequency: row[5] ? row[5].toString() : '',
-          responsible: row[6] ? row[6].toString() : ''
-        });
+        const objectiveValue = row[1] ? row[1].toString() : '';
+        
+        // Solo agregar si el objetivo no está vacío
+        if (objectiveValue.trim() !== '') {
+          objectivesData.push({
+            id: objectivesData.length + 1,
+            objective:   objectiveValue,
+            indicator:   row[2] ? row[2].toString() : '',
+            formula:     row[3] ? row[3].toString() : '',
+            goal:        row[4] ? row[4].toString() : '',
+            frequency:   row[5] ? row[5].toString() : '',
+            responsible: row[6] ? row[6].toString() : '',
+            principleId: row[7] ? parseInt(row[7]) || null : null  // Col H: principio asignado (1-4), null = auto-detectar
+          });
+          sendLog(`[MAIN][Objetivos] Fila ${i + 1}: Objetivo encontrado: "${objectiveValue.substring(0, 50)}..."`, 'INFO');
+        }
       }
     }
 
-    sendLog(`[MAIN] Datos de objetivos cargados: ${objectivesData.length} registros`, 'INFO');
+    sendLog(`[MAIN][Objetivos] Total de objetivos leídos: ${objectivesData.length} registros`, 'INFO');
 
     return {
       success: true,
@@ -4264,14 +4996,18 @@ ipcMain.handle('load-objetivos-excel-data', async (event, filePath) => {
 // Handler para guardar datos en el archivo Excel de objetivos
 ipcMain.handle('save-objetivos-excel-data', async (event, filePath, data) => {
   try {
-    sendLog(`[MAIN] Guardando datos en archivo Excel de objetivos: ${filePath}`, 'INFO');
+    sendLog(`[MAIN][Objetivos][GUARDADO] === INICIO DEL GUARDADO ===`, 'INFO');
+    sendLog(`[MAIN][Objetivos][GUARDADO] Archivo: ${filePath}`, 'INFO');
+    
+    const dataRows = data.objectivesData || [];
+    sendLog(`[MAIN][Objetivos][GUARDADO] Datos a guardar: ${dataRows.length} registros`, 'INFO');
 
     // Verificar que el archivo existe
     try {
       await fsp.access(filePath, fs.constants.R_OK);
-      sendLog(`[MAIN] Archivo Excel accesible para escritura: ${filePath}`, 'DEBUG');
+      sendLog(`[MAIN][Objetivos][GUARDADO] Archivo Excel accesible para escritura`, 'DEBUG');
     } catch (accessError) {
-      sendLog(`[MAIN] Error de acceso al archivo Excel ${filePath}: ${accessError.message}`, 'ERROR');
+      sendLog(`[MAIN][Objetivos][GUARDADO] Error de acceso al archivo: ${accessError.message}`, 'ERROR');
       return { success: false, error: `El archivo no es accesible o no existe: ${filePath}. Error: ${accessError.message}` };
     }
 
@@ -4281,46 +5017,770 @@ ipcMain.handle('save-objetivos-excel-data', async (event, filePath, data) => {
 
     // Obtener la primera hoja
     const worksheet = workbook.getWorksheet(1);
+    sendLog(`[MAIN][Objetivos][GUARDADO] Hoja obtenida: ${worksheet.name}`, 'INFO');
+    sendLog(`[MAIN][Objetivos][GUARDADO] Total de filas actuales: ${worksheet.rowCount}`, 'INFO');
 
     // Actualizar la política en la celda A6
     if (data.policyText) {
       worksheet.getCell('A6').value = data.policyText;
+      sendLog(`[MAIN][Objetivos][GUARDADO] Política actualizada en celda A6`, 'DEBUG');
     }
 
-    // Actualizar los objetivos
-    // Iniciar escritura desde la fila 7 (índice 7 en ExcelJS que es 1-based)
-    const startIndex = 7;
-    const dataRows = data.objectivesData || [];
+    // ESTRUCTURA DEL EXCEL:
+    // - Fila 5 (índice 5 en ExcelJS 1-based): Encabezados de columnas
+    // - Fila 6 (índice 6 en ExcelJS 1-based): PRIMER FILA DE DATOS
+    // Mapeo de columnas:
+    // B (col 2): Objetivos estratégicos
+    // C (col 3): Indicadores de gestión
+    // D (col 4): Fórmula
+    // E (col 5): Meta
+    // F (col 6): Frecuencia
+    // G (col 7): Responsable
+    // H (col 8): Principle ID (1-4)
 
-    // Limpiar filas anteriores (eliminar datos pero mantener encabezados y estructura)
-    // Limpiamos columnas 2 a 7 (B a G) desde la fila 7 hacia abajo
-    for (let i = startIndex; i < startIndex + 100; i++) { // Limpiar hasta 100 filas potenciales
+    const startIndex = 6; // Fila 6 en ExcelJS (1-based) - DONDE COMIENZAN LOS DATOS
+    sendLog(`[MAIN][Objetivos][GUARDADO] Iniciando escritura desde fila ${startIndex}`, 'INFO');
+
+    // ESTRATEGIA DE LIMPIEZA SEGURA:
+    // 1. NO limpiar 100 filas indiscriminadamente
+    // 2. Solo limpiar las filas necesarias basadas en datos existentes y nuevos
+    // 3. Preservar formato, solo cambiar valores
+    
+    const currentRowCount = worksheet.rowCount;
+    const newEndRow = startIndex + dataRows.length - 1;
+    const rowsToClear = Math.max(0, currentRowCount - startIndex + 1);
+    
+    sendLog(`[MAIN][Objetivos][GUARDADO] Filas actuales: ${currentRowCount}, Nuevas filas necesarias: ${newEndRow}`, 'DEBUG');
+    sendLog(`[MAIN][Objetivos][GUARDADO] Limpiando ${rowsToClear} filas existentes (desde fila ${startIndex} hasta ${currentRowCount})`, 'DEBUG');
+
+    // Limpiar solo las filas existentes desde startIndex hasta el final
+    // Esto preserva el formato y solo elimina valores antiguos
+    for (let i = startIndex; i <= currentRowCount; i++) {
       const row = worksheet.getRow(i);
-      for (let col = 2; col <= 7; col++) {
-          row.getCell(col).value = null;
+      for (let col = 2; col <= 8; col++) {
+        const cell = row.getCell(col);
+        // Solo limpiar si hay un valor previo
+        if (cell.value !== null && cell.value !== '') {
+          cell.value = null;
+        }
       }
     }
 
-    // Escribir los nuevos datos
+    sendLog(`[MAIN][Objetivos][GUARDADO] Escribiendo ${dataRows.length} nuevos registros...`, 'INFO');
+
+    // Escribir los nuevos datos comenzando desde fila 6
     dataRows.forEach((obj, index) => {
-      const row = worksheet.getRow(startIndex + index);
-      row.getCell(2).value = obj.objective || '';   // Col B
-      row.getCell(3).value = obj.indicator || '';   // Col C
-      row.getCell(4).value = obj.formula || '';     // Col D
-      row.getCell(5).value = obj.goal || '';        // Col E
-      row.getCell(6).value = obj.frequency || '';   // Col F
-      row.getCell(7).value = obj.responsible || ''; // Col G
+      const rowNum = startIndex + index;
+      const row = worksheet.getRow(rowNum);
+      
+      row.getCell(2).value = obj.objective   || '';  // Col B: Objetivo
+      row.getCell(3).value = obj.indicator   || '';  // Col C: Indicador
+      row.getCell(4).value = obj.formula     || '';  // Col D: Fórmula
+      row.getCell(5).value = obj.goal        || '';  // Col E: Meta
+      row.getCell(6).value = obj.frequency   || '';  // Col F: Frecuencia
+      row.getCell(7).value = obj.responsible || '';  // Col G: Responsable
+      row.getCell(8).value = (obj.principleId != null) ? obj.principleId : ''; // Col H: principleId
+      
+      // Log de las primeras 3 filas escritas
+      if (index < 3) {
+        sendLog(`[MAIN][Objetivos][GUARDADO] Fila ${rowNum}: "${obj.objective?.substring(0, 40) || ''}..." - Principle: ${obj.principleId || 'auto'}`, 'DEBUG');
+      }
     });
+
+    if (dataRows.length > 3) {
+      sendLog(`[MAIN][Objetivos][GUARDADO] ... y ${dataRows.length - 3} registros adicionales`, 'DEBUG');
+    }
 
     // Guardar el archivo
     await workbook.xlsx.writeFile(filePath);
 
-    sendLog(`[MAIN] Datos de objetivos guardados exitosamente en: ${filePath}`, 'INFO');
+    sendLog(`[MAIN][Objetivos][GUARDADO] === GUARDADO COMPLETADO EXITOSAMENTE ===`, 'INFO');
+    sendLog(`[MAIN][Objetivos][GUARDADO] Archivo guardado: ${filePath}`, 'INFO');
+    sendLog(`[MAIN][Objetivos][GUARDADO] Total de registros guardados: ${dataRows.length}`, 'INFO');
 
     return { success: true };
   } catch (error) {
-    sendLog(`[MAIN] Error guardando datos en archivo Excel de objetivos: ${error.message}`, 'ERROR');
+    sendLog(`[MAIN][Objetivos][GUARDADO] ERROR: ${error.message}`, 'ERROR');
     return { success: false, error: error.message };
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RESULTADOS DE OBJETIVOS SST (JSON en Google Drive)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function getResultadosFilePath(excelFilePath) {
+  // Guardar el JSON en la misma carpeta que el Excel (Google Drive)
+  const dir = path.dirname(excelFilePath);
+  return path.join(dir, 'resultados-objetivos.json');
+}
+
+ipcMain.handle('get-objetivos-resultados', async (event, excelFilePath) => {
+  try {
+    const jsonPath = getResultadosFilePath(excelFilePath);
+    if (!fs.existsSync(jsonPath)) {
+      return { success: true, data: { resultados: {} } };
+    }
+    const content = await fsp.readFile(jsonPath, 'utf8');
+    const data = JSON.parse(content);
+    return { success: true, data };
+  } catch (error) {
+    sendLog(`[MAIN][Objetivos][RESULTADOS] Error leyendo resultados: ${error.message}`, 'WARN');
+    return { success: true, data: { resultados: {} } };
+  }
+});
+
+ipcMain.handle('save-objetivos-resultados', async (event, excelFilePath, resultadosData) => {
+  try {
+    const jsonPath = getResultadosFilePath(excelFilePath);
+    const data = {
+      companyName: resultadosData.companyName || '',
+      sourceFile: path.basename(excelFilePath),
+      lastModified: new Date().toISOString(),
+      resultados: resultadosData.resultados || {}
+    };
+    await fsp.writeFile(jsonPath, JSON.stringify(data, null, 2), 'utf8');
+    sendLog(`[MAIN][Objetivos][RESULTADOS] Guardados en: ${jsonPath}`, 'INFO');
+    return { success: true };
+  } catch (error) {
+    sendLog(`[MAIN][Objetivos][RESULTADOS] Error guardando: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// OBJETIVOS SST - RESULTADOS AUTOMÁTICOS (desde submódulos existentes)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Calcula resultados automáticamente desde los datos de los submódulos.
+ * Retorna un mapa normalizado: { [keyword]: { resultado, porcentajeReal, source } }
+ */
+async function calculateAutoResultados(companyName) {
+  const resultado = {};
+  let rootPath = null;
+  try {
+    rootPath = await getCompanyRootPath(companyName);
+  } catch (e) {
+    sendLog(`[AUTO-RESULTADOS] No se pudo obtener rootPath: ${e.message}`, 'WARN');
+    return resultado;
+  }
+  if (!rootPath) return resultado;
+
+  const currentYear = new Date().getFullYear();
+  const today = new Date();
+
+  // Ejecutar todas las fuentes en paralelo
+  const [capStats, indStats, presStats, evalStats, planStats] = await Promise.all([
+    calculateCapacitacionesStats(rootPath).catch(() => null),
+    calculateInduccionesStats(rootPath, companyName).catch(() => null),
+    calculatePresupuestoStats(rootPath, companyName).catch(() => null),
+    calculateEvaluacionInicialStats(rootPath).catch(() => null),
+    calculatePlanTrabajoStats(rootPath, currentYear).catch(() => null)
+  ]);
+
+  // ── 1. CAPACITACIONES ──────────────────────────────────────────────────────
+  if (capStats && capStats.totalCapacitaciones > 0) {
+    const total = capStats.totalCapacitaciones;
+    const realizadas = capStats.realizadas;
+    const pct = capStats.porcentajeCumplimiento;
+    resultado['capacitacion'] = {
+      resultado: `${realizadas}/${total} capacitaciones completadas`,
+      porcentajeReal: pct,
+      source: 'auto'
+    };
+    resultado['capacitaciones'] = resultado['capacitacion'];
+  }
+
+  // ── 2. INDUCCIONES ─────────────────────────────────────────────────────────
+  if (indStats && indStats.totalTrabajadores > 0) {
+    const total = indStats.totalTrabajadores;
+    const completadas = indStats.completadas;
+    const pendientes = indStats.pendientes;
+    const pct = indStats.porcentajeCompletado;
+    resultado['induccion'] = {
+      resultado: `${completadas}/${total} inducciones completadas (${pendientes} pendientes)`,
+      porcentajeReal: pct,
+      source: 'auto'
+    };
+    resultado['reinduccion'] = resultado['induccion'];
+  }
+
+  // ── 3. PRESUPUESTO ─────────────────────────────────────────────────────────
+  if (presStats && presStats.totalAsignado > 0) {
+    const ejecutado = presStats.totalEjecutado;
+    const asignado = presStats.totalAsignado;
+    const pct = presStats.porcentajeEjecucion;
+    resultado['presupuesto'] = {
+      resultado: `$${(ejecutado / 1000000).toFixed(1)}M ejecutados de $${(asignado / 1000000).toFixed(1)}M`,
+      porcentajeReal: pct,
+      source: 'auto'
+    };
+    resultado['recurso'] = resultado['presupuesto'];
+    resultado['recursos'] = resultado['presupuesto'];
+    resultado['asignacion'] = resultado['presupuesto'];
+  }
+
+  // ── 4. EVALUACIÓN INICIAL ──────────────────────────────────────────────────
+  if (evalStats && evalStats.disponible) {
+    const cum = evalStats.combinado;
+    const hallazgos = cum.totalHallazgos || 0;
+    const cumplidos = cum.hallazgosCumplidos || 0;
+    const pct = cum.cumplimiento || 0;
+    resultado['evaluacion'] = {
+      resultado: `${cumplidos}/${hallazgos} hallazgos cumplidos (${pct}%)`,
+      porcentajeReal: pct,
+      source: 'auto'
+    };
+    resultado['hallazgo'] = resultado['evaluacion'];
+    resultado['hallazgos'] = resultado['evaluacion'];
+  }
+
+  // ── 5. PLAN DE TRABAJO ─────────────────────────────────────────────────────
+  if (planStats && planStats.totalActividades > 0) {
+    const total = planStats.totalActividades;
+    const ejecutadas = planStats.actividadesEjecutadas;
+    const pct = planStats.porcentajeAvance;
+    resultado['plan'] = {
+      resultado: `${ejecutadas}/${total} actividades ejecutadas`,
+      porcentajeReal: pct,
+      source: 'auto'
+    };
+    resultado['trabajo'] = resultado['plan'];
+    resultado['actividad'] = resultado['plan'];
+    resultado['plan de trabajo'] = resultado['plan'];
+  }
+
+  // ── 6. INSPECCIONES ────────────────────────────────────────────────────────
+  try {
+    const inspResult = await require('./main/inspecciones-bridge').getInspeccionesStats
+      ? null
+      : null;
+    // Inspecciones están en módulo separado, intentar vía IPC no es posible aquí.
+    // Usar cálculo directo leyendo archivos.
+    const recursosPath = path.join(rootPath, '1. Recursos');
+    if (fs.existsSync(recursosPath)) {
+      const subs = await fsp.readdir(recursosPath);
+      const inspFolder = subs.find(s => s.startsWith('4.2') || s.toLowerCase().includes('inspecc'));
+      if (inspFolder) {
+        const inspPath = path.join(recursosPath, inspFolder);
+        const inspFiles = await fsp.readdir(inspPath);
+        const programmaFile = inspFiles.find(f => f.toLowerCase().includes('programa') && (f.endsWith('.xlsx') || f.endsWith('.xls')));
+        if (programmaFile) {
+          const wb = xlsx.readFile(path.join(inspPath, programmaFile));
+          const sheet = wb.Sheets[wb.SheetNames[0]];
+          const data = xlsx.utils.sheet_to_json(sheet, { header: 1 });
+          let totalAct = 0, completadas = 0;
+          for (let r = 1; r < data.length; r++) {
+            const row = data[r];
+            if (!row || row.length < 2) continue;
+            const nombre = row[1] || row[0];
+            if (!nombre || typeof nombre !== 'string') continue;
+            if (nombre.toLowerCase().includes('total')) break;
+            totalAct++;
+            // Verificar si tiene mark en mes actual (col del mes)
+            const mesCol = today.getMonth() + 3; // Columna C=mes1, D=mes2...
+            if (mesCol < row.length && (row[mesCol] === 'c' || row[mesCol] === 'C' || row[mesCol] === 'x' || row[mesCol] === 'X')) {
+              completadas++;
+            }
+          }
+          if (totalAct > 0) {
+            const pct = Math.round((completadas / totalAct) * 100);
+            resultado['inspeccion'] = {
+              resultado: `${completadas}/${totalAct} inspecciones completadas este mes`,
+              porcentajeReal: pct,
+              source: 'auto'
+            };
+            resultado['inspecciones'] = resultado['inspeccion'];
+          }
+        }
+      }
+    }
+  } catch (e) {
+    sendLog(`[AUTO-RESULTADOS] Error calculando inspecciones: ${e.message}`, 'WARN');
+  }
+
+  // ── 7. IDENTIFICACIÓN DE PELIGROS ──────────────────────────────────────────
+  try {
+    const matrizBridge = require('./main/identificacion-peligros-bridge');
+    // No se puede llamar directamente, leer JSON de la matriz
+    const normalize = (str) => str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+    const companyCfg = config.companyPaths?.[companyName];
+    if (companyCfg?.path) {
+      const empresaPath = companyCfg.path;
+      const peligrosDir = path.join(empresaPath, '4. Gestión de los Peligros');
+      if (fs.existsSync(peligrosDir)) {
+        const subDirs = await fsp.readdir(peligrosDir);
+        const ipDir = subDirs.find(d => d.startsWith('4.1') || normalize(d).includes('identificacion'));
+        if (ipDir) {
+          const ipPath = path.join(peligrosDir, ipDir);
+          const ipFiles = await fsp.readdir(ipPath);
+          const matrizFile = ipFiles.find(f => f.toLowerCase().includes('matriz') && (f.endsWith('.json') || f.endsWith('.xlsx')));
+          if (matrizFile && matrizFile.endsWith('.json')) {
+            const matrizData = JSON.parse(await fsp.readFile(path.join(ipPath, matrizFile), 'utf8'));
+            let total = 0, evaluados = 0, inaceptables = 0;
+            if (matrizData.sedes) {
+              for (const sede of matrizData.sedes) {
+                for (const proc of (sede.procesos || [])) {
+                  for (const cargo of (proc.cargos || [])) {
+                    for (const pel of (cargo.peligros || [])) {
+                      total++;
+                      if (pel.nd != null && pel.ne != null && pel.nc != null) evaluados++;
+                      const nr = pel.nrNivel || 'I';
+                      if (nr === 'III' || nr === 'IV' || nr === 'V') inaceptables++;
+                    }
+                  }
+                }
+              }
+            }
+            if (total > 0) {
+              const tasaEval = Math.round((evaluados / total) * 100);
+              const tasaInac = Math.round((inaceptables / total) * 100);
+              resultado['peligro'] = {
+                resultado: `${evaluados}/${total} peligros evaluados (${inaceptables} inaceptables)`,
+                porcentajeReal: tasaEval,
+                source: 'auto'
+              };
+              resultado['riesgo'] = resultado['peligro'];
+              resultado['nr'] = resultado['peligro'];
+              resultado['peligros'] = resultado['peligro'];
+              resultado['riesgos'] = resultado['peligro'];
+            }
+          }
+        }
+      }
+    }
+  } catch (e) {
+    sendLog(`[AUTO-RESULTADOS] Error calculando peligros: ${e.message}`, 'WARN');
+  }
+
+  // ── 8. ACCIDENTES / FRECUENCIA / SEVERIDAD (leerIndicadores) ────────────────
+  try {
+    // Buscar archivo INDICADORES: primero en 3.2.3, luego fallback a 6.1.1
+    let indicadoresFullPath = null;
+
+    // Intento 1: 3. Gestión de la Salud / 3.2.3*
+    const gestionSaludDir = path.join(rootPath, '3. Gestión de la Salud');
+    if (fs.existsSync(gestionSaludDir)) {
+      const subDirs = fs.readdirSync(gestionSaludDir);
+      const registroDir = subDirs.find(d => d.startsWith('3.2.3'));
+      if (registroDir) {
+        const registroPath = path.join(gestionSaludDir, registroDir);
+        const files = fs.readdirSync(registroPath);
+        const indicadoresFile = files.find(f => f.toLowerCase().includes('indicadores') && f.endsWith('.xlsx') && !f.startsWith('~$'));
+        if (indicadoresFile) indicadoresFullPath = path.join(registroPath, indicadoresFile);
+      }
+    }
+
+    // Intento 2: 6. Verificación / 6.1.1*
+    if (!indicadoresFullPath) {
+      const verifDir = path.join(rootPath, '6. Verificación');
+      if (fs.existsSync(verifDir)) {
+        const verifSubDirs = fs.readdirSync(verifDir);
+        const folder611 = verifSubDirs.find(d => d.startsWith('6.1.1'));
+        if (folder611) {
+          const verifPath = path.join(verifDir, folder611);
+          const verifFiles = fs.readdirSync(verifPath);
+          const indFile = verifFiles.find(f => f.toLowerCase().includes('indicadores') && f.endsWith('.xlsx') && !f.startsWith('~$'));
+          if (indFile) indicadoresFullPath = path.join(verifPath, indFile);
+        }
+      }
+    }
+
+    sendLog(`[AUTO-RESULTADOS] INDICADORES ruta: ${indicadoresFullPath || 'NO ENCONTRADO'}`, 'INFO');
+
+    if (indicadoresFullPath) {
+      const indResult = await excelBridge.leerIndicadores(indicadoresFullPath);
+      if (indResult.success && indResult.data) {
+        const ind = indResult.data;
+
+            // ── Leer meta de Objetivos SST (2.2.1) ──
+            let metaObjetivo = null;
+            let metaSeveridadObjetivo = null;
+            let metaMortalidadObjetivo = null;
+            try {
+              const giDir = path.join(rootPath, '2. Gestión Integral del SG-SST');
+              if (fs.existsSync(giDir)) {
+                const giEntries = fs.readdirSync(giDir);
+                const folder221 = giEntries.find(f => f.startsWith('2.2.1'));
+                if (folder221) {
+                  const objDir = path.join(giDir, folder221);
+                  const objFiles = fs.readdirSync(objDir);
+                  const objXlsx = objFiles.find(f => f.toLowerCase().endsWith('.xlsx') && !f.startsWith('~$'));
+                  if (objXlsx) {
+                    const objWb = xlsx.readFile(path.join(objDir, objXlsx));
+                    const objWs = objWb.Sheets[objWb.SheetNames[0]];
+                    if (objWs) {
+                      const objRows = xlsx.utils.sheet_to_json(objWs, { header: 1, defval: '' });
+                      for (let r = 0; r < objRows.length; r++) {
+                        const colC = String(objRows[r][2] || '').trim().toLowerCase();
+                        if (colC.indexOf('frecuencia') >= 0 && colC.indexOf('accidentalidad') >= 0) {
+                          const metaRaw = String(objRows[r][4] || '').trim();
+                          const match = metaRaw.match(/[\d.]+/);
+                          if (match) {
+                            metaObjetivo = parseFloat(match[0]);
+                            sendLog(`[AUTO-RESULTADOS] Meta Objetivos SST (Frecuencia): ${metaRaw} → ${metaObjetivo}`, 'INFO');
+                          }
+                        }
+                        if (colC.indexOf('severidad') >= 0 && colC.indexOf('accidentalidad') >= 0) {
+                          const metaRaw = String(objRows[r][4] || '').trim();
+                          const match = metaRaw.match(/[\d.]+/);
+                          if (match) {
+                            metaSeveridadObjetivo = parseFloat(match[0]);
+                            sendLog(`[AUTO-RESULTADOS] Meta Objetivos SST (Severidad): ${metaRaw} → ${metaSeveridadObjetivo}`, 'INFO');
+                          }
+                        }
+                        if (colC.indexOf('mortalidad') >= 0 || (colC.indexOf('proporcion') >= 0 && colC.indexOf('mortal') >= 0)) {
+                          const metaRaw = String(objRows[r][4] || '').trim();
+                          const match = metaRaw.match(/[\d.]+/);
+                          if (match) {
+                            metaMortalidadObjetivo = parseFloat(match[0]);
+                            sendLog(`[AUTO-RESULTADOS] Meta Objetivos SST (Mortalidad): ${metaRaw} → ${metaMortalidadObjetivo}`, 'INFO');
+                          }
+                        }
+                        if (metaObjetivo && metaSeveridadObjetivo && metaMortalidadObjetivo) break;
+                      }
+                    }
+                  }
+                }
+              }
+            } catch (eObj) {
+              sendLog(`[AUTO-RESULTADOS] No se pudo leer meta de Objetivos SST: ${eObj.message}`, 'WARN');
+            }
+
+            // Usar meta de Objetivos SST si existe, si no usar la del INDICADORES
+            const metaFrec = metaObjetivo || ind.config.metaFrecuencia;
+            const metaSev = metaSeveridadObjetivo || ind.config.metaSeveridad;
+
+            // ── Auto-fill AT desde 3.2.3 (igual que en renderer) ──
+            try {
+              const gsDirAuto = path.join(rootPath, '3. Gestión de la Salud');
+              if (fs.existsSync(gsDirAuto)) {
+                const gsEntriesAuto = fs.readdirSync(gsDirAuto);
+                const folder323Auto = gsEntriesAuto.find(f => f.startsWith('3.2.3'));
+                if (folder323Auto) {
+                  const subDirAuto = path.join(gsDirAuto, folder323Auto);
+                  const subEntriesAuto = fs.readdirSync(subDirAuto);
+                  const xlsxAuto = subEntriesAuto.find(f => f.toLowerCase().endsWith('.xlsx') && !f.startsWith('~$'));
+                  if (xlsxAuto) {
+                    const rutaAuto = path.join(subDirAuto, xlsxAuto);
+                    const resAutoAT = await excelBridge.contarATPorMes(currentYear, rutaAuto);
+                    if (resAutoAT.success && resAutoAT.data && resAutoAT.data.mensual) {
+                      const autoAT = resAutoAT.data.mensual;
+                      sendLog(`[AUTO-RESULTADOS] Auto AT desde 3.2.3: ${JSON.stringify(autoAT)}`, 'INFO');
+                      ind.frecuenciaMensual.forEach(row => {
+                        const autoCount = autoAT[row.mes] || 0;
+                        if (autoCount > 0) {
+                          row.accidentes = autoCount;
+                          row.indiceFrecuencia = row.trabajadores > 0
+                            ? Math.round(((autoCount / row.trabajadores) * 100) * 10000) / 10000
+                            : 0;
+                        }
+                      });
+                    }
+                  }
+                }
+              }
+            } catch (eAuto) {
+              sendLog(`[AUTO-RESULTADOS] No se pudo auto-fill AT: ${eAuto.message}`, 'WARN');
+            }
+
+            // ── Cargar diasCargados desde severidad-data.json ──
+            try {
+              const jsonSevPath = path.join(rootPath, 'severidad-data.json');
+              if (fs.existsSync(jsonSevPath)) {
+                const rawSev = fs.readFileSync(jsonSevPath, 'utf8');
+                const allSevData = JSON.parse(rawSev);
+                const yearSevData = allSevData[String(currentYear)] || {};
+                ind.severidadMensual.forEach(row => {
+                  const mesData = yearSevData[String(row.mes)] || {};
+                  row.diasCargados = mesData.diasCargados || 0;
+                  row.indiceSeveridad = row.trabajadores > 0
+                    ? Math.round((((row.diasPerdidos + row.diasCargados) / row.trabajadores) * 100) * 10000) / 10000
+                    : 0;
+                });
+                // ── Override eventosMortalesMensual con severidad: diasCargados === 6000 → 1 mortal ──
+                ind.eventosMortalesMensual.forEach(row => {
+                  const mesData = yearSevData[String(row.mes)] || {};
+                  const diasCargados = mesData.diasCargados || 0;
+                  row.diasCargados = diasCargados;
+                  row.eventosMortales = diasCargados === 6000 ? 1 : 0;
+                });
+                sendLog(`[AUTO-RESULTADOS] diasCargados cargados desde JSON para severidad + mortalidad`, 'INFO');
+              }
+            } catch (eSevJson) {
+              sendLog(`[AUTO-RESULTADOS] No se pudo cargar diasCargados: ${eSevJson.message}`, 'WARN');
+            }
+
+            // ── Frecuencia (IF) - Promedio anual entre 12 meses ──
+            const promIF = ind.frecuenciaMensual.length > 0
+              ? (ind.frecuenciaMensual.reduce((s, m) => s + m.indiceFrecuencia, 0) / 12).toFixed(4)
+              : 0;
+
+            resultado['frecuencia'] = {
+              resultado: `IF promedio: ${promIF} (meta: ${metaFrec})`,
+              porcentajeReal: metaFrec > 0
+                ? Math.min(100, Math.round((1 - promIF / metaFrec) * 100))
+                : 0,
+              source: 'auto'
+            };
+
+            // ── Severidad (IS) - Promedio anual entre 12 meses ──
+            const promIS = ind.severidadMensual.length > 0
+              ? (ind.severidadMensual.reduce((s, m) => s + m.indiceSeveridad, 0) / 12).toFixed(4)
+              : 0;
+
+            resultado['severidad'] = {
+              resultado: `IS promedio: ${promIS} (meta: ${metaSev})`,
+              porcentajeReal: metaSev > 0
+                ? Math.min(100, Math.round((1 - promIS / metaSev) * 100))
+                : 0,
+              source: 'auto'
+            };
+            resultado['severidad de accidentalidad'] = resultado['severidad'];
+
+            // ── Total AT ──
+            const totalDiasPerdidos = ind.severidadMensual.reduce((s, m) => s + m.diasPerdidos, 0);
+
+            // Total AT para mortalidad: auto-fill desde 3.2.3
+            let totalATMortal = ind.totalAT2024;
+            try {
+              const gsDirMort = path.join(rootPath, '3. Gestión de la Salud');
+              if (fs.existsSync(gsDirMort)) {
+                const gsEntriesMort = fs.readdirSync(gsDirMort);
+                const folder323Mort = gsEntriesMort.find(f => f.startsWith('3.2.3'));
+                if (folder323Mort) {
+                  const subDirMort = path.join(gsDirMort, folder323Mort);
+                  const subEntriesMort = fs.readdirSync(subDirMort);
+                  const xlsxMort = subEntriesMort.find(f => f.toLowerCase().endsWith('.xlsx') && !f.startsWith('~$'));
+                  if (xlsxMort) {
+                    const rutaMort = path.join(subDirMort, xlsxMort);
+                    const resMortAT = await excelBridge.contarATPorMes(currentYear, rutaMort);
+                    if (resMortAT.success && resMortAT.data && resMortAT.data.mensual) {
+                      const autoATMort = resMortAT.data.mensual;
+                      let sumAT = 0;
+                      ind.eventosMortalesMensual.forEach(row => {
+                        const autoCount = autoATMort[row.mes] || 0;
+                        if (autoCount > 0) row.totalATMes = autoCount;
+                        sumAT += row.totalATMes;
+                      });
+                      totalATMortal = sumAT;
+                      sendLog(`[AUTO-RESULTADOS] Total AT mortalidad desde 3.2.3: ${totalATMortal}`, 'INFO');
+                    }
+                  }
+                }
+              }
+            } catch (eMortAT) {
+              sendLog(`[AUTO-RESULTADOS] Error auto-fill AT mortalidad: ${eMortAT.message}`, 'WARN');
+            }
+
+            // Total AT general (para accidente/AT)
+            const totalAT = ind.frecuenciaMensual.reduce((s, m) => s + m.accidentes, 0);
+            const totalMortal = ind.eventosMortalesMensual.reduce((s, m) => s + m.eventosMortales, 0);
+
+            resultado['accidente'] = {
+              resultado: `${totalAT} AT en ${currentYear} | Mortales: ${totalMortal} | Días perdidos: ${totalDiasPerdidos}`,
+              porcentajeReal: 0,
+              source: 'auto'
+            };
+            resultado['at'] = resultado['accidente'];
+            resultado['accidentalidad'] = resultado['frecuencia'];
+
+            // ── Mortalidad ──
+            const metaMortal = metaMortalidadObjetivo || ind.config.metaMortalidad || 0;
+            const proporcionMortal = totalATMortal > 0 ? ((totalMortal / totalATMortal) * 100).toFixed(2) : '0.00';
+            resultado['mortalidad'] = {
+              resultado: `Proporción mortalidad: ${proporcionMortal}% (${totalMortal} mortales / ${totalATMortal} AT en ${currentYear})`,
+              porcentajeReal: metaMortal > 0 ? (parseFloat(proporcionMortal) <= metaMortal ? 100 : 0) : 0,
+              source: 'auto'
+            };
+            resultado['mortal'] = resultado['mortalidad'];
+
+            // ── Ausentismo ──
+            const promAusentismo = ind.ausentismoMensual.length > 0
+              ? (ind.ausentismoMensual.reduce((s, m) => s + m.tasaAusentismo, 0) / ind.ausentismoMensual.length).toFixed(2)
+              : 0;
+
+            resultado['ausentismo'] = {
+              resultado: `Tasa ausentismo promedio: ${promAusentismo}%`,
+              porcentajeReal: 0,
+              source: 'auto'
+            };
+            resultado['incapacidad'] = resultado['ausentismo'];
+
+            // ── Prevalencia EL ──
+            {
+              const totalTrab = ind.frecuenciaMensual.reduce((s, m) => s + m.trabajadores, 0);
+              const promTrab = ind.frecuenciaMensual.length > 0 ? Math.round(totalTrab / ind.frecuenciaMensual.length) : 0;
+              const totalCasosEL = ind.config.prevalenciaEL || 0;
+              const prevalenciaCalc = promTrab > 0 ? ((totalCasosEL / promTrab) * 100000).toFixed(2) : '0.00';
+              resultado['prevalencia'] = {
+                resultado: `Prevalencia EL: ${prevalenciaCalc} por 100.000 trabajadores (${totalCasosEL} casos / ${promTrab} prom. trabajadores)`,
+                porcentajeReal: 0,
+                source: 'auto'
+              };
+            }
+
+            // ── Incidencia EL ──
+            {
+              const totalTrabInc = ind.frecuenciaMensual.reduce((s, m) => s + m.trabajadores, 0);
+              const promTrabInc = ind.frecuenciaMensual.length > 0 ? Math.round(totalTrabInc / ind.frecuenciaMensual.length) : 0;
+              const totalCasosNuevos = ind.config.incidenciaEL || 0;
+              const incidenciaCalc = promTrabInc > 0 ? ((totalCasosNuevos / promTrabInc) * 100000).toFixed(2) : '0.00';
+              resultado['incidencia'] = {
+                resultado: `Incidencia EL: ${incidenciaCalc} por 100.000 trabajadores (${totalCasosNuevos} casos nuevos / ${promTrabInc} prom. trabajadores)`,
+                porcentajeReal: 0,
+                source: 'auto'
+              };
+            }
+
+            // ── IFA / IG (índices del registro estadístico) ──
+            resultado['ifa'] = {
+              resultado: `IF promedio: ${promIF} | IS promedio: ${promIS}`,
+              porcentajeReal: 0,
+              source: 'auto'
+            };
+          }
+      }
+  } catch (e) {
+    sendLog(`[AUTO-RESULTADOS] Error calculando frecuencia/severidad: ${e.message}`, 'WARN');
+  }
+
+  // ── 9. AUSENTISMO ─────────────────────────────────────────────────────────
+  try {
+    const configData2 = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config2 = JSON.parse(configData2);
+    const companyCfg2 = config2.companyPaths?.[companyName];
+    if (companyCfg2?.path) {
+      const empresaPath = companyCfg2.path;
+      const saludDir = path.join(empresaPath, '3. Gestión de la Salud');
+      if (fs.existsSync(saludDir)) {
+        const subDirs = await fsp.readdir(saludDir);
+        const ausDir = subDirs.find(d => d.startsWith('3.3.6') || d.toLowerCase().includes('ausentismo'));
+        if (ausDir) {
+          const ausPath = path.join(saludDir, ausDir);
+          const ausFiles = await fsp.readdir(ausPath);
+          const ausFile = ausFiles.find(f => f.toLowerCase().includes('ausentismo') && (f.endsWith('.xlsx') || f.endsWith('.xls')));
+          if (ausFile) {
+            const wb = xlsx.readFile(path.join(ausPath, ausFile));
+            const sheet = wb.Sheets[wb.SheetNames[0]];
+            const data = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+            let headerIdx = 0;
+            for (let i = 0; i < Math.min(5, data.length); i++) {
+              const row = data[i];
+              if (row && row.some(c => String(c).toLowerCase().includes('cedula'))) { headerIdx = i; break; }
+            }
+            const hdrs = data[headerIdx].map(h => String(h).trim().toLowerCase());
+            const iDias = hdrs.findIndex(h => h.includes('dias') || h.includes('incapacidad'));
+            const iInicio = hdrs.findIndex(h => h.includes('inicio'));
+            const iFin = hdrs.findIndex(h => h.includes('fin'));
+            const iClase = hdrs.findIndex(h => h.includes('clase'));
+
+            let totalDias = 0, casos = 0, arlCases = 0;
+            for (let r = headerIdx + 1; r < data.length; r++) {
+              const row = data[r];
+              if (!row || row.length < 2) continue;
+              const dias = parseInt(row[iDias]) || 0;
+              if (dias > 0) {
+                totalDias += dias;
+                casos++;
+                const clase = iClase >= 0 ? String(row[iClase] || '').toLowerCase() : '';
+                if (clase.includes('arl')) arlCases++;
+              }
+            }
+            if (casos > 0) {
+              resultado['ausentismo'] = {
+                resultado: `${casos} casos activos (${totalDias} días, ${arlCases} PRIC)`,
+                porcentajeReal: 0,
+                source: 'auto'
+              };
+              resultado['incapacidad'] = resultado['ausentismo'];
+            }
+          }
+        }
+      }
+    }
+  } catch (e) {
+    sendLog(`[AUTO-RESULTADOS] Error calculando ausentismo: ${e.message}`, 'WARN');
+  }
+
+  // ── 10. INVESTIGACIÓN DE ACCIDENTES ────────────────────────────────────────
+  try {
+    const configData3 = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config3 = JSON.parse(configData3);
+    const companyCfg3 = config3.companyPaths?.[companyName];
+    if (companyCfg3?.path) {
+      const empresaPath = companyCfg3.path;
+      const saludDir = path.join(empresaPath, '3. Gestión de la Salud');
+      if (fs.existsSync(saludDir)) {
+        const subDirs = await fsp.readdir(saludDir);
+        const invDir = subDirs.find(d => d.startsWith('3.2.2') || d.toLowerCase().includes('investigacion'));
+        if (invDir) {
+          const invPath = path.join(saludDir, invDir);
+          const invFiles = await fsp.readdir(invPath);
+          const investigations = invFiles.filter(f => f.endsWith('.pdf') || f.endsWith('.html'));
+          if (investigations.length > 0) {
+            resultado['investigacion'] = {
+              resultado: `${investigations.length} investigaciones realizadas`,
+              porcentajeReal: 0,
+              source: 'auto'
+            };
+          }
+        }
+      }
+    }
+  } catch (e) {
+    sendLog(`[AUTO-RESULTADOS] Error calculando investigaciones: ${e.message}`, 'WARN');
+  }
+
+  // ── 11. POLÍTICA SST ──────────────────────────────────────────────────────
+  try {
+    const politicaStats = await calculatePoliticaStats(rootPath);
+    if (politicaStats.documento_encontrado) {
+      const estado = politicaStats.actualizada ? 'Actualizada' : 'Por actualizar';
+      const fecha = politicaStats.fecha ? new Date(politicaStats.fecha).toLocaleDateString('es-CO') : 'N/D';
+      resultado['politica'] = {
+        resultado: `Política ${estado} (última: ${fecha})`,
+        porcentajeReal: politicaStats.actualizada ? 100 : 50,
+        source: 'auto'
+      };
+    }
+  } catch (e) {
+    sendLog(`[AUTO-RESULTADOS] Error calculando política: ${e.message}`, 'WARN');
+  }
+
+  // ── 12. COPASST / COMITÉ (desde dashboard alertas) ────────────────────────
+  try {
+    const copasstPath = path.join(rootPath, '1. Recursos', '1.1.6 Conformación de Copasst');
+    if (fs.existsSync(copasstPath)) {
+      const currentYear2 = new Date().getFullYear();
+      const reunionFiles = fs.readdirSync(copasstPath).filter(f => f.endsWith('.pdf') || f.endsWith('.docx'));
+      const yearFiles = reunionFiles.filter(f => f.includes(currentYear2.toString()));
+      resultado['copasst'] = {
+        resultado: `${yearFiles.length} actas de COPASST en ${currentYear2}`,
+        porcentajeReal: Math.min(100, Math.round((yearFiles.length / 12) * 100)),
+        source: 'auto'
+      };
+      resultado['comite'] = resultado['copasst'];
+    }
+  } catch (e) {
+    sendLog(`[AUTO-RESULTADOS] Error calculando COPASST: ${e.message}`, 'WARN');
+  }
+
+  return resultado;
+}
+
+ipcMain.handle('get-objetivos-resultados-auto', async (event, companyName) => {
+  try {
+    sendLog(`[MAIN][AUTO-RESULTADOS] Calculando resultados auto para: ${companyName}`, 'INFO');
+    const autoData = await calculateAutoResultados(companyName);
+    sendLog(`[MAIN][AUTO-RESULTADOS] Resultados calculados: ${Object.keys(autoData).length} keywords`, 'INFO');
+    return { success: true, data: autoData };
+  } catch (error) {
+    sendLog(`[MAIN][AUTO-RESULTADOS] Error: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message, data: {} };
   }
 });
 
@@ -4718,6 +6178,81 @@ ipcMain.handle('list-provider-files', async (event, folderPath) => {
     return { success: false, error: error.message, files: [] };
   }
 });
+
+// =============================================================================
+// HANDLERS PARA DIAGNÓSTICO Y REPARACIÓN DE WORD COM
+// =============================================================================
+
+// Handler para diagnóstico de Word COM
+ipcMain.handle('diagnose-word-com', async (event) => {
+  sendLog(`[MAIN][diagnose-word-com] Ejecutando diagnóstico de Word COM`, 'INFO');
+  
+  try {
+    const pythonPath = await getPython();
+    const diagnoseScript = getPythonScriptPath('diagnose_word_com.py');
+    
+    if (!fs.existsSync(diagnoseScript)) {
+      sendLog(`[MAIN][diagnose-word-com] Script de diagnóstico no encontrado: ${diagnoseScript}`, 'ERROR');
+      return { success: false, error: `Script no encontrado: ${diagnoseScript}` };
+    }
+    
+    const { stdout, stderr } = await execFilePromise(pythonPath, [diagnoseScript]);
+    
+    if (stderr) {
+      sendLog(`[MAIN][diagnose-word-com] Diagnóstico stderr: ${stderr}`, 'WARN');
+    }
+    
+    try {
+      const result = JSON.parse(stdout);
+      sendLog(`[MAIN][diagnose-word-com] Diagnóstico completado`, 'INFO');
+      return { success: true, data: result };
+    } catch (parseError) {
+      sendLog(`[MAIN][diagnose-word-com] Error parseando resultado: ${parseError.message}`, 'ERROR');
+      return { success: false, error: 'Error parseando diagnóstico', raw: stdout };
+    }
+  } catch (error) {
+    sendLog(`[MAIN][diagnose-word-com] Error ejecutando diagnóstico: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+// Handler para reparación de Word COM
+ipcMain.handle('repair-word-com', async (event) => {
+  sendLog(`[MAIN][repair-word-com] Iniciando reparación de Word COM`, 'INFO');
+  
+  try {
+    const pythonPath = await getPython();
+    const repairScript = getPythonScriptPath('repair_word_com.py');
+    
+    if (!fs.existsSync(repairScript)) {
+      sendLog(`[MAIN][repair-word-com] Script de reparación no encontrado: ${repairScript}`, 'ERROR');
+      return { success: false, error: `Script no encontrado: ${repairScript}` };
+    }
+    
+    sendLog(`[MAIN][repair-word-com] Ejecutando script de reparación...`, 'INFO');
+    const { stdout, stderr } = await execFilePromise(pythonPath, [repairScript], { timeout: 180000 });
+    
+    if (stderr) {
+      sendLog(`[MAIN][repair-word-com] Reparación stderr: ${stderr}`, 'WARN');
+    }
+    
+    try {
+      const result = JSON.parse(stdout);
+      sendLog(`[MAIN][repair-word-com] Reparación completada. Éxito: ${result.final_com_working}`, 'INFO');
+      return { success: true, data: result };
+    } catch (parseError) {
+      sendLog(`[MAIN][repair-word-com] Error parseando resultado: ${parseError.message}`, 'ERROR');
+      return { success: false, error: 'Error parseando resultado de reparación', raw: stdout };
+    }
+  } catch (error) {
+    sendLog(`[MAIN][repair-word-com] Error ejecutando reparación: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+// =============================================================================
+// HANDLERS PARA VISUALIZACIÓN DE DOCUMENTOS WORD
+// =============================================================================
 
 ipcMain.handle('get-word-preview', async (event, rawFilePath) => {
   sendLog(`[MAIN][get-word-preview] Solicitud recibida para filePath: ${rawFilePath}`, 'INFO');
@@ -5458,6 +6993,139 @@ ipcMain.handle('open-file', async (event, filePath) => {
   }
 });
 
+// ===============================
+// Manejador para crear carpeta
+// ===============================
+ipcMain.handle('create-folder', async (event, payload) => {
+  const { parentPath, folderName } = payload;
+
+  sendLog(`[MAIN][create-folder] Solicitud para crear carpeta: "${folderName}" en ${parentPath}`, 'INFO');
+
+  try {
+    if (!parentPath || !folderName) {
+      throw new Error('Ruta padre o nombre de carpeta no proporcionados');
+    }
+
+    const normalizedParent = path.normalize(parentPath);
+    const newFolderPath = path.join(normalizedParent, folderName);
+
+    const exists = await fsp.access(newFolderPath).then(() => true).catch(() => false);
+    if (exists) {
+      throw new Error('Ya existe una carpeta con ese nombre');
+    }
+
+    await fsp.mkdir(newFolderPath, { recursive: true });
+
+    sendLog(`[MAIN][create-folder] Carpeta creada exitosamente: ${newFolderPath}`, 'INFO');
+
+    return {
+      success: true,
+      path: newFolderPath
+    };
+  } catch (error) {
+    sendLog(`[MAIN][create-folder] Error al crear carpeta: ${error.message}`, 'ERROR');
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+});
+
+// ===============================
+// Manejador para eliminar carpeta
+// ===============================
+ipcMain.handle('delete-folder', async (event, payload) => {
+  const { folderPath } = payload;
+
+  sendLog(`[MAIN][delete-folder] Solicitud para eliminar carpeta: ${folderPath}`, 'INFO');
+
+  try {
+    if (!folderPath) {
+      throw new Error('Ruta de carpeta no válida');
+    }
+
+    const normalizedPath = path.normalize(folderPath);
+    sendLog(`[MAIN][delete-folder] Ruta normalizada: ${normalizedPath}`, 'DEBUG');
+
+    const exists = await fsp.access(normalizedPath).then(() => true).catch(() => false);
+    if (!exists) {
+      sendLog(`[MAIN][delete-folder] Carpeta no existe: ${normalizedPath}`, 'ERROR');
+      return { success: false, error: 'La carpeta no existe', code: 'ENOENT' };
+    }
+
+    const stats = await fsp.stat(normalizedPath);
+    if (!stats.isDirectory()) {
+      throw new Error('La ruta no corresponde a una carpeta');
+    }
+
+    try {
+      await shell.trashItem(normalizedPath);
+      sendLog(`[MAIN][delete-folder] Carpeta movida a papelera exitosamente`, 'INFO');
+      return { success: true };
+    } catch (trashError) {
+      sendLog(`[MAIN][delete-folder] trashItem falló: ${trashError.message}, usando fsp.rm`, 'WARN');
+      await fsp.rm(normalizedPath, { recursive: true, force: true });
+      sendLog(`[MAIN][delete-folder] Carpeta eliminada con fsp.rm`, 'INFO');
+      return { success: true };
+    }
+  } catch (error) {
+    sendLog(`[MAIN][delete-folder] Error al eliminar carpeta: ${error.message}`, 'ERROR');
+
+    let errorCode = 'UNKNOWN';
+    if (error.code === 'ENOENT') errorCode = 'ENOENT';
+    else if (error.code === 'EACCES' || error.code === 'EPERM') errorCode = 'EACCES';
+
+    return {
+      success: false,
+      error: error.message,
+      code: errorCode
+    };
+  }
+});
+
+ipcMain.handle('rename-item', async (event, payload) => {
+  const { itemPath, newName } = payload;
+
+  sendLog(`[MAIN][rename-item] Solicitud para renombrar: ${itemPath} -> ${newName}`, 'INFO');
+
+  try {
+    if (!itemPath || !newName) {
+      throw new Error('Ruta del item o nuevo nombre no proporcionados');
+    }
+
+    const normalizedPath = path.normalize(itemPath);
+    const exists = await fsp.access(normalizedPath).then(() => true).catch(() => false);
+    if (!exists) {
+      return { success: false, error: 'El archivo o carpeta no existe', code: 'ENOENT' };
+    }
+
+    const parentDir = path.dirname(normalizedPath);
+    const newPath = path.join(parentDir, newName);
+
+    const targetExists = await fsp.access(newPath).then(() => true).catch(() => false);
+    if (targetExists) {
+      return { success: false, error: 'Ya existe un archivo o carpeta con ese nombre', code: 'EEXIST' };
+    }
+
+    await fsp.rename(normalizedPath, newPath);
+    sendLog(`[MAIN][rename-item] Renombrado exitosamente: ${newPath}`, 'INFO');
+    return { success: true, newPath };
+  } catch (error) {
+    sendLog(`[MAIN][rename-item] Error: ${error.message}`, 'ERROR');
+
+    let errorCode = 'UNKNOWN';
+    if (error.code === 'ENOENT') errorCode = 'ENOENT';
+    else if (error.code === 'EACCES' || error.code === 'EPERM') errorCode = 'EACCES';
+    else if (error.code === 'EEXIST') errorCode = 'EEXIST';
+
+    return {
+      success: false,
+      error: error.message,
+      code: errorCode
+    };
+  }
+});
+
 // Manejador para obtener la lista de archivos de presupuesto
 ipcMain.handle('getPresupuestoFiles', async (event, companyName) => {
   sendLog(`[MAIN] Buscando archivos de presupuesto para: ${companyName} en el submódulo 1.1.3.`);
@@ -6040,19 +7708,104 @@ ipcMain.on('stop-watching-capacitaciones', () => {
   }
 });
 
+// ═══════════════════════════════════════════════════════
+// FURAT - Reportes de Accidentes (Submódulo 3.2.1)
+// Handlers IPC para dashboard y biblioteca
+// ═══════════════════════════════════════════════════════
+
+function registerFuratHandlers(appInstance) {
+  sendLog('[FURAT] Registrando handlers IPC...', 'INFO');
+
+  // No necesitamos handlers adicionales porque el logic.js
+  // usa los contracts existentes (get-document-folders, get-pdf-preview, etc.)
+  // El dashboard y biblioteca se calculan en el frontend (renderer)
+
+  sendLog('[FURAT] Handlers registrados correctamente (usa contratos existentes)', 'INFO');
+}
+
 // Manejador para la creación de la ventana principal
 app.whenReady().then(() => {
-  // Solo crear ventana si no ha sido creada antes
+  // Mostrar pantalla de carga inmediatamente
+  createLoadingWindow();
+
+  // Crear ventana principal en paralelo (oculta hasta que carga termine)
   if (!isWindowCreated) {
     createWindow();
   }
 
-  // Iniciar la búsqueda de actualizaciones una vez que la app esté lista
-  // Usar función segura con manejo de errores
+  // Handler: la pantalla de carga terminó → cerrar loading, mostrar app
+  ipcMain.on('loading-complete', () => {
+    if (loadingWindow && !loadingWindow.isDestroyed()) {
+      loadingWindow.close();
+    }
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+
+// Registrar handlers de Archivo y Retención Documental (Submódulo 2.5.1)
+try {
+registerArchivoRetencionHandlers(app);
+sendLog('[MAIN] Handlers de Archivo y Retención Documental (2.5.1) registrados correctamente', 'INFO');
+} catch (err) {
+sendLog(`[MAIN] Error registrando handlers de Archivo Retención: ${err.message}`, 'ERROR');
+}
+
+// Registrar handlers de Inspecciones Sistemáticas (Submódulo 4.2.4)
+try {
+registerInspeccionesHandlers(app, { getCompanyRootPath });
+sendLog('[MAIN] Handlers de Inspecciones Sistemáticas (4.2.4) registrados correctamente', 'INFO');
+} catch (err) {
+sendLog(`[MAIN] Error registrando handlers de Inspecciones Sistemáticas: ${err.message}`, 'ERROR');
+ }
+
+// Registrar handlers de Mantenimiento Periódico (Submódulo 4.2.5)
+try {
+  registerMantenimientoHandlers(app, { getCompanyRootPath });
+  sendLog('[MAIN] Handlers de Mantenimiento Periódico (4.2.5) registrados correctamente', 'INFO');
+} catch (err) {
+  sendLog(`[MAIN] Error registrando handlers de Mantenimiento Periódico: ${err.message}`, 'ERROR');
+}
+
+// Registrar handlers de Identificación de Peligros (Submódulo 4.1.2)
+try {
+  registerIdentificacionPeligrosHandlers(app, { getCompanyRootPath });
+  sendLog('[MAIN] Handlers de Identificación de Peligros (4.1.2) registrados correctamente', 'INFO');
+} catch (err) {
+  sendLog(`[MAIN] Error registrando handlers de Identificación de Peligros: ${err.message}`, 'ERROR');
+}
+
+// Registrar handlers de Revisión por la Alta Dirección (Submódulo 6.1.3)
+try {
+  registerRevisionAltaDireccionHandlers(app, { getCompanyRootPath, getDb });
+  sendLog('[MAIN] Handlers de Revisión por la Alta Dirección (6.1.3) registrados correctamente', 'INFO');
+} catch (err) {
+  sendLog(`[MAIN] Error registrando handlers de Revisión por la Alta Dirección: ${err.message}`, 'ERROR');
+}
+
+// Registrar handlers de Auditoría Anual (Submódulo 6.1.2) — F1 (2026-06-19)
+try {
+  registerAuditoriaAnualHandlers(app, { getCompanyRootPath, getDb });
+  sendLog('[MAIN] Handlers de Auditoría Anual (6.1.2) registrados correctamente', 'INFO');
+} catch (err) {
+  sendLog(`[MAIN] Error registrando handlers de Auditoría Anual: ${err.message}`, 'ERROR');
+}
+
+ // Registrar handlers de FURAT - Reportes de Accidentes (Submódulo 3.2.1)
+  try {
+    registerFuratHandlers(app);
+    sendLog('[MAIN] Handlers de FURAT (3.2.1) registrados correctamente', 'INFO');
+  } catch (err) {
+    sendLog(`[MAIN] Error registrando handlers de FURAT: ${err.message}`, 'ERROR');
+  }
+
+  // Iniciar smart polling de actualizaciones una vez que la app esté lista
+  // Esperar 5 segundos para evitar conflictos con la inicialización
   setTimeout(() => {
-    sendLog('Iniciando verificación de actualizaciones...', 'INFO');
-    checkForUpdatesSafe();
-  }, 5000);  // Esperar 5 segundos después de cargar la ventana para evitar conflictos
+    sendLog('Iniciando verificación de actualizaciones (smart polling)...', 'INFO');
+    scheduleUpdateChecks();
+  }, 5000);
 
   app.on('activate', () => {
     // En macOS, es común volver a crear una ventana en la aplicación cuando
@@ -6490,6 +8243,154 @@ ipcMain.handle('read-ausentismo-data', async (event, companyName) => {
       success: false,
       error: error.message
     };
+  }
+});
+
+// =============================================================================
+// Handler: registro-estadistico:cargar-datos (Submódulo 3.2.3)
+// =============================================================================
+ipcMain.handle('registro-estadistico:cargar-datos', async (event, { companyName }) => {
+  console.log('[REGISTRO-EST] Handler llamado para empresa:', companyName);
+  try {
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+
+    const normalizedInput = (companyName || '').toLowerCase();
+    const companyKey = Object.keys(config.companyPaths || {}).find(
+      key => key.toLowerCase() === normalizedInput
+    );
+    const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
+
+    if (!companyConfig || !companyConfig.root) {
+      console.warn(`[REGISTRO-EST] Empresa "${companyName}" no encontrada`);
+      return { success: true, data: [], isEmpty: true, reason: 'COMPANY_NOT_FOUND' };
+    }
+
+    // Buscar carpeta "3. Gestión de la Salud" y dentro cualquier carpeta que empiece con "3.2.3"
+    const gestionSaludDir = path.join(companyConfig.root, '3. Gestión de la Salud');
+    let gestionEntries;
+    try {
+      gestionEntries = await fsp.readdir(gestionSaludDir);
+    } catch (err) {
+      if (err.code === 'ENOENT') return { success: true, data: [], isEmpty: true, reason: 'FOLDER_NOT_FOUND' };
+      throw err;
+    }
+
+    const registro323Folder = gestionEntries.find(f => f.startsWith('3.2.3'));
+    if (!registro323Folder) {
+      console.log('[REGISTRO-EST] Carpeta 3.2.3 no encontrada en:', gestionSaludDir);
+      return { success: true, data: [], isEmpty: true, reason: 'FOLDER_NOT_FOUND' };
+    }
+
+    const submoduleDir = path.join(gestionSaludDir, registro323Folder);
+    let entries;
+    try {
+      entries = await fsp.readdir(submoduleDir);
+    } catch (err) {
+      if (err.code === 'ENOENT') return { success: true, data: [], isEmpty: true, reason: 'FOLDER_NOT_FOUND' };
+      throw err;
+    }
+
+    const excelFile = entries.find(f => f.toLowerCase().endsWith('.xlsx') && !f.startsWith('~$'));
+    if (!excelFile) {
+      console.log('[REGISTRO-EST] No se encontró archivo .xlsx en:', submoduleDir);
+      return { success: true, data: [], isEmpty: true, reason: 'FILE_NOT_FOUND' };
+    }
+
+    const filePath = path.join(submoduleDir, excelFile);
+    console.log('[REGISTRO-EST] Leyendo:', filePath);
+
+    const XLSX = require('xlsx');
+    const wb = XLSX.readFile(filePath);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    if (!ws) return { success: true, data: [], isEmpty: true, reason: 'NO_SHEET' };
+
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    if (rows.length < 2) return { success: true, data: [], isEmpty: true, reason: 'NO_DATA' };
+
+    // Detectar fila de encabezados (buscar "Ciudad" o "Año" en primeras 10 filas)
+    let headerIdx = 0;
+    for (let i = 0; i < Math.min(10, rows.length); i++) {
+      const row = rows[i];
+      if (row.some(c => {
+        const s = String(c).trim().toLowerCase();
+        return s === 'ciudad' || s === 'año' || s === 'evento';
+      })) {
+        headerIdx = i;
+        break;
+      }
+    }
+
+    // Mapear columnas por nombre de encabezado
+    const headers = rows[headerIdx].map(h => String(h).trim().replace(/\r\n|\r|\n/g, ''));
+    const idx = (name) => headers.findIndex(h => h.toLowerCase() === name.toLowerCase());
+
+    const iCiudad      = idx('Ciudad');
+    const iAnio        = idx('Año');
+    const iFecha       = idx('Fecha del incidente');
+    const iMes         = idx('Mes');
+    const iEvento      = idx('Evento');
+    const iNombre      = idx('Nombre Completo');
+    const iSexo        = idx('Sexo');
+    const iId          = idx('Identificación');
+    const iCargo       = idx('Cargo');
+    const iTipoEvento  = idx('Tipo Evento');
+    const iSeveridad   = idx('Severidad');
+    const iEstado      = idx('Estado');
+    const iMortal      = idx('Eventos Mortales');
+    const iParteAt     = idx('Parte Afectada AT');
+    const iMecanismo   = idx('Mecanismo');
+    const iLugar       = idx('Lugar');
+    const iAgente      = idx('Agente');
+    const iTipoLesion  = idx('Tipo Lesión');
+    const iDesc        = idx('Descripción del evento');
+
+    // Convertir serial de fecha Excel a string ISO YYYY-MM-DD
+    const toISO = (v) => {
+      if (!v) return '';
+      if (typeof v === 'number') {
+        const d = XLSX.SSF.parse_date_code(Math.floor(v));
+        return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+      }
+      return String(v).trim();
+    };
+
+    const cell = (row, i) => i >= 0 ? String(row[i] ?? '').trim() : '';
+
+    const records = [];
+    for (let r = headerIdx + 1; r < rows.length; r++) {
+      const row = rows[r];
+      const anio = parseInt(cell(row, iAnio));
+      if (!anio || anio < 2000 || anio > 2099) continue;
+      records.push([
+        anio,                          // 0: anio
+        toISO(row[iFecha]),            // 1: fecha
+        cell(row, iMes),               // 2: mes
+        cell(row, iCiudad),            // 3: ciudad
+        cell(row, iEvento),            // 4: evento
+        cell(row, iNombre),            // 5: nombreCompleto
+        cell(row, iSexo),              // 6: sexo
+        cell(row, iId),                // 7: identificacion
+        cell(row, iCargo),             // 8: cargo
+        cell(row, iTipoEvento),        // 9: tipoEvento
+        cell(row, iSeveridad),         // 10: severidad
+        cell(row, iEstado),            // 11: estado
+        cell(row, iMortal),            // 12: mortal
+        cell(row, iParteAt),           // 13: parteAfectada
+        cell(row, iMecanismo),         // 14: mecanismo
+        cell(row, iLugar),             // 15: lugar
+        cell(row, iAgente),            // 16: agente
+        cell(row, iTipoLesion),        // 17: tipoLesion
+        cell(row, iDesc),              // 18: descripcion
+      ]);
+    }
+
+    console.log(`[REGISTRO-EST] Registros parseados: ${records.length} de ${filePath}`);
+    return { success: true, data: records, isEmpty: records.length === 0, file: excelFile };
+
+  } catch (error) {
+    console.error('[REGISTRO-EST] Error:', error.message);
+    return { success: false, error: { code: error.code || 'READ_ERROR', message: error.message } };
   }
 });
 
@@ -7723,7 +9624,8 @@ ipcMain.handle('generate-copasst-acta', async (event, changes, savePath = null) 
       }
 
       // Definir nombre de archivo con timestamp
-      const fileName = `ACTA_COPASST_${new Date().toISOString().slice(0, 10)}_${Date.now()}.xlsx`;
+      const MESES_FB = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+      const fileName = `ACT-FO-029 Acta de Reunión Copasst ${MESES_FB[new Date().getMonth()]}.xlsx`;
       outputPath = path.join(outputDir, fileName);
     }
 
@@ -7751,9 +9653,27 @@ ipcMain.handle('generate-copasst-acta', async (event, changes, savePath = null) 
       throw new Error(`El archivo de salida no se creó correctamente en: ${outputPath}`);
     }
 
-    sendLog(`[MAIN][generate-copasst-acta] Acta generada exitosamente en: ${outputPath}`, 'INFO');
+            sendLog(`[MAIN][generate-copasst-acta] Acta generada exitosamente en: ${outputPath}`, 'INFO');
 
-    // Limpiar el archivo temporal
+            // Invalidar cache de recursos para que se recalculen estadisticas de actas
+            try {
+                const savedConfigPath = path.join(app.getPath('userData'), 'config.json');
+                const savedConfig = JSON.parse(fs.readFileSync(savedConfigPath, 'utf8') || '{}');
+                const normalizedOutput = outputPath.toLowerCase().replace(/\\/g, '/');
+                for (const [cName, cData] of Object.entries(savedConfig.companyPaths || {})) {
+                    const companyRoot = (cData.root || cData.ruta_base || '').toLowerCase().replace(/\\/g, '/');
+                    if (companyRoot && normalizedOutput.includes(companyRoot)) {
+                        const cacheKey = `recursos_${cName.toUpperCase()}`;
+                        statsMemoryCache.delete(cacheKey);
+                        sendLog(`[CACHE] Invalidado: ${cacheKey} tras generar acta COPASST`, 'INFO');
+                        break;
+                    }
+                }
+            } catch (cacheErr) {
+                sendLog(`[CACHE] Error invalidando cache tras acta COPASST: ${cacheErr.message}`, 'WARN');
+            }
+
+            // Limpiar el archivo temporal
     try {
       await fsp.unlink(tempJsonPath);
       sendLog(`[MAIN][generate-copasst-acta] Archivo temporal eliminado: ${tempJsonPath}`, 'INFO');
@@ -7847,9 +9767,27 @@ ipcMain.handle('generate-convivencia-acta', async (event, changes, savePath = nu
       throw new Error(`El archivo de salida no se creó correctamente en: ${outputPath}`);
     }
 
-    sendLog(`[MAIN][generate-convivencia-acta] Acta generada exitosamente en: ${outputPath}`, 'INFO');
+            sendLog(`[MAIN][generate-convivencia-acta] Acta generada exitosamente en: ${outputPath}`, 'INFO');
 
-    // Limpiar el archivo temporal
+            // Invalidar cache de recursos para que se recalculen estadisticas de actas
+            try {
+                const savedConfigPath = path.join(app.getPath('userData'), 'config.json');
+                const savedConfig = JSON.parse(fs.readFileSync(savedConfigPath, 'utf8') || '{}');
+                const normalizedOutput = outputPath.toLowerCase().replace(/\\/g, '/');
+                for (const [cName, cData] of Object.entries(savedConfig.companyPaths || {})) {
+                    const companyRoot = (cData.root || cData.ruta_base || '').toLowerCase().replace(/\\/g, '/');
+                    if (companyRoot && normalizedOutput.includes(companyRoot)) {
+                        const cacheKey = `recursos_${cName.toUpperCase()}`;
+                        statsMemoryCache.delete(cacheKey);
+                        sendLog(`[CACHE] Invalidado: ${cacheKey} tras generar acta Convivencia`, 'INFO');
+                        break;
+                    }
+                }
+            } catch (cacheErr) {
+                sendLog(`[CACHE] Error invalidando cache tras acta Convivencia: ${cacheErr.message}`, 'WARN');
+            }
+
+            // Limpiar el archivo temporal
     try {
       await fsp.unlink(tempJsonPath);
       sendLog(`[MAIN][generate-convivencia-acta] Archivo temporal eliminado: ${tempJsonPath}`, 'INFO');
@@ -7872,10 +9810,1315 @@ ipcMain.handle('generate-convivencia-acta', async (event, changes, savePath = nu
   }
 });
 
+// ==========================================================================
+// Handler: Autollenado inteligente de Acta COPASST
+// Recopila datos de múltiples módulos para pre-llenar el formulario del acta
+// ==========================================================================
+ipcMain.handle('get-copasst-auto-fill-data', async (event, companyName) => {
+  sendLog(`[K+AIRSST][COPASST][AUTO_FILL][START] Empresa: ${companyName}`, 'INFO');
+
+  const MESES_CAPITALIZED = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  ];
+  const MESES_LOWER = MESES_CAPITALIZED.map(m => m.toLowerCase());
+  const currentYear = new Date().getFullYear();
+
+  const emptyResult = {
+    success: true,
+    data: {
+      nextActaNumber: 1,
+      lastActaNumber: 0,
+      lastActaMonth: null,
+      lastActaMonthNumber: 0,
+      lastActaYear: currentYear,
+      targetMonth: MESES_CAPITALIZED[new Date().getMonth()],
+      targetMonthNumber: new Date().getMonth() + 1,
+      targetYear: currentYear,
+      suggestedDate: new Date().toISOString().split('T')[0],
+      agenda: [],
+      desarrollo: [],
+      warnings: []
+    }
+  };
+
+  try {
+    const basePath = await getCompanyRootPath(companyName);
+    if (!basePath) {
+      emptyResult.data.warnings.push('Empresa no configurada');
+      return emptyResult;
+    }
+
+    const copasstPath = path.join(basePath, '1. Recursos');
+    let copasstDir = null;
+    try {
+      const entries = await fsp.readdir(copasstPath);
+      copasstDir = entries.find(e => e.includes('1.1.6') && e.toLowerCase().includes('copasst'));
+    } catch (err) {
+      emptyResult.data.warnings.push('Carpeta COPASST no encontrada');
+      return emptyResult;
+    }
+
+    if (!copasstDir) {
+      emptyResult.data.warnings.push('Submódulo 1.1.6 no encontrado');
+      return emptyResult;
+    }
+
+    const copasstFullPath = path.join(copasstPath, copasstDir);
+    sendLog(`[K+AIRSST][COPASST][AUTO_FILL] Ruta COPASST: ${copasstFullPath}`, 'DEBUG');
+
+    // ============================================================
+    // PASO 1: Encontrar última acta y leer consecutivo
+    // ============================================================
+    let lastActaNumber = 0;
+    let lastActaMonth = null;
+    let lastActaMonthNumber = 0;
+    let lastActaYear = currentYear;
+
+    const yearFoldersToScan = [currentYear, currentYear - 1];
+    let allActas = [];
+
+    for (const year of yearFoldersToScan) {
+      const yearFolderPath = path.join(copasstFullPath, `COPASST ${year}`);
+      if (!fs.existsSync(yearFolderPath)) continue;
+
+      const actasInYear = getActasByFileName(yearFolderPath);
+      for (const acta of actasInYear) {
+        allActas.push({ ...acta, year });
+      }
+    }
+
+    allActas.sort((a, b) => {
+      if (a.year !== b.year) return b.year - a.year;
+      return b.monthNumber - a.monthNumber;
+    });
+
+    let lastActaFilePath = null;
+
+    if (allActas.length > 0) {
+      const latestActa = allActas[0];
+      lastActaMonth = latestActa.month;
+      lastActaMonthNumber = latestActa.monthNumber;
+      lastActaYear = latestActa.year;
+      lastActaFilePath = path.join(copasstFullPath, `COPASST ${latestActa.year}`, latestActa.fileName);
+
+      if (fs.existsSync(lastActaFilePath) && lastActaFilePath.toLowerCase().endsWith('.xlsx')) {
+        try {
+          const ExcelJS = require('exceljs');
+          const workbook = new ExcelJS.Workbook();
+          const fileBuffer = await fsp.readFile(lastActaFilePath);
+          await workbook.xlsx.load(fileBuffer);
+          const worksheet = workbook.worksheets[0];
+
+          if (worksheet) {
+            const actaNumCell = worksheet.getCell(5, 7); // F5 en Excel = row 5, col 7
+            const cellValue = actaNumCell.value;
+            if (cellValue !== null && cellValue !== undefined) {
+              const parsed = parseInt(String(cellValue).trim());
+              if (!isNaN(parsed) && parsed > 0) {
+                lastActaNumber = parsed;
+                sendLog(`[K+AIRSST][COPASST][AUTO_FILL] Consecutivo leído: ${lastActaNumber} de ${latestActa.fileName}`, 'INFO');
+              }
+            }
+          }
+        } catch (excelErr) {
+          sendLog(`[K+AIRSST][COPASST][AUTO_FILL] Error leyendo Excel: ${excelErr.message}`, 'WARN');
+          emptyResult.data.warnings.push('No se pudo leer consecutivo del Excel anterior');
+        }
+      }
+    }
+
+    // ============================================================
+    // PASO 2: Calcular mes objetivo y fecha sugerida
+    // ============================================================
+    let targetMonthNumber, targetYear;
+
+    if (lastActaMonthNumber > 0 && lastActaYear > 0) {
+      targetMonthNumber = lastActaMonthNumber + 1;
+      targetYear = lastActaYear;
+      if (targetMonthNumber > 12) {
+        targetMonthNumber = 1;
+        targetYear = targetYear + 1;
+      }
+    } else {
+      targetMonthNumber = new Date().getMonth() + 1;
+      targetYear = currentYear;
+    }
+
+    const targetMonth = numberToMonth(targetMonthNumber);
+
+    function getFirstBusinessDay(year, month) {
+      for (let day = 1; day <= 5; day++) {
+        const date = new Date(year, month - 1, day);
+        const dayOfWeek = date.getDay();
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+          return date.toISOString().split('T')[0];
+        }
+      }
+      return new Date(year, month - 1, 6).toISOString().split('T')[0];
+    }
+
+    const suggestedDate = getFirstBusinessDay(targetYear, targetMonthNumber);
+
+    function getLastDayOfMonth(year, month) {
+      const date = new Date(year, month, 0);
+      return date.toISOString().split('T')[0];
+    }
+
+    const lastDayOfTargetMonth = getLastDayOfMonth(targetYear, targetMonthNumber);
+
+    // ============================================================
+    // PASO 3: Construir agenda (3 items fijos)
+    // ============================================================
+    const nextActaNumber = lastActaNumber + 1;
+
+    const previousMonthNumber = targetMonthNumber - 1;
+    let previousMonthYear = targetYear;
+    let previousMonthName;
+    if (previousMonthNumber < 1) {
+      previousMonthName = numberToMonth(12);
+      previousMonthYear = targetYear - 1;
+    } else {
+      previousMonthName = numberToMonth(previousMonthNumber);
+    }
+
+    const agenda = [
+      {
+        tema: `Revisión del acta anterior N° ${lastActaNumber}`,
+        duracion: '00:10 Minutos',
+        lider: 'Representante del Copasst'
+      },
+      {
+        tema: `Revisión de Accidentes del Mes de ${previousMonthName}`,
+        duracion: '00:10 Minutos',
+        lider: 'Representante del Copasst'
+      },
+      {
+        tema: `Revisión Avance de Cumplimiento del Plan de Trabajo Anual mes de ${previousMonthName} ${previousMonthYear}`,
+        duracion: '00:30 Minutos',
+        lider: 'Representante del Copasst'
+      }
+    ];
+
+    // ============================================================
+    // PASO 4: Barrer Plan de Trabajo para desarrollo item 1
+    // ============================================================
+    const desarrollo = [];
+    let planActivitiesExecuted = [];
+
+    try {
+      const posiblesNombresGI = [
+        '2. Gestión Integral', '2. Gestion Integral', '2. Gestión Integral del SG-SST'
+      ];
+      let gestionIntegralPath = null;
+      for (const nombre of posiblesNombresGI) {
+        const pathIntento = path.join(basePath, nombre);
+        if (fs.existsSync(pathIntento)) {
+          gestionIntegralPath = pathIntento;
+          break;
+        }
+      }
+
+      if (gestionIntegralPath) {
+        const posiblesNombresPlan = [
+          '2.4.1 Plan de Trabajo Anual', '2.4 Plan de Trabajo Anual',
+          '2.4.1 Plan de Trabajo', '2.4 Plan de Trabajo', 'Plan de Trabajo Anual'
+        ];
+        let planFolderPath = null;
+        for (const nombre of posiblesNombresPlan) {
+          const pathIntento = path.join(gestionIntegralPath, nombre);
+          if (fs.existsSync(pathIntento)) {
+            planFolderPath = pathIntento;
+            break;
+          }
+        }
+
+if (planFolderPath) {
+      const planYearForPrevious = previousMonthYear;
+      const planFiles = await fsp.readdir(planFolderPath);
+      let planFile = planFiles.find(f =>
+        f.toUpperCase().includes('PLAN DE TRABAJO ANUAL') &&
+        f.includes(planYearForPrevious.toString()) &&
+        (f.toLowerCase().endsWith('.xlsx') || f.toLowerCase().endsWith('.xls')) &&
+        !f.startsWith('~$')
+      );
+      if (!planFile && planYearForPrevious !== targetYear) {
+        planFile = planFiles.find(f =>
+          f.toUpperCase().includes('PLAN DE TRABAJO ANUAL') &&
+          f.includes(targetYear.toString()) &&
+          (f.toLowerCase().endsWith('.xlsx') || f.toLowerCase().endsWith('.xls')) &&
+          !f.startsWith('~$')
+        );
+      }
+
+      if (planFile) {
+        const planFilePath = path.join(planFolderPath, planFile);
+        const workbook = xlsx.readFile(planFilePath);
+
+        let worksheet = null;
+        let targetSheetName = '';
+        const priorityNames = ['PLAN DE TRABAJO', 'CRONOGRAMA', 'MATRIZ', 'ACTIVIDADES', 'PLAN ANUAL'];
+        for (const sheetName of workbook.SheetNames) {
+          const normalizedName = sheetName.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          if (priorityNames.some(p => normalizedName.includes(p))) {
+            if (normalizedName.includes(planYearForPrevious.toString())) {
+              targetSheetName = sheetName;
+              break;
+            }
+            if (normalizedName.includes(targetYear.toString())) {
+              targetSheetName = sheetName;
+              break;
+            }
+            if (!targetSheetName) targetSheetName = sheetName;
+          }
+        }
+        if (!targetSheetName) targetSheetName = workbook.SheetNames[0];
+            worksheet = workbook.Sheets[targetSheetName];
+
+            const rawData = xlsx.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+
+            let headerRowIndex = -1;
+            let columnMap = {};
+            const normalize = (str) => {
+              if (!str) return '';
+              return str.toString().toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            };
+
+            for (let i = 0; i < Math.min(15, rawData.length); i++) {
+              const row = rawData[i];
+              if (!Array.isArray(row)) continue;
+              let monthCount = 0;
+              let hasActividades = false;
+              row.forEach(cell => {
+                const val = normalize(cell);
+                if (['ene', 'feb', 'mar', 'abr', 'may', 'jun'].every(m => val.includes(m))) monthCount = 6;
+                if (val.includes('actividad')) hasActividades = true;
+              });
+              if (monthCount >= 6 && hasActividades) {
+                headerRowIndex = i;
+                row.forEach((cell, colIndex) => {
+                  const val = normalize(cell);
+                  if (val.includes('actividad')) columnMap['actividad'] = colIndex;
+                  else if (val.includes('responsable')) columnMap['responsable'] = colIndex;
+                  else {
+                    for (let m = 0; m < 12; m++) {
+                      const monthAbbr = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+                      const monthFull = MESES_LOWER;
+                      if (val === monthAbbr[m] || val === monthFull[m]) {
+                        columnMap[MESES_LOWER[m]] = colIndex;
+                        break;
+                      }
+                    }
+                  }
+                });
+                break;
+              }
+            }
+
+            if (headerRowIndex === -1) {
+              columnMap = {
+                'actividad': 1, 'responsable': 2,
+                'enero': 3, 'febrero': 4, 'marzo': 5, 'abril': 6,
+                'mayo': 7, 'junio': 8, 'julio': 9, 'agosto': 10,
+                'septiembre': 11, 'octubre': 12, 'noviembre': 13, 'diciembre': 14
+              };
+              headerRowIndex = 7;
+            }
+
+const previousMonthIdx = previousMonthNumber < 1 ? 11 : previousMonthNumber - 1;
+const previousMonthKey = MESES_LOWER[previousMonthIdx];
+const targetCol = columnMap[previousMonthKey];
+            const actividadCol = columnMap['actividad'] || 1;
+            const responsableCol = columnMap['responsable'] || 2;
+            const nivel1Keywords = ['MEDICINA PREVENTIVA', 'SEGURIDAD INDUSTRIAL', 'HIGIENE INDUSTRIAL', 'SALUD PUBLICA', 'BIENESTAR', 'VERIFICACION', 'INTEGRAL'];
+            const nivel3Keywords = ['PLANEAR', 'HACER', 'VERIFICAR', 'ACTUAR', 'PHVA'];
+
+            if (targetCol !== undefined) {
+              for (let i = headerRowIndex + 1; i < rawData.length; i++) {
+                const row = rawData[i];
+                if (!row) continue;
+                const actividad = String(row[actividadCol] || '').trim();
+                if (!actividad || actividad.length < 2) continue;
+                if (actividad.toLowerCase().includes('total') || actividad.toLowerCase().includes('velocímetro')) continue;
+
+                const colA = String(row[0] || '').trim().toUpperCase();
+                let isLevel4 = false;
+
+                if (colA !== '' && !isNaN(parseFloat(colA.replace(',', '.')))) {
+                  isLevel4 = true;
+                } else if (colA === 'T1' || colA === 'T2' || colA === 'T3') {
+                  isLevel4 = false;
+                } else {
+                  const normalizedAct = actividad.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                  if (nivel1Keywords.some(k => normalizedAct.includes(k))) isLevel4 = false;
+                  else if (nivel3Keywords.some(k => normalizedAct === k || normalizedAct.startsWith(k))) isLevel4 = false;
+                  else isLevel4 = true;
+                }
+
+                if (!isLevel4) continue;
+
+                const mesValor = String(row[targetCol] || '').trim().toUpperCase();
+                if (mesValor === 'C' || mesValor === 'P') {
+                  planActivitiesExecuted.push({
+                    name: actividad,
+                    status: mesValor === 'C' ? 'Completada' : 'Programada',
+                    responsible: String(row[responsableCol] || '').trim()
+                  });
+                }
+              }
+            }
+
+            sendLog(`[K+AIRSST][COPASST][AUTO_FILL] Plan de Trabajo: ${planActivitiesExecuted.length} actividades para ${previousMonthName} (mes anterior al acta)`, 'INFO');
+          }
+        }
+      }
+    } catch (planErr) {
+      sendLog(`[K+AIRSST][COPASST][AUTO_FILL] Error barrido Plan Trabajo: ${planErr.message}`, 'WARN');
+      emptyResult.data.warnings.push('No se pudo leer Plan de Trabajo');
+    }
+
+// Desarrollo item 1: Revisión del Acta Anterior
+desarrollo.push({
+tema: 'Revisión del Acta Anterior, se continúan realizando las inspecciones programadas y están acorde, se continua desarrollando las actividades contempladas en el plan de trabajo anual.',
+compromisos: 'Ninguno',
+fecha: lastDayOfTargetMonth,
+responsable: 'Miembros del Copasst'
+});
+
+    // ============================================================
+    // PASO 5: Barrer accidentalidad para desarrollo item 2
+    // ============================================================
+    let accidentData = null;
+
+    try {
+      const prevMonthIndex = targetMonthNumber - 2;
+      const prevMonthYearForAccidents = targetMonthNumber === 1 ? targetYear - 1 : targetYear;
+
+      const gestionSaludDir = path.join(basePath, '3. Gestión de la Salud');
+
+      try {
+        const gestionEntries = await fsp.readdir(gestionSaludDir);
+        const registro323Folder = gestionEntries.find(f => f.startsWith('3.2.3'));
+        if (registro323Folder) {
+          const submoduleDir = path.join(gestionSaludDir, registro323Folder);
+          const entries = await fsp.readdir(submoduleDir);
+          const excelFile = entries.find(f => f.toLowerCase().endsWith('.xlsx') && !f.startsWith('~$'));
+          if (excelFile) {
+            const filePath = path.join(submoduleDir, excelFile);
+            const workbook = xlsx.readFile(filePath);
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const rawData = xlsx.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+
+            let headerRowIdx = -1;
+            for (let i = 0; i < Math.min(10, rawData.length); i++) {
+              const row = rawData[i];
+              if (row && row.some(c => {
+                const s = String(c).trim().toLowerCase();
+                return s === 'ciudad' || s === 'año' || s === 'evento';
+              })) {
+                headerRowIdx = i;
+                break;
+              }
+            }
+            if (headerRowIdx === -1) headerRowIdx = 0;
+
+            const headers = rawData[headerRowIdx].map(h => String(h).trim().replace(/\r\n|\r|\n/g, ''));
+const idx = (name) => headers.findIndex(h => h.toLowerCase() === name.toLowerCase());
+const iAnio = idx('Año');
+const iFecha = idx('Fecha del incidente');
+const iMes = idx('Mes');
+const iEvento = idx('Evento');
+const iNombreCompleto = idx('Nombre Completo');
+const iNombre = idx('Nombre') !== -1 ? idx('Nombre') : idx('Trabajador');
+const iIdentificacion = idx('Identificación') !== -1 ? idx('Identificación') : idx('Cédula');
+
+            const MESES_MAP = {
+              'enero':0,'febrero':1,'marzo':2,'abril':3,'mayo':4,'junio':5,
+              'julio':6,'agosto':7,'septiembre':8,'octubre':9,'noviembre':10,'diciembre':11,
+              'ene':0,'feb':1,'mar':2,'abr':3,'may':4,'jun':5,
+              'jul':6,'ago':7,'sep':8,'oct':9,'nov':10,'dic':11
+            };
+
+            const accidentsInPrevMonth = [];
+            const prevMonth0Index = prevMonthIndex >= 0 ? prevMonthIndex : 11;
+            const yearToMatch = prevMonthYearForAccidents;
+
+            for (let r = headerRowIdx + 1; r < rawData.length; r++) {
+              const row = rawData[r];
+              if (!row) continue;
+
+              const anio = parseInt(row[iAnio]);
+              if (!anio || anio !== yearToMatch) continue;
+
+              const evento = String(row[iEvento] || '').trim().toLowerCase();
+              if (evento !== 'at') continue;
+
+let mesIdx = -1;
+let fechaParsed = null;
+const fechaVal = row[iFecha];
+if (fechaVal) {
+  let fecha = null;
+  if (typeof fechaVal === 'number') {
+    const d = xlsx.SSF.parse_date_code(fechaVal);
+    fecha = new Date(d.y, d.m - 1, d.d);
+    fechaParsed = `${String(d.d).padStart(2,'0')}/${String(d.m).padStart(2,'0')}/${d.y}`;
+  } else {
+    fecha = new Date(fechaVal);
+    if (!isNaN(fecha.getTime())) {
+      const dd = String(fecha.getDate()).padStart(2,'0');
+      const mm = String(fecha.getMonth() + 1).padStart(2,'0');
+      const yyyy = fecha.getFullYear();
+      fechaParsed = `${dd}/${mm}/${yyyy}`;
+    }
+  }
+  if (fecha && !isNaN(fecha.getTime())) mesIdx = fecha.getMonth();
+}
+
+              if (mesIdx === -1 && iMes >= 0) {
+                const mesLabel = String(row[iMes] || '').trim().toLowerCase();
+                mesIdx = MESES_MAP[mesLabel];
+              }
+
+if (mesIdx === prevMonth0Index) {
+  const nombre = iNombreCompleto >= 0 ? String(row[iNombreCompleto] || '').trim() : (iNombre >= 0 ? String(row[iNombre] || '').trim() : 'Trabajador');
+  const identificacion = iIdentificacion >= 0 ? String(row[iIdentificacion] || '').trim() : '';
+  accidentsInPrevMonth.push({ nombre, identificacion, fechaEvento: fechaParsed || '' });
+}
+            }
+
+            accidentData = { count: accidentsInPrevMonth.length, persons: accidentsInPrevMonth };
+            sendLog(`[K+AIRSST][COPASST][AUTO_FILL] Accidentes en ${previousMonthName}: ${accidentsInPrevMonth.length}`, 'INFO');
+          }
+        }
+      } catch (accErr) {
+        sendLog(`[K+AIRSST][COPASST][AUTO_FILL] Error lectura accidentalidad: ${accErr.message}`, 'WARN');
+      }
+
+      // Verificar investigaciones para accidentes encontrados
+      let hasInvestigation = false;
+      if (accidentData && accidentData.count > 0) {
+        try {
+          const invSubmodulePath = await _findInvestigacionSubmodulePath(companyName);
+          const furatSubmodulePath = await _findReportesAccidentesSubmodulePath(companyName);
+
+          if (invSubmodulePath && fs.existsSync(invSubmodulePath)) {
+            const invDiscovered = await _discoverInvestigations(invSubmodulePath);
+
+            for (const accident of accidentData.persons) {
+              const matchedInv = invDiscovered.find(inv =>
+                _isSamePerson(accident.nombre, inv.name) &&
+                _extractYearFromPath(inv.relativePath) === prevMonthYearForAccidents
+              );
+
+              if (matchedInv) {
+                let invEstado = 'pendiente';
+                if (matchedInv.isFolder) {
+                  try {
+                    const folderFiles = await fsp.readdir(matchedInv.fullPath, { withFileTypes: true });
+                    const fileInfos = folderFiles.filter(f => f.isFile()).map(f => ({ name: f.name }));
+                    const state = _analyzeInvestigationState(matchedInv.name, fileInfos);
+                    invEstado = state.estado;
+                  } catch (e) { /* mantener pendiente */ }
+                }
+                accident.hasInvestigation = invEstado === 'completada';
+                accident.investigationStatus = invEstado;
+                if (invEstado === 'completada') hasInvestigation = true;
+              } else {
+                accident.hasInvestigation = false;
+                accident.investigationStatus = 'sin_investigacion';
+              }
+            }
+          }
+        } catch (invErr) {
+          sendLog(`[K+AIRSST][COPASST][AUTO_FILL] Error verificación investigaciones: ${invErr.message}`, 'WARN');
+        }
+
+// Desarrollo item 2: Accidentalidad del mes anterior
+const personsWithoutInvestigation = accidentData.persons.filter(p => !p.hasInvestigation);
+const accidentLines = [];
+accidentLines.push(`En el mes de ${previousMonthName} ${prevMonthYearForAccidents}, Se presentó(ron) ${accidentData.count} accidente(s) de trabajo:`);
+accidentData.persons.forEach((p, i) => {
+  const parts = [p.nombre];
+  if (p.identificacion) parts.push(p.identificacion);
+  if (p.fechaEvento) parts.push(p.fechaEvento);
+  accidentLines.push(`  ${i + 1}. ${parts.join(' — ')}`);
+});
+let accidentTema = accidentLines.join('\n');
+const compromisoAccidente = personsWithoutInvestigation.length > 0
+? 'Pendiente investigación'
+: 'Ninguno';
+
+desarrollo.push({
+tema: accidentTema,
+compromisos: compromisoAccidente,
+fecha: lastDayOfTargetMonth,
+responsable: 'Miembros del Copasst y Asesor SST'
+});
+} else {
+desarrollo.push({
+tema: `En el mes de ${previousMonthName} ${prevMonthYearForAccidents}, No se presentaron accidentes laborales.`,
+compromisos: 'Ninguno',
+fecha: lastDayOfTargetMonth,
+responsable: 'Miembros del Copasst'
+});
+}
+    } catch (accidentOuterErr) {
+      sendLog(`[K+AIRSST][COPASST][AUTO_FILL] Error general accidentalidad: ${accidentOuterErr.message}`, 'WARN');
+emptyResult.data.warnings.push('No se pudo verificar accidentalidad');
+}
+
+// ============================================================
+// Desarrollo item 3: Plan de Trabajo Anual
+// ============================================================
+const completedActs = planActivitiesExecuted.filter(a => a.status === 'Completada');
+const programmedActs = planActivitiesExecuted.filter(a => a.status === 'Programada');
+
+let planTema, planCompromisos, planResponsable;
+if (planActivitiesExecuted.length === 0) {
+  planTema = `No se pudo verificar el estado del Plan de Trabajo Anual para el mes de ${previousMonthName}.`;
+  planCompromisos = 'Verificar cumplimiento del Plan de Trabajo';
+  planResponsable = 'Responsable del SG-SST';
+} else {
+  const lines = [];
+  lines.push(`Actividades del Plan de Trabajo — ${previousMonthName}:`);
+  lines.push('');
+  if (completedActs.length > 0) {
+    lines.push(`✓ Completadas (${completedActs.length}):`);
+    completedActs.forEach((a, i) => {
+      lines.push(`  ${i + 1}. ${a.name}`);
+    });
+  }
+  if (programmedActs.length > 0) {
+    if (completedActs.length > 0) lines.push('');
+    lines.push(`⏱ Programadas (${programmedActs.length}):`);
+    const startNum = completedActs.length + 1;
+    programmedActs.forEach((a, i) => {
+      lines.push(`  ${startNum + i}. ${a.name}`);
+    });
+  }
+  if (completedActs.length === 0 && programmedActs.length === 0) {
+    lines.push(`No se ejecutaron actividades del Plan de Trabajo en el mes de ${previousMonthName}.`);
+  }
+  planTema = lines.join('\n');
+  planCompromisos = programmedActs.length > 0 ? 'Seguimiento actividades pendientes' : 'Ninguno';
+  planResponsable = (completedActs.length > 0 && completedActs[0].responsible) ? completedActs[0].responsible : 'Responsable del SG-SST';
+}
+
+desarrollo.push({
+tema: planTema,
+compromisos: planCompromisos,
+fecha: lastDayOfTargetMonth,
+responsable: planResponsable
+});
+
+// ============================================================
+// Desarrollo item 4: Buzón de Sugerencias
+// ============================================================
+desarrollo.push({
+tema: 'Se revisa el buzón de sugerencias y no se encuentran sugerencias.',
+compromisos: 'Ninguno',
+fecha: lastDayOfTargetMonth,
+responsable: 'Representante del Copasst'
+});
+
+// ============================================================
+    // PASO 6: Construir respuesta final
+    // ============================================================
+    const result = {
+      success: true,
+      data: {
+        nextActaNumber,
+        lastActaNumber,
+        lastActaMonth,
+        lastActaMonthNumber,
+        lastActaYear,
+        targetMonth,
+        targetMonthNumber,
+        targetYear,
+        suggestedDate,
+        agenda,
+        desarrollo,
+        planActivities: planActivitiesExecuted,
+        accidents: accidentData ? {
+          count: accidentData.count,
+          details: accidentData.persons.map(p => ({
+            person: p.nombre,
+            hasInvestigation: p.hasInvestigation || false,
+            investigationStatus: p.investigationStatus || 'no_verificado'
+          }))
+        } : { count: 0, details: [] },
+        warnings: emptyResult.data.warnings
+      }
+    };
+
+    sendLog(`[K+AIRSST][COPASST][AUTO_FILL][SUCCESS] Acta N°${nextActaNumber}, mes: ${targetMonth} ${targetYear}, agenda: ${agenda.length} items, desarrollo: ${desarrollo.length} items`, 'INFO');
+    return result;
+
+  } catch (error) {
+    sendLog(`[K+AIRSST][COPASST][AUTO_FILL][ERROR] ${error.message}`, 'ERROR');
+    emptyResult.data.warnings.push(`Error: ${error.message}`);
+    return emptyResult;
+  }
+});
+
+// ==========================================================================
+// Handler: Ruta de guardado inteligente para Acta COPASST
+// Calcula la ruta correcta en el repositorio de la empresa y crea la carpeta
+// del año si no existe. Retorna defaultPath para showSaveDialog.
+// ==========================================================================
+ipcMain.handle('get-copasst-save-path', async (event, companyName, year, monthName, actaNumber) => {
+  sendLog(`[K+AIRSST][COPASST][SAVE_PATH][START] Empresa: ${companyName}, Año: ${year}, Mes: ${monthName}, Acta N°: ${actaNumber}`, 'INFO');
+
+  try {
+    const basePath = await getCompanyRootPath(companyName);
+    if (!basePath) {
+      return { success: false, error: { code: 'NO_COMPANY', message: 'Empresa no configurada' } };
+    }
+
+    const recursosPath = path.join(basePath, '1. Recursos');
+    if (!fs.existsSync(recursosPath)) {
+      return { success: false, error: { code: 'NO_RECURSOS', message: 'Carpeta 1. Recursos no encontrada' } };
+    }
+
+    const recursosEntries = await fsp.readdir(recursosPath);
+    const copasstDir = recursosEntries.find(e => e.includes('1.1.6') && e.toLowerCase().includes('copasst'));
+
+    if (!copasstDir) {
+      return { success: false, error: { code: 'NO_COPASST', message: 'Submódulo 1.1.6 COPASST no encontrado' } };
+    }
+
+    const copasstFullPath = path.join(recursosPath, copasstDir);
+    const yearFolderName = `COPASST ${year}`;
+    const yearFolderPath = path.join(copasstFullPath, yearFolderName);
+
+    if (!fs.existsSync(yearFolderPath)) {
+      await fsp.mkdir(yearFolderPath, { recursive: true });
+      sendLog(`[K+AIRSST][COPASST][SAVE_PATH] Carpeta creada: ${yearFolderPath}`, 'INFO');
+    }
+
+    const targetYear = parseInt(year) || new Date().getFullYear();
+    const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const resolvedMonth = monthName || MESES[new Date().getMonth()];
+const defaultFileName = `ACT-FO-029 Acta de Reunión Copasst ${resolvedMonth}.xlsx`;
+    const defaultPath = path.join(yearFolderPath, defaultFileName);
+
+    sendLog(`[K+AIRSST][COPASST][SAVE_PATH][SUCCESS] Ruta: ${defaultPath}`, 'INFO');
+
+    return {
+      success: true,
+      data: {
+        yearFolderPath,
+        defaultFileName,
+        defaultPath
+      }
+    };
+  } catch (error) {
+    sendLog(`[K+AIRSST][COPASST][SAVE_PATH][ERROR] ${error.message}`, 'ERROR');
+    return { success: false, error: { code: 'INTERNAL', message: error.message } };
+  }
+});
+
+// ==========================================================================
+// Handler: Auto-fill datos para Acta de Convivencia
+// ==========================================================================
+ipcMain.handle('get-convivencia-auto-fill-data', async (event, companyName) => {
+  sendLog(`[K+AIRSST][CONVIVENCIA][AUTO_FILL][START] Empresa: ${companyName}`, 'INFO');
+
+  const MESES_CAPITALIZED = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const currentYear = new Date().getFullYear();
+
+  const emptyResult = {
+    success: true,
+    data: {
+      nextActaNumber: 1,
+      lastActaNumber: 0,
+      lastActaMonth: null,
+      lastActaMonthNumber: 0,
+      lastActaYear: currentYear,
+      targetMonth: MESES_CAPITALIZED[new Date().getMonth()],
+      targetMonthNumber: new Date().getMonth() + 1,
+      targetYear: currentYear,
+      suggestedDate: new Date().toISOString().split('T')[0],
+      agenda: [],
+      desarrollo: [],
+      acosoData: { totalComplaints: 0, recentComplaints: [] },
+      climaData: { totalCumplimiento: 0, calificacion: 'Sin datos', dimensiones: [] },
+      warnings: []
+    }
+  };
+
+  try {
+    // ============================================================
+    // Resolucion de rutas de la empresa
+    // ============================================================
+    const basePath = await getCompanyRootPath(companyName);
+    if (!basePath) {
+      emptyResult.data.warnings.push('Empresa no configurada');
+      return emptyResult;
+    }
+
+    const recursosPath = path.join(basePath, '1. Recursos');
+    if (!fs.existsSync(recursosPath)) {
+      emptyResult.data.warnings.push('Carpeta 1. Recursos no encontrada');
+      return emptyResult;
+    }
+
+    const recursosEntries = await fsp.readdir(recursosPath);
+    const convivenciaDir = recursosEntries.find(e => {
+      const lower = e.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return (e.includes('1.1.8') || lower.includes('1.1.8')) && lower.includes('convivencia');
+    });
+
+    if (!convivenciaDir) {
+      emptyResult.data.warnings.push('Carpeta Comite de Convivencia no encontrada');
+      return emptyResult;
+    }
+
+    const convivenciaFullPath = path.join(recursosPath, convivenciaDir);
+    sendLog(`[K+AIRSST][CONVIVENCIA][AUTO_FILL] Carpeta Convivencia: ${convivenciaFullPath}`, 'INFO');
+
+    // ============================================================
+    // PASO 1: Encontrar ultima acta y calcular consecutivo
+    // ============================================================
+    let lastActaNumber = 0;
+    let lastActaMonth = null;
+    let lastActaMonthNumber = 0;
+    let lastActaYear = 0;
+    let latestActa = null;
+
+    const yearFoldersToScan = [currentYear, currentYear - 1];
+    const allActas = [];
+
+    for (const year of yearFoldersToScan) {
+      const yearFolderPath = path.join(convivenciaFullPath, `CONVIVENCIA ${year}`);
+      if (!fs.existsSync(yearFolderPath)) continue;
+
+      const actasInYear = getActasInYearFolder(yearFolderPath);
+      for (const acta of actasInYear) {
+        allActas.push({ ...acta, year });
+      }
+    }
+
+    if (allActas.length > 0) {
+      allActas.sort((a, b) => {
+        if (b.year !== a.year) return b.year - a.year;
+        return monthToNumber(b.month) - monthToNumber(a.month);
+      });
+
+      latestActa = allActas[0];
+      lastActaMonth = latestActa.month;
+      lastActaMonthNumber = monthToNumber(latestActa.month);
+      lastActaYear = latestActa.year;
+
+      const lastActaFilePath = path.join(
+        convivenciaFullPath,
+        `CONVIVENCIA ${latestActa.year}`,
+        latestActa.fileName
+      );
+
+      if (fs.existsSync(lastActaFilePath) && lastActaFilePath.toLowerCase().endsWith('.xlsx')) {
+        try {
+          const ExcelJS = require('exceljs');
+          const workbook = new ExcelJS.Workbook();
+          const fileBuffer = await fsp.readFile(lastActaFilePath);
+          await workbook.xlsx.load(fileBuffer);
+          const worksheet = workbook.worksheets[0];
+
+          if (worksheet) {
+            const actaNumCell = worksheet.getCell(7, 5); // E7 en Excel = row 7, col 5
+            const cellValue = actaNumCell.value;
+            if (cellValue !== null && cellValue !== undefined) {
+              const parsed = parseInt(String(cellValue).trim());
+              if (!isNaN(parsed) && parsed > 0) {
+                lastActaNumber = parsed;
+                sendLog(`[K+AIRSST][CONVIVENCIA][AUTO_FILL] Consecutivo leido: ${lastActaNumber} de ${latestActa.fileName}`, 'INFO');
+              }
+            }
+          }
+        } catch (excelErr) {
+          sendLog(`[K+AIRSST][CONVIVENCIA][AUTO_FILL] Error leyendo Excel: ${excelErr.message}`, 'WARN');
+          emptyResult.data.warnings.push('No se pudo leer consecutivo del Excel anterior');
+        }
+      }
+    }
+
+ const nextActaNumber = lastActaNumber + 1;
+
+ // ============================================================
+ // PASO 2: Calcular mes objetivo y fecha sugerida
+ //          Ciclo de reuniones: Feb(2), May(5), Aug(8), Nov(11)
+ // ============================================================
+ const CONVIVENCIA_CYCLE_MONTHS = [2, 5, 8, 11];
+ let targetMonthNumber, targetYear;
+
+ function getNextConvivenciaMonth(refMonth, refYear) {
+ const idx = CONVIVENCIA_CYCLE_MONTHS.indexOf(refMonth);
+ if (idx !== -1) {
+ const nextIdx = (idx + 1) % CONVIVENCIA_CYCLE_MONTHS.length;
+ const nextYear = nextIdx === 0 ? refYear + 1 : refYear;
+ return { month: CONVIVENCIA_CYCLE_MONTHS[nextIdx], year: nextYear };
+ }
+ const next = CONVIVENCIA_CYCLE_MONTHS.find(m => m > refMonth);
+ if (next) return { month: next, year: refYear };
+ return { month: CONVIVENCIA_CYCLE_MONTHS[0], year: refYear + 1 };
+ }
+
+ if (lastActaMonthNumber > 0 && lastActaYear > 0) {
+ const next = getNextConvivenciaMonth(lastActaMonthNumber, lastActaYear);
+ targetMonthNumber = next.month;
+ targetYear = next.year;
+ } else {
+ const currentMonth = new Date().getMonth() + 1;
+ const next = getNextConvivenciaMonth(currentMonth - 1, currentYear);
+ if (next.month >= currentMonth) {
+ targetMonthNumber = next.month;
+ targetYear = next.year;
+ } else {
+ const nextAfter = getNextConvivenciaMonth(currentMonth, currentYear);
+ targetMonthNumber = nextAfter.month;
+ targetYear = nextAfter.year;
+ }
+ }
+
+    const targetMonth = numberToMonth(targetMonthNumber);
+    const suggestedDate = getFirstBusinessDay(targetYear, targetMonthNumber);
+    const lastDayOfTargetMonth = getLastDayOfMonth(targetYear, targetMonthNumber);
+
+    function getFirstBusinessDay(year, month) {
+      for (let day = 1; day <= 5; day++) {
+        const date = new Date(year, month - 1, day);
+        const dayOfWeek = date.getDay();
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+          return date.toISOString().split('T')[0];
+        }
+      }
+      return new Date(year, month - 1, 6).toISOString().split('T')[0];
+    }
+
+    function getLastDayOfMonth(year, month) {
+      const date = new Date(year, month, 0);
+      return date.toISOString().split('T')[0];
+    }
+
+    // ============================================================
+    // PASO 3: Construir agenda (4 items fijos)
+    // ============================================================
+    const previousMonthName = numberToMonth(targetMonthNumber === 1 ? 12 : targetMonthNumber - 1);
+    const previousMonthYear = targetMonthNumber === 1 ? targetYear - 1 : targetYear;
+
+    const agenda = [
+      {
+        tema: 'Verificacion del Quorum',
+        duracion: '00:10 Minutos',
+        lider: 'Representante del Comite'
+      },
+      {
+        tema: 'Saludos e inicio de reunion',
+        duracion: '00:10 Minutos',
+        lider: 'Representante del Comite'
+      },
+      {
+        tema: 'Programa de bienestar y Temas Varios',
+        duracion: '00:30 Minutos',
+        lider: 'Representante del Comite'
+      },
+      {
+        tema: 'Varios',
+        duracion: '00:10 Minutos',
+        lider: 'Representante del Comite'
+      }
+    ];
+
+// ============================================================
+// PASO 4: Leer datos del SVE Psicosocial (.xlsb)
+// ============================================================
+let acosoData = { totalComplaints: 0, recentComplaints: [], periodComplaints: [] };
+let climaData = { totalCumplimiento: 0, calificacion: 'Sin datos', dimensiones: [] };
+let planSveData = { activities: [], totalProgramadas: 0, totalEjecutadas: 0 };
+
+const CONVIVENCIA_PERIOD_MAP = { 2: [12, 1], 5: [3, 4], 8: [6, 7], 11: [9, 10] };
+const [periodStartMonth, periodEndMonth] = CONVIVENCIA_PERIOD_MAP[targetMonthNumber] || [targetMonthNumber === 1 ? 12 : targetMonthNumber - 1, targetMonthNumber === 1 ? 12 : targetMonthNumber - 1];
+const periodStartMonthYear = periodStartMonth > targetMonthNumber ? targetYear - 1 : targetYear;
+const periodEndMonthYear = periodEndMonth < periodStartMonth ? (periodEndMonth >= targetMonthNumber ? targetYear - 1 : targetYear) : targetYear;
+const dateFrom = `${periodStartMonthYear}-${String(periodStartMonth).padStart(2, '0')}-01`;
+const dateTo = getLastDayOfMonth(periodEndMonthYear, periodEndMonth);
+
+    try {
+      const saludPath = path.join(basePath, '3. Gestión de la Salud');
+      const normalize = (str) => str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+      let sveFolderPath = null;
+      if (fs.existsSync(saludPath)) {
+        const saludEntries = await fsp.readdir(saludPath);
+        const medicinaFolder = saludEntries.find(e => normalize(e).includes('3.1.2') || normalize(e).includes('medicina preventiva'));
+
+        if (medicinaFolder) {
+          const medicinaPath = path.join(saludPath, medicinaFolder);
+          const medicinaEntries = await fsp.readdir(medicinaPath);
+          const sveFolder = medicinaEntries.find(e => normalize(e).includes('sve') && normalize(e).includes('psicosocial'));
+
+          if (sveFolder) {
+            sveFolderPath = path.join(medicinaPath, sveFolder);
+          }
+        }
+      }
+
+      if (sveFolderPath && fs.existsSync(sveFolderPath)) {
+        const sveFiles = await fsp.readdir(sveFolderPath);
+        const xlsbFile = sveFiles.find(f =>
+          !f.startsWith('~$') &&
+          f.toLowerCase().endsWith('.xlsb') &&
+          (normalize(f).includes('psicosicla') || normalize(f).includes('psicosocial'))
+        );
+
+        if (xlsbFile) {
+          const xlsbPath = path.join(sveFolderPath, xlsbFile);
+          sendLog(`[K+AIRSST][CONVIVENCIA][AUTO_FILL] SVE Psicosocial encontrado: ${xlsbPath}`, 'INFO');
+
+          // Paso 4a: Refresh de Power Query
+          try {
+            await refreshExcelPowerQuery(xlsbPath);
+            sendLog(`[K+AIRSST][CONVIVENCIA][AUTO_FILL] Power Query actualizado`, 'INFO');
+          } catch (pqErr) {
+            sendLog(`[K+AIRSST][CONVIVENCIA][AUTO_FILL] Power Query refresh falló (continuando sin refresh): ${pqErr.message}`, 'WARN');
+            emptyResult.data.warnings.push('No se pudo actualizar Power Query del SVE Psicosocial');
+          }
+
+          // Paso 4b: Ejecutar script Python para leer .xlsb
+const pythonPath = await getPython();
+    const scriptPath = getPythonScriptPath('read_sve_psicosocial.py');
+          const tempDir = app.getPath('temp');
+          const outputJsonPath = path.join(tempDir, `sve_psicosocial_${Date.now()}.json`);
+
+          const { stdout, stderr } = await execFilePromise(pythonPath, [scriptPath, xlsbPath, outputJsonPath, String(periodStartMonth), String(periodEndMonth), dateFrom, dateTo]);
+
+          if (stderr) {
+            sendLog(`[K+AIRSST][CONVIVENCIA][AUTO_FILL] Python stderr: ${stderr}`, 'WARN');
+          }
+
+          if (fs.existsSync(outputJsonPath)) {
+            try {
+              const rawData = await fsp.readFile(outputJsonPath, 'utf8');
+              const parsed = JSON.parse(rawData);
+
+if (parsed && parsed.payload && parsed.payload.success) {
+                    acosoData = parsed.payload.acosoData || acosoData;
+                    climaData = parsed.payload.climaData || climaData;
+                    planSveData = parsed.payload.planData || planSveData;
+                    sendLog(`[K+AIRSST][CONVIVENCIA][AUTO_FILL] Datos SVE leidos: ${acosoData.totalComplaints} quejas, Clima: ${climaData.calificacion} ${climaData.totalCumplimiento}%, Plan SVE: ${planSveData.activities.length} actividades, Quejas periodo: ${(acosoData.periodComplaints || []).length}`, 'INFO');
+              }
+            } finally {
+              try { fs.unlinkSync(outputJsonPath); } catch (_) {}
+            }
+          }
+        } else {
+          sendLog(`[K+AIRSST][CONVIVENCIA][AUTO_FILL] Archivo .xlsb no encontrado en SVE Psicosocial`, 'WARN');
+          emptyResult.data.warnings.push('Archivo SVE Psicosocial .xlsb no encontrado');
+        }
+      } else {
+        sendLog(`[K+AIRSST][CONVIVENCIA][AUTO_FILL] Carpeta SVE PSICOSOCIAL no encontrada`, 'WARN');
+        emptyResult.data.warnings.push('Carpeta SVE PSICOSOCIAL no encontrada');
+      }
+    } catch (sveErr) {
+      sendLog(`[K+AIRSST][CONVIVENCIA][AUTO_FILL] Error leyendo SVE Psicosocial: ${sveErr.message}`, 'ERROR');
+      emptyResult.data.warnings.push('No se pudieron leer datos del SVE Psicosocial');
+    }
+
+    // ============================================================
+    // PASO 5: Construir items de desarrollo (5 items)
+    // ============================================================
+    const desarrollo = [];
+
+// Item 1: Revision del Acta Anterior + Actividades del Plan SVE Psicosocial
+const planSveActivities = planSveData.activities || [];
+const executedActs = planSveActivities.filter(a => a.ae === 1);
+const programmedActs = planSveActivities.filter(a => a.ap === 1 && a.ae === 0);
+const periodStartMonthName = numberToMonth(periodStartMonth);
+const periodEndMonthName = numberToMonth(periodEndMonth);
+const periodLabel = periodStartMonth === periodEndMonth ? periodStartMonthName : `${periodStartMonthName} a ${periodEndMonthName}`;
+
+if (planSveActivities.length > 0) {
+const lines = [];
+lines.push(`Actividades del Plan SVE Psicosocial — Periodo: ${periodLabel}:`);
+lines.push('');
+if (executedActs.length > 0) {
+lines.push(`✓ Ejecutadas (${executedActs.length}):`);
+executedActs.forEach((a, i) => {
+lines.push(` ${i + 1}. ${a.name}`);
+});
+}
+if (programmedActs.length > 0) {
+if (executedActs.length > 0) lines.push('');
+lines.push(`⏱ Programadas (${programmedActs.length}):`);
+const startNum = executedActs.length + 1;
+programmedActs.forEach((a, i) => {
+lines.push(` ${startNum + i}. ${a.name}`);
+});
+}
+if (executedActs.length === 0 && programmedActs.length === 0) {
+lines.push(`No se ejecutaron actividades del Plan SVE Psicosocial en el periodo ${periodLabel}.`);
+}
+    desarrollo.push({
+        tema: lines.join('\n'),
+        compromisos: programmedActs.length > 0 ? 'Seguimiento actividades pendientes' : 'Ninguno',
+        fecha: lastDayOfTargetMonth,
+        responsable: (executedActs.length > 0 && executedActs[0].responsable) ? executedActs[0].responsable : 'Coordinador SST'
+    });
+} else {
+    desarrollo.push({
+        tema: 'Revision del Acta Anterior, se continuan con las actividades contempladas en el plan de trabajo del SVE Psicosocial.',
+        compromisos: 'Ninguno',
+        fecha: lastDayOfTargetMonth,
+        responsable: 'Miembros del Comite de Convivencia'
+    });
+}
+
+// Item 2: Reporte de Quejas de Acoso Laboral
+const periodComplaints = acosoData.periodComplaints || [];
+if (periodComplaints.length > 0) {
+let temaAcoso = `Se revisan las quejas registradas en el link de Reporte de Queja por Presunto Acoso. Se evidencian ${periodComplaints.length} queja(s) registrada(s) en el periodo:\n`;
+      periodComplaints.forEach((c, idx) => {
+        temaAcoso += `${idx + 1}. ${c.tipoSituacion || 'Sin tipo'} - ${c.nombre || 'Denunciante anonimo'}`;
+        if (c.fechaOcurrencia) {
+          const parts = c.fechaOcurrencia.split('-');
+          const formatted = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : c.fechaOcurrencia;
+          temaAcoso += ` [Fecha: ${formatted}]`;
+        }
+        if (c.involucrado) temaAcoso += ` (Presunto involucrado: ${c.involucrado})`;
+        temaAcoso += '\n';
+      });
+      desarrollo.push({
+        tema: temaAcoso.trim(),
+        compromisos: 'Activar protocolo de prevencion de acoso laboral, brindar apoyo y soporte psicologico con la ARL',
+        fecha: lastDayOfTargetMonth,
+        responsable: 'Presidente del Comite de Convivencia'
+      });
+    } else {
+      desarrollo.push({
+        tema: 'Se revisan las quejas registradas en el link de Reporte de Queja por Presunto Acoso. No se evidencian quejas registradas en el periodo.',
+        compromisos: 'Ninguno',
+        fecha: lastDayOfTargetMonth,
+        responsable: 'Presidente del Comite de Convivencia'
+      });
+    }
+
+    // Item 3: Resultados Encuesta de Clima Laboral
+    const climaDims = climaData.dimensiones || [];
+    const totalCumpl = climaData.totalCumplimiento || 0;
+    const califGeneral = climaData.calificacion || 'Sin datos';
+
+    if (totalCumpl > 0) {
+      let temaClima = `Resultados Encuesta de Clima Laboral: ${califGeneral} (${totalCumpl}%).\nDimensiones evaluadas:\n`;
+      const dimsDeficienteRegular = [];
+      climaDims.forEach(d => {
+        temaClima += `- ${d.nombre}: ${d.cumplimiento}% (${d.calificacion})\n`;
+        if (d.calificacion === 'Deficiente' || d.calificacion === 'Regular') {
+          dimsDeficienteRegular.push(d.nombre);
+        }
+      });
+      const compromisoClima = dimsDeficienteRegular.length > 0
+        ? `Seguimiento a dimensiones con calificacion Regular/Deficiente: ${dimsDeficienteRegular.join(', ')}`
+        : 'Ninguno';
+      desarrollo.push({
+        tema: temaClima.trim(),
+        compromisos: compromisoClima,
+        fecha: lastDayOfTargetMonth,
+        responsable: 'Coordinador SST'
+      });
+    } else {
+      desarrollo.push({
+        tema: 'No se pudieron verificar los resultados de la Encuesta de Clima Laboral. Se recomienda realizar la encuesta y registrar los resultados en el SVE Psicosocial.',
+        compromisos: 'Realizar encuesta de clima laboral',
+        fecha: lastDayOfTargetMonth,
+        responsable: 'Coordinador SST'
+      });
+    }
+
+    // Item 4: Programa de Bienestar
+    desarrollo.push({
+      tema: 'Se revisa el Programa de Bienestar Laboral, se continuan desarrollando las actividades programadas.',
+      compromisos: 'Ninguno',
+      fecha: lastDayOfTargetMonth,
+      responsable: 'Coordinador SST'
+    });
+
+// Item 5: Temas Varios
+if (periodComplaints.length > 0) {
+      desarrollo.push({
+        tema: 'Temas Varios: Se revisan la existencia de solicitudes o quejas sobre Acoso Laboral, se evidencia(n) queja(s) registrada(s) en el link de Reporte de Queja por Presunto Acoso. Se procedio en activar el protocolo de prevencion de acoso laboral, se brindo apoyo y soporte psicologico con la Asesoria de la ARL y se brindo orientacion sobre el debido proceso.',
+        compromisos: 'Solicitar a la profesional de la ARL soporte de atencion y orientacion sobre el caso presentado.',
+        fecha: lastDayOfTargetMonth,
+        responsable: 'Presidente del Comite de Convivencia'
+      });
+    } else {
+      desarrollo.push({
+        tema: 'Temas Varios: Se revisan la existencia de solicitudes o quejas sobre Acoso Laboral, no se evidencian quejas registradas en el periodo.',
+        compromisos: 'Ninguno',
+        fecha: lastDayOfTargetMonth,
+        responsable: 'Presidente del Comite de Convivencia'
+      });
+    }
+
+    // ============================================================
+    // PASO 6: Construir respuesta final
+    // ============================================================
+    const result = {
+      success: true,
+      data: {
+        nextActaNumber,
+        lastActaNumber,
+        lastActaMonth,
+        lastActaMonthNumber,
+        lastActaYear,
+        targetMonth,
+        targetMonthNumber,
+        targetYear,
+        suggestedDate,
+        agenda,
+        desarrollo,
+        acosoData,
+        climaData,
+        planSveActivities,
+        warnings: emptyResult.data.warnings
+      }
+    };
+
+    sendLog(`[K+AIRSST][CONVIVENCIA][AUTO_FILL][SUCCESS] Acta N${nextActaNumber} - ${targetMonth} ${targetYear}`, 'INFO');
+    return result;
+
+  } catch (error) {
+    sendLog(`[K+AIRSST][CONVIVENCIA][AUTO_FILL][ERROR] ${error.message}`, 'ERROR');
+    emptyResult.data.warnings.push(`Error: ${error.message}`);
+    return emptyResult;
+  }
+});
+
+// ==========================================================================
+// Handler: Ruta de guardado para Acta de Convivencia
+// ==========================================================================
+ipcMain.handle('get-convivencia-save-path', async (event, companyName, year, monthName) => {
+  sendLog(`[K+AIRSST][CONVIVENCIA][SAVE_PATH][START] Empresa: ${companyName}, Ano: ${year}, Mes: ${monthName}`, 'INFO');
+
+  try {
+    const basePath = await getCompanyRootPath(companyName);
+    if (!basePath) {
+      return { success: false, error: { code: 'NO_COMPANY', message: 'Empresa no configurada' } };
+    }
+
+    const recursosPath = path.join(basePath, '1. Recursos');
+    if (!fs.existsSync(recursosPath)) {
+      return { success: false, error: { code: 'NO_RECURSOS', message: 'Carpeta 1. Recursos no encontrada' } };
+    }
+
+    const recursosEntries = await fsp.readdir(recursosPath);
+    const normalize = (str) => str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const convivenciaDir = recursosEntries.find(e => {
+      const lower = normalize(e);
+      return (e.includes('1.1.8') || lower.includes('1.1.8')) && lower.includes('convivencia');
+    });
+
+    if (!convivenciaDir) {
+      return { success: false, error: { code: 'NO_CONVIVENCIA', message: 'Submodulo 1.1.8 Comite de Convivencia no encontrado' } };
+    }
+
+    const convivenciaFullPath = path.join(recursosPath, convivenciaDir);
+    const yearFolderName = `CONVIVENCIA ${year}`;
+    const yearFolderPath = path.join(convivenciaFullPath, yearFolderName);
+
+    if (!fs.existsSync(yearFolderPath)) {
+      await fsp.mkdir(yearFolderPath, { recursive: true });
+      sendLog(`[K+AIRSST][CONVIVENCIA][SAVE_PATH] Carpeta creada: ${yearFolderPath}`, 'INFO');
+    }
+
+    const targetYear = parseInt(year) || new Date().getFullYear();
+    const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const resolvedMonth = monthName || MESES[new Date().getMonth()];
+    const defaultFileName = `GI-FO-029 ACTA DE REUNION CONVIVENCIA ${resolvedMonth}.xlsx`;
+    const defaultPath = path.join(yearFolderPath, defaultFileName);
+
+    sendLog(`[K+AIRSST][CONVIVENCIA][SAVE_PATH][SUCCESS] Ruta: ${defaultPath}`, 'INFO');
+
+    return {
+      success: true,
+      data: {
+        yearFolderPath,
+        defaultFileName,
+        defaultPath
+      }
+    };
+  } catch (error) {
+    sendLog(`[K+AIRSST][CONVIVENCIA][SAVE_PATH][ERROR] ${error.message}`, 'ERROR');
+    return { success: false, error: { code: 'INTERNAL', message: error.message } };
+  }
+});
+
 // --- Manejador para reiniciar la aplicación ---
 
 
-// REPLACEMENT_MARKER
+// ==========================================================================
+// Handler: Estadísticas de Remisiones Médicas (Optimizado con Caché)
+// ==========================================================================
+ipcMain.handle('get-remisiones-stats', async (event, companyName) => {
+  try {
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+
+    let basePath = config.companyPaths?.[companyName]?.root || config.companyPaths?.[companyName]?.ruta_base;
+    if (!basePath) return { success: false, error: 'Empresa no configurada' };
+
+    const fileName = 'GI-FO-012 CONTROL DE REMISIONES.xlsx';
+    const excelFilePath = await findFileRecursive(basePath, fileName);
+
+    if (!excelFilePath) return { success: true, data: { total: 0, mesActual: 0 } };
+
+    const cacheKey = `remisiones_${companyName.toUpperCase()}`;
+    
+    const resultData = await getCachedStats(cacheKey, [excelFilePath], async () => {
+      const workbook = xlsx.readFile(excelFilePath);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
+
+      const today = new Date();
+      const currentMonth = today.getMonth() + 1;
+      const currentYear = today.getFullYear();
+
+      let total = 0;
+      let mesActual = 0;
+
+      // Omitir encabezados (asumiendo que los datos reales empiezan después de la fila 1)
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || !row[0]) continue; // ID o Fecha
+
+        total++;
+
+        // La fecha suele estar en la columna B (índice 1) en GI-FO-012
+        let rowDate = null;
+        const dateVal = row[1];
+        if (typeof dateVal === 'number') {
+          const d = xlsx.SSF.parse_date_code(dateVal);
+          rowDate = new Date(d.y, d.m - 1, d.d);
+        } else if (dateVal instanceof Date) {
+          rowDate = dateVal;
+        }
+
+        if (rowDate && rowDate.getFullYear() === currentYear && (rowDate.getMonth() + 1) === currentMonth) {
+          mesActual++;
+        }
+      }
+
+      return { total, mesActual, month: today.toLocaleString('es-ES', { month: 'long' }) };
+    });
+
+    return { success: true, data: resultData };
+  } catch (error) {
+    console.error('[REM-STATS] Error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// REPLACEMENT_MARKER_FOR_REFRESH_APP
 
 // Manejador para duplicar archivo de presupuesto con nuevo año
 ipcMain.handle('duplicate-budget-file', async (event, { currentFilePath, newYear }) => {
@@ -8057,27 +11300,42 @@ ipcMain.handle('get-inducciones-data', async (event, companyName) => {
         // Col I (8): Cargo
         // Col L (11): Género
 
-        inducciones.push({
-            id: i,
-            date: fecha || '',
-            year: row[4] || '',
-            name: empleado,
-            idCard: row[7] || 'N/A',
-            position: row[8] || 'N/A',
-            gender: row[11] || '',
-            score: row[1] || '0 / 22',
-            status: (row[2] && row[2].toString().toLowerCase().includes('aprob')) ? 'approved' : 'failed'
-        });
-    }
-
-    return { success: true, data: inducciones, filePath };
-  } catch (error) {
-    sendLog(`[MAIN] Error en get-inducciones-data: ${error.message}`, 'ERROR');
-    return { success: false, error: error.message };
-  }
+let rawScore = row[1];
+let numericScore = 0;
+if (typeof rawScore === 'number') {
+  numericScore = rawScore;
+} else if (typeof rawScore === 'string') {
+  const parsed = parseFloat(rawScore);
+  numericScore = isNaN(parsed) ? 0 : parsed;
+}
+let status;
+const colC = row[2] ? row[2].toString().toLowerCase().trim() : '';
+if (colC.includes('aprob') && !colC.includes('reprob')) {
+  status = 'approved';
+} else if (colC.includes('reprob')) {
+  status = 'failed';
+} else {
+  status = numericScore >= 20 ? 'approved' : 'failed';
+}
+inducciones.push({
+  id: i,
+  date: fecha || '',
+  year: row[4] || '',
+  name: empleado,
+  idCard: row[7] || 'N/A',
+  position: row[8] || 'N/A',
+  gender: row[11] || '',
+score: numericScore,
+status: status
 });
+}
 
-// ============================================================================
+return { success: true, data: inducciones, filePath };
+} catch (error) {
+sendLog(`[MAIN] Error en get-inducciones-data: ${error.message}`, 'ERROR');
+return { success: false, error: error.message };
+}
+});
 // INDUCCIONES - Actualizar Excel Power Query (COM Automation via VBScript)
 // ============================================================================
 async function refreshExcelPowerQuery(filePath) {
@@ -8478,25 +11736,46 @@ ipcMain.handle('sync-inducciones-from-forms', async (event, companyName) => {
             fecha = fecha.toISOString().split('T')[0];
         }
 
+        let rawScore = row[1];
+        let numericScore = 0;
+        if (typeof rawScore === 'number') {
+          numericScore = rawScore;
+        } else if (typeof rawScore === 'string') {
+          const parsed = parseFloat(rawScore);
+          numericScore = isNaN(parsed) ? 0 : parsed;
+        }
+        let status;
+        const colC = row[2] ? row[2].toString().toLowerCase().trim() : '';
+        if (colC.includes('aprob') && !colC.includes('reprob')) {
+          status = 'approved';
+        } else if (colC.includes('reprob')) {
+          status = 'failed';
+        } else {
+          status = numericScore >= 20 ? 'approved' : 'failed';
+        }
         inducciones.push({
-            id: i,
-            date: fecha || '',
-            year: row[4] || '',
-            name: empleado,
-            idCard: row[7] || 'N/A',
-            position: row[8] || 'N/A',
-            gender: row[11] || '',
-            score: row[1] || '0 / 22',
-            status: (row[2] && row[2].toString().toLowerCase().includes('aprob')) ? 'approved' : 'failed'
+          id: i,
+          date: fecha || '',
+          year: row[4] || '',
+          name: empleado,
+          idCard: row[7] || 'N/A',
+          position: row[8] || 'N/A',
+          gender: row[11] || '',
+          score: numericScore,
+          status: status
         });
-    }
+      }
 
-    // Obtener stats del archivo
+      // Obtener stats del archivo
     const stats = await fsp.stat(filePath);
     
-    sendLog(`[MAIN] Sincronización completada: ${inducciones.length} registros`, 'INFO');
-    
-    return { 
+	sendLog(`[MAIN] Sincronización completada: ${inducciones.length} registros`, 'INFO');
+
+	const recursosCacheKey = `recursos_${companyName.toUpperCase()}`;
+	statsMemoryCache.delete(recursosCacheKey);
+	sendLog(`[CACHE] Invalidado: ${recursosCacheKey} tras sync inducciones`, 'INFO');
+
+	return {
       success: true, 
       data: inducciones, 
       filePath,
@@ -9080,7 +12359,8 @@ async function calculateInduccionesStats(basePath, companyName) {
     pendientes: 0,               // ← CAMBIA: Ahora es employees - completadas
     porcentajeCompletado: 0,     // ← CAMBIA: (completadas / employees) * 100
     mensual: new Array(12).fill(0),
-    ultimoMesRegistrado: null    // ← NUEVO: Último mes con inducción completada
+    mensualApproved: new Array(12).fill(0),
+    ultimoMesRegistrado: null // ← NUEVO: Último mes con inducción completada
   };
   try {
     // ========================================================================
@@ -9098,27 +12378,57 @@ async function calculateInduccionesStats(basePath, companyName) {
       }
     }
 
-    if (!basePath) return stats;
+  if (!basePath) return stats;
 
-    const recursosPath = path.join(basePath, '1. Recursos');
-    let targetPath = path.join(recursosPath, '1.1 Inducción y Reinducción');
+  const recursosPath = path.join(basePath, '1. Recursos');
+  let targetPath = path.join(recursosPath, '1.1 Inducción y Reinducción');
 
-    if (!fs.existsSync(targetPath)) {
-       if (fs.existsSync(recursosPath)) {
-            const subs = await fsp.readdir(recursosPath);
-            const indFolder = subs.find(s => s.includes('1.1') || s.toLowerCase().includes('inducci'));
-            if (indFolder) targetPath = path.join(recursosPath, indFolder);
-        }
+  if (!fs.existsSync(targetPath)) {
+    sendLog(`[INDUCCIONES-STATS] Ruta estándar no existe, buscando alternativas...`, 'DEBUG');
+    if (fs.existsSync(recursosPath)) {
+      const subs = await fsp.readdir(recursosPath);
+      sendLog(`[INDUCCIONES-STATS] Subcarpetas en Recursos: ${subs.join(', ')}`, 'DEBUG');
+
+      const normalize = (str) => str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const indFolder = subs.find(s => {
+        const norm = normalize(s);
+        return norm.includes('induccion') || norm.includes('reinduccion');
+      });
+      const indFolderNumeric = subs.find(s => {
+        const norm = normalize(s);
+        return (s.startsWith('1.1') || s.startsWith('1.2')) && norm.includes('induccion');
+      });
+      const fallbackFolder = subs.find(s => s.includes('1.1') || normalize(s).includes('inducci'));
+      const finalFolder = indFolder || indFolderNumeric || fallbackFolder;
+
+      sendLog(`[INDUCCIONES-STATS] Carpeta encontrada: ${finalFolder || 'NINGUNA'}`, 'DEBUG');
+      if (finalFolder) targetPath = path.join(recursosPath, finalFolder);
     }
+  }
 
-    if (!fs.existsSync(targetPath)) return stats;
+  if (!fs.existsSync(targetPath)) {
+    sendLog(`[INDUCCIONES-STATS] No se encontró carpeta de inducciones. Ruta buscada: ${targetPath}`, 'WARN');
+    return stats;
+  }
 
-    const files = await fsp.readdir(targetPath);
-    // Filtrar archivos Excel que coincidan con ACT-FO-046
-    const excelFiles = files.filter(f =>
-        !f.startsWith('~$') && (f.endsWith('.xlsx') || f.endsWith('.xls')) &&
-        f.toLowerCase().includes('act-fo-046')
-    );
+  const files = await fsp.readdir(targetPath);
+  sendLog(`[INDUCCIONES-STATS] Archivos en carpeta: ${files.join(', ')}`, 'DEBUG');
+
+  const excelFiles = files.filter(f => {
+    if (!f.startsWith('~$') && (f.endsWith('.xlsx') || f.endsWith('.xls'))) {
+      const lowerName = f.toLowerCase();
+      return lowerName.includes('inducción') ||
+             lowerName.includes('induccion') ||
+             lowerName.includes('inducciones') ||
+             lowerName.includes('fo-046') ||
+             lowerName.includes('fo_046') ||
+             lowerName.includes('046') ||
+             lowerName.includes('registro');
+    }
+    return false;
+  });
+
+  sendLog(`[INDUCCIONES-STATS] Archivos Excel coincidentes: ${excelFiles.join(', ') || 'NINGUNO'}`, 'DEBUG');
 
     // Track del último mes registrado
     let ultimoMesIndex = -1;
@@ -9156,13 +12466,33 @@ async function calculateInduccionesStats(basePath, companyName) {
                 // Año en Col E (4) como respaldo
                 const yearVal = row[4] ? parseInt(row[4]) : null;
 
-                // Contar si es del año actual
-                if ((rowDate && rowDate.getFullYear() === currentYear) || yearVal === currentYear) {
-                    stats.totalInducciones++;
-                    stats.completadas++;
-                    if (rowDate) stats.mensual[rowDate.getMonth()]++;
+      // Contar si es del año actual
+      if ((rowDate && rowDate.getFullYear() === currentYear) || yearVal === currentYear) {
+        stats.totalInducciones++;
+        stats.completadas++;
+        if (rowDate) stats.mensual[rowDate.getMonth()]++;
 
-                    // Track del último mes encontrado (considerando año + mes)
+        // Determinar si es aprobada (misma lógica que get-inducciones-data)
+        let isApproved = false;
+        const rawScore = row[1];
+        let numericScore = 0;
+        if (typeof rawScore === 'number') {
+          numericScore = rawScore;
+        } else if (typeof rawScore === 'string') {
+          const p = parseFloat(rawScore);
+          numericScore = isNaN(p) ? 0 : p;
+        }
+        const colC = row[2] ? row[2].toString().toLowerCase().trim() : '';
+        if (colC.includes('aprob') && !colC.includes('reprob')) {
+          isApproved = true;
+        } else if (colC.includes('reprob')) {
+          isApproved = false;
+        } else {
+          isApproved = numericScore >= 20;
+        }
+        if (isApproved && rowDate) stats.mensualApproved[rowDate.getMonth()]++;
+
+        // Track del último mes encontrado (considerando año + mes)
                     if (rowDate) {
                         const monthIndex = rowDate.getMonth();
                         const fileYear = rowDate.getFullYear();
@@ -9185,18 +12515,11 @@ async function calculateInduccionesStats(basePath, companyName) {
     // Asignar último mes registrado
     stats.ultimoMesRegistrado = ultimoMesRegistrado ? ultimoMesRegistrado.display : null;
 
-    // ========================================================================
-    // 2. CALCULAR PENDIENTES Y PORCENTAJE REAL BASADO EN TRABAJADORES
-    // ========================================================================
-    // Convertir mensual a acumulado para el gráfico de tendencia
-    let cumulative = 0;
-    const trendData = [...stats.mensual];
-    for (let i = 0; i < 12; i++) {
-        cumulative += trendData[i];
-        stats.mensual[i] = cumulative;
-    }
+  // ========================================================================
+  // 2. CALCULAR PENDIENTES Y PORCENTAJE REAL BASADO EN TRABAJADORES
+  // ========================================================================
 
-    // Calcular pendientes: trabajadores que NO han recibido inducción
+  // Calcular pendientes: trabajadores que NO han recibido inducción
     stats.pendientes = Math.max(0, stats.totalTrabajadores - stats.completadas);
 
     // Calcular porcentaje REAL: (completadas / totalTrabajadores) * 100
@@ -9207,7 +12530,7 @@ async function calculateInduccionesStats(basePath, companyName) {
         stats.porcentajeCompletado = stats.totalInducciones > 0 ? 100 : 0;
     }
 
-    sendLog(`[DEBUG] calculateInduccionesStats - Completadas: ${stats.completadas}, Pendientes: ${stats.pendientes}, Porcentaje: ${stats.porcentajeCompletado}%, Último: ${stats.ultimoMesRegistrado || 'N/A'}`, 'DEBUG');
+    sendLog(`[INDUCCIONES-STATS] Completadas: ${stats.completadas}, Pendientes: ${stats.pendientes}, Porcentaje: ${stats.porcentajeCompletado}%, Último: ${stats.ultimoMesRegistrado || 'N/A'}, Mensual: [${stats.mensual.join(',')}], Approved: [${stats.mensualApproved.join(',')}]`, 'INFO');
 
   } catch (e) {
     sendLog(`Error calculando inducciones: ${e.message}`, 'WARN');
@@ -9786,8 +13109,7 @@ async function calculatePresupuestoStats(basePath, companyName) {
       if (typeof value === 'number') return value;
       if (typeof value === 'object' && value.value !== undefined) return value.value;
       if (typeof value === 'string') {
-        // Limpiar formato: "$ 13,407,464" -> 13407464
-        const clean = value.toString().replace(/\$/g, '').replace(/\s/g, '').replace(/,/g, '');
+        const clean = value.toString().replace(/\$/g, '').replace(/\s/g, '').replace(/\./g, '').replace(/,/g, '.');
         return parseFloat(clean) || 0;
       }
       return 0;
@@ -9919,51 +13241,90 @@ async function calculatePresupuestoStats(basePath, companyName) {
   return stats;
 }
 
-// --- API Estadísticas de Recursos (Implementación Real) ---
+// --- API Estadísticas de Recursos (Optimizado con Caché) ---
 ipcMain.handle('get-recursos-stats', async (event, companyName) => {
   try {
-    sendLog(`[MAIN] Obteniendo estadísticas REALES de recursos para: ${companyName}`, 'INFO');
-
     const rootPath = await getCompanyRootPath(companyName);
+    if (!rootPath) return { success: true, stats: null };
 
-    if (!rootPath) {
-        sendLog(`[MAIN] No se encontró ruta raíz para ${companyName}. Retornando ceros.`, 'WARN');
-        return {
-            success: true,
-            stats: {
-                inducciones: { totalTrabajadores: 0, totalInducciones: 0, completadas: 0, pendientes: 0, porcentajeCompletado: 0, mensual: new Array(12).fill(0) },
-                capacitaciones: { totalCapacitaciones: 0, programadas: 0, realizadas: 0, porcentajeCumplimiento: 0, mensual: { programadas: new Array(12).fill(0), realizadas: new Array(12).fill(0) } },
-                epps: { totalEPPs: 0, entregados: 0, pendientes: 0, stockActual: 0 },
-                afiliacion: { totalPlanillas: 0, planillaMesEnCurso: false, ultimoMesRegistrado: null, estado: 'ok', alertas: [] }
+		const cacheKey = `recursos_${companyName.toUpperCase()}`;
+
+        const recursosPath = path.join(rootPath, '1. Recursos');
+        let induccionesFolderPath = null;
+        let copasstFolderPath = null;
+        let copasstYearFolderPath = null;
+        let convivenciaFolderPath = null;
+        if (fs.existsSync(recursosPath)) {
+            try {
+                const subs = fs.readdirSync(recursosPath);
+                const normalize = (str) => str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                const indFolder = subs.find(s => {
+                    const norm = normalize(s);
+                    return norm.includes('induccion') || norm.includes('reinduccion');
+                });
+                if (indFolder) induccionesFolderPath = path.join(recursosPath, indFolder);
+            } catch (e) {
+                sendLog(`[CACHE] Error detectando carpeta inducciones para fingerprint: ${e.message}`, 'WARN');
             }
+            try {
+                const subs = fs.readdirSync(recursosPath);
+                const normalize = (str) => str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                const copFolder = subs.find(s => {
+                    const norm = normalize(s);
+                    return norm.includes('1.1.6') && norm.includes('copasst');
+                });
+                if (copFolder) {
+                    copasstFolderPath = path.join(recursosPath, copFolder);
+                    const currentYear = new Date().getFullYear();
+                    const yearCandidate = path.join(copasstFolderPath, `COPASST ${currentYear}`);
+                    if (fs.existsSync(yearCandidate)) {
+                        copasstYearFolderPath = yearCandidate;
+                    }
+                }
+                const cvFolder = subs.find(s => {
+                    const norm = normalize(s);
+                    return (norm.includes('1.1.8') && norm.includes('convivencia'));
+                });
+                if (cvFolder) convivenciaFolderPath = path.join(recursosPath, cvFolder);
+            } catch (e) {
+                sendLog(`[CACHE] Error detectando carpetas COPASST/Convivencia para fingerprint: ${e.message}`, 'WARN');
+            }
+        }
+
+        const deps = [
+            recursosPath,
+            induccionesFolderPath,
+            copasstFolderPath,
+            copasstYearFolderPath,
+            convivenciaFolderPath,
+            path.join(app.getPath('userData'), 'config.json')
+        ].filter(Boolean);
+
+    const stats = await getCachedStats(cacheKey, deps, async () => {
+        sendLog(`[MAIN] Recalculando estadísticas de recursos para: ${companyName}`, 'INFO');
+        const currentYear = new Date().getFullYear();
+        const [capacitaciones, inducciones, epps, copasst, convivencia, afiliacion] = await Promise.all([
+            calculateCapacitacionesStats(rootPath),
+            calculateInduccionesStats(rootPath, companyName),
+            calculateEppsStats(rootPath),
+            calculateCopasstStats(rootPath, currentYear),
+            calculateConvivenciaStats(rootPath, currentYear),
+            calculateAfiliacionStats(rootPath, companyName)
+        ]);
+
+        return {
+          inducciones,
+          capacitaciones,
+          epps,
+          copasst,
+          comite_convivencia: convivencia,
+          afiliacion
         };
-    }
+    });
 
-    // Ejecutar cálculos en paralelo
-    const currentYear = new Date().getFullYear();
-    const [capacitaciones, inducciones, epps, copasst, convivencia, afiliacion] = await Promise.all([
-        calculateCapacitacionesStats(rootPath),
-        calculateInduccionesStats(rootPath, companyName),
-        calculateEppsStats(rootPath),
-        calculateCopasstStats(rootPath, currentYear),
-        calculateConvivenciaStats(rootPath, currentYear),  // ← NUEVO: Comité de Convivencia
-        calculateAfiliacionStats(rootPath, companyName)
-    ]);
-
-    const stats = {
-      inducciones,
-      capacitaciones,
-      epps,
-      copasst,
-      comite_convivencia: convivencia,  // ← NUEVO: Comité de Convivencia
-      afiliacion
-    };
-
-    sendLog(`[MAIN] Estadísticas calculadas: ${JSON.stringify(stats)}`, 'DEBUG');
     return { success: true, stats };
-
   } catch (error) {
-    sendLog(`[MAIN] Error crítico en estadísticas: ${error.message}`, 'ERROR');
+    sendLog(`[MAIN] Error crítico en estadísticas de recursos: ${error.message}`, 'ERROR');
     return { success: false, error: error.message };
   }
 });
@@ -9983,26 +13344,36 @@ ipcMain.handle('get-gestion-integral-stats', async (event, companyName) => {
                 politica: { actualizada: false, fecha: null, estado: 'No disponible' },
                 objetivos: { total: 0, cumplidos: 0, porcentaje: 0 },
                 plan_trabajo: { tareas_pendientes: 0, tareas_realizadas: 0, total: 0 },
-                rendicion_cuentas: { actas_realizadas: 0, proxima_fecha: null }
+                rendicion_cuentas: { actas_realizadas: 0, proxima_fecha: null },
+                evaluacion_inicial: {
+                    disponible: false,
+                    combinado: { cumplimiento: 0, hallazgosCriticos: 0, hallazgosParciales: 0, hallazgosCumplidos: 0, totalHallazgos: 0 },
+                    ministerio: { disponible: false, cumplimiento: 0, hallazgosCriticos: 0, hallazgosParciales: 0, hallazgosCumplidos: 0, totalHallazgos: 0, ultimoInforme: null },
+                    arl: { disponible: false, cumplimiento: 0, hallazgosCriticos: 0, hallazgosParciales: 0, hallazgosCumplidos: 0, totalHallazgos: 0, ultimoInforme: null }
+                }
             }
         };
     }
 
     const currentYear = new Date().getFullYear();
 
-    // Calcular estadísticas en paralelo
-    const [politica, objetivos, plan_trabajo, rendicion] = await Promise.all([
+    // Calcular estadísticas en paralelo (incluyendo evaluación inicial)
+    const [politica, objetivos, plan_trabajo, rendicion, evaluacion_inicial, principiosAutoResultados] = await Promise.all([
         calculatePoliticaStats(rootPath),
         calculateObjetivosStats(rootPath),
         calculatePlanTrabajoStats(rootPath, currentYear),
-        calculateRendicionCuentasStats(rootPath)
+        calculateRendicionCuentasStats(rootPath),
+        calculateEvaluacionInicialStats(rootPath),
+        calculatePrincipiosAutoResultados(rootPath, companyName)
     ]);
 
     const stats = {
         politica,
         objetivos,
         plan_trabajo,
-        rendicion_cuentas: rendicion
+        rendicion_cuentas: rendicion,
+        evaluacion_inicial,
+        principiosAutoResultados
     };
 
     sendLog(`[MAIN] Estadísticas Gestión Integral calculadas: ${JSON.stringify(stats)}`, 'DEBUG');
@@ -10091,7 +13462,13 @@ async function calculateObjetivosStats(basePath) {
     total: 0,
     cumplidos: 0,
     porcentaje: 0,
-    vencidos: 0
+    vencidos: 0,
+    porPrincipio: {
+      1: { total: 0, cumplidos: 0, porcentaje: 0 },
+      2: { total: 0, cumplidos: 0, porcentaje: 0 },
+      3: { total: 0, cumplidos: 0, porcentaje: 0 },
+      4: { total: 0, cumplidos: 0, porcentaje: 0 }
+    }
   };
 
   try {
@@ -10136,7 +13513,9 @@ async function calculateObjetivosStats(basePath) {
         const worksheet = workbook.Sheets[sheetName];
         const data = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
 
-        // Asumir que hay columnas: Objetivo, Estado/Cumplimiento, Fecha
+        // Estructura Excel:
+        // B(1): Objetivo, C(2): Indicador, D(3): Fórmula, E(4): Meta,
+        // F(5): Frecuencia, G(6): Responsable, H(7): Principle ID (1-4)
         for (let i = 1; i < data.length; i++) {
             const row = data[i];
             if (!row || row.length < 2) continue;
@@ -10147,15 +13526,32 @@ async function calculateObjetivosStats(basePath) {
 
             stats.total++;
 
+            // Determinar principleId (columna H, índice 7)
+            let principleId = parseInt(row[7]) || null;
+            if (!principleId || principleId < 1 || principleId > 4) {
+                principleId = 1; // Default a principio 1
+            }
+
+            stats.porPrincipio[principleId].total++;
+
             // Verificar estado de cumplimiento
             const estado = (row[2] || row[3] || '').toString().toLowerCase();
-            if (estado.includes('cumplido') || estado.includes('realizado') || estado.includes('completado') || estado === 'si') {
+            const cumplido = estado.includes('cumplido') || estado.includes('realizado') || estado.includes('completado') || estado === 'si';
+            if (cumplido) {
                 stats.cumplidos++;
+                stats.porPrincipio[principleId].cumplidos++;
             }
         }
 
+        // Calcular porcentajes
         if (stats.total > 0) {
             stats.porcentaje = Math.round((stats.cumplidos / stats.total) * 100);
+        }
+        for (const pid of [1, 2, 3, 4]) {
+            const p = stats.porPrincipio[pid];
+            if (p.total > 0) {
+                p.porcentaje = Math.round((p.cumplidos / p.total) * 100);
+            }
         }
     }
   } catch (error) {
@@ -10163,6 +13559,70 @@ async function calculateObjetivosStats(basePath) {
   }
 
   return stats;
+}
+
+/**
+ * Calcular auto-resultados agrupados por principio
+ * Mapea keywords de calculateAutoResultados() a los 4 principios del SG-SST
+ */
+async function calculatePrincipiosAutoResultados(rootPath, companyName) {
+  const empty = {
+    1: { nombre: 'Prevención', keywords: {}, porcentajePromedio: 0, totalKeywords: 0 },
+    2: { nombre: 'Requisitos Legales', keywords: {}, porcentajePromedio: 0, totalKeywords: 0 },
+    3: { nombre: 'Satisfacción Cliente', keywords: {}, porcentajePromedio: 0, totalKeywords: 0 },
+    4: { nombre: 'Recursos y Mejora', keywords: {}, porcentajePromedio: 0, totalKeywords: 0 }
+  };
+
+  try {
+    const autoResultados = await calculateAutoResultados(companyName);
+
+    const KEYWORD_TO_PRINCIPIO = {
+      // Principio 1: Prevención
+      1: ['frecuencia', 'severidad', 'mortalidad', 'mortal', 'accidente', 'at',
+          'accidentalidad', 'peligro', 'riesgo', 'nr', 'peligros', 'riesgos',
+          'ausentismo', 'incapacidad', 'investigacion', 'inspeccion', 'inspecciones',
+          'ifa', 'prevalencia', 'incidencia'],
+      // Principio 2: Requisitos Legales
+      2: ['evaluacion', 'hallazgo', 'hallazgos', 'politica'],
+      // Principio 3: Satisfacción Cliente
+      3: ['copasst', 'comite'],
+      // Principio 4: Recursos y Mejora
+      4: ['capacitacion', 'capacitaciones', 'induccion', 'reinduccion',
+          'presupuesto', 'recurso', 'recursos', 'asignacion',
+          'plan', 'trabajo', 'actividad', 'plan de trabajo']
+    };
+
+    for (const [principioId, keywords] of Object.entries(KEYWORD_TO_PRINCIPIO)) {
+      const pid = parseInt(principioId);
+      const matched = {};
+
+      for (const kw of keywords) {
+        if (autoResultados[kw] && autoResultados[kw].resultado) {
+          const data = autoResultados[kw];
+          matched[kw] = {
+            resultado: data.resultado,
+            porcentajeReal: data.porcentajeReal || 0
+          };
+        }
+      }
+
+      const values = Object.values(matched).map(m => m.porcentajeReal).filter(v => v > 0);
+      const promedio = values.length > 0
+        ? Math.round(values.reduce((s, v) => s + v, 0) / values.length)
+        : 0;
+
+      empty[pid] = {
+        nombre: empty[pid].nombre,
+        keywords: matched,
+        porcentajePromedio: promedio,
+        totalKeywords: Object.keys(matched).length
+      };
+    }
+  } catch (e) {
+    sendLog(`[MAIN] Error calculando principios auto-resultados: ${e.message}`, 'WARN');
+  }
+
+  return empty;
 }
 
 /**
@@ -10310,8 +13770,8 @@ async function calculatePlanTrabajoStats(basePath, currentYear) {
 
         row.forEach(cell => {
             const val = normalize(cell);
-            if (['ene', 'feb', 'mar', 'abr', 'may', 'jun'].every(m => val.includes(m))) {
-                monthCount = 6;
+            if (['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'set', 'oct', 'nov', 'dic'].includes(val)) {
+                monthCount++;
             }
             if (val.includes('actividad') || val.includes('actividades')) {
                 hasActividades = true;
@@ -10529,6 +13989,220 @@ async function calculateRendicionCuentasStats(basePath) {
   return stats;
 }
 
+/**
+ * Calcular estadísticas de Evaluación Inicial del SG-SST
+ * Procesa los PDFs más recientes de Ministerio y ARL (sin filtro estricto por año)
+ * @param {string} basePath - Ruta raíz de la empresa
+ * @returns {Promise<Object>} Stats de evaluación inicial separados por fuente
+ */
+async function calculateEvaluacionInicialStats(basePath) {
+  const stats = {
+    disponible: false,
+    combinado: {
+      cumplimiento: 0,
+      hallazgosCriticos: 0,
+      hallazgosParciales: 0,
+      hallazgosCumplidos: 0,
+      totalHallazgos: 0
+    },
+    ministerio: {
+      disponible: false,
+      cumplimiento: 0,
+      hallazgosCriticos: 0,
+      hallazgosParciales: 0,
+      hallazgosCumplidos: 0,
+      totalHallazgos: 0,
+      ultimoInforme: null,
+      fechaProcesamiento: null
+    },
+    arl: {
+      disponible: false,
+      cumplimiento: 0,
+      hallazgosCriticos: 0,
+      hallazgosParciales: 0,
+      hallazgosCumplidos: 0,
+      totalHallazgos: 0,
+      ultimoInforme: null,
+      fechaProcesamiento: null
+    }
+  };
+
+  try {
+    // Intentar múltiples nombres de carpeta (priorizar nombre corto)
+    const posiblesNombres = [
+        '2. Gestión Integral',        // Nombre corto (primero)
+        '2. Gestion Integral',        // Sin tilde
+        '2. Gestión Integral del SG-SST'  // Nombre completo
+    ];
+
+    let gestionIntegralPath = null;
+    for (const nombre of posiblesNombres) {
+        const pathIntento = path.join(basePath, nombre);
+        if (fs.existsSync(pathIntento)) {
+            gestionIntegralPath = pathIntento;
+            break;
+        }
+    }
+
+    if (!gestionIntegralPath) {
+        return stats;
+    }
+
+    const evaluacionPath = path.join(gestionIntegralPath, '2.3.1 Evaluación inicial del SG-SST');
+    const evaluacionPathAlt = path.join(gestionIntegralPath, '2.3.1 Evaluacion inicial del SG-SST');
+
+    const rutaFinal = fs.existsSync(evaluacionPath) ? evaluacionPath : evaluacionPathAlt;
+
+    if (!fs.existsSync(rutaFinal)) {
+        return stats;
+    }
+
+    // Buscar PDFs en la carpeta principal y subcarpetas
+    const subfolders = ['', 'Diagnostico Ministerio', 'Diagnostico ARL', 'SGSST'];
+    let allPdfFiles = [];
+
+    for (const sub of subfolders) {
+        const subPath = sub ? path.join(rutaFinal, sub) : rutaFinal;
+        if (fs.existsSync(subPath)) {
+            const files = await fsp.readdir(subPath);
+            const pdfFiles = files.filter(f => f.toLowerCase().endsWith('.pdf'));
+            allPdfFiles = allPdfFiles.concat(pdfFiles.map(f => ({
+                name: f,
+                path: path.join(subPath, f),
+                folder: sub || 'raíz'
+            })));
+        }
+    }
+
+    if (allPdfFiles.length === 0) {
+        return stats;
+    }
+
+    // Separar por fuente (sin filtro por año)
+    const ministerioPdfs = allPdfFiles.filter(f => 
+        f.folder.toLowerCase().includes('ministerio') || 
+        f.name.toLowerCase().includes('ministerio') ||
+        f.name.toLowerCase().includes('resultados calificacion')
+    );
+    
+    // Para ARL: priorizar informes reales (Informe Res 0312) sobre certificaciones
+    const arlInformes = allPdfFiles.filter(f => 
+        f.folder.toLowerCase().includes('arl') || 
+        f.name.toLowerCase().includes('informe res 0312') ||
+        f.name.toLowerCase().includes('informe arl')
+    );
+    const arlCertificaciones = allPdfFiles.filter(f => 
+        f.name.toLowerCase().includes('certificacion') && 
+        f.name.toLowerCase().includes('arl')
+    );
+    
+    // Usar informes primero, si no hay usar certificaciones
+    const arlPdfs = arlInformes.length > 0 ? arlInformes : arlCertificaciones;
+
+    sendLog(`[Evaluacion] PDFs encontrados: ministerio=${ministerioPdfs.length}, arl=${arlPdfs.length} (informes=${arlInformes.length}, certificaciones=${arlCertificaciones.length})`, 'INFO');
+
+    // Función auxiliar para procesar un PDF
+    const procesarPdf = async (pdfInfo, fuente) => {
+        if (!pdfInfo || pdfInfo.length === 0) return null;
+        
+        // Ordenar por fecha (más reciente primero)
+        const sorted = await Promise.all(
+            pdfInfo.map(async (f) => {
+                try {
+                    const fileStats = await fsp.stat(f.path);
+                    return { ...f, mtime: fileStats.mtime };
+                } catch (e) {
+                    return { ...f, mtime: new Date(0) };
+                }
+            })
+        );
+        sorted.sort((a, b) => b.mtime - a.mtime);
+        
+        const latest = sorted[0];
+        sendLog(`[Evaluacion] Procesando ${fuente}: ${latest.name}`, 'INFO');
+        
+        const EvaluacionPdfParser = require('./utils/evaluacionPdfParser');
+        const parser = new EvaluacionPdfParser();
+        const result = await parser.parsePdf(latest.path, fuente);
+        
+        if (result.success && result.metrics) {
+            return {
+                disponible: true,
+                cumplimiento: result.metrics.cumplimiento || 0,
+                hallazgosCriticos: result.metrics.noCumplidos || 0,
+                hallazgosParciales: result.metrics.parcial || 0,
+                hallazgosCumplidos: result.metrics.cumplidos || 0,
+                totalHallazgos: result.metrics.totalItems || 0,
+                ultimoInforme: latest.name,
+                fechaProcesamiento: latest.mtime
+            };
+        }
+        return null;
+    };
+
+    // Procesar Ministerio
+    if (ministerioPdfs.length > 0) {
+        const ministerioStats = await procesarPdf(ministerioPdfs, 'ministerio');
+        if (ministerioStats) {
+            stats.ministerio = ministerioStats;
+        }
+    }
+
+    // Procesar ARL
+    if (arlPdfs.length > 0) {
+        const arlStats = await procesarPdf(arlPdfs, 'arl');
+        if (arlStats) {
+            stats.arl = arlStats;
+        }
+    }
+
+    // Calcular combinados (suma de ambos)
+    if (stats.ministerio.disponible || stats.arl.disponible) {
+        stats.disponible = true;
+        
+        // Si solo hay uno, usar sus datos como combinado
+        if (!stats.ministerio.disponible && stats.arl.disponible) {
+            stats.combinado = {
+                disponible: true,
+                cumplimiento: stats.arl.cumplimiento,
+                hallazgosCriticos: stats.arl.hallazgosCriticos,
+                hallazgosParciales: stats.arl.hallazgosParciales,
+                hallazgosCumplidos: stats.arl.hallazgosCumplidos,
+                totalHallazgos: stats.arl.totalHallazgos
+            };
+        } else if (stats.ministerio.disponible && !stats.arl.disponible) {
+            stats.combinado = {
+                disponible: true,
+                cumplimiento: stats.ministerio.cumplimiento,
+                hallazgosCriticos: stats.ministerio.hallazgosCriticos,
+                hallazgosParciales: stats.ministerio.hallazgosParciales,
+                hallazgosCumplidos: stats.ministerio.hallazgosCumplidos,
+                totalHallazgos: stats.ministerio.totalHallazgos
+            };
+        } else {
+            // Ambos disponibles - calcular cumplimiento desde totales sumados
+            const totalCumplidos = stats.ministerio.hallazgosCumplidos + stats.arl.hallazgosCumplidos;
+            const totalItems = stats.ministerio.totalHallazgos + stats.arl.totalHallazgos;
+            stats.combinado = {
+                disponible: true,
+                cumplimiento: totalItems > 0 ? Math.round((totalCumplidos / totalItems) * 100) : 0,
+                hallazgosCriticos: stats.ministerio.hallazgosCriticos + stats.arl.hallazgosCriticos,
+                hallazgosParciales: stats.ministerio.hallazgosParciales + stats.arl.hallazgosParciales,
+                hallazgosCumplidos: totalCumplidos,
+                totalHallazgos: totalItems
+            };
+        }
+    }
+
+    sendLog(`[Evaluacion] Stats calculados: combinado=${stats.combinado.cumplimiento}%, min=${stats.ministerio.cumplimiento}%, arl=${stats.arl.cumplimiento}%`, 'INFO');
+
+  } catch (error) {
+    sendLog(`[MAIN] Error calculando evaluación inicial stats: ${error.message}`, 'WARN');
+  }
+
+  return stats;
+}
+
 
 // Manejar la carga del archivo normativa-0312.json
 ipcMain.handle('load-normativa', async () => {
@@ -10578,6 +14252,454 @@ ipcMain.handle('process-evaluacion-pdf', async (event, pdfPath, sourceType) => {
       findings: [],
       metrics: { cumplimiento: 0, totalItems: 0, cumplidos: 0, noCumplidos: 0, parcial: 0 }
     };
+  }
+});
+
+// ============================================================================
+// GESTIÓN DEL CAMBIO (2.11.1) — IPC Handlers
+// ============================================================================
+
+/**
+ * Obtiene la ruta del archivo Excel de Gestión del Cambio para una empresa.
+ * Navega la estructura mapeada del repositorio de la empresa (patrón obtenerRutaAusentismo).
+ * Solo crea directorio como último recurso si la estructura no está mapeada.
+ */
+async function obtenerRutaGestionCambio(companyName) {
+  try {
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+
+    const normalizedName = companyName.toLowerCase().trim();
+    const companyKey = Object.keys(config.companyPaths || {}).find(
+      k => k.toLowerCase().trim() === normalizedName
+    );
+    const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
+
+    if (!companyConfig) {
+      console.error(`[GestionCambio] No se encontró configuración para empresa: ${companyName}`);
+      return null;
+    }
+
+    // Helper: normalizar string para comparación flexible (ignora tildes, mayúsculas, espacios extra)
+    const norm = (s) => String(s).toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ').trim();
+
+    // Búsqueda flexible: el key puede contener prefijos numéricos como "2. Gestión Integral"
+    function findDirFlexible(subdirs, target) {
+      if (!subdirs) return null;
+      const tgt = norm(target);
+      for (const [key, value] of Object.entries(subdirs)) {
+        const k = norm(key);
+        // Coincidencia exacta, o el key contiene el target, o el target coincide con la parte sin prefijo numérico
+        const kSinPrefijo = k.replace(/^\d+[\s.]+/, '');
+        if (k === tgt || k.includes(tgt) || kSinPrefijo === tgt) return value;
+      }
+      return null;
+    }
+
+    // Intentar navegar la estructura mapeada del repositorio
+    const rootStructure = companyConfig.structure?.structure;
+    if (rootStructure?.subdirectories) {
+      // Buscar carpeta "Gestión Integral" en el nivel raíz
+      const gestionIntegral = findDirFlexible(rootStructure.subdirectories, 'Gestion Integral');
+
+      if (gestionIntegral) {
+        // Buscar subcarpeta "Gestión del Cambio" dentro de Gestión Integral
+        const gcDir = findDirFlexible(gestionIntegral.subdirectories, 'Gestion del Cambio');
+
+        // Usar la subcarpeta si existe, si no usar Gestión Integral directamente
+        const targetDir = gcDir || gestionIntegral;
+        if (targetDir.path) {
+          const excelPath = path.join(targetDir.path, 'GI-FO-059_GestionDelCambio.xlsx');
+          console.log(`[GestionCambio] Ruta en repositorio: ${excelPath}`);
+          return excelPath;
+        }
+      }
+    }
+
+    // Fallback: usar raíz de la empresa + "Gestión Integral" (sin crear subcarpeta "2.11.1")
+    const root = companyConfig.root || companyConfig.ruta_base;
+    if (!root) {
+      console.error(`[GestionCambio] No se encontró ruta raíz para empresa: ${companyName}`);
+      return null;
+    }
+
+    const fallbackDir = path.join(root, 'Gestión Integral');
+    await fsp.mkdir(fallbackDir, { recursive: true });
+    console.warn(`[GestionCambio] Carpeta Gestión Integral no encontrada en estructura. Usando fallback: ${fallbackDir}`);
+    return path.join(fallbackDir, 'GI-FO-059_GestionDelCambio.xlsx');
+
+  } catch (err) {
+    console.error('[GestionCambio] Error obteniendo ruta:', err);
+    return null;
+  }
+}
+
+/**
+ * Re-aplica los keys de columna al worksheet después de leer un archivo xlsx.
+ * ExcelJS no persiste los column keys en el archivo — solo existen en memoria
+ * cuando se crean con ws.columns. Sin esto, row.getCell('id') falla.
+ */
+function applyGestionCambioColumnKeys(worksheet) {
+  if (!worksheet) return;
+  const keys = [
+    'id','fecha','areaEjecutora','areaUsuaria','responsable','cargo',
+    'descripcion','justificacion','tipoCambio','nivelRiesgo','estado',
+    'riesgoAntes','riesgoDespues','introducePeligros','modificaRiesgos',
+    'fechaEjecucion','controlesImplementados','controlesEficaces',
+    'fechaCierre','jsonFull',
+  ];
+  keys.forEach((key, i) => {
+    const col = worksheet.getColumn(i + 1);
+    if (col) col.key = key;
+  });
+}
+
+/**
+ * Asegura que el archivo Excel exista con la estructura correcta.
+ */
+async function ensureGestionCambioExcel(filePath) {
+  if (fs.existsSync(filePath)) return;
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'K+AIR SG-SST';
+  workbook.lastModifiedBy = 'K+AIR SG-SST';
+
+  // Hoja principal de cambios
+  const ws = workbook.addWorksheet('Cambios', {
+    properties: { tabColor: { argb: '174EA6' } }
+  });
+
+  ws.columns = [
+    { header: 'ID', key: 'id', width: 20 },
+    { header: 'Fecha', key: 'fecha', width: 14 },
+    { header: 'Área Ejecutora', key: 'areaEjecutora', width: 20 },
+    { header: 'Área Usuaria', key: 'areaUsuaria', width: 20 },
+    { header: 'Responsable', key: 'responsable', width: 25 },
+    { header: 'Cargo', key: 'cargo', width: 20 },
+    { header: 'Descripción', key: 'descripcion', width: 40 },
+    { header: 'Justificación', key: 'justificacion', width: 40 },
+    { header: 'Tipo de Cambio', key: 'tipoCambio', width: 30 },
+    { header: 'Nivel de Riesgo', key: 'nivelRiesgo', width: 15 },
+    { header: 'Estado', key: 'estado', width: 15 },
+    { header: 'Riesgo Antes', key: 'riesgoAntes', width: 15 },
+    { header: 'Riesgo Después', key: 'riesgoDespues', width: 15 },
+    { header: 'Introduce Peligros', key: 'introducePeligros', width: 15 },
+    { header: 'Modifica Riesgos', key: 'modificaRiesgos', width: 15 },
+    { header: 'Fecha Ejecución', key: 'fechaEjecucion', width: 14 },
+    { header: 'Controles Implementados', key: 'controlesImplementados', width: 15 },
+    { header: 'Controles Eficaces', key: 'controlesEficaces', width: 15 },
+    { header: 'Fecha Cierre', key: 'fechaCierre', width: 14 },
+    { header: 'Datos Completos (JSON)', key: 'jsonFull', width: 50 },
+  ];
+
+  // Estilo de header
+  ws.getRow(1).eachCell((cell) => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '174EA6' } };
+    cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 10 };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+  });
+
+  await workbook.xlsx.writeFile(filePath);
+  console.log(`[GestionCambio] Archivo Excel creado: ${filePath}`);
+}
+
+/**
+ * Carga todos los cambios del archivo Excel.
+ */
+ipcMain.handle('gestion-cambio-load-data', async (event, companyName) => {
+  try {
+    const filePath = await obtenerRutaGestionCambio(companyName);
+    if (!filePath) {
+      return { success: false, error: { code: 'COMPANY_NOT_FOUND', message: 'Empresa no encontrada' } };
+    }
+
+    await ensureGestionCambioExcel(filePath);
+
+    if (!fs.existsSync(filePath)) {
+      return { success: true, data: { changes: [], metrics: { pending: 0, highRisk: 0, active: 0, month: 0 } } };
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(filePath);
+    const worksheet = workbook.getWorksheet('Cambios');
+
+    if (!worksheet || worksheet.rowCount <= 1) {
+      return { success: true, data: { changes: [], metrics: { pending: 0, highRisk: 0, active: 0, month: 0 } } };
+    }
+
+    // ExcelJS no persiste los keys de columna en el archivo xlsx —
+    // hay que re-aplicarlos después de leer para que getCell(key) funcione.
+    applyGestionCambioColumnKeys(worksheet);
+
+    const changes = [];
+    worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      if (rowNumber === 1) return; // Saltar header
+
+      const rowData = {
+        id: row.getCell('id').value,
+        fecha: row.getCell('fecha').value,
+        areaEjecutora: row.getCell('areaEjecutora').value,
+        areaUsuaria: row.getCell('areaUsuaria').value,
+        responsable: row.getCell('responsable').value,
+        cargo: row.getCell('cargo').value,
+        descripcion: row.getCell('descripcion').value,
+        justificacion: row.getCell('justificacion').value,
+        tipoCambio: row.getCell('tipoCambio').value,
+        nivelRiesgo: row.getCell('nivelRiesgo').value,
+        estado: row.getCell('estado').value,
+        riesgoAntes: row.getCell('riesgoAntes').value,
+        riesgoDespues: row.getCell('riesgoDespues').value,
+        introducePeligros: row.getCell('introducePeligros').value,
+        modificaRiesgos: row.getCell('modificaRiesgos').value,
+        fechaEjecucion: row.getCell('fechaEjecucion').value,
+        controlesImplementados: row.getCell('controlesImplementados').value,
+        controlesEficaces: row.getCell('controlesEficaces').value,
+        fechaCierre: row.getCell('fechaCierre').value,
+      };
+
+      // Intentar leer JSON completo si existe
+      const jsonFull = row.getCell('jsonFull').value;
+      if (jsonFull && typeof jsonFull === 'string') {
+        try {
+          Object.assign(rowData, JSON.parse(jsonFull));
+        } catch (e) { /* ignorar */ }
+      }
+
+      // Normalizar fecha
+      if (rowData.fecha instanceof Date) {
+        rowData.fecha = rowData.fecha.toISOString().split('T')[0];
+      }
+
+      // Parsear tipoCambio si es string
+      if (typeof rowData.tipoCambio === 'string') {
+        try {
+          rowData.tipoCambio = JSON.parse(rowData.tipoCambio);
+        } catch (e) {
+          rowData.tipoCambio = [rowData.tipoCambio];
+        }
+      }
+
+      changes.push(rowData);
+    });
+
+    return { success: true, data: { changes } };
+  } catch (err) {
+    console.error('[GestionCambio] Error al cargar datos:', err);
+    return { success: false, error: { code: 'LOAD_ERROR', message: err.message } };
+  }
+});
+
+/**
+ * Guarda o actualiza un cambio en el archivo Excel.
+ */
+ipcMain.handle('gestion-cambio-save-data', async (event, companyName, changeData) => {
+  try {
+    const filePath = await obtenerRutaGestionCambio(companyName);
+    if (!filePath) {
+      return { success: false, error: { code: 'COMPANY_NOT_FOUND', message: 'Empresa no encontrada' } };
+    }
+
+    await ensureGestionCambioExcel(filePath);
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(filePath);
+    const worksheet = workbook.getWorksheet('Cambios');
+
+    // Re-aplicar keys de columna (ExcelJS no los persiste en xlsx)
+    applyGestionCambioColumnKeys(worksheet);
+
+    // Serializar datos complejos como JSON
+    const jsonFull = JSON.stringify(changeData);
+    const tipoCambioStr = Array.isArray(changeData.tipoCambio)
+      ? JSON.stringify(changeData.tipoCambio)
+      : (changeData.tipoCambio || '');
+
+    const rowValues = {
+      id: changeData.id,
+      fecha: changeData.fecha,
+      areaEjecutora: changeData.areaEjecutora,
+      areaUsuaria: changeData.areaUsuaria,
+      responsable: changeData.responsable,
+      cargo: changeData.cargo,
+      descripcion: changeData.descripcion,
+      justificacion: changeData.justificacion,
+      tipoCambio: tipoCambioStr,
+      nivelRiesgo: changeData.nivelRiesgo,
+      estado: changeData.estado,
+      riesgoAntes: changeData.riesgoAntes,
+      riesgoDespues: changeData.riesgoDespues,
+      introducePeligros: changeData.introducePeligros ? 'SI' : 'NO',
+      modificaRiesgos: changeData.modificaRiesgos ? 'SI' : 'NO',
+      fechaEjecucion: changeData.fechaEjecucion,
+      controlesImplementados: changeData.controlesImplementados,
+      controlesEficaces: changeData.controlesEficaces,
+      fechaCierre: changeData.fechaCierre,
+      jsonFull: jsonFull,
+    };
+
+    // Buscar si ya existe (por ID) para actualizar
+    let existingRow = null;
+    worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      if (rowNumber === 1) return; // saltar cabecera
+      if (row.getCell('id').value === changeData.id) {
+        existingRow = row;
+      }
+    });
+
+    if (existingRow) {
+      // Actualizar fila existente usando los keys de columna
+      Object.keys(rowValues).forEach((key) => {
+        existingRow.getCell(key).value = rowValues[key];
+      });
+      console.log(`[GestionCambio] Cambio actualizado: ${changeData.id}`);
+    } else {
+      // Agregar nueva fila
+      worksheet.addRow(rowValues);
+      console.log(`[GestionCambio] Nuevo cambio agregado: ${changeData.id}`);
+    }
+
+    await workbook.xlsx.writeFile(filePath);
+
+    return { success: true, data: { id: changeData.id } };
+  } catch (err) {
+    console.error('[GestionCambio] Error al guardar:', err);
+    return { success: false, error: { code: 'SAVE_ERROR', message: err.message } };
+  }
+});
+
+/**
+ * Genera el siguiente ID consecutivo CHG-YYYY-XXX.
+ */
+ipcMain.handle('gestion-cambio-generate-id', async (event, companyName) => {
+  try {
+    const filePath = await obtenerRutaGestionCambio(companyName);
+    if (!filePath) {
+      return { success: false, error: { code: 'COMPANY_NOT_FOUND', message: 'Empresa no encontrada' } };
+    }
+
+    await ensureGestionCambioExcel(filePath);
+
+    const year = new Date().getFullYear();
+    let maxNum = 0;
+
+    if (fs.existsSync(filePath)) {
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.readFile(filePath);
+      const worksheet = workbook.getWorksheet('Cambios');
+
+      // Re-aplicar keys de columna (ExcelJS no los persiste en xlsx)
+      applyGestionCambioColumnKeys(worksheet);
+
+      worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+        if (rowNumber === 1) return;
+        const id = row.getCell('id').value;
+        if (id && typeof id === 'string') {
+          // Formato CHG-YYYY-XXX
+          const match = id.match(/CHG-(\d{4})-(\d+)/);
+          if (match && parseInt(match[1]) === year) {
+            const num = parseInt(match[2]);
+            if (num > maxNum) maxNum = num;
+          }
+        }
+      });
+    }
+
+    const nextId = `CHG-${year}-${String(maxNum + 1).padStart(3, '0')}`;
+    return { success: true, data: { id: nextId } };
+  } catch (err) {
+    console.error('[GestionCambio] Error al generar ID:', err);
+    const year = new Date().getFullYear();
+    return { success: true, data: { id: `CHG-${year}-001` } };
+  }
+});
+
+/**
+ * Actualiza el estado de un cambio (máquina de estados con transiciones validadas).
+ * Solo permite transiciones definidas en VALID_TRANSITIONS.
+ */
+ipcMain.handle('gestion-cambio-update-estado', async (event, companyName, changeId, nuevoEstado, extraData = {}) => {
+  const VALID_TRANSITIONS = {
+    'Solicitud':     ['En Evaluación'],
+    'Pendiente':     ['En Evaluación'],
+    'En Evaluación': ['Aprobado', 'No Aprobado'],
+    'Aprobado':      ['En Ejecución'],
+    'En Ejecución':  ['Cerrado'],
+  };
+
+  try {
+    const filePath = await obtenerRutaGestionCambio(companyName);
+    if (!filePath) {
+      return { success: false, error: { code: 'COMPANY_NOT_FOUND', message: 'Empresa no encontrada' } };
+    }
+
+    if (!fs.existsSync(filePath)) {
+      return { success: false, error: { code: 'NOT_FOUND', message: 'Archivo de datos no encontrado' } };
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(filePath);
+    const worksheet = workbook.getWorksheet('Cambios');
+    applyGestionCambioColumnKeys(worksheet);
+
+    // Buscar la fila por ID
+    let targetRow = null;
+    let currentEstado = null;
+    worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      if (rowNumber === 1) return;
+      if (row.getCell('id').value === changeId) {
+        targetRow = row;
+        currentEstado = String(row.getCell('estado').value || '');
+      }
+    });
+
+    if (!targetRow) {
+      return { success: false, error: { code: 'NOT_FOUND', message: `Cambio "${changeId}" no encontrado` } };
+    }
+
+    // Validar transición permitida
+    const allowed = VALID_TRANSITIONS[currentEstado] || [];
+    if (!allowed.includes(nuevoEstado)) {
+      return {
+        success: false,
+        error: {
+          code: 'INVALID_TRANSITION',
+          message: `No se puede cambiar de "${currentEstado}" a "${nuevoEstado}"`,
+        },
+      };
+    }
+
+    // Actualizar campo estado
+    targetRow.getCell('estado').value = nuevoEstado;
+
+    // Campos adicionales opcionales según el estado destino
+    if (nuevoEstado === 'En Ejecución' && extraData.fechaEjecucion) {
+      targetRow.getCell('fechaEjecucion').value = extraData.fechaEjecucion;
+    }
+    if (nuevoEstado === 'Cerrado' && extraData.fechaCierre) {
+      targetRow.getCell('fechaCierre').value = extraData.fechaCierre;
+    }
+
+    // Actualizar jsonFull para mantener consistencia con el estado nuevo
+    const jsonCell = targetRow.getCell('jsonFull');
+    if (jsonCell.value) {
+      try {
+        const parsed = JSON.parse(String(jsonCell.value));
+        parsed.estado = nuevoEstado;
+        Object.assign(parsed, extraData);
+        jsonCell.value = JSON.stringify(parsed);
+      } catch (e) { /* ignorar si no es JSON válido */ }
+    }
+
+    await workbook.xlsx.writeFile(filePath);
+    console.log(`[GestionCambio] Transición exitosa: ${changeId} → "${currentEstado}" → "${nuevoEstado}"`);
+
+    return { success: true, data: { id: changeId, estado: nuevoEstado, estadoAnterior: currentEstado } };
+
+  } catch (err) {
+    console.error('[GestionCambio] Error al actualizar estado:', err);
+    return { success: false, error: { code: 'UPDATE_ERROR', message: err.message } };
   }
 });
 
@@ -10855,6 +14977,2521 @@ async function startLlmServer() {
         console.error('[MAIN] ❌ Error iniciando servidor LLM:', error.message);
     }
 }
+
+// ==========================================================================
+// Módulo 2.10.1 — Evaluación y Selección de Proveedores y Contratistas
+// Handlers IPC para persistencia JSON de datos del módulo
+// ==========================================================================
+
+function getESDataDir() {
+  // Usar el directorio de datos de la app para almacenar datos del módulo 2.10.1
+  const dataDir = path.join(app.getPath('userData'), 'evaluacion-seleccion-data');
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
+  return dataDir;
+}
+
+function readESFile(filename) {
+  try {
+    const filePath = path.join(getESDataDir(), filename);
+    if (fs.existsSync(filePath)) {
+      const content = fs.readFileSync(filePath, 'utf8');
+      return JSON.parse(content);
+    }
+  } catch (e) { console.error('[2.10.1] Error leyendo ' + filename + ':', e); }
+  return [];
+}
+
+function writeESFile(filename, data) {
+  try {
+    const filePath = path.join(getESDataDir(), filename);
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+  } catch (e) { console.error('[2.10.1] Error escribiendo ' + filename + ':', e); }
+}
+
+ipcMain.handle('get-asociados-es', async () => readESFile('asociados.json'));
+ipcMain.handle('save-asociados-es', async (event, data) => writeESFile('asociados.json', data));
+ipcMain.handle('get-evaluaciones-es', async () => readESFile('evaluaciones.json'));
+ipcMain.handle('save-evaluaciones-es', async (event, data) => writeESFile('evaluaciones.json', data));
+ipcMain.handle('get-reevaluaciones-es', async () => readESFile('reevaluaciones.json'));
+ipcMain.handle('save-reevaluaciones-es', async (event, data) => writeESFile('reevaluaciones.json', data));
+ipcMain.handle('get-noconformidades-es', async () => readESFile('noconformidades.json'));
+ipcMain.handle('save-noconformidades-es', async (event, data) => writeESFile('noconformidades.json', data));
+
+// ==========================================================================
+// Módulo Ausentismo — Consulta Global de Trabajadores
+// Busca en las bases de datos de personal de todas las empresas
+// ==========================================================================
+
+/**
+ * Obtiene la configuración de empresas con sus rutas de BD de personal
+ */
+function getEmpresasBDPersonalConfig() {
+  // Usar las mismas rutas que el sistema de ausentismo ya tiene funcionando
+  const ausentismoRutas = {
+    "TEMPOACTIVA": "G:/Mi unidad/2. Trabajo/1. SG-SST/2. Temporales Comfa/1. Tempoactiva Est SAS/3. Gestión de la Salud/3.3.6 Medición del ausentismo por causa médica/GI-FO-076 AUSENTISMO POR ARL Y EPS 2024.xlsx",
+    "TEMPOSUM": "G:/Mi unidad/2. Trabajo/1. SG-SST/2. Temporales Comfa/2. Temposum Est SAS/3. Gestión de la Salud/3.3.6 Medición del ausentismo por causa médica/3 AUSENTISMO POR ARL Y EPS (TEMPOSUM) 2024.XLSX",
+    "ASEPLUS": "G:/Mi unidad/2. Trabajo/1. SG-SST/2. Temporales Comfa/3. Aseplus/3. Gestión de la Salud/3.3.6 Medición del ausentismo por causa médica/PI-FO-076 AUSENTISMO POR ARL Y EPS (ASEPLUS).XLSX",
+    "ASEL": "G:/Mi unidad/2. Trabajo/1. SG-SST/19. Asel S.A.S/3. Gestión de la Salud/3.3.6 Medición del ausentismo por causa médica/A-FR-31 Ausentismo Laboral.xlsx"
+  };
+
+  // Construir rutas de BD de personal basadas en la estructura conocida de cada empresa
+  const bdRutas = {
+    "TEMPOACTIVA": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\1. Tempoactiva Est SAS\\Base de Datos Personal Temporales.xlsx",
+    "TEMPOSUM": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\2. Temposum Est SAS\\Base de Datos Personal Temporales.xlsx",
+    "ASEPLUS": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\3. Aseplus\\Base de Datos Personal Temporales.xlsx",
+    "ASEL": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\19. Asel S.A.S\\Formato - Base de datos personal ASEL.xlsx"
+  };
+
+  // También intentar obtener empresas dinámicas del config
+  let companies = [];
+  try {
+    const configPath = path.join(app.getPath('userData'), 'config.json');
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      if (config.companyPaths) {
+        companies = Object.keys(config.companyPaths);
+      }
+    }
+  } catch (e) {
+    // Ignorar, usar las conocidas
+  }
+
+  // Usar solo las empresas que tienen BD de personal conocida
+  const knownEmpresas = Object.keys(bdRutas);
+  const empresasFinal = companies.length > 0
+    ? knownEmpresas.filter(e => companies.some(c => c.toUpperCase() === e))
+    : knownEmpresas;
+
+  return empresasFinal.map(nombre => {
+    const key = nombre.toUpperCase();
+    const isASEL = key === 'ASEL';
+    return {
+      nombre: nombre,
+      tipoBD: isASEL ? 'ASEL' : 'TEMPORALES',
+      rutaBD: bdRutas[key] || null
+    };
+  }).filter(e => e.rutaBD);
+}
+
+/**
+ * Lee y normaliza los datos de BD de personal de una empresa
+ */
+function leerBDPersonal(empresaData) {
+  const { nombre, tipoBD, rutaBD } = empresaData;
+
+  if (!fs.existsSync(rutaBD)) {
+    console.warn(`[consulta-trabajadores] Archivo no encontrado para ${nombre}: ${rutaBD}`);
+    return [];
+  }
+
+  try {
+    const workbook = xlsx.readFile(rutaBD);
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const rows = xlsx.utils.sheet_to_json(worksheet, { defval: '' });
+
+    if (rows.length > 0) {
+      console.log(`[MAIN] 📊 Columnas detectadas en Excel de ${nombre}:`, Object.keys(rows[0]));
+    }
+
+    if (tipoBD === 'ASEL') {
+      return rows.map(row => normalizarASEL(row, nombre));
+    } else {
+      return rows.map(row => normalizarTemporales(row, nombre));
+    }
+  } catch (error) {
+    console.error(`[consulta-trabajadores] Error leyendo ${nombre}:`, error.message);
+    return [];
+  }
+}
+
+/**
+ * Normaliza registro de BD Temporales
+ */
+function normalizarTemporales(row, empresa) {
+  return {
+    tipoBD: 'TEMPORALES',
+    empresa: empresa,
+    cedula: String(row['CEDULA'] || '').trim(),
+    nombreCompleto: String(row['Nombre Completo'] || '').trim(),
+    cargo: String(row['CARGO'] || '').trim(),
+    ubicacion: String(row['UBICACIÓN'] || row['UBICACION'] || '').trim(),
+    estado: String(row['EST. ACTUAL'] || '').trim(),
+    estActual: String(row['EST. ACTUAL'] || '').trim(),
+    eps: String(row['EPS/SURA'] || row['EPS'] || '').trim(),
+    afp: String(row['AFP'] || '').trim(),
+    porcentajeARL: String(row['% ARL'] || '').trim(),
+    salario: String(row['SALARIO'] || '').trim(),
+    fechaIngreso: row['FEC. ING.'] || null,
+    fecIng: row['FEC. ING.'] || null,
+    fechaNacimiento: row['FEC. NAC.'] || null,
+    fecNac: row['FEC. NAC.'] || null,
+    fechaRetiro: row['FEC. RETIRO'] || null,
+    fecRetiro: row['FEC. RETIRO'] || null,
+    direccion: String(row['DIRECCION'] || '').trim(),
+    telefono1: String(row['TELF 1'] || '').trim(),
+    telefono2: String(row['TELF 2'] || '').trim(),
+    celular: String(row['CELULAR'] || '').trim(),
+    correo: String(row['Correos'] || '').trim(),
+    nitEmpresaServicio: String(row['NIT DONDE PRESTA SERVICIO'] || '').trim(),
+    empresaServicio: String(row['EMPRESA DONDE PRESTA SERVICIO'] || '').trim(),
+  };
+}
+
+/**
+ * Normaliza registro de BD ASEL
+ */
+function normalizarASEL(row, empresa) {
+  // Función para buscar una columna de forma flexible (ignora tildes, mayúsculas y espacios)
+  const getVal = (possibleNames) => {
+    for (const name of possibleNames) {
+      if (row[name] !== undefined && row[name] !== null) return String(row[name]).trim();
+      
+      // Búsqueda insensible
+      const normalizedTarget = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const foundKey = Object.keys(row).find(k => {
+        const normalizedKey = k.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        return normalizedKey === normalizedTarget || normalizedKey.includes(normalizedTarget);
+      });
+      if (foundKey) return String(row[foundKey]).trim();
+    }
+    return '';
+  };
+
+  let fechaNac = getVal(['FECHA DE NACIMIENTO R', 'FECHA DE NACIMIENTO', 'FEC NAC']);
+  if (fechaNac && typeof fechaNac === 'number') {
+    const str = String(fechaNac);
+    if (str.length === 8) {
+      const anio = parseInt(str.substring(0, 4));
+      const mes = parseInt(str.substring(4, 6)) - 1;
+      const dia = parseInt(str.substring(6, 8));
+      fechaNac = new Date(anio, mes, dia);
+    }
+  }
+
+  return {
+    tipoBD: 'ASEL',
+    empresa: String(getVal(['Empresa']) || empresa || 'ASEL').trim(),
+    cedula: getVal(['CEDULA', 'DOCUMENTO', 'IDENTIFICACION']),
+    nombreCompleto: getVal(['NOMBRES COMPLETOS FORMATO', 'NOMBRE COMPLETO', 'NOMBRES Y APELLIDOS']),
+    cargo: getVal(['CARGO', 'PUESTO']),
+    estado: getVal(['ESTADO', 'EST ACTUAL']),
+    genero: getVal(['GENERO', 'SEXO']),
+    sede: getVal(['SEDE', 'UBICACION']),
+    lugarTrabajo: getVal(['LUGAR DE TRABAJO FORMATO', 'LUGAR TRABAJO']),
+    tipoContrato: getVal(['TIPO DE CONTRATO', 'CONTRATO']),
+    jornadaLaboral: getVal(['JORNADA LABORAL FORMATO', 'JORNADA']),
+    eps: getVal(['EPS']),
+    fondoPension: getVal(['FONDO DE PENSION', 'PENSION']),
+    fondoCesantias: getVal(['FONDO DE CESANTIAS', 'CESANTIAS']),
+    salario: getVal(['SALARIO']),
+    tasaRiesgo: getVal(['TASA RIESGO', 'RIESGO']),
+    fechaIngreso: getVal(['FECHA DE INGRESO', 'FEC ING']),
+    fechaNacimiento: fechaNac,
+    direccion: getVal(['DIRECCION']),
+    municipio: getVal(['MUNICIPIO', 'CIUDAD']),
+    barrio: getVal(['BARRIO']),
+    celular: getVal(['CELULAR', 'TELEFONO']),
+    correo: getVal(['CORREO', 'EMAIL']),
+  };
+}
+
+/**
+ * Filtra trabajadores por cédula y/o nombre
+ */
+function filtrarTrabajadores(trabajadores, cedula, nombre) {
+	const cedulaNorm = String(cedula || '').trim().toLowerCase().replace(/\D/g, '');
+	const nombreNorm = String(nombre || '').trim().toLowerCase()
+		.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+	return trabajadores.filter(t => {
+		const tCedula = String(t.cedula || '').trim().toLowerCase().replace(/\D/g, '');
+		const tNombre = String(t.nombreCompleto || '').trim().toLowerCase()
+			.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+		const cedulaMatch = cedulaNorm === '' || tCedula.includes(cedulaNorm);
+		const nombreMatch = nombreNorm === '' || tNombre.includes(nombreNorm);
+
+		return cedulaMatch && nombreMatch;
+	});
+}
+
+/**
+ * Handler: Consulta global de trabajadores
+ */
+ipcMain.handle('consultar-trabajadores-global', async (event, params) => {
+	try {
+		const { cedula = '', nombre = '', empresa = 'all' } = params || {};
+
+    if (!cedula.trim() && !nombre.trim()) {
+      return {
+        success: false,
+        error: { code: 'INVALID_PARAMS', message: 'Se requiere al menos un criterio de búsqueda (cédula o nombre).' }
+      };
+    }
+
+    const empresasConfig = getEmpresasBDPersonalConfig();
+    const empresasABuscar = empresa === 'all'
+      ? empresasConfig
+      : empresasConfig.filter(e => e.nombre.toUpperCase() === empresa.toUpperCase());
+
+    const resultados = [];
+    for (const emp of empresasABuscar) {
+      const nombreEmp = emp.nombre || 'Empresa';
+      console.log(`[MAIN] 🔎 Buscando en BD de: ${nombreEmp}...`);
+      
+      const trabajadores = leerBDPersonal(emp);
+      if (!trabajadores || trabajadores.length === 0) {
+        console.log(`[MAIN] ⚠️ No se encontraron trabajadores para: ${nombreEmp}`);
+        continue;
+      }
+      
+      console.log(`[MAIN] ✅ ${trabajadores.length} registros cargados para ${nombreEmp}. Filtrando por: "${cedula}" / "${nombre}"`);
+      const filtrados = filtrarTrabajadores(trabajadores, cedula, nombre);
+      console.log(`[MAIN] 🎯 Coincidencias encontradas en ${nombreEmp}: ${filtrados.length}`);
+      resultados.push(...filtrados);
+    }
+
+    return {
+      success: true,
+      data: resultados,
+      meta: {
+        totalEmpresasConsultadas: empresasABuscar.length,
+        totalResultados: resultados.length
+      }
+    };
+  } catch (error) {
+    console.error('[consultar-trabajadores-global] Error:', error);
+    return {
+      success: false,
+      error: { code: 'INTERNAL_ERROR', message: error.message || 'Error interno al consultar trabajadores.' }
+    };
+  }
+});
+
+/**
+ * Handler: Obtener empresas con BD de personal
+ */
+ipcMain.handle('obtener-empresas-con-bd-personal', async () => {
+  try {
+    const empresasConfig = getEmpresasBDPersonalConfig();
+    const empresas = empresasConfig.map(e => e.nombre);
+    return { success: true, empresas: empresas };
+  } catch (error) {
+    console.error('[obtener-empresas-con-bd-personal] Error:', error);
+    return { success: false, error: { code: 'INTERNAL_ERROR', message: error.message } };
+  }
+});
+
+// ==========================================================================
+// SISTEMA DE CACHÉ DE ESTADÍSTICAS (Optimización de Rendimiento)
+// Evita re-leer archivos Excel pesados si no han cambiado en disco.
+// ==========================================================================
+const statsMemoryCache = new Map();
+
+/**
+ * Helper para obtener datos con caché basada en la fecha de modificación del archivo.
+ * @param {string} cacheKey - Clave única (empresa + tipo)
+ * @param {string[]} filePaths - Lista de rutas de archivos de los que depende el cálculo
+ * @param {Function} computeFn - Función que realiza el cálculo real
+ */
+async function getCachedStats(cacheKey, filePaths, computeFn) {
+  try {
+    const existingCache = statsMemoryCache.get(cacheKey);
+    
+    // Obtener timestamps de todos los archivos involucrados
+    const currentStats = filePaths.filter(p => p && fs.existsSync(p)).map(p => {
+      const s = fs.statSync(p);
+      return `${p}:${s.mtimeMs}`;
+    }).join('|');
+
+    // Si el caché existe y los archivos no han cambiado, retornar caché
+    if (existingCache && existingCache.fingerprint === currentStats) {
+      console.log(`[CACHE] Hit para: ${cacheKey}`);
+      return existingCache.data;
+    }
+
+    // Si no hay caché o cambió el archivo, calcular
+    console.log(`[CACHE] Miss/Refresh para: ${cacheKey}. Recalculando...`);
+    const newData = await computeFn();
+    
+    // Guardar en memoria
+    statsMemoryCache.set(cacheKey, {
+      fingerprint: currentStats,
+      data: newData,
+      timestamp: Date.now()
+    });
+
+    return newData;
+  } catch (error) {
+    console.error(`[CACHE] Error en gestión de caché para ${cacheKey}:`, error);
+    return await computeFn(); // Fallback al cálculo normal
+  }
+}
+
+// ==========================================================================
+// Handler: Estadísticas de Ausentismo (Optimizado con Caché)
+// ==========================================================================
+ipcMain.handle('get-ausentismo-stats', async (event, companyName, mode) => {
+  const ausentismoFiles = {
+    "TEMPOACTIVA": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\1. Tempoactiva Est SAS\\3. Gestión de la Salud\\3.3.6 Medición del ausentismo por causa médica\\GI-FO-076 AUSENTISMO POR ARL Y EPS 2024.xlsx",
+    "TEMPOSUM": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\2. Temposum Est SAS\\3. Gestión de la Salud\\3.3.6 Medición del ausentismo por causa médica\\3 AUSENTISMO POR ARL Y EPS (TEMPOSUM) 2024.XLSX",
+    "ASEPLUS": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\3. Aseplus\\3. Gestión de la Salud\\3.3.6 Medición del ausentismo por causa médica\\PI-FO-076 AUSENTISMO POR ARL Y EPS (ASEPLUS).XLSX",
+    "ASEL": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\19. Asel S.A.S\\3. Gestión de la Salud\\3.3.6 Medición del ausentismo por causa médica\\A-FR-31 Ausentismo Laboral.xlsx"
+  };
+
+  const filePath = ausentismoFiles[companyName.toUpperCase()];
+  if (!filePath || !fs.existsSync(filePath)) {
+    return { success: false, error: 'Archivo no encontrado' };
+  }
+
+  const cacheKey = `ausentismo_${companyName.toUpperCase()}`;
+  
+  const resultData = await getCachedStats(cacheKey, [filePath], async () => {
+    // Lógica de cálculo original (encapsulada para el helper)
+    const workbook = xlsx.readFile(filePath);
+    const companyNameLower = companyName.toLowerCase();
+    let sheetName = workbook.SheetNames.find(s =>
+      s.toLowerCase().includes(companyNameLower) && !s.toLowerCase().includes('cie') && !s.toLowerCase().includes('rips')
+    );
+    if (!sheetName) {
+      const yearStr = new Date().getFullYear();
+      sheetName = workbook.SheetNames.find(s => s.includes(String(yearStr)));
+    }
+    if (!sheetName) sheetName = workbook.SheetNames[0];
+
+    const worksheet = workbook.Sheets[sheetName];
+    const rawData = xlsx.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+
+    let headerRowIdx = -1, colMes = -1, colAnio = -1;
+    for (let i = 0; i < Math.min(rawData.length, 15); i++) {
+      const row = rawData[i];
+      if (!Array.isArray(row)) continue;
+      const mesIdx = row.findIndex(c => String(c || '').toUpperCase().trim() === 'MES');
+      const anioIdx = row.findIndex(c => {
+        const v = String(c || '').toUpperCase().trim().replace(/\u00d1/g, 'N').replace(/\u00f1/g, 'N');
+        return v === 'ANO' || v === 'A\u00d1O';
+      });
+      if (mesIdx !== -1 && anioIdx !== -1) {
+        headerRowIdx = i; colMes = mesIdx; colAnio = anioIdx;
+        break;
+      }
+    }
+    if (headerRowIdx === -1) { colMes = 9; colAnio = 14; headerRowIdx = 6; }
+
+    const dataRows = rawData.slice(headerRowIdx + 1).filter(r => Array.isArray(r) && r.length > colAnio && r[colAnio] !== '');
+    const currentMonth = new Date().getMonth();
+    const monthNames = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+
+    let fileYear = null;
+    for (const r of dataRows) {
+      const yr = parseInt(String(r[colAnio] || '').trim());
+      if (yr >= 2010 && yr <= 2099) { if (!fileYear || yr > fileYear) fileYear = yr; }
+    }
+
+    let totalCount = 0;
+    let monthCount = 0;
+
+    dataRows.forEach(row => {
+      const yr = parseInt(String(row[colAnio] || '').trim());
+      if (fileYear && yr === fileYear) {
+        totalCount++;
+        const mes = String(row[colMes] || '').toUpperCase().trim();
+        if (mes === monthNames[currentMonth]) monthCount++;
+      }
+    });
+
+    return {
+      total: totalCount,
+      mesActual: monthCount,
+      year: fileYear || new Date().getFullYear(),
+      mes: monthNames[currentMonth]
+    };
+  });
+
+  return { success: true, data: resultData };
+});
+
+// ==========================================================================
+// Handler: Estadísticas de Seguimientos Médicos (Optimizado con Caché)
+// ==========================================================================
+ipcMain.handle('get-salud-seguimientos-stats', async (event, companyName) => {
+  const ausentismoFiles = {
+    "TEMPOACTIVA": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\1. Tempoactiva Est SAS\\3. Gestión de la Salud\\3.3.6 Medición del ausentismo por causa médica\\GI-FO-076 AUSENTISMO POR ARL Y EPS 2024.xlsx",
+    "TEMPOSUM": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\2. Temposum Est SAS\\3. Gestión de la Salud\\3.3.6 Medición del ausentismo por causa médica\\3 AUSENTISMO POR ARL Y EPS (TEMPOSUM) 2024.XLSX",
+    "ASEPLUS": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\3. Aseplus\\3. Gestión de la Salud\\3.3.6 Medición del ausentismo por causa médica\\PI-FO-076 AUSENTISMO POR ARL Y EPS (ASEPLUS).XLSX",
+    "ASEL": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\19. Asel S.A.S\\3. Gestión de la Salud\\3.3.6 Medición del ausentismo por causa médica\\A-FR-31 Ausentismo Laboral.xlsx"
+  };
+
+  const seguimientoFilePath = path.join(app.getPath('documents'), 'Seguimiento Casos Medicos.xlsx');
+  const googleDrivePath = "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\Seguimiento Casos Medicos.xlsx";
+  const followUpPath = fs.existsSync(seguimientoFilePath) ? seguimientoFilePath : (fs.existsSync(googleDrivePath) ? googleDrivePath : null);
+  const ausPath = ausentismoFiles[companyName.toUpperCase()];
+
+  if (!ausPath || !fs.existsSync(ausPath)) {
+    return { success: false, error: 'Archivo de ausentismo no encontrado' };
+  }
+
+  const cacheKey = `seguimientos_${companyName.toUpperCase()}`;
+  
+  const resultData = await getCachedStats(cacheKey, [ausPath, followUpPath], async () => {
+    // 1. Cargar Seguimientos (PRI)
+    let followUpData = {};
+    if (followUpPath && fs.existsSync(followUpPath)) {
+      const workbookPRI = xlsx.readFile(followUpPath);
+      const rowsPRI = xlsx.utils.sheet_to_json(workbookPRI.Sheets[workbookPRI.SheetNames[0]]);
+      rowsPRI.forEach(row => {
+        const ced = row['Cédula'] || row['CEDULA'] || row['IDENTIFICACION'] || '';
+        const id = String(ced).replace(/[^0-9]/g, '');
+        if (id) {
+          if (!followUpData[id]) followUpData[id] = [];
+          followUpData[id].push(row);
+        }
+      });
+    }
+
+    // 2. Procesar Ausentismo
+    const workbookAus = xlsx.readFile(ausPath);
+    const companyNameLower = companyName.toLowerCase();
+    let sheetName = workbookAus.SheetNames.find(s => 
+      s.toLowerCase().includes(companyNameLower) && !s.toLowerCase().includes('cie')
+    ) || workbookAus.SheetNames[0];
+
+    const rawData = xlsx.utils.sheet_to_json(workbookAus.Sheets[sheetName], { header: 1 });
+    
+    let totalPendientesAnio = 0, totalRealizadosAnio = 0, totalPendientesMes = 0, totalRealizadosMes = 0;
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonthIdx = today.getMonth();
+    const MONTH_NAMES_ES = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+    const currentMonthName = MONTH_NAMES_ES[currentMonthIdx];
+
+    let hIdx = -1, cCed = -1, cDias = -1, cAnio = -1, cMes = -1;
+    for (let i = 0; i < Math.min(rawData.length, 15); i++) {
+      const r = rawData[i];
+      if (!r || !Array.isArray(r)) continue;
+      const idxCed = r.findIndex(c => String(c||'').toUpperCase().includes('CEDULA') || String(c||'').toUpperCase().includes('IDENTIF'));
+      const idxDias = r.findIndex(c => String(c||'').toUpperCase().includes('DIAS'));
+      const idxMes = r.findIndex(c => String(c||'').toUpperCase().trim() === 'MES');
+      const idxAnio = r.findIndex(c => {
+        const v = String(c||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        return v === 'ANO' || v === 'A\u00d1O';
+      });
+      if (idxCed !== -1 && idxDias !== -1) {
+        hIdx = i; cCed = idxCed; cDias = idxDias; cAnio = idxAnio; cMes = idxMes;
+        break;
+      }
+    }
+
+    if (hIdx !== -1) {
+      const processedCedulas = new Set();
+      const dataRows = rawData.slice(hIdx + 1);
+      dataRows.forEach(row => {
+        if (!row || row.length <= Math.max(cCed, cDias)) return;
+        const cedula = String(row[cCed] || '').replace(/[^0-9]/g, '');
+        const dias = parseInt(String(row[cDias] || '').replace(/,/g, '')) || 0;
+        const anioVal = cAnio !== -1 ? parseInt(String(row[cAnio] || '').trim()) : currentYear;
+        const mesVal = cMes !== -1 ? String(row[cMes] || '').toUpperCase().trim() : '';
+
+        if (cedula && dias > 15 && anioVal === currentYear) {
+          if (processedCedulas.has(cedula)) return;
+          processedCedulas.add(cedula);
+
+          const followUps = followUpData[cedula];
+          let isRealizado = false;
+          if (followUps && followUps.length > 0) {
+            const latest = [...followUps].sort((a,b) => (new Date(a['Fecha Seguimiento'] || a['FECHA'] || 0)) - (new Date(b['Fecha Seguimiento'] || b['FECHA'] || 0)))[0];
+            const estado = String(latest['Estado Caso'] || latest['ESTADO'] || '').toLowerCase();
+            if (estado === 'recovered' || estado === 'recuperado' || estado === 'finalizado') isRealizado = true;
+          }
+
+          if (isRealizado) totalRealizadosAnio++; else totalPendientesAnio++;
+          if (mesVal === currentMonthName) {
+            if (isRealizado) totalRealizadosMes++; else totalPendientesMes++;
+          }
+        }
+      });
+    }
+
+    return {
+      totalAnio: totalPendientesAnio, realizadosAnio: totalRealizadosAnio,
+      totalMes: totalPendientesMes, realizadosMes: totalRealizadosMes,
+      year: currentYear, mes: currentMonthName
+    };
+  });
+
+  return { success: true, data: resultData };
+});
+
+// ==========================================================================
+// Handler: Estadísticas de Accidentes (desde Registro Estadístico 3.2.3)
+// ==========================================================================
+ipcMain.handle('get-accidentes-stats', async (event, companyName) => {
+  const emptyResult = { totalYear: 0, mesActual: 0, year: new Date().getFullYear(), mes: '---', mensual: Array(12).fill(0) };
+
+  try {
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+
+    const normalizedInput = (companyName || '').toLowerCase();
+    const companyKey = Object.keys(config.companyPaths || {}).find(
+      key => key.toLowerCase() === normalizedInput
+    );
+    const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
+
+    if (!companyConfig || !companyConfig.root) {
+      return { success: true, data: emptyResult };
+    }
+
+    const gestionSaludDir = path.join(companyConfig.root, '3. Gestión de la Salud');
+    let gestionEntries;
+    try {
+      gestionEntries = await fsp.readdir(gestionSaludDir);
+    } catch (err) {
+      if (err.code === 'ENOENT') return { success: true, data: emptyResult };
+      throw err;
+    }
+
+    const registro323Folder = gestionEntries.find(f => f.startsWith('3.2.3'));
+    if (!registro323Folder) {
+      return { success: true, data: emptyResult };
+    }
+
+    const submoduleDir = path.join(gestionSaludDir, registro323Folder);
+    let entries;
+    try {
+      entries = await fsp.readdir(submoduleDir);
+    } catch (err) {
+      if (err.code === 'ENOENT') return { success: true, data: emptyResult };
+      throw err;
+    }
+
+    const excelFile = entries.find(f => f.toLowerCase().endsWith('.xlsx') && !f.startsWith('~$'));
+    if (!excelFile) {
+      return { success: true, data: emptyResult };
+    }
+
+    const filePath = path.join(submoduleDir, excelFile);
+
+    const cacheKey = `accidentes_${companyName.toUpperCase()}`;
+
+    const resultData = await getCachedStats(cacheKey, [filePath], async () => {
+      try {
+        const workbook = xlsx.readFile(filePath);
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const rawData = xlsx.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+
+        let headerRowIdx = -1;
+        for (let i = 0; i < Math.min(10, rawData.length); i++) {
+          const row = rawData[i];
+          if (row && row.some(c => {
+            const s = String(c).trim().toLowerCase();
+            return s === 'ciudad' || s === 'año' || s === 'evento';
+          })) {
+            headerRowIdx = i;
+            break;
+          }
+        }
+        if (headerRowIdx === -1) headerRowIdx = 0;
+
+        const headers = rawData[headerRowIdx].map(h => String(h).trim().replace(/\r\n|\r|\n/g, ''));
+        const idx = (name) => headers.findIndex(h => h.toLowerCase() === name.toLowerCase());
+
+        const iAnio = idx('Año');
+        const iFecha = idx('Fecha del incidente');
+        const iMes = idx('Mes');
+        const iEvento = idx('Evento');
+
+        const MESES_MAP = {
+          'enero':0,'febrero':1,'marzo':2,'abril':3,'mayo':4,'junio':5,
+          'julio':6,'agosto':7,'septiembre':8,'octubre':9,'noviembre':10,'diciembre':11,
+          'ene':0,'feb':1,'mar':2,'abr':3,'may':4,'jun':5,
+          'jul':6,'ago':7,'sep':8,'oct':9,'nov':10,'dic':11
+        };
+
+        const currentYear = new Date().getFullYear();
+        const currentMonth = new Date().getMonth();
+        const monthNames = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+
+        const monthlyCount = Array(12).fill(0);
+        let totalCount = 0;
+        let monthCount = 0;
+
+        for (let r = headerRowIdx + 1; r < rawData.length; r++) {
+          const row = rawData[r];
+          if (!row) continue;
+
+          const anio = parseInt(row[iAnio]);
+          if (!anio || anio !== currentYear) continue;
+
+          const evento = String(row[iEvento] || '').trim().toLowerCase();
+          if (evento !== 'at') continue;
+
+          let mesIdx = -1;
+
+          const fechaVal = row[iFecha];
+          if (fechaVal) {
+            let fecha = null;
+            if (typeof fechaVal === 'number') {
+              const d = xlsx.SSF.parse_date_code(fechaVal);
+              fecha = new Date(d.y, d.m - 1, d.d);
+            } else {
+              fecha = new Date(fechaVal);
+            }
+            if (fecha && !isNaN(fecha.getTime())) {
+              mesIdx = fecha.getMonth();
+            }
+          }
+
+          if (mesIdx === -1 && iMes >= 0) {
+            const mesLabel = String(row[iMes] || '').trim().toLowerCase();
+            mesIdx = MESES_MAP[mesLabel];
+          }
+
+          if (mesIdx >= 0 && mesIdx < 12) {
+            monthlyCount[mesIdx]++;
+            totalCount++;
+            if (mesIdx === currentMonth) monthCount++;
+          }
+        }
+
+        return {
+          totalYear: totalCount,
+          mesActual: monthCount,
+          year: currentYear,
+          mes: monthNames[currentMonth],
+          mensual: monthlyCount
+        };
+      } catch (err) {
+        console.error('[ACCIDENTES] Error calculando:', err);
+        return { totalYear: 0, mesActual: 0, year: new Date().getFullYear(), mes: 'ERROR', mensual: Array(12).fill(0) };
+      }
+    });
+
+    return { success: true, data: resultData };
+  } catch (err) {
+    console.error('[ACCIDENTES] Error resolviendo ruta:', err);
+    return { success: true, data: emptyResult };
+  }
+});
+
+// ==========================================================================
+// Handler: Estadísticas de Exámenes Médicos (Optimizado con Caché)
+// ==========================================================================
+ipcMain.handle('get-examenes-stats', async (event, companyName) => {
+  const examenesFiles = {
+    "TEMPOACTIVA": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\1. Tempoactiva Est SAS\\3. Gestión de la Salud\\3.1.4 Evaluaciones médicas\\GI-FO-010 CONTROL DE EVALUACIONES MEDICAS OCUPACIONALES.xlsx",
+    "TEMPOSUM": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\2. Temposum Est SAS\\3. Gestión de la Salud\\3.1.4 Evaluaciones médicas\\GI-FO-010 CONTROL DE EVALUACIONES MEDICAS OCUPACIONALES.xlsx",
+    "ASEPLUS": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\2. Temporales Comfa\\3. Aseplus\\3. Gestión de la Salud\\3.1.4 Evaluaciones médicas\\PI-FO-010 CONTROL DE EVALUACIONES MEDICAS OCUPACIONALES (ASEPLUS).xlsx",
+    "ASEL": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\19. Asel S.A.S\\3. Gestión de la Salud\\3.1.4 Evaluaciones médicas\\A-FR-17 Control Exámenes Médicos.xlsx"
+  };
+
+  const filePath = examenesFiles[companyName.toUpperCase()];
+  if (!filePath || !fs.existsSync(filePath)) {
+    return { success: true, data: { totalYear: 0, mesActual: 0, year: new Date().getFullYear(), mes: '---' } };
+  }
+
+  const cacheKey = `examenes_${companyName.toUpperCase()}`;
+  
+  const resultData = await getCachedStats(cacheKey, [filePath], async () => {
+    try {
+      const workbook = xlsx.readFile(filePath);
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const rawData = xlsx.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+
+      let headerRowIdx = -1, colFecha = -1;
+      for (let i = 0; i < Math.min(rawData.length, 20); i++) {
+        const row = rawData[i];
+        if (!Array.isArray(row)) continue;
+        const fIdx = row.findIndex(c => String(c || '').toUpperCase().includes('FECHA') && (String(c || '').toUpperCase().includes('REALIZA') || String(c || '').toUpperCase().includes('EXAMEN')));
+        if (fIdx !== -1) {
+          headerRowIdx = i; colFecha = fIdx;
+          break;
+        }
+      }
+      if (headerRowIdx === -1) { colFecha = 2; headerRowIdx = 0; }
+
+      const dataRows = rawData.slice(headerRowIdx + 1);
+      const today = new Date();
+      const currentYear = today.getFullYear();
+      const currentMonth = today.getMonth();
+      const monthNames = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+
+      let totalCount = 0;
+      let monthCount = 0;
+
+      dataRows.forEach(row => {
+        if (!row || row.length <= colFecha || !row[colFecha]) return;
+        
+        let fecha = null;
+        const val = row[colFecha];
+        if (typeof val === 'number') {
+          fecha = xlsx.SSF.parse_date_code(val);
+          fecha = new Date(fecha.y, fecha.m - 1, fecha.d);
+        } else {
+          fecha = new Date(val);
+        }
+
+        if (fecha && !isNaN(fecha.getTime())) {
+          if (fecha.getFullYear() === currentYear) {
+            totalCount++;
+            if (fecha.getMonth() === currentMonth) {
+              monthCount++;
+            }
+          }
+        }
+      });
+
+      return {
+        totalYear: totalCount,
+        mesActual: monthCount,
+        year: currentYear,
+        mes: monthNames[currentMonth]
+      };
+    } catch (err) {
+      console.error('[EXAMENES] Error calculando:', err);
+      return { totalYear: 0, mesActual: 0, year: new Date().getFullYear(), mes: 'ERROR' };
+    }
+  });
+
+  return { success: true, data: resultData };
+});
+
+// ═══════════════════════════════════════════════════════════
+// HANDLERS IPC - REMISIONES MÉDICAS (Submódulo 3.1.6)
+// ═══════════════════════════════════════════════════════════
+
+// ── Handler: select-pdf-file ──────────────────────────────
+ipcMain.handle('select-pdf-file', async (event) => {
+  sendLog(`[REMISION-PDF] Abriendo diálogo de selección de PDF...`);
+  
+  try {
+    const result = await dialog.showOpenDialog({
+      title: 'Seleccionar PDF de Remisión Médica',
+      filters: [
+        { name: 'Archivos PDF', extensions: ['pdf'] }
+      ],
+      properties: ['openFile'],
+      buttonLabel: 'Seleccionar'
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+      sendLog(`[REMISION-PDF] Selección cancelada por el usuario`);
+      return null;
+    }
+
+    const selectedPath = result.filePaths[0];
+    sendLog(`[REMISION-PDF] Archivo seleccionado: ${selectedPath}`);
+    return selectedPath;
+
+  } catch (error) {
+    sendLog(`[REMISION-PDF] Error al seleccionar archivo: ${error.message}`, 'ERROR');
+    throw error;
+  }
+});
+
+// ── Handler: process-remision-pdf ─────────────────────────
+ipcMain.handle('process-remision-pdf', async (event, pdfPath) => {
+  sendLog(`[REMISION-PDF] Procesando PDF: ${pdfPath}`);
+  
+  try {
+    // Verificar que el archivo existe
+    if (!fs.existsSync(pdfPath)) {
+      return {
+        success: false,
+        error: `El archivo PDF no existe: ${pdfPath}`
+      };
+    }
+
+    // Importar RemisionUtils para extracción de datos
+    const RemisionUtils = require('./utils/remisionUtils.js');
+    const remisionUtils = new RemisionUtils();
+
+    // Extraer texto del PDF
+    sendLog(`[REMISION-PDF] Extrayendo texto del PDF...`);
+    const text = await remisionUtils.extractTextFromPDF(pdfPath);
+    
+    // Extraer datos estructurados del texto
+    sendLog(`[REMISION-PDF] Extrayendo datos estructurados...`);
+    const extractedData = remisionUtils.extractDataFromText(text, pdfPath);
+    
+    // Validar datos críticos
+    const isValid = remisionUtils.validateCriticalData(extractedData);
+    
+    if (!isValid) {
+      sendLog(`[REMISION-PDF] Validación de datos críticos falló`, 'WARN');
+      return {
+        success: false,
+        error: 'Los datos extraídos no son válidos. Verifique el PDF.',
+        data: extractedData
+      };
+    }
+
+    sendLog(`[REMISION-PDF] Datos extraídos exitosamente: ${Object.keys(extractedData).length} campos`);
+    
+    return {
+      success: true,
+      data: extractedData
+    };
+
+  } catch (error) {
+    sendLog(`[REMISION-PDF] Error crítico al procesar PDF: ${error.message}`, 'ERROR');
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+});
+
+// ── Handler: generate-remision-document ───────────────────
+ipcMain.handle('generate-remision-document', async (event, extractedData, empresa) => {
+  sendLog(`[REMISION-DOC] Generando documento Word para empresa: ${empresa}`);
+
+  try {
+    if (!extractedData || Object.keys(extractedData).length === 0) {
+      return { success: false, error: 'No hay datos extraídos para generar el documento' };
+    }
+
+    // Agregar empresa a los datos para uso posterior
+    extractedData['Afiliación'] = empresa;
+    extractedData['Empresa'] = empresa;
+
+    // Forzar afiliación según empresa seleccionada (como Python)
+    const RemisionUtils = require('./utils/remisionUtils.js');
+    const remisionUtils = new RemisionUtils();
+    remisionUtils.forceAfiliacion(extractedData, empresa);
+
+    // Cargar configuración para obtener rutas
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+
+    let basePath = null;
+    if (config.companyPaths && config.companyPaths[empresa]) {
+      basePath = config.companyPaths[empresa].root || config.companyPaths[empresa].ruta_base;
+    }
+    if (!basePath) {
+      return { success: false, error: `No se encontró ruta base para la empresa "${empresa}"` };
+    }
+
+    // Buscar plantilla y directorio de salida
+    const plantillaNombre = 'GI-OD-007 REMISION A EPS.docx';
+    const templatePath = await findFileRecursive(basePath, plantillaNombre);
+
+    if (!templatePath) {
+      sendLog(`[REMISION-DOC] Plantilla no encontrada: ${plantillaNombre}`, 'WARN');
+      return { success: false, error: `Plantilla no encontrada: ${plantillaNombre}` };
+    }
+
+    // Directorio de salida: buscar o crear carpeta de remisiones
+    const remisionesDir = await findFileRecursive(basePath, '3.1.6.1. Remisiones EPS')
+                       || await findFileRecursive(basePath, '3.1.6.1 Remisiones EPS')
+                       || await findFileRecursive(basePath, 'Remisiones EPS')
+                       || path.join(basePath, 'Remisiones y Recomendaciones Médicas');
+
+    if (!fs.existsSync(remisionesDir)) {
+      sendLog(`[REMISION-DOC] Creando directorio: ${remisionesDir}`);
+      await fsp.mkdir(remisionesDir, { recursive: true });
+    }
+
+    // Buscar archivo de control
+    const controlFileName = 'GI-FO-012 CONTROL DE REMISIONES.xlsx';
+    const controlPath = await findFileRecursive(basePath, controlFileName);
+
+    sendLog(`[REMISION-DOC] Plantilla: ${templatePath}`);
+    sendLog(`[REMISION-DOC] Directorio salida: ${remisionesDir}`);
+    sendLog(`[REMISION-DOC] Control: ${controlPath || 'No encontrado'}`);
+
+    // Generar documento Word + actualizar control
+    const result = await remisionUtils.generateRemisionDocument(
+      extractedData, templatePath, remisionesDir, controlPath
+    );
+
+    if (result.success) {
+      sendLog(`[REMISION-DOC] Documento generado: ${result.documentPath}`);
+      if (result.controlUpdated) {
+        sendLog(`[REMISION-DOC] Control actualizado: ${result.controlPath}`);
+      } else if (result.controlWarning) {
+        sendLog(`[REMISION-DOC] ⚠ ADVERTENCIA: ${result.controlWarning}`, 'WARN');
+      }
+    } else {
+      sendLog(`[REMISION-DOC] Error: ${result.error}`, 'ERROR');
+    }
+
+    return result;
+
+  } catch (error) {
+    sendLog(`[REMISION-DOC] Error crítico al generar documento: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+// ── Handler: get-contact-info ─────────────────────────────
+ipcMain.handle('get-contact-info', async (event, cedula, empresa) => {
+  try {
+    const ContactFinder = require('./utils/contactUtils');
+    const contactFinder = new ContactFinder();
+    const { telefono, email } = contactFinder.obtenerContacto(cedula, empresa);
+    
+    return { success: true, telefono, email };
+  } catch (error) {
+    sendLog(`[CONTACT-INFO] Error: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+// ── Handler: send-remision-by-whatsapp ────────────────────
+ipcMain.handle('send-remision-by-whatsapp', async (event, docPath, extractedData, empresa) => {
+  try {
+    sendLog('[REMISION-WHATSAPP] Preparando envío por WhatsApp...', 'INFO');
+
+    if (!docPath || !fs.existsSync(docPath)) {
+      return { success: false, error: 'El documento no existe o no es accesible' };
+    }
+
+    // Obtener cédula y nombre
+    const cedula = extractedData['No. Identificación'] || extractedData['Cédula'] || 'N/A';
+    const nombre = extractedData['Nombre Completo'] || extractedData['Nombre'] || 'N/A';
+
+    // Buscar contacto del trabajador
+    const ContactFinder = require('./utils/contactUtils');
+    const contactFinder = new ContactFinder();
+    const { telefono } = contactFinder.obtenerContacto(cedula, empresa);
+
+    if (!telefono) {
+      sendLog(`[REMISION-WHATSAPP] Teléfono no encontrado para cédula: ${cedula}`, 'WARN');
+      return { success: false, error: `No se encontró teléfono para cédula ${cedula}` };
+    }
+
+    // Construir mensaje
+    const WhatsAppSender = require('./utils/whatsappSender');
+    const whatsappSender = new WhatsAppSender();
+    const message = whatsappSender.buildRemisionMessage(extractedData);
+
+    // Enviar WhatsApp
+    sendLog(`[REMISION-WHATSAPP] Enviando a: ${telefono}`, 'INFO');
+    const result = whatsappSender.sendMessage({
+      phoneNumber: telefono,
+      message: message,
+      filePath: docPath
+    });
+
+    if (result.success) {
+      sendLog(`[REMISION-WHATSAPP] WhatsApp Web abierto correctamente`, 'INFO');
+      return { success: true, message: 'WhatsApp preparado correctamente' };
+    } else {
+      sendLog(`[REMISION-WHATSAPP] Error: ${result.error}`, 'ERROR');
+      return { success: false, error: result.error };
+    }
+
+  } catch (error) {
+    sendLog(`[REMISION-WHATSAPP] Error crítico: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+// ── Handler: send-remision-by-email ───────────────────────
+ipcMain.handle('send-remision-by-email', async (event, docPath, extractedData, empresa) => {
+  try {
+    sendLog('[REMISION-EMAIL] Preparando envío por correo...', 'INFO');
+
+    if (!docPath || !fs.existsSync(docPath)) {
+      return { success: false, error: 'El documento no existe o no es accesible' };
+    }
+
+    // Obtener datos
+    const cedula = extractedData['No. Identificación'] || extractedData['Cédula'] || 'N/A';
+    const nombre = extractedData['Nombre Completo'] || extractedData['Nombre'] || 'N/A';
+    const fecha = extractedData['Fecha de Atención'] || extractedData['Fecha'] || 'N/A';
+
+    // Buscar contacto del trabajador
+    const ContactFinder = require('./utils/contactUtils');
+    const contactFinder = new ContactFinder();
+    const { email } = contactFinder.obtenerContacto(cedula, empresa);
+
+    if (!email) {
+      sendLog(`[REMISION-EMAIL] Email no encontrado para cédula: ${cedula}`, 'WARN');
+      return { success: false, error: `No se encontró email para cédula ${cedula}` };
+    }
+
+    // Enviar correo
+    const EmailSender = require('./utils/emailSender');
+    const emailSender = new EmailSender(empresa);
+
+    sendLog(`[REMISION-EMAIL] Enviando a: ${email}`, 'INFO');
+    const result = await emailSender.enviarCorreo({
+      destinatario: email,
+      nombre: nombre,
+      fechaAtencion: fecha,
+      archivoAdjunto: docPath
+    });
+
+    if (result.success) {
+      sendLog(`[REMISION-EMAIL] Correo enviado exitosamente a ${email}`, 'INFO');
+      return { success: true, message: result.message, messageId: result.messageId };
+    } else {
+      sendLog(`[REMISION-EMAIL] Error: ${result.error}`, 'ERROR');
+      return { success: false, error: result.error };
+    }
+
+  } catch (error) {
+    sendLog(`[REMISION-EMAIL] Error crítico: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+// =============================================================================
+// Handler: Frecuencia de la Accidentalidad (Submódulo 3.3.1)
+// =============================================================================
+
+var _indicadoresRutas = {};
+
+function _setRuta(submodulo, rutaIndicadores, rutaCaracterizacion, companyRoot, year) {
+  _indicadoresRutas[submodulo] = { indicadores: rutaIndicadores, caracterizacion: rutaCaracterizacion || null, companyRoot: companyRoot || null, year: year || null };
+}
+
+function _getRuta(submodulo) {
+  return _indicadoresRutas[submodulo] || null;
+}
+
+// Configurar rutas de archivos Excel para una empresa específica
+ipcMain.handle('frecuencia-accidentalidad:configurar-rutas', async (event, companyName, year) => {
+  console.log('[FrecuenciaAccidentalidad][MAIN] ===== HANDLER CALLED =====');
+  console.log('[FrecuenciaAccidentalidad][MAIN] companyName recibido:', companyName);
+  
+  try {
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+    console.log('[FrecuenciaAccidentalidad][MAIN] config cargada, companyPaths:', Object.keys(config.companyPaths || {}));
+
+    const normalizedInput = (companyName || '').toLowerCase();
+    const companyKey = Object.keys(config.companyPaths || {}).find(
+      key => key.toLowerCase() === normalizedInput
+    );
+    console.log('[FrecuenciaAccidentalidad][MAIN] companyKey encontrado:', companyKey);
+    
+    const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
+    console.log('[FrecuenciaAccidentalidad][MAIN] companyConfig:', companyConfig ? 'EXISTS' : 'NULL');
+    console.log('[FrecuenciaAccidentalidad][MAIN] companyConfig.root:', companyConfig && companyConfig.root);
+    console.log('[FrecuenciaAccidentalidad][MAIN] companyConfig.structure:', companyConfig && companyConfig.structure ? 'EXISTS' : 'NULL');
+
+    if (!companyConfig || !companyConfig.root) {
+      console.log('[FrecuenciaAccidentalidad][MAIN] ERROR: Empresa no encontrada');
+      return { 
+        success: false, 
+        error: { 
+          code: 'COMPANY_NOT_FOUND', 
+          message: `Empresa "${companyName}" no encontrada` 
+        } 
+      };
+    }
+
+    if (!companyConfig.structure?.structure) {
+      console.log('[FrecuenciaAccidentalidad][MAIN] ERROR: No tiene estructura mapeada');
+      return { 
+        success: false, 
+        error: { 
+          code: 'NO_STRUCTURE', 
+          message: `Empresa "${companyName}" no tiene estructura mapeada` 
+        } 
+      };
+    }
+
+    const rootStructure = companyConfig.structure.structure;
+    console.log('[FrecuenciaAccidentalidad][MAIN] rootStructure.subdirectories:', Object.keys(rootStructure.subdirectories || {}));
+
+    // Función auxiliar: Buscar carpeta de forma flexible
+    function findDirFlexible(subdirs, target) {
+      if (!subdirs) return null;
+      
+      const normalizedTarget = target
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      for (const [key, value] of Object.entries(subdirs)) {
+        const normalizedKey = key
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        if (normalizedKey === normalizedTarget) {
+          return value;
+        }
+      }
+      return null;
+    }
+
+    // Buscar carpeta de indicadores - probar múltiples ubicaciones
+    var indicadoresPath = null;
+    
+    // Lista de ubicaciones donde puede estar el archivo
+    var ubicacionesAPrueba = [
+      { modulo: "3. Gestion de la Salud", submodulo: "3.3.1 Frecuencia de la Accidentalidad" },
+      { modulo: "3. Gestion de la Salud", submodulo: "3.2.3 Frecuencia de la Accidentalidad" },
+      { modulo: "6. Verificacion", submodulo: "6.1.1 Definicion de indicadores" },
+      { modulo: "6. Verificación", submodulo: "6.1.1 Definición de indicadores" },
+    ];
+    
+    console.log('[FrecuenciaAccidentalidad][MAIN] Probando ubicaciones para indicadores...');
+    console.log('[FrecuenciaAccidentalidad][MAIN] Subdirectorios	root:', Object.keys(rootStructure.subdirectories || {}));
+    
+    for (var i = 0; i < ubicacionesAPrueba.length; i++) {
+      var loc = ubicacionesAPrueba[i];
+      console.log('[FrecuenciaAccidentalidad][MAIN] Probando:', loc.modulo, '->', loc.submodulo);
+      
+      var modulo = findDirFlexible(rootStructure.subdirectories, loc.modulo);
+      if (modulo && modulo.subdirectories) {
+        var submodulo = findDirFlexible(modulo.subdirectories, loc.submodulo);
+        if (submodulo) {
+          indicadoresPath = submodulo;
+          console.log('[FrecuenciaAccidentalidad][MAIN] ENCONTRADO en:', loc.modulo, '->', loc.submodulo);
+          break;
+        }
+      }
+    }
+
+    if (!indicadoresPath) {
+      console.log('[FrecuenciaAccidentalidad][MAIN] ERROR: No se encontró carpeta de indicadores');
+      console.log('[FrecuenciaAccidentalidad][MAIN] Intentando buscar cualquier carpeta con "indicadores" o "frecuencia"...');
+      
+      // Búsqueda dinámica - buscar cualquier carpeta que contenga "indicadores" o similar
+      for (var key in rootStructure.subdirectories) {
+        if (key.toLowerCase().includes('indicador') || key.toLowerCase().includes('frecuencia')) {
+          indicadoresPath = rootStructure.subdirectories[key];
+          console.log('[FrecuenciaAccidentalidad][MAIN] Encontrado por búsqueda dinámica:', key);
+          break;
+        }
+      }
+    }
+
+    if (!indicadoresPath) {
+      return { 
+        success: false, 
+        error: { 
+          code: 'SUBMODULE_NOT_FOUND', 
+          message: 'No se encontró carpeta de indicadores' 
+        } 
+      };
+    }
+
+    console.log('[FrecuenciaAccidentalidad][MAIN] indicadoresPath.path:', indicadoresPath.path);
+    console.log('[FrecuenciaAccidentalidad][MAIN] Llamando a excelBridge.configurarRutasConRuta()...');
+    
+const rutas = excelBridge.configurarRutasConRuta(indicadoresPath.path, year);
+console.log('[FrecuenciaAccidentalidad][MAIN] rutas result:', rutas);
+console.log('[FrecuenciaAccidentalidad][MAIN] rutas.indicadores:', rutas.indicadores);
+console.log('[FrecuenciaAccidentalidad][MAIN] rutas.caracterizacion:', rutas.caracterizacion);
+
+_setRuta('frecuencia', rutas.indicadores, rutas.caracterizacion);
+
+return {
+success: true,
+data: {
+indicadores: rutas.indicadores ? path.basename(rutas.indicadores) : null,
+caracterizacion: rutas.caracterizacion ? path.basename(rutas.caracterizacion) : null,
+selectedFile: rutas.selectedFile,
+availableFiles: rutas.availableFiles
+        }
+      };
+  } catch (error) {
+    console.error('[FrecuenciaAccidentalidad][MAIN] EXCEPTION:', error.message);
+    console.error('[FrecuenciaAccidentalidad][MAIN] STACK:', error.stack);
+    return { 
+      success: false, 
+      error: { 
+        code: 'CONFIG_ERROR', 
+        message: error.message 
+      } 
+    };
+  }
+});
+
+// Leer indicadores desde Excel de origen
+ipcMain.handle('frecuencia-accidentalidad:leer-indicadores', async () => {
+try {
+var rutas = _getRuta('frecuencia');
+return await excelBridge.leerIndicadores(rutas && rutas.indicadores);
+  } catch (error) {
+    console.error('[FrecuenciaAccidentalidad] Error leyendo indicadores:', error);
+    return { 
+      success: false, 
+      error: { 
+        code: 'EXCEL_READ_ERROR', 
+        message: error.message 
+      } 
+    };
+  }
+});
+
+// Leer caracterización desde Excel de origen
+ipcMain.handle('frecuencia-accidentalidad:leer-caracterizacion', async () => {
+try {
+var rutas = _getRuta('frecuencia');
+return await excelBridge.leerCaracterizacion(rutas && rutas.caracterizacion);
+  } catch (error) {
+    console.error('[FrecuenciaAccidentalidad] Error leyendo caracterización:', error);
+    return { 
+      success: false, 
+      error: { 
+        code: 'EXCEL_READ_ERROR', 
+        message: error.message 
+      } 
+    };
+  }
+});
+
+// Contar AT por mes desde Registro Estadístico 3.2.3 (auto-fill)
+ipcMain.handle('frecuencia-accidentalidad:contar-at-por-mes', async (event, year, companyName) => {
+  try {
+    // Buscar el Excel de 3.2.3 (Registro Estadístico)
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+    const normalizedInput = (companyName || '').toLowerCase();
+    const companyKey = Object.keys(config.companyPaths || {}).find(
+      key => key.toLowerCase() === normalizedInput
+    );
+    const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
+
+    var rutaRegistro = null;
+    if (companyConfig && companyConfig.root) {
+      try {
+        const gsDir = path.join(companyConfig.root, '3. Gestión de la Salud');
+        const gsEntries = await fsp.readdir(gsDir);
+        const folder323 = gsEntries.find(function(f) { return f.startsWith('3.2.3'); });
+        if (folder323) {
+          const subDir = path.join(gsDir, folder323);
+          const subEntries = await fsp.readdir(subDir);
+          const xlsxFile = subEntries.find(function(f) {
+            return f.toLowerCase().endsWith('.xlsx') && !f.startsWith('~$');
+          });
+          if (xlsxFile) rutaRegistro = path.join(subDir, xlsxFile);
+        }
+      } catch (e) {
+        console.warn('[FrecuenciaAccidentalidad] Error buscando 3.2.3:', e.message);
+      }
+    }
+
+    console.log('[FrecuenciaAccidentalidad] Ruta registro 3.2.3:', rutaRegistro);
+    return await excelBridge.contarATPorMes(year, rutaRegistro);
+  } catch (error) {
+    console.error('[FrecuenciaAccidentalidad] Error contando AT por mes:', error);
+    return {
+      success: false,
+      error: {
+        code: 'EXCEL_READ_ERROR',
+        message: error.message
+      }
+    };
+  }
+});
+
+// Leer meta de Objetivos SST para frecuencia
+ipcMain.handle('frecuencia-accidentalidad:leer-meta-objetivo', async (event, companyName) => {
+  try {
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+    const normalizedInput = (companyName || '').toLowerCase();
+    const companyKey = Object.keys(config.companyPaths || {}).find(
+      key => key.toLowerCase() === normalizedInput
+    );
+    const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
+
+    if (!companyConfig || !companyConfig.root) {
+      return { success: true, data: null };
+    }
+
+    // Buscar carpeta "2. Gestión Integral del SG-SST" → "2.2.1 Objetivos SST"
+    var rutaObjetivos = null;
+    try {
+      const giDir = path.join(companyConfig.root, '2. Gestión Integral del SG-SST');
+      const giEntries = await fsp.readdir(giDir);
+      const folder221 = giEntries.find(function(f) { return f.startsWith('2.2.1'); });
+      if (folder221) {
+        const subDir = path.join(giDir, folder221);
+        const subEntries = await fsp.readdir(subDir);
+        const xlsxFile = subEntries.find(function(f) {
+          return f.toLowerCase().endsWith('.xlsx') && !f.startsWith('~$');
+        });
+        if (xlsxFile) rutaObjetivos = path.join(subDir, xlsxFile);
+      }
+    } catch (e) {
+      console.warn('[FrecuenciaAccidentalidad] Error buscando 2.2.1:', e.message);
+    }
+
+    if (!rutaObjetivos) {
+      console.log('[FrecuenciaAccidentalidad] No se encontró Excel de objetivos');
+      return { success: true, data: null };
+    }
+
+    console.log('[FrecuenciaAccidentalidad] Leyendo meta desde:', rutaObjetivos);
+
+    const XLSX = require('xlsx');
+    const wb = XLSX.readFile(rutaObjetivos);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    if (!ws) return { success: true, data: null };
+
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    if (rows.length < 2) return { success: true, data: null };
+
+    // Buscar fila donde Col C contenga "frecuencia" y "accidentalidad"
+    var metaFrecuencia = null;
+    var metaTextoFrecuencia = '';
+    var formulaFrecuencia = '';
+
+    for (var r = 0; r < rows.length; r++) {
+      var colC = String(rows[r][2] || '').trim().toLowerCase();
+      if (colC.indexOf('frecuencia') >= 0 && colC.indexOf('accidentalidad') >= 0) {
+        var metaRaw = String(rows[r][4] || '').trim();
+        formulaFrecuencia = String(rows[r][3] || '').trim();
+        metaTextoFrecuencia = metaRaw;
+
+        // Parsear: extraer número de "<1", "< 1", "1.5", etc.
+        var match = metaRaw.match(/[\d.]+/);
+        if (match) {
+          metaFrecuencia = parseFloat(match[0]);
+        }
+        console.log('[FrecuenciaAccidentalidad] Meta encontrada:', metaRaw, '→', metaFrecuencia);
+        break;
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        meta: metaFrecuencia,
+        metaTexto: metaTextoFrecuencia,
+        formula: formulaFrecuencia,
+        fuente: rutaObjetivos
+      }
+    };
+  } catch (error) {
+    console.error('[FrecuenciaAccidentalidad] Error leyendo meta objetivo:', error);
+    return {
+      success: false,
+      error: {
+        code: 'EXCEL_READ_ERROR',
+        message: error.message
+      }
+    };
+  }
+});
+
+// Escribir en Excel de origen
+ipcMain.handle('frecuencia-accidentalidad:escribir-excel', async (event, mes, campos) => {
+try {
+var rutas = _getRuta('frecuencia');
+return await excelBridge.escribirEnExcel(mes, campos, rutas && rutas.indicadores);
+  } catch (error) {
+    console.error('[FrecuenciaAccidentalidad] Error escribiendo en Excel:', error);
+    return {
+      success: false,
+      error: {
+        code: 'EXCEL_WRITE_ERROR',
+        message: error.message
+      }
+    };
+  }
+});
+
+// =============================================================================
+// Severidad de la Accidentalidad - Handlers IPC (Submódulo 3.3.2)
+// =============================================================================
+
+// Configurar rutas de archivos Excel para una empresa específica
+ipcMain.handle('severidad-accidentalidad:configurar-rutas', async (event, companyName, year) => {
+  console.log('[SeveridadAccidentalidad][MAIN] ===== HANDLER CALLED =====');
+  console.log('[SeveridadAccidentalidad][MAIN] companyName recibido:', companyName);
+
+  try {
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+    console.log('[SeveridadAccidentalidad][MAIN] config cargada, companyPaths:', Object.keys(config.companyPaths || {}));
+
+    const normalizedInput = (companyName || '').toLowerCase();
+    const companyKey = Object.keys(config.companyPaths || {}).find(
+      key => key.toLowerCase() === normalizedInput
+    );
+    console.log('[SeveridadAccidentalidad][MAIN] companyKey encontrado:', companyKey);
+
+    const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
+    console.log('[SeveridadAccidentalidad][MAIN] companyConfig:', companyConfig ? 'EXISTS' : 'NULL');
+
+    if (!companyConfig || !companyConfig.root) {
+      console.log('[SeveridadAccidentalidad][MAIN] ERROR: Empresa no encontrada');
+      return {
+        success: false,
+        error: {
+          code: 'COMPANY_NOT_FOUND',
+          message: `Empresa "${companyName}" no encontrada`
+        }
+      };
+    }
+
+    if (!companyConfig.structure?.structure) {
+      console.log('[SeveridadAccidentalidad][MAIN] ERROR: No tiene estructura mapeada');
+      return {
+        success: false,
+        error: {
+          code: 'NO_STRUCTURE',
+          message: `Empresa "${companyName}" no tiene estructura mapeada`
+        }
+      };
+    }
+
+    const rootStructure = companyConfig.structure.structure;
+    console.log('[SeveridadAccidentalidad][MAIN] rootStructure.subdirectories:', Object.keys(rootStructure.subdirectories || {}));
+
+    function findDirFlexible(subdirs, target) {
+      if (!subdirs) return null;
+
+      const normalizedTarget = target
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      for (const [key, value] of Object.entries(subdirs)) {
+        const normalizedKey = key
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        if (normalizedKey === normalizedTarget) {
+          return value;
+        }
+      }
+      return null;
+    }
+
+    var indicadoresPath = null;
+
+var ubicacionesAPrueba = [
+  { modulo: "6. Verificacion", submodulo: "6.1.1 Definicion de indicadores" },
+  { modulo: "6. Verificación", submodulo: "6.1.1 Definición de indicadores" },
+  { modulo: "3. Gestion de la Salud", submodulo: "3.3.2 Severidad de la Accidentalidad" },
+  { modulo: "3. Gestion de la Salud", submodulo: "3.3.1 Frecuencia de la Accidentalidad" },
+];
+
+    console.log('[SeveridadAccidentalidad][MAIN] Probando ubicaciones para indicadores...');
+
+    for (var i = 0; i < ubicacionesAPrueba.length; i++) {
+      var loc = ubicacionesAPrueba[i];
+      console.log('[SeveridadAccidentalidad][MAIN] Probando:', loc.modulo, '->', loc.submodulo);
+
+      var modulo = findDirFlexible(rootStructure.subdirectories, loc.modulo);
+      if (modulo && modulo.subdirectories) {
+        var submodulo = findDirFlexible(modulo.subdirectories, loc.submodulo);
+        if (submodulo) {
+          indicadoresPath = submodulo;
+          console.log('[SeveridadAccidentalidad][MAIN] ENCONTRADO en:', loc.modulo, '->', loc.submodulo);
+          break;
+        }
+      }
+    }
+
+    if (!indicadoresPath) {
+      console.log('[SeveridadAccidentalidad][MAIN] ERROR: No se encontró carpeta de indicadores');
+      console.log('[SeveridadAccidentalidad][MAIN] Intentando buscar cualquier carpeta con "indicadores" o "severidad"...');
+
+      for (var key in rootStructure.subdirectories) {
+        if (key.toLowerCase().includes('indicador') || key.toLowerCase().includes('severidad')) {
+          indicadoresPath = rootStructure.subdirectories[key];
+          console.log('[SeveridadAccidentalidad][MAIN] Encontrado por búsqueda dinámica:', key);
+          break;
+        }
+      }
+    }
+
+    if (!indicadoresPath) {
+      return {
+        success: false,
+        error: {
+          code: 'SUBMODULE_NOT_FOUND',
+          message: 'No se encontró carpeta de indicadores'
+        }
+      };
+    }
+
+    console.log('[SeveridadAccidentalidad][MAIN] indicadoresPath.path:', indicadoresPath.path);
+    console.log('[SeveridadAccidentalidad][MAIN] Llamando a excelBridge.configurarRutasConRuta()...');
+
+const rutas = excelBridge.configurarRutasConRuta(indicadoresPath.path, year);
+console.log('[SeveridadAccidentalidad][MAIN] rutas result:', rutas);
+
+_setRuta('severidad', rutas.indicadores, rutas.caracterizacion, companyConfig.root, year);
+
+return {
+        success: true,
+        data: {
+          indicadores: rutas.indicadores ? path.basename(rutas.indicadores) : null,
+          caracterizacion: rutas.caracterizacion ? path.basename(rutas.caracterizacion) : null,
+          selectedFile: rutas.selectedFile,
+          availableFiles: rutas.availableFiles
+        }
+      };
+  } catch (error) {
+    console.error('[SeveridadAccidentalidad][MAIN] EXCEPTION:', error.message);
+    console.error('[SeveridadAccidentalidad][MAIN] STACK:', error.stack);
+    return {
+      success: false,
+      error: {
+        code: 'CONFIG_ERROR',
+        message: error.message
+      }
+    };
+  }
+});
+
+// Leer indicadores desde Excel de origen
+ipcMain.handle('severidad-accidentalidad:leer-indicadores', async () => {
+try {
+var rutas = _getRuta('severidad');
+var result = await excelBridge.leerIndicadores(rutas && rutas.indicadores);
+
+// Cargar diasCargados desde JSON si existe
+if (result.success && result.data && result.data.severidadMensual) {
+  var companyRoot = rutas && rutas.companyRoot;
+  var year = rutas && rutas.year || new Date().getFullYear();
+  if (companyRoot) {
+    var jsonPath = path.join(companyRoot, 'severidad-data.json');
+    if (fs.existsSync(jsonPath)) {
+      try {
+        var rawData = await fsp.readFile(jsonPath, 'utf8');
+        var allData = JSON.parse(rawData);
+        var yearData = allData[String(year)] || {};
+        result.data.severidadMensual.forEach(function(row) {
+          var mesData = yearData[String(row.mes)] || {};
+          row.diasCargados = mesData.diasCargados || 0;
+          row.indiceSeveridad = row.trabajadores > 0
+            ? Math.round((((row.diasPerdidos + row.diasCargados) / row.trabajadores) * 100) * 10000) / 10000
+            : 0;
+        });
+        console.log('[SeveridadAccidentalidad] diasCargados cargados desde JSON');
+      } catch (jsonErr) {
+        console.error('[SeveridadAccidentalidad] Error leyendo JSON diasCargados:', jsonErr);
+      }
+    }
+  }
+}
+
+return result;
+  } catch (error) {
+    console.error('[SeveridadAccidentalidad] Error leyendo indicadores:', error);
+    return {
+      success: false,
+      error: {
+        code: 'EXCEL_READ_ERROR',
+        message: error.message
+      }
+    };
+  }
+});
+
+// Escribir en Excel de origen
+ipcMain.handle('severidad-accidentalidad:escribir-excel', async (event, mes, campos) => {
+try {
+var rutas = _getRuta('severidad');
+
+// Si solo tiene diasCargados, guardar en JSON (no en Excel)
+if (campos && 'diasCargados' in campos && Object.keys(campos).length === 1) {
+  var companyRoot = rutas && rutas.companyRoot;
+  var year = rutas && rutas.year || new Date().getFullYear();
+  if (!companyRoot) {
+    return { success: false, error: { code: 'NO_COMPANY_ROOT', message: 'No se encontró ruta de empresa' } };
+  }
+  var jsonPath = path.join(companyRoot, 'severidad-data.json');
+  var allData = {};
+  if (fs.existsSync(jsonPath)) {
+    var rawData = await fsp.readFile(jsonPath, 'utf8');
+    allData = JSON.parse(rawData);
+  }
+  var yearStr = String(year);
+  var mesStr = String(mes);
+  if (!allData[yearStr]) allData[yearStr] = {};
+  if (!allData[yearStr][mesStr]) allData[yearStr][mesStr] = {};
+  allData[yearStr][mesStr].diasCargados = campos.diasCargados;
+  await fsp.writeFile(jsonPath, JSON.stringify(allData, null, 2), 'utf8');
+  console.log('[SeveridadAccidentalidad] Guardado diasCargados:', yearStr, mesStr, campos.diasCargados);
+  return { success: true };
+}
+
+return await excelBridge.escribirEnExcel(mes, campos, rutas && rutas.indicadores);
+  } catch (error) {
+    console.error('[SeveridadAccidentalidad] Error escribiendo en Excel:', error);
+    return {
+      success: false,
+      error: {
+        code: 'EXCEL_WRITE_ERROR',
+        message: error.message
+      }
+    };
+  }
+});
+
+// =============================================================================
+// Indicadores de Salud - Handler integral (Home Gestion de la Salud)
+// Lee datos de submodulos 3.3.1, 3.3.2, 3.3.3 en una sola llamada
+// =============================================================================
+ipcMain.handle('get-indicadores-salud-stats', async (event, companyName) => {
+  try {
+    const currentYear = new Date().getFullYear();
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+const config = JSON.parse(configData);
+
+const normalizedInput = (companyName || '').toLowerCase();
+const companyKey = Object.keys(config.companyPaths || {}).find(
+  key => key.toLowerCase() === normalizedInput
+);
+
+const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
+
+if (!companyConfig || !companyConfig.root) {
+  return {
+    success: false,
+    error: {
+      code: 'COMPANY_NOT_FOUND',
+      message: `Empresa "${companyName}" no encontrada`
+    }
+  };
+}
+
+if (!companyConfig.structure?.structure) {
+  return {
+    success: false,
+    error: {
+      code: 'NO_STRUCTURE',
+      message: `Empresa "${companyName}" no tiene estructura mapeada`
+    }
+  };
+}
+
+const rootStructure = companyConfig.structure.structure;
+
+function findDirFlexible(subdirs, target) {
+  if (!subdirs) return null;
+  const normalizedTarget = target
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  for (const [key, value] of Object.entries(subdirs)) {
+    const normalizedKey = key
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (normalizedKey === normalizedTarget) {
+      return value;
+    }
+  }
+  return null;
+}
+
+var indicadoresPath = null;
+var ubicacionesAPrueba = [
+  { modulo: "3. Gestion de la Salud", submodulo: "3.3.1 Frecuencia de la Accidentalidad" },
+  { modulo: "3. Gestion de la Salud", submodulo: "3.2.3 Frecuencia de la Accidentalidad" },
+  { modulo: "6. Verificacion", submodulo: "6.1.1 Definicion de indicadores" },
+  { modulo: "6. Verificación", submodulo: "6.1.1 Definición de indicadores" },
+];
+
+for (var i = 0; i < ubicacionesAPrueba.length; i++) {
+  var loc = ubicacionesAPrueba[i];
+  var modulo = findDirFlexible(rootStructure.subdirectories, loc.modulo);
+  if (modulo && modulo.subdirectories) {
+    var submodulo = findDirFlexible(modulo.subdirectories, loc.submodulo);
+    if (submodulo) {
+      indicadoresPath = submodulo;
+      break;
+    }
+  }
+}
+
+if (!indicadoresPath) {
+  for (var key in rootStructure.subdirectories) {
+    if (key.toLowerCase().includes('indicador') || key.toLowerCase().includes('frecuencia')) {
+      indicadoresPath = rootStructure.subdirectories[key];
+      break;
+    }
+  }
+}
+
+if (!indicadoresPath) {
+  return {
+    success: false,
+    error: {
+      code: 'SUBMODULE_NOT_FOUND',
+      message: 'No se encontró carpeta de indicadores'
+    }
+  };
+}
+
+excelBridge.configurarRutasConRuta(indicadoresPath.path, currentYear);
+
+const result = await excelBridge.leerIndicadores();
+
+return result;
+} catch (error) {
+console.error('[IndicadoresSalud] Error:', error);
+return {
+  success: false,
+  error: {
+    code: 'INDICADORES_READ_ERROR',
+    message: error.message
+  }
+};
+}
+});
+
+// =============================================================================
+// Indicadores de Salud - Listar archivos disponibles + Duplicar para nuevo año
+// =============================================================================
+
+ipcMain.handle('get-indicadores-files', async (event, { companyName, submodule }) => {
+  try {
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+
+    const normalizedInput = (companyName || '').toLowerCase();
+    const companyKey = Object.keys(config.companyPaths || {}).find(
+      key => key.toLowerCase() === normalizedInput
+    );
+
+    const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
+    if (!companyConfig || !companyConfig.root || !companyConfig.structure?.structure) {
+      return { success: false, error: { code: 'CONFIG_NOT_FOUND' } };
+    }
+
+    const rootStructure = companyConfig.structure.structure;
+
+    function findDirFlexible(subdirs, target) {
+      if (!subdirs) return null;
+      const normalizedTarget = target.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+      for (const [key, value] of Object.entries(subdirs)) {
+        const normalizedKey = key.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+        if (normalizedKey === normalizedTarget) return value;
+      }
+      return null;
+    }
+
+    var searchPaths = [];
+    if (submodule === '3.3.1') {
+      searchPaths = [
+        { modulo: "3. Gestion de la Salud", submodulo: "3.3.1 Frecuencia de la Accidentalidad" },
+        { modulo: "3. Gestion de la Salud", submodulo: "3.2.3 Frecuencia de la Accidentalidad" },
+        { modulo: "6. Verificacion", submodulo: "6.1.1 Definicion de indicadores" },
+      ];
+    } else if (submodule === '3.3.2') {
+      searchPaths = [
+        { modulo: "3. Gestion de la Salud", submodulo: "3.3.2 Severidad de la Accidentalidad" },
+        { modulo: "3. Gestion de la Salud", submodulo: "3.3.1 Frecuencia de la Accidentalidad" },
+        { modulo: "6. Verificacion", submodulo: "6.1.1 Definicion de indicadores" },
+      ];
+    } else if (submodule === '3.3.3') {
+      searchPaths = [
+        { modulo: "3. Gestion de la Salud", submodulo: "3.3.3 Proporcion de accidentes de trabajo mortales" },
+        { modulo: "3. Gestion de la Salud", submodulo: "3.3.3 Indice de Mortalidad" },
+        { modulo: "3. Gestion de la Salud", submodulo: "3.3.3 Proporcion de accidentes mortales" },
+      ];
+    }
+
+    var foundPath = null;
+    for (var i = 0; i < searchPaths.length; i++) {
+      var loc = searchPaths[i];
+      var modulo = findDirFlexible(rootStructure.subdirectories, loc.modulo);
+      if (modulo && modulo.subdirectories) {
+        var submodulo = findDirFlexible(modulo.subdirectories, loc.submodulo);
+        if (submodulo) {
+          foundPath = submodulo;
+          break;
+        }
+      }
+    }
+
+    if (!foundPath) {
+      for (var key in rootStructure.subdirectories) {
+        if (key.toLowerCase().includes('indicador') || key.toLowerCase().includes('frecuencia')) {
+          foundPath = rootStructure.subdirectories[key];
+          break;
+        }
+      }
+    }
+
+    if (!foundPath) {
+      return { success: false, error: { code: 'SUBMODULE_NOT_FOUND' } };
+    }
+
+    const availableFiles = excelBridge.listarIndicadoresFiles(foundPath.path);
+    return { success: true, files: availableFiles, folderPath: foundPath.path };
+  } catch (error) {
+    return { success: false, error: { code: 'LIST_FILES_ERROR', message: error.message } };
+  }
+});
+
+ipcMain.handle('duplicate-indicadores-file', async (event, { currentFilePath, newYear }) => {
+  try {
+    if (!currentFilePath || !fs.existsSync(currentFilePath)) {
+      return { success: false, error: { code: 'FILE_NOT_FOUND', message: 'Archivo origen no encontrado' } };
+    }
+
+    const dir = path.dirname(currentFilePath);
+    const ext = path.extname(currentFilePath);
+    const baseName = path.basename(currentFilePath, ext);
+
+    const yearMatch = baseName.match(/(20\d{2})/);
+    let newFileName;
+    if (yearMatch) {
+      newFileName = baseName.replace(yearMatch[1], String(newYear)) + ext;
+    } else {
+      newFileName = baseName + ' ' + newYear + ext;
+    }
+
+    const newFilePath = path.join(dir, newFileName);
+
+    if (fs.existsSync(newFilePath)) {
+      return { success: false, error: { code: 'FILE_EXISTS', message: `Ya existe "${newFileName}"` } };
+    }
+
+    fs.copyFileSync(currentFilePath, newFilePath);
+
+    const ExcelJS = require('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(newFilePath);
+
+    const ROWS_TO_CLEAR = [9, 11, 13, 15, 17, 19, 20];
+    const DATA_COLS = [5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27];
+
+    workbook.eachSheet(function(worksheet) {
+      ROWS_TO_CLEAR.forEach(function(rowNum) {
+        const row = worksheet.getRow(rowNum);
+        if (row) {
+          DATA_COLS.forEach(function(colNum) {
+            const cell = row.getCell(colNum);
+            if (cell && cell.type !== ExcelJS.ValueType.Null) {
+              cell.value = 0;
+            }
+          });
+        }
+      });
+    });
+
+    await workbook.xlsx.writeFile(newFilePath);
+
+    return {
+      success: true,
+      newFilePath: newFilePath,
+      newFileName: newFileName,
+      message: `Archivo duplicado como "${newFileName}" con datos de ejecución limpiados`
+    };
+  } catch (error) {
+    console.error('[duplicate-indicadores-file] Error:', error);
+    return { success: false, error: { code: 'DUPLICATE_ERROR', message: error.message } };
+  }
+});
+
+// Índice de Mortalidad - Handlers IPC (Submódulo 3.3.3)
+// =============================================================================
+
+// Configurar rutas de archivos Excel para una empresa específica
+ipcMain.handle('mortalidad:configurar-rutas', async (event, companyName, year) => {
+  console.log('[IndiceMortalidad][MAIN] ===== HANDLER CALLED =====');
+  console.log('[IndiceMortalidad][MAIN] companyName recibido:', companyName);
+
+  try {
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+
+    const normalizedInput = (companyName || '').toLowerCase();
+    const companyKey = Object.keys(config.companyPaths || {}).find(
+      key => key.toLowerCase() === normalizedInput
+    );
+
+    const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
+
+    if (!companyConfig || !companyConfig.root) {
+      return {
+        success: false,
+        error: {
+          code: 'COMPANY_NOT_FOUND',
+          message: `Empresa "${companyName}" no encontrada`
+        }
+      };
+    }
+
+    if (!companyConfig.structure?.structure) {
+      return {
+        success: false,
+        error: {
+          code: 'NO_STRUCTURE',
+          message: `Empresa "${companyName}" no tiene estructura mapeada`
+        }
+      };
+    }
+
+    const rootStructure = companyConfig.structure.structure;
+
+    function findDirFlexible(subdirs, target) {
+      if (!subdirs) return null;
+
+      const normalizedTarget = target
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      for (const [key, value] of Object.entries(subdirs)) {
+        const normalizedKey = key
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        if (normalizedKey === normalizedTarget) {
+          return value;
+        }
+      }
+      return null;
+    }
+
+    // Buscar carpeta de indicadores - probar múltiples ubicaciones
+    var mortalidadPath = null;
+var ubicacionesAPrueba = [
+  { modulo: "6. Verificacion", submodulo: "6.1.1 Definicion de indicadores" },
+  { modulo: "6. Verificación", submodulo: "6.1.1 Definición de indicadores" },
+  { modulo: "3. Gestion de la Salud", submodulo: "3.3.3 Proporcion de accidentes de trabajo mortales" },
+  { modulo: "3. Gestion de la Salud", submodulo: "3.3.3 Indice de Mortalidad" },
+  { modulo: "3. Gestion de la Salud", submodulo: "3.3.3 Proporcion de accidentes mortales" },
+];
+
+    for (var i = 0; i < ubicacionesAPrueba.length; i++) {
+      var loc = ubicacionesAPrueba[i];
+      var modulo = findDirFlexible(rootStructure.subdirectories, loc.modulo);
+      if (modulo && modulo.subdirectories) {
+        var submodulo = findDirFlexible(modulo.subdirectories, loc.submodulo);
+        if (submodulo) {
+          mortalidadPath = submodulo;
+          console.log('[IndiceMortalidad][MAIN] ENCONTRADO en:', loc.modulo, '->', loc.submodulo);
+          break;
+        }
+      }
+    }
+
+    if (!mortalidadPath) {
+      return {
+        success: false,
+        error: {
+          code: 'SUBMODULE_NOT_FOUND',
+          message: 'No se encontró carpeta de indicadores de mortalidad'
+        }
+      };
+    }
+
+    console.log('[IndiceMortalidad][MAIN] mortalidadPath.path:', mortalidadPath.path);
+
+const rutas = excelBridge.configurarRutasConRuta(mortalidadPath.path, year);
+
+_setRuta('mortalidad', rutas.indicadores, null, companyConfig.root, year);
+
+return {
+        success: true,
+        data: {
+          indicadores: rutas.indicadores ? path.basename(rutas.indicadores) : null,
+          selectedFile: rutas.selectedFile,
+          availableFiles: rutas.availableFiles
+        }
+      };
+  } catch (error) {
+    console.error('[IndiceMortalidad][MAIN] EXCEPTION:', error.message);
+    return {
+      success: false,
+      error: {
+        code: 'CONFIG_ERROR',
+        message: error.message
+      }
+    };
+  }
+});
+
+// Leer indicadores desde Excel de origen
+ipcMain.handle('mortalidad:leer-indicadores', async () => {
+try {
+var rutas = _getRuta('mortalidad');
+var result = await excelBridge.leerIndicadoresMortalidad(rutas && rutas.indicadores);
+
+// Enriquecer con datos de severidad-data.json
+// REGLA: diasCargados === 6000 → 1 evento mortal en ese mes
+// Total AT Mortales = conteo de meses con 6000 días cargados
+if (result.success && result.data && result.data.eventosMortalesMensual) {
+  var companyRoot = rutas && rutas.companyRoot;
+  var year = rutas && rutas.year || new Date().getFullYear();
+  if (companyRoot) {
+    var jsonPath = path.join(companyRoot, 'severidad-data.json');
+    if (fs.existsSync(jsonPath)) {
+      try {
+        var rawData = await fsp.readFile(jsonPath, 'utf8');
+        var allSevData = JSON.parse(rawData);
+        var yearSevData = allSevData[String(year)] || {};
+        var totalATMortales = 0;
+
+        result.data.eventosMortalesMensual.forEach(function(row) {
+          var mesData = yearSevData[String(row.mes)] || {};
+          var diasCargados = mesData.diasCargados || 0;
+          var esMortal = diasCargados === 6000;
+
+          row.diasCargados = diasCargados;
+          row.eventosMortales = esMortal ? 1 : 0;
+
+          if (esMortal) totalATMortales++;
+        });
+
+        result.data.totalATMortales = totalATMortales;
+        result.data.eventos = result.data.eventosMortalesMensual.map(function(r) { return r.eventosMortales; });
+        console.log('[IndiceMortalidad] AT mortales desde severidad:', totalATMortales);
+      } catch (jsonErr) {
+        console.error('[IndiceMortalidad] Error leyendo severidad-data.json:', jsonErr);
+        result.data.totalATMortales = 0;
+      }
+    } else {
+      result.data.totalATMortales = 0;
+    }
+  } else {
+    result.data.totalATMortales = 0;
+  }
+
+  // ── Auto-fill Total AT desde Registro Estadístico 3.2.3 ──
+  // Misma lógica que Frecuencia (3.3.1): contarATPorMes()
+  if (companyRoot) {
+    try {
+      var gsDir = path.join(companyRoot, '3. Gestión de la Salud');
+      var rutaRegistro = null;
+      if (fs.existsSync(gsDir)) {
+        var gsEntries = await fsp.readdir(gsDir);
+        var folder323 = gsEntries.find(function(f) { return f.startsWith('3.2.3'); });
+        if (folder323) {
+          var subDir = path.join(gsDir, folder323);
+          var subEntries = await fsp.readdir(subDir);
+          var xlsxFile = subEntries.find(function(f) {
+            return f.toLowerCase().endsWith('.xlsx') && !f.startsWith('~$');
+          });
+          if (xlsxFile) rutaRegistro = path.join(subDir, xlsxFile);
+        }
+      }
+
+      if (rutaRegistro) {
+        var resAT = await excelBridge.contarATPorMes(year, rutaRegistro);
+        if (resAT.success && resAT.data && resAT.data.mensual) {
+          var autoAT = resAT.data.mensual;
+          var totalAT = 0;
+
+          result.data.eventosMortalesMensual.forEach(function(row) {
+            var autoCount = autoAT[row.mes] || 0;
+            if (autoCount > 0) {
+              row.totalATMes = autoCount;
+            }
+            totalAT += row.totalATMes;
+          });
+
+          result.data.totalAT = totalAT;
+          console.log('[IndiceMortalidad] Total AT desde 3.2.3:', totalAT);
+        }
+      } else {
+        console.warn('[IndiceMortalidad] Carpeta 3.2.3 no encontrada, usando AT del Excel');
+      }
+    } catch (autoErr) {
+      console.warn('[IndiceMortalidad] Error auto-fill AT desde 3.2.3:', autoErr.message);
+    }
+  }
+}
+
+return result;
+  } catch (error) {
+    console.error('[IndiceMortalidad] Error leyendo indicadores:', error);
+    return {
+      success: false,
+      error: {
+        code: 'EXCEL_READ_ERROR',
+        message: error.message
+      }
+    };
+  }
+});
+
+// Escribir en Excel de origen
+ipcMain.handle('mortalidad:escribir-excel', async (event, mes, campos) => {
+try {
+var rutas = _getRuta('mortalidad');
+return await excelBridge.escribirEnExcelMortalidad(mes, campos, rutas && rutas.indicadores);
+  } catch (error) {
+    console.error('[IndiceMortalidad] Error escribiendo en Excel:', error);
+    return {
+      success: false,
+      error: {
+        code: 'EXCEL_WRITE_ERROR',
+        message: error.message
+      }
+    };
+  }
+});
+
+// =============================================================================
+// Leer severidad-data.json desde mortalidad (validación cruzada)
+// =============================================================================
+ipcMain.handle('mortalidad:leer-severidad-json', async (event, companyName, year) => {
+  try {
+    var companyRoot = null;
+    var configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    var config = JSON.parse(configData);
+    var normalizedInput = (companyName || '').toLowerCase();
+    var companyKey = Object.keys(config.companyPaths || {}).find(
+      function(k) { return k.toLowerCase() === normalizedInput; }
+    );
+    var companyConfig = companyKey ? config.companyPaths[companyKey] : null;
+    if (companyConfig && companyConfig.root) {
+      companyRoot = companyConfig.root;
+    }
+
+    if (!companyRoot) {
+      return { success: true, data: { meses: {} } };
+    }
+
+    var jsonPath = path.join(companyRoot, 'severidad-data.json');
+    if (!fs.existsSync(jsonPath)) {
+      return { success: true, data: { meses: {} } };
+    }
+
+    var rawData = await fsp.readFile(jsonPath, 'utf8');
+    var allData = JSON.parse(rawData);
+    var yearData = allData[String(year)] || {};
+
+    var meses = {};
+    for (var m = 1; m <= 12; m++) {
+      var mesData = yearData[String(m)] || {};
+      meses[m] = { diasCargados: mesData.diasCargados || 0 };
+    }
+
+    return { success: true, data: { meses: meses } };
+  } catch (error) {
+    console.error('[IndiceMortalidad] Error leyendo severidad-data.json:', error);
+    return { success: true, data: { meses: {} } };
+  }
+});
+
+// =============================================================================
+// PREVALENCIA DE ENFERMEDAD LABORAL (Submódulo 3.3.4)
+// =============================================================================
+ipcMain.handle('prevalencia:configurar-rutas', async (event, companyName, year) => {
+  console.log('[Prevalencia][MAIN] ===== HANDLER CALLED =====');
+  console.log('[Prevalencia][MAIN] companyName recibido:', companyName);
+
+  try {
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+
+    const normalizedInput = (companyName || '').toLowerCase();
+    const companyKey = Object.keys(config.companyPaths || {}).find(
+      key => key.toLowerCase() === normalizedInput
+    );
+
+    const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
+
+    if (!companyConfig || !companyConfig.root) {
+      return {
+        success: false,
+        error: {
+          code: 'COMPANY_NOT_FOUND',
+          message: `Empresa "${companyName}" no encontrada`
+        }
+      };
+    }
+
+    if (!companyConfig.structure?.structure) {
+      return {
+        success: false,
+        error: {
+          code: 'NO_STRUCTURE',
+          message: `Empresa "${companyName}" no tiene estructura mapeada`
+        }
+      };
+    }
+
+    const rootStructure = companyConfig.structure.structure;
+
+    function findDirFlexible(subdirs, target) {
+      if (!subdirs) return null;
+      const normalizedTarget = target
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      for (const [key, value] of Object.entries(subdirs)) {
+        const normalizedKey = key
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+        if (normalizedKey === normalizedTarget) {
+          return value;
+        }
+      }
+      return null;
+    }
+
+    var prevalenciaPath = null;
+    var ubicacionesAPrueba = [
+      { modulo: "3. Gestion de la Salud", submodulo: "3.3.4 Prevalencia de enfermedad laboral" },
+      { modulo: "3. Gestion de la Salud", submodulo: "3.3.4 Medicion de la prevalencia de enfermedades laborales" },
+      { modulo: "3. Gestion de la Salud", submodulo: "3.3.4 Prevalencia de Enfermedad Laboral" },
+    ];
+
+    for (var i = 0; i < ubicacionesAPrueba.length; i++) {
+      var loc = ubicacionesAPrueba[i];
+      var modulo = findDirFlexible(rootStructure.subdirectories, loc.modulo);
+      if (modulo && modulo.subdirectories) {
+        var submodulo = findDirFlexible(modulo.subdirectories, loc.submodulo);
+        if (submodulo) {
+          prevalenciaPath = submodulo;
+          console.log('[Prevalencia][MAIN] ENCONTRADO en:', loc.modulo, '->', loc.submodulo);
+          break;
+        }
+      }
+    }
+
+    if (!prevalenciaPath) {
+      return {
+        success: false,
+        error: {
+          code: 'SUBMODULE_NOT_FOUND',
+          message: 'No se encontró carpeta de indicadores de prevalencia'
+        }
+      };
+    }
+
+    console.log('[Prevalencia][MAIN] prevalenciaPath.path:', prevalenciaPath.path);
+
+    const rutas = excelBridge.configurarRutasConRuta(prevalenciaPath.path, year);
+
+    _setRuta('prevalencia', rutas.indicadores, null, companyConfig.root, year);
+
+    return {
+      success: true,
+      data: {
+        indicadores: rutas.indicadores ? path.basename(rutas.indicadores) : null,
+        selectedFile: rutas.selectedFile,
+        availableFiles: rutas.availableFiles
+      }
+    };
+  } catch (error) {
+    console.error('[Prevalencia][MAIN] EXCEPTION:', error.message);
+    return {
+      success: false,
+      error: {
+        code: 'CONFIG_ERROR',
+        message: error.message
+      }
+    };
+  }
+});
+
+ipcMain.handle('prevalencia:leer-indicadores', async () => {
+  try {
+    var rutas = _getRuta('prevalencia');
+    var result = await excelBridge.leerIndicadoresPrevalencia(rutas && rutas.indicadores);
+    return result;
+  } catch (error) {
+    console.error('[Prevalencia] Error leyendo indicadores:', error);
+    return {
+      success: false,
+      error: {
+        code: 'EXCEL_READ_ERROR',
+        message: error.message
+      }
+    };
+  }
+});
+
+ipcMain.handle('prevalencia:escribir-excel', async (event, mes, campos) => {
+  try {
+    var rutas = _getRuta('prevalencia');
+    return await excelBridge.escribirEnExcelPrevalencia(mes, campos, rutas && rutas.indicadores);
+  } catch (error) {
+    console.error('[Prevalencia] Error escribiendo en Excel:', error);
+    return {
+      success: false,
+      error: {
+        code: 'EXCEL_WRITE_ERROR',
+        message: error.message
+      }
+    };
+  }
+});
+
+// =============================================================================
+// INCIDENCIA DE ENFERMEDAD LABORAL (Submódulo 3.3.5)
+// =============================================================================
+ipcMain.handle('incidencia:configurar-rutas', async (event, companyName, year) => {
+  console.log('[Incidencia][MAIN] ===== HANDLER CALLED =====');
+  console.log('[Incidencia][MAIN] companyName recibido:', companyName);
+
+  try {
+    const configData = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+    const config = JSON.parse(configData);
+
+    const normalizedInput = (companyName || '').toLowerCase();
+    const companyKey = Object.keys(config.companyPaths || {}).find(
+      key => key.toLowerCase() === normalizedInput
+    );
+
+    const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
+
+    if (!companyConfig || !companyConfig.root) {
+      return {
+        success: false,
+        error: {
+          code: 'COMPANY_NOT_FOUND',
+          message: `Empresa "${companyName}" no encontrada`
+        }
+      };
+    }
+
+    if (!companyConfig.structure?.structure) {
+      return {
+        success: false,
+        error: {
+          code: 'NO_STRUCTURE',
+          message: `Empresa "${companyName}" no tiene estructura mapeada`
+        }
+      };
+    }
+
+    const rootStructure = companyConfig.structure.structure;
+
+    function findDirFlexible(subdirs, target) {
+      if (!subdirs) return null;
+      const normalizedTarget = target
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      for (const [key, value] of Object.entries(subdirs)) {
+        const normalizedKey = key
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+        if (normalizedKey === normalizedTarget) {
+          return value;
+        }
+      }
+      return null;
+    }
+
+    var incidenciaPath = null;
+    var ubicacionesAPrueba = [
+      { modulo: "3. Gestion de la Salud", submodulo: "3.3.5 Incidencia de enfermedad laboral" },
+      { modulo: "3. Gestion de la Salud", submodulo: "3.3.5 Medicion de la incidencia de enfermedades laborales" },
+      { modulo: "3. Gestion de la Salud", submodulo: "3.3.5 Incidencia de Enfermedad Laboral" },
+    ];
+
+    for (var i = 0; i < ubicacionesAPrueba.length; i++) {
+      var loc = ubicacionesAPrueba[i];
+      var modulo = findDirFlexible(rootStructure.subdirectories, loc.modulo);
+      if (modulo && modulo.subdirectories) {
+        var submodulo = findDirFlexible(modulo.subdirectories, loc.submodulo);
+        if (submodulo) {
+          incidenciaPath = submodulo;
+          console.log('[Incidencia][MAIN] ENCONTRADO en:', loc.modulo, '->', loc.submodulo);
+          break;
+        }
+      }
+    }
+
+    if (!incidenciaPath) {
+      return {
+        success: false,
+        error: {
+          code: 'SUBMODULE_NOT_FOUND',
+          message: 'No se encontró carpeta de indicadores de incidencia'
+        }
+      };
+    }
+
+    console.log('[Incidencia][MAIN] incidenciaPath.path:', incidenciaPath.path);
+
+    const rutas = excelBridge.configurarRutasConRuta(incidenciaPath.path, year);
+
+    _setRuta('incidencia', rutas.indicadores, null, companyConfig.root, year);
+
+    return {
+      success: true,
+      data: {
+        indicadores: rutas.indicadores ? path.basename(rutas.indicadores) : null,
+        selectedFile: rutas.selectedFile,
+        availableFiles: rutas.availableFiles
+      }
+    };
+  } catch (error) {
+    console.error('[Incidencia][MAIN] EXCEPTION:', error.message);
+    return {
+      success: false,
+      error: {
+        code: 'CONFIG_ERROR',
+        message: error.message
+      }
+    };
+  }
+});
+
+ipcMain.handle('incidencia:leer-indicadores', async () => {
+  try {
+    var rutas = _getRuta('incidencia');
+    var result = await excelBridge.leerIndicadoresIncidencia(rutas && rutas.indicadores);
+    return result;
+  } catch (error) {
+    console.error('[Incidencia] Error leyendo indicadores:', error);
+    return {
+      success: false,
+      error: {
+        code: 'EXCEL_READ_ERROR',
+        message: error.message
+      }
+    };
+  }
+});
+
+ipcMain.handle('incidencia:escribir-excel', async (event, mes, campos) => {
+  try {
+    var rutas = _getRuta('incidencia');
+    return await excelBridge.escribirEnExcelIncidencia(mes, campos, rutas && rutas.indicadores);
+  } catch (error) {
+    console.error('[Incidencia] Error escribiendo en Excel:', error);
+    return {
+      success: false,
+      error: {
+        code: 'EXCEL_WRITE_ERROR',
+        message: error.message
+      }
+    };
+  }
+});
 
 // Iniciar el servidor OnlyOffice al iniciar la aplicación
 app.whenReady().then(() => {

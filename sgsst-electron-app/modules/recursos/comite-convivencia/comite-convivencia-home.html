@@ -1,0 +1,68 @@
+<link rel="stylesheet" href="./modules/recursos/comite-convivencia/comite-convivencia-home.css">
+
+<div class="cc-portal">
+  <div class="cc-portal__card">
+
+    <div class="cc-portal__header">
+      <div class="cc-portal__logo">K+<span>AIR</span></div>
+      <a class="cc-portal__back-btn" onclick="goBackToModule()">
+        <i class="bi bi-arrow-left"></i>
+        <span>Volver al Menú</span>
+      </a>
+    </div>
+
+    <div class="cc-portal__status-pill">
+      <i class="bi bi-check-circle"></i> Comité de Convivencia Laboral Activo
+    </div>
+
+    <h1 class="cc-portal__hero-title">Comité de Convivencia</h1>
+    <p class="cc-portal__hero-subtitle">
+      Espacio para la gestión de actas, protocolos de prevención de acoso laboral y seguimiento a compromisos del CCL.
+    </p>
+
+    <div class="cc-portal__main-actions">
+
+      <div class="cc-portal__main-action cc-portal__main-action--primary" onclick="enterRepositorioActas()">
+        <div class="cc-portal__main-action-icon">
+          <i class="bi bi-folder2-open"></i>
+        </div>
+        <div class="cc-portal__main-action-content">
+          <div class="cc-portal__action-title">Explorar Repositorio de Actas</div>
+          <div class="cc-portal__action-desc">Acceder al repositorio documental con todas las actas de reunión del comité.</div>
+        </div>
+      </div>
+
+      <div class="cc-portal__main-action" onclick="realizarNuevaActa()">
+        <div class="cc-portal__main-action-icon cc-portal__main-action-icon--success">
+          <i class="bi bi-file-earmark-text"></i>
+        </div>
+        <div class="cc-portal__main-action-content">
+          <div class="cc-portal__action-title">Realizar Nueva Acta</div>
+          <div class="cc-portal__action-desc">Registrar acta de reunión del CCL usando la plantilla oficial para auditorías.</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="cc-portal__quick-actions">
+      <div class="cc-portal__quick-actions-title">Herramientas y Operaciones</div>
+
+      <div class="cc-portal__actions-grid">
+
+        <div class="cc-portal__action-card" onclick="openProtocoloPrevencion()">
+          <div class="cc-portal__action-icon"><i class="bi bi-shield-check"></i></div>
+          <div class="cc-portal__action-title">Protocolo de Prevención</div>
+          <div class="cc-portal__action-desc">Consultar los procedimientos establecidos para la prevención del acoso laboral.</div>
+        </div>
+
+        <div class="cc-portal__action-card" onclick="openMarcoNormativo()">
+          <div class="cc-portal__action-icon cc-portal__action-icon--warning"><i class="bi bi-scale"></i></div>
+          <div class="cc-portal__action-title">Marco Normativo CCL</div>
+          <div class="cc-portal__action-desc">Acceso rápido a la Resolución 652 de 2012 y normatividad relacionada.</div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>

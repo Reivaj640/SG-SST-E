@@ -1,0 +1,674 @@
+// ============================================================
+// K+AIR SG-SST - frecuencia-accidentalidad.js
+// Lógica del renderer para el dashboard de accidentalidad
+// Submódulo 3.3.1 Frecuencia de la Accidentalidad
+// ============================================================
+
+(function() {
+  'use strict';
+  
+  var api, indicadores, caracterizacion, companyName;
+var currentYear = null;
+var availableFiles = [];
+  
+  function getElement(id) {
+    return document.getElementById(id);
+  }
+  
+  function escapeHtml(str) {
+    if (str === undefined || str === null) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  
+  function showToast(msg, type) {
+    type = type || 'success';
+    var container = getElement('toastContainer') || document.body;
+    var toast = document.createElement('div');
+    toast.className = 'kair-toast ' + type;
+    toast.textContent = msg;
+    container.appendChild(toast);
+    
+    setTimeout(function() {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateX(100%)';
+      setTimeout(function() { toast.remove(); }, 300);
+    }, 3500);
+  }
+  
+  function fmt(n, d) {
+    d = d || 2;
+    if (n === undefined || n === null || isNaN(n)) return '0';
+    return Number(n).toFixed(d);
+  }
+  
+  function getCompanyName() {
+    var params = new URLSearchParams(window.location.search);
+    return params.get('company') || localStorage.getItem('selectedCompany') || '';
+  }
+  
+  function buildGridLines(P, cH, W, maxV) {
+    var lines = '';
+    for (var i = 0; i < 6; i++) {
+      var y = P.t + cH - (i / 5) * cH;
+      var val = (maxV / 5 * i).toFixed(2);
+      lines += '<line x1="' + P.l + '" y1="' + y + '" x2="' + (W - P.r) + '" y2="' + y + '" stroke="#dee2e6" stroke-width="0.5" stroke-dasharray="4,4"/>';
+      lines += '<text x="' + (P.l - 10) + '" y="' + (y + 4) + '" text-anchor="end" fill="#6c757d" font-size="11">' + val + '</text>';
+    }
+    return lines;
+  }
+  
+  function buildChartPoints(pts, P, cH) {
+    var g = '';
+    for (var i = 0; i < pts.length; i++) {
+      var p = pts[i];
+      g += '<g>';
+      g += '<circle cx="' + p.x + '" cy="' + p.y + '" r="5" fill="#fff" stroke="#174ea6" stroke-width="2"/>';
+      g += '<text x="' + p.x + '" y="' + (P.t + cH + 20) + '" text-anchor="middle" fill="#6c757d" font-size="10">' + escapeHtml(p.label) + '</text>';
+      if (p.at > 0) {
+        g += '<text x="' + p.x + '" y="' + (p.y - 12) + '" text-anchor="middle" fill="#2d3748" font-size="9" font-weight="600">' + p.val + '</text>';
+      }
+      g += '</g>';
+    }
+    return g;
+  }
+  
+function configurarRutas(year) {
+  return new Promise(function(resolve, reject) {
+    companyName = getCompanyName();
+    console.log('[FrecuenciaAccidentalidad] ===== CONFIGURAR RUTAS =====');
+    console.log('[FrecuenciaAccidentalidad] companyName:', companyName, '| year:', year);
+
+    if (!companyName) {
+      showToast('No se ha seleccionado una empresa', 'warning');
+      resolve(false);
+      return;
+    }
+
+    api.configurarRutas(companyName, year || undefined).then(function(res) {
+      console.log('[FrecuenciaAccidentalidad] Respuesta de configurarRutas:', res);
+
+      if (res.success) {
+        if (res.data.availableFiles) {
+          availableFiles = res.data.availableFiles;
+          populateYearFilter();
+        }
+        if (res.data.selectedFile) {
+          updateYearLabels(res.data.selectedFile);
+        }
+        resolve(true);
+      } else {
+        console.log('[FrecuenciaAccidentalidad] ERROR en configurarRutas:', res.error);
+        showToast(res.error && res.error.message || 'Error configurando rutas', 'error');
+        resolve(false);
+      }
+    })['catch'](function(e) {
+      console.log('[FrecuenciaAccidentalidad] EXCEPTION en configurarRutas:', e.message);
+      showToast('Error de conexion: ' + e.message, 'error');
+      resolve(false);
+    });
+  });
+}
+
+function populateYearFilter() {
+  var select = getElement('yearFilter');
+  if (!select) return;
+
+  select.innerHTML = '';
+
+  availableFiles.forEach(function(f) {
+    var opt = document.createElement('option');
+    opt.value = f.year || '';
+    opt.textContent = f.year ? String(f.year) : f.fileName;
+    if (f.year === currentYear) opt.selected = true;
+    select.appendChild(opt);
+  });
+
+  if (!currentYear && availableFiles.length > 0) {
+    currentYear = availableFiles[0].year || null;
+    select.value = currentYear || '';
+  }
+}
+
+function updateYearLabels(fileName) {
+  var syncEl = getElement('syncFileName');
+  if (syncEl) syncEl.textContent = fileName;
+
+  var yearMatch = fileName && fileName.match(/(20\d{2})/);
+  var year = yearMatch ? yearMatch[1] : String(new Date().getFullYear());
+  currentYear = parseInt(year) || null;
+
+  var kpiYearEl = getElement('kpiYearLabel');
+  if (kpiYearEl) kpiYearEl.textContent = year;
+
+  var methodFileEl = getElement('methodFileName');
+  if (methodFileEl) methodFileEl.textContent = fileName;
+
+  var methodSourcesEl = getElement('methodSources');
+  if (methodSourcesEl) methodSourcesEl.textContent = fileName;
+}
+  
+function cargarDatos() {
+  console.log('[FrecuenciaAccidentalidad] ===== CARGAR DATOS =====');
+
+  var chartContainer = getElement('chartContainer');
+  if (chartContainer) {
+    chartContainer.innerHTML = '<div class="kair-loading"><div class="kair-spinner"></div><p class="kair-loading-text">Cargando datos desde Excel...</p></div>';
+  }
+
+  var year = currentYear || undefined;
+
+  configurarRutas(year).then(function(rutasOk) {
+    console.log('[FrecuenciaAccidentalidad] configurarRutas result:', rutasOk);
+      
+      if (!rutasOk) {
+        console.log('[FrecuenciaAccidentalidad] ERROR: No se pudieron configurar las rutas');
+        renderizar();
+        return;
+      }
+      
+      console.log('[FrecuenciaAccidentalidad] Llamando a api.leerIndicadores() y api.leerCaracterizacion()...');
+      console.log('[FrecuenciaAccidentalidad] api.leerIndicadores existe:', typeof api.leerIndicadores);
+      console.log('[FrecuenciaAccidentalidad] api.leerCaracterizacion existe:', typeof api.leerCaracterizacion);
+      console.log('[FrecuenciaAccidentalidad] api.contarATPorMes existe:', typeof api.contarATPorMes);
+      console.log('[FrecuenciaAccidentalidad] api.leerMetaObjetivo existe:', typeof api.leerMetaObjetivo);
+      
+      Promise.all([
+        api.leerIndicadores(),
+        api.leerCaracterizacion(),
+        api.contarATPorMes(currentYear, companyName),
+        api.leerMetaObjetivo(companyName)
+      ]).then(function(results) {
+        console.log('[FrecuenciaAccidentalidad] Resultados completos:', results);
+        
+        var resInd = results[0];
+        var resCar = results[1];
+        var resAtAuto = results[2];
+        var resMeta = results[3];
+        
+        console.log('[FrecuenciaAccidentalidad] leerIndicadores response:', resInd);
+        
+        if (resInd.success) {
+          console.log('[FrecuenciaAccidentalidad] indicadores cargados OK');
+          indicadores = resInd.data;
+        } else {
+          console.log('[FrecuenciaAccidentalidad] ERROR leerIndicadores:', resInd.error);
+          showToast(resInd.error && resInd.error.message || 'Error al leer indicadores', 'error');
+          indicadores = null;
+        }
+        
+        console.log('[FrecuenciaAccidentalidad] leerCaracterizacion response:', resCar);
+        
+        if (resCar.success) {
+          console.log('[FrecuenciaAccidentalidad] caracterizacion cargada OK');
+          caracterizacion = resCar.data;
+        } else {
+          console.log('[FrecuenciaAccidentalidad] WARN leerCaracterizacion:', resCar.error);
+          caracterizacion = null;
+        }
+        
+        if (indicadores && resAtAuto && resAtAuto.success && resAtAuto.data && resAtAuto.data.mensual) {
+          var autoMensual = resAtAuto.data.mensual;
+          console.log('[FrecuenciaAccidentalidad] Auto AT por mes:', autoMensual);
+          indicadores.frecuenciaMensual.forEach(function(row) {
+            var autoCount = autoMensual[row.mes] || 0;
+            if (autoCount > 0) {
+              row.accidentesOriginal = row.accidentes;
+              row.accidentes = autoCount;
+              row.indiceFrecuencia = row.trabajadores > 0
+                ? Math.round(((autoCount / row.trabajadores) * 100) * 10000) / 10000
+                : 0;
+              row.isAuto = true;
+            }
+          });
+        }
+        
+        if (indicadores && resMeta && resMeta.success && resMeta.data && resMeta.data.meta) {
+          console.log('[FrecuenciaAccidentalidad] Meta desde Objetivos SST:', resMeta.data.meta, '(' + resMeta.data.metaTexto + ')');
+          indicadores.config.metaFrecuencia = resMeta.data.meta;
+        }
+        
+        renderizar();
+      })['catch'](function(e) {
+        showToast('Error de conexion: ' + e.message, 'error');
+        console.error('[FrecuenciaAccidentalidad] Error cargando datos:', e);
+      });
+    });
+  }
+  
+  function renderizar() {
+    if (!indicadores) {
+      renderEmptyState();
+      return;
+    }
+
+    renderKPIs();
+    renderTargetCard();
+    renderChart();
+    renderTabla();
+    renderMonthCards();
+    renderReference();
+    renderColapsables();
+  }
+  
+  function renderEmptyState() {
+    var kpiSection = getElement('kpiSection');
+    var chartContainer = getElement('chartContainer');
+    
+    if (kpiSection) kpiSection.style.display = 'none';
+if (chartContainer) {
+    chartContainer.innerHTML = '<div class="kair-empty"><svg class="kair-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg><h3>No hay datos disponibles</h3><p>No se encontró el archivo de indicadores para el año ' + (currentYear || 'seleccionado') + ' en la carpeta de esta empresa.</p></div>';
+  }
+  }
+  
+  function renderKPIs() {
+    var fM = indicadores.frecuenciaMensual;
+    var meta = indicadores.config.metaFrecuencia;
+    
+    var fNZ = fM.filter(function(f) { return f.indiceFrecuencia > 0; });
+    var promIF = fNZ.length ? fNZ.reduce(function(s, f) { return s + f.indiceFrecuencia; }, 0) / fNZ.length : 0;
+    
+    var exceden = fM.filter(function(f) { return f.indiceFrecuencia > meta; }).length;
+    
+    var kpiIF = getElement('kpiIF');
+    if (kpiIF) {
+      kpiIF.textContent = fmt(promIF, 4);
+      kpiIF.className = 'kair-kpi-value ' + (promIF > meta ? 'danger' : 'success');
+    }
+    
+    var kpiMetaF = getElement('kpiMetaF');
+    if (kpiMetaF) kpiMetaF.textContent = fmt(meta, 4);
+    
+    var kpiTotalAT = getElement('kpiTotalAT');
+    if (kpiTotalAT) kpiTotalAT.textContent = indicadores.totalAT2024;
+    
+    var kpiHist = getElement('kpiHist');
+    if (kpiHist) kpiHist.textContent = caracterizacion ? caracterizacion.totalGeneral : '-';
+    
+    var kpiExceden = getElement('kpiExceden');
+    if (kpiExceden) kpiExceden.textContent = exceden + '/' + fM.length;
+    
+    var kpiMort = getElement('kpiMort');
+    if (kpiMort) {
+      kpiMort.textContent = indicadores.config.mortalidad;
+      kpiMort.className = 'kair-kpi-value ' + (indicadores.config.mortalidad > 0 ? 'danger' : 'success');
+    }
+    
+    var kpiAus = getElement('kpiAus');
+    if (kpiAus) {
+      var aus = indicadores.ausentismoMensual.reduce(function(s, a) { return s + a.tasaAusentismo; }, 0) / 12;
+      kpiAus.textContent = fmt(aus, 2) + '%';
+    }
+  }
+  
+  function renderChart() {
+    var fM = indicadores.frecuenciaMensual;
+    var meta = indicadores.config.metaFrecuencia;
+
+    var container = getElement('chartContainer');
+    if (!container) return;
+
+    var containerWidth = container.offsetWidth || 800;
+    var screenWidth = window.innerWidth;
+
+    var baseWidth = screenWidth >= 2560 ? 1400 : screenWidth >= 1920 ? 1200 : 800;
+    var W = Math.max(800, Math.min(containerWidth, baseWidth));
+    var H = Math.max(320, Math.round(W * 0.4));
+
+    var P = { t: 30, r: 40, b: 50, l: 60 };
+    var cW = W - P.l - P.r;
+    var cH = H - P.t - P.b;
+
+    var maxV = Math.max(meta * 3, fM.reduce(function(m, d) { return Math.max(m, d.indiceFrecuencia); }, 0), 0.01);
+
+    var barWidth = cW / 12 * 0.6;
+    var gap = cW / 12;
+
+    var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;font-family:var(--kair-font)">';
+
+    // Fondo
+    svg += '<rect x="' + P.l + '" y="' + P.t + '" width="' + cW + '" height="' + cH + '" fill="#fafbfc" rx="4"/>';
+
+    // Línea de meta
+    if (meta > 0) {
+      var targetY = P.t + cH - (meta / maxV) * cH;
+      svg += '<line x1="' + P.l + '" y1="' + targetY + '" x2="' + (W - P.r) + '" y2="' + targetY + '" stroke="#dc3545" stroke-width="1.5" stroke-dasharray="6,4"/>';
+      svg += '<text x="' + (W - P.r + 5) + '" y="' + (targetY + 4) + '" fill="#dc3545" font-size="10" font-weight="600">Meta: ' + meta + '</text>';
+    }
+
+    // Grid Y axis
+    for (var i = 0; i <= 5; i++) {
+      var y = P.t + (i / 5) * cH;
+      svg += '<line x1="' + P.l + '" y1="' + y + '" x2="' + (W - P.r) + '" y2="' + y + '" stroke="#e9ecef" stroke-width="1"/>';
+      svg += '<text x="' + (P.l - 5) + '" y="' + (y + 4) + '" fill="#adb5bd" font-size="10" text-anchor="end">' + (maxV * (5 - i) / 5).toFixed(1) + '</text>';
+    }
+
+    // Barras
+    fM.forEach(function(month, i) {
+      var x = P.l + i * gap + gap * 0.2;
+      var barHeight = (month.indiceFrecuencia / maxV) * cH;
+      var y = P.t + cH - barHeight;
+      var status = month.accidentes === 0 ? '#28a745' : month.indiceFrecuencia <= meta ? '#28a745' : month.indiceFrecuencia <= meta * 5 ? '#ffc107' : '#dc3545';
+
+      svg += '<rect x="' + x + '" y="' + y + '" width="' + barWidth + '" height="' + barHeight + '" fill="' + status + '" rx="3" opacity="0.85"/>';
+
+      if (month.indiceFrecuencia > 0) {
+        svg += '<text x="' + (x + barWidth / 2) + '" y="' + (y - 4) + '" fill="#212529" font-size="9" font-weight="600" text-anchor="middle">' + month.indiceFrecuencia.toFixed(1) + '</text>';
+      }
+
+      svg += '<text x="' + (x + barWidth / 2) + '" y="' + (P.t + cH + 16) + '" fill="#6c757d" font-size="11" font-weight="500" text-anchor="middle">' + month.mesLabel + '</text>';
+    });
+
+    // Label Y
+    svg += '<text x="15" y="' + (P.t + cH / 2) + '" fill="#6c757d" font-size="11" text-anchor="middle" transform="rotate(-90 15 ' + (P.t + cH / 2) + ')">Índice de Frecuencia</text>';
+
+    svg += '</svg>';
+
+    container.innerHTML = svg;
+  }
+  
+  function renderTabla() {
+    var fM = indicadores.frecuenciaMensual;
+    var meta = indicadores.config.metaFrecuencia;
+    
+    var tbody = getElement('tablaBody');
+    if (!tbody) return;
+    
+    var html = '';
+    
+    fM.forEach(function(row, i) {
+      var exc = row.indiceFrecuencia > meta;
+      
+      html += '<tr>';
+      html += '<td>' + row.mesLabel + '</td>';
+      var badge = row.isAuto ? '<span class="freq-badge-auto" title="Auto desde Caracterizacion">🤖</span>' : '';
+      html += '<td><span class="kair-editable" data-mes="' + row.mes + '" data-campo="accidentes" tabindex="0">' + badge + row.accidentes + '</span></td>';
+      html += '<td><span class="kair-editable" data-mes="' + row.mes + '" data-campo="trabajadores" tabindex="0">' + row.trabajadores + '</span></td>';
+      html += '<td style="font-weight:700;color:' + (exc ? '#dc3545' : '#28a745') + '">' + fmt(row.indiceFrecuencia, 4) + '</td>';
+      html += '<td style="color:#6c757d">' + meta + '</td>';
+      html += '<td><span class="kair-badge-status ' + (exc ? 'kair-badge-excede' : 'kair-badge-cumple') + '">' + (exc ? 'EXCEDE' : 'CUMPLE') + '</span></td>';
+      html += '</tr>';
+    });
+    
+    tbody.innerHTML = html;
+    
+    var btns = tbody.querySelectorAll('.kair-editable');
+    btns.forEach(function(el) {
+      el.addEventListener('click', iniciarEdicion);
+      el.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') iniciarEdicion.call(el);
+      });
+    });
+    
+    var totalAT = fM.reduce(function(s, f) { return s + f.accidentes; }, 0);
+    var tNZ = fM.filter(function(f) { return f.trabajadores > 0; });
+    var promTrab = tNZ.length ? Math.round(fM.reduce(function(s, f) { return s + f.trabajadores; }, 0) / tNZ.length) : 0;
+    var promIF = fM.reduce(function(s, f) { return s + f.indiceFrecuencia; }, 0) / 12;
+    
+    var tablaFoot = getElement('tablaFoot');
+    if (tablaFoot) {
+      tablaFoot.innerHTML = '<tr><td>TOTAL</td><td>' + totalAT + '</td><td>' + promTrab + '</td><td style="color:#174ea6">' + fmt(promIF, 4) + '</td><td>' + meta + '</td><td>-</td></tr>';
+    }
+  }
+  
+  function iniciarEdicion() {
+    var el = this;
+    var actual = parseInt(el.textContent) || 0;
+    var mes = parseInt(el.dataset.mes);
+    var campo = el.dataset.campo;
+    
+    var input = document.createElement('input');
+    input.type = 'number';
+    input.className = 'kair-input';
+    input.value = actual;
+    input.min = '0';
+    input.step = '1';
+    
+    el.replaceWith(input);
+    input.focus();
+    input.select();
+    
+    var commit = function() {
+      var val = parseInt(input.value) || 0;
+      if (val !== actual) {
+        api.escribirEnExcel(mes, (function() { var o = {}; o[campo] = val; return o; })()).then(function(res) {
+          if (res.success) {
+            showToast('Excel actualizado: ' + campo + ' -> ' + val);
+            cargarDatos();
+          } else {
+            showToast(res.error && res.error.message || 'Error al guardar', 'error');
+          }
+        })['catch'](function(e) {
+          showToast('Error: ' + e.message, 'error');
+        });
+      } else {
+        cargarDatos();
+      }
+    };
+    
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        commit();
+      }
+      if (e.key === 'Escape') {
+        cargarDatos();
+      }
+    });
+    
+    input.addEventListener('blur', commit);
+  }
+  
+  function renderColapsables() {
+    var seccionesContainer = getElement('seccionesColapsables');
+    if (!seccionesContainer) return;
+    
+    if (!caracterizacion) {
+      seccionesContainer.innerHTML = '';
+      return;
+    }
+    
+    var sections = [
+      { title: 'Evolucion Historica por Ano', data: caracterizacion.historialAnual, key: 'anio', val: 'total' },
+      { title: 'Distribucion por Empresa', data: caracterizacion.empresaDesglose, key: 'empresa', val: 'total' },
+      { title: 'Tipo de Evento', data: caracterizacion.tipoEvento, key: 'tipo', val: 'total' },
+      { title: 'Distribucion Mensual Historica', data: caracterizacion.mesHistorico, key: 'mes', val: 'total' }
+    ].filter(function(s) { return s.data && s.data.length > 0; });
+    
+    var colors = ['#174ea6', '#28a745', '#ffc107', '#dc3545', '#6f42c1', '#20c997', '#fd7e14', '#6610f2'];
+    
+    var html = '';
+    
+    sections.forEach(function(s, idx) {
+      var maxV = Math.max.apply(null, s.data.map(function(d) { return d[s.val]; }).concat([1]));
+      
+      var bars = '';
+      s.data.forEach(function(d, i) {
+        var v = d[s.val];
+        var pct = (v / maxV) * 100;
+        var label = String(d[s.key]).length > 28 ? String(d[s.key]).substring(0, 28) + '...' : d[s.key];
+        
+        bars += '<div class="kair-progress-wrap">';
+        bars += '<span class="kair-progress-label" title="' + d[s.key] + '">' + label + '</span>';
+        bars += '<div class="kair-progress-track">';
+        bars += '<div class="kair-progress-fill" style="width:' + pct + '%;background:' + colors[i % colors.length] + '"></div>';
+        bars += '</div>';
+        bars += '<span class="kair-progress-value">' + v + '</span>';
+        bars += '</div>';
+      });
+      
+      html += '<div class="kair-collapsible">';
+      html += '<button class="kair-collapsible-header" data-idx="' + idx + '">' + s.title + '<span class="kair-collapsible-arrow">*</span></button>';
+      html += '<div class="kair-collapsible-body" id="collapsible-' + idx + '">' + bars + '</div>';
+      html += '</div>';
+    });
+    
+    seccionesContainer.innerHTML = html;
+    
+    var btns = seccionesContainer.querySelectorAll('.kair-collapsible-header');
+    btns.forEach(function(btn) {
+      btn.addEventListener('click', toggleCollapsible);
+    });
+  }
+  
+  function toggleCollapsible() {
+    var idx = this.dataset.idx;
+    var body = getElement('collapsible-' + idx);
+    var arrow = this.querySelector('.kair-collapsible-arrow');
+    
+    if (!body) return;
+    
+    var isOpen = body.classList.contains('open');
+    
+    var container = getElement('seccionesColapsables');
+    if (container) {
+      var bodies = container.querySelectorAll('.kair-collapsible-body');
+      bodies.forEach(function(b) { b.classList.remove('open'); });
+      var arrows = container.querySelectorAll('.kair-collapsible-arrow');
+      arrows.forEach(function(a) { a.classList.remove('open'); });
+    }
+    
+    if (!isOpen) {
+      body.classList.add('open');
+      if (arrow) arrow.classList.add('open');
+    }
+}
+
+  function renderTargetCard() {
+    var config = indicadores.config || {};
+    var meta = config.metaFrecuencia || 0;
+    var fM = indicadores.frecuenciaMensual;
+
+    var fNZ = fM.filter(function(f) { return f.indiceFrecuencia > 0; });
+    var promIF = fNZ.length ? fNZ.reduce(function(s, f) { return s + f.indiceFrecuencia; }, 0) / fNZ.length : 0;
+
+    var targetValue = getElement('targetValue');
+    if (targetValue) targetValue.textContent = meta;
+
+    var targetBadge = getElement('targetBadge');
+    if (targetBadge) {
+      targetBadge.textContent = 'Promedio: ' + fmt(promIF, 4);
+      targetBadge.className = 'kair-target-badge ' + (promIF > meta ? 'danger' : promIF > 0 ? 'warning' : 'success');
+    }
+  }
+
+  function renderMonthCards() {
+    var container = getElement('monthCards');
+    if (!container) return;
+
+    var config = indicadores.config || {};
+    var meta = config.metaFrecuencia || 0;
+    var fM = indicadores.frecuenciaMensual;
+
+    var html = '';
+
+    fM.forEach(function(month) {
+      var status = month.accidentes === 0 ? 'success' : month.indiceFrecuencia <= meta ? 'success' : month.indiceFrecuencia <= meta * 5 ? 'warning' : 'danger';
+      var statusColor = status === 'success' ? '#28a745' : status === 'warning' ? '#856404' : '#dc3545';
+      var statusLabel = status === 'success' ? 'Sin AT' : status === 'warning' ? 'Precaución' : 'Crítico';
+
+      html += '<div class="kair-month-card" style="border-top: 3px solid ' + statusColor + '">';
+      html += '<div class="kair-month-card-name">' + month.mesLabel + '</div>';
+      html += '<div class="kair-month-card-value" style="color:' + statusColor + '">' + fmt(month.indiceFrecuencia, 4) + '</div>';
+      html += '<div class="kair-month-card-detail">' + month.accidentes + ' AT / ' + month.trabajadores + ' trab.</div>';
+      html += '<span class="kair-badge-status kair-badge-' + (status === 'success' ? 'cumple' : 'excede') + '">' + statusLabel + '</span>';
+      html += '</div>';
+    });
+
+    container.innerHTML = html;
+  }
+
+  function renderReference() {
+    var config = indicadores.config || {};
+
+    var refType = getElement('refType');
+    if (refType) refType.textContent = 'RESULTADO';
+
+    var refFormula = getElement('refFormula');
+    if (refFormula) refFormula.textContent = '(AT / Trabajadores) × 100';
+
+    var refFreq = getElement('refFreq');
+    if (refFreq) refFreq.textContent = 'MENSUAL';
+
+    var refTargetF = getElement('refTargetF');
+    if (refTargetF) refTargetF.textContent = fmt(config.metaFrecuencia || 0, 4);
+  }
+
+  // Init
+  api = window.electronAPI && window.electronAPI.frecuenciaAccidentalidad;
+  
+  if (!api) {
+    var container = document.getElementById('app') || document.body;
+    container.innerHTML = '<div class="kair-empty" style="padding: 3rem;"><h3>Error de Inicializacion</h3><p>electronAPI.frecuenciaAccidentalidad no disponible.</p></div>';
+    return;
+  }
+  
+var btnRefrescar = getElement('btnRefrescar');
+if (btnRefrescar) {
+  btnRefrescar.addEventListener('click', cargarDatos);
+}
+
+var yearFilter = getElement('yearFilter');
+if (yearFilter) {
+  yearFilter.addEventListener('change', function() {
+    var selectedYear = parseInt(this.value) || null;
+    currentYear = selectedYear;
+    cargarDatos();
+  });
+}
+
+var btnClone = getElement('btnCloneYear');
+if (btnClone) {
+  btnClone.addEventListener('click', function() {
+    if (!currentYear) {
+      window.updateNotifier.show({ type: 'warning', title: 'Año no seleccionado', subtitle: 'Seleccione un año primero', autoClose: 4000 });
+      return;
+    }
+    var nextYear = currentYear + 1;
+
+    window.updateNotifier.show({
+      type: 'warning',
+      title: 'Duplicar Archivo',
+      subtitle: '¿Duplicar INDICADORES ' + currentYear + ' para ' + nextYear + '?',
+      message: 'Se conservarán metas y trabajadores. Datos de ejecución se limpiarán.',
+      buttonText: 'Duplicar',
+      onClick: function() {
+        window.updateNotifier.remove(window.updateNotifier.currentToast);
+
+        var currentFile = availableFiles.find(function(f) { return f.year === currentYear; });
+        if (!currentFile) {
+          window.updateNotifier.show({ type: 'error', title: 'Archivo no encontrado', subtitle: 'No se encontró el archivo actual', autoClose: 5000 });
+          return;
+        }
+
+        window.updateNotifier.show({ type: 'info', title: 'Duplicando Archivo', subtitle: 'Creando INDICADORES ' + nextYear + '.xlsx...', progress: { percent: 0 }, autoClose: 0 });
+
+        window.electronAPI.duplicateIndicadoresFile({
+          currentFilePath: currentFile.filePath,
+          newYear: nextYear
+        }).then(function(result) {
+          if (result.success) {
+            window.updateNotifier.show({ type: 'success', title: 'Archivo Duplicado', subtitle: result.newFileName, message: 'Metas y trabajadores conservados. Datos de ejecución limpiados.', autoClose: 5000 });
+            currentYear = nextYear;
+            cargarDatos();
+          } else {
+            window.updateNotifier.show({ type: 'error', title: 'Error al Duplicar', subtitle: result.error && result.error.message || 'Error desconocido', autoClose: 6000 });
+          }
+        })['catch'](function(e) {
+          window.updateNotifier.show({ type: 'error', title: 'Error Inesperado', subtitle: e.message, autoClose: 6000 });
+        });
+      },
+      autoClose: 0
+    });
+  });
+}
+
+  var btnVolver = getElement('btnVolver');
+  if (btnVolver) {
+    btnVolver.addEventListener('click', function() {
+      window.parent.postMessage({ type: 'back-to-module-request' }, '*');
+    });
+  }
+  
+  setTimeout(cargarDatos, 100);
+  
+})();

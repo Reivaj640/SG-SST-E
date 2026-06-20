@@ -71,8 +71,7 @@ document.addEventListener('DOMContentLoaded', function() {
 function setupEventListeners() {
     document.getElementById('backBtn').addEventListener('click', () => {
         if (window.parent && window.parent.postMessage) {
-            // Use a standardized message format for all communications
-            window.parent.postMessage({ type: 'back-to-module-request' }, '*');
+            window.parent.postMessage({ type: 'back-to-submodule-home' }, '*');
         }
     });
     document.getElementById('downloadBtn').addEventListener('click', downloadDocument);

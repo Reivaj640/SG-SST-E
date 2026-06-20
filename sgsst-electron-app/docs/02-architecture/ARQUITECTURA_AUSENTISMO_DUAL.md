@@ -1,7 +1,7 @@
 # 📊 Arquitectura Dual de Archivos - Módulo de Ausentismo
 
-**Versión:** 0.1.50
-**Fecha de actualización:** 26 de febrero de 2026
+**Versión:** 0.1.99
+**Fecha de actualización:** 9 de junio de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
 ---
@@ -408,13 +408,13 @@ Cuando un caso se marca como "cerrado" en PRI.xlsx, **NO se actualiza automátic
 ## 🚀 Próximos Pasos (Pendientes)
 
 ### **Frontend**
-- [ ] Actualizar `seguimiento-incapacidades.html` para usar `getPriSeguimientoData` cuando se abra el seguimiento de un caso individual
-- [ ] Implementar formulario de seguimiento detallado (Etapas PRIC, Recomendaciones, Calificación PCL)
-- [ ] Agregar botón "Guardar Seguimiento" que escriba en PRI.xlsx
+- [x] Actualizar `seguimiento-incapacidades.html` para usar `getPriSeguimientoData` cuando se abra el seguimiento de un caso individual
+- [x] Implementar formulario de seguimiento detallado (Etapas PRIC, Recomendaciones, Calificación PCL)
+- [x] Agregar botón "Guardar Seguimiento" que escriba en PRI.xlsx
 
 ### **Backend**
-- [ ] Implementar handler `save-follow-up` para escribir en PRI.xlsx
-- [ ] Validar que los datos escritos en PRI.xlsx mantengan la integridad del archivo
+- [x] Implementar handler `save-follow-up` para escribir en PRI.xlsx (`saveFollowUp` — 9 IPC handlers PRI)
+- [x] Validar que los datos escritos en PRI.xlsx mantengan la integridad del archivo
 
 ---
 

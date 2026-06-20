@@ -74,14 +74,6 @@ function setupEventListeners() {
     window.finalizeReport = finalizeReport;
     window.loadExcelData = loadExcelData;
     window.saveExcelData = saveExcelData;
-
-    // Evento para volver al módulo
-    document.getElementById('backBtn')?.addEventListener('click', () => {
-        if (window.parent && window.parent.postMessage) {
-            // Use a standardized message format for all communications
-            window.parent.postMessage({ type: 'back-to-module-request' }, '*');
-        }
-    });
 }
 
 // Inicializar la rendición de cuentas
@@ -112,12 +104,19 @@ function loadURLParameters() {
  * Renderiza el submódulo de rendición de cuentas
  * @param {HTMLElement} container - Contenedor donde se va a renderizar
  * @param {Object} context - Contexto con información adicional
+ * @param {Function} backCallback - Callback para volver al módulo
  */
-async function render(container, context = {}) {
+async function render(container, context = {}, backCallback = null) {
     try {
         // Extraer información del contexto
         rendicionCurrentCompany = context.company || 'Empresa Desconocida';
         rendicionCurrentPeriod = context.period || '2024';
+
+        // Guardar callback si se proporciona (para compatibilidad)
+        if (backCallback && typeof backCallback === 'function') {
+            window.rendicionModuleBackCallback = backCallback;
+            console.log('[Rendicion Viewer] Callback de retorno registrado');
+        }
 
         // Cargar datos iniciales
         await loadData();
@@ -462,15 +461,22 @@ function initializeEvents() {
         breadcrumbPeriod.textContent = rendicionCurrentPeriod;
     }
 
-    // Evento para el botón Volver
-    const backBtn = document.getElementById('backBtn');
+    // Evento para el botón Volver (Patrón K+AIR)
+    const backBtn = document.getElementById('backToModuleBtn');
     if (backBtn) {
         backBtn.onclick = () => {
-            console.log('Botón volver clickeado');
-            // Solo enviamos el mensaje al padre para evitar bucle infinito
-            const message = { type: 'back-to-module-request' };
-            if (window.parent !== window) {
-                window.parent.postMessage(message, '*');
+            console.log('[Rendicion Viewer] Botón volver clickeado');
+            // Retornar al portal de bienvenida
+            if (window.rendicionPortalComponent && typeof window.rendicionPortalComponent.backToPortal === 'function') {
+                console.log('[Rendicion Viewer] Usando backToPortal()');
+                window.rendicionPortalComponent.backToPortal();
+            } else {
+                // Fallback a postMessage para compatibilidad
+                console.log('[Rendicion Viewer] Usando postMessage como fallback');
+                const message = { type: 'back-to-module-request' };
+                if (window.parent !== window) {
+                    window.parent.postMessage(message, '*');
+                }
             }
         };
     }
@@ -507,7 +513,7 @@ function switchSection(sectionId, navElement) {
     // Ocultar todas las secciones
     document.querySelectorAll('.section-view').forEach(el => el.classList.remove('active'));
     // Quitar clase active de botones
-    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.rendicion-tab').forEach(el => el.classList.remove('active'));
 
     // Mostrar sección seleccionada
     document.getElementById(sectionId).classList.add('active');

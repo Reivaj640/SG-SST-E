@@ -27,8 +27,9 @@
   <link rel="stylesheet" href="assets/css/font-awesome.min.css">
 </head>
 <body>
-  <div id="app">
-    <header id="app-header">
+<div id="app">
+  <div id="header-hover-zone"></div>
+  <header id="app-header">
       <div class="header-content">
         <div class="logo-container">
           <img id="header-logo" src="" alt="Logo" style="display:none;">
@@ -54,12 +55,25 @@
           <button id="calendar-button" class="header-btn" title="Calendario">
             <span id="calendar-icon-placeholder" class="icon-placeholder">📅</span>
           </button>
+          <button id="header-update-btn" class="header-btn header-update-btn header-update-uptodate" title="Cargando versión...">
+            <span class="icon-placeholder">🔄</span>
+            <span id="header-update-text" class="header-update-text">...</span>
+          </button>
           <button id="config-button" class="header-btn" title="Configuraciones">
             <span id="config-icon-placeholder" class="icon-placeholder">⚙️</span>
           </button>
           <button id="llm-button" class="header-btn" title="Chat LLM">
             <span id="llm-icon-placeholder" class="icon-placeholder">💬</span>
           </button>
+        </div>
+        <div id="header-update-panel" class="header-update-panel" style="display:none">
+          <div class="update-progress-container">
+            <div class="update-progress-bar">
+              <div id="update-progress-fill" class="update-progress-fill"></div>
+            </div>
+            <span id="update-progress-text" class="update-progress-text">Descargando...</span>
+          </div>
+          <button id="update-install-btn" class="update-install-btn" style="display:none">Actualizar</button>
         </div>
       </div>
     </header>
@@ -112,6 +126,13 @@
   <script src="modules/gestion-salud/restricciones-medicas/restricciones-medicas-logic.js"></script>
   <script src="modules/gestion-salud/evaluaciones-medicas/evaluaciones-medicas-logic.js"></script>
   <script src="modules/recursos/responsable-sg/responsable-sg-logic.js"></script>
+  <script src="modules/gestion-amenazas/plan-prevencion/plan-prevencion-logic.js"></script>
+  <script src="modules/gestion-amenazas/examenes-brigadista/examenes-brigadista-logic.js"></script>
+  <script src="modules/mejoramiento/acciones-preventivas-correctivas/acciones-pc-logic.js"></script>
+  <script src="modules/mejoramiento/acciones-mejora-gerencia/acciones-mg-logic.js"></script>
+  <script src="modules/mejoramiento/acciones-mejora-atel/acciones-ma-logic.js"></script>
+  <script src="modules/mejoramiento/planes-mejoramiento/planes-logic.js"></script>
+ <script src="modules/gestion-peligros/metodologia-ipevr/metodologia-ipevr-logic.js"></script>
   <script src="modules/recursos/capacitacion-copasst/capacitacion-copasst-logic.js"></script>
   <script src="modules/recursos/trabajo-alto-riesgo/trabajo-alto-riesgo-logic.js"></script>
   <script src="modules/recursos/roles-responsabilidades/roles-responsabilidades-logic.js"></script>
@@ -120,7 +141,9 @@
   <script src="modules/recursos/manual-proveedores/manual-proveedores-logic.js"></script>
   <script src="modules/gestion-integral/politica/politica-logic.js"></script>
   <script src="modules/gestion-integral/objetivos-sst/objetivos-sst-logic.js"></script>
+  <script src="modules/gestion-integral/archivo-retencion/archivo-retencion.js"></script>
   <script src="modules/gestion-integral/evaluacion-inicial-sg-sst/evaluacion-inicial-sg-sst.js"></script>
+  <script src="modules/gestion-integral/gestion-del-cambio/gestion-cambio-logic.js"></script>
   <script src="modules/gestion-salud/sociodemografica/sociodemografica-component.js"></script>
   <script src="modules/gestion-integral/gestion-integral-home.js"></script>
   <script src="modules/recursos/recursos-home.js"></script>
@@ -128,12 +151,35 @@
   <script src="modules/gestion-peligros/gestion-peligros-home.js"></script>
   <script src="modules/gestion-amenazas/gestion-amenazas-home.js"></script>
   <script src="modules/verificacion/verificacion-home.js"></script>
+  <script src="modules/verificacion/definicion-indicadores/definicion-indicadores-service.js"></script>
+  <script src="modules/verificacion/definicion-indicadores/indicadores-resultado-view.js"></script>
+  <script src="modules/verificacion/definicion-indicadores/indicadores-estructura-view.js"></script>
+  <script src="modules/verificacion/definicion-indicadores/indicadores-proceso-view.js"></script>
+  <script src="modules/verificacion/definicion-indicadores/indicadores-detalle-modal.js"></script>
+  <script src="modules/verificacion/definicion-indicadores/definicion-indicadores-component.js"></script>
+  <script src="modules/verificacion/auditoria-anual/auditoria-anual-service.js"></script>
+  <script src="modules/verificacion/auditoria-anual/auditoria-anual-component.js"></script>
+  <!-- Submódulo 6.1.3 — Revisión por la Alta Dirección -->
+  <link rel="stylesheet" href="modules/verificacion/revision-alta-direccion/revision-alta-direccion.css">
+  <link rel="stylesheet" href="modules/verificacion/revision-alta-direccion/revision-alta-direccion-v2.css">
+  <script src="modules/verificacion/revision-alta-direccion/revision-alta-direccion-service.js"></script>
+  <script src="modules/verificacion/revision-alta-direccion/vistas/revisiones-list.js"></script>
+  <script src="modules/verificacion/revision-alta-direccion/vistas/revision-editor.js"></script>
+  <script src="modules/verificacion/revision-alta-direccion/vistas/revision-viewer.js"></script>
+  <script src="modules/verificacion/revision-alta-direccion/vistas/actas-editor.js"></script>
+  <script src="modules/verificacion/revision-alta-direccion/vistas/actas-reunion.js"></script>
+  <script src="modules/verificacion/revision-alta-direccion/vistas/despliegue-estrategico.js"></script>
+  <script src="modules/verificacion/revision-alta-direccion/vistas/procedimiento.js"></script>
+  <script src="modules/verificacion/revision-alta-direccion/vistas/registro-documental.js"></script>
+  <script src="modules/verificacion/revision-alta-direccion/revision-alta-direccion-component.js"></script>
+  <script src="modules/mejoramiento/mejoramiento-store.js"></script>
   <script src="modules/mejoramiento/mejoramiento-home.js"></script>
   <script src="modules/gestion-salud/investigacion-accidentes/investigacion-accidentes-logic.js"></script>
   <script src="modules/recursos/copasst/copasst-logic.js"></script>
+<script src="modules/recursos/copasst/copasst-portal-logic.js"></script>
   <script src="modules/recursos/comite-convivencia/comite-convivencia-logic.js"></script>
+<script src="modules/recursos/comite-convivencia/comite-convivencia-portal-logic.js"></script>
   <script src="modules/gestion-salud/ausentismo/medicion-ausentismo.js"></script>
-  <script src="modules/gestion-salud/ausentismo/medicion-ausentismo-home.js"></script>
   <script src="modules/gestion-salud/ausentismo/registrar-ausentismo.js"></script>
   <script src="modules/recursos/presupuesto/presupuesto-logic.js"></script>
   <script src="modules/recursos/capacitaciones/capacitaciones-logic.js"></script>
@@ -149,8 +195,48 @@
   <link rel="stylesheet" href="modules/gestion-integral/evaluacion-proveedores/evaluacion-proveedores.css">
   <script src="modules/gestion-integral/evaluacion-proveedores/evaluacion-proveedores.js"></script>
 
-  <!-- Sistema de Notificaciones Moderno para Actualizaciones -->
-  <script src="assets/js/update-notifications.js"></script>
+<!-- Submódulo 2.10.1 - Evaluación y Selección de Proveedores y Contratistas -->
+<link rel="stylesheet" href="modules/gestion-integral/evaluacion-seleccion/evaluacion-seleccion.css">
+<script src="modules/gestion-integral/evaluacion-seleccion/kair-utils.js"></script>
+<script src="modules/gestion-integral/evaluacion-seleccion/asociados-service.js"></script>
+<script src="modules/gestion-integral/evaluacion-seleccion/evaluaciones-service.js"></script>
+<script src="modules/gestion-integral/evaluacion-seleccion/noconformidades-service.js"></script>
+<script src="modules/gestion-integral/evaluacion-seleccion/dashboard.js"></script>
+<script src="modules/gestion-integral/evaluacion-seleccion/registro.js"></script>
+<script src="modules/gestion-integral/evaluacion-seleccion/evaluacion.js"></script>
+<script src="modules/gestion-integral/evaluacion-seleccion/reevaluacion.js"></script>
+<script src="modules/gestion-integral/evaluacion-seleccion/noconformidades.js"></script>
+<script src="modules/gestion-integral/evaluacion-seleccion/reportes.js"></script>
+<script src="modules/gestion-integral/evaluacion-seleccion/evaluacion-seleccion-component.js"></script>
+
+<!-- Submódulo 4.1.2 - Identificación de Peligros (Matriz GTC-45) -->
+<link rel="stylesheet" href="modules/gestion-peligros/identificacion-peligros/identificacion-peligros.css">
+<script src="modules/gestion-peligros/identificacion-peligros/identificacion-peligros-service.js"></script>
+<script src="modules/gestion-peligros/identificacion-peligros/matriz-view.js"></script>
+<script src="modules/gestion-peligros/identificacion-peligros/priorizacion-view.js"></script>
+<script src="modules/gestion-peligros/identificacion-peligros/indicadores-view.js"></script>
+<script src="modules/gestion-peligros/identificacion-peligros/identificacion-peligros-component.js"></script>
+
+<!-- Submódulo 4.2.4 - Inspecciones Sistemáticas a las Instalaciones, Máquinas o Equipos -->
+<link rel="stylesheet" href="modules/gestion-peligros/inspecciones/inspecciones.css">
+<script src="modules/gestion-peligros/inspecciones/inspecciones-service.js"></script>
+<script src="modules/gestion-peligros/inspecciones/programa-insp.js"></script>
+<script src="modules/gestion-peligros/inspecciones/formulario-insp.js"></script>
+<script src="modules/gestion-peligros/inspecciones/historial-insp.js"></script>
+<script src="modules/gestion-peligros/inspecciones/inspecciones-component.js"></script>
+
+<!-- Submódulo 4.2.5 - Mantenimiento Periódico de Equipos, Instalaciones, Herramientas -->
+<link rel="stylesheet" href="modules/gestion-peligros/mantenimiento/mantenimiento.css">
+<script src="modules/gestion-peligros/mantenimiento/mantenimiento-service.js"></script>
+<script src="modules/gestion-peligros/mantenimiento/cronograma-mant.js"></script>
+<script src="modules/gestion-peligros/mantenimiento/resumen-mant.js"></script>
+<script src="modules/gestion-peligros/mantenimiento/mantenimiento-component.js"></script>
+
+<!-- Sistema de Notificaciones K+AIR (módulos) -->
+<script src="assets/js/kair-toast.js"></script>
+
+<!-- Sistema de Notificaciones Moderno para Actualizaciones -->
+<script src="assets/js/update-notifications.js"></script>
   
   <script src="renderer.js"></script>
   

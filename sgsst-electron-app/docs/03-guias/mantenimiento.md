@@ -18,7 +18,7 @@ Esta guía explica cómo mantener la documentación del proyecto SG-SST actualiz
 
 ## Documento Maestro del Proyecto
 
-Antes de realizar cualquier cambio en el sistema, es fundamental leer [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md). Este archivo contiene:
+Antes de realizar cualquier cambio en el sistema, es fundamental leer [_archivado/PROJECT_OVERVIEW.md](../_archivado/PROJECT_OVERVIEW.md). Este archivo contiene:
 
 - Visión general del proyecto
 - Decisiones arquitectónicas clave

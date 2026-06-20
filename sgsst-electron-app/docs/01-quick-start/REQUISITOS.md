@@ -1,8 +1,8 @@
 # 📋 Requisitos de Instalación - K+AIR SG-SST
 
 **Versión del documento:** 2.0  
-**Fecha:** 18 de marzo de 2026  
-**Aplicación:** K+AIR - Sistema de Gestión SG-SST v0.1.78+
+**Fecha:** 9 de junio de 2026  
+**Aplicación:** K+AIR - Sistema de Gestión SG-SST v0.1.99
 
 ---
 
@@ -207,4 +207,4 @@ Marque cada elemento una vez completado:
 
 **Documento elaborado por:** Equipo de Desarrollo K+AIR  
 **Contacto:** soporte@kair.local  
-**Última actualización:** 18 de marzo de 2026
+**Última actualización:** 9 de junio de 2026

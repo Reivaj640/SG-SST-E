@@ -4,8 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>K+AIR | Plan de Trabajo Anual SST</title>
-    <!-- Iconos -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Iconos -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <!-- Fuentes -->
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet">
     <!-- Chart.js -->
@@ -14,100 +15,142 @@
 </head>
 <body>
 
-<div class="app-container">
-    <!-- HEADER (FULL WIDTH) -->
-    <header class="header">
-        <button class="btn btn-ghost" id="backBtn" style="display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; cursor: pointer; font-family: 'Roboto', sans-serif; font-size: 14px; color: #212529;">
-            <i class="fas fa-arrow-left"></i> Volver
-        </button>
-        <div class="breadcrumb">Gestión Integral <i class="fas fa-chevron-right" style="font-size: 0.7rem; margin: 0 5px;"></i> <strong>Plan de Trabajo Anual</strong></div>
-        <div class="user-profile">
-            <div style="text-align: right;">
-                <div style="font-weight: 500; font-size: 0.9rem;" id="companyName">...</div>
-                <div style="font-size: 0.8rem; color: var(--text-muted);" id="userRole">Responsable SST</div>
-            </div>
-            <div class="avatar" id="userInitials">CS</div>
-        </div>
-    </header>
+  <div class="app-container">
+<!-- HEADER — Card k-section-card (tabs integrados) -->
+<div class="k-section-card" style="padding:0; margin-bottom:0; flex-shrink:0; flex-grow:0;">
+  <!-- Fila 1: contenido principal -->
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
+    <div style="display:flex; align-items:center; gap:0.75rem;">
+      <i class="fas fa-tasks" style="color:#174ea6; font-size:1.25rem;"></i>
+      <div>
+        <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Plan de Trabajo Anual SST</h3>
+        <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Gestión y seguimiento del plan de trabajo anual SG-SST.</p>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+      <div class="tabs-header__company">
+        <i class="bi bi-building"></i>
+        <span id="companyName">...</span>
+      </div>
+      <span class="tabs-header__role" id="userRole">Responsable SST</span>
+      <div style="width:1px; height:24px; background:#dee2e6;"></div>
+      <button class="btn-period" onclick="showPeriodSelector()">
+        <i class="bi bi-calendar3"></i>
+        <span id="currentPeriodLabel">2026</span>
+        <i class="bi bi-chevron-down"></i>
+      </button>
+      <div style="width:1px; height:24px; background:#dee2e6;"></div>
+      <button class="header-back-btn" id="backBtn" title="Volver">
+        <i class="fas fa-arrow-left"></i> Volver
+      </button>
+    </div>
+  </div>
 
-    <!-- WORKSPACE -->
-    <div class="workspace">
-        <div class="tabs-header">
-            <button class="tab-btn" onclick="switchMainView('dashboard')">
-                <i class="fas fa-chart-pie"></i> Dashboard de Avance
-            </button>
-            <button class="tab-btn active" onclick="switchMainView('plan')">
-                <i class="fas fa-stream"></i> Cronograma (Tree View)
-            </button>
-        </div>
+  <!-- Fila 2: tabs (dentro del card) -->
+  <div class="plan-tabs">
+    <button class="plan-tab" onclick="switchMainView('dashboard')">
+      <i class="fas fa-chart-pie"></i> Dashboard de Avance
+    </button>
+    <button class="plan-tab active" onclick="switchMainView('plan')">
+      <i class="fas fa-stream"></i> Cronograma
+    </button>
+  </div>
+</div>
 
-        <!-- VIEW 1: DASHBOARD -->
-        <div id="view-dashboard" class="dashboard-view">
-            <div class="page-header">
-                <div class="page-title">
-                    <h1>Dashboard Plan de Trabajo <span id="currentPeriodLabel">...</span></h1>
-                    <p>Seguimiento global de actividades programadas vs ejecutadas.</p>
-                </div>
-                <button class="btn btn-primary" onclick="showPeriodSelector()"><i class="fas fa-calendar-plus"></i> Cambiar Periodo</button>
-            </div>
-            <div class="kpi-grid">
-                <div class="kpi-card" style="border-left-color: var(--primary);">
-                    <div class="kpi-content"><h4>Total Actividades</h4><div class="value" id="kpiTotal">0</div></div>
-                </div>
-                <div class="kpi-card" style="border-left-color: var(--success);">
-                    <div class="kpi-content"><h4>Avance General</h4><div class="value" id="kpiProgress">0%</div></div>
-                </div>
-                <div class="kpi-card" style="border-left-color: var(--warning);">
-                    <div class="kpi-content"><h4>Programadas</h4><div class="value" id="kpiScheduled">0</div></div>
-                </div>
-                <div class="kpi-card" style="border-left-color: var(--danger);">
-                    <div class="kpi-content"><h4>Vencidas</h4><div class="value" id="kpiOverdue">0</div></div>
-                </div>
-            </div>
+<!-- VIEW 1: DASHBOARD -->
+<div id="view-dashboard" class="dashboard-view">
+  <div class="k-stats-ribbon">
+    <div class="k-stats-ribbon__item">
+      <span class="k-stats-ribbon__icon primary"><i class="bi bi-calendar-check"></i></span>
+      <div class="k-stats-ribbon__data">
+        <span class="k-stats-ribbon__value" id="stat-total">0</span>
+        <span class="k-stats-ribbon__label">Programadas</span>
+      </div>
+      <span class="k-stats-ribbon__pct" id="stat-progress-text">0%</span>
+    </div>
+    <div class="k-stats-ribbon__divider"></div>
+    <div class="k-stats-ribbon__item">
+      <span class="k-stats-ribbon__icon success"><i class="bi bi-check-circle"></i></span>
+      <div class="k-stats-ribbon__data">
+        <span class="k-stats-ribbon__value" id="stat-completed">0</span>
+        <span class="k-stats-ribbon__label">Realizadas</span>
+      </div>
+    </div>
+    <div class="k-stats-ribbon__divider"></div>
+    <div class="k-stats-ribbon__item">
+      <span class="k-stats-ribbon__icon warning"><i class="bi bi-clock-history"></i></span>
+      <div class="k-stats-ribbon__data">
+        <span class="k-stats-ribbon__value" id="stat-pending">0</span>
+        <span class="k-stats-ribbon__label">Pendientes</span>
+      </div>
+    </div>
+    <div class="k-stats-ribbon__divider"></div>
+    <div class="k-stats-ribbon__item">
+      <span class="k-stats-ribbon__icon danger"><i class="bi bi-exclamation-triangle"></i></span>
+      <div class="k-stats-ribbon__data">
+        <span class="k-stats-ribbon__value" id="stat-overdue">0</span>
+        <span class="k-stats-ribbon__label">Vencidas</span>
+      </div>
+    </div>
+  </div>
 
-            <!-- GRÁFICOS DEL DASHBOARD -->
-            <div class="charts-grid">
-                <!-- Gráfico 1: Actividades por Estado -->
-                <div class="chart-card">
-                    <div class="chart-header">
-                        <h3><i class="fas fa-chart-bar"></i> Actividades por Estado</h3>
-                    </div>
-                    <div class="chart-body">
-                        <canvas id="chartStatus"></canvas>
-                    </div>
-                </div>
+  <!-- GRÁFICOS DEL DASHBOARD — 3x2 -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-header">
+        <h3><i class="fas fa-chart-bar"></i> Actividades por Estado</h3>
+      </div>
+      <div class="chart-body">
+        <canvas id="chartStatus"></canvas>
+      </div>
+    </div>
 
-                <!-- Gráfico 2: Avance Mensual -->
-                <div class="chart-card">
-                    <div class="chart-header">
-                        <h3><i class="fas fa-chart-line"></i> Avance Mensual</h3>
-                    </div>
-                    <div class="chart-body">
-                        <canvas id="chartMonthlyProgress"></canvas>
-                    </div>
-                </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <h3><i class="fas fa-chart-line"></i> Avance Mensual</h3>
+      </div>
+      <div class="chart-body">
+        <canvas id="chartMonthlyProgress"></canvas>
+      </div>
+    </div>
 
-                <!-- Gráfico 3: Distribución por Responsable -->
-                <div class="chart-card">
-                    <div class="chart-header">
-                        <h3><i class="fas fa-chart-pie"></i> Distribución por Responsable</h3>
-                    </div>
-                    <div class="chart-body">
-                        <canvas id="chartByResponsible"></canvas>
-                    </div>
-                </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <h3><i class="fas fa-chart-column"></i> Cumplimiento Trimestral</h3>
+      </div>
+      <div class="chart-body">
+        <canvas id="chartQuarterly"></canvas>
+      </div>
+    </div>
 
-                <!-- Gráfico 4: Actividades por Mes y Estado -->
-                <div class="chart-card chart-card-wide">
-                    <div class="chart-header">
-                        <h3><i class="fas fa-chart-area"></i> Actividades por Mes y Estado</h3>
-                    </div>
-                    <div class="chart-body">
-                        <canvas id="chartMonthlyStatus"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <h3><i class="fas fa-chart-area"></i> Actividades por Mes y Estado</h3>
+      </div>
+      <div class="chart-body">
+        <canvas id="chartMonthlyStatus"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-header">
+        <h3><i class="bi bi-list-columns-reverse"></i> Cumplimiento por Categoría</h3>
+      </div>
+      <div class="chart-body">
+        <canvas id="chartByCategory"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-header">
+        <h3><i class="bi bi-compass"></i> Distribución Anual</h3>
+      </div>
+      <div class="chart-body">
+        <canvas id="chartAnnualRadar"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
 
         <!-- VIEW 2: TREE VIEW + WATERFALL -->
         <div id="view-plan" class="plan-view active">
@@ -162,9 +205,10 @@
 </div>
 
 <!-- OVERLAY SELECTOR DE PERIODO -->
-<div id="periodSelector">
-    <div class="period-card">
-        <h2 style="font-family: 'Lexend', sans-serif; margin-bottom: 0.5rem;">Seleccione Periodo</h2>
+<div id="periodSelector" onclick="if(event.target===this)hidePeriodSelector()">
+  <div class="period-card">
+    <button class="period-card__close" onclick="hidePeriodSelector()" aria-label="Cerrar"><i class="fas fa-xmark"></i></button>
+    <h2 style="font-family: 'Lexend', sans-serif; margin-bottom: 0.5rem;">Seleccione Periodo</h2>
         <p style="color: var(--text-muted);">Escoja el año del Plan de Trabajo que desea gestionar.</p>
         
         <div class="period-grid" id="periodGrid">

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K+AIR | Plan de Prevención</title>
+    <!-- Iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Fuentes -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Estilos -->
+    <link rel="stylesheet" href="plan-prevencion-view.css">
+</head>
+<body>
+
+    <!-- HEADER -->
+    <header class="app-header">
+        <div class="header-left">
+            <button class="btn btn-ghost" id="backToModuleBtn" title="Regresar al módulo">
+                <i class="fas fa-arrow-left"></i>
+                <span style="margin-left:5px; font-weight:500;">Módulo</span>
+            </button>
+            <div class="app-title">Plan de Prevención</div>
+            <span class="badge-mod">Gestión de Amenazas</span>
+        </div>
+
+        <div class="header-actions">
+            <button class="btn btn-ghost" id="closeDocBtn" title="Cerrar documento / Volver a archivos" disabled style="opacity: 0.3;">
+                <i class="fas fa-times"></i>
+                <span style="font-size: 0.85rem; margin-left:4px;">Cerrar</span>
+            </button>
+
+            <div class="divider"></div>
+
+            <button class="btn btn-ghost" id="downloadBtn" title="Descargar documento" disabled style="opacity: 0.3;">
+                <i class="fas fa-download"></i>
+            </button>
+            <button class="btn btn-ghost" id="printBtn" title="Imprimir documento" disabled style="opacity: 0.3;">
+                <i class="fas fa-print"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- BODY LAYOUT -->
+    <div class="app-body">
+
+        <!-- SIDEBAR: NAVIGATION & FILES -->
+        <aside class="sidebar">
+
+            <div class="sidebar-header">
+                <button class="btn btn-ghost" id="goBackBtn" style="width:100%; justify-content:flex-start; padding-left:0;" disabled>
+                    <i class="fas fa-level-up-alt"></i> Volver a carpeta anterior
+                </button>
+            </div>
+
+            <!-- Breadcrumb -->
+            <div class="breadcrumb-nav" id="breadcrumb">
+                <div class="crumb-item"><i class="fas fa-hdd"></i> Raíz</div>
+            </div>
+
+            <div class="list-header">
+                Carpetas
+            </div>
+            <div class="sidebar-content" id="folderList">
+            </div>
+
+            <div class="list-header">
+                Documentos
+                <span id="docCount" style="font-weight: 400; text-transform: none; font-size:0.75rem;">0</span>
+            </div>
+            <div class="sidebar-content" id="fileList">
+            </div>
+        </aside>
+
+        <!-- MAIN VIEWER AREA -->
+        <main class="viewer-stage">
+
+            <div class="empty-state" id="emptyState">
+                <div class="empty-icon"><i class="fas fa-folder-open"></i></div>
+                <h2 class="empty-title">Explorador de Archivos</h2>
+                <p class="empty-desc">Seleccione una carpeta del panel izquierdo para navegar o haga clic en un archivo para visualizarlo.</p>
+            </div>
+
+            <div class="viewer-toolbar" id="toolbar">
+                <div class="tool-group">
+                    <span id="docName" style="font-weight: 600; color: var(--text-dark); max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></span>
+                </div>
+                <div class="tool-group">
+                    <button class="btn btn-ghost" id="zoomOutBtn" title="Reducir Zoom"><i class="fas fa-minus"></i></button>
+                    <span id="zoomLevelDisplay" style="font-size: 0.9rem; width: 50px; text-align: center;">100%</span>
+                    <button class="btn btn-ghost" id="zoomInBtn" title="Aumentar Zoom"><i class="fas fa-plus"></i></button>
+                    <div class="divider"></div>
+                    <button class="btn btn-ghost" id="fitWidthBtn" title="Ajustar a ancho"><i class="fas fa-arrows-alt-h"></i></button>
+                </div>
+            </div>
+
+            <div class="viewer-content" id="viewerContainer" style="display: none;">
+            </div>
+
+            <div class="loading-overlay" id="loadingOverlay">
+                <div class="spinner"></div>
+                <p style="margin-top:10px; font-size: 0.9rem; font-weight: 500;">Cargando documento...</p>
+            </div>
+
+        </main>
+
+    </div>
+
+    <!-- Notification System -->
+    <div class="notification" id="notification">
+        <i class="notification-icon fas fa-check-circle"></i>
+        <div class="notification-message">Operación completada con éxito</div>
+    </div>
+
+    <!-- Toast Notifications Container (K+AIR Modern) -->
+    <div class="k-toast-container" id="kToastContainer"></div>
+
+    <!-- Confirm Modal (K+AIR Modern) -->
+    <div id="confirmModal" class="k-modal-overlay" style="display: none;">
+        <div class="k-modal">
+            <div class="k-modal-header">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h3>Confirmar eliminación</h3>
+            </div>
+            <div class="k-modal-body">
+                <p>¿Está seguro de eliminar "<strong id="confirmFileName">archivo.pdf</strong>"?</p>
+                <p class="k-modal-warning">
+                    <i class="fas fa-info-circle"></i>
+                    Esta acción no se puede deshacer.
+                </p>
+            </div>
+            <div class="k-modal-footer">
+                <button class="k-btn k-btn-ghost" id="confirmCancelBtn">
+                    Cancelar
+                </button>
+                <button class="k-btn k-btn-danger" id="confirmAcceptBtn">
+                    <i class="fas fa-trash"></i> Eliminar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Context Menu (Clic Derecho) -->
+    <div id="contextMenu" class="context-menu" style="display: none;">
+        <div class="context-menu-item" id="openFileBtn">
+            <i class="fas fa-external-link-alt"></i> Abrir archivo
+        </div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item" id="deleteFileBtn">
+            <i class="fas fa-trash"></i> Eliminar archivo
+        </div>
+    </div>
+
+    <script src="plan-prevencion-viewer.js"></script>
+</body>
+</html>

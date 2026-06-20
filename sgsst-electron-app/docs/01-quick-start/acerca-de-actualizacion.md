@@ -1,5 +1,9 @@
 # Actualización de la sección "Acerca de" en K+AIR
 
+**Versión:** 1.1
+**Actualizado:** 9 de junio de 2026
+**Estado:** ✅ Actualizado v0.1.99
+
 ## Descripción
 
 Se ha actualizado la sección "Acerca de la app" dentro de la configuración del sistema para mostrar información real del proyecto, incluyendo:

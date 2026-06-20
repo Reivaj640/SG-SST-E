@@ -6,6 +6,7 @@
     <title>Gestión de Presupuesto - K+AIR</title>
     <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;600;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
     <style>
         /* =========================================
@@ -39,21 +40,35 @@
             display: flex; flex-direction: column;
         }
 
-        /* HEADER */
-        header {
-            background-color: var(--k-bg-card);
-            border-bottom: 1px solid var(--k-border);
-            padding: 0 1.5rem;
-            height: var(--k-header-height);
-            display: flex; align-items: center; justify-content: space-between;
-            flex-shrink: 0; z-index: 20;
-        }
-
-        .header-left { display: flex; align-items: center; gap: 1rem; }
-        .k-module-title { font-size: 1.2rem; font-weight: 600; color: var(--k-primary); line-height: 1.2; }
-        .k-module-subtitle { font-size: 0.8rem; color: var(--k-text-muted); font-weight: 400; }
-
-        .header-actions { display: flex; gap: 0.75rem; }
+/* =========================================
+HEADER ACTION BUTTONS
+========================================= */
+.header-back-btn {
+  padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.8125rem;
+  font-weight: 500; cursor: pointer; display: inline-flex; align-items: center;
+  gap: 0.375rem; border: 1px solid var(--k-border); background-color: #f8f9fa;
+  color: var(--k-text-muted); transition: all 0.2s; white-space: nowrap;
+  font-family: var(--k-font-family);
+}
+.header-back-btn:hover {
+  background-color: #e2e8f0; color: var(--k-primary); border-color: var(--k-primary);
+}
+.header-action--primary {
+  display: inline-flex; align-items: center; gap: 0.375rem;
+  padding: 0.5rem 1rem; font-size: 0.8125rem; font-weight: 500;
+  color: #fff; background: var(--k-primary); border: 1px solid var(--k-primary);
+  border-radius: 0.5rem; cursor: pointer; transition: background 0.15s ease;
+  font-family: var(--k-font-family); white-space: nowrap;
+}
+.header-action--primary:hover { background: var(--k-primary-hover); }
+.header-action--success {
+  display: inline-flex; align-items: center; gap: 0.375rem;
+  padding: 0.5rem 1rem; font-size: 0.8125rem; font-weight: 500;
+  color: #fff; background: var(--k-success); border: 1px solid var(--k-success);
+  border-radius: 0.5rem; cursor: pointer; transition: background 0.15s ease;
+  font-family: var(--k-font-family); white-space: nowrap;
+}
+.header-action--success:hover { background: #218838; }
 
         /* BOTONES */
         .k-btn {
@@ -71,41 +86,94 @@
         .k-btn-success { background: var(--k-success); color: white; border-color: var(--k-success); }
         .k-btn-success:hover { background: #218838; }
 
-        /* CONTENIDO PRINCIPAL */
-        .content-wrapper {
-            flex: 1; display: flex; flex-direction: column;
-            overflow: hidden; padding: 1.5rem; gap: 1.5rem;
-        }
+/* CONTENIDO PRINCIPAL */
+.content-wrapper {
+  flex: 1; display: flex; flex-direction: column;
+  overflow: hidden; padding: 1.5rem; gap: 0;
+  background: var(--k-bg-app);
+}
 
-        /* KPI CARDS */
-        .kpi-container {
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;
-            flex-shrink: 0;
-        }
+/* STATS RIBBON — Patrón Canónico K+AIR */
+.k-stats-ribbon {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--k-bg-card);
+  border: 1px solid var(--k-border);
+  border-radius: var(--k-radius-lg);
+  padding: 0;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--k-shadow-sm);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.k-stats-ribbon__item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  flex: 1;
+  min-width: 0;
+}
+.k-stats-ribbon__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+.k-stats-ribbon__icon.primary { background: #e8f0fe; color: #174ea6; }
+.k-stats-ribbon__icon.warning { background: #fff3cd; color: #856404; }
+.k-stats-ribbon__icon.success { background: #d4edda; color: #28a745; }
+.k-stats-ribbon__icon.muted  { background: #f0f2f5; color: #6c757d; }
+.k-stats-ribbon__data {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.k-stats-ribbon__value {
+  font-family: 'Lexend', 'Segoe UI', sans-serif;
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--k-text-main);
+  line-height: 1.2;
+}
+.k-stats-ribbon__label {
+  font-size: 0.6875rem;
+  color: var(--k-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+.k-stats-ribbon__divider {
+  width: 1px;
+  height: 36px;
+  background: #e5e7eb;
+  flex-shrink: 0;
+}
+.k-section-card {
+  background: var(--k-bg-card);
+  border: 1px solid var(--k-border);
+  border-radius: var(--k-radius-lg);
+  box-shadow: var(--k-shadow-sm);
+  overflow: hidden;
+}
+.k-section-card--grow {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
 
-        .kpi-card {
-            background: var(--k-bg-card); border: 1px solid var(--k-border);
-            border-radius: var(--k-radius-lg); padding: 1.25rem;
-            box-shadow: var(--k-shadow-sm); display: flex; flex-direction: column;
-            border-left: 4px solid transparent; /* Indicador de color */
-        }
-
-        .kpi-label { font-size: 0.8rem; color: var(--k-text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 0.5rem; }
-        .kpi-value { font-size: 1.5rem; font-weight: 700; color: var(--k-text-main); }
-
-        /* Bordes de color semántico */
-        .kpi-card:nth-child(1) { border-left-color: var(--k-primary); }
-        .kpi-card:nth-child(2) { border-left-color: var(--k-warning); }
-        .kpi-card:nth-child(3) { border-left-color: var(--k-success); }
-        .kpi-card:nth-child(4) { border-left-color: #17a2b8; }
-
-        /* TABLA STICKY */
-        .table-wrapper {
-            flex: 1; overflow: auto;
-            background: var(--k-bg-card); border: 1px solid var(--k-border);
-            border-radius: var(--k-radius-lg); box-shadow: var(--k-shadow-sm);
-            position: relative;
-        }
+/* TABLA STICKY */
+.table-wrapper {
+  flex: 1; overflow: auto;
+  position: relative;
+}
 
         table { width: 100%; border-collapse: collapse; font-size: 0.9rem; table-layout: fixed; }
 
@@ -204,58 +272,86 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .k-stats-ribbon { flex-wrap: wrap; }
+  .k-stats-ribbon__item { flex: 1 1 45%; }
+  .k-stats-ribbon__divider { display: none; }
+  .k-section-card[style*="flex"] { flex-wrap: wrap; }
+  .header-back-btn, .header-action--primary, .header-action--success { font-size: 0.75rem; padding: 0.375rem 0.75rem; }
+}
+
     </style>
 </head>
 <body>
 
-    <header>
-        <div class="header-left">
-            <button class="k-btn" id="backToSelectorBtn">
-                <i class="fas fa-chevron-left"></i>
-            </button>
-            <button class="k-btn" id="backToSubmodulesBtn">
-                <i class="fas fa-home"></i>
-            </button>
-            <div>
-                <div class="k-module-title" id="moduleTitle">Gestión Presupuestal</div>
-                <div class="k-module-subtitle">Asignación y Control de Recursos</div>
-            </div>
-        </div>
-        <div class="header-actions">
-            <button class="k-btn" id="backBtn" style="display:none;">Volver</button>
-            <button class="k-btn k-btn-primary" id="addRowBtn">
-                <i class="fas fa-plus"></i> Nueva Partida
-            </button>
-            <button class="k-btn k-btn-success" id="saveBtn">
-                <i class="fas fa-save"></i> Guardar Cambios
-            </button>
-        </div>
-    </header>
+<div class="content-wrapper">
 
-    <div class="content-wrapper">
-        <!-- KPIs -->
-        <div class="kpi-container">
-            <div class="kpi-card">
-                <div class="kpi-label">Presupuesto Total</div>
-                <div class="kpi-value" id="totalPresupuesto">$0</div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-label">Aporte Empresa (Ejecutado)</div>
-                <div class="kpi-value" id="totalEmpresa">$0</div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-label">% Cumplimiento</div>
-                <div class="kpi-value" id="totalArl">0%</div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-label">Saldo Disponible</div>
-                <div class="kpi-value" id="saldoDisponible">$0</div>
-            </div>
-        </div>
+<!-- HEADER — Card independiente -->
+<div class="k-section-card" style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem; margin-bottom:1.5rem; flex-shrink:0; flex-grow:0;">
+  <div style="display:flex; align-items:center; gap:0.75rem;">
+    <i class="fas fa-coins" style="color:#174ea6; font-size:1.25rem;"></i>
+    <div>
+      <h3 id="moduleTitle" style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Gestión Presupuestal</h3>
+      <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Administración de partidas presupuestales y ejecución.</p>
+    </div>
+  </div>
+  <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+    <span style="display:flex; align-items:center; gap:0.375rem; font-size:0.8125rem; color:#64748B;">
+      <i class="fas fa-building" style="font-size:0.875rem;"></i>
+      <span id="header-company-text">—</span>
+    </span>
+    <div style="width:1px; height:24px; background:#dee2e6;"></div>
+    <button id="backToSelectorBtn" class="header-back-btn" title="Volver al selector">
+      <i class="fas fa-arrow-left"></i> Volver
+    </button>
+    <button id="addRowBtn" class="header-action--primary">
+      <i class="fas fa-plus"></i> Nueva Partida
+    </button>
+    <button id="saveBtn" class="header-action--success">
+      <i class="fas fa-save"></i> Guardar Cambios
+    </button>
+  </div>
+</div>
+<!-- KPI RIBBON — Patrón Canónico K+AIR -->
+<div class="k-stats-ribbon">
+  <div class="k-stats-ribbon__item">
+    <span class="k-stats-ribbon__icon primary"><i class="bi bi-cash-stack"></i></span>
+    <div class="k-stats-ribbon__data">
+      <span class="k-stats-ribbon__value" id="totalPresupuesto">$0</span>
+      <span class="k-stats-ribbon__label">Presupuesto Total</span>
+    </div>
+  </div>
+  <div class="k-stats-ribbon__divider"></div>
+  <div class="k-stats-ribbon__item">
+    <span class="k-stats-ribbon__icon warning"><i class="bi bi-graph-up-arrow"></i></span>
+    <div class="k-stats-ribbon__data">
+      <span class="k-stats-ribbon__value" id="totalEmpresa">$0</span>
+      <span class="k-stats-ribbon__label">Ejecutado</span>
+    </div>
+  </div>
+  <div class="k-stats-ribbon__divider"></div>
+  <div class="k-stats-ribbon__item">
+    <span class="k-stats-ribbon__icon success"><i class="bi bi-percent"></i></span>
+    <div class="k-stats-ribbon__data">
+      <span class="k-stats-ribbon__value" id="totalArl">0%</span>
+      <span class="k-stats-ribbon__label">% Cumplimiento</span>
+    </div>
+  </div>
+  <div class="k-stats-ribbon__divider"></div>
+  <div class="k-stats-ribbon__item">
+    <span class="k-stats-ribbon__icon muted"><i class="bi bi-wallet2"></i></span>
+    <div class="k-stats-ribbon__data">
+      <span class="k-stats-ribbon__value" id="saldoDisponible">$0</span>
+      <span class="k-stats-ribbon__label">Saldo Disponible</span>
+    </div>
+  </div>
+</div>
 
-        <!-- TABLA -->
-        <div class="table-wrapper">
-            <table id="budgetTable">
+<!-- TABLA -->
+<div class="k-section-card k-section-card--grow">
+<div class="table-wrapper">
+<table id="budgetTable">
                 <colgroup>
                     <col style="width: 50px;">   <!-- ID -->
                     <col style="width: 250px;"> <!-- Detalle -->
@@ -284,9 +380,10 @@
                 <tbody id="budgetTableBody">
                     <!-- JS inyectará filas aquí -->
                 </tbody>
-            </table>
-        </div>
-    </div>
+</table>
+</div>
+</div><!-- /.k-section-card -->
+</div>
 
     <!-- TOAST -->
     <div class="k-toast" id="notification">
@@ -305,10 +402,15 @@
             setupEventListeners();
 
             // Mensajes del padre
-            window.addEventListener('message', async (event) => {
-                if (event.source !== parent) return;
+  window.addEventListener('message', async (event) => {
+    if (event.source !== parent) return;
 
-                if (event.data.file) {
+    if (event.data.company) {
+      const el = document.getElementById('header-company-text');
+      if (el) el.textContent = event.data.company;
+    }
+
+    if (event.data.file) {
                     currentFile = event.data.file;
                     updateFileInfo();
                     await loadData();
@@ -330,29 +432,24 @@
             });
         });
 
-        function setupEventListeners() {
-            const backToSelector = () => {
-                if (!hasPendingChanges || confirm('Tiene cambios sin guardar. ¿Está seguro de que desea salir?')) {
-                    window.parent.postMessage({ action: 'backToSelector' }, '*');
-                }
-            };
-            const backToSubmodules = () => {
-                if (!hasPendingChanges || confirm('Tiene cambios sin guardar. ¿Está seguro de que desea salir?')) {
-                    window.parent.postMessage({ action: 'backToSubmodules' }, '*');
-                }
-            };
+function setupEventListeners() {
+  const backToSelector = () => {
+    if (!hasPendingChanges || confirm('Tiene cambios sin guardar. ¿Está seguro de que desea salir?')) {
+      window.parent.postMessage({ action: 'backToSelector' }, '*');
+    }
+  };
 
-            document.getElementById('backToSelectorBtn').addEventListener('click', backToSelector);
-            document.getElementById('backToSubmodulesBtn').addEventListener('click', backToSubmodules);
-            document.getElementById('addRowBtn').addEventListener('click', addNewRow);
-            document.getElementById('saveBtn').addEventListener('click', saveChanges);
+  document.getElementById('backToSelectorBtn').addEventListener('click', backToSelector);
+  document.getElementById('addRowBtn').addEventListener('click', addNewRow);
+  document.getElementById('saveBtn').addEventListener('click', saveChanges);
         }
 
-        function updateFileInfo() {
-            if (!currentFile) return;
-            const year = extractYearFromFileName(currentFile.name);
-            document.getElementById('moduleTitle').textContent = `Presupuesto ${year}`;
-        }
+function updateFileInfo() {
+  if (!currentFile) return;
+  const year = extractYearFromFileName(currentFile.name);
+  const titleEl = document.getElementById('moduleTitle');
+  if (titleEl) titleEl.textContent = `Presupuesto ${year}`;
+}
 
         function extractYearFromFileName(fileName) {
             const yearMatch = fileName.match(/(20\d{2})/);
@@ -397,13 +494,17 @@
             btn.innerHTML = '<i class="fas fa-save"></i> Guardar Cambios';
         }
 
-        function parseFormattedNumber(value) {
-            if (value === null || value === undefined || value === '') return 0;
-            if (typeof value === 'number') return value;
-            let clean = value.toString().replace(/\$/g, '').replace(/\s/g, '').replace(/,/g, '');
-            const parsed = parseFloat(clean);
-            return isNaN(parsed) ? 0 : parsed;
-        }
+function parseFormattedNumber(value) {
+    if (value === null || value === undefined || value === '') return 0;
+    if (typeof value === 'number') return value;
+    let clean = value.toString()
+        .replace(/\$/g, '')
+        .replace(/\s/g, '')
+        .replace(/\./g, '')
+        .replace(/,/g, '.');
+    const parsed = parseFloat(clean);
+    return isNaN(parsed) ? 0 : parsed;
+  }
 
         function formatNumber(num) {
             if (num === null || num === undefined || num === '') return '0,00';

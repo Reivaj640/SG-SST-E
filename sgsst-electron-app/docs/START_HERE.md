@@ -1,8 +1,8 @@
 # 👋 Bienvenido a la Documentación de K+AIR
 
 **Tiempo de lectura:** 5 minutos
-**Última actualización:** 22 de marzo de 2026
-**Versión:** 0.1.91
+**Última actualización:** 9 de junio de 2026
+**Versión:** 0.1.99
 
 ---
 
@@ -13,10 +13,15 @@ K+AIR es una aplicación empresarial Electron que implementa un Sistema de Gesti
 **Características principales:**
 - ✅ Multi-empresa (una sola UX/UI)
 - ✅ Motor normativo inteligente
-- ✅ 7 módulos principales + 27 submódulos
+- ✅ 7 módulos principales + 44 submódulos
 - ✅ Python empaquetado (sin instalación manual)
 - ✅ Autenticación con SQLite
 - ✅ Actualizaciones automáticas
+- ✅ Dashboard interactivo con KPIs y gráficas
+- ✅ Sistema de alertas por vencimiento (COPASST/Convivencia)
+- ✅ Generación automática de actas con autofill
+- ✅ Login modernizado con animaciones
+- ✅ Soporte responsive 1366x768+
 
 ---
 
@@ -26,22 +31,22 @@ K+AIR es una aplicación empresarial Electron que implementa un Sistema de Gesti
 
 **Ruta recomendada (30-45 minutos):**
 
-1. **docs/01-quick-start/installation.md** (10 min)
+1. **docs/03-guias/instalacion-configuracion.md** (10 min)
    - Instalar Node.js, Python (ya incluido)
    - Clonar repositorio
    - Ejecutar en modo desarrollo
 
-2. **docs/02-architecture/overview.md** (15 min)
+2. **docs/02-architecture/arquitectura-general.md** (15 min)
    - Entender arquitectura Electron
    - Flujo Renderer ↔️ Preload ↔️ Main
    - Contratos IPC
 
-3. **docs/02-architecture/ipc-contracts.md** (10 min)
+3. **docs/02-architecture/ipc-contratos.md** (10 min)
    - **CRÍTICO:** Todos los handlers IPC
    - Formato de requests/responses
    - Ejemplos de uso
 
-4. **docs/03-modules/** (según tu módulo)
+4. **docs/02-modulos/** (según tu módulo)
    - Cada módulo tiene su propia documentación
    - Incluye ejemplos de código
 
@@ -54,21 +59,21 @@ K+AIR es una aplicación empresarial Electron que implementa un Sistema de Gesti
 1. **CONTEXT.md** (raíz del proyecto) - **LEER PRIMERO**
    - Contexto completo del proyecto
    - Arquitectura resumida
-   - Estado actual (v0.1.85)
+   - Estado actual (v0.1.99)
    - Enlaces críticos
 
-2. **docs/02-architecture/ipc-contracts.md**
-   - Todos los 78 handlers IPC
+2. **docs/02-architecture/ipc-contratos.md**
+   - Todos los 137 handlers IPC (133+ `ipcMain.handle()` + 4 `ipcMain.on()`)
    - Formato de requests/responses
    - Ejemplos de uso
 
-3. **docs/03-modules/[módulo específico]**
+3. **docs/02-modulos/[módulo específico]**
    - Documentación del módulo relevante
    - Lógica de negocio específica
 
 4. **CHANGELOG.md**
    - Historial de cambios por versión
-   - Últimos cambios en v0.1.87
+   - Últimos cambios en v0.1.99
 
 ---
 
@@ -81,10 +86,9 @@ K+AIR es una aplicación empresarial Electron que implementa un Sistema de Gesti
    - Características principales
    - Uso básico
 
-2. **docs/01-quick-start/troubleshooting.md**
-   - Problemas comunes
-   - Soluciones paso a paso
-   - FAQs
+2. **docs/03-guias/instalacion-configuracion.md** (sección 5)
+- Solución de problemas comunes
+- Errores de Python
 
 3. **docs/acerca-de-actualizacion.md**
    - Cómo actualizar el sistema
@@ -96,10 +100,10 @@ K+AIR es una aplicación empresarial Electron que implementa un Sistema de Gesti
 
 **Ruta recomendada (20 minutos):**
 
-1. **docs/04-guides/maintenance.md**
-   - Mantenimiento de documentación
-   - Convenciones de código
-   - Checklist de releases
+1. **docs/03-guias/mantenimiento.md**
+- Mantenimiento de documentación
+- Convenciones de código
+- Checklist de releases
 
 2. **docs/05-updates/**
    - Cambios por versión
@@ -119,26 +123,37 @@ docs/
 ├── START_HERE.md                # Este archivo - Punto de entrada
 │
 ├── 01-quick-start/              # Inicio rápido
-│   ├── installation.md          # Instalación y configuración
+│ ├── instalacion-configuracion.md # Instalación y configuración
 │   ├── first-company.md         # Crear primera empresa
-│   └── troubleshooting.md       # Problemas comunes
+│ └── REQUISITOS.md # Requisitos del sistema
 │
-├── 02-architecture/             # Arquitectura
-│   ├── overview.md              # Arquitectura general
-│   ├── ipc-contracts.md         # ⚠️ CRÍTICO - Contratos IPC
-│   ├── normative-engine.md      # Motor normativo 0312
-│   └── python-embedded.md       # Python empaquetado
+├── 02-architecture/ # Arquitectura
+│ ├── arquitectura-general.md # Arquitectura general
+│ ├── ipc-contratos.md # ⚠️ CRÍTICO - Contratos IPC
+│ ├── infraestructura-cross-cutting.md # Componentes compartidos (Toast, Loading, KPI Ribbon)
+│ ├── motor-normativo.md # Motor normativo 0312
+│ ├── python-embedded.md # Python empaquetado
+│ └── roles-permisos-rbac.md # Roles y permisos RBAC
 │
-├── 03-modules/                  # Módulos
-│   ├── module-1-resources.md    # Módulo 1: Recursos
-│   ├── module-2-health.md       # Módulo 2: Gestión de la Salud
-│   ├── module-3-integral.md     # Módulo 3: Gestión Integral
-│   └── ...                      # Resto de módulos
+├── 02-modulos/ # Módulos
+│ ├── modulo-1-recursos.md # Módulo 1: Recursos (12 submódulos)
+│ ├── modulo-2-4-5-6-7-gestion-integral-y-restantes.md # Módulo 2: Gestión Integral (13 submódulos)
+│ ├── modulo-2-3-1-evaluacion-inicial-sg-sst.md # Submód 2.3.1: Evaluación Inicial
+│ ├── modulo-2-5-1-archivo-retencion.md # Submód 2.5.1: Archivo y Retención
+│ ├── modulo-2-10-1-evaluacion-seleccion.md # Submód 2.10.1: Evaluación y Selección
+│ ├── modulo-2-11-1-gestion-del-cambio.md # Submód 2.11.1: Gestión del Cambio
+│ ├── modulo-3-gestion-salud.md # Módulo 3: Gestión de la Salud (19 submódulos)
+│ ├── modulo-4-gestion-peligros.md # Módulo 4: Gestión de Peligros (10 submódulos)
+│ ├── modulo-5-gestion-amenazas.md # Módulo 5: Gestión de Amenazas (2 submódulos)
+│ ├── modulo-6-verificacion.md # Módulo 6: Verificación (4 submódulos)
+│ ├── modulo-7-mejoramiento.md # Módulo 7: Mejoramiento (4 submódulos)
+│ └── alertas-recursos-dashboard.md # Alertas y Dashboard
 │
-├── 04-guides/                   # Guías
-│   ├── backend-contracts.md     # Contratos backend
-│   ├── python-scripts.md        # Scripts Python
-│   └── maintenance.md           # Mantenimiento
+├── 03-guias/ # Guías
+│ ├── instalacion-configuracion.md # Instalación y configuración
+│ ├── guia-contratos-backend.md # Contratos backend
+│ ├── scripts-python.md # Scripts Python
+│ ├── mantenimiento.md # Mantenimiento
 │
 ├── 05-updates/                  # Actualizaciones por versión
 │   ├── v0.1.83-python-optimization.md  # Esta semana
@@ -146,7 +161,7 @@ docs/
 │   ├── v0.1.81-cdn-resources.md
 │   └── v0.1.80-python-embedded.md
 │
-└── _archived/                   # Archivado (nada eliminado)
+└── _archivado/ # Archivado (nada eliminado)
     ├── reorganizacion-febrero-2026/
     ├── actualizaciones-v0.1.x/
     ├── arquitectura-v1/
@@ -162,19 +177,19 @@ docs/
 |-----------|-----------|--------|
 | [CONTEXT.md](../CONTEXT.md) | Contexto para IA | 15 min |
 | [README.md](../README.md) | Visión general | 10 min |
-| [CHANGELOG.md](../CHANGELOG.md) | Historial de cambios | Variable |
+| [CHANGELOG.md](CHANGELOG.md) | Historial de cambios | Variable |
 
 ### Para Desarrolladores
 | Documento | Propósito | Tiempo |
 |-----------|-----------|--------|
-| [docs/01-quick-start/installation.md](01-quick-start/installation.md) | Instalación | 10 min |
-| [docs/02-architecture/overview.md](02-architecture/overview.md) | Arquitectura | 15 min |
-| [docs/02-architecture/ipc-contracts.md](02-architecture/ipc-contracts.md) | Contratos IPC | 10 min |
+| [docs/03-guias/instalacion-configuracion.md](03-guias/instalacion-configuracion.md) | Instalación | 10 min |
+| [docs/02-architecture/arquitectura-general.md](02-architecture/arquitectura-general.md) | Arquitectura | 15 min |
+| [docs/02-architecture/ipc-contratos.md](02-architecture/ipc-contratos.md) | Contratos IPC | 10 min |
 
 ### Para Mantenimiento
 | Documento | Propósito | Tiempo |
 |-----------|-----------|--------|
-| [docs/04-guides/maintenance.md](04-guides/maintenance.md) | Mantenimiento | 10 min |
+| [docs/03-guias/mantenimiento.md](03-guias/mantenimiento.md) | Mantenimiento | 10 min |
 | [docs/05-updates/](05-updates/) | Actualizaciones | Variable |
 
 ---
@@ -208,9 +223,9 @@ npm run debug
 
 ## ❓ ¿Necesitas Ayuda?
 
-1. **Problemas técnicos:** Ver `docs/01-quick-start/troubleshooting.md`
-2. **Dudas de arquitectura:** Ver `docs/02-architecture/overview.md`
-3. **Dudas de módulos:** Ver `docs/03-modules/[módulo]`
+1. **Problemas técnicos:** Ver `docs/03-guias/instalacion-configuracion.md` (sección 5)
+2. **Dudas de arquitectura:** Ver `docs/02-architecture/arquitectura-general.md`
+3. **Dudas de módulos:** Ver `docs/02-modulos/[módulo]`
 4. **Cambios recientes:** Ver `docs/05-updates/` o `CHANGELOG.md`
 
 ---

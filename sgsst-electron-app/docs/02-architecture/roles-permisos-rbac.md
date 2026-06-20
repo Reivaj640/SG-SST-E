@@ -1,5 +1,11 @@
 # Roles y Permisos (RBAC) - K+AIR
 
+**Versión:** 1.1
+**Actualizado:** 9 de junio de 2026
+**Estado:** ✅ Actualizado v0.1.99
+
+---
+
 ## Objetivo
 Definir el catalogo de roles y la matriz de permisos para la aplicacion K+AIR bajo un modelo RBAC (Role Based Access Control), sin modificar contratos ni logica existente.
 
@@ -34,15 +40,19 @@ Acciones especiales por dominio:
 
 ## Modulos y submodulos (prefijos canonicos)
 - recursos.*
-  responsable-sg, roles-responsabilidades, presupuesto, afiliacion, trabajo-alto-riesgo, copasst, capacitacion-copasst, comite-convivencia, capacitaciones, inducciones, curso-virtual
+  responsable-sg, roles-responsabilidades, presupuesto, afiliacion, trabajo-alto-riesgo, copasst, capacitacion-copasst, comite-convivencia, capacitaciones, inducciones, curso-virtual, manual-proveedores
 - salud.*
-  sociodemografica, evaluaciones-medicas, restricciones-medicas, reportes-accidentes, investigacion-accidentes, ausentismo
+  sociodemografica, evaluaciones-medicas, restricciones-medicas, reportes-accidentes, investigacion-accidentes, ausentismo, registro-estadistico, frecuencia-accidentalidad, severidad-accidentalidad, indice-mortalidad
 - gestion-integral.*
-  politica, objetivos, plan-trabajo, rendicion
+politica, objetivos, plan-trabajo, rendicion
 - gestion-peligros.*
+metodologia-ipevr, identificacion-peligros, sustancias-quimicas, mediciones-ambientales, medidas-prevencion, aplicacion-medidas, evaluacion-procedimientos, inspecciones, mantenimiento, entrega-epp
 - gestion-amenazas.*
+plan-emergencias, examenes-brigadistas
 - verificacion.*
+indicadores, auditoria-anual, revision-alta-direccion, planificacion-auditoria
 - mejoramiento.*
+acciones-preventivas-correctivas, acciones-mejora-alta-gerencia, acciones-mejora-at-el, planes-mejoramiento-autoridades
 
 ## Catalogo de roles (vigente)
 1. Administrador del Sistema (global)
@@ -146,3 +156,9 @@ mejoramiento.* | ver, crear, editar, cerrar, exportar | ver, exportar, aprobar |
 ## Notas
 - Se excluyen por ahora los roles Supervisor y Auditor. Se pueden reincorporar en una version futura.
 - Esta definicion es documental. La implementacion se realizara en una fase posterior sin romper contratos IPC existentes.
+
+---
+
+**Mantenido por:** Product Architect & Full-Stack Team
+**Última actualización:** 9 de junio de 2026
+**Versión:** 1.1 (v0.1.99)

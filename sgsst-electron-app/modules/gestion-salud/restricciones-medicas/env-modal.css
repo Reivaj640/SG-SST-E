@@ -1,0 +1,311 @@
+/* ============================================================================
+   env-modal.css — Modal de Envío de Remisiones (3.1.6)
+   Sistema Visual Oficial K+AIR — Aislado y Coherente
+   ============================================================================ */
+
+:root {
+    --env-primary: #174ea6;
+    --env-primary-hover: #185abd;
+    --env-primary-light: #e8f0fe;
+    --env-success: #28a745;
+    --env-success-light: #d4edda;
+    --env-warning: #ffc107;
+    --env-danger: #dc3545;
+    --env-info: #17a2b8;
+    --env-wa: #25d366;
+    --env-text-primary: #212529;
+    --env-text-secondary: #495057;
+    --env-text-muted: #6c757d;
+    --env-bg-body: #f0f2f5;
+    --env-bg-card: #ffffff;
+    --env-border: #dee2e6;
+    --env-radius: 0.375rem;
+    --env-radius-lg: 0.5rem;
+    --env-shadow-lg: 0 10px 25px rgba(0,0,0,0.1);
+    --env-font-heading: 'Lexend', sans-serif;
+    --env-font-body: 'Roboto', sans-serif;
+}
+
+/* Overlay del modal */
+.env-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    animation: envFadeIn 0.2s ease-out;
+}
+
+@keyframes envFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Card del modal */
+.env-modal {
+    background-color: var(--env-bg-card);
+    border-radius: var(--env-radius-lg);
+    box-shadow: var(--env-shadow-lg);
+    max-width: 550px;
+    width: 90%;
+    overflow: hidden;
+    animation: envSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    font-family: var(--env-font-body);
+}
+
+@keyframes envSlideUp {
+    from { opacity: 0; transform: translateY(15px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Header del modal */
+.env-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--env-border);
+    background-color: #fafafa;
+}
+
+.env-modal-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.env-modal-title h2 {
+    font-family: var(--env-font-heading);
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--env-primary);
+    margin: 0;
+}
+
+.env-modal-close {
+    background: none;
+    border: none;
+    color: var(--env-text-muted);
+    font-size: 1.25rem;
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.env-modal-close:hover {
+    background-color: #eee;
+    color: var(--env-danger);
+}
+
+/* Body del modal */
+.env-modal-body {
+    padding: 1.5rem;
+}
+
+/* Banner de éxito */
+.env-success-banner {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background-color: var(--env-success-light);
+    border-radius: var(--env-radius);
+    margin-bottom: 1.5rem;
+    border: 1px solid rgba(40, 167, 69, 0.1);
+}
+
+.env-success-banner i {
+    font-size: 1.75rem;
+    color: var(--env-success);
+}
+
+.env-success-text h3 {
+    font-family: var(--env-font-heading);
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #155724;
+    margin: 0 0 0.15rem 0;
+}
+
+.env-success-text p {
+    font-size: 0.8rem;
+    color: #155724;
+    opacity: 0.8;
+    margin: 0;
+}
+
+/* Info del documento */
+.env-doc-info-card {
+    background-color: #f8f9fa;
+    border-radius: var(--env-radius);
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--env-border);
+}
+
+.env-doc-info-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    padding: 0.4rem 0;
+}
+
+.env-doc-info-row:not(:last-child) {
+    border-bottom: 1px dashed var(--env-border);
+}
+
+.env-doc-info-row i {
+    color: var(--env-primary);
+    font-size: 0.9rem;
+    width: 18px;
+    text-align: center;
+}
+
+.env-doc-label {
+    font-weight: 600;
+    color: var(--env-text-secondary);
+    min-width: 110px;
+    font-size: 0.8rem;
+}
+
+.env-doc-value {
+    color: var(--env-text-primary);
+    font-size: 0.85rem;
+    flex: 1;
+    word-break: break-all;
+}
+
+/* Botones de acción de envío */
+.env-modal-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.env-send-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1.25rem 1rem;
+    border: 2px solid var(--env-border);
+    border-radius: var(--env-radius);
+    background-color: white;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    font-family: inherit;
+    position: relative;
+    overflow: hidden;
+}
+
+.env-send-btn:hover:not(:disabled) {
+    border-color: var(--env-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.env-send-btn.env-send-wa:hover:not(:disabled) {
+    border-color: var(--env-wa);
+    background-color: rgba(37, 211, 102, 0.03);
+}
+
+.env-send-btn.env-send-email:hover:not(:disabled) {
+    border-color: var(--env-primary);
+    background-color: rgba(23, 78, 166, 0.03);
+}
+
+.env-send-icon {
+    font-size: 2rem;
+    margin-bottom: 0.25rem;
+}
+
+.env-send-label {
+    font-family: var(--env-font-heading);
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--env-text-primary);
+}
+
+.env-send-contact {
+    font-size: 0.7rem;
+    color: var(--env-text-muted);
+}
+
+.env-send-btn:disabled {
+    opacity: 0.6;
+    background-color: #f5f5f5;
+    cursor: not-allowed;
+}
+
+/* Footer del modal */
+.env-modal-footer {
+    padding: 1rem 1.5rem;
+    background-color: #fafafa;
+    border-top: 1px solid var(--env-border);
+    text-align: center;
+}
+
+.env-modal-footer p {
+    font-size: 0.7rem;
+    color: var(--env-text-muted);
+    margin: 0;
+}
+
+/* Estado de envío */
+.env-send-status {
+    margin-top: 1.25rem;
+    padding: 0.75rem;
+    border-radius: var(--env-radius);
+    display: none;
+    text-align: center;
+    font-size: 0.85rem;
+}
+
+.env-send-status.active {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+}
+
+.env-send-status.success {
+    background-color: var(--env-success-light);
+    color: #155724;
+}
+
+.env-send-status.error {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+/* Spinner */
+.env-spinner-sm {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(0,0,0,0.1);
+    border-top-color: var(--env-primary);
+    border-radius: 50%;
+    animation: env-spin 0.8s linear infinite;
+}
+
+@keyframes env-spin { to { transform: rotate(360deg); } }
+
+/* Responsive */
+@media (max-width: 500px) {
+    .env-modal-actions { grid-template-columns: 1fr; }
+    .env-send-btn { flex-direction: row; padding: 1rem; justify-content: flex-start; }
+    .env-send-icon { font-size: 1.5rem; margin-bottom: 0; margin-right: 1rem; }
+}

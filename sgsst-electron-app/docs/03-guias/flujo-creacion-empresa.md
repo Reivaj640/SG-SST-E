@@ -1,5 +1,9 @@
 # Flujo de Creación de Empresa
 
+**Versión:** 1.0
+**Actualizado:** 9 de junio de 2026
+**Estado:** ✅ Actualizado v0.1.99
+
 ## Proceso General
 
 El flujo de creación de empresa permite registrar una nueva empresa en el sistema SG-SST y asignarle el escenario normativo correspondiente.

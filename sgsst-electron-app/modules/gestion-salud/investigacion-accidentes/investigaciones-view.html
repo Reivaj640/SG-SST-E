@@ -1,95 +1,178 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visualizador de Investigaciones de Accidentes</title>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="investigaciones-view.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestión de Investigaciones - K+AIR</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Lexend:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="investigaciones-view.css">
 </head>
 <body>
-    <div class="document-viewer-wrapper">
-        <header>
-            <div class="logo">
-                <i class="fas fa-file-alt"></i>
-                <h1>Visualizador de Investigaciones de Accidentes</h1>
-            </div>
-            <div class="header-actions">
-                <button class="btn btn-secondary" id="backBtn">
-                    <i class="fas fa-arrow-left"></i>
-                    Volver
-                </button>
-                <button class="btn btn-primary" id="downloadBtn">
-                    <i class="fas fa-download"></i>
-                    Descargar
-                </button>
-                <button class="btn btn-secondary" id="printBtn">
-                    <i class="fas fa-print"></i>
-                    Imprimir
-                </button>
-            </div>
-        </header>
-        <div class="content">
-            <div class="sidebar">
-                <div class="navigation-controls">
-                    <button class="btn btn-secondary" id="upLevelBtn" title="Subir un nivel">
-                        <i class="fas fa-level-up-alt"></i>
-                        Subir Nivel
-                    </button>
-                </div>
-                <h3>Carpetas de Documentos</h3>
-                <div id="folderList">
-                    <!-- Las carpetas se cargarán dinámicamente -->
-                </div>
-                <h3 style="margin-top: 20px;">Documentos en Carpeta</h3>
-                <div id="documentList">
-                    <!-- Los documentos se cargarán dinámicamente aquí -->
-                </div>
-            </div>
-            <div class="main-content">
-                <div class="document-info">
-                    <div class="document-title" id="documentTitle">Selecciona un documento</div>
-                    <div class="document-actions">
-                        <div class="toolbar-group">
-                            <label for="zoomLevel">Zoom:</label>
-                            <select id="zoomLevel">
-                                <option value="auto">Auto</option>
-                                <option value="page-width">Ancho de página</option>
-                                <option value="page-height">Alto de página</option>
-                                <option value="50%">50%</option>
-                                <option value="75%">75%</option>
-                                <option value="100%">100%</option>
-                                <option value="125%">125%</option>
-                                <option value="150%">150%</option>
-                                <option value="200%">200%</option>
-                            </select>
-                        </div>
-                        <div class="toolbar-group">
-                            <label for="pageOrientation">Orientación:</label>
-                            <select id="pageOrientation">
-                                <option value="vertical">Vertical</option>
-                                <option value="horizontal">Horizontal</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-                <div class="document-viewer-container">
-                    <div class="loading" id="loadingDiv">
-                        <div class="spinner"></div>
-                        <p>Cargando documento...</p>
-                    </div>
-                    <div id="viewerContainer" style="display: none;">
-                        <!-- El visor de documento se cargará aquí -->
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="notification" id="notification">
-            <i class="notification-icon fas fa-check-circle"></i>
-            <div class="notification-message">Operación completada con éxito</div>
-        </div>
+
+<div class="inv-layout">
+
+<!-- Header -->
+<div class="k-section-card" style="padding:0; margin-bottom:1rem;">
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
+    <div style="display:flex; align-items:center; gap:0.75rem;">
+      <i class="fas fa-microscope" style="color:#174ea6; font-size:1.25rem;"></i>
+      <div>
+        <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Gestión de Investigaciones</h3>
+        <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Gestión de la Salud — 3.2.2 Ver Investigaciones</p>
+      </div>
     </div>
-    <script src="investigaciones-viewer.js"></script>
+    <div style="display:flex; align-items:center; gap:0.75rem;">
+      <span class="k-section-card__company">
+        <i class="bi bi-building"></i>
+        <span id="invCompanyName">—</span>
+      </span>
+      <div class="k-section-card__divider"></div>
+      <button class="header-action--ghost" id="refreshBtn" title="Actualizar lista">
+        <i class="fas fa-sync-alt" id="refreshIcon"></i> Actualizar
+      </button>
+      <button class="header-back-btn" id="backBtn" title="Volver al portal">
+        <i class="fas fa-arrow-left"></i> Volver
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Contenido principal con scroll -->
+<div class="inv-body">
+
+<!-- XRef Panel — collapsed by default -->
+<div class="inv-xref-panel" id="xrefPanel">
+<div class="inv-xref-icon"><i class="fas fa-exchange-alt"></i></div>
+<div class="inv-xref-content">
+<div class="inv-xref-title">Referencia Cruzada: FURAT (3.2.1) ↔ Investigación (3.2.2)</div>
+<div class="inv-xref-summary" id="xrefSummary">
+<span class="inv-xref-badge inv-xref-badge--furat"><i class="fas fa-file-alt"></i> <span id="xrefFuratCount">0</span> FURATs</span>
+<span class="inv-xref-badge inv-xref-badge--matched"><i class="fas fa-link"></i> <span id="xrefMatchedCount">0</span> Emparejados</span>
+<span class="inv-xref-badge inv-xref-badge--unmatched"><i class="fas fa-unlink"></i> <span id="xrefUnmatchedCount">0</span> Sin Investigación</span>
+<span class="inv-xref-badge inv-xref-badge--mismatch"><i class="fas fa-exclamation-triangle"></i> <span id="xrefMismatchCount">0</span> Año Diferente</span>
+</div>
+</div>
+<button class="inv-xref-toggle" id="xrefToggleBtn" title="Mostrar/ocultar detalles">
+<i class="fas fa-chevron-down" id="xrefToggleIcon"></i>
+</button>
+<div class="inv-xref-detail" id="xrefDetail">
+<div class="inv-xref-diagram">
+<div class="inv-xref-diagram__path inv-xref-diagram__path--furat">
+<i class="fas fa-file-alt"></i>
+<span>3.2.1 Reportes de Accidentes</span>
+<small>FURATs</small>
+</div>
+<div class="inv-xref-diagram__connector"><i class="fas fa-arrows-alt-h"></i></div>
+<div class="inv-xref-diagram__path inv-xref-diagram__path--inv">
+<i class="fas fa-search"></i>
+<span>3.2.2 Investigación</span>
+<small>Accidentes</small>
+</div>
+</div>
+<div id="xrefList" class="inv-xref-list"></div>
+</div>
+<button class="inv-xref-close" id="xrefCloseBtn" title="Cerrar panel"><i class="fas fa-times"></i></button>
+</div>
+
+<!-- Filter Bar — filter-buttons + search + view-toggle -->
+<div class="inv-filter-bar">
+    <div class="inv-filter-buttons" id="filterButtons">
+      <button class="inv-filter-btn active" data-filter="todas"><i class="fas fa-layer-group"></i> Todas</button>
+      <button class="inv-filter-btn" data-filter="pendiente"><i class="fas fa-clock"></i> Pendientes</button>
+      <button class="inv-filter-btn" data-filter="completada"><i class="fas fa-check-double"></i> Completadas</button>
+    </div>
+    <div class="inv-year-wrapper">
+      <i class="fas fa-calendar-alt inv-year-icon"></i>
+      <select id="yearFilter" class="inv-year-select">
+        <option value="todos">Todos los años</option>
+      </select>
+    </div>
+    <div class="inv-search-wrapper">
+<i class="fas fa-search inv-search-icon"></i>
+<input type="text" id="searchInput" placeholder="Buscar por nombre..." class="inv-search-input">
+<button id="clearSearchBtn" class="inv-search-clear hidden" title="Limpiar"><i class="fas fa-times"></i></button>
+</div>
+<button class="inv-view-toggle" id="viewToggleBtn" title="Cambiar vista">
+<i class="fas fa-th-large" id="viewToggleIcon"></i>
+</button>
+</div>
+
+<!-- Cards container — flat list -->
+<div id="investigationsList" class="inv-cards-list"></div>
+
+</div>
+
+<!-- Upload FAB -->
+<button id="uploadFab" class="inv-upload-fab" title="Agregar FURAT">
+<i class="fas fa-plus"></i>
+</button>
+
+<!-- Upload Overlay + Modal -->
+<div id="uploadOverlay" class="inv-upload-overlay hidden">
+<div class="inv-upload-modal">
+<div class="inv-upload-modal__header">
+<h3 class="inv-upload-modal__title"><i class="fas fa-cloud-upload-alt"></i> Agregar Nuevo FURAT</h3>
+<button id="closeUploadBtn" class="inv-upload-modal__close" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+</div>
+<div class="inv-upload-modal__body">
+<div class="inv-upload-path-hint" id="uploadPathHint">
+<i class="fas fa-folder-open"></i>
+<span>3.2.1/Reporte de los accidentes de trabajo/</span>
+</div>
+<div id="dropZone" class="inv-drop-zone">
+<div class="inv-drop-zone__content">
+<i class="fas fa-cloud-upload-alt inv-drop-zone__icon"></i>
+<p class="inv-drop-zone__title">Arrastra un archivo PDF aquí</p>
+<p class="inv-drop-zone__subtitle">o haz clic para seleccionar un archivo</p>
+</div>
+<input type="file" id="fileInput" accept=".pdf" class="hidden">
+</div>
+<div id="uploadProgress" class="inv-upload-progress hidden">
+<div class="inv-upload-progress__bar">
+<div class="inv-upload-progress__fill" id="uploadProgressFill"></div>
+</div>
+<span class="inv-upload-progress__text" id="uploadProgressText">Guardando FURAT...</span>
+</div>
+<div id="uploadSuccess" class="inv-upload-success hidden">
+<i class="fas fa-check-circle"></i>
+<span id="uploadSuccessText">FURAT guardado exitosamente</span>
+</div>
+<div id="uploadQueue" class="inv-upload-queue"></div>
+</div>
+<div class="inv-upload-modal__footer">
+<button class="inv-upload-modal__btn inv-upload-modal__btn--cancel" id="uploadCancelBtn">Cancelar</button>
+<button class="inv-upload-modal__btn inv-upload-modal__btn--save" id="uploadSaveBtn" disabled>Guardar</button>
+</div>
+</div>
+</div>
+
+<!-- Preview Overlay + Modal -->
+<div id="previewOverlay" class="inv-preview-overlay hidden">
+<div class="inv-preview-modal">
+<div class="inv-preview-modal__header">
+<h3 class="inv-preview-modal__title" id="previewTitle">Previsualización</h3>
+<button id="closePreviewBtn" class="inv-preview-modal__close" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+</div>
+<div class="inv-preview-modal__body" id="previewBody">
+<div class="inv-preview-field-grid" id="previewFieldGrid"></div>
+<div id="previewIframeContainer" class="inv-preview-iframe-container"></div>
+</div>
+<div class="inv-preview-modal__footer">
+<button class="inv-preview-modal__btn inv-preview-modal__btn--close" id="previewCloseBtn">Cerrar</button>
+<button class="inv-preview-modal__btn inv-preview-modal__btn--start" id="previewStartBtn" style="display:none;">
+<i class="fas fa-search-plus"></i> Iniciar Investigación
+</button>
+</div>
+</div>
+</div>
+
+<!-- Toast Container — top-right -->
+<div id="toastContainer" class="inv-toast-container"></div>
+
+</div>
+
+<script src="investigaciones-viewer.js"></script>
 </body>
 </html>

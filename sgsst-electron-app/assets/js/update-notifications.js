@@ -238,49 +238,8 @@ class UpdateNotificationManager {
 // Instancia global del gestor de notificaciones
 window.updateNotifier = new UpdateNotificationManager();
 
-// Integración con electronAPI (si está disponible)
-console.log('[UPDATER] update-notifications.js: Verificando electronAPI...');
-console.log('[UPDATER] electronAPI disponible:', !!window.electronAPI);
-
-if (window.electronAPI) {
-    console.log('[UPDATER] Configurando listeners en update-notifications.js...');
-    
-    // Cuando comienza a buscar actualizaciones
-    window.electronAPI.onUpdateChecking && window.electronAPI.onUpdateChecking(() => {
-        console.log('[UPDATER] update-notifications.js: update_checking recibido');
-        window.updateNotifier.notifyChecking();
-    });
-    
-    // Cuando hay actualización disponible
-    window.electronAPI.onUpdateAvailable && window.electronAPI.onUpdateAvailable((info) => {
-        console.log('[UPDATER] update-notifications.js: update_available recibido', info);
-        if (info && info.version) {
-            window.updateNotifier.notifyAvailable(info.version);
-        }
-    });
-    
-    // Progreso de descarga
-    window.electronAPI.onUpdateProgress && window.electronAPI.onUpdateProgress((data) => {
-        console.log('[UPDATER] update-notifications.js: update_progress recibido', data);
-        if (data && data.percent !== undefined) {
-            window.updateNotifier.updateProgress(data.percent, data.speed);
-        }
-    });
-
-    // Cuando la descarga se completa
-    window.electronAPI.onUpdateDownloaded && window.electronAPI.onUpdateDownloaded((info) => {
-        console.log('[UPDATER] update-notifications.js: update_downloaded recibido', info);
-        const version = info ? info.version : 'nueva';
-        window.updateNotifier.notifyDownloaded(version, () => {
-            // Reiniciar la aplicación
-            if (window.electronAPI.restartApp) {
-                window.electronAPI.restartApp();
-            }
-        });
-    });
-    
-    console.log('[UPDATER] Listeners configurados en update-notifications.js');
-}
+// Los listeners de eventos de actualización están en renderer.js (handler principal)
+// Esta clase solo gestiona la UI de notificaciones toast
 
 // Exportar para uso en otros módulos
 if (typeof module !== 'undefined' && module.exports) {

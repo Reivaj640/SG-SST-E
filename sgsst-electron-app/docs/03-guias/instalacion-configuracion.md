@@ -1,8 +1,8 @@
 # 🛠️ Instalación y Configuración K+AIR
 
-**Versión:** 1.0  
-**Actualizado:** 6 de marzo de 2026  
-**Estado:** ✅ Actualizado
+**Versión:** 2.0
+**Actualizado:** 9 de junio de 2026
+**Estado:** ✅ Actualizado (Python empaquetado desde v0.1.80)
 
 ---
 
@@ -33,7 +33,7 @@
 | Componente | Versión Mínima | Recomendada | Notas |
 |------------|----------------|-------------|-------|
 | **Node.js** | 18.x | 20.x LTS | [Descargar](https://nodejs.org/) |
-| **Python** | 3.10 | 3.11-3.12 | ⚠️ NO usar 3.14 |
+| **Python** | 3.11.9 (incluido) | N/A | ⚠️ Empaquetado desde v0.1.80, NO requiere instalación manual |
 | **Git** | Última | Última | [Descargar](https://git-scm.com/) |
 | **CUDA** (opcional) | 12.x | 12.x | Para GPU NVIDIA |
 
@@ -76,56 +76,51 @@ npm list --depth=0
 - `pdf-parse` ^2.4.5 - Lectura de PDF
 - `electron-builder` ^26.0.12 - Empaquetado
 
-### 2.3 Configurar Entorno Virtual Python
+### 2.3 Python Empaquetado (Sin Configuración Requerida)
+
+> ✅ **Desde v0.1.80**, Python 3.11.9 viene empaquetado en el installer.
+> No se requiere instalación manual ni entorno virtual.
+
+**Para desarrollo (opcional):** Si deseas ejecutar scripts Python fuera de la app:
 
 ```bash
-# Navegar a directorio Portear
-cd Portear
+# El Python empaquetado está en:
+# Windows: resources/python-embed/python.exe
 
-# Crear entorno virtual
-python -m venv .venv
-
-# Activar entorno virtual
-# Windows:
-.venv\Scripts\activate
-
-# Linux/Mac:
-source .venv/bin/activate
+# O instalar Python 3.11 separadamente para desarrollo
+# Ver docs/02-architecture/python-embedded.md para detalles completos
 ```
 
-### 2.4 Instalar Dependencias Python
+### 2.4 Dependencias Python (Pre-instaladas)
 
-```bash
-# Instalar todas las dependencias
-pip install -r requirements.txt
+> ✅ **79+ paquetes Python** ya vienen instalados en el Python empaquetado.
+> Ver lista completa en `docs/05-updates/IMPLEMENTACION_PYTHON_EMPAQUETADO_v0.1.80.md`.
 
-# Verificar instalación
-pip list
-```
-
-**Dependencias críticas:**
+**Paquetes críticos incluidos:**
 - `python-docx` 1.1.2 - Documentos Word
 - `openpyxl` 3.1.5 - Archivos Excel
 - `pandas` 2.2.3 - Manipulación de datos
 - `flask` - Servidor HTTP para LLM
-- `torch` 2.9.0+cu128 - Framework Deep Learning
-- `transformers` 4.53.1 - Modelos de lenguaje
 - `pdfplumber` 0.11.4 - Extracción de PDF
+
+**Nota:** `torch` y `transformers` NO están incluidos en el build (excluidos en v0.1.83 para reducir tamaño). El servidor LLM requiere instalación separada si se usa Investigación de Accidentes con IA.
 
 ### 2.5 Verificar Instalación
 
 ```bash
 # Verificar Node.js
-node --version  # Debe mostrar v18.x o v20.x
+node --version # Debe mostrar v18.x o v20.x
 
 # Verificar npm
 npm --version
 
-# Verificar Python
-python --version  # Debe mostrar 3.10, 3.11 o 3.12
+# Python (empaquetado, verificar solo si se necesita desarrollo externo)
+python --version # 3.11.9 (si está en PATH)
 
-# Verificar pip
-pip --version
+# Verificar que la app encuentra Python (al ejecutar la app)
+# La app usa getPython() en main.js que busca en:
+# 1. resources/python-embed/python.exe (empaquetado)
+# 2. PATH del sistema (fallback para desarrollo)
 ```
 
 ---
@@ -227,24 +222,24 @@ npm test
 
 ## 5. Solución de Problemas
 
-### 5.1 Python No Encontrado
+### 5.1 Python No Encontrado en Desarrollo
 
 **Error:**
 ```
 Error: Python not found. Please install Python 3.10-3.12
 ```
 
-**Solución:**
+**Solución (en producción):** Este error no debería ocurrir ya que Python viene empaquetado. Si ocurre:
+1. Verificar que `resources/python-embed/python.exe` existe
+2. Reinstalar la aplicación
+
+**Solución (en desarrollo):** Si ejecutas desde código fuente sin build:
 ```bash
-# Windows - Verificar instalación
+# Opción 1: Usar Python del sistema (3.11 recomendado)
 py --version
 
-# Si no está instalado, descargar de https://www.python.org/downloads/
-# Marcar "Add Python to PATH" durante instalación
-
-# Verificar que Python esté en PATH
-where python  # Windows
-which python  # Linux/Mac
+# Opción 2: Crear enlace al Python empaquetado
+# Ver docs/02-architecture/python-embedded.md para configuración de desarrollo
 ```
 
 ### 5.2 Error de Dependencias Python
@@ -372,14 +367,14 @@ rm -rf node_modules package-lock.json
 npm install
 ```
 
-### 7.2 Actualizar Dependencias Python
+### 7.2 Python (Sin Actualización Requerida)
 
+> ✅ Python empaquetado se actualiza automáticamente con cada nuevo installer.
+> Las dependencias del Python empaquetado se gestionan en el build, no manualmente.
+
+**Para desarrollo local con Python del sistema:**
 ```bash
-# Activar entorno virtual
-cd Portear
-.venv\Scripts\activate  # Windows
-
-# Actualizar dependencias
+# Si usas Python del sistema para desarrollo
 pip install --upgrade -r requirements.txt
 ```
 
@@ -409,4 +404,4 @@ Los datos de empresas se mantienen en el directorio `Empresas/`. No es necesario
 
 **Mantenido por:** Product Architect & Full-Stack Team  
 **Última actualización:** 6 de marzo de 2026  
-**Versión:** 0.1.70
+**Versión:** 2.0 (v0.1.99)

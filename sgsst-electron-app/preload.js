@@ -41,6 +41,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('system-theme-changed', listener);
     return () => ipcRenderer.removeListener('system-theme-changed', listener);
   },
+  onFullscreenChanged: (callback) => {
+    const listener = (event, isFullscreen) => callback(isFullscreen);
+    ipcRenderer.on('fullscreen-changed', listener);
+    return () => ipcRenderer.removeListener('fullscreen-changed', listener);
+  },
+  isMaximized: () => ipcRenderer.invoke('get-maximized-state'),
 
   // --- Manejo de archivos y directorios ---
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
@@ -93,6 +99,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveProveedoresExcelData: (filePath, data) => ipcRenderer.invoke('save-proveedores-excel-data', filePath, data),
   processExcelData: (payload) => ipcRenderer.invoke('process-excel-data', payload),
   updatePlanTrabajoExcel: (payload) => ipcRenderer.invoke('update-plan-trabajo-excel', payload),
+  repairPlanTrabajoExcel: (payload) => ipcRenderer.invoke('repair-plan-trabajo-excel', payload),
+
+  // --- Módulo 2.10.1 Evaluación y Selección de Proveedores y Contratistas ---
+  getAsociadosES: () => ipcRenderer.invoke('get-asociados-es'),
+  saveAsociadosES: (data) => ipcRenderer.invoke('save-asociados-es', data),
+  getEvaluacionesES: () => ipcRenderer.invoke('get-evaluaciones-es'),
+  saveEvaluacionesES: (data) => ipcRenderer.invoke('save-evaluaciones-es', data),
+  getReevaluacionesES: () => ipcRenderer.invoke('get-reevaluaciones-es'),
+  saveReevaluacionesES: (data) => ipcRenderer.invoke('save-reevaluaciones-es', data),
+  getNoConformidadesES: () => ipcRenderer.invoke('get-noconformidades-es'),
+  saveNoConformidadesES: (data) => ipcRenderer.invoke('save-noconformidades-es', data),
 
   // --- Gestión de Archivos de Proveedores (Evidencias) ---
   createProviderFolder: (basePath, folderName) => ipcRenderer.invoke('create-provider-folder', basePath, folderName),
@@ -138,6 +155,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   uploadDocument: (payload) => ipcRenderer.invoke('upload-document', payload),
   deleteDocument: (filePath) => ipcRenderer.invoke('delete-document', filePath),
   openFile: (filePath) => ipcRenderer.invoke('open-file', filePath),
+  createFolder: (payload) => ipcRenderer.invoke('create-folder', payload),
+  deleteFolder: (payload) => ipcRenderer.invoke('delete-folder', payload),
+  renameItem: (payload) => ipcRenderer.invoke('rename-item', payload),
+  
+  // --- Diagnóstico y reparación de Word COM ---
+  diagnoseWordCom: () => ipcRenderer.invoke('diagnose-word-com'),
+  repairWordCom: () => ipcRenderer.invoke('repair-word-com'),
 
   // --- Edición de documentos ---
   getEditableContent: (payload) => ipcRenderer.invoke('get-editable-content', payload),
@@ -162,6 +186,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('send-remision-by-email', docPath, extractedData, empresa),
   sendRemisionByWhatsapp: (docPath, extractedData, empresa) =>
     ipcRenderer.invoke('send-remision-by-whatsapp', docPath, extractedData, empresa),
+  getContactInfo: (cedula, empresa) =>
+    ipcRenderer.invoke('get-contact-info', cedula, empresa),
 
   // --- Excel ---
   getCapacitacionesSheets: (filePath) => ipcRenderer.invoke('get-capacitaciones-sheets', filePath),
@@ -188,6 +214,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   generateAccidentReport: (combinedData) =>
     ipcRenderer.invoke('investigacion-accidentes-generate-accident-report', combinedData),
   saveTempPdfFile: (filename, data) => ipcRenderer.invoke('investigacion-accidentes-save-temp-pdf-file', filename, data),
+
+  // --- Investigación de Accidentes (Gestión) ---
+  getInvestigacionStats: (companyName) => ipcRenderer.invoke('investigacion-accidentes-get-stats', { companyName }),
+  listInvestigations: (companyName, filter) => ipcRenderer.invoke('investigacion-accidentes-list-investigations', { companyName, filter }),
+  getInvestigationDetail: (companyName, investigationName) => ipcRenderer.invoke('investigacion-accidentes-get-investigation-detail', { companyName, investigationName }),
+  getCrossReferenceData: (companyName) => ipcRenderer.invoke('investigacion-accidentes-cross-reference-data', { companyName }),
+
+  // --- Registro Estadístico (3.2.3) ---
+  registroEstadisticoCargarDatos: (companyName) =>
+    ipcRenderer.invoke('registro-estadistico:cargar-datos', { companyName }),
+
   readAusentismoData: (companyName) =>
     ipcRenderer.invoke('get-ausentismo-data', companyName),
   getPriSeguimientoData: (companyName) =>
@@ -203,6 +240,33 @@ contextBridge.exposeInMainWorld('electronAPI', {
   buscarRegistrosCedula: (cedula, companyName) =>
     ipcRenderer.invoke('buscar-registros-cedula', cedula, companyName),
 
+  // --- Consulta de Trabajadores (Módulo Ausentismo) ---
+  consultarTrabajadoresGlobal: (params) =>
+    ipcRenderer.invoke('consultar-trabajadores-global', params),
+  obtenerEmpresasConBDPersonal: () =>
+    ipcRenderer.invoke('obtener-empresas-con-bd-personal'),
+
+  // --- Estadísticas de Ausentismo (widget home) ---
+  getAusentismoStats: (companyName, mode) =>
+    ipcRenderer.invoke('get-ausentismo-stats', companyName, mode),
+
+  // --- Estadísticas de Accidentes FURAT (widget home) ---
+getAccidentesStats: (companyName) =>
+ipcRenderer.invoke('get-accidentes-stats', companyName),
+
+getIndicadoresSaludStats: (companyName) =>
+ipcRenderer.invoke('get-indicadores-salud-stats', companyName),
+
+  // --- Estadísticas de Exámenes Médicos (widget home) ---
+  getExamenesStats: (companyName) =>
+    ipcRenderer.invoke('get-examenes-stats', companyName),
+
+  getRemisionesStats: (companyName) =>
+    ipcRenderer.invoke('get-remisiones-stats', companyName),
+
+  getSaludSeguimientosStats: (companyName) =>
+    ipcRenderer.invoke('get-salud-seguimientos-stats', companyName),
+
   // --- Inducciones ---
   getInduccionesData: (companyName) => ipcRenderer.invoke('get-inducciones-data', companyName),
   syncInduccionesFromForms: (companyName) => ipcRenderer.invoke('sync-inducciones-from-forms', companyName),
@@ -211,10 +275,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // --- Actas ---
   getActaData: () => ipcRenderer.invoke('get-acta-data'),
   getConvivenciaActaData: () => ipcRenderer.invoke('getConvivenciaActaData'),
-  generateCopasstActa: (changes) => ipcRenderer.invoke('generate-copasst-acta', changes),
-  generateConvivenciaActa: (changes) => ipcRenderer.invoke('generate-convivencia-acta', changes),
+  generateCopasstActa: (changes, savePath) => ipcRenderer.invoke('generate-copasst-acta', changes, savePath),
+  generateConvivenciaActa: (changes, savePath) => ipcRenderer.invoke('generate-convivencia-acta', changes, savePath),
+ getCopasstAutoFillData: (companyName) => ipcRenderer.invoke('get-copasst-auto-fill-data', companyName),
+ getCopasstSavePath: (companyName, year, monthName, actaNumber) => ipcRenderer.invoke('get-copasst-save-path', companyName, year, monthName, actaNumber),
+ getConvivenciaAutoFillData: (companyName) => ipcRenderer.invoke('get-convivencia-auto-fill-data', companyName),
+ getConvivenciaSavePath: (companyName, year, monthName) => ipcRenderer.invoke('get-convivencia-save-path', companyName, year, monthName),
 
-  // --- Diálogo de guardado ---
+ // --- Diálogo de guardado ---
   showSaveDialog: (options) => ipcRenderer.invoke('save-file-dialog', options),
 
   // --- Seguimiento de Incapacidades ---
@@ -229,9 +297,168 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getObjetivosExcelPath: (companyName) => ipcRenderer.invoke('get-objetivos-excel-path', companyName),
   loadObjetivosExcelData: (filePath) => ipcRenderer.invoke('load-objetivos-excel-data', filePath),
   saveObjetivosExcelData: (filePath, data) => ipcRenderer.invoke('save-objetivos-excel-data', filePath, data),
+  getObjetivosResultados: (excelFilePath) => ipcRenderer.invoke('get-objetivos-resultados', excelFilePath),
+  saveObjetivosResultados: (excelFilePath, data) => ipcRenderer.invoke('save-objetivos-resultados', excelFilePath, data),
+  getObjetivosResultadosAuto: (companyName) => ipcRenderer.invoke('get-objetivos-resultados-auto', companyName),
 
   // --- Evaluación Inicial SG-SST ---
   processEvaluacionPdf: (pdfPath, sourceType) => ipcRenderer.invoke('process-evaluacion-pdf', pdfPath, sourceType),
+
+  // --- Archivo y Retención Documental (Submódulo 2.5.1) ---
+  archivoRetencion: {
+    getStats: (companyName) => ipcRenderer.invoke('archivo-retencion:get-stats', companyName),
+    getExcelPath: (companyName) => ipcRenderer.invoke('archivo-retencion:get-excel-path', companyName),
+    leerTodos: (companyName) => ipcRenderer.invoke('archivo-retencion:leer-todos', companyName),
+    guardar: (companyName, documentos) => ipcRenderer.invoke('archivo-retencion:guardar', companyName, documentos),
+    crear: (companyName, documento) => ipcRenderer.invoke('archivo-retencion:crear', companyName, documento),
+    actualizar: (companyName, documento) => ipcRenderer.invoke('archivo-retencion:actualizar', companyName, documento),
+    eliminar: (companyName, numero) => ipcRenderer.invoke('archivo-retencion:eliminar', companyName, { numero }),
+  },
+
+  // --- Revisión por la Alta Dirección (Submódulo 6.1.3) ---
+  revisionAltaDireccion: {
+    cargarTodo: (empresaId) => ipcRenderer.invoke('revisionAltaDireccion:cargarTodo', { empresaId }),
+    listarRevisiones: (empresaId, filtros) => ipcRenderer.invoke('revisionAltaDireccion:listarRevisiones', { empresaId, filtros }),
+    obtenerRevision: (empresaId, id) => ipcRenderer.invoke('revisionAltaDireccion:obtenerRevision', { empresaId, id }),
+    crearRevision: (empresaId, data) => ipcRenderer.invoke('revisionAltaDireccion:crearRevision', { empresaId, data }),
+    actualizarRevision: (empresaId, id, cambios) => ipcRenderer.invoke('revisionAltaDireccion:actualizarRevision', { empresaId, id, cambios }),
+    cambiarEstadoRevision: (empresaId, id, nuevoEstado) => ipcRenderer.invoke('revisionAltaDireccion:cambiarEstadoRevision', { empresaId, id, nuevoEstado }),
+    eliminarRevision: (empresaId, id) => ipcRenderer.invoke('revisionAltaDireccion:eliminarRevision', { empresaId, id }),
+    listarActas: (empresaId, filtros) => ipcRenderer.invoke('revisionAltaDireccion:listarActas', { empresaId, filtros }),
+    guardarActa: (empresaId, acta) => ipcRenderer.invoke('revisionAltaDireccion:guardarActa', { empresaId, acta }),
+    listarIndicadores: (empresaId) => ipcRenderer.invoke('revisionAltaDireccion:listarIndicadores', { empresaId }),
+    guardarIndicador: (empresaId, indicador) => ipcRenderer.invoke('revisionAltaDireccion:guardarIndicador', { empresaId, indicador }),
+    importarXlsx: (empresaId, archivoPath, tipoPlantilla) => ipcRenderer.invoke('revisionAltaDireccion:importarXlsx', { empresaId, archivoPath, tipoPlantilla }),
+    exportarXlsx: (empresaId, tipoPlantilla, id) => ipcRenderer.invoke('revisionAltaDireccion:exportarXlsx', { empresaId, tipoPlantilla, id }),
+    subirDocumento: (empresaId, buffer, metadata) => ipcRenderer.invoke('revisionAltaDireccion:subirDocumento', { empresaId, buffer, metadata }),
+    obtenerProcedimiento: (empresaId) => ipcRenderer.invoke('revisionAltaDireccion:obtenerProcedimiento', { empresaId }),
+    abrirProcedimiento: (empresaId) => ipcRenderer.invoke('revisionAltaDireccion:abrirProcedimiento', { empresaId }),
+  },
+
+  // --- Auditoría Anual (Submódulo 6.1.2) — F1 (2026-06-19) ---
+  auditoriaAnual: {
+    cargarTodo: (empresaId) => ipcRenderer.invoke('auditoriaAnual:cargarTodo', { empresaId }),
+    guardarAuditoria: (empresaId, auditoria) => ipcRenderer.invoke('auditoriaAnual:guardarAuditoria', { empresaId, auditoria }),
+    eliminarAuditoria: (empresaId, id) => ipcRenderer.invoke('auditoriaAnual:eliminarAuditoria', { empresaId, id }),
+    guardarHallazgo: (empresaId, hallazgo) => ipcRenderer.invoke('auditoriaAnual:guardarHallazgo', { empresaId, hallazgo }),
+    eliminarHallazgo: (empresaId, id) => ipcRenderer.invoke('auditoriaAnual:eliminarHallazgo', { empresaId, id }),
+    exportarXlsx: (empresaId) => ipcRenderer.invoke('auditoriaAnual:exportarXlsx', { empresaId }),
+    importarXlsx: (empresaId, archivoPath) => ipcRenderer.invoke('auditoriaAnual:importarXlsx', { empresaId, archivoPath }),
+    seleccionarArchivoImportar: () => ipcRenderer.invoke('auditoriaAnual:seleccionarArchivoImportar'),
+  },
+
+  // --- Gestión del Cambio (2.11.1) ---
+  loadGestionCambioData: (companyName) => ipcRenderer.invoke('gestion-cambio-load-data', companyName),
+  saveGestionCambioData: (companyName, changeData) => ipcRenderer.invoke('gestion-cambio-save-data', companyName, changeData),
+  generateGestionCambioId: (companyName) => ipcRenderer.invoke('gestion-cambio-generate-id', companyName),
+  updateGestionCambioEstado: (companyName, changeId, nuevoEstado, extraData) =>
+    ipcRenderer.invoke('gestion-cambio-update-estado', companyName, changeId, nuevoEstado, extraData),
+
+// --- Frecuencia de la Accidentalidad (3.3.1) ---
+frecuenciaAccidentalidad: {
+  configurarRutas: (companyName, year) => ipcRenderer.invoke('frecuencia-accidentalidad:configurar-rutas', companyName, year),
+  leerIndicadores: () => ipcRenderer.invoke('frecuencia-accidentalidad:leer-indicadores'),
+  leerCaracterizacion: () => ipcRenderer.invoke('frecuencia-accidentalidad:leer-caracterizacion'),
+  contarATPorMes: (year, companyName) => ipcRenderer.invoke('frecuencia-accidentalidad:contar-at-por-mes', year, companyName),
+  leerMetaObjetivo: (companyName) => ipcRenderer.invoke('frecuencia-accidentalidad:leer-meta-objetivo', companyName),
+  escribirEnExcel: (mes, campos) => ipcRenderer.invoke('frecuencia-accidentalidad:escribir-excel', mes, campos),
+},
+
+// --- Severidad de la Accidentalidad (3.3.2) ---
+severidadAccidentalidad: {
+  configurarRutas: (companyName, year) => ipcRenderer.invoke('severidad-accidentalidad:configurar-rutas', companyName, year),
+  leerIndicadores: () => ipcRenderer.invoke('severidad-accidentalidad:leer-indicadores'),
+  escribirEnExcel: (mes, campos) => ipcRenderer.invoke('severidad-accidentalidad:escribir-excel', mes, campos),
+},
+
+// --- Índice de Mortalidad (3.3.3) ---
+mortalidad: {
+  configurarRutas: (companyName, year) => ipcRenderer.invoke('mortalidad:configurar-rutas', companyName, year),
+  leerIndicadores: () => ipcRenderer.invoke('mortalidad:leer-indicadores'),
+  escribirExcel: (mes, campos) => ipcRenderer.invoke('mortalidad:escribir-excel', mes, campos),
+  leerSeveridadJson: (companyName, year) => ipcRenderer.invoke('mortalidad:leer-severidad-json', companyName, year),
+},
+
+// --- Prevalencia de Enfermedad Laboral (3.3.4) ---
+prevalencia: {
+  configurarRutas: (companyName, year) => ipcRenderer.invoke('prevalencia:configurar-rutas', companyName, year),
+  leerIndicadores: () => ipcRenderer.invoke('prevalencia:leer-indicadores'),
+  escribirEnExcel: (mes, campos) => ipcRenderer.invoke('prevalencia:escribir-excel', mes, campos),
+},
+
+// --- Incidencia de Enfermedad Laboral (3.3.5) ---
+incidencia: {
+  configurarRutas: (companyName, year) => ipcRenderer.invoke('incidencia:configurar-rutas', companyName, year),
+  leerIndicadores: () => ipcRenderer.invoke('incidencia:leer-indicadores'),
+  escribirEnExcel: (mes, campos) => ipcRenderer.invoke('incidencia:escribir-excel', mes, campos),
+},
+
+getIndicadoresFiles: ({ companyName, submodule }) => ipcRenderer.invoke('get-indicadores-files', { companyName, submodule }),
+duplicateIndicadoresFile: ({ currentFilePath, newYear }) => ipcRenderer.invoke('duplicate-indicadores-file', { currentFilePath, newYear }),
+
+  // --- Inspecciones Sistemáticas (4.2.4) ---
+  inspecciones: {
+    getStats: (companyName) => ipcRenderer.invoke('inspecciones:get-stats', companyName),
+    getSchedule: (companyName, year) => ipcRenderer.invoke('inspecciones:get-schedule', companyName, year),
+    updateMonth: (companyName, activityId, month, status) => ipcRenderer.invoke('inspecciones:update-month', companyName, activityId, month, status),
+    updateField: (companyName, activityId, field, value) => ipcRenderer.invoke('inspecciones:update-field', companyName, activityId, field, value),
+    readExcel: (companyName, type) => ipcRenderer.invoke('inspecciones:read-excel', companyName, type),
+    writeExcel: (companyName, type, formData) => ipcRenderer.invoke('inspecciones:write-excel', companyName, type, formData),
+    writeHeader: (companyName, type, headerData) => ipcRenderer.invoke('inspecciones:write-header', companyName, type, headerData),
+    getTemplate: (companyName, type) => ipcRenderer.invoke('inspecciones:get-template', companyName, type),
+    listFiles: (companyName) => ipcRenderer.invoke('inspecciones:list-files', companyName),
+    getFileMetadata: (companyName, filePath) => ipcRenderer.invoke('inspecciones:get-file-metadata', companyName, filePath),
+    listInspections: (companyName, filters) => ipcRenderer.invoke('inspecciones:list', companyName, filters),
+    getInspection: (companyName, id) => ipcRenderer.invoke('inspecciones:get', companyName, id),
+    deleteInspection: (companyName, id) => ipcRenderer.invoke('inspecciones:delete', companyName, id),
+    createInspection: (companyName, type, month, year) => ipcRenderer.invoke('inspecciones:create', companyName, type, month, year),
+    listFilesByType: (companyName, type) => ipcRenderer.invoke('inspecciones:list-by-type', companyName, type),
+    readExcelByPath: (companyName, type, filePath) => ipcRenderer.invoke('inspecciones:read-by-path', companyName, type, filePath),
+    writeExcelByPath: (companyName, type, formData, filePath) => ipcRenderer.invoke('inspecciones:write-by-path', companyName, type, formData, filePath),
+  },
+
+  // --- Mantenimiento Periódico (4.2.5) ---
+  mantenimiento: {
+    read: (companyName) => ipcRenderer.invoke('mantenimiento:read', companyName),
+    save: (companyName, items) => ipcRenderer.invoke('mantenimiento:save', companyName, items),
+    toggleMonth: (companyName, rowIndex, month, type, value) => ipcRenderer.invoke('mantenimiento:toggle-month', companyName, rowIndex, month, type, value),
+    updateField: (companyName, rowIndex, field, value) => ipcRenderer.invoke('mantenimiento:update-field', companyName, rowIndex, field, value),
+    addRow: (companyName, itemData) => ipcRenderer.invoke('mantenimiento:add-row', companyName, itemData),
+    saveEvidence: (companyName, evidenceData) => ipcRenderer.invoke('mantenimiento:save-evidence', companyName, evidenceData),
+    readEvidenceFile: (companyName, relativePath) => ipcRenderer.invoke('mantenimiento:read-evidence-file', companyName, relativePath),
+    deleteEvidence: (companyName, relativePath) => ipcRenderer.invoke('mantenimiento:delete-evidence', companyName, relativePath),
+    listEvidences: (companyName, rowIndex, category, year) => ipcRenderer.invoke('mantenimiento:list-evidences', companyName, rowIndex, category, year),
+    getStats: (companyName) => ipcRenderer.invoke('mantenimiento:get-stats', companyName),
+  },
+
+  // --- Identificación de Peligros (4.1.2) ---
+  matrizPeligros: {
+    read: (companyName) => ipcRenderer.invoke('matriz-peligros:read', companyName),
+    save: (companyName, data) => ipcRenderer.invoke('matriz-peligros:save', companyName, data),
+    addSede: (companyName, nombre) => ipcRenderer.invoke('matriz-peligros:add-sede', companyName, nombre),
+    addProceso: (companyName, sedeId, nombre) => ipcRenderer.invoke('matriz-peligros:add-proceso', companyName, sedeId, nombre),
+    addCargo: (companyName, procesoId, nombre) => ipcRenderer.invoke('matriz-peligros:add-cargo', companyName, procesoId, nombre),
+    addPeligro: (companyName, cargoId, data) => ipcRenderer.invoke('matriz-peligros:add-peligro', companyName, cargoId, data),
+    updatePeligro: (companyName, peligroId, cambios) => ipcRenderer.invoke('matriz-peligros:update-peligro', companyName, peligroId, cambios),
+    deletePeligro: (companyName, peligroId) => ipcRenderer.invoke('matriz-peligros:delete-peligro', companyName, peligroId),
+    deleteCargo: (companyName, cargoId) => ipcRenderer.invoke('matriz-peligros:delete-cargo', companyName, cargoId),
+    deleteProceso: (companyName, procesoId) => ipcRenderer.invoke('matriz-peligros:delete-proceso', companyName, procesoId),
+    deleteSede: (companyName, sedeId) => ipcRenderer.invoke('matriz-peligros:delete-sede', companyName, sedeId),
+    renameSede: (companyName, sedeId, nombre) => ipcRenderer.invoke('matriz-peligros:rename-sede', companyName, sedeId, nombre),
+    renameProceso: (companyName, procesoId, nombre) => ipcRenderer.invoke('matriz-peligros:rename-proceso', companyName, procesoId, nombre),
+renameCargo: (companyName, cargoId, nombre) => ipcRenderer.invoke('matriz-peligros:rename-cargo', companyName, cargoId, nombre),
+      updateCargo: (companyName, cargoId, cambios) => ipcRenderer.invoke('matriz-peligros:update-cargo', companyName, cargoId, cambios),
+      stats: (companyName) => ipcRenderer.invoke('matriz-peligros:stats', companyName),
+    heatmap: (companyName) => ipcRenderer.invoke('matriz-peligros:heatmap', companyName),
+    priorizacion: (companyName) => ipcRenderer.invoke('matriz-peligros:priorizacion', companyName),
+    metadata: (companyName) => ipcRenderer.invoke('matriz-peligros:metadata', companyName),
+    updateMetadata: (companyName, metadata) => ipcRenderer.invoke('matriz-peligros:update-metadata', companyName, metadata),
+    notasAnaliticas: (companyName) => ipcRenderer.invoke('matriz-peligros:notas-analiticas', companyName),
+      gtc45Options: () => ipcRenderer.invoke('matriz-peligros:gtc45-options'),
+    discoverXlsx: (companyName) => ipcRenderer.invoke('matriz-peligros:discover-xlsx', companyName),
+    importXlsx: (companyName, filePath) => ipcRenderer.invoke('matriz-peligros:import-xlsx', companyName, filePath),
+    syncXlsx: (companyName) => ipcRenderer.invoke('matriz-peligros:sync-xlsx', companyName),
+  },
 
   // --- Eventos IPC ---
   send: (channel, data) => ipcRenderer.send(channel, data),
@@ -248,4 +475,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onUpdateProgress: (callback) => ipcRenderer.on('update_progress', (event, ...args) => callback(...args)),
   onUpdateError: (callback) => ipcRenderer.on('update_error', (event, ...args) => callback(...args)),
   restartApp: () => ipcRenderer.send('restart_app'),
+  checkForUpdatesManual: () => ipcRenderer.invoke('check-for-updates-manual'),
+  // Acceso directo en escritorio (autoUpdater no lo recrea tras update)
+  createDesktopShortcut: () => ipcRenderer.invoke('create-desktop-shortcut'),
+  checkDesktopShortcut: () => ipcRenderer.invoke('check-desktop-shortcut'),
 });
