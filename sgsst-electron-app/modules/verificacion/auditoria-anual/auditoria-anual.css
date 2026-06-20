@@ -86,27 +86,34 @@
   isolation: isolate;
 }
 
-@media (prefers-color-scheme: dark) {
-  .kair-v3-module, .kair-v3-hub, .kair-v3-editor {
-    --v3-background: #0f1117;
-    --v3-foreground: #e4e6eb;
-    --v3-card: #181c25;
-    --v3-card-foreground: #e4e6eb;
-    --v3-popover: #181c25;
-    --v3-popover-foreground: #e4e6eb;
-    --v3-primary-soft: rgba(23, 78, 166, 0.18);
-    --v3-secondary: rgba(23, 78, 166, 0.12);
-    --v3-muted: #21262f;
-    --v3-muted-foreground: #9ca3af;
-    --v3-accent: rgba(23, 78, 166, 0.12);
-    --v3-destructive-soft: rgba(220, 53, 69, 0.18);
-    --v3-success-soft: rgba(40, 167, 69, 0.18);
-    --v3-warning-soft: rgba(255, 193, 7, 0.18);
-    --v3-info-soft: rgba(108, 117, 125, 0.18);
-    --v3-border: #2a2f3a;
-    --v3-border-strong: #4a5060;
-    --v3-input: #2a2f3a;
-  }
+/* F9 (2026-06-19): Dark mode controlado por el theme manager de la app
+   (no por prefers-color-scheme del OS). El theme manager pone data-theme="dark"
+   para system-dark o data-theme="dark-legacy" para dark explicito.
+   Sin data-theme = light, independiente del OS. */
+[data-theme="dark"] .kair-v3-module,
+[data-theme="dark"] .kair-v3-hub,
+[data-theme="dark"] .kair-v3-editor,
+[data-theme="dark-legacy"] .kair-v3-module,
+[data-theme="dark-legacy"] .kair-v3-hub,
+[data-theme="dark-legacy"] .kair-v3-editor {
+  --v3-background: #0f1117;
+  --v3-foreground: #e4e6eb;
+  --v3-card: #181c25;
+  --v3-card-foreground: #e4e6eb;
+  --v3-popover: #181c25;
+  --v3-popover-foreground: #e4e6eb;
+  --v3-primary-soft: rgba(23, 78, 166, 0.18);
+  --v3-secondary: rgba(23, 78, 166, 0.12);
+  --v3-muted: #21262f;
+  --v3-muted-foreground: #9ca3af;
+  --v3-accent: rgba(23, 78, 166, 0.12);
+  --v3-destructive-soft: rgba(220, 53, 69, 0.18);
+  --v3-success-soft: rgba(40, 167, 69, 0.18);
+  --v3-warning-soft: rgba(255, 193, 7, 0.18);
+  --v3-info-soft: rgba(108, 117, 125, 0.18);
+  --v3-border: #2a2f3a;
+  --v3-border-strong: #4a5060;
+  --v3-input: #2a2f3a;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -163,10 +170,9 @@
   background: rgba(0, 0, 0, 0.02);
 }
 
-@media (prefers-color-scheme: dark) {
-  .kair-v3-card__footer {
-    background: rgba(255, 255, 255, 0.02);
-  }
+[data-theme="dark"] .kair-v3-card__footer,
+[data-theme="dark-legacy"] .kair-v3-card__footer {
+  background: rgba(255, 255, 255, 0.02);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -448,10 +454,9 @@
   flex-shrink: 0;
 }
 
-@media (prefers-color-scheme: dark) {
-  .kair-v3-dialog__footer {
-    background: rgba(255, 255, 255, 0.02);
-  }
+[data-theme="dark"] .kair-v3-dialog__footer,
+[data-theme="dark-legacy"] .kair-v3-dialog__footer {
+  background: rgba(255, 255, 255, 0.02);
 }
 
 @keyframes kair-v3-fade-in {
@@ -746,9 +751,12 @@
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-  max-width: 1400px;
+  /* F12 (2026-06-20): quitado max-width: 1400px y margin: 0 auto.
+     El 6.1.3 ocupa el 100% del ancho disponible (sin tope).
+     Antes el contenido se centraba en pantallas maximizadas y dejaba
+     franjas blancas a los lados, además de no aprovechar bien el espacio. */
   width: 100%;
-  margin: 0 auto;
+  min-width: 0;
 }
 
 .kair-v3-kpi-strip {
@@ -2070,3 +2078,348 @@
   border: 2px solid var(--v3-background);
 }
 .kair-v3-module ::-webkit-scrollbar-thumb:hover { background: var(--v3-muted-foreground); }
+
+/* ════════════════════════════════════════════════════════════════════════
+   F11 (2026-06-20) · HEADER ESTÁNDAR K+AIR · Patrón del 6.1.3 (revision-alta-direccion)
+   Encapsulado bajo .kair-v3-hub para no contaminar scope global.
+   ════════════════════════════════════════════════════════════════════════ */
+
+.kair-v3-hub > .k-module-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 1.5rem;
+  height: 64px;
+  background: #ffffff;
+  border-bottom: 1px solid var(--v3-border);
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  flex-shrink: 0;
+}
+
+.kair-v3-hub .k-header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.kair-v3-hub .k-header-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.kair-v3-hub .k-header-main-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--v3-foreground);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.kair-v3-hub .k-header-main-title i {
+  color: var(--v3-primary);
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.kair-v3-hub .k-header-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  color: var(--v3-muted-foreground);
+  flex-wrap: wrap;
+}
+
+.kair-v3-hub .k-header-breadcrumb button {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.kair-v3-hub .k-header-breadcrumb button:hover {
+  color: var(--v3-primary);
+}
+
+.kair-v3-hub .k-breadcrumb-item.active {
+  color: var(--v3-primary);
+  font-weight: 500;
+}
+
+.kair-v3-hub .k-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
+
+.kair-v3-hub .k-sync-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border-radius: 2rem;
+  white-space: nowrap;
+}
+
+.kair-v3-hub .k-sync-synced { background: rgba(40, 167, 69, 0.1); color: #28a745; }
+.kair-v3-hub .k-sync-saving { background: rgba(255, 193, 7, 0.1); color: #856404; }
+.kair-v3-hub .k-sync-error  { background: rgba(220, 53, 69, 0.1); color: #dc3545; }
+
+.kair-v3-hub .k-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  font-family: "Segoe UI", Roboto, sans-serif;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.kair-v3-hub .k-btn-primary  { background: var(--v3-primary); color: #fff; }
+.kair-v3-hub .k-btn-primary:hover  { background: var(--v3-primary-hover); }
+.kair-v3-hub .k-btn-sm       { padding: 0.35rem 0.75rem; font-size: 0.72rem; }
+.kair-v3-hub .k-btn-ghost    { background: transparent; color: var(--v3-muted-foreground); border: 1px solid var(--v3-border); }
+.kair-v3-hub .k-btn-ghost:hover { background: var(--v3-muted); color: var(--v3-foreground); }
+
+.kair-v3-hub .header-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  font: 500 0.8125rem/1.2 "Segoe UI", Roboto, sans-serif;
+  color: #5a6378;
+  background: transparent;
+  border: 1px solid var(--v3-border);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.kair-v3-hub .header-back-btn:hover {
+  background: #e8f0fe;
+  color: var(--v3-primary);
+  border-color: var(--v3-primary);
+}
+
+.kair-v3-hub .header-back-btn i { font-size: 0.875rem; }
+
+/* KPI sub variants (alineados con 6.1.3) */
+.kair-v3-hub .kair-v3-kpi__sub--success { color: #28a745; display: inline-flex; align-items: center; gap: 0.3rem; }
+.kair-v3-hub .kair-v3-kpi__sub--warning { color: #856404; display: inline-flex; align-items: center; gap: 0.3rem; }
+.kair-v3-hub .kair-v3-kpi__sub--danger  { color: #dc3545; display: inline-flex; align-items: center; gap: 0.3rem; }
+
+.kair-v3-hub .kair-v3-kpi__sub svg { flex-shrink: 0; }
+
+/* ════════════════════════════════════════════════════════════════════════
+   F12 (2026-06-20) · KPI STRIP DEL HUB · Patrón estándar 6.1.3 (flexbox)
+   El 6.1.3 usa flexbox con flex:1 → 4 KPIs comparten ancho disponible.
+   Antes el HUB usaba CSS Grid con media queries que partía en 2 columnas
+   cuando el ancho era pequeño. Sobreescribimos dentro del HUB para que se
+   comporte igual que el 6.1.3: flexbox adaptable sin media queries feas.
+   ════════════════════════════════════════════════════════════════════════ */
+
+.kair-v3-hub .kair-v3-kpi-strip {
+  display: flex;
+  align-items: stretch;
+  background: var(--v3-card);
+  border: 1px solid var(--v3-border);
+  border-radius: 0.625rem;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  margin: 0;
+  overflow: hidden;
+}
+
+.kair-v3-hub .kair-v3-kpi {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  position: relative;
+  min-width: 0;
+}
+
+/* Divider vertical entre KPIs (igual que 6.1.3) */
+.kair-v3-hub .kair-v3-kpi + .kair-v3-kpi::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 12%;
+  bottom: 12%;
+  width: 1px;
+  background: var(--v3-border);
+}
+
+.kair-v3-hub .kair-v3-kpi__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.kair-v3-hub .kair-v3-kpi__content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.kair-v3-hub .kair-v3-kpi__value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--v3-foreground);
+  letter-spacing: -0.02em;
+}
+
+.kair-v3-hub .kair-v3-kpi__label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--v3-muted-foreground);
+  margin-top: 2px;
+}
+
+.kair-v3-hub .kair-v3-kpi__sub {
+  font-size: 0.8125rem;
+  color: var(--v3-muted-foreground);
+  margin-top: 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Responsive: igual que el 6.1.3
+   ≤1100px → KPIs se acomodan en 2 filas de 2 (flex-wrap)
+   ≤720px  → KPIs en columna vertical */
+@media (max-width: 1100px) {
+  .kair-v3-hub .kair-v3-kpi-strip {
+    flex-wrap: wrap;
+  }
+  .kair-v3-hub .kair-v3-kpi {
+    flex: 1 1 calc(50% - 1px);
+    min-width: 240px;
+  }
+  .kair-v3-hub .kair-v3-kpi + .kair-v3-kpi::before {
+    display: none;
+  }
+  .kair-v3-hub .kair-v3-kpi:nth-child(2)::before {
+    display: block;
+  }
+}
+
+@media (max-width: 720px) {
+  .kair-v3-hub .kair-v3-kpi-strip {
+    flex-direction: column;
+    margin: 0.75rem 0.75rem 0 0.75rem;
+  }
+  .kair-v3-hub .kair-v3-kpi {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .kair-v3-hub .kair-v3-kpi + .kair-v3-kpi {
+    border-top: 1px solid var(--v3-border);
+  }
+  .kair-v3-hub .kair-v3-kpi + .kair-v3-kpi::before {
+    display: none;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   F14 (2026-06-20) · FIX KPIs HUB · Coherencia con 6.1.3
+   3 bugs detectados:
+   1. Icono se veía cuadrado (border-radius: 0.5rem) en vez de circular (50%)
+   2. Color del icono no se aplicaba (reglas usaban padre .kair-v3-kpi--success
+      pero el HTML solo tiene .kair-v3-kpi__icon--success en el icono)
+   3. Divisor vertical dejaba huecos arriba/abajo (top:12%; bottom:12%)
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* 1. Icono circular (igual que 6.1.3) */
+.kair-v3-hub .kair-v3-kpi__icon {
+  border-radius: 50% !important;
+}
+
+/* 2. Color del icono — clases independientes (el HTML usa la clase en el icono,
+   no en el contenedor padre). Mismo patrón y colores que 6.1.3. */
+.kair-v3-hub .kair-v3-kpi__icon--primary {
+  background: rgba(23, 78, 166, 0.12);
+  color: #174ea6;
+}
+.kair-v3-hub .kair-v3-kpi__icon--success {
+  background: rgba(40, 167, 69, 0.12);
+  color: #28a745;
+}
+.kair-v3-hub .kair-v3-kpi__icon--warning {
+  background: rgba(255, 193, 7, 0.15);
+  color: #b08500;
+}
+.kair-v3-hub .kair-v3-kpi__icon--danger {
+  background: rgba(220, 53, 69, 0.12);
+  color: #dc3545;
+}
+.kair-v3-hub .kair-v3-kpi__icon--info {
+  background: rgba(23, 162, 184, 0.12);
+  color: #17a2b8;
+}
+
+/* 3. Divisor vertical centrado con altura limitada (igual que 6.1.3)
+   El divisor NO debe tocar los bordes superior/inferior — debe "flotar"
+   centrado entre los KPIs. Usamos altura fija del 50% centrada verticalmente
+   en vez de top/bottom % porque con padding variable del KPI el porcentaje
+   daba márgenes inconsistentes (se veía casi cerrado). */
+.kair-v3-hub .kair-v3-kpi + .kair-v3-kpi::before {
+  top: 50%;
+  bottom: auto;
+  height: 50%;
+  transform: translateY(-50%);
+}
+
+/* En responsive ≤1100px sigue igual que antes (sin divider porque es 2 filas) */
+@media (max-width: 1100px) {
+  .kair-v3-hub .kair-v3-kpi + .kair-v3-kpi::before {
+    display: none;
+  }
+  .kair-v3-hub .kair-v3-kpi:nth-child(2)::before {
+    display: none;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   F15 (2026-06-20) · FIX DOBLE LÍNEA EN DIVISORES DEL HUB
+   Había 2 divisores sobrepuestos entre KPIs:
+   1. Regla original línea 781: `.kair-v3-kpi + .kair-v3-kpi { border-left: ... }`
+   2. Mi `::before` agregado que dibuja OTRA línea encima del border-left
+   El 6.1.3 solo usa `::before` (sin border-left), por eso se ve limpio.
+   Solución: eliminar el border-left en el HUB, dejar SOLO el ::before.
+   ════════════════════════════════════════════════════════════════════════ */
+.kair-v3-hub .kair-v3-kpi + .kair-v3-kpi {
+  border-left: none;
+}

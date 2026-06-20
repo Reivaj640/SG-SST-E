@@ -2,10 +2,18 @@
    K+AIR · Hub view (replica HubView.tsx del tar)
    Submódulo 6.1.2 + 6.1.4 — Patrón B Submodule Home
    v3.0 · 2026-06-19
+   F11 (2026-06-20): bind click + store subscribe UNA SOLA VEZ por instancia.
+     Antes, render(container) → _bindEvents(container) agregaba listeners en cada
+     re-render → 5+ listeners en el container → 1 click disparaba 5 handlers.
    ═══════════════════════════════════════════════════════════════════ */
 
 var AuditoriaHubView = (function () {
   'use strict';
+
+  /* Estado de bind por instancia (no global, para evitar conflictos entre HUBs) */
+  var _clickBound = false;
+  var _storeBound = false;
+  var _activeContainer = null;
 
   function _esc(s) { return KairUI.esc(s); }
 
@@ -32,50 +40,111 @@ var AuditoriaHubView = (function () {
   }
 
   function _renderHeader(company) {
-    return '<header class="kair-v3-hub-header">' +
-      '<div class="kair-v3-hub-header__left">' +
-        '<span class="kair-v3-hub-header__pill">' +
-          '<i class="bi bi-stack"></i> 6.1.2 + 6.1.4' +
-        '</span>' +
-        '<h1 class="kair-v3-hub-header__title">Auditorías SG-SST</h1>' +
-        '<p class="kair-v3-hub-header__subtitle">Submódulo combinado 6.1.2 Planificación y ejecución · 6.1.4 Seguimiento a hallazgos</p>' +
+    /* F11 (2026-06-20): Header estándar K+AIR · mismo patrón que 6.1.3 (revision-alta-direccion).
+       Estructura: .k-module-header > (.k-header-left + .k-header-right)
+       - Left: title group (icono + main title + breadcrumb)
+       - Right: sync badge + botón "Volver al módulo" + CTA "Nueva auditoría" */
+    var instance = window.__kairAudInstance;
+    var backCallback = instance && typeof instance.backToModuleCallback === 'function'
+      ? instance.backToModuleCallback
+      : null;
+    var empresaText = company || 'Empresa';
+
+    return '<header class="k-module-header" id="kair-aud-header-card">' +
+      '<div class="k-header-left">' +
+        '<div class="k-header-title-group">' +
+          '<div class="k-header-main-title">' +
+            '<i class="bi bi-clipboard-check-fill"></i> ' +
+            '6.1.2 · Auditoría Anual' +
+          '</div>' +
+          '<div class="k-header-breadcrumb">' +
+            '<span>' + _esc(empresaText) + '</span>' +
+            '<i class="bi bi-chevron-right"></i>' +
+            '<button type="button" data-bc="verificacion">Verificación</button>' +
+            '<i class="bi bi-chevron-right"></i>' +
+            '<span class="k-breadcrumb-item active">6.1.2 Auditoría Anual</span>' +
+          '</div>' +
+        '</div>' +
       '</div>' +
-      '<div class="kair-v3-hub-header__right">' +
-        '<span class="kair-v3-hub-company">' +
-          '<i class="bi bi-building"></i> ' + _esc(company) +
+      '<div class="k-header-right">' +
+        '<span class="k-sync-badge k-sync-synced" title="Datos cargados">' +
+          '<i class="bi bi-check-circle-fill"></i> Sincronizado' +
         '</span>' +
+        '<button type="button" class="header-back-btn" id="kair-aud-back" title="Volver al módulo Verificación">' +
+          '<i class="bi bi-arrow-left"></i> Volver' +
+        '</button>' +
+        '<button type="button" class="k-btn k-btn-primary k-btn-sm" id="kair-aud-cta-new" title="Crear nueva auditoría">' +
+          '<i class="bi bi-plus-circle"></i> Nueva auditoría' +
+        '</button>' +
       '</div>' +
     '</header>';
   }
 
   function _renderKpis(kpisAud, kpisHal) {
+    /* F11 (2026-06-20): KPIs alineados con el estándar del 6.1.3.
+       Estructura: icon (con color) + content (value + label + sub con icono SVG).
+       Sub usa SVGs inline para coincidir con el patrón del 6.1.3. */
+    var calif = kpisAud.calificacionProm || 0;
+    var proximaFecha = '';
+    var audits = KairStore.selectAudits();
+    var proxima = audits
+      .filter(function (a) { return a.status === 'programada'; })
+      .sort(function (a, b) { return (a.fechaProgramada || '').localeCompare(b.fechaProgramada || ''); })[0];
+    if (proxima) proximaFecha = _formatDate(proxima.fechaProgramada);
+
+    var svgCheck = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+    var svgClock = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+    var svgWarn = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+    var svgCal = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
+
     var kpis = [
-      { key: 'programadas', label: 'Programadas', value: kpisAud.programadas, color: 'primary' },
-      { key: 'encurso', label: 'En curso', value: kpisAud.enCurso, color: 'warning' },
-      { key: 'realizadas', label: 'Realizadas', value: kpisAud.realizadas, color: 'success' },
-      { key: 'vencidas', label: 'Vencidas', value: kpisAud.vencidas, color: 'danger' },
       {
-        key: 'hallazgos_abiertos',
+        value: String(kpisAud.realizadas || 0),
+        label: 'Realizadas',
+        icon: 'bi-clipboard-check',
+        color: 'success',
+        sub: (kpisAud.realizadas || 0) > 0
+          ? svgCheck + ' Histórico cerrado'
+          : 'Sin histórico aún',
+        subClass: (kpisAud.realizadas || 0) > 0 ? 'kair-v3-kpi__sub--success' : ''
+      },
+      {
+        value: String((kpisAud.programadas || 0) + (kpisAud.enCurso || 0)),
+        label: 'Programadas / En curso',
+        icon: 'bi-clock-history',
+        color: 'warning',
+        sub: svgClock + ' Próxima: ' + (proximaFecha || '—'),
+        subClass: 'kair-v3-kpi__sub--warning'
+      },
+      {
+        value: String(kpisHal.abiertas + kpisHal.enTratamiento + kpisHal.vencidas),
         label: 'Hallazgos abiertos',
-        value: kpisHal.abiertas + kpisHal.enTratamiento + kpisHal.vencidas,
+        icon: 'bi-exclamation-triangle',
         color: 'danger',
-        sub: kpisHal.vencidas + ' vencidos · ' + kpisHal.cerradas + ' cerrados'
+        sub: (kpisHal.vencidas > 0)
+          ? svgWarn + ' ' + kpisHal.vencidas + ' vencidos'
+          : svgCheck + ' Sin hallazgos críticos',
+        subClass: (kpisHal.vencidas > 0) ? 'kair-v3-kpi__sub--danger' : 'kair-v3-kpi__sub--success'
+      },
+      {
+        value: calif + '%',
+        label: 'Calificación Promedio',
+        icon: 'bi-trophy',
+        color: calif >= 80 ? 'success' : (calif >= 60 ? 'warning' : 'danger'),
+        sub: svgCal + ' ' + (calif >= 80 ? 'Excelente' : (calif >= 60 ? 'Aceptable' : 'Por mejorar'))
       }
     ];
 
     return '<div class="kair-v3-kpi-strip">' +
-      kpis.map(function (k) {
-        return '<div class="kair-v3-kpi kair-v3-kpi--' + k.color + '" data-kpi="' + k.key + '">' +
-          '<div class="kair-v3-kpi__icon"><i class="bi bi-' + (
-            k.key === 'programadas' ? 'clipboard-check' :
-            k.key === 'encurso' ? 'graph-up-arrow' :
-            k.key === 'realizadas' ? 'shield-check' :
-            'exclamation-triangle'
-          ) + '"></i></div>' +
+      kpis.map(function (kpi) {
+        return '<div class="kair-v3-kpi" data-kpi="' + kpi.color + '">' +
+          '<div class="kair-v3-kpi__icon kair-v3-kpi__icon--' + kpi.color + '">' +
+            '<i class="bi ' + kpi.icon + '" style="font-size:1.125rem"></i>' +
+          '</div>' +
           '<div class="kair-v3-kpi__content">' +
-            '<div class="kair-v3-kpi__value">' + k.value + '</div>' +
-            '<div class="kair-v3-kpi__label">' + k.label + '</div>' +
-            (k.sub ? '<div class="kair-v3-kpi__sub">' + _esc(k.sub) + '</div>' : '') +
+            '<div class="kair-v3-kpi__value">' + _esc(kpi.value) + '</div>' +
+            '<div class="kair-v3-kpi__label">' + _esc(kpi.label) + '</div>' +
+            '<div class="kair-v3-kpi__sub ' + (kpi.subClass || '') + '">' + kpi.sub + '</div>' +
           '</div>' +
         '</div>';
       }).join('') +
@@ -235,6 +304,8 @@ var AuditoriaHubView = (function () {
     var proximas = _computeProximas(audits);
     var criticos = _computeCriticos(audits);
 
+    _activeContainer = container;
+
     container.innerHTML =
       '<div class="kair-v3-hub">' +
         _renderHeader(company) +
@@ -249,11 +320,49 @@ var AuditoriaHubView = (function () {
         '</main>' +
       '</div>';
 
-    _bindEvents(container);
+    /* F11 (2026-06-20): bind UNA SOLA VEZ por instancia.
+       Si re-bindamos, los listeners se acumulan y 1 click dispara N handlers. */
+    if (!_clickBound) {
+      _bindClick(container);
+      _clickBound = true;
+    }
+    if (!_storeBound) {
+      _bindStoreSubscribe();
+      _storeBound = true;
+    }
   }
 
-  function _bindEvents(container) {
+  function _bindClick(container) {
     container.addEventListener('click', function (e) {
+      /* F11 (2026-06-20): botones del header estándar (Volver + Nueva auditoría + breadcrumb) */
+      var headerBack = e.target.closest('#kair-aud-back, .header-back-btn');
+      if (headerBack) {
+        var inst = window.__kairAudInstance;
+        if (inst && typeof inst.backToModuleCallback === 'function') {
+          inst.backToModuleCallback();
+        }
+        return;
+      }
+      var headerCtaNew = e.target.closest('#kair-aud-cta-new');
+      if (headerCtaNew) {
+        if (window.kairAuditoriaAnual && typeof window.kairAuditoriaAnual.openAuditoriaForm === 'function') {
+          window.kairAuditoriaAnual.openAuditoriaForm();
+        }
+        return;
+      }
+      var bc = e.target.closest('[data-bc]');
+      if (bc) {
+        var target = bc.getAttribute('data-bc');
+        if (target === 'verificacion') {
+          var inst2 = window.__kairAudInstance;
+          if (inst2 && typeof inst2.backToModuleCallback === 'function') {
+            inst2.backToModuleCallback();
+          }
+        }
+        return;
+      }
+
+      /* Cards del HUB → navegar a vista interna */
       var card = e.target.closest('[data-card]');
       if (card) {
         var key = card.getAttribute('data-card');
@@ -288,22 +397,30 @@ var AuditoriaHubView = (function () {
         }
       }
     });
+  }
 
-    // Re-render cuando el store cambie
-    if (window.KairStore && window.KairStore.subscribe) {
-      window._kairV3HubUnsub = window.KairStore.subscribe(function () {
-        // Solo re-renderizar si el hub está visible
-        var hubEl = container.querySelector('.kair-v3-hub');
-        if (hubEl && KairStore.getState().view === 'hub') render(container);
-      });
+  function _bindStoreSubscribe() {
+    if (!window.KairStore || !window.KairStore.subscribe) return;
+    if (window._kairV3HubUnsub) {
+      try { window._kairV3HubUnsub(); } catch (e) { /* noop */ }
+      window._kairV3HubUnsub = null;
     }
+    window._kairV3HubUnsub = window.KairStore.subscribe(function () {
+      /* Solo re-renderizar si el hub está visible Y tenemos container activo */
+      if (!_activeContainer) return;
+      var hubEl = _activeContainer.querySelector('.kair-v3-hub');
+      if (hubEl && KairStore.getState().view === 'hub') render(_activeContainer);
+    });
   }
 
   function destroy() {
     if (window._kairV3HubUnsub) {
-      window._kairV3HubUnsub();
+      try { window._kairV3HubUnsub(); } catch (e) { /* noop */ }
       window._kairV3HubUnsub = null;
     }
+    _clickBound = false;
+    _storeBound = false;
+    _activeContainer = null;
   }
 
   return { render: render, destroy: destroy };

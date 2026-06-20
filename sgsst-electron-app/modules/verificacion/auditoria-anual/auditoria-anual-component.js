@@ -394,8 +394,15 @@ AuditoriaAnualComponent.prototype.render = function () {
   this._loadCSS(function () {
     /* F2 (2026-06-19): Cargar datos reales del backend antes de renderizar.
        cargarTodo() hidrata el cache del service. Si falla, el fallback a mocks
-       mantiene la app funcional en modo dev sin Electron. */
-    var empresaId = self.currentCompany || (window.currentCompany && window.currentCompany.nombre) || 'default_company';
+       mantiene la app funcional en modo dev sin Electron.
+       F11 (2026-06-20): unificar empresaId con el bridge (KairMockData.ACTIVE_COMPANY.id).
+       Antes el componente usaba self.currentCompany ('Tempoactiva' con T mayúscula)
+       y el bridge usaba 'tempoactiva' → 2 cargarTodo por carga del módulo con IDs
+       distintos y resultados potencialmente diferentes en BD case-sensitive. */
+    var empresaId = (window.KairMockData && window.KairMockData.ACTIVE_COMPANY && window.KairMockData.ACTIVE_COMPANY.id)
+      || self.currentCompany
+      || (window.currentCompany && window.currentCompany.nombre)
+      || 'default_company';
     var loadPromise = (typeof AuditoriaService.cargarTodo === 'function')
       ? AuditoriaService.cargarTodo(empresaId)
       : Promise.resolve();
@@ -966,6 +973,16 @@ window.kairAuditoriaAnual = {
   },
   showToast: function (msg, type) {
     if (window.__kairAudInstance) window.__kairAudInstance._showToast(msg, type);
+  },
+  /* F11 (2026-06-20): refresh disparado por las vistas v3 tras navegar.
+     Antes este método no existía → las 6 vistas (hub/list/editor/cronograma/
+     hallazgos/informes) lo buscaban con `&& window.kairAuditoriaAnual._refreshView`
+     y nunca encontraban, así que tras un goList/goHub/etc. el contenedor
+     quedaba con la vista anterior sin re-renderizar. */
+  _refreshView: function () {
+    if (window.__kairAudInstance && typeof window.__kairAudInstance._renderUI === 'function') {
+      window.__kairAudInstance._renderUI();
+    }
   }
 };
 
