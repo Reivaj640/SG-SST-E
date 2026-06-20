@@ -1,4 +1,4 @@
-﻿/* ═══════════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════════
    K+AIR · Submódulo 6.1.2 — Auditoría Anual
    Component Orchestrator — Tabs + KPI Strip + Header
    ═══════════════════════════════════════════════════════════════════ */
@@ -46,56 +46,52 @@ AuditoriaAnualComponent.prototype._loadCSS = function (callback) {
     document.head.appendChild(s);
   }
 
-  /* Cascada: v1 → v2 → v3 (carga bases para refactor de F0-F3) */
+  /* Cascada: CSS único + design system + 6 vistas v3 */
   loadCss('modules/verificacion/auditoria-anual/auditoria-anual.css', function () {
-    loadCss('modules/verificacion/auditoria-anual/auditoria-anual-v2.css', function () {
-      loadCss('modules/verificacion/auditoria-anual/v3/auditoria-anual-v3.css', function () {
-        loadScript('modules/verificacion/auditoria-anual/v3/kair-icons.js', function () {
-          loadScript('modules/verificacion/auditoria-anual/v3/kair-ui.js', function () {
-            loadScript('modules/verificacion/auditoria-anual/v3/kair-types.js', function () {
-              loadScript('modules/verificacion/auditoria-anual/v3/kair-helpers.js', function () {
-                loadScript('modules/verificacion/auditoria-anual/v3/kair-mock-data.js', function () {
-                  loadScript('modules/verificacion/auditoria-anual/v3/kair-store.js', function () {
-                    loadScript('modules/verificacion/auditoria-anual/v3/kair-store-bridge.js', function () {
-                      loadScript('modules/verificacion/auditoria-anual/v3/auditoria-hub-view.js', function () {
-                        loadScript('modules/verificacion/auditoria-anual/v3/auditoria-list-view.js', function () {
-                          loadScript('modules/verificacion/auditoria-anual/v3/auditoria-editor-view.js', function () {
-                            loadScript('modules/verificacion/auditoria-anual/v3/auditoria-cronograma-view.js', function () {
-                              loadScript('modules/verificacion/auditoria-anual/v3/auditoria-hallazgos-view.js', function () {
-                                loadScript('modules/verificacion/auditoria-anual/v3/auditoria-informes-view.js', function () {
-                                  if (window.KairUI && window.KairStore) {
-                                    var kpisAud = window.KairStore.computeKpisAuditorias();
-                                    var kpisHal = window.KairStore.computeKpisHallazgos();
-                                    console.log('[K+AIRSST][6.1.2][V3] Design system v3 cargado · ' +
-                                      Object.keys(window.KairUI).length + ' componentes · ' +
-                                      (window.KairIcons ? Object.keys(window.KairIcons).length : 0) + ' iconos · ' +
-                                      window.KairStore.getState().audits.length + ' auditorías mock · ' +
-                                      'KPIs aud: ' + kpisAud.programadas + 'P ' + kpisAud.enCurso + 'EC ' + kpisAud.realizadas + 'R ' + kpisAud.vencidas + 'V · ' +
-                                      'KPIs hal: ' + kpisHal.abiertas + ' abiertas, ' + kpisHal.vencidas + ' vencidas');
-                                    /* F9 (2026-06-19): hidratar desde el service real (si está disponible) */
-                                    if (window.KairStoreBridge) {
-                                      window.KairStoreBridge.hydrate().then(function () {
-                                        var src = window.KairStoreBridge.isUsingService() ? 'service' : 'mock';
-                                        console.log('[K+AIRSST][6.1.2][V3] Store hidratado desde ' + src + ' · ' +
-                                          window.KairStore.getState().audits.length + ' auditorías finales');
-                                        _installBridgePersistence();
-                                        self.cssLoaded = true;
-                                        callback();
-                                      }).catch(function () {
-                                        self.cssLoaded = true;
-                                        callback();
-                                      });
-                                    } else {
-                                      self.cssLoaded = true;
-                                      callback();
-                                    }
-                                  } else {
-                                    console.warn('[K+AIRSST][6.1.2][V3] Carga incompleta · KairUI=' + !!window.KairUI + ' KairStore=' + !!window.KairStore);
+    loadScript('modules/verificacion/auditoria-anual/kair-icons.js', function () {
+      loadScript('modules/verificacion/auditoria-anual/kair-ui.js', function () {
+        loadScript('modules/verificacion/auditoria-anual/kair-types.js', function () {
+          loadScript('modules/verificacion/auditoria-anual/kair-helpers.js', function () {
+            loadScript('modules/verificacion/auditoria-anual/kair-mock-data.js', function () {
+              loadScript('modules/verificacion/auditoria-anual/kair-store.js', function () {
+                loadScript('modules/verificacion/auditoria-anual/kair-store-bridge.js', function () {
+                  loadScript('modules/verificacion/auditoria-anual/auditoria-hub-view.js', function () {
+                    loadScript('modules/verificacion/auditoria-anual/auditoria-list-view.js', function () {
+                      loadScript('modules/verificacion/auditoria-anual/auditoria-editor-view.js', function () {
+                        loadScript('modules/verificacion/auditoria-anual/auditoria-cronograma-view.js', function () {
+                          loadScript('modules/verificacion/auditoria-anual/auditoria-hallazgos-view.js', function () {
+                            loadScript('modules/verificacion/auditoria-anual/auditoria-informes-view.js', function () {
+                              if (window.KairUI && window.KairStore) {
+                                var kpisAud = window.KairStore.computeKpisAuditorias();
+                                var kpisHal = window.KairStore.computeKpisHallazgos();
+                                console.log('[K+AIRSST][6.1.2][V3] Design system v3 cargado · ' +
+                                  Object.keys(window.KairUI).length + ' componentes · ' +
+                                  (window.KairIcons ? Object.keys(window.KairIcons).length : 0) + ' iconos · ' +
+                                  window.KairStore.getState().audits.length + ' auditorías mock · ' +
+                                  'KPIs aud: ' + kpisAud.programadas + 'P ' + kpisAud.enCurso + 'EC ' + kpisAud.realizadas + 'R ' + kpisAud.vencidas + 'V · ' +
+                                  'KPIs hal: ' + kpisHal.abiertas + ' abiertas, ' + kpisHal.vencidas + ' vencidas');
+                                /* F9 (2026-06-19): hidratar desde el service real (si está disponible) */
+                                if (window.KairStoreBridge) {
+                                  window.KairStoreBridge.hydrate().then(function () {
+                                    var src = window.KairStoreBridge.isUsingService() ? 'service' : 'mock';
+                                    console.log('[K+AIRSST][6.1.2][V3] Store hidratado desde ' + src + ' · ' +
+                                      window.KairStore.getState().audits.length + ' auditorías finales');
+                                    _installBridgePersistence();
                                     self.cssLoaded = true;
                                     callback();
-                                  }
-                                });
-                              });
+                                  }).catch(function () {
+                                    self.cssLoaded = true;
+                                    callback();
+                                  });
+                                } else {
+                                  self.cssLoaded = true;
+                                  callback();
+                                }
+                              } else {
+                                console.warn('[K+AIRSST][6.1.2][V3] Carga incompleta · KairUI=' + !!window.KairUI + ' KairStore=' + !!window.KairStore);
+                                self.cssLoaded = true;
+                                callback();
+                              }
                             });
                           });
                         });
