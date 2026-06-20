@@ -9,6 +9,9 @@
 
   var _state = {
     audits: (window.KairMockData && window.KairMockData.audits) || [],
+    /* F21.23 (2026-06-20): items de cronograma sin auditoría asociada
+       (texto libre). Se muestran junto al resto en el cronograma. */
+    freeCronograma: [],
     hydrated: false,
     view: 'hub',
     activeAuditId: undefined,
@@ -240,8 +243,12 @@
 
     /* CRUD cronograma */
     addCronogramaItem: function (item) {
-      log('CRONOGRAMA', 'ADD', 'SUCCESS', 'id=' + item.id + ' audit=' + item.auditId);
+      log('CRONOGRAMA', 'ADD', 'SUCCESS', 'id=' + item.id + ' audit=' + (item.auditId || 'libre'));
       setState(function (s) {
+        /* F21.23: si auditId está vacío, guardar en freeCronograma (texto libre). */
+        if (!item.auditId) {
+          return { freeCronograma: [].concat(s.freeCronograma, [item]) };
+        }
         return {
           audits: s.audits.map(function (a) {
             return a.id === item.auditId ? Object.assign({}, a, { cronograma: [].concat(a.cronograma, [item]) }) : a;
@@ -252,6 +259,15 @@
     updateCronogramaItem: function (id, patch) {
       log('CRONOGRAMA', 'UPDATE', 'SUCCESS', 'id=' + id);
       setState(function (s) {
+        /* Buscar primero en items libres. */
+        var inFree = s.freeCronograma.some(function (c) { return c.id === id; });
+        if (inFree) {
+          return {
+            freeCronograma: s.freeCronograma.map(function (c) {
+              return c.id === id ? Object.assign({}, c, patch) : c;
+            })
+          };
+        }
         return {
           audits: s.audits.map(function (a) {
             return Object.assign({}, a, {
@@ -276,6 +292,10 @@
     removeCronogramaItem: function (id) {
       log('CRONOGRAMA', 'REMOVE', 'SUCCESS', 'id=' + id);
       setState(function (s) {
+        /* F21.23: si el item está en freeCronograma, removerlo de ahí. */
+        if (s.freeCronograma.some(function (c) { return c.id === id; })) {
+          return { freeCronograma: s.freeCronograma.filter(function (c) { return c.id !== id; }) };
+        }
         return {
           audits: s.audits.map(function (a) {
             return Object.assign({}, a, {

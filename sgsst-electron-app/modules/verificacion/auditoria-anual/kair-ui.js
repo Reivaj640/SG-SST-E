@@ -109,9 +109,14 @@
     if (props.disabled) attrs += ' disabled';
     if (props.onClick) attrs += ' data-action="btn" data-btn-id="' + _esc(props.btnId || '') + '"';
     if (props.title) attrs += ' title="' + _esc(props.title) + '"';
-    if (props.dataset) {
-      Object.keys(props.dataset).forEach(function(k) {
-        attrs += ' data-' + _esc(k) + '="' + _esc(props.dataset[k]) + '"';
+    /* F21.24 (2026-06-20): aceptar tanto `dataset` (estándar) como `dataAttrs`
+       (alias usado por todos los call sites del módulo). Esto resuelve el bug
+       donde los botones no recibían atributos data-* porque se pasaba
+       dataAttrs pero el código solo leía dataset. */
+    var datasetMerged = Object.assign({}, props.dataset || {}, props.dataAttrs || {});
+    if (Object.keys(datasetMerged).length > 0) {
+      Object.keys(datasetMerged).forEach(function(k) {
+        attrs += ' data-' + _esc(k) + '="' + _esc(datasetMerged[k]) + '"';
       });
     }
     return '<button' + attrs + '>' + iconHtml + content + '</button>';

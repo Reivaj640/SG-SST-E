@@ -10,7 +10,7 @@
    Alineados con los tokens K+AIR ya existentes para coherencia
    ───────────────────────────────────────────────────────────────────────── */
 
-.kair-v3-module, .kair-v3-hub, .kair-v3-editor {
+.kair-v3-module, .kair-v3-hub, .kair-v3-editor, .kair-v3-dialog-overlay {
   /* Colores semánticos (alineados con shadcn) */
   --v3-background: #f8f9fa;
   --v3-foreground: #1a1a2e;
@@ -93,9 +93,11 @@
 [data-theme="dark"] .kair-v3-module,
 [data-theme="dark"] .kair-v3-hub,
 [data-theme="dark"] .kair-v3-editor,
+[data-theme="dark"] .kair-v3-dialog-overlay,
 [data-theme="dark-legacy"] .kair-v3-module,
 [data-theme="dark-legacy"] .kair-v3-hub,
-[data-theme="dark-legacy"] .kair-v3-editor {
+[data-theme="dark-legacy"] .kair-v3-editor,
+[data-theme="dark-legacy"] .kair-v3-dialog-overlay {
   --v3-background: #0f1117;
   --v3-foreground: #e4e6eb;
   --v3-card: #181c25;
@@ -347,10 +349,13 @@
 .kair-v3-dialog-overlay {
   position: fixed;
   inset: 0;
-  z-index: 1000;
-  background: rgba(15, 16, 32, 0.55);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
+  z-index: 9999;
+  /* F21.22 (2026-06-20): overlay slate sutil con blur. El modal se monta en
+     document.body vía KairUI.openDialog, así que ningún stacking context
+     heredado puede afectarlo. */
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   display: none;
   align-items: center;
   justify-content: center;
@@ -364,10 +369,16 @@
 
 .kair-v3-dialog {
   position: relative;
+  /* F21.22: estilo limpio y profesional — fondo sólido, esquinas generosas,
+     sombra elegante. Sin borde azul gigante ni colores chillones. */
   background: var(--v3-card);
-  color: var(--v3-card-foreground);
-  border-radius: var(--v3-radius-lg);
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.08);
+  color: var(--v3-foreground);
+  border-radius: var(--v3-radius-xl);
+  box-shadow:
+    0 12px 24px -8px rgba(15, 23, 42, 0.18),
+    0 24px 48px -12px rgba(15, 23, 42, 0.22),
+    0 0 0 1px rgba(15, 23, 42, 0.06);
+  border: 1px solid var(--v3-border);
   width: 100%;
   max-width: 540px;
   max-height: calc(100vh - 2rem);
@@ -375,7 +386,6 @@
   flex-direction: column;
   animation: kair-v3-scale-in 220ms var(--v3-anim-in);
   overflow: hidden;
-  border: 1px solid var(--v3-border);
 }
 
 .kair-v3-dialog--lg { max-width: 720px; }
@@ -387,44 +397,60 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid var(--v3-border);
+  padding: 1.5rem 1.75rem 1.25rem;
+  /* F21.19 (2026-06-20): header con tinte azul corporativo visible — gradiente
+     que se desvanece hacia el card para dar color sin saturar. */
+  background: linear-gradient(180deg,
+    var(--v3-primary-soft) 0%,
+    rgba(232, 240, 254, 0.55) 55%,
+    var(--v3-card) 100%);
+  border-bottom: 2px solid var(--v3-primary);
   flex-shrink: 0;
 }
 
 .kair-v3-dialog__title {
   margin: 0;
-  font-size: 1.125rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
   line-height: 1.3;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.625rem;
+  color: var(--v3-foreground);
 }
 
 .kair-v3-dialog__title i {
-  color: var(--v3-primary);
-  font-size: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--v3-radius-md);
+  background: var(--v3-primary);
+  color: var(--v3-primary-foreground);
+  font-size: 1.05rem;
+  box-shadow: 0 3px 8px rgba(23, 78, 166, 0.32);
 }
 
 .kair-v3-dialog__description {
-  margin: 4px 0 0 0;
+  margin: 6px 0 0 0;
+  padding-left: 42px; /* alinear con el texto del title (icon width + gap) */
   font-size: 0.875rem;
   color: var(--v3-muted-foreground);
   line-height: 1.5;
 }
 
 .kair-v3-dialog__close {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border: none;
   background: transparent;
   color: var(--v3-muted-foreground);
   font-size: 1.25rem;
   line-height: 1;
   cursor: pointer;
-  border-radius: var(--v3-radius-sm);
+  border-radius: var(--v3-radius-md);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -438,25 +464,90 @@
 }
 
 .kair-v3-dialog__body {
-  padding: 1.5rem;
+  padding: 1.75rem;
   overflow-y: auto;
   flex: 1;
+  background-color: var(--v3-card);
 }
 
 .kair-v3-dialog__footer {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 0.5rem;
-  padding: 1rem 1.5rem;
+  gap: 0.625rem;
+  padding: 1rem 1.75rem;
   border-top: 1px solid var(--v3-border);
-  background: rgba(0, 0, 0, 0.02);
+  /* F21.19: gradiente sutil para que el footer tenga profundidad sin ser plano. */
+  background: linear-gradient(180deg, var(--v3-card) 0%, var(--v3-muted) 100%);
   flex-shrink: 0;
+}
+
+/* F21.19: campos dentro del dialog — bordes más visibles, hover reactivo
+   al primary para guiar la interacción. */
+.kair-v3-dialog .kair-v3-input,
+.kair-v3-dialog .kair-v3-select,
+.kair-v3-dialog .kair-v3-textarea {
+  border: 1.5px solid var(--v3-border-strong);
+  background: var(--v3-background);
+}
+
+.kair-v3-dialog .kair-v3-input:hover:not(:disabled):not(:focus),
+.kair-v3-dialog .kair-v3-select:hover:not(:disabled):not(:focus),
+.kair-v3-dialog .kair-v3-textarea:hover:not(:disabled):not(:focus) {
+  border-color: var(--v3-primary);
+}
+
+.kair-v3-dialog .kair-v3-input:focus,
+.kair-v3-dialog .kair-v3-select:focus,
+.kair-v3-dialog .kair-v3-textarea:focus {
+  border-color: var(--v3-primary);
+  background: var(--v3-card);
+}
+
+/* F21.22 (2026-06-20): labels limpios y estándar — solo el texto y el asterisco
+   de requerido, sin colores chillones. La identidad visual viene del icono
+   DENTRO del input (patrón kair-v3-input-wrap), igual que el resto del proyecto. */
+.kair-v3-dialog .kair-v3-field__label {
+  font-weight: 600;
+  font-size: 0.8125rem;
+  color: var(--v3-foreground);
+  letter-spacing: 0.01em;
+}
+
+.kair-v3-dialog .kair-v3-field__required {
+  color: var(--v3-destructive);
+  font-style: normal;
+  font-weight: 700;
+  margin-left: 2px;
+}
+
+.kair-v3-dialog .kair-v3-field__hint {
+  font-size: 0.75rem;
+  color: var(--v3-muted-foreground);
+  line-height: 1.4;
+  margin-top: -2px;
+}
+
+[data-theme="dark"] .kair-v3-dialog-overlay,
+[data-theme="dark-legacy"] .kair-v3-dialog-overlay {
+  /* F21.22: en dark mode el overlay un poco más oscuro. */
+  background: rgba(0, 0, 0, 0.7);
+}
+
+[data-theme="dark"] .kair-v3-dialog .kair-v3-input,
+[data-theme="dark"] .kair-v3-dialog .kair-v3-select,
+[data-theme="dark"] .kair-v3-dialog .kair-v3-textarea,
+[data-theme="dark-legacy"] .kair-v3-dialog .kair-v3-input,
+[data-theme="dark-legacy"] .kair-v3-dialog .kair-v3-select,
+[data-theme="dark-legacy"] .kair-v3-dialog .kair-v3-textarea {
+  /* En dark, el border-strong es muy oscuro — usar border normal pero más grueso. */
+  border-color: var(--v3-border-strong);
+  background: rgba(255, 255, 255, 0.02);
 }
 
 [data-theme="dark"] .kair-v3-dialog__footer,
 [data-theme="dark-legacy"] .kair-v3-dialog__footer {
-  background: rgba(255, 255, 255, 0.02);
+  background: linear-gradient(180deg, var(--v3-card) 0%, var(--v3-muted) 100%);
 }
 
 @keyframes kair-v3-fade-in {
@@ -1811,96 +1902,347 @@
    14. CRONOGRAMA — Grid anual + lista
    ───────────────────────────────────────────────────────────────────────── */
 
+/* F21.25 (2026-06-20): calendario rediseñado según mockup del usuario.
+   Filas = auditorías, columnas = meses, celdas = tarjetas de hitos. */
 .kair-v3-cron-grid {
   display: grid;
-  grid-template-columns: 100px repeat(12, minmax(72px, 1fr));
+  grid-template-columns: 260px repeat(12, minmax(72px, 1fr));
   gap: 1px;
   background: var(--v3-border);
   border-radius: var(--v3-radius-md);
   overflow: hidden;
-  min-width: 1000px;
+  min-width: 1080px;
+  font-family: var(--v3-font-sans);
 }
 
-.kair-v3-cron-grid__head {
-  display: contents;
-}
+.kair-v3-cron-grid__head { display: contents; }
 
 .kair-v3-cron-grid__head .kair-v3-cron-grid__corner {
   background: var(--v3-muted);
-  padding: 8px 12px;
-  font: 600 0.75rem/1.3 var(--v3-font-sans);
+  padding: 10px 14px;
+  font: 600 0.7rem/1.3 var(--v3-font-sans);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   color: var(--v3-muted-foreground);
+  display: flex;
+  align-items: center;
 }
 
 .kair-v3-cron-grid__head .kair-v3-cron-grid__month {
   background: var(--v3-muted);
-  padding: 8px 6px;
-  font: 600 0.6875rem/1.3 var(--v3-font-sans);
+  padding: 10px 6px;
+  font: 600 0.7rem/1.3 var(--v3-font-sans);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   color: var(--v3-muted-foreground);
   text-align: center;
-}
-
-.kair-v3-cron-grid__row {
-  display: contents;
-}
-
-.kair-v3-cron-grid__fase {
-  background: var(--v3-muted);
-  padding: 8px 12px;
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  align-items: flex-start;
-  font-size: 0.8125rem;
-  font-weight: 600;
+  align-items: center;
+  justify-content: center;
 }
 
-.kair-v3-cron-grid__fase strong {
+.kair-v3-cron-grid__row { display: contents; }
+
+/* Celda fija izquierda: nombre de la auditoría */
+.kair-v3-cron-grid__audit {
+  background: var(--v3-card);
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 76px;
+  border-left: 3px solid var(--v3-primary);
+}
+
+.kair-v3-cron-grid__audit-icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--v3-radius-md);
+  background: var(--v3-primary-soft);
+  color: var(--v3-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+}
+
+.kair-v3-cron-grid__audit-body {
+  flex: 1;
+  min-width: 0;
   font-size: 0.875rem;
+  line-height: 1.3;
 }
 
+.kair-v3-cron-grid__audit-body strong {
+  display: block;
+  font-weight: 600;
+  color: var(--v3-foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Celdas de meses */
 .kair-v3-cron-grid__cell {
   background: var(--v3-card);
-  min-height: 64px;
+  min-height: 76px;
   padding: 4px;
   display: flex;
   flex-direction: column;
   gap: 4px;
   cursor: pointer;
   transition: background var(--v3-transition);
+  position: relative;
 }
 
-.kair-v3-cron-grid__cell:hover {
-  background: var(--v3-muted);
+.kair-v3-cron-grid__cell:hover { background: var(--v3-muted); }
+.kair-v3-cron-grid__cell--has { background: #fafbfc; }
+.kair-v3-cron-grid__cell--has:hover { background: var(--v3-muted); }
+
+/* "+" sutil en celdas vacías */
+.kair-v3-cron-grid__plus {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--v3-muted-foreground);
+  font-size: 1rem;
+  font-weight: 300;
+  opacity: 0;
+  transition: opacity var(--v3-transition);
 }
 
-.kair-v3-cron-grid__cell--has {
-  background: #fafbfc;
-}
+.kair-v3-cron-grid__cell--empty:hover .kair-v3-cron-grid__plus { opacity: 0.55; }
 
-.kair-v3-cron-cell-item {
-  padding: 4px 6px;
+/* Tarjeta de hito dentro de la celda */
+.kair-v3-cron-hito {
+  padding: 6px 8px;
   border-radius: var(--v3-radius-sm);
-  font-size: 0.6875rem;
   cursor: pointer;
-  transition: transform var(--v3-transition);
+  transition: transform var(--v3-transition), box-shadow var(--v3-transition);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.kair-v3-cron-cell-item:hover {
-  transform: translateX(2px);
+.kair-v3-cron-hito:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
 }
 
-.kair-v3-cron-cell-item__code {
-  font: 600 0.625rem/1.2 ui-monospace, monospace;
-  color: var(--v3-foreground);
-  margin-bottom: 2px;
+.kair-v3-cron-hito__head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.kair-v3-cron-hito__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.kair-v3-cron-hito__fase {
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.kair-v3-cron-hito__fecha {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--v3-foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+.kair-v3-cron-hito__estado {
+  font-size: 0.5625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--v3-muted-foreground);
+}
+
+/* F21.25 (2026-06-20): leyenda de colores al pie del cronograma */
+.kair-v3-cron-leyenda {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 12px 14px;
+  margin-top: 8px;
+  background: var(--v3-card);
+  border: 1px solid var(--v3-border);
+  border-radius: var(--v3-radius-md);
+  font-size: 0.8125rem;
+}
+
+.kair-v3-cron-leyenda__label {
+  font-weight: 700;
+  color: var(--v3-muted-foreground);
+  letter-spacing: 0.04em;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+}
+
+.kair-v3-cron-leyenda__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--v3-foreground);
+}
+
+.kair-v3-cron-leyenda__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  flex-shrink: 0;
+}
+
+/* F21.27 (2026-06-20): barra de herramientas del cronograma (mockup).
+   Estructura: < [badge año] > | FASE: [tabs] ........ X hitos en AÑO */
+.kair-v3-cron-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--v3-card);
+  border: 1px solid var(--v3-border);
+  border-radius: var(--v3-radius-md);
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.kair-v3-cron-toolbar__left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.kair-v3-cron-toolbar__right {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.kair-v3-cron-toolbar__divider {
+  width: 1px;
+  height: 24px;
+  background: var(--v3-border);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.kair-v3-cron-toolbar__label {
+  font: 700 0.7rem/1 var(--v3-font-sans);
+  letter-spacing: 0.06em;
+  color: var(--v3-muted-foreground);
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.kair-v3-cron-toolbar__count {
+  font-size: 0.8125rem;
+  color: var(--v3-muted-foreground);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.kair-v3-cron-nav {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--v3-card);
+  border: 1px solid var(--v3-border);
+  border-radius: var(--v3-radius-md);
+  color: var(--v3-muted-foreground);
+  cursor: pointer;
+  font-size: 0.875rem;
+  flex-shrink: 0;
+  transition: all var(--v3-transition);
+}
+
+.kair-v3-cron-nav:hover:not(:disabled) {
+  background: var(--v3-muted);
+  border-color: var(--v3-primary);
+  color: var(--v3-primary);
+}
+
+.kair-v3-cron-nav:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.kair-v3-cron-year-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  background: var(--v3-primary-soft);
+  color: var(--v3-primary);
+  border-radius: var(--v3-radius-md);
+  font-weight: 700;
+  font-size: 0.9375rem;
+  letter-spacing: -0.01em;
+  border: 1px solid var(--v3-primary);
+}
+
+.kair-v3-cron-year-badge i {
+  font-size: 0.95rem;
+}
+
+/* Tabs de fase en la toolbar */
+.kair-v3-cron-phase {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: var(--v3-radius-md);
+  border: 1px solid transparent;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--v3-transition);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.kair-v3-cron-phase:not(.kair-v3-cron-phase--active):hover {
+  filter: brightness(0.97);
+}
+
+.kair-v3-cron-phase__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.kair-v3-cron-phase__label {
+  font-weight: 600;
+}
+
+.kair-v3-cron-phase__count {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 8px;
+  margin-left: 2px;
 }
 
 .kair-v3-cron-cell-item__obs {
@@ -2422,4 +2764,180 @@
    ════════════════════════════════════════════════════════════════════════ */
 .kair-v3-hub .kair-v3-kpi + .kair-v3-kpi {
   border-left: none;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   F16 (2026-06-20) · APLICAR HEADER ESTÁNDAR K+AIR TAMBIÉN EN .kair-v3-editor
+   El header del editor usa el mismo patrón estándar que las otras vistas.
+   Sin este bloque, las clases .k-module-header, .k-header-* etc. no se
+   aplicarían dentro del editor (solo aplicaban dentro de .kair-v3-hub).
+   ════════════════════════════════════════════════════════════════════════ */
+
+.kair-v3-editor > .k-module-header,
+.kair-v3-editor .k-module-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 1.5rem;
+  height: 64px;
+  background: #ffffff;
+  border-bottom: 1px solid var(--v3-border);
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
+  flex-shrink: 0;
+}
+
+.kair-v3-editor .k-header-left,
+.kair-v3-editor .k-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.kair-v3-editor .k-header-left { min-width: 0; flex: 1; }
+
+.kair-v3-editor .k-header-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.kair-v3-editor .k-header-main-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--v3-foreground);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.kair-v3-editor .k-header-main-title i {
+  color: var(--v3-primary);
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.kair-v3-editor .k-header-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  color: var(--v3-muted-foreground);
+  flex-wrap: wrap;
+}
+
+.kair-v3-editor .k-header-breadcrumb button {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.kair-v3-editor .k-header-breadcrumb button:hover { color: var(--v3-primary); }
+
+.kair-v3-editor .k-breadcrumb-item.active { color: var(--v3-primary); font-weight: 500; }
+
+.kair-v3-editor .k-sync-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border-radius: 2rem;
+  white-space: nowrap;
+}
+
+.kair-v3-editor .k-sync-synced { background: rgba(40, 167, 69, 0.1); color: #28a745; }
+
+.kair-v3-editor .k-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  font-family: "Segoe UI", Roboto, sans-serif;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.kair-v3-editor .k-btn-primary  { background: var(--v3-primary); color: #fff; }
+.kair-v3-editor .k-btn-primary:hover  { background: var(--v3-primary-hover); }
+.kair-v3-editor .k-btn-success  { background: #28a745; color: #fff; }
+.kair-v3-editor .k-btn-success:hover  { background: #218838; }
+.kair-v3-editor .k-btn-secondary { background: var(--v3-muted); color: var(--v3-foreground); }
+.kair-v3-editor .k-btn-secondary:hover { background: var(--v3-border); }
+.kair-v3-editor .k-btn-sm       { padding: 0.35rem 0.75rem; font-size: 0.72rem; }
+
+.kair-v3-editor .header-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  font: 500 0.8125rem/1.2 "Segoe UI", Roboto, sans-serif;
+  color: #5a6378;
+  background: transparent;
+  border: 1px solid var(--v3-border);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.kair-v3-editor .header-back-btn:hover {
+  background: #e8f0fe;
+  color: var(--v3-primary);
+  border-color: var(--v3-primary);
+}
+
+.kair-v3-editor .header-back-btn i { font-size: 0.875rem; }
+
+/* Tabs del editor: se muestran como nav propio DEBAJO del header estándar */
+.kair-v3-editor .kair-v3-editor-tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0 1.5rem;
+  background: #ffffff;
+  border-bottom: 1px solid var(--v3-border);
+  flex-shrink: 0;
+}
+
+.kair-v3-editor .kair-v3-editor-tabs .kair-v3-tab {
+  padding: 0.75rem 1rem;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  color: var(--v3-muted-foreground);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.kair-v3-editor .kair-v3-editor-tabs .kair-v3-tab:hover { color: var(--v3-foreground); }
+
+.kair-v3-editor .kair-v3-editor-tabs .kair-v3-tab--active {
+  color: var(--v3-primary);
+  border-bottom-color: var(--v3-primary);
+}
+
+.kair-v3-editor .kair-v3-tab__badge {
+  background: var(--v3-muted);
+  color: var(--v3-muted-foreground);
+  font-size: 0.7rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
 }
