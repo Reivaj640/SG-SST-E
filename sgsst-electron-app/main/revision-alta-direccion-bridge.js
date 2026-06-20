@@ -1026,7 +1026,7 @@ function _loadActasFromDb(empresaId) {
   try {
     var db = _getDb();
     var rows = db.prepare('SELECT id, numero, fecha, estado, archivo_path, metadata_json, creado_en, actualizado_en FROM actas WHERE empresa_id = ? ORDER BY fecha DESC, creado_en DESC').all(empresaId);
-    return rows.map(function(r) {
+    var result = rows.map(function(r) {
       var metadata = {};
       try { if (r.metadata_json) metadata = JSON.parse(r.metadata_json); } catch (e) { metadata = {}; }
       return {
@@ -1040,6 +1040,27 @@ function _loadActasFromDb(empresaId) {
         actualizado_en: r.actualizado_en
       };
     });
+
+    /* F6 (2026-06-19) · Puente JSON→SQLite (mismo patrón que revisiones) */
+    try {
+      var dir = _getEmpresaDir(empresaId);
+      var jsonPath = path.join(dir, 'G-FO-009.json');
+      if (fs.existsSync(jsonPath)) {
+        var jsonActas = _readJson(jsonPath) || [];
+        var dbIds = {};
+        result.forEach(function(a) { if (a.id) dbIds[a.id] = true; });
+        var orphans = jsonActas.filter(function(a) { return a && a.id && !dbIds[a.id]; });
+        if (orphans.length > 0) {
+          console.log('[K+AIRSST][6.1.3][DB_LOAD_ACTAS] Puente JSON: ' + orphans.length +
+            ' acta(s) huérfana(s) agregada(s): ' + orphans.map(function(o) { return o.id; }).join(', '));
+          result = result.concat(orphans);
+        }
+      }
+    } catch (e) {
+      console.warn('[K+AIRSST][6.1.3][DB_LOAD_ACTAS][PUENTE]', e.message);
+    }
+
+    return result;
   } catch (e) {
     console.error('[K+AIRSST][6.1.3][DB_LOAD_ACTAS]', e.message);
     return null;
@@ -1079,7 +1100,7 @@ function _loadRevisionesFromDb(empresaId) {
       });
     });
 
-    return revs.map(function(r) {
+    var result = revs.map(function(r) {
       var secs = seccionesByRev[r.id] || [];
       secs.forEach(function(sec) {
         var k = r.id + '||' + sec.seccion_key;
@@ -1105,6 +1126,32 @@ function _loadRevisionesFromDb(empresaId) {
         actualizado_en: r.actualizado_en
       };
     });
+
+    /* F6 (2026-06-19) · Puente JSON→SQLite
+       Mientras el handler crearRevision escribe a G-FO-006.json y los handlers
+       de lectura consultan la BD, las revisiones recién creadas se quedan
+       "huérfanas" en el JSON. Este puente las agrega al final del resultado
+       para que sean visibles, sin duplicar las que ya están en la BD. */
+    try {
+      var dir = _getEmpresaDir(empresaId);
+      var jsonPath = path.join(dir, 'G-FO-006.json');
+      if (fs.existsSync(jsonPath)) {
+        var jsonRevs = _readJson(jsonPath) || [];
+        var dbIds = {};
+        result.forEach(function(r) { if (r.id) dbIds[r.id] = true; });
+        var orphans = jsonRevs.filter(function(r) { return r && r.id && !dbIds[r.id]; });
+        if (orphans.length > 0) {
+          console.log('[K+AIRSST][6.1.3][DB_LOAD_REVISIONES] Puente JSON: ' + orphans.length +
+            ' revisión(es) en JSON no estaban en BD, agregadas: ' +
+            orphans.map(function(o) { return o.id; }).join(', '));
+          result = result.concat(orphans);
+        }
+      }
+    } catch (e) {
+      console.warn('[K+AIRSST][6.1.3][DB_LOAD_REVISIONES][PUENTE]', e.message);
+    }
+
+    return result;
   } catch (e) {
     console.error('[K+AIRSST][6.1.3][DB_LOAD_REVISIONES]', e.message);
     return null;

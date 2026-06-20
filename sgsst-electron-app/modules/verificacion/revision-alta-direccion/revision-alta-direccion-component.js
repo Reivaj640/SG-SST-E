@@ -231,32 +231,35 @@ var RevisionAltaDireccionComponent = (function() {
      TOAST · Feedback visual no-bloqueante
      ═══════════════════════════════════════════════════════════════════════ */
 
+  /* F-Sileo (2026-06-19): toast() ahora es un proxy a Sileo.
+     Mantiene la firma (title, msg, type) para no tocar los ~30 call-sites. */
   function toast(title, msg, type) {
-    type = type || 'info';
-    var stack = document.getElementById('kair-rad-toast-stack');
-    if (!stack) return;
-
-    var icons = {
-      success: 'bi-check-circle-fill',
-      warning: 'bi-exclamation-triangle-fill',
-      error: 'bi-x-circle-fill',
-      info: 'bi-info-circle-fill'
-    };
-
-    var el = document.createElement('div');
-    el.className = 'kair-rad-toast kair-rad-toast--' + type;
-    el.innerHTML =
-      '<i class="bi ' + (icons[type] || icons.info) + ' kair-rad-toast__icon"></i>' +
-      '<div>' +
-        '<div class="kair-rad-toast__title">' + _esc(title) + '</div>' +
-        (msg ? '<div class="kair-rad-toast__msg">' + _esc(msg) + '</div>' : '') +
-      '</div>';
-    stack.appendChild(el);
-
-    setTimeout(function() {
-      el.classList.add('is-leaving');
-      setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 250);
-    }, 3800);
+    if (window.Sileo && window.Sileo[type || 'info']) {
+      window.Sileo[type || 'info']({ title: title, description: msg });
+    } else {
+      /* Fallback al sistema legacy si Sileo no está cargado todavía */
+      var stack = document.getElementById('kair-rad-toast-stack');
+      if (!stack) return;
+      var icons = {
+        success: 'bi-check-circle-fill',
+        warning: 'bi-exclamation-triangle-fill',
+        error: 'bi-x-circle-fill',
+        info: 'bi-info-circle-fill'
+      };
+      var el = document.createElement('div');
+      el.className = 'kair-rad-toast kair-rad-toast--' + (type || 'info');
+      el.innerHTML =
+        '<i class="bi ' + (icons[type] || icons.info) + ' kair-rad-toast__icon"></i>' +
+        '<div>' +
+          '<div class="kair-rad-toast__title">' + _esc(title) + '</div>' +
+          (msg ? '<div class="kair-rad-toast__msg">' + _esc(msg) + '</div>' : '') +
+        '</div>';
+      stack.appendChild(el);
+      setTimeout(function() {
+        el.classList.add('is-leaving');
+        setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 250);
+      }, 3800);
+    }
   }
 
   /* ═══════════════════════════════════════════════════════════════════════
@@ -317,37 +320,38 @@ var RevisionAltaDireccionComponent = (function() {
    * @param {string} [opts.variant]   - 'danger' | 'warning' | 'info' (default: 'danger')
    * @returns {Promise<boolean>}    - true si el usuario aceptó, false si canceló
    */
+  /* F-Sileo (2026-06-19): _showConfirmDialog() ahora es un proxy a Sileo.confirm.
+     Mantiene la firma ({title, message, acceptLabel, cancelLabel, warning, variant}).
+     Devuelve Promise<boolean> igual que antes. */
   function _showConfirmDialog(opts) {
-    /* DEBUG: trace del showConfirmDialog */
     try { console.log('[K+AIRSST][6.1.3][DELETE-MODAL] _showConfirmDialog() opts:', opts); } catch (e) {}
 
+    if (window.Sileo && window.Sileo.confirm) {
+      var description = opts.message || '¿Estás seguro?';
+      if (opts.warning) description += '\n\n⚠ ' + opts.warning;
+      return window.Sileo.confirm({
+        title:      opts.title || 'Confirmar acción',
+        description: description,
+        confirmText: opts.acceptLabel || 'Confirmar',
+        cancelText:  opts.cancelLabel || 'Cancelar',
+        danger:     opts.variant !== 'warning' /* default: danger */
+      });
+    }
+
+    /* Fallback al modal legacy si Sileo aún no cargó */
     return new Promise(function(resolve) {
       var overlay = _ensureConfirmModal();
-
-      // Set content
       document.getElementById('kair-rad-confirm-title-text').textContent = opts.title || 'Confirmar acción';
       document.getElementById('kair-rad-confirm-message').textContent = opts.message || '¿Estás seguro?';
       document.getElementById('kair-rad-confirm-accept-label').textContent = opts.acceptLabel || 'Confirmar';
-
       var cancelBtn = overlay.querySelector('#kair-rad-confirm-cancel');
       cancelBtn.textContent = opts.cancelLabel || 'Cancelar';
-
       var warnEl = document.getElementById('kair-rad-confirm-warning');
-      if (opts.warning) {
-        warnEl.textContent = opts.warning;
-        warnEl.style.display = 'block';
-      } else {
-        warnEl.style.display = 'none';
-      }
-
-      // Variant
+      if (opts.warning) { warnEl.textContent = opts.warning; warnEl.style.display = 'block'; }
+      else { warnEl.style.display = 'none'; }
       var acceptBtn = overlay.querySelector('#kair-rad-confirm-accept');
       acceptBtn.className = 'k-btn ' + (opts.variant === 'warning' ? 'k-btn-warning' : 'k-btn-danger');
-
-      // Open
       overlay.classList.add('open');
-
-      // Handlers (limpios antes de asignar)
       var close = function(result) {
         overlay.classList.remove('open');
         acceptBtn.removeEventListener('click', onAccept);
@@ -361,7 +365,6 @@ var RevisionAltaDireccionComponent = (function() {
       var onCancel = function() { close(false); };
       var onBackdrop = function(e) { if (e.target === overlay) close(false); };
       var onEscape = function(e) { if (e.key === 'Escape') close(false); };
-
       acceptBtn.addEventListener('click', onAccept);
       cancelBtn.addEventListener('click', onCancel);
       document.getElementById('kair-rad-confirm-close').addEventListener('click', onCancel);
@@ -644,12 +647,30 @@ var RevisionAltaDireccionComponent = (function() {
     cssLoaded = true;
     var href = 'modules/verificacion/revision-alta-direccion/revision-alta-direccion-v2.css';
     var existing = document.querySelector('link[href*="revision-alta-direccion-v2.css"]');
-    if (existing) return;
-    var link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = href;
-    document.head.appendChild(link);
-    log('CSS_LOAD', 'INFO', href);
+    if (!existing) {
+      var link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = href;
+      document.head.appendChild(link);
+      log('CSS_LOAD', 'INFO', href);
+    }
+    /* F-Sileo (2026-06-19): cargar assets de Sileo vanilla (aislado a 6.1.3) */
+    if (!document.querySelector('link[href*="k-sileo.css"]')) {
+      var sileoCss = document.createElement('link');
+      sileoCss.rel = 'stylesheet';
+      sileoCss.href = 'shared/k-sileo.css';
+      document.head.appendChild(sileoCss);
+      log('SILEO_CSS', 'INFO', 'shared/k-sileo.css');
+    }
+    if (!document.querySelector('script[src*="k-sileo.js"]') && !window.Sileo) {
+      var sileoScript = document.createElement('script');
+      sileoScript.src = 'shared/k-sileo.js';
+      sileoScript.onload = function () { log('SILEO_JS', 'INFO', 'Cargado y listo'); };
+      sileoScript.onerror = function () { log('SILEO_JS', 'ERROR', 'No se pudo cargar shared/k-sileo.js'); };
+      document.head.appendChild(sileoScript);
+    } else {
+      log('SILEO_JS', 'INFO', 'Ya estaba cargado');
+    }
   }
 
   /* ═══════════════════════════════════════════════════════════════════════
@@ -1464,13 +1485,13 @@ var RevisionAltaDireccionComponent = (function() {
     var thead = '<thead><tr>' +
       '<th>Consecutivo</th>' +
       '<th>Período</th>' +
-      '<th>Empresa</th>' +
+      '<th class="cell-ellipsis">Empresa</th>' +
       '<th>Fecha</th>' +
-      '<th>Preside</th>' +
-      '<th>Elabora</th>' +
+      '<th class="cell-ellipsis">Preside</th>' +
+      '<th class="cell-ellipsis">Elabora</th>' +
       '<th>Estado</th>' +
       '<th style="min-width:140px">Progreso</th>' +
-      '<th style="width:110px; text-align:right">Acciones</th>' +
+      '<th class="cell-actions-head">Acciones</th>' +
     '</tr></thead>';
     table.innerHTML = thead;
 
@@ -1483,10 +1504,10 @@ var RevisionAltaDireccionComponent = (function() {
       tr.innerHTML =
         '<td class="cell-mono">' + _esc(r.id || '') + '</td>' +
         '<td>' + _esc(r.periodo || '') + '</td>' +
-        '<td>' + _esc(r.empresa || '—') + '</td>' +
+        '<td class="cell-ellipsis" title="' + _esc(r.empresa || '—') + '">' + _esc(r.empresa || '—') + '</td>' +
         '<td>' + _esc(formatDate(r.fecha || r.fechaProgramada || '')) + '</td>' +
-        '<td>' + _esc(r.preside || '—') + '</td>' +
-        '<td>' + _esc(r.elabora || '—') + '</td>' +
+        '<td class="cell-ellipsis" title="' + _esc(r.preside || '—') + '">' + _esc(r.preside || '—') + '</td>' +
+        '<td class="cell-ellipsis" title="' + _esc(r.elabora || '—') + '">' + _esc(r.elabora || '—') + '</td>' +
         '<td>' + badgeFor(r.estado || 'Borrador') + '</td>' +
         '<td>' +
           '<div class="kair-rad-table-progress">' +
@@ -1496,7 +1517,7 @@ var RevisionAltaDireccionComponent = (function() {
             '<span class="kair-rad-table-progress__label">' + prog + '%</span>' +
           '</div>' +
         '</td>' +
-        '<td><div class="cell-actions">' +
+        '<td class="cell-actions-cell"><div class="cell-actions">' +
           '<button class="kair-rad-icon-btn" title="Ver acta" data-hub-action="view" data-row-id="' + _esc(r.id || '') + '">' +
             '<i class="bi bi-eye"></i>' +
           '</button>' +
@@ -1750,12 +1771,30 @@ var RevisionAltaDireccionComponent = (function() {
      ═══════════════════════════════════════════════════════════════════════ */
 
   function bindGlobalActions() {
-    /* CTA primaria del header (Nueva revisión) */
+    /* CTA primaria del header (Nueva Revisión Gerencial)
+       FIX (2026-06-19, segundo intento): siempre crea una revisión nueva,
+       sin importar que ya exista cicloActivo. La acción del usuario es
+       explícita ("quiero una nueva"), no "continuar con la actual". */
     var cta = document.getElementById('kair-rad-cta-new');
     if (cta) {
-      cta.addEventListener('click', function() {
-        navigate('revisiones-list');
-        toast('Nueva Revisión Gerencial', 'Iniciando ciclo conforme a G-PR-001', 'info');
+      cta.addEventListener('click', async function() {
+        var t = null;
+        try { t = Sileo.loading({ title: 'Nueva Revisión Gerencial', description: 'Creando borrador inicial...' }); } catch (e) {}
+        try {
+          var result = await guardarRevision({}, true);
+          if (t) { try { t.dismiss(); } catch (e) {} }
+          if (result && result.success && result.revision) {
+            /* Poner la nueva como ciclo activo */
+            state.cicloActivo = result.revision;
+            navigate('revisiones-editor', { id: result.revision.id });
+          } else {
+            navigate('revisiones-list');
+          }
+        } catch (e) {
+          if (t) { try { t.dismiss(); } catch (e) {} }
+          log('NEW', 'ERROR', e && e.message ? e.message : String(e));
+          navigate('revisiones-list');
+        }
       });
     }
 
@@ -1860,13 +1899,27 @@ var RevisionAltaDireccionComponent = (function() {
 
     /* Hero CTAs */
     document.querySelectorAll('[data-cta]').forEach(function(btn) {
-      btn.addEventListener('click', function() {
+      btn.addEventListener('click', async function() {
         var cta = btn.getAttribute('data-cta');
         if (cta === 'open-cycle') {
-          /* Si hay ciclo activo, abrir su editor; si no, ir al listado */
+          /* Si hay ciclo activo, abrir su editor; si no, crear uno nuevo y abrirlo */
           if (state.cicloActivo && state.cicloActivo.id) {
             navigate('revisiones-editor', { id: state.cicloActivo.id });
-          } else {
+            return;
+          }
+          var t = null;
+          try { t = Sileo.loading({ title: 'Iniciando ciclo de revisión', description: 'Conforme a G-PR-001' }); } catch (e) {}
+          try {
+            var result = await guardarRevision({}, true);
+            if (t) { try { t.dismiss(); } catch (e) {} }
+            if (result && result.success && result.revision) {
+              navigate('revisiones-editor', { id: result.revision.id });
+            } else {
+              navigate('revisiones-list');
+            }
+          } catch (e) {
+            if (t) { try { t.dismiss(); } catch (e) {} }
+            log('OPEN_CYCLE', 'ERROR', e && e.message ? e.message : String(e));
             navigate('revisiones-list');
           }
         } else if (cta === 'history') {

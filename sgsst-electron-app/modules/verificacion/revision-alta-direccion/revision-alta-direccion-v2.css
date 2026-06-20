@@ -1036,8 +1036,15 @@
 }
 
 /* Tabla dentro de columna narrow del hub · más compacta */
+.kair-rad-hub-row__col--narrow .kair-rad-table-card {
+  /* Permitir scroll horizontal limpio cuando la tabla es más ancha que el contenedor */
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .kair-rad-hub-row__col--narrow .kair-rad-table {
   font-size: 0.8125rem;
+  min-width: 720px; /* fuerza scroll horizontal si el contenedor es < 720px */
 }
 
 .kair-rad-hub-row__col--narrow .kair-rad-table thead th {
@@ -1048,6 +1055,28 @@
 .kair-rad-hub-row__col--narrow .kair-rad-table tbody td {
   padding: 10px var(--rad-s2);
   white-space: nowrap;
+}
+
+/* Columnas con texto largo (Empresa, Preside, Elabora) · truncar con ellipsis */
+.kair-rad-hub-row__col--narrow .kair-rad-table tbody td.cell-ellipsis {
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Columna de Acciones · ancho mínimo para los 3 botones siempre visibles */
+.kair-rad-hub-row__col--narrow .kair-rad-table thead th.cell-actions-head,
+.kair-rad-hub-row__col--narrow .kair-rad-table tbody td.cell-actions-cell {
+  min-width: 110px;
+  width: 110px;
+  text-align: right;
+}
+
+.kair-rad-hub-row__col--narrow .cell-actions {
+  display: inline-flex;
+  gap: 4px;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
 }
 
 .kair-rad-hub-row__col--narrow .kair-rad-table .cell-mono {

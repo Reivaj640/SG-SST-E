@@ -99,9 +99,18 @@ class VerificacionHome {
         const chartCumplimiento = document.createElement('div');
         chartCumplimiento.className = 'chart-container';
         chartCumplimiento.innerHTML = `
-            <h3>Cumplimiento por Submódulo — ${new Date().getFullYear()}</h3>
+            <h3>Avance Revisión Gerencial — ${new Date().getFullYear()}</h3>
             <div class="chart-placeholder" style="padding: 0.5rem 0;">
-                <canvas id="verCumplimientoChart" style="max-height: 180px;"></canvas>
+                <div class="k-air-chart-wrap">
+                    <canvas id="verCumplimientoChart" style="max-height: 180px;"></canvas>
+                    <div class="k-air-chart-center" id="verCumplimientoCenter">
+                        <div class="k-air-chart-center__pct">—</div>
+                        <div class="k-air-chart-center__label">sin ciclo</div>
+                    </div>
+                </div>
+                <div class="k-air-chart-footer" id="verCumplimientoFooter">
+                    Cargando información del ciclo activo…
+                </div>
             </div>
         `;
         chartsGrid.appendChild(chartCumplimiento);
@@ -335,42 +344,135 @@ class VerificacionHome {
         });
     }
 
-    renderCumplimientoChart() {
+    async renderCumplimientoChart() {
         if (typeof Chart === 'undefined') return;
         const canvas = document.getElementById('verCumplimientoChart');
         if (!canvas) return;
 
-        const labels = ['6.1.1', '6.1.2', '6.1.3', '6.1.4'];
-        const colors = ['#28a745', '#174ea6', '#ffc107', '#dc3545'];
-        const cumplimiento = [78, 75, 67, 67];
+        /* ── 1) Cargar datos reales del submódulo 6.1.3 vía IPC ── */
+        let cicloActivo = null;
+        let revisiones = [];
+        let seedInfo = null;
+        let loadError = null;
 
-        const existingChart = Chart.getChart(canvas);
+        try {
+            if (window.RevisionAltaDireccionService && typeof window.RevisionAltaDireccionService.cargarTodo === 'function') {
+                const resp = await window.RevisionAltaDireccionService.cargarTodo(this.currentCompany);
+                if (resp && resp.success && resp.data) {
+                    cicloActivo = resp.data.cicloActivo || null;
+                    revisiones = resp.data.revisiones || [];
+                    seedInfo = resp.data.seedIndicadores || null;
+                } else {
+                    loadError = (resp && resp.error && resp.error.message) || 'Sin respuesta';
+                }
+            } else {
+                loadError = 'Servicio 6.1.3 no disponible';
+            }
+        } catch (e) {
+            loadError = e && e.message ? e.message : 'Error desconocido';
+        }
+
+        /* ── 2) Calcular % de avance del ciclo activo ── */
+        let progreso = 0;
+        let detalleFooter = '';
+        let centerPct = '—';
+        let centerLabel = 'sin ciclo';
+
+        if (cicloActivo && cicloActivo.id) {
+            /* Prioridad: campo progreso explícito → conteo de secciones completadas */
+            if (typeof cicloActivo.progreso === 'number') {
+                progreso = Math.max(0, Math.min(100, cicloActivo.progreso));
+            } else if (Array.isArray(cicloActivo.secciones)) {
+                const total = cicloActivo.secciones.length || 12;
+                const completas = cicloActivo.secciones.filter(function(s) { return s && (s.completada === true || s.estado === 'completada'); }).length;
+                progreso = total > 0 ? Math.round((completas / total) * 100) : 0;
+            } else {
+                /* Si no hay datos de progreso, estimar desde estado */
+                progreso = (cicloActivo.estado === 'Cerrada' || cicloActivo.estado === 'Realizada') ? 100 : 0;
+            }
+
+            centerPct = String(progreso) + '%';
+            centerLabel = 'avance';
+
+            var idCorto = cicloActivo.id || '—';
+            var estado = cicloActivo.estado || '—';
+            var fecha = cicloActivo.fechaProgramada || cicloActivo.fechaRealizacion || '—';
+            var secciones = Array.isArray(cicloActivo.secciones) ? cicloActivo.secciones.length : '—';
+
+            detalleFooter =
+                '<strong>' + idCorto + '</strong> · ' + estado +
+                ' · Fecha programada: ' + fecha +
+                ' · ' + secciones + ' secciones';
+        } else {
+            /* Sin ciclo activo — derivar de revisiones */
+            if (revisiones.length > 0) {
+                var ultimaCerrada = revisiones.find(function(r) { return r.estado === 'Realizada' || r.estado === 'Cerrada'; });
+                if (ultimaCerrada) {
+                    centerPct = '100%';
+                    centerLabel = 'cerrado';
+                    detalleFooter = 'Último ciclo cerrado: <strong>' + (ultimaCerrada.id || '—') + '</strong> · ' + (ultimaCerrada.fechaRealizacion || '—');
+                } else {
+                    detalleFooter = revisiones.length + ' revisión(es) registrada(s), ninguna en ciclo activo';
+                }
+            } else {
+                detalleFooter = loadError
+                    ? ('No se pudo cargar 6.1.3: ' + loadError)
+                    : 'No hay ciclo de revisión activo para ' + this.currentCompany;
+            }
+        }
+
+        /* ── 3) Renderizar donut con anillo grueso + colores K+AIR ── */
+        var colorAvance = progreso >= 80 ? '#16a34a'
+                       : progreso >= 50 ? '#0d6efd'
+                       : progreso >= 25 ? '#f59e0b'
+                       : '#dc2626';
+
+        var existingChart = Chart.getChart(canvas);
         if (existingChart) existingChart.destroy();
 
         new Chart(canvas, {
             type: 'doughnut',
             data: {
-                labels: labels,
+                labels: ['Avance', 'Restante'],
                 datasets: [{
-                    data: cumplimiento,
-                    backgroundColor: colors.map(c => c + 'cc'),
-                    borderColor: colors,
-                    borderWidth: 2
+                    data: [progreso, 100 - progreso],
+                    backgroundColor: [colorAvance, '#e5e7eb'],
+                    borderColor: ['#ffffff', '#ffffff'],
+                    borderWidth: 2,
+                    cutout: '72%',
+                    circumference: 360,
+                    rotation: -90
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: true,
                 plugins: {
-                    legend: { display: true, position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12, padding: 8 } },
+                    legend: { display: false },
                     tooltip: {
                         callbacks: {
-                            label: (ctx) => ` ${ctx.label}: ${ctx.raw}% cumplimiento`
+                            label: function(ctx) {
+                                return ctx.dataIndex === 0
+                                    ? ' Avance: ' + progreso + '%'
+                                    : ' Restante: ' + (100 - progreso) + '%';
+                            }
                         }
                     }
                 }
             }
         });
+
+        /* ── 4) Actualizar overlay central y footer ── */
+        var centerEl = document.getElementById('verCumplimientoCenter');
+        if (centerEl) {
+            centerEl.querySelector('.k-air-chart-center__pct').textContent = centerPct;
+            centerEl.querySelector('.k-air-chart-center__pct').style.color = colorAvance;
+            centerEl.querySelector('.k-air-chart-center__label').textContent = centerLabel;
+        }
+        var footerEl = document.getElementById('verCumplimientoFooter');
+        if (footerEl) {
+            footerEl.innerHTML = detalleFooter;
+        }
     }
 
     renderSubmoduleItem(name) {
@@ -454,8 +556,10 @@ class VerificacionHome {
                 flex-direction: column;
                 gap: 1rem;
                 overflow-y: auto;
+                overflow-x: hidden;
                 padding-right: 0.5rem;
                 width: 100%;
+                min-width: 0;
             }
 
             .widgets-container {
@@ -463,6 +567,7 @@ class VerificacionHome {
                 grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
                 gap: 1rem;
                 margin-bottom: 0 !important;
+                min-width: 0;
             }
 
             .widget {
@@ -511,6 +616,8 @@ class VerificacionHome {
                 min-height: 280px;
                 display: flex;
                 flex-direction: column;
+                min-width: 0;     /* FIX: permite que el chart no fuerce overflow horizontal en grid 2col */
+                overflow: hidden; /* FIX: recorta canvas que exceda el contenedor */
             }
             .chart-container h3 {
                 margin-top: 0;
@@ -521,8 +628,49 @@ class VerificacionHome {
                 text-transform: uppercase;
                 letter-spacing: 0.05em;
             }
-            .charts-grid-verificacion { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-            @media (max-width: 992px) { .charts-grid-verificacion { grid-template-columns: 1fr; } }
+            .charts-grid-verificacion {
+                display: grid;
+                /* FIX: minmax(0, 1fr) permite que las columnas se encojan sin overflow */
+                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+                gap: 1rem;
+            }
+            @media (max-width: 1100px) { .charts-grid-verificacion { grid-template-columns: 1fr; } }
+            @media (max-width: 992px)  { .charts-grid-verificacion { grid-template-columns: 1fr; } }
+
+            /* ── K+AIR: Gráfica donut con centro + footer ── */
+            .k-air-chart-wrap { position: relative; height: 180px; width: 100%; }
+            .k-air-chart-wrap canvas { max-height: 180px; max-width: 100%; }
+            .k-air-chart-center {
+                position: absolute;
+                top: 50%; left: 50%;
+                transform: translate(-50%, -50%);
+                text-align: center;
+                pointer-events: none;
+                line-height: 1.05;
+            }
+            .k-air-chart-center__pct {
+                font-size: 1.75rem;
+                font-weight: 700;
+                color: var(--k-text-main);
+                letter-spacing: -0.02em;
+            }
+            .k-air-chart-center__label {
+                font-size: 0.7rem;
+                font-weight: 500;
+                color: var(--k-text-muted);
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                margin-top: 0.15rem;
+            }
+            .k-air-chart-footer {
+                margin-top: 0.5rem;
+                padding-top: 0.75rem;
+                border-top: 1px solid var(--k-border);
+                font-size: 0.75rem;
+                color: var(--k-text-muted);
+                line-height: 1.45;
+            }
+            .k-air-chart-footer strong { color: var(--k-text-main); font-weight: 600; }
 
             .submodules-container {
                 background: var(--k-bg-card);
