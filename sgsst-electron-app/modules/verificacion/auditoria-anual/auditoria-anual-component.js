@@ -25,6 +25,17 @@ AuditoriaAnualComponent.prototype._loadCSS = function (callback) {
   var self = this;
   if (this.cssLoaded) { callback(); return; }
 
+  function loadCss(href, done) {
+    var existing = document.querySelector('link[href="' + href + '"]');
+    if (existing) { done(); return; }
+    var l = document.createElement('link');
+    l.rel = 'stylesheet';
+    l.href = href;
+    l.onload = done;
+    l.onerror = done;
+    document.head.appendChild(l);
+  }
+
   function loadScript(src, done) {
     var existing = document.querySelector('script[src="' + src + '"]');
     if (existing) { done(); return; }
