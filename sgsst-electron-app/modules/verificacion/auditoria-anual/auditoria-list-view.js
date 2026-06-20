@@ -45,21 +45,37 @@ var AuditoriaListView = (function () {
   }
 
   function _renderHeader() {
-    return '<header class="kair-v3-hub-header">' +
-      '<div class="kair-v3-hub-header__left">' +
-        '<button class="k-btn k-btn-ghost k-btn-sm" id="kair-v3-list-back" style="width:auto;height:32px;padding:0 12px;">' +
-          '<i class="bi bi-arrow-left"></i> Hub' +
-        '</button>' +
-        '<div style="margin-left:0.5rem;">' +
-          '<h1 class="kair-v3-hub-header__title">Gestión de Auditorías</h1>' +
-          '<p class="kair-v3-hub-header__subtitle">Ciclo completo: planificación, ejecución, hallazgos, informe y seguimiento</p>' +
+    /* F16 (2026-06-20): Header estándar K+AIR · mismo patrón que HUB y 6.1.3 */
+    var company = (window.KairMockData && window.KairMockData.ACTIVE_COMPANY && window.KairMockData.ACTIVE_COMPANY.nombre) || 'Empresa';
+    return '<header class="k-module-header">' +
+      '<div class="k-header-left">' +
+        '<div class="k-header-title-group">' +
+          '<div class="k-header-main-title">' +
+            '<i class="bi bi-clipboard-check-fill"></i> ' +
+            'Gestión de Auditorías' +
+          '</div>' +
+          '<div class="k-header-breadcrumb">' +
+            '<span>' + _esc(company) + '</span>' +
+            '<i class="bi bi-chevron-right"></i>' +
+            '<button type="button" data-back-module="1">Verificación</button>' +
+            '<i class="bi bi-chevron-right"></i>' +
+            '<button type="button" data-go-hub="1">6.1.2 Auditoría Anual</button>' +
+            '<i class="bi bi-chevron-right"></i>' +
+            '<span class="k-breadcrumb-item active">Gestión de Auditorías</span>' +
+          '</div>' +
         '</div>' +
       '</div>' +
-      '<div class="kair-v3-hub-header__right">' +
-        '<button class="k-btn k-btn-ghost k-btn-sm" data-action="reset-seed">' +
+      '<div class="k-header-right">' +
+        '<span class="k-sync-badge k-sync-synced" title="Datos cargados">' +
+          '<i class="bi bi-check-circle-fill"></i> Sincronizado' +
+        '</span>' +
+        '<button type="button" class="header-back-btn" data-go-hub="1" title="Volver al Hub del submódulo">' +
+          '<i class="bi bi-arrow-left"></i> Hub' +
+        '</button>' +
+        '<button type="button" class="k-btn k-btn-ghost k-btn-sm" data-action="reset-seed" title="Restablecer datos de demostración">' +
           '<i class="bi bi-arrow-counterclockwise"></i> Restablecer demo' +
         '</button>' +
-        '<button class="k-btn k-btn-primary k-btn-sm" data-action="new-audit">' +
+        '<button type="button" class="k-btn k-btn-primary k-btn-sm" data-action="new-audit" title="Crear nueva auditoría">' +
           '<i class="bi bi-plus-lg"></i> Nueva auditoría' +
         '</button>' +
       '</div>' +
@@ -268,16 +284,26 @@ var AuditoriaListView = (function () {
       });
     });
 
-    // Botón volver al Hub
-    var backBtn = document.getElementById('kair-v3-list-back');
-    if (backBtn) {
-      backBtn.addEventListener('click', function () {
+    // Botón volver al Hub (F16: data-go-hub)
+    var goHubBtns = container.querySelectorAll('[data-go-hub]');
+    goHubBtns.forEach(function (btn) {
+      btn.addEventListener('click', function () {
         KairStore.actions.goHub();
         if (window.kairAuditoriaAnual && window.kairAuditoriaAnual._refreshView) {
           window.kairAuditoriaAnual._refreshView();
         }
       });
-    }
+    });
+    /* F17: breadcrumb "Verificación" → regresa al módulo padre */
+    var backModuleBtns = container.querySelectorAll('[data-back-module]');
+    backModuleBtns.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var inst = window.__kairAudInstance;
+        if (inst && typeof inst.backToModuleCallback === 'function') {
+          inst.backToModuleCallback();
+        }
+      });
+    });
 
     // Botón reset demo
     var resetBtn = container.querySelector('[data-action="reset-seed"]');

@@ -425,13 +425,39 @@ AuditoriaAnualComponent.prototype.render = function () {
 
 // ── Destroy ─────────────────────────────────────────────────────
 AuditoriaAnualComponent.prototype.destroy = function () {
-  this.container.innerHTML = '';
+  /* F21.14 (2026-06-20): limpieza exhaustiva para evitar overlays/listeners huérfanos
+     que bloqueen la interacción con el home del módulo al regresar. */
+  try { this.container.innerHTML = ''; } catch (e) { /* noop */ }
   var modal = document.getElementById('kair-aud-modal-auditoria');
   if (modal) modal.remove();
   var modalH = document.getElementById('kair-aud-modal-hallazgo');
   if (modalH) modalH.remove();
   var toast = document.getElementById('kair-aud-toast');
   if (toast) toast.remove();
+
+  /* Limpiar dialog del cronograma si quedó abierto */
+  var dialogCron = document.getElementById('kair-v3-hito-dialog');
+  if (dialogCron) dialogCron.remove();
+
+  /* Limpiar overlays deprecados o zombies que pudieran estar en body */
+  document.querySelectorAll('.kair-v3-dialog-overlay, .kair-aud-modal-overlay, .modal-backdrop').forEach(function (el) {
+    try { el.remove(); } catch (e) { /* noop */ }
+  });
+
+  /* Resetear estado global del cronograma para forzar recarga limpia en próximo mount */
+  if (window.AuditoriaCronogramaView && typeof window.AuditoriaCronogramaView.resetState === 'function') {
+    try { window.AuditoriaCronogramaView.resetState(); } catch (e) { /* noop */ }
+  }
+
+  /* Llamar destroy de la vista activa si existe */
+  if (this.activeView && typeof this.activeView.destroy === 'function') {
+    try { this.activeView.destroy(); } catch (e) { /* noop */ }
+  }
+
+  /* Forzar reflow para que el navegador limpie eventos pendientes */
+  try {
+    void this.container.offsetHeight;
+  } catch (e) { /* noop */ }
 };
 
 /* ═══════════════════════════════════════════════════════════════════════

@@ -92,6 +92,126 @@ function _ensureDir(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
 
+/* F21.4 (2026-06-20): Búsqueda recursiva de archivos Excel dentro de una carpeta raíz.
+   Retorna array de objetos { file, fullPath, relPath } para que el caller pueda
+   elegir entre múltiples candidatos según prioridad/año/heurística. */
+function _findExcelRecursivo(rootDir, maxDepth) {
+  var results = [];
+  if (!rootDir || !fs.existsSync(rootDir)) return results;
+  if (typeof maxDepth !== 'number') maxDepth = 4;
+
+  var visit = function(dir, depth) {
+    if (depth > maxDepth) return;
+    var entries;
+    try { entries = fs.readdirSync(dir); } catch (e) { return; }
+
+    entries.forEach(function(name) {
+      if (name.startsWith('~$') || name.startsWith('.')) return; /* ignorar temporales y ocultos */
+      var full = path.join(dir, name);
+      var stat;
+      try { stat = fs.statSync(full); } catch (e) { return; }
+      if (stat.isDirectory()) {
+        visit(full, depth + 1);
+      } else if (stat.isFile() && /\.(xls|xlsx|xlsm)$/i.test(name)) {
+        results.push({
+          file: name,
+          fullPath: full,
+          relPath: path.relative(rootDir, full)
+        });
+      }
+    });
+  };
+
+  visit(rootDir, 0);
+  return results;
+}
+
+/* F21 (2026-06-20): Resuelve la carpeta del cronograma con fallback 6.1.2 → 6.1.4.
+   F21.2 (2026-06-20): Invierte la prioridad — ahora prioriza 6.1.4 sobre 6.1.2.
+   F21.4 (2026-06-20): Búsqueda recursiva porque los Excels del usuario están en
+   subcarpetas (ej: "6.1.4/2024/GI-FO-062..."), no directamente en la raíz. */
+function _getEmpresaDirConFallback(empresaId) {
+  /* Prioridad 1: carpeta 6.1.4 (donde el usuario realmente guarda el cronograma) */
+  var dir614 = _getEmpresaDirFor614(empresaId);
+  var files614 = dir614 ? _findExcelRecursivo(dir614) : [];
+
+  /* Prioridad 2: carpeta 6.1.2 */
+  var dir612 = _getEmpresaDir(empresaId);
+  var files612 = dir612 ? _findExcelRecursivo(dir612) : [];
+
+  /* F21.1: log para debug — muestra qué archivos hay en cada carpeta */
+  _log('CARGAR_CRONOGRAMA_DEBUG',
+    'empresa=' + empresaId +
+    ' 6.1.4=[' + files614.map(function(f) { return f.relPath; }).join('|') + ']' +
+    ' 6.1.2=[' + files612.map(function(f) { return f.relPath; }).join('|') + ']'
+  );
+
+  /* Decisión: priorizar 6.1.4 si tiene Excels */
+  if (files614.length > 0) return { dir: dir614, files: files614, origen: '6.1.4' };
+  if (files612.length > 0) return { dir: dir612, files: files612, origen: '6.1.2' };
+
+  /* Si no hay Excel en ninguno, retornar 6.1.4 por defecto */
+  return { dir: dir614 || dir612, files: [], origen: '6.1.4' };
+}
+
+/* Resuelve la carpeta 6.1.4 usando la misma estrategia que _getEmpresaDir pero buscando "6.1.4" */
+function _getEmpresaDirFor614(empresaId) {
+  if (!empresaId) {
+    const userData = app.getPath('userData');
+    return path.join(userData, 'empresas', 'default', '6.1.4');
+  }
+
+  var companyRoot = null;
+  try {
+    var configPath = path.join(app.getPath('userData'), 'config.json');
+    if (fs.existsSync(configPath)) {
+      var cfg = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      var normalized = String(empresaId).toLowerCase().trim();
+      var companyKey = Object.keys(cfg.companyPaths || {}).find(function(k) {
+        return String(k).toLowerCase().trim() === normalized;
+      });
+      if (companyKey) {
+        companyRoot = cfg.companyPaths[companyKey].root || cfg.companyPaths[companyKey].ruta_base || null;
+      }
+    }
+  } catch (e) { /* ignore */ }
+
+  if (!companyRoot || !fs.existsSync(companyRoot)) {
+    const userData = app.getPath('userData');
+    return path.join(userData, 'empresas', empresaId, '6.1.4');
+  }
+
+  var verifVariants = ['6. Verificación', '6. Verificacion'];
+  for (var i = 0; i < verifVariants.length; i++) {
+    var verifDir = path.join(companyRoot, verifVariants[i]);
+    if (fs.existsSync(verifDir)) {
+      try {
+        var entries = fs.readdirSync(verifDir);
+        var subfolder = entries.find(function(f) {
+          return f.indexOf('6.1.4') === 0 && fs.statSync(path.join(verifDir, f)).isDirectory();
+        });
+        if (subfolder) return path.join(verifDir, subfolder);
+      } catch (e) { /* ignore */ }
+    }
+  }
+
+  /* Si no se encontró, intentar búsqueda recursiva */
+  try {
+    var rootEntries = fs.readdirSync(companyRoot);
+    var verifFolder = rootEntries.find(function(f) {
+      return /^6\.\s*Verific/i.test(f) && fs.statSync(path.join(companyRoot, f)).isDirectory();
+    });
+    if (verifFolder) {
+      var folder = path.join(companyRoot, verifFolder);
+      var subEntries = fs.readdirSync(folder);
+      var sub = subEntries.find(function(f) { return f.indexOf('6.1.4') === 0; });
+      if (sub) return path.join(folder, sub);
+    }
+  } catch (e) { /* ignore */ }
+
+  return path.join(companyRoot, '6. Verificación', '6.1.4 Seguimiento a hallazgos');
+}
+
 function _readJson(filePath) {
   try {
     if (!fs.existsSync(filePath)) return null;
@@ -846,6 +966,350 @@ function registerAuditoriaAnualHandlers(app, deps) {
       return { success: false, error: { code: 'INTERNAL', message: e.message } };
     }
   });
+
+  /* ──────────────────────────────────────────────────────────────────
+   F18-F21 (2026-06-20) · Handler para leer cronograma desde el repositorio
+   Soporta filtro por año (cargarCronograma(anio)) para multi-año.
+   Si no existe el archivo para el año solicitado → retorna NO_DATA_FOR_YEAR.
+   F21: Busca primero en 6.1.2, fallback en 6.1.4 (donde el usuario guarda el cronograma).
+   ────────────────────────────────────────────────────────────────── */
+  ipcMain.handle('auditoriaAnual:cargarCronograma', async function(event, params) {
+    try {
+      if (!XLSX) return { success: false, error: { code: 'NO_XLSX', message: 'Módulo xlsx no disponible' } };
+
+      var empresaId = params && params.empresaId;
+      var anioSolicitado = params && params.anio ? parseInt(params.anio) : null;
+
+      /* F21: resolver carpeta con fallback 6.1.2 → 6.1.4 */
+      var dirResult = _getEmpresaDirConFallback(empresaId);
+      if (!dirResult.dir) {
+        return { success: false, error: { code: 'DIR_NOT_FOUND', message: 'Carpeta 6.1.2 ni 6.1.4 encontrada para empresa ' + empresaId } };
+      }
+      var dir = dirResult.dir;
+      var dirOrigen = dirResult.origen; /* '6.1.2' o '6.1.4' */
+
+      if (!fs.existsSync(dir)) {
+        return { success: false, error: { code: 'DIR_NOT_FOUND', message: 'Carpeta no encontrada: ' + dir } };
+      }
+
+      var files = dirResult.files; /* F21.4: array de {file, fullPath, relPath} */
+
+      /* F20: Si se pidió un año específico, buscar archivo que contenga ese año en el nombre */
+      var cronogramaEntry = null;
+      if (anioSolicitado) {
+        cronogramaEntry = files.find(function(f) {
+          return new RegExp('(20\\d{2}|' + anioSolicitado + ')', 'i').test(f.file) &&
+                 (/cronograma/i.test(f.file) || /^GI-FO-062/i.test(f.file));
+        });
+        /* Si no encontró por año, intentar con archivos del año más cercano */
+        if (!cronogramaEntry) {
+          var archivosConAnio = files.map(function(f) {
+            var m = f.file.match(/(20\d{2})/);
+            return { entry: f, anio: m ? parseInt(m[1]) : null };
+          }).filter(function(x) { return x.anio !== null; });
+
+          if (archivosConAnio.length === 0) {
+            return { success: false, error: { code: 'NO_DATA_FOR_YEAR', message: 'No existe cronograma para ' + anioSolicitado, anio: anioSolicitado } };
+          }
+          /* Si el año solicitado es futuro, retornar vacío (para mostrar botón "Crear") */
+          var aniosDisponibles = archivosConAnio.map(function(x) { return x.anio; }).sort(function(a,b){return a-b;});
+          var maxAnio = Math.max.apply(null, aniosDisponibles);
+          if (anioSolicitado > maxAnio) {
+            return { success: false, error: { code: 'NO_DATA_FOR_YEAR', message: 'No existe cronograma para ' + anioSolicitado, anio: anioSolicitado, aniosDisponibles: aniosDisponibles } };
+          }
+          /* Si el año solicitado es pasado y existe, usar el más cercano */
+          cronogramaEntry = archivosConAnio[archivosConAnio.length - 1].entry;
+        }
+      }
+
+      /* Si no se pidió año o no se encontró por año, usar la búsqueda por prioridad */
+      if (!cronogramaEntry) {
+        cronogramaEntry = files.find(function(f) { return /^GI-FO-062/i.test(f.file); });
+      }
+      if (!cronogramaEntry) {
+        cronogramaEntry = files.find(function(f) {
+          return /cronograma\s+de\s+auditor/i.test(f.file);
+        });
+      }
+      if (!cronogramaEntry) {
+        cronogramaEntry = files.find(function(f) { return /cronograma/i.test(f.file); });
+      }
+      if (!cronogramaEntry) {
+        cronogramaEntry = files[0]; /* Primer Excel como último recurso */
+      }
+
+      if (!cronogramaEntry) {
+        return { success: false, error: { code: 'FILE_NOT_FOUND', message: 'Ningún Excel encontrado en ' + dir } };
+      }
+
+      var cronogramaFile = cronogramaEntry.file;
+      var filePath = cronogramaEntry.fullPath;
+      var wb = XLSX.readFile(filePath, { cellDates: true });
+      var sheetName = wb.SheetNames.find(function(n) {
+        return /cronograma|actividades|anual/i.test(n);
+      }) || wb.SheetNames[0];
+      var sheet = wb.Sheets[sheetName];
+      var rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+      var parseado = _parsearCronograma(rows);
+      var totalHitosSinFiltro = parseado.hitos.length;
+
+      /* F20: si se pidió un año, filtrar hitos por ese año.
+         F21.3 (2026-06-20): Si tras el filtro quedan 0 hitos pero el archivo
+         SÍ tiene datos de otro año, devolver los hitos sin filtrar para que
+         el usuario vea el contenido real (en vez de un empty state engañoso). */
+      var anioDetectadoArchivo = parseado.anio;
+      var avisoAnio = null;
+      if (anioSolicitado && parseado.hitos.length > 0) {
+        parseado.hitos = parseado.hitos.filter(function(h) { return h.anio === anioSolicitado; });
+        if (parseado.hitos.length === 0 && totalHitosSinFiltro > 0 && anioDetectadoArchivo && anioDetectadoArchivo !== anioSolicitado) {
+          /* Re-parsear para obtener los hitos originales sin filtro */
+          var parseadoSinFiltro = _parsearCronograma(rows);
+          parseado.hitos = parseadoSinFiltro.hitos;
+          avisoAnio = 'El archivo encontrado cubre el año ' + anioDetectadoArchivo + ', no el ' + anioSolicitado + ' que solicitaste. Mostrando los datos disponibles.';
+        }
+      }
+
+      _log('CARGAR_CRONOGRAMA', 'empresa=' + empresaId + ' anio=' + (anioSolicitado || 'auto') + ' carpeta=' + dirOrigen + ' archivo=' + cronogramaFile + ' fases=' + parseado.fases.length + ' hitos=' + parseado.hitos.length + (avisoAnio ? ' AVISO=' + avisoAnio : ''));
+
+      return {
+        success: true,
+        data: {
+          archivo: cronogramaFile,
+          hoja: sheetName,
+          ruta: filePath,
+          carpeta: dirOrigen,
+          anio: parseado.anio,
+          anioSolicitado: anioSolicitado,
+          anioDetectadoArchivo: anioDetectadoArchivo,
+          avisoAnio: avisoAnio,
+          fases: parseado.fases,
+          hitos: parseado.hitos,
+          /* F21.11 (2026-06-20): siempre devolver lista de años con archivo Excel. */
+          aniosConArchivo: files.map(function (f) {
+            var m = f.file.match(/(20\d{2})/);
+            return m ? parseInt(m[1]) : null;
+          }).filter(function (x) { return x !== null; }).sort(function (a, b) { return b - a; })
+        }
+      };
+    } catch (e) {
+      _log('CARGAR_CRONOGRAMA', 'Error: ' + e.message, 'ERROR');
+      return { success: false, error: { code: 'INTERNAL', message: e.message } };
+    }
+  });
+
+  /* F20 (2026-06-20) · Crea un nuevo archivo de cronograma para el año solicitado.
+     Si ya existe un archivo del año, lo sobrescribe (clone-and-blank).
+     Si existe otro año, lo usa como plantilla para heredar estilos/estructura. */
+  ipcMain.handle('auditoriaAnual:crearCronograma', async function(event, params) {
+    try {
+      if (!XLSX) return { success: false, error: { code: 'NO_XLSX', message: 'Módulo xlsx no disponible' } };
+
+      var empresaId = params && params.empresaId;
+      var anio = params && params.anio ? parseInt(params.anio) : null;
+      /* F21: usar fallback 6.1.2 → 6.1.4 para mantener el archivo donde ya existe */
+      var dirResult = _getEmpresaDirConFallback(empresaId);
+      var dir = dirResult.dir;
+      var dirOrigen = dirResult.origen;
+
+      if (!anio || anio < 2020 || anio > 2100) {
+        return { success: false, error: { code: 'INVALID_YEAR', message: 'Año inválido (debe estar entre 2020 y 2100)' } };
+      }
+
+      if (!fs.existsSync(dir)) {
+        _ensureDir(dir);
+      }
+
+      /* F21.4: usar lista recursiva del fallback */
+      var files = dirResult.files || _findExcelRecursivo(dir);
+      var existingEntry = files.find(function(f) {
+        return new RegExp(String(anio)).test(f.file) && (/cronograma/i.test(f.file) || /^GI-FO-062/i.test(f.file));
+      });
+
+      if (existingEntry) {
+        return { success: false, error: { code: 'ALREADY_EXISTS', message: 'Ya existe un cronograma para ' + anio + ': ' + existingEntry.relPath } };
+      }
+
+      /* Buscar plantilla: cualquier otro archivo de cronograma existente para heredar estilos */
+      var templateEntry = files.find(function(f) { return /cronograma/i.test(f.file) || /^GI-FO-062/i.test(f.file); });
+
+      var wb;
+      if (templateEntry) {
+        /* Clonar la estructura del archivo existente */
+        try {
+          wb = XLSX.readFile(templateEntry.fullPath, { cellDates: true });
+        } catch (e) {
+          wb = XLSX.utils.book_new();
+        }
+      } else {
+        /* Crear workbook nuevo desde cero */
+        wb = XLSX.utils.book_new();
+      }
+
+      /* Generar/sobrescribir la hoja 'Cronograma' con 4 fases × 12 meses vacíos */
+      var data = [
+        ['Cronograma de Auditoría ' + anio + ' — Decreto 1072 de 2015'],
+        [''],
+        ['Mes', 'Preparación', 'Realización', 'Plan de Acción', 'Implementación']
+      ];
+      var meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+      meses.forEach(function(m) { data.push([m, '', '', '', '']); });
+      var ws = XLSX.utils.aoa_to_sheet(data);
+
+      /* Ajustar anchos de columna (meses + 4 fases) */
+      ws['!cols'] = [{ wch: 14 }, { wch: 28 }, { wch: 28 }, { wch: 28 }, { wch: 28 }];
+
+      /* Reemplazar hoja existente o crear nueva */
+      if (wb.SheetNames.indexOf('Cronograma') !== -1) {
+        wb.Sheets['Cronograma'] = ws;
+      } else if (wb.SheetNames.length === 1 && wb.SheetNames[0] === 'Sheet1' && Object.keys(wb.Sheets).length === 1) {
+        /* Reemplazar la hoja por defecto si el workbook venía vacío */
+        wb.Sheets[wb.SheetNames[0]] = ws;
+        wb.SheetNames[0] = 'Cronograma';
+      } else {
+        XLSX.utils.book_append_sheet(wb, ws, 'Cronograma');
+      }
+
+      /* Guardar archivo con nombre normalizado */
+      var newFileName = 'Cronograma de auditoría ' + anio + '.xlsx';
+      var newPath = path.join(dir, newFileName);
+      XLSX.writeFile(wb, newPath);
+
+      _log('CREAR_CRONOGRAMA', 'empresa=' + empresaId + ' anio=' + anio + ' carpeta=' + dirOrigen + ' archivo=' + newFileName + ' plantilla=' + (templateEntry ? templateEntry.relPath : 'none'));
+
+      return {
+        success: true,
+        data: {
+          archivo: newFileName,
+          ruta: newPath,
+          carpeta: dirOrigen,
+          anio: anio
+        }
+      };
+    } catch (e) {
+      _log('CREAR_CRONOGRAMA', 'Error: ' + e.message, 'ERROR');
+      return { success: false, error: { code: 'INTERNAL', message: e.message } };
+    }
+  });
+
+  /* Parser heurístico del GI-FO-062.
+     Detecta automáticamente las fases del ciclo de auditoría (4 o 6) y los 12 meses
+     del año, extrayendo los hitos correspondientes. Robusto ante variaciones
+     en la posición de las columnas del archivo normativo.
+     F21.5 (2026-06-20): Soporta archivos con fases en FILAS (formato oficial
+     GI-FO-062: COL0=Proceso, COL1-12=Meses). Detección automática de orientación.
+     F21.6 (2026-06-20): Modo "cualquier texto en COL0" — si la columna de
+     procesos tiene 2+ filas con texto no vacío, se tratan como fases sin
+     requerir match exacto contra keys. Acepta nombres específicos del usuario. */
+  function _parsearCronograma(rows) {
+    if (!rows || rows.length === 0) return { anio: new Date().getFullYear(), fases: [], hitos: [] };
+
+    var meses = [
+      { keys: ['enero', 'january', 'jan'], label: 'Enero', num: 1 },
+      { keys: ['febrero', 'february', 'feb'], label: 'Febrero', num: 2 },
+      { keys: ['marzo', 'march', 'mar'], label: 'Marzo', num: 3 },
+      { keys: ['abril', 'april', 'apr'], label: 'Abril', num: 4 },
+      { keys: ['mayo', 'may'], label: 'Mayo', num: 5 },
+      { keys: ['junio', 'june', 'jun'], label: 'Junio', num: 6 },
+      { keys: ['julio', 'july', 'jul'], label: 'Julio', num: 7 },
+      { keys: ['agosto', 'august', 'aug'], label: 'Agosto', num: 8 },
+      { keys: ['septiembre', 'september', 'sep', 'setiembre'], label: 'Septiembre', num: 9 },
+      { keys: ['octubre', 'october', 'oct'], label: 'Octubre', num: 10 },
+      { keys: ['noviembre', 'november', 'nov'], label: 'Noviembre', num: 11 },
+      { keys: ['diciembre', 'december', 'dec', 'diciemb'], label: 'Diciembre', num: 12 }
+    ];
+
+    /* Detectar año en las primeras filas */
+    var anio = new Date().getFullYear();
+    for (var i = 0; i < Math.min(rows.length, 8); i++) {
+      var rowStr = (rows[i] || []).join(' ');
+      var anioMatch = rowStr.match(/\b(20[2-9]\d)\b/);
+      if (anioMatch) { anio = parseInt(anioMatch[1]); break; }
+    }
+
+    /* F21.6: Detección robusta de fases en COL0.
+       Busca la primera fila con 1+ mes detectado (headerRow), luego cuenta filas
+       consecutivas con texto no vacío en COL0 después de esa fila. Esas son las fases.
+       Funciona tanto con formatos normativos (4-6 fases) como con archivos del
+       usuario (5 fases con nombres específicos). */
+    var headerRowIdx = -1;
+    var mesesDetectados = [];
+    for (var i = 0; i < Math.min(rows.length, 25); i++) {
+      var row = rows[i] || [];
+      var matchesMesEnFila = [];
+      for (var j = 0; j < row.length; j++) {
+        var cell = String(row[j] || '').toLowerCase().trim();
+        for (var m = 0; m < meses.length; m++) {
+          if (meses[m].keys.some(function(k) { return cell === k; })) {
+            if (matchesMesEnFila.every(function(mm) { return mm.num !== meses[m].num; })) {
+              matchesMesEnFila.push({ idx: j, num: meses[m].num, label: meses[m].label });
+            }
+            break;
+          }
+        }
+      }
+      /* Si tiene 6+ meses detectados en una fila, es el header */
+      if (matchesMesEnFila.length >= 6) {
+        headerRowIdx = i;
+        mesesDetectados = matchesMesEnFila;
+        break;
+      }
+    }
+
+    if (headerRowIdx === -1 || mesesDetectados.length < 6) {
+      return { anio: anio, fases: [], hitos: [], filas: rows, orientacion: null };
+    }
+
+    /* F21.6: Recoger todas las filas con texto no vacío en COL0 después del header.
+       Esas son las fases (sin importar el nombre). Saltamos filas que sean headers
+       (como "PROCESO" o vacías). */
+    var fases = [];
+    for (var i = headerRowIdx + 1; i < rows.length; i++) {
+      var row = rows[i] || [];
+      var col0Text = String(row[0] || '').trim();
+      if (!col0Text) continue;
+      /* Saltar headers obvios */
+      var lowerCol0 = col0Text.toLowerCase();
+      if (lowerCol0 === 'proceso' || lowerCol0 === 'actividad' || lowerCol0 === 'fase') continue;
+      fases.push({
+        fila: i,
+        key: 'fase_' + (fases.length + 1),
+        label: col0Text.substring(0, 80) /* truncar nombres muy largos */
+      });
+    }
+
+    if (fases.length === 0) {
+      return { anio: anio, fases: [], hitos: [], filas: rows, orientacion: null };
+    }
+
+    /* Extraer hitos: por cada fase, revisar las celdas de meses */
+    var hitos = [];
+    for (var f = 0; f < fases.length; f++) {
+      var fase = fases[f];
+      var fila = rows[fase.fila] || [];
+      for (var m = 0; m < mesesDetectados.length; m++) {
+        var mesInfo = mesesDetectados[m];
+        var cellValue = String(fila[mesInfo.idx] || '').trim();
+        if (cellValue) {
+          hitos.push({
+            mes: mesInfo.num,
+            mesNombre: mesInfo.label,
+            fase: fase.key,
+            faseLabel: fase.label,
+            descripcion: cellValue,
+            anio: anio
+          });
+        }
+      }
+    }
+
+    return {
+      anio: anio,
+      orientacion: 'B', /* filas = fases, columnas = meses */
+      fases: fases.map(function(f) { return { key: f.key, label: f.label }; }),
+      hitos: hitos
+    };
+  }
 
   /* Helper: convierte una celda Excel fecha a string YYYY-MM-DD */
   function formatXlsxDate(v) {

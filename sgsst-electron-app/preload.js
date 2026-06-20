@@ -343,6 +343,10 @@ ipcRenderer.invoke('get-indicadores-salud-stats', companyName),
     guardarHallazgo: (empresaId, hallazgo) => ipcRenderer.invoke('auditoriaAnual:guardarHallazgo', { empresaId, hallazgo }),
     eliminarHallazgo: (empresaId, id) => ipcRenderer.invoke('auditoriaAnual:eliminarHallazgo', { empresaId, id }),
     exportarXlsx: (empresaId) => ipcRenderer.invoke('auditoriaAnual:exportarXlsx', { empresaId }),
+    /* F18 (2026-06-20): Lee el GI-FO-062 del repositorio de la empresa */
+    cargarCronograma: (empresaId, anio) => ipcRenderer.invoke('auditoriaAnual:cargarCronograma', { empresaId, anio }),
+    /* F20 (2026-06-20): Crea un nuevo archivo de cronograma para un año futuro */
+    crearCronograma: (empresaId, anio) => ipcRenderer.invoke('auditoriaAnual:crearCronograma', { empresaId, anio }),
     importarXlsx: (empresaId, archivoPath) => ipcRenderer.invoke('auditoriaAnual:importarXlsx', { empresaId, archivoPath }),
     seleccionarArchivoImportar: () => ipcRenderer.invoke('auditoriaAnual:seleccionarArchivoImportar'),
   },

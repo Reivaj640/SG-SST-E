@@ -64,18 +64,36 @@ var AuditoriaHallazgosView = (function () {
   }
 
   function _renderHeader() {
-    return '<header class="kair-v3-hub-header">' +
-      '<div class="kair-v3-hub-header__left">' +
-        '<button class="k-btn k-btn-ghost k-btn-sm" id="kair-v3-hal-back" style="width:auto;height:32px;padding:0 12px;">' +
-          '<i class="bi bi-arrow-left"></i> Hub' +
-        '</button>' +
-        '<div style="margin-left:0.5rem;">' +
-          '<h1 class="kair-v3-hub-header__title">Hallazgos y Planes de Acción</h1>' +
-          '<p class="kair-v3-hub-header__subtitle">Seguimiento transversal de no conformidades — Submódulo 6.1.4</p>' +
+    /* F16 (2026-06-20): Header estándar K+AIR · mismo patrón que HUB y 6.1.3 */
+    var company = (window.KairMockData && window.KairMockData.ACTIVE_COMPANY && window.KairMockData.ACTIVE_COMPANY.nombre) || 'Empresa';
+    return '<header class="k-module-header">' +
+      '<div class="k-header-left">' +
+        '<div class="k-header-title-group">' +
+          '<div class="k-header-main-title">' +
+            '<i class="bi bi-exclamation-triangle-fill"></i> ' +
+            'Hallazgos y Planes de Acción' +
+          '</div>' +
+          '<div class="k-header-breadcrumb">' +
+            '<span>' + _esc(company) + '</span>' +
+            '<i class="bi bi-chevron-right"></i>' +
+            '<button type="button" data-back-module="1">Verificación</button>' +
+            '<i class="bi bi-chevron-right"></i>' +
+            '<button type="button" data-go-hub="1">6.1.2 Auditoría Anual</button>' +
+            '<i class="bi bi-chevron-right"></i>' +
+            '<span class="k-breadcrumb-item active">Hallazgos y Planes</span>' +
+          '</div>' +
         '</div>' +
       '</div>' +
-      '<div class="kair-v3-hub-header__right">' +
-        KairUI.Button({ id: 'kair-v3-hal-export', variant: 'ghost', size: 'sm', icon: 'download', label: 'Exportar CSV' }) +
+      '<div class="k-header-right">' +
+        '<span class="k-sync-badge k-sync-synced" title="Datos cargados">' +
+          '<i class="bi bi-check-circle-fill"></i> Sincronizado' +
+        '</span>' +
+        '<button type="button" class="header-back-btn" data-go-hub="1" title="Volver al Hub del submódulo">' +
+          '<i class="bi bi-arrow-left"></i> Hub' +
+        '</button>' +
+        '<button type="button" class="k-btn k-btn-ghost k-btn-sm" data-action="export-csv" title="Exportar hallazgos a CSV">' +
+          '<i class="bi bi-download"></i> Exportar CSV' +
+        '</button>' +
       '</div>' +
     '</header>';
   }
@@ -214,17 +232,29 @@ var AuditoriaHallazgosView = (function () {
   }
 
   function _bindEvents(container, audits) {
-    /* Volver al Hub */
-    var backBtn = document.getElementById('kair-v3-hal-back');
-    if (backBtn) backBtn.addEventListener('click', function () {
-      KairStore.actions.goHub();
-      if (window.kairAuditoriaAnual && window.kairAuditoriaAnual._refreshView) {
-        window.kairAuditoriaAnual._refreshView();
-      }
+    /* F16: Volver al Hub (data-go-hub) */
+    var goHubBtns = container.querySelectorAll('[data-go-hub]');
+    goHubBtns.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        KairStore.actions.goHub();
+        if (window.kairAuditoriaAnual && window.kairAuditoriaAnual._refreshView) {
+          window.kairAuditoriaAnual._refreshView();
+        }
+      });
+    });
+    /* F17: breadcrumb "Verificación" → regresa al módulo padre */
+    var backModuleBtns = container.querySelectorAll('[data-back-module]');
+    backModuleBtns.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var inst = window.__kairAudInstance;
+        if (inst && typeof inst.backToModuleCallback === 'function') {
+          inst.backToModuleCallback();
+        }
+      });
     });
 
     /* Exportar CSV */
-    var exportBtn = document.getElementById('kair-v3-hal-export');
+    var exportBtn = container.querySelector('[data-action="export-csv"]');
     if (exportBtn) exportBtn.addEventListener('click', function () {
       if (window.Sileo) Sileo.info({ title: 'Exportar CSV', description: 'En la versión enterprise, este botón exporta los hallazgos a CSV.' });
     });

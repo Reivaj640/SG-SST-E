@@ -334,12 +334,30 @@ var AuditoriaHubView = (function () {
 
   function _bindClick(container) {
     container.addEventListener('click', function (e) {
+      /* F17 (2026-06-20): GUARD CRÍTICO.
+         El listener del HUB se bindea UNA SOLA VEZ (F11) y NUNCA se desactiva.
+         Si no validamos view === 'hub', este listener captura clicks de OTRAS
+         vistas (list, hallazgos, cronograma, informes, editor) y ejecuta
+         backToModuleCallback(), regresando al módulo Verificación en lugar
+         de quedarse en el HUB del submódulo. */
+      var currentView = window.KairStore && window.KairStore.getState ? window.KairStore.getState().view : 'hub';
+      if (currentView !== 'hub') return;
+
       /* F11 (2026-06-20): botones del header estándar (Volver + Nueva auditoría + breadcrumb) */
       var headerBack = e.target.closest('#kair-aud-back, .header-back-btn');
       if (headerBack) {
         var inst = window.__kairAudInstance;
         if (inst && typeof inst.backToModuleCallback === 'function') {
           inst.backToModuleCallback();
+        }
+        return;
+      }
+      /* F17 (2026-06-20): breadcrumb con data-back-module → también al módulo padre */
+      var backModuleH = e.target.closest('[data-back-module]');
+      if (backModuleH) {
+        var instBM = window.__kairAudInstance;
+        if (instBM && typeof instBM.backToModuleCallback === 'function') {
+          instBM.backToModuleCallback();
         }
         return;
       }
