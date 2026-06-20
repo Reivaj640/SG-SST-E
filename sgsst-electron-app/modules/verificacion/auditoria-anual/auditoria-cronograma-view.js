@@ -1,209 +1,407 @@
 /* ═══════════════════════════════════════════════════════════════════
-   K+AIR · Submódulo 6.1.2 — Cronograma de Auditorías
-   Vista Cronograma — Trimestres + Tabla K+AIR (Patrón 6.1.3)
+   K+AIR · Cronograma view (replica CronogramaView.tsx del tar)
+   v3.0 · 2026-06-19
+   Vista simplificada: header + KPIs + tabs por fase + lista cronológica + dialog edición
+   (drag&drop complejo se omite; el user puede mover vía editar)
    ═══════════════════════════════════════════════════════════════════ */
 
 var AuditoriaCronogramaView = (function () {
   'use strict';
 
-  var _container = null;
-  var _currentFilter = 'todos';
+  var FASES = [
+    { id: 'preparacion',    label: 'Preparación',                  short: 'Prep',  color: '#174ea6', bg: '#e8f0fe' },
+    { id: 'realizacion',    label: 'Realización',                 short: 'Real',  color: '#856404', bg: '#fff3cd' },
+    { id: 'plan_accion',    label: 'Plan de acción',              short: 'Plan',  color: '#383d41', bg: '#e2e3e5' },
+    { id: 'implementacion', label: 'Implementación',              short: 'Impl',  color: '#155724', bg: '#d4edda' }
+  ];
 
-  function load(container) {
-    _container = container;
-    render();
-  }
+  var _state = { year: new Date().getFullYear(), faseFilter: 'todas', editing: null };
 
-  function _esc(str) {
-    if (str == null) return '';
-    return String(str)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-  }
+  function _esc(s) { return KairUI.esc(s); }
+  function _fmtDate(iso) { return KairHelpers.formatDate(iso); }
+  function _shortMonth(mes) { return KairHelpers.MONTHS_SHORT_ES[mes - 1] || '—'; }
 
-  function render() {
-    var auditorias = AuditoriaService.getAuditorias();
-    var stats = AuditoriaService.getKpiStats();
-
-    /* Toolbar: filtros + acción primaria */
-    var filterHtml =
-      '<div class="kair-aud-view__header">' +
-        '<h2 class="kair-aud-section-title">Cronograma anual</h2>' +
-        '<div class="kair-aud-view__actions">' +
-          '<button class="k-btn k-btn-primary k-btn-sm" data-aud-action="nueva-auditoria">' +
-            '<i class="bi bi-plus-lg"></i> Nueva auditoría' +
-          '</button>' +
-        '</div>' +
-      '</div>';
-
-    /* Distribución por trimestre (cards) */
-    var trimestres = [
-      { key: 'Q1', label: 'Trimestre 1', meses: ['Enero', 'Febrero', 'Marzo'], icon: 'bi-calendar3', color: 'primary' },
-      { key: 'Q2', label: 'Trimestre 2', meses: ['Abril', 'Mayo', 'Junio'],     icon: 'bi-calendar3', color: 'info'    },
-      { key: 'Q3', label: 'Trimestre 3', meses: ['Julio', 'Agosto', 'Septiembre'], icon: 'bi-calendar3', color: 'warning' },
-      { key: 'Q4', label: 'Trimestre 4', meses: ['Octubre', 'Noviembre', 'Diciembre'], icon: 'bi-calendar3', color: 'success' }
-    ];
-
-    var cronogramaHtml = '<div class="kair-aud-card-grid">' + trimestres.map(function (t) {
-      var audTrimestre = auditorias.filter(function (a) {
-        if (_currentFilter !== 'todos' && a.estado !== _currentFilter) return false;
-        return a.trimestre === t.key;
+  function _getAllItems(audits, year) {
+    var all = [];
+    audits.forEach(function (a) {
+      (a.cronograma || []).forEach(function (c) {
+        all.push(Object.assign({}, c, {
+          auditCode: a.code,
+          auditProcess: a.process,
+          auditId: a.id
+        }));
       });
-      var completadas = audTrimestre.filter(function (a) { return a.estado === 'completada'; }).length;
-      var totalMes = audTrimestre.length;
-      var progCls = totalMes > 0 ? (completadas === totalMes ? 'success' : (completadas > 0 ? 'warning' : 'danger')) : '';
-      var prog = totalMes > 0 ? Math.round(completadas * 100 / totalMes) : 0;
-
-      return '<div class="kair-aud-submodule-card" data-trimestre="' + t.key + '">' +
-        '<div class="kair-aud-submodule-card__head">' +
-          '<div class="kair-aud-submodule-card__icon kair-aud-submodule-card__icon--' + t.color + '">' +
-            '<i class="bi ' + t.icon + '"></i>' +
-          '</div>' +
-          '<div class="kair-aud-submodule-card__title-block">' +
-            '<div class="kair-aud-submodule-card__format">' + t.key + ' · ' + t.meses.join(' · ') + '</div>' +
-            '<h3 class="kair-aud-submodule-card__title">' + t.label + '</h3>' +
-          '</div>' +
-          '<i class="bi bi-chevron-right kair-aud-submodule-card__chev"></i>' +
-        '</div>' +
-        '<p class="kair-aud-submodule-card__desc">' +
-          (totalMes > 0
-            ? totalMes + ' auditoría' + (totalMes !== 1 ? 's' : '') + ' programada' + (totalMes !== 1 ? 's' : '') + ' · ' + completadas + ' completada' + (completadas !== 1 ? 's' : '')
-            : 'Sin auditorías programadas en este trimestre.') +
-        '</p>' +
-        (totalMes > 0 ? '<div class="kair-aud-progress"><div class="kair-aud-progress__bar kair-aud-progress__bar--' + progCls + '" style="width:' + prog + '%"></div></div>' : '') +
-        '<div class="kair-aud-submodule-card__divider"></div>' +
-        '<div class="kair-aud-submodule-card__meta">' +
-          '<span class="kair-aud-submodule-card__chip kair-aud-submodule-card__chip--' + (totalMes > 0 ? 'primary' : 'neutral') + '">' + totalMes + ' total</span>' +
-          '<span class="kair-aud-submodule-card__chip kair-aud-submodule-card__chip--success">' + completadas + ' completadas</span>' +
-          (totalMes - completadas > 0 ? '<span class="kair-aud-submodule-card__chip kair-aud-submodule-card__chip--warning">' + (totalMes - completadas) + ' pendientes</span>' : '') +
-        '</div>' +
-      '</div>';
-    }).join('') + '</div>';
-
-    /* Filtros (chip-style) */
-    var filterChips =
-      '<div class="kair-aud-table-card" style="margin-top:1rem;">' +
-        '<div class="kair-aud-table-card__head">' +
-          '<h3 class="kair-aud-table-card__title">Listado de auditorías</h3>' +
-          '<div class="kair-aud-table-card__filters">' +
-            '<button class="kair-aud-table-card__filter' + (_currentFilter === 'todos' ? ' kair-aud-table-card__filter--active' : '') + '" data-filter="todos">Todas (' + stats.total + ')</button>' +
-            '<button class="kair-aud-table-card__filter' + (_currentFilter === 'completada' ? ' kair-aud-table-card__filter--active' : '') + '" data-filter="completada">Completadas (' + stats.completadas + ')</button>' +
-            '<button class="kair-aud-table-card__filter' + (_currentFilter === 'en-progreso' ? ' kair-aud-table-card__filter--active' : '') + '" data-filter="en-progreso">En Progreso (' + stats.enProgreso + ')</button>' +
-            '<button class="kair-aud-table-card__filter' + (_currentFilter === 'programada' ? ' kair-aud-table-card__filter--active' : '') + '" data-filter="programada">Programadas (' + stats.programadas + ')</button>' +
-            '<button class="kair-aud-table-card__filter' + (_currentFilter === 'cancelada' ? ' kair-aud-table-card__filter--active' : '') + '" data-filter="cancelada">Canceladas (' + (stats.canceladas || 0) + ')</button>' +
-          '</div>' +
-        '</div>' +
-        buildTableHtml(auditorias) +
-      '</div>';
-
-    _container.innerHTML = filterHtml + cronogramaHtml + filterChips;
-
-    bindEvents();
+    });
+    return all.filter(function (i) { return i.anio === year; });
   }
 
-  function buildTableHtml(auditorias) {
-    var filtered = auditorias;
-    if (_currentFilter !== 'todos') {
-      filtered = auditorias.filter(function (a) { return a.estado === _currentFilter; });
-    }
+  function _renderHeader(year, years) {
+    return '<header class="kair-v3-hub-header">' +
+      '<div class="kair-v3-hub-header__left">' +
+        '<button class="k-btn k-btn-ghost k-btn-sm" id="kair-v3-cron-back" style="width:auto;height:32px;padding:0 12px;">' +
+          '<i class="bi bi-arrow-left"></i> Hub' +
+        '</button>' +
+        '<div style="margin-left:0.5rem;">' +
+          '<h1 class="kair-v3-hub-header__title">Cronograma Anual de Auditorías</h1>' +
+          '<p class="kair-v3-hub-header__subtitle">Calendarización de las 4 fases del ciclo — GI-FO-062</p>' +
+        '</div>' +
+      '</div>' +
+      '<div class="kair-v3-hub-header__right">' +
+        '<div class="kair-v3-row">' +
+          '<i class="bi bi-calendar3" style="color:var(--v3-muted-foreground);"></i>' +
+          '<select class="kair-v3-select" id="kair-v3-cron-year" style="width:auto;min-width:120px;">' +
+            years.map(function (y) {
+              return '<option value="' + y + '"' + (_state.year === y ? ' selected' : '') + '>' + y + '</option>';
+            }).join('') +
+          '</select>' +
+        '</div>' +
+        KairUI.Button({ id: 'kair-v3-cron-new', variant: 'primary', size: 'sm', icon: 'plus-lg', label: 'Nuevo hito' }) +
+      '</div>' +
+    '</header>';
+  }
 
-    var rows = filtered.map(function (a) {
-      var badgeCls = 'kair-aud-badge--' + (
-        a.estado === 'completada' ? 'success' :
-        a.estado === 'en-progreso' ? 'info' :
-        a.estado === 'cancelada' ? 'neutral' : 'warning'
-      );
-      var estadoLabel = a.estado === 'completada' ? 'Completada' : a.estado === 'en-progreso' ? 'En Progreso' : a.estado === 'cancelada' ? 'Cancelada' : 'Programada';
-      var calificacion = a.calificacion !== null && a.calificacion !== undefined ? a.calificacion + '%' : '—';
-      var hallazgos = a.hallazgos !== undefined ? a.hallazgos : 0;
+  function _renderKpis(kpis) {
+    var items = [
+      { label: 'Total hitos', value: kpis.total, color: 'primary', icon: 'calendar-event' },
+      { label: 'Pendientes', value: kpis.pendientes, color: 'neutral', icon: 'clock' },
+      { label: 'En curso', value: kpis.enCurso, color: 'warning', icon: 'arrow-repeat' },
+      { label: 'Completados', value: kpis.completados, color: 'success', icon: 'check-circle' },
+      { label: 'Vencidos', value: kpis.vencidos, color: 'danger', icon: 'exclamation-triangle' }
+    ];
+    return '<div class="kair-v3-kpi-strip">' +
+      items.map(function (k) {
+        return '<div class="kair-v3-kpi kair-v3-kpi--' + k.color + '">' +
+          '<div class="kair-v3-kpi__icon"><i class="bi bi-' + k.icon + '"></i></div>' +
+          '<div class="kair-v3-kpi__content">' +
+            '<div class="kair-v3-kpi__value">' + k.value + '</div>' +
+            '<div class="kair-v3-kpi__label">' + k.label + '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('') +
+    '</div>';
+  }
 
-      return '<tr>' +
-        '<td><span class="kair-aud-table__id">' + _esc(a.id) + '</span></td>' +
-        '<td><div class="kair-aud-table__title">' + _esc(a.nombre) + '</div></td>' +
-        '<td>' + _esc(a.tipo) + '</td>' +
-        '<td>' + formatDate(a.fechaInicio) + ' → ' + formatDate(a.fechaFin) + '</td>' +
-        '<td><span class="kair-aud-badge ' + badgeCls + '"><span class="dot"></span>' + estadoLabel + '</span></td>' +
-        '<td>' + _esc(a.auditorLider || '—') + '</td>' +
-        '<td style="text-align:center;">' + hallazgos + '</td>' +
-        '<td style="text-align:center;">' + calificacion + '</td>' +
-        '<td><div class="kair-aud-table__actions">' +
-          '<button class="kair-aud-icon-btn" data-aud-action="editar" data-id="' + _esc(a.id) + '" title="Editar"><i class="bi bi-pencil"></i></button>' +
-          '<button class="kair-aud-icon-btn kair-aud-icon-btn--danger" data-aud-action="eliminar" data-id="' + _esc(a.id) + '" title="Eliminar"><i class="bi bi-trash"></i></button>' +
-        '</div></td>' +
-      '</tr>';
+  function _renderCalendar(items, audits) {
+    /* Vista calendario 4 fases × 12 meses. Cada celda es un stack vertical. */
+    return '<section class="kair-v3-section-card" style="overflow-x:auto;">' +
+      '<header class="kair-v3-section-card__head">' +
+        '<h3 class="kair-v3-section-card__title"><i class="bi bi-calendar3"></i> Vista anual ' + _state.year + '</h3>' +
+        KairUI.Badge({ variant: 'info', children: items.length + ' hitos' }) +
+      '</header>' +
+      '<div class="kair-v3-section-card__body">' +
+        '<div class="kair-v3-cron-grid">' +
+          '<div class="kair-v3-cron-grid__head">' +
+            '<div class="kair-v3-cron-grid__corner"></div>' +
+            KairHelpers.MONTHS_SHORT_ES.map(function (m) {
+              return '<div class="kair-v3-cron-grid__month">' + m + '</div>';
+            }).join('') +
+          '</div>' +
+          FASES.map(function (fase) {
+            var faseItems = items.filter(function (i) { return i.fase === fase.id; });
+            return '<div class="kair-v3-cron-grid__row">' +
+              '<div class="kair-v3-cron-grid__fase" style="background:' + fase.bg + ';color:' + fase.color + ';">' +
+                '<strong>' + fase.short + '</strong>' +
+                '<span style="font-size:0.6875rem;font-weight:500;">' + faseItems.length + ' hitos</span>' +
+              '</div>' +
+              KairHelpers.MONTHS_SHORT_ES.map(function (_, mesIdx) {
+                var mes = mesIdx + 1;
+                var cellItems = faseItems.filter(function (i) { return i.mes === mes; });
+                var cellHtml = cellItems.map(function (i) {
+                  var audit = audits.find(function (a) { return a.id === i.auditId; });
+                  return '<div class="kair-v3-cron-cell-item" data-edit-hito="' + _esc(i.id) + '" data-audit-id="' + _esc(i.auditId) + '" style="background:' + fase.color + '20;border-left:3px solid ' + fase.color + ';">' +
+                    '<div class="kair-v3-cron-cell-item__code">' + _esc(i.auditCode || '—') + '</div>' +
+                    '<div class="kair-v3-cron-cell-item__obs" title="' + _esc(i.observaciones || '') + '">' + _esc((i.observaciones || '').substring(0, 40)) + '</div>' +
+                  '</div>';
+                }).join('');
+                return '<div class="kair-v3-cron-grid__cell' + (cellItems.length > 0 ? ' kair-v3-cron-grid__cell--has' : '') + '">' + cellHtml + '</div>';
+              }).join('') +
+            '</div>';
+          }).join('') +
+        '</div>' +
+      '</div>' +
+    '</section>';
+  }
+
+  function _renderList(items, audits) {
+    /* Lista cronológica agrupada por fase (vista complementaria) */
+    return '<section class="kair-v3-section-card">' +
+      '<header class="kair-v3-section-card__head">' +
+        '<h3 class="kair-v3-section-card__title"><i class="bi bi-list-task"></i> Listado cronológico</h3>' +
+        KairUI.Badge({ variant: 'info', children: items.length + ' hitos' }) +
+      '</header>' +
+      '<div class="kair-v3-section-card__body">' +
+        (items.length === 0
+          ? KairUI.EmptyState({ icon: 'calendar-event', title: 'Sin hitos', description: 'No hay hitos registrados para este año. Crea uno con el botón "Nuevo hito".' })
+          : '<div class="kair-v3-stack">' +
+            FASES.map(function (fase) {
+              var faseItems = items.filter(function (i) { return i.fase === fase.id; });
+              if (faseItems.length === 0) return '';
+              return '<div class="kair-v3-stack kair-v3-stack--sm">' +
+                '<div class="kair-v3-row">' +
+                  '<span class="kair-v3-badge kair-v3-badge--soft-primary" style="background:' + fase.bg + ';color:' + fase.color + ';">' + fase.label + '</span>' +
+                  '<span style="font-size:0.8125rem;color:var(--v3-muted-foreground);">' + faseItems.length + ' hitos</span>' +
+                '</div>' +
+                faseItems.sort(function (a, b) { return a.mes - b.mes; }).map(function (i) {
+                  return '<div class="kair-v3-cron-list-item" data-edit-hito="' + _esc(i.id) + '" data-audit-id="' + _esc(i.auditId) + '">' +
+                    '<div class="kair-v3-cron-list-item__mes" style="background:' + fase.color + ';">' + _shortMonth(i.mes) + '</div>' +
+                    '<div class="kair-v3-cron-list-item__body">' +
+                      '<div class="kair-v3-cron-list-item__title">' + _esc(i.auditProcess || '—') + '</div>' +
+                      '<div class="kair-v3-cron-list-item__sub">' + _esc(i.auditCode || '—') + (i.observaciones ? ' · ' + _esc(i.observaciones) : '') + '</div>' +
+                    '</div>' +
+                    KairUI.Badge({ variant: KairHelpers.cronogramaItemStatusBadge[i.estado] || 'neutral', dot: true, children: KairHelpers.cronogramaItemStatusLabel[i.estado] || i.estado }) +
+                    '<div class="kair-v3-row">' +
+                      KairUI.Button({ size: 'sm', variant: 'ghost', icon: 'pencil', dataAttrs: { 'edit-hito': i.id, 'edit-audit': i.auditId }, title: 'Editar hito' }) +
+                      KairUI.Button({ size: 'sm', variant: 'ghost', icon: 'trash', dataAttrs: { 'remove-hito': i.id }, title: 'Eliminar hito' }) +
+                    '</div>' +
+                  '</div>';
+                }).join('') +
+              '</div>';
+            }).join('') +
+          '</div>') +
+      '</div>' +
+    '</section>';
+  }
+
+  function _renderEditingDialog(editing, year) {
+    if (!editing) return '';
+    var isNew = editing.isNew;
+    var i = editing.item || { fase: 'preparacion', mes: 1, anio: year, estado: 'pendiente' };
+    var auditOptions = KairStore.selectAudits().map(function (a) {
+      return '<option value="' + _esc(a.id) + '"' + (editing.auditId === a.id ? ' selected' : '') + '>' + _esc(a.code + ' · ' + (a.process || '').substring(0, 40)) + '</option>';
+    }).join('');
+    var faseOptions = FASES.map(function (f) {
+      return '<option value="' + f.id + '"' + (i.fase === f.id ? ' selected' : '') + '>' + _esc(f.label) + '</option>';
+    }).join('');
+    var mesOptions = KairHelpers.MONTHS_ES.map(function (m, idx) {
+      return '<option value="' + (idx + 1) + '"' + (i.mes === (idx + 1) ? ' selected' : '') + '>' + m + '</option>';
+    }).join('');
+    var estadoOptions = ['pendiente', 'en_curso', 'completado', 'vencido'].map(function (e) {
+      return '<option value="' + e + '"' + (i.estado === e ? ' selected' : '') + '>' + _esc(KairHelpers.cronogramaItemStatusLabel[e] || e) + '</option>';
     }).join('');
 
-    if (!rows) {
-      rows = '<tr><td colspan="9" class="kair-aud-table__empty">' +
-        '<div>' +
-          '<i class="bi bi-inbox"></i>' +
-          '<h4 class="kair-aud-table__empty-title">Sin auditorías en este filtro</h4>' +
-          '<p class="kair-aud-table__empty-desc">Haz clic en <strong>Nueva auditoría</strong> para crear la primera.</p>' +
+    return '<div class="kair-v3-dialog-overlay kair-v3-dialog-overlay--open" id="kair-v3-hito-dialog">' +
+      '<div class="kair-v3-dialog" style="max-width:520px;">' +
+        '<div class="kair-v3-dialog__header">' +
+          '<div>' +
+            '<h3 class="kair-v3-dialog__title"><i class="bi bi-calendar-plus"></i> ' + (isNew ? 'Nuevo hito' : 'Editar hito') + '</h3>' +
+            '<p class="kair-v3-dialog__description">' + (isNew ? 'Programa un nuevo hito en el cronograma anual.' : 'Modifica el hito del cronograma.') + '</p>' +
+          '</div>' +
+          '<button class="kair-v3-dialog__close" data-dialog-close aria-label="Cerrar">&times;</button>' +
         '</div>' +
-        '</td></tr>';
-    }
-
-    return '<table class="kair-aud-table">' +
-      '<thead><tr>' +
-        '<th>ID</th><th>Nombre</th><th>Tipo</th><th>Período</th>' +
-        '<th>Estado</th><th>Auditor Líder</th><th>Hallazgos</th><th>Calificación</th>' +
-        '<th style="text-align:right;">Acciones</th>' +
-      '</tr></thead>' +
-      '<tbody>' + rows + '</tbody>' +
-    '</table>';
+        '<div class="kair-v3-dialog__body">' +
+          '<div class="kair-v3-stack">' +
+            (isNew
+              ? '<label class="kair-v3-stack kair-v3-stack--sm"><span class="kair-v3-field__label">Auditoría *</span><select class="kair-v3-select" id="kair-v3-hito-audit">' + auditOptions + '</select></label>'
+              : '<input type="hidden" id="kair-v3-hito-audit" value="' + _esc(editing.auditId) + '">' +
+                '<div class="kair-v3-stack kair-v3-stack--sm"><span class="kair-v3-field__label">Auditoría</span><div style="font-weight:600;">' + _esc(i.auditCode || '') + ' · ' + _esc((i.auditProcess || '').substring(0, 60)) + '</div></div>'
+            ) +
+            '<div class="kair-v3-form-grid-2">' +
+              '<label class="kair-v3-stack kair-v3-stack--sm"><span class="kair-v3-field__label">Fase *</span><select class="kair-v3-select" id="kair-v3-hito-fase">' + faseOptions + '</select></label>' +
+              '<label class="kair-v3-stack kair-v3-stack--sm"><span class="kair-v3-field__label">Mes *</span><select class="kair-v3-select" id="kair-v3-hito-mes">' + mesOptions + '</select></label>' +
+            '</div>' +
+            '<div class="kair-v3-form-grid-2">' +
+              '<label class="kair-v3-stack kair-v3-stack--sm"><span class="kair-v3-field__label">Año *</span><input type="number" class="kair-v3-input" id="kair-v3-hito-anio" value="' + (i.anio || year) + '" min="2020" max="2099"></label>' +
+              '<label class="kair-v3-stack kair-v3-stack--sm"><span class="kair-v3-field__label">Estado</span><select class="kair-v3-select" id="kair-v3-hito-estado">' + estadoOptions + '</select></label>' +
+            '</div>' +
+            '<label class="kair-v3-stack kair-v3-stack--sm"><span class="kair-v3-field__label">Observaciones</span><textarea class="kair-v3-textarea" id="kair-v3-hito-obs" rows="2" placeholder="Detalles del hito, responsable, etc.">' + _esc(i.observaciones || '') + '</textarea></label>' +
+          '</div>' +
+        '</div>' +
+        '<div class="kair-v3-dialog__footer">' +
+          KairUI.Button({ variant: 'ghost', label: 'Cancelar', dataAttrs: { 'dialog-close': '1' } }) +
+          KairUI.Button({ variant: 'primary', icon: 'check-lg', label: 'Guardar hito', dataAttrs: { 'save-hito': '1', 'hito-id': i.id || '', 'is-new': isNew ? '1' : '' } }) +
+        '</div>' +
+      '</div>' +
+    '</div>';
   }
 
-  function formatDate(dateStr) {
-    if (!dateStr) return '—';
-    var d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    var day = String(d.getDate()).padStart(2, '0');
-    var month = String(d.getMonth() + 1).padStart(2, '0');
-    var year = d.getFullYear();
-    return day + '/' + month + '/' + year;
+  function render(container) {
+    var audits = KairStore.selectAudits();
+    var years = (function () {
+      var ys = new Set();
+      audits.forEach(function (a) { (a.cronograma || []).forEach(function (c) { ys.add(c.anio); }); });
+      ys.add(new Date().getFullYear());
+      return Array.from(ys).sort(function (a, b) { return b - a; });
+    })();
+    var items = _getAllItems(audits, _state.year);
+    var filtered = _state.faseFilter === 'todas' ? items : items.filter(function (i) { return i.fase === _state.faseFilter; });
+    var kpis = KairStore.computeKpisCronograma(_state.year);
+
+    container.innerHTML =
+      '<div class="kair-v3-hub">' +
+        _renderHeader(_state.year, years) +
+        '<main class="kair-v3-hub-main">' +
+          _renderKpis(kpis) +
+          '<div class="kair-v3-tabs" style="border-top:none;border-bottom:none;background:transparent;padding:0;margin-bottom:0;">' +
+            '<button type="button" class="kair-v3-tab' + (_state.faseFilter === 'todas' ? ' kair-v3-tab--active' : '') + '" data-set-fase="todas"><i class="bi bi-grid-3x3-gap"></i> Todas <span class="kair-v3-tab__badge">' + items.length + '</span></button>' +
+            FASES.map(function (f) {
+              var count = items.filter(function (i) { return i.fase === f.id; }).length;
+              var active = _state.faseFilter === f.id;
+              return '<button type="button" class="kair-v3-tab' + (active ? ' kair-v3-tab--active' : '') + '" data-set-fase="' + f.id + '" style="' + (active ? 'border-bottom-color:' + f.color + ';' : '') + '">' +
+                '<i class="bi bi-circle-fill" style="color:' + f.color + ';font-size:0.5rem;"></i> ' + f.short + ' <span class="kair-v3-tab__badge">' + count + '</span>' +
+              '</button>';
+            }).join('') +
+          '</div>' +
+          _renderCalendar(filtered, audits) +
+          _renderList(filtered, audits) +
+        '</main>' +
+      '</div>' +
+      _renderEditingDialog(_state.editing, _state.year);
+
+    _bindEvents(container, audits);
   }
 
-  function bindEvents() {
-    var filters = _container.querySelectorAll('.kair-aud-table-card__filter');
-    filters.forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        _currentFilter = btn.getAttribute('data-filter');
-        render();
-      });
-    });
+  function _openEditDialog(auditId, item) {
+    _state.editing = { auditId: auditId, item: item, isNew: !item };
+    render(_currentContainer || document.querySelector('.kair-v3-module, .kair-aud-module') || document.body);
+  }
 
-    var accionNueva = _container.querySelector('[data-aud-action="nueva-auditoria"]');
-    if (accionNueva) {
-      accionNueva.addEventListener('click', function () {
-        if (window.kairAuditoriaAnual) window.kairAuditoriaAnual.openAuditoriaForm(null);
-      });
-    }
+  function _closeDialog() {
+    _state.editing = null;
+    render(_currentContainer || document.body);
+  }
 
-    var acciones = _container.querySelectorAll('[data-aud-action]');
-    acciones.forEach(function (btn) {
-      var accion = btn.getAttribute('data-aud-action');
-      if (accion !== 'nueva-auditoria') {
-        var id = btn.getAttribute('data-id');
-        if (accion === 'editar') {
-          btn.addEventListener('click', function () {
-            var aud = AuditoriaService.getAuditoriaById(id);
-            if (aud && window.kairAuditoriaAnual) window.kairAuditoriaAnual.openAuditoriaForm(aud);
-            else if (window.kairAuditoriaAnual) window.kairAuditoriaAnual.showToast('Auditoría no encontrada: ' + id, 'error');
-          });
-        } else if (accion === 'eliminar') {
-          btn.addEventListener('click', function () {
-            if (window.kairAuditoriaAnual) window.kairAuditoriaAnual.deleteAuditoria(id);
-          });
-        }
+  var _currentContainer = null;
+
+  function _bindEvents(container, audits) {
+    _currentContainer = container;
+
+    /* Volver al Hub */
+    var backBtn = document.getElementById('kair-v3-cron-back');
+    if (backBtn) backBtn.addEventListener('click', function () {
+      KairStore.actions.goHub();
+      if (window.kairAuditoriaAnual && window.kairAuditoriaAnual._refreshView) {
+        window.kairAuditoriaAnual._refreshView();
       }
     });
+
+    /* Cambio de año */
+    var yearEl = document.getElementById('kair-v3-cron-year');
+    if (yearEl) yearEl.addEventListener('change', function (e) {
+      _state.year = parseInt(e.target.value, 10);
+      render(container);
+    });
+
+    /* Filtros de fase (tabs) */
+    container.querySelectorAll('[data-set-fase]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        _state.faseFilter = btn.getAttribute('data-set-fase');
+        render(container);
+      });
+    });
+
+    /* Nuevo hito */
+    var newBtn = document.getElementById('kair-v3-cron-new');
+    if (newBtn) newBtn.addEventListener('click', function () {
+      _openEditDialog(null, null);
+    });
+
+    /* Editar hito (desde celda o item de lista) */
+    container.querySelectorAll('[data-edit-hito]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var hId = el.getAttribute('data-edit-hito');
+        var auditId = el.getAttribute('data-audit-id');
+        var item = null;
+        if (hId && hId !== '') {
+          var a = audits.find(function (x) { return x.id === auditId; });
+          if (a) item = (a.cronograma || []).find(function (c) { return c.id === hId; });
+        }
+        _openEditDialog(auditId, item);
+      });
+    });
+
+    /* Eliminar hito */
+    container.querySelectorAll('[data-remove-hito]').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var hId = btn.getAttribute('data-remove-hito');
+        if (window.Sileo) {
+          Sileo.confirm({
+            title: '¿Eliminar hito?',
+            description: 'Esta acción no se puede deshacer.',
+            confirmText: 'Eliminar', danger: true
+          }).then(function (ok) {
+            if (ok) {
+              KairStore.actions.removeCronogramaItem(hId);
+              if (window.Sileo) Sileo.success({ title: 'Hito eliminado' });
+              if (window.kairAuditoriaAnual && window.kairAuditoriaAnual._refreshView) {
+                window.kairAuditoriaAnual._refreshView();
+              }
+            }
+          });
+        }
+      });
+    });
+
+    /* Dialog */
+    var dialog = document.getElementById('kair-v3-hito-dialog');
+    if (dialog) {
+      dialog.addEventListener('click', function (e) {
+        if (e.target.closest('[data-dialog-close]') || e.target === dialog) {
+          _closeDialog();
+        }
+        if (e.target.closest('[data-save-hito]')) {
+          _saveHitoFromDialog(container);
+        }
+      });
+      document.addEventListener('keydown', function escHandler(e) {
+        if (e.key === 'Escape' && _state.editing) {
+          _closeDialog();
+          document.removeEventListener('keydown', escHandler);
+        }
+      });
+    }
   }
 
-  function destroy() {
-    _container = null;
+  function _saveHitoFromDialog(container) {
+    var auditEl = document.getElementById('kair-v3-hito-audit');
+    var faseEl = document.getElementById('kair-v3-hito-fase');
+    var mesEl = document.getElementById('kair-v3-hito-mes');
+    var anioEl = document.getElementById('kair-v3-hito-anio');
+    var estadoEl = document.getElementById('kair-v3-hito-estado');
+    var obsEl = document.getElementById('kair-v3-hito-obs');
+    if (!auditEl || !faseEl || !mesEl || !anioEl) return;
+
+    var auditId = auditEl.value || auditEl.getAttribute('value');
+    var fase = faseEl.value;
+    var mes = parseInt(mesEl.value, 10);
+    var anio = parseInt(anioEl.value, 10);
+    var estado = estadoEl ? estadoEl.value : 'pendiente';
+    var obs = obsEl ? obsEl.value : '';
+
+    if (!auditId) {
+      if (window.Sileo) Sileo.error({ title: 'Selecciona una auditoría' });
+      return;
+    }
+
+    var saveBtn = document.querySelector('[data-save-hito]');
+    var isNew = saveBtn && saveBtn.getAttribute('data-is-new') === '1';
+    var hId = saveBtn ? saveBtn.getAttribute('hito-id') : '';
+
+    if (isNew) {
+      KairStore.actions.addCronogramaItem({
+        id: KairHelpers.genId('CRON'),
+        auditId: auditId,
+        fase: fase,
+        mes: mes,
+        anio: anio,
+        estado: estado,
+        observaciones: obs
+      });
+      if (window.Sileo) Sileo.success({ title: 'Hito creado' });
+    } else {
+      KairStore.actions.updateCronogramaItem(hId, {
+        fase: fase, mes: mes, anio: anio, estado: estado, observaciones: obs
+      });
+      if (window.Sileo) Sileo.success({ title: 'Hito actualizado' });
+    }
+
+    _state.editing = null;
+    if (window.kairAuditoriaAnual && window.kairAuditoriaAnual._refreshView) {
+      window.kairAuditoriaAnual._refreshView();
+    }
   }
 
-  return { load: load, destroy: destroy };
+  return { render: render };
 })();
 
 window.AuditoriaCronogramaView = AuditoriaCronogramaView;
