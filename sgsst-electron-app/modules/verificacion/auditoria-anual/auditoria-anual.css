@@ -10,7 +10,7 @@
    Alineados con los tokens K+AIR ya existentes para coherencia
    ───────────────────────────────────────────────────────────────────────── */
 
-.kair-v3-module {
+.kair-v3-module, .kair-v3-hub, .kair-v3-editor {
   /* Colores semánticos (alineados con shadcn) */
   --v3-background: #f8f9fa;
   --v3-foreground: #1a1a2e;
@@ -87,7 +87,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  .kair-v3-module {
+  .kair-v3-module, .kair-v3-hub, .kair-v3-editor {
     --v3-background: #0f1117;
     --v3-foreground: #e4e6eb;
     --v3-card: #181c25;
