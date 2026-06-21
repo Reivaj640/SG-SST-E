@@ -388,8 +388,8 @@ var AuditoriaHubView = (function () {
                                     key === 'hallazgos' ? 'Hallazgos' :
                                     key === 'cronograma' ? 'Cronograma' :
                                     key === 'informes' ? 'Informes' : '')]();
-        if (typeof Sileo !== 'undefined') {
-          Sileo.info({ title: 'Navegando a ' + card.querySelector('.kair-v3-hub-card__title').textContent });
+        if (window.updateNotifier) {
+          window.updateNotifier.show({ type: 'info', title: 'Navegando a ' + card.querySelector('.kair-v3-hub-card__title').textContent });
         }
         if (window.kairAuditoriaAnual && window.kairAuditoriaAnual._refreshView) {
           window.kairAuditoriaAnual._refreshView();

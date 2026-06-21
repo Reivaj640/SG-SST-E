@@ -256,7 +256,7 @@ var AuditoriaHallazgosView = (function () {
     /* Exportar CSV */
     var exportBtn = container.querySelector('[data-action="export-csv"]');
     if (exportBtn) exportBtn.addEventListener('click', function () {
-      if (window.Sileo) Sileo.info({ title: 'Exportar CSV', description: 'En la versión enterprise, este botón exporta los hallazgos a CSV.' });
+      if (window.updateNotifier) window.updateNotifier.show({ type: 'info', title: 'Exportar CSV', subtitle: 'En la versión enterprise, este botón exporta los hallazgos a CSV.' });
     });
 
     /* Búsqueda */
@@ -289,7 +289,7 @@ var AuditoriaHallazgosView = (function () {
         var hId = btn.getAttribute('data-set-estado');
         var estado = btn.getAttribute('data-estado');
         KairStore.actions.updateHallazgoEstado(hId, estado);
-        if (window.Sileo) Sileo.success({ title: 'Hallazgo ' + (estado === 'cerrada' ? 'cerrado' : 'verificado') });
+        if (window.updateNotifier) window.updateNotifier.show({ type: 'success', title: 'Hallazgo ' + (estado === 'cerrada' ? 'cerrado' : 'verificado') });
         if (window.kairAuditoriaAnual && window.kairAuditoriaAnual._refreshView) {
           window.kairAuditoriaAnual._refreshView();
         }

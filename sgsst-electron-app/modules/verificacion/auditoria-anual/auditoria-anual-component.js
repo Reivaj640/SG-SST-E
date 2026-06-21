@@ -485,6 +485,16 @@ AuditoriaAnualComponent.prototype._ensureToastStack = function () {
 };
 
 AuditoriaAnualComponent.prototype._showToast = function (msg, type) {
+  if (window.updateNotifier && typeof window.updateNotifier.show === 'function') {
+    window.updateNotifier.show({
+      type: type || 'info',
+      title: type === 'success' ? 'Éxito' : type === 'error' ? 'Error' : type === 'warning' ? 'Atención' : 'Información',
+      subtitle: msg || '',
+      autoClose: type === 'error' ? 6000 : type === 'warning' ? 4000 : 5000
+    });
+    return;
+  }
+  /* Fallback al sistema legacy si updateNotifier no está disponible */
   this._ensureToastStack();
   var stack = document.getElementById('kair-aud-toast-stack');
   var t = (type || 'info').toLowerCase();
@@ -513,35 +523,38 @@ AuditoriaAnualComponent.prototype._showConfirm = function (opts, onConfirm) {
     opts = { message: opts, title: 'Confirmar acción', danger: false };
   }
   var self = this;
-  var overlay = document.createElement('div');
-  overlay.className = 'kair-aud-confirm-overlay';
-  overlay.innerHTML =
-    '<div class="kair-aud-confirm-modal" role="dialog" aria-modal="true">' +
-      '<div class="kair-aud-confirm-modal__icon' + (opts.danger ? ' kair-aud-confirm-modal__icon--danger' : '') + '">' +
-        '<i class="bi bi-' + (opts.danger ? 'exclamation-triangle-fill' : 'question-circle-fill') + '"></i>' +
-      '</div>' +
-      '<h3 class="kair-aud-confirm-modal__title">' + this._escape(opts.title || 'Confirmar') + '</h3>' +
-      '<p class="kair-aud-confirm-modal__msg">' + this._escape(opts.message || '¿Estás seguro?').replace(/\n/g, '<br>') + '</p>' +
-      '<div class="kair-aud-confirm-modal__actions">' +
-        '<button class="k-btn k-btn-ghost" data-action="cancel">Cancelar</button>' +
-        '<button class="k-btn ' + (opts.danger ? 'k-btn-danger' : 'k-btn-primary') + '" data-action="accept">' +
-          this._escape(opts.acceptLabel || 'Confirmar') +
-        '</button>' +
-      '</div>' +
-    '</div>';
-  document.body.appendChild(overlay);
+  return new Promise(function (resolve) {
+    var overlay = document.createElement('div');
+    overlay.className = 'kair-aud-confirm-overlay';
+    overlay.innerHTML =
+      '<div class="kair-aud-confirm-modal" role="dialog" aria-modal="true">' +
+        '<div class="kair-aud-confirm-modal__icon' + (opts.danger ? ' kair-aud-confirm-modal__icon--danger' : '') + '">' +
+          '<i class="bi bi-' + (opts.danger ? 'exclamation-triangle-fill' : 'question-circle-fill') + '"></i>' +
+        '</div>' +
+        '<h3 class="kair-aud-confirm-modal__title">' + self._escape(opts.title || 'Confirmar') + '</h3>' +
+        '<p class="kair-aud-confirm-modal__msg">' + self._escape(opts.message || '¿Estás seguro?').replace(/\n/g, '<br>') + '</p>' +
+        '<div class="kair-aud-confirm-modal__actions">' +
+          '<button class="k-btn k-btn-ghost" data-action="cancel">Cancelar</button>' +
+          '<button class="k-btn ' + (opts.danger ? 'k-btn-danger' : 'k-btn-primary') + '" data-action="accept">' +
+            self._escape(opts.acceptLabel || 'Confirmar') +
+          '</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
 
-  function close(result) {
-    overlay.remove();
-    if (result && typeof onConfirm === 'function') onConfirm();
-  }
-  overlay.addEventListener('click', function (e) {
-    var t = e.target.closest('[data-action]');
-    if (!t) return;
-    close(t.getAttribute('data-action') === 'accept');
-  });
-  document.addEventListener('keydown', function escHandler(e) {
-    if (e.key === 'Escape') { close(false); document.removeEventListener('keydown', escHandler); }
+    function close(result) {
+      overlay.remove();
+      if (result && typeof onConfirm === 'function') onConfirm();
+      resolve(result);
+    }
+    overlay.addEventListener('click', function (e) {
+      var t = e.target.closest('[data-action]');
+      if (!t) return;
+      close(t.getAttribute('data-action') === 'accept');
+    });
+    document.addEventListener('keydown', function escHandler(e) {
+      if (e.key === 'Escape') { close(false); document.removeEventListener('keydown', escHandler); }
+    });
   });
 };
 
@@ -996,6 +1009,10 @@ window.kairAuditoriaAnual = {
   },
   deleteHallazgo: function (id) {
     if (window.__kairAudInstance) window.__kairAudInstance._deleteHallazgo(id);
+  },
+  showConfirm: function (opts, onConfirm) {
+    if (window.__kairAudInstance) return window.__kairAudInstance._showConfirm(opts, onConfirm);
+    return Promise.resolve(false);
   },
   showToast: function (msg, type) {
     if (window.__kairAudInstance) window.__kairAudInstance._showToast(msg, type);

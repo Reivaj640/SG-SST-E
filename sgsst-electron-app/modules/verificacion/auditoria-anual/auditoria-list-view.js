@@ -309,15 +309,15 @@ var AuditoriaListView = (function () {
     var resetBtn = container.querySelector('[data-action="reset-seed"]');
     if (resetBtn) {
       resetBtn.addEventListener('click', function () {
-        if (window.Sileo) {
-          Sileo.confirm({
+        if (window.kairAuditoriaAnual && window.kairAuditoriaAnual.showConfirm) {
+          window.kairAuditoriaAnual.showConfirm({
             title: 'Restablecer demo',
-            description: '¿Restablecer los datos de demostración? Se perderán los cambios locales.',
-            confirmText: 'Restablecer', danger: true
+            message: '¿Restablecer los datos de demostración? Se perderán los cambios locales.',
+            acceptLabel: 'Restablecer', danger: true
           }).then(function (ok) {
             if (ok) {
               KairStore.actions.resetSeed();
-              if (window.Sileo) Sileo.success({ title: 'Datos restablecidos' });
+              if (window.updateNotifier) window.updateNotifier.show({ type: 'success', title: 'Datos restablecidos' });
               _rerender();
             }
           });
@@ -329,8 +329,8 @@ var AuditoriaListView = (function () {
     var newBtn = container.querySelector('[data-action="new-audit"]');
     if (newBtn) {
       newBtn.addEventListener('click', function () {
-        if (window.Sileo) {
-          Sileo.info({ title: 'Nueva auditoría', description: 'En la versión enterprise, este botón abre el formulario de nueva auditoría.' });
+        if (window.updateNotifier) {
+          window.updateNotifier.show({ type: 'info', title: 'Nueva auditoría', subtitle: 'En la versión enterprise, este botón abre el formulario de nueva auditoría.' });
         }
       });
     }

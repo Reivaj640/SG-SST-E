@@ -477,7 +477,7 @@ var AuditoriaEditorView = (function () {
     var startBtn = document.getElementById('kair-v3-editor-start');
     if (startBtn) startBtn.addEventListener('click', function () {
       KairStore.actions.updateAuditStatus(audit.id, 'en_curso');
-      if (window.Sileo) Sileo.success({ title: 'Auditoría en curso' });
+      if (window.updateNotifier) window.updateNotifier.show({ type: 'success', title: 'Auditoría en curso' });
     });
 
     var finishBtn = document.getElementById('kair-v3-editor-finish');
@@ -495,7 +495,7 @@ var AuditoriaEditorView = (function () {
     });
     var saveBtn = document.getElementById('kair-v3-editor-save');
     if (saveBtn) saveBtn.addEventListener('click', function () {
-      if (window.Sileo) Sileo.success({ title: 'Borrador guardado', description: 'Auditoría ' + audit.code });
+      if (window.updateNotifier) window.updateNotifier.show({ type: 'success', title: 'Borrador guardado', subtitle: 'Auditoría ' + audit.code });
     });
 
     /* Acciones inline de hallazgos */
@@ -504,7 +504,7 @@ var AuditoriaEditorView = (function () {
         e.stopPropagation();
         var hId = btn.getAttribute('data-mark-verified');
         KairStore.actions.updateHallazgoEstado(hId, 'verificada');
-        if (window.Sileo) Sileo.success({ title: 'Hallazgo verificado' });
+        if (window.updateNotifier) window.updateNotifier.show({ type: 'success', title: 'Hallazgo verificado' });
         if (window.kairAuditoriaAnual && window.kairAuditoriaAnual._refreshView) {
           window.kairAuditoriaAnual._refreshView();
         }
@@ -515,7 +515,7 @@ var AuditoriaEditorView = (function () {
         e.stopPropagation();
         var hId = btn.getAttribute('data-mark-closed');
         KairStore.actions.updateHallazgoEstado(hId, 'cerrada');
-        if (window.Sileo) Sileo.success({ title: 'Hallazgo cerrado' });
+        if (window.updateNotifier) window.updateNotifier.show({ type: 'success', title: 'Hallazgo cerrado' });
         if (window.kairAuditoriaAnual && window.kairAuditoriaAnual._refreshView) {
           window.kairAuditoriaAnual._refreshView();
         }
@@ -524,16 +524,16 @@ var AuditoriaEditorView = (function () {
   }
 
   function _confirmFinish(audit) {
-    if (window.Sileo) {
-      Sileo.confirm({
+    if (window.kairAuditoriaAnual && window.kairAuditoriaAnual.showConfirm) {
+      window.kairAuditoriaAnual.showConfirm({
         title: '¿Finalizar auditoría?',
-        description: 'Se emitirá el informe y se habilitarán las firmas.',
-        confirmText: 'Finalizar',
+        message: 'Se emitirá el informe y se habilitarán las firmas.',
+        acceptLabel: 'Finalizar',
         danger: false
       }).then(function (ok) {
         if (ok) {
           KairStore.actions.updateAuditStatus(audit.id, 'realizada');
-          if (window.Sileo) Sileo.success({ title: 'Auditoría finalizada', description: 'Informe de ' + audit.code + ' emitido' });
+          if (window.updateNotifier) window.updateNotifier.show({ type: 'success', title: 'Auditoría finalizada', subtitle: 'Informe de ' + audit.code + ' emitido' });
           if (window.kairAuditoriaAnual && window.kairAuditoriaAnual._refreshView) {
             window.kairAuditoriaAnual._refreshView();
           }

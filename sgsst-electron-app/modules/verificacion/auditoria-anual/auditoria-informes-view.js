@@ -444,7 +444,7 @@ var AuditoriaInformesView = (function () {
     /* Download / Print (placeholders) */
     container.querySelectorAll('[data-download-informe], [data-print-informe]').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        if (window.Sileo) Sileo.info({ title: 'Función no disponible', description: 'En la versión enterprise, este botón exporta/imprime el informe.' });
+        if (window.updateNotifier) window.updateNotifier.show({ type: 'info', title: 'Función no disponible', subtitle: 'En la versión enterprise, este botón exporta/imprime el informe.' });
       });
     });
 
@@ -457,7 +457,7 @@ var AuditoriaInformesView = (function () {
           _rerender();
         }
         if (e.target.closest('[data-save-informe]')) {
-          if (window.Sileo) Sileo.success({ title: 'Informe guardado', description: 'Borrador del informe actualizado' });
+          if (window.updateNotifier) window.updateNotifier.show({ type: 'success', title: 'Informe guardado', subtitle: 'Borrador del informe actualizado' });
           _state.editing = null;
           if (window.kairAuditoriaAnual && window.kairAuditoriaAnual._refreshView) {
             window.kairAuditoriaAnual._refreshView();
@@ -479,11 +479,11 @@ var AuditoriaInformesView = (function () {
           var nombre = document.getElementById('kair-v3-firma-nombre');
           var cargo = document.getElementById('kair-v3-firma-cargo');
           if (!rol || !rol.value) {
-            if (window.Sileo) Sileo.error({ title: 'Selecciona un rol' });
+            if (window.updateNotifier) window.updateNotifier.show({ type: 'error', title: 'Selecciona un rol', autoClose: 6000 });
             return;
           }
           if (!nombre || !nombre.value.trim()) {
-            if (window.Sileo) Sileo.error({ title: 'Ingresa el nombre' });
+            if (window.updateNotifier) window.updateNotifier.show({ type: 'error', title: 'Ingresa el nombre', autoClose: 6000 });
             return;
           }
           KairStore.actions.addFirma(auditId, {
@@ -495,7 +495,7 @@ var AuditoriaInformesView = (function () {
             fecha: new Date().toISOString().slice(0, 10),
             firmado: false
           });
-          if (window.Sileo) Sileo.success({ title: 'Firma registrada' });
+          if (window.updateNotifier) window.updateNotifier.show({ type: 'success', title: 'Firma registrada' });
           _state.firmaDialog = null;
           if (window.kairAuditoriaAnual && window.kairAuditoriaAnual._refreshView) {
             window.kairAuditoriaAnual._refreshView();
