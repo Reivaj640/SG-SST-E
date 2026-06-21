@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════
    K+AIR · 7.1.1 — Matriz de Control Operacional
-   Viewer · prefijo mco-
+   Viewer · prefijo kair-
    F21.43 (2026-06-21) — Refactor al modelo de la referencia
    ═══════════════════════════════════════════════════════════════════ */
 
@@ -62,11 +62,11 @@ function _fmtDate(s) {
   } catch (e) { return s; }
 }
 function _todayIso() { return new Date().toISOString().split('T')[0]; }
-function _badgeTipo(t) { return `<span class="mco-tipo mco-tipo--${t || 'AM'}">${_esc(t || 'AM')}</span>`; }
+function _badgeTipo(t) { return `<span class="kair-tipo kair-tipo--${t || 'AM'}">${_esc(t || 'AM')}</span>`; }
 function _badgeEstado(e) {
-  const cls = 'mco-estado--' + (e || '').replace(/ /g, '_').replace(/Ó/g, 'O');
+  const cls = 'kair-estado--' + (e || '').replace(/ /g, '_').replace(/Ó/g, 'O');
   const label = ({'ABIERTA':'Abierta','EN PROCESO':'En proceso','CERRADO':'Cerrado','VENCIDA':'Vencida'})[e] || e;
-  return `<span class="mco-estado ${cls}">${_esc(label || '—')}</span>`;
+  return `<span class="kair-estado ${cls}">${_esc(label || '—')}</span>`;
 }
 function _isVencida(a) {
   if (!a.cierre || !a.cierre.cerrada) {
@@ -80,15 +80,22 @@ function _truncate(s, n) {
   return s.length > n ? s.substring(0, n - 1) + '…' : s;
 }
 
-/* ── Toast ── */
-function _toast(title, desc, type) {
-  const iconMap = { success: 'check-circle-fill', error: 'exclamation-circle-fill', warning: 'exclamation-triangle-fill', info: 'info-circle-fill' };
-  const t = document.createElement('div');
-  t.className = 'mco-toast mco-toast--' + (type || 'info');
-  t.innerHTML = `<i class="bi bi-${iconMap[type || 'info']}"></i><div><div class="mco-toast__title">${_esc(title)}</div>${desc ? `<div class="mco-toast__desc">${_esc(desc)}</div>` : ''}</div>`;
-  document.getElementById('toast-container').appendChild(t);
-  setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3500);
+/* ── Notificaciones (estándar updateNotifier del proyecto) ──
+   F21.47 (2026-06-21): Usa window.updateNotifier.show({type, title, subtitle, autoClose}).
+   Proxy pattern: intenta el parent (donde está registrado el notifier) y luego window. */
+function _notify(type, title, subtitle, options) {
+  var payload = Object.assign({ type: type || 'info', title: title || '' }, options || {});
+  if (subtitle) payload.subtitle = subtitle;
+  var notifier = (window.parent && window.parent.updateNotifier) || window.updateNotifier;
+  if (notifier && typeof notifier.show === 'function') {
+    return notifier.show(payload);
+  }
+  /* Fallback silencioso si el notifier no está disponible */
+  console.log('[' + (type || 'info').toUpperCase() + '] ' + title + (subtitle ? ' — ' + subtitle : ''));
 }
+
+/* Backward-compat: alias para no romper llamadas existentes */
+function _toast(title, desc, type) { return _notify(type, title, desc); }
 
 /* ── Vista: Lista ── */
 function renderKpis() {
@@ -115,17 +122,17 @@ function renderKpis() {
     const pendientes = state.conteos.pendientesExportar || 0;
     let html = '';
     if (state.fuente === 'excel') {
-      html += `<span class="mco-fuente-pill mco-fuente-pill--excel"><i class="bi bi-file-earmark-spreadsheet"></i> Fuente: Excel (${state.conteos.excel})</span>`;
+      html += `<span class="kair-fuente-pill kair-fuente-pill--excel"><i class="bi bi-file-earmark-spreadsheet"></i> Fuente: Excel (${state.conteos.excel})</span>`;
     } else if (state.fuente === 'sqlite') {
-      html += `<span class="mco-fuente-pill mco-fuente-pill--sqlite"><i class="bi bi-database"></i> Fuente: Cache local (${state.conteos.sqlite})</span>`;
+      html += `<span class="kair-fuente-pill kair-fuente-pill--sqlite"><i class="bi bi-database"></i> Fuente: Cache local (${state.conteos.sqlite})</span>`;
     } else {
-      html += `<span class="mco-fuente-pill mco-fuente-pill--empty"><i class="bi bi-inbox"></i> Sin datos</span>`;
+      html += `<span class="kair-fuente-pill kair-fuente-pill--empty"><i class="bi bi-inbox"></i> Sin datos</span>`;
     }
     if (pendientes > 0) {
-      html += `<span class="mco-fuente-pill mco-fuente-pill--pending"><i class="bi bi-cloud-upload"></i> ${pendientes} pendiente${pendientes > 1 ? 's' : ''} de sincronizar al Excel</span>`;
+      html += `<span class="kair-fuente-pill kair-fuente-pill--pending"><i class="bi bi-cloud-upload"></i> ${pendientes} pendiente${pendientes > 1 ? 's' : ''} de sincronizar al Excel</span>`;
     }
     if (state.excelError) {
-      html += `<span class="mco-fuente-pill mco-fuente-pill--error" title="${state.excelError}"><i class="bi bi-exclamation-triangle"></i> Error leyendo Excel</span>`;
+      html += `<span class="kair-fuente-pill kair-fuente-pill--error" title="${state.excelError}"><i class="bi bi-exclamation-triangle"></i> Error leyendo Excel</span>`;
     }
     badge.innerHTML = html;
   }
@@ -165,10 +172,10 @@ function renderTable() {
   document.getElementById('resultCount').textContent = `${rows.length} de ${state.data.length} acciones`;
 
   if (rows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="11"><div class="mco-empty">
-      <i class="bi bi-clipboard-list mco-empty__icon"></i>
-      <div class="mco-empty__title">No se encontraron acciones</div>
-      <div class="mco-empty__desc">${state.data.length === 0 ? 'Aún no hay acciones registradas. Crea una con el botón "Nueva acción".' : 'No hay acciones que coincidan con los filtros aplicados.'}</div>
+    tbody.innerHTML = `<tr><td colspan="11"><div class="kair-empty">
+      <i class="bi bi-clipboard-list kair-empty__icon"></i>
+      <div class="kair-empty__title">No se encontraron acciones</div>
+      <div class="kair-empty__desc">${state.data.length === 0 ? 'Aún no hay acciones registradas. Crea una con el botón "Nueva acción".' : 'No hay acciones que coincidan con los filtros aplicados.'}</div>
     </div></td></tr>`;
     return;
   }
@@ -181,24 +188,24 @@ function renderTable() {
     const vencida = _isVencida(a);
     return `
       <tr data-id="${_esc(a.id)}">
-        <td class="mco-td-num">${num}</td>
-        <td class="mco-td-fecha">${_fmtDate(a.fecha)}</td>
-        <td class="mco-td-desc">
-          <div class="mco-td-desc__title" title="${_esc(a.descripcion)}">${_esc(descCorta)}</div>
+        <td class="kair-td-num">${num}</td>
+        <td class="kair-td-fecha">${_fmtDate(a.fecha)}</td>
+        <td class="kair-td-desc">
+          <div class="kair-td-desc__title" title="${_esc(a.descripcion)}">${_esc(descCorta)}</div>
         </td>
-        <td class="mco-td-tipo">${_badgeTipo(a.tipo)}</td>
+        <td class="kair-td-tipo">${_badgeTipo(a.tipo)}</td>
         <td>${_esc(a.procesoPertenece || '—')}</td>
-        <td class="mco-td-fuente">${_esc(a.fuente || '—')}</td>
-        <td class="mco-td-resp">${_esc(a.responsableEjecucion || '—')}</td>
-        <td class="mco-td-fechaprop">
+        <td class="kair-td-fuente">${_esc(a.fuente || '—')}</td>
+        <td class="kair-td-resp">${_esc(a.responsableEjecucion || '—')}</td>
+        <td class="kair-td-fechaprop">
           ${_fmtDate(fechaProp)}
-          ${vencida ? '<div class="mco-td-fechaprop__vencida">vencida</div>' : ''}
+          ${vencida ? '<div class="kair-td-fechaprop__vencida">vencida</div>' : ''}
         </td>
-        <td class="mco-td-fechacierre">${_fmtDate(a.cierre && a.cierre.fecha)}</td>
+        <td class="kair-td-fechacierre">${_fmtDate(a.cierre && a.cierre.fecha)}</td>
         <td>${_badgeEstado(a.estado)}</td>
-        <td class="mco-td-acc">
+        <td class="kair-td-acc">
           <button title="Ver detalle" data-act="edit"><i class="bi bi-pencil"></i></button>
-          <button title="Eliminar" data-act="del" class="mco-btn--danger-ghost"><i class="bi bi-trash"></i></button>
+          <button title="Eliminar" data-act="del" class="kair-btn--danger-ghost"><i class="bi bi-trash"></i></button>
         </td>
       </tr>
     `;
@@ -234,10 +241,12 @@ function openEditor(accion) {
   document.getElementById('main-view').style.display = 'none';
   document.getElementById('editor-view').hidden = false;
 
-  /* Header back: volver a la lista */
+  /* Header: cambiar a modo edición con breadcrumb */
+  _setHeaderMode('edit', accion);
+
   /* Inicializar sidebar nav */
-  document.querySelectorAll('.mco-side-nav__item').forEach(b => b.classList.remove('is-active'));
-  document.querySelector('.mco-side-nav__item[data-section="datos-basicos"]').classList.add('is-active');
+  document.querySelectorAll('.kair-side-nav__item').forEach(b => b.classList.remove('is-active'));
+  document.querySelector('.kair-side-nav__item[data-section="datos-basicos"]').classList.add('is-active');
 
   /* Cargar catálogos en selects del editor */
   _populateEditorCatalogos();
@@ -245,11 +254,47 @@ function openEditor(accion) {
 
   /* Reset secciones: abiertas por defecto */
   state.sectionsCollapsed = {};
-  document.querySelectorAll('.mco-section').forEach(s => s.classList.remove('is-collapsed'));
+  document.querySelectorAll('\.kair-form-section').forEach(s => s.classList.remove('is-collapsed'));
 
   updateEditorSidebar();
   updateBannerEstado();
   updateCompletitud();
+}
+
+/* F21.46 (2026-06-21): Cambia el header entre vista de lista y edición.
+   - Lista: title="Matriz de Control Operacional", subtitle visible, sin breadcrumb, botón="Volver"
+   - Edición: title="Nueva acción"/"Editar AP-XXX", subtitle oculto, breadcrumb visible, botón="Cerrar" */
+function _setHeaderMode(mode, accion) {
+  const titleEl = document.getElementById('header-title');
+  const subtitleEl = document.getElementById('header-subtitle');
+  const breadcrumbEl = document.getElementById('header-breadcrumb');
+  const breadcrumbCurrent = document.getElementById('header-breadcrumb-current');
+  const backBtn = document.getElementById('btn-back');
+  const backText = document.getElementById('btn-back-text');
+  const importarBtn = document.getElementById('btn-importar');
+  const exportarBtn = document.getElementById('btn-exportar');
+
+  if (mode === 'edit') {
+    const isNew = !accion;
+    const codigo = (accion && accion.codigo) || (accion && accion.id) || 'Nueva';
+    if (titleEl) titleEl.textContent = isNew ? 'Nueva acción' : 'Editar ' + codigo;
+    if (subtitleEl) subtitleEl.hidden = true;
+    if (breadcrumbEl) breadcrumbEl.hidden = false;
+    if (breadcrumbCurrent) breadcrumbCurrent.textContent = isNew ? 'Nueva acción' : codigo;
+    if (backBtn) backBtn.title = 'Cerrar editor y volver a la lista';
+    if (backText) backText.textContent = 'Cerrar';
+    /* En modo edición ocultamos importar/exportar (no aplican al editor) */
+    if (importarBtn) importarBtn.hidden = true;
+    if (exportarBtn) exportarBtn.hidden = true;
+  } else {
+    if (titleEl) titleEl.textContent = 'Matriz de Control Operacional';
+    if (subtitleEl) subtitleEl.hidden = false;
+    if (breadcrumbEl) breadcrumbEl.hidden = true;
+    if (backBtn) backBtn.title = 'Volver al módulo Mejoramiento';
+    if (backText) backText.textContent = 'Volver';
+    if (importarBtn) importarBtn.hidden = false;
+    if (exportarBtn) exportarBtn.hidden = false;
+  }
 }
 
 function _nuevaAccionVacia() {
@@ -295,7 +340,7 @@ function _populateEditorCatalogos() {
   const sg = document.getElementById('edit-sistemas');
   if (sg) {
     sg.innerHTML = state.catalogos.sistemas.map(s => `
-      <label class="mco-check"><input type="checkbox" data-sistema="${_esc(s)}"><span>${_esc(s)}</span></label>
+      <label class="kair-check"><input type="checkbox" data-sistema="${_esc(s)}"><span>${_esc(s)}</span></label>
     `).join('');
   }
 }
@@ -341,12 +386,12 @@ function renderPorques() {
   for (let i = 0; i < 5; i++) {
     const v = (state.editing.causas && state.editing.causas[i]) || '';
     const item = document.createElement('div');
-    item.className = 'mco-5porques__item';
+    item.className = 'kair-5porques__item';
     item.innerHTML = `
-      <span class="mco-5porques__num">${i + 1}</span>
-      <div class="mco-5porques__body">
-        <label class="mco-field__label">¿Por qué ocurrió? — Nivel ${i + 1}</label>
-        <textarea class="mco-field__textarea" data-causa="${i}" rows="2" placeholder="Respuesta al porqué número ${i + 1}...">${_esc(v)}</textarea>
+      <span class="kair-5porques__num">${i + 1}</span>
+      <div class="kair-5porques__body">
+        <label class="kair-field__label">¿Por qué ocurrió? — Nivel ${i + 1}</label>
+        <textarea class="kair-field__textarea" data-causa="${i}" rows="2" placeholder="Respuesta al porqué número ${i + 1}...">${_esc(v)}</textarea>
       </div>
     `;
     cont.appendChild(item);
@@ -366,7 +411,7 @@ function renderPlanAccion() {
       <td style="text-align:center;"><input type="checkbox" data-plan="realizada" data-idx="${idx}" ${act.realizada ? 'checked' : ''}></td>
       <td><input type="text" data-plan="verifico" data-idx="${idx}" value="${_esc(act.verifico || '')}"></td>
       <td><input type="date" data-plan="fechaVerif" data-idx="${idx}" value="${_esc(act.fechaVerif || '')}"></td>
-      <td><button class="mco-plan-del" data-plan-del="${idx}" title="Eliminar"><i class="bi bi-trash"></i></button></td>
+      <td><button class="kair-plan-del" data-plan-del="${idx}" title="Eliminar"><i class="bi bi-trash"></i></button></td>
     `;
     tbody.appendChild(tr);
   });
@@ -384,21 +429,21 @@ function updateBannerEstado() {
   const a = state.editing;
   const banner = document.getElementById('banner-estado');
   if (!a.estado) {
-    banner.className = 'mco-banner mco-banner--info';
+    banner.className = 'kair-banner kair-banner--info';
     banner.innerHTML = '<i class="bi bi-info-circle-fill"></i><div><strong>Nueva acción.</strong> Completa los datos básicos para empezar.</div>';
     return;
   }
   if (a.estado === 'ABIERTA') {
-    banner.className = 'mco-banner mco-banner--info';
+    banner.className = 'kair-banner kair-banner--info';
     banner.innerHTML = '<i class="bi bi-info-circle-fill"></i><div><strong>Acción abierta.</strong> Pendiente de ejecutar el plan de acción.</div>';
   } else if (a.estado === 'EN PROCESO') {
-    banner.className = 'mco-banner mco-banner--warning';
+    banner.className = 'kair-banner kair-banner--warning';
     banner.innerHTML = '<i class="bi bi-arrow-repeat"></i><div><strong>Acción en proceso.</strong> Plan de acción ejecutándose. Pendiente de verificación y cierre.</div>';
   } else if (a.estado === 'CERRADO') {
-    banner.className = 'mco-banner mco-banner--success';
+    banner.className = 'kair-banner kair-banner--success';
     banner.innerHTML = '<i class="bi bi-check-circle-fill"></i><div><strong>Acción cerrada.</strong> Se verificó la eficacia y se documentó el cierre formal.</div>';
   } else {
-    banner.className = 'mco-banner mco-banner--info';
+    banner.className = 'kair-banner kair-banner--info';
     banner.innerHTML = '<i class="bi bi-info-circle-fill"></i><div><strong>Estado:</strong> ' + _esc(a.estado) + '</div>';
   }
 }
@@ -523,6 +568,8 @@ function closeEditor() {
   state.editing = null;
   document.getElementById('editor-view').hidden = true;
   document.getElementById('main-view').style.display = '';
+  /* Volver el header a modo lista */
+  _setHeaderMode('list');
 }
 
 function deleteAccion(id) {
@@ -549,6 +596,51 @@ function deleteAccion(id) {
     }
     render();
     _toast('Acción eliminada', (a.codigo || a.id) + (a.__fuente === 'excel' ? ' (solo del cache local — el Excel la conserva)' : ''), 'success');
+  }).catch(err => {
+    _toast('Error', err.message, 'error');
+  });
+}
+
+/* F21.46 (2026-06-21): Importar desde Excel (botón del header k-section-card) */
+function importarDesdeExcel() {
+  const api = _api();
+  if (!api || !api.seleccionarArchivoImportar) {
+    _toast('Sin IPC', 'Bridge IPC no disponible para importar.', 'error');
+    return;
+  }
+  api.seleccionarArchivoImportar().then(sel => {
+    if (!sel || !sel.success || !sel.data) {
+      _toast('Cancelado', 'Importación cancelada por el usuario.', 'info');
+      return;
+    }
+    return api.importarXlsx(_empresaId(), sel.data.archivoPath);
+  }).then(resp => {
+    if (!resp) return;
+    if (resp.success) {
+      _toast('Importación completa', `${resp.data.importados} acciones importadas de ${resp.data.archivo}`, 'success');
+      cargarTodo();
+    } else {
+      _toast('Error al importar', (resp.error && resp.error.message) || 'No se pudo importar', 'error');
+    }
+  }).catch(err => {
+    _toast('Error', err.message, 'error');
+  });
+}
+
+/* F21.46 (2026-06-21): Exportar a Excel (botón del header k-section-card) */
+function exportarAExcel() {
+  const api = _api();
+  if (!api || !api.exportarXlsx) {
+    _toast('Sin IPC', 'Bridge IPC no disponible para exportar.', 'error');
+    return;
+  }
+  _toast('Exportando...', 'Generando archivo Excel...', 'info');
+  api.exportarXlsx(_empresaId()).then(resp => {
+    if (resp && resp.success) {
+      _toast('Exportación completa', `${resp.data.acciones} acciones → ${resp.data.archivo}`, 'success');
+    } else {
+      _toast('Error al exportar', (resp && resp.error && resp.error.message) || 'No se pudo exportar', 'error');
+    }
   }).catch(err => {
     _toast('Error', err.message, 'error');
   });
@@ -608,9 +700,9 @@ function cargarTodo() {
 function bindEvents() {
   /* Tabs */
   document.getElementById('tabs').addEventListener('click', e => {
-    const tab = e.target.closest('.mco-tab');
+    const tab = e.target.closest('.kair-tab');
     if (!tab) return;
-    document.querySelectorAll('.mco-tab').forEach(t => t.classList.remove('is-active'));
+    document.querySelectorAll('.kair-tab').forEach(t => t.classList.remove('is-active'));
     tab.classList.add('is-active');
     state.filterTab = tab.getAttribute('data-filter');
     renderTable();
@@ -637,8 +729,8 @@ function bindEvents() {
     document.getElementById('searchInput').value = '';
     document.getElementById('filterTipo').value = '';
     document.getElementById('filterFuente').value = '';
-    document.querySelectorAll('.mco-tab').forEach(t => t.classList.remove('is-active'));
-    document.querySelector('.mco-tab[data-filter="TODAS"]').classList.add('is-active');
+    document.querySelectorAll('.kair-tab').forEach(t => t.classList.remove('is-active'));
+    document.querySelector('.kair-tab[data-filter="TODAS"]').classList.add('is-active');
     renderTable();
     _toast('Filtros restablecidos', '', 'info');
   });
@@ -646,8 +738,7 @@ function bindEvents() {
   /* Botones principales */
   document.getElementById('btn-new').addEventListener('click', () => openEditor(null));
   document.getElementById('btn-back').addEventListener('click', () => {
-    /* Si el editor está abierto, cerrarlo. Si no, pedir al parent que vuelva al home del módulo.
-       NO usamos confirm() para evitar alertas nativas del navegador — el toast interno se encarga. */
+    /* Si el editor está abierto, cerrarlo. Si no, pedir al parent que vuelva al home del módulo. */
     if (!document.getElementById('editor-view').hidden) {
       closeEditor();
       _toast('Editor cerrado', 'Los cambios no guardados se perdieron.', 'warning');
@@ -658,6 +749,20 @@ function bindEvents() {
         console.warn('[7.1.1] No se pudo enviar mensaje al parent:', e);
       }
     }
+  });
+
+  /* F21.46: botones del header k-section-card — Importar / Exportar */
+  document.getElementById('btn-importar').addEventListener('click', () => importarDesdeExcel());
+  document.getElementById('btn-exportar').addEventListener('click', () => exportarAExcel());
+
+  /* Breadcrumb (visible en modo edición) — clic en crumbs cierra el editor */
+  document.querySelectorAll('#header-breadcrumb button[data-crumb]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!document.getElementById('editor-view').hidden) {
+        closeEditor();
+        _toast('Editor cerrado', '', 'info');
+      }
+    });
   });
 
   /* Tabla: click en fila = editar */
@@ -680,13 +785,13 @@ function bindEvents() {
 
   /* Sidebar nav */
   document.getElementById('side-nav').addEventListener('click', e => {
-    const btn = e.target.closest('.mco-side-nav__item');
+    const btn = e.target.closest('.kair-side-nav__item');
     if (!btn) return;
-    document.querySelectorAll('.mco-side-nav__item').forEach(b => b.classList.remove('is-active'));
+    document.querySelectorAll('.kair-side-nav__item').forEach(b => b.classList.remove('is-active'));
     btn.classList.add('is-active');
     const target = btn.getAttribute('data-section');
     /* Scroll a la sección */
-    const sec = document.querySelector(`.mco-section[data-section-card="${target}"]`);
+    const sec = document.querySelector(`.kair-form-section[data-section-card="${target}"]`);
     if (sec) {
       sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
       /* Asegurar que esté expandida */
@@ -695,9 +800,9 @@ function bindEvents() {
   });
 
   /* Secciones colapsables */
-  document.querySelectorAll('.mco-section__head').forEach(h => {
+  document.querySelectorAll('.kair-form-section__head').forEach(h => {
     h.addEventListener('click', () => {
-      const sec = h.closest('.mco-section');
+      const sec = h.closest('\.kair-form-section');
       sec.classList.toggle('is-collapsed');
     });
   });
@@ -762,6 +867,9 @@ function bindEvents() {
 document.addEventListener('DOMContentLoaded', () => {
   const headerCompany = document.getElementById('header-company-text');
   if (headerCompany) headerCompany.textContent = COMPANY;
+
+  /* Header en modo lista por defecto */
+  _setHeaderMode('list');
 
   bindEvents();
   cargarTodo();
