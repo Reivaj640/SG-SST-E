@@ -111,3 +111,112 @@ DESPUÉS (corregido): [Descripción simple]
 
 NO usar términos como: callback, listener, async, await, variable, función, línea, código, archivo, etc.
 SI usar términos como: sistema, mensaje, ventana, tema, preferencia, configuración, resultado, etc.
+
+---
+
+## Arquitectura del Proyecto (para IA nueva)
+
+Si otra IA va a extender el proyecto, debe seguir estas convenciones:
+
+### Stack
+- **Electron** (no React, no Vue, no frameworks frontend)
+- **Vanilla JS** (ES5/ES6 mixto, sin TypeScript)
+- **CSS plano** (sin Tailwind, sin preprocessors — solo BEM con prefijo `kair-`)
+- **Bootstrap Icons** vía `<i class="bi bi-xxx">`
+- **Backend IPC** vía `window.electronAPI.*` (definido en preload.js con contextBridge)
+
+### Patrón de archivo (template para cualquier vista nueva)
+
+```javascript
+/* ═══════════════════════════════════════════════════════════════════
+   K+AIR · Nombre vista (replica XxxView.tsx del .tar)
+   v3.0 · FECHA — descripción breve
+   ═══════════════════════════════════════════════════════════════════ */
+
+var NombreVista = (function () {
+  'use strict';
+
+  // Estado privado del módulo (se preserva entre renders)
+  var _state = { ... };
+  var _onRerender = null;
+
+  function _esc(s) { return KairUI.esc(s); }
+  function _fmtDate(iso) { return KairHelpers.formatDate(iso); }
+
+  function _renderHeader() { return '<div class="kair-header">...</div>'; }
+  function _renderKpis() { return '...'; }
+  function _renderList() { return '...'; }
+
+  function _rerender() { if (typeof _onRerender === 'function') _onRerender(); }
+
+  function render(container) {
+    var data = KairStore.selectAudits();  // o cualquier selector
+    container.innerHTML = '<div class="kair-main">' +
+      _renderHeader() + _renderKpis() + _renderList(data) +
+      '</div>';
+    _bindEvents(container);
+  }
+
+  function _bindEvents(container) {
+    container.querySelectorAll('[data-action]').forEach(function (btn) {
+      btn.addEventListener('click', function () { ... });
+    });
+  }
+
+  function setRerenderCallback(fn) { _onRerender = fn; }
+  function destroy() { /* cleanup timers, listeners */ }
+
+  return { render: render, destroy: destroy, setRerenderCallback: setRerenderCallback };
+})();
+
+window.NombreVista = NombreVista;  // SIEMPRE exportar a window
+```
+
+### Reglas obligatorias
+- `var` (no `let`/`const`) para mantener compat con código legacy
+- Funciones en camelCase con `_` prefix para helpers privados (`_renderHeader`, `_bindEvents`)
+- **Siempre** escapar HTML con `KairUI.esc()` antes de inyectar texto del usuario
+- **Siempre** formatear fechas con `KairHelpers.formatDate()`
+- **Siempre** traducir enums a labels con diccionarios `KairHelpers.*Label[enum]`
+- **Siempre** traducir enums a badge variant con `KairHelpers.*Badge[enum]`
+- Para `data-*` en HTML usar kebab-case (`data-go-hub`, `data-action="new"`)
+- **NUNCA** usar `bind` events sin cleanup en `destroy()` (causa memory leaks + double-fire)
+- Exports a `window.X = X` SIEMPRE al final del archivo
+
+### Clases CSS canónicas (NO crear nuevas)
+Las vistas usan exclusivamente el sistema BEM `kair-*` definido en `kair-canonical.css`:
+- Header: `kair-header`, `kair-header__bar`, `kair-header__left/center/right`, `kair-header__tab`, `kair-header__tab-badge`, `kair-header__action--{primary|secondary|ghost|success}`, `kair-header__back`, `kair-header__company`, `kair-header__breadcrumb`
+- KPIs: `kair-kpi-strip`, `kair-kpi-item`, `kair-kpi-item__icon/value/label/subdata`
+- Cards: `kair-card`, `kair-hub-card`, `kair-hub-card__icon/title/desc/meta`
+- Tables: `kair-table-wrap`, `kair-table`
+- Forms: `kair-field`, `kair-field__label/input/textarea/select`, `kair-field__input-wrap`
+- Badges: `kair-badge`, `kair-badge--{primary|success|warning|danger|info|neutral}`, `kair-dot`
+- Empty states: `kair-empty`, `kair-empty__icon/title/desc`
+- Buttons: clases `kair-header__action--*` (NO usar shadcn-style buttons)
+- Section cards: `kair-rad-section-card`, `kair-rad-section-card__head/title/body`
+- Progress: `kair-progress`, `kair-progress__bar`, `kair-progress__bar.is-{success|warning|danger}`
+- Dialog: `kair-dialog-overlay`, `kair-dialog`, `kair-dialog__header/body/footer/title`
+- Calendarios: `kair-cron-grid`, `kair-cron-grid__row/cell/head/corner/month/audit/hito`
+- Workflow editor: `kair-rad-editor`, `kair-rad-editor__main/sidebar`, `kair-rad-sticky-footer`, `kair-rad-side-nav__item`
+
+### Comunicación
+- **Renderer ↔ Main process**: `window.electronAPI.modulo.metodo(arg).then(...)`
+- **Entre vistas**: `window.KairStore.actions.goXxx()` + `_refreshView()` en el componente
+- **Toasts**: `window.updateNotifier.show({ type: 'success|info|warning|error', title, subtitle })`
+- **Confirm dialogs**: `window.kairAuditoriaAnual.showConfirm({...}).then(ok => ...)`
+
+### Carga de dependencias (cascada)
+El componente carga sus dependencias con `loadCss()` + `loadScript()` en cascada anidada. NO usar ES modules ni require(). Ver `auditoria-anual-component.js` líneas 24-110 como referencia.
+
+### Stores y estado
+- Cada módulo tiene un `kair-store.js` con patrón pub/sub: `getState()`, `setState()`, `subscribe(fn)`, `actions`
+- Selectores computados: `KairStore.computeKpisXxx()`, `KairStore.selectAudits()`
+- Mutaciones: `KairStore.actions.addXxx()`, `KairStore.actions.updateXxx()`
+- Persistencia SQLite: `KairStoreBridge.persist('addXxx', { ... })`
+
+### Cuando extender con una nueva vista:
+1. Crear archivo en el módulo correspondiente (`modules/<area>/<submodulo>/`)
+2. Seguir el patrón IIFE + window export
+3. Usar solo clases CSS canónicas (`kair-*`)
+4. Si necesita un componente orquestador (como `auditoria-anual-component.js`), crear uno que cargue CSS + scripts + vistas via cascada
+5. NO commitear sin autorización explícita del usuario ("sí"/"dale"/"commit")

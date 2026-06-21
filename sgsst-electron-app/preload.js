@@ -351,6 +351,17 @@ ipcRenderer.invoke('get-indicadores-salud-stats', companyName),
     seleccionarArchivoImportar: () => ipcRenderer.invoke('auditoriaAnual:seleccionarArchivoImportar'),
   },
 
+  // --- Acciones Preventivas y Correctivas (Submódulo 7.1.1) — F21.41 (2026-06-21) ---
+  accionesPc: {
+    cargarTodo: (empresaId) => ipcRenderer.invoke('accionesPc:cargarTodo', { empresaId }),
+    guardarAccion: (empresaId, accion) => ipcRenderer.invoke('accionesPc:guardarAccion', { empresaId, accion }),
+    eliminarAccion: (empresaId, id) => ipcRenderer.invoke('accionesPc:eliminarAccion', { empresaId, id }),
+    cambiarEstado: (empresaId, id, estado) => ipcRenderer.invoke('accionesPc:cambiarEstado', { empresaId, id, estado }),
+    exportarXlsx: (empresaId) => ipcRenderer.invoke('accionesPc:exportarXlsx', { empresaId }),
+    importarXlsx: (empresaId, archivoPath) => ipcRenderer.invoke('accionesPc:importarXlsx', { empresaId, archivoPath }),
+    seleccionarArchivoImportar: () => ipcRenderer.invoke('accionesPc:seleccionarArchivoImportar'),
+  },
+
   // --- Gestión del Cambio (2.11.1) ---
   loadGestionCambioData: (companyName) => ipcRenderer.invoke('gestion-cambio-load-data', companyName),
   saveGestionCambioData: (companyName, changeData) => ipcRenderer.invoke('gestion-cambio-save-data', companyName, changeData),
