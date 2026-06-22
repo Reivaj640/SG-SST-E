@@ -96,6 +96,8 @@ var _xlsxSyncTimer = null;
           }
           _updateComputedCells(pid, result.data);
         _debouncedXlsxSync();
+        /* F1: notificar al component para que recalcule el banner (cambia NR/nivel) */
+        try { document.dispatchEvent(new CustomEvent('kair-mp:peligros-changed')); } catch (e) {}
         } else {
           IdentificacionPeligrosService.toast('Error al guardar cambios', 'error');
         }
@@ -442,13 +444,26 @@ function _flushCargoChanges(cargoId) {
   if (col.type === 'select-nd' || col.type === 'select-ne' || col.type === 'select-nc' || col.type === 'select-tipo') {
     var selVal = (_pendingChanges[cellId] !== undefined) ? _pendingChanges[cellId] : peligro[col.key];
     var options = '';
-    if (col.type === 'select-nd') options = _buildSelectOptions(_gtc45Options ? _gtc45Options.nd : [], selVal);
-    else if (col.type === 'select-ne') options = _buildSelectOptions(_gtc45Options ? _gtc45Options.ne : [], selVal);
-    else if (col.type === 'select-nc') options = _buildSelectOptions(_gtc45Options ? _gtc45Options.nc : [], selVal);
-    else if (col.type === 'select-tipo') options = _buildTipoOptions(_gtc45Options ? _gtc45Options.tipos : [], selVal);
+    var tooltip = '';
+    if (col.type === 'select-nd') {
+      options = _buildSelectOptions(_gtc45Options ? _gtc45Options.nd : [], selVal);
+      tooltip = 'Nivel de Deficiencia (GTC-45): 1=Sin daño, 2=Daño menor, 4=Daño moderado, 6=Daño severo';
+    }
+    else if (col.type === 'select-ne') {
+      options = _buildSelectOptions(_gtc45Options ? _gtc45Options.ne : [], selVal);
+      tooltip = 'Nivel de Exposición (GTC-45): 1=Esporádica, 2=Ocasional, 3=Frecuente, 4=Continua';
+    }
+    else if (col.type === 'select-nc') {
+      options = _buildSelectOptions(_gtc45Options ? _gtc45Options.nc : [], selVal);
+      tooltip = 'Nivel de Consecuencia (GTC-45): 10=Lesión leve, 25=Incapacidad temporal, 60=Incapacidad permanente parcial, 100=Muerte';
+    }
+    else if (col.type === 'select-tipo') {
+      options = _buildTipoOptions(_gtc45Options ? _gtc45Options.tipos : [], selVal);
+      tooltip = 'Clasificación del peligro según GTC-45';
+    }
 
-      return '<td class="kair-mp-acc__cell kair-mp-acc__cell--select" data-col="' + col.key + '" data-cell-id="' + cellId + '">' +
-        '<select class="kair-mp-acc__cell-select" data-peligro-id="' + peligro.id + '" data-field="' + col.key + '">' + options + '</select>' +
+      return '<td class="kair-mp-acc__cell kair-mp-acc__cell--select" data-col="' + col.key + '" data-cell-id="' + cellId + '" title="' + _escHtml(tooltip) + '">' +
+        '<select class="kair-mp-acc__cell-select" data-peligro-id="' + peligro.id + '" data-field="' + col.key + '" title="' + _escHtml(tooltip) + '">' + options + '</select>' +
         '</td>';
     }
 
@@ -1181,6 +1196,8 @@ function _reload() {
       }
       var container = document.getElementById('kair-mp-matriz-content');
       if (container) _render(container);
+      /* F1: notificar al component para recalcular el banner tras add/delete/refresh */
+      try { document.dispatchEvent(new CustomEvent('kair-mp:peligros-changed')); } catch (e) {}
     }).catch(function () {
       var container = document.getElementById('kair-mp-matriz-content');
       if (container) {

@@ -278,6 +278,13 @@ var IdentificacionPeligrosService = {
     return Promise.resolve({ success: false });
   },
 
+  reset: function (companyName) {
+    if (_hasElectronAPI()) {
+      return window.electronAPI.matrizPeligros.reset(companyName);
+    }
+    return Promise.resolve({ success: true, data: { matriz: _mockMatriz, stats: _mockStats } });
+  },
+
   toast: _toast,
 
   getColorForNivel: function (nivel) {

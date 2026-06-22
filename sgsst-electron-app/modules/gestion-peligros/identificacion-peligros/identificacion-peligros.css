@@ -1896,3 +1896,117 @@ RESPONSIVE
   .kair-mp-prior__dist-legend { gap: 0.5rem; }
 .kair-mp-prior__uneval-item { flex-direction: column; gap: 0.2rem; }
 }
+
+/* ==========================================================================
+F21.52 (2026-06-22) — F1: Banner de estado dinámico (4 variantes)
+========================================================================== */
+.kair-mp-wrapper .kair-mp-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.85rem 1.15rem;
+  border-radius: var(--kair-mp-radius-md, 0.5rem);
+  margin-bottom: 1rem;
+  border: 1px solid transparent;
+  font-size: var(--kair-mp-font-size-sm, 0.85rem);
+  flex-shrink: 0;
+  transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+}
+.kair-mp-wrapper .kair-mp-banner__icon {
+  font-size: 1.4rem;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.kair-mp-wrapper .kair-mp-banner__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.kair-mp-wrapper .kair-mp-banner__title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.kair-mp-wrapper .kair-mp-banner__msg {
+  font-size: 0.78rem;
+  opacity: 0.92;
+  line-height: 1.35;
+}
+
+.kair-mp-wrapper .kair-mp-banner--info {
+  background: #e8f0fe;
+  border-color: #174ea6;
+  color: #174ea6;
+}
+.kair-mp-wrapper .kair-mp-banner--success {
+  background: #e6f6e9;
+  border-color: #1b5e20;
+  color: #1b5e20;
+}
+.kair-mp-wrapper .kair-mp-banner--warning {
+  background: #fff8e1;
+  border-color: #f57f17;
+  color: #b45309;
+}
+.kair-mp-wrapper .kair-mp-banner--danger {
+  background: #fee2e2;
+  border-color: #b71c1c;
+  color: #b71c1c;
+}
+
+[data-theme="dark"] .kair-mp-wrapper .kair-mp-banner--info {
+  background: rgba(23, 78, 166, 0.18);
+  border-color: #4da6ff;
+  color: #cfe2ff;
+}
+[data-theme="dark"] .kair-mp-wrapper .kair-mp-banner--success {
+  background: rgba(27, 94, 32, 0.22);
+  border-color: #5cb85c;
+  color: #c8e6c9;
+}
+[data-theme="dark"] .kair-mp-wrapper .kair-mp-banner--warning {
+  background: rgba(245, 127, 23, 0.18);
+  border-color: #f0ad4e;
+  color: #ffe0a3;
+}
+[data-theme="dark"] .kair-mp-wrapper .kair-mp-banner--danger {
+  background: rgba(183, 28, 28, 0.22);
+  border-color: #d9534f;
+  color: #ffc6c6;
+}
+
+/* F1: Header actions --primary para botón "Nuevo peligro" */
+.kair-mp-wrapper .header-action--primary {
+  background: var(--k-primary, #174ea6);
+  color: #ffffff;
+  border: 1px solid var(--k-primary, #174ea6);
+  padding: 0.4rem 0.9rem;
+  border-radius: var(--kair-mp-radius-md, 0.4rem);
+  font-size: var(--kair-mp-font-size-sm, 0.85rem);
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: background 0.18s ease;
+}
+.kair-mp-wrapper .header-action--primary:hover {
+  background: var(--k-primary-hover, #185abd);
+  border-color: var(--k-primary-hover, #185abd);
+}
+.kair-mp-wrapper .header-action--primary:disabled,
+.kair-mp-wrapper .header-action--ghost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+[data-theme="dark"] .kair-mp-wrapper .header-action--primary {
+  background: #4da6ff;
+  border-color: #4da6ff;
+  color: #0d1117;
+}
+[data-theme="dark"] .kair-mp-wrapper .header-action--primary:hover {
+  background: #66b3ff;
+  border-color: #66b3ff;
+}

@@ -473,6 +473,7 @@ renameCargo: (companyName, cargoId, nombre) => ipcRenderer.invoke('matriz-peligr
     discoverXlsx: (companyName) => ipcRenderer.invoke('matriz-peligros:discover-xlsx', companyName),
     importXlsx: (companyName, filePath) => ipcRenderer.invoke('matriz-peligros:import-xlsx', companyName, filePath),
     syncXlsx: (companyName) => ipcRenderer.invoke('matriz-peligros:sync-xlsx', companyName),
+    reset: (companyName) => ipcRenderer.invoke('matriz-peligros:reset', companyName),
   },
 
   // --- Eventos IPC ---

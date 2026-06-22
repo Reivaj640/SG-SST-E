@@ -25,18 +25,46 @@ function IdentificacionPeligrosComponent(container, currentCompany, moduleName, 
 IdentificacionPeligrosComponent.prototype.render = function () {
   var self = this;
   this.container.innerHTML = '';
+  /* F1: AbortController para evitar memory leak del listener al destruir/recrear
+     el component. document.addEventListener persiste aunque destruyamos la instancia. */
+  if (this._bannerAbortController) {
+    try { this._bannerAbortController.abort(); } catch (e) {}
+  }
+  this._bannerAbortController = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+
   this._loadCSS(function () {
     self._renderUI();
     self._initNavigation();
     self._navigate('matriz');
     self._updateHeaderContext();
+    /* F1: poblar banner con stats iniciales tras el primer read */
+    IdentificacionPeligrosService.stats(self.currentCompany).then(function (r) {
+      if (r && r.success && r.data) self._updateBanner(r.data);
+    }).catch(function () {});
   });
+
+  /* F1: reaccionar a ediciones/add/delete/reset refrescando el banner.
+     Usamos { signal } para que destroy() pueda abortar el listener limpiamente. */
+  var handler = function () {
+    /* Si el component ya fue destruido, self.container está vacío → no hacer nada */
+    if (!self.container) return;
+    IdentificacionPeligrosService.stats(self.currentCompany).then(function (r) {
+      if (r && r.success && r.data) self._updateBanner(r.data);
+    }).catch(function () {});
+  };
+  var opts = this._bannerAbortController ? { signal: this._bannerAbortController.signal } : { once: true };
+  document.addEventListener('kair-mp:peligros-changed', handler, opts);
 };
 
 IdentificacionPeligrosComponent.prototype.destroy = function () {
   if (window.MatrizView) MatrizView.destroy();
   if (window.PriorizacionView) PriorizacionView.destroy();
   if (window.IndicadoresView) IndicadoresView.destroy();
+  /* F1: abortar listener del banner para evitar memory leak */
+  if (this._bannerAbortController) {
+    try { this._bannerAbortController.abort(); } catch (e) {}
+    this._bannerAbortController = null;
+  }
   this.container.innerHTML = '';
 };
 
@@ -90,10 +118,27 @@ IdentificacionPeligrosComponent.prototype._renderUI = function () {
     '<button id="kair-mp-btn-import-xlsx" class="header-action--ghost" title="Importar matriz desde archivo Excel">' +
     '<i class="bi bi-file-earmark-spreadsheet"></i> Importar XLSX' +
     '</button>' +
+    '<button id="kair-mp-btn-nuevo-peligro" class="header-action--primary" title="Crear nuevo peligro (editor completo en próxima fase)">' +
+    '<i class="bi bi-plus-circle"></i> Nuevo peligro' +
+    '</button>' +
+    '<button id="kair-mp-btn-reset" class="header-action--ghost" title="Restablecer matriz a estado vacío">' +
+    '<i class="bi bi-arrow-counterclockwise"></i> Restablecer' +
+    '</button>' +
     '</div>' +
     '</div>' +
     '<div class="kair-mp-tabs" id="kair-mp-tabs">' +
     tabsHtml +
+    '</div>' +
+    '</div>';
+
+  /* Banner de estado dinámico — 4 variantes (rojo/amarillo/azul/verde).
+     Se recalcula desde updateBanner() tras read/import/reset/edit. */
+  var bannerHtml =
+    '<div class="kair-mp-banner kair-mp-banner--info" id="kair-mp-banner" role="status">' +
+    '<i class="bi bi-info-circle-fill kair-mp-banner__icon"></i>' +
+    '<div class="kair-mp-banner__body">' +
+    '<strong class="kair-mp-banner__title">Cargando…</strong>' +
+    '<span class="kair-mp-banner__msg">Leyendo estado actual de la matriz.</span>' +
     '</div>' +
     '</div>';
 
@@ -123,6 +168,7 @@ IdentificacionPeligrosComponent.prototype._renderUI = function () {
   wrapper.className = 'kair-mp-wrapper';
   wrapper.innerHTML =
     headerHtml +
+    bannerHtml +
     '<div class="kair-mp-views-container" style="flex:1;display:flex;flex-direction:column;overflow:hidden;">' +
     viewsHtml +
     '</div>' +
@@ -172,6 +218,20 @@ IdentificacionPeligrosComponent.prototype._initNavigation = function () {
   if (importBtn) {
     importBtn.addEventListener('click', function () {
       self._handleImportXlsx();
+    });
+  }
+
+  var nuevoBtn = wrapper.querySelector('#kair-mp-btn-nuevo-peligro');
+  if (nuevoBtn) {
+    nuevoBtn.addEventListener('click', function () {
+      self._handleNuevoPeligro();
+    });
+  }
+
+  var resetBtn = wrapper.querySelector('#kair-mp-btn-reset');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', function () {
+      self._handleReset();
     });
   }
 
@@ -293,6 +353,11 @@ IdentificacionPeligrosComponent.prototype._refreshAllViews = function () {
   if (window.MatrizView) MatrizView.refresh();
   if (window.PriorizacionView) PriorizacionView.refresh();
   if (window.IndicadoresView) IndicadoresView.refresh();
+  /* F1: recalcular banner tras cualquier operación de datos */
+  var self = this;
+  IdentificacionPeligrosService.stats(this.currentCompany).then(function (r) {
+    if (r && r.success && r.data) self._updateBanner(r.data);
+  }).catch(function () {});
 };
 
 IdentificacionPeligrosComponent.prototype._showImportError = function (message) {
@@ -337,6 +402,105 @@ IdentificacionPeligrosComponent.prototype._bindModalEvents = function () {
       if (e.target === modal) modal.classList.remove('visible');
     });
   }
+};
+
+/* F21.52 (2026-06-22) — F1: handler del botón "Nuevo peligro".
+   Para F1 abre un modal stub anunciando que el editor completo (Patrón C)
+   llega en F3. En F3 se reemplazará por window.open o un overlay fullscreen. */
+IdentificacionPeligrosComponent.prototype._handleNuevoPeligro = function () {
+  this._showModal(
+    'Nuevo peligro — editor en construcción',
+    '<div class="kair-mp-import-msg"><i class="bi bi-tools"></i><p>El editor completo con sidebar de 5 secciones + indicador de completitud <strong>X/5</strong> llega en la <strong>Fase 3 (F3)</strong> de este rediseño.</p>' +
+    '<p class="kair-mp-import-msg__hint">Por ahora, agrega el peligro desde la Matriz: selecciona una sede → proceso → cargo → clic en <em>"Agregar peligro"</em>.</p></div>',
+    null
+  );
+};
+
+/* F1: handler del botón "Restablecer". Pide confirmación y vacía la matriz
+   via IdentificacionPeligrosService.reset. */
+IdentificacionPeligrosComponent.prototype._handleReset = function () {
+  var self = this;
+  this._showModal(
+    'Restablecer matriz',
+    '<div class="kair-mp-import-msg kair-mp-import-msg--error"><i class="bi bi-exclamation-triangle"></i>' +
+    '<p>Vas a <strong>borrar todos los peligros, sedes, procesos y cargos</strong> de la matriz de esta empresa.</p>' +
+    '<p class="kair-mp-import-msg__hint">La metadata (código de formato GI-FO-019, fechas) se conserva. Esta acción no se puede deshacer.</p></div>',
+    function () { self._executeReset(); }
+  );
+};
+
+IdentificacionPeligrosComponent.prototype._executeReset = function () {
+  var self = this;
+  var btn = this.container.querySelector('#kair-mp-btn-reset');
+  if (btn) { btn.disabled = true; btn.classList.add('header-action--ghost--loading'); }
+
+  IdentificacionPeligrosService.reset(this.currentCompany).then(function (result) {
+    if (btn) { btn.disabled = false; btn.classList.remove('header-action--ghost--loading'); }
+    if (!result || !result.success) {
+      IdentificacionPeligrosService.toast(
+        'Error al restablecer: ' + (result && result.error && result.error.message || 'desconocido'),
+        'error'
+      );
+      return;
+    }
+    IdentificacionPeligrosService.toast('Matriz restablecida', 'success');
+    /* Refrescar banner con los nuevos stats + las 3 vistas */
+    if (result.data && result.data.stats) self._updateBanner(result.data.stats);
+    self._refreshAllViews();
+  }).catch(function (e) {
+    if (btn) { btn.disabled = false; btn.classList.remove('header-action--ghost--loading'); }
+    IdentificacionPeligrosService.toast('Error inesperado al restablecer: ' + (e.message || ''), 'error');
+  });
+};
+
+/* F1: banner dinámico — recalcula la variante desde stats.porAcept.
+   4 variantes (doc §9):
+     danger  = hay Nivel V (Nivel I del doc — peor)
+     warning = hay Nivel IV o III (Nivel II del doc — alto)
+     success = todo en I/II (aceptable)
+     info    = sin datos */
+IdentificacionPeligrosComponent.prototype._updateBanner = function (stats) {
+  var bannerEl = this.container.querySelector('#kair-mp-banner');
+  if (!bannerEl) return;
+  var iconEl = bannerEl.querySelector('.kair-mp-banner__icon');
+  var titleEl = bannerEl.querySelector('.kair-mp-banner__title');
+  var msgEl = bannerEl.querySelector('.kair-mp-banner__msg');
+
+  var variant = 'info';
+  var icon = 'bi-info-circle-fill';
+  var title = 'Sin datos aún';
+  var msg = 'Importe la matriz desde Excel o agregue peligros para empezar.';
+
+  if (stats && (stats.total || 0) > 0) {
+    var pa = stats.porAcept || {};
+    var v = pa.V || 0, iv = pa.IV || 0, iii = pa.III || 0, ii = pa.II || 0, i = pa.I || 0;
+    if (v > 0) {
+      variant = 'danger';
+      icon = 'bi-exclamation-octagon-fill';
+      title = 'Nivel I — No aceptable';
+      msg = v + ' peligro(s) en Nivel V (peor nivel). Requiere intervención inmediata.';
+    } else if (iv > 0) {
+      variant = 'warning';
+      icon = 'bi-exclamation-triangle-fill';
+      title = 'Nivel II — Alto';
+      msg = iv + ' peligro(s) en Nivel IV. Implementar controles específicos.';
+    } else if (iii > 0) {
+      variant = 'warning';
+      icon = 'bi-exclamation-triangle-fill';
+      title = 'Nivel III — Inaceptable nivel 1';
+      msg = iii + ' peligro(s) en Nivel III. Tomar medidas correctivas.';
+    } else {
+      variant = 'success';
+      icon = 'bi-check-circle-fill';
+      title = 'Riesgo controlado';
+      msg = (i + ii) + ' peligro(s) en niveles aceptables (I-II). Sin riesgos altos.';
+    }
+  }
+
+  bannerEl.className = 'kair-mp-banner kair-mp-banner--' + variant;
+  if (iconEl) iconEl.className = 'bi ' + icon + ' kair-mp-banner__icon';
+  if (titleEl) titleEl.textContent = title;
+  if (msgEl) msgEl.textContent = msg;
 };
 
 IdentificacionPeligrosComponent.prototype._showModal = function (title, bodyHtml, onConfirm) {

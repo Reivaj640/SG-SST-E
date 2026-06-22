@@ -1735,6 +1735,36 @@ var companyRoot = _getCompanyRootPath ? await _getCompanyRootPath(companyName) :
       return { success: false, error: { code: 'SYNC_ERROR', message: e.message } };
     }
   });
+
+  /* ─── Reset: limpia la matriz a estado vacío ───────────────────────────
+     Para F1: vacía sedes/peligros pero preserva metadata.
+     En F4 se reemplazará por carga de 48 peligros seed (doc §14). */
+  ipcMain.handle('matriz-peligros:reset', async function(_e, companyName) {
+    try {
+      var current = _readMatriz(companyName);
+      var empty = {
+        version: 1,
+        companyName: companyName,
+        lastModified: new Date().toISOString(),
+        metadata: current.metadata || {
+          formatCode: 'GI-FO-019',
+          version: 'V0',
+          elaborado: '', revisado: '', aprobado: '', fecha: ''
+        },
+        _nextId: 1,
+        sedes: [],
+        sourceXlsxPath: null
+      };
+      var ok = _writeMatriz(companyName, empty);
+      if (!ok) return { success: false, error: { code: 'WRITE_ERROR', message: 'Error al resetear matriz' } };
+      var fresh = _readMatriz(companyName);
+      _enriquecerMatriz(fresh);
+      var stats = _calcularStats(fresh);
+      return { success: true, data: { matriz: fresh, stats: stats } };
+    } catch (e) {
+      return { success: false, error: { code: 'RESET_ERROR', message: e.message } };
+    }
+  });
 }
 
 module.exports = { registerIdentificacionPeligrosHandlers };
