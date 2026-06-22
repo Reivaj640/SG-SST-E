@@ -95,10 +95,11 @@ const ALL_SUBMODULES = {
     "6.1.4 Planificación de la Auditoria",
   ],
   "Mejoramiento": [
+    /* F21.49 (2026-06-21) — Mejoramiento ahora SOLO tiene 7.1.1.
+       7.1.2 / 7.1.3 / 7.1.4 quedan integrados en el módulo único 7.1.1
+       (Matriz de Control Operacional GI-FO-014).
+       Por lo tanto la normativa legal ya no los activa como submódulos separados. */
     "7.1.1 Acciones Preventivas y Correctivas",
-    "7.1.2 Acciones de Mejora conforme a revisiones de la alta gerencia",
-    "7.1.3 Acciones de Mejora con base en investigaciones de AT y EL",
-    "7.1.4 Elaboración de Planes de Mejoramiento de medidas y acciones correctivas por autoridades y ARL",
   ]
 };
 
@@ -178,9 +179,7 @@ const SUBMODULE_PERMISSION_MAP_UI = new Map([
   ['6.1.3 revision de la alta direccion', 'verificacion.general'],
   ['6.1.4 planificacion de la auditoria', 'verificacion.general'],
   ['7.1.1 acciones preventivas y correctivas', 'mejoramiento.general'],
-  ['7.1.2 acciones de mejora conforme a revisiones de la alta gerencia', 'mejoramiento.general'],
-  ['7.1.3 acciones de mejora con base en investigaciones de at y el', 'mejoramiento.general'],
-  ['7.1.4 elaboracion de planes de mejoramiento de medidas y acciones correctivas por autoridades y arl', 'mejoramiento.general']
+  /* F21.49 (2026-06-21) — 7.1.2 / 7.1.3 / 7.1.4 ya no son submódulos activos de Mejoramiento */
 ]);
 
 function getResourceForSubmodule(moduleName, submoduleName) {

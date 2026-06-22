@@ -1,10 +1,20 @@
 // mejoramiento-home.js - Componente para el home del módulo "Mejoramiento"
 
+// F21.49 (2026-06-21) — Mejoramiento ahora SOLO tiene 7.1.1.
+// 7.1.2 / 7.1.3 / 7.1.4 ya no son submódulos activos — sus interfaces quedan reservadas
+// en modules/ pero NO se les crea UI porque la normativa (ALL_SUBMODULES en renderer.js)
+// solo incluye 7.1.1 en el módulo "Mejoramiento".
+
 class MejoramientoHome {
     constructor(container, moduleName, submodules) {
         this.container = container;
         this.moduleName = moduleName;
-        this.submodules = submodules || [];
+        /* this.submodules viene de RESOURCES_SUBMODULES[moduleName] en renderer.js,
+           que ya está filtrado por la normativa. Para Mejoramiento ahora solo trae
+           7.1.1. Si por algún motivo el array viene vacío, fallback a 7.1.1. */
+        this.submodules = (submodules && submodules.length > 0) ? submodules : [
+          '7.1.1 Acciones Preventivas y Correctivas'
+        ];
         this.currentCompany = null;
         this.widgets = {};
         this._unsubscribe = null;

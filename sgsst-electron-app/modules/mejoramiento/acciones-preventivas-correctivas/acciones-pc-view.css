@@ -357,7 +357,7 @@ body {
 .kair-empty__title { font-weight: 600; font-size: 15px; margin-bottom: 6px; color: var(--kair-text); }
 .kair-empty__desc { font-size: 13px; }
 
-/* ── EDITOR (vista de edición · refinado según referencia) ── */
+/* ── EDITOR (vista de edición · layout sidebar fijo + main scrolleable) ── */
 .kair-editor {
   display: grid;
   grid-template-columns: 280px 1fr;
@@ -368,15 +368,20 @@ body {
   flex: 1;
   min-height: 0;
   background: var(--kair-bg);
+  align-items: start; /* ← sidebar no se estira al 100% */
 }
 .kair-editor[hidden] { display: none; }
 
-/* ── Sidebar ── */
+/* ── Sidebar (sticky · altura natural · solo scroll interno si es muy largo) ── */
 .kair-editor__sidebar {
   grid-area: sidebar;
   background: var(--kair-card);
   border-right: 1px solid var(--kair-border);
   padding: 18px 14px;
+  position: sticky;
+  top: 0;
+  align-self: start;
+  max-height: 100vh;
   overflow-y: auto;
 }
 .kair-side-nav__title {
