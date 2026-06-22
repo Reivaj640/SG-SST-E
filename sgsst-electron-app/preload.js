@@ -471,7 +471,7 @@ renameCargo: (companyName, cargoId, nombre) => ipcRenderer.invoke('matriz-peligr
     notasAnaliticas: (companyName) => ipcRenderer.invoke('matriz-peligros:notas-analiticas', companyName),
       gtc45Options: () => ipcRenderer.invoke('matriz-peligros:gtc45-options'),
     discoverXlsx: (companyName) => ipcRenderer.invoke('matriz-peligros:discover-xlsx', companyName),
-    importXlsx: (companyName, filePath) => ipcRenderer.invoke('matriz-peligros:import-xlsx', companyName, filePath),
+    importXlsx: (companyName, filePath, opts) => ipcRenderer.invoke('matriz-peligros:import-xlsx', companyName, filePath, opts),
     syncXlsx: (companyName) => ipcRenderer.invoke('matriz-peligros:sync-xlsx', companyName),
     reset: (companyName) => ipcRenderer.invoke('matriz-peligros:reset', companyName),
   },

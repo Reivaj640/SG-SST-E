@@ -4437,15 +4437,15 @@ showDevelopmentMessage(submoduleContentDiv, submoduleName);
 }
 
 } else if (submoduleName === "4.1.2 Identificación de Peligros") {
-createComponentSafely(window.IdentificacionPeligrosComponent,
+createComponentSafely(window.KairMatrizPeligros,
 submoduleContentDiv,
 currentCompany,
 moduleName,
 submoduleName,
 safeBackToModuleCallback
 );
-if (!window.IdentificacionPeligrosComponent) {
-console.error('❌ IdentificacionPeligrosComponent no encontrado');
+if (!window.KairMatrizPeligros) {
+console.error('❌ KairMatrizPeligros no encontrado');
 showDevelopmentMessage(submoduleContentDiv, submoduleName);
 }
 

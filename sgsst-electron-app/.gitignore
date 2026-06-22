@@ -40,5 +40,9 @@ __pycache__/
 *.tmp
 *.temp
 
+# Scripts y datos de debug puntuales (raíz del repo)
+test-*.js
+test-*.xlsx
+
 # Archivos de configuración generados
 config.json

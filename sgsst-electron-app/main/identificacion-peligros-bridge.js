@@ -858,9 +858,9 @@ var HEADER_KEYWORDS = {
   actividades: ['ACTIVIDADES'],
   tareas: ['TAREAS', 'TAREA'],
   rutinaria: ['RUTINARIA', 'RUTINARIO'],
-  tipo: ['TIPO DE PELIGRO', 'TIPO DE RIESGO', 'CLASIFICACION', 'CLASIFICACIÓN', 'TIPO'],
-  peligro: ['DESCRIPCION DEL PELIGRO', 'DESCRIPCIÓN DEL PELIGRO', 'FACTOR DE RIESGO', 'DESCRIPCION', 'DESCRIPCIÓN'],
-  efectosPosibles: ['EFECTOS POSIBLES', 'EFECTO', 'POSIBLES DAÑOS', 'CONSECUENCIA'],
+  tipo: ['TIPO DE PELIGRO', 'TIPO DE RIESGO', 'CLASIFICACION DEL PELIGRO', 'CLASIFICACIÓN DEL PELIGRO'],
+  peligro: ['DESCRIPCION DEL PELIGRO', 'DESCRIPCIÓN DEL PELIGRO', 'FACTOR DE RIESGO', 'PELIGRO / ASPECTO', 'PELIGRO/ASPECTO'],
+  efectosPosibles: ['EFECTOS POSIBLES', 'EFECTO POSIBLE', 'POSIBLES DAÑOS', 'CONSECUENCIA'],
   nd: ['ND', 'NIVEL DE DEFICIENCIA'],
   ne: ['NE', 'NIVEL DE EXPOSICION', 'NIVEL DE EXPOSICIÓN'],
   np: ['NP', 'NIVEL DE PROBABILIDAD'],
@@ -868,7 +868,7 @@ var HEADER_KEYWORDS = {
   nc: ['NC', 'NIVEL DE CONSECUENCIA'],
   nr: ['NR', 'NIVEL DE RIESGO'],
   nrLabel: ['ACEPTABILIDAD', 'NIVEL DE RIESGO Y ACEPTABILIDAD'],
-  criterioEstablecido: ['CRITERIO ESTABLECIDO', 'CRITERIO DE LAS CONSECUENCIAS', 'CRITERIOS PARA ESTABLECER CONTROLES', 'CRITERIOS'],
+  criterioEstablecido: ['CRITERIO ESTABLECIDO', 'CRITERIO DE LAS CONSECUENCIAS'],
   fuente: ['FUENTE', 'MEDIDA FUENTE'],
   medio: ['MEDIO', 'MEDIDA MEDIO', 'MEDIO AMBIENTE', 'MEDIO DE TRANSMISION', 'MEDIO DE TRANSMISIÓN'],
   individuo: ['INDIVIDUO', 'MEDIDA INDIVIDUO', 'TRABAJADOR'],
@@ -1047,19 +1047,9 @@ async function _exportMatrizToXlsx(xlsxPath, matriz) {
   }
 }
 
-function _parseMatrizXlsx(filePath) {
-	var workbook = xlsx.readFile(filePath, { type: 'file' });
-	var sheetName = null;
-	for (var si = 0; si < workbook.SheetNames.length; si++) {
-		var sn = workbook.SheetNames[si].toUpperCase();
-		if (sn.indexOf('MATRIZ') !== -1 || sn.indexOf('PELIGRO') !== -1 || sn.indexOf('GTC') !== -1 || sn.indexOf('IDENTIFICACI') !== -1) {
-			sheetName = workbook.SheetNames[si];
-			break;
-		}
-	}
-	if (!sheetName) sheetName = workbook.SheetNames[0];
-	var ws = workbook.Sheets[sheetName];
-var rows = xlsx.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true });
+function _parseSingleSheet(ws, defaultSedeName, startIdx) {
+	var rows = xlsx.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true });
+	var sourceRowOffset = (typeof startIdx === 'number') ? startIdx : 0;
 
   var SKIP_FIELDS = { np: true, npInterpretacion: true, nr: true, nrLabel: true };
   var SUB_HEADER_FIELDS = { nd: true, ne: true, nc: true, nr: true, nrLabel: true, tipo: true, peligro: true, fuente: true, medio: true, individuo: true, np: true, npInterpretacion: true, expuestos: true, eliminacion: true, sustitucion: true, controlIngenieria: true, senalizacion: true, epp: true, peorConsecuencia: true };
@@ -1136,8 +1126,16 @@ var rows = xlsx.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true });
     }
     if (subFieldCount >= 3) {
       subRowIdx = sr;
+      /* Solo agregar campos del sub-row que NO fueron asignados por el group-row.
+         Esto evita que matches parciales del sub-scan (score bajo) sobrescriban
+         matches correctos del group-row (score alto).
+         Ej: group-scan "PELIGRO / ASPECTO" → col 5 (score 100)
+             sub-scan "DESCRIPCIÓN" matchea parcialmente "DESCRIPCIÓN DEL PELIGRO" → col 30 (score 23.91)
+             Sin este fix, el sub-scan sobrescribiría col 5 con col 30 (incorrecto). */
       for (var sf2 in subScan.trial) {
-        colMap[sf2] = subScan.trial[sf2];
+        if (SUB_HEADER_FIELDS[sf2] && colMap[sf2] === undefined) {
+          colMap[sf2] = subScan.trial[sf2];
+        }
       }
       break;
     }
@@ -1321,6 +1319,72 @@ var rows = xlsx.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true });
 		} else {
 			parseErrors.push('Fila ' + (dr + 1) + ': no se pudo crear cargo para "' + cargoVal + '"');
 		}
+
+		/* === SEGUNDO PELIGRO EN LA MISMA FILA (cols 29-35) ===
+		   Formato K+AIR/Tempoactiva: cada fila tiene 2 peligros combinados.
+		   Grupo A (cols 0-25): peligro principal + clasificación + controles + evaluación
+		   Grupo B (cols 29-35): segundo peligro + tipo + fuente + aceptabilidad + medidas
+		   Usamos offsets fijos para evitar colisiones con keywords del grupo A */
+		var p2Peligro = dataRow[30] != null ? String(dataRow[30] || '').trim() : '';
+		var p2Tipo = dataRow[31] != null ? String(dataRow[31] || '').trim() : '';
+		if (p2Peligro || p2Tipo) {
+			var p2MatchedTipo = _normalizarTipo(p2Tipo);
+			if (!p2MatchedTipo) p2MatchedTipo = p2Tipo || 'Físico';
+			var p2Data = {
+				tipo: p2MatchedTipo,
+				peligro: p2Peligro,
+				efectosPosibles: '',
+				expuestos: null,
+				nd: _getNum('nd'),
+				ne: _getNum('ne'),
+				nc: _getNum('nc'),
+				criterioEstablecido: '',
+				fuente: dataRow[32] != null ? String(dataRow[32] || '').trim() : '',
+				medio: '',
+				individuo: '',
+				medidasExistenteFuente: '',
+				medidasExistenteMedio: '',
+				medidasExistenteIndividuo: '',
+				medidasIntervencion: dataRow[35] != null ? String(dataRow[35] || '').trim() : '',
+				peorConsecuencia: '',
+				responsable: '',
+				plazo: '',
+				observaciones: ''
+			};
+			/* Aceptabilidad del grupo B → nrLabel si existe */
+			var p2Acept = dataRow[33] != null ? String(dataRow[33] || '').trim() : '';
+			if (p2Acept) p2Data.nrLabel = p2Acept;
+
+			/* Reutilizar validaciones de nd/ne/nc del peligro 1 */
+			if (p2Data.nd != null) {
+				if (p2Data.nd < 0) p2Data.nd = 0;
+				if (p2Data.nd > 5) p2Data.nd = 5;
+			}
+			if (p2Data.ne != null) {
+				if (p2Data.ne < 1) p2Data.ne = 1;
+				if (p2Data.ne > 4) p2Data.ne = 4;
+			}
+			if (p2Data.nc != null) {
+				var ncValid = [10, 20, 40, 60, 80, 100];
+				var ncClosest = null;
+				var ncMinDiff = Infinity;
+				for (var ni = 0; ni < ncValid.length; ni++) {
+					var diff = Math.abs(p2Data.nc - ncValid[ni]);
+					if (diff < ncMinDiff) { ncMinDiff = diff; ncClosest = ncValid[ni]; }
+				}
+				if (ncMinDiff <= 5) p2Data.nc = ncClosest;
+				else if (p2Data.nc >= 80) p2Data.nc = 80;
+				else if (p2Data.nc >= 60) p2Data.nc = 60;
+				else if (p2Data.nc >= 40) p2Data.nc = 40;
+				else if (p2Data.nc >= 20) p2Data.nc = 20;
+				else p2Data.nc = 10;
+			}
+
+			if (cargoMap[cargoKey]) {
+				_addPeligro(matriz, cargoMap[cargoKey], p2Data);
+				rowsImported++;
+			}
+		}
 	}
 
 	_enriquecerMatriz(matriz);
@@ -1332,7 +1396,105 @@ var rows = xlsx.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true });
 		sedesCreated: sedesCreated,
 		procesosCreated: procesosCreated,
 		cargosCreated: cargosCreated,
-		errors: parseErrors
+		errors: parseErrors,
+		sourceRowOffset: sourceRowOffset,
+		defaultSedeName: defaultSedeName,
+		hasSedeColumn: (colMap.sede != null)
+	};
+}
+
+function _parseMatrizXlsx(filePath) {
+	var workbook = xlsx.readFile(filePath, { type: 'file' });
+
+	/* Determinar qué hojas procesar:
+	   - Si hay UNA hoja, usar esa
+	   - Si hay VARIAS, procesarlas TODAS y usar el nombre de cada hoja como "sede"
+	     (a menos que la hoja tenga su propia columna "sede") */
+	var targetSheets = [];
+	for (var si = 0; si < workbook.SheetNames.length; si++) {
+		var sn = workbook.SheetNames[si];
+		var snUpper = sn.toUpperCase();
+		/* Filtrar hojas de instrucciones/readme/legales */
+		if (snUpper.indexOf('INSTRUCCIONES') !== -1) continue;
+		if (snUpper.indexOf('README') !== -1) continue;
+		if (snUpper.indexOf('LEEME') !== -1) continue;
+		targetSheets.push(sn);
+	}
+	if (targetSheets.length === 0) targetSheets = [workbook.SheetNames[0]];
+
+	/* Matriz combinada de todas las hojas */
+	var matrizFinal = _crearMatrizVacia('');
+	var totalRows = 0;
+	var totalSedes = 0;
+	var totalProcesos = 0;
+	var totalCargos = 0;
+	var allErrors = [];
+
+	for (var shi = 0; shi < targetSheets.length; shi++) {
+		var sheetName = targetSheets[shi];
+		var ws = workbook.Sheets[sheetName];
+		if (!ws) continue;
+
+		var singleResult = _parseSingleSheet(ws, sheetName, 0);
+		if (!singleResult || !singleResult.matriz) continue;
+
+		/* Mezclar las sedes de esta hoja en la matriz final */
+		for (var sdi = 0; sdi < singleResult.matriz.sedes.length; sdi++) {
+			var srcSede = singleResult.matriz.sedes[sdi];
+			/* Si la hoja NO tiene columna sede propia, usar el nombre de la hoja */
+			if (!singleResult.hasSedeColumn && srcSede.nombre === 'Sede Principal') {
+				srcSede.nombre = singleResult.defaultSedeName || sheetName;
+			}
+			matrizFinal.sedes.push(srcSede);
+		}
+
+		totalRows += singleResult.rowsImported;
+		totalSedes += singleResult.sedesCreated;
+		totalProcesos += singleResult.procesosCreated;
+		totalCargos += singleResult.cargosCreated;
+		if (singleResult.errors && singleResult.errors.length) {
+			allErrors = allErrors.concat(singleResult.errors);
+		}
+	}
+
+	/* Recalcular _nextId para que no haya colisiones */
+	matrizFinal._nextId = 1;
+	for (var fi = 0; fi < matrizFinal.sedes.length; fi++) {
+		var fSede = matrizFinal.sedes[fi];
+		if (!fSede.id || parseInt(fSede.id.split('_')[1]) >= matrizFinal._nextId) {
+			matrizFinal._nextId = parseInt(fSede.id.split('_')[1]) + 1;
+		}
+		for (var pi = 0; pi < (fSede.procesos || []).length; pi++) {
+			var fProc = fSede.procesos[pi];
+			if (!fProc.id || parseInt(fProc.id.split('_')[1]) >= matrizFinal._nextId) {
+				matrizFinal._nextId = parseInt(fProc.id.split('_')[1]) + 1;
+			}
+			for (var ci = 0; ci < (fProc.cargos || []).length; ci++) {
+				var fCar = fProc.cargos[ci];
+				if (!fCar.id || parseInt(fCar.id.split('_')[1]) >= matrizFinal._nextId) {
+					matrizFinal._nextId = parseInt(fCar.id.split('_')[1]) + 1;
+				}
+				for (var pei = 0; pei < (fCar.peligros || []).length; pei++) {
+					var fPel = fCar.peligros[pei];
+					if (!fPel.id || parseInt(fPel.id.split('_')[1]) >= matrizFinal._nextId) {
+						matrizFinal._nextId = parseInt(fPel.id.split('_')[1]) + 1;
+					}
+				}
+			}
+		}
+	}
+
+	_enriquecerMatriz(matrizFinal);
+
+	return {
+		success: true,
+		matriz: matrizFinal,
+		rowsImported: totalRows,
+		sedesCreated: totalSedes,
+		procesosCreated: totalProcesos,
+		cargosCreated: totalCargos,
+		errors: allErrors,
+		sheetsProcessed: targetSheets.length
 	};
 }
 
@@ -1612,8 +1774,10 @@ var companyRoot = _getCompanyRootPath ? await _getCompanyRootPath(companyName) :
     }
   });
 
-  ipcMain.handle('matriz-peligros:import-xlsx', async function(_e, companyName, filePath) {
+  ipcMain.handle('matriz-peligros:import-xlsx', async function(_e, companyName, filePath, opts) {
     try {
+      opts = opts || {};
+      var replaceMode = opts.replace === true; /* default: REEMPLAZAR */
       if (!filePath) {
 var companyRoot = _getCompanyRootPath ? await _getCompanyRootPath(companyName) : null;
 			if (!companyRoot) return { success: false, error: { code: 'NO_COMPANY', message: 'No se encontró la ruta de la empresa' } };
@@ -1627,17 +1791,29 @@ var companyRoot = _getCompanyRootPath ? await _getCompanyRootPath(companyName) :
       if (!parsed.success) {
         return { success: false, error: { code: 'PARSE_ERROR', message: parsed.error } };
       }
+
+      /* En modo REEMPLAZAR (default): crear matriz nueva preservando solo metadata */
       var existing = _readMatriz(companyName);
-      if (!existing.sedes) existing.sedes = [];
+      var target;
+      if (replaceMode) {
+        target = _crearMatrizVacia(companyName);
+        target.metadata = existing.metadata || target.metadata;
+      } else {
+        target = existing;
+        if (!target.sedes) target.sedes = [];
+      }
+
 	var importSedes = parsed.matriz && parsed.matriz.sedes ? parsed.matriz.sedes : [];
 	for (var s = 0; s < importSedes.length; s++) {
 		var srcSede = importSedes[s];
         var existingSede = null;
-        for (var es = 0; es < existing.sedes.length; es++) {
-          if (existing.sedes[es].nombre === srcSede.nombre) { existingSede = existing.sedes[es]; break; }
+        if (!replaceMode) {
+          for (var es = 0; es < target.sedes.length; es++) {
+            if (target.sedes[es].nombre === srcSede.nombre) { existingSede = target.sedes[es]; break; }
+          }
         }
         if (!existingSede) {
-          var newSede = _addSede(existing, srcSede.nombre);
+          var newSede = _addSede(target, srcSede.nombre);
           existingSede = newSede;
         }
 	if (!existingSede.procesos) existingSede.procesos = [];
@@ -1645,11 +1821,13 @@ var companyRoot = _getCompanyRootPath ? await _getCompanyRootPath(companyName) :
 	for (var p = 0; p < srcSede.procesos.length; p++) {
           var srcProc = srcSede.procesos[p];
           var existingProc = null;
-          for (var ep = 0; ep < existingSede.procesos.length; ep++) {
-            if (existingSede.procesos[ep].nombre === srcProc.nombre) { existingProc = existingSede.procesos[ep]; break; }
+          if (!replaceMode) {
+            for (var ep = 0; ep < existingSede.procesos.length; ep++) {
+              if (existingSede.procesos[ep].nombre === srcProc.nombre) { existingProc = existingSede.procesos[ep]; break; }
+            }
           }
           if (!existingProc) {
-            var newProc = _addProceso(existing, existingSede.id, srcProc.nombre);
+            var newProc = _addProceso(target, existingSede.id, srcProc.nombre);
             existingProc = newProc;
           }
           if (!existingProc) continue;
@@ -1658,11 +1836,13 @@ var companyRoot = _getCompanyRootPath ? await _getCompanyRootPath(companyName) :
 	for (var c = 0; c < srcProc.cargos.length; c++) {
             var srcCargo = srcProc.cargos[c];
             var existingCargo = null;
-            for (var ec = 0; ec < existingProc.cargos.length; ec++) {
-              if (existingProc.cargos[ec].nombre === srcCargo.nombre) { existingCargo = existingProc.cargos[ec]; break; }
+            if (!replaceMode) {
+              for (var ec = 0; ec < existingProc.cargos.length; ec++) {
+                if (existingProc.cargos[ec].nombre === srcCargo.nombre) { existingCargo = existingProc.cargos[ec]; break; }
+              }
             }
             if (!existingCargo) {
-              var newCargo = _addCargo(existing, existingProc.id, srcCargo.nombre);
+              var newCargo = _addCargo(target, existingProc.id, srcCargo.nombre);
               existingCargo = newCargo;
             }
             if (!existingCargo) continue;
@@ -1680,17 +1860,18 @@ var companyRoot = _getCompanyRootPath ? await _getCompanyRootPath(companyName) :
                 medidasExistenteIndividuo: srcPel.medidasExistenteIndividuo, medidasIntervencion: srcPel.medidasIntervencion,
                 responsable: srcPel.responsable, plazo: srcPel.plazo, observaciones: srcPel.observaciones
               };
-              _addPeligro(existing, existingCargo.id, pelData);
+              _addPeligro(target, existingCargo.id, pelData);
             }
           }
         }
       }
-  existing.lastModified = new Date().toISOString();
-  existing.sourceXlsxPath = filePath;
-  _writeMatriz(companyName, existing);
+  target.lastModified = new Date().toISOString();
+  target.sourceXlsxPath = filePath;
+  _writeMatriz(companyName, target);
       return {
         success: true,
         data: {
+          mode: replaceMode ? 'replace' : 'append',
           rowsImported: parsed.rowsImported,
           sedesCreated: parsed.sedesCreated,
           procesosCreated: parsed.procesosCreated,
