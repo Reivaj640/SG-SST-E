@@ -1121,6 +1121,12 @@ Basado en modules/recursos/capacitaciones/capacitaciones-view.html
   border: 1px solid var(--km-border);
   border-radius: var(--km-radius-md);
   overflow: hidden;
+  /* F21.50 (2026-06-23) — flex-shrink:0 evita que las secciones se encojan
+     dentro del flex-column del .km-editor-content. Sin esto, las secciones
+     se comprimen y el `overflow:hidden` recorta su contenido a 1 sola fila.
+     Cada tarjeta debe mantener su altura natural completa; el scroll se
+     delega al padre .km-editor-content (overflow-y:auto). */
+  flex-shrink: 0;
 }
 .km-editor-section__head {
   display: flex;
