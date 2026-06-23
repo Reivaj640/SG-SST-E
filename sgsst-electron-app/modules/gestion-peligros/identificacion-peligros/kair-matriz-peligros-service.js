@@ -85,6 +85,18 @@ service.js — IPC + seed JSON fallback
       return Promise.resolve({ success: true, data: { id: KM.uid('sed'), nombre: nombre } });
     },
 
+    addProceso: function (companyName, sedeId, nombre) {
+      var r = passthrough('addProceso', [companyName, sedeId, nombre]);
+      if (r) return r;
+      return Promise.resolve({ success: true, data: { id: KM.uid('pro'), nombre: nombre } });
+    },
+
+    addCargo: function (companyName, procesoId, nombre) {
+      var r = passthrough('addCargo', [companyName, procesoId, nombre]);
+      if (r) return r;
+      return Promise.resolve({ success: true, data: { id: KM.uid('car'), nombre: nombre } });
+    },
+
     deleteSede: function (companyName, sedeId) {
       var r = passthrough('deleteSede', [companyName, sedeId]);
       if (r) return r;

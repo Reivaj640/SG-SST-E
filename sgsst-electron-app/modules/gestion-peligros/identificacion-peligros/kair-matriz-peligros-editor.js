@@ -152,18 +152,48 @@ Convenciones:
     var items = SECTIONS.map(function (sec) {
       var st = _sectionStatus(sec.key);
       if (st === 'complete') completitud++;
+      var checkCls = 'km-editor-side-check km-editor-side-check--' + st;
+      var checkIcon = st === 'complete' ? 'bi-check-circle-fill' : 'bi-circle';
       return (
         '<li class="km-editor-side-item" data-jump="' + sec.key + '">' +
           '<span class="km-editor-side-icon"><i class="bi bi-' + sec.icon + '"></i></span>' +
           '<span class="km-editor-side-label">' + _esc(sec.label) + '</span>' +
+          '<span class="' + checkCls + '"><i class="bi ' + checkIcon + '"></i></span>' +
           _statusBadge(st) +
         '</li>'
       );
     }).join('');
 
+    /* Datos clave (ID, sede, NR) según doc técnico */
+    var d = _state.data || {};
+    var nr = KM.calcNR(KM.calcNP(d.nd, d.ne), d.nc);
+    var interpNr = KM.interpNR(nr);
+    var nrDisplay = nr != null ? String(nr) : '—';
+    var nrNivelDisplay = interpNr.nivel ? ('Nivel ' + interpNr.nivel) : '—';
+
+    var keyData = (
+      '<div class="km-editor-sidebar__keydata">' +
+        '<div class="km-editor-keydata__row">' +
+          '<span class="km-editor-keydata__label">ID</span>' +
+          '<span class="km-editor-keydata__value">' + _esc(d.id || '—') + '</span>' +
+        '</div>' +
+        '<div class="km-editor-keydata__row">' +
+          '<span class="km-editor-keydata__label">Sede</span>' +
+          '<span class="km-editor-keydata__value">' + _esc(d.sede || '—') + '</span>' +
+        '</div>' +
+        '<div class="km-editor-keydata__row">' +
+          '<span class="km-editor-keydata__label">NR</span>' +
+          '<span class="km-editor-keydata__value">' + nrDisplay +
+            (interpNr.nivel ? ' <span class="km-editor-keydata__chip km-badge km-badge--' + interpNr.tone + '">' + _esc(nrNivelDisplay) + '</span>' : '') +
+          '</span>' +
+        '</div>' +
+      '</div>'
+    );
+
     return (
       '<div class="km-editor-sidebar__title">SECCIONES</div>' +
       '<ul class="km-editor-side-nav">' + items + '</ul>' +
+      keyData +
       '<div class="km-editor-sidebar__progress">' +
         '<div class="km-editor-sidebar__progress-label">COMPLETITUD</div>' +
         '<div class="km-editor-sidebar__progress-count">' + completitud + '/' + SECTIONS.length + '</div>' +
@@ -172,11 +202,56 @@ Convenciones:
     );
   }
 
+  /* Banner dinámico: 4 variantes según NR (según doc técnico)
+     - Sin NR calculado → azul info
+     - NR >= 800 → rojo (Nivel I - NO ACEPTABLE, intervención inmediata)
+     - NR >= 180 → amarillo (Nivel II - ACEPTABLE CON CONTROL ESPECIFICO)
+     - NR >= 40  → azul/info (Nivel III - MEJORABLE)
+     - NR < 40   → verde (Nivel IV - ACEPTABLE) */
   function _renderBanner() {
+    var d = _state.data || {};
+    var nd = d.nd, ne = d.ne, nc = d.nc;
+    var hasAll = (nd != null && nd !== '') && (ne != null && ne !== '') && (nc != null && nc !== '');
+    var variant = 'info';
+    var icon = 'info-circle';
+    var title = 'Completa todas las secciones para registrar el peligro en la matriz.';
+    var subtitle = '';
+
+    if (hasAll) {
+      var np = KM.calcNP(nd, ne);
+      var nr = KM.calcNR(np, nc);
+      var interpNr = KM.interpNR(nr);
+      var npInterp = KM.interpNP(np);
+      if (nr >= 800) {
+        variant = 'danger';
+        icon = 'exclamation-octagon-fill';
+        title = 'Nivel I — No aceptable. Requiere intervención inmediata.';
+        subtitle = 'NP = ' + np + ' (' + npInterp.label + ') · NR = ' + nr + ' · Aceptabilidad: NO ACEPTABLE';
+      } else if (nr >= 180) {
+        variant = 'warning';
+        icon = 'exclamation-triangle-fill';
+        title = 'Nivel II — Alto. Implementar controles específicos.';
+        subtitle = 'NP = ' + np + ' (' + npInterp.label + ') · NR = ' + nr + ' · Aceptabilidad: ACEPTABLE CON CONTROL ESPECIFICO';
+      } else if (nr >= 40) {
+        variant = 'info';
+        icon = 'info-circle-fill';
+        title = 'Nivel III — Mejorable. Riesgo medio, documentar controles.';
+        subtitle = 'NP = ' + np + ' (' + npInterp.label + ') · NR = ' + nr + ' · Aceptabilidad: MEJORABLE';
+      } else {
+        variant = 'success';
+        icon = 'check-circle-fill';
+        title = 'Nivel IV — Aceptable. Riesgo bajo, mantener controles existentes.';
+        subtitle = 'NP = ' + np + ' (' + npInterp.label + ') · NR = ' + nr + ' · Aceptabilidad: ACEPTABLE';
+      }
+    }
+
     return (
-      '<div class="km-editor-banner">' +
-        '<i class="bi bi-info-circle"></i>' +
-        '<span>Completa todas las secciones para registrar el peligro en la matriz.</span>' +
+      '<div class="km-editor-banner km-editor-banner--' + variant + '" data-banner>' +
+        '<i class="bi bi-' + icon + '"></i>' +
+        '<div class="km-editor-banner__text">' +
+          '<div class="km-editor-banner__title">' + _esc(title) + '</div>' +
+          (subtitle ? '<div class="km-editor-banner__sub">' + _esc(subtitle) + '</div>' : '') +
+        '</div>' +
       '</div>'
     );
   }
@@ -317,13 +392,13 @@ Convenciones:
   function _renderSectionControles() {
     var d = _state.data;
     return _sectionCardOpen('controles', 'Controles existentes', 'shield-check') +
-      _field('Control en la fuente', 'fuente', d.fuente, { type: 'textarea', rows: 2, full: true, placeholder: 'Ej: Pasamanos, protección partes rotativas...' }) +
-      _field('Control en el medio', 'medio', d.medio, { type: 'textarea', rows: 2, full: true, placeholder: 'Ej: Ventilación, aislamiento acústico...' }) +
-      _field('Control en el individuo', 'individuo', d.individuo, { type: 'textarea', rows: 2, full: true, placeholder: 'Ej: Capacitación, EPP, procedimientos...' }) +
+      _field('Control en la fuente', 'controlFuente', d.controlFuente, { type: 'textarea', rows: 2, full: true, placeholder: 'Ej: Pasamanos, protección partes rotativas...' }) +
+      _field('Control en el medio', 'controlMedio', d.controlMedio, { type: 'textarea', rows: 2, full: true, placeholder: 'Ej: Ventilación, aislamiento acústico...' }) +
+      _field('Control en la persona', 'controlPersona', d.controlPersona, { type: 'textarea', rows: 2, full: true, placeholder: 'Ej: Capacitación, EPP, procedimientos...' }) +
       _sectionCardClose();
   }
 
-  /* --- Section 4: Evaluación (auto) --- */
+  /* --- Section 4: Evaluación del riesgo (auto-cálculo GTC 45) --- */
   function _renderSectionEvaluacion() {
     var opts = _state.gtc45Options || { nd: [], ne: [], nc: [] };
     var ndOpts = (opts.nd || []).map(function (o) { return { value: o.value, label: o.label }; });
@@ -331,16 +406,24 @@ Convenciones:
     var ncOpts = (opts.nc || []).map(function (o) { return { value: o.value, label: o.label }; });
 
     var d = _state.data;
-    return _sectionCardOpen('evaluacion', 'Evaluación (auto)', 'speedometer2') +
-      '<div class="km-editor-grid">' +
-        _field('Nivel de deficiencia (ND)', 'nd', d.nd, { type: 'select', required: true, options: ndOpts }) +
-        _field('Nivel de exposición (NE)', 'ne', d.ne, { type: 'select', required: true, options: neOpts }) +
-        _field('Nivel de consecuencia (NC)', 'nc', d.nc, { type: 'select', required: true, options: ncOpts }) +
+    return _sectionCardOpen('evaluacion', 'Evaluación del riesgo (auto-cálculo GTC 45)', 'speedometer2') +
+      '<div class="km-editor-eval-internal-banner">' +
+        '<i class="bi bi-info-circle"></i>' +
+        '<span>Selecciona ND, NE y NC. El sistema calcula automáticamente NP, NR, interpretaciones y aceptabilidad.</span>' +
       '</div>' +
-      '<div class="km-editor-eval-preview" data-eval-preview></div>' +
+      '<div class="km-editor-grid km-editor-grid--three">' +
+        _field('ND', 'nd', d.nd, { type: 'select', required: true, options: ndOpts }) +
+        _field('NE', 'ne', d.ne, { type: 'select', required: true, options: neOpts }) +
+        _field('NC', 'nc', d.nc, { type: 'select', required: true, options: ncOpts }) +
+      '</div>' +
+      '<div class="km-editor-resultado" data-eval-preview>' +
+        '<div class="km-editor-resultado__title">RESULTADO (AUTOMATICO)</div>' +
+        '<div class="km-editor-resultado__grid" data-eval-preview-content></div>' +
+      '</div>' +
       _sectionCardClose();
   }
 
+  /* RESULTADO panel unificado (4 columnas: NP / NC / NR / Aceptabilidad) */
   function _renderEvalPreviewContent() {
     var d = _state.data;
     var nd = d.nd, ne = d.ne, nc = d.nc;
@@ -349,33 +432,41 @@ Convenciones:
     var interpNp = KM.interpNP(np);
     var interpNr = KM.interpNR(nr);
     return (
-      '<div class="km-editor-eval-preview__row">' +
-        '<div class="km-editor-eval-preview__item">' +
-          '<div class="km-editor-eval-preview__label">NP = ND × NE</div>' +
-          '<div class="km-editor-eval-preview__value">' + (np != null ? np : '—') + '</div>' +
-          '<div class="km-editor-eval-preview__sub">' + _esc(interpNp.label || '—') + '</div>' +
-        '</div>' +
-        '<div class="km-editor-eval-preview__item km-editor-eval-preview__item--nr">' +
-          '<div class="km-editor-eval-preview__label">NR = NP × NC</div>' +
-          '<div class="km-editor-eval-preview__value">' + (nr != null ? nr : '—') + '</div>' +
-          '<div class="km-editor-eval-preview__sub">' +
-            (interpNr.nivel ? ('Nivel ' + interpNr.nivel + ' · ') : '') +
-            _esc(interpNr.label || '—') +
-          '</div>' +
-        '</div>' +
+      '<div class="km-editor-resultado__col">' +
+        '<div class="km-editor-resultado__value">' + (np != null ? np : '0') + '</div>' +
+        '<div class="km-editor-resultado__formula">NP=NDxNE</div>' +
+        '<span class="km-editor-resultado__chip km-badge km-badge--' + (interpNp.tone || 'info') + '">' + _esc(interpNp.label || '—') + '</span>' +
+      '</div>' +
+      '<div class="km-editor-resultado__col">' +
+        '<div class="km-editor-resultado__value">' + (nc != null ? nc : '0') + '</div>' +
+        '<div class="km-editor-resultado__formula">NC</div>' +
+        '<span class="km-editor-resultado__chip">&nbsp;</span>' +
+      '</div>' +
+      '<div class="km-editor-resultado__col">' +
+        '<div class="km-editor-resultado__value">' + (nr != null ? nr : '0') + '</div>' +
+        '<div class="km-editor-resultado__formula">NR=NPxNC</div>' +
+        (interpNr.nivel
+          ? '<span class="km-editor-resultado__chip km-badge km-badge--' + interpNr.tone + '">Nivel ' + _esc(interpNr.nivel) + '</span>'
+          : '<span class="km-editor-resultado__chip">&nbsp;</span>') +
+      '</div>' +
+      '<div class="km-editor-resultado__col km-editor-resultado__col--acept">' +
+        '<div class="km-editor-resultado__formula">Aceptabilidad</div>' +
+        (interpNr.label
+          ? '<span class="km-editor-resultado__chip km-badge km-badge--' + interpNr.tone + '">' + _esc(interpNr.label) + '</span>'
+          : '<span class="km-editor-resultado__chip">&nbsp;</span>') +
       '</div>'
     );
   }
 
-  /* --- Section 5: Medidas de intervención --- */
+  /* --- Section 5: Medidas de intervención (jerarquía 1-5 según GTC-45) --- */
   function _renderSectionMedidas() {
     var d = _state.data;
     return _sectionCardOpen('medidas', 'Medidas de intervención', 'hammer') +
-      _field('Eliminación', 'eliminacion', d.eliminacion, { type: 'textarea', rows: 2, full: true, placeholder: '¿Se puede eliminar el peligro?' }) +
-      _field('Sustitución', 'sustitucion', d.sustitucion, { type: 'textarea', rows: 2, full: true, placeholder: '¿Se puede sustituir por algo menos peligroso?' }) +
-      _field('Controles de ingeniería', 'controlIngenieria', d.controlIngenieria, { type: 'textarea', rows: 2, full: true, placeholder: 'Guardas, barreras, ventilación, aislamiento...' }) +
-      _field('Controles administrativos', 'senalizacion', d.senalizacion, { type: 'textarea', rows: 2, full: true, placeholder: 'Procedimientos, señalización, capacitación, rotación...' }) +
-      _field('EPP', 'epp', d.epp, { type: 'textarea', rows: 2, full: true, placeholder: 'Elementos de protección personal requeridos...' }) +
+      _field('1. Eliminación', 'medidaEliminacion', d.medidaEliminacion, { type: 'textarea', rows: 2, full: true, placeholder: 'Eliminar el peligro...' }) +
+      _field('2. Sustitución', 'medidaSustitucion', d.medidaSustitucion, { type: 'textarea', rows: 2, full: true, placeholder: 'Reemplazar por algo menos peligroso...' }) +
+      _field('3. Ingeniería', 'medidaIngenieria', d.medidaIngenieria, { type: 'textarea', rows: 2, full: true, placeholder: 'Modificar instalaciones o equipos...' }) +
+      _field('4. Administrativos', 'medidaAdministrativos', d.medidaAdministrativos, { type: 'textarea', rows: 2, full: true, placeholder: 'Procedimientos, capacitación...' }) +
+      _field('5. EPP', 'medidaEpp', d.medidaEpp, { type: 'textarea', rows: 2, full: true, placeholder: 'Casco, gafas, guantes...' }) +
       _sectionCardClose();
   }
 
@@ -401,8 +492,8 @@ Convenciones:
     );
     _state.container.innerHTML = html;
     /* Pintar preview NP/NR dentro del bloque de evaluación */
-    var preview = _state.container.querySelector('[data-eval-preview]');
-    if (preview) preview.innerHTML = _renderEvalPreviewContent();
+    var previewContent = _state.container.querySelector('[data-eval-preview-content]');
+    if (previewContent) previewContent.innerHTML = _renderEvalPreviewContent();
   }
 
   function _refresh() {
@@ -446,8 +537,9 @@ Convenciones:
       var el = _state.container.querySelector('[name="' + k + '"]');
       if (el) el.addEventListener('change', function () {
         _state.data[k] = el.value;
-        var preview = _state.container.querySelector('[data-eval-preview]');
-        if (preview) preview.innerHTML = _renderEvalPreviewContent();
+        var previewContent = _state.container.querySelector('[data-eval-preview-content]');
+        if (previewContent) previewContent.innerHTML = _renderEvalPreviewContent();
+        _updateBanner();
         _updateFooterHint();
         _updateSidebarBadges();
       });
@@ -522,6 +614,16 @@ Convenciones:
     tmp.innerHTML = _renderSidebar();
     var newSidebar = tmp.firstChild;
     if (newSidebar) sidebar.replaceWith(newSidebar);
+  }
+
+  function _updateBanner() {
+    if (!_state || !_state.container) return;
+    var banner = _state.container.querySelector('[data-banner]');
+    if (!banner) return;
+    var tmp = document.createElement('div');
+    tmp.innerHTML = _renderBanner();
+    var newBanner = tmp.firstChild;
+    if (newBanner) banner.replaceWith(newBanner);
   }
 
   /* ---------------- Save / Cancel ---------------- */

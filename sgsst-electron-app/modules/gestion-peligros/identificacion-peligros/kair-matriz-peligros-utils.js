@@ -54,23 +54,28 @@ utils.js — Helpers: GTC-45, escape, toasts, modales, logging
     return { label: 'ALTO', tone: 'alto' };
   };
 
-  /* GTC-45 nivel por NR: I (<=40), II (40-179), III (180-799), IV (>=800) */
+  /* GTC-45 nivel por NR — convención del doc técnico + seed (Nivel I = peor,
+     Nivel IV = mejor). Rangos:
+       NR >= 800  → Nivel I  (NO ACEPTABLE — rojo)
+       NR >= 180  → Nivel II (ACEPTABLE CON CONTROL ESPECIFICO — amarillo)
+       NR >= 40   → Nivel III (MEJORABLE — azul/info)
+       NR < 40    → Nivel IV (ACEPTABLE — verde) */
   KM.interpNR = function (nr) {
-    if (nr == null) return { nivel: '', label: '', tone: '' };
-    if (nr < 40)   return { nivel: 'I',   label: 'ACEPTABLE',                tone: 'success' };
-    if (nr < 180)  return { nivel: 'II',  label: 'ACEPTABLE CON CONTROL',    tone: 'warning' };
-    if (nr < 800)  return { nivel: 'III', label: 'ACEPTABLE',                tone: 'info' };
-    return { nivel: 'IV', label: 'NO ACEPTABLE', tone: 'danger' };
+    if (nr == null || nr === '') return { nivel: '', label: '', tone: '' };
+    if (nr >= 800)  return { nivel: 'I',   label: 'NO ACEPTABLE',                     tone: 'danger' };
+    if (nr >= 180)  return { nivel: 'II',  label: 'ACEPTABLE CON CONTROL ESPECIFICO', tone: 'warning' };
+    if (nr >= 40)   return { nivel: 'III', label: 'MEJORABLE',                        tone: 'info' };
+    return { nivel: 'IV', label: 'ACEPTABLE', tone: 'success' };
   };
 
-  /* Clasifica nivel de riesgo (1-5) según NR */
+  /* Clasifica nivel de riesgo (1-5) según NR — convención inversa:
+     1 = peor, 5 = mejor (0 = no evaluado) */
   KM.nivelRiesgo = function (nr) {
     if (nr == null) return 0;
-    if (nr < 40) return 1;
-    if (nr < 180) return 2;
-    if (nr < 800) return 3;
-    if (nr < 2400) return 4;
-    return 5;
+    if (nr >= 800) return 1;
+    if (nr >= 180) return 2;
+    if (nr >= 40)  return 3;
+    return 4;
   };
 
   /* Cuenta y agrega estadísticas */

@@ -24,15 +24,15 @@ Namespace: km- (aislado, sin colisiones)
   --km-info: #174ea6;
   --km-info-light: #e8f0fe;
 
-  /* GTC-45 niveles */
-  --km-nivel-I: #1b5e20;
-  --km-nivel-I-bg: #d4edda;
+  /* GTC-45 niveles (convención doc técnico: Nivel I = peor, Nivel IV = mejor) */
+  --km-nivel-I: #b71c1c;
+  --km-nivel-I-bg: #fee2e2;
   --km-nivel-II: #f57f17;
   --km-nivel-II-bg: #fff8e1;
   --km-nivel-III: #e65100;
   --km-nivel-III-bg: #ffedd5;
-  --km-nivel-IV: #b71c1c;
-  --km-nivel-IV-bg: #fee2e2;
+  --km-nivel-IV: #1b5e20;
+  --km-nivel-IV-bg: #d4edda;
   --km-nivel-V: #4a148c;
   --km-nivel-V-bg: #e9d5ff;
 
@@ -1304,4 +1304,177 @@ Basado en modules/recursos/capacitaciones/capacitaciones-view.html
   .km-editor-grid { grid-template-columns: 1fr; }
   .km-editor-eval-preview__row { flex-direction: column; align-items: stretch; }
   .km-editor-eval-preview__item--nr { text-align: left; }
+}
+
+/* ==========================================================================
+13. EDITOR v2 — Banner dinámico, sidebar key data, RESULTADO panel
+   Ajustes según doc técnico (Capítulo 12).
+========================================================================== */
+
+/* --- Banner dinámico (4 variantes según NR) --- */
+.km-editor-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 20px;
+  border-bottom: 1px solid #c7d7f5;
+  font-size: var(--km-fs-sm);
+  flex-shrink: 0;
+  line-height: 1.4;
+}
+.km-editor-banner i { font-size: 1.1rem; margin-top: 1px; }
+.km-editor-banner__text { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.km-editor-banner__title { font-weight: 600; }
+.km-editor-banner__sub { font-size: var(--km-fs-xs); opacity: 0.85; }
+.km-editor-banner--info {
+  background: #e8f0fe;
+  border-bottom-color: #c7d7f5;
+  color: #1a1a2e;
+}
+.km-editor-banner--info i { color: var(--km-primary); }
+.km-editor-banner--success {
+  background: var(--km-nivel-IV-bg);
+  border-bottom-color: #a3d9a5;
+  color: var(--km-nivel-IV);
+}
+.km-editor-banner--success i { color: var(--km-nivel-IV); }
+.km-editor-banner--warning {
+  background: var(--km-nivel-II-bg);
+  border-bottom-color: #f0d68a;
+  color: var(--km-warning-dark);
+}
+.km-editor-banner--warning i { color: var(--km-warning-dark); }
+.km-editor-banner--danger {
+  background: var(--km-nivel-I-bg);
+  border-bottom-color: #f5a5a5;
+  color: var(--km-nivel-I);
+}
+.km-editor-banner--danger i { color: var(--km-nivel-I); }
+[data-theme="dark"] .km-editor-banner--info    { background: #1e3a8a; border-bottom-color: #1e40af; color: #cfe2ff; }
+[data-theme="dark"] .km-editor-banner--info i  { color: #93c5fd; }
+[data-theme="dark"] .km-editor-banner--success { background: #14532d; border-bottom-color: #166534; color: #bbf7d0; }
+[data-theme="dark"] .km-editor-banner--success i { color: #4ade80; }
+[data-theme="dark"] .km-editor-banner--warning { background: #78350f; border-bottom-color: #92400e; color: #fde68a; }
+[data-theme="dark"] .km-editor-banner--warning i { color: #fbbf24; }
+[data-theme="dark"] .km-editor-banner--danger  { background: #7f1d1d; border-bottom-color: #991b1b; color: #fecaca; }
+[data-theme="dark"] .km-editor-banner--danger i { color: #f87171; }
+
+/* --- Sidebar: check verde por sección --- */
+.km-editor-side-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  width: 20px;
+  height: 20px;
+}
+.km-editor-side-check--complete { color: var(--km-success); }
+.km-editor-side-check--partial  { color: var(--km-warning); }
+.km-editor-side-check--empty,
+.km-editor-side-check--sin-sede { color: var(--km-text-light); }
+
+/* --- Sidebar: datos clave (ID, sede, NR) --- */
+.km-editor-sidebar__keydata {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  background: #f8fafc;
+  border: 1px solid var(--km-border-light);
+  border-radius: var(--km-radius-sm);
+}
+.km-editor-keydata__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--km-fs-xs);
+}
+.km-editor-keydata__label {
+  color: var(--km-text-muted);
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.km-editor-keydata__value {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--km-text-primary);
+  font-weight: 600;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.km-editor-keydata__chip { font-size: 0.6875rem; }
+[data-theme="dark"] .km-editor-sidebar__keydata { background: #0f172a; border-color: #334155; }
+[data-theme="dark"] .km-editor-keydata__label  { color: #94a3b8; }
+[data-theme="dark"] .km-editor-keydata__value { color: #f1f5f9; }
+
+/* --- Sección Evaluación: banner interno + grid 3 cols --- */
+.km-editor-eval-internal-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #e8f0fe;
+  border: 1px solid #c7d7f5;
+  border-radius: var(--km-radius-sm);
+  color: #1a1a2e;
+  font-size: var(--km-fs-xs);
+}
+.km-editor-eval-internal-banner i { color: var(--km-primary); }
+[data-theme="dark"] .km-editor-eval-internal-banner { background: #1e3a8a; border-color: #1e40af; color: #cfe2ff; }
+[data-theme="dark"] .km-editor-eval-internal-banner i { color: #93c5fd; }
+.km-editor-grid--three { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 768px) { .km-editor-grid--three { grid-template-columns: 1fr; } }
+
+/* --- Panel RESULTADO (unificado, 4 columnas) --- */
+.km-editor-resultado {
+  background: #f8fafc;
+  border: 1px solid var(--km-border-light);
+  border-radius: var(--km-radius-sm);
+  padding: 14px 18px;
+}
+.km-editor-resultado__title {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--km-text-muted);
+  letter-spacing: 0.06em;
+  margin-bottom: 12px;
+}
+.km-editor-resultado__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+  align-items: end;
+}
+.km-editor-resultado__col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+}
+.km-editor-resultado__col--acept { align-items: flex-start; text-align: left; }
+.km-editor-resultado__value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--km-text-primary);
+  line-height: 1.1;
+}
+.km-editor-resultado__formula {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  color: var(--km-text-muted);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.km-editor-resultado__chip { font-size: 0.6875rem; margin-top: 2px; }
+[data-theme="dark"] .km-editor-resultado { background: #0f172a; border-color: #334155; }
+[data-theme="dark"] .km-editor-resultado__value { color: #f1f5f9; }
+@media (max-width: 768px) {
+  .km-editor-resultado__grid { grid-template-columns: repeat(2, 1fr); }
 }
