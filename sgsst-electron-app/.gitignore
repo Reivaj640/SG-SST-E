@@ -43,6 +43,7 @@ __pycache__/
 # Scripts y datos de debug puntuales (raíz del repo)
 test-*.js
 test-*.xlsx
+test-*.html
 
 # Archivos de configuración generados
 config.json

@@ -295,6 +295,35 @@ matriz.js — Vista Matriz: buscador + 3 dropdowns + tabla plana con todas las c
     });
   }
 
+  /* Buscar un peligro (data completa) y sus referencias sede/proceso/cargo por ID. */
+  function _findPeligroById(pid) {
+    if (!_matriz || !_matriz.sedes) return null;
+    for (var si = 0; si < _matriz.sedes.length; si++) {
+      var sede = _matriz.sedes[si];
+      for (var pi = 0; pi < (sede.procesos || []).length; pi++) {
+        var proc = sede.procesos[pi];
+        for (var ci = 0; ci < (proc.cargos || []).length; ci++) {
+          var cargo = proc.cargos[ci];
+          for (var li = 0; li < (cargo.peligros || []).length; li++) {
+            var pel = cargo.peligros[li];
+            if (pel.id === pid) {
+              return {
+                peligro: pel,
+                sede: sede,
+                proceso: proc,
+                cargo: cargo,
+                sedeId: sede.id,
+                procesoId: proc.id,
+                cargoId: cargo.id
+              };
+            }
+          }
+        }
+      }
+    }
+    return null;
+  }
+
   function _bindTable(container) {
     var wrap = container.querySelector('.km-table-wrapper');
     if (!wrap) return;
@@ -302,7 +331,15 @@ matriz.js — Vista Matriz: buscador + 3 dropdowns + tabla plana con todas las c
       var editBtn = e.target.closest('[data-action="edit"]');
       if (editBtn) {
         var pid = editBtn.getAttribute('data-peligro-id');
-        try { document.dispatchEvent(new CustomEvent('km:open-editor', { detail: { mode: 'edit', peligroId: pid } })); } catch (err) {}
+        var found = _findPeligroById(pid);
+        var detail = { mode: 'edit', peligroId: pid };
+        if (found) {
+          detail.data = found.peligro;
+          detail.cargoId = found.cargoId;
+          detail.sedeId = found.sedeId;
+          detail.procesoId = found.procesoId;
+        }
+        try { document.dispatchEvent(new CustomEvent('km:open-editor', { detail: detail })); } catch (err) {}
         return;
       }
       var delBtn = e.target.closest('[data-action="delete"]');

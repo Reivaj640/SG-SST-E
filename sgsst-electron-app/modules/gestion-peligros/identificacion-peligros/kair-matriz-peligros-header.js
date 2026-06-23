@@ -45,27 +45,42 @@ Patrón: modules/recursos/capacitaciones/capacitaciones-view.html
       '</div>';
 
     /* Fila 2: tabs dentro de la misma card (acciones inline en la derecha) */
-    var tabsHtml = TABS.map(function (t) {
-      var cls = 'km-header-tab' + (t.key === currentView ? ' km-header-tab--active' : '');
-      return '<button type="button" class="' + cls + '" data-tab="' + t.key + '" role="tab"' +
-        (t.key === currentView ? ' aria-selected="true"' : ' aria-selected="false"') + '>' +
-        '<i class="bi ' + t.icon + '"></i> ' + KM.esc(t.label) +
-        '</button>';
-    }).join('');
+    var isEditor = (currentView === 'editor');
+    var tabsRow;
+    if (isEditor) {
+      /* En modo editor: ocultar tabs y mostrar acción "Volver a la matriz" a la izquierda */
+      tabsRow =
+        '<div class="km-header-card__tabs km-header-card__tabs--editor" role="tablist">' +
+          '<button type="button" class="km-btn km-btn--sm km-btn--ghost" data-action="back-to-matriz">' +
+            '<i class="bi bi-arrow-left"></i> Volver a la matriz' +
+          '</button>' +
+          '<div class="km-header-tab-actions">' +
+            '<button type="button" class="km-btn km-btn--sm km-btn--ghost" data-action="reset" title="Restablecer vista"><i class="bi bi-arrow-counterclockwise"></i></button>' +
+          '</div>' +
+        '</div>';
+    } else {
+      var tabsHtml = TABS.map(function (t) {
+        var cls = 'km-header-tab' + (t.key === currentView ? ' km-header-tab--active' : '');
+        return '<button type="button" class="' + cls + '" data-tab="' + t.key + '" role="tab"' +
+          (t.key === currentView ? ' aria-selected="true"' : ' aria-selected="false"') + '>' +
+          '<i class="bi ' + t.icon + '"></i> ' + KM.esc(t.label) +
+          '</button>';
+      }).join('');
 
-    var actionsHtml = '';
-    if (currentView === 'matriz') {
-      /* Solo Nuevo peligro — Importar/Exportar Excel están en la toolbar de la vista */
-      actionsHtml =
-        '<button type="button" class="km-btn km-btn--sm km-btn--primary" data-action="new-peligro"><i class="bi bi-plus-circle"></i> Nuevo peligro</button>';
+      var actionsHtml = '';
+      if (currentView === 'matriz') {
+        /* Solo Nuevo peligro — Importar/Exportar Excel están en la toolbar de la vista */
+        actionsHtml =
+          '<button type="button" class="km-btn km-btn--sm km-btn--primary" data-action="new-peligro"><i class="bi bi-plus-circle"></i> Nuevo peligro</button>';
+      }
+      actionsHtml += '<button type="button" class="km-btn km-btn--sm km-btn--ghost" data-action="reset" title="Restablecer vista"><i class="bi bi-arrow-counterclockwise"></i></button>';
+
+      tabsRow =
+        '<div class="km-header-card__tabs" role="tablist">' +
+          tabsHtml +
+          '<div class="km-header-tab-actions">' + actionsHtml + '</div>' +
+        '</div>';
     }
-    actionsHtml += '<button type="button" class="km-btn km-btn--sm km-btn--ghost" data-action="reset" title="Restablecer vista"><i class="bi bi-arrow-counterclockwise"></i></button>';
-
-    var tabsRow =
-      '<div class="km-header-card__tabs" role="tablist">' +
-        tabsHtml +
-        '<div class="km-header-tab-actions">' + actionsHtml + '</div>' +
-      '</div>';
 
     return '<div class="km-header-card">' + mainRow + tabsRow + '</div>';
   };
@@ -76,6 +91,9 @@ Patrón: modules/recursos/capacitaciones/capacitaciones-view.html
 
     var back = container.querySelector('[data-action="back"]');
     if (back && handlers.onBack) back.addEventListener('click', handlers.onBack);
+
+    var backToMatriz = container.querySelector('[data-action="back-to-matriz"]');
+    if (backToMatriz && handlers.onBackToMatriz) backToMatriz.addEventListener('click', handlers.onBackToMatriz);
 
     var tabs = container.querySelectorAll('.km-header-tab[data-tab]');
     tabs.forEach(function (tab) {
