@@ -109,8 +109,13 @@ header o vía evento `km:open-editor` desde la vista Matriz (editar existente).
     this.currentView = viewKey;
     var wrapper = this.container.querySelector('.km-wrapper');
     if (!wrapper) return;
+    var headerOpts = { currentView: this.currentView, company: this.currentCompany };
+    if (viewKey === 'editor' && this._editorSession) {
+      headerOpts.editorMode = this._editorSession.mode || 'new';
+      headerOpts.editorPeligroId = (this._editorSession.data && this._editorSession.data.id) || '';
+    }
     var newHeader = document.createElement('div');
-    newHeader.innerHTML = Header.render({ currentView: this.currentView, company: this.currentCompany });
+    newHeader.innerHTML = Header.render(headerOpts);
     var oldCard = wrapper.querySelector('.km-header-card');
     if (oldCard) oldCard.replaceWith(newHeader.firstChild);
     else wrapper.insertBefore(newHeader.firstChild, wrapper.firstChild);

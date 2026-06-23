@@ -46,9 +46,35 @@ Patrón: modules/recursos/capacitaciones/capacitaciones-view.html
 
     /* Fila 2: tabs dentro de la misma card (acciones inline en la derecha) */
     var isEditor = (currentView === 'editor');
+    var editorMode = opts.editorMode || 'new';
+    var editorPeligroId = opts.editorPeligroId || '';
     var tabsRow;
     if (isEditor) {
-      /* En modo editor: ocultar tabs y mostrar acción "Volver a la matriz" a la izquierda */
+      var editorTitle = editorMode === 'edit' && editorPeligroId
+        ? 'Editar peligro ' + editorPeligroId
+        : 'Nuevo peligro';
+      var editorSubtitle = 'Identificación, evaluación y medidas de intervención';
+      /* En modo editor: header de editor con pill GI-FO-019 + título dinámico */
+      mainRow =
+        '<div class="km-header-card__main">' +
+          '<div class="km-header-card__title-block">' +
+            '<span class="kair-header__pill--section" style="margin-right:8px">GI-FO-019</span>' +
+            '<div>' +
+              '<h3 class="km-header-card__title">' + KM.esc(editorTitle) + '</h3>' +
+              '<p class="km-header-card__subtitle">' + KM.esc(editorSubtitle) + '</p>' +
+            '</div>' +
+          '</div>' +
+          '<div class="km-header-card__right">' +
+            (company
+              ? '<span class="km-header-card__company" title="Empresa activa"><i class="bi bi-building" style="font-size:0.875rem;"></i> ' + KM.esc(company) + '</span>'
+              : '') +
+            (company ? '<div class="km-header-card__divider" aria-hidden="true"></div>' : '') +
+            '<button type="button" class="km-header-card__back" data-action="back-to-matriz" title="Volver a la matriz" aria-label="Volver a la matriz">' +
+              '<i class="bi bi-arrow-left"></i> Volver' +
+            '</button>' +
+          '</div>' +
+        '</div>';
+
       tabsRow =
         '<div class="km-header-card__tabs km-header-card__tabs--editor" role="tablist">' +
           '<button type="button" class="km-btn km-btn--sm km-btn--ghost" data-action="back-to-matriz">' +

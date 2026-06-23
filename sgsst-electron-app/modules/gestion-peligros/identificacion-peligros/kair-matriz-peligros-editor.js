@@ -32,7 +32,7 @@ Convenciones:
 
   /* Definición canónica de las 5 secciones (orden, icono, label, required fields) */
   var SECTIONS = [
-    { key: 'datos',     icon: 'info-circle',         label: 'Datos básicos',           required: ['sedeId', 'procesoId', 'cargoId', 'tareas', 'expuestos'] },
+    { key: 'datos',     icon: 'info-circle',         label: 'Datos básicos',           required: ['sedeId', 'procesoId', 'cargoId', 'tareas', 'rutinaria', 'expuestos'] },
     { key: 'peligro',   icon: 'exclamation-triangle',label: 'Peligro y efectos',       required: ['tipo', 'peligro', 'efectosPosibles'] },
     { key: 'controles', icon: 'shield-check',        label: 'Controles existentes',    required: [] },
     { key: 'evaluacion',icon: 'speedometer2',        label: 'Evaluación (auto)',       required: ['nd', 'ne', 'nc'] },
@@ -265,6 +265,9 @@ Convenciones:
     var hint = showHint
       ? 'NP = ' + np + ' · NR = ' + nr
       : 'Selecciona ND, NE y NC para ver el cálculo';
+    var isNew = _state.mode === 'new';
+    var primaryLabel = isNew ? 'Crear y cerrar' : 'Guardar y cerrar';
+    var primaryIcon = isNew ? 'bi-check2-circle' : 'bi-save';
 
     return (
       '<div class="km-editor-footer__hint"><i class="bi bi-calculator"></i> ' + _esc(hint) + '</div>' +
@@ -274,7 +277,7 @@ Convenciones:
         '<button type="button" class="km-btn km-btn--outline" data-footer-action="save">' +
           '<i class="bi bi-save"></i> Guardar</button>' +
         '<button type="button" class="km-btn km-btn--primary" data-footer-action="save-close">' +
-          '<i class="bi bi-check2-circle"></i> Crear y cerrar</button>' +
+          '<i class="bi ' + primaryIcon + '"></i> ' + primaryLabel + '</button>' +
       '</div>'
     );
   }
@@ -338,8 +341,9 @@ Convenciones:
         '</select>' +
         (addable ? '<button type="button" class="km-editor-add-btn" data-add="' + name + '" title="Agregar nuevo"><i class="bi bi-plus"></i></button>' : '') +
       '</div>';
+    var cls = 'km-editor-field' + (opts.full ? ' km-editor-field--full' : '');
     return (
-      '<div class="km-editor-field">' +
+      '<div class="' + cls + '">' +
         '<label class="km-editor-field__label">' + _esc(label) + req + '</label>' +
         input +
       '</div>'
@@ -357,21 +361,17 @@ Convenciones:
 
     var d = _state.data;
     return _sectionCardOpen('datos', 'Datos básicos', 'info-circle') +
-      '<div class="km-editor-grid">' +
-        _selectWithAdd('Sede', 'sedeId', d.sedeId, sedesOpts, { required: true, addable: true }) +
-        _selectWithAdd('Proceso', 'procesoId', d.procesoId, procesosOpts, { required: true, addable: false }) +
-        _field('Zona / Lugar', 'zona', d.zona, { placeholder: 'Ej: Piso 2, área de producción' }) +
-        _selectWithAdd('Actividad', 'actividad', d.actividad, cargosOpts.length ? cargosOpts : [], { required: false, addable: false, placeholder: d.cargoId ? 'Actividad del cargo' : 'Selecciona sede y proceso' }) +
-      '</div>' +
+      _selectWithAdd('Sede', 'sedeId', d.sedeId, sedesOpts, { required: true, addable: true }) +
+      _selectWithAdd('Proceso', 'procesoId', d.procesoId, procesosOpts, { required: true, addable: false }) +
+      _field('Zona / Lugar', 'zona', d.zona, { placeholder: 'Ej: Piso 2, área de producción' }) +
+      _selectWithAdd('Cargo / Actividad', 'cargoId', d.cargoId, cargosOpts, { required: true, addable: true, placeholder: d.procesoId ? 'Selecciona cargo...' : 'Selecciona sede y proceso' }) +
       _field('Tareas específicas', 'tareas', d.tareas, { type: 'textarea', rows: 3, required: true, full: true, placeholder: 'Describe las tareas...' }) +
-      '<div class="km-editor-grid">' +
-        _field('Es rutinaria?', 'rutinaria', d.rutinaria, {
-          type: 'select', required: true,
-          options: [{ value: 'Si', label: 'Sí' }, { value: 'No', label: 'No' }],
-          placeholder: 'Selecciona...'
-        }) +
-        _field('N° de expuestos', 'expuestos', d.expuestos, { type: 'number', min: 0 }) +
-      '</div>' +
+      _field('Es rutinaria?', 'rutinaria', d.rutinaria, {
+        type: 'select', required: true,
+        options: [{ value: 'Si', label: 'Sí' }, { value: 'No', label: 'No' }],
+        placeholder: 'Selecciona...'
+      }) +
+      _field('N° de expuestos', 'expuestos', d.expuestos, { type: 'number', min: 0 }) +
       _sectionCardClose();
   }
 
@@ -411,7 +411,7 @@ Convenciones:
         '<i class="bi bi-info-circle"></i>' +
         '<span>Selecciona ND, NE y NC. El sistema calcula automáticamente NP, NR, interpretaciones y aceptabilidad.</span>' +
       '</div>' +
-      '<div class="km-editor-grid km-editor-grid--three">' +
+      '<div class="km-editor-grid km-editor-grid--three km-editor-field--full">' +
         _field('ND', 'nd', d.nd, { type: 'select', required: true, options: ndOpts }) +
         _field('NE', 'ne', d.ne, { type: 'select', required: true, options: neOpts }) +
         _field('NC', 'nc', d.nc, { type: 'select', required: true, options: ncOpts }) +
@@ -468,6 +468,192 @@ Convenciones:
       _field('4. Administrativos', 'medidaAdministrativos', d.medidaAdministrativos, { type: 'textarea', rows: 2, full: true, placeholder: 'Procedimientos, capacitación...' }) +
       _field('5. EPP', 'medidaEpp', d.medidaEpp, { type: 'textarea', rows: 2, full: true, placeholder: 'Casco, gafas, guantes...' }) +
       _sectionCardClose();
+  }
+
+  /* ---------------- Modal rápido para agregar entidades (botones "+") ---------------- */
+
+  var _quickAddState = { field: null, overlay: null };
+
+  function _quickAddConfig(field) {
+    var configs = {
+      sedeId: {
+        title: 'Agregar sede',
+        icon: 'bi-building',
+        fields: [
+          { name: 'nombre', label: 'Nombre de la sede', required: true, placeholder: 'Ej: Sede Principal' }
+        ],
+        save: function(data) {
+          if (!global.KMService || !global.KMService.addSede) return Promise.reject(new Error('Servicio no disponible'));
+          return global.KMService.addSede(_state.companyName, data.nombre);
+        },
+        onSuccess: function(res, data) {
+          if (res && res.success && res.data && res.data.id) {
+            _state.data.sedeId = res.data.id;
+            _state.data.sede = res.data.nombre || data.nombre;
+          }
+        }
+      },
+      procesoId: {
+        title: 'Agregar proceso',
+        icon: 'bi-diagram-3',
+        fields: [
+          { name: 'nombre', label: 'Nombre del proceso', required: true, placeholder: 'Ej: Operativo' }
+        ],
+        save: function(data) {
+          if (!global.KMService || !global.KMService.addProceso) return Promise.reject(new Error('Servicio no disponible'));
+          var sedeId = _state.data.sedeId;
+          if (!sedeId) return Promise.reject(new Error('Selecciona una sede primero'));
+          return global.KMService.addProceso(_state.companyName, sedeId, data.nombre);
+        },
+        onSuccess: function(res, data) {
+          if (res && res.success && res.data && res.data.id) {
+            _state.data.procesoId = res.data.id;
+            _state.data.proceso = res.data.nombre || data.nombre;
+          }
+        }
+      },
+      cargoId: {
+        title: 'Agregar cargo / actividad',
+        icon: 'bi-person-workspace',
+        fields: [
+          { name: 'nombre', label: 'Nombre del cargo', required: true, placeholder: 'Ej: Operario' },
+          { name: 'zona', label: 'Zona / Lugar', placeholder: 'Ej: Área de producción' },
+          { name: 'actividades', label: 'Actividades', placeholder: 'Ej: Labores operativas' },
+          { name: 'tareas', label: 'Tareas', placeholder: 'Ej: Mantenimiento, inspección' }
+        ],
+        save: function(data) {
+          if (!global.KMService || !global.KMService.addCargo) return Promise.reject(new Error('Servicio no disponible'));
+          var procesoId = _state.data.procesoId;
+          if (!procesoId) return Promise.reject(new Error('Selecciona un proceso primero'));
+          return global.KMService.addCargo(_state.companyName, procesoId, data.nombre);
+        },
+        onSuccess: function(res, data) {
+          if (res && res.success && res.data && res.data.id) {
+            _state.data.cargoId = res.data.id;
+            _state.data.cargo = res.data.nombre || data.nombre;
+            if (data.zona) _state.data.zona = data.zona;
+            if (data.actividades) _state.data.actividades = data.actividades;
+            if (data.tareas) _state.data.tareas = data.tareas;
+          }
+        }
+      },
+      tipo: {
+        title: 'Agregar clasificación de peligro',
+        icon: 'bi-tags',
+        fields: [
+          { name: 'nombre', label: 'Nombre de la clasificación', required: true, placeholder: 'Ej: Físico-Químico' }
+        ],
+        save: function(data) {
+          return new Promise(function(resolve) {
+            if (!global.KM || !global.KM.GTC45 || !global.KM.GTC45.tipos) {
+              resolve({ success: false, error: { message: 'No se puede agregar clasificación' } });
+              return;
+            }
+            var tipos = global.KM.GTC45.tipos;
+            if (tipos.indexOf(data.nombre) === -1) tipos.push(data.nombre);
+            resolve({ success: true, data: { nombre: data.nombre } });
+          });
+        },
+        onSuccess: function(res, data) {
+          _state.data.tipo = data.nombre;
+          if (_state.gtc45Options && _state.gtc45Options.tipos) {
+            if (_state.gtc45Options.tipos.indexOf(data.nombre) === -1) {
+              _state.gtc45Options.tipos.push(data.nombre);
+            }
+          }
+        }
+      }
+    };
+    return configs[field] || null;
+  }
+
+  function _renderQuickAddModal(field) {
+    var cfg = _quickAddConfig(field);
+    if (!cfg) return '';
+    var fieldsHtml = cfg.fields.map(function(f) {
+      return (
+        '<div class="km-editor-field">' +
+          '<label class="km-editor-field__label">' + _esc(f.label) + (f.required ? ' <span class="km-editor-required">*</span>' : '') + '</label>' +
+          '<input type="text" class="km-editor-field__input" name="quickadd-' + f.name + '" value="" placeholder="' + _esc(f.placeholder || '') + '"' + (f.required ? ' required' : '') + ' />' +
+        '</div>'
+      );
+    }).join('');
+    return (
+      '<div class="km-modal-overlay" id="km-quickadd-overlay" style="z-index:10000">' +
+        '<div class="km-modal" style="max-width:440px">' +
+          '<div class="km-modal__header">' +
+            '<h3 class="km-modal__title"><i class="bi ' + cfg.icon + '"></i> ' + _esc(cfg.title) + '</h3>' +
+            '<button type="button" class="km-modal__close" id="km-quickadd-close" aria-label="Cerrar"><i class="bi bi-x-lg"></i></button>' +
+          '</div>' +
+          '<div class="km-modal__body">' + fieldsHtml + '</div>' +
+          '<div class="km-modal__footer">' +
+            '<button type="button" class="km-btn km-btn--ghost" id="km-quickadd-cancel">Cancelar</button>' +
+            '<button type="button" class="km-btn km-btn--primary" id="km-quickadd-save">Crear</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  function _openQuickAdd(field) {
+    if (_quickAddState.overlay) { _quickAddState.overlay.remove(); _quickAddState.overlay = null; }
+    var html = _renderQuickAddModal(field);
+    if (!html) return;
+    _quickAddState.field = field;
+    var tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    _quickAddState.overlay = tmp.firstChild;
+    document.body.appendChild(_quickAddState.overlay);
+    _bindQuickAddModal(field);
+  }
+
+  function _closeQuickAdd() {
+    if (_quickAddState.overlay) { _quickAddState.overlay.remove(); _quickAddState.overlay = null; }
+    _quickAddState.field = null;
+  }
+
+  function _bindQuickAddModal(field) {
+    var overlay = _quickAddState.overlay;
+    if (!overlay) return;
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) _closeQuickAdd(); });
+    var closeBtn = overlay.querySelector('#km-quickadd-close');
+    if (closeBtn) closeBtn.addEventListener('click', _closeQuickAdd);
+    var cancelBtn = overlay.querySelector('#km-quickadd-cancel');
+    if (cancelBtn) cancelBtn.addEventListener('click', _closeQuickAdd);
+    var saveBtn = overlay.querySelector('#km-quickadd-save');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', function() {
+        var cfg = _quickAddConfig(field);
+        if (!cfg) return;
+        var data = {};
+        var missing = false;
+        cfg.fields.forEach(function(f) {
+          var input = overlay.querySelector('[name="quickadd-' + f.name + '"]');
+          var val = input ? input.value.trim() : '';
+          data[f.name] = val;
+          if (f.required && !val) missing = true;
+        });
+        if (missing) {
+          KM.notify('Campos incompletos', 'Completa los campos obligatorios', 'warning', 4000);
+          return;
+        }
+        saveBtn.disabled = true;
+        cfg.save(data).then(function(res) {
+          saveBtn.disabled = false;
+          if (res && res.success) {
+            KM.notify(cfg.title + ' creado', '', 'success', 3000);
+            cfg.onSuccess(res, data);
+            _closeQuickAdd();
+            _refresh();
+          } else {
+            KM.notify('Error', (res && res.error && res.error.message) || 'No se pudo crear', 'error', 5000);
+          }
+        }).catch(function(err) {
+          saveBtn.disabled = false;
+          KM.notify('Error', (err && err.message) || 'Error inesperado', 'error', 5000);
+        });
+      });
+    }
   }
 
   /* ---------------- Render: top-level ---------------- */
@@ -555,13 +741,12 @@ Convenciones:
       });
     });
 
-    /* Botones "+" → toast "Próximamente" */
+    /* Botones "+" → modal rápido de creación */
     var addBtns = _state.container.querySelectorAll('[data-add]');
     addBtns.forEach(function (btn) {
       btn.addEventListener('click', function () {
         var field = btn.getAttribute('data-add');
-        var labels = { sedeId: 'sede', procesoId: 'proceso', tipo: 'clasificación', actividad: 'actividad' };
-        KM.notify('Próximamente', 'Crear inline de ' + (labels[field] || field) + ' en próxima iteración', 'info', 3500);
+        _openQuickAdd(field);
       });
     });
 
@@ -634,8 +819,8 @@ Convenciones:
     var d = _state.data;
 
     /* Required mínimos */
-    if (!d.sedeId || !d.procesoId || !d.cargoId) {
-      KM.notify('Sección "Datos básicos" incompleta', 'Selecciona sede, proceso y cargo', 'warning', 5000);
+    if (!d.sedeId || !d.procesoId || !d.cargoId || !d.tareas || String(d.tareas).trim() === '' || !d.rutinaria) {
+      KM.notify('Sección "Datos básicos" incompleta', 'Selecciona sede, proceso, cargo, tareas y rutinaria', 'warning', 5000);
       var sec = _state.container.querySelector('#' + _sectionAnchorId('datos'));
       if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
@@ -738,6 +923,7 @@ Convenciones:
   };
 
   Editor.destroy = function () {
+    _closeQuickAdd();
     if (_state && _state.container) _state.container.innerHTML = '';
     if (_docKeyHandler) { document.removeEventListener('keydown', _docKeyHandler); _docKeyHandler = null; }
     if (_inputChangeHandler && _state && _state.container) {
