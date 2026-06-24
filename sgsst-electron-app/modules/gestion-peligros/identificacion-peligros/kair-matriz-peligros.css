@@ -102,6 +102,13 @@ Basado en modules/recursos/capacitaciones/capacitaciones-view.html
   overflow: hidden;
 }
 
+/* F21.51 (2026-06-23) — En modo editor, el header card se separa del
+   inicio del editor (sidebar + banner + secciones) con un margin-bottom
+   mas amplio para evitar que el bloque se vea pegado al contenido. */
+.km-wrapper .km-header-card--editor {
+  margin-bottom: 20px;
+}
+
 /* Fila 1: contenido principal (icono + título/subtítulo a la izquierda, acciones a la derecha) */
 .km-wrapper .km-header-card__main {
   display: flex;
@@ -263,6 +270,16 @@ Basado en modules/recursos/capacitaciones/capacitaciones-view.html
   color: var(--km-text-muted);
 }
 .km-wrapper .km-btn--ghost:hover { background: #f1f3f5; color: var(--km-text-primary); }
+
+/* F21.55 (2026-06-23) — Bug #6: variante danger (rojo) usada por
+   KM.modal({danger:true}) en confirmaciones destructivas. No estaba
+   definida y el boton salia sin estilo. */
+.km-wrapper .km-btn--danger {
+  background: var(--km-danger);
+  color: #ffffff;
+  border-color: var(--km-danger);
+}
+.km-wrapper .km-btn--danger:hover { background: #c82333; border-color: #c82333; }
 
 /* Tamaño pequeño — usado en el header card */
 .km-wrapper .km-btn--sm {
@@ -868,52 +885,180 @@ Basado en modules/recursos/capacitaciones/capacitaciones-view.html
 /* ==========================================================================
 9. MODAL GENÉRICO
 ========================================================================== */
+
+/* F21.55 (2026-06-23) — Bug #4: @keyframes para animaciones de entrada
+   del modal quickAdd. Antes solo existia km-toast-in; faltaban los
+   de modal (km-fade-in para el overlay, km-slide-up para la caja). */
+@keyframes km-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes km-slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 .km-modal-overlay {
-  position: fixed;
-  inset: 0;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  right: auto !important;
+  bottom: auto !important;
   background: rgba(0, 0, 0, 0.55);
   z-index: 9000;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 16px;
+  /* F21.54 (2026-06-23) — Fix robusto para position:fixed que se rompe
+     cuando hay contenedores ancestros con overflow:hidden/auto (body,
+     #main-content con overflow-y:auto, .km-wrapper con overflow:hidden,
+     .km-editor-view con overflow:hidden, .km-editor-content con
+     overflow-y:auto). En Edge/Chromium esos contenedores se vuelven
+     scroll containers y position:fixed se comporta como absolute
+     relativo al padre.
+
+     Soluciones combinadas:
+     1) Dimensiones explicitas con vw/vh + !important (resiste cualquier
+        sobrescritura por especificidad)
+     2) transform: translateZ(0) para forzar un nuevo compositing layer
+        y un containing block propio para position:fixed
+     3) contain: layout para reforzar el aislamiento
+
+     Adicionalmente, en _openQuickAdd/_closeQuickAdd (kair-matriz-peligros-editor.js)
+     se cambia temporalmente el overflow del body/html/#main-content a
+     'visible' para que no limiten el area del modal. */
+  transform: translateZ(0);
+  contain: layout;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  /* F21.55 (2026-06-23) — Bug #4: animacion de entrada al overlay
+     (fade-in 200ms). Los @keyframes km-fade-in/km-slide-up estan
+     definidos mas abajo en este archivo. */
+  animation: km-fade-in 0.2s ease forwards;
+  /* F21.56 (2026-06-23) — CAUSA RAÍZ: El modal se monta en document.body
+     (fuera de .km-wrapper), por lo que las variables CSS definidas en
+     .km-wrapper (--km-bg-card, --km-border, etc.) NO resuelven.
+     Resultado: el modal pierde colores, bordes, radios y tipografía.
+     Solución: duplicar las variables necesarias aquí para que el modal
+     y todos sus descendientes (.km-modal, .km-modal__header, etc.)
+     hereden los tokens de diseño correctamente. */
+  --km-primary: #174ea6;
+  --km-primary-hover: #185abd;
+  --km-primary-light: #e8f0fe;
+  --km-danger: #dc3545;
+  --km-bg-card: #ffffff;
+  --km-border: #dee2e6;
+  --km-radius-sm: 6px;
+  --km-radius-md: 10px;
+  --km-text-primary: #212529;
+  --km-text-muted: #6c757d;
+  --km-fs-sm: 0.8125rem;
+  --km-fs-base: 0.875rem;
+  --km-fs-md: 1rem;
 }
 .km-modal {
   background: var(--km-bg-card);
   border-radius: var(--km-radius-md);
   width: 100%;
   max-width: 520px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  animation: km-slide-up 0.2s ease;
 }
 .km-modal__header {
-  padding: 16px;
+  /* F21.55 (2026-06-23) — Bug #3: padding consistente con km-editor-modal */
+  padding: 16px 20px;
   border-bottom: 1px solid var(--km-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-shrink: 0;
 }
 .km-modal__title { font-size: var(--km-fs-md); font-weight: 600; }
 .km-modal__close {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: none;
   background: transparent;
   color: var(--km-text-muted);
+  border-radius: var(--km-radius-sm);
   cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
 }
-.km-modal__body { padding: 16px; font-size: var(--km-fs-base); }
+/* F21.55 (2026-06-23) — Bug #2: hover feedback para el boton cerrar */
+.km-modal__close:hover { background: #f1f3f5; color: var(--km-text-primary); }
+.km-modal__close:focus-visible { outline: 2px solid var(--km-primary); outline-offset: 1px; }
+.km-modal__body {
+  /* F21.55 (2026-06-23) — Bug #3 + Bug #5: padding consistente con
+     estandar K+AIR y scroll interno cuando el contenido es largo */
+  padding: 20px;
+  font-size: var(--km-fs-base);
+  flex: 1;
+  overflow-y: auto;
+}
 .km-modal__footer {
-  padding: 12px 16px;
+  /* F21.55 (2026-06-23) — Bug #3: padding consistente con km-editor-modal */
+  padding: 12px 20px;
   border-top: 1px solid var(--km-border);
   display: flex;
   justify-content: flex-end;
   gap: 8px;
   background: #fafbfc;
   border-radius: 0 0 var(--km-radius-md) var(--km-radius-md);
+  flex-shrink: 0;
 }
+
+/* F21.55 (2026-06-23) — Botones dentro del modal quickAdd: como el
+   modal se monta en document.body (fuera de .km-wrapper), los
+   selectores .km-wrapper .km-btn / .km-btn--* NO le aplican. Estos
+   selectores adicionales apuntan a los botones cuando estan dentro
+   de .km-modal, replicando el mismo estilo visual que en el resto
+   de la app. Sin esto, los botones "Cancelar" y "Crear" salen con
+   el estilo default del navegador. */
+.km-modal .km-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: var(--km-fs-sm);
+  font-weight: 500;
+  font-family: inherit;
+  border-radius: var(--km-radius-sm);
+  border: 1px solid var(--km-border);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  background: var(--km-bg-card);
+  color: var(--km-text-primary);
+  white-space: nowrap;
+}
+.km-modal .km-btn:hover { background: #f1f3f5; }
+.km-modal .km-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.km-modal .km-btn--primary {
+  background: var(--km-primary);
+  color: #ffffff;
+  border-color: var(--km-primary);
+}
+.km-modal .km-btn--primary:hover { background: var(--km-primary-hover); border-color: var(--km-primary-hover); }
+.km-modal .km-btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--km-text-muted);
+}
+.km-modal .km-btn--ghost:hover { background: #f1f3f5; color: var(--km-text-primary); }
+.km-modal .km-btn--danger {
+  background: var(--km-danger);
+  color: #ffffff;
+  border-color: var(--km-danger);
+}
+.km-modal .km-btn--danger:hover { background: #c82333; border-color: #c82333; }
 
 /* ==========================================================================
 10. DARK MODE
@@ -957,6 +1102,23 @@ Basado en modules/recursos/capacitaciones/capacitaciones-view.html
 [data-theme="dark"] .km-wrapper .km-editor-modal__footer,
 [data-theme="dark"] .km-wrapper .km-modal__header,
 [data-theme="dark"] .km-wrapper .km-modal__footer { background: #0f172a; border-color: #334155; }
+
+/* F21.55 (2026-06-23) — Bug #1 dark mode del modal quickAdd:
+   El modal se monta como hijo directo de document.body (no dentro de
+   .km-wrapper), por lo que los selectores anteriores con .km-wrapper
+   como ancestro NO aplican. Estos selectores adicionales apuntan
+   directamente al modal cuando esta fuera de .km-wrapper (caso del
+   quickAdd) y replican los mismos colores dark para mantener
+   consistencia visual entre modales. */
+[data-theme="dark"] .km-modal-overlay { background: rgba(0, 0, 0, 0.7); }
+[data-theme="dark"] .km-modal { background: #1e293b; color: #e2e8f0; }
+[data-theme="dark"] .km-modal__header,
+[data-theme="dark"] .km-modal__footer { background: #0f172a; border-color: #334155; }
+[data-theme="dark"] .km-modal__close:hover { background: #334155; color: #e2e8f0; }
+[data-theme="dark"] .km-modal__body .km-editor-field__label { color: #94a3b8; }
+[data-theme="dark"] .km-modal__body .km-editor-field__input,
+[data-theme="dark"] .km-modal__body .km-editor-field__select,
+[data-theme="dark"] .km-modal__body .km-editor-field__textarea { background: #0f172a; color: #e2e8f0; border-color: #334155; }
 [data-theme="dark"] .km-wrapper .km-editor-field__input,
 [data-theme="dark"] .km-wrapper .km-editor-field__select,
 [data-theme="dark"] .km-wrapper .km-editor-field__textarea { background: #0f172a; color: #e2e8f0; border-color: #334155; }
@@ -985,10 +1147,14 @@ Basado en modules/recursos/capacitaciones/capacitaciones-view.html
   grid-template-areas:
     "sidebar main"
     "footer  footer";
-  width: 100%;
+  width: auto;
   height: 100%;
+  margin: 0 16px;
   background: var(--km-bg-app);
   overflow: hidden;
+  /* F21.52 (2026-06-23) — Margen lateral de 16px para alinear el editor
+     con el header card (que tiene margin:16px lateral). Sin esto el body
+     del editor sobresale por izquierda y derecha y se ve desalineado. */
 }
 
 /* --- Sidebar --- */

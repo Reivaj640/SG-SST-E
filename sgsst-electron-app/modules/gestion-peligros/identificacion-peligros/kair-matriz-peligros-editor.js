@@ -124,6 +124,12 @@ Convenciones:
     _state.data.cargoId = '';
     var sede = (_state.matriz.sedes || []).filter(function (s) { return s.id === _state.data.sedeId; })[0];
     var proc = sede && (sede.procesos || []).filter(function (p) { return p.id === newProcesoId; })[0];
+    /* F21.56 — Si el proceso seleccionado es uno de los defaults
+       (pro_def_*), no existe en la matriz; caemos al PROCESOS_DEFAULT
+       para mantener el nombre sincronizado con el id. */
+    if (!proc && newProcesoId) {
+      proc = PROCESOS_DEFAULT.filter(function (p) { return p.id === newProcesoId; })[0];
+    }
     _state.data.proceso = proc ? proc.nombre : '';
     _state.data.cargo = '';
     _refresh();
@@ -164,36 +170,16 @@ Convenciones:
       );
     }).join('');
 
-    /* Datos clave (ID, sede, NR) según doc técnico */
-    var d = _state.data || {};
-    var nr = KM.calcNR(KM.calcNP(d.nd, d.ne), d.nc);
-    var interpNr = KM.interpNR(nr);
-    var nrDisplay = nr != null ? String(nr) : '—';
-    var nrNivelDisplay = interpNr.nivel ? ('Nivel ' + interpNr.nivel) : '—';
-
-    var keyData = (
-      '<div class="km-editor-sidebar__keydata">' +
-        '<div class="km-editor-keydata__row">' +
-          '<span class="km-editor-keydata__label">ID</span>' +
-          '<span class="km-editor-keydata__value">' + _esc(d.id || '—') + '</span>' +
-        '</div>' +
-        '<div class="km-editor-keydata__row">' +
-          '<span class="km-editor-keydata__label">Sede</span>' +
-          '<span class="km-editor-keydata__value">' + _esc(d.sede || '—') + '</span>' +
-        '</div>' +
-        '<div class="km-editor-keydata__row">' +
-          '<span class="km-editor-keydata__label">NR</span>' +
-          '<span class="km-editor-keydata__value">' + nrDisplay +
-            (interpNr.nivel ? ' <span class="km-editor-keydata__chip km-badge km-badge--' + interpNr.tone + '">' + _esc(nrNivelDisplay) + '</span>' : '') +
-          '</span>' +
-        '</div>' +
-      '</div>'
-    );
+    /* F21.53 (2026-06-23) — Quitado el bloque keydata (ID / SEDE / NR) del
+       sidebar. Generaba un espacio vacio enorme entre los items y
+       COMPLETITUD (que va al fondo via margin-top:auto). Ahora el sidebar
+       queda compacto: lista de secciones arriba + COMPLETITUD al fondo.
+       Los estilos .km-editor-sidebar__keydata* se mantienen en CSS por si
+       se quieren reutilizar en otra vista. */
 
     return (
       '<div class="km-editor-sidebar__title">SECCIONES</div>' +
       '<ul class="km-editor-side-nav">' + items + '</ul>' +
-      keyData +
       '<div class="km-editor-sidebar__progress">' +
         '<div class="km-editor-sidebar__progress-label">COMPLETITUD</div>' +
         '<div class="km-editor-sidebar__progress-count">' + completitud + '/' + SECTIONS.length + '</div>' +
@@ -284,6 +270,35 @@ Convenciones:
 
   /* ---------------- Render: section cards ---------------- */
 
+  /* F21.56 (2026-06-23) — Procesos por defecto que siempre aparecen en el
+     selector de Proceso, aunque la matriz no los tenga. Sirven como atajo
+     para no tener que crearlos cada vez (Administrativo y Operativo son
+     los dos macro-procesos tipicos del SG-SST colombiano). Usamos IDs
+     estables con prefijo "pro_def_" para que:
+       1) Sean faciles de reconocer al inspeccionar el estado
+       2) No colisionen con IDs reales del backend (sed_/pro_/car_/pel_)
+       3) Si en el futuro se migran a la matriz real, sea trivial mapearlos
+     Los procesos default se ocultan si la matriz ya tiene uno con el mismo
+     nombre (case-insensitive), para evitar duplicados visuales. */
+  var PROCESOS_DEFAULT = [
+    { id: 'pro_def_administrativo', nombre: 'Administrativo' },
+    { id: 'pro_def_operativo',      nombre: 'Operativo' }
+  ];
+
+  function _buildProcesosOpts(sede) {
+    var fromMatriz = sede ? (sede.procesos || []).map(function (p) {
+      return { value: p.id, label: p.nombre, source: 'matriz' };
+    }) : [];
+    var existentes = {};
+    fromMatriz.forEach(function (o) {
+      existentes[String(o.label || '').toLowerCase().trim()] = true;
+    });
+    var defaults = PROCESOS_DEFAULT
+      .filter(function (d) { return !existentes[String(d.nombre).toLowerCase().trim()]; })
+      .map(function (d) { return { value: d.id, label: d.nombre, source: 'default' }; });
+    return defaults.concat(fromMatriz);
+  }
+
   function _sectionCardHeader(sec, title) {
     return (
       '<header class="km-editor-section__head">' +
@@ -355,7 +370,13 @@ Convenciones:
     var matriz = _state.matriz || { sedes: [] };
     var sedesOpts = (matriz.sedes || []).map(function (s) { return { value: s.id, label: s.nombre }; });
     var sede = (matriz.sedes || []).filter(function (s) { return s.id === _state.data.sedeId; })[0];
-    var procesosOpts = sede ? (sede.procesos || []).map(function (p) { return { value: p.id, label: p.nombre }; }) : [];
+    /* F21.56 — Selector de Proceso ahora mezcla: defaults (Administrativo,
+       Operativo) + procesos reales de la matriz de la sede seleccionada.
+       Si el usuario ya tiene un proceso con el mismo nombre en la matriz,
+       el default se oculta automaticamente para no duplicar. */
+    var procesosOpts = _buildProcesosOpts(sede);
+    /* F21.56 — Para el sub-select de Cargo, si el procesoId actual es un
+       default (no existe en la matriz), no hay cargos para mostrar. */
     var proc = sede && (sede.procesos || []).filter(function (p) { return p.id === _state.data.procesoId; })[0];
     var cargosOpts = proc ? (proc.cargos || []).map(function (c) { return { value: c.id, label: c.nombre }; }) : [];
 
@@ -488,8 +509,23 @@ Convenciones:
         },
         onSuccess: function(res, data) {
           if (res && res.success && res.data && res.data.id) {
-            _state.data.sedeId = res.data.id;
-            _state.data.sede = res.data.nombre || data.nombre;
+            /* F21.55 (2026-06-23) — El bug original: solo se actualizaba
+               _state.data.sedeId pero no se insertaba la nueva sede en
+               _state.matriz.sedes, asi que al hacer _refresh() el <select>
+               se reconstruia sin la opcion nueva y el value quedaba huerfano
+               (select visualmente vacio). Ahora tambien empujamos la sede al
+               arbol de la matriz para que el select la muestre y la marque. */
+            var newSede = {
+              id: res.data.id,
+              nombre: res.data.nombre || data.nombre,
+              procesos: []
+            };
+            _state.data.sedeId = newSede.id;
+            _state.data.sede = newSede.nombre;
+            if (!_state.matriz) _state.matriz = { sedes: [] };
+            if (!_state.matriz.sedes) _state.matriz.sedes = [];
+            var dup = _state.matriz.sedes.filter(function (s) { return s.id === newSede.id; })[0];
+            if (!dup) _state.matriz.sedes.push(newSede);
           }
         }
       },
@@ -507,8 +543,25 @@ Convenciones:
         },
         onSuccess: function(res, data) {
           if (res && res.success && res.data && res.data.id) {
-            _state.data.procesoId = res.data.id;
-            _state.data.proceso = res.data.nombre || data.nombre;
+            /* F21.55 — Mismo patron que sedeId: actualizar el arbol matriz
+               ademas de _state.data para que el <select> muestre el nuevo
+               proceso. El proceso se cuelga de la sede actualmente
+               seleccionada (_state.data.sedeId). */
+            var newProceso = {
+              id: res.data.id,
+              nombre: res.data.nombre || data.nombre,
+              cargos: []
+            };
+            _state.data.procesoId = newProceso.id;
+            _state.data.proceso = newProceso.nombre;
+            if (_state.matriz && _state.matriz.sedes) {
+              var sede = _state.matriz.sedes.filter(function (s) { return s.id === _state.data.sedeId; })[0];
+              if (sede) {
+                if (!sede.procesos) sede.procesos = [];
+                var dup = sede.procesos.filter(function (p) { return p.id === newProceso.id; })[0];
+                if (!dup) sede.procesos.push(newProceso);
+              }
+            }
           }
         }
       },
@@ -529,11 +582,32 @@ Convenciones:
         },
         onSuccess: function(res, data) {
           if (res && res.success && res.data && res.data.id) {
-            _state.data.cargoId = res.data.id;
-            _state.data.cargo = res.data.nombre || data.nombre;
+            /* F21.55 — Mismo patron: ademas de pintar el cargo en _state.data,
+               lo insertamos en el arbol _state.matriz (dentro del proceso
+               actualmente seleccionado) para que el <select> lo refleje. */
+            var newCargo = {
+              id: res.data.id,
+              nombre: res.data.nombre || data.nombre,
+              zona: data.zona || '',
+              actividades: data.actividades || '',
+              tareas: data.tareas || ''
+            };
+            _state.data.cargoId = newCargo.id;
+            _state.data.cargo = newCargo.nombre;
             if (data.zona) _state.data.zona = data.zona;
             if (data.actividades) _state.data.actividades = data.actividades;
             if (data.tareas) _state.data.tareas = data.tareas;
+            if (_state.matriz && _state.matriz.sedes) {
+              var sede = _state.matriz.sedes.filter(function (s) { return s.id === _state.data.sedeId; })[0];
+              if (sede && sede.procesos) {
+                var proc = sede.procesos.filter(function (p) { return p.id === _state.data.procesoId; })[0];
+                if (proc) {
+                  if (!proc.cargos) proc.cargos = [];
+                  var dup = proc.cargos.filter(function (c) { return c.id === newCargo.id; })[0];
+                  if (!dup) proc.cargos.push(newCargo);
+                }
+              }
+            }
           }
         }
       },
@@ -603,6 +677,24 @@ Convenciones:
     var tmp = document.createElement('div');
     tmp.innerHTML = html;
     _quickAddState.overlay = tmp.firstChild;
+    /* F21.54 (2026-06-23) — El bug: position:fixed se rompe en Edge/Chromium
+       cuando un contenedor ancestro (body, #main-content, .km-wrapper, etc)
+       tiene overflow:hidden/auto. Esos contenedores se convierten en scroll
+       containers y position:fixed se comporta como absolute relativo al padre.
+       Mitigacion: cuando abrimos el modal, guardamos el overflow del body y
+       lo cambiamos a 'visible' para que body deje de ser scroll container.
+       Tambien anadimos overflow:visible al html y al #main-content por si
+       alguno de ellos esta rompiendo el fixed. Al cerrar restauramos todo. */
+    _quickAddState._savedOverflow = {
+      body: document.body.style.overflow,
+      html: document.documentElement.style.overflow,
+      mainContent: (document.getElementById('main-content') || {}).style
+        ? document.getElementById('main-content').style.overflow : null
+    };
+    document.body.style.overflow = 'visible';
+    document.documentElement.style.overflow = 'visible';
+    var mainContentEl = document.getElementById('main-content');
+    if (mainContentEl) mainContentEl.style.overflow = 'visible';
     document.body.appendChild(_quickAddState.overlay);
     _bindQuickAddModal(field);
   }
@@ -610,6 +702,16 @@ Convenciones:
   function _closeQuickAdd() {
     if (_quickAddState.overlay) { _quickAddState.overlay.remove(); _quickAddState.overlay = null; }
     _quickAddState.field = null;
+    /* F21.54 — Restaurar overflow que guardamos al abrir el modal */
+    if (_quickAddState._savedOverflow) {
+      document.body.style.overflow = _quickAddState._savedOverflow.body;
+      document.documentElement.style.overflow = _quickAddState._savedOverflow.html;
+      var mainContentEl = document.getElementById('main-content');
+      if (mainContentEl && _quickAddState._savedOverflow.mainContent != null) {
+        mainContentEl.style.overflow = _quickAddState._savedOverflow.mainContent;
+      }
+      _quickAddState._savedOverflow = null;
+    }
   }
 
   function _bindQuickAddModal(field) {

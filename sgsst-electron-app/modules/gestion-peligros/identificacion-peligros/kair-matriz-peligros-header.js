@@ -108,7 +108,11 @@ Patrón: modules/recursos/capacitaciones/capacitaciones-view.html
         '</div>';
     }
 
-    return '<div class="km-header-card">' + mainRow + tabsRow + '</div>';
+    /* F21.51 (2026-06-23) — En modo editor se agrega una clase modificadora
+       para que el CSS pueda dar mas separacion vertical entre el header card
+       y el inicio del editor (sidebar + banner + secciones). */
+    var cardClass = isEditor ? 'km-header-card km-header-card--editor' : 'km-header-card';
+    return '<div class="' + cardClass + '">' + mainRow + tabsRow + '</div>';
   };
 
   /* Bindear eventos */

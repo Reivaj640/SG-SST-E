@@ -209,8 +209,13 @@
 <script src="modules/gestion-integral/evaluacion-seleccion/reportes.js"></script>
 <script src="modules/gestion-integral/evaluacion-seleccion/evaluacion-seleccion-component.js"></script>
 
-<!-- Submódulo 4.1.2 - Identificación de Peligros (Matriz GTC-45) -->
-<link rel="stylesheet" href="modules/gestion-peligros/identificacion-peligros/kair-matriz-peligros.css">
+<!-- Submódulo 4.1.2 - Identificación de Peligros (Matriz GTC-45)
+     v=20260623a — query string para forzar recarga del CSS y evitar
+     que Electron/Chromium sirva una version cacheada del archivo.
+     Subir la version (a, b, c...) cada vez que se cambie el CSS
+     del modulo de peligros para garantizar que los usuarios vean
+     los estilos actualizados sin tener que limpiar el cache. -->
+<link rel="stylesheet" href="modules/gestion-peligros/identificacion-peligros/kair-matriz-peligros.css?v=20260623a">
   <script src="modules/gestion-peligros/identificacion-peligros/kair-matriz-peligros-utils.js"></script>
   <script src="modules/gestion-peligros/identificacion-peligros/kair-matriz-peligros-service.js"></script>
   <script src="modules/gestion-peligros/identificacion-peligros/kair-matriz-peligros-header.js"></script>
