@@ -1237,6 +1237,19 @@ Basado en modules/recursos/capacitaciones/capacitaciones-view.html
   font-weight: 700;
   color: var(--km-primary);
   text-align: right;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+/* F21.61 (2026-06-23) — Porcentaje granular al lado del contador X/N.
+   Mas pequeno y color secundario para que el contador X/N siga siendo
+   el dato principal, pero el % da la medida real del avance. */
+.km-editor-sidebar__progress-percent {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--km-text-muted);
+  letter-spacing: 0.02em;
 }
 .km-editor-progress {
   width: 100%;

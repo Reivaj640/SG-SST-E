@@ -144,42 +144,22 @@ service.js — IPC + seed JSON fallback
       return Promise.resolve({ success: false, error: { code: 'NO_ELECTRON', message: 'Sync solo en Electron' } });
     },
 
-    /* Carga la matriz y SIEMPRE auto-importa desde el XLSX de la empresa.
-   Si no existe XLSX, usa los datos existentes de la BD. */
+    /* F21.62 (2026-06-23) — AUTO-IMPORT DESACTIVADO.
+       Antes esta funcion SIEMPRE re-importaba el XLSX de la empresa con
+       replace:true cada vez que el usuario entraba al modulo, lo cual
+       BORRABA cualquier peligro que el usuario hubiera creado en la
+       sesion anterior (el JSON se sobrescribia con el contenido del Excel).
+       Resultado visible: el usuario creaba "pel_71", veia el toast de
+       exito, y al regresar a la matriz el peligro ya no estaba.
+
+       Fix: loadWithAutoImport ahora SOLO lee del JSON. Si el usuario
+       quiere re-importar desde el Excel, debe usar el boton "Importar
+       Excel" de la toolbar de la vista (que ya existia, solo estaba
+       siendo ignorado por el auto-import). El JSON queda como la unica
+       fuente de verdad entre sesiones. */
     loadWithAutoImport: function (companyName) {
-      if (!hasElectronAPI()) {
-        return Service.read(companyName);
-      }
-      /* Paso 1: descubrir si hay XLSX */
-      return Service.discoverXlsx(companyName).then(function (d) {
-        if (!d || !d.success || !d.data || !d.data.found) {
-          KM.log('PELIGROS', 'AUTO_IMPORT', 'INFO', 'no xlsx encontrado, usando datos en BD');
-          return Service.read(companyName);
-        }
-        KM.log('PELIGROS', 'AUTO_IMPORT', 'INFO', 'xlsx=' + d.data.fileName + ' (reimport forzado)');
-if (global.KM && global.KM.notify) {
-          global.KM.notify('Cargando matriz desde Excel', 'Importación automática en curso…', 'info');
-        }
-        /* Paso 2: importar con replace:true (siempre reemplaza) */
-        return Service.importXlsx(companyName, null, { replace: true }).then(function (ir) {
-          if (ir && ir.success) {
-            var sheets = (ir.data && ir.data.sheetsProcessed) || 0;
-            KM.log('PELIGROS', 'AUTO_IMPORT', 'SUCCESS',
-              'rows=' + (ir.data.rowsImported || 0) +
-              ' sedes=' + (ir.data.sedesCreated || 0) +
-              ' sheets=' + sheets);
-            if (global.KM && global.KM.notify) {
-              var summary = ir.data.rowsImported + ' peligros en ' + ir.data.sedesCreated + ' sedes';
-              if (sheets > 1) summary += ' (' + sheets + ' hojas)';
-              global.KM.notify('Matriz importada', summary, 'success', 4500);
-            }
-            return Service.read(companyName);
-          }
-          KM.log('PELIGROS', 'AUTO_IMPORT', 'WARNING',
-            ir && ir.error ? ir.error.message : 'unknown');
-          return Service.read(companyName);
-        });
-      });
+      KM.log('PELIGROS', 'AUTO_IMPORT', 'INFO', 'desactivado — leyendo solo del JSON local');
+      return Service.read(companyName);
     },
 
     reset: function (companyName) {

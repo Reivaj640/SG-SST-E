@@ -39,10 +39,22 @@ Convenciones:
     { key: 'medidas',   icon: 'hammer',              label: 'Medidas de intervención', required: [] }
   ];
 
-  /* Opcionales por sección (para status "complete" de secciones sin required) */
+  /* F21.61 (2026-06-23) — Opcionales por seccion. Antes tenia los nombres
+     de campos mal: decia 'fuente', 'medio', 'individuo' (cortos) pero el
+     formulario realmente usa 'controlFuente', 'controlMedio', 'controlPersona'
+     (largos, con prefijo control). Igual para medidas: la lista decia
+     'eliminacion' etc. pero el form usa 'medidaEliminacion' etc. Resultado:
+     el sistema JAMAS rastreaba esos campos como opcionales, asi que las
+     secciones Controles existentes y Medidas de intervencion siempre
+     quedaban con status raro. Tambien anadi los pocos campos opcionales
+     que existian en el form pero no estaban en esta lista:
+     - 'zona' (Datos basicos, entre proceso y cargo)
+     - 'peorConsecuencia' (Peligro y efectos) */
   var OPTIONAL_BY_SECTION = {
-    controles: ['fuente', 'medio', 'individuo'],
-    medidas:   ['eliminacion', 'sustitucion', 'controlIngenieria', 'senalizacion', 'epp']
+    datos:     ['zona'],
+    peligro:   ['peorConsecuencia'],
+    controles: ['controlFuente', 'controlMedio', 'controlPersona'],
+    medidas:   ['medidaEliminacion', 'medidaSustitucion', 'medidaIngenieria', 'medidaAdministrativos', 'medidaEpp']
   };
 
   function _sectionStatus(sectionKey) {
@@ -58,12 +70,33 @@ Convenciones:
       var v = d[k];
       if (v !== null && v !== undefined && String(v).trim() !== '') reqFilled++;
     });
-    if (reqFilled === sec.required.length) return 'complete';
-    if (reqFilled === 0) {
-      var opt = OPTIONAL_BY_SECTION[sectionKey] || [];
-      var hasAny = opt.some(function (k) { return d[k] && String(d[k]).trim() !== ''; });
-      return hasAny ? 'partial' : 'empty';
+    /* F21.60 (2026-06-23) — Logica de status re-escrita para que:
+       1) Secciones CON campos requeridos: vacio=empty, parcial=partial, todo=complete
+          (sin cambios).
+       2) Secciones SIN requeridos (Controles existentes, Medidas de
+          intervencion): el status debe basarse en los campos OPCIONALES.
+          Antes siempre daba 'complete' (porque reqFilled=0 === required.length=0
+          → retornaba 'complete' en la primera condicion), aunque la seccion
+          estuviera totalmente vacia. Eso era incorrecto: veiamos "Completo"
+          en verde sin haber llenado nada.
+          Ahora: 0 opcionales llenos = 'empty' (badge "Opcional"),
+                 algunos = 'partial' (badge "Pendiente"),
+                 todos = 'complete' (badge "Completo"). */
+    if (sec.required.length > 0) {
+      if (reqFilled === sec.required.length) return 'complete';
+      if (reqFilled === 0) return 'empty';
+      return 'partial';
     }
+    /* Sin required → mirar solo los opcionales */
+    var opt = OPTIONAL_BY_SECTION[sectionKey] || [];
+    if (opt.length === 0) return 'empty';
+    var optFilled = 0;
+    opt.forEach(function (k) {
+      var v = d[k];
+      if (v !== null && v !== undefined && String(v).trim() !== '') optFilled++;
+    });
+    if (optFilled === 0) return 'optional';
+    if (optFilled === opt.length) return 'complete';
     return 'partial';
   }
 
@@ -73,6 +106,11 @@ Convenciones:
     if (s === 'complete')   { label = 'Completo';   variant = 'success'; }
     if (s === 'partial')    { label = 'Pendiente';  variant = 'warning'; }
     if (s === 'sin-sede')   { label = 'Sin sede';   variant = 'neutral'; }
+    /* F21.60 — Nuevo estado 'optional' para secciones sin requeridos
+       que estan totalmente vacias. Se muestra como "Opcional" con
+       variant neutral (gris) para que sea visualmente distinto de
+       'Nuevo' (azul) que es para secciones con requeridos pendientes. */
+    if (s === 'optional')   { label = 'Opcional';   variant = 'neutral'; }
     if (s === 'empty')      { label = 'Nuevo';      variant = 'info'; }
     return '<span class="km-editor-side-badge km-badge km-badge--' + variant + '">' + label + '</span>';
   }
@@ -153,11 +191,47 @@ Convenciones:
 
   /* ---------------- Render: shell ---------------- */
 
+  /* F21.61 (2026-06-23) — Progreso GRANULAR por seccion (0 a 1). A diferencia
+     de _sectionStatus (que solo dice empty/partial/complete), esta funcion
+     devuelve una fraccion para alimentar la barra de COMPLETITUD con un
+     avance suave: cuenta campos llenos (requeridos + opcionales) sobre el
+     total de campos de la seccion. Asi si lleno 4 de 6 requeridos de
+     "Datos basicos", la barra avanza 4/6 = 66% de esa seccion, no 0 como
+     antes. Si la seccion no tiene campos (caso raro), devuelve 0. */
+  function _sectionProgress(sectionKey) {
+    var sec = SECTIONS.filter(function (s) { return s.key === sectionKey; })[0];
+    if (!sec) return 0;
+    var d = _state.data || {};
+    var reqFilled = 0;
+    sec.required.forEach(function (k) {
+      var v = d[k];
+      if (v !== null && v !== undefined && String(v).trim() !== '') reqFilled++;
+    });
+    var opt = OPTIONAL_BY_SECTION[sectionKey] || [];
+    var optFilled = 0;
+    opt.forEach(function (k) {
+      var v = d[k];
+      if (v !== null && v !== undefined && String(v).trim() !== '') optFilled++;
+    });
+    var total = sec.required.length + opt.length;
+    if (total === 0) return 0;
+    return (reqFilled + optFilled) / total;
+  }
+
   function _renderSidebar() {
     var completitud = 0;
+    /* F21.61 — Ahora la barra se alimenta del progreso GRANULAR
+       (suma de _sectionProgress de cada seccion / N secciones), no de
+       un contador de "completas". Asi la barra avanza suavemente a
+       medida que el usuario llena campos, en vez de dar saltos de
+       20% en 20% (0, 20, 40, 60, 80, 100) como antes. Tambien se
+       muestra el porcentaje explicito al lado del contador X/N. */
+    var totalProgress = 0;
     var items = SECTIONS.map(function (sec) {
       var st = _sectionStatus(sec.key);
       if (st === 'complete') completitud++;
+      var prog = _sectionProgress(sec.key);
+      totalProgress += prog;
       var checkCls = 'km-editor-side-check km-editor-side-check--' + st;
       var checkIcon = st === 'complete' ? 'bi-check-circle-fill' : 'bi-circle';
       return (
@@ -169,6 +243,9 @@ Convenciones:
         '</li>'
       );
     }).join('');
+
+    var avgProgress = SECTIONS.length > 0 ? (totalProgress / SECTIONS.length) : 0;
+    var percent = Math.round(avgProgress * 100);
 
     /* F21.53 (2026-06-23) — Quitado el bloque keydata (ID / SEDE / NR) del
        sidebar. Generaba un espacio vacio enorme entre los items y
@@ -182,8 +259,11 @@ Convenciones:
       '<ul class="km-editor-side-nav">' + items + '</ul>' +
       '<div class="km-editor-sidebar__progress">' +
         '<div class="km-editor-sidebar__progress-label">COMPLETITUD</div>' +
-        '<div class="km-editor-sidebar__progress-count">' + completitud + '/' + SECTIONS.length + '</div>' +
-        '<div class="km-editor-progress"><div class="km-editor-progress__bar" style="width:' + Math.round((completitud / SECTIONS.length) * 100) + '%"></div></div>' +
+        '<div class="km-editor-sidebar__progress-count">' +
+          '<span>' + completitud + '/' + SECTIONS.length + '</span>' +
+          '<span class="km-editor-sidebar__progress-percent">' + percent + '%</span>' +
+        '</div>' +
+        '<div class="km-editor-progress"><div class="km-editor-progress__bar" style="width:' + percent + '%"></div></div>' +
       '</div>'
     );
   }
@@ -568,35 +648,76 @@ Convenciones:
       cargoId: {
         title: 'Agregar cargo / actividad',
         icon: 'bi-person-workspace',
+        /* F21.58 (2026-06-23) — El modal de cargo ahora SOLO pide el nombre.
+           Antes tenia 4 campos (nombre, zona, actividades, tareas) con la
+           idea de pre-rellenar el form del peligro, pero el backend
+           (addCargo) solo persiste el nombre, asi que los otros 3 se
+           quedaban en variables locales y se perdian al cerrar la sesion.
+           Era placebo visual: el usuario llenaba 3 casillas que nunca
+           se guardaban. Ahora se quitan — el usuario llena zona y tareas
+           directamente en el formulario del peligro, que es donde tienen
+           sentido en el flujo GTC-45. actividades se elimina del
+           formulario del cargo porque ademas nunca existio como campo
+           en el form del peligro (seria metadata huerfana). */
         fields: [
-          { name: 'nombre', label: 'Nombre del cargo', required: true, placeholder: 'Ej: Operario' },
-          { name: 'zona', label: 'Zona / Lugar', placeholder: 'Ej: Área de producción' },
-          { name: 'actividades', label: 'Actividades', placeholder: 'Ej: Labores operativas' },
-          { name: 'tareas', label: 'Tareas', placeholder: 'Ej: Mantenimiento, inspección' }
+          { name: 'nombre', label: 'Nombre del cargo', required: true, placeholder: 'Ej: Operario' }
         ],
         save: function(data) {
           if (!global.KMService || !global.KMService.addCargo) return Promise.reject(new Error('Servicio no disponible'));
           var procesoId = _state.data.procesoId;
           if (!procesoId) return Promise.reject(new Error('Selecciona un proceso primero'));
+          /* F21.59 (2026-06-23) — Auto-promover proceso default a proceso
+             real. Si el usuario selecciono un proceso de PROCESOS_DEFAULT
+             (id pro_def_*), ese id es virtual y no existe en la matriz del
+             backend, asi que addCargo fallaba con "Proceso no encontrado".
+             Solucion: detectar el default, crear el proceso real con
+             addProceso, actualizar el id en _state.data, y solo entonces
+             llamar addCargo con el id real. Asi el primer cargo bajo un
+             proceso default "materializa" el proceso en la empresa. */
+          if (procesoId.indexOf('pro_def_') === 0) {
+            var defProc = PROCESOS_DEFAULT.filter(function (p) { return p.id === procesoId; })[0];
+            if (!defProc) return Promise.reject(new Error('Proceso default no encontrado'));
+            var sedeIdForProc = _state.data.sedeId;
+            if (!sedeIdForProc) return Promise.reject(new Error('Selecciona una sede primero'));
+            return global.KMService.addProceso(_state.companyName, sedeIdForProc, defProc.nombre).then(function (pr) {
+              if (!pr || !pr.success || !pr.data || !pr.data.id) {
+                return Promise.reject(new Error((pr && pr.error && pr.error.message) || 'No se pudo crear el proceso'));
+              }
+              /* Actualizar state con el id real del proceso para que
+                 onSuccess lo use al insertar el cargo en _state.matriz */
+              _state.data.procesoId = pr.data.id;
+              _state.data.proceso = pr.data.nombre || defProc.nombre;
+              /* Insertar el proceso real en _state.matriz local para que
+                 el dropdown de Proceso deje de mostrar el default y muestre
+                 el proceso ya materializado */
+              if (_state.matriz && _state.matriz.sedes) {
+                var sedeForProc = _state.matriz.sedes.filter(function (s) { return s.id === sedeIdForProc; })[0];
+                if (sedeForProc) {
+                  if (!sedeForProc.procesos) sedeForProc.procesos = [];
+                  var dupP = sedeForProc.procesos.filter(function (p) { return p.id === pr.data.id; })[0];
+                  if (!dupP) sedeForProc.procesos.push({ id: pr.data.id, nombre: pr.data.nombre || defProc.nombre, cargos: [] });
+                }
+              }
+              /* Ahora si, crear el cargo con el id real del proceso */
+              return global.KMService.addCargo(_state.companyName, pr.data.id, data.nombre);
+            });
+          }
           return global.KMService.addCargo(_state.companyName, procesoId, data.nombre);
         },
         onSuccess: function(res, data) {
           if (res && res.success && res.data && res.data.id) {
-            /* F21.55 — Mismo patron: ademas de pintar el cargo en _state.data,
+            /* F21.55 + F21.58 — Ademas de pintar el cargo en _state.data,
                lo insertamos en el arbol _state.matriz (dentro del proceso
-               actualmente seleccionado) para que el <select> lo refleje. */
+               actualmente seleccionado) para que el <select> lo refleje.
+               Ahora newCargo solo lleva id+nombre (lo unico que persiste
+               el backend); zona/actividades/tareas se llenan despues en
+               el form del peligro si el usuario los necesita. */
             var newCargo = {
               id: res.data.id,
-              nombre: res.data.nombre || data.nombre,
-              zona: data.zona || '',
-              actividades: data.actividades || '',
-              tareas: data.tareas || ''
+              nombre: res.data.nombre || data.nombre
             };
             _state.data.cargoId = newCargo.id;
             _state.data.cargo = newCargo.nombre;
-            if (data.zona) _state.data.zona = data.zona;
-            if (data.actividades) _state.data.actividades = data.actividades;
-            if (data.tareas) _state.data.tareas = data.tareas;
             if (_state.matriz && _state.matriz.sedes) {
               var sede = _state.matriz.sedes.filter(function (s) { return s.id === _state.data.sedeId; })[0];
               if (sede && sede.procesos) {
@@ -865,7 +986,17 @@ Convenciones:
 
     /* Live status badges para sidebar (cuando cambian inputs) */
     if (_inputChangeHandler) _state.container.removeEventListener('input', _inputChangeHandler);
-    _inputChangeHandler = function () { _updateSidebarBadges(); };
+    /* F21.60 — Bug critico: antes este handler solo llamaba a
+       _updateSidebarBadges() (que re-pinta el sidebar), pero no sincronizaba
+       _state.data con los valores actuales del formulario. Resultado: el
+       usuario llenaba "Datos basicos" completo (Sede, Proceso, Cargo, Zona,
+       Tareas, Rutinaria, Expuestos) pero el sidebar seguia mostrando
+       "Pendiente" porque _state.data estaba desactualizado (solo se actualiza
+       en los handlers explicitos de sede/proceso/cargo via _collectForm).
+       Fix: llamar _collectForm() PRIMERO para refrescar _state.data desde
+       los inputs actuales, y LUEGO repintar el sidebar. Asi el status se
+       calcula con la realidad del formulario, no con datos viejos. */
+    _inputChangeHandler = function () { _collectForm(); _updateSidebarBadges(); };
     _state.container.addEventListener('input', _inputChangeHandler);
     _state.container.addEventListener('change', _inputChangeHandler);
 
@@ -894,13 +1025,20 @@ Convenciones:
 
   function _updateSidebarBadges() {
     if (!_state || !_state.container) return;
-    /* Re-render del sidebar sin tocar el resto (optimización ligera) */
+    /* F21.57 (2026-06-23) — Bug critico que descubrimos al ver la captura:
+       _renderSidebar() devuelve 3 elementos hermanos (title, ul con items,
+       progress con COMPLETITUD), no un contenedor unico. El codigo anterior
+       hacia tmp.firstChild para obtener "el sidebar nuevo", pero firstChild
+       es SOLO el title (<div>SECCIONES</div>), y sidebar.replaceWith(title)
+       reemplazaba el <aside> ENTERO por un unico div de titulo, borrando
+       la lista de secciones y el bloque de completitud. Resultado visible:
+       sidebar mostraba solo "SECCIONES" y el resto quedaba en blanco.
+
+       Fix: en vez de replaceWith el <aside>, setear sidebar.innerHTML con
+       el render. Asi el <aside> se preserva y solo cambian sus hijos. */
     var sidebar = _state.container.querySelector('.km-editor-sidebar');
     if (!sidebar) return;
-    var tmp = document.createElement('div');
-    tmp.innerHTML = _renderSidebar();
-    var newSidebar = tmp.firstChild;
-    if (newSidebar) sidebar.replaceWith(newSidebar);
+    sidebar.innerHTML = _renderSidebar();
   }
 
   function _updateBanner() {
