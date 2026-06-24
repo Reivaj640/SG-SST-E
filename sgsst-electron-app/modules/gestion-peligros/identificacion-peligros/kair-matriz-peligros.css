@@ -424,9 +424,7 @@ Basado en modules/recursos/capacitaciones/capacitaciones-view.html
 .km-wrapper .km-table tbody tr:hover td { background: #fef3c7; }
 
 .km-wrapper .km-table__id-cell {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  white-space: nowrap;
 }
 .km-wrapper .km-table__expand-btn {
   width: 22px;
@@ -445,6 +443,7 @@ Basado en modules/recursos/capacitaciones/capacitaciones-view.html
   font-weight: 600;
   color: var(--km-primary);
   font-size: var(--km-fs-sm);
+  white-space: nowrap;
 }
 
 .km-wrapper .km-table__cell-peligro {

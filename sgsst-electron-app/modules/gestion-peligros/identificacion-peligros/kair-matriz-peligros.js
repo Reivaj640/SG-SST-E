@@ -30,8 +30,10 @@ header o vía evento `km:open-editor` desde la vista Matriz (editar existente).
     this.currentView = 'matriz';
     this._editorSession = null; /* payload pendiente al abrir editor (mode/data/cargoId) */
     this._abortController = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    /* render() ahora también re-registra _bindGlobalEvents() con el nuevo
+       AbortController, así que NO necesitamos llamarlo explícitamente aquí
+       (antes sí hacía falta porque render() no re-registraba). */
     this.render();
-    this._bindGlobalEvents();
   }
 
   KairMatrizPeligros.prototype.render = function () {
@@ -39,6 +41,13 @@ header o vía evento `km:open-editor` desde la vista Matriz (editar existente).
     this.container.innerHTML = '';
     if (this._abortController) { try { this._abortController.abort(); } catch (e) {} }
     this._abortController = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    /* F438 — Re-registrar listeners globales con el nuevo AbortController.
+       Antes, render() abortaba el controller viejo pero NO volvía a llamar
+       _bindGlobalEvents(), por lo que cualquier evento disparado después
+       (km:open-editor, km:close-editor, km:peligros-changed) caía en el
+       vacío. createComponentSafely en renderer.js llama render() después del
+       constructor, así que este era el bug que rompía editar/eliminar. */
+    if (this._bindGlobalEvents) this._bindGlobalEvents();
     /* Si el editor estaba montado, destruirlo */
     if (Editor && Editor.destroy) Editor.destroy();
 
@@ -85,11 +94,19 @@ header o vía evento `km:open-editor` desde la vista Matriz (editar existente).
     document.addEventListener('km:open-editor', function (e) {
       if (!self.container) return;
       var d = e.detail || {};
+      /* F438 — Pasar sedeId/procesoId/cargoId dentro de data para que el editor
+         preseleccione los dropdowns de ubicación al editar un peligro existente.
+         Antes solo se pasaba cargoId por separado y se perdían sedeId/procesoId,
+         dejando los 3 selectores vacíos al editar. */
+      var merged = Object.assign({}, d.data || {});
+      if (d.sedeId) merged.sedeId = d.sedeId;
+      if (d.procesoId) merged.procesoId = d.procesoId;
+      if (d.cargoId) merged.cargoId = d.cargoId;
       self._openEditor({
         companyName: self.currentCompany,
         mode: d.mode || 'new',
         cargoId: d.cargoId || null,
-        data: d.data || {}
+        data: merged
       });
     }, opts);
     document.addEventListener('km:close-editor', function () {

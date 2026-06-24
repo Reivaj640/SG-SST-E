@@ -125,8 +125,7 @@ matriz.js — Vista Matriz: buscador + 3 dropdowns + tabla plana con todas las c
       return v != null && String(v).trim() !== '';
     }
     if (col.key === 'id') {
-      return '<button type="button" class="km-table__expand-btn" data-action="expand" data-peligro-id="' + KM.esc(p.id) + '"><i class="bi bi-chevron-right"></i></button>' +
-             '<span class="km-table__id">' + KM.esc(p.id) + '</span>';
+      return '<span class="km-table__id">' + KM.esc(p.id) + '</span>';
     }
     if (col.key === 'actividadTarea') {
       var txt = hasValue(p.actividadTarea) ? p.actividadTarea : '—';

@@ -54,7 +54,10 @@ Patrón: modules/recursos/capacitaciones/capacitaciones-view.html
         ? 'Editar peligro ' + editorPeligroId
         : 'Nuevo peligro';
       var editorSubtitle = 'Identificación, evaluación y medidas de intervención';
-      /* En modo editor: header de editor con pill GI-FO-019 + título dinámico */
+      /* En modo editor: header de editor con pill GI-FO-019 + título dinámico.
+         F24.1 (2026-06-24): quitamos el botón "Volver" duplicado del mainRow
+         (km-header-card__back). Ahora solo queda el botón "Volver a la matriz"
+         en los tabs (km-btn--ghost), que es la acción explícita del editor. */
       mainRow =
         '<div class="km-header-card__main">' +
           '<div class="km-header-card__title-block">' +
@@ -68,10 +71,6 @@ Patrón: modules/recursos/capacitaciones/capacitaciones-view.html
             (company
               ? '<span class="km-header-card__company" title="Empresa activa"><i class="bi bi-building" style="font-size:0.875rem;"></i> ' + KM.esc(company) + '</span>'
               : '') +
-            (company ? '<div class="km-header-card__divider" aria-hidden="true"></div>' : '') +
-            '<button type="button" class="km-header-card__back" data-action="back-to-matriz" title="Volver a la matriz" aria-label="Volver a la matriz">' +
-              '<i class="bi bi-arrow-left"></i> Volver' +
-            '</button>' +
           '</div>' +
         '</div>';
 
