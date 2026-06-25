@@ -453,12 +453,45 @@ Basado en modules/recursos/capacitaciones/capacitaciones-view.html
   margin: 20px 16px 16px 16px;
   box-shadow: var(--km-shadow-sm);
 }
+/* 📦445/📦446 (2026-06-25) — Variante con scroll horizontal/vertical
+   automático + max-height. Usado en la vista de Priorización
+   (kair-matriz-peligros-priorizacion.js) donde hay 12 columnas y muchas
+   filas: la tabla con table-layout:fixed mide 1240px exactos (suma de
+   colgroup), y cuando el wrapper mide menos que eso (modo ventana,
+   pantallas < 1240px efectivos, sidebar abierto, etc.) aparece scroll
+   horizontal automáticamente. La barra vertical aparece cuando las filas
+   exceden max-height (calc 100vh - 260px para que quepa el sticky header
+   + footer + header global). */
+.km-wrapper .km-table-wrapper--scroll {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: calc(100vh - 260px);
+  min-height: 320px;
+  /* 📦446: hint visual sutil — sombra interna derecha que aparece cuando
+     hay contenido scrolleable a la derecha (mejora UX sin distraer). */
+  background:
+    /* shadow derecha (indicador "hay más contenido →") */
+    linear-gradient(to right, var(--km-bg-card) 30%, rgba(0,0,0,0)) left center / 20px 100% no-repeat,
+    linear-gradient(to left, var(--km-bg-card) 30%, rgba(0,0,0,0)) right center / 20px 100% no-repeat,
+    radial-gradient(farthest-side at 0 50%, rgba(0,0,0,0.08), rgba(0,0,0,0)) left center / 12px 100% no-repeat,
+    radial-gradient(farthest-side at 100% 50%, rgba(0,0,0,0.08), rgba(0,0,0,0)) right center / 12px 100% no-repeat;
+  background-attachment: local, local, scroll, scroll;
+  background-color: var(--km-bg-card);
+}
 .km-wrapper .km-table {
-  width: 100%;
+  width: auto;
   border-collapse: separate;
   border-spacing: 0;
   font-size: var(--km-fs-sm);
-  min-width: 2400px;
+  /* 📦446 (2026-06-25) — table-layout:fixed es CRÍTICO para que los anchos
+     definidos en <colgroup> (<col style="width:Xpx">) se respeten
+     estrictamente. Sin esto, el navegador usa table-layout:auto y reescala
+     las columnas según el contenido, IGNORANDO los anchos del colgroup
+     (PELIGRO volvía a verse ancha aunque el JS pidiera 200px).
+     También quitamos min-width:2400px porque con table-layout:fixed la
+     tabla mide = suma de anchos de columnas (1240px). Si quisiéramos más
+     ancho en una columna, ajustamos el colgroup, no el min-width. */
+  table-layout: fixed;
 }
 /* 📦440 (2026-06-25) — Tabla estilo Excel GI-FO-019:
    - 2 filas en thead (super-encabezado con colspan + sub-encabezado)
@@ -825,6 +858,559 @@ Basado en modules/recursos/capacitaciones/capacitaciones-view.html
 }
 
 /* ==========================================================================
+   5b. VISTA INDICADORES — Grid 2 columnas + 5 nuevos KPIs (📦448 2026-06-25)
+   ========================================================================== */
+/* Grid 2 columnas: el contenedor padre (.km-kpis-grid) decide el layout.
+   Por defecto 2 columnas; en < 1024px → 1 columna. */
+.km-wrapper .km-kpis-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+/* Variante full-width para KPIs que necesitan todo el ancho
+   (ej: stacked bar de expuestos por sede). */
+.km-wrapper .km-kpis-grid--full {
+  grid-template-columns: 1fr;
+}
+/* Card base de cada uno de los 5 nuevos KPIs */
+.km-wrapper .km-kpi-card {
+  background: var(--km-bg-card);
+  border: 1px solid var(--km-border);
+  border-radius: var(--km-radius-md);
+  padding: 20px;
+  box-shadow: var(--km-shadow-sm);
+  display: flex;
+  flex-direction: column;
+  min-width: 0; /* evita overflow en grid */
+}
+.km-wrapper .km-kpi-card__header {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--km-border-light);
+}
+.km-wrapper .km-kpi-card__title {
+  font-size: var(--km-fs-base);
+  font-weight: 700;
+  color: var(--km-text-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.km-wrapper .km-kpi-card__title i { color: var(--km-primary); }
+.km-wrapper .km-kpi-card__subtitle {
+  font-size: 0.75rem;
+  color: var(--km-text-muted);
+  margin-top: 4px;
+}
+.km-wrapper .km-kpi-card__body {
+  flex: 1;
+  min-height: 0;
+}
+.km-wrapper .km-empty-inline {
+  text-align: center;
+  color: var(--km-text-light);
+  padding: 24px 12px;
+  font-size: 0.85rem;
+}
+
+/* — KPI #1: Cobertura de controles — */
+.km-wrapper .km-coverage { display: flex; flex-direction: column; gap: 16px; }
+.km-wrapper .km-coverage__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.km-wrapper .km-coverage__icon {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  flex-shrink: 0;
+}
+.km-wrapper .km-coverage__icon--verde { background: #dcfce7; color: #166534; }
+.km-wrapper .km-coverage__icon--azul { background: #dbeafe; color: #1e40af; }
+.km-wrapper .km-coverage__icon--morado { background: #ede9fe; color: #6b21a8; }
+.km-wrapper .km-coverage__label {
+  flex: 1;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--km-text-primary);
+}
+.km-wrapper .km-coverage__pct {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--km-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.km-wrapper .km-coverage__track {
+  background: #f1f5f9;
+  border-radius: 6px;
+  height: 10px;
+  overflow: hidden;
+}
+.km-wrapper .km-coverage__bar {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.3s ease;
+}
+.km-wrapper .km-coverage__bar--ok { background: linear-gradient(90deg, #22c55e, #16a34a); }
+.km-wrapper .km-coverage__bar--mid { background: linear-gradient(90deg, #f59e0b, #d97706); }
+.km-wrapper .km-coverage__bar--low { background: linear-gradient(90deg, #ef4444, #dc2626); }
+.km-wrapper .km-coverage__meta {
+  font-size: 0.72rem;
+  color: var(--km-text-muted);
+  margin-top: 4px;
+}
+
+/* — KPI #2: Donut Rutinaria vs No rutinaria — */
+.km-wrapper .km-donut-wrap {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  justify-content: center;
+  padding: 8px 0;
+}
+.km-wrapper .km-donut { flex-shrink: 0; }
+.km-wrapper .km-donut__seg { transition: stroke-dasharray 0.3s ease; }
+.km-wrapper .km-donut__seg--si { stroke: #16a34a; }
+.km-wrapper .km-donut__seg--no { stroke: #f59e0b; }
+.km-wrapper .km-donut__seg--sc { stroke: #cbd5e1; }
+.km-wrapper .km-donut__total {
+  font-size: 1.5rem;
+  font-weight: 800;
+  fill: var(--km-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.km-wrapper .km-donut__label {
+  font-size: 0.7rem;
+  fill: var(--km-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.km-wrapper .km-donut-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.km-wrapper .km-donut-legend__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+.km-wrapper .km-donut-legend__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.km-wrapper .km-donut-legend__dot--si { background: #16a34a; }
+.km-wrapper .km-donut-legend__dot--no { background: #f59e0b; }
+.km-wrapper .km-donut-legend__dot--sc { background: #cbd5e1; }
+.km-wrapper .km-donut-legend__label {
+  flex: 1;
+  color: var(--km-text-secondary);
+}
+.km-wrapper .km-donut-legend__value {
+  font-weight: 700;
+  color: var(--km-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* — KPI #3: Distribución NR (histograma) — */
+.km-wrapper .km-nr-dist__stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 10px;
+  background: #f8fafc;
+  border-radius: var(--km-radius-sm);
+}
+.km-wrapper .km-nr-dist__stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.km-wrapper .km-nr-dist__stat-label {
+  font-size: 0.65rem;
+  color: var(--km-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+.km-wrapper .km-nr-dist__stat-value {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--km-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.km-wrapper .km-nr-dist__stat-value--warn { color: var(--km-danger); }
+.km-wrapper .km-nr-dist__bars { display: flex; flex-direction: column; gap: 10px; }
+.km-wrapper .km-nr-dist__row { display: flex; flex-direction: column; gap: 4px; }
+.km-wrapper .km-nr-dist__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+}
+.km-wrapper .km-nr-dist__range {
+  display: inline-flex;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.km-wrapper .km-nr-dist__range--verde { background: #dcfce7; color: #166534; }
+.km-wrapper .km-nr-dist__range--azul { background: #dbeafe; color: #1e40af; }
+.km-wrapper .km-nr-dist__range--amarillo { background: #fef3c7; color: #92400e; }
+.km-wrapper .km-nr-dist__range--naranja { background: #ffedd5; color: #9a3412; }
+.km-wrapper .km-nr-dist__range--rojo { background: #fee2e2; color: #991b1b; }
+.km-wrapper .km-nr-dist__label {
+  flex: 1;
+  color: var(--km-text-secondary);
+}
+.km-wrapper .km-nr-dist__value {
+  font-weight: 700;
+  color: var(--km-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.km-wrapper .km-nr-dist__track {
+  background: #f1f5f9;
+  border-radius: 4px;
+  height: 8px;
+  overflow: hidden;
+}
+.km-wrapper .km-nr-dist__bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+.km-wrapper .km-nr-dist__bar--verde { background: linear-gradient(90deg, #4ade80, #16a34a); }
+.km-wrapper .km-nr-dist__bar--azul { background: linear-gradient(90deg, #60a5fa, #2563eb); }
+.km-wrapper .km-nr-dist__bar--amarillo { background: linear-gradient(90deg, #fcd34d, #f59e0b); }
+.km-wrapper .km-nr-dist__bar--naranja { background: linear-gradient(90deg, #fb923c, #ea580c); }
+.km-wrapper .km-nr-dist__bar--rojo { background: linear-gradient(90deg, #f87171, #dc2626); }
+
+/* — KPI #4: Top cargos — */
+.km-wrapper .km-top-cargos { display: flex; flex-direction: column; gap: 12px; }
+.km-wrapper .km-top-cargos__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.km-wrapper .km-top-cargos__rank {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--km-primary-light);
+  color: var(--km-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.km-wrapper .km-top-cargos__body { flex: 1; min-width: 0; }
+.km-wrapper .km-top-cargos__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.km-wrapper .km-top-cargos__name {
+  font-size: 0.82rem;
+  color: var(--km-text-primary);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.km-wrapper .km-top-cargos__count {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--km-text-primary);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.km-wrapper .km-top-cargos__track {
+  background: #f1f5f9;
+  border-radius: 4px;
+  height: 8px;
+  overflow: hidden;
+}
+.km-wrapper .km-top-cargos__bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+.km-wrapper .km-top-cargos__bar--azul { background: linear-gradient(90deg, #60a5fa, #2563eb); }
+.km-wrapper .km-top-cargos__bar--verde { background: linear-gradient(90deg, #4ade80, #16a34a); }
+.km-wrapper .km-top-cargos__bar--amarillo { background: linear-gradient(90deg, #fcd34d, #f59e0b); }
+.km-wrapper .km-top-cargos__bar--naranja { background: linear-gradient(90deg, #fb923c, #ea580c); }
+.km-wrapper .km-top-cargos__bar--morado { background: linear-gradient(90deg, #c084fc, #9333ea); }
+
+/* — KPI #5: Expuestos por sede (stacked bar) — */
+.km-wrapper .km-exp-sede { display: flex; flex-direction: column; gap: 12px; }
+.km-wrapper .km-exp-sede__row {
+  display: grid;
+  grid-template-columns: 180px 1fr 60px;
+  gap: 12px;
+  align-items: center;
+}
+.km-wrapper .km-exp-sede__label {
+  font-size: 0.85rem;
+  color: var(--km-text-primary);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.km-wrapper .km-exp-sede__track {
+  background: #f1f5f9;
+  border-radius: 6px;
+  height: 24px;
+  overflow: hidden;
+  display: flex;
+}
+.km-wrapper .km-exp-sede__seg {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+.km-wrapper .km-exp-sede__seg--rojo { background: #dc2626; }
+.km-wrapper .km-exp-sede__seg--naranja { background: var(--km-nivel-III); }
+.km-wrapper .km-exp-sede__seg--amarillo { background: var(--km-warning); }
+.km-wrapper .km-exp-sede__seg--verde { background: var(--km-success); }
+.km-wrapper .km-exp-sede__seg--morado { background: var(--km-nivel-V); }
+.km-wrapper .km-exp-sede__total {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--km-text-primary);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.km-wrapper .km-exp-sede__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding-top: 14px;
+  margin-top: 6px;
+  border-top: 1px solid var(--km-border-light);
+  font-size: 0.78rem;
+  color: var(--km-text-muted);
+}
+.km-wrapper .km-exp-sede__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.km-wrapper .km-exp-sede__legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+.km-wrapper .km-exp-sede__legend-dot--rojo { background: #dc2626; }
+.km-wrapper .km-exp-sede__legend-dot--naranja { background: var(--km-nivel-III); }
+.km-wrapper .km-exp-sede__legend-dot--amarillo { background: var(--km-warning); }
+.km-wrapper .km-exp-sede__legend-dot--verde { background: var(--km-success); }
+.km-wrapper .km-exp-sede__legend-total {
+  margin-left: auto;
+  color: var(--km-text-secondary);
+}
+.km-wrapper .km-exp-sede__legend-total strong {
+  color: var(--km-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* — KPI A (sustituye Tareas rutinarias): Concentración de riesgo — */
+.km-wrapper .km-concentracion {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.km-wrapper .km-concentracion__hero {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.km-wrapper .km-concentracion__pct {
+  font-size: 1.7rem;
+  font-weight: 800;
+  fill: var(--km-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.km-wrapper .km-concentracion__pct--crit { fill: #dc2626; }
+.km-wrapper .km-concentracion__pct--alto { fill: #ea580c; }
+.km-wrapper .km-concentracion__pct--ok { fill: #16a34a; }
+.km-wrapper .km-concentracion__copy {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.km-wrapper .km-concentracion__title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--km-text-primary);
+}
+.km-wrapper .km-concentracion__sub {
+  font-size: 0.85rem;
+  color: var(--km-text-secondary);
+}
+.km-wrapper .km-concentracion__sub strong {
+  color: var(--km-danger);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.km-wrapper .km-concentracion__other {
+  font-size: 0.78rem;
+  color: var(--km-text-muted);
+}
+.km-wrapper .km-concentracion__other strong {
+  color: var(--km-text-secondary);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.km-wrapper .km-concentracion__breakdown {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--km-border-light);
+}
+.km-wrapper .km-concentracion__bd-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border-radius: var(--km-radius-sm);
+  border-left: 3px solid;
+}
+.km-wrapper .km-concentracion__bd-item--crit { border-left-color: #dc2626; }
+.km-wrapper .km-concentracion__bd-item--alto { border-left-color: #ea580c; }
+.km-wrapper .km-concentracion__bd-icon {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+.km-wrapper .km-concentracion__bd-item--crit .km-concentracion__bd-icon { background: #fee2e2; color: #991b1b; }
+.km-wrapper .km-concentracion__bd-item--alto .km-concentracion__bd-icon { background: #ffedd5; color: #9a3412; }
+.km-wrapper .km-concentracion__bd-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.km-wrapper .km-concentracion__bd-value {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--km-text-primary);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.km-wrapper .km-concentracion__bd-label {
+  font-size: 0.72rem;
+  color: var(--km-text-muted);
+  font-weight: 600;
+}
+
+/* — KPI D: % de expuestos por sede — */
+.km-wrapper .km-exp-pct {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.km-wrapper .km-exp-pct__row {
+  display: grid;
+  grid-template-columns: 200px 1fr 60px 80px;
+  gap: 12px;
+  align-items: center;
+}
+.km-wrapper .km-exp-pct__label {
+  font-size: 0.85rem;
+  color: var(--km-text-primary);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.km-wrapper .km-exp-pct__track {
+  background: #f1f5f9;
+  border-radius: 6px;
+  height: 22px;
+  overflow: hidden;
+}
+.km-wrapper .km-exp-pct__bar {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.3s ease;
+}
+.km-wrapper .km-exp-pct__bar--azul { background: linear-gradient(90deg, #60a5fa, #2563eb); }
+.km-wrapper .km-exp-pct__bar--verde { background: linear-gradient(90deg, #4ade80, #16a34a); }
+.km-wrapper .km-exp-pct__bar--amarillo { background: linear-gradient(90deg, #fcd34d, #f59e0b); }
+.km-wrapper .km-exp-pct__bar--naranja { background: linear-gradient(90deg, #fb923c, #ea580c); }
+.km-wrapper .km-exp-pct__bar--morado { background: linear-gradient(90deg, #c084fc, #9333ea); }
+.km-wrapper .km-exp-pct__bar--cyan { background: linear-gradient(90deg, #22d3ee, #0891b2); }
+.km-wrapper .km-exp-pct__bar--rosa { background: linear-gradient(90deg, #f472b6, #db2777); }
+.km-wrapper .km-exp-pct__value {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--km-text-primary);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.km-wrapper .km-exp-pct__count {
+  font-size: 0.78rem;
+  color: var(--km-text-muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.km-wrapper .km-exp-pct__total {
+  margin-top: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--km-border-light);
+  font-size: 0.85rem;
+  color: var(--km-text-secondary);
+  text-align: right;
+}
+.km-wrapper .km-exp-pct__total strong {
+  color: var(--km-text-primary);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 1100px) {
+  .km-wrapper .km-exp-pct__row {
+    grid-template-columns: 120px 1fr 50px 60px;
+  }
+  .km-wrapper .km-concentracion__hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* Responsive: en pantallas chicas el grid pasa a 1 columna */
+@media (max-width: 1100px) {
+  .km-wrapper .km-kpis-grid {
+    grid-template-columns: 1fr;
+  }
+  .km-wrapper .km-exp-sede__row {
+    grid-template-columns: 120px 1fr 50px;
+  }
+}
+
+/* ==========================================================================
 6. VISTA PRIORIZACIÓN — Leyenda + sub-tabs + tabla semáforo
 ========================================================================== */
 .km-wrapper .km-prior-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 20px; }
@@ -832,7 +1418,7 @@ Basado en modules/recursos/capacitaciones/capacitaciones-view.html
 .km-wrapper .km-leyenda {
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 12px;
   padding: 16px 20px;
   background: var(--km-bg-card);
   border: 1px solid var(--km-border);
@@ -841,17 +1427,197 @@ Basado en modules/recursos/capacitaciones/capacitaciones-view.html
   flex-wrap: wrap;
   box-shadow: var(--km-shadow-sm);
 }
-.km-wrapper .km-leyenda__label { font-weight: 600; color: var(--km-text-secondary); margin-right: 8px; }
+.km-wrapper .km-leyenda__label { font-weight: 700; color: var(--km-text-secondary); margin-right: 8px; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.05em; }
 .km-wrapper .km-leyenda__item { display: inline-flex; align-items: center; gap: 6px; }
 .km-wrapper .km-leyenda__dot {
   width: 12px;
   height: 12px;
   border-radius: 50%;
+  flex-shrink: 0;
 }
 .km-wrapper .km-leyenda__dot--I { background: var(--km-nivel-I); }
 .km-wrapper .km-leyenda__dot--II { background: var(--km-nivel-II); }
 .km-wrapper .km-leyenda__dot--III { background: var(--km-nivel-III); }
 .km-wrapper .km-leyenda__dot--IV { background: var(--km-nivel-IV); }
+
+/* 📦447 (2026-06-25) — Botones de filtro de la leyenda.
+   Cada item es un botón clickeable que filtra la tabla semáforo por nivel.
+   - estado normal: fondo neutro, borde sutil
+   - hover: fondo se aclara, borde se marca
+   - --active: fondo del color del nivel (con transparencia), borde sólido del color
+   - --empty: opacidad reducida (nivel sin peligros en la matriz)
+   - --reset: estilo diferenciado (outline + icono), para "Todos" */
+.km-wrapper .km-leyenda__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px 7px 10px;
+  background: var(--km-bg-card);
+  border: 1.5px solid var(--km-border);
+  border-radius: 999px;
+  color: var(--km-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.km-wrapper .km-leyenda__btn:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: var(--km-text-primary);
+}
+.km-wrapper .km-leyenda__btn-label {
+  white-space: nowrap;
+  line-height: 1;
+}
+.km-wrapper .km-leyenda__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  background: #e2e8f0;
+  color: #475569;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  margin-left: 2px;
+}
+.km-wrapper .km-leyenda__btn--empty {
+  opacity: 0.5;
+  cursor: default;
+}
+.km-wrapper .km-leyenda__btn--empty:hover {
+  background: var(--km-bg-card);
+  border-color: var(--km-border);
+}
+/* 📦447 — Estados activos por nivel: cada botón toma el color de su nivel
+   para reforzar visualmente "estás filtrando por este nivel". */
+.km-wrapper .km-leyenda__btn--active[data-level="I"] {
+  background: var(--km-nivel-I-bg);
+  border-color: var(--km-nivel-I);
+  color: var(--km-nivel-I);
+  font-weight: 600;
+  box-shadow: 0 0 0 2px rgba(27, 94, 32, 0.15);
+}
+.km-wrapper .km-leyenda__btn--active[data-level="II"] {
+  background: var(--km-nivel-II-bg);
+  border-color: var(--km-nivel-II);
+  color: var(--km-nivel-II);
+  font-weight: 600;
+  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.15);
+}
+.km-wrapper .km-leyenda__btn--active[data-level="III"] {
+  background: var(--km-nivel-III-bg);
+  border-color: var(--km-nivel-III);
+  color: var(--km-nivel-III);
+  font-weight: 600;
+  box-shadow: 0 0 0 2px rgba(245, 127, 23, 0.15);
+}
+.km-wrapper .km-leyenda__btn--active[data-level="IV"] {
+  background: var(--km-nivel-IV-bg);
+  border-color: var(--km-nivel-IV);
+  color: var(--km-nivel-IV);
+  font-weight: 600;
+  box-shadow: 0 0 0 2px rgba(230, 81, 0, 0.15);
+}
+.km-wrapper .km-leyenda__btn--active .km-leyenda__count {
+  background: rgba(255, 255, 255, 0.6);
+  color: inherit;
+}
+/* 📦447 — Botón "Todos" (reset) — estilo diferenciado con borde punteado,
+   se vuelve sólido cuando está activo (sin filtro). */
+.km-wrapper .km-leyenda__btn--reset {
+  border-style: dashed;
+  background: transparent;
+}
+.km-wrapper .km-leyenda__btn--reset:hover {
+  border-style: solid;
+  background: #f8fafc;
+}
+.km-wrapper .km-leyenda__btn--reset.km-leyenda__btn--active {
+  background: #1e293b;
+  border-style: solid;
+  border-color: #1e293b;
+  color: #fff;
+  font-weight: 600;
+}
+.km-wrapper .km-leyenda__btn--reset.km-leyenda__btn--active .km-leyenda__count {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+/* 📦447 (2026-06-25) — Banner del filtro activo dentro de la card.
+   Aparece entre el header y la tabla cuando hay un filtro aplicado.
+   Muestra qué nivel está filtrando + conteo, con X para limpiar. */
+.km-wrapper .km-filter-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  margin: 12px 16px 0 16px;
+  background: linear-gradient(135deg, #e0f2fe 0%, #dbeafe 100%);
+  border: 1px solid #93c5fd;
+  border-radius: var(--km-radius-sm);
+  color: #1e40af;
+  font-size: 0.85rem;
+}
+.km-wrapper .km-filter-banner i.bi-funnel-fill {
+  color: #2563eb;
+  font-size: 1rem;
+}
+.km-wrapper .km-filter-banner strong {
+  font-weight: 700;
+}
+.km-wrapper .km-filter-banner__clear {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #1e40af;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.km-wrapper .km-filter-banner__clear:hover {
+  background: rgba(30, 64, 175, 0.1);
+  border-color: #1e40af;
+}
+
+/* 📦447 — Empty state para cuando el filtro no devuelve resultados.
+   Estilo similar a .km-empty pero con CTA inline para quitar filtro. */
+.km-wrapper .km-table-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--km-text-muted);
+}
+.km-wrapper .km-table-empty i.bi-inbox {
+  font-size: 3rem;
+  color: var(--km-text-light);
+}
+.km-wrapper .km-table-empty h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--km-text-secondary);
+  font-weight: 600;
+}
+.km-wrapper .km-table-empty p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--km-text-muted);
+  max-width: 380px;
+}
 
 .km-wrapper .km-prior-tabs {
   display: flex;
@@ -1229,6 +1995,39 @@ Basado en modules/recursos/capacitaciones/capacitaciones-view.html
 [data-theme="dark"] .km-wrapper .km-bar-section,
 [data-theme="dark"] .km-wrapper .km-prior-card,
 [data-theme="dark"] .km-wrapper .km-leyenda { background: #1e293b; border-color: #334155; }
+/* 📦448 — Dark mode para los 5 nuevos KPIs */
+[data-theme="dark"] .km-wrapper .km-kpi-card { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .km-wrapper .km-kpi-card__header { border-color: #334155; }
+[data-theme="dark"] .km-wrapper .km-kpi-card__title { color: #f1f5f9; }
+[data-theme="dark"] .km-wrapper .km-coverage__track,
+[data-theme="dark"] .km-wrapper .km-nr-dist__track,
+[data-theme="dark"] .km-wrapper .km-top-cargos__track,
+[data-theme="dark"] .km-wrapper .km-exp-sede__track { background: #334155; }
+[data-theme="dark"] .km-wrapper .km-nr-dist__stats { background: #0f172a; }
+[data-theme="dark"] .km-wrapper .km-coverage__icon--verde { background: #064e3b; color: #6ee7b7; }
+[data-theme="dark"] .km-wrapper .km-coverage__icon--azul { background: #1e3a8a; color: #93c5fd; }
+[data-theme="dark"] .km-wrapper .km-coverage__icon--morado { background: #581c87; color: #d8b4fe; }
+[data-theme="dark"] .km-wrapper .km-nr-dist__range--verde { background: #064e3b; color: #6ee7b7; }
+[data-theme="dark"] .km-wrapper .km-nr-dist__range--azul { background: #1e3a8a; color: #93c5fd; }
+[data-theme="dark"] .km-wrapper .km-nr-dist__range--amarillo { background: #78350f; color: #fcd34d; }
+[data-theme="dark"] .km-wrapper .km-nr-dist__range--naranja { background: #7c2d12; color: #fdba74; }
+[data-theme="dark"] .km-wrapper .km-nr-dist__range--rojo { background: #7f1d1d; color: #fca5a5; }
+[data-theme="dark"] .km-wrapper .km-exp-sede__legend { border-color: #334155; }
+/* 📦448 — Dark mode para KPI A (concentración) y KPI D (% expuestos) */
+[data-theme="dark"] .km-wrapper .km-concentracion__breakdown { border-color: #334155; }
+[data-theme="dark"] .km-wrapper .km-concentracion__bd-item { background: #0f172a; }
+[data-theme="dark"] .km-wrapper .km-concentracion__bd-item--crit .km-concentracion__bd-icon { background: #7f1d1d; color: #fca5a5; }
+[data-theme="dark"] .km-wrapper .km-concentracion__bd-item--alto .km-concentracion__bd-icon { background: #7c2d12; color: #fdba74; }
+[data-theme="dark"] .km-wrapper .km-exp-pct__track { background: #334155; }
+[data-theme="dark"] .km-wrapper .km-exp-pct__total { border-color: #334155; }
+/* 📦447 — Dark mode para los botones de filtro de la leyenda */
+[data-theme="dark"] .km-wrapper .km-leyenda__btn { background: #0f172a; border-color: #334155; color: #cbd5e1; }
+[data-theme="dark"] .km-wrapper .km-leyenda__btn:hover { background: #1e293b; border-color: #475569; color: #f1f5f9; }
+[data-theme="dark"] .km-wrapper .km-leyenda__count { background: #334155; color: #cbd5e1; }
+[data-theme="dark"] .km-wrapper .km-filter-banner { background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); border-color: #3b82f6; color: #dbeafe; }
+[data-theme="dark"] .km-wrapper .km-filter-banner i.bi-funnel-fill { color: #93c5fd; }
+[data-theme="dark"] .km-wrapper .km-filter-banner__clear { color: #dbeafe; }
+[data-theme="dark"] .km-wrapper .km-filter-banner__clear:hover { background: rgba(219, 234, 254, 0.1); border-color: #dbeafe; }
 [data-theme="dark"] .km-wrapper .km-kpi__value,
 [data-theme="dark"] .km-wrapper .km-bar-section__title,
 [data-theme="dark"] .km-wrapper .km-prior-card__title { color: #f1f5f9; }

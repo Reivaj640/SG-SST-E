@@ -217,9 +217,51 @@ function _calcularStats(matriz) {
   var totalProcesos = 0;
   var totalCargos = 0;
   var evaluados = 0;
+  /* 📦448 (2026-06-25) — Nuevos agregados para los 5 KPIs adicionales
+     del módulo 4.1.2 (cobertura de controles, NR distribución, top
+     cargos, tareas rutinarias, expuestos por sede × nivel). El frontend
+     (kair-matriz-peligros-indicadores.js) lee estos campos para
+     alimentar los nuevos visuales del grid 2 columnas. */
+  var totalExpuestos = 0;
+  var controlesFuente = 0, controlesMedio = 0, controlesPersona = 0;
+  var expuestosPorSede = {};
+  var nrDistribucion = { '0-20': 0, '21-100': 0, '101-300': 0, '301-600': 0, '>600': 0 };
+  var nrSuma = 0, nrCount = 0, nrMaxCalc = 0;
+  var porCargoSimple = {};
+  var rutinariaDist = { si: 0, no: 0, sinClasificar: 0 };
 
   if (!matriz || !matriz.sedes) {
-    return { total: 0, porAcept: porAcept, porTipo: porTipo, porSede: porSede, porCargo: porCargo, maxNR: 0, inaceptables: 0, tasaInaceptable: 0, totalSedes: 0, totalProcesos: 0, totalCargos: 0, evaluados: 0, tasaEvaluados: 0 };
+return {
+      total: 0,
+      porAcept: porAcept,
+      porTipo: porTipo,
+      porSede: porSede,
+      porCargo: porCargo,
+      maxNR: maxNR,
+      inaceptables: inaceptables,
+      tasaInaceptable: 0,
+      totalSedes: 0,
+      totalProcesos: 0,
+      totalCargos: 0,
+      evaluados: 0,
+      tasaEvaluados: 0,
+      /* 📦448 — defaults vacíos */
+      totalExpuestos: 0,
+      porNivel: Object.assign({}, porAcept),
+      cobertura: {
+        fuente:  { count: 0, total: 0, pct: 0 },
+        medio:   { count: 0, total: 0, pct: 0 },
+        persona: { count: 0, total: 0, pct: 0 }
+      },
+      expuestosPorSede: {},
+      nrDistribucion: nrDistribucion,
+      nrPromedio: 0,
+      nrMax: 0,
+      topCargos: [],
+      rutinariaDist: rutinariaDist,
+      concentracionCritAltos: { count: 0, total: 0, pct: 0, criticos: 0, altos: 0 },
+      expuestosPorSedePct: {}
+    };
   }
 
   totalSedes = matriz.sedes.length;
@@ -228,31 +270,97 @@ function _calcularStats(matriz) {
     var sede = matriz.sedes[s];
     if (!sede.procesos) continue;
     totalProcesos += sede.procesos.length;
+    var sName = sede.nombre || 'Sin sede';
+    var sExp = { total: 0, porNivel: { I: 0, II: 0, III: 0, IV: 0, V: 0 } };
     for (var pr = 0; pr < sede.procesos.length; pr++) {
       var proceso = sede.procesos[pr];
       if (!proceso.cargos) continue;
       totalCargos += proceso.cargos.length;
       for (var c = 0; c < proceso.cargos.length; c++) {
         var cargo = proceso.cargos[c];
+        /* 📦448 — Rutinaria se evalúa por CARGO (la tarea es rutinaria o
+           no, no por peligro individual). Sumamos 1 al bucket del cargo. */
+        if (cargo.rutinaria === true) rutinariaDist.si++;
+        else if (cargo.rutinaria === false) rutinariaDist.no++;
+        else rutinariaDist.sinClasificar++;
         if (!cargo.peligros) continue;
         for (var pe = 0; pe < cargo.peligros.length; pe++) {
           var p = cargo.peligros[pe];
           total++;
           var nivel = p.nrNivel || 'I';
           if (porAcept[nivel] != null) porAcept[nivel]++;
+          if (sExp.porNivel[nivel] != null) sExp.porNivel[nivel]++;
           var tipo = p.tipo || 'Sin tipo';
           porTipo[tipo] = (porTipo[tipo] || 0) + 1;
-          var sName = sede.nombre || 'Sin sede';
           porSede[sName] = (porSede[sName] || 0) + 1;
           var cKey = cargo.nombre + '@@' + sede.nombre;
           porCargo[cKey] = (porCargo[cKey] || 0) + 1;
+          /* 📦448 — Conteo simple por cargo (sin sede, para el top 5) */
+          if (cargo.nombre) porCargoSimple[cargo.nombre] = (porCargoSimple[cargo.nombre] || 0) + 1;
           if (p.nr != null && p.nr > maxNR) maxNR = p.nr;
           if (nivel === 'IV' || nivel === 'V' || nivel === 'III') inaceptables++;
           if (p.nd != null && p.ne != null && p.nc != null) evaluados++;
+          /* 📦448 — Cobertura de controles (jerarquía GTC-45) */
+          if (p.controlFuente && String(p.controlFuente).trim() !== '') controlesFuente++;
+          if (p.controlMedio && String(p.controlMedio).trim() !== '') controlesMedio++;
+          if (p.controlPersona && String(p.controlPersona).trim() !== '') controlesPersona++;
+          /* 📦448 — Expuestos por sede */
+          if (p.expuestos != null && p.expuestos !== '') {
+            var exp = Number(p.expuestos) || 0;
+            totalExpuestos += exp;
+            sExp.total += exp;
+          }
+          /* 📦448 — Distribución NR en bins oficiales GTC-45 */
+          if (p.nr != null && p.nr !== '') {
+            var n = Number(p.nr) || 0;
+            nrSuma += n;
+            nrCount++;
+            if (n > nrMaxCalc) nrMaxCalc = n;
+            if (n > 600) nrDistribucion['>600']++;
+            else if (n > 300) nrDistribucion['301-600']++;
+            else if (n > 100) nrDistribucion['101-300']++;
+            else if (n > 20)  nrDistribucion['21-100']++;
+            else              nrDistribucion['0-20']++;
+          }
         }
       }
     }
+    if (sExp.total > 0 || total > 0) expuestosPorSede[sName] = sExp;
   }
+
+  /* 📦448 — Top 5 cargos con más peligros (orden descendente) */
+  var topCargosArr = Object.keys(porCargoSimple).map(function (k) {
+    return { nombre: k, count: porCargoSimple[k] };
+  });
+  topCargosArr.sort(function (a, b) { return b.count - a.count; });
+  var topCargos = topCargosArr.slice(0, 5);
+
+  /* 📦448 — Concentración de riesgo Nivel I + II (críticos + altos).
+     KPI crítico para SG-SST — la Resolución 0312 mide este % en auditorías.
+     Se calcula desde porAcept, que ya está poblado en el loop principal. */
+  var criticos = porAcept.I || 0;
+  var altos = porAcept.II || 0;
+  var concentracionCritAltos = {
+    count: criticos + altos,
+    total: total,
+    pct: total > 0 ? Math.round(((criticos + altos) / total) * 100) : 0,
+    criticos: criticos,
+    altos: altos
+  };
+
+  /* 📦448 — % de expuestos por sede (respecto al total de expuestos).
+     Complementa el stacked bar con la perspectiva porcentual: "¿qué %
+     de la fuerza laboral está en cada sede?" */
+  var expuestosPorSedePct = {};
+  Object.keys(expuestosPorSede).forEach(function (sede) {
+    var c = expuestosPorSede[sede].total;
+    expuestosPorSedePct[sede] = {
+      count: c,
+      pct: totalExpuestos > 0 ? Math.round((c / totalExpuestos) * 100) : 0
+    };
+  });
+
+  var nrPromedio = nrCount > 0 ? Math.round(nrSuma / nrCount) : 0;
 
   return {
     total: total,
@@ -267,7 +375,24 @@ function _calcularStats(matriz) {
     totalProcesos: totalProcesos,
     totalCargos: totalCargos,
     evaluados: evaluados,
-    tasaEvaluados: total > 0 ? Math.round((evaluados / total) * 100) : 0
+    tasaEvaluados: total > 0 ? Math.round((evaluados / total) * 100) : 0,
+    /* 📦448 — Nuevos campos */
+    totalExpuestos: totalExpuestos,
+    /* Alias de porAcept (el frontend indicadores.js lee porNivel) */
+    porNivel: Object.assign({}, porAcept),
+    cobertura: {
+      fuente:  { count: controlesFuente,   total: total, pct: total > 0 ? Math.round((controlesFuente   / total) * 100) : 0 },
+      medio:   { count: controlesMedio,    total: total, pct: total > 0 ? Math.round((controlesMedio    / total) * 100) : 0 },
+      persona: { count: controlesPersona,  total: total, pct: total > 0 ? Math.round((controlesPersona  / total) * 100) : 0 }
+    },
+    expuestosPorSede: expuestosPorSede,
+    nrDistribucion: nrDistribucion,
+    nrPromedio: nrPromedio,
+    nrMax: nrMaxCalc,
+    topCargos: topCargos,
+    rutinariaDist: rutinariaDist,
+    concentracionCritAltos: concentracionCritAltos,
+    expuestosPorSedePct: expuestosPorSedePct
   };
 }
 

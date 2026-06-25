@@ -101,32 +101,91 @@ KM.calcNP = function (nd, ne) {
     var porNivel = { I: 0, II: 0, III: 0, IV: 0, V: 0 };
     var porTipo = {}, porSede = {};
     var nivelGlobalMax = 0;
+    /* 📦448 (2026-06-25) — Nuevos agregados para los 5 KPIs adicionales:
+       - controlesFuente/Medio/Persona: cobertura de la jerarquía GTC-45
+       - expuestosPorSede: stack de expuestos por sede × nivel
+       - nrDistribucion: histograma del NR en 5 bins oficiales
+       - topCargos: ranking de cargos por # de peligros
+       - rutinariaDist: tareas rutinarias vs no rutinarias vs sin clasificar
+       - nrPromedio / nrMax: estadísticos del NR */
+    var controlesFuente = 0, controlesMedio = 0, controlesPersona = 0;
+    var expuestosPorSede = {};   // { sede: { total, porNivel: {I,II,III,IV,V} } }
+    var nrDistribucion = { '0-20': 0, '21-100': 0, '101-300': 0, '301-600': 0, '>600': 0 };
+    var nrSuma = 0, nrCount = 0, nrMax = 0;
+    var porCargo = {};           // { cargoName: count }
+    var rutinariaDist = { si: 0, no: 0, sinClasificar: 0 };
 
     matriz.sedes.forEach(function (s) {
       var sName = s.nombre || '';
       var sCount = 0;
+      var sExp = { total: 0, porNivel: { I: 0, II: 0, III: 0, IV: 0, V: 0 } };
       (s.procesos || []).forEach(function (p) {
         (p.cargos || []).forEach(function (c) {
+          var cName = c.nombre || '';
+          /* Rutinaria se evalúa por CARGO (la tarea es rutinaria o no), no por
+             peligro individual. Sumamos 1 al bucket del cargo. */
+          if (c.rutinaria === true) rutinariaDist.si++;
+          else if (c.rutinaria === false) rutinariaDist.no++;
+          else rutinariaDist.sinClasificar++;
           (c.peligros || []).forEach(function (pel) {
             total++;
             sCount++;
             if (pel.nd != null && pel.ne != null && pel.nc != null) evaluados++;
-            if (pel.expuestos) totalExpuestos += Number(pel.expuestos) || 0;
+            if (pel.expuestos) {
+              var exp = Number(pel.expuestos) || 0;
+              totalExpuestos += exp;
+              sExp.total += exp;
+            }
             var nr = pel.nr;
             var nivel = KM.nivelRiesgo(nr);
             if (nivel > nivelGlobalMax) nivelGlobalMax = nivel;
             // Mapear NR-> nivel I-V
-            if (nivel === 1) porNivel.I++;
-            else if (nivel === 2) porNivel.II++;
-            else if (nivel === 3) porNivel.III++;
-            else if (nivel === 4) porNivel.IV++;
-            else if (nivel === 5) porNivel.V++;
+            if (nivel === 1) { porNivel.I++; sExp.porNivel.I++; }
+            else if (nivel === 2) { porNivel.II++; sExp.porNivel.II++; }
+            else if (nivel === 3) { porNivel.III++; sExp.porNivel.III++; }
+            else if (nivel === 4) { porNivel.IV++; sExp.porNivel.IV++; }
+            else if (nivel === 5) { porNivel.V++; sExp.porNivel.V++; }
             if (pel.tipo) porTipo[pel.tipo] = (porTipo[pel.tipo] || 0) + 1;
+            /* 📦448 — Cobertura de controles (jerarquía GTC-45) */
+            if (pel.controlFuente && String(pel.controlFuente).trim() !== '') controlesFuente++;
+            if (pel.controlMedio && String(pel.controlMedio).trim() !== '') controlesMedio++;
+            if (pel.controlPersona && String(pel.controlPersona).trim() !== '') controlesPersona++;
+            /* 📦448 — Distribución del NR en bins oficiales (alineado con
+               KM.interpNR y Resolución 0312) */
+            if (nr != null && nr !== '') {
+              var n = Number(nr) || 0;
+              nrSuma += n;
+              nrCount++;
+              if (n > nrMax) nrMax = n;
+              if (n > 600) nrDistribucion['>600']++;
+              else if (n > 300) nrDistribucion['301-600']++;
+              else if (n > 100) nrDistribucion['101-300']++;
+              else if (n > 20)  nrDistribucion['21-100']++;
+              else              nrDistribucion['0-20']++;
+            }
+            /* 📦448 — Conteo por cargo (top-N posterior) */
+            if (cName) porCargo[cName] = (porCargo[cName] || 0) + 1;
           });
         });
       });
       if (sCount > 0) porSede[sName] = sCount;
+      if (sExp.total > 0 || sCount > 0) expuestosPorSede[sName] = sExp;
     });
+
+    /* 📦448 — Top 5 cargos con más peligros */
+    var topCargosArr = Object.keys(porCargo).map(function (k) { return { nombre: k, count: porCargo[k] }; });
+    topCargosArr.sort(function (a, b) { return b.count - a.count; });
+    var topCargos = topCargosArr.slice(0, 5);
+
+    /* 📦448 — Estadísticos del NR */
+    var nrPromedio = nrCount > 0 ? Math.round(nrSuma / nrCount) : 0;
+
+    /* 📦448 — Cobertura de controles como % */
+    var cobertura = {
+      fuente:   { count: controlesFuente,   total: total, pct: total > 0 ? Math.round((controlesFuente   / total) * 100) : 0 },
+      medio:    { count: controlesMedio,    total: total, pct: total > 0 ? Math.round((controlesMedio    / total) * 100) : 0 },
+      persona:  { count: controlesPersona,  total: total, pct: total > 0 ? Math.round((controlesPersona  / total) * 100) : 0 }
+    };
 
     return {
       total: total,
@@ -136,7 +195,15 @@ KM.calcNP = function (nd, ne) {
       porNivel: porNivel,
       porTipo: porTipo,
       porSede: porSede,
-      nivelGlobalMax: nivelGlobalMax
+      nivelGlobalMax: nivelGlobalMax,
+      /* 📦448 — Nuevos */
+      cobertura: cobertura,
+      expuestosPorSede: expuestosPorSede,
+      nrDistribucion: nrDistribucion,
+      nrPromedio: nrPromedio,
+      nrMax: nrMax,
+      topCargos: topCargos,
+      rutinariaDist: rutinariaDist
     };
   };
 
