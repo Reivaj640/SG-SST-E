@@ -28,16 +28,22 @@ utils.js — Helpers: GTC-45, escape, toasts, modales, logging
       { value: 3, label: '3 — Frecuente', short: '3' },
       { value: 4, label: '4 — Continua', short: '4' }
     ],
+    /* F439.8 (2026-06-24): GTC-45 Tabla 6 — Niveles de Consecuencia.
+     Etiquetas alineadas con la tabla oficial del PDF GTC_45_2012:
+     10 → Leve (L) - Lesiones que no requieren incapacidad
+     25 → Grave (G) - Lesiones con incapacidad laboral temporal
+     60 → Muy Grave (MG) - Incapacidad permanente parcial o invalidez
+     100 → Mortal/Catastrófico (M) - Muerte(s) */
     nc: [
-      { value: 10,  label: '10 — Lesión leve', short: '10' },
-      { value: 25,  label: '25 — Incapacidad temporal', short: '25' },
-      { value: 60,  label: '60 — IPP', short: '60' },
-      { value: 100, label: '100 — Muerte', short: '100' }
+      { value: 10,  label: '10 — Leve (L)',                   short: '10' },
+      { value: 25,  label: '25 — Grave (G)',                  short: '25' },
+      { value: 60,  label: '60 — Muy Grave (MG)',             short: '60' },
+      { value: 100, label: '100 — Mortal/Catastrófico (M)',   short: '100' }
     ],
     tipos: ['Físico', 'Químico', 'Biológico', 'Psicosocial', 'Ergonómico', 'Mecánico', 'Eléctrico', 'Locativo', 'Fenómenos Naturales', 'Público', 'Biomecánico', 'De seguridad', 'De seguridad (Locativo)', 'Físico-Químico', 'Transito', 'Sin clasificar']
   };
 
-  KM.calcNP = function (nd, ne) {
+KM.calcNP = function (nd, ne) {
     if (nd == null || ne == null) return null;
     return Number(nd) * Number(ne);
   };
@@ -47,35 +53,44 @@ utils.js — Helpers: GTC-45, escape, toasts, modales, logging
     return Number(np) * Number(nc);
   };
 
+  /* F439.7 (2026-06-24): GTC-45 Tabla 23 — Nivel de Probabilidad (NP = ND × NE).
+     Rangos oficiales:
+       NP 0-4   → BAJO
+       NP 5-8   → MEDIO
+       NP 9-40  → ALTO */
   KM.interpNP = function (np) {
     if (np == null) return { label: '', tone: '' };
     if (np <= 4)  return { label: 'BAJO', tone: 'bajo' };
-    if (np <= 12) return { label: 'MEDIO', tone: 'medio' };
+    if (np <= 8)  return { label: 'MEDIO', tone: 'medio' };
     return { label: 'ALTO', tone: 'alto' };
   };
 
-  /* GTC-45 nivel por NR — convención del doc técnico + seed (Nivel I = peor,
-     Nivel IV = mejor). Rangos:
-       NR >= 800  → Nivel I  (NO ACEPTABLE — rojo)
-       NR >= 180  → Nivel II (ACEPTABLE CON CONTROL ESPECIFICO — amarillo)
-       NR >= 40   → Nivel III (MEJORABLE — azul/info)
-       NR < 40    → Nivel IV (ACEPTABLE — verde) */
+  /* F439.7 (2026-06-24): GTC-45 Tabla 25 — Aceptabilidad del Riesgo.
+     Convención: I = mejor (Aceptable), V = peor (No aceptable nivel 3).
+     Rangos oficiales:
+       NR ≤ 20       → Nivel I  — Aceptable
+       NR 21-100     → Nivel II — Aceptable con control específico
+       NR 101-300    → Nivel III — Mejorable (No aceptable)
+       NR 301-600    → Nivel IV — No aceptable nivel 1
+       NR > 600      → Nivel V  — No aceptable nivel 2 (catastrófico) */
   KM.interpNR = function (nr) {
     if (nr == null || nr === '') return { nivel: '', label: '', tone: '' };
-    if (nr >= 800)  return { nivel: 'I',   label: 'NO ACEPTABLE',                     tone: 'danger' };
-    if (nr >= 180)  return { nivel: 'II',  label: 'ACEPTABLE CON CONTROL ESPECIFICO', tone: 'warning' };
-    if (nr >= 40)   return { nivel: 'III', label: 'MEJORABLE',                        tone: 'info' };
-    return { nivel: 'IV', label: 'ACEPTABLE', tone: 'success' };
+    if (nr > 600)  return { nivel: 'V',   label: 'NO ACEPTABLE NIVEL 2',           tone: 'danger' };
+    if (nr > 300)  return { nivel: 'IV',  label: 'NO ACEPTABLE NIVEL 1',           tone: 'danger' };
+    if (nr > 100)  return { nivel: 'III', label: 'MEJORABLE / NO ACEPTABLE',      tone: 'warning' };
+    if (nr > 20)   return { nivel: 'II',  label: 'ACEPTABLE CON CONTROL ESPECIFICO', tone: 'info' };
+    return { nivel: 'I', label: 'ACEPTABLE', tone: 'success' };
   };
 
-  /* Clasifica nivel de riesgo (1-5) según NR — convención inversa:
-     1 = peor, 5 = mejor (0 = no evaluado) */
+  /* F439.7 (2026-06-24): Clasifica nivel de riesgo (1-5) según NR — convención GTC-45:
+     1 = mejor (Aceptable), 5 = peor (No aceptable nivel 2) */
   KM.nivelRiesgo = function (nr) {
     if (nr == null) return 0;
-    if (nr >= 800) return 1;
-    if (nr >= 180) return 2;
-    if (nr >= 40)  return 3;
-    return 4;
+    if (nr > 600) return 5;
+    if (nr > 300) return 4;
+    if (nr > 100) return 3;
+    if (nr > 20)  return 2;
+    return 1;
   };
 
   /* Cuenta y agrega estadísticas */

@@ -144,22 +144,82 @@ service.js — IPC + seed JSON fallback
       return Promise.resolve({ success: false, error: { code: 'NO_ELECTRON', message: 'Sync solo en Electron' } });
     },
 
-    /* F21.62 (2026-06-23) — AUTO-IMPORT DESACTIVADO.
-       Antes esta funcion SIEMPRE re-importaba el XLSX de la empresa con
-       replace:true cada vez que el usuario entraba al modulo, lo cual
-       BORRABA cualquier peligro que el usuario hubiera creado en la
-       sesion anterior (el JSON se sobrescribia con el contenido del Excel).
-       Resultado visible: el usuario creaba "pel_71", veia el toast de
-       exito, y al regresar a la matriz el peligro ya no estaba.
+    /* F21.62 (2026-06-23) — AUTO-IMPORT DESACTIVADO con replace:true porque
+       sobrescribia el JSON y borraba peligros nuevos como pel_71.
 
-       Fix: loadWithAutoImport ahora SOLO lee del JSON. Si el usuario
-       quiere re-importar desde el Excel, debe usar el boton "Importar
-       Excel" de la toolbar de la vista (que ya existia, solo estaba
-       siendo ignorado por el auto-import). El JSON queda como la unica
-       fuente de verdad entre sesiones. */
+       F439.4 (2026-06-24) — Reactivado en modo SEGURO (merge-empty). Ya NO
+       sobrescribe nada: solo completa los campos VACÍOS del JSON con los
+       valores del Excel. Si el usuario ya editó algo, eso se preserva.
+       Si el Excel no está disponible, simplemente lee del JSON como antes.
+
+       📦441 (2026-06-25) — Ahora detecta cuando el JSON y el Excel están
+       totalmente desfasados (sedesMatched=0 en el debug de merge-empty) y
+       agrega la bandera `needsReplace: true` al resultado para que la UI
+       pueda notificar al usuario y sugerir "Reemplazar desde Excel". */
     loadWithAutoImport: function (companyName) {
-      KM.log('PELIGROS', 'AUTO_IMPORT', 'INFO', 'desactivado — leyendo solo del JSON local');
-      return Service.read(companyName);
+      KM.log('PELIGROS', 'AUTO_MERGE', 'INFO', 'modo merge-empty — completa vacíos desde Excel sin sobrescribir');
+      return Service.read(companyName).then(function (readResult) {
+        if (!readResult || !readResult.success) return readResult;
+        /* Intentar descubrir el Excel; si está, hacer merge-empty */
+        return Service.discoverXlsx(companyName).then(function (disc) {
+          if (!disc || !disc.success || !disc.data || !disc.data.found) {
+            KM.log('PELIGROS', 'AUTO_MERGE', 'INFO', 'Excel no encontrado — JSON local sin cambios');
+            return readResult;
+          }
+          var excelPath = (disc.data && disc.data.filePath) || '';
+          return Service.importXlsx(companyName, null, { mode: 'merge-empty' }).then(function (imp) {
+            var needsReplace = false;
+            var mismatchDetail = null;
+            if (imp && imp.success) {
+              var filled = (imp.data && imp.data.fieldsFilled) || 0;
+              var dbg = (imp.data && imp.data.debug) || null;
+              var msg = (imp.data && imp.data.message) || ('campos vacíos completados=' + filled);
+              KM.log('PELIGROS', 'AUTO_MERGE', filled > 0 ? 'SUCCESS' : 'INFO', msg);
+              /* 📦441 — Detectar desfase total entre JSON y Excel */
+              if (dbg) {
+                var sedMatched = dbg.sedesMatched || 0;
+                var sedJson = dbg.jsonSedes || 0;
+                var sedExcel = dbg.excelSedes || 0;
+                /* Si merge-empty NO encontró NINGUNA sede en común y AMBOS lados
+                   tienen datos, el JSON está completamente desfasado del Excel */
+                if (sedMatched === 0 && sedJson > 0 && sedExcel > 0) {
+                  needsReplace = true;
+                  mismatchDetail = {
+                    excelPath: excelPath,
+                    excelSedes: dbg.excelSedeNames || [],
+                    jsonSedes: dbg.jsonSedeNames || []
+                  };
+                  KM.log('PELIGROS', 'AUTO_MERGE', 'WARN',
+                    'DESFASE detectado: JSON (' + sedJson + ' sedes) y Excel (' +
+                    sedExcel + ' sedes) no comparten ninguna sede. ' +
+                    'Use "Reemplazar desde Excel" para sincronizar.');
+                }
+              }
+              if (filled > 0) {
+                return Service.read(companyName).then(function (fresh) {
+                  if (fresh && fresh.data) {
+                    fresh.data.needsReplace = needsReplace;
+                    fresh.data.mismatchDetail = mismatchDetail;
+                  }
+                  return fresh;
+                });
+              }
+            } else {
+              KM.log('PELIGROS', 'AUTO_MERGE', 'WARN', 'merge-empty returned no success: ' + JSON.stringify(imp));
+            }
+            /* Sin cambios: anotar la bandera needsReplace en el resultado original */
+            if (readResult && readResult.data) {
+              readResult.data.needsReplace = needsReplace;
+              readResult.data.mismatchDetail = mismatchDetail;
+            }
+            return readResult;
+          }).catch(function () {
+            return readResult;
+          });
+        }).catch(function () {
+          return readResult;
+        });
+      });
     },
 
     reset: function (companyName) {
