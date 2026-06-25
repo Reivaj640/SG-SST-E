@@ -72,7 +72,7 @@
   --line-height-base: 1.5;
 
   /* Otros */
-  --sidebar-width: 260px; /* Ampliado de 220px para que los nombres largos (Gestión de Peligros y Riesgos) quepan en una línea */
+  --sidebar-width: 290px; /* Ampliado de 260px para que los nombres largos (Gestión de Peligros y Riesgos) quepan en una línea, sin necesidad de reglas especiales de wrap */
   --header-height: 45px;
 }
 
@@ -2025,11 +2025,13 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
   /* El icono mantiene su tamaño (no se "engrandece" al expandir) */
 }
 
-/* Excepción: "Gestión de Peligros y Riesgos" permite texto centrado por ser muy largo */
+/* Excepción legacy de "Gestión de Peligros y Riesgos" — ya no es necesaria.
+   Con --sidebar-width: 290px el texto cabe completo en una línea.
+   Se mantiene la clase en el HTML por compatibilidad pero sin reglas especiales
+   para que se vea igual que los demás botones del sidebar. */
 .sidebar-menu-button.sidebar-long-label {
-  text-align: center;
-  justify-content: center;
-  white-space: normal;
+  /* Intencionalmente vacío — antes forzaba white-space:normal + text-align:center
+     para textos largos, pero con el sidebar ampliado ya no hace falta. */
 }
 
 #sidebar.sidebar-collapsed .company-info {
@@ -4294,7 +4296,7 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
 @media (max-width: 1536px) and (max-height: 864px) {
   :root {
     --header-height: 42px;
-    --sidebar-width: 240px;
+    --sidebar-width: 280px;
   }
 
   body {
@@ -4351,7 +4353,7 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
   /* Variables de layout ajustadas */
   :root {
     --header-height: 40px;
-    --sidebar-width: 230px;
+    --sidebar-width: 270px;
   }
 
   /* Fuente base más pequeña */

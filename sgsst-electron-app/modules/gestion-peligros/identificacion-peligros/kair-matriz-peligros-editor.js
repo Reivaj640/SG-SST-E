@@ -32,7 +32,7 @@ Convenciones:
 
   /* Definición canónica de las 5 secciones (orden, icono, label, required fields) */
   var SECTIONS = [
-    { key: 'datos',     icon: 'info-circle',         label: 'Datos básicos',           required: ['sedeId', 'procesoId', 'cargoId', 'tareas', 'rutinaria', 'expuestos'] },
+    { key: 'datos',     icon: 'info-circle',         label: 'Datos básicos',           required: ['sedeId', 'procesoId', 'cargoId', 'tareas', 'expuestos'] },
     { key: 'peligro',   icon: 'exclamation-triangle',label: 'Peligro y efectos',       required: ['tipo', 'peligro', 'efectosPosibles'] },
     { key: 'controles', icon: 'shield-check',        label: 'Controles existentes',    required: [] },
     { key: 'evaluacion',icon: 'speedometer2',        label: 'Evaluación (auto)',       required: ['nd', 'ne', 'nc'] },
@@ -182,11 +182,48 @@ Convenciones:
       /* Pre-rellenar desde el cargo si el peligro no tiene esos datos aún */
       if (!_state.data.tareas && cargo.tareas) _state.data.tareas = cargo.tareas;
       if (!_state.data.zona && cargo.zona) _state.data.zona = cargo.zona;
-      if (_state.data.rutinaria == null || _state.data.rutinaria === '') {
-        _state.data.rutinaria = cargo.rutinaria === true ? 'Si' : (cargo.rutinaria === false ? 'No' : '');
-      }
+      /* 📦442 (2026-06-25) — actividades se pre-rellena desde el cargo para
+         mantener consistencia entre el JSON y la columna "Actividades" de
+         la tabla. Si el peligro ya tiene su propio valor (caso edición),
+         no se sobreescribe. */
+      if (!_state.data.actividades && cargo.actividades) _state.data.actividades = cargo.actividades;
     }
     _refresh();
+  }
+
+  /* 📦442 (2026-06-25) — Pre-rellenar zona/actividades/tareas desde el cargo
+     cuando el editor se abre en modo 'edit'. La misma lógica de _onCargoChange
+     pero se ejecuta UNA VEZ al montar el editor (sin disparar _refresh, que
+     se hace al final del .then).
+
+     ANTES: al editar un peligro existente, los campos zona/actividades/tareas
+     se veían VACÍOS aunque el cargo sí tuviera esos datos, porque la lógica
+     de pre-rellenado solo corría cuando el usuario cambiaba manualmente el
+     select de cargo. En el JSON de la empresa, esos campos viven a nivel
+     CARGO (no peligro), así que el editor nunca los mostraba al editar.
+
+     AHORA: al abrir en modo 'edit', si el peligro no trae su propio valor
+     para zona/actividades/tareas, los tomamos del cargo seleccionado para
+     que el usuario vea TODA la información al editar. Si el peligro SÍ tiene
+     su propio valor (caso raro pero posible), se respeta. */
+  function _preloadFromCargoInEdit() {
+    if (_state.mode !== 'edit') return;
+    if (!_state.data || !_state.data.cargoId) return;
+    var sede = (_state.matriz.sedes || []).filter(function (s) { return s.id === _state.data.sedeId; })[0];
+    if (!sede) return;
+    var proc = (sede.procesos || []).filter(function (p) { return p.id === _state.data.procesoId; })[0] || null;
+    /* F21.56 — Si procesoId es un default (pro_def_*), no existe en la matriz.
+       Buscamos por nombre para mantener compatibilidad con procesos default. */
+    if (!proc && _state.data.procesoId) {
+      proc = (sede.procesos || []).filter(function (p) {
+        return p.nombre && _state.data.proceso && p.nombre.toLowerCase() === _state.data.proceso.toLowerCase();
+      })[0];
+    }
+    var cargo = proc && (proc.cargos || []).filter(function (c) { return c.id === _state.data.cargoId; })[0];
+    if (!cargo) return;
+    if (!_state.data.tareas && cargo.tareas) _state.data.tareas = cargo.tareas;
+    if (!_state.data.zona && cargo.zona) _state.data.zona = cargo.zona;
+    if (!_state.data.actividades && cargo.actividades) _state.data.actividades = cargo.actividades;
   }
 
   /* ---------------- Render: shell ---------------- */
@@ -466,12 +503,8 @@ Convenciones:
       _selectWithAdd('Proceso', 'procesoId', d.procesoId, procesosOpts, { required: true, addable: false }) +
       _field('Zona / Lugar', 'zona', d.zona, { placeholder: 'Ej: Piso 2, área de producción' }) +
       _selectWithAdd('Cargo / Actividad', 'cargoId', d.cargoId, cargosOpts, { required: true, addable: true, placeholder: d.procesoId ? 'Selecciona cargo...' : 'Selecciona sede y proceso' }) +
-      _field('Tareas específicas', 'tareas', d.tareas, { type: 'textarea', rows: 3, required: true, full: true, placeholder: 'Describe las tareas...' }) +
-      _field('Es rutinaria?', 'rutinaria', d.rutinaria, {
-        type: 'select', required: true,
-        options: [{ value: 'Si', label: 'Sí' }, { value: 'No', label: 'No' }],
-        placeholder: 'Selecciona...'
-      }) +
+      _field('Actividades', 'actividades', d.actividades, { type: 'textarea', rows: 3, full: true, placeholder: 'Describe las actividades generales del cargo...' }) +
+      _field('Tareas específicas', 'tareas', d.tareas, { type: 'textarea', rows: 3, required: true, full: true, placeholder: 'Describe las tareas específicas donde se presenta el peligro...' }) +
       _field('N° de expuestos', 'expuestos', d.expuestos, { type: 'number', min: 0 }) +
       _sectionCardClose();
   }
@@ -989,8 +1022,8 @@ Convenciones:
     /* F21.60 — Bug critico: antes este handler solo llamaba a
        _updateSidebarBadges() (que re-pinta el sidebar), pero no sincronizaba
        _state.data con los valores actuales del formulario. Resultado: el
-       usuario llenaba "Datos basicos" completo (Sede, Proceso, Cargo, Zona,
-       Tareas, Rutinaria, Expuestos) pero el sidebar seguia mostrando
+usuario llenaba "Datos basicos" completo (Sede, Proceso, Cargo, Zona,
+        Actividades, Tareas, Expuestos) pero el sidebar seguia mostrando
        "Pendiente" porque _state.data estaba desactualizado (solo se actualiza
        en los handlers explicitos de sede/proceso/cargo via _collectForm).
        Fix: llamar _collectForm() PRIMERO para refrescar _state.data desde
@@ -1059,8 +1092,8 @@ Convenciones:
     var d = _state.data;
 
     /* Required mínimos */
-    if (!d.sedeId || !d.procesoId || !d.cargoId || !d.tareas || String(d.tareas).trim() === '' || !d.rutinaria) {
-      KM.notify('Sección "Datos básicos" incompleta', 'Selecciona sede, proceso, cargo, tareas y rutinaria', 'warning', 5000);
+    if (!d.sedeId || !d.procesoId || !d.cargoId || !d.tareas || String(d.tareas).trim() === '') {
+      KM.notify('Sección "Datos básicos" incompleta', 'Selecciona sede, proceso, cargo y completa las tareas', 'warning', 5000);
       var sec = _state.container.querySelector('#' + _sectionAnchorId('datos'));
       if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
@@ -1148,6 +1181,10 @@ Convenciones:
     if (!_state.gtc45Options) work = work.then(_loadGtc45Options);
     work = work.then(_loadMatriz).then(function (matriz) {
       _state.matriz = matriz;
+      /* 📦442 (2026-06-25) — Pre-rellenar zona/actividades/tareas desde el cargo
+         al abrir en modo 'edit'. Sin esto, esos campos se ven vacíos al editar
+         porque en el JSON viven a nivel CARGO, no peligro. */
+      _preloadFromCargoInEdit();
       _render();
       _bind();
     });
