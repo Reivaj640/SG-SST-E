@@ -28,14 +28,58 @@ console.log('[HANDLERS] Portear src path:', PORTAR_SRC_PATH);
 console.log('[HANDLERS] LLM Server URL:', LLM_SERVER_URL);
 console.log('[HANDLERS] LLM Server Script:', LLM_SERVER_SCRIPT);
 
+// Resuelve la ruta del intérprete de Python priorizando SIEMPRE el Python embebido
+// del proyecto (Portear/python-embed/python.exe), que tiene todas las dependencias
+// instaladas (docxtpl, transformers, torch, etc.).
+//
+// Bug histórico: si global.getPython aún no estaba inicializado cuando se cargó este
+// módulo (porque investigacion_handlers.js se requiere en main.js ANTES de que se
+// defina global.getPython = getPython), el fallback retornaba 'python' del PATH del
+// sistema, que es un Python diferente sin las dependencias → ImportError al ejecutar
+// accident_processor.py (ej: "No module named 'docxtpl'").
+//
+// Ahora: verificamos primero el Python embebido si existe, luego el .venv, luego
+// delegamos a global.getPython, y solo al final caemos al 'python' del sistema.
 async function resolvePython() {
-	if (global.getPython) {
-		return await global.getPython();
-	}
-	if (global.cachedPythonPath && fs.existsSync(global.cachedPythonPath)) {
-		return global.cachedPythonPath;
-	}
-	return 'python';
+    // 1. PRIORIDAD MÁXIMA: Python embebido del proyecto (Portear/python-embed/python.exe)
+    const embeddedPath = path.join(PORTAR_SRC_PATH, '..', 'python-embed', 'python.exe');
+    if (fs.existsSync(embeddedPath)) {
+        console.log('[PYTHON-RESOLVE] Usando Python embebido del proyecto:', embeddedPath);
+        // Cachear para que global.cachedPythonPath no use otro Python
+        global.cachedPythonPath = embeddedPath;
+        return embeddedPath;
+    }
+
+    // 2. .venv del proyecto como segunda opción
+    const venvPath = path.join(PORTAR_SRC_PATH, '..', '.venv', 'Scripts', 'python.exe');
+    if (fs.existsSync(venvPath)) {
+        console.log('[PYTHON-RESOLVE] Usando .venv del proyecto:', venvPath);
+        global.cachedPythonPath = venvPath;
+        return venvPath;
+    }
+
+    // 3. Delegar a global.getPython si está disponible (definido por main.js)
+    if (typeof global.getPython === 'function') {
+        try {
+            const pyPath = await global.getPython();
+            if (pyPath && fs.existsSync(pyPath)) {
+                console.log('[PYTHON-RESOLVE] Usando global.getPython:', pyPath);
+                return pyPath;
+            }
+        } catch (e) {
+            console.warn('[PYTHON-RESOLVE] global.getPython() falló:', e.message);
+        }
+    }
+
+    // 4. Cache en memoria si existe y es válido
+    if (global.cachedPythonPath && fs.existsSync(global.cachedPythonPath)) {
+        console.log('[PYTHON-RESOLVE] Usando global.cachedPythonPath:', global.cachedPythonPath);
+        return global.cachedPythonPath;
+    }
+
+    // 5. Último recurso: 'python' del PATH (probablemente fallará por deps faltantes)
+    console.warn('[PYTHON-RESOLVE] ⚠ Ningún Python del proyecto encontrado, usando "python" del PATH (puede fallar por dependencias faltantes)');
+    return 'python';
 }
 
 function sendLog(message, level = 'INFO') {
@@ -124,9 +168,136 @@ async function checkLlmServerRunning() {
 }
 
 /**
+ * Probe rápido (3s timeout) del servidor Flask. Retorna true si responde,
+ * false si conexión rehusada o timeout. Usado para auto-recuperación.
+ */
+async function probeLlmServer() {
+    return new Promise((resolve) => {
+        const req = http.request({
+            hostname: LLM_SERVER_HOST,
+            port: LLM_SERVER_PORT,
+            path: '/health',
+            method: 'GET',
+            timeout: 3000,
+        }, (res) => {
+            // Cualquier respuesta HTTP (incluso 503) cuenta como "vivo"
+            resolve(true);
+            res.resume();
+        });
+        req.on('error', () => resolve(false));
+        req.on('timeout', () => { req.destroy(); resolve(false); });
+        req.end();
+    });
+}
+
+/**
+ * Verifica si Ollama está corriendo en :11434. Si no, lo inicia en background.
+ * Esto evita que el usuario tenga que correr `ollama serve` manualmente.
+ *
+ * Además, mata instancias zombies de Ollama que puedan haber quedado de arranques
+ * anteriores. Tener múltiples ollama.exe escuchando en :11434 causa que las
+ * peticiones HTTP se conecten aleatoriamente a cualquiera de ellas — algunas
+ * están zombie y no responden, dando falsos "Ollama no está corriendo".
+ */
+async function ensureOllamaRunning() {
+    // 0. Matar instancias zombie previas para evitar conflictos de puerto.
+    // Esto sucede cuando la app se cerró abruptamente o Ollama quedó colgado.
+    try {
+        const { execSync } = require('child_process');
+        const out = execSync('tasklist /FI "IMAGENAME eq ollama.exe" /FO CSV /NH', { encoding: 'utf-8', timeout: 5000 });
+        const pids = [...out.matchAll(/ollama\.exe","(\d+)"/g)].map(m => parseInt(m[1], 10));
+        if (pids.length > 0) {
+            sendLog(`[OLLAMA] Detectadas ${pids.length} instancias previas de ollama.exe. Verificando cuál responde...`);
+            // Probar cada una; matar las que NO responden
+            const livePids = [];
+            for (const pid of pids) {
+                const alive = await new Promise((resolve) => {
+                    const req = http.request({ hostname: '127.0.0.1', port: 11434, path: '/api/tags', method: 'GET', timeout: 1500 }, (res) => {
+                        resolve(true);
+                        res.resume();
+                    });
+                    req.on('error', () => resolve(false));
+                    req.on('timeout', () => { req.destroy(); resolve(false); });
+                    req.end();
+                });
+                if (alive) {
+                    livePids.push(pid);
+                } else {
+                    sendLog(`[OLLAMA] Matando instancia zombie PID ${pid} (no responde)`);
+                    try { execSync(`taskkill /F /PID ${pid}`, { encoding: 'utf-8', timeout: 3000 }); } catch (e) { /* ignorar */ }
+                }
+            }
+            if (livePids.length > 0) {
+                sendLog(`[OLLAMA] Ya hay ${livePids.length} instancia(s) viva(s). Reutilizando.`);
+                return true;
+            }
+        }
+    } catch (e) {
+        sendLog(`[OLLAMA] No se pudo enumerar instancias previas: ${e.message}`, 'WARN');
+    }
+
+    // 1. Verificar si Ollama ya responde
+    try {
+        await new Promise((resolve, reject) => {
+            const req = http.request({ hostname: '127.0.0.1', port: 11434, path: '/', method: 'GET', timeout: 2000 }, (res) => {
+                resolve();
+            });
+            req.on('error', reject);
+            req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+            req.end();
+        });
+        sendLog('[OLLAMA] Ya está corriendo en :11434');
+        return true;
+    } catch (e) {
+        sendLog('[OLLAMA] No responde, intentando iniciar...');
+    }
+
+    // 2. Intentar iniciar `ollama serve` en background
+    const { spawn } = require('child_process');
+    const candidates = [
+        'ollama',                                          // PATH
+        'C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Ollama\\ollama.exe', // instalación típica Windows
+        path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Ollama', 'ollama.exe'),
+    ];
+    for (const cmd of candidates) {
+        try {
+            sendLog(`[OLLAMA] Intentando iniciar con: ${cmd} serve`);
+            const proc = spawn(cmd, ['serve'], {
+                detached: true,
+                stdio: 'ignore',
+                windowsHide: true,
+            });
+            proc.unref();
+            // Esperar hasta 15s a que responda
+            for (let i = 0; i < 30; i++) {
+                await new Promise(r => setTimeout(r, 500));
+                try {
+                    await new Promise((resolve, reject) => {
+                        const req = http.request({ hostname: '127.0.0.1', port: 11434, path: '/', method: 'GET', timeout: 1000 }, () => resolve());
+                        req.on('error', reject);
+                        req.end();
+                    });
+                    sendLog(`[OLLAMA] Iniciado correctamente (PID ${proc.pid})`);
+                    return true;
+                } catch (e) { /* seguir esperando */ }
+            }
+            sendLog('[OLLAMA] No respondió en 15s, continuando de todas formas...', 'WARN');
+            return false;
+        } catch (e) {
+            sendLog(`[OLLAMA] No se pudo iniciar con ${cmd}: ${e.message}`, 'WARN');
+        }
+    }
+    sendLog('[OLLAMA] No se pudo iniciar automáticamente. El usuario debe correr "ollama serve" manualmente.', 'WARN');
+    return false;
+}
+
+/**
  * Inicia el servidor LLM si no está corriendo
  */
 async function startLlmServer() {
+    // 0. Asegurar que Ollama esté corriendo (lo inicia si no lo está)
+    await ensureOllamaRunning();
+
     // Verificar si ya está corriendo CON MODELO CARGADO
     const isRunning = await checkLlmServerHealth();
     if (isRunning) {
@@ -212,6 +383,15 @@ async function startLlmServer() {
  * Analiza un accidente usando el servidor LLM
  */
 async function analyzeAccidentViaServer(descripcion, contexto) {
+    // Auto-recuperación: si Flask no responde, marcar como caído y reiniciar.
+    // Esto cubre el caso donde Ollama se cayó y el wrapper Flask también.
+    const probeOk = await probeLlmServer();
+    if (!probeOk) {
+        sendLog('[LLM] Servidor Flask no responde, reiniciando...', 'WARN');
+        llmServerReady = false;
+        llmServerProcess = null;
+    }
+
     // Verificar/Iniciar servidor
     if (!llmServerReady) {
         await startLlmServer();
@@ -531,6 +711,46 @@ ipcMain.handle('investigacion-accidentes-analyze-accident', async (event, extrac
     }
 });
 
+/**
+ * Regenera el análisis 5 Porqués (total o parcial) con feedback del usuario.
+ *
+ * Request body:
+ *   - descripcion:        descripción del accidente (string, requerido)
+ *   - contexto:          contexto adicional (string, opcional)
+ *   - feedback:          comentario del usuario (string, opcional)
+ *   - level:             1-5 para regenerar SOLO ese nivel; null/ausente = regenerar todo
+ *   - current_analysis:  análisis actual (objeto, usado como referencia)
+ *
+ * Response: { success, data, raw_text, generation_time, regenerated_level }
+ *   - regenerated_level: número regenerado (1-5) o null si fue completo
+ */
+ipcMain.handle('investigacion-accidentes-regenerate-analysis', async (event, { descripcion, contexto, feedback, level, currentAnalysis }) => {
+    try {
+        sendLog(`IPC: regenerate-analysis recibido (level=${level}, feedback=${(feedback || '').length} chars)`);
+
+        if (!descripcion || !descripcion.trim()) {
+            return { success: false, error: 'Se requiere la descripción del accidente' };
+        }
+        if (level !== null && level !== undefined && !(Number.isInteger(level) && level >= 1 && level <= 5)) {
+            return { success: false, error: `level debe ser 1-5 o null, recibido: ${level}` };
+        }
+
+        const response = await llmServerRequest('/regenerate', 'POST', {
+            descripcion: descripcion,
+            contexto: contexto || '',
+            feedback: feedback || '',
+            level: level,
+            current_analysis: currentAnalysis || {}
+        });
+
+        sendLog(`[LLM] Regeneración completada: success=${response.success} (level=${response.regenerated_level})`);
+        return response;
+    } catch (error) {
+        sendLog(`Error en regenerate-analysis: ${error.message}`, 'ERROR');
+        return { success: false, error: error.message };
+    }
+});
+
 ipcMain.handle('investigacion-accidentes-generate-accident-report', (event, combinedData) => {
     return new Promise(async (resolve, reject) => {
         let tempDataPath;
@@ -659,6 +879,11 @@ ipcMain.handle('investigacion-accidentes-get-config', async (event, empresa) => 
 async function initializeLlmServer() {
     try {
         sendLog('[LLM] Inicializando servidor LLM en segundo plano...');
+
+        // 0. Asegurar que Ollama esté corriendo (lo inicia si no lo está).
+        // Esto cubre el caso donde el usuario abre la app sin haber ejecutado
+        // 'ollama serve' manualmente.
+        await ensureOllamaRunning();
         
         // Verificar si ya está corriendo CON MODELO CARGADO
         const isRunning = await checkLlmServerHealth();

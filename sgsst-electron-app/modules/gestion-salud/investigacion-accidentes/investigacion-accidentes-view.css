@@ -555,6 +555,14 @@
   position: relative;
 }
 
+/* El input file del dropzone SIEMPRE debe estar oculto (solo se usa via JS al clickear el dropzone).
+   Bug histÃ³rico: .hidden solo aplicaba dentro de .inv-layout, asÃ­ que #fileInput se veÃ­a
+   cuando el contenido del dropzone era corto (ej: "Archivo procesado exitosamente"). */
+.inv-drop-zone #fileInput.hidden,
+.inv-drop-zone #fileInput[hidden] {
+  display: none !important;
+}
+
 .inv-drop-zone:hover {
   border-color: var(--inv-primary);
   background-color: rgba(23, 78, 166, 0.02);
@@ -570,6 +578,34 @@
   border-color: var(--inv-success);
   border-style: solid;
   background-color: rgba(40, 167, 69, 0.03);
+}
+
+/* Drop zone cuando el PDF ya fue PROCESADO (datos extraÃ­dos) */
+.inv-drop-zone.is-processed {
+  border-color: var(--inv-success);
+  border-style: solid;
+  background-color: rgba(40, 167, 69, 0.08);
+  cursor: default;
+  pointer-events: none;
+}
+
+.inv-drop-zone.is-processed .inv-drop-icon {
+  background-color: var(--inv-success);
+}
+
+.inv-drop-zone.is-processed .inv-drop-icon i {
+  color: #ffffff;
+  font-size: 1.35rem;
+}
+
+.inv-drop-zone.is-processed .inv-drop-title {
+  color: var(--inv-success);
+  font-weight: 600;
+}
+
+.inv-drop-zone.is-processed .inv-drop-subtitle {
+  color: var(--inv-success);
+  opacity: 0.85;
 }
 
 .inv-drop-icon {
@@ -1910,4 +1946,284 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ============================================================
+   REVIEW TOOLBAR (Análisis de Causa Raíz)
+   Sistema de 3 estados: idle ? reviewing ? approved (con dirty)
+   ============================================================ */
+
+.inv-review-toolbar {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--inv-border-light);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.inv-review-toolbar.hidden {
+  display: none;
+}
+
+.inv-review-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.inv-review-actions.hidden {
+  display: none;
+}
+
+.inv-review-actions--idle {
+  justify-content: flex-start;
+}
+
+.inv-review-hint {
+  font-size: 0.8125rem;
+  color: var(--inv-text-muted);
+  margin-left: 0.5rem;
+}
+
+/* Botones de revisión (estilo consistente con K+AIR) */
+.inv-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.875rem;
+  border-radius: var(--inv-radius);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.inv-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.inv-btn--primary {
+  background: var(--inv-primary, #2563eb);
+  color: white;
+  border-color: var(--inv-primary, #2563eb);
+}
+
+.inv-btn--primary:hover:not(:disabled) {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+.inv-btn--secondary {
+  background: white;
+  color: var(--inv-text-primary);
+  border-color: var(--inv-border);
+}
+
+.inv-btn--secondary:hover:not(:disabled) {
+  background: var(--inv-surface-hover, #f3f4f6);
+}
+
+.inv-btn--ghost {
+  background: transparent;
+  color: var(--inv-text-muted);
+  border-color: transparent;
+}
+
+.inv-btn--ghost:hover:not(:disabled) {
+  background: var(--inv-surface-hover, #f3f4f6);
+}
+
+.inv-btn--success {
+  background: var(--inv-success, #16a34a);
+  color: white;
+  border-color: var(--inv-success, #16a34a);
+}
+
+.inv-btn--success:hover:not(:disabled) {
+  background: #15803d;
+  border-color: #15803d;
+}
+
+/* Textarea de feedback */
+.inv-review-feedback {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  flex: 1 1 100%;
+}
+
+.inv-review-feedback label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--inv-text-primary);
+}
+
+.inv-textarea {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--inv-border);
+  border-radius: var(--inv-radius);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  resize: vertical;
+  min-height: 2.5rem;
+}
+
+.inv-textarea:focus {
+  outline: none;
+  border-color: var(--inv-primary, #2563eb);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+/* Badge de estado de revisión */
+.inv-review-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-left: 0.5rem;
+}
+
+.inv-review-badge.hidden {
+  display: none;
+}
+
+.inv-review-badge--reviewing {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.inv-review-badge--approved {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.inv-review-badge--dirty {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.inv-review-success {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: var(--inv-success, #16a34a);
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+/* Tabla editable de 5 Porqués */
+.inv-why-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  font-size: 0.8125rem;
+  background: white;
+  border-radius: var(--inv-radius);
+  overflow: hidden;
+}
+
+.inv-why-table th,
+.inv-why-table td {
+  border: 1px solid var(--inv-border-light);
+  padding: 0.5rem 0.625rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.inv-why-table th {
+  background: var(--inv-surface-card, #f9fafb);
+  font-weight: 600;
+  color: var(--inv-text-primary);
+}
+
+.inv-why-table th.inv-why-col-nivel {
+  width: 4rem;
+  text-align: center;
+}
+
+.inv-why-table th.inv-why-col-action {
+  width: 3.5rem;
+  text-align: center;
+}
+
+.inv-why-table td.inv-why-cell-nivel {
+  text-align: center;
+  font-weight: 600;
+  background: var(--inv-surface-card, #f9fafb);
+}
+
+.inv-why-cell-edit {
+  min-width: 6rem;
+  min-height: 2.5rem;
+  cursor: text;
+  border-radius: 4px;
+  padding: 0.25rem 0.375rem;
+  transition: background 0.15s ease;
+}
+
+.inv-why-cell-edit:hover {
+  background: rgba(37, 99, 235, 0.04);
+}
+
+.inv-why-cell-edit:focus {
+  outline: none;
+  background: rgba(37, 99, 235, 0.08);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+.inv-why-cell-edit.is-user-edited {
+  background: #fef9c3;
+  border-left: 3px solid #facc15;
+}
+
+.inv-why-cell-na {
+  color: var(--inv-text-muted, #9ca3af);
+  font-style: italic;
+}
+
+.inv-why-cell-action {
+  text-align: center;
+}
+
+.inv-btn-regenerate-level {
+  width: 1.875rem;
+  height: 1.875rem;
+  border-radius: 50%;
+  border: 1px solid var(--inv-border);
+  background: white;
+  color: var(--inv-text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.inv-btn-regenerate-level:hover:not(:disabled) {
+  border-color: var(--inv-primary, #2563eb);
+  color: var(--inv-primary, #2563eb);
+  transform: rotate(180deg);
+}
+
+.inv-btn-regenerate-level:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.inv-btn-regenerate-level.regenerating {
+  animation: inv-spin 1s linear infinite;
+}
+
+@keyframes inv-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }

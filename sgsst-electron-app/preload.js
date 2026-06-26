@@ -228,6 +228,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   startModelLoading: () => ipcRenderer.invoke('investigacion-accidentes-start-model-loading'),
   generateAccidentReport: (combinedData) =>
     ipcRenderer.invoke('investigacion-accidentes-generate-accident-report', combinedData),
+  regenerateAnalysis: (params) =>
+    ipcRenderer.invoke('investigacion-accidentes-regenerate-analysis', params),
   saveTempPdfFile: (filename, data) => ipcRenderer.invoke('investigacion-accidentes-save-temp-pdf-file', filename, data),
 
   // --- Investigación de Accidentes (Gestión) ---

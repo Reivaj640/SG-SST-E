@@ -14962,8 +14962,9 @@ async function startLlmServer() {
 
         console.log('[MAIN] 🚀 Iniciando servidor LLM...');
 
-        // Obtener ruta de Python
-        const pythonPath = global.cachedPythonPath || 'python';
+        // Obtener ruta de Python — usar el resolver robusto para garantizar el Python correcto
+        // (no hacer fallback ciego a 'python' del PATH porque ese Python no tiene torch/transformers)
+        const pythonPath = await getPython();
         const serverScript = getPythonScriptPath('llm_server.py');
 
         if (!fs.existsSync(serverScript)) {

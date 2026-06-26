@@ -1146,6 +1146,13 @@ case 'investigacion-accidentes-read-directory-request':
       apiCallArgs = [payload];
       responseType = 'investigacion-accidentes-rename-item-request-response';
       break;
+    case 'investigacion-accidentes-show-item-in-folder-request':
+      // Abrir el explorador de Windows en la carpeta del archivo seleccionado
+      // (usado por los botones "Visualizar investigación" y "Ver en carpeta").
+      apiCallFunction = window.electronAPI.showItemInFolder;
+      apiCallArgs = [payload.filePath];
+      responseType = 'investigacion-accidentes-show-item-in-folder-request-response';
+      break;
     case 'investigacion-accidentes-select-directory-request':
       apiCallFunction = window.electronAPI.selectDirectory;
       apiCallArgs = [];

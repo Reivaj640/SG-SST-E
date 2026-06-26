@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Elementos del DOM
     const fileInput = document.getElementById('fileInput');
     const dropZone = document.getElementById('dropZone');
+    const dropZoneContent = document.getElementById('dropZoneContent');
     const selectedFileInfo = document.getElementById('selectedFileInfo');
     const selectedFileName = document.getElementById('selectedFileName');
     const selectedFileSize = document.getElementById('selectedFileSize');
@@ -26,6 +27,12 @@ document.addEventListener('DOMContentLoaded', function() {
     let analysisResult = null;
     let lastReportPath = null;   // ruta del último informe .docx generado
     let isAnalyzing = false;     // guard contra doble-click en Iniciar Análisis
+
+    // ── Estado de revisión del análisis (feature nuevo) ──
+    let analysisState = 'idle';     // 'idle' | 'reviewing' | 'approved' | 'dirty'
+    let analysisEdits = {};         // {PorQue1: {Mano de Obra: 'edit', ...}, ...} — ediciones inline del usuario
+    let analysisOriginalBackup = null;  // copia profunda del análisis para "Deshacer" tras regenerar
+    let isRegenerating = false;     // guard contra doble-click en Regenerar
     
     // Obtener empresa desde parámetros de URL o window.currentCompany
     const urlParams = new URLSearchParams(window.location.search);
@@ -42,8 +49,42 @@ document.addEventListener('DOMContentLoaded', function() {
         companyNameElement.textContent = currentEmpresa;
     }
 
+    // Cambia el estado visual del dropzone según la fase del PDF.
+    // Estados:
+    //   'initial'  → "Selecciona un archivo PDF" + icono PDF (estado por defecto)
+    //   'selected' → mismo aspecto que initial pero con clase has-file (verde) tras seleccionar
+    //   'processed' → "✓ Archivo procesado exitosamente" + icono check, fondo verde, no clickeable
+    function setDropzoneState(state) {
+        if (!dropZone || !dropZoneContent) return;
+        if (state === 'processed') {
+            dropZone.classList.remove('has-file');
+            dropZone.classList.add('is-processed');
+            dropZoneContent.innerHTML =
+                '<div class="inv-drop-icon"><i class="fas fa-check-circle"></i></div>' +
+                '<p class="inv-drop-title">Archivo procesado exitosamente</p>' +
+                '<p class="inv-drop-subtitle">Datos del FURAT extraídos</p>';
+        } else if (state === 'selected') {
+            dropZone.classList.add('has-file');
+            dropZone.classList.remove('is-processed');
+            dropZoneContent.innerHTML =
+                '<div class="inv-drop-icon"><i class="fas fa-file-pdf"></i></div>' +
+                '<p class="inv-drop-title">PDF listo para procesar</p>' +
+                '<p class="inv-drop-subtitle">Extrayendo datos…</p>';
+        } else {
+            // initial / reset
+            dropZone.classList.remove('has-file');
+            dropZone.classList.remove('is-processed');
+            dropZoneContent.innerHTML =
+                '<div class="inv-drop-icon"><i class="fas fa-file-pdf"></i></div>' +
+                '<p class="inv-drop-title">Selecciona un archivo PDF</p>' +
+                '<p class="inv-drop-subtitle">o arrastra y suelta aquí</p>';
+        }
+    }
+
     // Evento para abrir el diálogo de selección de archivo
     dropZone.addEventListener('click', function() {
+        // No abrir selector si el archivo ya fue procesado (se debe quitar antes con la X)
+        if (dropZone.classList.contains('is-processed')) return;
         fileInput.click();
     });
 
@@ -96,8 +137,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     selectedFileSize.textContent = formatFileSize(file.size);
                     selectedFileInfo.classList.remove('hidden');
 
-                    // Actualizar estado visual
-                    dropZone.classList.add('has-file');
+                    // Actualizar estado visual del dropzone a "seleccionado" (extrayendo...)
+                    setDropzoneState('selected');
                     updateStepStatus(1, 'completed');
 
                     // Habilitar botón de análisis
@@ -181,7 +222,7 @@ document.addEventListener('DOMContentLoaded', function() {
         fileInput.value = '';
         selectedPdfPath = null;
         selectedFileInfo.classList.add('hidden');
-        dropZone.classList.remove('has-file');
+        setDropzoneState('initial');
         processBtn.disabled = true;
         updateStepStatus(1, 'pending');
         
@@ -224,7 +265,7 @@ document.addEventListener('DOMContentLoaded', function() {
             fileInput.value = '';
             selectedPdfPath = null;
             selectedFileInfo.classList.add('hidden');
-            dropZone.classList.remove('has-file');
+            setDropzoneState('initial');
             
             // Limpiar datos y análisis
             extractedData = null;
@@ -354,6 +395,18 @@ document.addEventListener('DOMContentLoaded', function() {
         await runAnalysis();
     });
 
+    // ── Listeners del toolbar de revisión del análisis ──
+    const btnStartReview = document.getElementById('btnStartReview');
+    const btnRegenerateAll = document.getElementById('btnRegenerateAll');
+    const btnCancelReview = document.getElementById('btnCancelReview');
+    const btnApproveAnalysis = document.getElementById('btnApproveAnalysis');
+    const btnReReview = document.getElementById('btnReReview');
+    if (btnStartReview) btnStartReview.addEventListener('click', window._onStartReview);
+    if (btnRegenerateAll) btnRegenerateAll.addEventListener('click', window._onRegenerateAll);
+    if (btnCancelReview) btnCancelReview.addEventListener('click', window._onCancelReview);
+    if (btnApproveAnalysis) btnApproveAnalysis.addEventListener('click', window._onApproveAnalysis);
+    if (btnReReview) btnReReview.addEventListener('click', window._onReReview);
+
     // Botón de volver
     backBtn.addEventListener('click', function() {
         // Enviar mensaje al iframe padre para volver
@@ -427,7 +480,10 @@ return await callParentAPI('generate-accident-report', combinedData);
             
             // Actualizar paso 2 como completado
             updateStepStatus(2, 'completed');
-            
+
+            // Marcar el dropzone como "procesado" (icono check verde, no clickeable)
+            setDropzoneState('processed');
+
             // Mostrar datos extraídos
             displayExtractedData(extractedData);
             
@@ -580,15 +636,17 @@ return await callParentAPI('generate-accident-report', combinedData);
             logActivity('success', `Análisis de causa raíz completado en ${totalMinutes}m ${totalSeconds}s`);
 
 // ─────────────────────────────────────────────────────────────
-// MOSTRAR MODAL DE GUARDADO EN LUGAR DE GENERACIÓN AUTOMÁTICA
+// MOSTRAR TOOLBAR DE REVISIÓN (feature nuevo)
+// El usuario debe revisar/editar/aprobar el análisis ANTES de poder generar el informe.
 // ─────────────────────────────────────────────────────────────
-updateProgressBar(80, 'Preparando guardado del informe...');
-logActivity('info', 'Análisis completado. Seleccione ubicación para guardar el informe.');
+updateProgressBar(80, 'Análisis completado — revise antes de generar el informe');
+logActivity('info', 'Análisis completado. Pendiente de revisión por el usuario.');
 
-showToast('Análisis completado', 'Seleccione la ubicación y nombre del informe.', 'success');
+showToast('Análisis completado', 'Revisa el análisis y apruébalo antes de generar el informe.', 'success');
 
 progressArea.classList.add('hidden');
-saveModal.open();
+analysisState = 'idle';  // Mostrar toolbar en estado inicial
+showReviewToolbar();
             
         } catch (analysisError) {
             // Error específico del análisis
@@ -723,6 +781,86 @@ saveModal.open();
         });
     }
 
+    // Normaliza el valor de un campo del FURAT para corregir artefactos del script de extracción.
+    //
+    // Problemas conocidos en datos crudos del PDF (Invest_APP_V_3.PdfProcessor.extract_pdf_data):
+    //   - "No. Identificación": el script concatena identificación + parte del teléfono.
+    //     Ej: id="114326350408", tel="1143263504" → id real="1143263504"
+    //   - "Nombre Completo": el PDF tiene etiqueta "SEGUNDO APELLIDO" como primera línea
+    //     y luego las 4 partes (1er apellido, 2do apellido, 1er nombre, 2do nombre)
+    //     en orden Apellido1 + Apellido2 + Nombre1 + Nombre2. Se debe mostrar como
+    //     "Nombre1 Nombre2 Apellido1 Apellido2".
+    //   - "Cargo": el PDF antepone una categoría de zona (URBANA / ADMINISTRATIVO /
+    //     OPERATIVO) antes del cargo real. Solo se debe mostrar el cargo real
+    //     (última línea).
+    function normalizeFieldValue(key, value, allData) {
+        if (value == null || value === 'N/A') return value || 'N/A';
+        let s = String(value);
+
+        if (key === 'No. Identificación') {
+            // El script Python (Invest_APP_V_3.extract_pdf_data) tiene un bug conocido donde
+            // la identificación extraída incluye dígitos basura concatenados del campo siguiente.
+            // Ejemplo real: PDF id="1143263504" → extraído "114326350408" (12 dígitos).
+            // Heurística: las cédulas colombianas tienen 6-10 dígitos. Si el valor extraído
+            // tiene más de 10 dígitos, descartar del final hasta tener exactamente 10.
+            const idDigits = s.replace(/\D/g, '');
+            if (idDigits.length > 10 && /^\d+$/.test(idDigits)) {
+                const realId = idDigits.slice(0, 10);
+                console.log('[NORMALIZE] Identificación con dígitos basura:', s, '→', realId);
+                return realId;
+            }
+            return s;
+        }
+
+        if (key === 'Nombre Completo') {
+            // El PDF del FURAT guarda el nombre en líneas separadas, pero a veces varios
+            // valores vienen en una sola línea separados por muchos espacios (artefacto del
+            // formulario). Estrategia:
+            //   1. Separar por saltos de línea Y por secuencias de 3+ espacios
+            //   2. Limpiar cada palabra y filtrar vacías
+            //   3. Quitar la etiqueta "SEGUNDO APELLIDO" si aparece como primer elemento
+            //   4. Asumir formato PDF: [1erApellido, 2doApellido, 1erNombre, 2doNombre]
+            //      (puede haber solo 3 si falta un apellido o nombre)
+            //   5. Mostrar en español: Nombres primero, luego Apellidos
+            const tokens = s
+                .split(/\r?\n+|\s{3,}/)
+                .map(t => t.replace(/\s+/g, ' ').trim())
+                .filter(Boolean);
+            if (tokens.length === 0) return s;
+            const labelPatterns = /^(PRIMER|SEGUNDO|PRIMER\/SEGUNDO)\s+APELLIDO$/i;
+            const nameTokens = tokens[0].match(labelPatterns) ? tokens.slice(1) : tokens;
+            if (nameTokens.length === 1) return nameTokens[0];
+            // Dividir en 2 mitades: apellidos (primera mitad) + nombres (segunda mitad)
+            const half = Math.floor(nameTokens.length / 2);
+            const apellidos = nameTokens.slice(0, half);
+            const nombres = nameTokens.slice(half);
+            const reordered = [...nombres, ...apellidos].join(' ');
+            console.log('[NORMALIZE] Nombre reordenado:', s, '→', reordered);
+            return reordered;
+        }
+
+        if (key === 'Cargo') {
+            // Quitar categoría de zona (URBANA/ADMINISTRATIVO/OPERATIVO) si es la primera línea
+            const lines = s.split(/\r?\n+/).map(l => l.replace(/\s+/g, ' ').trim()).filter(Boolean);
+            if (lines.length <= 1) return s;
+            const zonas = /^(URBANA|RURAL|ADMINISTRATIVO?|OPERATIVO?|MIXTA|COMERCIAL|INDUSTRIAL|SERVICIOS?|PRODUCCI[ÓO]N|DIRECCI[ÓO]N|GERENCIA)$/i;
+            const filtered = zonas.test(lines[0]) ? lines.slice(1) : lines;
+            const result = filtered.join(' ');
+            if (result !== s) console.log('[NORMALIZE] Cargo limpiado:', s, '→', result);
+            return result;
+        }
+
+        // Para cualquier campo con saltos de línea que no sea cargo/nombre/id,
+        // unir las líneas en un párrafo (ej: Descripcion del Accidente multi-línea)
+        if (s.includes('\n') && key !== 'Nombre Completo' && key !== 'Cargo') {
+            const joined = s.split(/\r?\n+/).map(l => l.replace(/\s+/g, ' ').trim()).filter(Boolean).join(' ');
+            if (joined !== s) console.log('[NORMALIZE] Multi-línea unificado:', key, '→', joined);
+            return joined;
+        }
+
+        return s;
+    }
+
     // Función para mostrar datos extraídos
     function displayExtractedData(data) {
         console.log('[INVESTIGACION-ACCIDENTES-MAIN] Mostrando datos extraídos:', data);
@@ -813,7 +951,8 @@ saveModal.open();
   let htmlContent = '<div class="inv-data-grid">';
 
   fields.forEach(field => {
-    const value = actualData[field.key] || 'N/A';
+    const rawValue = actualData[field.key];
+    const value = rawValue ? normalizeFieldValue(field.key, rawValue, actualData) : 'N/A';
     htmlContent += `
   <div class="inv-data-field">
     <label>${field.label}</label>
@@ -824,7 +963,8 @@ saveModal.open();
 
   htmlContent += '</div>';
 
-  const descripcion = actualData['Descripcion del Accidente'] || actualData['Descripcion'] || 'N/A';
+  const descripcionRaw = actualData['Descripcion del Accidente'] || actualData['Descripcion'] || 'N/A';
+  const descripcion = descripcionRaw !== 'N/A' ? normalizeFieldValue('Descripcion del Accidente', descripcionRaw, actualData) : 'N/A';
   if (descripcion && descripcion !== 'N/A') {
     htmlContent += `
   <div class="inv-data-description">
@@ -1068,7 +1208,349 @@ saveModal.open();
         }
         
         analysisContent.innerHTML = htmlContent;
+
+        // ── Activar toolbar de revisión (feature nuevo) ──
+        showReviewToolbar();
     }
+
+    // ── Feature: Revisión del análisis de causa raíz (3 estados) ──
+    //
+    // Estados:
+    //   'idle'       → muestra botón "Revisar análisis"
+    //   'reviewing'  → muestra tabla editable + botones regenerar/aprobar/cancelar
+    //   'approved'   → muestra "✓ Aprobado" + botón "Re-revisar"
+    //   'dirty'      → usuario editó celda después de aprobar; requiere re-aprobación
+
+    // Categorías 5M que se muestran en la tabla editable
+    const FIVE_M_CATEGORIES = [
+        { key: 'Mano de Obra', label: '👷 Mano de Obra' },
+        { key: 'Método', label: '📋 Método', fallbackKey: 'Metodo' },
+        { key: 'Maquinaria', label: '⚙️ Maquinaria' },
+        { key: 'Medio Ambiente', label: '🌍 Medio Ambiente' },
+        { key: 'Material', label: '📦 Material' }
+    ];
+
+    // Construye la representación canónica del análisis (PorQue1..PorQue5)
+    function normalizeAnalysisData(rawAnalysis) {
+        if (!rawAnalysis || typeof rawAnalysis !== 'object') return null;
+        // Si ya viene en formato PorQue1..PorQue5, devolver tal cual
+        const keys = Object.keys(rawAnalysis);
+        if (keys.some(k => /PorQue\d/.test(k))) {
+            return rawAnalysis;
+        }
+        // Si viene como {Por Qué 1, Por Qué 2, ...}, convertir
+        const normalized = {};
+        for (let i = 1; i <= 5; i++) {
+            const key1 = `PorQue${i}`;
+            const key2 = `Por Qué ${i}`;
+            if (rawAnalysis[key1]) normalized[key1] = rawAnalysis[key1];
+            else if (rawAnalysis[key2]) normalized[key1] = rawAnalysis[key2];
+        }
+        return Object.keys(normalized).length ? normalized : null;
+    }
+
+    // Renderiza la tabla editable de 5 Porqués × 5 categorías
+    function renderEditableAnalysisTable(analysisData) {
+        const normalized = normalizeAnalysisData(analysisData);
+        if (!normalized) {
+            return '<p class="inv-error-hint">No se pudo renderizar el análisis en formato editable.</p>';
+        }
+        const levels = [1, 2, 3, 4, 5].filter(i => normalized[`PorQue${i}`]);
+        const headers = FIVE_M_CATEGORIES.map(cat => `<th>${cat.label}</th>`).join('');
+        const rows = levels.map(level => {
+            const porQue = normalized[`PorQue${level}`];
+            const cells = FIVE_M_CATEGORIES.map(cat => {
+                const raw = porQue[cat.key] !== undefined ? porQue[cat.key]
+                          : (cat.fallbackKey && porQue[cat.fallbackKey] !== undefined ? porQue[cat.fallbackKey]
+                          : 'N/A');
+                const value = raw || 'N/A';
+                const isNa = !value || value === 'N/A' || (typeof value === 'string' && value.trim().toUpperCase() === 'N/A');
+                const cellClass = isNa ? 'inv-why-cell-edit inv-why-cell-na' : 'inv-why-cell-edit';
+                const display = isNa ? 'N/A' : value;
+                return `<td><div class="${cellClass}" contenteditable="plaintext-only" spellcheck="true"
+                    data-level="${level}" data-cat="${cat.key}"
+                    oninput="window._onAnalysisCellEdit(this)">${escapeHtml(display)}</div></td>`;
+            }).join('');
+            const regenDisabled = isRegenerating ? 'disabled' : '';
+            return `<tr>
+                <td class="inv-why-cell-nivel">${level}</td>
+                ${cells}
+                <td class="inv-why-cell-action">
+                    <button type="button" class="inv-btn-regenerate-level" data-level="${level}"
+                        title="Regenerar solo este nivel con el feedback actual"
+                        ${regenDisabled} onclick="window._onRegenerateLevel(${level})">
+                        <i class="fas fa-sync"></i>
+                    </button>
+                </td>
+            </tr>`;
+        }).join('');
+        return `<table class="inv-why-table">
+            <thead>
+                <tr>
+                    <th class="inv-why-col-nivel">Nivel</th>
+                    ${headers}
+                    <th class="inv-why-col-action">Acción</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>`;
+    }
+
+    // Muestra/oculta el toolbar según el estado
+    function showReviewToolbar() {
+        const toolbar = document.getElementById('analysisReviewToolbar');
+        const idle = document.getElementById('reviewActionsIdle');
+        const reviewing = document.getElementById('reviewActionsReviewing');
+        const approved = document.getElementById('reviewActionsApproved');
+        const badge = document.getElementById('analysisReviewBadge');
+        if (!toolbar || !idle || !reviewing || !approved || !badge) return;
+
+        toolbar.classList.remove('hidden');
+        badge.classList.remove('hidden');
+        idle.classList.add('hidden');
+        reviewing.classList.add('hidden');
+        approved.classList.add('hidden');
+        badge.classList.remove('inv-review-badge--reviewing', 'inv-review-badge--approved', 'inv-review-badge--dirty');
+
+        if (analysisState === 'idle') {
+            idle.classList.remove('hidden');
+            // No badge en idle (estado inicial)
+            badge.classList.add('hidden');
+        } else if (analysisState === 'reviewing') {
+            reviewing.classList.remove('hidden');
+            badge.classList.add('inv-review-badge--reviewing');
+            badge.innerHTML = '<i class="fas fa-edit"></i> En revisión';
+        } else if (analysisState === 'approved') {
+            approved.classList.remove('hidden');
+            badge.classList.add('inv-review-badge--approved');
+            badge.innerHTML = '<i class="fas fa-check"></i> Aprobado';
+        } else if (analysisState === 'dirty') {
+            reviewing.classList.remove('hidden');
+            badge.classList.add('inv-review-badge--dirty');
+            badge.innerHTML = '<i class="fas fa-exclamation-circle"></i> Cambios sin re-aprobar';
+        }
+
+        // Habilitar/deshabilitar botón "Generar Informe" según estado
+        updateReportButtonState();
+    }
+
+    // Habilita/deshabilita el botón "Guardar Informe" del header según el estado
+    function updateReportButtonState() {
+        const reportBtn = document.getElementById('downloadBtn') ||
+                           document.querySelector('[data-action="generate-report"]');
+        if (!reportBtn) return;
+        const enabled = analysisState === 'approved';
+        reportBtn.disabled = !enabled;
+        reportBtn.title = enabled
+            ? 'Generar el informe .docx con el análisis aprobado'
+            : 'Aprueba el análisis antes de generar el informe';
+        reportBtn.classList.toggle('inv-btn--disabled-soft', !enabled);
+    }
+
+    // Construye el análisis efectivo: combina analysisResult + analysisEdits del usuario
+    function getEffectiveAnalysis() {
+        const base = normalizeAnalysisData(analysisResult) || {};
+        // Aplica las ediciones inline del usuario (sobrescriben el resultado del modelo)
+        const merged = {};
+        Object.keys(base).forEach(levelKey => {
+            merged[levelKey] = { ...base[levelKey] };
+        });
+        Object.keys(analysisEdits).forEach(levelKey => {
+            if (!merged[levelKey]) merged[levelKey] = {};
+            Object.keys(analysisEdits[levelKey]).forEach(catKey => {
+                merged[levelKey][catKey] = analysisEdits[levelKey][catKey];
+            });
+        });
+        return merged;
+    }
+
+    // ── Handlers del toolbar (expuestos como window.* para onclick inline) ──
+
+    window._onAnalysisCellEdit = function(div) {
+        const level = parseInt(div.dataset.level, 10);
+        const cat = div.dataset.cat;
+        if (!level || !cat) return;
+        if (!analysisEdits[`PorQue${level}`]) analysisEdits[`PorQue${level}`] = {};
+        const newValue = div.textContent.trim() || 'N/A';
+        const wasEdited = (analysisEdits[`PorQue${level}`][cat] !== undefined);
+        analysisEdits[`PorQue${level}`][cat] = newValue;
+        // Marcar celda visualmente
+        if (newValue.toUpperCase() === 'N/A') {
+            div.classList.add('inv-why-cell-na');
+        } else {
+            div.classList.remove('inv-why-cell-na');
+        }
+        div.classList.add('is-user-edited');
+        // Si ya estaba aprobado, marcar como dirty (requiere re-aprobación)
+        if (analysisState === 'approved') {
+            analysisState = 'dirty';
+            showReviewToolbar();
+        }
+    };
+
+    window._onStartReview = function() {
+        if (!analysisResult) return;
+        analysisState = 'reviewing';
+        // Renderizar tabla editable reemplazando el contenido del análisis
+        const editableHtml = renderEditableAnalysisTable(analysisResult);
+        // Insertar la tabla al inicio del contenido (debajo del badge de revisión)
+        const existing = analysisContent.innerHTML;
+        analysisContent.innerHTML = editableHtml + existing;
+        showReviewToolbar();
+    };
+
+    window._onCancelReview = function() {
+        if (!confirm('¿Cancelar la revisión? Se descartarán los cambios inline.')) return;
+        analysisState = 'idle';
+        analysisEdits = {};
+        // Re-renderizar el análisis en modo lectura
+        displayAnalysisResults(analysisResult);
+    };
+
+    window._onApproveAnalysis = function() {
+        analysisState = 'approved';
+        // Limpiar highlight de edición al aprobar
+        analysisContent.querySelectorAll('.is-user-edited').forEach(c => c.classList.remove('is-user-edited'));
+        showReviewToolbar();
+        showToast('Análisis aprobado', 'Ya puedes generar el informe.', 'success');
+    };
+
+    window._onReReview = function() {
+        analysisState = 'reviewing';
+        // Volver a mostrar la tabla editable con las ediciones aplicadas
+        const merged = getEffectiveAnalysis();
+        const editableHtml = renderEditableAnalysisTable(merged);
+        const existing = analysisContent.innerHTML;
+        analysisContent.innerHTML = editableHtml + existing;
+        showReviewToolbar();
+    };
+
+    // Helper para hacer POST a /regenerate con auto-recuperación de Flask/Ollama
+    async function callRegenerate(params) {
+        try {
+            // Usar la misma ruta IPC que ya está expuesta via preload
+            const api = window.electronAPI;
+            if (!api || typeof api.regenerateAnalysis !== 'function') {
+                // Fallback: usar callParentAPI (para iframe context)
+                return await callParentAPI('regenerate-analysis', params);
+            }
+            return await api.regenerateAnalysis(params);
+        } catch (e) {
+            console.error('[REGENERATE] Error:', e);
+            return { success: false, error: e.message };
+        }
+    }
+
+    // Regenerar un nivel específico usando el feedback del usuario
+    window._onRegenerateLevel = async function(level) {
+        if (isRegenerating) return;
+        if (!analysisResult) return;
+        const feedback = (document.getElementById('regenerateFeedback') || {}).value || '';
+        const btn = document.querySelector(`.inv-btn-regenerate-level[data-level="${level}"]`);
+        const btnIcon = btn ? btn.querySelector('i') : null;
+        if (btn) btn.disabled = true;
+        if (btnIcon) btnIcon.classList.add('regenerating');
+        isRegenerating = true;
+
+        try {
+            const descripcion = extractedData?.['Descripcion del Accidente'] || extractedData?.['Descripcion'] || '';
+            const contexto = (document.getElementById('contextInput') || {}).value || '';
+            // Backup del análisis antes de regenerar (para "Deshacer")
+            analysisOriginalBackup = JSON.parse(JSON.stringify(getEffectiveAnalysis()));
+            // Construir análisis actual pasando las ediciones inline del usuario para los niveles que NO se regeneran
+            const merged = getEffectiveAnalysis();
+            // Si regenera nivel N, los demás niveles mantienen las ediciones inline del usuario
+
+            const result = await callRegenerate({
+                descripcion: descripcion,
+                contexto: contexto,
+                feedback: feedback,
+                level: level,
+                currentAnalysis: merged
+            });
+
+            if (result && result.success && result.data) {
+                // Merge: reemplazar SOLO el nivel regenerado, mantener los demás (con ediciones)
+                const regeneratedLevelKey = `PorQue${level}`;
+                if (!analysisResult[regeneratedLevelKey]) analysisResult[regeneratedLevelKey] = {};
+                Object.keys(result.data[regeneratedLevelKey] || {}).forEach(cat => {
+                    analysisResult[regeneratedLevelKey][cat] = result.data[regeneratedLevelKey][cat];
+                });
+                // Si había una edición inline del usuario en ese nivel, descartarla (el modelo lo regeneró)
+                if (analysisEdits[regeneratedLevelKey]) {
+                    delete analysisEdits[regeneratedLevelKey];
+                }
+                // Limpiar backup si todo salió bien
+                analysisOriginalBackup = null;
+                // Re-renderizar tabla editable
+                const newMerged = getEffectiveAnalysis();
+                const editableHtml = renderEditableAnalysisTable(newMerged);
+                const existing = analysisContent.innerHTML;
+                analysisContent.innerHTML = editableHtml + existing;
+                showToast('Nivel regenerado', `El nivel ${level} ha sido regenerado con el feedback aplicado.`, 'success');
+                logActivity('success', `Nivel ${level} del análisis regenerado con feedback`);
+            } else {
+                showToast('Error', result?.error || 'No se pudo regenerar el nivel', 'error');
+            }
+        } catch (e) {
+            showToast('Error', e.message, 'error');
+        } finally {
+            isRegenerating = false;
+            if (btn) btn.disabled = false;
+            if (btnIcon) btnIcon.classList.remove('regenerating');
+        }
+    };
+
+    // Regenerar el análisis completo usando el feedback del usuario
+    window._onRegenerateAll = async function() {
+        if (isRegenerating) return;
+        if (!analysisResult) return;
+        const feedback = (document.getElementById('regenerateFeedback') || {}).value || '';
+        if (!feedback.trim()) {
+            if (!confirm('No has escrito feedback. ¿Regenerar el análisis igualmente (sin guía específica)?')) return;
+        }
+        isRegenerating = true;
+        const btnRegen = document.getElementById('btnRegenerateAll');
+        if (btnRegen) btnRegen.disabled = true;
+
+        try {
+            const descripcion = extractedData?.['Descripcion del Accidente'] || extractedData?.['Descripcion'] || '';
+            const contexto = (document.getElementById('contextInput') || {}).value || '';
+            // Backup antes de regenerar todo
+            analysisOriginalBackup = JSON.parse(JSON.stringify(getEffectiveAnalysis()));
+            const merged = getEffectiveAnalysis();
+
+            const result = await callRegenerate({
+                descripcion: descripcion,
+                contexto: contexto,
+                feedback: feedback,
+                level: null,  // null = regenerar todo
+                currentAnalysis: merged
+            });
+
+            if (result && result.success && result.data) {
+                // Reemplazar el análisis completo con el regenerado
+                // Mantener las ediciones inline de niveles que el modelo regeneró idénticos
+                analysisResult = result.data;
+                // Limpiar ediciones inline del usuario (todo se regeneró)
+                analysisEdits = {};
+                analysisOriginalBackup = null;
+                // Re-renderizar tabla editable
+                const editableHtml = renderEditableAnalysisTable(analysisResult);
+                const existing = analysisContent.innerHTML;
+                analysisContent.innerHTML = editableHtml + existing;
+                showToast('Análisis regenerado', 'Los 5 niveles han sido regenerados.', 'success');
+                logActivity('success', 'Análisis completo regenerado con feedback');
+            } else {
+                showToast('Error', result?.error || 'No se pudo regenerar el análisis', 'error');
+            }
+        } catch (e) {
+            showToast('Error', e.message, 'error');
+        } finally {
+            isRegenerating = false;
+            if (btnRegen) btnRegen.disabled = false;
+        }
+    };
 
     // Función para actualizar el estado de un paso
   function updateStepStatus(stepNumber, status) {
@@ -1126,7 +1608,24 @@ saveModal.open();
 let _toastContainer = null;
 let _toastCounter = 0;
 
+// Wrapper que usa el sistema moderno de notificaciones (window.parent.updateNotifier)
+// y cae al inv-toast legacy si no está disponible. Compatible con showToast(title, message, type).
 function showToast(title, message, type = 'info') {
+  // Intentar usar el sistema moderno (estilo 6.1.3) vía window.parent.updateNotifier
+  try {
+    const notifier = window.parent && window.parent.updateNotifier;
+    if (notifier && typeof notifier.show === 'function') {
+      notifier.show({
+        type: type || 'info',
+        title: title,
+        subtitle: message,
+        autoClose: type === 'error' ? 6000 : 4000,
+      });
+      return;
+    }
+  } catch (e) { /* fallback abajo */ }
+
+  // Fallback: inv-toast legacy (compatibilidad si updateNotifier no está)
 if (!_toastContainer) {
 _toastContainer = document.createElement('div');
 _toastContainer.id = 'toastContainer';
@@ -1696,7 +2195,7 @@ return { open, close, navigateTo };
         selectedPdfPath = urlFuratPath;
         if (selectedFileName) selectedFileName.textContent = autoFilename;
         if (selectedFileInfo) selectedFileInfo.classList.remove('hidden');
-        if (dropZone) dropZone.classList.add('has-file');
+        if (dropZone) setDropzoneState('selected');
         if (processBtn) processBtn.disabled = false;
         updateStepStatus(1, 'completed');
         showToast(
@@ -1734,7 +2233,7 @@ return { open, close, navigateTo };
                 selectedPdfPath = furatPath;
                 if (selectedFileName) selectedFileName.textContent = autoFilename;
                 if (selectedFileInfo) selectedFileInfo.classList.remove('hidden');
-                if (dropZone) dropZone.classList.add('has-file');
+                if (dropZone) setDropzoneState('selected');
                 if (processBtn) processBtn.disabled = false;
                 updateStepStatus(1, 'completed');
                 showToast('FURAT localizado', 'Procesando: ' + autoFilename, 'success');
