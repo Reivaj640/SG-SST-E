@@ -5916,3 +5916,158 @@ position: relative;
     display: none;
   }
 }
+
+/* ==========================================================================
+   📦443 (2026-06-25) — ANIMACIONES DE LOADING ESTÁNDAR
+   Usado por formularios de incapacidades, medición ausentismo, etc.
+   Reemplaza los antiguos spinners fa-spinner con animación consistente.
+   ========================================================================== */
+
+/* Celda de loading para tablas */
+.km-loading-cell {
+  text-align: center;
+  padding: 40px 20px !important;
+  color: #64748B;
+}
+
+/* Bloque standalone (no dentro de tabla) */
+.km-loading-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 60px 20px;
+  text-align: center;
+  color: #64748B;
+  min-height: 200px;
+}
+
+/* Spinner con 3 anillos rotando (estándar del proyecto) */
+.km-loading-spinner {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 12px;
+}
+
+.km-loading-spinner--lg {
+  width: 64px;
+  height: 64px;
+}
+
+.km-loading-spinner__ring {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  border-top-color: #3b82f6;
+  animation: km-loading-spin 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+}
+
+.km-loading-spinner__ring:nth-child(1) {
+  border-top-color: #3b82f6;
+  animation-delay: -0.45s;
+}
+
+.km-loading-spinner__ring:nth-child(2) {
+  border-top-color: #60a5fa;
+  animation-delay: -0.3s;
+  width: 80%;
+  height: 80%;
+  top: 10%;
+  left: 10%;
+}
+
+.km-loading-spinner__ring:nth-child(3) {
+  border-top-color: #93c5fd;
+  animation-delay: -0.15s;
+  width: 60%;
+  height: 60%;
+  top: 20%;
+  left: 20%;
+}
+
+@keyframes km-loading-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Texto debajo del spinner */
+.km-loading-text {
+  margin: 8px 0 0 0;
+  font-size: 0.9rem;
+  color: #475569;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+/* Skeleton bars (efecto shimmer) */
+.km-loading-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 320px;
+  margin: 16px auto 0;
+}
+
+.km-loading-skeleton__bar {
+  height: 10px;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    rgba(226, 232, 240, 0.4) 25%,
+    rgba(203, 213, 225, 0.7) 50%,
+    rgba(226, 232, 240, 0.4) 75%
+  );
+  background-size: 200% 100%;
+  animation: km-loading-shimmer 1.5s ease-in-out infinite;
+}
+
+.km-loading-skeleton__bar:nth-child(1) { width: 100%; }
+.km-loading-skeleton__bar:nth-child(2) { width: 80%; animation-delay: -0.3s; }
+.km-loading-skeleton__bar:nth-child(3) { width: 60%; animation-delay: -0.6s; }
+
+@keyframes km-loading-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Dark mode para loaders */
+[data-theme="dark"] .km-loading-cell,
+[data-theme="dark"] .km-loading-block,
+[data-theme="dark"] .km-loading-text {
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .km-loading-spinner__ring:nth-child(1) {
+  border-top-color: #60a5fa;
+}
+[data-theme="dark"] .km-loading-spinner__ring:nth-child(2) {
+  border-top-color: #93c5fd;
+}
+[data-theme="dark"] .km-loading-spinner__ring:nth-child(3) {
+  border-top-color: #bfdbfe;
+}
+
+[data-theme="dark"] .km-loading-skeleton__bar {
+  background: linear-gradient(
+    90deg,
+    rgba(51, 65, 85, 0.4) 25%,
+    rgba(71, 85, 105, 0.7) 50%,
+    rgba(51, 65, 85, 0.4) 75%
+  );
+  background-size: 200% 100%;
+}
+
+/* Animación de pulso para skeleton (alternativa más sutil) */
+@media (prefers-reduced-motion: reduce) {
+  .km-loading-spinner__ring,
+  .km-loading-skeleton__bar {
+    animation: none;
+  }
+}

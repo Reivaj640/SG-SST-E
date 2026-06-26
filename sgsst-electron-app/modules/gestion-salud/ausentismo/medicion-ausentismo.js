@@ -17,6 +17,59 @@ class MedicionAusentismoComponent {
         this.openDocument = this.openDocument.bind(this);
     }
 
+    /* 📦443 (2026-06-25) — Helper de loading animado estándar.
+       Devuelve HTML para insertar en <td colspan> o contenedor cuando se está
+       cargando datos. Usa animación CSS consistente con el resto del proyecto.
+       Parámetros:
+       - message: texto a mostrar ("Cargando seguimientos...", etc.)
+       - colspan: para usar dentro de <tr><td colspan="N">
+       Uso:
+         row.innerHTML = `<tr><td>${this._loadingRowHtml('Cargando X...', 17)}</td></tr>`;
+       O sin colspan:
+         container.innerHTML = this._loadingRowHtml('Cargando X...'); */
+    _loadingRowHtml(message, colspan) {
+        var colspanAttr = colspan ? ' colspan="' + colspan + '"' : '';
+        return `<td${colspanAttr} class="km-loading-cell">
+            <div class="km-loading-spinner">
+                <div class="km-loading-spinner__ring"></div>
+                <div class="km-loading-spinner__ring"></div>
+                <div class="km-loading-spinner__ring"></div>
+            </div>
+            <p class="km-loading-text">${message || 'Cargando...'}</p>
+            <div class="km-loading-skeleton">
+                <div class="km-loading-skeleton__bar"></div>
+                <div class="km-loading-skeleton__bar"></div>
+                <div class="km-loading-skeleton__bar"></div>
+            </div>
+        </td>`;
+    }
+
+    /* 📦443 — Helper de loading para contenedor (no fila de tabla).
+       Devuelve HTML para mostrar en un div vacío mientras se carga. */
+    _loadingBlockHtml(message) {
+        return `<div class="km-loading-block">
+            <div class="km-loading-spinner km-loading-spinner--lg">
+                <div class="km-loading-spinner__ring"></div>
+                <div class="km-loading-spinner__ring"></div>
+                <div class="km-loading-spinner__ring"></div>
+            </div>
+            <p class="km-loading-text">${message || 'Cargando...'}</p>
+        </div>`;
+    }
+
+    /* 📦443 (2026-06-25) — Helper de notificación compatible con iframe.
+       Resuelve window.parent.updateNotifier automáticamente (porque este archivo
+       se ejecuta dentro de un iframe). Usar este helper en lugar de llamar
+       window.updateNotifier directamente para garantizar compatibilidad. */
+    _notify(title, subtitle, type, autoClose) {
+        var notifier = (window.parent && window.parent.updateNotifier) || window.updateNotifier;
+        if (!notifier || typeof notifier.show !== 'function') return;
+        var opts = { type: type || 'info', title: title, subtitle: subtitle || '' };
+        if (autoClose != null) opts.autoClose = autoClose;
+        else opts.autoClose = type === 'error' ? 6000 : type === 'warning' ? 4000 : 3000;
+        notifier.show(opts);
+    }
+
     render() {
         // Ejecutar cleanup anterior si existe
         if (this.portalMessageCleanup) {
@@ -178,7 +231,7 @@ class MedicionAusentismoComponent {
         // Verificar si el componente está disponible
         if (typeof window.RegistrarAusentismoComponent === 'undefined') {
             console.error('RegistrarAusentismoComponent no está definido');
-            alert('Error: El componente de registro de ausentismo no está disponible.');
+            this._notify('Error', 'El componente de registro de ausentismo no está disponible.', 'error', 6000);
             return;
         }
 
@@ -195,7 +248,7 @@ class MedicionAusentismoComponent {
     }
 
     handleComingSoon() {
-        alert('Esta funcionalidad estará disponible próximamente.');
+        this._notify('Próximamente', 'Esta funcionalidad estará disponible próximamente.', 'info');
     }
 
     handleSeguimientoIncapacidades() {
@@ -467,10 +520,7 @@ class MedicionAusentismoComponent {
                 </thead>
                 <tbody id="seguimientoTableBody">
                     <tr>
-                        <td colspan="6" style="text-align: center; padding: 40px; color: #64748B;">
-                            <i class="fas fa-spinner fa-spin" style="font-size: 24px; margin-bottom: 10px;"></i>
-                            <p>Cargando seguimientos...</p>
-                        </td>
+                        ${this._loadingRowHtml('Cargando seguimientos...', 6)}
                     </tr>
                 </tbody>
             </table>
@@ -4676,25 +4726,14 @@ class MedicionAusentismoComponent {
       box-sizing: border-box;
         `;
 
-        // Notificación toast
-        const notificationDiv = document.createElement('div');
-        notificationDiv.id = 'notification-toast';
-        notificationDiv.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 25px;
-            background: white;
-            border-left: 4px solid #28a745;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            border-radius: 4px;
-            z-index: 2000;
-            transform: translateX(120%);
-            transition: transform 0.3s ease;
-            font-weight: 500;
-            color: #1E293B;
-        `;
-        mainContent.appendChild(notificationDiv);
+        // 📦443 (2026-06-25) — Notificación toast ELIMINADA.
+        // Antes había un notificationDiv con position:fixed + translateX(120%)
+        // que asomaba una franja verde en la esquina superior derecha (sistema
+        // viejo de notificaciones). Ahora todo va por window.parent.updateNotifier
+        // (sistema estándar del proyecto, mismo que 6.1.3), así que ya no
+        // necesitamos este div. Si el fallback del showNotification legacy
+        // llega a buscarlo, simplemente no mostrará nada (mejor que el viejo
+        // div verde que se asomaba).
 
         // Contenedor del formulario
         const formContainer = document.createElement('div');
@@ -4984,20 +5023,27 @@ class MedicionAusentismoComponent {
             console.log('Event listeners setup started');
             console.log('Current company:', this.currentCompany);
 
+            console.log('[DEBUG] Setup búsqueda de empleado habilitado. Escribe una cédula y presiona Tab.');
+
             // 1. Autocompletar al salir del campo Cédula
             const cedulaInput = document.getElementById('cedula-input');
             if (cedulaInput) {
                 console.log('Cédula input found, adding blur event listener');
                 cedulaInput.addEventListener('blur', async () => {
                     const cedula = cedulaInput.value.trim();
+                    console.log('[DEBUG cedula blur] cedula:', cedula);
                     if (!cedula) return;
 
-                    this.showStatus(statusDiv, 'Buscando empleado...', 'info');
+                    /* 📦443 (2026-06-25) — loading=true para mostrar spinner
+                       animado durante la búsqueda asíncrona del empleado. */
+                    this.showStatus(statusDiv, 'Buscando empleado...', 'info', true);
 
                     try {
                         const result = await window.electronAPI.buscarEmpleadoPorCedula(cedula, this.currentCompany);
+                        console.log('[DEBUG buscarEmpleado] result:', JSON.stringify(result));
 
                         if (result && result.success) {
+                            console.log('[DEBUG buscarEmpleado] datos:', JSON.stringify(result.datos));
                             document.getElementById('nombre-input').value = result.datos.nombre || '';
                             document.getElementById('cargo-input').value = result.datos.cargo || '';
                             document.getElementById('departamento-input').value = result.datos.area || '';
@@ -5016,7 +5062,8 @@ class MedicionAusentismoComponent {
                                     this.currentCompany,
                                     () => {
                                         // Usuario confirmó - continuar con el registro
-                                        this.showStatus(statusDiv, 'Empleado encontrado. Puede continuar con el registro.', 'success');
+                                        /* 📦443 — Mini-tarjeta con datos del empleado en lugar de mensaje plano */
+                                        this._showEmpleadoCard(statusDiv, result.datos);
                                     },
                                     () => {
                                         // Usuario canceló - limpiar formulario
@@ -5030,7 +5077,8 @@ class MedicionAusentismoComponent {
                                 );
                             } else {
                                 // ✅ Empleado de la misma empresa
-                                this.showStatus(statusDiv, 'Empleado encontrado. Puede continuar con el registro.', 'success');
+                                /* 📦443 — Mini-tarjeta con datos del empleado en lugar de mensaje plano */
+                                this._showEmpleadoCard(statusDiv, result.datos);
                             }
                         } else {
                             this.showStatus(statusDiv, 'Empleado no encontrado. Diligencie manualmente.', 'warning');
@@ -5054,16 +5102,23 @@ class MedicionAusentismoComponent {
                     const cie10Code = codigoInput.value.trim();
                     if (!cie10Code) return;
 
-                    this.showStatus(statusDiv, 'Buscando descripción...', 'info');
+                    /* 📦443 (2026-06-25) — loading=true para mostrar spinner
+                       animado durante la búsqueda asíncrona del CIE-10. */
+                    this.showStatus(statusDiv, 'Buscando descripción...', 'info', true);
 
                     try {
                         const result = await window.electronAPI.buscarCie10Descripcion(this.currentCompany, cie10Code);
 
                         if (result && result.success) {
                             document.getElementById('descripcion-input').value = result.datos.descripcion || '';
-                            this.showStatus(statusDiv, 'Descripción encontrada.', 'success');
+                            /* 📦443 — Mensaje enriquecido con código + descripción */
+                            this.showStatus(
+                                statusDiv,
+                                '<strong>CIE-10 ' + this._escapeHtml(cie10Code) + '</strong> · ' + this._escapeHtml(result.datos.descripcion || ''),
+                                'success'
+                            );
                         } else {
-                            this.showStatus(statusDiv, 'Descripción no encontrada.', 'warning');
+                            this.showStatus(statusDiv, 'Descripción no encontrada para el código ' + cie10Code + '. Verifica o digita manualmente.', 'warning');
                             document.getElementById('descripcion-input').value = '';
                         }
                     } catch (error) {
@@ -5143,15 +5198,84 @@ class MedicionAusentismoComponent {
     // --- Funciones Auxiliares para el Formulario ---
 
     /**
+     * 📦443 (2026-06-25) — Muestra una mini-tarjeta de éxito con los datos
+     * del empleado encontrado. Reemplaza el mensaje plano "Empleado
+     * encontrado" con una card visual que incluye:
+     *  - Avatar circular con las iniciales del empleado (animado)
+     *  - Check verde animado (scale-in)
+     *  - Nombre destacado
+     *  - Cédula en formato "Cédula 12345"
+     *  - Cargo · Departamento · Empresa (línea secundaria)
+     *  - Mensaje de confirmación en la parte inferior
+     * @param {HTMLElement} statusDiv - Elemento contenedor del estado
+     * @param {Object} datos - Datos del empleado (nombre, cedula, cargo, area, empresa, etc.)
+     */
+    _showEmpleadoCard(statusDiv, datos) {
+        var nombre = (datos.nombre || 'Empleado').trim();
+        var cedula = (datos.cedula || '').trim();
+        var cargo = (datos.cargo || '').trim();
+        var area = (datos.area || '').trim();
+        var empresa = (datos.empresa || datos.empresa_usuaria || '').trim();
+
+        // 📦443 (2026-06-25) — Asegurar visibilidad: display:block y limpiar
+        // estilos inline conflictivos de llamadas anteriores.
+        statusDiv.style.display = 'block';
+        statusDiv.style.removeProperty('cssText');
+        statusDiv.className = 'status-message status-message--empleado';
+
+        // Construir lista de detalles (cargo · área · empresa)
+        var detalles = [];
+        if (cargo) detalles.push('<i class="bi bi-briefcase"></i> ' + this._escapeHtml(cargo));
+        if (area) detalles.push('<i class="bi bi-geo-alt"></i> ' + this._escapeHtml(area));
+        if (empresa) detalles.push('<i class="bi bi-building"></i> ' + this._escapeHtml(empresa));
+
+        // 📦443 (2026-06-25) — Diseño minimalista con icono de persona.
+        // Reemplaza el avatar morado por un círculo con icono bi-person-fill.
+        // El icono es universal (no requiere iniciales ni cálculo de hash)
+        // y combina mejor con el estilo general del formulario.
+        statusDiv.innerHTML =
+            '<div class="km-empleado-card">' +
+                '<div class="km-empleado-card__icon">' +
+                    '<i class="bi bi-person-fill"></i>' +
+                '</div>' +
+                '<div class="km-empleado-card__body">' +
+                    '<div class="km-empleado-card__name">' + this._escapeHtml(nombre) + '</div>' +
+                    (cedula ? '<div class="km-empleado-card__cedula"><i class="bi bi-credit-card-2-front"></i> Cédula ' + this._escapeHtml(cedula) + '</div>' : '') +
+                    (detalles.length > 0
+                        ? '<div class="km-empleado-card__details">' + detalles.join('<span class="km-empleado-card__sep">·</span>') + '</div>'
+                        : '') +
+                    '<div class="km-empleado-card__success-msg">' +
+                        '<i class="bi bi-check-circle-fill"></i> Empleado encontrado. Puede continuar con el registro.' +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+    }
+
+    /**
+     * Helper para escapar HTML y prevenir XSS en los datos del empleado
+     * (que vienen del backend y no son sanitizados).
+     */
+    _escapeHtml(str) {
+        if (str == null) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    /**
      * Muestra mensaje de estado moderno con icono y animación
      * @param {HTMLElement} statusDiv - Elemento contenedor del estado
      * @param {string} message - Mensaje a mostrar
      * @param {string} type - Tipo de estado: 'success', 'error', 'warning', 'info'
+     * @param {boolean} loading - Si true, muestra spinner animado de búsqueda
      */
-    showStatus(statusDiv, message, type) {
+    showStatus(statusDiv, message, type, loading) {
         statusDiv.style.display = 'block';
-        statusDiv.className = 'status-message';
-        
+        statusDiv.className = loading ? 'status-message status-message--loading' : 'status-message';
+
         // Definir configuración por tipo
         const config = {
             success: {
@@ -5186,7 +5310,7 @@ class MedicionAusentismoComponent {
 
         const currentConfig = config[type] || config.info;
 
-        // Aplicar estilos modernos
+        // Aplicar estilos modernos (con position:relative cuando loading para shimmer)
         statusDiv.style.cssText = `
             display: flex;
             align-items: center;
@@ -5200,25 +5324,44 @@ class MedicionAusentismoComponent {
             color: ${currentConfig.text};
             animation: slideDown 0.3s ease-out;
             margin-bottom: 20px;
+            ${loading ? 'position: relative; overflow: hidden;' : ''}
         `;
 
-        // Contenido con icono
-        statusDiv.innerHTML = `
-            <div style="
-                width: 36px;
-                height: 36px;
-                border-radius: 50%;
-                background: ${currentConfig.iconBg};
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                flex-shrink: 0;
-                color: ${currentConfig.text};
-            ">
-                ${currentConfig.icon}
-            </div>
-            <span style="flex: 1;">${message}</span>
-        `;
+        // 📦443 (2026-06-25) — Contenido con icono estático O spinner animado.
+        // Cuando loading=true (búsqueda asíncrona), mostramos:
+        // 1. Spinner de 3 anillos rotando (en lugar del icono info estático)
+        // 2. Shimmer effect de fondo (barrido de luz que indica "buscando")
+        var iconHtml;
+        if (loading) {
+            iconHtml = '<div class="km-loading-spinner km-loading-spinner--sm">' +
+                          '<div class="km-loading-spinner__ring"></div>' +
+                          '<div class="km-loading-spinner__ring"></div>' +
+                          '<div class="km-loading-spinner__ring"></div>' +
+                       '</div>';
+        } else {
+            iconHtml = '<div style="' +
+                'width: 36px;' +
+                'height: 36px;' +
+                'border-radius: 50%;' +
+                'background: ' + currentConfig.iconBg + ';' +
+                'display: flex;' +
+                'align-items: center;' +
+                'justify-content: center;' +
+                'flex-shrink: 0;' +
+                'color: ' + currentConfig.text + ';' +
+            '">' +
+                currentConfig.icon +
+            '</div>';
+        }
+
+        // Shimmer effect: capa con gradiente animado que se desplaza horizontalmente
+        var shimmerHtml = loading
+            ? '<div class="km-status-shimmer"></div>'
+            : '';
+
+        statusDiv.innerHTML = shimmerHtml +
+            '<div class="km-status-icon-wrap">' + iconHtml + '</div>' +
+            '<span style="flex: 1;">' + message + '</span>';
 
         // Agregar animación si no existe
         if (!document.getElementById('status-animations')) {
@@ -5552,25 +5695,8 @@ class MedicionAusentismoComponent {
             box-sizing: border-box;
         `;
 
-        // Notificación toast
-        const notificationDiv = document.createElement('div');
-        notificationDiv.id = 'notification-toast-list';
-        notificationDiv.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 25px;
-            background: white;
-            border-left: 4px solid #28a745;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            border-radius: 4px;
-            z-index: 2000;
-            transform: translateX(120%);
-            transition: transform 0.3s ease;
-            font-weight: 500;
-            color: #1E293B;
-        `;
-        mainContent.appendChild(notificationDiv);
+        // 📦443 (2026-06-25) — Notificación toast ELIMINADA (sistema legacy).
+        // Ahora todo va por window.parent.updateNotifier (estándar K+AIR).
 
         // Contenedor de la lista
         const listContainer = document.createElement('div');
@@ -5780,10 +5906,7 @@ class MedicionAusentismoComponent {
             </thead>
             <tbody id="ausentismoTableBody">
                 <tr>
-                    <td colspan="17" style="text-align: center; padding: 40px; color: #64748B;">
-                        <i class="fas fa-spinner fa-spin" style="font-size: 24px; margin-bottom: 10px;"></i>
-                        <p>Cargando registros...</p>
-                    </td>
+                    ${this._loadingRowHtml('Cargando registros...', 17)}
                 </tr>
             </tbody>
         `;
@@ -6085,11 +6208,23 @@ class MedicionAusentismoComponent {
     }
 
     showNotification(message, type = 'success', elementId = 'notification-toast') {
+        /* Buscar updateNotifier en padre (si estamos en iframe) o en window */
+        var notifier = (window.parent && window.parent.updateNotifier) || window.updateNotifier;
+        if (notifier && typeof notifier.show === 'function') {
+            notifier.show({
+                type: type,
+                title: message,
+                subtitle: '',
+                autoClose: type === 'error' ? 6000 : type === 'warning' ? 4000 : 3000
+            });
+            return;
+        }
+        /* Fallback al DOM legacy si updateNotifier no está disponible */
         const notificationDiv = document.getElementById(elementId);
         if (!notificationDiv) return;
 
         notificationDiv.textContent = message;
-        notificationDiv.style.borderLeftColor = type === 'error' ? '#dc3545' : 
+        notificationDiv.style.borderLeftColor = type === 'error' ? '#dc3545' :
                                                 type === 'warning' ? '#ffc107' : '#28a745';
         notificationDiv.style.transform = 'translateX(0)';
 
@@ -6301,25 +6436,8 @@ class MedicionAusentismoComponent {
       background: #f8f9fa;
     `;
 
-    // Notificación toast
-    const notificationDiv = document.createElement('div');
-    notificationDiv.id = 'notification-toast-stats';
-    notificationDiv.style.cssText = `
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      padding: 15px 25px;
-      background: white;
-      border-left: 4px solid #28a745;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-      border-radius: 4px;
-      z-index: 2000;
-      transform: translateX(120%);
-      transition: transform 0.3s ease;
-      font-weight: 500;
-      color: #1E293B;
-    `;
-    mainContent.appendChild(notificationDiv);
+    // 📦443 (2026-06-25) — Notificación toast ELIMINADA (sistema legacy).
+    // Ahora todo va por window.parent.updateNotifier (estándar K+AIR).
 
     // ================================================================
     // 1. HEADER — Card independiente
@@ -6998,7 +7116,7 @@ class MedicionAusentismoComponent {
             await window.electronAPI.openPath(filePath);
         } catch (error) {
             console.error('Error al abrir el documento:', error);
-            alert('Error al abrir el documento.');
+            this._notify('Error', 'No se pudo abrir el documento.', 'error', 5000);
         }
     }
 
@@ -7034,10 +7152,10 @@ class MedicionAusentismoComponent {
     async saveCellData(rowIndex, colIndex, newValue, filePath) {
         try {
             console.log(`Guardando cambios en fila ${rowIndex}, columna ${colIndex}...`);
-            alert(`Cambios guardados: ${newValue} en fila ${rowIndex}, columna ${colIndex}`);
+            this._notify('Cambios guardados', `${newValue} en fila ${rowIndex}, columna ${colIndex}`, 'success');
         } catch (error) {
             console.error('Error al guardar cambios:', error);
-            alert(`Error al guardar cambios: ${error.message}`);
+            this._notify('Error al guardar', error.message, 'error', 6000);
         }
     }
 
