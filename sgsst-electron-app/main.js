@@ -2944,6 +2944,24 @@ ipcMain.handle('open-path', async (event, pathToOpen) => {
   }
 });
 
+// Mostrar archivo en su carpeta (Explorer/Finder) — para botón "Visualizar investigación"
+ipcMain.handle('show-item-in-folder', async (event, filePath) => {
+  try {
+    if (!filePath || typeof filePath !== 'string') {
+      return { success: false, error: 'Ruta de archivo inválida' };
+    }
+    const fs = require('fs');
+    if (!fs.existsSync(filePath)) {
+      return { success: false, error: 'El archivo no existe: ' + filePath };
+    }
+    shell.showItemInFolder(filePath);
+    return { success: true };
+  } catch (error) {
+    console.error('Error en show-item-in-folder:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // Manejar lectura de archivo Excel como buffer
 ipcMain.handle('read-excel-file', async (event, filePath) => {
   try {

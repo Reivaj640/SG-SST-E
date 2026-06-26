@@ -95,6 +95,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
       });
   },
 
+  // Muestra el archivo en su carpeta (Explorer/Finder). Usado por el botón
+  // "Visualizar investigación" del módulo 3.2.2 para abrir el docx recién generado.
+  showItemInFolder: (filePath) => {
+    log('DEBUG', `showItemInFolder llamado con: ${filePath}`);
+    return ipcRenderer.invoke('show-item-in-folder', filePath)
+      .then(result => {
+        log('DEBUG', 'showItemInFolder resultado:', result);
+        return result;
+      })
+      .catch(error => {
+        log('ERROR', `Error en showItemInFolder: ${error.message}`);
+        throw error;
+      });
+  },
+
   readExcelFile: (filePath) => ipcRenderer.invoke('read-excel-file', filePath),
   saveProveedoresExcelData: (filePath, data) => ipcRenderer.invoke('save-proveedores-excel-data', filePath, data),
   processExcelData: (payload) => ipcRenderer.invoke('process-excel-data', payload),
@@ -220,6 +235,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   listInvestigations: (companyName, filter) => ipcRenderer.invoke('investigacion-accidentes-list-investigations', { companyName, filter }),
   getInvestigationDetail: (companyName, investigationName) => ipcRenderer.invoke('investigacion-accidentes-get-investigation-detail', { companyName, investigationName }),
   getCrossReferenceData: (companyName) => ipcRenderer.invoke('investigacion-accidentes-cross-reference-data', { companyName }),
+  // Busca el archivo FURAT (PDF) en 3.2.1 por nombre — usado como fallback cuando
+  // el viewer no envía la ruta del FURAT al iframe de nueva investigación.
+  findFuratByName: (companyName, caseName) => ipcRenderer.invoke('investigacion-accidentes-find-furat-by-name', { companyName, caseName }),
 
   // --- Registro Estadístico (3.2.3) ---
   registroEstadisticoCargarDatos: (companyName) =>

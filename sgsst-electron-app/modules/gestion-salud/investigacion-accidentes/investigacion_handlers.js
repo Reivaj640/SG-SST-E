@@ -1405,6 +1405,84 @@ function _hasInformeFinal(archivos) {
 }
 
 /**
+ * IPC Handler: investigacion-accidentes-find-furat-by-name
+ * Busca el archivo FURAT (PDF) en el módulo 3.2.1 por nombre de caso.
+ * Se usa como fallback cuando el viewer no envía la ruta del FURAT.
+ *
+ * Input: { companyName: string, caseName: string }
+ * Output: { success: true, data: { furatPath, furatName, relativePath } } | { success: false, error }
+ */
+ipcMain.handle('investigacion-accidentes-find-furat-by-name', async (event, { companyName, caseName }) => {
+    try {
+        sendLog(`[INV-FIND-FURAT] Buscando FURAT para "${caseName}" en empresa ${companyName}`, 'INFO');
+
+        if (!companyName || !caseName) {
+            return { success: false, error: { code: 'MISSING_PARAMS', message: 'companyName y caseName requeridos' } };
+        }
+
+        const furatBasePath = await _findReportesAccidentesSubmodulePath(companyName);
+        if (!furatBasePath || !fs.existsSync(furatBasePath)) {
+            return { success: false, error: { code: 'PATH_NOT_FOUND', message: 'Ruta 3.2.1 no encontrada' } };
+        }
+
+        // Normalizar el caseName para búsqueda flexible
+        const normalize = (s) => (s || '')
+            .toLowerCase()
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]/g, '');
+
+        const targetNormalized = normalize(caseName);
+
+        // Buscar recursivamente en toda la estructura
+        const found = await _findFuratRecursive(furatBasePath, targetNormalized, normalize);
+
+        if (found) {
+            sendLog(`[INV-FIND-FURAT] FURAT encontrado: ${found.furatPath}`, 'INFO');
+            return { success: true, data: found };
+        }
+
+        sendLog(`[INV-FIND-FURAT] No se encontró FURAT para "${caseName}"`, 'WARN');
+        return { success: false, error: { code: 'NOT_FOUND', message: `No se encontró FURAT para "${caseName}"` } };
+    } catch (error) {
+        sendLog(`[INV-FIND-FURAT] Error: ${error.message}`, 'ERROR');
+        return { success: false, error: { code: 'FIND_ERROR', message: error.message } };
+    }
+});
+
+/**
+ * Helper recursivo: busca archivo PDF en toda la estructura cuyo nombre normalizado
+ * contenga el targetNormalized (o viceversa). Retorna el primero que coincida.
+ */
+async function _findFuratRecursive(dirPath, targetNormalized, normalizeFn) {
+    try {
+        const entries = await fsp.readdir(dirPath, { withFileTypes: true });
+        for (const entry of entries) {
+            const fullPath = path.join(dirPath, entry.name);
+            if (entry.isDirectory()) {
+                // Saltar carpetas del sistema y de backups
+                if (entry.name.startsWith('.') || entry.name === 'desktop.ini' || entry.name.startsWith('$')) continue;
+                const result = await _findFuratRecursive(fullPath, targetNormalized, normalizeFn);
+                if (result) return result;
+            } else if (entry.isFile()) {
+                const ext = path.extname(entry.name).toLowerCase();
+                if (ext !== '.pdf') continue;
+                if (entry.name === 'desktop.ini') continue;
+                const fileNormalized = normalizeFn(entry.name);
+                // Match: target contenido en nombre OR nombre contenido en target
+                if (fileNormalized.includes(targetNormalized) || targetNormalized.includes(fileNormalized)) {
+                    return {
+                        furatPath: fullPath,
+                        furatName: entry.name,
+                        relativePath: fullPath
+                    };
+                }
+            }
+        }
+    } catch (_) { /* silencioso */ }
+    return null;
+}
+
+/**
  * IPC Handler: investigacion-accidentes-list-investigations (v2)
  * Lista TODOS los eventos (FURATs + Investigaciones) unificados.
  * - Fuentes: 3.2.1 (FURATs) y 3.2.2 (Investigaciones).

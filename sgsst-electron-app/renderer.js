@@ -1114,6 +1114,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       apiCallArgs = [payload.companyName];
       responseType = 'investigacion-accidentes-cross-reference-data-response';
       break;
+    case 'investigacion-accidentes-find-furat-by-name-request':
+      // Búsqueda del FURAT (PDF) en 3.2.1 por nombre — usada como fallback
+      // cuando el viewer no envía la ruta del FURAT al iframe.
+      apiCallFunction = window.electronAPI.findFuratByName;
+      apiCallArgs = [payload.companyName, payload.caseName];
+      responseType = 'investigacion-accidentes-find-furat-by-name-response';
+      break;
 case 'investigacion-accidentes-read-directory-request':
                     apiCallFunction = window.electronAPI.readDirectory;
                     apiCallArgs = [payload.path];
@@ -1233,6 +1240,17 @@ case 'investigacion-accidentes-read-directory-request':
                   if (type.endsWith('-response')) {
                       console.log(`RENDERER: Ignoring response message type (likely already processed): ${type}`);
                       return; // No responder a mensajes de respuesta para evitar bucles
+                  }
+
+                  // Mensajes manejados por componentes wrapper — no requieren
+                  // acción del renderer global. Se ignoran sin warning.
+                  if (
+                    type === 'investigacion-home-action' ||
+                    type === 'iniciar-investigacion-desde-viewer'
+                  ) {
+                    // El componente InvestigacionAccidentesComponent maneja este mensaje
+                    // directamente. Ver: modules/gestion-salud/investigacion-accidentes/investigacion-accidentes-logic.js
+                    return;
                   }
 
                   // Mensaje no reconocido — ignorar silenciosamente.

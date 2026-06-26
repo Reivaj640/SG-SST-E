@@ -325,12 +325,28 @@ if (inv.estado === 'pendiente') {
 var furatFile = (inv.archivos || []).find(function(f) {
 return f.name.toUpperCase().includes('FURAT') && (f.extension || '').toLowerCase() === 'pdf';
 });
+// Fallback 1: archivo cuyo nombre coincide con inv.nombre (común cuando el FURAT
+// está en la misma carpeta que la investigación)
+if (!furatFile) {
+furatFile = (inv.archivos || []).find(function(f) {
+return f.name === inv.nombre && (f.extension || '').toLowerCase() === 'pdf';
+});
+}
+// Fallback 2: cualquier PDF en la lista
 if (!furatFile) {
 furatFile = (inv.archivos || []).find(function(f) {
 return (f.extension || '').toLowerCase() === 'pdf';
 });
 }
 var furatPath = furatFile ? furatFile.path : '';
+console.log('[INV-MGR] 🔍 Construyendo botón para investigación:', {
+invNombre: inv.nombre,
+archivosCount: (inv.archivos || []).length,
+furatPath: furatPath,
+furatFileName: furatFile ? furatFile.name : null,
+fullPath: inv.fullPath || null,
+relativePath: inv.relativePath || null
+});
 actionBtnHtml = '<button class="inv-card__action-btn ' + actionBtnClass + '"'
 + ' data-invnombre="' + escapeHtml(inv.nombre) + '"'
 + ' data-furatpath="' + escapeHtml(furatPath) + '"'
@@ -953,11 +969,23 @@ if (inv.estado === 'pendiente') {
 var furatFile = (inv.archivos || []).find(function(f) {
 return f.name.toUpperCase().includes('FURAT') && (f.extension || '').toLowerCase() === 'pdf';
 });
+// Fallback 1: archivo cuyo nombre coincide con inv.nombre
+if (!furatFile) {
+furatFile = (inv.archivos || []).find(function(f) {
+return f.name === inv.nombre && (f.extension || '').toLowerCase() === 'pdf';
+});
+}
+// Fallback 2: cualquier PDF
 if (!furatFile) {
 furatFile = (inv.archivos || []).find(function(f) {
 return (f.extension || '').toLowerCase() === 'pdf';
 });
 }
+console.log('[INV-MGR] 🔍 Preview StartBtn:', {
+invNombre: inv.nombre,
+furatPath: furatFile ? furatFile.path : '',
+furatFileName: furatFile ? furatFile.name : null
+});
 startBtn.style.display = '';
 startBtn.dataset.invnombre = inv.nombre;
 startBtn.dataset.furatpath = furatFile ? furatFile.path : '';
@@ -993,12 +1021,20 @@ iframeContainer.innerHTML = '<div class="inv-empty" style="padding: 2rem;"><div 
 };
 
 window._startInvestigation = function(invNombre, furatPath) {
+console.log('[INV-MGR] 🖱️ _startInvestigation clickeado:', {
+invNombre: invNombre,
+furatPath: furatPath,
+furatPathEmpty: !furatPath
+});
 window.parent.postMessage({
 type: 'iniciar-investigacion-desde-viewer',
 investigacionNombre: invNombre || '',
 furatPath: furatPath || ''
 }, '*');
 };
+
+// NOTA: la versión duplicada que existía al final del archivo fue eliminada.
+// Solo se conserva esta definición (líneas 1105-1111 originales).
 
 function closePreview() {
 document.getElementById('previewOverlay').classList.add('hidden');
@@ -1101,14 +1137,6 @@ window._dismissToast(toastEl.id);
 
 toastEl._timeoutId = timeoutId;
 }
-
-window._startInvestigation = function(invNombre, furatPath) {
-window.parent.postMessage({
-type: 'iniciar-investigacion-desde-viewer',
-investigacionNombre: invNombre || '',
-furatPath: furatPath || ''
-}, '*');
-};
 
 window._dismissToast = function(toastId) {
 var toastEl = document.getElementById(toastId);

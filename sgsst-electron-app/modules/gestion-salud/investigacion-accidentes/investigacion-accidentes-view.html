@@ -26,10 +26,10 @@
         </div>
       </div>
       <div style="display:flex; align-items:center; gap:0.75rem;">
-        <button class="header-action--ghost" id="downloadBtn" disabled title="Descargar informe">
-          <i class="fas fa-download"></i> Descargar
+        <button class="header-action--ghost" id="downloadBtn" disabled title="Mostrar el informe generado en su carpeta">
+          <i class="fas fa-external-link-alt"></i> Visualizar investigación
         </button>
-        <button class="header-action--ghost" id="printBtn" disabled title="Imprimir informe">
+        <button class="header-action--ghost" id="printBtn" disabled title="Abrir el informe para imprimir (Ctrl+P)">
           <i class="fas fa-print"></i> Imprimir
         </button>
         <div class="k-section-card__divider"></div>
@@ -163,6 +163,7 @@
         </div>
         <div class="inv-card-body">
           <textarea id="contextInput" class="inv-context-textarea" rows="3" placeholder="Agrega cualquier detalle adicional que no esté presente en el FURAT y que pueda ser relevante para el análisis de causa raíz..."></textarea>
+          <div id="contextHint" class="inv-context-hint">Mínimo 20 caracteres para que el análisis lo considere.</div>
         </div>
       </div>
 

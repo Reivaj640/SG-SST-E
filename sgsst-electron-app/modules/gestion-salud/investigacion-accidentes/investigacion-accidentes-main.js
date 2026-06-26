@@ -24,6 +24,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let selectedPdfPath = null;
     let extractedData = null;
     let analysisResult = null;
+    let lastReportPath = null;   // ruta del último informe .docx generado
+    let isAnalyzing = false;     // guard contra doble-click en Iniciar Análisis
     
     // Obtener empresa desde parámetros de URL o window.currentCompany
     const urlParams = new URLSearchParams(window.location.search);
@@ -49,10 +51,27 @@ document.addEventListener('DOMContentLoaded', function() {
     fileInput.addEventListener('change', function(e) {
         if (e.target.files.length > 0) {
             const file = e.target.files[0];
-            
-            // Validar que sea un PDF
-            if (file.type !== 'application/pdf') {
-                showToast('Error', 'Por favor selecciona un archivo PDF válido.', 'error');
+
+            // Validar tipo (MIME o extensión como fallback)
+            const isPdfByMime = file.type === 'application/pdf';
+            const isPdfByExt = /\.pdf$/i.test(file.name);
+            if (!isPdfByMime && !isPdfByExt) {
+                showToast('Archivo no válido', 'Solo se aceptan archivos PDF para el FURAT.', 'error');
+                fileInput.value = '';
+                return;
+            }
+
+            // Validar tamaño (50MB máximo, alineado con investigaciones-viewer)
+            const MAX_SIZE = 50 * 1024 * 1024;
+            if (file.size > MAX_SIZE) {
+                const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+                showToast('Archivo demasiado grande', `El archivo pesa ${sizeMb}MB. Máximo permitido: 50MB.`, 'error');
+                fileInput.value = '';
+                return;
+            }
+            if (file.size === 0) {
+                showToast('Archivo vacío', 'El archivo PDF no contiene datos.', 'error');
+                fileInput.value = '';
                 return;
             }
 
@@ -60,45 +79,58 @@ document.addEventListener('DOMContentLoaded', function() {
             const reader = new FileReader();
             reader.onload = async function(event) {
                 const arrayBuffer = event.target.result;
-                
+
                 // Enviar el archivo al proceso principal para guardarlo temporalmente
                 try {
                     // Usar la comunicación con el padre para guardar el archivo temporalmente
-                    const saveResult = await callParentAPI('save-temp-pdf-file', { 
-                        filename: file.name, 
-                        data: Array.from(new Uint8Array(arrayBuffer)) 
+                    const saveResult = await callParentAPI('save-temp-pdf-file', {
+                        filename: file.name,
+                        data: Array.from(new Uint8Array(arrayBuffer))
                     });
-                    
+
                     // Extraer la ruta del archivo del resultado
                     selectedPdfPath = saveResult.filePath || saveResult;
-                    
+
                     // Mostrar información del archivo seleccionado
                     selectedFileName.textContent = file.name;
                     selectedFileSize.textContent = formatFileSize(file.size);
                     selectedFileInfo.classList.remove('hidden');
-                    
+
                     // Actualizar estado visual
                     dropZone.classList.add('has-file');
                     updateStepStatus(1, 'completed');
-                    
+
                     // Habilitar botón de análisis
                     processBtn.disabled = false;
-                    
+
                     // INICIAR PROCESAMIENTO AUTOMÁTICO DEL PDF
                     showToast('Procesando PDF', 'Extrayendo datos del documento...', 'info');
+                    logActivity('info', 'Archivo cargado: ' + file.name + ' (' + formatFileSize(file.size) + ')');
                     await processPdfFile(selectedPdfPath);
-                    
+
                     showToast('Archivo seleccionado', `Datos extraídos de: ${file.name}`, 'success');
                 } catch (error) {
                     console.error('Error guardando archivo temporal:', error);
                     showToast('Error', `No se pudo procesar el archivo: ${error.message}`, 'error');
+                    logActivity('error', 'Error al procesar PDF: ' + error.message);
                 }
             };
-            
+
             reader.onerror = function() {
-                showToast('Error', 'No se pudo leer el archivo.', 'error');
+                showToast('Error', 'No se pudo leer el archivo del disco.', 'error');
+                fileInput.value = '';
             };
-            
+
+            reader.onprogress = function(progressEvent) {
+                if (progressEvent.lengthComputable) {
+                    // Mostrar feedback durante la lectura del archivo grande
+                    const pct = Math.round((progressEvent.loaded / progressEvent.total) * 100);
+                    if (pct < 100 && progressEvent.total > 1024 * 1024) {
+                        selectedFileSize.textContent = formatFileSize(progressEvent.loaded) + ' / ' + formatFileSize(progressEvent.total) + ' (' + pct + '%)';
+                    }
+                }
+            };
+
             reader.readAsArrayBuffer(file);
         }
     });
@@ -117,18 +149,30 @@ document.addEventListener('DOMContentLoaded', function() {
     dropZone.addEventListener('drop', function(e) {
         e.preventDefault();
         dropZone.classList.remove('dragover');
-        
+
         if (e.dataTransfer.files.length > 0) {
             const file = e.dataTransfer.files[0];
-            
-            if (file.type === 'application/pdf') {
-                // Simular evento de cambio en el input
-                const event = new Event('change', { bubbles: true });
-                fileInput.files = e.dataTransfer.files;
-                fileInput.dispatchEvent(event);
-            } else {
-                showToast('Error', 'Solo se aceptan archivos PDF.', 'error');
+
+            // Validar tipo antes de pasar al flujo principal
+            const isPdfByMime = file.type === 'application/pdf';
+            const isPdfByExt = /\.pdf$/i.test(file.name);
+            if (!isPdfByMime && !isPdfByExt) {
+                showToast('Archivo no válido', 'Solo se aceptan archivos PDF para el FURAT.', 'error');
+                return;
             }
+
+            // Validar tamaño
+            const MAX_SIZE = 50 * 1024 * 1024;
+            if (file.size > MAX_SIZE) {
+                const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+                showToast('Archivo demasiado grande', `El archivo pesa ${sizeMb}MB. Máximo permitido: 50MB.`, 'error');
+                return;
+            }
+
+            // Simular evento de cambio en el input para reutilizar todo el flujo
+            const event = new Event('change', { bubbles: true });
+            fileInput.files = e.dataTransfer.files;
+            fileInput.dispatchEvent(event);
         }
     });
 
@@ -233,14 +277,80 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
+  // ── Botones header: Visualizar investigación + Imprimir ──────────────
+  // Estos listeners solo se registran una vez. La habilitación (disabled=false)
+  // se hace recién cuando se genera el informe exitosamente.
+  const downloadBtn = document.getElementById('downloadBtn');
+  const printBtn = document.getElementById('printBtn');
+
+  function _disableReportButtons() {
+    if (downloadBtn) downloadBtn.disabled = true;
+    if (printBtn) printBtn.disabled = true;
+  }
+
+  if (downloadBtn) {
+    downloadBtn.addEventListener('click', async function() {
+      if (!lastReportPath) {
+        showToast('Sin informe', 'Primero debes generar un informe para visualizarlo.', 'warning');
+        return;
+      }
+      const api = window.electronAPI && window.electronAPI.showItemInFolder
+        ? window.electronAPI
+        : {
+            showItemInFolder: (p) => callParentAPI('show-item-in-folder', { filePath: p })
+          };
+      try {
+        const result = await api.showItemInFolder(lastReportPath);
+        if (result && result.success) {
+          logActivity('success', 'Carpeta abierta: ' + lastReportPath);
+        } else {
+          const msg = (result && result.error) || 'No se pudo abrir la carpeta.';
+          showToast('Error', msg, 'error');
+          logActivity('error', 'No se pudo visualizar la investigación: ' + msg);
+        }
+      } catch (err) {
+        console.error('[INVESTIGACION-ACCIDENTES-MAIN] Error en Visualizar:', err);
+        showToast('Error', 'No se pudo visualizar la investigación: ' + err.message, 'error');
+      }
+    });
+  }
+
+  if (printBtn) {
+    printBtn.addEventListener('click', async function() {
+      if (!lastReportPath) {
+        showToast('Sin informe', 'Primero debes generar un informe para imprimir.', 'warning');
+        return;
+      }
+      const api = window.electronAPI && window.electronAPI.openPath
+        ? window.electronAPI
+        : { openPath: (p) => callParentAPI('open-path', { filePath: p }) };
+      try {
+        const result = await api.openPath(lastReportPath);
+        if (result && result.success) {
+          logActivity('info', 'Documento abierto para impresión: ' + lastReportPath);
+          showToast('Documento abierto', 'Use Ctrl+P para imprimir.', 'info');
+        } else {
+          const msg = (result && result.error) || 'No se pudo abrir el documento.';
+          showToast('Error', msg, 'error');
+          logActivity('error', 'No se pudo abrir para impresión: ' + msg);
+        }
+      } catch (err) {
+        console.error('[INVESTIGACION-ACCIDENTES-MAIN] Error en Imprimir:', err);
+        showToast('Error', 'No se pudo abrir para impresión: ' + err.message, 'error');
+      }
+    });
+  }
+
   // Botón de procesamiento - Solo ejecuta el análisis si los datos ya están extraídos
     processBtn.addEventListener('click', async function() {
         if (!extractedData) {
             showToast('Error', 'Primero debes seleccionar y procesar un archivo PDF.', 'error');
             return;
         }
-        
-        // Ejecutar solo el análisis con los datos ya extraídos
+        if (isAnalyzing) {
+            showToast('Análisis en curso', 'Ya hay un análisis ejecutándose. Espera a que termine.', 'warning');
+            return;
+        }
         await runAnalysis();
     });
 
@@ -345,6 +455,11 @@ return await callParentAPI('generate-accident-report', combinedData);
     // Función separada para ejecutar el análisis
     async function runAnalysis() {
         console.log('[INVESTIGACION-ACCIDENTES-MAIN] Iniciando análisis de causa raíz');
+
+        // Guard contra doble-click o clicks múltiples durante análisis largos de IA
+        isAnalyzing = true;
+        if (processBtn) processBtn.disabled = true;
+        if (clearBtn) clearBtn.disabled = true;
 
         try {
             // Mostrar barra de progreso
@@ -512,70 +627,70 @@ saveModal.open();
             updateStepStatus(4, 'error');
             showToast('Error en análisis', `El análisis falló: ${analysisError.message}`, 'error');
         } finally {
+            // Restaurar estado de botones y guard
+            isAnalyzing = false;
+            if (processBtn) processBtn.disabled = false;
+            if (clearBtn) clearBtn.disabled = false;
             // Ocultar barra de progreso
             progressArea.classList.add('hidden');
         }
     }
 
-    // Función para comunicarse con la ventana padre (iframe)
+// Función para comunicarse con la ventana padre (iframe)
     function callParentAPI(type, payload) {
         return new Promise((resolve, reject) => {
             // ID único para esta solicitud para emparejarla con la respuesta
             const requestId = `investigacion-accidentes-${Date.now()}-${Math.random()}`;
-            
+
             // Función para manejar la respuesta
             const handleResponse = (event) => {
                 // Verificar que el origen sea seguro (archivo local en este caso)
                 if (event.source !== window.parent) {
                     return;
                 }
-                
+
                 const response = event.data;
-                // Verificar si la respuesta corresponde a nuestra solicitud
                 const responseType = response.type;
                 const expectedResponseType = `investigacion-accidentes-${type}-request-response`;
-                
-                // Verificar que el requestId coincida con el nuestro para evitar conflictos con otros módulos
+                // El renderer responde con '-response' (no '-request-response') — aceptamos ambos formatos
+                const simpleResponseType = `investigacion-accidentes-${type}-response`;
+
+                // Verificar que el requestId coincida con el nuestro
                 if (response.requestId && response.requestId.startsWith('investigacion-accidentes-') && response.requestId === requestId) {
                     // Limpiar el timeout si existe
                     if (window._investigacionTimeoutClear && window._investigacionTimeoutClear[requestId]) {
                         window._investigacionTimeoutClear[requestId]();
                         delete window._investigacionTimeoutClear[requestId];
                     }
-                    
-                    // Manejar el caso especial para save-temp-pdf-file
-                    if (type === 'save-temp-pdf-file' && responseType === 'investigacion-accidentes-save-temp-pdf-file-response') {
-                        // Limpiar el listener de eventos
-                        window.removeEventListener('message', handleResponse);
-                        
-      if (response.success) {
-        resolve(response.payload);
-      } else {
-        const errObj = response.error;
-        const errorMessage = typeof errObj === 'string' ? errObj : (errObj?.message || errObj?.code || 'Error desconocido desde la ventana padre');
-        reject(new Error(errorMessage));
-      }
-    } else if (responseType === expectedResponseType) {
-      window.removeEventListener('message', handleResponse);
 
-      if (response.success) {
-        resolve(response.payload);
-      } else {
-        const errObj = response.error;
-        const errorMessage = typeof errObj === 'string' ? errObj : (errObj?.message || errObj?.code || 'Error desconocido desde la ventana padre');
-        reject(new Error(errorMessage));
-      }
+                    // Aceptar respuesta con cualquier formato (-response, -request-response, save-temp-pdf-file especial)
+                    const isValidResponse =
+                        responseType === expectedResponseType ||
+                        responseType === simpleResponseType ||
+                        (type === 'save-temp-pdf-file' && responseType === 'investigacion-accidentes-save-temp-pdf-file-response');
+
+                    if (isValidResponse) {
+                        window.removeEventListener('message', handleResponse);
+
+                        if (response.success) {
+                            resolve(response.payload);
+                        } else {
+                            const errObj = response.error;
+                            const errorMessage = typeof errObj === 'string' ? errObj : (errObj?.message || errObj?.code || 'Error desconocido desde la ventana padre');
+                            reject(new Error(errorMessage));
+                        }
+                        return;
                     }
-                } else if (responseType === `${type}-response`) {
-                    // Limpiar el timeout si existe
+                }
+
+                // Fallback: compatibilidad con formato antiguo (sin prefijo, sin requestId)
+                if (responseType === `${type}-response` && !response.requestId) {
                     if (window._investigacionTimeoutClear && window._investigacionTimeoutClear[requestId]) {
                         window._investigacionTimeoutClear[requestId]();
                         delete window._investigacionTimeoutClear[requestId];
                     }
-                    
-                    // Compatibilidad con el formato anterior por si acaso
                     window.removeEventListener('message', handleResponse);
-                    
+
                     if (response.success) {
                         resolve(response.payload);
                     } else {
@@ -1494,8 +1609,8 @@ if (reportResult && reportResult.documentPath) {
 logActivity('success', `Informe generado: ${reportResult.documentPath}`);
 showToast('Informe generado', `Guardado en: ${reportResult.documentPath}`, 'success');
 
-const downloadBtn = document.getElementById('downloadBtn');
-const printBtn = document.getElementById('printBtn');
+// Guardar ruta y habilitar botones de header para acceder al informe
+lastReportPath = reportResult.documentPath;
 if (downloadBtn) downloadBtn.disabled = false;
 if (printBtn) printBtn.disabled = false;
 
@@ -1534,11 +1649,36 @@ if (newItemCancel) newItemCancel.addEventListener('click', _hideNewItemArea);
 if (filenameInput) filenameInput.addEventListener('input', updateSaveBtnState);
 
 if (newItemInput) {
-newItemInput.addEventListener('keydown', (e) => {
-if (e.key === 'Enter') { e.preventDefault(); _confirmCreateFolder(); }
-else if (e.key === 'Escape') { e.preventDefault(); _hideNewItemArea(); }
-});
-}
+    newItemInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); _confirmCreateFolder(); }
+      else if (e.key === 'Escape') { e.preventDefault(); _hideNewItemArea(); }
+    });
+  }
+
+  // ── Paso 3 (Contexto): actualizar stepper al escribir ────────────
+  const contextInput = document.getElementById('contextInput');
+  const contextHint = document.getElementById('contextHint');
+  if (contextInput) {
+    contextInput.addEventListener('input', function() {
+      const len = contextInput.value.trim().length;
+      if (len >= 20) {
+        updateStepStatus(3, 'completed');
+        if (contextHint) contextHint.style.display = 'none';
+      } else if (len > 0) {
+        updateStepStatus(3, 'active');
+        if (contextHint) {
+          contextHint.style.display = '';
+          contextHint.textContent = `Faltan ${20 - len} caracteres para considerarlo en el análisis.`;
+        }
+      } else {
+        updateStepStatus(3, 'pending');
+        if (contextHint) {
+          contextHint.style.display = '';
+          contextHint.textContent = 'Mínimo 20 caracteres para que el análisis lo considere.';
+        }
+      }
+    });
+  }
 
 document.addEventListener('keydown', (e) => {
 if (modal.classList.contains('hidden')) return;
@@ -1569,11 +1709,54 @@ return { open, close, navigateTo };
             showToast('Error', 'No se pudo procesar el FURAT: ' + err.message, 'error');
         });
     } else if (urlNombre) {
-        showToast(
-            'Caso: ' + urlNombre,
-            'Selecciona o arrastra el FURAT PDF para continuar.',
-            'info'
-        );
+        // FALLBACK: el viewer no envió furatPath. Intentar encontrar el archivo
+        // en el módulo 3.2.1 buscando por nombre normalizado.
+        console.log('[INVESTIGACION-ACCIDENTES-MAIN] urlFuratPath vacío, buscando FURAT por nombre:', urlNombre);
+        showToast('Buscando FURAT...', 'Localizando el archivo en el sistema.', 'info');
+
+        // Usar directamente window.electronAPI.findFuratByName (preload expone el IPC).
+        // Si no está disponible por caché, hacer fallback a callParentAPI SIN prefijo
+        // (callParentAPI ya agrega 'investigacion-accidentes-' al inicio del tipo).
+        function _findFuratDirect(companyName, caseName) {
+            if (window.electronAPI && typeof window.electronAPI.findFuratByName === 'function') {
+                console.log('[INVESTIGACION-ACCIDENTES-MAIN] Usando window.electronAPI.findFuratByName directo');
+                return window.electronAPI.findFuratByName(companyName, caseName);
+            }
+            console.log('[INVESTIGACION-ACCIDENTES-MAIN] Fallback: usando callParentAPI con prefijo automático');
+            return callParentAPI('find-furat-by-name', { companyName, caseName });
+        }
+
+        _findFuratDirect(currentEmpresa, urlNombre).then(function(result) {
+            if (result && result.success && result.data && result.data.furatPath) {
+                const furatPath = result.data.furatPath;
+                console.log('[INVESTIGACION-ACCIDENTES-MAIN] FURAT encontrado por fallback:', furatPath);
+                const autoFilename = result.data.furatName || furatPath.split('\\').pop().split('/').pop();
+                selectedPdfPath = furatPath;
+                if (selectedFileName) selectedFileName.textContent = autoFilename;
+                if (selectedFileInfo) selectedFileInfo.classList.remove('hidden');
+                if (dropZone) dropZone.classList.add('has-file');
+                if (processBtn) processBtn.disabled = false;
+                updateStepStatus(1, 'completed');
+                showToast('FURAT localizado', 'Procesando: ' + autoFilename, 'success');
+                logActivity('info', 'FURAT localizado por fallback: ' + autoFilename);
+                return processPdfFile(furatPath);
+            } else {
+                console.warn('[INVESTIGACION-ACCIDENTES-MAIN] FURAT no encontrado por fallback:', result);
+                showToast(
+                    'Caso: ' + urlNombre,
+                    'No se encontró el FURAT. Súbelo manualmente desde la dropzone.',
+                    'warning'
+                );
+                logActivity('warn', 'FURAT no encontrado en 3.2.1. Usuario debe subirlo manualmente.');
+            }
+        }).catch(function(err) {
+            console.error('[INVESTIGACION-ACCIDENTES-MAIN] Error en fallback findFuratByName:', err);
+            showToast(
+                'Caso: ' + urlNombre,
+                'No se pudo localizar el FURAT. Súbelo manualmente.',
+                'warning'
+            );
+        });
     }
 
     console.log('[INVESTIGACION-ACCIDENTES-MAIN] Inicialización completada');
