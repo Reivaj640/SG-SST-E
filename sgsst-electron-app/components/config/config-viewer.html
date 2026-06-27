@@ -1190,26 +1190,47 @@
             </div>
 
             <div class="ai-dashboard">
-                <!-- Tarjeta de Estado del Modelo -->
+                <!-- Tarjeta de Estado del Modelo — DATOS REALES vía IPC -->
                 <div class="ai-card full-width" style="border-left: 5px solid var(--primary);">
                     <h3>Estado del Modelo Activo</h3>
                     <div class="model-info-grid">
                         <div>
                             <span class="stat-label">Proveedor</span>
-                            <div class="stat-value" style="font-size: 1.2rem;">OpenAI</div>
+                            <div class="stat-value" style="font-size: 1.2rem;" id="ai-provider">Ollama (local)</div>
                         </div>
                         <div>
-                            <span class="stat-label">Modelo</span>
-                            <div class="stat-value">GPT-4 Turbo</div>
+                            <span class="stat-label">Modelo activo</span>
+                            <div class="stat-value" id="ai-model-name">—</div>
                         </div>
                         <div>
-                            <span class="stat-label">Versión API</span>
-                            <div class="stat-value">v1.5.0</div>
+                            <span class="stat-label">Tamaño</span>
+                            <div class="stat-value" id="ai-model-size">—</div>
                         </div>
                         <div>
-                            <span class="stat-label">Contexto Máximo</span>
-                            <div class="stat-value">128k Tokens</div>
+                            <span class="stat-label">Modificado</span>
+                            <div class="stat-value" id="ai-model-modified">—</div>
                         </div>
+                    </div>
+                    <div id="ai-model-warning" style="margin-top: 0.75rem; padding: 0.6rem 0.9rem; border-radius: 6px; background: #fef3c7; color: #92400e; display: none;"></div>
+                </div>
+
+                <!-- Selector de Modelo (dropdown dinámico) -->
+                <div class="ai-card full-width">
+                    <h3>Cambiar Modelo</h3>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.8rem;">
+                        Selecciona uno de los modelos Ollama ya creados en tu sistema.
+                        El cambio se aplica en caliente — no necesitas reiniciar.
+                    </p>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <select id="ai-model-select" style="flex: 1; padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border); font-size: 0.95rem;">
+                            <option value="">— Cargando modelos... —</option>
+                        </select>
+                        <button type="button" class="btn btn-outline" id="ai-model-refresh" title="Recargar lista de modelos">
+                            <i class="bi bi-arrow-clockwise"></i> Recargar
+                        </button>
+                        <button type="button" class="btn btn-primary" id="ai-model-apply">
+                            <i class="bi bi-check2"></i> Aplicar
+                        </button>
                     </div>
                 </div>
 
@@ -1217,23 +1238,26 @@
                 <div class="ai-card">
                     <h3>Parámetros de Generación</h3>
                     <div class="slider-group">
-                        <div class="slider-label"><span>Temperatura (Creatividad)</span> <span id="temp-val">0.7</span></div>
-                        <input type="range" min="0" max="1" step="0.1" value="0.7" oninput="document.getElementById('temp-val').innerText = this.value">
+                        <div class="slider-label"><span>Temperatura (Creatividad)</span> <span id="temp-val">0.4</span></div>
+                        <input type="range" id="ai-temp-slider" min="0" max="1" step="0.1" value="0.4" oninput="document.getElementById('temp-val').innerText = this.value">
                         <small style="color: var(--text-muted); display: block; margin-top: 0.5rem;">Valores bajos son más precisos, altos más creativos.</small>
                     </div>
                     <div class="slider-group">
-                        <div class="slider-label"><span>Max Tokens (Longitud)</span> <span id="token-val">2048</span></div>
-                        <input type="range" min="256" max="4096" step="256" value="2048" oninput="document.getElementById('token-val').innerText = this.value">
+                        <div class="slider-label"><span>Max Tokens (Longitud)</span> <span id="token-val">4000</span></div>
+                        <input type="range" id="ai-tokens-slider" min="256" max="8000" step="256" value="4000" oninput="document.getElementById('token-val').innerText = this.value">
                     </div>
-                    <button class="btn btn-primary" style="width: 100%;">Guardar Parámetros</button>
+                    <button class="btn btn-primary" id="ai-save-params" style="width: 100%; margin-top: 0.5rem;">Guardar Parámetros</button>
                 </div>
 
                 <!-- Configuración del Prompt -->
                 <div class="ai-card">
-                    <h3>Configuración del Asistente (Prompt)</h3>
+                    <h3>Configuración del Asistente (Prompt del Sistema)</h3>
                     <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.8rem;">Define cómo se comporta la IA como experto SST.</p>
-                    <textarea class="ai-textarea" rows="6" id="ai-prompt">Eres un asistente experto en Seguridad y Salud en el Trabajo (SG-SST) normatividad colombiana. Tu tono es profesional, técnico y directo. Ayudas a interpretar la resolución 0312 de 2019.</textarea>
-                    <button class="btn btn-outline" style="width: 100%; margin-top: 1rem;" onclick="resetAIPrompt()">Restaurar Configuración por Defecto</button>
+                    <textarea class="ai-textarea" rows="10" id="ai-prompt"></textarea>
+                    <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                        <button class="btn btn-primary" id="ai-save-prompt" style="flex: 1;">Guardar Prompt</button>
+                        <button class="btn btn-outline" id="ai-reset-prompt" style="flex: 1;" onclick="resetAIPrompt()">Restaurar por Defecto</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -2282,16 +2306,162 @@
     }
 
     /* ================= CONFIGURACIÓN IA ================= */
-    function saveLLMParams() {
-        const temp = document.getElementById('temp-val').textContent;
-        const tokens = document.getElementById('token-val').textContent;
-        showToast('Parámetros de IA guardados: Temp=' + temp + ', Tokens=' + tokens, 'success');
+
+    // Carga la lista de modelos Ollama + la config actual al entrar a la pestaña
+    async function loadAIModels() {
+        const select = document.getElementById('ai-model-select');
+        if (!select) return;
+        if (!window.electronAPI || typeof window.electronAPI.llmListModels !== 'function') {
+            select.innerHTML = '<option value="">— IPC no disponible —</option>';
+            return;
+        }
+        select.innerHTML = '<option value="">— Cargando modelos... —</option>';
+        try {
+            const result = await window.electronAPI.llmListModels();
+            if (!result || !result.success) {
+                select.innerHTML = '<option value="">— Error al listar —</option>';
+                return;
+            }
+            const models = result.models || [];
+            const active = result.active_model || '';
+            if (models.length === 0) {
+                select.innerHTML = '<option value="">— No hay modelos Ollama —</option>';
+                return;
+            }
+            select.innerHTML = models.map(m => {
+                const name = m.name || '';
+                const sel = (name === active) ? 'selected' : '';
+                return `<option value="${name}" ${sel}>${name}</option>`;
+            }).join('');
+        } catch (e) {
+            console.error('[AI-CONFIG] Error cargando modelos:', e);
+            select.innerHTML = '<option value="">— Error de conexión —</option>';
+        }
+    }
+
+    async function loadAIConfig() {
+        if (!window.electronAPI || typeof window.electronAPI.llmGetConfig !== 'function') return;
+        try {
+            const result = await window.electronAPI.llmGetConfig();
+            if (!result || !result.success) return;
+            const cfg = result.config || {};
+
+            // Estado del modelo activo
+            document.getElementById('ai-model-name').textContent = cfg.llmModel || '—';
+            document.getElementById('ai-provider').textContent = 'Ollama (local)';
+
+            // Parámetros
+            const temp = (cfg.llmTemperature !== undefined) ? cfg.llmTemperature : 0.4;
+            const tokens = (cfg.llmMaxTokens !== undefined) ? cfg.llmMaxTokens : 4000;
+            const tempSlider = document.getElementById('ai-temp-slider');
+            const tokensSlider = document.getElementById('ai-tokens-slider');
+            if (tempSlider) tempSlider.value = temp;
+            if (tokensSlider) tokensSlider.value = tokens;
+            document.getElementById('temp-val').textContent = temp;
+            document.getElementById('token-val').textContent = tokens;
+
+            // Prompt
+            const promptEl = document.getElementById('ai-prompt');
+            if (promptEl && cfg.llmSystemPrompt) {
+                promptEl.value = cfg.llmSystemPrompt;
+            }
+
+            // Mostrar tamaño del modelo activo si está disponible
+            // (se carga después con loadAIModels)
+        } catch (e) {
+            console.error('[AI-CONFIG] Error cargando config:', e);
+        }
+    }
+
+    async function applyAIModel() {
+        const select = document.getElementById('ai-model-select');
+        const model = (select && select.value) || '';
+        if (!model) {
+            showToast('Selecciona un modelo primero', 'warning');
+            return;
+        }
+        if (!window.electronAPI || typeof window.electronAPI.llmSelectModel !== 'function') return;
+        try {
+            const result = await window.electronAPI.llmSelectModel(model);
+            if (result && result.success) {
+                document.getElementById('ai-model-name').textContent = result.active_model || model;
+                const warningEl = document.getElementById('ai-model-warning');
+                if (result.warning) {
+                    warningEl.textContent = '⚠️ ' + result.warning;
+                    warningEl.style.display = 'block';
+                } else {
+                    warningEl.style.display = 'none';
+                }
+                showToast('Modelo cambiado a: ' + (result.active_model || model), 'success');
+            } else {
+                showToast('Error: ' + (result && result.error ? result.error : 'desconocido'), 'error');
+            }
+        } catch (e) {
+            console.error('[AI-CONFIG] Error aplicando modelo:', e);
+            showToast('Error aplicando modelo: ' + e.message, 'error');
+        }
+    }
+
+    async function saveLLMParams() {
+        if (!window.electronAPI || typeof window.electronAPI.llmSaveConfig !== 'function') {
+            showToast('IPC no disponible', 'error');
+            return;
+        }
+        const temp = parseFloat(document.getElementById('ai-temp-slider').value);
+        const tokens = parseInt(document.getElementById('ai-tokens-slider').value, 10);
+        try {
+            const result = await window.electronAPI.llmSaveConfig({
+                llmTemperature: temp,
+                llmMaxTokens: tokens,
+            });
+            if (result && result.success) {
+                showToast('Parámetros guardados: Temp=' + temp + ', Tokens=' + tokens, 'success');
+            } else {
+                showToast('Error guardando: ' + (result && result.error), 'error');
+            }
+        } catch (e) {
+            showToast('Error: ' + e.message, 'error');
+        }
+    }
+
+    async function saveAIPrompt() {
+        if (!window.electronAPI || typeof window.electronAPI.llmSaveConfig !== 'function') {
+            showToast('IPC no disponible', 'error');
+            return;
+        }
+        const prompt = document.getElementById('ai-prompt').value;
+        try {
+            const result = await window.electronAPI.llmSaveConfig({ llmSystemPrompt: prompt });
+            if (result && result.success) {
+                showToast('Prompt guardado', 'success');
+            } else {
+                showToast('Error: ' + (result && result.error), 'error');
+            }
+        } catch (e) {
+            showToast('Error: ' + e.message, 'error');
+        }
     }
 
     function resetAIPrompt() {
-        document.getElementById('ai-prompt').value = 'Eres un asistente experto en Seguridad y Salud en el Trabajo (SG-SST) normatividad colombiana. Tu tono es profesional, técnico y directo. Ayudas a interpretar la resolución 0312 de 2019.';
-        showToast('Prompt de IA restaurado a valor por defecto', 'success');
+        const defaultPrompt = 'Eres un asistente experto en Seguridad y Salud en el Trabajo (SG-SST) normatividad colombiana. Tu tono es profesional, técnico y directo. Ayudas a interpretar la resolución 0312 de 2019.';
+        document.getElementById('ai-prompt').value = defaultPrompt;
+        showToast('Prompt restaurado (recuerda hacer click en "Guardar Prompt" para persistir)', 'info');
     }
+
+    // Wire-up automático al cargar el DOM
+    document.addEventListener('DOMContentLoaded', function() {
+        const btnApply = document.getElementById('ai-model-apply');
+        if (btnApply) btnApply.addEventListener('click', applyAIModel);
+        const btnRefresh = document.getElementById('ai-model-refresh');
+        if (btnRefresh) btnRefresh.addEventListener('click', loadAIModels);
+        const btnSaveParams = document.getElementById('ai-save-params');
+        if (btnSaveParams) btnSaveParams.addEventListener('click', saveLLMParams);
+        const btnSavePrompt = document.getElementById('ai-save-prompt');
+        if (btnSavePrompt) btnSavePrompt.addEventListener('click', saveAIPrompt);
+        // Carga inicial (puede fallar si Flask no está listo, pero el usuario puede recargar)
+        loadAIConfig();
+        loadAIModels();
+    });
 
     /* ================= INTERFAZ UI ================= */
     async function setTheme(mode, el) {

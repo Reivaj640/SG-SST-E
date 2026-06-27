@@ -396,16 +396,22 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // ── Listeners del toolbar de revisión del análisis ──
-    const btnStartReview = document.getElementById('btnStartReview');
-    const btnRegenerateAll = document.getElementById('btnRegenerateAll');
-    const btnCancelReview = document.getElementById('btnCancelReview');
-    const btnApproveAnalysis = document.getElementById('btnApproveAnalysis');
-    const btnReReview = document.getElementById('btnReReview');
-    if (btnStartReview) btnStartReview.addEventListener('click', window._onStartReview);
-    if (btnRegenerateAll) btnRegenerateAll.addEventListener('click', window._onRegenerateAll);
-    if (btnCancelReview) btnCancelReview.addEventListener('click', window._onCancelReview);
-    if (btnApproveAnalysis) btnApproveAnalysis.addEventListener('click', window._onApproveAnalysis);
-    if (btnReReview) btnReReview.addEventListener('click', window._onReReview);
+    // IMPORTANTE: se bindean AQUÍ (no en la inicialización) porque los handlers
+    // window._onXxx se definen MÁS ABAJO en este mismo archivo. Si se bindearan
+    // en la inicialización, serían undefined y el clic no haría nada.
+    function _bindReviewToolbarListeners() {
+        const btnStartReview = document.getElementById('btnStartReview');
+        const btnRegenerateAll = document.getElementById('btnRegenerateAll');
+        const btnCancelReview = document.getElementById('btnCancelReview');
+        const btnApproveAnalysis = document.getElementById('btnApproveAnalysis');
+        const btnReReview = document.getElementById('btnReReview');
+        if (btnStartReview) btnStartReview.addEventListener('click', window._onStartReview);
+        if (btnRegenerateAll) btnRegenerateAll.addEventListener('click', window._onRegenerateAll);
+        if (btnCancelReview) btnCancelReview.addEventListener('click', window._onCancelReview);
+        if (btnApproveAnalysis) btnApproveAnalysis.addEventListener('click', window._onApproveAnalysis);
+        if (btnReReview) btnReReview.addEventListener('click', window._onReReview);
+    }
+    // Se llamará al final del archivo (después de definir _onRegenerateAll)
 
     // Botón de volver
     backBtn.addEventListener('click', function() {
@@ -598,7 +604,16 @@ return await callParentAPI('generate-accident-report', combinedData);
 
             // Analizar los datos extraídos
             analysisResult = await api.analyzeAccident(extractedData, contextoAdicional);
-            
+
+            // Desanidar el wrapper {success, data, validation, ...} para tener
+            // SOLO el objeto de análisis ({PorQue1..PorQue5}).
+            // Si NO desanidamos, `analysisResult` queda con wrapper y
+            // `renderEditableAnalysisTable` no encuentra las claves PorQue,
+            // mostrando "No se pudo renderizar el análisis en formato editable."
+            if (analysisResult && analysisResult.success === true && analysisResult.data) {
+                analysisResult = analysisResult.data;
+            }
+
             // Detener verificación de progreso
             clearInterval(modelLoadingCheckInterval);
 
@@ -1272,16 +1287,21 @@ showReviewToolbar();
                     oninput="window._onAnalysisCellEdit(this)">${escapeHtml(display)}</div></td>`;
             }).join('');
             const regenDisabled = isRegenerating ? 'disabled' : '';
+            // El botón ↻ va DENTRO de la celda de nivel para garantizar visibilidad
+            // (anteriormente estaba en una columna aparte que se ocultaba por overflow).
             return `<tr>
-                <td class="inv-why-cell-nivel">${level}</td>
-                ${cells}
-                <td class="inv-why-cell-action">
-                    <button type="button" class="inv-btn-regenerate-level" data-level="${level}"
-                        title="Regenerar solo este nivel con el feedback actual"
-                        ${regenDisabled} onclick="window._onRegenerateLevel(${level})">
-                        <i class="fas fa-sync"></i>
-                    </button>
+                <td class="inv-why-cell-nivel">
+                    <div class="inv-why-level-header">
+                        <span class="inv-why-level-number" data-level="${level}">${level}</span>
+                        <button type="button" class="inv-btn-regenerate-level" data-level="${level}"
+                            title="Regenerar solo este nivel con el feedback actual"
+                            aria-label="Regenerar nivel ${level}"
+                            ${regenDisabled} onclick="window._onRegenerateLevel(${level})">
+                            <i class="fas fa-sync"></i>
+                        </button>
+                    </div>
                 </td>
+                ${cells}
             </tr>`;
         }).join('');
         return `<table class="inv-why-table">
@@ -1289,7 +1309,6 @@ showReviewToolbar();
                 <tr>
                     <th class="inv-why-col-nivel">Nivel</th>
                     ${headers}
-                    <th class="inv-why-col-action">Acción</th>
                 </tr>
             </thead>
             <tbody>${rows}</tbody>
@@ -1316,18 +1335,40 @@ showReviewToolbar();
             idle.classList.remove('hidden');
             // No badge en idle (estado inicial)
             badge.classList.add('hidden');
+            // Rehabilitar botón "Iniciar Análisis" (puede que venga de un estado approved previo)
+            if (processBtn) {
+                processBtn.disabled = false;
+                processBtn.title = '';
+            }
         } else if (analysisState === 'reviewing') {
             reviewing.classList.remove('hidden');
             badge.classList.add('inv-review-badge--reviewing');
             badge.innerHTML = '<i class="fas fa-edit"></i> En revisión';
+            // Rehabilitar botón "Iniciar Análisis" (el usuario podría querer re-analizar desde cero)
+            if (processBtn) {
+                processBtn.disabled = false;
+                processBtn.title = '';
+            }
         } else if (analysisState === 'approved') {
             approved.classList.remove('hidden');
             badge.classList.add('inv-review-badge--approved');
             badge.innerHTML = '<i class="fas fa-check"></i> Aprobado';
+            // Anti-rebote: cuando el análisis ya está aprobado, deshabilitar el botón
+            // "Iniciar Análisis" del footer para que el usuario no reinicie el flujo
+            // por accidente (el siguiente paso es "Generar Informe", no re-analizar).
+            if (processBtn) {
+                processBtn.disabled = true;
+                processBtn.title = 'Análisis aprobado — usa "Generar Informe" para continuar';
+            }
         } else if (analysisState === 'dirty') {
             reviewing.classList.remove('hidden');
             badge.classList.add('inv-review-badge--dirty');
             badge.innerHTML = '<i class="fas fa-exclamation-circle"></i> Cambios sin re-aprobar';
+            // Rehabilitar botón "Iniciar Análisis" (estado dirty → permite re-empezar)
+            if (processBtn) {
+                processBtn.disabled = false;
+                processBtn.title = '';
+            }
         }
 
         // Habilitar/deshabilitar botón "Generar Informe" según estado
@@ -1391,11 +1432,11 @@ showReviewToolbar();
     window._onStartReview = function() {
         if (!analysisResult) return;
         analysisState = 'reviewing';
-        // Renderizar tabla editable reemplazando el contenido del análisis
+        // Renderizar tabla editable REEMPLAZANDO las cards originales del análisis.
+        // Si las dejábamos (concat), las cards ocupaban el viewport y empujaban la
+        // tabla (con los botones ↻ por nivel) fuera de la vista visible.
         const editableHtml = renderEditableAnalysisTable(analysisResult);
-        // Insertar la tabla al inicio del contenido (debajo del badge de revisión)
-        const existing = analysisContent.innerHTML;
-        analysisContent.innerHTML = editableHtml + existing;
+        analysisContent.innerHTML = editableHtml;
         showReviewToolbar();
     };
 
@@ -1417,11 +1458,11 @@ showReviewToolbar();
 
     window._onReReview = function() {
         analysisState = 'reviewing';
-        // Volver a mostrar la tabla editable con las ediciones aplicadas
+        // Volver a mostrar la tabla editable con las ediciones aplicadas.
+        // REEMPLAZA las cards originales — no concatenar (ver _onStartReview).
         const merged = getEffectiveAnalysis();
         const editableHtml = renderEditableAnalysisTable(merged);
-        const existing = analysisContent.innerHTML;
-        analysisContent.innerHTML = editableHtml + existing;
+        analysisContent.innerHTML = editableHtml;
         showReviewToolbar();
     };
 
@@ -1453,7 +1494,16 @@ showReviewToolbar();
         isRegenerating = true;
 
         try {
-            const descripcion = extractedData?.['Descripcion del Accidente'] || extractedData?.['Descripcion'] || '';
+            // Extraer la descripción del accidente — `extractedData` puede tener
+            // hasta doble wrapper ({success, data: {success, data: {campos}}})
+            // dependiendo de cómo lo devolvió el handler.
+            const innerData = extractedData?.data?.data || extractedData?.data || extractedData || {};
+            const descripcion =
+                innerData['Descripcion del Accidente'] ||
+                innerData['Descripcion'] ||
+                innerData['descripcion del accidente'] ||
+                innerData['descripcion'] ||
+                '';
             const contexto = (document.getElementById('contextInput') || {}).value || '';
             // Backup del análisis antes de regenerar (para "Deshacer")
             analysisOriginalBackup = JSON.parse(JSON.stringify(getEffectiveAnalysis()));
@@ -1482,11 +1532,43 @@ showReviewToolbar();
                 }
                 // Limpiar backup si todo salió bien
                 analysisOriginalBackup = null;
-                // Re-renderizar tabla editable
+                // Re-renderizar tabla editable REEMPLAZANDO (no concatenar — ver _onStartReview).
                 const newMerged = getEffectiveAnalysis();
                 const editableHtml = renderEditableAnalysisTable(newMerged);
-                const existing = analysisContent.innerHTML;
-                analysisContent.innerHTML = editableHtml + existing;
+                analysisContent.innerHTML = editableHtml;
+
+                // [Fix C] Diagnóstico: qué devolvió el modelo y cuánto tardó
+                try {
+                    const cats = result.data && result.data[regeneratedLevelKey] ? Object.keys(result.data[regeneratedLevelKey]) : [];
+                    console.log(`[REGENERATE] Nivel ${level} regenerado OK en ${(result.generation_time || 0).toFixed(1)}s — categorías devueltas: [${cats.join(', ')}]`);
+                    const rawLen = (result.raw_text || '').length;
+                    console.log(`[REGENERATE] raw_text (${rawLen} chars): ${(result.raw_text || '').slice(0, 220)}${rawLen > 220 ? '…' : ''}`);
+                    console.log(`[REGENERATE] data.PorQue${level}:`, result.data && result.data[regeneratedLevelKey]);
+                } catch (e) { console.warn('[REGENERATE] Error en logging:', e); }
+
+                // [Fix B] Badge persistente "regenerado por IA" en el número del nivel
+                const levelNumberEl = analysisContent.querySelector(
+                    `.inv-why-level-number[data-level="${level}"]`
+                );
+                if (levelNumberEl) levelNumberEl.classList.add('is-regenerated');
+
+                // [Fix A] Flash temporal en las celdas del nivel regenerado (1.6s)
+                // Permite al usuario ver QUÉ fila cambió y se quita sola para permitir
+                // re-flash si vuelve a regenerar el mismo nivel.
+                const regenCells = analysisContent.querySelectorAll(
+                    `.inv-why-cell-edit[data-level="${level}"]`
+                );
+                regenCells.forEach(c => {
+                    // Quitar clase primero para permitir re-disparar la animación
+                    c.classList.remove('is-just-regenerated');
+                    // Forzar reflow para reiniciar la animación
+                    void c.offsetWidth;
+                    c.classList.add('is-just-regenerated');
+                });
+                setTimeout(() => {
+                    regenCells.forEach(c => c.classList.remove('is-just-regenerated'));
+                }, 1700);
+
                 showToast('Nivel regenerado', `El nivel ${level} ha sido regenerado con el feedback aplicado.`, 'success');
                 logActivity('success', `Nivel ${level} del análisis regenerado con feedback`);
             } else {
@@ -1514,7 +1596,15 @@ showReviewToolbar();
         if (btnRegen) btnRegen.disabled = true;
 
         try {
-            const descripcion = extractedData?.['Descripcion del Accidente'] || extractedData?.['Descripcion'] || '';
+            // Extraer la descripción del accidente — `extractedData` puede tener
+            // hasta doble wrapper ({success, data: {success, data: {campos}}})
+            const innerData = extractedData?.data?.data || extractedData?.data || extractedData || {};
+            const descripcion =
+                innerData['Descripcion del Accidente'] ||
+                innerData['Descripcion'] ||
+                innerData['descripcion del accidente'] ||
+                innerData['descripcion'] ||
+                '';
             const contexto = (document.getElementById('contextInput') || {}).value || '';
             // Backup antes de regenerar todo
             analysisOriginalBackup = JSON.parse(JSON.stringify(getEffectiveAnalysis()));
@@ -1535,10 +1625,9 @@ showReviewToolbar();
                 // Limpiar ediciones inline del usuario (todo se regeneró)
                 analysisEdits = {};
                 analysisOriginalBackup = null;
-                // Re-renderizar tabla editable
+                // Re-renderizar tabla editable REEMPLAZANDO (no concatenar — ver _onStartReview).
                 const editableHtml = renderEditableAnalysisTable(analysisResult);
-                const existing = analysisContent.innerHTML;
-                analysisContent.innerHTML = editableHtml + existing;
+                analysisContent.innerHTML = editableHtml;
                 showToast('Análisis regenerado', 'Los 5 niveles han sido regenerados.', 'success');
                 logActivity('success', 'Análisis completo regenerado con feedback');
             } else {
@@ -1551,6 +1640,11 @@ showReviewToolbar();
             if (btnRegen) btnRegen.disabled = false;
         }
     };
+
+    // Bindear listeners del toolbar de revisión AHORA que todos los handlers existen.
+    // (Ver _bindReviewToolbarListeners más arriba — se pospuso para evitar referencias
+    //  a window._onXxx cuando aún eran undefined).
+    _bindReviewToolbarListeners();
 
     // Función para actualizar el estado de un paso
   function updateStepStatus(stepNumber, status) {
@@ -2183,6 +2277,17 @@ document.addEventListener('keydown', (e) => {
 if (modal.classList.contains('hidden')) return;
 if (e.key === 'Escape' && !isRenaming && !isCreatingFolder) { close(); }
 });
+
+// Botón "Generar Informe" del toolbar de aprobación (HTML id=btnGenerateReportFromApproval).
+// Antes de este cambio, no había forma de abrir el saveModal desde la UI tras aprobar —
+// el approved toolbar solo tenía "Re-revisar". Ahora el botón dispara open() que hace
+// el setup completo (filename sugerido, navegación al dir por defecto, reset de estado).
+const btnGenerateReportFromApproval = document.getElementById('btnGenerateReportFromApproval');
+if (btnGenerateReportFromApproval) {
+    btnGenerateReportFromApproval.addEventListener('click', () => {
+        open();
+    });
+}
 
 return { open, close, navigateTo };
   })();

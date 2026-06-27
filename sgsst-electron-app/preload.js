@@ -232,6 +232,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('investigacion-accidentes-regenerate-analysis', params),
   saveTempPdfFile: (filename, data) => ipcRenderer.invoke('investigacion-accidentes-save-temp-pdf-file', filename, data),
 
+  // --- Gestión de Modelo LLM (Configuración IA) ---
+  llmListModels: () => ipcRenderer.invoke('llm-list-models'),
+  llmSelectModel: (model) => ipcRenderer.invoke('llm-select-model', { model }),
+  llmGetConfig: () => ipcRenderer.invoke('llm-get-config'),
+  llmSaveConfig: (config) => ipcRenderer.invoke('llm-save-config', config),
+
   // --- Investigación de Accidentes (Gestión) ---
   getInvestigacionStats: (companyName) => ipcRenderer.invoke('investigacion-accidentes-get-stats', { companyName }),
   listInvestigations: (companyName, filter) => ipcRenderer.invoke('investigacion-accidentes-list-investigations', { companyName, filter }),

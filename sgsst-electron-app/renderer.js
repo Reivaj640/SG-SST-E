@@ -1092,6 +1092,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                   apiCallArgs = [payload];
                   responseType = 'investigacion-accidentes-generate-accident-report-request-response';
                   break;
+              case 'investigacion-accidentes-regenerate-analysis-request':
+                  // Manejar solicitud para regenerar análisis (completo o por nivel) con feedback del usuario
+                  apiCallFunction = window.electronAPI.regenerateAnalysis;
+                  // El payload trae { descripcion, contexto, feedback, level, currentAnalysis }
+                  apiCallArgs = [payload];
+                  responseType = 'investigacion-accidentes-regenerate-analysis-response';
+                  break;
               case 'investigacion-accidentes-get-stats-request':
                   // Manejar solicitud de estadísticas de investigaciones
                   apiCallFunction = window.electronAPI.getInvestigacionStats;

@@ -606,6 +606,70 @@ ipcMain.handle('investigacion-accidentes-process-accident-pdf', async (event, pd
     }
 });
 
+// ============================================================================
+// IPC: Gestión de Modelos Ollama + Configuración IA (desde Configuración IA tab)
+// ============================================================================
+
+/**
+ * Lista los modelos Ollama disponibles.
+ * Devuelve la lista de modelos + el modelo activo actualmente.
+ */
+ipcMain.handle('llm-list-models', async () => {
+    try {
+        const response = await llmServerRequest('/models', 'GET', null);
+        return response;
+    } catch (error) {
+        sendLog(`Error listando modelos LLM: ${error.message}`, 'ERROR');
+        return { success: false, error: error.message, models: [], active_model: null };
+    }
+});
+
+/**
+ * Cambia el modelo Ollama activo en caliente (sin reiniciar Flask).
+ * Body: { model: 'nombre' }
+ */
+ipcMain.handle('llm-select-model', async (event, { model }) => {
+    try {
+        if (!model || typeof model !== 'string') {
+            return { success: false, error: 'Se requiere el nombre del modelo' };
+        }
+        const response = await llmServerRequest('/models/select', 'POST', { model });
+        sendLog(`[LLM-CONFIG] Modelo cambiado a: ${response.active_model || model}`);
+        return response;
+    } catch (error) {
+        sendLog(`Error cambiando modelo LLM: ${error.message}`, 'ERROR');
+        return { success: false, error: error.message };
+    }
+});
+
+/**
+ * Obtiene la configuración LLM (modelo + temperatura + max_tokens + prompt).
+ */
+ipcMain.handle('llm-get-config', async () => {
+    try {
+        const response = await llmServerRequest('/llm-config', 'GET', null);
+        return response;
+    } catch (error) {
+        sendLog(`Error leyendo config LLM: ${error.message}`, 'ERROR');
+        return { success: false, error: error.message };
+    }
+});
+
+/**
+ * Guarda la configuración LLM y aplica cambios en caliente.
+ * Body: { llmModel?, llmTemperature?, llmMaxTokens?, llmSystemPrompt? }
+ */
+ipcMain.handle('llm-save-config', async (event, config) => {
+    try {
+        const response = await llmServerRequest('/llm-config', 'POST', config || {});
+        sendLog(`[LLM-CONFIG] Config guardada: model=${response.config?.llmModel}`);
+        return response;
+    } catch (error) {
+        sendLog(`Error guardando config LLM: ${error.message}`, 'ERROR');
+        return { success: false, error: error.message };
+    }
+});
+
 ipcMain.handle('investigacion-accidentes-analyze-accident', async (event, extractedData, contextoAdicional) => {
     // 🔒 Bloqueo anti-duplicación
     if (isAnalyzingAccident) {
