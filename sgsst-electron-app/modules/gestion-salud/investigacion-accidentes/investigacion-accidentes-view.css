@@ -132,7 +132,10 @@ html { overflow-x: hidden; }
   background-color: #4a5568;
 }
 
-.inv-layout .hidden {
+/* FIX 2026-06-27: antes .inv-layout .hidden — el body NUNCA tiene la clase
+   .inv-layout, así que la regla nunca aplicaba y los elementos con clase
+   "hidden" no se ocultaban. Ahora es global: cualquier .hidden se oculta. */
+.hidden {
   display: none !important;
 }
 
@@ -303,20 +306,8 @@ html { overflow-x: hidden; }
 
 /* ================================================================
    GLOBAL PROGRESS (thin bar under header)
+   ELIMINADO 2026-06-27: código muerto sin uso en JS.
    ================================================================ */
-.inv-global-progress {
-  height: 4px;
-  background-color: var(--inv-surface-card);
-  position: sticky;
-  top: 53px;
-  z-index: 99;
-}
-
-.inv-global-progress-bar {
-  height: 100%;
-  background: linear-gradient(90deg, var(--inv-primary) 0%, var(--inv-primary-hover) 100%);
-  transition: width 0.5s ease;
-}
 
 /* ================================================================
    CONTEXT BADGES

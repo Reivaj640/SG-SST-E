@@ -570,37 +570,84 @@ return await callParentAPI('generate-accident-report', combinedData);
             // Variable para tracking del tiempo de carga
             const analysisStartTime = Date.now();
             let modelLoadingCheckInterval;
-            
-            // Verificar progreso de carga del modelo
+
+            // ── Progreso inteligente basado en historial ─────────────────
+            // Iteración 2: tras probar en frío, el cap de 30% durante 25s hacía
+            // que análisis rápidos (15s) solo llegaran a 18%. Ahora easing
+            // exponencial desde el segundo 1, con coeficiente 4.0 → al alcanzar
+            // el baseline estimado la barra llega a ~98%.
+            // ─────────────────────────────────────────────────────────────
+            let analysisHistory = {};
+            try {
+                analysisHistory = JSON.parse(localStorage.getItem('kair_analysis_history') || '{}');
+            } catch (e) { /* localStorage no disponible */ }
+
+            const historyBaseline = (typeof analysisHistory.averageTime === 'number' && analysisHistory.averageTime > 0)
+                ? analysisHistory.averageTime : null;
+            // Default 30s (mucho más realista que 60s — modelo warm suele ser ~10-20s)
+            const estimatedTotal = historyBaseline || 30;
+
+            function formatElapsed(sec) {
+                const m = Math.floor(sec / 60);
+                const s = sec % 60;
+                return m > 0 ? `${m}m ${s}s` : `${s}s`;
+            }
+
+            function computeProgress(elapsed) {
+                // Easing exponencial agresivo: 1 - e^(-4 * ratio)
+                //   ratio=0.25 → 63%
+                //   ratio=0.50 → 86%
+                //   ratio=0.75 → 95%
+                //   ratio=1.00 → 98%
+                const ratio = elapsed / estimatedTotal;
+                const eased = 100 * (1 - Math.exp(-4 * ratio));
+                // Cap 96% hasta terminar de verdad
+                return { pct: Math.min(96, eased) };
+            }
+
+            // Verificar progreso de carga del modelo (cada 500ms para máxima suavidad)
             modelLoadingCheckInterval = setInterval(() => {
                 const elapsed = Math.floor((Date.now() - analysisStartTime) / 1000);
-                const minutes = Math.floor(elapsed / 60);
-                const seconds = elapsed % 60;
-                
+
                 const statusEl = document.getElementById('analysis-status');
                 const substatusEl = document.getElementById('analysis-substatus');
                 const progressEl = document.getElementById('model-progress');
                 const progressTextEl = document.getElementById('model-progress-text');
-                
+
+                const { pct } = computeProgress(elapsed);
+
                 if (statusEl) {
-                    statusEl.textContent = `Cargando modelo de IA... (${minutes}m ${seconds}s)`;
+                    if (historyBaseline) {
+                        statusEl.textContent = `Generando análisis... (${formatElapsed(elapsed)})`;
+                    } else {
+                        statusEl.textContent = `Iniciando análisis... (${formatElapsed(elapsed)})`;
+                    }
                 }
-                
+
                 if (substatusEl) {
-                    substatusEl.textContent = 'El servidor se está iniciando. Esto solo ocurre en la primera ejecución.';
+                    if (historyBaseline) {
+                        substatusEl.textContent = `Análisis típico: ~${formatElapsed(Math.round(historyBaseline))} (basado en tu historial)`;
+                    } else if (elapsed < 20) {
+                        substatusEl.textContent = 'Primera ejecución: estimando tiempo del modelo...';
+                    } else {
+                        substatusEl.textContent = 'Procesando con el modelo (más lento de lo habitual)...';
+                    }
                 }
-                
-                // Actualizar barra de progreso (estimado basado en tiempo típico de 5 minutos)
+
                 if (progressEl) {
-                    const estimatedProgress = Math.min((elapsed / 300) * 100, 95); // 300s = 5 min
-                    progressEl.style.width = `${estimatedProgress}%`;
+                    progressEl.style.width = `${pct}%`;
                 }
-                
+
                 if (progressTextEl) {
-                    const estimatedProgress = Math.min((elapsed / 300) * 100, 95);
-                    progressTextEl.textContent = `${Math.round(estimatedProgress)}% completado - Estimado: ${Math.max(0, 5 - minutes)}m ${Math.max(0, 60 - seconds)}s restantes`;
+                    const elapsedStr = formatElapsed(elapsed);
+                    if (historyBaseline) {
+                        const remaining = Math.max(0, Math.round(historyBaseline - elapsed));
+                        progressTextEl.textContent = `${Math.round(pct)}% completado · ${elapsedStr} transcurridos · ~${remaining}s restantes`;
+                    } else {
+                        progressTextEl.textContent = `${Math.round(pct)}% completado · ${elapsedStr} transcurridos`;
+                    }
                 }
-            }, 2000);
+            }, 500);
 
             // Analizar los datos extraídos
             analysisResult = await api.analyzeAccident(extractedData, contextoAdicional);
@@ -622,6 +669,31 @@ return await callParentAPI('generate-accident-report', combinedData);
             const totalMinutes = Math.floor(totalTime / 60);
             const totalSeconds = totalTime % 60;
 
+            // Persistir tiempo real como baseline para próxima corrida
+            // EMA asimétrica: si la corrida actual fue MÁS RÁPIDA que el promedio,
+            // baja el promedio rápido (peso 60% al nuevo); si fue más lenta,
+            // sube lento (peso 20% al nuevo) para no reaccionar a outliers lentos.
+            try {
+                const prev = analysisHistory || {};
+                const prevAvg = (typeof prev.averageTime === 'number' && prev.averageTime > 0) ? prev.averageTime : null;
+                let newAvg;
+                if (!prevAvg) {
+                    newAvg = totalTime;
+                } else if (totalTime < prevAvg) {
+                    newAvg = prevAvg * 0.4 + totalTime * 0.6;
+                } else {
+                    newAvg = prevAvg * 0.8 + totalTime * 0.2;
+                }
+                const newHistory = {
+                    lastTime: totalTime,
+                    averageTime: Math.round(newAvg),
+                    count: (prev.count || 0) + 1,
+                    lastUpdated: new Date().toISOString()
+                };
+                localStorage.setItem('kair_analysis_history', JSON.stringify(newHistory));
+                analysisHistory = newHistory;
+            } catch (e) { /* localStorage no disponible, no crítico */ }
+
             // Actualizar mensaje final
             const statusEl = document.getElementById('analysis-status');
             const substatusEl = document.getElementById('analysis-substatus');
@@ -632,14 +704,14 @@ return await callParentAPI('generate-accident-report', combinedData);
                 statusEl.textContent = '¡Análisis completado!';
             }
             if (substatusEl) {
-                substatusEl.textContent = `Tiempo total: ${totalMinutes}m ${totalSeconds}s`;
+                substatusEl.textContent = `Tiempo total: ${formatElapsed(totalTime)}`;
             }
             if (progressEl) {
                 progressEl.style.width = '100%';
                 progressEl.classList.remove('progress-bar-animated');
             }
             if (progressTextEl) {
-                progressTextEl.textContent = 'Modelo listo para usar';
+                progressTextEl.textContent = `Completado en ${formatElapsed(totalTime)}`;
             }
 
             // Actualizar paso 4 como completado
