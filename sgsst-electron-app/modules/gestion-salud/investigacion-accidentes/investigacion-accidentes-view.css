@@ -15,21 +15,29 @@
 /* ── k-section-card (header) ─────────────────────────────────────── */
 .k-section-card {
   background: #ffffff;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--inv-border-light);
   border-radius: 0.5rem;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--inv-shadow-sm);
 }
 
 /* ── Global body/html reset (necesario para que el contenido aproveche
    todo el ancho del iframe — Chrome aplica margin: 8px por defecto al body
    y muchas reglas de este CSS están scoped a .inv-layout que el body no tiene).
-   Esto NO interfiere con el resto del CSS porque solo resetea box model. */
+   FIX 2026-06-27: height:100vh (no min-height) + overflow:hidden en body.
+   El bug era que con min-height:100vh + contenido más alto que viewport,
+   el body crecía y el iframe recortaba ~27px entre header y action bar.
+   Ahora el body es EXACTO al viewport; el overflow interno lo maneja .inv-main-scroll. */
 html, body {
   margin: 0;
   padding: 0;
   width: 100%;
-  min-height: 100vh;
+  height: 100vh;
   box-sizing: border-box;
+  overflow: hidden;
+}
+body {
+  display: flex;
+  flex-direction: column;
 }
 html { overflow-x: hidden; }
 
@@ -53,18 +61,26 @@ html { overflow-x: hidden; }
   --inv-danger-light: #f8d7da;
   --inv-info: #17a2b8;
   --inv-info-light: #d1ecf1;
-  --inv-surface: #f8f9fa;
+  /* FIX 2026-06-27: --inv-surface era #f8f9fa, casi blanco, lo que hacía que el
+   lado izquierdo de las cards se "comiera" contra el fondo. Ahora #eef0f3
+   (más gris) — las cards blancas resaltan claramente en los 4 lados. */
+  --inv-surface: #eef0f3;
   --inv-surface-card: #ffffff;
   --inv-text-primary: #1a1a2e;
   --inv-text-secondary: #4a5568;
   --inv-text-muted: #718096;
   --inv-border: #dee2e6;
-  --inv-border-light: #e9ecef;
+  /* FIX 2026-06-27: --inv-border-light era #e9ecef, casi igual al fondo (#f8f9fa),
+     haciendo que el lado izquierdo de las cards se perdiera visualmente.
+     Ahora #d1d5db (Tailwind gray-300) — más contraste, bordes simétricos izq/der. */
+  --inv-border-light: #d1d5db;
   --inv-radius: 0.5rem;
   --inv-radius-lg: 0.75rem;
-  --inv-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
-  --inv-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
-  --inv-shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.12);
+  /* FIX 2026-06-27: shadows reforzadas para que las cards "salten" del fondo
+     de forma simétrica en los 4 lados, no solo donde la luz artificial lo favorece. */
+  --inv-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.10), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --inv-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.06);
+  --inv-shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.10), 0 4px 10px rgba(0, 0, 0, 0.06);
   --inv-transition: all 0.2s ease;
   --inv-font-display: 'Lexend', 'Segoe UI', sans-serif;
   --inv-font-body: 'Roboto', 'Segoe UI', sans-serif;
@@ -283,11 +299,18 @@ html { overflow-x: hidden; }
 
 /* ================================================================
    MAIN WRAPPER — Vertical layout with sticky action bar
+   FIX 2026-06-27: usar flex:1 en lugar de height:calc(100vh - 53px).
+   El bug era que el header (k-section-card) está AFUERA del wrapper
+   y el cálculo hardcoded de 53px no coincidía con la altura real del
+   header (~84px), causando que el body overflows ~30px y el iframe
+   recortara header y action bar. Ahora flex:1 hace que el wrapper
+   ocupe el espacio restante después del header, sin asumir alturas.
    ================================================================ */
 .inv-main-wrapper {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 53px);
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -295,7 +318,13 @@ html { overflow-x: hidden; }
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 1.25rem 1.5rem 6rem;
+  /* FIX 2026-06-27: padding horizontal 2rem (32px) + scrollbar-gutter:stable.
+     En ventanas estrechas el scrollbar vertical (~15px) recortaba el borde
+     derecho de las cards. scrollbar-gutter:stable reserva el espacio del
+     scrollbar desde el inicio, evitando que se "coma" el padding derecho. */
+  padding: 1.25rem 2rem 6rem;
+  scrollbar-gutter: stable;
+  box-sizing: border-box;
   /* Aprovechar TODO el ancho disponible del viewport. Sin max-width para que la
      tabla 5 PorQués × 5 categorías 5M pueda expandirse en pantallas maximizadas.
      Los cards internos (.inv-card, .inv-combined-card) ya manejan su propio padding
@@ -484,11 +513,14 @@ html { overflow-x: hidden; }
 .inv-combined-left {
   padding: 1.25rem;
   border-right: 1px solid var(--inv-border-light);
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  /* FIX 2026-06-27: antes gradient #f8fafc→#f1f5f9 (casi imperceptible pero
+     suficiente para que el lado izquierdo se viera "apagado" vs el derecho
+     blanco puro). Ahora flat #fafbfc — visualmente simétrico con la derecha. */
+  background: #fafbfc;
 }
 
 [data-theme="dark"] .inv-combined-left {
-  background: linear-gradient(135deg, #1e2a3a 0%, #243447 100%);
+  background: #1a2230;
 }
 
 .inv-combined-right {

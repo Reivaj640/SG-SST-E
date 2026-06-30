@@ -74,6 +74,20 @@
   /* Otros */
   --sidebar-width: 290px; /* Ampliado de 260px para que los nombres largos (Gestión de Peligros y Riesgos) quepan en una línea, sin necesidad de reglas especiales de wrap */
   --header-height: 45px;
+
+  /* Sidebar light-theme (por defecto) — variables consumidas por #sidebar y .sidebar-module-card */
+  --sidebar-bg-color: #ffffff;
+  --sidebar-text-color: #1f2937;
+  --sidebar-subtitle-color: #6b7280;
+  --sidebar-header-color: #9ca3af;
+  --sidebar-card-bg: #ffffff;
+  --sidebar-card-hover-bg: #f3f4f6;
+  --sidebar-card-active-bg: #eff6ff;
+  --sidebar-card-active-border: #174ea6;
+  --sidebar-icon-fallback-bg: #f3f4f6;
+  --sidebar-hover-bg: rgba(23, 78, 166, 0.08);
+  --sidebar-active-bg: rgba(23, 78, 166, 0.12);
+  --sidebar-border-color: #e5e7eb;
 }
 
 /* Variables de tema oscuro (Tema de Sistema) */
@@ -925,6 +939,31 @@ select.form-control {
   font-size: 0.85rem;
 }
 
+/* Etiqueta independiente con el nombre de la empresa, al lado del botón Home.
+   Visualmente equivalente a "Powered by GEST-IAR" del título: texto plano que
+   identifica en qué empresa estamos trabajando, sin estar dentro del botón. */
+.header-company-label {
+  display: flex;
+  align-items: center;
+  padding: 0 6px 0 4px;
+  max-width: 220px;
+  font-family: 'Teko', sans-serif;             /* Misma fuente que "Powered by GEST-IAR" */
+  font-weight: 400;
+  font-size: 1.05rem;                          /* Teko es alta, queda bien a este tamaño */
+  letter-spacing: 0.02em;
+  text-transform: uppercase;                   /* Coincide con el bloque de la izquierda */
+  color: var(--text-color);
+  border-right: 1px solid var(--border-color, #d0d7de);   /* Separador visual vs botones */
+  margin-right: 4px;
+}
+
+.header-company-label #header-company-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
 /* Header Update Button */
 .header-update-btn {
   position: relative;
@@ -1079,86 +1118,151 @@ select.form-control {
   left: 0;
   height: 100%;
   width: var(--sidebar-width); /* Mantener el ancho completo para el efecto de superposición */
-  background-color: var(--dark-color);
-  color: var(--white-color);
+  background-color: var(--sidebar-bg-color);
+  color: var(--sidebar-text-color);
   padding: var(--spacer);
   transition: left var(--transition-normal); /* Transición solo para la propiedad left */
   z-index: 900;
   overflow-y: auto;
+  border-right: 1px solid var(--sidebar-border-color);
 }
 
-.company-info {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-bottom: var(--spacer);
-  padding-bottom: var(--spacer);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.company-logo-placeholder {
-  width: 60px;
-  height: 60px;
-  background-color: rgba(255, 255, 255, 0.1);
-  border-radius: 50%;
-  display: none; /* Oculto por defecto */
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  color: var(--white-color);
-  margin-bottom: var(--spacer-sm);
-}
-
-#company-name {
-  font-weight: var(--font-weight-bold);
-  font-size: 1rem; /* Reducido de 1.25rem */
-}
+/* DEPRECATED: el logo/nombre de empresa se movió al header (botón Home).
+   Selectores vacíos para no romper referencias externas antiguas. */
+.company-info { }
+.company-logo-placeholder { }
+#company-name { }
 
 #sidebar-menu {
   list-style: none;
   padding: 0;
   margin: 0;
-}
-
-.sidebar-menu-item {
-  margin-bottom: 0;             /* <-- Sin margen entre items (compacto) */
-}
-
-.sidebar-menu-button {
   display: flex;
-  flex-direction: row;          /* <-- Icono a la izquierda, texto a la derecha */
-  align-items: center;          /* <-- Centra verticalmente icono+texto */
-  justify-content: flex-start;  /* <-- Alinea contenido a la izquierda */
+  flex-direction: column;
+  gap: 0.4rem;                  /* Separación uniforme entre cards */
+}
+
+/* Header de sección "MÓDULOS DEL SISTEMA" */
+.sidebar-modules-header-li {
+  list-style: none;
+  padding: 0.5rem 0.25rem 0.75rem;
+}
+.sidebar-modules-header {
+  font-size: 0.6875rem;         /* 11px — texto auxiliar */
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sidebar-header-color);
+}
+
+/* Wrapper de cada card (li) — sin estilos adicionales, solo gap del padre */
+.sidebar-module-card-li,
+.sidebar-footer-li {
+  list-style: none;
+}
+
+/* Separador antes del footer "Salir" */
+.sidebar-footer-li {
+  margin-top: auto;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--sidebar-border-color);
+  margin-top: 1rem;
+}
+
+/* CARD — el bloque principal */
+.sidebar-module-card {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
   width: 100%;
-  padding: 6px 14px;            /* <-- Padding vertical reducido (módulos más juntos) */
-  color: rgba(255, 255, 255, 0.85);
-  background-color: transparent;
-  border: none;
+  padding: 0.625rem 0.75rem;
+  background-color: var(--sidebar-card-bg);
+  border: 1px solid var(--sidebar-border-color);
   border-radius: var(--border-radius-md);
-  text-align: left;             /* <-- Texto lineal (no centrado, no justificado) */
+  text-align: left;
   cursor: pointer;
-  /* Sin transition: evita el efecto "engrandecer iconos" al expandir/colapsar */
-  font-size: 13px;              /* <-- Texto más compacto para look elongado */
-  line-height: 1.25;
-  gap: 10px;                    /* <-- Espacio entre icono y texto */
-  white-space: nowrap;          /* <-- Texto en UNA sola línea, alineado con el icono */
-  overflow: hidden;
-  text-overflow: ellipsis;      /* <-- Si no entra, trunca con "…" (no debería pasar con width 260px) */
+  font-family: var(--font-family-base);
+  color: var(--sidebar-text-color);
+  gap: 0.75rem;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
 }
 
-.sidebar-menu-button:hover,
-.sidebar-menu-button.active {
-  color: var(--white-color);
-  background-color: rgba(255, 255, 255, 0.1);
+/* 2026-06-27: hover y active usan el mismo gris suave. Sin azul.
+   El active es idéntico al hover — el usuario navega sabiendo dónde está. */
+.sidebar-module-card:hover {
+  background-color: var(--sidebar-card-hover-bg);
+  border-color: var(--sidebar-border-color);
 }
 
-.sidebar-icon {
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;               /* <-- No se encoge en el flex layout */
+.sidebar-module-card.active {
+  background-color: var(--sidebar-card-hover-bg);
+  border-color: var(--sidebar-border-color);
+}
+
+/* Caja del icono (cuadrado redondeado con color pastel de fondo) */
+.sidebar-module-icon {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: var(--border-radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background-color: var(--sidebar-icon-fallback-bg);
+}
+
+.sidebar-module-icon-img {
+  width: 22px;
+  height: 22px;
   object-fit: contain;
-  /* Sin margin-bottom: el espaciado lo maneja el gap del botón padre */
+  /* Sin filter en light mode: los iconos PNG conservan su color natural
+     sobre el fondo pastel, igual que la referencia visual. */
 }
+
+/* Bloque de texto (título + subtítulo en columna) */
+.sidebar-module-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  flex: 1;
+  min-width: 0;                  /* Permite truncate del título */
+  overflow: hidden;
+}
+
+.sidebar-module-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--sidebar-text-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-module-subtitle {
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.2;
+  color: var(--sidebar-subtitle-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Variante para el botón "Salir" — más sutil, separado del listado principal */
+.sidebar-module-card--footer {
+  background-color: transparent;
+  border-style: dashed;
+  border-color: var(--sidebar-border-color);
+}
+.sidebar-module-card--footer:hover {
+  background-color: var(--sidebar-card-hover-bg);
+}
+
+/* Compatibilidad legacy: clases antiguas referenciadas por otros componentes */
+.sidebar-menu-item { margin-bottom: 0; }
+.sidebar-icon { width: 20px; height: 20px; flex-shrink: 0; object-fit: contain; }
 
 #main-content {
   flex: 1;
@@ -1166,6 +1270,7 @@ select.form-control {
   padding: var(--spacer);
   background-color: var(--bg-color);
   overflow-y: auto;
+  transition: margin-left var(--transition-normal); /* Sincroniza con la animación del sidebar */
 }
 
 #content-area {
@@ -1689,13 +1794,9 @@ select.form-control {
     display: none !important; /* Importante para anular otros estilos */
 }
 
-/* Estilos para el logo de la empresa en el sidebar */
+/* Estilos legacy para #company-logo (DEPRECATED — el logo ya no está en el sidebar) */
 #company-logo {
-  width: 120px; /* Ancho fijo para consistencia */
-  height: 60px; /* Alto fijo para consistencia */
-  object-fit: contain; /* Mantiene la proporción del logo sin deformar */
-  margin-bottom: var(--spacer-sm);
-  display: none; /* Oculto por defecto */
+  /* Mantenido vacío para no romper referencias externas */
 }
 /* --- Estilos para la tabla de ausentismo --- */
 .data-table-container {
@@ -2005,40 +2106,53 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
 }
 
 /* --- Collapsible Sidebar Styles --- */
+/* 2026-06-27: el sidebar se colapsa por auto-hide al sacar el mouse.
+   Diseño: cuando colapsa, el sidebar se desliza COMPLETAMENTE fuera de vista
+   (sin dejar ni 1px visible). Para volver a expandirlo, hay un hotspot invisible
+   (#sidebar-hotspot) en el borde izquierdo de la pantalla que detecta el mouse.
+   Así no queda ningún rastro blanco visible cuando está colapsado. */
 #sidebar.sidebar-collapsed {
-  left: calc(-1 * (var(--sidebar-width) - 30px)); /* Oculta la mayor parte del sidebar, dejando 30px visibles */
+  left: calc(-1 * var(--sidebar-width)); /* Totalmente fuera de vista */
+  pointer-events: none;                    /* No bloquea clicks en lo que está detrás */
 }
 
-#sidebar.sidebar-collapsed .sidebar-menu-button {
-  font-size: 0; /* Oculta el texto */
-  padding: 12px 0;
-  justify-content: center; /* Centra SOLO el icono cuando está colapsado */
-  gap: 0;
+/* 2026-06-27: cuando el sidebar colapsa, el #main-content se expande a la izquierda
+   para ocupar todo el ancho del lienzo (incluyendo los 30px del margin-left).
+   Usa :has() para reaccionar al estado del sidebar sin tocar JS.
+   El transition del #main-content (definido arriba) hace que el movimiento sea suave. */
+.main-container:has(#sidebar.sidebar-collapsed) #main-content {
+  margin-left: 0;
 }
 
-#sidebar.sidebar-collapsed .sidebar-menu-button.active {
-  background-color: transparent !important; /* Oculta el resaltado del botón activo cuando está colapsado */
-  border: none !important;
+/* Hotspot invisible en el borde izquierdo: detecta el mouse para expandir el sidebar.
+   Solo está activo cuando el sidebar está colapsado (via JS se agrega/quita la clase). */
+#sidebar-hotspot {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 24px;
+  height: 100vh;
+  z-index: 950;                            /* Detrás del sidebar (z-900) pero encima del main-content */
+  display: none;                           /* Oculto por defecto; el JS lo muestra cuando colapsa */
 }
 
-#sidebar.sidebar-collapsed .sidebar-icon {
-  /* El icono mantiene su tamaño (no se "engrandece" al expandir) */
+#sidebar-hotspot.active {
+  display: block;
 }
 
-/* Excepción legacy de "Gestión de Peligros y Riesgos" — ya no es necesaria.
-   Con --sidebar-width: 290px el texto cabe completo en una línea.
-   Se mantiene la clase en el HTML por compatibilidad pero sin reglas especiales
-   para que se vea igual que los demás botones del sidebar. */
+/* Reglas de colapso internas ELIMINADAS 2026-06-27 para evitar que iconos/textos
+   se encojan u oculten. El sidebar colapsado conserva su layout interno completo:
+   - iconos siguen a 36x36 (no a 28x28)
+   - textos mantienen su tamaño (no font-size:0)
+   - cards mantienen padding, background y border originales
+   - módulo activo mantiene su estilo de highlight
+*/
+
+/* Compatibilidad legacy de la clase long-label (ya no se usa en JS nuevo,
+   pero se conserva el selector por si alguna referencia externa la aplica) */
 .sidebar-menu-button.sidebar-long-label {
-  /* Intencionalmente vacío — antes forzaba white-space:normal + text-align:center
-     para textos largos, pero con el sidebar ampliado ya no hace falta. */
+  /* Intencionalmente vacío */
 }
-
-#sidebar.sidebar-collapsed .company-info {
-  display: none; /* Oculta la información de la empresa */
-}
-
-/* Removida la transición de font-size para evitar el efecto de "engrandecimiento" al expandir */
 
 
 /* Estilos para el formulario de registro de ausentismo */
@@ -2516,33 +2630,46 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
     border-right: 1px solid var(--sidebar-border-color) !important;
 }
 
+[data-theme="dark"] .sidebar-module-card,
 [data-theme="dark"] .sidebar-menu-button {
     color: #ffffff !important;
 }
 
+/* 2026-06-27: en dark, hover y active usan gris sutil (no azul).
+   Mismo color en ambos — el usuario navega sabiendo dónde está. */
+[data-theme="dark"] .sidebar-module-card:hover,
 [data-theme="dark"] .sidebar-menu-button:hover {
     background-color: var(--sidebar-hover-bg) !important;
     color: #ffffff !important;
 }
 
+[data-theme="dark"] .sidebar-module-card.active,
 [data-theme="dark"] .sidebar-menu-button.active {
-    background-color: var(--sidebar-active-bg) !important;
+    background-color: var(--sidebar-hover-bg) !important;
     color: #ffffff !important;
-    font-weight: 600 !important;
 }
 
-/* 4. .company-info - Aplicar tema al área de información de empresa */
-[data-theme="dark"] .company-info {
-    border-bottom-color: var(--sidebar-border-color) !important;
+[data-theme="dark"] .sidebar-modules-header {
+    color: rgba(255, 255, 255, 0.55) !important;
 }
 
-[data-theme="dark"] .company-logo-placeholder {
-    background-color: rgba(255, 255, 255, 0.1) !important;
-    color: var(--text-light-color) !important;
+[data-theme="dark"] .sidebar-module-subtitle {
+    color: rgba(255, 255, 255, 0.6) !important;
 }
 
-[data-theme="dark"] #company-name {
+[data-theme="dark"] .sidebar-module-icon-img {
+    filter: brightness(0) invert(1);   /* Iconos blancos sobre fondo oscuro */
+}
+
+[data-theme="dark"] .sidebar-module-card--footer {
+    background-color: transparent !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* 4. Etiqueta de empresa en tema dark */
+[data-theme="dark"] .header-company-label {
     color: var(--text-color) !important;
+    border-right-color: rgba(255, 255, 255, 0.15) !important;
 }
 
 /* 5. #home-page - Aplicar tema al fondo de Vanta.js */
@@ -2921,36 +3048,48 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
     border-right-color: var(--sidebar-border-color) !important;
 }
 
+[data-theme="dark-legacy"] .sidebar-module-card,
 [data-theme="dark-legacy"] .sidebar-menu-button {
     color: var(--white-color) !important;
 }
 
+/* 2026-06-27: en dark-legacy, hover y active usan gris sutil.
+   Mismo color en ambos — el usuario navega sabiendo dónde está. */
+[data-theme="dark-legacy"] .sidebar-module-card:hover,
 [data-theme="dark-legacy"] .sidebar-menu-button:hover {
     background-color: var(--sidebar-hover-bg) !important;
     color: var(--white-color) !important;
 }
 
+[data-theme="dark-legacy"] .sidebar-module-card.active,
 [data-theme="dark-legacy"] .sidebar-menu-button.active {
-    background-color: var(--sidebar-active-bg) !important;
+    background-color: var(--sidebar-hover-bg) !important;
     color: var(--white-color) !important;
 }
 
-[data-theme="dark-legacy"] #sidebar.sidebar-collapsed .sidebar-menu-button.active {
+[data-theme="dark-legacy"] .sidebar-modules-header {
+    color: rgba(255, 255, 255, 0.55) !important;
+}
+
+[data-theme="dark-legacy"] .sidebar-module-subtitle {
+    color: rgba(255, 255, 255, 0.6) !important;
+}
+
+[data-theme="dark-legacy"] .sidebar-module-icon-img {
+    filter: brightness(0) invert(1);
+}
+
+[data-theme="dark-legacy"] .sidebar-module-card--footer {
     background-color: transparent !important;
-    border: none !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
 }
 
-[data-theme="dark-legacy"] .company-info {
-    border-bottom-color: var(--sidebar-border-color) !important;
-}
+/* 2026-06-27: reglas de dark-legacy para sidebar-colapsado ELIMINADAS.
+   Al quitar las reglas internas de colapso, estas ya no aplican. */
 
-[data-theme="dark-legacy"] #company-name {
+[data-theme="dark-legacy"] .header-company-label {
     color: var(--white-color) !important;
-}
-
-[data-theme="dark-legacy"] .company-logo-placeholder {
-    background-color: rgba(255, 255, 255, 0.1) !important;
-    color: var(--text-light-color) !important;
+    border-right-color: rgba(255, 255, 255, 0.2) !important;
 }
 
 /* Home Page - Selección de empresas */
@@ -4388,6 +4527,27 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
   .sidebar-menu-item {
     padding: 0.5rem 0.75rem;
     font-size: 0.8125rem;
+  }
+
+  /* Cards del sidebar más compactos en mobile/tablet */
+  .sidebar-module-card {
+    padding: 0.5rem 0.625rem;
+    gap: 0.5rem;
+  }
+  .sidebar-module-icon {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+  }
+  .sidebar-module-icon-img {
+    width: 20px;
+    height: 20px;
+  }
+  .sidebar-module-title {
+    font-size: 0.8125rem;
+  }
+  .sidebar-module-subtitle {
+    font-size: 0.6875rem;
   }
 
   /* Widgets más compactos */

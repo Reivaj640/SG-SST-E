@@ -1,9 +1,36 @@
 {
   "name": "sgsst-electron-app",
-  "version": "0.1.106",
+  "version": "0.1.108",
   "description": "Sistema de Gestión de Seguridad y Salud en el Trabajo",
   "main": "main.js",
   "author": "Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos.",
+  "dependencies": {
+    "accepts": "^2.0.0",
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.6.0",
+    "body-parser": "^2.2.2",
+    "core-util-is": "^1.0.3",
+    "cors": "^2.8.6",
+    "docxtemplater": "^3.68.4",
+    "electron-log": "^5.4.3",
+    "electron-squirrel-startup": "^1.0.1",
+    "electron-updater": "^6.6.2",
+    "exceljs": "^4.4.0",
+    "express": "^5.2.1",
+    "jquery": "^3.7.1",
+    "jquery-ui-dist": "^1.13.3",
+    "node-fetch": "^2.7.0",
+    "nodemailer": "^8.0.5",
+    "pdf-lib": "^1.17.1",
+    "pdf-parse": "^2.4.5",
+    "pizzip": "^3.2.0",
+    "request": "^2.88.2",
+    "vanilla-calendar-pro": "^3.0.5",
+    "xlsx": "^0.18.5"
+  },
+  "optionalDependencies": {
+    "@napi-rs/canvas-android-arm64": "^0.1.95"
+  },
   "scripts": {
     "start": "electron .",
     "start:utf8": "chcp 65001 >nul && electron .",
@@ -110,32 +137,5 @@
     "jsdoc": "^4.0.5",
     "minami": "^1.2.3",
     "nodemon": "^3.1.10"
-  },
-  "dependencies": {
-    "accepts": "^2.0.0",
-    "bcryptjs": "^2.4.3",
-    "better-sqlite3": "^11.6.0",
-    "body-parser": "^2.2.2",
-    "core-util-is": "^1.0.3",
-    "cors": "^2.8.6",
-    "docxtemplater": "^3.68.4",
-    "electron-log": "^5.4.3",
-    "electron-squirrel-startup": "^1.0.1",
-    "electron-updater": "^6.6.2",
-    "exceljs": "^4.4.0",
-    "express": "^5.2.1",
-    "jquery": "^3.7.1",
-    "jquery-ui-dist": "^1.13.3",
-    "node-fetch": "^2.7.0",
-    "nodemailer": "^8.0.5",
-    "pdf-lib": "^1.17.1",
-    "pdf-parse": "^2.4.5",
-    "pizzip": "^3.2.0",
-    "request": "^2.88.2",
-    "vanilla-calendar-pro": "^3.0.5",
-    "xlsx": "^0.18.5"
-  },
-  "optionalDependencies": {
-    "@napi-rs/canvas-android-arm64": "^0.1.95"
   }
 }

@@ -2501,7 +2501,8 @@ async function runPythonScript(scriptPath, args) {
       
       const pythonProcess = spawn(pythonPath, [scriptPath, ...args], {
         cwd: path.dirname(scriptPath),
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+        windowsHide: true
       });
 
       let stdoutData = '';
@@ -8634,7 +8635,8 @@ ipcMain.handle('buscar-empleado-por-cedula', async (event, { cedula, empresa }) 
     getPython().then(pythonPath => {
       const python = spawn(pythonPath, [scriptPath, 'buscar_empleado', cedula, empresa], {
         cwd: path.dirname(scriptPath),
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+        windowsHide: true
       });
 
       let buffer = '';
@@ -8727,7 +8729,8 @@ ipcMain.handle('buscar-cie10-descripcion', async (event, { companyName, cie10Cod
 
     const pythonProcess = spawn(pythonPath, [scriptPath, 'buscar_cie10', excelFilePath, cie10Code], {
       cwd: path.dirname(scriptPath),
-      env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+      windowsHide: true
     });
 
     return new Promise((resolve, reject) => {
@@ -8929,7 +8932,8 @@ ipcMain.handle('procesar-ausentismo', async (event, empresa, formData) => {
         formDataJson  // ARG 3
       ], {
         cwd: path.dirname(scriptPath),
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+        windowsHide: true
       });
 
       let buffer = '';
@@ -9029,7 +9033,8 @@ ipcMain.handle('save-follow-up', async (event, followUpData, companyName) => {
         followUpDataJson // ARG 3
       ], {
         cwd: path.dirname(scriptPath),
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+        windowsHide: true
       });
 
       let buffer = '';
@@ -9118,7 +9123,8 @@ ipcMain.handle('buscar-registros-cedula', async (event, cedula, companyName) => 
         cedula
       ], {
         cwd: path.dirname(scriptPath),
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+        windowsHide: true
       });
 
       let buffer = '';
@@ -9203,7 +9209,8 @@ ipcMain.handle('buscar-todos-registros-pri', async (event, companyName) => {
         filePath
       ], {
         cwd: path.dirname(scriptPath),
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+        windowsHide: true
       });
 
       let buffer = '';
@@ -9332,7 +9339,8 @@ ipcMain.handle('get-follow-up-history', async (event, caseId, companyName) => {
         filePath
       ], {
         cwd: path.dirname(scriptPath),
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+        windowsHide: true
       });
 
       let buffer = '';
@@ -9468,7 +9476,9 @@ ipcMain.handle('load-follow-up-data', async (event, companyName) => {
 
         cwd: path.dirname(scriptPath),
 
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+
+        windowsHide: true
 
       });
 
@@ -11464,7 +11474,9 @@ WScript.Quit 0
       }
 
       // Ejecutar VBScript con cscript, pasando la ruta como argumento
-      const vbsProcess = spawn('cscript.exe', [vbsPath, '//Nologo', filePath]);
+      const vbsProcess = spawn('cscript.exe', [vbsPath, '//Nologo', filePath], {
+        windowsHide: true
+      });
       
       let output = '';
       let errorOutput = '';

@@ -9,15 +9,17 @@ const MODULES_WITH_CALENDAR = [
 ];
 
 // Definir los botones de la barra lateral según la estructura de tu aplicación Python
+// Cada módulo incluye `subtitle` (línea descriptiva debajo del título) e `iconBg`
+// (color de fondo de la caja del icono, en formato hex) para el rediseño tipo card.
 const SIDEBAR_BUTTONS = [
-  { name: "Recursos", icon: "kpi.png" },
-  { name: "Gestión Integral", icon: "gestion.png" },
-  { name: "Gestión de la Salud", icon: "medico.png" },
-  { name: "Gestión de Peligros y Riesgos", icon: "identificar.png" },
-  { name: "Gestión de Amenazas", icon: "amenaza.png" },
-  { name: "Verificación", icon: "seguro-de-salud.png" },
-  { name: "Mejoramiento", icon: "ventas.png" },
-  { name: "Salir", icon: "superacion-personal.png" }
+  { name: "Recursos",                         icon: "kpi.png",                 subtitle: "Capacitación, Roles",     iconBg: "#EEF2FF" },
+  { name: "Gestión Integral",                 icon: "gestion.png",             subtitle: "Política, Planes",        iconBg: "#F0FDF4" },
+  { name: "Gestión de la Salud",              icon: "medico.png",              subtitle: "Ausentismo, AT, EL",      iconBg: "#FEF2F2" },
+  { name: "Gestión de Peligros y Riesgos",    icon: "identificar.png",         subtitle: "IPERC, Controles",        iconBg: "#FFF7ED" },
+  { name: "Gestión de Amenazas",              icon: "amenaza.png",             subtitle: "Emergencias",             iconBg: "#FFFBEB" },
+  { name: "Verificación",                     icon: "seguro-de-salud.png",     subtitle: "Auditorías",              iconBg: "#EFF6FF" },
+  { name: "Mejoramiento",                     icon: "ventas.png",              subtitle: "Acciones Correctivas",    iconBg: "#F5F3FF" },
+  { name: "Salir",                            icon: "superacion-personal.png", subtitle: "Cerrar sesión",           iconBg: "#F3F4F6" }
 ];
 
 // Submódulos para cada sección principal
@@ -605,6 +607,8 @@ let companyNameElement;
 let companyLogoElement;
 let companyLogoPlaceholder;
 let companyHomeButton;
+let headerCompanyNameElement;
+let headerCompanyLabel;
 
 // Función para aplicar el tema globalmente
 async function applyGlobalTheme() {
@@ -709,6 +713,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   companyLogoElement = document.getElementById('company-logo');
   companyLogoPlaceholder = document.getElementById('company-logo-placeholder');
   companyHomeButton = document.getElementById('company-home-button');
+  headerCompanyNameElement = document.getElementById('header-company-name');
+  headerCompanyLabel = document.getElementById('header-company-label');
 
   console.log('DOM elements found:', { contentArea, sidebarMenu, companyNameElement, companyLogoElement, companyLogoPlaceholder, companyHomeButton });
 
@@ -1357,25 +1363,37 @@ case 'investigacion-accidentes-read-directory-request':
 
   // --- BEGIN: Collapsible Sidebar Logic ---
   const sidebar = document.getElementById('sidebar');
+  const sidebarHotspot = document.getElementById('sidebar-hotspot');
+
+  function expandSidebar() {
+    if (!sidebar) return;
+    sidebar.classList.remove('sidebar-collapsed');
+    if (sidebarHotspot) sidebarHotspot.classList.remove('active');
+    if (window.updateVantaEffect) setTimeout(window.updateVantaEffect, 100);
+  }
+
+  function collapseSidebar() {
+    if (!sidebar) return;
+    sidebar.classList.add('sidebar-collapsed');
+    if (sidebarHotspot) sidebarHotspot.classList.add('active');
+    if (window.updateVantaEffect) setTimeout(window.updateVantaEffect, 100);
+  }
+
   if (sidebar) {
     // Collapse sidebar by default
-    sidebar.classList.add('sidebar-collapsed');
+    collapseSidebar();
 
-    sidebar.addEventListener('mouseenter', () => {
-      sidebar.classList.remove('sidebar-collapsed');
-      // Actualizar la animación si existe
-      if (window.updateVantaEffect) {
-        setTimeout(window.updateVantaEffect, 100); // Pequeño retraso para que la animación se actualice después del cambio de estado
-      }
-    });
+    // Cuando el mouse entra al sidebar visible, expandir
+    sidebar.addEventListener('mouseenter', expandSidebar);
 
-    sidebar.addEventListener('mouseleave', () => {
-      sidebar.classList.add('sidebar-collapsed');
-      // Actualizar la animación si existe
-      if (window.updateVantaEffect) {
-        setTimeout(window.updateVantaEffect, 100); // Pequeño retraso para que la animación se actualice después del cambio de estado
-      }
-    });
+    // Cuando el mouse entra al hotspot (borde izquierdo cuando colapsado), expandir
+    if (sidebarHotspot) {
+      sidebarHotspot.addEventListener('mouseenter', expandSidebar);
+    }
+
+    // Cuando el mouse sale del sidebar, colapsar de nuevo
+    sidebar.addEventListener('mouseleave', collapseSidebar);
+
     console.log('Collapsible sidebar logic initialized.');
   }
   // --- END: Collapsible Sidebar Logic ---
@@ -2368,6 +2386,13 @@ contentArea.innerHTML = '';
         waveSpeed: 1.20,
         zoom: 0.68
       });
+      // 2026-06-27: forzar un resize inmediato para que Vanta ocupe todo el viewport.
+      // Sin esto, Vanta mide el contenedor antes de que termine el render y queda con
+      // tamaño menor, dejando una franja blanca en el lado derecho.
+      if (typeof window.vantaEffect.resize === 'function') {
+        setTimeout(() => window.vantaEffect.resize(), 50);
+        setTimeout(() => window.vantaEffect.resize(), 300);
+      }
       console.log('Vanta.js aplicado al login correctamente');
     }, 100);
   }
@@ -2534,62 +2559,135 @@ function initializeApp(overrideCompanies = null) {
 
 function createSidebarButtons(activeModules = null) {
   console.log('Creating sidebar buttons...', activeModules ? `Filtrando por: ${activeModules.length} módulos activos` : 'Mostrando todos');
-  
+
   // ✅ LIMPIAR REFERENCIA AL BOTÓN ACTIVO ANTERIOR (el DOM va a ser eliminado)
   if (window.activeSidebarButton) {
     console.log('⚠️ [SIDEBAR] Limpiando referencia a botón activo anterior antes de reconstruir');
     window.activeSidebarButton = null;
   }
-  
+
   // Limpiar el menú existente
   sidebarMenu.innerHTML = '';
-  // console.log('Cleared sidebar menu'); // Reducir ruido en logs
 
-  SIDEBAR_BUTTONS.forEach((item, index) => {
+  // Header de sección "MÓDULOS DEL SISTEMA" (solo cuando hay módulos, no en home)
+  const headerLi = document.createElement('li');
+  headerLi.className = 'sidebar-modules-header-li';
+  headerLi.innerHTML = '<div class="sidebar-modules-header">Módulos del Sistema</div>';
+  sidebarMenu.appendChild(headerLi);
+
+  // Separar "Salir" del resto — se renderiza como footer al final
+  const modules = SIDEBAR_BUTTONS.filter(b => b.name !== 'Salir');
+  const salir = SIDEBAR_BUTTONS.find(b => b.name === 'Salir');
+
+  modules.forEach((item) => {
     // FILTRADO DINÁMICO:
     // Si activeModules está definido (no es null), filtramos.
     // El botón "Salir" SIEMPRE se muestra.
-    // Para los demás, verificamos si su nombre está en la lista de activos.
-    if (activeModules && item.name !== "Salir" && !activeModules.includes(item.name)) {
+    if (activeModules && !activeModules.includes(item.name)) {
       return; // No crear este botón
     }
 
     const li = document.createElement('li');
-    li.className = 'sidebar-menu-item';
+    li.className = 'sidebar-module-card-li';
 
-    const button = document.createElement('button');
-    /* "Gestión de Peligros y Riesgos" tiene la clase extra para permitir texto centrado
-       (es el único módulo cuyo nombre es demasiado largo para el layout lineal). */
-    button.className = 'sidebar-menu-button' + (item.name === 'Gestión de Peligros y Riesgos' ? ' sidebar-long-label' : '');
-    button.textContent = item.name;
+    const card = document.createElement('button');
+    card.className = 'sidebar-module-card';
+    card.setAttribute('type', 'button');
+    card.setAttribute('data-module', item.name);
+    card.setAttribute('aria-label', item.name);
 
-    button.addEventListener('click', () => {
-      if (item.name === "Salir") {
-        handleLogout();
-      } else if (currentCompany) {
-        // ✅ NUEVA VALIDACIÓN: No cambiar módulo si estamos en un submódulo
+    // Caja del icono con color de fondo (tono pastel por módulo)
+    const iconWrap = document.createElement('span');
+    iconWrap.className = 'sidebar-module-icon';
+    iconWrap.style.backgroundColor = item.iconBg || '#F3F4F6';
+
+    const iconImg = document.createElement('img');
+    iconImg.src = `assets/${item.icon}`;
+    iconImg.alt = '';
+    iconImg.className = 'sidebar-module-icon-img';
+    iconWrap.appendChild(iconImg);
+
+    // Bloque de texto (título + subtítulo)
+    const textWrap = document.createElement('span');
+    textWrap.className = 'sidebar-module-text';
+
+    const titleEl = document.createElement('span');
+    titleEl.className = 'sidebar-module-title';
+    titleEl.textContent = item.name;
+
+    const subtitleEl = document.createElement('span');
+    subtitleEl.className = 'sidebar-module-subtitle';
+    subtitleEl.textContent = item.subtitle || '';
+
+    textWrap.appendChild(titleEl);
+    textWrap.appendChild(subtitleEl);
+
+    card.appendChild(iconWrap);
+    card.appendChild(textWrap);
+
+    card.addEventListener('click', () => {
+      if (currentCompany) {
+        // ✅ Validación: No cambiar módulo si estamos en un submódulo
         if (currentSubmodule && currentModule !== item.name) {
           console.log(`ℹ️ Ignorando click en "${item.name}" porque estamos en submódulo: "${currentSubmodule}"`);
           return;
         }
-
-        setActiveSidebarButton(button);
+        setActiveSidebarButton(card);
         showModuleContent(item.name);
       } else {
-        showCustomAlert("Por favor, selecciona una empresa antes de ingresar a un módulo.");
+        showCustomAlert('Por favor, selecciona una empresa antes de ingresar a un módulo.');
       }
     });
 
-    // Crear elemento de imagen para el icono
-    const iconImg = document.createElement('img');
-    iconImg.src = `assets/${item.icon}`;
-    iconImg.alt = item.name;
-    iconImg.className = 'sidebar-icon';
-    button.prepend(iconImg);
-
-    li.appendChild(button);
+    li.appendChild(card);
     sidebarMenu.appendChild(li);
   });
+
+  // Footer: "Salir" como card separada al final, con clase para estilo distinto
+  if (salir) {
+    const footerLi = document.createElement('li');
+    footerLi.className = 'sidebar-footer-li';
+
+    const card = document.createElement('button');
+    card.className = 'sidebar-module-card sidebar-module-card--footer';
+    card.setAttribute('type', 'button');
+    card.setAttribute('data-module', salir.name);
+    card.setAttribute('aria-label', salir.name);
+
+    const iconWrap = document.createElement('span');
+    iconWrap.className = 'sidebar-module-icon';
+    iconWrap.style.backgroundColor = salir.iconBg || '#F3F4F6';
+
+    const iconImg = document.createElement('img');
+    iconImg.src = `assets/${salir.icon}`;
+    iconImg.alt = '';
+    iconImg.className = 'sidebar-module-icon-img';
+    iconWrap.appendChild(iconImg);
+
+    const textWrap = document.createElement('span');
+    textWrap.className = 'sidebar-module-text';
+
+    const titleEl = document.createElement('span');
+    titleEl.className = 'sidebar-module-title';
+    titleEl.textContent = salir.name;
+
+    const subtitleEl = document.createElement('span');
+    subtitleEl.className = 'sidebar-module-subtitle';
+    subtitleEl.textContent = salir.subtitle || '';
+
+    textWrap.appendChild(titleEl);
+    textWrap.appendChild(subtitleEl);
+
+    card.appendChild(iconWrap);
+    card.appendChild(textWrap);
+
+    card.addEventListener('click', () => {
+      handleLogout();
+    });
+
+    footerLi.appendChild(card);
+    sidebarMenu.appendChild(footerLi);
+  }
 
   console.log('Sidebar buttons created.');
 }
@@ -2780,7 +2878,10 @@ if (mainContainerSel) mainContainerSel.classList.remove('vanta-fullscreen');
   const sidebar = document.getElementById('sidebar');
   if (sidebar) {
     sidebar.classList.remove('sidebar-hidden');
-    sidebar.classList.add('sidebar-collapsed'); // Asegurar que permanezca colapsado
+    // 2026-06-27: asegurar que permanezca colapsado + activar hotspot
+    sidebar.classList.add('sidebar-collapsed');
+    const hotspot = document.getElementById('sidebar-hotspot');
+    if (hotspot) hotspot.classList.add('active');
   }
 
   // Cargar la normativa si aún no se ha hecho
@@ -2826,19 +2927,9 @@ if (mainContainerSel) mainContainerSel.classList.remove('vanta-fullscreen');
     createSidebarButtons(null);
   }
 
-  // Actualizar UI: nombre de la empresa y logo en la barra lateral
-  companyNameElement.textContent = ''; // Clear the text
-  companyNameElement.style.display = 'none'; // Hide the element
-
-  const logoPath = COMPANY_LOGOS[companyName];
-  if (logoPath) {
-    companyLogoElement.src = logoPath;
-    companyLogoElement.style.display = 'block';
-    companyLogoPlaceholder.style.display = 'none';
-  } else {
-    // Si no hay logo específico para la empresa, usar un placeholder genérico o dejarlo como está
-    companyLogoElement.style.display = 'none';
-    companyLogoPlaceholder.style.display = 'flex';
+  // Actualizar UI: nombre de la empresa en el botón Home del header
+  if (headerCompanyNameElement) {
+    headerCompanyNameElement.textContent = companyName;
   }
 
   // Actualizar estado visual de los botones de empresa
@@ -2870,13 +2961,20 @@ if (mainContainerSel) mainContainerSel.classList.remove('vanta-fullscreen');
 }
 
 /**
+ * Muestra/oculta el bloque de empresa activa en el header (label con nombre + botón Home).
+ */
+function setCompanyHeaderVisibility(visible) {
+  const display = visible ? 'flex' : 'none';
+  if (companyHomeButton) companyHomeButton.style.display = display;
+  if (headerCompanyLabel) headerCompanyLabel.style.display = visible ? 'flex' : 'none';
+}
+
+/**
  * Maneja el clic en el botón "Home Empresa" para regresar al dashboard de la empresa actual.
  */
 function handleCompanyHome() {
   if (!currentCompany) {
-    if (companyHomeButton) {
-      companyHomeButton.style.display = 'none';
-    }
+    setCompanyHeaderVisibility(false);
     return;
   }
   
@@ -2899,9 +2997,7 @@ function handleCompanyHome() {
   }
   
   // Ocultar botón home porque YA estamos en home
-  if (companyHomeButton) {
-    companyHomeButton.style.display = 'none';
-  }
+  setCompanyHeaderVisibility(false);
 }
 
 async function handleLogout() {
@@ -2914,14 +3010,8 @@ const mainContainerLogout = document.querySelector('.main-container');
 if (mainContainerLogout) mainContainerLogout.classList.add('vanta-fullscreen');
 
 // Resetear UI
-  if (companyNameElement) {
-    companyNameElement.textContent = 'Empresa';
-  }
-  if (companyLogoElement) {
-    companyLogoElement.style.display = 'none';
-  }
-  if (companyLogoPlaceholder) {
-    companyLogoPlaceholder.style.display = 'none';
+  if (headerCompanyNameElement) {
+    headerCompanyNameElement.textContent = '—';
   }
 
   document.querySelectorAll('.company-select-button').forEach(btn => {
@@ -2964,9 +3054,7 @@ if (mainContainerLogout) mainContainerLogout.classList.add('vanta-fullscreen');
   }
 
   // Ocultar botón home empresa porque NO hay empresa seleccionada
-  if (companyHomeButton) {
-    companyHomeButton.style.display = 'none';
-  }
+  setCompanyHeaderVisibility(false);
 
   renderLoginScreen();
   console.log('Usuario desconectado.');
@@ -3000,14 +3088,14 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
   console.log(`Showing dashboard for company: ${currentCompany}`);
 
   // Ocultar botón home porque YA estamos en home de empresa
-  if (companyHomeButton) {
-    companyHomeButton.style.display = 'none';
-  }
+  setCompanyHeaderVisibility(false);
 
-  // Asegurar que el sidebar permanezca colapsado
+  // Asegurar que el sidebar permanezca colapsado + activar hotspot
   const sidebar = document.getElementById('sidebar');
   if (sidebar) {
     sidebar.classList.add('sidebar-collapsed');
+    const hotspot = document.getElementById('sidebar-hotspot');
+    if (hotspot) hotspot.classList.add('active');
   }
 
   contentArea.innerHTML = '';
@@ -3565,8 +3653,8 @@ function showModuleContentWithSubmodule(moduleName, submoduleName) {
   currentModule = moduleName;
 
   // Mostrar botón home empresa
-  if (companyHomeButton && currentCompany) {
-    companyHomeButton.style.display = 'flex';
+  if (currentCompany) {
+    setCompanyHeaderVisibility(true);
   }
 
   if (!contentArea) {
@@ -3706,8 +3794,8 @@ currentModule = moduleName;
   console.log(`🔍 [showModuleContent] currentModule actualizado a: ${currentModule}`);
 
   // Mostrar botón home empresa porque YA NO estamos en home
-  if (companyHomeButton && currentCompany) {
-    companyHomeButton.style.display = 'flex';
+  if (currentCompany) {
+    setCompanyHeaderVisibility(true);
   }
 
   // Verificar que contentArea exista
@@ -4001,10 +4089,10 @@ if (mainContainerSub) mainContainerSub.classList.remove('vanta-fullscreen');
   }
   
   // Mostrar botón home empresa porque YA NO estamos en home
-  if (companyHomeButton && currentCompany) {
-    companyHomeButton.style.display = 'flex';
+  if (currentCompany) {
+    setCompanyHeaderVisibility(true);
   }
-  
+
   const currentRole = companyRoleByKey[currentCompany] || '';
   if (!isSubmoduleAllowed(currentRole, moduleName, submoduleName)) {
     showErrorMessage(container, submoduleName, 'No tienes permiso para acceder a este submódulo.');

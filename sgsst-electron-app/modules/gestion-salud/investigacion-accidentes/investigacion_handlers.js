@@ -840,7 +840,10 @@ ipcMain.handle('investigacion-accidentes-generate-accident-report', (event, comb
             const pythonScriptPath = path.join(PORTAR_SRC_PATH, 'accident_report_generator.py');
             await fsp.access(pythonScriptPath);
 
-            const pythonProcess = spawn(pythonExecutable, ['-X', 'utf8', pythonScriptPath, tempDataPath], { cwd: path.dirname(pythonScriptPath) });
+            const pythonProcess = spawn(pythonExecutable, ['-X', 'utf8', pythonScriptPath, tempDataPath], {
+                cwd: path.dirname(pythonScriptPath),
+                windowsHide: true
+            });
 
             let stdoutData = '';
             let stderrData = '';

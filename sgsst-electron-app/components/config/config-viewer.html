@@ -1606,6 +1606,14 @@
             } else {
                 document.documentElement.removeAttribute('data-theme');
             }
+
+            // Red de seguridad: el padre ya inyectó electronAPI antes de mandar este mensaje.
+            // Si el polling de DOMContentLoaded no alcanzó, refrescamos modelos aquí.
+            // Es idempotente: si ya cargó, solo reemplaza con la misma data.
+            if (window.electronAPI && typeof window.electronAPI.llmListModels === 'function') {
+                loadAIConfig();
+                loadAIModels();
+            }
         }
     });
     
@@ -2307,12 +2315,67 @@
 
     /* ================= CONFIGURACIÓN IA ================= */
 
+    // Formatea bytes a una unidad legible (B / KB / MB / GB / TB).
+    function _formatBytes(bytes) {
+        if (!bytes || bytes <= 0) return '—';
+        var units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        var i = 0;
+        var value = bytes;
+        while (value >= 1024 && i < units.length - 1) {
+            value /= 1024;
+            i++;
+        }
+        return (value < 10 ? value.toFixed(2) : value.toFixed(1)) + ' ' + units[i];
+    }
+
+    // Formatea fecha ISO a algo legible en es-CO.
+    function _formatModelDate(iso) {
+        if (!iso) return '—';
+        var d = new Date(iso);
+        if (isNaN(d.getTime())) return '—';
+        return d.toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' });
+    }
+
+    // Pinta los campos Tamaño / Modificado del card "Estado del Modelo Activo"
+    // a partir de un objeto modelo Ollama (o null para reset a "—").
+    function _paintActiveModelMeta(model) {
+        var sizeEl = document.getElementById('ai-model-size');
+        var modEl  = document.getElementById('ai-model-modified');
+        if (!model) {
+            if (sizeEl) sizeEl.textContent = '—';
+            if (modEl)  modEl.textContent  = '—';
+            return;
+        }
+        if (sizeEl) sizeEl.textContent = _formatBytes(model.size);
+        if (modEl)  modEl.textContent  = _formatModelDate(model.modified_at);
+    }
+
+    // Espera a que el padre (renderer.js) inyecte window.electronAPI en el iframe.
+    // Necesario porque el onload del padre corre DESPUÉS del DOMContentLoaded del iframe,
+    // y sin electronAPI no podemos listar modelos Ollama ni leer/guardar config.
+    function waitForElectronAPI(maxAttempts, intervalMs) {
+        maxAttempts = maxAttempts || 40;   // 40 * 75ms = 3s
+        intervalMs  = intervalMs  || 75;
+        return new Promise(function (resolve) {
+            var tries = 0;
+            var tick  = function () {
+                if (window.electronAPI && typeof window.electronAPI.llmListModels === 'function') {
+                    return resolve(true);
+                }
+                if (++tries >= maxAttempts) return resolve(false);
+                setTimeout(tick, intervalMs);
+            };
+            tick();
+        });
+    }
+
     // Carga la lista de modelos Ollama + la config actual al entrar a la pestaña
     async function loadAIModels() {
         const select = document.getElementById('ai-model-select');
         if (!select) return;
         if (!window.electronAPI || typeof window.electronAPI.llmListModels !== 'function') {
             select.innerHTML = '<option value="">— IPC no disponible —</option>';
+            _paintActiveModelMeta(null);
             return;
         }
         select.innerHTML = '<option value="">— Cargando modelos... —</option>';
@@ -2320,22 +2383,41 @@
             const result = await window.electronAPI.llmListModels();
             if (!result || !result.success) {
                 select.innerHTML = '<option value="">— Error al listar —</option>';
+                _paintActiveModelMeta(null);
                 return;
             }
             const models = result.models || [];
             const active = result.active_model || '';
             if (models.length === 0) {
                 select.innerHTML = '<option value="">— No hay modelos Ollama —</option>';
+                _paintActiveModelMeta(null);
                 return;
             }
             select.innerHTML = models.map(m => {
                 const name = m.name || '';
                 const sel = (name === active) ? 'selected' : '';
-                return `<option value="${name}" ${sel}>${name}</option>`;
+                return `<option value="${name}" ${sel} data-size="${m.size || 0}" data-modified="${m.modified_at || ''}">${name}</option>`;
             }).join('');
+
+            // Pinta los metadatos del modelo activo (o el primero si active no aparece en la lista)
+            const activeModelObj = models.find(m => m.name === active) || models[0];
+            _paintActiveModelMeta(activeModelObj);
+
+            // Live-update: al cambiar el dropdown, refresca tamaño/modificado del card
+            // para que el usuario pueda comparar entre modelos antes de pulsar "Aplicar".
+            select.onchange = function () {
+                const opt = select.options[select.selectedIndex];
+                if (!opt || !opt.value) { _paintActiveModelMeta(null); return; }
+                _paintActiveModelMeta({
+                    name: opt.value,
+                    size: parseInt(opt.dataset.size || '0', 10),
+                    modified_at: opt.dataset.modified || ''
+                });
+            };
         } catch (e) {
             console.error('[AI-CONFIG] Error cargando modelos:', e);
             select.innerHTML = '<option value="">— Error de conexión —</option>';
+            _paintActiveModelMeta(null);
         }
     }
 
@@ -2366,8 +2448,8 @@
                 promptEl.value = cfg.llmSystemPrompt;
             }
 
-            // Mostrar tamaño del modelo activo si está disponible
-            // (se carga después con loadAIModels)
+            // Tamaño y Modificado se pintan desde loadAIModels (necesita el catálogo
+            // completo de Ollama, no solo la config guardada).
         } catch (e) {
             console.error('[AI-CONFIG] Error cargando config:', e);
         }
@@ -2458,9 +2540,17 @@
         if (btnSaveParams) btnSaveParams.addEventListener('click', saveLLMParams);
         const btnSavePrompt = document.getElementById('ai-save-prompt');
         if (btnSavePrompt) btnSavePrompt.addEventListener('click', saveAIPrompt);
-        // Carga inicial (puede fallar si Flask no está listo, pero el usuario puede recargar)
-        loadAIConfig();
-        loadAIModels();
+        // Esperar a que renderer.js inyecte electronAPI antes de tocar IPC.
+        // Sin este guard, loadAIConfig/loadAIModels corren con window.electronAPI = undefined
+        // y dejan el dropdown en "— IPC no disponible —" hasta recargar manualmente.
+        waitForElectronAPI().then(function (ready) {
+            if (!ready) {
+                console.warn('[AI-CONFIG] electronAPI no apareció tras esperar — el padre probablemente no inyectó el bridge');
+                return;
+            }
+            loadAIConfig();
+            loadAIModels();
+        });
     });
 
     /* ================= INTERFAZ UI ================= */

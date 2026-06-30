@@ -49,6 +49,9 @@
           <strong>K+AIR</strong> <small> Powered by GEST-IAR</small>
         </h1>
         <div class="header-buttons">
+          <div id="header-company-label" class="header-company-label" style="display: none;">
+            <span id="header-company-name">—</span>
+          </div>
           <button id="company-home-button" class="header-btn" title="Volver al Inicio de la Empresa" style="display: none;">
             <span class="icon-placeholder">🏠</span>
           </button>
@@ -78,13 +81,11 @@
       </div>
     </header>
 
+    <!-- Hotspot invisible para expandir el sidebar cuando está colapsado -->
+    <div id="sidebar-hotspot"></div>
+
     <div class="main-container">
       <aside id="sidebar">
-        <div id="company-info" class="company-info">
-          <img id="company-logo" src="" alt="Logo Empresa" style="display:none;">
-          <div id="company-logo-placeholder" class="company-logo-placeholder">Logo</div>
-          <span id="company-name">Empresa</span>
-        </div>
         <nav>
           <ul id="sidebar-menu"></ul>
         </nav>
