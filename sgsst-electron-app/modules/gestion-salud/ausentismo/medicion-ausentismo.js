@@ -512,6 +512,7 @@ class MedicionAusentismoComponent {
                     <tr>
                         <th style="background: #F8FAFC; padding: 12px 15px; text-align: left; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; border-bottom: 1px solid #e2e8f0;">Empleado</th>
                         <th style="background: #F8FAFC; padding: 12px 15px; text-align: left; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; border-bottom: 1px solid #e2e8f0;">Tipo</th>
+                        <th style="background: #F8FAFC; padding: 12px 15px; text-align: left; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; border-bottom: 1px solid #e2e8f0;" title="¿Es un caso PRI formal?">PRI</th>
                         <th style="background: #F8FAFC; padding: 12px 15px; text-align: left; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; border-bottom: 1px solid #e2e8f0;">Periodo</th>
                         <th style="background: #F8FAFC; padding: 12px 15px; text-align: left; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; border-bottom: 1px solid #e2e8f0;">Avance</th>
                         <th style="background: #F8FAFC; padding: 12px 15px; text-align: left; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; border-bottom: 1px solid #e2e8f0;">Estado</th>
@@ -520,7 +521,7 @@ class MedicionAusentismoComponent {
                 </thead>
                 <tbody id="seguimientoTableBody">
                     <tr>
-                        ${this._loadingRowHtml('Cargando seguimientos...', 6)}
+                        ${this._loadingRowHtml('Cargando seguimientos...', 7)}
                     </tr>
                 </tbody>
             </table>
@@ -1240,7 +1241,7 @@ class MedicionAusentismoComponent {
             console.log('[DEBUG renderSeguimientoTableWithBody] No hay datos para mostrar');
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" style="text-align: center; padding: 40px; color: #64748B;">
+                    <td colspan="7" style="text-align: center; padding: 40px; color: #64748B;">
                         <i class="fas fa-inbox" style="font-size: 48px; margin-bottom: 15px; opacity: 0.3;"></i>
                         <p>No hay seguimientos para mostrar</p>
                     </td>
@@ -1303,6 +1304,22 @@ class MedicionAusentismoComponent {
             // Iniciales para avatar
             const initials = nombre.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 
+            // 📦 Modalidad PRI: badge "📋 PRI" si está marcado como caso PRI formal,
+            // "⚠️ Seg." para los que sólo son seguimiento de incapacidad, "○ Seg."
+            // para los que aún no están clasificados. Lee registroPRI?.casoIngresadoPRIC
+            // (mismo campo que controla el banner).
+            const priValor = (empleado.registroPRI && empleado.registroPRI.casoIngresadoPRIC
+                ? String(empleado.registroPRI.casoIngresadoPRIC).toUpperCase()
+                : '');
+            let priBadge;
+            if (priValor === 'SI') {
+                priBadge = '<span class="sp-pri-badge is-pri" title="Caso PRI formal"><i class="fas fa-clipboard-check"></i> PRI</span>';
+            } else if (priValor === 'NO') {
+                priBadge = '<span class="sp-pri-badge is-no-pri-strong" title="Seguimiento: NO es caso PRI formal">⚠ Seg.</span>';
+            } else {
+                priBadge = '<span class="sp-pri-badge is-no-pri" title="Aún sin clasificar">○ Seg.</span>';
+            }
+
             // Formatear fechas
             const periodoStr = fechaInicio && fechaFin ?
                 `${fechaInicio.toLocaleDateString('es-ES', {day: 'numeric', month: 'short'})} - ${fechaFin.toLocaleDateString('es-ES', {day: 'numeric', month: 'short'})}` :
@@ -1321,6 +1338,9 @@ class MedicionAusentismoComponent {
                     </td>
                     <td style="padding: 15px;">
                         <span style="padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; background: ${tipo === 'ARL' ? '#FEF3C7' : '#DCFCE7'}; color: ${tipo === 'ARL' ? '#92400E' : '#166534'};">${tipo}</span>
+                    </td>
+                    <td style="padding: 15px;">
+                        ${priBadge}
                     </td>
                     <td style="padding: 15px;">
                         <div style="font-size: 13px; color: #1E293B;">${periodoStr}</div>
@@ -2169,6 +2189,26 @@ class MedicionAusentismoComponent {
                 }
                 .sp-nav-item i { font-size: 14px; }
 
+                /* 📦 Bloqueo de pasos: las navs futuras a la sección activa están bloqueadas
+                con candado y sin pointer-events. Solo "Siguiente" las desbloquea. */
+                .sp-nav-item.is-locked-step {
+                    opacity: 0.4;
+                    cursor: not-allowed;
+                    pointer-events: none;
+                    background: repeating-linear-gradient(
+                        -45deg,
+                        transparent,
+                        transparent 4px,
+                        rgba(100, 116, 139, 0.04) 4px,
+                        rgba(100, 116, 139, 0.04) 8px
+                    );
+                }
+                .sp-nav-item .sp-nav-lock-icon {
+                    font-size: 11px;
+                    margin-left: 4px;
+                    color: var(--sp-text-muted);
+                }
+
                 /* Área de Contenido */
                 .sp-content-area {
                     flex: 1; padding: 25px 30px; overflow-y: auto; background: #FDFEFE;
@@ -2212,6 +2252,65 @@ class MedicionAusentismoComponent {
                     background: #F9FAFB; color: var(--sp-text-main);
                 }
 
+                /* 📦 Wizard de validación — borde rojo para campos requeridos vacíos.
+                Se aplica SOLO a inputs con data-required="true" Y que están vacíos. */
+                .sp-form-control[data-required="true"].is-required-empty {
+                    border-color: #EF4444 !important;
+                    background: #FEF2F2;
+                    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23EF4444' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'/><line x1='12' y1='8' x2='12' y2='12'/><line x1='12' y1='16' x2='12.01' y2='16'/></svg>");
+                    background-repeat: no-repeat;
+                    background-position: right 10px center;
+                    background-size: 14px;
+                    padding-right: 32px;
+                }
+                .sp-form-control[data-required="true"].is-required-empty:focus {
+                    outline: none;
+                    border-color: #EF4444 !important;
+                    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
+                }
+
+                /* Asterisco rojo en label cuando el campo es requerido */
+                .sp-form-label[data-required-mark="true"]::after {
+                    content: ' *';
+                    color: #EF4444;
+                    font-weight: 700;
+                }
+
+                /* Contador de completitud en el header de cada sección */
+                .sp-section-completitud {
+                    margin-left: auto; font-size: 12px; font-weight: 500;
+                    padding: 4px 10px; border-radius: 12px;
+                    background: var(--sp-secondary); color: var(--sp-text-muted);
+                    transition: all 0.25s ease;
+                }
+                .sp-section-completitud.is-complete {
+                    background: #D1FAE5; color: #065F46;
+                }
+                .sp-section-completitud.is-incomplete {
+                    background: #FEE2E2; color: #991B1B;
+                }
+
+                /* Mensaje inline de error pegado al primer campo vacío de la sección */
+                .sp-required-hint {
+                    display: block; font-size: 11.5px; color: #DC2626;
+                    margin-top: 4px; font-weight: 500;
+                }
+
+                /* Footer reorganizado con navegación de wizard */
+                .sp-panel-footer {
+                    padding: 15px 30px; border-top: 1px solid var(--sp-border); background: white;
+                    display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
+                    gap: 12px;
+                }
+                .sp-panel-footer-left { display: flex; gap: 8px; align-items: center; }
+                .sp-panel-footer-right { display: flex; gap: 8px; align-items: center; }
+                .sp-panel-footer-progress {
+                    font-size: 12px; color: var(--sp-text-muted);
+                    padding: 6px 12px; border-radius: 16px;
+                    background: var(--sp-secondary);
+                }
+                .sp-panel-footer-progress strong { color: var(--sp-text-main); font-weight: 600; }
+
                 /* Subsection */
                 .sp-subsection {
                     background: white; border: 1px solid var(--sp-border); border-radius: 8px;
@@ -2222,6 +2321,97 @@ class MedicionAusentismoComponent {
                     display: flex; align-items: center; gap: 8px;
                 }
                 .sp-subsection-title i { color: var(--sp-accent); font-size: 12px; }
+
+                /* 📦 Banner PRI — estado formal del caso (PRIC vs seguimiento simple) */
+                .sp-pri-banner {
+                    padding: 12px 30px; flex-shrink: 0;
+                    display: flex; align-items: center; gap: 12px;
+                    border-bottom: 1px solid var(--sp-border);
+                    font-size: 13px;
+                    background: var(--sp-secondary);
+                    transition: background-color 0.25s ease, border-color 0.25s ease;
+                }
+                .sp-pri-banner .sp-pri-banner-icon {
+                    width: 36px; height: 36px; border-radius: 50%;
+                    display: flex; align-items: center; justify-content: center;
+                    font-size: 16px; flex-shrink: 0;
+                }
+                .sp-pri-banner .sp-pri-banner-text { flex: 1; line-height: 1.35; }
+                .sp-pri-banner .sp-pri-banner-text strong { font-weight: 600; }
+                .sp-pri-banner .sp-pri-banner-text small { display: block; font-size: 11.5px; opacity: 0.85; margin-top: 2px; }
+
+                /* Estado 1: Caso PRI formal */
+                .sp-pri-banner.is-pri {
+                    background: linear-gradient(90deg, #ECFDF5 0%, #D1FAE5 100%);
+                    border-bottom-color: #10B981;
+                }
+                .sp-pri-banner.is-pri .sp-pri-banner-icon { background: var(--sp-accent); color: white; }
+
+                /* Estado 2: Caso con seguimiento pero NO PRI formal */
+                .sp-pri-banner.is-no-pri {
+                    background: linear-gradient(90deg, #FFFBEB 0%, #FEF3C7 100%);
+                    border-bottom-color: #F59E0B;
+                }
+                .sp-pri-banner.is-no-pri .sp-pri-banner-icon { background: #F59E0B; color: white; }
+
+                /* Estado 3: Aún sin clasificar (caso recién creado sin valor) */
+                .sp-pri-banner.is-unclassified {
+                    background: linear-gradient(90deg, #F8FAFC 0%, #F1F5F9 100%);
+                    border-bottom-color: var(--sp-border);
+                }
+                .sp-pri-banner.is-unclassified .sp-pri-banner-icon { background: #94A3B8; color: white; }
+
+                /* Botones contextuales del banner — el control de decisión vive aquí para
+                que NUNCA dependa de navegar a una sección atenuada. */
+                .sp-pri-banner .sp-pri-banner-actions {
+                    display: flex; gap: 8px; flex-shrink: 0; align-items: center;
+                }
+                .sp-pri-banner .sp-pri-banner-btn {
+                    padding: 7px 14px; border-radius: 6px; cursor: pointer;
+                    font-size: 12px; font-weight: 600; white-space: nowrap;
+                    display: inline-flex; align-items: center; gap: 6px;
+                    transition: all 0.2s; border: 1px solid transparent;
+                }
+                .sp-pri-banner .sp-pri-banner-btn.is-pri {
+                    background: var(--sp-accent); color: white;
+                }
+                .sp-pri-banner .sp-pri-banner-btn.is-pri:hover {
+                    background: #059669; transform: translateY(-1px);
+                    box-shadow: 0 4px 6px rgba(16, 185, 129, 0.25);
+                }
+                .sp-pri-banner .sp-pri-banner-btn.is-no-pri {
+                    background: white; color: #92400E; border-color: #F59E0B;
+                }
+                .sp-pri-banner .sp-pri-banner-btn.is-no-pri:hover {
+                    background: #FEF3C7; transform: translateY(-1px);
+                }
+                .sp-pri-banner .sp-pri-banner-btn.is-ghost {
+                    background: transparent; color: #4F46E5; border-color: #4F46E5;
+                }
+                .sp-pri-banner .sp-pri-banner-btn.is-ghost:hover {
+                    background: var(--sp-primary-light); transform: translateY(-1px);
+                }
+
+                /* Atenuación — sólo aplica a Calificación PCL, que genuinamente requiere
+                ser caso PRI formal. La sección Etapas PRIC nunca se atenúa: el usuario debe
+                poder entrar a diligenciar lo que aplique sin estar bloqueado. */
+                .sp-section-dimmed { opacity: 0.45; pointer-events: none; transition: opacity 0.25s ease; }
+                .sp-section-dimmed .sp-subsection { position: relative; }
+                .sp-nav-item.is-dimmed { opacity: 0.5; }
+                .sp-nav-item.is-dimmed i { color: var(--sp-text-muted); }
+
+                /* Badge de modalidad en la tabla principal */
+                .sp-pri-badge {
+                    display: inline-flex; align-items: center; gap: 5px;
+                    padding: 3px 9px; border-radius: 12px;
+                    font-size: 11px; font-weight: 600;
+                    letter-spacing: 0.2px;
+                    white-space: nowrap;
+                }
+                .sp-pri-badge i { font-size: 11px; line-height: 1; }
+                .sp-pri-badge.is-pri { background: #D1FAE5; color: #065F46; }
+                .sp-pri-badge.is-no-pri { background: #F1F5F9; color: #64748B; }
+                .sp-pri-badge.is-no-pri-strong { background: #FEF3C7; color: #92400E; }
 
                 /* Tabla de Recomendaciones */
                 .sp-data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -2241,7 +2431,16 @@ class MedicionAusentismoComponent {
                 .sp-panel-footer {
                     padding: 15px 30px; border-top: 1px solid var(--sp-border); background: white;
                     display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
+                    gap: 12px;
                 }
+                .sp-panel-footer-left { display: flex; gap: 8px; align-items: center; }
+                .sp-panel-footer-right { display: flex; gap: 8px; align-items: center; }
+                .sp-panel-footer-progress {
+                    font-size: 12px; color: var(--sp-text-muted);
+                    padding: 6px 12px; border-radius: 16px;
+                    background: var(--sp-secondary);
+                }
+                .sp-panel-footer-progress strong { color: var(--sp-text-main); font-weight: 600; }
                 .sp-btn {
                     padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 500;
                     cursor: pointer; display: inline-flex; align-items: center; gap: 8px; border: none;
@@ -2251,6 +2450,8 @@ class MedicionAusentismoComponent {
                 .sp-btn-primary:hover { background: #4338CA; transform: translateY(-1px); box-shadow: 0 4px 6px rgba(79, 70, 229, 0.3); }
                 .sp-btn-outline { background: white; border: 1px solid var(--sp-border); color: var(--sp-text-main); }
                 .sp-btn-outline:hover { background: var(--sp-secondary); border-color: #CBD5E1; }
+                .sp-btn-outline:disabled { opacity: 0.4; cursor: not-allowed; }
+                .sp-btn-outline:disabled:hover { background: white; border-color: var(--sp-border); transform: none; box-shadow: none; }
                 .sp-btn-success { background: var(--sp-accent); color: white; }
                 .sp-btn-success:hover { background: #059669; transform: translateY(-1px); box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3); }
                 .sp-btn-sm { padding: 4px 8px; font-size: 11px; }
@@ -2285,22 +2486,35 @@ class MedicionAusentismoComponent {
                     </button>
                 </div>
 
-                <!-- Navegación Horizontal -->
+                <!-- 📦 Banner PRI: estado formal del caso (PRIC formal vs seguimiento simple) + control directo -->
+                <div id="sp-pri-banner" class="sp-pri-banner is-unclassified">
+                    <div class="sp-pri-banner-icon"><i class="fas fa-info-circle"></i></div>
+                    <div class="sp-pri-banner-text" id="sp-pri-banner-text">
+                        <strong>Sin clasificar aún</strong>
+                        <small>Este caso aún no tiene definido si es un seguimiento simple o un caso PRI formal.</small>
+                    </div>
+                    <div class="sp-pri-banner-actions" id="sp-pri-banner-actions">
+                        <!-- Se llenan dinámicamente según el estado (is-pri / is-no-pri / is-unclassified) -->
+                    </div>
+                </div>
+
+                <!-- Navegación Horizontal — navegación secuencial: solo se desbloquea la siguiente
+                al hacer click en "Siguiente". Click en navs futuras se ignora. -->
                 <nav class="sp-horizontal-nav">
-                    <div class="sp-nav-item active" onclick="window.medicAusentismoComponent.showSeguimientoPanelSection('datos', this)">
-                        <i class="fas fa-id-card"></i> Datos Generales
+                    <div class="sp-nav-item active" onclick="window.medicAusentismoComponent._intentarNavegarANavItem(this, 'datos')">
+                        <i class="fas fa-id-card"></i> <span>1. Datos Generales</span>
                     </div>
-                    <div class="sp-nav-item" onclick="window.medicAusentismoComponent.showSeguimientoPanelSection('incapacidad', this)">
-                        <i class="fas fa-procedures"></i> Incapacidad Temporal
+                    <div class="sp-nav-item" onclick="window.medicAusentismoComponent._intentarNavegarANavItem(this, 'incapacidad')">
+                        <i class="fas fa-procedures"></i> <span>2. Incapacidad Temporal</span>
                     </div>
-                    <div class="sp-nav-item" onclick="window.medicAusentismoComponent.showSeguimientoPanelSection('etapas', this)">
-                        <i class="fas fa-tasks"></i> Etapas PRIC
+                    <div class="sp-nav-item" onclick="window.medicAusentismoComponent._intentarNavegarANavItem(this, 'etapas')">
+                        <i class="fas fa-tasks"></i> <span>3. Etapas PRIC</span>
                     </div>
-                    <div class="sp-nav-item" onclick="window.medicAusentismoComponent.showSeguimientoPanelSection('recomendaciones', this)">
-                        <i class="fas fa-clipboard-check"></i> Seg. Recomendaciones
+                    <div class="sp-nav-item" onclick="window.medicAusentismoComponent._intentarNavegarANavItem(this, 'recomendaciones')">
+                        <i class="fas fa-clipboard-check"></i> <span>4. Seg. Recomendaciones</span>
                     </div>
-                    <div class="sp-nav-item" onclick="window.medicAusentismoComponent.showSeguimientoPanelSection('calificacion', this)">
-                        <i class="fas fa-balance-scale"></i> Calificación PCL
+                    <div class="sp-nav-item" onclick="window.medicAusentismoComponent._intentarNavegarANavItem(this, 'calificacion')">
+                        <i class="fas fa-balance-scale"></i> <span>5. Calificación PCL</span>
                     </div>
                 </nav>
 
@@ -3142,14 +3356,28 @@ class MedicionAusentismoComponent {
 
                 </div>
 
-                <!-- Footer -->
+                <!-- Footer con navegación wizard -->
                 <div class="sp-panel-footer">
-                    <button class="sp-btn sp-btn-outline" onclick="window.medicAusentismoComponent.closeSeguimientoPanel()">
-                        <i class="fas fa-times"></i> Cancelar
-                    </button>
-                    <button class="sp-btn sp-btn-success" onclick="window.medicAusentismoComponent.saveSeguimientoData()">
-                        <i class="fas fa-save"></i> Guardar en Excel
-                    </button>
+                    <div class="sp-panel-footer-left">
+                        <button class="sp-btn sp-btn-outline" onclick="window.medicAusentismoComponent.closeSeguimientoPanel()">
+                            <i class="fas fa-times"></i> Cancelar
+                        </button>
+                    </div>
+                    <div class="sp-panel-footer-progress" id="sp-panel-progress">
+                        Sección <strong id="sp-panel-progress-current">1</strong> de <strong id="sp-panel-progress-total">5</strong> —
+                        <span id="sp-panel-progress-text">0/0 campos diligenciados</span>
+                    </div>
+                    <div class="sp-panel-footer-right">
+                        <button class="sp-btn sp-btn-outline" id="sp-btn-prev" onclick="window.medicAusentismoComponent._irASeccionAnterior()">
+                            <i class="fas fa-arrow-left"></i> Anterior
+                        </button>
+                        <button class="sp-btn sp-btn-primary" id="sp-btn-next" onclick="window.medicAusentismoComponent._irASiguienteSeccion()">
+                            Siguiente <i class="fas fa-arrow-right"></i>
+                        </button>
+                        <button class="sp-btn sp-btn-success" onclick="window.medicAusentismoComponent.saveSeguimientoData()">
+                            <i class="fas fa-save"></i> Guardar en Excel
+                        </button>
+                    </div>
                 </div>
             </div>
         `;
@@ -3162,6 +3390,26 @@ class MedicionAusentismoComponent {
                 this.closeSeguimientoPanel();
             }
         });
+
+        // 📦 Banner PRI — listener "live": cualquier cambio en el campo clave dispara
+        // la re-evaluación del banner y la atenuación/desatenua ción de secciones.
+        // El listener se engancha una sola vez (porque createSeguimientoPanel sólo se
+        // llama cuando el backdrop aún no existe en el DOM).
+        const selCaso = document.getElementById('sp-caso-ingresado-pric');
+        const fIngresoPric = document.getElementById('sp-fecha-ingreso-pric');
+        if (selCaso) {
+            selCaso.addEventListener('change', () => this._actualizarBannerPRI());
+        }
+        if (fIngresoPric) {
+            fIngresoPric.addEventListener('change', () => this._actualizarBannerPRI());
+        }
+
+        // 📦 Wizard de validación: enganchar delegación de eventos sobre el panel
+        // para que cualquier input/select requerido se valide en vivo (borde rojo +
+        // asterisco en label). Se llama una sola vez al crear el panel.
+        this._setupListenersValidacion();
+        // Marcar de entrada los campos base como requeridos.
+        this._aplicarReglasRequeridos();
     }
 
     /**
@@ -3474,12 +3722,12 @@ class MedicionAusentismoComponent {
             document.getElementById('sp-talla').value = caso.talla || '';
             document.getElementById('sp-imc').value = caso.imc || '';
             document.getElementById('sp-actividades-extralaborales').value = caso.actividades_extralaborales || '';
-            
+
             // Calcular IMC si hay peso y talla
             if (caso.peso && caso.talla) {
                 this.calcularIMC();
             }
-            
+
             // === Datos de incapacidad ===
             if (caso.fecha_fin) {
                 try {
@@ -3489,11 +3737,18 @@ class MedicionAusentismoComponent {
                     }
                 } catch (e) { console.warn('Error cargando fecha_fin:', e); }
             }
-            
+
             document.getElementById('sp-dias-acumulados').value = caso.dias_acumulados || '';
             document.getElementById('sp-codigo-cie10').value = caso.codigo_cie10 || '';
             document.getElementById('sp-descripcion-diagnostico').value = caso.diagnostico || '';
-            
+
+            // 📦 Actualizar el banner PRI ahora que el campo sp-caso-ingresado-pric ya tiene valor.
+            // (Este campo se setea arriba en líneas previas; banner refleja el estado real del caso).
+            this._actualizarBannerPRI();
+            // 📦 Wizard: aplicar reglas (muchos condicionales solo si es PRI) y progreso.
+            this._aplicarReglasRequeridos();
+            this._actualizarProgresoSeccion();
+
             // Mostrar notificación
             this.showNotification(`✅ Caso cargado: ${caso.nombre} (Fila ${caso.fila})`, 'success');
             console.log('[CARGAR CASO SELECCIONADO] Datos cargados exitosamente');
@@ -3527,6 +3782,13 @@ class MedicionAusentismoComponent {
         // Inicializar seguimientos
         this.inicializarSeguimientos();
 
+        // 📦 Actualizar el banner PRI antes de mostrar el panel (caso nuevo: sin clasificar).
+        this._actualizarBannerPRI();
+        // 📦 Wizard: aplicar reglas de requeridos + actualizar progreso del footer.
+        // (caso nuevo: la mayoría de campos estará vacía → borde rojo aparecerá)
+        this._aplicarReglasRequeridos();
+        this._actualizarProgresoSeccion();
+
         // Abrir el panel
         document.getElementById('seguimientoPanelBackdrop').classList.add('active');
 
@@ -3546,6 +3808,514 @@ class MedicionAusentismoComponent {
         // Actualizar navegación
         document.querySelectorAll('.sp-nav-item').forEach(el => el.classList.remove('active'));
         navElement.classList.add('active');
+
+        // 📦 Wizard: al cambiar de sección, re-aplicar reglas + actualizar progreso
+        // + actualizar candados en las navs futuras.
+        // (setTimeout para asegurar que el cambio de display ya surtió efecto.)
+        setTimeout(() => {
+            this._aplicarReglasRequeridos();
+            this._actualizarProgresoSeccion();
+            this._aplicarBloqueoStepNav();
+        }, 0);
+    }
+
+    /**
+     * 📦 Actualiza el banner PRI según el valor del campo "sp-caso-ingresado-pric".
+     *
+     * Reglas REORGANIZADAS para evitar el deadlock anterior:
+     *  - "SI"  → banner verde; Calificación PCL habilitada.
+     *  - "NO"  → banner amarillo; Calificación PCL atenuada (no aplica).
+     *  - ""     → banner gris; Calificación PCL atenuada (mientras no defina).
+     *
+     * Importante: la sección "Etapas PRIC" NUNCA se atenúa. Su control de decisión
+     * vive duplicado en el banner (botones contextuales) para que el usuario pueda
+     * cambiar el modo sin tener que entrar a la sección ni depender de un
+     * sub-bloque específico.
+     */
+    _actualizarBannerPRI() {
+        const banner = document.getElementById('sp-pri-banner');
+        const textEl = document.getElementById('sp-pri-banner-text');
+        const actionsEl = document.getElementById('sp-pri-banner-actions');
+        if (!banner || !textEl || !actionsEl) return;
+
+        const secCalificacion = document.getElementById('sp-section-calificacion');
+        const navItems = document.querySelectorAll('.sp-nav-item');
+        const navCalificacion = navItems[4];
+
+        const sel = document.getElementById('sp-caso-ingresado-pric');
+        const fechaIngreso = document.getElementById('sp-fecha-ingreso-pric');
+        const valor = sel ? (sel.value || '').toUpperCase() : '';
+
+        // Limpiar estado anterior
+        banner.classList.remove('is-pri', 'is-no-pri', 'is-unclassified');
+        [secCalificacion, navCalificacion].forEach(el => {
+            if (el) el.classList.remove('sp-section-dimmed', 'is-dimmed');
+        });
+        actionsEl.innerHTML = ''; // limpiar botones del estado previo
+
+        if (valor === 'SI') {
+            // Estado: Caso PRI formal
+            banner.classList.add('is-pri');
+            const fechaStr = fechaIngreso && fechaIngreso.value
+                ? new Date(fechaIngreso.value + 'T00:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })
+                : 'sin fecha registrada';
+            textEl.innerHTML = '<strong>📋 Caso PRI Formal</strong>' +
+                '<small>Ingreso al PRIC: ' + fechaStr + ' — Calificación PCL habilitada. Etapas PRIC siempre están disponibles.</small>';
+            // Sin botones: ya está clasificado como PRI formal.
+        } else if (valor === 'NO') {
+            // Estado: Seguimiento explícito, no PRI formal
+            banner.classList.add('is-no-pri');
+            textEl.innerHTML = '<strong>⚠️ Seguimiento (no es caso PRI formal)</strong>' +
+                '<small>Calificación PCL atenuada porque no aplica. Cambia a PRI formal si necesitas diligenciarla.</small>';
+            // Ofrecer cambiar a PRI formal (un solo botón, evita clic accidental)
+            actionsEl.innerHTML = '<button type="button" class="sp-pri-banner-btn is-ghost" onclick="window.medicAusentismoComponent._setModoPRI(\'SI\')">' +
+                '<i class="fas fa-arrow-up"></i> Convertir en caso PRI formal</button>';
+            // Atenuar Calificación PCL
+            if (secCalificacion) secCalificacion.classList.add('sp-section-dimmed');
+            if (navCalificacion) navCalificacion.classList.add('is-dimmed');
+        } else {
+            // Estado: Sin clasificar (campo vacío) — caso nuevo o recién abierto
+            banner.classList.add('is-unclassified');
+            textEl.innerHTML = '<strong>Sin clasificar aún</strong>' +
+                '<small>Este caso aún no tiene definido si es un seguimiento simple o un caso PRI formal.</small>';
+            // 2 botones: el usuario decide explícitamente
+            actionsEl.innerHTML =
+                '<button type="button" class="sp-pri-banner-btn is-pri" onclick="window.medicAusentismoComponent._setModoPRI(\'SI\')">' +
+                '<i class="fas fa-check"></i> Marcar como PRI formal</button>' +
+                '<button type="button" class="sp-pri-banner-btn is-no-pri" onclick="window.medicAusentismoComponent._setModoPRI(\'NO\')">' +
+                '<i class="fas fa-stethoscope"></i> Solo seguimiento</button>';
+            // Atenuar Calificación PCL (también bloqueada mientras no defina)
+            if (secCalificacion) secCalificacion.classList.add('sp-section-dimmed');
+            if (navCalificacion) navCalificacion.classList.add('is-dimmed');
+        }
+    }
+
+    /**
+     * 📦 Setea el modo PRI desde el banner (botones contextuales). Sincroniza el select
+     * "sp-caso-ingresado-pric" para que el guardado en Excel use el valor correcto, y
+     * dispara la actualización del banner (que a su vez ajusta Calificación PCL).
+     *
+     * Si el campo está vacío y se elige "SI" se autocompleta la fecha de ingreso al PRIC
+     * con la fecha de hoy para no dejar el caso inconsistente.
+     */
+    _setModoPRI(modo) {
+        const sel = document.getElementById('sp-caso-ingresado-pric');
+        const fechaIngreso = document.getElementById('sp-fecha-ingreso-pric');
+        if (!sel) return;
+
+        sel.value = modo;
+        // Si eligió PRI formal y no había fecha, proponer hoy.
+        if (modo === 'SI' && fechaIngreso && !fechaIngreso.value) {
+            const hoy = new Date();
+            const yyyy = hoy.getFullYear();
+            const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+            const dd = String(hoy.getDate()).padStart(2, '0');
+            fechaIngreso.value = `${yyyy}-${mm}-${dd}`;
+        }
+        // Disparar change manualmente para que cualquier listener externo reaccione
+        // y refrescar banner + atenuaciones.
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+        this._actualizarBannerPRI();
+        // Al cambiar el modo también cambian los campos requeridos.
+        this._aplicarReglasRequeridos();
+        this._actualizarProgresoSeccion();
+
+        const etiquetas = { SI: 'caso PRI formal', NO: 'seguimiento simple' };
+        this.showNotification('Modo actualizado: ' + (etiquetas[modo] || modo), 'success');
+    }
+
+    /**
+     * 📦 Mapa de IDs de inputs/selects REQUERIDOS por sección.
+     * Separamos lo que SIEMRE es obligatorio de lo que solo aplica a casos PRI formales.
+     * Lo demás (peso, talla, AFP, salario, diagnósticos secundarios, etc.) queda libre.
+     *
+     * Notas:
+     *  - "sp-nombre" y "sp-cedula" son autollenados, pero los dejamos en la lista por
+     *    si alguien abre un caso huérfano sin datos del empleado.
+     *  - "sp-caso-ingresado-pric" (Etapa 1) es SIEMPRE requerido para bloquear el flujo
+     *    hasta que el usuario clasifique el caso (tema de la vueltita anterior).
+     */
+    _CAMPOS_REQUERIDOS_BASE = [
+        // Sección 1 — Datos Generales
+        'sp-nombre', 'sp-cedula', 'sp-genero', 'sp-cargo', 'sp-tipo-cargo',
+        'sp-area', 'sp-fecha-ingreso', 'sp-tipo-evento', 'sp-tipo-contrato', 'sp-eps',
+        // Sección 2 — Incapacidad Temporal
+        'sp-fecha-inicio', 'sp-fecha-fin', 'sp-codigo-cie10', 'sp-descripcion-diagnostico',
+        // Sección 3 — Etapas PRIC (Etapa 1 siempre)
+        'sp-caso-ingresado-pric'
+    ];
+    _CAMPOS_REQUERIDOS_SOLO_PRI = [
+        // Etapa 1 ampliada
+        'sp-mecanismo-deteccion', 'sp-fecha-ingreso-pric',
+        // Etapa 2 — Plan de Tratamiento
+        'sp-trabajador-plan-tratamiento', 'sp-objetivos-tratamiento',
+        'sp-fecha-inicio-plan', 'sp-fecha-probable-alta',
+        // Etapa 3 — Ejecución y Seguimiento
+        'sp-fecha-proxima-cita', 'sp-periodicidad-seguimiento',
+        // Etapa 4 — Reincorporación
+        'sp-fecha-reincorporacion', 'sp-tipo-reintegro',
+        // Etapa 5 — Cierre
+        'sp-fecha-cierre', 'sp-motivo-cierre',
+        // Sección 5 — Calificación PCL
+        'sp-estado-proceso-regional', 'sp-fecha-solicitud-regional'
+    ];
+
+    /**
+     * 📦 Aplica data-required="true" según el modo PRI del caso.
+     *  - Campos _CAMPOS_REQUERIDOS_BASE siempre quedan marcados.
+     *  - Campos _CAMPOS_REQUERIDOS_SOLO_PRI solo se marcan si el caso es PRI formal.
+     *  - Campos no listados quedan libres (sin validación).
+     */
+    _aplicarReglasRequeridos() {
+        // Quitar todas las marcas previas (atributo + asterisco rojo en label)
+        document.querySelectorAll('.sp-form-control[data-required="true"]').forEach(el => {
+            el.removeAttribute('data-required');
+        });
+        document.querySelectorAll('.sp-form-label[data-required-mark="true"]').forEach(el => {
+            el.removeAttribute('data-required-mark');
+        });
+
+        const aplicar = (id) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.setAttribute('data-required', 'true');
+            // Marcar el label hermano con asterisco rojo via CSS ::after
+            const group = el.closest('.sp-form-group');
+            if (group) {
+                const label = group.querySelector('.sp-form-label');
+                if (label) label.setAttribute('data-required-mark', 'true');
+            }
+        };
+
+        // Restaurar los base (siempre)
+        this._CAMPOS_REQUERIDOS_BASE.forEach(aplicar);
+
+        // Condicionales: solo si el caso es PRI formal
+        const sel = document.getElementById('sp-caso-ingresado-pric');
+        if (sel && (sel.value || '').toUpperCase() === 'SI') {
+            this._CAMPOS_REQUERIDOS_SOLO_PRI.forEach(aplicar);
+        }
+    }
+
+    /**
+     * 📦 Determina si un input/select está "vacío" para efectos de validación.
+     * Trata "Seleccione..." (placeholder de los selects) como vacío.
+     */
+    _esCampoVacio(el) {
+        if (!el || el.disabled || el.readOnly) return false;
+        const val = (el.value || '').trim();
+        if (!val) return true;
+        // En los <select> el primer <option> tiene value="" y texto "Seleccione..."
+        if (el.tagName === 'SELECT' && el.selectedIndex === 0) return true;
+        return false;
+    }
+
+    /**
+     * 📦 Valida la sección actualmente visible. Aplica el borde rojo a cada input
+     * requerido vacío y al label del campo le agrega el asterisco rojo.
+     * Retorna { valido, vacios: [{ el, nombre }] } para que el caller pueda
+     * decidir si avanza o muestra error.
+     */
+    _validarSeccionActual() {
+        const section = document.querySelector('.sp-form-section.active');
+        if (!section) return { valido: true, vacios: [] };
+
+        const requeridos = section.querySelectorAll('.sp-form-control[data-required="true"]');
+        const vacios = [];
+        const total = requeridos.length;
+
+        requeridos.forEach(el => {
+            const nombre = this._nombreAmigableDeCampo(el) || el.id;
+            if (this._esCampoVacio(el)) {
+                el.classList.add('is-required-empty');
+                vacios.push({ el: el, nombre: nombre });
+            } else {
+                el.classList.remove('is-required-empty');
+            }
+        });
+
+        // Actualizar el contador visible en el section-title de la sección activa
+        this._actualizarContadorSeccion(section, total - vacios.length, total);
+
+        return { valido: vacios.length === 0, vacios, total };
+    }
+
+    /**
+     * 📦 Devuelve un nombre legible del campo para mensajes de error, p. ej.
+     * "sp-tipo-evento" → "Tipo de evento", "sp-codigo-cie10" → "Código CIE10".
+     */
+    _nombreAmigableDeCampo(el) {
+        // Buscar el label asociado (estructura: div.sp-form-group > label + input)
+        const group = el.closest('.sp-form-group');
+        if (group) {
+            const label = group.querySelector('.sp-form-label');
+            if (label) return label.textContent.trim();
+        }
+        return el.id;
+    }
+
+    /**
+     * 📦 Inserta/actualiza el contador de completitud en el section-title.
+     *   - Cuando todos los campos requeridos están diligenciados: badge verde "✓ X/X".
+     *   - Cuando faltan: badge rojo "⚠ X/Y".
+     *   - Cuando no hay campos requeridos: badge gris "○ libre".
+     */
+    _actualizarContadorSeccion(section, diligenciados, total) {
+        if (!section) return;
+        const title = section.querySelector('.sp-section-title');
+        if (!title) return;
+
+        let badge = title.querySelector('.sp-section-completitud');
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'sp-section-completitud';
+            title.appendChild(badge);
+        }
+
+        if (total === 0) {
+            badge.classList.remove('is-complete', 'is-incomplete');
+            badge.textContent = '○ sin campos obligatorios';
+            return;
+        }
+
+        if (diligenciados === total) {
+            badge.classList.add('is-complete');
+            badge.classList.remove('is-incomplete');
+            badge.textContent = '✓ ' + diligenciados + '/' + total + ' completos';
+        } else {
+            badge.classList.add('is-incomplete');
+            badge.classList.remove('is-complete');
+            badge.textContent = '⚠ ' + diligenciados + '/' + total + ' pendientes';
+        }
+    }
+
+    /**
+     * 📦 Engancha listeners live (blur + change + input) en cada input/select con
+     * data-required="true". Cada vez que el usuario sale del campo o cambia su valor,
+     * se re-valida la sección y se actualiza el contador. Se llama una sola vez al
+     * crear el panel; los nuevos data-required se enganchan dinámicamente vía
+     * delegación escuchando el DOM completo.
+     */
+    _setupListenersValidacion() {
+        const handler = (e) => {
+            const t = e.target;
+            if (t && t.classList && t.classList.contains('sp-form-control')
+                && t.getAttribute('data-required') === 'true') {
+                if (this._esCampoVacio(t)) t.classList.add('is-required-empty');
+                else t.classList.remove('is-required-empty');
+                this._actualizarProgresoSeccion();
+            }
+        };
+        // Capturamos los eventos a nivel del panel (delegación)
+        const panel = document.querySelector('.seguimiento-panel');
+        if (!panel) return;
+        panel.addEventListener('blur', handler, true);
+        panel.addEventListener('change', handler, true);
+        panel.addEventListener('input', handler, true);
+    }
+
+    /**
+     * 📦 Actualiza el contador del footer (X/Y completados de la SECCIÓN ACTUAL).
+     * También deshabilita el botón "Siguiente" si la sección actual está incompleta.
+     */
+    _actualizarProgresoSeccion() {
+        const r = this._validarSeccionActual();
+        const cur = document.getElementById('sp-panel-progress-current');
+        const total = document.getElementById('sp-panel-progress-total');
+        const txt = document.getElementById('sp-panel-progress-text');
+        const btnNext = document.getElementById('sp-btn-next');
+        const btnPrev = document.getElementById('sp-btn-prev');
+
+        if (cur && total && txt) {
+            // Calcular índice de la sección actual
+            const sections = Array.from(document.querySelectorAll('.sp-form-section'));
+            const idx = sections.findIndex(s => s.classList.contains('active'));
+            cur.textContent = String(idx >= 0 ? idx + 1 : 1);
+            total.textContent = String(sections.length);
+            const dilig = r.total === 0 ? 'libre' : (r.total - r.vacios.length) + '/' + r.total;
+            txt.textContent = (r.total === 0 ? 'Sin campos obligatorios' : dilig + ' campos diligenciados');
+        }
+        if (btnNext) {
+            // El botón siempre se puede pulsar; al hacer click se valida y se muestra error.
+            // Solo lo deshabilitamos si NO hay sección siguiente (última sección).
+            const sections = Array.from(document.querySelectorAll('.sp-form-section'));
+            const idx = sections.findIndex(s => s.classList.contains('active'));
+            btnNext.disabled = idx < 0 || idx >= sections.length - 1;
+        }
+        if (btnPrev) {
+            const sections = Array.from(document.querySelectorAll('.sp-form-section'));
+            const idx = sections.findIndex(s => s.classList.contains('active'));
+            btnPrev.disabled = idx <= 0;
+        }
+    }
+
+    /**
+     * 📦 Wizard: intenta avanzar a la siguiente sección. Si la actual tiene campos
+     * requeridos vacíos, los marca con borde rojo, hace focus al primero y muestra
+     * un toast de error con conteo. Si todo OK, navega a la siguiente.
+     */
+    _irASiguienteSeccion() {
+        const r = this._validarSeccionActual();
+        if (!r.valido) {
+            // Mostrar toast con conteo y nombres de los primeros 3 campos.
+            const nombres = r.vacios.slice(0, 3).map(v => v.nombre).join(', ');
+            const extra = r.vacios.length > 3 ? ` y ${r.vacios.length - 3} más` : '';
+            this.showNotification(
+                `Tienes ${r.vacios.length} campo(s) por diligenciar: ${nombres}${extra}`,
+                'error', 6000
+            );
+            // Focus + scroll al primer campo vacío
+            const primero = r.vacios[0];
+            if (primero && primero.el) {
+                try {
+                    primero.el.focus({ preventScroll: false });
+                } catch (e) {
+                    primero.el.focus();
+                }
+                primero.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            return false;
+        }
+
+        // Avanzar a la siguiente sección visible y habilitada
+        const sections = Array.from(document.querySelectorAll('.sp-form-section'));
+        const idx = sections.findIndex(s => s.classList.contains('active'));
+        if (idx < 0 || idx >= sections.length - 1) return true;
+        const nextSection = sections[idx + 1];
+        const sectionId = nextSection.id.replace(/^sp-section-/, '');
+        // Saltarse la sección Calificación si está atenuada (no aplica al caso).
+        if (sectionId === 'calificacion' && nextSection.classList.contains('sp-section-dimmed')) {
+            // Si la calificación está atenuada, saltarla e ir a la anterior ya está cubierta
+            // al volver; aquí el flujo natural lleva al usuario al final del wizard.
+            // Igual navegamos porque la atenuación no la hace desaparecer del DOM.
+        }
+        const navItems = document.querySelectorAll('.sp-nav-item');
+        const targetNav = navItems[idx + 1];
+        if (targetNav) {
+            this.showSeguimientoPanelSection(sectionId, targetNav);
+            this._actualizarProgresoSeccion();
+            // Scroll al top del panel
+            const contentArea = document.querySelector('.sp-content-area');
+            if (contentArea) contentArea.scrollTop = 0;
+        }
+        return true;
+    }
+
+    /**
+     * 📦 Wizard: ir a la sección anterior. Sin validación dura (porque ya llenamos
+     * la sección en la que estamos); solo navega.
+     */
+    _irASeccionAnterior() {
+        const sections = Array.from(document.querySelectorAll('.sp-form-section'));
+        const idx = sections.findIndex(s => s.classList.contains('active'));
+        if (idx <= 0) return;
+        const prevSection = sections[idx - 1];
+        const sectionId = prevSection.id.replace(/^sp-section-/, '');
+        const navItems = document.querySelectorAll('.sp-nav-item');
+        const targetNav = navItems[idx - 1];
+        if (targetNav) {
+            this.showSeguimientoPanelSection(sectionId, targetNav);
+            this._actualizarProgresoSeccion();
+            const contentArea = document.querySelector('.sp-content-area');
+            if (contentArea) contentArea.scrollTop = 0;
+        }
+    }
+
+    /**
+     * 📦 Wizard: handler único para clicks en las nav-tabs. Valida si la sección
+     * destino está desbloqueada y, si no, aborta con un toast claro.
+     *
+     * Reglas:
+     *  - idx destino <= idx actual → permitido (atrás o misma).
+     *  - idx destino === idx actual + 1 → permitido SOLO si la sección actual pasa
+     *    _validarSeccionActual(); si falla, muestra toast y hace focus al 1er vacío.
+     *  - idx destino > idx actual + 1 → NO permitido. Toast: "completa las secciones
+     *    intermedias primero". El usuario DEBE ir paso a paso con "Siguiente".
+     */
+    _intentarNavegarANavItem(navEl, sectionId) {
+        const sections = Array.from(document.querySelectorAll('.sp-form-section'));
+        const targetIdx = sections.findIndex(s => s.id === `sp-section-${sectionId}`);
+        const idxActual = sections.findIndex(s => s.classList.contains('active'));
+        if (targetIdx < 0 || idxActual < 0) return;
+
+        // Click en la misma sección: no hacer nada
+        if (targetIdx === idxActual) return;
+
+        // Click atrás: siempre permitido
+        if (targetIdx < idxActual) {
+            this.showSeguimientoPanelSection(sectionId, navEl);
+            this._actualizarProgresoSeccion();
+            const contentArea = document.querySelector('.sp-content-area');
+            if (contentArea) contentArea.scrollTop = 0;
+            return;
+        }
+
+        // Click 1 adelante: exigir validación
+        if (targetIdx === idxActual + 1) {
+            const r = this._validarSeccionActual();
+            if (!r.valido) {
+                const nombres = r.vacios.slice(0, 3).map(v => v.nombre).join(', ');
+                const extra = r.vacios.length > 3 ? ` y ${r.vacios.length - 3} más` : '';
+                this.showNotification(
+                    `Completa los ${r.vacios.length} campo(s) pendiente(s) en esta sección antes de avanzar: ${nombres}${extra}`,
+                    'error', 6000
+                );
+                const primero = r.vacios[0];
+                if (primero && primero.el) {
+                    try { primero.el.focus({ preventScroll: false }); } catch (e) { primero.el.focus(); }
+                    primero.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+                return;
+            }
+            // OK: navegar
+            this.showSeguimientoPanelSection(sectionId, navEl);
+            this._actualizarProgresoSeccion();
+            const contentArea = document.querySelector('.sp-content-area');
+            if (contentArea) contentArea.scrollTop = 0;
+            return;
+        }
+
+        // Click más adelante (salto): bloquear
+        const restantes = targetIdx - idxActual;
+        const palabra = restantes === 1 ? 'sección' : 'secciones';
+        this.showNotification(
+            `Debes avanzar paso a paso. Completa las ${restantes} ${palabra} intermedia(s) usando el botón "Siguiente" antes de saltar a "${sectionId}".`,
+            'warning', 5000
+        );
+    }
+
+    /**
+     * 📦 Aplica el candado visual a las navs futuras: idx > idxActual se marcan
+     * como is-locked-step (con candado y pointer-events:none). Las pasadas y la
+     * actual quedan libres.
+     *
+     * Se llama automáticamente desde showSeguimientoPanelSection después de
+     * cada cambio de sección, así que el candado siempre refleja el estado real.
+     */
+    _aplicarBloqueoStepNav() {
+        const sections = Array.from(document.querySelectorAll('.sp-form-section'));
+        const idxActual = sections.findIndex(s => s.classList.contains('active'));
+        const navItems = document.querySelectorAll('.sp-nav-item');
+        navItems.forEach((nav, i) => {
+            if (i > idxActual) {
+                nav.classList.add('is-locked-step');
+                if (!nav.querySelector('.sp-nav-lock-icon')) {
+                    const icon = document.createElement('i');
+                    icon.className = 'fas fa-lock sp-nav-lock-icon';
+                    nav.appendChild(icon);
+                }
+                if (!nav.getAttribute('title')) {
+                    nav.setAttribute('title', 'Completa esta sección y haz clic en "Siguiente" para desbloquear');
+                }
+            } else {
+                nav.classList.remove('is-locked-step');
+                const icon = nav.querySelector('.sp-nav-lock-icon');
+                if (icon) icon.remove();
+                if (nav.getAttribute('title') && nav.getAttribute('title').indexOf('desbloquear') >= 0) {
+                    nav.removeAttribute('title');
+                }
+            }
+        });
     }
 
     /**
