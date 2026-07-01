@@ -45,6 +45,8 @@ const { registerRevisionAltaDireccionHandlers } = require('./main/revision-alta-
 // Importar handlers de Auditoría Anual (Submódulo 6.1.2) — F1 (2026-06-19)
 const { registerAuditoriaAnualHandlers } = require('./main/auditoria-anual-bridge');
 const { registerAccionesPreventivasCorrectivasHandlers } = require('./main/acciones-preventivas-correctivas-bridge');
+// K+AIR Calendar — bridge de eventos rápidos (botón calendario del header)
+const { registerEventosRapidosHandlers } = require('./main/eventos-rapidos-bridge');
 
 // Capturar promesas no manejadas globalmente
 process.on('unhandledRejection', (reason, promise) => {
@@ -3807,6 +3809,24 @@ ipcMain.handle('repair-plan-trabajo-excel', async (event, { filePath, templatePa
     sendLog(`[REPAIR-PLAN][ERROR] Stack: ${error.stack}`, 'ERROR');
     return { success: false, error: error.message };
   }
+});
+
+// ── K+AIR Calendar: Plan de Trabajo (placeholder v1) ──────────────────
+// TODO v2: leer el cronograma del Plan de Trabajo Anual (Excel GI-FO-062 o similar)
+// y mapear cada actividad con fecha a un evento { id, title, date, start, end, type: 'plan' }.
+// Por ahora devuelve [] para que el calendario muestre solo auditoría + eventos rápidos.
+ipcMain.handle('plan-trabajo:get-events', async (event, range) => {
+  sendLog('[CAL-PLAN-TRABAJO] placeholder v1 — devolviendo [] (TODO: implementar mapper Excel)', 'INFO');
+  return { success: true, data: [] };
+});
+
+// ── K+AIR Calendar: Capacitaciones (placeholder v1) ───────────────────
+// TODO v2: leer el archivo de capacitaciones (xlsx vía get-capacitaciones-sheets),
+// parsear las filas con fechas y mapear a eventos { id, title, date, start, end, type: 'capacitacion' }.
+// Por ahora devuelve [] para que el calendario muestre solo auditoría + eventos rápidos.
+ipcMain.handle('capacitaciones:get-events', async (event, range) => {
+  sendLog('[CAL-CAPACITACIONES] placeholder v1 — devolviendo [] (TODO: implementar mapper Excel)', 'INFO');
+  return { success: true, data: [] };
 });
 
 // Handler para obtener las hojas de un archivo de capacitaciones
@@ -7818,6 +7838,14 @@ try {
   sendLog('[MAIN] Handlers de Acciones Preventivas y Correctivas (7.1.1) registrados correctamente', 'INFO');
 } catch (err) {
   sendLog(`[MAIN] Error registrando handlers de Acciones Preventivas y Correctivas: ${err.message}`, 'ERROR');
+}
+
+// Registrar handlers de K+AIR Calendar — eventos rápidos (botón calendario del header)
+try {
+  registerEventosRapidosHandlers(app, { getDb });
+  sendLog('[MAIN] Handlers de K+AIR Calendar / eventos-rapidos registrados correctamente', 'INFO');
+} catch (err) {
+  sendLog(`[MAIN] Error registrando handlers de eventos-rapidos: ${err.message}`, 'ERROR');
 }
 
  // Registrar handlers de FURAT - Reportes de Accidentes (Submódulo 3.2.1)

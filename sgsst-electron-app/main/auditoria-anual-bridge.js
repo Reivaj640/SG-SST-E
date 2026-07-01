@@ -1336,7 +1336,52 @@ function registerAuditoriaAnualHandlers(app, deps) {
     return s;
   }
 
-  _log('INIT', 'Handlers de Auditoría Anual registrados correctamente (7 canales)');
+  // ── K+AIR Calendar: devolver fases/auditorías como eventos (rango visible) ──
+  ipcMain.handle('auditoria:get-fases', async function (event, range) {
+    try {
+      var db = _getDb();
+      if (!db) return { success: false, error: { code: 'NO_DB', message: 'DB no disponible' } };
+      _ensureSchema(db);
+
+      var start = range && range.start;
+      var end = range && range.end;
+      var rows;
+      if (start && end && /^\d{4}-\d{2}-\d{2}$/.test(start) && /^\d{4}-\d{2}-\d{2}$/.test(end)) {
+        rows = db.prepare(
+          'SELECT id, empresa_id, nombre, fecha_inicio, fecha_fin, estado FROM auditorias_anual ' +
+          'WHERE fecha_inicio <= ? AND (fecha_fin IS NULL OR fecha_fin >= ?) ' +
+          'ORDER BY fecha_inicio ASC'
+        ).all(end, start);
+      } else {
+        rows = db.prepare(
+          'SELECT id, empresa_id, nombre, fecha_inicio, fecha_fin, estado FROM auditorias_anual ' +
+          'ORDER BY fecha_inicio DESC LIMIT 200'
+        ).all();
+      }
+
+      var eventos = [];
+      for (var i = 0; i < rows.length; i++) {
+        var r = rows[i];
+        if (!r.fecha_inicio) continue;
+        eventos.push({
+          id: 'aud-' + r.id,
+          title: r.nombre || 'Auditoría',
+          date: r.fecha_inicio,
+          start: null,
+          end: r.fecha_fin || null,
+          type: 'auditoria',
+          description: (r.estado ? 'Estado: ' + r.estado : '') + (r.empresa_id ? ' · Empresa: ' + r.empresa_id : '')
+        });
+      }
+      _log('CAL_FASES', 'rango=' + (start || '*') + '..' + (end || '*') + ' count=' + eventos.length);
+      return { success: true, data: eventos };
+    } catch (err) {
+      _log('CAL_FASES', 'ERROR ' + err.message, 'ERROR');
+      return { success: false, error: { code: 'INTERNAL_ERROR', message: err.message } };
+    }
+  });
+
+  _log('INIT', 'Handlers de Auditoría Anual registrados correctamente (8 canales)');
 }
 
 module.exports = { registerAuditoriaAnualHandlers: registerAuditoriaAnualHandlers };

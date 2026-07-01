@@ -213,6 +213,29 @@ contextBridge.exposeInMainWorld('electronAPI', {
   convertExcelToPdf: (filePath) => ipcRenderer.invoke('convertExcelToPdf', filePath),
   auditExcelContent: (data) => ipcRenderer.invoke('audit-excel-content', data),
 
+  // --- K+AIR Calendar: Eventos Rápidos ---
+  // Usado por el calendario central del header (#calendar-button).
+  // Crea/lee/edita/elimina eventos personales del usuario sin necesidad de un módulo específico.
+  eventosRapidos: {
+    list: (range) => ipcRenderer.invoke('eventos-rapidos:list', range),
+    create: (event) => ipcRenderer.invoke('eventos-rapidos:create', event),
+    update: (event) => ipcRenderer.invoke('eventos-rapidos:update', event),
+    remove: (id) => ipcRenderer.invoke('eventos-rapidos:remove', id)
+  },
+
+  // --- K+AIR Calendar: agregadores de las 3 fuentes principales ---
+  // Devuelven eventos en formato unificado: { id, title, date, start, end, type }.
+  // type puede ser: 'plan' | 'capacitacion' | 'auditoria' | 'rapido' | 'vencido'.
+  planTrabajo: {
+    getEvents: (range) => ipcRenderer.invoke('plan-trabajo:get-events', range)
+  },
+  capacitaciones: {
+    getEvents: (range) => ipcRenderer.invoke('capacitaciones:get-events', range)
+  },
+  auditoria: {
+    getFases: (range) => ipcRenderer.invoke('auditoria:get-fases', range)
+  },
+
   // --- Presupuesto ---
   getPresupuestoFiles: (companyName) => ipcRenderer.invoke('getPresupuestoFiles', companyName),
   readPresupuestoData: (filePath) => ipcRenderer.invoke('readPresupuestoData', filePath),

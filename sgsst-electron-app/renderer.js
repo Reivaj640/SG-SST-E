@@ -1661,15 +1661,46 @@ if (appHeader) {
     console.error('LLM button NOT found in DOM.');
   }
 
-  // Botón de calendario
+  // Botón de calendario (K+AIR Calendar Component v1 — popover centralizado)
   const calendarButton = document.getElementById('calendar-button');
   if (calendarButton) {
     console.log('Found calendar button, attaching event listener.');
-    calendarButton.addEventListener('click', function(event) {
-      console.log('Calendar button clicked.');
-      event.preventDefault(); // Prevenir comportamiento por defecto
-      toggleCalendarModal(); // Esta función mostrará/ocultará el calendario
-    });
+    if (typeof window.KairCalendar === 'object' && typeof window.KairCalendar.create === 'function') {
+      // Una sola instancia global — reusar si ya existe (p.ej. tras HMR o reinit).
+      if (!window.kairCal) {
+        window.kairCal = window.KairCalendar.create({
+          triggerSelector: '#calendar-button',
+          anchor: 'right',
+          inline: false,
+          initialView: 'month',
+          initialDate: new Date(),
+          locale: 'es',
+          showSidebar: true,
+          eventTypes: [
+            { id: 'plan',         label: 'Plan de Trabajo', color: '#174ea6' },
+            { id: 'capacitacion', label: 'Capacitación',    color: '#28a745' },
+            { id: 'auditoria',    label: 'Auditoría',       color: '#ffc107' },
+            { id: 'rapido',       label: 'Evento rápido',   color: '#6c757d' },
+            { id: 'vencido',      label: 'Vencido',         color: '#dc3545' }
+          ],
+          adapter: window.KairCalendarAdapter || null,
+          onEventClick: function (ev) {
+            // Eventos de plan/cap/aud → side panel con "Ir al módulo".
+            // Eventos rápidos → el calendario abre su modal nativo de edición.
+            if (ev && ev.type !== 'rapido' && window.calendarDetailPanel) {
+              window.calendarDetailPanel.open(ev);
+            }
+          }
+        });
+      } else {
+        // Ya existe: solo registrar el trigger adicional (no-op si ya estaba).
+        if (typeof window.kairCal.addTrigger === 'function') {
+          window.kairCal.addTrigger(calendarButton);
+        }
+      }
+    } else {
+      console.warn('[K+AIR] KairCalendar no disponible — el botón calendario no tendrá acción.');
+    }
   } else {
     console.error('Calendar button NOT found in DOM.');
   }
@@ -1689,176 +1720,6 @@ if (appHeader) {
 
   initializeAuthFlow();
 });
-
-// Variable para controlar el estado del modal del calendario
-let isCalendarModalVisible = false;
-let calendarModalElement = null;
-
-// Función para mostrar/ocultar el modal del calendario
-function toggleCalendarModal() {
-  if (isCalendarModalVisible) {
-    hideCalendarModal();
-  } else {
-    showCalendarModal();
-  }
-}
-
-// Función para mostrar el modal del calendario
-function showCalendarModal() {
-  // Eliminar el modal anterior si existe
-  if (calendarModalElement && document.body.contains(calendarModalElement)) {
-    document.body.removeChild(calendarModalElement);
-  }
-
-  // Obtener la posición del botón de calendario
-  const calendarButton = document.getElementById('calendar-button');
-  if (!calendarButton) {
-    console.error('Botón de calendario no encontrado');
-    return;
-  }
-
-  const rect = calendarButton.getBoundingClientRect();
-
-  // Crear el contenedor principal del modal
-  calendarModalElement = document.createElement('div');
-  calendarModalElement.id = 'calendar-modal';
-  calendarModalElement.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.1);
-    display: flex;
-    z-index: 9999;
-    pointer-events: auto;
-  `;
-
-  // Crear el contenedor del calendario
-  const calendarContainer = document.createElement('div');
-  calendarContainer.id = 'calendar-container';
-  // Calcular la posición para que el calendario no se salga de la pantalla
-  let calendarLeftPosition = rect.left + rect.width + 5; // Posición normal a la derecha del botón
-  const calendarWidth = 300; // Ancho del calendario
-  const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
-
-  // Si el calendario se saldría de la pantalla a la derecha, posicionarlo a la izquierda del botón
-  if (calendarLeftPosition + calendarWidth > viewportWidth) {
-    calendarLeftPosition = Math.max(0, rect.left - calendarWidth - 5); // Posicionar a la izquierda con margen
-  }
-
-  calendarContainer.style.cssText = `
-    background-color: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(10px);
-    border-radius: 8px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-    padding: 15px;
-    width: 300px;
-    height: 300px;
-    position: fixed;
-    top: ${rect.bottom + 5}px;
-    left: ${calendarLeftPosition}px; /* Posición calculada para evitar desbordamiento */
-    opacity: 0;
-    transform: scale(0.8);
-    transition: all 0.2s ease-out;
-    z-index: 10000;
-    border: 1px solid rgba(255, 255, 255, 0.3); /* Borde blanco semi-transparente */
-  `;
-
-  // Botón de cierre
-  const closeButton = document.createElement('button');
-  closeButton.innerHTML = '&times;';
-  closeButton.style.cssText = `
-    position: absolute;
-    top: 5px;
-    right: 8px;
-    background: none;
-    border: none;
-    font-size: 18px;
-    cursor: pointer;
-    color: #666;
-    padding: 0;
-    width: 20px;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 10001;
-    font-weight: bold;
-  `;
-  closeButton.addEventListener('click', hideCalendarModal);
-  calendarContainer.appendChild(closeButton);
-
-  // Contenido del calendario
-  const calendarContent = document.createElement('div');
-  calendarContent.id = 'calendar-content';
-  calendarContent.style.cssText = `
-    margin-top: 5px;
-    height: calc(100% - 10px);
-  `;
-  calendarContainer.appendChild(calendarContent);
-
-  // Agregar el contenedor del calendario al modal
-  calendarModalElement.appendChild(calendarContainer);
-
-  // Agregar el modal al body
-  document.body.appendChild(calendarModalElement);
-
-  // Inicializar el calendario en el contenedor
-  try {
-    if (window.VanillaCalendarPro) {
-      const { Calendar } = window.VanillaCalendarPro;
-      const calendar = new Calendar('#calendar-content', {
-        settings: {
-          selection: {
-            day: 'single',
-          },
-          visibility: {
-            theme: 'light',
-          }
-        }
-      });
-      calendar.init();
-    } else {
-      calendarContent.innerHTML = '<p style="color: #666; font-size: 14px; text-align: center; margin-top: 20px;">Error: Calendario no disponible.</p>';
-    }
-  } catch (error) {
-    console.error('Error al inicializar el calendario:', error);
-    calendarContent.innerHTML = '<p style="color: #666; font-size: 14px; text-align: center; margin-top: 20px;">Error al cargar el calendario.</p>';
-  }
-
-  // Activar la visibilidad con animación
-  setTimeout(() => {
-    calendarContainer.style.opacity = '1';
-    calendarContainer.style.transform = 'scale(1)';
-  }, 10);
-
-  isCalendarModalVisible = true;
-}
-
-// Función para ocultar el modal del calendario
-function hideCalendarModal() {
-  if (calendarModalElement && document.body.contains(calendarModalElement)) {
-    const calendarContainer = calendarModalElement.querySelector('#calendar-container');
-
-    // Aplicar animación de salida
-    if (calendarContainer) {
-      calendarContainer.style.transform = 'translateY(-10px) scale(0.95)';
-      calendarContainer.style.opacity = '0';
-      calendarModalElement.style.backgroundColor = 'rgba(0, 0, 0, 0)';
-
-      // Eliminar el modal después de la animación
-      setTimeout(() => {
-        if (document.body.contains(calendarModalElement)) {
-          document.body.removeChild(calendarModalElement);
-        }
-      }, 300);
-    } else {
-      document.body.removeChild(calendarModalElement);
-    }
-  }
-  isCalendarModalVisible = false;
-}
 
 // Variable para mantener el botón activo del sidebar
 let activeSidebarButton = null;
