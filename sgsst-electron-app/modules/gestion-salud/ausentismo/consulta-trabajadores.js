@@ -291,8 +291,15 @@ function limpiarBusqueda() {
 }
 
 function goBackToHome() {
+    // [📦454 2026-07-01] Cambiado de 'back-to-module-request' a 'back-to-submodule-home'.
+    // El handler global de renderer.js para back-to-module-request navegaba al
+    // MODULO principal (no al submódulo de Medición de Ausentismo) porque el
+    // componente de Medición de Ausentismo no califica como Portal Component
+    // (no tiene window.*PortalComponent). Usar back-to-submodule-home invoca
+    // el branch que detecta currentSubmodule y llama showSubmoduleContent(),
+    // que es exactamente lo que el usuario espera desde Consulta de Trabajadores.
     if (window.parent && window.parent.postMessage) {
-        window.parent.postMessage({ type: 'back-to-module-request' }, '*');
+        window.parent.postMessage({ type: 'back-to-submodule-home' }, '*');
     }
 }
 
