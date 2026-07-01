@@ -2248,11 +2248,27 @@ contentArea.innerHTML = '';
         zoom: 0.68
       });
       // 2026-06-27: forzar un resize inmediato para que Vanta ocupe todo el viewport.
-      // Sin esto, Vanta mide el contenedor antes de que termine el render y queda con
-      // tamaño menor, dejando una franja blanca en el lado derecho.
-      if (typeof window.vantaEffect.resize === 'function') {
-        setTimeout(() => window.vantaEffect.resize(), 50);
-        setTimeout(() => window.vantaEffect.resize(), 300);
+      // 2026-07-01 v2: los 2 setTimeout no alcanzaban — Vanta seguia con franja
+      // blanca en el lado derecho cuando el contenedor terminaba de expandirse
+      // despues de la animacion del splash. Reforzar con multiples intentos
+      // escalonados + listener permanente de resize + ResizeObserver.
+      const triggerResize = function () {
+        if (window.vantaEffect && typeof window.vantaEffect.resize === 'function') {
+          window.vantaEffect.resize();
+        }
+      };
+      // Multiples intentos escalonados (cubre fuentes web async, fonts, transitions).
+      setTimeout(triggerResize, 50);
+      setTimeout(triggerResize, 300);
+      setTimeout(triggerResize, 1000);
+      setTimeout(triggerResize, 2500);
+      // Listener permanente: cualquier resize del window reajusta Vanta.
+      window.addEventListener('resize', triggerResize);
+      // ResizeObserver: detecta cambios del contenedor (CSS animations, flex).
+      if (typeof ResizeObserver !== 'undefined') {
+        const ro = new ResizeObserver(triggerResize);
+        const vantaEl = document.getElementById('vanta-login-container');
+        if (vantaEl) ro.observe(vantaEl);
       }
       console.log('Vanta.js aplicado al login correctamente');
     }, 100);
