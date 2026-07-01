@@ -2368,7 +2368,7 @@ class MedicionAusentismoComponent {
                                     <input type="date" id="sp-fecha-ingreso" class="sp-form-control" onchange="window.medicAusentismoComponent.calcularAntiguedad()">
                                 </div>
                                 <div class="sp-form-group">
-                                    <label class="sp-form-label">Antigüedad (Años)</label>
+                                    <label class="sp-form-label">Antigüedad (Meses)</label>
                                     <input type="number" id="sp-antiguedad" class="sp-form-control" placeholder="0">
                                 </div>
                                 <div class="sp-form-group">
@@ -3584,16 +3584,18 @@ class MedicionAusentismoComponent {
         const fechaIngreso = new Date(fechaIngresoInput.value);
         const hoy = new Date();
 
-        let anios = hoy.getFullYear() - fechaIngreso.getFullYear();
-        const mesDiferencia = hoy.getMonth() - fechaIngreso.getMonth();
+        // [📦455 v4] Calcular meses totales desde la fecha de ingreso hasta hoy.
+        // (anios * 12) + meses_transcurridos, ajustando si el dia del mes actual
+        // es menor al dia del mes de ingreso (aun no cumplio el mes completo).
+        let mesesTotales = (hoy.getFullYear() - fechaIngreso.getFullYear()) * 12
+            + (hoy.getMonth() - fechaIngreso.getMonth());
 
-        // Ajustar si aún no ha cumplido año completo
-        if (mesDiferencia < 0 || (mesDiferencia === 0 && hoy.getDate() < fechaIngreso.getDate())) {
-            anios--;
+        if (hoy.getDate() < fechaIngreso.getDate()) {
+            mesesTotales--;
         }
 
-        antiguedadInput.value = anios >= 0 ? anios : 0;
-        console.log('[SEGUIMIENTO] Antigüedad calculada:', anios, 'años');
+        antiguedadInput.value = mesesTotales >= 0 ? mesesTotales : 0;
+        console.log('[SEGUIMIENTO] Antigüedad calculada:', mesesTotales, 'meses');
     }
 
     /**
@@ -3694,7 +3696,12 @@ class MedicionAusentismoComponent {
         // Datos básicos del trabajador (SOLO nombre y cédula, lo demás vacío para caso nuevo)
         document.getElementById('sp-nombre').value = empleadoData.nombre || '';
         document.getElementById('sp-cedula').value = empleadoData.cedula || '';
-        
+
+        // [📦455 2026-07-01 v3] Auto-completar cargo, area, fecha ingreso, salario
+        // y fecha de nacimiento desde BD de personal ASEL. Misma fuente que usa
+        // Consulta de Trabajadores. Llamada async que no bloquea el modal.
+        this._loadDatosEmpleado(empleadoData.cedula);
+
         // Los demás campos se dejan VACÍOS para que el usuario los diligencie manualmente
         document.getElementById('sp-genero').value = '';
         document.getElementById('sp-cargo').value = '';
@@ -3736,6 +3743,201 @@ class MedicionAusentismoComponent {
         document.getElementById('sp-fecha-inicio-remoto').value = '';
 
         console.log('[SEGUIMIENTO][PANEL] Panel vacío para nuevo caso - solo nombre y cédula precargados');
+    }
+
+    /**
+     * [📦455 2026-07-01 v2] Auto-completar Fecha de Nacimiento desde BD de personal ASEL/Temporales.
+     * Usa el mismo endpoint que Consulta de Trabajadores (consultarTrabajadoresGlobal)
+     * con la misma robustez de parseo que formatearFecha() de ese modulo: maneja
+     * Date objects, strings ISO, strings dd/mm/yyyy y Excel serial numbers.
+     *
+     * Race-safe: si el usuario cambia de empleado antes de que llegue la respuesta,
+     * el token comparativo descarta el resultado obsoleto.
+     */
+    async _loadDatosEmpleado(cedula) {
+        if (!cedula) return;
+        // Token anti-race: descarta respuestas tardias si el usuario ya cambio de empleado.
+        this._datosEmpToken = (this._datosEmpToken || 0) + 1;
+        const myToken = this._datosEmpToken;
+        try {
+            if (!window.electronAPI || typeof window.electronAPI.consultarTrabajadoresGlobal !== 'function') {
+                return;
+            }
+            const result = await window.electronAPI.consultarTrabajadoresGlobal({
+                cedula: String(cedula).trim(),
+                nombre: '',
+                empresa: 'all'
+            });
+            // Si el usuario ya selecciono otro empleado, descartar.
+            if (myToken !== this._datosEmpToken) return;
+            if (!result || !result.success || !Array.isArray(result.data) || result.data.length === 0) {
+                return;
+            }
+            // Preferir registro ASEL (BD de personal); caer a cualquier resultado si no hay.
+            const trab = result.data.find(t => t.tipoBD === 'ASEL') || result.data[0];
+
+            // Cargo Actual
+            this._setInputValue('sp-cargo', trab.cargo);
+
+            // Area / Dependencia (algunas BDs usan 'departamento', otras 'ubicacion')
+            this._setInputValue('sp-area', trab.departamento || trab.ubicacion);
+
+            // EPS y AFP (datos utiles que normalmente faltan)
+            this._setInputValue('sp-eps', trab.eps);
+            this._setInputValue('sp-afp', trab.afp);
+
+            // Fecha de Ingreso: usar el parser robusto (mismo helper que fecha nacimiento)
+            const fechaIngRaw = trab.fechaIngreso || trab.fecIng || trab.fecha_ingreso || '';
+            const fechaIng = this._parsearFechaNacimiento(fechaIngRaw);
+            if (fechaIng) {
+                const input = document.getElementById('sp-fecha-ingreso');
+                if (input) {
+                    input.value = fechaIng.toISOString().split('T')[0];
+                    this.calcularAntiguedad();
+                }
+            }
+
+            // Salario: limpiar simbolos y separadores antes de asignar a input type=number.
+            // El backend puede enviarlo como '$ 1.500.000' o '1500000' o 'No disponible'.
+            if (trab.salario != null && trab.salario !== '' && String(trab.salario).toLowerCase() !== 'no disponible') {
+                const salNum = parseFloat(String(trab.salario).replace(/[^\d.-]/g, ''));
+                const input = document.getElementById('sp-salario');
+                if (input && !isNaN(salNum) && salNum > 0) {
+                    input.value = salNum;
+                }
+            }
+
+            // Fecha de Nacimiento: misma logica que antes (mantener compatibilidad)
+            const fechaNacRaw = trab.fechaNacimiento || trab.fecNac || trab.fecha_nacimiento || '';
+            const fechaNac = this._parsearFechaNacimiento(fechaNacRaw);
+            if (fechaNac) {
+                const input = document.getElementById('sp-fecha-nacimiento');
+                if (input) {
+                    input.value = fechaNac.toISOString().split('T')[0];
+                    this.calcularEdad();
+                }
+            }
+
+            console.log('[SEGUIMIENTO] Datos del empleado auto-cargados:', {
+                cargo: !!trab.cargo,
+                area: !!(trab.departamento || trab.ubicacion),
+                fechaIngRaw: fechaIngRaw,
+                salario: trab.salario,
+                fechaNac: !!fechaNac
+            });
+        } catch (err) {
+            // Silencioso: si falla la BD, el usuario puede digitar manualmente.
+            if (myToken !== this._datosEmpToken) return;
+            console.log('[SEGUIMIENTO] No se pudieron auto-cargar datos del empleado:', err && err.message ? err.message : err);
+        }
+    }
+
+    /**
+     * [📦455 v3] Helper simple: setea .value en un input por id, solo si el valor es
+     * truthy y el input existe. Usado por _loadDatosEmpleado.
+     */
+    _setInputValue(id, value) {
+        if (value == null || value === '') return;
+        const el = document.getElementById(id);
+        if (el) el.value = String(value);
+    }
+
+    /**
+     * [📦455 2026-07-01 v3] Parsea fechas de nacimiento en cualquier formato que
+     * venga del Excel (Date object, ISO string, dd/mm/yyyy, YYYYMMDD sin
+     * separadores, Excel serial number, timestamp ms).
+     *
+     * IMPORTANTE (v3): el caso YYYYMMDD debe probarse ANTES del fallback ISO,
+     * porque new Date('19830927') se interpreta como 19.830.927 ms desde epoch
+     * (que cae en año 1980, NO en la fecha 27-sept-1983 que el dato representa).
+     *
+     * Rechaza fechas invalidas (epoch 1970, años < 1940 o > año actual).
+     * Inspirado en formatearFecha() de consulta-trabajadores.js.
+     * @param {*} fecha - Valor crudo de la BD de personal
+     * @returns {Date|null} - Date valida o null si no se puede parsear
+     */
+    _parsearFechaNacimiento(fecha) {
+        if (fecha == null || fecha === '') return null;
+        try {
+            // Caso 1: ya es Date object
+            if (fecha instanceof Date) {
+                if (isNaN(fecha.getTime())) return null;
+                if (fecha.getFullYear() < 1940 || fecha.getFullYear() > new Date().getFullYear()) return null;
+                return fecha;
+            }
+            const str = String(fecha).trim();
+            if (!str) return null;
+
+            // ============================================================
+            // Caso 2 (v3): string YYYYMMDD (8 digitos, sin separadores) — PRIORIDAD ALTA
+            // Detecta esto ANTES de new Date() porque la conversion ISO basica
+            // interpreta '19830927' como ms (no como fecha), produciendo 1970-01-01.
+            // ============================================================
+            if (/^\d{8}$/.test(str)) {
+                const anio = parseInt(str.substring(0, 4), 10);
+                const mes = parseInt(str.substring(4, 6), 10) - 1;
+                const dia = parseInt(str.substring(6, 8), 10);
+                const d4 = new Date(anio, mes, dia);
+                if (!isNaN(d4.getTime()) && d4.getFullYear() >= 1940 && d4.getFullYear() <= new Date().getFullYear()) {
+                    return d4;
+                }
+            }
+
+            // ============================================================
+            // Caso 3: string ISO (YYYY-MM-DD o con tiempo)
+            // Solo si Caso 2 no matcheo. NOTA: la iso basica sin separadores
+            // ('19830927') no la usamos aqui porque fue atrapada por Caso 2.
+            // ============================================================
+            const isoMatch = str.match(/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}.*)?$/);
+            if (isoMatch) {
+                const date = new Date(str);
+                if (!isNaN(date.getTime()) && date.getFullYear() >= 1940 && date.getFullYear() <= new Date().getFullYear()) {
+                    return date;
+                }
+            }
+
+            // ============================================================
+            // Caso 4: string dd/mm/yyyy o dd-mm-yyyy
+            // ============================================================
+            const ddmmyyyy = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+            if (ddmmyyyy) {
+                const dia = parseInt(ddmmyyyy[1], 10);
+                const mes = parseInt(ddmmyyyy[2], 10) - 1;
+                let anio = parseInt(ddmmyyyy[3], 10);
+                if (anio < 100) anio = anio < 50 ? 2000 + anio : 1900 + anio;
+                // Solo aceptar anios en rango razonable de fechas de nacimiento.
+                if (anio >= 1940 && anio <= new Date().getFullYear()) {
+                    const d3 = new Date(anio, mes, dia);
+                    if (!isNaN(d3.getTime()) && d3.getFullYear() >= 1940 && d3.getFullYear() <= new Date().getFullYear()) {
+                        return d3;
+                    }
+                }
+            }
+
+            // ============================================================
+            // Caso 5: numero serial de Excel (eg. 28000 para 1976-08-21).
+            // Seriales Excel razonables estan entre 1 (1900) y ~60000 (año 2064).
+            // Si es > 100000 NO es serial — es otra cosa (timestamp ms o year*10000+mmdd).
+            // ============================================================
+            if (/^\d+(\.\d+)?$/.test(str)) {
+                const serial = parseFloat(str);
+                if (serial >= 1 && serial < 100000) {
+                    // Excel epoch: 1899-12-30 (corrigiendo el bug del 29-feb-1900)
+                    const ms = (serial - 25569) * 86400 * 1000;
+                    const d = new Date(ms);
+                    if (!isNaN(d.getTime()) && d.getFullYear() >= 1940 && d.getFullYear() <= new Date().getFullYear()) {
+                        return d;
+                    }
+                }
+                // Si es numero grande (timestamp ms o year*10000+mmdd NO matcheable),
+                // retornar null — mejor no asignar nada que asignar una fecha incorrecta.
+                return null;
+            }
+
+            return null;
+        } catch (e) {
+            return null;
+        }
     }
 
     /**
