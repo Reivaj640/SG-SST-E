@@ -308,12 +308,37 @@ function renderizarError(mensaje) {
 }
 
 function mostrarToast(mensaje, tipo) {
-    var toast = document.getElementById('ct-toast');
-    var toastMessage = document.getElementById('ct-toast-message');
-    toast.className = 'ct-toast toast-' + (tipo || 'info');
-    toastMessage.textContent = mensaje;
-    toast.classList.add('show');
-    setTimeout(function () { toast.classList.remove('show'); }, 3500);
+    // [📦453 2026-07-01] Migrado al sistema de notificaciones K+AIR (estandar 6.1.3).
+    // El toast custom ct-toast era local al iframe y tenia look inconsistente
+    // con el resto de la app. Ahora usa window.parent.updateNotifier.show()
+    // con fallback a window.updateNotifier para que funcione tambien si el
+    // modulo se monta standalone (sin iframe).
+    var notifier = (window.parent && window.parent.updateNotifier) || window.updateNotifier;
+    if (notifier && typeof notifier.show === 'function') {
+        var titles = {
+            success: 'Busqueda completada',
+            warning: 'Atencion',
+            error: 'Error en la consulta',
+            info: 'Informacion'
+        };
+        var autoCloses = {
+            success: 4000,
+            warning: 5000,
+            error: 6000,
+            info: 4000
+        };
+        notifier.show({
+            type: tipo || 'info',
+            title: titles[tipo] || 'Consulta de Trabajadores',
+            subtitle: mensaje,
+            autoClose: autoCloses[tipo] || 4500
+        });
+        return;
+    }
+    // Fallback final: console (silencioso, no rompe el flujo si no hay notifier).
+    if (tipo === 'error') console.error('[consulta-trabajadores]', mensaje);
+    else if (tipo === 'warning') console.warn('[consulta-trabajadores]', mensaje);
+    else console.log('[consulta-trabajadores]', mensaje);
 }
 
 function normalizarEstado(estado) {

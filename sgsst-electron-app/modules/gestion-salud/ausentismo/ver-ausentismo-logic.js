@@ -74,7 +74,19 @@ class VerAusentismoComponent {
           if (this.ausentismoFilePath) {
             window.electronAPI.openPath(this.ausentismoFilePath);
           } else {
-            alert('La ruta del archivo no está disponible.');
+            // [📦453 2026-07-01] Migrado de alert() nativo a window.updateNotifier
+            // (sistema de notificaciones estandar 6.1.3 — feedback no bloqueante).
+            var notifier = (window.parent && window.parent.updateNotifier) || window.updateNotifier;
+            if (notifier && typeof notifier.show === 'function') {
+              notifier.show({
+                type: 'warning',
+                title: 'Ruta no disponible',
+                subtitle: 'No se encontro la ruta del archivo de ausentismo. Verifica que el archivo este sincronizado.',
+                autoClose: 5000
+              });
+            } else {
+              alert('La ruta del archivo no está disponible.');
+            }
           }
         });
         contentDiv.appendChild(openFileButton);

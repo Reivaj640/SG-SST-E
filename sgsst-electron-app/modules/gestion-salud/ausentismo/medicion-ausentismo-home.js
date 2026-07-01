@@ -243,10 +243,22 @@ function loadInformePriBuilder() {
     const contentArea = document.getElementById('content-area');
     if (!contentArea) {
         console.error('[HOME] No se encontro content-area');
-        alert('Error: No se pudo cargar la vista del informe');
+        // [📦453 2026-07-01] Migrado de alert() nativo a window.updateNotifier
+        // (sistema de notificaciones estandar 6.1.3 — feedback no bloqueante).
+        const notifier1 = (window.parent && window.parent.updateNotifier) || window.updateNotifier;
+        if (notifier1 && typeof notifier1.show === 'function') {
+            notifier1.show({
+                type: 'error',
+                title: 'Error cargando informe',
+                subtitle: 'No se encontro content-area. Vuelve al menu y reintenta.',
+                autoClose: 6000
+            });
+        } else {
+            alert('Error: No se pudo cargar la vista del informe');
+        }
         return;
     }
-    
+
     // Cargar el HTML del constructor
     fetch('modules/gestion-salud/ausentismo/informe-pri-builder.html')
         .then(response => {
@@ -261,7 +273,19 @@ function loadInformePriBuilder() {
         })
         .catch(error => {
             console.error('[HOME] Error cargando informe:', error);
-            alert('Error al cargar el constructor de informes: ' + error.message);
+            // [📦453 2026-07-01] Migrado de alert() nativo a window.updateNotifier
+            // (sistema de notificaciones estandar 6.1.3 — feedback no bloqueante).
+            const notifier2 = (window.parent && window.parent.updateNotifier) || window.updateNotifier;
+            if (notifier2 && typeof notifier2.show === 'function') {
+                notifier2.show({
+                    type: 'error',
+                    title: 'Error cargando constructor',
+                    subtitle: 'No se pudo cargar el constructor de informes: ' + error.message,
+                    autoClose: 6000
+                });
+            } else {
+                alert('Error al cargar el constructor de informes: ' + error.message);
+            }
         });
 }
 
