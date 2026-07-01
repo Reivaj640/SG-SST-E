@@ -254,38 +254,61 @@ async function ensureOllamaRunning() {
 
     // 2. Intentar iniciar `ollama serve` en background
     const { spawn } = require('child_process');
+    const fs = require('fs');
     const candidates = [
         'ollama',                                          // PATH
         'C:\\Users\\Javier RF\\AppData\\Local\\Programs\\Ollama\\ollama.exe', // instalación típica Windows
         path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Ollama', 'ollama.exe'),
     ];
     for (const cmd of candidates) {
+        // Si es una ruta absoluta y NO existe, saltar sin intentar (evita ENOENT ruidoso)
+        if (cmd !== 'ollama' && !fs.existsSync(cmd)) {
+            sendLog(`[OLLAMA] ${cmd} no existe, saltando...`, 'INFO');
+            continue;
+        }
+
+        let proc;
         try {
             sendLog(`[OLLAMA] Intentando iniciar con: ${cmd} serve`);
-            const proc = spawn(cmd, ['serve'], {
+            proc = spawn(cmd, ['serve'], {
                 detached: true,
                 stdio: 'ignore',
                 windowsHide: true,
             });
-            proc.unref();
-            // Esperar hasta 15s a que responda
-            for (let i = 0; i < 30; i++) {
-                await new Promise(r => setTimeout(r, 500));
-                try {
-                    await new Promise((resolve, reject) => {
-                        const req = http.request({ hostname: '127.0.0.1', port: 11434, path: '/', method: 'GET', timeout: 1000 }, () => resolve());
-                        req.on('error', reject);
-                        req.end();
-                    });
-                    sendLog(`[OLLAMA] Iniciado correctamente (PID ${proc.pid})`);
-                    return true;
-                } catch (e) { /* seguir esperando */ }
-            }
-            sendLog('[OLLAMA] No respondió en 15s, continuando de todas formas...', 'WARN');
-            return false;
         } catch (e) {
             sendLog(`[OLLAMA] No se pudo iniciar con ${cmd}: ${e.message}`, 'WARN');
+            continue;
         }
+
+        // ENOENT y otros errores del child process son ASÍNCRONOS — no caen en try/catch.
+        // Sin este handler, el error se propaga como uncaughtException y rompe Electron.
+        let spawnError = null;
+        proc.on('error', (err) => {
+            spawnError = err;
+            sendLog(`[OLLAMA] ${cmd} falló al iniciar: ${err.message}`, 'WARN');
+        });
+        proc.unref();
+
+        // Esperar hasta 15s a que responda
+        for (let i = 0; i < 30; i++) {
+            await new Promise(r => setTimeout(r, 500));
+            if (spawnError) break; // falló el spawn, no tiene sentido seguir esperando
+            try {
+                await new Promise((resolve, reject) => {
+                    const req = http.request({ hostname: '127.0.0.1', port: 11434, path: '/', method: 'GET', timeout: 1000 }, () => resolve());
+                    req.on('error', reject);
+                    req.end();
+                });
+                sendLog(`[OLLAMA] Iniciado correctamente (PID ${proc.pid})`);
+                return true;
+            } catch (e) { /* seguir esperando */ }
+        }
+
+        if (spawnError) {
+            // Falló este candidato, probar el siguiente
+            continue;
+        }
+        sendLog(`[OLLAMA] ${cmd} no respondió en 15s, probando siguiente candidato...`, 'WARN');
     }
     sendLog('[OLLAMA] No se pudo iniciar automáticamente. El usuario debe correr "ollama serve" manualmente.', 'WARN');
     return false;
