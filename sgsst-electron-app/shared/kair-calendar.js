@@ -253,7 +253,7 @@
     const pop = document.createElement('div');
     pop.className = 'kair-cal-popover kair-cal-popover--anchor-' + this.opts.anchor;
     pop.setAttribute('role', 'dialog');
-    pop.setAttribute('aria-modal', 'false');
+    pop.setAttribute('aria-modal', 'true');
     pop.setAttribute('aria-label', 'Calendario K+AIR');
     pop.innerHTML =
       // ===== Topbar estilo Bitrix24: logo + búsqueda + toggle + settings =====
@@ -331,30 +331,69 @@
       '</div>';
 
     // Anclar al trigger o al body (en modo inline, _buildInline se encarga del montaje)
+    // ═══════════════════════════════════════════════════════════════════════════
+    // [Fix 2026-07-01] Calendar como MODAL central (z-index 1100):
+    // En lugar de anclar el pop al wrapper del trigger (donde #app-header lo
+    // recorta via overflow:hidden), envolver el pop en un .kair-cal-modal-overlay
+    // que vive en document.body. Asi queda por encima de TODO y es independiente
+    // del header. Reusa el mismo patron CSS que el modal de "Nuevo evento".
+    // ═══════════════════════════════════════════════════════════════════════════
     if (!inline) {
-      if (this._els.trigger && this._els.trigger.parentElement) {
-        // wrap: necesitamos position:relative en el contenedor del trigger
-        const wrapper = this._els.trigger.parentElement;
-        if (getComputedStyle(wrapper).position === 'static') {
-          wrapper.classList.add('kair-cal-trigger-wrap');
-          // inyecta regla mínima inline para garantizar position relative sin tocar CSS global
-          if (!document.getElementById('kair-cal-wrap-style')) {
-            const s = document.createElement('style');
-            s.id = 'kair-cal-wrap-style';
-            s.textContent = '.kair-cal-trigger-wrap{position:relative;}';
-            document.head.appendChild(s);
-          }
-        }
-        wrapper.appendChild(pop);
-      } else {
-        // Sin trigger: anclado a body con posición fija (esquina sup. derecha)
-        pop.classList.add('kair-cal-popover--floating');
-        document.body.appendChild(pop);
-      }
+      // Estilos para que el pop se vea como modal grande.
+      // [Fix 2026-07-01 v2] NO forzar opacity/pointer-events inline — debe
+      // heredar del overlay via las clases --open para que cuando el calendario
+      // esta cerrado los clicks pasen a traves (no quede bloqueando el header).
+      pop.classList.remove('kair-cal-popover--anchor-right', 'kair-cal-popover--anchor-left', 'kair-cal-popover--anchor-center');
+      pop.style.position = 'relative';
+      pop.style.top = 'auto';
+      pop.style.right = 'auto';
+      pop.style.left = 'auto';
+      pop.style.transform = 'none';
+      pop.style.width = '960px';
+      pop.style.maxWidth = 'calc(100vw - 64px)';
+      pop.style.maxHeight = 'calc(100vh - 32px)';
+      // [Fix 2026-07-01 v4] Modal ocupa casi todo el alto del viewport para
+      // que la grilla del mes (5-6 filas) entre sin cortarse en pantallas <800px.
+      pop.style.height = 'calc(100vh - 32px)';
+
+      const overlay = document.createElement('div');
+      overlay.className = 'kair-cal-modal-overlay kair-cal-overlay--main';
+      overlay.appendChild(pop);
+      document.body.appendChild(overlay);
+      this._els.overlay = overlay;
+
+      // Click en el backdrop (overlay, no descendiente del pop) cierra el
+      // calendario principal. Guard 200ms anti doble-disparo: si el click
+      // viene del trigger bubbled up inmediatamente despues de open(), no cerrar.
+      this._on(overlay, 'click', function (e) {
+        if (e.target !== overlay) return; // click dentro del pop: ignorar
+        // [Fix 2026-07-01 v3] Si el modal de "Nuevo evento" esta abierto,
+        // no cerrar el calendario principal. El modal chiquito ya tiene
+        // su propia logica de cierre al click en su backdrop.
+        if (this._els.eventModalOverlay) return;
+        const since = Date.now() - (this._lastOpenedAt || 0);
+        if (since < 200) return; // vino del trigger, no cerrar
+        this.close();
+      }.bind(this));
     }
 
     this._els.popover = pop;
     this._els.main = pop.querySelector('[data-kair-cal-main]');
+
+    // [Fix 2026-07-01 v4] En modo modal, sobrescribir las constraints CSS del
+    // body (min-height: 480px + max-height: 70vh) que cortan la grilla del mes
+    // en pantallas <800px. Hacerlo scrolleable y flexible.
+    if (!inline) {
+      const body = pop.querySelector('.kair-cal-body');
+      if (body) {
+        body.style.minHeight = '0';    // quita min-height: 480px del CSS
+        body.style.maxHeight = 'none'; // quita max-height: 70vh del CSS
+        body.style.overflowY = 'auto'; // scroll si el contenido no entra
+        body.style.flex = '1';         // ocupar el espacio restante del pop
+        body.style.minWidth = '0';     // evitar overflow horizontal por sidebar
+        this._els.body = body;
+      }
+    }
     this._els.miniGrid = pop.querySelector('[data-kair-cal-mini="grid"]');
     this._els.labelNav = pop.querySelector('[data-kair-cal-label="nav"]');
     this._els.labelMiniTitle = pop.querySelector('[data-kair-cal-label="mini-title"]');
@@ -846,14 +885,16 @@
         '</div>' +
       '</div>';
     document.body.appendChild(overlay);
-    this._els.modalOverlay = overlay;
+    this._els.eventModalOverlay = overlay;
     this._els.modalEditingId = ev.id;
     // Abrir con animación
     requestAnimationFrame(() => overlay.classList.add('kair-cal-modal-overlay--open'));
     // Bind acciones del modal
     this._on(overlay, 'click', (e) => {
+      e.stopPropagation(); // [Fix 2026-07-01 v3] evita propagacion al overlay principal
       const actEl = e.target.closest('[data-kair-cal-action]');
       if (actEl) {
+        e.preventDefault();
         this._handleAction(actEl.getAttribute('data-kair-cal-action'));
         return;
       }
@@ -867,16 +908,16 @@
   };
 
   KairCalendar.prototype._closeEventModal = function () {
-    if (!this._els.modalOverlay) return;
-    const ov = this._els.modalOverlay;
+    if (!this._els.eventModalOverlay) return;
+    const ov = this._els.eventModalOverlay;
     ov.classList.remove('kair-cal-modal-overlay--open');
     setTimeout(() => { if (ov.parentNode) ov.parentNode.removeChild(ov); }, 160);
-    this._els.modalOverlay = null;
+    this._els.eventModalOverlay = null;
     this._els.modalEditingId = null;
   };
 
   KairCalendar.prototype._saveEventFromModal = function () {
-    const ov = this._els.modalOverlay;
+    const ov = this._els.eventModalOverlay;
     if (!ov) return;
     const title = ov.querySelector('#kair-cal-f-title').value.trim();
     const date = ov.querySelector('#kair-cal-f-date').value;
@@ -1003,7 +1044,14 @@
     this.state.open = true;
     // Timestamp para el guard anti-doble-disparo del handler "cerrar al click fuera"
     this._lastOpenedAt = Date.now();
-    this._els.popover.classList.add('kair-cal-popover--open');
+    // [Fix 2026-07-01 v2] Modal: alternar overlay principal Y pop. Si por
+    // alguna razón no existe el overlay (modo inline puro), caer al legacy.
+    if (this._els.overlay) {
+      this._els.overlay.classList.add('kair-cal-modal-overlay--open');
+      this._els.popover.classList.add('kair-cal-popover--open');
+    } else {
+      this._els.popover.classList.add('kair-cal-popover--open');
+    }
     if (this._els.trigger) this._els.trigger.classList.add('kair-cal-trigger--active');
     // Marcar también triggers adicionales
     if (this._triggers) {
@@ -1016,7 +1064,13 @@
     if (!this._els.popover) return;
     if (this.opts.inline) return; // no-op en modo inline (siempre visible)
     this.state.open = false;
-    this._els.popover.classList.remove('kair-cal-popover--open');
+    // [Fix 2026-07-01 v2] Modal: quitar --open del overlay Y del pop.
+    if (this._els.overlay) {
+      this._els.overlay.classList.remove('kair-cal-modal-overlay--open');
+      this._els.popover.classList.remove('kair-cal-popover--open');
+    } else {
+      this._els.popover.classList.remove('kair-cal-popover--open');
+    }
     if (this._els.trigger) this._els.trigger.classList.remove('kair-cal-trigger--active');
     if (this._triggers) {
       this._triggers.forEach(t => t.classList.remove('kair-cal-trigger--active'));
@@ -1030,8 +1084,9 @@
     this._stopNowLineTimer();
     this._listeners.forEach(({ el, type, fn }) => el.removeEventListener(type, fn));
     this._listeners = [];
+    if (this._els.overlay && this._els.overlay.parentNode) this._els.overlay.parentNode.removeChild(this._els.overlay);
     if (this._els.popover && this._els.popover.parentNode) this._els.popover.parentNode.removeChild(this._els.popover);
-    if (this._els.modalOverlay && this._els.modalOverlay.parentNode) this._els.modalOverlay.parentNode.removeChild(this._els.modalOverlay);
+    if (this._els.eventModalOverlay && this._els.eventModalOverlay.parentNode) this._els.eventModalOverlay.parentNode.removeChild(this._els.eventModalOverlay);
   };
   KairCalendar.prototype.refresh = function () {
     return this._loadEvents().then(() => this._refresh());
@@ -1053,7 +1108,16 @@
     el.addEventListener(type, fn);
     this._listeners.push({ el, type, fn });
   };
-  KairCalendar.prototype._bindGlobal = function () {};
+  KairCalendar.prototype._bindGlobal = function () {
+    // [Fix 2026-07-01] Modal central: ESC cierra el calendario principal.
+    // No cerrar si hay un modal de "Nuevo evento" abierto encima (prioridad).
+    this._on(document, 'keydown', function (e) {
+      if (e.key !== 'Escape' && e.key !== 'Esc') return;
+      if (!this.state.open) return;
+      if (this._els.eventModalOverlay) return; // modal de evento tiene prioridad
+      this.close();
+    }.bind(this));
+  };
   KairCalendar.prototype._startNowLineTimer = function () {
     this._stopNowLineTimer();
     this._nowTimer = setInterval(() => {
