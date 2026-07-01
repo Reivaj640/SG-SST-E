@@ -2394,7 +2394,7 @@ class MedicionAusentismoComponent {
                                 </div>
                                 <div class="sp-form-group">
                                     <label class="sp-form-label">Salario Básico</label>
-                                    <input type="number" id="sp-salario" class="sp-form-control" placeholder="0">
+                                    <input type="number" id="sp-salario" class="sp-form-control" placeholder="">
                                 </div>
                             </div>
                         </div>
@@ -3799,11 +3799,19 @@ class MedicionAusentismoComponent {
 
             // Salario: limpiar simbolos y separadores antes de asignar a input type=number.
             // El backend puede enviarlo como '$ 1.500.000' o '1500000' o 'No disponible'.
-            if (trab.salario != null && trab.salario !== '' && String(trab.salario).toLowerCase() !== 'no disponible') {
-                const salNum = parseFloat(String(trab.salario).replace(/[^\d.-]/g, ''));
-                const input = document.getElementById('sp-salario');
-                if (input && !isNaN(salNum) && salNum > 0) {
-                    input.value = salNum;
+            // Aceptar salario >= 0 (incluyendo 0 real) y descartar solo si
+            // la BD devuelve null, vacio, "No disponible", "n/a" o "na".
+            const salarioRaw = trab.salario;
+            const salarioStr = salarioRaw == null ? '' : String(salarioRaw).trim();
+            const salarioLower = salarioStr.toLowerCase();
+            const inputSalario = document.getElementById('sp-salario');
+
+            if (salarioStr === '' || salarioLower === 'no disponible' || salarioLower === 'n/a' || salarioLower === 'na') {
+                // No hay salario real en la BD: dejar el input vacio.
+            } else {
+                const salNum = parseFloat(salarioStr.replace(/[^\d.-]/g, ''));
+                if (inputSalario && !isNaN(salNum) && salNum >= 0) {
+                    inputSalario.value = salNum;
                 }
             }
 
@@ -3818,13 +3826,14 @@ class MedicionAusentismoComponent {
                 }
             }
 
-            console.log('[SEGUIMIENTO] Datos del empleado auto-cargados:', {
+            console.log('[SEGUIMIENTO] Datos del empleado auto-cargados:', JSON.stringify({
                 cargo: !!trab.cargo,
                 area: !!(trab.departamento || trab.ubicacion),
                 fechaIngRaw: fechaIngRaw,
-                salario: trab.salario,
+                salario_raw: trab.salario,
+                salario_tipo: typeof trab.salario,
                 fechaNac: !!fechaNac
-            });
+            }));
         } catch (err) {
             // Silencioso: si falla la BD, el usuario puede digitar manualmente.
             if (myToken !== this._datosEmpToken) return;

@@ -15191,7 +15191,7 @@ function normalizarTemporales(row, empresa) {
     eps: String(row['EPS/SURA'] || row['EPS'] || '').trim(),
     afp: String(row['AFP'] || '').trim(),
     porcentajeARL: String(row['% ARL'] || '').trim(),
-    salario: String(row['SALARIO'] || '').trim(),
+    salario: String(row[' SALARIO '] || '').trim(),
     fechaIngreso: row['FEC. ING.'] || null,
     fecIng: row['FEC. ING.'] || null,
     fechaNacimiento: row['FEC. NAC.'] || null,
@@ -15309,13 +15309,13 @@ ipcMain.handle('consultar-trabajadores-global', async (event, params) => {
     for (const emp of empresasABuscar) {
       const nombreEmp = emp.nombre || 'Empresa';
       console.log(`[MAIN] 🔎 Buscando en BD de: ${nombreEmp}...`);
-      
+
       const trabajadores = leerBDPersonal(emp);
       if (!trabajadores || trabajadores.length === 0) {
         console.log(`[MAIN] ⚠️ No se encontraron trabajadores para: ${nombreEmp}`);
         continue;
       }
-      
+
       console.log(`[MAIN] ✅ ${trabajadores.length} registros cargados para ${nombreEmp}. Filtrando por: "${cedula}" / "${nombre}"`);
       const filtrados = filtrarTrabajadores(trabajadores, cedula, nombre);
       console.log(`[MAIN] 🎯 Coincidencias encontradas en ${nombreEmp}: ${filtrados.length}`);

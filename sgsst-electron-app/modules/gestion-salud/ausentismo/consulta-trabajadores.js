@@ -98,7 +98,7 @@ function ejecutarBusqueda() {
  */
 function onSearchResponse(data) {
     var elapsed = Math.round(performance.now() - (ConsultaTrabajadores._searchStart || performance.now()));
-    
+
     // El renderer suele envolver el resultado en 'payload'
     var response = data.payload || data;
 
