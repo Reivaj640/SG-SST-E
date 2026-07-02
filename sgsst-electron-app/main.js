@@ -4704,7 +4704,101 @@ ipcMain.handle('convertExcelToPdf', async (event, filePath) => {
   }
 });
 
-// --- Manejadores para el Visor de Documentos ---
+// 📦 PRINT-INFORME-TO-PDF: Plan B para el informe PRI (gestión de la salud / ausentismo).
+// El enfoque anterior usaba window.print() del iframe, pero Chromium tiene
+// problemas conocidos para renderizar contenido multipágina dentro de iframes
+// anidados (las páginas 2+ no se imprimen). Este handler usa el método
+// NATIVO de Electron `webContents.printToPDF()` en un BrowserWindow
+// OCULTO, que renderiza TODO el HTML correctamente y devuelve un PDF real.
+ipcMain.handle('print-informe-to-pdf', async (event, payload) => {
+  let win = null;
+  try {
+    sendLog('[MAIN][print-informe-to-pdf] Solicitud recibida', 'INFO');
+    const { html, targetFolder, filename } = payload || {};
+
+    if (!html || typeof html !== 'string') {
+      throw new Error('No se recibió HTML válido para imprimir.');
+    }
+    if (!targetFolder || !filename) {
+      throw new Error('Faltan parámetros: targetFolder y filename son requeridos.');
+    }
+
+    // Construir un HTML completo autocontenido con meta charset
+    // (Electron necesita un doctype válido para que el motor de rendering
+    //  aplique las reglas @page y page-break).
+    const fullHtml = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Informe PRI</title>
+</head>
+<body>
+${html}
+</body>
+</html>`;
+
+    sendLog('[MAIN][print-informe-to-pdf] Creando BrowserWindow oculto…', 'INFO');
+
+    // Crear ventana oculta. NO show:true para no bloquear UI. NO nodeIntegration
+    // porque este HTML no necesita Node. sandbox:true para máxima seguridad.
+    win = new BrowserWindow({
+      show: false,
+      width: 1240,
+      height: 1754, // A4 a 150 DPI aprox
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        sandbox: true,
+        offscreen: false
+      }
+    });
+
+    // Cargar el HTML como data URL (no escribimos a disco temporal, evita
+    // fugas y locks en Windows).
+    const dataUrl = 'data:text/html;charset=UTF-8,' + encodeURIComponent(fullHtml);
+    await win.loadURL(dataUrl);
+    sendLog('[MAIN][print-informe-to-pdf] HTML cargado, esperando render…', 'INFO');
+
+    // Pequeño delay para que webContents termine el primer paint del HTML
+    // (sin esto, printToPDF puede capturar antes de que los .report-page
+    //  tengan dimensiones finales).
+    await new Promise(r => setTimeout(r, 600));
+
+    // 🖨️ Método nativo de Electron: renderiza multipágina correctamente
+    // y devuelve un Buffer con los bytes del PDF.
+    const pdfBuffer = await win.webContents.printToPDF({
+      pageSize: 'A4',
+      printBackground: true,
+      landscape: false,
+      margins: { top: 0, bottom: 0, left: 0, right: 0 },
+      preferCSSPageSize: false
+    });
+
+    sendLog(`[MAIN][print-informe-to-pdf] PDF generado: ${pdfBuffer.length} bytes`, 'INFO');
+
+    // Asegurar que la carpeta destino existe (Electron corre con cwd variable)
+    await fsp.mkdir(targetFolder, { recursive: true });
+
+    const safeFilename = filename.endsWith('.pdf') ? filename : filename + '.pdf';
+    const targetPath = path.join(targetFolder, safeFilename);
+
+    await fsp.writeFile(targetPath, pdfBuffer);
+
+    sendLog(`[MAIN][print-informe-to-pdf] PDF guardado en: ${targetPath}`, 'INFO');
+
+    // Cerrar ventana oculta (en finally para garantizar cleanup)
+    return { success: true, path: targetPath, sizeBytes: pdfBuffer.length };
+  } catch (err) {
+    sendLog(`[MAIN][print-informe-to-pdf] Error: ${err.message}`, 'ERROR');
+    return { success: false, error: err.message };
+  } finally {
+    if (win && !win.isDestroyed()) {
+      try { win.close(); } catch (e) { /* ignorar errores de cierre */ }
+    }
+  }
+});
+
+
 
 ipcMain.handle('get-excel-preview', async (event, rawFilePath) => {
     sendLog(`[MAIN][get-excel-preview] Solicitud recibida para filePath: ${rawFilePath}`, 'INFO');
@@ -4827,6 +4921,8 @@ ipcMain.handle('get-pdf-preview', async (event, filePath) => {
     return { success: false, error: error.message };
   }
 });
+
+// --- Manejadores para el Visor de Documentos ---
 
 // --- Manejadores para el módulo de Objetivos SST ---
 

@@ -211,6 +211,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   duplicateCapacitacionesSheet: (args) => ipcRenderer.invoke('duplicate-capacitaciones-sheet', args),
   updateExcelCell: (data) => ipcRenderer.invoke('update-excel-cell', data),
   convertExcelToPdf: (filePath) => ipcRenderer.invoke('convertExcelToPdf', filePath),
+  printInformeToPdf: (payload) => ipcRenderer.invoke('print-informe-to-pdf', payload),
   auditExcelContent: (data) => ipcRenderer.invoke('audit-excel-content', data),
 
   // --- K+AIR Calendar: Eventos Rápidos ---

@@ -2252,9 +2252,10 @@ class MedicionAusentismoComponent {
                     background: #F9FAFB; color: var(--sp-text-main);
                 }
 
-                /* 📦 Wizard de validación — borde rojo para campos requeridos vacíos.
-                Se aplica SOLO a inputs con data-required="true" Y que están vacíos. */
-                .sp-form-control[data-required="true"].is-required-empty {
+                /* 📦 Wizard de validación — recuadro rojo universal para TODO input/select/
+                textarea vacío, sea obligatorio u opcional. La distinción "obligatorio" se
+                sigue marcando con el asterisco rojo en el label, no con el recuadro. */
+                .sp-form-control.is-empty {
                     border-color: #EF4444 !important;
                     background: #FEF2F2;
                     background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23EF4444' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'/><line x1='12' y1='8' x2='12' y2='12'/><line x1='12' y1='16' x2='12.01' y2='16'/></svg>");
@@ -2263,10 +2264,17 @@ class MedicionAusentismoComponent {
                     background-size: 14px;
                     padding-right: 32px;
                 }
-                .sp-form-control[data-required="true"].is-required-empty:focus {
+                .sp-form-control.is-empty:focus {
                     outline: none;
                     border-color: #EF4444 !important;
                     box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
+                }
+
+                /* 📦 SELECTS: el ícono no debe chocar con la flecha nativa del dropdown.
+                Movemos el ícono a la izquierda de la flecha y reservamos espacio. */
+                select.sp-form-control.is-empty {
+                    padding-right: 44px;
+                    background-position: right 28px center;
                 }
 
                 /* Asterisco rojo en label cuando el campo es requerido */
@@ -3749,6 +3757,13 @@ class MedicionAusentismoComponent {
             this._aplicarReglasRequeridos();
             this._actualizarProgresoSeccion();
 
+            // 📦 Auto-completar desde BD de personal para campos que el Excel pudo no
+            // tener guardados (ej: Área, AFP, Cargo, EPS). Usa la versión "if empty"
+            // para no pisar nada que ya estuviera guardado en el Excel del caso.
+            if (caso.cedula) {
+                this._loadDatosEmpleado(String(caso.cedula).trim());
+            }
+
             // Mostrar notificación
             this.showNotification(`✅ Caso cargado: ${caso.nombre} (Fila ${caso.fila})`, 'success');
             console.log('[CARGAR CASO SELECCIONADO] Datos cargados exitosamente');
@@ -3777,6 +3792,13 @@ class MedicionAusentismoComponent {
         // Cargar datos del empleado en el formulario
         if (empleadoData) {
             this.cargarDatosEnPanelSeguimiento(empleadoData);
+        }
+
+        // 📦 Autollenar Sección 2 (Incapacidad Temporal) desde la incapacidad que el
+        // usuario seleccionó en el modal de "Agregar Seguimiento". Si no hay una
+        // seleccionada, no hace nada (el usuario puede diligenciar a mano).
+        if (this.incapacidadSeleccionada) {
+            this._poblarSeccionIncapacidadDesdeSeleccion(this.incapacidadSeleccionada);
         }
 
         // Inicializar seguimientos
@@ -3961,6 +3983,71 @@ class MedicionAusentismoComponent {
     ];
 
     /**
+     * 📦 IDs de inputs que NUNCA deben mostrar la marca visual is-empty (recuadro rojo +
+     * icono) aunque estén vacíos. Son campos informativos/complementarios: si el caso
+     * no aplica (ej: no hubo prórogas, no hay DX adicional), no tiene sentido alarmar
+     * al usuario con un recuadro rojo de "obligatorio".
+     *
+     * Estos campos siguen siendo editables y pueden guardarse vacíos sin problema.
+     * Solo se EXCLUYEN de la marca visual universal.
+     *
+     * Adicionalmente, _getCamposExcluidosVacios() amplía esta lista dinámicamente:
+     *  - Si el caso NO es PRI formal, todos los _CAMPOS_REQUERIDOS_SOLO_PRI también
+     *    se excluyen (porque "fuera de scope" = no aplica a este caso).
+     *  - Si es PRI formal, esos campos SÍ muestran is-empty si están vacíos.
+     */
+    _CAMPOS_SIN_MARCA_VACIA = [
+        // Sección 2 — Prórrogas: si el caso no tuvo prórogas, no debe alarmar.
+        'sp-numero-prorrogas', 'sp-fecha-ultima-prorroga',
+        // Sección 2 — Diagnósticos adicionales: opcionales (puede haber 1 solo DX).
+        'sp-cie10-dx2', 'sp-origen-dx2', 'sp-cie10-dx3', 'sp-origen-dx3',
+        // Sección 2 — Reincorporación / cierre del seguimiento de incapacidad:
+        // todos opcionales porque solo aplican si el caso terminó.
+        'sp-adaptaciones-inc', 'sp-fecha-reincorporacion-inc', 'sp-tipo-reintegro-inc',
+        'sp-observaciones-finales-inc', 'sp-fecha-cierre-inc', 'sp-motivo-cierre-inc',
+        // Sección 3 — Etapas PRIC: campos informativos y Etapa 5 ampliada.
+        'sp-adaptaciones', 'sp-tiene-desercion', 'sp-logro-mejoria-medica',
+        'sp-anio-ultima-calificacion-pcl', 'sp-anio-seguimiento-empresa',
+        'sp-fecha-calificacion-pcl', 'sp-porcentaje-pcl-calificacion',
+        'sp-cie10-dx1-calificada', 'sp-origen-dx1',
+        'sp-cie10-dx2-calificada', 'sp-origen-dx2-calificada',
+        'sp-cie10-dx3-calificada', 'sp-origen-dx3-calificada',
+        'sp-cie10-dx4-calificada', 'sp-origen-dx4-calificada',
+        'sp-origen-caso', 'sp-ingreso-sve',
+        'sp-fecha-examen-medico', 'sp-resultado-examen-medico',
+        'sp-fecha-examen-periodico', 'sp-resultado-examen-post-incapacidad',
+        'sp-trabajador-remoto', 'sp-fecha-inicio-remoto',
+        'sp-fecha-ultimo-seguimiento', 'sp-evolucion-clinica', 'sp-adherencia',
+        'sp-fecha-reintegro', 'sp-recomendaciones-laborales',
+        'sp-fecha-vencimiento-recomendaciones', 'sp-descripcion-recomendaciones',
+        'sp-fecha-proximo-seguimiento-recomendaciones',
+        'sp-descripcion-seguimiento-1', 'sp-descripcion-seguimiento-2'
+        // Los campos de seguimiento "Fecha seguimiento 1/2" también se excluyen porque
+        // ya hay un control de "Agregar Seguimiento" para crear filas dedicadas.
+    ];
+
+    /**
+     * 📦 Devuelve el Set de IDs que deben EXCLUIRSE del recuadro rojo universal.
+     * Combina:
+     *  - _CAMPOS_SIN_MARCA_VACIA (lista base: prórogas, DX adicionales, etc.)
+     *  - Si el modo PRI es != 'SI', también se excluyen los _CAMPOS_REQUERIDOS_SOLO_PRI
+     *    (porque las Etapas 2-5 y Calificación PCL están fuera de scope).
+     *
+     * Devolver un Set permite la búsqueda O(1) en loops grandes.
+     */
+    _getCamposExcluidosVacios() {
+        const excluidos = new Set(this._CAMPOS_SIN_MARCA_VACIA);
+        const sel = document.getElementById('sp-caso-ingresado-pric');
+        const modo = sel ? (sel.value || '').toUpperCase() : '';
+        if (modo !== 'SI') {
+            // El resto del formulario (Etapas 2-5 + Calificación PCL) NO aplica
+            // si el caso no es PRI formal — no debe alarmar con recuadro rojo.
+            this._CAMPOS_REQUERIDOS_SOLO_PRI.forEach(id => excluidos.add(id));
+        }
+        return excluidos;
+    }
+
+    /**
      * 📦 Aplica data-required="true" según el modo PRI del caso.
      *  - Campos _CAMPOS_REQUERIDOS_BASE siempre quedan marcados.
      *  - Campos _CAMPOS_REQUERIDOS_SOLO_PRI solo se marcan si el caso es PRI formal.
@@ -4011,15 +4098,30 @@ class MedicionAusentismoComponent {
     }
 
     /**
-     * 📦 Valida la sección actualmente visible. Aplica el borde rojo a cada input
-     * requerido vacío y al label del campo le agrega el asterisco rojo.
-     * Retorna { valido, vacios: [{ el, nombre }] } para que el caller pueda
-     * decidir si avanza o muestra error.
+     * 📦 Valida la sección actualmente visible. Aplica el recuadro rojo universal
+     * (is-empty) a TODO control vacío de la sección, cuente o no como obligatorio.
+     * Para la lógica de "bloqueo de Siguiente" sólo considera los [data-required="true"]
+     * vacíos.
+     * Retorna { valido, vacios: [{ el, nombre }], total }.
      */
     _validarSeccionActual() {
         const section = document.querySelector('.sp-form-section.active');
-        if (!section) return { valido: true, vacios: [] };
+        if (!section) return { valido: true, vacios: [], total: 0 };
 
+        // 1) Marca universal is-empty en TODOS los .sp-form-control EXCEPTO los que están
+        // excluidos (lista base + dinámica según modo PRI).
+        const excluidos = this._getCamposExcluidosVacios();
+        const todos = section.querySelectorAll('.sp-form-control');
+        todos.forEach(el => {
+            if (excluidos.has(el.id)) {
+                el.classList.remove('is-empty');
+                return;
+            }
+            if (this._esCampoVacio(el)) el.classList.add('is-empty');
+            else el.classList.remove('is-empty');
+        });
+
+        // 2) Lista de campos OBLIGATORIOS vacíos (los que bloquean "Siguiente")
         const requeridos = section.querySelectorAll('.sp-form-control[data-required="true"]');
         const vacios = [];
         const total = requeridos.length;
@@ -4027,10 +4129,7 @@ class MedicionAusentismoComponent {
         requeridos.forEach(el => {
             const nombre = this._nombreAmigableDeCampo(el) || el.id;
             if (this._esCampoVacio(el)) {
-                el.classList.add('is-required-empty');
                 vacios.push({ el: el, nombre: nombre });
-            } else {
-                el.classList.remove('is-required-empty');
             }
         });
 
@@ -4099,12 +4198,19 @@ class MedicionAusentismoComponent {
     _setupListenersValidacion() {
         const handler = (e) => {
             const t = e.target;
-            if (t && t.classList && t.classList.contains('sp-form-control')
-                && t.getAttribute('data-required') === 'true') {
-                if (this._esCampoVacio(t)) t.classList.add('is-required-empty');
-                else t.classList.remove('is-required-empty');
+            if (!t || !t.classList || !t.classList.contains('sp-form-control')) return;
+            // Saltar campos excluidos (lista dinámica: base + modo PRI).
+            // Recalculamos la exclusión cada vez porque el modo PRI puede cambiar.
+            if (this._getCamposExcluidosVacios().has(t.id)) {
+                t.classList.remove('is-empty');
                 this._actualizarProgresoSeccion();
+                return;
             }
+            // Marca universal is-empty (aplica a TODO control que NO esté excluido)
+            if (this._esCampoVacio(t)) t.classList.add('is-empty');
+            else t.classList.remove('is-empty');
+            // Actualizar contador del footer + progreso
+            this._actualizarProgresoSeccion();
         };
         // Capturamos los eventos a nivel del panel (delegación)
         const panel = document.querySelector('.seguimiento-panel');
@@ -4285,19 +4391,36 @@ class MedicionAusentismoComponent {
     }
 
     /**
-     * 📦 Aplica el candado visual a las navs futuras: idx > idxActual se marcan
-     * como is-locked-step (con candado y pointer-events:none). Las pasadas y la
-     * actual quedan libres.
+     * 📦 Aplica el candado visual a las navs futuras: idx > idxActual+1 se marcan
+     * como is-locked-step (con candado y pointer-events:none).
      *
-     * Se llama automáticamente desde showSeguimientoPanelSection después de
-     * cada cambio de sección, así que el candado siempre refleja el estado real.
+     * La nav INMEDIATAMENTE SIGUIENTE a la actual se desbloquea visualmente en cuanto
+     * la sección actual cumple validación (todos los requeridos diligenciados). Eso
+     * da una pista visual de "ya podés pasar" sin permitir saltos (para saltar sigue
+     * siendo obligatorio usar el botón "Siguiente" o click directo sobre esa nav
+     * ya desbloqueada).
+     *
+     * Si la sección actual NO cumple, todas las navs desde idxActual+1 en adelante
+     * quedan bloqueadas (incluida la inmediata siguiente).
+     *
+     * Se llama automáticamente desde showSeguimientoPanelSection y desde los handlers
+     * de validación live.
      */
     _aplicarBloqueoStepNav() {
         const sections = Array.from(document.querySelectorAll('.sp-form-section'));
         const idxActual = sections.findIndex(s => s.classList.contains('active'));
+        if (idxActual < 0) return;
+
+        // Chequear si la sección actual cumple validación
+        const r = this._validarSeccionActual();
+        // Umbral de desbloqueo visual: si la actual cumple, idxActual+1 está libre.
+        // Si no, todas desde idxActual+1 quedan bloqueadas.
+        const primerIdxDesbloqueado = r.valido ? idxActual + 2 : idxActual + 1;
+
         const navItems = document.querySelectorAll('.sp-nav-item');
         navItems.forEach((nav, i) => {
-            if (i > idxActual) {
+            if (i >= primerIdxDesbloqueado) {
+                // Bloqueada
                 nav.classList.add('is-locked-step');
                 if (!nav.querySelector('.sp-nav-lock-icon')) {
                     const icon = document.createElement('i');
@@ -4305,9 +4428,14 @@ class MedicionAusentismoComponent {
                     nav.appendChild(icon);
                 }
                 if (!nav.getAttribute('title')) {
-                    nav.setAttribute('title', 'Completa esta sección y haz clic en "Siguiente" para desbloquear');
+                    nav.setAttribute('title',
+                        r.valido
+                            ? 'Completa las secciones intermedias usando "Siguiente" antes de saltar acá'
+                            : 'Completa esta sección y haz clic en "Siguiente" para desbloquear'
+                    );
                 }
             } else {
+                // Libre
                 nav.classList.remove('is-locked-step');
                 const icon = nav.querySelector('.sp-nav-lock-icon');
                 if (icon) icon.remove();
@@ -4547,30 +4675,30 @@ class MedicionAusentismoComponent {
             const trab = result.data.find(t => t.tipoBD === 'ASEL') || result.data[0];
 
             // Cargo Actual
-            this._setInputValue('sp-cargo', trab.cargo);
+            this._setInputValueIfEmpty('sp-cargo', trab.cargo);
 
             // Area / Dependencia (algunas BDs usan 'departamento', otras 'ubicacion')
-            this._setInputValue('sp-area', trab.departamento || trab.ubicacion);
+            this._setInputValueIfEmpty('sp-area', trab.departamento || trab.ubicacion);
 
             // EPS y AFP (datos utiles que normalmente faltan)
-            this._setInputValue('sp-eps', trab.eps);
-            this._setInputValue('sp-afp', trab.afp);
+            this._setInputValueIfEmpty('sp-eps', trab.eps);
+            this._setInputValueIfEmpty('sp-afp', trab.afp);
 
-            // Fecha de Ingreso: usar el parser robusto (mismo helper que fecha nacimiento)
+            // Fecha de Ingreso: usar el parser robusto. Solo autollenar si el input está
+            // vacío (para no pisar lo que ya tenía guardado en el Excel del caso).
             const fechaIngRaw = trab.fechaIngreso || trab.fecIng || trab.fecha_ingreso || '';
             const fechaIng = this._parsearFechaNacimiento(fechaIngRaw);
-            if (fechaIng) {
-                const input = document.getElementById('sp-fecha-ingreso');
-                if (input) {
-                    input.value = fechaIng.toISOString().split('T')[0];
-                    this.calcularAntiguedad();
-                }
+            const inputFechaIng = document.getElementById('sp-fecha-ingreso');
+            if (fechaIng && inputFechaIng && !String(inputFechaIng.value || '').trim()) {
+                inputFechaIng.value = fechaIng.toISOString().split('T')[0];
+                this.calcularAntiguedad();
             }
 
             // Salario: limpiar simbolos y separadores antes de asignar a input type=number.
             // El backend puede enviarlo como '$ 1.500.000' o '1500000' o 'No disponible'.
             // Aceptar salario >= 0 (incluyendo 0 real) y descartar solo si
             // la BD devuelve null, vacio, "No disponible", "n/a" o "na".
+            // Solo autollenar si el input está vacío.
             const salarioRaw = trab.salario;
             const salarioStr = salarioRaw == null ? '' : String(salarioRaw).trim();
             const salarioLower = salarioStr.toLowerCase();
@@ -4578,22 +4706,21 @@ class MedicionAusentismoComponent {
 
             if (salarioStr === '' || salarioLower === 'no disponible' || salarioLower === 'n/a' || salarioLower === 'na') {
                 // No hay salario real en la BD: dejar el input vacio.
-            } else {
+            } else if (inputSalario && !String(inputSalario.value || '').trim()) {
                 const salNum = parseFloat(salarioStr.replace(/[^\d.-]/g, ''));
-                if (inputSalario && !isNaN(salNum) && salNum >= 0) {
+                if (!isNaN(salNum) && salNum >= 0) {
                     inputSalario.value = salNum;
                 }
             }
 
-            // Fecha de Nacimiento: misma logica que antes (mantener compatibilidad)
+            // Fecha de Nacimiento: misma logica que antes (mantener compatibilidad).
+            // Solo autollenar si el input está vacío.
             const fechaNacRaw = trab.fechaNacimiento || trab.fecNac || trab.fecha_nacimiento || '';
             const fechaNac = this._parsearFechaNacimiento(fechaNacRaw);
-            if (fechaNac) {
-                const input = document.getElementById('sp-fecha-nacimiento');
-                if (input) {
-                    input.value = fechaNac.toISOString().split('T')[0];
-                    this.calcularEdad();
-                }
+            const inputFechaNac = document.getElementById('sp-fecha-nacimiento');
+            if (fechaNac && inputFechaNac && !String(inputFechaNac.value || '').trim()) {
+                inputFechaNac.value = fechaNac.toISOString().split('T')[0];
+                this.calcularEdad();
             }
 
             console.log('[SEGUIMIENTO] Datos del empleado auto-cargados:', JSON.stringify({
@@ -4619,6 +4746,70 @@ class MedicionAusentismoComponent {
         if (value == null || value === '') return;
         const el = document.getElementById(id);
         if (el) el.value = String(value);
+    }
+
+    /**
+     * 📦 Puebla los campos de la sección "Incapacidad Temporal" con los datos de la
+     * incapacidad que el usuario seleccionó en el modal de selección.
+     *
+     * Las fechas pueden venir como:
+     *  - string ISO 'yyyy-mm-dd'
+     *  - string 'd/m/yy' (formato corto del Excel legacy)
+     *  - Date object (cuando vienen del preview del modal)
+     *  - string YYYYMMDD sin separador
+     *
+     * El método reusa _parsearFechaNacimiento (mismo parser robusto que se usa
+     * para fecha de nacimiento del empleado desde la BD de personal).
+     */
+    _poblarSeccionIncapacidadDesdeSeleccion(sel) {
+        if (!sel) return;
+
+        // Fechas
+        const setFecha = (inputId, raw) => {
+            const el = document.getElementById(inputId);
+            if (!el || !raw) return;
+            const d = this._parsearFechaNacimiento(raw);
+            if (d && !isNaN(d.getTime())) {
+                el.value = d.toISOString().split('T')[0];
+            }
+        };
+        setFecha('sp-fecha-inicio', sel.fechaInicio);
+        setFecha('sp-fecha-fin', sel.fechaFin);
+
+        // Días acumulados: usar el dato si viene como número, si no recalcular
+        const elDias = document.getElementById('sp-dias-acumulados');
+        if (elDias && sel.dias != null && sel.dias !== '') {
+            const d = parseInt(String(sel.dias), 10);
+            if (!isNaN(d) && d > 0) elDias.value = d;
+        }
+        // Si no vino en dias y tenemos fechas válidas, recalcular
+        if (elDias && (!elDias.value || elDias.value === '')) {
+            const fi = document.getElementById('sp-fecha-inicio').value;
+            const ff = document.getElementById('sp-fecha-fin').value;
+            if (fi && ff) {
+                try {
+                    const diff = (new Date(ff) - new Date(fi)) / (1000 * 60 * 60 * 24);
+                    if (diff >= 0) elDias.value = Math.ceil(diff) + 1;
+                } catch (e) { /* silencioso */ }
+            }
+        }
+
+        // Diagnóstico
+        this._setInputValue('sp-codigo-cie10', sel.codigo);
+        this._setInputValue('sp-descripcion-diagnostico', sel.diagnostico);
+
+        console.log('[INCAPACIDAD AUTOLLENADA] sección 2 poblada desde selección:', sel);
+    }
+
+    /**
+     * Igual que _setInputValue pero SOLO escribe si el input está vacío. Usado al
+     * auto-completar desde la BD de personal después de cargar un caso existente,
+     * para no pisar un valor que ya estaba guardado en el Excel.
+     */
+    _setInputValueIfEmpty(id, value) {
+        if (value == null || value === '') return;
+        const el = document.getElementById(id);
+        if (el && !String(el.value || '').trim()) el.value = String(value);
     }
 
     /**
