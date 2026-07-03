@@ -504,6 +504,25 @@
             color: var(--text-muted);
         }
 
+        /* 📦459 (2026-07-02) — KPI "no disponible" (modo degradado).
+           Cuando el archivo de ausentismo no se puede leer, mostramos "—"
+           con opacidad reducida y un tooltip explicativo. Diferencia visual
+           entre "0 real" (casos reales = 0) y "no se pudo calcular". */
+        .stat-value.kpi-unavailable {
+            opacity: 0.45;
+            font-style: italic;
+            cursor: help;
+        }
+
+        .stat-item.kpi-card-unavailable .stat-label {
+            opacity: 0.6;
+        }
+
+        .stat-item.kpi-card-unavailable .stat-label::after {
+            content: ' ⚠';
+            font-size: 0.75rem;
+        }
+
         @media (max-width: 768px) {
             .main-actions {
                 grid-template-columns: 1fr;
@@ -554,6 +573,10 @@
                 <div class="stat-item">
                     <div class="stat-value" id="ausentismoActivos">0</div>
                     <div class="stat-label">Casos Activos</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="ausentismoCerrados">0</div>
+                    <div class="stat-label">Casos Cerrados</div>
                 </div>
             </div>
 

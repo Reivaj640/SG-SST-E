@@ -544,9 +544,14 @@ def cargar_todos_registros_pri(empresa, file_path):
             tipo_reintegro = ws[f"CC{fila_idx}"].value or ""
             adaptaciones = ws[f"CD{fila_idx}"].value or ""
 
-            # Etapa 5: Cierre de Caso (columnas CE-CH)
-            fecha_cierre = str(ws[f"CE{fila_idx}"].value) if ws[f"CE{fila_idx}"].value else ""
-            motivo_cierre = ws[f"CF{fila_idx}"].value or ""
+            # 📦459 (2026-07-02) — FIX: leer de AV/AW en vez de CE/CF.
+            # BUG RAÍZ: guardar_seguimiento escribe fechaCierre/motivoCierre en AV/AW
+            # (índice 47-48, desde incapacidad.fechaCierre). Pero este handler
+            # leía de CE/CF (índice 82-83, desde pric.fechaCierre que el frontend
+            # nunca envía). Resultado: siempre retornaba vacío aunque los datos
+            # estuvieran escritos en el Excel. Ahora lee de las columnas correctas.
+            fecha_cierre = str(ws[f"AV{fila_idx}"].value) if ws[f"AV{fila_idx}"].value else ""
+            motivo_cierre = ws[f"AW{fila_idx}"].value or ""
             fecha_calificacion_pcl = str(ws[f"CG{fila_idx}"].value) if ws[f"CG{fila_idx}"].value else ""
             porcentaje_pcl_calificacion = ws[f"CH{fila_idx}"].value or ""
 

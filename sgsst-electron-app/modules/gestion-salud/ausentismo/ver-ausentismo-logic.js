@@ -60,6 +60,59 @@ class VerAusentismoComponent {
     try {
       const result = await window.electronAPI.readAusentismoData(this.currentCompany);
 
+      // 📦459 (2026-07-02) — Modo degradado: handler puede retornar _missingFile:true
+      // y success:true. Antes caíamos en el else y mostrábamos "❌ Error al cargar".
+      // Ahora distinguimos el modo degradado y mostramos un banner claro con CTA.
+      if (result && result._missingFile) {
+        this.ausentismoFilePath = null;
+        this.originalRows = [];
+        contentDiv.innerHTML = '';
+
+        // Mensaje de banner amarillo estandarizado (mismo estilo que medicion-ausentismo)
+        const messages = {
+          folder_missing: 'La carpeta "Medición del ausentismo por causa médica" no existe.',
+          folder_unreadable: 'No se puede acceder a la carpeta (permisos o red).',
+          not_found: 'Ningún archivo coincide con "PI-FO-076" o "AUSENTISMO".',
+          corrupt: 'El archivo existe pero no se puede abrir (corrupto o formato no soportado).',
+          unreadable: 'El archivo está bloqueado por otra aplicación.'
+        };
+        const reasonMsg = messages[result._missingFileReason] || 'Archivo no disponible.';
+
+        const banner = document.createElement('div');
+        banner.style.cssText = 'background:#FEF3C7;border:1px solid #F59E0B;border-radius:8px;padding:16px;margin-bottom:16px;color:#92400E;';
+        banner.innerHTML = `
+          <div style="display:flex;align-items:start;gap:12px;">
+            <i class="fas fa-exclamation-triangle" style="font-size:20px;margin-top:2px;"></i>
+            <div style="flex:1;">
+              <strong style="display:block;margin-bottom:4px;">Archivo de ausentismo no disponible</strong>
+              <p style="margin:0 0 8px 0;font-size:13px;">${reasonMsg}</p>
+              <small style="display:block;opacity:0.8;font-family:monospace;font-size:11px;">${result._expectedDir || ''}</small>
+              ${result._details ? `<small style="display:block;opacity:0.7;font-size:11px;margin-top:4px;">${result._details}</small>` : ''}
+            </div>
+            <button class="btn btn-sm btn-primary" style="white-space:nowrap;" id="va-retry-btn">
+              <i class="fas fa-sync-alt"></i> Reintentar
+            </button>
+          </div>
+        `;
+        contentDiv.appendChild(banner);
+
+        const retryBtn = banner.querySelector('#va-retry-btn');
+        if (retryBtn) {
+          retryBtn.addEventListener('click', () => this.loadAndRenderAusentismoData(contentDiv));
+        }
+
+        // Mensaje explicativo + empty state
+        const explain = document.createElement('div');
+        explain.style.cssText = 'text-align:center;padding:24px;color:#64748B;';
+        explain.innerHTML = `
+          <i class="fas fa-database" style="font-size:36px;opacity:0.4;margin-bottom:12px;"></i>
+          <p style="margin:0;font-size:14px;">No hay datos de ausentismo para mostrar.</p>
+          <small style="font-size:12px;">Restaura el archivo PI-FO-076 y haz clic en "Reintentar".</small>
+        `;
+        contentDiv.appendChild(explain);
+        return;
+      }
+
       if (result.success) {
         this.ausentismoFilePath = result.filePath; // Guardar la ruta del archivo
         this.originalRows = result.rows; // Guardar los datos originales

@@ -14,7 +14,134 @@ class MedicionAusentismoComponent {
         this.logMessage = (msg, type) => console.log(`[${type}] ${msg}`); // Placeholder
         this.excelInitialized = false; // Para saber si ya inicializamos el gestor de Excel
 
+        // 📦459 (2026-07-02) — Estado del último load de PI-FO-076. Se llena cada vez
+        // que se llama readAusentismoData. Sirve para que el wizard seguimiento sepa
+        // si debe mostrar banner preventivo en la Sección 2 cuando los datos de
+        // incapacidad lleguen vacíos (causa: archivo no disponible).
+        // Estructura: { missing: bool, reason: string, expectedDir: string, details: string }
+        this.ausentismoFileStatus = null;
+
         this.openDocument = this.openDocument.bind(this);
+    }
+
+    /* 📦459 (2026-07-02) — Mapeo de razones de modo degradado a mensajes UI.
+       Cada razón tiene un texto amigable + sugerencia de acción para el usuario.
+       Esto centraliza los mensajes para que sean consistentes en todas las vistas
+       (Ver Ausentismo, Estadísticas, Wizard Seguimiento, Registrar Incapacidad). */
+    _getMissingFileMessage(reason, details) {
+        const messages = {
+            folder_missing: {
+                title: 'Carpeta de ausentismo no encontrada',
+                detail: 'La carpeta "Medición del ausentismo por causa médica" no existe en la raíz de la empresa. Sin ella, los datos de incapacidad no se pueden cargar.',
+                action: 'Verificar ruta de la empresa'
+            },
+            folder_unreadable: {
+                title: 'No se puede acceder a la carpeta',
+                detail: 'La carpeta existe pero no se puede leer (permisos o error de red).',
+                action: 'Verificar permisos'
+            },
+            not_found: {
+                title: 'Archivo PI-FO-076 no encontrado',
+                detail: 'La carpeta existe pero ningún archivo coincide con "PI-FO-076" o "AUSENTISMO". Puede haber sido renombrado o movido.',
+                action: 'Buscar archivo manualmente'
+            },
+            corrupt: {
+                title: 'Archivo ilegible',
+                detail: 'El archivo existe pero no se puede abrir. Puede estar corrupto o tener un formato no soportado.',
+                action: 'Re-abrir archivo en Excel'
+            },
+            unreadable: {
+                title: 'Archivo bloqueado',
+                detail: 'El archivo existe pero está bloqueado por otra aplicación (¿abierto en Excel?).',
+                action: 'Cerrar archivo en Excel'
+            }
+        };
+        const m = messages[reason] || {
+            title: 'Archivo de ausentismo no disponible',
+            detail: 'No se pudo acceder al archivo de ausentismo.',
+            action: 'Verificar estado'
+        };
+        return {
+            ...m,
+            technicalDetail: details || ''
+        };
+    }
+
+    /* 📦459 — Helper que retorna HTML del banner amarillo estandarizado.
+       Reusado en Ver Ausentismo, Estadísticas y Wizard Seguimiento (Sección 2).
+       Variantes:
+         - variant: 'info' (azul) | 'warning' (amarillo) | 'error' (rojo)
+         - compact: true para versiones inline (ej: dentro de sección de wizard)
+         - showAction: false para esconder botón "Buscar manualmente"
+         - retryMethod: nombre del método del componente a invocar al reintentar.
+           Default: 'loadSeguimientoData'. Si el banner está en vista de estadísticas
+           o ausentismo, pasar el método correspondiente. */
+    _ausentismoMissingBannerHtml(status, options) {
+        options = options || {};
+        const variant = options.variant || 'warning';
+        const compact = !!options.compact;
+        const showAction = options.showAction !== false;
+        const retryMethod = options.retryMethod || 'loadSeguimientoData';
+
+        const msg = this._getMissingFileMessage(status.reason, status.details);
+
+        const iconByVariant = {
+            warning: 'fa-exclamation-triangle',
+            error: 'fa-times-circle',
+            info: 'fa-info-circle'
+        };
+        const icon = iconByVariant[variant] || iconByVariant.warning;
+
+        const actionButton = showAction ? `
+            <button type="button" class="km-missing-banner__action" onclick="window.electronAPI.openPath('${(status.expectedDir || '').replace(/'/g, "\\'")}')">
+                <i class="fas fa-folder-open"></i> Abrir carpeta esperada
+            </button>` : '';
+
+        // El botón reintento usa guard para evitar errores si el componente ya no existe
+        const retryButton = !compact ? `
+            <button type="button" class="km-missing-banner__action km-missing-banner__action--secondary" onclick="window.medicAusentismoComponent && typeof window.medicAusentismoComponent.${retryMethod} === 'function' && window.medicAusentismoComponent.${retryMethod}()">
+                <i class="fas fa-sync-alt"></i> Reintentar
+            </button>` : '';
+
+        if (compact) {
+            return `<div class="km-missing-banner km-missing-banner--${variant} km-missing-banner--compact">
+                <i class="fas ${icon} km-missing-banner__icon"></i>
+                <div class="km-missing-banner__body">
+                    <strong>${msg.title}</strong>
+                    <small>${msg.detail}</small>
+                </div>
+                ${actionButton}
+            </div>`;
+        }
+
+        return `<div class="km-missing-banner km-missing-banner--${variant}">
+            <div class="km-missing-banner__icon-wrap"><i class="fas ${icon}"></i></div>
+            <div class="km-missing-banner__body">
+                <strong class="km-missing-banner__title">${msg.title}</strong>
+                <p class="km-missing-banner__detail">${msg.detail}</p>
+                ${msg.technicalDetail ? `<small class="km-missing-banner__tech"><i class="fas fa-wrench"></i> ${msg.technicalDetail}</small>` : ''}
+                <div class="km-missing-banner__hint"><i class="fas fa-lightbulb"></i> <strong>${msg.action}</strong></div>
+            </div>
+            <div class="km-missing-banner__actions">
+                ${actionButton}
+                ${retryButton}
+            </div>
+        </div>`;
+    }
+
+    /* 📦459 — Helper que inyecta el banner al inicio de un contenedor si el archivo
+       está en modo degradado. Retorna true si inyectó banner, false si no hizo nada.
+       Usar después de cargar datos en cualquier vista para alertar al usuario. */
+    _injectAusentismoMissingBanner(container, options) {
+        if (!container) return false;
+        if (!this.ausentismoFileStatus || !this.ausentismoFileStatus.missing) return false;
+        // Si ya existe un banner idéntico, no duplicar
+        const existing = container.querySelector('.km-missing-banner');
+        if (existing) return true;
+        const banner = document.createElement('div');
+        banner.innerHTML = this._ausentismoMissingBannerHtml(this.ausentismoFileStatus, options);
+        container.insertBefore(banner.firstElementChild, container.firstChild);
+        return true;
     }
 
     /* 📦443 (2026-06-25) — Helper de loading animado estándar.
@@ -160,6 +287,55 @@ class MedicionAusentismoComponent {
                         this.render();
                         break;
                 }
+            } else if (data.type === 'ipc-invoke') {
+                // 📦459 (2026-07-02) — IPC proxy: el iframe home no tiene acceso directo
+                // al contextBridge de Electron (corre en isolated world). Proxyamos las
+                // invocaciones IPC a través de postMessage: el iframe pide, nosotros
+                // invocamos window.electronAPI[channel] y devolvemos el resultado.
+                // Esto cubre los 3 escenarios diagnosticados:
+                //   - electronAPI undefined en iframe → sin esto no hay IPC
+                //   - electronAPI existe pero getAusentismoStats falta → mismo síntoma
+                //   - IPC cuelga en el iframe → al menos tenemos logs en el parent
+                const respond = (payload) => {
+                    try {
+                        iframe.contentWindow.postMessage(payload, '*');
+                    } catch (postErr) {
+                        console.error('[ipc-invoke] No se pudo enviar respuesta al iframe:', postErr.message);
+                    }
+                };
+                if (!data || !data.channel || !data.requestId) {
+                    console.warn('[ipc-invoke] Mensaje mal formado:', data);
+                    return;
+                }
+                const api = window.electronAPI;
+                if (!api || typeof api[data.channel] !== 'function') {
+                    console.error(`[ipc-invoke] electronAPI.${data.channel} no existe en el parent`);
+                    respond({
+                        type: 'ipc-response',
+                        requestId: data.requestId,
+                        error: `electronAPI.${data.channel} no disponible en el renderer principal`
+                    });
+                    return;
+                }
+                // Invocar y responder (async para no bloquear el message handler)
+                (async () => {
+                    try {
+                        const args = Array.isArray(data.args) ? data.args : [];
+                        const result = await api[data.channel](...args);
+                        respond({
+                            type: 'ipc-response',
+                            requestId: data.requestId,
+                            result
+                        });
+                    } catch (invokeErr) {
+                        console.error(`[ipc-invoke] Error invocando ${data.channel}:`, invokeErr.message);
+                        respond({
+                            type: 'ipc-response',
+                            requestId: data.requestId,
+                            error: invokeErr.message
+                        });
+                    }
+                })();
             }
         };
 
@@ -566,7 +742,33 @@ class MedicionAusentismoComponent {
         try {
             const result = await window.electronAPI.readAusentismoData(this.currentCompany);
 
-            if (result.success && result.rows) {
+            // 📦459 (2026-07-02) — Persistir estado del archivo para uso en wizard
+            // seguimiento (banner preventivo en Sección 2). El handler puede retornar
+            // success:true con _missingFile:true (modo degradado) — eso es éxito
+            // operacional, la app sigue funcionando con BD y muestra banners.
+            if (result && result._missingFile) {
+                this.ausentismoFileStatus = {
+                    missing: true,
+                    reason: result._missingFileReason,
+                    expectedDir: result._expectedDir,
+                    details: result._details
+                };
+                console.warn('[MEDICION-AUSENT][📦459] Archivo de ausentismo no disponible:',
+                    result._missingFileReason, result._details);
+            } else if (result && result.success) {
+                this.ausentismoFileStatus = { missing: false };
+                this.ausentismoFilePath = result.file || null;
+            } else if (result && !result.success) {
+                // Error grave (empresa sin mapear, etc.) — no es modo degradado
+                this.ausentismoFileStatus = {
+                    missing: true,
+                    reason: 'unreadable',
+                    expectedDir: null,
+                    details: result.error || 'Error desconocido'
+                };
+            }
+
+            if (result.success && result.rows && !result._missingFile) {
                 // Procesar datos para seguimiento
                 const today = new Date();
                 const currentMonth = today.toLocaleString('default', { month: 'long' }).toUpperCase();
@@ -587,6 +789,31 @@ class MedicionAusentismoComponent {
                             const cedulaLimpia = reg.cedula?.replace(/,/g, '') || reg.CEDULA?.replace(/,/g, '') || '';
                             priMap.set(cedulaLimpia, reg);
                         });
+                        // 📦459 (2026-07-02) — DIAGNÓSTICO: mostrar el primer registro recibido
+                        // para ver la estructura real que llega al frontend
+                        const primer = priData.registros[0];
+                        if (primer) {
+                            console.log(`[LOAD-PRI][📦459-DEBUG] Total registros: ${priData.registros.length}`);
+                            console.log(`[LOAD-PRI][📦459-DEBUG] Cédula primer registro: ${primer.cedula}`);
+                            console.log(`[LOAD-PRI][📦459-DEBUG] Nivel raíz tiene:`, {
+                                fecha_cierre: primer.fecha_cierre,
+                                fechaCierre: primer.fechaCierre,
+                                motivo_cierre: primer.motivo_cierre,
+                                motivoCierre: primer.motivoCierre,
+                                fecha_reintegro: primer.fecha_reintegro,
+                                fechaReintegro: primer.fechaReintegro,
+                                pric_existe: !!primer.pric,
+                                pric_es_objeto: typeof primer.pric === 'object' && primer.pric !== null
+                            });
+                            if (primer.pric && typeof primer.pric === 'object') {
+                                console.log(`[LOAD-PRI][📦459-DEBUG] Dentro de pric:`, {
+                                    fechaCierre: primer.pric.fechaCierre,
+                                    motivoCierre: primer.pric.motivoCierre,
+                                    fechaReintegro: primer.pric.fechaReintegro,
+                                    fecha_cierre: primer.pric.fecha_cierre
+                                });
+                            }
+                        }
                     }
                 } catch (error) {
                     console.error('❌ ERROR cargando PRI.xlsx:', error);
@@ -609,8 +836,8 @@ class MedicionAusentismoComponent {
 
                 // AGRUPAR incapacidades por empleado (cedula)
                 const empleadosMap = new Map();
-                
-                allRecords.forEach(record => {
+
+                allRecords.forEach((record, recordIndex) => {
                     const cedula = record['CEDULA'] || record['cedula'];
                     if (!cedula) return;
                     
@@ -633,17 +860,27 @@ class MedicionAusentismoComponent {
 
                     // === FUNCIÓN AUXILIAR para parsear fechas correctamente ===
                     // Maneja años de 2 dígitos (ej: "4/1/25" → 2025, no 1925)
-                    function parsearFecha(fechaStr) {
+                    //
+                    // 📦459 (2026-07-02) — Mejorado: cuando NO puede parsear una fecha,
+                    // loguea contexto útil para que el usuario ubique la fila en su Excel:
+                    // fila aproximada + cédula + nombre + campo. Esto facilita corregir
+                    // datos corruptos como "30/012/2017", "20222", "109/2017" que aparecen
+                    // por tipeo en el archivo fuente.
+                    //
+                    // IMPORTANTE: NO hace "best effort" (no inventa fechas). En un sistema
+                    // de salud ocupacional regulado por la Resolución 0312 de 2019, una fecha
+                    // inventada en un reporte oficial es peor que omitir la fila.
+                    function parsearFecha(fechaStr, ctx) {
                         if (!fechaStr) return null;
-                        
+
                         // Si ya es un objeto Date, retornarlo
                         if (fechaStr instanceof Date) return fechaStr;
-                        
+
                         const str = fechaStr.toString().trim();
-                        
+
                         // Intentar parsear directamente primero
                         let date = new Date(str);
-                        
+
                         // Si la fecha es inválida o el año es anterior a 2000, intentar formato DD/MM/YY o DD/MM/YYYY
                         if (isNaN(date.getTime()) || date.getFullYear() < 2000) {
                             // Intentar extraer componentes manualmente
@@ -652,22 +889,36 @@ class MedicionAusentismoComponent {
                                 const dia = parseInt(match[1], 10);
                                 const mes = parseInt(match[2], 10) - 1; // Meses en JS son 0-11
                                 let anio = parseInt(match[3], 10);
-                                
+
                                 // Si el año tiene 2 dígitos, asumir 2000s
                                 if (anio < 100) {
                                     anio = anio < 50 ? 2000 + anio : 1900 + anio;
                                 }
-                                
+
                                 date = new Date(anio, mes, dia);
                             }
                         }
-                        
+
                         // Validar que la fecha sea correcta
                         if (isNaN(date.getTime())) {
-                            console.warn(`[PARSEAR FECHA] No se pudo parsear: "${fechaStr}"`);
+                            // 📦459 — Log enriquecido con contexto para facilitar ubicación
+                            // en el Excel. La fila es aproximada (header en fila 1, datos
+                            // desde fila 2); main.js no retorna headerRowIndex, así que no
+                            // podemos calcular la fila exacta sin tocar el IPC.
+                            const filaAprox = (ctx && ctx.recordIndex != null) ? ctx.recordIndex + 2 : '?';
+                            const cedulaCtx = (ctx && ctx.cedula) ? `Cédula ${ctx.cedula}` : 'Cédula ?';
+                            const nombreCtx = (ctx && ctx.nombre) ? `(${ctx.nombre})` : '';
+                            const campoCtx = (ctx && ctx.campo) ? `campo "${ctx.campo}"` : '';
+                            console.warn(
+                                `[PARSEAR FECHA] No se pudo parsear: "${fechaStr}"` +
+                                ` — Fila ~${filaAprox} del Excel` +
+                                ` | ${cedulaCtx} ${nombreCtx}` +
+                                (campoCtx ? ` | ${campoCtx}` : '') +
+                                ` | Sugerencia: revisar la celda y corregir el formato de fecha.`
+                            );
                             return null;
                         }
-                        
+
                         return date;
                     }
 
@@ -685,8 +936,8 @@ class MedicionAusentismoComponent {
                     }
 
                     empleadosMap.get(cedula).incapacidades.push({
-                        fechaInicio: parsearFecha(fechaInicio),
-                        fechaFin: parsearFecha(fechaFin),
+                        fechaInicio: parsearFecha(fechaInicio, { recordIndex, cedula, nombre: record['NOMBRE'] || record['nombre'] || '', campo: 'F. INICIO' }),
+                        fechaFin: parsearFecha(fechaFin, { recordIndex, cedula, nombre: record['NOMBRE'] || record['nombre'] || '', campo: 'F. FIN' }),
                         diasIncapacidad: diasIncapacidad,
                         record
                     });
@@ -820,6 +1071,21 @@ class MedicionAusentismoComponent {
 
                 // Renderizar tabla
                 this.renderSeguimientoTable(this.seguimientoData);
+            } else if (result && result.success && result._missingFile) {
+                // 📦459 — Modo degradado: archivo no disponible, pero app sigue funcionando.
+                // Mostrar banner preventivo arriba de la tabla + tabla vacía con CTA.
+                console.log('[MEDICION-AUSENT][📦459] Cargando vista con banner de archivo faltante');
+                this.seguimientoData = [];
+                this.calculateKPIs();
+                this.renderSeguimientoTable([]);
+
+                // Buscar contenedor principal de la vista de seguimiento
+                const scrollWrapper = document.getElementById('seguimiento-incapacidades-scroll-wrapper');
+                const bannerContainer = scrollWrapper || this.container;
+                // Quitar banner previo si existe
+                const oldBanner = bannerContainer.querySelector('.km-missing-banner');
+                if (oldBanner) oldBanner.remove();
+                this._injectAusentismoMissingBanner(bannerContainer, { variant: 'warning' });
             } else {
                 //console.log('[DEBUG loadSeguimientoData] No hay datos o error en result');
                 this.renderSeguimientoTable([]);
@@ -1057,43 +1323,85 @@ class MedicionAusentismoComponent {
         //console.log('[DETERMINAR ESTADO] Record Ausentismo:', recordAusentismo);
         //console.log('[DETERMINAR ESTADO] Record PRI:', recordPRI);
         
-        // === Buscar fecha de cierre en PRI.xlsx (fuente primaria) ===
-        let fechaCierreInc = null;
-        let fechaCierrePric = null;
-        
+        // === 📦459 (2026-07-02) — Detección AMPLIADA de cierre ===
+        // BUG RAÍZ: el handler Python `cargar_todos_registros_pri` devuelve los campos
+        // de cierre en camelCase DENTRO de `pric`:
+        //   recordPRI.pric.fechaCierre   (NO recordPRI.fecha_cierre)
+        //   recordPRI.pric.motivoCierre
+        //   recordPRI.pric.fechaReintegro
+        // Mi código buscaba snake_case a nivel raíz → nunca encontraba nada.
+        // AHORA busca snake_case a nivel raíz (de buscar_registros_por_cedula) Y
+        // camelCase dentro de pric (de cargar_todos_registros_pri).
+        let tieneFechaCierre = false;
+        let motivoCierreDetectado = null;
+
         if (recordPRI && Object.keys(recordPRI).length > 0) {
-            // Buscar en PRI.xlsx primero
-            fechaCierreInc = recordPRI.fecha_cierre || recordPRI.fechaCierre || null;
-            fechaCierrePric = recordPRI.pric?.fechaCierre || recordPRI.fecha_cierre_pric || null;
-        } else {
-            // Si no hay PRI, buscar en Ausentismo (backup)
-            fechaCierreInc = recordAusentismo['FECHA CIERRE'] || recordAusentismo['fecha_cierre'] || 
-                            recordAusentismo['FECHA CIERRE INC'] || recordAusentismo['fecha_cierre_inc'] || null;
-            fechaCierrePric = recordAusentismo['FECHA CIERRE PRIC'] || recordAusentismo['fecha_cierre_pric'] || null;
+            // PRI primero (fuente primaria) — 22 variantes
+            const candidatosPRI = [
+                // snake_case a nivel raíz (de buscar_registros_por_cedula)
+                recordPRI.fecha_cierre, recordPRI.fechaCierre,
+                recordPRI.fecha_cierre_pric, recordPRI.fechaCierrePric,
+                recordPRI.fecha_reintegro, recordPRI.fechaReintegro,
+                recordPRI.fecha_alta, recordPRI.fechaAlta,
+                recordPRI.fecha_cierre_seguimiento, recordPRI.fechaCierreSeguimiento,
+                recordPRI.motivo_cierre, recordPRI.motivoCierre,
+                recordPRI.estado_caso, recordPRI.estadoCaso, recordPRI.estado,
+                recordPRI['Estado Caso'], recordPRI['ESTADO'],
+                // camelCase dentro de pric (de cargar_todos_registros_pri)
+                recordPRI.pric?.fechaCierre, recordPRI.pric?.fechaCierrePric,
+                recordPRI.pric?.fechaReintegro, recordPRI.pric?.fechaAlta,
+                recordPRI.pric?.motivoCierre, recordPRI.pric?.estadoCaso,
+                // snake_case dentro de pric (por si acaso)
+                recordPRI.pric?.fecha_cierre, recordPRI.pric?.fecha_reintegro,
+                recordPRI.pric?.fecha_alta, recordPRI.pric?.motivo_cierre
+            ];
+            for (const cand of candidatosPRI) {
+                if (cand && String(cand).trim() !== '') {
+                    tieneFechaCierre = true;
+                    motivoCierreDetectado = String(cand);
+                    break;
+                }
+            }
         }
-        
-        const tieneFechaCierre = fechaCierreInc || fechaCierrePric;
+        if (!tieneFechaCierre) {
+            // Fallback al Excel de Ausentismo
+            const candidatosAus = [
+                recordAusentismo['FECHA CIERRE'], recordAusentismo['fecha_cierre'],
+                recordAusentismo['FECHA CIERRE INC'], recordAusentismo['fecha_cierre_inc'],
+                recordAusentismo['FECHA CIERRE PRIC'], recordAusentismo['fecha_cierre_pric'],
+                recordAusentismo['FECHA REINTEGRO'], recordAusentismo['fecha_reintegro'],
+                recordAusentismo['FECHA ALTA'], recordAusentismo['fecha_alta'],
+                recordAusentismo['MOTIVO CIERRE'], recordAusentismo['motivo_cierre']
+            ];
+            for (const cand of candidatosAus) {
+                if (cand && String(cand).trim() !== '') {
+                    tieneFechaCierre = true;
+                    motivoCierreDetectado = String(cand);
+                    break;
+                }
+            }
+        }
 
         // === Buscar fecha de seguimiento ===
         let fechaSeguimiento1 = null;
-        
+
         if (recordPRI && Object.keys(recordPRI).length > 0) {
             // Buscar en PRI.xlsx primero
-            fechaSeguimiento1 = recordPRI.seguimientos?.[0]?.fecha || 
-                               recordPRI.fecha_seguimiento_1 || 
+            fechaSeguimiento1 = recordPRI.seguimientos?.[0]?.fecha ||
+                               recordPRI.fecha_seguimiento_1 ||
                                recordPRI.pric?.fechaSeguimiento1 || null;
         } else {
             // Si no hay PRI, buscar en Ausentismo (backup)
             fechaSeguimiento1 = recordAusentismo['FECHA SEGUIMIENTO 1'] || recordAusentismo['fecha_seguimiento_1'] || null;
         }
-        
+
         const tieneSeguimientos = fechaSeguimiento1 ? true : false;
 
         // === Verificar si hay cédula (siempre debería haberla si estamos en la tabla) ===
-        const tieneCedulaEnExcel = recordAusentismo['CEDULA'] || recordAusentismo['cedula'] || 
+        const tieneCedulaEnExcel = recordAusentismo['CEDULA'] || recordAusentismo['cedula'] ||
                                    recordPRI.cedula || recordPRI.CEDULA || null;
 
-        //console.log('[DETERMINAR ESTADO] fechaCierreInc:', fechaCierreInc, 'fechaCierrePric:', fechaCierrePric, 'tieneFechaCierre:', tieneFechaCierre);
+        //console.log('[DETERMINAR ESTADO] tieneFechaCierre:', tieneFechaCierre, 'motivo:', motivoCierreDetectado);
         //console.log('[DETERMINAR ESTADO] fechaSeguimiento1:', fechaSeguimiento1, 'tieneSeguimientos:', tieneSeguimientos);
         //console.log('[DETERMINAR ESTADO] tieneCedulaEnExcel:', tieneCedulaEnExcel);
 
@@ -1107,7 +1415,7 @@ class MedicionAusentismoComponent {
             estado = 'Cerrado';
             badgeClass = 'badge-finished';
             progressClass = 'success';
-            console.log('[DETERMINAR ESTADO] Estado determinado: CERRADO (tiene fecha de cierre:', tieneFechaCierre + ')');
+            console.log('[DETERMINAR ESTADO] Estado determinado: CERRADO (motivo:', motivoCierreDetectado + ')');
         }
         // Regla 2: Si tiene fecha de seguimiento → EN SEGUIMIENTO
         else if (tieneSeguimientos) {
@@ -1168,24 +1476,75 @@ class MedicionAusentismoComponent {
             }
         }
         
-        // === Buscar fecha de cierre ===
-        let fechaCierreInc = null;
-        let fechaCierrePric = null;
-        
+        // === 📦459 (2026-07-02) — Detección AMPLIADA de cierre (igual que determinarEstadoCaso)
+        // BUG RAÍZ: buscar_todos_registros_pri devuelve campos en camelCase dentro de pric:
+        //   recordPRI.pric.fechaCierre, recordPRI.pric.motivoCierre, etc.
+        // Por eso el cálculo de avance quedaba en 60% aunque la fecha de cierre existiera.
+        let tieneFechaCierre = false;
+
         if (recordPRI && Object.keys(recordPRI).length > 0) {
-            fechaCierreInc = recordPRI.fecha_cierre || recordPRI.fechaCierre || null;
-            fechaCierrePric = recordPRI.pric?.fechaCierre || recordPRI.fecha_cierre_pric || null;
-        } else {
-            fechaCierreInc = recordAusentismo['FECHA CIERRE'] || recordAusentismo['fecha_cierre'] || 
-                            recordAusentismo['FECHA CIERRE INC'] || recordAusentismo['fecha_cierre_inc'] || null;
-            fechaCierrePric = recordAusentismo['FECHA CIERRE PRIC'] || recordAusentismo['fecha_cierre_pric'] || null;
+            const candidatosPRI = [
+                // snake_case a nivel raíz
+                recordPRI.fecha_cierre, recordPRI.fechaCierre,
+                recordPRI.fecha_cierre_pric, recordPRI.fechaCierrePric,
+                recordPRI.fecha_reintegro, recordPRI.fechaReintegro,
+                recordPRI.fecha_alta, recordPRI.fechaAlta,
+                recordPRI.fecha_cierre_seguimiento, recordPRI.fechaCierreSeguimiento,
+                recordPRI.motivo_cierre, recordPRI.motivoCierre,
+                recordPRI.estado_caso, recordPRI.estadoCaso, recordPRI.estado,
+                recordPRI['Estado Caso'], recordPRI['ESTADO'],
+                // camelCase dentro de pric (lo que usa cargar_todos_registros_pri)
+                recordPRI.pric?.fechaCierre, recordPRI.pric?.fechaCierrePric,
+                recordPRI.pric?.fechaReintegro, recordPRI.pric?.fechaAlta,
+                recordPRI.pric?.motivoCierre, recordPRI.pric?.estadoCaso,
+                // snake_case dentro de pric (por si acaso)
+                recordPRI.pric?.fecha_cierre, recordPRI.pric?.fecha_reintegro,
+                recordPRI.pric?.fecha_alta, recordPRI.pric?.motivo_cierre
+            ];
+            for (const cand of candidatosPRI) {
+                if (cand && String(cand).trim() !== '') {
+                    tieneFechaCierre = true;
+                    break;
+                }
+            }
         }
-        
-        const tieneFechaCierre = fechaCierreInc || fechaCierrePric;
+        if (!tieneFechaCierre) {
+            const candidatosAus = [
+                recordAusentismo['FECHA CIERRE'], recordAusentismo['fecha_cierre'],
+                recordAusentismo['FECHA CIERRE INC'], recordAusentismo['fecha_cierre_inc'],
+                recordAusentismo['FECHA CIERRE PRIC'], recordAusentismo['fecha_cierre_pric'],
+                recordAusentismo['FECHA REINTEGRO'], recordAusentismo['fecha_reintegro'],
+                recordAusentismo['FECHA ALTA'], recordAusentismo['fecha_alta'],
+                recordAusentismo['MOTIVO CIERRE'], recordAusentismo['motivo_cierre']
+            ];
+            for (const cand of candidatosAus) {
+                if (cand && String(cand).trim() !== '') {
+                    tieneFechaCierre = true;
+                    break;
+                }
+            }
+        }
         const cantidadSeguimientos = seguimientos.filter(s => s.fecha && s.fecha.trim() !== '').length;
-        
-        //console.log('[CALCULAR AVANCE] Seguimientos encontrados:', cantidadSeguimientos, seguimientos);
-        //console.log('[CALCULAR AVANCE] Tiene fecha de cierre:', tieneFechaCierre);
+
+        // 📦459 (2026-07-02) — DIAGNÓSTICO: mostrar qué campos de cierre encuentra y dónde
+        if (recordPRI && Object.keys(recordPRI).length > 0) {
+            const todosCandidatos = [
+                ['nivel_raiz.fecha_cierre', recordPRI.fecha_cierre],
+                ['nivel_raiz.fechaCierre', recordPRI.fechaCierre],
+                ['nivel_raiz.fecha_reintegro', recordPRI.fecha_reintegro],
+                ['nivel_raiz.fechaReintegro', recordPRI.fechaReintegro],
+                ['nivel_raiz.motivo_cierre', recordPRI.motivo_cierre],
+                ['nivel_raiz.motivoCierre', recordPRI.motivoCierre],
+                ['pric.fechaCierre', recordPRI.pric?.fechaCierre],
+                ['pric.motivoCierre', recordPRI.pric?.motivoCierre],
+                ['pric.fechaReintegro', recordPRI.pric?.fechaReintegro],
+                ['pric.fecha_cierre', recordPRI.pric?.fecha_cierre],
+                ['pric.disponible', !!recordPRI.pric]
+            ];
+            const encontrados = todosCandidatos.filter(([_, val]) => val && String(val).trim() !== '');
+            console.log(`[CALCULAR AVANCE][📦459-DEBUG] Cédula=${recordPRI.cedula || '?'} | pric_disponible=${!!recordPRI.pric} | campos_con_valor_encontrados=[${encontrados.map(([k, v]) => k + '=' + JSON.stringify(String(v).slice(0, 30))).join(', ')}]`);
+            console.log(`[CALCULAR AVANCE][📦459-DEBUG] tieneFechaCierre final: ${tieneFechaCierre} | cantidadSeguimientos: ${cantidadSeguimientos}`);
+        }
         
         // === Reglas de porcentaje de avance ===
         let porcentaje = 0;
@@ -3806,6 +4165,11 @@ class MedicionAusentismoComponent {
 
         // 📦 Actualizar el banner PRI antes de mostrar el panel (caso nuevo: sin clasificar).
         this._actualizarBannerPRI();
+        // 📦459 (2026-07-02) — Banner preventivo en Sección 2: si el archivo de
+        // ausentismo no está disponible Y la Sección 2 quedó vacía tras autollenar,
+        // mostramos un banner compacto amarillo. Caso contrario removemos cualquier
+        // banner previo (porque los datos sí están disponibles ahora).
+        this._actualizarBannerSeccion2Incapacidad();
         // 📦 Wizard: aplicar reglas de requeridos + actualizar progreso del footer.
         // (caso nuevo: la mayoría de campos estará vacía → borde rojo aparecerá)
         this._aplicarReglasRequeridos();
@@ -4799,6 +5163,62 @@ class MedicionAusentismoComponent {
         this._setInputValue('sp-descripcion-diagnostico', sel.diagnostico);
 
         console.log('[INCAPACIDAD AUTOLLENADA] sección 2 poblada desde selección:', sel);
+    }
+
+    /**
+     * 📦459 (2026-07-02) — Plan B: banner preventivo en Sección 2 del wizard.
+     *
+     * Decisión de mostrar banner:
+     *   - Si `this.ausentismoFileStatus.missing === true` Y la Sección 2 quedó
+     *     vacía (fecha inicio + fin + días + diagnóstico) → banner amarillo
+     *     compacto: "No pude autollenar la incapacidad — el archivo PI-FO-076
+     *     no está disponible. Llena los campos manualmente."
+     *   - Si los datos están disponibles → remover cualquier banner previo.
+     *
+     * Por qué compacto: el wizard ya tiene banners (PRI, progreso, validación).
+     * Un banner gigante rompería la jerarquía visual.
+     */
+    _actualizarBannerSeccion2Incapacidad() {
+        const seccion = document.getElementById('sp-section-incapacidad');
+        if (!seccion) return;
+
+        // Limpiar banner previo siempre (idempotente)
+        const oldBanner = seccion.querySelector('.km-missing-banner');
+        if (oldBanner) oldBanner.remove();
+
+        // Si archivo está OK, no hacer nada (ya removimos el banner)
+        if (!this.ausentismoFileStatus || !this.ausentismoFileStatus.missing) return;
+
+        // Verificar si Sección 2 quedó vacía tras autollenar
+        const fechaInicio = document.getElementById('sp-fecha-inicio');
+        const fechaFin = document.getElementById('sp-fecha-fin');
+        const codigoCie10 = document.getElementById('sp-codigo-cie10');
+        const descripcionDx = document.getElementById('sp-descripcion-diagnostico');
+
+        const camposClave = [fechaInicio, fechaFin, codigoCie10, descripcionDx].filter(Boolean);
+        const todosVacios = camposClave.length > 0 && camposClave.every(el => !String(el.value || '').trim());
+
+        // Solo mostrar banner si NO hay datos Y el archivo está missing
+        if (!todosVacios) return;
+
+        const titleEl = seccion.querySelector('.sp-section-title');
+        if (!titleEl) return;
+
+        // Inyectar banner compacto amarillo justo después del título
+        const banner = document.createElement('div');
+        banner.style.cssText = 'margin: 8px 0 16px 0;';
+        banner.innerHTML = this._ausentismoMissingBannerHtml(
+            {
+                reason: this.ausentismoFileStatus.reason,
+                expectedDir: this.ausentismoFileStatus.expectedDir,
+                details: this.ausentismoFileStatus.details
+            },
+            { variant: 'warning', compact: true, showAction: false }
+        );
+
+        titleEl.insertAdjacentElement('afterend', banner.firstElementChild);
+
+        console.log('[WIZARD][📦459] Banner preventivo inyectado en Sección 2 — archivo missing:', this.ausentismoFileStatus.reason);
     }
 
     /**
@@ -6336,7 +6756,20 @@ class MedicionAusentismoComponent {
 
                     try {
                         const ausentismoResult = await window.electronAPI.readAusentismoData(this.currentCompany);
+                        // 📦459 (2026-07-02) — Registrar incapacidad SÍ es bloqueante (sin
+                        // archivo no podemos escribir). Distinguimos modo degradado
+                        // (_missingFile:true) para mostrar mensaje útil vs error genérico.
                         if (!ausentismoResult.success) throw new Error(ausentismoResult.error);
+                        if (ausentismoResult._missingFile) {
+                            const msg = this._getMissingFileMessage(
+                                ausentismoResult._missingFileReason,
+                                ausentismoResult._details
+                            );
+                            throw new Error(
+                                `No se puede registrar la incapacidad: ${msg.title}. ` +
+                                `${msg.action}. (${ausentismoResult._expectedDir || 'ruta desconocida'})`
+                            );
+                        }
 
                         const result = await window.electronAPI.procesarAusentismo(this.currentCompany, formData);
 
@@ -7090,7 +7523,7 @@ class MedicionAusentismoComponent {
         container.appendChild(scrollWrapper);
 
         // Cargar datos
-        this.loadAusentismoData(table, notificationDiv);
+        this.loadAusentismoData(table);
 
         // Setup de eventos de filtros
         setTimeout(() => {
@@ -7099,7 +7532,7 @@ class MedicionAusentismoComponent {
 
             if (applyBtn) {
                 applyBtn.addEventListener('click', () => {
-                    this.applyFilters(table, notificationDiv);
+                    this.applyFilters(table);
                 });
             }
 
@@ -7109,18 +7542,30 @@ class MedicionAusentismoComponent {
                     document.getElementById('yearFilter').value = '';
                     document.getElementById('monthFilter').value = '';
                     document.getElementById('typeFilter').value = '';
-                    this.loadAusentismoData(table, notificationDiv);
-                    this.showNotification('Filtros limpiados', 'info', 'notification-toast-list');
+                    this.loadAusentismoData(table);
+                    this.showNotification('Filtros limpiados', 'info');
                 });
             }
         }, 0);
     }
 
-    async loadAusentismoData(tableElement, notificationDiv) {
+    async loadAusentismoData(tableElement, notificationDiv) { // 📦459 — notificationDiv es legacy (DOM notification). Las notificaciones usan window.parent.updateNotifier vía showNotification().
         try {
             const result = await window.electronAPI.readAusentismoData(this.currentCompany);
 
-            if (result.success && result.rows) {
+            // 📦459 — Persistir estado del archivo (también usado por wizard seguimiento)
+            if (result && result._missingFile) {
+                this.ausentismoFileStatus = {
+                    missing: true,
+                    reason: result._missingFileReason,
+                    expectedDir: result._expectedDir,
+                    details: result._details
+                };
+            } else if (result && result.success) {
+                this.ausentismoFileStatus = { missing: false };
+            }
+
+            if (result.success && result.rows && !result._missingFile) {
                 console.log('[DEBUG] Headers del Excel:', result.headers);
                 console.log('[DEBUG] Primera fila de datos:', result.rows[0]);
                 
@@ -7158,14 +7603,33 @@ class MedicionAusentismoComponent {
                 
                 // Actualizar filtros con datos reales
                 this.populateDynamicFilters();
+            } else if (result && result._missingFile) {
+                // 📦459 — Modo degradado: banner amarillo + empty state con CTA
+                this.renderTable(tableElement, []);
+                this.showNotification(
+                    `Archivo de ausentismo no disponible. ${this._getMissingFileMessage(result._missingFileReason, result._details).action}.`,
+                    'warning'
+                );
+                // Inyectar banner arriba del contenedor de la tabla
+                const tableContainer = tableElement.closest('.ausentismo-table-wrap, .table-container, section') || tableElement.parentElement;
+                if (tableContainer) {
+                    const oldBanner = tableContainer.querySelector('.km-missing-banner');
+                    if (oldBanner) oldBanner.remove();
+                    const wrapper = document.createElement('div');
+                    wrapper.innerHTML = this._ausentismoMissingBannerHtml(
+                        { reason: result._missingFileReason, expectedDir: result._expectedDir, details: result._details },
+                        { variant: 'warning', retryMethod: 'loadAusentismoData' }
+                    );
+                    tableContainer.insertBefore(wrapper.firstElementChild, tableContainer.firstChild);
+                }
             } else {
                 this.renderTable(tableElement, []);
-                this.showNotification('No hay registros disponibles', 'warning', notificationDiv.id);
+                this.showNotification('No hay registros disponibles', 'warning');
             }
         } catch (error) {
             console.error('Error loading ausentismo data:', error);
             this.renderTable(tableElement, []);
-            this.showNotification(`Error: ${error.message}`, 'error', notificationDiv.id);
+            this.showNotification(`Error: ${error.message}`, 'error');
         }
     }
 
@@ -7240,35 +7704,35 @@ class MedicionAusentismoComponent {
         }
     }
 
-    applyFilters(tableElement, notificationDiv) {
+    applyFilters(tableElement, notificationDiv) { // 📦459 — notificationDiv es legacy. Las notificaciones van por updateNotifier.
         const search = document.getElementById('searchFilter').value.toLowerCase();
         const year = document.getElementById('yearFilter').value;
         const month = document.getElementById('monthFilter').value;
         const type = document.getElementById('typeFilter').value;
 
         if (!this.currentAusentismoData) {
-            this.showNotification('No hay datos cargados', 'warning', notificationDiv.id);
+            this.showNotification('No hay datos cargados', 'warning');
             return;
         }
 
         let filtered = this.currentAusentismoData.filter(row => {
             const nombre = (row.NOMBRE || row['2'] || '').toLowerCase();
             const cedula = (row.CEDULA || row['3'] || '').toLowerCase();
-            
+
             // Búsqueda por nombre o cédula
             const matchesSearch = !search || nombre.includes(search) || cedula.includes(search);
-            
+
             // Filtro por año - Usar columna 14 (O) o AÑO
             const rowYear = row['14'] || row.AÑO || row.ANO || '';
             const matchesYear = !year || rowYear === year;
-            
+
             // Filtro por mes
             const matchesMonth = !month || {
                 '1': 'ENERO', '2': 'FEBRERO', '3': 'MARZO', '4': 'ABRIL',
                 '5': 'MAYO', '6': 'JUNIO', '7': 'JULIO', '8': 'AGOSTO',
                 '9': 'SEPTIEMBRE', '10': 'OCTUBRE', '11': 'NOVIEMBRE', '12': 'DICIEMBRE'
             }[month] === (row.MES || row['9'] || '').toUpperCase();
-            
+
             // Filtro por tipo (CLASE DE INCAPACIDAD) - Usar columna 11 (L)
             const rowType = (row['CLASE DE INCAPACIDAD'] || row['11'] || '').toUpperCase();
             const matchesType = !type || rowType === type;
@@ -7277,7 +7741,7 @@ class MedicionAusentismoComponent {
         });
 
         this.renderTable(tableElement, filtered);
-        this.showNotification(`${filtered.length} registros encontrados`, 'success', notificationDiv.id);
+        this.showNotification(`${filtered.length} registros encontrados`, 'success');
     }
 
     renderTable(tableElement, data) {
@@ -7823,7 +8287,7 @@ class MedicionAusentismoComponent {
     container.appendChild(scrollWrapper);
 
         // Cargar datos y renderizar gráficos
-        this.loadEstadisticasData(notificationDiv);
+        this.loadEstadisticasData();
 
         // Setup de eventos de filtros
         setTimeout(() => {
@@ -7832,7 +8296,7 @@ class MedicionAusentismoComponent {
 
             if (applyBtn) {
                 applyBtn.addEventListener('click', () => {
-                    this.applyStatsFilters(notificationDiv);
+                    this.applyStatsFilters();
                 });
             }
 
@@ -7842,21 +8306,21 @@ class MedicionAusentismoComponent {
                     document.getElementById('statsMonthFilter').value = '';
                     document.getElementById('statsGenderFilter').value = '';
                     document.getElementById('statsClassFilter').value = '';
-                    this.loadEstadisticasData(notificationDiv);
-                    this.showNotification('Filtros limpiados', 'info', notificationDiv.id);
+                    this.loadEstadisticasData();
+                    this.showNotification('Filtros limpiados', 'info');
                 });
             }
         }, 0);
     }
 
-    applyStatsFilters(notificationDiv) {
+    applyStatsFilters(notificationDiv) { // 📦459 — notificationDiv legacy, no se usa
         const year = document.getElementById('statsYearFilter').value;
         const month = document.getElementById('statsMonthFilter').value;
         const gender = document.getElementById('statsGenderFilter').value;
         const clase = document.getElementById('statsClassFilter').value;
 
         if (!this.currentAusentismoDataStats) {
-            this.showNotification('No hay datos cargados', 'warning', notificationDiv.id);
+            this.showNotification('No hay datos cargados', 'warning');
             return;
         }
 
@@ -7871,16 +8335,28 @@ class MedicionAusentismoComponent {
 
         this.updateStatsMetrics(filtered);
         this.renderCharts(filtered);
-        this.showNotification(`${filtered.length} registros filtrados`, 'success', notificationDiv.id);
+        this.showNotification(`${filtered.length} registros filtrados`, 'success');
     }
 
-    async loadEstadisticasData(notificationDiv) {
+    async loadEstadisticasData(notificationDiv) { // 📦459 — notificationDiv legacy. Se usa this.container como fallback para inyectar banner.
         try {
             console.log('[ESTADISTICAS] Cargando datos para empresa:', this.currentCompany);
             const result = await window.electronAPI.readAusentismoData(this.currentCompany);
             console.log('[ESTADISTICAS] Resultado:', result);
 
-            if (result.success && result.rows) {
+            // 📦459 — Persistir estado del archivo
+            if (result && result._missingFile) {
+                this.ausentismoFileStatus = {
+                    missing: true,
+                    reason: result._missingFileReason,
+                    expectedDir: result._expectedDir,
+                    details: result._details
+                };
+            } else if (result && result.success) {
+                this.ausentismoFileStatus = { missing: false };
+            }
+
+            if (result.success && result.rows && !result._missingFile) {
                 const data = result.rows.map(row => {
                     const rowObj = {};
                     result.headers.forEach((header, i) => {
@@ -7897,16 +8373,39 @@ class MedicionAusentismoComponent {
 
                 this.updateStatsMetrics(data);
                 this.renderCharts(data);
-                
+
                 // Actualizar filtros dinámicos
                 this.populateStatsFilters(data);
+            } else if (result && result._missingFile) {
+                // 📦459 — Modo degradado: banner amarillo + mensaje claro
+                console.warn('[ESTADISTICAS] Archivo no disponible:', result._missingFileReason);
+                this.showNotification(
+                    `Archivo de ausentismo no disponible. ${this._getMissingFileMessage(result._missingFileReason, result._details).action}.`,
+                    'warning'
+                );
+                // Inyectar banner — usar notificationDiv si está disponible, sino this.container
+                const statsContainer = (notificationDiv && notificationDiv.closest)
+                    ? notificationDiv.closest('section, .estadisticas-container, .tab-content') || notificationDiv.parentElement
+                    : (this.container ? this.container.querySelector('.estadisticas-dashboard, .estadisticas-container') || this.container : null);
+                if (statsContainer) {
+                    const oldBanner = statsContainer.querySelector('.km-missing-banner');
+                    if (oldBanner) oldBanner.remove();
+                    const wrapper = document.createElement('div');
+                    wrapper.innerHTML = this._ausentismoMissingBannerHtml(
+                        { reason: result._missingFileReason, expectedDir: result._expectedDir, details: result._details },
+                        { variant: 'warning', retryMethod: 'loadEstadisticasData' }
+                    );
+                    statsContainer.insertBefore(wrapper.firstElementChild, statsContainer.firstChild);
+                }
+                // Poblar filtros vacíos para que la UI no se rompa
+                this.populateStatsFilters([]);
             } else {
                 console.warn('[ESTADISTICAS] No hay datos:', result);
-                this.showNotification('No hay datos para mostrar', 'warning', notificationDiv.id);
+                this.showNotification('No hay datos para mostrar', 'warning');
             }
         } catch (error) {
             console.error('[ESTADISTICAS] Error loading data:', error);
-            this.showNotification(`Error: ${error.message}`, 'error', notificationDiv.id);
+            this.showNotification(`Error: ${error.message}`, 'error');
         }
     }
 
