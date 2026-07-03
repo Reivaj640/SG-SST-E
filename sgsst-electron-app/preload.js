@@ -300,6 +300,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAusentismoStats: (companyName, mode) =>
     ipcRenderer.invoke('get-ausentismo-stats', companyName, mode),
 
+  // --- 📦465 (2026-07-03) — Seguimiento de Gestación (Salud Materna) ---
+  // Handlers del bridge `gestacion-bridge.js` (persistencia SQLite central).
+  gestacionCargarTodo: (params) =>
+    ipcRenderer.invoke('gestacion:cargarTodo', params),
+  gestacionGetStats: (params) =>
+    ipcRenderer.invoke('gestacion:getStats', params),
+  gestacionListarGestantes: (params) =>
+    ipcRenderer.invoke('gestacion:listarGestantes', params),
+  gestacionObtenerGestante: (params) =>
+    ipcRenderer.invoke('gestacion:obtenerGestante', params),
+  gestacionRegistrarGestante: (params) =>
+    ipcRenderer.invoke('gestacion:registrarGestante', params),
+  gestacionActualizarGestante: (params) =>
+    ipcRenderer.invoke('gestacion:actualizarGestante', params),
+  gestacionEliminarGestante: (params) =>
+    ipcRenderer.invoke('gestacion:eliminarGestante', params),
+  gestacionGuardarSeguimiento: (params) =>
+    ipcRenderer.invoke('gestacion:guardarSeguimiento', params),
+  gestacionObtenerSeguimientos: (params) =>
+    ipcRenderer.invoke('gestacion:obtenerSeguimientos', params),
+
   // --- Estadísticas de Accidentes FURAT (widget home) ---
 getAccidentesStats: (companyName) =>
 ipcRenderer.invoke('get-accidentes-stats', companyName),

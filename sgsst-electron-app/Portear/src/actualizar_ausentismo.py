@@ -158,6 +158,9 @@ def buscar_empleado_por_cedula(cedula, empresa):
         col_area = buscar_columna(["UBICACION", "UBICACIÓN", "AREA", "ÁREA", "DEPARTAMENTO"])
         col_genero = buscar_columna(["GENERO", "SEXO"])
         col_entidad = buscar_columna(["EPS", "SURA","EPS/SURA", "ENTIDAD"])
+        # 📦467 (2026-07-03) — ARL para autollenado en modal de Gestación (Salud Materna)
+        # Antes solo retornaba entidad/EPS; ahora también ARL si la columna existe.
+        col_arl = buscar_columna(["ARL"])
 
         result = {
             "nombre": nombre_completo or "",
@@ -167,6 +170,7 @@ def buscar_empleado_por_cedula(cedula, empresa):
             "area": (row.get(col_area) or "") if col_area else "",  # Departamento/Ubicación
             "genero": (row.get(col_genero) or "") if col_genero else "",
             "entidad": (row.get(col_entidad) or "") if col_entidad else "",  # EPS/SURA
+            "arl": (row.get(col_arl) or "") if col_arl else "",  # 📦467
             "_fila_index": int(row.name)
         }
 

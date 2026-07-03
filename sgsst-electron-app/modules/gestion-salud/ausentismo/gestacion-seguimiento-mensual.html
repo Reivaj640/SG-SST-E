@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K+AIR | Seguimiento Mensual - Gestación</title>
+    <link rel="stylesheet" href="../../../assets/css/font-awesome.min.css">
+    <link rel="stylesheet" href="../../../assets/css/google-fonts.css">
+    <link rel="stylesheet" href="../../../assets/css/bootstrap-icons.css">
+    <style>
+        /* ═══════════════════════════════════════════════════════════════════
+           📦463 (2026-07-03) — Refactor: header estándar K+AIR (patrón 6.1.3)
+           Mantiene el estilo del formulario pero usa header/kpi estándar.
+           ═══════════════════════════════════════════════════════════════════ */
+
+        :root {
+            --v3-primary: #174ea6;
+            --v3-primary-hover: #185abd;
+            --v3-primary-soft: #e8f0fe;
+            --v3-success: #28a745;
+            --v3-success-soft: rgba(40, 167, 69, 0.1);
+            --v3-warning: #ffc107;
+            --v3-warning-soft: rgba(255, 193, 7, 0.1);
+            --v3-destructive: #dc3545;
+            --v3-destructive-soft: rgba(220, 53, 69, 0.1);
+            --v3-foreground: #212529;
+            --v3-muted-foreground: #6c757d;
+            --v3-card: #ffffff;
+            --v3-border: #dee2e6;
+            --v3-muted: #f8f9fa;
+            --v3-radius-lg: 0.625rem;
+            --v3-radius-md: 0.5rem;
+            --v3-font-sans: "Segoe UI", Roboto, sans-serif;
+
+            --rosa: #be185d;
+            --rosa-light: #fce7f3;
+            --rosa-bg: #fdf2f8;
+            --rosa-hover: #9d174d;
+            --text-dark: #212529;
+            --text-muted: #6c757d;
+            --bg-body: #f0f2f5;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
+
+        body {
+            font-family: var(--v3-font-sans);
+            background-color: var(--bg-body);
+            color: var(--text-dark);
+            font-size: 14px;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ════════════════════════════════════════════════════════════════════
+           HEADER ESTÁNDAR K+AIR · Patrón 6.1.3
+           ════════════════════════════════════════════════════════════════════ */
+
+        .kair-v3-hub {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .k-module-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 1.5rem;
+            height: 64px;
+            background: #ffffff;
+            border-bottom: 1px solid var(--v3-border);
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            flex-shrink: 0;
+        }
+
+        .k-header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .k-header-title-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.1rem;
+            min-width: 0;
+        }
+
+        .k-header-main-title {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--v3-foreground);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-width: 0;
+        }
+
+        .k-header-main-title i {
+            color: var(--v3-primary);
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+
+        .k-header-breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            font-size: 0.72rem;
+            color: var(--v3-muted-foreground);
+            flex-wrap: wrap;
+        }
+
+        .k-header-breadcrumb button {
+            background: none;
+            border: none;
+            padding: 0;
+            font: inherit;
+            color: inherit;
+            cursor: pointer;
+        }
+
+        .k-header-breadcrumb button:hover { color: var(--v3-primary); }
+
+        .k-breadcrumb-item.active {
+            color: var(--v3-primary);
+            font-weight: 500;
+        }
+
+        .k-header-right {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            flex-shrink: 0;
+        }
+
+        .k-sync-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.3rem 0.6rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            border-radius: 2rem;
+            white-space: nowrap;
+        }
+
+        .k-sync-synced { background: rgba(40, 167, 69, 0.1); color: #28a745; }
+        .k-sync-saving { background: rgba(255, 193, 7, 0.1); color: #856404; }
+
+        .k-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+            padding: 0.5rem 1rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+            font-family: var(--v3-font-sans);
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+
+        .k-btn-primary { background: var(--v3-primary); color: #fff; }
+        .k-btn-primary:hover { background: var(--v3-primary-hover); }
+        .k-btn-sm { padding: 0.35rem 0.75rem; font-size: 0.72rem; }
+
+        .header-back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.375rem 0.75rem;
+            font: 500 0.8125rem/1.2 var(--v3-font-sans);
+            color: #5a6378;
+            background: transparent;
+            border: 1px solid var(--v3-border);
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+
+        .header-back-btn:hover {
+            background: var(--v3-primary-soft);
+            color: var(--v3-primary);
+            border-color: var(--v3-primary);
+        }
+
+        .header-back-btn i { font-size: 0.875rem; }
+
+        /* ════════════════════════════════════════════════════════════════════
+           MAIN · Info card, banner, formulario
+           ════════════════════════════════════════════════════════════════════ */
+
+        .gsm-main {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 24px;
+        }
+        .gsm-container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        .gsm-info-card {
+            background: white;
+            border-radius: var(--v3-radius-lg);
+            padding: 18px 22px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            border-left: 4px solid var(--rosa);
+        }
+        .gsm-info-card__avatar {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: var(--rosa-light);
+            color: var(--rosa);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+        .gsm-info-card__name {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+        .gsm-info-card__meta {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        .gsm-info-card__chips {
+            display: flex;
+            gap: 8px;
+            margin-left: auto;
+        }
+        .gsm-chip {
+            padding: 6px 12px;
+            border-radius: 12px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .gsm-chip.bajo { background: var(--v3-success-soft); color: #155724; }
+        .gsm-chip.alto { background: var(--v3-warning-soft); color: #856404; }
+        .gsm-chip.muy-alto { background: var(--v3-destructive-soft); color: #721c24; }
+        .gsm-chip.rosa { background: var(--rosa-light); color: var(--rosa); }
+
+        .gsm-banner {
+            background: linear-gradient(90deg, #fef3c7 0%, #fde68a 100%);
+            border: 1px solid #f59e0b;
+            border-left: 4px solid #b45309;
+            color: #78350f;
+            padding: 12px 18px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.82rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+        .gsm-banner i { font-size: 1.05rem; flex-shrink: 0; margin-top: 1px; }
+        .gsm-banner b { color: #451a03; }
+
+        .gsm-form-card {
+            background: white;
+            border-radius: var(--v3-radius-lg);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            overflow: hidden;
+        }
+        .gsm-section { border-bottom: 1px solid #f1f3f5; }
+        .gsm-section:last-child { border-bottom: none; }
+        .gsm-section__head {
+            padding: 14px 22px;
+            background: var(--rosa-bg);
+            border-bottom: 1px solid #f1f3f5;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .gsm-section__title {
+            font-size: 0.92rem;
+            font-weight: 600;
+            color: var(--rosa);
+        }
+        .gsm-section__desc {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            margin-left: 8px;
+        }
+        .gsm-section__body {
+            padding: 20px 22px;
+        }
+        .gsm-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 14px 20px;
+        }
+        .gsm-field { display: flex; flex-direction: column; gap: 6px; }
+        .gsm-field__label {
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+        .gsm-field__hint {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            font-weight: 400;
+            margin-left: 6px;
+        }
+        .gsm-field__input,
+        .gsm-field__select,
+        .gsm-field__textarea {
+            padding: 8px 10px;
+            border: 1px solid var(--v3-border);
+            border-radius: 0.4rem;
+            font-size: 0.88rem;
+            font-family: inherit;
+            background: white;
+        }
+        .gsm-field__input:focus,
+        .gsm-field__select:focus,
+        .gsm-field__textarea:focus {
+            border-color: var(--rosa);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(190, 24, 93, 0.15);
+        }
+        .gsm-field__textarea { min-height: 60px; resize: vertical; }
+        .gsm-options {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .gsm-option {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            background: var(--v3-muted);
+            border: 1px solid var(--v3-border);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.15s;
+        }
+        .gsm-option:hover { border-color: var(--rosa); }
+        .gsm-option input { cursor: pointer; }
+
+        .gsm-action-bar {
+            padding: 16px 22px;
+            background: var(--rosa-bg);
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .gsm-history {
+            background: white;
+            border-radius: var(--v3-radius-lg);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            margin-top: 20px;
+            overflow: hidden;
+        }
+        .gsm-history__head {
+            padding: 14px 22px;
+            background: var(--rosa-bg);
+            border-bottom: 1px solid #f1f3f5;
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--rosa);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .gsm-history__list { padding: 8px 0; }
+        .gsm-history-item {
+            padding: 14px 22px;
+            border-bottom: 1px solid #f1f3f5;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+        }
+        .gsm-history-item:last-child { border-bottom: none; }
+        .gsm-history-item__date {
+            font-weight: 700;
+            color: var(--text-dark);
+            font-size: 0.88rem;
+            min-width: 110px;
+        }
+        .gsm-history-item__meta {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+        .gsm-history-item__body { flex: 1; }
+        .gsm-history-item__text { font-size: 0.85rem; color: var(--text-dark); }
+
+        @media (max-width: 768px) {
+            .k-module-header { flex-direction: column; align-items: stretch; gap: 12px; padding: 12px 1rem; height: auto; }
+            .k-header-right { justify-content: flex-end; }
+            .gsm-info-card { flex-direction: column; align-items: flex-start; }
+            .gsm-info-card__chips { margin-left: 0; }
+        }
+
+        /* 📦466 — Keyframes para el spinner de carga (animation:spin en JS) */
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div class="kair-v3-hub">
+
+    <!-- ════════════════════════════════════════════════════════════════
+         HEADER ESTÁNDAR K+AIR · Patrón 6.1.3
+         ════════════════════════════════════════════════════════════════ -->
+    <header class="k-module-header" id="kair-gsm-header-card">
+        <div class="k-header-left">
+            <div class="k-header-title-group">
+                <div class="k-header-main-title">
+                    <i class="bi bi-clipboard2-pulse"></i>
+                    Seguimiento Mensual de Gestación
+                </div>
+                <div class="k-header-breadcrumb">
+                    <span id="kair-gsm-bc-company">Empresa</span>
+                    <i class="bi bi-chevron-right"></i>
+                    <span>Gestión de la Salud</span>
+                    <i class="bi bi-chevron-right"></i>
+                    <span>Seguimiento de Gestación</span>
+                    <i class="bi bi-chevron-right"></i>
+                    <span class="k-breadcrumb-item active">F-PT-014-04</span>
+                </div>
+            </div>
+        </div>
+        <div class="k-header-right">
+            <span class="k-sync-badge k-sync-synced" title="Datos cargados">
+                <i class="bi bi-check-circle-fill"></i> Borrador
+            </span>
+            <button type="button" class="header-back-btn" id="kair-gsm-back" title="Volver al listado">
+                <i class="bi bi-arrow-left"></i> Volver
+            </button>
+            <button type="button" class="k-btn k-btn-primary k-btn-sm" id="kair-gsm-cta-save" title="Guardar seguimiento">
+                <i class="bi bi-save"></i> Guardar Seguimiento
+            </button>
+        </div>
+    </header>
+
+    <main class="gsm-main">
+        <div class="gsm-container">
+
+            <!-- Tarjeta info gestante -->
+            <div class="gsm-info-card" id="infoGestante">
+                <!-- Se renderiza via JS -->
+            </div>
+
+            <!-- Banner de confidencialidad -->
+            <div class="gsm-banner">
+                <i class="fas fa-shield-halved"></i>
+                <div>
+                    <b>DOCUMENTO CONFIDENCIAL.</b>
+                    Ley 1581/2012 (Protección de Datos Personales) · Art. 16 Res. 1843/2025 (custodia 20 años) ·
+                    Art. 6 Res. 957/2005 CAN (independencia profesional del personal SST). Acceso restringido al
+                    Responsable del SG-SST y a la trabajadora. <b>No transcribir diagnósticos clínicos</b> en este formulario —
+                    esa información reposa en la historia clínica ocupacional de la IPS.
+                </div>
+            </div>
+
+            <!-- Formulario -->
+            <form class="gsm-form-card" id="formSeguimiento" onsubmit="event.preventDefault(); guardarSeguimiento();">
+
+                <!-- SECCIÓN 1: IDENTIFICACIÓN -->
+                <div class="gsm-section">
+                    <div class="gsm-section__head">
+                        <i class="fas fa-id-card"></i>
+                        <div class="gsm-section__title">1. Identificación de la trabajadora</div>
+                        <div class="gsm-section__desc">Solo datos administrativos (sin información médica sensible)</div>
+                    </div>
+                    <div class="gsm-section__body">
+                        <div class="gsm-grid">
+                            <div class="gsm-field">
+                                <label class="gsm-field__label">Cargo</label>
+                                <input type="text" class="gsm-field__input" id="fCargo" readonly style="background: var(--v3-muted);" />
+                            </div>
+                            <div class="gsm-field">
+                                <label class="gsm-field__label">Empresa / Área</label>
+                                <input type="text" class="gsm-field__input" id="fEmpresa" readonly style="background: var(--v3-muted);" />
+                            </div>
+                            <div class="gsm-field">
+                                <label class="gsm-field__label">Semanas de gestación al inicio del seguimiento</label>
+                                <input type="number" class="gsm-field__input" id="fSemanas" readonly style="background: var(--v3-muted);" />
+                            </div>
+                            <div class="gsm-field">
+                                <label class="gsm-field__label">Fecha probable de parto (FPP)</label>
+                                <input type="date" class="gsm-field__input" id="fFPP" readonly style="background: var(--v3-muted);" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN 2: CLASIFICACIÓN DEL RIESGO -->
+                <div class="gsm-section">
+                    <div class="gsm-section__head">
+                        <i class="fas fa-triangle-exclamation"></i>
+                        <div class="gsm-section__title">2. Clasificación del riesgo obstétrico (Res. 3280/2018)</div>
+                    </div>
+                    <div class="gsm-section__body">
+                        <div class="gsm-field">
+                            <label class="gsm-field__label">Nivel de riesgo actual</label>
+                            <div class="gsm-options">
+                                <label class="gsm-option"><input type="radio" name="clasificacion" value="bajo" /> Bajo riesgo</label>
+                                <label class="gsm-option"><input type="radio" name="clasificacion" value="alto" /> Alto riesgo</label>
+                                <label class="gsm-option"><input type="radio" name="clasificacion" value="muy-alto" /> Muy alto riesgo</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN 3: CONTROLES PRENATALES -->
+                <div class="gsm-section">
+                    <div class="gsm-section__head">
+                        <i class="fas fa-calendar-check"></i>
+                        <div class="gsm-section__title">3. Controles prenatales del mes</div>
+                    </div>
+                    <div class="gsm-section__body">
+                        <div class="gsm-grid">
+                            <div class="gsm-field">
+                                <label class="gsm-field__label">¿Asistió a los controles programados?</label>
+                                <div class="gsm-options">
+                                    <label class="gsm-option"><input type="radio" name="ctrlAsistio" value="si" /> Sí</label>
+                                    <label class="gsm-option"><input type="radio" name="ctrlAsistio" value="no" /> No</label>
+                                    <label class="gsm-option"><input type="radio" name="ctrlAsistio" value="parcial" /> Parcialmente</label>
+                                </div>
+                            </div>
+                            <div class="gsm-field">
+                                <label class="gsm-field__label">Permisos prenatales utilizados en el mes</label>
+                                <select class="gsm-field__select" id="fPermisos">
+                                    <option value="0">0</option>
+                                    <option value="1">1</option>
+                                    <option value="2">2</option>
+                                    <option value="3">3 o más</option>
+                                </select>
+                            </div>
+                            <div class="gsm-field">
+                                <label class="gsm-field__label">Próxima cita programada</label>
+                                <input type="date" class="gsm-field__input" id="fProximaCita" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN 4: SALUD GENERAL -->
+                <div class="gsm-section">
+                    <div class="gsm-section__head">
+                        <i class="fas fa-heart-pulse"></i>
+                        <div class="gsm-section__title">4. Estado de salud general</div>
+                        <div class="gsm-section__desc">Sin incluir diagnósticos (reservados a la historia clínica de la IPS)</div>
+                    </div>
+                    <div class="gsm-section__body">
+                        <div class="gsm-grid">
+                            <div class="gsm-field">
+                                <label class="gsm-field__label">¿Molestia física que afecta sus funciones?</label>
+                                <div class="gsm-options">
+                                    <label class="gsm-option"><input type="radio" name="molestia" value="si" /> Sí</label>
+                                    <label class="gsm-option"><input type="radio" name="molestia" value="no" /> No</label>
+                                </div>
+                            </div>
+                            <div class="gsm-field" id="descMolestiaField" style="display: none;">
+                                <label class="gsm-field__label">Descripción breve (genérica)</label>
+                                <input type="text" class="gsm-field__input" id="fDescMolestia" maxlength="100" placeholder="Sin incluir diagnósticos" />
+                            </div>
+                            <div class="gsm-field">
+                                <label class="gsm-field__label">¿Fue incapacitada este mes?</label>
+                                <div class="gsm-options">
+                                    <label class="gsm-option"><input type="radio" name="incapacitada" value="si" /> Sí</label>
+                                    <label class="gsm-option"><input type="radio" name="incapacitada" value="no" /> No</label>
+                                </div>
+                            </div>
+                            <div class="gsm-field">
+                                <label class="gsm-field__label">Días de incapacidad</label>
+                                <input type="number" class="gsm-field__input" id="fDiasIncapacidad" min="0" max="30" />
+                            </div>
+                            <div class="gsm-field">
+                                <label class="gsm-field__label">Origen de la incapacidad</label>
+                                <div class="gsm-options">
+                                    <label class="gsm-option"><input type="radio" name="origenIncapacidad" value="comun" /> Común</label>
+                                    <label class="gsm-option"><input type="radio" name="origenIncapacidad" value="laboral" /> Laboral</label>
+                                </div>
+                            </div>
+                            <div class="gsm-field">
+                                <label class="gsm-field__label">¿Nuevas restricciones médicas para el trabajo?</label>
+                                <div class="gsm-options">
+                                    <label class="gsm-option"><input type="radio" name="restricciones" value="si" /> Sí</label>
+                                    <label class="gsm-option"><input type="radio" name="restricciones" value="no" /> No</label>
+                                </div>
+                            </div>
+                            <div class="gsm-field" style="grid-column: 1 / -1;">
+                                <label class="gsm-field__label">Descripción genérica de las restricciones (si aplica) <span class="gsm-field__hint">Sin diagnósticos</span></label>
+                                <textarea class="gsm-field__textarea" id="fDescRestricciones" maxlength="200" placeholder="Ej: Limitar carga > 5kg, evitar postura bípeda prolongada, no trabajo nocturno"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN 5: ESTADO EMOCIONAL -->
+                <div class="gsm-section">
+                    <div class="gsm-section__head">
+                        <i class="bi bi-emoji-smile"></i>
+                        <div class="gsm-section__title">5. Estado emocional y psicosocial</div>
+                    </div>
+                    <div class="gsm-section__body">
+                        <div class="gsm-field">
+                            <label class="gsm-field__label">¿Cómo se ha sentido emocionalmente? (1 = muy mal / 5 = muy bien)</label>
+                            <div class="gsm-options">
+                                <label class="gsm-option"><input type="radio" name="emocional" value="1" /> 1 (Muy mal)</label>
+                                <label class="gsm-option"><input type="radio" name="emocional" value="2" /> 2</label>
+                                <label class="gsm-option"><input type="radio" name="emocional" value="3" /> 3</label>
+                                <label class="gsm-option"><input type="radio" name="emocional" value="4" /> 4</label>
+                                <label class="gsm-option"><input type="radio" name="emocional" value="5" /> 5 (Muy bien)</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN 6: CONDICIONES DEL PUESTO -->
+                <div class="gsm-section">
+                    <div class="gsm-section__head">
+                        <i class="fas fa-briefcase"></i>
+                        <div class="gsm-section__title">6. Condiciones del puesto de trabajo</div>
+                    </div>
+                    <div class="gsm-section__body">
+                        <div class="gsm-grid">
+                            <div class="gsm-field">
+                                <label class="gsm-field__label">¿Puesto compatible con la gestación?</label>
+                                <div class="gsm-options">
+                                    <label class="gsm-option"><input type="radio" name="compatible" value="si" /> Sí</label>
+                                    <label class="gsm-option"><input type="radio" name="compatible" value="no" /> No</label>
+                                    <label class="gsm-option"><input type="radio" name="compatible" value="parcial" /> Parcial</label>
+                                </div>
+                            </div>
+                            <div class="gsm-field">
+                                <label class="gsm-field__label">¿Requiere ajustes?</label>
+                                <div class="gsm-options">
+                                    <label class="gsm-option"><input type="radio" name="ajustes" value="si" /> Sí</label>
+                                    <label class="gsm-option"><input type="radio" name="ajustes" value="no" /> No</label>
+                                </div>
+                            </div>
+                            <div class="gsm-field" style="grid-column: 1 / -1;">
+                                <label class="gsm-field__label">Observaciones SST</label>
+                                <textarea class="gsm-field__textarea" id="fObservaciones" maxlength="300" placeholder="Solo hechos relevantes para la gestión del riesgo laboral. NO incluir diagnósticos."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN 7: ACCIONES TOMADAS -->
+                <div class="gsm-section">
+                    <div class="gsm-section__head">
+                        <i class="fas fa-list-check"></i>
+                        <div class="gsm-section__title">7. Acciones tomadas en el mes (Diligenciado por SST)</div>
+                    </div>
+                    <div class="gsm-section__body">
+                        <div class="gsm-options">
+                            <label class="gsm-option"><input type="checkbox" name="accion" value="permisos" /> Permisos para controles prenatales otorgados</label>
+                            <label class="gsm-option"><input type="checkbox" name="accion" value="emo" /> EMO de seguimiento aplicado</label>
+                            <label class="gsm-option"><input type="checkbox" name="accion" value="ajuste" /> Ajuste al puesto aplicado</label>
+                            <label class="gsm-option"><input type="checkbox" name="accion" value="reubicacion" /> Reubicación a otro puesto</label>
+                            <label class="gsm-option"><input type="checkbox" name="accion" value="arl" /> Asesoría ARL solicitada</label>
+                            <label class="gsm-option"><input type="checkbox" name="accion" value="arl-at" /> AT/EL reportado a ARL (≤ 2 días)</label>
+                            <label class="gsm-option"><input type="checkbox" name="accion" value="arl-novedad" /> Novedad laboral reportada a ARL</label>
+                            <label class="gsm-option"><input type="checkbox" name="accion" value="iper" /> Matriz IPER actualizada</label>
+                            <label class="gsm-option"><input type="checkbox" name="accion" value="visita" /> Visita al puesto realizada</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Barra de acciones -->
+                <div class="gsm-action-bar">
+                    <button type="button" class="k-btn k-btn-primary" onclick="volverAlListado()">
+                        <i class="bi bi-arrow-left"></i> Volver al listado
+                    </button>
+                    <button type="submit" class="k-btn k-btn-primary">
+                        <i class="bi bi-save"></i> Guardar Seguimiento
+                    </button>
+                </div>
+            </form>
+
+            <!-- Historial -->
+            <section class="gsm-history">
+                <div class="gsm-history__head">
+                    <i class="fas fa-clock-rotate-left"></i>
+                    Historial de Seguimientos Anteriores
+                </div>
+                <div class="gsm-history__list" id="historialList">
+                    <!-- Se renderiza via JS -->
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+</div>
+
+<script src="gestacion-seguimiento-mensual.js"></script>
+</body>
+</html>

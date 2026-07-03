@@ -232,6 +232,13 @@ class MedicionAusentismoComponent {
             case 'consulta-trabajadores':
                 this.renderConsultaTrabajadoresView(this.container);
                 break;
+            // 📦462 (2026-07-03) — Vistas nuevas de Seguimiento de Gestación
+            case 'seguimiento-gestacion':
+                this.renderSeguimientoGestacionView(this.container);
+                break;
+            case 'seguimiento-gestacion-mensual':
+                this.renderSeguimientoMensualView(this.container, this._gestanteActualId);
+                break;
             default:
                 this.renderMainView(this.container);
         }
@@ -284,6 +291,23 @@ class MedicionAusentismoComponent {
                         break;
                     case 'consulta-trabajadores':
                         this.currentView = 'consulta-trabajadores';
+                        this.render();
+                        break;
+                    case 'seguimiento-gestacion':
+                        // 📦462 (2026-07-03) — Vista principal de Seguimiento de Gestación (Salud Materna)
+                        this.currentView = 'seguimiento-gestacion';
+                        this._gestanteActualId = null;
+                        this.render();
+                        break;
+                    case 'seguimiento-gestacion-mensual':
+                        // 📦462 (2026-07-03) — Vista de seguimiento mensual de una gestante específica
+                        this.currentView = 'seguimiento-gestacion-mensual';
+                        this._gestanteActualId = (data.payload && data.payload.gestanteId) || null;
+                        this.render();
+                        break;
+                    case 'main':
+                        // 📦462 (2026-07-03) — Volver al home principal del módulo
+                        this.currentView = 'main';
                         this.render();
                         break;
                 }
@@ -8963,6 +8987,132 @@ class MedicionAusentismoComponent {
         button.innerHTML = text;
         button.addEventListener('click', onClick);
         return button;
+    }
+
+    // 📦462 (2026-07-03) — Vistas nuevas del módulo de Seguimiento de Gestación.
+    // Se renderizan como iframes para mantener el patrón existente del módulo
+    // (cada vista es autocontenida y no comparte estado JS con el padre).
+
+    /**
+     * Renderiza la vista principal de Seguimiento de Gestación
+     * (KPIs + filtros + tabla de gestantes).
+     */
+    renderSeguimientoGestacionView(container) {
+        container.style.padding = '0';
+        container.style.overflow = 'hidden';
+
+        const iframe = document.createElement('iframe');
+        iframe.src = 'modules/gestion-salud/ausentismo/gestacion-seguimiento-home.html';
+        iframe.style.cssText = 'width: 100%; height: 100%; border: none; display: block;';
+
+        const handleMessage = (event) => {
+            if (event.source !== iframe.contentWindow) return;
+            const data = event.data;
+            if (data.type === 'ausentismo-home-action') {
+                switch (data.action) {
+                    case 'seguimiento-gestacion-mensual':
+                        this.currentView = 'seguimiento-gestacion-mensual';
+                        this._gestanteActualId = (data.payload && data.payload.gestanteId) || null;
+                        this.render();
+                        break;
+                    case 'main':
+                        this.currentView = 'main';
+                        this.render();
+                        break;
+                }
+            }
+        };
+
+        if (this.portalMessageCleanup) {
+            this.portalMessageCleanup();
+        }
+        window.addEventListener('message', handleMessage);
+        this.portalMessageCleanup = () => {
+            window.removeEventListener('message', handleMessage);
+        };
+
+        iframe.onload = () => {
+            try {
+                // 📦466 (2026-07-03) — Expose electronAPI del renderer principal
+                // al iframe para que pueda invocar IPC directo (gestacionCargarTodo, etc.).
+                // Patrón idéntico a renderer.js línea 5547. Sin esto, las llamadas
+                // `window.electronAPI.gestacionXxx(...)` fallan con "Cannot read
+                // properties of undefined".
+                if (iframe.contentWindow && window.electronAPI) {
+                    iframe.contentWindow.electronAPI = window.electronAPI;
+                }
+                iframe.contentWindow.postMessage({
+                    type: 'SET_COMPANY_CONTEXT',
+                    company: this.currentCompany
+                }, '*');
+            } catch (error) {
+                console.error('[seguimiento-gestacion] Error al enviar contexto al iframe:', error);
+            }
+        };
+
+        container.appendChild(iframe);
+    }
+
+    /**
+     * Renderiza la vista de seguimiento mensual de una gestante específica.
+     * Recibe el gestanteId por postMessage o por parámetro directo.
+     */
+    renderSeguimientoMensualView(container, gestanteId) {
+        container.style.padding = '0';
+        container.style.overflow = 'hidden';
+
+        const iframe = document.createElement('iframe');
+        // Pasamos el gestanteId por query string para que la vista
+        // pueda leerlo incluso si llega antes del postMessage.
+        const idParam = gestanteId ? '?id=' + encodeURIComponent(gestanteId) : '';
+        iframe.src = 'modules/gestion-salud/ausentismo/gestacion-seguimiento-mensual.html' + idParam;
+        iframe.style.cssText = 'width: 100%; height: 100%; border: none; display: block;';
+
+        const handleMessage = (event) => {
+            if (event.source !== iframe.contentWindow) return;
+            const data = event.data;
+            if (data.type === 'ausentismo-home-action') {
+                switch (data.action) {
+                    case 'seguimiento-gestacion':
+                        this.currentView = 'seguimiento-gestacion';
+                        this.render();
+                        break;
+                    case 'main':
+                        this.currentView = 'main';
+                        this.render();
+                        break;
+                }
+            }
+        };
+
+        if (this.portalMessageCleanup) {
+            this.portalMessageCleanup();
+        }
+        window.addEventListener('message', handleMessage);
+        this.portalMessageCleanup = () => {
+            window.removeEventListener('message', handleMessage);
+        };
+
+        iframe.onload = () => {
+            try {
+                // 📦466 (2026-07-03) — Expose electronAPI del renderer principal
+                // al iframe (gestacion-seguimiento-mensual.html) para que pueda
+                // invocar IPC directo (gestacionObtenerGestante, gestacionGuardarSeguimiento).
+                // Patrón idéntico a renderer.js línea 5547.
+                if (iframe.contentWindow && window.electronAPI) {
+                    iframe.contentWindow.electronAPI = window.electronAPI;
+                }
+                iframe.contentWindow.postMessage({
+                    type: 'SET_COMPANY_CONTEXT',
+                    company: this.currentCompany,
+                    gestanteId: gestanteId
+                }, '*');
+            } catch (error) {
+                console.error('[seguimiento-gestacion-mensual] Error al enviar contexto al iframe:', error);
+            }
+        };
+
+        container.appendChild(iframe);
     }
 }
 

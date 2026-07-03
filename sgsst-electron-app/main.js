@@ -45,6 +45,8 @@ const { registerRevisionAltaDireccionHandlers } = require('./main/revision-alta-
 // Importar handlers de Auditoría Anual (Submódulo 6.1.2) — F1 (2026-06-19)
 const { registerAuditoriaAnualHandlers } = require('./main/auditoria-anual-bridge');
 const { registerAccionesPreventivasCorrectivasHandlers } = require('./main/acciones-preventivas-correctivas-bridge');
+// 📦465 (2026-07-03) — Handlers de Seguimiento de Gestación (Salud Materna)
+const { registerGestacionHandlers, SCHEMA_SQL: GESTACION_SCHEMA_SQL } = require('./main/gestacion-bridge');
 // K+AIR Calendar — bridge de eventos rápidos (botón calendario del header)
 const { registerEventosRapidosHandlers } = require('./main/eventos-rapidos-bridge');
 
@@ -337,6 +339,18 @@ function initDbOnce() {
         expires_at TEXT NOT NULL
       );
     `);
+
+    // 📦466 (2026-07-03) — Schema de Seguimiento de Gestación (Salud Materna)
+    // 2 tablas: gestaciones + seguimiento_gestacion_mensual
+    // Persistencia: SQLite central en app.getPath('userData')/kair.db
+    // FIX: estaba ADENTRO del template literal anterior — SQLite lo recibía como
+    // texto literal y nunca creaba las tablas. Todos los IPC devolvían NO_DB.
+    try {
+      db.exec(GESTACION_SCHEMA_SQL);
+      console.log('[DB] 📦466 · Tablas de gestacion creadas/verificadas');
+    } catch (gsErr) {
+      console.error('[DB] 📦466 · Error creando schema de gestacion:', gsErr.message);
+    }
 
     const roleNames = ['Administrador', 'SST', 'Auditoría', 'Gerencia', 'Recursos Humanos'];
     const insertRole = db.prepare('INSERT OR IGNORE INTO roles (name) VALUES (?)');
@@ -7934,6 +7948,14 @@ try {
   sendLog('[MAIN] Handlers de Acciones Preventivas y Correctivas (7.1.1) registrados correctamente', 'INFO');
 } catch (err) {
   sendLog(`[MAIN] Error registrando handlers de Acciones Preventivas y Correctivas: ${err.message}`, 'ERROR');
+}
+
+// Registrar handlers de Seguimiento de Gestación (Salud Materna) — 📦465 (2026-07-03)
+try {
+  registerGestacionHandlers(app, { getDb });
+  sendLog('[MAIN] Handlers de Seguimiento de Gestación (Salud Materna) registrados correctamente', 'INFO');
+} catch (err) {
+  sendLog(`[MAIN] Error registrando handlers de Gestación: ${err.message}`, 'ERROR');
 }
 
 // Registrar handlers de K+AIR Calendar — eventos rápidos (botón calendario del header)

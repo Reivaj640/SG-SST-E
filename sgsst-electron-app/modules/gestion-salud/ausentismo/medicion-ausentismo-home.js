@@ -454,3 +454,20 @@ function consultaTrabajadores() {
         }, '*');
     }
 }
+
+/**
+ * 📦461 (2026-07-03) — Abre la vista de Seguimiento de Gestación (Salud Materna).
+ * Envía mensaje al padre para que cargue la nueva vista. Por ahora, mientras se
+ * desarrolla la vista completa, el padre mostrará un toast indicando que el
+ * módulo está en construcción.
+ */
+function seguimientoGestacion() {
+    console.log('[HOME] Abriendo seguimiento de gestación...');
+
+    if (window.parent && window.parent.postMessage) {
+        window.parent.postMessage({
+            type: 'ausentismo-home-action',
+            action: 'seguimiento-gestacion'
+        }, '*');
+    }
+}
