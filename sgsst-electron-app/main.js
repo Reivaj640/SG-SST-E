@@ -8309,11 +8309,42 @@ ipcMain.handle('get-ausentismo-data', async (event, companyName) => {
 
 // =============================================================================
 // Handler: read-ausentismo-data (Para estadísticas - retorna todos los datos sin filtrar)
+//
+// 📦459 (2026-07-02) — Modo degradado: cuando el archivo PI-FO-076 no está disponible
+// (carpeta no existe / archivo no matchea / archivo corrupto / sin permisos), el
+// handler retorna success:true con flags informativos (_missingFile, _missingFileReason)
+// en lugar de success:false. Esto permite que las vistas SIGAN funcionando con datos
+// de BD cuando sea posible, mostrando banners claros al usuario en vez de romper.
+//
+// Razones de modo degradado:
+//   - folder_missing : la carpeta de ausentismo no existe en la raíz de la empresa
+//   - not_found      : la carpeta existe pero ningún archivo matchea PI-FO-076/AUSENTISMO
+//   - folder_unreadable: la carpeta existe pero readdir falló (permisos/red)
+//   - corrupt        : el archivo existe pero XLSX.readFile() lanzó error
+//   - unreadable     : el archivo existe pero no se puede abrir (bloqueado por otra app)
+//
+// Errores graves (success:false) se reservan para:
+//   - empresa sin ruta mapeada en config
+//   - JSON de config corrupto irrecuperable
 // =============================================================================
 ipcMain.handle('read-ausentismo-data', async (event, companyName) => {
   console.log('========================================');
   console.log(`[ESTADISTICAS][MAIN] Handler read-ausentismo-data llamado para empresa: ${companyName}`);
   sendLog(`[ESTADISTICAS] Cargando datos para estadísticas: ${companyName}`, 'INFO');
+
+  // Estructura común para modo degradado — evita repetir el "esqueleto" en cada rama
+  const degradedResponse = (reason, expectedDir, expectedFileName, details) => ({
+    success: true, // <- true a propósito: la app debe seguir, no romperse
+    headers: [],
+    rows: [],
+    file: null,
+    sheet: null,
+    _missingFile: true,
+    _missingFileReason: reason,
+    _expectedDir: expectedDir,
+    _expectedFileName: expectedFileName,
+    _details: details || null
+  });
 
   try {
     // 1. Cargar configuración
@@ -8329,71 +8360,143 @@ ipcMain.handle('read-ausentismo-data', async (event, companyName) => {
     const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
 
     if (!companyConfig || !companyConfig.root) {
+      // Error grave — la empresa ni siquiera existe en config
       throw new Error(`Empresa "${companyName}" no tiene ruta mapeada`);
     }
 
-    // 3. Buscar archivo de ausentismo (PI-FO-076)
+    // 3. Calcular carpeta esperada del archivo de ausentismo (PI-FO-076)
     const ausentismoDir = path.join(
       companyConfig.root,
       '3. Gestión de la Salud',
       '3.3.6 Medición del ausentismo por causa médica'
     );
+    const expectedFileName = 'PI-FO-076*.xlsx (o cualquier archivo que contenga "AUSENTISMO")';
 
-    const files = await fsp.readdir(ausentismoDir);
-    const ausentismoFile = files.find(f => 
+    // 3a. Verificar primero si la carpeta existe — evita ensuciar logs con stacktraces
+    try {
+      const dirStat = await fsp.stat(ausentismoDir);
+      if (!dirStat.isDirectory()) {
+        console.warn(`[ESTADISTICAS] Ruta existe pero no es directorio: ${ausentismoDir}`);
+        return degradedResponse('folder_missing', ausentismoDir, expectedFileName,
+          `La ruta existe pero no es una carpeta: ${ausentismoDir}`);
+      }
+    } catch (statErr) {
+      if (statErr.code === 'ENOENT') {
+        console.warn(`[ESTADISTICAS] Carpeta de ausentismo no existe: ${ausentismoDir}`);
+        sendLog(`[WARN] Carpeta de ausentismo no encontrada: ${ausentismoDir}`, 'WARN');
+        return degradedResponse('folder_missing', ausentismoDir, expectedFileName,
+          'La carpeta de Medición del ausentismo no existe en la raíz de la empresa.');
+      }
+      // Error de permisos u otro al hacer stat
+      console.warn(`[ESTADISTICAS] No se pudo acceder a la carpeta: ${statErr.message}`);
+      return degradedResponse('folder_unreadable', ausentismoDir, expectedFileName,
+        `Error al acceder a la carpeta: ${statErr.code || statErr.message}`);
+    }
+
+    // 3b. Listar archivos de la carpeta
+    let files;
+    try {
+      files = await fsp.readdir(ausentismoDir);
+    } catch (readErr) {
+      console.warn(`[ESTADISTICAS] readdir falló: ${readErr.message}`);
+      return degradedResponse('folder_unreadable', ausentismoDir, expectedFileName,
+        `No se pudo listar la carpeta: ${readErr.code || readErr.message}`);
+    }
+
+    // 3c. Buscar archivo que matchee el patrón
+    const ausentismoFile = files.find(f =>
       f.includes('PI-FO-076') || f.includes('AUSENTISMO')
     );
 
     if (!ausentismoFile) {
-      throw new Error('No se encontró el archivo de ausentismo (PI-FO-076)');
+      console.warn(`[ESTADISTICAS] No se encontró archivo PI-FO-076 en ${ausentismoDir}. Archivos vistos: ${files.length}`);
+      sendLog(`[WARN] No se encontró PI-FO-076. Archivos en carpeta: ${files.slice(0, 5).join(', ')}${files.length > 5 ? '...' : ''}`, 'WARN');
+      return degradedResponse('not_found', ausentismoDir, expectedFileName,
+        `Se buscó el patrón "PI-FO-076" o "AUSENTISMO" en el nombre. Se encontraron ${files.length} archivos en la carpeta.`);
     }
 
     const filePath = path.join(ausentismoDir, ausentismoFile);
     console.log(`[ESTADISTICAS] Archivo encontrado: ${filePath}`);
 
-    // 4. Leer Excel con XLSX
-    const XLSX = require('xlsx');
-    const workbook = XLSX.readFile(filePath);
-    
-    // 5. Obtener hoja del año actual (o la primera que tenga datos)
-    const sheetName = workbook.SheetNames.find(name => 
+    // 4. Verificar accesibilidad del archivo antes de intentar leerlo
+    try {
+      await fsp.access(filePath, fs.constants.R_OK);
+    } catch (accErr) {
+      console.warn(`[ESTADISTICAS] Archivo no accesible: ${accErr.message}`);
+      return degradedResponse('unreadable', ausentismoDir, expectedFileName,
+        `El archivo existe pero no se puede leer (puede estar bloqueado por otra app): ${filePath}`);
+    }
+
+    // 5. Leer Excel con XLSX — capturar errores de parseo
+    let workbook;
+    try {
+      const XLSX = require('xlsx');
+      workbook = XLSX.readFile(filePath);
+    } catch (xlsxErr) {
+      console.warn(`[ESTADISTICAS] XLSX.readFile() falló: ${xlsxErr.message}`);
+      sendLog(`[WARN] Archivo de ausentismo corrupto o ilegible: ${filePath} — ${xlsxErr.message}`, 'WARN');
+      return degradedResponse('corrupt', ausentismoDir, expectedFileName,
+        `No se pudo parsear el Excel: ${xlsxErr.message}. El archivo puede estar corrupto o tener un formato no soportado.`);
+    }
+
+    // 6. Obtener hoja del año actual (o la primera que tenga datos)
+    const sheetName = workbook.SheetNames.find(name =>
       name.includes(companyKey ? companyKey.toUpperCase() : '2024')
     ) || workbook.SheetNames[0];
+
+    if (!sheetName) {
+      console.warn(`[ESTADISTICAS] Workbook sin hojas: ${filePath}`);
+      return degradedResponse('corrupt', ausentismoDir, expectedFileName,
+        'El archivo Excel no contiene hojas.');
+    }
 
     const sheet = workbook.Sheets[sheetName];
     const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-    // 6. Encontrar encabezados (primera fila con "NOMBRE" o "CEDULA")
+    // 7. Encontrar encabezados (primera fila con "NOMBRE" o "CEDULA")
     let headerRowIndex = 0;
     for (let i = 0; i < Math.min(rawData.length, 20); i++) {
       const row = rawData[i];
-      if (row.some(cell => cell && (String(cell).includes('NOMBRE') || String(cell).includes('CEDULA')))) {
+      if (row && row.some(cell => cell && (String(cell).includes('NOMBRE') || String(cell).includes('CEDULA')))) {
         headerRowIndex = i;
         break;
       }
     }
 
-    const headers = rawData[headerRowIndex].map(h => h ? String(h).trim() : '');
+    // 📦459 — Guard: si no se encontraron headers reconocibles, devolver modo degradado
+    // (antes esto devolvía headers vacíos sin avisar — fuente de bugs silenciosos)
+    const detectedHeaders = rawData[headerRowIndex] || [];
+    const hasValidHeader = detectedHeaders.some(h => h && String(h).trim() !== '');
+    if (!hasValidHeader && rawData.length > 0) {
+      console.warn(`[ESTADISTICAS] No se detectaron headers válidos en ${filePath} (hoja: ${sheetName})`);
+      return degradedResponse('corrupt', ausentismoDir, expectedFileName,
+        `No se reconocieron encabezados (NOMBRE/CÉDULA) en la hoja "${sheetName}". El formato del archivo puede haber cambiado.`);
+    }
+
+    const headers = detectedHeaders.map(h => h ? String(h).trim() : '');
     const dataRows = rawData.slice(headerRowIndex + 1);
 
     console.log(`[ESTADISTICAS] Headers: ${headers.length} columnas`);
     console.log(`[ESTADISTICAS] Data rows: ${dataRows.length} filas`);
 
-    // 7. Retornar datos
+    // 8. Retornar datos exitosos
     return {
       success: true,
       headers,
       rows: dataRows,
       file: filePath,
-      sheet: sheetName
+      sheet: sheetName,
+      _missingFile: false
     };
 
   } catch (error) {
-    console.error('[ESTADISTICAS] Error:', error);
-    sendLog(`[ERROR] Error en read-ausentismo-data: ${error.message}`, 'ERROR');
+    // Solo errores graves llegan aquí (empresa sin mapear, JSON de config corrupto, etc.)
+    console.error('[ESTADISTICAS] Error grave en read-ausentismo-data:', error);
+    sendLog(`[ERROR] Error grave en read-ausentismo-data: ${error.message}`, 'ERROR');
     return {
       success: false,
-      error: error.message
+      error: error.message,
+      _unexpected: true
     };
   }
 });
@@ -15497,6 +15600,27 @@ async function getCachedStats(cacheKey, filePaths, computeFn) {
 
 // ==========================================================================
 // Handler: Estadísticas de Ausentismo (Optimizado con Caché)
+//
+// 📦459 (2026-07-02) — Refactorizado para corregir bug de contrato + modo degradado.
+//
+// ANTES (buggy):
+//   - Handler retornaba { total, mesActual, year, mes }
+//   - Frontend pedía { pendientes, activos } → siempre quedaba en 0 por el fallback
+//   - Si archivo no existía → success:false → frontend mostraba 0 sin diagnóstico
+//   - Sin distinción entre "pendiente" (sin seguimiento) y "activo" (en seguimiento)
+//
+// AHORA:
+//   - Handler retorna { pendientes, activos, total, year, mes, _missingFile }
+//   - "Pendientes": incapacidad >15 días SIN ningún seguimiento registrado
+//   - "Activos":    incapacidad >15 días CON seguimiento(s) abierto(s) (no cerrados)
+//   - Modo degradado consistente con read-ausentismo-data: success:true con _missingFile:true
+//   - Usa la misma lógica de cruce con Seguimiento Casos Medicos.xlsx que el handler adyacente
+//
+// Reglas de clasificación (basadas en la lógica existente de get-salud-seguimientos-stats):
+//   - Solo se cuentan casos con dias > 15 (umbral de seguimiento por condición de salud)
+//   - Si NO hay registro en Seguimiento Casos Medicos.xlsx → pendiente (requiere gestión)
+//   - Si hay registro Y su último estado es 'recovered'/'recuperado'/'finalizado' → NO se cuenta
+//   - Si hay registro Y su último estado es otro (en curso, etc.) → activo
 // ==========================================================================
 ipcMain.handle('get-ausentismo-stats', async (event, companyName, mode) => {
   const ausentismoFiles = {
@@ -15506,74 +15630,570 @@ ipcMain.handle('get-ausentismo-stats', async (event, companyName, mode) => {
     "ASEL": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\19. Asel S.A.S\\3. Gestión de la Salud\\3.3.6 Medición del ausentismo por causa médica\\A-FR-31 Ausentismo Laboral.xlsx"
   };
 
+  // 📦459 — Modo degradado: si empresa no está en el mapa O archivo no existe,
+  // retornar success:true con _missingFile:true para que el frontend muestre "—"
+  // en vez de "0" (que es engañoso — sugiere que no hay datos cuando en realidad
+  // no se pudo acceder al archivo).
+  const EMPTY_RESULT = { pendientes: 0, activos: 0, total: 0, year: new Date().getFullYear(), mes: '---' };
+
+  if (!companyName || typeof companyName !== 'string') {
+    return { success: true, data: { ...EMPTY_RESULT, _missingFile: true, _missingFileReason: 'no_company' }, _missingFile: true };
+  }
+
   const filePath = ausentismoFiles[companyName.toUpperCase()];
-  if (!filePath || !fs.existsSync(filePath)) {
-    return { success: false, error: 'Archivo no encontrado' };
+  if (!filePath) {
+    return { success: true, data: { ...EMPTY_RESULT, _missingFile: true, _missingFileReason: 'company_not_mapped', _details: `Empresa "${companyName}" no tiene ruta de ausentismo configurada` }, _missingFile: true };
+  }
+
+  try {
+    if (!fs.existsSync(filePath)) {
+      return { success: true, data: { ...EMPTY_RESULT, _missingFile: true, _missingFileReason: 'not_found', _expectedPath: filePath, _details: 'Archivo de ausentismo no encontrado en la ruta configurada' }, _missingFile: true };
+    }
+  } catch (statErr) {
+    return { success: true, data: { ...EMPTY_RESULT, _missingFile: true, _missingFileReason: 'unreadable', _expectedPath: filePath, _details: statErr.message }, _missingFile: true };
+  }
+
+  // 📦459 (2026-07-02) — Cambio de fuente de cruce:
+  //   ANTES: Seguimiento Casos Medicos.xlsx (ruta hardcoded en Documents/ o Google Drive)
+  //          → problema: si el archivo no está exactamente en esas rutas, no se encuentra
+  //            y todos los casos quedan como "pendientes" (false negatives)
+  //   AHORA: PRI.xlsx en la misma carpeta que PI-FO-076 (misma carpeta de ausentismo)
+  //          → robusto: PRI.xlsx y PI-FO-076 SIEMPRE coexisten en la misma carpeta
+  //          → consistente: usa la misma fuente que la vista de Seguimiento de Incapacidades
+  //          → sin rutas hardcoded: usa la misma búsqueda por patrón que ya tenemos
+  //
+  // Si PRI.xlsx no existe, todos los casos con dias>15 serán clasificados como
+  // "pendientes" (no "activos"), que es semánticamente correcto.
+  //
+  // NOTA: este handler NO construye `companyConfig` desde config.json (usa el mapa
+  // hardcoded `ausentismoFiles`). Por eso derivamos el directorio desde `filePath`
+  // con `path.dirname()` en vez de construirlo desde `companyConfig.root`.
+  const ausentismoDirForPri = path.dirname(filePath);
+  let followUpPath = null;
+  try {
+    const ausentismoEntries = await fsp.readdir(ausentismoDirForPri);
+    // PRI.xlsx — buscar archivo que contenga "PRI" en el nombre (exacto o con sufijo)
+    const priFile = ausentismoEntries.find(f => {
+      const upper = f.toUpperCase();
+      // Coincide con "PRI.xlsx", "PRI 2024.xlsx", "PRI_2025.xlsx", etc.
+      return upper.includes('PRI') && upper.endsWith('.XLSX') && !upper.startsWith('~$');
+    });
+    if (priFile) {
+      followUpPath = path.join(ausentismoDirForPri, priFile);
+      console.log(`[AUSENTISMO-STATS] ✓ PRI.xlsx encontrado: ${followUpPath}`);
+    } else {
+      console.warn(`[AUSENTISMO-STATS] ⚠ PRI.xlsx NO encontrado en ${ausentismoDirForPri}. Archivos vistos:`,
+        ausentismoEntries.filter(f => f.toUpperCase().endsWith('.XLSX')).join(', ') || '(ninguno)');
+    }
+  } catch (priDirErr) {
+    console.warn(`[AUSENTISMO-STATS] No se pudo leer la carpeta de ausentismo para buscar PRI.xlsx: ${priDirErr.message}`);
   }
 
   const cacheKey = `ausentismo_${companyName.toUpperCase()}`;
-  
-  const resultData = await getCachedStats(cacheKey, [filePath], async () => {
-    // Lógica de cálculo original (encapsulada para el helper)
-    const workbook = xlsx.readFile(filePath);
-    const companyNameLower = companyName.toLowerCase();
-    let sheetName = workbook.SheetNames.find(s =>
-      s.toLowerCase().includes(companyNameLower) && !s.toLowerCase().includes('cie') && !s.toLowerCase().includes('rips')
-    );
-    if (!sheetName) {
-      const yearStr = new Date().getFullYear();
-      sheetName = workbook.SheetNames.find(s => s.includes(String(yearStr)));
-    }
-    if (!sheetName) sheetName = workbook.SheetNames[0];
 
-    const worksheet = workbook.Sheets[sheetName];
-    const rawData = xlsx.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+  // 📦459 — currentYear se declara ANTES del bloque de carga para que esté
+  // disponible en el filtro de año de PRI.xlsx (FIX #4). Antes se declaraba
+  // más abajo en el bloque de clasificación, lo que causaba ReferenceError al
+  // usarlo en el loop de PRI.
+  const _today = new Date();
+  const currentYear = _today.getFullYear();
 
-    let headerRowIdx = -1, colMes = -1, colAnio = -1;
-    for (let i = 0; i < Math.min(rawData.length, 15); i++) {
-      const row = rawData[i];
-      if (!Array.isArray(row)) continue;
-      const mesIdx = row.findIndex(c => String(c || '').toUpperCase().trim() === 'MES');
-      const anioIdx = row.findIndex(c => {
-        const v = String(c || '').toUpperCase().trim().replace(/\u00d1/g, 'N').replace(/\u00f1/g, 'N');
-        return v === 'ANO' || v === 'A\u00d1O';
+  let resultData;
+  try {
+    resultData = await getCachedStats(cacheKey, [filePath, followUpPath].filter(Boolean), async () => {
+      // 1. Cargar PRI.xlsx (si existe) — fuente de verdad para seguimientos
+      let followUpData = {};
+      if (followUpPath && fs.existsSync(followUpPath)) {
+        try {
+          const workbookPRI = xlsx.readFile(followUpPath);
+          console.log(`[AUSENTISMO-STATS] PRI.xlsx tiene ${workbookPRI.SheetNames.length} hoja(s): [${workbookPRI.SheetNames.join(', ')}]`);
+          // 📦459 (2026-07-02) — BUG RAÍZ ENCONTRADO: antes usábamos SheetNames[0]
+          // (primera hoja, que suele ser "Dashboard" o portada con formato no tabular).
+          // Python usa explícitamente "Casos en seguimiento" que tiene 630 filas
+          // con las cédulas. Ahora replicamos esa lógica: buscar "Casos en
+          // seguimiento" / "Seguimiento" / "Casos" / primera hoja como fallback.
+          const PRI_SHEET_PRIORITY = [
+            'Casos en seguimiento',
+            'Seguimiento',
+            'Casos',
+            'seguimiento',
+            'casos en seguimiento'
+          ];
+          let priSheetName = null;
+          for (const candidate of PRI_SHEET_PRIORITY) {
+            if (workbookPRI.SheetNames.includes(candidate)) {
+              priSheetName = candidate;
+              break;
+            }
+          }
+          // Si ninguno matchea, usar la primera que tenga datos tabulares (no Dashboard)
+          if (!priSheetName) {
+            const sheetNoDashboard = workbookPRI.SheetNames.find(n =>
+              !/dashboard|inicio|portada|caratula/i.test(n)
+            );
+            priSheetName = sheetNoDashboard || workbookPRI.SheetNames[0];
+          }
+          console.log(`[AUSENTISMO-STATS] Usando hoja: "${priSheetName}"`);
+
+          // 📦459 (2026-07-02) — REFACTOR: en lugar de pelearnos con sheet_to_json
+          // y sus fallbacks, iteramos el sheet MANUALMENTE leyendo celdas específicas
+          // por coordenadas (igual que hace Python en cargar_todos_registros_pri).
+          //
+          // Por qué esta es la solución correcta:
+          //   1. PRI.xlsx tiene títulos en filas 1-6 y datos en fila 7+. sheet_to_json
+          //      con header:6 puede no encontrar las cédulas si los headers están en
+          //      otra fila (como en este caso — el header row puede tener otras keys).
+          //   2. Python lee por coordenadas (D{fila_idx} para cédula, AV{fila_idx}
+          //      para fechaCierre) — independiente del header de la hoja.
+          //   3. Las funciones determinarEstado() y calcularPorcentajeAvance()
+          //      esperan estructura NESTED `pric.fechaCierre`. Antes construíamos
+          //      filas planas y luego añadíamos pric con idx-based mapping (incorrecto
+          //      cuando el fallback corría). Ahora construimos ambos en una pasada.
+          //
+          // Mapeo cell → key (basado en cargar_todos_registros_pri líneas 504-545):
+          //   D=3    → cédula
+          //   AV=47  → fechaCierre
+          //   AW=48  → motivoCierre
+          //   BP=65  → fechaReintegro
+          //   CB=66  → fechaReincorporacion
+          //   CC=67  → tipoReintegro
+          //   CD=68  → adaptaciones
+          const priSheet = workbookPRI.Sheets[priSheetName];
+          const priRange = xlsx.utils.decode_range(priSheet['!ref'] || 'A1');
+
+          // Detectar dinámicamente la fila del header: primera fila que tenga
+          // "CEDULA" o "Cédula" o "IDENTIFICACION" en alguna columna. Empezamos
+          // desde fila 1 (índice 0). Típicamente será índice 6 (fila 7) según el
+          // layout conocido, pero puede variar.
+          let headerRowIdx = -1;
+          for (let r = 0; r < Math.min(priRange.e.r, 12); r++) {
+            for (let c = priRange.s.c; c <= priRange.e.c; c++) {
+              const cellAddr = xlsx.utils.encode_cell({ r, c });
+              const cell = priSheet[cellAddr];
+              if (!cell || cell.v === undefined) continue;
+              const v = String(cell.v).toUpperCase();
+              if (v.includes('CÉDULA') || v.includes('CEDULA') || v.includes('IDENTIFICACION') || v.includes('IDENTIFICACIÓN')) {
+                headerRowIdx = r;
+                break;
+              }
+            }
+            if (headerRowIdx >= 0) break;
+          }
+          // Si no se detectó header, asumir fila 7 (idx 6) por convención del proyecto
+          if (headerRowIdx < 0) {
+            console.warn('[AUSENTISMO-STATS][📦459] No se detectó fila de header por búsqueda dinámica, usando fila 7 (idx 6) por defecto');
+            headerRowIdx = 6;
+          }
+          console.log(`[AUSENTISMO-STATS][📦459] Header detectado en fila ${headerRowIdx + 1} (índice ${headerRowIdx})`);
+
+          // Construir mapa de headers: col → nombre del header
+          const headersMap = {};
+          for (let c = priRange.s.c; c <= priRange.e.c; c++) {
+            const cellAddr = xlsx.utils.encode_cell({ r: headerRowIdx, c });
+            const cell = priSheet[cellAddr];
+            headersMap[c] = cell?.v !== undefined ? String(cell.v).trim() : `col_${c}`;
+          }
+
+          // Iterar filas de datos (desde headerRowIdx + 1 hasta el final del sheet)
+          let debugCierreEncontrado = 0;
+          let debugRowsProcesados = 0;
+          let debugFilasSaltadas = 0;
+          for (let r = headerRowIdx + 1; r <= priRange.e.r; r++) {
+            // Cédula: leer celda D (col 3) directamente — igual que Python
+            const cedulaCellAddr = xlsx.utils.encode_cell({ r, c: 3 });
+            const cedulaCell = priSheet[cedulaCellAddr];
+            const cedulaRaw = cedulaCell?.v !== undefined ? String(cedulaCell.v) : '';
+            const cedulaClean = cedulaRaw.replace(/[^0-9]/g, '');
+            // 📦459 (2026-07-02) — Filtros de validación:
+            //  - Cédula vacía: saltar (igual que Python).
+            //  - Cédula <6 dígitos: probablemente basura del header row o fila de
+            //    totales (vimos "Cédula 3" con valores numéricos como fechaCierre).
+            //  - Sin nombre (col C = 2): probablemente fila espuria.
+            //  - Sin fecha_inicio (col Z = 25): fila vacía o de resumen.
+            if (!cedulaClean) { debugFilasSaltadas++; continue; }
+            if (cedulaClean.length < 6) { debugFilasSaltadas++; continue; }
+
+            const nombreCellAddr = xlsx.utils.encode_cell({ r, c: 2 });
+            const nombreCell = priSheet[nombreCellAddr];
+            const nombre = nombreCell?.v !== undefined ? String(nombreCell.v).trim() : '';
+            if (!nombre || nombre.length < 3) { debugFilasSaltadas++; continue; }
+
+            const fechaInicioCellAddr = xlsx.utils.encode_cell({ r, c: 25 });  // Z
+            const fechaInicioCell = priSheet[fechaInicioCellAddr];
+            const fechaInicioRaw = fechaInicioCell?.v !== undefined ? String(fechaInicioCell.v) : '';
+            if (!fechaInicioRaw.trim()) { debugFilasSaltadas++; continue; }
+
+            // 📦459 (2026-07-02) — Filtro de año: solo contar casos del año actual
+            // (PRI.xlsx tiene casos de años históricos como 22510880 del 2025 con
+            // fechaCierre 2025-04-27 — son "viejos" y no deben contar en el KPI
+            // del año en curso). Aceptamos fechas de inicio en el año actual.
+            //
+            // Las fechas en xlsx pueden venir como:
+            //   - Date object (si la celda tiene formato fecha y xlsx lo parsea)
+            //   - Excel serial number (más común: e.g. 46078 = 2026-01-01)
+            //   - String con formato (e.g. "1/15/2026" o "2026-01-15")
+            // Hay que manejar los 3 casos.
+            let fechaInicioYear = null;
+            const fechaInicioV = fechaInicioCell?.v;
+            if (fechaInicioV !== undefined && fechaInicioV !== null) {
+              if (fechaInicioV instanceof Date) {
+                fechaInicioYear = fechaInicioV.getFullYear();
+              } else if (typeof fechaInicioV === 'number') {
+                // Excel serial: días desde 1900-01-01 (con bug de 1900 leap year).
+                // El epoch de Excel (1900-01-01) = 25569 días desde epoch JS (1970-01-01).
+                // Usamos 25569 + (serial - 1) por el bug de 1900-02-29 que Excel asume.
+                const excelSerial = fechaInicioV;
+                // El -2 compensa: Excel cuenta 1900-01-01 como día 1, pero 1900-02-29 no existió.
+                const jsDate = new Date(Math.round((excelSerial - 25569) * 86400 * 1000));
+                if (!isNaN(jsDate.getTime())) {
+                  fechaInicioYear = jsDate.getUTCFullYear();
+                }
+              } else {
+                // String: buscar año de 4 dígitos (19xx o 20xx) — más estricto que \d{4}
+                const matchY = String(fechaInicioV).match(/\b(?:19|20)\d{2}\b/);
+                if (matchY) fechaInicioYear = parseInt(matchY[0], 10);
+              }
+            }
+            if (fechaInicioYear !== currentYear) {
+              debugFilasSaltadas++;
+              continue;
+            }
+
+            // Construir row plano con headers de la hoja (para compatibilidad con
+            // cualquier código que aún use flat keys)
+            const row = {};
+            for (let c = priRange.s.c; c <= priRange.e.c; c++) {
+              const cellAddr = xlsx.utils.encode_cell({ r, c });
+              const cell = priSheet[cellAddr];
+              row[headersMap[c]] = cell?.v !== undefined ? cell.v : '';
+            }
+
+            // Construir `pric` anidado leyendo celdas específicas (igual que Python)
+            const pric = {};
+            const PRI_CELL_MAP = [
+              { col: 47, key: 'fechaCierre' },         // AV
+              { col: 48, key: 'motivoCierre' },        // AW
+              { col: 65, key: 'fechaReintegro' },      // BP
+              { col: 66, key: 'fechaReincorporacion' },// CB
+              { col: 67, key: 'tipoReintegro' },       // CC
+              { col: 68, key: 'adaptaciones' }         // CD
+            ];
+            for (const { col, key } of PRI_CELL_MAP) {
+              const cellAddr = xlsx.utils.encode_cell({ r, c: col });
+              const cell = priSheet[cellAddr];
+              pric[key] = cell?.v !== undefined ? String(cell.v).trim() : '';
+            }
+            row.pric = pric;
+
+            // Debug: log si encontramos cierres (CARELIS 1047239028 debería aparecer)
+            if (pric.fechaCierre) {
+              debugCierreEncontrado++;
+              if (debugCierreEncontrado <= 3) {
+                console.log(`[AUSENTISMO-STATS][📦459] Cédula ${cedulaClean} (${nombre}): fechaCierre="${pric.fechaCierre}", motivoCierre="${pric.motivoCierre}" (celda AV${r + 1}/AW${r + 1})`);
+              }
+            }
+
+            // Agregar a followUpData indexado por cédula
+            if (!followUpData[cedulaClean]) followUpData[cedulaClean] = [];
+            followUpData[cedulaClean].push(row);
+            debugRowsProcesados++;
+          }
+          console.log(`[AUSENTISMO-STATS][📦459] PRI procesado: ${debugRowsProcesados} filas válidas (${debugFilasSaltadas} saltadas por filtros), ${debugCierreEncontrado} con fecha de cierre detectada vía celdas AV/AW`);
+        } catch (priErr) {
+          console.warn('[AUSENTISMO-STATS] No se pudo leer PRI.xlsx:', priErr.message);
+          // Continuar con followUpData vacío — todos los casos serán "pendientes"
+        }
+      } else {
+        console.warn('[AUSENTISMO-STATS] ⚠ Sin PRI.xlsx: todos los casos con dias>15 se clasificarán como "pendientes"');
+      }
+
+      // 📦459-FIX2 (2026-07-02) — Restaurar cruce GI-FO-076 + PRI.xlsx.
+      // Lección: solo PRI no alcanza. GI-FO-076 es la fuente de "qué
+      // incapacidades hubo este año con >15 días" (es el archivo vivo donde se
+      // registran las incapacidades nuevas). PRI es solo la fuente de "cuál está
+      // cerrada o en seguimiento". Sin GI-FO-076, no se veían los casos pendientes
+      // del año actual que aún no tienen seguimiento.
+      //
+      // Flujo:
+      //   1. Leer GI-FO-076 hoja de la empresa del año actual
+      //   2. Filtrar: cédula válida, año == currentYear, días > 15
+      //   3. Agrupar por cédula (una persona puede tener varias incapacidades)
+      //   4. Para cada cédula, cruzar con followUpData (PRI):
+      //      - pric.fechaCierre → CERRADO
+      //      - tiene seguimiento (no cerrado) → ACTIVO
+      //      - sin nada en PRI → PENDIENTE
+      let giFoEntries = [];  // [{cedula, nombre, dias, anio}]
+      if (filePath && fs.existsSync(filePath)) {
+        try {
+          const workbookAus = xlsx.readFile(filePath);
+          // Detectar hoja de la empresa (misma lógica que el otro handler
+          // get-salud-seguimientos-stats). Priorizar hojas que contengan el
+          // nombre de la empresa en lowercase y NO contengan "CIE" (que es
+          // la hoja auxiliar de códigos).
+          const companyNameLower = companyName.toLowerCase();
+          let ausSheetName = workbookAus.SheetNames.find(s => {
+            const sl = s.toLowerCase();
+            return sl.includes(companyNameLower) && !sl.includes('cie');
+          });
+          // Si no hay hoja específica de la empresa, buscar hoja "Tempoactiva <año>"
+          // o "PI-FO-076" genérica. Como fallback, tomar la segunda hoja (la primera
+          // suele ser "Dashboard" portada).
+          if (!ausSheetName) {
+            ausSheetName = workbookAus.SheetNames.find(s =>
+              !/dashboard|inicio|portada|caratula|cie/i.test(s)
+            ) || workbookAus.SheetNames[1] || workbookAus.SheetNames[0];
+          }
+          console.log(`[AUSENTISMO-STATS][📦459-FIX2] GI-FO-076 hoja: "${ausSheetName}"`);
+
+          const ausSheet = workbookAus.Sheets[ausSheetName];
+          const ausRange = xlsx.utils.decode_range(ausSheet['!ref'] || 'A1');
+
+          // Detectar header row dinámicamente: buscar fila que contenga
+          // "CEDULA" / "IDENTIFICACION" en alguna columna. Mismo patrón que
+          // usamos para PRI.xlsx.
+          let headerRowIdx = -1;
+          let cCed = -1, cDias = -1, cAnio = -1;
+          for (let r = 0; r < Math.min(ausRange.e.r, 15); r++) {
+            for (let c = ausRange.s.c; c <= ausRange.e.c; c++) {
+              const cellAddr = xlsx.utils.encode_cell({ r, c });
+              const cell = ausSheet[cellAddr];
+              if (!cell || cell.v === undefined) continue;
+              const v = String(cell.v).toUpperCase();
+              if (v.includes('CÉDULA') || v.includes('CEDULA') || v.includes('IDENTIFICACION') || v.includes('IDENTIFICACIÓN')) {
+                headerRowIdx = r;
+                cCed = c;  // 📦459-FIX2 — faltaba esta asignación (BUG detectado por test interno)
+                // Aprovechar la misma fila para detectar las otras columnas
+                for (let c2 = ausRange.s.c; c2 <= ausRange.e.c; c2++) {
+                  const addr2 = xlsx.utils.encode_cell({ r, c: c2 });
+                  const cell2 = ausSheet[addr2];
+                  if (!cell2 || cell2.v === undefined) continue;
+                  // Normalizar para matchear "AÑO" / "ANO" (la NFD decompone la tilde)
+                  const v2 = String(cell2.v).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+                  if (v2.includes('DIAS') && cDias === -1) cDias = c2;
+                  if ((v2 === 'ANO' || v2 === 'AÑO') && cAnio === -1) cAnio = c2;
+                }
+                break;
+              }
+            }
+            if (headerRowIdx >= 0) break;
+          }
+          console.log(`[AUSENTISMO-STATS][📦459-FIX2] Header GI-FO-076 fila=${headerRowIdx + 1}, cCed=${cCed}, cDias=${cDias}, cAnio=${cAnio}`);
+
+          if (headerRowIdx >= 0 && cCed !== -1 && cDias !== -1) {
+            for (let r = headerRowIdx + 1; r <= ausRange.e.r; r++) {
+              const cedulaCellAddr = xlsx.utils.encode_cell({ r, c: cCed });
+              const cedulaCell = ausSheet[cedulaCellAddr];
+              const cedulaRaw = cedulaCell?.v !== undefined ? String(cedulaCell.v) : '';
+              const cedulaClean = cedulaRaw.replace(/[^0-9]/g, '');
+              if (!cedulaClean || cedulaClean.length < 6) continue;
+
+              const diasCellAddr = xlsx.utils.encode_cell({ r, c: cDias });
+              const diasCell = ausSheet[diasCellAddr];
+              const diasRaw = diasCell?.v !== undefined ? String(diasCell.v).replace(/,/g, '') : '0';
+              const dias = parseInt(diasRaw, 10) || 0;
+              if (dias <= 15) continue;
+
+              // Año: si la columna existe, leerla; si no, asumir currentYear
+              let anioVal = currentYear;
+              if (cAnio !== -1) {
+                const anioCellAddr = xlsx.utils.encode_cell({ r, c: cAnio });
+                const anioCell = ausSheet[anioCellAddr];
+                const anioRaw = anioCell?.v !== undefined ? String(anioCell.v).trim() : '';
+                if (anioRaw) {
+                  const parsed = parseInt(anioRaw, 10);
+                  if (!isNaN(parsed)) anioVal = parsed;
+                }
+              }
+              if (anioVal !== currentYear) continue;
+
+              // Nombre (col 2 = C)
+              const nombreCellAddr = xlsx.utils.encode_cell({ r, c: 2 });
+              const nombreCell = ausSheet[nombreCellAddr];
+              const nombre = nombreCell?.v !== undefined ? String(nombreCell.v).trim() : '';
+
+              giFoEntries.push({ cedula: cedulaClean, nombre, dias, anio: anioVal });
+            }
+          }
+          console.log(`[AUSENTISMO-STATS][📦459-FIX2] GI-FO-076: ${giFoEntries.length} incapacidades del año ${currentYear} con >15 días`);
+        } catch (giFoErr) {
+          console.warn('[AUSENTISMO-STATS][📦459-FIX2] No se pudo leer GI-FO-076:', giFoErr.message);
+        }
+      } else {
+        console.warn('[AUSENTISMO-STATS][📦459-FIX2] ⚠ Sin GI-FO-076: no se puede calcular el KPI');
+      }
+
+      // Agrupar por cédula (una persona puede tener varias incapacidades en GI-FO-076,
+      // nos quedamos con la primera que aparezca que sea del año actual).
+      const giFoCedulasMap = new Map();
+      for (const inc of giFoEntries) {
+        if (!giFoCedulasMap.has(inc.cedula)) giFoCedulasMap.set(inc.cedula, inc);
+      }
+
+      // 📦459 (2026-07-02) — REFACTOR CRÍTICO: fuente de casos cambiada a PRI.xlsx.
+      //
+      // ANTES: el handler iteraba el Excel GI-FO-076 "Tempoactiva 2024" (que tiene
+      //   datos del 2024) y buscaba cada cédula en PRI.xlsx. Las cédulas del 2024
+      //   NO coinciden con las del 2026 — son personas distintas. Resultado: NUNCA
+      //   se encontraba cierre en PRI, todos los casos quedaban como PENDIENTE.
+      //
+      // AHORA: PRI.xlsx es la fuente de verdad para los casos del año actual (2026).
+      //   Iteramos `followUpData` directamente. Para cada cédula con seguimiento,
+      //   clasificamos según su estado de cierre (pric.fechaCierre / motivoCierre).
+      //   Esto replica exactamente lo que hace la vista de Seguimiento, que carga
+      //   PRI.xlsx vía Python (buscarTodosRegistrosPRI).
+      // 📦459 — currentYear viene del scope padre (declarado antes del callback
+      // para uso en el filtro de año de PRI.xlsx). NO redeclarar aquí: al hacer
+      // `const currentYear` dentro de este bloque, JS sombea la del padre y
+      // TODAS las referencias a `currentYear` dentro del callback (incluyendo
+      // las de las líneas anteriores como el filtro de año en PRI) quedan en
+      // TDZ hasta que esta línea se ejecute — pero como esta línea está
+      // DESPUÉS del filtro, el filtro revienta con
+      // "Cannot access 'currentYear' before initialization".
+      const today = new Date();
+      const MONTH_NAMES_ES = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+      const currentMonthName = MONTH_NAMES_ES[today.getMonth()];
+
+      // 📦459 — Determinar estado replicando la lógica de determinarEstadoCaso()
+      // del componente MedicionAusentismoComponent. Ahora se llama con
+      // recordAusentismo={} (vacío) y recordPRI=followUpData[cedula], porque la
+      // fuente de verdad es PRI.xlsx.
+      function determinarEstado(recordAusentismo, recordPRI) {
+        const rAus = recordAusentismo || {};
+        const rPri = recordPRI || {};
+        const tienePRI = rPri && Object.keys(rPri).length > 0;
+
+        // Detección ampliada de cierre: cubre fecha de cierre tradicional, fecha
+        // de reintegro, fecha de alta médica, motivo de cierre, y campos de estado.
+        let motivoCierreDetectado = null;
+        let fechaCierre = null;
+        if (tienePRI) {
+          const candidatosCierre = [
+            rPri.fecha_cierre, rPri.fechaCierre, rPri.pric?.fechaCierre,
+            rPri.fecha_cierre_pric, rPri.pric?.fechaCierrePric,
+            rPri.fecha_reintegro, rPri.fechaReintegro, rPri.pric?.fechaReintegro,
+            rPri.fecha_alta, rPri.fechaAlta, rPri.pric?.fechaAlta,
+            rPri.fecha_cierre_seguimiento, rPri.fechaCierreSeguimiento,
+            rPri.motivo_cierre, rPri.motivoCierre,
+            rPri.estado_caso, rPri.estadoCaso, rPri.estado,
+            rPri['Estado Caso'], rPri['ESTADO']
+          ];
+          for (const cand of candidatosCierre) {
+            if (cand && String(cand).trim() !== '') {
+              fechaCierre = cand;
+              motivoCierreDetectado = String(cand);
+              break;
+            }
+          }
+        }
+        if (!fechaCierre) {
+          const candidatosExcel = [
+            rAus['FECHA CIERRE'], rAus['fecha_cierre'],
+            rAus['FECHA CIERRE INC'], rAus['fecha_cierre_inc'],
+            rAus['FECHA CIERRE PRIC'], rAus['fecha_cierre_pric'],
+            rAus['FECHA REINTEGRO'], rAus['fecha_reintegro'],
+            rAus['FECHA ALTA'], rAus['fecha_alta'],
+            rAus['MOTIVO CIERRE'], rAus['motivo_cierre']
+          ];
+          for (const cand of candidatosExcel) {
+            if (cand && String(cand).trim() !== '') {
+              fechaCierre = cand;
+              motivoCierreDetectado = String(cand);
+              break;
+            }
+          }
+        }
+
+        if (fechaCierre) return 'CERRADO';
+
+        // Buscar fecha de seguimiento — PRI primero
+        let fechaSeguimiento = null;
+        if (tienePRI) {
+          fechaSeguimiento = rPri.seguimientos?.[0]?.fecha || rPri.fecha_seguimiento_1 || rPri.pric?.fechaSeguimiento1;
+        } else {
+          fechaSeguimiento = rAus['FECHA SEGUIMIENTO 1'] || rAus['fecha_seguimiento_1'];
+        }
+
+        if (fechaSeguimiento) return 'EN SEGUIMIENTO';
+
+        return 'SIN INICIAR';
+      }
+
+      let pendientes = 0;
+      let activos = 0;
+      let cerrados = 0;
+      let total = 0;
+      const clasificadasLog = [];
+
+      // 📦459-FIX2 (2026-07-02) — Iterar GI-FO-076 (incapacidades del año actual
+      // con >15 días) y cruzar con PRI para clasificar cada caso.
+      //
+      // Antes (FIX1) iterábamos PRI como fuente única → solo veíamos Cédulas
+      // que estaban en PRI.xlsx → perdíamos todos los casos del año que aún
+      // no tienen seguimiento (los más comunes).
+      //
+      // Ahora: GI-FO-076 es la fuente de "qué incapacidades hay que gestionar
+      // este año". PRI es la fuente de "cuál está cerrada / en seguimiento".
+      // Para cada cédula con incapacidad en GI-FO-076:
+      //   - buscar en followUpData (PRI)
+      //   - pric.fechaCierre → CERRADO
+      //   - tiene seguimiento sin cierre → ACTIVO
+      //   - sin nada en PRI → PENDIENTE
+      console.log(`[AUSENTISMO-STATS][📦459-FIX2] Clasificando ${giFoCedulasMap.size} cédulas únicas desde GI-FO-076 + cruce con PRI.xlsx`);
+
+      giFoCedulasMap.forEach((inc, cedula) => {
+        if (!inc) return;
+
+        total++;
+
+        // Buscar en PRI: tomar el row más reciente (último seguimiento)
+        const rows = followUpData[cedula];
+        const recordPRI = (rows && rows.length > 0) ? rows[rows.length - 1] : null;
+
+        // determinarEstado con recordAusentismo vacío — toda la info viene de PRI
+        const estado = determinarEstado({}, recordPRI);
+
+        if (estado === 'CERRADO') {
+          cerrados++;
+          const motivoCierre = recordPRI?.pric?.motivoCierre || recordPRI?.pric?.fechaCierre || 'cierre detectado';
+          clasificadasLog.push(`${cedula} (${inc.nombre}) → CERRADO (motivo: "${motivoCierre}")`);
+        } else if (estado === 'EN SEGUIMIENTO') {
+          activos++;
+          clasificadasLog.push(`${cedula} (${inc.nombre}) → ACTIVO (con seguimiento en PRI, sin cierre)`);
+        } else {
+          // SIN INICIAR o sin registro en PRI
+          pendientes++;
+          clasificadasLog.push(`${cedula} (${inc.nombre}) → PENDIENTE (sin seguimiento en PRI, ${inc.dias} días)`);
+        }
       });
-      if (mesIdx !== -1 && anioIdx !== -1) {
-        headerRowIdx = i; colMes = mesIdx; colAnio = anioIdx;
-        break;
+
+      // Imprimir log de diagnóstico para auditoría
+      if (clasificadasLog.length > 0) {
+        console.log(`[AUSENTISMO-STATS] 📋 Clasificación de casos (fuente: PRI.xlsx):`);
+        clasificadasLog.forEach(line => console.log(`[AUSENTISMO-STATS]   ${line}`));
+        console.log(`[AUSENTISMO-STATS] 📊 Resultado: total=${total}, pendientes=${pendientes}, activos=${activos}, cerrados=${cerrados}`);
+      } else {
+        console.log(`[AUSENTISMO-STATS] ℹ️ No hay casos en PRI.xlsx (siga usando GI-FO-076 si necesita histórico)`);
       }
-    }
-    if (headerRowIdx === -1) { colMes = 9; colAnio = 14; headerRowIdx = 6; }
 
-    const dataRows = rawData.slice(headerRowIdx + 1).filter(r => Array.isArray(r) && r.length > colAnio && r[colAnio] !== '');
-    const currentMonth = new Date().getMonth();
-    const monthNames = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
-
-    let fileYear = null;
-    for (const r of dataRows) {
-      const yr = parseInt(String(r[colAnio] || '').trim());
-      if (yr >= 2010 && yr <= 2099) { if (!fileYear || yr > fileYear) fileYear = yr; }
-    }
-
-    let totalCount = 0;
-    let monthCount = 0;
-
-    dataRows.forEach(row => {
-      const yr = parseInt(String(row[colAnio] || '').trim());
-      if (fileYear && yr === fileYear) {
-        totalCount++;
-        const mes = String(row[colMes] || '').toUpperCase().trim();
-        if (mes === monthNames[currentMonth]) monthCount++;
-      }
+      return {
+        pendientes,
+        activos,
+        cerrados,
+        total,
+        year: currentYear,
+        mes: currentMonthName,
+        _missingFile: false
+      };
     });
-
+  } catch (xlsxErr) {
+    // 📦459 — Modo degradado: archivo corrupto o error de parseo
+    console.error('[AUSENTISMO-STATS] Error procesando archivo:', xlsxErr.message);
     return {
-      total: totalCount,
-      mesActual: monthCount,
-      year: fileYear || new Date().getFullYear(),
-      mes: monthNames[currentMonth]
+      success: true,
+      data: { ...EMPTY_RESULT, _missingFile: true, _missingFileReason: 'corrupt', _expectedPath: filePath, _details: xlsxErr.message },
+      _missingFile: true
     };
-  });
+  }
 
   return { success: true, data: resultData };
 });
