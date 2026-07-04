@@ -1404,12 +1404,26 @@
 
     // ─── Init ───
     document.addEventListener('DOMContentLoaded', function () {
-        console.log('[REPORTES-GESTACION] Inicializando vista de reportes (📦472 charts)...');
+        console.log('[REPORTES-GESTACION] Inicializando vista de reportes (📦478-fix scroll)...');
         _setupChartDefaults();
         _renderReporte();
         _actualizarBotonesExportar();
         _bindHeader();
         _applyCompanyContext();
+        // 📦478-fix — Log de diagnóstico: confirmar altura computada
+        setTimeout(function () {
+            var main = document.querySelector('.gr-main');
+            if (main) {
+                var rect = main.getBoundingClientRect();
+                console.log('[REPORTES-GESTACION] .gr-main dims:', {
+                    width: rect.width,
+                    height: rect.height,
+                    scrollHeight: main.scrollHeight,
+                    clientHeight: main.clientHeight,
+                    overflowY: getComputedStyle(main).overflowY
+                });
+            }
+        }, 500);
     });
 
 })();

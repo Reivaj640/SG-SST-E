@@ -118,24 +118,25 @@
 
         /* ─── Main scroll ─── */
         .gr-main {
-            flex: 1;
-            overflow-y: auto;
+            flex: 1 1 0;            /* 📦478-fix — flex-basis:0 permite que scrolee correctamente */
+            min-height: 0;          /* 📦478-fix — necesario para que el scroll funcione dentro de flex */
+            overflow-y: scroll !important;  /* 📦478-fix — SIEMPRE muestra scrollbar (no auto-hide) */
             overflow-x: hidden;
             padding: 24px;
-            scrollbar-gutter: stable;  /* 📦478 — reserva el espacio del scrollbar (Chrome 94+) */
+            scrollbar-gutter: stable;
             /* Scrollbar visible cross-browser */
             scrollbar-width: thin;
             scrollbar-color: #94a3b8 #f1f3f5;
         }
-        .gr-main::-webkit-scrollbar { width: 12px; height: 12px; }
-        .gr-main::-webkit-scrollbar-track { background: #f1f3f5; border-radius: 6px; }
+        .gr-main::-webkit-scrollbar { width: 14px !important; height: 14px; -webkit-appearance: none; }
+        .gr-main::-webkit-scrollbar-track { background: #f1f3f5; border-radius: 7px; }
         .gr-main::-webkit-scrollbar-thumb {
-            background: #94a3b8;
-            border-radius: 6px;
-            border: 2px solid #f1f3f5;
+            background: #94a3b8 !important;
+            border-radius: 7px;
+            border: 3px solid #f1f3f5;
         }
-        .gr-main::-webkit-scrollbar-thumb:hover { background: #64748b; }
-        .gr-main::-webkit-scrollbar-thumb:active { background: #475569; }
+        .gr-main::-webkit-scrollbar-thumb:hover { background: #64748b !important; }
+        .gr-main::-webkit-scrollbar-thumb:active { background: #475569 !important; }
         .gr-main::-webkit-scrollbar-corner { background: #f1f3f5; }
 
         /* ─── Selector de tipo de reporte (3 cards grandes) ─── */
