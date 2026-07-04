@@ -741,7 +741,9 @@ class MedicionAusentismoComponent {
                 </thead>
                 <tbody id="seguimientoTableBody">
                     <tr>
-                        ${this._loadingRowHtml('Cargando seguimientos...', 7)}
+                        <td colspan="7" class="ks-loading-cell" style="padding: 16px;">
+                            ${KairSkeleton.table(8, 7)}
+                        </td>
                     </tr>
                 </tbody>
             </table>
@@ -7555,7 +7557,9 @@ class MedicionAusentismoComponent {
             </thead>
             <tbody id="ausentismoTableBody">
                 <tr>
-                    ${this._loadingRowHtml('Cargando registros...', 17)}
+                    <td colspan="17" class="ks-loading-cell" style="padding: 16px;">
+                        ${KairSkeleton.table(12, 17)}
+                    </td>
                 </tr>
             </tbody>
         `;
@@ -8458,11 +8462,7 @@ class MedicionAusentismoComponent {
     const extendedStatsContainer = document.createElement('div');
     extendedStatsContainer.id = 'extendedStatsContainer';
     extendedStatsContainer.className = 'extended-stats-container';
-    extendedStatsContainer.innerHTML = `
-      <div class="es-loading">
-        <i class="bi bi-hourglass-split"></i> Calculando estadísticas extendidas…
-      </div>
-    `;
+    extendedStatsContainer.innerHTML = KairSkeleton.kpiStrip(4) + KairSkeleton.chartBars(12);
     mainContent.appendChild(extendedStatsContainer);
 
     scrollWrapper.appendChild(mainContent);
