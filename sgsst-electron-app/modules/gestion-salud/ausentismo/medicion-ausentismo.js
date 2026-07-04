@@ -9041,6 +9041,11 @@ class MedicionAusentismoComponent {
                         this._gestanteActualId = (data.payload && data.payload.gestanteId) || null;
                         this.render();
                         break;
+                    case 'seguimiento-gestacion-reportes':
+                        // 📦477 — Botón "Ver Reportes" desde la home de Gestación
+                        this.currentView = 'seguimiento-gestacion-reportes';
+                        this.render();
+                        break;
                     case 'main':
                         this.currentView = 'main';
                         this.render();
@@ -9108,6 +9113,11 @@ class MedicionAusentismoComponent {
                         this._gestanteActualId = (data.payload && data.payload.gestanteId) || gestanteId;
                         this.render();
                         break;
+                    case 'seguimiento-gestacion-reportes':
+                        // 📦477 — Abrir Reportes desde cualquier sub-vista de Gestación
+                        this.currentView = 'seguimiento-gestacion-reportes';
+                        this.render();
+                        break;
                     case 'seguimiento-gestacion':
                         // "Volver al listado" → home de seguimiento
                         this.currentView = 'seguimiento-gestacion';
@@ -9169,6 +9179,11 @@ class MedicionAusentismoComponent {
                 switch (data.action) {
                     case 'seguimiento-gestacion':
                         this.currentView = 'seguimiento-gestacion';
+                        this.render();
+                        break;
+                    case 'seguimiento-gestacion-reportes':
+                        // 📦477 — Abrir Reportes desde el wizard mensual
+                        this.currentView = 'seguimiento-gestacion-reportes';
                         this.render();
                         break;
                     case 'main':
