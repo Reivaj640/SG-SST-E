@@ -62,6 +62,38 @@
         return map[c] || '<span class="gs-badge">' + _esc(c) + '</span>';
     }
 
+    /**
+     * 📦468 (2026-07-04) — Res. 0312/2019 art. 14 · Periodicidad por clasificación.
+     * Replica el mismo patrón de gestacion-antesala.js:_frecuenciaPorRiesgo().
+     * Devuelve la fecha (YYYY-MM-DD) en que se debe hacer el próximo seguimiento,
+     * partiendo del último seguimiento si existe (o fechaNotificacion si no).
+     * Retorna null si la gestante no requiere próximo seguimiento (cerrada o en licencia).
+     * Marcamos `vencido: true` si la fecha calculada es anterior a hoy.
+     */
+    function _calcularProximoSeguimiento(g) {
+        if (!g || g.estado === 'cerrado' || g.estado === 'licencia') return null;
+
+        // Periodicidad (en días) según clasificación
+        var diasPaso = 30;
+        if (g.clasificacion === 'alto') diasPaso = 15;       // quincenal
+        if (g.clasificacion === 'muy-alto') diasPaso = 7;    // semanal
+
+        var baseIso = g.ultimoSeguimiento || g.fechaNotificacion;
+        if (!baseIso) return null;
+
+        var base = new Date(baseIso + 'T00:00:00');
+        if (isNaN(base.getTime())) return null;
+        var proximo = new Date(base.getTime() + diasPaso * 24 * 60 * 60 * 1000);
+
+        var hoy = new Date();
+        hoy.setHours(0, 0, 0, 0);
+
+        return {
+            fecha: proximo.toISOString().slice(0, 10),
+            vencido: proximo < hoy
+        };
+    }
+
     function _setSyncBadge(state) {
         var badge = document.querySelector('.k-sync-badge');
         if (!badge) return;
@@ -83,6 +115,40 @@
         if (notifier && typeof notifier.show === 'function') {
             notifier.show({ type: tipo, title: titulo, subtitle: mensaje, autoClose: 4000 });
         }
+    }
+
+    /**
+     * 📦467 (2026-07-04) — Helper local de confirmación.
+     * Antes usábamos `window.KAIRUtils.showConfirm(...)`, pero KAIRUtils solo
+     * está cargado en el submódulo de Evaluación y Selección (otro módulo).
+     * Este helper replica el patrón modal genérico (overlay + 2 botones) y
+     * mantiene la vista autocontenida (no depende de otros submódulos).
+     * @param {string} message Texto a mostrar al usuario.
+     * @returns {Promise<boolean>} true si confirma, false si cancela.
+     */
+    function _showConfirm(message) {
+        return new Promise(function (resolve) {
+            var overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10000;';
+            overlay.innerHTML =
+                '<div style="background:#fff;padding:24px;border-radius:8px;max-width:440px;width:90%;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,0.2);">' +
+                    '<div style="margin-bottom:20px;font-size:15px;color:#212529;line-height:1.5;white-space:pre-wrap;">' +
+                        message.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') +
+                    '</div>' +
+                    '<div style="display:flex;gap:10px;justify-content:center;">' +
+                        '<button class="gs-confirm-cancel" style="padding:8px 20px;border:1px solid #dee2e6;background:#f8f9fa;border-radius:4px;cursor:pointer;font:inherit;">Cancelar</button>' +
+                        '<button class="gs-confirm-ok" style="padding:8px 20px;border:none;background:#dc3545;color:#fff;border-radius:4px;cursor:pointer;font:inherit;">Confirmar</button>' +
+                    '</div>' +
+                '</div>';
+
+            overlay.querySelector('.gs-confirm-cancel').addEventListener('click', function () { overlay.remove(); resolve(false); });
+            overlay.querySelector('.gs-confirm-ok').addEventListener('click', function () { overlay.remove(); resolve(true); });
+            overlay.addEventListener('click', function (e) {
+                if (e.target === overlay) { overlay.remove(); resolve(false); }
+            });
+
+            document.body.appendChild(overlay);
+        });
     }
 
     // ─── Carga de datos desde SQLite ───
@@ -181,7 +247,7 @@
     // ─── Render tabla ───
     function _renderTablaLoading() {
         document.getElementById('tablaGestantes').innerHTML =
-            '<tr><td colspan="8">' +
+            '<tr><td colspan="10">' +
                 '<div class="gs-empty"><div class="gs-empty__icon"><i class="bi bi-arrow-clockwise"></i></div>' +
                 '<div class="gs-empty__title">Cargando gestantes…</div></div>' +
             '</td></tr>';
@@ -191,7 +257,7 @@
     function _renderTabla(gestantes) {
         if (!gestantes || gestantes.length === 0) {
             document.getElementById('tablaGestantes').innerHTML =
-                '<tr><td colspan="8">' +
+                '<tr><td colspan="10">' +
                     '<div class="gs-empty">' +
                         '<div class="gs-empty__icon"><i class="bi bi-person-plus"></i></div>' +
                         '<div class="gs-empty__title">No hay gestantes registradas</div>' +
@@ -208,17 +274,35 @@
             var semanas = g.semanasGestacion || 0;
             var pct = Math.min(100, Math.round((semanas / 40) * 100));
 
+            // 📦468 — Próximo seguimiento (Res. 0312/2019 art. 14)
+            var prox = _calcularProximoSeguimiento(g);
+            var proxCell;
+            if (!prox) {
+                var labelNoProx = g.estado === 'cerrado' ? 'Caso cerrado'
+                                : g.estado === 'licencia' ? 'En licencia'
+                                : '—';
+                proxCell = '<span style="color: var(--text-muted);">' + _esc(labelNoProx) + '</span>';
+            } else {
+                var proxClass = prox.vencido ? 'gs-prox--vencido' : 'gs-prox--ok';
+                var proxIcon = prox.vencido ? 'bi-exclamation-circle-fill' : 'bi-calendar-plus';
+                var proxLabel = prox.vencido ? 'Vencido · ' : '';
+                proxCell = '<span class="' + proxClass + '" style="font-size:0.8rem;">' +
+                    '<i class="bi ' + proxIcon + '"></i> ' + proxLabel + _fmtDate(prox.fecha) +
+                '</span>';
+            }
+
             html += '<tr onclick="abrirSeguimientoMensual(\'' + _esc(g.id) + '\')" style="cursor: pointer;">' +
                 '<td>' +
                     '<div class="gs-empleado">' +
                         '<div class="gs-empleado__avatar">' + _esc(_initials(g.nombre)) + '</div>' +
                         '<div class="gs-empleado__info">' +
                             '<div class="gs-empleado__name">' + _esc(g.nombre) + '</div>' +
-                            '<div class="gs-empleado__cedula"><i class="bi bi-credit-card-2-front"></i> ' + _esc(g.cedula) + ' · ' + _esc(g.cargo || '') + '</div>' +
+                            '<div class="gs-empleado__cedula"><i class="bi bi-credit-card-2-front"></i> ' + _esc(g.cedula) + '</div>' +
                         '</div>' +
                     '</div>' +
                 '</td>' +
                 '<td>' + _esc(g.empresa || '') + '</td>' +
+                '<td>' + (g.cargo ? _esc(g.cargo) : '<span style="color:var(--text-muted);">—</span>') + '</td>' +
                 '<td>' +
                     '<div class="gs-semanas">' + semanas + '<span class="gs-semanas__label"> sem</span></div>' +
                     '<div class="gs-progress-bar"><div class="gs-progress-bar__fill" style="width: ' + pct + '%;"></div></div>' +
@@ -229,6 +313,7 @@
                 '<td style="font-size: 0.8rem; color: var(--text-muted);">' +
                     '<div><i class="bi bi-calendar-event"></i> ' + _fmtDate(g.ultimoSeguimiento) + '</div>' +
                 '</td>' +
+                '<td>' + proxCell + '</td>' +
                 '<td>' +
                     '<div class="gs-row-actions">' +
                         '<button class="gs-row-btn primary" title="Ver seguimiento mensual" onclick="event.stopPropagation(); abrirSeguimientoMensual(\'' + _esc(g.id) + '\');"><i class="fas fa-notes-medical"></i></button>' +
@@ -503,7 +588,7 @@
         var explicacion = nuevoEstado === 'cerrado'
             ? 'El caso se marcará como cerrado y no contará en los KPIs de gestantes activas.'
             : 'El caso volverá a estado activo y volverá a contar en los KPIs.';
-        var confirmed = await window.KAIRUtils.showConfirm(
+        var confirmed = await _showConfirm(
             '¿' + verbo + ' el caso de "' + nombre + '"?\n\n' + explicacion
         );
         if (!confirmed) return;
@@ -534,7 +619,7 @@
     // 📦468 — Botón "trash" en acciones de fila.
     // Backend: `gestacionEliminarGestante` ya borra seguimientos por FK CASCADE.
     async function _confirmarEliminarGestante(gestanteId, nombre, cedula) {
-        var confirmed = await window.KAIRUtils.showConfirm(
+        var confirmed = await _showConfirm(
             '¿Eliminar a "' + nombre + '" (CC ' + cedula + ')?\n\n' +
             '⚠️ Se eliminarán también todos sus seguimientos mensuales.\n\n' +
             'Esta acción NO se puede deshacer.'
@@ -569,10 +654,12 @@
             _mostrarToast('warning', 'Sin datos', 'No hay gestantes para exportar.');
             return;
         }
-        var headers = ['Cedula', 'Nombre', 'Empresa', 'Cargo', 'Semanas', 'FPP', 'Clasificacion', 'Estado', 'Ultimo Seguimiento'];
+        // 📦468 — Cabeceras/filas amplían con Próx. seguimiento
+        var headers = ['Cedula', 'Nombre', 'Empresa', 'Cargo', 'Semanas', 'FPP', 'Clasificacion', 'Estado', 'Ultimo Seguimiento', 'Proximo Seguimiento', 'Proximo Vencido'];
         var rows = [headers.join(',')];
         for (var i = 0; i < datos.length; i++) {
             var g = datos[i];
+            var prox = _calcularProximoSeguimiento(g);
             rows.push([
                 g.cedula,
                 '"' + (g.nombre || '').replace(/"/g, '""') + '"',
@@ -582,7 +669,9 @@
                 g.fpp,
                 g.clasificacion,
                 g.estado,
-                g.ultimoSeguimiento || ''
+                g.ultimoSeguimiento || '',
+                prox ? prox.fecha : '',
+                prox ? (prox.vencido ? 'SI' : 'NO') : ''
             ].join(','));
         }
         var csv = rows.join('\n');

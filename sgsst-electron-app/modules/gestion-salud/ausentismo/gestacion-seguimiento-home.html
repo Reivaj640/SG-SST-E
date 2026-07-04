@@ -484,6 +484,15 @@
         .gs-row-btn.danger:hover { border-color: #dc3545; color: #dc3545; background: #fff5f5; }
         .gs-row-btn.warning:hover { border-color: #f59e0b; color: #f59e0b; background: #fffbeb; }
 
+        /* 📦468 — Próximo seguimiento: ok (azul) / vencido (rojo) */
+        .gs-prox--ok      { color: var(--v3-primary); font-weight: 500; }
+        .gs-prox--vencido { color: var(--v3-destructive); font-weight: 600; }
+        .gs-prox--vencido i { animation: pulse-warn 1.6s ease-in-out infinite; }
+        @keyframes pulse-warn {
+            0%, 100% { opacity: 1; }
+            50%      { opacity: 0.45; }
+        }
+
         .gs-empty {
             padding: 60px 20px;
             text-align: center;
@@ -799,11 +808,13 @@
                         <tr>
                             <th>Trabajadora</th>
                             <th>Empresa</th>
+                            <th>Cargo</th>
                             <th>Semanas</th>
                             <th>FPP</th>
                             <th>Clasificación</th>
                             <th>Estado</th>
                             <th>Último seg.</th>
+                            <th>Próx. seg.</th>
                             <th style="text-align: right;">Acciones</th>
                         </tr>
                     </thead>
