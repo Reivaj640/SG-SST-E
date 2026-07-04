@@ -772,6 +772,16 @@
         }
     };
 
+    // 📦477 — Abrir módulo de Reportes de Seguimiento
+    window.abrirReportesGestacion = function () {
+        if (window.parent && window.parent.postMessage) {
+            window.parent.postMessage({
+                type: 'ausentismo-home-action',
+                action: 'seguimiento-gestacion-reportes'
+            }, '*');
+        }
+    };
+
     // ─── Bind del header estándar ───
     function _bindHeader() {
         var btnBack = document.getElementById('kair-gs-back');
@@ -780,6 +790,9 @@
         if (btnExport) btnExport.addEventListener('click', _exportarCSV);
         var btnNew = document.getElementById('kair-gs-cta-new');
         if (btnNew) btnNew.addEventListener('click', _abrirModalNuevaGestante);
+        // 📦477 — Botón Ver Reportes
+        var btnReportes = document.getElementById('kair-gs-cta-reportes');
+        if (btnReportes) btnReportes.addEventListener('click', window.abrirReportesGestacion);
     }
 
     // ─── Contexto de empresa + carga inicial ───

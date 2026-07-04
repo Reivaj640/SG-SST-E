@@ -244,6 +244,10 @@ class MedicionAusentismoComponent {
             case 'seguimiento-gestacion-mensual':
                 this.renderSeguimientoMensualView(this.container, this._gestanteActualId);
                 break;
+            // 📦477 — Reportes de Seguimiento de Gestación
+            case 'seguimiento-gestacion-reportes':
+                this.renderGestacionReportesView(this.container);
+                break;
             default:
                 this.renderMainView(this.container);
         }
@@ -314,6 +318,11 @@ class MedicionAusentismoComponent {
                         // 📦462 (2026-07-03) — Vista de seguimiento mensual de una gestante específica
                         this.currentView = 'seguimiento-gestacion-mensual';
                         this._gestanteActualId = (data.payload && data.payload.gestanteId) || null;
+                        this.render();
+                        break;
+                    case 'seguimiento-gestacion-reportes':
+                        // 📦477 — Reportes de Seguimiento de Gestación (3 tipos)
+                        this.currentView = 'seguimiento-gestacion-reportes';
                         this.render();
                         break;
                     case 'main':
@@ -9194,6 +9203,62 @@ class MedicionAusentismoComponent {
                 }, '*');
             } catch (error) {
                 console.error('[seguimiento-gestacion-mensual] Error al enviar contexto al iframe:', error);
+            }
+        };
+
+        container.appendChild(iframe);
+    }
+
+    /**
+     * 📦477 — Renderiza la vista de Reportes de Seguimiento de Gestación
+     * (gestacion-reportes.html). Patrón idéntico a renderGestacionAntesalaView:
+     * iframe + postMessage + SET_COMPANY_CONTEXT.
+     */
+    renderGestacionReportesView(container) {
+        container.style.padding = '0';
+        container.style.overflow = 'hidden';
+
+        const iframe = document.createElement('iframe');
+        iframe.src = 'modules/gestion-salud/ausentismo/gestacion-reportes.html';
+        iframe.style.cssText = 'width: 100%; height: 100%; border: none; display: block;';
+
+        const handleMessage = (event) => {
+            if (event.source !== iframe.contentWindow) return;
+            const data = event.data;
+            if (!data || data.type !== 'ausentismo-home-action') return;
+            switch (data.action) {
+                case 'seguimiento-gestacion':
+                    this.currentView = 'seguimiento-gestacion';
+                    this.render();
+                    break;
+                case 'main':
+                    this.currentView = 'main';
+                    this.render();
+                    break;
+                default:
+                    // Otras acciones del iframe se ignoran aquí
+                    break;
+            }
+        };
+
+        if (this.portalMessageCleanup) this.portalMessageCleanup();
+        window.addEventListener('message', handleMessage);
+        this.portalMessageCleanup = () => window.removeEventListener('message', handleMessage);
+
+        iframe.onload = () => {
+            try {
+                // Exponer IPC al iframe (gestacion-reportes.js usa
+                // window.electronAPI.gestacionCalcularReporte y printInformeToPdf)
+                if (iframe.contentWindow && window.electronAPI) {
+                    iframe.contentWindow.electronAPI = window.electronAPI;
+                }
+                iframe.contentWindow.postMessage({
+                    type: 'SET_COMPANY_CONTEXT',
+                    company: this.currentCompany
+                    // sin gestanteId: reportes trabaja sobre todas las gestantes
+                }, '*');
+            } catch (error) {
+                console.error('[seguimiento-gestacion-reportes] Error al enviar contexto al iframe:', error);
             }
         };
 
