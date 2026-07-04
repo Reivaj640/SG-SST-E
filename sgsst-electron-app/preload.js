@@ -326,6 +326,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 📦469 — Cambio de estado con validación de flujo lineal estricto
   gestacionActualizarEstado: (params) =>
     ipcRenderer.invoke('gestacion:actualizarEstado', params),
+  // 📦481-fix — Ruta de Downloads del usuario (para guardar PDFs de reportes)
+  getDownloadsPath: () => ipcRenderer.invoke('get-downloads-path'),
 
   // --- Estadísticas de Accidentes FURAT (widget home) ---
 getAccidentesStats: (companyName) =>

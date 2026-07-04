@@ -4749,6 +4749,20 @@ ipcMain.handle('convertExcelToPdf', async (event, filePath) => {
   }
 });
 
+// 📦481-fix — getDownloadsPath
+// Devuelve la ruta de la carpeta Downloads del usuario (donde Electron
+// guarda archivos por default si no se especifica otra). Usado por el
+// frontend de Reportes de Gestación para guardar PDFs sin requerir
+// que el usuario elija carpeta cada vez.
+ipcMain.handle('get-downloads-path', async function () {
+  try {
+    const downloadsPath = app.getPath('downloads');
+    return { success: true, path: downloadsPath };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
 // 📦 PRINT-INFORME-TO-PDF: Plan B para el informe PRI (gestión de la salud / ausentismo).
 // El enfoque anterior usaba window.print() del iframe, pero Chromium tiene
 // problemas conocidos para renderizar contenido multipágina dentro de iframes

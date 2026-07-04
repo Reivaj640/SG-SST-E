@@ -574,7 +574,7 @@
             '<div class="gr-rep__firma">' +
                 '<div class="gr-rep__firma-block">' +
                     '<div class="gr-rep__firma-label">Responsable del SG-SST</div>' +
-                    '<div class="gr-rep__firma-nombre">Mg. Carlos Andrés Perdomo</div>' +
+                    '<div class="gr-rep__firma-nombre">Esp. Gerencia de Proyectos Javier Robles Fontalvo</div>' +
                     '<div class="gr-rep__firma-cargo">Responsable SG-SST — ' + _esc((d.empresa && d.empresa.id) || 'ASEL S.A.S.') + '</div>' +
                 '</div>' +
                 '<div class="gr-rep__firma-block">' +
@@ -670,7 +670,7 @@
             '<div class="gr-rep__firma">' +
                 '<div class="gr-rep__firma-block">' +
                     '<div class="gr-rep__firma-label">Responsable del SG-SST</div>' +
-                    '<div class="gr-rep__firma-nombre">Mg. Carlos Andrés Perdomo</div>' +
+                    '<div class="gr-rep__firma-nombre">Esp. Gerencia de Proyectos Javier Robles Fontalvo</div>' +
                     '<div class="gr-rep__firma-cargo">Responsable SG-SST — ' + _esc((d.empresa && d.empresa.id) || 'ASEL S.A.S.') + '</div>' +
                 '</div>' +
                 '<div class="gr-rep__firma-block">' +
@@ -836,7 +836,7 @@
             '<div class="gr-rep__firma">' +
                 '<div class="gr-rep__firma-block">' +
                     '<div class="gr-rep__firma-label">Responsable del SG-SST</div>' +
-                    '<div class="gr-rep__firma-nombre">Mg. Carlos Andrés Perdomo</div>' +
+                    '<div class="gr-rep__firma-nombre">Esp. Gerencia de Proyectos Javier Robles Fontalvo</div>' +
                     '<div class="gr-rep__firma-cargo">Responsable SG-SST — ' + _esc((d.empresa && d.empresa.id) || 'ASEL S.A.S.') + '</div>' +
                 '</div>' +
                 '<div class="gr-rep__firma-block">' +
@@ -1101,6 +1101,11 @@
         // Periodo change → mostrar/ocultar fechas custom
         var selPeriodo = document.getElementById('grPeriodo');
         if (selPeriodo) selPeriodo.addEventListener('change', _toggleFechasCustom);
+        // 📦481 — Bind de botones de exportación (estaban sin listener)
+        var btnExportExcel = document.getElementById('kair-gr-export-excel');
+        if (btnExportExcel) btnExportExcel.addEventListener('click', window.exportarExcelReportes);
+        var btnPrint = document.getElementById('kair-gr-print');
+        if (btnPrint) btnPrint.addEventListener('click', window.imprimirReportes);
     }
 
     // ─── Contexto de empresa + carga inicial ───
@@ -1266,10 +1271,11 @@
     /**
      * Imprimir/guardar como PDF usando el handler `print-informe-to-pdf` (main.js:4734).
      * Estrategia:
-     *   1. Capturar charts como <img> PNG (canvas→img) antes de imprimir
-     *   2. Construir HTML autocontenido con CSS embebido + header K+AIR
-     *   3. Llamar window.electronAPI.printInformeToPdf
-     *   4. Restaurar canvas originales (re-renderizar charts) después
+     *   1. Obtener carpeta Downloads del usuario (vía IPC `getDownloadsPath`)
+     *   2. Capturar charts como <img> PNG (canvas→img) antes de imprimir
+     *   3. Construir HTML autocontenido con CSS embebido + header K+AIR
+     *   4. Llamar window.electronAPI.printInformeToPdf con carpeta + filename válidos
+     *   5. Restaurar canvas originales (re-renderizar charts) después
      */
     function imprimirReportesPDF() {
         var d = _state.datosReporte;
@@ -1277,36 +1283,48 @@
         var container = document.getElementById('grReporteContainer');
         if (!container) return;
 
-        // Paso 1: capturar charts como imágenes
-        var n = _captureChartsAsImages('grReporteContainer');
-
-        // Paso 2: construir HTML autocontenido
-        var tipoLabel = tipo === 'ejecutivo' ? 'Resumen Ejecutivo' : (tipo === 'individual' ? 'Reporte Individual' : 'Reporte Detallado');
-        var filename = 'reporte-gestacion-' + tipo + '-' + new Date().toISOString().slice(0, 10);
-        var htmlContent = _buildHtmlForPdf(container.innerHTML, tipoLabel, d);
-
-        // Paso 3: enviar al backend
         _setSyncBadge('saving');
-        window.electronAPI.printInformeToPdf({
-            html: htmlContent,
-            filename: filename,
-            targetFolder: null  // null = dejar que el SO pida al usuario
-        }).then(function (result) {
-            _setSyncBadge('synced');
-            if (result && result.success) {
-                _mostrarToast('success', 'PDF generado', 'Archivo: ' + (result.path || filename));
-            } else {
-                _mostrarToast('warning', 'Imprimir cancelado',
-                    (result && result.error) || 'El usuario canceló o hubo un error.');
+
+        // Paso 1: obtener carpeta destino (Downloads del usuario) vía IPC
+        window.electronAPI.getDownloadsPath().then(function (pathResult) {
+            if (!pathResult || !pathResult.success) {
+                _setSyncBadge('error');
+                _mostrarToast('error', 'Error al obtener carpeta destino',
+                    (pathResult && pathResult.error) || 'No se pudo resolver la carpeta de descargas.');
+                return;
             }
+            var targetFolder = pathResult.path;
+
+            // Paso 2: capturar charts como imágenes
+            var n = _captureChartsAsImages('grReporteContainer');
+
+            // Paso 3: construir HTML autocontenido
+            var tipoLabel = tipo === 'ejecutivo' ? 'Resumen Ejecutivo' : (tipo === 'individual' ? 'Reporte Individual' : 'Reporte Detallado');
+            var filename = 'reporte-gestacion-' + tipo + '-' + new Date().toISOString().slice(0, 10) + '.pdf';
+            var htmlContent = _buildHtmlForPdf(container.innerHTML, tipoLabel, d);
+
+            // Paso 4: enviar al backend con carpeta + filename válidos
+            return window.electronAPI.printInformeToPdf({
+                html: htmlContent,
+                filename: filename,
+                targetFolder: targetFolder
+            }).then(function (result) {
+                _setSyncBadge(result && result.success ? 'synced' : 'error');
+                if (result && result.success) {
+                    _mostrarToast('success', 'PDF generado', 'Guardado en: ' + (result.path || filename));
+                } else {
+                    _mostrarToast('warning', 'Imprimir cancelado o error',
+                        (result && result.error) || 'El usuario canceló o hubo un error.');
+                }
+                return n;
+            });
         }).catch(function (err) {
             _setSyncBadge('error');
             _mostrarToast('error', 'Error al generar PDF', err.message || String(err));
-        }).then(function () {
-            // Paso 4: restaurar canvas originales (si los hubo)
-            if (n > 0) {
-                var restored = _restoreChartsFromImages('grReporteContainer');
-                // Re-renderizar charts con datos actuales
+        }).then(function (n) {
+            // Paso 5: restaurar canvas originales (si los hubo)
+            if (n && n > 0) {
+                _restoreChartsFromImages('grReporteContainer');
                 _renderDemosChartsSegunTipo();
             }
         });
@@ -1429,16 +1447,13 @@
     });
 
     /**
-     * 📦479 — Indicadores visuales de scroll.
-     * - Agrega clase .gr-main--has-more al contenedor cuando hay scroll pendiente
-     *   (muestra gradient fade al fondo — pista visual).
-     * - Quita la clase cuando se llega al final.
-     * - Agrega botón flotante "scroll to top" si el scroll es > 200px.
+     * 📦480 — Indicadores visuales de scroll (estrategia nueva: BODY scrollea).
+     * - El botón flotante "ir arriba" hace scrollTo sobre document.documentElement.
+     * - Indicador "has-more" se aplica al body para el gradient fade.
+     * - ResizeObserver observa al body para recalcular cuando cambian los charts.
      */
     function _setupScrollIndicators() {
-        var main = document.querySelector('.gr-main');
-        if (!main) return;
-        // Crear botón flotante "ir arriba" (oculto por default)
+        // Botón flotante "ir arriba"
         var btn = document.createElement('button');
         btn.id = 'grScrollTopBtn';
         btn.innerHTML = '<i class="bi bi-arrow-up"></i>';
@@ -1453,40 +1468,59 @@
             'background: #174ea6',
             'color: #fff',
             'border: none',
-            'box-shadow: 0 4px 12px rgba(0,0,0,0.2)',
+            'box-shadow: 0 4px 12px rgba(0,0,0,0.25)',
             'cursor: pointer',
             'font-size: 1.1rem',
-            'z-index: 9999',
+            'z-index: 99999',
             'display: none',
             'align-items: center',
             'justify-content: center',
             'transition: opacity 0.2s, transform 0.2s'
         ].join(';');
         btn.addEventListener('click', function () {
-            main.scrollTo({ top: 0, behavior: 'smooth' });
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         });
         btn.addEventListener('mouseenter', function () { btn.style.transform = 'translateY(-2px)'; });
         btn.addEventListener('mouseleave', function () { btn.style.transform = 'translateY(0)'; });
         document.body.appendChild(btn);
 
+        function _getScrollState() {
+            var doc = document.documentElement;
+            var scrollTop = window.scrollY || doc.scrollTop;
+            var scrollHeight = Math.max(
+                document.body.scrollHeight, doc.scrollHeight,
+                document.body.offsetHeight, doc.offsetHeight,
+                document.body.clientHeight, doc.clientHeight
+            );
+            var clientHeight = window.innerHeight || doc.clientHeight;
+            return {
+                scrollTop: scrollTop,
+                scrollHeight: scrollHeight,
+                clientHeight: clientHeight,
+                hasMore: scrollHeight - scrollTop - clientHeight > 4
+            };
+        }
+
         function _update() {
-            var hasMore = main.scrollHeight - main.scrollTop - main.clientHeight > 4;
-            var isAtTop = main.scrollTop < 200;
-            if (hasMore) {
-                main.classList.add('gr-main--has-more');
+            var s = _getScrollState();
+            var isAtTop = s.scrollTop < 200;
+            if (s.hasMore) {
+                document.body.classList.add('gr-main--has-more');
             } else {
-                main.classList.remove('gr-main--has-more');
+                document.body.classList.remove('gr-main--has-more');
             }
             btn.style.display = isAtTop ? 'none' : 'flex';
         }
-        main.addEventListener('scroll', _update);
-        // Observar cambios de tamaño del contenido (charts se renderizan async)
+
+        window.addEventListener('scroll', _update);
+        // ResizeObserver en el body (los charts cambian altura async)
         if (typeof ResizeObserver !== 'undefined') {
-            new ResizeObserver(_update).observe(main);
+            new ResizeObserver(_update).observe(document.body);
         }
-        // Chequeo inicial después del primer render de charts
-        setTimeout(_update, 800);
-        setTimeout(_update, 2000);
+        // Chequeos iniciales
+        setTimeout(_update, 500);
+        setTimeout(_update, 1500);
+        setTimeout(_update, 3000);
     }
 
 })();
