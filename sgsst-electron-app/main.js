@@ -46,7 +46,7 @@ const { registerRevisionAltaDireccionHandlers } = require('./main/revision-alta-
 const { registerAuditoriaAnualHandlers } = require('./main/auditoria-anual-bridge');
 const { registerAccionesPreventivasCorrectivasHandlers } = require('./main/acciones-preventivas-correctivas-bridge');
 // 📦465 (2026-07-03) — Handlers de Seguimiento de Gestación (Salud Materna)
-const { registerGestacionHandlers, SCHEMA_SQL: GESTACION_SCHEMA_SQL } = require('./main/gestacion-bridge');
+const { registerGestacionHandlers, SCHEMA_SQL: GESTACION_SCHEMA_SQL, MIGRATIONS_SQL: GESTACION_MIGRATIONS_SQL } = require('./main/gestacion-bridge');
 // K+AIR Calendar — bridge de eventos rápidos (botón calendario del header)
 const { registerEventosRapidosHandlers } = require('./main/eventos-rapidos-bridge');
 
@@ -350,6 +350,30 @@ function initDbOnce() {
       console.log('[DB] 📦466 · Tablas de gestacion creadas/verificadas');
     } catch (gsErr) {
       console.error('[DB] 📦466 · Error creando schema de gestacion:', gsErr.message);
+    }
+
+    // 📦468 (2026-07-04) — MIGRACIONES idempotentes sobre `gestaciones`.
+    // Cada ALTER TABLE se ejecuta individualmente con try/catch: si la columna
+    // ya existe, SQLite lanza "duplicate column" que se ignora silenciosamente.
+    // Permite evolucionar el schema sin sistema de versiones formal.
+    if (Array.isArray(GESTACION_MIGRATIONS_SQL)) {
+      var applied = 0;
+      var skipped = 0;
+      for (var mi = 0; mi < GESTACION_MIGRATIONS_SQL.length; mi++) {
+        var stmt = GESTACION_MIGRATIONS_SQL[mi];
+        try {
+          db.exec(stmt);
+          applied++;
+        } catch (migErr) {
+          // "duplicate column name" = la columna ya existe, es esperado en re-ejecuciones
+          if (/duplicate column/i.test(migErr.message)) {
+            skipped++;
+          } else {
+            console.warn('[DB] 📦468 · Migración gestacion fallida:', stmt, '-', migErr.message);
+          }
+        }
+      }
+      console.log('[DB] 📦468 · Migraciones gestacion aplicadas=' + applied + ' omitidas=' + skipped);
     }
 
     const roleNames = ['Administrador', 'SST', 'Auditoría', 'Gerencia', 'Recursos Humanos'];

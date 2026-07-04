@@ -1,12 +1,20 @@
 /**
  * =====================================================================
  * 📦465 (2026-07-03) — SUBMÓDULO SEGUIMIENTO DE GESTACIÓN (Salud Materna)
+ * 📦468 (2026-07-04) — MIGRACIÓN schema: estados 'reintegro'/'suspendida'
+ *                       + columnas area/empresa_nombre/empresa_cliente
+ *                       + fechas de reintegro y suspensión
  * Bridge IPC · Backend Process
  *
  * Persistencia: SQLite central en app.getPath('userData')/kair.db
  * Tablas:
- *   - gestaciones                          (datos básicos + clasificación + estado)
+ *   - gestaciones                          (datos + estado + fechas ciclo vida)
  *   - seguimiento_gestacion_mensual        (FK a gestaciones, registros mensuales)
+ *
+ * 📦468 — Valores válidos de `gestaciones.estado` (flujo lineal estricto):
+ *   activo → licencia → reintegro → cerrado
+ *   'suspendida' es estado excepcional (sale del flujo normal, con motivo obligatorio).
+ *   Para llegar a 'cerrado' es obligatorio pasar antes por 'reintegro' (📦469 valida).
  *
  * Patrón idéntico a revision-alta-direccion-bridge.js:
  *   - registerHandlers(app, deps) recibe getDb() por inyección
@@ -27,6 +35,8 @@ var MOD = '📦465-GESTACION';
 
 // =====================================================================
 // SCHEMA SQL · Se ejecuta en initDbOnce() desde main.js (idempotente)
+// CREATE TABLE solo aplica a INSTALACIONES NUEVAS. Para actualizar una
+// base existente se usan las MIGRATIONS_SQL de abajo (ALTER TABLE).
 // =====================================================================
 const SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS gestaciones (
@@ -44,6 +54,16 @@ const SCHEMA_SQL = `
     arl TEXT,
     fecha_inicio_licencia TEXT,
     fecha_fin_licencia TEXT,
+    -- 📦468 — Datos extendidos para Reportes de Seguimiento
+    area TEXT,                              -- Departamento/Área donde trabaja (Finanzas, Operaciones, etc.)
+    empresa_nombre TEXT,                    -- Nombre legible de la empresa ("ASEL S.A.S.") para reportes
+    empresa_cliente TEXT,                   -- Empresa cliente si presta servicios allí ("TechNova Ltda.")
+    -- 📦468 — Fechas y motivos del ciclo de vida (reintegro / suspensión)
+    fecha_inicio_reintegro TEXT,
+    fecha_fin_reintegro TEXT,
+    fecha_suspension TEXT,
+    motivo_suspension TEXT,
+    motivo_reintegro TEXT,
     observaciones TEXT,
     creado_en TEXT NOT NULL,
     actualizado_en TEXT NOT NULL,
@@ -93,6 +113,27 @@ const SCHEMA_SQL = `
 `;
 
 // =====================================================================
+// MIGRATIONS SQL · 📦468 — ALTER TABLE idempotente
+// Se ejecuta DESPUÉS de SCHEMA_SQL en initDbOnce(). Cada ALTER se aplica
+// individualmente con try/catch en main.js, así son idempotentes:
+//   - Si la columna NO existe → se agrega
+//   - Si ya existe → SQLite lanza "duplicate column" que se ignora
+// Esto evita necesidad de un sistema de versiones de schema formal.
+// =====================================================================
+const MIGRATIONS_SQL = [
+  // 📦468 — Datos extendidos (Reportes)
+  "ALTER TABLE gestaciones ADD COLUMN area TEXT",
+  "ALTER TABLE gestaciones ADD COLUMN empresa_nombre TEXT",
+  "ALTER TABLE gestaciones ADD COLUMN empresa_cliente TEXT",
+  // 📦468 — Fechas y motivos del ciclo de vida (reintegro / suspensión)
+  "ALTER TABLE gestaciones ADD COLUMN fecha_inicio_reintegro TEXT",
+  "ALTER TABLE gestaciones ADD COLUMN fecha_fin_reintegro TEXT",
+  "ALTER TABLE gestaciones ADD COLUMN fecha_suspension TEXT",
+  "ALTER TABLE gestaciones ADD COLUMN motivo_suspension TEXT",
+  "ALTER TABLE gestaciones ADD COLUMN motivo_reintegro TEXT"
+];
+
+// =====================================================================
 // HELPERS · Generadores de ID y conversores
 // =====================================================================
 
@@ -133,6 +174,16 @@ function _rowToGestacion(r) {
         arl: r.arl || '',
         fechaInicioLicencia: r.fecha_inicio_licencia || null,
         fechaFinLicencia: r.fecha_fin_licencia || null,
+        // 📦468 — Datos extendidos para Reportes
+        area: r.area || '',
+        empresaNombre: r.empresa_nombre || '',
+        empresaCliente: r.empresa_cliente || '',
+        // 📦468 — Fechas y motivos del ciclo de vida
+        fechaInicioReintegro: r.fecha_inicio_reintegro || null,
+        fechaFinReintegro: r.fecha_fin_reintegro || null,
+        fechaSuspension: r.fecha_suspension || null,
+        motivoSuspension: r.motivo_suspension || '',
+        motivoReintegro: r.motivo_reintegro || '',
         observaciones: r.observaciones || '',
         ultimoSeguimiento: null, // Se actualiza con JOIN si aplica
         creadoEn: r.creado_en,
@@ -635,5 +686,6 @@ function registerGestacionHandlers(app, deps) {
 
 module.exports = {
     registerGestacionHandlers: registerGestacionHandlers,
-    SCHEMA_SQL: SCHEMA_SQL
+    SCHEMA_SQL: SCHEMA_SQL,
+    MIGRATIONS_SQL: MIGRATIONS_SQL
 };
