@@ -645,7 +645,7 @@ container.innerHTML = '<div class="inv-empty">'
 
 function showLoading() {
 var container = document.getElementById('investigationsList');
-container.innerHTML = '<div class="inv-loading"><div class="inv-spinner"></div><p>Cargando investigaciones...</p></div>';
+container.innerHTML = KairSkeleton.list(8);
 }
 
 function hideLoading() {}
@@ -666,7 +666,7 @@ document.getElementById('backBtn').addEventListener('click', function() {
 document.getElementById('refreshBtn').addEventListener('click', function() {
 var icon = document.getElementById('refreshIcon');
 icon.classList.add('fa-spin');
-document.getElementById('investigationsList').innerHTML = '<div class="inv-loading"><div class="inv-spinner"></div><p>Actualizando...</p></div>';
+document.getElementById('investigationsList').innerHTML = KairSkeleton.list(4);
 xrefData = null;
 loadAllData().then(function() {
 icon.classList.remove('fa-spin');
@@ -1006,7 +1006,7 @@ startBtn.dataset.furatpath = furatFile ? furatFile.path : '';
 }
 }
 
-iframeContainer.innerHTML = '<div class="inv-loading"><div class="inv-spinner"></div><p>Cargando documento...</p></div>';
+iframeContainer.innerHTML = KairSkeleton.detail(6);
 
 try {
 var ext = extension.toLowerCase();

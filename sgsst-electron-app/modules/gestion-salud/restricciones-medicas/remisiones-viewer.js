@@ -257,8 +257,7 @@
     }
 
     function showLoading() {
-        document.getElementById('documentsList').innerHTML =
-            '<div class="rem-loading"><div class="rem-spinner"></div><p>Cargando documentos...</p></div>';
+        document.getElementById('documentsList').innerHTML = KairSkeleton.list(8);
     }
 
     // ─── Eventos ────────────────────────────────────────────────────────
@@ -344,7 +343,7 @@
 
         modal.classList.remove('hidden');
         titleEl.textContent = fileName;
-        body.innerHTML = '<div class="rem-loading"><div class="rem-spinner"></div><p>Cargando documento...</p></div>';
+        body.innerHTML = KairSkeleton.detail(6);
 
         try {
             var ext = (extension || '').toLowerCase();

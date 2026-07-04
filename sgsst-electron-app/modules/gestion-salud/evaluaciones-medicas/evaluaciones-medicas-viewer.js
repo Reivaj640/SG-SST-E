@@ -327,16 +327,8 @@ async function loadLibrary() {
 }
 
 function showLibraryLoading() {
-    document.getElementById('folderList').innerHTML = `
-        <div class="em-loading">
-            <div class="em-spinner"></div>
-            <p>Cargando biblioteca...</p>
-        </div>`;
-    document.getElementById('documentList').innerHTML = `
-        <div class="em-empty-state em-empty-state--large">
-            <i class="fas fa-folder-open"></i>
-            <h3>Cargando biblioteca...</h3>
-        </div>`;
+    document.getElementById('folderList').innerHTML = KairSkeleton.list(5);
+    document.getElementById('documentList').innerHTML = KairSkeleton.list(6);
 }
 
 function showLibraryError(message) {
@@ -494,7 +486,7 @@ async function openPreviewModal(filePath) {
                      : 'fas fa-file-medical';
 
     modal.classList.remove('hidden');
-    body.innerHTML = '<div class="em-loading"><div class="em-spinner"></div><p>Cargando evaluación...</p></div>';
+    body.innerHTML = KairSkeleton.detail(6);
 
     try {
         let result;
