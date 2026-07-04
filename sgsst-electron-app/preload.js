@@ -320,6 +320,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('gestacion:guardarSeguimiento', params),
   gestacionObtenerSeguimientos: (params) =>
     ipcRenderer.invoke('gestacion:obtenerSeguimientos', params),
+  // 📦469 — Motor de cálculos para Reportes de Seguimiento (Resumen Ejecutivo / Detallado / Individual)
+  gestacionCalcularReporte: (params) =>
+    ipcRenderer.invoke('gestacion:calcularReporte', params),
+  // 📦469 — Cambio de estado con validación de flujo lineal estricto
+  gestacionActualizarEstado: (params) =>
+    ipcRenderer.invoke('gestacion:actualizarEstado', params),
 
   // --- Estadísticas de Accidentes FURAT (widget home) ---
 getAccidentesStats: (companyName) =>

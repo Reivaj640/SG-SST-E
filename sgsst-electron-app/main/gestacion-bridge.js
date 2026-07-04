@@ -593,6 +593,466 @@ function _handlerObtenerSeguimientos(empresaId, gestanteId) {
 }
 
 // =====================================================================
+// 📦469 — MOTOR DE CÁLCULOS PARA REPORTES DE SEGUIMIENTO
+// =====================================================================
+
+/**
+ * Genera array de strings 'YYYY-MM' entre dos fechas (inclusivo).
+ * Si desde > hasta, devuelve array con solo desde (1 mes).
+ */
+function _generarMesesRango(desde, hasta) {
+    var meses = [];
+    var d = new Date(desde + 'T00:00:00');
+    var h = new Date(hasta + 'T00:00:00');
+    while (d <= h) {
+        meses.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'));
+        d.setMonth(d.getMonth() + 1);
+        // Tope defensivo: máximo 36 meses para evitar loops infinitos
+        if (meses.length > 36) break;
+    }
+    return meses;
+}
+
+/**
+ * Periodicidad en días según clasificación (Res. 0312/2019 art. 14).
+ * Mismo criterio que gestacion-antesala.js:_frecuenciaPorRiesgo().
+ */
+function _diasPasoPorClasificacion(c) {
+    if (c === 'alto') return 15;
+    if (c === 'muy-alto') return 7;
+    return 30; // bajo
+}
+
+/**
+ * Resuelve el rango de fechas final a partir del filtro de periodo del frontend.
+ * Filtros aceptados:
+ *   { periodo: 'ultimoTrimestre' | 'mesActual' | 'mesAnterior' | 'ultimoMes' }
+ *   { fechaDesde: 'YYYY-MM-DD', fechaHasta: 'YYYY-MM-DD' }  (custom, toma precedencia)
+ */
+function _resolverRangoFechas(filtros) {
+    var hoy = new Date();
+    var desde, hasta;
+    var periodo = (filtros && filtros.periodo) || 'ultimoTrimestre';
+
+    if (filtros && filtros.fechaDesde && filtros.fechaHasta) {
+        return { desde: filtros.fechaDesde, hasta: filtros.fechaHasta, etiqueta: 'Personalizado' };
+    }
+
+    if (periodo === 'mesActual') {
+        desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+        hasta = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
+        return { desde: desde.toISOString().slice(0, 10), hasta: hasta.toISOString().slice(0, 10), etiqueta: 'Mes actual' };
+    }
+    if (periodo === 'mesAnterior') {
+        desde = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
+        hasta = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
+        return { desde: desde.toISOString().slice(0, 10), hasta: hasta.toISOString().slice(0, 10), etiqueta: 'Mes anterior' };
+    }
+    if (periodo === 'ultimoMes') {
+        desde = new Date(hoy.getTime() - 30 * 24 * 60 * 60 * 1000);
+        hasta = hoy;
+        return { desde: desde.toISOString().slice(0, 10), hasta: hasta.toISOString().slice(0, 10), etiqueta: 'Últimos 30 días' };
+    }
+    // Default: último trimestre
+    desde = new Date(hoy.getTime() - 90 * 24 * 60 * 60 * 1000);
+    hasta = hoy;
+    return { desde: desde.toISOString().slice(0, 10), hasta: hasta.toISOString().slice(0, 10), etiqueta: 'Último trimestre' };
+}
+
+/**
+ * 📦469 — calcularReporte
+ * Motor de agregaciones para los 3 tipos de reporte (Resumen Ejecutivo, Detallado, Individual).
+ * Devuelve un objeto con todas las métricas/visualizaciones ya pre-calculadas.
+ *
+ * Filtros aceptados:
+ *   - periodo: 'ultimoTrimestre' | 'mesActual' | 'mesAnterior' | 'ultimoMes' (default: ultimoTrimestre)
+ *   - fechaDesde, fechaHasta: rango custom (override periodo)
+ *   - riesgo: 'bajo' | 'alto' | 'muy-alto' | null=todos
+ *   - empresa: string|null (default: la del argumento empresaId)
+ *   - gestanteId: solo para Individual, filtra seguimientos a 1 gestante
+ */
+function _handlerCalcularReporte(empresaId, filtros) {
+    if (!_getDb) {
+        return { success: false, error: { code: 'NO_DB', message: 'Base de datos no disponible' } };
+    }
+    if (!empresaId) {
+        return { success: false, error: { code: 'NO_COMPANY', message: 'empresaId requerido' } };
+    }
+    filtros = filtros || {};
+
+    try {
+        var db = _getDb();
+        var rango = _resolverRangoFechas(filtros);
+
+        // ── 1. Cargar gestantes (enriquecidas con último seguimiento) ──
+        var listarResult = _handlerListarGestantes(empresaId);
+        if (!listarResult.success) return listarResult;
+        var gestantes = listarResult.data;
+
+        // Filtro por riesgo
+        if (filtros.riesgo) {
+            gestantes = gestantes.filter(function (g) { return g.clasificacion === filtros.riesgo; });
+        }
+        // Filtro por gestante individual
+        if (filtros.gestanteId) {
+            gestantes = gestantes.filter(function (g) { return g.id === filtros.gestanteId; });
+        }
+
+        // ── 2. Cargar seguimientos del periodo (JOIN con gestaciones) ──
+        var sqlSegs = db.prepare(`
+            SELECT s.*, g.nombre as gest_nombre, g.cedula as gest_cedula,
+                   g.cargo as gest_cargo, g.clasificacion as gest_clasificacion,
+                   g.area as gest_area, g.empresa_cliente as gest_empresa_cliente
+            FROM seguimiento_gestacion_mensual s
+            JOIN gestaciones g ON g.id = s.gestacion_id
+            WHERE s.empresa_id = ? AND s.fecha BETWEEN ? AND ?
+            ${filtros.gestanteId ? 'AND s.gestacion_id = ?' : ''}
+            ORDER BY s.fecha DESC, s.periodo DESC
+        `);
+        var paramsSegs = filtros.gestanteId
+            ? [empresaId, rango.desde, rango.hasta, filtros.gestanteId]
+            : [empresaId, rango.desde, rango.hasta];
+        var segRows = sqlSegs.all.apply(sqlSegs, paramsSegs);
+
+        // ── 3. KPIs principales ──
+        var activas = gestantes.filter(function (g) {
+            return g.estado === 'activo' || g.estado === 'licencia' || g.estado === 'reintegro';
+        });
+
+        // ── 4. Cálculo de seguimientos vencidos (heurística por clasificación) ──
+        var hoyD = new Date(); hoyD.setHours(0, 0, 0, 0);
+        var alertas = [];
+        var seguimientosVencidosSet = {};
+        gestantes.forEach(function (g) {
+            if (g.estado === 'cerrado' || g.estado === 'suspendida') return;
+            var diasPaso = _diasPasoPorClasificacion(g.clasificacion);
+            var baseIso = g.ultimoSeguimiento || g.fechaNotificacion;
+            if (!baseIso) return;
+            var base = new Date(baseIso + 'T00:00:00');
+            if (isNaN(base.getTime())) return;
+            var proximo = new Date(base.getTime() + diasPaso * 24 * 60 * 60 * 1000);
+            if (proximo < hoyD) {
+                seguimientosVencidosSet[g.id] = true;
+                alertas.push({
+                    gestante: g.nombre,
+                    gestanteId: g.id,
+                    tipo: 'VENCIDO',
+                    mensaje: 'Seguimiento vencido desde ' + _fmtIsoCorto(proximo),
+                    fecha: _fmtIsoCorto(proximo)
+                });
+            }
+            // Alerta adicional por Muy Alto Riesgo
+            if (g.clasificacion === 'muy-alto') {
+                alertas.push({
+                    gestante: g.nombre,
+                    gestanteId: g.id,
+                    tipo: 'MUY_ALTO_RIESGO',
+                    mensaje: 'Clasificada como Muy Alto Riesgo Obstétrico — requiere seguimiento semanal',
+                    fecha: g.ultimoSeguimiento || g.fechaNotificacion
+                });
+            }
+        });
+
+        var seguimientosVencidos = Object.keys(seguimientosVencidosSet).length;
+        var seguimientosCompletados = segRows.length;
+        // Programados = activas * 1 seguimiento esperado en el rango (heurística base)
+        var seguimientosProgramados = activas.length; // simplificación: 1 por gestante activa
+        var cumplimientoFrecuencia = seguimientosProgramados > 0
+            ? Math.round((seguimientosCompletados / seguimientosProgramados) * 100)
+            : 0;
+        // Promedio bienestar emocional (campo "emocional" tipo "4/5")
+        var emocionales = [];
+        segRows.forEach(function (s) {
+            if (s.emocional && typeof s.emocional === 'string') {
+                var parts = s.emocional.split('/');
+                if (parts.length === 2) {
+                    var num = parseInt(parts[0], 10);
+                    var den = parseInt(parts[1], 10);
+                    if (!isNaN(num) && !isNaN(den) && den > 0) emocionales.push(num / den);
+                }
+            }
+        });
+        var promedioBienestar = emocionales.length > 0
+            ? emocionales.reduce(function (a, b) { return a + b; }, 0) / emocionales.length
+            : 0;
+        var promedioBienestarEmocional = {
+            valor: Math.round(promedioBienestar * 10) / 10,
+            formato: (Math.round(promedioBienestar * 10) / 10).toFixed(1) + ' / 5',
+            base: 5
+        };
+
+        // ── 5. Distribución por riesgo ──
+        var distribRiesgo = { bajo: 0, alto: 0, muyAlto: 0 };
+        activas.forEach(function (g) {
+            if (g.clasificacion === 'bajo') distribRiesgo.bajo++;
+            else if (g.clasificacion === 'alto') distribRiesgo.alto++;
+            else if (g.clasificacion === 'muy-alto') distribRiesgo.muyAlto++;
+        });
+        var totalPorRiesgo = distribRiesgo.bajo + distribRiesgo.alto + distribRiesgo.muyAlto;
+
+        // ── 6. Estado de seguimientos ──
+        var distribEstado = {
+            completados: seguimientosCompletados,
+            programados: seguimientosProgramados,
+            vencidos: seguimientosVencidos
+        };
+        var totalSegsEnPeriodo = seguimientosCompletados + seguimientosVencidos;
+        var tasaFinalizacion = totalSegsEnPeriodo > 0
+            ? Math.round((seguimientosCompletados / totalSegsEnPeriodo) * 100)
+            : 0;
+
+        // ── 7. Tendencia mensual ──
+        var mesesRango = _generarMesesRango(rango.desde, rango.hasta);
+        var tendenciaMensual = mesesRango.map(function (m) {
+            var delMes = segRows.filter(function (s) { return s.periodo === m; });
+            var completados = delMes.length;
+            // Cuántas gestantes activas había en ese periodo — heurística: las activas hoy
+            var programados = activas.length;
+            var vencidos = delMes.filter(function (s) {
+                return seguimientosVencidosSet[s.gestacion_id];
+            }).length;
+            return {
+                periodo: m,
+                completados: completados,
+                programados: Math.max(0, programados - completados),
+                vencidos: vencidos
+            };
+        });
+
+        // ── 8. Distribución por área ──
+        var areaMap = {};
+        activas.forEach(function (g) {
+            var area = g.area || 'Sin área';
+            areaMap[area] = (areaMap[area] || 0) + 1;
+        });
+        var distribucionArea = Object.keys(areaMap).map(function (a) {
+            return { area: a, count: areaMap[a] };
+        }).sort(function (x, y) { return y.count - x.count; });
+
+        // ── 9. Acciones más frecuentes ──
+        var accionesCount = {};
+        var totalPermisos = 0, totalIncapacidades = 0, totalAjustes = 0, totalReubicaciones = 0;
+        segRows.forEach(function (s) {
+            totalPermisos += s.permisos || 0;
+            totalIncapacidades += s.dias_incapacidad || 0;
+            try {
+                var accs = JSON.parse(s.acciones || '[]');
+                if (Array.isArray(accs)) {
+                    accs.forEach(function (a) {
+                        var key = (typeof a === 'string') ? a : (a.nombre || a.tipo || JSON.stringify(a));
+                        accionesCount[key] = (accionesCount[key] || 0) + 1;
+                        var k = key.toLowerCase();
+                        if (k.indexOf('ajuste') !== -1) totalAjustes++;
+                        if (k.indexOf('reubicac') !== -1) totalReubicaciones++;
+                    });
+                }
+            } catch (e) { /* ignore parse errors */ }
+        });
+        var accionesFrecuentes = Object.keys(accionesCount)
+            .map(function (k) { return { accion: k, count: accionesCount[k] }; })
+            .sort(function (x, y) { return y.count - x.count; })
+            .slice(0, 10);
+        var totalesAcciones = {
+            permisos: totalPermisos,
+            diasIncapacidad: totalIncapacidades,
+            ajustes: totalAjustes,
+            reubicaciones: totalReubicaciones
+        };
+
+        // ── 10. Detalle de seguimientos (para tabla) ──
+        var detalle = segRows.map(function (s) {
+            var accsCount = 0;
+            try {
+                var arr = JSON.parse(s.acciones || '[]');
+                if (Array.isArray(arr)) accsCount = arr.length;
+            } catch (e) {}
+            var estadoSeg = seguimientosVencidosSet[s.gestacion_id] ? 'VENCIDO' : 'COMPLETADO';
+            return {
+                gestante: s.gest_nombre,
+                cedula: s.gest_cedula,
+                cargo: s.gest_cargo || '',
+                area: s.gest_area || '',
+                empresaCliente: s.gest_empresa_cliente || '',
+                periodo: s.periodo,
+                fecha: s.fecha,
+                riesgo: s.gest_clasificacion,
+                semanas: s.semanas,
+                estado: estadoSeg,
+                controles: s.ctrl_asistio || '—',
+                permisos: s.permisos || 0,
+                emocional: s.emocional || '—',
+                acciones: accsCount,
+                gestanteId: s.gestacion_id
+            };
+        });
+
+        // ── 11. Ensamblar respuesta ──
+        return {
+            success: true,
+            data: {
+                periodo: { desde: rango.desde, hasta: rango.hasta, etiqueta: rango.etiqueta },
+                empresa: { id: empresaId },
+                filtros: filtros,
+                kpis: {
+                    gestantesActivas: activas.length,
+                    gestantesEnSeguimiento: activas.length,
+                    seguimientosCompletados: seguimientosCompletados,
+                    seguimientosProgramados: seguimientosProgramados,
+                    seguimientosVencidos: seguimientosVencidos,
+                    cumplimientoFrecuencia: Math.min(100, cumplimientoFrecuencia),
+                    alertasCriticas: alertas.length,
+                    promedioBienestarEmocional: promedioBienestarEmocional,
+                    tasaFinalizacion: tasaFinalizacion
+                },
+                distribucionRiesgo: {
+                    bajo: distribRiesgo.bajo,
+                    alto: distribRiesgo.alto,
+                    muyAlto: distribRiesgo.muyAlto,
+                    total: totalPorRiesgo,
+                    porcentajes: totalPorRiesgo > 0 ? {
+                        bajo: Math.round((distribRiesgo.bajo / totalPorRiesgo) * 100),
+                        alto: Math.round((distribRiesgo.alto / totalPorRiesgo) * 100),
+                        muyAlto: Math.round((distribRiesgo.muyAlto / totalPorRiesgo) * 100)
+                    } : { bajo: 0, alto: 0, muyAlto: 0 }
+                },
+                distribucionEstado: distribEstado,
+                tendenciaMensual: tendenciaMensual,
+                distribucionArea: distribucionArea,
+                accionesFrecuentes: accionesFrecuentes,
+                totalesAcciones: totalesAcciones,
+                alertasCriticas: alertas,
+                detalleSeguimientos: detalle,
+                gestantes: activas,
+                fechaGeneracion: new Date().toISOString()
+            }
+        };
+    } catch (e) {
+        console.error('[' + MOD + '][CALCULAR_REPORTE]', e.message);
+        return { success: false, error: { code: 'DB_ERROR', message: e.message } };
+    }
+}
+
+/** Helper de formato fecha corto YYYY-MM-DD (sin T00:00 para evitar timezone shift). */
+function _fmtIsoCorto(isoOrDate) {
+    if (!isoOrDate) return '';
+    if (typeof isoOrDate === 'string') return isoOrDate.slice(0, 10);
+    if (isoOrDate instanceof Date) {
+        return isoOrDate.toISOString().slice(0, 10);
+    }
+    return '';
+}
+
+// =====================================================================
+// 📦469 — ACTUALIZAR ESTADO (con validación de flujo lineal estricto)
+// =====================================================================
+
+/**
+ * Reglas del flujo lineal estricto (acordadas con el usuario):
+ *   activo → licencia → reintegro → cerrado
+ *   'suspendida' es estado excepcional: puede salir de cualquier estado
+ *   activo/licencia/reintegro, pero requiere motivo_suspension obligatorio.
+ *   Para llegar a 'cerrado' hay que pasar antes por 'reintegro' (o ser 'suspendida').
+ *   No se permite retroceder (ej. reintegro → licencia).
+ *
+ * Datos opcionales que se persisten según estado:
+ *   - licencia:       { fechaInicioLicencia, fechaFinLicencia }
+ *   - reintegro:      { fechaInicioReintegro, fechaFinReintegro, motivoReintegro }
+ *   - suspendida:     { fechaSuspension, motivoSuspension }
+ *   - cerrado:        (sin datos extra, toma los que ya estén)
+ */
+function _handlerActualizarEstado(empresaId, gestanteId, data) {
+    if (!_getDb) {
+        return { success: false, error: { code: 'NO_DB', message: 'Base de datos no disponible' } };
+    }
+    if (!empresaId || !gestanteId) {
+        return { success: false, error: { code: 'VALIDATION', message: 'empresaId y gestanteId requeridos' } };
+    }
+    var nuevoEstado = data && data.estado;
+    if (!nuevoEstado) {
+        return { success: false, error: { code: 'VALIDATION', message: 'estado requerido' } };
+    }
+    var ESTADOS_VALIDOS = ['activo', 'licencia', 'reintegro', 'suspendida', 'cerrado'];
+    if (ESTADOS_VALIDOS.indexOf(nuevoEstado) === -1) {
+        return { success: false, error: { code: 'INVALID_STATE', message: 'Estado no válido: ' + nuevoEstado } };
+    }
+
+    try {
+        var db = _getDb();
+        var row = db.prepare(
+            'SELECT estado FROM gestaciones WHERE id = ? AND empresa_id = ?'
+        ).get(gestanteId, empresaId);
+        if (!row) {
+            return { success: false, error: { code: 'NOT_FOUND', message: 'Gestante no encontrada' } };
+        }
+        var estadoActual = row.estado;
+
+        // ── Validación de flujo lineal estricto ──
+        // Orden normal: activo → licencia → reintegro → cerrado
+        var flujoPermitido = {
+            'activo':     ['licencia', 'suspendida', 'cerrado'],    // activo puede ir a cerrado (caso edge: sin licencia)
+            'licencia':   ['reintegro', 'suspendida'],
+            'reintegro':  ['cerrado', 'suspendida'],
+            'suspendida': ['activo', 'licencia', 'reintegro', 'cerrado'], // sale de suspendida, decisión del usuario
+            'cerrado':    ['activo'] // reabrir
+        };
+        var permitidos = flujoPermitido[estadoActual] || [];
+        if (permitidos.indexOf(nuevoEstado) === -1) {
+            return {
+                success: false,
+                error: {
+                    code: 'INVALID_TRANSITION',
+                    message: 'Transición no permitida: ' + estadoActual + ' → ' + nuevoEstado +
+                             '. Estados válidos desde ' + estadoActual + ': ' + permitidos.join(', ')
+                }
+            };
+        }
+
+        // ── Validación de motivo obligatorio para 'suspendida' ──
+        if (nuevoEstado === 'suspendida' && (!data.motivoSuspension || !data.motivoSuspension.trim())) {
+            return {
+                success: false,
+                error: { code: 'VALIDATION', message: 'motivoSuspension es obligatorio al pasar a Suspendida' }
+            };
+        }
+
+        // ── Construir UPDATE dinámico según estado y campos provistos ──
+        var sets = ['estado = ?', 'actualizado_en = ?'];
+        var params = [nuevoEstado, new Date().toISOString()];
+
+        if (nuevoEstado === 'licencia') {
+            if (data.fechaInicioLicencia) { sets.push('fecha_inicio_licencia = ?'); params.push(data.fechaInicioLicencia); }
+            if (data.fechaFinLicencia)    { sets.push('fecha_fin_licencia = ?');    params.push(data.fechaFinLicencia); }
+        }
+        if (nuevoEstado === 'reintegro') {
+            if (data.fechaInicioReintegro) { sets.push('fecha_inicio_reintegro = ?'); params.push(data.fechaInicioReintegro); }
+            if (data.fechaFinReintegro)    { sets.push('fecha_fin_reintegro = ?');    params.push(data.fechaFinReintegro); }
+            if (data.motivoReintegro)      { sets.push('motivo_reintegro = ?');       params.push(data.motivoReintegro); }
+        }
+        if (nuevoEstado === 'suspendida') {
+            if (data.fechaSuspension)   { sets.push('fecha_suspension = ?');   params.push(data.fechaSuspension); }
+            if (data.motivoSuspension)  { sets.push('motivo_suspension = ?');  params.push(data.motivoSuspension); }
+        }
+
+        params.push(gestanteId, empresaId);
+        db.prepare(
+            'UPDATE gestaciones SET ' + sets.join(', ') +
+            ' WHERE id = ? AND empresa_id = ?'
+        ).run.apply(null, params);
+
+        // Devolver el registro actualizado
+        var updated = db.prepare(
+            'SELECT * FROM gestaciones WHERE id = ? AND empresa_id = ?'
+        ).get(gestanteId, empresaId);
+
+        console.log('[' + MOD + '][ACTUALIZAR_ESTADO] ' + gestanteId + ' ' + estadoActual + ' → ' + nuevoEstado);
+        return { success: true, data: _rowToGestacion(updated) };
+    } catch (e) {
+        console.error('[' + MOD + '][ACTUALIZAR_ESTADO]', e.message);
+        return { success: false, error: { code: 'DB_ERROR', message: e.message } };
+    }
+}
+
+// =====================================================================
 // REGISTRO DE HANDLERS IPC
 // =====================================================================
 
@@ -681,7 +1141,17 @@ function registerGestacionHandlers(app, deps) {
         return _handlerObtenerSeguimientos(params.empresaId, params.gestanteId);
     });
 
-    console.log('[' + MOD + '][INIT][SUCCESS] 8 handlers de Seguimiento de Gestación registrados');
+    // 📦469 — Calcular reporte (motor de agregaciones para Reportes de Seguimiento)
+    ipcMain.handle('gestacion:calcularReporte', async function (event, params) {
+        return _handlerCalcularReporte(params.empresaId, params.filtros || {});
+    });
+
+    // 📦469 — Actualizar estado de gestante (con validación de flujo lineal estricto)
+    ipcMain.handle('gestacion:actualizarEstado', async function (event, params) {
+        return _handlerActualizarEstado(params.empresaId, params.gestanteId, params.data || {});
+    });
+
+    console.log('[' + MOD + '][INIT][SUCCESS] 11 handlers de Seguimiento de Gestación registrados');
 }
 
 module.exports = {
