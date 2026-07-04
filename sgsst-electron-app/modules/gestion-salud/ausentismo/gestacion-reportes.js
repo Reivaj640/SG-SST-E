@@ -61,14 +61,45 @@
         badge.classList.remove('k-sync-synced', 'k-sync-saving', 'k-sync-error');
         if (state === 'saving') {
             badge.classList.add('k-sync-saving');
-            badge.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Cargando…';
+            badge.innerHTML = window._iconSync('saving') + 'Cargando…';
         } else if (state === 'error') {
             badge.classList.add('k-sync-error');
-            badge.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Error';
+            badge.innerHTML = window._iconSync('error') + 'Error';
         } else {
             badge.classList.add('k-sync-synced');
-            badge.innerHTML = '<i class="bi bi-check-circle-fill"></i> Sincronizado';
+            badge.innerHTML = window._iconSync('synced') + 'Sincronizado';
         }
+    }
+
+    /**
+     * 📦481-iconos — Inyecta SVGs en todos los placeholders del header
+     * (mismo estilo que KairCalendar: outline, stroke=currentColor, sin emojis)
+     */
+    function _setupIcons() {
+        // Título del header
+        var titleIcon = document.getElementById('kair-gr-title-icon');
+        if (titleIcon) titleIcon.innerHTML = SVG_REPORT;
+        // Botón Volver
+        var backIcon = document.getElementById('kair-gr-back-icon');
+        if (backIcon) backIcon.innerHTML = SVG_CHEVRON_LEFT;
+        // Botones de export
+        var exportIcon = document.getElementById('kair-gr-export-icon');
+        if (exportIcon) exportIcon.innerHTML = SVG_GRID;
+        var printIcon = document.getElementById('kair-gr-print-icon');
+        if (printIcon) printIcon.innerHTML = SVG_PRINTER;
+        // Filtros
+        var filterIcon = document.getElementById('kair-gr-filter-icon');
+        if (filterIcon) filterIcon.innerHTML = SVG_FILTER;
+        var userIcon = document.getElementById('kair-gr-user-icon');
+        if (userIcon) userIcon.innerHTML = SVG_USER;
+        // Selector de tipo (3 cards grandes)
+        var tipoIcons = document.querySelectorAll('.gr-tipo__icon [data-icon]');
+        tipoIcons.forEach(function (el) {
+            var tipo = el.getAttribute('data-icon');
+            if (tipo === 'ejecutivo') el.innerHTML = SVG_CLIPBOARD;
+            else if (tipo === 'detallado') el.innerHTML = SVG_DOCUMENT;
+            else if (tipo === 'individual') el.innerHTML = SVG_USER;
+        });
     }
 
     function _mostrarToast(tipo, titulo, mensaje) {
@@ -1422,8 +1453,9 @@
 
     // ─── Init ───
     document.addEventListener('DOMContentLoaded', function () {
-        console.log('[REPORTES-GESTACION] Inicializando vista de reportes (📦479 scroll fixed)...');
+        console.log('[REPORTES-GESTACION] Inicializando vista de reportes (📦481 iconos SVG)...');
         _setupChartDefaults();
+        _setupIcons();           /* 📦481 — Inyectar SVGs al estilo del calendario */
         _renderReporte();
         _actualizarBotonesExportar();
         _bindHeader();

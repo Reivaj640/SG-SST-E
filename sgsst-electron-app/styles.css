@@ -4,6 +4,7 @@
   /* Colores principales */
   --primary-color: #174ea6;
   --primary-hover-color: #185abd;
+  --primary-soft: #e8f0fe;        /* 📦481 — bg claro para hover/active (alineado con .kair-cal-trigger) */
   --secondary-color: #6c757d;
   --success-color: #28a745;
   --danger-color: #dc3545;
@@ -920,18 +921,46 @@ select.form-control {
   border-radius: var(--border-radius-md);
   padding: 8px;
   cursor: pointer;
-  transition: background-color var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
   min-width: 40px;
   min-height: 40px;
 }
 
+/* 📦481-iconos — Hover/active alineados con .kair-cal-trigger (shared/kair-calendar.css)
+   El calendario al hover: bg claro + border primario + icono color primario.
+   Al active (seleccionado): mantiene el mismo estilo que hover.
+   Los demás botones del header ahora replican este patrón. */
 .header-btn:hover {
-  background-color: var(--button-hover-bg-color);
-  color: var(--white-color);
+  background-color: var(--primary-soft);
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+.header-btn--active,
+.header-btn.active,
+.header-btn[aria-pressed="true"] {
+  background-color: var(--primary-soft);
+  border-color: var(--primary-color);
+  color: var(--primary-color);
 }
 
 .icon-placeholder {
   font-size: 1.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: currentColor;
+  line-height: 1;
+}
+/* 📦481-iconos — SVGs outline estilo calendario (Feather/Lucide) */
+.icon-placeholder svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: middle;
 }
 
 .header-btn-text {

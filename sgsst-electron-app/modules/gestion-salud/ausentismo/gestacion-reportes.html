@@ -113,6 +113,32 @@
         .k-btn-ghost    { background: transparent; color: var(--v3-muted-foreground); border: 1px solid var(--v3-border); }
         .k-btn-ghost:hover { background: var(--v3-muted); color: var(--v3-foreground); }
 
+        /* 📦481-iconos — Patrón del CALENDARIO (no del header principal):
+           SVGs inline con stroke="currentColor", outline estilo Feather/Lucide.
+           Coincide con los SVGs que usa KairCalendar en shared/kair-calendar.js */
+        .icon-placeholder {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 6px;
+            color: currentColor;
+            line-height: 1;
+        }
+        .icon-placeholder svg {
+            width: 16px;
+            height: 16px;
+            stroke-width: 2;
+            fill: none;
+            stroke: currentColor;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .k-btn .icon-placeholder { margin-right: 5px; }
+        .k-header-main-title .icon-placeholder svg { width: 20px; height: 20px; color: var(--v3-primary); }
+        .gr-tipo__icon .icon-placeholder svg { width: 22px; height: 22px; color: var(--v3-primary); }
+        .gr-filtros__title .icon-placeholder svg { width: 16px; height: 16px; color: var(--v3-primary); }
+        .k-sync-badge .icon-placeholder svg { width: 14px; height: 14px; }
+
         .header-back-btn {
             display: inline-flex; align-items: center; gap: 0.375rem;
             padding: 0.375rem 0.75rem; font: 500 0.8125rem/1.2 var(--v3-font-sans);
@@ -664,7 +690,7 @@
         <div class="k-header-left">
             <div class="k-header-title-group">
                 <div class="k-header-main-title">
-                    <i class="bi bi-file-earmark-bar-graph"></i>
+                    <span class="icon-placeholder" id="kair-gr-title-icon"></span>
                     Reportes de Seguimiento
                 </div>
                 <div class="k-header-breadcrumb">
@@ -680,17 +706,17 @@
         </div>
         <div class="k-header-right">
             <span class="k-sync-badge k-sync-synced" id="kair-gr-sync" title="Datos cargados">
-                <i class="bi bi-check-circle-fill"></i> Sincronizado
+                <span class="icon-placeholder" id="kair-gr-sync-icon"></span> Sincronizado
             </span>
             <button type="button" class="header-back-btn" id="kair-gr-back" title="Volver al listado">
-                <i class="bi bi-arrow-left"></i> Volver
+                <span class="icon-placeholder" id="kair-gr-back-icon"></span> Volver
             </button>
             <!-- 📦476 — Exportación Excel + Imprimir/PDF -->
             <button type="button" class="k-btn k-btn-ghost k-btn-sm" id="kair-gr-export-excel" title="Exportar a Excel" disabled>
-                <i class="bi bi-file-earmark-excel"></i> Exportar Excel
+                <span class="icon-placeholder" id="kair-gr-export-icon"></span> Exportar Excel
             </button>
             <button type="button" class="k-btn k-btn-primary k-btn-sm" id="kair-gr-print" title="Imprimir o guardar como PDF" disabled>
-                <i class="bi bi-printer"></i> Imprimir / PDF
+                <span class="icon-placeholder" id="kair-gr-print-icon"></span> Imprimir / PDF
             </button>
         </div>
     </header>
@@ -700,21 +726,21 @@
         <!-- ═══════════ SELECTOR DE TIPO DE REPORTE ═══════════ -->
         <section class="gr-tipo-row" id="grTipoRow">
             <div class="gr-tipo active" data-tipo="ejecutivo" onclick="seleccionarTipoReporte('ejecutivo', this)">
-                <div class="gr-tipo__icon"><i class="bi bi-clipboard-data"></i></div>
+                <div class="gr-tipo__icon"><span class="icon-placeholder" data-icon="ejecutivo"></span></div>
                 <div>
                     <div class="gr-tipo__title">Resumen Ejecutivo</div>
                     <div class="gr-tipo__desc">Visión consolidada para gerencia: KPIs, tendencias y alertas críticas.</div>
                 </div>
             </div>
             <div class="gr-tipo" data-tipo="detallado" onclick="seleccionarTipoReporte('detallado', this)">
-                <div class="gr-tipo__icon"><i class="bi bi-file-text"></i></div>
+                <div class="gr-tipo__icon"><span class="icon-placeholder" data-icon="detallado"></span></div>
                 <div>
                     <div class="gr-tipo__title">Reporte Detallado</div>
                     <div class="gr-tipo__desc">Reporte completo para cliente/auditoría: incluye tabla de todos los seguimientos.</div>
                 </div>
             </div>
             <div class="gr-tipo" data-tipo="individual" onclick="seleccionarTipoReporte('individual', this)">
-                <div class="gr-tipo__icon"><i class="bi bi-person-vcard"></i></div>
+                <div class="gr-tipo__icon"><span class="icon-placeholder" data-icon="individual"></span></div>
                 <div>
                     <div class="gr-tipo__title">Reporte Individual</div>
                     <div class="gr-tipo__desc">Historial completo de una trabajadora específica.</div>
@@ -725,7 +751,7 @@
         <!-- ═══════════ FILTROS ═══════════ -->
         <section class="gr-filtros">
             <div class="gr-filtros__title">
-                <i class="bi bi-funnel"></i> Filtros
+                <span class="icon-placeholder" id="kair-gr-filter-icon"></span> Filtros
             </div>
             <div class="gr-filtros__grid">
                 <div class="gr-field">
@@ -767,7 +793,7 @@
         <!-- ═══════════ SELECTOR DE GESTANTE (solo Individual) ═══════════ -->
         <section class="gr-filtros" id="grGestanteField" style="display:none;">
             <div class="gr-filtros__title">
-                <i class="bi bi-person"></i> Trabajadora
+                <span class="icon-placeholder" id="kair-gr-user-icon"></span> Trabajadora
             </div>
             <div class="gr-filtros__grid" style="grid-template-columns: 1fr;">
                 <div class="gr-field">
@@ -791,6 +817,30 @@
 
 <!-- 📦472 — Chart.js v4 vía CDN (jsdelivr) — visualizaciones de los reportes -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<!-- 📦481-iconos — SVGs inline al estilo del calendario (KairCalendar) -->
+<script>
+    // SVGs copiados del mismo estilo de shared/kair-calendar.js
+    const SVG_CHEVRON_LEFT  = '<svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>';
+    const SVG_CHEVRON_RIGHT = '<svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>';
+    const SVG_REPORT       = '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>';
+    const SVG_GRID          = '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>';
+    const SVG_PRINTER       = '<svg viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>';
+    const SVG_CHECK         = '<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>';
+    const SVG_REFRESH       = '<svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>';
+    const SVG_ALERT         = '<svg viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+    const SVG_CLIPBOARD     = '<svg viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>';
+    const SVG_DOCUMENT      = '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>';
+    const SVG_USER          = '<svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
+    const SVG_FILTER        = '<svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>';
+    const SVG_HEART         = '<svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
+    // Función helper para inyectar el icono según el estado
+    window._iconSync = function(state) {
+        if (state === 'saving') return '<span class="icon-placeholder">' + SVG_REFRESH + '</span>';
+        if (state === 'error') return '<span class="icon-placeholder">' + SVG_ALERT + '</span>';
+        return '<span class="icon-placeholder">' + SVG_CHECK + '</span>';
+    };
+</script>
+
 <script src="gestacion-reportes.js"></script>
 </body>
 </html>
