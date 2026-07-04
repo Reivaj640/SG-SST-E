@@ -420,6 +420,20 @@
                                 '<label class="ng-field__label">Cargo</label>' +
                                 '<input type="text" class="ng-field__input" id="ngCargo" maxlength="100" placeholder="Ej: Auxiliar administrativa" />' +
                             '</div>' +
+                            // 📦470 — Nuevos campos autollenados desde BD de personal (Reportes)
+                            '<div class="ng-field">' +
+                                '<label class="ng-field__label">Área / Departamento</label>' +
+                                '<input type="text" class="ng-field__input" id="ngArea" maxlength="80" placeholder="Ej: Finanzas" />' +
+                                '<div class="ng-field__hint">Se autollena al tabular la cédula</div>' +
+                            '</div>' +
+                            '<div class="ng-field">' +
+                                '<label class="ng-field__label">Empresa</label>' +
+                                '<input type="text" class="ng-field__input" id="ngEmpresaNombre" maxlength="100" placeholder="Ej: ASEL S.A.S." />' +
+                            '</div>' +
+                            '<div class="ng-field">' +
+                                '<label class="ng-field__label">Cliente</label>' +
+                                '<input type="text" class="ng-field__input" id="ngEmpresaCliente" maxlength="100" placeholder="(Si presta servicios a un cliente)" />' +
+                            '</div>' +
                             '<div class="ng-field">' +
                                 '<label class="ng-field__label">EPS</label>' +
                                 '<input type="text" class="ng-field__input" id="ngEps" maxlength="60" placeholder="Ej: Sura" />' +
@@ -493,6 +507,10 @@
         var cargoEl = document.getElementById('ngCargo');
         var epsEl = document.getElementById('ngEps');
         var arlEl = document.getElementById('ngArl');
+        // 📦470 — Nuevos campos para Reportes (autollenado desde BD de personal)
+        var areaEl = document.getElementById('ngArea');
+        var empresaNombreEl = document.getElementById('ngEmpresaNombre');
+        var empresaClienteEl = document.getElementById('ngEmpresaCliente');
 
         // Hint visual mientras se busca
         if (nombreEl) nombreEl.placeholder = 'Buscando en BD de personal...';
@@ -505,6 +523,10 @@
                 if (cargoEl) cargoEl.value = d.cargo || '';
                 if (epsEl) epsEl.value = d.entidad || '';
                 if (arlEl) arlEl.value = d.arl || '';
+                // 📦470 — Capturar también área, empresa empleadora y cliente (si aplica)
+                if (areaEl) areaEl.value = d.area || '';
+                if (empresaNombreEl) empresaNombreEl.value = d.empresa || '';
+                if (empresaClienteEl) empresaClienteEl.value = d.empresa_usuaria || '';
                 _mostrarToast('success', 'Datos autollenados',
                     (d.nombre ? d.nombre : 'Trabajadora') + ' · ' + (d.cargo || 'cargo N/D'));
             } else {
@@ -513,6 +535,9 @@
                 if (cargoEl) cargoEl.value = '';
                 if (epsEl) epsEl.value = '';
                 if (arlEl) arlEl.value = '';
+                if (areaEl) areaEl.value = '';
+                if (empresaNombreEl) empresaNombreEl.value = '';
+                if (empresaClienteEl) empresaClienteEl.value = '';
                 _mostrarToast('warning', 'No encontrada',
                     'Cédula ' + cedula + ' no existe en BD de personal. Diligencia manualmente.');
             }
@@ -545,6 +570,10 @@
             cedula: cedula,
             nombre: nombre,
             cargo: document.getElementById('ngCargo').value.trim(),
+            // 📦470 — Datos extendidos para Reportes (autollenados o manuales)
+            area: document.getElementById('ngArea').value.trim(),
+            empresaNombre: document.getElementById('ngEmpresaNombre').value.trim(),
+            empresaCliente: document.getElementById('ngEmpresaCliente').value.trim(),
             fechaNotificacion: document.getElementById('ngFechaNotificacion').value,
             fpp: document.getElementById('ngFpp').value,
             semanasGestacion: parseInt(document.getElementById('ngSemanas').value || '0', 10),

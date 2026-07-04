@@ -388,19 +388,25 @@ function _handlerRegistrarGestante(empresaId, data) {
 
         var now = new Date().toISOString();
         var id = _newGestacionId();
+        // 📦470 — Persistir también area, empresa_nombre, empresa_cliente (autollenados
+        // desde la BD de personal o ingresados manualmente).
         db.prepare(`
             INSERT INTO gestaciones (
                 id, empresa_id, cedula, nombre, cargo,
+                area, empresa_nombre, empresa_cliente,
                 fecha_notificacion, fpp, semanas_gestacion,
                 clasificacion, estado, eps, arl,
                 observaciones, creado_en, actualizado_en
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
             id,
             empresaId,
             String(data.cedula).trim(),
             String(data.nombre).trim(),
             data.cargo || '',
+            data.area || '',
+            data.empresaNombre || data.empresa_nombre || '',
+            data.empresaCliente || data.empresa_cliente || '',
             data.fechaNotificacion,
             data.fpp,
             data.semanasGestacion || 0,
