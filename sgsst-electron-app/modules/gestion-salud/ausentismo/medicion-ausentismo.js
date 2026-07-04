@@ -8085,6 +8085,127 @@ class MedicionAusentismoComponent {
             document.head.appendChild(styleEl);
         }
 
+        // ================================================================
+        // 📦482 — CSS EXTENDED STATS (16 métricas, 3 tabs)
+        // ================================================================
+        if (!document.getElementById('extended-stats-css')) {
+            const styleEl2 = document.createElement('style');
+            styleEl2.id = 'extended-stats-css';
+            styleEl2.textContent = `
+      .extended-stats-container { margin-top: 1.5rem; }
+      .extended-stats-container .es-loading { padding: 2rem; text-align: center; color: #6c757d; font-size: 0.9375rem; }
+      .extended-stats-container .es-empty { padding: 2rem; text-align: center; color: #6c757d; font-size: 0.9375rem; }
+      .es-tabs-header { background: #fff; border: 1px solid #dee2e6; border-radius: 0.625rem 0.625rem 0 0; padding: 1rem 1.25rem; border-bottom: none; }
+      .es-tabs-title { margin: 0 0 0.875rem 0; font-size: 1.0625rem; font-weight: 600; color: #1a1a2e; display: flex; align-items: center; gap: 0.5rem; }
+      .es-tabs-title i { color: #174ea6; }
+      .es-tabs-badge { background: #e8f0fe; color: #174ea6; font-size: 0.75rem; font-weight: 600; padding: 0.1875rem 0.625rem; border-radius: 999px; margin-left: auto; }
+      .es-tabs-nav { display: flex; gap: 0.375rem; flex-wrap: wrap; }
+      .es-tab-btn { padding: 0.5rem 0.875rem; border: 1px solid #dee2e6; background: #f8f9fa; color: #495057; border-radius: 0.4375rem; font-size: 0.8125rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4375rem; transition: all 0.15s ease; }
+      .es-tab-btn:hover { background: #e9ecef; border-color: #adb5bd; }
+      .es-tab-btn.active { background: #174ea6; border-color: #174ea6; color: #fff; box-shadow: 0 1px 3px rgba(23,78,166,0.25); }
+      .es-tabs-body { background: #fff; border: 1px solid #dee2e6; border-top: none; border-radius: 0 0 0.625rem 0.625rem; padding: 1.25rem; }
+      .es-tab-panel { display: none; animation: esFadeIn 0.2s ease-out; }
+      .es-tab-panel.active { display: block; }
+      @keyframes esFadeIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
+
+      /* Tier 1 — KPI Regulatorios */
+      .es-reg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.875rem; margin-bottom: 1.25rem; }
+      .es-reg-card { display: flex; align-items: flex-start; gap: 0.875rem; padding: 1rem; background: #fafbfc; border: 1px solid #e9ecef; border-radius: 0.5rem; transition: border-color 0.15s ease; }
+      .es-reg-card:hover { border-color: #174ea6; }
+      .es-reg-card__icon { width: 44px; height: 44px; border-radius: 0.5rem; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; flex-shrink: 0; }
+      .es-reg-card__icon.primary { background: #e8f0fe; color: #174ea6; }
+      .es-reg-card__icon.warning { background: #fff3cd; color: #856404; }
+      .es-reg-card__icon.danger { background: #f8d7da; color: #721c24; }
+      .es-reg-card__icon.muted { background: #f0f2f5; color: #6c757d; }
+      .es-reg-card__data { display: flex; flex-direction: column; min-width: 0; }
+      .es-reg-card__label { font-size: 0.75rem; font-weight: 600; color: #6c757d; text-transform: uppercase; letter-spacing: 0.025em; margin-bottom: 0.1875rem; }
+      .es-reg-card__value { font-size: 1.625rem; font-weight: 700; color: #1a1a2e; line-height: 1.15; margin-bottom: 0.25rem; }
+      .es-reg-card__sub { font-size: 0.6875rem; color: #6c757d; line-height: 1.35; }
+
+      /* Comparativa YoY */
+      .es-yoy { background: #fafbfc; border: 1px solid #e9ecef; border-radius: 0.5rem; padding: 1rem 1.25rem; }
+      .es-yoy__title { margin: 0 0 0.75rem 0; font-size: 0.9375rem; font-weight: 600; color: #1a1a2e; display: flex; align-items: center; gap: 0.5rem; }
+      .es-yoy__years { font-size: 0.75rem; color: #174ea6; background: #e8f0fe; padding: 0.125rem 0.5rem; border-radius: 999px; font-weight: 600; }
+      .es-yoy__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+      .es-yoy__cell { display: flex; flex-direction: column; gap: 0.125rem; }
+      .es-yoy__label { font-size: 0.6875rem; color: #6c757d; font-weight: 500; }
+      .es-yoy__current { font-size: 1.5rem; font-weight: 700; color: #1a1a2e; line-height: 1.2; }
+      .es-yoy__prev { font-size: 0.75rem; color: #6c757d; }
+      .es-var { font-size: 0.8125rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.125rem 0.5rem; border-radius: 0.375rem; margin-top: 0.25rem; width: fit-content; }
+      .es-var.up { background: #f8d7da; color: #721c24; }
+      .es-var.down { background: #d4edda; color: #155724; }
+      .es-var.neutral { background: #e9ecef; color: #6c757d; }
+      .es-yoy__empty { margin: 0; padding: 0.5rem; font-size: 0.8125rem; color: #6c757d; text-align: center; }
+
+      /* Tier 3 — Distribuciones */
+      .es-dist-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 0.875rem; margin-bottom: 0.875rem; }
+      .es-dist-grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 0.875rem; margin-bottom: 0.875rem; }
+      .es-dist-card { background: #fafbfc; border: 1px solid #e9ecef; border-radius: 0.5rem; padding: 1rem; }
+      .es-dist-card__head { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; padding-bottom: 0.625rem; border-bottom: 1px solid #e9ecef; }
+      .es-dist-card__head i { color: #174ea6; font-size: 1rem; }
+      .es-dist-card__head h4 { margin: 0; font-size: 0.875rem; font-weight: 600; color: #1a1a2e; flex: 1; }
+      .es-dist-card__total { font-size: 0.6875rem; color: #6c757d; font-weight: 500; }
+      .es-dist-card__body { display: flex; flex-direction: column; gap: 0.5rem; }
+      .es-bar-row { display: grid; grid-template-columns: 130px 1fr 60px; align-items: center; gap: 0.625rem; }
+      .es-bar-row__label { font-size: 0.8125rem; color: #1a1a2e; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+      .es-bar-row__label i { color: #6c757d; margin-right: 0.1875rem; }
+      .es-bar-track { height: 0.625rem; background: #e9ecef; border-radius: 999px; overflow: hidden; }
+      .es-bar-fill { height: 100%; background: linear-gradient(90deg, #174ea6 0%, #4285f4 100%); border-radius: 999px; transition: width 0.3s ease; min-width: 2px; }
+      .es-bar-fill--duration { background: linear-gradient(90deg, #6f42c1 0%, #d63384 100%); }
+      .es-bar-fill--gender.es-bar-fill--femenino { background: linear-gradient(90deg, #d63384 0%, #f06292 100%); }
+      .es-bar-fill--gender.es-bar-fill--masculino { background: linear-gradient(90deg, #174ea6 0%, #4285f4 100%); }
+      .es-bar-fill--gender.es-bar-fill--otro { background: linear-gradient(90deg, #6c757d 0%, #adb5bd 100%); }
+      .es-bar-row__count { font-size: 0.8125rem; font-weight: 600; color: #1a1a2e; text-align: right; }
+      .es-bar-row__count small { font-weight: 400; color: #6c757d; }
+
+      /* Heatmap */
+      .es-dist-card--heatmap { margin-top: 0; }
+      .es-heatmap-container { overflow-x: auto; }
+      .es-heatmap-table { width: 100%; border-collapse: separate; border-spacing: 2px; font-size: 0.75rem; }
+      .es-heatmap-th { font-weight: 600; color: #495057; padding: 0.375rem 0.25rem; text-align: center; background: #f8f9fa; border-radius: 0.25rem; font-size: 0.6875rem; }
+      .es-heatmap-cell { text-align: center; padding: 0.5rem 0.25rem; border-radius: 0.25rem; font-weight: 600; min-width: 36px; transition: transform 0.15s ease; }
+      .es-heatmap-cell:hover { transform: scale(1.05); box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 1; position: relative; }
+      .es-heatmap-legend { display: flex; align-items: center; gap: 0.25rem; justify-content: center; margin-top: 0.75rem; font-size: 0.6875rem; color: #6c757d; }
+      .es-heatmap-legend__swatch { width: 18px; height: 12px; border-radius: 0.1875rem; }
+
+      /* Tier 2 — Rankings */
+      .es-rank-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.875rem; margin-bottom: 1.25rem; }
+      .es-rank-summary__cell { display: flex; align-items: flex-start; gap: 0.75rem; padding: 1rem; background: linear-gradient(135deg, #f8f9fa 0%, #e8f0fe 100%); border: 1px solid #d6e3fc; border-radius: 0.5rem; }
+      .es-rank-summary__cell > i { font-size: 1.5rem; color: #174ea6; margin-top: 0.125rem; }
+      .es-rank-summary__value { display: block; font-size: 1.75rem; font-weight: 700; color: #1a1a2e; line-height: 1.1; }
+      .es-rank-summary__label { display: block; font-size: 0.8125rem; color: #174ea6; font-weight: 600; margin-top: 0.1875rem; }
+      .es-rank-summary__sub { display: block; font-size: 0.6875rem; color: #6c757d; margin-top: 0.125rem; }
+      .es-rank-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.875rem; }
+      .es-rank-card { background: #fafbfc; border: 1px solid #e9ecef; border-radius: 0.5rem; padding: 1rem; overflow: hidden; }
+      .es-rank-card--full { grid-column: 1 / -1; }
+      .es-rank-card h4 { margin: 0 0 0.75rem 0; font-size: 0.875rem; font-weight: 600; color: #1a1a2e; display: flex; align-items: center; gap: 0.4375rem; padding-bottom: 0.5rem; border-bottom: 1px solid #e9ecef; }
+      .es-rank-card h4 i { color: #174ea6; }
+      .es-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+      .es-table th { text-align: left; padding: 0.4375rem 0.625rem; background: #f1f3f5; color: #495057; font-weight: 600; font-size: 0.75rem; border-bottom: 1px solid #dee2e6; }
+      .es-table td { padding: 0.5rem 0.625rem; border-bottom: 1px solid #f1f3f5; color: #1a1a2e; vertical-align: middle; }
+      .es-table tbody tr:hover { background: #f8f9fa; }
+      .es-td-idx { width: 36px; color: #6c757d; font-weight: 600; }
+      .es-td-center { text-align: center; }
+      .es-td-strong { font-weight: 700; color: #174ea6; }
+      .es-td-muted { color: #6c757d; font-size: 0.75rem; }
+      .es-trab-name { font-weight: 600; color: #1a1a2e; font-size: 0.8125rem; }
+      .es-trab-meta { font-size: 0.6875rem; color: #6c757d; margin-top: 0.125rem; }
+      .es-empty-row { text-align: center; color: #6c757d; padding: 1rem; font-size: 0.8125rem; margin: 0; }
+      .es-badge { display: inline-block; padding: 0.125rem 0.5rem; border-radius: 999px; font-size: 0.6875rem; font-weight: 600; }
+      .es-badge--danger { background: #f8d7da; color: #721c24; }
+      .es-badge--warning { background: #fff3cd; color: #856404; }
+
+      /* Responsive */
+      @media (max-width: 768px) {
+        .es-rank-grid { grid-template-columns: 1fr; }
+        .es-bar-row { grid-template-columns: 90px 1fr 50px; }
+        .es-tabs-nav { gap: 0.25rem; }
+        .es-tab-btn { font-size: 0.75rem; padding: 0.4375rem 0.625rem; }
+      }
+      `;
+            document.head.appendChild(styleEl2);
+        }
+
         // Contenedor wrapper con scroll condicional
         const scrollWrapper = document.createElement('div');
         scrollWrapper.id = 'estadisticas-ausentismo-scroll-wrapper';
@@ -8327,6 +8448,23 @@ class MedicionAusentismoComponent {
     });
 
     mainContent.appendChild(chartsGrid);
+
+    // ================================================================
+    // 📦482 — STATS EXTENDIDAS (16 métricas) — Container con tabs
+    // Tier 1: Indicadores regulatorios
+    // Tier 2: Rankings y casos críticos
+    // Tier 3: Distribuciones avanzadas
+    // ================================================================
+    const extendedStatsContainer = document.createElement('div');
+    extendedStatsContainer.id = 'extendedStatsContainer';
+    extendedStatsContainer.className = 'extended-stats-container';
+    extendedStatsContainer.innerHTML = `
+      <div class="es-loading">
+        <i class="bi bi-hourglass-split"></i> Calculando estadísticas extendidas…
+      </div>
+    `;
+    mainContent.appendChild(extendedStatsContainer);
+
     scrollWrapper.appendChild(mainContent);
     container.appendChild(scrollWrapper);
 
@@ -8418,6 +8556,11 @@ class MedicionAusentismoComponent {
                 this.updateStatsMetrics(data);
                 this.renderCharts(data);
 
+                // 📦482 — Calcular 16 métricas extendidas (Tier 1+2+3)
+                this.currentAusentismoStatsExtended = this._calcularEstadisticasExtendidas(data);
+                // Re-renderizar vista para mostrar tabs (la primera vez)
+                this._renderEstadisticasTabs();
+
                 // Actualizar filtros dinámicos
                 this.populateStatsFilters(data);
             } else if (result && result._missingFile) {
@@ -8452,6 +8595,775 @@ class MedicionAusentismoComponent {
             this.showNotification(`Error: ${error.message}`, 'error');
         }
     }
+
+    /**
+     * 📦482 — Calcula las 16 métricas extendidas (Tier 1+2+3).
+     * A partir del array de filas crudo (objetos con headers como keys),
+     * devuelve un objeto con: kpisBasicos, kpisRegulatorios, distribuciones,
+     * rankings, casosCriticos, metadata.
+     *
+     * @param {Array<Object>} data - Filas del Excel de ausentismo
+     * @returns {Object} Objeto con todas las métricas calculadas
+     */
+    _calcularEstadisticasExtendidas(data) {
+        if (!data || data.length === 0) {
+            return this._estructuraVaciaExtendida();
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        // HELPERS LOCALES
+        // ════════════════════════════════════════════════════════════════
+        const norm = s => (s == null ? '' : String(s).trim());
+        const upper = s => norm(s).toUpperCase();
+        const num = v => {
+            if (v == null || v === '') return 0;
+            const n = parseFloat(String(v).replace(/[^\d.-]/g, ''));
+            return isNaN(n) ? 0 : n;
+        };
+
+        const getCol = (row, ...candidates) => {
+            for (const c of candidates) {
+                if (row[c] != null && row[c] !== '') return row[c];
+            }
+            return null;
+        };
+
+        // ════════════════════════════════════════════════════════════════
+        // MÉTRICAS BASE (ya existentes, replicadas para no tocar código viejo)
+        // ════════════════════════════════════════════════════════════════
+        const totalFilas = data.length;
+        const totalDias = data.reduce((s, r) => s + num(getCol(r, 'N° DIAS DE INCAPACIDAD', 'Nº DIAS DE INCAPACIDAD', 'N° DIAS', 'DIAS')), 0);
+        const totalEPS = data.filter(r => upper(getCol(r, 'CLASE DE INCAPACIDAD')) === 'EPS').length;
+        const totalARL = data.filter(r => upper(getCol(r, 'CLASE DE INCAPACIDAD')) === 'ARL').length;
+        const totalLicencias = data.filter(r => upper(getCol(r, 'CLASE DE INCAPACIDAD')).includes('LICENCIA')).length;
+        const femenino = data.filter(r => upper(getCol(r, 'GENERO')) === 'FEMENINO').length;
+        const masculino = data.filter(r => upper(getCol(r, 'GENERO')) === 'MASCULINO').length;
+
+        // ════════════════════════════════════════════════════════════════
+        // TRABAJADORES ÚNICOS (cedula) — base para tasas
+        // ════════════════════════════════════════════════════════════════
+        const cedulasUnicas = new Set();
+        data.forEach(r => {
+            const c = norm(getCol(r, 'CEDULA', 'CÉDULA', '4', 'Columna1'));
+            if (c) cedulasUnicas.add(c);
+        });
+        const totalTrabajadores = cedulasUnicas.size;
+
+        // ════════════════════════════════════════════════════════════════
+        // TIER 1 — INDICADORES REGULATORIOS (Decreto 1072/2015, Res. 0312/2019)
+        // ════════════════════════════════════════════════════════════════
+        // Tasa de Ausentismo = (días perdidos / días programados) × 100
+        // Aproximación: 250 días laborables/año por trabajador
+        const diasProgramados = totalTrabajadores * 250;
+        const tasaAusentismo = diasProgramados > 0
+            ? Math.round((totalDias / diasProgramados) * 100 * 10) / 10
+            : 0;
+
+        // Índice de Frecuencia (IF) = (# accidentes / # trabajadores) × 100
+        const indiceFrecuencia = totalTrabajadores > 0
+            ? Math.round((totalARL / totalTrabajadores) * 100 * 10) / 10
+            : 0;
+
+        // Índice de Severidad (IS) = (días perdidos / # trabajadores) × 100
+        const indiceSeveridad = totalTrabajadores > 0
+            ? Math.round((totalDias / totalTrabajadores) * 100 * 10) / 10
+            : 0;
+
+        // Tasa de Accidentalidad = (# AT / # trabajadores) × 100
+        const tasaAccidentalidad = totalTrabajadores > 0
+            ? Math.round((totalARL / totalTrabajadores) * 100 * 10) / 10
+            : 0;
+
+        // Comparativa YoY (vs año anterior)
+        const aniosSet = new Set();
+        data.forEach(r => {
+            const a = norm(getCol(r, 'AÑO', 'ANO'));
+            if (a && a !== '-') aniosSet.add(a);
+        });
+        const anios = Array.from(aniosSet).sort();
+        const anioActual = anios[anios.length - 1];
+        const anioAnterior = anios[anios.length - 2];
+        let comparativaYoY = null;
+        if (anioActual && anioAnterior) {
+            const dataActual = data.filter(r => norm(getCol(r, 'AÑO', 'ANO')) === anioActual);
+            const dataAnterior = data.filter(r => norm(getCol(r, 'AÑO', 'ANO')) === anioAnterior);
+            const diasActual = dataActual.reduce((s, r) => s + num(getCol(r, 'N° DIAS DE INCAPACIDAD', 'DIAS')), 0);
+            const diasAnterior = dataAnterior.reduce((s, r) => s + num(getCol(r, 'N° DIAS DE INCAPACIDAD', 'DIAS')), 0);
+            const casosActual = dataActual.length;
+            const casosAnterior = dataAnterior.length;
+            comparativaYoY = {
+                anioActual, anioAnterior,
+                diasActual, diasAnterior,
+                casosActual, casosAnterior,
+                variacionDias: diasAnterior > 0 ? Math.round(((diasActual - diasAnterior) / diasAnterior) * 100 * 10) / 10 : 0,
+                variacionCasos: casosAnterior > 0 ? Math.round(((casosActual - casosAnterior) / casosAnterior) * 100 * 10) / 10 : 0
+            };
+        }
+
+        const kpisRegulatorios = {
+            tasaAusentismo,
+            indiceFrecuencia,
+            indiceSeveridad,
+            tasaAccidentalidad,
+            comparativaYoY,
+            diasProgramados,
+            trabajadores: totalTrabajadores
+        };
+
+        // ════════════════════════════════════════════════════════════════
+        // TIER 3 — DISTRIBUCIONES
+        // ════════════════════════════════════════════════════════════════
+        // Por Área
+        const porArea = {};
+        data.forEach(r => {
+            const a = norm(getCol(r, 'ÁREA O DPTO', 'AREA O DPTO', 'DEPARTAMENTO', 'AREA'));
+            if (a) porArea[a] = (porArea[a] || 0) + 1;
+        });
+
+        // Por Empresa Usuaria (cliente)
+        const porEmpresaUsuaria = {};
+        data.forEach(r => {
+            const e = norm(getCol(r, 'EMPRESA USUARIA'));
+            if (e) porEmpresaUsuaria[e] = (porEmpresaUsuaria[e] || 0) + 1;
+        });
+
+        // Por EPS
+        const porEPS = {};
+        data.forEach(r => {
+            const e = norm(getCol(r, 'ENTIDAD', 'EPS'));
+            if (e) porEPS[e] = (porEPS[e] || 0) + 1;
+        });
+
+        // Por Tipo de incapacidad (descripción del diagnóstico CIE-10)
+        const porTipo = {};
+        data.forEach(r => {
+            const t = norm(getCol(r, 'TIPO DE INCAPACIDAD'));
+            if (t) porTipo[t] = (porTipo[t] || 0) + 1;
+        });
+
+        // Por rango de duración (1-3, 4-7, 8-15, 16-30, 31+)
+        const porRangoDuracion = { '1-3 días': 0, '4-7 días': 0, '8-15 días': 0, '16-30 días': 0, '31+ días': 0 };
+        data.forEach(r => {
+            const d = num(getCol(r, 'N° DIAS DE INCAPACIDAD', 'DIAS'));
+            if (d <= 3) porRangoDuracion['1-3 días']++;
+            else if (d <= 7) porRangoDuracion['4-7 días']++;
+            else if (d <= 15) porRangoDuracion['8-15 días']++;
+            else if (d <= 30) porRangoDuracion['16-30 días']++;
+            else porRangoDuracion['31+ días']++;
+        });
+
+        // Distribución por género
+        const porGenero = { Femenino: femenino, Masculino: masculino, Otro: totalFilas - femenino - masculino };
+
+        // Heatmap día de semana vs mes (filas = días L-V, cols = meses)
+        const heatmapDiaSemana = {
+            labelsDias: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie'],
+            labelsMeses: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
+            data: Array.from({ length: 5 }, () => new Array(12).fill(0))
+        };
+        const monthNames = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+        data.forEach(r => {
+            const mes = upper(getCol(r, 'MES'));
+            const mi = monthNames.indexOf(mes);
+            const fiStr = norm(getCol(r, 'F. INICIO'));
+            if (mi >= 0 && fiStr) {
+                let di = 0;
+                try {
+                    // Formato puede ser "7/2/24" o ISO
+                    let fecha;
+                    if (/^\d{4}-\d{2}-\d{2}/.test(fiStr)) {
+                        fecha = new Date(fiStr);
+                    } else {
+                        const parts = fiStr.split('/');
+                        if (parts.length === 3) {
+                            fecha = new Date(parseInt(parts[2]) + 2000, parseInt(parts[1]) - 1, parseInt(parts[0]));
+                        }
+                    }
+                    if (fecha && !isNaN(fecha.getTime())) {
+                        const dow = fecha.getDay(); // 0=Dom, 1=Lun, ..., 5=Vie, 6=Sab
+                        di = dow >= 1 && dow <= 5 ? dow - 1 : -1;
+                    }
+                } catch (e) { /* ignore */ }
+                if (di >= 0) heatmapDiaSemana.data[di][mi]++;
+            }
+        });
+
+        // Top 5 áreas / empresa usuaria / EPS
+        const top5 = map => Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 5)
+            .map(([k, v]) => ({ label: k, count: v }));
+        const distribuciones = {
+            porArea: top5(porArea),
+            porAreaTotal: Object.keys(porArea).length,
+            porEmpresaUsuaria: top5(porEmpresaUsuaria),
+            porEmpresaUsuariaTotal: Object.keys(porEmpresaUsuaria).length,
+            porEPS: top5(porEPS),
+            porEPSTotal: Object.keys(porEPS).length,
+            porTipo: top5(porTipo),
+            porTipoTotal: Object.keys(porTipo).length,
+            porRangoDuracion,
+            porGenero,
+            heatmapDiaSemana
+        };
+
+        // ════════════════════════════════════════════════════════════════
+        // TIER 2 — RANKINGS Y CASOS CRÍTICOS
+        // ════════════════════════════════════════════════════════════════
+        // Por trabajador (cedula → stats agregadas)
+        const porTrabajador = {};
+        data.forEach(r => {
+            const ced = norm(getCol(r, 'CEDULA', 'CÉDULA', 'Columna1'));
+            const nombre = norm(getCol(r, 'NOMBRE'));
+            if (!ced && !nombre) return;
+            const key = ced || nombre;
+            if (!porTrabajador[key]) {
+                porTrabajador[key] = {
+                    cedula: ced,
+                    nombre: nombre,
+                    cargo: norm(getCol(r, 'CARGO')),
+                    area: norm(getCol(r, 'ÁREA O DPTO', 'AREA')),
+                    genero: upper(getCol(r, 'GENERO')),
+                    totalIncapacidades: 0,
+                    totalDias: 0,
+                    ultimaIncapacidad: ''
+                };
+            }
+            porTrabajador[key].totalIncapacidades++;
+            porTrabajador[key].totalDias += num(getCol(r, 'N° DIAS DE INCAPACIDAD', 'DIAS'));
+            const fi = norm(getCol(r, 'F. INICIO'));
+            if (fi && fi > porTrabajador[key].ultimaIncapacidad) porTrabajador[key].ultimaIncapacidad = fi;
+        });
+
+        const trabajadoresArr = Object.values(porTrabajador);
+
+        // Top 10 por días perdidos
+        const top10Dias = trabajadoresArr
+            .sort((a, b) => b.totalDias - a.totalDias)
+            .slice(0, 10);
+
+        // Top 10 por cantidad de incapacidades
+        const top10Casos = trabajadoresArr
+            .sort((a, b) => b.totalIncapacidades - a.totalIncapacidades)
+            .slice(0, 10);
+
+        // Tasa de re-incidencia (% con >1 incapacidad)
+        const reincidentes = trabajadoresArr.filter(t => t.totalIncapacidades > 1).length;
+        const tasaReincidencia = totalTrabajadores > 0
+            ? Math.round((reincidentes / totalTrabajadores) * 100 * 10) / 10
+            : 0;
+
+        // Top 10 diagnósticos CIE-10
+        const cie10Map = {};
+        data.forEach(r => {
+            const codigo = norm(getCol(r, 'CODIGO'));
+            const desc = norm(getCol(r, 'DESCRIPCION'));
+            if (!codigo && !desc) return;
+            const key = codigo || desc;
+            if (!cie10Map[key]) cie10Map[key] = { codigo, descripcion: desc, count: 0, dias: 0 };
+            cie10Map[key].count++;
+            cie10Map[key].dias += num(getCol(r, 'N° DIAS DE INCAPACIDAD', 'DIAS'));
+        });
+        const top10CIE10 = Object.values(cie10Map)
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 10);
+
+        const rankings = {
+            top10Dias,
+            top10Casos,
+            top10CIE10,
+            tasaReincidencia,
+            totalReincidentes: reincidentes
+        };
+
+        // ════════════════════════════════════════════════════════════════
+        // CASOS CRÍTICOS
+        // ════════════════════════════════════════════════════════════════
+        // Críticos = incapacidades >15 días (sin importar el tipo)
+        const casosCriticosList = data
+            .filter(r => num(getCol(r, 'N° DIAS DE INCAPACIDAD', 'DIAS')) > 15)
+            .map(r => ({
+                cedula: norm(getCol(r, 'CEDULA', 'Columna1')),
+                nombre: norm(getCol(r, 'NOMBRE')),
+                cargo: norm(getCol(r, 'CARGO')),
+                dias: num(getCol(r, 'N° DIAS DE INCAPACIDAD', 'DIAS')),
+                clase: upper(getCol(r, 'CLASE DE INCAPACIDAD')),
+                tipo: norm(getCol(r, 'TIPO DE INCAPACIDAD')),
+                diagnostico: norm(getCol(r, 'DESCRIPCION')),
+                fechaInicio: norm(getCol(r, 'F. INICIO')),
+                fechaFin: norm(getCol(r, 'F. FIN')),
+                eps: norm(getCol(r, 'ENTIDAD'))
+            }))
+            .sort((a, b) => b.dias - a.dias);
+
+        // Sospechosos de abuso: >5 incapacidades en el año de duración <3 días cada una
+        const sospechososMap = {};
+        data.forEach(r => {
+            const dias = num(getCol(r, 'N° DIAS DE INCAPACIDAD', 'DIAS'));
+            if (dias > 0 && dias < 3) {
+                const ced = norm(getCol(r, 'CEDULA', 'Columna1'));
+                if (ced) sospechososMap[ced] = (sospechososMap[ced] || 0) + 1;
+            }
+        });
+        const sospechososAbuso = Object.entries(sospechososMap)
+            .filter(([_, count]) => count > 5)
+            .map(([ced, count]) => {
+                const t = porTrabajador[ced] || {};
+                return { cedula: ced, nombre: t.nombre || '(sin nombre)', count, cargo: t.cargo || '', area: t.area || '' };
+            })
+            .sort((a, b) => b.count - a.count);
+
+        const casosCriticos = {
+            activos: casosCriticosList,
+            total: casosCriticosList.length,
+            sospechososAbuso,
+            totalSospechosos: sospechososAbuso.length
+        };
+
+        // ════════════════════════════════════════════════════════════════
+        // METADATA
+        // ════════════════════════════════════════════════════════════════
+        const metadata = {
+            totalFilas,
+            totalDias,
+            totalTrabajadores,
+            totalARL,
+            totalEPS,
+            totalLicencias,
+            femenino,
+            masculino,
+            otro: totalFilas - femenino - masculino,
+            anios,
+            anioActual,
+            anioAnterior,
+            fechaGeneracion: new Date().toISOString()
+        };
+
+        return {
+            kpis: { totalIncapacidades: totalFilas, totalDias, totalEPS, totalARL, totalLicencias, femenino, masculino },
+            kpisRegulatorios,
+            distribuciones,
+            rankings,
+            casosCriticos,
+            metadata
+        };
+    }
+
+    _estructuraVaciaExtendida() {
+        return {
+            kpis: { totalIncapacidades: 0, totalDias: 0, totalEPS: 0, totalARL: 0, totalLicencias: 0, femenino: 0, masculino: 0 },
+            kpisRegulatorios: {
+                tasaAusentismo: 0, indiceFrecuencia: 0, indiceSeveridad: 0,
+                tasaAccidentalidad: 0, comparativaYoY: null,
+                diasProgramados: 0, trabajadores: 0
+            },
+            distribuciones: {
+                porArea: [], porAreaTotal: 0, porEmpresaUsuaria: [], porEmpresaUsuariaTotal: 0,
+                porEPS: [], porEPSTotal: 0, porTipo: [], porTipoTotal: 0,
+                porRangoDuracion: { '1-3 días': 0, '4-7 días': 0, '8-15 días': 0, '16-30 días': 0, '31+ días': 0 },
+                porGenero: { Femenino: 0, Masculino: 0, Otro: 0 },
+                heatmapDiaSemana: {
+                    labelsDias: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie'],
+                    labelsMeses: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
+                    data: Array.from({ length: 5 }, () => new Array(12).fill(0))
+                }
+            },
+            rankings: { top10Dias: [], top10Casos: [], top10CIE10: [], tasaReincidencia: 0, totalReincidentes: 0 },
+            casosCriticos: { activos: [], total: 0, sospechososAbuso: [], totalSospechosos: 0 },
+            metadata: { totalFilas: 0, totalDias: 0, totalTrabajadores: 0, totalARL: 0, totalEPS: 0, totalLicencias: 0, femenino: 0, masculino: 0, otro: 0, anios: [], anioActual: null, anioAnterior: null }
+        };
+    }
+
+    /**
+     * 📦482 — Pinta los 3 tabs de estadísticas extendidas (Indicadores / Distribuciones / Ranking)
+     * Lee de this.currentAusentismoStatsExtended y actualiza #extendedStatsContainer
+     */
+    _renderEstadisticasTabs() {
+        const container = document.getElementById('extendedStatsContainer');
+        if (!container) return;
+        const stats = this.currentAusentismoStatsExtended;
+        if (!stats) {
+            container.innerHTML = `
+              <div class="es-empty">
+                <i class="bi bi-info-circle"></i> No hay datos suficientes para calcular estadísticas extendidas.
+              </div>`;
+            return;
+        }
+
+        const meta = stats.metadata;
+        container.innerHTML = `
+          <div class="es-tabs-header">
+            <h3 class="es-tabs-title">
+              <i class="bi bi-bar-chart-line-fill"></i>
+              Estadísticas Extendidas
+              <span class="es-tabs-badge">${meta.totalFilas} registros</span>
+            </h3>
+            <div class="es-tabs-nav">
+              <button class="es-tab-btn active" data-es-tab="indicadores">
+                <i class="bi bi-speedometer2"></i> Indicadores Regulatorios
+              </button>
+              <button class="es-tab-btn" data-es-tab="distribuciones">
+                <i class="bi bi-pie-chart-fill"></i> Distribuciones
+              </button>
+              <button class="es-tab-btn" data-es-tab="ranking">
+                <i class="bi bi-trophy-fill"></i> Ranking & Críticos
+              </button>
+            </div>
+          </div>
+          <div class="es-tabs-body">
+            <div class="es-tab-panel active" data-es-panel="indicadores">${this._renderTabIndicadores(stats)}</div>
+            <div class="es-tab-panel" data-es-panel="distribuciones">${this._renderTabDistribuciones(stats)}</div>
+            <div class="es-tab-panel" data-es-panel="ranking">${this._renderTabRanking(stats)}</div>
+          </div>
+        `;
+
+        // Bind tab switchers
+        container.querySelectorAll('.es-tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const target = btn.getAttribute('data-es-tab');
+                container.querySelectorAll('.es-tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+                container.querySelectorAll('.es-tab-panel').forEach(p => {
+                    p.classList.toggle('active', p.getAttribute('data-es-panel') === target);
+                });
+            });
+        });
+
+        // Pintar heatmap día-semana en el panel de Distribuciones
+        this._renderHeatmapEnPanel(stats);
+    }
+
+    /** 📦482 — Tab 1: Indicadores Regulatorios (Tier 1) */
+    _renderTabIndicadores(stats) {
+        const k = stats.kpisRegulatorios;
+        const cmp = k.comparativaYoY;
+        const fmtVar = v => {
+            if (v == null || isNaN(v)) return '<span class="es-var neutral">—</span>';
+            const cls = v > 0 ? 'up' : (v < 0 ? 'down' : 'neutral');
+            const icon = v > 0 ? 'bi-arrow-up' : (v < 0 ? 'bi-arrow-down' : 'bi-dash');
+            const sign = v > 0 ? '+' : '';
+            return `<span class="es-var ${cls}"><i class="bi ${icon}"></i> ${sign}${v}%</span>`;
+        };
+        return `
+          <div class="es-reg-grid">
+            <div class="es-reg-card">
+              <div class="es-reg-card__icon primary"><i class="bi bi-percent"></i></div>
+              <div class="es-reg-card__data">
+                <span class="es-reg-card__label">Tasa de Ausentismo</span>
+                <span class="es-reg-card__value">${k.tasaAusentismo}%</span>
+                <span class="es-reg-card__sub">${k.diasProgramados.toLocaleString('es-CO')} días programados (${k.trabajadores} trab × 250)</span>
+              </div>
+            </div>
+            <div class="es-reg-card">
+              <div class="es-reg-card__icon warning"><i class="bi bi-exclamation-octagon"></i></div>
+              <div class="es-reg-card__data">
+                <span class="es-reg-card__label">Índice de Frecuencia (AT)</span>
+                <span class="es-reg-card__value">${k.indiceFrecuencia}%</span>
+                <span class="es-reg-card__sub">${k.indiceFrecuencia > 0 ? 'ARL sobre trabajadores' : 'Sin accidentes reportados'}</span>
+              </div>
+            </div>
+            <div class="es-reg-card">
+              <div class="es-reg-card__icon danger"><i class="bi bi-calendar-x"></i></div>
+              <div class="es-reg-card__data">
+                <span class="es-reg-card__label">Índice de Severidad</span>
+                <span class="es-reg-card__value">${k.indiceSeveridad}%</span>
+                <span class="es-reg-card__sub">Días perdidos / trabajadores × 100</span>
+              </div>
+            </div>
+            <div class="es-reg-card">
+              <div class="es-reg-card__icon muted"><i class="bi bi-shield-exclamation"></i></div>
+              <div class="es-reg-card__data">
+                <span class="es-reg-card__label">Tasa de Accidentalidad</span>
+                <span class="es-reg-card__value">${k.tasaAccidentalidad}%</span>
+                <span class="es-reg-card__sub">ARL como % de la plantilla</span>
+              </div>
+            </div>
+          </div>
+          ${cmp ? `
+          <div class="es-yoy">
+            <h4 class="es-yoy__title">
+              <i class="bi bi-graph-up-arrow"></i> Comparativa año a año
+              <span class="es-yoy__years">${cmp.anioAnterior} → ${cmp.anioActual}</span>
+            </h4>
+            <div class="es-yoy__grid">
+              <div class="es-yoy__cell">
+                <span class="es-yoy__label">Días perdidos</span>
+                <span class="es-yoy__current">${cmp.diasActual.toLocaleString('es-CO')}</span>
+                <span class="es-yoy__prev">vs ${cmp.diasAnterior.toLocaleString('es-CO')}</span>
+                ${fmtVar(cmp.variacionDias)}
+              </div>
+              <div class="es-yoy__cell">
+                <span class="es-yoy__label">Casos reportados</span>
+                <span class="es-yoy__current">${cmp.casosActual.toLocaleString('es-CO')}</span>
+                <span class="es-yoy__prev">vs ${cmp.casosAnterior.toLocaleString('es-CO')}</span>
+                ${fmtVar(cmp.variacionCasos)}
+              </div>
+            </div>
+          </div>` : `
+          <div class="es-yoy">
+            <p class="es-yoy__empty"><i class="bi bi-info-circle"></i> No hay datos de un año anterior para comparar.</p>
+          </div>`}
+        `;
+    }
+
+    /** 📦482 — Tab 2: Distribuciones (Tier 3) */
+    _renderTabDistribuciones(stats) {
+        const d = stats.distribuciones;
+        const renderTopBar = (titulo, items, total, kind) => {
+            if (!items || items.length === 0) return '';
+            const max = Math.max(...items.map(i => i.count));
+            const iconMap = {
+                area: 'bi-diagram-3',
+                empresa: 'bi-building',
+                eps: 'bi-hospital',
+                tipo: 'bi-clipboard2-pulse'
+            };
+            return `
+              <div class="es-dist-card">
+                <div class="es-dist-card__head">
+                  <i class="bi ${iconMap[kind]}"></i>
+                  <h4>${titulo}</h4>
+                  <span class="es-dist-card__total">${total} ${total === 1 ? 'categoría' : 'categorías'}</span>
+                </div>
+                <div class="es-dist-card__body">
+                  ${items.map(item => `
+                    <div class="es-bar-row">
+                      <span class="es-bar-row__label" title="${this._escapeHtml(item.label)}">${this._escapeHtml(item.label)}</span>
+                      <div class="es-bar-track">
+                        <div class="es-bar-fill" style="width: ${(item.count / max * 100).toFixed(1)}%;"></div>
+                      </div>
+                      <span class="es-bar-row__count">${item.count}</span>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            `;
+        };
+        const rango = d.porRangoDuracion;
+        const rangoTotal = Object.values(rango).reduce((a, b) => a + b, 0);
+        const generoTotal = d.porGenero.Femenino + d.porGenero.Masculino + d.porGenero.Otro;
+
+        return `
+          <div class="es-dist-grid">
+            ${renderTopBar('Por Área / Departamento', d.porArea, d.porAreaTotal, 'area')}
+            ${renderTopBar('Por Empresa Usuaria', d.porEmpresaUsuaria, d.porEmpresaUsuariaTotal, 'empresa')}
+            ${renderTopBar('Por EPS / Entidad', d.porEPS, d.porEPSTotal, 'eps')}
+            ${renderTopBar('Por Tipo de Incapacidad', d.porTipo, d.porTipoTotal, 'tipo')}
+          </div>
+
+          <div class="es-dist-grid-2">
+            <div class="es-dist-card">
+              <div class="es-dist-card__head">
+                <i class="bi bi-stopwatch"></i>
+                <h4>Por Rango de Duración</h4>
+                <span class="es-dist-card__total">${rangoTotal} casos</span>
+              </div>
+              <div class="es-dist-card__body">
+                ${Object.entries(rango).map(([k, v]) => {
+                    const pct = rangoTotal > 0 ? (v / rangoTotal * 100).toFixed(1) : 0;
+                    return `
+                      <div class="es-bar-row">
+                        <span class="es-bar-row__label">${k}</span>
+                        <div class="es-bar-track">
+                          <div class="es-bar-fill es-bar-fill--duration" style="width: ${pct}%;"></div>
+                        </div>
+                        <span class="es-bar-row__count">${v} <small>(${pct}%)</small></span>
+                      </div>
+                    `;
+                }).join('')}
+              </div>
+            </div>
+            <div class="es-dist-card">
+              <div class="es-dist-card__head">
+                <i class="bi bi-gender-ambiguous"></i>
+                <h4>Por Género</h4>
+                <span class="es-dist-card__total">${generoTotal} casos</span>
+              </div>
+              <div class="es-dist-card__body">
+                ${['Femenino', 'Masculino', 'Otro'].map(g => {
+                    const v = d.porGenero[g];
+                    const pct = generoTotal > 0 ? (v / generoTotal * 100).toFixed(1) : 0;
+                    const icon = g === 'Femenino' ? 'bi-gender-female' : (g === 'Masculino' ? 'bi-gender-male' : 'bi-gender-ambiguous');
+                    return `
+                      <div class="es-bar-row">
+                        <span class="es-bar-row__label"><i class="bi ${icon}"></i> ${g}</span>
+                        <div class="es-bar-track">
+                          <div class="es-bar-fill es-bar-fill--gender es-bar-fill--${g.toLowerCase()}" style="width: ${pct}%;"></div>
+                        </div>
+                        <span class="es-bar-row__count">${v} <small>(${pct}%)</small></span>
+                      </div>
+                    `;
+                }).join('')}
+              </div>
+            </div>
+          </div>
+
+          <div class="es-dist-card es-dist-card--heatmap">
+            <div class="es-dist-card__head">
+              <i class="bi bi-grid-3x3"></i>
+              <h4>Heatmap Día de Semana × Mes</h4>
+              <span class="es-dist-card__total">${stats.metadata.totalFilas} registros</span>
+            </div>
+            <div class="es-heatmap-container" id="esHeatmapContainer"></div>
+          </div>
+        `;
+    }
+
+    /** 📦482 — Tab 3: Ranking & Casos Críticos (Tier 2) */
+    _renderTabRanking(stats) {
+        const r = stats.rankings;
+        const cc = stats.casosCriticos;
+        const renderTrabajadorRow = (t, idx) => `
+          <tr>
+            <td class="es-td-idx">${idx + 1}</td>
+            <td>
+              <div class="es-trab-name">${this._escapeHtml(t.nombre || '—')}</div>
+              <div class="es-trab-meta">${this._escapeHtml(t.cargo || '')}${t.area ? ' · ' + this._escapeHtml(t.area) : ''}</div>
+            </td>
+            <td class="es-td-center">${t.totalIncapacidades}</td>
+            <td class="es-td-center es-td-strong">${t.totalDias}</td>
+            <td class="es-td-muted">${this._escapeHtml(t.ultimaIncapacidad || '—')}</td>
+          </tr>`;
+        const renderCIE10Row = (c, idx) => `
+          <tr>
+            <td class="es-td-idx">${idx + 1}</td>
+            <td><code>${this._escapeHtml(c.codigo || '—')}</code></td>
+            <td>${this._escapeHtml(c.descripcion || '—')}</td>
+            <td class="es-td-center">${c.count}</td>
+            <td class="es-td-center es-td-strong">${c.dias}</td>
+          </tr>`;
+        const renderCriticoRow = (c, idx) => `
+          <tr>
+            <td class="es-td-idx">${idx + 1}</td>
+            <td>
+              <div class="es-trab-name">${this._escapeHtml(c.nombre || '—')}</div>
+              <div class="es-trab-meta">${this._escapeHtml(c.cargo || '')}${c.eps ? ' · ' + this._escapeHtml(c.eps) : ''}</div>
+            </td>
+            <td class="es-td-center"><span class="es-badge ${c.clase === 'ARL' ? 'es-badge--danger' : 'es-badge--warning'}">${c.clase || '—'}</span></td>
+            <td>${this._escapeHtml(c.tipo || '—')}</td>
+            <td class="es-td-strong">${c.dias} días</td>
+            <td class="es-td-muted">${this._escapeHtml(c.fechaInicio || '—')}</td>
+          </tr>`;
+
+        return `
+          <div class="es-rank-summary">
+            <div class="es-rank-summary__cell">
+              <i class="bi bi-arrow-repeat"></i>
+              <div>
+                <span class="es-rank-summary__value">${r.tasaReincidencia}%</span>
+                <span class="es-rank-summary__label">Tasa de Re-incidencia</span>
+                <span class="es-rank-summary__sub">${r.totalReincidentes} trabajadores con &gt;1 incapacidad</span>
+              </div>
+            </div>
+            <div class="es-rank-summary__cell">
+              <i class="bi bi-exclamation-diamond"></i>
+              <div>
+                <span class="es-rank-summary__value">${cc.total}</span>
+                <span class="es-rank-summary__label">Casos Críticos</span>
+                <span class="es-rank-summary__sub">Incapacidades &gt; 15 días</span>
+              </div>
+            </div>
+            <div class="es-rank-summary__cell">
+              <i class="bi bi-shield-exclamation"></i>
+              <div>
+                <span class="es-rank-summary__value">${cc.totalSospechosos}</span>
+                <span class="es-rank-summary__label">Sospechosos de Abuso</span>
+                <span class="es-rank-summary__sub">&gt; 5 incapacidades cortas en el periodo</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="es-rank-grid">
+            <div class="es-rank-card">
+              <h4><i class="bi bi-calendar-week"></i> Top 10 — Más Días Perdidos</h4>
+              ${r.top10Dias.length > 0 ? `
+                <table class="es-table">
+                  <thead><tr><th>#</th><th>Trabajador</th><th class="es-td-center">Casos</th><th class="es-td-center">Días</th><th>Última</th></tr></thead>
+                  <tbody>${r.top10Dias.map(renderTrabajadorRow).join('')}</tbody>
+                </table>
+              ` : '<p class="es-empty-row">Sin datos.</p>'}
+            </div>
+            <div class="es-rank-card">
+              <h4><i class="bi bi-list-ol"></i> Top 10 — Más Incapacidades</h4>
+              ${r.top10Casos.length > 0 ? `
+                <table class="es-table">
+                  <thead><tr><th>#</th><th>Trabajador</th><th class="es-td-center">Casos</th><th class="es-td-center">Días</th><th>Última</th></tr></thead>
+                  <tbody>${r.top10Casos.map(renderTrabajadorRow).join('')}</tbody>
+                </table>
+              ` : '<p class="es-empty-row">Sin datos.</p>'}
+            </div>
+            <div class="es-rank-card es-rank-card--full">
+              <h4><i class="bi bi-clipboard2-pulse"></i> Top 10 — Diagnósticos CIE-10</h4>
+              ${r.top10CIE10.length > 0 ? `
+                <table class="es-table">
+                  <thead><tr><th>#</th><th>Código</th><th>Descripción</th><th class="es-td-center">Casos</th><th class="es-td-center">Días</th></tr></thead>
+                  <tbody>${r.top10CIE10.map(renderCIE10Row).join('')}</tbody>
+                </table>
+              ` : '<p class="es-empty-row">Sin datos.</p>'}
+            </div>
+            <div class="es-rank-card es-rank-card--full">
+              <h4><i class="bi bi-exclamation-diamond-fill"></i> Casos Críticos (&gt; 15 días)</h4>
+              ${cc.activos.length > 0 ? `
+                <table class="es-table">
+                  <thead><tr><th>#</th><th>Trabajador</th><th class="es-td-center">Clase</th><th>Tipo</th><th>Días</th><th>Inicio</th></tr></thead>
+                  <tbody>${cc.activos.slice(0, 50).map(renderCriticoRow).join('')}</tbody>
+                </table>
+                ${cc.activos.length > 50 ? `<p class="es-empty-row">Mostrando 50 de ${cc.activos.length} casos críticos.</p>` : ''}
+              ` : '<p class="es-empty-row">Sin casos críticos.</p>'}
+            </div>
+            <div class="es-rank-card es-rank-card--full">
+              <h4><i class="bi bi-shield-exclamation"></i> Sospechosos de Abuso</h4>
+              ${cc.sospechososAbuso.length > 0 ? `
+                <table class="es-table">
+                  <thead><tr><th>#</th><th>Trabajador</th><th>Cargo / Área</th><th class="es-td-center">Incap. cortas</th></tr></thead>
+                  <tbody>${cc.sospechososAbuso.map((s, i) => `
+                    <tr>
+                      <td class="es-td-idx">${i + 1}</td>
+                      <td><div class="es-trab-name">${this._escapeHtml(s.nombre)}</div><div class="es-trab-meta">${this._escapeHtml(s.cedula)}</div></td>
+                      <td>${this._escapeHtml(s.cargo || '')}${s.area ? '<br><small>' + this._escapeHtml(s.area) + '</small>' : ''}</td>
+                      <td class="es-td-center es-td-strong">${s.count}</td>
+                    </tr>`).join('')}
+                  </tbody>
+                </table>
+              ` : '<p class="es-empty-row">Sin patrones de sospecha detectados.</p>'}
+            </div>
+          </div>
+        `;
+    }
+
+    /** 📦482 — Pinta heatmap día-semana vs mes con HTML+CSS */
+    _renderHeatmapEnPanel(stats) {
+        const container = document.getElementById('esHeatmapContainer');
+        if (!container) return;
+        const h = stats.distribuciones.heatmapDiaSemana;
+        const max = Math.max(1, ...h.data.flat());
+        const cells = h.data.map((row, di) => row.map((v, mi) => {
+            const intensity = v / max;
+            const bg = v === 0
+                ? '#f8f9fa'
+                : `rgba(23, 78, 166, ${0.15 + intensity * 0.85})`;
+            const fg = intensity > 0.5 ? '#fff' : '#1a1a2e';
+            return `<td class="es-heatmap-cell" style="background:${bg};color:${fg};" title="${h.labelsDias[di]} ${h.labelsMeses[mi]}: ${v} casos">${v}</td>`;
+        }).join('')).map((rowHtml, di) => `<tr><th class="es-heatmap-th">${h.labelsDias[di]}</th>${rowHtml}</tr>`).join('');
+        container.innerHTML = `
+          <table class="es-heatmap-table">
+            <thead>
+              <tr>
+                <th></th>
+                ${h.labelsMeses.map(m => `<th class="es-heatmap-th">${m}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>${cells}</tbody>
+          </table>
+          <div class="es-heatmap-legend">
+            <span>Menos</span>
+            <span class="es-heatmap-legend__swatch" style="background:rgba(23, 78, 166, 0.15);"></span>
+            <span class="es-heatmap-legend__swatch" style="background:rgba(23, 78, 166, 0.40);"></span>
+            <span class="es-heatmap-legend__swatch" style="background:rgba(23, 78, 166, 0.70);"></span>
+            <span class="es-heatmap-legend__swatch" style="background:rgba(23, 78, 166, 1.0);"></span>
+            <span>Más</span>
+          </div>
+        `;
+    }
+
+    /** 📦482 — _escapeHtml() ya existe en línea ~6907 (helper global del componente). NO redeclarar. */
 
     /**
      * Llena los filtros de estadísticas con datos reales
