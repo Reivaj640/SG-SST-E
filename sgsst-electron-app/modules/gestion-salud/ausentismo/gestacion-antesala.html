@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K+AIR | Antesala de Seguimiento de Gestación</title>
+    <link rel="stylesheet" href="../../../assets/css/font-awesome.min.css">
+    <link rel="stylesheet" href="../../../assets/css/google-fonts.css">
+    <link rel="stylesheet" href="../../../assets/css/bootstrap-icons.css">
+    <style>
+        /* ═══════════════════════════════════════════════════════════════════
+           📦464 (2026-07-03) — ANTESALA DE GESTACIÓN
+           Vista resumen de la gestante que se muestra ANTES del wizard
+           mensual. Carga datos vía IPC (gestacion:obtenerGestante).
+           Tema rosa (--rosa) coherente con el resto del módulo gs-*.
+           ═══════════════════════════════════════════════════════════════════ */
+
+        :root {
+            /* Variables CSS v3-* estándar K+AIR */
+            --v3-primary: #174ea6;
+            --v3-primary-hover: #185abd;
+            --v3-primary-soft: #e8f0fe;
+            --v3-success: #28a745;
+            --v3-success-soft: rgba(40, 167, 69, 0.1);
+            --v3-warning: #f59e0b;
+            --v3-warning-soft: rgba(245, 158, 11, 0.1);
+            --v3-destructive: #dc3545;
+            --v3-destructive-soft: rgba(220, 53, 69, 0.1);
+            --v3-foreground: #212529;
+            --v3-muted-foreground: #6c757d;
+            --v3-card: #ffffff;
+            --v3-border: #dee2e6;
+            --v3-muted: #f8f9fa;
+            --v3-radius-lg: 0.625rem;
+            --v3-radius-md: 0.5rem;
+            --v3-font-sans: "Segoe UI", Roboto, sans-serif;
+
+            /* Variables locales — paleta rosa (gestación) */
+            --rosa: #be185d;
+            --rosa-light: #fce7f3;
+            --rosa-bg: #fdf2f8;
+            --bg-body: #f0f2f5;
+            --text-dark: #212529;
+            --text-muted: #6c757d;
+            --shadow-sm: 0 2px 8px rgba(0,0,0,0.04);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.06);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
+
+        body {
+            font-family: var(--v3-font-sans);
+            background-color: var(--bg-body);
+            color: var(--text-dark);
+            font-size: 14px;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ════════════════════════════════════════════════════════════════════
+           HEADER ESTÁNDAR K+AIR
+           ════════════════════════════════════════════════════════════════════ */
+        .k-module-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 1.5rem;
+            height: 64px;
+            background: #ffffff;
+            border-bottom: 1px solid var(--v3-border);
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
+            flex-shrink: 0;
+        }
+        .k-header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            min-width: 0;
+            flex: 1;
+        }
+        .k-header-title-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.1rem;
+            min-width: 0;
+        }
+        .k-header-main-title {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--v3-foreground);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .k-header-main-title i { color: var(--rosa); font-size: 1.1rem; }
+        .k-header-breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            font-size: 0.72rem;
+            color: var(--v3-muted-foreground);
+            flex-wrap: wrap;
+        }
+        .k-header-breadcrumb button {
+            background: none;
+            border: none;
+            padding: 0;
+            font: inherit;
+            color: inherit;
+            cursor: pointer;
+        }
+        .k-header-breadcrumb button:hover { color: var(--rosa); }
+        .k-header-right {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            flex-shrink: 0;
+        }
+        .k-sync-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.3rem 0.6rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            border-radius: 2rem;
+            white-space: nowrap;
+        }
+        .k-sync-synced  { background: rgba(40, 167, 69, 0.1); color: #28a745; }
+        .k-sync-saving  { background: rgba(255, 193, 7, 0.1); color: #856404; }
+        .k-sync-error   { background: rgba(220, 53, 69, 0.1); color: #dc3545; }
+        .k-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+            padding: 0.5rem 1rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+            font-family: var(--v3-font-sans);
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+        .k-btn-primary  { background: var(--rosa); color: #fff; }
+        .k-btn-primary:hover  { background: #9d1749; }
+        .k-btn-secondary { background: #fff; color: var(--v3-foreground); border: 1px solid var(--v3-border); }
+        .k-btn-secondary:hover { background: var(--v3-muted); border-color: var(--rosa); color: var(--rosa); }
+        .k-btn-ghost    { background: transparent; color: var(--v3-muted-foreground); border: 1px solid var(--v3-border); }
+        .k-btn-ghost:hover { background: var(--v3-muted); color: var(--v3-foreground); }
+
+        .header-back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.375rem 0.75rem;
+            font: 500 0.8125rem/1.2 var(--v3-font-sans);
+            color: #5a6378;
+            background: transparent;
+            border: 1px solid var(--v3-border);
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+        .header-back-btn:hover {
+            background: var(--rosa-light);
+            color: var(--rosa);
+            border-color: var(--rosa);
+        }
+        .header-back-btn i { font-size: 0.875rem; }
+
+        /* ════════════════════════════════════════════════════════════════════
+           MAIN · scroll vertical interno
+           ════════════════════════════════════════════════════════════════════ */
+        .gsa-main {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px 28px;
+        }
+
+        /* ════════════════════════════════════════════════════════════════════
+           KPI STRIP — 4 KPIs (meses / seguimientos / días FPP / frecuencia)
+           ════════════════════════════════════════════════════════════════════ */
+        .kair-v3-kpi-strip {
+            display: flex;
+            align-items: stretch;
+            background: var(--v3-card);
+            border: 1px solid var(--v3-border);
+            border-radius: var(--v3-radius-lg);
+            box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+            margin-bottom: 20px;
+        }
+        .kair-v3-kpi {
+            display: flex;
+            align-items: center;
+            gap: 0.875rem;
+            padding: 1.1rem 1.5rem;
+            flex: 1;
+            min-width: 0;
+        }
+        .kair-v3-kpi + .kair-v3-kpi { border-left: 1px solid var(--v3-border); }
+        .kair-v3-kpi__icon {
+            width: 44px;
+            height: 44px;
+            border-radius: var(--v3-radius-md);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.15rem;
+            flex-shrink: 0;
+        }
+        .kair-v3-kpi--primary .kair-v3-kpi__icon { background: var(--v3-primary-soft); color: var(--v3-primary); }
+        .kair-v3-kpi--warning .kair-v3-kpi__icon { background: var(--v3-warning-soft); color: var(--v3-warning); }
+        .kair-v3-kpi--success .kair-v3-kpi__icon { background: var(--v3-success-soft); color: var(--v3-success); }
+        .kair-v3-kpi--info    .kair-v3-kpi__icon { background: var(--rosa-light); color: var(--rosa); }
+        .kair-v3-kpi__content { min-width: 0; flex: 1; }
+        .kair-v3-kpi__value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            line-height: 1.1;
+            color: var(--v3-foreground);
+            font-family: var(--v3-font-sans);
+        }
+        .kair-v3-kpi__label {
+            font-size: 0.78rem;
+            color: var(--v3-muted-foreground);
+            margin-top: 2px;
+        }
+        .kair-v3-kpi__sub {
+            font-size: 0.7rem;
+            color: var(--v3-muted-foreground);
+            margin-top: 3px;
+            font-style: italic;
+        }
+
+        /* ════════════════════════════════════════════════════════════════════
+           CARD PRINCIPAL DE LA GESTANTE
+           ════════════════════════════════════════════════════════════════════ */
+        .gsa-gestante {
+            background: var(--v3-card);
+            border: 1px solid var(--v3-border);
+            border-radius: var(--v3-radius-lg);
+            box-shadow: var(--shadow-sm);
+            padding: 24px 28px;
+            margin-bottom: 20px;
+        }
+        .gsa-gestante__top {
+            display: flex;
+            align-items: flex-start;
+            gap: 18px;
+            padding-bottom: 18px;
+            border-bottom: 1px solid #f1f3f5;
+            margin-bottom: 20px;
+        }
+        .gsa-gestante__avatar {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--rosa-light) 0%, #fbcfe8 100%);
+            color: var(--rosa);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.4rem;
+            flex-shrink: 0;
+            border: 2px solid #fff;
+            box-shadow: 0 2px 6px rgba(190, 24, 93, 0.18);
+        }
+        .gsa-gestante__info {
+            flex: 1;
+            min-width: 0;
+        }
+        .gsa-gestante__name {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--v3-foreground);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .gsa-gestante__meta {
+            font-size: 0.82rem;
+            color: var(--v3-muted-foreground);
+            margin-top: 4px;
+        }
+
+        /* Badges inline (estilo kair-badge + variantes) */
+        .gsa-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 10px;
+            border-radius: 2rem;
+            font-size: 0.72rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .gsa-badge--primary { background: var(--v3-primary-soft); color: var(--v3-primary); }
+        .gsa-badge--success { background: var(--v3-success-soft); color: var(--v3-success); }
+        .gsa-badge--warning { background: var(--v3-warning-soft); color: #92400e; }
+        .gsa-badge--danger  { background: var(--v3-destructive-soft); color: var(--v3-destructive); }
+        .gsa-badge--info    { background: var(--rosa-light); color: var(--rosa); }
+        .gsa-badge--neutral { background: var(--v3-muted); color: var(--text-muted); }
+
+        /* Grid de datos (3 columnas x 3 filas) */
+        .gsa-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 18px 32px;
+        }
+        .gsa-field {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            min-width: 0;
+        }
+        .gsa-field__label {
+            font-size: 0.7rem;
+            color: var(--v3-muted-foreground);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .gsa-field__label i { font-size: 0.78rem; color: var(--rosa); }
+        .gsa-field__value {
+            font-size: 0.95rem;
+            color: var(--v3-foreground);
+            font-weight: 500;
+            word-break: break-word;
+        }
+
+        /* ════════════════════════════════════════════════════════════════════
+           LAYOUT 2 COLUMNAS (Izq 2/3 + Der 1/3)
+           ════════════════════════════════════════════════════════════════════ */
+        .gsa-cols {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            align-items: flex-start;
+        }
+        .gsa-col-left { display: flex; flex-direction: column; gap: 20px; }
+        .gsa-col-right { display: flex; flex-direction: column; gap: 20px; }
+
+        /* Card genérico para secciones (Próx Seguimientos / Historial / Info Clave / Confidencialidad) */
+        .gsa-section {
+            background: var(--v3-card);
+            border: 1px solid var(--v3-border);
+            border-radius: var(--v3-radius-lg);
+            box-shadow: var(--shadow-sm);
+            overflow: hidden;
+        }
+        .gsa-section__head {
+            padding: 14px 20px;
+            border-bottom: 1px solid #f1f3f5;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .gsa-section__title {
+            font-size: 0.92rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .gsa-section__title i { color: var(--rosa); }
+        .gsa-section__sub {
+            font-size: 0.72rem;
+            color: var(--v3-muted-foreground);
+            margin-top: 2px;
+            font-weight: 400;
+        }
+        .gsa-section__body {
+            padding: 14px 20px;
+        }
+
+        /* ════════════════════════════════════════════════════════════════════
+           PRÓXIMOS SEGUIMIENTOS
+           ════════════════════════════════════════════════════════════════════ */
+        .gsa-prox-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .gsa-prox-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            background: var(--rosa-bg);
+            border: 1px solid var(--rosa-light);
+            border-radius: var(--v3-radius-md);
+            transition: all 0.15s;
+        }
+        .gsa-prox-item:hover { background: #fce7f3; }
+        .gsa-prox-item__icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: #fff;
+            color: var(--rosa);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .gsa-prox-item__body {
+            flex: 1;
+            min-width: 0;
+        }
+        .gsa-prox-item__title {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: var(--v3-foreground);
+        }
+        .gsa-prox-item__desc {
+            font-size: 0.72rem;
+            color: var(--v3-muted-foreground);
+        }
+        .gsa-prox-item__badge {
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 3px 10px;
+            border-radius: 2rem;
+            background: var(--rosa);
+            color: #fff;
+            flex-shrink: 0;
+        }
+        .gsa-prox-item__badge.vencido {
+            background: var(--v3-destructive);
+        }
+        .gsa-prox-empty {
+            text-align: center;
+            padding: 24px 0;
+            color: var(--v3-muted-foreground);
+            font-size: 0.85rem;
+        }
+
+        /* Botón grande "Iniciar ahora" dentro del item próximo */
+        .gsa-prox-item__cta {
+            background: var(--rosa);
+            color: #fff;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 0.4rem;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.15s;
+        }
+        .gsa-prox-item__cta:hover { background: #9d1749; }
+
+        /* ════════════════════════════════════════════════════════════════════
+           HISTORIAL DE SEGUIMIENTOS
+           ════════════════════════════════════════════════════════════════════ */
+        .gsa-hist {
+            display: flex;
+            flex-direction: column;
+        }
+        .gsa-hist-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid #f1f3f5;
+        }
+        .gsa-hist-item:last-child { border-bottom: none; }
+        .gsa-hist-item__icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 0.5rem;
+            background: var(--v3-primary-soft);
+            color: var(--v3-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .gsa-hist-item__body { flex: 1; min-width: 0; }
+        .gsa-hist-item__title {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: var(--v3-foreground);
+        }
+        .gsa-hist-item__meta {
+            font-size: 0.72rem;
+            color: var(--v3-muted-foreground);
+            margin-top: 2px;
+        }
+        .gsa-hist-empty {
+            text-align: center;
+            padding: 28px 0;
+            color: var(--v3-muted-foreground);
+            font-size: 0.85rem;
+        }
+        .gsa-hist-empty i {
+            display: block;
+            font-size: 2rem;
+            margin-bottom: 8px;
+            color: #d1d5db;
+        }
+
+        /* ════════════════════════════════════════════════════════════════════
+           INFORMACIÓN CLAVE
+           ════════════════════════════════════════════════════════════════════ */
+        .gsa-kv {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            row-gap: 10px;
+            column-gap: 12px;
+            align-items: center;
+            font-size: 0.85rem;
+        }
+        .gsa-kv__k {
+            color: var(--v3-muted-foreground);
+            font-weight: 500;
+        }
+        .gsa-kv__v {
+            color: var(--v3-foreground);
+            font-weight: 600;
+            text-align: right;
+        }
+
+        /* ════════════════════════════════════════════════════════════════════
+           CONFIDENCIALIDAD
+           ════════════════════════════════════════════════════════════════════ */
+        .gsa-section--conf {
+            background: #fffbeb;
+            border-color: #fde68a;
+        }
+        .gsa-section--conf .gsa-section__title { color: #92400e; }
+        .gsa-section--conf .gsa-section__title i { color: #b45309; }
+        .gsa-section--conf .gsa-section__body {
+            font-size: 0.78rem;
+            color: #78350f;
+            line-height: 1.5;
+        }
+        .gsa-section--conf .gsa-section__body strong { color: #92400e; }
+
+        /* ════════════════════════════════════════════════════════════════════
+           LOADING STATE
+           ════════════════════════════════════════════════════════════════════ */
+        .gsa-loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 0;
+            color: var(--v3-muted-foreground);
+        }
+        .gsa-loading i {
+            font-size: 1.8rem;
+            color: var(--rosa);
+            margin-bottom: 12px;
+        }
+
+        /* ════════════════════════════════════════════════════════════════════
+           RESPONSIVE
+           ════════════════════════════════════════════════════════════════════ */
+        @media (max-width: 1100px) {
+            .gsa-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 900px) {
+            .gsa-cols { grid-template-columns: 1fr; }
+            .gsa-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <!-- ═══════════════════════════════════════════════════════════════════
+         HEADER
+         ═══════════════════════════════════════════════════════════════════ -->
+    <header class="k-module-header">
+        <div class="k-header-left">
+            <button class="header-back-btn" id="kair-gsa-back" title="Volver al listado">
+                <i class="bi bi-arrow-left"></i> Listado
+            </button>
+            <div class="k-header-title-group">
+                <div class="k-header-main-title">
+                    <i class="bi bi-person-hearts"></i>
+                    <span id="kair-gsa-title">Antesala de Seguimiento</span>
+                </div>
+                <div class="k-header-breadcrumb">
+                    <button onclick="volverAlHome()">Inicio</button>
+                    <i class="bi bi-chevron-right" style="font-size: 0.65rem;"></i>
+                    <button onclick="volverAlListado()">Seguimiento de Gestación</button>
+                    <i class="bi bi-chevron-right" style="font-size: 0.65rem;"></i>
+                    <span class="k-breadcrumb-item active" id="kair-gsa-bc-gestante">—</span>
+                </div>
+            </div>
+        </div>
+        <div class="k-header-right">
+            <span class="k-sync-badge k-sync-synced">
+                <i class="bi bi-check-circle-fill"></i> Borrador
+            </span>
+            <button class="k-btn k-btn-secondary" id="kair-gsa-cta-print" title="Imprimir ficha">
+                <i class="bi bi-printer"></i> Imprimir
+            </button>
+            <button class="k-btn k-btn-secondary" id="kair-gsa-cta-export" title="Exportar a CSV">
+                <i class="bi bi-download"></i> Exportar
+            </button>
+            <button class="k-btn k-btn-primary" id="kair-gsa-cta-new" title="Iniciar nuevo seguimiento">
+                <i class="bi bi-plus-lg"></i> Nuevo Seguimiento
+            </button>
+        </div>
+    </header>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         MAIN
+         ═══════════════════════════════════════════════════════════════════ -->
+    <main class="gsa-main" id="gsaMain">
+        <div class="gsa-loading">
+            <i class="bi bi-arrow-clockwise"></i>
+            <div>Cargando información de la gestante…</div>
+        </div>
+    </main>
+
+    <script src="gestacion-antesala.js"></script>
+</body>
+</html>

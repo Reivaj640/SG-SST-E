@@ -236,6 +236,11 @@ class MedicionAusentismoComponent {
             case 'seguimiento-gestacion':
                 this.renderSeguimientoGestacionView(this.container);
                 break;
+            // 📦464 (2026-07-03) — Antesala: vista resumen de la gestante
+            // que se muestra ANTES del wizard mensual de seguimiento.
+            case 'seguimiento-gestacion-antesala':
+                this.renderGestacionAntesalaView(this.container, this._gestanteActualId);
+                break;
             case 'seguimiento-gestacion-mensual':
                 this.renderSeguimientoMensualView(this.container, this._gestanteActualId);
                 break;
@@ -297,6 +302,12 @@ class MedicionAusentismoComponent {
                         // 📦462 (2026-07-03) — Vista principal de Seguimiento de Gestación (Salud Materna)
                         this.currentView = 'seguimiento-gestacion';
                         this._gestanteActualId = null;
+                        this.render();
+                        break;
+                    case 'seguimiento-gestacion-antesala':
+                        // 📦464 (2026-07-03) — Antesala de seguimiento (vista resumen de la gestante)
+                        this.currentView = 'seguimiento-gestacion-antesala';
+                        this._gestanteActualId = (data.payload && data.payload.gestanteId) || null;
                         this.render();
                         break;
                     case 'seguimiento-gestacion-mensual':
@@ -9010,6 +9021,12 @@ class MedicionAusentismoComponent {
             const data = event.data;
             if (data.type === 'ausentismo-home-action') {
                 switch (data.action) {
+                    case 'seguimiento-gestacion-antesala':
+                        // 📦464 (2026-07-03) — Home ahora pide la ANTESALA en vez del wizard directo.
+                        this.currentView = 'seguimiento-gestacion-antesala';
+                        this._gestanteActualId = (data.payload && data.payload.gestanteId) || null;
+                        this.render();
+                        break;
                     case 'seguimiento-gestacion-mensual':
                         this.currentView = 'seguimiento-gestacion-mensual';
                         this._gestanteActualId = (data.payload && data.payload.gestanteId) || null;
@@ -9047,6 +9064,74 @@ class MedicionAusentismoComponent {
                 }, '*');
             } catch (error) {
                 console.error('[seguimiento-gestacion] Error al enviar contexto al iframe:', error);
+            }
+        };
+
+        container.appendChild(iframe);
+    }
+
+    /**
+     * 📦464 (2026-07-03) — Renderiza la ANTESALA de seguimiento de gestación.
+     * Vista resumen de la gestante (KPIs + datos básicos + próximos seguimientos
+     * + historial) que se muestra ANTES del wizard mensual. Desde la antesala,
+     * el botón "Iniciar ahora" o "Nuevo Seguimiento" navega a la vista mensual.
+     *
+     * Patrón idéntico a renderSeguimientoMensualView: iframe + postMessage
+     * con SET_COMPANY_CONTEXT (company + gestanteId).
+     */
+    renderGestacionAntesalaView(container, gestanteId) {
+        container.style.padding = '0';
+        container.style.overflow = 'hidden';
+
+        const iframe = document.createElement('iframe');
+        const idParam = gestanteId ? '?id=' + encodeURIComponent(gestanteId) : '';
+        iframe.src = 'modules/gestion-salud/ausentismo/gestacion-antesala.html' + idParam;
+        iframe.style.cssText = 'width: 100%; height: 100%; border: none; display: block;';
+
+        const handleMessage = (event) => {
+            if (event.source !== iframe.contentWindow) return;
+            const data = event.data;
+            if (data.type === 'ausentismo-home-action') {
+                switch (data.action) {
+                    case 'seguimiento-gestacion-mensual':
+                        // "Iniciar ahora" desde la antesala → wizard mensual
+                        this.currentView = 'seguimiento-gestacion-mensual';
+                        this._gestanteActualId = (data.payload && data.payload.gestanteId) || gestanteId;
+                        this.render();
+                        break;
+                    case 'seguimiento-gestacion':
+                        // "Volver al listado" → home de seguimiento
+                        this.currentView = 'seguimiento-gestacion';
+                        this.render();
+                        break;
+                    case 'main':
+                        this.currentView = 'main';
+                        this.render();
+                        break;
+                }
+            }
+        };
+
+        if (this.portalMessageCleanup) {
+            this.portalMessageCleanup();
+        }
+        window.addEventListener('message', handleMessage);
+        this.portalMessageCleanup = () => {
+            window.removeEventListener('message', handleMessage);
+        };
+
+        iframe.onload = () => {
+            try {
+                if (iframe.contentWindow && window.electronAPI) {
+                    iframe.contentWindow.electronAPI = window.electronAPI;
+                }
+                iframe.contentWindow.postMessage({
+                    type: 'SET_COMPANY_CONTEXT',
+                    company: this.currentCompany,
+                    gestanteId: gestanteId
+                }, '*');
+            } catch (error) {
+                console.error('[seguimiento-gestacion-antesala] Error al enviar contexto al iframe:', error);
             }
         };
 

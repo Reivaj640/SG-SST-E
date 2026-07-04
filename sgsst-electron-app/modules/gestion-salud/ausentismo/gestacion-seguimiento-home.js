@@ -628,10 +628,13 @@
     };
 
     window.abrirSeguimientoMensual = function (gestanteId) {
+        // 📦464 (2026-07-03) — Cambio de flujo: ahora vamos a la ANTESALA primero
+        // (vista resumen de la gestante). Desde la antesala, el botón "Iniciar ahora"
+        // o "Nuevo Seguimiento" navega al wizard mensual propiamente.
         if (window.parent && window.parent.postMessage) {
             window.parent.postMessage({
                 type: 'ausentismo-home-action',
-                action: 'seguimiento-gestacion-mensual',
+                action: 'seguimiento-gestacion-antesala',
                 payload: { gestanteId: gestanteId, empresaId: _state.empresaId }
             }, '*');
         }
