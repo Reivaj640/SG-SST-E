@@ -249,6 +249,319 @@
         }
         @keyframes gr-spin { to { transform: rotate(360deg); } }
 
+        /* ─── 📦472 — Contenedores de charts ─── */
+        .gr-chart-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 18px;
+            margin-bottom: 18px;
+        }
+        .gr-chart-grid--single { grid-template-columns: 1fr; }
+        .gr-chart-card {
+            background: white;
+            border: 1px solid var(--v3-border);
+            border-radius: var(--v3-radius-lg);
+            padding: 16px 18px;
+            box-shadow: var(--shadow-sm);
+        }
+        .gr-chart-card__title {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--v3-primary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .gr-chart-card__title i { font-size: 0.95rem; }
+        .gr-chart-canvas-wrap {
+            position: relative;
+            width: 100%;
+            height: 240px;
+        }
+        .gr-chart-canvas-wrap--tall { height: 300px; }
+        .gr-chart-canvas-wrap canvas { max-width: 100%; max-height: 100%; }
+        .gr-chart-legend {
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px 18px;
+            font-size: 0.78rem;
+            color: var(--text-dark);
+        }
+        .gr-chart-legend__item { display: inline-flex; align-items: center; gap: 6px; }
+        .gr-chart-legend__dot {
+            width: 10px; height: 10px;
+            border-radius: 2px;
+            display: inline-block;
+        }
+        .gr-chart-center {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            pointer-events: none;
+        }
+        .gr-chart-center__value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--text-dark);
+            line-height: 1.1;
+        }
+        .gr-chart-center__label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        @media (max-width: 900px) {
+            .gr-chart-grid { grid-template-columns: 1fr; }
+        }
+
+        /* ─── 📦473 — Reporte Detallado (estilos del informe) ─── */
+        .gr-rep {
+            font-family: var(--v3-font-sans);
+            color: var(--text-dark);
+        }
+        /* Header del documento */
+        .gr-rep__doc-header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 16px 0;
+            border-bottom: 2px solid var(--v3-primary);
+            margin-bottom: 16px;
+        }
+        .gr-rep__doc-icon {
+            width: 48px; height: 48px;
+            background: var(--v3-primary);
+            color: white;
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.3rem;
+            flex-shrink: 0;
+        }
+        .gr-rep__doc-title { font-size: 1.15rem; font-weight: 700; color: var(--v3-primary); }
+        .gr-rep__doc-subtitle { font-size: 0.82rem; color: var(--text-muted); margin-top: 2px; }
+        .gr-rep__doc-fecha { text-align: right; margin-left: auto; }
+        .gr-rep__doc-fecha-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+        .gr-rep__doc-fecha-value { font-size: 0.9rem; font-weight: 600; color: var(--text-dark); margin-top: 2px; }
+
+        /* Resumen de metadata */
+        .gr-rep__meta {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            padding: 14px 16px;
+            background: var(--v3-muted);
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.82rem;
+        }
+        .gr-rep__meta-item { display: flex; align-items: flex-start; gap: 8px; }
+        .gr-rep__meta-item i { color: var(--v3-primary); margin-top: 2px; }
+        .gr-rep__meta-label { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+        .gr-rep__meta-value { font-weight: 500; color: var(--text-dark); margin-top: 2px; }
+
+        /* Banner confidencialidad */
+        .gr-rep__confidential {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.82rem;
+            color: #78350f;
+            line-height: 1.5;
+        }
+        .gr-rep__confidential i { color: #f59e0b; font-size: 1.1rem; flex-shrink: 0; }
+        .gr-rep__confidential strong { font-weight: 700; }
+
+        /* KPIs principales */
+        .gr-rep__kpis {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        .gr-rep__kpi {
+            background: white;
+            border: 1px solid var(--v3-border);
+            border-radius: 8px;
+            padding: 14px 16px;
+            text-align: center;
+        }
+        .gr-rep__kpi-value { font-size: 1.6rem; font-weight: 700; color: var(--text-dark); line-height: 1.1; }
+        .gr-rep__kpi-value.success { color: var(--v3-success); }
+        .gr-rep__kpi-value.warning { color: #b45309; }
+        .gr-rep__kpi-value.danger { color: var(--v3-destructive); }
+        .gr-rep__kpi-label { font-size: 0.72rem; color: var(--text-muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+        .gr-rep__kpi-sub { font-size: 0.7rem; color: var(--text-muted); margin-top: 4px; }
+
+        /* Secciones */
+        .gr-rep__section {
+            margin-bottom: 22px;
+        }
+        .gr-rep__section-title {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--v3-primary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 10px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid var(--v3-primary-soft);
+        }
+
+        /* Resumen narrativo */
+        .gr-rep__narrative {
+            background: white;
+            border: 1px solid var(--v3-border);
+            border-radius: 8px;
+            padding: 16px 18px;
+            line-height: 1.6;
+            font-size: 0.88rem;
+            color: var(--text-dark);
+        }
+        .gr-rep__narrative strong { color: var(--v3-primary); }
+        .gr-rep__narrative .crit { color: var(--v3-destructive); font-weight: 600; }
+
+        /* Tabla detalle */
+        .gr-rep__table-wrap {
+            overflow-x: auto;
+            background: white;
+            border: 1px solid var(--v3-border);
+            border-radius: 8px;
+        }
+        .gr-rep__table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.78rem;
+        }
+        .gr-rep__table th {
+            background: var(--v3-muted);
+            color: var(--v3-muted-foreground);
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--v3-border);
+            white-space: nowrap;
+        }
+        .gr-rep__table td {
+            padding: 9px 12px;
+            border-bottom: 1px solid #f1f3f5;
+            color: var(--text-dark);
+            vertical-align: middle;
+        }
+        .gr-rep__table tr:last-child td { border-bottom: none; }
+        .gr-rep__table tr:hover { background: var(--v3-muted); }
+
+        /* Badges en la tabla */
+        .gr-rep__badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .gr-rep__badge.bajo { background: var(--v3-success-soft); color: #155724; }
+        .gr-rep__badge.alto { background: var(--v3-warning-soft); color: #856404; }
+        .gr-rep__badge.muy-alto { background: var(--v3-destructive-soft); color: #721c24; }
+        .gr-rep__badge.completado { background: var(--v3-success-soft); color: #155724; }
+        .gr-rep__badge.vencido { background: var(--v3-destructive-soft); color: #721c24; }
+
+        /* Alertas */
+        .gr-rep__alerta {
+            background: var(--v3-destructive-soft);
+            border-left: 3px solid var(--v3-destructive);
+            padding: 10px 14px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+        .gr-rep__alerta strong { color: var(--v3-destructive); }
+        .gr-rep__alerta small { color: var(--text-muted); font-size: 0.75rem; }
+
+        /* Acciones frecuentes - tarjetas pequeñas */
+        .gr-rep__totales-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-top: 12px;
+        }
+        .gr-rep__total-card {
+            background: white;
+            border: 1px solid var(--v3-border);
+            border-radius: 8px;
+            padding: 10px 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .gr-rep__total-card i {
+            width: 32px; height: 32px;
+            background: var(--v3-primary-soft);
+            color: var(--v3-primary);
+            border-radius: 6px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.9rem;
+        }
+        .gr-rep__total-card-value { font-size: 1.1rem; font-weight: 700; color: var(--text-dark); line-height: 1; }
+        .gr-rep__total-card-label { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
+
+        /* Firma */
+        .gr-rep__firma {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            padding: 20px 0;
+            border-top: 2px solid var(--v3-border);
+            margin-top: 24px;
+        }
+        .gr-rep__firma-block {
+            padding: 14px 16px;
+            background: var(--v3-muted);
+            border-radius: 8px;
+        }
+        .gr-rep__firma-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 6px;
+        }
+        .gr-rep__firma-nombre { font-size: 1rem; font-weight: 700; color: var(--text-dark); margin-top: 30px; }
+        .gr-rep__firma-cargo { font-size: 0.82rem; color: var(--text-muted); margin-top: 2px; }
+
+        @media (max-width: 1100px) {
+            .gr-rep__kpis { grid-template-columns: repeat(3, 1fr); }
+            .gr-rep__totales-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 700px) {
+            .gr-rep__kpis { grid-template-columns: repeat(2, 1fr); }
+            .gr-rep__meta { grid-template-columns: 1fr; }
+            .gr-rep__firma { grid-template-columns: 1fr; }
+        }
+
+        /* Print rules — aplicado también a PDF */
+        @media print {
+            body { background: white; }
+            .gr-rep { page-break-inside: auto; }
+            .gr-rep__section { page-break-inside: avoid; }
+            .gr-rep__kpis { page-break-inside: avoid; }
+            .gr-rep__table-wrap { page-break-inside: auto; }
+        }
+
         /* ─── Responsive ─── */
         @media (max-width: 1100px) {
             .gr-filtros__grid { grid-template-columns: repeat(2, 1fr); }
@@ -396,6 +709,8 @@
 
 </div>
 
+<!-- 📦472 — Chart.js v4 vía CDN (jsdelivr) — visualizaciones de los reportes -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="gestacion-reportes.js"></script>
 </body>
 </html>
