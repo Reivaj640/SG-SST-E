@@ -1363,10 +1363,13 @@ ipcMain.handle('get-app-path', async () => {
 
 // Crear acceso directo en el escritorio del usuario (Windows)
 // Nota: autoUpdater.quitAndInstall() NO recrea shortcuts, por eso este IPC existe
-ipcMain.handle('create-desktop-shortcut', async () => {
+// 📦465 (2026-07-03) — Refactor: lógica extraída a _ensureDesktopShortcut()
+// para poder invocarla desde la auto-reparación silenciosa en app.whenReady()
+// (fix para "instalación limpia o actualización no crea shortcut en escritorio").
+function _ensureDesktopShortcut() {
   try {
     if (process.platform !== 'win32') {
-      return { success: false, error: 'Esta función solo está disponible en Windows actualmente.' };
+      return { success: false, error: 'Solo disponible en Windows' };
     }
 
     const desktopPath = app.getPath('desktop');
@@ -1417,6 +1420,10 @@ ipcMain.handle('create-desktop-shortcut', async () => {
     sendLog(`[SHORTCUT] Error creando acceso directo: ${error.message}`, 'ERROR');
     return { success: false, error: error.message };
   }
+}
+
+ipcMain.handle('create-desktop-shortcut', async () => {
+  return _ensureDesktopShortcut();
 });
 
 // Verificar si ya existe el acceso directo en el escritorio
@@ -7875,6 +7882,26 @@ function registerFuratHandlers(appInstance) {
 
 // Manejador para la creación de la ventana principal
 app.whenReady().then(() => {
+  // 📦465 (2026-07-03) — AUTO-REPARACIÓN SILENCIOSA DEL ACCESO DIRECTO
+  // El instalador NSIS oneClick a veces no crea el .lnk (bug conocido de
+  // electron-builder ≥ 24 con .nsh custom) y electron-updater/Squirrel.Windows
+  // lo BORRA al actualizar sin recrearlo. Si detectamos que estamos en
+  // producción y NO hay shortcut, lo creamos en background sin interrumpir
+  // el arranque. El usuario nunca se entera.
+  if (app.isPackaged && process.platform === 'win32') {
+    setImmediate(() => {
+      try {
+        const desktopShortcut = path.join(app.getPath('desktop'), 'K+AIR.lnk');
+        if (!fs.existsSync(desktopShortcut)) {
+          sendLog('[SHORTCUT-AUTOFIX] Shortcut faltante, reparando en background...', 'INFO');
+          _ensureDesktopShortcut();
+        }
+      } catch (autofixErr) {
+        sendLog(`[SHORTCUT-AUTOFIX] Error en auto-reparación: ${autofixErr.message}`, 'WARN');
+      }
+    });
+  }
+
   // Mostrar pantalla de carga inmediatamente
   createLoadingWindow();
 
