@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<title>K+AIR · Demo Skeleton Screens (sistema real KairSkeleton.*)</title>
+<link rel="stylesheet" href="../styles.css">
+<style>
+/* Override mínimos solo para el demo (no afecta la app) */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #f4f6fa;
+  color: #1e293b;
+  padding: 32px 24px;
+  line-height: 1.5;
+}
+[data-theme="dark"] body { background: #0f172a; color: #e2e8f0; }
+
+h1 { font-size: 1.75rem; margin-bottom: 8px; }
+h2 { font-size: 1.125rem; margin: 32px 0 12px; color: #475569; }
+[data-theme="dark"] h2 { color: #94a3b8; }
+p.lead { color: #64748b; margin-bottom: 24px; font-size: 0.9375rem; }
+[data-theme="dark"] p.lead { color: #94a3b8; }
+
+.controls {
+  display: flex; gap: 12px; align-items: center;
+  margin-bottom: 24px; padding: 14px 16px;
+  background: #fff; border-radius: 12px; border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+  flex-wrap: wrap;
+}
+[data-theme="dark"] .controls { background: #1e293b; border-color: #334155; }
+.controls button {
+  padding: 8px 14px; border-radius: 8px; border: 1px solid #cbd5e1;
+  background: #fff; cursor: pointer; font-size: 0.875rem; font-weight: 500;
+  transition: all 0.15s ease;
+}
+[data-theme="dark"] .controls button { background: #334155; color: #e2e8f0; border-color: #475569; }
+.controls button:hover { background: #f1f5f9; border-color: #94a3b8; }
+[data-theme="dark"] .controls button:hover { background: #475569; }
+.controls button.primary { background: #3b82f6; color: white; border-color: #3b82f6; }
+.controls button.primary:hover { background: #2563eb; }
+
+.demo-card {
+  background: #fff; border-radius: 14px; padding: 24px;
+  border: 1px solid #e2e8f0; margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(15,23,42,0.04);
+}
+[data-theme="dark"] .demo-card { background: #1e293b; border-color: #334155; }
+.demo-card h3 {
+  font-size: 1rem; font-weight: 600; margin-bottom: 16px;
+  display: flex; align-items: center; gap: 8px;
+}
+.demo-card h3::before {
+  content: ''; width: 4px; height: 18px; background: #3b82f6; border-radius: 2px;
+}
+.demo-card .code-snippet {
+  margin-top: 12px; padding: 10px 14px;
+  background: #0f172a; color: #94e2d5;
+  border-radius: 8px; font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 0.8125rem; line-height: 1.6;
+}
+[data-theme="dark"] .demo-card .code-snippet { background: #020617; }
+
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 6px;
+  font-size: 0.75rem; font-weight: 600;
+  background: #dbeafe; color: #1e40af;
+}
+[data-theme="dark"] .badge { background: #1e3a8a; color: #bfdbfe; }
+</style>
+</head>
+<body>
+
+<h1>K+AIR · Skeleton Screens — Sistema Real <span class="badge">v1.0</span></h1>
+<p class="lead">
+  Este demo carga <code>shared/kair-skeleton.js</code> y <code>styles.css</code> directamente desde el repo.
+  Cada componente se genera con <code>KairSkeleton.*</code> — exactamente como se usará en producción.
+</p>
+
+<div class="controls">
+  <button class="primary" onclick="renderAll()">▶ Regenerar con API</button>
+  <button onclick="toggleTheme()">🌓 Toggle dark mode</button>
+  <button onclick="location.reload()">🔄 Reset</button>
+</div>
+
+<!-- ════════════════════════════════════════════════════
+     COMPONENTES (renderizados por KairSkeleton.*)
+     ════════════════════════════════════════════════════ -->
+
+<div class="demo-card">
+  <h3>1 · <code>KairSkeleton.section()</code> + <code>KairSkeleton.filters(4)</code></h3>
+  <div id="demo-section"></div>
+  <div class="code-snippet">container.innerHTML = KairSkeleton.section() + KairSkeleton.filters(4);</div>
+</div>
+
+<div class="demo-card">
+  <h3>2 · <code>KairSkeleton.kpiStrip(4)</code> — Tira de 4 KPIs</h3>
+  <div id="demo-kpis"></div>
+  <div class="code-snippet">container.innerHTML = KairSkeleton.kpiStrip(4);</div>
+</div>
+
+<div class="demo-card">
+  <h3>3 · <code>KairSkeleton.table(8, 6)</code> — Tabla con 8 filas × 6 columnas</h3>
+  <div id="demo-table"></div>
+  <div class="code-snippet">container.innerHTML = KairSkeleton.table(8, 6);</div>
+</div>
+
+<div class="demo-card">
+  <h3>4 · <code>KairSkeleton.chartBars(12)</code> — Chart de barras (12 meses)</h3>
+  <div id="demo-bars"></div>
+  <div class="code-snippet">container.innerHTML = KairSkeleton.chartBars(12);</div>
+</div>
+
+<div class="demo-card">
+  <h3>5 · <code>KairSkeleton.chartDonut()</code> — Donut + leyenda</h3>
+  <div id="demo-donut"></div>
+  <div class="code-snippet">container.innerHTML = KairSkeleton.chartDonut();</div>
+</div>
+
+<div class="demo-card">
+  <h3>6 · <code>KairSkeleton.list(6)</code> — Lista con 6 items</h3>
+  <div id="demo-list"></div>
+  <div class="code-snippet">container.innerHTML = KairSkeleton.list(6);</div>
+</div>
+
+<div class="demo-card">
+  <h3>7 · <code>KairSkeleton.detail(5)</code> — Vista detalle</h3>
+  <div id="demo-detail"></div>
+  <div class="code-snippet">container.innerHTML = KairSkeleton.detail(5);</div>
+</div>
+
+<div class="demo-card">
+  <h3>8 · <code>KairSkeleton.form(5)</code> — Formulario</h3>
+  <div id="demo-form"></div>
+  <div class="code-snippet">container.innerHTML = KairSkeleton.form(5);</div>
+</div>
+
+<div class="demo-card">
+  <h3>9 · <code>KairSkeleton.card({image: true})</code> — Card con imagen</h3>
+  <div id="demo-card" style="max-width:320px;"></div>
+  <div class="code-snippet">container.innerHTML = KairSkeleton.card({ image: true });</div>
+</div>
+
+<div class="demo-card">
+  <h3>10 · Helper <code>KairSkeleton.show(container, component, opts)</code> con auto-hide</h3>
+  <div id="demo-helper"></div>
+  <div class="code-snippet">KairSkeleton.show('#demo-helper', 'table', { rows: 5, cols: 4 });<br>
+setTimeout(() => KairSkeleton.hide('#demo-helper'), 3000);</div>
+</div>
+
+<!-- ════════════════════════════════════════════════════
+     CARGA EL SISTEMA REAL
+     ════════════════════════════════════════════════════ -->
+<script src="../shared/kair-skeleton.js"></script>
+<script>
+function renderAll() {
+  document.getElementById('demo-section').innerHTML = KairSkeleton.section() + KairSkeleton.filters(4);
+  document.getElementById('demo-kpis').innerHTML = KairSkeleton.kpiStrip(4);
+  document.getElementById('demo-table').innerHTML = KairSkeleton.table(8, 6);
+  document.getElementById('demo-bars').innerHTML = KairSkeleton.chartBars(12);
+  document.getElementById('demo-donut').innerHTML = KairSkeleton.chartDonut();
+  document.getElementById('demo-list').innerHTML = KairSkeleton.list(6);
+  document.getElementById('demo-detail').innerHTML = KairSkeleton.detail(5);
+  document.getElementById('demo-form').innerHTML = KairSkeleton.form(5);
+  document.getElementById('demo-card').innerHTML = KairSkeleton.card({ image: true });
+
+  // Demo del helper show/hide con auto-hide a los 4s
+  KairSkeleton.show('#demo-helper', 'table', { rows: 5, cols: 4 });
+}
+
+function toggleTheme() {
+  const html = document.documentElement;
+  html.setAttribute('data-theme', html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+}
+
+// Auto-render al cargar
+window.addEventListener('DOMContentLoaded', renderAll);
+</script>
+
+</body>
+</html>

@@ -6461,3 +6461,344 @@ position: relative;
     justify-content: center;
   }
 }
+
+/* ==========================================================================
+   📦483 (2026-07-04) — Skeleton Helpers v1.0 (sistema centralizado)
+
+   Sistema reutilizable de skeleton screens que imitan la forma del componente
+   real. Reutiliza el @keyframes km-loading-shimmer ya existente.
+
+   Prefijo: .ks-* (kair-skeleton) — NO colisiona con nada del proyecto.
+   Theming: via variables CSS --ks-base / --ks-highlight (light + dark).
+   Activado por window.KairSkeleton.* (ver shared/kair-skeleton.js).
+
+   COMPONENTES CUBIERTOS:
+   - .ks-bar (primitiva) + variantes: text, text-sm, text-lg, title, number,
+     avatar, button
+   - .ks-kpi-strip / .ks-kpi-card  → tira de KPIs
+   - .ks-table / .ks-table__header / .ks-table__row  → tabla con header
+   - .ks-chart + .ks-chart__body--bars / --donut / .ks-donut  → charts
+   - .ks-filters  → barra de filtros
+   - .ks-section / .ks-section__head  → header de sección
+   - .ks-form / .ks-form__field  → formulario
+   - .ks-detail / .ks-detail__row  → vista detalle
+   - .ks-list / .ks-list__item / .ks-list__body  → lista genérica
+   - .ks-card / .ks-card__body  → card individual
+   - .ks-skeleton-state  → wrapper de estado skeleton
+   - .ks-stagger  → cascada de delays (1..N hijos)
+   ========================================================================== */
+
+/* ── Variables CSS (color del shimmer según tema) ──────────────── */
+:root {
+  --ks-base: rgba(226, 232, 240, 0.55);
+  --ks-highlight: rgba(203, 213, 225, 0.95);
+  --ks-radius: 6px;
+}
+
+[data-theme="dark"],
+[data-theme="dark-legacy"] {
+  --ks-base: rgba(51, 65, 85, 0.45);
+  --ks-highlight: rgba(100, 116, 139, 0.95);
+}
+
+/* ── Primitiva .ks-bar ─────────────────────────────────────────── */
+.ks-bar {
+  display: inline-block;
+  background: linear-gradient(
+    90deg,
+    var(--ks-base) 25%,
+    var(--ks-highlight) 50%,
+    var(--ks-base) 75%
+  );
+  background-size: 200% 100%;
+  animation: km-loading-shimmer 1.4s ease-in-out infinite;
+  border-radius: var(--ks-radius);
+  vertical-align: middle;
+}
+
+.ks-bar.ks-text       { height: 12px; width: 100%; }
+.ks-bar.ks-text-sm    { height: 10px; width: 100%; }
+.ks-bar.ks-text-lg    { height: 16px; width: 100%; }
+.ks-bar.ks-title      { height: 22px; width: 60%; }
+.ks-bar.ks-number     { height: 36px; width: 70%; border-radius: 8px; }
+.ks-bar.ks-avatar     { width: 40px; height: 40px; border-radius: 50%; }
+.ks-bar.ks-button     { width: 120px; height: 36px; border-radius: 8px; }
+
+/* ── Stagger: cascada de delays para efecto "respiración" ──────── */
+.ks-stagger > .ks-bar:nth-child(1)  { animation-delay: 0s; }
+.ks-stagger > .ks-bar:nth-child(2)  { animation-delay: -0.15s; }
+.ks-stagger > .ks-bar:nth-child(3)  { animation-delay: -0.3s; }
+.ks-stagger > .ks-bar:nth-child(4)  { animation-delay: -0.45s; }
+.ks-stagger > .ks-bar:nth-child(5)  { animation-delay: -0.6s; }
+.ks-stagger > .ks-bar:nth-child(6)  { animation-delay: -0.75s; }
+.ks-stagger > .ks-bar:nth-child(7)  { animation-delay: -0.9s; }
+.ks-stagger > .ks-bar:nth-child(8)  { animation-delay: -1.05s; }
+.ks-stagger > .ks-bar:nth-child(9)  { animation-delay: -1.2s; }
+.ks-stagger > .ks-bar:nth-child(10) { animation-delay: -1.35s; }
+.ks-stagger > .ks-bar:nth-child(n+11) { animation-delay: -1.5s; }
+
+/* ── Wrapper de estado skeleton ────────────────────────────────── */
+.ks-skeleton-state {
+  display: block;
+  width: 100%;
+}
+
+/* ── KPI Strip ─────────────────────────────────────────────────── */
+.ks-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.ks-kpi-card {
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 104px;
+}
+
+[data-theme="dark"] .ks-kpi-card,
+[data-theme="dark-legacy"] .ks-kpi-card {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.ks-kpi-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* ── Tabla ─────────────────────────────────────────────────────── */
+.ks-table {
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg-card, #ffffff);
+}
+
+[data-theme="dark"] .ks-table,
+[data-theme="dark-legacy"] .ks-table {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.ks-table__header {
+  display: grid;
+  gap: 16px;
+  padding: 14px 20px;
+  background: var(--bg-header, #f8fafc);
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+
+[data-theme="dark"] .ks-table__header,
+[data-theme="dark-legacy"] .ks-table__header {
+  background: #0f172a;
+  border-bottom-color: #334155;
+}
+
+.ks-table__row {
+  display: grid;
+  gap: 16px;
+  padding: 14px 20px;
+  border-bottom: 1px solid #f1f5f9;
+  align-items: center;
+}
+
+.ks-table__row:last-child {
+  border-bottom: none;
+}
+
+[data-theme="dark"] .ks-table__row,
+[data-theme="dark-legacy"] .ks-table__row {
+  border-bottom-color: #334155;
+}
+
+/* ── Chart ─────────────────────────────────────────────────────── */
+.ks-chart {
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 12px;
+  padding: 20px;
+  min-height: 280px;
+}
+
+[data-theme="dark"] .ks-chart,
+[data-theme="dark-legacy"] .ks-chart {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.ks-chart__header {
+  margin-bottom: 16px;
+}
+
+.ks-chart__body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ks-chart__body--bars {
+  align-items: flex-end;
+  justify-content: space-around;
+  gap: 8px;
+  height: 200px;
+  padding-top: 12px;
+}
+
+.ks-chart__body--donut {
+  flex-direction: row;
+  gap: 24px;
+  min-height: 180px;
+}
+
+.ks-donut {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--ks-base) 0deg 90deg,
+    var(--ks-highlight) 90deg 180deg,
+    var(--ks-base) 180deg 270deg,
+    var(--ks-highlight) 270deg 360deg
+  );
+  flex-shrink: 0;
+}
+
+.ks-donut-legend {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* ── Filtros ───────────────────────────────────────────────────── */
+.ks-filters {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+/* ── Section header ────────────────────────────────────────────── */
+.ks-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.ks-section__head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Form ──────────────────────────────────────────────────────── */
+.ks-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.ks-form__field {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Detail ────────────────────────────────────────────────────── */
+.ks-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ks-detail__row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.ks-detail__row:last-child {
+  border-bottom: none;
+}
+
+[data-theme="dark"] .ks-detail__row,
+[data-theme="dark-legacy"] .ks-detail__row {
+  border-bottom-color: #334155;
+}
+
+/* ── List ──────────────────────────────────────────────────────── */
+.ks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ks-list__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 10px;
+}
+
+[data-theme="dark"] .ks-list__item,
+[data-theme="dark-legacy"] .ks-list__item {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.ks-list__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* ── Card ──────────────────────────────────────────────────────── */
+.ks-card {
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+[data-theme="dark"] .ks-card,
+[data-theme="dark-legacy"] .ks-card {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.ks-card__body {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Reduced motion ────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .ks-bar,
+  .ks-donut {
+    animation: none;
+  }
+}
