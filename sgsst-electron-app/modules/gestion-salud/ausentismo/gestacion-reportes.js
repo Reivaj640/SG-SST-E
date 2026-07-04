@@ -1404,12 +1404,13 @@
 
     // ─── Init ───
     document.addEventListener('DOMContentLoaded', function () {
-        console.log('[REPORTES-GESTACION] Inicializando vista de reportes (📦478-fix scroll)...');
+        console.log('[REPORTES-GESTACION] Inicializando vista de reportes (📦479 scroll fixed)...');
         _setupChartDefaults();
         _renderReporte();
         _actualizarBotonesExportar();
         _bindHeader();
         _applyCompanyContext();
+        _setupScrollIndicators();  /* 📦479 */
         // 📦478-fix — Log de diagnóstico: confirmar altura computada
         setTimeout(function () {
             var main = document.querySelector('.gr-main');
@@ -1420,10 +1421,72 @@
                     height: rect.height,
                     scrollHeight: main.scrollHeight,
                     clientHeight: main.clientHeight,
-                    overflowY: getComputedStyle(main).overflowY
+                    overflowY: getComputedStyle(main).overflowY,
+                    hasMore: main.scrollHeight > main.clientHeight
                 });
             }
         }, 500);
     });
+
+    /**
+     * 📦479 — Indicadores visuales de scroll.
+     * - Agrega clase .gr-main--has-more al contenedor cuando hay scroll pendiente
+     *   (muestra gradient fade al fondo — pista visual).
+     * - Quita la clase cuando se llega al final.
+     * - Agrega botón flotante "scroll to top" si el scroll es > 200px.
+     */
+    function _setupScrollIndicators() {
+        var main = document.querySelector('.gr-main');
+        if (!main) return;
+        // Crear botón flotante "ir arriba" (oculto por default)
+        var btn = document.createElement('button');
+        btn.id = 'grScrollTopBtn';
+        btn.innerHTML = '<i class="bi bi-arrow-up"></i>';
+        btn.title = 'Ir al inicio';
+        btn.style.cssText = [
+            'position: fixed',
+            'bottom: 24px',
+            'right: 36px',
+            'width: 44px',
+            'height: 44px',
+            'border-radius: 50%',
+            'background: #174ea6',
+            'color: #fff',
+            'border: none',
+            'box-shadow: 0 4px 12px rgba(0,0,0,0.2)',
+            'cursor: pointer',
+            'font-size: 1.1rem',
+            'z-index: 9999',
+            'display: none',
+            'align-items: center',
+            'justify-content: center',
+            'transition: opacity 0.2s, transform 0.2s'
+        ].join(';');
+        btn.addEventListener('click', function () {
+            main.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+        btn.addEventListener('mouseenter', function () { btn.style.transform = 'translateY(-2px)'; });
+        btn.addEventListener('mouseleave', function () { btn.style.transform = 'translateY(0)'; });
+        document.body.appendChild(btn);
+
+        function _update() {
+            var hasMore = main.scrollHeight - main.scrollTop - main.clientHeight > 4;
+            var isAtTop = main.scrollTop < 200;
+            if (hasMore) {
+                main.classList.add('gr-main--has-more');
+            } else {
+                main.classList.remove('gr-main--has-more');
+            }
+            btn.style.display = isAtTop ? 'none' : 'flex';
+        }
+        main.addEventListener('scroll', _update);
+        // Observar cambios de tamaño del contenido (charts se renderizan async)
+        if (typeof ResizeObserver !== 'undefined') {
+            new ResizeObserver(_update).observe(main);
+        }
+        // Chequeo inicial después del primer render de charts
+        setTimeout(_update, 800);
+        setTimeout(_update, 2000);
+    }
 
 })();
