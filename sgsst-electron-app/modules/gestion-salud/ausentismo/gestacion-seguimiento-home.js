@@ -232,6 +232,11 @@
                 '<td>' +
                     '<div class="gs-row-actions">' +
                         '<button class="gs-row-btn primary" title="Ver seguimiento mensual" onclick="event.stopPropagation(); abrirSeguimientoMensual(\'' + _esc(g.id) + '\');"><i class="fas fa-notes-medical"></i></button>' +
+                        (g.estado === 'cerrado'
+                            ? '<button class="gs-row-btn warning" title="Reabrir caso" onclick="event.stopPropagation(); toggleEstadoGestante(\'' + _esc(g.id) + '\', \'cerrado\', \'' + _esc(g.nombre) + '\');"><i class="fas fa-lock-open"></i></button>'
+                            : '<button class="gs-row-btn warning" title="Cerrar caso" onclick="event.stopPropagation(); toggleEstadoGestante(\'' + _esc(g.id) + '\', \'' + _esc(g.estado || 'activo') + '\', \'' + _esc(g.nombre) + '\');"><i class="fas fa-lock"></i></button>'
+                        ) +
+                        '<button class="gs-row-btn danger" title="Eliminar gestante" onclick="event.stopPropagation(); confirmarEliminarGestante(\'' + _esc(g.id) + '\', \'' + _esc(g.nombre) + '\', \'' + _esc(g.cedula) + '\');"><i class="fas fa-trash"></i></button>' +
                     '</div>' +
                 '</td>' +
             '</tr>';
@@ -489,6 +494,74 @@
         }
     }
 
+    // ─── Toggle Cerrar/Reabrir caso ───
+    // 📦468 (2026-07-03) — Botón "lock" en acciones de fila para alternar estado activo/cerrado.
+    // Mismo IPC `gestacionActualizarGestante` que el resto del módulo, sin agregar handler nuevo.
+    async function _toggleEstadoGestante(gestanteId, estadoActual, nombre) {
+        var nuevoEstado = estadoActual === 'cerrado' ? 'activo' : 'cerrado';
+        var verbo = nuevoEstado === 'cerrado' ? 'Cerrar' : 'Reabrir';
+        var explicacion = nuevoEstado === 'cerrado'
+            ? 'El caso se marcará como cerrado y no contará en los KPIs de gestantes activas.'
+            : 'El caso volverá a estado activo y volverá a contar en los KPIs.';
+        var confirmed = await window.KAIRUtils.showConfirm(
+            '¿' + verbo + ' el caso de "' + nombre + '"?\n\n' + explicacion
+        );
+        if (!confirmed) return;
+
+        _setSyncBadge('saving');
+        try {
+            var res = await window.electronAPI.gestacionActualizarGestante({
+                empresaId: _state.empresaId,
+                gestanteId: gestanteId,
+                data: { estado: nuevoEstado }
+            });
+            if (res && res.success) {
+                _mostrarToast('success', 'Estado actualizado',
+                    'Caso de ' + nombre + ' ahora está ' + (nuevoEstado === 'cerrado' ? 'cerrado' : 'activo') + '.');
+                await _cargarDatos();
+            } else {
+                _setSyncBadge('error');
+                var msg = (res && res.error && res.error.message) || 'Error desconocido';
+                _mostrarToast('error', 'Error al ' + verbo.toLowerCase(), msg);
+            }
+        } catch (e) {
+            _setSyncBadge('error');
+            _mostrarToast('error', 'Error de conexión', e.message);
+        }
+    }
+
+    // ─── Confirmar + Eliminar gestante ───
+    // 📦468 — Botón "trash" en acciones de fila.
+    // Backend: `gestacionEliminarGestante` ya borra seguimientos por FK CASCADE.
+    async function _confirmarEliminarGestante(gestanteId, nombre, cedula) {
+        var confirmed = await window.KAIRUtils.showConfirm(
+            '¿Eliminar a "' + nombre + '" (CC ' + cedula + ')?\n\n' +
+            '⚠️ Se eliminarán también todos sus seguimientos mensuales.\n\n' +
+            'Esta acción NO se puede deshacer.'
+        );
+        if (!confirmed) return;
+
+        _setSyncBadge('saving');
+        try {
+            var res = await window.electronAPI.gestacionEliminarGestante({
+                empresaId: _state.empresaId,
+                gestanteId: gestanteId
+            });
+            if (res && res.success) {
+                _mostrarToast('success', 'Gestante eliminada',
+                    nombre + ' y sus seguimientos fueron eliminados.');
+                await _cargarDatos();
+            } else {
+                _setSyncBadge('error');
+                var msg = (res && res.error && res.error.message) || 'Error desconocido';
+                _mostrarToast('error', 'Error al eliminar', msg);
+            }
+        } catch (e) {
+            _setSyncBadge('error');
+            _mostrarToast('error', 'Error de conexión', e.message);
+        }
+    }
+
     // ─── Exportar CSV ───
     function _exportarCSV() {
         var datos = _state.gestantes;
@@ -568,6 +641,9 @@
     window.cerrarModalNuevaGestante = _cerrarModalNuevaGestante;
     window.guardarNuevaGestante = _guardarNuevaGestante;
     window.exportarExcel = _exportarCSV;
+    // 📦468 — Acciones de fila
+    window.toggleEstadoGestante = _toggleEstadoGestante;
+    window.confirmarEliminarGestante = _confirmarEliminarGestante;
 
     window.volverAlHome = function () {
         if (window.parent && window.parent.postMessage) {
