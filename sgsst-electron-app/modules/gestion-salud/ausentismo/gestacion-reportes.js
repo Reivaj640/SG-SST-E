@@ -1128,13 +1128,279 @@
     };
     // 📦476 — Stubs de exportar (se implementan en ese commit)
     window.exportarExcelReportes = function () {
-        if (!_state.datosReporte) return;
-        _mostrarToast('info', 'Exportar Excel', 'Funcionalidad disponible en 📦476');
+        if (!_state.datosReporte) {
+            _mostrarToast('warning', 'Sin datos', 'No hay datos para exportar.');
+            return;
+        }
+        exportarExcelReportes();
     };
     window.imprimirReportes = function () {
-        if (!_state.datosReporte) return;
-        _mostrarToast('info', 'Imprimir / PDF', 'Funcionalidad disponible en 📦476');
+        if (!_state.datosReporte) {
+            _mostrarToast('warning', 'Sin datos', 'No hay datos para imprimir.');
+            return;
+        }
+        imprimirReportesPDF();
     };
+
+    // ═══════════════════════════════════════════════════════════════════
+    // 📦476 — EXPORTACIÓN (Excel + PDF)
+    // Excel: renderer-puro (sin IPC), genera CSV con BOM UTF-8 (consistente con
+    //   gestacion-seguimiento-home.js:_exportarCSV y otros 5+ módulos del proyecto).
+    // PDF: usa window.electronAPI.printInformeToPdf (handler existente en
+    //   main.js:4734) con el truco de canvas→img para capturar los charts
+    //   de Chart.js antes de la impresión.
+    // ═══════════════════════════════════════════════════════════════════
+
+    function exportarExcelReportes() {
+        var d = _state.datosReporte;
+        var tipo = _state.tipoReporte;
+        var headers, rows;
+
+        if (tipo === 'individual') {
+            // 1 hoja con datos personales + tabla de seguimientos
+            headers = ['Trabajadora', 'Cédula', 'Cargo', 'Área', 'Empresa', 'Cliente',
+                'Estado', 'Clasificación', 'FPP', 'Notificación',
+                'Periodo', 'Fecha', 'Semanas', 'Estado Seg.', 'Permisos', 'Emocional', 'Acciones'];
+            rows = [headers.join(',')];
+            var segs = (d.detalleSeguimientos || []).filter(function (s) {
+                return s.gestanteId === _state.filtros.gestanteId;
+            });
+            var g = (d.gestantes && d.gestantes[0]) || {};
+            for (var i = 0; i < segs.length; i++) {
+                var s = segs[i];
+                rows.push([
+                    _csvField(g.nombre || s.gestante),
+                    g.cedula || s.cedula || '',
+                    _csvField(g.cargo || s.cargo),
+                    _csvField(g.area || s.area),
+                    _csvField(g.empresaNombre || g.empresa || ''),
+                    _csvField(g.empresaCliente || s.empresaCliente),
+                    g.estado || '',
+                    g.clasificacion || s.riesgo,
+                    g.fpp || '',
+                    g.fechaNotificacion || '',
+                    s.periodo || '',
+                    s.fecha || '',
+                    s.semanas || 0,
+                    s.estado || '',
+                    s.permisos || 0,
+                    s.emocional || '',
+                    s.acciones || 0
+                ].join(','));
+            }
+        } else {
+            // Ejecutivo o Detallado: 1 hoja con KPIs + tabla detalle
+            // Cabecera con metadatos del reporte
+            rows = [
+                'Reporte,' + (tipo === 'ejecutivo' ? 'Resumen Ejecutivo' : 'Detallado'),
+                'Empresa,' + _csvField((d.empresa && (d.empresa.nombre || d.empresa.id)) || ''),
+                'Periodo,' + _csvField(d.periodo.etiqueta || '') + ' (' + d.periodo.desde + ' a ' + d.periodo.hasta + ')',
+                'Generado,' + _csvField(new Date(d.fechaGeneracion).toLocaleString('es-CO')),
+                '',
+                'KPIS',
+                'Gestantes activas,' + d.kpis.gestantesActivas,
+                'Seguimientos completados,' + d.kpis.seguimientosCompletados,
+                'Seguimientos programados,' + d.kpis.seguimientosProgramados,
+                'Seguimientos vencidos,' + d.kpis.seguimientosVencidos,
+                'Cumplimiento frecuencia (%),' + d.kpis.cumplimientoFrecuencia,
+                'Tasa finalización (%),' + d.kpis.tasaFinalizacion,
+                'Alertas críticas,' + d.kpis.alertasCriticas,
+                'Promedio bienestar emocional,' + d.kpis.promedioBienestarEmocional.formato,
+                '',
+                'DISTRIBUCIÓN POR RIESGO',
+                'Bajo Riesgo,' + d.distribucionRiesgo.bajo,
+                'Alto Riesgo,' + d.distribucionRiesgo.alto,
+                'Muy Alto Riesgo,' + d.distribucionRiesgo.muyAlto,
+                '',
+                'DISTRIBUCIÓN POR ÁREA'
+            ];
+            for (var k = 0; k < d.distribucionArea.length; k++) {
+                rows.push(d.distribucionArea[k].area + ',' + d.distribucionArea[k].count);
+            }
+            rows.push('');
+            rows.push('DETALLE DE SEGUIMIENTOS');
+            rows.push(['Trabajadora', 'Cédula', 'Cargo', 'Área', 'Cliente',
+                'Periodo', 'Fecha', 'Riesgo', 'Semanas', 'Estado', 'Permisos', 'Emocional', 'Acciones'].join(','));
+            for (var j = 0; j < d.detalleSeguimientos.length; j++) {
+                var x = d.detalleSeguimientos[j];
+                rows.push([
+                    _csvField(x.gestante),
+                    x.cedula || '',
+                    _csvField(x.cargo),
+                    _csvField(x.area),
+                    _csvField(x.empresaCliente),
+                    x.periodo || '',
+                    x.fecha || '',
+                    x.riesgo || '',
+                    x.semanas || 0,
+                    x.estado || '',
+                    x.permisos || 0,
+                    x.emocional || '',
+                    x.acciones || 0
+                ].join(','));
+            }
+        }
+
+        var csv = rows.join('\n');
+        // BOM para que Excel respete UTF-8
+        var blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        var tipoLabel = tipo === 'ejecutivo' ? 'ejecutivo' : (tipo === 'individual' ? 'individual' : 'detallado');
+        var fechaHoy = new Date().toISOString().slice(0, 10);
+        a.download = 'reporte-gestacion-' + tipoLabel + '-' + fechaHoy + '.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+        _mostrarToast('success', 'Exportación completa',
+            'Se descargaron ' + (d.detalleSeguimientos.length || 0) + ' registros.');
+    }
+
+    function _csvField(s) {
+        if (s == null) return '';
+        return '"' + String(s).replace(/"/g, '""') + '"';
+    }
+
+    /**
+     * Imprimir/guardar como PDF usando el handler `print-informe-to-pdf` (main.js:4734).
+     * Estrategia:
+     *   1. Capturar charts como <img> PNG (canvas→img) antes de imprimir
+     *   2. Construir HTML autocontenido con CSS embebido + header K+AIR
+     *   3. Llamar window.electronAPI.printInformeToPdf
+     *   4. Restaurar canvas originales (re-renderizar charts) después
+     */
+    function imprimirReportesPDF() {
+        var d = _state.datosReporte;
+        var tipo = _state.tipoReporte;
+        var container = document.getElementById('grReporteContainer');
+        if (!container) return;
+
+        // Paso 1: capturar charts como imágenes
+        var n = _captureChartsAsImages('grReporteContainer');
+
+        // Paso 2: construir HTML autocontenido
+        var tipoLabel = tipo === 'ejecutivo' ? 'Resumen Ejecutivo' : (tipo === 'individual' ? 'Reporte Individual' : 'Reporte Detallado');
+        var filename = 'reporte-gestacion-' + tipo + '-' + new Date().toISOString().slice(0, 10);
+        var htmlContent = _buildHtmlForPdf(container.innerHTML, tipoLabel, d);
+
+        // Paso 3: enviar al backend
+        _setSyncBadge('saving');
+        window.electronAPI.printInformeToPdf({
+            html: htmlContent,
+            filename: filename,
+            targetFolder: null  // null = dejar que el SO pida al usuario
+        }).then(function (result) {
+            _setSyncBadge('synced');
+            if (result && result.success) {
+                _mostrarToast('success', 'PDF generado', 'Archivo: ' + (result.path || filename));
+            } else {
+                _mostrarToast('warning', 'Imprimir cancelado',
+                    (result && result.error) || 'El usuario canceló o hubo un error.');
+            }
+        }).catch(function (err) {
+            _setSyncBadge('error');
+            _mostrarToast('error', 'Error al generar PDF', err.message || String(err));
+        }).then(function () {
+            // Paso 4: restaurar canvas originales (si los hubo)
+            if (n > 0) {
+                var restored = _restoreChartsFromImages('grReporteContainer');
+                // Re-renderizar charts con datos actuales
+                _renderDemosChartsSegunTipo();
+            }
+        });
+    }
+
+    /**
+     * Construye HTML autocontenido para el PDF: replica el contenido pero con
+     * estilos CSS completos embebidos (printToPDF no carga el CSS del HTML original).
+     */
+    function _buildHtmlForPdf(contenidoReporte, tipoLabel, d) {
+        var fechaGen = new Date(d.fechaGeneracion).toLocaleString('es-CO');
+        return '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">' +
+            '<title>K+AIR — ' + tipoLabel + '</title>' +
+            '<style>' + _pdfCss() + '</style>' +
+            '</head><body>' +
+            '<div class="pdf-header">' +
+                '<div class="pdf-header__logo">K+AIR · SG-SST</div>' +
+                '<div class="pdf-header__title">' + _esc(tipoLabel) + '</div>' +
+                '<div class="pdf-header__date">' + _esc(fechaGen) + '</div>' +
+            '</div>' +
+            contenidoReporte +
+            '</body></html>';
+    }
+
+    function _pdfCss() {
+        // CSS mínimo necesario para que el PDF se vea similar a la vista
+        return '' +
+            '@page { size: A4 portrait; margin: 12mm; }' +
+            '* { box-sizing: border-box; }' +
+            'body { font-family: "Segoe UI", Roboto, sans-serif; color: #212529; font-size: 10pt; margin: 0; }' +
+            '.pdf-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 2px solid #174ea6; margin-bottom: 14px; }' +
+            '.pdf-header__logo { font-weight: 700; color: #174ea6; font-size: 11pt; }' +
+            '.pdf-header__title { font-weight: 600; font-size: 13pt; color: #174ea6; }' +
+            '.pdf-header__date { color: #6c757d; font-size: 9pt; }' +
+            '.gr-rep__doc-header { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 2px solid #174ea6; margin-bottom: 12px; }' +
+            '.gr-rep__doc-icon { width: 40px; height: 40px; background: #174ea6; color: #fff; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }' +
+            '.gr-rep__doc-title { font-size: 14pt; font-weight: 700; color: #174ea6; }' +
+            '.gr-rep__doc-subtitle { font-size: 9pt; color: #6c757d; margin-top: 2px; }' +
+            '.gr-rep__doc-fecha { margin-left: auto; text-align: right; }' +
+            '.gr-rep__doc-fecha-label { font-size: 8pt; color: #6c757d; text-transform: uppercase; letter-spacing: 0.05em; }' +
+            '.gr-rep__doc-fecha-value { font-size: 10pt; font-weight: 600; margin-top: 2px; }' +
+            '.gr-rep__meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 10px 12px; background: #f8f9fa; border-radius: 6px; margin-bottom: 14px; font-size: 9pt; }' +
+            '.gr-rep__meta-item { display: flex; align-items: flex-start; gap: 6px; }' +
+            '.gr-rep__meta-label { font-size: 7pt; color: #6c757d; text-transform: uppercase; }' +
+            '.gr-rep__meta-value { font-weight: 500; margin-top: 2px; }' +
+            '.gr-rep__confidential { background: #fef3c7; border: 1px solid #f59e0b; border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; display: flex; gap: 10px; font-size: 9pt; color: #78350f; line-height: 1.5; }' +
+            '.gr-rep__confidential i { color: #f59e0b; font-size: 1.1rem; }' +
+            '.gr-rep__confidential strong { font-weight: 700; }' +
+            '.gr-rep__kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 18px; }' +
+            '.gr-rep__kpi { background: #fff; border: 1px solid #dee2e6; border-radius: 6px; padding: 10px 12px; text-align: center; }' +
+            '.gr-rep__kpi-value { font-size: 18pt; font-weight: 700; line-height: 1.1; }' +
+            '.gr-rep__kpi-value.success { color: #28a745; }' +
+            '.gr-rep__kpi-value.warning { color: #b45309; }' +
+            '.gr-rep__kpi-value.danger { color: #dc3545; }' +
+            '.gr-rep__kpi-label { font-size: 8pt; color: #6c757d; margin-top: 4px; text-transform: uppercase; }' +
+            '.gr-rep__kpi-sub { font-size: 7pt; color: #6c757d; margin-top: 2px; }' +
+            '.gr-rep__section { margin-bottom: 14px; page-break-inside: avoid; }' +
+            '.gr-rep__section-title { font-size: 10pt; font-weight: 700; color: #174ea6; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid #e8f0fe; }' +
+            '.gr-rep__narrative { background: #fff; border: 1px solid #dee2e6; border-radius: 6px; padding: 12px 14px; line-height: 1.5; font-size: 10pt; }' +
+            '.gr-rep__narrative strong { color: #174ea6; }' +
+            '.gr-rep__narrative .crit { color: #dc3545; font-weight: 600; }' +
+            '.gr-chart-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px; }' +
+            '.gr-chart-grid--single { grid-template-columns: 1fr; }' +
+            '.gr-chart-card { background: #fff; border: 1px solid #dee2e6; border-radius: 6px; padding: 12px 14px; page-break-inside: avoid; }' +
+            '.gr-chart-card__title { font-size: 9pt; font-weight: 700; color: #174ea6; text-transform: uppercase; margin-bottom: 8px; }' +
+            '.gr-chart-canvas-wrap, .gr-chart-canvas-wrap--tall { position: relative; width: 100%; height: 200px; }' +
+            '.gr-chart-canvas-wrap--tall { height: 240px; }' +
+            '.gr-chart-canvas-wrap img { width: 100%; height: 100%; object-fit: contain; }' +
+            '.gr-chart-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none; }' +
+            '.gr-chart-center__value { font-size: 18pt; font-weight: 700; line-height: 1.1; }' +
+            '.gr-chart-center__label { font-size: 7pt; color: #6c757d; text-transform: uppercase; }' +
+            '.gr-rep__table-wrap { overflow: visible; background: #fff; border: 1px solid #dee2e6; border-radius: 6px; }' +
+            '.gr-rep__table { width: 100%; border-collapse: collapse; font-size: 8pt; }' +
+            '.gr-rep__table th { background: #f8f9fa; color: #6c757d; font-size: 7pt; font-weight: 700; text-transform: uppercase; padding: 8px 10px; text-align: left; border-bottom: 1px solid #dee2e6; }' +
+            '.gr-rep__table td { padding: 7px 10px; border-bottom: 1px solid #f1f3f5; vertical-align: middle; }' +
+            '.gr-rep__table tr:last-child td { border-bottom: none; }' +
+            '.gr-rep__badge { display: inline-block; padding: 2px 7px; border-radius: 999px; font-size: 7pt; font-weight: 600; white-space: nowrap; }' +
+            '.gr-rep__badge.bajo { background: rgba(40,167,69,0.1); color: #155724; }' +
+            '.gr-rep__badge.alto { background: rgba(255,193,7,0.1); color: #856404; }' +
+            '.gr-rep__badge.muy-alto { background: rgba(220,53,69,0.1); color: #721c24; }' +
+            '.gr-rep__badge.completado { background: rgba(40,167,69,0.1); color: #155724; }' +
+            '.gr-rep__badge.vencido { background: rgba(220,53,69,0.1); color: #721c24; }' +
+            '.gr-rep__alerta { background: rgba(220,53,69,0.08); border-left: 3px solid #dc3545; padding: 8px 12px; margin-bottom: 6px; border-radius: 4px; font-size: 9pt; }' +
+            '.gr-rep__alerta strong { color: #dc3545; }' +
+            '.gr-rep__totales-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }' +
+            '.gr-rep__total-card { background: #fff; border: 1px solid #dee2e6; border-radius: 6px; padding: 8px 10px; display: flex; align-items: center; gap: 8px; }' +
+            '.gr-rep__total-card-value { font-size: 12pt; font-weight: 700; }' +
+            '.gr-rep__total-card-label { font-size: 7pt; color: #6c757d; text-transform: uppercase; }' +
+            '.gr-rep__firma { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 14px 0; border-top: 2px solid #dee2e6; margin-top: 18px; }' +
+            '.gr-rep__firma-block { padding: 12px 14px; background: #f8f9fa; border-radius: 6px; }' +
+            '.gr-rep__firma-label { font-size: 8pt; color: #6c757d; text-transform: uppercase; margin-bottom: 4px; }' +
+            '.gr-rep__firma-nombre { font-size: 11pt; font-weight: 700; margin-top: 20px; }' +
+            '.gr-rep__firma-cargo { font-size: 8pt; color: #6c757d; margin-top: 2px; }';
+    }
 
     // ─── Init ───
     document.addEventListener('DOMContentLoaded', function () {
