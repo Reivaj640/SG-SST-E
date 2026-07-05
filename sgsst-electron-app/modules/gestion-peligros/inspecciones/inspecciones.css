@@ -1305,34 +1305,6 @@ COMPONENTES BASE (botones, cards, modal, notificación)
   max-width: 400px;
 }
 
-/* --- Loading --- */
-.kair-insp-loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: var(--kair-insp-space-12) var(--kair-insp-space-4);
-  gap: var(--kair-insp-space-3);
-}
-
-.kair-insp-spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid var(--kair-insp-border-light);
-  border-radius: 50%;
-  border-top-color: var(--kair-insp-primary);
-  animation: kairInspSpin 0.8s linear infinite;
-}
-
-@keyframes kairInspSpin {
-  to { transform: rotate(360deg); }
-}
-
-.kair-insp-loading p {
-  font-size: var(--kair-insp-font-size-sm);
-  color: var(--kair-insp-text-muted);
-}
-
 /* ==========================================================================
 FORMULARIO — Tipo Tabs (Extintor / Instalación / Emergencia / Botiquín)
 ========================================================================== */

@@ -369,23 +369,6 @@ body {
 .rm-card.expanded .rm-chevron { transform: rotate(180deg); }
 .rm-chevron { transition: transform 0.3s; color: var(--rm-text-muted); font-size: 0.85rem; }
 
-/* ═══ LOADING ═══ */
-.rm-loading {
-    text-align: center;
-    padding: 3rem 1rem;
-}
-
-.rm-spinner {
-    width: 36px; height: 36px;
-    border: 3px solid var(--rm-border-light);
-    border-top-color: var(--rm-primary);
-    border-radius: 50%;
-    animation: rm-spin 0.8s linear infinite;
-    margin: 0 auto 1rem;
-}
-
-@keyframes rm-spin { to { transform: rotate(360deg); } }
-
 /* ═══ EMPTY STATE ═══ */
 .rm-empty {
     text-align: center;

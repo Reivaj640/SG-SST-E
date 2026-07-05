@@ -144,46 +144,6 @@ class MedicionAusentismoComponent {
         return true;
     }
 
-    /* 📦443 (2026-06-25) — Helper de loading animado estándar.
-       Devuelve HTML para insertar en <td colspan> o contenedor cuando se está
-       cargando datos. Usa animación CSS consistente con el resto del proyecto.
-       Parámetros:
-       - message: texto a mostrar ("Cargando seguimientos...", etc.)
-       - colspan: para usar dentro de <tr><td colspan="N">
-       Uso:
-         row.innerHTML = `<tr><td>${this._loadingRowHtml('Cargando X...', 17)}</td></tr>`;
-       O sin colspan:
-         container.innerHTML = this._loadingRowHtml('Cargando X...'); */
-    _loadingRowHtml(message, colspan) {
-        var colspanAttr = colspan ? ' colspan="' + colspan + '"' : '';
-        return `<td${colspanAttr} class="km-loading-cell">
-            <div class="km-loading-spinner">
-                <div class="km-loading-spinner__ring"></div>
-                <div class="km-loading-spinner__ring"></div>
-                <div class="km-loading-spinner__ring"></div>
-            </div>
-            <p class="km-loading-text">${message || 'Cargando...'}</p>
-            <div class="km-loading-skeleton">
-                <div class="km-loading-skeleton__bar"></div>
-                <div class="km-loading-skeleton__bar"></div>
-                <div class="km-loading-skeleton__bar"></div>
-            </div>
-        </td>`;
-    }
-
-    /* 📦443 — Helper de loading para contenedor (no fila de tabla).
-       Devuelve HTML para mostrar en un div vacío mientras se carga. */
-    _loadingBlockHtml(message) {
-        return `<div class="km-loading-block">
-            <div class="km-loading-spinner km-loading-spinner--lg">
-                <div class="km-loading-spinner__ring"></div>
-                <div class="km-loading-spinner__ring"></div>
-                <div class="km-loading-spinner__ring"></div>
-            </div>
-            <p class="km-loading-text">${message || 'Cargando...'}</p>
-        </div>`;
-    }
-
     /* 📦443 (2026-06-25) — Helper de notificación compatible con iframe.
        Resuelve window.parent.updateNotifier automáticamente (porque este archivo
        se ejecuta dentro de un iframe). Usar este helper en lugar de llamar
@@ -8097,7 +8057,6 @@ class MedicionAusentismoComponent {
             styleEl2.id = 'extended-stats-css';
             styleEl2.textContent = `
       .extended-stats-container { margin-top: 1.5rem; }
-      .extended-stats-container .es-loading { padding: 2rem; text-align: center; color: #6c757d; font-size: 0.9375rem; }
       .extended-stats-container .es-empty { padding: 2rem; text-align: center; color: #6c757d; font-size: 0.9375rem; }
       .es-tabs-header { background: #fff; border: 1px solid #dee2e6; border-radius: 0.625rem 0.625rem 0 0; padding: 1rem 1.25rem; border-bottom: none; }
       .es-tabs-title { margin: 0 0 0.875rem 0; font-size: 1.0625rem; font-weight: 600; color: #1a1a2e; display: flex; align-items: center; gap: 0.5rem; }

@@ -344,16 +344,8 @@ async function loadLibrary() {
 }
 
 function showLibraryLoading() {
-    document.getElementById('folderList').innerHTML = `
-        <div class="furat-loading">
-            <div class="furat-spinner"></div>
-            <p>Cargando biblioteca...</p>
-        </div>`;
-    document.getElementById('documentList').innerHTML = `
-        <div class="furat-empty-state furat-empty-state--large">
-            <i class="fas fa-folder-open"></i>
-            <h3>Cargando biblioteca...</h3>
-        </div>`;
+    document.getElementById('folderList').innerHTML = KairSkeleton.list(5);
+    document.getElementById('documentList').innerHTML = KairSkeleton.list(6);
 }
 
 function populateYearFilter(years) {
