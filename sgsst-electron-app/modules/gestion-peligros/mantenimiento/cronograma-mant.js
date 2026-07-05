@@ -68,7 +68,7 @@ Vista Cronograma — Tabla editable con toggles de meses y evidencias
 
    if (!kpisEl && !tableEl) return;
 
-   kpisEl.innerHTML = '<div class="kair-mnt-loading"><div class="kair-mnt-spinner"></div><p>Cargando cronograma...</p></div>';
+   kpisEl.innerHTML = KairSkeleton.kpiStrip(4);
 
    MantenimientoService.read(this.companyName).then(function (result) {
     if (!result.success) {
@@ -154,7 +154,7 @@ Vista Cronograma — Tabla editable con toggles de meses y evidencias
   _renderTable: function (container) {
    if (!container) return;
    if (!_data) {
-    container.innerHTML = '<div class="kair-mnt-loading"><div class="kair-mnt-spinner"></div><p>Cargando...</p></div>';
+    container.innerHTML = KairSkeleton.list(8);
     return;
    }
 
@@ -411,7 +411,7 @@ MantenimientoService.updateField(this.companyName, rowIndex, field, value).then(
     '<input type="file" id="kair-mnt-evidence-file-input" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" style="display:none">' +
     '</div>' +
     '<div class="kair-mnt-evidence__list" id="kair-mnt-evidence-list">' +
-    '<div class="kair-mnt-loading"><div class="kair-mnt-spinner"></div><p>Cargando evidencias...</p></div>' +
+    KairSkeleton.list(6) +
     '</div>';
 
    overlay.classList.add('visible');

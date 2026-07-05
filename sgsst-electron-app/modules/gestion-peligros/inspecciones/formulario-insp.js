@@ -92,7 +92,7 @@ var FormularioInsp = {
     this.currentMonth = null;
     this.currentYear = null;
 
-    body.innerHTML = '<div class="kair-insp-loading"><div class="kair-insp-spinner"></div><p>Cargando inspecciones ' + InspeccionesService.getTypeLabel(type) + '...</p></div>';
+    body.innerHTML = KairSkeleton.list(8);
 
     var self = this;
     InspeccionesService.listFilesByType(this.companyName, type).then(function (listResult) {
@@ -133,7 +133,7 @@ var FormularioInsp = {
       this.currentYear = matchingFile.year;
     }
 
-    body.innerHTML = '<div class="kair-insp-loading"><div class="kair-insp-spinner"></div><p>Cargando formulario...</p></div>';
+    body.innerHTML = KairSkeleton.form(6);
 
     InspeccionesService.readExcelByPath(this.companyName, this.currentType, filePath).then(function (result) {
       if (!result.success) {

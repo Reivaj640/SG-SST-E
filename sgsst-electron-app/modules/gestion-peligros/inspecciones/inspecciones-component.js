@@ -145,7 +145,7 @@ InspeccionesComponent.prototype._loadCSS = function (callback) {
 
     case 'formulario':
       return '<div id="kair-insp-formulario-content">' +
-        '<div class="kair-insp-loading"><div class="kair-insp-spinner"></div><p>Cargando formulario...</p></div>' +
+        KairSkeleton.form(6) +
         '</div>';
 
     case 'historial':

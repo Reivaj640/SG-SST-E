@@ -135,7 +135,7 @@ Patrón 4 Constructor: (container, currentCompany, moduleName, submoduleTitle, b
      '<div id="kair-mnt-cronograma-table"></div>';
    case 'resumen':
     return '<div id="kair-mnt-resumen-content">' +
-     '<div class="kair-mnt-loading"><div class="kair-mnt-spinner"></div><p>Cargando resumen...</p></div>' +
+     KairSkeleton.kpiStrip(4) +
      '</div>';
    default:
     return '<div class="kair-mnt-empty-state"><i class="bi bi-inbox"></i><h3>Vista no disponible</h3></div>';

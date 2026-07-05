@@ -70,7 +70,7 @@ var HistorialInsp = {
     var container = document.getElementById('kair-insp-historial-table');
     if (!container) return;
 
-    container.innerHTML = '<div class="kair-insp-loading"><div class="kair-insp-spinner"></div><p>Cargando archivos...</p></div>';
+    container.innerHTML = KairSkeleton.list(8);
 
     InspeccionesService.listFiles(this.companyName).then(function (result) {
       if (!result.success) {
