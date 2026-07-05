@@ -64,8 +64,9 @@ class RecursosHome {
         layout.appendChild(contentContainer);
         this.container.appendChild(layout);
 
-        // 📦491-fix — Microtask delay para que el browser renderice el skeleton antes de reemplazarlo
-        await new Promise(r => requestAnimationFrame(r));
+        // 📦491-fix — Retardo de 200ms para que el browser pinte el skeleton y el ojo lo registre
+        // antes de que JS continue con la carga. Sin esto, el skeleton se borra antes de verse.
+        await new Promise(r => setTimeout(r, 200));
 
         // Renderizar contenido (limpia el skeleton y pinta widgets reales cuando llegan los datos)
         await this.renderMainArea(mainArea);

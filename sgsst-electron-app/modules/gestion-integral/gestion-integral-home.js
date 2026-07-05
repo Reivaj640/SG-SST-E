@@ -64,8 +64,9 @@ class GestionIntegralHome {
         layout.appendChild(contentContainer);
         this.container.appendChild(layout);
 
-        // 📦491-fix — Microtask delay para que el browser renderice el skeleton antes de reemplazarlo
-        await new Promise(r => requestAnimationFrame(r));
+        // 📦491-fix — Retardo de 200ms para que el browser pinte el skeleton y el ojo lo registre
+        // antes de que JS continue con la carga. Sin esto, el skeleton se borra antes de verse.
+        await new Promise(r => setTimeout(r, 200));
 
         // 0. Cargar estadísticas reales de Gestión Integral (skeleton visible durante la espera)
         await this.loadGestionIntegralStats();
