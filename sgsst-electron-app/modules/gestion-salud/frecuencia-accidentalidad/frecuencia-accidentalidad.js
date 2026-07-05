@@ -152,7 +152,7 @@ function cargarDatos() {
 
   var chartContainer = getElement('chartContainer');
   if (chartContainer) {
-    chartContainer.innerHTML = '<div class="kair-loading"><div class="kair-spinner"></div><p class="kair-loading-text">Cargando datos desde Excel...</p></div>';
+    chartContainer.innerHTML = KairSkeleton.chartBars(12);
   }
 
   var year = currentYear || undefined;

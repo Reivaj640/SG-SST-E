@@ -304,7 +304,7 @@
 
         modal.style.display = 'flex';
         titleEl.textContent = doc.name;
-        body.innerHTML = '<div class="rm-loading"><div class="rm-spinner"></div><p>Cargando vista previa…</p></div>';
+        body.innerHTML = KairSkeleton.detail(6);
 
         try {
             var ext = doc.extension;

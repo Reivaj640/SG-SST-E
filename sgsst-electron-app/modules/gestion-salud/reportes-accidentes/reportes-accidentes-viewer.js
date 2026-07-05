@@ -512,7 +512,7 @@ async function openPreviewModal(filePath) {
                      : 'fas fa-file';
 
     modal.classList.remove('hidden');
-    body.innerHTML = '<div class="furat-loading"><div class="furat-spinner"></div><p>Cargando documento...</p></div>';
+    body.innerHTML = KairSkeleton.detail(6);
 
     try {
         let result;

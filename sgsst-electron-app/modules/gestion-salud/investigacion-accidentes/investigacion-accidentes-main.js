@@ -1903,7 +1903,7 @@ currentPath = dirPath;
 selectedItem = null;
 renameBtn.disabled = true;
 deleteBtn.disabled = true;
-folderListEl.innerHTML = '<div class="save-modal-loading"><i class="fas fa-spinner fa-spin"></i> Cargando...</div>';
+folderListEl.innerHTML = KairSkeleton.list(6);
 
 try {
 const result = await callParentAPI('read-directory', { path: dirPath });
