@@ -3,7 +3,8 @@
 > Sistema centralizado de esqueletos de carga (skeleton screens) para reemplazar
 > spinners genéricos por placeholders que imitan la forma del componente real.
 >
-> **Versión:** 1.0 · **Introducido en:** 📦483 (2026-07-04)
+> **Versión:** 1.1 · **Introducido en:** 📦483 (2026-07-04)
+> **Homes principales:** 📦491 (2026-07-04)
 >
 > **API:** `window.KairSkeleton.*` (ver [`shared/kair-skeleton.js`](../shared/kair-skeleton.js))
 >
@@ -206,7 +207,9 @@ Todas respetan `[data-theme="dark"]` automáticamente.
 
 ## Vistas migradas (referencia)
 
-Las siguientes vistas usan `KairSkeleton.*` desde 📦484:
+### Vistas específicas (📦484-488)
+
+Las siguientes vistas específicas usan `KairSkeleton.*`:
 
 | Módulo | Archivo | Componentes usados |
 |---|---|---|
@@ -222,6 +225,64 @@ Las siguientes vistas usan `KairSkeleton.*` desde 📦484:
 | Gestión Salud · Frecuencia Accidentalidad | `frecuencia-accidentalidad.js` | `chartBars` |
 | Gestión Peligros · Mantenimiento (resumen + cronograma + evidencias) | `resumen-mant.js`, `mantenimiento-component.js`, `cronograma-mant.js` | `kpiStrip`, `list` |
 | Gestión Peligros · Inspecciones (formulario + historial) | `inspecciones-component.js`, `formulario-insp.js`, `historial-insp.js` | `form`, `list` |
+
+### Homes de módulo principales (📦491)
+
+Los homes de los 7 módulos principales (primera pantalla que ve el usuario al clickear un módulo desde el sidebar) usan el patrón **skeleton + render skeleton + await loadStats + render widgets reales**. El skeleton refleja exactamente la cantidad de widgets y tipo de charts que se pintan al final.
+
+| Módulo | Archivo | Skeleton | Widgets reales | Charts reales |
+|---|---|---|---|---|
+| Gestión Integral | `gestion-integral-home.js` | `kpiStrip(5) + 2×chartBars(12)` | 5 | 2 bar |
+| Recursos | `recursos-home.js` | `kpiStrip(6) + 3×chartBars(12)` | 6 | 3 (line/bar/line) |
+| Gestión de la Salud | `gestion-salud-home.js` | `kpiStrip(6) + 2×chartBars(12)` | 6 | 2 (bar/line) |
+| Gestión de Peligros | `gestion-peligros-home.js` | `kpiStrip(5) + chartBars(12) + chartDonut()` | 5 | 2 (bar/doughnut) |
+| Gestión de Amenazas | `gestion-amenazas-home.js` | `kpiStrip(2) + chartBars(12) + chartDonut()` | 2 | 2 (bar/doughnut) |
+| Verificación | `verificacion-home.js` | `kpiStrip(6) + chartBars(12) + chartDonut()` | 6 | 2 (bar/doughnut) |
+| Mejoramiento | `mejoramiento-home.js` | `kpiStrip(5) + chartBars(12) + chartDonut()` | 5 | 2 (bar/doughnut) |
+
+### Patrón estándar para homes de módulo
+
+```js
+async render() {
+    this.container.innerHTML = '';
+    this.currentCompany = this.getCurrentCompany();
+
+    // ... setup de layout, header, contentContainer, mainArea ...
+
+    // 1. Inyectar skeleton EN mainArea
+    mainArea.innerHTML = KairSkeleton.kpiStrip(5) + KairSkeleton.chartBars(12) + KairSkeleton.chartDonut();
+
+    // 2. Agregar al DOM (skeleton visible)
+    contentContainer.appendChild(mainArea);
+    layout.appendChild(contentContainer);
+    this.container.appendChild(layout);
+
+    // 3. Retardo 200ms para que el ojo registre el skeleton
+    //    (requestAnimationFrame es insuficiente, 16ms no se ve)
+    await new Promise(r => setTimeout(r, 200));
+
+    // 4. Cargar datos async (skeleton visible mientras espera)
+    await this.refreshStats();  // o await this.loadXxxStats()
+
+    // 5. Renderizar contenido real (limpia skeleton y pinta widgets)
+    await this.renderMainArea(mainArea);
+}
+
+async renderMainArea(container) {
+    // 📦491-fix — Limpiar skeleton antes de pintar widgets reales
+    container.innerHTML = '';
+
+    // ... crear widgets y charts con datos reales ...
+}
+```
+
+**Orden crítico:**
+1. `mainArea.innerHTML = skeleton` ← inyecta
+2. `appendChild` al DOM ← skeleton visible
+3. `await setTimeout(200)` ← ojo registra
+4. `await loadStats()` o `await renderMainArea()` ← carga y reemplaza
+
+**Si invertís el orden (1-3 después de 4)**, el skeleton nunca se ve porque el await termina antes de que mainArea sea visible en el DOM.
 
 ---
 
@@ -247,6 +308,94 @@ Las siguientes vistas usan `KairSkeleton.*` desde 📦484:
 - **Contenido muy específico**: si el componente real tiene una forma única (ej: wizard
   de 3 pasos, dashboard con widgets custom), podés combinar primitivas `.ks-bar()` para
   construir el skeleton manualmente.
+- **Skeleton apenas se ve con cache caliente**: cuando el backend ya tiene los datos en
+  memoria (`getRecursosStats`, `getAusentismoStats` cacheados), el `await` termina casi
+  instantáneamente. El `setTimeout(200)` previo al await garantiza 200ms de visibilidad
+  mínima — suficiente para que el ojo lo registre pero no se sienta lento.
+- **Overlays fullscreen no migran**: vistas como "Clonar Plan" o "Generar Informe PDF"
+  usan overlays fullscreen con spinner grande. Esos son acciones bloqueantes, no carga
+  de datos — el overlay es la UX correcta. NO se migran a skeletons.
+
+---
+
+## Troubleshooting
+
+### El skeleton se ve pero los widgets también aparecen al mismo tiempo (encimados)
+
+**Causa:** `renderMainArea()` no limpia el `container.innerHTML` antes de pintar widgets.
+
+**Fix:** agregar al inicio de `renderMainArea()`:
+```js
+async renderMainArea(container) {
+    container.innerHTML = '';  // ← esta línea
+    // ... resto del código
+}
+```
+
+### El skeleton no se ve nunca (aparece directo el widget real)
+
+**Causa:** el `await this.renderMainArea(mainArea)` corre ANTES de que `mainArea` se agregue al DOM. El `renderMainArea` limpia el skeleton antes de que sea visible.
+
+**Fix:** invertir el orden:
+```js
+// ❌ Mal
+await this.renderMainArea(mainArea);
+this.container.appendChild(layout);
+
+// ✅ Bien
+this.container.appendChild(layout);
+await new Promise(r => setTimeout(r, 200));
+await this.renderMainArea(mainArea);
+```
+
+### El skeleton aparece pero desaparece demasiado rápido (ni se registra)
+
+**Causa:** `requestAnimationFrame` (16ms) es insuficiente para que el ojo humano registre
+el skeleton. Especialmente con datos en cache o widgets síncronos.
+
+**Fix:** usar `setTimeout(200)` en lugar de `requestAnimationFrame`:
+```js
+// ❌ Insuficiente
+await new Promise(r => requestAnimationFrame(r));
+
+// ✅ Suficiente (200ms = 12 frames a 60fps)
+await new Promise(r => setTimeout(r, 200));
+```
+
+### El skeleton aparece pero los charts al fondo se ven vacíos
+
+**Causa:** el skeleton inyectado no coincide con la cantidad/tipo de charts reales. Los
+containers de los charts quedan vacíos hasta que JS los pinte con datos.
+
+**Fix:** verificar el código de `renderMainArea()` y contar:
+- `widgetsContainer.appendChild(...)` → cantidad de widgets
+- `chartsGrid.appendChild(...)` → cantidad de charts
+- `type: 'bar'` / `type: 'doughnut'` / `type: 'line'` → tipo de cada chart
+
+Y ajustar el `KairSkeleton.*` inyectado para que coincida exactamente.
+
+### El skeleton tiene conteo incorrecto (más o menos barritas que cards reales)
+
+**Causa:** el `kpiStrip(N)` y los `chartBars(12)` no coinciden con los widgets/charts
+que `renderMainArea()` realmente crea.
+
+**Fix:** usar el script automatizado para detectar el bug:
+```bash
+node -e "
+const fs=require('fs');
+const code=fs.readFileSync('TU_ARCHIVO.js','utf8');
+// ... cuenta widgetsContainer.appendChild y chartsGrid.appendChild
+"
+```
+
+O leer el código de `renderMainArea()` manualmente y ajustar el `KairSkeleton.*` para
+que refleje exactamente la estructura.
+
+### El skeleton nunca se borra (queda debajo de los widgets reales)
+
+**Causa:** `renderMainArea` no hace `container.innerHTML = ''` antes de pintar.
+
+**Fix:** ver primer punto de esta sección.
 
 ---
 
@@ -266,5 +415,33 @@ Las siguientes vistas usan `KairSkeleton.*` desde 📦484:
   - Bloque CSS `.ks-*` en `styles.css`
   - Demo interactivo
 - **📦484 (2026-07-04)** — Piloto en Medición Ausentismo
-- **📦485-488 (2026-07-04)** — Migración de 9 vistas en Gestión Salud y Gestión Peligros
-- **📦490 (2026-07-04)** — Cleanup: borrar CSS obsoletas, helpers JS, crear esta documentación
+- **📦485-488 (2026-07-04)** — Migración de 13 vistas en Gestión Salud y Gestión Peligros
+- **📦490 (2026-07-04)** — Cleanup: borrar CSS obsoletas (25 archivos, +298/-437), helpers JS, crear esta documentación
+- **📦491 (2026-07-04)** — Skeleton en los 7 homes de módulo principales
+  - Skeleton inyectado antes de la carga async en cada home
+  - Conteo ajustado al render real (5-7 widgets, 2-3 charts)
+  - Fix crítico de orden: appendChild al DOM ANTES del await
+  - Fix de limpieza: `container.innerHTML = ''` en `renderMainArea()` para borrar skeleton
+- **📦491-fix (2026-07-04)** — Microtask delay con `requestAnimationFrame` (16ms)
+- **📦491-fix2 (2026-07-04)** — Aumento del delay a `setTimeout(200)` para visibilidad humana
+  - El `requestAnimationFrame` era insuficiente (16ms = 1 frame, el ojo no lo registra)
+  - `setTimeout(200)` = 12 frames a 60fps, suficiente para registrar el skeleton
+  - Aplicado a 4 homes: recursos, gestion-integral, verificacion, mejoramiento
+
+---
+
+## Pendientes del sistema
+
+### 📦492 (próximo) — Skeleton en dashboards
+- `archivo-retencion-dashboard.js` (con `loading-state` y `dashboard-content`)
+- Otros dashboards que se encuentren
+- Patrón: `<div id="loading-state">` con skeleton → reemplazado por `#dashboard-content` con datos
+
+### 📦493 (futuro) — Skeleton en homes de submódulos de Gestión Salud
+- `medicion-ausentismo-home.js`
+- `gestacion-seguimiento-home.js` (Seguimiento de Gestación)
+- `evaluaciones-medicas-home.js`
+- `investigacion-home.js`
+- `restricciones-medicas-home.js`
+- Patrón: estos homes usan IIFE / estructuras diferentes a los homes principales,
+  requieren análisis caso por caso antes de aplicar el patrón estándar.
