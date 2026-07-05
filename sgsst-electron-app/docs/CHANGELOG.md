@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.110] - 2026-07-04
+
+### Added
+- **🎨 Sistema de Skeleton Screens — sistema centralizado v1.0**
+  - API `window.KairSkeleton.*` con 10 componentes: `kpiStrip`, `table`, `chartBars`, `chartDonut`, `filters`, `section`, `form`, `detail`, `list`, `card` + primitiva `bar` + helpers `show`/`hide`
+  - Bloque CSS `.ks-*` en `styles.css` con theming automático light/dark/dark-legacy via variables (`--ks-base`, `--ks-highlight`)
+  - Reutiliza `@keyframes km-loading-shimmer` existente (no duplica animación)
+  - Cascada de delays con `.ks-stagger` (1..N+10 hijos)
+  - Respeta `prefers-reduced-motion`
+  - Demo interactivo: `docs/skeleton-demo.html` (carga el sistema real del repo)
+  - Docs: `docs/SKELETON-SYSTEM.md` (~450 líneas) + `docs/SKELETON-HOMES.md` (~270 líneas)
+
+- **🎨 Skeleton en 7 homes de módulo principales** (`📦491`)
+  - Skeleton inyectado antes de la carga async en cada home
+  - Conteo ajustado al render real (5-7 widgets, 2-3 charts)
+  - Fix crítico de orden: `appendChild` al DOM ANTES del `await renderMainArea`
+  - Fix de limpieza: `container.innerHTML = ''` en `renderMainArea()` para borrar skeleton
+  - 200ms de retardo con `setTimeout(200)` (suficiente para que el ojo humano registre el skeleton)
+  - Aplicado a: Gestion Integral, Recursos, Gestion Salud, Gestion Peligros, Gestion Amenazas, Verificación, Mejoramiento
+
+### Fixed
+- **Skeleton se quedaba estático** (`📦491-fix`, `📦491-fix2`)
+  - Bug: `await this.renderMainArea(mainArea)` corría ANTES del `appendChild` al DOM, el skeleton nunca se veía
+  - Bug: `requestAnimationFrame` (16ms) insuficiente para que el ojo humano registre el skeleton
+  - Fix: invertir orden + usar `setTimeout(200)` en lugar de `requestAnimationFrame`
+
+### Changed
+- **📦490 — Cleanup final del sistema de Skeletons**
+  - 25 archivos modificados, +28/-437 líneas (borrando CSS obsoletas, helpers JS, etc.)
+  - Backward compat: `.km-loading-skeleton*` y `@keyframes km-loading-shimmer` conservadas en `styles.css` (legacy views lo usan, sistema `ks-*` lo reutiliza)
+  - Documentación: `docs/SKELETON-SYSTEM.md` con guía completa + sección de troubleshooting
+
+### Migration Notes
+- Si vas a usar skeleton en una vista nueva: `container.innerHTML = KairSkeleton.X()` antes del await, y `container.innerHTML = ''` al inicio del render real.
+- Si vas a agregar un home de módulo: seguir el patrón canónico de `docs/SKELETON-HOMES.md`.
+
+---
+
 ## [0.1.102] - 2026-06-17
 
 ### Fixed

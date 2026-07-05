@@ -235,3 +235,115 @@ Patrones que aprendí corrigiendo problemas visuales. Aplicar a cualquier vista 
 3. Usar solo clases CSS canónicas (`kair-*`)
 4. Si necesita un componente orquestador (como `auditoria-anual-component.js`), crear uno que cargue CSS + scripts + vistas via cascada
 5. NO commitear sin autorización explícita del usuario ("sí"/"dale"/"commit")
+
+---
+
+## 🎨 Sistema de Skeleton Screens (v0.1.110+, 📦483-491)
+
+El proyecto tiene un sistema centralizado de placeholders de carga que reemplazan los spinners genéricos. **SI vas a tocar loaders o UX de carga, leer primero:**
+- `docs/SKELETON-SYSTEM.md` — API `KairSkeleton.*` con 10 componentes
+- `docs/SKELETON-HOMES.md` — Patrón para homes de módulo principales
+
+### Patrón canónico para homes de módulo
+
+```js
+async render() {
+    this.container.innerHTML = '';
+    // ... setup de layout ...
+
+    const mainArea = document.createElement('div');
+    mainArea.className = 'main-area';
+    mainArea.style.flex = '1';
+
+    // 1. Inyectar skeleton EN mainArea
+    mainArea.innerHTML = KairSkeleton.kpiStrip(5) + KairSkeleton.chartBars(12) + KairSkeleton.chartDonut();
+
+    // 2. Agregar al DOM (skeleton visible)
+    contentContainer.appendChild(mainArea);
+    layout.appendChild(contentContainer);
+    this.container.appendChild(layout);
+
+    // 3. Retardo 200ms (ojo registra el skeleton)
+    await new Promise(r => setTimeout(r, 200));
+
+    // 4. Cargar datos (skeleton visible mientras espera)
+    await this.refreshStats();  // o await this.loadXxxStats();
+
+    // 5. Renderizar widgets (limpia skeleton primero)
+    await this.renderMainArea(mainArea);
+}
+
+async renderMainArea(container) {
+    container.innerHTML = '';  // SIEMPRE limpiar antes de pintar
+    // ... crear widgets y charts con datos reales ...
+}
+```
+
+### Reglas críticas
+
+1. **Orden del DOM**: `appendChild` debe ir ANTES del `await renderMainArea/loadStats`. Si invertís el orden, el await termina antes de que mainArea sea visible.
+2. **Retardo 200ms**: `setTimeout(200)` mínimo entre `appendChild` y `await`. `requestAnimationFrame` (16ms) es insuficiente.
+3. **Limpieza en renderMainArea**: `container.innerHTML = ''` SIEMPRE al inicio, sino el skeleton queda apilado con los widgets reales.
+4. **Conteo correcto**: el skeleton debe coincidir con la cantidad y tipo de widgets/charts que `renderMainArea` realmente crea.
+
+### Bug detector automatizado
+
+```bash
+node -e "
+const fs=require('fs');
+const path=require('path');
+const homes=['modules/gestion-integral/gestion-integral-home.js','modules/recursos/recursos-home.js','modules/gestion-salud/gestion-salud-home.js','modules/gestion-peligros/gestion-peligros-home.js','modules/gestion-amenazas/gestion-amenazas-home.js','modules/verificacion/verificacion-home.js','modules/mejoramiento/mejoramiento-home.js'];
+homes.forEach(f=>{const code=fs.readFileSync(f,'utf8');const renderStart=code.indexOf('async render()');const body=code.slice(renderStart,renderStart+3000);const awaitIdx=body.indexOf('await this.renderMainArea');const appendIdx=body.indexOf('this.container.appendChild(layout)');if(awaitIdx>0&&appendIdx>0&&awaitIdx<appendIdx){console.log('⚠️  '+f);}else{console.log('✅ '+path.basename(f));}});
+"
+```
+
+---
+
+## 🔄 Dual-tree workflow (instalador ↔ git clone)
+
+El proyecto se mantiene en DOS árboles paralelos:
+
+- **Instalador built** (`D:\K-AIR-Installer-v<X>\resources\`) — artefacto empaquetado, runtime "source of truth"
+- **Git clone** (`C:\Proyectos de Programación\Clone de Git\SG-SST-E\sgsst-electron-app\`) — repositorio de desarrollo
+
+### Flujo
+
+1. El usuario trabaja en la app instalada (la ejecuta como usuario final)
+2. Periódicamente sincroniza el clon con el contenido del instalador para commitear cambios
+3. La sincronización es **unidireccional D → C** (instalador → clon)
+4. El clon recibe los cambios, se commitea, se pushea a GitHub
+
+### Reglas
+
+- **NO** copiar wholesale el `package.json` del instalador — solo trae `dependencies` (runtime), pierde `scripts`/`build`/`devDependencies`. Merge selectivo: deps del instalador + scripts/build/devDeps del clon.
+- **Verificar** que `D:\` NO tiene `.git` antes de copiar (para no pisar nada por accidente)
+- **Después de copiar**: `git status --short` puede reportar muchos "modified" pero el `git commit` real capturará menos (autocrlf).
+- **Al reportar al usuario**, NO fiarse del conteo de `git status`. Decir "se copiaron N archivos pero solo M tenían cambios reales vs HEAD" si hay discrepancia.
+- **Bump de versión** en `package.json` lo hace el USUARIO manualmente (no automático), 1 commit dedicado.
+- **NO** commitear sin autorización ("sí"/"dale"/"commit"). Delegaciones por fase son puntuales, no transferibles.
+
+### Script de sync típico
+
+```bash
+# Antes de sincronizar, verificar que D:\ no tiene .git
+ls "D:\K-AIR-Installer-v0.1.110\resources" | Select-String ".git"
+
+# Sincronizar selectivamente
+Copy-Item "D:\K-AIR-Installer-v0.1.110\resources\modules\gestion-integral\gestion-integral-home.js" `
+            "C:\Proyectos de Programación\Clone de Git\SG-SST-E\sgsst-electron-app\modules\gestion-integral\gestion-integral-home.js" -Force
+
+# Verificar
+cd "C:\Proyectos de Programación\Clone de Git\SG-SST-E\sgsst-electron-app"
+git status --short
+```
+
+---
+
+## 📊 Snapshot actual del proyecto (snapshot 2026-07-04)
+
+- **Versión:** 0.1.110
+- **Working tree:** limpio
+- **Último commit:** `d1a4047` (📦491-docs — actualización de documentación)
+- **Sistema de Skeletons:** completo (📦483-491, 9 commits)
+- **9 módulos + 48 submódulos con lógica + ~58 submódulos menú**
+- **Pendientes próximos:** 📦492 (dashboards), 📦493 (homes de submódulos)

@@ -1,8 +1,8 @@
 # 👋 Bienvenido a la Documentación de K+AIR
 
 **Tiempo de lectura:** 5 minutos
-**Última actualización:** 9 de junio de 2026
-**Versión:** 0.1.99
+**Última actualización:** 4 de julio de 2026
+**Versión:** 0.1.110
 
 ---
 
@@ -13,7 +13,7 @@ K+AIR es una aplicación empresarial Electron que implementa un Sistema de Gesti
 **Características principales:**
 - ✅ Multi-empresa (una sola UX/UI)
 - ✅ Motor normativo inteligente
-- ✅ 7 módulos principales + 44 submódulos
+- ✅ 9 módulos principales + 48 submódulos
 - ✅ Python empaquetado (sin instalación manual)
 - ✅ Autenticación con SQLite
 - ✅ Actualizaciones automáticas
@@ -22,6 +22,8 @@ K+AIR es una aplicación empresarial Electron que implementa un Sistema de Gesti
 - ✅ Generación automática de actas con autofill
 - ✅ Login modernizado con animaciones
 - ✅ Soporte responsive 1366x768+
+- ✅ **Sistema de Skeleton Screens** (placeholders que imitan la forma del componente mientras carga)
+- ✅ **Dual-tree workflow** (instalador built ↔ git clone, sincronización periódica)
 
 ---
 
@@ -59,21 +61,33 @@ K+AIR es una aplicación empresarial Electron que implementa un Sistema de Gesti
 1. **CONTEXT.md** (raíz del proyecto) - **LEER PRIMERO**
    - Contexto completo del proyecto
    - Arquitectura resumida
-   - Estado actual (v0.1.99)
+   - Estado actual (v0.1.110)
    - Enlaces críticos
 
-2. **docs/02-architecture/ipc-contratos.md**
+2. **AGENTS.md** (raíz del proyecto) - **Convención de IA**
+   - Skills disponibles (ui-ux-pro-max, code-architect, etc.)
+   - Convención de commits (`📦<numero>`)
+   - Patrón arquitectónico (prefijo `kair-`, BEM, vanilla JS)
+   - Gotchas del proyecto (dark/light, estructura plana, actas semestrales)
+
+3. **docs/02-architecture/ipc-contratos.md**
    - Todos los 137 handlers IPC (133+ `ipcMain.handle()` + 4 `ipcMain.on()`)
    - Formato de requests/responses
    - Ejemplos de uso
 
-3. **docs/02-modulos/[módulo específico]**
+4. **docs/SKELETON-SYSTEM.md** + **docs/SKELETON-HOMES.md** (si vas a tocar loaders/UX)
+   - Sistema centralizado de placeholders de carga
+   - API `KairSkeleton.*` con 10 componentes
+   - Patrón para homes de módulo (orden crítico: skeleton → appendChild → setTimeout(200) → loadStats)
+   - Troubleshooting de bugs comunes
+
+5. **docs/02-modulos/[módulo específico]**
    - Documentación del módulo relevante
    - Lógica de negocio específica
 
-4. **CHANGELOG.md**
+6. **CHANGELOG.md**
    - Historial de cambios por versión
-   - Últimos cambios en v0.1.99
+   - Últimos cambios en v0.1.110
 
 ---
 

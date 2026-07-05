@@ -1,8 +1,8 @@
 # 📦 Documentación de Módulos K+AIR
 
-**Versión:** 1.0
-**Actualizado:** 9 de junio de 2026
-**Estado:** ✅ Actualizado v0.1.99
+**Versión:** 1.1
+**Actualizado:** 4 de julio de 2026
+**Estado:** ✅ Actualizado v0.1.110
 
 ---
 
@@ -11,16 +11,30 @@
 | Módulo | Documentación | Submódulos | Componentes Reales |
 |--------|---------------|------------|-------------------|
 | **1. Recursos** | [modulo-1-recursos.md](modulo-1-recursos.md) | 12 | 12 ✅ |
-| **2. Gestión Integral** | [modulo-2-4-5-6-7-gestion-integral-y-restantes.md](modulo-2-4-5-6-7-gestion-integral-y-restantes.md) | 13 | 8 ✅ / 5 🟡 |
-| **3. Gestión de la Salud** | [modulo-3-gestion-salud.md](modulo-3-gestion-salud.md) | 19 | 10 ✅ / 9 🟡 |
-| **4. Gestión de Peligros** | [modulo-4-gestion-peligros.md](modulo-4-gestion-peligros.md) | 10 | 5 ✅ / 5 🟡 |
-| **5. Gestión de Amenazas** | [modulo-5-gestion-amenazas.md](modulo-5-gestion-amenazas.md) | 2 | 0 ✅ / 2 🟡 |
-| **6. Verificación** | [modulo-6-verificacion.md](modulo-6-verificacion.md) | 4 | 0 ✅ / 4 🟡 |
-| **7. Mejoramiento** | [modulo-7-mejoramiento.md](modulo-7-mejoramiento.md) | 4 | 0 ✅ / 4 🟡 |
+| **2. Gestión Integral** | [modulo-2-4-5-6-7-gestion-integral-y-restantes.md](modulo-2-4-5-6-7-gestion-integral-y-restantes.md) | 9 | 8 ✅ / 1 🟡 |
+| **3. Gestión de la Salud** | [modulo-3-gestion-salud.md](modulo-3-gestion-salud.md) | 12 | 10 ✅ / 2 🟡 |
+| **4. Gestión de Peligros** | [modulo-4-gestion-peligros.md](modulo-4-gestion-peligros.md) | 4 | 4 ✅ |
+| **5. Gestión de Amenazas** | [modulo-5-gestion-amenazas.md](modulo-5-gestion-amenazas.md) | 2 | 2 ✅ |
+| **6. Verificación** | [modulo-6-verificacion.md](modulo-6-verificacion.md) | 3 | 3 ✅ |
+| **7. Mejoramiento** | [modulo-7-mejoramiento.md](modulo-7-mejoramiento.md) | 4 | 4 ✅ |
 
-**Total:** 7 módulos, 64 submódulos menú, 44 submódulos con lógica real
+**Total:** 7 módulos principales (con `helpers` y `shared` aparte), 48 submódulos con lógica, ~58 submódulos menú
 
 > **Leyenda:** ✅ = Componente dedicado implementado, 🟡 = Generic fallback (redirige a vista del módulo)
+
+### Skeleton Screens por módulo (📦483-491)
+
+Los homes de los 7 módulos principales tienen skeleton screens implementados:
+
+| Módulo | Home | Skeleton | Doc |
+|---|---|---|---|
+| Gestión Integral | `gestion-integral-home.js` | `kpiStrip(5) + 2×chartBars(12)` | [SKELETON-HOMES.md](SKELETON-HOMES.md) |
+| Recursos | `recursos-home.js` | `kpiStrip(6) + 3×chartBars(12)` | idem |
+| Gestión de la Salud | `gestion-salud-home.js` | `kpiStrip(6) + 2×chartBars(12)` | idem |
+| Gestión de Peligros | `gestion-peligros-home.js` | `kpiStrip(5) + chartBars(12) + chartDonut()` | idem |
+| Gestión de Amenazas | `gestion-amenazas-home.js` | `kpiStrip(2) + chartBars(12) + chartDonut()` | idem |
+| Verificación | `verificacion-home.js` | `kpiStrip(6) + chartBars(12) + chartDonut()` | idem |
+| Mejoramiento | `mejoramiento-home.js` | `kpiStrip(5) + chartBars(12) + chartDonut()` | idem |
 
 ---
 

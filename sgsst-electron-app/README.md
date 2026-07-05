@@ -1,7 +1,7 @@
 # K+AIR - Sistema de Gestión SG-SST
 
-**Versión:** 0.1.101
-**Última actualización:** 14 de junio de 2026
+**Versión:** 0.1.110
+**Última actualización:** 4 de julio de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
 ---
@@ -14,8 +14,7 @@
 
 - ✅ **Multi-empresa**: Gestión de múltiples empresas con una sola experiencia UX/UI
 - ✅ **Motor Normativo Inteligente**: Escenarios normativos basados en tamaño y riesgo
-- ✅ **7 Módulos Principales**: Recursos, Gestión Integral, Salud, Peligros, Amenazas, Verificación, Mejoramiento
-- ✅ **29+ Submódulos**: Cada uno con su propia lógica y vistas especializadas
+- ✅ **9 Módulos Principales + 48 Submódulos con lógica**: Recursos (12), Gestión Integral (9), Salud (12), Peligros (4), Amenazas (2), Verificación (3), Mejoramiento (4), más `helpers` y `shared`
 - ✅ **IA Integrada**: Análisis de accidentes con LLM (Mistral 3 3B)
 - ✅ **Seguimiento PRIC**: Gestión completa de casos de incapacidad y rehabilitación
 - ✅ **Calificación PCL Dual**: Secciones separadas para Calificación Regional y Nacional (14 campos)
@@ -26,18 +25,20 @@
 - ✅ **Etapas de Reincorporación y Cierre**: Gestión completa de reincorporación laboral y cierre de casos
 - ✅ **Diagnósticos Múltiples**: Hasta 3 diagnósticos CIE-10 por caso (DX principal + DX2 + DX3)
 - ✅ **KPIs en Tiempo Real**: Actualización dinámica con filtros de año/mes
-- ✅ **Inducciones con Sincronización Automática** 🆕: Google Forms → Excel → App sin intervención manual
-- ✅ **Búsqueda Inteligente de Archivos** 🆕: Normalización de tildes y múltiples variaciones de nombres
-- ✅ **COM Automation** 🆕: VBScript para controlar Excel y actualizar Power Query automáticamente
+- ✅ **Inducciones con Sincronización Automática**: Google Forms → Excel → App sin intervención manual
+- ✅ **Búsqueda Inteligente de Archivos**: Normalización de tildes y múltiples variaciones de nombres
+- ✅ **COM Automation**: VBScript para controlar Excel y actualizar Power Query automáticamente
+- ✅ **Sistema de Skeleton Screens** 🆕 (v0.1.110): API `KairSkeleton.*` con 10 componentes que reemplazan spinners genéricos por placeholders que imitan la forma del componente. Cubierto en 25 loaders en 13 vistas + 7 homes de módulo. Ver [docs/SKELETON-SYSTEM.md](docs/SKELETON-SYSTEM.md) y [docs/SKELETON-HOMES.md](docs/SKELETON-HOMES.md).
 - ✅ **Solo 13 archivos en raíz**: Proyecto limpio y organizado
-- ✅ **Tabla de Ausentismo 17 Columnas**: Año, Fecha Inicio, Fecha Fin, Código 🆕
-- ✅ **Filtros Dinámicos Inteligentes**: Año y tipo basados en datos reales 🆕
-- ✅ **Información de Mapeo**: Fecha y tipo de mapeo en tarjetas de empresas 🆕
-- ✅ **Portales de Bienvenida (Antesalas)** 🆕: Interfaz moderna tipo portal para submódulos clave
-- ✅ **Sistema de Notificaciones Toast** 🆕: Notificaciones modernas no intrusivas
-- ✅ **Modales Modernizados** 🆕: Diseño centrado, animaciones suaves, UX mejorada
-- ✅ **Detección Automática de Año Activo** 🆕: El sistema detecta automáticamente el año más reciente
-- ✅ **Autenticación de Usuarios** 🆕: Login obligatorio por sesión con control de acceso
+- ✅ **Tabla de Ausentismo 17 Columnas**: Año, Fecha Inicio, Fecha Fin, Código
+- ✅ **Filtros Dinámicos Inteligentes**: Año y tipo basados en datos reales
+- ✅ **Información de Mapeo**: Fecha y tipo de mapeo en tarjetas de empresas
+- ✅ **Portales de Bienvenida (Antesalas)**: Interfaz moderna tipo portal para submódulos clave
+- ✅ **Sistema de Notificaciones Toast**: Notificaciones modernas no intrusivas
+- ✅ **Modales Modernizados**: Diseño centrado, animaciones suaves, UX mejorada
+- ✅ **Detección Automática de Año Activo**: El sistema detecta automáticamente el año más reciente
+- ✅ **Autenticación de Usuarios**: Login obligatorio por sesión con control de acceso
+- ✅ **Stats extendidas de Ausentismo** 🆕 (v0.1.110): 16 métricas calculadas en una sola pasada (Tasa Ausentismo, Índice Frecuencia, Índice Severidad, Tasa Accidentalidad, Top 10 por días/casos/CIE-10, heatmap día-semana × mes, etc.)
 - ✅ **Roles por Empresa** 🆕: Asignación de perfiles por empresa (incluye Recursos Humanos)
 - ✅ **Base de Datos Local (SQLite)** 🆕: Persistencia de usuarios, roles, sesiones y asignaciones
 - ✅ **Alerta de Afiliación SSSI** 🆕: Detección automática de planillas faltantes del mes en curso

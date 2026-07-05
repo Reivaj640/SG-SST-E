@@ -1,7 +1,7 @@
 # K+AIR - Contexto del Proyecto
 
-**Última actualización:** 9 de junio de 2026
-**Versión actual:** 0.1.99
+**Última actualización:** 4 de julio de 2026
+**Versión actual:** 0.1.110
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 
 ---

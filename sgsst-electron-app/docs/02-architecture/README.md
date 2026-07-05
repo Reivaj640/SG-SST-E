@@ -2,6 +2,10 @@
 
 Este directorio contiene documentación sobre la arquitectura del sistema.
 
+**Versión:** 1.1
+**Actualizado:** 4 de julio de 2026
+**Estado:** ✅ Actualizado v0.1.110
+
 ---
 
 ## 📋 Documentos Disponibles
@@ -45,6 +49,43 @@ Este directorio contiene documentación sobre la arquitectura del sistema.
 - Sistema PI-FO-076 + PRI.xlsx
 - Flujo de archivos
 - Sincronización automática
+
+---
+
+## 🆕 Sistema de Skeleton Screens (v0.1.110+)
+
+Desde v0.1.110, el proyecto tiene un sistema centralizado de skeleton screens que reemplaza los spinners genéricos por placeholders que imitan la forma del componente real. Documentación:
+
+- **Ver:** [../SKELETON-SYSTEM.md](../SKELETON-SYSTEM.md) — API completa (`KairSkeleton.*`) con 10 componentes
+- **Ver:** [../SKELETON-HOMES.md](../SKELETON-HOMES.md) — Patrón para homes de módulo principales
+
+### Resumen
+
+- **API:** `window.KairSkeleton.kpiStrip(N)`, `.table(rows, cols)`, `.chartBars(12)`, `.chartDonut()`, etc.
+- **Cobertura:** 25 loaders migrados en 13 vistas específicas + 7 homes de módulo principales
+- **Auto-themed:** light/dark/dark-legacy via CSS variables (`--ks-base`, `--ks-highlight`)
+- **Respeta `prefers-reduced-motion`:** animaciones se desactivan automáticamente
+
+### Patrón crítico (homes)
+
+```js
+// 1. Inyectar skeleton
+mainArea.innerHTML = KairSkeleton.kpiStrip(5) + KairSkeleton.chartBars(12);
+
+// 2. Agregar al DOM (skeleton visible)
+contentContainer.appendChild(mainArea);
+layout.appendChild(contentContainer);
+this.container.appendChild(layout);
+
+// 3. Retardo 200ms (ojo registra el skeleton)
+await new Promise(r => setTimeout(r, 200));
+
+// 4. Cargar datos (skeleton visible mientras espera)
+await this.refreshStats();
+
+// 5. Renderizar widgets (limpia skeleton primero)
+await this.renderMainArea(mainArea);  // container.innerHTML = '' al inicio
+```
 
 ---
 
