@@ -73,14 +73,18 @@ class GestionAmenazasHome {
         mainArea.className = 'main-area';
         mainArea.style.flex = '1';
 
-        this.renderMainArea(mainArea);
+        // 📦491 — Skeleton mientras cargan stats de Gestión Amenazas (2 widgets + 2 charts: bar + doughnut)
+        mainArea.innerHTML = KairSkeleton.kpiStrip(2) + KairSkeleton.chartBars(12) + KairSkeleton.chartDonut();
 
         contentContainer.appendChild(mainArea);
         layout.appendChild(contentContainer);
         this.container.appendChild(layout);
 
         /* Cargar datos reales desde electronAPI.getDocumentFolders */
-        this.refreshStats();
+        await this.refreshStats();
+
+        /* Renderizar contenido con datos reales */
+        this.renderMainArea(mainArea);
     }
 
     injectStyles() {
@@ -386,6 +390,9 @@ class GestionAmenazasHome {
      * electronAPI.getDocumentFolders() para cada submódulo.
      */
     renderMainArea(container) {
+        // 📦491-fix — Limpiar skeleton antes de pintar widgets reales
+        container.innerHTML = '';
+
         const cached = this._getCachedStats() || {};
 
         /* ── Widgets (uno por submódulo) ───────────────────────────────── */

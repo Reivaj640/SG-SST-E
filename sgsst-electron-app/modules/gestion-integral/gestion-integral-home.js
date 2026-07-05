@@ -22,9 +22,6 @@ class GestionIntegralHome {
         this.container.innerHTML = '';
         this.currentCompany = this.getCurrentCompany();
 
-        // 0. Cargar estadísticas reales de Gestión Integral
-        await this.loadGestionIntegralStats();
-
         // 1. Inyectar Estilos K+AIR
         this.injectStyles();
 
@@ -59,11 +56,19 @@ class GestionIntegralHome {
         mainArea.className = 'main-area';
         mainArea.style.flex = '1';
 
-        await this.renderMainArea(mainArea);
+        // 📦491 — Skeleton mientras cargan estadísticas de Gestión Integral (5 widgets + 2 bar charts)
+        mainArea.innerHTML = KairSkeleton.kpiStrip(5) + KairSkeleton.chartBars(12) + KairSkeleton.chartBars(12);
 
+        // 📦491-fix — Agregar al DOM ANTES del await para que el skeleton sea visible
         contentContainer.appendChild(mainArea);
         layout.appendChild(contentContainer);
         this.container.appendChild(layout);
+
+        // 0. Cargar estadísticas reales de Gestión Integral (skeleton visible durante la espera)
+        await this.loadGestionIntegralStats();
+
+        // 1. Renderizar contenido (limpia el skeleton y pinta widgets reales)
+        await this.renderMainArea(mainArea);
 
         // Listen for fullscreen changes to update chart texts
         if (window.electronAPI?.onFullscreenChanged) {
@@ -923,6 +928,9 @@ gap: 1rem;
     }
 
     async renderMainArea(container) {
+        // 📦491-fix — Limpiar skeleton antes de pintar widgets reales
+        container.innerHTML = '';
+
         // Widgets con contadores específicos para Gestión Integral (USANDO DATOS REALES)
         const widgetsContainer = document.createElement('div');
         widgetsContainer.className = 'widgets-container';

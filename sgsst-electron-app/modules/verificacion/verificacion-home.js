@@ -51,14 +51,21 @@ class VerificacionHome {
         mainArea.className = 'main-area';
         mainArea.style.flex = '1';
 
-        this.renderMainArea(mainArea);
+        // 📦491 — Skeleton mientras cargan widgets y charts de cumplimiento (6 widgets + 2 charts: bar + doughnut)
+        mainArea.innerHTML = KairSkeleton.kpiStrip(6) + KairSkeleton.chartBars(12) + KairSkeleton.chartDonut();
 
         contentContainer.appendChild(mainArea);
         layout.appendChild(contentContainer);
         this.container.appendChild(layout);
+
+        // Pintar widgets con datos (algunos hardcoded, otros de RevisionAltaDireccionService)
+        this.renderMainArea(mainArea);
     }
 
     renderMainArea(container) {
+        // 📦491-fix — Limpiar skeleton antes de pintar widgets reales
+        container.innerHTML = '';
+
         const widgetsContainer = document.createElement('div');
         widgetsContainer.className = 'widgets-container';
 

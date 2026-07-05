@@ -59,13 +59,18 @@ class GestionPeligrosHome {
 		mainArea.className = 'main-area';
 		mainArea.style.flex = '1';
 
-		this.renderMainArea(mainArea);
+		// 📦491 — Skeleton mientras cargan stats de Gestión Peligros (5 widgets + 2 charts)
+		mainArea.innerHTML = KairSkeleton.kpiStrip(5) + KairSkeleton.chartBars(12) + KairSkeleton.chartDonut();
 
 		contentContainer.appendChild(mainArea);
 		layout.appendChild(contentContainer);
 		this.container.appendChild(layout);
 
-		this.refreshStats();
+		// Cargar stats ANTES de pintar widgets para que el skeleton se vea mientras esperan los datos
+		await this.refreshStats();
+
+		// Renderizar contenido con datos reales
+		this.renderMainArea(mainArea);
 	}
 
 	async refreshStats() {
@@ -125,6 +130,9 @@ class GestionPeligrosHome {
 	}
 
 	renderMainArea(container) {
+		// 📦491-fix — Limpiar skeleton antes de pintar widgets reales
+		container.innerHTML = '';
+
 		var widgetsContainer = document.createElement('div');
 		widgetsContainer.className = 'widgets-container';
 

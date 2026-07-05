@@ -62,11 +62,14 @@ class MejoramientoHome {
         mainArea.className = 'main-area';
         mainArea.style.flex = '1';
 
-        this.renderMainArea(mainArea);
+        // 📦491 — Skeleton mientras Mejora Store carga stats (5 widgets + 2 charts: bar + doughnut)
+        mainArea.innerHTML = KairSkeleton.kpiStrip(5) + KairSkeleton.chartBars(12) + KairSkeleton.chartDonut();
 
         contentContainer.appendChild(mainArea);
         layout.appendChild(contentContainer);
         this.container.appendChild(layout);
+
+        this.renderMainArea(mainArea);
 
         if (window.MejoramientoStore) {
             this._unsubscribe = window.MejoramientoStore.subscribe((stats) => {
@@ -78,6 +81,9 @@ class MejoramientoHome {
     }
 
     renderMainArea(container) {
+        // 📦491-fix — Limpiar skeleton antes de pintar widgets reales
+        container.innerHTML = '';
+
         /* F21.51 (2026-06-21) — Los 5 KPIs del home son EXACTAMENTE los mismos que
            muestra el viewer 7.1.1 (acciones-pc-viewer.js → renderKpis):
            total / abiertas / enProceso / cerradas / vencidas.

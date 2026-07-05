@@ -56,12 +56,16 @@ class RecursosHome {
         mainArea.className = 'main-area';
         mainArea.style.flex = '1';
 
-        // Renderizar contenido
-        await this.renderMainArea(mainArea);
+        // 📦491 — Skeleton mientras cargan estadísticas de Recursos (6 widgets + 3 charts: line+bar+line)
+        mainArea.innerHTML = KairSkeleton.kpiStrip(6) + KairSkeleton.chartBars(12) + KairSkeleton.chartBars(12) + KairSkeleton.chartBars(12);
 
+        // 📦491-fix — Agregar al DOM ANTES del await para que el skeleton sea visible
         contentContainer.appendChild(mainArea);
         layout.appendChild(contentContainer);
         this.container.appendChild(layout);
+
+        // Renderizar contenido (limpia el skeleton y pinta widgets reales cuando llegan los datos)
+        await this.renderMainArea(mainArea);
 
         // Inicializar gráficos
         setTimeout(() => this.initCharts(), 100);
@@ -495,6 +499,9 @@ margin-bottom: 0.5rem;
     }
 
     async renderMainArea(container) {
+        // 📦491-fix — Limpiar skeleton antes de pintar widgets reales
+        container.innerHTML = '';
+
         const widgetsContainer = document.createElement('div');
         widgetsContainer.className = 'widgets-container';
 

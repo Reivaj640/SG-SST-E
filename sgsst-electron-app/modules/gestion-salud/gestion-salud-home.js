@@ -64,15 +64,18 @@ class GestionSaludHome {
         mainArea.className = 'main-area';
         mainArea.style.flex = '1';
 
-        // Renderizar contenido
-        this.renderMainArea(mainArea);
+        // 📦491 — Skeleton mientras cargan las 6 estadísticas de Gestión Salud en paralelo (6 widgets + 2 bar/line charts)
+        mainArea.innerHTML = KairSkeleton.kpiStrip(6) + KairSkeleton.chartBars(12) + KairSkeleton.chartBars(12);
 
         contentContainer.appendChild(mainArea);
         layout.appendChild(contentContainer);
         this.container.appendChild(layout);
 
-        // 3. Lanzar actualización en segundo plano (main.js ya tiene su propia caché de disco)
-        this.refreshStats();
+        // 3. Cargar estadísticas ANTES de pintar widgets (main.js tiene caché de disco)
+        await this.refreshStats();
+
+        // 4. Renderizar contenido con datos reales
+        this.renderMainArea(mainArea);
     }
 
     /**
@@ -383,6 +386,9 @@ new Chart(canvas, {
 }
 
 renderMainArea(container) {
+        // 📦491-fix — Limpiar skeleton antes de pintar widgets reales
+        container.innerHTML = '';
+
         const widgetsContainer = document.createElement('div');
         widgetsContainer.className = 'widgets-container';
 
