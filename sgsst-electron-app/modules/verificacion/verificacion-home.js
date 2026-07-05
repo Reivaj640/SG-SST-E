@@ -58,6 +58,9 @@ class VerificacionHome {
         layout.appendChild(contentContainer);
         this.container.appendChild(layout);
 
+        // 📦491-fix — Microtask delay para que el browser renderice el skeleton antes de reemplazarlo
+        await new Promise(r => requestAnimationFrame(r));
+
         // Pintar widgets con datos (algunos hardcoded, otros de RevisionAltaDireccionService)
         this.renderMainArea(mainArea);
     }
