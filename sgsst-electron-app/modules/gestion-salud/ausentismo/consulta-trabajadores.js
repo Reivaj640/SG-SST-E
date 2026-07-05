@@ -68,7 +68,7 @@ function ejecutarBusqueda() {
     }
 
     var tableContainer = document.getElementById('ct-table-container');
-    tableContainer.innerHTML = '<div class="ct-loading"><i class="fas fa-spinner"></i><p>Buscando en ' + ConsultaTrabajadores.empresaActiva + '...</p></div>';
+    tableContainer.innerHTML = KairSkeleton.list(8);
     document.getElementById('ct-stats-bar').style.display = 'none';
 
   ConsultaTrabajadores._searchStart = performance.now();
