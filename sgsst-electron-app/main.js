@@ -3865,13 +3865,265 @@ ipcMain.handle('plan-trabajo:get-events', async (event, range) => {
   return { success: true, data: [] };
 });
 
-// ── K+AIR Calendar: Capacitaciones (placeholder v1) ───────────────────
-// TODO v2: leer el archivo de capacitaciones (xlsx vía get-capacitaciones-sheets),
-// parsear las filas con fechas y mapear a eventos { id, title, date, start, end, type: 'capacitacion' }.
-// Por ahora devuelve [] para que el calendario muestre solo auditoría + eventos rápidos.
-ipcMain.handle('capacitaciones:get-events', async (event, range) => {
-  sendLog('[CAL-CAPACITACIONES] placeholder v1 — devolviendo [] (TODO: implementar mapper Excel)', 'INFO');
-  return { success: true, data: [] };
+// ── K+AIR Calendar: Capacitaciones (📦495 — implementación real) ──────
+// Lee el Excel de cronograma de capacitaciones de la empresa actual y
+// devuelve cada capacitación con fecha válida como evento del calendario.
+// payload esperado: { start?: 'YYYY-MM-DD', end?: 'YYYY-MM-DD', currentCompany?: string }
+// Devuelve: { success: true, data: [{ id, title, date, start, end, type: 'capacitacion', estado }] }
+//
+// Degradación elegante: si la empresa no tiene archivo de cronograma, si Drive
+// lo tiene bloqueado, o si no encuentra la hoja del año actual, devuelve []
+// y loggea warning — el calendario sigue mostrando los otros tipos de eventos.
+ipcMain.handle('capacitaciones:get-events', async (event, payload) => {
+  // 📦495-debug — Estos console.log van a la consola del MAIN process.
+  // Para verlos: DevTools de Electron (Ctrl+Shift+I) → Console.
+  // O ver el archivo de log del main process.
+  console.log('[CAL-CAP] === INICIO get-events ===');
+  console.log('[CAL-CAP] payload recibido:', JSON.stringify(payload));
+
+  try {
+    // Acepta tanto un objeto {range} como un objeto directo {start, end, currentCompany}
+    const { start, end, currentCompany } = payload && typeof payload === 'object'
+      ? payload
+      : { start: (payload && payload.start), end: (payload && payload.end), currentCompany: null };
+
+    console.log('[CAL-CAP] start=', start, 'end=', end, 'currentCompany=', currentCompany);
+
+    if (!currentCompany || currentCompany === 'default_company') {
+      console.log('[CAL-CAP] WARN: Sin empresa actual, devolviendo []');
+      sendLog('[CAL-CAP] Sin empresa actual, devolviendo []', 'WARN');
+      return { success: true, data: [] };
+    }
+
+    // 1. Resolver la ruta del submódulo "1.2.1 Programa de capacitación Anual"
+    let submodulePath = null;
+    try {
+      const configRaw = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+      const config = JSON.parse(configRaw);
+      const companyRoot = config.companyPaths && config.companyPaths[currentCompany];
+      const actualStructure = companyRoot && companyRoot.structure && companyRoot.structure.structure;
+      if (actualStructure) {
+        // Búsqueda específica en "1. Recursos" → submódulo que empiece con "1.2.1"
+        const resourcesFolder = actualStructure.subdirectories && actualStructure.subdirectories['1. Recursos'];
+        if (resourcesFolder) {
+          submodulePath = searchInStructure(resourcesFolder, '1.2.1');
+        }
+        // Fallback: buscar en toda la estructura
+        if (!submodulePath) {
+          submodulePath = searchInStructure(actualStructure, '1.2.1');
+        }
+      }
+    } catch (err) {
+      console.log('[CAL-CAP] ERROR leyendo config:', err.message);
+      sendLog(`[CAL-CAP] Error leyendo config: ${err.message}`, 'WARN');
+    }
+
+    console.log('[CAL-CAP] submodulePath=', submodulePath);
+
+    if (!submodulePath) {
+      console.log('[CAL-CAP] WARN: No se encontró carpeta 1.2.1');
+      sendLog(`[CAL-CAP] No se encontró la carpeta 1.2.1 para ${currentCompany}`, 'WARN');
+      return { success: true, data: [] };
+    }
+
+    // 2. Listar la carpeta y buscar archivos de cronograma (.xlsx/.xls)
+    let files;
+    try {
+      files = await fsp.readdir(submodulePath);
+    } catch (err) {
+      console.log('[CAL-CAP] ERROR leyendo dir:', err.message);
+      sendLog(`[CAL-CAP] No se pudo leer directorio ${submodulePath}: ${err.message}`, 'WARN');
+      return { success: true, data: [] };
+    }
+
+    const cronogramaFile = files.find(name => {
+      const lower = name.toLowerCase();
+      return lower.includes('cronograma') && (lower.endsWith('.xlsx') || lower.endsWith('.xls')) && !lower.startsWith('~$');
+    });
+
+    console.log('[CAL-CAP] archivos en carpeta:', files.length, 'cronograma encontrado:', cronogramaFile || 'NINGUNO');
+
+    if (!cronogramaFile) {
+      sendLog(`[CAL-CAP] No hay archivo de cronograma en ${submodulePath}`, 'INFO');
+      return { success: true, data: [] };
+    }
+
+    const filePath = require('path').join(submodulePath, cronogramaFile);
+
+    // 3. Leer el Excel — usar xlsx (SheetJS) consistente con init-excel
+    let workbook;
+    try {
+      workbook = xlsx.readFile(filePath);
+      console.log('[CAL-CAP] Excel leído. Hojas:', (workbook.SheetNames || []).join(', '));
+    } catch (err) {
+      console.log('[CAL-CAP] ERROR leyendo Excel:', err.message);
+      sendLog(`[CAL-CAP] Error leyendo Excel ${filePath}: ${err.message}`, 'WARN');
+      return { success: true, data: [] };
+    }
+
+    // 4. Buscar la hoja del año actual (preferentemente), si no, la primera Matriz Cap.*
+    const currentYear = new Date().getFullYear();
+    const matrixPatternCurrent = new RegExp(`Matriz Cap\\.\\s*${currentYear}`, 'i');
+    let sheetName = (workbook.SheetNames || []).find(n => matrixPatternCurrent.test(n));
+    if (!sheetName) {
+      sheetName = (workbook.SheetNames || []).find(n => /Matriz Cap\./i.test(n));
+    }
+    if (!sheetName) {
+      sheetName = workbook.SheetNames && workbook.SheetNames[0];
+    }
+
+    console.log('[CAL-CAP] Hoja seleccionada:', sheetName);
+
+    if (!sheetName) {
+      sendLog(`[CAL-CAP] Excel sin hojas válidas en ${filePath}`, 'WARN');
+      return { success: true, data: [] };
+    }
+
+    // 5. Parsear las filas de la hoja
+    const worksheet = workbook.Sheets[sheetName];
+    if (!worksheet || !worksheet['!ref']) {
+      console.log('[CAL-CAP] Hoja vacía o sin ref');
+      return { success: true, data: [] };
+    }
+    const allData = xlsx.utils.sheet_to_json(worksheet, { header: 1, raw: false, defval: '' });
+    console.log('[CAL-CAP] allData tiene', allData.length, 'filas.');
+
+    // 📦495-fix — Detección robusta de la fila de header.
+    // Las hojas de capacitación tienen hasta 5-6 filas de "encabezado visual"
+    // (logo, código, versión) antes del header real de la tabla. Buscamos en
+    // las primeras 20 filas cuál contiene los nombres de columna que
+    // esperamos, y usamos ESA fila como header (los datos arrancan en la
+    // siguiente).
+    const HEADER_HINTS = {
+      colNombre: ['nombre', 'capacitacion', 'capacitación', 'tema', 'descripcion', 'descripción'],
+      colFecha:  ['fecha', 'date', 'programada', 'f. programada', 'f.programada'],
+      colEstado: ['estado', 'status', 'indicador', 'ejecutado', 'realizada']
+    };
+
+    let headerRowIdx = -1;
+    let colNombre = -1, colFecha = -1, colEstado = -1;
+
+    for (let i = 0; i < Math.min(20, allData.length); i++) {
+      const row = allData[i];
+      if (!Array.isArray(row)) continue;
+      // Calcular matches por fila
+      let foundNombre = -1, foundFecha = -1, foundEstado = -1;
+      for (let j = 0; j < row.length; j++) {
+        const cell = String(row[j] || '').toLowerCase().trim();
+        if (!cell) continue;
+        if (foundNombre < 0 && HEADER_HINTS.colNombre.some(h => cell.includes(h))) foundNombre = j;
+        if (foundFecha < 0 && HEADER_HINTS.colFecha.some(h => cell.includes(h))) foundFecha = j;
+        if (foundEstado < 0 && HEADER_HINTS.colEstado.some(h => cell.includes(h))) foundEstado = j;
+      }
+      // Si esta fila tiene AL MENOS 2 de los 3 esperados con confianza, es la header row
+      const matches = [foundNombre, foundFecha, foundEstado].filter(v => v >= 0).length;
+      if (matches >= 2) {
+        headerRowIdx = i;
+        colNombre = foundNombre;
+        colFecha = foundFecha;
+        colEstado = foundEstado;
+        break;
+      }
+    }
+
+    // Si no encontramos header confiado, usar defaults razonables y header row 5
+    if (headerRowIdx < 0) {
+      headerRowIdx = 5;
+      colNombre = colNombre >= 0 ? colNombre : 1;
+      colFecha  = colFecha  >= 0 ? colFecha  : 3;
+      colEstado = colEstado >= 0 ? colEstado : 8;
+      console.log('[CAL-CAP] No se detectó header; usando defaults. headerRowIdx=', headerRowIdx);
+    } else {
+      // Si nos faltó uno de los 3, completar con defaults razonables
+      if (colNombre < 0) colNombre = 1;
+      if (colFecha  < 0) colFecha  = 3;
+      if (colEstado < 0) colEstado = 8;
+    }
+
+    console.log('[CAL-CAP] headerRowIdx=', headerRowIdx, 'colNombre=', colNombre, 'colFecha=', colFecha, 'colEstado=', colEstado);
+    console.log('[CAL-CAP] Header row contenido:', JSON.stringify(allData[headerRowIdx]));
+
+    const dataRows = allData.slice(headerRowIdx + 1); // datos arrancan en headerRowIdx + 1
+    console.log('[CAL-CAP] dataRows tiene', dataRows.length, 'filas para parsear');
+
+    // 6. Mapear las filas válidas a eventos
+    const events = [];
+    let skippedNoFecha = 0;
+    let skippedNoNombre = 0;
+    for (let i = 0; i < dataRows.length; i++) {
+      const row = dataRows[i];
+      if (!Array.isArray(row) || row.length < Math.max(colNombre, colFecha, colEstado)) continue;
+
+      const getCell = (cell) => {
+        if (cell === null || cell === undefined) return '';
+        if (typeof cell === 'object' && cell.value !== undefined) return cell.value;
+        return String(cell);
+      };
+
+      const nombre = String(getCell(row[colNombre]) || '').trim();
+      if (!nombre || nombre.length < 3) { skippedNoNombre++; continue; }
+      if (nombre.toLowerCase().includes('nombre de la')) { skippedNoNombre++; continue; }
+      if (nombre.toLowerCase().includes('total capacitaciones')) break;
+
+      // Parsear fecha — soporta seriales Excel (números) y strings d/m/Y o Y-m-d
+      let fechaProgramada = null;
+      const fechaValue = getCell(row[colFecha]);
+      if (fechaValue) {
+        if (typeof fechaValue === 'number' && fechaValue >= 1) {
+          const utc = new Date((fechaValue - 25569) * 86400 * 1000);
+          if (!isNaN(utc.getTime())) {
+            fechaProgramada = `${utc.getUTCFullYear()}-${String(utc.getUTCMonth() + 1).padStart(2, '0')}-${String(utc.getUTCDate()).padStart(2, '0')}`;
+          }
+        } else {
+          const fStr = String(fechaValue).trim();
+          let parsed = null;
+          let m = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/.exec(fStr);
+          if (m) parsed = new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1]));
+          if (!parsed) {
+            m = /^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/.exec(fStr);
+            if (m) parsed = new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]));
+          }
+          if (!parsed) parsed = new Date(fStr);
+          if (parsed && !isNaN(parsed.getTime()) && parsed.getFullYear() >= 1900) {
+            fechaProgramada = `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+          }
+        }
+      }
+
+      // Solo eventos con fecha (los que tienen "No especificada" no aparecen en el calendario)
+      if (!fechaProgramada) { skippedNoFecha++; continue; }
+
+      // 📦495-fix — NO filtramos por rango start/end acá.
+      // El calendar-component ya filtra por mes visible en el frontend.
+      // Devolvemos TODAS las capacitaciones de la empresa (típicamente 10-25)
+      // para que aparezcan en el calendario al navegar entre meses, sin tener
+      // que re-pegarle al backend cada vez que cambia el rango visible.
+      // Si más adelante se vuelve un tema de performance (cientos de caps),
+      // se puede reactivar el filtro o paginar.
+
+      const estadoRaw = String(getCell(row[colEstado]) || '').trim();
+      const estado = estadoRaw || 'Pendiente';
+
+      events.push({
+        id: 'cap-' + String(i + 1) + '-' + nombre.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 40),
+        title: nombre,
+        date: fechaProgramada,
+        start: null,
+        end: null,
+        type: 'capacitacion',
+        estado
+      });
+    }
+
+    console.log(`[CAL-CAP] RESULTADO: ${events.length} eventos (TODOS, sin filtrar por rango). Skippeados: ${skippedNoNombre} sin nombre, ${skippedNoFecha} sin fecha`);
+    sendLog(`[CAL-CAP] ${events.length} eventos de capacitaciones para ${currentCompany}`, 'INFO');
+    return { success: true, data: events };
+  } catch (err) {
+    console.error('[CAL-CAP] ERROR inesperado:', err.message);
+    sendLog(`[CAL-CAP] Error inesperado: ${err.message}`, 'ERROR');
+    console.error('[CAL-CAP] Stack:', err.stack);
+    return { success: true, data: [] };
+  }
 });
 
 // Handler para obtener las hojas de un archivo de capacitaciones

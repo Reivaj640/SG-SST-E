@@ -41,9 +41,17 @@
   // range = { start: 'YYYY-MM-DD', end: 'YYYY-MM-DD' }
   async function list(range) {
     var api = (global.electronAPI) || {};
+    // 📦495 — Pasar currentCompany al backend de capacitaciones para que sepa
+    // cuál Excel leer (el calendario es global pero las capacitaciones son
+    // por empresa).
+    var capPayload = Object.assign({}, range || {}, {
+      currentCompany: (global.currentCompany && global.currentCompany !== 'default_company')
+        ? global.currentCompany
+        : null
+    });
     var results = await Promise.all([
       _safe(function () { return api.planTrabajo && api.planTrabajo.getEvents(range); }),
-      _safe(function () { return api.capacitaciones && api.capacitaciones.getEvents(range); }),
+      _safe(function () { return api.capacitaciones && api.capacitaciones.getEvents(capPayload); }),
       _safe(function () { return api.auditoria && api.auditoria.getFases(range); }),
       _safe(function () { return api.eventosRapidos && api.eventosRapidos.list(range); })
     ]);
