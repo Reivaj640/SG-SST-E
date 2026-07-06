@@ -503,14 +503,20 @@ margin-bottom: 0.5rem;
     }
 
     async renderMainArea(container) {
-        // 📦491-fix — Limpiar skeleton antes de pintar widgets reales
+        // 📦494-fix — cargar datos PRIMERO con el skeleton todavía visible.
+        // Antes este clear se hacía arriba (container.innerHTML = '') y eso
+        // dejaba el contenedor en blanco durante los 2-3s de loadResourceStats().
+        // Ahora limpiamos recién cuando los datos ya están.
+
+        // Cargar estadísticas reales de recursos (con skeleton visible)
+        await this.loadResourceStats();
+
+        // 📦494-fix — Recién ahora limpiamos el skeleton, los datos ya están listos
+        // para que los widgets se pinten instantáneamente sin "blanco" intermedio.
         container.innerHTML = '';
 
         const widgetsContainer = document.createElement('div');
         widgetsContainer.className = 'widgets-container';
-
-        // Cargar estadísticas reales de recursos
-        await this.loadResourceStats();
 
         // Widgets Simples (Actualizados con datos reales)
         widgetsContainer.appendChild(this.createInductionWidget());
