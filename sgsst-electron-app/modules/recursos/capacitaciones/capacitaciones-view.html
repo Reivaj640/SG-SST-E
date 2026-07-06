@@ -199,7 +199,8 @@
                             <th>Instructor</th>
                             <th>Duración</th>
                             <th>Estado</th>
-                            <th class="text-right" style="min-width:120px">Acciones</th>
+                            <th class="text-center" style="min-width:80px">Evidencia</th>
+                            <th class="text-right" style="min-width:180px">Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="trainings-table-body"></tbody>
@@ -285,6 +286,57 @@
             <button type="button" class="k-btn k-btn-outline btn-close-modal">Cancelar</button>
             <button type="button" class="k-btn k-btn-primary" id="btn-save-training">
                 <i class="bi bi-check-lg"></i> Guardar
+            </button>
+        </div>
+
+    </div>
+</div>
+
+<!-- ======================== -->
+<!-- MODAL: EVIDENCIAS DE CAPACITACIÓN -->
+<!-- ======================== -->
+<div class="k-modal-overlay" id="evidenciaModal">
+    <div class="k-modal" style="max-width: 720px;">
+
+        <div class="k-modal-header">
+            <h3 class="k-modal-title" id="evidencia-modal-title">
+                <i class="bi bi-paperclip"></i>
+                Evidencias
+            </h3>
+            <button type="button" class="btn-close-modal" aria-label="Cerrar" data-close-evidencia>
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <div class="k-modal-body">
+            <p class="k-evidencia-cap-label" id="evidencia-cap-label">
+                <i class="bi bi-mortarboard-fill"></i>
+                <span id="evidencia-cap-name">—</span>
+            </p>
+
+            <!-- Dropzone -->
+            <label class="k-evidencia-dropzone" id="evidenciaDropzone" for="evidenciaFileInput">
+                <input type="file" id="evidenciaFileInput" multiple
+                       accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx"
+                       style="position:absolute; opacity:0; pointer-events:none; width:1px; height:1px;">
+                <i class="bi bi-cloud-arrow-up"></i>
+                <div class="k-evidencia-dropzone-title">Arrastrá archivos acá o hacé clic</div>
+                <div class="k-evidencia-dropzone-hint">Formatos: PDF, JPG, PNG, GIF, DOC, DOCX</div>
+            </label>
+
+            <!-- Lista de archivos -->
+            <div class="k-evidencia-section-title">
+                <span>Archivos cargados</span>
+                <span class="k-evidencia-count" id="evidenciaCount">0</span>
+            </div>
+            <div class="k-evidencia-list" id="evidenciaList">
+                <!-- Se llena por JS -->
+            </div>
+        </div>
+
+        <div class="k-modal-footer">
+            <button type="button" class="k-btn k-btn-outline btn-close-modal" data-close-evidencia>
+                Cerrar
             </button>
         </div>
 

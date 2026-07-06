@@ -982,3 +982,269 @@ select.k-form-control {
  color: #f0ad4e;
  background: rgba(240, 173, 78, 0.1);
 }
+
+/* =========================================
+   16. EVIDENCIAS — Modal & Cell Button
+   ========================================= */
+
+.k-evidencia-cap-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--k-text-muted);
+    margin-bottom: 1rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--k-bg-app);
+    border-radius: var(--k-radius-md);
+    border-left: 3px solid var(--k-primary);
+}
+
+.k-evidencia-cap-label i {
+    color: var(--k-primary);
+    font-size: 1rem;
+}
+
+.k-evidencia-cap-label #evidencia-cap-name {
+    font-weight: 500;
+    color: var(--k-text-main);
+}
+
+.k-evidencia-dropzone {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem 1rem;
+    margin-bottom: 1.25rem;
+    border: 2px dashed var(--k-border);
+    border-radius: var(--k-radius-lg);
+    background: var(--k-bg-app);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+}
+
+.k-evidencia-dropzone:hover,
+.k-evidencia-dropzone.is-dragging {
+    border-color: var(--k-primary);
+    background: var(--k-primary-light);
+}
+
+.k-evidencia-dropzone i {
+    font-size: 2rem;
+    color: var(--k-primary);
+    margin-bottom: 0.5rem;
+}
+
+.k-evidencia-dropzone-title {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--k-text-main);
+    margin-bottom: 0.25rem;
+}
+
+.k-evidencia-dropzone-hint {
+    font-size: 0.78rem;
+    color: var(--k-text-muted);
+}
+
+.k-evidencia-section-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--k-text-main);
+    margin: 0.5rem 0 0.75rem 0;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--k-border);
+}
+
+.k-evidencia-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 7px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 11px;
+    background: var(--k-primary-light);
+    color: var(--k-primary);
+}
+
+.k-evidencia-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.k-evidencia-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem 0.85rem;
+    background: var(--k-bg-app);
+    border: 1px solid var(--k-border);
+    border-radius: var(--k-radius-md);
+    transition: all 0.15s ease;
+}
+
+.k-evidencia-item:hover {
+    border-color: var(--k-primary);
+    background: var(--k-primary-light);
+}
+
+.k-evidencia-item-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--k-radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    flex-shrink: 0;
+    background: var(--k-bg-card);
+    color: var(--k-primary);
+}
+
+.k-evidencia-item-icon.is-pdf {
+    color: #dc3545;
+    background: var(--k-danger-light);
+}
+.k-evidencia-item-icon.is-image {
+    color: #28a745;
+    background: var(--k-success-light);
+}
+.k-evidencia-item-icon.is-doc {
+    color: #174ea6;
+    background: var(--k-primary-light);
+}
+
+.k-evidencia-item-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+
+.k-evidencia-item-name {
+    font-size: 0.875rem;
+    color: var(--k-text-main);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 320px;
+}
+
+.k-evidencia-item-meta {
+    font-size: 0.72rem;
+    color: var(--k-text-muted);
+}
+
+.k-evidencia-item-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.k-evidencia-item-actions .k-btn {
+    height: 30px;
+    width: 30px;
+}
+
+.k-evidencia-empty {
+    text-align: center;
+    padding: 1.5rem 1rem;
+    color: var(--k-text-muted);
+    font-size: 0.85rem;
+    font-style: italic;
+}
+
+.k-evidencia-empty i {
+    font-size: 2rem;
+    display: block;
+    margin-bottom: 0.5rem;
+    opacity: 0.5;
+}
+
+/* Botón de evidencia en la tabla */
+.k-evidencia-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    width: 32px;
+    padding: 0;
+    border: 1px solid var(--k-border);
+    background: var(--k-bg-card);
+    color: var(--k-text-muted);
+    border-radius: var(--k-radius-md);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.k-evidencia-btn:hover {
+    border-color: var(--k-primary);
+    color: var(--k-primary);
+    background: var(--k-primary-light);
+}
+
+.k-evidencia-btn.has-files {
+    color: var(--k-primary);
+    border-color: var(--k-primary);
+    background: var(--k-primary-light);
+}
+
+.k-evidencia-btn-count {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    border-radius: 9px;
+    background: var(--k-primary);
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+/* Dark theme — Evidencias */
+.capacitaciones-container[data-theme="dark"] .k-evidencia-dropzone {
+    background: var(--k-bg-card);
+    border-color: var(--k-border);
+}
+
+.capacitaciones-container[data-theme="dark"] .k-evidencia-dropzone:hover,
+.capacitaciones-container[data-theme="dark"] .k-evidencia-dropzone.is-dragging {
+    border-color: var(--k-primary);
+    background: rgba(77, 166, 255, 0.15);
+}
+
+.capacitaciones-container[data-theme="dark"] .k-evidencia-item {
+    background: var(--k-bg-card);
+    border-color: var(--k-border);
+}
+
+.capacitaciones-container[data-theme="dark"] .k-evidencia-item-icon.is-pdf {
+    background: rgba(217, 83, 79, 0.15);
+}
+.capacitaciones-container[data-theme="dark"] .k-evidencia-item-icon.is-image {
+    background: rgba(92, 184, 92, 0.15);
+}
+.capacitaciones-container[data-theme="dark"] .k-evidencia-item-icon.is-doc {
+    background: rgba(77, 166, 255, 0.15);
+}

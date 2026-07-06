@@ -20,6 +20,10 @@ class CapacitacionesComponent {
  this._confirmCallback = null;
  this._confirmModalInBody = null;
  this._isSaving = false;
+ this._evidenciaCap = null;
+ this._evidenciaFiles = [];
+ this._evidenciasCache = new Map();
+ this._evidenciaUploading = false;
     }
 
     render() {
@@ -145,6 +149,14 @@ class CapacitacionesComponent {
   document.body.removeChild(this._confirmModalInBody);
   this._confirmModalInBody = null;
  }
+ // Evidencias: cerrar modal y limpiar cache
+ const evModal = document.getElementById('evidenciaModal');
+ if (evModal && evModal.parentNode === document.body) {
+   document.body.removeChild(evModal);
+ }
+ this._evidenciaCap = null;
+ this._evidenciaFiles = [];
+ this._evidenciasCache = new Map();
     }
 
     initializeEventListeners() {
@@ -192,6 +204,8 @@ class CapacitacionesComponent {
 
         // Guardar (crea o actualiza según el estado del modal)
         document.getElementById('btn-save-training')?.addEventListener('click', () => this.saveTraining());
+
+ this.setupEvidenciaModal();
 
  this.setupConfirmModal();
     }
@@ -443,6 +457,14 @@ class CapacitacionesComponent {
             const { processedData, headers } = excelResult.data;
             this.capacitaciones = this.parseExcelDataToCapacitaciones(processedData, headers);
             this.applyFilters();
+
+            // Cargar el cache de evidencias en background (no bloquea la UI)
+            this._loadAllEvidenciaCounts().then(() => {
+              if (this.currentView === 'trainings') this.renderTable();
+            }).catch(err => {
+              console.warn('[EVIDENCIA] No se pudo pre-cargar cache de evidencias:', err);
+            });
+
             window.KAIRToast.show(`Datos del ${year} cargados.`, 'success');
 
         } catch (error) {
@@ -658,7 +680,7 @@ class CapacitacionesComponent {
         tbody.innerHTML = '';
 
         if (this.filteredCapacitaciones.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--k-text-muted);">No se encontraron capacitaciones</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--k-text-muted);">No se encontraron capacitaciones</td></tr>`;
             return;
         }
 
@@ -667,6 +689,9 @@ class CapacitacionesComponent {
             const badgeClass = item.estado === 'completed' ? 'k-badge-success' : 'k-badge-warning';
             const statusText = item.estado === 'completed' ? 'Completada' : 'Pendiente';
             const typeBadge  = item.tipo === 'sst' ? 'k-badge-primary' : 'k-badge-info';
+            const evCount    = this._evidenciasCache.get(item.id) || 0;
+            const hasEv      = evCount > 0;
+            const evTooltip  = hasEv ? `${evCount} archivo${evCount === 1 ? '' : 's'} de evidencia` : 'Sin evidencia';
 
             tr.innerHTML = `
                 <td><strong>${item.nombre}</strong></td>
@@ -675,6 +700,15 @@ class CapacitacionesComponent {
                 <td>${item.instructor}</td>
                 <td>${item.duracion}</td>
                 <td><span class="k-badge ${badgeClass}">${statusText}</span></td>
+                <td class="text-center">
+                  <button class="k-evidencia-btn ${hasEv ? 'has-files' : ''}"
+                          data-id="${item.id}"
+                          title="${evTooltip}"
+                          aria-label="${evTooltip}">
+                    <i class="bi bi-paperclip"></i>
+                    ${hasEv ? `<span class="k-evidencia-btn-count">${evCount}</span>` : ''}
+                  </button>
+                </td>
 			<td class="text-right k-cell-actions"><div class="k-cell-actions__inner">
           <button class="k-btn k-btn-outline k-btn-icon edit-btn" data-id="${item.id}" title="Editar">
             <i class="bi bi-pencil"></i>
@@ -712,6 +746,9 @@ class CapacitacionesComponent {
     );
     tbody.querySelectorAll('.delete-btn').forEach(btn =>
       btn.addEventListener('click', () => this.deleteTraining(parseInt(btn.dataset.id)))
+    );
+    tbody.querySelectorAll('.k-evidencia-btn').forEach(btn =>
+      btn.addEventListener('click', () => this.openEvidenciaModal(parseInt(btn.dataset.id)))
     );
     }
 
@@ -1074,6 +1111,533 @@ class CapacitacionesComponent {
     }
 
   // --- UTILIDADES ---
+
+  // ===== GESTIÓN DE EVIDENCIAS =====
+
+  setupEvidenciaModal() {
+    // Cerrar modal
+    document.querySelectorAll('[data-close-evidencia]').forEach(btn => {
+      btn.addEventListener('click', () => this.closeEvidenciaModal());
+    });
+
+    // Click fuera del overlay cierra
+    const overlay = document.getElementById('evidenciaModal');
+    if (overlay) {
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) this.closeEvidenciaModal();
+      });
+    }
+
+    // Esc cierra
+    document.addEventListener('keydown', (e) => {
+      const modal = document.getElementById('evidenciaModal');
+      if (e.key === 'Escape' && modal && modal.classList.contains('open')) {
+        this.closeEvidenciaModal();
+      }
+    });
+
+    // File input change
+    const fileInput = document.getElementById('evidenciaFileInput');
+    if (fileInput) {
+      fileInput.addEventListener('change', (e) => {
+        const files = Array.from(e.target.files || []);
+        if (files.length > 0 && this._evidenciaCap) {
+          this._uploadEvidenciaFiles(this._evidenciaCap, files);
+        }
+        e.target.value = '';
+      });
+    }
+
+    // Drag & drop
+    const dropzone = document.getElementById('evidenciaDropzone');
+    if (dropzone) {
+      ['dragenter', 'dragover'].forEach(evt => {
+        dropzone.addEventListener(evt, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropzone.classList.add('is-dragging');
+        });
+      });
+
+      ['dragleave', 'drop'].forEach(evt => {
+        dropzone.addEventListener(evt, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropzone.classList.remove('is-dragging');
+        });
+      });
+
+      dropzone.addEventListener('drop', (e) => {
+        const files = Array.from(e.dataTransfer?.files || []);
+        if (files.length > 0 && this._evidenciaCap) {
+          this._uploadEvidenciaFiles(this._evidenciaCap, files);
+        }
+      });
+    }
+  }
+
+  /**
+   * Ruta de la carpeta del submódulo (donde está el Excel y donde vivirá
+   * la carpeta de evidencias como hermana). Devuelve null si todavía no
+   * hay archivo de Excel cargado.
+   */
+  _getEvidenciaSubmodulePath() {
+    if (!this.excelFilePath) return null;
+    const sep = this.excelFilePath.includes('\\') ? '\\' : '/';
+    const lastSep = this.excelFilePath.lastIndexOf(sep);
+    if (lastSep === -1) return null;
+    return this.excelFilePath.substring(0, lastSep);
+  }
+
+  /**
+   * Genera un nombre de carpeta estable para una capacitación:
+   * cap-<id>-<slug-del-nombre>
+   */
+  _getCapFolderName(cap) {
+    const slug = this._slugify(cap.nombre || `cap-${cap.id}`);
+    return `cap-${cap.id}-${slug}`.substring(0, 60);
+  }
+
+  /**
+   * Construye la ruta completa de la carpeta de evidencia de una cap
+   * SIN crearla en disco. Usar _ensureEvidenciaFolders() antes de subir.
+   */
+  _getEvidenciaFolder(cap) {
+    const submodule = this._getEvidenciaSubmodulePath();
+    if (!submodule) return null;
+    const sep = submodule.includes('\\') ? '\\' : '/';
+    return submodule + sep + 'evidencias-capacitaciones' + sep + this._getCapFolderName(cap);
+  }
+
+  /**
+   * Crea (si no existe) la carpeta `evidencias-capacitaciones/` y dentro la
+   * carpeta de la cap. Devuelve la ruta final. Es idempotente: si las
+   * carpetas ya existen, el backend responde success:true sin error.
+   */
+  async _ensureEvidenciaFolders(cap) {
+    const submodule = this._getEvidenciaSubmodulePath();
+    if (!submodule) throw new Error('No hay ruta del submódulo cargada');
+
+    const submoduleFwd = submodule.replace(/\\/g, '/');
+
+    // Nivel 1: evidencias-capacitaciones
+    const baseResult = await window.electronAPI.createProviderFolder(
+      submoduleFwd, 'evidencias-capacitaciones'
+    );
+    if (!baseResult || !baseResult.success) {
+      throw new Error(`No se pudo crear carpeta base de evidencias: ${baseResult?.error || 'unknown'}`);
+    }
+
+    const basePath = (baseResult.path || '').replace(/\\/g, '/');
+
+    // Nivel 2: evidencias-capacitaciones/<cap-X-...>
+    const capResult = await window.electronAPI.createProviderFolder(
+      basePath, this._getCapFolderName(cap)
+    );
+    if (!capResult || !capResult.success) {
+      throw new Error(`No se pudo crear carpeta de la capacitación: ${capResult?.error || 'unknown'}`);
+    }
+
+    return capResult.path;
+  }
+
+  /**
+   * Normaliza un string para usar como nombre de carpeta:
+   * lowercase, sin acentos, sin caracteres especiales, kebab-case, max 40 chars.
+   */
+  _slugify(text) {
+    return (text || '')
+      .toString()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, ' ')
+      .trim()
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .substring(0, 40) || 'cap';
+  }
+
+  _evidenciaIconClass(fileName) {
+    const ext = (fileName.split('.').pop() || '').toLowerCase();
+    if (ext === 'pdf') return 'is-pdf bi-file-earmark-pdf-fill';
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext)) return 'is-image bi-file-earmark-image';
+    if (['doc', 'docx'].includes(ext)) return 'is-doc bi-file-earmark-word-fill';
+    return 'bi-file-earmark';
+  }
+
+  _formatBytes(bytes) {
+    if (!bytes || bytes <= 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let v = bytes;
+    let i = 0;
+    while (v >= 1024 && i < units.length - 1) {
+      v /= 1024;
+      i++;
+    }
+    return v.toFixed(v < 10 && i > 0 ? 1 : 0) + ' ' + units[i];
+  }
+
+  /**
+   * Cuenta archivos para TODAS las capacitaciones del año actual.
+   * Cachea los resultados en this._evidenciasCache (id → count).
+   * Si una carpeta no existe, cuenta 0.
+   */
+  async _loadAllEvidenciaCounts() {
+    this._evidenciasCache = new Map();
+
+    if (!this.excelFilePath) return;
+
+    const submodule = this._getEvidenciaSubmodulePath();
+    if (!submodule) return;
+
+    const base = submodule + (submodule.includes('\\') ? '\\' : '/') + 'evidencias-capacitaciones';
+    const sep = base.includes('\\') ? '\\' : '/';
+
+    for (const cap of this.capacitaciones) {
+      const folderName = this._getCapFolderName(cap);
+      const folderPath = base + sep + folderName;
+
+      try {
+        const result = await window.electronAPI.listProviderFiles(folderPath);
+        if (result && result.success && Array.isArray(result.files)) {
+          this._evidenciasCache.set(cap.id, result.files.length);
+        } else {
+          this._evidenciasCache.set(cap.id, 0);
+        }
+      } catch (e) {
+        this._evidenciasCache.set(cap.id, 0);
+      }
+    }
+  }
+
+  async openEvidenciaModal(capId) {
+    const cap = this.capacitaciones.find(c => c.id === capId);
+    if (!cap) {
+      window.KAIRToast.show('Capacitación no encontrada', 'warning');
+      return;
+    }
+    if (!this.excelFilePath) {
+      window.KAIRToast.show('No hay archivo de Excel cargado', 'warning');
+      return;
+    }
+
+    this._evidenciaCap = cap;
+    this._evidenciaFiles = [];
+
+    const modal = document.getElementById('evidenciaModal');
+    const nameEl = document.getElementById('evidencia-cap-name');
+    const countEl = document.getElementById('evidenciaCount');
+    const listEl = document.getElementById('evidenciaList');
+
+    if (!modal || !nameEl || !listEl) return;
+
+    nameEl.textContent = cap.nombre;
+    if (countEl) countEl.textContent = '...';
+
+    listEl.innerHTML = `
+      <div class="k-evidencia-empty">
+        <i class="bi bi-hourglass-split"></i>
+        Cargando archivos…
+      </div>
+    `;
+
+    // Mover el modal al body para escapar de scope CSS (igual que trainingModal)
+    if (modal.parentNode !== document.body) {
+      const computed = getComputedStyle(this.container);
+      const cssVars = [
+        '--k-primary', '--k-primary-hover', '--k-primary-light',
+        '--k-success', '--k-success-light',
+        '--k-warning', '--k-warning-light',
+        '--k-danger',  '--k-danger-light',
+        '--k-info',    '--k-info-light',
+        '--k-bg-app',  '--k-bg-card', '--k-border',
+        '--k-text-main', '--k-text-muted',
+        '--k-radius-md', '--k-radius-lg'
+      ];
+      cssVars.forEach(v => {
+        const val = computed.getPropertyValue(v).trim();
+        if (val) modal.style.setProperty(v, val);
+      });
+      document.body.appendChild(modal);
+    }
+
+    modal.classList.add('open');
+
+    await this._loadEvidenciaFiles(cap);
+  }
+
+  closeEvidenciaModal() {
+    const modal = document.getElementById('evidenciaModal');
+    if (modal) modal.classList.remove('open');
+    this._evidenciaCap = null;
+    this._evidenciaFiles = [];
+  }
+
+  async _loadEvidenciaFiles(cap) {
+    const folder = this._getEvidenciaFolder(cap);
+    const listEl = document.getElementById('evidenciaList');
+    const countEl = document.getElementById('evidenciaCount');
+    if (!folder || !listEl) return;
+
+    try {
+      const result = await window.electronAPI.listProviderFiles(folder);
+      const files = (result && result.success) ? result.files : [];
+
+      this._evidenciaFiles = files;
+      this._evidenciasCache.set(cap.id, files.length);
+
+      if (countEl) countEl.textContent = files.length;
+
+      if (files.length === 0) {
+        listEl.innerHTML = `
+          <div class="k-evidencia-empty">
+            <i class="bi bi-inbox"></i>
+            No hay archivos cargados todavía. Arrastrá un PDF o hacé clic en la zona de arriba.
+          </div>
+        `;
+      } else {
+        listEl.innerHTML = '';
+        files.forEach(file => listEl.appendChild(this._renderEvidenciaItem(file, cap)));
+      }
+
+      // Si la tabla está visible, refrescar el badge
+      if (this.currentView === 'trainings') this.renderTable();
+    } catch (error) {
+      console.error('[EVIDENCIA] Error listando archivos:', error);
+      listEl.innerHTML = `
+        <div class="k-evidencia-empty">
+          <i class="bi bi-exclamation-triangle"></i>
+          Error al listar los archivos.
+        </div>
+      `;
+    }
+  }
+
+  _renderEvidenciaItem(file, cap) {
+    const div = document.createElement('div');
+    div.className = 'k-evidencia-item';
+
+    const iconClass = this._evidenciaIconClass(file.name);
+    const [cls, iconName] = iconClass.split(' ');
+
+    const safeName = file.name.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const size = this._formatBytes(file.size);
+    const modified = file.modified ? new Date(file.modified).toLocaleString('es-ES') : '';
+
+    div.innerHTML = `
+      <div class="k-evidencia-item-icon ${cls}">
+        <i class="bi ${iconName}"></i>
+      </div>
+      <div class="k-evidencia-item-info">
+        <div class="k-evidencia-item-name" title="${safeName}">${safeName}</div>
+        <div class="k-evidencia-item-meta">${size}${modified ? ' · ' + modified : ''}</div>
+      </div>
+      <div class="k-evidencia-item-actions">
+        <button class="k-btn k-btn-outline k-btn-icon ev-open-btn"
+                data-name="${safeName.replace(/"/g, '&quot;')}"
+                title="Abrir archivo">
+          <i class="bi bi-box-arrow-up-right"></i>
+        </button>
+        <button class="k-btn k-btn-outline k-btn-icon ev-delete-btn"
+                style="color:var(--k-danger);border-color:var(--k-danger);"
+                data-name="${safeName.replace(/"/g, '&quot;')}"
+                title="Eliminar archivo (a papelera)">
+          <i class="bi bi-trash"></i>
+        </button>
+      </div>
+    `;
+
+    div.querySelector('.ev-open-btn').addEventListener('click', () => {
+      this._openEvidenciaFile(cap, file.name);
+    });
+
+    div.querySelector('.ev-delete-btn').addEventListener('click', () => {
+      this._confirmDeleteEvidencia(cap, file.name);
+    });
+
+    return div;
+  }
+
+  _confirmDeleteEvidencia(cap, fileName) {
+    this.showConfirmModal({
+      title: 'Eliminar evidencia',
+      message: `¿Eliminar "${fileName}"?`,
+      warning: 'El archivo se moverá a la Papelera de Reciclaje de Windows (recuperable).',
+      acceptLabel: 'Eliminar',
+      acceptIcon: 'bi-trash',
+      onAccept: () => this._removeEvidenciaFile(cap, fileName)
+    });
+  }
+
+  async _uploadEvidenciaFiles(cap, files) {
+    if (this._evidenciaUploading) {
+      window.KAIRToast.show('Hay una subida en curso, esperá unos segundos', 'warning');
+      return;
+    }
+
+    // Validar tipos MIME / extensiones
+    const allowedExts = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'doc', 'docx', 'webp', 'bmp'];
+    const validFiles = files.filter(f => {
+      const ext = (f.name.split('.').pop() || '').toLowerCase();
+      return allowedExts.includes(ext);
+    });
+
+    if (validFiles.length === 0) {
+      window.KAIRToast.show('Ningún archivo tiene un formato permitido', 'warning');
+      return;
+    }
+    if (validFiles.length !== files.length) {
+      window.KAIRToast.show(`${files.length - validFiles.length} archivo(s) ignorado(s) por formato`, 'info');
+    }
+
+    let folder;
+    try {
+      // ✏️ FIX: el backend `copy-file-to-provider-folder` NO crea carpetas,
+      // solo escribe. Hay que asegurar la existencia de la ruta primero.
+      folder = await this._ensureEvidenciaFolders(cap);
+    } catch (err) {
+      console.error('[EVIDENCIA] Error creando carpetas:', err);
+      window.KAIRToast.show(`No se pudo preparar la carpeta: ${err.message}`, 'danger');
+      return;
+    }
+
+    if (!folder) {
+      window.KAIRToast.show('No se pudo determinar la carpeta de evidencias', 'danger');
+      return;
+    }
+
+    this._evidenciaUploading = true;
+    const total = validFiles.length;
+    let success = 0;
+    let errors = 0;
+
+    window.KAIRToast.show(`Subiendo ${total} archivo(s)…`, 'info');
+
+    try {
+      for (let i = 0; i < total; i++) {
+        const file = validFiles[i];
+        try {
+          // Asegurar unicidad del nombre
+          const finalName = await this._ensureUniqueName(folder, file.name);
+
+          // Convertir a base64 (sin prefijo data:...)
+          const base64 = await this._fileToBase64(file);
+
+          const res = await window.electronAPI.copyFileToProviderFolder(
+            base64, folder, finalName, file.type || ''
+          );
+
+          if (res && res.success) success++;
+          else {
+            errors++;
+            console.error('[EVIDENCIA] Backend rechazó el archivo', file.name, res?.error);
+          }
+        } catch (err) {
+          console.error('[EVIDENCIA] Error subiendo', file.name, err);
+          errors++;
+        }
+      }
+
+      if (success > 0) {
+        window.KAIRToast.show(`${success} archivo(s) subido(s)${errors ? `, ${errors} con error` : ''}`, success === total ? 'success' : 'warning');
+      } else if (errors > 0) {
+        window.KAIRToast.show('No se pudo subir ningún archivo', 'danger');
+      }
+
+      await this._loadEvidenciaFiles(cap);
+    } finally {
+      this._evidenciaUploading = false;
+    }
+  }
+
+  /**
+   * Si ya existe `name` en `folder`, devuelve `name (2).ext`, `name (3).ext`, etc.
+   */
+  async _ensureUniqueName(folder, name) {
+    try {
+      const res = await window.electronAPI.listProviderFiles(folder);
+      const existing = (res && res.success) ? new Set((res.files || []).map(f => f.name)) : new Set();
+      if (!existing.has(name)) return name;
+
+      const lastDot = name.lastIndexOf('.');
+      const base = lastDot > 0 ? name.substring(0, lastDot) : name;
+      const ext  = lastDot > 0 ? name.substring(lastDot) : '';
+
+      let counter = 2;
+      let candidate = `${base} (${counter})${ext}`;
+      while (existing.has(candidate) && counter < 1000) {
+        counter++;
+        candidate = `${base} (${counter})${ext}`;
+      }
+      return candidate;
+    } catch (e) {
+      return name;
+    }
+  }
+
+  _fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      // Mismo patrón que evaluacion-proveedores: arrayBuffer → bytes → btoa
+      // (más robusto con archivos grandes que FileReader.readAsDataURL)
+      file.arrayBuffer()
+        .then(arrayBuffer => {
+          try {
+            const bytes = new Uint8Array(arrayBuffer);
+            let binary = '';
+            for (let i = 0; i < bytes.byteLength; i++) {
+              binary += String.fromCharCode(bytes[i]);
+            }
+            resolve(btoa(binary));
+          } catch (err) {
+            reject(err);
+          }
+        })
+        .catch(reject);
+    });
+  }
+
+  async _removeEvidenciaFile(cap, fileName) {
+    const folder = this._getEvidenciaFolder(cap);
+    if (!folder) return;
+
+    const sep = folder.includes('\\') ? '\\' : '/';
+    const fullPath = folder + sep + fileName;
+
+    window.KAIRToast.show('Eliminando archivo…', 'info');
+
+    try {
+      // Reusar delete-document del main (usa shell.trashItem, amigable con Google Drive)
+      const res = await window.electronAPI.deleteDocument(fullPath);
+      if (res && res.success) {
+        window.KAIRToast.show(`"${fileName}" movido a papelera`, 'success');
+        await this._loadEvidenciaFiles(cap);
+      } else {
+        window.KAIRToast.show(`Error al eliminar: ${res?.error || 'desconocido'}`, 'danger');
+      }
+    } catch (err) {
+      console.error('[EVIDENCIA] Error eliminando', fileName, err);
+      window.KAIRToast.show('Error inesperado al eliminar', 'danger');
+    }
+  }
+
+  async _openEvidenciaFile(cap, fileName) {
+    const folder = this._getEvidenciaFolder(cap);
+    if (!folder) return;
+    const sep = folder.includes('\\') ? '\\' : '/';
+    const fullPath = folder + sep + fileName;
+
+    try {
+      const res = await window.electronAPI.openFile(fullPath);
+      if (res && !res.success) {
+        window.KAIRToast.show(`No se pudo abrir: ${res.error || 'desconocido'}`, 'danger');
+      }
+    } catch (err) {
+      console.error('[EVIDENCIA] Error abriendo', fileName, err);
+      window.KAIRToast.show('Error al abrir el archivo', 'danger');
+    }
+  }
+
+  // ===== FIN GESTIÓN DE EVIDENCIAS =====
 
   formatDate(dateString) {
         if (!dateString || dateString === 'No especificada') return '-';
