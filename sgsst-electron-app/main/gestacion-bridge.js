@@ -1157,7 +1157,126 @@ function registerGestacionHandlers(app, deps) {
         return _handlerActualizarEstado(params.empresaId, params.gestanteId, params.data || {});
     });
 
-    console.log('[' + MOD + '][INIT][SUCCESS] 11 handlers de Seguimiento de Gestación registrados');
+    // 📦497 — Próximos seguimientos de gestación para el calendario K+AIR.
+    // Devuelve un evento por cada gestante que tiene un próximo seguimiento
+    // programado (ultimo seguimiento.proxima_cita) o, si nunca se ha hecho
+    // un seguimiento, calcula la primera cita según clasificación de riesgo
+    // obstétrico (Res. 0312/2019 art. 14):
+    //   muy-alto riesgo → cada 7 días
+    //   alto riesgo     → cada 15 días
+    //   bajo riesgo     → cada 30 días
+    //
+    // payload esperado: { currentCompany: string }
+    // Solo incluye gestantes en estado 'activo' o 'reintegro' (excluye
+    // cerrada/suspendida/licencia). Devuelve TODOS los eventos (pasados y
+    // futuros) para que aparezcan al navegar entre meses en el calendario.
+    ipcMain.handle('gestaciones:get-events', async function (event, payload) {
+        try {
+            var params = (payload && typeof payload === 'object') ? payload : {};
+            var empresaId = params.currentCompany || (params && params.empresaId);
+            if (!empresaId || empresaId === 'default_company') {
+                return { success: true, data: [] };
+            }
+            return _handlerEventosCalendario(empresaId);
+        } catch (e) {
+            console.error('[' + MOD + '][CAL_GEST]', e.message);
+            return { success: false, error: { code: 'INTERNAL', message: e.message }, data: [] };
+        }
+    });
+
+    console.log('[' + MOD + '][INIT][SUCCESS] 12 handlers de Seguimiento de Gestación registrados');
+}
+
+/**
+ * 📦497 — Implementación de eventos de calendario para gestaciones.
+ * Una sola query bulk trae los últimos seguimientos (con proxima_cita) de
+ * todas las gestantes activo/reintegro de la empresa. Si una gestante nunca
+ * tuvo seguimiento, calcula la primera cita basándose en clasificación
+ * de riesgo obstétrico (Res. 0312/2019 art. 14).
+ */
+function _handlerEventosCalendario(empresaId) {
+    if (!_getDb) {
+        return { success: false, error: { code: 'NO_DB', message: 'Base de datos no disponible' }, data: [] };
+    }
+    try {
+        var db = _getDb();
+
+        // 1) Gestantes relevantes (activo + reintegro)
+        var gestantes = db.prepare(
+            "SELECT id, nombre, cedula, estado, clasificacion, fecha_notificacion, fpp " +
+            "FROM gestaciones WHERE empresa_id = ? AND estado IN ('activo', 'reintegro')"
+        ).all(empresaId);
+
+        if (gestantes.length === 0) {
+            return { success: true, data: [] };
+        }
+
+        // 2) Bulk query: último seguimiento (con proxima_cita) por gestante
+        var ids = gestantes.map(function (g) { return g.id; });
+        var placeholders = ids.map(function () { return '?'; }).join(',');
+        var stmtUltimo = db.prepare(
+            "SELECT s.gestacion_id, s.proxima_cita, s.fecha, s.periodo, s.clasificacion " +
+            "FROM seguimiento_gestacion_mensual s " +
+            "INNER JOIN (" +
+            "  SELECT gestacion_id, MAX(fecha) AS max_fecha " +
+            "  FROM seguimiento_gestacion_mensual " +
+            "  WHERE empresa_id = ? AND gestacion_id IN (" + placeholders + ") " +
+            "  GROUP BY gestacion_id" +
+            ") latest ON latest.gestacion_id = s.gestacion_id AND latest.max_fecha = s.fecha " +
+            "WHERE s.empresa_id = ?"
+        );
+        var rowsSeguimiento = stmtUltimo.all.apply(stmtUltimo, [empresaId].concat(ids).concat([empresaId]));
+
+        var mapUltimo = {};
+        rowsSeguimiento.forEach(function (r) { mapUltimo[r.gestacion_id] = r; });
+
+        // 3) Mapear cada gestante a un evento
+        var events = [];
+        gestantes.forEach(function (g) {
+            var last = mapUltimo[g.id];
+            var proximaCita = last && last.proxima_cita ? String(last.proxima_cita) : null;
+
+            // Si no hay proxima_cita (gestante nunca registrada para seguimiento),
+            // calcular primera cita basándonos en clasificación desde fecha_notificacion.
+            if (!proximaCita) {
+                var baseDate = g.fecha_notificacion;
+                if (!baseDate) return;
+                var dias;
+                if (g.clasificacion === 'muy-alto') dias = 7;
+                else if (g.clasificacion === 'alto') dias = 15;
+                else dias = 30;
+                var base = new Date(baseDate);
+                if (isNaN(base.getTime())) return;
+                var primera = new Date(base.getTime() + dias * 24 * 60 * 60 * 1000);
+                // Solo incluir si está en el futuro (no mostrar citas viejas sin registro previo)
+                if (primera.getTime() < Date.now()) return;
+                proximaCita = primera.toISOString().slice(0, 10);
+            }
+
+            // Validar formato YYYY-MM-DD
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(proximaCita)) return;
+
+            var nombreCorto = (g.nombre || '').split(/\s+/).filter(Boolean).slice(0, 2).join(' ');
+            events.push({
+                id: 'gest-' + g.id + '-' + proximaCita,
+                title: 'Seguimiento: ' + (nombreCorto || 'Gestante'),
+                date: proximaCita,
+                start: '00:00',
+                end: '23:59',
+                type: 'gestacion',
+                descripcion: 'Seguimiento mensual de gestación (clasificación: ' + (g.clasificacion || 'bajo') + ')',
+                estado: g.estado,
+                gestanteId: g.id,
+                cedula: g.cedula,
+                clasificacion: g.clasificacion || 'bajo'
+            });
+        });
+
+        return { success: true, data: events };
+    } catch (e) {
+        console.error('[' + MOD + '][CAL_EVENTOS]', e.message);
+        return { success: false, error: { code: 'DB_ERROR', message: e.message }, data: [] };
+    }
 }
 
 module.exports = {

@@ -226,7 +226,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // --- K+AIR Calendar: agregadores de las 3 fuentes principales ---
   // Devuelven eventos en formato unificado: { id, title, date, start, end, type }.
-  // type puede ser: 'plan' | 'capacitacion' | 'auditoria' | 'rapido' | 'vencido'.
+  // type puede ser: 'plan' | 'capacitacion' | 'auditoria' | 'rapido' | 'vencido' | 'gestacion'.
   planTrabajo: {
     getEvents: (range) => ipcRenderer.invoke('plan-trabajo:get-events', range)
   },
@@ -235,6 +235,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   auditoria: {
     getFases: (range) => ipcRenderer.invoke('auditoria:get-fases', range)
+  },
+  // 📦497 — Eventos de seguimientos de gestación (Salud Materna).
+  // Devuelve los próximos seguimientos programados por gestante activa/reintegro.
+  gestaciones: {
+    getEvents: (payload) => ipcRenderer.invoke('gestaciones:get-events', payload)
   },
 
   // --- Presupuesto ---

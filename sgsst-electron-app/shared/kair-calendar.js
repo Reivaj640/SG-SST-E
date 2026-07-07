@@ -104,8 +104,34 @@
     this._els = {};
     this._listeners = [];
     this._adapter = this.opts.adapter || createLocalAdapter();
+    // 📦497 — Cache lookup de color por tipo desde eventTypes
+    this._typeColorCache = {};
+    (this.opts.eventTypes || []).forEach(function (t) {
+      if (t && t.id && t.color) this._typeColorCache[t.id] = t.color;
+    }, this);
     this._init();
   }
+
+  // 📦497-fix — Devuelve el color configurado en eventTypes para un tipo dado,
+  // o null si no está configurado. Usado para inyectar border-left-color inline
+  // en chips/blocks (inline style gana sobre cualquier CSS conflictivo).
+  KairCalendar.prototype._typeColor = function (type) {
+    if (!type) return null;
+    return this._typeColorCache[type] || null;
+  };
+
+  // Atributos de estilo para el chip de mes: solo border-left-color.
+  KairCalendar.prototype._chipStyle = function (e) {
+    const c = this._typeColor(e.type);
+    return c ? ' style="border-left-color:' + c + '"' : '';
+  };
+
+  // CSS inline para bloques (vista semana/día). Devuelve la parte del atributo
+  // style="" adicional (después de top/height). Devuelve '' si no hay color.
+  KairCalendar.prototype._blockBorderCss = function (e) {
+    const c = this._typeColor(e.type);
+    return c ? 'border-left-color:' + c + ';' : '';
+  };
 
   // ---------- Adaptador local (demo / fallback) ----------
   function createLocalAdapter() {
@@ -603,7 +629,7 @@
       html += '<div class="kair-cal-month__events">';
       const maxShow = 3;
       dayEvents.slice(0, maxShow).forEach(e => {
-        html += '<div class="kair-cal-event-chip kair-cal-event-chip--' + escapeHTML(e.type || 'primary') + '" data-kair-cal-event-id="' + escapeHTML(e.id) + '" title="' + escapeHTML(e.title) + '">';
+        html += '<div class="kair-cal-event-chip kair-cal-event-chip--' + escapeHTML(e.type || 'primary') + '" data-kair-cal-event-id="' + escapeHTML(e.id) + '" title="' + escapeHTML(e.title) + '"' + this._chipStyle(e) + '>';
         if (e.start && e.start !== '00:00') {
           html += '<span class="kair-cal-event-chip__time">' + escapeHTML(e.start) + '</span>';
         }
@@ -624,6 +650,16 @@
       html = stateEmptyHTML('No hay eventos', 'Click en cualquier día para crear uno nuevo o usa “Nuevo evento”.') + html;
     }
     this._els.main.innerHTML = html;
+    // 📦497 — Aplicar border-left-color vía DOM directo (bypassa cualquier
+    // specificity de CSS). Usamos el cache construido del eventTypes config.
+    this._els.main.querySelectorAll('.kair-cal-event-chip').forEach(function (el) {
+      var id = el.getAttribute('data-kair-cal-event-id');
+      var ev = (this.state.events || []).find(function (e) { return e.id === id; });
+      if (ev) {
+        var c = this._typeColor(ev.type);
+        if (c) el.style.borderLeftColor = c;
+      }
+    }, this);
   };
 
   // ---------- Render: vista SEMANA ----------
@@ -676,7 +712,7 @@
         const height = Math.max(20, ((eh + em/60) - (sh + sm/60)) * 48);
         html += '<div class="kair-cal-event-block kair-cal-event-block--' + escapeHTML(e.type || 'primary') + '" '
               + 'data-kair-cal-event-id="' + escapeHTML(e.id) + '" '
-              + 'style="top:' + top + 'px;height:' + height + 'px;">'
+              + 'style="top:' + top + 'px;height:' + height + 'px;' + this._blockBorderCss(e) + '">'
               + '<div class="kair-cal-event-block__title">' + escapeHTML(e.title) + '</div>'
               + '<div class="kair-cal-event-block__time">' + escapeHTML(e.start) + (e.end ? ' – ' + escapeHTML(e.end) : '') + '</div>'
               + '</div>';
@@ -687,6 +723,15 @@
     html += '</div>'; // view-week
 
     this._els.main.innerHTML = html;
+    // 📦497-debug — Aplicar color vía DOM directo (week view)
+    this._els.main.querySelectorAll('.kair-cal-event-block').forEach(function (el) {
+      var id = el.getAttribute('data-kair-cal-event-id');
+      var ev = (this.state.events || []).find(function (e) { return e.id === id; });
+      if (ev) {
+        var c = this._typeColor(ev.type);
+        if (c) el.style.borderLeftColor = c;
+      }
+    }, this);
     this._positionNowLine();
   };
 
@@ -719,7 +764,7 @@
         // Evento de todo el día: banner arriba
         html += '<div class="kair-cal-event-block kair-cal-event-block--' + escapeHTML(e.type || 'primary') + '" '
               + 'data-kair-cal-event-id="' + escapeHTML(e.id) + '" '
-              + 'style="top:4px;height:32px;left:8px;right:8px;">'
+              + 'style="top:4px;height:32px;left:8px;right:8px;' + this._blockBorderCss(e) + '">'
               + '<div class="kair-cal-event-block__title">' + escapeHTML(e.title) + ' (Todo el día)</div>'
               + '</div>';
         return;
@@ -730,7 +775,7 @@
       const height = Math.max(28, ((eh + em/60) - (sh + sm/60)) * 56);
       html += '<div class="kair-cal-event-block kair-cal-event-block--' + escapeHTML(e.type || 'primary') + '" '
             + 'data-kair-cal-event-id="' + escapeHTML(e.id) + '" '
-            + 'style="top:' + top + 'px;height:' + height + 'px;">'
+            + 'style="top:' + top + 'px;height:' + height + 'px;' + this._blockBorderCss(e) + '">'
             + '<div class="kair-cal-event-block__title">' + escapeHTML(e.title) + '</div>'
             + '<div class="kair-cal-event-block__time">' + escapeHTML(e.start) + (e.end ? ' – ' + escapeHTML(e.end) : '') + '</div>'
             + '</div>';
@@ -739,6 +784,15 @@
     html += '</div>'; // view-day
 
     this._els.main.innerHTML = html;
+    // 📦497-fix-v2 — Aplicar border-left-color vía DOM directo
+    this._els.main.querySelectorAll('.kair-cal-event-block').forEach(function (el) {
+      var id = el.getAttribute('data-kair-cal-event-id');
+      var ev = (this.state.events || []).find(function (e) { return e.id === id; });
+      if (ev) {
+        var c = this._typeColor(ev.type);
+        if (c) el.style.borderLeftColor = c;
+      }
+    }, this);
     this._positionNowLine();
   };
 
@@ -1005,7 +1059,7 @@
           this.state.error = (res && res.error && res.error.message) || 'No se pudieron cargar los eventos';
           this.state.events = [];
         } else {
-          this.state.events = (res.data || []).map(normalizeEvent);
+          this.state.events = (res.data || []).map(e => this._normalizeEvent(e));
         }
       })
       .catch(err => {
@@ -1129,17 +1183,30 @@
   };
 
   // ---------- Normalización de evento ----------
-  function normalizeEvent(e) {
+  // 📦497 — Reemplazo de normalizeEvent() global: ahora es un método de
+  // instancia porque necesita acceder a this.opts.eventTypes para validar
+  // tipos custom (capacitacion, gestacion, etc.). Antes usaba un whitelist
+  // hardcoded de 5 tipos default que descartaba tipos custom → chips
+  // mostraban type='primary' aunque vinieran con type='gestacion'.
+  KairCalendar.prototype._normalizeEvent = function (e) {
+    if (!e) return null;
+    // Whitelist dinámico desde eventTypes config. Si un tipo no está,
+    // cae a 'primary' (mantiene compatibilidad con eventos sin tipo).
+    var validIds = (this._typeColorCache && Object.keys(this._typeColorCache).length)
+      ? Object.keys(this._typeColorCache)
+      : ['primary','success','warning','danger','info'];
+    var t = e.type;
+    var finalType = validIds.indexOf(t) >= 0 ? t : 'primary';
     return {
       id: safeEl(e.id),
       title: safeEl(e.title) || '(Sin título)',
       date: safeEl(e.date),
       start: e.start ? safeEl(e.start) : null,
       end: e.end ? safeEl(e.end) : null,
-      type: ['primary','success','warning','danger','info'].indexOf(e.type) >= 0 ? e.type : 'primary',
+      type: finalType,
       description: e.description ? safeEl(e.description) : ''
     };
-  }
+  };
 
   // ---------- Estados HTML ----------
   function stateLoadingHTML() {

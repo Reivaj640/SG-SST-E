@@ -2,11 +2,12 @@
  * shared/kair-calendar-adapter.js
  *
  * Adapter SG-SST para el K+AIR Calendar Component.
- * Une las 4 fuentes de eventos que muestra el calendario:
+ * Une las 5 fuentes de eventos que muestra el calendario:
  *   1. Plan de Trabajo Anual (electronAPI.planTrabajo.getEvents)
  *   2. Capacitaciones (electronAPI.capacitaciones.getEvents)
  *   3. Auditoría Anual — fases (electronAPI.auditoria.getFases)
  *   4. Eventos rápidos del usuario (electronAPI.eventosRapidos)
+ *   5. Seguimientos de Gestación (electronAPI.gestaciones.getEvents) — 📦497
  *
  * Contrato implementado (consumido por KairCalendar):
  *   list(range)   -> { success, data: [...] }  (data = array unificado de eventos)
@@ -18,7 +19,7 @@
  *   - Si una fuente falla (ej: Excel del plan no se puede leer), se loggea y se devuelve
  *     array vacío para esa fuente. Las demás siguen funcionando (degradación elegante).
  *   - Solo eventos con type='rapido' se pueden crear/editar/eliminar desde el calendario.
- *     Los eventos de plan/cap/aud se editan en su módulo origen.
+ *     Los eventos de plan/cap/aud/gest se editan en su módulo origen.
  */
 
 (function (global) {
@@ -41,19 +42,21 @@
   // range = { start: 'YYYY-MM-DD', end: 'YYYY-MM-DD' }
   async function list(range) {
     var api = (global.electronAPI) || {};
+    var currentCompany = (global.currentCompany && global.currentCompany !== 'default_company')
+      ? global.currentCompany
+      : null;
     // 📦495 — Pasar currentCompany al backend de capacitaciones para que sepa
     // cuál Excel leer (el calendario es global pero las capacitaciones son
     // por empresa).
-    var capPayload = Object.assign({}, range || {}, {
-      currentCompany: (global.currentCompany && global.currentCompany !== 'default_company')
-        ? global.currentCompany
-        : null
-    });
+    var capPayload = Object.assign({}, range || {}, { currentCompany: currentCompany });
+    // 📦497 — Pasar currentCompany al backend de gestaciones (BD por empresa).
+    var gestPayload = Object.assign({}, range || {}, { currentCompany: currentCompany });
     var results = await Promise.all([
       _safe(function () { return api.planTrabajo && api.planTrabajo.getEvents(range); }),
       _safe(function () { return api.capacitaciones && api.capacitaciones.getEvents(capPayload); }),
       _safe(function () { return api.auditoria && api.auditoria.getFases(range); }),
-      _safe(function () { return api.eventosRapidos && api.eventosRapidos.list(range); })
+      _safe(function () { return api.eventosRapidos && api.eventosRapidos.list(range); }),
+      _safe(function () { return api.gestaciones && api.gestaciones.getEvents(gestPayload); })
     ]);
     var merged = [];
     for (var i = 0; i < results.length; i++) {
@@ -116,6 +119,6 @@
     create: create,
     update: update,
     remove: remove,
-    version: '1.0.0'
+    version: '1.1.0'
   };
 })(typeof window !== 'undefined' ? window : this);

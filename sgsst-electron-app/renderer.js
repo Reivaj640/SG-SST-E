@@ -1681,7 +1681,10 @@ if (appHeader) {
             { id: 'capacitacion', label: 'Capacitación',    color: '#28a745' },
             { id: 'auditoria',    label: 'Auditoría',       color: '#ffc107' },
             { id: 'rapido',       label: 'Evento rápido',   color: '#6c757d' },
-            { id: 'vencido',      label: 'Vencido',         color: '#dc3545' }
+            { id: 'vencido',      label: 'Vencido',         color: '#dc3545' },
+            // 📦497 — Seguimientos de Gestación (Salud Materna). Color rosa
+            // distintivo del módulo de gestación.
+            { id: 'gestacion',    label: 'Seguimiento Gestación', color: '#ec4899' }
           ],
           adapter: window.KairCalendarAdapter || null,
           onEventClick: function (ev) {

@@ -27,6 +27,7 @@
     auditoria:    'Auditoría',
     rapido:       'Evento rápido',
     vencido:      'Vencido',
+    gestacion:    'Seguimiento Gestación',
     primary:      'Evento',
     success:      'Evento',
     warning:      'Evento',
@@ -39,7 +40,8 @@
     capacitacion: '#28a745',
     auditoria:    '#ffc107',
     rapido:       '#6c757d',
-    vencido:      '#dc3545'
+    vencido:      '#dc3545',
+    gestacion:    '#ec4899'
   };
 
   // Mapeo de tipo de evento → función de navegación al módulo origen.
@@ -47,7 +49,11 @@
   var NAV_MAP = {
     plan:         function () { _navigate('plan-trabajo'); },
     capacitacion: function () { _navigate('capacitaciones'); },
-    auditoria:    function () { _navigate('auditoria-anual'); }
+    auditoria:    function () { _navigate('auditoria-anual'); },
+    // 📦497 — Gestación: navega al submódulo de ausentismo donde está
+    // Seguimiento de Gestación. 1 click adicional del usuario para llegar
+    // a la vista específica (consistente con el patrón de capacitación).
+    gestacion:    function () { _navigate('3.3.6 Medición del ausentismo por causa médica'); }
   };
 
   // ── Estado ───────────────────────────────────────────────────────────

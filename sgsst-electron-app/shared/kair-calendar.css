@@ -863,6 +863,16 @@
 .kair-cal-event-chip--warning { border-left-color: var(--kair-cal-warning); }
 .kair-cal-event-chip--danger  { border-left-color: var(--kair-cal-danger); }
 .kair-cal-event-chip--info    { border-left-color: var(--kair-cal-info); }
+/* 📦497-fix — Tipos custom del K+AIR (capacitacion/auditoria/plan/rapido/
+   vencido/gestacion). Sin estas reglas, los chips caen al default azul
+   (--kair-cal-primary) en vez del color del eventType configurado en
+   renderer.js. Colores sincronizados con el array eventTypes. */
+.kair-cal-event-chip--capacitacion { border-left-color: #28a745; }
+.kair-cal-event-chip--auditoria    { border-left-color: #ffc107; }
+.kair-cal-event-chip--plan         { border-left-color: #174ea6; }
+.kair-cal-event-chip--rapido       { border-left-color: #6c757d; }
+.kair-cal-event-chip--vencido      { border-left-color: #dc3545; }
+.kair-cal-event-chip--gestacion    { border-left-color: #ec4899; }
 .kair-cal-month__more {
   font-size: 0.6875rem;
   font-weight: 600;
@@ -1019,6 +1029,14 @@
 .kair-cal-event-block--warning { border-left-color: var(--kair-cal-warning); background: rgba(255, 193, 7, 0.12); }
 .kair-cal-event-block--danger  { border-left-color: var(--kair-cal-danger);  background: rgba(220, 53, 69, 0.08); }
 .kair-cal-event-block--info    { border-left-color: var(--kair-cal-info);    background: rgba(108, 117, 125, 0.08); }
+/* 📦497-fix — Tipos custom K+AIR para vista semanal/diario. Mismo
+   sincronizado que chip -- ver comentario anterior. */
+.kair-cal-event-block--capacitacion { border-left-color: #28a745; background: rgba(40, 167, 69, 0.08); }
+.kair-cal-event-block--auditoria    { border-left-color: #ffc107; background: rgba(255, 193, 7, 0.12); }
+.kair-cal-event-block--plan         { border-left-color: #174ea6; background: rgba(23, 78, 166, 0.08); }
+.kair-cal-event-block--rapido       { border-left-color: #6c757d; background: rgba(108, 117, 125, 0.08); }
+.kair-cal-event-block--vencido      { border-left-color: #dc3545; background: rgba(220, 53, 69, 0.08); }
+.kair-cal-event-block--gestacion    { border-left-color: #ec4899; background: rgba(236, 72, 153, 0.10); }
 
 /* ---------- 8. Vista DÍA ---------- */
 .kair-cal-view-day {
