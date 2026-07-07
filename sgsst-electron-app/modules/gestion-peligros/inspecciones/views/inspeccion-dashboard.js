@@ -16,6 +16,8 @@
 
     var wrap = tpl.el("div", { className: "kair-app", style: "min-height:100vh;display:flex;flex-direction:column;" });
     wrap.appendChild(tpl.buildHeader({
+      onBack: typeof ctx.backToModule === "function" ? ctx.backToModule : null,
+      backTitle: "Volver a Gestión de Peligros",
       title: "Programa de Inspecciones SG-SST",
       subtitle: "Programación anual " + new Date().getFullYear() + " · Sistema de Gestión de Seguridad y Salud en el Trabajo",
       companyName: store.companyName,

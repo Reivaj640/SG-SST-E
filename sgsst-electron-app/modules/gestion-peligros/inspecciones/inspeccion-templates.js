@@ -49,6 +49,21 @@
   }
 
   function toast(title, msg, type) {
+    var notifier = global.updateNotifier;
+    if (notifier && typeof notifier.show === "function") {
+      notifier.show({
+        type: type || "info",
+        title: String(title || ""),
+        subtitle: msg ? String(msg) : "",
+        autoClose: type === "error" ? 6000 : type === "warning" ? 4000 : 3500
+      });
+      return;
+    }
+    var sileo = global.Sileo;
+    if (sileo && typeof sileo[type || "info"] === "function") {
+      sileo[type || "info"]({ title: String(title || ""), description: msg ? String(msg) : "" });
+      return;
+    }
     var container = document.getElementById("kair-toasts");
     if (!container) return;
     var t = el("div", { className: "kair-toast kair-toast--" + (type || "info") }, [
@@ -65,73 +80,70 @@
   }
 
   function buildHeader(opts) {
-    var header = el("header", { className: "kair-header no-print" });
-    var bar = el("div", { className: "kair-header__bar" });
+    opts = opts || {};
 
-    var left = el("div", { className: "kair-header__left" });
-    if (opts.onBack) {
-      left.appendChild(el("button", {
-        type: "button",
-        className: "kair-header__back",
-        "aria-label": "Volver",
-        onclick: opts.onBack
-      }, [icon("chevron-left", 20)]));
+    var header = el("header", { className: "k-module-header no-print" });
+
+    var left = el("div", { className: "k-header-left" });
+    var titleGroup = el("div", { className: "k-header-title-group" });
+
+    var mainTitle = el("div", { className: "k-header-main-title" });
+    mainTitle.appendChild(icon(opts.titleIcon || "clipboard-check", 18));
+    mainTitle.appendChild(document.createTextNode(opts.title || "Inspecciones"));
+    titleGroup.appendChild(mainTitle);
+
+    var breadcrumb = el("div", { className: "k-header-breadcrumb" });
+    function addCrumb(label, onClick, current) {
+      if (!label) return;
+      if (breadcrumb.childNodes.length) {
+        breadcrumb.appendChild(el("i", { className: "bi bi-chevron-right", "aria-hidden": "true" }));
+      }
+      if (onClick && !current) {
+        breadcrumb.appendChild(el("button", { type: "button", onclick: onClick, textContent: label }));
+      } else {
+        breadcrumb.appendChild(el("span", { className: current ? "k-breadcrumb-item active" : "", textContent: label }));
+      }
     }
-    if (opts.sectionPill) {
-      left.appendChild(el("span", { className: "kair-header__pill--section", textContent: opts.sectionPill }));
-    }
+
+    addCrumb(opts.companyName || "Empresa");
+    addCrumb(opts.parentLabel || "Gestión de Peligros", opts.onParentClick);
     if (opts.breadcrumb && opts.breadcrumb.length) {
-      var ol = el("ol", { className: "kair-header__breadcrumb" });
       opts.breadcrumb.forEach(function (item, idx) {
-        var isLast = idx === opts.breadcrumb.length - 1;
-        var li = el("li", { className: isLast ? "is-current" : "" });
-        if (item.onClick) {
-          li.appendChild(el("button", { type: "button", onclick: item.onClick, textContent: item.label }));
-        } else {
-          li.appendChild(el("span", { textContent: item.label }));
-        }
-        if (!isLast) {
-          var chev = icon("chevron-right", 12);
-          chev.classList.add("chevron");
-          li.appendChild(chev);
-        }
-        ol.appendChild(li);
+        addCrumb(item.label, item.onClick, idx === opts.breadcrumb.length - 1);
       });
-      left.appendChild(ol);
+    } else {
+      addCrumb(opts.activeLabel || opts.sectionPill || "4.2.4 Inspecciones Sistemáticas", null, true);
     }
-    bar.appendChild(left);
+    titleGroup.appendChild(breadcrumb);
+    left.appendChild(titleGroup);
+    header.appendChild(left);
 
-    var center = el("div", { className: "kair-header__center" }, [
-      el("h1", { className: "kair-header__title", textContent: opts.title }),
-      opts.subtitle ? el("p", { className: "kair-header__subtitle", textContent: opts.subtitle }) : null
-    ]);
-    bar.appendChild(center);
+    var right = el("div", { className: "k-header-right" });
+    var syncLabel = opts.statusLabel || "Sincronizado";
+    var syncIcon = opts.statusIcon || "bi-check-circle-fill";
+    var syncClass = opts.statusClass || "k-sync-synced";
+    right.appendChild(el("span", { className: "k-sync-badge " + syncClass }, [
+      el("i", { className: "bi " + syncIcon, "aria-hidden": "true" }),
+      document.createTextNode(" " + syncLabel)
+    ]));
 
-    var right = el("div", { className: "kair-header__right" });
-    if (opts.companyName) {
-      var company = el("span", { className: "kair-header__company" }, [icon("building-2", 14)]);
-      company.querySelector("[data-lucide]").classList.add("icon");
-      company.appendChild(document.createTextNode(opts.companyName));
-      right.appendChild(company);
-    }
-    if (opts.companyName && opts.contextLabel) {
-      right.appendChild(el("span", { className: "kair-header__divider" }));
-    }
-    if (opts.contextLabel) {
+    if (opts.onBack) {
       right.appendChild(el("button", {
         type: "button",
-        className: "kair-header__context",
-        onclick: opts.onContextClick || function () {}
+        className: "header-back-btn",
+        title: opts.backTitle || "Volver",
+        "aria-label": "Volver",
+        onclick: opts.onBack
       }, [
-        icon("layout-grid", 14),
-        document.createTextNode(opts.contextLabel),
-        icon("chevron-right", 12)
+        el("i", { className: "bi bi-arrow-left", "aria-hidden": "true" }),
+        document.createTextNode("Volver")
       ]));
     }
+
     (opts.actions || []).slice(0, 3).forEach(function (a) {
       var btn = el("button", {
         type: "button",
-        className: "kair-header__action kair-header__action--" + (a.variant || "primary"),
+        className: "k-btn k-btn-" + (a.variant || "primary") + " k-btn-sm",
         onclick: a.onClick,
         disabled: a.disabled || false
       });
@@ -139,25 +151,28 @@
       btn.appendChild(document.createTextNode(a.label));
       right.appendChild(btn);
     });
-    bar.appendChild(right);
-    header.appendChild(bar);
+    header.appendChild(right);
+
+    var fragment = document.createDocumentFragment();
+    fragment.appendChild(header);
 
     if (opts.tabs && opts.tabs.length) {
-      var tabs = el("div", { className: "kair-header__tabs" });
+      var tabs = el("nav", { className: "kair-insp-tabs no-print", role: "tablist" });
       opts.tabs.forEach(function (t) {
         var tab = el("button", {
           type: "button",
-          className: "kair-header__tab " + (t.active ? "is-active" : ""),
+          className: "kair-insp-tab " + (t.active ? "kair-insp-tab--active" : ""),
           onclick: t.onClick
         }, [document.createTextNode(t.label)]);
         if (typeof t.badge === "number") {
-          tab.appendChild(el("span", { className: "kair-header__tab-badge", textContent: String(t.badge) }));
+          tab.appendChild(el("span", { className: "kair-insp-tab__badge", textContent: String(t.badge) }));
         }
         tabs.appendChild(tab);
       });
-      header.appendChild(tabs);
+      fragment.appendChild(tabs);
     }
-    return header;
+
+    return fragment;
   }
 
   var TONE_STYLES = {

@@ -168,14 +168,14 @@
     function save() {
       if (!state.performedBy.trim()) { tpl.toast("Validación", "El campo 'Realizada por' es obligatorio", "warning"); return; }
       state.saving = true; renderAll();
-      var payload = { type: "instalaciones", date: state.date, performedBy: state.performedBy, role: state.role, site: state.site, observations: state.observations, status: "Completada", data: state.data };
+      var payload = { type: "instalaciones", date: state.date, performedBy: state.performedBy, role: state.role, site: state.site, observations: state.observations, status: "Completada", data: state.data, companyId: store.companyId, companyName: store.companyName };
       var p = state.savedId ? api.updateInspection(state.savedId, payload) : api.createInspection(payload);
       p.then(function (res) {
         if (!res.success) throw new Error(res.error && res.error.message);
         state.savedId = res.data.inspection.id;
-        tpl.toast("Guardado", "Inspección guardada correctamente", "success");
-        renderAll();
-      }).catch(function (e) { tpl.toast("Error", e.message, "error"); state.saving = false; renderAll(); });
+        tpl.toast("Inspección guardada", "La inspección quedó registrada correctamente", "success");
+        ctx.go({ name: "historial" });
+      }).catch(function (e) { tpl.toast("Error al guardar", e.message, "error"); state.saving = false; renderAll(); });
     }
 
     function exportOne(format) {

@@ -204,7 +204,9 @@
         site: state.site,
         observations: state.observations,
         status: "Completada",
-        data: state.data
+        data: state.data,
+        companyId: store.companyId,
+        companyName: store.companyName
       };
       var p = state.savedId
         ? api.updateInspection(state.savedId, payload)
@@ -212,10 +214,10 @@
       p.then(function (res) {
         if (!res.success) throw new Error(res.error && res.error.message);
         state.savedId = res.data.inspection.id;
-        tpl.toast("Guardado", "Inspección guardada correctamente", "success");
-        renderAll();
+        tpl.toast("Inspección guardada", "La inspección quedó registrada correctamente", "success");
+        ctx.go({ name: "historial" });
       }).catch(function (e) {
-        tpl.toast("Error", e.message, "error");
+        tpl.toast("Error al guardar", e.message, "error");
         state.saving = false;
         renderAll();
       });

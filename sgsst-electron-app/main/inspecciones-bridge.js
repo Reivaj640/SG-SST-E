@@ -60,6 +60,13 @@ function ensureCompany(companyId) {
       createdAt: new Date().toISOString(),
     };
     save();
+  } else if (companyId !== "default" &&
+             data.companies[companyId].name === "Empresa K+AIR") {
+    /* Backfill: empresas reales creadas con el placeholder genérico se
+       renombran a su propio id (mejor que el placeholder). El historial
+       refrescará los companyName de las inspecciones migradas. */
+    data.companies[companyId].name = companyId;
+    save();
   }
   return data.companies[companyId];
 }
@@ -183,8 +190,54 @@ var INSPECTION_META = {
   equipos_emergencia: { code: "GI-FO-023", title: "Inspección de Equipos de Emergencia" }
 };
 
+/* Migra inspecciones heredadas que quedaron con companyId="default" pero
+   fueron creadas para otra empresa. Reasigna companyId + companyName a la
+   empresa del filtro. */
+function migrateLegacyDefaultInspections(targetCompanyId, targetCompanyName) {
+  if (!targetCompanyId || targetCompanyId === "default") return false;
+  var data = load();
+
+  /* Si el caller no mandó companyName, lo tomamos del registro de empresa
+     persistido. Si tampoco existe, usamos el companyId como fallback. */
+  var resolvedName = targetCompanyName;
+  if (!resolvedName && data.companies[targetCompanyId]) {
+    resolvedName = data.companies[targetCompanyId].name;
+  }
+  if (!resolvedName) resolvedName = targetCompanyId;
+
+  var changed = false;
+  data.inspections.forEach(function (i) {
+    if (i.companyId === "default") {
+      i.companyId = targetCompanyId;
+      i.companyName = resolvedName;
+      changed = true;
+    } else if (i.companyId === targetCompanyId && resolvedName &&
+               (!i.companyName || i.companyName === "K+AIR Demo S.A.S.")) {
+      /* Si la inspección ya está bien asignada por companyId pero el
+         companyName quedó con el placeholder de demo, también lo
+         actualizamos para que la columna Empresa muestre el nombre real. */
+      i.companyName = resolvedName;
+      changed = true;
+    }
+  });
+  if (changed) {
+    save();
+    console.log("[K+AIRSST][INSPECTION][MIGRATE] default -> " + targetCompanyId + " (name=" + resolvedName + ")");
+  }
+  return changed;
+}
+
 function listInspections(filter) {
   var data = load();
+
+  /* Si el filtro pide una empresa específica que NO es "default" y existen
+     inspecciones heredadas bajo "default" o con companyName de demo,
+     migrarlas a esa empresa. */
+  if (filter && filter.companyId && filter.companyId !== "default") {
+    migrateLegacyDefaultInspections(filter.companyId, filter.companyName);
+    data = load();
+  }
+
   var list = data.inspections.slice();
   if (filter && filter.type && filter.type !== "all") {
     list = list.filter(function (i) { return i.type === filter.type; });
@@ -218,8 +271,8 @@ function createInspection(payload) {
     performedBy: payload.performedBy,
     role: payload.role || null,
     site: payload.site || null,
-    companyId: company.id,
-    companyName: company.name,
+    companyId: payload.companyId || company.id,
+    companyName: payload.companyName || company.name,
     status: payload.status || "Completada",
     observations: payload.observations || null,
     data: payload.data || {},
@@ -265,11 +318,19 @@ function deleteInspection(id) {
 /* ---------- Backward-compat para widgets del home ---------- */
 /* El home de gestion-peligros llama electronAPI.inspecciones.getStats(company)
    y espera {totalInspecciones, completadas, pendientesMes, tasaCumplimiento,
-             extintoresVigentes, extintoresTotal}. Leemos del nuevo store. */
+              extintoresVigentes, extintoresTotal, year, mes,
+              mensualCompletadas, mensualPendientes}. Leemos del nuevo store. */
 function getInspeccionesStats(companyName) {
   try {
     var data = load();
     var companyId = companyName || "default";
+
+    /* Migrar legacy "default" -> empresa destino antes de filtrar (idempotente) */
+    if (companyId !== "default") {
+      migrateLegacyDefaultInspections(companyId, null);
+      data = load();
+    }
+
     var company = data.companies[companyId];
     if (!company) {
       return ok({
@@ -278,7 +339,14 @@ function getInspeccionesStats(companyName) {
         pendientesMes: 0,
         tasaCumplimiento: 0,
         extintoresVigentes: 0,
-        extintoresTotal: 0
+        extintoresTotal: 0,
+        year: new Date().getFullYear(),
+        mes: new Date().toLocaleDateString("es-CO", { month: "long" }),
+        mensualCompletadas: Array(12).fill(0),
+        mensualPendientes: Array(12).fill(0),
+        programaTotal: 0,
+        programaCompletadas: 0,
+        programaPendientes: 0
       });
     }
     var insps = data.inspections.filter(function (i) { return i.companyId === companyId; });
@@ -287,8 +355,22 @@ function getInspeccionesStats(companyName) {
     var mesActual = now.getMonth();
     var anioActual = now.getFullYear();
     var pendientesMes = 0;
+    /* Desglose mensual: cuenta por mes del año actual, basado en i.date.
+       "Completadas" = status === "Completada"; "Pendientes" = todo lo demás. */
+    var mensualCompletadas = Array(12).fill(0);
+    var mensualPendientes = Array(12).fill(0);
     insps.forEach(function (i) {
+      if (!i.date) return;
       var d = new Date(i.date);
+      if (isNaN(d.getTime())) return;
+      if (d.getFullYear() === anioActual) {
+        var m = d.getMonth();
+        if (i.status === "Completada") {
+          mensualCompletadas[m] = (mensualCompletadas[m] || 0) + 1;
+        } else {
+          mensualPendientes[m] = (mensualPendientes[m] || 0) + 1;
+        }
+      }
       if (d.getMonth() === mesActual && d.getFullYear() === anioActual && i.status !== "Completada") {
         pendientesMes++;
       }
@@ -302,13 +384,25 @@ function getInspeccionesStats(companyName) {
         return new Date(r.fechaVencimiento) > now;
       });
     }).length;
+
+    /* Programa anual de la empresa (mismo año actual) */
+    var programKey = companyId + ":" + anioActual;
+    var programSummary = summarizeProgram(data.programs[programKey]);
+
     return ok({
       totalInspecciones: insps.length,
       completadas: completadas,
       pendientesMes: pendientesMes,
       tasaCumplimiento: tasaCumplimiento,
       extintoresVigentes: extintoresVigentes,
-      extintoresTotal: extintores.length
+      extintoresTotal: extintores.length,
+      year: anioActual,
+      mes: now.toLocaleDateString("es-CO", { month: "long" }),
+      mensualCompletadas: mensualCompletadas,
+      mensualPendientes: mensualPendientes,
+      programaTotal: programSummary.programaTotal,
+      programaCompletadas: programSummary.programaCompletadas,
+      programaPendientes: programSummary.programaPendientes
     });
   } catch (e) {
     console.error("[K+AIRSST][INSPECTIONS][STATS][ERROR]", e);
@@ -318,9 +412,38 @@ function getInspeccionesStats(companyName) {
       pendientesMes: 0,
       tasaCumplimiento: 0,
       extintoresVigentes: 0,
-      extintoresTotal: 0
+      extintoresTotal: 0,
+      year: new Date().getFullYear(),
+      mes: new Date().toLocaleDateString("es-CO", { month: "long" }),
+      mensualCompletadas: Array(12).fill(0),
+      mensualPendientes: Array(12).fill(0),
+      programaTotal: 0,
+      programaCompletadas: 0,
+      programaPendientes: 0
     });
   }
+}
+
+/* Calcula contadores del programa anual: total de actividades-mes
+   programadas (valor 'p' o 'c'), completadas ('c') y pendientes ('p').
+   Acepta el payload del programa (data.programs[key]) o null. */
+function summarizeProgram(program) {
+  if (!program || !program.activities) {
+    return { programaTotal: 0, programaCompletadas: 0, programaPendientes: 0 };
+  }
+  var total = 0, comp = 0, pend = 0;
+  program.activities.forEach(function (a) {
+    if (!a.monthlySchedule) return;
+    Object.keys(a.monthlySchedule).forEach(function (m) {
+      var v = a.monthlySchedule[m];
+      if (v === "p" || v === "c") {
+        total++;
+        if (v === "c") comp++;
+        else if (v === "p") pend++;
+      }
+    });
+  });
+  return { programaTotal: total, programaCompletadas: comp, programaPendientes: pend };
 }
 
 /* ---------- Registro de handlers IPC ---------- */

@@ -158,6 +158,7 @@
       var company = ensureCompanyLs();
       var meta = T.INSPECTION_TYPES[payload.type];
       if (!meta) return Promise.resolve({ success: false, error: { code: "INVALID_TYPE", message: "Tipo inválido" } });
+      var enriched = Object.assign({}, payload, { companyId: company.id, companyName: company.name });
       var newInsp = {
         id: "insp_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8),
         type: payload.type,
@@ -167,11 +168,11 @@
         performedBy: payload.performedBy,
         role: payload.role || null,
         site: payload.site || null,
-        companyId: company.id,
-        companyName: company.name,
-        status: payload.status || "Completada",
-        observations: payload.observations || null,
-        data: payload.data || {},
+        companyId: enriched.companyId || company.id,
+        companyName: enriched.companyName || company.name,
+        status: enriched.status || "Completada",
+        observations: enriched.observations || null,
+        data: enriched.data || {},
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };

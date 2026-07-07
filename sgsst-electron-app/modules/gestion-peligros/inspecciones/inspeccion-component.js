@@ -77,14 +77,13 @@
 
     // Arrancar la app del módulo
     if (window.KairApp && typeof window.KairApp.init === "function") {
-      window.KairApp.init(this.viewContainer);
+      window.KairApp.init(this.viewContainer, { onExit: this.backToModuleCallback });
     } else {
       console.error("[InspeccionComponent] KairApp no disponible");
     }
 
-    // BackToModule: cuando el usuario navega a "hub", expone el botón
-    // back via store para que las vistas lo usen (vía ctx).
-    // Aquí solo guardamos la referencia por si las vistas la piden.
+    // BackToModule: se pasa al app controller para que el dashboard pueda
+    // volver al módulo padre (Gestión de Peligros) usando el header estándar.
     this._backCallback = this.backToModuleCallback;
   };
 

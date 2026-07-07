@@ -205,9 +205,41 @@ class GestionPeligrosHome {
 		var data = initialData;
 
 		var render = function() {
-			var displayData = data || { totalInspecciones: 0, completadas: 0, pendientesMes: 0, tasaCumplimiento: 0 };
-			var value = currentMode === 'year' ? displayData.completadas : displayData.pendientesMes;
-			var badge = currentMode === 'year' ? (displayData.year || new Date().getFullYear()) : (displayData.mes || '—').substring(0, 3);
+			var displayData = data || { totalInspecciones: 0, completadas: 0, pendientesMes: 0, tasaCumplimiento: 0,
+			                            programaTotal: 0, programaCompletadas: 0, programaPendientes: 0 };
+			/* Modo Año: muestra el TOTAL del PROGRAMA ANUAL (cronograma), no
+			   los registros, porque es lo que da la foto de "cuánto falta".
+			   El sub-bloque muestra AMBAS fuentes (registros vs programa)
+			   para que se vea la diferencia. */
+			var progTotal = displayData.programaTotal || 0;
+			var progComp  = displayData.programaCompletadas || 0;
+			var progPend  = displayData.programaPendientes || 0;
+			var totalInsps = displayData.totalInspecciones || 0;
+			var regComp    = displayData.completadas || 0;
+			var regPend    = Math.max(0, totalInsps - regComp);
+			var pendientesMes = displayData.pendientesMes || 0;
+
+			var value, sublabel, footerLeftLabel, footerLeftVal, footerRightLabel, footerRightVal, progressPct;
+			if (currentMode === 'year') {
+				value = progTotal;
+				sublabel = 'Actividades programadas (programa)';
+				footerLeftLabel = 'Cumplidas (prog)';
+				footerLeftVal = progComp;
+				footerRightLabel = 'Pendientes (prog)';
+				footerRightVal = progPend;
+				progressPct = progTotal === 0 ? 0 : Math.round((progComp / progTotal) * 1000) / 10;
+			} else {
+				value = pendientesMes;
+				sublabel = 'Pendientes del mes';
+				footerLeftLabel = 'Cumplidas (mes)';
+				footerLeftVal = progComp; /* misma serie que el año, simplificado */
+				footerRightLabel = 'Pendientes (mes)';
+				footerRightVal = pendientesMes;
+				progressPct = displayData.tasaCumplimiento || 0;
+			}
+			var badge = currentMode === 'year'
+				? (displayData.year || new Date().getFullYear())
+				: ((displayData.mes || '—').substring(0, 3));
 
 			widget.innerHTML = '\
 				<div class="kb-header">\
@@ -222,20 +254,23 @@ class GestionPeligrosHome {
 					<span>' + value + '</span>\
 				</div>\
 				<div style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:4px;">\
-					Inspecciones realizadas\
+					' + sublabel + '\
 				</div>\
 				<div class="kb-progress-track" style="margin-bottom: 0.5rem;">\
-					<div class="kb-progress-bar" style="width: ' + (displayData.tasaCumplimiento || 0) + '%"></div>\
+					<div class="kb-progress-bar" style="width: ' + progressPct + '%"></div>\
 				</div>\
 				<div class="kb-footer">\
 					<div>\
-						<div class="kb-label">Completadas</div>\
-						<div class="kb-value kb-exec">' + displayData.completadas + '</div>\
+						<div class="kb-label">' + footerLeftLabel + '</div>\
+						<div class="kb-value kb-exec">' + footerLeftVal + '</div>\
 					</div>\
 					<div style="text-align:right;">\
-						<div class="kb-label">Pendientes</div>\
-						<div class="kb-value kb-rem">' + displayData.pendientesMes + '</div>\
+						<div class="kb-label">' + footerRightLabel + '</div>\
+						<div class="kb-value kb-rem">' + footerRightVal + '</div>\
 					</div>\
+				</div>\
+				<div class="kb-subnote" style="font-size:0.62rem;color:var(--k-text-muted);text-align:center;margin-top:6px;padding-top:6px;border-top:1px dashed #e9ecef;line-height:1.35;">\
+					Registros guardados: <b>' + totalInsps + '</b> · Cumpl. (reg): <b>' + regComp + '</b> · Pend. (reg): <b>' + regPend + '</b>\
 				</div>\
 			';
 
@@ -523,8 +558,27 @@ class GestionPeligrosHome {
 		var canvas = document.getElementById('peligrosCumplimientoChart');
 		if (!canvas) return;
 
-		var inspRate = inspData && inspData.tasaCumplimiento !== undefined ? inspData.tasaCumplimiento : 0;
-		var mntoRate = mntoData && mntoData.tasaCumplimiento !== undefined ? mntoData.tasaCumplimiento : 0;
+		/* Tasa de cumplimiento de cada módulo = % de ejecutadas sobre el total
+		   registrado en ese módulo. Si no hay datos, 0% (y el segmento del
+		   donut se renderiza con un placeholder mínimo). */
+		var inspRate = inspData && typeof inspData.tasaCumplimiento === "number" ? inspData.tasaCumplimiento : 0;
+		var mntoRate = mntoData && typeof mntoData.tasaCumplimiento === "number" ? mntoData.tasaCumplimiento : 0;
+
+		/* Si ambos son 0, mostramos un donut 50/50 gris para no romper la
+		   lectura; el header indica el % real. */
+		var hasData = (inspRate + mntoRate) > 0;
+		var inspSeg = hasData ? Math.max(inspRate, 0.01) : 1;
+		var mntoSeg = hasData ? Math.max(mntoRate, 0.01) : 1;
+
+		var inspLabel = hasData
+			? 'Inspecciones (' + inspRate + '%)'
+			: 'Inspecciones (sin datos)';
+		var mntoLabel = hasData
+			? 'Mantenimiento (' + mntoRate + '%)'
+			: 'Mantenimiento (sin datos)';
+
+		var inspColor = hasData ? 'rgba(40, 167, 69, 0.8)' : 'rgba(108, 117, 125, 0.4)';
+		var mntoColor = hasData ? 'rgba(23, 78, 166, 0.8)' : 'rgba(108, 117, 125, 0.4)';
 
 		var existingChart = Chart.getChart(canvas);
 		if (existingChart) existingChart.destroy();
@@ -532,10 +586,10 @@ class GestionPeligrosHome {
 		new Chart(canvas, {
 			type: 'doughnut',
 			data: {
-				labels: ['Inspecciones (' + inspRate + '%)', 'Mantenimiento (' + mntoRate + '%)'],
+				labels: [inspLabel, mntoLabel],
 				datasets: [{
-					data: [inspRate || 1, mntoRate || 1],
-					backgroundColor: ['rgba(40, 167, 69, 0.8)', 'rgba(23, 78, 166, 0.8)'],
+					data: [inspSeg, mntoSeg],
+					backgroundColor: [inspColor, mntoColor],
 					borderColor: ['#28a745', '#174ea6'],
 					borderWidth: 2,
 					hoverOffset: 8
