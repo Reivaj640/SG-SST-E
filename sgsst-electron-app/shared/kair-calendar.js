@@ -481,12 +481,20 @@
         // setView()/goToDate()), NO cerrarlo. Da una ventana de 300ms.
         if (this._lastOpenedAt && (Date.now() - this._lastOpenedAt < 300)) return;
         if (pop.contains(e.target)) return;
-        // 📦501 — Excluir cualquier modal-overlay del calendario. Esto
+        // 📦501/📦499 — Excluir cualquier modal-overlay del calendario. Esto
         // cubre AMBOS: el modal de "Nuevo evento" y el detail panel
         // (que también es modal-overlay). Sin esta exclusion, cualquier
         // click dentro de cualquiera de los 2 modales cerraba el calendario.
-        var modalOverlay = document.querySelector('.kair-cal-modal-overlay');
-        if (modalOverlay && modalOverlay.contains(e.target)) return;
+        // 📦499 FIX BUG: antes usaba document.querySelector('.kair-cal-modal-overlay')
+        // que solo retorna el PRIMER overlay del DOM. Si el detail panel y el
+        // modal de edición están abiertos al mismo tiempo (click en "Editar"),
+        // querySelector devolvía el detail panel; el X del modal de edición
+        // NO está adentro del detail panel → modalOverlay.contains(target) era
+        // false → caía al this.close() → cerraba el calendario entero.
+        // Fix: usar closest() que sube desde el target y devuelve el overlay
+        // más cercano (o null si no hay). Si retorna algo, el target está
+        // dentro de ALGÚN modal-overlay → no cerrar el calendario.
+        if (e.target.closest && e.target.closest('.kair-cal-modal-overlay')) return;
         // Verificar si el click fue en CUALQUIER trigger registrado
         if (this._triggers && this._triggers.length) {
           for (let i = 0; i < this._triggers.length; i++) {
