@@ -2,12 +2,15 @@
  * shared/kair-calendar-adapter.js
  *
  * Adapter SG-SST para el K+AIR Calendar Component.
- * Une las 5 fuentes de eventos que muestra el calendario:
+ * Une las 6 fuentes de eventos que muestra el calendario:
  *   1. Plan de Trabajo Anual (electronAPI.planTrabajo.getEvents)
  *   2. Capacitaciones (electronAPI.capacitaciones.getEvents)
  *   3. Auditoría Anual — fases (electronAPI.auditoria.getFases)
  *   4. Eventos rápidos del usuario (electronAPI.eventosRapidos)
  *   5. Seguimientos de Gestación (electronAPI.gestaciones.getEvents) — 📦497
+ *   6. Estados de cumplimiento (electronAPI.eventosCumplidos.listar) — 📦498
+ *      → Enriquece cada evento con {cumplido:true/false, cumplidoEn:ISO}.
+ *      → NO agrega eventos, solo decora los existentes.
  *
  * Contrato implementado (consumido por KairCalendar):
  *   list(range)   -> { success, data: [...] }  (data = array unificado de eventos)
@@ -51,18 +54,41 @@
     var capPayload = Object.assign({}, range || {}, { currentCompany: currentCompany });
     // 📦497 — Pasar currentCompany al backend de gestaciones (BD por empresa).
     var gestPayload = Object.assign({}, range || {}, { currentCompany: currentCompany });
+    // 📦498 — Cumplimientos: por empresa, sin rango (es estado persistente)
+    var cumPayload = { empresaId: currentCompany };
     var results = await Promise.all([
       _safe(function () { return api.planTrabajo && api.planTrabajo.getEvents(range); }),
       _safe(function () { return api.capacitaciones && api.capacitaciones.getEvents(capPayload); }),
       _safe(function () { return api.auditoria && api.auditoria.getFases(range); }),
       _safe(function () { return api.eventosRapidos && api.eventosRapidos.list(range); }),
-      _safe(function () { return api.gestaciones && api.gestaciones.getEvents(gestPayload); })
+      _safe(function () { return api.gestaciones && api.gestaciones.getEvents(gestPayload); }),
+      // 📦498 — Esta fuente NO devuelve eventos: devuelve Map de cumplidos
+      _safe(function () { return api.eventosCumplidos && api.eventosCumplidos.listar(cumPayload); })
     ]);
+    // El último resultado (cumPayload) NO son eventos sino estados de cumplimiento.
+    // Lo separamos para enriquecer los eventos en lugar de mergearlos.
+    var cumplidosResult = results[results.length - 1];
+    var cumplidosMap = {};
+    if (cumplidosResult && cumplidosResult.success && Array.isArray(cumplidosResult.data)) {
+      cumplidosResult.data.forEach(function (c) {
+        cumplidosMap[c.evento_id] = { cumplidoEn: c.cumplido_en, nota: c.nota || '' };
+      });
+    }
+    var eventsResults = results.slice(0, results.length - 1);
     var merged = [];
-    for (var i = 0; i < results.length; i++) {
-      var r = results[i];
+    for (var i = 0; i < eventsResults.length; i++) {
+      var r = eventsResults[i];
       if (r && r.success && Array.isArray(r.data)) {
-        for (var j = 0; j < r.data.length; j++) merged.push(r.data[j]);
+        for (var j = 0; j < r.data.length; j++) {
+          var ev = r.data[j];
+          // 📦498 — Enriquecer con estado de cumplimiento
+          if (ev && ev.id && cumplidosMap[ev.id]) {
+            ev.cumplido = true;
+            ev.cumplidoEn = cumplidosMap[ev.id].cumplidoEn;
+            ev.cumplidoNota = cumplidosMap[ev.id].nota;
+          }
+          merged.push(ev);
+        }
       }
     }
     return { success: true, data: merged };

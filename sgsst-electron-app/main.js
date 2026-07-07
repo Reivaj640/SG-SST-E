@@ -47,6 +47,7 @@ const { registerAuditoriaAnualHandlers } = require('./main/auditoria-anual-bridg
 const { registerAccionesPreventivasCorrectivasHandlers } = require('./main/acciones-preventivas-correctivas-bridge');
 // 📦465 (2026-07-03) — Handlers de Seguimiento de Gestación (Salud Materna)
 const { registerGestacionHandlers, SCHEMA_SQL: GESTACION_SCHEMA_SQL, MIGRATIONS_SQL: GESTACION_MIGRATIONS_SQL } = require('./main/gestacion-bridge');
+const { registerEventosCumplidosHandlers, SCHEMA_SQL: EVENTOS_CUMPLIDOS_SCHEMA_SQL } = require('./main/eventos-cumplidos-bridge');
 // K+AIR Calendar — bridge de eventos rápidos (botón calendario del header)
 const { registerEventosRapidosHandlers } = require('./main/eventos-rapidos-bridge');
 
@@ -374,6 +375,18 @@ function initDbOnce() {
         }
       }
       console.log('[DB] 📦468 · Migraciones gestacion aplicadas=' + applied + ' omitidas=' + skipped);
+    }
+
+    // 📦498 — Schema de eventos_cumplidos (marcado del calendario).
+    // Tabla nueva, independiente de los modulos origen. Permite marcar
+    // cualquier evento del calendario (capacitacion, gestacion, reunion,
+    // etc.) como cumplido. Persistencia local, sin tocar Excel ni BD
+    // externas.
+    try {
+      db.exec(EVENTOS_CUMPLIDOS_SCHEMA_SQL);
+      console.log('[DB] 📦498 · Tabla eventos_cumplidos creada/verificada');
+    } catch (cumErr) {
+      console.error('[DB] 📦498 · Error creando tabla eventos_cumplidos:', cumErr.message);
     }
 
     const roleNames = ['Administrador', 'SST', 'Auditoría', 'Gerencia', 'Recursos Humanos'];
@@ -8270,6 +8283,7 @@ try {
 // Registrar handlers de Seguimiento de Gestación (Salud Materna) — 📦465 (2026-07-03)
 try {
   registerGestacionHandlers(app, { getDb });
+  registerEventosCumplidosHandlers(app, { getDb });
   sendLog('[MAIN] Handlers de Seguimiento de Gestación (Salud Materna) registrados correctamente', 'INFO');
 } catch (err) {
   sendLog(`[MAIN] Error registrando handlers de Gestación: ${err.message}`, 'ERROR');

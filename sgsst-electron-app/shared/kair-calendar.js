@@ -481,6 +481,12 @@
         // setView()/goToDate()), NO cerrarlo. Da una ventana de 300ms.
         if (this._lastOpenedAt && (Date.now() - this._lastOpenedAt < 300)) return;
         if (pop.contains(e.target)) return;
+        // 📦501 — Excluir cualquier modal-overlay del calendario. Esto
+        // cubre AMBOS: el modal de "Nuevo evento" y el detail panel
+        // (que también es modal-overlay). Sin esta exclusion, cualquier
+        // click dentro de cualquiera de los 2 modales cerraba el calendario.
+        var modalOverlay = document.querySelector('.kair-cal-modal-overlay');
+        if (modalOverlay && modalOverlay.contains(e.target)) return;
         // Verificar si el click fue en CUALQUIER trigger registrado
         if (this._triggers && this._triggers.length) {
           for (let i = 0; i < this._triggers.length; i++) {
@@ -629,11 +635,20 @@
       html += '<div class="kair-cal-month__events">';
       const maxShow = 3;
       dayEvents.slice(0, maxShow).forEach(e => {
-        html += '<div class="kair-cal-event-chip kair-cal-event-chip--' + escapeHTML(e.type || 'primary') + '" data-kair-cal-event-id="' + escapeHTML(e.id) + '" title="' + escapeHTML(e.title) + '"' + this._chipStyle(e) + '>';
+        // 📦498 — Class extra --cumplido si event.cumplido es true. La clase
+        // se concatena ANTES del cierre del class= para que coexista con
+        // --gestacion, --capacitacion, etc.
+        var cumplidoClass = e.cumplido ? ' kair-cal-event-chip--cumplido' : '';
+        html += '<div class="kair-cal-event-chip kair-cal-event-chip--' + escapeHTML(e.type || 'primary') + cumplidoClass + '" data-kair-cal-event-id="' + escapeHTML(e.id) + '" title="' + escapeHTML(e.title) + '"' + this._chipStyle(e) + '>';
         if (e.start && e.start !== '00:00') {
           html += '<span class="kair-cal-event-chip__time">' + escapeHTML(e.start) + '</span>';
         }
-        html += '<span class="kair-cal-event-chip__title">' + escapeHTML(e.title) + '</span>';
+        // 📦498 — Si cumplido, prefijo ✓ antes del título. 📦503 — Si es
+        // evento rápido (tipo=rapido), prefijo ⚡ para distinguirlo del
+        // gris plano del chip neutral. El ⚡ se ve siempre, independiente
+        // del tema/contraste.
+        var titlePrefix = e.cumplido ? '✓ ' : (e.type === 'rapido' ? '⚡ ' : '');
+        html += '<span class="kair-cal-event-chip__title">' + titlePrefix + escapeHTML(e.title) + '</span>';
         html += '</div>';
       });
       if (dayEvents.length > maxShow) {
@@ -710,10 +725,12 @@
         const [eh, em] = (e.end || e.start).split(':').map(Number);
         const top = (sh + sm/60) * 48;
         const height = Math.max(20, ((eh + em/60) - (sh + sm/60)) * 48);
-        html += '<div class="kair-cal-event-block kair-cal-event-block--' + escapeHTML(e.type || 'primary') + '" '
+        // 📦498 — Class extra --cumplido si event.cumplido
+        var cumplidoClass = e.cumplido ? ' kair-cal-event-block--cumplido' : '';
+        html += '<div class="kair-cal-event-block kair-cal-event-block--' + escapeHTML(e.type || 'primary') + cumplidoClass + '" '
               + 'data-kair-cal-event-id="' + escapeHTML(e.id) + '" '
               + 'style="top:' + top + 'px;height:' + height + 'px;' + this._blockBorderCss(e) + '">'
-              + '<div class="kair-cal-event-block__title">' + escapeHTML(e.title) + '</div>'
+              + '<div class="kair-cal-event-block__title">' + (e.cumplido ? '✓ ' : (e.type === 'rapido' ? '⚡ ' : '')) + escapeHTML(e.title) + '</div>'
               + '<div class="kair-cal-event-block__time">' + escapeHTML(e.start) + (e.end ? ' – ' + escapeHTML(e.end) : '') + '</div>'
               + '</div>';
       });
@@ -762,10 +779,11 @@
     dayEvents.forEach(e => {
       if (!e.start || e.start === '00:00') {
         // Evento de todo el día: banner arriba
-        html += '<div class="kair-cal-event-block kair-cal-event-block--' + escapeHTML(e.type || 'primary') + '" '
+        var allDayCumplidoClass = e.cumplido ? ' kair-cal-event-block--cumplido' : '';
+        html += '<div class="kair-cal-event-block kair-cal-event-block--' + escapeHTML(e.type || 'primary') + allDayCumplidoClass + '" '
               + 'data-kair-cal-event-id="' + escapeHTML(e.id) + '" '
               + 'style="top:4px;height:32px;left:8px;right:8px;' + this._blockBorderCss(e) + '">'
-              + '<div class="kair-cal-event-block__title">' + escapeHTML(e.title) + ' (Todo el día)</div>'
+              + '<div class="kair-cal-event-block__title">' + (e.cumplido ? '✓ ' : (e.type === 'rapido' ? '⚡ ' : '')) + escapeHTML(e.title) + ' (Todo el día)</div>'
               + '</div>';
         return;
       }
@@ -773,10 +791,11 @@
       const [eh, em] = (e.end || e.start).split(':').map(Number);
       const top = (sh + sm/60) * 56;
       const height = Math.max(28, ((eh + em/60) - (sh + sm/60)) * 56);
-      html += '<div class="kair-cal-event-block kair-cal-event-block--' + escapeHTML(e.type || 'primary') + '" '
+      var dayCumplidoClass = e.cumplido ? ' kair-cal-event-block--cumplido' : '';
+      html += '<div class="kair-cal-event-block kair-cal-event-block--' + escapeHTML(e.type || 'primary') + dayCumplidoClass + '" '
             + 'data-kair-cal-event-id="' + escapeHTML(e.id) + '" '
             + 'style="top:' + top + 'px;height:' + height + 'px;' + this._blockBorderCss(e) + '">'
-            + '<div class="kair-cal-event-block__title">' + escapeHTML(e.title) + '</div>'
+            + '<div class="kair-cal-event-block__title">' + (e.cumplido ? '✓ ' : (e.type === 'rapido' ? '⚡ ' : '')) + escapeHTML(e.title) + '</div>'
             + '<div class="kair-cal-event-block__time">' + escapeHTML(e.start) + (e.end ? ' – ' + escapeHTML(e.end) : '') + '</div>'
             + '</div>';
     });
@@ -1188,6 +1207,8 @@
   // tipos custom (capacitacion, gestacion, etc.). Antes usaba un whitelist
   // hardcoded de 5 tipos default que descartaba tipos custom → chips
   // mostraban type='primary' aunque vinieran con type='gestacion'.
+  // 📦498 — Acepta y preserva campos de cumplimiento: cumplido, cumplidoEn,
+  // cumplidoNota. Estos vienen del adapter (enriquecidos desde eventosCumplidos).
   KairCalendar.prototype._normalizeEvent = function (e) {
     if (!e) return null;
     // Whitelist dinámico desde eventTypes config. Si un tipo no está,
@@ -1204,7 +1225,11 @@
       start: e.start ? safeEl(e.start) : null,
       end: e.end ? safeEl(e.end) : null,
       type: finalType,
-      description: e.description ? safeEl(e.description) : ''
+      description: e.description ? safeEl(e.description) : '',
+      // 📦498 — Estado de cumplimiento (preservado del adapter)
+      cumplido: !!e.cumplido,
+      cumplidoEn: e.cumplidoEn ? String(e.cumplidoEn) : null,
+      cumplidoNota: e.cumplidoNota ? String(e.cumplidoNota) : ''
     };
   };
 

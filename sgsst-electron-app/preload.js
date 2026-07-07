@@ -331,6 +331,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 📦469 — Cambio de estado con validación de flujo lineal estricto
   gestacionActualizarEstado: (params) =>
     ipcRenderer.invoke('gestacion:actualizarEstado', params),
+
+  // 📦498 — Marcado de eventos del calendario como cumplidos (persistente).
+  // Funciona para cualquier tipo de evento del calendario (capacitacion,
+  // gestacion, reunion, plan, rapido, etc.). Es solo una marca personal
+  // en el calendario — NO impacta los modulos origen.
+  eventosCumplidos: {
+    listar: (params) => ipcRenderer.invoke('eventos-cumplidos:listar', params),
+    marcar: (params) => ipcRenderer.invoke('eventos-cumplidos:marcar', params),
+    desmarcar: (params) => ipcRenderer.invoke('eventos-cumplidos:desmarcar', params)
+  },
   // 📦481-fix — Ruta de Downloads del usuario (para guardar PDFs de reportes)
   getDownloadsPath: () => ipcRenderer.invoke('get-downloads-path'),
 

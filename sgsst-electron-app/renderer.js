@@ -1688,9 +1688,14 @@ if (appHeader) {
           ],
           adapter: window.KairCalendarAdapter || null,
           onEventClick: function (ev) {
-            // Eventos de plan/cap/aud → side panel con "Ir al módulo".
-            // Eventos rápidos → el calendario abre su modal nativo de edición.
-            if (ev && ev.type !== 'rapido' && window.calendarDetailPanel) {
+            // 📦503 — FIX: el handler antes filtraba `ev.type !== 'rapido'` y
+            // para eventos rapido NO hacía nada (ni panel ni modal). El usuario
+            // reportaba "los eventos rapidos no los esta mostrando" + "no
+            // permite edicion" porque el chip se renderizaba pero clickarlo no
+            // abría ningún flujo. Ahora TODOS los tipos abren el detail panel
+            // (consistente); el panel agrega botón "Editar" solo para
+            // type==='rapido' (los demás se editan en su módulo origen).
+            if (ev && window.calendarDetailPanel) {
               window.calendarDetailPanel.open(ev);
             }
           }

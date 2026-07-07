@@ -56,6 +56,17 @@
     gestacion:    function () { _navigate('3.3.6 Medición del ausentismo por causa médica'); }
   };
 
+  // 📦500 — Mapeo de tipo → label del módulo de origen (para mostrar como
+  // chip en el hero del detail panel). Coincide con NAV_MAP arriba.
+  var TYPE_SOURCE = {
+    plan:         'Plan de Trabajo',
+    capacitacion: 'Capacitación',
+    auditoria:    'Auditoría',
+    gestacion:    'Seguimiento de Gestación',
+    rapido:       'Evento rápido',
+    vencido:      'Vencido'
+  };
+
   // ── Estado ───────────────────────────────────────────────────────────
   var _el = null;          // overlay DOM
   var _currentEvent = null;
@@ -83,6 +94,31 @@
     return d + ' de ' + mes + ' de ' + m[1];
   }
 
+  // 📦500 — Nombre del día de la semana en español para el hero header
+  // (ej: "miércoles"). Acepta YYYY-MM-DD y devuelve '' si no parsea.
+  function _formatWeekday(iso) {
+    if (!iso) return '';
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso));
+    if (!m) return '';
+    var d = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
+    if (isNaN(d.getTime())) return '';
+    var dias = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+    return dias[d.getDay()] || '';
+  }
+
+  // 📦498 — Formato de fecha+hora ISO ('YYYY-MM-DDTHH:MM:SSZ' o similar) a
+  // string legible en español, ej: '15 de julio de 2026 a las 14:30'.
+  function _formatDateTime(iso) {
+    if (!iso) return '';
+    var m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(String(iso));
+    if (m) {
+      var meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+      return parseInt(m[3], 10) + ' de ' + (meses[parseInt(m[2], 10) - 1] || '') + ' de ' + m[1] + ' a las ' + m[4] + ':' + m[5];
+    }
+    // Fallback: solo fecha
+    return _formatDate(String(iso).slice(0, 10));
+  }
+
   function _navigate(internalModule) {
     // Cierra panel y calendario, navega al módulo origen vía showModuleContent
     // (función global del proyecto SG-SST, definida en renderer.js)
@@ -105,8 +141,12 @@
   function _ensureDom() {
     if (_el && document.body.contains(_el)) return _el;
     _el = document.createElement('div');
-    _el.className = 'kair-cal-dp-overlay';
+    // 📦501 — Wrapper idéntico al modal de "Nuevo evento" (mismo z-index
+    // system, mismo backdrop behavior). Clase extra kair-cal-dp-preview
+    // da hook para ajustes CSS específicos del preview.
+    _el.className = 'kair-cal-modal-overlay kair-cal-dp-preview';
     _el.setAttribute('role', 'dialog');
+    _el.setAttribute('aria-modal', 'true');
     _el.setAttribute('aria-label', 'Detalle del evento');
     document.body.appendChild(_el);
     return _el;
@@ -117,43 +157,119 @@
     var label = TYPE_LABELS[type] || 'Evento';
     var color = TYPE_COLORS[type] || '#6c757d';
     var dateStr = _formatDate(event.date);
-    var timeStr = '';
+    var weekdayStr = _formatWeekday(event.date);
+    var timeStr = 'Todo el día';
     if (event.start && event.start !== '00:00') {
       timeStr = event.start + (event.end ? ' – ' + event.end : '');
-    } else if (event.end && event.end !== '23:59') {
-      timeStr = event.start === '00:00' ? '' : '';
     }
-    var descStr = event.description ? _esc(event.description) : '<em style="color:var(--kair-cal-text-muted)">Sin descripción</em>';
+    var descStr = event.description
+      ? _esc(event.description)
+      : '<em style="color:var(--kair-cal-text-muted);font-style:italic;">Sin descripción</em>';
+
     var navFn = NAV_MAP[type];
-    var navBtn = navFn ? '<button type="button" class="kair-cal-dp-btn kair-cal-dp-btn--primary" data-kair-cal-dp-action="nav">' +
+    var navBtn = navFn ? '<button type="button" class="kair-cal-btn kair-cal-btn--primary" data-kair-cal-dp-action="nav">' +
                          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>' +
                          '<span>Ir al módulo</span>' +
                          '</button>' : '';
 
+    // 📦501 — Status pill arriba del body (estilo moderno, sobrio). Para
+    // eventos pendientes usamos un pill neutro con icono reloj. Para
+    // cumplidos, pill verde con check + fecha.
+    var statusPill = '';
+    var cumplidoFooter = '';
+    if (event.cumplido) {
+      var fechaCumplido = _formatDateTime(event.cumplidoEn || '');
+      statusPill =
+        '<div class="kair-cal-dp-status-done">' +
+          '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>' +
+          '<span>Realizado' + (fechaCumplido ? ' · ' + _esc(fechaCumplido) : '') + '</span>' +
+        '</div>';
+      cumplidoFooter =
+        '<button type="button" class="kair-cal-btn kair-cal-btn--secondary" data-kair-cal-dp-action="unmark-cumplido">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>' +
+          '<span>Desmarcar</span>' +
+        '</button>';
+    } else {
+      statusPill =
+        '<div class="kair-cal-dp-status-pending">' +
+          '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>' +
+          '<span>Pendiente</span>' +
+        '</div>';
+      cumplidoFooter =
+        '<button type="button" class="kair-cal-btn kair-cal-btn--secondary" data-kair-cal-dp-action="mark-cumplido">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>' +
+          '<span>Marcar como realizado</span>' +
+        '</button>';
+    }
+
+    // 📦503 — Botón Editar: solo para eventos rapido (los demás se editan
+    // en su módulo origen: capacitacion, gestacion, auditoria, plan). El
+    // handler de click llama a window.kairCal._openEventModal(ev) que abre
+    // el modal de edición nativa del calendario.
+    var editBtn = '';
+    if (type === 'rapido') {
+      editBtn =
+        '<button type="button" class="kair-cal-btn kair-cal-btn--secondary" data-kair-cal-dp-action="edit">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>' +
+          '<span>Editar</span>' +
+        '</button>';
+    }
+
     return '' +
-      '<div class="kair-cal-dp-panel" role="document">' +
-        '<header class="kair-cal-dp-head" style="background:linear-gradient(135deg,' + color + ' 0%,' + _darken(color) + ' 100%)">' +
-          '<span class="kair-cal-dp-pill">' + _esc(label) + '</span>' +
-          '<button type="button" class="kair-cal-dp-close" data-kair-cal-dp-action="close" aria-label="Cerrar">' +
-            '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
-          '</button>' +
-          '<h2 class="kair-cal-dp-title">' + _esc(event.title || '(Sin título)') + '</h2>' +
-        '</header>' +
-        '<div class="kair-cal-dp-body">' +
-          '<div class="kair-cal-dp-row">' +
-            '<span class="kair-cal-dp-row__label">Fecha</span>' +
-            '<span class="kair-cal-dp-row__value">' + _esc(dateStr) + '</span>' +
+      // 📦501 — Mismo wrapper que el modal de "Nuevo evento"
+      // (kair-cal-modal-overlay + kair-cal-modal). El detail panel ahora
+      // es un MODAL CENTRADO con la MISMA estructura que el modal de
+      // creación, pero con valores en lugar de inputs. Width 520px.
+      '<div class="kair-cal-modal" role="document" data-type="' + _esc(type) + '">' +
+        // Header idéntico al modal: titulo + close X
+        '<div class="kair-cal-modal__head">' +
+          '<div class="kair-cal-modal__title-wrap">' +
+            '<h3 class="kair-cal-modal__title" id="kair-cal-dp-title">' +
+              _esc(event.title || 'Detalle del evento') +
+            '</h3>' +
+            statusPill +
           '</div>' +
-          (timeStr ? '<div class="kair-cal-dp-row">' +
-            '<span class="kair-cal-dp-row__label">Hora</span>' +
-            '<span class="kair-cal-dp-row__value">' + _esc(timeStr) + '</span>' +
-          '</div>' : '') +
-          '<div class="kair-cal-dp-row kair-cal-dp-row--block">' +
-            '<span class="kair-cal-dp-row__label">Descripción</span>' +
-            '<span class="kair-cal-dp-row__value">' + descStr + '</span>' +
+          '<button type="button" class="kair-cal-modal__close" data-kair-cal-dp-action="close" aria-label="Cerrar">' +
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+          '</button>' +
+        '</div>' +
+        // Body con la MISMA estructura del modal pero valores en lugar de inputs
+        '<div class="kair-cal-modal__body">' +
+          // Categoría: dot + label
+          '<div class="kair-cal-field">' +
+            '<label class="kair-cal-field__label">Categoría</label>' +
+            '<div class="kair-cal-field__value kair-cal-dp-category">' +
+              '<span class="kair-cal-dp-type-dot" style="background:' + color + '"></span>' +
+              '<span>' + _esc(label) + '</span>' +
+            '</div>' +
+          '</div>' +
+          // Fecha + Hora en 2 columnas — mismo patrón que kair-cal-field__row
+          // del modal de Nuevo evento
+          '<div class="kair-cal-field__row">' +
+            '<div class="kair-cal-field">' +
+              '<label class="kair-cal-field__label">Fecha</label>' +
+              '<div class="kair-cal-field__value">' +
+                '<span class="kair-cal-dp-weekday-mini">' + _esc(weekdayStr) + '</span>' +
+                '<span>' + _esc(dateStr) + '</span>' +
+              '</div>' +
+            '</div>' +
+            '<div class="kair-cal-field">' +
+              '<label class="kair-cal-field__label">Hora</label>' +
+              '<div class="kair-cal-field__value">' + _esc(timeStr) + '</div>' +
+            '</div>' +
+          '</div>' +
+          // Descripción multilinea (estilo textarea del modal pero solo display)
+          '<div class="kair-cal-field">' +
+            '<label class="kair-cal-field__label">Descripción</label>' +
+            '<div class="kair-cal-field__value kair-cal-field__value--multiline">' + descStr + '</div>' +
           '</div>' +
         '</div>' +
-        (navBtn ? '<footer class="kair-cal-dp-foot">' + navBtn + '</footer>' : '') +
+        // Footer idéntico al modal — acciones right-aligned
+        '<div class="kair-cal-modal__foot">' +
+          editBtn +
+          cumplidoFooter +
+          navBtn +
+        '</div>' +
       '</div>';
   }
 
@@ -169,6 +285,101 @@
     return '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1);
   }
 
+  // ── 📦498 — Acciones de cumplimiento (marcar / desmarcar) ─────────
+  // Llaman al IPC, actualizan el currentEvent, re-renderizan el panel
+  // y disparan un callback opcional para que el calendario refresque los
+  // chips. EmpresaId se infiere de window.currentCompany igual que el adapter.
+  function _getEmpresaId() {
+    try {
+      var cc = (typeof global.currentCompany !== 'undefined') ? global.currentCompany : null;
+      return (cc && cc !== 'default_company') ? cc : null;
+    } catch (e) { return null; }
+  }
+
+  function _showToast(msg, type) {
+    if (typeof global.kairToast === 'function') {
+      global.kairToast(msg, type || 'info');
+    } else if (global.updateNotifier && global.updateNotifier.show) {
+      global.updateNotifier.show({ type: type || 'info', title: msg, subtitle: '' });
+    }
+  }
+
+  function _markCumplido(event) {
+    var empresaId = _getEmpresaId();
+    if (!empresaId || !event.id) {
+      _showToast('No se pudo marcar: falta contexto de empresa', 'error');
+      return;
+    }
+    var api = (typeof global.electronAPI !== 'undefined') ? global.electronAPI : null;
+    if (!api || !api.eventosCumplidos || !api.eventosCumplidos.marcar) {
+      _showToast('API de cumplimiento no disponible', 'error');
+      return;
+    }
+    api.eventosCumplidos.marcar({ empresaId: empresaId, eventoId: event.id, nota: '' })
+      .then(function (res) {
+        if (res && res.success) {
+          event.cumplido = true;
+          event.cumplidoEn = (res.data && res.data.cumplidoEn) || new Date().toISOString();
+          // Re-render del panel con el nuevo estado. 📦503 — FIX: el código
+          // viejo buscaba '.kair-cal-dp-panel' (clase que ya no existe tras
+          // 📦501, ahora se usa '.kair-cal-modal') → retornaba null →
+          // "Cannot set properties of null (setting 'outerHTML')". Reemplaza
+          // el modal adentro del overlay. Los listeners siguen en document
+          // (vía _onDocClick) así que el nuevo modal responde al click.
+          if (_isOpen && _el) {
+            var modalEl = _el.querySelector('.kair-cal-modal');
+            if (modalEl) {
+              modalEl.outerHTML = _render(event);
+            }
+          }
+          _showToast('Marcado como realizado ✓', 'success');
+          // Refrescar calendario para atenuar el chip
+          if (typeof global.kairCal !== 'undefined' && global.kairCal && typeof global.kairCal.refresh === 'function') {
+            global.kairCal.refresh();
+          }
+        } else {
+          _showToast('Error al marcar: ' + ((res && res.error && res.error.message) || 'desconocido'), 'error');
+        }
+      })
+      .catch(function (err) {
+        _showToast('Error de comunicación: ' + (err && err.message || ''), 'error');
+      });
+  }
+
+  function _unmarkCumplido(event) {
+    var empresaId = _getEmpresaId();
+    if (!empresaId || !event.id) {
+      _showToast('No se pudo desmarcar: falta contexto de empresa', 'error');
+      return;
+    }
+    var api = (typeof global.electronAPI !== 'undefined') ? global.electronAPI : null;
+    if (!api || !api.eventosCumplidos || !api.eventosCumplidos.desmarcar) {
+      _showToast('API de cumplimiento no disponible', 'error');
+      return;
+    }
+    api.eventosCumplidos.desmarcar({ empresaId: empresaId, eventoId: event.id })
+      .then(function (res) {
+        if (res && res.success) {
+          event.cumplido = false;
+          event.cumplidoEn = null;
+          if (_isOpen && _el) {
+            var host = _ensureDom();
+            host.innerHTML = _render(event);
+            void host.offsetWidth;
+          }
+          _showToast('Marcado removido', 'info');
+          if (typeof global.kairCal !== 'undefined' && global.kairCal && typeof global.kairCal.refresh === 'function') {
+            global.kairCal.refresh();
+          }
+        } else {
+          _showToast('Error al desmarcar: ' + ((res && res.error && res.error.message) || 'desconocido'), 'error');
+        }
+      })
+      .catch(function (err) {
+        _showToast('Error de comunicación: ' + (err && err.message || ''), 'error');
+      });
+  }
+
   // ── API pública ─────────────────────────────────────────────────────
   function open(event) {
     if (!event || typeof event !== 'object') return;
@@ -177,7 +388,11 @@
     host.innerHTML = _render(event);
     // Forzar reflow para que la animación se dispare
     void host.offsetWidth;
-    host.classList.add('kair-cal-dp-overlay--open');
+    // 📦501 — FIX: el host ahora usa clase `kair-cal-modal-overlay` (no
+    // `kair-cal-dp-overlay`). La clase `--open` debe ser la del wrapper
+    // actual (modal-overlay), sino el CSS lo deja con opacity:0/pointer-events:none
+    // y el modal nunca se hace visible.
+    host.classList.add('kair-cal-modal-overlay--open');
     _isOpen = true;
 
     // Click fuera del panel → cerrar
@@ -189,7 +404,8 @@
 
   function close() {
     if (!_isOpen || !_el) return;
-    _el.classList.remove('kair-cal-dp-overlay--open');
+    // 📦501 — Mismo cambio: usar la clase --open del wrapper actual
+    _el.classList.remove('kair-cal-modal-overlay--open');
     _isOpen = false;
     _currentEvent = null;
     _listeners.forEach(function (l) {
@@ -207,20 +423,50 @@
 
   function _onDocClick(e) {
     if (!_el) return;
-    var panel = _el.querySelector('.kair-cal-dp-panel');
-    if (panel && panel.contains(e.target)) {
-      // Dentro del panel: procesar acción si hay
+    var modal = _el.querySelector('.kair-cal-modal');
+    // 📦503 — FIX: click en el backdrop (el overlay mismo) cierra el modal.
+    // Antes usaba querySelector('.kair-cal-dp-panel') que ya no existe → panel=null
+    // → cualquier click caia al fallback close() → el botón "Marcar" o el X
+    // cerraban ANTES de procesar su acción. Ahora:
+    //   - target === overlay  → click en backdrop  → cerrar
+    //   - target dentro modal → procesar acción si hay → return (no cerrar)
+    //   - target fuera de ambos → click fuera → cerrar
+    if (e.target === _el) {
+      close();
+      return;
+    }
+    if (modal && modal.contains(e.target)) {
+      // Dentro del modal: procesar acción si hay
       var actEl = e.target.closest('[data-kair-cal-dp-action]');
       if (actEl) {
         var action = actEl.getAttribute('data-kair-cal-dp-action');
         if (action === 'close') close();
+        else if (action === 'edit' && _currentEvent) {
+          // 📦503 — Editar evento rapido: cierra el panel y abre el modal
+          // nativo de edición del calendario con los datos precargados.
+          // El modal hace update via adapter.update → bridge → DB.
+          var evToEdit = _currentEvent;
+          close();
+          if (window.kairCal && typeof window.kairCal._openEventModal === 'function') {
+            window.kairCal._openEventModal(evToEdit);
+          }
+        }
         else if (action === 'nav' && _currentEvent && NAV_MAP[_currentEvent.type]) {
           NAV_MAP[_currentEvent.type]();
         }
+        // 📦498 — Acciones de cumplimiento (marcar/desmarcar)
+        else if (action === 'mark-cumplido' && _currentEvent) {
+          _markCumplido(_currentEvent);
+        }
+        else if (action === 'unmark-cumplido' && _currentEvent) {
+          _unmarkCumplido(_currentEvent);
+        }
       }
+      // 📦503 — IMPORTANTE: retornar sin cerrar. Click dentro del modal que
+      // no es una accion conocida NO debe cerrar el panel.
       return;
     }
-    // Click fuera → cerrar
+    // Click fuera del modal y fuera del overlay (ej: sobre el calendario) → cerrar
     close();
   }
 

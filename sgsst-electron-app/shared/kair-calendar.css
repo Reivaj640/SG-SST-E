@@ -873,6 +873,17 @@
 .kair-cal-event-chip--rapido       { border-left-color: #6c757d; }
 .kair-cal-event-chip--vencido      { border-left-color: #dc3545; }
 .kair-cal-event-chip--gestacion    { border-left-color: #ec4899; }
+/* 📦498 — Estado "cumplido": atenuado + tachado en el título. Mantiene
+   border-left-color del tipo para que se distinga por color incluso
+   atenuado. No oculta el chip — el usuario quiere ver QUE está cumplido. */
+.kair-cal-event-chip--cumplido {
+  opacity: 0.55;
+  filter: saturate(0.6);
+}
+.kair-cal-event-chip--cumplido .kair-cal-event-chip__title {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
 .kair-cal-month__more {
   font-size: 0.6875rem;
   font-weight: 600;
@@ -1037,6 +1048,15 @@
 .kair-cal-event-block--rapido       { border-left-color: #6c757d; background: rgba(108, 117, 125, 0.08); }
 .kair-cal-event-block--vencido      { border-left-color: #dc3545; background: rgba(220, 53, 69, 0.08); }
 .kair-cal-event-block--gestacion    { border-left-color: #ec4899; background: rgba(236, 72, 153, 0.10); }
+/* 📦498 — Estado cumplido (mismas atenuaciones que chip). */
+.kair-cal-event-block--cumplido {
+  opacity: 0.55;
+  filter: saturate(0.6);
+}
+.kair-cal-event-block--cumplido .kair-cal-event-block__title {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
 
 /* ---------- 8. Vista DÍA ---------- */
 .kair-cal-view-day {
@@ -1337,137 +1357,115 @@
   color: var(--kair-cal-text-strong);
   border-color: var(--kair-cal-border);
 }
-/* ---------- 16. Side panel de detalle (modules/shared/calendar-detail-panel.js) ---------- */
-.kair-cal-dp-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(26, 26, 46, 0.35);
-  z-index: 1200;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 160ms ease;
-}
-.kair-cal-dp-overlay--open {
-  opacity: 1;
-  pointer-events: auto;
-}
-.kair-cal-dp-panel {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 420px;
-  max-width: calc(100vw - 32px);
-  background: var(--kair-cal-bg-card);
-  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.18);
+/* ---------- 16. Modal preview de detalle (modules/shared/calendar-detail-panel.js) — 📦501
+   El detail panel ahora es un MODAL CENTRADO que reutiliza el wrapper
+   .kair-cal-modal-overlay del modal de "Nuevo evento". Misma estructura
+   HTML, mismas clases internas (.kair-cal-modal, .kair-cal-modal__head,
+   __title, __close, __body, __foot, .kair-cal-field*, etc.). Adicionalmente
+   .kair-cal-dp-preview agrega tweaks (width 520px en vez de 460px). ---------- */
+/* Width más generoso para preview (titulo largo + descripcion) */
+.kair-cal-dp-preview .kair-cal-modal { width: 520px; }
+/* Wrap del titulo + status pill en el header (alineado a la izquierda) */
+.kair-cal-modal__title-wrap {
   display: flex;
-  flex-direction: column;
-  transform: translateX(100%);
-  transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-.kair-cal-dp-overlay--open .kair-cal-dp-panel {
-  transform: translateX(0);
-}
-.kair-cal-dp-head {
-  position: relative;
-  padding: 24px 24px 20px;
-  color: #fff;
-  min-height: 120px;
-}
-.kair-cal-dp-pill {
-  display: inline-block;
-  background: rgba(255, 255, 255, 0.22);
-  color: #fff;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 3px 10px;
-  border-radius: 999px;
-}
-.kair-cal-dp-close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 32px;
-  height: 32px;
-  background: rgba(255, 255, 255, 0.18);
-  border: none;
-  border-radius: 50%;
-  color: #fff;
-  cursor: pointer;
-  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  transition: background 160ms ease;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
 }
-.kair-cal-dp-close:hover { background: rgba(255, 255, 255, 0.32); }
-.kair-cal-dp-title {
-  margin: 12px 0 0 0;
-  font-size: 1.25rem;
-  font-weight: 600;
-  line-height: 1.25;
-  color: #fff;
+.kair-cal-modal__title-wrap .kair-cal-modal__title {
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---------- 16bis. Preview-only tweaks (📦501)
+   El detail panel ahora es un modal centrado que reutiliza TODOS los estilos
+   .kair-cal-modal*, .kair-cal-field*, etc. Acá solo agrego tweaks
+   específicos del preview que no están en el modal de edicion. ---------- */
+
+/* .kair-cal-field__value -- read-only display box, mismo styling que input */
+.kair-cal-field__value {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 38px;
+  padding: 8px 12px;
+  font-size: 0.875rem;
+  color: var(--kair-cal-text-strong);
+  background: var(--kair-cal-bg-card);
+  border: 1px solid var(--kair-cal-border);
+  border-radius: var(--kair-cal-radius-sm);
+  line-height: 1.4;
   word-break: break-word;
 }
-.kair-cal-dp-body {
-  flex: 1;
-  padding: 20px 24px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+.kair-cal-field__value--multiline {
+  display: block;
+  white-space: pre-wrap;
+  min-height: 60px;
+  padding: 10px 12px;
+  line-height: 1.5;
 }
-.kair-cal-dp-row {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+
+/* Categoria (dot + label) */
+.kair-cal-dp-category {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
 }
-.kair-cal-dp-row--block { gap: 6px; }
-.kair-cal-dp-row__label {
-  font-size: 0.6875rem;
-  font-weight: 700;
+.kair-cal-dp-type-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Fecha: weekday prefix en la primera linea del value */
+.kair-cal-dp-weekday-mini {
+  font-size: 0.75rem;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--kair-cal-text-muted);
-}
-.kair-cal-dp-row__value {
-  font-size: 0.9375rem;
-  color: var(--kair-cal-text-strong);
-  line-height: 1.45;
-}
-.kair-cal-dp-foot {
-  padding: 16px 24px;
-  border-top: 1px solid var(--kair-cal-border);
-  background: var(--kair-cal-bg-app);
-  display: flex;
-  justify-content: flex-end;
-}
-.kair-cal-dp-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 38px;
-  padding: 0 18px;
-  border: none;
-  border-radius: 8px;
-  font-family: inherit;
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 160ms ease, transform 160ms ease, box-shadow 160ms ease;
-}
-.kair-cal-dp-btn--primary {
-  background: var(--kair-cal-primary);
-  color: #fff;
-  box-shadow: 0 2px 6px rgba(23, 78, 166, 0.25);
-}
-.kair-cal-dp-btn--primary:hover {
-  background: var(--kair-cal-primary-hover);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(23, 78, 166, 0.3);
+  margin-right: 4px;
 }
 
-/* Dark mode para side panel */
-[data-theme="dark"] .kair-cal-dp-panel { box-shadow: -8px 0 32px rgba(0, 0, 0, 0.5); }
-[data-theme="dark"] .kair-cal-dp-foot { background: var(--kair-cal-bg-app); border-top-color: var(--kair-cal-border); }
+/* Status pills (header) - estilo moderno y discreto */
+.kair-cal-dp-status-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(40, 167, 69, 0.12);
+  color: #226d3a;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.kair-cal-dp-status-done svg { flex-shrink: 0; }
+.kair-cal-dp-status-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(108, 117, 125, 0.12);
+  color: var(--kair-cal-text-body);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.kair-cal-dp-status-pending svg { flex-shrink: 0; }
+
+/* Dark mode del preview */
+[data-theme="dark"] .kair-cal-dp-preview { backdrop-filter: blur(4px); }
+[data-theme="dark"] .kair-cal-field__value { background: var(--kair-cal-bg-app); }
+[data-theme="dark"] .kair-cal-dp-status-pending { background: rgba(180, 180, 200, 0.12); }
