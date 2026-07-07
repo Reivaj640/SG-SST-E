@@ -1070,18 +1070,51 @@ select.form-control {
   gap: 4px;
 }
 
+/* 📦503 — Panel de update con barra estilo K+AIR (como la del splash de carga).
+   Misma animación shimmer azul para que sea consistente con el resto de la app. */
 .update-progress-bar {
-  height: 6px;
+  width: 100%;
+  height: 5px;
   background: var(--border-color, #e9ecef);
-  border-radius: 3px;
+  border-radius: 100px;
   overflow: hidden;
+  position: relative;
 }
 
 .update-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--primary-color, #174ea6), #4285f4);
   width: 0%;
-  transition: width 0.3s ease;
+  background: linear-gradient(90deg, var(--primary-color, #174ea6) 0%, #4285f4 100%);
+  border-radius: 100px;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Shimmer: barrido blanco semitransparente que se mueve por encima del fill.
+   Solo se activa cuando el contenedor padre tiene la clase .is-active
+   (es decir, mientras hay descarga en curso). */
+.update-progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0; left: 0; right: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  transform: translateX(-100%);
+  animation: updateShimmer 1.4s ease-in-out infinite;
+}
+
+.update-progress-bar.is-active .update-progress-fill::after {
+  animation: updateShimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes updateShimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Cuando está al 100%, la barra se queda quieta (sin shimmer) */
+.update-progress-bar.is-complete .update-progress-fill::after {
+  display: none;
 }
 
 .update-progress-text {
@@ -1104,6 +1137,31 @@ select.form-control {
 
 .update-install-btn:hover {
   background: var(--success-hover, #218838);
+}
+
+/* 📦503 — Botón "Descargar" (estado available). Mismo estilo base que
+   install-btn pero amarillo para diferenciarlo. */
+.update-panel-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.update-download-btn {
+  background: var(--warning-color, #ffc107);
+  color: var(--dark-color, #212529);
+  border: none;
+  border-radius: var(--border-radius-sm, 6px);
+  padding: 6px 16px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+  transition: background-color var(--transition-fast);
+  white-space: nowrap;
+}
+
+.update-download-btn:hover {
+  background: #e0a800;
 }
 
 /* Dark theme support for update panel */

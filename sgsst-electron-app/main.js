@@ -74,8 +74,8 @@ Reason: ${reason instanceof Error ? reason.stack : JSON.stringify(reason)}
 // --- Configuración del Auto-Updater ---
 log.transports.file.level = 'info';
 autoUpdater.logger = log;
-autoUpdater.autoDownload = false;
-autoUpdater.autoInstallOnAppQuit = true;
+autoUpdater.autoDownload = false;       // NO descarga en update-available; solo notifica
+autoUpdater.autoInstallOnAppQuit = false; // NO instala al cerrar la app; install 100% manual
 autoUpdater.autoRunAppAfterInstall = true;
 // Configurar timeout para evitar cuelgues en conexiones lentas
 autoUpdater.requestHeaders = {
@@ -554,15 +554,15 @@ autoUpdater.on('checking-for-update', () => {
 });
 
 // Cuando hay una actualización disponible
+// 📦503 — NO descarga automáticamente; el renderer decide cuándo bajarla
+// (botón manual en el panel del header).
 autoUpdater.on('update-available', (info) => {
   sendLog(`Actualización disponible: v${info.version}`, 'INFO');
   sendLog(`[UPDATER] Enviando evento update_available con versión: ${info.version}`, 'INFO');
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('update_available', info);
-    sendLog('[UPDATER] Enviado: update_available', 'DEBUG');
+    sendLog('[UPDATER] Enviado: update_available (sin auto-download)', 'DEBUG');
   }
-  // Iniciar descarga automáticamente
-  autoUpdater.downloadUpdate();
 });
 
 // Cuando NO hay actualizaciones
@@ -1384,6 +1384,22 @@ ipcMain.handle('check-for-updates-manual', async () => {
   } catch (error) {
     sendLog(`[UPDATER] Error en verificación manual: ${error.message}`, 'ERROR');
     return { success: false, error: { code: 'UPDATE_CHECK_FAILED', message: error.message } };
+  }
+});
+
+// 📦503 — Descarga manual: solo se baja cuando el usuario hace click en "Descargar".
+// update-available ya no descarga en background (autoDownload = false).
+ipcMain.handle('update:download', async () => {
+  try {
+    sendLog('[UPDATER] Usuario solicitó descarga manual de la actualización', 'INFO');
+    if (typeof autoUpdater.downloadUpdate === 'function') {
+      autoUpdater.downloadUpdate();
+      return { success: true };
+    }
+    return { success: false, error: { code: 'NOT_AVAILABLE', message: 'autoUpdater no disponible' } };
+  } catch (error) {
+    sendLog(`[UPDATER] Error iniciando descarga: ${error.message}`, 'ERROR');
+    return { success: false, error: { code: 'DOWNLOAD_FAILED', message: error.message } };
   }
 });
 

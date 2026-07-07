@@ -1458,17 +1458,66 @@ if (appHeader) {
     const updateProgressFill = document.getElementById('update-progress-fill');
     const updateProgressText = document.getElementById('update-progress-text');
     const updateInstallBtn = document.getElementById('update-install-btn');
+    const updateDownloadBtn = document.getElementById('update-download-btn');
 
     let headerUpdatePanelVisible = false;
     let currentAppVersion = null;
 
     // Toggle update panel when clicking the update button
-    // El botón solo es visible cuando hay update, así que el click siempre toggle del panel
+    // 📦503 — El botón del header está SIEMPRE visible:
+    //  - Si está al día: solo muestra la versión, click no hace nada (o abre/cierra panel)
+    //  - Si hay update disponible: muestra panel con "Descargar"
+    //  - Si está descargado: muestra panel con "Actualizar y reiniciar"
     if (headerUpdateBtn) {
       headerUpdateBtn.addEventListener('click', () => {
         headerUpdatePanelVisible = !headerUpdatePanelVisible;
         if (headerUpdatePanel) {
           headerUpdatePanel.style.display = headerUpdatePanelVisible ? 'flex' : 'none';
+        }
+      });
+    }
+
+    // 📦503 — Botón "Descargar": dispara la descarga manual.
+    // update-available ya no descarga en background (autoDownload = false en main).
+    if (updateDownloadBtn) {
+      updateDownloadBtn.addEventListener('click', () => {
+        logMessage('Usuario solicitó descarga de la actualización', 'INFO');
+        if (window.electronAPI?.downloadUpdate) {
+          // Feedback inmediato: mostrar "preparando..." + activar shimmer
+          if (updateProgressText) updateProgressText.textContent = 'Preparando descarga...';
+          if (updateDownloadBtn) {
+            updateDownloadBtn.disabled = true;
+            updateDownloadBtn.textContent = 'Descargando...';
+          }
+          var bar = document.querySelector('.update-progress-bar');
+          if (bar) {
+            bar.classList.add('is-active');
+            bar.classList.remove('is-complete');
+            if (updateProgressFill) updateProgressFill.style.width = '2%'; // arranco con un poquito
+          }
+          window.electronAPI.downloadUpdate().then(res => {
+            if (res && res.success) {
+              if (updateProgressText) updateProgressText.textContent = 'Descargando...';
+            } else {
+              logMessage('Error iniciando descarga: ' + (res && res.error && res.error.message), 'ERROR');
+              if (bar) bar.classList.remove('is-active');
+              if (updateProgressFill) updateProgressFill.style.width = '0%';
+              if (updateProgressText) updateProgressText.textContent = 'Error al iniciar';
+              if (updateDownloadBtn) {
+                updateDownloadBtn.disabled = false;
+                updateDownloadBtn.textContent = 'Descargar';
+                updateDownloadBtn.style.display = 'block';
+              }
+              if (window.updateNotifier) {
+                window.updateNotifier.show({
+                  type: 'error',
+                  title: 'No se pudo iniciar la descarga',
+                  subtitle: res && res.error ? res.error.message : 'Error desconocido',
+                  autoClose: 6000
+                });
+              }
+            }
+          });
         }
       });
     }
@@ -1483,8 +1532,9 @@ if (appHeader) {
 
     // Helper: Update header status (unifica los 4 estados visuales del botón)
     // Estados: 'uptodate' | 'checking' | 'available' | 'ready'
-    // Comportamiento: el botón SOLO se muestra cuando hay update real (available/ready).
-    // Cuando está al día o buscando, queda oculto — sin indicador permanente.
+    // 📦503 — El botón está SIEMPRE visible (como en 6.1.3). El dot interior
+    // cambia de color según el estado: verde=al día, amarillo pulsante=disponible,
+    // azul parcial=descargando, verde fuerte=descargado.
     function updateHeaderStatus(state, options = {}) {
       if (!headerUpdateBtn || !headerUpdateText) return;
 
@@ -1498,8 +1548,14 @@ if (appHeader) {
 
       switch (state) {
         case 'uptodate':
-          // OCULTO: no hay update, no se muestra nada en el header
-          headerUpdateBtn.style.display = 'none';
+          // VISIBLE PERMANENTE: punto verde = "al día"
+          headerUpdateBtn.style.display = 'flex';
+          headerUpdateBtn.classList.add('header-update-uptodate');
+          headerUpdateText.textContent = options.version ? `v${options.version}` : 'Al día';
+          headerUpdateBtn.title = options.version
+            ? `Versión v${options.version} — al día. Click para ver detalles.`
+            : 'Actualización al día. Click para ver detalles.';
+          // Panel se cierra si estaba abierto
           if (headerUpdatePanel) {
             headerUpdatePanel.style.display = 'none';
             headerUpdatePanelVisible = false;
@@ -1507,8 +1563,15 @@ if (appHeader) {
           break;
 
         case 'checking':
-          // OCULTO durante la búsqueda (solo se ve el botón si hay update real)
-          headerUpdateBtn.style.display = 'none';
+          // VISIBLE: punto amarillo pulsante = "buscando"
+          headerUpdateBtn.style.display = 'flex';
+          headerUpdateBtn.classList.add('header-update-checking');
+          headerUpdateText.textContent = 'Buscando...';
+          headerUpdateBtn.title = 'Buscando actualizaciones...';
+          if (headerUpdatePanel) {
+            headerUpdatePanel.style.display = 'none';
+            headerUpdatePanelVisible = false;
+          }
           break;
 
         case 'available':
@@ -1517,40 +1580,75 @@ if (appHeader) {
           headerUpdateBtn.classList.add('header-update-available');
           headerUpdateText.textContent = options.version ? `v${options.version}` : 'Update';
           headerUpdateBtn.title = options.version
-            ? `Actualización v${options.version} disponible - Descargando...`
+            ? `Actualización v${options.version} disponible — Click para descargar`
             : 'Actualización disponible';
-          // Auto-abrir panel de descarga
+          // Mostrar panel con botón "Descargar" (no descarga todavía)
           if (headerUpdatePanel) {
             headerUpdatePanel.style.display = 'flex';
             headerUpdatePanelVisible = true;
           }
           if (updateProgressFill) updateProgressFill.style.width = '0%';
-          if (updateProgressText) updateProgressText.textContent = 'Descargando...';
+          if (updateProgressText) updateProgressText.textContent = 'Listo para descargar';
+          // En estado "available" NO se muestra el botón Instalar todavía
           if (updateInstallBtn) updateInstallBtn.style.display = 'none';
+          // En cambio, SÍ se muestra el botón Descargar
+          var downloadBtn = document.getElementById('update-download-btn');
+          if (downloadBtn) {
+            downloadBtn.style.display = 'block';
+            downloadBtn.disabled = false;
+            downloadBtn.textContent = 'Descargar';
+          }
+          // Resetear animación de barra
+          var barAvail = document.querySelector('.update-progress-bar');
+          if (barAvail) {
+            barAvail.classList.remove('is-active');
+            barAvail.classList.remove('is-complete');
+          }
           break;
 
         case 'ready':
-          // VISIBLE: update listo, botón verde con botón "Actualizar"
+          // VISIBLE: update descargado, botón verde con botón "Actualizar"
           headerUpdateBtn.style.display = 'flex';
           headerUpdateBtn.classList.add('header-update-ready');
           headerUpdateText.textContent = options.version ? `v${options.version}` : 'Listo';
           headerUpdateBtn.title = options.version
-            ? `Actualización v${options.version} lista para instalar`
-            : 'Actualización lista';
+            ? `Actualización v${options.version} descargada — Click para instalar`
+            : 'Actualización lista para instalar';
           if (updateProgressFill) updateProgressFill.style.width = '100%';
-          if (updateProgressText) updateProgressText.textContent = 'Descarga completa';
+          if (updateProgressText) updateProgressText.textContent = 'Descarga completa · Listo para instalar';
           if (updateInstallBtn) updateInstallBtn.style.display = 'block';
+          // En "ready" ocultar el botón Descargar (ya está descargado)
+          var dlBtn2 = document.getElementById('update-download-btn');
+          if (dlBtn2) dlBtn2.style.display = 'none';
+          // Detener shimmer, marcar como completa (barra quieta)
+          var barReady = document.querySelector('.update-progress-bar');
+          if (barReady) {
+            barReady.classList.add('is-complete');
+            barReady.classList.remove('is-active');
+          }
           break;
       }
     }
 
     // Helper: Update progress in header (usado durante descarga)
+    // 📦503 — Activa el shimmer animado mientras la descarga está en curso.
+    // El contenedor .update-progress-bar recibe .is-active mientras percent < 100.
     function updateHeaderProgress(percent, speed) {
       if (updateProgressFill) {
         updateProgressFill.style.width = `${percent}%`;
       }
       if (updateProgressText) {
-        updateProgressText.textContent = `${percent}%${speed ? ' - ' + speed : ''}`;
+        updateProgressText.textContent = `${percent}%${speed ? ' · ' + speed + ' MB/s' : ''}`;
+      }
+      var bar = document.querySelector('.update-progress-bar');
+      if (bar) {
+        if (percent > 0 && percent < 100) {
+          bar.classList.add('is-active');
+          bar.classList.remove('is-complete');
+        } else if (percent >= 100) {
+          bar.classList.add('is-complete');
+          bar.classList.remove('is-active');
+        }
       }
     }
 
@@ -1567,7 +1665,9 @@ if (appHeader) {
       updateHeaderStatus('checking');
     });
 
-    // Cuando hay una actualización disponible (comienza la descarga)
+    // Cuando hay una actualización disponible (ya NO descarga automáticamente)
+    // 📦503 — El renderer muestra el botón "Descargar" en el panel y solo
+    // descarga cuando el usuario hace click.
     window.electronAPI?.onUpdateAvailable && window.electronAPI.onUpdateAvailable((info) => {
       console.log('[UPDATER] Evento recibido: update_available', info);
       logMessage(`Actualización disponible: ${info ? info.version : 'nueva versión'}`, 'INFO');
@@ -1580,7 +1680,7 @@ if (appHeader) {
     window.electronAPI?.onUpdateNotAvailable && window.electronAPI.onUpdateNotAvailable((info) => {
       console.log('[UPDATER] Evento recibido: update_not_available', info);
       logMessage('No hay actualizaciones disponibles', 'INFO');
-      // Volver al estado "al día" (oculta el botón)
+      // Volver al estado "al día" (botón permanente con punto verde)
       updateHeaderStatus('uptodate', { version: info?.version || currentAppVersion });
     });
 
@@ -1598,7 +1698,7 @@ if (appHeader) {
       console.log('[UPDATER] Evento recibido: update_downloaded', info);
       logMessage('Actualización descargada y lista para instalar', 'INFO');
       const version = info ? info.version : 'más reciente';
-      // Update header UI → estado "ready" (botón verde con botón Actualizar en panel)
+      // Update header UI → estado "ready" (botón permanente con badge "Listo")
       updateHeaderStatus('ready', { version });
     });
 
@@ -1606,7 +1706,7 @@ if (appHeader) {
     window.electronAPI?.onUpdateError && window.electronAPI.onUpdateError((data) => {
       console.log('[UPDATER] Evento recibido: update_error', data);
       logMessage(`Error de actualización: ${data ? data.message : 'error desconocido'}`, 'ERROR');
-      // Volver a estado oculto
+      // Volver al estado "al día" (botón permanente con punto verde)
       updateHeaderStatus('uptodate', { version: currentAppVersion });
     });
 

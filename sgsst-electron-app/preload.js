@@ -586,6 +586,9 @@ renameCargo: (companyName, cargoId, nombre) => ipcRenderer.invoke('matriz-peligr
   onUpdateNotAvailable: (callback) => ipcRenderer.on('update_not_available', (event, ...args) => callback(...args)),
   onUpdateProgress: (callback) => ipcRenderer.on('update_progress', (event, ...args) => callback(...args)),
   onUpdateError: (callback) => ipcRenderer.on('update_error', (event, ...args) => callback(...args)),
+  // 📦503 — Descarga e instalación 100% manuales. La app chequea en background
+  // y notifica al usuario, pero NO baja ni instala sola.
+  downloadUpdate: () => ipcRenderer.invoke('update:download'),
   restartApp: () => ipcRenderer.send('restart_app'),
   checkForUpdatesManual: () => ipcRenderer.invoke('check-for-updates-manual'),
   // Acceso directo en escritorio (autoUpdater no lo recrea tras update)
