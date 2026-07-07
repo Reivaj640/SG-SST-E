@@ -228,13 +228,33 @@
   <script src="modules/gestion-peligros/identificacion-peligros/kair-matriz-peligros-editor.js"></script>
   <script src="modules/gestion-peligros/identificacion-peligros/kair-matriz-peligros.js"></script>
 
-<!-- Submódulo 4.2.4 - Inspecciones Sistemáticas a las Instalaciones, Máquinas o Equipos -->
-<link rel="stylesheet" href="modules/gestion-peligros/inspecciones/inspecciones.css">
-<script src="modules/gestion-peligros/inspecciones/inspecciones-service.js"></script>
-<script src="modules/gestion-peligros/inspecciones/programa-insp.js"></script>
-<script src="modules/gestion-peligros/inspecciones/formulario-insp.js"></script>
-<script src="modules/gestion-peligros/inspecciones/historial-insp.js"></script>
-<script src="modules/gestion-peligros/inspecciones/inspecciones-component.js"></script>
+<!-- Submódulo 4.2.4 - Inspecciones Sistemáticas a las Instalaciones, Máquinas o Equipos (NUEVO MÓDULO VANILLA.JS) -->
+<!-- CSS: tokens + components + modulo inspecciones consolidados -->
+<link rel="stylesheet" href="modules/gestion-peligros/inspecciones/inspeccion.css">
+<!-- Vendors (CSP 'self', sin CDN) -->
+<script src="vendor/lucide.min.js"></script>
+<script src="vendor/jspdf.umd.min.js"></script>
+<script src="vendor/jspdf.plugin.autotable.min.js"></script>
+<!-- xlsx ya está cargado antes (línea 121) desde node_modules/xlsx/dist/xlsx.full.min.js -->
+<!-- Lib core del módulo inspecciones -->
+<script src="modules/gestion-peligros/inspecciones/inspeccion-types.js"></script>
+<script src="modules/gestion-peligros/inspecciones/inspeccion-export-engine.js"></script>
+<script src="modules/gestion-peligros/inspecciones/inspeccion-store.js"></script>
+<script src="modules/gestion-peligros/inspecciones/inspeccion-api.js"></script>
+<script src="modules/gestion-peligros/inspecciones/inspeccion-templates.js"></script>
+<script src="modules/gestion-peligros/inspecciones/inspeccion-router.js"></script>
+<!-- Vistas -->
+<script src="modules/gestion-peligros/inspecciones/views/inspeccion-dashboard.js"></script>
+<script src="modules/gestion-peligros/inspecciones/views/inspeccion-hub.js"></script>
+<script src="modules/gestion-peligros/inspecciones/views/inspeccion-historial.js"></script>
+<script src="modules/gestion-peligros/inspecciones/views/inspeccion-detalle.js"></script>
+<script src="modules/gestion-peligros/inspecciones/views/inspeccion-form-botiquin.js"></script>
+<script src="modules/gestion-peligros/inspecciones/views/inspeccion-form-extintores.js"></script>
+<script src="modules/gestion-peligros/inspecciones/views/inspeccion-form-instalaciones.js"></script>
+<script src="modules/gestion-peligros/inspecciones/views/inspeccion-form-emergencia.js"></script>
+<!-- App controller + wrapper IIFE (debe ir último para registrar window.InspeccionComponent) -->
+<script src="modules/gestion-peligros/inspecciones/inspeccion-app.js"></script>
+<script src="modules/gestion-peligros/inspecciones/inspeccion-component.js"></script>
 
 <!-- Submódulo 4.2.5 - Mantenimiento Periódico de Equipos, Instalaciones, Herramientas -->
 <link rel="stylesheet" href="modules/gestion-peligros/mantenimiento/mantenimiento.css">

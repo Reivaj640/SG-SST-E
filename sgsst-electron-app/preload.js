@@ -505,25 +505,27 @@ incidencia: {
 getIndicadoresFiles: ({ companyName, submodule }) => ipcRenderer.invoke('get-indicadores-files', { companyName, submodule }),
 duplicateIndicadoresFile: ({ currentFilePath, newYear }) => ipcRenderer.invoke('duplicate-indicadores-file', { currentFilePath, newYear }),
 
-  // --- Inspecciones Sistemáticas (4.2.4) ---
+  // --- Inspecciones Sistemáticas (4.2.4) — NUEVO CONTRATO ---
+  // 📦500 — Nuevo bridge con 8 canales `modulo:accion` (file-based JSON store).
+  // Se conserva `getStats` como wrapper backward-compat para los widgets del
+  // home de gestion-peligros. Los métodos se exponen al TOP-LEVEL de
+  // electronAPI (no dentro del namespace `inspecciones`) para que el adapter
+  // pueda llamarlos como `electronAPI.programaObtener(...)` directamente.
+  // `inspecciones.getStats` se mantiene solo por backward-compat del home.
+
+  // Top-level: nuevo contrato modulo:accion (8 canales)
+  companyListar: () => ipcRenderer.invoke('company:listar'),
+  programaObtener: (year, companyId) => ipcRenderer.invoke('programa:obtener', year, companyId),
+  programaActualizarActividad: (activityId, patch) => ipcRenderer.invoke('programa:actualizarActividad', activityId, patch),
+  inspeccionListar: (filter) => ipcRenderer.invoke('inspeccion:listar', filter),
+  inspeccionObtener: (id) => ipcRenderer.invoke('inspeccion:obtener', id),
+  inspeccionCrear: (payload) => ipcRenderer.invoke('inspeccion:crear', payload),
+  inspeccionActualizar: (id, patch) => ipcRenderer.invoke('inspeccion:actualizar', id, patch),
+  inspeccionEliminar: (id) => ipcRenderer.invoke('inspeccion:eliminar', id),
+
+  // Backward-compat: consumido por gestion-peligros-home.js widgets
   inspecciones: {
-    getStats: (companyName) => ipcRenderer.invoke('inspecciones:get-stats', companyName),
-    getSchedule: (companyName, year) => ipcRenderer.invoke('inspecciones:get-schedule', companyName, year),
-    updateMonth: (companyName, activityId, month, status) => ipcRenderer.invoke('inspecciones:update-month', companyName, activityId, month, status),
-    updateField: (companyName, activityId, field, value) => ipcRenderer.invoke('inspecciones:update-field', companyName, activityId, field, value),
-    readExcel: (companyName, type) => ipcRenderer.invoke('inspecciones:read-excel', companyName, type),
-    writeExcel: (companyName, type, formData) => ipcRenderer.invoke('inspecciones:write-excel', companyName, type, formData),
-    writeHeader: (companyName, type, headerData) => ipcRenderer.invoke('inspecciones:write-header', companyName, type, headerData),
-    getTemplate: (companyName, type) => ipcRenderer.invoke('inspecciones:get-template', companyName, type),
-    listFiles: (companyName) => ipcRenderer.invoke('inspecciones:list-files', companyName),
-    getFileMetadata: (companyName, filePath) => ipcRenderer.invoke('inspecciones:get-file-metadata', companyName, filePath),
-    listInspections: (companyName, filters) => ipcRenderer.invoke('inspecciones:list', companyName, filters),
-    getInspection: (companyName, id) => ipcRenderer.invoke('inspecciones:get', companyName, id),
-    deleteInspection: (companyName, id) => ipcRenderer.invoke('inspecciones:delete', companyName, id),
-    createInspection: (companyName, type, month, year) => ipcRenderer.invoke('inspecciones:create', companyName, type, month, year),
-    listFilesByType: (companyName, type) => ipcRenderer.invoke('inspecciones:list-by-type', companyName, type),
-    readExcelByPath: (companyName, type, filePath) => ipcRenderer.invoke('inspecciones:read-by-path', companyName, type, filePath),
-    writeExcelByPath: (companyName, type, formData, filePath) => ipcRenderer.invoke('inspecciones:write-by-path', companyName, type, formData, filePath),
+    getStats: (companyName) => ipcRenderer.invoke('inspecciones:get-stats', companyName)
   },
 
   // --- Mantenimiento Periódico (4.2.5) ---
