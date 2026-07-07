@@ -222,18 +222,18 @@ class GestionPeligrosHome {
 			var value, sublabel, footerLeftLabel, footerLeftVal, footerRightLabel, footerRightVal, progressPct;
 			if (currentMode === 'year') {
 				value = progTotal;
-				sublabel = 'Actividades programadas (programa)';
-				footerLeftLabel = 'Cumplidas (prog)';
+				sublabel = 'Actividades programadas';
+				footerLeftLabel = 'Cumplidas';
 				footerLeftVal = progComp;
-				footerRightLabel = 'Pendientes (prog)';
+				footerRightLabel = 'Pendientes';
 				footerRightVal = progPend;
 				progressPct = progTotal === 0 ? 0 : Math.round((progComp / progTotal) * 1000) / 10;
 			} else {
 				value = pendientesMes;
 				sublabel = 'Pendientes del mes';
-				footerLeftLabel = 'Cumplidas (mes)';
-				footerLeftVal = progComp; /* misma serie que el año, simplificado */
-				footerRightLabel = 'Pendientes (mes)';
+				footerLeftLabel = 'Cumplidas';
+				footerLeftVal = progComp;
+				footerRightLabel = 'Pendientes';
 				footerRightVal = pendientesMes;
 				progressPct = displayData.tasaCumplimiento || 0;
 			}
@@ -270,7 +270,7 @@ class GestionPeligrosHome {
 					</div>\
 				</div>\
 				<div class="kb-subnote" style="font-size:0.62rem;color:var(--k-text-muted);text-align:center;margin-top:6px;padding-top:6px;border-top:1px dashed #e9ecef;line-height:1.35;">\
-					Registros guardados: <b>' + totalInsps + '</b> · Cumpl. (reg): <b>' + regComp + '</b> · Pend. (reg): <b>' + regPend + '</b>\
+					Reg: ' + totalInsps + ' · Cump: ' + regComp + ' · Pend: ' + regPend + '\
 				</div>\
 			';
 
@@ -667,7 +667,7 @@ class GestionPeligrosHome {
 	overflow-y: auto;\
 }\
 .widgets-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 0 !important; }\
-.widget { background: var(--k-bg-card); border: 1px solid var(--k-border); border-radius: var(--k-radius-lg); padding: 1rem; box-shadow: var(--k-shadow-sm); display: flex; flex-direction: column; min-height: 120px; transition: transform 0.2s ease; }\
+.widget { background: var(--k-bg-card); border: 1px solid var(--k-border); border-radius: var(--k-radius-lg); padding: 1rem; box-shadow: var(--k-shadow-sm); display: flex; flex-direction: column; min-height: 175px; transition: transform 0.2s ease; }\
 .widget:hover { transform: translateY(-3px); box-shadow: var(--k-shadow-md); }\
 .widget h4 { margin: 0 0 0.5rem 0; font-size: 0.65rem; color: var(--k-text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }\
 .widget-value { font-size: 1.4rem; font-weight: 700; color: var(--k-text-main); margin-bottom: 0.5rem; }\
@@ -684,6 +684,7 @@ class GestionPeligrosHome {
 .kb-exec { color: var(--k-success); }\
 .kb-rem { color: var(--k-primary); }\
 .kb-progress-track { width: 100%; height: 10px; background: #e9ecef; border-radius: 5px; overflow: hidden; margin-bottom: 0.5rem; position: relative; }\
+.kb-subnote { margin-top: auto; flex-shrink: 0; }\
 .kb-progress-bar { height: 100%; width: 0%; border-radius: 5px; background-color: var(--k-success); transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s; }\
 .ausentismo-toggles { display: flex; gap: 4px; margin: 4px 0; background: #f1f3f4; padding: 3px; border-radius: 6px; }\
 .ausentismo-toggle { flex: 1; border: none; background: transparent; font-size: 0.7rem; padding: 2px 6px; border-radius: var(--k-radius-md); cursor: pointer; color: var(--k-text-muted); transition: all 0.2s; }\
