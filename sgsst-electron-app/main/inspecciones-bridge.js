@@ -1,7 +1,7 @@
 /* ============================================================
  * K+AIR · Inspecciones — Bridge IPC con file-based JSON store
  *
- * Handlers (8 canales, naming `modulo:accion`):
+ * Handlers (9 canales, naming `modulo:accion`):
  *   company:listar                    → store.listCompanies()
  *   programa:obtener                  → store.getProgram(year, companyId)
  *   programa:actualizarActividad      → store.updateActivity(id, patch)
@@ -10,6 +10,12 @@
  *   inspeccion:crear                  → store.createInspection(payload)
  *   inspeccion:actualizar             → store.updateInspection(id, patch)
  *   inspeccion:eliminar               → store.deleteInspection(id)
+ *   inspeccion:exportarXlsx           → exporta la inspección a .xlsx usando
+ *                                        la plantilla oficial de utils/ como
+ *                                        base (preserva bordes, fonts, fills,
+ *                                        merges y anchos de columna).
+ *                                        Aplica a los 4 tipos: instalaciones,
+ *                                        botiquin, extintores, equipos_emergencia.
  *
  * Backward-compat (para widgets del home de gestion-peligros):
  *   inspecciones:get-stats(company)   → wrapper que lee del nuevo store
@@ -17,13 +23,55 @@
  *                tasaCumplimiento, extintoresVigentes, extintoresTotal}
  *
  * Persistencia: <userData>/kair-inspecciones-data.json
+ * Plantillas:    <appPath>/utils/GI-FO-*.xlsx
  * ============================================================ */
 const { app, ipcMain } = require("electron");
 const path = require("path");
 const fs = require("fs");
+const ExcelJS = require("exceljs");
 
 const DATA_FILE = () =>
   path.join(app.getPath("userData"), "kair-inspecciones-data.json");
+
+/* Las plantillas originales son .xls pero ExcelJS (que sí preserva estilos
+   al escribir .xlsx) requiere .xlsx de entrada. La conversión .xls → .xlsx
+   se hizo una sola vez con Excel vía pywin32 y queda commiteada en utils/.
+   En dev: <repo>/utils/...
+   En prod (asar=false): <appPath>/utils/... (incluida en el build por
+   la regla files: ["**\/*"] de electron-builder) */
+const TEMPLATE_BASE = () => path.join(app.getAppPath(), "utils");
+
+function fmtDate(d) {
+  try {
+    var date = typeof d === "string" ? new Date(d) : d;
+    var dd = String(date.getDate()).padStart(2, "0");
+    var mm = String(date.getMonth() + 1).padStart(2, "0");
+    var yyyy = date.getFullYear();
+    return dd + "/" + mm + "/" + yyyy;
+  } catch (e) { return String(d); }
+}
+
+/* Normaliza para matching: lowercase + ELIMINA todos los espacios.
+   Los items son frases únicas largas, no hay riesgo de falsos positivos;
+   esto cubre casos como "( SILLAS" vs "(SILLAS" que la plantilla trae. */
+function norm(s) {
+  return String(s || "").toLowerCase().replace(/\s+/g, "").trim();
+}
+
+/* Helper: extrae el texto plano de una celda que puede ser string, richText
+   o null (ExcelJS devuelve distinto según el tipo de celda). */
+function cellText(cell) {
+  var v = cell && cell.value;
+  if (v == null || v === "") return "";
+  if (typeof v === "string") return v;
+  if (v && v.richText) return v.richText.map(function (rt) { return rt.text; }).join("");
+  if (v && v.text) return v.text;
+  return String(v);
+}
+
+function setText(ws, addr, val) {
+  ws.getCell(addr).value = val == null ? "" : String(val);
+}
 
 let cache = null;
 
@@ -190,6 +238,232 @@ var INSPECTION_META = {
   equipos_emergencia: { code: "GI-FO-023", title: "Inspección de Equipos de Emergencia" }
 };
 
+/* ---------- Registry de plantillas para export XLSX ----------
+   Cada entrada define cómo llenar la plantilla oficial de un tipo de
+   inspección. La función genérica `exportXlsxFromTemplate` carga la
+   plantilla, aplica las funciones de mapping y devuelve el buffer.
+   Esto preserva borders, fonts, fills, merges y anchos de columna
+   (ExcelJS lee/escribe .xlsx preservando estilos; las plantillas
+   originales .xls se convierten una sola vez a .xlsx con Excel+pywin32).
+
+   `mapHeader(ws, insp)`     — llena celdas de cabecera (fecha, lugar, etc.)
+   `mapItems(ws, data)`      — llena filas de items del cuerpo
+   `mapFooter(ws, insp, data)` — opcional, llena celdas del pie
+   `extra(ws, insp, data)`   — opcional, pasos extra (ej. participantes) */
+var TEMPLATES = {
+
+  /* GI-FO-025: Instalaciones ----------------------------------------------
+     Cabecera: A7 = fecha, F7 = lugar
+     Items: 20 filas en col A (con categorias en 12, 16, 19, 22, 29) —
+     col C/D/E = X segun respuesta, F/G/H/I = textos
+     Pie: A38/39/40 = inspector/cargo/firma */
+  instalaciones: {
+    templateFile: "GI-FO-025 INSPECCION DE INSTALACIONES.xlsx",
+    itemRows: [13, 14, 15, 17, 18, 20, 21, 23, 24, 25, 26, 27, 28, 30, 31, 32, 33, 34, 35, 36],
+    labelCol: "A",
+    mapHeader: function (ws, insp) {
+      setText(ws, "A7", "FECHA: " + fmtDate(insp.date));
+      setText(ws, "F7", "LUGAR: " + (insp.site || ""));
+    },
+    mapItems: function (ws, data) {
+      var items = Array.isArray(data.items) ? data.items : [];
+      var byNorm = {};
+      items.forEach(function (it) { if (it && it.item) byNorm[norm(it.item)] = it; });
+      TEMPLATES.instalaciones.itemRows.forEach(function (r) {
+        var label = cellText(ws.getCell(TEMPLATES.instalaciones.labelCol + r));
+        if (!label) return;
+        var it = byNorm[norm(label)];
+        if (!it) return;
+        setText(ws, "C" + r, it.respuesta === "SI"  ? "X" : "");
+        setText(ws, "D" + r, it.respuesta === "NO"  ? "X" : "");
+        setText(ws, "E" + r, it.respuesta === "N/A" ? "X" : "");
+        setText(ws, "F" + r, it.observaciones || "");
+        setText(ws, "G" + r, it.compromisos   || "");
+        setText(ws, "H" + r, it.responsable   || "");
+        setText(ws, "I" + r, it.seguimiento   || "");
+      });
+    },
+    mapFooter: function (ws, insp, data) {
+      var inspPor = data.inspeccionadoPor || insp.performedBy || "";
+      setText(ws, "A38", "INSPECCIONADO POR: " + inspPor);
+      setText(ws, "A39", "CARGO: " + (data.cargo || insp.role || ""));
+      setText(ws, "A40", "FIRMA: " + (data.firma || inspPor));
+    }
+  },
+
+  /* GI-FO-031: Botiquin ---------------------------------------------------
+     Cabecera: A6 = fecha, E6 = realizado por
+     Items: 16 elementos en filas 9-24 (label en B/C/D por merge),
+     col E = cantidad, F = fecha vencimiento, G = estado
+     Filas 25-31 son slots extra vacíos; filas 32-33 son checks
+     (botiquin en buen estado / higiene adecuada) */
+  botiquin: {
+    templateFile: "GI-FO-031 INSPECCION DE BOTIQUIN DE PRIMEROS AUXILIOS.xlsx",
+    itemRows: [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
+    labelCol: "B",
+    mapHeader: function (ws, insp) {
+      setText(ws, "A6", "FECHA: " + fmtDate(insp.date));
+      setText(ws, "E6", "REALIZADO POR: " + (insp.performedBy || ""));
+    },
+    mapItems: function (ws, data) {
+      var items = Array.isArray(data.items) ? data.items : [];
+      var byNorm = {};
+      items.forEach(function (it) {
+        /* El form del botiquin usa el campo `item` para el nombre del
+           elemento (igual que la columna B de la plantilla). */
+        if (it && it.item) byNorm[norm(it.item)] = it;
+      });
+      TEMPLATES.botiquin.itemRows.forEach(function (r) {
+        var label = cellText(ws.getCell(TEMPLATES.botiquin.labelCol + r));
+        if (!label) return;
+        var it = byNorm[norm(label)];
+        if (!it) return;
+        setText(ws, "E" + r, it.cantidad         != null ? String(it.cantidad) : "");
+        setText(ws, "F" + r, it.fechaVencimiento || "");
+        setText(ws, "G" + r, it.estado           || "");
+      });
+    },
+    /* Checks: si el JSON trae `data.checks`, los matcheamos contra las
+       filas 32 ("Botiquin en buen estado") y 33 ("Higiene adecuada del
+       botiquin") y marcamos con X (o el valor) en col E. */
+    extra: function (ws, insp, data) {
+      var checks = Array.isArray(data.checks) ? data.checks : [];
+      if (checks.length === 0) return;
+      var byNorm = {};
+      checks.forEach(function (c) { if (c && c.label) byNorm[norm(c.label)] = c; });
+      [32, 33].forEach(function (r) {
+        var label = cellText(ws.getCell(TEMPLATES.botiquin.labelCol + r));
+        if (!label) return;
+        var c = byNorm[norm(label)];
+        if (!c) return;
+        setText(ws, "E" + r, c.value === true ? "X" : (c.value || ""));
+      });
+    }
+  },
+
+  /* GI-FO-026: Extintores -------------------------------------------------
+     Cabecera: A7 = fecha, A8 = realizado por, F8 = cargo
+     Items: 9 filas (12-20) con mapeo directo por columna:
+       A=ubicacion, B=#, C=tipo, D=capacidad, E=fechaRecarga,
+       F=fechaVencimiento, G=presion, H=estadoCilindro, I=pasador,
+       J=anillo, K=base, L=observaciones
+     Fila 21 = OBSERVACIONES (texto libre)
+     Filas siguientes = firmas (no las tocamos, el usuario firma manual) */
+  extintores: {
+    templateFile: "GI-FO-026 INSPECCION DE EXTINTORES.xlsx",
+    mapHeader: function (ws, insp) {
+      setText(ws, "A7", "Fecha de Realizacion de inspeccion: " + fmtDate(insp.date));
+      setText(ws, "A8", "Realizada por: " + (insp.performedBy || ""));
+      setText(ws, "F8", "Cargo: " + (insp.role || ""));
+    },
+    mapItems: function (ws, data) {
+      var rows = Array.isArray(data.rows) ? data.rows : [];
+      var startRow = 12;
+      var cols = ["ubicacion", "numero", "tipo", "capacidad", "fechaRecarga",
+                  "fechaVencimiento", "presion", "estadoCilindro", "pasador",
+                  "anillo", "base", "observaciones"];
+      rows.forEach(function (row, idx) {
+        if (idx >= 9) return; /* la plantilla tiene 9 slots (12-20) */
+        var r = startRow + idx;
+        cols.forEach(function (field, ci) {
+          setText(ws, String.fromCharCode(65 + ci) + r, row[field] || "");
+        });
+      });
+    },
+    extra: function (ws, insp, data) {
+      var obs = data.observaciones || insp.observations || "";
+      if (obs) setText(ws, "A22", obs);
+    }
+  },
+
+  /* GI-FO-023: Equipos de Emergencia --------------------------------------
+     Cabecera: A6 = fecha, A7 = sitio de inspeccion
+     Items: 9 filas (12-20) con label en A — col B/C/D = X segun estado
+     (BUENO/MALO/N/A), E=recomendaciones, F=responsables, G=seguimiento
+     Fila 25+ = participantes (no implementado por ahora; se llena abajo) */
+  equipos_emergencia: {
+    templateFile: "GI-FO-023 INSPECCION DE EQUIPOS DE EMERGENCIA.xlsx",
+    itemRows: [12, 13, 14, 15, 16, 17, 18, 19, 20],
+    labelCol: "A",
+    mapHeader: function (ws, insp) {
+      setText(ws, "A6", "FECHA: " + fmtDate(insp.date));
+      setText(ws, "A7", "SITIO DE INSPECCION: " + (insp.site || ""));
+    },
+    mapItems: function (ws, data) {
+      var items = Array.isArray(data.items) ? data.items : [];
+      var byNorm = {};
+      items.forEach(function (it) { if (it && it.item) byNorm[norm(it.item)] = it; });
+      TEMPLATES.equipos_emergencia.itemRows.forEach(function (r) {
+        var label = cellText(ws.getCell(TEMPLATES.equipos_emergencia.labelCol + r));
+        if (!label) return;
+        var it = byNorm[norm(label)];
+        if (!it) return;
+        setText(ws, "B" + r, it.estado === "BUENO" ? "X" : "");
+        setText(ws, "C" + r, it.estado === "MALO"  ? "X" : "");
+        setText(ws, "D" + r, it.estado === "N/A"  ? "X" : "");
+        setText(ws, "E" + r, it.recomendaciones || "");
+        setText(ws, "F" + r, it.responsables    || "");
+        setText(ws, "G" + r, it.seguimiento     || "");
+      });
+    },
+    /* Participantes: si el JSON trae `data.participantes`, los colocamos
+       a partir de la fila 25 (después del header de PARTICIPANTES). */
+    extra: function (ws, insp, data) {
+      var parts = Array.isArray(data.participantes) ? data.participantes : [];
+      if (parts.length === 0) return;
+      var startRow = 26; /* debajo del header "NOMBRE COMPLETO ... | CARGO" */
+      parts.forEach(function (p, idx) {
+        var r = startRow + idx;
+        if (r > 40) return; /* safety: no overflow */
+        setText(ws, "A" + r, p.nombre || "");
+        setText(ws, "D" + r, p.cargo   || "");
+      });
+    }
+  }
+};
+
+/* Funcion generica: carga la plantilla del tipo, aplica los mappers y
+   devuelve el .xlsx en base64. */
+async function exportXlsxFromTemplate(insp) {
+  var tpl = TEMPLATES[insp && insp.type];
+  if (!tpl) {
+    return err("NO_TEMPLATE",
+      "No hay plantilla registrada para type=" + (insp && insp.type));
+  }
+
+  var templatePath = path.join(TEMPLATE_BASE(), tpl.templateFile);
+  if (!fs.existsSync(templatePath)) {
+    return err("TEMPLATE_NOT_FOUND",
+      "Plantilla no encontrada en runtime: " + templatePath);
+  }
+
+  var wb = new ExcelJS.Workbook();
+  try {
+    await wb.xlsx.readFile(templatePath);
+  } catch (e) {
+    return err("TEMPLATE_READ_FAILED",
+      "No se pudo leer la plantilla .xlsx: " + e.message);
+  }
+  var ws = wb.worksheets[0];
+  if (!ws) return err("TEMPLATE_EMPTY", "La plantilla no tiene hojas");
+  var data = (insp && insp.data) || {};
+
+  if (tpl.mapHeader) tpl.mapHeader(ws, insp);
+  if (tpl.mapItems)  tpl.mapItems(ws, data);
+  if (tpl.mapFooter) tpl.mapFooter(ws, insp, data);
+  if (tpl.extra)     tpl.extra(ws, insp, data);
+
+  var buf;
+  try {
+    buf = await wb.xlsx.writeBuffer();
+  } catch (e) {
+    return err("XLSX_WRITE_FAILED", "No se pudo generar el .xlsx: " + e.message);
+  }
+
+  var nodeBuf = Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
+  return ok({ xlsxBase64: nodeBuf.toString("base64") });
+}
+
 /* Migra inspecciones heredadas que quedaron con companyId="default" pero
    fueron creadas para otra empresa. Reasigna companyId + companyName a la
    empresa del filtro. */
@@ -212,10 +486,11 @@ function migrateLegacyDefaultInspections(targetCompanyId, targetCompanyName) {
       i.companyName = resolvedName;
       changed = true;
     } else if (i.companyId === targetCompanyId && resolvedName &&
-               (!i.companyName || i.companyName === "K+AIR Demo S.A.S.")) {
+               (!i.companyName || i.companyName === "K+AIR Demo S.A.S." || i.companyName === "Empresa K+AIR")) {
       /* Si la inspección ya está bien asignada por companyId pero el
-         companyName quedó con el placeholder de demo, también lo
-         actualizamos para que la columna Empresa muestre el nombre real. */
+         companyName quedó con un placeholder heredado ("K+AIR Demo S.A.S.",
+         "Empresa K+AIR", vacío, etc.), lo normalizamos al nombre real de la
+         empresa para que la columna Empresa muestre el nombre correcto. */
       i.companyName = resolvedName;
       changed = true;
     }
@@ -508,6 +783,30 @@ function registerInspeccionesHandlers(_appOrIpcMain, _deps) {
       return deleteInspection(id);
     }
     catch (e) { console.error("[K+AIRSST][INSPECTION][DELETE][ERROR]", e); return err("DELETE_FAILED", e.message); }
+  });
+
+  /* Exporta una inspección a .xlsx usando la plantilla oficial de su tipo
+     (instalaciones, botiquin, extintores, equipos_emergencia). Solo aplica
+     a esos 4 tipos. Devuelve el archivo serializado en base64. */
+  ipcMain.handle("inspeccion:exportarXlsx", async function (event, insp) {
+    try {
+      if (!insp || !insp.type) {
+        return err("INVALID_INPUT", "insp.type es obligatorio");
+      }
+      if (!TEMPLATES[insp.type]) {
+        return err("NO_TEMPLATE",
+          "No hay plantilla registrada para type=" + insp.type);
+      }
+      var res = await exportXlsxFromTemplate(insp);
+      if (!res.success) {
+        console.warn("[K+AIRSST][INSPECTION][EXPORT_XLSX_FROM_TEMPLATE]", res.error);
+      }
+      return res;
+    }
+    catch (e) {
+      console.error("[K+AIRSST][INSPECTION][EXPORT_XLSX_FROM_TEMPLATE][ERROR]", e);
+      return err("EXPORT_FAILED", e.message);
+    }
   });
 
   /* Backward-compat: 1 canal para el home de gestion-peligros */

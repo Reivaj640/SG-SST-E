@@ -1464,10 +1464,11 @@ if (appHeader) {
     let currentAppVersion = null;
 
     // Toggle update panel when clicking the update button
-    // 📦503 — El botón del header está SIEMPRE visible:
-    //  - Si está al día: solo muestra la versión, click no hace nada (o abre/cierra panel)
-    //  - Si hay update disponible: muestra panel con "Descargar"
-    //  - Si está descargado: muestra panel con "Actualizar y reiniciar"
+    // 📦504 — El botón del header SOLO aparece cuando detecta update:
+    //  - Si está al día: OCULTO (sin ruido visual en uso normal)
+    //  - Si está buscando: OCULTO (transición interna, no necesita UI)
+    //  - Si hay update disponible: VISIBLE + panel con "Descargar"
+    //  - Si está descargado: VISIBLE + panel con "Actualizar y reiniciar"
     if (headerUpdateBtn) {
       headerUpdateBtn.addEventListener('click', () => {
         headerUpdatePanelVisible = !headerUpdatePanelVisible;
@@ -1532,9 +1533,10 @@ if (appHeader) {
 
     // Helper: Update header status (unifica los 4 estados visuales del botón)
     // Estados: 'uptodate' | 'checking' | 'available' | 'ready'
-    // 📦503 — El botón está SIEMPRE visible (como en 6.1.3). El dot interior
-    // cambia de color según el estado: verde=al día, amarillo pulsante=disponible,
-    // azul parcial=descargando, verde fuerte=descargado.
+    // 📦504 — El botón SOLO es visible cuando hay update ('available' | 'ready').
+    // En 'uptodate' y 'checking' el botón se oculta para no agregar ruido visual
+    // cuando todo está al día. Cuando aparece, el dot interior cambia de color
+    // según el estado: amarillo pulsante=disponible, verde fuerte=descargado.
     function updateHeaderStatus(state, options = {}) {
       if (!headerUpdateBtn || !headerUpdateText) return;
 
@@ -1548,13 +1550,9 @@ if (appHeader) {
 
       switch (state) {
         case 'uptodate':
-          // VISIBLE PERMANENTE: punto verde = "al día"
-          headerUpdateBtn.style.display = 'flex';
+          // OCULTO: está al día, no necesita UI
+          headerUpdateBtn.style.display = 'none';
           headerUpdateBtn.classList.add('header-update-uptodate');
-          headerUpdateText.textContent = options.version ? `v${options.version}` : 'Al día';
-          headerUpdateBtn.title = options.version
-            ? `Versión v${options.version} — al día. Click para ver detalles.`
-            : 'Actualización al día. Click para ver detalles.';
           // Panel se cierra si estaba abierto
           if (headerUpdatePanel) {
             headerUpdatePanel.style.display = 'none';
@@ -1563,11 +1561,9 @@ if (appHeader) {
           break;
 
         case 'checking':
-          // VISIBLE: punto amarillo pulsante = "buscando"
-          headerUpdateBtn.style.display = 'flex';
+          // OCULTO: buscando es transición interna, no necesita UI
+          headerUpdateBtn.style.display = 'none';
           headerUpdateBtn.classList.add('header-update-checking');
-          headerUpdateText.textContent = 'Buscando...';
-          headerUpdateBtn.title = 'Buscando actualizaciones...';
           if (headerUpdatePanel) {
             headerUpdatePanel.style.display = 'none';
             headerUpdatePanelVisible = false;

@@ -210,8 +210,11 @@
       return Promise.resolve({ success: true, data: { id: id } });
     },
 
-    /* Export (renderer-side con KairExport). En Electron sigue funcionando
-       porque el renderer tiene acceso a window.jspdf y window.XLSX vía vendors. */
+    /* Export a PDF (renderer-side con KairExport). El XLSX ya no pasa por
+       acá: la vista llama directo a window.electronAPI.inspeccionExportarXlsx(insp)
+       que dispara el handler `inspeccion:exportarXlsx` en el main process
+       y devuelve un .xlsx basado en la plantilla oficial de utils/ (preserva
+       bordes, fonts, fills, merges y anchos de columna vía ExcelJS). */
     exportInspection: function (id, format) {
       return api.getInspection(id).then(function (res) {
         if (!res.success) return res;
@@ -221,11 +224,8 @@
           var blob = global.KairExport.exportInspectionToPdfBlob(insp);
           return { success: true, data: { blob: blob, filename: global.KairExport.safeFileName(insp) + ".pdf" } };
         }
-        if (format === "xlsx") {
-          var blob2 = global.KairExport.exportInspectionToXlsxBlob(insp);
-          return { success: true, data: { blob: blob2, filename: global.KairExport.safeFileName(insp) + ".xlsx" } };
-        }
-        return { success: false, error: { code: "INVALID_FORMAT", message: "Formato inválido" } };
+        return { success: false, error: { code: "INVALID_FORMAT",
+          message: "Formato '" + format + "' no soportado. Use 'pdf' o 'xlsx' (xlsx va por electronAPI.inspeccionExportarXlsx)" } };
       });
     },
 

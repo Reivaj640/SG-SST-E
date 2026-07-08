@@ -522,6 +522,11 @@ duplicateIndicadoresFile: ({ currentFilePath, newYear }) => ipcRenderer.invoke('
   inspeccionCrear: (payload) => ipcRenderer.invoke('inspeccion:crear', payload),
   inspeccionActualizar: (id, patch) => ipcRenderer.invoke('inspeccion:actualizar', id, patch),
   inspeccionEliminar: (id) => ipcRenderer.invoke('inspeccion:eliminar', id),
+  // 📦504 — Exporta la inspección a .xlsx usando la plantilla oficial de
+  // su tipo (instalaciones, botiquin, extintores, equipos_emergencia) como
+  // base. Preserva bordes, fonts, fills, merges y anchos de columna.
+  // Devuelve el archivo serializado en base64.
+  inspeccionExportarXlsx: (insp) => ipcRenderer.invoke('inspeccion:exportarXlsx', insp),
 
   // Backward-compat: consumido por gestion-peligros-home.js widgets
   inspecciones: {

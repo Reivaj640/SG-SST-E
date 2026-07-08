@@ -66,7 +66,10 @@
     load();
 
     function load() {
-      api.listInspections({ companyId: store.companyId }).then(function (res) {
+      // 📦504 — Pasar también companyName para que la migración retroactiva
+      // del bridge pueda normalizar inspections guardadas con placeholders
+      // heredados ("K+AIR Demo S.A.S.", "Empresa K+AIR", etc.).
+      api.listInspections({ companyId: store.companyId, companyName: store.companyName }).then(function (res) {
         if (!res.success) throw new Error(res.error && res.error.message);
         allList = res.data.inspections;
         if (global.KairStore) global.KairStore.setInspections(allList);
@@ -133,7 +136,7 @@
         if (i.role) whoTd.appendChild(tpl.el("div", { style: "font-size:0.72rem;color:#5a6378;", textContent: i.role }));
         tr.appendChild(whoTd);
         tr.appendChild(tpl.el("td", {}, [tpl.el("span", { className: "kair-text-xs kair-text-muted", textContent: i.site || "—" })]));
-        tr.appendChild(tpl.el("td", {}, [tpl.el("span", { className: "kair-text-xs kair-text-muted", textContent: i.companyName || "—" })]));
+        tr.appendChild(tpl.el("td", {}, [tpl.el("span", { className: "kair-text-xs kair-text-muted", textContent: i.companyName || store.companyName || "—" })]));
         tr.appendChild(tpl.el("td", {}, [tpl.statusPill(i.status)]));
         var tdActions = tpl.el("td");
         var actionsWrap = tpl.el("div", { style: "display:flex;justify-content:flex-end;gap:4px;" });
@@ -153,6 +156,39 @@
 
     function exportOne(id, format) {
       tpl.toast("Exportando", "Generando " + format.toUpperCase() + "...", "info");
+
+      // 📦504 — XLSX va por IPC al main process, que carga la plantilla
+      // oficial de utils/ para el tipo de inspección, completa las celdas
+      // editables y devuelve un .xlsx preservando bordes, fonts, fills,
+      // merges y anchos de columna. Aplica a los 4 tipos con plantilla
+      // (instalaciones, botiquin, extintores, equipos_emergencia).
+      if (format === "xlsx") {
+        var inspRef = null;
+        api.getInspection(id).then(function (getRes) {
+          if (!getRes.success) throw new Error(getRes.error && getRes.error.message);
+          inspRef = getRes.data.inspection;
+          if (!global.electronAPI || typeof global.electronAPI.inspeccionExportarXlsx !== "function") {
+            throw new Error("API de export XLSX no disponible");
+          }
+          return global.electronAPI.inspeccionExportarXlsx(inspRef);
+        }).then(function (res) {
+          if (!res || !res.success || !res.data || !res.data.xlsxBase64) {
+            throw new Error((res && res.error && res.error.message) || "Error al generar XLSX");
+          }
+          // Decodificar base64 → Uint8Array → Blob y descargar
+          var binStr = atob(res.data.xlsxBase64);
+          var bytes = new Uint8Array(binStr.length);
+          for (var i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
+          var blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+          if (global.KairExport) {
+            global.KairExport.downloadBlob(blob, global.KairExport.safeFileName(inspRef) + ".xlsx");
+          }
+          tpl.toast("Éxito", "Archivo generado desde plantilla", "success");
+        }).catch(function (e) { tpl.toast("Error", e.message, "error"); });
+        return;
+      }
+
+      // PDF: engine cliente (sin cambios)
       api.exportInspection(id, format).then(function (res) {
         if (!res.success) throw new Error(res.error && res.error.message);
         if (global.KairExport) global.KairExport.downloadBlob(res.data.blob, res.data.filename);

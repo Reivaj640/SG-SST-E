@@ -307,139 +307,18 @@
     return doc.output("blob");
   }
 
-  /* ---------- XLSX ---------- */
-  function buildOfficialAoa(code, title, revision) {
-    return [
-      ["", "", "PROCESO DE GESTIÓN INTEGRAL", "", "", "", "", "CÓDIGO: " + code],
-      ["", "", "", "", "", "", "", ""],
-      ["", "", title, "", "", "", "", revision],
-      ["", "", "", "", "", "", "", ""]
-    ];
-  }
-
-  function aoaToXlsxBuffer(aoa, sheetName, cols, merges) {
-    var ws = XLSX.utils.aoa_to_sheet(aoa);
-    if (cols) ws["!cols"] = cols;
-    if (merges) ws["!merges"] = merges;
-    var wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, sheetName);
-    return XLSX.write(wb, { type: "array", bookType: "xlsx" });
-  }
-
-  function exportBotiquinXlsx(insp) {
-    var meta = T.INSPECTION_TYPES.botiquin;
-    var aoa = buildOfficialAoa(meta.code, meta.title, meta.revision);
-    aoa.push(["FECHA:", fmtDate(insp.date), "", "", "REALIZADO POR:", insp.performedBy, "", ""]);
-    aoa.push([insp.site ? "SEDE:" : "", insp.site || "", "", "", "EMPRESA:", insp.companyName, "", ""]);
-    aoa.push([]);
-    aoa.push(["ITEM", "ELEMENTOS", "CANTIDAD", "FECHA DE VENCIMIENTO", "ESTADO / OBSERVACIÓN"]);
-    var data = insp.data || {};
-    (data.items || []).forEach(function (it) {
-      aoa.push([it.item || "", it.elemento || "", it.cantidad || "", it.fechaVencimiento || "", it.estado || ""]);
-    });
-    if ((data.checks || []).length > 0) {
-      aoa.push([]);
-      aoa.push(["VERIFICACIÓN", "ESTADO"]);
-      (data.checks || []).forEach(function (c) { aoa.push([c.label || "", c.value || ""]); });
-    }
-    if (data.observaciones || insp.observations) {
-      aoa.push([]);
-      aoa.push(["OBSERVACIONES:", data.observaciones || insp.observations || ""]);
-    }
-    aoa.push([]);
-    aoa.push(["REALIZADO POR:", insp.performedBy, "", "FIRMA:", ""]);
-    aoa.push(["CARGO:", insp.role || "", "", "", ""]);
-    return aoaToXlsxBuffer(aoa, "Botiquín", [{ wch: 10 }, { wch: 32 }, { wch: 12 }, { wch: 22 }, { wch: 36 }], [
-      { s: { r: 0, c: 2 }, e: { r: 0, c: 6 } },
-      { s: { r: 2, c: 2 }, e: { r: 2, c: 6 } }
-    ]);
-  }
-
-  function exportExtintoresXlsx(insp) {
-    var meta = T.INSPECTION_TYPES.extintores;
-    var aoa = buildOfficialAoa(meta.code, meta.title, meta.revision);
-    aoa.push(["Fecha de realización de inspección:", fmtDate(insp.date), "", "", "", "", "", ""]);
-    aoa.push(["Realizada por:", insp.performedBy, "", "Cargo:", insp.role || "", "", "", ""]);
-    aoa.push([insp.site ? "Sede:" : "", insp.site || "", "", "Empresa:", insp.companyName, "", "", ""]);
-    aoa.push([]);
-    aoa.push(["UBICACIÓN", "# DE EXTINTOR", "TIPO", "CAPACIDAD", "FECHA DE RECARGA", "FECHA DE VENCIMIENTO", "PRESIÓN MANÓMETRO", "ESTADO CILINDRO", "PASADOR", "ANILLO VERIFICACIÓN", "BASE SOPORTE", "OBSERVACIONES"]);
-    var data = insp.data || {};
-    (data.rows || []).forEach(function (r) {
-      aoa.push([r.ubicacion || "", r.numero || "", r.tipo || "", r.capacidad || "", r.fechaRecarga || "", r.fechaVencimiento || "", r.presion || "", r.estadoCilindro || "", r.pasador || "", r.anillo || "", r.base || "", r.observaciones || ""]);
-    });
-    if (data.observaciones || insp.observations) {
-      aoa.push([]);
-      aoa.push(["OBSERVACIONES:", data.observaciones || insp.observations || ""]);
-    }
-    aoa.push([]);
-    aoa.push(["REALIZADO POR:", insp.performedBy, "", "FIRMA:", ""]);
-    return aoaToXlsxBuffer(aoa, "Extintores", [{ wch: 18 }, { wch: 14 }, { wch: 10 }, { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 12 }, { wch: 18 }, { wch: 16 }, { wch: 32 }], [
-      { s: { r: 0, c: 2 }, e: { r: 0, c: 6 } },
-      { s: { r: 2, c: 2 }, e: { r: 2, c: 6 } }
-    ]);
-  }
-
-  function exportInstalacionesXlsx(insp) {
-    var meta = T.INSPECTION_TYPES.instalaciones;
-    var aoa = buildOfficialAoa(meta.code, meta.title, meta.revision);
-    aoa.push(["FECHA:", fmtDate(insp.date), "", "LUGAR:", insp.site || "", "", "", ""]);
-    aoa.push(["EMPRESA:", insp.companyName, "", "", "", "", "", ""]);
-    aoa.push([]);
-    aoa.push(["ITEM REVISIÓN", "SI", "NO", "N/A", "OBSERVACIONES", "COMPROMISOS", "RESPONSABLE - FECHAS", "SEGUIMIENTO - ESTADO"]);
-    var data = insp.data || {};
-    var currentCat = "";
-    (data.items || []).forEach(function (it) {
-      if (it.categoria && it.categoria !== currentCat) {
-        currentCat = it.categoria;
-        aoa.push([currentCat, "", "", "", "", "", "", ""]);
-      }
-      aoa.push([it.item || "", it.respuesta === "SI" ? "X" : "", it.respuesta === "NO" ? "X" : "", it.respuesta === "N/A" ? "X" : "", it.observaciones || "", it.compromisos || "", it.responsable || "", it.seguimiento || ""]);
-    });
-    aoa.push([]);
-    aoa.push(["INSPECCIONADO POR:", data.inspeccionadoPor || insp.performedBy, "", "", "", "", "", ""]);
-    aoa.push(["CARGO:", data.cargo || insp.role || "", "", "", "", "", ""]);
-    aoa.push(["FIRMA:", "", "", "", "", "", "", ""]);
-    return aoaToXlsxBuffer(aoa, "Instalaciones", [{ wch: 60 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 30 }, { wch: 30 }, { wch: 25 }, { wch: 25 }], [
-      { s: { r: 0, c: 2 }, e: { r: 0, c: 6 } },
-      { s: { r: 2, c: 2 }, e: { r: 2, c: 6 } }
-    ]);
-  }
-
-  function exportEmergenciaXlsx(insp) {
-    var meta = T.INSPECTION_TYPES.equipos_emergencia;
-    var aoa = buildOfficialAoa(meta.code, meta.title, meta.revision);
-    aoa.push(["FECHA:", fmtDate(insp.date), "", "", "", "", "", ""]);
-    aoa.push(["SITIO DE INSPECCIÓN:", insp.site || "", "", "EMPRESA:", insp.companyName, "", "", ""]);
-    aoa.push([]);
-    aoa.push(["ITEMS PARA REVISAR", "BUENO", "MALO", "N/A", "RECOMENDACIONES / COMPROMISOS", "RESPONSABLES / FECHAS", "SEGUIMIENTO / ESTATUS"]);
-    var data = insp.data || {};
-    (data.items || []).forEach(function (it) {
-      aoa.push([it.item || "", it.estado === "BUENO" ? "X" : "", it.estado === "MALO" ? "X" : "", it.estado === "N/A" ? "X" : "", it.recomendaciones || "", it.responsables || "", it.seguimiento || ""]);
-    });
-    var participantes = data.participantes || [];
-    if (participantes.length > 0) {
-      aoa.push([]);
-      aoa.push(["NOMBRE COMPLETO DE PARTICIPANTES", "", "CARGO"]);
-      participantes.forEach(function (p) { aoa.push([p.nombre || "", "", p.cargo || ""]); });
-    }
-    aoa.push([]);
-    aoa.push(["REALIZADO POR:", insp.performedBy, "", "FIRMA:", ""]);
-    return aoaToXlsxBuffer(aoa, "Equipos Emergencia", [{ wch: 40 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 35 }, { wch: 25 }, { wch: 25 }], [
-      { s: { r: 0, c: 2 }, e: { r: 0, c: 6 } },
-      { s: { r: 2, c: 2 }, e: { r: 2, c: 6 } }
-    ]);
-  }
-
+  /* ---------- XLSX (INSPECCIONES INDIVIDUALES) ----------
+     📦504 — Este bloque de export XLSX de inspecciones individuales ya no
+     se usa. Lo reemplazó el handler `inspeccion:exportarXlsx` en el main
+     process, que parte de las plantillas oficiales de utils/ y preserva
+     bordes, fonts, fills, merges y anchos de columna usando ExcelJS.
+     El motor de export XLSX de PROGRAMA ANUAL (exportProgramToXlsxBlob)
+     sigue siendo necesario y se mantiene más abajo. */
   function exportInspectionToXlsxBlob(insp) {
-    var buf;
-    switch (insp.type) {
-      case "botiquin": buf = exportBotiquinXlsx(insp); break;
-      case "extintores": buf = exportExtintoresXlsx(insp); break;
-      case "instalaciones": buf = exportInstalacionesXlsx(insp); break;
-      case "equipos_emergencia": buf = exportEmergenciaXlsx(insp); break;
-      default: buf = exportBotiquinXlsx(insp);
-    }
-    return new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    throw new Error(
+      "exportInspectionToXlsxBlob está deprecado desde 📦504. " +
+      "Usá window.electronAPI.inspeccionExportarXlsx(insp) en su lugar."
+    );
   }
 
   /* ---------- PROGRAMA XLSX ---------- */
@@ -512,7 +391,6 @@
 
   global.KairExport = {
     exportInspectionToPdfBlob: exportInspectionToPdfBlob,
-    exportInspectionToXlsxBlob: exportInspectionToXlsxBlob,
     exportProgramToXlsxBlob: exportProgramToXlsxBlob,
     downloadBlob: downloadBlob,
     safeFileName: safeFileName
