@@ -12,7 +12,10 @@
  *      → Por cada actividad con monthlySchedule[Mes]="p" genera 1 evento
  *        en uno de los primeros 5 días hábiles del mes (round-robin entre
  *        actividades del mes).
- *   7. Estados de cumplimiento (electronAPI.eventosCumplidos.listar) — 📦498
+ *   7. Mantenimientos programados pendientes (electronAPI.mantenimiento.calendarioGetEvents) — 📦509
+ *      → Por cada item con MPP marcado en un mes genera 1 evento en uno de
+ *        los 10 días hábiles de las semanas 2 y 3 (round-robin). Solo MPP.
+ *   8. Estados de cumplimiento (electronAPI.eventosCumplidos.listar) — 📦498
  *      → Enriquece cada evento con {cumplido:true/false, cumplidoEn:ISO}.
  *      → NO agrega eventos, solo decora los existentes.
  *
@@ -81,6 +84,10 @@
     // KairCalendar tenga los eventos de todos los meses en memoria al navegar.
     var inspRange = _expandRangeToFullYear(range);
     var inspPayload = Object.assign({}, inspRange, { currentCompany: currentCompany });
+    // 📦509 — Mantenimientos programados: misma lógica de rango anual. Solo MPP
+    // (pendientes). Distribución en días hábiles de las semanas 2 y 3 del mes.
+    var mantRange = _expandRangeToFullYear(range);
+    var mantPayload = Object.assign({}, mantRange, { currentCompany: currentCompany });
     var results = await Promise.all([
       _safe(function () { return api.planTrabajo && api.planTrabajo.getEvents(range); }),
       _safe(function () { return api.capacitaciones && api.capacitaciones.getEvents(capPayload); }),
@@ -91,6 +98,12 @@
       _safe(function () {
         return api.inspeccionPrograma && api.inspeccionPrograma.getEventsCalendario
           ? api.inspeccionPrograma.getEventsCalendario(inspPayload)
+          : { success: true, data: [] };
+      }),
+      // 📦509 — Mantenimientos programados pendientes del cronograma anual
+      _safe(function () {
+        return api.mantenimiento && api.mantenimiento.calendarioGetEvents
+          ? api.mantenimiento.calendarioGetEvents(mantPayload)
           : { success: true, data: [] };
       }),
       // 📦498 — Esta fuente NO devuelve eventos: devuelve Map de cumplidos

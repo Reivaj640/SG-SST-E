@@ -8,6 +8,8 @@ var xlsx = require('xlsx');
 var path = require('path');
 var fs = require('fs');
 var crypto = require('crypto');
+var electron_ = require('electron');
+var BrowserWindow = electron_.BrowserWindow;
 
 var DATA_START_ROW = 9;
 var EXCELJS_ROW_OFFSET = 4;
@@ -152,6 +154,37 @@ function _buildMonthMap(rowValues) {
   months[MONTHS[m]] = monthData;
  }
 	return months;
+}
+
+/* Devuelve los días hábiles (lun-vie) de la 2da y 3ra semana natural de un mes.
+   Sirve para distribuir los mantenimientos programados en el calendario en
+   "los primeros 5 días de la 2 o 3 semana". Retorna hasta 10 strings 'YYYY-MM-DD'.
+   monthIdx es 0-based (0=Enero, 11=Diciembre). */
+function _getWeek2And3BusinessDays(year, monthIdx) {
+ var firstOfMonth = new Date(year, monthIdx, 1);
+ var firstWeekday = firstOfMonth.getDay(); // 0=Dom, 1=Lun, ..., 6=Sáb
+
+ // Calcular el primer lunes EN O DESPUÉS del día 1 del mes
+ var daysToFirstMonday = (1 - firstWeekday + 7) % 7;
+ var firstMondayDay = 1 + daysToFirstMonday;
+
+ var dates = [];
+ // Semana 2: lunes firstMondayDay+7 a viernes firstMondayDay+11
+ // Semana 3: lunes firstMondayDay+14 a viernes firstMondayDay+18
+ for (var week = 2; week <= 3; week++) {
+  var mondayOfWeek = firstMondayDay + (week - 1) * 7;
+  for (var d = 0; d < 5; d++) {
+   var dayNum = mondayOfWeek + d;
+   var date = new Date(year, monthIdx, dayNum);
+   // Si se pasa al mes siguiente (caso febrero corto), parar
+   if (date.getMonth() !== monthIdx) continue;
+   var yyyy = date.getFullYear();
+   var mm = String(date.getMonth() + 1).padStart(2, '0');
+   var dd = String(date.getDate()).padStart(2, '0');
+   dates.push(yyyy + '-' + mm + '-' + dd);
+  }
+ }
+ return dates;
 }
 
 function _convertXlsToXlsx(xlsPath) {
@@ -433,6 +466,23 @@ async function _toggleMonth(companyRoot, rowIndex, month, type, value) {
 			try { fs.unlinkSync(backupPath); } catch (e) {}
 		}
 
+		/* 📦509 — Notificar al renderer para que el calendario recargue si está
+		   visible (mismo patrón que en inspecciones). */
+		try {
+		 BrowserWindow.getAllWindows().forEach(function (win) {
+		  if (win && win.webContents && !win.isDestroyed()) {
+		   win.webContents.send("mantenimiento:programa:actualizado", {
+		    rowIndex: rowIndex,
+		    month: month,
+		    type: type,
+		    value: value
+		   });
+		  }
+		 });
+		} catch (e) {
+		 console.warn("[K+AIRSST][MANTENIMIENTO][BROADCAST_FAIL]", e.message);
+		}
+
 		return { success: true, data: { message: 'Celda actualizada', rowIndex: rowIndex, month: month, type: type, value: value } };
 	} catch (e) {
 		if (backupPath && fs.existsSync(backupPath)) {
@@ -484,6 +534,24 @@ async function _updateField(companyRoot, rowIndex, field, value) {
 
 		if (backupPath && fs.existsSync(backupPath)) {
 			try { fs.unlinkSync(backupPath); } catch (e) {}
+		}
+
+		/* 📦509 — Notificar al renderer para que el calendario recargue si está
+		   visible. _updateField usualmente no afecta eventos del calendario
+		   (edita texto de campos, no marca MPP/MPE/MPC), pero lo emitimos igual
+		   por consistencia y para futuras integraciones. */
+		try {
+		 BrowserWindow.getAllWindows().forEach(function (win) {
+		  if (win && win.webContents && !win.isDestroyed()) {
+		   win.webContents.send("mantenimiento:programa:actualizado", {
+		    rowIndex: rowIndex,
+		    field: field,
+		    value: value
+		   });
+		  }
+		 });
+		} catch (e) {
+		 console.warn("[K+AIRSST][MANTENIMIENTO][BROADCAST_FAIL]", e.message);
 		}
 
 		return { success: true, data: { message: 'Campo actualizado', rowIndex: rowIndex, field: field, value: value } };
@@ -763,6 +831,90 @@ function _getMantenimientoStats(companyRoot) {
 	};
 }
 
+/* 📦509 — Devuelve los eventos del calendario para los mantenimientos
+   PROGRAMADOS PENDIENTES (MPP) del cronograma anual de la empresa.
+   Por cada item (equipo) que tenga MPP marcado en un mes, genera 1 evento
+   en uno de los primeros 10 días hábiles de las semanas 2 y 3 del mes
+   (round-robin entre actividades del mes). Solo incluye MPP (pendientes),
+   NO incluye MPE (ya ejecutado) ni MPC (cancelado/no realizado).
+   Params: { start, end, currentCompany } (plano, NO envuelto en range). */
+function _getCalendarEvents(companyRoot, params) {
+ try {
+  var start = params && params.start;
+  var end = params && params.end;
+  var currentCompany = (params && params.currentCompany) || 'default';
+  if (!start || !end) {
+   return { success: false, error: { code: 'INVALID_INPUT', message: 'start y end son obligatorios' } };
+  }
+
+  var startDate = new Date(start + 'T00:00:00');
+  var endDate = new Date(end + 'T23:59:59');
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+   return { success: false, error: { code: 'INVALID_INPUT', message: 'start/end inválidos' } };
+  }
+
+  var readResult = _readExcel(companyRoot);
+  if (!readResult.success || !readResult.data) {
+   return { success: true, data: [] };
+  }
+
+  var items = readResult.data.items || [];
+  var events = [];
+
+  var cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+  var endCursor = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+  while (cursor <= endCursor) {
+   var year = cursor.getFullYear();
+   var monthIdx = cursor.getMonth();
+   var monthName = MONTHS[monthIdx];
+
+   var businessDays = _getWeek2And3BusinessDays(year, monthIdx);
+   /* Round-robin: cada item con MPP en el mes cae en UNO de los 10 días
+      hábiles de las semanas 2 y 3. Esto refleja el plan anual: 1 evento
+      por item por mes, sin apilar 10 copias en el calendario. */
+   var itemCount = 0;
+   items.forEach(function (item) {
+    var monthData = item.months && item.months[monthName];
+    if (!monthData || !monthData.MPP) return;
+    var dayIdx = itemCount % businessDays.length;
+    itemCount++;
+    var dateStr = businessDays[dayIdx];
+    var itemLabel = item.instalacion || item.codigo || ('Fila ' + item.rowIndex);
+    var itemCat = item._category || item.item || 'Mantenimiento';
+    events.push({
+     id: 'mnt-prog-' + currentCompany + '-' + year + '-' + monthIdx + '-' + item.rowIndex,
+     type: 'mantenimiento_programado',
+     title: 'MPP ' + itemCat + ' — ' + itemLabel,
+     date: dateStr,
+     start: '00:00',
+     end: '23:59',
+     color: '#0d9488',
+     source: 'mantenimiento',
+     meta: {
+      categoria: itemCat,
+      instalacion: item.instalacion || '',
+      codigo: item.codigo || '',
+      responsable: item.responsable || '',
+      rowIndex: item.rowIndex,
+      mes: monthName,
+      dia: dayIdx + 1,
+      empresaId: currentCompany,
+      year: year,
+      tipo: 'MPP'
+     }
+    });
+   });
+
+   cursor.setMonth(cursor.getMonth() + 1);
+  }
+
+  return { success: true, data: events };
+ } catch (e) {
+  console.error('[K+AIRSST][MANTENIMIENTO][CAL_EVENTS][ERROR]', e);
+  return { success: false, error: { code: 'GET_EVENTS_FAILED', message: e.message } };
+ }
+}
+
 function registerMantenimientoHandlers(app, deps) {
  _app = app;
  _getCompanyRootPath = deps && deps.getCompanyRootPath ? deps.getCompanyRootPath : null;
@@ -866,6 +1018,19 @@ function registerMantenimientoHandlers(app, deps) {
 			return _getMantenimientoStats(companyRoot);
 		} catch (e) {
 			return { success: false, error: { code: 'STATS_ERROR', message: e.message } };
+		}
+	});
+
+	/* 📦509 — Devuelve los eventos del calendario para los mantenimientos
+	   PROGRAMADOS PENDIENTES (MPP). Consumido por el adapter del calendario. */
+	ipcMain.handle('mantenimiento:calendario:get-events', async function(_e, params) {
+		try {
+			var companyName = params && params.currentCompany;
+			var companyRoot = _getCompanyRootPath ? await _getCompanyRootPath(companyName) : null;
+			if (!companyRoot) return { success: false, error: { code: 'COMPANY_NOT_FOUND', message: 'Empresa no encontrada' } };
+			return _getCalendarEvents(companyRoot, params);
+		} catch (e) {
+			return { success: false, error: { code: 'GET_EVENTS_FAILED', message: e.message } };
 		}
 	});
 }

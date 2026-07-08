@@ -29,6 +29,8 @@
     vencido:              'Vencido',
     gestacion:            'Seguimiento Gestación',
     inspeccion_programada: 'Inspección Programada',
+    // 📦509 — Mantenimientos programados pendientes (MPP) del cronograma anual.
+    mantenimiento_programado: 'Mantenimiento Programado',
     primary:              'Evento',
     success:              'Evento',
     warning:              'Evento',
@@ -43,7 +45,10 @@
     rapido:               '#6c757d',
     vencido:              '#dc3545',
     gestacion:            '#ec4899',
-    inspeccion_programada: '#174ea6'
+    inspeccion_programada: '#174ea6',
+    // 📦509 — Color teal (#0d9488) distintivo de mantenimiento, no choca con
+    // los azules de Inspecciones/Plan ni con los verdes de Capacitación.
+    mantenimiento_programado: '#0d9488'
   };
 
   // Mapeo de tipo de evento → función de navegación al módulo origen.
@@ -59,7 +64,10 @@
     // 📦506 — Inspecciones planificadas: navega al módulo de Gestión de
     // Peligros y Riesgos → Inspecciones (4.2.4). El usuario aterriza en el
     // hub donde puede ver las inspecciones disponibles del mes.
-    inspeccion_programada: function () { _navigate('4.2.4 Inspecciones Sistemáticas'); }
+    inspeccion_programada: function () { _navigate('4.2.4 Inspecciones Sistemáticas'); },
+    // 📦509 — Mantenimientos programados: navega al submódulo 4.2.5 que es
+    // donde el usuario edita el cronograma MPP/MPE/MPC.
+    mantenimiento_programado: function () { _navigate('4.2.5 Mantenimiento periodico de equipos, instalaciones herramientas'); }
   };
 
   // 📦500 — Mapeo de tipo → label del módulo de origen (para mostrar como
@@ -71,7 +79,9 @@
     gestacion:            'Seguimiento de Gestación',
     rapido:               'Evento rápido',
     vencido:              'Vencido',
-    inspeccion_programada: 'Inspecciones'
+    inspeccion_programada: 'Inspecciones',
+    // 📦509 — Mantenimientos programados: apunta al módulo 4.2.5.
+    mantenimiento_programado: 'Mantenimiento'
   };
 
   // ── Estado ───────────────────────────────────────────────────────────
@@ -270,14 +280,38 @@
             '<label class="kair-cal-field__label">Descripción</label>' +
             '<div class="kair-cal-field__value kair-cal-field__value--multiline">' + descStr + '</div>' +
           '</div>' +
-          // 📦506 — Meta extra para inspecciones planificadas: muestra
-          // el responsable y el tipo de inspección (datos que vienen en
-          // event.meta desde el adapter del programa anual).
+// 📦506 — Meta extra para inspecciones planificadas: muestra
+            // el responsable y el tipo de inspección (datos que vienen en
+            // event.meta desde el adapter del programa anual).
           (type === 'inspeccion_programada' && event.meta ? (
             '<div class="kair-cal-field__row">' +
               '<div class="kair-cal-field">' +
                 '<label class="kair-cal-field__label">Tipo</label>' +
                 '<div class="kair-cal-field__value">' + _esc(event.meta.tipoLabel || event.meta.tipoInspeccion || '—') + '</div>' +
+              '</div>' +
+              '<div class="kair-cal-field">' +
+                '<label class="kair-cal-field__label">Responsable</label>' +
+                '<div class="kair-cal-field__value">' + _esc(event.meta.responsable || '—') + '</div>' +
+              '</div>' +
+            '</div>'
+          ) : '') +
+          // 📦509 — Meta extra para mantenimientos programados: muestra
+          // categoría, instalación, código y responsable del equipo.
+          (type === 'mantenimiento_programado' && event.meta ? (
+            '<div class="kair-cal-field__row">' +
+              '<div class="kair-cal-field">' +
+                '<label class="kair-cal-field__label">Categoría</label>' +
+                '<div class="kair-cal-field__value">' + _esc(event.meta.categoria || '—') + '</div>' +
+              '</div>' +
+              '<div class="kair-cal-field">' +
+                '<label class="kair-cal-field__label">Instalación</label>' +
+                '<div class="kair-cal-field__value">' + _esc(event.meta.instalacion || '—') + '</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="kair-cal-field__row">' +
+              '<div class="kair-cal-field">' +
+                '<label class="kair-cal-field__label">Código</label>' +
+                '<div class="kair-cal-field__value">' + _esc(event.meta.codigo || '—') + '</div>' +
               '</div>' +
               '<div class="kair-cal-field">' +
                 '<label class="kair-cal-field__label">Responsable</label>' +

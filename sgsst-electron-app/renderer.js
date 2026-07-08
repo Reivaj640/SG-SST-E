@@ -470,6 +470,18 @@ if (window.electronAPI && window.electronAPI.inspeccionPrograma && typeof window
   });
 }
 
+// 📦509 — Mismo patrón para mantenimiento: cuando el usuario cambia una celda
+// MPP/MPE/MPC en el cronograma, el bridge emite 'mantenimiento:programa:actualizado'.
+// El calendario recarga si está visible. Log: [MANT-CAL][PROGRAMA_ACTUALIZADO].
+if (window.electronAPI && window.electronAPI.mantenimiento && typeof window.electronAPI.mantenimiento.onProgramaActualizado === 'function') {
+  window.electronAPI.mantenimiento.onProgramaActualizado(function (payload) {
+    if (currentCalendarInstance && typeof currentCalendarInstance.refresh === 'function') {
+      console.log('[MANT-CAL][PROGRAMA_ACTUALIZADO] Recargando calendario...', payload);
+      currentCalendarInstance.refresh();
+    }
+  });
+}
+
 // Variable para almacenar los submódulos filtrados por normativa
 let RESOURCES_SUBMODULES = ALL_SUBMODULES;
 
@@ -1798,7 +1810,11 @@ if (appHeader) {
             // que el header de Inspecciones (#174ea6) para coherencia visual.
             // Aparece en la leyenda TIPOS DE EVENTO y permite al KairCalendar
             // resolver el color del chip via _typeColorCache.
-            { id: 'inspeccion_programada', label: 'Inspección Programada',   color: '#174ea6' }
+            { id: 'inspeccion_programada', label: 'Inspección Programada',   color: '#174ea6' },
+            // 📦509 — Mantenimientos programados pendientes (MPP) del cronograma
+            // anual. Color teal (#0d9488) distintivo de mantenimiento, no choca
+            // con los azules de Inspecciones/Plan ni con los verdes de Capacitación.
+            { id: 'mantenimiento_programado', label: 'Mantenimiento Programado', color: '#0d9488' }
           ],
           adapter: window.KairCalendarAdapter || null,
           onEventClick: function (ev) {

@@ -561,6 +561,19 @@ duplicateIndicadoresFile: ({ currentFilePath, newYear }) => ipcRenderer.invoke('
     deleteEvidence: (companyName, relativePath) => ipcRenderer.invoke('mantenimiento:delete-evidence', companyName, relativePath),
     listEvidences: (companyName, rowIndex, category, year) => ipcRenderer.invoke('mantenimiento:list-evidences', companyName, rowIndex, category, year),
     getStats: (companyName) => ipcRenderer.invoke('mantenimiento:get-stats', companyName),
+    // 📦509 — Devuelve los eventos del calendario para los mantenimientos
+    // PROGRAMADOS PENDIENTES (MPP). Por cada item con MPP en un mes, genera
+    // 1 evento en uno de los 10 días hábiles de las semanas 2 y 3 del mes
+    // (round-robin entre actividades). Solo MPP, NO MPE/MPC.
+    calendarioGetEvents: (params) => ipcRenderer.invoke('mantenimiento:calendario:get-events', params),
+    // 📦509 — Notifica al renderer cuando se actualiza el cronograma para que
+    // el calendario recargue eventos si está visible (mismo patrón que
+    // inspecciones en 📦507).
+    onProgramaActualizado: (callback) => {
+      const listener = (_event, payload) => callback(payload);
+      ipcRenderer.on('mantenimiento:programa:actualizado', listener);
+      return () => ipcRenderer.off('mantenimiento:programa:actualizado', listener);
+    }
   },
 
   // --- Identificación de Peligros (4.1.2) ---
