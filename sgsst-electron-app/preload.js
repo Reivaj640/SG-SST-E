@@ -522,6 +522,13 @@ duplicateIndicadoresFile: ({ currentFilePath, newYear }) => ipcRenderer.invoke('
   inspeccionCrear: (payload) => ipcRenderer.invoke('inspeccion:crear', payload),
   inspeccionActualizar: (id, patch) => ipcRenderer.invoke('inspeccion:actualizar', id, patch),
   inspeccionEliminar: (id) => ipcRenderer.invoke('inspeccion:eliminar', id),
+  // 📦506 — Devuelve los eventos del calendario para las inspecciones
+  // planificadas del programa anual. Params: { range:{start,end}, currentCompany }.
+  // Cada actividad con monthlySchedule[Mes]="p" genera 5 eventos puntuales
+  // (uno por cada uno de los primeros 5 días hábiles del mes).
+  inspeccionPrograma: {
+    getEventsCalendario: (params) => ipcRenderer.invoke('inspeccion:programa:getEventsCalendario', params)
+  },
   // 📦504 — Exporta la inspección a .xlsx usando la plantilla oficial de
   // su tipo (instalaciones, botiquin, extintores, equipos_emergencia) como
   // base. Preserva bordes, fonts, fills, merges y anchos de columna.

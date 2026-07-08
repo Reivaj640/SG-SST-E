@@ -1773,14 +1773,19 @@ if (appHeader) {
           locale: 'es',
           showSidebar: true,
           eventTypes: [
-            { id: 'plan',         label: 'Plan de Trabajo', color: '#174ea6' },
-            { id: 'capacitacion', label: 'Capacitación',    color: '#28a745' },
-            { id: 'auditoria',    label: 'Auditoría',       color: '#ffc107' },
-            { id: 'rapido',       label: 'Evento rápido',   color: '#6c757d' },
-            { id: 'vencido',      label: 'Vencido',         color: '#dc3545' },
+            { id: 'plan',                 label: 'Plan de Trabajo',          color: '#174ea6' },
+            { id: 'capacitacion',         label: 'Capacitación',             color: '#28a745' },
+            { id: 'auditoria',            label: 'Auditoría',                color: '#ffc107' },
+            { id: 'rapido',               label: 'Evento rápido',            color: '#6c757d' },
+            { id: 'vencido',              label: 'Vencido',                  color: '#dc3545' },
             // 📦497 — Seguimientos de Gestación (Salud Materna). Color rosa
             // distintivo del módulo de gestación.
-            { id: 'gestacion',    label: 'Seguimiento Gestación', color: '#ec4899' }
+            { id: 'gestacion',            label: 'Seguimiento Gestación',    color: '#ec4899' },
+            // 📦506 — Inspecciones planificadas del programa anual. Mismo azul
+            // que el header de Inspecciones (#174ea6) para coherencia visual.
+            // Aparece en la leyenda TIPOS DE EVENTO y permite al KairCalendar
+            // resolver el color del chip via _typeColorCache.
+            { id: 'inspeccion_programada', label: 'Inspección Programada',   color: '#174ea6' }
           ],
           adapter: window.KairCalendarAdapter || null,
           onEventClick: function (ev) {

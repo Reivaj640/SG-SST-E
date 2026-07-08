@@ -22,49 +22,56 @@
 
   // ── Configuración interna ────────────────────────────────────────────
   var TYPE_LABELS = {
-    plan:         'Plan de Trabajo',
-    capacitacion: 'Capacitación',
-    auditoria:    'Auditoría',
-    rapido:       'Evento rápido',
-    vencido:      'Vencido',
-    gestacion:    'Seguimiento Gestación',
-    primary:      'Evento',
-    success:      'Evento',
-    warning:      'Evento',
-    danger:       'Evento',
-    info:         'Evento'
+    plan:                 'Plan de Trabajo',
+    capacitacion:         'Capacitación',
+    auditoria:            'Auditoría',
+    rapido:               'Evento rápido',
+    vencido:              'Vencido',
+    gestacion:            'Seguimiento Gestación',
+    inspeccion_programada: 'Inspección Programada',
+    primary:              'Evento',
+    success:              'Evento',
+    warning:              'Evento',
+    danger:               'Evento',
+    info:                 'Evento'
   };
 
   var TYPE_COLORS = {
-    plan:         '#174ea6',
-    capacitacion: '#28a745',
-    auditoria:    '#ffc107',
-    rapido:       '#6c757d',
-    vencido:      '#dc3545',
-    gestacion:    '#ec4899'
+    plan:                 '#174ea6',
+    capacitacion:         '#28a745',
+    auditoria:            '#ffc107',
+    rapido:               '#6c757d',
+    vencido:              '#dc3545',
+    gestacion:            '#ec4899',
+    inspeccion_programada: '#174ea6'
   };
 
   // Mapeo de tipo de evento → función de navegación al módulo origen.
   // Si no hay mapeo, no se muestra el botón "Ir al módulo".
   var NAV_MAP = {
-    plan:         function () { _navigate('plan-trabajo'); },
-    capacitacion: function () { _navigate('capacitaciones'); },
-    auditoria:    function () { _navigate('auditoria-anual'); },
+    plan:                 function () { _navigate('plan-trabajo'); },
+    capacitacion:         function () { _navigate('capacitaciones'); },
+    auditoria:            function () { _navigate('auditoria-anual'); },
     // 📦497 — Gestación: navega al submódulo de ausentismo donde está
     // Seguimiento de Gestación. 1 click adicional del usuario para llegar
     // a la vista específica (consistente con el patrón de capacitación).
-    gestacion:    function () { _navigate('3.3.6 Medición del ausentismo por causa médica'); }
+    gestacion:            function () { _navigate('3.3.6 Medición del ausentismo por causa médica'); },
+    // 📦506 — Inspecciones planificadas: navega al módulo de Gestión de
+    // Peligros y Riesgos → Inspecciones (4.2.4). El usuario aterriza en el
+    // hub donde puede ver las inspecciones disponibles del mes.
+    inspeccion_programada: function () { _navigate('4.2.4 Inspecciones Sistemáticas'); }
   };
 
   // 📦500 — Mapeo de tipo → label del módulo de origen (para mostrar como
   // chip en el hero del detail panel). Coincide con NAV_MAP arriba.
   var TYPE_SOURCE = {
-    plan:         'Plan de Trabajo',
-    capacitacion: 'Capacitación',
-    auditoria:    'Auditoría',
-    gestacion:    'Seguimiento de Gestación',
-    rapido:       'Evento rápido',
-    vencido:      'Vencido'
+    plan:                 'Plan de Trabajo',
+    capacitacion:         'Capacitación',
+    auditoria:            'Auditoría',
+    gestacion:            'Seguimiento de Gestación',
+    rapido:               'Evento rápido',
+    vencido:              'Vencido',
+    inspeccion_programada: 'Inspecciones'
   };
 
   // ── Estado ───────────────────────────────────────────────────────────
@@ -263,6 +270,21 @@
             '<label class="kair-cal-field__label">Descripción</label>' +
             '<div class="kair-cal-field__value kair-cal-field__value--multiline">' + descStr + '</div>' +
           '</div>' +
+          // 📦506 — Meta extra para inspecciones planificadas: muestra
+          // el responsable y el tipo de inspección (datos que vienen en
+          // event.meta desde el adapter del programa anual).
+          (type === 'inspeccion_programada' && event.meta ? (
+            '<div class="kair-cal-field__row">' +
+              '<div class="kair-cal-field">' +
+                '<label class="kair-cal-field__label">Tipo</label>' +
+                '<div class="kair-cal-field__value">' + _esc(event.meta.tipoLabel || event.meta.tipoInspeccion || '—') + '</div>' +
+              '</div>' +
+              '<div class="kair-cal-field">' +
+                '<label class="kair-cal-field__label">Responsable</label>' +
+                '<div class="kair-cal-field__value">' + _esc(event.meta.responsable || '—') + '</div>' +
+              '</div>' +
+            '</div>'
+          ) : '') +
         '</div>' +
         // Footer idéntico al modal — acciones right-aligned
         '<div class="kair-cal-modal__foot">' +

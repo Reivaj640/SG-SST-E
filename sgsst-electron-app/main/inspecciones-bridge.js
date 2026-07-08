@@ -238,6 +238,40 @@ var INSPECTION_META = {
   equipos_emergencia: { code: "GI-FO-023", title: "Inspección de Equipos de Emergencia" }
 };
 
+/* Labels humanos para los tipos de inspección que aparecen en el programa
+   anual (incluye gerencial y epp que NO son tipos del bridge de inspecciones
+   individuales — son actividades que se planifican en el programa pero no
+   generan un registro de inspección). Usado por el endpoint que alimenta
+   el calendario. */
+var INSPECTION_TYPE_LABELS = {
+  gerencial:          "Inspección Gerencial",
+  epp:                "Inspección de EPP",
+  equipos_emergencia: "Equipos de Emergencia",
+  extintores:         "Extintores",
+  botiquin:           "Botiquín",
+  instalaciones:      "Instalaciones"
+};
+
+/* Devuelve los primeros 5 días hábiles (lun-vie) de un mes.
+   monthIdx es 0-based (0=Enero, 11=Diciembre). Retorna array de strings
+   'YYYY-MM-DD' en zona horaria local (NO UTC). */
+function getFirst5BusinessDays(year, monthIdx) {
+  var dates = [];
+  var day = 1;
+  while (dates.length < 5) {
+    var date = new Date(year, monthIdx, day);
+    var dow = date.getDay(); // 0=Dom, 6=Sáb
+    if (dow !== 0 && dow !== 6) {
+      var yyyy = date.getFullYear();
+      var mm = String(date.getMonth() + 1).padStart(2, "0");
+      var dd = String(date.getDate()).padStart(2, "0");
+      dates.push(yyyy + "-" + mm + "-" + dd);
+    }
+    day++;
+  }
+  return dates;
+}
+
 /* ---------- Registry de plantillas para export XLSX ----------
    Cada entrada define cómo llenar la plantilla oficial de un tipo de
    inspección. La función genérica `exportXlsxFromTemplate` carga la
@@ -734,6 +768,91 @@ function registerInspeccionesHandlers(_appOrIpcMain, _deps) {
   ipcMain.handle("programa:obtener", async function (event, year, companyId) {
     try { return getProgram(year, companyId || "default"); }
     catch (e) { console.error("[K+AIRSST][PROGRAM][GET][ERROR]", e); return err("GET_FAILED", e.message); }
+  });
+
+  /* Devuelve los eventos del calendario para las inspecciones PLANIFICADAS
+     (monthlySchedule[Mes] === "p") del programa anual de la empresa.
+     Cada actividad planificada genera 5 eventos puntuales, uno por cada
+     uno de los primeros 5 días hábiles (lun-vie) del mes. Filtra por rango
+     y por empresa. El adapter del calendario lo consume.
+     Params: { start, end, currentCompany } (plano, NO envuelto en range). */
+  ipcMain.handle("inspeccion:programa:getEventsCalendario", async function (event, params) {
+    try {
+      var start = params && params.start;
+      var end = params && params.end;
+      var currentCompany = (params && params.currentCompany) || "default";
+      if (!start || !end) {
+        return err("INVALID_INPUT", "start y end son obligatorios");
+      }
+
+      var startDate = new Date(start + "T00:00:00");
+      var endDate = new Date(end + "T23:59:59");
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        return err("INVALID_INPUT", "start/end inválidos");
+      }
+
+      var events = [];
+      var cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+      var endCursor = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+      while (cursor <= endCursor) {
+        var year = cursor.getFullYear();
+        var monthIdx = cursor.getMonth();
+        var monthName = MONTHS[monthIdx];
+
+        var programRes = getProgram(year, currentCompany);
+        if (programRes && programRes.success && programRes.data && programRes.data.program) {
+          var program = programRes.data.program;
+          var businessDays = getFirst5BusinessDays(year, monthIdx);
+          /* Round-robin: cada actividad del mes cae en UNO de los primeros 5
+             días hábiles (no 5 eventos por actividad). Esto refleja la lógica
+             del programa anual: 1 inspección por actividad por mes, sin
+             apilar 5 copias de la misma actividad en el calendario.
+             Incluimos tanto "p" (programada pendiente) como "c" (completada)
+             para que el calendario refleje la programación completa del mes
+             — ej. en enero las 4 actividades tienen marca (3P + 1C). */
+          var activityCount = 0;
+          (program.activities || []).forEach(function (act) {
+            var schedule = act.monthlySchedule || {};
+            var mesEstado = schedule[monthName];
+            if (mesEstado !== "p" && mesEstado !== "c") return;
+            var dayIdx = activityCount % 5;
+            activityCount++;
+            var dateStr = businessDays[dayIdx];
+            var tipoLabel = INSPECTION_TYPE_LABELS[act.inspectionType] || act.inspectionType || "Inspección";
+            events.push({
+              id: "insp-prog-" + currentCompany + "-" + year + "-" + monthIdx + "-" + act.id,
+              type: "inspeccion_programada",
+              title: act.activity || tipoLabel,
+              date: dateStr,
+              start: "00:00",
+              end: "23:59",
+              color: "#174ea6",
+              source: "inspecciones",
+              meta: {
+                actividad: act.activity || tipoLabel,
+                tipoInspeccion: act.inspectionType,
+                tipoLabel: tipoLabel,
+                responsable: act.responsible || "",
+                actividadId: act.id,
+                mes: monthName,
+                dia: dayIdx + 1,
+                empresaId: currentCompany,
+                year: year,
+                estado: mesEstado  /* "p" = pendiente, "c" = completada */
+              }
+            });
+          });
+        }
+
+        cursor.setMonth(cursor.getMonth() + 1);
+      }
+
+      return ok(events);
+    }
+    catch (e) {
+      console.error("[K+AIRSST][INSPECTION][CAL_EVENTS][ERROR]", e);
+      return err("GET_EVENTS_FAILED", e.message);
+    }
   });
 
   ipcMain.handle("programa:actualizarActividad", async function (event, activityId, patch) {

@@ -2,13 +2,17 @@
  * shared/kair-calendar-adapter.js
  *
  * Adapter SG-SST para el K+AIR Calendar Component.
- * Une las 6 fuentes de eventos que muestra el calendario:
+ * Une las 7 fuentes de eventos que muestra el calendario:
  *   1. Plan de Trabajo Anual (electronAPI.planTrabajo.getEvents)
  *   2. Capacitaciones (electronAPI.capacitaciones.getEvents)
  *   3. Auditoría Anual — fases (electronAPI.auditoria.getFases)
  *   4. Eventos rápidos del usuario (electronAPI.eventosRapidos)
  *   5. Seguimientos de Gestación (electronAPI.gestaciones.getEvents) — 📦497
- *   6. Estados de cumplimiento (electronAPI.eventosCumplidos.listar) — 📦498
+ *   6. Inspecciones planificadas del programa anual (electronAPI.inspeccionPrograma.getEventsCalendario) — 📦506
+ *      → Por cada actividad con monthlySchedule[Mes]="p" genera 1 evento
+ *        en uno de los primeros 5 días hábiles del mes (round-robin entre
+ *        actividades del mes).
+ *   7. Estados de cumplimiento (electronAPI.eventosCumplidos.listar) — 📦498
  *      → Enriquece cada evento con {cumplido:true/false, cumplidoEn:ISO}.
  *      → NO agrega eventos, solo decora los existentes.
  *
@@ -22,7 +26,7 @@
  *   - Si una fuente falla (ej: Excel del plan no se puede leer), se loggea y se devuelve
  *     array vacío para esa fuente. Las demás siguen funcionando (degradación elegante).
  *   - Solo eventos con type='rapido' se pueden crear/editar/eliminar desde el calendario.
- *     Los eventos de plan/cap/aud/gest se editan en su módulo origen.
+ *     Los eventos de plan/cap/aud/gest/insp se editan en su módulo origen.
  */
 
 (function (global) {
@@ -41,6 +45,21 @@
     });
   }
 
+  /* Amplía el rango visible al año completo (enero-dic de cada año en el rango).
+     Necesario para la fuente de inspecciones porque el KairCalendar no recarga
+     eventos al navegar de mes (bug pre-existente). Si solo pasáramos el mes
+     visible, el usuario no vería las inspecciones planificadas al navegar a
+     otro mes. Pre-cargamos los 12 meses del año para que estén en memoria. */
+  function _expandRangeToFullYear(range) {
+    if (!range || !range.start || !range.end) return range;
+    var startD = new Date(range.start + 'T00:00:00');
+    var endD = new Date(range.end + 'T00:00:00');
+    if (isNaN(startD.getTime()) || isNaN(endD.getTime())) return range;
+    var yStart = startD.getFullYear();
+    var yEnd = endD.getFullYear();
+    return { start: yStart + '-01-01', end: yEnd + '-12-31' };
+  }
+
   // ── list ──────────────────────────────────────────────────────────────
   // range = { start: 'YYYY-MM-DD', end: 'YYYY-MM-DD' }
   async function list(range) {
@@ -56,12 +75,24 @@
     var gestPayload = Object.assign({}, range || {}, { currentCompany: currentCompany });
     // 📦498 — Cumplimientos: por empresa, sin rango (es estado persistente)
     var cumPayload = { empresaId: currentCompany };
+    // 📦506 — Inspecciones planificadas: por empresa + rango ampliado al año completo.
+    // El handler genera 1 evento por actividad por mes (round-robin entre los
+    // primeros 5 días hábiles). Ampliamos el rango a año completo para que el
+    // KairCalendar tenga los eventos de todos los meses en memoria al navegar.
+    var inspRange = _expandRangeToFullYear(range);
+    var inspPayload = Object.assign({}, inspRange, { currentCompany: currentCompany });
     var results = await Promise.all([
       _safe(function () { return api.planTrabajo && api.planTrabajo.getEvents(range); }),
       _safe(function () { return api.capacitaciones && api.capacitaciones.getEvents(capPayload); }),
       _safe(function () { return api.auditoria && api.auditoria.getFases(range); }),
       _safe(function () { return api.eventosRapidos && api.eventosRapidos.list(range); }),
       _safe(function () { return api.gestaciones && api.gestaciones.getEvents(gestPayload); }),
+      // 📦506 — Inspecciones planificadas del programa anual
+      _safe(function () {
+        return api.inspeccionPrograma && api.inspeccionPrograma.getEventsCalendario
+          ? api.inspeccionPrograma.getEventsCalendario(inspPayload)
+          : { success: true, data: [] };
+      }),
       // 📦498 — Esta fuente NO devuelve eventos: devuelve Map de cumplidos
       _safe(function () { return api.eventosCumplidos && api.eventosCumplidos.listar(cumPayload); })
     ]);
@@ -145,6 +176,6 @@
     create: create,
     update: update,
     remove: remove,
-    version: '1.1.0'
+    version: '1.2.0'
   };
 })(typeof window !== 'undefined' ? window : this);
