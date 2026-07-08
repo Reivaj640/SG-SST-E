@@ -523,11 +523,20 @@ duplicateIndicadoresFile: ({ currentFilePath, newYear }) => ipcRenderer.invoke('
   inspeccionActualizar: (id, patch) => ipcRenderer.invoke('inspeccion:actualizar', id, patch),
   inspeccionEliminar: (id) => ipcRenderer.invoke('inspeccion:eliminar', id),
   // 📦506 — Devuelve los eventos del calendario para las inspecciones
-  // planificadas del programa anual. Params: { range:{start,end}, currentCompany }.
-  // Cada actividad con monthlySchedule[Mes]="p" genera 5 eventos puntuales
-  // (uno por cada uno de los primeros 5 días hábiles del mes).
+  // planificadas del programa anual. Params: { start, end, currentCompany }.
+  // Cada actividad con monthlySchedule[Mes]="p" o "c" genera 1 evento
+  // en uno de los primeros 5 días hábiles del mes (round-robin entre
+  // actividades del mes).
+  // 📦507 — Notifica al renderer cuando se actualiza el programa para que
+  // el calendario recargue eventos si está visible.
   inspeccionPrograma: {
-    getEventsCalendario: (params) => ipcRenderer.invoke('inspeccion:programa:getEventsCalendario', params)
+    getEventsCalendario: (params) => ipcRenderer.invoke('inspeccion:programa:getEventsCalendario', params),
+    onProgramaActualizado: (callback) => {
+      const listener = (_event, payload) => callback(payload);
+      ipcRenderer.on('inspeccion:programa:actualizado', listener);
+      // Devuelve función de cleanup para des-suscribirse si hace falta
+      return () => ipcRenderer.off('inspeccion:programa:actualizado', listener);
+    }
   },
   // 📦504 — Exporta la inspección a .xlsx usando la plantilla oficial de
   // su tipo (instalaciones, botiquin, extintores, equipos_emergencia) como

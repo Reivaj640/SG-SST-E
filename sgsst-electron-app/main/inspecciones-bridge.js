@@ -25,7 +25,7 @@
  * Persistencia: <userData>/kair-inspecciones-data.json
  * Plantillas:    <appPath>/utils/GI-FO-*.xlsx
  * ============================================================ */
-const { app, ipcMain } = require("electron");
+const { app, ipcMain, BrowserWindow } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const ExcelJS = require("exceljs");
@@ -208,10 +208,14 @@ function deriveStatus(schedule, pct) {
 function updateActivity(activityId, patch) {
   var data = load();
   var updated = null;
+  var targetCompanyId = null;
+  var targetYear = null;
   Object.keys(data.programs).forEach(function (key) {
     var program = data.programs[key];
     var idx = program.activities.findIndex(function (a) { return a.id === activityId; });
     if (idx >= 0) {
+      targetCompanyId = program.companyId;
+      targetYear = program.year;
       var schedule = patch.monthlySchedule || program.activities[idx].monthlySchedule;
       var pct = computePct(schedule);
       var status = patch.status || deriveStatus(schedule, pct);
@@ -227,6 +231,22 @@ function updateActivity(activityId, patch) {
   });
   if (!updated) return err("NOT_FOUND", "Actividad no encontrada");
   save();
+  /* 📦507 — Notificar al renderer para que el calendario recargue si está
+     visible. Antes el calendario quedaba con eventos stale hasta que se
+     cerraba y volvía a abrir. */
+  try {
+    BrowserWindow.getAllWindows().forEach(function (win) {
+      if (win && win.webContents && !win.isDestroyed()) {
+        win.webContents.send("inspeccion:programa:actualizado", {
+          activityId: activityId,
+          companyId: targetCompanyId,
+          year: targetYear
+        });
+      }
+    });
+  } catch (e) {
+    console.warn("[K+AIRSST][PROGRAM][BROADCAST_FAIL]", e.message);
+  }
   return ok({ activity: updated });
 }
 

@@ -457,6 +457,19 @@ let logTextareaCached = null; // Cache del textarea para evitar querySelector en
 let currentCalendarInstance = null; // Para mantener una referencia a la instancia del calendario
 let currentActiveComponent = null; // Para mantener una referencia al componente activo y poder destruirlo adecuadamente
 
+// 📦507 — Cuando el usuario actualiza el programa anual de inspecciones
+// (cambia una P/C, agrega actividad, etc.) el bridge emite
+// 'inspeccion:programa:actualizado'. Si el calendario está visible lo
+// recargamos para que muestre los cambios sin tener que cerrarlo y abrirlo.
+if (window.electronAPI && window.electronAPI.inspeccionPrograma && typeof window.electronAPI.inspeccionPrograma.onProgramaActualizado === 'function') {
+  window.electronAPI.inspeccionPrograma.onProgramaActualizado(function (payload) {
+    if (currentCalendarInstance && typeof currentCalendarInstance.refresh === 'function') {
+      console.log('[INSP-CAL][PROGRAMA_ACTUALIZADO] Recargando calendario...', payload);
+      currentCalendarInstance.refresh();
+    }
+  });
+}
+
 // Variable para almacenar los submódulos filtrados por normativa
 let RESOURCES_SUBMODULES = ALL_SUBMODULES;
 
