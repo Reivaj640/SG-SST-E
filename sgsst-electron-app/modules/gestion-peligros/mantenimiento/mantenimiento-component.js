@@ -17,7 +17,10 @@ Patrón 4 Constructor: (container, currentCompany, moduleName, submoduleTitle, b
   this.moduleName = moduleName;
   this.submoduleTitle = submoduleTitle;
   this.backToModuleCallback = backToModuleCallback;
-  this.currentView = 'cronograma';
+  /* currentView=null para que el primer _navigate('cronograma') desde render()
+     NO retorne por el early return y pueda cargar la vista inicial.
+     Antes era 'cronograma' pero bloqueaba la primera carga (bug tras Fase 2). */
+  this.currentView = null;
   this.cssLoaded = false;
  }
 
@@ -166,6 +169,7 @@ Patrón 4 Constructor: (container, currentCompany, moduleName, submoduleTitle, b
  };
 
  MantenimientoComponent.prototype._navigate = function (viewKey) {
+  if (this.currentView === viewKey) return;
   this.currentView = viewKey;
 
   var wrapper = this.container.querySelector('.kair-mnt-wrapper');

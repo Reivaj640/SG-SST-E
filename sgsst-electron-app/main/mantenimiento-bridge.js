@@ -197,6 +197,39 @@ function _readExcel(companyRoot) {
 	}
 
  try {
+   return _parseExcel(filePath);
+ } catch (e) {
+   return { success: false, error: { code: 'READ_ERROR', message: e.message } };
+ }
+}
+
+function _getExcelFilePath(companyRoot) {
+	var dir = _getCompanyMantenimientoDir(companyRoot);
+	var filePath;
+
+	if (dir && fs.existsSync(dir)) {
+		filePath = _findExcelFile(dir, 'GS-FO-008') || _findExcelFile(dir, 'MANTENIMIENTO') || _findExcelFile(dir, 'CRONOGRAMA');
+	}
+
+	if (!filePath) {
+		filePath = _copyTemplateToDir(dir || path.join(companyRoot, '4. Gestion de Peligros y Riesgos', '4.2.5 Mantenimiento periodico de equipos, instalaciones herramientas'));
+	}
+
+	if (!filePath || !fs.existsSync(filePath)) {
+		return { success: false, error: { code: 'FILE_NOT_FOUND', message: 'Archivo Excel no encontrado' } };
+	}
+
+	if (filePath.toLowerCase().endsWith('.xls') && !filePath.toLowerCase().endsWith('.xlsx')) {
+		filePath = _convertXlsToXlsx(filePath);
+		if (!filePath) {
+			return { success: false, error: { code: 'CONVERT_ERROR', message: 'No se pudo convertir .xls a .xlsx' } };
+		}
+	}
+
+	return { success: true, data: { filePath: filePath } };
+}
+
+function _parseExcel(filePath) {
   var wb = xlsx.readFile(filePath, { type: 'file' });
   var sheetName = SHEET_NAME;
   if (!wb.SheetNames.includes(sheetName)) {
@@ -264,10 +297,7 @@ function _readExcel(companyRoot) {
     _filePath: filePath
    }
   };
- } catch (e) {
-  return { success: false, error: { code: 'READ_ERROR', message: e.message } };
  }
-}
 
 function _extractYearFromHeader(sd) {
  for (var r = 0; r < Math.min(9, sd.length); r++) {
@@ -289,10 +319,10 @@ function _extractYearFromHeader(sd) {
 }
 
 async function _saveExcel(companyRoot, items) {
-	var readResult = _readExcel(companyRoot);
-	if (!readResult.success) return readResult;
+	var pathResult = _getExcelFilePath(companyRoot);
+	if (!pathResult.success) return pathResult;
 
-	var filePath = readResult.data._filePath;
+	var filePath = pathResult.data.filePath;
 	if (!filePath || !fs.existsSync(filePath)) {
 		return { success: false, error: { code: 'FILE_NOT_FOUND', message: 'Archivo Excel no encontrado' } };
 	}
@@ -361,10 +391,10 @@ async function _saveExcel(companyRoot, items) {
 }
 
 async function _toggleMonth(companyRoot, rowIndex, month, type, value) {
-	var readResult = _readExcel(companyRoot);
-	if (!readResult.success) return readResult;
+	var pathResult = _getExcelFilePath(companyRoot);
+	if (!pathResult.success) return pathResult;
 
-	var filePath = readResult.data._filePath;
+	var filePath = pathResult.data.filePath;
 	if (!filePath || !fs.existsSync(filePath)) {
 		return { success: false, error: { code: 'FILE_NOT_FOUND', message: 'Archivo Excel no encontrado' } };
 	}
@@ -420,13 +450,10 @@ async function _updateField(companyRoot, rowIndex, field, value) {
 		return { success: false, error: { code: 'INVALID_FIELD', message: 'Campo no editable: ' + field } };
 	}
 
-	var readResult = _readExcel(companyRoot);
-	if (!readResult.success) return readResult;
+	var pathResult = _getExcelFilePath(companyRoot);
+	if (!pathResult.success) return pathResult;
 
-	var filePath = readResult.data._filePath;
-	if (!filePath || !fs.existsSync(filePath)) {
-		return { success: false, error: { code: 'FILE_NOT_FOUND', message: 'Archivo Excel no encontrado' } };
-	}
+	var filePath = pathResult.data.filePath;
 
 	var backupPath = _createBackup(filePath);
 
@@ -469,13 +496,10 @@ async function _updateField(companyRoot, rowIndex, field, value) {
 }
 
 async function _addRow(companyRoot, itemData) {
-	var readResult = _readExcel(companyRoot);
-	if (!readResult.success) return readResult;
+	var pathResult = _getExcelFilePath(companyRoot);
+	if (!pathResult.success) return pathResult;
 
-	var filePath = readResult.data._filePath;
-	if (!filePath || !fs.existsSync(filePath)) {
-		return { success: false, error: { code: 'FILE_NOT_FOUND', message: 'Archivo Excel no encontrado' } };
-	}
+	var filePath = pathResult.data.filePath;
 
 	var backupPath = _createBackup(filePath);
 
