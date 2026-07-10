@@ -528,6 +528,7 @@
     position: relative;
     overflow: visible;  /* El botón de collapse debe sobresalir para verse aún colapsado */
     min-width: 0;
+    min-height: 0;  /* Grid item: permite que la fila lo haga más chico que su contenido, habilitando el scroll de .kair-sidebar__body */
 }
 
 .kair-sidebar__head {
@@ -545,6 +546,7 @@
 
 .kair-sidebar__body {
     flex: 1;
+    min-height: 0;  /* habilita overflow-y cuando hay muchas carpetas (mismo patrón que .kair-main__body) */
     overflow-y: auto;
     padding: var(--kair-space-2);
 }
