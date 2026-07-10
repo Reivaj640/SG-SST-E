@@ -178,20 +178,27 @@ this.renderIndicesChart(data.indicadores);
         if (existingChart) existingChart.destroy();
 
         new Chart(canvas, {
-            type: 'bar',
+            type: 'line',
             data: {
                 labels: labels,
                 datasets: [{
                     label: 'Accidentes',
                     data: monthlyData,
-                    backgroundColor: barColors,
-                    borderColor: borderColors,
-                    borderWidth: 1
+                    borderColor: '#174ea6',
+                    backgroundColor: 'rgba(23, 78, 166, 0.08)',
+                    borderWidth: 2,
+                    tension: 0.3,
+                    fill: true,
+                    pointBackgroundColor: barColors,
+                    pointBorderColor: '#ffffff',
+                    pointBorderWidth: 1,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
                 }]
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: true,
+                maintainAspectRatio: false,
                 plugins: {
                     legend: { display: false },
                     tooltip: {
@@ -203,8 +210,13 @@ this.renderIndicesChart(data.indicadores);
                 scales: {
                     y: {
                         beginAtZero: true,
-                        ticks: { stepSize: 1, precision: 0 },
-                        title: { display: true, text: 'Cantidad', font: { size: 10 } }
+                        suggestedMax: 5,
+                        ticks: { stepSize: 1, precision: 0, maxTicksLimit: 6 },
+                        title: { display: true, text: 'Cantidad', font: { size: 10 } },
+                        grid: { display: false }
+                    },
+                    x: {
+                        grid: { display: false }
                     }
                 }
             }
@@ -322,7 +334,7 @@ new Chart(canvas, {
   plugins: [metaPlugin],
   options: {
     responsive: true,
-    maintainAspectRatio: true,
+    maintainAspectRatio: false,
     interaction: {
       mode: 'index',
       intersect: false
@@ -360,7 +372,8 @@ new Chart(canvas, {
           text: 'Índice (IF / IS)',
           font: { size: 10 }
         },
-        ticks: { font: { size: 9 } }
+        ticks: { font: { size: 9 } },
+        grid: { display: false }
       },
       y1: {
         type: 'linear',
@@ -376,9 +389,10 @@ new Chart(canvas, {
           precision: 0,
           font: { size: 9 }
         },
-        grid: {
-          drawOnChartArea: false
-        }
+        grid: { display: false }
+      },
+      x: {
+        grid: { display: false }
       }
     }
   }
@@ -420,7 +434,7 @@ chartContainer.className = 'chart-container';
 chartContainer.innerHTML = `
 <h3>Accidentes por Mes — ${new Date().getFullYear()}</h3>
 <div class="chart-placeholder" style="padding: 0.5rem 0;">
-<canvas id="saludAccidentesChart" style="max-height: 180px;"></canvas>
+<canvas id="saludAccidentesChart"></canvas>
 </div>
 `;
 chartsGrid.appendChild(chartContainer);
@@ -430,7 +444,7 @@ indicesChartContainer.className = 'chart-container';
 indicesChartContainer.innerHTML = `
 <h3>Índices de Accidentalidad — ${new Date().getFullYear()}</h3>
 <div class="chart-placeholder" style="padding: 0.5rem 0;">
-<canvas id="saludIndicesChart" style="max-height: 180px;"></canvas>
+<canvas id="saludIndicesChart"></canvas>
 </div>
 `;
 chartsGrid.appendChild(indicesChartContainer);
@@ -810,7 +824,8 @@ Trabajadores con inducción al día
 
     injectStyles() {
         const styleId = 'k-salud-home-optimized-styles';
-        if (document.getElementById(styleId)) return;
+        const oldStyle = document.getElementById(styleId);
+        if (oldStyle) oldStyle.remove();
 
         const style = document.createElement('style');
         style.id = styleId;
@@ -867,8 +882,10 @@ overflow-y: auto;
             .main-area { display: flex; flex-direction: column; gap: 1rem; }
 .submodules-container { background: var(--k-bg-card); border: 1px solid var(--k-border); border-radius: var(--k-radius-lg); padding: 1.5rem; box-shadow: var(--k-shadow-sm); margin-top: 0 !important; }
 .submodules-container h3 { margin-top: 0; margin-bottom: 1rem; font-size: 1.1rem; font-weight: 600; color: var(--k-text-main); padding-bottom: 1rem; border-bottom: 1px solid var(--k-border); text-transform: uppercase; letter-spacing: 0.05em; }
-            .chart-container { background: var(--k-bg-card); border: 1px solid var(--k-border); border-radius: var(--k-radius-lg); padding: 1.5rem; box-shadow: var(--k-shadow-sm); min-height: 350px; display: flex; flex-direction: column; }
+            .chart-container { background: var(--k-bg-card); border: 1px solid var(--k-border); border-radius: var(--k-radius-lg); padding: 1.5rem; box-shadow: var(--k-shadow-sm); min-height: 350px; max-height: 350px; display: flex; flex-direction: column; }
 .chart-container h3 { margin-top: 0; margin-bottom: 1rem; font-size: 1.1rem; font-weight: 600; color: var(--k-text-main); text-transform: uppercase; letter-spacing: 0.05em; }
+.chart-placeholder { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.chart-placeholder canvas { flex: 1; min-height: 0; width: 100% !important; height: 100% !important; }
 .charts-grid-salud { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 @media (max-width: 992px) { .charts-grid-salud { grid-template-columns: 1fr; } }
 

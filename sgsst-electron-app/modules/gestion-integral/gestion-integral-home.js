@@ -1609,11 +1609,13 @@ gap: 1rem;
                         stacked: true,
                         beginAtZero: true,
                         ticks: { stepSize: 1, precision: 0, font: { size: 11 } },
+                        grid: { display: false },
                         title: { display: true, text: hasAutoData ? 'Cantidad / % Avance' : 'Cantidad', font: { size: 10 } }
                     },
                     y: {
                         stacked: true,
-                        ticks: { font: { size: 11, weight: '500' } }
+                        ticks: { font: { size: 11, weight: '500' } },
+                        grid: { display: false }
                     }
                 },
                 plugins: {

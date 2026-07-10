@@ -1793,7 +1793,7 @@ parseFormattedNumber(value) {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: { legend: { position: 'bottom' } },
-                    scales: { y: { display: false, beginAtZero: true } }
+                    scales: { y: { display: false, beginAtZero: true, grid: { display: false } } }
                 }
             });
         }
@@ -1836,7 +1836,7 @@ parseFormattedNumber(value) {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    scales: { x: { stacked: false }, y: { beginAtZero: true, ticks: { precision: 0 } } },
+                    scales: { x: { stacked: false, grid: { display: false } }, y: { beginAtZero: true, ticks: { precision: 0 }, grid: { display: false } } },
                     plugins: {
                         legend: {
                             display: true,
@@ -1881,7 +1881,7 @@ parseFormattedNumber(value) {
           responsive: true,
           maintainAspectRatio: false,
           plugins: { legend: { position: 'bottom' } },
-          scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+          scales: { y: { beginAtZero: true, ticks: { precision: 0 }, grid: { display: false } }, x: { grid: { display: false } } }
         }
       });
     }

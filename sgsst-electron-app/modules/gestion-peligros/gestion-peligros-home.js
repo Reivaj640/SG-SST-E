@@ -160,7 +160,7 @@ class GestionPeligrosHome {
 		chartContainer.innerHTML = '\
 			<h3>Inspecciones — Cumplimiento Mensual ' + new Date().getFullYear() + '</h3>\
 			<div class="chart-placeholder" style="padding: 0.5rem 0;">\
-				<canvas id="peligrosInspeccionesChart" style="max-height: 180px;"></canvas>\
+				<canvas id="peligrosInspeccionesChart"></canvas>\
 			</div>\
 		';
 		chartsGrid.appendChild(chartContainer);
@@ -170,7 +170,7 @@ class GestionPeligrosHome {
 		cumplimientoChartContainer.innerHTML = '\
 			<h3>Cumplimiento Global</h3>\
 			<div class="chart-placeholder" style="padding: 0.5rem 0;">\
-				<canvas id="peligrosCumplimientoChart" style="max-height: 180px;"></canvas>\
+				<canvas id="peligrosCumplimientoChart"></canvas>\
 			</div>\
 		';
 		chartsGrid.appendChild(cumplimientoChartContainer);
@@ -505,29 +505,41 @@ class GestionPeligrosHome {
 		if (existingChart) existingChart.destroy();
 
 		new Chart(canvas, {
-			type: 'bar',
+			type: 'line',
 			data: {
 				labels: labels,
 				datasets: [
 					{
 						label: 'Completadas',
 						data: completadas,
-						backgroundColor: 'rgba(40, 167, 69, 0.7)',
 						borderColor: '#28a745',
-						borderWidth: 1
+						backgroundColor: 'rgba(40, 167, 69, 0.1)',
+						borderWidth: 2,
+						tension: 0.3,
+						pointRadius: 4,
+						pointBackgroundColor: '#28a745',
+						pointBorderColor: '#fff',
+						pointBorderWidth: 1,
+						fill: false
 					},
 					{
 						label: 'Pendientes',
 						data: pendientes,
-						backgroundColor: 'rgba(220, 53, 69, 0.5)',
 						borderColor: '#dc3545',
-						borderWidth: 1
+						backgroundColor: 'rgba(220, 53, 69, 0.1)',
+						borderWidth: 2,
+						tension: 0.3,
+						pointRadius: 4,
+						pointBackgroundColor: '#dc3545',
+						pointBorderColor: '#fff',
+						pointBorderWidth: 1,
+						fill: false
 					}
 				]
 			},
 			options: {
 				responsive: true,
-				maintainAspectRatio: true,
+				maintainAspectRatio: false,
 				plugins: {
 					legend: {
 						display: true,
@@ -543,9 +555,14 @@ class GestionPeligrosHome {
 					}
 				},
 				scales: {
+					x: {
+						grid: { display: false }
+					},
 					y: {
 						beginAtZero: true,
+						suggestedMax: 3,
 						ticks: { stepSize: 1, precision: 0 },
+						grid: { display: false },
 						title: { display: true, text: 'Cantidad', font: { size: 10 } }
 					}
 				}
@@ -597,7 +614,7 @@ class GestionPeligrosHome {
 			},
 			options: {
 				responsive: true,
-				maintainAspectRatio: true,
+				maintainAspectRatio: false,
 				cutout: '55%',
 				plugins: {
 					legend: {
@@ -697,8 +714,10 @@ class GestionPeligrosHome {
 .main-area { display: flex; flex-direction: column; gap: 1rem; }\
 .submodules-container { background: var(--k-bg-card); border: 1px solid var(--k-border); border-radius: var(--k-radius-lg); padding: 1.5rem; box-shadow: var(--k-shadow-sm); margin-top: 0 !important; }\
 .submodules-container h3 { margin-top: 0; margin-bottom: 1rem; font-size: 1.1rem; font-weight: 600; color: var(--k-text-main); padding-bottom: 1rem; border-bottom: 1px solid var(--k-border); text-transform: uppercase; letter-spacing: 0.05em; }\
-.chart-container { background: var(--k-bg-card); border: 1px solid var(--k-border); border-radius: var(--k-radius-lg); padding: 1.5rem; box-shadow: var(--k-shadow-sm); min-height: 350px; display: flex; flex-direction: column; }\
+.chart-container { background: var(--k-bg-card); border: 1px solid var(--k-border); border-radius: var(--k-radius-lg); padding: 1.5rem; box-shadow: var(--k-shadow-sm); min-height: 350px; max-height: 350px; display: flex; flex-direction: column; }\
 .chart-container h3 { margin-top: 0; margin-bottom: 1rem; font-size: 1.1rem; font-weight: 600; color: var(--k-text-main); text-transform: uppercase; letter-spacing: 0.05em; }\
+.chart-placeholder { flex: 1; min-height: 0; display: flex; flex-direction: column; }\
+.chart-placeholder canvas { flex: 1; min-height: 0; width: 100% !important; height: 100% !important; }\
 .charts-grid-peligros { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }\
 @media (max-width: 992px) { .charts-grid-peligros { grid-template-columns: 1fr; } }\
 /* ANULAR ESTILOS GLOBALES (styles.css) */\
