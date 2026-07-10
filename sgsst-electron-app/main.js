@@ -844,7 +844,7 @@ const createWindow = () => {
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
 
   // Abrir DevTools en modo desarrollo
-  // mainWindow.webContents.openDevTools();
+  mainWindow.webContents.openDevTools();
 };
 
 // Función auxiliar para búsqueda recursiva de archivos en el sistema de archivos
