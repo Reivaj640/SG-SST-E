@@ -14130,10 +14130,18 @@ async function calculateObjetivosStats(basePath) {
         return stats;
     }
 
-    const objetivosPath = path.join(gestionIntegralPath, '2.2 Objetivos SST');
-    const objetivosPathAlt = path.join(gestionIntegralPath, '2.2 Objetivos');
+    const objetivosPath = path.join(gestionIntegralPath, '2.2.1 Objetivos SST');
+    const objetivosPathAlt = path.join(gestionIntegralPath, '2.2 Objetivos SST');
+    const objetivosPathAlt2 = path.join(gestionIntegralPath, '2.2 Objetivos');
 
-    const rutaFinal = fs.existsSync(objetivosPath) ? objetivosPath : objetivosPathAlt;
+    let rutaFinal = null;
+    if (fs.existsSync(objetivosPath)) {
+        rutaFinal = objetivosPath;
+    } else if (fs.existsSync(objetivosPathAlt)) {
+        rutaFinal = objetivosPathAlt;
+    } else if (fs.existsSync(objetivosPathAlt2)) {
+        rutaFinal = objetivosPathAlt2;
+    }
 
     if (!fs.existsSync(rutaFinal)) {
         return stats;
