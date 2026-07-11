@@ -6,6 +6,13 @@
  * (MedicionAusentismoComponent) que actúa como proxy al backend.
  * ========================================================================== */
 
+// === SHIM: KairSkeleton desde ventana padre si no esta definido localmente ===
+// Los iframes no heredan los globales del padre automaticamente; este puente
+// evita el error "KairSkeleton is not defined" en vistas cargadas dentro de iframes.
+if (typeof window.KairSkeleton === 'undefined' && typeof parent !== 'undefined' && parent !== window && parent.window && parent.window.KairSkeleton) {
+  window.KairSkeleton = parent.window.KairSkeleton;
+}
+
 const ConsultaTrabajadores = {
     empresaActiva: null,     // Se recibe via SET_COMPANY_CONTEXT
     resultados: [],
