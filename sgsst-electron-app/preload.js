@@ -584,7 +584,17 @@ duplicateIndicadoresFile: ({ currentFilePath, newYear }) => ipcRenderer.invoke('
     // 📦523 — Idem para el Comite de Convivencia (Res. 0312/2019 estandar 6.2.2).
     // Misma logica: 1 evento por mes el dia 1 (movido al lunes si cae en
     // fin de semana). Color cyan #0891b2 para distinguirse del naranja COPASST.
-    convivenciaGetEvents: (params) => ipcRenderer.invoke('recordatorio-convivencia:get-events', params)
+    convivenciaGetEvents: (params) => ipcRenderer.invoke('recordatorio-convivencia:get-events', params),
+    // 📦524 — Recordatorio de Actualización de Presupuesto Mensual: 2 eventos
+    // por mes (día 5 y día 20, ajustados al lunes si caen en fin de semana).
+    // Color emerald #10b981 (verde monetario) para distinguirse del naranja
+    // COPASST y cyan Convivencia. Recordatorio OPERATIVO (no legal).
+    presupuestoGetEvents: (params) => ipcRenderer.invoke('recordatorio-presupuesto:get-events', params),
+    // 📦525 — Recordatorio de Afiliación al SSSI (Sistema de Seguridad Social
+    // Integral): 1 evento por mes (día 10, ajustado al lunes si cae en fin
+    // de semana). Color amber #f59e0b para distinguirse del resto. Recordatorio
+    // LEGAL-OPERATIVO (Ley 100/1993, Decreto 1295/1994, Decreto 806/1998 art. 16).
+    afiliacionGetEvents: (params) => ipcRenderer.invoke('recordatorio-afiliacion:get-events', params)
   },
 
   // --- Identificación de Peligros (4.1.2) ---

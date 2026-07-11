@@ -4085,6 +4085,188 @@ ipcMain.handle('recordatorio-convivencia:get-events', async (event, params) => {
   }
 });
 
+// ── K+AIR Calendar: Recordatorio Actualización Presupuesto (📦524) ──────
+// 📅 Recordatorio MENSUAL con 2 eventos por mes: día 5 (cierre de los
+// "5 primeros días" del mes) y día 20 (cierre de los "20 primeros días").
+// Si la fecha cae en fin de semana se mueve al lunes siguiente (mismo
+// patrón que COPASST/Convivencia). Color emerald #10b981 (verde monetario)
+// para distinguirse del naranja COPASST y cyan Convivencia.
+//
+// Genera 24 eventos por año (2/mes × 12). No depende de empresa — es global
+// (la actualización de presupuesto es un recordatorio operativo, no legal).
+const VENTANAS_PRESUPUESTO = [
+  { day: 5,  ventana: '5 primeros días' },
+  { day: 20, ventana: '20 primeros días' }
+];
+ipcMain.handle('recordatorio-presupuesto:get-events', async (event, params) => {
+  try {
+    const params2 = params || {};
+    const now = new Date();
+    const currentYear = now.getFullYear();
+
+    let startStr = params2.start;
+    let endStr = params2.end;
+    if (!startStr || !endStr) {
+      startStr = `${currentYear}-01-01`;
+      endStr = `${currentYear}-12-31`;
+    }
+
+    const startDate = new Date(startStr + 'T00:00:00');
+    const endDate = new Date(endStr + 'T23:59:59');
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return { success: false, error: { code: 'INVALID_INPUT', message: 'start/end inválidos' } };
+    }
+
+    const events = [];
+    const cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    const endCursor = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+    while (cursor <= endCursor) {
+      const year = cursor.getFullYear();
+      const monthIdx = cursor.getMonth();
+      const monthNum = monthIdx + 1;
+      const monthStr = String(monthNum).padStart(2, '0');
+
+      for (const v of VENTANAS_PRESUPUESTO) {
+        const dayDate = new Date(year, monthIdx, v.day);
+        const dayOfWeek = dayDate.getDay();
+        let adjustedDay = v.day;
+        let ajusteTexto = '';
+        if (dayOfWeek === 6) {
+          // Sábado → lunes siguiente (v.day + 2)
+          adjustedDay = v.day + 2;
+          ajusteTexto = ` (día ${v.day} cae sábado, se muestra lunes ${adjustedDay})`;
+        } else if (dayOfWeek === 0) {
+          // Domingo → lunes siguiente (v.day + 1)
+          adjustedDay = v.day + 1;
+          ajusteTexto = ` (día ${v.day} cae domingo, se muestra lunes ${adjustedDay})`;
+        }
+        const dayStr = String(adjustedDay).padStart(2, '0');
+        const dateStr = `${year}-${monthStr}-${dayStr}`;
+
+        events.push({
+          id: `recordatorio-presupuesto-${v.ventana.replace(/\s/g, '')}-${year}-${monthStr}-${dayStr}`,
+          type: 'recordatorio_presupuesto',
+          title: `Actualización de Presupuesto (${v.ventana})`,
+          date: dateStr,
+          start: '00:00',
+          end: '23:59',
+          allDay: true,
+          color: '#10b981',
+          source: 'recordatorio_presupuesto',
+          meta: {
+            plazoTexto: `Cierre de los ${v.ventana} del mes` + ajusteTexto,
+            mes: monthNum,
+            year: year,
+            ventana: v.ventana,
+            diaOriginal: v.day,
+            diaMostrado: adjustedDay,
+            esFinDeSemana: dayOfWeek === 0 || dayOfWeek === 6,
+            ciclo: 'Mensual (día 5 y día 20)'
+          }
+        });
+      }
+
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+
+    return { success: true, data: events };
+  } catch (e) {
+    sendLog(`[CAL-PRESUPUESTO] Error generando recordatorios: ${e.message}`, 'ERROR');
+    return { success: false, error: { code: 'GET_EVENTS_FAILED', message: e.message } };
+  }
+});
+
+// ── K+AIR Calendar: Recordatorio Afiliación al SSSI (📦525) ────────────
+// 📅 Recordatorio MENSUAL: día 10 (cierre de los "10 primeros días" del
+// mes). Recordatorio LEGAL-OPERATIVO: en Colombia, la afiliación al
+// Sistema de Seguridad Social Integral (SSSI) — salud (EPS), pensión
+// (AFP), riesgos laborales (ARL) — debe mantenerse actualizada con
+// los ingresos y retiros del mes (Ley 100/1993, Decreto 1295/1994,
+// Decreto 806/1998 art. 16). El usuario tiene los 10 primeros días
+// del mes para reportar novedades de personal. Si el día 10 cae en
+// fin de semana se mueve al lunes siguiente (mismo patrón que COPASST
+// /Convivencia/Presupuesto). Color amber #f59e0b para distinguirse
+// del resto.
+//
+// Genera 12 eventos por año (1/mes × 12). No depende de empresa — es global.
+ipcMain.handle('recordatorio-afiliacion:get-events', async (event, params) => {
+  try {
+    const params2 = params || {};
+    const now = new Date();
+    const currentYear = now.getFullYear();
+
+    let startStr = params2.start;
+    let endStr = params2.end;
+    if (!startStr || !endStr) {
+      startStr = `${currentYear}-01-01`;
+      endStr = `${currentYear}-12-31`;
+    }
+
+    const startDate = new Date(startStr + 'T00:00:00');
+    const endDate = new Date(endStr + 'T23:59:59');
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return { success: false, error: { code: 'INVALID_INPUT', message: 'start/end inválidos' } };
+    }
+
+    const events = [];
+    const cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    const endCursor = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+    while (cursor <= endCursor) {
+      const year = cursor.getFullYear();
+      const monthIdx = cursor.getMonth();
+      const monthNum = monthIdx + 1;
+      const monthStr = String(monthNum).padStart(2, '0');
+
+      // 1 evento por mes: día 10 (cierre de los 10 primeros días)
+      const dayDate = new Date(year, monthIdx, 10);
+      const dayOfWeek = dayDate.getDay();
+      let adjustedDay = 10;
+      let ajusteTexto = '';
+      if (dayOfWeek === 6) {
+        // Sábado → lunes siguiente (10 + 2 = 12)
+        adjustedDay = 12;
+        ajusteTexto = ' (día 10 cae sábado, se muestra lunes 12)';
+      } else if (dayOfWeek === 0) {
+        // Domingo → lunes siguiente (10 + 1 = 11)
+        adjustedDay = 11;
+        ajusteTexto = ' (día 10 cae domingo, se muestra lunes 11)';
+      }
+      const dayStr = String(adjustedDay).padStart(2, '0');
+      const dateStr = `${year}-${monthStr}-${dayStr}`;
+
+      events.push({
+        id: `recordatorio-afiliacion-${year}-${monthStr}-${dayStr}`,
+        type: 'recordatorio_afiliacion',
+        title: 'Actualización de Afiliación al SSSI',
+        date: dateStr,
+        start: '00:00',
+        end: '23:59',
+        allDay: true,
+        color: '#f59e0b',
+        source: 'recordatorio_afiliacion',
+        meta: {
+          plazoTexto: 'Cierre de los 10 primeros días del mes para reportar novedades' + ajusteTexto,
+          mes: monthNum,
+          year: year,
+          ventana: '10 primeros días',
+          diaOriginal: 10,
+          diaMostrado: adjustedDay,
+          esFinDeSemana: dayOfWeek === 0 || dayOfWeek === 6,
+          ciclo: 'Mensual (día 10)',
+          norma: 'Ley 100/1993 · Decreto 1295/1994 · Decreto 806/1998 art. 16'
+        }
+      });
+
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+
+    return { success: true, data: events };
+  } catch (e) {
+    sendLog(`[CAL-AFILIACION] Error generando recordatorios: ${e.message}`, 'ERROR');
+    return { success: false, error: { code: 'GET_EVENTS_FAILED', message: e.message } };
+  }
+});
+
 // ── K+AIR Calendar: Capacitaciones (📦495 — implementación real) ──────
 // Lee el Excel de cronograma de capacitaciones de la empresa actual y
 // devuelve cada capacitación con fecha válida como evento del calendario.

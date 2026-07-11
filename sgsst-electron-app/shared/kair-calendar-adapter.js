@@ -27,6 +27,20 @@
  *        o domingo se mueve al lunes), color cyan #0891b2 para distinguirse
  *        del naranja COPASST. Refleja la configuracion del autofill en
  *        main.js (CONVIVENCIA_CYCLE_MONTHS), no el maximo legal mensual.
+ *   10. Recordatorio Actualizacion de Presupuesto (electronAPI.recordatorios.presupuestoGetEvents) — 📦524
+ *      → Recordatorio OPERATIVO con 2 eventos por mes: dia 5 (cierre de los
+ *        "5 primeros dias") y dia 20 (cierre de los "20 primeros dias").
+ *        Mismo patron de ajuste de fin de semana que COPASST/Convivencia
+ *        (sabado/domingo se mueve al lunes). Color emerald #10b981 (verde
+ *        monetario) para distinguirse del naranja COPASST y cyan Convivencia.
+ *        24 eventos por anio (2/mes x 12).
+ *   11. Recordatorio Afiliacion al SSSI (electronAPI.recordatorios.afiliacionGetEvents) — 📦525
+ *      → Recordatorio LEGAL-OPERATIVO con 1 evento por mes: dia 10 (cierre
+ *        de los "10 primeros dias" para reportar novedades de personal al
+ *        Sistema de Seguridad Social Integral — EPS/AFP/ARL). Mismo patron
+ *        de ajuste de fin de semana (sabado/domingo se mueve al lunes). Color
+ *        amber #f59e0b para distinguirse del resto. 12 eventos por anio (1/mes).
+ *        Base legal: Ley 100/1993, Decreto 1295/1994, Decreto 806/1998 art. 16.
  *   10. Estados de cumplimiento (electronAPI.eventosCumplidos.listar) — 📦498
  *      → Enriquece cada evento con {cumplido:true/false, cumplidoEn:ISO}.
  *      → NO agrega eventos, solo decora los existentes.
@@ -110,6 +124,10 @@
     var copasstPayload = Object.assign({}, recRange);
     // 📦523 — Recordatorio Convivencia: idem. Comparte el mismo rango anual.
     var convivenciaPayload = Object.assign({}, recRange);
+    // 📦524 — Recordatorio Presupuesto: idem. Comparte el mismo rango anual.
+    var presupuestoPayload = Object.assign({}, recRange);
+    // 📦525 — Recordatorio Afiliacion: idem. Comparte el mismo rango anual.
+    var afiliacionPayload = Object.assign({}, recRange);
     var results = await Promise.all([
       _safe(function () { return api.planTrabajo && api.planTrabajo.getEvents(range); }),
       _safe(function () { return api.capacitaciones && api.capacitaciones.getEvents(capPayload); }),
@@ -140,6 +158,22 @@
       _safe(function () {
         return api.recordatorios && api.recordatorios.convivenciaGetEvents
           ? api.recordatorios.convivenciaGetEvents(convivenciaPayload)
+          : { success: true, data: [] };
+      }),
+      // 📦524 — Recordatorio "Actualizacion de Presupuesto" (2 eventos por mes:
+      // dia 5 y dia 20, ajustados al lunes si caen en fin de semana). Operativo,
+      // no legal. Comparte el rango anual con COPASST/Convivencia.
+      _safe(function () {
+        return api.recordatorios && api.recordatorios.presupuestoGetEvents
+          ? api.recordatorios.presupuestoGetEvents(presupuestoPayload)
+          : { success: true, data: [] };
+      }),
+      // 📦525 — Recordatorio "Afiliacion al SSSI" (1 evento por mes: dia 10,
+      // ajustado al lunes si cae en fin de semana). Legal-operativo. Comparte
+      // el rango anual con el resto de recordatorios.
+      _safe(function () {
+        return api.recordatorios && api.recordatorios.afiliacionGetEvents
+          ? api.recordatorios.afiliacionGetEvents(afiliacionPayload)
           : { success: true, data: [] };
       }),
       // 📦498 — Esta fuente NO devuelve eventos: devuelve Map de cumplidos

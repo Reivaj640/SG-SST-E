@@ -38,6 +38,17 @@
     // 📦523 — Recordatorio mensual del Comite de Convivencia (Res. 0312/2019
     // estandar 6.2.2: reunion mensual obligatoria). Mismo patron que COPASST.
     recordatorio_convivencia: 'Acta Comite Convivencia',
+    // 📦524 — Recordatorio operativo de Actualizacion de Presupuesto Mensual.
+    // 2 eventos por mes: dia 5 (cierre de los "5 primeros dias") y dia 20
+    // (cierre de los "20 primeros dias"). NO es un recordatorio legal — es
+    // operativo, para que el usuario no olvide actualizar el presupuesto del
+    // modulo de Recursos.
+    recordatorio_presupuesto: 'Actualización Presupuesto',
+    // 📦525 — Recordatorio LEGAL-OPERATIVO de Afiliacion al SSSI (Sistema de
+    // Seguridad Social Integral — salud/pension/riesgos laborales). 1 evento
+    // por mes (dia 10) para reportar novedades de personal del mes anterior
+    // (Ley 100/1993, Decreto 1295/1994, Decreto 806/1998 art. 16).
+    recordatorio_afiliacion: 'Afiliación SSSI',
     primary:              'Evento',
     success:              'Evento',
     warning:              'Evento',
@@ -61,7 +72,13 @@
     recordatorio_copasst:   '#ea580c',
     // 📦523 — Color cyan (#0891b2) para el recordatorio del Comite de Convivencia.
     // Distinto del naranja del COPASST para que el usuario diferencie facilmente.
-    recordatorio_convivencia: '#0891b2'
+    recordatorio_convivencia: '#0891b2',
+    // 📦524 — Color emerald (#10b981) para el recordatorio de Actualizacion de
+    // Presupuesto. Verde monetario, distintivo del naranja COPASST y cyan Convivencia.
+    recordatorio_presupuesto: '#10b981',
+    // 📦525 — Color amber (#f59e0b) para el recordatorio de Afiliacion al SSSI.
+    // Amarillo calido, distintivo de los 3 recordatorios anteriores.
+    recordatorio_afiliacion: '#f59e0b'
   };
 
   // Mapeo de tipo de evento → función de navegación al módulo origen.
@@ -87,7 +104,17 @@
     // modulo" SI debe aparecer para que el usuario pueda ir rapidamente.
     recordatorio_copasst:   function () { _navigate('copasst'); },
     // 📦523 — Recordatorio Comite de Convivencia: navega al submódulo 1.1.8.
-    recordatorio_convivencia: function () { _navigate('comite-convivencia'); }
+    recordatorio_convivencia: function () { _navigate('comite-convivencia'); },
+    // 📦524 — Recordatorio Actualizacion de Presupuesto: navega al modulo
+    // 1.1.3 Asignacion de Recursos → Presupuesto. Aterriza en el home del
+    // modulo donde el usuario puede ver el resumen del año en curso y los
+    // botones "Ingresar" / "Historico de Anos" para editar.
+    recordatorio_presupuesto: function () { _navigate('presupuesto'); },
+    // 📦525 — Recordatorio Afiliacion al SSSI: navega al modulo
+    // 1.1.5 Afiliacion en Recursos. Aterriza en el home del modulo de
+    // afiliacion donde el usuario puede ver el estado de los colaboradores
+    // afiliados a EPS/AFP/ARL.
+    recordatorio_afiliacion: function () { _navigate('afiliacion'); }
   };
 
   // 📦500 — Mapeo de tipo → label del módulo de origen (para mostrar como
@@ -107,7 +134,13 @@
     recordatorio_copasst:   'COPASST',
     // 📦523 — Recordatorio Comite de Convivencia: el origen es el
     // submódulo 1.1.8 Comite de Convivencia.
-    recordatorio_convivencia: 'Comite Convivencia'
+    recordatorio_convivencia: 'Comite Convivencia',
+    // 📦524 — Recordatorio Actualizacion de Presupuesto: el origen es el
+    // modulo 1.1.3 Asignacion de Recursos → Presupuesto.
+    recordatorio_presupuesto: 'Presupuesto',
+    // 📦525 — Recordatorio Afiliacion al SSSI: el origen es el modulo
+    // 1.1.5 Afiliacion en Recursos.
+    recordatorio_afiliacion: 'Afiliación SSSI'
   };
 
   // ── Estado ───────────────────────────────────────────────────────────

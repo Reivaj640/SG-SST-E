@@ -1822,7 +1822,18 @@ if (appHeader) {
             // 📦523 — Recordatorio mensual del Comite de Convivencia. Mismo
             // patron que COPASST (Reunion mensual Res. 0312/2019 est. 6.2.2).
             // Color cyan #0891b2 para distinguirse del naranja COPASST.
-            { id: 'recordatorio_convivencia', label: 'Acta Comite Convivencia', color: '#0891b2' }
+            { id: 'recordatorio_convivencia', label: 'Acta Comite Convivencia', color: '#0891b2' },
+            // 📦524 — Recordatorio de Actualizacion de Presupuesto Mensual.
+            // 2 eventos por mes (dia 5 y dia 20, ajustados al lunes si caen
+            // en fin de semana). Color emerald #10b981 (verde monetario)
+            // para distinguirse del naranja COPASST y cyan Convivencia.
+            // Recordatorio OPERATIVO (no legal).
+            { id: 'recordatorio_presupuesto', label: 'Actualización Presupuesto', color: '#10b981' },
+            // 📦525 — Recordatorio de Afiliacion al SSSI (Sistema de Seguridad
+            // Social Integral). 1 evento por mes (dia 10, ajustado al lunes si
+            // cae en fin de semana). Color amber #f59e0b para distinguirse del
+            // resto. Recordatorio LEGAL-OPERATIVO (Ley 100/1993, Decreto 1295/1994).
+            { id: 'recordatorio_afiliacion', label: 'Afiliación SSSI', color: '#f59e0b' }
           ],
           adapter: window.KairCalendarAdapter || null,
           onEventClick: function (ev) {
