@@ -37,6 +37,16 @@ Portear/venv/
 Portear/python-embed/
 Portear/python-embed.bak/
 
+# 📦526 — Backups historicos de reorganizaciones del proyecto (NO trackear).
+# Contiene versiones antiguas de archivos (.js, .css, .html) que ya fueron
+# migrados a modules/recursos/<submodulo>/<submodulo>-logic.js. La historia
+# completa se conserva en git (commit 4a5492e para backup_archivos_originales
+# y 301b054 para backup_restore) por si se necesita recuperar algo. Pero
+# no tienen razon de vivir en el repo actual: ocupan 1.25 MB, no las usa
+# nada del codigo actual, y confunden a nuevos devs.
+backup_archivos_originales/
+backup_restore/
+
 # Archivos compilados de Python
 __pycache__/
 *.pyc
