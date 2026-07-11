@@ -21,6 +21,9 @@ tmp/
 .vscode/
 .idea/
 
+# Configuracion personal de npm (no es del proyecto)
+.npmrc
+
 # Archivos de respaldo
 *.bak
 *.backup
