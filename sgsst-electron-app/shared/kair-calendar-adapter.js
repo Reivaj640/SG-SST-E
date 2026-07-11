@@ -15,7 +15,12 @@
  *   7. Mantenimientos programados pendientes (electronAPI.mantenimiento.calendarioGetEvents) — 📦509
  *      → Por cada item con MPP marcado en un mes genera 1 evento en uno de
  *        los 10 días hábiles de las semanas 2 y 3 (round-robin). Solo MPP.
- *   8. Estados de cumplimiento (electronAPI.eventosCumplidos.listar) — 📦498
+ *   8. Recordatorio Acta COPASST (electronAPI.recordatorios.copasstGetEvents) — 📦522
+ *      → Genera 1 evento el dia 1 de cada mes del rango. Recordatorio LEGAL
+ *        (Decreto 614/1984, Res. 0312/2019 estandar 1.1.6): "Realizar Acta del
+ *        COPASST dentro de los primeros 5 dias habiles del mes". Global, no
+ *        depende de empresa.
+ *   9. Estados de cumplimiento (electronAPI.eventosCumplidos.listar) — 📦498
  *      → Enriquece cada evento con {cumplido:true/false, cumplidoEn:ISO}.
  *      → NO agrega eventos, solo decora los existentes.
  *
@@ -88,6 +93,8 @@
     // (pendientes). Distribución en días hábiles de las semanas 2 y 3 del mes.
     var mantRange = _expandRangeToFullYear(range);
     var mantPayload = Object.assign({}, mantRange, { currentCompany: currentCompany });
+    // 📦522 — Recordatorio COPASST: no necesita currentCompany (es global).
+    var copasstPayload = Object.assign({}, range || {});
     var results = await Promise.all([
       _safe(function () { return api.planTrabajo && api.planTrabajo.getEvents(range); }),
       _safe(function () { return api.capacitaciones && api.capacitaciones.getEvents(capPayload); }),
@@ -104,6 +111,14 @@
       _safe(function () {
         return api.mantenimiento && api.mantenimiento.calendarioGetEvents
           ? api.mantenimiento.calendarioGetEvents(mantPayload)
+          : { success: true, data: [] };
+      }),
+      // 📦522 — Recordatorio mensual "Acta del COPASST" (1 evento por mes, dia 1).
+      // No falla si la API no esta expuesta: devuelve [] silenciosamente para no
+      // romper el calendario en builds donde aun no se actualizo preload.js.
+      _safe(function () {
+        return api.recordatorios && api.recordatorios.copasstGetEvents
+          ? api.recordatorios.copasstGetEvents(copasstPayload)
           : { success: true, data: [] };
       }),
       // 📦498 — Esta fuente NO devuelve eventos: devuelve Map de cumplidos

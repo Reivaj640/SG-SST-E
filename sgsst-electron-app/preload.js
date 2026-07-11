@@ -575,6 +575,13 @@ duplicateIndicadoresFile: ({ currentFilePath, newYear }) => ipcRenderer.invoke('
       return () => ipcRenderer.off('mantenimiento:programa:actualizado', listener);
     }
   },
+  // 📦522 — Recordatorios mensuales de cumplimiento legal (COPASST).
+  // Genera 1 evento por mes en el calendario: "Realizar Acta del COPASST"
+  // el dia 1 de cada mes (recordatorio legal Decreto 614/1984, Res. 0312/2019).
+  // No depende de la empresa — es global. Acepta rango opcional.
+  recordatorios: {
+    copasstGetEvents: (params) => ipcRenderer.invoke('recordatorio-copasst:get-events', params)
+  },
 
   // --- Identificación de Peligros (4.1.2) ---
   matrizPeligros: {

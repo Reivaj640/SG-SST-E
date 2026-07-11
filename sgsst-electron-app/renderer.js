@@ -1814,7 +1814,11 @@ if (appHeader) {
             // 📦509 — Mantenimientos programados pendientes (MPP) del cronograma
             // anual. Color teal (#0d9488) distintivo de mantenimiento, no choca
             // con los azules de Inspecciones/Plan ni con los verdes de Capacitación.
-            { id: 'mantenimiento_programado', label: 'Mantenimiento Programado', color: '#0d9488' }
+            { id: 'mantenimiento_programado', label: 'Mantenimiento Programado', color: '#0d9488' },
+            // 📦522 — Recordatorio mensual del COPASST (cumplimiento legal).
+            // Aparece el dia 1 de cada mes con el texto "Realizar Acta del
+            // COPASST". Color naranja intenso (#ea580c) bien diferenciable.
+            { id: 'recordatorio_copasst', label: 'Acta COPASST', color: '#ea580c' }
           ],
           adapter: window.KairCalendarAdapter || null,
           onEventClick: function (ev) {

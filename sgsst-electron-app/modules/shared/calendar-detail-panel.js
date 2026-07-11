@@ -31,6 +31,10 @@
     inspeccion_programada: 'Inspección Programada',
     // 📦509 — Mantenimientos programados pendientes (MPP) del cronograma anual.
     mantenimiento_programado: 'Mantenimiento Programado',
+    // 📦522 — Recordatorio mensual del COPASST (cumplimiento legal Decreto 614/1984
+    // y Res. 0312/2019 estandar 1.1.6: acta mensual obligatoria dentro de los
+    // primeros 5 dias habiles del mes).
+    recordatorio_copasst:   'Acta COPASST',
     primary:              'Evento',
     success:              'Evento',
     warning:              'Evento',
@@ -48,7 +52,10 @@
     inspeccion_programada: '#174ea6',
     // 📦509 — Color teal (#0d9488) distintivo de mantenimiento, no choca con
     // los azules de Inspecciones/Plan ni con los verdes de Capacitación.
-    mantenimiento_programado: '#0d9488'
+    mantenimiento_programado: '#0d9488',
+    // 📦522 — Color naranja intenso (#ea580c) para el recordatorio del COPASST.
+    // Distintivo, alto contraste, evoca "alerta/pendiente" sin ser rojo critico.
+    recordatorio_copasst:   '#ea580c'
   };
 
   // Mapeo de tipo de evento → función de navegación al módulo origen.
@@ -67,7 +74,12 @@
     inspeccion_programada: function () { _navigate('4.2.4 Inspecciones Sistemáticas'); },
     // 📦509 — Mantenimientos programados: navega al submódulo 4.2.5 que es
     // donde el usuario edita el cronograma MPP/MPE/MPC.
-    mantenimiento_programado: function () { _navigate('4.2.5 Mantenimiento periodico de equipos, instalaciones herramientas'); }
+    mantenimiento_programado: function () { _navigate('4.2.5 Mantenimiento periodico de equipos, instalaciones herramientas'); },
+    // 📦522 — Recordatorio COPASST: navega al submódulo 1.1.6 donde estan
+    // las actas y la gestion del COPASST. Es un recordatorio de cumplimiento
+    // legal (Decreto 614/1984, Res. 0312/2019), por lo que el boton "Ir al
+    // modulo" SI debe aparecer para que el usuario pueda ir rapidamente.
+    recordatorio_copasst:   function () { _navigate('copasst'); }
   };
 
   // 📦500 — Mapeo de tipo → label del módulo de origen (para mostrar como
@@ -81,7 +93,10 @@
     vencido:              'Vencido',
     inspeccion_programada: 'Inspecciones',
     // 📦509 — Mantenimientos programados: apunta al módulo 4.2.5.
-    mantenimiento_programado: 'Mantenimiento'
+    mantenimiento_programado: 'Mantenimiento',
+    // 📦522 — Recordatorio COPASST: el origen del recordatorio es el
+    // submódulo 1.1.6 COPASST.
+    recordatorio_copasst:   'COPASST'
   };
 
   // ── Estado ───────────────────────────────────────────────────────────

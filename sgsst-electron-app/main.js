@@ -3897,6 +3897,97 @@ ipcMain.handle('plan-trabajo:get-events', async (event, range) => {
   return { success: true, data: [] };
 });
 
+// ── K+AIR Calendar: Recordatorio Acta COPASST (📦522 — mensual global) ──
+// 📅 Recordatorio mensual: "Realizar Acta del COPASST" el día 1 de cada mes.
+// Recordatorio LEGAL — todas las empresas con COPASST deben levantar acta
+// mensualmente segun el Decreto 614/1984 y la Resolucion 0312/2019 (numeral
+// 1.1.6 del estandar). El recordatorio aparece el dia 1 con texto que
+// recuerda el plazo: "dentro de los primeros 5 dias habiles del mes".
+//
+// Genera 1 evento por mes en el rango. No depende de la empresa — es global.
+// El adapter del calendario lo consume. Se cachea la lista en memoria
+// (los eventos del año en curso se generan una sola vez por sesion).
+//
+// Params: { start?: 'YYYY-MM-DD', end?: 'YYYY-MM-DD' }
+// Si no se pasa rango, se generan los 12 meses del año actual.
+ipcMain.handle('recordatorio-copasst:get-events', async (event, params) => {
+  try {
+    const params2 = params || {};
+    const now = new Date();
+    const currentYear = now.getFullYear();
+
+    // Determinar rango: si no viene, usar el año completo
+    let startStr = params2.start;
+    let endStr = params2.end;
+    if (!startStr || !endStr) {
+      startStr = `${currentYear}-01-01`;
+      endStr = `${currentYear}-12-31`;
+    }
+
+    const startDate = new Date(startStr + 'T00:00:00');
+    const endDate = new Date(endStr + 'T23:59:59');
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return { success: false, error: { code: 'INVALID_INPUT', message: 'start/end inválidos' } };
+    }
+
+    const events = [];
+    // Iterar mes a mes desde el primer mes del rango hasta el ultimo
+    const cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    const endCursor = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+    while (cursor <= endCursor) {
+      const year = cursor.getFullYear();
+      const monthIdx = cursor.getMonth();
+      const monthNum = String(monthIdx + 1).padStart(2, '0');
+
+      // 📅 Si el dia 1 cae sabado (6) o domingo (0), mover al siguiente dia habil
+      // (lunes = 1, ... viernes = 5). Esto evita que el recordatorio caiga en
+      // fin de semana donde nadie lo va a ver. getDay() devuelve 0 (Dom) a 6 (Sab).
+      const dayOfWeek = cursor.getDay();
+      let adjustedDay = 1;
+      let ajusteTexto = '';
+      if (dayOfWeek === 6) {
+        // Sabado → mover al lunes (dia 3)
+        adjustedDay = 3;
+        ajusteTexto = ' (1° cae sábado, se muestra el lunes 3)';
+      } else if (dayOfWeek === 0) {
+        // Domingo → mover al lunes (dia 2)
+        adjustedDay = 2;
+        ajusteTexto = ' (1° cae domingo, se muestra el lunes 2)';
+      }
+      const dayStr = String(adjustedDay).padStart(2, '0');
+      const dateStr = `${year}-${monthNum}-${dayStr}`;
+
+      events.push({
+        id: `recordatorio-copasst-${year}-${monthNum}-${dayStr}`,
+        type: 'recordatorio_copasst',
+        title: 'Realizar Acta del COPASST',
+        date: dateStr,
+        start: '00:00',
+        end: '23:59',
+        allDay: true,
+        color: '#ea580c',
+        source: 'recordatorio_copasst',
+        meta: {
+          plazoTexto: 'Dentro de los primeros 5 días hábiles del mes' + ajusteTexto,
+          mes: monthIdx + 1,
+          year: year,
+          diaOriginal: 1,
+          diaMostrado: adjustedDay,
+          esFinDeSemana: dayOfWeek === 0 || dayOfWeek === 6,
+          norma: 'Decreto 614/1984 · Res. 0312/2019 estándar 1.1.6'
+        }
+      });
+
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+
+    return { success: true, data: events };
+  } catch (e) {
+    sendLog(`[CAL-COPASST] Error generando recordatorios: ${e.message}`, 'ERROR');
+    return { success: false, error: { code: 'GET_EVENTS_FAILED', message: e.message } };
+  }
+});
+
 // ── K+AIR Calendar: Capacitaciones (📦495 — implementación real) ──────
 // Lee el Excel de cronograma de capacitaciones de la empresa actual y
 // devuelve cada capacitación con fecha válida como evento del calendario.
