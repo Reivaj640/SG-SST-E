@@ -1180,7 +1180,9 @@ margin-bottom: 0.5rem;
             <div class="kb-description">Trabajadores con inducción SST completada</div>
 
             <div class="kb-progress-track">
-                <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};"></div>
+                <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};">
+                    <div class="kb-shimmer"></div>
+                </div>
             </div>
 
             <div class="kb-footer">
@@ -1258,7 +1260,9 @@ margin-bottom: 0.5rem;
             <div class="kb-description">Capacitaciones del plan anual ejecutadas</div>
 
             <div class="kb-progress-track">
-                <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};"></div>
+                <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};">
+                    <div class="kb-shimmer"></div>
+                </div>
             </div>
 
             <div class="kb-footer">
@@ -1333,7 +1337,9 @@ margin-bottom: 0.5rem;
             <div class="kb-description">Reuniones mensuales del COPASST</div>
 
             <div class="kb-progress-track">
-                <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};"></div>
+                <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};">
+                    <div class="kb-shimmer"></div>
+                </div>
             </div>
 
             <div class="kb-footer">
@@ -1400,7 +1406,9 @@ margin-bottom: 0.5rem;
             <div class="kb-description">Reuniones del Comité de Convivencia</div>
 
             <div class="kb-progress-track">
-                <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};"></div>
+                <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};">
+                    <div class="kb-shimmer"></div>
+                </div>
             </div>
 
             <div class="kb-footer">
@@ -1479,7 +1487,9 @@ margin-bottom: 0.5rem;
             <div class="kb-description">Planillas de afiliación al SSSI</div>
 
             <div class="kb-progress-track">
-                <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};"></div>
+                <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};">
+                    <div class="kb-shimmer"></div>
+                </div>
             </div>
 
             <div class="kb-footer">
@@ -1608,7 +1618,9 @@ margin-bottom: 0.5rem;
             <div class="kb-description">Ejecución presupuestal del SG-SST</div>
 
             <div class="kb-progress-track">
-                <div class="kb-progress-bar" id="kb-bar-${Math.random()}" style="width: 0%;"></div>
+                <div class="kb-progress-bar" id="kb-bar-${Math.random()}" style="width: 0%;">
+                    <div class="kb-shimmer"></div>
+                </div>
             </div>
 
             <div class="kb-footer">

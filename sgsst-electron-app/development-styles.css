@@ -826,6 +826,166 @@
   color: var(--text-light-color);
 }
 
+/* =========================================
+   KB-* STAT CARDS (Recursos / Inducciones / Capacitaciones / etc.)
+   Replica del diseno: titulo+badge header, valor grande,
+   descripcion, barra fina con shimmer siempre activo.
+   ========================================= */
+.k-budget-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px 20px;
+  background-color: var(--widget-bg-color, #ffffff);
+  border: 1px solid var(--border-color, #e5e5e5);
+  border-radius: var(--border-radius-md, 12px);
+  box-shadow: var(--box-shadow, 0 1px 3px rgba(0,0,0,0.04));
+  text-align: left;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.15s ease;
+}
+.k-budget-card:hover {
+  transform: translateY(-2px);
+}
+
+.kb-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.kb-title {
+  font-size: 13px;
+  color: var(--text-light-color, #6b7280);
+  font-weight: 500;
+  line-height: 1.2;
+}
+.kb-badge {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+  white-space: nowrap;
+  letter-spacing: 0.2px;
+}
+.kb-badge.bg-success { background: #EAF3DE; color: #27500A; }
+.kb-badge.bg-warning { background: #FAEEDA; color: #633806; }
+.kb-badge.bg-danger  { background: #FCEBEB; color: #791F1F; }
+.kb-badge.bg-pending { background: #ECEFF3; color: #4A5568; }
+
+.kb-amount {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--heading-color, #1a202c);
+  line-height: 1.1;
+  margin-top: 2px;
+  margin-bottom: 2px;
+}
+
+.kb-description {
+  font-size: 12.5px;
+  color: var(--text-light-color, #6b7280);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.kb-progress-track {
+  height: 6px;
+  background: #f0f0f0;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 10px;
+  position: relative;
+}
+.kb-progress-bar {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  position: relative;
+  overflow: hidden;
+  transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+/* Colores semaforo para la barra */
+.kb-progress-bar.bg-success { background: #639922; }
+.kb-progress-bar.bg-warning { background: #EF9F27; }
+.kb-progress-bar.bg-danger  { background: #E24B4A; }
+
+/* Shimmer (brillo que recorre la barra — SIEMPRE activo, alto contraste) */
+.kb-shimmer {
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.45) 25%,
+    rgba(255, 255, 255, 0.85) 50%,
+    rgba(255, 255, 255, 0.45) 75%,
+    transparent 100%
+  );
+  animation: kb-shimmer-slide 1.8s linear infinite;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  filter: blur(0.3px);
+}
+@keyframes kb-shimmer-slide {
+  0%   { left: -60%; }
+  100% { left: 110%; }
+}
+
+/* Ancho minimo visible de la barra para que el shimmer se vea
+   incluso cuando el porcentaje es 0% o muy bajo */
+.kb-progress-bar {
+  min-width: 4px;
+}
+
+.kb-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-top: 8px;
+  gap: 12px;
+}
+.kb-label {
+  font-size: 11px;
+  color: var(--text-light-color, #9ca3af);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 2px;
+}
+.kb-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--heading-color, #1a202c);
+}
+.kb-exec { color: var(--k-success, #639922); }
+.kb-rem  { color: var(--k-text-muted, #6b7280); }
+
+/* Dark mode */
+[data-theme="dark"] .k-budget-card {
+  background-color: var(--widget-bg-color, #2d3748);
+  border-color: #4a5568;
+}
+[data-theme="dark"] .kb-title,
+[data-theme="dark"] .kb-description,
+[data-theme="dark"] .kb-label {
+  color: #a0aec0;
+}
+[data-theme="dark"] .kb-amount,
+[data-theme="dark"] .kb-value {
+  color: #e2e8f0;
+}
+[data-theme="dark"] .kb-progress-track {
+  background: #1a202c;
+}
+[data-theme="dark"] .kb-badge.bg-success { background: #1f3a14; color: #b7e08c; }
+[data-theme="dark"] .kb-badge.bg-warning { background: #3a2a0e; color: #f5c98c; }
+[data-theme="dark"] .kb-badge.bg-danger  { background: #3a1414; color: #f0a0a0; }
+[data-theme="dark"] .kb-badge.bg-pending { background: #2d3748; color: #a0aec0; }
+
 [data-theme="dark"] .submodule-item {
   background-color: #2d3748;
   border-color: #4a5568;
