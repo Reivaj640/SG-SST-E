@@ -1818,7 +1818,11 @@ if (appHeader) {
             // 📦522 — Recordatorio mensual del COPASST (cumplimiento legal).
             // Aparece el dia 1 de cada mes con el texto "Realizar Acta del
             // COPASST". Color naranja intenso (#ea580c) bien diferenciable.
-            { id: 'recordatorio_copasst', label: 'Acta COPASST', color: '#ea580c' }
+            { id: 'recordatorio_copasst', label: 'Acta COPASST', color: '#ea580c' },
+            // 📦523 — Recordatorio mensual del Comite de Convivencia. Mismo
+            // patron que COPASST (Reunion mensual Res. 0312/2019 est. 6.2.2).
+            // Color cyan #0891b2 para distinguirse del naranja COPASST.
+            { id: 'recordatorio_convivencia', label: 'Acta Comite Convivencia', color: '#0891b2' }
           ],
           adapter: window.KairCalendarAdapter || null,
           onEventClick: function (ev) {

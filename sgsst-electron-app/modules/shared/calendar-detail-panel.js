@@ -35,6 +35,9 @@
     // y Res. 0312/2019 estandar 1.1.6: acta mensual obligatoria dentro de los
     // primeros 5 dias habiles del mes).
     recordatorio_copasst:   'Acta COPASST',
+    // 📦523 — Recordatorio mensual del Comite de Convivencia (Res. 0312/2019
+    // estandar 6.2.2: reunion mensual obligatoria). Mismo patron que COPASST.
+    recordatorio_convivencia: 'Acta Comite Convivencia',
     primary:              'Evento',
     success:              'Evento',
     warning:              'Evento',
@@ -55,7 +58,10 @@
     mantenimiento_programado: '#0d9488',
     // 📦522 — Color naranja intenso (#ea580c) para el recordatorio del COPASST.
     // Distintivo, alto contraste, evoca "alerta/pendiente" sin ser rojo critico.
-    recordatorio_copasst:   '#ea580c'
+    recordatorio_copasst:   '#ea580c',
+    // 📦523 — Color cyan (#0891b2) para el recordatorio del Comite de Convivencia.
+    // Distinto del naranja del COPASST para que el usuario diferencie facilmente.
+    recordatorio_convivencia: '#0891b2'
   };
 
   // Mapeo de tipo de evento → función de navegación al módulo origen.
@@ -79,7 +85,9 @@
     // las actas y la gestion del COPASST. Es un recordatorio de cumplimiento
     // legal (Decreto 614/1984, Res. 0312/2019), por lo que el boton "Ir al
     // modulo" SI debe aparecer para que el usuario pueda ir rapidamente.
-    recordatorio_copasst:   function () { _navigate('copasst'); }
+    recordatorio_copasst:   function () { _navigate('copasst'); },
+    // 📦523 — Recordatorio Comite de Convivencia: navega al submódulo 1.1.8.
+    recordatorio_convivencia: function () { _navigate('comite-convivencia'); }
   };
 
   // 📦500 — Mapeo de tipo → label del módulo de origen (para mostrar como
@@ -96,7 +104,10 @@
     mantenimiento_programado: 'Mantenimiento',
     // 📦522 — Recordatorio COPASST: el origen del recordatorio es el
     // submódulo 1.1.6 COPASST.
-    recordatorio_copasst:   'COPASST'
+    recordatorio_copasst:   'COPASST',
+    // 📦523 — Recordatorio Comite de Convivencia: el origen es el
+    // submódulo 1.1.8 Comite de Convivencia.
+    recordatorio_convivencia: 'Comite Convivencia'
   };
 
   // ── Estado ───────────────────────────────────────────────────────────

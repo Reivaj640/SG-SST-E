@@ -3988,6 +3988,103 @@ ipcMain.handle('recordatorio-copasst:get-events', async (event, params) => {
   }
 });
 
+// ── K+AIR Calendar: Recordatorio Acta Comite de Convivencia (📦523) ─────
+// 📅 Recordatorio TRIMESTRAL alineado con el ciclo de auto-llenado del
+// acta (main.js:11457 CONVIVENCIA_CYCLE_MONTHS = [2, 5, 8, 11]). El
+// boton "Autollenado" del modulo sugiere la proxima reunion siguiendo
+// ese mismo ciclo Feb/May/Ago/Nov, por eso el calendario refleja
+// exactamente esas 4 reuniones al ano. Aparece el dia 1 del mes del
+// ciclo (movido al lunes si cae en fin de semana), color cyan #0891b2
+// para distinguirse del naranja de COPASST.
+//
+// (Nota historica: la Res. 0312/2019 estandar 6.2.2 y la Ley 1010/2006
+// piden reuniones mensuales, pero el autofill de la app esta
+// configurado en ciclo trimestral desde su creacion — el calendario
+// refleja la configuracion real de la app, no el maximo legal. Si en
+// algun momento se cambia el autofill a mensual, sincronizar este
+// array con [1..12] tambien.)
+const CONVIVENCIA_RECORDATORIO_MONTHS = [2, 5, 8, 11]; // Feb, May, Ago, Nov
+ipcMain.handle('recordatorio-convivencia:get-events', async (event, params) => {
+  try {
+    const params2 = params || {};
+    const now = new Date();
+    const currentYear = now.getFullYear();
+
+    let startStr = params2.start;
+    let endStr = params2.end;
+    if (!startStr || !endStr) {
+      startStr = `${currentYear}-01-01`;
+      endStr = `${currentYear}-12-31`;
+    }
+
+    const startDate = new Date(startStr + 'T00:00:00');
+    const endDate = new Date(endStr + 'T23:59:59');
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return { success: false, error: { code: 'INVALID_INPUT', message: 'start/end inválidos' } };
+    }
+
+    const events = [];
+    const cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    const endCursor = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+    while (cursor <= endCursor) {
+      const year = cursor.getFullYear();
+      const monthIdx = cursor.getMonth();
+      const monthNum = monthIdx + 1; // 1-12, sin padding todavía
+
+      // Solo generar recordatorio en los meses del ciclo trimestral
+      if (!CONVIVENCIA_RECORDATORIO_MONTHS.includes(monthNum)) {
+        cursor.setMonth(cursor.getMonth() + 1);
+        continue;
+      }
+
+      const monthStr = String(monthNum).padStart(2, '0');
+
+      // Misma logica que COPASST: si dia 1 cae en fin de semana, mover al lunes
+      const dayOfWeek = cursor.getDay();
+      let adjustedDay = 1;
+      let ajusteTexto = '';
+      if (dayOfWeek === 6) {
+        adjustedDay = 3;
+        ajusteTexto = ' (1° cae sábado, se muestra el lunes 3)';
+      } else if (dayOfWeek === 0) {
+        adjustedDay = 2;
+        ajusteTexto = ' (1° cae domingo, se muestra el lunes 2)';
+      }
+      const dayStr = String(adjustedDay).padStart(2, '0');
+      const dateStr = `${year}-${monthStr}-${dayStr}`;
+
+      events.push({
+        id: `recordatorio-convivencia-${year}-${monthStr}-${dayStr}`,
+        type: 'recordatorio_convivencia',
+        title: 'Realizar Acta del Comité de Convivencia',
+        date: dateStr,
+        start: '00:00',
+        end: '23:59',
+        allDay: true,
+        color: '#0891b2',
+        source: 'recordatorio_convivencia',
+        meta: {
+          plazoTexto: 'Reunión trimestral del Comité de Convivencia' + ajusteTexto,
+          mes: monthNum,
+          year: year,
+          diaOriginal: 1,
+          diaMostrado: adjustedDay,
+          esFinDeSemana: dayOfWeek === 0 || dayOfWeek === 6,
+          ciclo: 'Trimestral (Feb, May, Ago, Nov)',
+          norma: 'Res. 0312/2019 estándar 6.2.2 · Ley 1010/2006'
+        }
+      });
+
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+
+    return { success: true, data: events };
+  } catch (e) {
+    sendLog(`[CAL-CONVIVENCIA] Error generando recordatorios: ${e.message}`, 'ERROR');
+    return { success: false, error: { code: 'GET_EVENTS_FAILED', message: e.message } };
+  }
+});
+
 // ── K+AIR Calendar: Capacitaciones (📦495 — implementación real) ──────
 // Lee el Excel de cronograma de capacitaciones de la empresa actual y
 // devuelve cada capacitación con fecha válida como evento del calendario.

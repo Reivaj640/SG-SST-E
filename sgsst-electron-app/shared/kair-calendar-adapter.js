@@ -20,7 +20,14 @@
  *        (Decreto 614/1984, Res. 0312/2019 estandar 1.1.6): "Realizar Acta del
  *        COPASST dentro de los primeros 5 dias habiles del mes". Global, no
  *        depende de empresa.
- *   9. Estados de cumplimiento (electronAPI.eventosCumplidos.listar) — 📦498
+ *   9. Recordatorio Acta Comite de Convivencia (electronAPI.recordatorios.convivenciaGetEvents) — 📦523
+ *      → Recordatorio TRIMESTRAL alineado con el ciclo de auto-llenado del
+ *        acta: Feb(2), May(5), Ago(8), Nov(11) — 4 reuniones al año. Mismo
+ *        patron de ajuste de fin de semana que COPASST (si día 1 cae sábado
+ *        o domingo se mueve al lunes), color cyan #0891b2 para distinguirse
+ *        del naranja COPASST. Refleja la configuracion del autofill en
+ *        main.js (CONVIVENCIA_CYCLE_MONTHS), no el maximo legal mensual.
+ *   10. Estados de cumplimiento (electronAPI.eventosCumplidos.listar) — 📦498
  *      → Enriquece cada evento con {cumplido:true/false, cumplidoEn:ISO}.
  *      → NO agrega eventos, solo decora los existentes.
  *
@@ -94,7 +101,15 @@
     var mantRange = _expandRangeToFullYear(range);
     var mantPayload = Object.assign({}, mantRange, { currentCompany: currentCompany });
     // 📦522 — Recordatorio COPASST: no necesita currentCompany (es global).
-    var copasstPayload = Object.assign({}, range || {});
+    // BUG-FIX: usar rango anual (mismo truco que inspecciones/mantenimientos)
+    // porque el KairCalendar NO recarga eventos al navegar de mes — si pasáramos
+    // solo el mes visible, los recordatorios de los otros 11 meses desaparecerían
+    // al navegar (el usuario abria el calendario en Julio y no veia los eventos
+    // de Enero-Junio). Ampliamos a año completo para que esten en memoria.
+    var recRange = _expandRangeToFullYear(range);
+    var copasstPayload = Object.assign({}, recRange);
+    // 📦523 — Recordatorio Convivencia: idem. Comparte el mismo rango anual.
+    var convivenciaPayload = Object.assign({}, recRange);
     var results = await Promise.all([
       _safe(function () { return api.planTrabajo && api.planTrabajo.getEvents(range); }),
       _safe(function () { return api.capacitaciones && api.capacitaciones.getEvents(capPayload); }),
@@ -119,6 +134,12 @@
       _safe(function () {
         return api.recordatorios && api.recordatorios.copasstGetEvents
           ? api.recordatorios.copasstGetEvents(copasstPayload)
+          : { success: true, data: [] };
+      }),
+      // 📦523 — Recordatorio mensual "Acta del Comite de Convivencia" (mismo patron).
+      _safe(function () {
+        return api.recordatorios && api.recordatorios.convivenciaGetEvents
+          ? api.recordatorios.convivenciaGetEvents(convivenciaPayload)
           : { success: true, data: [] };
       }),
       // 📦498 — Esta fuente NO devuelve eventos: devuelve Map de cumplidos
