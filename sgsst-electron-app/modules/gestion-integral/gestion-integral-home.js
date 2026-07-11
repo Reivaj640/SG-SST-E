@@ -1094,7 +1094,9 @@ gap: 1rem;
             <div class="kb-description">Actividades del plan anual ejecutadas</div>
 
             <div class="kb-progress-track">
-                <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};"></div>
+                <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};">
+                    <div class="kb-shimmer"></div>
+                </div>
             </div>
 
             <div class="kb-footer">
@@ -1148,7 +1150,9 @@ gap: 1rem;
             <div class="kb-description">Documentos con vigencia verificada</div>
 
             <div class="kb-progress-track">
-                <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};"></div>
+                <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};">
+                    <div class="kb-shimmer"></div>
+                </div>
             </div>
 
             <div class="kb-footer">
@@ -1282,7 +1286,9 @@ gap: 1rem;
             <div class="kb-description">Cumplimiento de estándares del SG-SST</div>
 
             <div class="kb-progress-track">
-                <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};"></div>
+                <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};">
+                    <div class="kb-shimmer"></div>
+                </div>
             </div>
 
             <div class="kb-footer">

@@ -193,7 +193,9 @@ class MejoramientoHome {
                 </div>
                 ${pct !== null ? `
                 <div class="kb-progress-track" style="margin-bottom: 0.5rem;">
-                    <div class="kb-progress-bar" style="width: ${pct}%"></div>
+                    <div class="kb-progress-bar" style="width: ${pct}%">
+    <div class="kb-shimmer"></div>
+</div>
                 </div>
                 <div class="kb-footer">
                     <div>

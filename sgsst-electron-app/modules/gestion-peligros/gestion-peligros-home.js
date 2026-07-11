@@ -257,7 +257,9 @@ class GestionPeligrosHome {
 					' + sublabel + '\
 				</div>\
 				<div class="kb-progress-track" style="margin-bottom: 0.5rem;">\
-					<div class="kb-progress-bar" style="width: ' + progressPct + '%"></div>\
+					<div class="kb-progress-bar" style="width: ' + progressPct + '%">\
+    <div class="kb-shimmer"></div>\
+</div>\
 				</div>\
 				<div class="kb-footer">\
 					<div>\
@@ -318,7 +320,9 @@ class GestionPeligrosHome {
 					Actividades programadas\
 				</div>\
 				<div class="kb-progress-track" style="margin-bottom: 0.5rem;">\
-					<div class="kb-progress-bar" style="width: ' + (displayData.tasaCumplimiento || 0) + '%"></div>\
+					<div class="kb-progress-bar" style="width: ' + (displayData.tasaCumplimiento || 0) + '%">\
+    <div class="kb-shimmer"></div>\
+</div>\
 				</div>\
 				<div class="kb-footer">\
 					<div>\
@@ -375,7 +379,9 @@ class GestionPeligrosHome {
   Peligros identificados\
 </div>\
 <div class="kb-progress-track" style="margin-bottom: 0.5rem;">\
-  <div class="kb-progress-bar" style="width: ' + (tasa > 0 ? Math.min(tasa, 100) : 0) + '%;background-color:' + (tasa >= 30 ? 'var(--k-danger)' : 'var(--k-success)') + ';"></div>\
+  <div class="kb-progress-bar" style="width: ' + (tasa > 0 ? Math.min(tasa, 100) : 0) + '%;background-color:' + (tasa >= 30 ? 'var(--k-danger)' : 'var(--k-success)') + ';">\
+    <div class="kb-shimmer"></div>\
+</div>\
 </div>\
 <div class="kb-footer">\
   <div>\

@@ -234,7 +234,9 @@ class VerificacionHome {
                     Completados / Total
                 </div>
                 <div class="kb-progress-track" style="margin-bottom: 0.5rem;">
-                    <div class="kb-progress-bar" style="width: ${d.eficacia}%"></div>
+                    <div class="kb-progress-bar" style="width: ${d.eficacia}%">
+    <div class="kb-shimmer"></div>
+</div>
                 </div>
                 <div class="kb-footer">
                     <div>

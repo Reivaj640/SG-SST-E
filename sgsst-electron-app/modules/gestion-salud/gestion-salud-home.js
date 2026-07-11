@@ -781,7 +781,9 @@ Control de remisiones y recomendaciones
 Trabajadores con inducción al día
                 </div>
                 <div class="kb-progress-track" style="margin-bottom: 0.5rem;">
-                    <div class="kb-progress-bar" style="width: ${displayData.porcentajeCompletado}%"></div>
+                    <div class="kb-progress-bar" style="width: ${displayData.porcentajeCompletado}%">
+    <div class="kb-shimmer"></div>
+</div>
                 </div>
                 <div class="kb-footer">
                     <div>
