@@ -29,6 +29,11 @@ tmp/
 Portear/.venv/
 Portear/venv/
 
+# Python embebido de K+AIR (se restaura desde el instalador, NO trackear)
+# La build config en package.json ya lo excluye con !Portear/python-embed/**
+Portear/python-embed/
+Portear/python-embed.bak/
+
 # Archivos compilados de Python
 __pycache__/
 *.pyc

@@ -843,8 +843,11 @@ const createWindow = () => {
   // Cargar el archivo HTML principal
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
 
-  // Abrir DevTools en modo desarrollo
-  mainWindow.webContents.openDevTools();
+  // DevTools desactivado: el usuario lo abre manualmente con F12 o Ctrl+Shift+I
+  // cuando lo necesita. Antes se abría solo en cada arranque (molesto).
+  // if (!app.isPackaged) {
+  //   mainWindow.webContents.openDevTools();
+  // }
 };
 
 // Función auxiliar para búsqueda recursiva de archivos en el sistema de archivos
@@ -15571,7 +15574,8 @@ async function startLlmServer() {
         console.log('[MAIN] 🚀 Iniciando servidor LLM...');
 
         // Obtener ruta de Python — usar el resolver robusto para garantizar el Python correcto
-        // (no hacer fallback ciego a 'python' del PATH porque ese Python no tiene torch/transformers)
+        // (no hacer fallback ciego a 'python' del PATH porque ese Python no tiene las dependencias
+        // del proyecto como docxtpl, pdfplumber, flask, etc.)
         const pythonPath = await getPython();
         const serverScript = getPythonScriptPath('llm_server.py');
 
