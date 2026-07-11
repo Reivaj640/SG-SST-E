@@ -249,7 +249,7 @@ HEADER ACTION BUTTONS
       <span id="header-company-text">—</span>
     </span>
     <div style="width:1px; height:24px; background:#dee2e6;"></div>
-    <button id="backToSubmodulesBtn" class="header-back-btn" title="Volver al módulo Recursos">
+    <button id="backToSubmodulesBtn" class="header-back-btn" title="Volver al inicio">
       <i class="fas fa-arrow-left"></i> Volver
     </button>
   </div>
@@ -319,7 +319,7 @@ HEADER ACTION BUTTONS
 
             // Navegación
             document.getElementById('backToSubmodulesBtn').addEventListener('click', () => {
-                window.parent.postMessage({ action: 'backToSubmodules' }, '*');
+                window.parent.postMessage({ action: 'backToHome' }, '*');
             });
 
             // Acciones de Archivo

@@ -302,7 +302,7 @@ HEADER ACTION BUTTONS
       <span id="header-company-text">—</span>
     </span>
     <div style="width:1px; height:24px; background:#dee2e6;"></div>
-    <button id="backToSelectorBtn" class="header-back-btn" title="Volver al selector">
+    <button id="backToSelectorBtn" class="header-back-btn" title="Volver al inicio">
       <i class="fas fa-arrow-left"></i> Volver
     </button>
     <button id="addRowBtn" class="header-action--primary">
@@ -435,7 +435,7 @@ HEADER ACTION BUTTONS
 function setupEventListeners() {
   const backToSelector = () => {
     if (!hasPendingChanges || confirm('Tiene cambios sin guardar. ¿Está seguro de que desea salir?')) {
-      window.parent.postMessage({ action: 'backToSelector' }, '*');
+      window.parent.postMessage({ action: 'backToHome' }, '*');
     }
   };
 
