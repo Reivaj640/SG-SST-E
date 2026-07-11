@@ -4267,6 +4267,95 @@ ipcMain.handle('recordatorio-afiliacion:get-events', async (event, params) => {
   }
 });
 
+// ── K+AIR Calendar: Recordatorio Actualización Inducciones (📦525) ──────
+// 📅 Recordatorio MENSUAL: día 2 (cierre de los "2 primeros días" del
+// mes). Recordatorio LEGAL-OPERATIVO: en Colombia, todo trabajador
+// nuevo debe recibir inducción antes de iniciar sus tareas (Decreto
+// 1072/2015 art. 2.2.4.6.11). El usuario tiene los 2 primeros días
+// del mes para actualizar el registro de inducciones del mes anterior
+// (nuevos ingresos, reinducciones, etc.). Si el día 2 cae en fin de
+// semana se mueve al lunes siguiente (mismo patrón que el resto de
+// recordatorios). Color indigo #6366f1 para distinguirse del resto.
+//
+// Genera 12 eventos por año (1/mes × 12). No depende de empresa — es global.
+ipcMain.handle('recordatorio-inducciones:get-events', async (event, params) => {
+  try {
+    const params2 = params || {};
+    const now = new Date();
+    const currentYear = now.getFullYear();
+
+    let startStr = params2.start;
+    let endStr = params2.end;
+    if (!startStr || !endStr) {
+      startStr = `${currentYear}-01-01`;
+      endStr = `${currentYear}-12-31`;
+    }
+
+    const startDate = new Date(startStr + 'T00:00:00');
+    const endDate = new Date(endStr + 'T23:59:59');
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return { success: false, error: { code: 'INVALID_INPUT', message: 'start/end inválidos' } };
+    }
+
+    const events = [];
+    const cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    const endCursor = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+    while (cursor <= endCursor) {
+      const year = cursor.getFullYear();
+      const monthIdx = cursor.getMonth();
+      const monthNum = monthIdx + 1;
+      const monthStr = String(monthNum).padStart(2, '0');
+
+      // 1 evento por mes: día 2 (cierre de los 2 primeros días)
+      const dayDate = new Date(year, monthIdx, 2);
+      const dayOfWeek = dayDate.getDay();
+      let adjustedDay = 2;
+      let ajusteTexto = '';
+      if (dayOfWeek === 6) {
+        // Sábado → lunes siguiente (2 + 2 = 4)
+        adjustedDay = 4;
+        ajusteTexto = ' (día 2 cae sábado, se muestra lunes 4)';
+      } else if (dayOfWeek === 0) {
+        // Domingo → lunes siguiente (2 + 1 = 3)
+        adjustedDay = 3;
+        ajusteTexto = ' (día 2 cae domingo, se muestra lunes 3)';
+      }
+      const dayStr = String(adjustedDay).padStart(2, '0');
+      const dateStr = `${year}-${monthStr}-${dayStr}`;
+
+      events.push({
+        id: `recordatorio-inducciones-${year}-${monthStr}-${dayStr}`,
+        type: 'recordatorio_inducciones',
+        title: 'Actualización de Inducciones',
+        date: dateStr,
+        start: '00:00',
+        end: '23:59',
+        allDay: true,
+        color: '#6366f1',
+        source: 'recordatorio_inducciones',
+        meta: {
+          plazoTexto: 'Cierre de los 2 primeros días del mes para actualizar registro de inducciones' + ajusteTexto,
+          mes: monthNum,
+          year: year,
+          ventana: '2 primeros días',
+          diaOriginal: 2,
+          diaMostrado: adjustedDay,
+          esFinDeSemana: dayOfWeek === 0 || dayOfWeek === 6,
+          ciclo: 'Mensual (día 2)',
+          norma: 'Decreto 1072/2015 art. 2.2.4.6.11'
+        }
+      });
+
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+
+    return { success: true, data: events };
+  } catch (e) {
+    sendLog(`[CAL-INDUCCIONES] Error generando recordatorios: ${e.message}`, 'ERROR');
+    return { success: false, error: { code: 'GET_EVENTS_FAILED', message: e.message } };
+  }
+});
+
 // ── K+AIR Calendar: Capacitaciones (📦495 — implementación real) ──────
 // Lee el Excel de cronograma de capacitaciones de la empresa actual y
 // devuelve cada capacitación con fecha válida como evento del calendario.

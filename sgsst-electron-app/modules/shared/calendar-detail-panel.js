@@ -49,6 +49,11 @@
     // por mes (dia 10) para reportar novedades de personal del mes anterior
     // (Ley 100/1993, Decreto 1295/1994, Decreto 806/1998 art. 16).
     recordatorio_afiliacion: 'Afiliación SSSI',
+    // 📦525 — Recordatorio LEGAL-OPERATIVO de Actualizacion de Inducciones.
+    // 1 evento por mes (dia 2) para actualizar el registro de inducciones
+    // del mes anterior (Decreto 1072/2015 art. 2.2.4.6.11 — induccion
+    // obligatoria antes de iniciar tareas).
+    recordatorio_inducciones: 'Actualización Inducciones',
     primary:              'Evento',
     success:              'Evento',
     warning:              'Evento',
@@ -78,43 +83,43 @@
     recordatorio_presupuesto: '#10b981',
     // 📦525 — Color amber (#f59e0b) para el recordatorio de Afiliacion al SSSI.
     // Amarillo calido, distintivo de los 3 recordatorios anteriores.
-    recordatorio_afiliacion: '#f59e0b'
+    recordatorio_afiliacion: '#f59e0b',
+    // 📦525 — Color indigo (#6366f1) para el recordatorio de Inducciones.
+    // Azul-violeta, distintivo de los 4 recordatorios anteriores.
+    recordatorio_inducciones: '#6366f1'
   };
 
   // Mapeo de tipo de evento → función de navegación al módulo origen.
   // Si no hay mapeo, no se muestra el botón "Ir al módulo".
+  // 📦525 — BUG-FIX: usar _navigateTo(module, submodule) para los tipos que
+  // viven en un submódulo especifico. Antes se usaba _navigate() que solo
+  // navega al HOME del modulo padre — el usuario tenia que buscar el
+  // submodulo manualmente. Ahora va directo al submodulo correcto.
   var NAV_MAP = {
     plan:                 function () { _navigate('plan-trabajo'); },
     capacitacion:         function () { _navigate('capacitaciones'); },
     auditoria:            function () { _navigate('auditoria-anual'); },
     // 📦497 — Gestación: navega al submódulo de ausentismo donde está
-    // Seguimiento de Gestación. 1 click adicional del usuario para llegar
-    // a la vista específica (consistente con el patrón de capacitación).
-    gestacion:            function () { _navigate('3.3.6 Medición del ausentismo por causa médica'); },
-    // 📦506 — Inspecciones planificadas: navega al módulo de Gestión de
-    // Peligros y Riesgos → Inspecciones (4.2.4). El usuario aterriza en el
-    // hub donde puede ver las inspecciones disponibles del mes.
-    inspeccion_programada: function () { _navigate('4.2.4 Inspecciones Sistemáticas'); },
-    // 📦509 — Mantenimientos programados: navega al submódulo 4.2.5 que es
-    // donde el usuario edita el cronograma MPP/MPE/MPC.
-    mantenimiento_programado: function () { _navigate('4.2.5 Mantenimiento periodico de equipos, instalaciones herramientas'); },
-    // 📦522 — Recordatorio COPASST: navega al submódulo 1.1.6 donde estan
-    // las actas y la gestion del COPASST. Es un recordatorio de cumplimiento
-    // legal (Decreto 614/1984, Res. 0312/2019), por lo que el boton "Ir al
-    // modulo" SI debe aparecer para que el usuario pueda ir rapidamente.
-    recordatorio_copasst:   function () { _navigate('copasst'); },
+    // Seguimiento de Gestación. Antes usaba _navigate() que caia en el
+    // placeholder generico — ahora va directo al submodulo 3.3.6.
+    gestacion:            function () { _navigateTo('Gestión de la Salud', '3.3.6 Medición del ausentismo por causa médica'); },
+    // 📦506 — Inspecciones planificadas: navega al submódulo 4.2.4 (el
+    // nombre real del submodulo es "Realización de inspecciones
+    // sistematicas..." — antes el NAV_MAP usaba un nombre inventado que
+    // no existia en ALL_SUBMODULES).
+    inspeccion_programada: function () { _navigateTo('Gestión de Peligros y Riesgos', '4.2.4 Realización de inspecciones sistematicas a las instalaciones, maquinas o equipos'); },
+    // 📦509 — Mantenimientos programados: navega al submódulo 4.2.5.
+    mantenimiento_programado: function () { _navigateTo('Gestión de Peligros y Riesgos', '4.2.5 Mantenimiento periodico de equipos, instalaciones herramientas'); },
+    // 📦522 — Recordatorio COPASST: navega al submódulo 1.1.6.
+    recordatorio_copasst:   function () { _navigateTo('Recursos', '1.1.6 Conformación de Copasst'); },
     // 📦523 — Recordatorio Comite de Convivencia: navega al submódulo 1.1.8.
-    recordatorio_convivencia: function () { _navigate('comite-convivencia'); },
-    // 📦524 — Recordatorio Actualizacion de Presupuesto: navega al modulo
-    // 1.1.3 Asignacion de Recursos → Presupuesto. Aterriza en el home del
-    // modulo donde el usuario puede ver el resumen del año en curso y los
-    // botones "Ingresar" / "Historico de Anos" para editar.
-    recordatorio_presupuesto: function () { _navigate('presupuesto'); },
-    // 📦525 — Recordatorio Afiliacion al SSSI: navega al modulo
-    // 1.1.5 Afiliacion en Recursos. Aterriza en el home del modulo de
-    // afiliacion donde el usuario puede ver el estado de los colaboradores
-    // afiliados a EPS/AFP/ARL.
-    recordatorio_afiliacion: function () { _navigate('afiliacion'); }
+    recordatorio_convivencia: function () { _navigateTo('Recursos', '1.1.8 Conformación de Comite de Convivencia'); },
+    // 📦524 — Recordatorio Actualizacion de Presupuesto: submódulo 1.1.3.
+    recordatorio_presupuesto: function () { _navigateTo('Recursos', '1.1.3 Asignación de Recursos'); },
+    // 📦524 — Recordatorio Afiliacion al SSSI: submódulo 1.1.4.
+    recordatorio_afiliacion: function () { _navigateTo('Recursos', '1.1.4 Afiliación al SSSI'); },
+    // 📦525 — Recordatorio Inducciones: submódulo 1.2.2.
+    recordatorio_inducciones: function () { _navigateTo('Recursos', '1.2.2 Inducción y Reinducción'); }
   };
 
   // 📦500 — Mapeo de tipo → label del módulo de origen (para mostrar como
@@ -140,7 +145,10 @@
     recordatorio_presupuesto: 'Presupuesto',
     // 📦525 — Recordatorio Afiliacion al SSSI: el origen es el modulo
     // 1.1.5 Afiliacion en Recursos.
-    recordatorio_afiliacion: 'Afiliación SSSI'
+    recordatorio_afiliacion: 'Afiliación SSSI',
+    // 📦525 — Recordatorio Inducciones: el origen es el modulo
+    // 1.1.7 Inducciones en Recursos.
+    recordatorio_inducciones: 'Inducciones'
   };
 
   // ── Estado ───────────────────────────────────────────────────────────
@@ -214,6 +222,39 @@
     }
   }
 
+  // 📦525 — BUG-FIX: navegacion directa a submódulos. La mayoria de los
+  // recordatorios (y los eventos de ausentismo/inspecciones/mantenimiento)
+  // viven dentro de un submódulo del modulo padre (ej: "1.1.6 Conformacion
+  // de Copasst" dentro de "Recursos"). showModuleContent() solo abre el
+  // HOME del modulo padre, no el submodulo especifico. Antes, _navigate()
+  // caia al fallback generico de showModuleContent y el usuario terminaba
+  // en una pagina placeholder "Contenido del modulo 'X' se cargara aqui"
+  // (o en el peor caso, en el home de Recursos que muestra TODOS los
+  // submodulos — incluyendo Induccion, lo que el usuario confundia con
+  // "siempre me envia a inducciones"). La solucion es
+  // showModuleContentWithSubmodule() que SÍ navega directo al submodulo.
+  // Fallback: si la funcion no esta expuesta, va al home del modulo padre
+  // (mejor que el placeholder vacio).
+  function _navigateTo(moduleName, submoduleName) {
+    close();
+    if (typeof global.showModuleContentWithSubmodule === 'function') {
+      try {
+        global.showModuleContentWithSubmodule(moduleName, submoduleName);
+        return;
+      } catch (e) {
+        console.warn('[CalendarDetailPanel] Error navegando a ' + moduleName + ' > ' + submoduleName + ': ' + e.message);
+      }
+    }
+    // Fallback: home del modulo padre
+    if (typeof global.showModuleContent === 'function') {
+      try {
+        global.showModuleContent(moduleName);
+      } catch (e) {
+        console.warn('[CalendarDetailPanel] Error con showModuleContent: ' + e.message);
+      }
+    }
+  }
+
   function _ensureDom() {
     if (_el && document.body.contains(_el)) return _el;
     _el = document.createElement('div');
@@ -262,7 +303,7 @@
         '</div>';
       cumplidoFooter =
         '<button type="button" class="kair-cal-btn kair-cal-btn--secondary" data-kair-cal-dp-action="unmark-cumplido">' +
-          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>' +
           '<span>Desmarcar</span>' +
         '</button>';
     } else {

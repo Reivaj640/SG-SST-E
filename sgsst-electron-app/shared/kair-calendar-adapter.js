@@ -41,6 +41,13 @@
  *        de ajuste de fin de semana (sabado/domingo se mueve al lunes). Color
  *        amber #f59e0b para distinguirse del resto. 12 eventos por anio (1/mes).
  *        Base legal: Ley 100/1993, Decreto 1295/1994, Decreto 806/1998 art. 16.
+ *   12. Recordatorio Actualizacion Inducciones (electronAPI.recordatorios.induccionesGetEvents) — 📦525
+ *      → Recordatorio LEGAL-OPERATIVO con 1 evento por mes: dia 2 (cierre de
+ *        los "2 primeros dias" para actualizar el registro de inducciones del
+ *        mes anterior). Mismo patron de ajuste de fin de semana. Color indigo
+ *        #6366f1 para distinguirse del resto. 12 eventos por anio (1/mes).
+ *        Base legal: Decreto 1072/2015 art. 2.2.4.6.11 (induccion obligatoria
+ *        antes de iniciar tareas).
  *   10. Estados de cumplimiento (electronAPI.eventosCumplidos.listar) — 📦498
  *      → Enriquece cada evento con {cumplido:true/false, cumplidoEn:ISO}.
  *      → NO agrega eventos, solo decora los existentes.
@@ -128,6 +135,8 @@
     var presupuestoPayload = Object.assign({}, recRange);
     // 📦525 — Recordatorio Afiliacion: idem. Comparte el mismo rango anual.
     var afiliacionPayload = Object.assign({}, recRange);
+    // 📦525 — Recordatorio Inducciones: idem. Comparte el mismo rango anual.
+    var induccionesPayload = Object.assign({}, recRange);
     var results = await Promise.all([
       _safe(function () { return api.planTrabajo && api.planTrabajo.getEvents(range); }),
       _safe(function () { return api.capacitaciones && api.capacitaciones.getEvents(capPayload); }),
@@ -174,6 +183,14 @@
       _safe(function () {
         return api.recordatorios && api.recordatorios.afiliacionGetEvents
           ? api.recordatorios.afiliacionGetEvents(afiliacionPayload)
+          : { success: true, data: [] };
+      }),
+      // 📦525 — Recordatorio "Actualizacion de Inducciones" (1 evento por mes:
+      // dia 2, ajustado al lunes si cae en fin de semana). Legal-operativo.
+      // Comparte el rango anual con el resto de recordatorios.
+      _safe(function () {
+        return api.recordatorios && api.recordatorios.induccionesGetEvents
+          ? api.recordatorios.induccionesGetEvents(induccionesPayload)
           : { success: true, data: [] };
       }),
       // 📦498 — Esta fuente NO devuelve eventos: devuelve Map de cumplidos

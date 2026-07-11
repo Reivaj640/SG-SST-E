@@ -1833,7 +1833,12 @@ if (appHeader) {
             // Social Integral). 1 evento por mes (dia 10, ajustado al lunes si
             // cae en fin de semana). Color amber #f59e0b para distinguirse del
             // resto. Recordatorio LEGAL-OPERATIVO (Ley 100/1993, Decreto 1295/1994).
-            { id: 'recordatorio_afiliacion', label: 'Afiliación SSSI', color: '#f59e0b' }
+            { id: 'recordatorio_afiliacion', label: 'Afiliación SSSI', color: '#f59e0b' },
+            // 📦525 — Recordatorio de Actualizacion de Inducciones. 1 evento
+            // por mes (dia 2, ajustado al lunes si cae en fin de semana). Color
+            // indigo #6366f1 para distinguirse del resto. Recordatorio
+            // LEGAL-OPERATIVO (Decreto 1072/2015 art. 2.2.4.6.11).
+            { id: 'recordatorio_inducciones', label: 'Actualización Inducciones', color: '#6366f1' }
           ],
           adapter: window.KairCalendarAdapter || null,
           onEventClick: function (ev) {

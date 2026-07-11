@@ -594,7 +594,13 @@ duplicateIndicadoresFile: ({ currentFilePath, newYear }) => ipcRenderer.invoke('
     // Integral): 1 evento por mes (día 10, ajustado al lunes si cae en fin
     // de semana). Color amber #f59e0b para distinguirse del resto. Recordatorio
     // LEGAL-OPERATIVO (Ley 100/1993, Decreto 1295/1994, Decreto 806/1998 art. 16).
-    afiliacionGetEvents: (params) => ipcRenderer.invoke('recordatorio-afiliacion:get-events', params)
+    afiliacionGetEvents: (params) => ipcRenderer.invoke('recordatorio-afiliacion:get-events', params),
+    // 📦525 — Recordatorio de Actualización de Inducciones: 1 evento por mes
+    // (día 2, ajustado al lunes si cae en fin de semana). Color indigo #6366f1
+    // para distinguirse del resto. Recordatorio LEGAL-OPERATIVO (Decreto
+    // 1072/2015 art. 2.2.4.6.11 — todo trabajador nuevo debe recibir inducción
+    // antes de iniciar tareas).
+    induccionesGetEvents: (params) => ipcRenderer.invoke('recordatorio-inducciones:get-events', params)
   },
 
   // --- Identificación de Peligros (4.1.2) ---
