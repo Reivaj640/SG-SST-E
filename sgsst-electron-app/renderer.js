@@ -1869,6 +1869,17 @@ if (appHeader) {
     console.error('Calendar button NOT found in DOM.');
   }
 
+  // 📦 Alertas calendario — Inicializar el sistema de badge + popover de
+  // pendientes. Se hace DESPUÉS de KairCalendar para que ambos coexistan
+  // sobre el mismo #calendar-button. El badge tiene su propio click handler
+  // (con stopPropagation) — el botón sigue abriendo el calendario como hoy.
+  if (typeof window.KairAlerts === 'object' && typeof window.KairAlerts.init === 'function') {
+    window.KairAlerts.init();
+    console.log('[K+AIR] KairAlerts inicializado.');
+  } else {
+    console.warn('[K+AIR] KairAlerts no disponible — el badge de alertas no funcionará.');
+  }
+
   // Botón de home de empresa
   const companyHomeButtonElement = document.getElementById('company-home-button');
   if (companyHomeButtonElement) {
@@ -2912,6 +2923,13 @@ async function selectCompany(companyName, buttonElement) {
 console.log(`Selecting company: ${companyName}`);
 currentCompany = companyName;
 
+// 📦 Alertas calendario — refrescar badge al cambiar de empresa (los pendientes
+// son por empresa). El módulo puede no estar cargado aún (caso de login inicial);
+// el init() se hace en el bloque DOMContentLoaded y ya hace su propio refresh.
+if (window.KairAlerts && typeof window.KairAlerts.refresh === 'function') {
+  window.KairAlerts.refresh();
+}
+
 const mainContainerSel = document.querySelector('.main-container');
 if (mainContainerSel) mainContainerSel.classList.remove('vanta-fullscreen');
 
@@ -2985,6 +3003,11 @@ if (mainContainerSel) mainContainerSel.classList.remove('vanta-fullscreen');
 
   // Establecer la empresa también en el contexto global
   window.currentCompany = companyName;
+
+  // 📦 Alertas calendario — refrescar al cambiar de empresa.
+  if (window.KairAlerts && typeof window.KairAlerts.refresh === 'function') {
+    window.KairAlerts.refresh();
+  }
 
   // Destruir la animación de Vanta antes de cambiar de página
   if (window.vantaEffect && typeof window.vantaEffect.destroy === 'function') {

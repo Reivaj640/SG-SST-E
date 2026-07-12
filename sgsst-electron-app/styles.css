@@ -5963,6 +5963,404 @@ border-bottom: 1px solid var(--border-color) !important;
 box-shadow: var(--box-shadow) !important;
 }
 
+/* 📦 Alertas calendario — Header pinned (forzado a visible cuando hay pendientes).
+   Sobreescribe app-header-collapsed. Mismo padding/border que el modo hovering
+   para coherencia visual cuando hay alertas. */
+#app-header.app-header-pinned {
+  max-height: 70px !important;
+  padding-top: calc(var(--spacer-sm) * 0.5) !important;
+  padding-bottom: calc(var(--spacer-sm) * 0.5) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  box-shadow: var(--box-shadow) !important;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   BADGE DE ALERTAS EN ICONO DEL CALENDARIO
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+#calendar-button {
+  position: relative; /* ancla para el badge absoluto */
+}
+
+.kair-cal-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #dc3545;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 2;
+  user-select: none;
+  /* Animación sutil de pulso para llamar la atención */
+  animation: kair-cal-badge-pulse 2.4s ease-in-out infinite;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.kair-cal-badge[hidden] {
+  display: none !important;
+}
+
+.kair-cal-badge:hover {
+  background: #c82333;
+  transform: scale(1.08);
+}
+
+@keyframes kair-cal-badge-pulse {
+  0%, 100% { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25), 0 0 0 0 rgba(220, 53, 69, 0.4); }
+  50%      { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25), 0 0 0 6px rgba(220, 53, 69, 0); }
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   PANEL LATERAL DE PENDIENTES (kair-alerts)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Panel anclado al badge del calendario. Se posiciona via JS (position:fixed
+   con top/left calculados del rect del badge). La flecha indica el origen
+   apuntando al badge. NO usa backdrop — el resto de la app sigue
+   interactuable. Cierra con click fuera, ESC, o el botón X. */
+.kair-alerts-panel {
+  position: fixed;
+  z-index: 1090;
+  opacity: 0;
+  transform: translateY(-6px);
+  pointer-events: none;
+  transition: opacity 0.16s ease-out, transform 0.16s ease-out;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* top/left/width se setean via JS */
+}
+
+.kair-alerts-panel--open {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+/* Flecha que apunta al badge. Se posiciona via JS con style.left.
+   Es un triángulo de 14x8 px con la punta hacia arriba (por defecto).
+   Si el panel está arriba del badge (kair-alerts-panel--above), la flecha
+   se voltea apuntando hacia abajo. */
+.kair-alerts-panel__arrow {
+  position: absolute;
+  top: -8px;
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-bottom: 8px solid #fff;
+  filter: drop-shadow(0 -1px 1px rgba(0, 0, 0, 0.08));
+  /* left se setea via JS para apuntar al centro del badge */
+}
+
+[data-theme="dark"] .kair-alerts-panel__arrow,
+[data-theme="dark-legacy"] .kair-alerts-panel__arrow {
+  border-bottom-color: #1f2937;
+}
+
+.kair-alerts-panel--above .kair-alerts-panel__arrow {
+  top: auto;
+  bottom: -8px;
+  border-bottom: none;
+  border-top: 8px solid #fff;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.08));
+}
+
+[data-theme="dark"] .kair-alerts-panel--above .kair-alerts-panel__arrow,
+[data-theme="dark-legacy"] .kair-alerts-panel--above .kair-alerts-panel__arrow {
+  border-top-color: #1f2937;
+}
+
+/* Contenedor interno del panel (la "tarjeta" blanca) */
+.kair-alerts-popover {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18), 0 2px 6px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  max-height: calc(100vh - 100px);
+}
+
+[data-theme="dark"] .kair-alerts-popover,
+[data-theme="dark-legacy"] .kair-alerts-popover {
+  background: #1f2937;
+  color: #e5e7eb;
+}
+
+.kair-alerts-popover__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f8fafc;
+}
+
+[data-theme="dark"] .kair-alerts-popover__head,
+[data-theme="dark-legacy"] .kair-alerts-popover__head {
+  background: #111827;
+  border-bottom-color: #374151;
+}
+
+.kair-alerts-popover__title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #174ea6;
+}
+
+[data-theme="dark"] .kair-alerts-popover__title-wrap,
+[data-theme="dark-legacy"] .kair-alerts-popover__title-wrap {
+  color: #60a5fa;
+}
+
+.kair-alerts-popover__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+}
+
+[data-theme="dark"] .kair-alerts-popover__title,
+[data-theme="dark-legacy"] .kair-alerts-popover__title {
+  color: #f3f4f6;
+}
+
+.kair-alerts-popover__count {
+  background: #dc3545;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  min-width: 22px;
+  text-align: center;
+}
+
+.kair-alerts-popover__close {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.kair-alerts-popover__close:hover {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+[data-theme="dark"] .kair-alerts-popover__close:hover,
+[data-theme="dark-legacy"] .kair-alerts-popover__close:hover {
+  background: #374151;
+  color: #f3f4f6;
+}
+
+.kair-alerts-popover__body {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.kair-alerts-popover__foot {
+  padding: 10px 16px;
+  border-top: 1px solid #e5e7eb;
+  background: #f8fafc;
+  display: flex;
+  justify-content: center;
+}
+
+[data-theme="dark"] .kair-alerts-popover__foot,
+[data-theme="dark-legacy"] .kair-alerts-popover__foot {
+  background: #111827;
+  border-top-color: #374151;
+}
+
+.kair-alerts-popover__calendar-link {
+  background: transparent;
+  border: 1px solid #d1d5db;
+  color: #174ea6;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s;
+}
+
+.kair-alerts-popover__calendar-link:hover {
+  background: #eff6ff;
+  border-color: #174ea6;
+}
+
+[data-theme="dark"] .kair-alerts-popover__calendar-link,
+[data-theme="dark-legacy"] .kair-alerts-popover__calendar-link {
+  border-color: #4b5563;
+  color: #60a5fa;
+}
+
+[data-theme="dark"] .kair-alerts-popover__calendar-link:hover,
+[data-theme="dark-legacy"] .kair-alerts-popover__calendar-link:hover {
+  background: #1e3a8a;
+  border-color: #60a5fa;
+}
+
+/* Lista de items */
+.kair-alerts-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.kair-alerts-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background-color 0.15s;
+}
+
+.kair-alerts-item:hover {
+  background: #f8fafc;
+}
+
+[data-theme="dark"] .kair-alerts-item,
+[data-theme="dark-legacy"] .kair-alerts-item {
+  border-bottom-color: #374151;
+}
+
+[data-theme="dark"] .kair-alerts-item:hover,
+[data-theme="dark-legacy"] .kair-alerts-item:hover {
+  background: #111827;
+}
+
+.kair-alerts-item__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.kair-alerts-item__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.kair-alerts-item__type {
+  font-weight: 600;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-size: 10px;
+}
+
+[data-theme="dark"] .kair-alerts-item__type,
+[data-theme="dark-legacy"] .kair-alerts-item__type {
+  color: #94a3b8;
+}
+
+.kair-alerts-item__rel {
+  margin-left: auto;
+  color: #dc3545;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.kair-alerts-item__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.3;
+}
+
+[data-theme="dark"] .kair-alerts-item__title,
+[data-theme="dark-legacy"] .kair-alerts-item__title {
+  color: #f3f4f6;
+}
+
+.kair-alerts-item__meta {
+  font-size: 11px;
+  color: #6b7280;
+}
+
+[data-theme="dark"] .kair-alerts-item__meta,
+[data-theme="dark-legacy"] .kair-alerts-item__meta {
+  color: #9ca3af;
+}
+
+.kair-alerts-item__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.kair-alerts-item__btn {
+  background: #174ea6;
+  color: #fff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.15s;
+}
+
+.kair-alerts-item__btn:hover {
+  background: #0d3a82;
+}
+
+.kair-alerts-item__btn[data-kair-alerts-action="open"]:has(svg path[d^="M20 6"]) {
+  background: #28a745;
+}
+
+.kair-alerts-item__btn[data-kair-alerts-action="open"]:has(svg path[d^="M20 6"]):hover {
+  background: #1e7e34;
+}
+
+/* Empty state */
+.kair-alerts-empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: #6b7280;
+}
+
+.kair-alerts-empty__title {
+  margin: 12px 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+[data-theme="dark"] .kair-alerts-empty__title,
+[data-theme="dark-legacy"] .kair-alerts-empty__title {
+  color: #f3f4f6;
+}
+
+.kair-alerts-empty__desc {
+  margin: 0;
+  font-size: 12px;
+}
+
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 VANTA FULLSCREEN MODE - Pantallas con fondo animado (Login / Home selección)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */

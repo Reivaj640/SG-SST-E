@@ -493,6 +493,11 @@
           if (typeof global.kairCal !== 'undefined' && global.kairCal && typeof global.kairCal.refresh === 'function') {
             global.kairCal.refresh();
           }
+          // 📦 Alertas calendario — refrescar badge (decrementa contador
+          // y desfija el header si llega a 0).
+          if (typeof global.KairAlerts !== 'undefined' && global.KairAlerts && typeof global.KairAlerts.refresh === 'function') {
+            global.KairAlerts.refresh();
+          }
         } else {
           _showToast('Error al marcar: ' + ((res && res.error && res.error.message) || 'desconocido'), 'error');
         }
@@ -526,6 +531,11 @@
           _showToast('Marcado removido', 'info');
           if (typeof global.kairCal !== 'undefined' && global.kairCal && typeof global.kairCal.refresh === 'function') {
             global.kairCal.refresh();
+          }
+          // 📦 Alertas calendario — refrescar badge (puede re-incrementar
+          // si el evento que se desmarcó estaba vencido).
+          if (typeof global.KairAlerts !== 'undefined' && global.KairAlerts && typeof global.KairAlerts.refresh === 'function') {
+            global.KairAlerts.refresh();
           }
         } else {
           _showToast('Error al desmarcar: ' + ((res && res.error && res.error.message) || 'desconocido'), 'error');
