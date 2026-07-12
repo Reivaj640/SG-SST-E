@@ -59,11 +59,9 @@
       });
       return;
     }
-    var sileo = global.Sileo;
-    if (sileo && typeof sileo[type || "info"] === "function") {
-      sileo[type || "info"]({ title: String(title || ""), description: msg ? String(msg) : "" });
-      return;
-    }
+    // 📦532 — Si en el futuro se quiere otro fallback de notificación,
+    // agregar acá (ej: window.KAIRToast). Por ahora cae directo al toast
+    // manual.
     var container = document.getElementById("kair-toasts");
     if (!container) return;
     var t = el("div", { className: "kair-toast kair-toast--" + (type || "info") }, [

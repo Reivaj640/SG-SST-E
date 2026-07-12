@@ -53,9 +53,10 @@ class EvaluacionInicialSgSst {
         this.container.className = ''; // Limpiar clases previas
         this.container.classList.add('k-module-container'); // Clase contenedora estándar
 
-        // 📦531 — Toast FUERA del container para que sobreviva re-renders.
-        // Se crea una vez y se reutiliza en todos los showToast().
-        this._ensureToastNode();
+        // 📦532 — El sistema de notificaciones ahora es window.KAIRToast
+        // (assets/js/kair-toast.js), el estandar del proyecto. KAIRToast
+        // gestiona su propio hub #notification-hub internamente, asi que
+        // no necesitamos un nodo toast propio en el container.
 
         const mainLayout = document.createElement('div');
         mainLayout.className = 'k-module-layout ev-inicial-sgsst';
@@ -286,16 +287,6 @@ class EvaluacionInicialSgSst {
         if (btnPdf) {
             btnPdf.addEventListener('click', this._viewPdfHandler);
         }
-    }
-
-    // 📦531 — Crea el nodo toast una sola vez en document.body. Sobrevive
-    // re-renders porque vive fuera del container. showToast() lo reutiliza.
-    _ensureToastNode() {
-        if (document.getElementById('k-toast')) return;
-        const t = document.createElement('div');
-        t.id = 'k-toast';
-        t.className = 'k-toast';
-        document.body.appendChild(t);
     }
 
     // --- LÓGICA DE NAVEGACIÓN (TABS) ---
@@ -1964,17 +1955,24 @@ this.lastScore = score;
         console.log('[EvaluacionInicialSgSst] Total de planes de acción generados:', this.actionPlans.length);
     }
 
+    // 📦532 — showToast ahora delega a window.KAIRToast, el estandar
+    // de notificaciones del proyecto (mismo que usan los modulos de
+    // Capacitacion, COPASST, Comite de Convivencia, etc.). Ver
+    // assets/js/kair-toast.js para la API completa (show msg, type, opts).
+    //
+    // Mantenemos showToast como wrapper para no romper los 30+ call
+    // sites que ya usan this.showToast(msg, type). KAIRToast.show()
+    // acepta los mismos tipos que usabamos antes ('success' | 'error' |
+    // 'warning' | 'info' | 'danger' → 'error').
     showToast(msg, type = 'info') {
-        // 📦531 — El toast ahora vive en document.body (no en el container)
-        // para sobrevivir re-renders. _ensureToastNode() lo crea en
-        // render() si no existe.
-        this._ensureToastNode();
-        const t = document.getElementById('k-toast');
-        if (t) {
-            t.textContent = msg;
-            t.className = 'k-toast show ' + type;
-            setTimeout(() => t.classList.remove('show'), 3000);
+        if (typeof window.KAIRToast !== 'object' || typeof window.KAIRToast.show !== 'function') {
+            // Fallback defensivo: si KAIRToast no esta disponible (ej: en
+            // un test o si se carga en orden raro), usar console.error
+            // para no perder el mensaje silenciosamente.
+            console.error('[showToast fallback] ' + type + ': ' + msg);
+            return;
         }
+        window.KAIRToast.show(msg, type);
     }
 
     drawGauge(value = 0) {
@@ -2057,11 +2055,12 @@ this.lastScore = score;
             this._gaugeResizeObserver = null;
         }
 
-        // Remover el toast externo (lo creamos nosotros, no es del container)
-        const toast = document.getElementById('k-toast');
-        if (toast && toast.parentNode) {
-            toast.parentNode.removeChild(toast);
-        }
+        // 📦532 — El sistema de toasts es global (KAIRToast usa
+        // #notification-hub en document.body). No hay nada que limpiar
+        // local al desmontar el modulo — los toasts que sigan visibles
+        // se mantendran hasta su autoClose natural. Si quisieramos
+        // limpiarlos, hariamos window.KAIRToast (no expone dismiss
+        // actualmente; ver si se quiere agregar).
 
         // Limpiar referencias grandes
         this.actionPlans = [];
@@ -2208,12 +2207,8 @@ if (!document.getElementById('k-air-eval-styles')) {
         .text-danger { color: var(--danger) !important; }
         .text-muted { color: var(--text-muted) !important; }
 
-        /* TOAST */
-        .k-toast { visibility: hidden; min-width: 300px; background-color: #333; color: #fff; text-align: center; border-radius: 6px; padding: 12px 20px; position: fixed; z-index: 2000; bottom: 30px; right: 30px; font-size: 0.9rem; box-shadow: 0 4px 12px rgba(0,0,0,0.15); opacity: 0; transition: opacity 0.3s; }
-        .k-toast.show { visibility: visible; opacity: 1; }
-        .k-toast.success { background-color: var(--success); }
-        .k-toast.warning { background-color: var(--warning); color: #212529; }
-        .k-toast.danger { background-color: var(--danger); }
+        /* 📦532 — El bloque .k-toast se elimino. Las notificaciones ahora
+           las gestiona KAIRToast (assets/js/kair-toast.js + #notification-hub). */
 
     `;
     document.head.appendChild(style);

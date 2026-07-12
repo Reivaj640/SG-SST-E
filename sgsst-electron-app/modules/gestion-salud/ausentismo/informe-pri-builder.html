@@ -2192,22 +2192,21 @@
             }
         }
 
-        /**
-         * 📦 Helper de notificación consistente con el sistema 6.1.3 (updateNotifier).
-         * El archivo se carga dentro de un iframe (ver `load-module-view` en
-         * renderer.js), así que `window.updateNotifier` no está disponible localmente.
-         * Hay que buscarlo en `window.parent` (o `window.opener` como fallback).
-         *
-         * Orden de búsqueda:
-         *  1. window.updateNotifier / window.KairStore.updateNotifier (mismo frame)
-         *  2. window.parent.updateNotifier / window.KairStore.updateNotifier (iframe parent)
-         *  3. window.opener.updateNotifier (si fue abierto por window.open)
-         *  4. window.Sileo (fallback vanilla)
-         *  5. window.showNotification (legacy)
-         *  6. alert() (último recurso visible, NO recomendado en producción pero sirve
-         *     para confirmar al usuario que la acción se ejecutó)
-         *  7. console.log (siempre, como rastro de auditoría)
-         */
+         /**
+          * 📦 Helper de notificación consistente con el sistema 6.1.3 (updateNotifier).
+          * El archivo se carga dentro de un iframe (ver `load-module-view` en
+          * renderer.js), así que `window.updateNotifier` no está disponible localmente.
+          * Hay que buscarlo en `window.parent` (o `window.opener` como fallback).
+          *
+          * Orden de búsqueda:
+          *  1. window.updateNotifier / window.KairStore.updateNotifier (mismo frame)
+          *  2. window.parent.updateNotifier / window.KairStore.updateNotifier (iframe parent)
+          *  3. window.opener.updateNotifier (si fue abierto por window.open)
+          *  4. window.showNotification (legacy)
+          *  5. alert() (último recurso visible, NO recomendado en producción pero sirve
+          *     para confirmar al usuario que la acción se ejecutó)
+          *  6. console.log (siempre, como rastro de auditoría)
+          */
         function showInformeNotification(type, title, subtitle) {
             const payload = { type: type, title: title, subtitle: subtitle || '' };
             const notifier = findNotifier();
