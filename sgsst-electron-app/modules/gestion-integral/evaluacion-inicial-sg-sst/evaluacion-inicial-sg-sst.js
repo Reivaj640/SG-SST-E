@@ -44,6 +44,52 @@ class EvaluacionInicialSgSst {
         }
     }
 
+    /**
+     * 📦534 — Wrapper fijo para modales adjuntados al body.
+     *
+     * Por que: position: fixed en el modal-overlay falla en este Electron app
+     * porque body { overflow: hidden; height: 100vh } + otros z-index altos
+     * (loading-overlay z-index: 10000) hacen que el modal se renderice mal.
+     *
+     * Solucion: crear un wrapper position:fixed fullscreen UNA sola vez,
+     * appendear el modal como position:absolute dentro de el. Asi el modal
+     * siempre se posiciona relativo al wrapper (que SI es fixed al viewport).
+     */
+    _getModalRoot() {
+        let root = document.getElementById('k-modal-root');
+        if (!root) {
+            root = document.createElement('div');
+            root.id = 'k-modal-root';
+            root.style.cssText = [
+                'position: fixed',
+                'inset: 0',
+                'z-index: 99999',
+                'pointer-events: none'
+            ].join(';') + ';';
+            document.body.appendChild(root);
+        }
+        return root;
+    }
+
+    /**
+     * 📦534 — Inyecta ::backdrop para los <dialog> de planes de acción.
+     * Se llama una sola vez. Regla global porque los <dialog> se mueven
+     * al top layer y no se ven afectados por scoping del módulo.
+     */
+    _ensureDialogBackdropStyle() {
+        if (document.getElementById('k-modal-dialog-backdrop-style')) return;
+        const style = document.createElement('style');
+        style.id = 'k-modal-dialog-backdrop-style';
+        style.textContent = `
+            dialog.k-modal[open]::backdrop {
+                background: rgba(0, 0, 0, 0.6);
+                backdrop-filter: blur(2px);
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+
     async render() {
         // Registrar instancia global para manejo de eventos DOM
         window.currentEvaluacionInstance = this;
@@ -500,9 +546,20 @@ class EvaluacionInicialSgSst {
     showPdfSelector(pdfFiles) {
         this._log('log', 'showPdfSelector() - Iniciando con ' + pdfFiles.length + ' PDFs');
 
+        // 📦534 — Limpieza defensiva: eliminar cualquier modal PDF selector
+        // existente antes de crear uno nuevo. Evita que se acumulen modales
+        // apilados (causa "se coloca más negro" + no poder cerrar).
+        document.querySelectorAll('.k-file-selector-modal').forEach(m => m.remove());
+
         // Crear un modal estilo Copasst para seleccionar el PDF
         const modal = document.createElement('div');
         modal.className = 'k-file-selector-modal';
+        // 📦534 — Pointer-events: el wrapper #k-modal-root tiene
+        // pointer-events:none para no bloquear el fondo. Esto se hereda
+        // a los hijos. Restauramos auto en el modal (y todos sus hijos)
+        // para que los clicks funcionen. Sin esto, el modal se ve pero
+        // no se puede clickear.
+        modal.style.cssText = 'pointer-events: auto !important;';
 
         // Agrupar PDFs por tipo
         const ministerioPdfs = pdfFiles.filter(f => f.path.toLowerCase().includes('ministerio'));
@@ -606,7 +663,7 @@ class EvaluacionInicialSgSst {
         `;
 
         modal.innerHTML = modalContent;
-        document.body.appendChild(modal);
+        this._getModalRoot().appendChild(modal);
 
         // Guardar referencia a los PDFs para usar en navigateToFolder
         this.pdfFilesCache = {
@@ -1004,14 +1061,12 @@ this.lastScore = score;
     
     showPdfSelectorModal() {
         console.log('[EvaluacionInicialSgSst] Abriendo modal de selección de PDFs (forzando)');
-        
-        // Cerrar cualquier modal existente primero
-        const existingModal = document.querySelector('.k-file-selector-modal');
-        if (existingModal) {
-            console.log('[EvaluacionInicialSgSst] Cerrando modal existente');
-            existingModal.remove();
-        }
-        
+
+        // 📦534 — Cerrar TODOS los modales PDF selector existentes antes de
+        // crear uno nuevo. Evita que se acumulen si loadRealFiles se llama
+        // varias veces en un loop o re-render.
+        document.querySelectorAll('.k-file-selector-modal').forEach(m => m.remove());
+
         // Cargar archivos y forzar mostrar el modal
         this.loadRealFiles(true);
     }
@@ -1029,9 +1084,25 @@ this.lastScore = score;
         const isEdit = planId !== null;
         const plan = isEdit ? this.actionPlans.find(p => p.id === planId) : null;
         
-        const modal = document.createElement('div');
+        const modal = document.createElement('dialog');
         modal.className = 'k-modal';
-        
+        // 📦534 — HTML5 <dialog> con showModal(): el navegador centra
+        // automaticamente y da ::backdrop nativo. Sin position:fixed,
+        // sin wrapper, sin stacking context. Los close buttons
+        // (this.closest('.k-modal').remove()) siguen funcionando
+        // porque removemos el dialog del DOM.
+        modal.style.cssText = `
+            background: transparent !important;
+            border: none !important;
+            padding: 0 !important;
+            margin: auto !important;
+            max-width: 95vw !important;
+            max-height: 95vh !important;
+            overflow: visible !important;
+            color: inherit !important;
+            animation: ei-fadeIn 0.3s ease-in-out;
+        `;
+
         const hallazgosOptions = this.currentFindings.map(f => 
             `<option value="${f.code}">${f.code} - ${f.desc.substring(0, 50)}...</option>`
         ).join('');
@@ -1094,6 +1165,8 @@ this.lastScore = score;
         
         modal.innerHTML = modalContent;
         document.body.appendChild(modal);
+        modal.showModal();
+        this._ensureDialogBackdropStyle();
         
         // Si es edición, llenar el formulario con los datos existentes
         if (isEdit && plan) {
@@ -1192,35 +1265,28 @@ this.lastScore = score;
         
         const hallazgo = this.currentFindings.find(f => f.code === plan.hallazgoId);
         
-        const modal = document.createElement('div');
+        const modal = document.createElement('dialog');
         modal.className = 'k-modal';
+        // 📦534 — HTML5 <dialog> con showModal(): el navegador centra
+        // automaticamente y da ::backdrop nativo. Sin position:fixed,
+        // sin wrapper, sin stacking context. Los close buttons
+        // (this.closest('.k-modal').remove()) siguen funcionando
+        // porque removemos el dialog del DOM.
         modal.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.6);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-            animation: fadeIn 0.3s ease-in-out;
+            background: transparent !important;
+            border: none !important;
+            padding: 0 !important;
+            margin: auto !important;
+            max-width: 95vw !important;
+            max-height: 95vh !important;
+            overflow: visible !important;
+            color: inherit !important;
+            animation: ei-fadeIn 0.3s ease-in-out;
         `;
-        
+
         let modalContent = `
-            <div class="k-modal-content" style="
-                background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-                padding: 2.5rem;
-                border-radius: 16px;
-                width: 90%;
-                max-width: 800px;
-                max-height: 85vh;
-                overflow-y: auto;
-                box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-                animation: slideUp 0.4s ease-out;
-            ">
-                <div class="k-modal-header" style="margin-bottom: 2rem; text-align: center;">
+            <div class="k-modal-content" style="background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);">
+                <div class="k-modal-header text-center" style="margin-bottom: 2rem;">
                     <div style="
                         display: inline-flex;
                         align-items: center;
@@ -1239,8 +1305,8 @@ this.lastScore = score;
                     </h3>
                 </div>
                 <div class="k-modal-body">
-                    <div style="display: grid; gap: 1.5rem;">
-                        <div style="background: var(--bg-card); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border);">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                        <div style="grid-column: 1 / -1; background: var(--bg-card); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border);">
                             <h4 style="margin: 0 0 1rem 0; color: var(--primary); font-size: 1.1rem; font-weight: 600;">
                                 <i class="bi bi-list-check me-2"></i> Información del Plan
                             </h4>
@@ -1388,6 +1454,8 @@ this.lastScore = score;
         
         modal.innerHTML = modalContent;
         document.body.appendChild(modal);
+        modal.showModal();
+        this._ensureDialogBackdropStyle();
     }
     
     showFollowUpModal(planId) {
@@ -1399,22 +1467,25 @@ this.lastScore = score;
             return;
         }
         
-        const modal = document.createElement('div');
+        const modal = document.createElement('dialog');
         modal.className = 'k-modal';
+        // 📦534 — HTML5 <dialog> con showModal(): el navegador centra
+        // automaticamente y da ::backdrop nativo. Sin position:fixed,
+        // sin wrapper, sin stacking context. Los close buttons
+        // (this.closest('.k-modal').remove()) siguen funcionando
+        // porque removemos el dialog del DOM.
         modal.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.6);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-            animation: fadeIn 0.3s ease-in-out;
+            background: transparent !important;
+            border: none !important;
+            padding: 0 !important;
+            margin: auto !important;
+            max-width: 95vw !important;
+            max-height: 95vh !important;
+            overflow: visible !important;
+            color: inherit !important;
+            animation: ei-fadeIn 0.3s ease-in-out;
         `;
-        
+
         let modalContent = `
             <div class="k-modal-content" style="
                 background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
@@ -1427,7 +1498,7 @@ this.lastScore = score;
                 box-shadow: 0 10px 40px rgba(0,0,0,0.2);
                 animation: slideUp 0.4s ease-out;
             ">
-                <div class="k-modal-header" style="margin-bottom: 2rem; text-align: center;">
+                <div class="k-modal-header text-center" style="margin-bottom: 2rem;">
                     <div style="
                         display: inline-flex;
                         align-items: center;
@@ -1528,6 +1599,8 @@ this.lastScore = score;
         
         modal.innerHTML = modalContent;
         document.body.appendChild(modal);
+        modal.showModal();
+        this._ensureDialogBackdropStyle();
     }
     
     saveFollowUp(planId) {
@@ -1576,22 +1649,25 @@ this.lastScore = score;
             return;
         }
         
-        const modal = document.createElement('div');
+        const modal = document.createElement('dialog');
         modal.className = 'k-modal';
+        // 📦534 — HTML5 <dialog> con showModal(): el navegador centra
+        // automaticamente y da ::backdrop nativo. Sin position:fixed,
+        // sin wrapper, sin stacking context. Los close buttons
+        // (this.closest('.k-modal').remove()) siguen funcionando
+        // porque removemos el dialog del DOM.
         modal.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.6);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-            animation: fadeIn 0.3s ease-in-out;
+            background: transparent !important;
+            border: none !important;
+            padding: 0 !important;
+            margin: auto !important;
+            max-width: 95vw !important;
+            max-height: 95vh !important;
+            overflow: visible !important;
+            color: inherit !important;
+            animation: ei-fadeIn 0.3s ease-in-out;
         `;
-        
+
         let modalContent = `
             <div class="k-modal-content" style="
                 background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
@@ -1604,7 +1680,7 @@ this.lastScore = score;
                 box-shadow: 0 10px 40px rgba(0,0,0,0.2);
                 animation: slideUp 0.4s ease-out;
             ">
-                <div class="k-modal-header" style="margin-bottom: 2rem; text-align: center;">
+                <div class="k-modal-header text-center" style="margin-bottom: 2rem;">
                     <div style="
                         display: inline-flex;
                         align-items: center;
@@ -1716,6 +1792,8 @@ this.lastScore = score;
         
         modal.innerHTML = modalContent;
         document.body.appendChild(modal);
+        modal.showModal();
+        this._ensureDialogBackdropStyle();
     }
     
     addResponsible(planId) {
@@ -2396,6 +2474,128 @@ if (!document.getElementById('k-air-eval-styles')) {
         .text-warning { color: var(--warning) !important; }
         .text-danger { color: var(--danger) !important; }
         .text-muted { color: var(--text-muted) !important; }
+
+        /* 📦534 — Reglas de modal SIN scoping + posición ABSOLUTE.
+           Los modales se adjuntan al wrapper #k-modal-root (que SI es
+           position:fixed fullscreen), NO al body. Por eso el overlay
+           usa position:absolute relativo al wrapper. Esto evita los
+           problemas de position:fixed en Electron con body overflow:hidden.
+           El CSS externo evaluacion-inicial-sg-sst.css define .k-modal
+           bajo .ev-inicial-sgsst (no aplica) y con position:fixed (tambien
+           problematico). Por eso duplicamos las reglas base aqui. */
+        .k-modal {
+            position: absolute !important;
+            inset: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            z-index: 9999 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border: none !important;
+            pointer-events: auto !important;
+            animation: ei-fadeIn 0.3s ease-in-out;
+        }
+        .k-modal-content {
+            background: var(--bg-card);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 700px;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            pointer-events: auto !important;
+            animation: ei-slideUp 0.4s ease-out;
+        }
+        .k-modal-content.k-modal-content--wide { max-width: 900px; }
+        .k-modal-header {
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        .k-modal-header.text-center {
+            text-align: center;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+        .k-modal-header h3 { margin: 0; font-size: 1.25rem; font-weight: 600; color: var(--text-dark); }
+        .k-modal-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 56px; height: 56px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark, #0d3578) 100%);
+            border-radius: 50%;
+            margin-bottom: 0.75rem;
+        }
+        .k-modal-icon i { color: white; font-size: 1.6rem; }
+        .k-modal-subtitle {
+            margin: 0;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+        .k-modal-body {
+            padding: 1.5rem 2rem;
+            overflow-y: auto;
+            flex: 1;
+        }
+        .k-modal-footer {
+            padding: 1rem 2rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+            flex-shrink: 0;
+            background: var(--bg-body);
+        }
+
+        /* 📦533 — Form SIN scoping (misma razón que modal: el form vive
+           dentro del modal que se adjunta al body, fuera del scope). */
+        .k-form-group { margin-bottom: 1.25rem; }
+        .k-form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+        .k-form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            font-size: 0.9rem;
+        }
+        .k-form-control {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-family: inherit;
+            color: var(--text-dark);
+            background: var(--bg-card);
+            transition: border-color 0.2s, box-shadow 0.2s;
+            box-sizing: border-box;
+        }
+        .k-form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1);
+        }
+        .k-form-control-sm { padding: 0.375rem 0.625rem; font-size: 0.8rem; }
+
+        @keyframes ei-fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes ei-slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
 
         /* 📦532 — El bloque .k-toast se elimino. Las notificaciones ahora
            las gestiona KAIRToast (assets/js/kair-toast.js + #notification-hub). */
