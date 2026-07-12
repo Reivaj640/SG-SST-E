@@ -74,12 +74,18 @@ class EvaluacionInicialSgSst {
                   </div>
                 </div>
                 <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
-                  <select class="header-select" id="sourceSelect" onchange="window.currentEvaluacionInstance.updateSource()">
-                    <option value="ministerio">🏛️ Ministerio de Trabajo</option>
-                    <option value="arl">🛡️ Informe ARL</option>
-                  </select>
-                  <button class="header-action--outline" id="btn-change-pdf" onclick="window.currentEvaluacionInstance.showPdfSelectorModal()" title="Cambiar archivo PDF">
-                    <i class="bi bi-file-earmark-pdf"></i> Cambiar Archivo
+                  <!-- 📦533 — Selector simplificado: 2 botones directos.
+                       Antes habia un <select> + un boton "Cambiar Archivo" (4 pasos:
+                       cambiar dropdown + click + seleccionar PDF + procesar). Ahora
+                       2 pasos: click en el boton del source + seleccionar PDF. -->
+                  <button class="header-action--outline" id="btn-load-ministerio" onclick="window.currentEvaluacionInstance.loadPdfBySource('ministerio')" title="Cargar PDF del Ministerio de Trabajo">
+                    <i class="bi bi-building"></i> Cargar Ministerio
+                  </button>
+                  <button class="header-action--outline" id="btn-load-arl" onclick="window.currentEvaluacionInstance.loadPdfBySource('arl')" title="Cargar PDF del informe de la ARL">
+                    <i class="bi bi-shield-check"></i> Cargar ARL
+                  </button>
+                  <button class="header-action--outline" id="btn-change-pdf" onclick="window.currentEvaluacionInstance.showPdfSelectorModal()" title="Buscar un PDF en la carpeta (auto-detecta el source)" style="display:none;">
+                    <i class="bi bi-folder2-open"></i> Explorar
                   </button>
                   <div id="loading-indicator" class="k-loading-badge" style="display:none;">
                     <span class="spinner-border spinner-border-sm"></span> Procesando...
@@ -101,9 +107,6 @@ class EvaluacionInicialSgSst {
                 </button>
                 <button class="evaluacion-tab" data-tab="actions" onclick="window.currentEvaluacionInstance.switchTab('actions')">
                   <i class="bi bi-clipboard-check"></i> Planes de Acción
-                </button>
-                <button class="evaluacion-tab" data-tab="history" onclick="window.currentEvaluacionInstance.switchTab('history')">
-                  <i class="bi bi-clock-history"></i> Historial
                 </button>
               </div>
             </div>
@@ -192,7 +195,7 @@ class EvaluacionInicialSgSst {
                             <h3>Detalle de Estándares</h3>
                             <input type="text" class="k-input-search" placeholder="Buscar estándar...">
                         </div>
-                        <div class="k-table-responsive">
+                        <div class="k-table-responsive k-table-scrollable">
                             <table class="k-table">
                                 <thead>
                                     <tr>
@@ -220,7 +223,7 @@ class EvaluacionInicialSgSst {
                                 <i class="bi bi-plus-lg"></i> Nuevo Plan
                             </button>
                         </div>
-                        <div class="k-table-responsive">
+                        <div class="k-table-responsive k-table-scrollable">
                             <table class="k-table">
                                 <thead>
                                     <tr>
@@ -236,16 +239,6 @@ class EvaluacionInicialSgSst {
                                     <tr><td colspan="6" class="k-empty-table">No hay planes activos.</td></tr>
                                 </tbody>
                             </table>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- VISTA: HISTORIAL -->
-                <section id="view-history" class="k-view">
-                    <div class="k-card" id="history-content">
-                        <div class="k-empty-state">
-                            <i class="bi bi-folder2-open"></i>
-                            <p>Explorando directorio...</p>
                         </div>
                     </div>
                 </section>
@@ -346,10 +339,11 @@ class EvaluacionInicialSgSst {
         }
     }
 
-    // 📦531 — Carga los planes persistidos de la BD para la empresa+año
-    // actuales. Si ya hay planes en memoria, hace merge (los de memoria
-    // tienen precedencia por si hay cambios no guardados).
-    async _loadPersistedActionPlans() {
+    // 📦531/533 — Carga los planes persistidos de la BD para la empresa+año
+    // actuales, FILTRADOS por source (ministerio/arl) para no mezclar
+    // planes de informes diferentes. Si ya hay planes en memoria con el
+    // mismo source, hace merge (los de memoria tienen precedencia).
+    async _loadPersistedActionPlans(sourceFilter) {
         try {
             if (!window.electronAPI || !window.electronAPI.evaluacionActionPlans) {
                 this._log('warn', 'evaluacionActionPlans API no disponible');
@@ -369,19 +363,22 @@ class EvaluacionInicialSgSst {
                 return;
             }
             const persisted = res.data || [];
-            this._log('log', 'Cargados ' + persisted.length + ' planes persistidos de ' + empresaId + '/' + this.currentYear);
+            // 📦533 — Filtrar por source: si el usuario esta cargando un
+            // PDF del Ministerio, NO mostrar planes persistidos de ARL
+            // (y viceversa). Asi cada vista muestra SOLO lo del informe
+            // seleccionado.
+            const filtered = sourceFilter
+                ? persisted.filter(function (p) { return (p._source || 'manual') === sourceFilter || (p._source || 'manual') === 'manual'; })
+                : persisted;
+            this._log('log', 'Cargados ' + filtered.length + ' planes persistidos de ' + empresaId + '/' + this.currentYear + ' (filtrados por source=' + (sourceFilter || 'all') + ', total BD=' + persisted.length + ')');
             // Merge: planes en memoria tienen precedencia. Solo agregamos los
             // que no estan en memoria (por id).
-            const inMemoryIds = new Set(this.actionPlans.map(p => p.id));
-            for (let i = 0; i < persisted.length; i++) {
-                const p = persisted[i];
+            const inMemoryIds = new Set(this.actionPlans.map(function (p) { return p.id; }));
+            for (let i = 0; i < filtered.length; i++) {
+                const p = filtered[i];
                 if (!inMemoryIds.has(p.id)) {
                     this.actionPlans.push(p);
                 }
-            }
-            // Si la tabla de planes esta visible, re-renderizarla
-            if (this.activeTab === 'actions') {
-                this.renderActionPlansTable();
             }
         } catch (e) {
             this._log('error', 'Excepcion cargando planes persistidos: ' + e.message);
@@ -447,7 +444,6 @@ class EvaluacionInicialSgSst {
             }
 
             console.log('[EvaluacionInicialSgSst] Total de archivos encontrados:', allFiles.length);
-            this.renderHistoryFiles(allFiles);
 
             // Filtrar solo archivos PDF
             const pdfFiles = allFiles.filter(f => f.name.toLowerCase().endsWith('.pdf'));
@@ -825,6 +821,17 @@ class EvaluacionInicialSgSst {
             const sourceType = pdfPath.toLowerCase().includes('arl') ? 'arl' : 'ministerio';
             this._log('log', 'Tipo de fuente detectado: ' + sourceType);
 
+            // 📦533 — Reset COMPLETO del estado del PDF anterior antes de
+            // procesar el nuevo. Antes los hallazgos y planes del PDF
+            // anterior persistian en memoria, lo que causaba que al
+            // cambiar de Ministerio a ARL (o viceversa) se mostraran
+            // mezclados. Ahora cada PDF muestra SOLO sus hallazgos y planes.
+            this.currentSource = sourceType;
+            this.currentPdfPath = pdfPath;
+            this.currentFindings = [];
+            this.actionPlans = [];
+            this._log('log', 'Estado reseteado para source=' + sourceType);
+
             if (window.electronAPI && window.electronAPI.processEvaluacionPdf) {
                 const result = await window.electronAPI.processEvaluacionPdf(pdfPath, sourceType);
 
@@ -839,6 +846,10 @@ class EvaluacionInicialSgSst {
                 this.currentFindings = result.findings || [];
                 this.renderHallazgosTable();
                 this.updateDashboardWithRealData(result.metrics);
+
+                // Cargar planes persistidos de BD filtrados por source + year
+                // (best-effort: si falla, seguimos con los que estan en memoria)
+                await this._loadPersistedActionPlans(sourceType);
 
                 // Procesar planes de acción según el tipo de fuente
                 if (result.source === 'arl' && result.actionPlans && result.actionPlans.length > 0) {
@@ -868,57 +879,6 @@ class EvaluacionInicialSgSst {
     }
 
     // --- RENDERIZADO DE COMPONENTES ---
-    renderHistoryFiles(files) {
-        const container = document.getElementById('history-content');
-        if (!container) return;
-
-        if (!files || files.length === 0) {
-            container.innerHTML = `
-                <div class="k-empty-state">
-                    <i class="bi bi-folder-x"></i>
-                    <p>Carpeta vacía</p>
-                </div>`;
-            return;
-        }
-
-        let html = `
-            <div class="k-card-header"><h3>Archivos Disponibles</h3></div>
-            <div class="k-table-responsive">
-            <table class="k-table">
-                <thead><tr><th>Tipo</th><th>Nombre del Archivo</th><th class="text-right">Acción</th></tr></thead>
-                <tbody>
-        `;
-
-        files.forEach(f => {
-            const isPdf = f.name.toLowerCase().endsWith('.pdf');
-            const isXls = f.name.toLowerCase().includes('xls');
-            let icon = '<i class="bi bi-file-earmark"></i>';
-            let colorClass = 'text-muted';
-            
-            if (isPdf) { icon = '<i class="bi bi-file-earmark-pdf-fill"></i>'; colorClass = 'text-danger'; }
-            if (isXls) { icon = '<i class="bi bi-file-earmark-excel-fill"></i>'; colorClass = 'text-success'; }
-            
-            const encodedPath = encodeURIComponent(f.path);
-            
-            html += `
-                <tr>
-                    <td class="text-center" style="font-size:1.2rem; color:var(--text-muted);"><span class="${colorClass}">${icon}</span></td>
-                    <td>
-                        <div style="font-weight:500;">${f.name}</div>
-                        <div style="font-size:0.75rem; color:var(--text-muted);">${f.path.split('\\').slice(-2, -1)[0] || 'Raíz'}</div>
-                    </td>
-                    <td class="text-right">
-                        <button class="k-btn k-btn-sm k-btn-outline" onclick="window.electronAPI.openPath(decodeURIComponent('${encodedPath}'))">
-                            Abrir <i class="bi bi-box-arrow-up-right ms-1"></i>
-                        </button>
-                    </td>
-                </tr>
-            `;
-        });
-        html += '</tbody></table></div>';
-        container.innerHTML = html;
-    }
-
     renderHallazgosTable() {
         const tbody = this.hallazgosTableBody;
         if (!tbody) return;
@@ -1021,27 +981,25 @@ this.lastScore = score;
         }
     }
 
+    /**
+     * 📦533 — Selector simplificado. En vez del viejo flujo
+     * (cambiar dropdown + click "Cambiar Archivo" + seleccionar PDF),
+     * el usuario hace click directo en "Cargar Ministerio" o "Cargar ARL"
+     * y se abre el file picker (que el SO suele recordar la ultima carpeta).
+     * Si hay varios PDFs en la subcarpeta, se muestra el modal de
+     * seleccion. Si hay solo uno, se procesa directamente.
+     */
+    loadPdfBySource(source) {
+        this._log('log', 'loadPdfBySource(' + source + ')');
+        this.currentSource = source;
+        this.loadRealFiles(true);
+    }
+
+    // Mantener updateSource como wrapper retrocompatible (por si algo
+    // todavia llama el viejo handler del <select>), pero ya no se usa
+    // desde el template.
     updateSource() {
-        console.log('[EvaluacionInicialSgSst] Fuente actualizada por el usuario');
-        
-        // Obtener el valor seleccionado
-        const sourceSelect = document.getElementById('sourceSelect');
-        const yearSelect = document.getElementById('yearSelect');
-        
-        if (!sourceSelect || !yearSelect) return;
-        
-        const newSource = sourceSelect.value;
-        const newYear = yearSelect.value;
-        
-        console.log('[EvaluacionInicialSgSst] Nueva fuente:', newSource);
-        console.log('[EvaluacionInicialSgSst] Nuevo año:', newYear);
-        
-        // Actualizar estado
-        this.currentSource = newSource;
-        this.currentYear = newYear;
-        
-        // Cargar archivos nuevamente sin recargar la página
-        this.loadRealFiles();
+        this._log('warn', 'updateSource() llamado pero ya no se usa (selector simplificado)');
     }
     
     showPdfSelectorModal() {
@@ -1818,11 +1776,16 @@ this.lastScore = score;
     }
     
     getEstadoBadge(estado) {
+        // 📦532 — El badge usa k-badge--inline para que el emoji y el texto
+        // queden en la misma linea (display: inline-flex + align-items: center).
+        // Antes se veia apilado porque el k-badge default no tiene gap ni
+        // nowrap, y el emoji ⏳/✅ con line-height alto quedaba visualmente
+        // arriba del texto.
         const badges = {
-            'pendiente': '<span class="k-badge k-badge-warning">⏳ Pendiente</span>',
-            'en_progreso': '<span class="k-badge k-badge-info">🔄 En Progreso</span>',
-            'completado': '<span class="k-badge k-badge-success">✅ Completado</span>',
-            'cancelado': '<span class="k-badge k-badge-danger">❌ Cancelado</span>'
+            'pendiente': '<span class="k-badge k-badge-warning k-badge--inline">⏳ Pendiente</span>',
+            'en_progreso': '<span class="k-badge k-badge-info k-badge--inline">🔄 En Progreso</span>',
+            'completado': '<span class="k-badge k-badge-success k-badge--inline">✅ Completado</span>',
+            'cancelado': '<span class="k-badge k-badge-danger k-badge--inline">❌ Cancelado</span>'
         };
         return badges[estado] || badges['pendiente'];
     }
@@ -1834,125 +1797,332 @@ this.lastScore = score;
             console.error('[EvaluacionInicialSgSst] actionTableBody no encontrado');
             return;
         }
-        
+
+        // 📦533 — Separar planes con hallazgo vinculado de planes huerfanos
+        // (hallazgoId null). Los huerfanos vienen del parser del ARL que es
+        // demasiado permisivo (utils/evaluacionPdfParser.js). Los ocultamos
+        // del render normal y los mostramos en una fila colapsable al final
+        // para que el usuario los pueda ver/eliminar si quiere.
+        var normalPlans = this.actionPlans.filter(function (p) { return p.hallazgoId != null; });
+        var orphanPlans = this.actionPlans.filter(function (p) { return p.hallazgoId == null; });
+
         if (this.actionPlans.length === 0) {
             tbody.innerHTML = '<tr><td colspan="6" class="k-empty-table">No hay planes activos.</td></tr>';
             return;
         }
-        
-        console.log('[EvaluacionInicialSgSst] Renderizando', this.actionPlans.length, 'planes de acción');
-        tbody.innerHTML = this.actionPlans.map(plan => {
-            const hallazgo = this.currentFindings.find(f => f.code === plan.hallazgoId);
-            const hallazgoText = hallazgo ? `${hallazgo.code} - ${hallazgo.desc.substring(0, 30)}...` : 'No encontrado';
-            
-            return `
-                <tr>
-                    <td>${this.getEstadoBadge(plan.estado)}</td>
-                    <td>
-                        <div style="font-weight: 500;">${hallazgoText}</div>
-                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">
-                            ${plan.accion.substring(0, 50)}${plan.accion.length > 50 ? '...' : ''}
-                        </div>
-                    </td>
-                    <td>${plan.responsable}</td>
-                    <td>${new Date(plan.fechaLimite).toLocaleDateString('es-CO')}</td>
-                    <td>
-                        <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
-                            <button class="k-btn k-btn-sm k-btn-outline" onclick="window.currentEvaluacionInstance.showActionPlanDetailModal(${plan.id})" title="Ver detalle">
-                                <i class="bi bi-eye"></i>
-                            </button>
-                            <button class="k-btn k-btn-sm k-btn-outline" onclick="window.currentEvaluacionInstance.showActionPlanModal(${plan.id})" title="Editar">
-                                <i class="bi bi-pencil"></i>
-                            </button>
-                            <button class="k-btn k-btn-sm k-btn-outline" onclick="window.currentEvaluacionInstance.deleteActionPlan(${plan.id})" title="Eliminar" style="color: var(--danger); border-color: var(--danger);">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            `;
-        }).join('');
+
+        if (normalPlans.length === 0 && orphanPlans.length > 0) {
+            // Solo hay huerfanos. Mostrar el disclosure por defecto.
+            tbody.innerHTML = '<tr><td colspan="6" class="k-empty-table">' +
+                'Todos los planes extraídos del PDF actual quedaron sin hallazgo vinculado. ' +
+                'Probablemente el parser del ARL extrajo texto descriptivo en vez de planes reales. ' +
+                'Verificá el PDF o revisá el parser.</td></tr>';
+            this._renderOrphanDisclosure(tbody, orphanPlans);
+            return;
+        }
+
+        console.log('[EvaluacionInicialSgSst] Renderizando', normalPlans.length, 'planes normales +', orphanPlans.length, 'huerfanos');
+
+        var rows = normalPlans.map(function (plan) {
+            var hallazgo = this.currentFindings.find(function (f) { return f.code === plan.hallazgoId; });
+            var hallazgoCode = hallazgo ? hallazgo.code : '';
+            var hallazgoDesc = hallazgo ? hallazgo.desc : '';
+            return '<tr>' +
+                '<td>' + this.getEstadoBadge(plan.estado) + '</td>' +
+                '<td>' +
+                  '<div style="font-weight: 500;">' + hallazgoCode + '</div>' +
+                  '<div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">' + hallazgoDesc + '</div>' +
+                '</td>' +
+                '<td>' + plan.accion + '</td>' +
+                '<td>' + plan.responsable + '</td>' +
+                '<td>' + (plan.fechaLimite ? new Date(plan.fechaLimite).toLocaleDateString('es-CO') : '—') + '</td>' +
+                '<td>' +
+                  '<div style="display: flex; gap: 0.5rem; justify-content: flex-end;">' +
+                    '<button class="k-btn k-btn-sm k-btn-outline" onclick="window.currentEvaluacionInstance.showActionPlanDetailModal(\'' + plan.id + '\')" title="Ver detalle">' +
+                      '<i class="bi bi-eye"></i></button>' +
+                    '<button class="k-btn k-btn-sm k-btn-outline" onclick="window.currentEvaluacionInstance.showActionPlanModal(\'' + plan.id + '\')" title="Editar">' +
+                      '<i class="bi bi-pencil"></i></button>' +
+                    '<button class="k-btn k-btn-sm k-btn-outline" onclick="window.currentEvaluacionInstance.deleteActionPlan(\'' + plan.id + '\')" title="Eliminar" style="color: var(--danger); border-color: var(--danger);">' +
+                      '<i class="bi bi-trash"></i></button>' +
+                  '</div>' +
+                '</td>' +
+            '</tr>';
+        }.bind(this));
+
+        if (orphanPlans.length > 0) {
+            this._renderOrphanDisclosure(tbody, orphanPlans);
+        }
+
+        tbody.innerHTML = rows.join('');
+    }
+
+    /**
+     * 📦533 — Renderiza una fila colapsable al final de la tabla con los
+     * planes huerfanos (sin hallazgo vinculado). Por defecto esta fila
+     * esta colapsada (muestra solo un resumen). El usuario hace click para
+     * expandir y ver/eliminar los planes huerfanos.
+     */
+    _renderOrphanDisclosure(tbody, orphanPlans) {
+        var disclosureId = 'kair-orphan-disclosure-' + Date.now();
+        var rows = orphanPlans.map(function (plan, idx) {
+            return '<tr style="background-color: rgba(255, 193, 7, 0.08);">' +
+                '<td>' + this.getEstadoBadge(plan.estado) + '</td>' +
+                '<td colspan="2">' +
+                  '<span class="k-badge k-badge-warning k-badge--inline" title="Este plan no se vinculo a ningun hallazgo del PDF">⚠️ Plan ARL sin hallazgo</span>' +
+                '</td>' +
+                '<td>' + plan.responsable + '</td>' +
+                '<td>' + (plan.fechaLimite ? new Date(plan.fechaLimite).toLocaleDateString('es-CO') : '—') + '</td>' +
+                '<td>' +
+                  '<div style="display: flex; gap: 0.5rem; justify-content: flex-end;">' +
+                    '<button class="k-btn k-btn-sm k-btn-outline" onclick="window.currentEvaluacionInstance.showActionPlanDetailModal(\'' + plan.id + '\')" title="Ver detalle">' +
+                      '<i class="bi bi-eye"></i></button>' +
+                    '<button class="k-btn k-btn-sm k-btn-outline" onclick="window.currentEvaluacionInstance.deleteActionPlan(\'' + plan.id + '\')" title="Eliminar" style="color: var(--danger); border-color: var(--danger);">' +
+                      '<i class="bi bi-trash"></i></button>' +
+                  '</div>' +
+                '</td>' +
+            '</tr>';
+        }.bind(this));
+
+        var html = '<tr class="kair-orphan-disclosure-row">' +
+            '<td colspan="6" style="padding: 0; background-color: #fff8e1; border-left: 3px solid #ffc107;">' +
+              '<div style="padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;" onclick="document.getElementById(\'' + disclosureId + '\').classList.toggle(\'kair-collapsed\'); this.querySelector(\'i\').classList.toggle(\'bi-chevron-down\'); this.querySelector(\'i\').classList.toggle(\'bi-chevron-up\');">' +
+                '<div>' +
+                  '<i class="bi bi-chevron-down" style="margin-right: 8px; color: #856404;"></i>' +
+                  '<span style="color: #856404; font-weight: 600;">' + orphanPlans.length + ' plan(es) huerfano(s) del ARL</span>' +
+                  '<span style="color: #856404; opacity: 0.7; margin-left: 8px; font-size: 0.85rem;">(sin hallazgo vinculado, posible ruido del parser)</span>' +
+                '</div>' +
+                '<button class="k-btn k-btn-sm" style="background: #ffc107; color: #212529; border: none;" onclick="event.stopPropagation(); window.currentEvaluacionInstance._discardAllOrphans();" title="Eliminar todos los huerfanos">' +
+                  '<i class="bi bi-trash"></i> Descartar todos' +
+                '</button>' +
+              '</div>' +
+              '<div id="' + disclosureId + '" class="kair-collapsed">' +
+                '<table style="width: 100%; border-collapse: collapse;">' +
+                  rows.join('') +
+                '</table>' +
+              '</div>' +
+            '</td>' +
+        '</tr>';
+
+        tbody.insertAdjacentHTML('beforeend', html);
+    }
+
+    /**
+     * 📦533 — Descarta todos los planes huerfanos (sin hallazgo vinculado).
+     * Se llama desde el boton "Descartar todos" del disclosure.
+     */
+    _discardAllOrphans() {
+        if (!confirm('¿Eliminar todos los planes huerfanos (sin hallazgo vinculado)? Esta accion no se puede deshacer.')) {
+            return;
+        }
+        var orphansRemoved = 0;
+        this.actionPlans = this.actionPlans.filter(function (p) {
+            if (p.hallazgoId == null) {
+                orphansRemoved++;
+                // Eliminar de la BD tambien
+                if (window.electronAPI && window.electronAPI.evaluacionActionPlans) {
+                    var empresaId = window.currentCompany;
+                    if (empresaId && empresaId !== 'default_company') {
+                        window.electronAPI.evaluacionActionPlans.eliminar({
+                            empresaId: empresaId,
+                            id: p.id
+                        }).catch(function (e) { /* ignore */ });
+                    }
+                }
+                return false;
+            }
+            return true;
+        });
+        this._log('log', '_discardAllOrphans: eliminados ' + orphansRemoved + ' planes huerfanos');
+        this.renderActionPlansTable();
+        this.showToast(orphansRemoved + ' plan(es) huerfano(s) descartado(s)', 'success');
     }
     
     /**
-     * Procesa los planes de acción extraídos de un informe de ARL
+     * Procesa los planes de acción extraídos de un informe de ARL.
+     * 📦533 — NO borra los planes existentes. Hace merge: los planes del
+     * ARL se agregan a this.actionPlans sin pisar los que ya están
+     * (de cargas anteriores o de carga del Ministerio). Después llama
+     * a _ensureNoCumpleFindingsHavePlans() para garantizar que cada
+     * hallazgo no_cumple tenga su plan de acción visible.
      * @param {Array} arlActionPlans - Planes de acción extraídos del informe ARL
      */
     processArlActionPlans(arlActionPlans) {
         console.log('[EvaluacionInicialSgSst] Procesando', arlActionPlans.length, 'planes de acción de ARL');
-        
-        // Limpiar planes de acción existentes
-        this.actionPlans = [];
-        this.actionPlanIdCounter = 1;
-        
+
+        // IDs de hallazgos que ya tienen plan del ARL (se usan despues para
+        // el merge con planes auto-generados)
+        const hallazgosCubiertosPorARL = new Set();
+
         // Procesar cada plan de acción del ARL
         arlActionPlans.forEach((arlPlan, index) => {
             // Intentar encontrar un hallazgo relacionado
             let relatedHallazgo = null;
-            
+
             // Buscar por coincidencia en la descripción del hallazgo
             for (const hallazgo of this.currentFindings) {
-                if (hallazgo.status === 'no_cumple' && 
+                if (hallazgo.status === 'no_cumple' &&
                     (hallazgo.desc.toLowerCase().includes(arlPlan.accion.toLowerCase().substring(0, 50)) ||
                      arlPlan.accion.toLowerCase().includes(hallazgo.desc.toLowerCase().substring(0, 50)))) {
                     relatedHallazgo = hallazgo;
                     break;
                 }
             }
-            
-            // Crear el plan de acción
-            const actionPlan = {
-                id: this.actionPlanIdCounter++,
-                hallazgoId: relatedHallazgo ? relatedHallazgo.code : null,
-                hallazgoDesc: relatedHallazgo ? relatedHallazgo.desc : '',
-                accion: arlPlan.accion,
-                responsable: arlPlan.responsable || 'Por asignar',
-                fechaLimite: arlPlan.fechaLimite,
-                estado: arlPlan.estado || 'pendiente',
-                seguimientos: arlPlan.seguimientos || [],
-                responsables: arlPlan.responsables || []
-            };
-            
-            this.actionPlans.push(actionPlan);
-            console.log('[EvaluacionInicialSgSst] Plan de acción creado:', actionPlan.id, '- Hallazgo:', actionPlan.hallazgoId);
+
+            // Si hay un hallazgo relacionado, sobrescribir el plan existente
+            // (si lo hay) para usar la data del ARL que es más especifica.
+            if (relatedHallazgo) {
+                hallazgosCubiertosPorARL.add(relatedHallazgo.code);
+                // Buscar si ya hay un plan para este hallazgo
+                const existingIdx = this.actionPlans.findIndex(
+                    p => p.hallazgoId === relatedHallazgo.code
+                );
+                const newPlan = {
+                    id: existingIdx >= 0 ? this.actionPlans[existingIdx].id : this._generatePlanId(),
+                    hallazgoId: relatedHallazgo.code,
+                    hallazgoCodigo: relatedHallazgo.code,
+                    hallazgoDescripcion: relatedHallazgo.desc,
+                    accion: arlPlan.accion,
+                    responsable: arlPlan.responsable || 'Por asignar',
+                    fechaLimite: arlPlan.fechaLimite,
+                    estado: arlPlan.estado || 'pendiente',
+                    seguimientos: arlPlan.seguimientos || [],
+                    responsables: arlPlan.responsables || []
+                };
+                if (existingIdx >= 0) {
+                    this.actionPlans[existingIdx] = newPlan;
+                } else {
+                    this.actionPlans.push(newPlan);
+                }
+                console.log('[EvaluacionInicialSgSst] Plan ARL vinculado a hallazgo:', relatedHallazgo.code);
+            } else {
+                // Plan del ARL sin hallazgo relacionado: lo agregamos igual
+                // con hallazgoId null. Sirve para mostrar planes que el ARL
+                // extrajo pero que no pudimos vincular automaticamente.
+                const newPlan = {
+                    id: this._generatePlanId(),
+                    hallazgoId: null,
+                    hallazgoCodigo: null,
+                    hallazgoDescripcion: '',
+                    accion: arlPlan.accion,
+                    responsable: arlPlan.responsable || 'Por asignar',
+                    fechaLimite: arlPlan.fechaLimite,
+                    estado: arlPlan.estado || 'pendiente',
+                    seguimientos: arlPlan.seguimientos || [],
+                    responsables: arlPlan.responsables || [],
+                    _source: 'arl-sin-vincular'
+                };
+                this.actionPlans.push(newPlan);
+                console.log('[EvaluacionInicialSgSst] Plan ARL sin hallazgo vinculado (agregado con hallazgoId=null)');
+            }
         });
-        
-        console.log('[EvaluacionInicialSgSst] Total de planes de acción creados:', this.actionPlans.length);
+
+        console.log('[EvaluacionInicialSgSst] Hallazgos cubiertos por ARL:', hallazgosCubiertosPorARL.size);
+
+        // Despues de procesar el ARL, garantizar que cada hallazgo no_cumple
+        // tenga su plan visible (genera los que faltan).
+        this._ensureNoCumpleFindingsHavePlans('arl');
     }
-    
+
     /**
-     * Genera automáticamente planes de acción para hallazgos con estado "no_cumple"
+     * Genera automáticamente planes de acción para hallazgos con estado "no_cumple".
+     * 📦533 — NO borra los planes existentes. Solo crea planes para los
+     * hallazgos no_cumple que AUN NO tienen un plan. Despues limpia los
+     * planes cuyo hallazgo ya no es no_cumple (porque el status del
+     * hallazgo cambio en una carga posterior del PDF).
      */
     generateActionPlansForNoCumple() {
-        console.log('[EvaluacionInicialSgSst] Generando planes de acción para hallazgos no_cumple');
-        
-        // Limpiar planes de acción existentes
-        this.actionPlans = [];
-        this.actionPlanIdCounter = 1;
-        
-        // Filtrar hallazgos con estado "no_cumple"
+        console.log('[EvaluacionInicialSgSst] Generando planes de acción para hallazgos no_cumple (modo merge)');
+
+        // Limpiar planes cuyo hallazgo ya no es no_cumple (o ya no existe
+        // en currentFindings). Esto evita planes huerfanos de cargas
+        // anteriores del PDF.
+        const hallazgosMap = new Map(this.currentFindings.map(f => [f.code, f]));
+        const before = this.actionPlans.length;
+        this.actionPlans = this.actionPlans.filter(p => {
+            if (!p.hallazgoId) {
+                // Planes sin hallazgo vinculado (ej: ARL sin match) — los dejamos
+                return true;
+            }
+            const hallazgo = hallazgosMap.get(p.hallazgoId);
+            return hallazgo && hallazgo.status === 'no_cumple';
+        });
+        const removed = before - this.actionPlans.length;
+        if (removed > 0) {
+            console.log('[EvaluacionInicialSgSst] Eliminados', removed, 'planes cuyo hallazgo ya no es no_cumple');
+        }
+
+        // Delegar a la funcion unificada
+        this._ensureNoCumpleFindingsHavePlans('ministerio');
+    }
+
+    /**
+     * 📦533 — Garantiza que cada hallazgo con status='no_cumple' tenga al
+     * menos un plan de acción visible en this.actionPlans.
+     *
+     * Estrategia:
+     * 1. Calcula los hallazgos no_cumple del PDF actual
+     * 2. Calcula los hallazgos que ya tienen plan (por hallazgoId)
+     * 3. Para cada hallazgo no_cumple SIN plan: crea uno generico
+     *    (accion placeholder, responsable 'Por asignar', fecha limite +30 dias)
+     * 4. Persiste los nuevos planes en la BD
+     *
+     * Esto resuelve el bug donde cargar un PDF de ARL pisaba los planes
+     * del Ministerio: ahora ambos tipos conviven, y los hallazgos que
+     * quedaron sin cubrir tienen un plan auto-generado que el usuario
+     * puede editar (responsable, fecha, accion especifica).
+     *
+     * @param {string} source - 'ministerio' | 'arl' (para logging y
+     *                           metadata del plan auto-generado)
+     */
+    _ensureNoCumpleFindingsHavePlans(source) {
         const noCumpleFindings = this.currentFindings.filter(f => f.status === 'no_cumple');
-        console.log('[EvaluacionInicialSgSst] Hallazgos no_cumple encontrados:', noCumpleFindings.length);
-        
-        // Generar un plan de acción para cada hallazgo "no_cumple"
-        noCumpleFindings.forEach((hallazgo, index) => {
-            const actionPlan = {
-                id: this.actionPlanIdCounter++,
+        console.log('[EvaluacionInicialSgSst] [_ensureNoCumpleFindingsHavePlans] source=' + source + ' hallazgos no_cumple=' + noCumpleFindings.length);
+
+        // Set de hallazgoId que ya tienen plan en memoria
+        const hallazgosConPlan = new Set(
+            this.actionPlans
+                .map(p => p.hallazgoId)
+                .filter(id => id != null)
+        );
+
+        let created = 0;
+        for (const hallazgo of noCumpleFindings) {
+            if (hallazgosConPlan.has(hallazgo.code)) continue;
+
+            // Crear plan generico para este hallazgo no_cumple
+            const newPlan = {
+                id: this._generatePlanId(),
                 hallazgoId: hallazgo.code,
-                hallazgoDesc: hallazgo.desc,
-                accion: `Implementar acciones correctivas para cumplir con el estándar ${hallazgo.code}`,
+                hallazgoCodigo: hallazgo.code,
+                hallazgoDescripcion: hallazgo.desc,
+                accion: 'Implementar acciones correctivas para cumplir con el estandar ' + hallazgo.code,
                 responsable: 'Por asignar',
-                fechaLimite: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 días desde hoy
+                fechaLimite: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 dias desde hoy
                 estado: 'pendiente',
                 seguimientos: [],
-                responsables: []
+                responsables: [],
+                _source: source,
+                _autoGenerated: true
             };
-            
-            this.actionPlans.push(actionPlan);
-            console.log('[EvaluacionInicialSgSst] Plan de acción generado:', actionPlan.id, '- Hallazgo:', hallazgo.code);
-        });
-        
-        console.log('[EvaluacionInicialSgSst] Total de planes de acción generados:', this.actionPlans.length);
+            this.actionPlans.push(newPlan);
+            created++;
+            // Persistir en la BD (best-effort: si falla, el plan queda en memoria)
+            this._persistActionPlan(newPlan);
+        }
+        if (created > 0) {
+            console.log('[EvaluacionInicialSgSst] [_ensureNoCumpleFindingsHavePlans] ' + created + ' planes auto-generados para cubrir hallazgos no_cumple');
+        }
+    }
+
+    /**
+     * 📦533 — Genera un ID unico para un plan. Usa crypto.randomUUID()
+     * si esta disponible, con fallback timestamp+random hex.
+     */
+    _generatePlanId() {
+        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+            return crypto.randomUUID();
+        }
+        return 'eap-' + Date.now().toString(36) + '-' + Math.floor(Math.random() * 0xffffff).toString(16);
     }
 
     // 📦532 — showToast ahora delega a window.KAIRToast, el estandar
@@ -2182,8 +2352,28 @@ if (!document.getElementById('k-air-eval-styles')) {
         .k-table tr.k-row-warning { background-color: #fff3cd; border-left: 3px solid var(--warning); }
         .k-empty-table { text-align: center; padding: 2rem; color: var(--text-muted); font-style: italic; }
 
+        /* Tablas con scroll vertical propio y encabezado fijo.
+           Aplica a la tabla de estándares (~60 filas) y a la de
+           planes de acción. Evita que los títulos se pierdan al
+           hacer scroll dentro de la tabla. */
+        .k-table-scrollable { max-height: 60vh; overflow-y: auto; scrollbar-gutter: stable; }
+        .k-table-scrollable .k-table { border-collapse: separate; border-spacing: 0; }
+        .k-table-scrollable .k-table th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            background: #f8f9fa;
+            border-bottom: none;
+            box-shadow: inset 0 -2px 0 var(--border);
+        }
+
         /* BADGES & BUTTONS */
         .k-badge { padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+        /* 📦532 — Variante inline del badge: emoji + texto en la misma
+           linea (display: inline-flex + align-items: center + gap + white-space: nowrap).
+           Sin esto, el emoji quedaba visualmente arriba del texto en columnas
+           angostas (ej: Estado con 10% de ancho). */
+        .k-badge.k-badge--inline { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; line-height: 1.2; }
         .k-badge-success { background: #d4edda; color: #155724; }
         .k-badge-danger { background: #f8d7da; color: #721c24; }
         .k-btn { padding: 0.4rem 0.8rem; border-radius: 4px; font-size: 0.9rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; transition: 0.2s; border: 1px solid transparent; }
