@@ -341,6 +341,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     marcar: (params) => ipcRenderer.invoke('eventos-cumplidos:marcar', params),
     desmarcar: (params) => ipcRenderer.invoke('eventos-cumplidos:desmarcar', params)
   },
+  // 📦531 — Persistencia de planes de acción del submódulo 2.3.1 Evaluación
+  // Inicial del SG-SST. Antes los planes vivían en memoria y se perdían al
+  // cerrar el módulo. Ahora se persisten por (empresaId, year) y se
+  // recuperan al abrir el submódulo.
+  evaluacionActionPlans: {
+    listar: (params) => ipcRenderer.invoke('evaluacion-action-plans:listar', params),
+    guardar: (params) => ipcRenderer.invoke('evaluacion-action-plans:guardar', params),
+    eliminar: (params) => ipcRenderer.invoke('evaluacion-action-plans:eliminar', params)
+  },
   // 📦481-fix — Ruta de Downloads del usuario (para guardar PDFs de reportes)
   getDownloadsPath: () => ipcRenderer.invoke('get-downloads-path'),
 

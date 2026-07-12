@@ -50,6 +50,8 @@ const { registerGestacionHandlers, SCHEMA_SQL: GESTACION_SCHEMA_SQL, MIGRATIONS_
 const { registerEventosCumplidosHandlers, SCHEMA_SQL: EVENTOS_CUMPLIDOS_SCHEMA_SQL } = require('./main/eventos-cumplidos-bridge');
 // K+AIR Calendar — bridge de eventos rápidos (botón calendario del header)
 const { registerEventosRapidosHandlers } = require('./main/eventos-rapidos-bridge');
+// 📦531 — Persistencia de planes de acción del submódulo 2.3.1 Evaluación Inicial
+const { registerEvaluacionActionPlansHandlers, SCHEMA_SQL: EVAL_ACTION_PLANS_SCHEMA_SQL } = require('./main/evaluacion-action-plans-bridge');
 
 // Capturar promesas no manejadas globalmente
 process.on('unhandledRejection', (reason, promise) => {
@@ -387,6 +389,17 @@ function initDbOnce() {
       console.log('[DB] 📦498 · Tabla eventos_cumplidos creada/verificada');
     } catch (cumErr) {
       console.error('[DB] 📦498 · Error creando tabla eventos_cumplidos:', cumErr.message);
+    }
+
+    // 📦531 — Schema de planes de acción de Evaluación Inicial. Persiste
+    // los planes del submódulo 2.3.1 que antes se perdían al cerrar el
+    // módulo. plan_json almacena el objeto completo (incluye seguimientos
+    // y responsables). Indice por (empresa_id, year) para queries rápidas.
+    try {
+      db.exec(EVAL_ACTION_PLANS_SCHEMA_SQL);
+      console.log('[DB] 📦531 · Tabla evaluacion_action_plans creada/verificada');
+    } catch (eapErr) {
+      console.error('[DB] 📦531 · Error creando tabla evaluacion_action_plans:', eapErr.message);
     }
 
     const roleNames = ['Administrador', 'SST', 'Auditoría', 'Gerencia', 'Recursos Humanos'];
@@ -8762,6 +8775,7 @@ try {
 try {
   registerGestacionHandlers(app, { getDb });
   registerEventosCumplidosHandlers(app, { getDb });
+  registerEvaluacionActionPlansHandlers(app, { getDb });
   sendLog('[MAIN] Handlers de Seguimiento de Gestación (Salud Materna) registrados correctamente', 'INFO');
 } catch (err) {
   sendLog(`[MAIN] Error registrando handlers de Gestación: ${err.message}`, 'ERROR');

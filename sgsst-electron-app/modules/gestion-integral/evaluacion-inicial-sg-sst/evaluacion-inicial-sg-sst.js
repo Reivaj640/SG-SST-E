@@ -8,8 +8,8 @@ class EvaluacionInicialSgSst {
         this.moduleName = moduleName;
         this.submoduleTitle = submoduleTitle;
         this.backToModuleCallback = backToModuleCallback;
- 
-        // Estado del componente
+
+        // 📦531 — Estado del componente
         this.currentFindings = [];
         this.currentData = [];
         this.currentYear = new Date().getFullYear().toString();
@@ -17,15 +17,31 @@ class EvaluacionInicialSgSst {
         this.currentPdfPath = null;
         this.submodulePath = null;
         this.activeTab = 'dashboard';
- 
+
         // Datos vacíos iniciales
         this.findingsBase = {};
         this.dataBase = {};
-        
-// Datos de planes de acción
-this.actionPlans = [];
-this.actionPlanIdCounter = 1;
-this.lastScore = 0;
+
+        // Datos de planes de acción — persistidos en SQLite desde 📦531
+        this.actionPlans = [];
+        this.lastScore = 0;
+
+        // 📦531 — Flag de debug. Poner en true para ver console.logs de flujo.
+        // Mantener en false en producción (default).
+        this._debug = false;
+
+        // 📦531 — Referencia al ResizeObserver del gauge (para cleanup en destroy)
+        this._gaugeResizeObserver = null;
+
+        // 📦531 — Flag para evitar doble-bind de event listeners en re-renders
+        this._listenersBound = false;
+    }
+
+    _log(level, msg) {
+        if (!this._debug && level === 'log') return;
+        if (typeof console !== 'undefined' && console[level]) {
+            console[level]('[EvaluacionInicialSgSst] ' + msg);
+        }
     }
 
     async render() {
@@ -36,6 +52,10 @@ this.lastScore = 0;
         this.container.innerHTML = '';
         this.container.className = ''; // Limpiar clases previas
         this.container.classList.add('k-module-container'); // Clase contenedora estándar
+
+        // 📦531 — Toast FUERA del container para que sobreviva re-renders.
+        // Se crea una vez y se reutiliza en todos los showToast().
+        this._ensureToastNode();
 
         const mainLayout = document.createElement('div');
         mainLayout.className = 'k-module-layout ev-inicial-sgsst';
@@ -230,11 +250,10 @@ this.lastScore = 0;
                 </section>
 
             </div>
-
-            <!-- Notificaciones Toast -->
-            <div id="k-toast" class="k-toast"></div>
         `;
 
+        // 📦531 — El toast ahora es externo (creado por _ensureToastNode) y
+        // sobrevive re-renders. Ya no se incluye en el template.
         this.container.appendChild(mainLayout);
 
         // Inicializar referencias y datos
@@ -243,26 +262,46 @@ this.lastScore = 0;
     }
 
     updateReferences() {
-        this.hallazgosTableBody = document.getElementById('hallazgosTableBody');
-        this.actionTableBody = document.getElementById('actionTableBody');
+        // 📦531 — DOM scope: usar this.container.querySelector en vez de
+        // getElementById global. Evita colisiones si hay otros componentes
+        // en la página con IDs similares.
+        this.hallazgosTableBody = this.container.querySelector('#hallazgosTableBody');
+        this.actionTableBody = this.container.querySelector('#actionTableBody');
 
-        const backBtn = document.getElementById('btn-back-eval');
-        if (backBtn && this.backToModuleCallback) {
-            backBtn.addEventListener('click', this.backToModuleCallback);
+        // 📦531 — Listeners con cleanup. Guardamos referencias para removerlas
+        // en destroy() si el usuario re-renderiza el módulo.
+        // (Por ahora los listeners se recrean en cada render — el DOM viejo
+        // se va con innerHTML='', pero mantenemos el patrón por seguridad.)
+        this._backHandler = this.backToModuleCallback;
+        this._viewPdfHandler = () => {
+            if (this.currentPdfPath) window.electronAPI.openPath(this.currentPdfPath);
+        };
+
+        const backBtn = this.container.querySelector('#btn-back-eval');
+        if (backBtn && this._backHandler) {
+            backBtn.addEventListener('click', this._backHandler);
         }
 
-        const btnPdf = document.getElementById('btn-view-pdf');
+        const btnPdf = this.container.querySelector('#btn-view-pdf');
         if (btnPdf) {
-            btnPdf.addEventListener('click', () => {
-                if (this.currentPdfPath) window.electronAPI.openPath(this.currentPdfPath);
-            });
+            btnPdf.addEventListener('click', this._viewPdfHandler);
         }
+    }
+
+    // 📦531 — Crea el nodo toast una sola vez en document.body. Sobrevive
+    // re-renders porque vive fuera del container. showToast() lo reutiliza.
+    _ensureToastNode() {
+        if (document.getElementById('k-toast')) return;
+        const t = document.createElement('div');
+        t.id = 'k-toast';
+        t.className = 'k-toast';
+        document.body.appendChild(t);
     }
 
     // --- LÓGICA DE NAVEGACIÓN (TABS) ---
     switchTab(tabId) {
-        console.log('[EvaluacionInicialSgSst] switchTab() - Cambiando a pestaña:', tabId);
-        
+        this._log('log', 'switchTab() - Cambiando a pestaña: ' + tabId);
+
         // 1. Actualizar botones de navegación
         const navItems = this.container.querySelectorAll('.evaluacion-tab');
         navItems.forEach(btn => {
@@ -270,20 +309,15 @@ this.lastScore = 0;
             else btn.classList.remove('active');
         });
 
-        // 2. Mostrar la sección correspondiente
+        // 2. Mostrar la sección correspondiente.
+        // 📦531 — Quitamos el style.display inline redundante. El CSS ya
+        // hace esto con .k-view { display: none } y .k-view.active.
         const views = this.container.querySelectorAll('.k-view');
-        views.forEach(view => {
-            view.classList.remove('active');
-            // Usar display none/block para asegurar limpieza visual
-            view.style.display = 'none';
-        });
+        views.forEach(view => view.classList.remove('active'));
 
         const activeView = this.container.querySelector(`#view-${tabId}`);
         if (activeView) {
-            console.log('[EvaluacionInicialSgSst] switchTab() - Vista encontrada:', activeView.id);
             activeView.classList.add('active');
-            activeView.style.display = 'block';
-            console.log('[EvaluacionInicialSgSst] switchTab() - Vista activada con display:', activeView.style.display);
 
             // Redibujar gráficos si se entra al dashboard para asegurar renderizado correcto
             if (tabId === 'dashboard' && this.currentFindings.length > 0) {
@@ -291,11 +325,10 @@ this.lastScore = 0;
                 setTimeout(() => this.updateDashboardWithRealData({ cumplimiento: this.lastScore || 0 }), 50);
             }
         } else {
-            console.error('[EvaluacionInicialSgSst] switchTab() - Vista no encontrada:', `#view-${tabId}`);
+            this._log('error', 'switchTab() - Vista no encontrada: #' + 'view-' + tabId);
         }
 
         this.activeTab = tabId;
-        console.log('[EvaluacionInicialSgSst] switchTab() - Pestaña actual actualizada a:', this.activeTab);
     }
 
     // --- LÓGICA DE DATOS ---
@@ -310,9 +343,85 @@ this.lastScore = 0;
             } else {
                 this.showToast('No se encontró la carpeta del submódulo.', 'warning');
             }
+
+            // 📦531 — Cargar planes de acción persistidos del año actual.
+            // Esto resuelve el bug crítico donde los planes se perdían al
+            // cerrar el módulo. Si los planes en memoria (this.actionPlans)
+            // ya tienen contenido, se respeta (no se pisan cambios no guardados).
+            await this._loadPersistedActionPlans();
         } catch (error) {
             console.error('Init Error:', error);
             this.showToast('Error inicializando sistema de archivos.', 'danger');
+        }
+    }
+
+    // 📦531 — Carga los planes persistidos de la BD para la empresa+año
+    // actuales. Si ya hay planes en memoria, hace merge (los de memoria
+    // tienen precedencia por si hay cambios no guardados).
+    async _loadPersistedActionPlans() {
+        try {
+            if (!window.electronAPI || !window.electronAPI.evaluacionActionPlans) {
+                this._log('warn', 'evaluacionActionPlans API no disponible');
+                return;
+            }
+            const empresaId = window.currentCompany;
+            if (!empresaId || empresaId === 'default_company') {
+                this._log('warn', 'No hay empresa activa para cargar planes');
+                return;
+            }
+            const res = await window.electronAPI.evaluacionActionPlans.listar({
+                empresaId: empresaId,
+                year: this.currentYear
+            });
+            if (!res || !res.success) {
+                this._log('error', 'Error listando planes persistidos: ' + (res && res.error && res.error.message));
+                return;
+            }
+            const persisted = res.data || [];
+            this._log('log', 'Cargados ' + persisted.length + ' planes persistidos de ' + empresaId + '/' + this.currentYear);
+            // Merge: planes en memoria tienen precedencia. Solo agregamos los
+            // que no estan en memoria (por id).
+            const inMemoryIds = new Set(this.actionPlans.map(p => p.id));
+            for (let i = 0; i < persisted.length; i++) {
+                const p = persisted[i];
+                if (!inMemoryIds.has(p.id)) {
+                    this.actionPlans.push(p);
+                }
+            }
+            // Si la tabla de planes esta visible, re-renderizarla
+            if (this.activeTab === 'actions') {
+                this.renderActionPlansTable();
+            }
+        } catch (e) {
+            this._log('error', 'Excepcion cargando planes persistidos: ' + e.message);
+        }
+    }
+
+    // 📦531 — Persiste un plan en la BD. Si la operacion falla, no
+    // afecta el estado en memoria (el usuario ve el plan igual; la
+    // persistencia se reintenta en el proximo save).
+    async _persistActionPlan(plan) {
+        try {
+            if (!window.electronAPI || !window.electronAPI.evaluacionActionPlans) return;
+            const empresaId = window.currentCompany;
+            if (!empresaId || empresaId === 'default_company') {
+                this._log('warn', 'No hay empresa activa para guardar plan');
+                return;
+            }
+            const res = await window.electronAPI.evaluacionActionPlans.guardar({
+                empresaId: empresaId,
+                year: this.currentYear,
+                source: this.currentSource,
+                plan: plan
+            });
+            if (!res || !res.success) {
+                this._log('error', 'Error persistiendo plan: ' + (res && res.error && res.error.message));
+                this.showToast('No se pudo guardar el plan en disco (sigue en memoria)', 'warning');
+            } else {
+                this._log('log', 'Plan ' + plan.id + ' guardado OK');
+            }
+        } catch (e) {
+            this._log('error', 'Excepcion persistiendo plan: ' + e.message);
         }
     }
 
@@ -365,15 +474,16 @@ this.lastScore = 0;
                 }
             } else if (pdfFiles.length === 1) {
                 // Si solo hay uno, procesarlo directamente
-                console.log('[EvaluacionInicialSgSst] Procesando único PDF encontrado');
+                this._log('log', 'Procesando único PDF encontrado');
                 const reportPdf = pdfFiles[0];
                 this.currentPdfPath = reportPdf.path;
-                const titleEl = document.getElementById('source-title');
-                const metaEl = document.getElementById('source-meta');
-                const btnView = document.getElementById('btn-view-pdf');
+                // 📦531 — Scoping al container del módulo
+                const titleEl = this.container.querySelector('#source-title');
+                const metaEl = this.container.querySelector('#source-meta');
+                const btnView = this.container.querySelector('#btn-view-pdf');
 
                 if (titleEl) titleEl.textContent = reportPdf.name;
-                if (metaEl) metaEl.textContent = `Archivo detectado en: ...${reportPdf.path.slice(-30)}`;
+                if (metaEl) metaEl.textContent = 'Archivo detectado en: ...' + (reportPdf.path ? reportPdf.path.slice(-30) : '');
                 if (btnView) btnView.style.display = 'inline-flex';
 
                 // Si se forzó el modal pero solo hay 1 PDF, mostrar mensaje y procesar
@@ -382,10 +492,13 @@ this.lastScore = 0;
                 }
                 await this.processPdfData(reportPdf.path);
             } else {
-                console.warn('[EvaluacionInicialSgSst] No se encontraron archivos PDF');
-                document.getElementById('source-title').textContent = "No se encontró informe estándar";
-                document.getElementById('source-meta').textContent = "Por favor cargue un archivo PDF de evaluación (0312).";
-                
+                this._log('warn', 'No se encontraron archivos PDF');
+                // 📦531 — Scoping
+                const titleEl2 = this.container.querySelector('#source-title');
+                const metaEl2 = this.container.querySelector('#source-meta');
+                if (titleEl2) titleEl2.textContent = 'No se encontró informe estándar';
+                if (metaEl2) metaEl2.textContent = 'Por favor cargue un archivo PDF de evaluación (0312).';
+
                 if (forceShowModal) {
                     this.showToast('No se encontraron archivos PDF en la carpeta.', 'warning');
                 }
@@ -398,12 +511,11 @@ this.lastScore = 0;
     }
 
     showPdfSelector(pdfFiles) {
-        console.log('[EvaluacionInicialSgSst] showPdfSelector() - Iniciando con', pdfFiles.length, 'PDFs');
-        
+        this._log('log', 'showPdfSelector() - Iniciando con ' + pdfFiles.length + ' PDFs');
+
         // Crear un modal estilo Copasst para seleccionar el PDF
         const modal = document.createElement('div');
         modal.className = 'k-file-selector-modal';
-        console.log('[EvaluacionInicialSgSst] showPdfSelector() - Modal creado:', modal);
 
         // Agrupar PDFs por tipo
         const ministerioPdfs = pdfFiles.filter(f => f.path.toLowerCase().includes('ministerio'));
@@ -413,6 +525,25 @@ this.lastScore = 0;
             !f.path.toLowerCase().includes('arl')
         );
 
+        // 📦531 — Sin inline onclick. Usamos data-* attributes + event
+        // delegation abajo. Tambien: el conteo por carpeta va en data-count
+        // para que el JS lo actualice sin re-renderizar el HTML (evita XSS).
+        let otherItem = '';
+        if (otherPdfs.length > 0) {
+            otherItem = `
+                <div class="k-file-item" data-folder="otros">
+                    <div class="k-file-item-icon folder">
+                        <i class="fas fa-folder"></i>
+                    </div>
+                    <div class="k-file-item-info">
+                        <div class="k-file-item-name">Otros Archivos</div>
+                        <div class="k-file-item-meta">
+                            <span class="k-file-badge" data-folder-count="otros">${otherPdfs.length}</span>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
         let modalContent = `
             <div class="k-file-selector-content">
                 <div class="k-file-selector-header">
@@ -421,66 +552,54 @@ this.lastScore = 0;
                         Seleccionar PDF de Evaluación
                     </div>
                     <div>
-                        <button class="btn btn-ghost" onclick="this.closest('.k-file-selector-modal').remove()">
+                        <button class="btn btn-ghost" data-modal-close>
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
                 </div>
                 <div class="k-file-selector-body">
                     <div class="k-file-selector-sidebar">
-                        <div class="k-file-breadcrumb" id="folderBreadcrumb">
+                        <div class="k-file-breadcrumb" data-folder-breadcrumb>
                             <span class="k-file-breadcrumb-current">Raíz</span>
                         </div>
                         <div class="k-file-section-header">
                             Carpetas
                         </div>
                         <div class="k-file-section-content">
-                            <div class="k-file-item" onclick="window.currentEvaluacionInstance.navigateToFolder('ministerio')">
+                            <div class="k-file-item" data-folder="ministerio">
                                 <div class="k-file-item-icon folder">
                                     <i class="fas fa-folder"></i>
                                 </div>
                                 <div class="k-file-item-info">
                                     <div class="k-file-item-name">Ministerio de Trabajo</div>
                                     <div class="k-file-item-meta">
-                                        <span class="k-file-badge">${ministerioPdfs.length}</span>
+                                        <span class="k-file-badge" data-folder-count="ministerio">${ministerioPdfs.length}</span>
                                     </div>
                                 </div>
                             </div>
-                            <div class="k-file-item" onclick="window.currentEvaluacionInstance.navigateToFolder('arl')">
+                            <div class="k-file-item" data-folder="arl">
                                 <div class="k-file-item-icon folder">
                                     <i class="fas fa-shield-alt"></i>
                                 </div>
                                 <div class="k-file-item-info">
                                     <div class="k-file-item-name">Informe ARL</div>
                                     <div class="k-file-item-meta">
-                                        <span class="k-file-badge">${arlPdfs.length}</span>
+                                        <span class="k-file-badge" data-folder-count="arl">${arlPdfs.length}</span>
                                     </div>
                                 </div>
                             </div>
-                            ${otherPdfs.length > 0 ? `
-                            <div class="k-file-item" onclick="window.currentEvaluacionInstance.navigateToFolder('otros')">
-                                <div class="k-file-item-icon folder">
-                                    <i class="fas fa-folder"></i>
-                                </div>
-                                <div class="k-file-item-info">
-                                    <div class="k-file-item-name">Otros Archivos</div>
-                                    <div class="k-file-item-meta">
-                                        <span class="k-file-badge">${otherPdfs.length}</span>
-                                    </div>
-                                </div>
-                            </div>
-                            ` : ''}
+                            ${otherItem}
                         </div>
                     </div>
                     <div class="k-file-selector-main">
-                        <div class="k-file-go-back" id="goBackFolderBtn" onclick="window.currentEvaluacionInstance.goBackToRoot()" style="display: none;">
+                        <div class="k-file-go-back" data-go-back style="display: none;">
                             <i class="fas fa-level-up-alt" style="margin-right: 8px; transform: rotate(90deg);"></i>
                             Volver a carpetas
                         </div>
                         <div class="k-file-section-header">
                             Documentos
                         </div>
-                        <div class="k-file-section-content" id="pdfFileList">
+                        <div class="k-file-section-content" data-pdf-list>
                             <div class="k-file-empty-state">
                                 <div class="k-file-empty-icon">
                                     <i class="fas fa-folder-open"></i>
@@ -492,7 +611,7 @@ this.lastScore = 0;
                     </div>
                 </div>
                 <div class="k-file-selector-footer">
-                    <button class="btn btn-ghost" onclick="this.closest('.k-file-selector-modal').remove()">
+                    <button class="btn btn-ghost" data-modal-close>
                         Cancelar
                     </button>
                 </div>
@@ -500,176 +619,253 @@ this.lastScore = 0;
         `;
 
         modal.innerHTML = modalContent;
-        console.log('[EvaluacionInicialSgSst] showPdfSelector() - Contenido HTML asignado');
-        console.log('[EvaluacionInicialSgSst] showPdfSelector() - Adjuntando modal al document.body');
         document.body.appendChild(modal);
-        console.log('[EvaluacionInicialSgSst] showPdfSelector() - Modal adjuntado exitosamente');
-        
+
         // Guardar referencia a los PDFs para usar en navigateToFolder
         this.pdfFilesCache = {
             ministerio: ministerioPdfs,
             arl: arlPdfs,
             otros: otherPdfs
         };
-        
+
         // Inicializar estado de navegación
         this.currentFolder = null;
+
+        // 📦531 — Event delegation (reemplaza los inline onclick que eran
+        // vulnerables a XSS). Un solo listener en el modal maneja TODOS
+        // los clicks. Lee data-* attributes para saber qué hacer.
+        modal.addEventListener('click', (e) => {
+            const t = e.target;
+            // Click en el backdrop (no en contenido) cierra
+            if (t === modal) {
+                modal.remove();
+                return;
+            }
+            // Click en botón de cerrar
+            if (t.closest('[data-modal-close]')) {
+                modal.remove();
+                return;
+            }
+            // Click en una carpeta
+            const folderItem = t.closest('[data-folder]');
+            if (folderItem) {
+                this.navigateToFolder(folderItem.dataset.folder);
+                return;
+            }
+            // Click en "volver a carpetas"
+            if (t.closest('[data-go-back]')) {
+                this.goBackToRoot();
+                return;
+            }
+            // Click en un PDF (item con data-pdf-path)
+            const pdfItem = t.closest('[data-pdf-path]');
+            if (pdfItem) {
+                this.selectPdf(pdfItem.dataset.pdfPath, pdfItem.dataset.pdfName);
+                return;
+            }
+        });
     }
-    
+
     navigateToFolder(type) {
-        const pdfs = this.pdfFilesCache[type] || [];
-        const fileList = document.getElementById('pdfFileList');
-        const breadcrumb = document.getElementById('folderBreadcrumb');
-        const goBackBtn = document.getElementById('goBackFolderBtn');
-        
+        const pdfs = (this.pdfFilesCache && this.pdfFilesCache[type]) || [];
+        // 📦531 — Scoping: usar el modal actual como root en vez de
+        // getElementById global. Esto permite multiples instancias del modal
+        // y evita colisiones con otros componentes.
+        const modal = this.container.ownerDocument.querySelector('.k-file-selector-modal') ||
+                      document.querySelector('.k-file-selector-modal');
+        if (!modal) return;
+        const fileList = modal.querySelector('[data-pdf-list]');
+        const breadcrumb = modal.querySelector('[data-folder-breadcrumb]');
+        const goBackBtn = modal.querySelector('[data-go-back]');
+
         // Actualizar estado de navegación
         this.currentFolder = type;
-        
+
         // Mostrar botón de volver
-        goBackBtn.style.display = 'flex';
-        
-        // Actualizar breadcrumb
+        if (goBackBtn) goBackBtn.style.display = 'flex';
+
+        // Actualizar breadcrumb (con textContent para evitar XSS)
         const folderNames = {
             ministerio: 'Ministerio de Trabajo',
             arl: 'Informe ARL',
             otros: 'Otros Archivos'
         };
-        
-        breadcrumb.innerHTML = `
-            <span class="k-file-breadcrumb-item" onclick="window.currentEvaluacionInstance.goBackToRoot()">Raíz</span>
-            <span class="k-file-breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
-            <span class="k-file-breadcrumb-current">${folderNames[type] || type}</span>
-        `;
-        
+        if (breadcrumb) {
+            breadcrumb.innerHTML = '';
+            const root = document.createElement('span');
+            root.className = 'k-file-breadcrumb-item';
+            root.textContent = 'Raíz';
+            root.addEventListener('click', () => this.goBackToRoot());
+            const sep = document.createElement('span');
+            sep.className = 'k-file-breadcrumb-separator';
+            sep.innerHTML = '<i class="fas fa-chevron-right"></i>';
+            const current = document.createElement('span');
+            current.className = 'k-file-breadcrumb-current';
+            current.textContent = folderNames[type] || type;
+            breadcrumb.appendChild(root);
+            breadcrumb.appendChild(sep);
+            breadcrumb.appendChild(current);
+        }
+
         if (pdfs.length === 0) {
-            fileList.innerHTML = `
-                <div class="k-file-empty-state">
-                    <div class="k-file-empty-icon">
-                        <i class="fas fa-file-pdf"></i>
-                    </div>
-                    <div class="k-file-empty-title">No hay archivos</div>
-                    <div class="k-file-empty-desc">No se encontraron archivos PDF en esta carpeta.</div>
-                </div>
-            `;
+            if (fileList) {
+                fileList.innerHTML = `
+                    <div class="k-file-empty-state">
+                        <div class="k-file-empty-icon">
+                            <i class="fas fa-file-pdf"></i>
+                        </div>
+                        <div class="k-file-empty-title">No hay archivos</div>
+                        <div class="k-file-empty-desc">No se encontraron archivos PDF en esta carpeta.</div>
+                    </div>`;
+            }
             return;
         }
-        
-        fileList.innerHTML = pdfs.map(pdf => {
-            const encodedPath = encodeURIComponent(pdf.path);
-            const encodedName = encodeURIComponent(pdf.name);
-            
-            return `
-                <div class="k-file-item" onclick="window.currentEvaluacionInstance.selectPdf(decodeURIComponent('${encodedPath}'), decodeURIComponent('${encodedName}'))">
+
+        // 📦531 — Construir items con textContent (no template literals con
+        // data del filesystem). El nombre del PDF y su path van a data-*
+        // attributes que el event delegation lee. Esto elimina el XSS
+        // completamente (un nombre con ' o < no rompe nada).
+        if (fileList) {
+            fileList.innerHTML = '';
+            const frag = document.createDocumentFragment();
+            for (let i = 0; i < pdfs.length; i++) {
+                const pdf = pdfs[i];
+                const item = document.createElement('div');
+                item.className = 'k-file-item';
+                item.setAttribute('data-pdf-path', pdf.path);
+                item.setAttribute('data-pdf-name', pdf.name);
+                item.innerHTML = `
                     <div class="k-file-item-icon pdf">
                         <i class="fas fa-file-pdf"></i>
                     </div>
                     <div class="k-file-item-info">
-                        <div class="k-file-item-name">${pdf.name}</div>
+                        <div class="k-file-item-name"></div>
                         <div class="k-file-item-meta">
-                            <span class="k-file-badge">${Math.round(pdf.size / 1024)} KB</span>
+                            <span class="k-file-badge"></span>
                         </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
+                    </div>`;
+                // textContent para evitar inyeccion
+                item.querySelector('.k-file-item-name').textContent = pdf.name;
+                item.querySelector('.k-file-badge').textContent = Math.round((pdf.size || 0) / 1024) + ' KB';
+                frag.appendChild(item);
+            }
+            fileList.appendChild(frag);
+        }
     }
-    
+
     goBackToRoot() {
-        const fileList = document.getElementById('pdfFileList');
-        const breadcrumb = document.getElementById('folderBreadcrumb');
-        const goBackBtn = document.getElementById('goBackFolderBtn');
-        
+        const modal = this.container.ownerDocument.querySelector('.k-file-selector-modal') ||
+                      document.querySelector('.k-file-selector-modal');
+        if (!modal) return;
+        const fileList = modal.querySelector('[data-pdf-list]');
+        const breadcrumb = modal.querySelector('[data-folder-breadcrumb]');
+        const goBackBtn = modal.querySelector('[data-go-back]');
+
         // Resetear estado de navegación
         this.currentFolder = null;
-        
+
         // Ocultar botón de volver
-        goBackBtn.style.display = 'none';
-        
+        if (goBackBtn) goBackBtn.style.display = 'none';
+
         // Resetear breadcrumb
-        breadcrumb.innerHTML = `
-            <span class="k-file-breadcrumb-current">Raíz</span>
-        `;
-        
+        if (breadcrumb) {
+            breadcrumb.innerHTML = '';
+            const current = document.createElement('span');
+            current.className = 'k-file-breadcrumb-current';
+            current.textContent = 'Raíz';
+            breadcrumb.appendChild(current);
+        }
+
         // Mostrar estado inicial
-        fileList.innerHTML = `
-            <div class="k-file-empty-state">
-                <div class="k-file-empty-icon">
-                    <i class="fas fa-folder-open"></i>
-                </div>
-                <div class="k-file-empty-title">Seleccione una carpeta</div>
-                <div class="k-file-empty-desc">Haga clic en una carpeta del panel izquierdo para ver los archivos PDF disponibles.</div>
-            </div>
-        `;
+        if (fileList) {
+            fileList.innerHTML = `
+                <div class="k-file-empty-state">
+                    <div class="k-file-empty-icon">
+                        <i class="fas fa-folder-open"></i>
+                    </div>
+                    <div class="k-file-empty-title">Seleccione una carpeta</div>
+                    <div class="k-file-empty-desc">Haga clic en una carpeta del panel izquierdo para ver los archivos PDF disponibles.</div>
+                </div>`;
+        }
     }
 
     selectPdf(pdfPath, pdfName) {
         // Cerrar el modal de selección de archivos
-        const modal = document.querySelector('.k-file-selector-modal');
+        const modal = this.container.ownerDocument.querySelector('.k-file-selector-modal');
         if (modal) modal.remove();
 
         // Actualizar la UI con el archivo seleccionado
         this.currentPdfPath = pdfPath;
-        const titleEl = document.getElementById('source-title');
-        const metaEl = document.getElementById('source-meta');
-        const btnView = document.getElementById('btn-view-pdf');
+        // 📦531 — Scoping al container del módulo
+        const titleEl = this.container.querySelector('#source-title');
+        const metaEl = this.container.querySelector('#source-meta');
+        const btnView = this.container.querySelector('#btn-view-pdf');
 
         if (titleEl) titleEl.textContent = pdfName;
-        if (metaEl) metaEl.textContent = `Archivo seleccionado: ...${pdfPath.slice(-30)}`;
+        if (metaEl) metaEl.textContent = 'Archivo seleccionado: ...' + (pdfPath ? pdfPath.slice(-30) : '');
         if (btnView) btnView.style.display = 'inline-flex';
 
         // Procesar el PDF seleccionado
         this.processPdfData(pdfPath);
     }
 
+    // 📦531 — Valida que el resultado del backend tenga la estructura
+    // mínima esperada. Si no, loguea y devuelve false (el caller maneja).
+    _validateProcessResult(result) {
+        if (!result || typeof result !== 'object') return false;
+        if (result.success !== true) return false;
+        if (result.findings !== undefined && !Array.isArray(result.findings)) {
+            this._log('error', 'result.findings no es array');
+            return false;
+        }
+        if (result.metrics !== undefined && (typeof result.metrics !== 'object' || result.metrics === null)) {
+            this._log('error', 'result.metrics no es objeto');
+            return false;
+        }
+        return true;
+    }
+
     async processPdfData(pdfPath) {
-        const loading = document.getElementById('loading-indicator');
+        const loading = this.container.querySelector('#loading-indicator');
         if (loading) loading.style.display = 'inline-flex';
 
         try {
-            console.log('[EvaluacionInicialSgSst] Iniciando procesamiento de PDF:', pdfPath);
+            this._log('log', 'Iniciando procesamiento de PDF: ' + pdfPath);
             const sourceType = pdfPath.toLowerCase().includes('arl') ? 'arl' : 'ministerio';
-            console.log('[EvaluacionInicialSgSst] Tipo de fuente detectado:', sourceType);
+            this._log('log', 'Tipo de fuente detectado: ' + sourceType);
 
             if (window.electronAPI && window.electronAPI.processEvaluacionPdf) {
-                console.log('[EvaluacionInicialSgSst] Llamando a processEvaluacionPdf...');
                 const result = await window.electronAPI.processEvaluacionPdf(pdfPath, sourceType);
-                console.log('[EvaluacionInicialSgSst] Resultado recibido:', result);
 
-                if (result.success) {
-                    console.log('[EvaluacionInicialSgSst] PDF procesado exitosamente');
-                    console.log('[EvaluacionInicialSgSst] Hallazgos encontrados:', result.findings?.length || 0);
-                    console.log('[EvaluacionInicialSgSst] Métricas:', result.metrics);
-                    console.log('[EvaluacionInicialSgSst] Pestaña actual:', this.activeTab);
-                    console.log('[EvaluacionInicialSgSst] Planes de acción extraídos:', result.actionPlans?.length || 0);
-                    
-                    this.currentFindings = result.findings || [];
-                    this.renderHallazgosTable();
-                    this.updateDashboardWithRealData(result.metrics);
-                    
-                    // Procesar planes de acción según el tipo de fuente
-                    if (result.source === 'arl' && result.actionPlans && result.actionPlans.length > 0) {
-                        // Para informes de ARL, usar los planes de acción extraídos
-                        console.log('[EvaluacionInicialSgSst] Procesando planes de acción de ARL');
-                        this.processArlActionPlans(result.actionPlans);
-                    } else if (result.source === 'ministerio') {
-                        // Para informes del Ministerio, generar planes automáticamente para hallazgos "no_cumple"
-                        console.log('[EvaluacionInicialSgSst] Generando planes de acción para hallazgos no_cumple');
-                        this.generateActionPlansForNoCumple();
-                    }
-                    
-                    this.renderActionPlansTable();
-                    
-                    // Cambiar a la pestaña de Planes de Acción para mostrar la tabla
-                    console.log('[EvaluacionInicialSgSst] Cambiando a pestaña de Planes de Acción');
-                    this.switchTab('actions');
-                    
-                    this.showToast('Datos procesados correctamente.', 'success');
-                } else {
-                    console.error('[EvaluacionInicialSgSst] Error procesando PDF:', result.error);
-                    this.showToast(`No se pudieron extraer datos: ${result.error || 'Error desconocido'}`, 'warning');
+                // 📦531 — Validar estructura del resultado antes de usarlo
+                if (!this._validateProcessResult(result)) {
+                    this._log('error', 'Resultado del backend invalido: ' + JSON.stringify(result).slice(0, 200));
+                    this.showToast('El backend devolvió datos con formato inesperado.', 'danger');
+                    return;
                 }
+
+                this._log('log', 'PDF procesado OK. Hallazgos=' + (result.findings ? result.findings.length : 0));
+                this.currentFindings = result.findings || [];
+                this.renderHallazgosTable();
+                this.updateDashboardWithRealData(result.metrics);
+
+                // Procesar planes de acción según el tipo de fuente
+                if (result.source === 'arl' && result.actionPlans && result.actionPlans.length > 0) {
+                    this._log('log', 'Procesando planes de acción de ARL');
+                    this.processArlActionPlans(result.actionPlans);
+                } else if (result.source === 'ministerio') {
+                    this._log('log', 'Generando planes de acción para hallazgos no_cumple');
+                    this.generateActionPlansForNoCumple();
+                }
+
+                this.renderActionPlansTable();
+
+                // Cambiar a la pestaña de Planes de Acción para mostrar la tabla
+                this.switchTab('actions');
+
+                this.showToast('Datos procesados correctamente.', 'success');
             } else {
-                console.error('[EvaluacionInicialSgSst] electronAPI o processEvaluacionPdf no disponible');
+                this._log('error', 'electronAPI o processEvaluacionPdf no disponible');
                 this.showToast('Error: API no disponible', 'danger');
             }
         } catch (error) {
@@ -782,42 +978,55 @@ const pendingCount = this.actionPlans.filter(p => p.estado !== 'completado').len
 
 this.lastScore = score;
 
-const scoreEl = document.getElementById('kpi-score');
-const scorePctEl = document.getElementById('kpi-score-pct');
-const gapsEl = document.getElementById('kpi-gaps');
-const pendingEl = document.getElementById('kpi-pending');
-const chartLabel = document.getElementById('chart-score-label');
+        const scoreEl = this.container.querySelector('#kpi-score');
+        const scorePctEl = this.container.querySelector('#kpi-score-pct');
+        const gapsEl = this.container.querySelector('#kpi-gaps');
+        const pendingEl = this.container.querySelector('#kpi-pending');
+        const chartLabel = this.container.querySelector('#chart-score-label');
 
-if (scoreEl) scoreEl.textContent = score + '%';
-if (scorePctEl) scorePctEl.textContent = score + '%';
-if (chartLabel) chartLabel.textContent = score + '%';
-if (gapsEl) gapsEl.textContent = noCumplidos;
-if (pendingEl) pendingEl.textContent = pendingCount;
+        if (scoreEl) scoreEl.textContent = score + '%';
+        if (scorePctEl) scorePctEl.textContent = score + '%';
+        if (chartLabel) chartLabel.textContent = score + '%';
+        if (gapsEl) gapsEl.textContent = noCumplidos;
+        if (pendingEl) pendingEl.textContent = pendingCount;
 
-// Actualizar Gráficos
-this.drawGauge(score);
+        // Actualizar Gráficos
+        this.drawGauge(score);
+        // 📦531 — Setup del observer para resize (solo la primera vez)
+        this._setupGaugeResizeObserver();
 
-        // Simular PHVA si no hay datos detallados
-        const phvaContainer = document.getElementById('phva-chart-container');
+        // 📦531 — PHVA: si el backend trae datos reales por fase
+        // (metrics.phva = {planear, hacer, verificar, actuar}), los usamos.
+        // Si no, mostramos empty state. Ya no fabricamos datos falsos.
+        const phvaContainer = this.container.querySelector('#phva-chart-container');
         if (phvaContainer) {
-            phvaContainer.innerHTML = `
-                <div class="k-progress-group">
-                    <div class="k-progress-label"><span>PLANEAR</span><span>${Math.min(score + 10, 100)}%</span></div>
-                    <div class="k-progress-bar"><div class="k-progress-fill" style="width:${Math.min(score + 10, 100)}%; background:var(--primary);"></div></div>
-                </div>
-                <div class="k-progress-group">
-                    <div class="k-progress-label"><span>HACER</span><span>${score}%</span></div>
-                    <div class="k-progress-bar"><div class="k-progress-fill" style="width:${score}%; background:var(--success);"></div></div>
-                </div>
-                <div class="k-progress-group">
-                    <div class="k-progress-label"><span>VERIFICAR</span><span>${Math.max(score - 5, 0)}%</span></div>
-                    <div class="k-progress-bar"><div class="k-progress-fill" style="width:${Math.max(score - 5, 0)}%; background:var(--info);"></div></div>
-                </div>
-                <div class="k-progress-group">
-                    <div class="k-progress-label"><span>ACTUAR</span><span>${Math.max(score - 10, 0)}%</span></div>
-                    <div class="k-progress-bar"><div class="k-progress-fill" style="width:${Math.max(score - 10, 0)}%; background:var(--warning);"></div></div>
-                </div>
-            `;
+            const phva = metrics.phva;
+            if (phva && typeof phva === 'object'
+                && phva.planear !== undefined
+                && phva.hacer !== undefined
+                && phva.verificar !== undefined
+                && phva.actuar !== undefined) {
+                phvaContainer.innerHTML = `
+                    <div class="k-progress-group">
+                        <div class="k-progress-label"><span>PLANEAR</span><span>${Math.min(phva.planear, 100)}%</span></div>
+                        <div class="k-progress-bar"><div class="k-progress-fill" style="width:${Math.min(phva.planear, 100)}%; background:var(--primary);"></div></div>
+                    </div>
+                    <div class="k-progress-group">
+                        <div class="k-progress-label"><span>HACER</span><span>${Math.min(phva.hacer, 100)}%</span></div>
+                        <div class="k-progress-bar"><div class="k-progress-fill" style="width:${Math.min(phva.hacer, 100)}%; background:var(--success);"></div></div>
+                    </div>
+                    <div class="k-progress-group">
+                        <div class="k-progress-label"><span>VERIFICAR</span><span>${Math.min(phva.verificar, 100)}%</span></div>
+                        <div class="k-progress-bar"><div class="k-progress-fill" style="width:${Math.min(phva.verificar, 100)}%; background:var(--info);"></div></div>
+                    </div>
+                    <div class="k-progress-group">
+                        <div class="k-progress-label"><span>ACTUAR</span><span>${Math.min(phva.actuar, 100)}%</span></div>
+                        <div class="k-progress-bar"><div class="k-progress-fill" style="width:${Math.min(phva.actuar, 100)}%; background:var(--warning);"></div></div>
+                    </div>
+                `;
+            } else {
+                phvaContainer.innerHTML = '<div class="k-empty-state-small">Sin datos PHVA en el PDF</div>';
+            }
         }
     }
 
@@ -982,11 +1191,17 @@ this.drawGauge(score);
                     fechaModificacion: new Date().toISOString()
                 };
                 this.showToast('Plan de acción actualizado correctamente', 'success');
+                // 📦531 — Persistir en BD
+                this._persistActionPlan(this.actionPlans[planIndex]);
             }
         } else {
-            // Crear nuevo plan
+            // Crear nuevo plan — 📦531 usar crypto.randomUUID() en vez de
+            // contador (mas robusto, sin colisiones entre instancias).
+            var newId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+                ? crypto.randomUUID()
+                : 'eap-' + Date.now().toString(36) + '-' + Math.floor(Math.random() * 0xffffff).toString(16);
             const newPlan = {
-                id: this.actionPlanIdCounter++,
+                id: newId,
                 hallazgoId,
                 hallazgoCodigo: hallazgo.code,
                 hallazgoDescripcion: hallazgo.desc,
@@ -1000,13 +1215,21 @@ this.drawGauge(score);
             };
             this.actionPlans.push(newPlan);
             this.showToast('Plan de acción creado correctamente', 'success');
+            // 📦531 — Persistir en BD
+            this._persistActionPlan(newPlan);
         }
-        
+
         // Cerrar modal y actualizar tabla
         const modal = document.querySelector('.k-modal');
         if (modal) modal.remove();
-        
+
         this.renderActionPlansTable();
+
+        // 📦531 — Refrescar KPI del dashboard si esta visible (cambio
+        // de estado pendiente/completado afecta el contador).
+        if (this.activeTab === 'dashboard' || this.currentFindings.length > 0) {
+            this.updateDashboardWithRealData({ cumplimiento: this.lastScore });
+        }
     }
     
     showActionPlanDetailModal(planId) {
@@ -1742,16 +1965,21 @@ this.drawGauge(score);
     }
 
     showToast(msg, type = 'info') {
-        const t = document.getElementById("k-toast");
-        if(t) {
+        // 📦531 — El toast ahora vive en document.body (no en el container)
+        // para sobrevivir re-renders. _ensureToastNode() lo crea en
+        // render() si no existe.
+        this._ensureToastNode();
+        const t = document.getElementById('k-toast');
+        if (t) {
             t.textContent = msg;
-            t.className = `k-toast show ${type}`;
+            t.className = 'k-toast show ' + type;
             setTimeout(() => t.classList.remove('show'), 3000);
         }
     }
 
     drawGauge(value = 0) {
-        const canvas = document.getElementById('gaugeChart');
+        // 📦531 — Scoping al container
+        const canvas = this.container.querySelector('#gaugeChart');
         if (!canvas) return;
 
         // Asegurar alta resolución
@@ -1788,6 +2016,68 @@ this.drawGauge(score);
         ctx.arc(cx, cy, r, Math.PI, endAngle);
         ctx.strokeStyle = strokeColor;
         ctx.stroke();
+    }
+
+    // 📦531 — Setup del ResizeObserver para que el gauge se redibuje
+    // cuando el usuario redimensiona la ventana. Llamar una vez despues
+    // del render inicial. Cleanup en destroy().
+    _setupGaugeResizeObserver() {
+        const canvas = this.container.querySelector('#gaugeChart');
+        if (!canvas) return;
+        const parent = canvas.parentElement;
+        if (!parent || typeof ResizeObserver === 'undefined') return;
+        // Si ya hay uno, desconectarlo
+        if (this._gaugeResizeObserver) {
+            this._gaugeResizeObserver.disconnect();
+        }
+        this._gaugeResizeObserver = new ResizeObserver(() => {
+            // Redibujar con throttle basico (evita llamar varias veces
+            // en el mismo frame)
+            if (this._gaugeResizePending) return;
+            this._gaugeResizePending = true;
+            requestAnimationFrame(() => {
+                this._gaugeResizePending = false;
+                if (this.lastScore !== undefined) {
+                    this.drawGauge(this.lastScore);
+                }
+            });
+        });
+        this._gaugeResizeObserver.observe(parent);
+    }
+
+    // 📦531 — Cleanup. Llamar cuando el módulo se desmonta (ej: el
+    // usuario navega a otro módulo o submódulo). Libera observers,
+    // listeners y referencias para evitar memory leaks.
+    destroy() {
+        this._log('log', 'destroy() — limpiando recursos');
+
+        // Desconectar ResizeObserver
+        if (this._gaugeResizeObserver) {
+            this._gaugeResizeObserver.disconnect();
+            this._gaugeResizeObserver = null;
+        }
+
+        // Remover el toast externo (lo creamos nosotros, no es del container)
+        const toast = document.getElementById('k-toast');
+        if (toast && toast.parentNode) {
+            toast.parentNode.removeChild(toast);
+        }
+
+        // Limpiar referencias grandes
+        this.actionPlans = [];
+        this.currentFindings = [];
+        this.pdfFilesCache = null;
+        this.hallazgosTableBody = null;
+        this.actionTableBody = null;
+        this._backHandler = null;
+        this._viewPdfHandler = null;
+
+        // Limpiar instancia global
+        if (window.currentEvaluacionInstance === this) {
+            window.currentEvaluacionInstance = null;
+        }
+
+        // El container se vacia desde el caller; no tocamos el DOM acá.
     }
 }
 
