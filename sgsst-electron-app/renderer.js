@@ -1603,10 +1603,12 @@ if (appHeader) {
           headerUpdateBtn.title = options.version
             ? `Actualización v${options.version} disponible — Click para descargar`
             : 'Actualización disponible';
-          // Mostrar panel con botón "Descargar" (no descarga todavía)
+          // 📦529 — FIX: NO auto-abrir el panel. El usuario hace clic en el botón
+          // amarillo para abrir el panel con "Descargar". Antes se auto-abría y el
+          // primer click del usuario lo cerraba (interpretado como "no pasa nada").
           if (headerUpdatePanel) {
-            headerUpdatePanel.style.display = 'flex';
-            headerUpdatePanelVisible = true;
+            headerUpdatePanel.style.display = 'none';
+            headerUpdatePanelVisible = false;
           }
           if (updateProgressFill) updateProgressFill.style.width = '0%';
           if (updateProgressText) updateProgressText.textContent = 'Listo para descargar';

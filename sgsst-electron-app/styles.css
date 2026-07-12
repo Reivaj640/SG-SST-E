@@ -877,6 +877,7 @@ select.form-control {
   align-items: center;
   width: 100%;
   gap: 0;
+  position: relative; /* 📦529 — FIX: ancla para .header-update-panel (position:absolute) */
 }
 
 .logo-container {
