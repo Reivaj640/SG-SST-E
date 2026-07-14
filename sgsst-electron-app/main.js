@@ -8708,20 +8708,6 @@ app.whenReady().then(() => {
     createWindow();
   }
 
-  // 📦538 — Inicializar sync multipc: generar pcId estable y arrancar
-  // auto-sync para todas las empresas con sync.enabled=true.
-  try {
-    pcidGenerator.ensurePcId(app.getPath('userData'));
-    // Esperar un tick para que el SyncService termine de inicializarse
-    // (ya fue inicializado por registerSyncHandlers arriba, en el try
-    // block de Gestación). Llamar a startAutoSyncForAllEnabled.
-    const syncService = require('./main/sync-service');
-    syncService.startAutoSyncForAllEnabled();
-    sendLog('[SYNC] Auto-sync multipc inicializado para empresas habilitadas', 'INFO');
-  } catch (syncInitErr) {
-    sendLog('[SYNC] Error inicializando auto-sync: ' + syncInitErr.message, 'WARN');
-  }
-
   // Handler: la pantalla de carga terminó → cerrar loading, mostrar app
   ipcMain.on('loading-complete', () => {
     if (loadingWindow && !loadingWindow.isDestroyed()) {
@@ -8795,6 +8781,14 @@ try {
   registerEventosCumplidosHandlers(app, { getDb });
   registerEvaluacionActionPlansHandlers(app, { getDb });
   registerSyncHandlers(app, { getDb });
+  // 📦538 (FIX orden init) — Generar pcId y arrancar auto-sync DESPUES de
+  // que registerSyncHandlers haya llamado a syncService.init() (setea _configPath).
+  // Si se llama antes, _getAllCompanies() retorna [] porque _configPath es null
+  // y ninguna empresa se inicia con auto-sync.
+  pcidGenerator.ensurePcId(app.getPath('userData'));
+  const syncService = require('./main/sync-service');
+  syncService.startAutoSyncForAllEnabled();
+  sendLog('[SYNC] Auto-sync multipc inicializado para empresas habilitadas', 'INFO');
   sendLog('[MAIN] Handlers de Seguimiento de Gestación (Salud Materna) y Sync multipc registrados correctamente', 'INFO');
 } catch (err) {
   sendLog(`[MAIN] Error registrando handlers de Gestación: ${err.message}`, 'ERROR');
