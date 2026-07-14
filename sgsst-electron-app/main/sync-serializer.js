@@ -120,7 +120,7 @@ function _serializeGestaciones(db, companyKey) {
     if (!tableExists) return [];
 
     var rows = db.prepare(
-      'SELECT * FROM gestaciones WHERE empresa_id = ? ORDER BY updated_at DESC'
+      'SELECT * FROM gestaciones WHERE empresa_id = ? ORDER BY actualizado_en DESC'
     ).all(companyKey);
 
     var result = [];
@@ -139,7 +139,7 @@ function _serializeGestaciones(db, companyKey) {
         id: g.id,
         gestante: g,
         seguimientos: seguimientos,
-        updatedAt: g.updated_at || new Date().toISOString()
+        updatedAt: g.actualizado_en || g.created_at || new Date().toISOString()
       });
     }
     return result;
@@ -347,12 +347,111 @@ function _deserializeGestaciones(db, remoteRecords, companyKey, result, conflict
       continue;
     }
 
-    // TODO 📦537/538: implementar merge completo de gestaciones +
-    // seguimiento_gestacion_mensual cuando veamos la estructura exacta.
-    // Por ahora dejamos skip explicito para que el sync no rompa si
-    // la app del cliente ya tiene gestaciones y la del admin no.
-    counter.skipped++;
-    result.skipped++;
+    try {
+      // 1) UPSERT de la gestante (last-write-wins por updatedAt)
+      var localG = db.prepare(
+        'SELECT id, actualizado_en FROM gestaciones WHERE id = ?'
+      ).get(remote.id);
+      var g = remote.gestante;
+      if (!localG) {
+        // INSERT gestante nueva
+        var colsG = Object.keys(g);
+        var placeholdersG = colsG.map(function () { return '?'; }).join(', ');
+        var valuesG = colsG.map(function (k) { return g[k] != null ? g[k] : null; });
+        var stmtG = db.prepare(
+          'INSERT INTO gestaciones (' + colsG.join(', ') + ') VALUES (' + placeholdersG + ')'
+        );
+        stmtG.run.apply(stmtG, valuesG);
+        counter.applied++;
+        result.applied++;
+      } else if (g.actualizado_en && g.actualizado_en > localG.actualizado_en) {
+        // UPDATE gestante con datos mas nuevos
+        var setG = Object.keys(g).map(function (k) { return k + ' = ?'; }).join(', ');
+        var valuesG2 = Object.keys(g).map(function (k) { return g[k] != null ? g[k] : null; });
+        valuesG2.push(remote.id);
+        var stmtG2 = db.prepare(
+          'UPDATE gestaciones SET ' + setG + ' WHERE id = ?'
+        );
+        stmtG2.run.apply(stmtG2, valuesG2);
+        counter.applied++;
+        result.applied++;
+      } else {
+        counter.skipped++;
+        result.skipped++;
+      }
+
+      // 2) UPSERT de cada seguimiento (last-write-wins)
+      if (Array.isArray(remote.seguimientos)) {
+        // Verificar que la tabla de seguimientos existe
+        var segTableExists = db.prepare(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='seguimiento_gestacion_mensual'"
+        ).get();
+        if (!segTableExists) {
+          console.warn('[' + MOD + '] Tabla seguimiento_gestacion_mensual no existe, saltando merge de seguimientos');
+          continue;
+        }
+
+        for (var j = 0; j < remote.seguimientos.length; j++) {
+          var seg = remote.seguimientos[j];
+          if (!seg || !seg.id) {
+            counter.skipped++;
+            result.skipped++;
+            continue;
+          }
+          // La tabla seguimiento_gestacion_mensual tiene su propio updatedAt-ish.
+          // Usamos creado_en como proxy si no hay updated_at explicito.
+          // Si created/updated es null, saltamos.
+          var localS = db.prepare(
+            'SELECT id, creado_en FROM seguimiento_gestacion_mensual WHERE id = ?'
+          ).get(seg.id);
+          if (!localS) {
+            // INSERT
+            try {
+              var colsS = Object.keys(seg);
+              var placeholdersS = colsS.map(function () { return '?'; }).join(', ');
+              var valuesS = colsS.map(function (k) { return seg[k] != null ? seg[k] : null; });
+              var stmtS = db.prepare(
+                'INSERT INTO seguimiento_gestacion_mensual (' + colsS.join(', ') + ') VALUES (' + placeholdersS + ')'
+              );
+              stmtS.run.apply(stmtS, valuesS);
+              counter.applied++;
+              result.applied++;
+            } catch (insertErr) {
+              counter.skipped++;
+              result.skipped++;
+            }
+          } else {
+            // Ya existe local. Last-write-wins: comparamos creado_en.
+            // En la tabla seguimiento_gestacion_mensual el timestamp es creado_en
+            // (no hay columna updated_at). Si el remoto es mas nuevo, UPDATE.
+            var segUpdated = seg.creado_en || seg.actualizado_en;
+            if (segUpdated && (!localS.creado_en || segUpdated > localS.creado_en)) {
+              try {
+                var setS = Object.keys(seg).map(function (k) { return k + ' = ?'; }).join(', ');
+                var valuesS2 = Object.keys(seg).map(function (k) { return seg[k] != null ? seg[k] : null; });
+                valuesS2.push(seg.id);
+                var stmtS2 = db.prepare(
+                  'UPDATE seguimiento_gestacion_mensual SET ' + setS + ' WHERE id = ?'
+                );
+                stmtS2.run.apply(stmtS2, valuesS2);
+                counter.applied++;
+                result.applied++;
+              } catch (updErr) {
+                counter.skipped++;
+                result.skipped++;
+              }
+            } else {
+              counter.skipped++;
+              result.skipped++;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[' + MOD + '] Error mergeando gestacion ' + remote.id + ': ' + e.message);
+      counter.skipped++;
+      result.skipped++;
+    }
   }
 }
 

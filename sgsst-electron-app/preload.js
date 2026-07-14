@@ -325,6 +325,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('gestacion:guardarSeguimiento', params),
   gestacionObtenerSeguimientos: (params) =>
     ipcRenderer.invoke('gestacion:obtenerSeguimientos', params),
+  // 📦538 — Eliminar un seguimiento mensual especifico (se propaga via sync multipc)
+  gestacionEliminarSeguimiento: (params) =>
+    ipcRenderer.invoke('gestacion:eliminarSeguimiento', params),
   // 📦469 — Motor de cálculos para Reportes de Seguimiento (Resumen Ejecutivo / Detallado / Individual)
   gestacionCalcularReporte: (params) =>
     ipcRenderer.invoke('gestacion:calcularReporte', params),

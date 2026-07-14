@@ -420,6 +420,29 @@
         .gsm-history-item__body { flex: 1; }
         .gsm-history-item__text { font-size: 0.85rem; color: var(--text-dark); }
 
+        /* 📦538 — Boton eliminar en historial de seguimientos */
+        .gsm-history-item__delete {
+            background: transparent;
+            border: 1px solid transparent;
+            color: #dc3545;
+            padding: 4px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            line-height: 1;
+            transition: all 0.15s;
+            opacity: 0.6;
+        }
+        .gsm-history-item__delete:hover {
+            background: #fff5f5;
+            border-color: #f5c6cb;
+            opacity: 1;
+        }
+        .gsm-history-item__delete:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
         @media (max-width: 768px) {
             .k-module-header { flex-direction: column; align-items: stretch; gap: 12px; padding: 12px 1rem; height: auto; }
             .k-header-right { justify-content: flex-end; }

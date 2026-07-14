@@ -587,6 +587,48 @@ function _handlerGuardarSeguimiento(empresaId, data) {
 }
 
 /**
+ * 📦538 — eliminarSeguimiento
+ * Elimina UN seguimiento mensual especifico por id. NO elimina la gestante
+ * (eso es _handlerEliminarGestante). Validacion cross-tenant: el seguimiento
+ * debe pertenecer a una gestante de la empresa indicada.
+ */
+function _handlerEliminarSeguimiento(empresaId, seguimientoId) {
+    if (!_getDb) {
+        return { success: false, error: { code: 'NO_DB', message: 'Base de datos no disponible' } };
+    }
+    if (!empresaId || !seguimientoId) {
+        return {
+            success: false,
+            error: { code: 'VALIDATION', message: 'empresaId y seguimientoId son requeridos' }
+        };
+    }
+    try {
+        var db = _getDb();
+        // Cross-tenant: verificar que el seguimiento pertenece a la empresa
+        var existing = db.prepare(
+            'SELECT id, gestacion_id, periodo FROM seguimiento_gestacion_mensual ' +
+            'WHERE id = ? AND empresa_id = ?'
+        ).get(seguimientoId, empresaId);
+        if (!existing) {
+            return { success: false, error: { code: 'NOT_FOUND', message: 'Seguimiento no encontrado o no pertenece a la empresa' } };
+        }
+        var result = db.prepare(
+            'DELETE FROM seguimiento_gestacion_mensual WHERE id = ? AND empresa_id = ?'
+        ).run(seguimientoId, empresaId);
+        if (result.changes === 0) {
+            return { success: false, error: { code: 'NOT_FOUND', message: 'No se elimino ningun registro' } };
+        }
+        console.log('[' + MOD + '][ELIMINAR_SEG] Seguimiento ' + seguimientoId + ' (gestante=' + existing.gestacion_id + ', periodo=' + existing.periodo + ') eliminado');
+        // 📦538 — Trigger push al hub multipc
+        try { var syncService = require('./sync-service'); syncService.debouncedPush(empresaId); } catch (syncErr) { console.warn('[' + MOD + '] sync push: ' + syncErr.message); }
+        return { success: true, data: { id: seguimientoId, deleted: true, gestanteId: existing.gestacion_id, periodo: existing.periodo } };
+    } catch (e) {
+        console.error('[' + MOD + '][ELIMINAR_SEGUIMIENTO]', e.message);
+        return { success: false, error: { code: 'DB_ERROR', message: e.message } };
+    }
+}
+
+/**
  * 📦465 — obtenerSeguimientos
  * Lista todos los seguimientos de una gestante (ordenados por periodo DESC).
  */
@@ -1157,6 +1199,11 @@ function registerGestacionHandlers(app, deps) {
         return _handlerObtenerSeguimientos(params.empresaId, params.gestanteId);
     });
 
+    // ── 📦538 — Eliminar un seguimiento mensual especifico ──
+    ipcMain.handle('gestacion:eliminarSeguimiento', async function (event, params) {
+        return _handlerEliminarSeguimiento(params.empresaId, params.seguimientoId);
+    });
+
     // 📦469 — Calcular reporte (motor de agregaciones para Reportes de Seguimiento)
     ipcMain.handle('gestacion:calcularReporte', async function (event, params) {
         return _handlerCalcularReporte(params.empresaId, params.filtros || {});
@@ -1194,7 +1241,7 @@ function registerGestacionHandlers(app, deps) {
         }
     });
 
-    console.log('[' + MOD + '][INIT][SUCCESS] 12 handlers de Seguimiento de Gestación registrados');
+    console.log('[' + MOD + '][INIT][SUCCESS] 13 handlers de Seguimiento de Gestación registrados');
 }
 
 /**
@@ -1292,5 +1339,10 @@ function _handlerEventosCalendario(empresaId) {
 module.exports = {
     registerGestacionHandlers: registerGestacionHandlers,
     SCHEMA_SQL: SCHEMA_SQL,
-    MIGRATIONS_SQL: MIGRATIONS_SQL
+    MIGRATIONS_SQL: MIGRATIONS_SQL,
+    // 📦538 — Exportar handlers internos para tests / debug
+    // (mismo patron que evaluacion-action-plans-bridge.js)
+    _handlerRegistrarGestante: _handlerRegistrarGestante,
+    _handlerGuardarSeguimiento: _handlerGuardarSeguimiento,
+    _handlerEliminarSeguimiento: _handlerEliminarSeguimiento
 };

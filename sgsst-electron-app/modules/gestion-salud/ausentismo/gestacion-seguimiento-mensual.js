@@ -292,12 +292,79 @@
                     '<div class="gsm-history-item__body">' +
                         '<div class="gsm-history-item__text">' + _esc(s.observaciones || '—') + '</div>' +
                     '</div>' +
-                    '<div>' + _badgeRiesgo(s.clasificacion) + '</div>' +
+                    '<div style="display:flex; gap:6px; align-items:center;">' +
+                        _badgeRiesgo(s.clasificacion) +
+                        // 📦538 — Boton eliminar por item (con confirm)
+                        '<button class="gsm-history-item__delete" type="button" ' +
+                            'data-action="delete-seguimiento" data-id="' + _esc(s.id || '') + '" ' +
+                            'data-periodo="' + _esc(s.periodo || '') + '" ' +
+                            'title="Eliminar este seguimiento" aria-label="Eliminar">' +
+                            '<i class="bi bi-trash3"></i>' +
+                        '</button>' +
+                    '</div>' +
                 '</div>';
         }
 
         list.innerHTML = html;
+        // Bind de los botones delete
+        var deleteBtns = list.querySelectorAll('[data-action="delete-seguimiento"]');
+        for (var j = 0; j < deleteBtns.length; j++) {
+            deleteBtns[j].addEventListener('click', window._onDeleteSeguimientoClick);
+        }
     }
+
+    // ─── 📦538 — Handler del boton eliminar seguimiento ───
+    window._onDeleteSeguimientoClick = async function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        var btn = ev.currentTarget;
+        var seguimientoId = btn.getAttribute('data-id');
+        var periodo = btn.getAttribute('data-periodo') || '';
+        if (!seguimientoId) {
+            _mostrarToast('error', 'Error', 'No se pudo identificar el seguimiento a eliminar.');
+            return;
+        }
+        var confirmMsg = '¿Eliminar el seguimiento del periodo ' + periodo + '?\n\n' +
+            'Esta accion no se puede deshacer. Si tenes sync multipc activo, ' +
+            'el cambio se propagara a las otras PCs automaticamente.';
+        if (!confirm(confirmMsg)) return;
+        if (!window.electronAPI || !window.electronAPI.gestacionEliminarSeguimiento) {
+            _mostrarToast('error', 'Error', 'API de eliminacion no disponible. Reinstala la app o reinicia.');
+            return;
+        }
+        var g = _state.gestante;
+        if (!g) {
+            _mostrarToast('error', 'Error', 'No se ha cargado la gestante.');
+            return;
+        }
+        btn.disabled = true;
+        try {
+            var res = await window.electronAPI.gestacionEliminarSeguimiento({
+                empresaId: g.empresa || window.currentCompany,
+                seguimientoId: seguimientoId
+            });
+            if (res && res.success) {
+                _mostrarToast('success', 'Seguimiento eliminado', 'Periodo ' + periodo + ' fue eliminado.');
+                // Recargar historial desde BD
+                _state.seguimientosAnteriores = [];
+                var resReload = await window.electronAPI.gestacionObtenerSeguimientos({
+                    empresaId: g.empresa || window.currentCompany,
+                    gestanteId: g.id
+                });
+                if (resReload && resReload.success && resReload.data) {
+                    _state.seguimientosAnteriores = resReload.data;
+                }
+                _renderHistorial();
+            } else {
+                _mostrarToast('error', 'Error al eliminar', (res && res.error && res.error.message) || 'Error desconocido');
+                btn.disabled = false;
+            }
+        } catch (err) {
+            console.error('[GESTACION-MENSUAL] Error eliminando:', err);
+            _mostrarToast('error', 'Error al eliminar', err.message);
+            btn.disabled = false;
+        }
+    };
 
     // ─── Comportamiento condicional del formulario ───
     function _bindFormBehavior() {
