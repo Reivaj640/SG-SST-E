@@ -406,6 +406,12 @@
                 _irASeguimientoMensual();
             });
         }
+
+        // 📦539 — Bind de los botones eliminar del historial
+        var deleteBtns = document.querySelectorAll('[data-action="delete-seguimiento"]');
+        for (var d = 0; d < deleteBtns.length; d++) {
+            deleteBtns[d].addEventListener('click', _onDeleteSeguimientoClick);
+        }
     }
 
     function _kpi(label, value, sub, icon, color) {
@@ -491,6 +497,9 @@
                 var s = segs[i];
                 var semLabel = s.semanas ? ' · Semana ' + s.semanas : '';
                 var respLabel = s.reportadoPor ? ' · Responsable: ' + _esc(s.reportadoPor) : '';
+                // 📦539 — Boton papelera por item (con confirm).
+                // Mismo patron que el wizard mensual (gestacion-seguimiento-mensual.js).
+                // El handler esta bindeado en _bindHistorialHandlers tras el render.
                 items += '<div class="gsa-hist-item">' +
                     '<div class="gsa-hist-item__icon"><i class="bi bi-file-earmark-medical"></i></div>' +
                     '<div class="gsa-hist-item__body">' +
@@ -502,6 +511,12 @@
                     '</div>' +
                     _badgeRiesgo(s.clasificacion) +
                     '<span class="gsa-badge gsa-badge--success"><i class="bi bi-check"></i> Completado</span>' +
+                    '<button class="gsa-hist-item__delete" type="button" ' +
+                        'data-action="delete-seguimiento" data-id="' + _esc(s.id || '') + '" ' +
+                        'data-periodo="' + _esc(s.periodo || '') + '" ' +
+                        'title="Eliminar este seguimiento" aria-label="Eliminar">' +
+                        '<i class="bi bi-trash3"></i>' +
+                    '</button>' +
                 '</div>';
             }
             body = '<div class="gsa-hist">' + items + '</div>';
@@ -576,6 +591,67 @@
             action: 'seguimiento-gestacion-mensual',
             payload: { gestanteId: _state.gestanteId, empresaId: _state.empresaId }
         }, '*');
+    }
+
+    /**
+     * 📦539 — Handler del boton papelera del historial de la antesala.
+     * Mismo patron que gestacion-seguimiento-mensual.js:_onDeleteSeguimientoClick.
+     * Confirma con el usuario, llama al IPC `gestacionEliminarSeguimiento` y
+     * al volver recarga _state.seguimientos + re-render para reflejar el cambio
+     * en KPIs, "Proximo Seguimiento" y conteo "Total Seguimientos".
+     */
+    async function _onDeleteSeguimientoClick(ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        var btn = ev.currentTarget;
+        var seguimientoId = btn.getAttribute('data-id');
+        var periodo = btn.getAttribute('data-periodo') || '';
+        if (!seguimientoId) {
+            _mostrarToast('error', 'Error', 'No se pudo identificar el seguimiento a eliminar.');
+            return;
+        }
+        if (!window.confirm('¿Eliminar el seguimiento del periodo ' + periodo + '?\n\n' +
+            'Esta accion no se puede deshacer. Si tenes sync multipc activo, ' +
+            'el cambio se propagara a las otras PCs automaticamente.')) {
+            return;
+        }
+        if (!window.electronAPI || !window.electronAPI.gestacionEliminarSeguimiento) {
+            _mostrarToast('error', 'Error', 'API de eliminacion no disponible. Reinstala la app o reinicia.');
+            return;
+        }
+        btn.disabled = true;
+        try {
+            var res = await window.electronAPI.gestacionEliminarSeguimiento({
+                empresaId: _state.empresaId,
+                seguimientoId: seguimientoId
+            });
+            if (res && res.success) {
+                _mostrarToast('success', 'Seguimiento eliminado', 'Periodo ' + periodo + ' fue eliminado.');
+                // 📦539 — Recargar solo los seguimientos desde BD y re-renderizar.
+                // Antes se hacia _cargarDatos() completo (gestante + seguimientos),
+                // pero eso enriquecía con datos de personal y disparaba toast de
+                // error si la BD de personal estaba vacia. Re-fetch selectivo.
+                var resReload = await window.electronAPI.gestacionObtenerGestante({
+                    empresaId: _state.empresaId,
+                    gestanteId: _state.gestanteId
+                });
+                if (resReload && resReload.success && resReload.data) {
+                    _state.seguimientos = resReload.data.seguimientos || [];
+                    _state.gestante = resReload.data;
+                    _renderTodo();
+                } else {
+                    // Fallback: re-render con _state.seguimientos ya filtrado
+                    _renderTodo();
+                }
+            } else {
+                _mostrarToast('error', 'Error al eliminar', (res && res.error && res.error.message) || 'Error desconocido');
+                btn.disabled = false;
+            }
+        } catch (err) {
+            console.error('[GESTACION-ANTESALA] Error eliminando:', err);
+            _mostrarToast('error', 'Error al eliminar', err.message);
+            btn.disabled = false;
+        }
     }
 
     function _imprimir() {

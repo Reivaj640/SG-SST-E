@@ -102,8 +102,15 @@ const SCHEMA_SQL = `
     acciones TEXT,
     reportado_por TEXT,
     creado_en TEXT NOT NULL,
-    FOREIGN KEY (gestacion_id) REFERENCES gestaciones(id) ON DELETE CASCADE,
-    UNIQUE(gestacion_id, periodo)
+    FOREIGN KEY (gestacion_id) REFERENCES gestaciones(id) ON DELETE CASCADE
+    -- 📦539 — QUITADO el UNIQUE(gestacion_id, periodo) que venia del schema
+    -- original. Antes, INSERT OR REPLACE en _handlerGuardarSeguimiento
+    -- REEMPLAZABA el seguimiento previo del mismo periodo, perdiendo la
+    -- trazabilidad (e.g. una "revisión" del mes se cargaba encima de la
+    -- version original). Ahora cada save crea un row nuevo. El wizard mensual
+    -- y la antesala exponen un boton de papelera para borrar el que no
+    -- quiera quedarse. La migracion para DBs existentes esta en
+    -- MIGRATIONS_SQL más abajo.
   );
 
   CREATE INDEX IF NOT EXISTS idx_seguimiento_gestacion
@@ -130,7 +137,66 @@ const MIGRATIONS_SQL = [
   "ALTER TABLE gestaciones ADD COLUMN fecha_fin_reintegro TEXT",
   "ALTER TABLE gestaciones ADD COLUMN fecha_suspension TEXT",
   "ALTER TABLE gestaciones ADD COLUMN motivo_suspension TEXT",
-  "ALTER TABLE gestaciones ADD COLUMN motivo_reintegro TEXT"
+  "ALTER TABLE gestaciones ADD COLUMN motivo_reintegro TEXT",
+  // 📦539 — Quitar UNIQUE(gestacion_id, periodo) para que cada save de
+  // seguimiento cree un row nuevo (antes el INSERT OR REPLACE del bridge
+  // pisaba el row anterior del mismo periodo y se perdia la trazabilidad).
+  // SQLite no soporta ALTER TABLE ... DROP CONSTRAINT, asi que la unica
+  // forma es recrear la tabla copiando los datos. Como es destructivo
+  // (altera definicion de tabla), lo intento UNA vez: si la tabla ya fue
+  // recreada en una corrida anterior, el primer ALTER RENAME falla con
+  // "no such table: _seg_old" y la migracion se ignora silenciosamente.
+  // En cualquier caso, NO se pierden datos: el INSERT ... SELECT copia
+  // todo el contenido antes del DROP.
+  [
+    "PRAGMA foreign_keys=off;",
+    "BEGIN TRANSACTION;",
+    "ALTER TABLE seguimiento_gestacion_mensual RENAME TO _seg_old_539;",
+    "CREATE TABLE seguimiento_gestacion_mensual (",
+    "  id TEXT PRIMARY KEY,",
+    "  gestacion_id TEXT NOT NULL,",
+    "  empresa_id TEXT NOT NULL,",
+    "  periodo TEXT NOT NULL,",
+    "  fecha TEXT NOT NULL,",
+    "  semanas INTEGER NOT NULL,",
+    "  clasificacion TEXT NOT NULL,",
+    "  ctrl_asistio TEXT,",
+    "  permisos INTEGER DEFAULT 0,",
+    "  proxima_cita TEXT,",
+    "  molestia TEXT,",
+    "  desc_molestia TEXT,",
+    "  incapacitada TEXT,",
+    "  dias_incapacidad INTEGER DEFAULT 0,",
+    "  origen_incapacidad TEXT,",
+    "  restricciones TEXT,",
+    "  desc_restricciones TEXT,",
+    "  emocional TEXT,",
+    "  compatible TEXT,",
+    "  ajustes TEXT,",
+    "  observaciones TEXT,",
+    "  acciones TEXT,",
+    "  reportado_por TEXT,",
+    "  creado_en TEXT NOT NULL,",
+    "  FOREIGN KEY (gestacion_id) REFERENCES gestaciones(id) ON DELETE CASCADE",
+    ");",
+    "INSERT INTO seguimiento_gestacion_mensual",
+    "  (id, gestacion_id, empresa_id, periodo, fecha, semanas, clasificacion,",
+    "   ctrl_asistio, permisos, proxima_cita, molestia, desc_molestia,",
+    "   incapacitada, dias_incapacidad, origen_incapacidad, restricciones,",
+    "   desc_restricciones, emocional, compatible, ajustes, observaciones,",
+    "   acciones, reportado_por, creado_en)",
+    "SELECT id, gestacion_id, empresa_id, periodo, fecha, semanas, clasificacion,",
+    "       ctrl_asistio, permisos, proxima_cita, molestia, desc_molestia,",
+    "       incapacitada, dias_incapacidad, origen_incapacidad, restricciones,",
+    "       desc_restricciones, emocional, compatible, ajustes, observaciones,",
+    "       acciones, reportado_por, creado_en",
+    "  FROM _seg_old_539;",
+    "DROP TABLE _seg_old_539;",
+    "CREATE INDEX IF NOT EXISTS idx_seguimiento_gestacion ON seguimiento_gestacion_mensual(gestacion_id);",
+    "CREATE INDEX IF NOT EXISTS idx_seguimiento_empresa_periodo ON seguimiento_gestacion_mensual(empresa_id, periodo);",
+    "COMMIT;",
+    "PRAGMA foreign_keys=on;"
+  ].join("\n")
 ];
 
 // =====================================================================
@@ -518,7 +584,12 @@ function _handlerEliminarGestante(empresaId, gestanteId) {
 
 /**
  * 📦465 — guardarSeguimiento
- * Inserta o actualiza un seguimiento mensual (upsert por gestacion_id + periodo).
+ * Inserta un nuevo seguimiento mensual. A partir de 📦539 NO hace upsert:
+ * cada llamada crea un row nuevo (id unico generado por _newSeguimientoId),
+ * de modo que se conservan todas las versiones del mismo periodo.
+ * El UNIQUE(gestacion_id, periodo) original fue removido del schema
+ * (ver MIGRATIONS_SQL). Si el usuario carga un seguimiento de mas,
+ * puede borrarlo desde la antesala o el wizard mensual.
  */
 function _handlerGuardarSeguimiento(empresaId, data) {
     if (!_getDb) {
@@ -544,9 +615,11 @@ function _handlerGuardarSeguimiento(empresaId, data) {
         var id = _newSeguimientoId();
         var accionesJson = JSON.stringify(data.acciones || []);
 
-        // INSERT OR REPLACE (upsert por la UNIQUE(gestacion_id, periodo))
+        // 📦539 — INSERT (no OR REPLACE). Cada save crea un row nuevo para
+        // preservar el historial completo de versiones del mismo periodo.
+        // El frontend ofrece UI para borrar el que no quiera quedarse.
         db.prepare(`
-            INSERT OR REPLACE INTO seguimiento_gestacion_mensual (
+            INSERT INTO seguimiento_gestacion_mensual (
                 id, gestacion_id, empresa_id, periodo, fecha,
                 semanas, clasificacion, ctrl_asistio, permisos,
                 proxima_cita, molestia, desc_molestia,
@@ -571,12 +644,12 @@ function _handlerGuardarSeguimiento(empresaId, data) {
             new Date().toISOString()
         );
 
-        // Recuperar el registro guardado (puede haber cambiado el id si fue UPDATE)
+        // Recuperar el registro guardado por id unico (no por periodo)
         var saved = db.prepare(
-            'SELECT * FROM seguimiento_gestacion_mensual WHERE gestacion_id = ? AND periodo = ?'
-        ).get(data.gestacionId, data.periodo);
+            'SELECT * FROM seguimiento_gestacion_mensual WHERE id = ?'
+        ).get(id);
 
-        console.log('[' + MOD + '][GUARDAR_SEG] Gestante ' + data.gestacionId + ' · periodo ' + data.periodo);
+        console.log('[' + MOD + '][GUARDAR_SEG] Gestante ' + data.gestacionId + ' · periodo ' + data.periodo + ' · id ' + id);
         // 📦538 — Trigger push al hub multipc
         try { var syncService = require('./sync-service'); syncService.debouncedPush(empresaId); } catch (syncErr) { console.warn('[' + MOD + '] sync push: ' + syncErr.message); }
         return { success: true, data: _rowToSeguimiento(saved) };
