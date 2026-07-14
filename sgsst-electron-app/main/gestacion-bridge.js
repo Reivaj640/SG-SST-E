@@ -538,8 +538,13 @@ function _handlerActualizarGestante(empresaId, gestanteId, data) {
         values.push(gestanteId);
         values.push(empresaId);
 
-        db.prepare('UPDATE gestaciones SET ' + sets.join(', ') +
-            ' WHERE id = ? AND empresa_id = ?').run.apply(null, values);
+        // 📦542 (FIX) — better-sqlite3 requiere que `this` sea el statement en
+        // .run.apply(...). Antes era .run.apply(null, values) lo que producia
+        // "Illegal invocation" en runtime. Mismo fix que aplicamos en
+        // sync-serializer.js (📦538).
+        var stmt = db.prepare('UPDATE gestaciones SET ' + sets.join(', ') +
+            ' WHERE id = ? AND empresa_id = ?');
+        stmt.run.apply(stmt, values);
 
         var updated = _rowToGestacion(db.prepare('SELECT * FROM gestaciones WHERE id = ?').get(gestanteId));
         console.log('[' + MOD + '][ACTUALIZAR] Gestante ' + gestanteId + ' actualizada');
@@ -648,6 +653,19 @@ function _handlerGuardarSeguimiento(empresaId, data) {
         var saved = db.prepare(
             'SELECT * FROM seguimiento_gestacion_mensual WHERE id = ?'
         ).get(id);
+
+        // 📦542 — Auto-actualizar semanas_gestacion de la gestante con el valor
+        // del seguimiento. Sin esto, las semanas quedan congeladas con el valor
+        // inicial del registro. Cada seguimiento mensual refleja la semana real,
+        // asi que la propagamos a la gestante (que se muestra en la lista y en
+        // el badge "X semanas" del header). El sync multipc se dispara abajo.
+        if (data.semanas != null && data.semanas > 0) {
+            db.prepare(
+                'UPDATE gestaciones SET semanas_gestacion = ?, actualizado_en = ? WHERE id = ?'
+            ).run(data.semanas, new Date().toISOString(), data.gestacionId);
+            console.log('[' + MOD + '][AUTO_SEMANAS] Gestante ' + data.gestacionId +
+                        ' → sem ' + data.semanas);
+        }
 
         console.log('[' + MOD + '][GUARDAR_SEG] Gestante ' + data.gestacionId + ' · periodo ' + data.periodo + ' · id ' + id);
         // 📦538 — Trigger push al hub multipc
@@ -1163,10 +1181,13 @@ function _handlerActualizarEstado(empresaId, gestanteId, data) {
         }
 
         params.push(gestanteId, empresaId);
-        db.prepare(
+        // 📦542 (FIX) — better-sqlite3 requiere que `this` sea el statement.
+        // Antes era .run.apply(null, params) → "Illegal invocation".
+        var stmtUpd = db.prepare(
             'UPDATE gestaciones SET ' + sets.join(', ') +
             ' WHERE id = ? AND empresa_id = ?'
-        ).run.apply(null, params);
+        );
+        stmtUpd.run.apply(stmtUpd, params);
 
         // Devolver el registro actualizado
         var updated = db.prepare(

@@ -756,10 +756,188 @@
         }
     };
 
+    // ─── Modal de edición manual de gestante (📦542) ───
+    // Permite editar semanas, FPP, clasificación, estado, EPS, ARL, cargo, observaciones
+    // sin necesidad de pasar por el wizard mensual. Llama a
+    // window.electronAPI.gestacionActualizarGestante (ya expuesto en preload).
+    // El bridge dispara debouncedPush al sync multipc automaticamente.
+    // Patron: modal dinamico appendChild al body con cssText inline (defensa
+    // primaria) + <style> con prefijo unico (ei-) para keyframes (defensa
+    // secundaria por si otro modulo inyecta estilos con el mismo nombre).
+    function _abrirModalEditarGestante() {
+        if (!_state.gestante) {
+            _mostrarToast('error', 'Sin gestante', 'No hay gestante cargada para editar.');
+            return;
+        }
+        var g = _state.gestante;
+        var empresaId = _state.empresaId;
+
+        var overlay = document.createElement('div');
+        overlay.id = 'ei-gestacion-edit-modal';
+        overlay.style.cssText = [
+            'position: fixed',
+            'inset: 0',
+            'background: rgba(0,0,0,0.5)',
+            'z-index: 9999',
+            'display: flex',
+            'align-items: center',
+            'justify-content: center',
+            'animation: ei-fadeIn 0.18s ease'
+        ].join(';');
+
+        var dialog = document.createElement('div');
+        dialog.style.cssText = [
+            'background: var(--v3-bg-card, #fff)',
+            'border-radius: 12px',
+            'box-shadow: 0 20px 60px rgba(0,0,0,0.3)',
+            'width: 92%',
+            'max-width: 540px',
+            'max-height: 90vh',
+            'overflow-y: auto',
+            'padding: 24px',
+            'animation: ei-slideUp 0.22s ease'
+        ].join(';');
+
+        var html = '';
+        html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">';
+        html +=   '<h2 style="margin:0;font-size:1.1rem;color:var(--v3-foreground,#1f2937);">';
+        html +=     '<i class="bi bi-pencil-square" style="color:var(--rosa,#e91e63);margin-right:8px;"></i>';
+        html +=     'Editar gestante';
+        html +=   '</h2>';
+        html +=   '<button id="ei-close" style="background:none;border:none;cursor:pointer;font-size:1.4rem;color:var(--v3-muted,#6b7280);line-height:1;">&times;</button>';
+        html += '</div>';
+
+        // Info de la gestante (solo lectura)
+        html += '<div style="background:var(--v3-muted,#f3f4f6);border-radius:8px;padding:12px;margin-bottom:18px;font-size:0.85rem;">';
+        html +=   '<div><b>' + _esc(g.nombre) + '</b> · ' + _esc(g.cedula) + '</div>';
+        html +=   '<div style="color:var(--v3-muted,#6b7280);margin-top:2px;">' + _esc(g.cargo || '—') + ' · ' + _esc(g.empresa || empresaId) + '</div>';
+        html += '</div>';
+
+        // Grid 2 columnas: semanas + FPP + clasificación + estado + EPS + ARL
+        html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">';
+        html +=   '<div>';
+        html +=     '<label style="display:block;font-size:0.8rem;font-weight:600;margin-bottom:4px;color:var(--v3-foreground,#374151);">Semanas de gestación</label>';
+        html +=     '<input type="number" id="ei-semanas" min="0" max="42" value="' + (g.semanasGestacion || 0) + '" style="width:100%;padding:8px 10px;border:1px solid var(--v3-border,#d1d5db);border-radius:6px;font-size:0.9rem;">';
+        html +=   '</div>';
+        html +=   '<div>';
+        html +=     '<label style="display:block;font-size:0.8rem;font-weight:600;margin-bottom:4px;color:var(--v3-foreground,#374151);">FPP</label>';
+        html +=     '<input type="date" id="ei-fpp" value="' + _esc(g.fpp || '') + '" style="width:100%;padding:8px 10px;border:1px solid var(--v3-border,#d1d5db);border-radius:6px;font-size:0.9rem;">';
+        html +=   '</div>';
+        html +=   '<div>';
+        html +=     '<label style="display:block;font-size:0.8rem;font-weight:600;margin-bottom:4px;color:var(--v3-foreground,#374151);">Clasificación</label>';
+        html +=     '<select id="ei-clasificacion" style="width:100%;padding:8px 10px;border:1px solid var(--v3-border,#d1d5db);border-radius:6px;font-size:0.9rem;">';
+        ['bajo', 'medio', 'alto'].forEach(function (opt) {
+            html += '<option value="' + opt + '"' + (g.clasificacion === opt ? ' selected' : '') + '>' + opt + '</option>';
+        });
+        html +=     '</select>';
+        html +=   '</div>';
+        html +=   '<div>';
+        html +=     '<label style="display:block;font-size:0.8rem;font-weight:600;margin-bottom:4px;color:var(--v3-foreground,#374151);">Estado</label>';
+        html +=     '<select id="ei-estado" style="width:100%;padding:8px 10px;border:1px solid var(--v3-border,#d1d5db);border-radius:6px;font-size:0.9rem;">';
+        ['activo', 'suspendido', 'reintegro', 'licencia'].forEach(function (opt) {
+            html += '<option value="' + opt + '"' + (g.estado === opt ? ' selected' : '') + '>' + opt + '</option>';
+        });
+        html +=     '</select>';
+        html +=   '</div>';
+        html +=   '<div>';
+        html +=     '<label style="display:block;font-size:0.8rem;font-weight:600;margin-bottom:4px;color:var(--v3-foreground,#374151);">EPS</label>';
+        html +=     '<input type="text" id="ei-eps" value="' + _esc(g.eps || '') + '" style="width:100%;padding:8px 10px;border:1px solid var(--v3-border,#d1d5db);border-radius:6px;font-size:0.9rem;">';
+        html +=   '</div>';
+        html +=   '<div>';
+        html +=     '<label style="display:block;font-size:0.8rem;font-weight:600;margin-bottom:4px;color:var(--v3-foreground,#374151);">ARL</label>';
+        html +=     '<input type="text" id="ei-arl" value="' + _esc(g.arl || '') + '" style="width:100%;padding:8px 10px;border:1px solid var(--v3-border,#d1d5db);border-radius:6px;font-size:0.9rem;">';
+        html +=   '</div>';
+        html += '</div>';
+
+        html += '<div style="margin-bottom:14px;">';
+        html +=   '<label style="display:block;font-size:0.8rem;font-weight:600;margin-bottom:4px;color:var(--v3-foreground,#374151);">Cargo</label>';
+        html +=   '<input type="text" id="ei-cargo" value="' + _esc(g.cargo || '') + '" style="width:100%;padding:8px 10px;border:1px solid var(--v3-border,#d1d5db);border-radius:6px;font-size:0.9rem;">';
+        html += '</div>';
+
+        html += '<div style="margin-bottom:18px;">';
+        html +=   '<label style="display:block;font-size:0.8rem;font-weight:600;margin-bottom:4px;color:var(--v3-foreground,#374151);">Observaciones</label>';
+        html +=   '<textarea id="ei-observaciones" rows="3" style="width:100%;padding:8px 10px;border:1px solid var(--v3-border,#d1d5db);border-radius:6px;font-size:0.9rem;resize:vertical;">' + _esc(g.observaciones || '') + '</textarea>';
+        html += '</div>';
+
+        // Botones
+        html += '<div style="display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--v3-border,#e5e7eb);padding-top:16px;">';
+        html +=   '<button id="ei-cancel" class="k-btn k-btn-secondary" style="padding:8px 16px;">Cancelar</button>';
+        html +=   '<button id="ei-save" class="k-btn k-btn-primary" style="padding:8px 16px;">';
+        html +=     '<i class="bi bi-check2-circle"></i> Guardar cambios';
+        html +=   '</button>';
+        html += '</div>';
+
+        dialog.innerHTML = html;
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+
+        // Defensa secundaria: keyframes con prefijo unico (ei-) por si el modal-content
+        // u otro modulo inyecta <style> con nombres genericos como fadeIn.
+        if (!document.getElementById('ei-gestacion-edit-styles')) {
+            var styleEl = document.createElement('style');
+            styleEl.id = 'ei-gestacion-edit-styles';
+            styleEl.textContent = '@keyframes ei-fadeIn { from { opacity: 0 } to { opacity: 1 } }' +
+                '@keyframes ei-slideUp { from { transform: translateY(20px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }';
+            document.head.appendChild(styleEl);
+        }
+
+        function _cerrar() {
+            if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        }
+        document.getElementById('ei-close').addEventListener('click', _cerrar);
+        document.getElementById('ei-cancel').addEventListener('click', _cerrar);
+        overlay.addEventListener('click', function (e) {
+            if (e.target === overlay) _cerrar();
+        });
+
+        document.getElementById('ei-save').addEventListener('click', async function () {
+            var btn = document.getElementById('ei-save');
+            if (btn.disabled) return;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Guardando...';
+
+            var data = {
+                semanasGestacion: parseInt(document.getElementById('ei-semanas').value || '0', 10),
+                fpp: document.getElementById('ei-fpp').value || null,
+                clasificacion: document.getElementById('ei-clasificacion').value,
+                estado: document.getElementById('ei-estado').value,
+                eps: document.getElementById('ei-eps').value.trim(),
+                arl: document.getElementById('ei-arl').value.trim(),
+                cargo: document.getElementById('ei-cargo').value.trim(),
+                observaciones: document.getElementById('ei-observaciones').value.trim() || null
+            };
+
+            try {
+                if (!window.electronAPI || !window.electronAPI.gestacionActualizarGestante) {
+                    throw new Error('electronAPI.gestacionActualizarGestante no disponible');
+                }
+                var resp = await window.electronAPI.gestacionActualizarGestante({
+                    empresaId: empresaId,
+                    gestanteId: g.id,
+                    data: data
+                });
+                if (resp && resp.success) {
+                    _cerrar();
+                    _mostrarToast('success', 'Guardado', 'Datos actualizados. Sync multipc disparado.');
+                    _cargarDatos();
+                } else {
+                    throw new Error((resp && resp.error && resp.error.message) || 'Error desconocido');
+                }
+            } catch (e) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-check2-circle"></i> Guardar cambios';
+                _mostrarToast('error', 'Error', e.message);
+            }
+        });
+    }
+
     // ─── Bind del header estándar ───
     function _bindHeader() {
         var btnBack = document.getElementById('kair-gsa-back');
         if (btnBack) btnBack.addEventListener('click', window.volverAlListado);
+
+        var btnEdit = document.getElementById('kair-gsa-cta-edit');
+        if (btnEdit) btnEdit.addEventListener('click', _abrirModalEditarGestante);
 
         var btnPrint = document.getElementById('kair-gsa-cta-print');
         if (btnPrint) btnPrint.addEventListener('click', _imprimir);
