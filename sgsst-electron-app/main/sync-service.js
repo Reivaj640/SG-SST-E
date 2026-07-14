@@ -418,14 +418,14 @@ function _getCompanySyncConfig(companyKey) {
     return null;
   }
 
-  var companies = (config && config.companies) || [];
-  for (var i = 0; i < companies.length; i++) {
-    var c = companies[i];
-    if (c.key === companyKey && c.sync) {
-      // Retornar el sync object INCLUSO si enabled=false,
-      // para que getStatus pueda distinguir "no existe" vs "deshabilitado"
-      return c.sync;
-    }
+  // 📦537 — Las empresas viven en config.companyPaths (no config.companies)
+  // porque ese es el formato que usa la UI de Gestion de Empresas.
+  // La estructura es: { "Tempoactiva": {root, structure, sync?}, "Asel": {...} }
+  var companyPaths = (config && config.companyPaths) || {};
+  if (companyPaths[companyKey] && companyPaths[companyKey].sync) {
+    // Retornar el sync object INCLUSO si enabled=false,
+    // para que getStatus pueda distinguir "no existe" vs "deshabilitado"
+    return companyPaths[companyKey].sync;
   }
   return null;
 }
@@ -435,7 +435,13 @@ function _getAllCompanies() {
   try {
     var raw = fs.readFileSync(_configPath, 'utf8');
     var config = JSON.parse(raw);
-    return (config && config.companies) || [];
+    var companyPaths = (config && config.companyPaths) || {};
+    // Devolver array de { key, ... } para compatibilidad con startAutoSyncForAllEnabled
+    var result = [];
+    Object.keys(companyPaths).forEach(function (key) {
+      result.push({ key: key, sync: companyPaths[key].sync });
+    });
+    return result;
   } catch (e) {
     return [];
   }

@@ -360,7 +360,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     start: (params) => ipcRenderer.invoke('sync:start', params),
     stop: (params) => ipcRenderer.invoke('sync:stop', params),
     startAll: () => ipcRenderer.invoke('sync:start-all'),
-    stopAll: () => ipcRenderer.invoke('sync:stop-all')
+    stopAll: () => ipcRenderer.invoke('sync:stop-all'),
+    configure: (params) => ipcRenderer.invoke('sync:configure', params),
+    disable: (params) => ipcRenderer.invoke('sync:disable', params),
+    pickFolder: (params) => ipcRenderer.invoke('sync:pick-folder', params)
   },
   // 📦481-fix — Ruta de Downloads del usuario (para guardar PDFs de reportes)
   getDownloadsPath: () => ipcRenderer.invoke('get-downloads-path'),

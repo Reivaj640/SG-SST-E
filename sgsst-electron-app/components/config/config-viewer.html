@@ -398,6 +398,154 @@
             box-shadow: var(--shadow-md);
         }
 
+        /* 📦537 — Switch de sincronizacion multipc por empresa */
+        .sync-section {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.9rem 1rem;
+            margin-top: 0.75rem;
+            background: linear-gradient(135deg, #f0f4ff 0%, #f8f9fa 100%);
+            border-radius: var(--radius);
+            border: 1px solid #e0e7ff;
+        }
+        .sync-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+            color: var(--text-main);
+            font-weight: 500;
+        }
+        .sync-label i {
+            color: var(--primary);
+            font-size: 1.1rem;
+        }
+        .sync-hub-info {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.2rem;
+            word-break: break-all;
+        }
+        .sync-hub-info.active {
+            color: var(--success);
+        }
+        /* Switch estilo iOS */
+        .sync-switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+        .sync-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .sync-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc;
+            transition: 0.3s;
+            border-radius: 24px;
+        }
+        .sync-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.3s;
+            border-radius: 50%;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        .sync-switch input:checked + .sync-slider {
+            background-color: var(--primary);
+        }
+        .sync-switch input:checked + .sync-slider:before {
+            transform: translateX(20px);
+        }
+        /* Modal de configuracion de sync */
+        .sync-modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
+        .sync-modal {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            max-width: 520px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .sync-modal h3 {
+            margin: 0 0 0.5rem 0;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .sync-modal h3 i { color: var(--primary); }
+        .sync-modal p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin: 0 0 1.5rem 0;
+        }
+        .sync-modal-field {
+            margin-bottom: 1rem;
+        }
+        .sync-modal-field label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-bottom: 0.4rem;
+        }
+        .sync-modal-field input[type="text"],
+        .sync-modal-field select {
+            width: 100%;
+            padding: 0.6rem 0.8rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            box-sizing: border-box;
+        }
+        .sync-modal-field .input-with-button {
+            display: flex;
+            gap: 0.5rem;
+        }
+        .sync-modal-field .input-with-button input {
+            flex: 1;
+        }
+        .sync-modal-field input[readonly] {
+            background: #f8f9fa;
+            color: var(--text-muted);
+        }
+        .sync-modal-field .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+        .sync-modal-field .checkbox-row input { width: auto; }
+        .sync-modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+            margin-top: 1.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-color);
+        }
+
         /* Borde superior según riesgo */
         .company-card.risk-I { border-top-color: var(--success); }
         .company-card.risk-II { border-top-color: var(--info); }
@@ -1992,6 +2140,10 @@
             cardBody.appendChild(companyStats);
             cardBody.appendChild(buttonsDiv);
 
+            // 📦537 — Switch de sincronizacion multipc por empresa
+            const syncSection = _buildSyncSection(comp.name);
+            cardBody.appendChild(syncSection);
+
             // --- Sección de información de mapeo (solo si la empresa está vinculada) ---
             if (currentConfig && currentConfig.companyPaths) {
                 const companyConfig = currentConfig.companyPaths[comp.name];
@@ -2056,6 +2208,228 @@
 
         return itemCounts[escenario] || 30; // Valor por defecto
     }
+
+    // 📦537 — Switch de sincronizacion multipc por empresa
+    function _buildSyncSection(companyName) {
+        const syncConfig = (currentConfig && currentConfig.companyPaths && currentConfig.companyPaths[companyName])
+            ? currentConfig.companyPaths[companyName].sync
+            : null;
+        const isEnabled = !!(syncConfig && syncConfig.enabled);
+        const hubPath = syncConfig ? syncConfig.hubPath : '';
+
+        const section = document.createElement('div');
+        section.className = 'sync-section';
+        section.innerHTML =
+            '<div>' +
+                '<div class="sync-label">' +
+                    '<i class="bi bi-arrow-repeat"></i>' +
+                    '<span>Sincronización multipc</span>' +
+                '</div>' +
+                '<div class="sync-hub-info ' + (isEnabled ? 'active' : '') + '" id="sync-hub-info-' + companyName + '">' +
+                    (isEnabled ? '<i class="bi bi-check-circle-fill"></i> ' + _escapeHtml(hubPath) : 'Apagado — click para activar') +
+                '</div>' +
+            '</div>' +
+            '<label class="sync-switch" title="' + (isEnabled ? 'Desactivar sincronización' : 'Activar sincronización') + '">' +
+                '<input type="checkbox" id="sync-switch-' + companyName + '" ' + (isEnabled ? 'checked' : '') +
+                    ' onchange="window._toggleSync(\'' + _escapeAttr(companyName) + '\', this.checked)">' +
+                '<span class="sync-slider"></span>' +
+            '</label>';
+
+        if (syncConfig && !isEnabled) {
+            const hubInfo = section.querySelector('.sync-hub-info');
+            hubInfo.style.cursor = 'pointer';
+            hubInfo.title = 'Click para reconfigurar';
+            hubInfo.onclick = function () { _openSyncModal(companyName, true); };
+        }
+        return section;
+    }
+
+    function _toggleSync(companyName, wantEnabled) {
+        if (wantEnabled) {
+            _openSyncModal(companyName, false);
+            const sw = document.getElementById('sync-switch-' + companyName);
+            if (sw) sw.checked = false;
+        } else {
+            if (!confirm('¿Desactivar la sincronización de "' + companyName + '"?\n\nLos datos en otras PCs dejarán de actualizarse con esta PC.')) {
+                const sw = document.getElementById('sync-switch-' + companyName);
+                if (sw) sw.checked = true;
+                return;
+            }
+            if (window.electronAPI && window.electronAPI.sync && window.electronAPI.sync.disable) {
+                window.electronAPI.sync.disable({ companyKey: companyName })
+                    .then(function (res) {
+                        if (res && res.success) {
+                            if (currentConfig && currentConfig.companyPaths && currentConfig.companyPaths[companyName]) {
+                                if (currentConfig.companyPaths[companyName].sync) {
+                                    currentConfig.companyPaths[companyName].sync.enabled = false;
+                                }
+                            }
+                            showToast('Sincronización desactivada para ' + companyName, 'success');
+                            renderCompanyCards();
+                        } else {
+                            showToast('Error al desactivar: ' + (res && res.error && res.error.message), 'error');
+                            const sw = document.getElementById('sync-switch-' + companyName);
+                            if (sw) sw.checked = true;
+                        }
+                    })
+                    .catch(function (err) {
+                        console.error('[SYNC] Error:', err);
+                        showToast('Error al desactivar: ' + err.message, 'error');
+                        const sw = document.getElementById('sync-switch-' + companyName);
+                        if (sw) sw.checked = true;
+                    });
+            } else {
+                showToast('electronAPI.sync no disponible', 'error');
+            }
+        }
+    }
+
+    function _openSyncModal(companyName, isReconfig) {
+        const syncConfig = (currentConfig && currentConfig.companyPaths && currentConfig.companyPaths[companyName])
+            ? currentConfig.companyPaths[companyName].sync
+            : null;
+        const defaultHub = syncConfig ? syncConfig.hubPath : 'G:/Mi unidad/K+AIR Sync/' + companyName;
+        const defaultInterval = syncConfig ? (syncConfig.intervalMinutes || 5) : 5;
+        const defaultAuto = syncConfig ? (syncConfig.autoSync !== false) : true;
+
+        const prev = document.getElementById('sync-modal-backdrop');
+        if (prev) prev.remove();
+
+        const backdrop = document.createElement('div');
+        backdrop.id = 'sync-modal-backdrop';
+        backdrop.className = 'sync-modal-backdrop';
+        backdrop.onclick = function (e) {
+            if (e.target === backdrop) _closeSyncModal();
+        };
+        backdrop.innerHTML =
+            '<div class="sync-modal" onclick="event.stopPropagation()">' +
+                '<h3><i class="bi bi-arrow-repeat"></i> ' + (isReconfig ? 'Reconfigurar' : 'Activar') + ' sincronización multipc</h3>' +
+                '<p>La empresa <strong>' + _escapeHtml(companyName) + '</strong> sincronizará sus datos con otras PCs a través de una carpeta compartida (Google Drive, OneDrive, etc).</p>' +
+                '<div class="sync-modal-field">' +
+                    '<label>Carpeta compartida (hub):</label>' +
+                    '<div class="input-with-button">' +
+                        '<input type="text" id="sync-hub-input" value="' + _escapeAttr(defaultHub) + '" placeholder="G:/Mi unidad/K+AIR Sync/' + _escapeAttr(companyName) + '">' +
+                        '<button class="btn btn-outline" type="button" onclick="_pickSyncFolder()">' +
+                            '<i class="bi bi-folder2-open"></i> Elegir...' +
+                        '</button>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="sync-modal-field">' +
+                    '<label>Intervalo de sincronización automática (minutos):</label>' +
+                    '<select id="sync-interval-input">' +
+                        '<option value="1" ' + (defaultInterval === 1 ? 'selected' : '') + '>Cada 1 minuto</option>' +
+                        '<option value="5" ' + (defaultInterval === 5 ? 'selected' : '') + '>Cada 5 minutos (recomendado)</option>' +
+                        '<option value="15" ' + (defaultInterval === 15 ? 'selected' : '') + '>Cada 15 minutos</option>' +
+                        '<option value="30" ' + (defaultInterval === 30 ? 'selected' : '') + '>Cada 30 minutos</option>' +
+                        '<option value="60" ' + (defaultInterval === 60 ? 'selected' : '') + '>Cada hora</option>' +
+                    '</select>' +
+                '</div>' +
+                '<div class="sync-modal-field">' +
+                    '<div class="checkbox-row">' +
+                        '<input type="checkbox" id="sync-auto-input" ' + (defaultAuto ? 'checked' : '') + '>' +
+                        '<label for="sync-auto-input" style="margin: 0; font-weight: normal;">Iniciar sincronización automáticamente al abrir la app</label>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="sync-modal-field" style="background: #fff8e1; padding: 0.75rem; border-radius: 6px; border: 1px solid #ffe082;">' +
+                    '<small style="color: #856404;"><i class="bi bi-info-circle"></i> <strong>Importante:</strong> La ruta debe ser la MISMA en todas las PCs que sincronizan esta empresa. Si usás Google Drive File Stream, elegí la carpeta dentro de tu Drive.</small>' +
+                '</div>' +
+                '<div class="sync-modal-actions">' +
+                    '<button class="btn btn-outline" onclick="_closeSyncModal()">Cancelar</button>' +
+                    '<button class="btn btn-primary" id="sync-modal-save-btn" onclick="_saveSyncConfig(\'' + _escapeAttr(companyName) + '\')">' +
+                        '<i class="bi bi-check-lg"></i> ' + (isReconfig ? 'Guardar cambios' : 'Activar sincronización') +
+                    '</button>' +
+                '</div>' +
+            '</div>';
+        document.body.appendChild(backdrop);
+    }
+
+    function _closeSyncModal() {
+        const prev = document.getElementById('sync-modal-backdrop');
+        if (prev) prev.remove();
+    }
+
+    function _pickSyncFolder() {
+        if (!window.electronAPI || !window.electronAPI.sync || !window.electronAPI.sync.pickFolder) {
+            showToast('API de file picker no disponible', 'error');
+            return;
+        }
+        window.electronAPI.sync.pickFolder({ title: 'Elegir carpeta compartida' })
+            .then(function (res) {
+                if (res && res.success && res.data && res.data.path) {
+                    const input = document.getElementById('sync-hub-input');
+                    if (input) input.value = res.data.path;
+                }
+            })
+            .catch(function (err) {
+                showToast('Error abriendo file picker: ' + err.message, 'error');
+            });
+    }
+
+    function _saveSyncConfig(companyName) {
+        const hubPath = document.getElementById('sync-hub-input').value.trim();
+        const interval = parseInt(document.getElementById('sync-interval-input').value, 10) || 5;
+        const auto = document.getElementById('sync-auto-input').checked;
+
+        if (!hubPath) {
+            showToast('Por favor elegí una carpeta para sincronizar', 'warning');
+            return;
+        }
+
+        const saveBtn = document.getElementById('sync-modal-save-btn');
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Guardando...';
+        }
+
+        if (!window.electronAPI || !window.electronAPI.sync || !window.electronAPI.sync.configure) {
+            showToast('API de sync no disponible', 'error');
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="bi bi-check-lg"></i> Activar sincronización';
+            }
+            return;
+        }
+
+        window.electronAPI.sync.configure({
+            companyKey: companyName,
+            hubPath: hubPath,
+            intervalMinutes: interval,
+            autoSync: auto
+        }).then(function (res) {
+            if (res && res.success) {
+                if (!currentConfig.companyPaths) currentConfig.companyPaths = {};
+                if (!currentConfig.companyPaths[companyName]) currentConfig.companyPaths[companyName] = {};
+                currentConfig.companyPaths[companyName].sync = res.data;
+                _closeSyncModal();
+                showToast('Sincronización activada para ' + companyName, 'success');
+                renderCompanyCards();
+            } else {
+                showToast('Error: ' + (res && res.error && res.error.message), 'error');
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = '<i class="bi bi-check-lg"></i> Activar sincronización';
+                }
+            }
+        }).catch(function (err) {
+            console.error('[SYNC] Error:', err);
+            showToast('Error: ' + err.message, 'error');
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="bi bi-check-lg"></i> Activar sincronización';
+            }
+        });
+    }
+
+    function _escapeHtml(s) {
+        if (s == null) return '';
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+    function _escapeAttr(s) { return _escapeHtml(s); }
 
     // Función para eliminar una empresa
     function eliminarEmpresa(nombreEmpresa) {

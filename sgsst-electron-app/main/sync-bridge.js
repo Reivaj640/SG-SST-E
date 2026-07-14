@@ -17,14 +17,20 @@
  */
 'use strict';
 
-const { ipcMain } = require('electron');
+const { ipcMain, dialog } = require('electron');
 const syncService = require('./sync-service.js');
+const syncConfigWriter = require('./sync-config-writer.js');
 
 const MOD = 'SYNC-BRIDGE';
 
 function registerSyncHandlers(app, deps) {
   // Init del service UNA vez
   syncService.init(app, deps);
+
+  // Helper: path al config.json (reutilizado por configure/disable)
+  var _getConfigPath = function () {
+    return require('path').join(app.getPath('userData'), 'config.json');
+  };
 
   console.log('[' + MOD + '][INIT] Registrando handlers de sync multipc...');
 
@@ -108,7 +114,73 @@ function registerSyncHandlers(app, deps) {
     }
   });
 
-  console.log('[' + MOD + '][INIT] 7 handlers de sync registrados');
+  // --- Configure sync per company (UI uses this from the switch) ---
+  ipcMain.handle('sync:configure', async function (event, payload) {
+    try {
+      var params = (payload && typeof payload === 'object') ? payload : {};
+      if (!params.companyKey) {
+        return { success: false, error: { code: 'VALIDATION', message: 'companyKey requerido' } };
+      }
+      if (!params.hubPath) {
+        return { success: false, error: { code: 'VALIDATION', message: 'hubPath requerido' } };
+      }
+      var result = await syncConfigWriter.writeCompanySyncConfig(
+        _getConfigPath(), params.companyKey, {
+          enabled: params.enabled !== false,
+          hubPath: params.hubPath,
+          intervalMinutes: params.intervalMinutes,
+          autoSync: params.autoSync
+        }
+      );
+      // Si se activo el sync, arrancar el auto-sync timer
+      if (result.success && result.data && result.data.enabled) {
+        syncService.startAutoSync(params.companyKey);
+      }
+      return result;
+    } catch (e) {
+      console.error('[' + MOD + '][CONFIGURE]', e.message);
+      return { success: false, error: { code: 'INTERNAL', message: e.message } };
+    }
+  });
+
+  // --- Disable sync per company ---
+  ipcMain.handle('sync:disable', async function (event, payload) {
+    try {
+      var params = (payload && typeof payload === 'object') ? payload : {};
+      if (!params.companyKey) {
+        return { success: false, error: { code: 'VALIDATION', message: 'companyKey requerido' } };
+      }
+      var result = await syncConfigWriter.disableCompanySync(_getConfigPath(), params.companyKey);
+      if (result.success) {
+        syncService.stopAutoSync(params.companyKey);
+      }
+      return result;
+    } catch (e) {
+      console.error('[' + MOD + '][DISABLE]', e.message);
+      return { success: false, error: { code: 'INTERNAL', message: e.message } };
+    }
+  });
+
+  // --- Pick a folder for hub path (file dialog) ---
+  ipcMain.handle('sync:pick-folder', async function (event, payload) {
+    try {
+      var params = (payload && typeof payload === 'object') ? payload : {};
+      var result = await dialog.showOpenDialog({
+        title: params.title || 'Elegir carpeta compartida para sincronizar',
+        properties: ['openDirectory', 'createDirectory'],
+        defaultPath: params.defaultPath || undefined
+      });
+      if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+        return { success: true, data: null, canceled: true };
+      }
+      return { success: true, data: { path: result.filePaths[0] } };
+    } catch (e) {
+      console.error('[' + MOD + '][PICK-FOLDER]', e.message);
+      return { success: false, error: { code: 'INTERNAL', message: e.message } };
+    }
+  });
+
+  console.log('[' + MOD + '][INIT] 10 handlers de sync registrados');
 }
 
 module.exports = {
