@@ -52,6 +52,10 @@ const { registerEventosCumplidosHandlers, SCHEMA_SQL: EVENTOS_CUMPLIDOS_SCHEMA_S
 const { registerEventosRapidosHandlers } = require('./main/eventos-rapidos-bridge');
 // 📦531 — Persistencia de planes de acción del submódulo 2.3.1 Evaluación Inicial
 const { registerEvaluacionActionPlansHandlers, SCHEMA_SQL: EVAL_ACTION_PLANS_SCHEMA_SQL } = require('./main/evaluacion-action-plans-bridge');
+// 📦537 — Sync multipc (BD local <-> .kairsync en carpeta compartida)
+const { registerSyncHandlers } = require('./main/sync-bridge');
+// 📦538 — Generador de pcId (ID unico por PC para el sync multipc)
+const pcidGenerator = require('./main/pcid-generator');
 
 // Capturar promesas no manejadas globalmente
 process.on('unhandledRejection', (reason, promise) => {
@@ -8704,6 +8708,20 @@ app.whenReady().then(() => {
     createWindow();
   }
 
+  // 📦538 — Inicializar sync multipc: generar pcId estable y arrancar
+  // auto-sync para todas las empresas con sync.enabled=true.
+  try {
+    pcidGenerator.ensurePcId(app.getPath('userData'));
+    // Esperar un tick para que el SyncService termine de inicializarse
+    // (ya fue inicializado por registerSyncHandlers arriba, en el try
+    // block de Gestación). Llamar a startAutoSyncForAllEnabled.
+    const syncService = require('./main/sync-service');
+    syncService.startAutoSyncForAllEnabled();
+    sendLog('[SYNC] Auto-sync multipc inicializado para empresas habilitadas', 'INFO');
+  } catch (syncInitErr) {
+    sendLog('[SYNC] Error inicializando auto-sync: ' + syncInitErr.message, 'WARN');
+  }
+
   // Handler: la pantalla de carga terminó → cerrar loading, mostrar app
   ipcMain.on('loading-complete', () => {
     if (loadingWindow && !loadingWindow.isDestroyed()) {
@@ -8776,7 +8794,8 @@ try {
   registerGestacionHandlers(app, { getDb });
   registerEventosCumplidosHandlers(app, { getDb });
   registerEvaluacionActionPlansHandlers(app, { getDb });
-  sendLog('[MAIN] Handlers de Seguimiento de Gestación (Salud Materna) registrados correctamente', 'INFO');
+  registerSyncHandlers(app, { getDb });
+  sendLog('[MAIN] Handlers de Seguimiento de Gestación (Salud Materna) y Sync multipc registrados correctamente', 'INFO');
 } catch (err) {
   sendLog(`[MAIN] Error registrando handlers de Gestación: ${err.message}`, 'ERROR');
 }

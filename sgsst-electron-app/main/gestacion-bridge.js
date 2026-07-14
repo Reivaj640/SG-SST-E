@@ -421,6 +421,8 @@ function _handlerRegistrarGestante(empresaId, data) {
 
         var creado = _rowToGestacion(db.prepare('SELECT * FROM gestaciones WHERE id = ?').get(id));
         console.log('[' + MOD + '][REGISTRAR] Nueva gestante ' + id + ' · ' + creado.nombre + ' · ' + empresaId);
+        // 📦538 — Trigger push al hub multipc
+        try { var syncService = require('./sync-service'); syncService.debouncedPush(empresaId); } catch (syncErr) { console.warn('[' + MOD + '] sync push: ' + syncErr.message); }
         return { success: true, data: creado };
     } catch (e) {
         console.error('[' + MOD + '][REGISTRAR_GESTANTE]', e.message);
@@ -475,6 +477,8 @@ function _handlerActualizarGestante(empresaId, gestanteId, data) {
 
         var updated = _rowToGestacion(db.prepare('SELECT * FROM gestaciones WHERE id = ?').get(gestanteId));
         console.log('[' + MOD + '][ACTUALIZAR] Gestante ' + gestanteId + ' actualizada');
+        // 📦538 — Trigger push al hub multipc
+        try { var syncService = require('./sync-service'); syncService.debouncedPush(empresaId); } catch (syncErr) { console.warn('[' + MOD + '] sync push: ' + syncErr.message); }
         return { success: true, data: updated };
     } catch (e) {
         console.error('[' + MOD + '][ACTUALIZAR_GESTANTE]', e.message);
@@ -503,6 +507,8 @@ function _handlerEliminarGestante(empresaId, gestanteId) {
             return { success: false, error: { code: 'NOT_FOUND', message: 'Gestante no encontrada' } };
         }
         console.log('[' + MOD + '][ELIMINAR] Gestante ' + gestanteId + ' eliminada (' + result.changes + ' rows)');
+        // 📦538 — Trigger push al hub multipc
+        try { var syncService = require('./sync-service'); syncService.debouncedPush(empresaId); } catch (syncErr) { console.warn('[' + MOD + '] sync push: ' + syncErr.message); }
         return { success: true, data: { id: gestanteId, deleted: true } };
     } catch (e) {
         console.error('[' + MOD + '][ELIMINAR_GESTANTE]', e.message);
@@ -571,6 +577,8 @@ function _handlerGuardarSeguimiento(empresaId, data) {
         ).get(data.gestacionId, data.periodo);
 
         console.log('[' + MOD + '][GUARDAR_SEG] Gestante ' + data.gestacionId + ' · periodo ' + data.periodo);
+        // 📦538 — Trigger push al hub multipc
+        try { var syncService = require('./sync-service'); syncService.debouncedPush(empresaId); } catch (syncErr) { console.warn('[' + MOD + '] sync push: ' + syncErr.message); }
         return { success: true, data: _rowToSeguimiento(saved) };
     } catch (e) {
         console.error('[' + MOD + '][GUARDAR_SEGUIMIENTO]', e.message);
@@ -1051,6 +1059,8 @@ function _handlerActualizarEstado(empresaId, gestanteId, data) {
         ).get(gestanteId, empresaId);
 
         console.log('[' + MOD + '][ACTUALIZAR_ESTADO] ' + gestanteId + ' ' + estadoActual + ' → ' + nuevoEstado);
+        // 📦538 — Trigger push al hub multipc
+        try { var syncService = require('./sync-service'); syncService.debouncedPush(empresaId); } catch (syncErr) { console.warn('[' + MOD + '] sync push: ' + syncErr.message); }
         return { success: true, data: _rowToGestacion(updated) };
     } catch (e) {
         console.error('[' + MOD + '][ACTUALIZAR_ESTADO]', e.message);

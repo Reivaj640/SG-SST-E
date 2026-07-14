@@ -350,6 +350,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     guardar: (params) => ipcRenderer.invoke('evaluacion-action-plans:guardar', params),
     eliminar: (params) => ipcRenderer.invoke('evaluacion-action-plans:eliminar', params)
   },
+  // 📦537 — Sync multipc. Sincroniza datos de una empresa entre varias PCs
+  // usando una carpeta compartida (Google Drive por ahora, TrueNAS después).
+  // La BD local de cada PC queda intacta; solo se sincroniza un JSON resumen.
+  sync: {
+    status: (params) => ipcRenderer.invoke('sync:status', params),
+    pull: (params) => ipcRenderer.invoke('sync:pull', params),
+    push: (params) => ipcRenderer.invoke('sync:push', params),
+    start: (params) => ipcRenderer.invoke('sync:start', params),
+    stop: (params) => ipcRenderer.invoke('sync:stop', params),
+    startAll: () => ipcRenderer.invoke('sync:start-all'),
+    stopAll: () => ipcRenderer.invoke('sync:stop-all')
+  },
   // 📦481-fix — Ruta de Downloads del usuario (para guardar PDFs de reportes)
   getDownloadsPath: () => ipcRenderer.invoke('get-downloads-path'),
 

@@ -135,6 +135,15 @@ function _handlerGuardar(params) {
         updated_at = excluded.updated_at
     `).run(id, empresaId, year, source, planJson, now);
     console.log('[' + MOD + '][GUARDAR] ' + id + ' en ' + empresaId + '/' + year);
+    // 📦538 — Trigger push al hub multipc (debounced 2s). Si sync esta
+    // deshabilitado o no inicializado, no hace nada.
+    try {
+      var syncService = require('./sync-service');
+      syncService.debouncedPush(empresaId);
+    } catch (syncErr) {
+      // Sync es opcional, no fallar la operacion principal
+      console.warn('[' + MOD + '] No se pudo triggear sync push: ' + syncErr.message);
+    }
     return { success: true, data: { id: id, updatedAt: now } };
   } catch (e) {
     console.error('[' + MOD + '][GUARDAR]', e.message);
@@ -163,6 +172,13 @@ function _handlerEliminar(empresaId, id) {
       'DELETE FROM evaluacion_action_plans WHERE id = ? AND empresa_id = ?'
     ).run(id, empresaId);
     console.log('[' + MOD + '][ELIMINAR] ' + id + ' (cambios=' + result.changes + ')');
+    // 📦538 — Trigger push al hub multipc (debounced 2s).
+    try {
+      var syncService = require('./sync-service');
+      syncService.debouncedPush(empresaId);
+    } catch (syncErr) {
+      console.warn('[' + MOD + '] No se pudo triggear sync push: ' + syncErr.message);
+    }
     return { success: true, deleted: result.changes > 0 };
   } catch (e) {
     console.error('[' + MOD + '][ELIMINAR]', e.message);

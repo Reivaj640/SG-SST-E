@@ -91,6 +91,13 @@ function _handlerMarcarCumplido(empresaId, eventoId, nota) {
         nota        = excluded.nota
     `).run(eventoId, empresaId, now, nota || '');
     console.log('[' + MOD + '][MARCAR] ' + eventoId + ' en ' + empresaId);
+    // 📦538 — Trigger push al hub multipc
+    try {
+      var syncService = require('./sync-service');
+      syncService.debouncedPush(empresaId);
+    } catch (syncErr) {
+      console.warn('[' + MOD + '] No se pudo triggear sync push: ' + syncErr.message);
+    }
     return { success: true, data: { eventoId: eventoId, cumplidoEn: now, nota: nota || '' } };
   } catch (e) {
     console.error('[' + MOD + '][MARCAR]', e.message);
@@ -117,6 +124,13 @@ function _handlerDesmarcarCumplido(empresaId, eventoId) {
       'DELETE FROM eventos_cumplidos WHERE evento_id = ? AND empresa_id = ?'
     ).run(eventoId, empresaId);
     console.log('[' + MOD + '][DESMARCAR] ' + eventoId + ' (cambios=' + result.changes + ')');
+    // 📦538 — Trigger push al hub multipc
+    try {
+      var syncService = require('./sync-service');
+      syncService.debouncedPush(empresaId);
+    } catch (syncErr) {
+      console.warn('[' + MOD + '] No se pudo triggear sync push: ' + syncErr.message);
+    }
     return { success: true, deleted: result.changes > 0 };
   } catch (e) {
     console.error('[' + MOD + '][DESMARCAR]', e.message);
