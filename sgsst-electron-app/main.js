@@ -80,8 +80,14 @@ Reason: ${reason instanceof Error ? reason.stack : JSON.stringify(reason)}
 // --- Configuración del Auto-Updater ---
 log.transports.file.level = 'info';
 autoUpdater.logger = log;
-autoUpdater.autoDownload = false;       // NO descarga en update-available; solo notifica
-autoUpdater.autoInstallOnAppQuit = false; // NO instala al cerrar la app; install 100% manual
+// 📦546 — Flujo "tipo Chrome": descarga en background + instala al cerrar.
+// A) autoDownload=true: apenas detecta update-available, baja el .exe sin pedir click.
+// B) El toast del renderer (window.updateNotifier.notifyAvailable) muestra el progreso.
+// C) autoInstallOnAppQuit=true: cuando el usuario cierra la app, si hay update descargado,
+//    se instala solo. Al reabrir, ya está en la nueva versión.
+// Nota: el botón "Descargar" del panel sigue existiendo como fallback por si falla la auto-descarga.
+autoUpdater.autoDownload = true;          // Descarga automática apenas detecta update-available
+autoUpdater.autoInstallOnAppQuit = true;  // Instala automáticamente al cerrar la app
 autoUpdater.autoRunAppAfterInstall = true;
 // Configurar timeout para evitar cuelgues en conexiones lentas
 autoUpdater.requestHeaders = {
@@ -1407,8 +1413,9 @@ ipcMain.handle('check-for-updates-manual', async () => {
   }
 });
 
-// 📦503 — Descarga manual: solo se baja cuando el usuario hace click en "Descargar".
-// update-available ya no descarga en background (autoDownload = false).
+// 📦546 — Descarga manual como FALLBACK. El flujo principal es auto-descarga
+// (autoDownload=true en main.js). Este IPC queda por si la auto-descarga falla
+// y el usuario quiere reintentar desde el panel del header.
 ipcMain.handle('update:download', async () => {
   try {
     sendLog('[UPDATER] Usuario solicitó descarga manual de la actualización', 'INFO');

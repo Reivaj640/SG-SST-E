@@ -1503,8 +1503,10 @@ if (appHeader) {
       });
     }
 
-    // 📦503 — Botón "Descargar": dispara la descarga manual.
-    // update-available ya no descarga en background (autoDownload = false en main).
+    // 📦546 — Botón "Descargar": FALLBACK por si la auto-descarga falla.
+    // El flujo principal descarga en background apenas detecta update-available
+    // (autoDownload=true en main.js). Este botón queda en el DOM pero normalmente
+    // está oculto (case 'available' lo pone display:none).
     if (updateDownloadBtn) {
       updateDownloadBtn.addEventListener('click', () => {
         logMessage('Usuario solicitó descarga de la actualización', 'INFO');
@@ -1597,34 +1599,37 @@ if (appHeader) {
 
         case 'available':
           // VISIBLE: hay update, botón amarillo pulsante con versión
+          // 📦546 — La descarga ya arrancó automáticamente en background
+          // (autoDownload=true en main.js). El estado 'available' dura muy poco
+          // antes de transicionar a 'ready' (vía download-progress + update-downloaded).
+          // El panel del header queda como atajo: si el usuario hace click en el botón
+          // amarillo, puede ver el progreso de la descarga. El botón "Descargar" se
+          // oculta porque ya no se necesita (la descarga está en curso).
           headerUpdateBtn.style.display = 'flex';
           headerUpdateBtn.classList.add('header-update-available');
           headerUpdateText.textContent = options.version ? `v${options.version}` : 'Update';
           headerUpdateBtn.title = options.version
-            ? `Actualización v${options.version} disponible — Click para descargar`
-            : 'Actualización disponible';
-          // 📦529 — FIX: NO auto-abrir el panel. El usuario hace clic en el botón
-          // amarillo para abrir el panel con "Descargar". Antes se auto-abría y el
-          // primer click del usuario lo cerraba (interpretado como "no pasa nada").
+            ? `Descargando actualización v${options.version} en segundo plano...`
+            : 'Actualización disponible — Descargando en segundo plano';
           if (headerUpdatePanel) {
             headerUpdatePanel.style.display = 'none';
             headerUpdatePanelVisible = false;
           }
           if (updateProgressFill) updateProgressFill.style.width = '0%';
-          if (updateProgressText) updateProgressText.textContent = 'Listo para descargar';
+          // 📦546 — Texto refleja que la descarga arrancó sola (ya no dice "Listo para descargar")
+          if (updateProgressText) updateProgressText.textContent = 'Descargando automáticamente...';
           // En estado "available" NO se muestra el botón Instalar todavía
           if (updateInstallBtn) updateInstallBtn.style.display = 'none';
-          // En cambio, SÍ se muestra el botón Descargar
+          // 📦546 — Ocultar botón "Descargar" porque ya está descargando en background
+          // (se mantiene en el DOM por si la auto-descarga falla y el usuario quiere reintentar)
           var downloadBtn = document.getElementById('update-download-btn');
           if (downloadBtn) {
-            downloadBtn.style.display = 'block';
-            downloadBtn.disabled = false;
-            downloadBtn.textContent = 'Descargar';
+            downloadBtn.style.display = 'none';
           }
           // Resetear animación de barra
           var barAvail = document.querySelector('.update-progress-bar');
           if (barAvail) {
-            barAvail.classList.remove('is-active');
+            barAvail.classList.add('is-active');
             barAvail.classList.remove('is-complete');
           }
           break;
@@ -1688,14 +1693,20 @@ if (appHeader) {
       updateHeaderStatus('checking');
     });
 
-    // Cuando hay una actualización disponible (ya NO descarga automáticamente)
-    // 📦503 — El renderer muestra el botón "Descargar" en el panel y solo
-    // descarga cuando el usuario hace click.
+    // Cuando hay una actualización disponible
+    // 📦546 — A+B+C: ahora main.js tiene autoDownload=true, así que la descarga
+    // arranca automáticamente. El toast notifica al usuario del progreso y
+    // el botón amarillo del header sigue ahí como atajo para abrir el panel.
+    // (El botón "Descargar" del panel queda como fallback por si falla la auto-descarga.)
     window.electronAPI?.onUpdateAvailable && window.electronAPI.onUpdateAvailable((info) => {
       console.log('[UPDATER] Evento recibido: update_available', info);
       logMessage(`Actualización disponible: ${info ? info.version : 'nueva versión'}`, 'INFO');
       if (info && info.version) {
         updateHeaderStatus('available', { version: info.version });
+        // B) Toast moderno con barra de progreso — autoClose 0 (no se cierra solo)
+        if (window.updateNotifier && typeof window.updateNotifier.notifyAvailable === 'function') {
+          window.updateNotifier.notifyAvailable(info.version);
+        }
       }
     });
 
@@ -1705,6 +1716,10 @@ if (appHeader) {
       logMessage('No hay actualizaciones disponibles', 'INFO');
       // Volver al estado "al día" (botón permanente con punto verde)
       updateHeaderStatus('uptodate', { version: info?.version || currentAppVersion });
+      // Si el toast de "descargando" quedó abierto por error, cerrarlo
+      if (window.updateNotifier && window.updateNotifier.currentToast) {
+        window.updateNotifier.remove(window.updateNotifier.currentToast);
+      }
     });
 
     // Progreso de descarga
@@ -1713,6 +1728,11 @@ if (appHeader) {
       // Update header progress (la barra dentro del panel)
       if (data && data.percent !== undefined) {
         updateHeaderProgress(data.percent, data.speed);
+        // B) Actualizar la barra de progreso del toast
+        if (window.updateNotifier && typeof window.updateNotifier.updateProgress === 'function') {
+          var speedLabel = data.speed ? data.speed + ' MB/s' : 'Calculando...';
+          window.updateNotifier.updateProgress(data.percent, speedLabel);
+        }
       }
     });
 
@@ -1723,6 +1743,16 @@ if (appHeader) {
       const version = info ? info.version : 'más reciente';
       // Update header UI → estado "ready" (botón permanente con badge "Listo")
       updateHeaderStatus('ready', { version });
+      // B) Toast de éxito con botón "Reiniciar e Instalar Ahora" — autoClose 0
+      // C) Al cerrar la app, autoInstallOnAppQuit=true instala la versión pendiente
+      //    aunque el usuario no abra el toast; este botón es para los que quieren
+      //    reiniciar YA sin esperar.
+      if (window.updateNotifier && typeof window.updateNotifier.notifyDownloaded === 'function') {
+        window.updateNotifier.notifyDownloaded(version, function() {
+          logMessage('Usuario solicitó reiniciar para instalar actualización (vía toast)', 'INFO');
+          window.electronAPI.restartApp && window.electronAPI.restartApp();
+        });
+      }
     });
 
     // Error en la actualización
@@ -1731,6 +1761,11 @@ if (appHeader) {
       logMessage(`Error de actualización: ${data ? data.message : 'error desconocido'}`, 'ERROR');
       // Volver al estado "al día" (botón permanente con punto verde)
       updateHeaderStatus('uptodate', { version: currentAppVersion });
+      // B) Toast de error con detalle
+      if (window.updateNotifier && typeof window.updateNotifier.notifyError === 'function') {
+        var errorMsg = data && data.message ? data.message : 'Error desconocido en la actualización';
+        window.updateNotifier.notifyError(errorMsg);
+      }
     });
 
     // Inicializar header con la versión actual (estado "al día" hasta que llegue el primer check)
