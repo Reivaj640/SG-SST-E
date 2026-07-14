@@ -1631,11 +1631,15 @@ this.lastScore = score;
         
         this.actionPlans[planIndex].seguimientos.push(newSeguimiento);
         this.showToast('Seguimiento agregado correctamente', 'success');
-        
+
+        // 📦535 — Persistir en BD: antes solo se guardaba en memoria y se
+        // perdia al cerrar la app. Ahora el seguimiento sobrevive reinicios.
+        this._persistActionPlan(this.actionPlans[planIndex]);
+
         // Cerrar modal y actualizar vista de detalle
         const modal = document.querySelector('.k-modal');
         if (modal) modal.remove();
-        
+
         // Mostrar el detalle actualizado
         this.showActionPlanDetailModal(planId);
     }
@@ -1811,11 +1815,14 @@ this.lastScore = score;
         
         this.actionPlans[planIndex].responsables.push(newResponsible.trim());
         this.showToast('Responsable agregado correctamente', 'success');
-        
+
+        // 📦535 — Persistir en BD: antes solo se guardaba en memoria.
+        this._persistActionPlan(this.actionPlans[planIndex]);
+
         // Cerrar modal y actualizar vista
         const modal = document.querySelector('.k-modal');
         if (modal) modal.remove();
-        
+
         this.showResponsibleModal(planId);
     }
     
@@ -1828,11 +1835,14 @@ this.lastScore = score;
         
         this.actionPlans[planIndex].responsables.splice(responsibleIndex, 1);
         this.showToast('Responsable eliminado correctamente', 'success');
-        
+
+        // 📦535 — Persistir en BD: antes solo se guardaba en memoria.
+        this._persistActionPlan(this.actionPlans[planIndex]);
+
         // Actualizar vista
         const modal = document.querySelector('.k-modal');
         if (modal) modal.remove();
-        
+
         this.showResponsibleModal(planId);
     }
     
@@ -1840,16 +1850,37 @@ this.lastScore = score;
         if (!confirm('¿Está seguro de que desea eliminar este plan de acción?')) {
             return;
         }
-        
+
         const planIndex = this.actionPlans.findIndex(p => p.id === planId);
         if (planIndex === -1) {
             this.showToast('Plan no encontrado', 'danger');
             return;
         }
-        
+
         this.actionPlans.splice(planIndex, 1);
         this.showToast('Plan de acción eliminado correctamente', 'success');
-        
+
+        // 📦535 — Persistir en BD: antes el plan "eliminado" volvia a
+        // aparecer al reiniciar la app porque solo se borraba de memoria.
+        // Ahora ademas de quitarlo de this.actionPlans, lo borramos de la
+        // tabla evaluacion_action_plans via IPC. Defensa cross-tenant
+        // ya esta en el bridge (WHERE id=? AND empresa_id=?).
+        if (window.electronAPI && window.electronAPI.evaluacionActionPlans) {
+            const empresaId = window.currentCompany;
+            if (empresaId && empresaId !== 'default_company') {
+                window.electronAPI.evaluacionActionPlans.eliminar({
+                    empresaId: empresaId,
+                    id: planId
+                }).then(function (res) {
+                    if (!res || !res.success) {
+                        console.warn('[EvaluacionInicialSgSst] No se pudo eliminar plan de BD:', res && res.error && res.error.message);
+                    }
+                }).catch(function (err) {
+                    console.error('[EvaluacionInicialSgSst] Error eliminando plan de BD:', err);
+                });
+            }
+        }
+
         this.renderActionPlansTable();
     }
     
