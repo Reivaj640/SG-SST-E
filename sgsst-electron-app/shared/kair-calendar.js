@@ -90,6 +90,16 @@
   function KairCalendar(options) {
     if (!(this instanceof KairCalendar)) return new KairCalendar(options);
     this.opts = Object.assign({}, DEFAULTS, options || {});
+    // 📦543 — Leer scope persistido de localStorage. Default 'company' para
+    // mantener el comportamiento original. Si el usuario activo "Todas las
+    // empresas" en una sesion anterior, lo respetamos al abrir.
+    var _persistedScope = 'company';
+    try {
+      if (typeof localStorage !== 'undefined') {
+        var v = localStorage.getItem('kair-cal.scope-all');
+        if (v === '1' || v === 'true') _persistedScope = 'all';
+      }
+    } catch (e) { /* sin localStorage (modo privado?), ignorar */ }
     this.state = {
       view: this.opts.initialView,
       current: new Date(this.opts.initialDate),
@@ -99,7 +109,10 @@
       loading: false,
       error: null,
       open: false,
-      miniCurrentEvents: new Set() // fechas ISO con eventos (para mini-cal)
+      miniCurrentEvents: new Set(), // fechas ISO con eventos (para mini-cal)
+      // 📦543 — Scope del calendario: 'company' = solo empresa actual,
+      // 'all' = todas las empresas. Se persiste en localStorage.
+      scope: _persistedScope
     };
     this._els = {};
     this._listeners = [];
@@ -295,10 +308,13 @@
           '</div>' +
         '</div>' +
         '<div class="kair-cal-topbar__right">' +
-          '<label class="kair-cal-toggle">' +
-            '<input type="checkbox" class="kair-cal-toggle__input" />' +
+          // 📦543 — Toggle "Todas las empresas": cuando esta ON, el adapter pasa
+          // scope:'all' a las fuentes por empresa, que devuelven eventos de
+          // TODAS las empresas (no solo la actual). Default OFF.
+          '<label class="kair-cal-toggle" title="Mostrar eventos de todas las empresas (no solo la actual)">' +
+            '<input type="checkbox" class="kair-cal-toggle__input" data-kair-cal-action="toggle-scope-all" ' + (this.state.scope === 'all' ? 'checked' : '') + ' />' +
             '<span class="kair-cal-toggle__track"></span>' +
-            '<span class="kair-cal-toggle__label">Espacios disponibles</span>' +
+            '<span class="kair-cal-toggle__label">Todas las empresas</span>' +
           '</label>' +
           '<button type="button" class="kair-cal-topbar__btn" aria-label="Calendarios">' + GRID_SVG + '<span>Calendarios</span>' + CHEVRON_DOWN_SVG + '</button>' +
           '<button type="button" class="kair-cal-topbar__icon-btn" aria-label="Configuración">' + GEAR_SVG + '</button>' +
@@ -451,8 +467,20 @@
       }
       const cellEl = e.target.closest('[data-kair-cal-cell-date]');
       if (cellEl) {
-        const dateStr = cellEl.getAttribute('data-kair-cal-cell-date');
-        this._handleCellClick(dateStr);
+        const slotStr = cellEl.getAttribute('data-kair-cal-cell-date');
+        // 📦544 — Click en celda del mes: cancelar hover, abrir popover
+        // EXPANDIDO cerca del día (con todos los eventos + botón crear).
+        // Si tiene hora (week view) mantiene el modal de crear.
+        if (slotStr.indexOf('T') >= 0) {
+          this._handleCellClick(slotStr);
+        } else {
+          const d = parseISODate(slotStr);
+          this.state.selectedDate = d;
+          this.state.current = new Date(d);
+          this._cancelDayPopover();
+          var dayEvents = (this.state.events || []).filter(function (e) { return e.date === slotStr; });
+          this._showDayPopover(slotStr, cellEl, dayEvents, /* expanded */ true);
+        }
         return;
       }
       const slotEl = e.target.closest('[data-kair-cal-slot]');
@@ -524,6 +552,22 @@
       case 'modal-save':   this._saveEventFromModal(); break;
       case 'modal-delete': this._deleteEventFromModal(); break;
       case 'modal-cancel': this._closeEventModal(); break;
+      // 📦544 — Day popover (cerrar / crear)
+      case 'day-popover-close': this._closeDayPopover(); break;
+      case 'day-popover-create':
+        var dateStrCreate = actEl.getAttribute('data-date');
+        this._closeDayPopover();
+        this._openEventModal(null, dateStrCreate, null);
+        break;
+      case 'toggle-scope-all':
+        // 📦543 — Alternar scope 'company' / 'all'. Persistir en localStorage
+        // y recargar eventos. El toggle en el DOM lo maneja el handler de
+        // 'change' (más abajo) — aca solo actualizamos el state cuando se
+        // dispara via el data-attribute.
+        this.state.scope = (this.state.scope === 'all') ? 'company' : 'all';
+        try { localStorage.setItem('kair-cal.scope-all', this.state.scope === 'all' ? '1' : '0'); } catch (e) {}
+        this._loadEvents().then(() => this._refresh());
+        break;
     }
   };
 
@@ -604,6 +648,9 @@
     if (this.state.view === 'month') this._renderMonth();
     else if (this.state.view === 'week') this._renderWeek();
     else if (this.state.view === 'day') this._renderDay();
+    // 📦544 — Wire hover 3s en celdas con eventos (después de re-renderizar
+    // el HTML, los listeners viejos se borran solos con el innerHTML).
+    this._wireCellHover();
     // Conteo footer
     if (this._els.labelFooterCount) {
       this._els.labelFooterCount.textContent = this.state.events.length + ' evento(s) en el rango visible';
@@ -911,6 +958,212 @@
     this._openEventModal(null, dateStr, timeStr);
   };
 
+  // ---------- 📦544 — Day popover (hover 1s + click expande) ----------
+  // Un solo componente: aparece cerca del día, muestra los eventos con scroll
+  // si hay muchos, y tiene botón "+ Nuevo evento" abajo. Se invoca desde
+  // hover (1s) o desde click (sin hover). El usuario pidió: "que se despliegue
+  // ya de esa alerta que se muestra en lugar de que se cree en una nueva
+  // ubicación" → posicionado cerca del día, NO en panel lateral.
+  KairCalendar.prototype._scheduleDayPopover = function (dateStr, anchorEl) {
+    this._cancelDayPopoverTimeout();
+    var dayEvents = (this.state.events || []).filter(function (e) { return e.date === dateStr; });
+    // Solo mostrar preview si hay eventos. Si está vacío, no tiene sentido
+    // un preview (pero el click sí lo va a mostrar para poder crear).
+    if (dayEvents.length === 0) return;
+    var self = this;
+    this._popoverTimeout = setTimeout(function () {
+      self._showDayPopover(dateStr, anchorEl, dayEvents, /* expanded */ false);
+    }, 1000);
+  };
+
+  // 📦545 — Cancelar SOLO el timer (sin cerrar el popover visible).
+  // El mouseleave de la celda llama a este para que si el mouse va al
+  // popover (ya visible), no se cierre. Si se va a otra celda, el popover
+  // se cierra por la lógica de "click en otro día" o "click fuera".
+  KairCalendar.prototype._cancelDayPopoverTimeout = function () {
+    if (this._popoverTimeout) {
+      clearTimeout(this._popoverTimeout);
+      this._popoverTimeout = null;
+    }
+  };
+
+  /**
+   * Muestra el day popover.
+   * - expanded=false (preview de hover): muestra hasta 3 eventos, sin botón crear
+   * - expanded=true  (click): muestra TODOS los eventos con scroll + botón crear
+   */
+  KairCalendar.prototype._showDayPopover = function (dateStr, anchorEl, dayEvents, expanded) {
+    this._closeDayPopover();
+    expanded = !!expanded;
+    var self = this;
+    var dayDate = new Date(dateStr + 'T00:00:00');
+    var dayName = dayDate.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'short' });
+    var pop = document.createElement('div');
+    pop.id = 'ei-day-popover';
+    pop.className = 'kair-cal-day-popover';
+    pop.style.cssText = [
+      'position: absolute',
+      'z-index: 1100',
+      'background: var(--v3-bg-card, #fff)',
+      'border: 1px solid var(--v3-border, #d1d5db)',
+      'border-radius: 8px',
+      'box-shadow: 0 6px 20px rgba(0,0,0,0.18)',
+      'padding: 10px 12px',
+      'min-width: 240px',
+      'max-width: 340px',
+      'max-height: ' + (expanded ? '420px' : '320px') + '',
+      'font-size: 0.85rem',
+      'pointer-events: auto',
+      'display: flex',
+      'flex-direction: column',
+      'animation: ei-tip-fadeIn 0.18s ease'
+    ].join(';');
+    var html = '';
+    // Header
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">';
+    html +=   '<div style="font-weight:600;color:var(--v3-foreground,#1f2937);font-size:0.9rem;text-transform:capitalize;">' + escapeHTML(dayName) + '</div>';
+    html +=   '<button data-kair-cal-action="day-popover-close" aria-label="Cerrar" style="background:none;border:none;cursor:pointer;font-size:1.3rem;color:var(--v3-muted,#6b7280);line-height:1;padding:0 4px;">&times;</button>';
+    html += '</div>';
+    // Lista de eventos (con scroll si hay muchos)
+    html += '<div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:4px;">';
+    var maxShow = expanded ? dayEvents.length : 3;
+    for (var i = 0; i < Math.min(maxShow, dayEvents.length); i++) {
+      var e = dayEvents[i];
+      var color = this._typeColor(e.type) || '#174ea6';
+      var hora = (e.start && e.start !== '00:00') ? e.start : '';
+      var prefix = e.cumplido ? '✓ ' : (e.type === 'rapido' ? '⚡ ' : '');
+      html += '<div class="ei-day-popover__event" data-event-id="' + escapeHTML(e.id) + '" style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:4px;background:var(--v3-muted,#f3f4f6);cursor:pointer;">';
+      html +=   '<span style="width:4px;height:18px;border-radius:2px;background:' + color + ';flex-shrink:0;"></span>';
+      html +=   '<div style="flex:1;min-width:0;">';
+      html +=     '<div style="font-size:0.8rem;color:var(--v3-foreground,#1f2937);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + prefix + escapeHTML(e.title) + '</div>';
+      if (hora) html += '<div style="font-size:0.7rem;color:var(--v3-muted,#6b7280);margin-top:1px;">' + hora + '</div>';
+      html +=   '</div>';
+      html += '</div>';
+    }
+    if (dayEvents.length > maxShow) {
+      html += '<div style="font-size:0.75rem;color:var(--v3-muted,#6b7280);text-align:center;padding-top:4px;">+' + (dayEvents.length - maxShow) + ' más</div>';
+    }
+    html += '</div>';  // lista
+    // Botón crear (solo en modo expanded)
+    if (expanded) {
+      html += '<div style="padding-top:8px;margin-top:8px;border-top:1px solid var(--v3-border,#e5e7eb);">';
+      html +=   '<button data-kair-cal-action="day-popover-create" data-date="' + escapeHTML(dateStr) + '" style="width:100%;padding:8px 10px;background:var(--rosa,#e91e63);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;font-weight:600;display:flex;align-items:center;justify-content:center;gap:4px;">';
+      html +=     '<i class="bi bi-plus-lg"></i> Nuevo evento para este día';
+      html +=   '</button>';
+      html += '</div>';
+    }
+    pop.innerHTML = html;
+    document.body.appendChild(pop);
+
+    // Posicionar cerca del anchor
+    var rect = anchorEl.getBoundingClientRect();
+    var popRect = pop.getBoundingClientRect();
+    var top, left;
+    // Default: debajo del día
+    top = window.scrollY + rect.bottom + 6;
+    left = window.scrollX + rect.left;
+    // Si no entra a la derecha, ajustar
+    if (left + popRect.width > window.innerWidth - 8) {
+      left = window.innerWidth - popRect.width - 8;
+    }
+    // Si no entra abajo (cerca del final de la página), poner arriba
+    if (rect.bottom + popRect.height + 12 > window.innerHeight) {
+      top = window.scrollY + rect.top - popRect.height - 6;
+    }
+    pop.style.top = top + 'px';
+    pop.style.left = Math.max(8, left) + 'px';
+
+    this._els.dayPopover = pop;
+    this._els.dayPopoverDate = dateStr;
+
+    // 📦545 — Si es el popover EXPANDIDO (click), no se cierra al mover
+    // el mouse fuera de la celda. Solo se cierra con X, click en otro día
+    // o click fuera del popover (con delay 200ms para dar tiempo a mover
+    // el mouse de un item a otro). Permite navegar por los eventos sin
+    // que se cierre.
+    if (expanded) {
+      var closeOnLeaveTimer = null;
+      pop.addEventListener('mouseenter', function () {
+        if (closeOnLeaveTimer) {
+          clearTimeout(closeOnLeaveTimer);
+          closeOnLeaveTimer = null;
+        }
+      });
+      pop.addEventListener('mouseleave', function () {
+        closeOnLeaveTimer = setTimeout(function () {
+          self._closeDayPopover();
+        }, 250);
+      });
+    }
+
+    // Bind: click en cada evento → abrir detail panel
+    var evEls = pop.querySelectorAll('.ei-day-popover__event');
+    for (var k = 0; k < evEls.length; k++) {
+      (function (el) {
+        el.addEventListener('click', function (e) {
+          // 📦545 (FIX) — stopPropagation evita que el click se propague al
+          // document y dispare el handler "click fuera → cerrar calendario"
+          // de kair-calendar.js. Antes, el detail panel se abría DESPUÉS
+          // del click, entonces cuando el handler del document evaluaba
+          // `e.target.closest('.kair-cal-modal-overlay')` aún no existía el
+          // modal → caía al this.close() → cerraba el calendario entero.
+          e.stopPropagation();
+          e.preventDefault();
+          var evId = el.getAttribute('data-event-id');
+          var ev = dayEvents.find(function (e) { return e.id === evId; });
+          if (!ev) return;
+          self._closeDayPopover();
+          if (window.calendarDetailPanel) {
+            window.calendarDetailPanel.open(ev);
+          } else if (self._els.main) {
+            // Fallback: simular click en el chip original
+            var chip = self._els.main.querySelector('[data-kair-cal-event-id="' + evId + '"]');
+            if (chip) chip.click();
+          }
+        });
+        el.addEventListener('mouseenter', function () { el.style.background = 'var(--v3-border,#e5e7eb)'; });
+        el.addEventListener('mouseleave', function () { el.style.background = 'var(--v3-muted,#f3f4f6)'; });
+      })(evEls[k]);
+    }
+  };
+
+  KairCalendar.prototype._closeDayPopover = function () {
+    if (this._els && this._els.dayPopover && this._els.dayPopover.parentNode) {
+      this._els.dayPopover.parentNode.removeChild(this._els.dayPopover);
+      this._els.dayPopover = null;
+      this._els.dayPopoverDate = null;
+    }
+  };
+
+  // Cerrar popover al hacer click fuera
+  // (Se hace via un listener global, se setea en _init)
+
+  // 📦544 — Wire del hover 1s en cada celda. Llamado desde _renderMain
+  // después de re-renderizar. Como el innerHTML borra listeners viejos,
+  // no hay duplicación.
+  KairCalendar.prototype._wireCellHover = function () {
+    if (!this._els || !this._els.main) return;
+    var self = this;
+    var cells = this._els.main.querySelectorAll('[data-kair-cal-cell-date]');
+    for (var i = 0; i < cells.length; i++) {
+      (function (cellEl) {
+        cellEl.addEventListener('mouseenter', function () {
+          var dateStr = cellEl.getAttribute('data-kair-cal-cell-date');
+          if (dateStr && dateStr.indexOf('T') < 0) {
+            self._scheduleDayPopover(dateStr, cellEl);
+          }
+        });
+        cellEl.addEventListener('mouseleave', function () {
+          // 📦545 — Solo cancelar el timer del preview, NO cerrar el
+          // popover visible. Si el mouse va al popover (ya expanded),
+          // no se cierra. El popover se cierra solo con X, click fuera,
+          // o cuando se navega a otro día.
+          self._cancelDayPopoverTimeout();
+        });
+      })(cells[i]);
+    }
+  };
+
   // ---------- Modal de evento ----------
   KairCalendar.prototype._openEventModal = function (event, dateStr, timeStr) {
     // Cerrar previo
@@ -1077,6 +1330,10 @@
   // ---------- Carga de eventos (rango visible) ----------
   KairCalendar.prototype._loadEvents = function () {
     const range = this._currentRange();
+    // 📦543 — Propagar el scope al adapter para que las fuentes por empresa
+    // (capacitaciones, gestaciones, inspecciones, mantenimientos, cumplidos)
+    // devuelvan eventos de TODAS las empresas cuando scope='all'.
+    range.scope = this.state.scope;
     this.state.loading = true;
     this.state.error = null;
     this._renderMain();
@@ -1145,6 +1402,10 @@
     if (!this._els.popover) return;
     if (this.opts.inline) return; // no-op en modo inline (siempre visible)
     this.state.open = false;
+    // 📦545 (FIX) — Limpiar el day popover al cerrar el calendario. Si no,
+    // el popover queda "huérfano" visible aunque el calendario ya no esté.
+    this._cancelDayPopoverTimeout();
+    this._closeDayPopover();
     // [Fix 2026-07-01 v2] Modal: quitar --open del overlay Y del pop.
     if (this._els.overlay) {
       this._els.overlay.classList.remove('kair-cal-modal-overlay--open');

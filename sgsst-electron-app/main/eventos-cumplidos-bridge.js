@@ -47,19 +47,27 @@ const SCHEMA_SQL = `
 /**
  * Lista todos los eventos cumplidos de una empresa.
  * Devuelve un array de { evento_id, empresa_id, cumplido_en, nota }.
+ *
+ * 📦543 — Soporte para empresaId === null: devuelve cumplidos de TODAS las
+ * empresas (usado por el toggle "Todas las empresas" del calendario).
  */
 function _handlerListarCumplidos(empresaId) {
   if (!_getDb) {
     return { success: false, error: { code: 'NO_DB', message: 'Base de datos no disponible' } };
   }
-  if (!empresaId) {
-    return { success: false, error: { code: 'VALIDATION', message: 'empresaId requerido' } };
-  }
   try {
     var db = _getDb();
-    var rows = db.prepare(
-      'SELECT evento_id, empresa_id, cumplido_en, nota FROM eventos_cumplidos WHERE empresa_id = ? ORDER BY cumplido_en DESC'
-    ).all(empresaId);
+    var rows;
+    if (!empresaId) {
+      // scope='all' → todas las empresas
+      rows = db.prepare(
+        'SELECT evento_id, empresa_id, cumplido_en, nota FROM eventos_cumplidos ORDER BY cumplido_en DESC'
+      ).all();
+    } else {
+      rows = db.prepare(
+        'SELECT evento_id, empresa_id, cumplido_en, nota FROM eventos_cumplidos WHERE empresa_id = ? ORDER BY cumplido_en DESC'
+      ).all(empresaId);
+    }
     return { success: true, data: rows };
   } catch (e) {
     console.error('[' + MOD + '][LISTAR]', e.message);

@@ -4382,24 +4382,13 @@ ipcMain.handle('recordatorio-inducciones:get-events', async (event, params) => {
 // Degradación elegante: si la empresa no tiene archivo de cronograma, si Drive
 // lo tiene bloqueado, o si no encuentra la hoja del año actual, devuelve []
 // y loggea warning — el calendario sigue mostrando los otros tipos de eventos.
-ipcMain.handle('capacitaciones:get-events', async (event, payload) => {
-  // 📦495-debug — Estos console.log van a la consola del MAIN process.
-  // Para verlos: DevTools de Electron (Ctrl+Shift+I) → Console.
-  // O ver el archivo de log del main process.
-  console.log('[CAL-CAP] === INICIO get-events ===');
-  console.log('[CAL-CAP] payload recibido:', JSON.stringify(payload));
-
+// 📦543 — Helper que lee las capacitaciones de UNA empresa desde su Excel.
+// Extraido del handler original para poder llamarlo en loop cuando el scope
+// es 'all' (mostrar todas las empresas en el calendario).
+async function _leerCapacitacionesDeEmpresa(currentCompany, start, end) {
+  console.log('[CAL-CAP] === _leerCapacitacionesDeEmpresa para', currentCompany, '===');
   try {
-    // Acepta tanto un objeto {range} como un objeto directo {start, end, currentCompany}
-    const { start, end, currentCompany } = payload && typeof payload === 'object'
-      ? payload
-      : { start: (payload && payload.start), end: (payload && payload.end), currentCompany: null };
-
-    console.log('[CAL-CAP] start=', start, 'end=', end, 'currentCompany=', currentCompany);
-
     if (!currentCompany || currentCompany === 'default_company') {
-      console.log('[CAL-CAP] WARN: Sin empresa actual, devolviendo []');
-      sendLog('[CAL-CAP] Sin empresa actual, devolviendo []', 'WARN');
       return { success: true, data: [] };
     }
 
@@ -4426,11 +4415,7 @@ ipcMain.handle('capacitaciones:get-events', async (event, payload) => {
       sendLog(`[CAL-CAP] Error leyendo config: ${err.message}`, 'WARN');
     }
 
-    console.log('[CAL-CAP] submodulePath=', submodulePath);
-
     if (!submodulePath) {
-      console.log('[CAL-CAP] WARN: No se encontró carpeta 1.2.1');
-      sendLog(`[CAL-CAP] No se encontró la carpeta 1.2.1 para ${currentCompany}`, 'WARN');
       return { success: true, data: [] };
     }
 
@@ -4439,8 +4424,6 @@ ipcMain.handle('capacitaciones:get-events', async (event, payload) => {
     try {
       files = await fsp.readdir(submodulePath);
     } catch (err) {
-      console.log('[CAL-CAP] ERROR leyendo dir:', err.message);
-      sendLog(`[CAL-CAP] No se pudo leer directorio ${submodulePath}: ${err.message}`, 'WARN');
       return { success: true, data: [] };
     }
 
@@ -4449,10 +4432,7 @@ ipcMain.handle('capacitaciones:get-events', async (event, payload) => {
       return lower.includes('cronograma') && (lower.endsWith('.xlsx') || lower.endsWith('.xls')) && !lower.startsWith('~$');
     });
 
-    console.log('[CAL-CAP] archivos en carpeta:', files.length, 'cronograma encontrado:', cronogramaFile || 'NINGUNO');
-
     if (!cronogramaFile) {
-      sendLog(`[CAL-CAP] No hay archivo de cronograma en ${submodulePath}`, 'INFO');
       return { success: true, data: [] };
     }
 
@@ -4462,10 +4442,7 @@ ipcMain.handle('capacitaciones:get-events', async (event, payload) => {
     let workbook;
     try {
       workbook = xlsx.readFile(filePath);
-      console.log('[CAL-CAP] Excel leído. Hojas:', (workbook.SheetNames || []).join(', '));
     } catch (err) {
-      console.log('[CAL-CAP] ERROR leyendo Excel:', err.message);
-      sendLog(`[CAL-CAP] Error leyendo Excel ${filePath}: ${err.message}`, 'WARN');
       return { success: true, data: [] };
     }
 
@@ -4480,28 +4457,18 @@ ipcMain.handle('capacitaciones:get-events', async (event, payload) => {
       sheetName = workbook.SheetNames && workbook.SheetNames[0];
     }
 
-    console.log('[CAL-CAP] Hoja seleccionada:', sheetName);
-
     if (!sheetName) {
-      sendLog(`[CAL-CAP] Excel sin hojas válidas en ${filePath}`, 'WARN');
       return { success: true, data: [] };
     }
 
     // 5. Parsear las filas de la hoja
     const worksheet = workbook.Sheets[sheetName];
     if (!worksheet || !worksheet['!ref']) {
-      console.log('[CAL-CAP] Hoja vacía o sin ref');
       return { success: true, data: [] };
     }
     const allData = xlsx.utils.sheet_to_json(worksheet, { header: 1, raw: false, defval: '' });
-    console.log('[CAL-CAP] allData tiene', allData.length, 'filas.');
 
     // 📦495-fix — Detección robusta de la fila de header.
-    // Las hojas de capacitación tienen hasta 5-6 filas de "encabezado visual"
-    // (logo, código, versión) antes del header real de la tabla. Buscamos en
-    // las primeras 20 filas cuál contiene los nombres de columna que
-    // esperamos, y usamos ESA fila como header (los datos arrancan en la
-    // siguiente).
     const HEADER_HINTS = {
       colNombre: ['nombre', 'capacitacion', 'capacitación', 'tema', 'descripcion', 'descripción'],
       colFecha:  ['fecha', 'date', 'programada', 'f. programada', 'f.programada'],
@@ -4514,7 +4481,6 @@ ipcMain.handle('capacitaciones:get-events', async (event, payload) => {
     for (let i = 0; i < Math.min(20, allData.length); i++) {
       const row = allData[i];
       if (!Array.isArray(row)) continue;
-      // Calcular matches por fila
       let foundNombre = -1, foundFecha = -1, foundEstado = -1;
       for (let j = 0; j < row.length; j++) {
         const cell = String(row[j] || '').toLowerCase().trim();
@@ -4523,7 +4489,6 @@ ipcMain.handle('capacitaciones:get-events', async (event, payload) => {
         if (foundFecha < 0 && HEADER_HINTS.colFecha.some(h => cell.includes(h))) foundFecha = j;
         if (foundEstado < 0 && HEADER_HINTS.colEstado.some(h => cell.includes(h))) foundEstado = j;
       }
-      // Si esta fila tiene AL MENOS 2 de los 3 esperados con confianza, es la header row
       const matches = [foundNombre, foundFecha, foundEstado].filter(v => v >= 0).length;
       if (matches >= 2) {
         headerRowIdx = i;
@@ -4534,25 +4499,18 @@ ipcMain.handle('capacitaciones:get-events', async (event, payload) => {
       }
     }
 
-    // Si no encontramos header confiado, usar defaults razonables y header row 5
     if (headerRowIdx < 0) {
       headerRowIdx = 5;
       colNombre = colNombre >= 0 ? colNombre : 1;
       colFecha  = colFecha  >= 0 ? colFecha  : 3;
       colEstado = colEstado >= 0 ? colEstado : 8;
-      console.log('[CAL-CAP] No se detectó header; usando defaults. headerRowIdx=', headerRowIdx);
     } else {
-      // Si nos faltó uno de los 3, completar con defaults razonables
       if (colNombre < 0) colNombre = 1;
       if (colFecha  < 0) colFecha  = 3;
       if (colEstado < 0) colEstado = 8;
     }
 
-    console.log('[CAL-CAP] headerRowIdx=', headerRowIdx, 'colNombre=', colNombre, 'colFecha=', colFecha, 'colEstado=', colEstado);
-    console.log('[CAL-CAP] Header row contenido:', JSON.stringify(allData[headerRowIdx]));
-
-    const dataRows = allData.slice(headerRowIdx + 1); // datos arrancan en headerRowIdx + 1
-    console.log('[CAL-CAP] dataRows tiene', dataRows.length, 'filas para parsear');
+    const dataRows = allData.slice(headerRowIdx + 1);
 
     // 6. Mapear las filas válidas a eventos
     const events = [];
@@ -4573,7 +4531,6 @@ ipcMain.handle('capacitaciones:get-events', async (event, payload) => {
       if (nombre.toLowerCase().includes('nombre de la')) { skippedNoNombre++; continue; }
       if (nombre.toLowerCase().includes('total capacitaciones')) break;
 
-      // Parsear fecha — soporta seriales Excel (números) y strings d/m/Y o Y-m-d
       let fechaProgramada = null;
       const fechaValue = getCell(row[colFecha]);
       if (fechaValue) {
@@ -4598,34 +4555,85 @@ ipcMain.handle('capacitaciones:get-events', async (event, payload) => {
         }
       }
 
-      // Solo eventos con fecha (los que tienen "No especificada" no aparecen en el calendario)
       if (!fechaProgramada) { skippedNoFecha++; continue; }
-
-      // 📦495-fix — NO filtramos por rango start/end acá.
-      // El calendar-component ya filtra por mes visible en el frontend.
-      // Devolvemos TODAS las capacitaciones de la empresa (típicamente 10-25)
-      // para que aparezcan en el calendario al navegar entre meses, sin tener
-      // que re-pegarle al backend cada vez que cambia el rango visible.
-      // Si más adelante se vuelve un tema de performance (cientos de caps),
-      // se puede reactivar el filtro o paginar.
 
       const estadoRaw = String(getCell(row[colEstado]) || '').trim();
       const estado = estadoRaw || 'Pendiente';
 
       events.push({
-        id: 'cap-' + String(i + 1) + '-' + nombre.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 40),
+        // 📦543 — Prefijar id con companyKey para que cuando se mezclan
+        // empresas en scope='all' no haya colisiones de id.
+        id: 'cap-' + currentCompany + '-' + String(i + 1) + '-' + nombre.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 40),
         title: nombre,
         date: fechaProgramada,
         start: null,
         end: null,
         type: 'capacitacion',
-        estado
+        estado,
+        // 📦543 — Incluir empresa en el evento para que la UI pueda mostrarlo
+        // o agruparlo cuando se ven todas las empresas.
+        empresa: currentCompany
       });
     }
 
-    console.log(`[CAL-CAP] RESULTADO: ${events.length} eventos (TODOS, sin filtrar por rango). Skippeados: ${skippedNoNombre} sin nombre, ${skippedNoFecha} sin fecha`);
     sendLog(`[CAL-CAP] ${events.length} eventos de capacitaciones para ${currentCompany}`, 'INFO');
     return { success: true, data: events };
+  } catch (err) {
+    console.error('[CAL-CAP] ERROR inesperado:', err.message);
+    return { success: true, data: [] };
+  }
+}
+
+// 📦543 — Handler IPC del calendario. Soporta scope='all' para mostrar
+// capacitaciones de TODAS las empresas (usado por el toggle "Todas las
+// empresas" del calendario). Para una sola empresa, llama al helper.
+ipcMain.handle('capacitaciones:get-events', async (event, payload) => {
+  console.log('[CAL-CAP] === INICIO get-events ===');
+  console.log('[CAL-CAP] payload recibido:', JSON.stringify(payload));
+
+  try {
+    // Acepta tanto un objeto {range} como un objeto directo {start, end, currentCompany}
+    const { start, end, currentCompany } = payload && typeof payload === 'object'
+      ? payload
+      : { start: (payload && payload.start), end: (payload && payload.end), currentCompany: null };
+
+    console.log('[CAL-CAP] start=', start, 'end=', end, 'currentCompany=', currentCompany);
+
+    // Si hay empresa valida (no null ni 'default_company'), leer solo de ella
+    if (currentCompany && currentCompany !== 'default_company') {
+      return _leerCapacitacionesDeEmpresa(currentCompany, start, end);
+    }
+
+    // 📦543 — Sin empresa actual: si el scope es 'all', leer de TODAS las
+    // empresas del config. Si no, devolver [] (comportamiento original).
+    const scope = (payload && payload.scope) || 'company';
+    if (scope !== 'all') {
+      console.log('[CAL-CAP] WARN: Sin empresa actual, devolviendo []');
+      sendLog('[CAL-CAP] Sin empresa actual, devolviendo []', 'WARN');
+      return { success: true, data: [] };
+    }
+
+    // Scope='all' → iterar todas las empresas del config
+    let config;
+    try {
+      const configRaw = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+      config = JSON.parse(configRaw);
+    } catch (err) {
+      console.log('[CAL-CAP] ERROR leyendo config para scope=all:', err.message);
+      return { success: true, data: [] };
+    }
+    const allCompanies = Object.keys((config && config.companyPaths) || {});
+    console.log('[CAL-CAP] scope=all → iterando', allCompanies.length, 'empresas:', allCompanies.join(', '));
+
+    const allEvents = [];
+    for (const company of allCompanies) {
+      const result = await _leerCapacitacionesDeEmpresa(company, start, end);
+      if (result && result.success && Array.isArray(result.data)) {
+        allEvents.push.apply(allEvents, result.data);
+      }
+    }
+    sendLog(`[CAL-CAP] scope=all: ${allEvents.length} eventos totales de ${allCompanies.length} empresas`, 'INFO');
+    return { success: true, data: allEvents };
   } catch (err) {
     console.error('[CAL-CAP] ERROR inesperado:', err.message);
     sendLog(`[CAL-CAP] Error inesperado: ${err.message}`, 'ERROR');

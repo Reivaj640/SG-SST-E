@@ -97,30 +97,39 @@
   }
 
   // ── list ──────────────────────────────────────────────────────────────
-  // range = { start: 'YYYY-MM-DD', end: 'YYYY-MM-DD' }
+  // range = { start: 'YYYY-MM-DD', end: 'YYYY-MM-DD', scope: 'company' | 'all' }
+  // scope (📦543):
+  //   - 'company' (default): fuentes por empresa reciben currentCompany = empresa actual
+  //   - 'all'               : fuentes por empresa reciben currentCompany = null
+  //                          y devuelven eventos de TODAS las empresas
   async function list(range) {
     var api = (global.electronAPI) || {};
     var currentCompany = (global.currentCompany && global.currentCompany !== 'default_company')
       ? global.currentCompany
       : null;
+    // 📦543 — Si el scope es 'all', pasar null a las fuentes por empresa para
+    // que el backend devuelva eventos de TODAS las empresas. Las fuentes
+    // globales (recordatorios, plan de trabajo) siempre se incluyen.
+    var scope = (range && range.scope) || 'company';
+    var companyForBackend = (scope === 'all') ? null : currentCompany;
     // 📦495 — Pasar currentCompany al backend de capacitaciones para que sepa
     // cuál Excel leer (el calendario es global pero las capacitaciones son
     // por empresa).
-    var capPayload = Object.assign({}, range || {}, { currentCompany: currentCompany });
+    var capPayload = Object.assign({}, range || {}, { currentCompany: companyForBackend });
     // 📦497 — Pasar currentCompany al backend de gestaciones (BD por empresa).
-    var gestPayload = Object.assign({}, range || {}, { currentCompany: currentCompany });
+    var gestPayload = Object.assign({}, range || {}, { currentCompany: companyForBackend });
     // 📦498 — Cumplimientos: por empresa, sin rango (es estado persistente)
-    var cumPayload = { empresaId: currentCompany };
+    var cumPayload = { empresaId: companyForBackend };
     // 📦506 — Inspecciones planificadas: por empresa + rango ampliado al año completo.
     // El handler genera 1 evento por actividad por mes (round-robin entre los
     // primeros 5 días hábiles). Ampliamos el rango a año completo para que el
     // KairCalendar tenga los eventos de todos los meses en memoria al navegar.
     var inspRange = _expandRangeToFullYear(range);
-    var inspPayload = Object.assign({}, inspRange, { currentCompany: currentCompany });
+    var inspPayload = Object.assign({}, inspRange, { currentCompany: companyForBackend });
     // 📦509 — Mantenimientos programados: misma lógica de rango anual. Solo MPP
     // (pendientes). Distribución en días hábiles de las semanas 2 y 3 del mes.
     var mantRange = _expandRangeToFullYear(range);
-    var mantPayload = Object.assign({}, mantRange, { currentCompany: currentCompany });
+    var mantPayload = Object.assign({}, mantRange, { currentCompany: companyForBackend });
     // 📦522 — Recordatorio COPASST: no necesita currentCompany (es global).
     // BUG-FIX: usar rango anual (mismo truco que inspecciones/mantenimientos)
     // porque el KairCalendar NO recarga eventos al navegar de mes — si pasáramos

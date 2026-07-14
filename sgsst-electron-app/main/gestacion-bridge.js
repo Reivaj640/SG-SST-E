@@ -1317,18 +1317,21 @@ function registerGestacionHandlers(app, deps) {
     //   alto riesgo     → cada 15 días
     //   bajo riesgo     → cada 30 días
     //
-    // payload esperado: { currentCompany: string }
+    // payload esperado: { currentCompany: string | null, scope: 'company' | 'all' }
     // Solo incluye gestantes en estado 'activo' o 'reintegro' (excluye
     // cerrada/suspendida/licencia). Devuelve TODOS los eventos (pasados y
     // futuros) para que aparezcan al navegar entre meses en el calendario.
+    //
+    // 📦543 — Soporte para scope='all': si currentCompany es null (o no llega),
+    // devuelve eventos de TODAS las empresas. Usado cuando el usuario activa
+    // el toggle "Todas las empresas" en el calendario.
     ipcMain.handle('gestaciones:get-events', async function (event, payload) {
         try {
             var params = (payload && typeof payload === 'object') ? payload : {};
             var empresaId = params.currentCompany || (params && params.empresaId);
-            if (!empresaId || empresaId === 'default_company') {
-                return { success: true, data: [] };
-            }
-            return _handlerEventosCalendario(empresaId);
+            // null = "todas las empresas" (scope='all')
+            if (empresaId === 'default_company') empresaId = null;
+            return _handlerEventosCalendario(empresaId || null);
         } catch (e) {
             console.error('[' + MOD + '][CAL_GEST]', e.message);
             return { success: false, error: { code: 'INTERNAL', message: e.message }, data: [] };
@@ -1352,11 +1355,24 @@ function _handlerEventosCalendario(empresaId) {
     try {
         var db = _getDb();
 
+        // 📦543 — Si empresaId es null, devolver eventos de TODAS las empresas
+        // (usado por el toggle "Todas las empresas" del calendario).
+        var allCompanies = !empresaId;
         // 1) Gestantes relevantes (activo + reintegro)
-        var gestantes = db.prepare(
-            "SELECT id, nombre, cedula, estado, clasificacion, fecha_notificacion, fpp " +
-            "FROM gestaciones WHERE empresa_id = ? AND estado IN ('activo', 'reintegro')"
-        ).all(empresaId);
+        var stmtGestantes, paramsGestantes, gestantes;
+        if (allCompanies) {
+            stmtGestantes = db.prepare(
+                "SELECT id, nombre, cedula, estado, clasificacion, fecha_notificacion, fpp " +
+                "FROM gestaciones WHERE estado IN ('activo', 'reintegro')"
+            );
+            gestantes = stmtGestantes.all();
+        } else {
+            stmtGestantes = db.prepare(
+                "SELECT id, nombre, cedula, estado, clasificacion, fecha_notificacion, fpp " +
+                "FROM gestaciones WHERE empresa_id = ? AND estado IN ('activo', 'reintegro')"
+            );
+            gestantes = stmtGestantes.all(empresaId);
+        }
 
         if (gestantes.length === 0) {
             return { success: true, data: [] };
@@ -1365,18 +1381,34 @@ function _handlerEventosCalendario(empresaId) {
         // 2) Bulk query: último seguimiento (con proxima_cita) por gestante
         var ids = gestantes.map(function (g) { return g.id; });
         var placeholders = ids.map(function () { return '?'; }).join(',');
-        var stmtUltimo = db.prepare(
-            "SELECT s.gestacion_id, s.proxima_cita, s.fecha, s.periodo, s.clasificacion " +
-            "FROM seguimiento_gestacion_mensual s " +
-            "INNER JOIN (" +
-            "  SELECT gestacion_id, MAX(fecha) AS max_fecha " +
-            "  FROM seguimiento_gestacion_mensual " +
-            "  WHERE empresa_id = ? AND gestacion_id IN (" + placeholders + ") " +
-            "  GROUP BY gestacion_id" +
-            ") latest ON latest.gestacion_id = s.gestacion_id AND latest.max_fecha = s.fecha " +
-            "WHERE s.empresa_id = ?"
-        );
-        var rowsSeguimiento = stmtUltimo.all.apply(stmtUltimo, [empresaId].concat(ids).concat([empresaId]));
+        // 📦543 — Seguimientos: filtrar por empresa solo si NO es "all"
+        var stmtUltimo, rowsSeguimiento;
+        if (allCompanies) {
+            stmtUltimo = db.prepare(
+                "SELECT s.gestacion_id, s.proxima_cita, s.fecha, s.periodo, s.clasificacion " +
+                "FROM seguimiento_gestacion_mensual s " +
+                "INNER JOIN (" +
+                "  SELECT gestacion_id, MAX(fecha) AS max_fecha " +
+                "  FROM seguimiento_gestacion_mensual " +
+                "  WHERE gestacion_id IN (" + placeholders + ") " +
+                "  GROUP BY gestacion_id" +
+                ") latest ON latest.gestacion_id = s.gestacion_id AND latest.max_fecha = s.fecha"
+            );
+            rowsSeguimiento = stmtUltimo.all.apply(stmtUltimo, ids);
+        } else {
+            stmtUltimo = db.prepare(
+                "SELECT s.gestacion_id, s.proxima_cita, s.fecha, s.periodo, s.clasificacion " +
+                "FROM seguimiento_gestacion_mensual s " +
+                "INNER JOIN (" +
+                "  SELECT gestacion_id, MAX(fecha) AS max_fecha " +
+                "  FROM seguimiento_gestacion_mensual " +
+                "  WHERE empresa_id = ? AND gestacion_id IN (" + placeholders + ") " +
+                "  GROUP BY gestacion_id" +
+                ") latest ON latest.gestacion_id = s.gestacion_id AND latest.max_fecha = s.fecha " +
+                "WHERE s.empresa_id = ?"
+            );
+            rowsSeguimiento = stmtUltimo.all.apply(stmtUltimo, [empresaId].concat(ids).concat([empresaId]));
+        }
 
         var mapUltimo = {};
         rowsSeguimiento.forEach(function (r) { mapUltimo[r.gestacion_id] = r; });

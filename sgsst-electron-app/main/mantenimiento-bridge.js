@@ -1022,13 +1022,40 @@ function registerMantenimientoHandlers(app, deps) {
 	});
 
 	/* 📦509 — Devuelve los eventos del calendario para los mantenimientos
-	   PROGRAMADOS PENDIENTES (MPP). Consumido por el adapter del calendario. */
+	   PROGRAMADOS PENDIENTES (MPP). Consumido por el adapter del calendario.
+
+	   📦543 — Soporte para scope='all': si companyName es null, lee de
+	   TODAS las empresas del config y concatena los eventos. */
 	ipcMain.handle('mantenimiento:calendario:get-events', async function(_e, params) {
 		try {
 			var companyName = params && params.currentCompany;
-			var companyRoot = _getCompanyRootPath ? await _getCompanyRootPath(companyName) : null;
-			if (!companyRoot) return { success: false, error: { code: 'COMPANY_NOT_FOUND', message: 'Empresa no encontrada' } };
-			return _getCalendarEvents(companyRoot, params);
+			if (companyName) {
+				var companyRoot = _getCompanyRootPath ? await _getCompanyRootPath(companyName) : null;
+				if (!companyRoot) return { success: false, error: { code: 'COMPANY_NOT_FOUND', message: 'Empresa no encontrada' } };
+				return _getCalendarEvents(companyRoot, params);
+			}
+			// 📦543 — Scope='all' → iterar todas las empresas del config
+			var configPath = path.join(_app.getPath('userData'), 'config.json');
+			var config;
+			try {
+				var fs = require('fs');
+				var configRaw = fs.readFileSync(configPath, 'utf8');
+				config = JSON.parse(configRaw);
+			} catch (e) {
+				return { success: false, error: { code: 'CONFIG_READ_FAILED', message: e.message } };
+			}
+			var allCompanies = Object.keys((config && config.companyPaths) || {});
+			var allEvents = [];
+			for (var i = 0; i < allCompanies.length; i++) {
+				var compName = allCompanies[i];
+				var compRoot = _getCompanyRootPath ? await _getCompanyRootPath(compName) : null;
+				if (!compRoot) continue;
+				var res = _getCalendarEvents(compRoot, params);
+				if (res && res.success && Array.isArray(res.data)) {
+					allEvents.push.apply(allEvents, res.data);
+				}
+			}
+			return { success: true, data: allEvents };
 		} catch (e) {
 			return { success: false, error: { code: 'GET_EVENTS_FAILED', message: e.message } };
 		}

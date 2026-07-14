@@ -790,12 +790,75 @@ function registerInspeccionesHandlers(_appOrIpcMain, _deps) {
     catch (e) { console.error("[K+AIRSST][PROGRAM][GET][ERROR]", e); return err("GET_FAILED", e.message); }
   });
 
+  // 📦543 — Helper: lee las inspecciones planificadas de UNA empresa.
+  // Extraido del handler para poder llamarlo en loop cuando el scope es 'all'.
+  function _leerInspeccionesCalendarioDeEmpresa(currentCompany, start, end) {
+    var startDate = new Date(start + "T00:00:00");
+    var endDate = new Date(end + "T23:59:59");
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return [];
+    }
+    var events = [];
+    var cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    var endCursor = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+    while (cursor <= endCursor) {
+      var year = cursor.getFullYear();
+      var monthIdx = cursor.getMonth();
+      var monthName = MONTHS[monthIdx];
+
+      var programRes = getProgram(year, currentCompany);
+      if (programRes && programRes.success && programRes.data && programRes.data.program) {
+        var program = programRes.data.program;
+        var businessDays = getFirst5BusinessDays(year, monthIdx);
+        var activityCount = 0;
+        (program.activities || []).forEach(function (act) {
+          var schedule = act.monthlySchedule || {};
+          var mesEstado = schedule[monthName];
+          if (mesEstado !== "p" && mesEstado !== "c") return;
+          var dayIdx = activityCount % 5;
+          activityCount++;
+          var dateStr = businessDays[dayIdx];
+          var tipoLabel = INSPECTION_TYPE_LABELS[act.inspectionType] || act.inspectionType || "Inspección";
+          events.push({
+            id: "insp-prog-" + currentCompany + "-" + year + "-" + monthIdx + "-" + act.id,
+            type: "inspeccion_programada",
+            title: act.activity || tipoLabel,
+            date: dateStr,
+            start: "00:00",
+            end: "23:59",
+            color: "#174ea6",
+            source: "inspecciones",
+            // 📦543 — Empresa en el nivel top para que la UI pueda filtrar/agrupar
+            empresa: currentCompany,
+            meta: {
+              actividad: act.activity || tipoLabel,
+              tipoInspeccion: act.inspectionType,
+              tipoLabel: tipoLabel,
+              responsable: act.responsible || "",
+              actividadId: act.id,
+              mes: monthName,
+              dia: dayIdx + 1,
+              empresaId: currentCompany,
+              year: year,
+              estado: mesEstado
+            }
+          });
+        });
+      }
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+    return events;
+  }
+
   /* Devuelve los eventos del calendario para las inspecciones PLANIFICADAS
      (monthlySchedule[Mes] === "p") del programa anual de la empresa.
      Cada actividad planificada genera 5 eventos puntuales, uno por cada
      uno de los primeros 5 días hábiles (lun-vie) del mes. Filtra por rango
      y por empresa. El adapter del calendario lo consume.
-     Params: { start, end, currentCompany } (plano, NO envuelto en range). */
+     Params: { start, end, currentCompany } (plano, NO envuelto en range).
+
+     📦543 — Soporte para scope='all': si currentCompany es null, lee de
+     TODAS las empresas del config y concatena los eventos. */
   ipcMain.handle("inspeccion:programa:getEventsCalendario", async function (event, params) {
     try {
       var start = params && params.start;
@@ -805,69 +868,30 @@ function registerInspeccionesHandlers(_appOrIpcMain, _deps) {
         return err("INVALID_INPUT", "start y end son obligatorios");
       }
 
-      var startDate = new Date(start + "T00:00:00");
-      var endDate = new Date(end + "T23:59:59");
-      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-        return err("INVALID_INPUT", "start/end inválidos");
+      // Si hay empresa valida, leer solo de ella
+      if (currentCompany && currentCompany !== "default") {
+        return ok(_leerInspeccionesCalendarioDeEmpresa(currentCompany, start, end));
       }
 
-      var events = [];
-      var cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
-      var endCursor = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
-      while (cursor <= endCursor) {
-        var year = cursor.getFullYear();
-        var monthIdx = cursor.getMonth();
-        var monthName = MONTHS[monthIdx];
-
-        var programRes = getProgram(year, currentCompany);
-        if (programRes && programRes.success && programRes.data && programRes.data.program) {
-          var program = programRes.data.program;
-          var businessDays = getFirst5BusinessDays(year, monthIdx);
-          /* Round-robin: cada actividad del mes cae en UNO de los primeros 5
-             días hábiles (no 5 eventos por actividad). Esto refleja la lógica
-             del programa anual: 1 inspección por actividad por mes, sin
-             apilar 5 copias de la misma actividad en el calendario.
-             Incluimos tanto "p" (programada pendiente) como "c" (completada)
-             para que el calendario refleje la programación completa del mes
-             — ej. en enero las 4 actividades tienen marca (3P + 1C). */
-          var activityCount = 0;
-          (program.activities || []).forEach(function (act) {
-            var schedule = act.monthlySchedule || {};
-            var mesEstado = schedule[monthName];
-            if (mesEstado !== "p" && mesEstado !== "c") return;
-            var dayIdx = activityCount % 5;
-            activityCount++;
-            var dateStr = businessDays[dayIdx];
-            var tipoLabel = INSPECTION_TYPE_LABELS[act.inspectionType] || act.inspectionType || "Inspección";
-            events.push({
-              id: "insp-prog-" + currentCompany + "-" + year + "-" + monthIdx + "-" + act.id,
-              type: "inspeccion_programada",
-              title: act.activity || tipoLabel,
-              date: dateStr,
-              start: "00:00",
-              end: "23:59",
-              color: "#174ea6",
-              source: "inspecciones",
-              meta: {
-                actividad: act.activity || tipoLabel,
-                tipoInspeccion: act.inspectionType,
-                tipoLabel: tipoLabel,
-                responsable: act.responsible || "",
-                actividadId: act.id,
-                mes: monthName,
-                dia: dayIdx + 1,
-                empresaId: currentCompany,
-                year: year,
-                estado: mesEstado  /* "p" = pendiente, "c" = completada */
-              }
-            });
-          });
-        }
-
-        cursor.setMonth(cursor.getMonth() + 1);
+      // 📦543 — Scope='all' → leer de todas las empresas del config
+      var configPath = path.join(_appOrIpcMain.getPath('userData'), 'config.json');
+      var config;
+      try {
+        var fs = require('fs');
+        var configRaw = fs.readFileSync(configPath, 'utf8');
+        config = JSON.parse(configRaw);
+      } catch (e) {
+        console.log('[INSP-CAL] ERROR leyendo config:', e.message);
+        return ok([]);
       }
-
-      return ok(events);
+      var allCompanies = Object.keys((config && config.companyPaths) || {});
+      console.log('[INSP-CAL] scope=all → iterando', allCompanies.length, 'empresas');
+      var allEvents = [];
+      for (var i = 0; i < allCompanies.length; i++) {
+        var evs = _leerInspeccionesCalendarioDeEmpresa(allCompanies[i], start, end);
+        allEvents.push.apply(allEvents, evs);
+      }
+      return ok(allEvents);
     }
     catch (e) {
       console.error("[K+AIRSST][INSPECTION][CAL_EVENTS][ERROR]", e);
