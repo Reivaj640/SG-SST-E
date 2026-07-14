@@ -286,6 +286,15 @@ let isWindowCreated = false; // Variable para rastrear si la ventana ya ha sido 
 // --- Función de Logging Centralizada ---
 function sendLog(message, level = 'INFO') {
   console.log(`[${level}] ${message}`); // Log to main process console
+  // 📦547 — También escribir al archivo de log (vía electron-log) para que
+  // sea visible en C:\Users\<user>\AppData\Roaming\sgsst-electron-app\logs\main.log
+  // Sin esto, los mensajes de mi código (auto-updater, handlers, sync) NO
+  // aparecían en el archivo y solo se veían en consola de Electron.
+  if (log && typeof log[level.toLowerCase()] === 'function') {
+    log[level.toLowerCase()](`[${level}] ${message}`);
+  } else if (log && typeof log.info === 'function') {
+    log.info(`[${level}] ${message}`);
+  }
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('log-message', message, level);
   }
