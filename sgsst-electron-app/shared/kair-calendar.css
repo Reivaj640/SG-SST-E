@@ -168,7 +168,10 @@
   /* ⚠️ top explícito para evitar que flexbox del padre (align-items:center)
      centre el popover verticalmente y lo saque del viewport. */
   top: calc(100% + 6px);
-  z-index: 1050;
+  /* 📦548 — Subido a 200000 para estar ENCIMA del #app-header (100000) y del
+     panel del update (100001). Sin esto, el popover queda tapado por el header
+     y el toggle "Todas las empresas" no se ve. */
+  z-index: 200000;
   width: 920px;
   max-width: calc(100vw - 32px);
   background: var(--kair-cal-bg-card);
@@ -1148,7 +1151,10 @@
   position: fixed;
   inset: 0;
   background: rgba(26, 26, 46, 0.4);
-  z-index: 1100;
+  /* 📦548 — Subido a 200000 para estar ENCIMA del #app-header (100000) y del
+     panel del update (100001). Sin esto, el modal queda tapado por el header
+     y la mitad superior (topbar con el toggle "Todas las empresas") no se ve. */
+  z-index: 200000;
   display: flex;
   align-items: center;
   justify-content: center;
