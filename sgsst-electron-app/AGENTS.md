@@ -77,12 +77,13 @@ El usuario usa su propio formato de commits con versionado incremental. **NO usa
 ```
 
 - El emoji 📦 es literal (no es un placeholder).
-- `<numero>` es secuencial e incremental (último conocido: 399 → siguiente 400).
+- `<numero>` es secuencial e incremental (último conocido: 552 → siguiente 553 al 2026-07-15).
 - La descripción es en español, sin punto final obligatorio, tono directo (ej: "Fix y Update sistema actualizacion e iconos y accesos directos del escritorio").
 - Para work-in-progress / doc-only / refactor sin cambio funcional visible, mantener el mismo formato 📦n #.
-- Ejemplos reales del repo: `📦396 #`, `📦397 #`, `📦398 #`, `📦399 #`.
+- Ejemplos reales del repo: `📦396 #`, `📦397 #`, `📦398 #`, `📦399 #`, `📦551+552 #`.
 
 **Antes de cada commit, verificar el último `📦<n>` en `git log` para usar el siguiente número correcto.**
+- Si la sesión trabaja con Mavis (agente), **ambos pueden usar numeración** — coordinarse con `git log` antes de cada commit para no colisionar. Si ya hay un 📦547 tuyo, yo uso 📦548+ (no 📦547+548).
 - Cumplir Resolucion 0312 de 2019 (Colombia)
 
 ### Regla de Comunicación - Explicación Simple
