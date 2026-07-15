@@ -14506,13 +14506,14 @@ ipcMain.handle('get-gestion-integral-stats', async (event, companyName) => {
     const currentYear = new Date().getFullYear();
 
     // Calcular estadísticas en paralelo (incluyendo evaluación inicial)
-    const [politica, objetivos, plan_trabajo, rendicion, evaluacion_inicial, principiosAutoResultados] = await Promise.all([
+    const [politica, objetivos, plan_trabajo, rendicion, evaluacion_inicial, principiosAutoResultados, cambios] = await Promise.all([
         calculatePoliticaStats(rootPath),
         calculateObjetivosStats(rootPath),
         calculatePlanTrabajoStats(rootPath, currentYear),
         calculateRendicionCuentasStats(rootPath),
         calculateEvaluacionInicialStats(rootPath),
-        calculatePrincipiosAutoResultados(rootPath, companyName)
+        calculatePrincipiosAutoResultados(rootPath, companyName),
+        calculateCambioStats(companyName)
     ]);
 
     const stats = {
@@ -14521,7 +14522,8 @@ ipcMain.handle('get-gestion-integral-stats', async (event, companyName) => {
         plan_trabajo,
         rendicion_cuentas: rendicion,
         evaluacion_inicial,
-        principiosAutoResultados
+        principiosAutoResultados,
+        cambios
     };
 
     sendLog(`[MAIN] Estadísticas Gestión Integral calculadas: ${JSON.stringify(stats)}`, 'DEBUG');
@@ -14575,20 +14577,20 @@ async function calculatePoliticaStats(basePath) {
     }
 
     const files = await fsp.readdir(rutaFinal);
-    const politicaFiles = files.filter(f => 
+    const politicaFiles = files.filter(f =>
         f.toLowerCase().includes('politica') && (f.endsWith('.pdf') || f.endsWith('.docx') || f.endsWith('.xlsx'))
     );
 
     if (politicaFiles.length > 0) {
         stats.documento_encontrado = true;
         stats.estado = 'Disponible';
-        
+
         // Obtener fecha del archivo más reciente
         const filePath = path.join(rutaFinal, politicaFiles[0]);
         const fileStats = await fsp.stat(filePath);
         stats.fecha = fileStats.mtime;
         stats.actualizada = (Date.now() - fileStats.mtime.getTime()) < (365 * 24 * 60 * 60 * 1000); // Menos de 1 año
-        
+
         if (stats.actualizada) {
             stats.estado = 'Actualizada';
         } else {
@@ -15559,6 +15561,131 @@ async function ensureGestionCambioExcel(filePath) {
 
   await workbook.xlsx.writeFile(filePath);
   console.log(`[GestionCambio] Archivo Excel creado: ${filePath}`);
+}
+
+/**
+ * 📦XXX — Clasifica un estado de cambio en una de las 5 etapas del pipeline.
+ * Misma lógica que gestion-cambio-logic.js#renderPipeline.
+ */
+function classifyCambioPipeline(estado) {
+  const e = String(estado || '').toLowerCase().trim();
+  if (e === 'solicitud' || e === 'pendiente') return 'solicitud';
+  if (e === 'en evaluación' || e === 'en evaluacion') return 'evaluacion';
+  if (e === 'aprobado' || e === 'aprobada') return 'aprobado';
+  if (e === 'en ejecución' || e === 'en ejecucion' || e === 'en proceso') return 'ejecucion';
+  if (e === 'cerrado' || e === 'cerrada' || e === 'cancelado' || e === 'cancelada' ||
+      e === 'no aprobado' || e === 'no aprobada' || e === 'completado' || e === 'completada') return 'cerrado';
+  return 'solicitud'; // catch-all para estados vacíos o desconocidos
+}
+
+/**
+ * 📦XXX — Clasifica una fecha en un bucket de antigüedad en días.
+ * Retorna null si la fecha es inválida o vacía.
+ */
+function classifyCambioAging(fecha, hoy) {
+  if (!fecha) return null;
+  let d;
+  try {
+    d = new Date(fecha);
+    if (isNaN(d.getTime())) return null;
+  } catch (e) {
+    return null;
+  }
+  const days = Math.floor((hoy.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+  if (days < 0) return '0_15'; // fechas futuras: tratar como recientes
+  if (days <= 15) return '0_15';
+  if (days <= 30) return '16_30';
+  if (days <= 60) return '31_60';
+  return '60_plus';
+}
+
+/**
+ * 📦XXX — Agrega stats a partir de un array de cambios (función pura testeable).
+ * Devuelve { pipeline: {solicitud, evaluacion, aprobado, ejecucion, cerrado},
+ *           aging: {0_15, 16_30, 31_60, 60_plus}, total, pending }
+ * - `total` cuenta todos los cambios
+ * - `pending` cuenta los que NO están cerrados (para aging)
+ */
+function aggregateCambioStats(changes, hoy) {
+  hoy = hoy || new Date();
+  const pipeline = { solicitud: 0, evaluacion: 0, aprobado: 0, ejecucion: 0, cerrado: 0 };
+  const aging = { '0_15': 0, '16_30': 0, '31_60': 0, '60_plus': 0 };
+  let total = 0;
+  let pending = 0;
+
+  if (!Array.isArray(changes)) return { pipeline, aging, total: 0, pending: 0 };
+
+  for (const ch of changes) {
+    total++;
+    const stage = classifyCambioPipeline(ch.estado);
+    pipeline[stage]++;
+
+    if (stage !== 'cerrado') {
+      pending++;
+      const bucket = classifyCambioAging(ch.fecha, hoy);
+      if (bucket) aging[bucket]++;
+    }
+  }
+
+  return { pipeline, aging, total, pending };
+}
+
+/**
+ * 📦XXX — Calcular estadísticas agregadas de Gestión del Cambio (2.11.1).
+ * Usado por el home de Gestión Integral para renderizar 2 widgets:
+ *   - Pipeline: 5 etapas (solicitud → evaluacion → aprobado → ejecucion → cerrado)
+ *   - Aging: 4 buckets de antigüedad de los cambios PENDIENTES
+ * Retorna shape: { pipeline, aging, total, pending, disponible }
+ */
+async function calculateCambioStats(companyName) {
+  const empty = {
+    pipeline: { solicitud: 0, evaluacion: 0, aprobado: 0, ejecucion: 0, cerrado: 0 },
+    aging: { '0_15': 0, '16_30': 0, '31_60': 0, '60_plus': 0 },
+    total: 0,
+    pending: 0,
+    disponible: false
+  };
+
+  try {
+    const filePath = await obtenerRutaGestionCambio(companyName);
+    if (!filePath) {
+      return empty;
+    }
+
+    await ensureGestionCambioExcel(filePath);
+
+    if (!fs.existsSync(filePath)) {
+      return empty;
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(filePath);
+    const worksheet = workbook.getWorksheet('Cambios');
+
+    if (!worksheet || worksheet.rowCount <= 1) {
+      return { ...empty, disponible: true };
+    }
+
+    applyGestionCambioColumnKeys(worksheet);
+
+    const changes = [];
+    worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      if (rowNumber === 1) return; // Saltar header
+      const fechaCell = row.getCell('fecha').value;
+      const fechaStr = fechaCell instanceof Date
+        ? fechaCell.toISOString().split('T')[0]
+        : (typeof fechaCell === 'string' ? fechaCell : null);
+      changes.push({
+        estado: row.getCell('estado').value,
+        fecha: fechaStr
+      });
+    });
+
+    return { ...aggregateCambioStats(changes), disponible: true };
+  } catch (error) {
+    sendLog(`[MAIN] Error calculando gestión del cambio stats: ${error.message}`, 'WARN');
+    return empty;
+  }
 }
 
 /**

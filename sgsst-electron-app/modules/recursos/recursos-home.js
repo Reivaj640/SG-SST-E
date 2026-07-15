@@ -1172,7 +1172,7 @@ margin-bottom: 0.5rem;
 
         w.innerHTML = `
             <div class="kb-header">
-                <span class="kb-title">Inducciones ${currentYear}</span>
+                <span class="kb-title">Inducciones</span>
                 <span class="kb-badge ${colorClass}">${Math.round(porcentajeProgreso)}%</span>
             </div>
 
@@ -1252,7 +1252,7 @@ margin-bottom: 0.5rem;
 
         widget.innerHTML = `
             <div class="kb-header">
-                <span class="kb-title">Plan Capacitación ${currentYear}</span>
+                <span class="kb-title">Plan Capacitación</span>
                 <span class="kb-badge ${colorClass}">${porcentaje}%</span>
             </div>
 
@@ -1329,7 +1329,7 @@ margin-bottom: 0.5rem;
 
         w.innerHTML = `
             <div class="kb-header">
-                <span class="kb-title">Actas COPASST ${currentYear}</span>
+                <span class="kb-title">Actas COPASST</span>
                 <span class="kb-badge ${colorClass}">${statusText}</span>
             </div>
 
@@ -1398,7 +1398,7 @@ margin-bottom: 0.5rem;
 
         w.innerHTML = `
             <div class="kb-header">
-                <span class="kb-title">Actas Comité Convivencia ${currentYear}</span>
+                <span class="kb-title">Actas Cocola</span>
                 <span class="kb-badge ${colorClass}">${statusText}</span>
             </div>
 
@@ -1479,7 +1479,7 @@ margin-bottom: 0.5rem;
 
         w.innerHTML = `
             <div class="kb-header">
-                <span class="kb-title">Afiliación SSSI ${currentYear}</span>
+                <span class="kb-title">Afiliación SSSI</span>
                 <span class="kb-badge ${colorClass}">${statusText}</span>
             </div>
 
@@ -1610,7 +1610,7 @@ margin-bottom: 0.5rem;
         // 2. Construir HTML (ESTRUCTURA MODERNA)
         widget.innerHTML = `
             <div class="kb-header">
-                <span class="kb-title">Presupuesto ${currentYear}</span>
+                <span class="kb-title">Presupuesto</span>
                 <span class="kb-badge ${colorClass}" id="kb-badge-${Math.random()}">${limitedPct.toFixed(1)}%</span>
             </div>
 

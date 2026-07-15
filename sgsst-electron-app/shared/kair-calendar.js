@@ -477,7 +477,7 @@
           const d = parseISODate(slotStr);
           this.state.selectedDate = d;
           this.state.current = new Date(d);
-          this._cancelDayPopover();
+          this._closeDayPopover();
           var dayEvents = (this.state.events || []).filter(function (e) { return e.date === slotStr; });
           this._showDayPopover(slotStr, cellEl, dayEvents, /* expanded */ true);
         }
@@ -1003,7 +1003,7 @@
     pop.className = 'kair-cal-day-popover';
     pop.style.cssText = [
       'position: absolute',
-      'z-index: 1100',
+      'z-index: 200001',
       'background: var(--v3-bg-card, #fff)',
       'border: 1px solid var(--v3-border, #d1d5db)',
       'border-radius: 8px',
@@ -1075,6 +1075,33 @@
 
     this._els.dayPopover = pop;
     this._els.dayPopoverDate = dateStr;
+
+    // 📦546 (FIX) — Bind: clicks en botones del day popover (X, + Nuevo evento).
+    // El day popover está appendeado a document.body, NO es hijo del
+    // contenedor principal del calendario. Por eso los clicks de estos
+    // botones nunca llegan al action handler que procesa 'day-popover-close'
+    // y 'day-popover-create'. Si dejamos que se propaguen al document, el
+    // _onDocClick del calendario evalúa `e.target.closest('.kair-cal-modal-overlay')`
+    // → null (el day popover no es un modal-overlay) → `this.close()` cierra
+    // el calendario entero. Fix: bind directo con e.stopPropagation() — mismo
+    // patrón que los eventos individuales del popover (línea 1117).
+    var dayPopoverBtns = pop.querySelectorAll('[data-kair-cal-action^="day-popover-"]');
+    for (var b = 0; b < dayPopoverBtns.length; b++) {
+      (function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          e.preventDefault();
+          var action = btn.getAttribute('data-kair-cal-action');
+          if (action === 'day-popover-close') {
+            self._closeDayPopover();
+          } else if (action === 'day-popover-create') {
+            var dateStrCreate = btn.getAttribute('data-date');
+            self._closeDayPopover();
+            self._openEventModal(null, dateStrCreate, null);
+          }
+        });
+      })(dayPopoverBtns[b]);
+    }
 
     // 📦545 — Si es el popover EXPANDIDO (click), no se cierra al mover
     // el mouse fuera de la celda. Solo se cierra con X, click en otro día

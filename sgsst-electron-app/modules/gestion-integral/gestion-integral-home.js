@@ -952,6 +952,13 @@ gap: 1rem;
             estado: 'warning'
         };
         const rendicion = this.gestionIntegralStats?.rendicion_cuentas || { actas_realizadas: 0 };
+        const cambios = this.gestionIntegralStats?.cambios || {
+            pipeline: { solicitud: 0, evaluacion: 0, aprobado: 0, ejecucion: 0, cerrado: 0 },
+            aging: { '0_15': 0, '16_30': 0, '31_60': 0, '60_plus': 0 },
+            total: 0,
+            pending: 0,
+            disponible: false
+        };
         // Estructura completa de evaluación inicial con las 3 fuentes de datos
         const evaluacion_inicial = this.gestionIntegralStats?.evaluacion_inicial || {
             disponible: false,
@@ -984,11 +991,11 @@ gap: 1rem;
 
         console.log('[GestionIntegralHome] Datos Evaluación Inicial:', evaluacion_inicial);
 
-        const widget1 = this.createWidget('Política SST', politica.estado, politica.actualizada ? '✅ Al día' : '⚠️ Por actualizar');
-        const widget2 = this.createWidget('Objetivos SST', `${objetivos.cumplidos}/${objetivos.total}`, `📊 ${objetivos.porcentaje}% cumplimiento`);
+        const widget1 = this.createWidgetGestionCambioPipeline(cambios);
+        const widget2 = this.createWidgetGestionCambioAging(cambios);
         const widget3 = this.createPlanTrabajoWidget(plan_trabajo);  // ← NUEVO: Widget moderno
         const widget4 = this.createEvaluacionInicialWidget(evaluacion_inicial);  // ← NUEVO: Widget Evaluación Inicial
-        const widget5 = this.createWidget('Rendición de Cuentas', `${rendicion.actas_realizadas} actas`, rendicion.actas_realizadas > 0 ? '✅ Realizadas' : '⚠️ Sin actas');
+        const widget5 = this.createWidget('Rendición de Cuentas', `${rendicion.actas_realizadas} actas`, rendicion.actas_realizadas > 0 ? 'Realizadas' : 'Sin actas');
 
         widgetsContainer.appendChild(widget1);
         widgetsContainer.appendChild(widget2);
@@ -1051,6 +1058,155 @@ gap: 1rem;
         this.updateChartTexts(this._isMaximized ?? false);
     }
 
+    /**
+     * 📦XXX — Widget de Pipeline de Gestión del Cambio (2.11.1).
+     * Esquema: misma estructura que los otros widgets del home (k-budget-card):
+     *   header (title + badge) → amount (big number) → description → progress bar
+     *   → 2 stats al fondo (Activos | Cerrados).
+     * Click → ir al módulo 2.11.1.
+     *
+     * @param {Object} data - { pipeline: {solicitud, evaluacion, aprobado, ejecucion, cerrado}, total, pending, disponible }
+     */
+    createWidgetGestionCambioPipeline(data) {
+        const widget = document.createElement('div');
+        widget.className = 'widget k-budget-card';
+        widget.style.cursor = 'pointer';
+        widget.title = 'Ver Gestión del Cambio';
+
+        const p = data.pipeline || { solicitud: 0, evaluacion: 0, aprobado: 0, ejecucion: 0, cerrado: 0 };
+        const total = data.total || 0;
+        const cerrados = p.cerrado || 0;
+        const activos = total - cerrados;
+        const pctCerrado = total > 0 ? Math.round((cerrados / total) * 100) : 0;
+
+        // Color del bar y badge: success si hay muchos cerrados, warning si pocos
+        const colorVar = pctCerrado >= 80 ? 'var(--k-success)'
+                      : pctCerrado >= 50 ? 'var(--k-warning)'
+                      : 'var(--k-danger)';
+        const badgeCls = total === 0 ? 'bg-secondary'
+                       : activos === 0 ? 'bg-success'
+                       : 'bg-warning';
+
+        const descripcion = total === 0
+            ? 'Sin cambios registrados'
+            : `${activos} activo${activos === 1 ? '' : 's'} en pipeline`;
+
+        widget.innerHTML = `
+            <div class="kb-header">
+                <span class="kb-title">Gestión del Cambio</span>
+                <span class="kb-badge ${badgeCls}">${total}</span>
+            </div>
+            <div class="kb-amount" style="font-size: 1.4rem;">${activos} / ${total}</div>
+            <div class="kb-description">${descripcion}</div>
+            <div class="kb-progress-track">
+                <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};">
+                    <div class="kb-shimmer"></div>
+                </div>
+            </div>
+            <div class="kb-footer">
+                <div>
+                    <div class="kb-label">Activos</div>
+                    <div class="kb-value kb-exec" style="color: var(--k-success);">${activos}</div>
+                </div>
+                <div style="text-align: right;">
+                    <div class="kb-label">Cerrados</div>
+                    <div class="kb-value kb-rem" style="color: var(--k-text-muted);">${cerrados}</div>
+                </div>
+            </div>
+        `;
+
+        // Animar la barra después de mount
+        setTimeout(() => {
+            const bar = widget.querySelector('.kb-progress-bar');
+            if (bar) bar.style.width = `${pctCerrado}%`;
+        }, 100);
+
+        widget.addEventListener('click', () => {
+            if (typeof showSubmoduleContent === 'function') {
+                showSubmoduleContent(this.container, this.moduleName, '2.11.1 Gestión del Cambio');
+            }
+        });
+
+        return widget;
+    }
+
+    /**
+     * 📦XXX — Widget de Cambios Pendientes por Antigüedad (2.11.1).
+     * Esquema: misma estructura que los otros widgets del home (k-budget-card):
+     *   header (title + badge) → amount (big number) → description → progress bar
+     *   → 2 stats al fondo (Recientes | Críticos).
+     * Click → ir al módulo 2.11.1.
+     *
+     * @param {Object} data - { aging: {'0_15', '16_30', '31_60', '60_plus'}, pending, disponible }
+     */
+    createWidgetGestionCambioAging(data) {
+        const widget = document.createElement('div');
+        widget.className = 'widget k-budget-card';
+        widget.style.cursor = 'pointer';
+        widget.title = 'Ver Gestión del Cambio';
+
+        const a = data.aging || { '0_15': 0, '16_30': 0, '31_60': 0, '60_plus': 0 };
+        const pending = data.pending || 0;
+        const recientes = a['0_15'] || 0;
+        const criticos = a['60_plus'] || 0;
+        const pctCriticos = pending > 0 ? Math.round((criticos / pending) * 100) : 0;
+
+        // Color del bar: rojo si hay críticos, amarillo si hayViejos, verde si solo recientes
+        const hayViejos = (a['16_30'] || 0) + (a['31_60'] || 0) > 0;
+        const colorVar = criticos > 0 ? 'var(--k-danger)'
+                      : hayViejos  ? 'var(--k-warning)'
+                      : 'var(--k-success)';
+        const badgeCls = pending === 0 ? 'bg-secondary'
+                       : criticos > 0 ? 'bg-danger'
+                       : 'bg-warning';
+
+        const descripcion = pending === 0
+            ? 'Sin cambios pendientes'
+            : criticos > 0
+                ? `${criticos} con más de 60 días`
+                : hayViejos
+                    ? 'Hay cambios con más de 15 días'
+                    : 'Todos dentro de los primeros 15 días';
+
+        widget.innerHTML = `
+            <div class="kb-header">
+                <span class="kb-title">Cambios Pendientes</span>
+                <span class="kb-badge ${badgeCls}">${pending}</span>
+            </div>
+            <div class="kb-amount" style="font-size: 1.4rem;">${recientes} / ${pending}</div>
+            <div class="kb-description">${descripcion}</div>
+            <div class="kb-progress-track">
+                <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};">
+                    <div class="kb-shimmer"></div>
+                </div>
+            </div>
+            <div class="kb-footer">
+                <div>
+                    <div class="kb-label">Recientes</div>
+                    <div class="kb-value kb-exec" style="color: var(--k-success);">${recientes}</div>
+                </div>
+                <div style="text-align: right;">
+                    <div class="kb-label">Críticos</div>
+                    <div class="kb-value" style="color: var(--k-danger);">${criticos}</div>
+                </div>
+            </div>
+        `;
+
+        // Animar la barra después de mount
+        setTimeout(() => {
+            const bar = widget.querySelector('.kb-progress-bar');
+            if (bar) bar.style.width = `${pctCriticos}%`;
+        }, 100);
+
+        widget.addEventListener('click', () => {
+            if (typeof showSubmoduleContent === 'function') {
+                showSubmoduleContent(this.container, this.moduleName, '2.11.1 Gestión del Cambio');
+            }
+        });
+
+        return widget;
+    }
+
     createWidget(title, value, description) {
         const widget = document.createElement('div');
         widget.className = 'widget k-budget-card';
@@ -1084,7 +1240,7 @@ gap: 1rem;
 
         w.innerHTML = `
             <div class="kb-header">
-                <span class="kb-title">Plan de Trabajo ${currentYear}</span>
+                <span class="kb-title">Plan de Trabajo</span>
                 <span class="kb-badge ${colorClass}">${stats.porcentajeAvance}%</span>
             </div>
 
@@ -1140,7 +1296,7 @@ gap: 1rem;
 
         w.innerHTML = `
             <div class="kb-header">
-                <span class="kb-title">📁 Gestión Documental</span>
+                <span class="kb-title">Gestión Documental</span>
                 <span class="kb-badge ${colorClass}">${stats.porcentajeVigencia}%</span>
             </div>
 
@@ -1262,7 +1418,7 @@ gap: 1rem;
 
         w.innerHTML = `
             <div class="kb-header">
-                <span class="kb-title">📋 Evaluación Inicial</span>
+                <span class="kb-title">Evaluación Inicial</span>
                 <span class="kb-badge ${colorClass}">${cumplimiento}%</span>
             </div>
 
@@ -1404,8 +1560,8 @@ gap: 1rem;
         container.innerHTML = `
             <div class="chart-header">
                 <div>
-                    <h3 class="chart-title" id="chart-title">📈 Avance del Plan Anual SST</h3>
-                    <p class="chart-subtitle" id="chart-subtitle">Plan de Trabajo ${currentYear} • Actualizado ${this.getLastUpdatedText(stats.ultimoMesRegistrado)}</p>
+                    <h3 class="chart-title" id="chart-title">Avance del Plan Anual SST</h3>
+                    <p class="chart-subtitle" id="chart-subtitle">Plan de Trabajo • Actualizado ${this.getLastUpdatedText(stats.ultimoMesRegistrado)}</p>
                 </div>
                 <div class="chart-badge ${statusClass}" id="chart-badge">
                     <i class="bi bi-${percentage >= expectedProgress ? 'check-circle-fill' : 'exclamation-triangle-fill'}"></i>
@@ -1517,7 +1673,7 @@ gap: 1rem;
         container.innerHTML = `
             <div class="chart-header">
                 <div>
-                    <h3 class="chart-title" id="obj-chart-title">📊 Objetivos SST</h3>
+                    <h3 class="chart-title" id="obj-chart-title">Objetivos SST</h3>
                     <p class="chart-subtitle" id="obj-chart-subtitle">${objetivos.cumplidos}/${objetivos.total} cumplidos</p>
                 </div>
                 <div class="chart-badge ${statusClass}" id="obj-chart-badge">
@@ -1683,14 +1839,14 @@ gap: 1rem;
 
         if (title) {
             title.textContent = isFullscreen
-                ? '📈 Avance del Plan Anual SST'
-                : '📈 Plan Anual SST';
+                ? 'Avance del Plan Anual SST'
+                : 'Plan Anual SST';
         }
 
         if (subtitle) {
             subtitle.textContent = isFullscreen
-                ? `Plan de Trabajo ${meta.currentYear} • Actualizado ${meta.lastUpdatedText}`
-                : `Plan ${meta.currentYear} • ${meta.lastUpdatedText}`;
+                ? `Plan de Trabajo • Actualizado ${meta.lastUpdatedText}`
+                : `Plan • ${meta.lastUpdatedText}`;
         }
 
         if (badge) {
