@@ -14605,10 +14605,137 @@ async function calculatePoliticaStats(basePath) {
 }
 
 /**
+ * 📦561 — Helpers para A1: parsear meta y valor de los indicadores
+ * cuando el porcentajeReal no está disponible (manual ni auto).
+ * Permite reflejar el cumplimiento real comparando el valor numérico
+ * contra la meta textual del Excel de objetivos.
+ */
+
+// Parsear meta tipo "<1", "0", "<5", "<50", "0%", "<=10", ">=0.5"
+// Retorna { operador, valor } o null si no se puede parsear.
+function parseMetaIndicador(metaStr) {
+  if (metaStr === null || metaStr === undefined) return null;
+  var s = String(metaStr).trim();
+  if (s === '') return null;
+
+  // Quitar "%" final si está
+  s = s.replace(/%$/, '').trim();
+
+  var match;
+  if ((match = s.match(/^<=\s*([-+]?\d*\.?\d+)$/))) {
+    return { operador: 'lte', valor: parseFloat(match[1]) };
+  }
+  if ((match = s.match(/^>=\s*([-+]?\d*\.?\d+)$/))) {
+    return { operador: 'gte', valor: parseFloat(match[1]) };
+  }
+  if ((match = s.match(/^<\s*([-+]?\d*\.?\d+)$/))) {
+    return { operador: 'lt', valor: parseFloat(match[1]) };
+  }
+  if ((match = s.match(/^>\s*([-+]?\d*\.?\d+)$/))) {
+    return { operador: 'gt', valor: parseFloat(match[1]) };
+  }
+  if ((match = s.match(/^=\s*([-+]?\d*\.?\d+)$/))) {
+    return { operador: 'eq', valor: parseFloat(match[1]) };
+  }
+  if ((match = s.match(/^([-+]?\d*\.?\d+)$/))) {
+    // Sin operador = igualdad exacta
+    return { operador: 'eq', valor: parseFloat(match[1]) };
+  }
+  return null;
+}
+
+// Parsear valor tipo "0.0421", "222.2222", "0.00%", "0.00 por 100.000 trabajadores",
+// "1 mortales / 2 AT en 2026", "Tasa ausentismo promedio: 0.00%".
+// Retorna número o null si no se puede parsear.
+function parseValorIndicador(valorStr) {
+  if (valorStr === null || valorStr === undefined) return null;
+  var s = String(valorStr).trim();
+  if (s === '' || s === 'NaN' || s === 'Infinity' || s === '-Infinity') return null;
+
+  // Buscar el primer número con signo opcional y decimales.
+  // Soporta formatos: "0.0421", "0.00%", "0.00 por 100.000", "1.5 AT", "-3.2"
+  var match = s.match(/-?\d+(?:\.\d+)?/);
+  if (!match) return null;
+  var num = parseFloat(match[0]);
+  if (isNaN(num)) return null;
+  return num;
+}
+
+// Evaluar cumplimiento de un valor numérico contra una meta textual.
+// Retorna { cumple, porcentajeReal }.
+//   - "cumple": true si el valor satisface la meta
+//   - "porcentajeReal": 0-100 (escala inversa para metas con "<")
+function evaluarCumplimientoPorMeta(valorNum, metaStr) {
+  if (typeof valorNum !== 'number' || isNaN(valorNum)) {
+    return { cumple: false, porcentajeReal: 0, razon: 'valor no numérico' };
+  }
+  var meta = parseMetaIndicador(metaStr);
+  if (!meta) {
+    return { cumple: false, porcentajeReal: 0, razon: 'meta no parseable' };
+  }
+
+  // lt: meta dice "el valor debe ser MENOR a X" (ej: IF < 1)
+  //   - Si valor < X: cumple. Escala inversa: 0 → 100%, X → 70% (umbral), >X → 0%
+  //   - Si valor === X: límite. Devuelve 70% (justo en el umbral).
+  //   - Si valor > X: no cumple.
+  if (meta.operador === 'lt') {
+    if (meta.valor === 0) {
+      // Meta "<0" no tiene sentido; tratar como igualdad
+      var eqC = valorNum === 0;
+      return { cumple: eqC, porcentajeReal: eqC ? 100 : 0 };
+    }
+    if (valorNum <= meta.valor) {
+      // Escala inversa: mientras más bajo mejor
+      // valor=0 → 100%, valor=meta → 70%
+      var ratio = 1 - (valorNum / meta.valor);
+      var pct = Math.round(ratio * 100);
+      // Asegurar que valor=meta da 0% (no 70, ya que está justo en el límite)
+      // y que valores por debajo de meta dan entre 70% y 100%
+      if (valorNum === meta.valor) {
+        return { cumple: true, porcentajeReal: 0 }; // Justo en meta, no cuenta como cumplimiento
+      }
+      // Mapear: valor=0 → 100, valor=meta → 0
+      return { cumple: true, porcentajeReal: Math.max(0, Math.min(100, pct)) };
+    }
+    return { cumple: false, porcentajeReal: 0 };
+  }
+
+  // lte: menor o igual
+  if (meta.operador === 'lte') {
+    var okLte = valorNum <= meta.valor;
+    return { cumple: okLte, porcentajeReal: okLte ? 100 : 0 };
+  }
+
+  // gt: mayor
+  if (meta.operador === 'gt') {
+    var okGt = valorNum > meta.valor;
+    return { cumple: okGt, porcentajeReal: okGt ? 100 : 0 };
+  }
+
+  // gte: mayor o igual
+  if (meta.operador === 'gte') {
+    var okGte = valorNum >= meta.valor;
+    return { cumple: okGte, porcentajeReal: okGte ? 100 : 0 };
+  }
+
+  // eq: igualdad exacta
+  if (meta.operador === 'eq') {
+    var okEq = valorNum === meta.valor;
+    return { cumple: okEq, porcentajeReal: okEq ? 100 : 0 };
+  }
+
+  return { cumple: false, porcentajeReal: 0, razon: 'operador desconocido' };
+}
+
+/**
  * Calcular estadísticas de Objetivos SST
  * 📦560 — Reescrito: usa resultados manuales (JSON) + auto-resultados por keyword,
  * en vez de buscar la palabra "cumplido" en una columna. Misma estructura de retorno
  * (más `nombre` en cada principio) para compatibilidad con el widget del home.
+ *
+ * 📦561 — A1: fallback cuando no hay porcentajeReal: parsear el valor del resultado
+ * (texto como "IF promedio: 0.0421") y compararlo con la meta del Excel (como "<1")
+ * usando los helpers parseValorIndicador/parseMetaIndicador/evaluarCumplimientoPorMeta.
  */
 async function calculateObjetivosStats(basePath, companyName) {
   const UMBRAL_CUMPLIMIENTO = 70; // >= 70% se considera cumplido
@@ -14826,18 +14953,37 @@ async function calculateObjetivosStats(basePath, companyName) {
 
         // Buscar resultado manual por groupIdx-indicatorIdx
         var manual = resultadosManuales[compKey];
+        var autoMatch = null;
         var porcentajeReal = null;
         var fuente = null;
+        var valorTextoDisponible = null; // 📦561 — texto del valor para parsear en A1 fallback
 
         if (manual && typeof manual.porcentajeReal === 'number' && manual.porcentajeReal > 0) {
           porcentajeReal = manual.porcentajeReal;
           fuente = 'manual';
+          valorTextoDisponible = manual.resultado || null;
         } else {
           // Fallback: auto-resultado por keyword
-          var autoMatch = matchAutoResultado((ind.objective || '') + ' ' + (ind.indicator || ''), autoResultados);
+          autoMatch = matchAutoResultado((ind.objective || '') + ' ' + (ind.indicator || ''), autoResultados);
           if (autoMatch) {
             porcentajeReal = autoMatch.porcentajeReal;
             fuente = 'auto';
+            valorTextoDisponible = autoMatch.resultado || null;
+          }
+        }
+
+        // 📦561 — A1: si porcentajeReal sigue siendo null o 0, intentar parsear
+        // el valor (de manual o auto) contra la meta del Excel del indicador.
+        // Esto permite que indicadores como "Frecuencia de accidentalidad" con
+        // valor 0.0421 y meta "<1" cuenten como cumplidos automáticamente.
+        if ((porcentajeReal === null || porcentajeReal === 0) && valorTextoDisponible && ind.goal) {
+          var valorNum = parseValorIndicador(valorTextoDisponible);
+          if (valorNum !== null) {
+            var evalRes = evaluarCumplimientoPorMeta(valorNum, ind.goal);
+            if (evalRes.porcentajeReal > 0) {
+              porcentajeReal = evalRes.porcentajeReal;
+              fuente = fuente ? fuente + '+meta' : 'meta';
+            }
           }
         }
 
