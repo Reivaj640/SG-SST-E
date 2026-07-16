@@ -1030,8 +1030,9 @@ gap: 1rem;
         chartsGrid.appendChild(chartContainer);
 
         // === GRÁFICA DE OBJETIVOS SST POR PRINCIPIO ===
-        const principiosAutoResultados = this.gestionIntegralStats?.principiosAutoResultados || null;
-        const objetivosChartContainer = this.createObjetivosChart(objetivos, principiosAutoResultados);
+        // 📦562 — createObjetivosChart ya no necesita principiosAutoResultados
+        // (la barra "Indicadores (%)" se eliminó — era de otro sistema y confundía).
+        const objetivosChartContainer = this.createObjetivosChart(objetivos);
         chartsGrid.appendChild(objetivosChartContainer);
 
         container.appendChild(chartsGrid);
@@ -1653,18 +1654,26 @@ gap: 1rem;
     }
 
     /**
-     * Crea la gráfica de barras horizontales para Objetivos SST por principio
+     * 📦562 — Crea la gráfica de Objetivos SST por principio.
+     * Stacked horizontal bar 100% con:
+     *   - Labels con nombres reales de los principios (Prevención, etc.)
+     *   - Color por rango (verde >=70%, amarillo >=40%, rojo <40%)
+     *   - Número grande adentro de cada barra
+     *   - Tooltip con X/Y cumplidos + principio
+     *   - Tarjeta clickeable → abre el submódulo "2.2.1 Objetivos SST"
      */
-    createObjetivosChart(objetivos, principiosAutoResultados) {
+    createObjetivosChart(objetivos) {
         const porPrincipio = objetivos.porPrincipio || {
-            1: { total: 0, cumplidos: 0, porcentaje: 0 },
-            2: { total: 0, cumplidos: 0, porcentaje: 0 },
-            3: { total: 0, cumplidos: 0, porcentaje: 0 },
-            4: { total: 0, cumplidos: 0, porcentaje: 0 }
+            1: { nombre: 'Prevención', total: 0, cumplidos: 0, porcentaje: 0 },
+            2: { nombre: 'Requisitos Legales', total: 0, cumplidos: 0, porcentaje: 0 },
+            3: { nombre: 'Satisfacción Cliente', total: 0, cumplidos: 0, porcentaje: 0 },
+            4: { nombre: 'Recursos y Mejora', total: 0, cumplidos: 0, porcentaje: 0 }
         };
 
         const container = document.createElement('div');
-        container.className = 'chart-container';
+        container.className = 'chart-container objetivos-chart-clickable';
+        container.style.cursor = 'pointer';
+        container.title = 'Click para ver el submódulo de Objetivos SST';
 
         const statusClass = objetivos.porcentaje >= 70 ? 'chart-badge-success'
             : objetivos.porcentaje >= 40 ? 'chart-badge-warning'
@@ -1674,7 +1683,7 @@ gap: 1rem;
             <div class="chart-header">
                 <div>
                     <h3 class="chart-title" id="obj-chart-title">Objetivos SST</h3>
-                    <p class="chart-subtitle" id="obj-chart-subtitle">${objetivos.cumplidos}/${objetivos.total} cumplidos</p>
+                    <p class="chart-subtitle" id="obj-chart-subtitle">${objetivos.cumplidos}/${objetivos.total} indicadores cumplen (${objetivos.porcentaje}%)</p>
                 </div>
                 <div class="chart-badge ${statusClass}" id="obj-chart-badge">
                     <i class="bi bi-${objetivos.porcentaje >= 70 ? 'check-circle-fill' : 'exclamation-triangle-fill'}"></i>
@@ -1686,6 +1695,13 @@ gap: 1rem;
             </div>
         `;
 
+        // 📦562 — Click → abrir el submódulo de Objetivos SST
+        container.addEventListener('click', () => {
+            if (typeof showSubmoduleContent === 'function') {
+                showSubmoduleContent(this.container, this.moduleName, '2.2.1 Objetivos SST');
+            }
+        });
+
         // Guardar textos para switching fullscreen
         this._objChartMeta = {
             total: objetivos.total,
@@ -1695,16 +1711,18 @@ gap: 1rem;
 
         // Renderizar Chart.js después de insertar en DOM
         setTimeout(() => {
-            this._renderObjetivosBarChart(porPrincipio, objetivos, principiosAutoResultados);
+            this._renderObjetivosBarChart(porPrincipio, objetivos);
         }, 100);
 
         return container;
     }
 
     /**
-     * Renderiza la gráfica de barras horizontales con Chart.js
+     * 📦562 — Renderiza stacked horizontal bar 100% con colores por rango.
+     * Sin leyenda (solo 2 series: Cumplidos/Pendientes, autoexplicativo).
+     * Plugin custom dibuja el número grande ("5/6 (83%)") adentro de cada barra.
      */
-    _renderObjetivosBarChart(porPrincipio, objetivos, principiosAutoResultados) {
+    _renderObjetivosBarChart(porPrincipio, objetivos) {
         if (typeof Chart === 'undefined') return;
         const canvas = document.getElementById('objetivosChart');
         if (!canvas) return;
@@ -1712,56 +1730,98 @@ gap: 1rem;
         const existingChart = Chart.getChart(canvas);
         if (existingChart) existingChart.destroy();
 
-        const labels = ['Principio 1', 'Principio 2', 'Principio 3', 'Principio 4'];
-        const cumplidos = [1, 2, 3, 4].map(pid => porPrincipio[pid].cumplidos);
-        const pendientes = [1, 2, 3, 4].map(pid => porPrincipio[pid].total - porPrincipio[pid].cumplidos);
-
-        // Auto-resultados: promedio de avance por principio (0-100)
-        const autoAvance = [1, 2, 3, 4].map(pid => {
-            if (principiosAutoResultados && principiosAutoResultados[pid]) {
-                return principiosAutoResultados[pid].porcentajePromedio || 0;
-            }
-            return 0;
+        // Labels: nombre real del principio (Prevención, Requisitos Legales, etc.)
+        const labels = [1, 2, 3, 4].map(pid => {
+            const p = porPrincipio[pid];
+            return (p && p.nombre) ? p.nombre : `Principio ${pid}`;
         });
 
-        const hasAutoData = autoAvance.some(v => v > 0);
+        // % de cumplimiento por principio (0-100)
+        const cumplidosPct = [1, 2, 3, 4].map(pid => {
+            const p = porPrincipio[pid];
+            if (!p || p.total === 0) return 0;
+            return Math.round((p.cumplidos / p.total) * 100);
+        });
+
+        // % pendiente = 100 - % cumplido
+        const pendientesPct = cumplidosPct.map(pct => 100 - pct);
+
+        // Color por rango: verde >=70, amarillo >=40, rojo <40
+        const colorPorRango = (pct) => {
+            if (pct >= 70) return 'rgba(40, 167, 69, 0.85)';  // Verde
+            if (pct >= 40) return 'rgba(255, 193, 7, 0.85)';   // Amarillo
+            return 'rgba(220, 53, 69, 0.85)';                  // Rojo
+        };
+        const colorsCumplidos = cumplidosPct.map(colorPorRango);
 
         const datasets = [
             {
                 label: 'Cumplidos',
-                data: cumplidos,
-                backgroundColor: 'rgba(23, 78, 166, 0.8)',
-                borderColor: '#174ea6',
+                data: cumplidosPct,
+                backgroundColor: colorsCumplidos,
+                borderColor: colorsCumplidos.map(c => c.replace('0.85', '1')),
                 borderWidth: 1,
-                borderRadius: 3,
-                stack: 'objetivos'
+                borderRadius: 4,
+                barPercentage: 0.7,
+                categoryPercentage: 0.8
             },
             {
                 label: 'Pendientes',
-                data: pendientes,
-                backgroundColor: 'rgba(200, 200, 200, 0.4)',
-                borderColor: '#c8c8c8',
+                data: pendientesPct,
+                backgroundColor: 'rgba(200, 200, 200, 0.35)',
+                borderColor: 'rgba(200, 200, 200, 0.6)',
                 borderWidth: 1,
-                borderRadius: 3,
-                stack: 'objetivos'
+                borderRadius: 4,
+                barPercentage: 0.7,
+                categoryPercentage: 0.8
             }
         ];
 
-        if (hasAutoData) {
-            datasets.push({
-                label: 'Indicadores (%)',
-                data: autoAvance,
-                backgroundColor: 'rgba(40, 167, 69, 0.7)',
-                borderColor: '#28a745',
-                borderWidth: 1,
-                borderRadius: 3,
-                stack: 'indicadores'
-            });
-        }
+        // Plugin custom: dibuja el texto "5/6 (83%)" en el centro de la parte verde
+        const numberLabelPlugin = {
+            id: 'kairNumberLabel',
+            afterDatasetsDraw(chart) {
+                try {
+                    const ctx2 = chart.ctx;
+                    const xScale = chart.scales.x;
+                    const yScale = chart.scales.y;
+                    ctx2.save();
+                    ctx2.font = '600 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                    ctx2.textAlign = 'center';
+                    ctx2.textBaseline = 'middle';
+
+                    const meta0 = chart.getDatasetMeta(0); // Cumplidos
+                    for (let i = 0; i < meta0.data.length; i++) {
+                        const p = porPrincipio[i + 1];
+                        if (!p) continue;
+                        const pct = cumplidosPct[i];
+                        if (pct === 0) continue;
+                        const bar = meta0.data[i];
+                        // bar.x es el borde derecho de la barra verde
+                        const centerX = (bar.x - (xScale.getPixelForValue(0))) / 2 + xScale.getPixelForValue(0);
+                        const yPos = bar.y;
+                        const text = `${p.cumplidos}/${p.total} (${p.porcentaje}%)`;
+                        // Si la barra es muy chica (< 20%), poner texto afuera a la derecha
+                        if (pct < 20) {
+                            ctx2.fillStyle = '#333';
+                            ctx2.textAlign = 'left';
+                            ctx2.fillText(text, bar.x + 8, yPos);
+                        } else {
+                            ctx2.fillStyle = '#fff';
+                            ctx2.fillText(text, centerX, yPos);
+                        }
+                    }
+                    ctx2.restore();
+                } catch (e) {
+                    // No hacer nada si el plugin falla (no es crítico)
+                }
+            }
+        };
 
         new Chart(canvas, {
             type: 'bar',
             data: { labels, datasets },
+            plugins: [numberLabelPlugin],
             options: {
                 indexAxis: 'y',
                 responsive: true,
@@ -1770,45 +1830,42 @@ gap: 1rem;
                     x: {
                         stacked: true,
                         beginAtZero: true,
-                        ticks: { stepSize: 1, precision: 0, font: { size: 11 } },
-                        grid: { display: false },
-                        title: { display: true, text: hasAutoData ? 'Cantidad / % Avance' : 'Cantidad', font: { size: 10 } }
+                        max: 100,
+                        ticks: {
+                            stepSize: 25,
+                            font: { size: 11 },
+                            callback: (v) => v + '%'
+                        },
+                        grid: { color: 'rgba(0,0,0,0.05)' },
+                        title: { display: true, text: '% Cumplimiento', font: { size: 10 } }
                     },
                     y: {
                         stacked: true,
-                        ticks: { font: { size: 11, weight: '500' } },
+                        ticks: { font: { size: 12, weight: '500' } },
                         grid: { display: false }
                     }
                 },
                 plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: { padding: 15, usePointStyle: true, pointStyle: 'rectRounded', font: { size: 11 } }
-                    },
+                    legend: { display: false },
                     tooltip: {
+                        backgroundColor: 'rgba(0,0,0,0.85)',
+                        padding: 12,
+                        cornerRadius: 6,
+                        titleFont: { size: 13, weight: '600' },
+                        bodyFont: { size: 12 },
                         callbacks: {
+                            title: (items) => {
+                                const pid = items[0].dataIndex + 1;
+                                const p = porPrincipio[pid];
+                                return p.nombre || `Principio ${pid}`;
+                            },
                             label: (ctx) => {
                                 const pid = ctx.dataIndex + 1;
                                 const p = porPrincipio[pid];
-                                if (ctx.dataset.label === 'Indicadores (%)') {
-                                    const auto = principiosAutoResultados?.[pid];
-                                    const total = auto?.totalKeywords || 0;
-                                    return ` Indicadores: ${ctx.raw}% promedio (${total} indicadores)`;
+                                if (ctx.dataset.label === 'Cumplidos') {
+                                    return ` ${p.cumplidos} de ${p.total} indicadores cumplen (${p.porcentaje}%)`;
                                 }
-                                return ` ${ctx.dataset.label}: ${ctx.raw} (${p.total > 0 ? Math.round((ctx.raw / p.total) * 100) : 0}%)`;
-                            },
-                            afterBody: (tooltipItems) => {
-                                const pid = tooltipItems[0].dataIndex + 1;
-                                const p = porPrincipio[pid];
-                                const lines = [`Total: ${p.cumplidos}/${p.total} (${p.porcentaje}%)`];
-                                if (hasAutoData && principiosAutoResultados?.[pid]) {
-                                    const auto = principiosAutoResultados[pid];
-                                    const kws = Object.keys(auto.keywords || {}).slice(0, 5);
-                                    if (kws.length > 0) {
-                                        lines.push(`Indicadores: ${kws.join(', ')}${auto.totalKeywords > 5 ? '...' : ''}`);
-                                    }
-                                }
-                                return lines;
+                                return ` ${p.total - p.cumplidos} pendientes (${100 - p.porcentaje}%)`;
                             }
                         }
                     }

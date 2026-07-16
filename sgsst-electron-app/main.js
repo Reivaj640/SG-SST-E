@@ -6379,6 +6379,11 @@ async function calculateAutoResultados(companyName) {
             let metaObjetivo = null;
             let metaSeveridadObjetivo = null;
             let metaMortalidadObjetivo = null;
+            // 📦562 — metas adicionales para que ausentismo/prevalencia/incidencia
+            // también calculen porcentajeReal (antes quedaban en 0)
+            let metaAusentismoObjetivo = null;
+            let metaPrevalenciaObjetivo = null;
+            let metaIncidenciaObjetivo = null;
             try {
               const giDir = path.join(rootPath, '2. Gestión Integral del SG-SST');
               if (fs.existsSync(giDir)) {
@@ -6419,7 +6424,32 @@ async function calculateAutoResultados(companyName) {
                             sendLog(`[AUTO-RESULTADOS] Meta Objetivos SST (Mortalidad): ${metaRaw} → ${metaMortalidadObjetivo}`, 'INFO');
                           }
                         }
-                        if (metaObjetivo && metaSeveridadObjetivo && metaMortalidadObjetivo) break;
+                        // 📦562 — Lectura de metas adicionales (ausentismo, prevalencia, incidencia)
+                        if (colC.indexOf('ausentismo') >= 0) {
+                          const metaRaw = String(objRows[r][4] || '').trim();
+                          const match = metaRaw.match(/[\d.]+/);
+                          if (match) {
+                            metaAusentismoObjetivo = parseFloat(match[0]);
+                            sendLog(`[AUTO-RESULTADOS] Meta Objetivos SST (Ausentismo): ${metaRaw} → ${metaAusentismoObjetivo}`, 'INFO');
+                          }
+                        }
+                        if (colC.indexOf('prevalencia') >= 0 && colC.indexOf('enfermedad') >= 0) {
+                          const metaRaw = String(objRows[r][4] || '').trim();
+                          const match = metaRaw.match(/[\d.]+/);
+                          if (match) {
+                            metaPrevalenciaObjetivo = parseFloat(match[0]);
+                            sendLog(`[AUTO-RESULTADOS] Meta Objetivos SST (Prevalencia): ${metaRaw} → ${metaPrevalenciaObjetivo}`, 'INFO');
+                          }
+                        }
+                        if (colC.indexOf('incidencia') >= 0 && colC.indexOf('enfermedad') >= 0) {
+                          const metaRaw = String(objRows[r][4] || '').trim();
+                          const match = metaRaw.match(/[\d.]+/);
+                          if (match) {
+                            metaIncidenciaObjetivo = parseFloat(match[0]);
+                            sendLog(`[AUTO-RESULTADOS] Meta Objetivos SST (Incidencia): ${metaRaw} → ${metaIncidenciaObjetivo}`, 'INFO');
+                          }
+                        }
+                        if (metaObjetivo && metaSeveridadObjetivo && metaMortalidadObjetivo && metaAusentismoObjetivo && metaPrevalenciaObjetivo && metaIncidenciaObjetivo) break;
                       }
                     }
                   }
@@ -6582,9 +6612,16 @@ async function calculateAutoResultados(companyName) {
               ? (ind.ausentismoMensual.reduce((s, m) => s + m.tasaAusentismo, 0) / ind.ausentismoMensual.length).toFixed(2)
               : 0;
 
+            // 📦562 — Calcular porcentajeReal usando metaAusentismoObjetivo (leída del Excel 2.2.1)
+            const metaAus = metaAusentismoObjetivo || 0;
+            const promAusNum = parseFloat(promAusentismo) || 0;
+            const pctAusentismo = metaAus > 0
+              ? Math.max(0, Math.min(100, Math.round((1 - promAusNum / metaAus) * 100)))
+              : 0;
+
             resultado['ausentismo'] = {
               resultado: `Tasa ausentismo promedio: ${promAusentismo}%`,
-              porcentajeReal: 0,
+              porcentajeReal: pctAusentismo,
               source: 'auto'
             };
             resultado['incapacidad'] = resultado['ausentismo'];
@@ -6595,9 +6632,17 @@ async function calculateAutoResultados(companyName) {
               const promTrab = ind.frecuenciaMensual.length > 0 ? Math.round(totalTrab / ind.frecuenciaMensual.length) : 0;
               const totalCasosEL = ind.config.prevalenciaEL || 0;
               const prevalenciaCalc = promTrab > 0 ? ((totalCasosEL / promTrab) * 100000).toFixed(2) : '0.00';
+
+              // 📦562 — Calcular porcentajeReal con metaPrevalenciaObjetivo
+              const metaPrev = metaPrevalenciaObjetivo || 0;
+              const prevNum = parseFloat(prevalenciaCalc) || 0;
+              const pctPrev = metaPrev > 0
+                ? Math.max(0, Math.min(100, Math.round((1 - prevNum / metaPrev) * 100)))
+                : 0;
+
               resultado['prevalencia'] = {
                 resultado: `Prevalencia EL: ${prevalenciaCalc} por 100.000 trabajadores (${totalCasosEL} casos / ${promTrab} prom. trabajadores)`,
-                porcentajeReal: 0,
+                porcentajeReal: pctPrev,
                 source: 'auto'
               };
             }
@@ -6608,9 +6653,17 @@ async function calculateAutoResultados(companyName) {
               const promTrabInc = ind.frecuenciaMensual.length > 0 ? Math.round(totalTrabInc / ind.frecuenciaMensual.length) : 0;
               const totalCasosNuevos = ind.config.incidenciaEL || 0;
               const incidenciaCalc = promTrabInc > 0 ? ((totalCasosNuevos / promTrabInc) * 100000).toFixed(2) : '0.00';
+
+              // 📦562 — Calcular porcentajeReal con metaIncidenciaObjetivo
+              const metaInc = metaIncidenciaObjetivo || 0;
+              const incNum = parseFloat(incidenciaCalc) || 0;
+              const pctInc = metaInc > 0
+                ? Math.max(0, Math.min(100, Math.round((1 - incNum / metaInc) * 100)))
+                : 0;
+
               resultado['incidencia'] = {
                 resultado: `Incidencia EL: ${incidenciaCalc} por 100.000 trabajadores (${totalCasosNuevos} casos nuevos / ${promTrabInc} prom. trabajadores)`,
-                porcentajeReal: 0,
+                porcentajeReal: pctInc,
                 source: 'auto'
               };
             }
@@ -14741,10 +14794,13 @@ async function calculateObjetivosStats(basePath, companyName) {
   const UMBRAL_CUMPLIMIENTO = 70; // >= 70% se considera cumplido
 
   // Keywords para auto-detectar principio (mismo set que objetivos-sst-viewer.js)
+  // 📦562 — Ampliadas con 'incidencia', 'prevalencia', 'ifa', 'incapacidad'
+  // para que el match encuentre los autoKeys correspondientes en calculateAutoResultados.
   const KEYWORD_MAP = {
     1: ['accidente', 'lesion', 'lesión', 'incidente', 'enfermedad laboral',
         'accidentalidad', 'mortalidad', 'ausentismo', 'peligro', 'riesgo',
-        'severidad', 'mortal', 'eventos con les', 'frecuencia de ac'],
+        'severidad', 'mortal', 'eventos con les', 'frecuencia de ac',
+        'incidencia', 'prevalencia', 'ifa', 'incapacidad'],
     2: ['legal', 'ley ', 'normativa', 'requisito legal', 'cumplimiento legal',
         'matriz legal', 'reglamento', 'decreto', 'resolución', 'otros requisitos',
         'cumplir con los requisitos'],
@@ -14792,41 +14848,97 @@ async function calculateObjetivosStats(basePath, companyName) {
   }
 
   // Helper: match indicador contra auto-resultados por keyword
+  // 📦562 — Ampliado con búsqueda directa del autoKey en el texto del indicador.
+  // Si el autoKey es "incidencia" y el indicador dice "Incidencia Enfermedad Laboral",
+  // matchea sin pasar por KEYWORD_MAP. Esto cubre keywords que faltaban en el map.
+  // 📦562b — FIX: si TODOS los matches tienen porcentajeReal = 0 (porque la meta no
+  // se leyó del Excel de objetivos), se asigna el match igualmente para que A1
+  // (fallback) pueda usar el valorTextoDisponible y comparar con la meta del indicador.
   function matchAutoResultado(indicatorText, autoResultados) {
     if (!autoResultados || Object.keys(autoResultados).length === 0) return null;
     var lower = (indicatorText || '').toLowerCase();
 
-    // Buscar keywords del indicador en los keys de autoResultados
     var bestMatch = null;
     var bestScore = 0;
 
+    function crearMatch(autoKey, autoVal) {
+      return {
+        porcentajeReal: autoVal.porcentajeReal,
+        source: 'auto',
+        keyword: autoKey,
+        resultado: autoVal.resultado || null  // 📦562b: propagar para A1
+      };
+    }
+
+    // ESTRATEGIA 1: búsqueda directa del autoKey en el texto del indicador
+    for (var directKey in autoResultados) {
+      if (!autoResultados.hasOwnProperty(directKey)) continue;
+      var directLower = directKey.toLowerCase();
+      if (directLower.length < 3) continue;
+      if (lower.indexOf(directLower) !== -1) {
+        var directAuto = autoResultados[directKey];
+        if (directAuto && typeof directAuto.porcentajeReal === 'number' && directAuto.porcentajeReal > bestScore) {
+          bestMatch = crearMatch(directKey, directAuto);
+          bestScore = directAuto.porcentajeReal;
+        }
+      }
+    }
+
+    // ESTRATEGIA 2: keywords del KEYWORD_MAP
     for (var pidStr in KEYWORD_MAP) {
       if (!KEYWORD_MAP.hasOwnProperty(pidStr)) continue;
       var kws = KEYWORD_MAP[parseInt(pidStr)];
       for (var k = 0; k < kws.length; k++) {
         var kw = kws[k].toLowerCase();
         if (lower.indexOf(kw) === -1) continue;
-
-        // Esta keyword matchea el indicador. Buscar en autoResultados.
         for (var autoKey in autoResultados) {
           if (!autoResultados.hasOwnProperty(autoKey)) continue;
           var autoLower = autoKey.toLowerCase();
-          // Match si la keyword del indicador está en el key del auto-resultado
-          // o viceversa (ej: "capacitacion" en indicador vs "capacitacion" en auto).
           if (autoLower.indexOf(kw) !== -1 || kw.indexOf(autoLower) !== -1) {
             var auto = autoResultados[autoKey];
             if (auto && typeof auto.porcentajeReal === 'number' && auto.porcentajeReal > bestScore) {
-              bestMatch = {
-                porcentajeReal: auto.porcentajeReal,
-                source: 'auto',
-                keyword: autoKey
-              };
+              bestMatch = crearMatch(autoKey, auto);
               bestScore = auto.porcentajeReal;
             }
           }
         }
       }
     }
+
+    // 📦562b — ESTRATEGIA 3: si no se encontró match con porcentajeReal > 0,
+    // buscar matches con porcentajeReal = 0 para que A1 pueda usar el valorTexto.
+    if (bestMatch === null) {
+      for (var directKey2 in autoResultados) {
+        if (!autoResultados.hasOwnProperty(directKey2)) continue;
+        var directLower2 = directKey2.toLowerCase();
+        if (directLower2.length < 3) continue;
+        if (lower.indexOf(directLower2) !== -1) {
+          bestMatch = crearMatch(directKey2, autoResultados[directKey2]);
+          break;
+        }
+      }
+    }
+    if (bestMatch === null) {
+      for (var pidStr2 in KEYWORD_MAP) {
+        if (!KEYWORD_MAP.hasOwnProperty(pidStr2)) continue;
+        var kws2 = KEYWORD_MAP[parseInt(pidStr2)];
+        for (var k2 = 0; k2 < kws2.length; k2++) {
+          var kw2 = kws2[k2].toLowerCase();
+          if (lower.indexOf(kw2) === -1) continue;
+          for (var autoKey2 in autoResultados) {
+            if (!autoResultados.hasOwnProperty(autoKey2)) continue;
+            var autoLower2 = autoKey2.toLowerCase();
+            if (autoLower2.indexOf(kw2) !== -1 || kw2.indexOf(autoLower2) !== -1) {
+              bestMatch = crearMatch(autoKey2, autoResultados[autoKey2]);
+              break;
+            }
+          }
+          if (bestMatch !== null) break;
+        }
+        if (bestMatch !== null) break;
+      }
+    }
+
     return bestMatch;
   }
 
