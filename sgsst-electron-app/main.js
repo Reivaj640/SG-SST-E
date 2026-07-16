@@ -14508,7 +14508,7 @@ ipcMain.handle('get-gestion-integral-stats', async (event, companyName) => {
     // Calcular estadísticas en paralelo (incluyendo evaluación inicial)
     const [politica, objetivos, plan_trabajo, rendicion, evaluacion_inicial, principiosAutoResultados, cambios] = await Promise.all([
         calculatePoliticaStats(rootPath),
-        calculateObjetivosStats(rootPath),
+        calculateObjetivosStats(rootPath, companyName),
         calculatePlanTrabajoStats(rootPath, currentYear),
         calculateRendicionCuentasStats(rootPath),
         calculateEvaluacionInicialStats(rootPath),
@@ -14606,114 +14606,270 @@ async function calculatePoliticaStats(basePath) {
 
 /**
  * Calcular estadísticas de Objetivos SST
+ * 📦560 — Reescrito: usa resultados manuales (JSON) + auto-resultados por keyword,
+ * en vez de buscar la palabra "cumplido" en una columna. Misma estructura de retorno
+ * (más `nombre` en cada principio) para compatibilidad con el widget del home.
  */
-async function calculateObjetivosStats(basePath) {
+async function calculateObjetivosStats(basePath, companyName) {
+  const UMBRAL_CUMPLIMIENTO = 70; // >= 70% se considera cumplido
+
+  // Keywords para auto-detectar principio (mismo set que objetivos-sst-viewer.js)
+  const KEYWORD_MAP = {
+    1: ['accidente', 'lesion', 'lesión', 'incidente', 'enfermedad laboral',
+        'accidentalidad', 'mortalidad', 'ausentismo', 'peligro', 'riesgo',
+        'severidad', 'mortal', 'eventos con les', 'frecuencia de ac'],
+    2: ['legal', 'ley ', 'normativa', 'requisito legal', 'cumplimiento legal',
+        'matriz legal', 'reglamento', 'decreto', 'resolución', 'otros requisitos',
+        'cumplir con los requisitos'],
+    3: ['cliente', 'satisfacc', 'queja', 'reclamo', 'encuesta', 'calidad total',
+        'expectativa', 'lograr la satisf', 'servicio al'],
+    4: ['presupuesto', 'recurso', 'capacitac', 'competen', 'mejora continua',
+        'acciones correctiva', 'acciones preventiva', 'cronograma',
+        'ambientes de trabajo', 'ambiente sano', 'correctiva', 'preventiva', 'sano y seguro']
+  };
+
   const stats = {
     total: 0,
     cumplidos: 0,
     porcentaje: 0,
-    vencidos: 0,
     porPrincipio: {
-      1: { total: 0, cumplidos: 0, porcentaje: 0 },
-      2: { total: 0, cumplidos: 0, porcentaje: 0 },
-      3: { total: 0, cumplidos: 0, porcentaje: 0 },
-      4: { total: 0, cumplidos: 0, porcentaje: 0 }
+      1: { nombre: 'Prevención', total: 0, cumplidos: 0, porcentaje: 0 },
+      2: { nombre: 'Requisitos Legales', total: 0, cumplidos: 0, porcentaje: 0 },
+      3: { nombre: 'Satisfacción Cliente', total: 0, cumplidos: 0, porcentaje: 0 },
+      4: { nombre: 'Recursos y Mejora', total: 0, cumplidos: 0, porcentaje: 0 }
     }
   };
 
+  // Helper: auto-detectar principio por keywords en el texto
+  function autoDetectPrinciple(text) {
+    var lower = (text || '').toLowerCase();
+    var scores = { 1: 0, 2: 0, 3: 0, 4: 0 };
+    for (var pid in KEYWORD_MAP) {
+      if (!KEYWORD_MAP.hasOwnProperty(pid)) continue;
+      var words = KEYWORD_MAP[pid];
+      for (var i = 0; i < words.length; i++) {
+        if (lower.indexOf(words[i].toLowerCase()) !== -1) {
+          scores[pid]++;
+        }
+      }
+    }
+    var maxScore = 0;
+    var bestPid = 4; // Default
+    for (var p in scores) {
+      if (scores.hasOwnProperty(p) && scores[p] > maxScore) {
+        maxScore = scores[p];
+        bestPid = parseInt(p);
+      }
+    }
+    return bestPid;
+  }
+
+  // Helper: match indicador contra auto-resultados por keyword
+  function matchAutoResultado(indicatorText, autoResultados) {
+    if (!autoResultados || Object.keys(autoResultados).length === 0) return null;
+    var lower = (indicatorText || '').toLowerCase();
+
+    // Buscar keywords del indicador en los keys de autoResultados
+    var bestMatch = null;
+    var bestScore = 0;
+
+    for (var pidStr in KEYWORD_MAP) {
+      if (!KEYWORD_MAP.hasOwnProperty(pidStr)) continue;
+      var kws = KEYWORD_MAP[parseInt(pidStr)];
+      for (var k = 0; k < kws.length; k++) {
+        var kw = kws[k].toLowerCase();
+        if (lower.indexOf(kw) === -1) continue;
+
+        // Esta keyword matchea el indicador. Buscar en autoResultados.
+        for (var autoKey in autoResultados) {
+          if (!autoResultados.hasOwnProperty(autoKey)) continue;
+          var autoLower = autoKey.toLowerCase();
+          // Match si la keyword del indicador está en el key del auto-resultado
+          // o viceversa (ej: "capacitacion" en indicador vs "capacitacion" en auto).
+          if (autoLower.indexOf(kw) !== -1 || kw.indexOf(autoLower) !== -1) {
+            var auto = autoResultados[autoKey];
+            if (auto && typeof auto.porcentajeReal === 'number' && auto.porcentajeReal > bestScore) {
+              bestMatch = {
+                porcentajeReal: auto.porcentajeReal,
+                source: 'auto',
+                keyword: autoKey
+              };
+              bestScore = auto.porcentajeReal;
+            }
+          }
+        }
+      }
+    }
+    return bestMatch;
+  }
+
   try {
-    // Intentar múltiples nombres de carpeta (priorizar nombre corto)
-    const posiblesNombres = [
-        '2. Gestión Integral',        // Nombre corto (primero)
-        '2. Gestion Integral',        // Sin tilde
-        '2. Gestión Integral del SG-SST'  // Nombre completo
+    // 1. Buscar la carpeta de Gestión Integral
+    var posiblesNombres = [
+      '2. Gestión Integral',
+      '2. Gestion Integral',
+      '2. Gestión Integral del SG-SST'
     ];
 
-    let gestionIntegralPath = null;
-    for (const nombre of posiblesNombres) {
-        const pathIntento = path.join(basePath, nombre);
-        if (fs.existsSync(pathIntento)) {
-            gestionIntegralPath = pathIntento;
-            break;
+    var gestionIntegralPath = null;
+    for (var n = 0; n < posiblesNombres.length; n++) {
+      var pIntento = path.join(basePath, posiblesNombres[n]);
+      if (fs.existsSync(pIntento)) {
+        gestionIntegralPath = pIntento;
+        break;
+      }
+    }
+
+    if (!gestionIntegralPath) return stats;
+
+    // 2. Buscar el archivo Excel
+    var objetivosPath = path.join(gestionIntegralPath, '2.2.1 Objetivos SST');
+    var objetivosPathAlt = path.join(gestionIntegralPath, '2.2 Objetivos SST');
+    var objetivosPathAlt2 = path.join(gestionIntegralPath, '2.2 Objetivos');
+
+    var rutaFinal = null;
+    if (fs.existsSync(objetivosPath)) rutaFinal = objetivosPath;
+    else if (fs.existsSync(objetivosPathAlt)) rutaFinal = objetivosPathAlt;
+    else if (fs.existsSync(objetivosPathAlt2)) rutaFinal = objetivosPathAlt2;
+
+    if (!rutaFinal || !fs.existsSync(rutaFinal)) return stats;
+
+    var files = await fsp.readdir(rutaFinal);
+    var objetivosFiles = files.filter(function (f) {
+      return (f.endsWith('.xlsx') || f.endsWith('.xls')) && !f.startsWith('~$');
+    });
+
+    if (objetivosFiles.length === 0) return stats;
+
+    var filePath = path.join(rutaFinal, objetivosFiles[0]);
+
+    // 3. Leer el Excel (misma estructura que load-objetivos-excel-data)
+    var workbook = xlsx.readFile(filePath);
+    var sheetName = workbook.SheetNames[0];
+    var worksheet = workbook.SheetNames.length > 0 ? workbook.Sheets[sheetName] : null;
+    if (!worksheet) return stats;
+
+    // Datos desde fila 6 (índice 5) — igual que load-objetivos-excel-data
+    var data = xlsx.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+    var startIndex = 5;
+
+    var objectivesData = [];
+    for (var r = startIndex; r < data.length; r++) {
+      var row = data[r];
+      if (!row || !row[1]) continue;
+      var objectiveValue = row[1] ? row[1].toString() : '';
+      if (objectiveValue.trim() === '') continue;
+      objectivesData.push({
+        id: objectivesData.length + 1,
+        objective: objectiveValue,
+        indicator: row[2] ? row[2].toString() : '',
+        formula: row[3] ? row[3].toString() : '',
+        goal: row[4] ? row[4].toString() : '',
+        frequency: row[5] ? row[5].toString() : '',
+        responsible: row[6] ? row[6].toString() : '',
+        principleId: row[7] ? parseInt(row[7]) || null : null
+      });
+    }
+
+    if (objectivesData.length === 0) return stats;
+
+    // 4. Leer resultados manuales (JSON en misma carpeta que el Excel)
+    var resultadosManuales = {};
+    var jsonPath = path.join(path.dirname(filePath), 'resultados-objetivos.json');
+    try {
+      if (fs.existsSync(jsonPath)) {
+        var content = await fsp.readFile(jsonPath, 'utf8');
+        var parsed = JSON.parse(content);
+        resultadosManuales = (parsed && parsed.resultados) || {};
+      }
+    } catch (e) {
+      sendLog('[MAIN][Objetivos] No se pudo leer resultados manuales: ' + e.message, 'WARN');
+    }
+
+    // 5. Calcular auto-resultados (de submódulos: capacitaciones, presupuesto, etc.)
+    var autoResultados = {};
+    if (companyName) {
+      try {
+        autoResultados = await calculateAutoResultados(companyName);
+      } catch (e) {
+        sendLog('[MAIN][Objetivos] Error en calculateAutoResultados: ' + e.message, 'WARN');
+      }
+    }
+
+    // 6. Agrupar por objetivo (mismo método que objetivos-sst-viewer.js buildGroups)
+    //    Esto asegura que el groupIdx coincida con el del viewer para matchear resultados.
+    var groupMap = {};
+    var groupOrder = [];
+    objectivesData.forEach(function (item) {
+      var key = (item.objective || '').trim();
+      if (!groupMap[key]) {
+        groupMap[key] = [];
+        groupOrder.push(key);
+      }
+      groupMap[key].push(item);
+    });
+
+    // 7. Para cada grupo/indicador, calcular cumplimiento
+    var groupIdx = 0;
+    groupOrder.forEach(function (objectiveKey) {
+      var indicatorsInGroup = groupMap[objectiveKey];
+      var indIdx = 0;
+
+      indicatorsInGroup.forEach(function (ind) {
+        var compKey = groupIdx + '-' + indIdx;
+
+        // Determinar principio: manual (col H) o auto-detectado por keywords
+        var pid = ind.principleId;
+        if (!pid || pid < 1 || pid > 4) {
+          pid = autoDetectPrinciple((ind.objective || '') + ' ' + (ind.indicator || ''));
         }
-    }
 
-    if (!gestionIntegralPath) {
-        return stats;
-    }
+        // Buscar resultado manual por groupIdx-indicatorIdx
+        var manual = resultadosManuales[compKey];
+        var porcentajeReal = null;
+        var fuente = null;
 
-    const objetivosPath = path.join(gestionIntegralPath, '2.2.1 Objetivos SST');
-    const objetivosPathAlt = path.join(gestionIntegralPath, '2.2 Objetivos SST');
-    const objetivosPathAlt2 = path.join(gestionIntegralPath, '2.2 Objetivos');
-
-    let rutaFinal = null;
-    if (fs.existsSync(objetivosPath)) {
-        rutaFinal = objetivosPath;
-    } else if (fs.existsSync(objetivosPathAlt)) {
-        rutaFinal = objetivosPathAlt;
-    } else if (fs.existsSync(objetivosPathAlt2)) {
-        rutaFinal = objetivosPathAlt2;
-    }
-
-    if (!fs.existsSync(rutaFinal)) {
-        return stats;
-    }
-
-    const files = await fsp.readdir(rutaFinal);
-    const objetivosFiles = files.filter(f => 
-        (f.endsWith('.xlsx') || f.endsWith('.xls')) && !f.startsWith('~$')
-    );
-
-    if (objetivosFiles.length > 0) {
-        const filePath = path.join(rutaFinal, objetivosFiles[0]);
-        const workbook = xlsx.readFile(filePath);
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const data = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
-
-        // Estructura Excel:
-        // B(1): Objetivo, C(2): Indicador, D(3): Fórmula, E(4): Meta,
-        // F(5): Frecuencia, G(6): Responsable, H(7): Principle ID (1-4)
-        for (let i = 1; i < data.length; i++) {
-            const row = data[i];
-            if (!row || row.length < 2) continue;
-
-            const objetivo = row[1];
-            if (!objetivo || typeof objetivo !== 'string') continue;
-            if (objetivo.toLowerCase().includes('total') || objetivo.toLowerCase().includes('objetivo')) continue;
-
-            stats.total++;
-
-            // Determinar principleId (columna H, índice 7)
-            let principleId = parseInt(row[7]) || null;
-            if (!principleId || principleId < 1 || principleId > 4) {
-                principleId = 1; // Default a principio 1
-            }
-
-            stats.porPrincipio[principleId].total++;
-
-            // Verificar estado de cumplimiento
-            const estado = (row[2] || row[3] || '').toString().toLowerCase();
-            const cumplido = estado.includes('cumplido') || estado.includes('realizado') || estado.includes('completado') || estado === 'si';
-            if (cumplido) {
-                stats.cumplidos++;
-                stats.porPrincipio[principleId].cumplidos++;
-            }
+        if (manual && typeof manual.porcentajeReal === 'number' && manual.porcentajeReal > 0) {
+          porcentajeReal = manual.porcentajeReal;
+          fuente = 'manual';
+        } else {
+          // Fallback: auto-resultado por keyword
+          var autoMatch = matchAutoResultado((ind.objective || '') + ' ' + (ind.indicator || ''), autoResultados);
+          if (autoMatch) {
+            porcentajeReal = autoMatch.porcentajeReal;
+            fuente = 'auto';
+          }
         }
 
-        // Calcular porcentajes
-        if (stats.total > 0) {
-            stats.porcentaje = Math.round((stats.cumplidos / stats.total) * 100);
+        stats.total++;
+        stats.porPrincipio[pid].total++;
+
+        // Cumplido si porcentajeReal >= umbral
+        if (porcentajeReal !== null && porcentajeReal >= UMBRAL_CUMPLIMIENTO) {
+          stats.cumplidos++;
+          stats.porPrincipio[pid].cumplidos++;
         }
-        for (const pid of [1, 2, 3, 4]) {
-            const p = stats.porPrincipio[pid];
-            if (p.total > 0) {
-                p.porcentaje = Math.round((p.cumplidos / p.total) * 100);
-            }
-        }
+
+        indIdx++;
+      });
+      groupIdx++;
+    });
+
+    // 8. Calcular porcentajes
+    if (stats.total > 0) {
+      stats.porcentaje = Math.round((stats.cumplidos / stats.total) * 100);
     }
+    for (var pid2 = 1; pid2 <= 4; pid2++) {
+      var p = stats.porPrincipio[pid2];
+      if (p.total > 0) {
+        p.porcentaje = Math.round((p.cumplidos / p.total) * 100);
+      }
+    }
+
+    sendLog('[MAIN][Objetivos] Stats calculados: ' + stats.cumplidos + '/' + stats.total +
+      ' indicadores cumplen meta (umbral ' + UMBRAL_CUMPLIMIENTO + '%)', 'DEBUG');
   } catch (error) {
-    sendLog(`[MAIN] Error calculando objetivos stats: ${error.message}`, 'WARN');
+    sendLog('[MAIN] Error calculando objetivos stats: ' + error.message, 'WARN');
   }
 
   return stats;
