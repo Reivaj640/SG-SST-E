@@ -8483,6 +8483,12 @@ class MedicionAusentismoComponent {
 
         this.updateStatsMetrics(filtered);
         this.renderCharts(filtered);
+        // 📦XXX — Recalcular las 16 métricas extendidas (Tier 1+2+3) con la data ya filtrada.
+        // Antes: solo updateStatsMetrics y renderCharts se recalculaban, dejando Top 10 CIE-10,
+        // Top 10 días, Top 10 casos, Casos Críticos, Sospechosos de Abuso y Tasa de Re-Incidencia
+        // con los datos históricos completos. Ahora respetan el filtro de año/mes/género/clase.
+        this.currentAusentismoStatsExtended = this._calcularEstadisticasExtendidas(filtered);
+        this._renderEstadisticasTabs();
         this.showNotification(`${filtered.length} registros filtrados`, 'success');
     }
 
