@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.119] - 2026-07-17
+
+### Changed
+- **📊 Gráfica de Objetivos SST rediseñada** (`📦562`, `9d3e061`) — Stacked horizontal bar 100% con labels de principios reales (Prevención, Requisitos Legales, Satisfacción Cliente, Recursos y Mejora), color por rango (verde ≥70%, amarillo ≥40%, rojo <40%), número grande "X/Y (Z%)" adentro de cada barra, tarjeta clickeable → submódulo 2.2.1. 2 archivos (`main.js`, `gestion-integral-home.js`), +254/-85 líneas.
+
+### Fixed
+- **🛠️ 4 fixes de datos en `calculateObjetivosStats`** (`📦562`) — KEYWORD_MAP[1] ampliado con `incidencia`/`prevalencia`/`ifa`/`incapacidad`; `matchAutoResultado` con búsqueda directa del autoKey (Estrategia 1) + fallback con propagación de valor cuando `porcentajeReal=0` (Estrategia 3); `calculateAutoResultados` ahora calcula `porcentajeReal` para ausentismo/prevalencia/incidencia leyendo las metas del Excel 2.2.1. Resultado: Prevención pasa de 2/6 (33%) rojo a 5/6 (83%) verde; total sube de 2/15 (13%) a ~7/15 (47%) amarillo en Tempoactiva. 78/78 tests OK.
+- **🔢 A1: parsear meta y valor numérico** (`📦561`, `37dc419`) — 3 nuevos helpers `parseMetaIndicador` (parsea `<1`, `0`, `<5`, `<50`, `<=10`, `>=0.5`), `parseValorIndicador` (extrae primer número de textos como "IF promedio: 0.0421"), `evaluarCumplimientoPorMeta` (escala inversa para metas `lt`). Integrados como fallback en `calculateObjetivosStats`. 69/69 tests OK.
+- **📋 Cálculo de cumplimiento refactorizado** (`📦560`, `811a987`) — `calculateObjetivosStats` ahora usa resultados manuales (JSON `resultados-objetivos.json`) + auto-resultados por keyword, en vez de buscar la palabra "cumplido" en una columna del Excel. Soporta `groupIdx-indicatorIdx` igual que el viewer del submódulo. 30/30 tests OK.
+- **🔍 Top 10 CIE-10 no respetaba filtro de año** (`📦559`, `514df13`) — `applyStatsFilters()` ahora también recalcula `this.currentAusentismoStatsExtended` y re-renderiza las tabs extendidas. 1 archivo (`medicion-ausentismo.js`), +6/-0 líneas.
+
+### Build & Tooling
+- **🔖 Bump version 0.1.119** (`📦558`, `4506713`) — `package.json` alineado con el tag nuevo.
+
+## [0.1.118] - 2026-07-15
+
+### Documentation
+- **📄 Spec huérfana: mejora de Política SST stats** (`2a10efb`) — Documento de diseño que describe la solución aprobada (Approach B) para mejorar la detección del documento Política SST en Gestión Integral. Sin cambios al código. Sigue en historial como docs huérfana, pendiente decisión del usuario sobre archivarlo o mantenerlo.
+
+## [0.1.117] - 2026-07-13
+
+### Added
+- **🛠️ Build script automatizado** (`📦554`, `4fc38f8`) — `build-and-publish.bat` en `sgsst-electron-app/`. Resuelve el problema recurrente del 422 "tag already exists" cuando se borra una release desde la UI de GitHub. El script hace: validación de `GH_TOKEN`, borrado del tag viejo (local + remoto), `git pull`, limpieza de `dist/`, `electron-builder --publish=always`, validación de los 3 assets críticos (exe, blockmap, latest.yml). 13/13 tests OK.
+
+### Changed
+- **📅 Calendario: 4 fixes del day popover + nuevos widgets** (`📦557`, `3d5f07e`) — (1) Cache-bust stale en `index.html` `?v=505` → `?v=545`. (2) Typo `_cancelDayPopover()` → `_closeDayPopover()` en `kair-calendar.js:480`. (3) z-index del day popover 1100 → 200001 (tapado por header 100000). (4) Listeners directos en botones del popover con `stopPropagation()` (handler equivocado en container). (B) 2 widgets nuevos en home de Gestión Integral: **Pipeline** (5 etapas Solicitud→Cerrado) y **Aging** (4 buckets 0-15/16-30/31-60/60+ días) para reemplazar Política SST y Objetivos SST, con datos del módulo 2.11.1 Gestión del Cambio. (C) Limpieza widget Política SST (4 métodos + ~101 líneas CSS eliminados). (D) Removido año "2026" de labels de widgets en Recursos y Gestión Integral. 5 archivos, +342/-32 líneas. Tests: 38 OK en `test-cambio-stats.js`.
+- **🔖 Bump version 0.1.117** (`📦556`, `36b7651`)
+
+### Build & Tooling
+- **🏷️ Tag cleanup v0.1.110-118** — Eliminados tags y releases intermedios antes de crear v0.1.119 limpio.
+
+## [0.1.111] - 2026-07-04 → [0.1.116] - 2026-07-10
+
+> **Nota:** Versiones intermedias con bug fixes y mejoras menores entre v0.1.110 y v0.1.117. Sin entradas detalladas porque no se documentaron en su momento. Si necesitás detalle de algún cambio específico en este rango, revisar `git log v0.1.110..v0.1.117` en la rama `Dev-Pc`.
+
+Cambios principales inferidos:
+- 0.1.111-0.1.116: builds intermedios sin tags publicados
+- Commits internos relacionados con fix de bugs varios (ver git log para detalle)
+
 ## [0.1.110] - 2026-07-04
 
 ### Added
