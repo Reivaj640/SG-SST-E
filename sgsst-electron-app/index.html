@@ -288,9 +288,10 @@
 <!-- Sistema de Notificaciones Moderno para Actualizaciones -->
 <script src="assets/js/update-notifications.js"></script>
 
-<!-- K+AIR Calendar Component (popover centralizado desde #calendar-button) — 📦545 cache-bust -->
-  <link rel="stylesheet" href="shared/kair-calendar.css?v=545">
-  <script src="shared/kair-calendar.js?v=545"></script>
+<!-- 📦573 — K+AIR Calendar Component (kair-calendar.js/css) quitado del main app.
+     La Bandeja Integrada iframe tiene su propia copia. Solo mantenemos el adapter
+     (KairAlerts lo usa) y el calendar-detail-panel (KairAlerts lo usa para abrir
+     el detalle del evento al clickear un pendiente). -->
   <script src="shared/kair-calendar-adapter.js?v=545"></script>
   <script src="modules/shared/calendar-detail-panel.js?v=545"></script>
   <!-- 📦 Alertas calendario — badge + popover de pendientes. Depende de KairCalendarAdapter y calendarDetailPanel. -->

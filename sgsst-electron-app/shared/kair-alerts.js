@@ -226,7 +226,7 @@
 
   // ── Render del badge ────────────────────────────────────────────────
   function _renderBadge(count) {
-    var badge = document.getElementById('kair-cal-badge');
+    var badge = document.getElementById('bandeja-integrada-badge');
     if (!badge) return;
     if (count <= 0) {
       badge.hidden = true;
@@ -421,7 +421,7 @@
         // Si el click es dentro del panel, ignorar
         if (_state.popoverEl.contains(target)) return;
         // Si el click es en el badge, ignorar (el badge tiene su propio toggle)
-        var badge = document.getElementById('kair-cal-badge');
+        var badge = document.getElementById('bandeja-integrada-badge');
         if (badge && badge.contains(target)) return;
         // Si el click es en el detail panel del calendario, ignorar
         // (sino cierra apenas se abre el detail)
@@ -455,7 +455,7 @@
   // Posiciona el panel debajo del badge con la flecha apuntando al centro
   // del badge. Si no se puede (panel no entra en viewport), lo ajusta.
   function _positionPanel(panel) {
-    var badge = document.getElementById('kair-cal-badge');
+    var badge = document.getElementById('bandeja-integrada-badge');
     if (!badge) return;
     var rect = badge.getBoundingClientRect();
     var panelWidth = 420;
@@ -590,13 +590,13 @@
   }
 
   function _wire() {
-    var badge = document.getElementById('kair-cal-badge');
+    var badge = document.getElementById('bandeja-integrada-badge');
     if (!badge) {
-      _log('warn', 'Badge no encontrado (#kair-cal-badge) — verifica index.html');
+      _log('warn', 'Badge no encontrado (#bandeja-integrada-badge) — verifica index.html');
       return;
     }
     // Click en el badge → toggle del popover. stopPropagation para que
-    // no se propague al #calendar-button (que abre el KairCalendar).
+    // no se propague al #bandeja-integrada-button (que abre el iframe de Bandeja Integrada).
     badge.addEventListener('click', function (e) {
       e.preventDefault();
       e.stopPropagation();
@@ -642,7 +642,7 @@
     _state.count = 0;
     _renderBadge(0);
     _pinHeader(0);
-    var badge = document.getElementById('kair-cal-badge');
+    var badge = document.getElementById('bandeja-integrada-badge');
     if (badge) {
       // No podemos remover el listener sin referencia, pero el badge sigue
       // siendo funcional. Si necesitas destroy real, recargar la página.

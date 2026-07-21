@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.124] - 2026-07-21
+
+### Fixed
+- **🔧 📦573 — KairAlerts no mostraba el popover después de retirar el calendar-button** — Después del 📦572, KairAlerts seguía buscando el badge `#kair-cal-badge` (que ya no existe) y su `_wire()` hacía early return con un warning. Resultado: el popover de pendientes nunca se abría. FIX: las 5 referencias a `getElementById('kair-cal-badge')` en `shared/kair-alerts.js` se cambiaron a `getElementById('bandeja-integrada-badge')`. También se actualizó el mensaje de warning y el comentario sobre `#calendar-button` que ya no existe. Ahora el badge de pendientes aparece en el botón de Bandeja Integrada y el popover se abre/cierra con click.
+
+### Removed
+- **🗑️ Carga innecesaria de kair-calendar.css y kair-calendar.js del main app** — Después de retirar el calendar-button (📦572), el componente KairCalendar (`kair-calendar.js`) y sus estilos (`kair-calendar.css`) ya no se usan en el main app. La Bandeja Integrada iframe tiene su propia copia de estos archivos. Se quitaron los `<link>` y `<script>` correspondientes del `index.html` principal. Se mantienen: `kair-calendar-adapter.js` (lo usa KairAlerts) y `calendar-detail-panel.js` (lo usa KairAlerts para el detalle del evento). Resultado: ~2 requests HTTP menos al iniciar la app y un main.js más limpio.
+
+### Changed
+- **🧹 Comentarios obsoletos en renderer.js e index.html** — Actualizados los comments que referenciaban `#calendar-button` (ya no existe) para apuntar al `#bandeja-integrada-button`. 3 comments en `renderer.js` (líneas 747, 754, 2189-2193) y 1 en `index.html` (línea 291) limpiados. La documentación interna ahora refleja el estado real de la app.
+
+### Build & Tooling
+- **🔖 Bump version 0.1.124** — `package.json` actualizado a v0.1.124 para reflejar la limpieza post-retiro del calendario.
+
 ## [0.1.123] - 2026-07-21
 
 ### Removed

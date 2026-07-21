@@ -743,14 +743,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   console.log('DOM elements found:', { contentArea, sidebarMenu, companyNameElement, companyLogoElement, companyLogoPlaceholder, companyHomeButton });
 
-  // 📦563 — Bandeja Integrada (Correo + Calendario).
-  // Entry point ADITIVO: no reemplaza el calendario actual del #calendar-button.
+  // 📦563/572 — Bandeja Integrada (Correo + Calendario) — entry point ÚNICO
+  // (reemplaza al calendar-button retirado en 📦572).
   // Click en el botón → abre un iframe fullscreen con renderer/bandeja-integrada/index.html.
   // Click en "Volver" del iframe → envía postMessage('bandeja-integrada-back') y el iframe se cierra.
   const bandejaIntegradaButton = document.getElementById('bandeja-integrada-button');
   let bandejaIntegradaFrame = null;
 
-  // F4 — Badge de alertas: mismo KairAlerts que el calendario viejo (#calendar-button).
+  // F4/573 — Badge de alertas (KairAlerts) ahora apunta al #bandeja-integrada-badge
+  // (antes apuntaba al #kair-cal-badge del calendar-button retirado en 📦572).
   // Se suscribe a onCountChange y actualiza el badge del botón de Bandeja Integrada.
   function updateBandejaIntegradaBadge(count) {
     var badge = document.getElementById('bandeja-integrada-badge');
@@ -2186,10 +2187,10 @@ if (appHeader) {
   // está disponible en el tag backup-pre-calendar-removal-2026-07-21.
   // (NOOP: el bloque fue removido intencionalmente)
 
-  // 📦 Alertas calendario — Inicializar el sistema de badge + popover de
-  // pendientes. Se hace DESPUÉS de KairCalendar para que ambos coexistan
-  // sobre el mismo #calendar-button. El badge tiene su propio click handler
-  // (con stopPropagation) — el botón sigue abriendo el calendario como hoy.
+  // 📦573 — Alertas calendario — Inicializar el sistema de badge + popover de
+  // pendientes. KairAlerts se suscribe al badge del botón de Bandeja Integrada
+  // (#bandeja-integrada-badge) con stopPropagation, para que el badge no abra
+  // el iframe al hacer click (solo el resto del botón abre la Bandeja Integrada).
   if (typeof window.KairAlerts === 'object' && typeof window.KairAlerts.init === 'function') {
     window.KairAlerts.init();
     console.log('[K+AIR] KairAlerts inicializado.');
