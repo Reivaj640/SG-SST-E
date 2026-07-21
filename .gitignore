@@ -1,2 +1,16 @@
 # referencias extraídas de tarball del usuario (no parte del repo)
 tmp/
+
+# Node modules (instalados por npm/pnpm, regenerables con package.json)
+node_modules/
+
+# Python cache (generado por import chains de debug)
+__pycache__/
+*.pyc
+*.pyo
+
+# Editor / OS junk
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

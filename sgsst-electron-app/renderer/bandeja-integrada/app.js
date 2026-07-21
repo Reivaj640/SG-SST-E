@@ -401,6 +401,154 @@
     }, 3500);
   }
 
+  // FIX loop 34 — Toast con botón "Deshacer" para undo de envío
+  // Patrón Gmail: después de enviar, mostrar toast persistente 5s con botón "Deshacer".
+  // El user tiene 5s para arrepentirse del envío. Si hace click, se muestra cómo deshacer
+  // manualmente (porque la API de delete de Gmail no está implementada en el backend todavía).
+  function showUndoToast(title, onUndo) {
+    var node = el("div", { class: "kair-toast kair-toast--success kair-toast--undo" });
+    node.innerHTML = '<span class="kair-toast__icon" style="color:var(--kair-success, #28a745);">' + D.ICONS.checkCircle + '</span>' +
+      '<div class="kair-toast__body">' +
+        '<p class="kair-toast__title">' + escapeHtml(title) + '</p>' +
+      '</div>' +
+      '<button class="kair-toast__action" type="button">Deshacer</button>';
+    var undoBtn = node.querySelector(".kair-toast__action");
+    undoBtn.addEventListener("click", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (typeof onUndo === "function") {
+        onUndo();
+      }
+      // Quitar el toast inmediatamente al hacer click
+      if (node.parentNode) {
+        node.style.opacity = "0";
+        node.style.transition = "opacity 200ms ease";
+        setTimeout(function () { if (node.parentNode) node.parentNode.removeChild(node); }, 200);
+      }
+    });
+    $("#toast-container").appendChild(node);
+    // Auto-cierre en 5 segundos (Gmail-style undo window)
+    setTimeout(function () {
+      if (node.parentNode) {
+        node.style.opacity = "0";
+        node.style.transition = "opacity 200ms ease";
+        setTimeout(function () { if (node.parentNode) node.parentNode.removeChild(node); }, 200);
+      }
+    }, 5000);
+    return node;
+  }
+
+  // FIX loop 35 — Snooze (posponer) de correos
+  // Almacenamiento local en localStorage (no integrado con Gmail todavía).
+  // Estructura: { "threadId": wakeTimeMs }
+  // El thread se considera snoozed si wakeTime > now. Si wakeTime <= now,
+  // el snooze venció y se considera "no snoozed" (el correo vuelve a INBOX).
+  var SNOOZE_STORAGE_KEY = "kair.snoozedThreads";
+
+  function getSnoozedMap() {
+    try {
+      var raw = localStorage.getItem(SNOOZE_STORAGE_KEY);
+      if (!raw) return {};
+      var map = JSON.parse(raw);
+      // Limpiar snoozes vencidos (wakeTime <= now)
+      var now = Date.now();
+      var changed = false;
+      for (var k in map) {
+        if (map[k] && map[k] <= now) {
+          delete map[k];
+          changed = true;
+        }
+      }
+      if (changed) {
+        localStorage.setItem(SNOOZE_STORAGE_KEY, JSON.stringify(map));
+      }
+      return map;
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function isThreadSnoozed(threadId) {
+    var map = getSnoozedMap();
+    return !!(map[threadId] && map[threadId] > Date.now());
+  }
+
+  function snoozeThread(threadId, wakeTimeMs) {
+    var map = getSnoozedMap();
+    map[threadId] = wakeTimeMs;
+    localStorage.setItem(SNOOZE_STORAGE_KEY, JSON.stringify(map));
+  }
+
+  function unsnoozeThread(threadId) {
+    var map = getSnoozedMap();
+    delete map[threadId];
+    localStorage.setItem(SNOOZE_STORAGE_KEY, JSON.stringify(map));
+  }
+
+  function getSnoozeRemainingLabel(wakeTimeMs) {
+    var diff = wakeTimeMs - Date.now();
+    if (diff <= 0) return "ahora";
+    var minutes = Math.floor(diff / 60000);
+    if (minutes < 60) return "en " + minutes + " min";
+    var hours = Math.floor(minutes / 60);
+    if (hours < 24) return "en " + hours + "h";
+    var days = Math.floor(hours / 24);
+    return "en " + days + "d";
+  }
+
+  // FIX loop 35 — Toast con opciones de snooze
+  // Muestra un toast con 4 botones: 1h, 3h, Mañana, Próxima semana
+  function showSnoozeToast(threadId) {
+    var node = el("div", { class: "kair-toast kair-toast--info kair-toast--snooze" });
+    node.innerHTML = '<div class="kair-toast__body">' +
+        '<p class="kair-toast__title">Posponer correo</p>' +
+        '<p class="kair-toast__desc">Elegí cuándo querés que vuelva</p>' +
+        '<div class="kair-toast__snooze-options">' +
+          '<button class="kair-toast__snooze-btn" data-hours="1">1 hora</button>' +
+          '<button class="kair-toast__snooze-btn" data-hours="3">3 horas</button>' +
+          '<button class="kair-toast__snooze-btn" data-tomorrow="1">Mañana</button>' +
+          '<button class="kair-toast__snooze-btn" data-week="1">Próx. semana</button>' +
+        '</div>' +
+      '</div>';
+    var btns = node.querySelectorAll(".kair-toast__snooze-btn");
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var btn = e.currentTarget;
+        var now = Date.now();
+        var wakeTime = 0;
+        if (btn.getAttribute("data-hours")) {
+          var hours = parseInt(btn.getAttribute("data-hours"), 10);
+          wakeTime = now + hours * 60 * 60 * 1000;
+        } else if (btn.getAttribute("data-tomorrow")) {
+          // Mañana 9am
+          var tomorrow = new Date();
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          tomorrow.setHours(9, 0, 0, 0);
+          wakeTime = tomorrow.getTime();
+        } else if (btn.getAttribute("data-week")) {
+          // Próxima semana (7 días)
+          wakeTime = now + 7 * 24 * 60 * 60 * 1000;
+        }
+        snoozeThread(threadId, wakeTime);
+        if (node.parentNode) node.parentNode.removeChild(node);
+        render();
+        toast("Correo pospuesto", "Vuelve " + getSnoozeRemainingLabel(wakeTime), "success");
+      });
+    }
+    // Cerrar el toast al hacer click fuera
+    setTimeout(function () {
+      document.addEventListener("click", function closeOnOutside(e) {
+        if (!node.contains(e.target)) {
+          if (node.parentNode) node.parentNode.removeChild(node);
+          document.removeEventListener("click", closeOnOutside);
+        }
+      });
+    }, 100);
+    $("#toast-container").appendChild(node);
+  }
+
   // ====== Inicialización ======
   // F2 — Carga de eventos desde IPC real (KairCalendarAdapter) con fallback a mocks.
   // El adapter unifica 12 fuentes: plan de trabajo, capacitaciones, auditoría,
@@ -1719,6 +1867,10 @@
     container.innerHTML = "";
 
     const filtered = state.mails.filter((m) => {
+      // FIX loop 35 — Ocultar mails snoozed de la lista INBOX
+      // (los snoozed tienen wakeTime > now y se devuelven automáticamente
+      // cuando vence el snooze via getSnoozedMap() que limpia los vencidos)
+      if (state.mailFilter !== "sent" && isThreadSnoozed(m.id)) return false;
       if (state.mailFilter === "unread") return m.unread;
       if (state.mailFilter === "flagged") return m.flagged;
       if (state.mailFilter === "meeting") return m.category === "meeting";
@@ -2267,6 +2419,21 @@
     toolbar.appendChild(iconBtn(D.ICONS.mailOpen, "Marcar como no leído", () => { mail.unread = !mail.unread; render(); }));
     // FIX loop 17 — Quitar "Mover a carpeta" (no es esencial, Gmail no lo tiene visible aquí)
     toolbar.appendChild(iconBtn(D.ICONS.trash, "Eliminar"));
+    // FIX loop 35 — Botón "Snooze" (posponer) — al click muestra opciones
+    var isAlreadySnoozed = isThreadSnoozed(mail.id);
+    toolbar.appendChild(iconBtn(
+      D.ICONS.clock || '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>',
+      isAlreadySnoozed ? "Desnoozear" : "Posponer",
+      function () {
+        if (isAlreadySnoozed) {
+          unsnoozeThread(mail.id);
+          render();
+          toast("Desnoozeado", "El correo volvió a la bandeja", "info");
+        } else {
+          showSnoozeToast(mail.id);
+        }
+      }
+    ));
     toolbar.appendChild(el("span", { class: "kair-header__divider", style: { margin: "0 4px" } }));
     // FIX loop 17 — Agregar Reply y Forward (estilo Gmail) en la toolbar del thread header
     toolbar.appendChild(iconBtn(D.ICONS.reply, "Responder", () => openComposeModal("reply", mail)));
@@ -2496,8 +2663,15 @@
 
         // AUDITORÍA 2026-07-18 — "para: jrf2011 ▼" colapsable (estilo Gmail)
         // Solo si hay destinatarios. Si no hay, no mostrar la línea.
+        // FIX loop 32 — No renderizar recipients si es el último mensaje.
+        // El thread header (.kair-mail-detail__header) YA muestra los
+        // recipients del último mensaje (Para: x, CC: y) desde loop 26.
+        // Renderizarlo aquí también causaba DUPLICACIÓN visual. El recipients
+        // colapsable solo tiene sentido en mensajes NO-último (que muestran
+        // los destinatarios históricos de ese mensaje específico cuando
+        // el user los expande).
         var toListParsed = parseToListFromMsg(msg);
-        if (toListParsed.length > 0) {
+        if (toListParsed.length > 0 && !isLastMessage) {
           var firstRecipient = toListParsed[0];
           var firstRecipientLabel = firstRecipient.name || firstRecipient.email || "(sin destinatario)";
           var moreCount = toListParsed.length - 1;
@@ -2905,12 +3079,24 @@
           <div class="compose-panel__field compose-panel__field--body">
             ${quoteHtml}
             <textarea class="compose-panel__textarea" id="compose-body" placeholder="${isReply ? 'Escribí tu respuesta...' : isForward ? 'Agregá un comentario (opcional)...' : 'Escribí tu mensaje...'}"></textarea>
+            <!-- FIX loop 33 — Drop zone + lista de adjuntos.
+                 El área completa del body es drop zone (dragover muestra feedback visual).
+                 Los archivos adjuntados se listan como chips con nombre, tamaño y botón X. -->
+            <div class="compose-panel__dropzone" id="compose-dropzone">
+              <div class="compose-panel__dropzone-hint">Arrastrá archivos aquí o usá el botón 📎</div>
+            </div>
+            <div class="compose-panel__attachments" id="compose-attachments"></div>
           </div>
         </div>
         <div class="compose-panel__toolbar">
-          <button class="compose-panel__toolbar__btn" type="button" title="Adjuntar archivo" disabled>
+          <!-- FIX loop 33 — Botón "Adjuntar archivo" habilitado (antes disabled).
+               Al hacer click abre el input file hidden que adjunta varios archivos. -->
+          <button class="compose-panel__toolbar__btn" type="button" title="Adjuntar archivo" id="compose-attach-btn">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
           </button>
+          <!-- FIX loop 33 — Input file hidden. Se activa al click del botón.
+               multiple: permite adjuntar varios archivos a la vez. -->
+          <input type="file" id="compose-attachments-input" multiple hidden />
           <button class="compose-panel__toolbar__btn" type="button" title="Insertar link" disabled>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
           </button>
@@ -3021,6 +3207,101 @@
       }
     }, 50);
 
+    // FIX loop 33 — Drag & drop + botón adjuntar
+    // Estado: array de archivos adjuntos (cada uno es un File object del browser)
+    var pendingAttachments = [];
+
+    // Función helper para formatear tamaño (Bytes → KB/MB)
+    function formatAttachSize(bytes) {
+      if (bytes < 1024) return bytes + " B";
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+      return (bytes / 1024 / 1024).toFixed(1) + " MB";
+    }
+
+    // Función helper para agregar archivos a la lista
+    function addAttachments(files) {
+      if (!files || files.length === 0) return;
+      for (var i = 0; i < files.length; i++) {
+        pendingAttachments.push(files[i]);
+      }
+      renderAttachments();
+    }
+
+    // Función helper para renderizar la lista de adjuntos
+    function renderAttachments() {
+      var container = modal.querySelector("#compose-attachments");
+      if (!container) return;
+      if (pendingAttachments.length === 0) {
+        container.innerHTML = "";
+        return;
+      }
+      var html = "";
+      for (var i = 0; i < pendingAttachments.length; i++) {
+        var f = pendingAttachments[i];
+        html += '<div class="compose-panel__attachment" data-idx="' + i + '">' +
+          '<span class="compose-panel__attachment-icon">📎</span>' +
+          '<span class="compose-panel__attachment-name">' + escapeHtml(f.name) + '</span>' +
+          '<span class="compose-panel__attachment-size">' + formatAttachSize(f.size) + '</span>' +
+          '<button class="compose-panel__attachment-remove" type="button" data-idx="' + i + '" title="Quitar">×</button>' +
+          '</div>';
+      }
+      container.innerHTML = html;
+      // Wire up remove buttons
+      var removeBtns = container.querySelectorAll(".compose-panel__attachment-remove");
+      for (var j = 0; j < removeBtns.length; j++) {
+        removeBtns[j].addEventListener("click", function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          var idx = parseInt(e.currentTarget.getAttribute("data-idx"), 10);
+          pendingAttachments.splice(idx, 1);
+          renderAttachments();
+        });
+      }
+    }
+
+    // Botón adjuntar → activa el input file
+    var attachBtn = modal.querySelector("#compose-attach-btn");
+    var fileInput = modal.querySelector("#compose-attachments-input");
+    if (attachBtn && fileInput) {
+      attachBtn.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        fileInput.click();
+      });
+      fileInput.addEventListener("change", function (e) {
+        addAttachments(e.target.files);
+        // Reset para permitir seleccionar el mismo archivo de nuevo
+        e.target.value = "";
+      });
+    }
+
+    // Drag & drop en el body del modal (drop zone)
+    var dropzone = modal.querySelector("#compose-dropzone");
+    if (dropzone) {
+      // dragover: prevenir default + mostrar feedback visual
+      dropzone.addEventListener("dragover", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.add("compose-panel__dropzone--active");
+      });
+      // dragleave: quitar feedback visual
+      dropzone.addEventListener("dragleave", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.remove("compose-panel__dropzone--active");
+      });
+      // drop: prevenir default + agregar archivos
+      dropzone.addEventListener("drop", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.remove("compose-panel__dropzone--active");
+        var files = e.dataTransfer ? e.dataTransfer.files : null;
+        if (files && files.length > 0) {
+          addAttachments(files);
+        }
+      });
+    }
+
     // 7) Acción de enviar
     modal.querySelector("#compose-send-btn").addEventListener("click", function () {
       sendComposedMail({
@@ -3110,7 +3391,14 @@
       });
 
       if (result && result.success) {
-        toast("Enviado", "Tu correo fue enviado correctamente", "success");
+        // FIX loop 34 — Undo de envío (5s window, Gmail-style)
+        // Después de enviar, mostrar un toast persistente con botón "Deshacer"
+        // durante 5 segundos. Si el user hace click, le indicamos cómo deshacer
+        // manualmente (la API de delete/trash de Gmail no está implementada en el
+        // backend todavía — queda como scope separado).
+        showUndoToast("Mensaje enviado", function () {
+          toast("Para deshacer", "Abrí Gmail → Enviados y eliminá el mensaje manualmente", "info");
+        });
         opts.closeModal();
         // Refrescar el cache para mostrar el nuevo mensaje
         if (api.emailCache && api.emailCache.syncInbox) {

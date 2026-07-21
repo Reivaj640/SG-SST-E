@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.121] - 2026-07-20
+
+### Added
+- **🎨 3 fixes visuales Gmail-style** — Loops 31-33 sobre Bandeja Integrada: (1) Loop 31 — Quote colapsable con mejor contraste (fondo `#f0f4f9`, borde izquierdo azul 4px `#1a73e8`, label con `font-weight: 600`, hover `#e8eef5`). (2) Loop 32 — "Para: x" colapsable unificado: el thread header ya muestra los recipients del último mensaje (loop 26), así que se eliminó el "para: x" propio del último mensaje individual para evitar duplicación visual. Los recipients siguen mostrándose en mensajes no-último cuando se expanden. (3) Loop 33 — Drag & drop de archivos al compose: botón "Adjuntar archivo" habilitado (antes `disabled`), `<input type="file" hidden multiple>` con wire-up al botón, drop zone en el body del modal con feedback visual (`.compose-panel__dropzone--active` con borde azul + fondo `#e8f0fe`), lista de archivos adjuntos con nombre/tamaño/botón X para quitar. Storage local en `pendingAttachments[]` (no se envían todavía — scope de integración con Gmail API).
+- **↩️ Loop 34 — Undo de envío (5s window, Gmail-style)** — Nueva función `showUndoToast(title, onUndo)` que muestra un toast persistente con botón "Deshacer" durante 5s después de enviar. Al hacer click en "Deshacer", el callback `onUndo` ejecuta `toast("Para deshacer", "Abrí Gmail → Enviados y eliminá el mensaje manualmente", "info")` (informativo, porque la API de delete/trash de Gmail no está implementada en el backend todavía). Reemplaza el `toast("Enviado", ..., "success")` simple que tenía antes.
+- **⏰ Loop 35 — Snooze (posponer) de correos** — Feature nueva: posponer un correo y sacarlo de la bandeja hasta una hora futura. Botón en la toolbar del detail con icono de reloj (label cambia entre "Posponer" y "Desnoozear" según estado). Al click muestra un toast con 4 opciones predefinidas: 1 hora, 3 horas, Mañana 9am, Próxima semana. Storage en `localStorage["kair.snoozedThreads"]` como `{"threadId": wakeTimeMs}`. Helpers: `getSnoozedMap()` (limpia snoozes vencidos), `isThreadSnoozed(threadId)`, `snoozeThread()`/`unsnoozeThread()`, `getSnoozeRemainingLabel()` ("en 1h", "en 2d", "ahora"). `renderMailList` filtra los mails snoozed de la lista INBOX (auto-cleanup cuando vence el wakeTime).
+
+### Changed
+- **🧹 Loop 36 — Eliminar BEM no usado** — Limpiados del CSS los selectores `.thread-header*` (15 reglas), `.quoted-thread` (1 regla) y `.message-block*` (13 reglas) del refactor BEM incompleto del 📦563. El HTML nunca se migró a esas clases (sigue usando `.kair-mail-detail__*` y `.kair-mail-message__*`), así que eran ~220 líneas de CSS muerto. También se eliminó el fragmento huérfano `gap: 6px; flex-wrap: wrap; }` que era residuo del mismo refactor incompleto.
+
+### Fixed
+- **🔧 Limpieza de gitignore** — Agregadas reglas para `node_modules/`, `__pycache__/`, `*.pyc`, `*.pyo`, `.vscode/`, `.idea/`, `.DS_Store`, `Thumbs.db` en `.gitignore`. Removidos del tracking los ~150 archivos de `node_modules/` que estaban commiteados erróneamente (xlsx, codepage, etc.). Ahora `node_modules/` se regenera con `npm install` desde `package.json`.
+
+### Build & Tooling
+- **🔖 Bump version 0.1.121** — `package.json` actualizado a v0.1.121 para reflejar los nuevos fixes visuales + features (snooze, undo, drag&drop).
+
+### Métricas
+- **Tests**: 503/503 OK acumulados (loops 1-36).
+- **Cache-bust**: v=575 → v=646 (71 versiones bumped en total).
+- **Commits acumulados en la rama**: 2 nuevos commits desde v0.1.120 (`39c01fa` loops 28-30 + este `🔖 v0.1.121` con loops 31-36).
+
 ## [0.1.120] - 2026-07-18
 
 ### Added

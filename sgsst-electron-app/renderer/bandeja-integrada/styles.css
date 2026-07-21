@@ -1956,229 +1956,10 @@ body {
   gap: 4px;
 }
 
-/* ============================================
-   📧 Componente 2: Thread header (.thread-header)
-   BEM-style. Recipients colapsables con <details>/<summary>.
-   ============================================ */
-.thread-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  padding: 20px 24px 16px;
-  border-bottom: 1px solid var(--email-border, #e0e0e0);
-  background: #fff;
-}
-.thread-header__avatar {
-  width: 52px;
-  height: 52px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: #fff;
-  flex-shrink: 0;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
-}
-.thread-header__main {
-  flex: 1;
-  min-width: 0;
-}
-.thread-header__sender-line {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 4px;
-}
-.thread-header__sender-name {
-  font-size: 1.0625rem;
-  font-weight: 700;
-  color: var(--email-text-primary, #202124);
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
-.thread-header__sender-email {
-  font-size: 0.875rem;
-  color: var(--email-text-secondary, #5f6368);
-  font-weight: 400;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
-.thread-header__recipients {
-  font-size: 0.8125rem;
-  color: var(--email-text-secondary, #5f6368);
-  margin-bottom: 4px;
-}
-.thread-header__recipients summary {
-  cursor: pointer;
-  user-select: none;
-  list-style: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.thread-header__recipients summary::-webkit-details-marker {
-  display: none;
-}
-.thread-header__recipients summary::before {
-  content: "▾";
-  font-size: 0.7rem;
-  transition: transform 120ms ease;
-}
-.thread-header__recipients[open] summary::before {
-  transform: rotate(180deg);
-}
-.thread-header__recipients-full {
-  margin-top: 6px;
-  padding: 8px 12px;
-  background: var(--email-bg-read, #f2f6fc);
-  border-radius: 4px;
-  font-size: 0.75rem;
-}
-.thread-header__recipients-row {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 2px;
-}
-.thread-header__recipients-label {
-  font-weight: 600;
-  color: var(--email-text-secondary, #5f6368);
-  min-width: 32px;
-}
-.thread-header__recipients-value {
-  color: var(--email-text-primary, #202124);
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
-.thread-header__meta {
-  display: flex;
-  align-items: flex-start;
-  flex-direction: column;
-  gap: 6px;
-  flex-shrink: 0;
-  text-align: right;
-  min-width: 110px;
-}
-.thread-header__date-full {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--email-text-primary, #202124);
-  white-space: nowrap;
-}
-.thread-header__date-time {
-  font-size: 0.75rem;
-  color: var(--email-text-secondary, #5f6368);
-}
-.thread-header__action-icons {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-  margin-top: 4px;
-}
-
-/* ============================================
-   📧 Componente 3: Quoted thread (.quoted-thread)
-   Cada mensaje del thread se renderiza como .message-block.
-   Solo el último viene expanded por default.
-   ============================================ */
-.quoted-thread {
-  padding: 0;
-}
-.message-block {
-  padding: 16px 0;
-  border-bottom: 1px solid var(--email-border, #e0e0e0);
-  cursor: pointer;
-}
-.message-block:last-child {
-  border-bottom: none;
-}
-.message-block--expanded {
-  cursor: default;
-}
-.message-block__summary {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 32px;
-}
-.message-block__summary-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: #fff;
-  flex-shrink: 0;
-}
-.message-block__summary-info {
-  flex: 1;
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  flex-wrap: wrap;
-  min-width: 0;
-}
-.message-block__summary-name {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--email-text-primary, #202124);
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
-.message-block__summary-snippet {
-  font-size: 0.8125rem;
-  color: var(--email-text-secondary, #5f6368);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex: 1;
-  min-width: 0;
-}
-.message-block__summary-date {
-  font-size: 0.75rem;
-  color: var(--email-text-secondary, #5f6368);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-.message-block__full {
-  display: none;
-  margin-top: 12px;
-  padding-left: 44px;
-}
-.message-block--expanded .message-block__full {
-  display: block;
-}
-.message-block__full-meta {
-  font-size: 0.75rem;
-  color: var(--email-text-secondary, #5f6368);
-  margin-bottom: 8px;
-}
-.message-block__full-body {
-  font-size: 0.875rem;
-  line-height: 1.65;
-  color: var(--email-text-primary, #202124);
-  white-space: normal;
-  word-wrap: break-word;
-}
-.message-block__full-body a {
-  color: var(--email-accent, #1a73e8);
-  text-decoration: underline;
-}
-.message-block__full-body blockquote {
-  margin: 12px 0 12px 8px;
-  padding: 4px 12px;
-  border-left: 2px solid var(--email-quote-border, #cccccc);
-  color: var(--email-text-secondary, #5f6368);
-  font-size: 0.85em;
-}
-  gap: 6px;
-  flex-wrap: wrap;
-}
+/* FIX loop 36 — Eliminar BEM no usado (.thread-header, .quoted-thread, .message-block).
+   Estas clases se crearon en el refactor BEM incompleto del 📦563 pero el HTML
+   nunca se migró. El HTML sigue usando .kair-mail-detail__* y .kair-mail-message__*.
+   Eliminar ~220 líneas de CSS muerto. */
 
 .kair-mail-detail__sender-row {
   display: flex;
@@ -2260,16 +2041,21 @@ body {
    Por default colapsado, el user clickea "..." para expandir (estilo Gmail). */
 .kair-mail-quote {
   margin: 12px 0;
-  border-left: 3px solid var(--kair-border, #dee2e6);
+  /* FIX loop 31 — Borde izquierdo azul (4px) en lugar de gris (3px).
+     Distingue visualmente el quote del body normal y le da identidad. */
+  border-left: 4px solid var(--kair-primary, #1a73e8);
   color: var(--kair-text-muted, #5f6368);
   font-size: 0.85em;
-  background: var(--kair-bg-app, #f8f9fa);
+  /* FIX loop 31 — Fondo con tinte azul (#f0f4f9) en lugar de gris
+     neutro (#f8f9fa). Más visible contra el fondo blanco del detail. */
+  background: #f0f4f9;
   border-radius: 0 4px 4px 0;
 }
 .kair-mail-quote summary::before {
   /* FIX loop 17 — Indicador ··· antes del label, más Gmail-style */
   content: "··· ";
-  color: var(--kair-text-muted, #5f6368);
+  /* FIX loop 31 — Color azul del accent para el ··· (no gris muted) */
+  color: var(--kair-primary, #1a73e8);
   font-weight: 600;
   margin-right: 4px;
 }
@@ -2279,11 +2065,15 @@ body {
   user-select: none;
   color: var(--kair-primary, #174ea6);
   font-size: 0.8125rem;
-  font-weight: 500;
+  /* FIX loop 31 — font-weight 600 (más bold que 500) para que el
+     label "N líneas citadas" sea más prominente. */
+  font-weight: 600;
   list-style: none;
 }
 .kair-mail-quote summary:hover {
-  background: var(--kair-bg-hover, #f1f3f5);
+  /* FIX loop 31 — Hover state más oscuro (#e8eef5) para feedback
+     visual claro al pasar el mouse. */
+  background: #e8eef5;
 }
 .kair-mail-quote summary::-webkit-details-marker {
   display: none;
@@ -2489,6 +2279,72 @@ body {
   background: transparent;
   font-family: inherit;
   line-height: 1.5;
+}
+
+/* FIX loop 33 — Drag & drop zone + attachments */
+.compose-panel__dropzone {
+  border: 2px dashed var(--kair-border, #dee2e6);
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 8px;
+  text-align: center;
+  background: var(--kair-bg-soft, #f8f9fa);
+  transition: border-color 160ms ease, background 160ms ease;
+}
+.compose-panel__dropzone--active {
+  border-color: var(--kair-primary, #1a73e8);
+  background: #e8f0fe;
+}
+.compose-panel__dropzone-hint {
+  font-size: 0.75rem;
+  color: var(--kair-text-muted, #5f6368);
+}
+.compose-panel__attachments {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+.compose-panel__attachment {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--kair-bg-soft, #f1f3f5);
+  border: 1px solid var(--kair-border, #dee2e6);
+  border-radius: 4px;
+  font-size: 0.8125rem;
+}
+.compose-panel__attachment-icon {
+  flex-shrink: 0;
+}
+.compose-panel__attachment-name {
+  flex: 1;
+  color: var(--email-text-primary, #202124);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.compose-panel__attachment-size {
+  color: var(--kair-text-muted, #5f6368);
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+.compose-panel__attachment-remove {
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--kair-text-muted, #5f6368);
+  font-size: 1rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.compose-panel__attachment-remove:hover {
+  background: rgba(220, 53, 69, 0.1);
+  color: var(--kair-danger, #dc3545);
 }
 .compose-panel__textarea:focus {
   outline: none;
