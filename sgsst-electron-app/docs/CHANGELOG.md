@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.129] - 2026-07-21
+
+### Fixed
+- **🐛 Click en evento del calendario no abría el modal de detalle** — Cuando el user hacía click en un evento del calendario grande, se mostraba un toast con info básica (Título · Sin lugar · Fecha) en la parte de abajo, pero el modal completo de detalle NUNCA se abría. CAUSA RAÍZ: el F4-fix (Loop 572) eliminó el `KAirCalendar` viejo que tenía el `onEventClick` callback, pero el `renderBigCalendar` custom (Loop 1918) que quedó en su lugar seguía usando `selectEvent(ev)` que SOLO mostraba el toast. La función `openEventDetailModal(ev, adapter)` existía y estaba bien implementada, pero NUNCA se llamaba desde el `selectEvent`. FIX (loops 46, 46b): (a) **Loop 46 CSS**: `.kair-event-modal-overlay` con `z-index: 500000` (era 300000, mismo que otros elementos del calendario → quedaba detrás), `backdrop-filter: blur(2px)`, y nuevo selector `.kair-event-modal-overlay[style*="display: flex"]` con `display: flex !important` para forzar la visibilidad. (b) **Loop 46b JS**: `selectEvent(ev)` ahora llama a `openEventDetailModal(ev, getKairCalendarAdapter())` cuando el evento NO tiene `linkedMailId` (en lugar de solo mostrar el toast). Si el modal no está disponible, fallback al toast. Resultado: el modal de detalle se abre centrado con overlay oscuro, mostrando header con categoría (color), título del evento, fecha + hora, ubicación, descripción, y los botones Marcar cumplido / Editar / Eliminar.
+
+### Build & Tooling
+- **🔖 Bump version 0.1.129** — `package.json` actualizado a v0.1.129.
+- **Cache-bust v=668 → v=669** — bump por el fix de `selectEvent` (CSS queda en v=668 porque solo cambió el JS del comportamiento).
+
 ## [0.1.128] - 2026-07-21
 
 ### Fixed

@@ -1360,15 +1360,30 @@ body {
   box-shadow: 0 0 0 1.5px var(--kair-primary, #174ea6);
 }
 /* F4 — Modal de detalle/crear/editar evento (K+AIR Bandeja Integrada) */
+/* Loop 46 — FIX CRÍTICO: el modal se renderizaba pero quedaba "pegado" abajo
+   del calendario en lugar de centrado. Causa: el z-index 300000 era igual
+   al de varios elementos del calendario (kair-cal-overlay también usa 300000
+   en algunos casos), entonces el modal quedaba detrás o mal posicionado.
+   Fix: z-index 500000 (más alto que cualquier elemento del calendario o del
+   Bandeja Integrada) + display:flex con !important para que el inline
+   style="display:flex" del JS siempre gane. */
 .kair-event-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
   display: none;
   align-items: center;
   justify-content: center;
-  z-index: 300000;  /* por encima del iframe del calendario viejo (200000) */
+  z-index: 500000;
   padding: 20px;
+}
+.kair-event-modal-overlay[style*="display: flex"],
+.kair-event-modal-overlay[style*="display:flex"] {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  animation: kair-modal-fade 160ms ease;
 }
 
 .kair-event-modal {

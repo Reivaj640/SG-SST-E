@@ -4076,8 +4076,18 @@
       render();
       toast("Evento vinculado con correo", "Abriste el correo que originó este evento.", "info");
     } else {
-      const cat = getCategoryStyle(ev.category);
-      toast(ev.title, `${cat.label || ev.category} · ${ev.location || "Sin lugar"} · ${ev.date}`, "info");
+      // Loop 46b — Antes solo mostraba un toast con info básica. Ahora también
+      // abre el modal de detalle completo (openEventDetailModal) para que el
+      // user pueda ver todos los detalles y editar/eliminar/marcar cumplido.
+      // El F4-fix eliminó el KAirCalendar viejo, pero el renderBigCalendar custom
+      // (línea 1918) usa este selectEvent que nunca llamaba al modal.
+      if (typeof openEventDetailModal === 'function') {
+        openEventDetailModal(ev, getKairCalendarAdapter());
+      } else {
+        // Fallback si el modal no está disponible
+        const cat = getCategoryStyle(ev.category);
+        toast(ev.title, `${cat.label || ev.category} · ${ev.location || "Sin lugar"} · ${ev.date}`, "info");
+      }
     }
   }
 
