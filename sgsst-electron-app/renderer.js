@@ -2179,90 +2179,12 @@ if (appHeader) {
     console.error('LLM button NOT found in DOM.');
   }
 
-  // Botón de calendario (K+AIR Calendar Component v1 — popover centralizado)
-  const calendarButton = document.getElementById('calendar-button');
-  if (calendarButton) {
-    console.log('Found calendar button, attaching event listener.');
-    if (typeof window.KairCalendar === 'object' && typeof window.KairCalendar.create === 'function') {
-      // Una sola instancia global — reusar si ya existe (p.ej. tras HMR o reinit).
-      if (!window.kairCal) {
-        window.kairCal = window.KairCalendar.create({
-          triggerSelector: '#calendar-button',
-          anchor: 'right',
-          inline: false,
-          initialView: 'month',
-          initialDate: new Date(),
-          locale: 'es',
-          showSidebar: true,
-          eventTypes: [
-            { id: 'plan',                 label: 'Plan de Trabajo',          color: '#174ea6' },
-            { id: 'capacitacion',         label: 'Capacitación',             color: '#28a745' },
-            { id: 'auditoria',            label: 'Auditoría',                color: '#ffc107' },
-            { id: 'rapido',               label: 'Evento rápido',            color: '#6c757d' },
-            { id: 'vencido',              label: 'Vencido',                  color: '#dc3545' },
-            // 📦497 — Seguimientos de Gestación (Salud Materna). Color rosa
-            // distintivo del módulo de gestación.
-            { id: 'gestacion',            label: 'Seguimiento Gestación',    color: '#ec4899' },
-            // 📦506 — Inspecciones planificadas del programa anual. Mismo azul
-            // que el header de Inspecciones (#174ea6) para coherencia visual.
-            // Aparece en la leyenda TIPOS DE EVENTO y permite al KairCalendar
-            // resolver el color del chip via _typeColorCache.
-            { id: 'inspeccion_programada', label: 'Inspección Programada',   color: '#174ea6' },
-            // 📦509 — Mantenimientos programados pendientes (MPP) del cronograma
-            // anual. Color teal (#0d9488) distintivo de mantenimiento, no choca
-            // con los azules de Inspecciones/Plan ni con los verdes de Capacitación.
-            { id: 'mantenimiento_programado', label: 'Mantenimiento Programado', color: '#0d9488' },
-            // 📦522 — Recordatorio mensual del COPASST (cumplimiento legal).
-            // Aparece el dia 1 de cada mes con el texto "Realizar Acta del
-            // COPASST". Color naranja intenso (#ea580c) bien diferenciable.
-            { id: 'recordatorio_copasst', label: 'Acta COPASST', color: '#ea580c' },
-            // 📦523 — Recordatorio mensual del Comite de Convivencia. Mismo
-            // patron que COPASST (Reunion mensual Res. 0312/2019 est. 6.2.2).
-            // Color cyan #0891b2 para distinguirse del naranja COPASST.
-            { id: 'recordatorio_convivencia', label: 'Acta Comite Convivencia', color: '#0891b2' },
-            // 📦524 — Recordatorio de Actualizacion de Presupuesto Mensual.
-            // 2 eventos por mes (dia 5 y dia 20, ajustados al lunes si caen
-            // en fin de semana). Color emerald #10b981 (verde monetario)
-            // para distinguirse del naranja COPASST y cyan Convivencia.
-            // Recordatorio OPERATIVO (no legal).
-            { id: 'recordatorio_presupuesto', label: 'Actualización Presupuesto', color: '#10b981' },
-            // 📦525 — Recordatorio de Afiliacion al SSSI (Sistema de Seguridad
-            // Social Integral). 1 evento por mes (dia 10, ajustado al lunes si
-            // cae en fin de semana). Color amber #f59e0b para distinguirse del
-            // resto. Recordatorio LEGAL-OPERATIVO (Ley 100/1993, Decreto 1295/1994).
-            { id: 'recordatorio_afiliacion', label: 'Afiliación SSSI', color: '#f59e0b' },
-            // 📦525 — Recordatorio de Actualizacion de Inducciones. 1 evento
-            // por mes (dia 2, ajustado al lunes si cae en fin de semana). Color
-            // indigo #6366f1 para distinguirse del resto. Recordatorio
-            // LEGAL-OPERATIVO (Decreto 1072/2015 art. 2.2.4.6.11).
-            { id: 'recordatorio_inducciones', label: 'Actualización Inducciones', color: '#6366f1' }
-          ],
-          adapter: window.KairCalendarAdapter || null,
-          onEventClick: function (ev) {
-            // 📦503 — FIX: el handler antes filtraba `ev.type !== 'rapido'` y
-            // para eventos rapido NO hacía nada (ni panel ni modal). El usuario
-            // reportaba "los eventos rapidos no los esta mostrando" + "no
-            // permite edicion" porque el chip se renderizaba pero clickarlo no
-            // abría ningún flujo. Ahora TODOS los tipos abren el detail panel
-            // (consistente); el panel agrega botón "Editar" solo para
-            // type==='rapido' (los demás se editan en su módulo origen).
-            if (ev && window.calendarDetailPanel) {
-              window.calendarDetailPanel.open(ev);
-            }
-          }
-        });
-      } else {
-        // Ya existe: solo registrar el trigger adicional (no-op si ya estaba).
-        if (typeof window.kairCal.addTrigger === 'function') {
-          window.kairCal.addTrigger(calendarButton);
-        }
-      }
-    } else {
-      console.warn('[K+AIR] KairCalendar no disponible — el botón calendario no tendrá acción.');
-    }
-  } else {
-    console.error('Calendar button NOT found in DOM.');
-  }
+  // 📦572 — Botón de calendario (K+AIR Calendar Component v1 — popover centralizado) RETIRADO.
+  // El calendario viejo ya no se abre desde el header de la app principal. La Bandeja Integrada
+  // tiene su propio calendario interno (mini-cal en sidebar + calendario grande en slide) que
+  // usa los mismos IPC handlers y datos. Si en el futuro se quiere re-activar, el código
+  // está disponible en el tag backup-pre-calendar-removal-2026-07-21.
+  // (NOOP: el bloque fue removido intencionalmente)
 
   // 📦 Alertas calendario — Inicializar el sistema de badge + popover de
   // pendientes. Se hace DESPUÉS de KairCalendar para que ambos coexistan

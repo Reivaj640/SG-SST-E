@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.123] - 2026-07-21
+
+### Removed
+- **🗑️ 📦572 — Retirar K+AIR Calendar viejo (popover del header)** — Se quitó el botón `calendar-button` del header principal de la app y todo su handler de click (KairCalendar.create con 14 eventTypes, onEventClick, etc). La Bandeja Integrada ya tiene su propio calendario interno (mini-cal en sidebar izquierdo + calendario grande en slide) que usa los mismos IPC handlers y los mismos datos, así que el calendario viejo era redundante. Cambios: (a) `sgsst-electron-app/index.html` — quitado el bloque `<button id="calendar-button">` y su badge `kair-cal-badge`. (b) `sgsst-electron-app/renderer.js` — quitado el bloque de 80 líneas que creaba la instancia de KairCalendar con todos los eventTypes (plan, capacitacion, auditoria, rapido, vencido, gestacion, inspeccion_programada, mantenimiento_programado, recordatorio_copasst, recordatorio_convivencia, recordatorio_presupuesto, recordatorio_afiliacion, recordatorio_inducciones). (c) `KairAlerts` se mantiene activo porque su badge ahora aparece en el botón de Bandeja Integrada (sigue mostrando el conteo de pendientes). (d) Los scripts compartidos `kair-calendar.js`, `kair-calendar-adapter.js`, `kair-calendar.css`, `kair-alerts.js` NO se quitaron del `index.html` principal porque el iframe de Bandeja Integrada y KairAlerts los siguen usando. Backup antes de los cambios: tag `backup-pre-calendar-removal-2026-07-21`. Resultado: -78 líneas netas de código (90 quitadas en renderer.js, 12 agregadas en index.html como documentación del cambio).
+
+### Build & Tooling
+- **🔖 Bump version 0.1.123** — `package.json` actualizado a v0.1.123 para reflejar el retiro del calendario viejo.
+
 ## [0.1.122] - 2026-07-21
 
 ### Added
