@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.122] - 2026-07-21
+
+### Added
+- **✚ Botón "Redactar" visible en la Bandeja Integrada (loops 37-37e)** — El header del iframe estaba oculto por CSS (kair-header display:none) y el handler `onComposeClick` solo mostraba un toast placeholder "próximamente F3.B". Ahora: botón "✚ Redactar" Gmail-style (azul, prominent) en la lista de correos, que abre el modal de compose real. Modal rediseñado estilo Gmail: cada input es una "fila" full-width con label DENTRO del input como placeholder (Para/Asunto/CC), el placeholder desaparece al hacer click o escribir. Titlebar del modal cambiado de fondo oscuro a claro (alineado con el resto). Drop zone rediseñado: invisible por defecto, aparece como overlay azul solo durante el drag, cubriendo todo el body field. Grises más suaves en todo el modal.
+- **📎 Loop 38 — Fix crítico de attachments** — Los archivos adjuntos (File objects de los chips) NUNCA se estaban enviando. La causa raíz estaba en 2 partes: (a) Frontend — `pendingAttachments[]` se renderizaba como chip pero nunca se pasaba a `sendComposedMail`. (b) Backend — `sendMessage` solo construía MIME `text/plain`, sin soporte para `multipart/mixed`. FIX: (a) `sendComposedMail` ahora lee cada File via FileReader.readAsDataURL, extrae la parte base64 pura, valida tamaño <=25MB (límite de Gmail), y pasa `[{name, mimeType, data}]` al IPC `googleGmail.sendMessage`. (b) `sendMessage` ahora detecta si hay attachments y construye un MIME `multipart/mixed` con boundary único (formato: `----=_KairBandeja_<timestamp>_<random>`), Content-Type correcto por archivo, Content-Disposition: attachment, Content-Transfer-Encoding: base64 con saltos de línea cada 76 chars (estándar MIME). Si NO hay attachments, mantiene el comportamiento anterior (text/plain) para compatibilidad con reply/forward.
+
+### Fixed
+- **🔧 Loop 38 — Attachments perdidos en el envío** — El usuario reportó que al enviar correo con adjuntos, los archivos se mostraban en el modal pero NO llegaban a Gmail. Causa raíz: `pendingAttachments` local al modal nunca se pasaba al handler de enviar, y el backend no construía MIME multipart. Ahora los adjuntos llegan correctamente a Gmail.
+
+### Build & Tooling
+- **🔖 Bump version 0.1.122** — `package.json` actualizado a v0.1.122 para reflejar el compose Gmail-style completo y el fix de attachments.
+- **Cache-bust**: v=646 → v=651 (v=647 loop 37 botón, v=648 loop 37b sin DE, v=649 loop 37c drop zone, v=650 loop 37d labels suaves, v=651 loop 37e placeholders Gmail).
+
 ## [0.1.121] - 2026-07-20
 
 ### Added
