@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.125] - 2026-07-21
+
+### Fixed
+- **🔗 Click en links del cuerpo del correo abría múltiples ventanas de Electron** — El bug tenía 3 causas raíz que se sumaban: (1) `<a href>` en iframes de Electron SIEMPRE dispara `target="_blank"` automático, incluso con `preventDefault()` y `useCapture: true` (es un comportamiento específico de Electron, no respeta el preventDefault). (2) `attachMailLinkClickHandler()` se llamaba cada vez que se renderizaba un mensaje del thread, y CADA llamada agregaba un nuevo listener al `document` (que es global, nunca se pierde). Resultado: 1 click en un link con thread de 8 mensajes = 8 listeners ejecutándose = 8 llamadas a `api.openExternalUrl()` = 8 ventanas de Electron abiertas en simultáneo. (3) El iframe de Bandeja Integrada NO tiene `window.electronAPI` directamente (solo el main app lo tiene via preload), por lo que el fallback a `window.open()` abría una nueva `BrowserWindow` de Electron en lugar del browser del sistema. FIX (loops 39-39h): (a) Pre-procesador de Google obfuscation para URLs multi-línea: `body.replace(/<(https?:\/\/[^>]+)>/g, ...)` con `replace(/\s+/g, '')` para unir las líneas que Google parte con `\n`. (b) Helper `attachMailLinkClickHandler()` con event delegation en capture phase (`document`) + bubble phase (`container`). (c) iframe `electronAPI` fallback: `var api = window.electronAPI || (window.parent && window.parent.electronAPI) || null;` — accede al IPC del main app via `window.parent.electronAPI`. (d) Solución principal: cambiar `<a href>` por `<span role="link" tabindex="0" data-href="...">` porque `<span>` NO tiene el comportamiento default problemático de `<a>` en Electron (necesita onclick explícito, no tiene `target="_blank"` automático). (e) Loop 39h — flag `isMailLinkHandlerAttached` que previene la duplicación del listener global del `document` (se adjunta UNA sola vez en todo el ciclo de vida del módulo). Defensa adicional: early-return si `e.defaultPrevented` es true. (f) CSS: `.kair-mail-link` ampliado para aplicar tanto a `<a>` como a `<span>`, focus visible con background. Resultado: 1 click en un link = 1 sola ventana del browser del sistema (Chrome/Edge/Firefox según el default del usuario), NO múltiples ventanas de Electron.
+
+### Changed
+- **🧹 Limpieza de console.log ruidosos** — Removidos los `console.log` de debug que se agregaron en loops 39-39e para identificar el bug. Solo se mantiene el log final `[BandejaIntegrada] ✓ <span> interceptado, abriendo en browser del sistema: ...` que confirma al usuario que el link se manejó correctamente.
+
+### Build & Tooling
+- **🔖 Bump version 0.1.125** — `package.json` actualizado a v0.1.125 para reflejar el fix crítico de duplicación de listeners.
+- **Cache-bust v=651 → v=659** — 8 versiones incrementadas durante la iteración del fix (v=652 loop 39, v=653 loop 39b, v=654 loop 39c, v=655 loop 39d, v=656 loop 39e, v=657 loop 39f, v=658 loop 39g, v=659 loop 39h listener dedup).
+
 ## [0.1.124] - 2026-07-21
 
 ### Fixed

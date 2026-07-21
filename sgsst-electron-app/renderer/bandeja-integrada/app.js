@@ -234,6 +234,19 @@
       function renderMailBodyHtml(body) {
     if (!body) return '<div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:32px 16px;color:var(--kair-text-light);"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg><p style="margin:0;font-size:0.875rem;font-weight:500;">Sin contenido en este correo</p><p style="margin:0;font-size:0.75rem;color:var(--kair-text-light);">El cuerpo del mensaje está vacío</p></div>';
 
+    // Loop 39b — Pre-procesar URLs ofuscadas de Google con patrón <URL>.
+    // Google a veces envuelve URLs largas en <URL> con saltos de línea adentro
+    // para evitar que los clientes de correo generen previews. Ejemplo real:
+    //   <https://accounts.google.com/AccountChooser?
+    //   Email=adminkair@gmail.com&continue=
+    //   https://myaccount.google.com/alert/nt/...et%3D0>
+    // El regex de linkify corta en el primer whitespace, así que solo capturaba
+    // la primera línea (URL incompleta) → Google respondía "Error 400 Bad Request".
+    // FIX: detectar el patrón completo <URL> y unir las líneas + quitar brackets.
+    body = body.replace(/<(https?:\/\/[^>]+)>/g, function (match, url) {
+      return url.replace(/\s+/g, "");
+    });
+
     // FIX 2026-07-19 (loop 13) — Parsing más profundo del body.
     // Estrategia de 5 pasadas para detectar quote incluso cuando el body
     // tiene: contenido + headers MIME sueltos + (separador) + quote anidado.
@@ -368,15 +381,112 @@
 
   // F1.A-fix2 — Detecta URLs en una línea y las convierte en links.
   // Escapa el resto de la línea y luego inserta los <a> alrededor de las URLs.
+  // Loop 39c — Quitamos `target="_blank"` del <a>: si el click handler (con
+  // useCapture=true) no atrapa el click, el default es navegar el iframe
+  // (no abrir ventana nueva de Electron). El click handler usa
+  // shell.openExternal para abrir en el browser del sistema.
+  // F1.A-fix2 — Detecta URLs en una línea y las convierte en "links seguros".
+  // Loop 39f — CAMBIO CRÍTICO: en vez de <a href>, usamos un <span> estilizado
+  // con onclick que llama a shell.openExternal. Razón: <a href> en un iframe
+  // de Electron dispara SIEMPRE target="_blank" → nueva ventana BrowserWindow,
+  // incluso con preventDefault(). El <span> NO tiene ese comportamiento por
+  // defecto — necesita onclick explícito para hacer algo.
+  //
+  // El <span> tiene role="link" + tabindex=0 + cursor:pointer + keydown
+  // handler para soporte de teclado (Enter / Space) y accesibilidad.
+  // Visualmente idéntico a un <a> (mismo color, mismo underline en hover).
   function linkifyLine(line) {
     // Escapar toda la línea primero
     var escaped = escapeHtml(line);
-    // Buscar URLs (http/https) y envolverlas con <a>
-    // La URL capturada NO debe contener < > (ya están escapados)
+    // Buscar URLs (http/https) y envolverlas con <span> en lugar de <a>.
+    // La URL capturada NO debe contener < > (ya están escapados).
     return escaped.replace(
       /\b(https?:\/\/[^\s<>"]+[^\s<>".])/g,
-      '<a href="$1" target="_blank" rel="noopener noreferrer" class="kair-mail-link">$1</a>'
+      function (match, url) {
+        return '<span role="link" tabindex="0" class="kair-mail-link" data-href="' + url + '">' + url + '</span>';
+      }
     );
+  }
+
+  // Loop 39h — FIX CRÍTICO: el listener del `document` se adjunta UNA SOLA VEZ.
+  // Antes: attachMailLinkClickHandler() se llamaba por cada mensaje del thread
+  // y CADA llamada agregaba un nuevo listener al `document` (que es global, nunca
+  // se pierde). Resultado: 1 click en un link con thread de 8 mensajes = 8 calls
+  // a api.openExternalUrl() = 8 ventanas de Electron abiertas.
+  //
+  // CAMBIOS vs Loop 39g:
+  // 1. Flag `isMailLinkHandlerAttached` previene duplicación del listener global
+  // 2. El listener del container sigue siendo por-mensaje (OK, container es nuevo
+  //    cada vez que se renderiza, así que el listener se va con el viejo)
+  // 3. Early-return si e.defaultPrevented (defensa adicional)
+  var isMailLinkHandlerAttached = false;
+  function attachMailLinkClickHandler(container) {
+    if (!container) return;
+    // Handler 1: capture phase en document — se adjunta UNA SOLA VEZ en todo el ciclo
+    // de vida del módulo. Aunque se llame 100 veces a attachMailLinkClickHandler,
+    // el listener en `document` se agrega solo la primera.
+    if (!isMailLinkHandlerAttached) {
+      document.addEventListener("click", function (e) {
+        handleMailLinkClick(e);
+      }, true);
+      isMailLinkHandlerAttached = true;
+    }
+    // Handler 2: bubble phase en container — se adjunta por cada render. Como el
+    // container es un nodo nuevo cada vez, el listener se va con el container viejo
+    // (GC lo limpia). No hay duplicación.
+    container.addEventListener("click", function (e) {
+      handleMailLinkClick(e);
+    });
+  }
+
+  function handleMailLinkClick(e) {
+    // Loop 39h — Defensa adicional: si el evento ya fue manejado por otro
+    // listener del document, salir. (Doble safety net por si la flag falla.)
+    if (e.defaultPrevented) return;
+    // Loop 39f — Acepta tanto <a> (legacy) como <span data-href> (nuevo).
+    // Itera hacia arriba buscando un elemento clickeable de link.
+    // IMPORTANTE: el iframe NO tiene window.electronAPI directamente — solo
+    // el main app lo tiene via preload. Tenemos que usar el fallback al
+    // window.parent.electronAPI, sino caemos al window.open() que abre
+    // una nueva BrowserWindow de Electron.
+    var api = (typeof window !== "undefined")
+      ? (window.electronAPI || (window.parent && window.parent.electronAPI) || null)
+      : null;
+    var openInSystemBrowser = function (url) {
+      if (api && typeof api.openExternalUrl === "function") {
+        // shell.openExternal via IPC — abre el browser del SISTEMA (Chrome/Edge/etc.)
+        api.openExternalUrl(url);
+        return true;
+      }
+      return false;
+    };
+    var target = e.target;
+    while (target && target !== document) {
+      if (target.tagName === "A" && target.href) {
+        var aHref = target.getAttribute("href");
+        if (aHref && /^https?:\/\//i.test(aHref)) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!openInSystemBrowser(aHref)) {
+            // Fallback: window.open con target=_blank (en Electron abre otra BrowserWindow)
+            window.open(aHref, "_blank", "noopener,noreferrer");
+          }
+          return;
+        }
+      }
+      if (target.classList && target.classList.contains("kair-mail-link") && target.dataset && target.dataset.href) {
+        var sHref = target.dataset.href;
+        if (sHref && /^https?:\/\//i.test(sHref)) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!openInSystemBrowser(sHref)) {
+            window.open(sHref, "_blank", "noopener,noreferrer");
+          }
+          return;
+        }
+      }
+      target = target.parentNode;
+    }
   }
 
   // ====== Toasts ======
@@ -2723,6 +2833,8 @@
         // Body del mensaje (cuando expandido)
         var msgBody = el("div", { class: "kair-mail-message__body" });
         msgBody.innerHTML = renderMailBodyHtml(msg.body_plain || "");
+        // Loop 39 — Interceptar clicks en links para abrirlos en el browser del sistema
+        attachMailLinkClickHandler(msgBody);
         msgDetails.appendChild(msgBody);
 
         // AUDITORÍA 2026-07-18 — "···" indicator si el body tiene más de 1 línea
@@ -2758,6 +2870,8 @@
       // Mensaje único (sin thread grouping) — F1.A render original
       const body = el("div", { class: "kair-mail-detail__body" });
       body.innerHTML = renderMailBodyHtml(mail.body || "");
+      // Loop 39 — Interceptar clicks en links para abrirlos en el browser del sistema
+      attachMailLinkClickHandler(body);
       scroll.appendChild(body);
     }
 

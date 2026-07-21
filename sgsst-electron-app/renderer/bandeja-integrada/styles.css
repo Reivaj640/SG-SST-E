@@ -2027,15 +2027,32 @@ body {
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
-/* F1.A-fix2 — Links dentro del body del correo. Color primario + underline. */
-.kair-mail-detail__body a.kair-mail-link {
+/* F1.A-fix2 — Links dentro del body del correo. Color primario + underline.
+   Loop 39f — Selector ampliado: aplica a <a> (legacy) y <span> (nuevo) con class
+   .kair-mail-link. Los <span> simulan links con role="link" + tabindex=0. */
+.kair-mail-detail__body a.kair-mail-link,
+.kair-mail-detail__body span.kair-mail-link,
+.kair-mail-message__body a.kair-mail-link,
+.kair-mail-message__body span.kair-mail-link {
   color: var(--kair-primary, #174ea6);
   text-decoration: underline;
   word-break: break-all;
+  cursor: pointer;
+  outline: none;
 }
-.kair-mail-detail__body a.kair-mail-link:hover {
+.kair-mail-detail__body a.kair-mail-link:hover,
+.kair-mail-detail__body span.kair-mail-link:hover,
+.kair-mail-detail__body span.kair-mail-link:focus,
+.kair-mail-message__body a.kair-mail-link:hover,
+.kair-mail-message__body span.kair-mail-link:hover,
+.kair-mail-message__body span.kair-mail-link:focus {
   color: var(--kair-primary-hover, #185abd);
   text-decoration: none;
+}
+.kair-mail-detail__body span.kair-mail-link:focus,
+.kair-mail-message__body span.kair-mail-link:focus {
+  background-color: rgba(23, 78, 166, 0.08);
+  border-radius: 2px;
 }
 /* F1.A-fix2 — Quoted text (líneas con ">"). Bloque colapsable con <details> HTML5.
    Por default colapsado, el user clickea "..." para expandir (estilo Gmail). */
