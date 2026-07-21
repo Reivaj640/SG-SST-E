@@ -162,34 +162,6 @@
     }
   }
 
-  // AUDITORIA 2026-07-18 — Formato día de la semana corto ("Dom", "Lun", etc.)
-  // Estilo Gmail: muestra el día de la semana en lugar de la fecha completa
-  // cuando el correo es reciente (hoy/ayer/esta semana)
-  function formatGmailWeekday(dateStr) {
-    if (!dateStr) return "";
-    try {
-      var d;
-      if (typeof dateStr === "number") {
-        d = new Date(dateStr < 1e12 ? dateStr * 1000 : dateStr);
-      } else {
-        d = new Date(dateStr);
-      }
-      if (isNaN(d.getTime())) return String(dateStr);
-      var weekdays = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-      var now = new Date();
-      var diffMs = now.getTime() - d.getTime();
-      var diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-      // Si es hoy, ayer o esta semana, mostrar solo el día
-      if (diffDays <= 6) {
-        return weekdays[d.getDay()];
-      }
-      // Si es más viejo, mostrar formato completo
-      return formatGmailDate(dateStr);
-    } catch (e) {
-      return String(dateStr);
-    }
-  }
-
   // FIX 2026-07-18 — Formato relativo "hace X horas" estilo Gmail.
   // Para fechas < 7 días: "hace X min/horas/días"
   // Para fechas más viejas: usar formatGmailDate (fecha completa)
@@ -2235,36 +2207,10 @@
     toolbar.appendChild(iconBtn(D.ICONS.printer, "Imprimir"));
     toolbar.appendChild(iconBtn(D.ICONS.more, "Más opciones"));
 
-    // AUDITORIA 2026-07-18 — "1 de N" dinámico con índice real del correo seleccionado
-    var currentIndex = state.mails.findIndex(function (m) { return m.id === state.selectedMailId; });
-    var totalMails = state.mails.length;
-    var currentPosition = currentIndex >= 0 ? (currentIndex + 1) : 1;
     const nav = el("div", { class: "ml-auto", style: { marginLeft: "auto", display: "flex", alignItems: "center", gap: "4px" } });
-    nav.innerHTML = `<span style="font-size:0.7rem;color:var(--kair-text-light);">${currentPosition} de ${totalMails}</span>`;
-    // Botón "anterior" (chevron up) — deshabilitado si es el primero
-    var prevBtn = el("button", { class: "kair-icon-btn", title: "Anterior", "aria-label": "Correo anterior" });
-    prevBtn.innerHTML = D.ICONS.chevronUp;
-    if (currentIndex <= 0) {
-      prevBtn.style.opacity = "0.4";
-      prevBtn.disabled = true;
-    } else {
-      prevBtn.addEventListener("click", function () {
-        if (currentIndex > 0) selectMail(state.mails[currentIndex - 1].id);
-      });
-    }
-    nav.appendChild(prevBtn);
-    // Botón "siguiente" (chevron down) — deshabilitado si es el último
-    var nextBtn = el("button", { class: "kair-icon-btn", title: "Siguiente", "aria-label": "Correo siguiente" });
-    nextBtn.innerHTML = D.ICONS.chevronRight.replace(/polyline points="9 18 15 12 9 6"/, 'polyline points="6 9 12 15 18 9"');
-    if (currentIndex >= totalMails - 1) {
-      nextBtn.style.opacity = "0.4";
-      nextBtn.disabled = true;
-    } else {
-      nextBtn.addEventListener("click", function () {
-        if (currentIndex < totalMails - 1) selectMail(state.mails[currentIndex + 1].id);
-      });
-    }
-    nav.appendChild(nextBtn);
+    nav.innerHTML = `<span style="font-size:0.7rem;color:var(--kair-text-light);">1 de 1</span>`;
+    nav.appendChild(iconBtn(D.ICONS.chevronUp, "Más reciente"));
+    nav.appendChild(iconBtn(D.ICONS.chevronRight.replace(/polyline points="9 18 15 12 9 6"/, 'polyline points="6 9 12 15 18 9"'), "Más antiguo"));
     toolbar.appendChild(nav);
     detail.appendChild(toolbar);
 
@@ -2312,7 +2258,7 @@
           <p class="kair-mail-detail__sender-email">${mail.senderEmail || ''}</p>
         </div>
         <div class="kair-mail-detail__time">
-          <div class="kair-mail-detail__time-main">${formatGmailWeekday(mail.date)}</div>
+          <div class="kair-mail-detail__time-main">${formatGmailDate(mail.date)}</div>
           <div class="kair-mail-detail__time-relative">${formatRelativeTime(mail.date)}</div>
         </div>
       </div>
@@ -2453,40 +2399,32 @@
           style: { display: isLastMessage ? "block" : "none", marginTop: "8px", paddingLeft: "44px", width: "100%" }
         });
 
-        // AUDITORÍA 2026-07-18 (v2) — "para: jrobles@kair-sst.co" como TEXTO PLANO (estilo Gmail)
+        // AUDITORÍA 2026-07-18 — "para: jrf2011 ▼" colapsable (estilo Gmail)
         // Solo si hay destinatarios. Si no hay, no mostrar la línea.
-        // Si hay muchos destinatarios (>3), mostrar "para: first, +N más" con dropdown.
         var toListParsed = parseToListFromMsg(msg);
         if (toListParsed.length > 0) {
-          if (toListParsed.length <= 3) {
-            // Pocos destinatarios: texto plano
-            var toText = toListParsed.map(function (a) { return a.name || a.email; }).join(", ");
-            var msgToLine = el("div", {
-              style: { fontSize: "0.75rem", color: "var(--kair-text-muted, #5f6368)", marginBottom: "8px", display: "flex", gap: "4px" }
-            });
-            msgToLine.appendChild(el("span", { style: { color: "var(--kair-text-light, #5f6368)" } }, "para:"));
-            msgToLine.appendChild(el("span", {}, toText));
-            msgDetails.appendChild(msgToLine);
-          } else {
-            // Muchos destinatarios: dropdown colapsable con +N
-            var firstRecipient = toListParsed[0];
-            var firstRecipientLabel = firstRecipient.name || firstRecipient.email || "(sin destinatario)";
-            var moreCount = toListParsed.length - 1;
+          var firstRecipient = toListParsed[0];
+          var firstRecipientLabel = firstRecipient.name || firstRecipient.email || "(sin destinatario)";
+          var moreCount = toListParsed.length - 1;
 
-            var recipientsDetails = el("details", { class: "kair-mail-message__recipients" });
-            var recipientsSummary = el("summary", {
-              style: { cursor: "pointer", listStyle: "none", display: "flex", alignItems: "center", gap: "6px", fontSize: "0.75rem", color: "var(--kair-text-muted, #5f6368)" }
-            });
-            recipientsSummary.innerHTML = '<span>para: ' + escapeHtml(firstRecipientLabel) + ' <span style="color:var(--kair-text-light,#999);">+' + moreCount + ' más</span></span><span class="kair-mail-message__recipients-arrow">▾</span>';
-            recipientsDetails.appendChild(recipientsSummary);
-            var recipientsContent = el("div", { class: "kair-mail-message__recipients-details" });
-            var toRow = el("div", { class: "kair-mail-message__recipients-row" });
-            toRow.appendChild(el("span", { class: "kair-mail-message__recipients-label" }, "Para:"));
-            toRow.appendChild(el("span", {}, toListParsed.map(function (a) { return a.name || a.email; }).join(", ")));
-            recipientsContent.appendChild(toRow);
-            recipientsDetails.appendChild(recipientsContent);
-            msgDetails.appendChild(recipientsDetails);
-          }
+          var recipientsDetails = el("details", { class: "kair-mail-message__recipients" });
+          var recipientsSummary = el("summary", {
+            style: { cursor: "pointer", listStyle: "none", display: "flex", alignItems: "center", gap: "6px", fontSize: "0.75rem", color: "var(--kair-text-muted, #5f6368)" }
+          });
+          // Ocultar marker nativo de <summary>
+          recipientsSummary.innerHTML = '<span>para: ' + escapeHtml(firstRecipientLabel) + (moreCount > 0 ? ' <span style="color:var(--kair-text-light,#999);">+' + moreCount + '</span>' : '') + '</span><span class="kair-mail-message__recipients-arrow">▾</span>';
+          recipientsDetails.appendChild(recipientsSummary);
+          // Contenido expandido con todos los destinatarios
+          var recipientsContent = el("div", { class: "kair-mail-message__recipients-details" });
+          // Para
+          var toRow = el("div", { class: "kair-mail-message__recipients-row" });
+          toRow.appendChild(el("span", { class: "kair-mail-message__recipients-label" }, "Para:"));
+          toRow.appendChild(el("span", {}, toListParsed.map(function (a) { return a.name || a.email; }).join(", ")));
+          recipientsContent.appendChild(toRow);
+          // CC si hay
+          // (FUTURO: parsear cc_list)
+          recipientsDetails.appendChild(recipientsContent);
+          msgDetails.appendChild(recipientsDetails);
         }
 
         // Body del mensaje (cuando expandido)
