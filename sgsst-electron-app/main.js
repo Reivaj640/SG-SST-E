@@ -1,6 +1,6 @@
 // main.js - Proceso principal de la aplicación Electron
 
-const { app, BrowserWindow, ipcMain, dialog, shell, nativeTheme } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, nativeTheme, Menu } = require('electron');
 const path = require('path');
 const fsp = require('fs').promises;
 const fs = require('fs');           // Para operaciones síncronas
@@ -867,6 +867,11 @@ const createWindow = () => {
     minHeight: 650, // Permite uso en pantallas 1366x768
     show: false, // Oculta hasta que loading screen complete
     icon: path.join(__dirname, 'assets', 'K+AIR-multires.ico'),
+    autoHideMenuBar: true, // 📦 Loop 47b (2026-07-21) — Oculta menú nativo por defecto.
+                           // Aparece SOLO cuando se presiona Alt (comportamiento estándar
+                           // de Windows para apps como Discord, Slack, VSCode, etc.).
+                           // En producción además se llama a Menu.setApplicationMenu(null)
+                           // para que ni siquiera aparezca con Alt (ver whenReady).
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -20134,6 +20139,19 @@ ipcMain.handle('incidencia:escribir-excel', async (event, mes, campos) => {
 // Iniciar el servidor OnlyOffice al iniciar la aplicación
 app.whenReady().then(() => {
     createWindow();
+
+    // 📦 Loop 47b (2026-07-21) — Menú nativo oculto en producción
+    // Combinado con autoHideMenuBar: true en el BrowserWindow:
+    //   - Modo DESARROLLO: menú OCULTO por defecto, aparece con Alt (estándar Windows)
+    //   - Modo PRODUCCIÓN: menú OCULTO TOTAL (ni Alt lo muestra)
+    // Esto le da al dev acceso rápido al menú con Alt para Reload/DevTools,
+    // y al cliente final una app limpia sin barra del sistema.
+    if (app.isPackaged) {
+        Menu.setApplicationMenu(null);
+        console.log('[MAIN] Menú nativo ocultado TOTALMENTE (app empaquetada / producción)');
+    } else {
+        console.log('[MAIN] Menú nativo oculto por defecto (presionar Alt para mostrar — modo desarrollo)');
+    }
 
     // Iniciar el servidor OnlyOffice Bridge
     startOnlyOfficeBridge();

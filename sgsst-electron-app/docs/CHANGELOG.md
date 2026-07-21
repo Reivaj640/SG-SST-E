@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.130] - 2026-07-21
+
+### Added
+- **🎨 Menú nativo de Electron oculto en dev y producción** — La barra de menú nativa de Windows (File / Edit / View / Window / Help) ya no se muestra de forma predeterminada. En **modo desarrollo** (`npm start`) el menú está oculto pero aparece temporalmente cuando se presiona la tecla **Alt** (comportamiento estándar de Windows para apps como Discord, Slack, VSCode). En **modo producción** (app instalada con `.exe`) el menú está oculto TOTALMENTE, ni siquiera aparece con Alt. Esto le da al dev acceso rápido a Reload/DevTools sin saturar la UI, y al cliente final una ventana limpia sin elementos del sistema operativo. Implementación: (a) nueva propiedad `autoHideMenuBar: true` en el `BrowserWindow` de `main.js` (opción nativa de Electron), (b) bloque condicional `if (app.isPackaged) { Menu.setApplicationMenu(null); }` en `app.whenReady()` que oculta el menú totalmente en producción.
+
+### Build & Tooling
+- **🔖 Bump version 0.1.130** — `package.json` actualizado a v0.1.130.
+
 ## [0.1.129] - 2026-07-21
 
 ### Fixed
