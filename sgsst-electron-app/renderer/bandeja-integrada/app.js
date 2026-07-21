@@ -210,48 +210,29 @@
     if (!body) return '<div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:32px 16px;color:var(--kair-text-light);"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg><p style="margin:0;font-size:0.875rem;font-weight:500;">Sin contenido en este correo</p><p style="margin:0;font-size:0.75rem;color:var(--kair-text-light);">El cuerpo del mensaje está vacío</p></div>';
 
     // 1. Detectar y remover headers MIME duplicados.
-    // FIX 2026-07-18: el regex anterior solo removía headers al INICIO del body.
-    // Pero cuando un correo tiene forwards/replies concatenados, los headers MIME
-    // pueden aparecer en CUALQUIER parte del body. Ahora eliminamos línea por línea.
+    // Solo removemos un BLOQUE CONTIGUO de headers al INICIO del body (típico de
+    // forwards/replies crudos de Gmail). NO eliminamos líneas sueltas en cualquier
+    // parte, porque en correos ENVIADOS (SENT) el cuerpo legítimo puede contener
+    // líneas que empiezan con "De:", "Para:", "Asunto:", etc. como parte del mensaje.
     var cleaned = body;
-    var lines = cleaned.split("\n");
+    var rawLines = cleaned.split("\n");
     // Regex de header MIME: "De: ...", "Enviado: ...", "Para: ...", etc.
-    // Patrón flexible que captura cualquier header conocido al inicio de línea.
     var mimeHeaderPattern = /^\s*(De|From|Enviado|Sent|Para|To|Asunto|Subject|CC|Cc|CCO|Bcc|Cco|Fecha|Date|Reply-To|Responder|MIME-Version|Content-Type|Content-Transfer-Encoding|X-[A-Za-z0-9-]+):\s*/i;
-    // Recorremos las líneas y eliminamos las que son headers MIME puros.
-    // Si hay un bloque de headers MIME (3+ líneas consecutivas), eliminamos también
-    // la línea vacía que suele seguir.
-    var filteredLines = [];
-    var consecutiveHeaderCount = 0;
-    for (var li = 0; li < lines.length; li++) {
-      var line = lines[li];
-      if (mimeHeaderPattern.test(line)) {
-        consecutiveHeaderCount++;
-        continue; // Skip esta línea
-      }
-      // Si la línea anterior era un header MIME y la actual es vacía, skip si ya hay 3+
-      if (consecutiveHeaderCount >= 3 && line.trim() === "") {
-        consecutiveHeaderCount = 0;
-        continue; // Skip línea vacía después de bloque de headers
-      }
-      // Si no es header ni línea vacía post-bloque, reset counter
-      consecutiveHeaderCount = 0;
-      filteredLines.push(line);
+    // Saltamos SOLO las líneas iniciales que son headers MIME contiguos.
+    var startIdx = 0;
+    while (startIdx < rawLines.length && mimeHeaderPattern.test(rawLines[startIdx])) {
+      startIdx++;
     }
+    // Si el bloque de headers inicial es contiguo, también saltamos la 1ª línea
+    // vacía que suele seguirlo.
+    if (startIdx > 0 && startIdx < rawLines.length && rawLines[startIdx].trim() === "") {
+      startIdx++;
+    }
+    var filteredLines = rawLines.slice(startIdx);
     cleaned = filteredLines.join("\n").trim();
     // También eliminar el separador "---------- Forwarded message ----------" que
     // algunos clientes ponen (Gmail lo usa en forwards)
     cleaned = cleaned.replace(/^-{5,}\s*Forwarded message\s*-{5,}\s*$/gim, '');
-    // Eliminar también líneas tipo "Date: X" o "From: X" sueltas en cualquier parte
-    // (por si quedaron headers que no se detectaron como bloque)
-    cleaned = cleaned.split("\n").filter(function (l) {
-      // No eliminar si la línea tiene contenido significativo más allá del header
-      var withoutHeader = l.replace(mimeHeaderPattern, "").trim();
-      if (withoutHeader.length === 0) return false; // Era solo el header
-      // Si la línea es el header + solo un email/url, no la eliminamos
-      // (porque podría ser contenido legítimo)
-      return true;
-    }).join("\n").trim();
 
     // 2. Limpiar placeholders de Gmail tipo "[image: Google]" que aparecen cuando
     // el correo tenía imágenes inline que el cliente no descargó.
@@ -266,12 +247,12 @@
     // IMPORTANTE: solo URLs http/https. NO escapamos < > porque el body es texto plano.
     // Patrón: captura URLs que NO estén ya dentro de < > (esos son links planos de texto,
     // los dejamos como están).
-    var lines = cleaned.split("\n");
+    var bodyLines = cleaned.split("\n");
     var inQuote = false;
     var result = [];
     var quoteBuffer = [];
-    for (var i = 0; i < lines.length; i++) {
-      var line = lines[i];
+    for (var i = 0; i < bodyLines.length; i++) {
+      var line = bodyLines[i];
       if (/^\s*>/.test(line)) {
         inQuote = true;
         quoteBuffer.push(line.replace(/^\s*>\s?/, ""));
@@ -1968,19 +1949,12 @@
           draggable: "true",
         });
 
-        // F1.A — Dot azul de "no leído" estilo Gmail. Reemplaza el check.
-        // Si el correo está leído, muestra el checkbox (para selección múltiple).
-        // Si no está leído, muestra el dot azul (indicador visual).
-        const unreadDot = el("span", {
-          class: "kair-mail-row__unread-dot",
-          title: "No leído",
-          "aria-label": "No leído",
-        });
-        row.appendChild(unreadDot);
+        // Columna 1 — Contenedor único (24px) que aloja check + dot superpuestos.
+        // El CSS intercambia dot <-> check según data-unread (Gmail-style).
+        const selectWrap = el("div", { class: "email-row__select kair-mail-row__select" });
 
-        // Checkbox
         const check = el("button", {
-          class: "kair-mail-row__check",
+          class: "email-row__check kair-mail-row__check",
           "data-checked": isChecked,
           "aria-label": "Seleccionar mensaje",
         });
@@ -1990,11 +1964,77 @@
           else state.checkedIds.add(m.id);
           render();
         });
-        row.appendChild(check);
+        selectWrap.appendChild(check);
 
-        // Star
+        const unreadDot = el("span", {
+          class: "email-row__unread-dot kair-mail-row__unread-dot",
+          title: "No leído",
+          "aria-label": "No leído",
+        });
+        selectWrap.appendChild(unreadDot);
+        row.appendChild(selectWrap);
+
+        // Columna 2 — Avatar (40x40, color de fondo derivado del email)
+        const avatar = el("div", {
+          class: "email-row__avatar kair-mail-row__avatar",
+          style: { background: m.avatarColor || "#5f6368" },
+          title: m.sender,
+        }, initials(m.sender));
+        row.appendChild(avatar);
+
+        // Columna 3 — Content: sender + subject/preview en una línea (estilo Gmail).
+        const content = el("div", { class: "email-row__content kair-mail-row__content" });
+
+        const sender = el("div", {
+          class: "email-row__sender kair-mail-row__sender",
+        }, m.sender);
+        content.appendChild(sender);
+
+        const tag = m.category === "meeting" ? '<span class="kair-mail-tag kair-mail-tag--meeting">Reunión</span>'
+                  : m.category === "urgent" ? '<span class="kair-mail-tag kair-mail-tag--urgent">Urgente</span>'
+                  : "";
+        // F1-Feature6 — Badge "N mensajes" cuando el thread tiene varios mensajes
+        var messageCountBadge = (m.messageCount && m.messageCount > 1)
+          ? '<span class="kair-mail-row__count" title="' + m.messageCount + ' mensajes en el hilo">' + m.messageCount + '</span>'
+          : "";
+        const subjectPreview = el("div", {
+          class: "email-row__subject-preview kair-mail-row__subject",
+        });
+        subjectPreview.innerHTML = `${tag}${messageCountBadge}<span class="email-row__subject-text kair-mail-row__subject-text">${m.subject}</span><span class="kair-hide-lg email-row__preview kair-mail-row__preview"> — ${m.preview}</span>`;
+        content.appendChild(subjectPreview);
+
+        // Indicador de adjunto dentro del content (no rompe el grid)
+        if (m.hasAttachment) {
+          const att = el("span", {
+            class: "email-row__attachment kair-mail-row__attachment",
+            title: "Tiene adjuntos",
+            "aria-label": "Tiene adjuntos",
+          });
+          att.innerHTML = D.ICONS.paperclip.replace(/width="\d+" height="\d+"/, 'width="12" height="12"');
+          att.style.color = "var(--kair-text-light)";
+          content.appendChild(att);
+        }
+        if (m.meetingSuggestion) {
+          const cal = el("span", {
+            class: "email-row__meeting kair-mail-row__meeting",
+            title: "Sugerencia de reunión",
+          });
+          cal.innerHTML = D.ICONS.calendarPlus.replace(/width="\d+" height="\d+"/, 'width="12" height="12"');
+          cal.style.color = "var(--kair-primary)";
+          content.appendChild(cal);
+        }
+        row.appendChild(content);
+
+        // Columna 4 — Meta: fecha (derecha) + acciones inline de adjunto/sugerencia.
+        const meta = el("div", { class: "email-row__meta kair-mail-row__meta" });
+        meta.appendChild(el("div", {
+          class: "email-row__date kair-mail-row__time",
+        }, m.time || "—"));
+        row.appendChild(meta);
+
+        // Columna 5 — Star (visible al hover o si está marcado).
         const star = el("button", {
-          class: "kair-mail-row__star",
+          class: "email-row__star kair-mail-row__star",
           "data-active": m.flagged,
           "aria-label": m.flagged ? "Quitar marca" : "Marcar",
           title: m.flagged ? "Quitar marca" : "Marcar",
@@ -2007,58 +2047,6 @@
           render();
         });
         row.appendChild(star);
-
-        // Avatar (40x40, color de fondo derivado del email)
-        const avatar = el("div", {
-          class: "kair-mail-row__avatar",
-          style: { background: m.avatarColor || "#5f6368" },
-          title: m.sender,
-        }, initials(m.sender));
-        row.appendChild(avatar);
-
-        // Sender
-        row.appendChild(el("div", {
-          class: "kair-mail-row__sender",
-          style: { fontSize: "0.8125rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
-        }, m.sender));
-
-        // Subject + preview
-        const subj = el("div", {
-          class: "kair-mail-row__subject",
-          style: { display: "flex", alignItems: "center", minWidth: "0" },
-        });
-        const tag = m.category === "meeting" ? '<span class="kair-mail-tag kair-mail-tag--meeting">Reunión</span>'
-                  : m.category === "urgent" ? '<span class="kair-mail-tag kair-mail-tag--urgent">Urgente</span>'
-                  : "";
-        // F1-Feature6 — Badge "N mensajes" cuando el thread tiene varios mensajes
-        var messageCountBadge = (m.messageCount && m.messageCount > 1)
-          ? '<span class="kair-mail-row__count" title="' + m.messageCount + ' mensajes en el hilo">' + m.messageCount + '</span>'
-          : "";
-        subj.innerHTML = `${tag}${messageCountBadge}<span class="kair-mail-row__subject-text" style="font-size:0.8125rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.subject}</span><span class="kair-hide-lg" style="font-size:0.7rem;color:var(--kair-text-light);fontWeight:400;flex:1;minWidth:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-left:8px;">— ${m.preview}</span>`;
-        row.appendChild(subj);
-
-        // Time
-        // F1.D-fix4 — Asegurar que SIEMPRE se muestre algo (aunque sea "—") y
-        // el text-align right + min-width para que no se corte.
-        var timeValue = m.time || "—";
-        row.appendChild(el("div", {
-          class: "kair-mail-row__time",
-          style: { minWidth: "50px", paddingLeft: "4px" }
-        }, timeValue));
-
-        // Attachment icon
-        const actions = el("div");
-        if (m.hasAttachment) {
-          actions.innerHTML = D.ICONS.paperclip.replace(/width="\d+" height="\d+"/, 'width="12" height="12"');
-          actions.firstChild.style.color = "var(--kair-text-light)";
-        }
-        if (m.meetingSuggestion) {
-          const cal = document.createElement("span");
-          cal.innerHTML = D.ICONS.calendarPlus.replace(/width="\d+" height="\d+"/, 'width="12" height="12"');
-          cal.firstChild.style.color = "var(--kair-primary)";
-          actions.appendChild(cal);
-        }
-        row.appendChild(actions);
 
         // F1.A — Hover actions (estilo Gmail: aparecen al pasar el mouse por encima).
         // Por ahora son UI solamente — la lógica real se hace en backend cuando
@@ -2217,16 +2205,54 @@
         <div class="kair-mail-detail__avatar" style="background:${mail.avatarColor};">${initials(mail.sender)}</div>
         <div class="kair-mail-detail__sender-info">
           <p class="kair-mail-detail__sender-name">${mail.sender}</p>
-          <p class="kair-mail-detail__sender-email">${mail.senderEmail}</p>
-          ${mail.recipient ? '<p class="kair-mail-detail__recipient">para: ' + mail.recipient + '</p>' : ''}
+          <p class="kair-mail-detail__sender-email">${mail.senderEmail || ''}</p>
         </div>
         <div class="kair-mail-detail__time">
-          <div style="font-weight:600;color:var(--kair-text-strong);">${formatGmailDate(mail.date)}</div>
-          <div style="font-size:0.7rem;color:var(--kair-text-muted);">${formatRelativeTime(mail.date)}</div>
+          <div class="kair-mail-detail__time-main">${formatGmailDate(mail.date)}</div>
+          <div class="kair-mail-detail__time-relative">${formatRelativeTime(mail.date)}</div>
         </div>
+      </div>
+      <div class="kair-mail-detail__actions">
+        <button class="kair-mail-detail__action-btn" type="button" title="Archivar" aria-label="Archivar" data-action="archive">${D.ICONS.archive}</button>
+        <button class="kair-mail-detail__action-btn" type="button" title="Marcar como no leído" aria-label="Marcar como no leído" data-action="mark-unread">${D.ICONS.mailOpen}</button>
+        <button class="kair-mail-detail__action-btn" type="button" title="Eliminar" aria-label="Eliminar" data-action="delete">${D.ICONS.trash}</button>
+        <span class="kair-mail-detail__actions-spacer"></span>
+        <button class="kair-mail-detail__action-btn" type="button" title="Marcar" aria-label="Marcar" data-action="star" data-active="${mail.flagged ? 'true' : 'false'}">${D.ICONS.star.replace(/fill=\"none\"/, m.flagged ? 'fill="currentColor"' : 'fill="none"')}</button>
+        <button class="kair-mail-detail__action-btn" type="button" title="Más opciones" aria-label="Más opciones" data-action="more">${D.ICONS.more}</button>
       </div>
       ${labelsHtml}
     `;
+
+    // AUDITORÍA 2026-07-18 — Wire up action buttons del thread header
+    setTimeout(function () {
+      var archiveBtn = header.querySelector('[data-action="archive"]');
+      var markUnreadBtn = header.querySelector('[data-action="mark-unread"]');
+      var deleteBtn = header.querySelector('[data-action="delete"]');
+      var starBtn = header.querySelector('[data-action="star"]');
+      if (archiveBtn) {
+        archiveBtn.addEventListener("click", function () {
+          if (typeof archiveMail === "function") archiveMail(mail);
+        });
+      }
+      if (markUnreadBtn) {
+        markUnreadBtn.addEventListener("click", function () {
+          mail.unread = true;
+          render();
+        });
+      }
+      if (deleteBtn) {
+        deleteBtn.addEventListener("click", function () {
+          toast("Eliminar", "Función pendiente de implementar", "info");
+        });
+      }
+      if (starBtn) {
+        starBtn.addEventListener("click", function () {
+          mail.flagged = !mail.flagged;
+          starBtn.setAttribute("data-active", mail.flagged ? "true" : "false");
+          render();
+        });
+      }
+    }, 0);
     scroll.appendChild(header);
 
     if (mail.category === "urgent") {
@@ -2262,95 +2288,132 @@
     }
 
     // Cuerpo
-    // F1.C — Thread grouping estilo Gmail:
-    //   - Cada mensaje en una "tarjeta" sin bordes
-    //   - Colapsado por default (excepto el último): solo avatar + sender + snippet
-    //   - Click en el header del mensaje → expand/collapse
-    //   - Expanded: header completo + body + quoted text colapsable
+    // AUDITORÍA 2026-07-18 — Thread grouping Gmail-style COMPACTO:
+    //   - Cada mensaje colapsado a 1 LÍNEA: avatar 32x32 + sender + SUBJECT completo inline + fecha
+    //   - Solo el último mensaje expandido por default
+    //   - Click en el head → expand/collapse
+    //   - Expanded: "para: jrf2011 ▼" colapsable + body completo + "···" si hay más
+    //   - Action icons en hover (responder, más ⋮)
     if (mail.messages && mail.messages.length > 1) {
       // Thread con varios mensajes
       mail.messages.forEach(function (msg, idx) {
         // Solo el último mensaje viene expanded por default
         var isLastMessage = idx === mail.messages.length - 1;
+
         var msgContainer = el("div", {
           class: "kair-mail-message" + (isLastMessage ? " kair-mail-message--expanded" : " kair-mail-message--collapsed"),
-          "data-message-id": msg.id,
-          style: {
-            display: "flex",
-            alignItems: "flex-start",
-            gap: "12px",
-            padding: "16px 0",
-            borderBottom: idx < mail.messages.length - 1 ? "1px solid var(--kair-border-soft, #e9ecef)" : "none",
-            cursor: "pointer"
-          }
+          "data-message-id": msg.id
         });
 
-        // Header siempre visible: avatar + sender + fecha
+        // Avatar del mensaje (32x32, más pequeño que el del thread header)
+        var msgAvatarInitials = (msg.from_name || msg.from_email || "?").split(" ").map(function (p) { return p[0]; }).slice(0, 2).join("").toUpperCase() || "?";
         var msgAvatar = el("div", {
           class: "kair-mail-message__avatar",
-          style: { width: "40px", height: "40px", borderRadius: "999px", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.875rem", fontWeight: 700, color: "#fff", background: "#" + stringHashColor(msg.from_email || msg.from_name || ""), flexShrink: 0 }
-        }, (msg.from_name || msg.from_email || "?").split(" ").map(function (p) { return p[0]; }).slice(0, 2).join("").toUpperCase() || "?");
+          style: { background: "#" + stringHashColor(msg.from_email || msg.from_name || "") }
+        }, msgAvatarInitials);
         msgContainer.appendChild(msgAvatar);
 
-        // Header del mensaje (sender, date, body snippet)
-        var msgHeader = el("div", {
-          class: "kair-mail-message__head",
-          style: { flex: 1, minWidth: 0, overflow: "hidden" }
-        });
-        var msgSenderLine = el("div", {
-          style: { display: "flex", alignItems: "baseline", gap: "8px", flexWrap: "wrap" }
-        });
-        var msgSenderName = el("span", {
-          style: { fontSize: "0.875rem", fontWeight: 600, color: "var(--kair-text-strong, #202124)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }
-        }, msg.from_name || msg.from_email || "(remitente desconocido)");
-        // FIX word-break: el email NO debe cortarse con ellipsis en medio de la palabra.
-        // Permitimos que se rompa en cualquier punto (overflow-wrap: anywhere) pero sin
-        // saltos de línea agresivos (word-break: keep-all mantiene palabras enteras).
-        var msgSenderEmail = el("span", {
-          style: { fontSize: "0.75rem", color: "var(--kair-text-muted, #5f6368)", marginLeft: "6px", whiteSpace: "nowrap", overflowWrap: "anywhere", maxWidth: "100%" }
-        }, "<" + (msg.from_email || "") + ">");
-        var msgDateLine = el("span", {
-          style: { fontSize: "0.75rem", color: "var(--kair-text-muted, #5f6368)", marginLeft: "auto", flexShrink: 0, whiteSpace: "nowrap" }
-        }, formatMsgDate(msg.date));
-        msgSenderLine.appendChild(msgSenderName);
-        msgSenderLine.appendChild(msgSenderEmail);
-        msgSenderLine.appendChild(msgDateLine);
-        msgHeader.appendChild(msgSenderLine);
+        // Head del mensaje: sender + subject + fecha en 1 línea horizontal
+        var msgHeader = el("div", { class: "kair-mail-message__head" });
 
-        // Body snippet/colapsado
-        var bodyText = (msg.body_plain || "").replace(/^De:.*?\n\n/s, "").replace(/^De:.*?\n/gm, "").trim();
+        // Línea 1: sender name (bold) + subject completo (gris) + fecha (derecha)
+        var msgLine = el("div", { class: "kair-mail-message__line" });
+        msgLine.appendChild(el("span", {
+          class: "kair-mail-message__sender"
+        }, msg.from_name || msg.from_email || "(remitente desconocido)"));
+        // AUDITORÍA 2026-07-18 — Subject completo como snippet (Gmail: NO usa el body)
+        // Si NO es el último mensaje, mostramos el subject del thread (que es la metadata del reply)
+        var msgSubject = (msg.subject && msg.subject !== mail.subject) ? msg.subject : mail.subject;
+        msgLine.appendChild(el("span", {
+          class: "kair-mail-message__subject"
+        }, msgSubject || ""));
+        msgLine.appendChild(el("span", {
+          class: "kair-mail-message__date"
+        }, formatMsgDate(msg.date)));
+        msgHeader.appendChild(msgLine);
+
+        // Línea 2 (snippet): primera línea del body, visible aunque esté expandido
+        var bodyText = (msg.body_plain || "").trim();
         var firstLine = bodyText.split("\n")[0] || "";
         if (firstLine.length > 200) firstLine = firstLine.substring(0, 200) + "...";
-        var msgSnippet = el("div", {
-          class: "kair-mail-message__snippet",
-          style: { fontSize: "0.8125rem", color: "var(--kair-text-body, #333)", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }
-        }, firstLine || "(sin contenido)");
-        msgHeader.appendChild(msgSnippet);
+        if (firstLine && firstLine !== msgSubject) {
+          msgHeader.appendChild(el("div", {
+            class: "kair-mail-message__snippet"
+          }, firstLine || "(sin contenido)"));
+        }
         msgContainer.appendChild(msgHeader);
 
         // Detalles expandidos (oculto por default en mensajes colapsados)
         var msgDetails = el("div", {
           class: "kair-mail-message__details",
-          style: { display: isLastMessage ? "block" : "none", marginTop: "12px", paddingLeft: "48px" }
+          style: { display: isLastMessage ? "block" : "none", marginTop: "8px", paddingLeft: "44px", width: "100%" }
         });
 
-        // Para: ... (en expanded) — solo si hay destinatarios. Si NO hay, no mostrar la línea.
+        // AUDITORÍA 2026-07-18 — "para: jrf2011 ▼" colapsable (estilo Gmail)
+        // Solo si hay destinatarios. Si no hay, no mostrar la línea.
         var toListParsed = parseToListFromMsg(msg);
         if (toListParsed.length > 0) {
-          var toText = toListParsed.map(function (a) { return a.name || a.email; }).join(", ");
-          var msgToLine = el("div", { style: { fontSize: "0.75rem", color: "var(--kair-text-muted, #5f6368)", marginBottom: "8px" } },
-            el("span", { style: { color: "var(--kair-text-light, #5f6368)" } }, "para: "),
-            el("span", {}, toText)
-          );
-          msgDetails.appendChild(msgToLine);
+          var firstRecipient = toListParsed[0];
+          var firstRecipientLabel = firstRecipient.name || firstRecipient.email || "(sin destinatario)";
+          var moreCount = toListParsed.length - 1;
+
+          var recipientsDetails = el("details", { class: "kair-mail-message__recipients" });
+          var recipientsSummary = el("summary", {
+            style: { cursor: "pointer", listStyle: "none", display: "flex", alignItems: "center", gap: "6px", fontSize: "0.75rem", color: "var(--kair-text-muted, #5f6368)" }
+          });
+          // Ocultar marker nativo de <summary>
+          recipientsSummary.innerHTML = '<span>para: ' + escapeHtml(firstRecipientLabel) + (moreCount > 0 ? ' <span style="color:var(--kair-text-light,#999);">+' + moreCount + '</span>' : '') + '</span><span class="kair-mail-message__recipients-arrow">▾</span>';
+          recipientsDetails.appendChild(recipientsSummary);
+          // Contenido expandido con todos los destinatarios
+          var recipientsContent = el("div", { class: "kair-mail-message__recipients-details" });
+          // Para
+          var toRow = el("div", { class: "kair-mail-message__recipients-row" });
+          toRow.appendChild(el("span", { class: "kair-mail-message__recipients-label" }, "Para:"));
+          toRow.appendChild(el("span", {}, toListParsed.map(function (a) { return a.name || a.email; }).join(", ")));
+          recipientsContent.appendChild(toRow);
+          // CC si hay
+          // (FUTURO: parsear cc_list)
+          recipientsDetails.appendChild(recipientsContent);
+          msgDetails.appendChild(recipientsDetails);
         }
 
-        // Body del mensaje
+        // Body del mensaje (cuando expandido)
         var msgBody = el("div", { class: "kair-mail-message__body" });
         msgBody.innerHTML = renderMailBodyHtml(msg.body_plain || "");
         msgDetails.appendChild(msgBody);
 
-        // Separador antes del siguiente mensaje
+        // AUDITORÍA 2026-07-18 — "···" indicator si el body tiene más de 1 línea
+        var bodyLines = bodyText.split("\n").filter(function (l) { return l.trim(); });
+        if (bodyLines.length > 1 && isLastMessage) {
+          var moreIndicator = el("div", {
+            class: "kair-mail-message__more",
+            title: "Mostrar todo el contenido"
+          }, "···");
+          msgDetails.appendChild(moreIndicator);
+        }
+
+        // AUDITORÍA 2026-07-18 — Action icons del mensaje (responder, más ⋮) en hover
+        var msgActions = el("div", { class: "kair-mail-message__actions" });
+        var msgReplyBtn = el("button", {
+          class: "kair-mail-message__action-btn",
+          title: "Responder",
+          "aria-label": "Responder"
+        });
+        msgReplyBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg>';
+        msgReplyBtn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          openComposeModal("reply", mail);
+        });
+        msgActions.appendChild(msgReplyBtn);
+        var msgMoreBtn = el("button", {
+          class: "kair-mail-message__action-btn",
+          title: "Más opciones",
+          "aria-label": "Más opciones"
+        });
+        msgMoreBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>';
+        msgActions.appendChild(msgMoreBtn);
+        msgDetails.appendChild(msgActions);
+
         msgContainer.appendChild(msgDetails);
 
         // Toggle expand/collapse al click en el header (no en el body)

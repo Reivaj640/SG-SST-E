@@ -723,21 +723,45 @@ body {
   font-weight: 700;
   color: var(--kair-text-strong);
 }
-/* F1.A — Dot azul de "no leído" estilo Gmail. Reemplaza el check cuando no leído. */
+/* F1.A — Dot azul de "no leído" estilo Gmail. Reemplaza el check cuando no leído.
+   El contenedor .kair-mail-row__select (24px) aloja check + dot superpuestos;
+   la celda del grid ya los posiciona. Se alinea con .email-row__* para evitar
+   reglas en conflicto. */
+.kair-mail-row__select {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  position: relative;
+}
 .kair-mail-row__unread-dot {
   width: 10px;
   height: 10px;
   border-radius: 999px;
   background: var(--kair-primary, #174ea6);
   display: none;
-  align-self: center;
-  justify-self: center;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
 }
 .kair-mail-row[data-unread="true"] .kair-mail-row__unread-dot {
   display: block;
 }
 .kair-mail-row[data-unread="true"] .kair-mail-row__check {
+  display: none;
+}
+.kair-mail-row[data-unread="true"] .kair-mail-row__check[data-checked="true"] {
+  display: flex;
+}
+.kair-mail-row[data-unread="true"] .kair-mail-row__check[data-checked="true"] + .kair-mail-row__unread-dot,
+.kair-mail-row__check[data-checked="true"] ~ .kair-mail-row__unread-dot {
+  display: none;
+}
+.kair-mail-row:hover .kair-mail-row__check {
+  display: flex;
+}
+.kair-mail-row:hover .kair-mail-row__unread-dot {
   display: none;
 }
 
@@ -748,7 +772,10 @@ body {
   border-radius: 3px;
   background: #fff;
   cursor: pointer;
-  display: inline-flex;
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  display: none;
   align-items: center;
   justify-content: center;
   transition: border-color 120ms ease, background 120ms ease;
@@ -759,6 +786,7 @@ body {
 .kair-mail-row__check[data-checked="true"] {
   background: var(--kair-primary);
   border-color: var(--kair-primary);
+  display: flex;
 }
 .kair-mail-row__check[data-checked="true"]::after {
   content: "✓";
@@ -827,6 +855,14 @@ body {
   background: #c2dbff;
   box-shadow: inset 3px 0 0 var(--email-accent);
 }
+.email-row__select {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  position: relative;
+}
 .email-row__check,
 .email-row__unread-dot {
   display: flex;
@@ -834,6 +870,10 @@ body {
   justify-content: center;
   width: 24px;
   height: 24px;
+}
+.email-row__check {
+  position: absolute;
+  inset: 0;
 }
 .email-row__unread-dot {
   width: 10px;
@@ -848,6 +888,12 @@ body {
   display: none;
 }
 .email-row[data-unread="false"] .email-row__unread-dot {
+  display: none;
+}
+.email-row:hover .email-row__check {
+  display: flex;
+}
+.email-row:hover .email-row__unread-dot {
   display: none;
 }
 .email-row__avatar {
@@ -3010,7 +3056,356 @@ body {
   background: var(--kair-primary);
 }
 
-/* F1-Feature2 — Chips de operadores de búsqueda (from:, to:, has:attachment, etc.) */
+/* ============================================
+   AUDITORÍA 2026-07-18 — Thread grouping Gmail-style COMPACTO
+   Formato: header 1 línea + mensajes 1 línea (colapsados) + body expandido
+   ============================================ */
+
+/* ---------- Thread header principal (header del detail) ---------- */
+.kair-mail-detail__header {
+  padding: 16px 20px 8px;
+  border-bottom: 1px solid var(--kair-border-soft, #e9ecef);
+}
+.kair-mail-detail__subject {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--kair-text-strong);
+  margin: 0 0 14px;
+  line-height: 1.3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  letter-spacing: -0.018em;
+}
+
+/* FIX 2026-07-18 — Label de carpeta (Recibidos/Enviados) como chip removable (estilo Gmail) */
+.kair-mail-detail__folder-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px 2px 10px;
+  background: var(--email-bg-soft, #e8f0fe);
+  color: var(--email-accent, #1a73e8);
+  border: 1px solid rgba(26, 115, 232, 0.2);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.kair-mail-detail__folder-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  color: var(--email-accent, #1a73e8);
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 120ms ease;
+}
+.kair-mail-detail__folder-remove:hover {
+  background: rgba(26, 115, 232, 0.15);
+}
+
+/* Sender row COMPACTO (estilo Gmail): avatar + sender info + actions todo en 1 línea */
+.kair-mail-detail__sender-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+}
+.kair-mail-detail__avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+.kair-mail-detail__sender-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.kair-mail-detail__sender-name {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--kair-text-strong, #202124);
+  line-height: 1.2;
+}
+.kair-mail-detail__sender-email {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--kair-text-muted, #5f6368);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.kair-mail-detail__recipient {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--kair-text-light, #5f6368);
+  line-height: 1.2;
+}
+.kair-mail-detail__time {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: 0.75rem;
+  color: var(--kair-text-muted, #5f6368);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.kair-mail-detail__time-main {
+  font-weight: 600;
+  color: var(--kair-text-strong, #202124);
+}
+.kair-mail-detail__time-relative {
+  font-size: 0.7rem;
+  color: var(--kair-text-muted, #5f6368);
+}
+
+/* FIX 2026-07-18 — Action icons al lado del último mensaje (estilo Gmail: star, emoji, reply, ⋮) */
+.kair-mail-detail__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 0;
+  border-top: 1px solid var(--kair-border-soft, #e9ecef);
+  margin-top: 8px;
+}
+.kair-mail-detail__actions-spacer {
+  flex: 1;
+}
+.kair-mail-detail__action-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--kair-text-muted, #5f6368);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 120ms ease, color 120ms ease;
+}
+.kair-mail-detail__action-btn:hover {
+  background: var(--kair-bg-hover, #f1f3f5);
+  color: var(--kair-text-strong, #202124);
+}
+.kair-mail-detail__action-btn[data-active="true"] {
+  color: var(--kair-warning, #ffc107);
+}
+
+/* ---------- Message block (cada mensaje del hilo) ---------- */
+.kair-mail-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--kair-border-soft, #e9ecef);
+  cursor: pointer;
+  position: relative;
+  transition: background 120ms ease;
+}
+.kair-mail-message:hover {
+  background: var(--kair-bg-hover, #f8f9fa);
+}
+.kair-mail-message:last-child {
+  border-bottom: none;
+}
+
+/* Avatar del mensaje (más pequeño que el del thread header) */
+.kair-mail-message__avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* Head del mensaje: sender + subject + fecha TODO en 1 línea horizontal */
+.kair-mail-message__head {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.kair-mail-message__line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8125rem;
+  line-height: 1.3;
+}
+.kair-mail-message__sender {
+  font-weight: 600;
+  color: var(--kair-text-strong, #202124);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 30%;
+  flex-shrink: 1;
+}
+.kair-mail-message__subject {
+  color: var(--kair-text-muted, #5f6368);
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+.kair-mail-message__date {
+  font-size: 0.75rem;
+  color: var(--kair-text-muted, #5f6368);
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* FIX 2026-07-18 — Snippet del body cuando colapsado (Gmail: primera línea del body) */
+.kair-mail-message__snippet {
+  font-size: 0.8125rem;
+  color: var(--kair-text-muted, #5f6368);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+/* FIX 2026-07-18 — "···" indicator (more content) */
+.kair-mail-message__more {
+  display: inline-block;
+  font-size: 0.8125rem;
+  color: var(--kair-text-muted, #5f6368);
+  letter-spacing: 0.2em;
+  margin-top: 4px;
+  cursor: pointer;
+  user-select: none;
+}
+.kair-mail-message__more:hover {
+  color: var(--kair-text-strong, #202124);
+}
+
+/* Recipients colapsables (Para: jrf2011 ▼) */
+.kair-mail-message__recipients {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--kair-text-muted, #5f6368);
+  margin: 8px 0;
+  cursor: pointer;
+  user-select: none;
+}
+.kair-mail-message__recipients:hover {
+  color: var(--kair-text-strong, #202124);
+}
+.kair-mail-message__recipients-arrow {
+  display: inline-block;
+  transition: transform 150ms ease;
+  font-size: 0.625rem;
+  color: var(--kair-text-muted, #5f6368);
+}
+.kair-mail-message__recipients[open] .kair-mail-message__recipients-arrow {
+  transform: rotate(180deg);
+}
+.kair-mail-message__recipients-details {
+  margin: 8px 0;
+  padding: 8px 12px;
+  background: var(--kair-bg-soft, #f8f9fa);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  color: var(--kair-text-muted, #5f6368);
+  line-height: 1.5;
+}
+.kair-mail-message__recipients-row {
+  display: flex;
+  gap: 8px;
+  padding: 2px 0;
+}
+.kair-mail-message__recipients-label {
+  font-weight: 600;
+  min-width: 50px;
+}
+
+/* Body del mensaje (cuando expandido) */
+.kair-mail-message__body {
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--kair-text-body, #202124);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+  margin-top: 12px;
+  padding-left: 44px; /* alinear con el head del mensaje (avatar 32 + gap 12) */
+}
+.kair-mail-message__body p {
+  margin: 0 0 12px;
+}
+.kair-mail-message__body a {
+  color: var(--email-accent, #1a73e8);
+  text-decoration: none;
+}
+.kair-mail-message__body a:hover {
+  text-decoration: underline;
+}
+
+/* Action icons del MENSAJE (no del thread header) — aparecen en hover */
+.kair-mail-message__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-left: 44px;
+  margin-top: 8px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.kair-mail-message:hover .kair-mail-message__actions {
+  opacity: 1;
+}
+.kair-mail-message__action-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--kair-text-muted, #5f6368);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 120ms ease, color 120ms ease;
+}
+.kair-mail-message__action-btn:hover {
+  background: var(--kair-bg-hover, #f1f3f5);
+  color: var(--kair-text-strong, #202124);
+}
+.kair-mail-search__chips {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
