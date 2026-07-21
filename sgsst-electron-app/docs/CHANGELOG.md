@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.126] - 2026-07-21
+
+### Added
+- **🎨 Render del body del correo como HTML Gmail-style (logo, botones, imágenes)** — El cuerpo del correo ahora se renderiza con su HTML original en lugar de texto plano. Se ven: el logo de Google, el botón "Ver actividad" como botón azul redondeado, las imágenes inline, la estructura visual del HTML preservada, y los links con el styling correcto. ANTES solo se mostraba el texto plano y los placeholders como `[image: Google]`.
+
+### Fixed
+- **🔧 Triple causa raíz del render de texto plano en correos HTML** — (1) `shared/google-gmail.js` `extractBody()` buscaba `text/plain` primero y nunca retornaba `text/html`. (2) Cuando solo había `text/html`, se lo "strippeaba" con `raw.replace(/<[^>]+>/g, ' ')` (le quitaba todos los tags). (3) `main/email-sync.js` línea 322 hardcodeaba `body_html: ''` al armar el `msgForDb` para `saveMessage`. Resultado: el cache NUNCA tenía HTML rico, la Bandeja Integrada renderizaba solo texto plano sin importar qué. FIX (loops 40-40b, 2 fases): (a) **Loop 40 frontend**: helper `sanitizeHtml(html)` con `DOMParser` que elimina tags peligrosos (`<script>`, `<iframe>`, `<object>`, `<embed>`, `<form>`, `<style>`, `<link>`, `<meta>`, etc), atributos `on*` (event handlers), URLs `javascript:` y `data:text/html`. Helper `isHtmlContent(str)` para detectar si el body es HTML o texto plano. `renderMailBodyHtml` ahora detecta HTML y lo envuelve en `<div class="kair-mail-message__html">` después de sanearlo. `loadMailBodyFromCache` ahora guarda `mail.body_html` además de `mail.body`. Las 2 llamadas a `renderMailBodyHtml` (thread grouping y single mail) ahora pasan `body_html || body_plain` con prioridad al HTML. (b) **Loop 40b backend**: refactor `extractBody` → `extractBodyParts(payload)` que retorna `{ plain, html }` por separado (HTML crudo, sin strippear). `normalizeMessage` ahora exporta `body_plain` Y `body_html` además de `body` (compatibilidad legacy). `email-sync.js` `msgForDb` ahora usa `normalizedMsg.body_plain || body` y `normalizedMsg.body_html || ''` en lugar de hardcodear vacío. (c) **CSS Gmail-style**: nuevo bloque `.kair-mail-message__html` con `max-width: 100%`, fuentes del sistema, `line-height: 1.6`, `word-wrap: break-word`. Estilos para `img` (responsive, max-width 100%, height auto), `table` (border-collapse), `h1-h6` (font-weight 600), `hr` (border-top), `blockquote` (border-left gris), `ul/ol/li`, `a` (color azul `#1a73e8` con underline en hover). (d) **IMPORTANTE — re-sincronización requerida**: los mensajes que ya estaban en el cache se sincronizaron ANTES de este fix, por lo que NO tienen HTML todavía. El user debe esperar al auto-refresh de 5 min o forzar un sync manual (botón Sincronizar / cerrar y abrir la app) para que el cache se llene con HTML.
+
+### Security
+- **🛡️ Sanitización XSS del HTML de emails** — `sanitizeHtml()` usa `DOMParser` para parsear el HTML en un Document temporal, eliminar tags peligrosos y atributos `on*` antes de inyectar via `innerHTML`. Previene XSS en correos maliciosos que intenten meter `<script>`, event handlers, `javascript:` URLs, o `data:text/html`. Validación por el user: el correo "Alerta de seguridad" de Google ahora se ve idéntico a Gmail (logo, botón "Ver actividad" como botón azul, link "https://myaccount.google.com/notifications" en azul, estructura visual completa, copyright de Google al final).
+
+### Build & Tooling
+- **🔖 Bump version 0.1.126** — `package.json` actualizado a v0.1.126 para reflejar el fix de render HTML.
+- **Cache-bust v=659 → v=660** — bump por el fix de render HTML (v=660 loop 40).
+
 ## [0.1.125] - 2026-07-21
 
 ### Fixed

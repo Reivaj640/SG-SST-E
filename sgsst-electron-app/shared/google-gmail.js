@@ -196,7 +196,15 @@ function normalizeMessage(msg, includeBody) {
     // F4 — SIEMPRE extraer body y attachments. La lista inicial usa format:'full'
     // (no 'metadata') para que el body venga en la primera carga. Si en el
     // futuro queremos lazy loading, podemos volver a poner la condición.
-    result.body = extractBody(msg.payload);
+    //
+    // Loop 40b — Extraer TANTO text/plain COMO text/html por separado. Antes solo
+    // se extraía text/plain (o text/html con tags removidos), por lo que el cache
+    // nunca tenía HTML rico. Ahora la Bandeja Integrada puede renderizar el HTML
+    // con el logo de Google, el botón "Ver actividad", las imágenes inline, etc.
+    var bodyParts = extractBodyParts(msg.payload);
+    result.body = bodyParts.plain;       // compatibilidad legacy (text/plain)
+    result.body_plain = bodyParts.plain; // para saveMessage → cache body_plain
+    result.body_html = bodyParts.html;   // para saveMessage → cache body_html
     result.attachments = extractAttachments(msg.payload);
   }
 
@@ -304,23 +312,47 @@ async function downloadAttachment(messageId, attachmentId, configPath) {
 }
 
 /**
- * Extrae el cuerpo en texto plano de un payload (busca text/plain, fallback a text/html).
- * Recursivo: maneja estructuras multipart anidadas (ej: multipart/mixed → multipart/alternative).
- * Patrón Mail-0: walk the parts tree.
+ * Loop 40b — Extrae TANTO el body en text/plain COMO en text/html de un payload.
+ * Antes (bug): esta función solo retornaba text/plain (o text/html CON TAGS
+ * REMOVIDOS via .replace(/<[^>]+>/g, ' ')). Resultado: el cache NUNCA tenía
+ * HTML rico, por lo que la Bandeja Integrada no podía renderizar el logo de
+ * Google, el botón "Ver actividad" como botón, las imágenes inline, etc.
+ *
+ * Ahora retorna un objeto { plain, html } donde:
+ *   - plain: texto plano (puede venir de text/plain nativo o de text/html con
+ *     tags removidos como fallback)
+ *   - html: HTML crudo sin modificar (para renderizar con formato Gmail)
+ *     Si el correo solo tiene text/plain, html queda como string vacío.
+ *
+ * Recursivo: maneja estructuras multipart anidadas (multipart/mixed →
+ * multipart/alternative). Patrón Mail-0: walk the parts tree.
  */
-function extractBody(payload) {
-  return walkPartsForBody(payload, 'text/plain', true) ||
-         walkPartsForBody(payload, 'text/html', true);
+function extractBodyParts(payload) {
+  return {
+    plain: walkPartsForBody(payload, 'text/plain', false) ||
+           walkPartsForBody(payload, 'text/html', true),  // fallback: HTML con tags removidos
+    html: walkPartsForBody(payload, 'text/html', false) || ''  // HTML crudo, sin strippear
+  };
 }
 
-function walkPartsForBody(payload, mimeType, decode) {
+/**
+ * Loop 40b (legacy) — Mantener por compatibilidad con callers viejos.
+ * Devuelve solo el text/plain. Si el body solo tiene HTML, lo devuelve con
+ * los tags removidos (modo "plain text view").
+ */
+function extractBody(payload) {
+  var parts = extractBodyParts(payload);
+  return parts.plain;
+}
+
+function walkPartsForBody(payload, mimeType, stripHtml) {
   if (!payload) return '';
   // Caso 1: el body está directamente en este payload
   if (payload.body && payload.body.data) {
     // Si este payload tiene mimeType, verificar que coincida
     if (!payload.mimeType || payload.mimeType === mimeType) {
       var raw = decodeBase64Url(payload.body.data);
-      if (decode && mimeType === 'text/html') {
+      if (stripHtml && mimeType === 'text/html') {
         return raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
       }
       return raw;
@@ -329,7 +361,7 @@ function walkPartsForBody(payload, mimeType, decode) {
   // Caso 2: recursivo en parts
   if (payload.parts && payload.parts.length > 0) {
     for (var i = 0; i < payload.parts.length; i++) {
-      var found = walkPartsForBody(payload.parts[i], mimeType, decode);
+      var found = walkPartsForBody(payload.parts[i], mimeType, stripHtml);
       if (found) return found;
     }
   }

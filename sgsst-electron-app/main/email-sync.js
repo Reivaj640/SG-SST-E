@@ -318,8 +318,11 @@ async function syncInbox(options) {
           cc_list: [],
           bcc_list: [],
           subject: normalizedMsg.subject || '',
-          body_plain: normalizedMsg.body || '',
-          body_html: '',
+          // Loop 40b — Usar body_plain y body_html que google-gmail.js ahora exporta.
+          // Antes body_html quedaba vacío, por lo que el cache nunca tenía HTML rico
+          // y la Bandeja Integrada renderizaba solo texto plano.
+          body_plain: normalizedMsg.body_plain || normalizedMsg.body || '',
+          body_html: normalizedMsg.body_html || '',
           snippet: normalizedMsg.snippet || '',
           date: msgDateMs,
           in_reply_to: null,

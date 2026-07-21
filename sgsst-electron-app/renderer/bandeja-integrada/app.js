@@ -219,6 +219,82 @@
   const initials = (name) =>
     name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
 
+  // Loop 40 — Sanitizador de HTML para emails.
+  // Gmail (y la mayoría de clientes) usan HTML rico en el body de los correos:
+  // <img>, <table>, <a>, <div>, <p>, etc. Si lo renderizamos con innerHTML sin
+  // sanitizar, abrimos la puerta a XSS (un correo malicioso puede meter
+  // <script>, <iframe>, onload, javascript: URLs, etc).
+  //
+  // APPROACH: usamos DOMParser para parsear el HTML en un Document temporal,
+  // eliminamos tags peligrosos y atributos on*, y devolvemos el HTML limpio.
+  // Es un approach seguro y rápido (no necesita librería externa).
+  //
+  // Tags eliminados: <script>, <style>, <iframe>, <object>, <embed>, <form>,
+  // <input>, <button>, <link>, <meta>, <base>, <frame>, <frameset>,
+  // <noframes>, <noscript>, <applet>
+  // Atributos eliminados: cualquier on* (onclick, onload, onerror, etc),
+  // href/src con javascript:
+  function sanitizeHtml(html) {
+    if (!html || typeof html !== "string") return "";
+    try {
+      var doc = new DOMParser().parseFromString(html, "text/html");
+
+      // 1. Eliminar tags peligrosos (incluyendo su contenido)
+      var dangerousTags = doc.querySelectorAll(
+        "script, style, iframe, object, embed, form, input, button, " +
+        "link, meta, base, frame, frameset, noframes, noscript, applet, " +
+        "svg, math"  // SVG/math pueden contener scripts en atributos
+      );
+      for (var i = 0; i < dangerousTags.length; i++) {
+        dangerousTags[i].parentNode.removeChild(dangerousTags[i]);
+      }
+
+      // 2. Eliminar atributos peligrosos de TODOS los elementos restantes
+      var all = doc.querySelectorAll("*");
+      for (var j = 0; j < all.length; j++) {
+        var el = all[j];
+        // Iterar sobre los atributos (es live, así que copiamos a array primero)
+        var attrs = Array.prototype.slice.call(el.attributes || []);
+        for (var k = 0; k < attrs.length; k++) {
+          var attr = attrs[k];
+          var name = (attr.name || "").toLowerCase();
+          var value = attr.value || "";
+          // Eliminar event handlers (onclick, onload, onerror, onmouseover, etc)
+          if (name.indexOf("on") === 0) {
+            el.removeAttribute(attr.name);
+            continue;
+          }
+          // Eliminar javascript: en href y src
+          if ((name === "href" || name === "src") && /^\s*javascript:/i.test(value)) {
+            el.removeAttribute(attr.name);
+            continue;
+          }
+          // Eliminar data: URLs en href (pueden contener HTML)
+          if (name === "href" && /^\s*data:text\/html/i.test(value)) {
+            el.removeAttribute(attr.name);
+            continue;
+          }
+        }
+      }
+      return doc.body.innerHTML || "";
+    } catch (err) {
+      console.warn("[BandejaIntegrada] sanitizeHtml error:", err.message);
+      // Si algo falla, devolver texto plano escapado (modo seguro)
+      return html.replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;");
+    }
+  }
+
+  // Loop 40 — Detecta si un string es HTML o texto plano.
+  // Heurística: si contiene tags HTML comunes (no solo saltos de línea) → HTML.
+  // Esto es para evitar renderizar texto plano como HTML (escaparíamos mal).
+  function isHtmlContent(str) {
+    if (!str || typeof str !== "string") return false;
+    // Busca tags HTML básicos: <tag>, </tag>, <br/>, <img ...>
+    return /<\s*\/?\s*(p|div|span|a|img|table|tr|td|th|h[1-6]|br|hr|strong|b|em|i|u|ul|ol|li|font|center|body|html)\b/i.test(str);
+  }
+
   // F1.A-fix2 — Render del body del correo con 3 mejoras:
   //   IMPORTANTE: NO escapamos HTML porque el body es text/plain.
   //   Si escapamos, los links planos como "<https://...>" se ven como "&lt;https...&gt;"
@@ -231,8 +307,20 @@
   //      target="_blank" + rel="noopener noreferrer" para evitar reverse tabnabbing.
   //   3. Detectar quoted text (líneas que empiezan con ">") y ponerlas en bloque colapsable.
   //      Estilo Gmail: el quote se ve en bloque con borde izquierdo gris.
+  //
+  // Loop 40 — Ahora también soporta HTML rico (body_html de Gmail). Si el body es HTML,
+  // lo sanea y lo renderiza dentro de .kair-mail-message__html (Gmail-style).
       function renderMailBodyHtml(body) {
     if (!body) return '<div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:32px 16px;color:var(--kair-text-light);"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg><p style="margin:0;font-size:0.875rem;font-weight:500;">Sin contenido en este correo</p><p style="margin:0;font-size:0.75rem;color:var(--kair-text-light);">El cuerpo del mensaje está vacío</p></div>';
+
+    // Loop 40 — Si el body es HTML rico (body_html de Gmail), lo sanea y renderiza
+    // como HTML real. Si es texto plano, sigue el flujo legacy de parsing.
+    if (isHtmlContent(body)) {
+      var cleanHtml = sanitizeHtml(body);
+      return '<div class="kair-mail-message__html">' + cleanHtml + '</div>';
+    }
+
+    // Loop 39b — Pre-procesar URLs ofuscadas de Google con patrón <URL>.
 
     // Loop 39b — Pre-procesar URLs ofuscadas de Google con patrón <URL>.
     // Google a veces envuelve URLs largas en <URL> con saltos de línea adentro
@@ -2832,7 +2920,9 @@
 
         // Body del mensaje (cuando expandido)
         var msgBody = el("div", { class: "kair-mail-message__body" });
-        msgBody.innerHTML = renderMailBodyHtml(msg.body_plain || "");
+        // Loop 40 — Preferir body_html (HTML rico de Gmail) sobre body_plain.
+        // renderMailBodyHtml detecta automáticamente si es HTML o texto plano.
+        msgBody.innerHTML = renderMailBodyHtml(msg.body_html || msg.body_plain || "");
         // Loop 39 — Interceptar clicks en links para abrirlos en el browser del sistema
         attachMailLinkClickHandler(msgBody);
         msgDetails.appendChild(msgBody);
@@ -2869,7 +2959,9 @@
     } else {
       // Mensaje único (sin thread grouping) — F1.A render original
       const body = el("div", { class: "kair-mail-detail__body" });
-      body.innerHTML = renderMailBodyHtml(mail.body || "");
+      // Loop 40 — Preferir body_html sobre body_plain. renderMailBodyHtml detecta
+      // automáticamente si es HTML (sanitiza + renderiza Gmail-style) o texto plano.
+      body.innerHTML = renderMailBodyHtml(mail.body_html || mail.body || "");
       // Loop 39 — Interceptar clicks en links para abrirlos en el browser del sistema
       attachMailLinkClickHandler(body);
       scroll.appendChild(body);
@@ -3626,6 +3718,11 @@
         var lastMsg = result.data.messages[result.data.messages.length - 1];
         if (lastMsg && lastMsg.body_plain) {
           mail.body = lastMsg.body_plain;
+          // Loop 40 — Guardar también el body_html (HTML rico de Gmail) si está
+          // disponible. Lo renderizamos con formato Gmail (logos, botones, etc).
+          if (lastMsg.body_html) {
+            mail.body_html = lastMsg.body_html;
+          }
           console.log("[BandejaIntegrada] Thread " + threadId + " cargado: " + result.data.messages.length + " mensaje(s)");
         }
         // F1-Feature5 — Cargar los adjuntos reales de cada mensaje en paralelo

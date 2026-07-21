@@ -3454,6 +3454,78 @@ body {
   text-decoration: underline;
 }
 
+/* Loop 40 — Wrapper para HTML rico de Gmail (body_html).
+   El HTML viene sanitizado (sin scripts/iframes/handlers). El wrapper
+   le da estilos consistentes con el resto de la UI (max-width, fuentes,
+   colores) sin afectar el HTML interno. */
+.kair-mail-message__html {
+  font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--kair-text-body, #202124);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
+  /* Gmail-style: el HTML puede tener su propio padding, no se lo quitamos */
+}
+.kair-mail-message__html p {
+  margin: 0 0 12px;
+}
+.kair-mail-message__html img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 8px 0;
+}
+.kair-mail-message__html table {
+  border-collapse: collapse;
+  max-width: 100%;
+  margin: 8px 0;
+}
+.kair-mail-message__html table td,
+.kair-mail-message__html table th {
+  padding: 4px 8px;
+}
+.kair-mail-message__html h1,
+.kair-mail-message__html h2,
+.kair-mail-message__html h3,
+.kair-mail-message__html h4,
+.kair-mail-message__html h5,
+.kair-mail-message__html h6 {
+  margin: 16px 0 8px;
+  font-weight: 600;
+  color: var(--kair-text-body, #202124);
+}
+.kair-mail-message__html hr {
+  border: none;
+  border-top: 1px solid var(--email-border, #e0e0e0);
+  margin: 16px 0;
+}
+.kair-mail-message__html blockquote {
+  margin: 8px 0;
+  padding: 4px 12px;
+  border-left: 3px solid var(--email-border, #e0e0e0);
+  color: var(--kair-text-light, #5f6368);
+}
+.kair-mail-message__html ul,
+.kair-mail-message__html ol {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+.kair-mail-message__html li {
+  margin: 4px 0;
+}
+/* Gmail-style: los links DENTRO del HTML de email también son azules.
+   Como el HTML está dentro de .kair-mail-message__body, estos selectores
+   se acumulan con los de .kair-mail-message__body a. */
+.kair-mail-message__html a {
+  color: var(--email-accent, #1a73e8);
+  text-decoration: none;
+}
+.kair-mail-message__html a:hover {
+  text-decoration: underline;
+}
+
 /* Action icons del MENSAJE (no del thread header) — FIX loop 15: siempre visibles */
 /* FIX loop 26 — Las acciones ahora están en el HEAD (Gmail-style) */
 .kair-mail-message__actions {
