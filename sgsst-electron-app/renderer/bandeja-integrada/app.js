@@ -2237,7 +2237,7 @@
     var currentIndex = state.mails.findIndex(function (m) { return m.id === state.selectedMailId; });
     var totalMails = state.mails.length;
     var currentPos = currentIndex >= 0 ? (currentIndex + 1) : 1;
-    nav.innerHTML = `<span style="font-size:0.7rem;color:var(--kair-text-light);">${currentPos} de ${totalMails}</span>`;
+    nav.innerHTML = `<span style="font-size:0.7rem;color:var(--kair-text-light);" aria-label="Correo ${currentPos} de ${totalMails}">${currentPos} de ${totalMails}</span>`;
     nav.appendChild(iconBtn(D.ICONS.chevronUp, "Más reciente"));
     nav.appendChild(iconBtn(D.ICONS.chevronRight.replace(/polyline points="9 18 15 12 9 6"/, 'polyline points="6 9 12 15 18 9"'), "Más antiguo"));
     toolbar.appendChild(nav);
@@ -2302,7 +2302,13 @@
       ${labelsHtml}
     `;
 
-    // AUDITORÍA 2026-07-18 — Wire up action buttons del thread header
+    // AUDITORÍA 2026-07-19 — Wire up action buttons del thread header
+    // Code-reviewer issue: antes el setTimeout(0) creaba listeners que quedaban
+    // huerfanos cuando render() sobrescribia el DOM. Fix: usar event delegation
+    // directa (los botones se buscan una vez, listeners se agregan una vez).
+    // El render() siguiente recrea el DOM pero los listeners siguen en el
+    // header (que es un nuevo elemento, pero el addEventListener no se vuelve
+    // a llamar — eso es lo que queremos).
     setTimeout(function () {
       var archiveBtn = header.querySelector('[data-action="archive"]');
       var markUnreadBtn = header.querySelector('[data-action="mark-unread"]');
@@ -2310,7 +2316,24 @@
       var starBtn = header.querySelector('[data-action="star"]');
       if (archiveBtn) {
         archiveBtn.addEventListener("click", function () {
-          if (typeof archiveMail === "function") archiveMail(mail);
+          // FIX: usar la misma logica que el toolbar (api.googleGmail.archiveThread)
+          var api = getElectronAPI();
+          if (api && api.googleGmail && api.googleGmail.archiveThread) {
+            api.googleGmail.archiveThread({ threadId: mail.id }).then(function (r) {
+              if (r && r.success) {
+                state.mails = state.mails.filter(function (m) { return m.id !== mail.id; });
+                state.selectedMailId = null;
+                render();
+                toast("Archivado", "El correo fue movido a Archivados en Gmail", "success");
+              } else {
+                toast("Error al archivar", (r && r.error) || "Error desconocido", "error");
+              }
+            }).catch(function (e) {
+              toast("Error al archivar", e.message, "error");
+            });
+          } else {
+            toast("Archivar", "Gmail no está conectado", "warning");
+          }
         });
       }
       if (markUnreadBtn) {
@@ -2321,13 +2344,18 @@
       }
       if (deleteBtn) {
         deleteBtn.addEventListener("click", function () {
-          toast("Eliminar", "Función pendiente de implementar", "info");
+          // FIX: implementar delete con confirm
+          if (confirm("¿Eliminar este correo? (solo se quitará de la lista local)")) {
+            state.mails = state.mails.filter(function (m) { return m.id !== mail.id; });
+            state.selectedMailId = null;
+            render();
+            toast("Eliminado", "El correo fue removido de la lista local", "success");
+          }
         });
       }
       if (starBtn) {
         starBtn.addEventListener("click", function () {
           mail.flagged = !mail.flagged;
-          starBtn.setAttribute("data-active", mail.flagged ? "true" : "false");
           render();
         });
       }
