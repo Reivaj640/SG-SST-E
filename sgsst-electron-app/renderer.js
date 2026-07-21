@@ -1041,7 +1041,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     bandejaIntegradaFrame = document.createElement('iframe');
     bandejaIntegradaFrame.id = 'bandeja-integrada-frame';
-    bandejaIntegradaFrame.src = 'renderer/bandeja-integrada/index.html?v=619';
+    bandejaIntegradaFrame.src = 'renderer/bandeja-integrada/index.html?v=640';
     // F4-fix — Usar el alto REAL del header de la app principal (no un valor fijo)
     // para que el iframe arranque justo donde termina el header, sin solaparlo.
     var mainHeader = document.getElementById('app-header');

@@ -231,92 +231,132 @@
   //      target="_blank" + rel="noopener noreferrer" para evitar reverse tabnabbing.
   //   3. Detectar quoted text (líneas que empiezan con ">") y ponerlas en bloque colapsable.
   //      Estilo Gmail: el quote se ve en bloque con borde izquierdo gris.
-  function renderMailBodyHtml(body) {
+      function renderMailBodyHtml(body) {
     if (!body) return '<div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:32px 16px;color:var(--kair-text-light);"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg><p style="margin:0;font-size:0.875rem;font-weight:500;">Sin contenido en este correo</p><p style="margin:0;font-size:0.75rem;color:var(--kair-text-light);">El cuerpo del mensaje está vacío</p></div>';
 
-    // 1. Detectar y remover headers MIME duplicados.
-    // Solo removemos un BLOQUE CONTIGUO de headers al INICIO del body (típico de
-    // forwards/replies crudos de Gmail). NO eliminamos líneas sueltas en cualquier
-    // parte, porque en correos ENVIADOS (SENT) el cuerpo legítimo puede contener
-    // líneas que empiezan con "De:", "Para:", "Asunto:", etc. como parte del mensaje.
-    var cleaned = body;
-    var rawLines = cleaned.split("\n");
-    // Regex de header MIME: "De: ...", "Enviado: ...", "Para: ...", etc.
-    var mimeHeaderPattern = /^\s*(De|From|Enviado|Sent|Para|To|Asunto|Subject|CC|Cc|CCO|Bcc|Cco|Fecha|Date|Reply-To|Responder|MIME-Version|Content-Type|Content-Transfer-Encoding|X-[A-Za-z0-9-]+):\s*/i;
-    // Saltamos SOLO las líneas iniciales que son headers MIME contiguos.
-    var startIdx = 0;
-    while (startIdx < rawLines.length && mimeHeaderPattern.test(rawLines[startIdx])) {
-      startIdx++;
-    }
-    // Si el bloque de headers inicial es contiguo, también saltamos la 1ª línea
-    // vacía que suele seguirlo.
-    if (startIdx > 0 && startIdx < rawLines.length && rawLines[startIdx].trim() === "") {
-      startIdx++;
-    }
-    var filteredLines = rawLines.slice(startIdx);
-    cleaned = filteredLines.join("\n").trim();
-    // También eliminar el separador "---------- Forwarded message ----------" que
-    // algunos clientes ponen (Gmail lo usa en forwards)
-    cleaned = cleaned.replace(/^-{5,}\s*Forwarded message\s*-{5,}\s*$/gim, '');
+    // FIX 2026-07-19 (loop 13) — Parsing más profundo del body.
+    // Estrategia de 5 pasadas para detectar quote incluso cuando el body
+    // tiene: contenido + headers MIME sueltos + (separador) + quote anidado.
+    //
+    // 1) Detectar separador "---------- Forwarded message ----------" o
+    //    "________________________________" → marca inicio de quote.
+    // 2) Detectar "El X escribió:" / "On X wrote:" → header del quote.
+    // 3) Detectar bloques de headers MIME (De:/Enviado:/Para:/Asunto:/
+    //    From:/To:/Subject:/Date:) en cualquier parte y meterlos en el quote.
+    // 4) Detectar quoted text con `>` → blockquote colapsable.
+    // 5) El resto es el cuerpo principal del mensaje.
 
-    // 2. Limpiar placeholders de Gmail tipo "[image: Google]" que aparecen cuando
-    // el correo tenía imágenes inline que el cliente no descargó.
-    // Los removemos porque no aportan al contenido visible.
-    cleaned = cleaned.replace(/^\[image: [^\]]+\]\s*$/gm, '');
-
-    // 3. Limpiar líneas de guiones/separadores que algunos clientes de correo
-    // ponen al final del cuerpo (ej: "________________________________")
-    cleaned = cleaned.replace(/^_{20,}\s*$/gm, '');
-
-    // 4. Convertir URLs a links (sin escapar, solo reemplazar).
-    // IMPORTANTE: solo URLs http/https. NO escapamos < > porque el body es texto plano.
-    // Patrón: captura URLs que NO estén ya dentro de < > (esos son links planos de texto,
-    // los dejamos como están).
-    var bodyLines = cleaned.split("\n");
+    var rawLines = body.split("\n");
+    var mainBody = [];
+    var quoteLines = [];
     var inQuote = false;
-    var result = [];
-    var quoteBuffer = [];
-    for (var i = 0; i < bodyLines.length; i++) {
-      var line = bodyLines[i];
+    var quoteHeader = "";
+    var consecutiveMimeCount = 0;  // cuenta headers MIME consecutivos
+    var MimeHeaderRE = /^\s*(De|From|Enviado|Sent|Para|To|Asunto|Subject|CC|Cc|CCO|Bcc|Cco|Fecha|Date|Reply-To|Responder|MIME-Version|Content-Type|Content-Transfer-Encoding|X-[A-Za-z0-9-]+):\s*/i;
+
+    for (var i = 0; i < rawLines.length; i++) {
+      var line = rawLines[i];
+      var trimmed = line.trim();
+
+      // 1. Separador de forward/quote
+      if (/^-{5,}\s*(Forwarded message|Forwarded|Message forwarded|Original Message|Mensaje original)\s*-{5,}$/i.test(trimmed) || /^_{20,}$/.test(trimmed)) {
+        inQuote = true;
+        quoteHeader = "";
+        consecutiveMimeCount = 0;
+        continue;
+      }
+
+      // 2. "El X escribió:" / "On X wrote:" → header del quote
+      var wrotePat = /^(El\s+\w+,?\s+\d{1,2}\s+\w+\s+\d{0,4},?\s*[\d:]+\s*[,.]?\s*.*?(escribió|wrote):?\s*)$/i;
+      var wrotePat2 = /^(En\s+\w+\s+\d{1,2}\s+de\s+\w+\s+de\s+\d{0,4},?\s*[\d:]+\s*,?\s*.*?(escribió|wrote):?\s*)$/i;
+      var wrotePat3 = /^(On\s+.{5,80}\s+wrote:?\s*)$/i;
+      if (inQuote && !quoteHeader && (wrotePat.test(trimmed) || wrotePat2.test(trimmed) || wrotePat3.test(trimmed))) {
+        quoteHeader = trimmed;
+        continue;
+      }
+
+      // 3. Dentro del quote → todo va al quote (incluyendo headers MIME)
+      if (inQuote) {
+        quoteLines.push(line);
+        continue;
+      }
+
+      // 4. Quoted text con `>`
       if (/^\s*>/.test(line)) {
         inQuote = true;
-        quoteBuffer.push(line.replace(/^\s*>\s?/, ""));
+        quoteLines.push(line.replace(/^\s*>\s?/, ""));
+        consecutiveMimeCount = 0;
         continue;
       }
-      if (inQuote && line.trim() === "") {
-        quoteBuffer.push("");
+
+      // 5. Detección de headers MIME en el cuerpo principal.
+      // Si encuentro 2+ headers MIME consecutivos, asumo que es el inicio
+      // de un quote (porque el cuerpo legítimo rara vez tiene 2+ líneas
+      // que empiecen con De:/Para:/Asunto: seguidas).
+      if (MimeHeaderRE.test(line)) {
+        consecutiveMimeCount++;
+        if (consecutiveMimeCount >= 2) {
+          // Inicio de quote retroactivo: tomar las últimas 2+ líneas MIME
+          // del mainBody y meterlas al quote, junto con esta
+          var mimeStart = mainBody.length - consecutiveMimeCount;
+          for (var j = mimeStart; j < mainBody.length; j++) {
+            if (mainBody[j] !== undefined) {
+              quoteLines.push(mainBody[j]);
+              mainBody[j] = undefined;  // marca para eliminar después
+            }
+          }
+          quoteLines.push(line);
+          mainBody = mainBody.filter(function (x) { return x !== undefined; });
+          inQuote = true;
+          consecutiveMimeCount = 0;
+          continue;
+        }
+        // 1 header suelto: agregarlo al mainBody (puede ser contenido legítimo)
+        mainBody.push(line);
         continue;
       }
-      if (inQuote) {
-        // F1-Afinamiento — Quote colapsable con <details> HTML5 (estilo Gmail).
-        // Por default colapsado, el user clickea "..." para expandir.
-        // Dentro del quote, NO linkear (texto citado, mantener como está).
-        var quoteContent = escapeHtml(quoteBuffer.join("\n")).replace(/\n/g, "<br>");
-        var quoteCount = quoteBuffer.filter(function (l) { return l.trim(); }).length;
-        var quoteLabel = quoteCount > 1
-          ? "··· " + quoteCount + " líneas citadas"
-          : "··· 1 línea citada";
-        result.push('<details class="kair-mail-quote"><summary>' + quoteLabel + '</summary><div class="kair-mail-quote__content">' + quoteContent + '</div></details>');
-        quoteBuffer = [];
-        inQuote = false;
-      }
-      // Linkear URLs en la línea (solo http/https). Escapar SOLO el resto de la línea
-      // (por seguridad, en caso de HTML inyectado).
-      var linked = linkifyLine(line);
-      result.push(linked);
-    }
-    if (inQuote && quoteBuffer.length > 0) {
-      var quoteContentEnd = escapeHtml(quoteBuffer.join("\n")).replace(/\n/g, "<br>");
-      var quoteCountEnd = quoteBuffer.filter(function (l) { return l.trim(); }).length;
-      var quoteLabelEnd = quoteCountEnd > 1
-        ? "··· " + quoteCountEnd + " líneas citadas"
-        : "··· 1 línea citada";
-      result.push('<details class="kair-mail-quote"><summary>' + quoteLabelEnd + '</summary><div class="kair-mail-quote__content">' + quoteContentEnd + '</div></details>');
+
+      // No es header MIME: reset counter y agregar al mainBody
+      consecutiveMimeCount = 0;
+      mainBody.push(line);
     }
 
-    return result.join("<br>");
+    // Limpiar placeholders de Gmail
+    mainBody = mainBody.filter(function (l) {
+      return !/^\[image: [^\]]+\]\s*$/.test(l.trim());
+    });
+
+    // Si NO hay quote, devolver solo mainBody
+    if (quoteLines.length === 0) {
+      return mainBody
+        .filter(function (l) { return l.trim(); })
+        .map(function (l) { return linkifyLine(l); })
+        .join("<br>");
+    }
+
+    // Construir mainHtml
+    var mainHtml = mainBody
+      .filter(function (l) { return l.trim(); })
+      .map(function (l) { return linkifyLine(l); })
+      .join("<br>");
+
+    // Construir quote colapsable
+    var quoteContent = escapeHtml(quoteLines.join("\n")).replace(/\n/g, "<br>");
+    var quoteCount = quoteLines.filter(function (l) { return l.trim(); }).length;
+    var quoteLabel = quoteCount > 1
+      ? "··· " + quoteCount + " líneas citadas"
+      : "··· 1 línea citada";
+    var headerHtml = quoteHeader
+      ? '<div class="kair-mail-quote__header">' + escapeHtml(quoteHeader) + '</div>'
+      : '';
+
+    return mainHtml +
+      '<details class="kair-mail-quote">' +
+        '<summary>' + quoteLabel + '</summary>' +
+        headerHtml +
+        '<div class="kair-mail-quote__content">' + quoteContent + '</div>' +
+      '</details>';
   }
-
   // F1.A-fix2 — Escapa SOLO los caracteres peligrosos para evitar XSS
   // (en caso de que el body tenga HTML inyectado), pero deja URLs y placeholders legibles.
   function escapeHtml(s) {
@@ -2225,26 +2265,29 @@
       }
     }));
     toolbar.appendChild(iconBtn(D.ICONS.mailOpen, "Marcar como no leído", () => { mail.unread = !mail.unread; render(); }));
-    toolbar.appendChild(iconBtn(D.ICONS.folder, "Mover a carpeta"));
+    // FIX loop 17 — Quitar "Mover a carpeta" (no es esencial, Gmail no lo tiene visible aquí)
     toolbar.appendChild(iconBtn(D.ICONS.trash, "Eliminar"));
     toolbar.appendChild(el("span", { class: "kair-header__divider", style: { margin: "0 4px" } }));
-    toolbar.appendChild(iconBtn(D.ICONS.star, mail.flagged ? "Quitar marca" : "Marcar", () => { mail.flagged = !mail.flagged; render(); }));
-    toolbar.appendChild(iconBtn(D.ICONS.printer, "Imprimir"));
+    // FIX loop 17 — Agregar Reply y Forward (estilo Gmail) en la toolbar del thread header
+    toolbar.appendChild(iconBtn(D.ICONS.reply, "Responder", () => openComposeModal("reply", mail)));
+    toolbar.appendChild(iconBtn(D.ICONS.forward, "Reenviar", () => openComposeModal("forward", mail)));
+    toolbar.appendChild(el("span", { class: "kair-header__divider", style: { margin: "0 4px" } }));
     toolbar.appendChild(iconBtn(D.ICONS.more, "Más opciones"));
 
     const nav = el("div", { class: "ml-auto", style: { marginLeft: "auto", display: "flex", alignItems: "center", gap: "4px" } });
-    // AUDITORIA 2026-07-19 — "1 de N" dinámico con navegación real
-    var currentIndex = state.mails.findIndex(function (m) { return m.id === state.selectedMailId; });
-    var totalMails = state.mails.length;
-    var currentPos = currentIndex >= 0 ? (currentIndex + 1) : 1;
-    nav.innerHTML = `<span style="font-size:0.7rem;color:var(--kair-text-light);" aria-label="Correo ${currentPos} de ${totalMails}">${currentPos} de ${totalMails}</span>`;
+    // FIX loop 17 — Solo las flechas de navegación (Gmail-style)
+    // El "1 de 2" se removió porque era redundante con la toolbar principal
     nav.appendChild(iconBtn(D.ICONS.chevronUp, "Más reciente"));
     nav.appendChild(iconBtn(D.ICONS.chevronRight.replace(/polyline points="9 18 15 12 9 6"/, 'polyline points="6 9 12 15 18 9"'), "Más antiguo"));
     toolbar.appendChild(nav);
     detail.appendChild(toolbar);
 
     // Scroll area
-    const scroll = el("div", { class: "flex-1 overflow-y-auto kair-scroll", style: { flex: "1", overflowY: "auto", minHeight: "0" } });
+    // FIX loop 23 — Detail es display: block. Scroll con altura natural.
+    // Reply al final del detail (NO dentro del scroll). El reply queda
+    // pegado al último mensaje cuando hay poco contenido, y al fondo
+    // del detail cuando hay mucho.
+    const scroll = el("div", { class: "overflow-y-auto kair-scroll", style: { overflowY: "auto", minHeight: "0" } });
 
     // Header del correo
     const header = el("div", { class: "kair-mail-detail__header" });
@@ -2268,12 +2311,26 @@
       labelsHtml = userLabels ? '<div class="kair-mail-detail__labels" style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap;">' + userLabels + '</div>' : '';
     }
     // FIX 2026-07-18 — Label del folder (Recibidos/Enviados) como chip al lado del subject (estilo Gmail)
+    // FIX 2026-07-19 (loop 18) — Restaurar el chip (Gmail SÍ lo tiene visible)
     var folderLabel = (state.mailFolder === 'SENT') ? 'Enviados' : (state.mailFolder === 'DRAFT') ? 'Borradores' : 'Recibidos';
     var folderChipHtml = '<span class="kair-mail-detail__folder-label" title="Click para quitar el filtro de carpeta">' +
       folderLabel +
       '<button class="kair-mail-detail__folder-remove" type="button" aria-label="Quitar filtro" title="Quitar">' +
       '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>' +
       '</button></span>';
+
+    // FIX loop 26 — Thread header Gmail-style con recipients (De/Para/CC)
+    // Mostrar "para mi" + "cc" + "fecha" en el thread header, no solo en cada mensaje.
+    var recipientsHtml = "";
+    if (mail.to_list && mail.to_list.length > 0) {
+      var toText = mail.to_list.map(function (a) { return a.name || a.email; }).join(", ");
+      recipientsHtml += '<div class="kair-mail-detail__recipient-row"><span class="kair-mail-detail__recipient-label">Para:</span> <span class="kair-mail-detail__recipient-value">' + escapeHtml(toText) + '</span></div>';
+    }
+    if (mail.cc_list && mail.cc_list.length > 0) {
+      var ccText = mail.cc_list.map(function (a) { return a.name || a.email; }).join(", ");
+      recipientsHtml += '<div class="kair-mail-detail__recipient-row"><span class="kair-mail-detail__recipient-label">CC:</span> <span class="kair-mail-detail__recipient-value">' + escapeHtml(ccText) + '</span></div>';
+    }
+
     header.innerHTML = `
       <h2 class="kair-mail-detail__subject">
         <span style="flex:1;">${mail.subject}</span>
@@ -2283,83 +2340,28 @@
       <div class="kair-mail-detail__sender-row">
         <div class="kair-mail-detail__avatar" style="background:${mail.avatarColor};">${initials(mail.sender)}</div>
         <div class="kair-mail-detail__sender-info">
-          <p class="kair-mail-detail__sender-name">${mail.sender}</p>
-          <p class="kair-mail-detail__sender-email">${mail.senderEmail || ''}</p>
+          <p class="kair-mail-detail__sender-name">${mail.sender} <span style="font-weight:400;color:var(--kair-text-muted);">&lt;${mail.senderEmail || ''}&gt;</span></p>
+          <div class="kair-mail-detail__recipients">
+            ${recipientsHtml}
+          </div>
+          <button class="kair-mail-detail__show-details" type="button" aria-label="Mostrar detalles">Mostrar detalles</button>
         </div>
         <div class="kair-mail-detail__time">
           <div class="kair-mail-detail__time-main">${formatGmailLongDate(mail.date)}</div>
           <div class="kair-mail-detail__time-relative">${formatRelativeTime(mail.date)}</div>
         </div>
       </div>
-      <div class="kair-mail-detail__actions">
-        <button class="kair-mail-detail__action-btn" type="button" title="Archivar" aria-label="Archivar" data-action="archive">${D.ICONS.archive}</button>
-        <button class="kair-mail-detail__action-btn" type="button" title="Marcar como no leído" aria-label="Marcar como no leído" data-action="mark-unread">${D.ICONS.mailOpen}</button>
-        <button class="kair-mail-detail__action-btn" type="button" title="Eliminar" aria-label="Eliminar" data-action="delete">${D.ICONS.trash}</button>
-        <span class="kair-mail-detail__actions-spacer"></span>
-        <button class="kair-mail-detail__action-btn" type="button" title="Marcar" aria-label="Marcar" data-action="star" data-active="${mail.flagged ? 'true' : 'false'}">${D.ICONS.star.replace(/fill=\"none\"/, mail.flagged ? 'fill="currentColor"' : 'fill="none"')}</button>
-        <button class="kair-mail-detail__action-btn" type="button" title="Más opciones" aria-label="Más opciones" data-action="more">${D.ICONS.more}</button>
-      </div>
+      <!-- FIX 2026-07-19 (loop 15) — Segunda toolbar (kair-mail-detail__actions) ELIMINADA.
+           Gmail tiene UNA sola toolbar arriba. Las acciones estaban duplicadas con la toolbar principal. -->
       ${labelsHtml}
     `;
 
-    // AUDITORÍA 2026-07-19 — Wire up action buttons del thread header
-    // Code-reviewer issue: antes el setTimeout(0) creaba listeners que quedaban
-    // huerfanos cuando render() sobrescribia el DOM. Fix: usar event delegation
-    // directa (los botones se buscan una vez, listeners se agregan una vez).
-    // El render() siguiente recrea el DOM pero los listeners siguen en el
-    // header (que es un nuevo elemento, pero el addEventListener no se vuelve
-    // a llamar — eso es lo que queremos).
-    setTimeout(function () {
-      var archiveBtn = header.querySelector('[data-action="archive"]');
-      var markUnreadBtn = header.querySelector('[data-action="mark-unread"]');
-      var deleteBtn = header.querySelector('[data-action="delete"]');
-      var starBtn = header.querySelector('[data-action="star"]');
-      if (archiveBtn) {
-        archiveBtn.addEventListener("click", function () {
-          // FIX: usar la misma logica que el toolbar (api.googleGmail.archiveThread)
-          var api = getElectronAPI();
-          if (api && api.googleGmail && api.googleGmail.archiveThread) {
-            api.googleGmail.archiveThread({ threadId: mail.id }).then(function (r) {
-              if (r && r.success) {
-                state.mails = state.mails.filter(function (m) { return m.id !== mail.id; });
-                state.selectedMailId = null;
-                render();
-                toast("Archivado", "El correo fue movido a Archivados en Gmail", "success");
-              } else {
-                toast("Error al archivar", (r && r.error) || "Error desconocido", "error");
-              }
-            }).catch(function (e) {
-              toast("Error al archivar", e.message, "error");
-            });
-          } else {
-            toast("Archivar", "Gmail no está conectado", "warning");
-          }
-        });
-      }
-      if (markUnreadBtn) {
-        markUnreadBtn.addEventListener("click", function () {
-          mail.unread = true;
-          render();
-        });
-      }
-      if (deleteBtn) {
-        deleteBtn.addEventListener("click", function () {
-          // FIX: implementar delete con confirm
-          if (confirm("¿Eliminar este correo? (solo se quitará de la lista local)")) {
-            state.mails = state.mails.filter(function (m) { return m.id !== mail.id; });
-            state.selectedMailId = null;
-            render();
-            toast("Eliminado", "El correo fue removido de la lista local", "success");
-          }
-        });
-      }
-      if (starBtn) {
-        starBtn.addEventListener("click", function () {
-          mail.flagged = !mail.flagged;
-          render();
-        });
-      }
-    }, 0);
+    // FIX loop 28 — Eliminar setTimeout zombie (75 líneas) que buscaba
+    // selectores data-action="archive|mark-unread|delete|star" en el
+    // header. Esos selectores NO EXISTEN en el HTML generado (solo se
+    // usan en el modal de eventos). El setTimeout era código muerto
+    // de un loop viejo. Las acciones reales están en el toolbar
+    // principal (línea ~2250) con addEventListener directo.
     scroll.appendChild(header);
 
     if (mail.category === "urgent") {
@@ -2418,6 +2420,7 @@
           class: "kair-mail-message__avatar",
           style: { background: "#" + stringHashColor(msg.from_email || msg.from_name || "") }
         }, msgAvatarInitials);
+        // FIX loop 25 — Avatar es hijo directo del msgContainer (no dentro de un row)
         msgContainer.appendChild(msgAvatar);
 
         // Head del mensaje: sender + subject + fecha en 1 línea horizontal
@@ -2430,7 +2433,9 @@
         }, msg.from_name || msg.from_email || "(remitente desconocido)"));
         // AUDITORÍA 2026-07-18 — Subject completo como snippet (Gmail: NO usa el body)
         // Si NO es el último mensaje, mostramos el subject del thread (que es la metadata del reply)
-        var msgSubject = (msg.subject && msg.subject !== mail.subject) ? msg.subject : mail.subject;
+        // FIX 2026-07-19 — Limpiar prefijos "Re:", "Fwd:" del subject (Gmail-style)
+        var rawSubject = (msg.subject && msg.subject !== mail.subject) ? msg.subject : mail.subject;
+        var msgSubject = (rawSubject || "").replace(/^(\s*(Re|Fwd|RE|FW)\s*:\s*)+/i, '');
         msgLine.appendChild(el("span", {
           class: "kair-mail-message__subject"
         }, msgSubject || ""));
@@ -2448,12 +2453,45 @@
             class: "kair-mail-message__snippet"
           }, firstLine || "(sin contenido)"));
         }
+
+        // FIX loop 26 — Acciones del mensaje en el HEAD (Gmail-style)
+        // Las acciones (responder, más) se muestran en el head, no al
+        // final del body. Esto es como Gmail: '← Responder' '↔ A todos'
+        // '→ Reenviar' '⋮' al lado del head.
+        if (isLastMessage) {
+          var msgActions = el("div", { class: "kair-mail-message__actions" });
+          var msgReplyBtn = el("button", {
+            class: "kair-mail-message__action-btn",
+            title: "Responder",
+            "aria-label": "Responder"
+          });
+          msgReplyBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg> Responder';
+          msgReplyBtn.addEventListener("click", function (e) {
+            e.stopPropagation();
+            openComposeModal("reply", mail);
+          });
+          msgActions.appendChild(msgReplyBtn);
+          var msgMoreBtn = el("button", {
+            class: "kair-mail-message__action-btn",
+            title: "Más opciones",
+            "aria-label": "Más opciones"
+          });
+          msgMoreBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>';
+          msgActions.appendChild(msgMoreBtn);
+          msgHeader.appendChild(msgActions);
+        }
+
+        // FIX loop 25 — Head es hijo directo del msgContainer
         msgContainer.appendChild(msgHeader);
 
         // Detalles expandidos (oculto por default en mensajes colapsados)
+        // FIX loop 28 — Limpiar inline style. paddingLeft: 52px, flex: 0 0 100%
+        // y marginTop ahora están en CSS (.kair-mail-message__details).
+        // Solo display: block|none queda inline porque depende del estado
+        // expand/collapse del mensaje.
         var msgDetails = el("div", {
           class: "kair-mail-message__details",
-          style: { display: isLastMessage ? "block" : "none", marginTop: "8px", paddingLeft: "44px", width: "100%" }
+          style: { display: isLastMessage ? "block" : "none" }
         });
 
         // AUDITORÍA 2026-07-18 — "para: jrf2011 ▼" colapsable (estilo Gmail)
@@ -2469,7 +2507,8 @@
             style: { cursor: "pointer", listStyle: "none", display: "flex", alignItems: "center", gap: "6px", fontSize: "0.75rem", color: "var(--kair-text-muted, #5f6368)" }
           });
           // Ocultar marker nativo de <summary>
-          recipientsSummary.innerHTML = '<span>para: ' + escapeHtml(firstRecipientLabel) + (moreCount > 0 ? ' <span style="color:var(--kair-text-light,#999);">+' + moreCount + '</span>' : '') + '</span><span class="kair-mail-message__recipients-arrow">▾</span>';
+          // FIX 2026-07-19 — Reemplazar "▾" Unicode por SVG inline (más limpio y consistente con el resto)
+          recipientsSummary.innerHTML = '<span>para: ' + escapeHtml(firstRecipientLabel) + (moreCount > 0 ? ' <span style="color:var(--kair-text-light,#999);">+' + moreCount + '</span>' : '') + '</span><svg class="kair-mail-message__recipients-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>';
           recipientsDetails.appendChild(recipientsSummary);
           // Contenido expandido con todos los destinatarios
           var recipientsContent = el("div", { class: "kair-mail-message__recipients-details" });
@@ -2490,36 +2529,20 @@
         msgDetails.appendChild(msgBody);
 
         // AUDITORÍA 2026-07-18 — "···" indicator si el body tiene más de 1 línea
+        // FIX 2026-07-19 — Renderizar como indicator centrado y estilizado (no texto plano)
         var bodyLines = bodyText.split("\n").filter(function (l) { return l.trim(); });
         if (bodyLines.length > 1 && isLastMessage) {
           var moreIndicator = el("div", {
             class: "kair-mail-message__more",
             title: "Mostrar todo el contenido"
-          }, "···");
+          });
+          moreIndicator.innerHTML = '<span class="kair-mail-message__more-dots">···</span>';
           msgDetails.appendChild(moreIndicator);
         }
 
-        // AUDITORÍA 2026-07-18 — Action icons del mensaje (responder, más ⋮) en hover
-        var msgActions = el("div", { class: "kair-mail-message__actions" });
-        var msgReplyBtn = el("button", {
-          class: "kair-mail-message__action-btn",
-          title: "Responder",
-          "aria-label": "Responder"
-        });
-        msgReplyBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg>';
-        msgReplyBtn.addEventListener("click", function (e) {
-          e.stopPropagation();
-          openComposeModal("reply", mail);
-        });
-        msgActions.appendChild(msgReplyBtn);
-        var msgMoreBtn = el("button", {
-          class: "kair-mail-message__action-btn",
-          title: "Más opciones",
-          "aria-label": "Más opciones"
-        });
-        msgMoreBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>';
-        msgActions.appendChild(msgMoreBtn);
-        msgDetails.appendChild(msgActions);
+        // FIX loop 26 — Acciones del mensaje MOVIDAS al head (Gmail-style)
+        // Antes estaban al final del body (msgDetails). Ahora están
+        // en el msgHeader (loop 26), al lado del head.
 
         msgContainer.appendChild(msgDetails);
 
@@ -2593,7 +2616,10 @@
 
     detail.appendChild(scroll);
 
-    // Reply bar
+    // Reply bar — FIX loop 23: al final del detail (NO dentro del scroll)
+    // El reply queda pegado al último mensaje cuando hay poco contenido,
+    // y al fondo del detail cuando hay mucho. El detail es display: block
+    // (no flex) para que el scroll y el reply fluyan normalmente.
     const reply = el("div", { class: "kair-mail-detail__reply" });
     const replyBtn = (icon, label, handler) => {
       const b = el("button", { class: "kair-header__action--ghost", style: { padding: "6px 10px", fontSize: "0.75rem" } });
@@ -2629,6 +2655,7 @@
     });
     reply.appendChild(sendBtn);
 
+    // FIX loop 23: reply al final del detail (después del scroll, NO dentro)
     detail.appendChild(reply);
     container.appendChild(detail);
   }
@@ -2773,32 +2800,41 @@
     var isForward = mode === 'forward';
 
     // 1) Construir el HTML del quote (se renderiza ARRIBA del textarea, NO como texto plano).
+    // FIX 2026-07-19 (loop 15) — Formato Gmail-style:
+    //   - Para reply: "El X escribió:" + quoted text con `>` prefix
+    //   - Para forward: "---------- Forwarded message ----------" + headers (De:/Date:/Subject:/To:) + body
     // El user escribe su respuesta en el textarea (vacío) y al enviar se concatena con el quote.
     var quoteHtml = '';
     if (mail && (isReply || isForward)) {
       var senderDisplay = (mail.sender || mail.senderEmail || '(remitente)');
       var senderEmail = mail.senderEmail || '';
       var quoteDate = mail.date ? formatGmailDate(mail.date) : '';
-      var quoteBodyText = (mail.body || '').replace(/\n/g, '<br>');
-      // Limpiar headers MIME duplicados si los hay
-      quoteBodyText = quoteBodyText.replace(/^De:.*?<br>/i, '').replace(/^Para:.*?<br>/i, '');
-      // Limitar preview a 8 líneas para no saturar el modal
-      var quoteSnippet = (mail.body || '').split('\n').slice(0, 8).join('\n');
-      if ((mail.body || '').split('\n').length > 8) quoteSnippet += '...';
-      var quoteAvatarBg = mail.avatarColor || '#5f6368';
-      var quoteInitials = initials(senderDisplay);
-      quoteHtml = `
-        <div class="compose-panel__quote">
-          <div class="compose-panel__quote-header">
-            <div class="compose-panel__quote-avatar" style="background:${quoteAvatarBg};">${quoteInitials}</div>
-            <div class="compose-panel__quote-info">
-              <div class="compose-panel__quote-sender">${senderDisplay}${senderEmail ? ' <span class="compose-panel__quote-email">&lt;' + senderEmail + '&gt;</span>' : ''}</div>
-              ${quoteDate ? '<div class="compose-panel__quote-date">' + quoteDate + '</div>' : ''}
-            </div>
-          </div>
-          <blockquote class="compose-panel__quote-body">${quoteSnippet.replace(/</g, '&lt;')}</blockquote>
-        </div>
-      `;
+      var quoteSubject = (mail.subject || '').replace(/^(\s*(Re|Fwd|RE|FW)\s*:\s*)+/i, '');
+      var quoteBody = (mail.body || '');
+      // Escapar HTML del body
+      var quoteBodyEscaped = quoteBody.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      if (isForward) {
+        // Gmail-style: separador + headers + body original
+        quoteHtml = '<div class="compose-panel__quote">' +
+          '<div class="compose-panel__quote-separator">---------- Forwarded message ----------</div>' +
+          '<div class="compose-panel__quote-headers">' +
+            '<div class="compose-panel__quote-header-row"><span class="kair-mail-quote__label">De:</span> ' + escapeHtml(senderDisplay) + (senderEmail ? ' &lt;' + escapeHtml(senderEmail) + '&gt;' : '') + '</div>' +
+            '<div class="compose-panel__quote-header-row"><span class="kair-mail-quote__label">Date:</span> ' + escapeHtml(quoteDate) + '</div>' +
+            '<div class="compose-panel__quote-header-row"><span class="kair-mail-quote__label">Subject:</span> ' + escapeHtml(quoteSubject) + '</div>' +
+            '<div class="compose-panel__quote-header-row"><span class="kair-mail-quote__label">To:</span> ' + escapeHtml(state.gmailEmail || '') + '</div>' +
+          '</div>' +
+          '<blockquote class="compose-panel__quote-body">' + quoteBodyEscaped.replace(/\n/g, '<br>') + '</blockquote>' +
+        '</div>';
+      } else {
+        // Reply: "El X escribió:" + quoted text con `>` prefix
+        var quotedBody = quoteBody.split('\n').map(function (l) { return '&gt; ' + l; }).join('<br>');
+        var wroteOn = 'El ' + quoteDate + ', ' + senderDisplay + ' escribió:';
+        quoteHtml = '<div class="compose-panel__quote">' +
+          '<div class="compose-panel__quote-separator">' + escapeHtml(wroteOn) + '</div>' +
+          '<blockquote class="compose-panel__quote-body">' + quotedBody + '</blockquote>' +
+        '</div>';
+      }
     }
 
     // 2) Construir los destinatarios
@@ -2848,6 +2884,11 @@
           </div>
         </div>
         <div class="compose-panel__body">
+          <!-- FIX 2026-07-19 (loop 14) — Campo "De:" arriba (Gmail-style) -->
+          <div class="compose-panel__field compose-panel__field--from">
+            <label>De</label>
+            <input type="text" class="compose-panel__input compose-panel__input--readonly" id="compose-from" value="${(state.gmailEmail || 'tucuenta@gmail.com').replace(/"/g, '&quot;')}" readonly />
+          </div>
           <div class="compose-panel__field">
             <label>Para</label>
             <input type="email" multiple class="compose-panel__input" id="compose-to" value="${toValue.replace(/"/g, '&quot;')}" placeholder="destinatario@email.com" />
