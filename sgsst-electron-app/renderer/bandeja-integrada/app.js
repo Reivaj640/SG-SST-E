@@ -162,6 +162,31 @@
     }
   }
 
+  // FIX 2026-07-19 — Formato largo con día de la semana (estilo Gmail):
+  // "martes, 21 de julio de 2026"
+  // Construido a mano (no depende de locale)
+  function formatGmailLongDate(dateStr) {
+    if (!dateStr) return "";
+    try {
+      var d;
+      if (typeof dateStr === "number") {
+        d = new Date(dateStr < 1e12 ? dateStr * 1000 : dateStr);
+      } else {
+        d = new Date(dateStr);
+      }
+      if (isNaN(d.getTime())) return String(dateStr);
+      var weekdays = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+      var months = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+      var weekday = weekdays[d.getDay()];
+      var day = d.getDate();
+      var month = months[d.getMonth()];
+      var year = d.getFullYear();
+      return weekday + ", " + day + " de " + month + " de " + year;
+    } catch (e) {
+      return String(dateStr);
+    }
+  }
+
   // FIX 2026-07-18 — Formato relativo "hace X horas" estilo Gmail.
   // Para fechas < 7 días: "hace X min/horas/días"
   // Para fechas más viejas: usar formatGmailDate (fecha completa)
@@ -2208,7 +2233,11 @@
     toolbar.appendChild(iconBtn(D.ICONS.more, "Más opciones"));
 
     const nav = el("div", { class: "ml-auto", style: { marginLeft: "auto", display: "flex", alignItems: "center", gap: "4px" } });
-    nav.innerHTML = `<span style="font-size:0.7rem;color:var(--kair-text-light);">1 de 1</span>`;
+    // AUDITORIA 2026-07-19 — "1 de N" dinámico con navegación real
+    var currentIndex = state.mails.findIndex(function (m) { return m.id === state.selectedMailId; });
+    var totalMails = state.mails.length;
+    var currentPos = currentIndex >= 0 ? (currentIndex + 1) : 1;
+    nav.innerHTML = `<span style="font-size:0.7rem;color:var(--kair-text-light);">${currentPos} de ${totalMails}</span>`;
     nav.appendChild(iconBtn(D.ICONS.chevronUp, "Más reciente"));
     nav.appendChild(iconBtn(D.ICONS.chevronRight.replace(/polyline points="9 18 15 12 9 6"/, 'polyline points="6 9 12 15 18 9"'), "Más antiguo"));
     toolbar.appendChild(nav);
@@ -2258,7 +2287,7 @@
           <p class="kair-mail-detail__sender-email">${mail.senderEmail || ''}</p>
         </div>
         <div class="kair-mail-detail__time">
-          <div class="kair-mail-detail__time-main">${formatGmailDate(mail.date)}</div>
+          <div class="kair-mail-detail__time-main">${formatGmailLongDate(mail.date)}</div>
           <div class="kair-mail-detail__time-relative">${formatRelativeTime(mail.date)}</div>
         </div>
       </div>
