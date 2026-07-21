@@ -9,6 +9,12 @@ __pycache__/
 *.pyc
 *.pyo
 
+# Variables de entorno — NUNCA commitear credenciales
+# (.env.example SÍ se commitea, .env NO)
+.env
+.env.local
+.env.*.local
+
 # Editor / OS junk
 .vscode/
 .idea/

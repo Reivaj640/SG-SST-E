@@ -3,10 +3,10 @@
 // loopback redirect (http://127.0.0.1) y servidor HTTP temporal
 // que captura el callback.
 //
-// CREDENCIALES: configuradas en el proyecto "KAIR Calendar Sync"
-// de Google Cloud (organización adminkair-org).
-//   - Client ID: TU_NUEVO_CLIENT_ID_AQUI.apps.googleusercontent.com
-//   - Scopes: calendar + gmail.readonly
+// CREDENCIALES (FIX v0.1.121 — seguridad): Leídas de process.env (.env file).
+// El .env está en .gitignore. NO se commitea al repo.
+//   - Setup: copiar .env.example a .env y completar con los valores.
+//   - Rotación: Google Cloud Console → Credentials → regenerar Client Secret.
 //
 // FLUJO:
 //   1. UI llama a googleAuth.startAuth() → devuelve { authUrl, port }
@@ -23,9 +23,61 @@ const http = require('http');
 const url = require('url');
 const tokensStore = require('./google-tokens');
 
+// Cargar .env file (sin librería externa — parser mínimo de KEY=VALUE)
+// Patrón: cada línea no-vacía y no-comentada es KEY=VALUE. Las comillas
+// opcionales se quitan. Líneas con # son comentarios.
+// El .env está en la RAÍZ del proyecto (un nivel arriba de shared/).
+function loadDotEnv() {
+  try {
+    var fs = require('fs');
+    var path = require('path');
+    // .env está en la raíz del proyecto (no en shared/)
+    var envPath = path.join(__dirname, '..', '.env');
+    if (!fs.existsSync(envPath)) return;
+    var content = fs.readFileSync(envPath, 'utf8');
+    var lines = content.split(/\r?\n/);
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].trim();
+      if (!line || line.charAt(0) === '#') continue;
+      var eqIdx = line.indexOf('=');
+      if (eqIdx < 0) continue;
+      var key = line.substring(0, eqIdx).trim();
+      var val = line.substring(eqIdx + 1).trim();
+      // Quitar comillas opcionales (simples o dobles)
+      if ((val.charAt(0) === '"' && val.charAt(val.length - 1) === '"') ||
+          (val.charAt(0) === "'" && val.charAt(val.length - 1) === "'")) {
+        val = val.substring(1, val.length - 1);
+      }
+      // Solo set si NO está ya en process.env (deja que process.env real gane)
+      if (!(key in process.env)) {
+        process.env[key] = val;
+      }
+    }
+  } catch (e) {
+    // Silenciar errores — el caller verá el fallback o el error claro
+  }
+}
+loadDotEnv();
+
 // CREDENCIALES — Proyecto "KAIR Calendar Sync" en Google Cloud
-const CLIENT_ID = 'TU_NUEVO_CLIENT_ID_AQUI.apps.googleusercontent.com';
-const CLIENT_SECRET = 'TU_NUEVO_CLIENT_SECRET_AQUI';
+// FIX v0.1.121 (cleanup): leídas SOLO de process.env (.env file).
+// NO hay fallback hardcoded — si falta .env, la app muestra error claro.
+// Para configurar: copiá .env.example a .env y completá con tus credenciales.
+var CLIENT_ID = process.env.GOOGLE_OAUTH_CLIENT_ID;
+var CLIENT_SECRET = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+var REDIRECT_PORT = parseInt(process.env.GOOGLE_OAUTH_REDIRECT_PORT || '42813', 10);
+var REDIRECT_URI = process.env.GOOGLE_OAUTH_REDIRECT_URI || ('http://127.0.0.1:' + REDIRECT_PORT + '/oauth2callback');
+
+// Validar que las credenciales NO son placeholders
+if (CLIENT_ID === 'TU_NUEVO_CLIENT_ID.apps.googleusercontent.com' || CLIENT_SECRET === 'TU_NUEVO_CLIENT_SECRET') {
+  console.warn('[google-auth] ⚠️ Las credenciales OAuth son placeholders. Copiá .env.example a .env y completá con tus credenciales reales de Google Cloud Console.');
+  CLIENT_ID = undefined;
+  CLIENT_SECRET = undefined;
+}
+if (!CLIENT_ID || !CLIENT_SECRET) {
+  console.error('[google-auth] ❌ Credenciales OAuth faltantes. Configurá GOOGLE_OAUTH_CLIENT_ID y GOOGLE_OAUTH_CLIENT_SECRET en .env');
+  console.error('[google-auth]    Ver .env.example para la estructura. Sin credenciales, el flujo OAuth fallará.');
+}
 const SCOPES = [
   'https://www.googleapis.com/auth/calendar',
   'https://www.googleapis.com/auth/gmail.readonly',
@@ -34,13 +86,6 @@ const SCOPES = [
   // F1.B-fix — Para crear/editar/eliminar borradores (futuro: drafts)
   'https://www.googleapis.com/auth/gmail.compose'
 ];
-
-// Puerto fijo para el loopback redirect (debe estar registrado en Google Cloud Console)
-// IMPORTANTE: en Google Cloud Console > Credentials > OAuth 2.0 Client IDs >
-// el client "Desktop app" debe tener agregado "http://127.0.0.1:42813" como
-// Authorized redirect URI. Si no está, el flujo falla con "redirect_uri_mismatch".
-const REDIRECT_PORT = 42813;
-const REDIRECT_URI = `http://127.0.0.1:${REDIRECT_PORT}/oauth2callback`;
 
 /**
  * Genera un code_verifier + code_challenge para PKCE (recomendado por Google
