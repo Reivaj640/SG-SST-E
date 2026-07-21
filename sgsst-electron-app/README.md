@@ -1,7 +1,7 @@
 # K+AIR - Sistema de Gestión SG-SST
 
-**Versión:** 0.1.119
-**Última actualización:** 17 de julio de 2026
+**Versión:** 0.1.120
+**Última actualización:** 18 de julio de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
 ---
@@ -12,6 +12,7 @@
 
 ### Características Principales
 
+- ✅ **Bandeja Integrada: Cliente Gmail Completo** 🆕 (v0.1.120, `📦563`): Cliente de correo profesional integrado con OAuth + SQLite cache + Gmail-look UI + 7 features. Búsqueda con operadores (`from:javier`, `has:adjunto`), adjuntos reales descargables, firma automática, sync bidireccional con Gmail, auto-refresh cada 5 min, BEM refactor con 4 componentes (`email-row`, `thread-header`, `quoted-thread`, `compose-panel` minimizable). Coexiste con K+AIR Calendar. Ver [docs/05-updates/v0.1.120-bandeja-integrada.md](docs/05-updates/v0.1.120-bandeja-integrada.md) y [docs/02-modulos/bandeja-integrada.md](docs/02-modulos/bandeja-integrada.md).
 - ✅ **Multi-empresa**: Gestión de múltiples empresas con una sola experiencia UX/UI
 - ✅ **Motor Normativo Inteligente**: Escenarios normativos basados en tamaño y riesgo
 - ✅ **9 Módulos Principales + 48 Submódulos con lógica**: Recursos (12), Gestión Integral (9), Salud (12), Peligros (4), Amenazas (2), Verificación (3), Mejoramiento (4), más `helpers` y `shared`
@@ -28,7 +29,7 @@
 - ✅ **Inducciones con Sincronización Automática**: Google Forms → Excel → App sin intervención manual
 - ✅ **Búsqueda Inteligente de Archivos**: Normalización de tildes y múltiples variaciones de nombres
 - ✅ **COM Automation**: VBScript para controlar Excel y actualizar Power Query automáticamente
-- ✅ **Sistema de Skeleton Screens** 🆕 (v0.1.110): API `KairSkeleton.*` con 10 componentes que reemplazan spinners genéricos por placeholders que imitan la forma del componente. Cubierto en 25 loaders en 13 vistas + 7 homes de módulo. Ver [docs/SKELETON-SYSTEM.md](docs/SKELETON-SYSTEM.md) y [docs/SKELETON-HOMES.md](docs/SKELETON-HOMES.md).
+- ✅ **Sistema de Skeleton Screens** (v0.1.110): API `KairSkeleton.*` con 10 componentes que reemplazan spinners genéricos por placeholders que imitan la forma del componente. Cubierto en 25 loaders en 13 vistas + 7 homes de módulo. Ver [docs/SKELETON-SYSTEM.md](docs/SKELETON-SYSTEM.md) y [docs/SKELETON-HOMES.md](docs/SKELETON-HOMES.md).
 - ✅ **Solo 13 archivos en raíz**: Proyecto limpio y organizado
 - ✅ **Tabla de Ausentismo 17 Columnas**: Año, Fecha Inicio, Fecha Fin, Código
 - ✅ **Filtros Dinámicos Inteligentes**: Año y tipo basados en datos reales

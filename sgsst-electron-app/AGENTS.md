@@ -340,11 +340,13 @@ git status --short
 
 ---
 
-## 📊 Snapshot actual del proyecto (snapshot 2026-07-04)
+## 📊 Snapshot actual del proyecto (snapshot 2026-07-18)
 
-- **Versión:** 0.1.110
+- **Versión:** 0.1.120
 - **Working tree:** limpio
-- **Último commit:** `d1a4047` (📦491-docs — actualización de documentación)
+- **Último commit:** `383a96f` (🔖 Bump version 0.1.120 — Bandeja Integrada release)
+- **Commit anterior:** `aef69d9` (📦563 # Bandeja Integrada: cliente Gmail completo con SQLite cache, Gmail-look UI, BEM refactor, 7 features. 22 archivos, +11,285/-28 líneas)
 - **Sistema de Skeletons:** completo (📦483-491, 9 commits)
-- **9 módulos + 48 submódulos con lógica + ~58 submódulos menú**
+- **Bandeja Integrada:** completa (📦563, 22 archivos, 11,285 líneas, 135/135 tests OK). Coexiste con K+AIR Calendar. OAuth + SQLite cache + Gmail-look UI + BEM refactor 4 componentes + 7 features. Ver [docs/02-modulos/bandeja-integrada.md](docs/02-modulos/bandeja-integrada.md) y [docs/05-updates/v0.1.120-bandeja-integrada.md](docs/05-updates/v0.1.120-bandeja-integrada.md)
+- **9 módulos + 48 submódulos con lógica + ~58 submódulos menú + Bandeja Integrada (nuevo módulo de correo)**
 - **Pendientes próximos:** 📦492 (dashboards), 📦493 (homes de submódulos)

@@ -1,8 +1,8 @@
 # 👋 Bienvenido a la Documentación de K+AIR
 
 **Tiempo de lectura:** 5 minutos
-**Última actualización:** 17 de julio de 2026
-**Versión:** 0.1.119
+**Última actualización:** 18 de julio de 2026
+**Versión:** 0.1.120
 
 ---
 
@@ -11,6 +11,7 @@
 K+AIR es una aplicación empresarial Electron que implementa un Sistema de Gestión de Seguridad y Salud en el Trabajo (SG-SST) para empresas colombianas. Cumple con la Resolución 0312 de 2019.
 
 **Características principales:**
+- ✅ **Bandeja Integrada: Cliente Gmail completo** (v0.1.120) — OAuth + SQLite cache + Gmail-look UI + búsqueda con operadores + adjuntos reales + firma automática + auto-refresh
 - ✅ Multi-empresa (una sola UX/UI)
 - ✅ Motor normativo inteligente
 - ✅ 9 módulos principales + 48 submódulos

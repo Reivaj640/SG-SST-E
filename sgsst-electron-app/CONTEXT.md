@@ -1,8 +1,10 @@
 # K+AIR - Contexto del Proyecto
 
-**Última actualización:** 4 de julio de 2026
-**Versión actual:** 0.1.110
+**Última actualización:** 18 de julio de 2026
+**Versión actual:** 0.1.120
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
+
+> **📧 v0.1.120 incluye la Bandeja Integrada (cliente Gmail completo).** Coexiste con K+AIR Calendar. Ver [docs/02-modulos/bandeja-integrada.md](docs/02-modulos/bandeja-integrada.md) y [docs/05-updates/v0.1.120-bandeja-integrada.md](docs/05-updates/v0.1.120-bandeja-integrada.md).
 
 ---
 

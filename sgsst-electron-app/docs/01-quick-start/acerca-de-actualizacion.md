@@ -1,8 +1,8 @@
 # Actualización de la sección "Acerca de" en K+AIR
 
-**Versión:** 1.1
-**Actualizado:** 9 de junio de 2026
-**Estado:** ✅ Actualizado v0.1.99
+**Versión:** 1.2
+**Actualizado:** 18 de julio de 2026
+**Estado:** ✅ Actualizado v0.1.120 (incluye Bandeja Integrada)
 
 ## Descripción
 

@@ -1,8 +1,10 @@
 # 🏗️ Arquitectura General K+AIR SG-SST
 
 **Versión:** 4.0 (Unificada)
-**Actualizado:** 9 de junio de 2026
-**Estado:** ✅ Actualizado (v0.1.99)
+**Actualizado:** 18 de julio de 2026
+**Estado:** ✅ Actualizado (v0.1.99) + nota de Bandeja Integrada (v0.1.120)
+
+> **📧 Nota sobre Bandeja Integrada (v0.1.120, `📦563`):** Este documento NO refleja la arquitectura completa del nuevo módulo **Bandeja Integrada** (cliente Gmail con OAuth + SQLite cache + Gmail-look UI). Para la arquitectura detallada de la Bandeja Integrada, ver [docs/02-modulos/bandeja-integrada.md](../02-modulos/bandeja-integrada.md). Resumen rápido: 5 tablas SQLite nuevas (`email_connections`, `email_threads`, `email_messages`, `email_labels`, `email_attachments`), 9 IPC handlers nuevos (`email-cache:*` y `google-gmail:*`), 3 archivos en `shared/` (Google OAuth + Gmail API), 4 archivos en `main/` (schema + driver + sync + singleton), iframe con cache-bust dinámico en `renderer/bandeja-integrada/` (3,438 líneas de app.js + 3,298 de styles.css).
 
 ---
 
@@ -16,6 +18,7 @@
 6. [Motor Normativo](#6-motor-normativo)
 7. [Integración con Python](#7-integración-con-python)
 8. [Decisiones Arquitectónicas](#8-decisiones-arquitectónicas)
+9. [Bandeja Integrada (v0.1.120)](#9-bandeja-integrada-v01120) — **NUEVA SECCIÓN**
 
 ---
 
@@ -661,6 +664,141 @@ npm run build
 
 ---
 
+## 9. Bandeja Integrada (v0.1.120)
+
+> **📌 Sección agregada el 18 de julio de 2026 con el commit `📦563` (`aef69d9`).**
+> Documentación completa en [docs/02-modulos/bandeja-integrada.md](../02-modulos/bandeja-integrada.md). Esta sección es un resumen arquitectónico de alto nivel.
+
+### 9.1 Visión General
+
+La **Bandeja Integrada** es el cliente de correo profesional integrado en K+AIR, basado en Gmail API con cache local SQLite. Se accede desde el botón "Bandeja Integrada" del header principal (icono de sobre con badge de alertas).
+
+**Decisión arquitectónica clave:** Se eligió **iframe con cache-bust dinámico** en lugar de integrar la Bandeja como módulo más del sistema. Esto permite:
+- Aislar el código de la Bandeja del resto de la app (sin contaminar `renderer.js`)
+- Iterar más rápido (no hay que tocar el `renderer.js` principal)
+- Cargar/descargar la Bandeja on-demand (no impacta el startup de la app)
+- Mantener K+AIR Calendar coexistiendo (no se reemplaza nada)
+
+### 9.2 Capas de la Bandeja Integrada
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  UI (iframe renderer/bandeja-integrada/)                        │
+│  - index.html (182 líneas)                                       │
+│  - app.js (3,438 líneas) — toda la lógica                        │
+│  - styles.css (3,298 líneas) — BEM Gmail-style                   │
+│  - data.js (317 líneas) — fallback mocks                         │
+└─────────────────────────────────────────────────────────────────┘
+                              │  contextBridge
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Preload (preload.js)                                            │
+│  - emailCache: { syncInbox, getThreads, getThread, getStats,     │
+│                  getLabels, getAttachments }                     │
+│  - googleGmail: { listInbox, getMessage, markRead, sendMessage,   │
+│                   listLabels, downloadAttachment, archiveThread,  │
+│                   markMessageRead }                              │
+└─────────────────────────────────────────────────────────────────┘
+                              │  ipcRenderer.invoke
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Main Process (main.js + 4 archivos en main/)                    │
+│  - email-cache:* handlers (SQLite local)                         │
+│  - google-gmail:* handlers (Gmail API real)                      │
+│  - email-schema-sql.js (5 tablas)                                │
+│  - email-db.js (CRUD con lazy db())                              │
+│  - email-sync.js (sync desde Gmail)                              │
+│  - db-instance.js (singleton kair.db)                            │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Google Services (shared/google-*.js)                            │
+│  - google-auth.js: OAuth2 + PKCE                                 │
+│  - google-tokens.js: refresh_token persistence                   │
+│  - google-gmail.js: wrapper Gmail API                            │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  External APIs                                                   │
+│  - accounts.google.com (OAuth)                                   │
+│  - gmail.googleapis.com (Gmail API v1)                           │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 9.3 Schema SQLite (kair.db)
+
+5 tablas nuevas en `kair.db` (mismo archivo que usa el resto de la app):
+
+| Tabla | Propósito | Campos clave |
+|-------|-----------|--------------|
+| `email_connections` | Conexiones OAuth por empresa | `email`, `access_token`, `refresh_token`, `scope` |
+| `email_threads` | Hilos (conversaciones) | `subject`, `last_message_date`, `message_count`, `has_unread` |
+| `email_messages` | Mensajes individuales | `from_email`, `to_list` (JSON), `body_plain`, `is_sent` |
+| `email_labels` | Etiquetas de Gmail | `name`, `color_background`, `type` (user/system) |
+| `email_attachments` | Adjuntos | `filename`, `size`, `attachment_id`, `message_id` |
+
+### 9.4 9 IPC Handlers Nuevos
+
+| Handler | Capa | Función |
+|---------|------|---------|
+| `email-cache:sync-inbox` | local | TRUNCATE-then-INSERT desde Gmail API |
+| `email-cache:get-threads` | local | Lectura instantánea (sin API call) |
+| `email-cache:get-thread` | local | Thread completo con mensajes |
+| `email-cache:get-stats` | local | Totales para footer |
+| `email-cache:get-labels` | local | Labels cacheados |
+| `email-cache:get-attachments` | local | Adjuntos de un mensaje |
+| `google-gmail:send-message` | API | Envía raw MIME + base64url |
+| `google-gmail:list-labels` | API | Labels reales con colores |
+| `google-gmail:download-attachment` | API | Descarga binario |
+| `google-gmail:mark-read` | API | Marca leído/no leído en Gmail |
+| `google-gmail:archive-thread` | API | Remueve label INBOX |
+
+### 9.5 BEM Refactor
+
+4 componentes BEM con tokens CSS compartidos:
+
+```css
+:root {
+  --email-bg: #ffffff;
+  --email-bg-read: #f2f6fc;
+  --email-border: #e0e0e0;
+  --email-accent: #1a73e8;
+  --email-row-height-min: 48px;
+  --email-row-padding-v: 12px;
+}
+```
+
+| Componente | Block | Elementos |
+|------------|-------|-----------|
+| Fila de bandeja | `.email-row` | `__avatar`, `__sender`, `__subject`, `__date`, `__star` |
+| Encabezado de hilo | `.thread-header` | `__avatar`, `__sender`, `__recipients`, `__meta` |
+| Mensajes previos | `.quoted-thread` + `.message-block` | `__summary`, `__full` |
+| Modal compose | `.compose-panel` | `__titlebar`, `__body`, `__toolbar`, `__footer`, `--minimized` |
+
+**Backward compat:** `.email-row` mantiene `.kair-mail-row` legacy. `.compose-panel` es full migration (modal temporal, fácil migrar todo).
+
+### 9.6 Decisiones Arquitectónicas Clave
+
+1. **SQLite cache vs API directa**: Cache local para evitar rate limiting de Gmail API. Refresh cada 5 min en background.
+2. **TRUNCATE-then-INSERT**: Para sync, borrar todos los threads de un folder y re-insertar. Más simple que diff y suficiente para 50 correos.
+3. **Lazy `db()` function**: SQLite connection lazy para evitar bloqueos en startup.
+4. **iframe vs módulo integrado**: iframe con cache-bust para aislar la Bandeja del resto.
+5. **BEM con backward compat**: `.email-row` mantiene `.kair-mail-row` para no romper tests legacy.
+6. **OAuth con refresh_token persistente**: No expiration check, refresh automático.
+7. **Search operators client-side**: No llamar a Gmail API para filtros simples, regex client-side.
+
+### 9.8 Referencias
+
+- **Documentación completa del módulo**: [docs/02-modulos/bandeja-integrada.md](../02-modulos/bandeja-integrada.md)
+- **Feature update**: [docs/05-updates/v0.1.120-bandeja-integrada.md](../05-updates/v0.1.120-bandeja-integrada.md)
+- **Changelog**: [docs/CHANGELOG.md](../CHANGELOG.md#0120---2026-07-18)
+- **README interna del módulo**: `renderer/bandeja-integrada/README.md`
+- **Gmail API docs**: https://developers.google.com/gmail/api
+
+---
+
 **Mantenido por:** Product Architect & Full-Stack Team
-**Última actualización:** 9 de junio de 2026
-**Versión:** 4.0 (v0.1.99)
+**Última actualización:** 18 de julio de 2026
+**Versión:** 4.0 (v0.1.99) + Bandeja Integrada (v0.1.120)
