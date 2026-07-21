@@ -86,6 +86,15 @@ El usuario usa su propio formato de commits con versionado incremental. **NO usa
 - Si la sesión trabaja con Mavis (agente), **ambos pueden usar numeración** — coordinarse con `git log` antes de cada commit para no colisionar. Si ya hay un 📦547 tuyo, yo uso 📦548+ (no 📦547+548).
 - Cumplir Resolucion 0312 de 2019 (Colombia)
 
+**Prefijos alternativos (no solo `📦<n>`):** además del formato principal `📦<n>`, se usan prefijos descriptivos para cambios no funcionales:
+- `🐛 fix:` — Bug fix puntual (ej: `🐛 fix(bandeja-integrada): 2 errores runtime`)
+- `🎨 audit:` — Mejora visual / auditoría de UI (ej: `🎨 audit(objetivo): 3 ajustes`)
+- `📧 audit:` — Auditoría de email (ej: `📧 audit(thread-grouping): refactor Gmail`)
+- `📚 docs:` — Documentación (ej: `📚 docs: actualizar documentación completa v0.1.120`)
+- `🔖 Bump version` — Bump de versión dedicado (1 commit)
+- `Revert "<mensaje del commit original>"` — Revertir un commit completo. Usar `git revert <hash>` (NO `git reset --hard`). El historial queda limpio (commit original + commit de revert).
+- Después de un revert, si querés reaplicar los cambios: `git revert <hash-revert>` o `git cherry-pick <hash-original>`
+
 ### Regla de Comunicación - Explicación Simple
 
 Cuando diagnostiques un error o propongas una corrección, SIEMPRE debes incluir al final de tu respuesta una sección explicativa en lenguaje sencillo (sin jerga técnica) que contenga:
@@ -110,8 +119,8 @@ ANTES (con bug): [Descripción simple]
 DESPUÉS (corregido): [Descripción simple]
 ```
 
-NO usar términos como: callback, listener, async, await, variable, función, línea, código, archivo, etc.
-SI usar términos como: sistema, mensaje, ventana, tema, preferencia, configuración, resultado, etc.
+NO usar términos como: callback, listener, async, await, variable, función, línea, código, archivo, componente, hook, state, props, render, mount, unmount, **BEM, CSS variable, data-attribute, grid, flexbox, hover, transition, shadow, border-radius, z-index, media query, pseudo-clase, cascada, responsive, overflow, scrollbar, gutter, opacity, transform, animación, breakpoint, padding, margin, gap, font, weight, color, background, border, radius, sombra, opacidad, transición, evento, controlador, manejador, helper, utilidad, módulo, import, export, require, dependency, paquete, librería, framework, patrón, refactor, debug, log, consola, stack, trace, error, excepción, promesa, callback, hilo, thread, mutex, lock, cache, memoria, almacenamiento, base de datos, query, SQL, índice, transacción, commit, rollback, merge, branch, push, pull, request, response, endpoint, API, endpoint, payload, JSON, XML, HTTP, HTTPS, SSL, TLS, header, body, query string, param, GET, POST, PUT, DELETE**, etc.
+SI usar términos como: sistema, mensaje, ventana, tema, preferencia, configuración, resultado, lista, tabla, tarjeta, botón, panel, formulario, campo, opción, calendario, fecha, hora, día, mes, año, correo, contacto, evento, reunión, cita, capacitación, inducción, evaluación, archivo, documento, empresa, empleado, persona, etc.
 
 ---
 
@@ -123,7 +132,7 @@ Si otra IA va a extender el proyecto, debe seguir estas convenciones:
 - **Electron** (no React, no Vue, no frameworks frontend)
 - **Vanilla JS** (ES5/ES6 mixto, sin TypeScript)
 - **CSS plano** (sin Tailwind, sin preprocessors — solo BEM con prefijo `kair-`)
-- **Bootstrap Icons** vía `<i class="bi bi-xxx">`
+- **Lucide icons** vía SVG inline (`<svg class="lucide lucide-mail">` con `<path>`, `<line>`, etc.) — generado desde `renderer/bandeja-integrada/data.js` (D.ICONS)
 - **Backend IPC** vía `window.electronAPI.*` (definido en preload.js con contextBridge)
 
 ### Patrón de archivo (template para cualquier vista nueva)
@@ -239,6 +248,176 @@ Patrones que aprendí corrigiendo problemas visuales. Aplicar a cualquier vista 
 
 ---
 
+## 🆕 Bandeja Integrada: Patrón Iframe + Cache-bust (v0.1.120, 📦563)
+
+La **Bandeja Integrada** (cliente Gmail integrado en K+AIR) sigue un patrón DIFERENTE al de las vistas de submódulos. En lugar de integrarse al sistema de vistas existentes, se carga como un **iframe aislado** dentro del header principal.
+
+### Estructura de archivos
+```
+sgsst-electron-app/
+├── renderer/bandeja-integrada/
+│   ├── index.html          # UI principal
+│   ├── app.js              # Toda la lógica (~3,400 líneas)
+│   ├── styles.css          # BEM Gmail-style (~3,300 líneas)
+│   ├── data.js             # D.ICONS (Lucide) + datos mock fallback
+│   └── README.md           # Doc interna
+└── (consumido desde renderer.js con iframe + cache-bust)
+```
+
+### Cómo se monta el iframe
+En `renderer.js`, cuando el user hace click en el botón "Bandeja Integrada" del header:
+```js
+var bandejaIntegradaFrame = document.createElement('iframe');
+bandejaIntegradaFrame.src = 'renderer/bandeja-integrada/index.html?v=' + currentVersion;
+document.body.appendChild(bandejaIntegradaFrame);
+```
+
+**Cache-bust dinámico (`?v=N`):** cada vez que se cambia código de la Bandeja Integrada, hay que bumpear el `currentVersion` (actualmente en `v=617`) en `renderer.js` línea ~1044. Sin esto, el navegador cachea la versión vieja y no se ven los cambios.
+
+### Comunicación iframe ↔ renderer principal
+- **renderer → Bandeja**: `bandejaIntegradaFrame.contentWindow.postMessage({ type: 'bandeja-integrada-toggle' }, '*')`
+- **Bandeja → renderer**: `window.parent.postMessage({ type: 'bandeja-integrada-back' }, '*')`
+- **3 formas de salir de la Bandeja**:
+  1. Botón "X" (toggle) en el header principal
+  2. FAB "← Volver" flotante arriba a la izquierda
+  3. Tecla `ESC` (con flag para evitar cierre accidental al escribir en inputs)
+
+### Reglas específicas de la Bandeja Integrada
+- **Coexiste con K+AIR Calendar**: NO lo reemplaza. Ambos funcionan en paralelo.
+- **OAuth Gmail + SQLite cache**: el cache local está en `kair.db` (mismo archivo que usa el resto de la app).
+- **BEM refactor 4 componentes**: `.email-row`, `.thread-header`, `.quoted-thread`, `.compose-panel` (con tokens CSS en `:root`).
+- **Sin Tailwind**: el archivo `styles.css` NO debe tener `@import "tailwindcss"`. Si lo ves, elimínalo (causa `ERR_FILE_NOT_FOUND` en consola).
+- **Patrón IIFE + window export**: igual que las vistas de submódulos, pero todo dentro del iframe.
+
+### Cómo extender la Bandeja Integrada
+1. Modificar archivos en `renderer/bandeja-integrada/`
+2. Bumpear cache-bust en `renderer.js` (línea ~1044: `?v=N+1`)
+3. Si agregás un IPC handler nuevo en `main.js`, exponerlo en `preload.js`
+4. Si agregás un módulo SQLite nuevo, actualizar `main/email-schema-sql.js` + `main/email-db.js` + `main/email-sync.js`
+5. NO commitear sin autorización explícita del usuario
+
+---
+
+## 🧪 Tests smoke (en `main/test-*.js`)
+
+Desde v0.1.120, el proyecto tiene **9 archivos de tests smoke** en `sgsst-electron-app/main/test-*.js` que validan que los cambios no rompen nada. **Todos están en `.gitignore`** (no se commitean).
+
+### Archivos de test
+| Archivo | Checks | Qué valida |
+|---------|--------|------------|
+| `test-compose-bem.js` | 58 | BEM refactor 4 componentes (email-row, thread-header, quoted-thread, compose-panel) |
+| `test-fixes-loop1.js` | 18 | 5 fixes visuales del loop 1 (hover fecha, word-break, quote, "para: —", chip "Recibidos") |
+| `test-fixes-loop2.js` | 20 | Features 4-7 (adjuntos, firma, badge N mensajes, auto-refresh) |
+| `test-fixes-loop3.js` | 11 | Badge N mensajes + auto-refresh 5 min |
+| `test-fixes-loop4.js` | 14 | Operadores de búsqueda con chips visuales |
+| `test-fixes-loop5.js` | 14 | 4 fixes visuales Gmail-style del loop 5 (body limpio, email no cortado, "hace X horas", chip) |
+| `test-fixes-loop6.js` | 4 | 2 errores runtime (m is not defined + tailwindcss) |
+| `test-fixes-loop7.js` | 8 | 3 mejoras visuales del preview de Z.ai (avatar 32px, sort, footer) |
+| `test-fixes-loop8.js` | 10 | 3 ajustes de la imagen objetivo (para plano, 1 de N, weekday) |
+| **Total** | **157** | Acumulado histórico |
+
+**Nota:** el total puede variar si se agregan o quitan tests. Siempre correr los 9 antes de commitear.
+
+### Patrón de test
+Cada test sigue el mismo patrón:
+```js
+const fs = require('fs');
+const path = require('path');
+const appPath = path.join(__dirname, '..', 'renderer', 'bandeja-integrada', 'app.js');
+const appSrc = fs.readFileSync(appPath, 'utf8');
+
+const checks = [];
+checks.push({ name: 'JS: feature X existe', ok: /patron regex/.test(appSrc) });
+// ... más checks
+
+// Reporte
+var failed = 0;
+checks.forEach(function (c) { /* ... */ });
+process.exit(failed === 0 ? 0 : 1);
+```
+
+### Cómo correr los tests antes de commitear
+```bash
+cd sgsst-electron-app
+for ($i=1; $i -le 8; $i++) { node main/test-fixes-loop$i.js }
+node main/test-compose-bem.js
+```
+
+### Reglas
+- **SIEMPRE** agregar un test nuevo cuando se implemente una feature (incrementar el contador)
+- **SIEMPRE** correr los tests antes de commitear
+- **NO** commitear si algún test falla (investigar y arreglar primero)
+- Los tests son **smoke tests** (validan estructura, no funcionalidad completa). Para tests de integración usar herramientas más pesadas (no implementadas aún).
+
+---
+
+## 🔍 Workflow de auditoría visual (v0.1.120+)
+
+Cuando el usuario pide una **auditoría visual** (compara una imagen objetivo con el código actual), seguir este workflow:
+
+### Pasos
+
+1. **Recibir la imagen objetivo** (screenshot, URL de preview, o descripción)
+2. **Comparar con el código actual** de la Bandeja Integrada:
+   - Render del detail (thread grouping, header, recipients, action icons)
+   - Render de la lista (avatars, sender, subject, snippet, time, attachments, labels)
+   - Estado de los correos (unread, read, selected, hover)
+   - Filtros y ordenamiento
+   - Footer / versión
+3. **Listar las diferencias** en una tabla priorizada:
+   - 🔴 Críticos (rompen la apariencia)
+   - 🟡 Importantes (no coincide con objetivo)
+   - 🟢 Nice to have (mejoras menores)
+4. **Aplicar fixes priorizados** con prefijos descriptivos (`🎨 audit:`, `📧 audit:`, `🐛 fix:`, `📚 docs:`)
+5. **Agregar test smoke** que valide cada fix (en `main/test-fixes-loop<N>.js`)
+6. **Commitear** con mensaje que liste los cambios
+
+### Ejemplo: `🎨 audit(objetivo): 3 ajustes para coincidir con imagen objetivo`
+- 3 cambios: "para:" como texto plano, "1 de N" dinámico, "Dom" weekday
+- 1 commit: `89bbf28`
+- 1 test: `test-fixes-loop8.js` (10 checks)
+- Si el user no está conforme: `git revert 89bbf28` → commit `1fd5c0f`
+
+### Skills útiles para auditorías
+- `ui-ux-pro-max` — Análisis de diseño con base de datos de patrones UI
+- `code-reviewer` — Review de confianza para validar que los fixes son correctos
+- `code-simplifier` — Simplificar el código de los fixes sin perder funcionalidad
+
+---
+
+## 📦 Skills de opencode-power-pack (instalados en v0.1.120, 📦564)
+
+Además de los 14 skills de superpowers, hay **11 skills de opencode-power-pack** instalados en `.opencode/skills/`. Cada uno tiene su propio SKILL.md que se carga con `skill({ name: "<nombre>" })`.
+
+| Skill | Propósito |
+|-------|-----------|
+| **brainstorming** | Refinar ideas antes de codificar |
+| **code-architect** | Diseñar arquitectura antes de implementar |
+| **code-explorer** | Entender código existente antes de modificarlo |
+| **code-reviewer** | Review de bugs/seguridad/calidad |
+| **code-simplifier** | Simplificar código manteniendo funcionalidad |
+| **commit-workflow** | Crear commits y PRs con mensajes significativos |
+| **dispatching-parallel-agents** | Workflows concurrentes con subagentes |
+| **doc-coauthoring** | Co-autoría de documentos estructurados |
+| **feature-dev** | Workflow de features nuevas (7 fases) |
+| **finishing-a-development-branch** | Decidir merge/PR/keep al completar tareas |
+| **receiving-code-review** | Responder a feedback de code review |
+| **requesting-code-review** | Checklist pre-review |
+| **security-review** | Review de seguridad (inyección, auth bypass, RCE) |
+| **silent-failure-hunter** | Cazar errores silenciosos en try-catch |
+| **subagent-driven-development** | Desarrollo rápido con subagentes |
+| **test-driven-development** | Ciclo RED-GREEN-REFACTOR |
+| **using-git-worktrees** | Branches aislados para desarrollo paralelo |
+| **using-superpowers** | Introducción al sistema de skills |
+| **verification-before-completion** | Verificar antes de declarar completo |
+| **visual-page** | Crear página HTML visual para conceptos complejos |
+| **writing-plans** | Crear planes de implementación |
+| **writing-skills** | Crear nuevos skills |
+
+**Nota:** Esta lista puede crecer. Verificar `.opencode/skills/` para los disponibles.
+
+---
+
 ## 🎨 Sistema de Skeleton Screens (v0.1.110+, 📦483-491)
 
 El proyecto tiene un sistema centralizado de placeholders de carga que reemplazan los spinners genéricos. **SI vas a tocar loaders o UX de carga, leer primero:**
@@ -340,13 +519,27 @@ git status --short
 
 ---
 
-## 📊 Snapshot actual del proyecto (snapshot 2026-07-18)
+## 📊 Snapshot actual del proyecto (snapshot 2026-07-19)
 
 - **Versión:** 0.1.120
 - **Working tree:** limpio
-- **Último commit:** `383a96f` (🔖 Bump version 0.1.120 — Bandeja Integrada release)
-- **Commit anterior:** `aef69d9` (📦563 # Bandeja Integrada: cliente Gmail completo con SQLite cache, Gmail-look UI, BEM refactor, 7 features. 22 archivos, +11,285/-28 líneas)
+- **Último commit:** `1fd5c0f` (Revert "🎨 audit(objetivo): 3 ajustes")
+- **Commits principales recientes (en orden inverso):**
+  - `1fd5c0f` — Revert "🎨 audit(objetivo): 3 ajustes" (deshizo el `89bbf28`)
+  - `89bbf28` — 🎨 audit(objetivo): 3 ajustes (REVERTIDO)
+  - `e44ddde` — 🎨 audit(preview-z-ai): 3 mejoras visuales (avatar 32px, sort, footer)
+  - `dd577fe` — 🐛 fix(bandeja-integrada): 2 errores runtime
+  - `b68b316` — 📧 audit(thread-grouping): refactor Gmail compacto
+  - `6c0fb4b` — 📦564 # Instalar skills oficiales
+  - `25a51d6` — 📚 docs: actualizar documentación completa v0.1.120
+  - `383a96f` — 🔖 Bump version 0.1.120
+  - `aef69d9` — 📦563 # Bandeja Integrada (release principal)
 - **Sistema de Skeletons:** completo (📦483-491, 9 commits)
-- **Bandeja Integrada:** completa (📦563, 22 archivos, 11,285 líneas, 135/135 tests OK). Coexiste con K+AIR Calendar. OAuth + SQLite cache + Gmail-look UI + BEM refactor 4 componentes + 7 features. Ver [docs/02-modulos/bandeja-integrada.md](docs/02-modulos/bandeja-integrada.md) y [docs/05-updates/v0.1.120-bandeja-integrada.md](docs/05-updates/v0.1.120-bandeja-integrada.md)
+- **Bandeja Integrada:** completa y validada (📦563, 22 archivos, 11,285 líneas). Coexiste con K+AIR Calendar. OAuth + SQLite cache + Gmail-look UI + BEM refactor 4 componentes + 7 features. **Tests: 172/172 OK** acumulado. Ver [docs/02-modulos/bandeja-integrada.md](docs/02-modulos/bandeja-integrada.md) y [docs/05-updates/v0.1.120-bandeja-integrada.md](docs/05-updates/v0.1.120-bandeja-integrada.md)
 - **9 módulos + 48 submódulos con lógica + ~58 submódulos menú + Bandeja Integrada (nuevo módulo de correo)**
-- **Pendientes próximos:** 📦492 (dashboards), 📦493 (homes de submódulos)
+- **Pendientes próximos (post-Bandeja Integrada):**
+  - F3.C — Google Calendar write (eventos creados en Bandeja Integrada → Google Calendar real)
+  - Refactor total legacy → BEM puro (sin compat con `.kair-mail-row`)
+  - Vista diferenciada Enviados vs Recibidos (mostrar destinatario como sender en Enviados)
+  - Drag & drop visual de correos al calendario
+  - Bandeja Integrada v2 features: drag&drop archivos al compose, undo, snooze, mail icons overlay en calendar
