@@ -401,6 +401,7 @@ async function sendMessage(options) {
   var body = options.body || '';
   var inReplyTo = options.inReplyTo || '';
   var references = options.references || '';
+  var attachments = Array.isArray(options.attachments) ? options.attachments : [];
 
   if (!to) return { success: false, error: 'Falta el destinatario (to)' };
 
@@ -426,19 +427,51 @@ async function sendMessage(options) {
     var gmail = google.gmail({ version: 'v1', auth: auth });
 
     // 1) Construir el raw MIME message
-    // RFC 5322: headers separados por \r\n, luego línea vacía, luego body
+    // Loop 38 — Soporte para attachments via multipart/mixed
     var headers = [
       'From: ' + from,
       'To: ' + to,
       cc ? 'Cc: ' + cc : null,
       bcc ? 'Bcc: ' + bcc : null,
       'Subject: ' + subject,
-      'Content-Type: text/plain; charset=UTF-8',
       inReplyTo ? 'In-Reply-To: ' + inReplyTo : null,
       references ? 'References: ' + references : null
     ].filter(function (h) { return h; });
 
-    var raw = headers.join('\r\n') + '\r\n\r\n' + body;
+    var raw;
+    if (attachments && attachments.length > 0) {
+      // Construir mensaje multipart/mixed con boundary
+      var boundary = '----=_KairBandeja_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+      // Override del header Content-Type (no incluirlo arriba, lo agregamos con boundary)
+      var headerLines = headers.join('\r\n');
+      raw = headerLines + '\r\n';
+      raw += 'MIME-Version: 1.0\r\n';
+      raw += 'Content-Type: multipart/mixed; boundary="' + boundary + '"\r\n\r\n';
+      // Parte 1: body (text/plain)
+      raw += '--' + boundary + '\r\n';
+      raw += 'Content-Type: text/plain; charset=UTF-8\r\n\r\n';
+      raw += body + '\r\n';
+      // Partes 2..N: cada attachment
+      for (var i = 0; i < attachments.length; i++) {
+        var att = attachments[i];
+        var attName = (att.name || 'archivo').replace(/"/g, '');
+        var attMime = att.mimeType || 'application/octet-stream';
+        var attData = att.data || '';
+        raw += '--' + boundary + '\r\n';
+        raw += 'Content-Type: ' + attMime + '; name="' + attName + '"\r\n';
+        raw += 'Content-Disposition: attachment; filename="' + attName + '"\r\n';
+        raw += 'Content-Transfer-Encoding: base64\r\n\r\n';
+        // El base64 viene del renderer sin saltos de línea. Gmail espera
+        // linebreaks cada 76 chars (estándar MIME). Lo partimos para que
+        // encoding funcione correctamente.
+        raw += attData.match(/.{1,76}/g).join('\r\n') + '\r\n';
+      }
+      raw += '--' + boundary + '--\r\n';
+    } else {
+      // Sin attachments: mensaje simple text/plain
+      var allHeaders = headers.concat(['Content-Type: text/plain; charset=UTF-8']);
+      raw = allHeaders.join('\r\n') + '\r\n\r\n' + body;
+    }
     var encoded = encodeBase64Url(raw);
 
     // 2) Enviar via Gmail API

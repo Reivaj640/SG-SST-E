@@ -876,15 +876,15 @@
     }
   }
 
-  // F4-fix — Handler del botón "Redactar". Si Gmail está conectado, abre
-  // un editor de correo (F3.B). Si NO, muestra mensaje para ir a Configuración.
+  // Loop 37 — Handler del botón "Redactar". Si Gmail está conectado, abre
+  // el modal de compose real (openComposeModal). Si NO, muestra mensaje para
+  // ir a Configuración.
   function onComposeClick() {
     if (state.gmailConnected) {
-      // F3.B — Abrir editor de correo
-      toast("Redactar nuevo correo", "Editor de correo (próximamente F3.B).", "info");
+      // Loop 37 — Abrir modal de compose en modo "new" (correo nuevo, no reply/forward)
+      openComposeModal("new", null);
     } else {
-      // F4-fix — El switch de Conectar/Desconectar ahora vive en
-      // Configuración > Gestión de Empresas. Acá solo informamos.
+      // El switch de Conectar/Desconectar vive en Configuración > Gestión de Empresas.
       toast("Gmail no conectado", "Conectá Gmail en Configuración > Gestión de Empresas.", "info");
     }
   }
@@ -1909,6 +1909,29 @@
       flagged: state.mails.filter((m) => m.flagged).length,
       meeting: state.mails.filter((m) => m.category === "meeting").length,
     };
+
+    // Loop 37 — Botón "Redactar" Gmail-style (prominent, arriba de la lista).
+    // El header interno del iframe está oculto por CSS (kair-header display:none),
+    // entonces agregamos el botón acá para que sea visible.
+    const composeBar = el("div", { class: "kair-mail-compose-bar" });
+    composeBar.innerHTML = `
+      <button class="kair-mail-compose-bar__btn" id="mail-compose-btn" title="Redactar correo nuevo (Ctrl+N)">
+        ${D.ICONS.plus}
+        <span>Redactar</span>
+      </button>
+    `;
+    container.appendChild(composeBar);
+
+    // Wire up compose button
+    setTimeout(function () {
+      var composeBtn = $("#mail-compose-btn", container);
+      if (composeBtn) {
+        composeBtn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          onComposeClick();
+        });
+      }
+    }, 0);
 
     // Header
     const header = el("div", { class: "kair-mail-list-header" });
@@ -3058,32 +3081,23 @@
           </div>
         </div>
         <div class="compose-panel__body">
-          <!-- FIX 2026-07-19 (loop 14) — Campo "De:" arriba (Gmail-style) -->
-          <div class="compose-panel__field compose-panel__field--from">
-            <label>De</label>
-            <input type="text" class="compose-panel__input compose-panel__input--readonly" id="compose-from" value="${(state.gmailEmail || 'tucuenta@gmail.com').replace(/"/g, '&quot;')}" readonly />
-          </div>
-          <div class="compose-panel__field">
-            <label>Para</label>
-            <input type="email" multiple class="compose-panel__input" id="compose-to" value="${toValue.replace(/"/g, '&quot;')}" placeholder="destinatario@email.com" />
-          </div>
+          <!-- Loop 37e — Patrón Gmail-style: labels DENTRO del input como placeholders.
+               - Sin columna de label separada
+               - El placeholder muestra "Para"/"Asunto" hasta que se escribe
+               - Al hacer click o escribir, el placeholder desaparece (browser default)
+               - Más limpio y menos elementos visuales -->
+          <input type="email" class="compose-panel__input" id="compose-to" value="${toValue.replace(/"/g, '&quot;')}" placeholder="Para" />
           ${mode === 'replyAll' ? `
-          <div class="compose-panel__field">
-            <label>CC</label>
-            <input type="text" class="compose-panel__input" id="compose-cc" value="${ccValue.replace(/"/g, '&quot;')}" placeholder="concopia@email.com" />
-          </div>` : ''}
-          <div class="compose-panel__field">
-            <label>Asunto</label>
-            <input type="text" class="compose-panel__input" id="compose-subject" value="${subjectValue.replace(/"/g, '&quot;')}" placeholder="Asunto del correo" />
-          </div>
-          <div class="compose-panel__field compose-panel__field--body">
+          <input type="text" class="compose-panel__input" id="compose-cc" value="${ccValue.replace(/"/g, '&quot;')}" placeholder="CC" />` : ''}
+          <input type="text" class="compose-panel__input" id="compose-subject" value="${subjectValue.replace(/"/g, '&quot;')}" placeholder="Asunto" />
+          <div class="compose-panel__field compose-panel__field--body" id="compose-body-field">
             ${quoteHtml}
-            <textarea class="compose-panel__textarea" id="compose-body" placeholder="${isReply ? 'Escribí tu respuesta...' : isForward ? 'Agregá un comentario (opcional)...' : 'Escribí tu mensaje...'}"></textarea>
-            <!-- FIX loop 33 — Drop zone + lista de adjuntos.
-                 El área completa del body es drop zone (dragover muestra feedback visual).
-                 Los archivos adjuntados se listan como chips con nombre, tamaño y botón X. -->
+            <textarea class="compose-panel__textarea" id="compose-body"></textarea>
+            <!-- Loop 37c — Drop zone overlay: solo visible DURANTE el drag.
+                 Ocupa todo el body field cuando se arrastra un archivo.
+                 No muestra texto "Arrastrá archivos..." por defecto (molestaba). -->
             <div class="compose-panel__dropzone" id="compose-dropzone">
-              <div class="compose-panel__dropzone-hint">Arrastrá archivos aquí o usá el botón 📎</div>
+              <div class="compose-panel__dropzone-hint">Soltá los archivos para adjuntar</div>
             </div>
             <div class="compose-panel__attachments" id="compose-attachments"></div>
           </div>
@@ -3275,23 +3289,31 @@
       });
     }
 
-    // Drag & drop en el body del modal (drop zone)
+    // Loop 37c — Drag & drop en el body field completo (cubre todo el área del cuerpo).
+    // El dropzone es un overlay invisible por defecto; solo aparece cuando se arrastra
+    // un archivo encima. Listeners en el body field, no en el overlay, para que el
+    // área completa sea drop target.
+    var bodyField = modal.querySelector("#compose-body-field");
     var dropzone = modal.querySelector("#compose-dropzone");
-    if (dropzone) {
-      // dragover: prevenir default + mostrar feedback visual
-      dropzone.addEventListener("dragover", function (e) {
+    if (bodyField && dropzone) {
+      // dragover: prevenir default + mostrar overlay
+      bodyField.addEventListener("dragover", function (e) {
         e.preventDefault();
         e.stopPropagation();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
         dropzone.classList.add("compose-panel__dropzone--active");
       });
-      // dragleave: quitar feedback visual
-      dropzone.addEventListener("dragleave", function (e) {
+      // dragleave: quitar overlay (solo si salimos del body field, no de hijos)
+      bodyField.addEventListener("dragleave", function (e) {
         e.preventDefault();
         e.stopPropagation();
-        dropzone.classList.remove("compose-panel__dropzone--active");
+        // relatedTarget es null cuando sales del elemento, o está fuera del bodyField
+        if (!e.relatedTarget || !bodyField.contains(e.relatedTarget)) {
+          dropzone.classList.remove("compose-panel__dropzone--active");
+        }
       });
       // drop: prevenir default + agregar archivos
-      dropzone.addEventListener("drop", function (e) {
+      bodyField.addEventListener("drop", function (e) {
         e.preventDefault();
         e.stopPropagation();
         dropzone.classList.remove("compose-panel__dropzone--active");
@@ -3313,6 +3335,8 @@
         isReply: isReply,
         isForward: isForward,
         threadId: mail ? mail.threadId : null,
+        // Loop 38 — Pasar los adjuntos al send (antes se perdían silenciosamente)
+        attachments: pendingAttachments,
         closeModal: closeModal
       });
     });
@@ -3339,6 +3363,41 @@
     }
 
     try {
+      // Loop 38 — Convertir los File objects de adjuntos a base64
+      // para poder enviarlos via IPC. Sin esto, los adjuntos se perdían.
+      var attachmentsPayload = [];
+      if (opts.attachments && opts.attachments.length > 0) {
+        for (var i = 0; i < opts.attachments.length; i++) {
+          var file = opts.attachments[i];
+          // Validar tamaño (Gmail limita a 25MB)
+          if (file.size > 25 * 1024 * 1024) {
+            toast("Archivo demasiado grande", file.name + " (" + (file.size / 1024 / 1024).toFixed(1) + " MB) excede el límite de Gmail (25 MB)", "error");
+            if (sendBtn) {
+              sendBtn.disabled = false;
+              sendBtn.innerHTML = originalText;
+            }
+            return;
+          }
+          // Leer el archivo como base64 (data URL → split comas → base64 puro)
+          var base64Data = await new Promise(function (resolve, reject) {
+            var reader = new FileReader();
+            reader.onload = function () {
+              var result = reader.result;
+              // result tiene formato "data:<mimeType>;base64,<data>"
+              var parts = result.split(",");
+              resolve(parts.length > 1 ? parts[1] : result);
+            };
+            reader.onerror = function () { reject(reader.error || new Error("Error leyendo archivo")); };
+            reader.readAsDataURL(file);
+          });
+          attachmentsPayload.push({
+            name: file.name,
+            mimeType: file.type || "application/octet-stream",
+            data: base64Data
+          });
+        }
+      }
+
       // Construir el headers In-Reply-To y References si es reply
       var inReplyTo = '';
       var references = '';
@@ -3387,7 +3446,9 @@
         body: bodyWithQuoteAndSignature,
         inReplyTo: inReplyTo,
         references: references,
-        threadId: opts.threadId || undefined
+        threadId: opts.threadId || undefined,
+        // Loop 38 — Pasar los adjuntos al backend
+        attachments: attachmentsPayload
       });
 
       if (result && result.success) {

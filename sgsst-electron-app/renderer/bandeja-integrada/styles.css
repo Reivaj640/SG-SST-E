@@ -2166,14 +2166,17 @@ body {
 }
 
 /* ---------- Titlebar ---------- */
+/* Loop 37e — Titlebar más suave: fondo gris claro, texto gris medio.
+   Antes era fondo oscuro #404040 + texto blanco (muy prominente).
+   Ahora es fondo #f8f9fa + texto #6b7280 (más sutil, como el resto del modal). */
 .compose-panel__titlebar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  border-bottom: 1px solid var(--email-border);
-  background: #404040;
-  color: #fff;
+  border-bottom: 1px solid var(--email-border-soft, #e5e7eb);
+  background: #f8f9fa;
+  color: #6b7280;
 }
 .compose-panel__title {
   margin: 0;
@@ -2197,15 +2200,15 @@ body {
   background: transparent;
   border-radius: 4px;
   cursor: pointer;
-  color: rgba(255, 255, 255, 0.85);
+  color: #6b7280;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   transition: background 120ms ease, color 120ms ease;
 }
 .compose-panel__btn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
+  background: rgba(0, 0, 0, 0.06);
+  color: #1f2937;
 }
 .compose-panel__btn--maximize {
   display: none;
@@ -2217,12 +2220,14 @@ body {
   overflow-y: auto;
   padding: 12px 20px;
 }
+/* Loop 37e — Inputs full-width con label como placeholder (patrón Gmail).
+   Sin columna de label separada, sin flex row. Cada input es independiente
+   y ocupa todo el ancho del modal. */
 .compose-panel__field {
-  display: flex;
-  align-items: center;
-  border-bottom: 1px solid var(--email-border);
-  padding: 8px 0;
-  gap: 12px;
+  display: block;
+  border-bottom: none;
+  padding: 0;
+  margin: 0;
 }
 /* FIX 2026-07-19 (loop 14) — Campo "De:" más sutil, sin border-bottom fuerte
    porque es de solo lectura y debe verse menos prominente que los demás */
@@ -2244,24 +2249,23 @@ body {
   padding: 12px 0;
   align-items: flex-start;
 }
-.compose-panel__field label {
-  width: 60px;
-  flex-shrink: 0;
-  font-size: 0.75rem;
-  color: var(--email-text-secondary);
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
+/* Loop 37e — Label CSS removido (ya no hay label separada, ahora es placeholder) */
 .compose-panel__input {
-  flex: 1;
+  display: block;
+  width: 100%;
   border: none;
   outline: none;
   font-size: 0.875rem;
+  line-height: 1.5;
   color: var(--email-text-primary);
-  padding: 6px 0;
+  padding: 8px 0;
   background: transparent;
   font-family: inherit;
+  margin: 4px 0;
+}
+.compose-panel__input::placeholder {
+  color: #cbd5e1;
+  font-weight: 400;
 }
 .compose-panel__input:focus {
   outline: none;
@@ -2281,23 +2285,37 @@ body {
   line-height: 1.5;
 }
 
-/* FIX loop 33 — Drag & drop zone + attachments */
+/* Loop 37c — Drop zone: invisible por defecto, aparece como overlay
+   SOLO cuando se arrastra un archivo. Cubre todo el body field. */
+.compose-panel__field--body {
+  position: relative;
+}
 .compose-panel__dropzone {
-  border: 2px dashed var(--kair-border, #dee2e6);
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(232, 240, 254, 0.92);
+  border: 2px dashed var(--kair-primary, #1a73e8);
   border-radius: 6px;
-  padding: 12px;
-  margin-top: 8px;
-  text-align: center;
-  background: var(--kair-bg-soft, #f8f9fa);
-  transition: border-color 160ms ease, background 160ms ease;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+  z-index: 5;
 }
 .compose-panel__dropzone--active {
-  border-color: var(--kair-primary, #1a73e8);
-  background: #e8f0fe;
+  opacity: 1;
 }
 .compose-panel__dropzone-hint {
-  font-size: 0.75rem;
-  color: var(--kair-text-muted, #5f6368);
+  font-size: 0.9375rem;
+  color: var(--kair-primary, #1a73e8);
+  font-weight: 500;
+  text-align: center;
+  padding: 0 16px;
 }
 .compose-panel__attachments {
   display: flex;
@@ -2865,6 +2883,46 @@ body {
 /* ============================================
    K+AIR Mail list panel header (Gmail style)
    ============================================ */
+
+/* Loop 37 — Botón "Redactar" Gmail-style (prominent, arriba de la lista).
+   Visible porque el header interno del iframe está oculto por CSS. */
+.kair-mail-compose-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  background: #fff;
+  border-bottom: 1px solid var(--kair-border-soft);
+}
+.kair-mail-compose-bar__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  background: var(--kair-primary, #174ea6);
+  color: #ffffff;
+  border: none;
+  border-radius: 16px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 160ms ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  font-family: inherit;
+}
+.kair-mail-compose-bar__btn:hover {
+  background: #1a4fa8;
+  box-shadow: 0 2px 8px rgba(23, 78, 166, 0.25);
+  transform: translateY(-1px);
+}
+.kair-mail-compose-bar__btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.kair-mail-compose-bar__btn svg {
+  flex-shrink: 0;
+}
+
 .kair-mail-list-header {
   display: flex;
   align-items: center;
