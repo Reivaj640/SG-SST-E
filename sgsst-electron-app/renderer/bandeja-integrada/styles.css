@@ -696,7 +696,10 @@ body {
 .kair-mail-row {
   display: grid;
   /* F1.A-refactor — Grid de 5 columnas: [check/dot] [avatar] [content] [date] [star] */
-  grid-template-columns: 24px 40px 1fr 90px 24px;
+  /* Loop 41 — Reducido el ancho de la columna de fecha de 90px a 64px (26px
+     recuperados) para dar más espacio al content. "11:27" o "ayer" entran
+     perfectamente en 64px. */
+  grid-template-columns: 24px 40px 1fr 64px 24px;
   align-items: center;
   gap: 14px;
   min-height: var(--email-row-height-min, 48px);
@@ -830,7 +833,8 @@ body {
    ============================================ */
 .email-row {
   display: grid;
-  grid-template-columns: 24px 40px 1fr 90px 24px;
+  /* Loop 41 — Mismo ajuste: fecha de 90px a 64px (ver .kair-mail-row arriba). */
+  grid-template-columns: 24px 40px 1fr 64px 24px;
   align-items: center;
   gap: 14px;
   min-height: var(--email-row-height-min);
@@ -922,9 +926,31 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
 }
 .email-row[data-unread="true"] .email-row__sender {
   font-weight: 700;
+}
+/* Loop 41 — Sub-label del email cuando el sender es un nombre (no email).
+   Estilo Gmail: nombre en bold + email en gris claro más pequeño al lado.
+   Si el email es muy largo, se trunca con ellipsis. */
+.email-row__sender-name {
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.email-row__sender-email {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--kair-text-light, #5f6368);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .email-row__subject-preview {
   font-size: 0.8125rem;
@@ -969,6 +995,10 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
 }
 .kair-mail-row__subject {
   font-size: 0.8125rem;
@@ -1823,7 +1853,10 @@ body {
 /* Correo: base layer (lista + detalle Gmail) */
 .kair-mail-stack {
   display: grid;
-  grid-template-columns: 340px 1fr;
+  /* Loop 41 — Aumentado de 340px a 420px (80px más) para que el sender y el
+     preview del cuerpo se vean sin truncar agresivamente. Antes quedaba solo
+     ~134px para content (sender + subject) y se veía "adm..." / "P...". */
+  grid-template-columns: 420px 1fr;
   height: 100%;
   gap: 0;
   transition: opacity 240ms ease;
@@ -1831,7 +1864,7 @@ body {
 
 @media (max-width: 1280px) {
   .kair-mail-stack {
-    grid-template-columns: 300px 1fr;
+    grid-template-columns: 380px 1fr;
   }
 }
 
@@ -1924,12 +1957,28 @@ body {
 /* ============================================
    K+AIR Mail Detail — Gmail reading pane
    ============================================ */
+
+/* Loop 42 — El scroll interno del detail (clase overflow-y-auto kair-scroll)
+   tiene que tomar todo el espacio vertical restante entre el header y el reply.
+   flex: 1 1 auto + min-height: 0 es el patrón estándar para que un hijo de
+   flex container haga scroll interno sin agrandar el padre. */
+.kair-mail-detail .overflow-y-auto {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .kair-mail-detail {
-  /* FIX loop 23 — display: flex con flex-direction: column PERO sin
-     height: 100%. Esto permite que el scroll tenga su altura natural
-     y el reply quede al final del contenido del detail. */
+  /* Loop 42 — Patrón "3 zonas" (header / content scroll / reply fijo al fondo).
+     - height: 100% toma toda la altura del container padre (.kair-mail-detail-container)
+     - display: flex + flex-direction: column apila los 3 hijos
+     - El scroll (hijo 2) tiene flex: 1 1 auto + min-height: 0 para que ocupe
+       todo el espacio restante y haga scroll INTERNO cuando el contenido es largo
+     - El reply (hijo 3) tiene flex-shrink: 0 para que NUNCA se comprima y
+       quede SIEMPRE al fondo del panel (estilo Gmail) */
   display: flex;
   flex-direction: column;
+  height: 100%;
+  min-height: 0;
   background: #fff;
   overflow: hidden;
 }
@@ -2854,6 +2903,12 @@ body {
   align-items: center;
   /* FIX loop 28 — Reply queda al final del detail sin anclar (loop 23
      lo revirtió del scroll al detail). */
+  /* Loop 42 — flex-shrink: 0 para que NUNCA se comprima cuando el scroll
+     interno quiere expandirse. Garantiza que el reply quede SIEMPRE al fondo
+     del panel con su altura natural (~56px), aunque el body tenga mucho
+     contenido. */
+  flex-shrink: 0;
+  z-index: 2;  /* encima del scroll si hay overlap */
 }
 .kair-mail-detail__reply button {
   display: inline-flex;

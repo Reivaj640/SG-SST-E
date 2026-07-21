@@ -2463,19 +2463,40 @@
         row.appendChild(selectWrap);
 
         // Columna 2 — Avatar (40x40, color de fondo derivado del email)
+        // Loop 41 — Tooltip muestra nombre + email (antes solo el nombre).
+        var avatarTitle = (m.sender && m.senderEmail && m.sender !== m.senderEmail)
+          ? m.sender + " <" + m.senderEmail + ">"
+          : (m.sender || m.senderEmail || '');
         const avatar = el("div", {
           class: "email-row__avatar kair-mail-row__avatar",
           style: { background: m.avatarColor || "#5f6368" },
-          title: m.sender,
-        }, initials(m.sender));
+          title: avatarTitle,
+        }, initials(m.sender || m.senderEmail));
         row.appendChild(avatar);
 
         // Columna 3 — Content: sender + subject/preview en una línea (estilo Gmail).
         const content = el("div", { class: "email-row__content kair-mail-row__content" });
 
-        const sender = el("div", {
+        // Loop 41 — Render mejorado del sender: si el sender es un nombre y hay
+        // email distinto, mostrar nombre (bold) + email (gris pequeño) al lado.
+        // Si el sender ES el email (caso típico de self-sent), mostrar solo el
+        // email. Tooltip (title) siempre tiene el email completo.
+        var senderName = m.sender || '';
+        var senderEmail = m.senderEmail || '';
+        var isEmailOnly = !senderEmail || senderName === senderEmail;
+        var senderTitle = isEmailOnly ? senderName : senderEmail;
+        var sender = el("div", {
           class: "email-row__sender kair-mail-row__sender",
-        }, m.sender);
+          title: senderTitle
+        });
+        if (isEmailOnly) {
+          sender.appendChild(document.createTextNode(senderName));
+        } else {
+          var nameSpan = el("span", { class: "email-row__sender-name" }, senderName);
+          var emailSpan = el("span", { class: "email-row__sender-email" }, senderEmail);
+          sender.appendChild(nameSpan);
+          sender.appendChild(emailSpan);
+        }
         content.appendChild(sender);
 
         const tag = m.category === "meeting" ? '<span class="kair-mail-tag kair-mail-tag--meeting">Reunión</span>'
@@ -2488,7 +2509,7 @@
         const subjectPreview = el("div", {
           class: "email-row__subject-preview kair-mail-row__subject",
         });
-        subjectPreview.innerHTML = `${tag}${messageCountBadge}<span class="email-row__subject-text kair-mail-row__subject-text">${m.subject}</span><span class="kair-hide-lg email-row__preview kair-mail-row__preview"> — ${m.preview}</span>`;
+        subjectPreview.innerHTML = `${tag}${messageCountBadge}<span class="email-row__subject-text kair-mail-row__subject-text">${m.subject}</span><span class="email-row__preview kair-mail-row__preview"> — ${m.preview}</span>`;
         content.appendChild(subjectPreview);
 
         // Indicador de adjunto dentro del content (no rompe el grid)
