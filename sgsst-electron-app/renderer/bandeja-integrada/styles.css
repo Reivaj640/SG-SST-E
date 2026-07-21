@@ -201,6 +201,42 @@ body {
   flex-shrink: 0;
 }
 
+/* Loop 45 — FAB flotante "Toggle empresas" (espejo del FAB de Volver).
+   El header interno del iframe está oculto (display:none) para no duplicar
+   el de la app principal, pero eso escondía el toggle de "Todas las empresas".
+   Solución: FAB flotante arriba a la derecha, con el mismo estilo pill del
+   FAB de Volver pero espejado. El switch (track + thumb) hereda los estilos
+   de .kair-toggle (líneas 1686-1735) — solo necesitamos el wrapper. */
+.kair-bandeja-fab-companies {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 100;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 8px;
+  background: #fff;
+  border: 1px solid var(--kair-border, #d0d7de);
+  border-radius: 999px;
+  font-size: 0.78rem;
+  color: var(--kair-text-body, #202124);
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+.kair-bandeja-fab-companies:hover {
+  background: var(--kair-bg-hover, #f8fafc);
+  border-color: var(--kair-primary, #174ea6);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+.kair-bandeja-fab-companies .kair-toggle__label {
+  white-space: nowrap;
+}
+
 .kair-main {
   flex: 1 1 auto;
   display: flex;
@@ -1154,6 +1190,42 @@ body {
   color: var(--kair-text-strong);
   min-width: 130px;
   text-align: center;
+}
+
+/* Loop 45b — Divisor vertical en la toolbar (entre "Hoy" y el switch) */
+.kair-cal-toolbar__divider {
+  display: inline-block;
+  width: 1px;
+  height: 18px;
+  background: var(--kair-border-soft, #e9ecef);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+/* Loop 45b — Switch "Todas las empresas" en la toolbar del calendario.
+   Reutiliza las reglas globales de .kair-toggle (track verde con data-on=true,
+   thumb animado con transform). Solo agregamos ajustes de tamaño/padding para
+   que se vea proporcionado en la toolbar (más pequeño que el FAB original). */
+.kair-cal-toolbar .kair-toggle {
+  font-size: 0.75rem;
+  padding: 4px 6px;
+  gap: 6px;
+}
+.kair-cal-toolbar .kair-toggle__track {
+  width: 30px;
+  height: 16px;
+}
+.kair-cal-toolbar .kair-toggle__thumb {
+  width: 12px;
+  height: 12px;
+}
+.kair-cal-toolbar .kair-toggle[data-on="true"] .kair-toggle__thumb {
+  transform: translateX(14px);
+}
+.kair-cal-toolbar .kair-toggle__label {
+  white-space: nowrap;
+  color: var(--kair-text-body);
+  font-weight: 500;
 }
 
 .kair-cal-toolbar__views {
@@ -3805,6 +3877,215 @@ body {
   height: 8px;
   background: var(--kair-danger);
   border-radius: 999px;
+}
+
+/* ============================================
+   K+AIR Modal (evento nuevo, edición, etc)
+   Loop 44 — CSS que faltaba para que el modal se vea bien.
+   Las clases (kair-modal__header/title/body/footer, kair-field, kair-input,
+   kair-select, kair-textarea, kair-chip-select, kair-duration-row) ya se
+   usaban en el JS (renderEventModal) pero no tenían reglas CSS.
+   Sin esto, todo se ve pegado.
+   ============================================ */
+
+/* Overlay (fondo oscuro semitransparente) — el contenedor full-screen */
+/* Loop 44b — FIX CRÍTICO: el modal estaba VISIBLE desde el inicio porque el CSS
+   ponía display: flex sin respetar el atributo `hidden` del HTML. Resultado: el
+   overlay tapaba toda la Bandeja Integrada y bloqueaba clicks. Fix: solo
+   aplicar display: flex cuando NO tiene `hidden`. */
+.kair-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+  z-index: 500000;       /* encima de todo, incluso del modal de compose */
+  padding: 16px;
+}
+.kair-modal-overlay:not([hidden]) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: kair-modal-fade 160ms ease;
+}
+@keyframes kair-modal-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Header del modal — título a la izquierda, X a la derecha */
+.kair-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--kair-border-soft, #e9ecef);
+  flex-shrink: 0;
+}
+.kair-modal__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--kair-text-strong, #202124);
+}
+.kair-modal__title svg {
+  color: var(--kair-primary, #174ea6);
+}
+
+/* Body del modal — contenido scrolleable */
+.kair-modal__body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Footer del modal — botones alineados a la derecha */
+.kair-modal__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--kair-border-soft, #e9ecef);
+  flex-shrink: 0;
+  background: var(--kair-bg-soft, #f8f9fa);
+}
+
+/* Field (label + input wrapper) — gap entre label y control */
+.kair-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.kair-field:last-child { margin-bottom: 0; }
+.kair-field__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--kair-text-muted, #5f6368);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.kair-field__label svg {
+  width: 12px;
+  height: 12px;
+  opacity: 0.7;
+}
+
+/* Inputs base — text, date, time, select, textarea */
+.kair-input,
+.kair-select,
+.kair-textarea {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 0.875rem;
+  color: var(--kair-text-body, #202124);
+  background: #fff;
+  border: 1px solid var(--kair-border, #d0d7de);
+  border-radius: 6px;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+  box-sizing: border-box;
+}
+.kair-input:focus,
+.kair-select:focus,
+.kair-textarea:focus {
+  border-color: var(--kair-primary, #174ea6);
+  box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.12);
+}
+.kair-textarea {
+  resize: vertical;
+  min-height: 56px;
+  font-family: inherit;
+}
+
+/* Chip-select (Categoría) — botones de selección con dot de color */
+.kair-chip-select {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.kair-chip-select__option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--kair-text-body, #202124);
+  background: #fff;
+  border: 1px solid var(--kair-border, #d0d7de);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 120ms ease;
+  font-family: inherit;
+}
+.kair-chip-select__option:hover {
+  background: var(--kair-bg-hover, #f1f3f5);
+  border-color: var(--kair-text-light, #9aa0a6);
+}
+.kair-chip-select__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+/* Duration row (Duración: 30 min | 1h | 1.5h | ...) */
+.kair-duration-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.kair-duration-row__btn {
+  padding: 6px 12px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--kair-text-body, #202124);
+  background: #fff;
+  border: 1px solid var(--kair-border, #d0d7de);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 120ms ease;
+  font-family: inherit;
+  min-width: 48px;
+}
+.kair-duration-row__btn:hover {
+  background: var(--kair-bg-hover, #f1f3f5);
+  border-color: var(--kair-text-light, #9aa0a6);
+}
+.kair-duration-row__btn[data-active="true"] {
+  background: var(--kair-primary, #174ea6);
+  color: #fff;
+  border-color: var(--kair-primary, #174ea6);
+}
+
+/* Loop 44 — Fix del header del iframe que ocultaba el toggle de empresas.
+   El header del iframe (.kair-header) tenía overflow que recortaba el toggle
+   cuando se hacía estrecho. Ahora permitimos wrap del contenido del header
+   y dejamos que el toggle se vea siempre. */
+.kair-header {
+  overflow: visible !important;       /* deja que el toggle se vea */
+}
+.kair-header__bar {
+  flex-wrap: wrap;                    /* si no entra, se acomoda */
+  min-height: 48px;
+}
+.kair-header__right {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.kair-header__divider {
+  display: inline-block;
+  width: 1px;
+  height: 20px;
+  background: var(--kair-border, #d0d7de);
+  margin: 0 4px;
+  flex-shrink: 0;
 }
 
 /* ============================================

@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.128] - 2026-07-21
+
+### Fixed
+- **🐛 Modal de crear evento se veía todo pegado** — El modal de "Nuevo evento de calendario" (renderEventModal) usaba clases como `.kair-field`, `.kair-input`, `.kair-modal__header/title/body/footer`, `.kair-chip-select`, `.kair-duration-row` que NO existían en el CSS de la Bandeja Integrada. Sin estilos, todo se veía pegado (label pegado al input, botón X en la esquina equivocada, sin padding interno, sin focus state en los inputs). FIX (loop 44): se agregaron todos los estilos CSS al `bandeja-integrada/styles.css` (nuevo bloque "K+AIR Modal") — overlay con backdrop blur, header con título y X a la derecha, body con padding y scroll, footer con botones alineados, field con gap 6px entre label e input, inputs con border-radius y focus state azul, chip-select para categoría con dot de color, duration-row con active state visible. La Bandeja Integrada se ve como un modal profesional ahora (Gmail-style).
+- **🐛 Overlay tapaba toda la Bandeja Integrada** — Después de agregar el CSS del modal, la Bandeja Integrada se veía con una opacidad oscura cubriendo todo y bloqueando clicks. CAUSA: el CSS ponía `display: flex` en `.kair-modal-overlay` que PISABA el atributo `hidden` del HTML (específico del navegador). Resultado: el modal aparecía desde el inicio, tapando todo. FIX (loop 44b): se cambió el selector a `.kair-modal-overlay:not([hidden])` para que el `display: flex` solo se aplique cuando NO está oculto. Ahora el modal se oculta por default y solo aparece al abrir.
+- **🐛 Switch "Todas las empresas" no se veía** — El switch existía en el HTML (index.html línea 74 con `id="toggle-companies"`) y en el JS (app.js línea 1156-1908 con handlers, localStorage, etc), pero NO se veía porque estaba dentro del `<header class="kair-header">` que tiene `display: none !important` (línea 164 del CSS, desde que se ocultó el header interno del iframe para no duplicar con el de la app principal). FIX (loops 45, 45b, 45c): (a) Saqué el toggle del header oculto y lo puse en la **toolbar del calendario grande**, justo antes del grupo "Día / Semana / Mes / Programar", con un divider vertical al lado. (b) Usé la clase `.kair-toggle` (no una nueva) para que las reglas CSS de animación funcionen correctamente: `data-on="true"` → track verde `#16a34a` + thumb a la derecha con `transform: translateX(14px)`, `data-on="false"` → track gris `#cbd5e1` + thumb a la izquierda. Transición animada de 220ms (cubic-bezier). (c) Moví el handler del click de los bindings iniciales al **bloque de bindings de la toolbar** (después de `main.appendChild(toolbar)`), porque la toolbar se re-crea con `innerHTML` en cada `render()` y el listener del binding inicial se perdía. El handler hace todo: toggle del estado, actualizar `data-on` y label, persistir en localStorage, actualizar el footer, y **recargar los eventos del calendario con el nuevo scope** (la pieza clave para que el filtro funcione).
+
+### Changed
+- **🔧 Switch de empresas más pequeño en la toolbar** — Para que se vea proporcionado dentro de la toolbar del calendario (que tiene poco espacio), el switch es más pequeño: 30px de ancho (vs 36px original) y 12px de thumb (vs 16px). El label sigue siendo legible con `font-size: 0.75rem` y `white-space: nowrap`.
+
+### Build & Tooling
+- **🔖 Bump version 0.1.128** — `package.json` actualizado a v0.1.128.
+- **Cache-bust v=660 → v=667** — 7 versiones incrementadas durante la iteración (v=660 loop 40 base, v=661 loop 41, v=662 loop 42, v=663 loop 44 modal CSS, v=664 loop 44b overlay fix, v=665 loop 45 switch FAB, v=666 loop 45b switch en toolbar, v=667 loop 45c handler del click).
+
 ## [0.1.127] - 2026-07-21
 
 ### Changed

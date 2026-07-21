@@ -1625,18 +1625,11 @@
       }
     });
     $("#panel-toggle").addEventListener("click", toggleCalendar);
-    // F4-fix — Toggle "Todas las empresas" (igual al calendario viejo 📦543).
-    // Cuando cambia, hay que RECARGAR los eventos del IPC con el nuevo scope
-    // (antes solo cambiaba el label y el data-on, pero NO recargaba → bug).
-    $("#toggle-companies").addEventListener("click", () => {
-      state.allCompanies = !state.allCompanies;
-      $("#toggle-companies").setAttribute("data-on", state.allCompanies);
-      // Persistir preferencia (igual que el calendario viejo usa localStorage)
-      try { localStorage.setItem('kair-bandeja.allCompanies', state.allCompanies ? '1' : '0'); } catch (e) {}
-      updateCompanyDisplay();
-      // Recargar eventos con el nuevo scope (la pieza que faltaba)
-      reloadEventsForScope();
-    });
+    // Loop 45c — Toggle "Todas las empresas" ahora se renderiza dentro de la
+    // toolbar del calendario grande, no del header oculto. El handler se
+    // re-adjunta en el bloque de bindings de la toolbar (después de appendChild)
+    // porque la toolbar se re-crea con innerHTML en cada render() y el listener
+    // del binding inicial se pierde. Ver: bindings toolbar (línea ~1976).
     $("#btn-refresh").addEventListener("click", refreshEvents);
     $("#btn-compose").addEventListener("click", onComposeClick);
     // F1-Feature4 — Editor de firma. Click → abrir mini modal para editarla.
@@ -1941,6 +1934,17 @@
       </div>
       <span class="kair-cal-toolbar__month-label">${state.viewMonthLabel || D.MONTH_VIEW.label}</span>
       <button class="kair-link-btn" id="btn-today" style="font-size:0.75rem;">Hoy</button>
+      <span class="kair-cal-toolbar__divider"></span>
+      <!-- Loop 45b — Switch "Todas las empresas" en la toolbar del calendario,
+           antes del grupo "Día / Semana / Mes / Programar". Usa la clase
+           kair-toggle para que la animación de thumb funcione correctamente
+           (track verde cuando data-on=true, gris cuando false). -->
+      <button class="kair-toggle" id="toggle-companies" data-on="${state.allCompanies ? 'true' : 'false'}" title="${state.allCompanies ? 'Mostrando todas las empresas' : 'Mostrando solo ' + (getActiveCompanyName() || 'la empresa actual')}">
+        <span class="kair-toggle__track">
+          <span class="kair-toggle__thumb"></span>
+        </span>
+        <span class="kair-toggle__label">${state.allCompanies ? 'Todas las empresas' : 'Solo ' + (getActiveCompanyName() || 'esta empresa')}</span>
+      </button>
       <div class="kair-cal-toolbar__views">
         ${["day", "week", "month", "schedule"].map((v) => `
           <button class="kair-cal-toolbar__view" data-view="${v}" data-active="${state.calView === v}">${v === "day" ? "Día" : v === "week" ? "Semana" : v === "month" ? "Mes" : "Programar"}</button>
@@ -1955,6 +1959,32 @@
     toolbar.querySelectorAll(".kair-cal-toolbar__view").forEach((b) => {
       b.addEventListener("click", () => { state.calView = b.getAttribute("data-view"); render(); });
     });
+    // Loop 45c — Handler del toggle "Todas las empresas" re-adjuntado acá
+    // (no en los bindings iniciales) porque la toolbar se re-crea con
+    // innerHTML en cada render() → el listener del binding inicial se pierde.
+    var toggleBtn = toolbar.querySelector("#toggle-companies");
+    if (toggleBtn) {
+      toggleBtn.addEventListener("click", () => {
+        state.allCompanies = !state.allCompanies;
+        toggleBtn.setAttribute("data-on", state.allCompanies ? "true" : "false");
+        // Actualizar el label inline
+        var label = toggleBtn.querySelector(".kair-toggle__label");
+        if (label) {
+          label.textContent = state.allCompanies
+            ? "Todas las empresas"
+            : "Solo " + (getActiveCompanyName() || "esta empresa");
+        }
+        // Persistir preferencia en localStorage
+        try { localStorage.setItem("kair-bandeja.allCompanies", state.allCompanies ? "1" : "0"); } catch (e) {}
+        // Actualizar el footer con el nombre de la empresa
+        var footer = $("#footer-company");
+        if (footer) {
+          footer.textContent = "Empresa: " + (state.allCompanies ? "Todas" : (getActiveCompanyName() || "—"));
+        }
+        // Recargar eventos con el nuevo scope (la pieza clave que faltaba)
+        reloadEventsForScope();
+      });
+    }
     // F4-fix — Botones prev/next del calendario grande. Antes NO tenían
     // listeners → clicks no hacían nada. Ahora llaman a changeMonth() que
     // ya existía para el mini-cal (mismo patrón).
