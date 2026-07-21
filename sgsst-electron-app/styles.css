@@ -5985,7 +5985,9 @@ box-shadow: var(--box-shadow) !important;
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    BADGE DE ALERTAS EN ICONO DEL CALENDARIO
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-#calendar-button {
+#calendar-button,
+#bandeja-integrada-button,
+#llm-button {
   position: relative; /* ancla para el badge absoluto */
 }
 
@@ -6025,6 +6027,313 @@ box-shadow: var(--box-shadow) !important;
 @keyframes kair-cal-badge-pulse {
   0%, 100% { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25), 0 0 0 0 rgba(220, 53, 69, 0.4); }
   50%      { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25), 0 0 0 6px rgba(220, 53, 69, 0); }
+}
+
+/* F4 — Popover de pendientes de la Bandeja Integrada (mismo look que kair-alerts-panel) */
+.kair-pendientes-popover {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+  width: 360px;
+  max-width: calc(100vw - 24px);
+  max-height: 480px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--kair-border);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.kair-pendientes-popover__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--kair-border-soft);
+  background: #fff8f8;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--kair-text-strong);
+}
+
+.kair-pendientes-popover__count {
+  display: inline-block;
+  background: #dc3545;
+  color: #fff;
+  border-radius: 999px;
+  min-width: 22px;
+  height: 18px;
+  line-height: 18px;
+  text-align: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0 6px;
+  margin-left: 6px;
+}
+
+.kair-pendientes-popover__close {
+  background: transparent;
+  border: 0;
+  font-size: 1.25rem;
+  line-height: 1;
+  color: var(--kair-text-muted);
+  cursor: pointer;
+  padding: 0 6px;
+  border-radius: 4px;
+}
+.kair-pendientes-popover__close:hover {
+  background: rgba(0,0,0,0.04);
+  color: var(--kair-text-body);
+}
+
+.kair-pendientes-popover__list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.kair-pendientes-popover__empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--kair-text-muted);
+  font-size: 0.875rem;
+}
+
+.kair-pendientes-popover__item {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--kair-border-soft);
+  font-size: 0.8rem;
+  color: var(--kair-text-body);
+}
+.kair-pendientes-popover__item:last-child {
+  border-bottom: 0;
+}
+.kair-pendientes-popover__item:hover {
+  background: var(--kair-bg-soft, #f8fafc);
+}
+
+.kair-pendientes-popover__item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  gap: 8px;
+}
+
+.kair-pendientes-popover__cat {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;  /* el color viene de inline style="color: ${color}" */
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+  /* F4 — Solo color de texto, sin fondo ni subrayado (más sutil) */
+}
+
+.kair-pendientes-popover__dias {
+  font-size: 0.7rem;
+  color: #dc3545;
+  font-weight: 600;
+  text-align: right;
+}
+
+.kair-pendientes-popover__title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--kair-text-strong);
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.kair-pendientes-popover__meta {
+  font-size: 0.7rem;
+  color: var(--kair-text-muted);
+  margin-bottom: 6px;
+}
+
+.kair-pendientes-popover__actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.kair-pendientes-popover__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--kair-border);
+  background: #fff;
+  color: var(--kair-primary, #174ea6);
+  font-size: 0.7rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+.kair-pendientes-popover__btn:hover {
+  background: var(--kair-bg-hover, #f1f5f9);
+}
+.kair-pendientes-popover__btn--primary {
+  background: var(--kair-primary, #174ea6);
+  color: #fff;
+  border-color: var(--kair-primary, #174ea6);
+}
+.kair-pendientes-popover__btn--primary:hover {
+  background: #154a8a;
+  border-color: #154a8a;
+}
+
+.kair-pendientes-popover__footer {
+  padding: 10px 14px;
+  border-top: 1px solid var(--kair-border-soft);
+  background: var(--kair-bg-soft, #f8fafc);
+  display: flex;
+  justify-content: center;
+}
+
+.kair-pendientes-popover__footer .kair-pendientes-popover__btn {
+  width: 100%;
+}
+
+/* F4 — Modal de detalle de evento (renderizado en el main app, fuera del iframe) */
+.kair-event-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300000;
+  padding: 20px;
+}
+
+.kair-event-modal {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  max-width: 480px;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.kair-event-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  gap: 12px;
+}
+
+.kair-event-modal__close {
+  background: transparent;
+  border: 0;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--kair-text-muted);
+  cursor: pointer;
+  padding: 0 6px;
+  border-radius: 4px;
+}
+.kair-event-modal__close:hover {
+  background: var(--kair-bg-hover, #f1f5f9);
+  color: var(--kair-text-body);
+}
+
+.kair-event-modal__body {
+  padding: 16px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.kair-event-modal__title {
+  margin: 0 0 12px;
+  font-size: 1.1rem;
+  color: var(--kair-text-strong);
+  font-weight: 600;
+}
+
+.kair-event-modal__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+  color: var(--kair-text-body);
+}
+.kair-event-modal__meta-row {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+.kair-event-modal__meta-row strong {
+  color: var(--kair-text-muted);
+  font-weight: 600;
+  min-width: 110px;
+  flex-shrink: 0;
+}
+
+.kair-event-modal__description {
+  padding: 10px 12px;
+  background: var(--kair-bg-soft, #f8fafc);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  color: var(--kair-text-body);
+  margin-top: 4px;
+}
+
+.kair-event-modal__actions {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--kair-border-soft);
+  background: var(--kair-bg-soft, #f8fafc);
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.kair-event-modal__btn {
+  padding: 7px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--kair-border);
+  background: #fff;
+  color: var(--kair-text-body);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+.kair-event-modal__btn:hover {
+  background: var(--kair-bg-hover, #f1f5f9);
+}
+
+.kair-event-modal__btn--primary {
+  background: var(--kair-primary, #174ea6);
+  color: #fff;
+  border-color: var(--kair-primary, #174ea6);
+}
+.kair-event-modal__btn--primary:hover {
+  background: #154a8a;
+  border-color: #154a8a;
+}
+
+.kair-event-modal__btn--secondary {
+  color: var(--kair-text-muted);
+  background: transparent;
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

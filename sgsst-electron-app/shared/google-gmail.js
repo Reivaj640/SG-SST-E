@@ -1,0 +1,485 @@
+// F3.B — Google Gmail reader.
+// Lee correos de Gmail usando el cliente OAuth2 ya autorizado.
+// Devuelve correos en formato compatible con la Bandeja Integrada:
+//
+//   {
+//     id: string,             // Gmail message ID
+//     threadId: string,
+//     subject: string,
+//     sender: string,         // "Nombre <email>"
+//     senderEmail: string,
+//     recipient: string,
+//     snippet: string,
+//     date: string,           // ISO 8601
+//     unread: boolean,
+//     labels: string[],
+//     hasAttachment: boolean,
+//     meetingSuggestion: {    // null si no hay invitación
+//       title: string,
+//       date: string,
+//       startHour: number,
+//       durationHours: number,
+//       location: string,
+//       attendees: string[]
+//     } | null,
+//     body: string,           // texto plano (recortado)
+//     attachments: [{ name, size, mimeType }]
+//   }
+
+const { google } = require('googleapis');
+const googleAuth = require('./google-auth');
+
+/**
+ * Lista los últimos N mensajes de la bandeja de entrada.
+ * Por defecto solo del inbox principal (label INBOX), excluyendo spam/trash.
+ *
+ * @param {Object} options
+ * @param {string} options.configPath - ruta al config.json
+ * @param {number} options.maxResults - cuántos correos traer (default 20)
+ * @param {string[]} options.extraQuery - parámetros extra de búsqueda (ej: ['is:unread'])
+ * @returns {Promise<{success, data?: Array, error?: string}>}
+ */
+async function listInbox(options) {
+  options = options || {};
+  var configPath = options.configPath;
+  var maxResults = options.maxResults || 20;
+  var extraQuery = options.extraQuery || [];
+
+  var auth = await googleAuth.getAuthorizedClient(configPath);
+  if (!auth) {
+    return { success: false, error: 'No hay cliente OAuth autorizado. Conectá Gmail primero.' };
+  }
+
+  var gmail = google.gmail({ version: 'v1', auth: auth });
+
+  try {
+    // 1) Listar IDs de mensajes
+    // F1.B-fix — Soporte para folder SENT (correos enviados).
+    // Antes solo filtraba por `in:inbox`. Ahora si options.folder === 'SENT' usa `in:sent`.
+    var query;
+    if (options.folder === 'SENT') {
+      query = ['in:sent'].concat(extraQuery).join(' ');
+    } else if (options.folder === 'DRAFTS') {
+      query = ['in:drafts'].concat(extraQuery).join(' ');
+    } else {
+      query = ['in:inbox'].concat(extraQuery).join(' ');
+    }
+    var listRes = await gmail.users.messages.list({
+      userId: 'me',
+      q: query,
+      maxResults: maxResults
+    });
+
+    var messages = listRes.data.messages || [];
+    if (messages.length === 0) {
+      return { success: true, data: [] };
+    }
+
+    // 2) Obtener detalles de cada mensaje en paralelo
+    // F4 — Usar format:'full' en vez de 'metadata' para traer el body del correo.
+    // El body es necesario para que la Bandeja Integrada muestre el contenido
+    // real del correo (no solo headers + snippet).
+    var detailPromises = messages.map(function (m) {
+      return gmail.users.messages.get({
+        userId: 'me',
+        id: m.id,
+        format: 'full'
+      }).catch(function (e) {
+        console.warn('[GoogleGmail] Error en message.get ' + m.id + ':', e.message);
+        return null;
+      });
+    });
+    var details = await Promise.all(detailPromises);
+
+    // 3) Normalizar al formato Bandeja Integrada
+    var normalized = details.filter(function (d) { return d !== null; }).map(function (d) {
+      return normalizeMessage(d.data);
+    });
+
+    return { success: true, data: normalized };
+  } catch (e) {
+    console.error('[GoogleGmail] Error en listInbox:', e);
+    return { success: false, error: e.message || 'Error leyendo bandeja' };
+  }
+}
+
+/**
+ * Obtiene un mensaje completo por ID (incluye body y attachments).
+ */
+async function getMessage(messageId, options) {
+  options = options || {};
+  var configPath = options.configPath;
+
+  var auth = await googleAuth.getAuthorizedClient(configPath);
+  if (!auth) {
+    return { success: false, error: 'No hay cliente OAuth autorizado' };
+  }
+
+  var gmail = google.gmail({ version: 'v1', auth: auth });
+  try {
+    var res = await gmail.users.messages.get({
+      userId: 'me',
+      id: messageId,
+      format: 'full'
+    });
+    return { success: true, data: normalizeMessage(res.data, true) };
+  } catch (e) {
+    console.error('[GoogleGmail] Error en getMessage:', e);
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Normaliza un mensaje de Gmail API al formato Bandeja Integrada.
+ */
+function normalizeMessage(msg, includeBody) {
+  var headers = {};
+  (msg.payload && msg.payload.headers || []).forEach(function (h) {
+    headers[h.name.toLowerCase()] = h.value;
+  });
+
+  var sender = headers['from'] || '';
+  var senderMatch = sender.match(/^(?:"?([^"<]*)"?\s*)?<?([^>]+)>?$/);
+  var senderName = senderMatch && senderMatch[1] ? senderMatch[1].trim() : sender;
+  var senderEmail = senderMatch && senderMatch[2] ? senderMatch[2].trim() : sender;
+
+  // Extraer "iniciales" del nombre para el avatar
+  var initials = senderName
+    .split(' ')
+    .map(function (p) { return p[0]; })
+    .filter(function (c) { return c; })
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || '?';
+
+  // Determinar si está no leído
+  var labelIds = msg.labelIds || [];
+  var unread = labelIds.indexOf('UNREAD') !== -1;
+
+  // Detectar invitaciones a calendario (heurística simple)
+  var subject = headers['subject'] || '(sin asunto)';
+  var meetingSuggestion = null;
+  if (/invit|meeting|reunión|convoc|comité/i.test(subject)) {
+    // Esto es una heurística muy básica. La Bandeja Integrada puede mejorar
+    // parseando el body cuando se abra el detalle (F3.B.2).
+    meetingSuggestion = {
+      title: subject.replace(/^(re:|fwd:|fw:)\s*/i, ''),
+      date: null,    // se llena al abrir detalle
+      startHour: null,
+      durationHours: null,
+      location: null,
+      attendees: []
+    };
+  }
+
+  // Color de avatar derivado del email (consistente)
+  var avatarColor = '#' + stringToColor(senderEmail);
+
+  var result = {
+    id: msg.id,
+    threadId: msg.threadId,
+    subject: subject,
+    sender: senderName,
+    senderEmail: senderEmail,
+    recipient: headers['to'] || '',
+    snippet: msg.snippet || '',
+    date: headers['date'] || new Date(parseInt(msg.internalDate || Date.now())).toISOString(),
+    unread: unread,
+    labels: labelIds,
+    hasAttachment: !!(msg.payload && msg.payload.parts && msg.payload.parts.some(function (p) { return p.filename; })),
+    meetingSuggestion: meetingSuggestion,
+    avatarInitials: initials,
+    avatarColor: avatarColor
+  };
+
+  if (includeBody || true) {
+    // F4 — SIEMPRE extraer body y attachments. La lista inicial usa format:'full'
+    // (no 'metadata') para que el body venga en la primera carga. Si en el
+    // futuro queremos lazy loading, podemos volver a poner la condición.
+    result.body = extractBody(msg.payload);
+    result.attachments = extractAttachments(msg.payload);
+  }
+
+  return result;
+}
+
+/**
+ * F4-fix — Obtiene el perfil del usuario Gmail conectado.
+ * Devuelve el email y métricas básicas. Útil para mostrar en el switch
+ * de Configuración ("Conectado como: usuario@gmail.com") y en el header
+ * de Bandeja Integrada como indicador visual.
+ *
+ * @param {string} configPath
+ * @returns {Promise<{success, data?: {email, messagesTotal, threadsTotal, historyId}, error?: string}>}
+ */
+async function getProfile(configPath) {
+  try {
+    var auth = await googleAuth.getAuthorizedClient(configPath);
+    if (!auth) {
+      return { success: false, error: 'No hay cliente OAuth autorizado. Conectá Gmail primero.' };
+    }
+    var gmail = google.gmail({ version: 'v1', auth: auth });
+    var profile = await gmail.users.getProfile({ userId: 'me' });
+    return {
+      success: true,
+      data: {
+        email: profile.data.emailAddress || '',
+        messagesTotal: profile.data.messagesTotal || 0,
+        threadsTotal: profile.data.threadsTotal || 0,
+        historyId: profile.data.historyId || ''
+      }
+    };
+  } catch (e) {
+    return { success: false, error: 'Error obteniendo perfil: ' + (e.message || e) };
+  }
+}
+
+/**
+ * F1-Feature1 — Lista todos los labels de Gmail del usuario autenticado.
+ * Devuelve labels del sistema (INBOX, SENT, STARRED, etc.) y labels de usuario.
+ * Incluye colores (color.backgroundColor, color.textColor) que la UI usa para
+ * mostrar los chips de colores en el thread grouping.
+ *
+ * @param {string} configPath
+ * @returns {Promise<{success, data?: Array<{id, name, type, color}>, error?: string}>}
+ */
+async function listLabels(configPath) {
+  try {
+    var auth = await googleAuth.getAuthorizedClient(configPath);
+    if (!auth) {
+      return { success: false, error: 'No hay cliente OAuth autorizado. Conectá Gmail primero.' };
+    }
+    var gmail = google.gmail({ version: 'v1', auth: auth });
+    var res = await gmail.users.labels.list({ userId: 'me' });
+    var labels = (res.data.labels || []).map(function (l) {
+      return {
+        id: l.id,
+        name: l.name,
+        type: l.type || 'user',  // 'system' o 'user'
+        messageCount: l.messagesTotal || 0,
+        unreadCount: l.messagesUnread || 0,
+        color: l.color ? {
+          background: l.color.backgroundColor || '#a479e2',
+          text: l.color.textColor || '#ffffff'
+        } : null
+      };
+    });
+    return { success: true, data: labels };
+  } catch (e) {
+    return { success: false, error: 'Error listando labels: ' + (e.message || e) };
+  }
+}
+
+/**
+ * F1-Feature1 — Lista los adjuntos de un mensaje específico.
+ * Usa el endpoint Gmail API: messages.attachments.get para descargar.
+ *
+ * @param {string} messageId
+ * @param {string} attachmentId
+ * @param {string} configPath
+ * @returns {Promise<{success, data?: {data: base64, size: number}, error?: string}>}
+ */
+async function downloadAttachment(messageId, attachmentId, configPath) {
+  try {
+    var auth = await googleAuth.getAuthorizedClient(configPath);
+    if (!auth) {
+      return { success: false, error: 'No autorizado' };
+    }
+    var gmail = google.gmail({ version: 'v1', auth: auth });
+    var res = await gmail.users.messages.attachments.get({
+      userId: 'me',
+      messageId: messageId,
+      id: attachmentId
+    });
+    return {
+      success: true,
+      data: {
+        data: res.data.data,  // base64url
+        size: res.data.size || 0
+      }
+    };
+  } catch (e) {
+    return { success: false, error: 'Error descargando adjunto: ' + (e.message || e) };
+  }
+}
+
+/**
+ * Extrae el cuerpo en texto plano de un payload (busca text/plain, fallback a text/html).
+ * Recursivo: maneja estructuras multipart anidadas (ej: multipart/mixed → multipart/alternative).
+ * Patrón Mail-0: walk the parts tree.
+ */
+function extractBody(payload) {
+  return walkPartsForBody(payload, 'text/plain', true) ||
+         walkPartsForBody(payload, 'text/html', true);
+}
+
+function walkPartsForBody(payload, mimeType, decode) {
+  if (!payload) return '';
+  // Caso 1: el body está directamente en este payload
+  if (payload.body && payload.body.data) {
+    // Si este payload tiene mimeType, verificar que coincida
+    if (!payload.mimeType || payload.mimeType === mimeType) {
+      var raw = decodeBase64Url(payload.body.data);
+      if (decode && mimeType === 'text/html') {
+        return raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      }
+      return raw;
+    }
+  }
+  // Caso 2: recursivo en parts
+  if (payload.parts && payload.parts.length > 0) {
+    for (var i = 0; i < payload.parts.length; i++) {
+      var found = walkPartsForBody(payload.parts[i], mimeType, decode);
+      if (found) return found;
+    }
+  }
+  return '';
+}
+
+function extractAttachments(payload) {
+  var atts = [];
+  if (!payload || !payload.parts) return atts;
+  payload.parts.forEach(function (p) {
+    if (p.filename && p.body && p.body.attachmentId) {
+      atts.push({
+        name: p.filename,
+        size: p.body.size || 0,
+        mimeType: p.mimeType || 'application/octet-stream',
+        attachmentId: p.body.attachmentId
+      });
+    }
+  });
+  return atts;
+}
+
+function decodeBase64Url(s) {
+  // Gmail usa base64url (sin padding, con - y _ en lugar de + y /)
+  var b64 = s.replace(/-/g, '+').replace(/_/g, '/');
+  while (b64.length % 4) b64 += '=';
+  try {
+    return Buffer.from(b64, 'base64').toString('utf8');
+  } catch (e) {
+    return '';
+  }
+}
+
+function stringToColor(str) {
+  if (!str) return '888888';
+  var hash = 0;
+  for (var i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  var c = (hash & 0x00FFFFFF).toString(16);
+  return ('000000' + c).slice(-6);
+}
+
+/**
+ * F1.B — Envía un email via Gmail API.
+ * Construye un raw MIME message y lo envía usando users.messages.send.
+ *
+ * @param {Object} options
+ * @param {string} options.configPath - ruta al config.json
+ * @param {string} options.from - email del remitente (ej: 'adminkair@gmail.com')
+ * @param {string|string[]} options.to - destinatario(s) (string o array)
+ * @param {string} [options.cc] - con copia (opcional)
+ * @param {string} [options.bcc] - con copia oculta (opcional)
+ * @param {string} options.subject - asunto del correo
+ * @param {string} options.body - cuerpo del correo (texto plano)
+ * @param {string} [options.inReplyTo] - Message-ID del correo al que responde (para threading)
+ * @param {string} [options.references] - References header (para threading)
+ * @param {string} [options.threadId] - threadId de Gmail al que responde (mantiene la conversación agrupada)
+ * @returns {Promise<{success, data?: {id, threadId, labelIds}, error?: string}>}
+ */
+async function sendMessage(options) {
+  options = options || {};
+  var configPath = options.configPath;
+  var from = options.from || '';
+  var to = Array.isArray(options.to) ? options.to.join(', ') : (options.to || '');
+  var cc = Array.isArray(options.cc) ? options.cc.join(', ') : (options.cc || '');
+  var bcc = Array.isArray(options.bcc) ? options.bcc.join(', ') : (options.bcc || '');
+  var subject = options.subject || '(sin asunto)';
+  var body = options.body || '';
+  var inReplyTo = options.inReplyTo || '';
+  var references = options.references || '';
+
+  if (!to) return { success: false, error: 'Falta el destinatario (to)' };
+
+  // Si no se pasa `from`, lo determinamos del perfil OAuth (cuenta conectada)
+  if (!from) {
+    try {
+      var profileRes = await getProfile(configPath);
+      if (profileRes && profileRes.success && profileRes.data && profileRes.data.email) {
+        from = profileRes.data.email;
+      } else {
+        return { success: false, error: 'No se pudo determinar el remitente (from). Conectá Gmail primero.' };
+      }
+    } catch (e) {
+      return { success: false, error: 'Error obteniendo perfil: ' + (e.message || e) };
+    }
+  }
+
+  try {
+    var auth = await googleAuth.getAuthorizedClient(configPath);
+    if (!auth) {
+      return { success: false, error: 'No hay cliente OAuth autorizado. Conectá Gmail primero.' };
+    }
+    var gmail = google.gmail({ version: 'v1', auth: auth });
+
+    // 1) Construir el raw MIME message
+    // RFC 5322: headers separados por \r\n, luego línea vacía, luego body
+    var headers = [
+      'From: ' + from,
+      'To: ' + to,
+      cc ? 'Cc: ' + cc : null,
+      bcc ? 'Bcc: ' + bcc : null,
+      'Subject: ' + subject,
+      'Content-Type: text/plain; charset=UTF-8',
+      inReplyTo ? 'In-Reply-To: ' + inReplyTo : null,
+      references ? 'References: ' + references : null
+    ].filter(function (h) { return h; });
+
+    var raw = headers.join('\r\n') + '\r\n\r\n' + body;
+    var encoded = encodeBase64Url(raw);
+
+    // 2) Enviar via Gmail API
+    var res = await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: {
+        raw: encoded,
+        threadId: options.threadId || undefined  // Mantiene la conversación agrupada si es reply
+      }
+    });
+
+    return {
+      success: true,
+      data: {
+        id: res.data.id,
+        threadId: res.data.threadId,
+        labelIds: res.data.labelIds || []
+      }
+    };
+  } catch (e) {
+    console.error('[GoogleGmail] Error en sendMessage:', e);
+    return { success: false, error: e.message || 'Error enviando correo' };
+  }
+}
+
+/**
+ * Codifica un string a base64url (formato que usa Gmail API).
+ * Buffer → base64 → replace + y / → strip padding.
+ */
+function encodeBase64Url(s) {
+  var b64 = Buffer.from(s, 'utf8').toString('base64');
+  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+module.exports = {
+  listInbox: listInbox,
+  getMessage: getMessage,
+  getProfile: getProfile,
+  sendMessage: sendMessage,
+  // F1-Feature1
+  listLabels: listLabels,
+  // F1-Feature5
+  downloadAttachment: downloadAttachment
+};

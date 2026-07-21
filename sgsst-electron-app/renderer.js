@@ -743,6 +743,366 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   console.log('DOM elements found:', { contentArea, sidebarMenu, companyNameElement, companyLogoElement, companyLogoPlaceholder, companyHomeButton });
 
+  // 📦563 — Bandeja Integrada (Correo + Calendario).
+  // Entry point ADITIVO: no reemplaza el calendario actual del #calendar-button.
+  // Click en el botón → abre un iframe fullscreen con renderer/bandeja-integrada/index.html.
+  // Click en "Volver" del iframe → envía postMessage('bandeja-integrada-back') y el iframe se cierra.
+  const bandejaIntegradaButton = document.getElementById('bandeja-integrada-button');
+  let bandejaIntegradaFrame = null;
+
+  // F4 — Badge de alertas: mismo KairAlerts que el calendario viejo (#calendar-button).
+  // Se suscribe a onCountChange y actualiza el badge del botón de Bandeja Integrada.
+  function updateBandejaIntegradaBadge(count) {
+    var badge = document.getElementById('bandeja-integrada-badge');
+    if (!badge) return;
+    if (count <= 0) {
+      badge.hidden = true;
+      badge.textContent = '0';
+      badge.setAttribute('aria-label', 'Sin eventos pendientes');
+    } else if (count >= 100) {
+      badge.hidden = false;
+      badge.textContent = '99+';
+      badge.setAttribute('aria-label', 'Más de 99 eventos pendientes');
+    } else {
+      badge.hidden = false;
+      badge.textContent = String(count);
+      badge.setAttribute('aria-label', count + ' evento' + (count === 1 ? '' : 's') + ' pendiente' + (count === 1 ? '' : 's'));
+    }
+  }
+
+  // F4-fix — Handler del badge: al hacer click, abre el popover de "Pendientes"
+  // (mismo patrón que el calendario viejo). Usa stopPropagation para que el
+  // click NO se propague al botón padre (que abriría el iframe de Bandeja Integrada).
+  function onBandejaIntegradaBadgeClick(e) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    showBandejaIntegradaPendientesPopover();
+  }
+
+  // F4-fix — Popover de pendientes (idéntico patrón al de KairAlerts en el
+  // calendario viejo: lista de eventos vencidos o que vencen hoy, con
+  // categoría color, días vencidos, botón "Ver detalle" y "Abrir calendario
+  // completo" abajo).
+  // F4-fix: colorMap a nivel de módulo (accesible desde el handler de Ver detalle)
+  var BANDEJA_INTEGRADA_COLOR_MAP = {
+    plan: '#174ea6', capacitacion: '#28a745', auditoria: '#b8860b',
+    actualizacion: '#6c757d', formacion: '#185abd', critico: '#dc3545',
+    rapido: '#0d6efd', gestacion: '#d63384',
+    mantenimiento_programado: '#fd7e14', inspeccion: '#198754',
+    recordatorio_copasst: '#dc3545', recordatorio_convivencia: '#0891b2',
+    recordatorio_presupuesto: '#10b981', recordatorio_afiliacion: '#f59e0b',
+    recordatorio_inducciones: '#6366f1'
+  };
+
+  function showBandejaIntegradaPendientesPopover() {
+    // Cerrar si ya está abierto
+    var existing = document.getElementById('bandeja-integrada-pendientes-popover');
+    if (existing) { existing.remove(); return; }
+
+    // Obtener pendientes del API de KairAlerts
+    var pending = (window.KairAlerts && window.KairAlerts.getPendingEvents)
+      ? window.KairAlerts.getPendingEvents()
+      : [];
+
+    var pop = document.createElement('div');
+    pop.id = 'bandeja-integrada-pendientes-popover';
+    pop.className = 'kair-pendientes-popover';
+    pop.innerHTML = `
+      <div class="kair-pendientes-popover__header">
+        <span>Pendientes <span class="kair-pendientes-popover__count">${pending.length}</span></span>
+        <button class="kair-pendientes-popover__close" data-action="close" aria-label="Cerrar">×</button>
+      </div>
+      <div class="kair-pendientes-popover__list" id="bandeja-pendientes-list"></div>
+      <div class="kair-pendientes-popover__footer">
+        <button class="kair-pendientes-popover__btn" data-action="open">Abrir calendario completo</button>
+      </div>
+    `;
+    document.body.appendChild(pop);
+
+    // Posicionar cerca del botón de Bandeja Integrada
+    var btn = document.getElementById('bandeja-integrada-button');
+    if (btn) {
+      var rect = btn.getBoundingClientRect();
+      pop.style.position = 'fixed';
+      pop.style.top = (rect.bottom + 8) + 'px';
+      pop.style.right = (window.innerWidth - rect.right) + 'px';
+      pop.style.zIndex = '250000';
+    }
+
+    // Renderizar items
+    var list = pop.querySelector('#bandeja-pendientes-list');
+    if (pending.length === 0) {
+      list.innerHTML = '<div class="kair-pendientes-popover__empty">No hay eventos pendientes 🎉</div>';
+    } else {
+      pending.forEach(function (ev) {
+        var item = document.createElement('div');
+        item.className = 'kair-pendientes-popover__item';
+        // Categoría color
+        // F4-fix: usar BANDEJA_INTEGRADA_COLOR_MAP (declarado a nivel de módulo)
+        var color = BANDEJA_INTEGRADA_COLOR_MAP[ev.type || ev.category] || '#6c757d';
+        var catLabel = (ev.type || ev.category || '').toUpperCase();
+        var dateStr = ev.date || '';
+        // Calcular días vencidos
+        var diasVencidos = '';
+        if (dateStr) {
+          var d = new Date(dateStr + 'T00:00:00');
+          var hoy = new Date(); hoy.setHours(0,0,0,0);
+          var diff = Math.floor((hoy - d) / 86400000);
+          if (diff === 0) diasVencidos = 'Vence hoy';
+          else if (diff > 0) diasVencidos = 'Vencida · hace ' + diff + ' días';
+          else diasVencidos = 'En ' + (-diff) + ' días';
+        }
+        item.innerHTML = `
+          <div class="kair-pendientes-popover__item-header">
+            <span class="kair-pendientes-popover__cat" style="color:${color};">${catLabel}</span>
+            <span class="kair-pendientes-popover__dias">${diasVencidos}</span>
+          </div>
+          <div class="kair-pendientes-popover__title">${(ev.title || '(sin título)').replace(/</g, '&lt;')}</div>
+          <div class="kair-pendientes-popover__meta">${dateStr}</div>
+          <div class="kair-pendientes-popover__actions">
+            <button class="kair-pendientes-popover__btn kair-pendientes-popover__btn--primary" data-action="open-event" data-event-id="${ev.id || ''}">Ver detalle</button>
+          </div>
+        `;
+        list.appendChild(item);
+      });
+    }
+
+    // Handlers
+    pop.querySelector("[data-action='close']").addEventListener('click', function () { pop.remove(); });
+    pop.querySelector("[data-action='open']").addEventListener('click', function () { pop.remove(); showBandejaIntegrada(); });
+    pop.querySelectorAll("[data-action='open-event']").forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        // F4-fix: stopPropagation para que el click NO cierre el popover por el
+        // listener de "click fuera" antes de que el modal se abra
+        if (e) { e.preventDefault(); e.stopPropagation(); }
+        var eventId = btn.getAttribute('data-event-id');
+        // F4-fix: abrir modal de detalle con la info del evento seleccionado
+        var ev = pending.find(function (x) { return x.id === eventId; });
+        if (ev) {
+          pop.remove();
+          try {
+            // F4-fix: usar BANDEJA_INTEGRADA_COLOR_MAP (definido a nivel de módulo)
+            openBandejaIntegradaEventDetailModal(ev, BANDEJA_INTEGRADA_COLOR_MAP);
+          } catch (err) {
+            console.error('[BandejaIntegrada] Error abriendo modal de detalle:', err);
+            // Fallback: alert nativo para que al menos se vea algo
+            alert('Detalle del evento:\n\n' +
+              'Tipo: ' + (ev.type || ev.category || '—') + '\n' +
+              'Título: ' + (ev.title || '(sin título)') + '\n' +
+              'Fecha: ' + (ev.date || '—'));
+          }
+        } else {
+          console.warn('[BandejaIntegrada] No se encontró evento con id=' + eventId);
+          pop.remove();
+        }
+      });
+    });
+    // Cerrar al hacer click fuera
+    setTimeout(function () {
+      var onOutsideClick = function (ev) {
+        if (!pop.contains(ev.target) && ev.target.id !== 'bandeja-integrada-badge') {
+          pop.remove();
+          document.removeEventListener('click', onOutsideClick);
+        }
+      };
+      document.addEventListener('click', onOutsideClick);
+    }, 0);
+  }
+
+  // F4-fix — Modal de detalle de un evento desde el popover de pendientes
+  // (en el main app, NO en el iframe). Muestra la info del evento + acciones.
+  function openBandejaIntegradaEventDetailModal(ev, colorMap) {
+    console.log('[BandejaIntegrada] Abriendo modal de detalle:', {
+      id: ev && ev.id,
+      type: ev && (ev.type || ev.category),
+      title: ev && ev.title,
+      date: ev && ev.date,
+      hasColorMap: !!colorMap,
+      colorMapKeys: colorMap ? Object.keys(colorMap).length : 0
+    });
+    var existing = document.getElementById('bandeja-integrada-event-detail-modal');
+    if (existing) existing.remove();
+
+    var color = (colorMap && colorMap[ev.type || ev.category]) || '#6c757d';
+    var catLabel = (ev.type || ev.category || '').toUpperCase();
+    var dateStr = ev.date || '—';
+    var timeStr = (ev.start || '') + (ev.end ? ' - ' + ev.end : '');
+    var locationStr = ev.location || '';
+    var titleStr = ev.title || '(sin título)';
+
+    // Días vencidos
+    var diasVencidos = '';
+    if (ev.date) {
+      var d = new Date(ev.date + 'T00:00:00');
+      var hoy = new Date(); hoy.setHours(0,0,0,0);
+      var diff = Math.floor((hoy - d) / 86400000);
+      if (diff === 0) diasVencidos = 'Vence hoy';
+      else if (diff > 0) diasVencidos = 'Vencida · hace ' + diff + ' días';
+      else diasVencidos = 'En ' + (-diff) + ' días';
+    }
+
+    var modal = document.createElement('div');
+    modal.id = 'bandeja-integrada-event-detail-modal';
+    modal.className = 'kair-event-modal-overlay';
+    modal.innerHTML = `
+      <div class="kair-event-modal">
+        <div class="kair-event-modal__header" style="border-bottom: 1px solid #e5e7eb; background: #f8fafc;">
+          <span class="kair-pendientes-popover__cat" style="color:${color}; font-size: 0.75rem;">${catLabel}</span>
+          <button class="kair-event-modal__close" data-action="close" aria-label="Cerrar">×</button>
+        </div>
+        <div class="kair-event-modal__body">
+          <h2 class="kair-event-modal__title">${(titleStr).replace(/</g, '&lt;')}</h2>
+          <div class="kair-event-modal__meta">
+            <div class="kair-event-modal__meta-row">
+              <strong>Fecha:</strong> ${dateStr} ${timeStr ? '· ' + timeStr : ''}
+            </div>
+            ${diasVencidos ? '<div class="kair-event-modal__meta-row" style="color:#dc3545;"><strong>Estado:</strong> ' + diasVencidos + '</div>' : ''}
+            ${locationStr ? '<div class="kair-event-modal__meta-row"><strong>Ubicación:</strong> ' + locationStr.replace(/</g, '&lt;') + '</div>' : ''}
+            ${ev.attendees && ev.attendees.length ? '<div class="kair-event-modal__meta-row"><strong>Asistentes:</strong> ' + ev.attendees.length + '</div>' : ''}
+            ${ev.description || ev.notes ? '<div class="kair-event-modal__meta-row" style="flex-direction:column;align-items:stretch;"><strong>Notas:</strong><div class="kair-event-modal__description">' + (ev.description || ev.notes).replace(/</g, '&lt;') + '</div></div>' : ''}
+          </div>
+        </div>
+        <div class="kair-event-modal__actions">
+          <button class="kair-event-modal__btn kair-event-modal__btn--secondary" data-action="open-calendar">Ir al calendario</button>
+          <button class="kair-event-modal__btn kair-event-modal__btn--primary" data-action="mark-done">Marcar cumplido</button>
+          <button class="kair-event-modal__btn kair-event-modal__btn--secondary" data-action="close">Cerrar</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
+
+    var closeModal = function () { modal.remove(); };
+    modal.querySelector("[data-action='close']").addEventListener('click', closeModal);
+    modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+    modal.querySelector("[data-action='open-calendar']").addEventListener('click', function () {
+      closeModal();
+      showBandejaIntegrada();
+    });
+    modal.querySelector("[data-action='mark-done']").addEventListener('click', function () {
+      // Marcar como cumplido via electronAPI
+      if (window.electronAPI && window.electronAPI.eventosCumplidos && ev.id) {
+        window.electronAPI.eventosCumplidos.marcar({
+          evento_id: ev.id,
+          empresaId: (window.currentCompany && window.currentCompany !== 'default_company') ? window.currentCompany : null
+        }).then(function (r) {
+          if (r && r.success) {
+            toast && toast('Marcado como cumplido', titleStr, 'success');
+            closeModal();
+            // Refrescar KAirAlerts para que el badge se actualice
+            if (window.KairAlerts && window.KairAlerts.refresh) window.KairAlerts.refresh();
+          } else {
+            toast && toast('No se pudo marcar', (r && r.error) || 'Error', 'error');
+          }
+        });
+      } else {
+        toast && toast('Marcar cumplido', 'API no disponible', 'info');
+        closeModal();
+      }
+    });
+  }
+
+  // Wire-up del badge (separado del handler del botón)
+  var bandejaIntegradaBadge = document.getElementById('bandeja-integrada-badge');
+  if (bandejaIntegradaBadge) {
+    bandejaIntegradaBadge.addEventListener('click', onBandejaIntegradaBadgeClick);
+    // Estilo: cursor pointer para indicar que es clickable
+    bandejaIntegradaBadge.style.cursor = 'pointer';
+  }
+  if (typeof window.KairAlerts !== 'undefined' && window.KairAlerts.onCountChange) {
+    window.KairAlerts.onCountChange(updateBandejaIntegradaBadge);
+  } else {
+    // F4 — KairAlerts puede no estar listo aún. Reintentar cuando lo esté.
+    var _kairAlertsWait = setInterval(function() {
+      if (typeof window.KairAlerts !== 'undefined' && window.KairAlerts.onCountChange) {
+        window.KairAlerts.onCountChange(updateBandejaIntegradaBadge);
+        clearInterval(_kairAlertsWait);
+      }
+    }, 500);
+  }
+
+  // F4-fix — Toggle del botón Bandeja Integrada: si está abierto, lo cierra.
+  // Si está cerrado, lo abre. El botón está en el header de la app principal
+  // (visible siempre), así que el user puede usarlo como toggle.
+  function toggleBandejaIntegrada() {
+    if (bandejaIntegradaFrame && bandejaIntegradaFrame.style.display !== 'none') {
+      hideBandejaIntegrada();
+    } else {
+      showBandejaIntegrada();
+    }
+  }
+
+  function showBandejaIntegrada() {
+    if (bandejaIntegradaFrame) {
+      bandejaIntegradaFrame.style.display = 'flex';
+      return;
+    }
+    bandejaIntegradaFrame = document.createElement('iframe');
+    bandejaIntegradaFrame.id = 'bandeja-integrada-frame';
+    bandejaIntegradaFrame.src = 'renderer/bandeja-integrada/index.html?v=613';
+    // F4-fix — Usar el alto REAL del header de la app principal (no un valor fijo)
+    // para que el iframe arranque justo donde termina el header, sin solaparlo.
+    var mainHeader = document.getElementById('app-header');
+    var headerHeight = mainHeader ? Math.max(mainHeader.getBoundingClientRect().height, 40) : 48;
+    bandejaIntegradaFrame.style.cssText = [
+      'position: fixed',
+      'top: ' + headerHeight + 'px',
+      'left: 0',
+      'width: 100vw',
+      'height: calc(100vh - ' + headerHeight + 'px)',
+      'border: 0',
+      // F1.5-fix2: el #app-header de la app principal tiene z-index 100000
+      // con isolation:isolate. El iframe necesita estar por encima de eso,
+      // y también por encima de .kair-cal-modal-overlay (200000) por si
+      // hay un modal del calendario viejo abierto. Usamos 200001.
+      'z-index: 200001',
+      'background: #fff',
+      'display: block'
+    ].join(';');
+    document.body.appendChild(bandejaIntegradaFrame);
+    logMessage('Bandeja Integrada abierta (iframe creado). Header height: ' + headerHeight + 'px', 'INFO');
+  }
+
+  function hideBandejaIntegrada() {
+    if (bandejaIntegradaFrame) {
+      bandejaIntegradaFrame.style.display = 'none';
+      logMessage('Bandeja Integrada cerrada (iframe oculto).', 'INFO');
+    }
+  }
+
+  // Listener dedicado para mensajes del iframe de Bandeja Integrada.
+  // Usa su propio listener (separado del de Iframe Communication Logic de abajo)
+  // para que el "back" funcione aunque el iframe genérico tenga filtros.
+  window.addEventListener('message', (event) => {
+    if (!event.data || typeof event.data !== 'object') return;
+    if (event.data.type === 'bandeja-integrada-back') {
+      hideBandejaIntegrada();
+    }
+    // F4-fix — El iframe pide abrir Configuración (cuando el user hace click en
+    // el indicador Gmail del header, para ir al switch de conectar/desconectar).
+    else if (event.data.type === 'bandeja-integrada-open-config') {
+      hideBandejaIntegrada();
+      // Abrir Configuración. Si el section es "empresas", navegar a esa tab
+      if (event.data.section && typeof showSettingsPage === 'function') {
+        showSettingsPage(event.data.section);
+      } else if (typeof showSettingsPage === 'function') {
+        showSettingsPage();
+      }
+    }
+  });
+
+  if (bandejaIntegradaButton) {
+    // F4-fix — Toggle: click abre o cierra (como cualquier app de bandeja).
+    // Antes solo abría — para cerrar había que hacer click en el botón de
+    // "Volver" dentro del iframe (que ahora está oculto porque el header
+    // interno del iframe está display:none).
+    bandejaIntegradaButton.addEventListener('click', toggleBandejaIntegrada);
+  } else {
+    console.warn('[BandejaIntegrada] Botón #bandeja-integrada-button no encontrado en el DOM.');
+  }
+
   // --- BEGIN: Iframe Communication Logic ---
   window.addEventListener('message', async (event) => {
       // IMPORTANT: Validate the origin for security
@@ -5727,7 +6087,11 @@ if (mainContainerView) mainContainerView.classList.remove('vanta-fullscreen');
       });
   }
 
-  function showSettingsPage() {
+  function showSettingsPage(section) {
+    // F4-fix — Acepta parámetro opcional 'section' para navegar directo a una tab
+    // (ej: 'empresas' para abrir Config > Gestión de Empresas, donde está el
+    // switch de Gmail). Si no se pasa, muestra la tab por defecto.
+    section = section || null;
     // ✅ Pasar contentArea a hideCalendar
     hideCalendar(contentArea);
     console.log('Showing enhanced settings page...');
@@ -5767,6 +6131,28 @@ if (mainContainerView) mainContainerView.classList.remove('vanta-fullscreen');
       if (iframe.contentWindow) {
         // Pasar la API de Electron al iframe
         iframe.contentWindow.electronAPI = window.electronAPI;
+
+        // F4-fix — Si se pidió una sección específica, navegar a ella después de cargar
+        if (section && typeof iframe.contentWindow.navigateToConfigSection === 'function') {
+          setTimeout(function() {
+            try { iframe.contentWindow.navigateToConfigSection(section); } catch (e) { /* ignore */ }
+          }, 250);
+        } else if (section) {
+          // Fallback: usar el DOM directamente
+          setTimeout(function() {
+            try {
+              var targetTab = iframe.contentDocument.getElementById('tab-' + section);
+              if (targetTab) {
+                // Ocultar todas las tabs
+                iframe.contentDocument.querySelectorAll('.section-container').forEach(function(s) { s.classList.remove('active'); });
+                targetTab.classList.add('active');
+                // Scroll a la sección de Gmail
+                var gmailSection = iframe.contentDocument.getElementById('gmail-section');
+                if (gmailSection) gmailSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            } catch (e) { /* ignore */ }
+          }, 250);
+        }
 
         // Propagar el tema actual al iframe
         const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';

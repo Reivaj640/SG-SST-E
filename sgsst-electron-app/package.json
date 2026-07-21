@@ -17,6 +17,7 @@
     "electron-updater": "^6.6.2",
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
+    "googleapis": "^173.0.0",
     "jquery": "^3.7.1",
     "jquery-ui-dist": "^1.13.3",
     "node-fetch": "^2.7.0",

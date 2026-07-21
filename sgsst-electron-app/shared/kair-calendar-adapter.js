@@ -75,10 +75,26 @@
   }
 
   function _safe(fn, fallback) {
-    return fn().catch(function (e) {
-      _warn('SOURCE_FAIL', (e && e.message) || String(e));
-      return { success: false, data: fallback || [] };
-    });
+    // F2 — Defensivo: si fn() lanza síncronamente o retorna algo que no es
+    // Promise (incluido undefined cuando una API no existe), devolver un
+    // resultado neutro sin romper el .list() completo. Esto permite usar el
+    // adapter desde iframes donde algunas APIs de electronAPI no están
+    // expuestas via contextBridge (ejecutándose en renderer padre via
+    // window.parent.electronAPI). Antes, un undefined.fn() lanzaba
+    // "Cannot read properties of undefined (reading 'catch')".
+    var p;
+    try { p = fn(); }
+    catch (syncErr) {
+      _warn('SOURCE_SYNC_FAIL', (syncErr && syncErr.message) || String(syncErr));
+      return Promise.resolve({ success: false, data: fallback || [] });
+    }
+    if (p && typeof p.then === 'function') {
+      return p.catch(function (e) {
+        _warn('SOURCE_FAIL', (e && e.message) || String(e));
+        return { success: false, data: fallback || [] };
+      });
+    }
+    return Promise.resolve({ success: false, data: fallback || [] });
   }
 
   /* Amplía el rango visible al año completo (enero-dic de cada año en el rango).
@@ -103,10 +119,21 @@
   //   - 'all'               : fuentes por empresa reciben currentCompany = null
   //                          y devuelven eventos de TODAS las empresas
   async function list(range) {
-    var api = (global.electronAPI) || {};
+    // F2 — Fallback a window.parent.electronAPI para que el adapter funcione
+    // dentro de iframes de Bandeja Integrada. El contextBridge de Electron
+    // no se hereda automáticamente a iframes, pero el renderer padre sí lo
+    // tiene y es accesible via window.parent (mismo origen = permitido).
+    var api = (global.electronAPI)
+      || (global.parent && global.parent.electronAPI)
+      || {};
+    // F2 — currentCompany también puede vivir solo en el renderer padre.
+    // Sin esto, el iframe no sabe qué empresa está activa y las fuentes
+    // por empresa devuelven array vacío.
     var currentCompany = (global.currentCompany && global.currentCompany !== 'default_company')
       ? global.currentCompany
-      : null;
+      : (global.parent && global.parent.currentCompany && global.parent.currentCompany !== 'default_company'
+          ? global.parent.currentCompany
+          : null);
     // 📦543 — Si el scope es 'all', pasar null a las fuentes por empresa para
     // que el backend devuelva eventos de TODAS las empresas. Las fuentes
     // globales (recordatorios, plan de trabajo) siempre se incluyen.

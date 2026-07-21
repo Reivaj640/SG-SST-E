@@ -409,6 +409,115 @@
             border-radius: var(--radius);
             border: 1px solid #e0e7ff;
         }
+
+        /* F4-fix — Sección de conexión Gmail (Bandeja Integrada). Igual look que .sync-section
+           pero con colores Gmail (rojo Google) y email del usuario conectado visible. */
+        .gmail-section {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1.1rem;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, #fef2f2 0%, #fefefe 100%);
+            border-radius: var(--radius);
+            border: 1px solid #fecaca;
+            gap: 1rem;
+        }
+        .gmail-section__left {
+            display: flex;
+            align-items: center;
+            gap: 0.85rem;
+            flex: 1;
+            min-width: 0;
+        }
+        .gmail-section__icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #ea4335 0%, #c5221f 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            flex-shrink: 0;
+        }
+        .gmail-section__info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.15rem;
+            min-width: 0;
+        }
+        .gmail-section__title {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.95rem;
+            color: var(--text-main);
+            font-weight: 600;
+        }
+        .gmail-section__email {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            word-break: break-all;
+        }
+        .gmail-section__email.connected {
+            color: var(--success);
+            font-weight: 500;
+        }
+        .gmail-section__actions {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-shrink: 0;
+        }
+        .gmail-section__btn {
+            padding: 0.45rem 0.9rem;
+            border-radius: 8px;
+            border: 1px solid transparent;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.16s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .gmail-section__btn--primary {
+            background: var(--primary);
+            color: #fff;
+        }
+        .gmail-section__btn--primary:hover {
+            filter: brightness(0.92);
+        }
+        .gmail-section__btn--secondary {
+            background: #fff;
+            color: var(--text-main);
+            border-color: #e5e7eb;
+        }
+        .gmail-section__btn--secondary:hover {
+            background: #f8fafc;
+        }
+        .gmail-section__btn--danger {
+            background: #fff;
+            color: #dc2626;
+            border-color: #fecaca;
+        }
+        .gmail-section__btn--danger:hover {
+            background: #fef2f2;
+        }
+        .gmail-section__pulse {
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: #16a34a;
+            box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.6);
+            animation: gmail-pulse 1.8s infinite;
+        }
+        @keyframes gmail-pulse {
+            0% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.6); }
+            70% { box-shadow: 0 0 0 8px rgba(22, 163, 74, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
+        }
         .sync-label {
             display: flex;
             align-items: center;
@@ -1281,6 +1390,38 @@
             <div class="section-header">
                 <h2 class="section-title">Gestión de Empresas</h2>
                 <p class="section-subtitle">Administra las empresas vinculadas y sus configuraciones normativas</p>
+            </div>
+
+            <!-- F4-fix — Sección de conexión Gmail (Bandeja Integrada).
+                 Switch iOS que muestra el email conectado y permite conectar/desconectar
+                 la cuenta Gmail que se usa en la Bandeja Integrada. Reemplaza el botón
+                 que estaba antes en el header del iframe. -->
+            <div class="gmail-section" id="gmail-section">
+                <div class="gmail-section__left">
+                    <div class="gmail-section__icon" aria-hidden="true">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                    </div>
+                    <div class="gmail-section__info">
+                        <div class="gmail-section__title">
+                            <span>Bandeja Integrada · Gmail</span>
+                            <span class="gmail-section__pulse" id="gmail-status-dot" style="display:none;"></span>
+                        </div>
+                        <div class="gmail-section__email" id="gmail-status-text">Verificando…</div>
+                    </div>
+                </div>
+                <div class="gmail-section__actions" id="gmail-actions">
+                    <button class="gmail-section__btn gmail-section__btn--primary" id="gmail-btn-connect" style="display:none;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                        <span>Conectar Gmail</span>
+                    </button>
+                    <button class="gmail-section__btn gmail-section__btn--secondary" id="gmail-btn-refresh" style="display:none;" title="Actualizar perfil">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                    </button>
+                    <button class="gmail-section__btn gmail-section__btn--danger" id="gmail-btn-disconnect" style="display:none;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+                        <span>Desconectar</span>
+                    </button>
+                </div>
             </div>
 
             <div class="users-header-actions">
@@ -4056,7 +4197,195 @@
 
         // Inicializar la sección "Acerca de"
         setTimeout(initializeAboutSection, 100);
+
+        // F4-fix — Inicializar la sección de Gmail (Bandeja Integrada).
+        // Carga el estado actual de la conexión y wire-up de los botones
+        // (Conectar / Refrescar / Desconectar). Reemplaza al botón "btn-gmail"
+        // que estaba en el header del iframe de Bandeja Integrada.
+        setTimeout(initializeGmailSection, 200);
     });
+
+    // ======================================================================
+    // F4-fix — Sección Gmail (Bandeja Integrada) en Configuración
+    // ======================================================================
+    var gmailSectionState = {
+      connected: false,
+      email: '',
+      loading: false
+    };
+
+    async function initializeGmailSection() {
+      console.log('[GmailSection] Inicializando sección Gmail...');
+      var btnConnect = document.getElementById('gmail-btn-connect');
+      var btnRefresh = document.getElementById('gmail-btn-refresh');
+      var btnDisconnect = document.getElementById('gmail-btn-disconnect');
+      if (!btnConnect || !btnRefresh || !btnDisconnect) {
+        console.warn('[GmailSection] Botones no encontrados en el DOM');
+        return;
+      }
+
+      // Wire-up de los botones (solo una vez)
+      if (!btnConnect.dataset.wired) {
+        btnConnect.addEventListener('click', onGmailConnectClick);
+        btnConnect.dataset.wired = 'true';
+      }
+      if (!btnRefresh.dataset.wired) {
+        btnRefresh.addEventListener('click', onGmailRefreshClick);
+        btnRefresh.dataset.wired = 'true';
+      }
+      if (!btnDisconnect.dataset.wired) {
+        btnDisconnect.addEventListener('click', onGmailDisconnectClick);
+        btnDisconnect.dataset.wired = 'true';
+      }
+
+      // Cargar estado inicial
+      await refreshGmailSectionState();
+    }
+
+    async function refreshGmailSectionState() {
+      if (gmailSectionState.loading) return;
+      gmailSectionState.loading = true;
+      var statusText = document.getElementById('gmail-status-text');
+      var statusDot = document.getElementById('gmail-status-dot');
+      var btnConnect = document.getElementById('gmail-btn-connect');
+      var btnRefresh = document.getElementById('gmail-btn-refresh');
+      var btnDisconnect = document.getElementById('gmail-btn-disconnect');
+
+      try {
+        if (statusText) statusText.textContent = 'Verificando…';
+        if (statusText) statusText.classList.remove('connected');
+
+        if (!window.electronAPI || !window.electronAPI.google) {
+          if (statusText) statusText.textContent = 'API no disponible';
+          gmailSectionState.connected = false;
+          renderGmailButtons(false);
+          gmailSectionState.loading = false;
+          return;
+        }
+
+        var statusRes = await window.electronAPI.google.status();
+        var connected = !!(statusRes && statusRes.success && statusRes.data && statusRes.data.connected);
+
+        if (!connected) {
+          if (statusText) statusText.textContent = 'Gmail desconectado · click para conectar';
+          if (statusText) statusText.classList.remove('connected');
+          if (statusDot) statusDot.style.display = 'none';
+          gmailSectionState.connected = false;
+          gmailSectionState.email = '';
+          renderGmailButtons(false);
+          gmailSectionState.loading = false;
+          return;
+        }
+
+        // Conectado: pedir el perfil para mostrar el email
+        var profileRes = await window.electronAPI.googleGmail.getProfile();
+        if (profileRes && profileRes.success && profileRes.data && profileRes.data.email) {
+          if (statusText) statusText.textContent = 'Conectado como ' + profileRes.data.email;
+          if (statusText) statusText.classList.add('connected');
+          if (statusDot) statusDot.style.display = 'inline-block';
+          gmailSectionState.connected = true;
+          gmailSectionState.email = profileRes.data.email;
+          renderGmailButtons(true);
+        } else {
+          if (statusText) statusText.textContent = 'Conectado · perfil no disponible';
+          if (statusText) statusText.classList.add('connected');
+          if (statusDot) statusDot.style.display = 'inline-block';
+          gmailSectionState.connected = true;
+          gmailSectionState.email = '';
+          renderGmailButtons(true);
+        }
+      } catch (e) {
+        console.error('[GmailSection] Error:', e);
+        if (statusText) statusText.textContent = 'Error verificando conexión';
+        gmailSectionState.connected = false;
+        renderGmailButtons(false);
+      }
+      gmailSectionState.loading = false;
+    }
+
+    function renderGmailButtons(connected) {
+      var btnConnect = document.getElementById('gmail-btn-connect');
+      var btnRefresh = document.getElementById('gmail-btn-refresh');
+      var btnDisconnect = document.getElementById('gmail-btn-disconnect');
+      if (!btnConnect || !btnRefresh || !btnDisconnect) return;
+      if (connected) {
+        btnConnect.style.display = 'none';
+        btnRefresh.style.display = 'inline-flex';
+        btnDisconnect.style.display = 'inline-flex';
+      } else {
+        btnConnect.style.display = 'inline-flex';
+        btnRefresh.style.display = 'none';
+        btnDisconnect.style.display = 'none';
+      }
+    }
+
+    async function onGmailConnectClick() {
+      var btn = document.getElementById('gmail-btn-connect');
+      if (btn) { btn.disabled = true; btn.textContent = 'Abriendo navegador…'; }
+      try {
+        var startRes = await window.electronAPI.google.start();
+        if (!startRes || !startRes.success) {
+          alert('No se pudo iniciar el flow OAuth: ' + (startRes && startRes.error || 'error desconocido'));
+          return;
+        }
+        // Abrir el browser externo con la URL de autorización
+        await window.openExternalUrl(startRes.data.authUrl);
+        // Esperar el callback
+        var cbRes = await window.electronAPI.google.awaitCallback();
+        if (!cbRes || !cbRes.success || !cbRes.data || !cbRes.data.code) {
+          alert('No se recibió el código de autorización');
+          return;
+        }
+        // Intercambiar el code por tokens
+        var exRes = await window.electronAPI.google.exchange({ code: cbRes.data.code });
+        if (!exRes || !exRes.success) {
+          alert('No se pudieron guardar los tokens: ' + (exRes && exRes.error || 'error desconocido'));
+          return;
+        }
+        // Refrescar el estado para mostrar el email
+        await refreshGmailSectionState();
+      } catch (e) {
+        console.error('[GmailSection] Error en connect:', e);
+        alert('Error: ' + (e.message || e));
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> <span>Conectar Gmail</span>';
+        }
+      }
+    }
+
+    async function onGmailRefreshClick() {
+      await refreshGmailSectionState();
+    }
+
+    async function onGmailDisconnectClick() {
+      if (!confirm('¿Desconectar Gmail? Los tokens serán eliminados de config.json. Podés volver a conectar cuando quieras.')) {
+        return;
+      }
+      try {
+        var res = await window.electronAPI.google.disconnect();
+        if (res && res.success) {
+          await refreshGmailSectionState();
+        } else {
+          alert('No se pudo desconectar: ' + (res && res.error || 'error desconocido'));
+        }
+      } catch (e) {
+        console.error('[GmailSection] Error en disconnect:', e);
+        alert('Error: ' + (e.message || e));
+      }
+    }
+
+    // F4-fix — Helper para abrir URL externa (usa el IPC 'open-external-url' que
+    // ya está expuesto en preload). Si no está disponible, fallback a window.open.
+    if (typeof window.openExternalUrl !== 'function') {
+      window.openExternalUrl = async function (url) {
+        if (window.electronAPI && window.electronAPI.openExternalUrl) {
+          return window.electronAPI.openExternalUrl(url);
+        }
+        return window.open(url, '_blank');
+      };
+    }
 </script>
 
 </body>

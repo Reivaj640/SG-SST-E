@@ -52,6 +52,10 @@ const { registerEventosCumplidosHandlers, SCHEMA_SQL: EVENTOS_CUMPLIDOS_SCHEMA_S
 const { registerEventosRapidosHandlers } = require('./main/eventos-rapidos-bridge');
 // 📦531 — Persistencia de planes de acción del submódulo 2.3.1 Evaluación Inicial
 const { registerEvaluacionActionPlansHandlers, SCHEMA_SQL: EVAL_ACTION_PLANS_SCHEMA_SQL } = require('./main/evaluacion-action-plans-bridge');
+// 📦 Bandeja Integrada — Schema SQLite para emails (threads, messages, labels, attachments)
+// Inspirado en Mail-0/Zero (https://github.com/Mail-0/Zero) — mismo patrón que
+// GESTACION_SCHEMA_SQL: CREATE TABLE IF NOT EXISTS + migraciones idempotentes.
+const { EMAIL_SCHEMA_SQL, EMAIL_MIGRATIONS_SQL } = require('./main/email-schema-sql');
 // 📦537 — Sync multipc (BD local <-> .kairsync en carpeta compartida)
 const { registerSyncHandlers } = require('./main/sync-bridge');
 // 📦538 — Generador de pcId (ID unico por PC para el sync multipc)
@@ -326,6 +330,9 @@ function initDbOnce() {
 
   try {
     db = new Database(dbPath);
+    // 📦 Bandeja Integrada — Compartir la instancia con módulos en main/
+    // (email-db.js la usa para CRUD de threads/messages/labels).
+    require('./main/db-instance').setDb(db);
     db.pragma('journal_mode = WAL');
 
     db.exec(`
@@ -419,6 +426,38 @@ function initDbOnce() {
       console.log('[DB] 📦531 · Tabla evaluacion_action_plans creada/verificada');
     } catch (eapErr) {
       console.error('[DB] 📦531 · Error creando tabla evaluacion_action_plans:', eapErr.message);
+    }
+
+    // 📦 Bandeja Integrada — Schema de emails (5 tablas: connections, threads,
+    // messages, labels, attachments). Persiste el inbox de Gmail localmente
+    // para carga instantánea y modo offline. Inspirado en el modelo de
+    // datos de Mail-0/Zero. Mismo patrón que GESTACION_SCHEMA_SQL.
+    try {
+      db.exec(EMAIL_SCHEMA_SQL);
+      console.log('[DB] 📦 Bandeja Integrada · Tablas de email (connections/threads/messages/labels/attachments) creadas/verificadas');
+    } catch (emailErr) {
+      console.error('[DB] 📦 Bandeja Integrada · Error creando schema de email:', emailErr.message);
+    }
+    // Migraciones idempotentes para email (mismo patrón que gestacion)
+    if (Array.isArray(EMAIL_MIGRATIONS_SQL)) {
+      var emailApplied = 0;
+      var emailSkipped = 0;
+      for (var emi = 0; emi < EMAIL_MIGRATIONS_SQL.length; emi++) {
+        var emStmt = EMAIL_MIGRATIONS_SQL[emi];
+        try {
+          db.exec(emStmt);
+          emailApplied++;
+        } catch (emMigErr) {
+          if (/duplicate column/i.test(emMigErr.message)) {
+            emailSkipped++;
+          } else {
+            console.warn('[DB] 📦 Bandeja Integrada · Migración email fallida:', emStmt, '-', emMigErr.message);
+          }
+        }
+      }
+      if (emailApplied > 0 || emailSkipped > 0) {
+        console.log('[DB] 📦 Bandeja Integrada · Migraciones email aplicadas=' + emailApplied + ' omitidas=' + emailSkipped);
+      }
     }
 
     const roleNames = ['Administrador', 'SST', 'Auditoría', 'Gerencia', 'Recursos Humanos'];
@@ -1396,6 +1435,389 @@ ipcMain.handle('assignments-list-by-user-v1', async (event, payload = {}) => {
   } catch (error) {
     console.error('[ASSIGNMENTS] Error listando por usuario:', error);
     return { success: false, error: { code: 'ASSIGNMENTS_LIST_ERROR', message: error.message } };
+  }
+});
+
+// ============================================================
+// ============================================================
+// F3.B — Google Gmail reader (Bandeja Integrada) — Bandeja Integrada
+// ============================================================
+// Lee correos reales de Gmail usando los tokens OAuth de F3.A.
+const googleGmail = require('./shared/google-gmail');
+
+ipcMain.handle('google-gmail:list-inbox', async (event, options) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var result = await googleGmail.listInbox(Object.assign({ configPath: configPath }, options || {}));
+    return result;
+  } catch (e) {
+    console.error('[GoogleGmail] Error en listInbox:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+ipcMain.handle('google-gmail:get-message', async (event, messageId) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var result = await googleGmail.getMessage(messageId, { configPath: configPath });
+    return result;
+  } catch (e) {
+    console.error('[GoogleGmail] Error en getMessage:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// google-gmail:mark-read — el handler unificado está más abajo (F1-Feature3 con options)
+
+// F4-fix — Obtiene el email del usuario Gmail conectado (para mostrar en el switch
+// de Configuración y en el header de Bandeja Integrada como indicador).
+ipcMain.handle('google-gmail:get-profile', async () => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var googleGmail = require('./shared/google-gmail');
+    var result = await googleGmail.getProfile(configPath);
+    return result;
+  } catch (e) {
+    console.error('[GoogleGmail] Error en getProfile:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// F1.B — Enviar un correo via Gmail API (Reply / Reply all / Forward / Nuevo).
+// Construye el raw MIME y lo envía. Después del envío, refresca el cache SQLite.
+ipcMain.handle('google-gmail:send-message', async (event, options) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var result = await googleGmail.sendMessage(Object.assign({ configPath: configPath }, options || {}));
+    // Si el envío fue OK y tenemos threadId, marcar como SENT en el cache
+    // (el background sync va a traer el nuevo mensaje al cache igual)
+    return result;
+  } catch (e) {
+    console.error('[GoogleGmail] Error en sendMessage:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// F1-Feature1 — Listar labels de Gmail (en vivo, no del cache).
+ipcMain.handle('google-gmail:list-labels', async (event) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var result = await googleGmail.listLabels(configPath);
+    return result;
+  } catch (e) {
+    console.error('[google-gmail] Error en list-labels:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// F1-Feature5 — Descargar un adjunto de un mensaje.
+ipcMain.handle('google-gmail:download-attachment', async (event, options) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var result = await googleGmail.downloadAttachment(options.messageId, options.attachmentId, configPath);
+    return result;
+  } catch (e) {
+    console.error('[google-gmail] Error en download-attachment:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// F1-Feature3 — Archivar thread (remove label INBOX).
+ipcMain.handle('google-gmail:archive-thread', async (event, options) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var auth = await googleAuth.getAuthorizedClient(configPath);
+    if (!auth) {
+      return { success: false, error: 'No autorizado' };
+    }
+    var gmail = google.gmail({ version: 'v1', auth: auth });
+    var threadId = options.threadId;
+    await gmail.users.threads.modify({
+      userId: 'me',
+      id: threadId,
+      requestBody: { removeLabelIds: ['INBOX'] }
+    });
+    // Actualizar cache: cambiar folder a ARCHIVED (no INBOX ni SENT)
+    try {
+      emailDb.getDb && emailDb.getDb().prepare('UPDATE email_threads SET folder = ? WHERE id = ?').run('ARCHIVED', threadId);
+    } catch (dbErr) {}
+    return { success: true };
+  } catch (e) {
+    console.error('[google-gmail] Error en archive-thread:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// F1-Feature3 — Marcar thread como leído (en Gmail API).
+ipcMain.handle('google-gmail:mark-thread-read', async (event, options) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var auth = await googleAuth.getAuthorizedClient(configPath);
+    if (!auth) {
+      return { success: false, error: 'No autorizado' };
+    }
+    var gmail = google.gmail({ version: 'v1', auth: auth });
+    var threadId = options.threadId;
+    await gmail.users.threads.modify({
+      userId: 'me',
+      id: threadId,
+      requestBody: { removeLabelIds: ['UNREAD'] }
+    });
+    try {
+      emailDb.getDb && emailDb.getDb().prepare('UPDATE email_threads SET has_unread = 0 WHERE id = ?').run(threadId);
+    } catch (dbErr) {}
+    return { success: true };
+  } catch (e) {
+    console.error('[google-gmail] Error en mark-thread-read:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// ============================================================
+// 📦 Bandeja Integrada — Email cache (SQLite) — Fase 0
+// ============================================================
+// 3 IPCs nuevos: sync-inbox (Gmail → SQLite), get-threads (lee de SQLite),
+// get-cache-stats (totales para el footer). Inspirado en el patrón
+// driver de Mail-0/Zero pero usando IPC + SQLite directo.
+const emailDb = require('./main/email-db');
+const emailSync = require('./main/email-sync');
+
+// Sincroniza el inbox desde Gmail al cache SQLite
+ipcMain.handle('email-cache:sync-inbox', async (event, options) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var result = await emailSync.syncInbox(Object.assign({ configPath: configPath }, options || {}));
+    return result;
+  } catch (e) {
+    console.error('[email-cache] Error en sync-inbox:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// Lee los threads del cache SQLite (instantáneo, sin API call)
+ipcMain.handle('email-cache:get-threads', async (event, options) => {
+  try {
+    var threads = emailDb.getThreadsFromCache(options || {});
+    return { success: true, data: threads };
+  } catch (e) {
+    console.error('[email-cache] Error en get-threads:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// Lee un thread completo con todos sus mensajes
+ipcMain.handle('email-cache:get-thread', async (event, threadId) => {
+  try {
+    var thread = emailDb.getThreadFromCache(threadId);
+    var messages = emailDb.getMessagesFromCache(threadId);
+    return { success: true, data: { thread: thread, messages: messages } };
+  } catch (e) {
+    console.error('[email-cache] Error en get-thread:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// F1-Feature5 — Obtener adjuntos de un mensaje desde el cache local
+ipcMain.handle('email-cache:get-attachments', async (event, messageId) => {
+  try {
+    var attachments = emailDb.getAttachmentsByMessage(messageId);
+    return { success: true, data: attachments };
+  } catch (e) {
+    console.error('[email-cache] Error en get-attachments:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// Estadísticas del cache (para mostrar en el footer "X correos")
+ipcMain.handle('email-cache:get-stats', async () => {
+  try {
+    var stats = emailDb.getCacheStats();
+    return { success: true, data: stats };
+  } catch (e) {
+    console.error('[email-cache] Error en get-stats:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// F1-Feature1 — Obtener los labels de Gmail del cache SQLite
+ipcMain.handle('email-cache:get-labels', async (event, connectionId) => {
+  try {
+    var labels = emailDb.getLabelsFromCache(connectionId || null);
+    return { success: true, data: labels };
+  } catch (e) {
+    console.error('[email-cache] Error en get-labels:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// F1-Feature3 (preparación) — Marcar mensaje como leído en Gmail + cache
+ipcMain.handle('google-gmail:mark-read', async (event, options) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var auth = await googleAuth.getAuthorizedClient(configPath);
+    if (!auth) {
+      return { success: false, error: 'No autorizado' };
+    }
+    var gmail = google.gmail({ version: 'v1', auth: auth });
+    var messageId = options.messageId;
+    var markAsRead = options.read !== false;  // default: marcar como leído
+    var modifyRes = await gmail.users.messages.modify({
+      userId: 'me',
+      id: messageId,
+      requestBody: markAsRead
+        ? { removeLabelIds: ['UNREAD'] }
+        : { addLabelIds: ['UNREAD'] }
+    });
+    // Actualizar cache local: has_unread
+    try {
+      if (markAsRead) {
+        emailDb.getDb && emailDb.getDb().prepare('UPDATE email_threads SET has_unread = 0 WHERE id IN (SELECT thread_id FROM email_messages WHERE id = ?)').run(messageId);
+      } else {
+        emailDb.getDb && emailDb.getDb().prepare('UPDATE email_threads SET has_unread = 1 WHERE id IN (SELECT thread_id FROM email_messages WHERE id = ?)').run(messageId);
+      }
+    } catch (dbErr) {
+      // No crítico
+    }
+    return { success: true, data: { id: modifyRes.data.id, labelIds: modifyRes.data.labelIds } };
+  } catch (e) {
+    console.error('[google-gmail] Error en mark-read:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// ============================================================
+// F3.A — Google OAuth (Calendar + Gmail) — Bandeja Integrada
+// ============================================================
+// Flujo:
+//   1. UI llama a google-oauth:start → devuelve { authUrl, port, ... }
+//   2. UI abre authUrl en browser externo y arranca el callback server
+//   3. Browser redirige a http://127.0.0.1:port/oauth2callback?code=XXX
+//   4. UI llama a google-oauth:exchange con el code capturado
+//   5. Tokens se persisten en config.json
+const googleAuth = require('./shared/google-auth');
+const googleTokens = require('./shared/google-tokens');
+
+// Estado en memoria del flow activo (1 solo a la vez)
+let googleAuthFlowState = null;
+
+function getGoogleConfigPath() {
+  if (!app || !app.getPath) return null;
+  return path.join(app.getPath('userData'), 'config.json');
+}
+
+// Inicia el flow: genera la URL de autorización y arranca el callback server.
+ipcMain.handle('google-oauth:start', async () => {
+  try {
+    if (googleAuthFlowState) {
+      return { success: false, error: 'Ya hay un flow de autorización activo. Esperá o cancelá.' };
+    }
+    const flow = googleAuth.startAuth();
+    const callbackServer = googleAuth.createCallbackServer(flow.port);
+
+    googleAuthFlowState = {
+      verifier: flow.verifier,
+      expectedState: flow.state,
+      configPath: getGoogleConfigPath(),
+      server: callbackServer
+    };
+
+    return {
+      success: true,
+      data: {
+        authUrl: flow.authUrl,
+        port: flow.port,
+        redirectUri: flow.redirectUri
+      }
+    };
+  } catch (e) {
+    console.error('[GoogleOAuth] Error en start:', e);
+    return { success: false, error: e.message || 'Error iniciando OAuth' };
+  }
+});
+
+// Espera el callback del browser (Google redirige a 127.0.0.1:port/?code=XXX).
+ipcMain.handle('google-oauth:await-callback', async () => {
+  if (!googleAuthFlowState) {
+    return { success: false, error: 'No hay un flow activo. Llamá a google-oauth:start primero.' };
+  }
+  try {
+    const { code, state, error } = await googleAuthFlowState.server.promise;
+    if (error) {
+      googleAuthFlowState = null;
+      return { success: false, error: error };
+    }
+    if (!code) {
+      googleAuthFlowState = null;
+      return { success: false, error: 'No se recibió code en el callback' };
+    }
+    return { success: true, data: { code, state } };
+  } catch (e) {
+    console.error('[GoogleOAuth] Error en await-callback:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// Intercambia el code por tokens (access + refresh) y los persiste.
+ipcMain.handle('google-oauth:exchange', async (event, payload) => {
+  if (!googleAuthFlowState) {
+    return { success: false, error: 'No hay un flow activo.' };
+  }
+  try {
+    const result = await googleAuth.exchangeCode({
+      code: payload.code,
+      verifier: googleAuthFlowState.verifier,
+      expectedState: googleAuthFlowState.expectedState,
+      actualState: payload.state,
+      configPath: googleAuthFlowState.configPath
+    });
+    // Limpiar el flow
+    try { googleAuthFlowState.server.close(); } catch (e) {}
+    googleAuthFlowState = null;
+    return result;
+  } catch (e) {
+    console.error('[GoogleOAuth] Error en exchange:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// Cancela el flow activo.
+ipcMain.handle('google-oauth:cancel', async () => {
+  if (!googleAuthFlowState) {
+    return { success: true, data: { cancelled: false } };
+  }
+  try { googleAuthFlowState.server.close(); } catch (e) {}
+  googleAuthFlowState = null;
+  return { success: true, data: { cancelled: true } };
+});
+
+// Devuelve el estado de la conexión (si hay tokens válidos guardados).
+ipcMain.handle('google-oauth:status', async () => {
+  const configPath = getGoogleConfigPath();
+  const has = googleTokens.hasValidTokens(configPath);
+  const tokens = googleTokens.loadTokens(configPath);
+  return {
+    success: true,
+    data: {
+      connected: has,
+      hasRefreshToken: !!(tokens && tokens.refresh_token),
+      expiryDate: tokens ? tokens.expiry_date : null,
+      savedAt: tokens ? tokens.savedAt : null
+    }
+  };
+});
+
+// Desconecta (borra los tokens guardados).
+ipcMain.handle('google-oauth:disconnect', async () => {
+  const configPath = getGoogleConfigPath();
+  const ok = googleTokens.clearTokens(configPath);
+  return { success: ok };
+});
+
+// F3.A — Abre una URL en el browser externo del usuario. Usado por el
+// flow OAuth de Gmail para mostrar la pantalla de consentimiento de Google.
+ipcMain.on('open-external-url', async (event, url) => {
+  if (typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://'))) {
+    await shell.openExternal(url);
   }
 });
 

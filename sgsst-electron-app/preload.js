@@ -131,6 +131,55 @@ contextBridge.exposeInMainWorld('electronAPI', {
   copyFileToProviderFolder: (sourcePath, destFolderPath, fileName) => ipcRenderer.invoke('copy-file-to-provider-folder', sourcePath, destFolderPath, fileName),
   listProviderFiles: (folderPath) => ipcRenderer.invoke('list-provider-files', folderPath),
 
+  // --- F3.A — Google OAuth (Calendar + Gmail) para Bandeja Integrada ---
+  google: {
+    start: () => ipcRenderer.invoke('google-oauth:start'),
+    awaitCallback: () => ipcRenderer.invoke('google-oauth:await-callback'),
+    exchange: (payload) => ipcRenderer.invoke('google-oauth:exchange', payload),
+    cancel: () => ipcRenderer.invoke('google-oauth:cancel'),
+    status: () => ipcRenderer.invoke('google-oauth:status'),
+    disconnect: () => ipcRenderer.invoke('google-oauth:disconnect')
+  },
+
+  // F4-fix — Abre URL en el browser externo del usuario (usado por el flow OAuth de Gmail).
+  openExternalUrl: (url) => ipcRenderer.send('open-external-url', url),
+
+  // --- F3.B — Gmail reader (correos reales de Gmail) ---
+  googleGmail: {
+    listInbox: (options) => ipcRenderer.invoke('google-gmail:list-inbox', options),
+    getMessage: (messageId) => ipcRenderer.invoke('google-gmail:get-message', messageId),
+    markRead: (messageId) => ipcRenderer.invoke('google-gmail:mark-read', messageId),
+    // F4-fix — Para mostrar el email del usuario conectado en el switch de Config.
+    getProfile: () => ipcRenderer.invoke('google-gmail:get-profile'),
+    // F1.B — Enviar correo (Reply / Reply all / Forward / Nuevo).
+    sendMessage: (options) => ipcRenderer.invoke('google-gmail:send-message', options),
+    // F1-Feature1 — Listar labels de Gmail.
+    listLabels: () => ipcRenderer.invoke('google-gmail:list-labels'),
+    // F1-Feature3 — Marcar mensaje como leído/no leído en Gmail.
+    markMessageRead: (options) => ipcRenderer.invoke('google-gmail:mark-read', options),
+    // F1-Feature3 — Archivar thread en Gmail.
+    archiveThread: (options) => ipcRenderer.invoke('google-gmail:archive-thread', options),
+    // F1-Feature5 — Descargar attachment de Gmail.
+    downloadAttachment: (options) => ipcRenderer.invoke('google-gmail:download-attachment', options)
+  },
+
+  // 📦 Bandeja Integrada — Email cache (SQLite) — Fase 0
+  // Patrón Mail-0: driver que lee de SQLite instantáneo en vez de llamar al API cada vez.
+  emailCache: {
+    // Sincroniza el inbox desde Gmail al cache local
+    syncInbox: (options) => ipcRenderer.invoke('email-cache:sync-inbox', options),
+    // Lee los threads del cache (instantáneo, sin API call)
+    getThreads: (options) => ipcRenderer.invoke('email-cache:get-threads', options),
+    // Lee un thread completo con sus mensajes
+    getThread: (threadId) => ipcRenderer.invoke('email-cache:get-thread', threadId),
+    // Estadísticas (totales para el footer)
+    getStats: () => ipcRenderer.invoke('email-cache:get-stats'),
+    // F1-Feature1 — Obtener labels cacheados.
+    getLabels: (connectionId) => ipcRenderer.invoke('email-cache:get-labels', connectionId),
+    // F1-Feature5 — Obtener adjuntos de un mensaje específico.
+    getAttachments: (messageId) => ipcRenderer.invoke('email-cache:get-attachments', messageId)
+  },
+
   // --- New Document Viewer ---
   getDocumentFolders: async (payload) => {
     try {

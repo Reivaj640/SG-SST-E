@@ -1,0 +1,3298 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* ============================================
+   K+AIR DESIGN TOKENS (Sistema Visual Oficial)
+   ============================================ */
+:root {
+  --radius: 0.375rem;
+
+  /* ============================================
+     EMAIL DESIGN TOKENS (Gmail-style)
+     ============================================ */
+  --email-bg: #ffffff;
+  --email-bg-read: #f2f6fc;
+  --email-border: #e0e0e0;
+  --email-text-primary: #202124;
+  --email-text-secondary: #5f6368;
+  --email-accent: #1a73e8;
+  --email-row-height-min: 48px;
+  --email-row-padding-v: 12px;
+  --email-quote-border: #cccccc;
+
+  /* K+AIR Official Colors */
+  --kair-primary: #174ea6;
+  --kair-primary-hover: #185abd;
+  --kair-success: #28a745;
+  --kair-warning: #ffc107;
+  --kair-danger: #dc3545;
+  --kair-info: #6c757d;
+
+  /* K+AIR Backgrounds */
+  --kair-bg-app: #f8f9fa;
+  --kair-bg-card: #ffffff;
+  --kair-bg-hover: #f1f3f5;
+  --kair-bg-soft: #e8f0fe;
+  --kair-border: #dee2e6;
+  --kair-border-soft: #e9ecef;
+
+  /* K+AIR Text */
+  --kair-text-strong: #1a1a2e;
+  --kair-text-body: #3a3f51;
+  --kair-text-muted: #5a6378;
+  --kair-text-light: #8a92a6;
+
+  /* Shadow */
+  --kair-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --kair-shadow-pop: 0 4px 16px rgba(0, 0, 0, 0.08);
+
+  /* Spacing scale (4px base) */
+  --kair-space-1: 4px;
+  --kair-space-2: 8px;
+  --kair-space-3: 12px;
+  --kair-space-4: 16px;
+  --kair-space-5: 20px;
+  --kair-space-6: 24px;
+  --kair-space-8: 32px;
+
+  /* shadcn fallbacks (kept for components) */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: #174ea6;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f3f5;
+  --secondary-foreground: #1a1a2e;
+  --muted: #f8f9fa;
+  --muted-foreground: #5a6378;
+  --accent: #e8f0fe;
+  --accent-foreground: #174ea6;
+  --destructive: #dc3545;
+  --destructive-foreground: #ffffff;
+  --border: #dee2e6;
+  --input: #dee2e6;
+  --ring: #174ea6;
+  --chart-1: #174ea6;
+  --chart-2: #28a745;
+  --chart-3: #ffc107;
+  --chart-4: #dc3545;
+  --chart-5: #6c757d;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: #174ea6;
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: #e8f0fe;
+  --sidebar-accent-foreground: #174ea6;
+  --sidebar-border: #dee2e6;
+  --sidebar-ring: #174ea6;
+}
+
+* {
+  border-color: var(--kair-border);
+}
+
+html,
+body {
+  background: var(--kair-bg-app);
+  color: var(--kair-text-body);
+  font-family: "Segoe UI", "Roboto", "Inter", system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* F1.5 — Layout root (header sticky + main scrollable + footer fijo)
+   Sin estas reglas el position:sticky del .kair-header falla y el
+   header/footer desaparecen al hacer scroll dentro del iframe. */
+.kair-app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--kair-bg-app);
+}
+
+/* F4-fix — El iframe arranca DEBAJO del header de la app principal
+   (renderer.js posiciona el iframe con top: 45px). El header interno
+   del iframe se oculta para no duplicarlo. */
+.kair-header {
+  display: none !important;
+}
+
+/* F4-fix — Botón flotante "Volver" arriba a la izquierda del iframe.
+   Reemplaza al botón de volver que estaba en el header interno (ahora oculto).
+   Estilo similar al FAB de Google Keep / Material Design. */
+.kair-bandeja-fab-back {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: #ffffff;
+  border: 1px solid var(--kair-border, #e5e7eb);
+  border-radius: 999px;
+  color: var(--kair-text-body, #1f2937);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  transition: all 160ms ease;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+.kair-bandeja-fab-back:hover {
+  background: var(--kair-bg-hover, #f8fafc);
+  border-color: var(--kair-primary, #174ea6);
+  color: var(--kair-primary, #174ea6);
+  transform: translateX(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+.kair-bandeja-fab-back:active {
+  transform: translateX(0);
+}
+.kair-bandeja-fab-back svg {
+  flex-shrink: 0;
+}
+
+.kair-main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 12px 16px 0;
+  gap: 12px;
+  overflow: auto;
+}
+
+.kair-footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 8px 20px;
+  background: #ffffff;
+  border-top: 1px solid var(--kair-border);
+  font-size: 0.75rem;
+  color: var(--kair-text-light);
+}
+
+.kair-footer__left,
+.kair-footer__right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.kair-footer strong {
+  color: var(--kair-text-body);
+  font-weight: 600;
+}
+
+/* ============================================
+   K+AIR Header System v2.0 (BEM aislado)
+   ============================================ */
+.kair-header {
+  background: #ffffff;
+  border-bottom: 1px solid var(--kair-border);
+  /* F1.5-fix: position sticky con flex container en iframe es inestable.
+     Usamos relative + flex-shrink:0 para que el header SIEMPRE esté visible
+     arriba y NUNCA se comprima (independiente del scroll del main). */
+  position: relative;
+  flex-shrink: 0;
+  z-index: 30;
+  width: 100%;
+}
+
+.kair-header__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--kair-space-3);
+  min-height: 52px;
+  padding: 8px 20px;
+}
+
+.kair-header__left {
+  display: flex;
+  align-items: center;
+  gap: var(--kair-space-2);
+  flex-shrink: 0;
+}
+
+.kair-header__center {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.kair-header__right {
+  display: flex;
+  align-items: center;
+  gap: var(--kair-space-2);
+  flex-shrink: 0;
+}
+
+.kair-header__back {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--kair-text-muted);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease;
+}
+.kair-header__back:hover {
+  background: var(--kair-bg-soft);
+  color: var(--kair-primary);
+}
+
+.kair-header__title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--kair-text-strong);
+  line-height: 1.2;
+  margin: 0;
+}
+
+.kair-header__subtitle {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--kair-text-muted);
+  margin: 0;
+  line-height: 1.3;
+}
+
+.kair-header__breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.8125rem;
+  flex-wrap: wrap;
+}
+.kair-header__breadcrumb li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.kair-header__breadcrumb a {
+  color: var(--kair-text-muted);
+  text-decoration: none;
+  transition: color 160ms ease;
+}
+.kair-header__breadcrumb a:hover {
+  color: var(--kair-primary);
+}
+.kair-header__breadcrumb li:last-child a,
+.kair-header__breadcrumb li:last-child span {
+  color: var(--kair-text-strong);
+  font-weight: 500;
+}
+.kair-header__breadcrumb .sep {
+  color: var(--kair-text-light);
+  font-size: 0.7rem;
+}
+
+.kair-header__pill--section {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--kair-bg-soft);
+  color: var(--kair-primary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 999px;
+  letter-spacing: 0.01em;
+}
+
+.kair-header__action--primary,
+.kair-header__action--success,
+.kair-header__action--secondary,
+.kair-header__action--ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.kair-header__action--primary {
+  background: var(--kair-primary);
+  color: #fff;
+  border-color: var(--kair-primary);
+}
+.kair-header__action--primary:hover {
+  background: var(--kair-primary-hover);
+  border-color: var(--kair-primary-hover);
+}
+
+.kair-header__action--success {
+  background: var(--kair-success);
+  color: #fff;
+  border-color: var(--kair-success);
+}
+.kair-header__action--success:hover {
+  filter: brightness(0.95);
+}
+
+.kair-header__action--secondary {
+  background: transparent;
+  color: var(--kair-primary);
+  border-color: var(--kair-primary);
+}
+.kair-header__action--secondary:hover {
+  background: var(--kair-bg-soft);
+}
+
+.kair-header__action--ghost {
+  background: transparent;
+  color: var(--kair-text-muted);
+  border-color: transparent;
+}
+.kair-header__action--ghost:hover {
+  background: var(--kair-bg-hover);
+  color: var(--kair-text-strong);
+}
+
+/* F4-fix — Indicador Gmail (read-only) en el header. Muestra el estado de
+   conexión (verde/rojo) y el email del usuario. El switch de Conectar/Desconectar
+   está en Configuración > Gestión de Empresas. */
+.kair-header__indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #f8fafc;
+  border: 1px solid var(--kair-border, #e5e7eb);
+  font-size: 0.78rem;
+  color: var(--kair-text-muted);
+  cursor: default;
+  user-select: none;
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kair-header__indicator svg {
+  flex-shrink: 0;
+  color: var(--kair-text-muted);
+}
+.kair-header__indicator-text {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kair-header__indicator-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #94a3b8;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 0 rgba(148, 163, 184, 0.6);
+}
+.kair-header__indicator[data-connected="true"] {
+  background: #f0fdf4;
+  border-color: #86efac;
+  color: #15803d;
+}
+.kair-header__indicator[data-connected="true"] svg {
+  color: #15803d;
+}
+.kair-header__indicator[data-connected="true"] .kair-header__indicator-dot {
+  background: #16a34a;
+  box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.6);
+  animation: gmail-indicator-pulse 1.8s infinite;
+}
+.kair-header__indicator[data-connected="false"] {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+.kair-header__indicator[data-connected="false"] svg {
+  color: #b91c1c;
+}
+.kair-header__indicator[data-connected="false"] .kair-header__indicator-dot {
+  background: #dc2626;
+}
+@keyframes gmail-indicator-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.6); }
+  70% { box-shadow: 0 0 0 6px rgba(22, 163, 74, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
+}
+
+.kair-header__tabs {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: #fff;
+  border-top: 1px solid var(--kair-border-soft);
+  padding: 0 20px;
+  overflow-x: auto;
+}
+
+.kair-header__tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--kair-text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 160ms ease;
+}
+.kair-header__tab:hover {
+  color: var(--kair-text-strong);
+}
+.kair-header__tab[data-active="true"] {
+  color: var(--kair-primary);
+  font-weight: 600;
+}
+.kair-header__tab[data-active="true"]::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: -1px;
+  height: 2px;
+  background: var(--kair-primary);
+  border-radius: 2px 2px 0 0;
+}
+
+.kair-header__tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: var(--kair-bg-soft);
+  color: var(--kair-primary);
+  border-radius: 999px;
+}
+.kair-header__tab[data-active="true"] .kair-header__tab-badge {
+  background: var(--kair-primary);
+  color: #fff;
+}
+
+.kair-header__company {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  color: var(--kair-text-muted);
+  background: var(--kair-bg-app);
+  border: 1px solid var(--kair-border-soft);
+  border-radius: 6px;
+}
+.kair-header__company strong {
+  color: var(--kair-text-strong);
+  font-weight: 600;
+}
+
+.kair-header__context {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--kair-text-body);
+  background: #fff;
+  border: 1px solid var(--kair-border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+.kair-header__context:hover {
+  background: var(--kair-bg-hover);
+  border-color: var(--kair-text-light);
+}
+
+.kair-header__divider {
+  width: 1px;
+  height: 24px;
+  background: var(--kair-border);
+  margin: 0 4px;
+}
+
+/* ============================================
+   K+AIR KPI Strip Enterprise v1.0
+   ============================================ */
+.kair-kpi-strip {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  background: #fff;
+  border: 1px solid var(--kair-border);
+  border-radius: 10px;
+  padding: 16px 20px;
+  box-shadow: var(--kair-shadow-card);
+}
+
+.kair-kpi-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 20px;
+  flex: 1;
+  min-width: 0;
+}
+.kair-kpi-item:first-child {
+  padding-left: 0;
+}
+.kair-kpi-item:last-child {
+  padding-right: 0;
+}
+
+.kair-kpi-divider {
+  width: 1px;
+  background: var(--kair-border-soft);
+  align-self: stretch;
+}
+
+.kair-kpi__icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.kair-kpi__icon--blue { background: #e8f0fe; color: #174ea6; }
+.kair-kpi__icon--green { background: #e6f7ec; color: #28a745; }
+.kair-kpi__icon--yellow { background: #fff8e1; color: #b8860b; }
+.kair-kpi__icon--red { background: #fdeaea; color: #dc3545; }
+.kair-kpi__icon--gray { background: #eef0f3; color: #6c757d; }
+
+.kair-kpi__value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--kair-text-strong);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+.kair-kpi__label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--kair-text-muted);
+  font-weight: 600;
+}
+.kair-kpi__subdata {
+  font-size: 0.75rem;
+  color: var(--kair-text-light);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ============================================
+   K+AIR Cards & surfaces
+   ============================================ */
+.kair-card {
+  background: #fff;
+  border: 1px solid var(--kair-border);
+  border-radius: 10px;
+  box-shadow: var(--kair-shadow-card);
+}
+
+.kair-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--kair-border-soft);
+}
+.kair-card__title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--kair-text-strong);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.kair-card__body {
+  padding: 16px;
+}
+
+/* ============================================
+   K+AIR Email list — Gmail style
+   ============================================ */
+.kair-mail-row {
+  display: grid;
+  /* F1.A-refactor — Grid de 5 columnas: [check/dot] [avatar] [content] [date] [star] */
+  grid-template-columns: 24px 40px 1fr 90px 24px;
+  align-items: center;
+  gap: 14px;
+  min-height: var(--email-row-height-min, 48px);
+  padding: var(--email-row-padding-v, 12px) 16px;
+  border-bottom: 1px solid var(--kair-border-soft);
+  cursor: pointer;
+  transition: background 120ms ease, box-shadow 120ms ease;
+  position: relative;
+  background: #fff;
+}
+.kair-mail-row[data-unread="false"] {
+  background: var(--email-bg-read, #f2f6fc);
+}
+.kair-mail-row:hover {
+  background: var(--email-bg, #ffffff);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  z-index: 1;
+}
+.kair-mail-row[data-selected="true"] {
+  background: #c2dbff;
+  box-shadow: inset 3px 0 0 var(--email-accent, #1a73e8);
+}
+.kair-mail-row[data-unread="true"] .kair-mail-row__sender,
+.kair-mail-row[data-unread="true"] .kair-mail-row__subject {
+  font-weight: 700;
+  color: var(--kair-text-strong);
+}
+/* F1.A — Dot azul de "no leído" estilo Gmail. Reemplaza el check cuando no leído. */
+.kair-mail-row__unread-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--kair-primary, #174ea6);
+  display: none;
+  align-self: center;
+  justify-self: center;
+  flex-shrink: 0;
+}
+.kair-mail-row[data-unread="true"] .kair-mail-row__unread-dot {
+  display: block;
+}
+.kair-mail-row[data-unread="true"] .kair-mail-row__check {
+  display: none;
+}
+
+.kair-mail-row__check {
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--kair-text-light);
+  border-radius: 3px;
+  background: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.kair-mail-row__check:hover {
+  border-color: var(--kair-primary);
+}
+.kair-mail-row__check[data-checked="true"] {
+  background: var(--kair-primary);
+  border-color: var(--kair-primary);
+}
+.kair-mail-row__check[data-checked="true"]::after {
+  content: "✓";
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.kair-mail-row__star {
+  cursor: pointer;
+  color: var(--kair-text-light);
+  transition: color 120ms ease, transform 120ms ease;
+}
+.kair-mail-row__star:hover {
+  transform: scale(1.15);
+}
+.kair-mail-row__star[data-active="true"] {
+  color: var(--kair-warning);
+}
+
+.kair-mail-row__avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+
+/* ============================================
+   📧 Componente 1: Email row (.email-row) — BEM-style Gmail
+   Estados: unread / read / hover / selected.
+   Respeta --email-row-height-min (48px) y --email-row-padding-v (12px).
+   ============================================ */
+.email-row {
+  display: grid;
+  grid-template-columns: 24px 40px 1fr 90px 24px;
+  align-items: center;
+  gap: 14px;
+  min-height: var(--email-row-height-min);
+  padding: var(--email-row-padding-v) 16px;
+  border-bottom: 1px solid var(--email-border);
+  cursor: pointer;
+  background: var(--email-bg);
+  position: relative;
+  transition: background 120ms ease, box-shadow 120ms ease;
+}
+.email-row[data-unread="true"] {
+  background: var(--email-bg);
+}
+.email-row[data-unread="false"] {
+  background: var(--email-bg-read);
+}
+.email-row:hover {
+  background: var(--email-bg);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  z-index: 1;
+}
+.email-row[data-selected="true"] {
+  background: #c2dbff;
+  box-shadow: inset 3px 0 0 var(--email-accent);
+}
+.email-row__check,
+.email-row__unread-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+.email-row__unread-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--email-accent);
+}
+.email-row[data-unread="true"] .email-row__unread-dot {
+  display: block;
+}
+.email-row[data-unread="true"] .email-row__check {
+  display: none;
+}
+.email-row[data-unread="false"] .email-row__unread-dot {
+  display: none;
+}
+.email-row__avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+.email-row__content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+.email-row__sender {
+  font-size: 0.875rem;
+  color: var(--email-text-primary);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.email-row[data-unread="true"] .email-row__sender {
+  font-weight: 700;
+}
+.email-row__subject-preview {
+  font-size: 0.8125rem;
+  color: var(--email-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.email-row__meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: var(--email-text-secondary);
+}
+.email-row__date {
+  white-space: nowrap;
+}
+.email-row__star {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--email-text-secondary);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.email-row:hover .email-row__star {
+  opacity: 1;
+}
+.email-row__star[data-active="true"] {
+  opacity: 1;
+  color: var(--kair-warning, #ffc107);
+}
+
+.kair-mail-row__sender {
+  font-size: 0.8125rem;
+  color: var(--kair-text-body);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kair-mail-row__subject {
+  font-size: 0.8125rem;
+  color: var(--kair-text-body);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.kair-mail-row__subject-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+/* F1-Feature6 — Badge de cantidad de mensajes en el hilo (Gmail-style) */
+.kair-mail-row__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  margin-right: 6px;
+  background: var(--email-bg-read, #f2f6fc);
+  color: var(--email-text-secondary, #5f6368);
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.kair-mail-row__preview {
+  font-size: 0.75rem;
+  color: var(--kair-text-light);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kair-mail-row__time {
+  font-size: 0.7rem;
+  color: var(--kair-text-light);
+  text-align: right;
+  transition: opacity 120ms ease;
+}
+/* Cuando se hace hover en la fila, los iconos de acción aparecen
+   (position absolute right: 14px) y la fecha debe ocultarse para
+   que no quede duplicada detrás. */
+.kair-mail-row:hover .kair-mail-row__time {
+  opacity: 0;
+}
+.kair-mail-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+/* F1.A — Hover actions estilo Gmail. Aparecen solo al pasar el mouse. */
+.kair-mail-row__hover-actions {
+  display: none;
+  gap: 2px;
+  align-items: center;
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: linear-gradient(to right, transparent, var(--kair-bg-hover, #f1f3f5) 30%, var(--kair-bg-hover, #f1f3f5) 100%);
+  padding-left: 20px;
+  height: 100%;
+}
+.kair-mail-row:hover .kair-mail-row__hover-actions {
+  display: flex;
+}
+.kair-mail-row__hover-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--kair-text-light, #5f6368);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 120ms ease, color 120ms ease;
+}
+.kair-mail-row__hover-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--kair-text-strong, #202124);
+}
+.kair-mail-row__hover-btn[data-active="true"] {
+  color: var(--kair-warning, #ffc107);
+}
+
+.kair-mail-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.kair-mail-tag--meeting { background: #e8f0fe; color: #174ea6; }
+.kair-mail-tag--urgent { background: #fdeaea; color: #dc3545; }
+
+/* ============================================
+   K+AIR Toolbar del Calendario
+   ============================================ */
+.kair-cal-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--kair-border-soft);
+  background: #fff;
+  flex-wrap: wrap;
+}
+
+.kair-cal-toolbar__create {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: var(--kair-success);
+  color: #fff;
+  border: 1px solid var(--kair-success);
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 160ms ease;
+  box-shadow: 0 1px 2px rgba(40, 167, 69, 0.2);
+}
+.kair-cal-toolbar__create:hover {
+  filter: brightness(0.95);
+}
+
+.kair-cal-toolbar__nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.kair-cal-toolbar__month-label {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--kair-text-strong);
+  min-width: 130px;
+  text-align: center;
+}
+
+.kair-cal-toolbar__views {
+  display: inline-flex;
+  align-items: center;
+  background: var(--kair-bg-app);
+  border: 1px solid var(--kair-border-soft);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.kair-cal-toolbar__view {
+  padding: 5px 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--kair-text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+  white-space: nowrap;
+}
+.kair-cal-toolbar__view:hover {
+  color: var(--kair-text-strong);
+}
+.kair-cal-toolbar__view[data-active="true"] {
+  background: #fff;
+  color: var(--kair-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+/* ============================================
+   K+AIR Sidebar (Mini Calendario + Leyenda)
+   ============================================ */
+.kair-cal-sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--kair-border);
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.kair-mini-cal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 6px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--kair-text-strong);
+}
+
+.kair-mini-cal__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  padding: 0 8px 10px;
+}
+
+.kair-mini-cal__weekday {
+  text-align: center;
+  font-size: 0.6rem;
+  color: var(--kair-text-light);
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 4px 0;
+}
+
+.kair-mini-cal__day {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: var(--kair-text-body);
+  cursor: pointer;
+  border-radius: 999px;
+  transition: background 120ms ease, color 120ms ease, box-shadow 120ms ease;
+  position: relative;
+  font-weight: 500;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 2px;
+}
+.kair-mini-cal__day:hover {
+  background: var(--kair-bg-hover);
+}
+.kair-mini-cal__day[data-out="true"] {
+  color: #cbd5e1;
+  opacity: 0.6;
+}
+.kair-mini-cal__day[data-out="true"]:hover {
+  opacity: 0.9;
+}
+.kair-mini-cal__day[data-today="true"] {
+  background: var(--kair-primary, #174ea6);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 0 0 2px rgba(23, 78, 166, 0.18);
+}
+.kair-mini-cal__day[data-selected="true"] {
+  background: #dbeafe;
+  color: var(--kair-primary, #174ea6);
+  font-weight: 700;
+}
+.kair-mini-cal__day[data-today="true"][data-selected="true"] {
+  /* Combinado: today + selected = sigue siendo today (azul oscuro) */
+  background: var(--kair-primary, #174ea6);
+  color: #fff;
+}
+.kair-mini-cal__day[data-has-events="true"]::after {
+  content: "";
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--event-color, var(--kair-primary, #174ea6));
+  box-shadow: 0 0 0 1.5px #fff, 0 0 0 2.5px rgba(0, 0, 0, 0.06);
+}
+.kair-mini-cal__day[data-today="true"][data-has-events="true"]::after {
+  /* Puntito blanco sobre fondo azul oscuro del today */
+  background: #fff;
+  box-shadow: 0 0 0 1.5px var(--kair-primary, #174ea6);
+}
+/* F4 — Modal de detalle/crear/editar evento (K+AIR Bandeja Integrada) */
+.kair-event-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 300000;  /* por encima del iframe del calendario viejo (200000) */
+  padding: 20px;
+}
+
+.kair-event-modal {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  max-width: 480px;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.kair-event-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--kair-border-soft);
+  background: var(--kair-bg-soft, #f8fafc);
+  gap: 12px;
+}
+.kair-event-modal__header[style*="border-left"] {
+  /* Cuando tiene border-left inline (categoría), ajustar padding */
+  padding-left: 12px;
+}
+
+.kair-event-modal__category {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.kair-event-modal__close {
+  background: transparent;
+  border: 0;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--kair-text-muted);
+  cursor: pointer;
+  padding: 0 6px;
+  border-radius: 4px;
+}
+.kair-event-modal__close:hover {
+  background: var(--kair-bg-hover, #f1f5f9);
+  color: var(--kair-text-body);
+}
+
+.kair-event-modal__body {
+  padding: 16px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.kair-event-modal__title {
+  margin: 0 0 12px;
+  font-size: 1.1rem;
+  color: var(--kair-text-strong);
+  font-weight: 600;
+}
+
+.kair-event-modal__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+  color: var(--kair-text-body);
+}
+.kair-event-modal__meta-row {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+.kair-event-modal__meta-row strong {
+  color: var(--kair-text-muted);
+  font-weight: 600;
+  min-width: 110px;
+  flex-shrink: 0;
+}
+
+.kair-event-modal__description {
+  padding: 10px 12px;
+  background: var(--kair-bg-soft, #f8fafc);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  color: var(--kair-text-body);
+}
+
+.kair-event-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.kair-event-modal__field > span {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--kair-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.kair-event-modal__field input,
+.kair-event-modal__field textarea,
+.kair-event-modal__field select {
+  padding: 8px 10px;
+  border: 1px solid var(--kair-border);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-family: inherit;
+  color: var(--kair-text-body);
+  background: #fff;
+  outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.kair-event-modal__field input:focus,
+.kair-event-modal__field textarea:focus,
+.kair-event-modal__field select:focus {
+  border-color: var(--kair-primary, #174ea6);
+  box-shadow: 0 0 0 2px rgba(23, 78, 166, 0.12);
+}
+
+.kair-event-modal__row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 8px;
+}
+@media (max-width: 480px) {
+  .kair-event-modal__row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.kair-event-modal__actions {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--kair-border-soft);
+  background: var(--kair-bg-soft, #f8fafc);
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.kair-event-modal__btn {
+  padding: 7px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--kair-border);
+  background: #fff;
+  color: var(--kair-text-body);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+.kair-event-modal__btn:hover {
+  background: var(--kair-bg-hover, #f1f5f9);
+}
+
+.kair-event-modal__btn--primary {
+  background: var(--kair-primary, #174ea6);
+  color: #fff;
+  border-color: var(--kair-primary, #174ea6);
+}
+.kair-event-modal__btn--primary:hover {
+  background: #154a8a;
+  border-color: #154a8a;
+}
+
+.kair-event-modal__btn--danger {
+  color: #dc3545;
+  border-color: #f5c2c7;
+  background: #fff;
+}
+.kair-event-modal__btn--danger:hover {
+  background: #fdeaea;
+  border-color: #dc3545;
+}
+
+.kair-event-modal__btn--secondary {
+  color: var(--kair-text-muted);
+  background: transparent;
+}
+#btn-gmail[data-connected="true"] {
+  color: #15803d;
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+#btn-gmail[data-connected="true"]:hover {
+  background: #dcfce7;
+  border-color: #4ade80;
+}
+/* F4-fix: restaurar regla removida por edit anterior */
+.kair-mini-cal__day[data-today="true"][data-has-events="true"]::after {
+  background: var(--kair-primary, #174ea6);
+}
+
+.kair-legend {
+  padding: 12px;
+  border-top: 1px solid var(--kair-border-soft);
+}
+
+.kair-legend__title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--kair-text-strong);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.kair-legend__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 0.75rem;
+  color: var(--kair-text-body);
+  cursor: pointer;
+  transition: opacity 120ms ease;
+  background: transparent;
+  border: 0;
+  width: 100%;
+  text-align: left;
+}
+.kair-legend__item:hover {
+  opacity: 0.7;
+}
+.kair-legend__item[data-active="false"] {
+  opacity: 0.4;
+  text-decoration: line-through;
+}
+.kair-legend__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+/* ============================================
+   K+AIR Vista Mensual
+   ============================================ */
+.kair-month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  background: var(--kair-border-soft);
+  gap: 1px;
+  flex: 1;
+  min-height: 0;
+}
+
+.kair-month-weekday {
+  background: #fafbfc;
+  padding: 8px 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--kair-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: left;
+  border-bottom: 1px solid var(--kair-border-soft);
+}
+
+.kair-month-cell {
+  background: #fff;
+  padding: 4px 6px;
+  min-height: 100px;
+  cursor: pointer;
+  transition: background 120ms ease;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: relative;
+  overflow: hidden;
+}
+.kair-month-cell:hover {
+  background: #fafbfc;
+}
+.kair-month-cell[data-out="true"] {
+  background: #fbfbfc;
+}
+.kair-month-cell[data-out="true"] .kair-month-cell__day {
+  color: var(--kair-text-light);
+  opacity: 0.5;
+}
+.kair-month-cell[data-today="true"] {
+  background: var(--kair-bg-soft);
+}
+.kair-month-cell[data-droppable="true"]:hover {
+  background: var(--kair-bg-soft);
+}
+.kair-month-cell[data-drop-active="true"] {
+  background: var(--kair-bg-soft);
+  outline: 2px dashed var(--kair-primary);
+  outline-offset: -2px;
+}
+
+.kair-month-cell__day {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--kair-text-body);
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.kair-month-cell[data-today="true"] .kair-month-cell__day {
+  background: var(--kair-primary);
+  color: #fff;
+}
+
+.kair-month-event {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--kair-text-body);
+  cursor: pointer;
+  transition: filter 120ms ease, transform 80ms ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-left: 2px solid transparent;
+}
+.kair-month-event:hover {
+  filter: brightness(0.96);
+  transform: translateX(1px);
+}
+.kair-month-event__title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kair-month-event__more {
+  font-size: 0.65rem;
+  color: var(--kair-text-muted);
+  font-weight: 600;
+  padding: 1px 5px;
+  cursor: pointer;
+}
+.kair-month-event__more:hover {
+  color: var(--kair-primary);
+}
+
+/* ============================================
+   K+AIR Footer del Calendario
+   ============================================ */
+.kair-cal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-top: 1px solid var(--kair-border-soft);
+  background: #fafbfc;
+  font-size: 0.7rem;
+  color: var(--kair-text-light);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.kair-cal-footer__hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.kair-cal-footer__counter {
+  color: var(--kair-text-muted);
+  font-weight: 600;
+}
+
+/* ============================================
+   K+AIR Toggle "Todas las empresas"
+   ============================================ */
+.kair-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--kair-text-body);
+  cursor: pointer;
+  user-select: none;
+  font-weight: 500;
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
+/* F4 — Track del switch (estilo iOS moderno) */
+.kair-toggle__track {
+  width: 36px;
+  height: 20px;
+  background: #cbd5e1;
+  border-radius: 999px;
+  position: relative;
+  transition: background 220ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 220ms ease;
+  flex-shrink: 0;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.kair-toggle__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 999px;
+  transition: transform 220ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 220ms ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.kair-toggle[data-on="true"] .kair-toggle__track {
+  background: #16a34a;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 0 2px rgba(22, 163, 74, 0.12);
+}
+.kair-toggle[data-on="true"] .kair-toggle__thumb {
+  transform: translateX(16px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(22, 163, 74, 0.3);
+}
+
+.kair-toggle:hover .kair-toggle__thumb {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+.kair-toggle__label {
+  white-space: nowrap;
+}
+
+/* ============================================
+   K+AIR Búsqueda integrada en header
+   ============================================ */
+.kair-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: var(--kair-bg-app);
+  border: 1px solid var(--kair-border-soft);
+  border-radius: 6px;
+  width: 220px;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+.kair-search:focus-within {
+  border-color: var(--kair-primary);
+  background: #fff;
+}
+.kair-search input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 0.75rem;
+  color: var(--kair-text-body);
+  flex: 1;
+  min-width: 0;
+}
+.kair-search input::placeholder {
+  color: var(--kair-text-light);
+}
+
+/* ============================================
+   K+AIR Botón de flecha entre sidebar y área de contenido
+   ============================================ */
+.kair-panel-toggle {
+  position: relative;
+  width: 22px;
+  align-self: stretch;
+  background: #fff;
+  border: 1px solid var(--kair-border);
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--kair-text-muted);
+  transition: background 160ms ease, color 160ms ease;
+  z-index: 5;
+  flex-shrink: 0;
+  margin-left: -1px;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.02);
+}
+.kair-panel-toggle:hover {
+  background: var(--kair-bg-soft);
+  color: var(--kair-primary);
+}
+.kair-panel-toggle:active {
+  background: var(--kair-bg-hover);
+}
+.kair-panel-toggle__icon {
+  transition: transform 240ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+/* data-calendar-visible="false" (default, correo visible): flecha apunta a la derecha (→)
+   indicando "abrir calendario".
+   data-calendar-visible="true" (calendario visible): flecha rota 180° apunta a la izquierda (←)
+   indicando "cerrar calendario". */
+.kair-panel-toggle[data-calendar-visible="true"] .kair-panel-toggle__icon {
+  transform: rotate(180deg);
+}
+
+/* ============================================
+   K+AIR Layout principal — sidebar + flecha + área de contenido
+   El correo SIEMPRE está visible (es la base).
+   El calendario grande es un OVERLAY que se desliza desde la izquierda
+   cubriendo el correo cuando se activa.
+   ============================================ */
+.kair-layout {
+  display: grid;
+  grid-template-columns: 240px 22px 1fr;
+  gap: 0;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+@media (max-width: 1280px) {
+  .kair-layout {
+    grid-template-columns: 220px 22px 1fr;
+  }
+}
+
+@media (max-width: 1024px) {
+  .kair-layout {
+    grid-template-columns: 22px 1fr;
+  }
+  .kair-layout .kair-sidebar {
+    display: none;
+  }
+}
+
+/* Área de contenido: contiene el correo (base) + calendario (overlay deslizante) */
+.kair-content-area {
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+  background: #fff;
+  border: 1px solid var(--kair-border);
+  border-left: none;
+  border-radius: 0 10px 10px 0;
+}
+
+/* Correo: base layer (lista + detalle Gmail) */
+.kair-mail-stack {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  height: 100%;
+  gap: 0;
+  transition: opacity 240ms ease;
+}
+
+@media (max-width: 1280px) {
+  .kair-mail-stack {
+    grid-template-columns: 300px 1fr;
+  }
+}
+
+.kair-mail-stack__list {
+  border-right: 1px solid var(--kair-border-soft);
+  overflow: hidden;
+  min-height: 0;
+}
+
+.kair-mail-stack__detail {
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* Cuando el calendario está visible, atenuamos el correo underneath (sigue renderizado) */
+.kair-content-area[data-calendar-visible="true"] .kair-mail-stack {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+/* Calendario: overlay deslizante que entra desde la izquierda */
+.kair-calendar-slide {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  /* Hidden state: desplazado 100% hacia la izquierda (fuera del viewport) */
+  transform: translateX(-100%);
+  /* Animación suave: 320ms con easing Material Design */
+  transition: transform 320ms cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 320ms ease;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  /* Sin sombra cuando está oculto */
+  box-shadow: none;
+  pointer-events: none;
+}
+
+/* Visible state: se desliza a su posición (translateX(0)) y muestra sombra */
+.kair-calendar-slide[data-visible="true"] {
+  transform: translateX(0);
+  box-shadow: 4px 0 16px rgba(0, 0, 0, 0.08);
+  pointer-events: auto;
+}
+
+/* Animación de los paneles (legacy, se mantiene para compatibilidad) */
+.kair-layout__panel {
+  transition: opacity 200ms ease;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ============================================
+   K+AIR Toggle de vista (Calendar ↔ Mail)
+   ============================================ */
+.kair-view-toggle {
+  display: inline-flex;
+  align-items: center;
+  background: var(--kair-bg-app);
+  border: 1px solid var(--kair-border-soft);
+  border-radius: 8px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.kair-view-toggle__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--kair-text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, box-shadow 120ms ease;
+  white-space: nowrap;
+}
+.kair-view-toggle__btn:hover {
+  color: var(--kair-text-strong);
+}
+.kair-view-toggle__btn[data-active="true"] {
+  background: #fff;
+  color: var(--kair-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* ============================================
+   K+AIR Mail Detail — Gmail reading pane
+   ============================================ */
+.kair-mail-detail {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #fff;
+  overflow: hidden;
+}
+
+.kair-mail-detail__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--kair-border-soft);
+  background: #fafbfc;
+  flex-wrap: wrap;
+}
+
+.kair-mail-detail__toolbar-label {
+  font-size: 0.7rem;
+  color: var(--kair-text-muted);
+  margin-right: 4px;
+}
+
+.kair-mail-detail__header {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--kair-border-soft);
+  background: #fff;
+}
+
+.kair-mail-detail__subject {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--kair-text-strong);
+  margin: 0 0 14px;
+  line-height: 1.3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  letter-spacing: -0.018em;
+}
+
+/* FIX 2026-07-18 — Label de carpeta (Recibidos/Enviados) como chip removable (estilo Gmail) */
+.kair-mail-detail__folder-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px 2px 10px;
+  background: var(--email-bg-soft, #e8f0fe);
+  color: var(--email-accent, #1a73e8);
+  border: 1px solid rgba(26, 115, 232, 0.2);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.kair-mail-detail__folder-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  color: var(--email-accent, #1a73e8);
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 120ms ease;
+}
+.kair-mail-detail__folder-remove:hover {
+  background: rgba(26, 115, 232, 0.15);
+}
+
+.kair-mail-detail__tags {
+  display: inline-flex;
+
+/* ============================================
+   📧 Componente 2: Thread header (.thread-header)
+   BEM-style. Recipients colapsables con <details>/<summary>.
+   ============================================ */
+.thread-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--email-border, #e0e0e0);
+  background: #fff;
+}
+.thread-header__avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+.thread-header__main {
+  flex: 1;
+  min-width: 0;
+}
+.thread-header__sender-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.thread-header__sender-name {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: var(--email-text-primary, #202124);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.thread-header__sender-email {
+  font-size: 0.875rem;
+  color: var(--email-text-secondary, #5f6368);
+  font-weight: 400;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.thread-header__recipients {
+  font-size: 0.8125rem;
+  color: var(--email-text-secondary, #5f6368);
+  margin-bottom: 4px;
+}
+.thread-header__recipients summary {
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.thread-header__recipients summary::-webkit-details-marker {
+  display: none;
+}
+.thread-header__recipients summary::before {
+  content: "▾";
+  font-size: 0.7rem;
+  transition: transform 120ms ease;
+}
+.thread-header__recipients[open] summary::before {
+  transform: rotate(180deg);
+}
+.thread-header__recipients-full {
+  margin-top: 6px;
+  padding: 8px 12px;
+  background: var(--email-bg-read, #f2f6fc);
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+.thread-header__recipients-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+.thread-header__recipients-label {
+  font-weight: 600;
+  color: var(--email-text-secondary, #5f6368);
+  min-width: 32px;
+}
+.thread-header__recipients-value {
+  color: var(--email-text-primary, #202124);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.thread-header__meta {
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+  text-align: right;
+  min-width: 110px;
+}
+.thread-header__date-full {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--email-text-primary, #202124);
+  white-space: nowrap;
+}
+.thread-header__date-time {
+  font-size: 0.75rem;
+  color: var(--email-text-secondary, #5f6368);
+}
+.thread-header__action-icons {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+/* ============================================
+   📧 Componente 3: Quoted thread (.quoted-thread)
+   Cada mensaje del thread se renderiza como .message-block.
+   Solo el último viene expanded por default.
+   ============================================ */
+.quoted-thread {
+  padding: 0;
+}
+.message-block {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--email-border, #e0e0e0);
+  cursor: pointer;
+}
+.message-block:last-child {
+  border-bottom: none;
+}
+.message-block--expanded {
+  cursor: default;
+}
+.message-block__summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 32px;
+}
+.message-block__summary-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+.message-block__summary-info {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.message-block__summary-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--email-text-primary, #202124);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.message-block__summary-snippet {
+  font-size: 0.8125rem;
+  color: var(--email-text-secondary, #5f6368);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+.message-block__summary-date {
+  font-size: 0.75rem;
+  color: var(--email-text-secondary, #5f6368);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.message-block__full {
+  display: none;
+  margin-top: 12px;
+  padding-left: 44px;
+}
+.message-block--expanded .message-block__full {
+  display: block;
+}
+.message-block__full-meta {
+  font-size: 0.75rem;
+  color: var(--email-text-secondary, #5f6368);
+  margin-bottom: 8px;
+}
+.message-block__full-body {
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: var(--email-text-primary, #202124);
+  white-space: normal;
+  word-wrap: break-word;
+}
+.message-block__full-body a {
+  color: var(--email-accent, #1a73e8);
+  text-decoration: underline;
+}
+.message-block__full-body blockquote {
+  margin: 12px 0 12px 8px;
+  padding: 4px 12px;
+  border-left: 2px solid var(--email-quote-border, #cccccc);
+  color: var(--email-text-secondary, #5f6368);
+  font-size: 0.85em;
+}
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.kair-mail-detail__sender-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.kair-mail-detail__avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.kair-mail-detail__sender-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.kair-mail-detail__sender-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--kair-text-strong);
+  margin: 0;
+}
+
+.kair-mail-detail__sender-email {
+  font-size: 0.75rem;
+  color: var(--kair-text-muted);
+  margin: 1px 0 0;
+}
+
+.kair-mail-detail__recipient {
+  font-size: 0.7rem;
+  color: var(--kair-text-light);
+  margin-top: 4px;
+}
+
+.kair-mail-detail__time {
+  font-size: 0.75rem;
+  color: var(--kair-text-muted);
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.kair-mail-detail__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: var(--kair-text-body);
+  white-space: normal;
+  min-height: 0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+/* F1.A-fix2 — Links dentro del body del correo. Color primario + underline. */
+.kair-mail-detail__body a.kair-mail-link {
+  color: var(--kair-primary, #174ea6);
+  text-decoration: underline;
+  word-break: break-all;
+}
+.kair-mail-detail__body a.kair-mail-link:hover {
+  color: var(--kair-primary-hover, #185abd);
+  text-decoration: none;
+}
+/* F1.A-fix2 — Quoted text (líneas con ">"). Bloque colapsable con <details> HTML5.
+   Por default colapsado, el user clickea "..." para expandir (estilo Gmail). */
+.kair-mail-quote {
+  margin: 12px 0;
+  border-left: 3px solid var(--kair-border, #dee2e6);
+  color: var(--kair-text-muted, #5f6368);
+  font-size: 0.85em;
+  background: var(--kair-bg-app, #f8f9fa);
+  border-radius: 0 4px 4px 0;
+}
+.kair-mail-quote summary {
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+  color: var(--kair-primary, #174ea6);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  list-style: none;
+}
+.kair-mail-quote summary:hover {
+  background: var(--kair-bg-hover, #f1f3f5);
+}
+.kair-mail-quote summary::-webkit-details-marker {
+  display: none;
+}
+.kair-mail-quote__content {
+  padding: 0 12px 8px 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ============================================
+   F1.B + BEM — Compose panel (.compose-panel)
+   Estilo Gmail: overlay oscuro + modal centrado,
+   con estado minimizable anclado a la esquina inferior derecha.
+   ============================================ */
+.compose-panel-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 400000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  /* Al minimizar, ocultamos el overlay completamente */
+  transition: opacity 160ms ease, visibility 160ms ease;
+}
+.compose-panel {
+  background: #fff;
+  border-radius: 8px;
+  width: 100%;
+  max-width: 640px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  transition: max-height 200ms ease, box-shadow 200ms ease;
+}
+
+/* ---------- Estado MINIMIZADO (Gmail-style bottom-right) ---------- */
+.compose-panel--minimized + .compose-panel-overlay,
+.compose-panel-overlay:has(.compose-panel--minimized) {
+  /* El overlay se vuelve invisible cuando el panel está minimizado */
+  background: transparent;
+  pointer-events: none;
+}
+.compose-panel--minimized {
+  position: fixed;
+  bottom: 0;
+  right: 24px;
+  width: 320px;
+  max-width: 320px;
+  max-height: 48px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  border-radius: 8px 8px 0 0;
+}
+.compose-panel--minimized .compose-panel__body,
+.compose-panel--minimized .compose-panel__toolbar,
+.compose-panel--minimized .compose-panel__footer {
+  display: none;
+}
+.compose-panel--minimized .compose-panel__titlebar {
+  border-bottom: none;
+  cursor: pointer;
+}
+.compose-panel--minimized .compose-panel__btn--minimize {
+  display: none;
+}
+.compose-panel--minimized .compose-panel__btn--maximize {
+  display: inline-flex;
+}
+
+/* ---------- Titlebar ---------- */
+.compose-panel__titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--email-border);
+  background: #404040;
+  color: #fff;
+}
+.compose-panel__title {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60%;
+}
+.compose-panel__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.compose-panel__btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.85);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 120ms ease, color 120ms ease;
+}
+.compose-panel__btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+.compose-panel__btn--maximize {
+  display: none;
+}
+
+/* ---------- Body / fields ---------- */
+.compose-panel__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 20px;
+}
+.compose-panel__field {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--email-border);
+  padding: 8px 0;
+  gap: 12px;
+}
+.compose-panel__field--body {
+  border-bottom: none;
+  flex: 1;
+  min-height: 200px;
+  padding: 12px 0;
+  align-items: flex-start;
+}
+.compose-panel__field label {
+  width: 60px;
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  color: var(--email-text-secondary);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.compose-panel__input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 0.875rem;
+  color: var(--email-text-primary);
+  padding: 6px 0;
+  background: transparent;
+  font-family: inherit;
+}
+.compose-panel__input:focus {
+  outline: none;
+}
+.compose-panel__textarea {
+  flex: 1;
+  width: 100%;
+  border: none;
+  outline: none;
+  font-size: 0.875rem;
+  color: var(--email-text-primary);
+  resize: vertical;
+  min-height: 120px;
+  padding: 6px 0;
+  background: transparent;
+  font-family: inherit;
+  line-height: 1.5;
+}
+.compose-panel__textarea:focus {
+  outline: none;
+}
+
+/* ---------- Quote del mensaje citado (estilo Gmail) ----------
+   Aparece ARRIBA del textarea cuando es reply/replyAll/forward.
+   Se renderiza como bloque visual (NO texto plano en el body).
+   Al enviar, el contenido se concatena en formato estándar al body. */
+.compose-panel__quote {
+  background: #f8f9fa;
+  border-left: 3px solid var(--email-accent);
+  border-radius: 4px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  font-size: 0.8125rem;
+  color: var(--email-text-secondary);
+  max-height: 160px;
+  overflow-y: auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+.compose-panel__quote-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.compose-panel__quote-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.compose-panel__quote-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.compose-panel__quote-sender {
+  font-weight: 600;
+  color: var(--email-text-primary);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.compose-panel__quote-email {
+  font-weight: 400;
+  color: var(--email-text-secondary);
+  font-size: 0.75rem;
+}
+.compose-panel__quote-date {
+  font-size: 0.7rem;
+  color: var(--email-text-secondary);
+}
+.compose-panel__quote-body {
+  margin: 0;
+  padding: 0 0 0 8px;
+  color: var(--email-text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* ---------- Toolbar inferior (iconos) ---------- */
+.compose-panel__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--email-border);
+  background: #fafbfc;
+}
+.compose-panel__toolbar__btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--email-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 120ms ease, color 120ms ease;
+}
+.compose-panel__toolbar__btn:hover:not(:disabled) {
+  background: var(--kair-bg-hover, #f1f3f5);
+  color: var(--email-text-primary);
+}
+.compose-panel__toolbar__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.compose-panel__toolbar__sep {
+  width: 1px;
+  height: 20px;
+  background: var(--email-border);
+  margin: 0 4px;
+}
+
+/* ---------- Footer / send row ---------- */
+.compose-panel__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--email-border);
+  background: #f8f9fa;
+}
+.compose-panel__hint {
+  font-size: 0.7rem;
+  color: var(--email-text-secondary);
+}
+
+/* ============================================
+   F1-Feature4 — Modal de firma (.kair-signature-modal)
+   Mini modal para editar la firma de correo.
+   Se guarda en localStorage["kair.emailSignature"].
+   ============================================ */
+.kair-signature-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 450000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.kair-signature-modal {
+  background: #fff;
+  border-radius: 8px;
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+.kair-signature-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--email-border);
+  background: #404040;
+  color: #fff;
+}
+.kair-signature-modal__header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.kair-signature-modal__close {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.85);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 120ms ease, color 120ms ease;
+}
+.kair-signature-modal__close:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+.kair-signature-modal__body {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.kair-signature-modal__hint {
+  font-size: 0.75rem;
+  color: var(--email-text-secondary);
+  margin: 0 0 4px 0;
+  line-height: 1.4;
+}
+.kair-signature-modal__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--email-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.kair-signature-modal__textarea {
+  width: 100%;
+  border: 1px solid var(--email-border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-size: 0.875rem;
+  font-family: inherit;
+  color: var(--email-text-primary);
+  resize: vertical;
+  min-height: 120px;
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+.kair-signature-modal__textarea:focus {
+  outline: none;
+  border-color: var(--email-accent);
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.15);
+}
+.kair-signature-modal__preview-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--email-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 8px 0 0 0;
+}
+.kair-signature-modal__preview {
+  background: #f8f9fa;
+  border: 1px solid var(--email-border);
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-size: 0.8125rem;
+  color: var(--email-text-primary);
+  line-height: 1.5;
+  min-height: 60px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+.kair-signature-modal__footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--email-border);
+  background: #f8f9fa;
+}
+.kair-signature-modal__btn {
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+  border: 1px solid transparent;
+}
+.kair-signature-modal__btn--primary {
+  background: var(--email-accent);
+  color: #fff;
+  border-color: var(--email-accent);
+}
+.kair-signature-modal__btn--primary:hover {
+  background: #1557b0;
+  border-color: #1557b0;
+}
+.kair-signature-modal__btn--secondary {
+  background: transparent;
+  color: var(--email-text-secondary);
+  border-color: var(--email-border);
+}
+.kair-signature-modal__btn--secondary:hover {
+  background: var(--kair-bg-hover, #f1f3f5);
+}
+.compose-panel__send {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--email-accent);
+  color: #fff;
+  border: 1px solid var(--email-accent);
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.compose-panel__send:hover:not(:disabled) {
+  background: #1557b0;
+  border-color: #1557b0;
+}
+.compose-panel__send:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.compose-panel__cancel {
+  padding: 8px 16px;
+  background: transparent;
+  color: var(--email-text-secondary);
+  border: 1px solid var(--email-border);
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.compose-panel__cancel:hover {
+  background: var(--kair-bg-hover, #f1f3f5);
+}
+.kair-mail-detail__body::-webkit-scrollbar {
+  width: 8px;
+}
+.kair-mail-detail__body::-webkit-scrollbar-thumb {
+  background: #cfd4dc;
+  border-radius: 8px;
+}
+
+.kair-mail-detail__attachments {
+  padding: 12px 20px;
+  border-top: 1px solid var(--kair-border-soft);
+  background: #fafbfc;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.kair-mail-detail__attachments-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--email-text-secondary);
+  margin-right: 4px;
+}
+
+.kair-attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: #fff;
+  border: 1px solid var(--kair-border);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  color: var(--kair-text-body);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+  text-decoration: none;
+}
+.kair-attachment-chip:hover {
+  background: var(--kair-bg-soft);
+  border-color: var(--kair-primary);
+}
+.kair-attachment-chip__icon {
+  width: 32px;
+  height: 32px;
+  background: var(--kair-bg-soft);
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 18px;
+  line-height: 1;
+}
+.kair-attachment-chip__info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.kair-attachment-chip__name {
+  font-weight: 600;
+  color: var(--kair-text-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+.kair-attachment-chip__size {
+  font-size: 0.65rem;
+  color: var(--kair-text-light);
+}
+
+.kair-mail-detail__meeting-banner {
+  margin: 16px 20px;
+  border: 1px solid #c5d9f5;
+  border-radius: 8px;
+  background: var(--kair-bg-soft);
+  padding: 12px 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.kair-mail-detail__meeting-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: var(--kair-primary);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.kair-mail-detail__meeting-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.kair-mail-detail__meeting-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--kair-primary);
+  margin: 0 0 4px;
+}
+
+.kair-mail-detail__meeting-meta {
+  font-size: 0.75rem;
+  color: var(--kair-text-body);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.kair-mail-detail__meeting-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.kair-mail-detail__reply {
+  border-top: 1px solid var(--kair-border-soft);
+  padding: 12px 20px;
+  background: #fff;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.kair-mail-detail__reply-input {
+  flex: 1;
+  padding: 8px 14px;
+  border: 1px solid var(--kair-border);
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  color: var(--kair-text-body);
+  background: var(--kair-bg-app);
+  outline: none;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.kair-mail-detail__reply-input:focus {
+  border-color: var(--kair-primary);
+  background: #fff;
+}
+.kair-mail-detail__reply-input::placeholder {
+  color: var(--kair-text-light);
+}
+
+.kair-mail-detail__urgent-banner {
+  margin: 0 20px 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #fdeaea;
+  border: 1px solid #f5c2c7;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: var(--kair-danger);
+  font-weight: 600;
+}
+
+/* ============================================
+   K+AIR Mail list panel header (Gmail style)
+   ============================================ */
+.kair-mail-list-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--kair-border-soft);
+  background: #fff;
+  flex-wrap: wrap;
+}
+
+.kair-mail-list-header__title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--kair-text-strong);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kair-mail-list-header__count {
+  font-size: 0.7rem;
+  color: var(--kair-text-muted);
+  background: var(--kair-bg-app);
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.kair-mail-list-header__actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.kair-mail-list-filters {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--kair-border-soft);
+  background: #fafbfc;
+  flex-wrap: wrap;
+}
+
+.kair-mail-list-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--kair-text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+.kair-mail-list-filter:hover {
+  background: var(--kair-bg-hover);
+  color: var(--kair-text-strong);
+}
+.kair-mail-list-filter[data-active="true"] {
+  background: var(--kair-primary, #174ea6);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(23, 78, 166, 0.15);
+}
+.kair-mail-list-filter__badge {
+  background: var(--kair-primary);
+  color: #fff;
+  padding: 0 5px;
+  border-radius: 999px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  min-width: 14px;
+  text-align: center;
+  line-height: 14px;
+}
+.kair-mail-list-filter[data-active="true"] .kair-mail-list-filter__badge {
+  background: var(--kair-primary);
+}
+
+/* F1-Feature2 — Chips de operadores de búsqueda (from:, to:, has:attachment, etc.) */
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+}
+.kair-mail-search__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px 3px 10px;
+  background: var(--email-bg-soft, #e8f0fe);
+  color: var(--email-accent, #1a73e8);
+  border: 1px solid rgba(26, 115, 232, 0.2);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.2;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kair-mail-search__chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+.kair-mail-search__chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  color: var(--email-accent, #1a73e8);
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 120ms ease;
+}
+.kair-mail-search__chip-remove:hover {
+  background: rgba(26, 115, 232, 0.15);
+}
+
+/* Empty state compacto */
+.kair-mail-empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--kair-text-muted);
+}
+.kair-mail-empty__icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  background: var(--kair-bg-app);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+.kair-mail-tag--normal { background: #eef0f3; color: #6c757d; }
+
+.kair-mail-flag {
+  width: 16px;
+  height: 16px;
+  color: var(--kair-warning);
+}
+
+/* ============================================
+   K+AIR Calendar
+   ============================================ */
+.kair-cal-grid {
+  display: grid;
+  grid-template-columns: 56px repeat(7, 1fr);
+  background: #fff;
+  border: 1px solid var(--kair-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.kair-cal-head {
+  background: #fafbfc;
+  border-bottom: 1px solid var(--kair-border);
+  padding: 8px 6px;
+  text-align: center;
+  font-size: 0.7rem;
+  color: var(--kair-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+.kair-cal-head[data-today="true"] {
+  color: var(--kair-primary);
+}
+.kair-cal-head__day {
+  font-size: 1rem;
+  color: var(--kair-text-strong);
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+  margin-top: 2px;
+  display: block;
+}
+.kair-cal-head[data-today="true"] .kair-cal-head__day {
+  color: var(--kair-primary);
+}
+
+.kair-cal-time {
+  font-size: 0.65rem;
+  color: var(--kair-text-light);
+  padding: 4px 6px;
+  text-align: right;
+  border-right: 1px solid var(--kair-border-soft);
+  border-bottom: 1px solid var(--kair-border-soft);
+  background: #fafbfc;
+}
+
+.kair-cal-cell {
+  border-right: 1px solid var(--kair-border-soft);
+  border-bottom: 1px solid var(--kair-border-soft);
+  min-height: 48px;
+  position: relative;
+  padding: 2px;
+  transition: background 120ms ease;
+}
+.kair-cal-cell:last-child {
+  border-right: none;
+}
+.kair-cal-cell[data-droppable="true"]:hover {
+  background: var(--kair-bg-soft);
+}
+.kair-cal-cell[data-drop-active="true"] {
+  background: var(--kair-bg-soft);
+  outline: 2px dashed var(--kair-primary);
+  outline-offset: -2px;
+}
+
+.kair-cal-event {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  top: 3px;
+  bottom: 3px;
+  border-radius: 5px;
+  padding: 4px 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #fff;
+  overflow: hidden;
+  cursor: pointer;
+  transition: filter 120ms ease, transform 120ms ease;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.kair-cal-event:hover {
+  filter: brightness(0.95);
+  transform: translateY(-1px);
+}
+.kair-cal-event__title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kair-cal-event__time {
+  font-size: 0.62rem;
+  font-weight: 500;
+  opacity: 0.9;
+}
+.kair-cal-event--primary { background: var(--kair-primary); }
+.kair-cal-event--success { background: var(--kair-success); }
+.kair-cal-event--warning { background: var(--kair-warning); color: #5a4500; }
+.kair-cal-event--danger { background: var(--kair-danger); }
+.kair-cal-event--gray { background: var(--kair-info); }
+
+.kair-cal-now-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--kair-danger);
+  z-index: 5;
+  pointer-events: none;
+}
+.kair-cal-now-line::before {
+  content: "";
+  position: absolute;
+  left: -4px;
+  top: -3px;
+  width: 8px;
+  height: 8px;
+  background: var(--kair-danger);
+  border-radius: 999px;
+}
+
+/* ============================================
+   Scrollbars
+   ============================================ */
+.kair-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.kair-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.kair-scroll::-webkit-scrollbar-thumb {
+  background: #cfd4dc;
+  border-radius: 8px;
+}
+.kair-scroll::-webkit-scrollbar-thumb:hover {
+  background: #aab1bd;
+}
+
+/* ============================================
+   Utilities
+   ============================================ */
+.kair-icon-btn {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--kair-text-muted);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.kair-icon-btn:hover {
+  background: var(--kair-bg-hover);
+  color: var(--kair-text-strong);
+}
+.kair-icon-btn[data-active="true"] {
+  background: var(--kair-bg-soft);
+  color: var(--kair-primary);
+}
+
+.kair-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: var(--kair-bg-app);
+  color: var(--kair-text-muted);
+  border: 1px solid var(--kair-border-soft);
+}
+
+.kair-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--kair-primary);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.kair-link-btn:hover {
+  background: var(--kair-bg-soft);
+}
+
+/* Custom scrollbar (shadcn ScrollArea alternative) */
+.kair-scroll-area {
+  scrollbar-width: thin;
+  scrollbar-color: #cfd4dc transparent;
+}
+
+@keyframes kair-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.kair-pulse {
+  animation: kair-pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

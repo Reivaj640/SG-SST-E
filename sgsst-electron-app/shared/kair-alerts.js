@@ -657,6 +657,12 @@
     isOpen: isOpen,
     close: close,
     destroy: destroy,
+    // F4-fix — API nuevo: devuelve la lista de eventos pendientes (vencidos o que vencen hoy).
+    // Usado por el badge de la Bandeja Integrada para mostrar el popover al hacer click.
+    // Devuelve copia del array para evitar mutaciones externas del state interno.
+    getPendingEvents: function () {
+      return Array.isArray(_state.pending) ? _state.pending.slice() : [];
+    },
     version: '1.0.0'
   };
 })(typeof window !== 'undefined' ? window : this);
