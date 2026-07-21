@@ -898,13 +898,13 @@ body {
   display: none;
 }
 .email-row__avatar {
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.875rem;
+  font-size: 0.75rem;
   font-weight: 700;
   color: #fff;
   flex-shrink: 0;
@@ -2999,6 +2999,27 @@ body {
   padding: 2px 8px;
   border-radius: 999px;
   font-weight: 600;
+}
+
+/* AUDITORIA 2026-07-18 — Botón de ordenamiento (estilo Gmail: "Reciente ▼") */
+.kair-mail-list-header__sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid var(--kair-border, #dee2e6);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--kair-text-muted, #5a6378);
+  font-size: 0.7rem;
+  font-weight: 500;
+  cursor: pointer;
+  margin-right: 4px;
+  transition: background 120ms ease, color 120ms ease;
+}
+.kair-mail-list-header__sort:hover {
+  background: var(--kair-bg-hover, #f1f3f5);
+  color: var(--kair-text-strong, #202124);
 }
 
 .kair-mail-list-header__actions {

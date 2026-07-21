@@ -1667,6 +1667,25 @@
              m.preview.toLowerCase().includes(q);
     });
 
+    // AUDITORIA 2026-07-18 — Sort por fecha según preferencia del user
+    var sortBy = state.mailSortBy || "recent";
+    filtered.sort(function (a, b) {
+      var dateA = a.date || 0;
+      var dateB = b.date || 0;
+      if (sortBy === "oldest") {
+        return dateA - dateB;  // Más antiguos primero
+      } else if (sortBy === "unread") {
+        // No leídos primero, luego por fecha
+        if (a.unread && !b.unread) return -1;
+        if (!a.unread && b.unread) return 1;
+        return dateB - dateA;
+      } else if (sortBy === "recent") {
+        return dateB - dateA;  // Más recientes primero (default)
+      } else {
+        return dateB - dateA;  // Fallback
+      }
+    });
+
     const counts = {
       all: state.mails.length,
       unread: state.mails.filter((m) => m.unread).length,
@@ -1676,6 +1695,9 @@
 
     // Header
     const header = el("div", { class: "kair-mail-list-header" });
+    // Orden actual (default: más recientes primero)
+    var sortBy = state.mailSortBy || "recent";
+    var sortLabel = sortBy === "oldest" ? "Más antiguos" : sortBy === "unread" ? "No leídos" : "Reciente";
     header.innerHTML = `
       <button class="kair-icon-btn" title="Refrescar" id="mail-refresh">${D.ICONS.refresh}</button>
       <div class="kair-mail-list-header__title">
@@ -1683,6 +1705,11 @@
         <span class="kair-mail-list-header__count">${filtered.length}</span>
       </div>
       <div class="kair-mail-list-header__actions">
+        <button class="kair-mail-list-header__sort" id="mail-sort-toggle" title="Cambiar orden">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="15" y2="12"></line><line x1="3" y1="18" x2="9" y2="18"></line></svg>
+          ${sortLabel}
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </button>
         ${state.checkedIds.size > 0 ? `
           <span style="font-size:0.7rem;color:var(--kair-text-muted);margin-right:8px;">${state.checkedIds.size} seleccionado(s)</span>
           <button class="kair-icon-btn" title="Archivar">${D.ICONS.archive}</button>
@@ -1692,6 +1719,29 @@
       </div>
     `;
     container.appendChild(header);
+
+    // Wire up sort toggle
+    setTimeout(function () {
+      var sortBtn = $("#mail-sort-toggle", container);
+      if (sortBtn) {
+        sortBtn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          // Ciclar entre recent / oldest / unread
+          if (state.mailSortBy === "recent" || !state.mailSortBy) {
+            state.mailSortBy = "oldest";
+          } else if (state.mailSortBy === "oldest") {
+            state.mailSortBy = "unread";
+            // Cuando el user selecciona "No leídos" en el sort, también activamos el filter
+            state.mailFilter = "unread";
+          } else {
+            state.mailSortBy = "recent";
+            // Volver al filter "Todos" cuando se sale del modo unread
+            state.mailFilter = "all";
+          }
+          render();
+        });
+      }
+    }, 0);
     header.querySelector("#mail-refresh").addEventListener("click", refresh);
 
     // F1.D — Input de búsqueda en tiempo real arriba de los filtros
