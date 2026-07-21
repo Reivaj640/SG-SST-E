@@ -2217,7 +2217,7 @@
         <button class="kair-mail-detail__action-btn" type="button" title="Marcar como no leído" aria-label="Marcar como no leído" data-action="mark-unread">${D.ICONS.mailOpen}</button>
         <button class="kair-mail-detail__action-btn" type="button" title="Eliminar" aria-label="Eliminar" data-action="delete">${D.ICONS.trash}</button>
         <span class="kair-mail-detail__actions-spacer"></span>
-        <button class="kair-mail-detail__action-btn" type="button" title="Marcar" aria-label="Marcar" data-action="star" data-active="${mail.flagged ? 'true' : 'false'}">${D.ICONS.star.replace(/fill=\"none\"/, m.flagged ? 'fill="currentColor"' : 'fill="none"')}</button>
+        <button class="kair-mail-detail__action-btn" type="button" title="Marcar" aria-label="Marcar" data-action="star" data-active="${mail.flagged ? 'true' : 'false'}">${D.ICONS.star.replace(/fill=\"none\"/, mail.flagged ? 'fill="currentColor"' : 'fill="none"')}</button>
         <button class="kair-mail-detail__action-btn" type="button" title="Más opciones" aria-label="Más opciones" data-action="more">${D.ICONS.more}</button>
       </div>
       ${labelsHtml}

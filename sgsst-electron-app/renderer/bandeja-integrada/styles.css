@@ -1,5 +1,6 @@
-@import "tailwindcss";
-@import "tw-animate-css";
+/* F4-fix — Este CSS NO usa Tailwind (vanilla JS con tokens propios).
+   Los imports de Tailwind fueron eliminados porque el proyecto no tiene
+   tailwindcss como dependencia (causaba ERR_FILE_NOT_FOUND en consola). */
 
 @custom-variant dark (&:is(.dark *));
 
