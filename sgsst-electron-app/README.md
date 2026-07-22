@@ -1,7 +1,7 @@
 # K+AIR - Sistema de Gestión SG-SST
 
-**Versión:** 0.1.120
-**Última actualización:** 18 de julio de 2026
+**Versión:** 0.1.130
+**Última actualización:** 21 de julio de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
 ---
@@ -12,7 +12,8 @@
 
 ### Características Principales
 
-- ✅ **Bandeja Integrada: Cliente Gmail Completo** 🆕 (v0.1.120, `📦563`): Cliente de correo profesional integrado con OAuth + SQLite cache + Gmail-look UI + 7 features. Búsqueda con operadores (`from:javier`, `has:adjunto`), adjuntos reales descargables, firma automática, sync bidireccional con Gmail, auto-refresh cada 5 min, BEM refactor con 4 componentes (`email-row`, `thread-header`, `quoted-thread`, `compose-panel` minimizable). Coexiste con K+AIR Calendar. Ver [docs/05-updates/v0.1.120-bandeja-integrada.md](docs/05-updates/v0.1.120-bandeja-integrada.md) y [docs/02-modulos/bandeja-integrada.md](docs/02-modulos/bandeja-integrada.md).
+- ✅ **Bandeja Integrada: Cliente Gmail Completo** 🆕 (v0.1.120, `📦563`): Cliente de correo profesional integrado con OAuth + SQLite cache + Gmail-look UI + 7 features. Búsqueda con operadores (`from:javier`, `has:adjunto`), adjuntos reales descargables, firma automática, sync bidireccional con Gmail, auto-refresh cada 5 min, BEM refactor con 4 componentes (`email-row`, `thread-header`, `quoted-thread`, `compose-panel` minimizable). Coexiste con K+AIR Calendar. Ver `AGENTS.md` (sección "🆕 Bandeja Integrada") para el detalle.
+- ✅ **Menú nativo de Electron oculto** 🆕 (v0.1.130, `📦579`): La barra de menú de Windows (File / Edit / View / Window / Help) ya no se muestra por defecto. En desarrollo aparece con la tecla **Alt**; en producción está oculta totalmente. La app se ve limpia y profesional tipo SaaS (Discord, Slack, VSCode). Ver `AGENTS.md` (sección "🆕 Menú nativo de Electron oculto") para el detalle.
 - ✅ **Multi-empresa**: Gestión de múltiples empresas con una sola experiencia UX/UI
 - ✅ **Motor Normativo Inteligente**: Escenarios normativos basados en tamaño y riesgo
 - ✅ **9 Módulos Principales + 48 Submódulos con lógica**: Recursos (12), Gestión Integral (9), Salud (12), Peligros (4), Amenazas (2), Verificación (3), Mejoramiento (4), más `helpers` y `shared`
@@ -29,7 +30,7 @@
 - ✅ **Inducciones con Sincronización Automática**: Google Forms → Excel → App sin intervención manual
 - ✅ **Búsqueda Inteligente de Archivos**: Normalización de tildes y múltiples variaciones de nombres
 - ✅ **COM Automation**: VBScript para controlar Excel y actualizar Power Query automáticamente
-- ✅ **Sistema de Skeleton Screens** (v0.1.110): API `KairSkeleton.*` con 10 componentes que reemplazan spinners genéricos por placeholders que imitan la forma del componente. Cubierto en 25 loaders en 13 vistas + 7 homes de módulo. Ver [docs/SKELETON-SYSTEM.md](docs/SKELETON-SYSTEM.md) y [docs/SKELETON-HOMES.md](docs/SKELETON-HOMES.md).
+- ✅ **Sistema de Skeleton Screens** (v0.1.110): API `KairSkeleton.*` con 10 componentes que reemplazan spinners genéricos por placeholders que imitan la forma del componente. Cubierto en 25 loaders en 13 vistas + 7 homes de módulo. Ver `AGENTS.md` (sección "🎨 Sistema de Skeleton Screens") para el detalle.
 - ✅ **Solo 13 archivos en raíz**: Proyecto limpio y organizado
 - ✅ **Tabla de Ausentismo 17 Columnas**: Año, Fecha Inicio, Fecha Fin, Código
 - ✅ **Filtros Dinámicos Inteligentes**: Año y tipo basados en datos reales
@@ -1000,15 +1001,15 @@ npm run docs:generate
 npm run docs:watch
 ```
 
-**Ubicación:** `docs/api/`
+**Ubicación:** `docs-api/` (se regenera cada vez que se corre el comando) — NO se commitea
 
 ### Estado del Proyecto
 
 | Archivo | Descripción |
 |---------|-------------|
-| [docs/ESTADO_ACTUAL_REORGANIZACION.md](docs/ESTADO_ACTUAL_REORGANIZACION.md) | 18 fases de reorganización completadas |
-| [docs/CHANGELOG.md](docs/CHANGELOG.md) | Historial de cambios por versión |
-| [docs/DEPENDENCIAS.md](docs/DEPENDENCIAS.md) | Guía completa de dependencias |
+| [CHANGELOG.md](CHANGELOG.md) | Historial completo de cambios por versión |
+| [CONTEXT.md](CONTEXT.md) | Contexto del proyecto para IAs y nuevos devs |
+| [AGENTS.md](AGENTS.md) | Convenciones, arquitectura y features clave |
 
 ---
 
@@ -1488,24 +1489,18 @@ Se agregaron 4 columnas adicionales entre "Entidad" y "Descripción":
 
 ## 📚 Documentación
 
-### Para Nuevos Desarrolladores
-1. **[docs/START_HERE.md](docs/START_HERE.md)** - Punto de entrada único (5 min)
-2. **[CONTEXT.md](CONTEXT.md)** - Contexto para IA y nuevos desarrolladores (15 min)
-3. **[docs/01-quick-start/installation.md](docs/01-quick-start/installation.md)** - Instalación y configuración
-4. **[docs/02-architecture/ipc-contracts.md](docs/02-architecture/ipc-contracts.md)** - Contratos IPC (CRÍTICO)
+La documentación del proyecto está consolidada en **4 archivos** en la raíz:
 
-### Para Usuarios Finales
-1. **[README.md](#)** - Este archivo (visión general)
-2. **[docs/acerca-de-actualizacion.md](docs/acerca-de-actualizacion.md)** - Actualización del sistema
-3. **[docs/01-quick-start/troubleshooting.md](docs/01-quick-start/troubleshooting.md)** - Problemas comunes
+| Archivo | Para quién | Qué tiene |
+|---|---|---|
+| **[README.md](README.md)** | Vos (cliente) y devs nuevos | Qué es K+AIR, cómo se instala, características |
+| **[AGENTS.md](AGENTS.md)** | IAs (yo) | Convenciones, arquitectura, Bandeja, menú nativo, etc. |
+| **[CONTEXT.md](CONTEXT.md)** | IAs y devs | Contexto general del proyecto |
+| **[CHANGELOG.md](CHANGELOG.md)** | Todos | Historial completo de cambios por versión |
 
-### Para Mantenedores
-1. **[CHANGELOG.md](CHANGELOG.md)** - Historial de cambios por versión
-2. **[docs/05-updates/](docs/05-updates/)** - Actualizaciones detalladas
-3. **[docs/04-guides/maintenance.md](docs/04-guides/maintenance.md)** - Mantenimiento del proyecto
+**Ruta recomendada según quién sos:**
 
-### Referencia Técnica
-- **[docs/02-architecture/](docs/02-architecture/)** - Arquitectura del sistema
-- **[docs/03-modules/](docs/03-modules/)** - Documentación de módulos
-- **[docs/04-guides/](docs/04-guides/)** - Guías y tutoriales
-- **[docs/_archived/](docs/_archived/)** - Documentación archivada
+- **👤 Cliente / usuario final:** este `README.md`
+- **👨‍💻 Dev nuevo:** `README.md` → `AGENTS.md` (sección arquitectura) → código
+- **🤖 IA (Mavis, Cursor, etc.):** `AGENTS.md` (principal) + `CONTEXT.md` (contexto)
+- **🔧 Mantenedor:** `CHANGELOG.md` + commits en git

@@ -77,10 +77,10 @@ El usuario usa su propio formato de commits con versionado incremental. **NO usa
 ```
 
 - El emoji 📦 es literal (no es un placeholder).
-- `<numero>` es secuencial e incremental (último conocido: 552 → siguiente 553 al 2026-07-15).
+- `<numero>` es secuencial e incremental (último conocido: 579 → siguiente 580 al 2026-07-21).
 - La descripción es en español, sin punto final obligatorio, tono directo (ej: "Fix y Update sistema actualizacion e iconos y accesos directos del escritorio").
 - Para work-in-progress / doc-only / refactor sin cambio funcional visible, mantener el mismo formato 📦n #.
-- Ejemplos reales del repo: `📦396 #`, `📦397 #`, `📦398 #`, `📦399 #`, `📦551+552 #`.
+- Ejemplos reales del repo: `📦396 #`, `📦397 #`, `📦398 #`, `📦399 #`, `📦551+552 #`, `📦579 #` (loop 47b, menú nativo).
 
 **Antes de cada commit, verificar el último `📦<n>` en `git log` para usar el siguiente número correcto.**
 - Si la sesión trabaja con Mavis (agente), **ambos pueden usar numeración** — coordinarse con `git log` antes de cada commit para no colisionar. Si ya hay un 📦547 tuyo, yo uso 📦548+ (no 📦547+548).
@@ -248,7 +248,7 @@ Patrones que aprendí corrigiendo problemas visuales. Aplicar a cualquier vista 
 
 ---
 
-## 🆕 Bandeja Integrada: Patrón Iframe + Cache-bust (v0.1.120, 📦563)
+## 🆕 Menú nativo de Electron oculto (Loop 47b, 📦579, v0.1.130)
 
 La **Bandeja Integrada** (cliente Gmail integrado en K+AIR) sigue un patrón DIFERENTE al de las vistas de submódulos. En lugar de integrarse al sistema de vistas existentes, se carga como un **iframe aislado** dentro del header principal.
 
@@ -295,6 +295,27 @@ document.body.appendChild(bandejaIntegradaFrame);
 3. Si agregás un IPC handler nuevo en `main.js`, exponerlo en `preload.js`
 4. Si agregás un módulo SQLite nuevo, actualizar `main/email-schema-sql.js` + `main/email-db.js` + `main/email-sync.js`
 5. NO commitear sin autorización explícita del usuario
+
+---
+
+## 🆕 Menú nativo de Electron oculto (Loop 47b, 📦579, v0.1.130)
+
+A partir de **v0.1.130** la barra de menú nativa de Windows (File / Edit / View / Window / Help) ya **no se muestra** por defecto en la app. Comportamiento idéntico a Discord, Slack, VSCode:
+
+- **Modo DESARROLLO** (`npm start`): menú OCULTO por defecto. Aparece temporalmente al presionar la tecla **Alt** (comportamiento estándar de Windows). Útil para acceder a Reload, DevTools, etc. sin saturar la UI.
+- **Modo PRODUCCIÓN** (app empaquetada con `.exe`): menú OCULTO TOTAL. Ni siquiera aparece con Alt. La app se ve limpia, sin elementos del sistema operativo que el cliente no necesita.
+
+### Implementación
+
+- **En `main.js` BrowserWindow**: `autoHideMenuBar: true` (opción NATIVA de Electron).
+- **En `main.js` `app.whenReady()`**: bloque condicional `if (app.isPackaged) { Menu.setApplicationMenu(null); }` que en producción lo oculta TOTALMENTE.
+- **Import necesario**: `const { ..., Menu } = require('electron');` (la línea 3 de main.js ya lo incluye).
+
+### Reglas para IAs que extiendan la app
+
+- **NO cambiar el comportamiento** sin preguntarle al usuario. El patrón está validado y funciona bien.
+- Si necesitás exponer un menú custom (ej. para una feature de debug), usá `Menu.buildFromTemplate([...])` y `Menu.setApplicationMenu(menu)` — pero **solo en modo dev** (`if (!app.isPackaged)`).
+- Los atajos de teclado del menú nativo (F12, Ctrl+R, Ctrl+Shift+I) **siguen funcionando** aunque el menú esté oculto, porque Electron los mantiene registrados internamente.
 
 ---
 
@@ -420,9 +441,15 @@ Además de los 14 skills de superpowers, hay **11 skills de opencode-power-pack*
 
 ## 🎨 Sistema de Skeleton Screens (v0.1.110+, 📦483-491)
 
-El proyecto tiene un sistema centralizado de placeholders de carga que reemplazan los spinners genéricos. **SI vas a tocar loaders o UX de carga, leer primero:**
-- `docs/SKELETON-SYSTEM.md` — API `KairSkeleton.*` con 10 componentes
-- `docs/SKELETON-HOMES.md` — Patrón para homes de módulo principales
+El proyecto tiene un sistema centralizado de placeholders de carga que reemplazan los spinners genéricos. **API expuesta como `KairSkeleton.*`** con 10 componentes (SkeletonCard, SkeletonTable, SkeletonKPI, etc.).
+
+**Cuándo usar:** cualquier vista que muestre datos asíncronos (KPIs, listas, tablas) antes de tener los datos reales.
+
+**Patrón canónico para homes de módulo** (orden crítico para evitar parpadeos):
+1. `container.innerHTML = '<div class="kair-skeleton-home">…</div>';` (mostrar skeleton YA)
+2. `main.appendChild(container);` (montar en DOM)
+3. `setTimeout(() => { loadStats(); }, 200);` (esperar 200ms para que el browser pinte el skeleton)
+4. Dentro de `loadStats()`: hacer fetch, render real, `container.innerHTML = …` (reemplazar skeleton)
 
 ### Patrón canónico para homes de módulo
 
@@ -535,7 +562,7 @@ git status --short
   - `383a96f` — 🔖 Bump version 0.1.120
   - `aef69d9` — 📦563 # Bandeja Integrada (release principal)
 - **Sistema de Skeletons:** completo (📦483-491, 9 commits)
-- **Bandeja Integrada:** completa y validada (📦563, 22 archivos, 11,285 líneas). Coexiste con K+AIR Calendar. OAuth + SQLite cache + Gmail-look UI + BEM refactor 4 componentes + 7 features. **Tests: 172/172 OK** acumulado. Ver [docs/02-modulos/bandeja-integrada.md](docs/02-modulos/bandeja-integrada.md) y [docs/05-updates/v0.1.120-bandeja-integrada.md](docs/05-updates/v0.1.120-bandeja-integrada.md)
+- **Bandeja Integrada:** completa y validada (📦563, 22 archivos, 11,285 líneas). Coexiste con K+AIR Calendar. OAuth + SQLite cache + Gmail-look UI + BEM refactor 4 componentes + 7 features. **Tests: 172/172 OK** acumulado. Ver la sección "🆕 Bandeja Integrada" más abajo en este archivo para los detalles completos.
 - **9 módulos + 48 submódulos con lógica + ~58 submódulos menú + Bandeja Integrada (nuevo módulo de correo)**
 - **Pendientes próximos (post-Bandeja Integrada):**
   - F3.C — Google Calendar write (eventos creados en Bandeja Integrada → Google Calendar real)

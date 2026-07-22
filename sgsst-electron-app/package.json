@@ -45,8 +45,8 @@
     "build:linux": "electron-builder --linux",
     "dist": "electron-builder",
     "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s",
-    "docs:generate": "jsdoc -c docs/jsdoc.json",
-    "docs:watch": "nodemon --watch . --ext js --exec \"jsdoc -c docs/jsdoc.json\""
+    "docs:generate": "jsdoc -c jsdoc.json",
+    "docs:watch": "nodemon --watch . --ext js --exec \"jsdoc -c jsdoc.json\""
   },
   "build": {
     "appId": "com.jrfsoluciones.sgsst",

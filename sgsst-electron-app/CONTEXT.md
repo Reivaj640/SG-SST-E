@@ -1,508 +1,220 @@
-# K+AIR - Contexto del Proyecto
+# K+AIR — Contexto del Proyecto
 
-**Última actualización:** 18 de julio de 2026
-**Versión actual:** 0.1.120
+**Última actualización:** 21 de julio de 2026
+**Versión actual:** 0.1.130
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
+**Stack:** Electron 37 + vanilla JS + Python 3.11.9 (empaquetado) + SQLite (kair.db)
 
-> **📧 v0.1.120 incluye la Bandeja Integrada (cliente Gmail completo).** Coexiste con K+AIR Calendar. Ver [docs/02-modulos/bandeja-integrada.md](docs/02-modulos/bandeja-integrada.md) y [docs/05-updates/v0.1.120-bandeja-integrada.md](docs/05-updates/v0.1.120-bandeja-integrada.md).
+> **🆕 v0.1.130 (📦579):** menú nativo de Electron oculto (loop 47b).
+> **🆕 v0.1.120 (📦563):** Bandeja Integrada (cliente Gmail con OAuth + SQLite cache + Gmail-look UI).
+>
+> Ver `AGENTS.md` (secciones "🆕 Menú nativo" y "🆕 Bandeja Integrada") para los detalles completos.
 
 ---
 
 ## 🎯 Propósito
 
-**K+AIR** es un sistema de gestión de Seguridad y Salud en el Trabajo (SG-SST) diseñado para empresas colombianas. Cumple con la Resolución 0312 de 2019 y permite gestionar múltiples empresas desde una única interfaz.
+**K+AIR** es un sistema de gestión de Seguridad y Salud en el Trabajo (SG-SST) para empresas colombianas. Cumple con la Resolución 0312 de 2019 y permite gestionar múltiples empresas desde una sola interfaz.
 
 **Usuarios objetivo:** Departamentos de SST, administración, auditoría, gerencia.
 
+**Owner:** Javier Robles F. (Prof. SG-SST - Esp. Gerencia de Proyectos)
+
 ---
 
-## 🏗️ Arquitectura (Resumen)
+## 🏗️ Arquitectura (resumen)
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    K+AIR Electron App                    │
 ├─────────────────────────────────────────────────────────┤
 │  RENDERER (Frontend)                                    │
-│  ├── index.html                                         │
-│  ├── renderer.js (Lógica de UI)                         │
-│  └── modules/ (27+ submódulos)                          │
+│  ├── index.html, renderer.js, styles.css                 │
+│  ├── modules/ (8 módulos, 48 submódulos)                │
+│  └── renderer/bandeja-integrada/ (iframe Gmail-look)    │
 ├─────────────────────────────────────────────────────────┤
 │  PRELOAD (Puente Seguro)                                │
-│  └── preload.js (78 contratos IPC expuestos)            │
+│  └── preload.js (~736 líneas, ~200 contratos IPC)       │
 ├─────────────────────────────────────────────────────────┤
 │  MAIN (Backend Electron)                                │
-│  └── main.js (78 handlers IPC)                          │
+│  ├── main.js (~20,173 líneas, 143+ handlers IPC)         │
+│  ├── shared/ (google-gmail.js, google-auth.js, etc.)    │
+│  ├── main/ (email-sync.js, db-instance.js, etc.)        │
+│  └── components/ (config, seguimiento)                  │
 ├─────────────────────────────────────────────────────────┤
 │  DATABASE                                                │
-│  └── SQLite (kair.db) - Usuarios, roles, sesiones       │
+│  └── SQLite (kair.db) en app.getPath('userData')         │
+│      Tablas: users, roles, sessions, companies, +5        │
+│      tablas de email (Bandeja Integrada)                 │
 ├─────────────────────────────────────────────────────────┤
 │  PYTHON (Portear/python-embed/)                         │
-│  ├── Python 3.11.9 empaquetado                          │
-│  ├── 79+ paquetes (pandas, openpyxl, PyMuPDF, etc.)    │
-│  └── Scripts: map_directory.py, actualizar_ausentismo   │
+│  ├── Python 3.11.9 embeddable (sin instalación)         │
+│  ├── 79+ paquetes (pandas, openpyxl, PyMuPDF, etc.)     │
+│  └── Scripts: map_directory, actualizar_ausentismo, etc. │
 └─────────────────────────────────────────────────────────┘
 ```
 
-**Tecnologías clave:**
-- Electron 37.x
-- Node.js
-- Python 3.11.9 (empaquetado)
-- SQLite (better-sqlite3)
-- React-like vanilla JS (sin framework)
+**Tecnologías clave:** Electron 37.x · Node.js · Python 3.11.9 · SQLite (better-sqlite3) · vanilla JS sin framework · BEM con prefijo `kair-`.
 
 ---
 
-## 📁 Estructura de Archivos Clave
-
-### Raíz del Proyecto
+## 📁 Archivos clave (raíz del proyecto Electron)
 
 | Archivo | Líneas | Propósito |
-|---------|--------|-----------|
-| `main.js` | ~7800 | Backend Electron, handlers IPC |
-| `preload.js` | ~180 | Contratos IPC (electronAPI) |
-| `renderer.js` | ~3200 | Lógica de UI, navegación |
+|---|---|---|
+| `main.js` | 20,173 | Backend Electron, handlers IPC |
+| `renderer.js` | 6,695 | Lógica de UI principal, navegación |
+| `preload.js` | 736 | Contratos IPC (electronAPI) |
+| `package.json` | 142 | Configuración npm + electron-builder |
 | `index.html` | 143 | Punto de entrada HTML |
-| `package.json` | 137 | Configuración npm + electron-builder |
+| `jsdoc.json` | 19 | Config JSDoc (genera doc auto con `npm run docs:generate`) |
 
-### Python (Portear/)
+---
 
-| Archivo | Propósito |
-|---------|-----------|
-| `Portear/python-embed/` | Python 3.11.9 + 79 paquetes |
-| `Portear/python-embed/python-scripts/` | Scripts de procesamiento |
-| `Portear/python-embed/python-scripts/map_directory.py` | Mapeo de directorios |
-| `Portear/python-embed/python-scripts/actualizar_ausentismo.py` | Ausentismo |
-| `Portear/python-embed/python-scripts/convert_docx_to_pdf.py` | Conversión Word→PDF |
-| `Portear/python-embed/python-scripts/convert_xlsx_to_pdf.py` | Conversión Excel→PDF |
-
-### Módulos (modules/)
+## 📂 Estructura de carpetas (resumen)
 
 ```
-modules/
-├── gestion-integral/       # Módulo 2
-├── gestion-salud/          # Módulo 3 (IA + Ausentismo)
-│   └── ausentismo/
-│       ├── medicion-ausentismo-home.html
-│       ├── medicion-ausentismo-home.js
-│       └── medicion-ausentismo.js
-├── recursos/               # Módulo 1
-└── ...
+sgsst-electron-app/
+├── AGENTS.md                  ← este archivo + convenciones para IAs
+├── README.md                  ← visión general del producto
+├── CONTEXT.md                 ← este archivo
+├── CHANGELOG.md               ← historial de versiones
+├── package.json
+├── main.js                    ← backend
+├── renderer.js                ← UI principal
+├── preload.js                 ← IPC
+├── index.html
+├── styles.css                 ← sistema visual K+AIR
+├── modules/                   ← 8 módulos, 48 submódulos
+├── renderer/bandeja-integrada/ ← cliente Gmail (iframe)
+├── shared/                    ← lógica compartida (Gmail API, etc.)
+├── main/                      ← scripts backend (email-sync, db, etc.)
+├── components/                ← componentes UI
+├── assets/                    ← iconos, imágenes
+├── Portear/                   ← Python 3.11.9 embeddable + scripts
+├── backup_archivos_originales/ ← respaldo histórico
+└── (configuración Electron, scripts auxiliares, etc.)
 ```
 
 ---
 
-## 🐍 Python Empaquetado (v0.1.80+)
+## 🆕 Bandeja Integrada (v0.1.120, 📦563)
 
-### Configuración
+Cliente Gmail profesional integrado en K+AIR, basado en Gmail API con cache local SQLite. Permite leer, enviar, responder y organizar correos sin abrir Gmail en el navegador.
+
+**Punto de entrada:** botón "Bandeja Integrada" en el header de la app.
+
+**Archivos clave:**
+- `renderer/bandeja-integrada/` — index.html + app.js (~3,400 líneas) + styles.css (~3,300 líneas) + data.js (Lucide icons)
+- `shared/google-gmail.js` — wrapper Gmail API
+- `shared/google-auth.js` — OAuth flow
+- `main/email-sync.js` — sync bidireccional
+- `main/email-schema-sql.js` — schema SQLite (5 tablas)
+
+**Detalle completo:** ver `AGENTS.md` (sección "🆕 Bandeja Integrada").
+
+---
+
+## 🆕 Menú nativo oculto (v0.1.130, 📦579)
+
+A partir de v0.1.130, la barra de menú nativa de Windows (File / Edit / View / Window / Help) ya no se muestra por defecto.
+
+- **Dev (`npm start`):** oculto por defecto, aparece con tecla **Alt** (estándar Windows)
+- **Producción (`.exe`):** oculto TOTAL, ni siquiera con Alt
+
+**Implementación:** `main.js` con `autoHideMenuBar: true` en `BrowserWindow` + `Menu.setApplicationMenu(null)` si `app.isPackaged`.
+
+**Detalle completo:** ver `AGENTS.md` (sección "🆕 Menú nativo de Electron oculto").
+
+---
+
+## 🐍 Python empaquetado (v0.1.80+)
 
 - **Versión:** Python 3.11.9 embeddable
 - **Ubicación:** `Portear/python-embed/`
-- **Configuración crítica:** `python311._pth` con `import site` descomentado
-- **Paquetes instalados en:** `Portear/python-embed/Lib/site-packages/`
-
-### Paquetes Críticos (79+)
-
-| Categoría | Paquetes |
-|-----------|----------|
-| **Datos** | pandas, numpy, python-dateutil |
-| **Word** | python-docx, docxtpl, lxml |
-| **Excel** | openpyxl, et-xmlfile |
-| **PDF** | PyMuPDF, reportlab, pillow |
-| **Servidor** | flask, jinja2, werkzeug |
-| **Automatización** | pywin32 |
-| **IA/LLM** | ~~torch~~ (excluido en v0.1.83) |
-| **Build** | pip, setuptools, wheel |
-
-### Scripts Python Principales
-
-| Script | Función |
-|--------|---------|
-| `map_directory.py` | Mapear estructura de directorios (SIN checksum desde v0.1.83) |
-| `actualizar_ausentismo.py` | Procesar archivos de ausentismo (Excel) |
-| `convert_docx_to_pdf.py` | Convertir Word a PDF |
-| `convert_xlsx_to_pdf.py` | Convertir Excel a PDF |
-| `dashboard_scanner.py` | Escanear dashboard (pandas) |
-| `copasst_acta_generator.py` | Generar actas COPASST |
-| `comite_convivencia_acta_generator.py` | Generar actas Convivencia |
+- **Paquetes:** 79+ pre-instalados (pandas, openpyxl, PyMuPDF, etc.)
+- **Scripts principales:** `map_directory.py`, `actualizar_ausentismo.py`, `convert_docx_to_pdf.py`, `convert_xlsx_to_pdf.py`, `dashboard_scanner.py`, generadores de actas COPASST/Convivencia.
+- **Limitación:** torch excluido (build de ~800 MB → ~450 MB). Si necesitás LLM local, re-habilitarlo manualmente.
 
 ---
 
-## 📊 Estado Actual (v0.1.99)
+## 📋 Convenciones críticas
 
-### ✅ Funcionalidades Operativas
+### Convención de commits (OBLIGATORIO)
 
-- [x] Python empaquetado funcional (sin instalación manual)
-- [x] Recursos locales (bootstrap-icons, font-awesome, Roboto)
-- [x] Mapeo rápido de directorios (<10 segundos)
-- [x] Ausentismo funcional (pandas)
-- [x] Conversión PDF (python-docx, openpyxl, PyMuPDF)
-- [x] Generación de actas (COPASST, Convivencia)
-- [x] Autenticación con SQLite
-- [x] Multi-empresa con escenarios normativos
-- [x] Actualizaciones automáticas desde GitHub
-- [x] **Guardado de Presupuesto** - Fórmulas compartidas preservadas 🆕
-- [x] **Inducciones con Cumplimiento Normativo** - Cálculo real basado en nómina 🆕
-- [x] **Visualizador 1.1.1 Mejorado** - Drag & drop, menú contextual, eliminar, toast 🆕
-- [x] **Soporte Responsive** - Optimizado para 1366x768 y 1536x864 🆕
-- [x] **Espaciado Compacto en Módulo Recursos** - 75% menos espacio entre widgets y gráficas 🆕
-- [x] **Login Modernizado** - Animaciones, logo K+AIR, fondo Vanta.js, íconos en inputs 🆕
-- [x] **Transición Animada Login→Interfaz** - Overlay con spinner, mensajes, progreso y check de éxito 🆕
-- [x] **Autollenado Actas COPASST** - Plan de Trabajo (mes anterior), accidentalidad enriquecida, texto formateado 🆕
-- [x] **Dashboard Plan de Trabajo (2.4.1)** - KPIs k-stats-ribbon, 6 gráficas, tabs-header empresa+periodo 🆕
-- [x] **Navegación Plan de Trabajo** - 2 flujos separados (cronograma→home, portal→módulo), patrón destroy 🆕
-- [x] **Modal Selector de Periodo** - Cierre con X y clic en fondo 🆕
+Formato: `📦<n> # <descripción en español, tono casual>`
 
-### ️ Limitaciones Temporales
+- `<n>` es **secuencial e incremental**. Verificar el último con `git log` antes de cada commit.
+- **NO** usar conventional commits (`feat:`, `fix:`, etc.)
+- Última verificación: `📦579` → siguiente es `📦580`
 
-- [ ] **IA/LLM deshabilitada** - torch excluido para reducir tamaño de build
-  - **Razón:** Build de ~800 MB → ~450 MB, tiempo 15-25 min → 8-12 min
-  - **Re-habilitar:** Eliminar `!Lib/site-packages/torch/**` de package.json
+### Reglas de código
 
-### 🔧 Mejores Recientes
+- `var` (no `let`/`const`) — compat con código legacy
+- BEM con prefijo `kair-` para CSS
+- Vanilla JS sin frameworks
+- Sin Tailwind
+- Exports a `window.X = X` al final de cada archivo
+- SIEMPRE escapar HTML con `KairUI.esc()` antes de inyectar texto del usuario
+- SIEMPRE formatear fechas con `KairHelpers.formatDate()`
+- NO commitear sin OK explícito del usuario ("dale" / "OK" / "commit")
 
-**v0.1.100 (11 de junio de 2026):**
-1. **Header Card Pattern (`k-section-card`)** - Patrón canónico de header para todos los módulos K+AIR
-2. **Migración Masiva de Headers** - 22 submódulos migrados de BEM `kair-header` a `k-section-card`
-3. **Tabs Integration** - Módulos con tabs ahora los integran DENTRO del card
-4. **Responsive Consistency** - `flex-wrap: wrap`, company oculta en mobile, padding reducido
-5. **IDs Preservados** - Ningún ID de elemento fue modificado, compatibilidad total con JS existente
-
-**v0.1.99 (9 de junio de 2026):**
-1. **Dashboard Plan de Trabajo 2.4.1** - KPIs `k-stats-ribbon` canónico, 6 gráficas (Estado, Progreso Mensual, Cumplimiento Trimestral, Estado Mensual, Categoría, Radar Anual)
-2. **Tabs-header empresa+periodo** - Reemplaza page-header legacy con BEM `.k-tabs-header`
-3. **Modal selector de periodo** - Cierra con botón X y clic en fondo (`hidePeriodSelector()`)
-4. **Navegación corregida** - Cronograma→Volver→portal home; Portal Home→Volver→menú Gestión Integral (patrón destroy)
-5. **`PlanTrabajoComponent.destroy()`** - Consistente con COPASST (null refs, cleanup script, clear container)
-6. **`goBackToModuleHome()`** - Método directo sin postMessage (evita loop del renderer)
-7. **Fix visual** - Eliminado subrayado en `.back-btn-internal:hover/focus/active`
-
-**v0.1.98 (4 de junio de 2026):**
-1. **Fix: Plan de Trabajo en actas COPASST** - Lee columna del mes anterior (norma COPASST)
-2. **Fix: Bug de mes en nombre de archivo** - Parseo directo `parseInt` vs `new Date()` (bug UTC-5)
-3. **Mejora: Texto formateado multilinea** - Numeración, iconos ✓/⏱, agrupación por estado
-4. **Mejora: Accidentalidad enriquecida** - Nombre completo, identificación, fecha DD/MM/YYYY
-5. **Fix: Nombre de archivo** - Eliminado "N°" del nombre por defecto
-
-**v0.1.90 (21 de marzo de 2026):**
-1. **Feature: Transición Animada Login→Interfaz** - Overlay con logo, spinner, mensajes y progreso
-2. **Secuencia de 8 fases** - Fade-out login, overlay, loading (4 mensajes), éxito, fade-out overlay
-3. **Personalización** - Nombre del usuario en bienvenida, mensajes dinámicos con dots animados
-4. **Accesibilidad** - Respeta `prefers-reduced-motion` para usuarios sensibles
-
-**v0.1.89 (21 de marzo de 2026):**
-1. **Feature: Login Modernizado** - Animaciones fade-in, stagger, logo K+AIR
-2. **Fondo Vanta.js** - Olas animadas con colores corporativos en login
-3. **Íconos en inputs** - Sobre (email) y candado (password) con Font Awesome
-4. **Micro-interacciones** - Hover, focus, shake, spinner de carga
-5. **Accesibilidad** - Respeta prefers-reduced-motion
-
-**v0.1.88 (21 de marzo de 2026):**
-1. **Fix: Espaciado Módulo Recursos** - Reducción de 75% en espacio entre widgets y gráficas
-2. **Estilos globales anidados** - Solucionado conflicto con `!important` en styles.css
-3. **Selectores con especificidad** - Patrón implementado para evitar conflictos futuros
-
-**v0.1.87 (20 de marzo de 2026):**
-1. **Feature: Soporte Responsive** - Optimizado para 1366x768 y 1536x864
-2. **Media queries específicas** - Ajustes progresivos por resolución
-3. **Ventana inicial optimizada** - 1200x700 (cabe en 1366x768)
-4. **Sin cambios en ≥1920x1080** - Mantiene UI original
-
-**v0.1.86 (20 de marzo de 2026):**
-1. **Feature: Drag & Drop en Visualizador 1.1.1** - Arrastrar y soltar archivos en carpetas
-2. **Feature: Menú Contextual** - Clic derecho para abrir o eliminar archivos
-3. **Feature: Modal de Confirmación** - Reemplaza `confirm()` nativo
-4. **Feature: Notificaciones Toast** - Sistema moderno K+AIR
-5. **Feature: Manejo de Errores** - Específico por tipo (EPERM, ENOENT, EACCES)
-
-**v0.1.85 (20 de marzo de 2026):**
-1. **Feature: Cumplimiento Normativo en Inducciones** - Cálculo real basado en nómina
-2. **Cálculo de pendientes** - `empleados - completadas`
-3. **Alertas inteligentes** - Óptimo (≥90%), refuerzo (≥50%), crítico (<50%)
-4. **Fallback automático** - Si no hay empleados configurados, usa histórico
-
-**v0.1.84 (20 de marzo de 2026):**
-1. **Fix: Error "Shared Formula master"** - Guardado de Presupuesto funcional
-2. **Detección de fórmulas compartidas** - Preservación automática
-3. **Cálculo de totales desde backend** - Fila TOTAL calculada automáticamente
-4. **Manejo seguro de merges** - Sin warnings por merges duplicados
-
-**v0.1.83 (19 de marzo de 2026):**
-1. **Exclusión de torch** - Reduce tamaño y tiempo de build
-2. **Eliminación de checksum** - Mapeo 1500+ segundos → <10 segundos
-3. **Recursos locales** - Sin ERR_TIMED_OUT de CDNs
-4. **waitForElement mejorado** - Retry logic con backoff exponencial
+**Detalle completo de convenciones:** ver `AGENTS.md`.
 
 ---
 
-## 🔗 Enlaces Críticos de Documentación
-
-### Para Nuevos Desarrolladores
-1. **docs/START_HERE.md** - Punto de entrada único
-2. **docs/01-quick-start/installation.md** - Instalación y configuración
-3. **docs/02-architecture/overview.md** - Arquitectura general
-
-### Para IA (Cursor, Copilot, etc.)
-1. **CONTEXT.md** (este archivo) - Contexto completo
-2. **docs/02-architecture/ipc-contracts.md** - Contratos IPC (CRÍTICO)
-3. **docs/03-modules/** - Módulos específicos
-
-### Para Usuarios Finales
-1. **README.md** (raíz) - Guía de usuario y visión general
-2. **docs/01-quick-start/troubleshooting.md** - Problemas comunes
-3. **docs/acerca-de-actualizacion.md** - Actualización del sistema
-
-### Referencia Técnica
-1. **CHANGELOG.md** - Historial de cambios por versión
-2. **docs/05-updates/** - Actualizaciones detalladas
-3. **docs/04-guides/backend-contracts.md** - Contratos backend
-
----
-
-## 📋 Convenciones de Desarrollo
-
-### Backend (main.js)
-
-```javascript
-// Todos los handlers IPC siguen este patrón:
-ipcMain.handle('nombre-handler', async (event, params) => {
-  try {
-    // 1. Validar datos
-    // 2. Ejecutar lógica
-    // 3. Retornar { success: true, data: {...} }
-  } catch (error) {
-    // Retornar { success: false, error: { code, message } }
-  }
-});
-```
-
-### Frontend (renderer.js)
-
-```javascript
-// Llamar handlers IPC:
-const result = await electronAPI.nombreHandler(params);
-if (result.success) {
-  // Usar result.data
-} else {
-  // Manejar result.error
-}
-```
-
-### Python Scripts
-
-```python
-# Todos los scripts retornan JSON por stdout:
-if __name__ == "__main__":
-    try:
-        result = process()
-        print(json.dumps(result, ensure_ascii=False))
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
-```
-
----
-
-## 🚀 Comandos de Build
+## 🚀 Comandos principales
 
 ```bash
 # Desarrollo
 npm start
 
 # Build (producción)
-export GH_TOKEN=<tu_token>
-npx electron-builder --win --publish=always
+export GH_TOKEN=<tu_token>     # ⚠️ NUNCA commitear el token
+npx.cmd electron-builder --win --publish=always
 
-# Build con Python empaquetado
-# (python-embed ya está configurado en package.json)
+# Documentación API (JSDoc)
+npm run docs:generate          # genera en ./docs-api/
+
+# Debug
+npm run debug
 ```
 
-**Tiempos estimados (v0.1.83):**
-- Build: 8-12 minutos
-- Tamaño installer: ~450 MB
+⚠️ **PowerShell:** usar `npx.cmd` (no `npx`) para evitar bloqueos de execution policy.
+
+**Tiempos de build (v0.1.83+):** 8-12 min, ~450 MB.
 
 ---
 
-## 🆕 Cambios Recientes (v0.1.93 - 25 de marzo de 2026)
+## 🔐 Seguridad — credenciales
 
-### 1. Visualizadores Modernizados (9 submódulos)
+**NUNCA** commitear credenciales. Todas en `.env` (local, no en repo):
 
-**Descripción:** Sistema unificado de gestión documental con funciones modernas replicadas en 9 visualizadores.
+- `GOOGLE_OAUTH_CLIENT_ID`
+- `GOOGLE_OAUTH_CLIENT_SECRET`
+- `GH_TOKEN` (para publish)
 
-**Submódulos Actualizados:**
-| Código | Submódulo | Funciones |
-|--------|-----------|-----------|
-| 1.1.1 | Responsable SG | Drag&Drop, Context Menu, Toast, Confirm Modal |
-| 1.1.2 | Roles y Responsabilidades | Drag&Drop, Context Menu, Toast, Confirm Modal |
-| 1.1.4 | Afiliación al SSSI | Drag&Drop, Context Menu, Toast, Confirm Modal |
-| 1.1.5 | Trabajo de Alto Riesgo | Drag&Drop, Context Menu, Toast, Confirm Modal |
-| 1.1.6 | Conformación de Copasst | Drag&Drop, Context Menu, Toast, Confirm Modal |
-| 1.1.7 | Capacitación al Copasst | Drag&Drop, Context Menu, Toast, Confirm Modal |
-| 1.1.8 | Comité de Convivencia | Drag&Drop, Context Menu, Toast, Confirm Modal |
-| 1.2.3 | Curso Virtual 50 Horas | Drag&Drop, Context Menu, Toast, Confirm Modal |
-| 1.2.4 | Manual SST Proveedores | Drag&Drop, Context Menu, Toast, Confirm Modal |
-
-**Funciones Implementadas:**
-
-1. **Drag & Drop de Archivos**
-   - Overlay visual con ícono animado bounce
-   - Subida automática de archivos soltados
-   - Manejo de múltiples archivos simultáneos
-   - Feedback con notificaciones toast
-
-2. **Menú Contextual (Clic Derecho)**
-   - Menú flotante con opciones: Abrir archivo, Eliminar archivo
-   - Posicionamiento inteligente (no sale de pantalla)
-   - Cierre con clic fuera o tecla Escape
-
-3. **Modal de Confirmación Moderno**
-   - Diseño centrado con animación slideUp
-   - Header amarillo con ícono de advertencia
-   - Nombre del archivo en caja destacada
-   - Botones Cancelar / Eliminar estilizados
-
-4. **Notificaciones Toast Modernas**
-   - 4 tipos: success, error, warning, info
-   - Iconos FontAwesome por tipo
-   - Auto-eliminación con animación fade-out (300ms)
-   - Contenedor en esquina superior derecha
-
-5. **Abrir Archivo con Aplicación Predeterminada**
-   - Opción en menú contextual
-   - Usa `electronAPI.open-file`
-   - Manejo de errores específico (EPERM, ENOENT, EACCES)
-
-**Archivos Modificados por Submódulo:**
-
-| Archivo | Líneas agregadas | Funciones |
-|---------|-----------------|-----------|
-| `[submodulo]-view.html` | ~40 | contextMenu, confirmModal, kToastContainer |
-| `[submodulo]-view.css` | ~280 | Estilos para modales, toast, drag&drop |
-| `[submodulo]-viewer.js` | ~450 | Todas las funciones modernas |
-
-**Funciones JavaScript Agregadas:**
-
-```javascript
-// Drag & Drop
-- setupDragAndDrop()
-- setupFolderDragAndDrop(folderElement, folderPath)
-- preventDefaults(e)
-- handleDragOver(e)
-- uploadFile(file, folderPath)
-- fileToBase64(file)
-
-// Context Menu
-- showContextMenu(x, y, doc)
-- hideContextMenu()
-- deleteDocument()
-- setupContextMenu()
-- openFile()
-
-// Toast Notifications
-- showToast(message, type, duration)
-
-// Confirm Modal
-- showConfirmModal(fileName, callback)
-- hideConfirmModal()
-- acceptConfirm()
-- cancelConfirm()
-- setupConfirmModal()
-```
-
-**Funciones Actualizadas:**
-
-| Función | Cambio |
-|---------|--------|
-| `setupEventListeners()` | Ahora llama a `setupDragAndDrop()` y `setupContextMenu()` |
-| `renderFolders()` | Agrega clase 'folder' y llama a `setupFolderDragAndDrop()` |
-| `renderDocuments()` | Agrega evento 'contextmenu' para clic derecho |
-
-**Impacto:**
-- **UX:** Mejora significativa en usabilidad y consistencia entre submódulos
-- **Backend:** Sin cambios (mismos contratos IPC)
-- **Temas:** Compatible con claro, oscuro (system), oscuro (legacy)
-- **Consistencia:** 9 visualizadores con misma UX/UI
+Si por error commiteás un secret, rotar inmediatamente y usar `git reset + cherry-pick` con sed-replace (hay memoria de esto en commits anteriores).
 
 ---
 
-## 🆕 Cambios Recientes (v0.1.92 - 25 de marzo de 2026)
+## 📞 Recursos
 
-### 1. Alerta de Afiliación al SSSI
-
-**Backend (`main.js`):**
-- Nueva función `calculateAfiliacionStats()` que busca planillas de afiliación en `1.1.4 Afiliación al SSSI`
-- Detección automática de archivos PDF/XLSX con "planilla" en el nombre
-- Extracción del mes desde el nombre del archivo (ej: "planilla_marzo_2026.pdf")
-- Comparación con el mes en curso y generación de alerta crítica si falta
-- Integración en `get-recursos-stats` API
-- Integración en `getDashboardAlertas()`
-
-**Frontend (`recursos-home.js`):**
-- Nueva función `calculateAfiliacionClientSide()` (espejo del backend)
-- Widget visual `createAfiliacionWidget()` con diseño consistente a presupuesto
-- Badge verde "Al día" o rojo "Pendiente"
-- Muestra mes actual y último mes registrado
-- Actualización en `loadResourceStats()`
-
-**Archivos modificados:**
-- `main.js`: `calculateAfiliacionStats()`, `get-recursos-stats`, `getDashboardAlertas()`
-- `modules/recursos/recursos-home.js`: `calculateAfiliacionClientSide()`, `createAfiliacionWidget()`, `loadResourceStats()`
-
-### 2. Dashboard con Filtros por Módulo
-
-**Panel "MÓDULOS DEL SISTEMA":**
-- Panel lateral en dashboard con lista de módulos interactiva
-- Cada módulo muestra badge con cantidad de alertas
-- Click en módulo filtra tareas del dashboard
-- Resaltado azul del módulo seleccionado
-
-**Funciones implementadas:**
-- `updateModuleSelection(moduleName)`: Actualiza visualmente módulo seleccionado
-- `filterDashboardTasksByModule(moduleName)`: Filtra tareas y actualiza UI
-- `clearFilter()`: Limpia filtro y selección de módulo
-
-**Archivos modificados:**
-- `renderer.js`: Creación del panel, `updateModuleSelection()`, `filterDashboardTasksByModule()`, `clearFilter()`
-
-### 3. Sidebar Inteligente
-
-**Problema corregido:** Botón de módulo permanecía resaltado permanentemente
-
-**Solución implementada:**
-- Limpieza de referencia `window.activeSidebarButton` en `createSidebarButtons()`
-- Limpieza en `showCompanyHomePage()` (al mostrar dashboard)
-- Limpieza en `selectCompany()` (al cambiar de empresa)
-
-**Archivos modificados:**
-- `renderer.js`: `createSidebarButtons()`, `showCompanyHomePage()`, `selectCompany()`
-
-### 4. Logs de Depuración para Alertas
-
-**Backend (`main.js`):**
-- Logs detallados para cada tipo de alerta (capacitaciones, inducciones, EPP, presupuesto, afiliación)
-- Resumen final con total de alertas generadas
-- Detalle de cada tarea con módulo, submódulo y descripción
-
-**Frontend (`recursos-home.js`):**
-- Logs en `calculateAfiliacionClientSide()` con datos para renderizar
-- Logs en `createAfiliacionWidget()` con estado visual
-- Resumen en `loadResourceStats()` con todas las estadísticas cargadas
-
-**Archivos modificados:**
-- `main.js`: `getDashboardAlertas()` con logs para cada alerta
-- `modules/recursos/recursos-home.js`: Logs en funciones de afiliación
-
----
-
-## 📞 Recursos Adicionales
-
-- **Repositorio:** https://github.com/Reivaj640/SG-SST-E
+- **Repo:** https://github.com/Reivaj640/SG-SST-E
 - **Releases:** https://github.com/Reivaj640/SG-SST-E/releases
-- **Documentación:** `/docs/`
-- **API (JSDoc):** `/docs/api/` (generado automáticamente)
+- **Branch activo:** `Dev-Pc` (production-ready), `Dev` (legacy)
+- **Owner:** Javier Robles F. (Prof. SG-SST - Esp. Gerencia de Proyectos)
 
 ---
 
-**Documento creado:** 19 de marzo de 2026  
-**Propósito:** Contexto unificado para IA y nuevos desarrolladores  
-**Mantenimiento:** Actualizar con cada cambio arquitectónico mayor
-$content
+## 🗺️ Roadmap (resumen)
+
+- **Corto plazo:** Bandeja Integrada v2 (Calendar write, templates, snooze real)
+- **Mediano plazo:** tests automatizados, CI/CD, backups de kair.db
+- **Largo plazo:** SaaS-ificación (Bandeja web con Next.js + PostgreSQL)
+
+Detalle completo en `CHANGELOG.md` y commits del repo.
+
+---
+
+**Mantenimiento:** actualizar con cada cambio arquitectónico mayor. Si un dev/IA toca algo grande, agregar entrada en `CHANGELOG.md` + commit `📦<n>` con descripción clara.
