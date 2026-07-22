@@ -1,10 +1,11 @@
 # K+AIR — Contexto del Proyecto
 
-**Última actualización:** 21 de julio de 2026
-**Versión actual:** 0.1.130
+**Última actualización:** 22 de julio de 2026
+**Versión actual:** 0.1.131
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 **Stack:** Electron 37 + vanilla JS + Python 3.11.9 (empaquetado) + SQLite (kair.db)
 
+> **🆕 v0.1.131 (📦581):** Update UX completo (Loops 1-10) — Claude-style, no invasivo, footer-anchored.
 > **🆕 v0.1.130 (📦579):** menú nativo de Electron oculto (loop 47b).
 > **🆕 v0.1.120 (📦563):** Bandeja Integrada (cliente Gmail con OAuth + SQLite cache + Gmail-look UI).
 >

@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.131] - 2026-07-22
+
+### Added
+- **🔄 Update UX completo (📦581, Loops 1-10)** — Sistema de actualizaciones rediseñado estilo Claude, no invasivo, anclado al footer. 7 loops de iteración visual con el user. (1) **Botón-dot opencode-style en el footer** (al lado de la versión): OCULTO al día, **AZUL con pulse** cuando hay update disponible, **VERDE con halo** cuando está descargado. Click en el dot abre el dropdown anclado arriba del footer. Sin texto redundante en el header (la versión ya está en el footer). (2) **Dropdown con Claude-style**: header azul claro (#e8f0fe), border-radius 12px, 2 botones de acción (Reiniciar / Más tarde) + link "Ver información de versión" que abre el modal. Z-index 500001 para escapar del `isolation: isolate` del header. (3) **Modal "Información de actualizaciones"** (user-invoked): badge de estado con dot animado, grid con versión instalada / última versión / última verificación / canal, botón "Buscar actualizaciones ahora" con feedback de "Buscando…", dark theme support. (4) **Panel "Actualizaciones" en Configuración** (pestaña "Acerca de la App"): grid con la misma info + 6 estados (idle / checking / not-available / available / downloaded / error) + botón de check manual + botón "Reiniciar e Instalar". (5) **Disclaimer "Se instalará al cerrar la app"** al lado del dot del footer (solo visible cuando hay update, cambia a "Lista para reiniciar" cuando está descargado). (6) **Release notes desde GitHub API** en el modal: IPC handler `get-release-notes` en `main.js` con cache de 1h, render en formato monospace con scroll interno.
+
+### Changed
+- **🔄 Toasts invasivos removidos (Loop 3)** — `notifyAvailable()`, `notifyDownloaded()` y `updateProgress()` ahora son no-ops (solo loguean). El UI muestra el dot del footer en su lugar. `notifyError()` se mantiene (errores merecen notificación, transitorio de 6s).
+- **📦 refactor del update button del header al footer (Loop 4b)** — Eliminado el `<button id="header-update-btn">` del header y 200+ líneas de CSS legacy (`.header-update-btn*`, `.header-update-text*`, `.header-update-panel`, `.update-progress-*`, keyframes viejos). El nuevo `<button id="footer-update-btn">` está al lado de `#app-version` con un dot de 8px que cambia de color según el estado.
+- **📐 Dropdown positioning con footer como referencia (Loop 5.5)** — El cálculo de posición del dropdown usa el `top` del `#app-footer` (no el del dot) y setea un `max-height` dinámico al espacio disponible. Si el contenido es más grande, hace scroll interno en el body. Fix del bug donde el dropdown invadía el footer.
+
+### Fixed
+- **🐛 Texto blanco invisible del header update button (Loop 4 fix)** — El color del texto era `rgba(255, 255, 255, 0.7)` (blanco), invisible sobre el header claro. Corregido a `var(--text-light-color, #6c757d)` (gris medio) que se ve bien en light + dark theme.
+- **🐛 Style.display inline override (Loop 1.5)** — `updateHeaderStatus()` ya no usa `headerUpdateBtn.style.display = 'none'` (que override el CSS con `!important`). Ahora usa `headerUpdateBtn.hidden = true/false` (manejado por CSS).
+- **🐛 aria-hidden warning con focus atrapado (Loop 5.5)** — `closeUpdateDropdown()` ahora hace `document.activeElement.blur()` antes de poner `aria-hidden="true"`. Sin esto, el browser loggeaba un warning de a11y cada vez que se cerraba el dropdown con focus en un botón.
+
+### Removed
+- **🗑️ CSS legacy del header update (200+ líneas)** — `.header-update-btn*`, `.header-update-text*`, `.header-update-btn__icon`, `.header-update-panel`, `.update-progress-*`, `.update-install-btn`, `.update-download-btn`, `@keyframes kair-update-btn-pulse`, `@keyframes kair-update-icon-bounce`. Todo reemplazado por el sistema del footer dot (más simple, menos invasivo).
+- **🗑️ 11 backup tags de git** — `backup-before-cleanup-*`, `backup-pre-*-2026-07-20/21/22`. Borrados local y remoto.
+
+### Build & Tooling
+- **🔖 Bump version 0.1.131** — `package.json` actualizado a v0.1.131.
+- **✅ 158 tests OK** en `main/test-fixes-loop48.js` cubriendo HTML/CSS/JS del footer dot, dropdown, modal, panel de config, disclaimer, release notes.
+
 ## [0.1.130] - 2026-07-21
 
 ### Added
