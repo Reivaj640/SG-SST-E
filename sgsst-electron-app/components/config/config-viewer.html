@@ -1099,6 +1099,18 @@
             width: 100%;
         }
 
+        /* 📦581 (Loop 7) — Grid con info detallada de la versión */
+        .kair-update-config-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            padding: 12px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 0.85rem;
+        }
+
         .update-status {
             display: flex;
             align-items: center;
@@ -1651,17 +1663,37 @@
                             <p id="shortcut-status" style="font-size: 0.85rem; margin-top: 0.5rem; margin-bottom: 0; display: none;"></p>
                         </div>
 
-                        <!-- Sección de actualizaciones -->
+                        <!-- 📦581 (Loop 7) — Sección de actualizaciones: panel refactorizado
+                             con info detallada (versión instalada, última versión, última
+                             verificación) + botón de check manual. Misma info que el
+                             modal "Información de actualizaciones" del footer (consistente). -->
                         <div id="update-section" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
+                            <h4 style="margin-top: 0; margin-bottom: 0.75rem;">
+                                <i class="fas fa-sync-alt"></i> Actualizaciones
+                            </h4>
+                            <div class="kair-update-config-grid" style="margin-bottom: 1rem;">
+                                <div>
+                                    <span style="color: var(--text-muted); font-size: 0.8rem;">Versión instalada</span>
+                                    <div id="config-current-version" style="font-weight: 600; font-size: 0.95rem;">—</div>
+                                </div>
+                                <div>
+                                    <span style="color: var(--text-muted); font-size: 0.8rem;">Última versión disponible</span>
+                                    <div id="config-latest-version" style="font-weight: 600; font-size: 0.95rem;">—</div>
+                                </div>
+                                <div>
+                                    <span style="color: var(--text-muted); font-size: 0.8rem;">Última verificación</span>
+                                    <div id="config-last-check" style="font-weight: 600; font-size: 0.95rem;">—</div>
+                                </div>
+                            </div>
                             <div id="update-idle" class="update-state">
                                 <button class="btn btn-outline" style="width: 100%;" onclick="checkForUpdates()">
-                                    <i class="fas fa-sync-alt"></i> Buscar Actualizaciones
+                                    <i class="fas fa-sync-alt"></i> Buscar actualizaciones ahora
                                 </button>
                             </div>
                             <div id="update-checking" class="update-state" style="display: none;">
                                 <div class="update-status checking">
                                     <i class="fas fa-spinner fa-spin"></i>
-                                    <span>Buscando actualizaciones...</span>
+                                    <span>Buscando actualizaciones…</span>
                                 </div>
                             </div>
                             <div id="update-not-available" class="update-state" style="display: none;">
@@ -1673,7 +1705,7 @@
                             <div id="update-available" class="update-state" style="display: none;">
                                 <div class="update-status info">
                                     <i class="fas fa-download"></i>
-                                    <span id="update-available-text">Descargando...</span>
+                                    <span id="update-available-text">Descargando…</span>
                                 </div>
                                 <div class="update-progress-container">
                                     <div class="update-progress-bar">
@@ -1700,6 +1732,9 @@
                                     <i class="fas fa-redo"></i> Reintentar
                                 </button>
                             </div>
+                            <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.75rem; margin-bottom: 0;">
+                                Las actualizaciones se descargan en segundo plano y se aplican automáticamente al cerrar la app.
+                            </p>
                         </div>
 
                         <button class="btn btn-outline" style="width: 100%; margin-top: 1.5rem;" onclick="showThirdPartyLicenses()">Ver Licencias de Terceros</button>
@@ -4018,6 +4053,57 @@
         });
     }
 
+    // 📦581 (Loop 7) — Formato de tiempo relativo (igual al del modal del footer)
+    function configFormatRelativeTime(ts) {
+        if (!ts) return 'Nunca';
+        const diff = Date.now() - ts;
+        if (diff < 30 * 1000) return 'Hace instantes';
+        if (diff < 60 * 1000) return 'Hace menos de 1 minuto';
+        if (diff < 60 * 60 * 1000) {
+            const m = Math.floor(diff / (60 * 1000));
+            return `Hace ${m} ${m === 1 ? 'minuto' : 'minutos'}`;
+        }
+        if (diff < 24 * 60 * 60 * 1000) {
+            const h = Math.floor(diff / (60 * 60 * 1000));
+            return `Hace ${h} ${h === 1 ? 'hora' : 'horas'}`;
+        }
+        const d = Math.floor(diff / (24 * 60 * 60 * 1000));
+        return `Hace ${d} ${d === 1 ? 'día' : 'días'}`;
+    }
+
+    // 📦581 (Loop 7) — Helper: actualizar la info de versión en el panel
+    function updateConfigVersionInfo(currentVersion, latestVersion, lastCheckTime) {
+        const $cur = document.getElementById('config-current-version');
+        const $lat = document.getElementById('config-latest-version');
+        const $chk = document.getElementById('config-last-check');
+        if ($cur) $cur.textContent = currentVersion ? `v${currentVersion}` : '—';
+        if ($lat) {
+            if (latestVersion && currentVersion && compareVersions(latestVersion, currentVersion) > 0) {
+                $lat.textContent = `v${latestVersion} (nueva)`;
+                $lat.style.color = 'var(--primary)';
+            } else {
+                $lat.textContent = 'Sin actualizaciones';
+                $lat.style.color = '';
+            }
+        }
+        if ($chk) $chk.textContent = configFormatRelativeTime(lastCheckTime);
+    }
+
+    // 📦581 (Loop 7) — Comparar versiones semánticas (x.y.z). -1, 0 o 1.
+    function compareVersions(a, b) {
+        if (!a || !b) return 0;
+        const pa = a.split('.').map(n => parseInt(n, 10) || 0);
+        const pb = b.split('.').map(n => parseInt(n, 10) || 0);
+        const len = Math.max(pa.length, pb.length);
+        for (let i = 0; i < len; i++) {
+            const da = pa[i] || 0;
+            const db = pb[i] || 0;
+            if (da < db) return -1;
+            if (da > db) return 1;
+        }
+        return 0;
+    }
+
     // Función para reiniciar la aplicación
     function restartForUpdate() {
         if (electronAPI && typeof electronAPI.restartApp === 'function') {
@@ -4029,20 +4115,37 @@
     function setupUpdateListeners() {
         if (!electronAPI) return;
 
+        // 📦581 (Loop 7) — Tracking de versión actual, última y last-check en el panel
+        let cfgCurrentVersion = null;
+        let cfgLatestVersion = null;
+        let cfgLastCheckTime = null;
+
         electronAPI.onUpdateChecking && electronAPI.onUpdateChecking(() => {
             showUpdateState('checking');
+            cfgLastCheckTime = Date.now();
+            updateConfigVersionInfo(cfgCurrentVersion, cfgLatestVersion, cfgLastCheckTime);
         });
 
-        electronAPI.onUpdateNotAvailable && electronAPI.onUpdateNotAvailable(() => {
+        electronAPI.onUpdateNotAvailable && electronAPI.onUpdateNotAvailable((info) => {
             showUpdateState('not-available');
+            cfgLastCheckTime = Date.now();
+            if (info?.version) cfgCurrentVersion = info.version;
+            // Si la búsqueda confirmó que NO hay update, limpiar latestVersion
+            if (cfgLatestVersion && cfgCurrentVersion && compareVersions(cfgLatestVersion, cfgCurrentVersion) <= 0) {
+                cfgLatestVersion = null;
+            }
+            updateConfigVersionInfo(cfgCurrentVersion, cfgLatestVersion, cfgLastCheckTime);
             setTimeout(() => showUpdateState('idle'), 4000);
         });
 
         electronAPI.onUpdateAvailable && electronAPI.onUpdateAvailable((info) => {
             showUpdateState('available');
             const version = info?.version || 'nueva';
+            if (info?.version) cfgLatestVersion = info.version;
+            cfgLastCheckTime = Date.now();
             document.getElementById('update-available-text').textContent =
                 `v${version} disponible - Descargando...`;
+            updateConfigVersionInfo(cfgCurrentVersion, cfgLatestVersion, cfgLastCheckTime);
         });
 
         electronAPI.onUpdateProgress && electronAPI.onUpdateProgress((data) => {
@@ -4055,15 +4158,28 @@
         electronAPI.onUpdateDownloaded && electronAPI.onUpdateDownloaded((info) => {
             showUpdateState('downloaded');
             const version = info?.version || 'nueva';
+            if (info?.version) cfgLatestVersion = info.version;
+            cfgLastCheckTime = Date.now();
             document.getElementById('update-downloaded-text').textContent =
                 `v${version} lista para instalar`;
+            updateConfigVersionInfo(cfgCurrentVersion, cfgLatestVersion, cfgLastCheckTime);
         });
 
         electronAPI.onUpdateError && electronAPI.onUpdateError((data) => {
             showUpdateState('error');
+            cfgLastCheckTime = Date.now();
+            updateConfigVersionInfo(cfgCurrentVersion, cfgLatestVersion, cfgLastCheckTime);
             document.getElementById('update-error-text').textContent =
                 data?.message || 'Error desconocido';
         });
+
+        // 📦581 (Loop 7) — Cargar versión actual al inicio
+        if (typeof electronAPI.getAppVersion === 'function') {
+            electronAPI.getAppVersion().then(version => {
+                cfgCurrentVersion = version;
+                updateConfigVersionInfo(cfgCurrentVersion, cfgLatestVersion, cfgLastCheckTime);
+            }).catch(() => {});
+        }
     }
 
     // Inicializar listeners cuando se carga la sección

@@ -999,207 +999,10 @@ select.form-control {
   min-width: 0;
 }
 
-/* Header Update Button */
-.header-update-btn {
-  position: relative;
-  gap: 4px;
-  padding: 6px 10px !important;
-}
-
-.header-update-text {
-  font-size: 0.75rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-/* Estado 1: Al día (verde sutil, siempre visible) */
-.header-update-uptodate {
-  background-color: transparent !important;
-  border-color: var(--border-color, #e0e0e0) !important;
-  color: var(--text-muted, #6c757d) !important;
-  opacity: 0.75;
-  transition: opacity 0.2s ease;
-}
-
-.header-update-uptodate:hover {
-  opacity: 1;
-  background-color: var(--bg-hover, #f8f9fa) !important;
-}
-
-/* Estado 2: Buscando (azul info, con pulso) */
-.header-update-checking {
-  background-color: var(--info-color, #17a2b8) !important;
-  border-color: var(--info-color, #17a2b8) !important;
-  color: var(--white-color, #fff) !important;
-  animation: pulse-update 2s infinite;
-}
-
-.header-update-available {
-  background-color: var(--warning-color, #ffc107) !important;
-  border-color: var(--warning-color, #ffc107) !important;
-  color: var(--dark-color, #212529) !important;
-  animation: pulse-update 2s infinite;
-}
-
-.header-update-ready {
-  background-color: var(--success-color, #28a745) !important;
-  border-color: var(--success-color, #28a745) !important;
-  color: var(--white-color, #fff) !important;
-}
-
-@keyframes pulse-update {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
-}
-
-/* Header Update Panel */
-.header-update-panel {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  background: var(--light-color, #fff);
-  border: 1px solid var(--border-color, #e0e0e0);
-  border-radius: var(--border-radius-md, 10px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  padding: 12px 16px;
-  min-width: 280px;
-  /* 📦547 — z-index 100001 (mayor que el header 100000) para que el panel del
-     update se renderice ENCIMA del header, escapando cualquier stacking context
-     que Vanta.js pueda crear en la home page. */
-  z-index: 100001;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.update-progress-container {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-/* 📦503 — Panel de update con barra estilo K+AIR (como la del splash de carga).
-   Misma animación shimmer azul para que sea consistente con el resto de la app. */
-.update-progress-bar {
-  width: 100%;
-  height: 5px;
-  background: var(--border-color, #e9ecef);
-  border-radius: 100px;
-  overflow: hidden;
-  position: relative;
-}
-
-.update-progress-fill {
-  height: 100%;
-  width: 0%;
-  background: linear-gradient(90deg, var(--primary-color, #174ea6) 0%, #4285f4 100%);
-  border-radius: 100px;
-  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
-}
-
-/* Shimmer: barrido blanco semitransparente que se mueve por encima del fill.
-   Solo se activa cuando el contenedor padre tiene la clase .is-active
-   (es decir, mientras hay descarga en curso). */
-.update-progress-fill::after {
-  content: '';
-  position: absolute;
-  top: 0; bottom: 0; left: 0; right: 0;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
-  transform: translateX(-100%);
-  animation: updateShimmer 1.4s ease-in-out infinite;
-}
-
-.update-progress-bar.is-active .update-progress-fill::after {
-  animation: updateShimmer 1.4s ease-in-out infinite;
-}
-
-@keyframes updateShimmer {
-  0%   { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-
-/* Cuando está al 100%, la barra se queda quieta (sin shimmer) */
-.update-progress-bar.is-complete .update-progress-fill::after {
-  display: none;
-}
-
-.update-progress-text {
-  font-size: 0.75rem;
-  color: var(--text-muted, #6c757d);
-}
-
-.update-install-btn {
-  background: var(--success-color, #28a745);
-  color: var(--white-color, #fff);
-  border: none;
-  border-radius: var(--border-radius-sm, 6px);
-  padding: 6px 16px;
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 0.85rem;
-  transition: background-color var(--transition-fast);
-  white-space: nowrap;
-}
-
-.update-install-btn:hover {
-  background: var(--success-hover, #218838);
-}
-
-/* 📦503 — Botón "Descargar" (estado available). Mismo estilo base que
-   install-btn pero amarillo para diferenciarlo. */
-.update-panel-actions {
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.update-download-btn {
-  background: var(--warning-color, #ffc107);
-  color: var(--dark-color, #212529);
-  border: none;
-  border-radius: var(--border-radius-sm, 6px);
-  padding: 6px 16px;
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 0.85rem;
-  transition: background-color var(--transition-fast);
-  white-space: nowrap;
-}
-
-.update-download-btn:hover {
-  background: #e0a800;
-}
-
-/* Dark theme support for update panel */
-[data-theme="dark"] .header-update-panel,
-[data-theme="dark-legacy"] .header-update-panel {
-  background: var(--dark-bg, #1e1e1e);
-  border-color: var(--border-dark, #404040);
-}
-
-[data-theme="dark"] .header-update-uptodate,
-[data-theme="dark-legacy"] .header-update-uptodate {
-  border-color: var(--border-dark, #404040);
-  color: var(--text-muted-dark, #adb5bd) !important;
-}
-
-[data-theme="dark"] .header-update-uptodate:hover,
-[data-theme="dark-legacy"] .header-update-uptodate:hover {
-  background-color: rgba(255, 255, 255, 0.05) !important;
-}
-
-[data-theme="dark"] .update-progress-bar,
-[data-theme="dark-legacy"] .update-progress-bar {
-  background: var(--border-dark, #404040);
-}
-
-[data-theme="dark"] .update-progress-text,
-[data-theme="dark-legacy"] .update-progress-text {
-  color: var(--text-muted-dark, #adb5bd);
-}
+/* Header Update Button — BLOQUE LEGACY ELIMINADO en Loop 4b (📦581).
+   El botón de update se movió del header al footer.
+   La versión se muestra solo en el footer (#app-version + #footer-update-btn).
+   Si quedó alguna referencia, es código muerto. */
 
 .main-container {
   position: relative;
@@ -7481,4 +7284,834 @@ position: relative;
   .ks-donut {
     animation: none;
   }
+}
+
+/* ── K+AIR Update (Loop 4b) ─────────────────────────────────────── */
+/* Patrón opencode: dot pequeño en el FOOTER (al lado de la versión) + dropdown al click.
+   El header NO muestra nada de updates (la versión ya está en el footer).
+   Cero contenido tapado, descubrible solo si el user lo necesita. */
+
+/* --- Wrapper de la versión en el footer --- */
+.footer-version-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* --- Botón-dot del footer (oculto por default) --- */
+.footer-update-btn {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 4px;
+  margin: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background 120ms ease, transform 80ms ease;
+  font: inherit;
+  position: relative;
+}
+
+.footer-update-btn[hidden] {
+  display: none !important;
+}
+
+.footer-update-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.footer-update-btn:active {
+  transform: scale(0.92);
+}
+
+.footer-update-btn:focus-visible {
+  outline: 2px solid #1a73e8;
+  outline-offset: 2px;
+}
+
+/* --- El dot interno (8px) --- */
+.footer-update-btn__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: transparent;
+  display: block;
+  flex-shrink: 0;
+}
+
+/* 📦581 (Loop 4b) — Estado: hay update disponible — dot AZUL con pulse.
+   Click en el dot → abre el dropdown anclado al dot del footer. */
+.footer-update-btn.footer-update-available .footer-update-btn__dot {
+  background: #1a73e8;
+  animation: kair-footer-update-pulse 2.4s ease-in-out infinite;
+}
+
+/* Estado: update descargado y listo para instalar — dot VERDE con halo */
+.footer-update-btn.footer-update-ready .footer-update-btn__dot {
+  background: #16a34a;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.18);
+}
+
+.footer-update-btn.footer-update-ready:hover .footer-update-btn__dot {
+  box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.28);
+}
+
+/* Dark theme: hover un poco más claro */
+[data-theme="dark"] .footer-update-btn:hover,
+[data-theme="dark-legacy"] .footer-update-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* 📦581 (Loop 8) — Disclaimer "se instalará al cerrar la app".
+   Aparece SOLO cuando hay update (junto al dot del footer).
+   Tipografía sutil, color muted, alineado con la versión. */
+.footer-update-disclaimer {
+  font-size: 0.7rem;
+  color: var(--text-light-color, #6c757d);
+  font-style: italic;
+  white-space: nowrap;
+  line-height: 1;
+  /* 📦581 (Loop 8) — Animación sutil de entrada cuando aparece */
+  animation: kair-footer-disclaimer-in 240ms ease-out;
+}
+
+.footer-update-disclaimer[hidden] {
+  display: none !important;
+}
+
+@keyframes kair-footer-disclaimer-in {
+  from { opacity: 0; transform: translateX(-4px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* --- Dropdown ---
+   NOTA: el dropdown está en el body (NO dentro del header) porque el header
+   tiene isolation:isolate que crea un stacking context. Si estuviera dentro
+   del header, el z-index no podría escapar y el Vanta/canvas lo taparía.
+   Con position:fixed + z-index alto, está siempre encima de todo. */
+.kair-update-dropdown {
+  position: fixed; /* relativo a la ventana, no al header */
+  top: 60px; /* aprox: altura del header + 4px de gap (JS lo ajusta dinámicamente) */
+  right: 100px; /* aprox: alineado al botón (JS lo ajusta dinámicamente) */
+  z-index: 500001; /* encima del header (100000) y del Vanta, debajo de modales (500000)... en realidad por encima */
+  min-width: 320px;
+  max-width: 360px;
+  background: #ffffff;
+  color: #1f2937;
+  /* 📦581 (Loop 1.8) — Border-radius más generoso (12px) para esquinas suaves */
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
+  font-family: 'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  overflow: visible; /* permite que la flechita se vea */
+  transform-origin: top right;
+  animation: kair-update-dropdown-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.kair-update-dropdown[hidden] {
+  display: none !important;
+}
+
+.kair-update-dropdown__inner {
+  position: relative;
+  overflow: hidden; /* la flechita ::before está afuera de este wrapper */
+  border-radius: 12px;
+}
+
+.kair-update-dropdown::before {
+  /* 📦581 (Loop 4b) — Flechita ABAJO del dropdown apuntando al dot del footer
+     (el trigger ahora está en el footer, abajo del dropdown).
+     Posición calculada con JS: la variable CSS --arrow-pos-x.
+     Esquinas visibles: bottom + right (rotadas 45° forman una flecha hacia abajo). */
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  left: var(--arrow-pos-x, calc(100% - 30px));
+  width: 12px;
+  height: 12px;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  border-right: 1px solid #e5e7eb;
+  border-bottom-right-radius: 2px;
+  transform: rotate(45deg);
+  z-index: 0;
+}
+
+/* 📦581 (Loop 4b) — Caso fallback: si el dot está muy arriba y el dropdown
+   no entra arriba, se abre DEBAJO del dot. La flecha tiene que apuntar hacia
+   ARRIBA (hacia el dot). El JS setea data-dropdown-direction="down" en ese caso. */
+.kair-update-dropdown[data-dropdown-direction="down"]::before {
+  bottom: auto;
+  top: -5px;
+  border-bottom: none;
+  border-right: none;
+  border-top: 1px solid #e5e7eb;
+  border-left: 1px solid #e5e7eb;
+  border-top-left-radius: 2px;
+  border-bottom-right-radius: 0;
+}
+
+.kair-update-dropdown__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  /* 📦581 (Loop 1.7) — Tono BAJO de azul (estilo Claude, sutil).
+     El azul fuerte del header anterior era demasiado intenso. Ahora es
+     #e8f0fe (azul muy claro) con texto azul oscuro (#1e3a8a). */
+  background: #e8f0fe;
+  color: #1e3a8a;
+  /* 📦581 (Loop 1.8) — Quitado el separador duro (causaba "puntas" en las esquinas).
+     El contraste entre header (#e8f0fe) y body (#ffffff) ya es suficiente
+     para separar visualmente las dos secciones. */
+}
+
+.kair-update-dropdown__icon {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  /* 📦581 (Loop 1.7) — Fondo del ícono: azul semitransparente (sutil) */
+  background: rgba(26, 115, 232, 0.12);
+  border-radius: 50%;
+  /* 📦581 (Loop 1.7) — Ícono: azul corporativo (no blanco) */
+  color: #1a73e8;
+}
+
+.kair-update-dropdown__title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.kair-update-dropdown__title-main {
+  font-weight: 600;
+  font-size: 13.5px;
+  line-height: 1.3;
+  margin-bottom: 1px;
+  color: #1e3a8a; /* azul oscuro, contraste sobre fondo claro */
+}
+
+.kair-update-dropdown__title-sub {
+  font-size: 12px;
+  color: #1e40af; /* azul medio, menos prominente que el título */
+  line-height: 1.3;
+  opacity: 0.85;
+}
+
+.kair-update-dropdown__body {
+  padding: 12px 14px 14px;
+  /* Fondo blanco del body (no azul) */
+  background: #ffffff;
+  /* 📦581 (Loop 4b) — Scroll interno si el contenido excede el max-height del outer.
+     El outer tiene un max-height dinámico calculado por JS según el espacio
+     disponible entre el top del footer y el top de la ventana. */
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* El inner debe ser flex-column para que el body tome el alto restante y haga scroll */
+.kair-update-dropdown__inner {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  max-height: inherit;
+}
+
+.kair-update-dropdown__desc {
+  margin: 0 0 12px 0;
+  font-size: 12.5px;
+  color: #4b5563;
+  line-height: 1.5;
+}
+
+.kair-update-dropdown__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.kair-update-dropdown__btn {
+  appearance: none;
+  flex: 1 1 auto;
+  border: 1px solid transparent;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 160ms ease, transform 100ms ease, box-shadow 160ms ease, border-color 160ms ease;
+  white-space: nowrap;
+}
+
+.kair-update-dropdown__btn:focus-visible {
+  outline: 2px solid #1a73e8;
+  outline-offset: 2px;
+}
+
+.kair-update-dropdown__btn:active {
+  transform: scale(0.97);
+}
+
+.kair-update-dropdown__btn--primary {
+  background: #1a73e8;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.kair-update-dropdown__btn--primary:hover {
+  background: #174ea6;
+  box-shadow: 0 1px 3px rgba(23, 78, 166, 0.3);
+}
+
+.kair-update-dropdown__btn--ghost {
+  background: #f3f4f6;
+  color: #1f2937;
+  border-color: #d1d5db;
+}
+
+.kair-update-dropdown__btn--ghost:hover {
+  background: #e5e7eb;
+  border-color: #9ca3af;
+}
+
+/* --- Animaciones --- */
+@keyframes kair-footer-update-pulse {
+  /* Pulse del dot del footer (radial box-shadow expandiéndose) */
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(26, 115, 232, 0.50);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(26, 115, 232, 0);
+  }
+}
+
+@keyframes kair-update-dropdown-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Reduced motion: deshabilita animaciones si el user lo prefiere */
+@media (prefers-reduced-motion: reduce) {
+  .footer-update-btn.footer-update-available .footer-update-btn__dot,
+  .kair-update-dropdown,
+  .kair-update-modal,
+  .kair-update-modal__state-badge[data-kair-modal-state="available"] .kair-update-modal__state-dot {
+    animation: none;
+  }
+}
+
+/* ============================================================
+   📦581 (Loop 5) — Modal "Información de actualizaciones"
+   Trigger: botón "Ver información de versión" en el dropdown del header.
+   UX: Claude-style, low blue tone (#e8f0fe), border-radius 12px, sin invadir.
+   ============================================================ */
+
+/* --- Overlay oscuro --- */
+.kair-update-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 500010; /* encima de todo (dropdown 500001) */
+  animation: kair-update-modal-overlay-in 160ms ease-out;
+}
+
+.kair-update-modal-overlay[hidden] {
+  display: none !important;
+}
+
+/* --- Card del modal --- */
+.kair-update-modal {
+  background: #ffffff;
+  color: #1f2937;
+  border-radius: 12px;
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.10),
+    0 8px 10px -6px rgba(0, 0, 0, 0.08),
+    0 0 0 1px rgba(0, 0, 0, 0.04);
+  width: min(92vw, 480px);
+  max-height: 88vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: kair-update-modal-in 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: inherit;
+}
+
+/* --- Header --- */
+.kair-update-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px 14px;
+  background: #f8fafc; /* slate-50 muy sutil */
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.kair-update-modal__title-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.kair-update-modal__icon {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #e8f0fe; /* low blue tone Claude-style */
+  color: #1a73e8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+}
+
+.kair-update-modal__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.3;
+}
+
+.kair-update-modal__subtitle {
+  margin: 2px 0 0 0;
+  font-size: 0.8125rem;
+  color: #64748b;
+  line-height: 1.3;
+}
+
+.kair-update-modal__close {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: #64748b;
+  font-size: 1.5rem;
+  line-height: 1;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  cursor: pointer;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.kair-update-modal__close:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.kair-update-modal__close:focus-visible {
+  outline: 2px solid #1a73e8;
+  outline-offset: 2px;
+}
+
+/* --- Body --- */
+.kair-update-modal__body {
+  padding: 18px 20px 6px;
+  overflow-y: auto;
+  flex: 1 1 auto;
+}
+
+/* Estado actual (badge grande) */
+.kair-update-modal__state {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.kair-update-modal__state-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #334155;
+  align-self: flex-start;
+}
+
+.kair-update-modal__state-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #94a3b8; /* default gris (uptodate) */
+  flex: 0 0 auto;
+}
+
+.kair-update-modal__state-badge[data-kair-modal-state="uptodate"] .kair-update-modal__state-dot {
+  background: #16a34a; /* verde */
+}
+
+.kair-update-modal__state-badge[data-kair-modal-state="available"] {
+  background: #e8f0fe; /* low blue */
+  color: #1e3a8a;
+}
+
+.kair-update-modal__state-badge[data-kair-modal-state="available"] .kair-update-modal__state-dot {
+  background: #1a73e8;
+  animation: kair-update-dot-pulse 1.6s ease-in-out infinite;
+}
+
+.kair-update-modal__state-badge[data-kair-modal-state="ready"] {
+  background: #dcfce7;
+  color: #14532d;
+}
+
+.kair-update-modal__state-badge[data-kair-modal-state="ready"] .kair-update-modal__state-dot {
+  background: #16a34a;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.18);
+}
+
+.kair-update-modal__state-badge[data-kair-modal-state="checking"] {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.kair-update-modal__state-badge[data-kair-modal-state="checking"] .kair-update-modal__state-dot {
+  background: #94a3b8;
+  animation: kair-update-dot-pulse 0.9s ease-in-out infinite;
+}
+
+.kair-update-modal__state-desc {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+/* Grid de info (versión, última check, canal) */
+.kair-update-modal__grid {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  padding: 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.kair-update-modal__row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) 2fr;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.kair-update-modal__row dt {
+  margin: 0;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.kair-update-modal__row dd {
+  margin: 0;
+  color: #0f172a;
+  font-weight: 600;
+  font-feature-settings: "tnum" 1;
+  word-break: break-word;
+}
+
+/* Nota al final del body */
+.kair-update-modal__note {
+  margin: 14px 0 6px;
+  font-size: 0.75rem;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+/* 📦581 (Loop 9) — Release notes (preview desde GitHub) */
+.kair-update-modal__notes-wrap {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.kair-update-modal__notes-wrap[hidden] {
+  display: none !important;
+}
+
+.kair-update-modal__notes-title {
+  margin: 0 0 8px 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.kair-update-modal__notes {
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: #334155;
+  /* Estilos para markdown básico */
+  font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.kair-update-modal__notes-loading {
+  text-align: center;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.kair-update-modal__notes-error {
+  text-align: center;
+  color: #dc2626;
+}
+
+/* --- Footer --- */
+.kair-update-modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px 16px;
+  border-top: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+
+.kair-update-modal__btn {
+  appearance: none;
+  border: 0;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 8px 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 120ms ease, transform 80ms ease, color 120ms ease;
+  font-family: inherit;
+}
+
+.kair-update-modal__btn:focus-visible {
+  outline: 2px solid #1a73e8;
+  outline-offset: 2px;
+}
+
+.kair-update-modal__btn:active {
+  transform: scale(0.97);
+}
+
+.kair-update-modal__btn--ghost {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.kair-update-modal__btn--ghost:hover {
+  background: #e2e8f0;
+}
+
+.kair-update-modal__btn--primary {
+  background: #1a73e8;
+  color: #ffffff;
+}
+
+.kair-update-modal__btn--primary:hover {
+  background: #174ea6;
+}
+
+.kair-update-modal__btn[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Link "Ver información de versión" en el dropdown */
+.kair-update-dropdown__link {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 4px 0 0;
+  background: transparent;
+  border: 0;
+  color: #1a73e8;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-align: center;
+  cursor: pointer;
+  text-decoration: none;
+  font-family: inherit;
+  transition: color 120ms ease;
+}
+
+.kair-update-dropdown__link:hover {
+  color: #174ea6;
+  text-decoration: underline;
+}
+
+.kair-update-dropdown__link:focus-visible {
+  outline: 2px solid #1a73e8;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* --- Animaciones del modal --- */
+@keyframes kair-update-modal-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes kair-update-modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes kair-update-dot-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.35); opacity: 0.55; }
+}
+
+/* Dark theme support */
+[data-theme="dark"] .kair-update-modal,
+[data-theme="dark-legacy"] .kair-update-modal {
+  background: #1e293b;
+  color: #e2e8f0;
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.40),
+    0 8px 10px -6px rgba(0, 0, 0, 0.32),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .kair-update-modal__header,
+[data-theme="dark-legacy"] .kair-update-modal__header {
+  background: #0f172a;
+  border-bottom-color: #334155;
+}
+
+[data-theme="dark"] .kair-update-modal__title,
+[data-theme="dark-legacy"] .kair-update-modal__title {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .kair-update-modal__subtitle,
+[data-theme="dark-legacy"] .kair-update-modal__subtitle {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .kair-update-modal__close,
+[data-theme="dark-legacy"] .kair-update-modal__close {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .kair-update-modal__close:hover,
+[data-theme="dark-legacy"] .kair-update-modal__close:hover {
+  background: #334155;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .kair-update-modal__grid,
+[data-theme="dark-legacy"] .kair-update-modal__grid {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+[data-theme="dark"] .kair-update-modal__row dt,
+[data-theme="dark-legacy"] .kair-update-modal__row dt {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .kair-update-modal__row dd,
+[data-theme="dark-legacy"] .kair-update-modal__row dd {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .kair-update-modal__note,
+[data-theme="dark-legacy"] .kair-update-modal__note {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .kair-update-modal__state-badge,
+[data-theme="dark-legacy"] .kair-update-modal__state-badge {
+  background: #334155;
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .kair-update-modal__state-badge[data-kair-modal-state="available"],
+[data-theme="dark-legacy"] .kair-update-modal__state-badge[data-kair-modal-state="available"] {
+  background: rgba(26, 115, 232, 0.18);
+  color: #bfdbfe;
+}
+
+[data-theme="dark"] .kair-update-modal__state-badge[data-kair-modal-state="ready"],
+[data-theme="dark-legacy"] .kair-update-modal__state-badge[data-kair-modal-state="ready"] {
+  background: rgba(22, 163, 74, 0.18);
+  color: #bbf7d0;
+}
+
+[data-theme="dark"] .kair-update-modal__state-desc,
+[data-theme="dark-legacy"] .kair-update-modal__state-desc {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .kair-update-modal__footer,
+[data-theme="dark-legacy"] .kair-update-modal__footer {
+  background: #1e293b;
+  border-top-color: #334155;
+}
+
+[data-theme="dark"] .kair-update-modal__btn--ghost,
+[data-theme="dark-legacy"] .kair-update-modal__btn--ghost {
+  background: #334155;
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .kair-update-modal__btn--ghost:hover,
+[data-theme="dark-legacy"] .kair-update-modal__btn--ghost:hover {
+  background: #475569;
+}
+
+[data-theme="dark"] .kair-update-dropdown__link,
+[data-theme="dark-legacy"] .kair-update-dropdown__link {
+  color: #93c5fd;
+}
+
+[data-theme="dark"] .kair-update-dropdown__link:hover,
+[data-theme="dark-legacy"] .kair-update-dropdown__link:hover {
+  color: #bfdbfe;
 }

@@ -730,6 +730,8 @@ renameCargo: (companyName, cargoId, nombre) => ipcRenderer.invoke('matriz-peligr
   downloadUpdate: () => ipcRenderer.invoke('update:download'),
   restartApp: () => ipcRenderer.send('restart_app'),
   checkForUpdatesManual: () => ipcRenderer.invoke('check-for-updates-manual'),
+  // 📦581 (Loop 9) — Release notes de la última versión de GitHub
+  getReleaseNotes: () => ipcRenderer.invoke('get-release-notes'),
   // Acceso directo en escritorio (autoUpdater no lo recrea tras update)
   createDesktopShortcut: () => ipcRenderer.invoke('create-desktop-shortcut'),
   checkDesktopShortcut: () => ipcRenderer.invoke('check-desktop-shortcut'),

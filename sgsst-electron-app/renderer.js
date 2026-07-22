@@ -1837,211 +1837,277 @@ if (appHeader) {
     console.log('[UPDATER] onUpdateAvailable disponible:', typeof window.electronAPI?.onUpdateAvailable);
     console.log('[UPDATER] updateNotifier disponible:', typeof window.updateNotifier);
     
-    // --- Header Update Button Elements ---
-    const headerUpdateBtn = document.getElementById('header-update-btn');
-    const headerUpdatePanel = document.getElementById('header-update-panel');
-    const headerUpdateText = document.getElementById('header-update-text');
-    const updateProgressFill = document.getElementById('update-progress-fill');
-    const updateProgressText = document.getElementById('update-progress-text');
-    const updateInstallBtn = document.getElementById('update-install-btn');
-    const updateDownloadBtn = document.getElementById('update-download-btn');
-
-    let headerUpdatePanelVisible = false;
+    // --- Footer Update Button Elements ---
+    // 📦581 (Loop 4b) — Movido del HEADER al FOOTER. La versión ya está en
+    // el footer (en #app-version), así que evitamos duplicación. El botón-dot
+    // aparece AL LADO de la versión SOLO cuando hay update. Estilo opencode.
+    // El panel viejo (header-update-panel, update-progress-*, etc.) ya no se usa.
+    const footerUpdateBtn = document.getElementById('footer-update-btn');
     let currentAppVersion = null;
 
-    // Toggle update panel when clicking the update button
-    // 📦504 — El botón del header SOLO aparece cuando detecta update:
+    // 📦581 (Loop 5) — Estado completo del updater para alimentar el modal
+    // "Información de actualizaciones". El footer dot muestra el estado
+    // resumido (dot azul = available, dot verde = ready, oculto = al día),
+    // pero el modal necesita más detalle: última versión conocida,
+    // última vez que se chequeó, etc.
+    const updateState = {
+      state: 'uptodate',          // 'uptodate' | 'checking' | 'available' | 'ready'
+      currentVersion: null,       // versión instalada
+      latestVersion: null,        // última versión encontrada (si hay update)
+      lastCheckTime: null,        // timestamp del último check
+      isChecking: false           // true mientras hay un check manual en curso
+    };
+
+    // Toggle update dropdown when clicking the footer dot
+    // 📦581 (Loop 4b) — El botón del footer SOLO aparece cuando detecta update:
     //  - Si está al día: OCULTO (sin ruido visual en uso normal)
-    //  - Si está buscando: OCULTO (transición interna, no necesita UI)
-    //  - Si hay update disponible: VISIBLE + panel con "Descargar"
-    //  - Si está descargado: VISIBLE + panel con "Actualizar y reiniciar"
-    if (headerUpdateBtn) {
-      headerUpdateBtn.addEventListener('click', () => {
-        headerUpdatePanelVisible = !headerUpdatePanelVisible;
-        if (headerUpdatePanel) {
-          headerUpdatePanel.style.display = headerUpdatePanelVisible ? 'flex' : 'none';
+    //  - Si está buscando: OCULTO (transición interna)
+    //  - Si hay update disponible: VISIBLE (dot azul + pulse)
+    //  - Si está descargado: VISIBLE (dot verde + halo)
+    if (footerUpdateBtn) {
+      footerUpdateBtn.addEventListener('click', () => {
+        // El dropdown está en el body, position:fixed, con z-index alto.
+        // Se ancla al dot del footer (abre HACIA ARRIBA del dot).
+        const dropdown = document.getElementById('kair-update-dropdown');
+        if (!dropdown) return;
+
+        const isOpen = !dropdown.hidden;
+        if (isOpen) {
+          closeUpdateDropdown();
+        } else {
+          openUpdateDropdown();
         }
       });
     }
 
-    // 📦546 — Botón "Descargar": FALLBACK por si la auto-descarga falla.
-    // El flujo principal descarga en background apenas detecta update-available
-    // (autoDownload=true en main.js). Este botón queda en el DOM pero normalmente
-    // está oculto (case 'available' lo pone display:none).
-    if (updateDownloadBtn) {
-      updateDownloadBtn.addEventListener('click', () => {
-        logMessage('Usuario solicitó descarga de la actualización', 'INFO');
-        if (window.electronAPI?.downloadUpdate) {
-          // Feedback inmediato: mostrar "preparando..." + activar shimmer
-          if (updateProgressText) updateProgressText.textContent = 'Preparando descarga...';
-          if (updateDownloadBtn) {
-            updateDownloadBtn.disabled = true;
-            updateDownloadBtn.textContent = 'Descargando...';
+    // 📦581 (Loop 2) — Handlers de los botones del dropdown
+    // "Reiniciar ahora" llama al IPC del backend para reiniciar e instalar.
+    // "Más tarde" cierra el dropdown (el banner sigue visible para recordatorio).
+    // Usamos delegación de eventos en el dropdown para que funcione aunque
+    // el botón no exista al cargar la página (defensa en profundidad).
+    const kairUpdateDropdown = document.getElementById('kair-update-dropdown');
+    if (kairUpdateDropdown) {
+      kairUpdateDropdown.addEventListener('click', (e) => {
+        const target = e.target.closest('[data-kair-update-action]');
+        if (!target) return;
+        const action = target.getAttribute('data-kair-update-action');
+        logMessage(`[UPDATER] Dropdown action: ${action}`, 'INFO');
+
+        if (action === 'restart') {
+          // Reiniciar ahora: el backend cierra la app e instala el update.
+          if (window.electronAPI && typeof window.electronAPI.restartApp === 'function') {
+            closeUpdateDropdown();
+            window.electronAPI.restartApp();
+          } else {
+            logMessage('[UPDATER] No se pudo reiniciar: electronAPI.restartApp no disponible', 'ERROR');
           }
-          var bar = document.querySelector('.update-progress-bar');
-          if (bar) {
-            bar.classList.add('is-active');
-            bar.classList.remove('is-complete');
-            if (updateProgressFill) updateProgressFill.style.width = '2%'; // arranco con un poquito
-          }
-          window.electronAPI.downloadUpdate().then(res => {
-            if (res && res.success) {
-              if (updateProgressText) updateProgressText.textContent = 'Descargando...';
-            } else {
-              logMessage('Error iniciando descarga: ' + (res && res.error && res.error.message), 'ERROR');
-              if (bar) bar.classList.remove('is-active');
-              if (updateProgressFill) updateProgressFill.style.width = '0%';
-              if (updateProgressText) updateProgressText.textContent = 'Error al iniciar';
-              if (updateDownloadBtn) {
-                updateDownloadBtn.disabled = false;
-                updateDownloadBtn.textContent = 'Descargar';
-                updateDownloadBtn.style.display = 'block';
-              }
-              if (window.updateNotifier) {
-                window.updateNotifier.show({
-                  type: 'error',
-                  title: 'No se pudo iniciar la descarga',
-                  subtitle: res && res.error ? res.error.message : 'Error desconocido',
-                  autoClose: 6000
-                });
-              }
-            }
-          });
+        } else if (action === 'dismiss') {
+          // Más tarde: solo cerramos el dropdown. El banner sigue visible
+          // (es un recordatorio). En Loop futuro podríamos persistir el
+          // "dismiss" en localStorage para no mostrar el banner en próximas
+          // sesiones, pero por ahora es un cierre simple.
+          closeUpdateDropdown();
+        } else if (action === 'details') {
+          // 📦581 (Loop 5) — Abrir modal "Información de actualizaciones".
+          // El modal muestra el estado completo (versión, última check, etc).
+          closeUpdateDropdown();
+          openUpdateModal();
         }
       });
     }
 
-    // Install button triggers restart
-    if (updateInstallBtn) {
-      updateInstallBtn.addEventListener('click', () => {
-        logMessage('Usuario solicitó reiniciar para instalar actualización', 'INFO');
-        window.electronAPI.restartApp && window.electronAPI.restartApp();
-      });
+    // 📦581 (Loop 4b) — Funciones helper para abrir/cerrar el dropdown.
+    // El dropdown se ancla al dot del FOOTER (no del header) y abre HACIA ARRIBA
+    // (porque el footer está en la parte inferior de la pantalla).
+    function openUpdateDropdown() {
+      const dropdown = document.getElementById('kair-update-dropdown');
+      const btn = document.getElementById('footer-update-btn');
+      const footer = document.getElementById('app-footer');
+      if (!dropdown || !btn) return;
+
+      // 1) Hacer visible ANTES de medir (offsetHeight es 0 si está hidden)
+      dropdown.hidden = false;
+      dropdown.setAttribute('aria-hidden', 'false');
+      btn.setAttribute('aria-expanded', 'true');
+
+      // 2) Medir el alto real del dropdown YA visible
+      const rect = btn.getBoundingClientRect();
+      const footerRect = footer ? footer.getBoundingClientRect() : null;
+      const dropdownHeight = dropdown.offsetHeight;
+      const dropdownWidth = 340; // min-width: 320 + padding/border
+      const GAP = 16; // gap entre el dropdown y el top del footer
+
+      // 📦581 (Loop 4b fix) — Usar el TOP DEL FOOTER como referencia inferior
+      // y LIMITAR EL ALTO del dropdown al espacio disponible. Si el contenido
+      // es más grande que el espacio, hace scroll interno (overflow: auto en body).
+      const footerTop = footerRect ? footerRect.top : rect.top;
+      const availableHeight = Math.max(120, footerTop - GAP - 8); // mínimo 120px
+      dropdown.style.maxHeight = availableHeight + 'px';
+      // Re-medir con el max-height aplicado
+      const realHeight = Math.min(dropdownHeight, availableHeight);
+      const proposedTop = footerTop - realHeight - GAP;
+      const top = proposedTop > 8 ? proposedTop : 8;
+      // right: distancia desde la derecha de la ventana al borde derecho del dot
+      const right = window.innerWidth - rect.right;
+      dropdown.style.top = top + 'px';
+      dropdown.style.right = right + 'px';
+
+      // Flechita apuntando al centro del dot (si el dropdown está arriba del dot,
+      // la flecha apunta hacia ABAJO; si está abajo, hacia ARRIBA)
+      const btnCenterX = rect.left + rect.width / 2;
+      const dropdownLeftX = window.innerWidth - right - dropdownWidth;
+      const arrowPosX = btnCenterX - dropdownLeftX - 6; // -6 porque la flecha es de 12px
+      dropdown.style.setProperty('--arrow-pos-x', Math.max(8, Math.min(arrowPosX, dropdownWidth - 20)) + 'px');
+      // 📦581 (Loop 4b) — Flag CSS para que la flecha sepa si apuntar arriba o abajo
+      const direction = proposedTop > 8 ? 'up' : 'down';
+      dropdown.setAttribute('data-dropdown-direction', direction);
     }
 
-    // Helper: Update header status (unifica los 4 estados visuales del botón)
+    function closeUpdateDropdown() {
+      const dropdown = document.getElementById('kair-update-dropdown');
+      const btn = document.getElementById('footer-update-btn');
+      if (dropdown) {
+        // 📦581 (Loop 4b fix) — Blur del focus antes de poner aria-hidden=true.
+        // Si un botón del dropdown tiene focus cuando lo cerramos, el navegador
+        // bloquea aria-hidden con un warning de a11y. Quitamos el focus primero.
+        if (dropdown.contains(document.activeElement)) {
+          document.activeElement.blur();
+        }
+        dropdown.hidden = true;
+        dropdown.setAttribute('aria-hidden', 'true');
+        // Limpiar estilos inline (para que la próxima apertura calcule desde 0)
+        dropdown.style.maxHeight = '';
+        dropdown.style.top = '';
+        dropdown.style.right = '';
+      }
+      if (btn) {
+        btn.setAttribute('aria-expanded', 'false');
+      }
+    }
+
+    // Cerrar dropdown al hacer click fuera o presionar Escape
+    document.addEventListener('click', (e) => {
+      const dropdown = document.getElementById('kair-update-dropdown');
+      const btn = document.getElementById('footer-update-btn');
+      if (!dropdown || dropdown.hidden) return;
+      if (dropdown.contains(e.target)) return; // click dentro del dropdown
+      if (btn && btn.contains(e.target)) return; // click en el dot
+      closeUpdateDropdown();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const dropdown = document.getElementById('kair-update-dropdown');
+        if (dropdown && !dropdown.hidden) {
+          closeUpdateDropdown();
+        }
+      }
+    });
+
+    // Cerrar dropdown al hacer scroll (UX: no quedar con dropdown abierto si scrolleás)
+    window.addEventListener('scroll', () => {
+      const dropdown = document.getElementById('kair-update-dropdown');
+      if (dropdown && !dropdown.hidden) {
+        closeUpdateDropdown();
+      }
+    }, { passive: true });
+
+    // Helper: Update footer status (unifica los 4 estados visuales del dot)
     // Estados: 'uptodate' | 'checking' | 'available' | 'ready'
-    // 📦504 — El botón SOLO es visible cuando hay update ('available' | 'ready').
-    // En 'uptodate' y 'checking' el botón se oculta para no agregar ruido visual
-    // cuando todo está al día. Cuando aparece, el dot interior cambia de color
-    // según el estado: amarillo pulsante=disponible, verde fuerte=descargado.
+    // 📦581 (Loop 4b) — El dot del footer SOLO es visible cuando hay update
+    // ('available' | 'ready'). En 'uptodate' y 'checking' el botón se oculta
+    // (atributo hidden) para no agregar ruido visual. Cuando aparece, el dot
+    // interior cambia de color: azul pulsante=disponible, verde con halo=descargado.
     function updateHeaderStatus(state, options = {}) {
-      if (!headerUpdateBtn || !headerUpdateText) return;
+      if (!footerUpdateBtn) return;
+
+      // 📦581 (Loop 5) — Sincronizar updateState para que el modal "Información
+      // de actualizaciones" tenga la misma fuente de verdad que el footer dot.
+      updateState.state = state;
+      if (options.version !== undefined) {
+        if (state === 'uptodate') {
+          updateState.currentVersion = options.version;
+        } else if (state === 'available' || state === 'ready') {
+          updateState.latestVersion = options.version;
+        }
+      }
+
+      // 📦581 (Loop 8) — Disclaimer "Se instalará al cerrar" al lado del dot
+      // Solo visible cuando hay update (available o ready)
+      const disclaimer = document.getElementById('footer-update-disclaimer');
+      const showDisclaimer = (state === 'available' || state === 'ready');
+      if (disclaimer) {
+        disclaimer.hidden = !showDisclaimer;
+        if (showDisclaimer) {
+          disclaimer.textContent = state === 'ready'
+            ? 'Lista para reiniciar'
+            : 'Se instalará al cerrar la app';
+        }
+      }
 
       // Limpiar todas las clases de estado
-      headerUpdateBtn.classList.remove(
-        'header-update-uptodate',
-        'header-update-checking',
-        'header-update-available',
-        'header-update-ready'
+      // 📦581 (Loop 4b) — Footer usa 'footer-update-ok/available/ready'.
+      // También limpiamos las legacy 'header-update-*' por si quedaron en el DOM.
+      footerUpdateBtn.classList.remove(
+        'footer-update-ok',
+        'footer-update-uptodate',
+        'footer-update-checking',
+        'footer-update-available',
+        'footer-update-ready'
       );
 
       switch (state) {
         case 'uptodate':
-          // OCULTO: está al día, no necesita UI
-          headerUpdateBtn.style.display = 'none';
-          headerUpdateBtn.classList.add('header-update-uptodate');
-          // Panel se cierra si estaba abierto
-          if (headerUpdatePanel) {
-            headerUpdatePanel.style.display = 'none';
-            headerUpdatePanelVisible = false;
+          // 📦581 (Loop 4b) — OCULTO (atributo hidden). El footer muestra
+          // solo la versión "v0.1.130" sin dot, sin ruido. Cuando hay update
+          // el case 'available'/'ready' lo hace visible con dot de color.
+          footerUpdateBtn.hidden = true;
+          footerUpdateBtn.classList.add('footer-update-ok');
+          if (currentAppVersion === null && options.version) {
+            currentAppVersion = options.version;
           }
+          footerUpdateBtn.title = options.version
+            ? `Versión ${options.version} — Click para más información`
+            : 'Click para más información';
           break;
 
         case 'checking':
-          // OCULTO: buscando es transición interna, no necesita UI
-          headerUpdateBtn.style.display = 'none';
-          headerUpdateBtn.classList.add('header-update-checking');
-          if (headerUpdatePanel) {
-            headerUpdatePanel.style.display = 'none';
-            headerUpdatePanelVisible = false;
-          }
+          // 📦581 (Loop 4b) — Igual: oculto mientras busca
+          footerUpdateBtn.hidden = true;
+          footerUpdateBtn.classList.add('footer-update-checking');
           break;
 
         case 'available':
-          // VISIBLE: hay update, botón amarillo pulsante con versión
-          // 📦546 — La descarga ya arrancó automáticamente en background
-          // (autoDownload=true en main.js). El estado 'available' dura muy poco
-          // antes de transicionar a 'ready' (vía download-progress + update-downloaded).
-          // El panel del header queda como atajo: si el usuario hace click en el botón
-          // amarillo, puede ver el progreso de la descarga. El botón "Descargar" se
-          // oculta porque ya no se necesita (la descarga está en curso).
-          headerUpdateBtn.style.display = 'flex';
-          headerUpdateBtn.classList.add('header-update-available');
-          headerUpdateText.textContent = options.version ? `v${options.version}` : 'Update';
-          headerUpdateBtn.title = options.version
-            ? `Descargando actualización v${options.version} en segundo plano...`
-            : 'Actualización disponible — Descargando en segundo plano';
-          if (headerUpdatePanel) {
-            headerUpdatePanel.style.display = 'none';
-            headerUpdatePanelVisible = false;
-          }
-          if (updateProgressFill) updateProgressFill.style.width = '0%';
-          // 📦546 — Texto refleja que la descarga arrancó sola (ya no dice "Listo para descargar")
-          if (updateProgressText) updateProgressText.textContent = 'Descargando automáticamente...';
-          // En estado "available" NO se muestra el botón Instalar todavía
-          if (updateInstallBtn) updateInstallBtn.style.display = 'none';
-          // 📦546 — Ocultar botón "Descargar" porque ya está descargando en background
-          // (se mantiene en el DOM por si la auto-descarga falla y el usuario quiere reintentar)
-          var downloadBtn = document.getElementById('update-download-btn');
-          if (downloadBtn) {
-            downloadBtn.style.display = 'none';
-          }
-          // Resetear animación de barra
-          var barAvail = document.querySelector('.update-progress-bar');
-          if (barAvail) {
-            barAvail.classList.add('is-active');
-            barAvail.classList.remove('is-complete');
-          }
+          // 📦581 (Loop 4b) — VISIBLE: hay update, dot AZUL con pulse
+          footerUpdateBtn.hidden = false;
+          footerUpdateBtn.classList.add('footer-update-available');
+          footerUpdateBtn.title = options.version
+            ? `Nueva versión v${options.version} disponible — Click para ver opciones`
+            : 'Actualización disponible — Click para ver opciones';
+          // Si el dropdown estaba abierto, cerrarlo (estado cambió)
+          if (typeof closeUpdateDropdown === 'function') closeUpdateDropdown();
           break;
 
         case 'ready':
-          // VISIBLE: update descargado, botón verde con botón "Actualizar"
-          headerUpdateBtn.style.display = 'flex';
-          headerUpdateBtn.classList.add('header-update-ready');
-          headerUpdateText.textContent = options.version ? `v${options.version}` : 'Listo';
-          headerUpdateBtn.title = options.version
-            ? `Actualización v${options.version} descargada — Click para instalar`
+          // 📦581 (Loop 4b) — VISIBLE: update descargado, dot VERDE con halo
+          footerUpdateBtn.hidden = false;
+          footerUpdateBtn.classList.add('footer-update-ready');
+          footerUpdateBtn.title = options.version
+            ? `Actualización v${options.version} descargada — Click para reiniciar`
             : 'Actualización lista para instalar';
-          if (updateProgressFill) updateProgressFill.style.width = '100%';
-          if (updateProgressText) updateProgressText.textContent = 'Descarga completa · Listo para instalar';
-          if (updateInstallBtn) updateInstallBtn.style.display = 'block';
-          // En "ready" ocultar el botón Descargar (ya está descargado)
-          var dlBtn2 = document.getElementById('update-download-btn');
-          if (dlBtn2) dlBtn2.style.display = 'none';
-          // Detener shimmer, marcar como completa (barra quieta)
-          var barReady = document.querySelector('.update-progress-bar');
-          if (barReady) {
-            barReady.classList.add('is-complete');
-            barReady.classList.remove('is-active');
-          }
+          // Si el dropdown estaba abierto, cerrarlo (estado cambió)
+          if (typeof closeUpdateDropdown === 'function') closeUpdateDropdown();
           break;
       }
     }
 
-    // Helper: Update progress in header (usado durante descarga)
-    // 📦503 — Activa el shimmer animado mientras la descarga está en curso.
-    // El contenedor .update-progress-bar recibe .is-active mientras percent < 100.
-    function updateHeaderProgress(percent, speed) {
-      if (updateProgressFill) {
-        updateProgressFill.style.width = `${percent}%`;
-      }
-      if (updateProgressText) {
-        updateProgressText.textContent = `${percent}%${speed ? ' · ' + speed + ' MB/s' : ''}`;
-      }
-      var bar = document.querySelector('.update-progress-bar');
-      if (bar) {
-        if (percent > 0 && percent < 100) {
-          bar.classList.add('is-active');
-          bar.classList.remove('is-complete');
-        } else if (percent >= 100) {
-          bar.classList.add('is-complete');
-          bar.classList.remove('is-active');
-        }
-      }
-    }
+    // 📦581 (Loop 2) — updateHeaderProgress() ELIMINADO. Era del panel viejo
+    // (header-update-panel) que ya no se usa. El progreso de descarga ahora
+    // se muestra SOLO en el toast (window.updateNotifier.updateProgress).
 
-    // Wrappers de compatibilidad (para no romper otros call sites)
+    // Wrappers de compatibilidad (mantener nombres para no romper call sites
+    // legacy; la función interna ahora se llama updateHeaderStatus pero opera
+    // sobre el dot del footer)
     function showHeaderUpdateAvailable(version) { updateHeaderStatus('available', { version }); }
     function showHeaderUpdateReady(version) { updateHeaderStatus('ready', { version }); }
     function hideHeaderUpdatePanel() { updateHeaderStatus('uptodate'); }
@@ -2051,6 +2117,9 @@ if (appHeader) {
     window.electronAPI?.onUpdateChecking && window.electronAPI.onUpdateChecking(() => {
       console.log('[UPDATER] Evento recibido: update_checking');
       logMessage('Buscando actualizaciones...', 'INFO');
+      // 📦581 (Loop 5) — Trackear lastCheckTime y marcar isChecking para el modal
+      updateState.lastCheckTime = Date.now();
+      updateState.isChecking = true;
       updateHeaderStatus('checking');
     });
 
@@ -2063,6 +2132,8 @@ if (appHeader) {
       console.log('[UPDATER] Evento recibido: update_available', info);
       logMessage(`Actualización disponible: ${info ? info.version : 'nueva versión'}`, 'INFO');
       if (info && info.version) {
+        // 📦581 (Loop 5) — Reset isChecking (el check terminó y encontró algo)
+        updateState.isChecking = false;
         updateHeaderStatus('available', { version: info.version });
         // B) Toast moderno con barra de progreso — autoClose 0 (no se cierra solo)
         if (window.updateNotifier && typeof window.updateNotifier.notifyAvailable === 'function') {
@@ -2075,6 +2146,13 @@ if (appHeader) {
     window.electronAPI?.onUpdateNotAvailable && window.electronAPI.onUpdateNotAvailable((info) => {
       console.log('[UPDATER] Evento recibido: update_not_available', info);
       logMessage('No hay actualizaciones disponibles', 'INFO');
+      // 📦581 (Loop 5) — Reset isChecking + limpiar latestVersion (búsqueda confirmó
+      // que no hay update disponible, así que la "última conocida" no aplica)
+      updateState.isChecking = false;
+      updateState.lastCheckTime = Date.now();
+      if (updateState.latestVersion && info && info.version && compareVersions(updateState.latestVersion, info.version) <= 0) {
+        updateState.latestVersion = null;
+      }
       // Volver al estado "al día" (botón permanente con punto verde)
       updateHeaderStatus('uptodate', { version: info?.version || currentAppVersion });
       // Si el toast de "descargando" quedó abierto por error, cerrarlo
@@ -2086,10 +2164,9 @@ if (appHeader) {
     // Progreso de descarga
     window.electronAPI?.onUpdateProgress && window.electronAPI.onUpdateProgress((data) => {
       console.log('[UPDATER] Evento recibido: update_progress', data);
-      // Update header progress (la barra dentro del panel)
+      // 📦581 (Loop 2) — updateHeaderProgress() ya no se usa (era del panel viejo).
+      // Solo actualizamos el toast de progreso (info útil para el user).
       if (data && data.percent !== undefined) {
-        updateHeaderProgress(data.percent, data.speed);
-        // B) Actualizar la barra de progreso del toast
         if (window.updateNotifier && typeof window.updateNotifier.updateProgress === 'function') {
           var speedLabel = data.speed ? data.speed + ' MB/s' : 'Calculando...';
           window.updateNotifier.updateProgress(data.percent, speedLabel);
@@ -2102,6 +2179,8 @@ if (appHeader) {
       console.log('[UPDATER] Evento recibido: update_downloaded', info);
       logMessage('Actualización descargada y lista para instalar', 'INFO');
       const version = info ? info.version : 'más reciente';
+      // 📦581 (Loop 5) — Reset isChecking
+      updateState.isChecking = false;
       // Update header UI → estado "ready" (botón permanente con badge "Listo")
       updateHeaderStatus('ready', { version });
       // B) Toast de éxito con botón "Reiniciar e Instalar Ahora" — autoClose 0
@@ -2120,6 +2199,9 @@ if (appHeader) {
     window.electronAPI?.onUpdateError && window.electronAPI.onUpdateError((data) => {
       console.log('[UPDATER] Evento recibido: update_error', data);
       logMessage(`Error de actualización: ${data ? data.message : 'error desconocido'}`, 'ERROR');
+      // 📦581 (Loop 5) — Reset isChecking
+      updateState.isChecking = false;
+      updateState.lastCheckTime = Date.now();
       // Volver al estado "al día" (botón permanente con punto verde)
       updateHeaderStatus('uptodate', { version: currentAppVersion });
       // B) Toast de error con detalle
@@ -2135,6 +2217,7 @@ if (appHeader) {
       window.electronAPI.getAppVersion()
         .then(version => {
           currentAppVersion = version;
+          updateState.currentVersion = version;
           updateHeaderStatus('uptodate', { version });
         })
         .catch(err => {
@@ -2144,6 +2227,242 @@ if (appHeader) {
     } else {
       updateHeaderStatus('uptodate', {});
     }
+
+    // ============================================================
+    // 📦581 (Loop 5) — Modal "Información de actualizaciones"
+    // Trigger: botón "Ver información de versión" en el dropdown del header.
+    // Render: estado completo (versión, última check, canal) + botón de check manual.
+    // UX: Claude-style, low blue tone, border-radius 12px, sin invadir.
+    // ============================================================
+
+    // Helper: comparar versiones semánticas (x.y.z). Devuelve -1, 0 o 1.
+    // Usado para detectar si la "última versión conocida" sigue siendo
+    // realmente la más reciente (o si ya hay una más nueva disponible).
+    function compareVersions(a, b) {
+      if (!a || !b) return 0;
+      const pa = a.split('.').map(n => parseInt(n, 10) || 0);
+      const pb = b.split('.').map(n => parseInt(n, 10) || 0);
+      const len = Math.max(pa.length, pb.length);
+      for (let i = 0; i < len; i++) {
+        const da = pa[i] || 0;
+        const db = pb[i] || 0;
+        if (da < db) return -1;
+        if (da > db) return 1;
+      }
+      return 0;
+    }
+
+    // Format: timestamp → "hace 3 minutos" / "hace 2 horas" / "hace 3 días"
+    function formatRelativeTime(ts) {
+      if (!ts) return 'Nunca';
+      const diff = Date.now() - ts;
+      if (diff < 30 * 1000) return 'Hace instantes';
+      if (diff < 60 * 1000) return 'Hace menos de 1 minuto';
+      if (diff < 60 * 60 * 1000) {
+        const m = Math.floor(diff / (60 * 1000));
+        return `Hace ${m} ${m === 1 ? 'minuto' : 'minutos'}`;
+      }
+      if (diff < 24 * 60 * 60 * 1000) {
+        const h = Math.floor(diff / (60 * 60 * 1000));
+        return `Hace ${h} ${h === 1 ? 'hora' : 'horas'}`;
+      }
+      const d = Math.floor(diff / (24 * 60 * 60 * 1000));
+      return `Hace ${d} ${d === 1 ? 'día' : 'días'}`;
+    }
+
+    // Open modal: muestra el overlay + renderiza el estado actual
+    function openUpdateModal() {
+      const overlay = document.getElementById('kair-update-modal-overlay');
+      if (!overlay) {
+        console.warn('[UPDATER] Modal de información no encontrado en el DOM');
+        return;
+      }
+      renderUpdateModal();
+      overlay.hidden = false;
+      // Focus en el botón de cerrar (a11y)
+      const closeBtn = overlay.querySelector('.kair-update-modal__close');
+      if (closeBtn) setTimeout(() => closeBtn.focus(), 50);
+    }
+
+    // Close modal: oculta el overlay
+    function closeUpdateModal() {
+      const overlay = document.getElementById('kair-update-modal-overlay');
+      if (overlay) overlay.hidden = true;
+    }
+
+    // Render: pinta el estado completo del modal según updateState
+    function renderUpdateModal() {
+      const overlay = document.getElementById('kair-update-modal-overlay');
+      if (!overlay) return;
+
+      const $ = (sel) => overlay.querySelector(sel);
+
+      // --- Badge de estado (pill con dot) ---
+      const stateBadge = $('[data-kair-modal-state]');
+      const stateText = $('[data-kair-modal-state-text]');
+      const stateDesc = $('[data-kair-modal-state-desc]');
+
+      // Textos por estado
+      const stateConfig = {
+        uptodate:   { text: 'Al día',                   desc: 'Estás usando la última versión disponible.' },
+        checking:   { text: 'Buscando actualizaciones…', desc: 'Consultando el servidor de releases de K+AIR.' },
+        available:  { text: 'Actualización disponible',  desc: 'Hay una nueva versión lista para descargar e instalar.' },
+        ready:      { text: 'Listo para reiniciar',      desc: 'La actualización se descargó. Se aplicará al cerrar la app o reiniciando ahora.' }
+      };
+      const cfg = stateConfig[updateState.state] || stateConfig.uptodate;
+      if (stateBadge) stateBadge.setAttribute('data-kair-modal-state', updateState.state);
+      if (stateText) stateText.textContent = cfg.text;
+      if (stateDesc) stateDesc.textContent = cfg.desc;
+
+      // --- Info grid ---
+      const currentVersionEl = $('[data-kair-modal-current-version]');
+      const latestVersionEl = $('[data-kair-modal-latest-version]');
+      const lastCheckEl = $('[data-kair-modal-last-check]');
+
+      if (currentVersionEl) {
+        currentVersionEl.textContent = updateState.currentVersion
+          ? `v${updateState.currentVersion}`
+          : '—';
+      }
+      if (latestVersionEl) {
+        if (updateState.latestVersion && compareVersions(updateState.latestVersion, updateState.currentVersion) > 0) {
+          latestVersionEl.textContent = `v${updateState.latestVersion} (nueva)`;
+        } else {
+          latestVersionEl.textContent = 'Sin actualizaciones';
+        }
+      }
+      if (lastCheckEl) {
+        lastCheckEl.textContent = formatRelativeTime(updateState.lastCheckTime);
+      }
+
+      // --- Botón "Buscar actualizaciones" (label cambia si está en checking) ---
+      const checkLabel = $('[data-kair-modal-check-label]');
+      const checkBtn = $('[data-kair-update-action="modal-check"]');
+      if (checkLabel) {
+        checkLabel.textContent = updateState.isChecking
+          ? 'Buscando…'
+          : 'Buscar actualizaciones ahora';
+      }
+      if (checkBtn) {
+        checkBtn.disabled = !!updateState.isChecking;
+      }
+
+      // 📦581 (Loop 9) — Release notes (solo si hay update)
+      const notesWrap = $('[data-kair-modal-notes-wrap]') || document.getElementById('kair-modal-release-notes-wrap');
+      if (notesWrap) {
+        const showNotes = (updateState.state === 'available' || updateState.state === 'ready');
+        notesWrap.hidden = !showNotes;
+        if (showNotes) {
+          loadReleaseNotes();
+        }
+      }
+    }
+
+    // 📦581 (Loop 9) — Fetch + render de las release notes de GitHub.
+    // Cachea el resultado en `cachedReleaseNotes` para no fetchar en cada apertura.
+    let cachedReleaseNotes = null;
+    function loadReleaseNotes() {
+      const notesEl = document.getElementById('kair-modal-release-notes');
+      if (!notesEl) return;
+      // Si ya tenemos datos en cache, renderizar inmediatamente
+      if (cachedReleaseNotes) {
+        renderReleaseNotes(cachedReleaseNotes);
+        return;
+      }
+      // Fetch
+      if (!window.electronAPI || typeof window.electronAPI.getReleaseNotes !== 'function') {
+        notesEl.innerHTML = '<div class="kair-update-modal__notes-error">No se pudo obtener las notas (API no disponible).</div>';
+        return;
+      }
+      window.electronAPI.getReleaseNotes()
+        .then(result => {
+          if (result && result.success && result.data) {
+            cachedReleaseNotes = result.data;
+            renderReleaseNotes(result.data);
+          } else {
+            notesEl.innerHTML = '<div class="kair-update-modal__notes-error">No se pudieron cargar las notas de la versión.</div>';
+          }
+        })
+        .catch(err => {
+          notesEl.innerHTML = '<div class="kair-update-modal__notes-error">Error: ' + (err && err.message || 'desconocido') + '</div>';
+        });
+    }
+
+    function renderReleaseNotes(release) {
+      const notesEl = document.getElementById('kair-modal-release-notes');
+      if (!notesEl) return;
+      // Mostrar el body (markdown sin procesar) con el tag/name como título
+      const title = release.name || release.tagName || 'Notas de la versión';
+      const body = release.body || '(Sin notas de la versión)';
+      notesEl.textContent = title + '\n\n' + body;
+    }
+
+    // Trigger: dispara un check manual (vía IPC). El backend responde con
+    // update_checking → update_available / update_not_available / update_error.
+    // El listener de onUpdateChecking ya actualiza updateState.isChecking.
+    function triggerUpdateCheck() {
+      logMessage('[UPDATER] Check manual disparado desde modal de información', 'INFO');
+      if (!window.electronAPI || typeof window.electronAPI.checkForUpdatesManual !== 'function') {
+        logMessage('[UPDATER] checkForUpdatesManual no disponible en electronAPI', 'ERROR');
+        return;
+      }
+      // Marcar isChecking YA (puede que el backend tarde unos ms en emitir
+      // el evento update_checking). Si el backend nunca responde, el user
+      // queda con "Buscando…" hasta el próximo evento.
+      updateState.isChecking = true;
+      renderUpdateModal(); // reflejar el estado "buscando" en el botón
+      window.electronAPI.checkForUpdatesManual()
+        .then(result => {
+          logMessage('[UPDATER] Check manual completado: ' + JSON.stringify(result || {}), 'INFO');
+          // El estado final lo emiten los listeners (onUpdateAvailable / NotAvailable / Error).
+          // Por las dudas, si el backend ya respondió SIN emitir un evento final,
+          // reseteamos isChecking acá para que el botón no quede en "Buscando…".
+          setTimeout(() => {
+            if (updateState.isChecking) {
+              updateState.isChecking = false;
+              renderUpdateModal();
+            }
+          }, 300);
+        })
+        .catch(err => {
+          logMessage('[UPDATER] Error en check manual: ' + (err && err.message), 'ERROR');
+          updateState.isChecking = false;
+          renderUpdateModal();
+        });
+    }
+
+    // --- Event delegation en el modal ---
+    const kairUpdateModalOverlay = document.getElementById('kair-update-modal-overlay');
+    if (kairUpdateModalOverlay) {
+      kairUpdateModalOverlay.addEventListener('click', (e) => {
+        const target = e.target.closest('[data-kair-update-action]');
+        if (!target) {
+          // Click en el overlay (no en el modal ni en un botón) → cerrar
+          if (e.target === kairUpdateModalOverlay) {
+            closeUpdateModal();
+          }
+          return;
+        }
+        const action = target.getAttribute('data-kair-update-action');
+        logMessage(`[UPDATER] Modal action: ${action}`, 'INFO');
+
+        if (action === 'modal-close') {
+          closeUpdateModal();
+        } else if (action === 'modal-check') {
+          triggerUpdateCheck();
+        }
+      });
+    }
+
+    // --- Escape cierra el modal (si está abierto) ---
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const overlay = document.getElementById('kair-update-modal-overlay');
+        if (overlay && !overlay.hidden) {
+          closeUpdateModal();
+        }
+      }
+    });
 
   } else {
     console.error('API de logging no disponible en window.electronAPI');

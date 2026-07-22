@@ -1866,6 +1866,46 @@ ipcMain.handle('update:download', async () => {
   }
 });
 
+// 📦581 (Loop 9) — Release notes desde GitHub API.
+// Cache por 1 hora para no martillar la API. Devuelve la última release.
+// El renderer puede mostrar el body markdown (sin procesar) en el modal.
+const releaseNotesCache = { data: null, fetchedAt: 0 };
+const RELEASE_NOTES_TTL = 60 * 60 * 1000; // 1 hora
+const GITHUB_REPO = 'Reivaj640/SG-SST-E';
+
+ipcMain.handle('get-release-notes', async () => {
+  try {
+    // Devolver cache si está fresco
+    if (releaseNotesCache.data && (Date.now() - releaseNotesCache.fetchedAt) < RELEASE_NOTES_TTL) {
+      return { success: true, cached: true, data: releaseNotesCache.data };
+    }
+    // Fetch desde GitHub
+    const url = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/vnd.github+json', 'User-Agent': 'K+AIR-Updater' }
+    });
+    if (!response.ok) {
+      return { success: false, error: { code: 'HTTP_' + response.status, message: `GitHub respondió ${response.status}` } };
+    }
+    const data = await response.json();
+    // Extraer lo que nos sirve
+    const release = {
+      tagName: data.tag_name || '',
+      name: data.name || data.tag_name || '',
+      body: data.body || '',  // markdown
+      publishedAt: data.published_at || '',
+      htmlUrl: data.html_url || ''
+    };
+    releaseNotesCache.data = release;
+    releaseNotesCache.fetchedAt = Date.now();
+    sendLog(`[UPDATER] Release notes fetched: ${release.tagName}`, 'INFO');
+    return { success: true, cached: false, data: release };
+  } catch (error) {
+    sendLog(`[UPDATER] Error fetching release notes: ${error.message}`, 'ERROR');
+    return { success: false, error: { code: 'FETCH_FAILED', message: error.message } };
+  }
+});
+
 // Manejar la obtención de la ruta de la aplicación
 ipcMain.handle('get-app-path', async () => {
   try {

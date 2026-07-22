@@ -74,10 +74,6 @@
             <!-- 📦563 + Alertas — Badge con conteo de eventos pendientes (mismo KairAlerts que el calendario viejo) -->
             <span id="bandeja-integrada-badge" class="kair-cal-badge" role="status" aria-label="Eventos pendientes" hidden>0</span>
           </button>
-          <button id="header-update-btn" class="header-btn header-update-btn header-update-uptodate" title="Cargando versión...">
-            <span class="icon-placeholder"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></span>
-            <span id="header-update-text" class="header-update-text">...</span>
-          </button>
           <button id="config-button" class="header-btn" title="Configuraciones">
             <span id="config-icon-placeholder" class="icon-placeholder"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
           </button>
@@ -85,23 +81,126 @@
             <span id="llm-icon-placeholder" class="icon-placeholder"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
           </button>
         </div>
-        <div id="header-update-panel" class="header-update-panel" style="display:none">
-          <div class="update-progress-container">
-            <div class="update-progress-bar">
-              <div id="update-progress-fill" class="update-progress-fill"></div>
-            </div>
-            <span id="update-progress-text" class="update-progress-text">Descargando...</span>
-          </div>
-          <div class="update-panel-actions">
-            <button id="update-download-btn" class="update-download-btn" style="display:none">Descargar</button>
-            <button id="update-install-btn" class="update-install-btn" style="display:none">Actualizar y reiniciar</button>
-          </div>
-        </div>
       </div>
     </header>
 
     <!-- Hotspot invisible para expandir el sidebar cuando está colapsado -->
     <div id="sidebar-hotspot"></div>
+
+    <!-- 📦581 (Loop 1.6) — Dropdown de actualización (FUERA del header, position: fixed, z-index alto).
+         Antes estaba dentro del header pero quedaba detrás del Vanta por
+         el stacking context (isolation: isolate) del header. Ahora está
+         en el body, position: fixed, y JS sincroniza su posición con el botón. -->
+    <div id="kair-update-dropdown" class="kair-update-dropdown" role="menu" aria-hidden="true" hidden>
+      <div class="kair-update-dropdown__inner">
+        <div class="kair-update-dropdown__header">
+          <div class="kair-update-dropdown__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+          </div>
+          <div class="kair-update-dropdown__title">
+            <div class="kair-update-dropdown__title-main">Nueva versión disponible</div>
+            <div class="kair-update-dropdown__title-sub">K+AIR v<span data-kair-update-version>—</span></div>
+          </div>
+        </div>
+        <div class="kair-update-dropdown__body">
+          <p class="kair-update-dropdown__desc">
+            Hay una actualización lista para instalar. Se aplicará automáticamente al cerrar la aplicación,
+            o podés reiniciar ahora.
+          </p>
+          <div class="kair-update-dropdown__actions">
+            <button type="button" class="kair-update-dropdown__btn kair-update-dropdown__btn--primary" data-kair-update-action="restart">
+              Reiniciar ahora
+            </button>
+            <button type="button" class="kair-update-dropdown__btn kair-update-dropdown__btn--ghost" data-kair-update-action="dismiss">
+              Más tarde
+            </button>
+          </div>
+          <!-- 📦581 (Loop 5) — Botón "Ver detalles" abre el modal de información de versión.
+               Link pequeño, ghost-style, separado del flujo principal de acciones. -->
+          <button type="button" class="kair-update-dropdown__link" data-kair-update-action="details">
+            Ver información de versión
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 📦581 (Loop 5) — Modal "Información de actualizaciones" (user-invoked).
+         Trigger: botón "Ver información de versión" en el dropdown del header.
+         Muestra: estado actual, versión instalada, versión disponible, última verificación,
+         canal de actualización, y permite forzar un check manual.
+         UX: Claude-style, low blue tone, border-radius 12px, sin invadir. -->
+    <div id="kair-update-modal-overlay" class="kair-update-modal-overlay" hidden>
+      <div id="kair-update-modal" class="kair-update-modal" role="dialog" aria-labelledby="kair-update-modal-title" aria-modal="true">
+        <header class="kair-update-modal__header">
+          <div class="kair-update-modal__title-wrap">
+            <div class="kair-update-modal__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12.01" y2="8"/>
+              </svg>
+            </div>
+            <div>
+              <h2 id="kair-update-modal-title" class="kair-update-modal__title">Información de actualizaciones</h2>
+              <p class="kair-update-modal__subtitle">K+AIR · Sistema de actualización automática</p>
+            </div>
+          </div>
+          <button type="button" class="kair-update-modal__close" data-kair-update-action="modal-close" aria-label="Cerrar">×</button>
+        </header>
+        <div class="kair-update-modal__body">
+          <!-- Estado actual (badge grande) -->
+          <div class="kair-update-modal__state">
+            <div class="kair-update-modal__state-badge" data-kair-modal-state="uptodate">
+              <span class="kair-update-modal__state-dot" aria-hidden="true"></span>
+              <span class="kair-update-modal__state-text" data-kair-modal-state-text>Al día</span>
+            </div>
+            <p class="kair-update-modal__state-desc" data-kair-modal-state-desc>Estás usando la última versión disponible.</p>
+          </div>
+          <!-- Info en grid -->
+          <dl class="kair-update-modal__grid">
+            <div class="kair-update-modal__row">
+              <dt>Versión instalada</dt>
+              <dd data-kair-modal-current-version>—</dd>
+            </div>
+            <div class="kair-update-modal__row">
+              <dt>Última versión disponible</dt>
+              <dd data-kair-modal-latest-version>—</dd>
+            </div>
+            <div class="kair-update-modal__row">
+              <dt>Última verificación</dt>
+              <dd data-kair-modal-last-check>—</dd>
+            </div>
+            <div class="kair-update-modal__row">
+              <dt>Canal</dt>
+              <dd>Estable (releases)</dd>
+            </div>
+          </dl>
+          <!-- Nota sobre auto-update -->
+          <p class="kair-update-modal__note">
+            Las actualizaciones se descargan en segundo plano y se aplican automáticamente al cerrar la aplicación.
+          </p>
+          <!-- 📦581 (Loop 9) — Release notes (preview de GitHub) -->
+          <div id="kair-modal-release-notes-wrap" class="kair-update-modal__notes-wrap" hidden>
+            <h3 class="kair-update-modal__notes-title">Qué hay de nuevo</h3>
+            <div id="kair-modal-release-notes" class="kair-update-modal__notes">
+              <div class="kair-update-modal__notes-loading">Cargando notas de la versión…</div>
+            </div>
+          </div>
+        </div>
+        <footer class="kair-update-modal__footer">
+          <button type="button" class="kair-update-modal__btn kair-update-modal__btn--ghost" data-kair-update-action="modal-close">
+            Cerrar
+          </button>
+          <button type="button" class="kair-update-modal__btn kair-update-modal__btn--primary" data-kair-update-action="modal-check">
+            <span data-kair-modal-check-label>Buscar actualizaciones ahora</span>
+          </button>
+        </footer>
+      </div>
+    </div>
 
     <div class="main-container">
       <aside id="sidebar">
@@ -118,7 +217,21 @@
     <footer id="app-footer">
       <div class="footer-content">
         <p>© 2025 Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos.</p>
-        <span id="app-version" class="footer-version"></span>
+        <span class="footer-version-wrap">
+          <span id="app-version" class="footer-version"></span>
+          <!-- 📦581 (Loop 4b) — Botón-dot de update en el footer (opencode-style).
+               OCULTO por default (al día). Aparece al lado de la versión
+               cuando hay update (dot azul pulse) o está descargado (dot verde halo).
+               Click en el dot abre el dropdown anclado al footer. -->
+          <button id="footer-update-btn" class="footer-update-btn" type="button" title="Versión actual" aria-label="Información de actualizaciones" aria-haspopup="menu" aria-expanded="false" hidden>
+            <span class="footer-update-btn__dot" aria-hidden="true"></span>
+          </button>
+          <!-- 📦581 (Loop 8) — Disclaimer "se instalará al cerrar" al lado del dot.
+               OCULTO por default. Aparece SOLO cuando hay update (dot visible).
+               Le recuerda al user que la actualización se aplica al cerrar la app,
+               sin necesidad de hacer nada. -->
+          <span id="footer-update-disclaimer" class="footer-update-disclaimer" hidden>Se instalará al cerrar la app</span>
+        </span>
       </div>
     </footer>
   </div>
