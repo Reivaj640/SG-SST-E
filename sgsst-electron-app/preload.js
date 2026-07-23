@@ -735,4 +735,37 @@ renameCargo: (companyName, cargoId, nombre) => ipcRenderer.invoke('matriz-peligr
   // Acceso directo en escritorio (autoUpdater no lo recrea tras update)
   createDesktopShortcut: () => ipcRenderer.invoke('create-desktop-shortcut'),
   checkDesktopShortcut: () => ipcRenderer.invoke('check-desktop-shortcut'),
+
+  // --- 📦589 (2026-07-23) — Submódulo 3.1.3 Perfiles de Cargo y Profesiograma ---
+  // Handlers del bridge `profesiograma-bridge.js` (persistencia SQLite central).
+  profesiograma: {
+    kpis: () => ipcRenderer.invoke('profesiograma:kpis'),
+    matriz: () => ipcRenderer.invoke('profesiograma:matriz'),
+    cargosList: () => ipcRenderer.invoke('profesiograma:cargos:list'),
+    cargosGet: (id) => ipcRenderer.invoke('profesiograma:cargos:get', { id }),
+    cargosSave: (data) => ipcRenderer.invoke('profesiograma:cargos:save', data),
+    cargosDelete: (id) => ipcRenderer.invoke('profesiograma:cargos:delete', { id }),
+    tipoExamenList: () => ipcRenderer.invoke('profesiograma:tipo-examen:list'),
+    tipoExamenSave: (data) => ipcRenderer.invoke('profesiograma:tipo-examen:save', data),
+    tipoExamenDelete: (id) => ipcRenderer.invoke('profesiograma:tipo-examen:delete', { id }),
+    pruebasList: () => ipcRenderer.invoke('profesiograma:pruebas:list'),
+    pruebasSave: (data) => ipcRenderer.invoke('profesiograma:pruebas:save', data),
+    pruebasDelete: (id) => ipcRenderer.invoke('profesiograma:pruebas:delete', { id }),
+    recomendacionesList: () => ipcRenderer.invoke('profesiograma:recomendaciones:list'),
+    recomendacionesSave: (data) => ipcRenderer.invoke('profesiograma:recomendaciones:save', data),
+    recomendacionesDelete: (id) => ipcRenderer.invoke('profesiograma:recomendaciones:delete', { id }),
+    vacunacionList: () => ipcRenderer.invoke('profesiograma:vacunacion:list'),
+    vacunacionSave: (data) => ipcRenderer.invoke('profesiograma:vacunacion:save', data),
+    vacunacionDelete: (id) => ipcRenderer.invoke('profesiograma:vacunacion:delete', { id }),
+    alturasList: () => ipcRenderer.invoke('profesiograma:alturas:list'),
+    alturasSave: (data) => ipcRenderer.invoke('profesiograma:alturas:save', data),
+    alturasDelete: (id) => ipcRenderer.invoke('profesiograma:alturas:delete', { id }),
+    grupoOcupacionalList: () => ipcRenderer.invoke('profesiograma:grupo-ocupacional:list'),
+    grupoOcupacionalSave: (data) => ipcRenderer.invoke('profesiograma:grupo-ocupacional:save', data),
+    grupoOcupacionalDelete: (id) => ipcRenderer.invoke('profesiograma:grupo-ocupacional:delete', { id }),
+    importExcel: (data) => ipcRenderer.invoke('profesiograma:import-excel', data),
+    selectExcel: () => ipcRenderer.invoke('profesiograma:select-excel'),
+    selectSavePath: (opts) => ipcRenderer.invoke('profesiograma:select-save-path', opts || {}),
+    exportExcel: (data) => ipcRenderer.invoke('profesiograma:export-excel', data),
+  },
 });

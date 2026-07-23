@@ -58,6 +58,8 @@ const { registerEventosCumplidosHandlers, SCHEMA_SQL: EVENTOS_CUMPLIDOS_SCHEMA_S
 const { registerEventosRapidosHandlers } = require('./main/eventos-rapidos-bridge');
 // 📦531 — Persistencia de planes de acción del submódulo 2.3.1 Evaluación Inicial
 const { registerEvaluacionActionPlansHandlers, SCHEMA_SQL: EVAL_ACTION_PLANS_SCHEMA_SQL } = require('./main/evaluacion-action-plans-bridge');
+// 📦589 — Submódulo 3.1.3 Perfiles de cargo y Profesiograma (Salud)
+const { registerProfesiogramaHandlers, SCHEMA_SQL: PROFESIOGRAMA_SCHEMA_SQL } = require('./main/profesiograma-bridge');
 // 📦 Bandeja Integrada — Schema SQLite para emails (threads, messages, labels, attachments)
 // Inspirado en Mail-0/Zero (https://github.com/Mail-0/Zero) — mismo patrón que
 // GESTACION_SCHEMA_SQL: CREATE TABLE IF NOT EXISTS + migraciones idempotentes.
@@ -429,6 +431,15 @@ function initDbOnce() {
       console.log('[DB] 📦498 · Tabla eventos_cumplidos creada/verificada');
     } catch (cumErr) {
       console.error('[DB] 📦498 · Error creando tabla eventos_cumplidos:', cumErr.message);
+    }
+
+    // 📦589 — Submódulo 3.1.3 Perfiles de cargo y Profesiograma
+    // Crea las 10 tablas kp_* (profesiograma, cargo, tipo_examen, etc.)
+    try {
+      db.exec(PROFESIOGRAMA_SCHEMA_SQL);
+      console.log('[DB] 📦589 · Tablas de Profesiograma (kp_*) creadas/verificadas');
+    } catch (profErr) {
+      console.error('[DB] 📦589 · Error creando tablas de Profesiograma:', profErr.message);
     }
 
     // 📦531 — Schema de planes de acción de Evaluación Inicial. Persiste
@@ -9345,6 +9356,8 @@ try {
 try {
   registerGestacionHandlers(app, { getDb });
   registerEventosCumplidosHandlers(app, { getDb });
+  // 📦589 — Submódulo 3.1.3 Perfiles de cargo y Profesiograma (Salud)
+  registerProfesiogramaHandlers(app, { getDb, getCompanyRootPath });
   registerEvaluacionActionPlansHandlers(app, { getDb });
   registerSyncHandlers(app, { getDb });
   // 📦538 (FIX orden init) — Generar pcId y arrancar auto-sync DESPUES de

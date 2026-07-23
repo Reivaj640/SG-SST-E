@@ -302,8 +302,13 @@ var ResponsableSgViewer = (function () {
         return new Promise(function (resolve, reject) {
             var requestId = 'req-' + Date.now() + '-' + Math.random();
 
+            // Usar window.top (renderer.js) en vez de window.parent para soportar
+            // embedding en iframes anidados (ej. submódulo 3.1.3 profesio).
+            // En uso normal de 1.1.1, window.top === window.parent === renderer.js.
+            var targetWindow = window.top || window.parent;
+
             function handleResponse(event) {
-                if (event.origin !== 'file://' || event.source !== window.parent) {
+                if (event.origin !== 'file://' || event.source !== targetWindow) {
                     return;
                 }
                 var response = event.data;
@@ -321,7 +326,7 @@ var ResponsableSgViewer = (function () {
             }
 
             window.addEventListener('message', handleResponse);
-            window.parent.postMessage({
+            targetWindow.postMessage({
                 type: type + '-request',
                 payload: payload,
                 requestId: requestId
@@ -1327,8 +1332,10 @@ var ResponsableSgViewer = (function () {
        ═══════════════════════════════════════════════════════════════ */
     function _backToModule() {
         _log('BACK_TO_MODULE', 'START');
-        if (window.parent && window.parent.postMessage) {
-            window.parent.postMessage({ type: 'back-to-module-request' }, '*');
+        // Usar window.top para soportar embedding en iframes anidados
+        var target = window.top || window.parent;
+        if (target && target.postMessage) {
+            target.postMessage({ type: 'back-to-module-request' }, '*');
         }
     }
 

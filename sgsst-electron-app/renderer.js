@@ -148,7 +148,7 @@ const SUBMODULE_PERMISSION_MAP_UI = new Map([
   ['2.13.1 elementos de proteccion personal', 'gestion-integral.plan-trabajo'],
   ['3.1.1 descripcion sociodemografica y diagnostico de condiciones de salud', 'salud.sociodemografica'],
   ['3.1.2 actividades de medicina y preventiva y promocion de la salud', 'salud.sociodemografica'],
-  ['3.1.3 perfil de cargo y profesiograma', 'salud.sociodemografica'],
+  ['3.1.3 perfil de cargo y profesiograma', 'salud.perfiles-cargo-profesiograma'],
   ['3.1.4 evaluaciones medicas', 'salud.evaluaciones-medicas'],
   ['3.1.5 custodia medica ocupacional', 'salud.sociodemografica'],
   ['3.1.6 restricciones y recomendaciones medicas', 'salud.restricciones-medicas'],
@@ -5166,6 +5166,20 @@ showDevelopmentMessage(submoduleContentDiv, submoduleName);
         sociodemograficaComponent.render();
       } else {
         console.error('❌ SociodemograficaComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
+    } else if (submoduleName === "3.1.3 Perfil de cargo y profesiograma") {
+      if (window.PerfilesCargoProfesiogramaComponent) {
+        const profesiogramaComponent = new window.PerfilesCargoProfesiogramaComponent(
+          submoduleContentDiv,
+          currentCompany,
+          moduleName,
+          submoduleName,
+          safeBackToModuleCallback
+        );
+        profesiogramaComponent.render();
+      } else {
+        console.error('❌ PerfilesCargoProfesiogramaComponent no encontrado');
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
     } else if (submoduleName === "3.1.6 Restricciones y recomendaciones médicas") {
