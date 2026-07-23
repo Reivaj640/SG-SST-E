@@ -93,6 +93,14 @@ autoUpdater.logger = log;
 autoUpdater.autoDownload = true;          // Descarga automática apenas detecta update-available
 autoUpdater.autoInstallOnAppQuit = true;  // Instala automáticamente al cerrar la app
 autoUpdater.autoRunAppAfterInstall = true;
+// 📦583 (Loop 11) — Workaround: deshabilitar differential download.
+// La versión empaquetada de builder-util-runtime tiene un bug inestable
+// que calcula el SHA512 en formatos inconsistentes (hex vs base64) durante
+// el DifferentialDownloader, causando errores "sha512 checksum mismatch"
+// falsos incluso cuando el archivo es correcto. Full download (264 MB)
+// es más lento pero 100% confiable. Si en el futuro se actualiza electron-updater
+// y se arregla el bug, se puede volver a habilitar (quitando esta línea).
+autoUpdater.disableDifferentialDownload = true;
 // Configurar timeout para evitar cuelgues en conexiones lentas
 autoUpdater.requestHeaders = {
   'Cache-Control': 'no-cache'
