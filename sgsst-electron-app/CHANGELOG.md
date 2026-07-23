@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **🚀 `scripts/release.ps1` — flujo automatizado de release** — Script PowerShell que ejecuta el流程 completo en 7 pasos: (1) verifica pre-requisitos (`GH_TOKEN` + branch `Dev-Pc` + working tree), (2) corre tests (`-SkipTests` para saltar), (3) `git push origin Dev-Pc`, (4) crea el tag `v<version>` local, (5) **`git push origin v<version>` — el paso crítico que evita el 422 de "Published releases must have a valid tag"**, (6) verifica que GitHub ve el tag, (7) corre `electron-builder --win --publish=always`. Si el build falla, llama automáticamente a `fix-release.ps1` como fallback. Mensajes claros en cada paso, detección de versión automática desde `package.json`, y rollback del tag si ya existe.
+- **🛟 `scripts/fix-release.ps1` — fallback cuando electron-builder falla al subir** — Versión reutilizable del workaround manual que aplicamos para v0.1.131/132/133. En 6 pasos: (1) verifica que el `.exe` y `.blockmap` existen localmente, (2) calcula el SHA512 real y regenera `latest.yml`, (3) obtiene o crea el release via API de GitHub, (4) borra assets huérfanos con nombre viejo (`sgsst-electron-app-setup-*`), (5) sube `.exe` + `.blockmap` + `latest.yml` con `curl` directo a `uploads.github.com`, (6) PATCH el name + body del release. Tiene los 2 fixes de bugs descubiertos en intentos manuales: regex correcta `\{[^}]*\}` (no se come el `}`) y delimitación `${uploadBase}` (PowerShell no trata `?` como wildcard).
+
+### Removed
+- **🗑️ `Portear/python-embed.bak/` (20.8 MB)** — Backup legacy con ejecutables de torch/transformers/accelerate/huggingface-cli del modelo viejo (cuando se usaba transformers, antes de migrar a Ollama/GGUF). Confirmado por grep: **NADIE lo referencia** — ni `main.js`, ni `package.json`, ni los build scripts, ni los scripts Python. Solo `.gitignore` lo conocía. La app usa exclusivamente `Portear/python-embed/` (340 MB con pandas, pymupdf, flask, etc.) que sigue intacto. Borrado del repo local y del build output (`dist/win-unpacked/resources/app/Portear/python-embed.bak/`). Recuperable desde la papelera de Windows.
+- **🗑️ ~60 archivos firmados con signtool innecesariamente** — El `.bak` se firmaba en cada build (accelerate.exe, transformers.exe, torchrun.exe, huggingface-cli.exe, etc.). Ahora se saltan, ahorrando 1-2 min de firma.
+
+### Build & Tooling
+- **📦585 — Commit de tooling** (este commit). Cero cambios funcionales, solo自动化 del流程 de release y limpieza de dead weight.
+
 ## [0.1.131] - 2026-07-22
 
 ### Added

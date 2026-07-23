@@ -334,6 +334,64 @@ b.className = 'footer-update-btn footer-update-available';
 b.click();  // abre el dropdown anclado arriba del dot
 ```
 
+## 🆕 Release flow automatizado (📦585, v0.1.131+)
+
+A partir de **v0.1.131+** el流程 de release está automatizado. Antes había que acordarse de hacer `git tag` + `git push origin <tag>` antes de correr `electron-builder --publish=always`, y si se olvidaba, GitHub devolvía **422 "Published releases must have a valid tag"** y el release quedaba roto con assets huérfanos.
+
+### `scripts/release.ps1` (7.6 KB)
+
+Ejecuta el流程 completo de release en 7 pasos. **El paso crítico es el 5: `git push origin v<version>` ANTES del build** — eso es lo que evita el 422.
+
+```powershell
+#流程 completo (con tests):
+.\scripts\release.ps1
+
+#流程 sin tests:
+.\scripts\release.ps1 -SkipTests
+```
+
+**Pasos del script**:
+
+1. **Pre-checks** — Verifica `GH_TOKEN` en environment, branch actual = `Dev-Pc` (configurable con `-Branch`), working tree limpio (advierte y pide confirmación si hay cambios).
+2. **Tests** (opcional) — Corre `main/test-fixes-loop48.js` si existe. Falla rápido si hay tests rotos.
+3. **`git push origin Dev-Pc`** — Sube los commits pendientes al remoto.
+4. **Crea tag `v<version>` local** — Lee la versión de `package.json`. Si el tag ya existe local, pregunta si lo borra.
+5. **`git push origin v<version>`** ← **EL PASO QUE EVITA EL 422**
+6. **Verifica visibilidad del tag en GitHub** — Hace `GET /repos/{owner}/{repo}/git/refs/tags/{tag}`. Si no está visible, espera 5s.
+7. **`npx electron-builder --win --publish=always`** — Build completo. Si falla, llama a `fix-release.ps1` automáticamente.
+
+### `scripts/fix-release.ps1` (7.8 KB) — Fallback
+
+Si `electron-builder` falla (típicamente por timeout al subir el `.exe` de 264 MB), `release.ps1` llama automáticamente a este script. También se puede correr manual:
+
+```powershell
+# Usa la version de package.json:
+.\scripts\fix-release.ps1
+
+# Version especifica:
+.\scripts\fix-release.ps1 -Version 0.1.133
+```
+
+**6 pasos del fix**:
+
+1. **Verifica archivos locales** — `.exe` y `.blockmap` en `dist/`. Falla si no existen.
+2. **SHA512 + latest.yml** — Calcula el hash real del `.exe` local y regenera `dist/latest.yml` con el formato que espera `electron-updater`.
+3. **Obtiene o crea el release** — `GET /repos/{owner}/{repo}/releases/tags/v{version}`. Si no existe, lo crea.
+4. **Borra assets huérfanos** — Recorre los assets existentes y borra los que tienen el nombre viejo (`sgsst-electron-app-setup-*`).
+5. **Sube assets con curl** — `.exe`, `.blockmap`, `latest.yml` con `& curl.exe -X POST` directo a `uploads.github.com`. Cada upload muestra OK/FAIL.
+6. **PATCH name + body** — `PATCH /releases/{id}` con el nombre `v{version}` y un body minimalista con link al CHANGELOG.
+
+### Bugs del fix manual que el script ya corrige
+
+Durante los intentos manuales de v0.1.131/132/133 descubrimos 2 bugs en el shell scripting que el script ya tiene arreglados:
+
+1. **Regex glotona**: `"\?.*$"` se comía el `}` final del `upload_url`, dejando `assets{` que curl rechazaba como "Bad hostname". **Fix**: usar `\{[^}]*\}` (una sola pasada, no glotona).
+2. **PowerShell wildcard**: `"$uploadBase?name=..."` se parseaba como `"$uploadBase?` (variable con 1 char extra) + `name=...` porque `?` es wildcard. **Fix**: delimitar con `{}` → `"${uploadBase}?name=..."`.
+
+### Cero impacto en runtime
+
+Los scripts son **solo para el build pipeline**, no se importan en la app. `package.json` no los referencia. Se pueden commitear al repo sin riesgo.
+
 ## 🆕 Menú nativo de Electron oculto (Loop 47b, 📦579, v0.1.130)
 
 A partir de **v0.1.130** la barra de menú nativa de Windows (File / Edit / View / Window / Help) ya **no se muestra** por defecto en la app. Comportamiento idéntico a Discord, Slack, VSCode:
