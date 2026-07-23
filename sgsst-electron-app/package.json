@@ -51,6 +51,7 @@
   "build": {
     "appId": "com.jrfsoluciones.sgsst",
     "productName": "K+AIR",
+    "artifactName": "${productName}-Setup-${version}.${ext}",
     "copyright": "Copyright © 2025 Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos.",
     "asar": false,
     "directories": {
