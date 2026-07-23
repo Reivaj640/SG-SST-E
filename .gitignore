@@ -4,6 +4,14 @@ tmp/
 # Node modules (instalados por npm/pnpm, regenerables con package.json)
 node_modules/
 
+# 📦584 (Loop cleanup) — Prevenir package.json/package-lock.json fantasma en la RAÍZ
+# del repo. El proyecto REAL está en sgsst-electron-app/ (4,450 bytes, con
+# name/version/build/etc). Si npm install se ejecuta por error desde la raíz,
+# crea un package.json minimo (55 bytes) que confunde a npx y electron-builder.
+# Estos paths son RELATIVOS a la raíz del repo (con / inicial).
+/package.json
+/package-lock.json
+
 # Python cache (generado por import chains de debug)
 __pycache__/
 *.pyc
