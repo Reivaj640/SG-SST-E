@@ -7,7 +7,13 @@ const fs = require('fs');           // Para operaciones síncronas
 const fsSync = require('fs');       // Para operaciones síncronas
 const { exec, spawn, execFile } = require('child_process'); // Asegúrate de incluir execFile
 const { promisify } = require('util');
-const xlsx = require('xlsx');
+// 📦588 # fix(defensive): wrap require('xlsx') para que la app no crashee si xlsx no esta disponible
+let xlsx = null;
+try {
+  xlsx = require('xlsx');
+} catch (e) {
+  console.warn('[MAIN] ⚠️ xlsx module not available, Excel features disabled:', e.message);
+}
 const os = require('os');
 const { autoUpdater } = require('electron-updater');
 const log = require('electron-log');
@@ -3581,7 +3587,15 @@ ipcMain.handle('process-excel-data', async (event, { buffer, company, period }) 
       throw new Error('No se proporcionó un buffer de archivo Excel válido');
     }
 
-    const XLSX = require('xlsx');
+    let XLSX;
+    try {
+      XLSX = require('xlsx');
+    } catch (e) {
+      return { success: false, error: { code: 'XLSX_NOT_AVAILABLE', message: 'xlsx module not available: ' + e.message } };
+    }
+    if (!XLSX) {
+      return { success: false, error: { code: 'XLSX_NOT_AVAILABLE', message: 'xlsx module not available' } };
+    }
     const workbook = XLSX.read(buffer, { type: 'buffer' });
 
     // --- LÓGICA MEJORADA: BUSCAR LA HOJA CORRECTA ---
@@ -9841,6 +9855,10 @@ ipcMain.handle('read-ausentismo-data', async (event, companyName) => {
     let workbook;
     try {
       const XLSX = require('xlsx');
+      if (!XLSX) {
+        return degradedResponse('xlsx-missing', ausentismoDir, expectedFileName,
+          'El módulo xlsx no está disponible. Reinstalá la app o contactá soporte.');
+      }
       workbook = XLSX.readFile(filePath);
     } catch (xlsxErr) {
       console.warn(`[ESTADISTICAS] XLSX.readFile() falló: ${xlsxErr.message}`);
@@ -9965,7 +9983,16 @@ ipcMain.handle('registro-estadistico:cargar-datos', async (event, { companyName 
     const filePath = path.join(submoduleDir, excelFile);
     console.log('[REGISTRO-EST] Leyendo:', filePath);
 
-    const XLSX = require('xlsx');
+    let XLSX;
+    try {
+      XLSX = require('xlsx');
+    } catch (e) {
+      console.warn('[REGISTRO-EST] xlsx no disponible:', e.message);
+      return { success: false, error: { code: 'XLSX_NOT_AVAILABLE', message: 'xlsx module not available' } };
+    }
+    if (!XLSX) {
+      return { success: false, error: { code: 'XLSX_NOT_AVAILABLE', message: 'xlsx module not available' } };
+    }
     const wb = XLSX.readFile(filePath);
     const ws = wb.Sheets[wb.SheetNames[0]];
     if (!ws) return { success: true, data: [], isEmpty: true, reason: 'NO_SHEET' };
@@ -19024,7 +19051,16 @@ ipcMain.handle('frecuencia-accidentalidad:leer-meta-objetivo', async (event, com
 
     console.log('[FrecuenciaAccidentalidad] Leyendo meta desde:', rutaObjetivos);
 
-    const XLSX = require('xlsx');
+    let XLSX;
+    try {
+      XLSX = require('xlsx');
+    } catch (e) {
+      console.warn('[FrecuenciaAccidentalidad] xlsx no disponible:', e.message);
+      return { success: false, error: { code: 'XLSX_NOT_AVAILABLE', message: 'xlsx module not available' } };
+    }
+    if (!XLSX) {
+      return { success: false, error: { code: 'XLSX_NOT_AVAILABLE', message: 'xlsx module not available' } };
+    }
     const wb = XLSX.readFile(rutaObjetivos);
     const ws = wb.Sheets[wb.SheetNames[0]];
     if (!ws) return { success: true, data: null };
