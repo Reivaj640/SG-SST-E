@@ -19,12 +19,20 @@ window.KairData = (function () {
     critico:       { id: "critico",       label: "Crítico / Vence",  color: "#dc3545", bg: "#fdeaea", border: "#f5c2c7" },
   };
 
-  // ====== Configuración del mes vigente ======
+  // ====== Configuración del mes vigente =====
+  // 📦594 — Inicializar dinámicamente desde la fecha actual del sistema.
+  // Antes estaba hardcoded a 2026-07-21 → la app siempre mostraba ese día
+  // aunque pasaran los días. Ahora se recalcula cada vez que se carga el módulo.
+  // El campo `label` se asigna más abajo, después de que MONTH_LABELS_ES exista.
+  const _now594 = new Date();
+  const _todayIso594 = _now594.getFullYear() + "-" +
+    String(_now594.getMonth() + 1).padStart(2, "0") + "-" +
+    String(_now594.getDate()).padStart(2, "0");
   const MONTH_VIEW = {
-    year: 2026,
-    month: 6, // 0-indexed: 6 = Julio
-    label: "Julio 2026",
-    todayIso: "2026-07-21",
+    year: _now594.getFullYear(),
+    month: _now594.getMonth(), // 0-indexed
+    label: "", // se asigna después de MONTH_LABELS_ES
+    todayIso: _todayIso594,
     firstDayOfWeek: 1, // Lunes
   };
 
@@ -80,6 +88,8 @@ window.KairData = (function () {
     "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
     "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
   ];
+  // 📦594 — Asignar label del mes vigente ahora que MONTH_LABELS_ES existe
+  MONTH_VIEW.label = MONTH_LABELS_ES[_now594.getMonth()] + " " + _now594.getFullYear();
   function buildMonthLabel(year, month) {
     return MONTH_LABELS_ES[month] + " " + year;
   }

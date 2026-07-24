@@ -547,6 +547,13 @@
       case 'next':    this._navigate(1); break;
       case 'today':   this.state.current = new Date(); this.state.selectedDate = new Date(); this.state.miniCurrent = new Date(); this._refresh(); break;
       case 'new':     this._openEventModal(null); break;
+      case 'programar':
+        // 📦594 — Programar: abre el modal de crear evento con la fecha de hoy
+        // preseteada. Mismo flujo que "+ Crear" pero sin scrollear el calendario
+        // para elegir día primero. _openEventModal ya cierra cualquier modal previo
+        // y usa el timeStr default ('09:00') si no se le pasa.
+        this._openEventModal(null, toISODate(new Date()), null);
+        break;
       case 'mini-prev': this.state.miniCurrent = new Date(this.state.miniCurrent.getFullYear(), this.state.miniCurrent.getMonth()-1, 1); this._renderMini(); break;
       case 'mini-next': this.state.miniCurrent = new Date(this.state.miniCurrent.getFullYear(), this.state.miniCurrent.getMonth()+1, 1); this._renderMini(); break;
       case 'modal-save':   this._saveEventFromModal(); break;
@@ -1422,6 +1429,15 @@
     if (this._triggers) {
       this._triggers.forEach(t => t.classList.add('kair-cal-trigger--active'));
     }
+    // 📦594 — Re-sincronizar current/selectedDate/miniCurrent con "hoy" cada vez
+    // que se abre el popover. Sin esto, si la app quedó abierta varios días,
+    // el calendario mostraba el día en que se cargó la app como "seleccionado"
+    // (porque state se cachea al instanciar el KairCalendar). Ahora al abrir
+    // siempre arranca en hoy, que es lo que el usuario espera.
+    var _today = new Date();
+    this.state.current = _today;
+    this.state.selectedDate = _today;
+    this.state.miniCurrent = _today;
     this._loadEvents().then(() => this._refresh());
     this._startNowLineTimer();
   };

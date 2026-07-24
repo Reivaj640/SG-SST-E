@@ -4190,3 +4190,498 @@ body {
 .kair-pulse {
   animation: kair-pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* 📦594 — Vistas Día / Semana / Programar (lista vertical estilo agenda) */
+.kair-agenda-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--kair-border-soft, #e5e7eb);
+  background: #fafbfc;
+  flex-shrink: 0;
+}
+.kair-agenda-head__title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--kair-text, #111);
+  text-transform: capitalize;
+}
+.kair-agenda-head__count {
+  font-size: 0.75rem;
+  color: var(--kair-text-light, #6b7280);
+}
+.kair-agenda-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+.kair-agenda-empty {
+  text-align: center;
+  padding: 40px 16px;
+  color: var(--kair-text-light, #6b7280);
+  font-size: 0.875rem;
+}
+.kair-agenda-item {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--kair-border-soft, #e5e7eb);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.kair-agenda-item:hover { background: rgba(0,0,0,0.03); }
+.kair-agenda-item__time {
+  width: 56px;
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--kair-text, #111);
+  padding-top: 2px;
+}
+.kair-agenda-item__bar {
+  width: 4px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.kair-agenda-item__body { flex: 1; min-width: 0; }
+.kair-agenda-item__title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--kair-text, #111);
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kair-agenda-item__meta {
+  font-size: 0.75rem;
+  color: var(--kair-text-light, #6b7280);
+}
+.kair-agenda-item__cat { font-weight: 600; }
+.kair-agenda-day-sep {
+  padding: 8px 16px 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--kair-text-light, #6b7280);
+  text-transform: capitalize;
+  background: #f3f4f6;
+  border-top: 1px solid var(--kair-border-soft, #e5e7eb);
+  border-bottom: 1px solid var(--kair-border-soft, #e5e7eb);
+}
+
+/* Vista semana: 7 columnas en grid */
+.kair-agenda-week {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  padding: 8px;
+  overflow: auto;
+  align-content: start;
+}
+.kair-agenda-week__day {
+  background: #fff;
+  border: 1px solid var(--kair-border-soft, #e5e7eb);
+  border-radius: 6px;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+}
+.kair-agenda-week__day--today {
+  border-color: var(--kair-primary, #185abd);
+  border-width: 2px;
+}
+.kair-agenda-week__day--selected {
+  background: rgba(24,90,189,0.04);
+}
+.kair-agenda-week__day-head {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--kair-border-soft, #e5e7eb);
+  background: #fafbfc;
+  border-radius: 6px 6px 0 0;
+}
+.kair-agenda-week__dow {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  color: var(--kair-text-light, #6b7280);
+  font-weight: 600;
+}
+.kair-agenda-week__num {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--kair-text, #111);
+}
+.kair-agenda-week__today-pill {
+  margin-left: auto;
+  font-size: 0.65rem;
+  background: var(--kair-primary, #185abd);
+  color: #fff;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+.kair-agenda-week__empty {
+  padding: 8px;
+  font-size: 0.7rem;
+  color: var(--kair-text-light, #9ca3af);
+  font-style: italic;
+}
+.kair-agenda-week__item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  font-size: 0.7rem;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+}
+.kair-agenda-week__item:hover { background: rgba(0,0,0,0.04); }
+.kair-agenda-week__time { color: var(--kair-text-light, #6b7280); font-weight: 500; }
+.kair-agenda-week__bar { width: 3px; height: 12px; border-radius: 1px; flex-shrink: 0; }
+.kair-agenda-week__title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 📦594 — Vista Día: grilla horaria estilo Google Calendar */
+.kair-day-grid-wrap {
+  flex: 1;
+  overflow: auto;
+  padding: 8px;
+  background: #f3f4f6;
+}
+.kair-day-grid {
+  display: flex;
+  background: #fff;
+  border: 1px solid var(--kair-border-soft, #e5e7eb);
+  border-radius: 4px;
+  overflow: hidden;
+  min-width: 600px;
+}
+.kair-day-hours {
+  width: 60px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--kair-border-soft, #e5e7eb);
+  background: #fafbfc;
+}
+.kair-day-hour-label {
+  height: 48px;
+  position: relative;
+  border-bottom: 1px solid var(--kair-border-soft, #e5e7eb);
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding-right: 8px;
+  box-sizing: border-box;
+}
+.kair-day-hour-label__text {
+  background: #fafbfc;
+  padding: 0 4px;
+  font-size: 0.7rem;
+  color: var(--kair-text-light, #6b7280);
+  line-height: 1;
+  /* 📦594 — El texto sobresale 7px arriba de la celda para que su centro
+     vertical quede sobre la línea horizontal de la hora (que está en
+     el border-bottom de la celda anterior, equivalente a top:0 de esta). */
+  margin-top: -7px;
+  position: relative;
+  z-index: 1;
+}
+.kair-day-hour-label__text--first {
+  margin-top: 2px;
+}
+.kair-day-events {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+}
+.kair-day-hour-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--kair-border-soft, #e5e7eb);
+}
+.kair-day-now-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #dc3545;
+  z-index: 5;
+}
+.kair-day-now-line::before {
+  content: "";
+  position: absolute;
+  left: -4px;
+  top: -4px;
+  width: 8px;
+  height: 8px;
+  background: #dc3545;
+  border-radius: 50%;
+}
+.kair-day-empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--kair-text-light, #6b7280);
+  font-size: 0.875rem;
+  font-style: italic;
+}
+.kair-day-event {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  border-left: 3px solid;
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  overflow: hidden;
+  z-index: 2;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.kair-day-event:hover {
+  transform: scale(1.01);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  z-index: 3;
+}
+.kair-day-event__time {
+  font-weight: 600;
+  font-size: 0.7rem;
+  opacity: 0.85;
+  margin-bottom: 2px;
+}
+.kair-day-event__title {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kair-day-event__cat {
+  font-size: 0.65rem;
+  opacity: 0.75;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 📦594 — Vista Semana: grilla horaria 7 columnas estilo Google Calendar */
+.kair-week-header {
+  display: grid;
+  grid-template-columns: 60px repeat(7, 1fr);
+  background: #fff;
+  border: 1px solid var(--kair-border-soft, #e5e7eb);
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  overflow: hidden;
+}
+.kair-week-corner {
+  border-right: 1px solid var(--kair-border-soft, #e5e7eb);
+  background: #fafbfc;
+}
+.kair-week-day-head {
+  padding: 6px 4px;
+  text-align: center;
+  border-left: 1px solid var(--kair-border-soft, #e5e7eb);
+  background: #fafbfc;
+  position: relative;
+}
+.kair-week-day-head--today {
+  background: rgba(24,90,189,0.08);
+  border-top: 2px solid var(--kair-primary, #185abd);
+}
+.kair-week-day-head--selected {
+  background: rgba(24,90,189,0.12);
+}
+.kair-week-dow {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: var(--kair-text-light, #6b7280);
+  font-weight: 600;
+}
+.kair-week-num {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--kair-text, #111);
+  line-height: 1.2;
+}
+.kair-week-today-pill {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 0.55rem;
+  background: var(--kair-primary, #185abd);
+  color: #fff;
+  padding: 1px 5px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+.kair-week-body {
+  display: flex;
+  flex: 1;
+  overflow: auto;
+  border: 1px solid var(--kair-border-soft, #e5e7eb);
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  background: #fff;
+}
+.kair-week-hours {
+  width: 60px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--kair-border-soft, #e5e7eb);
+  background: #fafbfc;
+  position: relative;
+}
+.kair-week-hour-label {
+  height: 40px;
+  position: relative;
+  border-bottom: 1px solid var(--kair-border-soft, #e5e7eb);
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding-right: 6px;
+  box-sizing: border-box;
+}
+.kair-week-hour-label__text {
+  background: #fafbfc;
+  padding: 0 3px;
+  font-size: 0.65rem;
+  color: var(--kair-text-light, #6b7280);
+  line-height: 1;
+  margin-top: -6px;
+  position: relative;
+  z-index: 1;
+}
+.kair-week-hour-label__text--first {
+  margin-top: 2px;
+}
+.kair-week-col {
+  flex: 1;
+  min-width: 80px;
+  position: relative;
+  border-left: 1px solid var(--kair-border-soft, #e5e7eb);
+}
+.kair-week-col--today {
+  background: rgba(24,90,189,0.03);
+}
+.kair-week-col--selected {
+  background: rgba(24,90,189,0.06);
+}
+.kair-week-hour-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--kair-border-soft, #e5e7eb);
+}
+.kair-week-now-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #dc3545;
+  z-index: 5;
+}
+.kair-week-now-line::before {
+  content: "";
+  position: absolute;
+  left: -3px;
+  top: -3px;
+  width: 6px;
+  height: 6px;
+  background: #dc3545;
+  border-radius: 50%;
+}
+.kair-week-event {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  border-left: 3px solid;
+  border-radius: 3px;
+  padding: 2px 4px;
+  font-size: 0.65rem;
+  cursor: pointer;
+  overflow: hidden;
+  z-index: 2;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.kair-week-event:hover {
+  transform: scale(1.02);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  z-index: 3;
+}
+.kair-week-event__time {
+  font-weight: 600;
+  font-size: 0.6rem;
+  opacity: 0.85;
+  margin-bottom: 1px;
+}
+.kair-week-event__title {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kair-week-event__cat {
+  font-size: 0.55rem;
+  opacity: 0.7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 📦594 — Eventos "todo el día" (00:00-23:59) en banner arriba */
+.kair-allday-banner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px 12px;
+  background: #f3f4f6;
+  border-bottom: 1px solid var(--kair-border-soft, #e5e7eb);
+}
+.kair-allday-chip {
+  border-left: 3px solid;
+  border-radius: 3px;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 280px;
+  transition: opacity 0.15s;
+}
+.kair-allday-chip:hover { opacity: 0.85; }
+
+/* Vista semana: chips all-day dentro del header de columna */
+.kair-week-day-head {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-height: 60px;
+}
+.kair-week-day-head__allday {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+.kair-week-allday-chip {
+  border-left: 3px solid;
+  border-radius: 3px;
+  padding: 2px 5px;
+  font-size: 0.6rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: opacity 0.15s;
+}
+.kair-week-allday-chip:hover { opacity: 0.85; }

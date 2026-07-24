@@ -123,6 +123,73 @@
     const mm = Math.round((h - hh) * 60);
     return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
   };
+
+  // 📦594 — Helpers unificados para hora de inicio / duración de evento.
+  // Los eventos del IPC vienen con `start` y `end` como string "HH:MM" (no numérico).
+  // Los mocks de data.js vienen con `startHour` (número decimal) y `durationHours`.
+  // Estos helpers unifican ambos formatos para que las grillas horarias funcionen
+  // con cualquier fuente de datos.
+  // v4: cuando un evento no tiene hora específica (sin start/end, o con start=00:00 +
+  // end=23:59 que la app usa como placeholder "todo el día sin hora"), se le asigna
+  // 9:00-11:00 como horario por defecto. Así se ve visualmente en la grilla y se
+  // puede hacer click para editar la hora real.
+  const DEFAULT_START_HOUR = 9;
+  const DEFAULT_DURATION_HOURS = 2; // 9-11 por defecto
+
+  // Detecta si el evento fue creado "sin hora específica" por la app
+  // (patrón: start=00:00 + end=23:59, o sin start/end).
+  function _isPlaceholderTime(ev) {
+    if (typeof ev.start === "string" && typeof ev.end === "string" &&
+        ev.start.indexOf(":") >= 0 && ev.end.indexOf(":") >= 0) {
+      var sH = parseInt(ev.start.split(":")[0], 10);
+      var sM = parseInt(ev.start.split(":")[1], 10) || 0;
+      var eH = parseInt(ev.end.split(":")[0], 10);
+      var eM = parseInt(ev.end.split(":")[1], 10) || 0;
+      // 00:00 → 23:59 = placeholder "todo el día sin hora"
+      if (sH === 0 && sM === 0 && eH === 23 && eM === 59) return true;
+      // 00:00 → 00:00 también = placeholder
+      if (sH === 0 && sM === 0 && eH === 0 && eM === 0) return true;
+    }
+    // Sin start/end definidos = placeholder
+    if (!ev.start && !ev.end && typeof ev.startHour !== "number") return true;
+    return false;
+  }
+
+  function getEventStartHour(ev) {
+    if (typeof ev.startHour === "number") return ev.startHour;
+    if (typeof ev.start === "string" && ev.start.indexOf(":") >= 0) {
+      var parts = ev.start.split(":");
+      var h = parseInt(parts[0], 10);
+      var m = parseInt(parts[1], 10) || 0;
+      if (h === 0 && m === 0) return DEFAULT_START_HOUR;
+      return h + m / 60;
+    }
+    return DEFAULT_START_HOUR;
+  }
+  function getEventDuration(ev) {
+    if (typeof ev.durationHours === "number") return ev.durationHours;
+    if (typeof ev.start === "string" && typeof ev.end === "string" &&
+        ev.start.indexOf(":") >= 0 && ev.end.indexOf(":") >= 0) {
+      var sH = parseInt(ev.start.split(":")[0], 10);
+      var sM = parseInt(ev.start.split(":")[1], 10) || 0;
+      var eH = parseInt(ev.end.split(":")[0], 10);
+      var eM = parseInt(ev.end.split(":")[1], 10) || 0;
+      if (_isPlaceholderTime(ev)) return DEFAULT_DURATION_HOURS;
+      var diff = (eH + eM/60) - (sH + sM/60);
+      return diff > 0 ? diff : 1;
+    }
+    return DEFAULT_DURATION_HOURS;
+  }
+
+  // 📦594 — Detecta eventos que la app marca como "todo el día" con flag explícito.
+  // v5: si el evento tiene startHour=0 y durationHours>=24 (mocks antiguos), va al banner.
+  // Si tiene start=00:00 + end=23:59 (placeholders de la app), NO va al banner — se
+  // renderizan en la grilla con horario por defecto (9-11).
+  function isAllDayEvent(ev) {
+    if (typeof ev.startHour === "number" && typeof ev.durationHours === "number" &&
+        ev.startHour === 0 && ev.durationHours >= 24) return true;
+    return false;
+  }
   const formatDate = (iso) => {
     const d = new Date(iso + "T00:00:00");
     return d.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
@@ -1344,7 +1411,10 @@
         adapter: adapter,
         eventTypes: eventTypes,
         initialView: "month",
-        initialDate: new Date(D.MONTH_VIEW.year, D.MONTH_VIEW.month, 21),
+        // 📦594 — Usar la fecha de hoy en vez del día 21 hardcoded.
+        // Antes era `new Date(D.MONTH_VIEW.year, D.MONTH_VIEW.month, 21)` → siempre
+        // día 21 del mes actual, sin importar la fecha real del sistema.
+        initialDate: new Date(),
         showSidebar: false,  // El sidebar ya está en la Bandeja Integrada (mini-cal propio)
         locale: "es",
         // F4 — Callbacks para hacer el calendario funcional (mismo patrón que el viejo)
@@ -1915,6 +1985,320 @@
   }
 
   // ====== Calendario grande ======
+
+  // 📦594 — Vistas Día / Semana / Programar. Antes NO existían: renderBigCalendar
+  // siempre pintaba la grilla mensual sin importar state.calView, así que los
+  // botones "Día / Semana / Programar" del toolbar eran no-op silenciosos.
+  // Ahora cada vista lista los eventos en formato agenda (más útil para revisar
+  // lo que hay en un día/semana puntual sin scrollear el grid mensual).
+
+  // ---- Vista Día: grilla horaria estilo Google Calendar (6am-10pm) ----
+  // 📦594 — Versión 2: en vez de lista vertical, muestra una grilla horaria
+  // con eventos posicionados según la hora (top = startHour * HOUR_PX, height = duration * HOUR_PX).
+  // Así se ve de un vistazo qué eventos hay en la mañana, mediodía, tarde, etc.
+  // v3: separar eventos "todo el día" (00:00-23:59) en un banner arriba.
+  function renderDayView(main) {
+    const dateIso = state.selectedDate || D.MONTH_VIEW.todayIso;
+    const allEvents = state.events
+      .filter((e) => state.activeCategories.has(e.category) && e.date === dateIso)
+      .map((e) => Object.assign({}, e, {
+        _sh: getEventStartHour(e),
+        _dur: getEventDuration(e),
+        _allDay: isAllDayEvent(e)
+      }));
+    const allDay = allEvents.filter((e) => e._allDay);
+    const events = allEvents.filter((e) => !e._allDay).sort((a, b) => a._sh - b._sh);
+
+    // Header
+    const head = el("div", { class: "kair-agenda-head" });
+    const d = new Date(dateIso + "T00:00:00");
+    const dateLabel = d.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    head.innerHTML = `<div class="kair-agenda-head__title">${dateLabel}</div><div class="kair-agenda-head__count">${allEvents.length} evento(s)</div>`;
+    main.appendChild(head);
+
+    // Banner de eventos "todo el día"
+    if (allDay.length > 0) {
+      const banner = el("div", { class: "kair-allday-banner" });
+      allDay.forEach((ev) => {
+        const cat = getCategoryStyle(ev.category);
+        const chip = el("div", { class: "kair-allday-chip" });
+        chip.style.background = cat.bg || "#eef0f3";
+        chip.style.borderLeftColor = cat.color || "#6c757d";
+        chip.style.color = cat.color || "#333";
+        chip.title = ev.title || "(sin título)";
+        chip.textContent = ev.title || "(sin título)";
+        chip.addEventListener("click", () => selectEvent(ev));
+        banner.appendChild(chip);
+      });
+      main.appendChild(banner);
+    }
+
+    // Grilla horaria
+    const HOUR_PX = 48;       // px por hora
+    const START_H = 6;         // 6am
+    const END_H = 20;          // 📦594 — 8pm (antes 10pm, más compacto)
+    const TOTAL_PX = (END_H - START_H) * HOUR_PX;
+
+    const gridWrap = el("div", { class: "kair-day-grid-wrap" });
+    const grid = el("div", { class: "kair-day-grid" });
+
+    // Columna izquierda: labels de hora
+    const hoursCol = el("div", { class: "kair-day-hours" });
+    for (let h = START_H; h < END_H; h++) {
+      const lbl = el("div", { class: "kair-day-hour-label" });
+      // Span absolute para alinear el texto con la línea horizontal
+      // (la primera hora no se desplaza para que no se corte)
+      const txt = el("span", { class: "kair-day-hour-label__text" });
+      txt.textContent = (h < 10 ? "0" : "") + h + ":00";
+      if (h === START_H) txt.classList.add("kair-day-hour-label__text--first");
+      lbl.appendChild(txt);
+      hoursCol.appendChild(lbl);
+    }
+    grid.appendChild(hoursCol);
+
+    // Columna derecha: área de eventos
+    const evCol = el("div", { class: "kair-day-events" });
+    evCol.style.height = TOTAL_PX + "px";
+
+    // Líneas horizontales por hora
+    for (let h = START_H; h < END_H; h++) {
+      const line = el("div", { class: "kair-day-hour-line" });
+      line.style.top = ((h - START_H) * HOUR_PX) + "px";
+      evCol.appendChild(line);
+    }
+
+    // Línea "ahora" si la vista es hoy
+    const todayIso = D.MONTH_VIEW.todayIso;
+    if (dateIso === todayIso) {
+      const now = new Date();
+      const nowH = now.getHours() + now.getMinutes() / 60;
+      if (nowH >= START_H && nowH < END_H) {
+        const nowLine = el("div", { class: "kair-day-now-line" });
+        nowLine.style.top = ((nowH - START_H) * HOUR_PX) + "px";
+        evCol.appendChild(nowLine);
+      }
+    }
+
+    // Eventos posicionados
+    if (events.length === 0 && allDay.length === 0) {
+      const empty = el("div", { class: "kair-day-empty" }, "No hay eventos para este día.");
+      evCol.appendChild(empty);
+    } else {
+      events.forEach((ev) => {
+        const top = Math.max(0, (ev._sh - START_H) * HOUR_PX);
+        const height = Math.max(20, Math.min(ev._dur * HOUR_PX - 2, TOTAL_PX - top));
+        const cat = getCategoryStyle(ev.category);
+        const block = el("div", { class: "kair-day-event" });
+        block.style.top = top + "px";
+        block.style.height = height + "px";
+        block.style.background = cat.bg || "#eef0f3";
+        block.style.borderLeftColor = cat.color || "#6c757d";
+        block.style.color = cat.color || "#333";
+        block.title = (ev.title || "(sin título)") + " · " + fmtHour(ev._sh) + " - " + fmtHour(ev._sh + ev._dur);
+        const timeStr = fmtHour(ev._sh) + " - " + fmtHour(ev._sh + ev._dur);
+        const catLabel = (D.EVENT_CATEGORIES[ev.category] && D.EVENT_CATEGORIES[ev.category].label) || ev.category || "";
+        block.innerHTML = `
+          <div class="kair-day-event__time">${timeStr}</div>
+          <div class="kair-day-event__title">${ev.title || "(sin título)"}</div>
+          <div class="kair-day-event__cat">${catLabel}${ev.location ? " · " + ev.location : ""}</div>
+        `;
+        block.addEventListener("click", () => selectEvent(ev));
+        evCol.appendChild(block);
+      });
+    }
+    grid.appendChild(evCol);
+    gridWrap.appendChild(grid);
+    main.appendChild(gridWrap);
+  }
+
+  // ---- Vista Semana: grilla horaria 7 columnas (lun-dom) estilo Google Calendar ----
+  // 📦594 — Versión 2: en vez de 7 tarjetas con listas, muestra una grilla horaria
+  // con 7 columnas (una por día) donde los eventos se posicionan verticalmente
+  // según la hora. Permite ver de un vistazo la disponibilidad de la semana.
+  // v3: separar eventos "todo el día" (00:00-23:59) en chips dentro del header de columna.
+  function renderWeekView(main) {
+    const refIso = state.selectedDate || D.MONTH_VIEW.todayIso;
+    const refDate = new Date(refIso + "T00:00:00");
+    // Lunes de la semana (firstDayOfWeek = 1)
+    const dow = refDate.getDay(); // 0=dom, 1=lun
+    const offsetToMonday = (dow === 0 ? -6 : 1 - dow);
+    const weekStart = new Date(refDate);
+    weekStart.setDate(refDate.getDate() + offsetToMonday);
+
+    // Header
+    const head = el("div", { class: "kair-agenda-head" });
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    const fmtShort = (d) => d.toLocaleDateString("es-CO", { day: "numeric", month: "short" });
+    head.innerHTML = `<div class="kair-agenda-head__title">Semana del ${fmtShort(weekStart)} al ${fmtShort(weekEnd)}</div>`;
+    main.appendChild(head);
+
+    // Calcular ISO de cada día + sus eventos (separar all-day y timed)
+    const todayIso = D.MONTH_VIEW.todayIso;
+    const days = [];
+    let totalAllDay = 0;
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(weekStart);
+      day.setDate(weekStart.getDate() + i);
+      const dayIso = day.getFullYear() + "-" + String(day.getMonth() + 1).padStart(2, "0") + "-" + String(day.getDate()).padStart(2, "0");
+      const dayAll = state.events
+        .filter((e) => state.activeCategories.has(e.category) && e.date === dayIso)
+        .map((e) => Object.assign({}, e, {
+          _sh: getEventStartHour(e),
+          _dur: getEventDuration(e),
+          _allDay: isAllDayEvent(e)
+        }));
+      const allDay = dayAll.filter((e) => e._allDay);
+      const events = dayAll.filter((e) => !e._allDay).sort((a, b) => a._sh - b._sh);
+      totalAllDay += allDay.length;
+      days.push({
+        date: day,
+        iso: dayIso,
+        allDay: allDay,
+        events: events,
+        isToday: dayIso === todayIso,
+        isSelected: dayIso === state.selectedDate
+      });
+    }
+
+    // Cabecera con los 7 días
+    const HOUR_PX = 40;
+    const START_H = 6;
+    const END_H = 20;          // 📦594 — 8pm (antes 10pm)
+    const TOTAL_PX = (END_H - START_H) * HOUR_PX;
+
+    const weekHeader = el("div", { class: "kair-week-header" });
+    const corner = el("div", { class: "kair-week-corner" });
+    weekHeader.appendChild(corner);
+    days.forEach((d) => {
+      const head = el("div", { class: "kair-week-day-head" + (d.isToday ? " kair-week-day-head--today" : "") + (d.isSelected ? " kair-week-day-head--selected" : "") });
+      head.innerHTML = `<div class="kair-week-dow">${d.date.toLocaleDateString("es-CO", { weekday: "short" })}</div><div class="kair-week-num">${d.date.getDate()}</div>${d.isToday ? '<div class="kair-week-today-pill">Hoy</div>' : ''}`;
+      // Si tiene eventos all-day, agregarlos como chips en el header de la columna
+      if (d.allDay.length > 0) {
+        const allDayWrap = el("div", { class: "kair-week-day-head__allday" });
+        d.allDay.forEach((ev) => {
+          const cat = getCategoryStyle(ev.category);
+          const chip = el("div", { class: "kair-week-allday-chip" });
+          chip.style.background = cat.bg || "#eef0f3";
+          chip.style.borderLeftColor = cat.color || "#6c757d";
+          chip.style.color = cat.color || "#333";
+          chip.title = ev.title || "(sin título)";
+          chip.textContent = ev.title || "(sin título)";
+          chip.addEventListener("click", () => selectEvent(ev));
+          allDayWrap.appendChild(chip);
+        });
+        head.appendChild(allDayWrap);
+      }
+      weekHeader.appendChild(head);
+    });
+    main.appendChild(weekHeader);
+
+    // Body: columna de horas + 7 columnas de eventos
+    const body = el("div", { class: "kair-week-body" });
+
+    // Columna de horas
+    const hoursCol = el("div", { class: "kair-week-hours" });
+    hoursCol.style.height = TOTAL_PX + "px";
+    for (let h = START_H; h < END_H; h++) {
+      const lbl = el("div", { class: "kair-week-hour-label" });
+      const txt = el("span", { class: "kair-week-hour-label__text" });
+      txt.textContent = (h < 10 ? "0" : "") + h + ":00";
+      if (h === START_H) txt.classList.add("kair-week-hour-label__text--first");
+      lbl.appendChild(txt);
+      hoursCol.appendChild(lbl);
+    }
+    body.appendChild(hoursCol);
+
+    // 7 columnas de días
+    days.forEach((d) => {
+      const col = el("div", { class: "kair-week-col" + (d.isToday ? " kair-week-col--today" : "") + (d.isSelected ? " kair-week-col--selected" : "") });
+      col.style.height = TOTAL_PX + "px";
+      // Líneas horizontales
+      for (let h = START_H; h < END_H; h++) {
+        const line = el("div", { class: "kair-week-hour-line" });
+        line.style.top = ((h - START_H) * HOUR_PX) + "px";
+        col.appendChild(line);
+      }
+      // Línea "ahora" si es hoy
+      if (d.isToday) {
+        const now = new Date();
+        const nowH = now.getHours() + now.getMinutes() / 60;
+        if (nowH >= START_H && nowH < END_H) {
+          const nowLine = el("div", { class: "kair-week-now-line" });
+          nowLine.style.top = ((nowH - START_H) * HOUR_PX) + "px";
+          col.appendChild(nowLine);
+        }
+      }
+      // Eventos timed
+      d.events.forEach((ev) => {
+        const top = Math.max(0, (ev._sh - START_H) * HOUR_PX);
+        const height = Math.max(18, Math.min(ev._dur * HOUR_PX - 2, TOTAL_PX - top));
+        const cat = getCategoryStyle(ev.category);
+        const block = el("div", { class: "kair-week-event" });
+        block.style.top = top + "px";
+        block.style.height = height + "px";
+        block.style.background = cat.bg || "#eef0f3";
+        block.style.borderLeftColor = cat.color || "#6c757d";
+        block.style.color = cat.color || "#333";
+        block.title = (ev.title || "(sin título)") + " · " + fmtHour(ev._sh) + " - " + fmtHour(ev._sh + ev._dur);
+        const timeStr = fmtHour(ev._sh) + " - " + fmtHour(ev._sh + ev._dur);
+        const catLabel = (D.EVENT_CATEGORIES[ev.category] && D.EVENT_CATEGORIES[ev.category].label) || ev.category || "";
+        block.innerHTML = `
+          <div class="kair-week-event__time">${timeStr}</div>
+          <div class="kair-week-event__title">${ev.title || "(sin título)"}</div>
+          <div class="kair-week-event__cat">${catLabel}</div>
+        `;
+        block.addEventListener("click", () => selectEvent(ev));
+        col.appendChild(block);
+      });
+      body.appendChild(col);
+    });
+    main.appendChild(body);
+  }
+
+  // ---- Vista Programar: agenda de los próximos eventos (a partir de hoy) ----
+  function renderScheduleView(main) {
+    const todayIso = D.MONTH_VIEW.todayIso;
+    const upcoming = state.events
+      .filter((e) => state.activeCategories.has(e.category) && e.date && e.date >= todayIso)
+      .sort((a, b) => (a.date + String(a.startHour || 0).padStart(2, "0")).localeCompare(b.date + String(b.startHour || 0).padStart(2, "0")));
+
+    const head = el("div", { class: "kair-agenda-head" });
+    head.innerHTML = `<div class="kair-agenda-head__title">Próximos eventos</div><div class="kair-agenda-head__count">${upcoming.length} evento(s)</div>`;
+    main.appendChild(head);
+
+    const list = el("div", { class: "kair-agenda-list" });
+    if (upcoming.length === 0) {
+      const empty = el("div", { class: "kair-agenda-empty" }, "No hay eventos próximos programados.");
+      list.appendChild(empty);
+    } else {
+      // Agrupar por día
+      let lastDate = "";
+      upcoming.forEach((ev) => {
+        if (ev.date !== lastDate) {
+          lastDate = ev.date;
+          const d = new Date(ev.date + "T00:00:00");
+          const dateLabel = d.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
+          const sep = el("div", { class: "kair-agenda-day-sep" }, dateLabel);
+          list.appendChild(sep);
+        }
+        const cat = getCategoryStyle(ev.category);
+        const item = el("div", { class: "kair-agenda-item" });
+        item.innerHTML = `
+          <div class="kair-agenda-item__time">${fmtHour(ev.startHour) || "—"}</div>
+          <div class="kair-agenda-item__bar" style="background:${cat.color}"></div>
+          <div class="kair-agenda-item__body">
+            <div class="kair-agenda-item__title">${ev.title || "(sin título)"}</div>
+            <div class="kair-agenda-item__meta"><span class="kair-agenda-item__cat" style="color:${cat.color}">${(D.EVENT_CATEGORIES[ev.category] && D.EVENT_CATEGORIES[ev.category].label) || ev.category || ""}</span>${ev.location ? ' · ' + ev.location : ''}</div>
+          </div>
+        `;
+        item.addEventListener("click", () => selectEvent(ev));
+        list.appendChild(item);
+      });
+    }
+    main.appendChild(list);
+  }
+
   function renderBigCalendar(container) {
     container.innerHTML = "";
 
@@ -1932,7 +2316,7 @@
         <button class="kair-icon-btn" title="Periodo anterior">${D.ICONS.chevronLeft}</button>
         <button class="kair-icon-btn" title="Periodo siguiente">${D.ICONS.chevronRight}</button>
       </div>
-      <span class="kair-cal-toolbar__month-label">${state.viewMonthLabel || D.MONTH_VIEW.label}</span>
+      <span class="kair-cal-toolbar__month-label" id="kair-toolbar-period-label">${state.viewMonthLabel || D.MONTH_VIEW.label}</span>
       <button class="kair-link-btn" id="btn-today" style="font-size:0.75rem;">Hoy</button>
       <span class="kair-cal-toolbar__divider"></span>
       <!-- Loop 45b — Switch "Todas las empresas" en la toolbar del calendario,
@@ -1988,11 +2372,96 @@
     // F4-fix — Botones prev/next del calendario grande. Antes NO tenían
     // listeners → clicks no hacían nada. Ahora llaman a changeMonth() que
     // ya existía para el mini-cal (mismo patrón).
+    // F4-fix — Botones prev/next del calendario grande. Antes NO tenían
+    // listeners → clicks no hacían nada. Ahora llaman a changeMonth() que
+    // ya existía para el mini-cal (mismo patrón).
+    // 📦594 — v3: según state.calView, navegan mes / día / semana.
+    // 📦594-fix: usar "T00:00:00" al final del ISO para que se parsee como
+    // local midnight (sin esto, "2026-07-24" se parsea como UTC y en
+    // Colombia UTC-5 eso es 19:00 del 23, causando saltos de 1 día en la
+    // navegación).
     var navBtns = toolbar.querySelectorAll(".kair-cal-toolbar__nav button");
     if (navBtns.length >= 2) {
-      navBtns[0].addEventListener("click", () => { changeMonth(-1); render(); });
-      navBtns[1].addEventListener("click", () => { changeMonth(1); render(); });
+      navBtns[0].addEventListener("click", () => {
+        var baseIso = state.selectedDate || D.MONTH_VIEW.todayIso;
+        if (state.calView === "day" || state.calView === "schedule") {
+          // Día / Programar: navegar ±1 día
+          var d = new Date(baseIso + "T00:00:00");
+          d.setDate(d.getDate() - 1);
+          state.selectedDate = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+        } else if (state.calView === "week") {
+          // Semana: navegar ±7 días
+          var d2 = new Date(baseIso + "T00:00:00");
+          d2.setDate(d2.getDate() - 7);
+          state.selectedDate = d2.getFullYear() + "-" + String(d2.getMonth() + 1).padStart(2, "0") + "-" + String(d2.getDate()).padStart(2, "0");
+        } else {
+          // month: navegar ±1 mes (comportamiento original)
+          changeMonth(-1);
+        }
+        render();
+      });
+      navBtns[1].addEventListener("click", () => {
+        var baseIso = state.selectedDate || D.MONTH_VIEW.todayIso;
+        if (state.calView === "day" || state.calView === "schedule") {
+          var d = new Date(baseIso + "T00:00:00");
+          d.setDate(d.getDate() + 1);
+          state.selectedDate = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+        } else if (state.calView === "week") {
+          var d2 = new Date(baseIso + "T00:00:00");
+          d2.setDate(d2.getDate() + 7);
+          state.selectedDate = d2.getFullYear() + "-" + String(d2.getMonth() + 1).padStart(2, "0") + "-" + String(d2.getDate()).padStart(2, "0");
+        } else {
+          changeMonth(1);
+        }
+        render();
+      });
     }
+
+    // 📦594 — Actualizar el label del toolbar según la vista actual.
+    // En "month" muestra "Julio 2026". En "day" muestra "24 de julio".
+    // En "week" muestra "20-26 de julio". En "schedule" muestra "Próximos eventos".
+    var periodLabel = toolbar.querySelector("#kair-toolbar-period-label");
+    if (periodLabel) {
+      if (state.calView === "day") {
+        var dd = new Date((state.selectedDate || D.MONTH_VIEW.todayIso) + "T00:00:00");
+        periodLabel.textContent = dd.toLocaleDateString("es-CO", { day: "numeric", month: "long" });
+      } else if (state.calView === "week") {
+        var ref = new Date((state.selectedDate || D.MONTH_VIEW.todayIso) + "T00:00:00");
+        var dowW = ref.getDay();
+        var offsetMon = (dowW === 0 ? -6 : 1 - dowW);
+        var ws = new Date(ref);
+        ws.setDate(ref.getDate() + offsetMon);
+        var we = new Date(ws);
+        we.setDate(ws.getDate() + 6);
+        var fmtDay = function (d) { return d.toLocaleDateString("es-CO", { day: "numeric" }); };
+        periodLabel.textContent = fmtDay(ws) + " - " + we.toLocaleDateString("es-CO", { day: "numeric", month: "long" });
+      } else if (state.calView === "schedule") {
+        periodLabel.textContent = "Próximos eventos";
+      } else {
+        periodLabel.textContent = state.viewMonthLabel || D.MONTH_VIEW.label;
+      }
+    }
+
+    // 📦594 — Dispatch de vista según state.calView. Antes NO existía este
+    // switch, así que aunque el user hiciera click en "Día / Semana / Programar"
+    // el handler (línea ~1960) cambiaba state.calView pero renderBigCalendar
+    // siempre pintaba la grilla mensual. Ahora cada vista llama a su propia
+    // función (renderDayView / renderWeekView / renderScheduleView) y retorna
+    // sin continuar con la lógica del mes. (El wrapper ya se appendó arriba,
+    // línea 2065, así que acá solo rellenamos `main` y salimos.)
+    if (state.calView === "day") {
+      renderDayView(main);
+      return;
+    }
+    if (state.calView === "week") {
+      renderWeekView(main);
+      return;
+    }
+    if (state.calView === "schedule") {
+      renderScheduleView(main);
+      return;
+    }
+    // default: "month" (la lógica original sigue acá abajo)
 
     // Cabecera días de la semana
     const head = el("div", { class: "grid border-b", style: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", background: "#fafbfc", borderBottom: "1px solid var(--kair-border-soft)" } });
