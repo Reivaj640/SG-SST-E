@@ -749,7 +749,7 @@
                     '<div><div class="gr-rep__meta-label">Periodo</div>' +
                     '<div class="gr-rep__meta-value">' + _esc(_fmtLongDate(d.periodo.desde)) + ' — ' + _esc(_fmtLongDate(d.periodo.hasta)) + '</div></div>' +
                 '</div>' +
-                '<div class="gr-rep__meta-item"><i class="bi bi-building"></i>' +
+                '<div class="gr-rep__meta-item"><i class="kair-icon-building"></i>' +
                     '<div><div class="gr-rep__meta-label">Empresa</div>' +
                     '<div class="gr-rep__meta-value">' + _esc(d.empresa && d.empresa.nombre ? d.empresa.nombre : (d.empresa && d.empresa.id) || '—') + '</div></div>' +
                 '</div>' +

@@ -24,6 +24,56 @@ class CapacitacionesComponent {
  this._evidenciaFiles = [];
  this._evidenciasCache = new Map();
  this._evidenciaUploading = false;
+ // Ubicaciones (NO viene del Excel, solo de la app) — persistidas en localStorage
+ this._ubicaciones = this._loadUbicaciones();
+    }
+
+    /**
+     * Carga el mapa {nombreCapacitacion: ubicacion} desde localStorage.
+     * La key es estable: el nombre de la capacitación es único por hoja del Excel.
+     */
+    _loadUbicaciones() {
+        try {
+            const raw = localStorage.getItem('kair-cap-ubicaciones');
+            const parsed = raw ? JSON.parse(raw) : {};
+            return (parsed && typeof parsed === 'object') ? parsed : {};
+        } catch (e) {
+            console.warn('[CAP] Error cargando ubicaciones de localStorage:', e);
+            return {};
+        }
+    }
+
+    /**
+     * Persiste el mapa de ubicaciones en localStorage.
+     */
+    _saveUbicaciones() {
+        try {
+            localStorage.setItem('kair-cap-ubicaciones', JSON.stringify(this._ubicaciones || {}));
+        } catch (e) {
+            console.warn('[CAP] Error guardando ubicaciones en localStorage:', e);
+        }
+    }
+
+    /**
+     * Devuelve la ubicación guardada para una capacitación (por nombre).
+     */
+    _getUbicacion(nombre) {
+        if (!nombre) return '';
+        return (this._ubicaciones && this._ubicaciones[nombre]) || '';
+    }
+
+    /**
+     * Guarda la ubicación de una capacitación (por nombre).
+     */
+    _setUbicacion(nombre, ubicacion) {
+        if (!nombre) return;
+        const val = (ubicacion || '').trim();
+        if (val) {
+            this._ubicaciones[nombre] = val;
+        } else {
+            delete this._ubicaciones[nombre];
+        }
+        this._saveUbicaciones();
     }
 
     render() {
@@ -264,6 +314,7 @@ class CapacitacionesComponent {
             document.getElementById('trainingDate').value         = cap.fechaProgramada;
             document.getElementById('trainingDuration').value     = parseFloat(cap.duracion) || 2;
             document.getElementById('trainingInstructor').value   = cap.instructor;
+            document.getElementById('trainingUbicacion').value   = cap.ubicacion || '';
             document.getElementById('trainingParticipants').value = cap.participantes || 0;
         }
 
@@ -456,6 +507,11 @@ class CapacitacionesComponent {
 
             const { processedData, headers } = excelResult.data;
             this.capacitaciones = this.parseExcelDataToCapacitaciones(processedData, headers);
+            // Enriquecer cada capacitación con su ubicación persistida en localStorage
+            // (NO viene del Excel, es metadata local de la app)
+            this.capacitaciones.forEach(cap => {
+                if (cap && cap.nombre) cap.ubicacion = this._getUbicacion(cap.nombre);
+            });
             this.applyFilters();
 
             // Cargar el cache de evidencias en background (no bloquea la UI)
@@ -680,7 +736,7 @@ class CapacitacionesComponent {
         tbody.innerHTML = '';
 
         if (this.filteredCapacitaciones.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--k-text-muted);">No se encontraron capacitaciones</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--k-text-muted);">No se encontraron capacitaciones</td></tr>`;
             return;
         }
 
@@ -698,6 +754,7 @@ class CapacitacionesComponent {
                 <td><span class="k-badge ${typeBadge}">${item.tipo.toUpperCase()}</span></td>
 			<td class="k-cell-date">${this.formatDate(item.fechaProgramada)}</td>
                 <td>${item.instructor}</td>
+                <td>${item.ubicacion || ''}</td>
                 <td>${item.duracion}</td>
                 <td><span class="k-badge ${badgeClass}">${statusText}</span></td>
                 <td class="text-center">
@@ -848,6 +905,7 @@ class CapacitacionesComponent {
         const newDate      = document.getElementById('trainingDate').value;
         const type         = document.getElementById('trainingType').value;
         const instructor   = document.getElementById('trainingInstructor').value;
+        const ubicacion    = document.getElementById('trainingUbicacion').value;
         const duration     = document.getElementById('trainingDuration').value;
         const participants = parseInt(document.getElementById('trainingParticipants').value) || 0;
 
@@ -872,11 +930,13 @@ class CapacitacionesComponent {
             tipo:          type,
             fechaProgramada,
             instructor,
+            ubicacion:     ubicacion,
             duracion:      `${duration} Horas`,
             participantes: participants,
             estado:        'pending'
         };
 
+        this._setUbicacion(name, ubicacion);
         this.capacitaciones.push(newTraining);
         this.closeModals();
         await this._saveDataToExcel();
@@ -904,15 +964,23 @@ class CapacitacionesComponent {
       ? `${p.getFullYear()}-${String(p.getMonth() + 1).padStart(2, '0')}-${String(p.getDate()).padStart(2, '0')}`
       : date;
 
+    const oldNombre = this.capacitaciones[index].nombre;
+    const newUbicacion = document.getElementById('trainingUbicacion').value;
     this.capacitaciones[index] = {
       ...this.capacitaciones[index],
       nombre: name,
       tipo: document.getElementById('trainingType').value,
       fechaProgramada: normalizedDate,
       instructor: document.getElementById('trainingInstructor').value,
+      ubicacion: newUbicacion,
       duracion: `${document.getElementById('trainingDuration').value} Horas`,
       participantes: parseInt(document.getElementById('trainingParticipants').value) || 0
     };
+    // Si el nombre cambió, la key de la ubicación también — migrar el valor
+    if (oldNombre && oldNombre !== name) {
+        this._setUbicacion(oldNombre, '');   // borrar la key vieja
+    }
+    this._setUbicacion(name, newUbicacion);   // guardar con la key nueva
 
         this.closeModals();
         await this._saveDataToExcel();
@@ -950,6 +1018,7 @@ class CapacitacionesComponent {
    acceptIcon: 'bi-trash',
    onAccept: async () => {
     this.capacitaciones.splice(index, 1);
+    this._setUbicacion(cap.nombre, '');  // limpiar ubicación persistida
     await this._saveDataToExcel();
     this.applyFilters();
     window.KAIRToast.show('Capacitación eliminada', 'success', { subtitle: `"${cap.nombre}" eliminada del registro` });

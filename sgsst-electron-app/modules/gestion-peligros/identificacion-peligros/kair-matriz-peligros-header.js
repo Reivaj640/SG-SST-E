@@ -35,7 +35,7 @@ Patrón: modules/recursos/capacitaciones/capacitaciones-view.html
         '</div>' +
         '<div class="km-header-card__right">' +
           (company
-            ? '<span class="km-header-card__company" title="Empresa activa"><i class="bi bi-building" style="font-size:0.875rem;"></i> ' + KM.esc(company) + '</span>'
+            ? '<span class="km-header-card__company" title="Empresa activa"><i class="kair-icon-building" style="font-size:0.875rem;"></i> ' + KM.esc(company) + '</span>'
             : '') +
           (company ? '<div class="km-header-card__divider" aria-hidden="true"></div>' : '') +
           '<button type="button" class="km-header-card__back" data-action="back" title="Volver al módulo" aria-label="Volver al módulo">' +
@@ -69,7 +69,7 @@ Patrón: modules/recursos/capacitaciones/capacitaciones-view.html
           '</div>' +
           '<div class="km-header-card__right">' +
             (company
-              ? '<span class="km-header-card__company" title="Empresa activa"><i class="bi bi-building" style="font-size:0.875rem;"></i> ' + KM.esc(company) + '</span>'
+              ? '<span class="km-header-card__company" title="Empresa activa"><i class="kair-icon-building" style="font-size:0.875rem;"></i> ' + KM.esc(company) + '</span>'
               : '') +
           '</div>' +
         '</div>';

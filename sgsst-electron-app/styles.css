@@ -8115,3 +8115,34 @@ position: relative;
 [data-theme="dark-legacy"] .kair-update-dropdown__link:hover {
   color: #bfdbfe;
 }
+
+/* =========================================
+   KAIR ICON HELPERS — SVG inline via mask
+   Reemplazan iconos bi-* que no se renderizan
+   correctamente en algunos contextos (HTML
+   inyectado via fetch). Usan mask-image para
+   que el color del icono herede el color del
+   texto (currentColor).
+   ========================================= */
+
+.kair-icon-building {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.125em;
+  background-color: currentColor;
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='4' y='2' width='16' height='20' rx='1'/><path d='M9 22v-4h6v4'/><path d='M8 6h.01'/><path d='M16 6h.01'/><path d='M12 6h.01'/><path d='M8 10h.01'/><path d='M16 10h.01'/><path d='M12 10h.01'/><path d='M8 14h.01'/><path d='M16 14h.01'/><path d='M12 14h.01'/></svg>");
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='4' y='2' width='16' height='20' rx='1'/><path d='M9 22v-4h6v4'/><path d='M8 6h.01'/><path d='M16 6h.01'/><path d='M12 6h.01'/><path d='M8 10h.01'/><path d='M16 10h.01'/><path d='M12 10h.01'/><path d='M8 14h.01'/><path d='M16 14h.01'/><path d='M12 14h.01'/></svg>");
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+
+/* Si el <i> ya trae font-size del style inline (ej style="font-size:0.875rem"),
+   el mask respeta ese tamaño porque width/height = 1em */
+.kair-icon-building[style*="font-size"] {
+  /* nothing extra — width/height: 1em ya respeta el font-size del style */
+}

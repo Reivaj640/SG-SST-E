@@ -6845,7 +6845,7 @@ class MedicionAusentismoComponent {
         var detalles = [];
         if (cargo) detalles.push('<i class="bi bi-briefcase"></i> ' + this._escapeHtml(cargo));
         if (area) detalles.push('<i class="bi bi-geo-alt"></i> ' + this._escapeHtml(area));
-        if (empresa) detalles.push('<i class="bi bi-building"></i> ' + this._escapeHtml(empresa));
+        if (empresa) detalles.push('<i class="kair-icon-building"></i> ' + this._escapeHtml(empresa));
 
         // 📦443 (2026-06-25) — Diseño minimalista con icono de persona.
         // Reemplaza el avatar morado por un círculo con icono bi-person-fill.

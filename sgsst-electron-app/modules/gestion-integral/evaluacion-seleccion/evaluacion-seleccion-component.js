@@ -99,7 +99,7 @@ EvaluacionSeleccionComponent.prototype.renderUI = function () {
         '</div>' +
         '<div style="display:flex; align-items:center; gap:0.75rem;">' +
           '<span class="k-section-card__company">' +
-            '<i class="bi bi-building"></i>' +
+            '<i class="kair-icon-building"></i>' +
             '<span id="kair-es-header-company">' + (this.currentCompany || '') + '</span>' +
           '</span>' +
           '<div class="k-section-card__divider"></div>' +

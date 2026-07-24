@@ -85,7 +85,7 @@ Patrón 4 Constructor: (container, currentCompany, moduleName, submoduleTitle, b
   '</div>' +
   '</div>' +
   '<div class="k-mnt-header-actions">' +
-  '<span class="k-mnt-header-company" id="kair-mnt-header-company"><i class="bi bi-building"></i> <span></span></span>' +
+  '<span class="k-mnt-header-company" id="kair-mnt-header-company"><i class="kair-icon-building"></i> <span></span></span>' +
   '<div class="k-mnt-header-divider"></div>' +
   '<button id="kair-mnt-btn-back" class="header-back-btn" title="Volver al módulo">' +
   '<i class="bi bi-arrow-left"></i> Volver' +

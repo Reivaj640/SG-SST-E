@@ -229,7 +229,7 @@ var AuditoriaInformesView = (function () {
         KairUI.Badge({ variant: meta.badge, dot: true, children: meta.label }) +
       '</div>' +
       '<div class="kair-v3-informe-card__meta">' +
-        '<span><i class="bi bi-building"></i> ' + _esc(audit.empresa || '—') + '</span>' +
+        '<span><i class="kair-icon-building"></i> ' + _esc(audit.empresa || '—') + '</span>' +
         '<span><i class="bi bi-person"></i> ' + _esc(audit.auditorLider || '—') + '</span>' +
         '<span><i class="bi bi-calendar"></i> ' + _esc(_fmtDate(audit.fechaProgramada)) + '</span>' +
         '<span><i class="bi bi-clipboard-check"></i> ' + (audit.hallazgos || []).length + ' hallazgos</span>' +

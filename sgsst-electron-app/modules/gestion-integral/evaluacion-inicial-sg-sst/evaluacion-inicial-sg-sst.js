@@ -125,7 +125,7 @@ class EvaluacionInicialSgSst {
                        cambiar dropdown + click + seleccionar PDF + procesar). Ahora
                        2 pasos: click en el boton del source + seleccionar PDF. -->
                   <button class="header-action--outline" id="btn-load-ministerio" onclick="window.currentEvaluacionInstance.loadPdfBySource('ministerio')" title="Cargar PDF del Ministerio de Trabajo">
-                    <i class="bi bi-building"></i> Cargar Ministerio
+                    <i class="kair-icon-building"></i> Cargar Ministerio
                   </button>
                   <button class="header-action--outline" id="btn-load-arl" onclick="window.currentEvaluacionInstance.loadPdfBySource('arl')" title="Cargar PDF del informe de la ARL">
                     <i class="bi bi-shield-check"></i> Cargar ARL
