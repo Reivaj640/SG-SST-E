@@ -58,10 +58,12 @@ __pycache__/
 *.tmp
 *.temp
 
-# Scripts y datos de debug puntuales (raíz del repo)
-test-*.js
-test-*.xlsx
-test-*.html
+# Scripts y datos de debug temporales (raíz del repo)
+# Solo ignora archivos con prefijo test-tmp-* (debug one-off).
+# Los tests reales (test-profesiograma-*, test-fixes-loop48, test-iframe-api, etc.) SÍ se trackean.
+test-tmp-*.js
+test-tmp-*.xlsx
+test-tmp-*.html
 
 # Archivos de configuración generados
 config.json
