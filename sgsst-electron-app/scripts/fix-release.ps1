@@ -36,7 +36,7 @@ if (-not $Version) {
     $Version = $PackageJson.version
 }
 $TagName = "v$Version"
-$ExeName = "K+AIR-Setup-$Version.exe"
+$ExeName = "K-AIR-Setup-$Version.exe"
 $BlockmapName = "$ExeName.blockmap"
 
 $ExePath = Join-Path $ProjectDir "dist\$ExeName"
