@@ -3579,25 +3579,56 @@
 
     el2.innerHTML = `
       <div class="kair-cal-invitation__head">
-        <div class="kair-cal-invitation__date">${escapeHtml(whenText)}</div>
-        <div class="kair-cal-invitation__title">${escapeHtml(icsEvent.summary || '(sin título)')}</div>
-        <div class="kair-cal-invitation__org">${escapeHtml(orgText)} <span class="kair-cal-invitation__org-label">(organizador)</span></div>
+        <div class="kair-cal-invitation__head-icon" aria-hidden="true">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" fill="#4285f4"/>
+            <rect x="3" y="4" width="9" height="9" fill="#ea4335"/>
+            <rect x="12" y="4" width="9" height="9" fill="#fbbc04"/>
+            <rect x="3" y="13" width="9" height="9" fill="#34a853"/>
+            <rect x="12" y="13" width="9" height="9" fill="#1a73e8"/>
+            <text x="12" y="17" font-family="Arial, sans-serif" font-size="6" font-weight="600" fill="#ffffff" text-anchor="middle">24</text>
+          </svg>
+        </div>
+        <div class="kair-cal-invitation__head-content">
+          <div class="kair-cal-invitation__date">${escapeHtml(whenText)}</div>
+          <div class="kair-cal-invitation__title">${escapeHtml(icsEvent.summary || '(sin título)')}</div>
+          <div class="kair-cal-invitation__org">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            <span>${escapeHtml(orgText)} <span class="kair-cal-invitation__org-label">(organizador)</span></span>
+          </div>
+        </div>
       </div>
       <div class="kair-cal-invitation__body">
         <div class="kair-cal-invitation__btns">
           <button class="kair-cal-invitation__btn kair-cal-invitation__btn--accept ${myStatus === 'accepted' ? 'kair-cal-invitation__btn--active' : ''}" data-ics-rsvp="accepted">Sí</button>
           <button class="kair-cal-invitation__btn kair-cal-invitation__btn--decline ${myStatus === 'declined' ? 'kair-cal-invitation__btn--active' : ''}" data-ics-rsvp="declined">No</button>
           <button class="kair-cal-invitation__btn kair-cal-invitation__btn--tentative ${myStatus === 'tentative' ? 'kair-cal-invitation__btn--active' : ''}" data-ics-rsvp="tentative">Tal vez</button>
+          <button class="kair-cal-invitation__btn kair-cal-invitation__btn--propose" data-ics-rsvp="propose">Proponer otro horario</button>
+          <button class="kair-cal-invitation__more" type="button" aria-label="Más opciones" title="Más opciones">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+          </button>
         </div>
         ${icsEvent.location ? '<div class="kair-cal-invitation__location">' + escapeHtml(icsEvent.location) + '</div>' : ''}
         ${icsEvent.description ? '<div class="kair-cal-invitation__description">' + escapeHtml(icsEvent.description) + '</div>' : ''}
       </div>
     `;
-    // Handlers de los botones
+    // Handlers de los botones RSVP
     el2.querySelectorAll('[data-ics-rsvp]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var newStatus = btn.getAttribute('data-ics-rsvp');
+        if (newStatus === 'propose') {
+          toast("Proponer otro horario", "Próximamente: abrí el evento en tu Calendar para sugerir otro horario", "info");
+          return;
+        }
         handleIcsRsvp(icsEvent, newStatus, btn, messageId, attachmentId);
+      });
+    });
+    // Handlers de los botones de feedback
+    el2.querySelectorAll('[data-vote]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        btn.classList.toggle('kair-cal-invitation__vote--active');
+        var vote = btn.getAttribute('data-vote');
+        toast("Gracias por tu feedback", vote === 'yes' ? 'Marcado como útil' : 'Marcado como spam', 'info');
       });
     });
     return el2;
@@ -3829,6 +3860,14 @@
     // principal (línea ~2250) con addEventListener directo.
     scroll.appendChild(header);
 
+    // 📦602-fix — Container para el banner de invitación de Calendar.
+    // En Gmail el banner aparece ENTRE el header del correo y el primer mensaje
+    // (no después del body). Mantenemos este orden: header → banner ICS → mensajes.
+    // El banner se inserta async (después de descargar el .ics) por eso
+    // dejamos un container vacío que se rellena cuando llega el .ics.
+    var icsBannerContainer = el("div", { class: "kair-ics-banner-container" });
+    scroll.appendChild(icsBannerContainer);
+
     if (mail.category === "urgent") {
       const banner = el("div", { class: "kair-mail-detail__urgent-banner" });
       banner.innerHTML = `${D.ICONS.alertTriangle} Requiere acción inmediata · Vence en 24 horas`;
@@ -4044,6 +4083,48 @@
       scroll.appendChild(body);
     }
 
+    // 📦602 — Divider estilo Gmail: "Según este correo electrónico" + "¿Está bien?"
+    // (aparece después del último mensaje, antes de los adjuntos)
+    var divider = el("div", { class: "kair-mail-divider" });
+    divider.innerHTML = `
+      <div class="kair-mail-divider__left">Según este correo electrónico</div>
+      <div class="kair-mail-divider__right">
+        <span>¿Está bien?</span>
+        <div class="kair-mail-divider__feedback">
+          <button class="kair-mail-divider__vote-btn" data-mail-vote="yes" title="Marcar como útil">👍</button>
+          <button class="kair-mail-divider__vote-btn" data-mail-vote="no" title="Marcar como spam">👎</button>
+        </div>
+      </div>
+    `;
+    divider.querySelectorAll('[data-mail-vote]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        btn.classList.toggle('kair-mail-divider__vote-btn--active');
+        var vote = btn.getAttribute('data-mail-vote');
+        toast("Gracias", vote === 'yes' ? 'Marcado como útil' : 'Marcado como spam', 'info');
+      });
+    });
+    scroll.appendChild(divider);
+
+    // 📦602 — Banner de traducción (placeholder visual cuando el contenido no está en español)
+    var bodyTxt = (mail.body || mail.body_html || '').toString();
+    var looksEnglish = /\b(the|and|meeting|please|this|with|have|will|are|for)\b/i.test(bodyTxt) && !/\b(que|para|con|este|esta|hola|gracias|reunion)\b/i.test(bodyTxt);
+    if (looksEnglish && bodyTxt.length > 50) {
+      var translateBanner = el("div", { class: "kair-mail-translate" });
+      translateBanner.innerHTML = `
+        <span class="kair-mail-translate__icon">🌐</span>
+        <span>Parece que este mensaje está en inglés</span>
+        <button class="kair-mail-translate__btn" type="button">Traducir al español</button>
+        <button class="kair-mail-translate__close" type="button" aria-label="Cerrar">×</button>
+      `;
+      translateBanner.querySelector('.kair-mail-translate__btn').addEventListener('click', function () {
+        toast("Traducción", "Función de traducción próximamente", "info");
+      });
+      translateBanner.querySelector('.kair-mail-translate__close').addEventListener('click', function () {
+        translateBanner.style.display = 'none';
+      });
+      scroll.appendChild(translateBanner);
+    }
+
     // F1-Feature5 — Adjuntos REALES del último mensaje del thread.
     // Recolecta todos los adjuntos de todos los mensajes del hilo y los muestra
     // al final del detail. Si no hay hilo (mensaje único), usa el último mensaje.
@@ -4068,12 +4149,18 @@
     if (allAttachments.length > 0) {
       const att = el("div", { class: "kair-mail-detail__attachments" });
       const header = el("div", { class: "kair-mail-detail__attachments-header" });
-      header.innerHTML = `${D.ICONS.paperclip.replace(/width="\d+" height="\d+"/, 'width="14" height="14"')} <span>${allAttachments.length} adjunto${allAttachments.length > 1 ? 's' : ''}</span>`;
+      // 📦602 — Estilo Gmail: "X archivo(s) adjunto(s) · Analizado por Gmail"
+      header.innerHTML = `
+        <span class="kair-attachment-header__icon">📎</span>
+        <span class="kair-attachment-header__count">${allAttachments.length} archivo${allAttachments.length > 1 ? 's adjunto' : ' adjunto'}</span>
+        <span class="kair-attachment-header__info">· Analizado por Gmail ⓘ</span>
+      `;
       att.appendChild(header);
 
       // 📦602 — Si algún attachment es .ics, parsearlo y mostrar el banner
-      // de invitación de Calendar con botones Sí/No/Tal vez (estilo Gmail).
-      // Lo hacemos ANTES de los chips para que el banner quede arriba.
+      // de invitación de Calendar ARRIBA del cuerpo del correo (estilo Gmail).
+      // La descarga es async, así que usamos requestAnimationFrame para insertarlo
+      // en el lugar correcto del scroll (después del body, antes del divider).
       var icsAttachments = allAttachments.filter(function (a) {
         var fn = (a.filename || '').toLowerCase();
         var mt = (a.mimeType || '').toLowerCase();
@@ -4086,13 +4173,27 @@
             var icsEvent = parseIcs(icsText);
             if (!icsEvent) return;
             var banner = renderCalendarInvitation(icsEvent, icsAtt._messageId, icsAtt.attachment_id);
-            if (banner) {
-              banner.setAttribute('data-ics-text', icsText);
-              // Insertar el banner ANTES del primer chip
-              var firstChip = att.querySelector('.kair-attachment-chip');
-              if (firstChip) att.insertBefore(banner, firstChip);
-              else att.appendChild(banner);
-            }
+            if (!banner) return;
+            banner.setAttribute('data-ics-text', icsText);
+            // Insertar el banner en el container que está ENTRE el header del
+            // correo y los mensajes (estilo Gmail). requestAnimationFrame
+            // espera al próximo frame para que el render haya terminado.
+            requestAnimationFrame(function () {
+              if (!scroll.isConnected) return; // el email cambió, ignorar
+              // Dedupe por UID: si ya hay un banner para este evento, no duplicar
+              if (scroll.querySelector('.kair-cal-invitation[data-ics-uid="' + (icsEvent.uid || '') + '"]')) return;
+              banner.setAttribute('data-ics-uid', icsEvent.uid || '');
+              // 📦602-fix — Insertar en el container dedicado (entre header y mensajes)
+              // o fallback: antes del divider o al inicio del scroll
+              var icsContainer = scroll.querySelector('.kair-ics-banner-container');
+              if (icsContainer) {
+                icsContainer.appendChild(banner);
+              } else {
+                var dividerEl = scroll.querySelector('.kair-mail-divider');
+                if (dividerEl) scroll.insertBefore(banner, dividerEl);
+                else scroll.insertBefore(banner, scroll.firstChild);
+              }
+            });
           }).catch(function (err) {
             console.warn('[BandejaIntegrada] No se pudo parsear ICS:', err);
           });
@@ -4121,6 +4222,35 @@
       });
       scroll.appendChild(att);
     }
+
+    // 📦602 — Footer Responder / Reenviar al final del email (estilo Gmail)
+    var replyFooter = el("div", { class: "kair-mail-reply-footer" });
+    replyFooter.innerHTML = `
+      <button class="kair-mail-reply-footer__btn kair-mail-reply-footer__btn--primary" data-reply-footer="reply">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg>
+        Responder
+      </button>
+      <button class="kair-mail-reply-footer__btn" data-reply-footer="forward">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 17 20 12 15 7"></polyline><path d="M4 18v-2a4 4 0 0 1 4-4h12"></path></svg>
+        Reenviar
+      </button>
+      <button class="kair-mail-reply-footer__btn" data-reply-footer="emoji" title="Insertar emoji">
+        😊
+      </button>
+    `;
+    replyFooter.querySelectorAll('[data-reply-footer]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var action = btn.getAttribute('data-reply-footer');
+        if (action === 'reply') {
+          openComposeModal('reply', mail);
+        } else if (action === 'forward') {
+          openComposeModal('forward', mail);
+        } else if (action === 'emoji') {
+          toast("Emoji", "Selector de emoji próximamente", 'info');
+        }
+      });
+    });
+    scroll.appendChild(replyFooter);
 
     detail.appendChild(scroll);
 

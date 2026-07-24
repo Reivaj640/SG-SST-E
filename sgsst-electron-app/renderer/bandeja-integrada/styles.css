@@ -5019,3 +5019,327 @@ body {
   white-space: pre-wrap;
   line-height: 1.45;
 }
+
+/* 📦602 — Botón "Proponer otro horario" del banner de invitación */
+.kair-cal-invitation__btn--propose {
+  background: transparent;
+  color: #185abd;
+  border-color: #d1d5db;
+  font-weight: 400;
+}
+.kair-cal-invitation__btn--propose:hover {
+  background: #f0f9ff;
+  border-color: #93c5fd;
+}
+.kair-cal-invitation__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 10px 16px 12px;
+  background: #f8fafc;
+  border-top: 1px solid #e5e7eb;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+.kair-cal-invitation__footer-label {
+  margin-right: 4px;
+}
+.kair-cal-invitation__vote {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 0.95rem;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: background 0.15s;
+  filter: grayscale(0.5);
+}
+.kair-cal-invitation__vote:hover {
+  background: #f3f4f6;
+  filter: grayscale(0);
+}
+.kair-cal-invitation__vote--active {
+  background: #e0e7ff;
+  filter: grayscale(0);
+}
+
+/* 📦602 — Sección "Según este correo electrónico" + footer Responder/Reenviar */
+.kair-mail-divider {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 24px 0 12px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+.kair-mail-divider__left { color: #4b5563; }
+.kair-mail-divider__right { display: flex; gap: 12px; align-items: center; }
+.kair-mail-divider__feedback { display: flex; align-items: center; gap: 4px; }
+.kair-mail-divider__vote-btn {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 0.95rem;
+  padding: 2px 4px;
+  border-radius: 4px;
+  filter: grayscale(0.5);
+  transition: background 0.15s, filter 0.15s;
+}
+.kair-mail-divider__vote-btn:hover {
+  background: #f3f4f6;
+  filter: grayscale(0);
+}
+.kair-mail-divider__vote-btn--active {
+  background: #e0e7ff;
+  filter: grayscale(0);
+}
+.kair-mail-reply-footer {
+  display: flex;
+  gap: 8px;
+  padding: 16px 0;
+  margin-top: 24px;
+  border-top: 1px solid #e5e7eb;
+}
+.kair-mail-reply-footer__btn {
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 8px 18px;
+  border-radius: 18px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s, border-color 0.15s;
+}
+.kair-mail-reply-footer__btn:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+.kair-mail-reply-footer__btn--primary {
+  background: #185abd;
+  color: #ffffff;
+  border-color: #185abd;
+}
+.kair-mail-reply-footer__btn--primary:hover {
+  background: #134a99;
+  border-color: #134a99;
+}
+
+/* 📦602 — Banner de traducción (placeholder visual) */
+.kair-mail-translate {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin: 12px 0;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: #1e40af;
+}
+.kair-mail-translate__icon {
+  font-size: 1rem;
+}
+.kair-mail-translate__btn {
+  background: transparent;
+  border: 0;
+  color: #185abd;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.8rem;
+  text-decoration: none;
+}
+.kair-mail-translate__btn:hover {
+  text-decoration: underline;
+}
+.kair-mail-translate__close {
+  margin-left: auto;
+  background: transparent;
+  border: 0;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+/* 📦602 — Header de adjuntos estilo Gmail ("X archivo(s) adjunto(s) · Analizado por Gmail") */
+.kair-attachment-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 8px 0;
+  font-size: 0.8rem;
+  color: #4b5563;
+}
+.kair-attachment-header__count {
+  font-weight: 500;
+}
+.kair-attachment-header__info {
+  color: #6b7280;
+}
+.kair-attachment-header__icon {
+  font-size: 0.9rem;
+}
+
+/* 📦602-fix2 — Container del banner ICS (entre header del correo y mensajes, estilo Gmail) */
+.kair-ics-banner-container {
+  width: 100%;
+  display: block;
+  box-sizing: border-box;
+}
+.kair-ics-banner-container:empty {
+  display: none;
+}
+
+/* 📦602-fix — Banner de invitación más prominente, full-width, estilo Gmail */
+.kair-cal-invitation {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  margin: 12px 0 20px 0;
+  padding: 0;
+  overflow: hidden;
+  width: 100%;
+  box-sizing: border-box;
+  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.05);
+}
+.kair-cal-invitation__head {
+  padding: 18px 24px 16px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e5e7eb;
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+.kair-cal-invitation__head-content {
+  flex: 1;
+  min-width: 0;
+}
+.kair-cal-invitation__head-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+}
+.kair-cal-invitation__date {
+  font-size: 0.85rem;
+  color: #5f6368;
+  font-weight: 500;
+  margin-bottom: 6px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.kair-cal-invitation__title {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #202124;
+  margin-bottom: 8px;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+.kair-cal-invitation__org {
+  font-size: 0.875rem;
+  color: #5f6368;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.kair-cal-invitation__org-label {
+  color: #9ca3af;
+  font-size: 0.8rem;
+  margin-left: 4px;
+}
+.kair-cal-invitation__body {
+  padding: 18px 24px 16px;
+  background: #ffffff;
+}
+.kair-cal-invitation__btns {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  align-items: center;
+}
+.kair-cal-invitation__btn {
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  padding: 9px 22px;
+  border-radius: 20px;
+  border: 1px solid #dadce0;
+  background: #ffffff;
+  color: #3c4043;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+  min-width: 64px;
+  text-align: center;
+}
+.kair-cal-invitation__btn:hover {
+  background: #f1f3f4;
+  border-color: #bdc1c6;
+  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.1);
+}
+.kair-cal-invitation__btn--active {
+  background: #1a73e8;
+  color: #ffffff;
+  border-color: #1a73e8;
+}
+.kair-cal-invitation__btn--active:hover {
+  background: #1557b0;
+  border-color: #1557b0;
+}
+.kair-cal-invitation__btn--propose {
+  background: transparent;
+  color: #1a73e8;
+  border-color: #dadce0;
+  font-weight: 500;
+}
+.kair-cal-invitation__btn--propose:hover {
+  background: #f1f8ff;
+  border-color: #a8c7fa;
+}
+
+/* 📦602-fix2 — Location/description del banner (texto secundario) */
+.kair-cal-invitation__location {
+  font-size: 0.85rem;
+  color: #5f6368;
+  margin-top: 6px;
+  font-style: italic;
+}
+.kair-cal-invitation__description {
+  font-size: 0.875rem;
+  color: #3c4043;
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
+/* 📦602-fix2 — Botón ⋮ adicional estilo Gmail (junto a "Proponer otro horario") */
+.kair-cal-invitation__more {
+  background: transparent;
+  border: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #5f6368;
+  transition: background 0.15s;
+  margin-left: 2px;
+}
+.kair-cal-invitation__more:hover {
+  background: #f1f3f4;
+}
