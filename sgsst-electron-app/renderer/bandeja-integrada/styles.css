@@ -4685,3 +4685,337 @@ body {
   transition: opacity 0.15s;
 }
 .kair-week-allday-chip:hover { opacity: 0.85; }
+
+/* 📦598 — Modal de detalle de evento v3: minimal/profesional
+   - Sin overlay oscuro (background transparente)
+   - Sin emojis (texto plano)
+   - Paleta neutra con línea de color de categoría arriba
+   - Anclado al elemento clickeado, no centrado
+*/
+.kair-event-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  display: none;
+  z-index: 500000;
+}
+.kair-event-modal-overlay[style*="display: block"],
+.kair-event-modal-overlay[style*="display:block"] {
+  display: block !important;
+}
+.kair-event-modal {
+  background: #ffffff;
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.10), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  width: 360px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
+  display: flex;
+  flex-direction: column;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", system-ui, sans-serif;
+  overflow: hidden;
+  animation: kair-modal-slide 140ms ease-out;
+}
+@keyframes kair-modal-slide {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.kair-event-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #ffffff;
+}
+.kair-event-modal__category {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  line-height: 1;
+}
+.kair-event-modal__close {
+  background: transparent;
+  border: 0;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 4px;
+  transition: background 0.15s, color 0.15s;
+}
+.kair-event-modal__close:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.kair-event-modal__body {
+  padding: 14px 16px 12px;
+  overflow-y: auto;
+}
+.kair-event-modal__title {
+  margin: 0 0 12px 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+.kair-event-modal__dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 6px 12px;
+  font-size: 0.85rem;
+}
+.kair-event-modal__dl dt {
+  color: #6b7280;
+  font-weight: 500;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  padding-top: 2px;
+}
+.kair-event-modal__dl dd {
+  margin: 0;
+  color: #1f2937;
+  line-height: 1.45;
+  word-wrap: break-word;
+}
+.kair-event-modal__sub {
+  color: #6b7280;
+  font-size: 0.8rem;
+}
+.kair-event-modal__attendees {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.kair-event-modal__attendee {
+  display: inline-block;
+  background: #f3f4f6;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  color: #374151;
+  line-height: 1.5;
+}
+.kair-event-modal__notes {
+  white-space: pre-wrap;
+  font-size: 0.85rem;
+  color: #374151;
+  background: #fafafa;
+  border-left: 2px solid #d1d5db;
+  padding: 6px 10px;
+  border-radius: 0 3px 3px 0;
+}
+.kair-event-modal__meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid #e5e7eb;
+  font-size: 0.7rem;
+  color: #6b7280;
+}
+.kair-event-modal__source {
+  letter-spacing: 0.02em;
+}
+.kair-event-modal__cumplido {
+  color: #15803d;
+  font-weight: 500;
+}
+
+.kair-event-modal__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 10px 12px;
+  border-top: 1px solid #e5e7eb;
+  background: #fafafa;
+}
+.kair-event-modal__btn {
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.kair-event-modal__btn:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+.kair-event-modal__btn--primary {
+  background: #185abd;
+  color: #ffffff;
+  border-color: #185abd;
+}
+.kair-event-modal__btn--primary:hover {
+  background: #134a99;
+  border-color: #134a99;
+}
+.kair-event-modal__btn--danger-text {
+  background: transparent;
+  border-color: transparent;
+  color: #b91c1c;
+}
+.kair-event-modal__btn--danger-text:hover {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+/* 📦600 — RSVP buttons (Asistiré / Tal vez / No asistiré) en modal de detalle */
+.kair-event-modal__rsvp {
+  padding: 10px 16px 12px;
+  border-top: 1px solid #e5e7eb;
+  background: #fafafa;
+}
+.kair-event-modal__rsvp-label {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+.kair-event-modal__rsvp-label strong {
+  color: #111827;
+  font-weight: 600;
+}
+.kair-event-modal__rsvp-btns {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.kair-event-modal__rsvp-btn {
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 7px 10px;
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.kair-event-modal__rsvp-btn:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+.kair-event-modal__rsvp-btn--active-accept {
+  background: #185abd;
+  color: #ffffff;
+  border-color: #185abd;
+}
+.kair-event-modal__rsvp-btn--active-accept:hover {
+  background: #134a99;
+  border-color: #134a99;
+}
+.kair-event-modal__rsvp-btn--active-tentative {
+  background: #b8860b;
+  color: #ffffff;
+  border-color: #b8860b;
+}
+.kair-event-modal__rsvp-btn--active-tentative:hover {
+  background: #936c08;
+  border-color: #936c08;
+}
+.kair-event-modal__rsvp-btn--active-decline {
+  background: #b91c1c;
+  color: #ffffff;
+  border-color: #b91c1c;
+}
+.kair-event-modal__rsvp-btn--active-decline:hover {
+  background: #991b1b;
+  border-color: #991b1b;
+}
+
+/* 📦602 — Banner de invitación de Calendar dentro del email viewer (estilo Gmail) */
+.kair-cal-invitation {
+  background: #f0f9ff;
+  border: 1px solid #d1e3f3;
+  border-radius: 8px;
+  margin: 12px 0;
+  overflow: hidden;
+}
+.kair-cal-invitation__head {
+  padding: 14px 16px 12px;
+  background: #f0f9ff;
+  border-bottom: 1px solid #d1e3f3;
+}
+.kair-cal-invitation__date {
+  font-size: 0.78rem;
+  color: #185abd;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+.kair-cal-invitation__title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 4px;
+}
+.kair-cal-invitation__org {
+  font-size: 0.8rem;
+  color: #4b5563;
+}
+.kair-cal-invitation__org-label {
+  color: #9ca3af;
+  font-size: 0.7rem;
+}
+.kair-cal-invitation__body {
+  padding: 14px 16px;
+  background: #ffffff;
+}
+.kair-cal-invitation__btns {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.kair-cal-invitation__btn {
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 8px 18px;
+  border-radius: 18px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+  cursor: pointer;
+  min-width: 56px;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.kair-cal-invitation__btn:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+.kair-cal-invitation__btn--active {
+  background: #185abd;
+  color: #ffffff;
+  border-color: #185abd;
+}
+.kair-cal-invitation__btn--active:hover {
+  background: #134a99;
+  border-color: #134a99;
+}
+.kair-cal-invitation__location {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin-top: 4px;
+  font-style: italic;
+}
+.kair-cal-invitation__description {
+  font-size: 0.85rem;
+  color: #4b5563;
+  margin-top: 8px;
+  white-space: pre-wrap;
+  line-height: 1.45;
+}

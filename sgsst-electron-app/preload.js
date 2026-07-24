@@ -163,6 +163,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
     downloadAttachment: (options) => ipcRenderer.invoke('google-gmail:download-attachment', options)
   },
 
+  // --- F3.C — Google Calendar sync (lectura/escritura desde Bandeja Integrada) ---
+  // Reusa el token OAuth de Gmail/Calendar que ya está autorizado. El scope
+  // calendar ya está en shared/google-auth.js (línea 82), no requiere re-autorización.
+  googleCalendar: {
+    list: (options) => ipcRenderer.invoke('google-calendar:list', options),
+    create: (event) => ipcRenderer.invoke('google-calendar:create', event),
+    update: (payload) => ipcRenderer.invoke('google-calendar:update', payload),
+    delete: (googleEventId) => ipcRenderer.invoke('google-calendar:delete', googleEventId),
+    sync: (options) => ipcRenderer.invoke('google-calendar:sync', options),
+    // 📦600 — Responder a una invitación (Sí / No / Tal vez)
+    respond: (payload) => ipcRenderer.invoke('google-calendar:respond', payload),
+    // 📦602 — Crear/actualizar evento desde un .ics y responder al organizador
+    upsertFromIcs: (payload) => ipcRenderer.invoke('google-calendar:upsert-from-ics', payload)
+  },
+
   // 📦 Bandeja Integrada — Email cache (SQLite) — Fase 0
   // Patrón Mail-0: driver que lee de SQLite instantáneo en vez de llamar al API cada vez.
   emailCache: {

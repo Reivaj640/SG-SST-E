@@ -1716,6 +1716,117 @@ ipcMain.handle('google-gmail:mark-read', async (event, options) => {
 });
 
 // ============================================================
+// F3.C — Google Calendar sync (lectura/escritura desde Bandeja Integrada)
+// ============================================================
+// Reutiliza el cliente OAuth2 ya autorizado por F3.A. El scope de Calendar
+// ya está en shared/google-auth.js (línea 82), no requiere re-autorización.
+//   - list   → trae eventos de Google Calendar en un rango de tiempo
+//   - create → crea evento en Google Calendar, devuelve googleEventId
+//   - update → actualiza evento existente
+//   - delete → elimina evento
+//   - sync   → sync completo (pull + deduplicación por googleEventId)
+const googleCalendar = require('./shared/google-calendar');
+
+ipcMain.handle('google-calendar:list', async (event, options) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var result = await googleCalendar.listEvents(
+      configPath,
+      options && options.timeMin,
+      options && options.timeMax
+    );
+    return result;
+  } catch (err) {
+    sendLog('[MAIN] google-calendar:list error: ' + (err.message || err), 'ERROR');
+    return { success: false, error: err.message || 'Error listando eventos de Calendar' };
+  }
+});
+
+ipcMain.handle('google-calendar:create', async (event, ev) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var result = await googleCalendar.createEvent(configPath, ev || {});
+    return result;
+  } catch (err) {
+    sendLog('[MAIN] google-calendar:create error: ' + (err.message || err), 'ERROR');
+    return { success: false, error: err.message || 'Error creando evento en Calendar' };
+  }
+});
+
+ipcMain.handle('google-calendar:update', async (event, payload) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var googleEventId = payload && payload.googleEventId;
+    var ev = payload && payload.event;
+    if (!googleEventId) return { success: false, error: 'Falta googleEventId' };
+    var result = await googleCalendar.updateEvent(configPath, googleEventId, ev || {});
+    return result;
+  } catch (err) {
+    sendLog('[MAIN] google-calendar:update error: ' + (err.message || err), 'ERROR');
+    return { success: false, error: err.message || 'Error actualizando evento en Calendar' };
+  }
+});
+
+ipcMain.handle('google-calendar:delete', async (event, googleEventId) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var result = await googleCalendar.deleteEvent(configPath, googleEventId);
+    return result;
+  } catch (err) {
+    sendLog('[MAIN] google-calendar:delete error: ' + (err.message || err), 'ERROR');
+    return { success: false, error: err.message || 'Error eliminando evento en Calendar' };
+  }
+});
+
+ipcMain.handle('google-calendar:sync', async (event, options) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var result = await googleCalendar.syncFromGoogle(configPath, options || {});
+    return result;
+  } catch (err) {
+    sendLog('[MAIN] google-calendar:sync error: ' + (err.message || err), 'ERROR');
+    return { success: false, error: err.message || 'Error sincronizando con Calendar' };
+  }
+});
+
+// 📦600 — Responder a una invitación de Google Calendar (Sí / No / Tal vez).
+// Llama a events.patch con el responseStatus del attendee que matchea el userEmail.
+ipcMain.handle('google-calendar:respond', async (event, payload) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var googleEventId = payload && payload.googleEventId;
+    var responseStatus = payload && payload.responseStatus;
+    var userEmail = payload && payload.userEmail;
+    var result = await googleCalendar.respondToEvent(
+      configPath, googleEventId, responseStatus, userEmail
+    );
+    return result;
+  } catch (err) {
+    sendLog('[MAIN] google-calendar:respond error: ' + (err.message || err), 'ERROR');
+    return { success: false, error: err.message || 'Error respondiendo al evento' };
+  }
+});
+
+// 📦602 — Recibe un .ics (texto), lo parsea, crea/actualiza el evento en
+// Google Calendar y responde al organizador. Usado cuando el user hace
+// click en Sí/No/Tal vez desde el banner dentro del email viewer.
+ipcMain.handle('google-calendar:upsert-from-ics', async (event, payload) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var icsText = payload && payload.icsText;
+    var responseStatus = payload && payload.responseStatus;
+    var userEmail = payload && payload.userEmail;
+    var result = await googleCalendar.upsertFromIcs(
+      configPath, icsText, responseStatus, userEmail
+    );
+    return result;
+  } catch (err) {
+    sendLog('[MAIN] google-calendar:upsert-from-ics error: ' + (err.message || err), 'ERROR');
+    return { success: false, error: err.message || 'Error procesando el ICS' };
+  }
+});
+
+// ============================================================
 // F3.A — Google OAuth (Calendar + Gmail) — Bandeja Integrada
 // ============================================================
 // Flujo:

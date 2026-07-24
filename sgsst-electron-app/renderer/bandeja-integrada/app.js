@@ -39,6 +39,7 @@
     searchQuery: "",
     checkedIds: new Set(),
     selectedDate: null,
+    userEmail: null,           // 📦600 — email del usuario autenticado (para RSVP)
     activeCategories: new Set(),
     calView: "month",          // "day" | "week" | "month" | "schedule"
     // F4 — Mes visible en el mini-cal (navegable con chevron)
@@ -880,6 +881,43 @@
     } catch (e) { /* no crítico */ }
   }
 
+  // 📦596 — F3.C: devuelve la API de Google Calendar del preload si está disponible.
+  // Retorna null si no está expuesto (versión vieja del preload) o si no hay OAuth.
+  function getGoogleCalendarApi() {
+    try {
+      var api = (window.electronAPI) || (window.parent && window.parent.electronAPI);
+      if (api && api.googleCalendar && typeof api.googleCalendar.create === "function") {
+        return api.googleCalendar;
+      }
+    } catch (e) { /* no crítico */ }
+    return null;
+  }
+
+  // 📦596 — F3.C: trae eventos de Google Calendar en un rango y los agrega
+  // a state.events (deduplicando por googleEventId). Best-effort.
+  async function loadEventsFromGoogle(rangeStart, rangeEnd) {
+    var gcal = getGoogleCalendarApi();
+    if (!gcal) return [];
+    try {
+      var res = await gcal.list({
+        timeMin: rangeStart || new Date(Date.now() - 7 * 86400000).toISOString(),
+        timeMax: rangeEnd || new Date(Date.now() + 60 * 86400000).toISOString()
+      });
+      if (!res || !res.success || !Array.isArray(res.data)) return [];
+      // Filtrar duplicados por googleEventId
+      var existing = {};
+      (state.events || []).forEach(function (e) {
+        if (e && e.googleEventId) existing[e.googleEventId] = true;
+      });
+      return res.data.filter(function (e) {
+        return e && e.googleEventId && !existing[e.googleEventId];
+      });
+    } catch (err) {
+      console.warn("[BandejaIntegrada] No se pudieron traer eventos de Google Calendar:", err);
+      return [];
+    }
+  }
+
   async function loadEventsFromIPC() {
     var api = getElectronAPI();
     var adapter = getKairCalendarAdapter();
@@ -913,6 +951,20 @@
           });
         });
         console.log("[BandejaIntegrada] IPC retorno " + normalized.length + " eventos del mundo real. Fuentes: " + JSON.stringify([...new Set(normalized.map(function(e) { return e.type || e.category; }))]));
+        // 📦596 — F3.C: también traer eventos de Google Calendar (best-effort).
+        // Si falla o no hay OAuth, devuelve [] y seguimos solo con los locales.
+        try {
+          var gcalEvents = await loadEventsFromGoogle(
+            new Date(D.MONTH_VIEW.year, 0, 1).toISOString(),
+            new Date(D.MONTH_VIEW.year, 11, 31, 23, 59, 59).toISOString()
+          );
+          if (gcalEvents && gcalEvents.length > 0) {
+            normalized = normalized.concat(gcalEvents);
+            console.log("[BandejaIntegrada] Google Calendar agrego " + gcalEvents.length + " eventos (sin duplicar)");
+          }
+        } catch (gcErr) {
+          console.warn("[BandejaIntegrada] Sync con Google Calendar no completado:", gcErr);
+        }
         return normalized;
       }
       console.warn("[BandejaIntegrada] adapter.list() no retorno datos válidos, usando mocks");
@@ -1041,19 +1093,34 @@
   // F1-Feature7 — Auto-refresh periódico cada 5 minutos para mantener el cache
   // actualizado sin que el user tenga que hacer click en "Sincronizar".
   // Solo corre si la Bandeja Integrada está abierta y el cache está inicializado.
+  // 📦601 — Auto-refresh cada 1 minuto (antes 5 min): refresca correos Y eventos.
   var autoRefreshInterval = null;
   function startAutoRefresh() {
     if (autoRefreshInterval) return; // ya está corriendo
     autoRefreshInterval = setInterval(function () {
       var api = getElectronAPI();
-      if (!api || !api.emailCache) return;
+      if (!api) return;
       // Solo refrescar si la Bandeja Integrada está visible
       var isVisible = document.visibilityState === 'visible';
       if (!isVisible) return;
-      console.log("[BandejaIntegrada] Auto-refresh disparado (cada 5 min)");
-      syncInboxInBackground();
-    }, 5 * 60 * 1000); // 5 minutos
-    console.log("[BandejaIntegrada] Auto-refresh cada 5 min activado");
+      console.log("[BandejaIntegrada] Auto-refresh disparado (cada 1 min)");
+      // Refrescar correos (background, no bloquea UI)
+      if (api.emailCache && state.gmailConnected) {
+        syncInboxInBackground();
+      }
+      // 📦601 — Refrescar eventos del IPC + Google Calendar en background
+      loadEventsFromIPC().then(function (events) {
+        if (events && Array.isArray(events)) {
+          state.events = events;
+          refreshKairAlerts();
+          // Solo re-renderizar si la Bandeja está visible (no en background tabs)
+          if (state.calendarVisible) render();
+        }
+      }).catch(function (err) {
+        console.warn("[BandejaIntegrada] Auto-refresh eventos falló:", err);
+      });
+    }, 60 * 1000); // 1 minuto
+    console.log("[BandejaIntegrada] Auto-refresh cada 1 min activado");
   }
   function stopAutoRefresh() {
     if (autoRefreshInterval) {
@@ -1223,6 +1290,8 @@
           var profileRes = await api.googleGmail.getProfile();
           var email = (profileRes && profileRes.success && profileRes.data && profileRes.data.email) || "";
           if (email) {
+            // 📦600 — Cachear el email del usuario para RSVP de Calendar
+            state.userEmail = String(email).toLowerCase();
             indicator.setAttribute("data-connected", "true");
             indicator.title = "Conectado como " + email + " · click para ir a Configuración";
             text.textContent = email;
@@ -1464,9 +1533,9 @@
         showSidebar: false,  // El sidebar ya está en la Bandeja Integrada (mini-cal propio)
         locale: "es",
         // F4 — Callbacks para hacer el calendario funcional (mismo patrón que el viejo)
-        onEventClick: function (ev) {
-          // Click en un evento → abrir modal de detalle
-          openEventDetailModal(ev, adapter);
+        onEventClick: function (ev, anchorEl) {
+          // Click en un evento → abrir modal de detalle anclado al anchor
+          openEventDetailModal(ev, adapter, anchorEl);
         },
         onEventCreate: function (ev) {
           // Click en celda vacía (drag → drop) → abrir modal de crear
@@ -1487,13 +1556,163 @@
   }
 
   // F4 — Modal de detalle de un evento del calendario
-  // Muestra la info del evento + botones (Editar / Eliminar / Marcar cumplido)
-  function openEventDetailModal(ev, adapter) {
+  // v3 (📦598): rediseñado con estética minimal/profesional (sin emojis,
+  // sin overlay oscuro, sin desenfoque). Se posiciona anclado al elemento
+  // clickeado (esquina de la celda del día o del evento).
+
+  // 📦600 — Handler del click en un botón RSVP. Llama a la API de Calendar
+  // para registrar la respuesta y refresca el modal.
+  async function handleRsvpClick(ev, newStatus, anchorEl) {
+    if (!ev || !ev.googleEventId) return;
+    var gcal = getGoogleCalendarApi();
+    if (!gcal || !state.userEmail) {
+      toast("No se puede responder", "Falta conexión con Google Calendar o email del usuario", "error");
+      return;
+    }
+    try {
+      var res = await gcal.respond({
+        googleEventId: ev.googleEventId,
+        responseStatus: newStatus,
+        userEmail: state.userEmail
+      });
+      if (res && res.success) {
+        var label = { accepted: "Asistirás", tentative: "Tal vez", declined: "No asistirás" }[newStatus] || newStatus;
+        toast("Respuesta enviada: " + label, ev.title, "success");
+        // Refrescar el modal con el nuevo estado
+        ev.selfResponseStatus = newStatus;  // para mostrar en el modal
+        // Actualizar el evento en state.events con el responseStatus nuevo
+        (state.events || []).forEach(function (e) {
+          if (e && e.googleEventId === ev.googleEventId) {
+            e.selfResponseStatus = newStatus;
+            if (Array.isArray(e.attendees)) {
+              e.attendees.forEach(function (a) {
+                if (a && String(a.email || '').toLowerCase() === state.userEmail) {
+                  a.responseStatus = newStatus;
+                }
+              });
+            }
+          }
+        });
+        // Reabrir el modal con datos actualizados
+        openEventDetailModal(ev, getKairCalendarAdapter(), anchorEl);
+      } else {
+        toast("No se pudo registrar la respuesta", (res && res.error) || "Error", "error");
+      }
+    } catch (err) {
+      toast("Error respondiendo", err && err.message ? err.message : "error", "error");
+    }
+  }
+
+  // 📦600 — Renderiza la sección "Asistiré / No / Quizás" para eventos de
+  // Google Calendar cuando el usuario autenticado es attendee.
+  function renderRsvpSection(ev, cat) {
+    var userEmailLower = (state.userEmail || '').toLowerCase();
+    var attendees = ev.attendees || ev._attendees || [];
+    var myAttendee = null;
+    if (Array.isArray(attendees) && userEmailLower) {
+      for (var i = 0; i < attendees.length; i++) {
+        if (attendees[i] && String(attendees[i].email || '').toLowerCase() === userEmailLower) {
+          myAttendee = attendees[i];
+          break;
+        }
+      }
+    }
+    var currentStatus = (myAttendee && myAttendee.responseStatus) || (ev.selfResponseStatus) || 'needsAction';
+    var statusLabel = {
+      'accepted': 'Asistirás',
+      'declined': 'No asistirás',
+      'tentative': 'Tal vez',
+      'needsAction': 'Sin respuesta'
+    }[currentStatus] || 'Sin respuesta';
+
+    return `
+      <div class="kair-event-modal__rsvp" data-rsvp-event="${escapeHtml(ev.googleEventId || '')}">
+        <div class="kair-event-modal__rsvp-label">Tu respuesta · <strong>${statusLabel}</strong></div>
+        <div class="kair-event-modal__rsvp-btns">
+          <button class="kair-event-modal__rsvp-btn ${currentStatus === 'accepted' ? 'kair-event-modal__rsvp-btn--active-accept' : ''}" data-rsvp="accepted">Asistiré</button>
+          <button class="kair-event-modal__rsvp-btn ${currentStatus === 'tentative' ? 'kair-event-modal__rsvp-btn--active-tentative' : ''}" data-rsvp="tentative">Tal vez</button>
+          <button class="kair-event-modal__rsvp-btn ${currentStatus === 'declined' ? 'kair-event-modal__rsvp-btn--active-decline' : ''}" data-rsvp="declined">No asistiré</button>
+        </div>
+      </div>
+    `;
+  }
+
+  // 📦598 — Posiciona el modal de detalle cerca del elemento clickeado.
+  // Si no hay anchor, lo centra en el viewport. Si el modal se sale de
+  // la pantalla, lo ajusta para que entre.
+  function positionEventDetailModal(modal, anchorEl) {
+    var inner = modal.querySelector(".kair-event-modal");
+    if (!inner) return;
+    var W = inner.offsetWidth || 360;
+    var H = inner.offsetHeight || 280;
+    var vw = window.innerWidth;
+    var vh = window.innerHeight;
+    var pad = 12;
+
+    var top, left;
+    if (anchorEl && anchorEl.getBoundingClientRect) {
+      var r = anchorEl.getBoundingClientRect();
+      // Por defecto: a la derecha del anchor
+      left = r.right + pad;
+      top = r.top;
+      // Si no entra a la derecha, lo pone a la izquierda
+      if (left + W + pad > vw) left = Math.max(pad, r.left - W - pad);
+      // Si no entra ni a la izquierda, lo alinea al borde derecho
+      if (left + W + pad > vw) left = Math.max(pad, vw - W - pad);
+      // Si no entra arriba, lo baja
+      if (top + H + pad > vh) top = Math.max(pad, vh - H - pad);
+      if (top < pad) top = pad;
+    } else {
+      // Sin anchor: centrado en el viewport
+      left = Math.max(pad, (vw - W) / 2);
+      top = Math.max(pad, (vh - H) / 2);
+    }
+    inner.style.position = "fixed";
+    inner.style.left = left + "px";
+    inner.style.top = top + "px";
+  }
+
+  function openEventDetailModal(ev, adapter, anchorEl) {
     var cat = getCategoryStyle(ev.category);
     var dateStr = ev.date || "—";
-    var timeStr = (ev.start || "") + (ev.end ? " - " + ev.end : "");
-    var locationStr = ev.location || "Sin ubicación";
+    // Construir rango de hora legible
+    var timeStr = "";
+    var startTime = ev.start || (ev.startHour != null ? String(Math.floor(ev.startHour)).padStart(2, "0") + ":" + String(Math.round((ev.startHour % 1) * 60)).padStart(2, "0") : "");
+    var endTime = ev.end || (ev.startHour != null && ev.durationHours != null
+      ? String(Math.floor(ev.startHour + ev.durationHours)).padStart(2, "0") + ":" + String(Math.round(((ev.startHour + ev.durationHours) % 1) * 60)).padStart(2, "0")
+      : "");
+    if (startTime && endTime && !(startTime === "00:00" && endTime === "23:59")) {
+      timeStr = startTime + " – " + endTime;
+    } else if (startTime && startTime !== "00:00") {
+      timeStr = startTime;
+    } else {
+      timeStr = "Todo el día";
+    }
+
+    // Duración legible
+    var durStr = "";
+    if (ev.durationHours != null && startTime !== "00:00") {
+      var h = ev.durationHours;
+      if (h === 0.5) durStr = "30 min";
+      else if (h === 1) durStr = "1 hora";
+      else if (Number.isInteger(h)) durStr = h + " h";
+      else durStr = h + " h";
+    }
+
+    var locationStr = ev.location || "";
     var titleStr = ev.title || "(sin título)";
+    var catLabel = cat.label || ev.category || "Sin categoría";
+    var sourceText = ev.source === "google" || ev.googleEventId ? "Google Calendar" : "K+AIR";
+
+    // Fecha larga en español
+    var dateLongStr = dateStr;
+    try {
+      var parts = dateStr.split("-");
+      if (parts.length === 3) {
+        var dDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        dateLongStr = dDate.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+      }
+    } catch (e) { /* fallback */ }
 
     // Crear/actualizar el modal
     var modal = document.getElementById("event-detail-modal");
@@ -1503,41 +1722,60 @@
       modal.className = "kair-event-modal-overlay";
       document.body.appendChild(modal);
     }
+    // Borde de color de categoría (línea fina arriba, sin fondo de color)
     modal.innerHTML = `
-      <div class="kair-event-modal">
-        <div class="kair-event-modal__header" style="background:${cat.bg};border-left:4px solid ${cat.color};">
-          <span class="kair-event-modal__category" style="background:${cat.color};color:#fff;">${cat.label || ev.category}</span>
+      <div class="kair-event-modal" style="border-top:3px solid ${cat.color};">
+        <div class="kair-event-modal__header">
+          <span class="kair-event-modal__category" style="color:${cat.color};">${escapeHtml(catLabel)}</span>
           <button class="kair-event-modal__close" data-action="close" aria-label="Cerrar">×</button>
         </div>
         <div class="kair-event-modal__body">
           <h2 class="kair-event-modal__title">${escapeHtml(titleStr)}</h2>
+          <dl class="kair-event-modal__dl">
+            <dt>Fecha y hora</dt>
+            <dd>${escapeHtml(dateLongStr)}${timeStr && timeStr !== "Todo el día" ? ' · ' + escapeHtml(timeStr) : ''}${durStr ? ' <span class="kair-event-modal__sub">· ' + durStr + '</span>' : ''}</dd>
+            ${locationStr ? `<dt>Lugar</dt><dd>${escapeHtml(locationStr)}</dd>` : ''}
+            ${ev.attendees && ev.attendees.length ? `<dt>Asistentes · ${ev.attendees.length}</dt><dd class="kair-event-modal__attendees">${ev.attendees.map(function (a) { return '<span class="kair-event-modal__attendee">' + escapeHtml(a) + '</span>'; }).join('')}</dd>` : ''}
+            ${ev.description || ev.notes ? `<dt>Notas</dt><dd class="kair-event-modal__notes">${escapeHtml(ev.description || ev.notes)}</dd>` : ''}
+          </dl>
           <div class="kair-event-modal__meta">
-            <div class="kair-event-modal__meta-row">
-              <strong>Fecha:</strong> ${dateStr} ${timeStr ? "· " + timeStr : ""}
-            </div>
-            <div class="kair-event-modal__meta-row">
-              <strong>Ubicación:</strong> ${escapeHtml(locationStr)}
-            </div>
-            ${ev.attendees && ev.attendees.length ? '<div class="kair-event-modal__meta-row"><strong>Asistentes:</strong> ' + ev.attendees.length + '</div>' : ''}
-            ${ev.linkedMailId ? '<div class="kair-event-modal__meta-row"><strong>Vinculado a correo:</strong> ' + escapeHtml(ev.linkedMailId) + '</div>' : ''}
+            <span class="kair-event-modal__source">${escapeHtml(sourceText)}</span>
+            ${ev.cumplido ? '<span class="kair-event-modal__cumplido">Cumplido</span>' : ''}
           </div>
-          ${ev.description || ev.notes ? '<div class="kair-event-modal__description">' + escapeHtml(ev.description || ev.notes) + '</div>' : ''}
         </div>
         <div class="kair-event-modal__actions">
-          <button class="kair-event-modal__btn kair-event-modal__btn--secondary" data-action="cumplido">
-            ${ev.cumplido ? '✓ Cumplido' : 'Marcar cumplido'}
-          </button>
+          <button class="kair-event-modal__btn" data-action="cumplido">${ev.cumplido ? 'Cumplido' : 'Marcar cumplido'}</button>
           <button class="kair-event-modal__btn kair-event-modal__btn--primary" data-action="edit">Editar</button>
-          <button class="kair-event-modal__btn kair-event-modal__btn--danger" data-action="delete">Eliminar</button>
+          <button class="kair-event-modal__btn kair-event-modal__btn--danger-text" data-action="delete">Eliminar</button>
         </div>
+        ${(ev.googleEventId && state.userEmail) ? renderRsvpSection(ev, cat) : ''}
       </div>
     `;
-    modal.style.display = "flex";
+    modal.style.display = "block";
+    // Posicionar el modal cerca del anchor (elemento clickeado)
+    positionEventDetailModal(modal, anchorEl);
 
     // Handlers de los botones
-    var closeModal = function () { modal.style.display = "none"; };
+    var closeModal = function () {
+      modal.style.display = "none";
+      document.removeEventListener("keydown", onEscClose, true);
+      document.removeEventListener("mousedown", onOutsideClick, true);
+    };
+    var onEscClose = function (e) { if (e.key === "Escape") closeModal(); };
+    // 📦598 — Click outside del modal también cierra (sin overlay oscuro)
+    var onOutsideClick = function (e) {
+      if (!modal.contains(e.target)) closeModal();
+    };
     modal.querySelector("[data-action='close']").addEventListener("click", closeModal);
-    modal.addEventListener("click", function (e) { if (e.target === modal) closeModal(); });
+    document.addEventListener("keydown", onEscClose, true);
+    document.addEventListener("mousedown", onOutsideClick, true);
+    // 📦600 — Handlers de los botones RSVP (Asistiré / Tal vez / No asistiré)
+    modal.querySelectorAll("[data-rsvp]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var newStatus = btn.getAttribute("data-rsvp");
+        handleRsvpClick(ev, newStatus, anchorEl);
+      });
+    });
     modal.querySelector("[data-action='cumplido']").addEventListener("click", function () {
       // F4-fix: marcar como cumplido usa la API de electronAPI (no adapter directo)
       var api = getElectronAPI();
@@ -2073,7 +2311,7 @@
         chip.style.color = cat.color || "#333";
         chip.title = ev.title || "(sin título)";
         chip.textContent = ev.title || "(sin título)";
-        chip.addEventListener("click", () => selectEvent(ev));
+        chip.addEventListener("click", (clickEv) => selectEvent(ev, clickEv));
         banner.appendChild(chip);
       });
       main.appendChild(banner);
@@ -2148,7 +2386,7 @@
           <div class="kair-day-event__title">${ev.title || "(sin título)"}</div>
           <div class="kair-day-event__cat">${catLabel}${ev.location ? " · " + ev.location : ""}</div>
         `;
-        block.addEventListener("click", () => selectEvent(ev));
+        block.addEventListener("click", (clickEv) => selectEvent(ev, clickEv));
         evCol.appendChild(block);
       });
     }
@@ -2230,7 +2468,7 @@
           chip.style.color = cat.color || "#333";
           chip.title = ev.title || "(sin título)";
           chip.textContent = ev.title || "(sin título)";
-          chip.addEventListener("click", () => selectEvent(ev));
+          chip.addEventListener("click", (clickEv) => selectEvent(ev, clickEv));
           allDayWrap.appendChild(chip);
         });
         head.appendChild(allDayWrap);
@@ -2294,7 +2532,7 @@
           <div class="kair-week-event__title">${ev.title || "(sin título)"}</div>
           <div class="kair-week-event__cat">${catLabel}</div>
         `;
-        block.addEventListener("click", () => selectEvent(ev));
+        block.addEventListener("click", (clickEv) => selectEvent(ev, clickEv));
         col.appendChild(block);
       });
       body.appendChild(col);
@@ -2338,7 +2576,7 @@
             <div class="kair-agenda-item__meta"><span class="kair-agenda-item__cat" style="color:${cat.color}">${(D.EVENT_CATEGORIES[ev.category] && D.EVENT_CATEGORIES[ev.category].label) || ev.category || ""}</span>${ev.location ? ' · ' + ev.location : ''}</div>
           </div>
         `;
-        item.addEventListener("click", () => selectEvent(ev));
+        item.addEventListener("click", (clickEv) => selectEvent(ev, clickEv));
         list.appendChild(item);
       });
     }
@@ -2555,7 +2793,7 @@
         `;
         eventBtn.addEventListener("click", (e) => {
           e.stopPropagation();
-          selectEvent(ev);
+          selectEvent(ev, e);
         });
         cellEl.appendChild(eventBtn);
       });
@@ -3159,6 +3397,279 @@
   }
 
   // ====== Detalle de correo (Gmail reading pane) ======
+
+  // 📦602 — Parser mínimo de iCalendar (RFC 5545) para extraer invitaciones de
+  // Calendar de adjuntos .ics. Solo parsea los campos que necesitamos para
+  // renderizar el banner de invitación (SUMMARY, DTSTART, DTEND, LOCATION,
+  // DESCRIPTION, ORGANIZER, ATTENDEE, METHOD, STATUS, UID, SEQUENCE).
+  function parseIcs(icsText) {
+    if (!icsText || typeof icsText !== 'string') return null;
+    // Desenrollar líneas largas (RFC 5545 §3.1: una línea puede continuar
+    // con un espacio o tab al inicio de la siguiente línea)
+    var unfolded = icsText.replace(/\r?\n[ \t]/g, '');
+    var lines = unfolded.split(/\r?\n/);
+    var ev = {
+      method: null,
+      uid: null,
+      sequence: 0,
+      summary: null,
+      description: null,
+      location: null,
+      organizer: null,
+      attendees: [],
+      start: null,
+      end: null,
+      status: 'CONFIRMED',
+      isReply: false,
+      isCancel: false
+    };
+    var inEvent = false;
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      if (line === 'BEGIN:VEVENT') { inEvent = true; continue; }
+      if (line === 'END:VEVENT') { inEvent = false; break; }
+      if (!inEvent) {
+        if (line.indexOf('METHOD:') === 0) ev.method = line.substring(7).trim();
+        continue;
+      }
+      // Parsear "PROPERTY[;PARAM=VAL[;PARAM=VAL]]:VALUE"
+      var colonIdx = line.indexOf(':');
+      if (colonIdx < 0) continue;
+      var header = line.substring(0, colonIdx);
+      var value = line.substring(colonIdx + 1);
+      var prop = header.split(';')[0];
+      switch (prop) {
+        case 'UID': ev.uid = value; break;
+        case 'SEQUENCE': ev.sequence = parseInt(value, 10) || 0; break;
+        case 'SUMMARY':
+          // Unescape de iCal: \, \; \n \\ \N
+          ev.summary = value.replace(/\\,/g, ',').replace(/\\;/g, ';').replace(/\\n/g, '\n').replace(/\\\\/g, '\\');
+          break;
+        case 'DESCRIPTION':
+          ev.description = value.replace(/\\,/g, ',').replace(/\\;/g, ';').replace(/\\n/g, '\n').replace(/\\\\/g, '\\');
+          break;
+        case 'LOCATION':
+          ev.location = value.replace(/\\,/g, ',').replace(/\\;/g, ';').replace(/\\n/g, '\n').replace(/\\\\/g, '\\');
+          break;
+        case 'ORGANIZER':
+          // ORGANIZER;CN=Javier:mailto:jrf2011@live.com
+          var cnMatch = /CN=([^;:]+)/.exec(header);
+          ev.organizer = {
+            cn: cnMatch ? cnMatch[1].trim() : null,
+            email: value.indexOf('mailto:') === 0 ? value.substring(7) : value
+          };
+          break;
+        case 'ATTENDEE':
+          var aCn = /CN=([^;:]+)/.exec(header);
+          var aPartStat = /PARTSTAT=([^;:]+)/.exec(header);
+          var aRole = /ROLE=([^;:]+)/.exec(header);
+          ev.attendees.push({
+            cn: aCn ? aCn[1].trim() : null,
+            email: value.indexOf('mailto:') === 0 ? value.substring(7) : value,
+            responseStatus: aPartStat ? aPartStat[1] : 'NEEDS-ACTION',
+            role: aRole ? aRole[1] : 'REQ-PARTICIPANT'
+          });
+          break;
+        case 'DTSTART':
+          ev.start = parseIcsDate(value, header);
+          break;
+        case 'DTEND':
+          ev.end = parseIcsDate(value, header);
+          break;
+        case 'STATUS':
+          ev.status = value;
+          break;
+      }
+    }
+    if (!ev.summary && !ev.uid) return null;
+    if (ev.method === 'CANCEL') ev.isCancel = true;
+    if (ev.method === 'REPLY') ev.isReply = true;
+    return ev;
+  }
+
+  // Helper para parsear fechas ICS (formato básico YYYYMMDDTHHMMSSZ o sin Z)
+  function parseIcsDate(value, header) {
+    var m = /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})(Z)?)?$/.exec(value);
+    if (!m) return null;
+    var iso = m[1] + '-' + m[2] + '-' + m[3];
+    if (m[4]) iso += 'T' + m[4] + ':' + m[5] + ':' + (m[6] || '00');
+    if (m[7]) iso += 'Z';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    return {
+      iso: iso,
+      date: m[1] + '-' + m[2] + '-' + m[3],
+      time: m[4] ? m[4] + ':' + m[5] : null,
+      utc: !!m[7],
+      dateObj: d
+    };
+  }
+
+  // 📦602 — Renderiza el banner de invitación de Calendar dentro del email viewer
+  // (estilo Gmail: muestra botones Sí/No/Tal vez cuando llega un .ics de Calendar).
+  // Devuelve un HTMLElement o null.
+  function renderCalendarInvitation(icsEvent, messageId, attachmentId) {
+    if (!icsEvent) return null;
+    var el2 = document.createElement('div');
+    el2.className = 'kair-cal-invitation';
+
+    if (icsEvent.isCancel) {
+      el2.innerHTML = `
+        <div class="kair-cal-invitation__head" style="background:#fef2f2;border-left:3px solid #b91c1c;">
+          <div class="kair-cal-invitation__date">Cancelado</div>
+          <div class="kair-cal-invitation__title">${escapeHtml(icsEvent.summary || '(sin título)')}</div>
+        </div>
+        <div class="kair-cal-invitation__body">
+          <p>Este evento fue cancelado por el organizador.</p>
+        </div>
+      `;
+      return el2;
+    }
+
+    if (icsEvent.isReply) {
+      // Es una respuesta a tu invitación, no muestra botones
+      var respLabel = { ACCEPTED: 'Asistirá', DECLINED: 'No asistirá', TENTATIVE: 'Tal vez' };
+      var firstAtt = (icsEvent.attendees || [])[0];
+      var attLabel = firstAtt ? (firstAtt.cn || firstAtt.email) : 'Asistente';
+      var attResp = firstAtt ? (respLabel[firstAtt.responseStatus] || firstAtt.responseStatus) : '';
+      el2.innerHTML = `
+        <div class="kair-cal-invitation__head" style="background:#f0f9ff;border-left:3px solid #185abd;">
+          <div class="kair-cal-invitation__title">Respuesta de ${escapeHtml(attLabel)}</div>
+          <div class="kair-cal-invitation__date">${escapeHtml(attResp)}</div>
+        </div>
+        <div class="kair-cal-invitation__body">
+          <p><strong>${escapeHtml(icsEvent.summary || '(sin título)')}</strong></p>
+        </div>
+      `;
+      return el2;
+    }
+
+    // Invitación nueva
+    var startDate = icsEvent.start;
+    var endDate = icsEvent.end;
+    var whenText = '';
+    if (startDate) {
+      try {
+        var dStart = new Date(startDate.iso);
+        var opts = { weekday: 'long', day: 'numeric', month: 'long' };
+        if (startDate.time) {
+          whenText = dStart.toLocaleDateString('es-CO', opts) + ' · ' + startDate.time;
+          if (endDate && endDate.time) whenText += ' – ' + endDate.time;
+        } else {
+          whenText = dStart.toLocaleDateString('es-CO', Object.assign(opts, { year: 'numeric' }));
+        }
+      } catch (e) { whenText = startDate.iso; }
+    }
+    var orgText = icsEvent.organizer
+      ? (icsEvent.organizer.cn || icsEvent.organizer.email)
+      : 'Organizador';
+    var myStatus = 'needsAction';
+    if (state.userEmail) {
+      for (var i = 0; i < (icsEvent.attendees || []).length; i++) {
+        var a = icsEvent.attendees[i];
+        if (a.email && String(a.email).toLowerCase() === String(state.userEmail).toLowerCase()) {
+          myStatus = (a.responseStatus || 'needsAction').toLowerCase();
+          if (myStatus === 'accepted') myStatus = 'accepted';
+          else if (myStatus === 'declined') myStatus = 'declined';
+          else if (myStatus === 'tentative') myStatus = 'tentative';
+          break;
+        }
+      }
+    }
+
+    el2.innerHTML = `
+      <div class="kair-cal-invitation__head">
+        <div class="kair-cal-invitation__date">${escapeHtml(whenText)}</div>
+        <div class="kair-cal-invitation__title">${escapeHtml(icsEvent.summary || '(sin título)')}</div>
+        <div class="kair-cal-invitation__org">${escapeHtml(orgText)} <span class="kair-cal-invitation__org-label">(organizador)</span></div>
+      </div>
+      <div class="kair-cal-invitation__body">
+        <div class="kair-cal-invitation__btns">
+          <button class="kair-cal-invitation__btn kair-cal-invitation__btn--accept ${myStatus === 'accepted' ? 'kair-cal-invitation__btn--active' : ''}" data-ics-rsvp="accepted">Sí</button>
+          <button class="kair-cal-invitation__btn kair-cal-invitation__btn--decline ${myStatus === 'declined' ? 'kair-cal-invitation__btn--active' : ''}" data-ics-rsvp="declined">No</button>
+          <button class="kair-cal-invitation__btn kair-cal-invitation__btn--tentative ${myStatus === 'tentative' ? 'kair-cal-invitation__btn--active' : ''}" data-ics-rsvp="tentative">Tal vez</button>
+        </div>
+        ${icsEvent.location ? '<div class="kair-cal-invitation__location">' + escapeHtml(icsEvent.location) + '</div>' : ''}
+        ${icsEvent.description ? '<div class="kair-cal-invitation__description">' + escapeHtml(icsEvent.description) + '</div>' : ''}
+      </div>
+    `;
+    // Handlers de los botones
+    el2.querySelectorAll('[data-ics-rsvp]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var newStatus = btn.getAttribute('data-ics-rsvp');
+        handleIcsRsvp(icsEvent, newStatus, btn, messageId, attachmentId);
+      });
+    });
+    return el2;
+  }
+
+  // 📦602 — Handler del click en un botón RSVP del .ics. Si tenemos el evento
+  // ya en K+AIR (por googleEventId), usa respondToEvent. Si no, llama a
+  // googleCalendar.upsertFromIcs (nueva función que voy a agregar).
+  async function handleIcsRsvp(icsEvent, newStatus, btn, messageId, attachmentId) {
+    var gcal = getGoogleCalendarApi();
+    if (!gcal || !state.userEmail) {
+      toast("No se puede responder", "Falta conexión con Google Calendar", "error");
+      return;
+    }
+    // 1) Buscar si el evento ya existe en K+AIR por UID o por title+date
+    var existing = null;
+    if (icsEvent.uid) {
+      // Buscar en state.events por algún campo que matchee con el UID
+      // (el UID viene del .ics, lo guardamos en extendedProperties al crear)
+      // Por ahora usamos heurística: title + date
+      if (icsEvent.start) {
+        existing = (state.events || []).find(function (e) {
+          return e && e.title === icsEvent.summary && e.date === icsEvent.start.date;
+        });
+      }
+    }
+    btn.disabled = true;
+    btn.textContent = '...';
+    try {
+      var res;
+      if (existing && existing.googleEventId) {
+        res = await gcal.respond({
+          googleEventId: existing.googleEventId,
+          responseStatus: newStatus,
+          userEmail: state.userEmail
+        });
+      } else {
+        // El evento no está en K+AIR todavía. Llamamos a una nueva API que
+        // crea el evento en Calendar desde el .ics y luego responde.
+        // (Por ahora, fallback: pedimos al main que parsee el .ics y lo cree)
+        var api = getElectronAPI();
+        if (api && api.googleCalendar && api.googleCalendar.upsertFromIcs) {
+          res = await api.googleCalendar.upsertFromIcs({
+            icsText: btn.closest('.kair-cal-invitation').getAttribute('data-ics-text') || '',
+            responseStatus: newStatus,
+            userEmail: state.userEmail
+          });
+        } else {
+          res = { success: false, error: 'No se puede crear el evento desde .ics (API no disponible)' };
+        }
+      }
+      if (res && res.success) {
+        var labels = { accepted: 'Asistirás', tentative: 'Tal vez', declined: 'No asistirás' };
+        toast("Respuesta enviada: " + (labels[newStatus] || newStatus), icsEvent.summary, 'success');
+        // Marcar visualmente el botón activo
+        btn.parentNode.querySelectorAll('[data-ics-rsvp]').forEach(function (b) {
+          b.classList.remove('kair-cal-invitation__btn--active');
+        });
+        btn.classList.add('kair-cal-invitation__btn--active');
+        // Recargar eventos
+        state.events = await loadEventsFromIPC();
+        render();
+      } else {
+        toast("No se pudo responder", (res && res.error) || 'Error', 'error');
+        btn.disabled = false;
+      }
+    } catch (err) {
+      toast("Error", err && err.message ? err.message : 'error', 'error');
+      btn.disabled = false;
+    }
+  }
+
   function renderMailDetail(container) {
     container.innerHTML = "";
     const mail = state.mails.find((m) => m.id === state.selectedMailId);
@@ -3559,6 +4070,34 @@
       const header = el("div", { class: "kair-mail-detail__attachments-header" });
       header.innerHTML = `${D.ICONS.paperclip.replace(/width="\d+" height="\d+"/, 'width="14" height="14"')} <span>${allAttachments.length} adjunto${allAttachments.length > 1 ? 's' : ''}</span>`;
       att.appendChild(header);
+
+      // 📦602 — Si algún attachment es .ics, parsearlo y mostrar el banner
+      // de invitación de Calendar con botones Sí/No/Tal vez (estilo Gmail).
+      // Lo hacemos ANTES de los chips para que el banner quede arriba.
+      var icsAttachments = allAttachments.filter(function (a) {
+        var fn = (a.filename || '').toLowerCase();
+        var mt = (a.mimeType || '').toLowerCase();
+        return fn.endsWith('.ics') || mt === 'text/calendar' || mt === 'application/ics';
+      });
+      for (var icsI = 0; icsI < icsAttachments.length; icsI++) {
+        (function (icsAtt) {
+          downloadMailAttachment(icsAtt._messageId, icsAtt.attachment_id, icsAtt.filename, true).then(function (icsText) {
+            if (!icsText || typeof icsText !== 'string') return;
+            var icsEvent = parseIcs(icsText);
+            if (!icsEvent) return;
+            var banner = renderCalendarInvitation(icsEvent, icsAtt._messageId, icsAtt.attachment_id);
+            if (banner) {
+              banner.setAttribute('data-ics-text', icsText);
+              // Insertar el banner ANTES del primer chip
+              var firstChip = att.querySelector('.kair-attachment-chip');
+              if (firstChip) att.insertBefore(banner, firstChip);
+              else att.appendChild(banner);
+            }
+          }).catch(function (err) {
+            console.warn('[BandejaIntegrada] No se pudo parsear ICS:', err);
+          });
+        })(icsAttachments[icsI]);
+      }
 
       allAttachments.forEach(function (a) {
         var attChip = el("a", {
@@ -4349,25 +4888,34 @@
   }
 
   // F1-Feature5 — Descarga un attachment y lo guarda con dialog nativo
-  async function downloadMailAttachment(messageId, attachmentId, filename) {
+  // 📦602 — Si returnContent=true, devuelve el contenido como string (sin descargar a disco)
+  async function downloadMailAttachment(messageId, attachmentId, filename, returnContent) {
     var api = getElectronAPI();
     if (!api || !api.googleGmail || !api.googleGmail.downloadAttachment) {
       toast("Error", "API de descarga no disponible", "error");
-      return;
+      return returnContent ? null : undefined;
     }
-    toast("Descargando", filename, "info");
+    if (!returnContent) toast("Descargando", filename, "info");
     try {
       var result = await api.googleGmail.downloadAttachment({
         messageId: messageId,
         attachmentId: attachmentId
       });
       if (result && result.success) {
-        // result.data es { data: base64url, size, filename, mimeType }
-        // Convertir a Uint8Array para descargar
         var base64 = result.data.data.replace(/-/g, '+').replace(/_/g, '/');
-        // Pad si es necesario
         while (base64.length % 4) base64 += '=';
         var binary = atob(base64);
+        // 📦602 — Si pidieron el contenido como string (e.g. para parsear .ics)
+        if (returnContent) {
+          // Detectar encoding: UTF-8 por default
+          try {
+            var bytes2 = new Uint8Array(binary.length);
+            for (var k = 0; k < binary.length; k++) bytes2[k] = binary.charCodeAt(k);
+            return new TextDecoder('utf-8').decode(bytes2);
+          } catch (e) {
+            return binary; // fallback a Latin-1
+          }
+        }
         var bytes = new Uint8Array(binary.length);
         for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
         var blob = new Blob([bytes], { type: result.data.mimeType || 'application/octet-stream' });
@@ -4382,6 +4930,7 @@
         toast("Descargado", a.download, "success");
       } else {
         toast("Error al descargar", (result && result.error) || "Error desconocido", "error");
+        return returnContent ? null : undefined;
       }
     } catch (e) {
       console.error("[BandejaIntegrada] Error descargando attachment:", e);
@@ -4583,7 +5132,7 @@
     toast("Correo soltado en el calendario", "Revisa los datos del evento antes de guardar.", "success");
   }
 
-  function selectEvent(ev) {
+  function selectEvent(ev, clickEv) {
     if (ev.linkedMailId) {
       state.selectedMailId = ev.linkedMailId;
       // Ocultamos el calendario overlay para revelar el correo vinculado
@@ -4596,8 +5145,10 @@
       // user pueda ver todos los detalles y editar/eliminar/marcar cumplido.
       // El F4-fix eliminó el KAirCalendar viejo, pero el renderBigCalendar custom
       // (línea 1918) usa este selectEvent que nunca llamaba al modal.
+      // 📦598 — Pasamos clickEv.currentTarget como anchor para que el modal
+      // se posicione cerca del click.
       if (typeof openEventDetailModal === 'function') {
-        openEventDetailModal(ev, getKairCalendarAdapter());
+        openEventDetailModal(ev, getKairCalendarAdapter(), clickEv && clickEv.currentTarget);
       } else {
         // Fallback si el modal no está disponible
         const cat = getCategoryStyle(ev.category);
@@ -4786,7 +5337,37 @@
       if (res && res.success) {
         // Refrescar eventos desde el IPC para que aparezca en el calendario
         state.events = await loadEventsFromIPC();
-        toast("Evento guardado y sincronizado", `${newEvent.title} · ${newEvent.date}`, "success");
+        // 📦596 — F3.C: si Google Calendar está conectado, también crear el
+        // evento allá. Es best-effort: si falla, no bloqueamos al usuario.
+        if (getGoogleCalendarApi()) {
+          try {
+            var gRes = await window.electronAPI.googleCalendar.create(newEvent);
+            if (gRes && gRes.success && gRes.data && gRes.data.googleEventId) {
+              // Guardar el googleEventId en el evento local para evitar duplicados
+              // en próximos syncs. El adapter debe soportar el update con este campo.
+              newEvent.googleEventId = gRes.data.googleEventId;
+              newEvent.source = "kair";
+              // Re-actualizar en DB para persistir el googleEventId
+              try {
+                await adapter.update(newEvent);
+                state.events = await loadEventsFromIPC();
+                toast("Evento guardado y sincronizado", newEvent.title + " · " + newEvent.date + " · Google Calendar ✓", "success");
+              } catch (uErr) {
+                // No crítico si falla el update
+                console.warn("[BandejaIntegrada][SAVE] No se pudo guardar googleEventId local:", uErr);
+                toast("Evento guardado y sincronizado", newEvent.title + " · " + newEvent.date + " · Google Calendar ✓", "success");
+              }
+            } else {
+              toast("Evento guardado y sincronizado", newEvent.title + " · " + newEvent.date, "success");
+            }
+          } catch (gErr) {
+            // Google Calendar no disponible o falló — guardamos local sin error
+            console.warn("[BandejaIntegrada][SAVE] No se pudo sincronizar con Google Calendar:", gErr);
+            toast("Evento guardado localmente", newEvent.title + " · Calendar no disponible", "warning");
+          }
+        } else {
+          toast("Evento guardado y sincronizado", `${newEvent.title} · ${newEvent.date}`, "success");
+        }
         // Re-armar activeCategories por si aparecieron nuevas
         state.events.forEach((ev) => {
           if (ev && ev.category && !state.activeCategories.has(ev.category)) {
