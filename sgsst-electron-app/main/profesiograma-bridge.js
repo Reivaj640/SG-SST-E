@@ -943,6 +943,11 @@ function _handlerImportExcel(payload) {
           if (grupoLower.indexOf('grupo') >= 0 && grupoLower.indexOf('ocupacional') >= 0) continue;
           if (grupoLower.indexOf('proceso') >= 0) continue;
           if (grupoLower.indexOf('total') >= 0) continue;
+          // Filtrar filas de convencion I/P/R (NO son cargos reales, son solo referencias de columnas)
+          // Estas filas tienen grupo="I"/"P"/"R" (1 letra) y cargo="Inicial"/"Periodico"/"Retiro"
+          if (grupoLower === 'i' || grupoLower === 'p' || grupoLower === 'r') continue;
+          var cargoLower = cargoNombre.toLowerCase();
+          if (cargoLower === 'inicial' || cargoLower === 'periodico' || cargoLower === 'retiro') continue;
           // El cargo debe tener contenido real
           if (cargoNombre.length < 3) continue;
 
