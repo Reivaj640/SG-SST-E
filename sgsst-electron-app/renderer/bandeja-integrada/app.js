@@ -846,6 +846,40 @@
       || null;
   }
 
+  // 📦595 — Helpers para notificación in-app de eventos próximos.
+  // Devuelve la fecha+hora del evento como Date (null si no se puede parsear).
+  function getEventStartDateTime(ev) {
+    if (!ev || !ev.date) return null;
+    var sh = getEventStartHour(ev);
+    var parts = ev.date.split("-");
+    if (parts.length !== 3) return null;
+    var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10), Math.floor(sh), Math.round((sh % 1) * 60));
+    return d;
+  }
+  // Devuelve eventos entre ahora y dentro de `withinHours` (default 24h),
+  // filtrados por las categorías activas del usuario.
+  function getUpcomingEvents(withinHours) {
+    if (!state.events) return [];
+    var now = new Date();
+    var max = new Date(now.getTime() + (withinHours || 24) * 3600 * 1000);
+    return state.events.filter(function (ev) {
+      if (!ev || !ev.date) return false;
+      if (state.activeCategories && !state.activeCategories.has(ev.category)) return false;
+      var d = getEventStartDateTime(ev);
+      if (!d) return false;
+      return d >= now && d <= max;
+    }).sort(function (a, b) {
+      return getEventStartDateTime(a).getTime() - getEventStartDateTime(b).getTime();
+    });
+  }
+  // Llama al badge de KairAlerts si está disponible (refresca el contador).
+  function refreshKairAlerts() {
+    try {
+      var KA = (window.KairAlerts) || (window.parent && window.parent.KairAlerts);
+      if (KA && typeof KA.refresh === "function") KA.refresh();
+    } catch (e) { /* no crítico */ }
+  }
+
   async function loadEventsFromIPC() {
     var api = getElectronAPI();
     var adapter = getKairCalendarAdapter();
@@ -1293,6 +1327,18 @@
     // F2 — Eventos del IPC (con fallback a mocks)
     state.events = await loadEventsFromIPC();
     console.log("[BandejaIntegrada][INIT] state.events.length=" + state.events.length + ", state.mails.length=" + state.mails.length + ", primera ev: " + (state.events[0] ? JSON.stringify({id: state.events[0].id, title: state.events[0].title, date: state.events[0].date, category: state.events[0].category}) : "none"));
+    // 📦595 — Notificación in-app: si hay eventos en las próximas 24h, mostrar toast.
+    setTimeout(function () {
+      var upcoming = getUpcomingEvents(24);
+      if (upcoming.length > 0) {
+        var first = upcoming[0];
+        var firstDate = getEventStartDateTime(first);
+        var hoursAway = Math.round((firstDate.getTime() - Date.now()) / 3600000 * 10) / 10;
+        var when = hoursAway < 1 ? "menos de 1h" : (hoursAway < 24 ? hoursAway + "h" : Math.round(hoursAway / 24) + "d");
+        toast("Tenés " + upcoming.length + " evento(s) próximo(s)", first.title + " · en " + when, "info");
+      }
+      refreshKairAlerts();
+    }, 1500);
     // F4-fix — Llamar selectMail (en vez de solo setear selectedMailId) para
     // que se dispare el lazy load del body desde email_messages.
     if (state.mails[0]) {
@@ -4699,22 +4745,76 @@
     $("#modal-save").addEventListener("click", saveEvent);
   }
 
-  function saveEvent() {
+  // 📦595 — saveEvent ahora persiste en DB vía el adapter IPC
+  // (getKairCalendarAdapter()). Antes solo hacía state.events.push (en memoria)
+  // y se perdía al refrescar la Bandeja o reiniciar la app. Si el adapter
+  // falla, hace fallback a push in-memory para no perder el evento.
+  async function saveEvent() {
     const d = state.draft;
+    const startH = d.startHour || 9;
+    const durH = d.durationHours || 1;
     const newEvent = {
-      id: "e-" + Date.now(),
+      id: "rapido-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8),
       title: d.title.trim() || "Evento sin título",
       date: d.date,
-      startHour: d.startHour,
-      durationHours: d.durationHours,
+      // IPC espera start/end como string "HH:MM" (no startHour numérico)
+      start: String(startH).padStart(2, "0") + ":00",
+      end: String(startH + Math.ceil(durH)).padStart(2, "0") + ":00",
+      startHour: startH,
+      durationHours: durH,
       category: d.category,
+      type: "rapido",
       location: d.location || undefined,
+      notes: d.notes || undefined,
       linkedMailId: d.linkedMailId,
-      attendees: d.attendees ? d.attendees.split(",").map((s) => s.trim()) : undefined,
+      attendees: d.attendees ? d.attendees.split(",").map((s) => s.trim()).filter(Boolean) : undefined,
     };
-    state.events.push(newEvent);
+
+    const adapter = getKairCalendarAdapter();
+    if (!adapter) {
+      // Fallback in-memory si el IPC no está disponible
+      state.events.push(newEvent);
+      closeEventModal();
+      toast("Evento guardado (sin persistir)", `${newEvent.title} · ${newEvent.date}`, "warning");
+      state.calendarVisible = false;
+      render();
+      return;
+    }
+
+    try {
+      const res = await adapter.create(newEvent);
+      if (res && res.success) {
+        // Refrescar eventos desde el IPC para que aparezca en el calendario
+        state.events = await loadEventsFromIPC();
+        toast("Evento guardado y sincronizado", `${newEvent.title} · ${newEvent.date}`, "success");
+        // Re-armar activeCategories por si aparecieron nuevas
+        state.events.forEach((ev) => {
+          if (ev && ev.category && !state.activeCategories.has(ev.category)) {
+            state.activeCategories.add(ev.category);
+          }
+        });
+        // 📦595 — Si el evento creado es hoy o mañana, mostrar toast específico.
+        var dStart = getEventStartDateTime(newEvent);
+        if (dStart) {
+          var hoursAway = (dStart.getTime() - Date.now()) / 3600000;
+          if (hoursAway >= 0 && hoursAway <= 24) {
+            var when = hoursAway < 1 ? "menos de 1h" : Math.round(hoursAway * 10) / 10 + "h";
+            toast("Recordatorio: " + newEvent.title, "Programado para " + when, "info");
+          }
+        }
+        // Refrescar badge KairAlerts para que se entere del nuevo evento
+        refreshKairAlerts();
+      } else {
+        // Adapter rechazó (ej: falta de permisos, DB locked). Fallback in-memory.
+        state.events.push(newEvent);
+        toast("No se pudo persistir el evento", (res && res.error) || "error desconocido", "error");
+      }
+    } catch (err) {
+      state.events.push(newEvent);
+      console.error("[BandejaIntegrada][SAVE] Error guardando evento:", err);
+      toast("Error guardando el evento", err && err.message ? err.message : "error", "error");
+    }
     closeEventModal();
-    toast("Evento guardado en el calendario", `${newEvent.title} · ${newEvent.date}`, "success");
     // Tras guardar, ocultamos el calendario overlay para volver al correo
     state.calendarVisible = false;
     render();
