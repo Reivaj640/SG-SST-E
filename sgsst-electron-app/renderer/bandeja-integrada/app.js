@@ -1078,7 +1078,33 @@
         // F1.B-fix — Solo actualizar state.mails si el cache corresponde al folder actual
         // (por si el user cambió de folder mientras se hacía el sync en background)
         if (state.mailFolder === currentFolder) {
-          state.mails = cacheResult.data.map(threadToMail);
+          // 📦603-fix — Preservar los `messages` cargados del mail viejo al reemplazarlo.
+          // ANTES: state.mails = cacheResult.data.map(threadToMail) creaba objetos
+          // nuevos sin `messages`, lo que causaba que el contenido del correo que el
+          // user estaba viendo se perdiera (renderMailDetail mostraba el mail nuevo
+          // sin messages, sin disparar loadMailBodyFromCache).
+          // AHORA: mergeamos los datos del cache con los mails existentes, preservando
+          // `messages`, `body`, `body_html`, `attachments` y otros campos lazy-loaded.
+          var oldMailsById = {};
+          for (var mi = 0; mi < state.mails.length; mi++) {
+            oldMailsById[state.mails[mi].id] = state.mails[mi];
+          }
+          state.mails = cacheResult.data.map(function (thread) {
+            var newMail = threadToMail(thread);
+            var oldMail = oldMailsById[newMail.id];
+            if (oldMail) {
+              // Preservar campos lazy-loaded del mail viejo
+              if (oldMail.messages && oldMail.messages.length > 0) {
+                newMail.messages = oldMail.messages;
+              }
+              if (oldMail.body) newMail.body = oldMail.body;
+              if (oldMail.body_html) newMail.body_html = oldMail.body_html;
+              if (oldMail.attachments) newMail.attachments = oldMail.attachments;
+              if (oldMail.to_list) newMail.to_list = oldMail.to_list;
+              if (oldMail.cc_list) newMail.cc_list = oldMail.cc_list;
+            }
+            return newMail;
+          });
           console.log("[BandejaIntegrada] Re-cargados " + state.mails.length + " threads (folder=" + currentFolder + ")");
           render();
         } else {
@@ -3705,6 +3731,19 @@
     container.innerHTML = "";
     const mail = state.mails.find((m) => m.id === state.selectedMailId);
 
+    // 📦603-fix — Lazy load de seguridad: si el mail no tiene messages ni body
+    // (caso edge: el mail object fue reemplazado sin preservar los datos),
+    // disparar loadMailBodyFromCache para traer el contenido del cache.
+    // Esto cubre el caso de que el user selecciona un thread, hace un sync manual,
+    // y el mail object se reemplaza sin preservar los messages.
+    // Usamos una flag en el mail object para evitar loops infinitos.
+    if (mail && !mail.body && !mail.messages && !mail._loadingBody) {
+      mail._loadingBody = true;
+      loadMailBodyFromCache(mail).then(function () {
+        if (mail) mail._loadingBody = false;
+      });
+    }
+
     if (!mail) {
       const empty = el("div", { class: "kair-mail-empty", style: { height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" } });
       empty.innerHTML = `
@@ -4988,6 +5027,9 @@
       }
     } catch (e) {
       console.warn("[BandejaIntegrada] Error cargando body del thread " + mail.threadId + ":", e.message);
+    } finally {
+      // 📦603-fix — Limpiar flag de loading para permitir reintentos
+      if (mail) mail._loadingBody = false;
     }
   }
 
