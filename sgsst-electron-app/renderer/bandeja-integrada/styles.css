@@ -5196,6 +5196,7 @@ body {
   width: 100%;
   display: block;
   box-sizing: border-box;
+  padding: 0 20px;  /* se alinea con el padding del header (avatar a la izquierda, fecha a la derecha) */
 }
 .kair-ics-banner-container:empty {
   display: none;
