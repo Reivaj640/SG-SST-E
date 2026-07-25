@@ -243,18 +243,17 @@ async function syncInbox(options) {
     return { success: false, error: 'listInbox falló: ' + (listResult.error || 'unknown') };
   }
 
-  // 5. Limpiar threads stale del folder antes de re-insertar.
-  // Razón: el UPSERT solo actualiza threads que están en el resultado del API.
-  // Si un thread ya no está en Gmail (borrado, archivado en otro folder),
-  // quedaría "huérfano" en el cache con datos vacíos.
-  // Por eso Mail-0 hace TRUNCATE antes de re-sync — replicamos esa idea.
-  try {
-    var deleted = emailDb.deleteThreadsByFolder(userEmail, folder);
-    if (deleted.changes > 0) {
-      console.log('[email-sync] Limpiados ' + deleted.changes + ' threads stale del cache (folder=' + folder + ')');
-    }
-  } catch (e) {
-    console.warn('[email-sync] Error limpiando threads stale:', e.message);
+  // 5. Recolectar los threadIds que están en el resultado del API.
+  // Se usa después del UPSERT para limpiar solo los huérfanos (threads que
+  // ya no están en Gmail: borrados, archivados en otro folder).
+  // ANTES se hacía un DELETE TOTAL antes del re-insert (estilo Mail-0), pero
+  // eso causaba que el thread que el user estaba viendo desapareciera del
+  // cache durante la ventana entre el delete y el re-insert. Ahora el delete
+  // se hace DESPUÉS, y solo de los threads que NO están en el nuevo resultado.
+  var newThreadIds = new Set();
+  for (var ti = 0; ti < listResult.data.length; ti++) {
+    var tid = listResult.data[ti].threadId || listResult.data[ti].id;
+    if (tid) newThreadIds.add(tid);
   }
 
   // 6. Por cada mensaje, construir un thread sintético con headers fake.
@@ -395,6 +394,29 @@ async function syncInbox(options) {
     systemLabels.forEach(function (l) {
       emailDb.saveLabel(Object.assign({ connection_id: userEmail }, l));
     });
+  }
+
+  // 7. Limpieza de huérfanos DESPUÉS del sync (no antes).
+  // Solo se eliminan los threads del folder que NO están en el nuevo resultado
+  // del API. Esto preserva los threads durante el sync (el user no pierde el
+  // correo que está viendo) y al mismo tiempo mantiene el cache limpio.
+  try {
+    var currentThreads = emailDb.getThreadsFromCache({ folder: folder, maxResults: 1000 });
+    var orphanIds = [];
+    for (var ci = 0; ci < currentThreads.length; ci++) {
+      var cthreadId = currentThreads[ci].id;
+      if (!newThreadIds.has(cthreadId)) {
+        orphanIds.push(cthreadId);
+      }
+    }
+    if (orphanIds.length > 0) {
+      var deleted = emailDb.deleteThreadsByIds(userEmail, orphanIds);
+      if (deleted.changes > 0) {
+        console.log('[email-sync] Limpiados ' + deleted.changes + ' threads huerfanos (folder=' + folder + ')');
+      }
+    }
+  } catch (e) {
+    console.warn('[email-sync] Error limpiando threads huerfanos:', e.message);
   }
 
   return {

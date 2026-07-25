@@ -5070,7 +5070,7 @@ body {
   align-items: center;
   justify-content: space-between;
   margin: 24px 0 12px;
-  padding-top: 16px;
+  padding: 16px 20px 0;
   border-top: 1px solid #e5e7eb;
   font-size: 0.8rem;
   color: #6b7280;
@@ -5099,7 +5099,7 @@ body {
 .kair-mail-reply-footer {
   display: flex;
   gap: 8px;
-  padding: 16px 0;
+  padding: 16px 20px;
   margin-top: 24px;
   border-top: 1px solid #e5e7eb;
 }
@@ -5123,13 +5123,13 @@ body {
   border-color: #9ca3af;
 }
 .kair-mail-reply-footer__btn--primary {
-  background: #185abd;
-  color: #ffffff;
-  border-color: #185abd;
+  background: #ffffff;
+  color: #3c4043;
+  border-color: #dadce0;
 }
 .kair-mail-reply-footer__btn--primary:hover {
-  background: #134a99;
-  border-color: #134a99;
+  background: #f1f3f4;
+  border-color: #bdc1c6;
 }
 
 /* 📦602 — Banner de traducción (placeholder visual) */

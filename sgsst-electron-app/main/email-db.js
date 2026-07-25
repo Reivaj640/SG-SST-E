@@ -202,6 +202,25 @@ function deleteThreadsByFolder(connectionId, folder) {
   return stmt.run(connectionId, folder);
 }
 
+/**
+ * Borra threads específicos por ID.
+ * Usado en sync para eliminar solo los threads HUÉRFANOS (los que ya no
+ * están en Gmail: fueron borrados, archivados en otro folder, etc).
+ * A diferencia de deleteThreadsByFolder, este NO borra los threads activos
+ * que están en el resultado del API.
+ */
+function deleteThreadsByIds(connectionId, threadIds) {
+  if (!Array.isArray(threadIds) || threadIds.length === 0) {
+    return { changes: 0 };
+  }
+  const placeholders = threadIds.map(() => '?').join(',');
+  const stmt = db().prepare(`
+    DELETE FROM email_threads
+    WHERE connection_id = ? AND id IN (${placeholders})
+  `);
+  return stmt.run(connectionId, ...threadIds);
+}
+
 // =====================================================================
 // 📦 MENSAJES (pertenecen a un thread)
 // =====================================================================
@@ -410,7 +429,7 @@ module.exports = {
   // Conexiones
   saveConnection, getConnection, getAllConnections,
   // Threads
-  saveThread, getThreadsFromCache, getThreadFromCache, deleteThreadsByFolder,
+  saveThread, getThreadsFromCache, getThreadFromCache, deleteThreadsByFolder, deleteThreadsByIds,
   // Mensajes
   saveMessage, getMessagesFromCache,
   // Labels
