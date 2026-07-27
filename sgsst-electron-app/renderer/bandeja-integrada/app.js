@@ -2228,8 +2228,9 @@
     container.appendChild(legend);
 
     // Integración correo
+    // 📦605 (paso 1) — kair-sidebar-integ para flex-shrink:0 (queda fija al fondo)
     const integ = el("div", {
-      class: "mt-auto p-3",
+      class: "kair-sidebar-integ mt-auto p-3",
       style: { borderTop: "1px solid var(--kair-border-soft)", background: "#fafbfc", marginTop: "auto", padding: "12px" },
     });
     integ.innerHTML = `

@@ -145,6 +145,11 @@ body {
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* 📦605 (paso 1) — Forzar altura del viewport y bloquear scroll de página.
+     El scroll se hace DENTRO de cada panel (sidebar, lista, detalle, calendar)
+     no en la página completa. Asi no se pierde de vista nada al scrollear. */
+  height: 100%;
+  overflow: hidden;
 }
 
 /* F1.5 — Layout root (header sticky + main scrollable + footer fijo)
@@ -153,6 +158,10 @@ body {
 .kair-app {
   display: flex;
   flex-direction: column;
+  /* 📦605 (paso 1) — height:100% para que el contenido (header+layout+footer)
+     quepa en el viewport. min-height:100vh mantiene el minimo si el contenido
+     es menor al viewport. */
+  height: 100%;
   min-height: 100vh;
   background: var(--kair-bg-app);
 }
@@ -1586,9 +1595,34 @@ body {
   background: var(--kair-primary, #174ea6);
 }
 
+/* 📦605 (paso 1) — Sidebar como flex column con altura limitada.
+   Mini-cal fijo arriba, leyenda flexible con scroll interno, integración fija abajo.
+   Asi el sidebar completo cabe en el viewport aunque la ventana sea chica. */
+.kair-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;     /* permite que el item flexible se encoja */
+  overflow: hidden;
+}
+
+/* 📦605 (paso 1) — Mini-cal: NO se encoje, queda fijo arriba del sidebar */
+.kair-mini-cal {
+  flex-shrink: 0;
+}
+
 .kair-legend {
   padding: 12px;
   border-top: 1px solid var(--kair-border-soft);
+  /* 📦605 (paso 1) — flex:1 para tomar el espacio restante del sidebar.
+     min-height:0 + overflow-y:auto → scroll INTERNO si los items no caben. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* 📦605 (paso 1) — Integración correo: NO se encoje, queda fija al fondo del sidebar */
+.kair-sidebar-integ {
+  flex-shrink: 0;
 }
 
 .kair-legend__title {
@@ -1905,10 +1939,18 @@ body {
 .kair-layout {
   display: grid;
   grid-template-columns: 240px 22px 1fr;
+  /* 📦605 (paso 1) — grid-template-rows: 1fr fuerza a la única fila a tomar
+     toda la altura disponible. Sin esto, los items de grid se ajustan al
+     contenido y el sidebar pierde altura limitada. */
+  grid-template-rows: 1fr;
+  align-items: stretch;
   gap: 0;
   flex: 1;
   min-height: 0;
   position: relative;
+  /* 📦605 (paso 1) — Bloquear overflow del layout para que sus hijos
+     (sidebar, content-area) controlen su propio scroll interno. */
+  overflow: hidden;
 }
 
 @media (max-width: 1280px) {
@@ -1955,9 +1997,32 @@ body {
   }
 }
 
+/* 📦605 (paso 2) — Lista de correos como flex column con altura limitada.
+   Header, buscador y filtros fijos arriba (flex-shrink:0).
+   Lista de items flexible con scroll INTERNO (flex:1 + min-height:0 + overflow-y:auto).
+   Asi la lista cabe en el viewport sin perder de vista el header ni los filtros. */
 .kair-mail-stack__list {
   border-right: 1px solid var(--kair-border-soft);
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
+  min-height: 0;
+}
+
+/* 📦605 (paso 2) — Items fijos en la lista: NO se encojen.
+   Usamos selector universal porque los items son creados dinámicamente
+   sin una clase BEM común (header, search, filters no comparten clase). */
+.kair-mail-stack__list > .kair-mail-list-header,
+.kair-mail-stack__list > .kair-mail-search,
+.kair-mail-stack__list > .kair-mail-list-filters {
+  flex-shrink: 0;
+}
+
+/* 📦605 (paso 2) — El último hijo (la lista de items con clase .kair-scroll)
+   es el que scrollea internamente. Ya tiene overflow-y:auto en el JS,
+   solo necesitamos flex:1 para que tome el espacio restante. */
+.kair-mail-stack__list > .kair-scroll {
+  flex: 1 1 auto;
   min-height: 0;
 }
 
