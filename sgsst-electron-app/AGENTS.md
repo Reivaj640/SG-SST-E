@@ -728,28 +728,73 @@ El user me lo recordó FIRME el 2026-07-24 después de que commiteé `📦604` s
 
 ---
 
-## 🆕 Layout Bandeja Integrada: el problema del scroll NO está resuelto (2026-07-24)
+## 🆕 Layout Bandeja Integrada: scroll interno en paneles (2026-07-27)
 
-El user reportó que tiene que scrollear mucho para ver la bandeja de correos y el contenido, perdiendo de vista el sidebar (mini-cal, leyenda, integración correo).
+El user pidió "que todo quepa en la app sin desplazamientos" — el scroll debe ser INTERNO de cada panel, no de la página completa.
 
-**Intenté fix (📦604) con**:
-- `html, body { height: 100%; overflow: hidden; }` para forzar altura del viewport
-- `.kair-mail-stack__list` en flex column con scroll interno
-- `.kair-sidebar` con `position: sticky; top: 0;`
+**Patrón validado** (commit `9643ea93`, 📦605 — pasos 1 y 2):
 
-**Resultado**: ROTO. El user reportó "lista cortada sin scroll visible, sidebar descolocado". Lo revertimos completo.
+```css
+html, body { height: 100%; overflow: hidden; }  /* bloquea scroll de página */
 
-**Investigación queda como referencia**:
-- `height: 100%` no se calcula si el padre no tiene altura explícita
-- En grid/flex containers, `align-self: stretch` es default pero `height: 100%` puede sobrescribirlo
-- `min-height: 0` es CRÍTICO en cada nivel de flex/grid para permitir scroll interno
-- El iframe tiene `height: calc(100vh - 48px)` (limitado)
+.kair-panel {                                    /* cualquier panel (sidebar, lista, detalle, calendar) */
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;                                 /* CRÍTICO: permite que el item flexible se encoja */
+  overflow: hidden;
+}
+.kair-panel > .fijo { flex-shrink: 0; }                       /* header/search/footer NO se encojen */
+.kair-panel > .scroll { flex: 1; min-height: 0; overflow-y: auto; }  /* contenido con scroll INTERNO */
+```
 
-**Pendiente**: explorar otro enfoque (e.g. compactar sidebar, hacerlo colapsable, o cambiar el layout completo). El user prefiere revertir y explorar otra forma antes de iterar en una dirección rota.
+**Requisito para que `height: 100%` funcione**:
+- El padre debe ser flex O grid (NO `display: block`)
+- En grid: `grid-template-rows: 1fr` + `align-items: stretch` explícitos
+- `min-height: 0` en CADA nivel de flex/grid anidado
+
+**Pasos aplicados**:
+- **Paso 1 (sidebar, ✅ validado)**: mini-cal fijo arriba, leyenda flexible con scroll, integración fija abajo
+- **Paso 2 (lista correos, ✅ validado)**: header + buscador + filtros fijos, items con scroll
+- **Paso 3 (pendiente)**: detalle del correo con header sticky + footer fijo + body scrollable
+- **Paso 4 (pendiente)**: calendar slide con toolbar fija + grid scrollable
+- **Paso 5 (pendiente)**: resize handler en `renderer.js` para que el iframe se reajuste al cambiar tamaño de ventana
+
+**Lección del 📦604 revertido (vs 📦605 que funciona)**:
+- **604**: hizo los 3 cambios a la vez (sidebar + lista + detalle + sticky) sin debuggear → se rompió
+- **605**: hace UN panel a la vez, validando con el user en cada paso → funciona
+- El user prefiere ir paso a paso con validación visual entre cada uno
 
 ---
 
-## 🆕 Pendientes próximos (post-2026-07-24)
+## 🆕 Skills de emilkowalski instaladas (2026-07-27)
+
+Commit `a578c09b` (📦604). 8 skills de diseño + animación instaladas:
+- `emil-design-eng` — skill principal (UI polish, animación, component design)
+- `review-animations` — review estricto contra estándares altos
+- `improve-animations` — audit + planes priorizados
+- `find-animation-opportunities` — búsqueda de oportunidades de motion
+- `animation-vocabulary` — glosario de términos correctos
+- `apple-design` — principios de diseño de Apple
+- `pick-ui-library` — picker de UI library
+- `prototype` — múltiples versiones de UI
+
+**Instalación**: `npx skills@latest add emilkowalski/skills --all`
+
+**Estructura creada**:
+- `.agents/skills/` — 8 skills fuente universal (SKILL.md reales)
+- `.opencode/skills/` — 8 junctions (mklink /J) → `.agents/skills/` (para opencode)
+- `.claude/skills/` — 8 junctions → `.agents/skills/` (para Claude)
+- `agent/skills/` — 8 junctions → `.agents/skills/` (otros agentes)
+- `skills-lock.json` — metadata con hashes para restaurar
+
+**Total en `.opencode/skills/`**: 21 skills (13 que ya teníamos + 8 nuevas).
+
+**Para Windows**: el instalador oficial crea symlinks Unix que no funcionan en Windows. Hay que usar `cmd /c "mklink /J ... ..."` o `New-Item -ItemType Junction` con paths absolutos (los paths relativos con `..\..\..\.agents\skills\` se resuelven mal).
+
+---
+
+## 🆕 Pendientes próximos (post-2026-07-27)
 
 1. 🔐 **URGENTE**: rotar `GH_TOKEN` (sigue expuesto en respuestas anteriores)
 2. Probar auto-update end-to-end: instalar v0.1.136 manual, bumpear a v0.1.137 trivial con `.\scripts\release.ps1`
@@ -759,5 +804,8 @@ El user reportó que tiene que scrollear mucho para ver la bandeja de correos y 
    - asar + asarUnpack bien configurado (F3.C puede meter assets)
    - Bandeja Integrada v2: drag&drop archivos al compose, undo, snooze
    - F3.C ya hecho (sync bidireccional) — falta polish
-5. **Layout Bandeja Integrada**: explorar otra forma de resolver el problema de scroll (sidebar fijo, lista scrolleable, etc)
+5. **Layout Bandeja Integrada — Pasos 3, 4, 5**:
+   - Paso 3: detalle del correo con header sticky + footer fijo
+   - Paso 4: calendar slide con scroll interno
+   - Paso 5: resize handler en renderer.js para ajustar iframe al cambiar tamaño
 
