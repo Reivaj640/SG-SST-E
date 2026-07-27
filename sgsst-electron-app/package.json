@@ -73,7 +73,12 @@
       "!Instructivo-Submodulos.txt",
       "!Portear/.venv/**",
       "!Portear/__pycache__/**",
-      "!Portear/python-embed/**"
+      "!Portear/python-embed/**",
+      "!.agents/**",
+      "!.claude/**",
+      "!agent/**",
+      "!.opencode/**",
+      "!skills-lock.json"
     ],
     "extraResources": [
       {
