@@ -528,26 +528,35 @@ async function openPreviewModal(filePath) {
 
         if (result.success && result.data) {
             body.innerHTML = '';
-            const iframe = document.createElement('iframe');
+            // 📦608-fix15 — File-viewer nativo (Office) vs PDF iframe (legacy)
+            if (result.mode === 'file-viewer' && result.data.bytes) {
+                if (window.KairDocPreview) {
+                    window.KairDocPreview.mountInContainer(body, result);
+                } else {
+                    body.innerHTML = '<div style="padding:20px;color:#b91c1c;">file-viewer no disponible</div>';
+                }
+            } else {
+                const iframe = document.createElement('iframe');
 
-            // Convertir base64 a Blob URL para evitar bloqueo del visor PDF por sandbox
-            const binary = atob(result.data);
-            const bytes = new Uint8Array(binary.length);
-            for (let i = 0; i < binary.length; i++) {
-                bytes[i] = binary.charCodeAt(i);
+                // Convertir base64 a Blob URL para evitar bloqueo del visor PDF por sandbox
+                const binary = atob(result.data);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) {
+                    bytes[i] = binary.charCodeAt(i);
+                }
+                const blob = new Blob([bytes], { type: 'application/pdf' });
+                const blobUrl = URL.createObjectURL(blob);
+
+                iframe.src = blobUrl;
+                iframe.style.cssText = 'width:100%;height:100%;border:none;';
+                // Sin sandbox: permite que el visor PDF nativo del navegador funcione
+                body.appendChild(iframe);
+
+                // Limpiar blob URL al cerrar el modal
+                const cleanup = () => { URL.revokeObjectURL(blobUrl); };
+                document.getElementById('previewOverlay')?.addEventListener('click', cleanup, { once: true });
+                document.getElementById('closePreviewBtn')?.addEventListener('click', cleanup, { once: true });
             }
-            const blob = new Blob([bytes], { type: 'application/pdf' });
-            const blobUrl = URL.createObjectURL(blob);
-
-            iframe.src = blobUrl;
-            iframe.style.cssText = 'width:100%;height:100%;border:none;';
-            // Sin sandbox: permite que el visor PDF nativo del navegador funcione
-            body.appendChild(iframe);
-
-            // Limpiar blob URL al cerrar el modal
-            const cleanup = () => { URL.revokeObjectURL(blobUrl); };
-            document.getElementById('previewOverlay')?.addEventListener('click', cleanup, { once: true });
-            document.getElementById('closePreviewBtn')?.addEventListener('click', cleanup, { once: true });
         } else {
             throw new Error(result.error || 'Error al cargar el documento');
         }

@@ -43,6 +43,17 @@ class ReportesAccidentesComponent {
 
             const data = event.data;
 
+            // 📦608-fix15 — El iframe nos pide abrir el modal full-screen de file-viewer.
+            if (data.type === 'open-file-viewer-modal') {
+                if (!data.filePath) return;
+                if (window.kairFV && typeof window.kairFV.openWithFileViewerFromPath === 'function') {
+                    window.kairFV.openWithFileViewerFromPath(data.filePath);
+                } else {
+                    console.warn('[FURAT] kairFV.openWithFileViewerFromPath no disponible');
+                }
+                return;
+            }
+
             // Manejar solicitud de regreso al módulo
             if (data.type === 'back-to-module-request') {
                 console.log('[FURAT] Back to module requested');
@@ -69,6 +80,19 @@ class ReportesAccidentesComponent {
 
         console.log(`[FURAT] API Request: ${requestType}`, payload);
 
+        // 📦608-fix15 — Previews unificados: el helper KairDocPreview hace el switch
+        // a readFileBytes para Office y postea él mismo al iframe. Retornamos antes
+        // del postMessage normal para evitar duplicar el response.
+        if (requestType === 'get-pdf-preview' || requestType === 'get-word-preview' || requestType === 'get-excel-preview') {
+            var apiName = {
+                'get-pdf-preview': 'getPDFPreview',
+                'get-word-preview': 'getWordPreview',
+                'get-excel-preview': 'getExcelPreview'
+            }[requestType];
+            window.KairDocPreview.handleRequest(event, apiName);
+            return;
+        }
+
         try {
             let result;
 
@@ -81,19 +105,6 @@ class ReportesAccidentesComponent {
                 // Library
                 case 'furat-get-library-data':
                     result = await this.getLibraryData(payload);
-                    break;
-
-                // Document operations (existing contracts)
-                case 'get-pdf-preview':
-                    result = await window.electronAPI.getPDFPreview(payload.filePath);
-                    break;
-
-                case 'get-excel-preview':
-                    result = await window.electronAPI.getExcelPreview(payload.filePath);
-                    break;
-
-                case 'get-word-preview':
-                    result = await window.electronAPI.getWordPreview(payload.filePath);
                     break;
 
                 case 'download-document':

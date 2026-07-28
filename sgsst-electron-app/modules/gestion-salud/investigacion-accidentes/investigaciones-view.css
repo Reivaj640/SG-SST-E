@@ -1980,3 +1980,43 @@ PULSE BORDER FOR PENDING CARDS
 .inv-card--pending.inv-card--pulse {
 animation: inv-pulse-border 2s ease-in-out infinite;
 }
+
+/* 📦608-fix10: file-viewer inline dentro del modal de preview */
+.inv-preview-iframe-container:has(flyfish-file-viewer) {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex: 1 1 0%;
+}
+.inv-preview-iframe-container:has(flyfish-file-viewer) flyfish-file-viewer {
+    flex: 1 1 0%;
+    min-height: 0;
+    display: block;
+}
+.inv-preview-iframe-container > div[style*="min-height"] { min-height: 0 !important; }
+
+/* 📦608: Botón "Ver completo" (outline style) */
+.inv-preview-modal__expand.kair-preview__action--primary {
+    width: auto;
+    height: 30px;
+    padding: 0 10px;
+    gap: 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    background: transparent;
+    color: var(--inv-primary, #174ea6);
+    border: 1px solid var(--inv-border, #dee2e6);
+    border-radius: 6px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    transition: all 0.15s ease;
+    font-family: inherit;
+    cursor: pointer;
+    margin-right: 4px;
+}
+.inv-preview-modal__expand.kair-preview__action--primary:hover:not(:disabled) {
+    background: var(--inv-primary-light, #e8f0fe);
+    border-color: var(--inv-primary, #174ea6);
+}

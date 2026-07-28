@@ -143,6 +143,10 @@
                     <button class="kair-preview__action" id="printBtn" disabled title="Imprimir">
                         <i class="bi bi-printer"></i>
                     </button>
+                    <button class="kair-preview__action--primary kair-preview__expand" id="previewExpandBtn" title="Ver completo" style="display:none;">
+                        <i class="bi bi-arrows-fullscreen"></i>
+                        <span>Ver completo</span>
+                    </button>
                     <button class="kair-preview__action" id="closeDocBtn" disabled title="Cerrar">
                         <i class="bi bi-x-lg"></i>
                     </button>
@@ -234,6 +238,10 @@
 
 <!-- ─────────── HIDDEN UPLOAD INPUT ─────────── -->
 <input type="file" id="hiddenFileInput" multiple style="display:none" accept=".pdf,.xls,.xlsx,.doc,.docx,.txt,.jpg,.jpeg,.png">
+
+<!-- 📦608: bundle IIFE de @file-viewer + helper KairDocPreview -->
+<script src="../../../renderer/file-viewer-assets/flyfish-file-viewer-web-full.iife.js"></script>
+<script src="../../../shared/file-viewer.js"></script>
 
 <script src="restricciones-viewer.js"></script>
 </body>

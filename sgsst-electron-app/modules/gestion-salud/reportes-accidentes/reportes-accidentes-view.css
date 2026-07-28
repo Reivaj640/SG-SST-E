@@ -1007,3 +1007,21 @@ body {
     .furat-folders-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
     .furat-docs-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
 }
+
+
+/* 📦608-fix15 — FILE-VIEWER INLINE dentro del modal del preview (FURAT) */
+.furat-preview-modal__body:has(flyfish-file-viewer) {
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 0;
+}
+.furat-preview-modal__body flyfish-file-viewer {
+    display: block;
+    width: 100%;
+    flex: 1 1 0%;
+    min-height: 480px;
+    max-height: calc(100vh - 200px);
+    overflow: hidden;
+}

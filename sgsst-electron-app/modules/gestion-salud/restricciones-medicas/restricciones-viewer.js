@@ -797,7 +797,7 @@ var RestriccionesViewer = (function () {
 
     function _loadPDF(filePath) {
         _callParentAPI('get-pdf-preview', { filePath: filePath }).then(function (result) {
-            _displayPDF(result.data);
+            _renderPreview(result, filePath);
         }).catch(function (error) {
             _showErrorInViewer('Error al cargar PDF: ' + error.message);
         });
@@ -805,7 +805,7 @@ var RestriccionesViewer = (function () {
 
     function _loadExcel(filePath) {
         _callParentAPI('get-excel-preview', { filePath: filePath }).then(function (result) {
-            _displayPDF(result.data); // Excel → PDF para preview unificado
+            _renderPreview(result, filePath);
         }).catch(function (error) {
             _showErrorInViewer('Error al cargar Excel: ' + error.message);
         });
@@ -813,10 +813,51 @@ var RestriccionesViewer = (function () {
 
     function _loadWord(filePath) {
         _callParentAPI('get-word-preview', { filePath: filePath }).then(function (result) {
-            _displayPDF(result.data); // Word → PDF para preview unificado
+            _renderPreview(result, filePath);
         }).catch(function (error) {
             _showErrorInViewer('Error al cargar Word: ' + error.message);
         });
+    }
+
+    // 📦608: renderiza file-viewer nativo (Office, 208 formatos) o iframe PDF legacy
+    function _renderPreview(result, filePath) {
+        var container = document.getElementById('viewerContainer');
+        if (!container) return;
+        container.innerHTML = '';
+        var expandBtn = document.getElementById('previewExpandBtn');
+
+        if (result && result.mode === 'file-viewer' && result.data && result.data.bytes) {
+            if (window.KairDocPreview && typeof window.KairDocPreview.mountInContainer === 'function') {
+                window.KairDocPreview.mountInContainer(container, result);
+            } else if (window.kairFV && typeof window.kairFV.mountInContainer === 'function') {
+                window.kairFV.mountInContainer(container, result.data);
+            } else {
+                _showErrorInViewer('file-viewer no disponible');
+                return;
+            }
+            if (expandBtn) {
+                expandBtn.style.display = '';
+                expandBtn.dataset.filePath = filePath || '';
+            }
+        } else if (result && (result.data || result.base64Data)) {
+            var base64 = (typeof result.data === 'string') ? result.data : result.base64Data;
+            if (!base64) { _showErrorInViewer('Sin datos para mostrar'); return; }
+            _displayPDF(base64);
+            if (expandBtn) expandBtn.style.display = 'none';
+        } else {
+            _showErrorInViewer('Sin datos para mostrar');
+            if (expandBtn) expandBtn.style.display = 'none';
+        }
+    }
+
+    // 📦608-fix13: pide al parent que abra el archivo en el modal file-viewer global
+    function _expandFileViewer(filePath) {
+        if (!filePath) return;
+        try {
+            window.top.postMessage({ type: 'open-file-viewer-modal', filePath: filePath, source: 'restricciones-medicas' }, '*');
+        } catch (e) {
+            _err('EXPAND_FILE_VIEWER', e);
+        }
     }
 
     function _displayPDF(pdfData) {
@@ -874,12 +915,14 @@ var RestriccionesViewer = (function () {
         var viewerContainer = document.getElementById('viewerContainer');
         var toolbar = document.getElementById('previewToolbar');
         var docName = document.getElementById('docName');
+        var expandBtn = document.getElementById('previewExpandBtn');
 
         if (docName) {
             docName.textContent = 'Selecciona un documento';
             docName.setAttribute('title', '');
         }
         if (toolbar) toolbar.classList.remove('is-visible');
+        if (expandBtn) expandBtn.style.display = 'none';
 
         if (viewerContainer) {
             viewerContainer.innerHTML =
@@ -1389,6 +1432,15 @@ var RestriccionesViewer = (function () {
 
         var closeDocBtn = document.getElementById('closeDocBtn');
         if (closeDocBtn) closeDocBtn.addEventListener('click', _closeDocument);
+
+        // 📦608: botón "Ver completo" → abrir en modal file-viewer global del parent
+        var previewExpandBtn = document.getElementById('previewExpandBtn');
+        if (previewExpandBtn) {
+            previewExpandBtn.addEventListener('click', function () {
+                var filePath = previewExpandBtn.dataset.filePath || _state.currentDocument;
+                if (filePath) _expandFileViewer(filePath);
+            });
+        }
 
         // Zoom
         var zoomInBtn = document.getElementById('zoomInBtn');

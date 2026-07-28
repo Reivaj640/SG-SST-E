@@ -153,6 +153,10 @@
 <div class="inv-preview-modal">
 <div class="inv-preview-modal__header">
 <h3 class="inv-preview-modal__title" id="previewTitle">Previsualización</h3>
+<button class="kair-preview__action--primary inv-preview-modal__expand" id="previewExpandBtn" title="Ver completo" style="display:none;">
+    <i class="fas fa-expand"></i>
+    <span>Ver completo</span>
+</button>
 <button id="closePreviewBtn" class="inv-preview-modal__close" aria-label="Cerrar"><i class="fas fa-times"></i></button>
 </div>
 <div class="inv-preview-modal__body" id="previewBody">
@@ -172,6 +176,10 @@
 <div id="toastContainer" class="inv-toast-container"></div>
 
 </div>
+
+<!-- 📦608: bundle IIFE de @file-viewer + helper KairDocPreview -->
+<script src="../../../renderer/file-viewer-assets/flyfish-file-viewer-web-full.iife.js"></script>
+<script src="../../../shared/file-viewer.js"></script>
 
 <script src="investigaciones-viewer.js"></script>
 </body>

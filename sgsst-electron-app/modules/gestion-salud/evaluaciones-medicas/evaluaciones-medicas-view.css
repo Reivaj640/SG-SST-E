@@ -779,3 +779,42 @@ body {
     .em-folders-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
     .em-docs-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
 }
+
+/* 📦608-fix10: file-viewer inline dentro del modal de preview */
+.em-preview-modal__body:has(flyfish-file-viewer) {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex: 1 1 0%;
+}
+.em-preview-modal__body:has(flyfish-file-viewer) flyfish-file-viewer {
+    flex: 1 1 0%;
+    min-height: 0;
+    display: block;
+}
+.em-preview-modal__body > div[style*="min-height"] { min-height: 0 !important; }
+
+/* 📦608: Botón "Ver completo" (outline style) */
+.em-preview-modal__expand.kair-preview__action--primary {
+    width: auto;
+    height: 30px;
+    padding: 0 10px;
+    gap: 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    background: transparent;
+    color: var(--em-primary, #174ea6);
+    border: 1px solid var(--em-border, #dee2e6);
+    border-radius: 6px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    transition: all 0.15s ease;
+    font-family: inherit;
+    cursor: pointer;
+}
+.em-preview-modal__expand.kair-preview__action--primary:hover:not(:disabled) {
+    background: var(--em-bg-hover, #f1f4f9);
+    border-color: var(--em-primary, #174ea6);
+}

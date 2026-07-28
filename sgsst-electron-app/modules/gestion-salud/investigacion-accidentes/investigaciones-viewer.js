@@ -1030,8 +1030,8 @@ iframeContainer.innerHTML = '<div class="inv-empty" style="padding: 2rem;"><div 
 return;
 }
 
-if (result && result.data) {
-iframeContainer.innerHTML = '<iframe src="data:application/pdf;base64,' + result.data + '" style="width:100%;height:450px;border:none;"></iframe>';
+if (result && result.success) {
+_renderPreview(iframeContainer, result, filePath);
 } else {
 iframeContainer.innerHTML = '<div class="inv-empty" style="padding: 2rem;"><div class="inv-empty__icon"><i class="fas fa-exclamation-triangle"></i></div><h3>Error al cargar</h3><p>No se pudo obtener la vista previa del documento.</p></div>';
 }
@@ -1040,6 +1040,49 @@ console.error('[INV-MGR] Error en preview:', error);
 iframeContainer.innerHTML = '<div class="inv-empty" style="padding: 2rem;"><div class="inv-empty__icon"><i class="fas fa-times-circle"></i></div><h3>Error</h3><p>' + escapeHtml(error.message) + '</p></div>';
 }
 };
+
+// 📦608: renderiza file-viewer (Office nativo) o iframe PDF legacy según el modo
+function _renderPreview(container, result, filePath) {
+if (!container) return;
+container.innerHTML = '';
+var expandBtn = document.getElementById('previewExpandBtn');
+
+if (result && result.mode === 'file-viewer' && result.data && result.data.bytes) {
+  if (window.KairDocPreview && typeof window.KairDocPreview.mountInContainer === 'function') {
+    window.KairDocPreview.mountInContainer(container, result);
+  } else if (window.kairFV && typeof window.kairFV.mountInContainer === 'function') {
+    window.kairFV.mountInContainer(container, result.data);
+  } else {
+    container.innerHTML = '<div style="padding:20px;color:#b91c1c;">file-viewer no disponible</div>';
+    return;
+  }
+  if (expandBtn) {
+    expandBtn.style.display = '';
+    expandBtn.dataset.filePath = filePath || '';
+  }
+} else if (result && result.data) {
+  var base64 = (typeof result.data === 'string') ? result.data : result.data.base64Data || result.base64Data;
+  if (!base64) {
+    container.innerHTML = '<div style="padding:20px;color:#b91c1c;">Sin datos para mostrar</div>';
+    return;
+  }
+  container.innerHTML = '<iframe src="data:application/pdf;base64,' + base64 + '" style="width:100%;height:450px;border:none;"></iframe>';
+  if (expandBtn) expandBtn.style.display = 'none';
+} else {
+  container.innerHTML = '<div style="padding:20px;color:#b91c1c;">Sin datos para mostrar</div>';
+  if (expandBtn) expandBtn.style.display = 'none';
+}
+}
+
+// 📦608-fix13: pide al parent que abra el archivo en el modal file-viewer global
+function _expandFileViewer(filePath) {
+if (!filePath) return;
+try {
+  window.top.postMessage({ type: 'open-file-viewer-modal', filePath: filePath, source: 'investigacion-accidentes' }, '*');
+} catch (e) {
+  console.error('[INV-MGR] Error enviando postMessage al parent:', e);
+}
+}
 
 window._startInvestigation = function(invNombre, furatPath) {
 console.log('[INV-MGR] 🖱️ _startInvestigation clickeado:', {
@@ -1062,7 +1105,21 @@ document.getElementById('previewOverlay').classList.add('hidden');
 document.getElementById('previewFieldGrid').innerHTML = '';
 document.getElementById('previewIframeContainer').innerHTML = '';
 document.getElementById('previewStartBtn').style.display = 'none';
+// 📦608: ocultar botón "Ver completo" al cerrar
+var expandBtn = document.getElementById('previewExpandBtn');
+if (expandBtn) expandBtn.style.display = 'none';
 }
+
+// 📦608: listener del botón "Ver completo"
+document.addEventListener('DOMContentLoaded', function() {
+var expandBtn = document.getElementById('previewExpandBtn');
+if (expandBtn) {
+  expandBtn.addEventListener('click', function() {
+    var filePath = expandBtn.dataset.filePath || '';
+    if (filePath) _expandFileViewer(filePath);
+  });
+}
+});
 
 function truncatePath(p) {
 if (!p) return '—';

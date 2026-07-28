@@ -277,6 +277,10 @@
                         <button class="em-btn em-btn--sm em-btn--ghost" id="previewDownloadBtn" title="Descargar documento">
                             <i class="fas fa-download"></i>
                         </button>
+                        <button class="kair-preview__action--primary em-preview-modal__expand" id="previewExpandBtn" title="Ver completo" style="display:none;">
+                            <i class="fas fa-expand"></i>
+                            <span>Ver completo</span>
+                        </button>
                         <button class="em-preview-modal__close" id="closePreviewBtn" aria-label="Cerrar">
                             <i class="fas fa-times"></i>
                         </button>
@@ -331,6 +335,10 @@
             color: var(--em-text-primary); display: inline-block; margin: 8px 0;
         }
     </style>
+
+    <!-- 📦608: bundle IIFE de @file-viewer + helper KairDocPreview -->
+    <script src="../../../renderer/file-viewer-assets/flyfish-file-viewer-web-full.iife.js"></script>
+    <script src="../../../shared/file-viewer.js"></script>
 
     <script src="evaluaciones-medicas-viewer.js"></script>
 </body>

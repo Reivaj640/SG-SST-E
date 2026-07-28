@@ -278,6 +278,13 @@ class InvestigacionAccidentesComponent {
         fullEventData: event.data
     });
     this.showModernInvestigationInterface(investigacionNombre, furatPath);
+} else if (type === 'open-file-viewer-modal' && event.data.filePath) {
+                // 📦608-fix13: el iframe pide abrir el archivo en el modal file-viewer del parent
+                if (window.kairFV && typeof window.kairFV.openWithFileViewerFromPath === 'function') {
+                    window.kairFV.openWithFileViewerFromPath(event.data.filePath);
+                } else {
+                    console.warn('[INVESTIGACION-ACCIDENTES-LOGIC] kairFV.openWithFileViewerFromPath no disponible');
+                }
 }
         };
 
