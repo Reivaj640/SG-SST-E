@@ -706,7 +706,31 @@ git status --short
 
 ---
 
-## 🆕 Regla crítica: NO commit sin autorización explícita del user (2026-07-24)
+## 📊 Snapshot actualizado (snapshot 2026-07-27 — file-viewer + v0.1.137)
+
+- **Versión:** 0.1.137 (publicada)
+- **Working tree:** con cambios sin commitear (file-viewer feature, ver abajo)
+- **Último commit pusheado:** `80fba542` (📦606 release notes)
+- **HEAD:** `80fba542`
+- **Tamaño `renderer/file-viewer-assets/`:** 29.16 MB (después de limpieza de carpetas no usadas; era 139 MB original)
+- **Pendiente próximo commit:** 1 commit único con todo el feature de file-viewer (Pendiente de autorización del user)
+
+**Commits pusheados desde snapshot anterior (📦604-📦606):**
+- `a578c09b` — 📦604 feat(skills): emilkowalski/skills (8 skills) + snapshot 2026-07-24
+- `7eb39dc7` — 📦603-fix feat(bandeja-integrada): preservar messages al refrescar state.mails
+- `5621989` — 📦603 fix(bandeja-integrada): 2 fixes importantes (sync no borra threads antes; banner+divider+footer alineados)
+- `b332f34d` — 📦602-fix feat(bandeja-integrada): alinear banner ICS con header
+- `a2a71e1` — 📦602 feat(bandeja-integrada): email viewer estilo Gmail
+- `a687a04` — 📦601 feat(calendario): RSVP modal + banner invitación ICS en emails + auto-refresh 1 min
+- `f0b0bbb6` — 🔧 chore(build): excluir skills de opencode del paquete
+- `a87e001d` — 🔖 Bump version 0.1.136 → 0.1.137
+- `9643ea93` — 📦605 feat(bandeja-integrada): scroll interno sidebar + lista correos
+- `80fba542` — 📦606 feat(release): release notes con `releaseInfo.releaseNotesFile` apuntando a `release-notes.md`
+
+**Commits REVERTIDOS esta sesión:**
+- `c76eb3d` — 📦604 (scroll interno + sidebar sticky). User pidió revertir. Lección: hacer un panel a la vez y validar entre cada uno.
+
+---
 
 El user me lo recordó FIRME el 2026-07-24 después de que commiteé `📦604` sin pedirle OK.
 
@@ -794,7 +818,117 @@ Commit `a578c09b` (📦604). 8 skills de diseño + animación instaladas:
 
 ---
 
-## 🆕 Pendientes próximos (post-2026-07-27)
+## 🆕 @file-viewer — preview nativo de Office/PDF (2026-07-27, working tree)
+
+User aprobó integrar [flyfish-dev/file-viewer](https://github.com/flyfish-dev/file-viewer) para reemplazar los 3 IPCs de preview actuales (`get-pdf-preview`, `get-word-preview`, `get-excel-preview`) que dependen de Python + LibreOffice (lentos, baja fidelidad, sin búsqueda, sin selección de texto).
+
+**Estrategia: migración gradual (Opción B)** — los 3 IPCs viejos siguen vivos (no se rompe nada), el file-viewer se agrega como camino nuevo para los formatos Office (PPTX, DOCX, XLSX, imágenes, etc.). PDF queda en el flujo viejo por ahora (decisión aparte, ver "Pendientes próximos").
+
+**Arquitectura del flujo nuevo**:
+
+```
+Renderer (browser)
+  ├─ PDF actual:    getPDFPreview   ─┐
+  ├─ DOCX actual:   getWordPreview  ─┤  ← MANTENER (prescindibles gradualmente)
+  ├─ XLSX actual:   getExcelPreview ─┘
+  └─ PPTX + resto:  readFileBytes (NUEVO) → Blob → <flyfish-file-viewer>
+                                                │
+Main process (Node)                              │
+  ├─ IPCs actuales (sin cambios) ────────────────┤
+  └─ IPC NUEVO read-file-bytes  ──────────────── ┘
+```
+
+**Componentes implementados (en working tree, sin commitear)**:
+
+1. **NPM deps nuevas**:
+   - `@file-viewer/web@2.2.3` (production) — bundle IIFE del viewer
+   - `@file-viewer/preset-office` (production) — solo PDF/Word/Excel/PowerPoint (no trae CAD/3D/drawio/typst)
+   - `pptxgenjs` (dev) — generador del sample de prueba
+
+2. **IPC nuevo `read-file-bytes`** (`main.js`):
+   - Recibe `filePath`, valida ruta accesible
+   - Whitelist de extensiones (~200 formatos Office/PDF/imagenes/video/audio/EML/ZIP/3D/CAD/Mermaid/PlantUML/XMind/draw.io)
+   - Validación de tamaño máximo **100 MB** (configurable vía `KAIR_FV_MAX_BYTES` env)
+   - Retorna `{ success, data: { bytes: Uint8Array, name, ext, size } }` o `{ success: false, error }`
+   - NO convierte a PDF, NO llama Python/LibreOffice — bytes crudos
+
+3. **Preload** (`preload.js`):
+   - `window.electronAPI.readFileBytes(filePath)` → IPC
+
+4. **Helper compartido** (`shared/file-viewer.js`):
+   - `window.kairFV.openWithFileViewerFromPath(filePath)` — abre el modal global con file-viewer
+   - `window.kairFV.openFileViewerFromFile(file)` — variante con File API (input file)
+   - `window.kairFV.closeFileViewer()` — cierra el modal
+   - Crea el DOM del modal (full-screen) si no existe
+   - Carga el bundle IIFE del viewer
+   - Configura `setDefaultFullAssetBaseUrl('renderer/file-viewer-assets/')` para que los workers carguen desde el directorio local
+
+5. **Bundle IIFE + helper cargados en `index.html` raíz** (renderer global):
+   - `<script src="renderer/file-viewer-assets/flyfish-file-viewer-web.iife.js">` antes de `renderer.js`
+   - `<script src="shared/file-viewer.js">` después del bundle
+   - **CSP ajustada** para permitir `blob:` en `frame-src`/`child-src`/`img-src`/`script-src`/`object-src` (necesario para que el viewer renderice con Blob URLs)
+
+6. **Switch del orquestador** (`renderer.js:1215`):
+   - Cuando llega cualquier `*-preview-request`, decodifica `payload.filePath`
+   - Detecta la extensión
+   - Si es Office (no PDF) → dispara `kairFV.openWithFileViewerFromPath()` y responde al módulo con un **PDF dummy 1×1px** (base64 hardcoded) marcado con `handled: 'file-viewer'` para que el módulo no rompa su flujo de mostrar el response en un iframe
+   - Si es PDF → llama al IPC viejo (sin cambios)
+   - **Workaround documentado**: la integración limpia en los 46 submódulos (que detecten `handled: 'file-viewer'` y no muestren nada) queda pendiente
+
+7. **Demo standalone en Bandeja Integrada** (`renderer/bandeja-integrada/{app.js,index.html,styles.css}`):
+   - Botón "Probar FV" en el header (temporal pero útil para probar archivos que no estén en el flujo)
+   - Input file oculto que acepta 200+ formatos
+   - Modal full-screen con header (extensión coloreada por tipo, nombre, tamaño) + body con `<flyfish-file-viewer>` + cerrar con ESC o click fuera
+   - 2 variantes: `openFileViewerFromFile(file)` (File API) y `openWithFileViewerFromPath(filePath)` (IPC)
+
+8. **Sample PPTX** (`assets/samples/sample-sgsst.pptx` + `scripts/generate-sample-pptx.js`):
+   - 8 slides con contenido SG-SST realista: portada, marco legal (Decreto 1072, Resolución 0312), política, objetivos, ciclo PHVA, indicadores, cierre
+   - 175 KB, generado con `pptxgenjs`
+   - Se puede regenerar con `node scripts/generate-sample-pptx.js`
+
+9. **Script de setup reproducible** (`scripts/setup-file-viewer.js`):
+   - Reinstala los assets oficiales via `file-viewer-copy-assets` (~139 MB)
+   - Borra las carpetas que no usamos con `preset-office` (drawio 59 MB, typst 36 MB, model 7.4 MB, cad 6.3 MB, data 0.6 MB) → **queda en 29 MB**
+   - Reporta el tamaño final
+   - **Uso**: `node scripts/setup-file-viewer.js` (idempotente, se puede correr cada vez que se actualice el paquete)
+
+**Limpieza de assets** — análisis del tamaño original de `renderer/file-viewer-assets/`:
+
+| Categoría          | Tamaño   | Usado |
+|--------------------|---------:|:-----:|
+| vendor/drawio/     | 59.29 MB | NO    |
+| wasm/typst/        | 36.25 MB | NO    |
+| vendor/ppt/        | 17.29 MB | SÍ    |
+| vendor/pdf/        |  9.18 MB | SÍ    |
+| wasm/model/ (3D)   |  7.40 MB | NO    |
+| wasm/cad/          |  6.26 MB | NO    |
+| vendor/libarchive/ |  1.01 MB | SÍ (ZIP)  |
+| vendor/xlsx/       |  0.79 MB | SÍ    |
+| wasm/data/ (sql)   |  0.63 MB | NO    |
+| vendor/pptx/       |  0.55 MB | SÍ    |
+| vendor/docx/       |  0.32 MB | SÍ    |
+| **Total**          | **139 MB → 29 MB** | |
+
+**Cosas que NO se tocaron** (preservadas para no romper):
+- Los 3 IPCs viejos (`get-pdf-preview`, `get-word-preview`, `get-excel-preview`) — siguen funcionando
+- El flujo de PDF — el switch del orquestador mantiene el camino viejo cuando ext === 'pdf'
+- Los 46 submódulos que llaman a los IPCs viejos — no se modificó ningún `*-logic.js` ni `*-component.js`
+- El modal genérico de la Bandeja Integrada (`#modal-overlay` / `#event-modal`) — el modal de file-viewer es independiente (`#fv-overlay` / `#fv-body`)
+
+**Pendiente de validación por el user** (working tree, sin commitear):
+- PPTX: abrir `assets/samples/sample-sgsst.pptx` desde Bandeja Integrada (botón "Probar FV")
+- XLSX: abrir un Excel desde cualquier submódulo → file-viewer modal global
+- DOCX: abrir un Word desde cualquier submódulo → file-viewer modal global
+- PDF: el flujo viejo (sin cambios, sigue funcionando)
+
+**Pendiente para iteración futura** (no urgente):
+- Integración limpia en los 46 submódulos (que detecten `handled: 'file-viewer'` y no muestren el PDF dummy)
+- Decisión sobre PDF (mantener flujo viejo o migrar a file-viewer)
+- Empaquetado: verificar que el `files: ["**/*"]` del package.json incluye `renderer/file-viewer-assets/` y que el .exe no excede ~270 MB (243 + 29)
+- Probar auto-update end-to-end
+- Rotar `GH_TOKEN` (comprometido, sigue pendiente)
+
+---
 
 1. 🔐 **URGENTE**: rotar `GH_TOKEN` (sigue expuesto en respuestas anteriores)
 2. Probar auto-update end-to-end: instalar v0.1.136 manual, bumpear a v0.1.137 trivial con `.\scripts\release.ps1`

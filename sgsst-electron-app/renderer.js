@@ -1212,18 +1212,77 @@ document.addEventListener('DOMContentLoaded', async () => {
                   apiCallFunction = window.electronAPI.getFolderContents;
                   apiCallArgs = [payload]; // payload is the folderPath string
                   break;
+              // 📦608 — Preview unificado: si la extensión es Office (no PDF),
+              // renderizamos con @file-viewer en modal global y devolvemos un
+              // payload inocuo al módulo (PDF dummy 1x1) para que no rompa
+              // su flujo de mostrar el response en un iframe. El módulo
+              // efectivamente no muestra nada útil — el file-viewer ya está
+              // visible en el modal global. La integración limpia (que el
+              // módulo detecte `handled: 'file-viewer'` y no muestre nada)
+              // queda para una iteración futura que toque los 46 submódulos.
               case 'get-pdf-preview-request':
-                  apiCallFunction = window.electronAPI.getPDFPreview;
-                  apiCallArgs = [payload.filePath]; // Ensure payload is destructured
-                  break;
               case 'get-excel-preview-request':
-                  apiCallFunction = window.electronAPI.getExcelPreview;
-                  apiCallArgs = [payload.filePath]; // Ensure payload is destructured
+              case 'get-word-preview-request': {
+                  const _fvFilePath = (payload && payload.filePath) || '';
+                  const _fvExt = (_fvFilePath.split('.').pop() || '').toLowerCase();
+                  const _fvIsOffice = _fvExt && _fvExt !== 'pdf' &&
+                      ['pptx','ppt','pptm','potx','ppsx','odp',
+                       'xlsx','xls','xlsm','xlsb','csv','ods','fods','numbers',
+                       'docx','doc','docm','dotx','rtf','odt',
+                       'eml','msg','md','markdown','txt',
+                       'png','jpg','jpeg','gif','webp','svg','bmp','tif','tiff',
+                       // 📦608-fix — agregar formatos de código/datos que file-viewer soporta
+                       'json','xml','yaml','yml','css','html','htm',
+                       'js','ts','jsx','tsx','mjs','cjs','java','py','c','cpp','cc','h','hpp',
+                       'cs','go','rs','php','rb','swift','kt','sql','sh','bash','log',
+                       'diff','patch','toml','ini','http','ipynb',
+                       // comprimidos (preview con libarchive)
+                       'zip','7z','rar','tar','gz','tgz','bz2','xz','cab','iso','apk','cbz','cbr',
+                       // otros formatos de file-viewer que valen la pena
+                       'svgz','epub','xmind','drawio','dio','mermaid','mmd','plantuml','puml',
+                       'sqlite','parquet','ttf','otf','woff','woff2','gltf','glb'].indexOf(_fvExt) >= 0;
+
+                  if (_fvIsOffice && window.kairFV && typeof window.kairFV.openWithFileViewerFromPath === 'function') {
+                      // 📦608-fix8 — Devolver los bytes del archivo al módulo para que
+                      // pueda renderizar el file-viewer directamente en su panel de
+                      // preview. El módulo detecta `mode: 'file-viewer'` y monta el
+                      // <flyfish-file-viewer> en su DOM. Si el módulo no lo soporta,
+                      // cae al flujo viejo (mostrar el PDF dummy) sin romper nada.
+                      apiCallFunction = async () => {
+                          try {
+                              const r = await window.electronAPI.readFileBytes(_fvFilePath);
+                              if (!r || !r.success) {
+                                  return { success: false, error: r && r.error || 'No se pudo leer el archivo' };
+                              }
+                              return {
+                                  success: true,
+                                  mode: 'file-viewer',
+                                  data: {
+                                      bytes: r.data.bytes,
+                                      name: r.data.name,
+                                      ext: r.data.ext,
+                                      size: r.data.size
+                                  }
+                              };
+                          } catch (e) {
+                              return { success: false, error: e.message || String(e) };
+                          }
+                      };
+                      apiCallArgs = [];
+                      break;
+                  }
+
+                  // Flujo original: PDF/Word/Excel según el type
+                  if (type === 'get-pdf-preview-request') {
+                      apiCallFunction = window.electronAPI.getPDFPreview;
+                  } else if (type === 'get-excel-preview-request') {
+                      apiCallFunction = window.electronAPI.getExcelPreview;
+                  } else if (type === 'get-word-preview-request') {
+                      apiCallFunction = window.electronAPI.getWordPreview;
+                  }
+                  apiCallArgs = [_fvFilePath];
                   break;
-              case 'get-word-preview-request':
-                  apiCallFunction = window.electronAPI.getWordPreview;
-                  apiCallArgs = [payload.filePath]; // Ensure payload is destructured
-                  break;
+              }
               case 'download-document-request':
                   apiCallFunction = window.electronAPI.downloadDocument;
                   apiCallArgs = [payload];
@@ -1652,10 +1711,12 @@ case 'investigacion-accidentes-read-directory-request':
                   // acción del renderer global. Se ignoran sin warning.
                   if (
                     type === 'investigacion-home-action' ||
-                    type === 'iniciar-investigacion-desde-viewer'
+                    type === 'iniciar-investigacion-desde-viewer' ||
+                    type === 'open-file-viewer-modal'
                   ) {
                     // El componente InvestigacionAccidentesComponent maneja este mensaje
                     // directamente. Ver: modules/gestion-salud/investigacion-accidentes/investigacion-accidentes-logic.js
+                    // open-file-viewer-modal: lo maneja ResponsableLogic (1.1.1) — ver responsable-sg-logic.js 📦608-fix13
                     return;
                   }
 
@@ -1687,15 +1748,7 @@ case 'investigacion-accidentes-read-directory-request':
                   console.warn(`RENDERER: Target window cerrado para ${type}, omitiendo respuesta`);
                   return;
               }
-              
-              console.log('[DEBUG] Enviando respuesta a iframe:', {
-                  type: responseType,
-                  requestId: requestId,
-                  hasConfig: !!result.config,
-                  targetWindowExists: !!targetWindow,
-                  targetWindowClosed: targetWindow?.closed
-              });
-              
+
       targetWindow.postMessage({
         type: responseType,
         success: result.success,
@@ -1703,8 +1756,6 @@ case 'investigacion-accidentes-read-directory-request':
         error: result.error || null,
         requestId: requestId
       }, '*');
-              
-              console.log('[DEBUG] Respuesta enviada a iframe');
           } catch (error) {
               // Manejo de errores específico para IPC
               if (error.message && error.message.includes('Object has been destroyed')) {

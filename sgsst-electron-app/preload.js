@@ -230,6 +230,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getPDFPreview: (filePath) => ipcRenderer.invoke('get-pdf-preview', filePath),
   getWordPreview: (filePath) => ipcRenderer.invoke('get-word-preview', filePath),
   getExcelPreview: (filePath) => ipcRenderer.invoke('get-excel-preview', filePath),
+  // 📦608 — Lectura genérica de bytes para @file-viewer (no convierte, no pasa por LibreOffice)
+  readFileBytes: (filePath) => ipcRenderer.invoke('read-file-bytes', filePath),
   downloadDocument: (filePath) => ipcRenderer.invoke('download-document', filePath),
   uploadDocument: (payload) => ipcRenderer.invoke('upload-document', payload),
   deleteDocument: (filePath) => ipcRenderer.invoke('delete-document', filePath),

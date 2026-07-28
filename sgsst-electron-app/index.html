@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net http://localhost:8080; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; img-src 'self' data:; font-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.gstatic.com https://fonts.googleapis.com; connect-src 'self' https://fonts.googleapis.com http://localhost:3010 http://localhost:3011 http://localhost:8080 ws://localhost:3010 ws://localhost:3011 ws://localhost:8080; frame-src 'self' http://localhost:3010 http://localhost:3011 http://localhost:8080; child-src 'self' http://localhost:3010 http://localhost:3011 http://localhost:8080; worker-src 'self' blob:; ">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net http://localhost:8080 blob:; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.gstatic.com https://fonts.googleapis.com; connect-src 'self' https://fonts.googleapis.com http://localhost:3010 http://localhost:3011 http://localhost:8080 ws://localhost:3010 ws://localhost:3011 ws://localhost:8080 blob:; frame-src 'self' http://localhost:3010 http://localhost:3011 http://localhost:8080 blob:; child-src 'self' http://localhost:3010 http://localhost:3011 http://localhost:8080 blob:; worker-src 'self' blob:; object-src 'self' blob:; ">
   <title>K+AIR</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="development-styles.css">
@@ -410,6 +410,16 @@
   <script src="modules/shared/calendar-detail-panel.js?v=545"></script>
   <!-- 📦 Alertas calendario — badge + popover de pendientes. Depende de KairCalendarAdapter y calendarDetailPanel. -->
   <script src="shared/kair-alerts.js"></script>
+
+  <!-- 📦608 — @file-viewer (preview nativo de Office/PDF/imágenes en el browser).
+       Bundle IIFE "web-full" auto-registra el custom element <flyfish-file-viewer>
+       CON todos los renderers adentro (PDF/Word/Excel/PowerPoint/Imágenes/etc).
+       Workers/WASM/fonts viven en renderer/file-viewer-assets/.
+       La versión "web-full" es la que funciona offline sin configurar presets
+       manualmente (la "web" sin -full es solo el shell que carga renderers
+       dinámicamente, y no funciona con `<script>` tag en modo offline). -->
+  <script src="renderer/file-viewer-assets/flyfish-file-viewer-web-full.iife.js"></script>
+  <script src="shared/file-viewer.js"></script>
 
   <script src="renderer.js"></script>
   

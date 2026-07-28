@@ -1,4 +1,40 @@
-# K+AIR v0.1.137
+# K+AIR v0.1.138 (working tree, próximo release)
+
+## 🎉 Novedades principales
+
+### @file-viewer — preview nativo de Office / PDF / imágenes (📦608)
+Reemplaza los previews de PDF/Word/Excel que dependían de Python + LibreOffice por un viewer nativo en el browser, sin conversión, instantáneo y con búsqueda + zoom + selección de texto.
+
+- **PPTX / PPT / PPTM / POTX / PPSX / ODP** → renderiza slides nativas con scroll y zoom (antes: sin preview, "abrir con app externa")
+- **XLSX / XLS / XLSM / XLSB / CSV / ODS** → tabla virtual real con scroll fluido y headers fijos (antes: PDF paginado horrible para hojas grandes)
+- **DOCX / DOC / DOCM / DOTX / RTF / ODT** → render nativo con búsqueda, copy/paste, zoom (antes: PDF convertido por LibreOffice, layouts rotos, 3-5s de espera)
+- **PDF** → sigue con el flujo viejo (decisión de migración pendiente)
+- **Imágenes, Markdown, JSON, código fuente, ZIP, EML, Mermaid, draw.io, XMind, EPUB, fonts** → preview instantáneo
+- Total: **208 formatos** soportados (cubrimos los 4 que el user usa en el día a día con `preset-office`)
+
+**Arquitectura de migración gradual (Opción B)**: los 3 IPCs viejos (`get-pdf-preview`, `get-word-preview`, `get-excel-preview`) siguen vivos — no se rompe nada. El nuevo IPC `read-file-bytes` agrega el camino para Office.
+
+**Componentes nuevos**:
+- IPC `read-file-bytes` con whitelist de extensiones + validación 100 MB
+- Helper compartido `shared/file-viewer.js` (`window.kairFV.openWithFileViewerFromPath`)
+- Bundle IIFE + assets en `renderer/file-viewer-assets/` (29 MB después de limpieza)
+- Botón "Probar FV" en Bandeja Integrada (input file con 200+ formatos)
+- Switch en `renderer.js` que detecta extensión y enruta a file-viewer para Office
+- CSP del `index.html` raíz ajustada para `blob:` en `frame-src`/`child-src`
+
+**Scripts nuevos** (reproducibles):
+- `scripts/setup-file-viewer.js` — reinstala assets y borra los 110 MB no usados
+- `scripts/generate-sample-pptx.js` — genera un sample SG-SST de 8 slides
+- `scripts/test-read-file-bytes.js` — test del IPC (5/5 OK)
+- `scripts/test-orchestrator-switch.js` — test del switch (22/22 OK)
+
+**Pendiente para iteración futura** (no bloqueante):
+- Integración limpia en los 46 submódulos (que detecten `handled: 'file-viewer'` y no muestren el PDF dummy en su iframe)
+- Decisión sobre migración de PDF a file-viewer
+
+---
+
+# K+AIR v0.1.137 (publicado)
 
 ## 🎉 Novedades principales
 

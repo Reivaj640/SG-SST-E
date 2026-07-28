@@ -6376,6 +6376,115 @@ ipcMain.handle('get-pdf-preview', async (event, filePath) => {
   }
 });
 
+// =============================================================================
+// 📦608 — IPC genérico read-file-bytes para @file-viewer (preview de archivos
+// Office / PDF / imágenes / etc. sin pasar por LibreOffice). Lee bytes crudos
+// del archivo y los retorna como Uint8Array para que el renderer los envuelva
+// en un Blob URL y los pase al Web Component <flyfish-file-viewer>.
+//
+// Validaciones:
+//   - Ruta accesible (R_OK)
+//   - Extensión dentro de la whitelist de file-viewer
+//   - Tamaño máximo 100 MB (configurable vía env KAIR_FV_MAX_BYTES)
+// =============================================================================
+const KAIR_FV_ALLOWED_EXTS = new Set([
+  // Office
+  'pdf','docx','docm','dotx','dotm','doc','dot','rtf','odt',
+  'xlsx','xltx','xlsm','xlsb','xls','xlt','xltm','csv','tsv','ods','fods','numbers',
+  'pptx','pptm','potx','potm','ppsx','ppsm','ppt','odp',
+  // Documentos
+  'ofd','typ','typst',
+  // Imágenes
+  'gif','jpg','jpeg','bmp','tiff','tif','png','svg','webp','avif','ico','heic','heif','jxl',
+  // Media
+  'mp4','webm','m3u8','mp3','wav','ogg','opus','m4a','aac','flac',
+  // Texto/código
+  'txt','md','markdown','json','xml','yaml','yml','html','htm','css','js','ts','py','java','c','cpp','cs','go','rs','php','rb','swift','kt','sql','sh','bash','log','diff','patch','toml','ini','http','ipynb',
+  // Email
+  'eml','msg','mbox',
+  // Diagramas
+  'xmind','drawio','dio','excalidraw','mermaid','mmd','plantuml','puml',
+  // Comprimidos
+  'zip','7z','rar','tar','gz','tgz','bz2','xz','cab','iso','apk','cbz','cbr',
+  // Otros
+  'epub','ttf','otf','woff','woff2','sqlite','parquet','dxf','dwg','dwf','gltf','glb','obj','stl','ply','step','stp','iges','igs','ifc','3dm','geojson','kml','gpx'
+]);
+const KAIR_FV_MAX_BYTES = (() => {
+  const env = Number(process.env.KAIR_FV_MAX_BYTES);
+  return Number.isFinite(env) && env > 0 ? env : 100 * 1024 * 1024; // 100 MB default
+})();
+
+ipcMain.handle('read-file-bytes', async (event, rawFilePath) => {
+  sendLog(`[MAIN][read-file-bytes] Solicitud recibida para filePath: ${rawFilePath}`, 'INFO');
+
+  // Normalizar ruta (mismo patrón que get-word-preview)
+  let filePath = typeof rawFilePath === 'string' ? rawFilePath : (rawFilePath?.filePath || '');
+  let prev = '';
+  while (filePath !== prev) {
+    prev = filePath;
+    try { filePath = decodeURIComponent(filePath); } catch (_) { /* ignore */ }
+  }
+  const driveLetterMatch = filePath.match(/^([A-Za-z])[\s\-+]+:([/\\].*)$/);
+  if (driveLetterMatch) {
+    filePath = driveLetterMatch[1] + ':' + driveLetterMatch[2];
+    filePath = filePath.replace(/\\/g, '\\').replace(/\//g, '\\');
+  }
+  sendLog(`[MAIN][read-file-bytes] Ruta normalizada: ${filePath}`, 'INFO');
+
+  // Validar extensión
+  const baseName = path.basename(filePath);
+  const ext = (path.extname(baseName).slice(1) || '').toLowerCase();
+  if (!ext) {
+    return { success: false, error: `El archivo no tiene extensión: ${baseName}` };
+  }
+  if (!KAIR_FV_ALLOWED_EXTS.has(ext)) {
+    return {
+      success: false,
+      error: `Extensión no soportada por file-viewer: .${ext}. Use uno de los formatos soportados (Office, PDF, imágenes, video, etc.).`
+    };
+  }
+
+  try {
+    // Verificar acceso
+    try {
+      await fsp.access(filePath, fs.constants.R_OK);
+    } catch (accessError) {
+      sendLog(`[MAIN][read-file-bytes] Error de acceso: ${accessError.message}`, 'ERROR');
+      return { success: false, error: `El archivo no es accesible o no existe: ${filePath}. Error: ${accessError.message}` };
+    }
+
+    // Verificar tamaño antes de leer
+    const stat = await fsp.stat(filePath);
+    if (stat.size > KAIR_FV_MAX_BYTES) {
+      const sizeMB = (stat.size / 1024 / 1024).toFixed(1);
+      const limitMB = (KAIR_FV_MAX_BYTES / 1024 / 1024).toFixed(0);
+      sendLog(`[MAIN][read-file-bytes] Archivo excede tamaño máximo: ${sizeMB}MB > ${limitMB}MB`, 'ERROR');
+      return {
+        success: false,
+        error: `El archivo pesa ${sizeMB} MB, excede el límite de ${limitMB} MB. Para archivos más grandes contactá al administrador.`
+      };
+    }
+
+    // Leer bytes
+    const buffer = await fsp.readFile(filePath);
+    const bytes = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+    sendLog(`[MAIN][read-file-bytes] OK — ${baseName} (${buffer.length} bytes, .${ext})`, 'INFO');
+
+    return {
+      success: true,
+      data: {
+        bytes,            // Uint8Array (ipcRenderer lo recibe como Buffer en Node y se restaura en el renderer)
+        name: baseName,
+        ext: ext,
+        size: buffer.length
+      }
+    };
+  } catch (error) {
+    sendLog(`[MAIN][read-file-bytes] Error leyendo ${filePath}: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
 // --- Manejadores para el Visor de Documentos ---
 
 // --- Manejadores para el módulo de Objetivos SST ---

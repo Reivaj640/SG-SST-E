@@ -931,6 +931,22 @@
     transition: all var(--kair-transition);
 }
 
+/* Botón "Ver completo" — más prominente para indicar que abre el modal */
+.kair-preview__action--primary {
+    background: var(--kair-primary);
+    color: #fff;
+    width: auto;
+    padding: 0 12px;
+    gap: 6px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+}
+
+.kair-preview__action--primary:hover:not(:disabled) {
+    background: var(--kair-primary-hover);
+    color: #fff;
+}
+
 .kair-preview__action:hover:not(:disabled) {
     background: var(--kair-bg-hover);
     color: var(--kair-primary);
@@ -943,7 +959,8 @@
 
 .kair-preview__collapse {
     position: absolute;
-    right: -12px;
+    left: -12px;            /* 📦608-fix9 — movido a la IZQUIERDA del panel para NO
+                              tapar la barra de scroll del viewer/file-viewer */
     top: 50%;
     transform: translateY(-50%);
     z-index: 5;
@@ -969,9 +986,17 @@
 }
 
 /* Chevron en preview usa la misma clase compartida arriba */
+/* 📦608-fix9 — cuando el botón está a la izquierda del panel,
+   el chevron debe apuntar al lado correcto:
+   - Preview expandido (default): chevron → (apunta a la derecha, "colapsar a la derecha")
+   - Preview colapsado: chevron ← (apunta a la izquierda, "expandir desde la derecha") */
+.kair-layout:not(.is-preview-collapsed) .kair-preview__collapse .kair-collapse-chevron--right {
+    transform: rotate(135deg);   /* → flecha hacia la derecha */
+    margin-left: 2px;
+}
 
 .kair-layout.is-preview-collapsed .kair-preview__collapse .kair-collapse-chevron {
-    transform: rotate(-135deg);
+    transform: rotate(-45deg);    /* ← flecha hacia la izquierda */
 }
 
 .kair-layout.is-preview-collapsed .kair-preview__head {
@@ -1056,6 +1081,39 @@
     border: none;
     background: #fff;
     display: block;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   FILE-VIEWER INLINE (📦608-fix10) — fix del bug de altura desbordada.
+   PROBLEMA RAÍZ (verificado con diagnóstico):
+   - El viewer con `flex: 1 1 auto` tomaba `flex-basis: auto` (alto del
+     contenido = 1714px) y se expandía más allá de la celda del grid.
+   - El body (flex column) crecía junto con el viewer porque ningún
+     ancestor tenía `min-height: 0 + overflow: hidden` para contenerlo.
+   - Resultado: viewer + body de 1714px de alto, sin scroll.
+   SOLUCIÓN:
+   - `.kair-preview`: `min-height: 0; overflow: hidden` (contiene el body)
+   - Viewer: `flex: 1 1 0%` (NO `auto` — toma el alto disponible, no del
+     contenido). El content interno del viewer tiene su propio scroll.
+   ═══════════════════════════════════════════════════════════════════ */
+.kair-preview {
+    min-height: 0;
+    overflow: hidden;
+}
+
+.kair-preview__body:has(flyfish-file-viewer) {
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;            /* permite que el body se encoja dentro del preview */
+}
+
+.kair-preview__body flyfish-file-viewer {
+    display: block;
+    width: 100%;
+    flex: 1 1 0%;             /* ← flex-basis: 0 (NO auto) → toma alto disponible */
+    min-height: 0;            /* permite que se encoja */
+    overflow: hidden;         /* el viewer maneja su scroll interno */
 }
 
 .kair-preview-error {

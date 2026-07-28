@@ -1989,13 +1989,9 @@
     // mandamos postMessage al parent para que cierre el iframe. Si estamos standalone,
     // caemos a history.back() como fallback.
     $("#btn-back").addEventListener("click", navigateBack);
-    // F4-fix — Botón flotante "Volver" (visible arriba a la izquierda del iframe).
-    // Como el header interno está oculto, este botón es la forma principal de
-    // salir de la Bandeja Integrada desde adentro.
-    var btnBackFloating = $("#btn-back-floating");
-    if (btnBackFloating) {
-      btnBackFloating.addEventListener("click", navigateBack);
-    }
+    // 📦607 — Botón flotante "Volver" ELIMINADO. Ya hay 2 formas de volver:
+    // (1) Tecla ESC, (2) Botón X de cerrar del header de la app principal.
+    // El botón flotante era redundante.
     // F4-fix — ESC también cierra la Bandeja Integrada (atajo de teclado estándar).
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape") {
@@ -2014,6 +2010,8 @@
     $("#btn-compose").addEventListener("click", onComposeClick);
     // F1-Feature4 — Editor de firma. Click → abrir mini modal para editarla.
     $("#btn-signature").addEventListener("click", openSignatureModal);
+    // 📦608 — Botón temporal de prueba para @file-viewer.
+    if (typeof wireFileViewerDemo === 'function') wireFileViewerDemo();
     // F4-fix — Indicador Gmail en el header: read-only. Click → ir a Configuración.
     var gmailIndicator = $("#gmail-indicator");
     if (gmailIndicator) {
@@ -5589,5 +5587,216 @@
     document.addEventListener("DOMContentLoaded", init);
   } else {
     init();
+  }
+
+  // =============================================================================
+  // 📦608 — @file-viewer (preview nativo de Office/PDF/etc en el browser).
+  //
+  // Esta sección se va a quedar MIENTRAS validamos el flujo. Una vez aprobado
+  // por el user, se integra al orquestador de renderer.js (Paso 2) y este demo
+  // se reemplaza por la lógica real.
+  //
+  // Por ahora:
+  //   - Botón "Probar FV" del header abre un input file oculto
+  //   - El user elige cualquier archivo de su disco
+  //   - FileReader lo lee como ArrayBuffer
+  //   - Se crea un Blob URL
+  //   - Se monta <flyfish-file-viewer> en el modal
+  //   - El viewer detecta el formato por extensión y renderiza
+  // =============================================================================
+  let _fvCurrentUrl = null;
+
+  function _fvFormatBytes(n) {
+    if (!n && n !== 0) return '—';
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+    return (n / 1024 / 1024).toFixed(2) + ' MB';
+  }
+
+  function closeFileViewer() {
+    var overlay = document.getElementById('fv-overlay');
+    if (overlay) overlay.setAttribute('hidden', '');
+    var body = document.getElementById('fv-body');
+    if (body) {
+      body.querySelectorAll('flyfish-file-viewer').forEach(function (el) {
+        try { if (typeof el.unload === 'function') el.unload(); } catch (_) {}
+        el.remove();
+      });
+      body.querySelectorAll('.kair-fv-loading,.kair-fv-error').forEach(function (el) { el.remove(); });
+    }
+    if (_fvCurrentUrl) {
+      try { URL.revokeObjectURL(_fvCurrentUrl); } catch (_) {}
+      _fvCurrentUrl = null;
+    }
+  }
+
+  function _fvShowError(msg) {
+    var body = document.getElementById('fv-body');
+    if (!body) return;
+    body.querySelectorAll('.kair-fv-loading,.kair-fv-error').forEach(function (el) { el.remove(); });
+    var div = document.createElement('div');
+    div.className = 'kair-fv-error';
+    div.innerHTML = '<p>' + msg + '</p>';
+    body.appendChild(div);
+  }
+
+  function _fvShowLoading(text) {
+    var body = document.getElementById('fv-body');
+    if (!body) return;
+    body.querySelectorAll('.kair-fv-loading,.kair-fv-error').forEach(function (el) { el.remove(); });
+    var div = document.createElement('div');
+    div.className = 'kair-fv-loading';
+    div.id = 'fv-loading';
+    div.innerHTML = '<div class="kair-fv-spinner"></div><p>' + (text || 'Cargando…') + '</p>';
+    body.appendChild(div);
+  }
+
+  function openFileViewerFromFile(file) {
+    if (!file) return;
+    var overlay = document.getElementById('fv-overlay');
+    var body = document.getElementById('fv-body');
+    if (!overlay || !body) return;
+
+    // Limpiar viewer previo
+    body.querySelectorAll('flyfish-file-viewer').forEach(function (el) { el.remove(); });
+    if (_fvCurrentUrl) { try { URL.revokeObjectURL(_fvCurrentUrl); } catch (_) {} _fvCurrentUrl = null; }
+
+    // Mostrar modal con metadata
+    overlay.removeAttribute('hidden');
+    var titleEl = document.getElementById('fv-filename');
+    var sizeEl  = document.getElementById('fv-filesize');
+    var badge   = document.getElementById('fv-ext-badge');
+    if (titleEl) titleEl.textContent = file.name;
+    if (sizeEl)  sizeEl.textContent  = _fvFormatBytes(file.size);
+    var ext = (file.name.split('.').pop() || '').toLowerCase();
+    if (badge) { badge.textContent = ext.toUpperCase(); badge.setAttribute('data-ext', ext); }
+
+    _fvShowLoading('Leyendo ' + file.name + '…');
+
+    var reader = new FileReader();
+    reader.onload = function (ev) {
+      var blob = new Blob([ev.target.result], { type: file.type || 'application/octet-stream' });
+      _fvCurrentUrl = URL.createObjectURL(blob);
+
+      // Quitar loading
+      body.querySelectorAll('.kair-fv-loading,.kair-fv-error').forEach(function (el) { el.remove(); });
+
+      // Insertar el custom element
+      var viewer = document.createElement('flyfish-file-viewer');
+      viewer.setAttribute('src', _fvCurrentUrl);
+      viewer.setAttribute('filename', file.name);
+      viewer.setAttribute('theme', 'light');
+      viewer.setAttribute('locale', 'es-ES');
+      viewer.setAttribute('toolbar-position', 'bottom-right');
+      viewer.style.cssText = 'display:block;width:100%;height:100%;min-height:540px;';
+      body.appendChild(viewer);
+      console.log('[FV][Bandeja] Viewer montado para', file.name, '(' + _fvFormatBytes(file.size) + ', .' + ext + ')');
+    };
+    reader.onerror = function () {
+      _fvShowError('Error leyendo el archivo: ' + (reader.error ? reader.error.message : 'error desconocido'));
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  /**
+   * 📦608 — Variante para abrir desde una ruta absoluta (usa el IPC read-file-bytes).
+   * Esta función se va a usar en el Paso 2 cuando integremos al orquestador de
+   * renderer.js. Por ahora queda lista pero no se llama desde el demo del botón.
+   */
+  async function openWithFileViewerFromPath(filePath) {
+    var api = (typeof getElectronAPI === 'function') ? getElectronAPI() : window.electronAPI;
+    if (!api || !api.readFileBytes) {
+      _fvShowError('API readFileBytes no disponible (¿preload no la expone?).');
+      return;
+    }
+    var overlay = document.getElementById('fv-overlay');
+    var body = document.getElementById('fv-body');
+    if (!overlay || !body) return;
+
+    body.querySelectorAll('flyfish-file-viewer').forEach(function (el) { el.remove(); });
+    if (_fvCurrentUrl) { try { URL.revokeObjectURL(_fvCurrentUrl); } catch (_) {} _fvCurrentUrl = null; }
+
+    var fileName = filePath.split(/[\\/]/).pop();
+    var ext = (fileName.split('.').pop() || '').toLowerCase();
+    overlay.removeAttribute('hidden');
+    var titleEl = document.getElementById('fv-filename');
+    var sizeEl  = document.getElementById('fv-filesize');
+    var badge   = document.getElementById('fv-ext-badge');
+    if (titleEl) titleEl.textContent = fileName;
+    if (badge)   { badge.textContent = ext.toUpperCase(); badge.setAttribute('data-ext', ext); }
+    if (sizeEl)  sizeEl.textContent  = '…';
+
+    _fvShowLoading('Leyendo bytes de ' + fileName + '…');
+
+    var res;
+    try { res = await api.readFileBytes(filePath); }
+    catch (e) {
+      _fvShowError('Error llamando read-file-bytes: ' + (e && e.message || e));
+      return;
+    }
+    if (!res || !res.success) {
+      _fvShowError('No se pudo leer el archivo: ' + (res && res.error || 'error desconocido'));
+      return;
+    }
+
+    var data = res.data;
+    var bytes = data.bytes;
+    var ab = new ArrayBuffer(bytes.byteLength);
+    new Uint8Array(ab).set(bytes);
+    var blob = new Blob([ab], { type: 'application/octet-stream' });
+    _fvCurrentUrl = URL.createObjectURL(blob);
+    if (sizeEl) sizeEl.textContent = _fvFormatBytes(data.size);
+
+    body.querySelectorAll('.kair-fv-loading,.kair-fv-error').forEach(function (el) { el.remove(); });
+    var viewer = document.createElement('flyfish-file-viewer');
+    viewer.setAttribute('src', _fvCurrentUrl);
+    viewer.setAttribute('filename', data.name);
+    viewer.setAttribute('theme', 'light');
+    viewer.setAttribute('locale', 'es-ES');
+    viewer.setAttribute('toolbar-position', 'bottom-right');
+    viewer.style.cssText = 'display:block;width:100%;height:100%;min-height:540px;';
+    body.appendChild(viewer);
+    console.log('[FV][Bandeja] Viewer montado desde path:', data.name, '(' + _fvFormatBytes(data.size) + ', .' + data.ext + ')');
+  }
+
+  function wireFileViewerDemo() {
+    // Si el bundle IIFE expone setDefaultFullAssetBaseUrl, apuntamos a nuestros assets locales.
+    try {
+      var F = window.FlyfishFileViewerWeb;
+      if (F && typeof F.setDefaultFullAssetBaseUrl === 'function') {
+        F.setDefaultFullAssetBaseUrl('../file-viewer-assets/');
+      }
+    } catch (e) { /* no-op */ }
+
+    var btn   = document.getElementById('btn-fv-test');
+    var input = document.getElementById('fv-file-input');
+    var closeBtn = document.getElementById('fv-close-btn');
+    var overlay = document.getElementById('fv-overlay');
+
+    if (btn && input) {
+      btn.addEventListener('click', function () { input.value = ''; input.click(); });
+    }
+    if (input) {
+      input.addEventListener('change', function (e) {
+        var file = e.target.files && e.target.files[0];
+        if (!file) return;
+        openFileViewerFromFile(file);
+      });
+    }
+    if (closeBtn) closeBtn.addEventListener('click', closeFileViewer);
+    // Cerrar con click fuera del modal
+    if (overlay) {
+      overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) closeFileViewer();
+      });
+    }
+    // Cerrar con ESC (solo si el modal está visible)
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && overlay && !overlay.hasAttribute('hidden')) {
+        closeFileViewer();
+      }
+    });
+
+    console.log('[FV][Bandeja] Demo de file-viewer wireado. Buscá "Probar FV" en el header.');
   }
 })();

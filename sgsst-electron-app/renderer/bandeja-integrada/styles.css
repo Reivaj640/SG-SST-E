@@ -173,42 +173,11 @@ body {
   display: none !important;
 }
 
-/* F4-fix — Botón flotante "Volver" arriba a la izquierda del iframe.
-   Reemplaza al botón de volver que estaba en el header interno (ahora oculto).
-   Estilo similar al FAB de Google Keep / Material Design. */
-.kair-bandeja-fab-back {
-  position: fixed;
-  top: 12px;
-  left: 12px;
-  z-index: 50;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  background: #ffffff;
-  border: 1px solid var(--kair-border, #e5e7eb);
-  border-radius: 999px;
-  color: var(--kair-text-body, #1f2937);
-  font-size: 0.85rem;
-  font-weight: 500;
-  cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-  transition: all 160ms ease;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-}
-.kair-bandeja-fab-back:hover {
-  background: var(--kair-bg-hover, #f8fafc);
-  border-color: var(--kair-primary, #174ea6);
-  color: var(--kair-primary, #174ea6);
-  transform: translateX(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-}
-.kair-bandeja-fab-back:active {
-  transform: translateX(0);
-}
-.kair-bandeja-fab-back svg {
-  flex-shrink: 0;
-}
+/* 📦607 — Botón flotante "Volver" (kair-bandeja-fab-back) ELIMINADO.
+   Ya hay 2 formas de volver de la Bandeja Integrada:
+   (1) Tecla ESC
+   (2) Botón X de cerrar del header de la app principal
+   El botón flotante era redundante y ocupaba la esquina superior izquierda. */
 
 /* Loop 45 — FAB flotante "Toggle empresas" (espejo del FAB de Volver).
    El header interno del iframe está oculto (display:none) para no duplicar
@@ -5408,4 +5377,194 @@ body {
 }
 .kair-cal-invitation__more:hover {
   background: #f1f3f4;
+}
+
+/* =============================================================================
+   📦608 — @file-viewer modal (preview nativo de Office / PDF / imágenes / etc)
+   - Full-screen overlay con header (nombre + extensión + tamaño + cerrar)
+   - Body con el <flyfish-file-viewer> ocupando todo el espacio
+   - Spinner y mensaje de error consistentes con el resto de K+AIR
+   ============================================================================= */
+.kair-fv-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  background: rgba(15, 23, 42, 0.72);
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 24px;
+  animation: kair-fv-fade-in 0.15s ease-out;
+}
+.kair-fv-overlay[hidden] { display: none; }
+
+@keyframes kair-fv-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.kair-fv-modal {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  background: var(--kair-surface, #ffffff);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--kair-border, #e0e3e7);
+}
+
+.kair-fv-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  background: var(--kair-surface-2, #f7f9fb);
+  border-bottom: 1px solid var(--kair-border, #e0e3e7);
+  flex-shrink: 0;
+  min-height: 56px;
+}
+
+.kair-fv-header__title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.kair-fv-header__ext {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: #ffffff;
+  background: var(--kair-primary, #1a73e8);
+  border-radius: 6px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+.kair-fv-header__ext[data-ext="pdf"]  { background: #c62828; }
+.kair-fv-header__ext[data-ext="pptx"],
+.kair-fv-header__ext[data-ext="ppt"]  { background: #d84315; }
+.kair-fv-header__ext[data-ext="docx"],
+.kair-fv-header__ext[data-ext="doc"]  { background: #1565c0; }
+.kair-fv-header__ext[data-ext="xlsx"],
+.kair-fv-header__ext[data-ext="xls"]  { background: #2e7d32; }
+
+.kair-fv-header__name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--kair-text, #1f2937);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.kair-fv-header__meta {
+  font-size: 12px;
+  color: var(--kair-text-light, #6b7280);
+  flex-shrink: 0;
+}
+
+.kair-fv-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.kair-fv-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--kair-text, #1f2937);
+  background: transparent;
+  border: 1px solid var(--kair-border, #d1d5db);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.kair-fv-btn:hover {
+  background: var(--kair-surface-3, #f3f4f6);
+  border-color: var(--kair-text-light, #9ca3af);
+}
+
+.kair-fv-body {
+  flex: 1 1 auto;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;        /* permite que el viewer scrollee si hace falta */
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.kair-fv-empty {
+  padding: 32px;
+  text-align: center;
+  color: var(--kair-text-light, #6b7280);
+}
+.kair-fv-empty p { margin: 0 0 12px 0; }
+.kair-fv-empty__hint { font-size: 12px; }
+.kair-fv-empty code {
+  background: var(--kair-surface-2, #f3f4f6);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.kair-fv-loading,
+.kair-fv-error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.92);
+  z-index: 2;
+}
+.kair-fv-error {
+  color: #b91c1c;
+  background: rgba(254, 242, 242, 0.96);
+}
+.kair-fv-error p {
+  max-width: 600px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.kair-fv-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--kair-surface-3, #e5e7eb);
+  border-top-color: var(--kair-primary, #1a73e8);
+  border-radius: 50%;
+  animation: kair-fv-spin 0.9s linear infinite;
+}
+@keyframes kair-fv-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* El custom element <flyfish-file-viewer> ocupa todo el body del modal */
+.kair-fv-body flyfish-file-viewer {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
 }
