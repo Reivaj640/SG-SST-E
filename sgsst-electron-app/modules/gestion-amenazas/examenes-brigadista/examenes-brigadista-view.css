@@ -1736,3 +1736,42 @@
         transition-duration: 0.01ms !important;
     }
 }
+
+/* 📦608-fix10: file-viewer inline dentro del preview panel lateral */
+#viewerContainer:has(flyfish-file-viewer) {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex: 1 1 0%;
+}
+#viewerContainer:has(flyfish-file-viewer) flyfish-file-viewer {
+    flex: 1 1 0%;
+    min-height: 0;
+    display: block;
+}
+#viewerContainer > div[style*="min-height"] { min-height: 0 !important; }
+
+/* 📦608: Botón "Ver completo" (outline style) en panel lateral */
+.kair-preview__expand.kair-preview__action--primary {
+    width: auto;
+    height: 30px;
+    padding: 0 10px;
+    gap: 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    background: transparent;
+    color: var(--kair-primary);
+    border: 1px solid var(--kair-border);
+    border-radius: var(--kair-radius-sm);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    transition: all var(--kair-transition);
+    font-family: inherit;
+    cursor: pointer;
+}
+.kair-preview__expand.kair-preview__action--primary:hover:not(:disabled) {
+    background: var(--kair-bg-hover);
+    border-color: var(--kair-primary);
+}
