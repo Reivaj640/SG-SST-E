@@ -805,7 +805,7 @@ var CursoVirtualViewer = (function () {
 
     function _loadExcel(filePath) {
         _callParentAPI('get-excel-preview', { filePath: filePath }).then(function (result) {
-            _displayPDF(result.data); // Excel → PDF para preview unificado
+            _renderPreview(result);
         }).catch(function (error) {
             _showErrorInViewer('Error al cargar Excel: ' + error.message);
         });
@@ -813,10 +813,63 @@ var CursoVirtualViewer = (function () {
 
     function _loadWord(filePath) {
         _callParentAPI('get-word-preview', { filePath: filePath }).then(function (result) {
-            _displayPDF(result.data); // Word → PDF para preview unificado
+            _renderPreview(result);
         }).catch(function (error) {
             _showErrorInViewer('Error al cargar Word: ' + error.message);
         });
+    }
+
+    // 📦608-fix15 — Switch entre file-viewer nativo (Office) e iframe PDF (legacy)
+    function _renderPreview(result) {
+        if (!result) {
+            _showErrorInViewer('Sin respuesta del servidor');
+            return;
+        }
+        if (result.mode === 'file-viewer' && result.data && result.data.bytes) {
+            // Office nativo: @file-viewer renderiza los bytes crudos
+            _hideLoading();
+            var viewerContainer = document.getElementById('viewerContainer');
+            if (viewerContainer && window.KairDocPreview) {
+                window.KairDocPreview.mountInContainer(viewerContainer, result);
+                var expandBtn = document.getElementById('expandPreviewBtn');
+                if (expandBtn) {
+                    expandBtn.style.display = '';
+                    expandBtn.disabled = false;
+                }
+            } else {
+                _showErrorInViewer('file-viewer no disponible');
+            }
+        } else {
+            // Compatibilidad: PDF viejo (base64)
+            _displayPDF(result.data);
+            var expandBtnPdf = document.getElementById('expandPreviewBtn');
+            if (expandBtnPdf) {
+                expandBtnPdf.style.display = 'none';
+                expandBtnPdf.disabled = true;
+            }
+        }
+    }
+
+    // 📦608-fix15 — Botón "Ver completo": abre el modal full-screen
+    function _expandFileViewer() {
+        if (!_state.currentDocument) {
+            _showToast('No hay un archivo para expandir', 'warning');
+            return;
+        }
+        var filePath = _state.currentDocument.path;
+        if (!filePath) {
+            _showToast('No se encontró la ruta del archivo', 'warning');
+            return;
+        }
+        if (window.top && window.top.postMessage) {
+            window.top.postMessage({
+                type: 'open-file-viewer-modal',
+                filePath: filePath,
+                source: 'curso-virtual'
+            }, '*');
+        } else if (window.kairFV && typeof window.kairFV.openWithFileViewerFromPath === 'function') {
+            window.kairFV.openWithFileViewerFromPath(filePath);
+        }
     }
 
     function _displayPDF(pdfData) {
@@ -869,6 +922,13 @@ var CursoVirtualViewer = (function () {
     function _closeDocument() {
         _log('CLOSE_DOC', 'START');
         _state.currentDocument = null;
+
+        // Ocultar botón "Ver completo" al cerrar
+        var expandBtn = document.getElementById('expandPreviewBtn');
+        if (expandBtn) {
+            expandBtn.style.display = 'none';
+            expandBtn.disabled = true;
+        }
 
         var emptyState = document.getElementById('emptyState');
         var viewerContainer = document.getElementById('viewerContainer');
@@ -1386,6 +1446,10 @@ var CursoVirtualViewer = (function () {
 
         var printBtn = document.getElementById('printBtn');
         if (printBtn) printBtn.addEventListener('click', _printDocument);
+
+        // 📦608-fix15 — Botón "Ver completo" (solo para file-viewer nativo)
+        var expandPreviewBtn = document.getElementById('expandPreviewBtn');
+        if (expandPreviewBtn) expandPreviewBtn.addEventListener('click', _expandFileViewer);
 
         var closeDocBtn = document.getElementById('closeDocBtn');
         if (closeDocBtn) closeDocBtn.addEventListener('click', _closeDocument);

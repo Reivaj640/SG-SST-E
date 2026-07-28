@@ -137,6 +137,10 @@
                     <span id="docName" title="">Selecciona un documento</span>
                 </div>
                 <div class="kair-preview__actions">
+                    <button class="kair-preview__action kair-preview__action--primary" id="expandPreviewBtn" disabled title="Ver documento completo en modal" style="display:none;">
+                        <i class="bi bi-arrows-fullscreen"></i>
+                        <span>Ver completo</span>
+                    </button>
                     <button class="kair-preview__action" id="downloadBtn" disabled title="Descargar">
                         <i class="bi bi-download"></i>
                     </button>
@@ -236,5 +240,8 @@
 <input type="file" id="hiddenFileInput" multiple style="display:none" accept=".pdf,.xls,.xlsx,.doc,.docx,.txt,.jpg,.jpeg,.png">
 
 <script src="trabajo-alto-riesgo-viewer.js"></script>
+<!-- 📦608-fix15 — File-viewer bundle (IIFE web-full) + helper genérico -->
+<script src="../../../renderer/file-viewer-assets/flyfish-file-viewer-web-full.iife.js"></script>
+<script src="../../../shared/file-viewer.js"></script>
 </body>
 </html>

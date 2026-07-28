@@ -805,7 +805,7 @@ var ManualProveedoresViewer = (function () {
 
     function _loadExcel(filePath) {
         _callParentAPI('get-excel-preview', { filePath: filePath }).then(function (result) {
-            _displayPDF(result.data); // Excel → PDF para preview unificado
+            _renderPreview(result);
         }).catch(function (error) {
             _showErrorInViewer('Error al cargar Excel: ' + error.message);
         });
@@ -813,10 +813,67 @@ var ManualProveedoresViewer = (function () {
 
     function _loadWord(filePath) {
         _callParentAPI('get-word-preview', { filePath: filePath }).then(function (result) {
-            _displayPDF(result.data); // Word → PDF para preview unificado
+            _renderPreview(result);
         }).catch(function (error) {
             _showErrorInViewer('Error al cargar Word: ' + error.message);
         });
+    }
+
+    // 📦608-fix15 — Switch entre file-viewer nativo (Office) e iframe PDF (legacy)
+    function _renderPreview(result) {
+        if (!result) {
+            _showErrorInViewer('Sin respuesta del servidor');
+            return;
+        }
+        if (result.mode === 'file-viewer' && result.data && result.data.bytes) {
+            // Office nativo: @file-viewer renderiza los bytes crudos
+            _hideLoading();
+            var viewerContainer = document.getElementById('viewerContainer');
+            if (viewerContainer && window.KairDocPreview) {
+                window.KairDocPreview.mountInContainer(viewerContainer, result);
+                // Mostrar botón "Ver completo" (solo para file-viewer nativo)
+                var expandBtn = document.getElementById('expandPreviewBtn');
+                if (expandBtn) {
+                    expandBtn.style.display = '';
+                    expandBtn.disabled = false;
+                }
+            } else {
+                _showErrorInViewer('file-viewer no disponible');
+            }
+        } else {
+            // Compatibilidad: PDF viejo (base64)
+            _displayPDF(result.data);
+            // Ocultar botón "Ver completo" para PDF (no aplica — PDF ya tiene scroll propio)
+            var expandBtnPdf = document.getElementById('expandPreviewBtn');
+            if (expandBtnPdf) {
+                expandBtnPdf.style.display = 'none';
+                expandBtnPdf.disabled = true;
+            }
+        }
+    }
+
+    // 📦608-fix15 — Botón "Ver completo": abre el modal full-screen con el archivo
+    // actual. El iframe NO tiene electronAPI, así que enviamos postMessage al parent.
+    function _expandFileViewer() {
+        if (!_state.currentDocument) {
+            _showToast('No hay un archivo para expandir', 'warning');
+            return;
+        }
+        var filePath = _state.currentDocument.path;
+        if (!filePath) {
+            _showToast('No se encontró la ruta del archivo', 'warning');
+            return;
+        }
+        if (window.top && window.top.postMessage) {
+            window.top.postMessage({
+                type: 'open-file-viewer-modal',
+                filePath: filePath,
+                source: 'manual-proveedores'
+            }, '*');
+        } else if (window.kairFV && typeof window.kairFV.openWithFileViewerFromPath === 'function') {
+            // Fallback extremo (no debería pasar en Electron)
+            window.kairFV.openWithFileViewerFromPath(filePath);
+        }
     }
 
     function _displayPDF(pdfData) {
@@ -869,6 +926,13 @@ var ManualProveedoresViewer = (function () {
     function _closeDocument() {
         _log('CLOSE_DOC', 'START');
         _state.currentDocument = null;
+
+        // Ocultar botón "Ver completo" al cerrar
+        var expandBtn = document.getElementById('expandPreviewBtn');
+        if (expandBtn) {
+            expandBtn.style.display = 'none';
+            expandBtn.disabled = true;
+        }
 
         var emptyState = document.getElementById('emptyState');
         var viewerContainer = document.getElementById('viewerContainer');
@@ -964,6 +1028,12 @@ var ManualProveedoresViewer = (function () {
         if (ext.indexOf('doc') !== -1) apiType = 'get-word-preview';
 
         _callParentAPI(apiType, { filePath: filePath }).then(function (result) {
+            // 📦608-fix15 — Si el result es file-viewer nativo, el user imprime
+            // desde la toolbar flotante del viewer (botón Print integrado).
+            if (result && result.mode === 'file-viewer') {
+                _showToast('Imprime desde la barra de herramientas del visualizador', 'info', 4000);
+                return;
+            }
             var printWindow = window.open('', '_blank');
             if (!printWindow) {
                 _showToast('Bloqueador de popups activo. Permite popups para imprimir.', 'warning', 5000);
@@ -1386,6 +1456,10 @@ var ManualProveedoresViewer = (function () {
 
         var printBtn = document.getElementById('printBtn');
         if (printBtn) printBtn.addEventListener('click', _printDocument);
+
+        // 📦608-fix15 — Botón "Ver completo" (solo para file-viewer nativo)
+        var expandPreviewBtn = document.getElementById('expandPreviewBtn');
+        if (expandPreviewBtn) expandPreviewBtn.addEventListener('click', _expandFileViewer);
 
         var closeDocBtn = document.getElementById('closeDocBtn');
         if (closeDocBtn) closeDocBtn.addEventListener('click', _closeDocument);

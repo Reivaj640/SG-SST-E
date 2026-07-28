@@ -469,7 +469,131 @@
     mountInContainer: mountInContainer
   };
 
+  // -----------------------------------------------------------------------------
+  // 📦608-fix15 — Helper genérico para visualizadores de submódulos.
+  // Reemplaza el handleStandardRequest custom de cada *-logic.js y centraliza
+  // el switch Office→readFileBytes + el render del preview en un solo lugar.
+  //
+  // Caso de uso típico (manual-proveedores, curso-virtual, etc.):
+  //   // En *-logic.js
+  //   case 'get-word-preview':
+  //     window.KairDocPreview.handleRequest(event, 'getWordPreview');
+  //     break;
+  //
+  //   // En *-viewer.js (donde antes había un iframe con data:application/pdf)
+  //   if (result && result.mode === 'file-viewer') {
+  //     window.KairDocPreview.mountInContainer(container, result);
+  //   } else {
+  //     // Compatibilidad con PDF viejo
+  //     container.innerHTML = '<iframe ...></iframe>';
+  //   }
+  // -----------------------------------------------------------------------------
+  window.KairDocPreview = {
+    /**
+     * Handler genérico para mensajes postMessage de iframes de visualizadores.
+     * Switch automático a readFileBytes para Office (no PDF).
+     */
+    handleRequest: async function (event, apiFunctionName) {
+      var requestId = event.data && event.data.requestId;
+      var payload = event.data && event.data.payload;
+      var filePath = (typeof payload === 'string') ? payload
+        : (payload && payload.filePath) ? payload.filePath : '';
+      var ext = (filePath.split('.').pop() || '').toLowerCase();
+      var isOffice = (apiFunctionName === 'getExcelPreview' || apiFunctionName === 'getWordPreview')
+        && ext && ext !== 'pdf';
+
+      var responsePayload;
+      try {
+        if (isOffice && window.electronAPI && window.electronAPI.readFileBytes) {
+          // 📦608 — Office nativo: leer bytes crudos para file-viewer
+          var rfb = await window.electronAPI.readFileBytes(filePath);
+          if (!rfb || !rfb.success) {
+            responsePayload = {
+              success: false,
+              error: (rfb && rfb.error) || 'No se pudo leer el archivo'
+            };
+          } else {
+            responsePayload = {
+              success: true,
+              mode: 'file-viewer',
+              data: {
+                bytes: rfb.data.bytes,
+                name: rfb.data.name,
+                ext: rfb.data.ext,
+                size: rfb.data.size,
+                filePath: filePath
+              }
+            };
+          }
+        } else {
+          // PDF (o API sin switch): flujo viejo
+          if (!window.electronAPI || typeof window.electronAPI[apiFunctionName] !== 'function') {
+            throw new Error('API function ' + apiFunctionName + ' not found');
+          }
+          var apiArgs = (payload && typeof payload === 'object' && payload.filePath) ? payload.filePath : payload;
+          var result = await window.electronAPI[apiFunctionName](apiArgs);
+          responsePayload = {
+            success: result.success,
+            data: result.data || result,
+            files: result.files,
+            folders: result.folders,
+            basePath: result.basePath,
+            fileName: result.fileName,
+            base64Data: result.base64Data,
+            error: result.error
+          };
+        }
+      } catch (error) {
+        responsePayload = {
+          success: false,
+          error: (error && error.message) || String(error)
+        };
+      }
+
+      event.source.postMessage({
+        type: (event.data.type || '').replace('-request', '') + '-response',
+        requestId: requestId,
+        payload: responsePayload
+      }, '*');
+    },
+
+    /**
+     * Monta el file-viewer (o iframe PDF de fallback) en un contenedor.
+     * result puede ser:
+     *   - { mode: 'file-viewer', data: { bytes, name, ext, size, filePath } }
+     *   - { success, data: { base64Data } } (PDF viejo)
+     *   - { base64Data } directo
+     */
+    mountInContainer: function (container, result) {
+      if (!container) return null;
+      container.innerHTML = '';
+      if (!result) {
+        container.innerHTML = '<div style="padding:20px;color:#6b7280;">Sin datos para mostrar</div>';
+        return null;
+      }
+      // Modo file-viewer (Office nativo)
+      if (result.mode === 'file-viewer' && result.data && result.data.bytes) {
+        if (window.kairFV && typeof window.kairFV.mountInContainer === 'function') {
+          return window.kairFV.mountInContainer(container, result.data);
+        }
+        container.innerHTML = '<div style="padding:20px;color:#b91c1c;">file-viewer no disponible</div>';
+        return null;
+      }
+      // Fallback: PDF viejo
+      var base64 = result.base64Data
+        || (result.data && result.data.base64Data)
+        || (result.data && typeof result.data === 'string' ? result.data : null);
+      if (base64) {
+        container.innerHTML = '<iframe src="data:application/pdf;base64,' + base64 +
+          '" style="width:100%;height:100%;border:none;"></iframe>';
+        return null;
+      }
+      container.innerHTML = '<div style="padding:20px;color:#6b7280;">Formato no soportado para preview</div>';
+      return null;
+    }
+  };
+
   // Configurar asset base apenas se carga (antes de cualquier render)
   tryConfigureAssetBase();
-  console.log('[kairFV] Helper inicializado. window.kairFV listo.');
+  console.log('[kairFV] Helper inicializado. window.kairFV + window.KairDocPreview listos.');
 })();
