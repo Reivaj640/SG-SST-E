@@ -1738,6 +1738,7 @@
 }
 
 /* 📦608-fix10: file-viewer inline dentro del preview panel lateral */
+.kair-preview { min-height: 0; overflow: hidden; }
 #viewerContainer:has(flyfish-file-viewer) {
     display: flex;
     flex-direction: column;

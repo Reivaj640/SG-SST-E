@@ -1982,6 +1982,7 @@ animation: inv-pulse-border 2s ease-in-out infinite;
 }
 
 /* 📦608-fix10: file-viewer inline dentro del modal de preview */
+.inv-preview { min-height: 0; overflow: hidden; }
 .inv-preview-iframe-container:has(flyfish-file-viewer) {
     display: flex;
     flex-direction: column;

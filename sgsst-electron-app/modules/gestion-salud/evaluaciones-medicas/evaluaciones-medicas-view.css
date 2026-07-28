@@ -781,6 +781,7 @@ body {
 }
 
 /* 📦608-fix10: file-viewer inline dentro del modal de preview */
+.em-preview-modal { min-height: 0; overflow: hidden; }
 .em-preview-modal__body:has(flyfish-file-viewer) {
     display: flex;
     flex-direction: column;

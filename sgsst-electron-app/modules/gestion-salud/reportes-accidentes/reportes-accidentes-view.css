@@ -1010,6 +1010,7 @@ body {
 
 
 /* 📦608-fix15 — FILE-VIEWER INLINE dentro del modal del preview (FURAT) */
+.furat-preview-modal { min-height: 0; overflow: hidden; }
 .furat-preview-modal__body:has(flyfish-file-viewer) {
     background: #fff;
     display: flex;
