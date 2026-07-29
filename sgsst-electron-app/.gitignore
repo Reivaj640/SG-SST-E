@@ -67,3 +67,19 @@ test-tmp-*.html
 
 # Archivos de configuración generados
 config.json
+
+# 📦629 — Duplicado accidental de renderer/file-viewer-assets/ (NO usar)
+# Cuando se corre `node node_modules/@file-viewer/web-full/scripts/copy-assets.mjs`
+# (script oficial del paquete @file-viewer), copia assets a public/file-viewer/.
+# Pero nuestro proyecto Electron ya carga los assets desde renderer/file-viewer-assets/
+# (ver shared/file-viewer.js y scripts/setup-file-viewer.js). El duplicado en public/
+# NO se usa en el codigo, pesa 176.84 MB, y solo mete ruido al working tree (2910
+# archivos untracked que VS Code reporta como "U"). Si necesitas regenerar assets,
+# corre `node scripts/setup-file-viewer.js` que SI sincroniza renderer/.
+public/file-viewer/
+
+# 📦629 — Documentacion temporal de mockups/disenos
+# Solo ignora el subdirectorio docs/ (mockups PNG de iconos y otros disenos).
+# Los iconos reales ya estan embebidos en renderer/bandeja-integrada/icons.js,
+# asi que el mockup de attachment-icons-mockup-svg.png ya no se necesita.
+docs/
