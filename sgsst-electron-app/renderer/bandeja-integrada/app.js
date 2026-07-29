@@ -4309,8 +4309,47 @@
           '<div class="kair-attachment-chip__size">' + formatAttachmentSize(a.size) + '</div>';
         attChip.appendChild(icon);
         attChip.appendChild(info);
+
+        // 📦627 — Acciones Ver / Descargar que aparecen en hover (estilo Gmail).
+        // El click en el área del icono/nombre sigue descargando (compatibilidad).
+        var actions = el("span", { class: "kair-attachment-chip__actions" });
+        // Botón Ver (abre el preview en el modal file-viewer)
+        var viewBtn = el("button", {
+          class: "kair-attachment-chip__action",
+          type: "button",
+          title: "Ver en preview",
+          "aria-label": "Ver " + (a.filename || 'adjunto') + " en preview"
+        });
+        viewBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Ver';
+        viewBtn.addEventListener("click", function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          openAttachmentPreview(a);
+        });
+        // Botón Descargar
+        var dlBtn = el("button", {
+          class: "kair-attachment-chip__action",
+          type: "button",
+          title: "Descargar",
+          "aria-label": "Descargar " + (a.filename || 'adjunto')
+        });
+        dlBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Descargar';
+        dlBtn.addEventListener("click", function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          downloadMailAttachment(a._messageId, a.attachment_id, a.filename);
+        });
+        actions.appendChild(viewBtn);
+        actions.appendChild(dlBtn);
+        attChip.appendChild(actions);
+
         attChip.addEventListener("click", function (e) {
           e.preventDefault();
+          // 📦627-fix — Si el click fue en un botón de acción, no hacer nada
+          // (cada botón tiene su propio handler que llama stopPropagation).
+          if (e.target.closest(".kair-attachment-chip__action")) return;
+          // Click normal en el chip = descarga (compatibilidad con el
+          // comportamiento anterior).
           downloadMailAttachment(a._messageId, a.attachment_id, a.filename);
         });
         att.appendChild(attChip);
@@ -5118,13 +5157,15 @@
 
   // F1-Feature5 — Descarga un attachment y lo guarda con dialog nativo
   // 📦602 — Si returnContent=true, devuelve el contenido como string (sin descargar a disco)
-  async function downloadMailAttachment(messageId, attachmentId, filename, returnContent) {
+  // 📦627 — Si returnBytes=true, devuelve { bytes, name, ext, size, mimeType }
+  // para alimentar el file-viewer del modal de preview (sin disparar descarga).
+  async function downloadMailAttachment(messageId, attachmentId, filename, returnContent, returnBytes) {
     var api = getElectronAPI();
     if (!api || !api.googleGmail || !api.googleGmail.downloadAttachment) {
       toast("Error", "API de descarga no disponible", "error");
-      return returnContent ? null : undefined;
+      return (returnContent || returnBytes) ? null : undefined;
     }
-    if (!returnContent) toast("Descargando", filename, "info");
+    if (!returnContent && !returnBytes) toast("Descargando", filename, "info");
     try {
       var result = await api.googleGmail.downloadAttachment({
         messageId: messageId,
@@ -5147,6 +5188,18 @@
         }
         var bytes = new Uint8Array(binary.length);
         for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        // 📦627 — Si pidieron los bytes (para el preview del file-viewer)
+        if (returnBytes) {
+          var resolvedName = result.data.filename || filename || 'archivo';
+          var resolvedExt = (resolvedName.split('.').pop() || '').toLowerCase();
+          return {
+            bytes: bytes,
+            name: resolvedName,
+            ext: resolvedExt,
+            size: bytes.byteLength,
+            mimeType: result.data.mimeType || 'application/octet-stream'
+          };
+        }
         var blob = new Blob([bytes], { type: result.data.mimeType || 'application/octet-stream' });
         var url = URL.createObjectURL(blob);
         var a = document.createElement('a');
@@ -5159,7 +5212,7 @@
         toast("Descargado", a.download, "success");
       } else {
         toast("Error al descargar", (result && result.error) || "Error desconocido", "error");
-        return returnContent ? null : undefined;
+        return (returnContent || returnBytes) ? null : undefined;
       }
     } catch (e) {
       console.error("[BandejaIntegrada] Error descargando attachment:", e);
@@ -5754,6 +5807,94 @@
       _fvShowError('Error leyendo el archivo: ' + (reader.error ? reader.error.message : 'error desconocido'));
     };
     reader.readAsArrayBuffer(file);
+  }
+
+  // 📦627 — Preview de un attachment de Gmail. Reusa el modal `kair-fv-modal`
+  // (el mismo que usa el botón "Probar FV"). Descarga los bytes via
+  // downloadMailAttachment(returnBytes=true) y monta el file-viewer.
+  async function openAttachmentPreview(att) {
+    if (!att) return;
+    var overlay = document.getElementById('fv-overlay');
+    var body = document.getElementById('fv-body');
+    if (!overlay || !body) {
+      toast("Error", "Modal de preview no disponible", "error");
+      return;
+    }
+
+    // Limpiar viewer previo
+    body.querySelectorAll('flyfish-file-viewer').forEach(function (el) { el.remove(); });
+    if (_fvCurrentUrl) { try { URL.revokeObjectURL(_fvCurrentUrl); } catch (_) {} _fvCurrentUrl = null; }
+
+    // Mostrar modal con metadata
+    overlay.removeAttribute('hidden');
+    var titleEl = document.getElementById('fv-filename');
+    var sizeEl  = document.getElementById('fv-filesize');
+    var badge   = document.getElementById('fv-ext-badge');
+    var ext = (att.filename || '').split('.').pop() || '';
+    ext = ext.toLowerCase();
+    if (titleEl) titleEl.textContent = att.filename || '(sin nombre)';
+    if (badge) { badge.textContent = ext.toUpperCase() || '…'; badge.setAttribute('data-ext', ext); }
+    if (sizeEl) sizeEl.textContent = att.size ? _fvFormatBytes(att.size) : '…';
+    _fvShowLoading('Descargando ' + (att.filename || 'adjunto') + '…');
+
+    // Descargar los bytes via Gmail API
+    var data = null;
+    try {
+      data = await downloadMailAttachment(att._messageId, att.attachment_id, att.filename, false, true);
+    } catch (e) {
+      console.error('[BandejaIntegrada] Error en preview:', e);
+    }
+    if (!data || !data.bytes) {
+      _fvShowError('No se pudo descargar el adjunto para preview.');
+      return;
+    }
+    if (sizeEl) sizeEl.textContent = _fvFormatBytes(data.size || data.bytes.byteLength);
+
+    // 📦628 — Detección temprana de .xls (BIFF binario 97-2003). El engine
+    // del file-viewer intenta renderizarlo pero produce 'vetas negras' en
+    // muchas celdas (limitación conocida del renderer XLS). Mostramos un
+    // mensaje claro en vez de un preview corrupto.
+    if (ext === 'xls') {
+      _fvShowXlsFallback(att.filename || 'archivo.xls', body);
+      return;
+    }
+
+    // Crear blob URL y montar el file-viewer
+    try {
+      var blob = new Blob([data.bytes], { type: data.mimeType || 'application/octet-stream' });
+      _fvCurrentUrl = URL.createObjectURL(blob);
+
+      // Quitar loading
+      body.querySelectorAll('.kair-fv-loading,.kair-fv-error').forEach(function (el) { el.remove(); });
+
+      var viewer = document.createElement('flyfish-file-viewer');
+      viewer.setAttribute('src', _fvCurrentUrl);
+      viewer.setAttribute('filename', data.name);
+      viewer.setAttribute('theme', 'light');
+      viewer.setAttribute('locale', 'es-ES');
+      viewer.setAttribute('toolbar-position', 'bottom-right');
+      viewer.style.cssText = 'display:block;width:100%;height:100%;min-height:540px;';
+      body.appendChild(viewer);
+      console.log('[FV][Bandeja] Preview attachment montado:', data.name, '(' + _fvFormatBytes(data.size) + ', .' + ext + ')');
+    } catch (e) {
+      console.error('[BandejaIntegrada] Error montando file-viewer:', e);
+      _fvShowError('Error mostrando el preview: ' + e.message);
+    }
+  }
+
+  // 📦628 — Mensaje amigable para archivos .xls legacy (BIFF 97-2003)
+  function _fvShowXlsFallback(filename, body) {
+    body.querySelectorAll('.kair-fv-loading,.kair-fv-error').forEach(function (el) { el.remove(); });
+    body.innerHTML = '<div style="padding:24px 20px;text-align:center;color:#374151;max-width:480px;margin:40px auto;">' +
+      '<div style="font-size:32px;margin-bottom:12px;">📊</div>' +
+      '<div style="font-size:1rem;font-weight:600;margin-bottom:6px;color:#1f2937;">Formato .xls legacy</div>' +
+      '<div style="font-size:0.875rem;color:#6b7280;margin-bottom:16px;line-height:1.4;">' +
+      'El formato Excel 97-2003 (.xls) puede tener problemas de render en el preview. ' +
+      'Convertilo a <strong>.xlsx</strong> para mejor resultado.' +
+      '</div>' +
+      '<div style="font-size:0.8125rem;color:#9ca3af;">Archivo: <code style="background:#f3f4f6;padding:2px 6px;border-radius:3px;">' +
+      filename + '</code></div>' +
+      '</div>';
   }
 
   /**
