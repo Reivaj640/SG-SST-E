@@ -930,6 +930,28 @@ Main process (Node)                              │
 
 ---
 
+## 🆕 Gotcha: copy-assets.mjs crea duplicado en public/file-viewer/ (📦629, 2026-07-29)
+
+**Síntoma**: VS Code muestra "Cambios 2911" con archivos "U" (Untracked) sin razón aparente.
+
+**Causa raíz**: El script oficial `node node_modules/@file-viewer/web-full/scripts/copy-assets.mjs`
+siempre copia los assets a `public/file-viewer/` (carpeta de la app original de file-viewer).
+Pero nuestro proyecto Electron usa `renderer/file-viewer-assets/` (ver `shared/file-viewer.js:455`
+y `scripts/setup-file-viewer.js`). El duplicado en `public/` no se usa, pesa 176.84 MB, y
+queda como 2910 archivos untracked que el `.gitignore` del subdir no cubría.
+
+**Fix aplicado** (commit `aa3a7e32`, 📦629):
+- `sgsst-electron-app/.gitignore`: agregar `public/file-viewer/` y `docs/`
+- `public/file-viewer/` (176.84 MB) → papelera con `mavis-trash`
+
+**Regla para futuro**:
+- Si VS Code reporta >100 untracked, **asumí .gitignore gap primero**, NO display bug
+- Después de correr `copy-assets.mjs`, **verificar** con `git ls-files --others --exclude-standard | wc -l`
+- Diagnosticar con `git ls-files --others --exclude-standard` (canta la verdad), NO solo `git status` (agrupa por dir)
+- Si aparecen 2900+ untracked justo después de un upgrade de file-viewer, es ESTO
+
+---
+
 1. 🔐 **URGENTE**: rotar `GH_TOKEN` (sigue expuesto en respuestas anteriores)
 2. Probar auto-update end-to-end: instalar v0.1.136 manual, bumpear a v0.1.137 trivial con `.\scripts\release.ps1`
 3. **Bug pre-existente `.gitignore`**: `test-*.js` ignora `main/test-fixes-loop48.js` (161 tests) y `main/test-profesiograma-*.js` (189 tests). Fix: cambiar regla a `test-tmp-*.js`. **Commit aparte** porque toca `.gitignore`.

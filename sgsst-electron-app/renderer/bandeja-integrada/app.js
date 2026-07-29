@@ -5867,14 +5867,48 @@
       // Quitar loading
       body.querySelectorAll('.kair-fv-loading,.kair-fv-error').forEach(function (el) { el.remove(); });
 
-      var viewer = document.createElement('flyfish-file-viewer');
-      viewer.setAttribute('src', _fvCurrentUrl);
-      viewer.setAttribute('filename', data.name);
-      viewer.setAttribute('theme', 'light');
-      viewer.setAttribute('locale', 'es-ES');
-      viewer.setAttribute('toolbar-position', 'bottom-right');
-      viewer.style.cssText = 'display:block;width:100%;height:100%;min-height:540px;';
-      body.appendChild(viewer);
+      // 📦630 — Reusar el MISMO path que el submódulo 1.1.1 (responsable-sg).
+      // Antes creábamos el viewer custom (createElement + setAttribute), pero la
+      // toolbar quedaba pegada a la derecha y no se veia bien en modo ventana.
+      // mountInContainer encapsula: density compact, toolbar centrada, search
+      // colapsable y el CSS inyectado al shadowRoot. Es el patrón validado.
+      if (window.kairFV && typeof window.kairFV.mountInContainer === 'function') {
+        // Limpiar viewer previo si existe
+        try {
+          body.querySelectorAll('flyfish-file-viewer').forEach(function (el) {
+            try { if (typeof el.unload === 'function') el.unload(); } catch (_) {}
+            el.remove();
+          });
+        } catch (_) {}
+        // Reusar el blob URL que ya creamos (mountInContainer también crea uno,
+        // pero limpiamos el nuestro después via _fvCurrentUrl).
+        // Para evitar doble URL, pasamos los bytes directamente con mimeType.
+        var mountData = {
+          bytes: data.bytes,
+          name: data.name,
+          ext: ext,
+          size: data.size,
+          mimeType: data.mimeType
+        };
+        // mountInContainer crea su propio blob URL — revocamos el nuestro para no leak
+        if (_fvCurrentUrl) { try { URL.revokeObjectURL(_fvCurrentUrl); } catch (_) {} _fvCurrentUrl = null; }
+        var mount = window.kairFV.mountInContainer(body, mountData);
+        if (mount && mount.url) _fvCurrentUrl = mount.url; // guardar para revocar al cerrar
+      } else {
+        // Fallback al flow viejo si kairFV no está (no debería pasar)
+        var viewer = document.createElement('flyfish-file-viewer');
+        viewer.setAttribute('src', _fvCurrentUrl);
+        viewer.setAttribute('filename', data.name);
+        viewer.setAttribute('theme', 'light');
+        viewer.setAttribute('locale', 'es-ES');
+        viewer.setAttribute('toolbar-position', 'bottom-right');
+        viewer.setAttribute('density', 'compact');
+        viewer.style.cssText = 'display:block;width:100%;height:100%;min-height:540px;';
+        body.appendChild(viewer);
+        if (window.kairFV && typeof window.kairFV._applyViewerCustomization === 'function') {
+          window.kairFV._applyViewerCustomization(viewer);
+        }
+      }
       console.log('[FV][Bandeja] Preview attachment montado:', data.name, '(' + _fvFormatBytes(data.size) + ', .' + ext + ')');
     } catch (e) {
       console.error('[BandejaIntegrada] Error montando file-viewer:', e);

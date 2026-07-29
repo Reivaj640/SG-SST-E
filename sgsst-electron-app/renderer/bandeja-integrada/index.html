@@ -180,10 +180,6 @@
           </div>
         </header>
         <div class="kair-fv-body" id="fv-body">
-          <div class="kair-fv-empty" id="fv-empty">
-            <p>Hacé clic en <strong>"Probar FV"</strong> en el header para elegir un archivo y verlo con @file-viewer.</p>
-            <p class="kair-fv-empty__hint">Formatos soportados: <code>PPTX, DOCX, XLSX, PDF, PPT, DOC, XLS, RTF, ODT, ODS, ODP, imágenes, video, audio, EML, ZIP</code> y más de 200 extensiones.</p>
-          </div>
         </div>
         <input type="file" id="fv-file-input" hidden
                accept=".pptx,.ppt,.pptm,.potx,.ppsx,.odp,.docx,.doc,.docm,.dotx,.rtf,.odt,.xlsx,.xls,.xlsm,.xlsb,.csv,.ods,.pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.bmp,.tif,.tiff,.ico,.heic,.mp4,.webm,.mp3,.wav,.ogg,.m4a,.flac,.txt,.md,.json,.xml,.yaml,.yml,.csv,.tsv,.eml,.msg,.zip"
@@ -211,5 +207,9 @@
        los renderers y muestra el error ".docx is in the supported matrix,
        but Word OpenXML renderer is not assembled in this project". -->
   <script src="../file-viewer-assets/flyfish-file-viewer-web-full.iife.js"></script>
+  <!-- 📦630 — Wrapper con window.kairFV (helper) + window.KairDocPreview.
+       CRITICO: sin este script, openAttachmentPreview cae al fallback
+       porque window.kairFV es undefined en el contexto del Bandeja. -->
+  <script src="../../shared/file-viewer.js"></script>
 </body>
 </html>

@@ -184,24 +184,93 @@
   }
 
   // -----------------------------------------------------------------------------
-  // 📦608-fix12 — Inyectar CSS en el shadowRoot del viewer para personalizaciones
-  // que la API nativa no soporta:
-  //   1) Search colapsable: el input se oculta cuando NO está en uso
-  //      (más espacio para los demás botones en ventanas chicas). Se expande
-  //      al `:focus-within` o cuando tiene valor.
-  //   2) Toolbar flotante centrada: cuando toolbar-position="bottom-right",
-  //      la toolbar queda por default pegada a la derecha — el user la quiere
-  //      centrada horizontalmente (centrada abajo).
+  // 📦608-fix12 — Aplica personalizaciones al viewer via CSS inyectado en
+  // el shadowRoot. Personaliza: toolbar centrada, toolbar siempre visible
+  // (override del [hidden] que pone el file-viewer mientras carga), y
+  // search colapsable.
   //
-  // El file-viewer usa shadow DOM (styleIsolation: 'shadow' por default), así
-  // que CSS externo no entra — hay que inyectar el <style> directamente al
-  // shadowRoot. Re-intenta cada 100ms hasta que el shadowRoot esté disponible
-  // (el viewer lo crea de forma async al mount).
+  // UBICACION: el <style> se inyecta en el parent del <style> del
+  // file-viewer (dentro del mountNode), justo DESPUES del mismo. Esto es
+  // porque en el cascade del shadow DOM, los <style> en descendientes ganan
+  // sobre los del shadow root y sobre adoptedStyleSheets. Ademas, en tree
+  // order gana el LATER (asi que necesitamos estar despues del file-viewer).
+  //
+  // TIMING: como el file-viewer agrega su <style> DESPUES via connectedCallback,
+  // usamos MutationObserver en todo el subtree del mountNode para detectar
+  // cuando aparece y agregar el nuestro justo despues. Si para entonces ya
+  // esta, appendCustomStyle devuelve true y salimos. Si no, reintentamos
+  // con setInterval como fallback (2s max).
   // -----------------------------------------------------------------------------
-  function _injectViewerCustomCss(viewerEl) {
+  function _applyViewerCustomization(viewerEl) {
     if (!viewerEl) return;
     var attempts = 0;
-    var maxAttempts = 30; // ~3s
+    var maxAttempts = 30; // ~3s para encontrar shadowRoot + mountNode
+    var customStyle = null;
+    var cssText = [
+      '/* === kfv-custom: 1) toolbar siempre visible === */',
+      '.file-viewer-web-toolbar[hidden]{',
+      '  display:inline-flex!important;',
+      '  opacity:0.5;',
+      '  pointer-events:none;',
+      '}',
+      '.file-viewer-web-toolbar:not([hidden]){',
+      '  opacity:1;',
+      '  pointer-events:auto;',
+      '  transition:opacity 0.2s ease;',
+      '}',
+      '',
+      '/* === kfv-custom: 2) toolbar centrada horizontalmente === */',
+      '.file-viewer-web-toolbar[data-toolbar-position="bottom-right"]{',
+      '  right:auto!important;',
+      '  left:50%!important;',
+      '  transform:translateX(-50%)!important;',
+      '  justify-content:center!important;',
+      '}',
+      '',
+      '/* === kfv-custom: 3) search colapsable === */',
+      '.file-viewer-web-search{',
+      '  display:inline-flex;align-items:center;position:relative;',
+      '  overflow:hidden;border-radius:var(--file-viewer-toolbar-radius);',
+      '  transition:background 0.15s ease;',
+      '}',
+      '.file-viewer-web-search input{',
+      '  width:0!important;',
+      '  min-width:0!important;',
+      '  padding-left:0!important;padding-right:0!important;',
+      '  opacity:0;',
+      '  border:0!important;',
+      '  transition:width 0.18s ease, padding 0.18s ease, opacity 0.12s ease;',
+      '}',
+      '.file-viewer-web-search:focus-within input,',
+      '.file-viewer-web-search input:not(:placeholder-shown){',
+      '  width:180px!important;',
+      '  min-width:180px!important;',
+      '  padding-left:8px!important;padding-right:8px!important;',
+      '  opacity:1;',
+      '}',
+      '.file-viewer-web-search:focus-within{',
+      '  background:var(--file-viewer-input-bg,#f3f4f6);',
+      '}'
+    ].join('\n');
+
+    // Funcion helper: agrega nuestro <style> justo despues del <style>
+    // del file-viewer (en el mismo parent). Devuelve true si lo agrego.
+    var appendCustomStyle = function (rootNode) {
+      var fvStyle = rootNode.querySelector('style:not([id])');
+      if (fvStyle && fvStyle.parentNode) {
+        if (fvStyle.parentNode.querySelector('#kfv-custom-css')) return false; // ya esta
+        if (!customStyle) {
+          customStyle = document.createElement('style');
+          customStyle.id = 'kfv-custom-css';
+          customStyle.textContent = cssText;
+        }
+        // Agregar justo despues del <style> del file-viewer (mismo parent)
+        fvStyle.parentNode.insertBefore(customStyle, fvStyle.nextSibling);
+        return true;
+      }
+      return false;
+    };
+
     var tryInject = function () {
       attempts++;
       var sr = viewerEl.shadowRoot;
@@ -209,45 +278,34 @@
         if (attempts < maxAttempts) setTimeout(tryInject, 100);
         return;
       }
-      // Idempotente: si ya inyectamos, salir
-      if (sr.getElementById && sr.getElementById('kfv-custom-css')) return;
-      if (sr.querySelector && sr.querySelector('#kfv-custom-css')) return;
-      var style = document.createElement('style');
-      style.id = 'kfv-custom-css';
-      style.textContent = [
-        '/* === kfv-custom: 1) search colapsable === */',
-        '.file-viewer-web-search{',
-        '  display:inline-flex;align-items:center;position:relative;',
-        '  overflow:hidden;border-radius:var(--file-viewer-toolbar-radius);',
-        '  transition:background 0.15s ease;',
-        '}',
-        '.file-viewer-web-search input{',
-        '  width:0!important;',
-        '  min-width:0!important;',
-        '  padding-left:0!important;padding-right:0!important;',
-        '  opacity:0;',
-        '  border:0!important;',
-        '  transition:width 0.18s ease, padding 0.18s ease, opacity 0.12s ease;',
-        '}',
-        '.file-viewer-web-search:focus-within input,',
-        '.file-viewer-web-search input:not(:placeholder-shown){',
-        '  width:180px!important;',
-        '  min-width:180px!important;',
-        '  padding-left:8px!important;padding-right:8px!important;',
-        '  opacity:1;',
-        '}',
-        '.file-viewer-web-search:focus-within{',
-        '  background:var(--file-viewer-input-bg,#f3f4f6);',
-        '}',
-        '',
-        '/* === kfv-custom: 2) toolbar flotante centrada === */',
-        '.file-viewer-web-toolbar[data-toolbar-position="bottom-right"]{',
-        '  right:auto!important;',
-        '  left:50%!important;',
-        '  transform:translateX(-50%)!important;',
-        '}'
-      ].join('\n');
-      sr.appendChild(style);
+      var mountNode = sr.querySelector('.file-viewer-web-host');
+      if (!mountNode) {
+        if (attempts < maxAttempts) setTimeout(tryInject, 100);
+        return;
+      }
+      // Idempotente
+      if (sr.querySelector('#kfv-custom-css')) return;
+
+      // Intentar agregar inmediatamente
+      if (appendCustomStyle(mountNode)) return;
+
+      // Esperar via MutationObserver a que aparezca el <style> del file-viewer
+      var mo = new MutationObserver(function () {
+        if (appendCustomStyle(mountNode)) {
+          mo.disconnect();
+          if (fallbackInterval) clearInterval(fallbackInterval);
+        }
+      });
+      mo.observe(mountNode, { childList: true, subtree: true });
+
+      // Fallback: reintentar cada 200ms hasta 2s por si el MO no dispara
+      var fallbackCount = 0;
+      var fallbackInterval = setInterval(function () {
+        fallbackCount++;
+        if (appendCustomStyle(mountNode) || fallbackCount > 10) {
+          clearInterval(fallbackInterval);
+        }
+      }, 200);
     };
     tryInject();
   }
@@ -280,7 +338,7 @@
     v.style.cssText = 'display:block;width:100%;height:100%;min-height:480px;';
     body.appendChild(v);
     // 📦608-fix12 — Inyectar CSS colapsable del search + centrar toolbar flotante
-    _injectViewerCustomCss(v);
+    _applyViewerCustomization(v);
   }
 
   // -----------------------------------------------------------------------------
@@ -329,7 +387,7 @@
     container.appendChild(v);
 
     // 📦608-fix12 — Inyectar CSS colapsable del search + centrar toolbar flotante
-    _injectViewerCustomCss(v);
+    _applyViewerCustomization(v);
 
     return {
       el: v,
@@ -466,7 +524,11 @@
     openWithFileViewerFromPath: openWithFileViewerFromPath,
     openFileViewerFromFile: openFileViewerFromFile,
     closeFileViewer: closeFileViewer,
-    mountInContainer: mountInContainer
+    mountInContainer: mountInContainer,
+    // 📦630 — Aplica personalizaciones (toolbar centrada, [hidden] override) al viewer.
+    // Usado internamente por mountViewer y mountInContainer. Tambien expuesto por si
+    // otros paths (ej. Bandeja preview) quieren aplicarlo manualmente.
+    _applyViewerCustomization: _applyViewerCustomization
   };
 
   // -----------------------------------------------------------------------------
