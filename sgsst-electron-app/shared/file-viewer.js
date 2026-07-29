@@ -573,6 +573,27 @@
       }
       // Modo file-viewer (Office nativo)
       if (result.mode === 'file-viewer' && result.data && result.data.bytes) {
+        // 📦628 — Detección temprana de .xls (BIFF binario 97-2003). El engine
+        // del file-viewer v2.2.4 intenta renderizarlo pero produce "vetas
+        // negras" en muchas celdas (limitación conocida del renderer XLS).
+        // Mostramos un mensaje claro en vez de un preview corrupto, y le
+        // damos al user la opción de descargar el archivo para abrirlo en
+        // Excel/LibreOffice o convertirlo a .xlsx.
+        var ext = (result.data.ext || '').toLowerCase();
+        if (ext === 'xls') {
+          var fileName = result.data.name || 'archivo.xls';
+          container.innerHTML = '<div style="padding:24px 20px;text-align:center;color:#374151;max-width:480px;margin:40px auto;">' +
+            '<div style="font-size:32px;margin-bottom:12px;">📊</div>' +
+            '<div style="font-size:1rem;font-weight:600;margin-bottom:6px;color:#1f2937;">Formato .xls legacy</div>' +
+            '<div style="font-size:0.875rem;color:#6b7280;margin-bottom:16px;line-height:1.4;">' +
+            'El formato Excel 97-2003 (.xls) puede tener problemas de render en el preview. ' +
+            'Convertilo a <strong>.xlsx</strong> para mejor resultado.' +
+            '</div>' +
+            '<div style="font-size:0.8125rem;color:#9ca3af;">Archivo: <code style="background:#f3f4f6;padding:2px 6px;border-radius:3px;">' +
+            fileName + '</code></div>' +
+            '</div>';
+          return null;
+        }
         if (window.kairFV && typeof window.kairFV.mountInContainer === 'function') {
           return window.kairFV.mountInContainer(container, result.data);
         }
