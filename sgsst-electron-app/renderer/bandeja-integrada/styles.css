@@ -3077,8 +3077,13 @@ body {
    K+AIR Mail list panel header (Gmail style)
    ============================================ */
 
-/* Loop 37 — Botón "Redactar" Gmail-style (prominent, arriba de la lista).
-   Visible porque el header interno del iframe está oculto por CSS. */
+/* Loop 37 — Botones del composeBar (Gmail-style, arriba de la lista).
+   Visible porque el header interno del iframe está oculto por CSS.
+   📦615 — 3 botones juntos: Redactar, Sincronizar, Recientes.
+   📦616 — Estilo unificado outline (como Responder/Reenviar del footer del
+   detalle), sin distinción primary/secondary.
+   📦617 — hover / active / focus comparten el mismo estilo (gris claro) para
+   que el botón "seleccionado" se vea igual que con el puntero encima. */
 .kair-mail-compose-bar {
   display: flex;
   align-items: center;
@@ -3091,26 +3096,36 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 9px 18px;
-  background: var(--kair-primary, #174ea6);
-  color: #ffffff;
-  border: none;
+  padding: 8px 16px;
   border-radius: 16px;
   font-size: 0.875rem;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 160ms ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   font-family: inherit;
+  /* Default — outline sutil como tabs inactivas (No leídos, Marcados) */
+  background: transparent;
+  color: var(--kair-text-body, #374151);
+  border: 1px solid var(--kair-border, #d1d5db);
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
-.kair-mail-compose-bar__btn:hover {
-  background: #1a4fa8;
-  box-shadow: 0 2px 8px rgba(23, 78, 166, 0.25);
-  transform: translateY(-1px);
+.kair-mail-compose-bar__btn:hover,
+.kair-mail-compose-bar__btn:active,
+.kair-mail-compose-bar__btn:focus,
+.kair-mail-compose-bar__btn:focus-visible {
+  /* Hover/active/focus — el MISMO estilo gris claro. ANTES el active era
+     diferente y se "perdía" el feedback de selección. */
+  background: var(--kair-bg-hover, #f3f4f6);
+  border-color: #9ca3af;
+  outline: none;
 }
-.kair-mail-compose-bar__btn:active {
-  transform: translateY(0);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+.kair-mail-compose-bar__btn[data-active="true"] {
+  /* Estado seleccionado persistente (ej: sort actual cuando NO es el default).
+     Se queda visible mientras el botón represente el estado activo, sin
+     depender de :hover o :focus. 📦619 — Sin border primary azul, solo gris
+     claro para que se vea "activo" pero sin competir con la tab azul de abajo. */
+  background: var(--kair-bg-hover, #f3f4f6);
+  border-color: #9ca3af;
+  color: var(--kair-text-strong, #202124);
 }
 .kair-mail-compose-bar__btn svg {
   flex-shrink: 0;
@@ -3188,23 +3203,26 @@ body {
   gap: 5px;
   padding: 4px 10px;
   font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--kair-text-muted);
+  font-weight: 500;
+  color: var(--kair-text-body, #374151);
   background: transparent;
-  border: 1px solid transparent;
+  border: 1px solid var(--kair-border, #d1d5db);
   border-radius: 999px;
   cursor: pointer;
-  transition: background 120ms ease, color 120ms ease;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 .kair-mail-list-filter:hover {
-  background: var(--kair-bg-hover);
-  color: var(--kair-text-strong);
+  background: var(--kair-bg-hover, #f3f4f6);
+  border-color: #9ca3af;
+  color: var(--kair-text-strong, #202124);
 }
 .kair-mail-list-filter[data-active="true"] {
-  background: var(--kair-primary, #174ea6);
-  color: #fff;
-  font-weight: 600;
-  box-shadow: 0 1px 2px rgba(23, 78, 166, 0.15);
+  /* 📦620 — Mismo patrón que el composeBar (sin primary azul). El active se
+     ve gris claro + border gris, como el hover pero persistente. El badge
+     primary sigue siendo el indicador del contador. */
+  background: var(--kair-bg-hover, #f3f4f6);
+  border-color: #9ca3af;
+  color: var(--kair-text-strong, #202124);
 }
 .kair-mail-list-filter__badge {
   background: var(--kair-primary);

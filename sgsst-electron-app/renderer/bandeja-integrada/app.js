@@ -1071,6 +1071,11 @@
         return api.emailCache.getThreads({ folder: currentFolder, maxResults: 50 });
       } else {
         console.warn("[BandejaIntegrada] Background sync failed:", r && r.error);
+        // 📦614-fix — Notificar al user con un toast claro + acción sugerida.
+        // ANTES: solo console.warn → el user no sabía qué pasaba ni cómo arreglarlo.
+        // AHORA: toast con la causa + cómo resolverlo. Throttle a 1 vez cada 5 min
+        // para no spammear al user (auto-refresh corre cada 1 min).
+        notifyGmailSyncError(r && r.error);
         return null;
       }
     }).then(function (cacheResult) {
@@ -1113,7 +1118,36 @@
       }
     }).catch(function (e) {
       console.warn("[BandejaIntegrada] Background sync error:", e.message);
+      // 📦614-fix — mismo toast de error (catch por si la promesa falla con excepción)
+      notifyGmailSyncError(e.message);
     });
+  }
+
+  // 📦614-fix — Notifica al user cuando el background sync falla por tokens
+  // expirados u otros errores. Throttle a 1 vez cada 5 min para no spammear
+  // (el auto-refresh corre cada 1 min y cada intento fallido llamaría al toast).
+  function notifyGmailSyncError(errorMsg) {
+    var now = Date.now();
+    var THROTTLE_MS = 5 * 60 * 1000; // 5 minutos
+    if (state.lastGmailErrorNotifiedAt && (now - state.lastGmailErrorNotifiedAt) < THROTTLE_MS) {
+      return; // ya notificamos hace poco, no spammear
+    }
+    state.lastGmailErrorNotifiedAt = now;
+
+    var errLower = (errorMsg || "").toLowerCase();
+    if (errLower.indexOf("token") !== -1 || errLower.indexOf("reconectar") !== -1 || errLower.indexOf("reconnect") !== -1) {
+      toast(
+        "Gmail desconectado",
+        "Reconectá Gmail desde Configuración → Gestión de Empresas para sincronizar correos.",
+        "warning"
+      );
+    } else {
+      toast(
+        "Error al sincronizar correos",
+        errorMsg || "Reintentando automáticamente. Si persiste, contactá soporte.",
+        "error"
+      );
+    }
   }
 
   // F1-Feature7 — Auto-refresh periódico cada 5 minutos para mantener el cache
@@ -2917,18 +2951,37 @@
     };
 
     // Loop 37 — Botón "Redactar" Gmail-style (prominent, arriba de la lista).
-    // El header interno del iframe está oculto por CSS (kair-header display:none),
-    // entonces agregamos el botón acá para que sea visible.
+    // 📦615 — Unificamos las 3 acciones principales en una sola barra:
+    //   [+ Redactar] (primary, azul sólido) + [⟳ Sincronizar] (secondary, outline)
+    //   + [≡ Recientes ▾] (secondary, outline, dropdown de orden).
+    // ANTES: había un header `kair-mail-list-header` aparte con título "Bandeja
+    // de Entrada 16" + refresh + sort, y arriba solo Redactar. Era confuso porque
+    // el contador "Bandeja de Entrada 16" se duplicaba con la tab azul de abajo
+    // ("Bandeja de entrada 16"). Ahora el header desapareció y los 3 botones
+    // quedan juntos, como en Gmail.
     const composeBar = el("div", { class: "kair-mail-compose-bar" });
+    // Orden actual (default: más recientes primero) — se calcula acá porque el
+    // sort toggle ahora vive dentro del composeBar.
+    var sortBy = state.mailSortBy || "recent";
+    var sortLabel = sortBy === "oldest" ? "Más antiguos" : sortBy === "unread" ? "No leídos" : "Reciente";
     composeBar.innerHTML = `
       <button class="kair-mail-compose-bar__btn" id="mail-compose-btn" title="Redactar correo nuevo (Ctrl+N)">
         ${D.ICONS.plus}
         <span>Redactar</span>
       </button>
+      <button class="kair-mail-compose-bar__btn" id="mail-refresh" title="Sincronizar correos">
+        ${D.ICONS.refresh}
+        <span>Sincronizar</span>
+      </button>
+      <button class="kair-mail-compose-bar__btn" id="mail-sort-toggle" data-active="${sortBy === "recent" ? "false" : "true"}" title="Cambiar orden">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="15" y2="12"></line><line x1="3" y1="18" x2="9" y2="18"></line></svg>
+        <span>${sortLabel}</span>
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </button>
     `;
     container.appendChild(composeBar);
 
-    // Wire up compose button
+    // Wire up compose + refresh + sort (los 3 viven en composeBar ahora)
     setTimeout(function () {
       var composeBtn = $("#mail-compose-btn", container);
       if (composeBtn) {
@@ -2937,37 +2990,15 @@
           onComposeClick();
         });
       }
-    }, 0);
 
-    // Header
-    const header = el("div", { class: "kair-mail-list-header" });
-    // Orden actual (default: más recientes primero)
-    var sortBy = state.mailSortBy || "recent";
-    var sortLabel = sortBy === "oldest" ? "Más antiguos" : sortBy === "unread" ? "No leídos" : "Reciente";
-    header.innerHTML = `
-      <button class="kair-icon-btn" title="Refrescar" id="mail-refresh">${D.ICONS.refresh}</button>
-      <div class="kair-mail-list-header__title">
-        Bandeja de Entrada
-        <span class="kair-mail-list-header__count">${filtered.length}</span>
-      </div>
-      <div class="kair-mail-list-header__actions">
-        <button class="kair-mail-list-header__sort" id="mail-sort-toggle" title="Cambiar orden">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="15" y2="12"></line><line x1="3" y1="18" x2="9" y2="18"></line></svg>
-          ${sortLabel}
-          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-        </button>
-        ${state.checkedIds.size > 0 ? `
-          <span style="font-size:0.7rem;color:var(--kair-text-muted);margin-right:8px;">${state.checkedIds.size} seleccionado(s)</span>
-          <button class="kair-icon-btn" title="Archivar">${D.ICONS.archive}</button>
-          <button class="kair-icon-btn" title="Eliminar">${D.ICONS.trash}</button>
-          <button class="kair-icon-btn" title="Marcar no leído">${D.ICONS.mailOpen}</button>
-        ` : ""}
-      </div>
-    `;
-    container.appendChild(header);
+      var refreshBtn = $("#mail-refresh", container);
+      if (refreshBtn) {
+        refreshBtn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          refresh();
+        });
+      }
 
-    // Wire up sort toggle
-    setTimeout(function () {
       var sortBtn = $("#mail-sort-toggle", container);
       if (sortBtn) {
         sortBtn.addEventListener("click", function (e) {
@@ -2988,10 +3019,9 @@
         });
       }
     }, 0);
-    header.querySelector("#mail-refresh").addEventListener("click", refresh);
 
     // F1.D — Input de búsqueda en tiempo real arriba de los filtros
-    const searchContainer = el("div", { class: "kair-mail-search", style: { padding: "8px 12px", borderBottom: "1px solid var(--kair-border-soft, #e9ecef)" } });
+    const searchContainer = el("div", { class: "kair-mail-search", style: { padding: "8px 14px", borderBottom: "1px solid var(--kair-border-soft, #e9ecef)" } });
 
     // F1-Feature2 — Chips de operadores. Se renderizan en vivo (al inicio y al tipear).
     // La función updateOperatorChips se define más abajo (necesita applySearchFilter).
@@ -3004,20 +3034,21 @@
       value: state.searchQuery || "",
       style: {
         width: "100%",
-        padding: "7px 10px 7px 30px",
+        padding: "7px 10px 7px 36px",  // 📦621 — más padding-left para dar espacio a la lupa
         border: "1px solid var(--kair-border, #dee2e6)",
         borderRadius: "6px",
         fontSize: "0.8125rem",
         outline: "none",
         background: "var(--kair-bg-card, #fff)",
-        color: "var(--kair-text-body, #333)"
+        color: "var(--kair-text-body, #333)",
+        boxSizing: "border-box"  // 📦622 — para que padding y border NO agranden el input y se salga del container
       }
     });
     // Icono de búsqueda (SVG) a la izquierda
     const searchIcon = el("span", {
       style: {
         position: "absolute",
-        left: "22px",
+        left: "12px",  // 📦621 — movemos la lupa más cerca del borde para que no quede pegada al texto
         top: "50%",
         transform: "translateY(-50%)",
         color: "var(--kair-text-light, #5f6368)",
@@ -4261,34 +4292,11 @@
       scroll.appendChild(att);
     }
 
-    // 📦602 — Footer Responder / Reenviar al final del email (estilo Gmail)
-    var replyFooter = el("div", { class: "kair-mail-reply-footer" });
-    replyFooter.innerHTML = `
-      <button class="kair-mail-reply-footer__btn kair-mail-reply-footer__btn--primary" data-reply-footer="reply">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg>
-        Responder
-      </button>
-      <button class="kair-mail-reply-footer__btn" data-reply-footer="forward">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 17 20 12 15 7"></polyline><path d="M4 18v-2a4 4 0 0 1 4-4h12"></path></svg>
-        Reenviar
-      </button>
-      <button class="kair-mail-reply-footer__btn" data-reply-footer="emoji" title="Insertar emoji">
-        😊
-      </button>
-    `;
-    replyFooter.querySelectorAll('[data-reply-footer]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var action = btn.getAttribute('data-reply-footer');
-        if (action === 'reply') {
-          openComposeModal('reply', mail);
-        } else if (action === 'forward') {
-          openComposeModal('forward', mail);
-        } else if (action === 'emoji') {
-          toast("Emoji", "Selector de emoji próximamente", 'info');
-        }
-      });
-    });
-    scroll.appendChild(replyFooter);
+    // 📦623 — Quitamos el `replyFooter` (botones "Responder / Reenviar / 😊"
+    // entre los adjuntos y el reply bar de abajo). Era redundante: el user ya
+    // tiene el head con "Responder / Reenviar" arriba del head del mensaje, y
+    // el reply bar de abajo con "Responder / A todos / Reenviar / Enviar".
+    // El divider "Según este correo electrónico" y los adjuntos quedan intactos.
 
     detail.appendChild(scroll);
 
