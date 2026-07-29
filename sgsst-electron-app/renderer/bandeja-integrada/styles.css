@@ -3042,6 +3042,17 @@ body {
 .kair-mail-detail__reply button svg {
   flex-shrink: 0;
 }
+/* 📦626 — Modo compact del reply bar (cuando mide <720px). Ocultamos los
+   labels de los botones y dejamos solo los iconos. El ResizeObserver en
+   app.js togglea la clase .kair-mail-detail__reply--compact. Apariencia
+   más limpia en modo ventana de la app. */
+.kair-mail-detail__reply--compact .kair-mail-detail__reply-label {
+  display: none;
+}
+.kair-mail-detail__reply--compact .kair-header__action--ghost,
+.kair-mail-detail__reply--compact .kair-header__action--primary {
+  padding: 6px 8px;
+}
 
 .kair-mail-detail__reply-input {
   flex: 1;

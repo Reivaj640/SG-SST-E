@@ -4331,9 +4331,11 @@
     // y al fondo del detail cuando hay mucho. El detail es display: block
     // (no flex) para que el scroll y el reply fluyan normalmente.
     const reply = el("div", { class: "kair-mail-detail__reply" });
+    // 📦626 — Envolvemos el label en un <span> para poder ocultarlo en modo
+    // compact (cuando el reply bar mide <720px, mostramos solo iconos).
     const replyBtn = (icon, label, handler) => {
-      const b = el("button", { class: "kair-header__action--ghost", style: { padding: "6px 10px", fontSize: "0.75rem" } });
-      b.innerHTML = `${icon} ${label}`;
+      const b = el("button", { class: "kair-header__action--ghost", style: { padding: "6px 10px", fontSize: "0.75rem" }, title: label, "aria-label": label });
+      b.innerHTML = `${icon} <span class="kair-mail-detail__reply-label">${label}</span>`;
       if (handler) b.addEventListener("click", handler);
       return b;
     };
@@ -4345,7 +4347,7 @@
     reply.appendChild(input);
 
     const sendBtn = el("button", { class: "kair-header__action--primary", style: { padding: "6px 12px", fontSize: "0.75rem" } });
-    sendBtn.innerHTML = `${D.ICONS.send} Enviar`;
+    sendBtn.innerHTML = `${D.ICONS.send} <span class="kair-mail-detail__reply-label">Enviar</span>`;
     sendBtn.addEventListener("click", () => {
       // F1.B — "Enviar" del input rápido = Reply simple
       if (!input.value || !input.value.trim()) {
@@ -4368,6 +4370,24 @@
     // FIX loop 23: reply al final del detail (después del scroll, NO dentro)
     detail.appendChild(reply);
     container.appendChild(detail);
+
+    // 📦626 — Modo compact del reply bar: cuando el reply mide <720px, ocultamos
+    // los labels de los botones (mostramos solo iconos). Apariencia más limpia
+    // y premium en modo ventana. El ResizeObserver detecta cambios de ancho
+    // cuando el user redimensiona la ventana o cambia el sidebar.
+    var REPLY_COMPACT_THRESHOLD = 720;
+    var updateReplyCompact = function () {
+      if (reply.offsetWidth > 0 && reply.offsetWidth < REPLY_COMPACT_THRESHOLD) {
+        reply.classList.add("kair-mail-detail__reply--compact");
+      } else {
+        reply.classList.remove("kair-mail-detail__reply--compact");
+      }
+    };
+    updateReplyCompact();
+    if (typeof ResizeObserver !== "undefined") {
+      var replyObserver = new ResizeObserver(updateReplyCompact);
+      replyObserver.observe(reply);
+    }
   }
 
   // ====== Acciones de correo ======
