@@ -4219,8 +4219,13 @@
       const att = el("div", { class: "kair-mail-detail__attachments" });
       const header = el("div", { class: "kair-mail-detail__attachments-header" });
       // 📦602 — Estilo Gmail: "X archivo(s) adjunto(s) · Analizado por Gmail"
+      // 📦625 — Reemplazamos el emoji 📎 por un SVG inline de paperclip (Feather Icons style)
       header.innerHTML = `
-        <span class="kair-attachment-header__icon">📎</span>
+        <span class="kair-attachment-header__icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+          </svg>
+        </span>
         <span class="kair-attachment-header__count">${allAttachments.length} archivo${allAttachments.length > 1 ? 's adjunto' : ' adjunto'}</span>
         <span class="kair-attachment-header__info">· Analizado por Gmail ⓘ</span>
       `;
@@ -4277,7 +4282,28 @@
           "data-message-id": a._messageId,
           "data-attachment-id": a.attachment_id
         });
-        var icon = el("span", { class: "kair-attachment-chip__icon" }, attachmentIcon(a.filename));
+        // 📦625 — Icono del adjunto viene de un SVG real (Material Design,
+        // extraído del repo mallowigi/iconGenerator, MIT license).
+        // attachmentIcon() retorna el nombre (ej: "word", "excel", "pdf").
+        // 📦625-fix2 — En vez de <img src="icons/x.svg"> (que no se renderizaba
+        // en el iframe de Electron por problemas de seguridad/rutas), usamos
+        // SVG inline via innerHTML. Los SVGs están embebidos como strings en
+        // window.KAIR_FILE_TYPE_ICONS (cargado por icons.js).
+        var iconName = attachmentIcon(a.filename);
+        var icon = el("span", { class: "kair-attachment-chip__icon" });
+        if (window.KAIR_FILE_TYPE_ICONS && window.KAIR_FILE_TYPE_ICONS[iconName]) {
+          icon.innerHTML = window.KAIR_FILE_TYPE_ICONS[iconName];
+          // Forzar el SVG a tener 32x32 (los originales son 16x16 viewBox)
+          var svgEl = icon.querySelector("svg");
+          if (svgEl) {
+            svgEl.setAttribute("width", "32");
+            svgEl.setAttribute("height", "32");
+            svgEl.style.display = "block";
+          }
+        } else {
+          // Fallback al emoji si por alguna razón icons.js no cargó
+          icon.textContent = "📎";
+        }
         var info = el("span", { class: "kair-attachment-chip__info" });
         info.innerHTML = '<div class="kair-attachment-chip__name">' + (a.filename || '(sin nombre)') + '</div>' +
           '<div class="kair-attachment-chip__size">' + formatAttachmentSize(a.size) + '</div>';
@@ -5050,20 +5076,24 @@
     return (bytes / 1024 / 1024 / 1024).toFixed(2) + " GB";
   }
 
-  // F1-Feature5 — Devuelve un emoji/SVG según la extensión del archivo
+  // F1-Feature5 — Devuelve el nombre del archivo SVG (sin extensión) según la
+  // extensión del archivo. Los SVGs están en shared/icons/file-types/ y
+  // vienen del repo mallowigi/iconGenerator (Material Design, MIT license).
+  // 📦625 — Antes retornaba un emoji (📝 📊 📈 etc), ahora retorna "word",
+  // "excel", "powerpoint" etc. y el render del chip usa <img src="...">.
   function attachmentIcon(filename) {
-    if (!filename) return "📎";
+    if (!filename) return "file";
     var ext = (filename.split(".").pop() || "").toLowerCase();
-    if (["pdf"].indexOf(ext) >= 0) return "📄";
-    if (["doc", "docx", "odt", "rtf"].indexOf(ext) >= 0) return "📝";
-    if (["xls", "xlsx", "ods", "csv"].indexOf(ext) >= 0) return "📊";
-    if (["ppt", "pptx", "odp"].indexOf(ext) >= 0) return "📈";
-    if (["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp"].indexOf(ext) >= 0) return "🖼️";
-    if (["mp4", "mov", "avi", "mkv", "webm"].indexOf(ext) >= 0) return "🎬";
-    if (["mp3", "wav", "ogg", "flac", "m4a"].indexOf(ext) >= 0) return "🎵";
-    if (["zip", "rar", "7z", "tar", "gz"].indexOf(ext) >= 0) return "🗜️";
-    if (["html", "htm", "xml", "json", "txt", "md"].indexOf(ext) >= 0) return "📃";
-    return "📎";
+    if (ext === "pdf") return "pdf";
+    if (["doc", "docx", "odt", "rtf"].indexOf(ext) >= 0) return "word";
+    if (["xls", "xlsx", "ods", "csv"].indexOf(ext) >= 0) return "excel";
+    if (["ppt", "pptx", "odp"].indexOf(ext) >= 0) return "powerpoint";
+    if (["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp"].indexOf(ext) >= 0) return "image";
+    if (["mp4", "mov", "avi", "mkv", "webm"].indexOf(ext) >= 0) return "video";
+    if (["mp3", "wav", "ogg", "flac", "m4a"].indexOf(ext) >= 0) return "audio";
+    if (["zip", "rar", "7z", "tar", "gz"].indexOf(ext) >= 0) return "archive";
+    if (["html", "htm", "xml", "json", "txt", "md"].indexOf(ext) >= 0) return "text";
+    return "file";
   }
 
   // F1-Feature5 — Descarga un attachment y lo guarda con dialog nativo

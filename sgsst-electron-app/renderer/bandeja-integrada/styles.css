@@ -2931,14 +2931,17 @@ body {
 .kair-attachment-chip__icon {
   width: 32px;
   height: 32px;
-  background: var(--kair-bg-soft);
+  background: transparent;  /* 📦625 — los SVGs tienen sus propios colores */
   border-radius: 4px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  font-size: 18px;
-  line-height: 1;
+}
+.kair-attachment-chip__icon svg {
+  width: 32px;
+  height: 32px;
+  display: block;
 }
 .kair-attachment-chip__info {
   display: flex;
@@ -5241,6 +5244,15 @@ body {
 }
 .kair-attachment-header__icon {
   font-size: 0.9rem;
+  /* 📦625 — el icono ahora es un SVG inline, no un emoji. Lo centramos y le
+     damos color del texto muted (hereda de currentColor). */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--kair-text-muted, #5f6368);
+}
+.kair-attachment-header__icon svg {
+  display: block;
 }
 
 /* 📦602-fix2 — Container del banner ICS (entre header del correo y mensajes, estilo Gmail) */
