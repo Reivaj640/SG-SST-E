@@ -3010,6 +3010,16 @@ currentSubmodule = null;
 
 setAuthUIState(false);
 
+  // ✅ FIX bug "Bienvenido pegado": resetear KairLoadingController
+  // KairLoadingController.complete() tiene un guard `if (this.isComplete) return;`
+  // que evita que el evento `kair-loading-complete` se dispare la segunda vez.
+  // Sin este reset, después del primer login el controller queda en isComplete=true
+  // y el segundo login (auto-login con credenciales recordadas) no puede cerrar
+  // el overlay "¡Bienvenido!" → se queda pegado en la pantalla.
+  if (window.kairLoading && typeof window.kairLoading.reset === 'function') {
+    window.kairLoading.reset();
+  }
+
 const mainContainer = document.querySelector('.main-container');
 if (mainContainer) mainContainer.classList.add('vanta-fullscreen');
 
