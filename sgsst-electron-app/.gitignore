@@ -78,6 +78,13 @@ config.json
 # corre `node scripts/setup-file-viewer.js` que SI sincroniza renderer/.
 public/file-viewer/
 
+# 🐛bug-fix (2026-07-30) — Ruido regenerativo del postinstall de @file-viewer
+# El hook copy-assets.mjs de @file-viewer/web-full re-genera este JSON en
+# cada `npm install` con timestamps nuevos (generatedAt, checkedAt). Como
+# el archivo estaba trackeado, producia un diff constante sin cambios
+# funcionales. Ahora se regenera localmente pero no se commitea.
+renderer/file-viewer-assets/flyfish-viewer-assets.json
+
 # 📦629 — Documentacion temporal de mockups/disenos
 # Solo ignora el subdirectorio docs/ (mockups PNG de iconos y otros disenos).
 # Los iconos reales ya estan embebidos en renderer/bandeja-integrada/icons.js,
