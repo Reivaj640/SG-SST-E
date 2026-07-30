@@ -1560,7 +1560,7 @@ ipcMain.handle('google-gmail:archive-thread', async (event, options) => {
     if (!auth) {
       return { success: false, error: 'No autorizado' };
     }
-    var gmail = google.gmail({ version: 'v1', auth: auth });
+    var gmail = googleAuth.getGmailClient(auth);
     var threadId = options.threadId;
     await gmail.users.threads.modify({
       userId: 'me',
@@ -1586,7 +1586,7 @@ ipcMain.handle('google-gmail:mark-thread-read', async (event, options) => {
     if (!auth) {
       return { success: false, error: 'No autorizado' };
     }
-    var gmail = google.gmail({ version: 'v1', auth: auth });
+    var gmail = googleAuth.getGmailClient(auth);
     var threadId = options.threadId;
     await gmail.users.threads.modify({
       userId: 'me',
@@ -1688,7 +1688,7 @@ ipcMain.handle('google-gmail:mark-read', async (event, options) => {
     if (!auth) {
       return { success: false, error: 'No autorizado' };
     }
-    var gmail = google.gmail({ version: 'v1', auth: auth });
+    var gmail = googleAuth.getGmailClient(auth);
     var messageId = options.messageId;
     var markAsRead = options.read !== false;  // default: marcar como leído
     var modifyRes = await gmail.users.messages.modify({

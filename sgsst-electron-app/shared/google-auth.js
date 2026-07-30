@@ -240,6 +240,20 @@ async function getAuthorizedClient(configPath) {
 }
 
 /**
+ * Helper para crear el cliente de Gmail API v1 ya autorizado.
+ * Encapsula la creación del service object para que los handlers de main.js
+ * no tengan que importar `googleapis` directamente.
+ *
+ * Patrón: usar SIEMPRE este helper (no `google.gmail(...)` en main.js).
+ *
+ * @param {OAuth2Client} auth - cliente OAuth2 ya autorizado (de getAuthorizedClient)
+ * @returns {gmail_v1.Gmail} - service object de Gmail v1
+ */
+function getGmailClient(auth) {
+  return google.gmail({ version: 'v1', auth });
+}
+
+/**
  * Crea un HTTP server temporal que escucha el callback OAuth en
  * `http://127.0.0.1:port/oauth2callback`. Cuando llega, captura el
  * `code` y `state`, y resuelve la promise.
@@ -317,5 +331,6 @@ module.exports = {
   exchangeCode,
   refreshAccessToken,
   getAuthorizedClient,
+  getGmailClient,
   createCallbackServer
 };
