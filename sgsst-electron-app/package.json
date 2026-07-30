@@ -44,7 +44,9 @@
     "dist": "electron-builder",
     "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s",
     "docs:generate": "jsdoc -c jsdoc.json",
-    "docs:watch": "nodemon --watch . --ext js --exec \"jsdoc -c jsdoc.json\""
+    "docs:watch": "nodemon --watch . --ext js --exec \"jsdoc -c jsdoc.json\"",
+    "postinstall": "node scripts/setup-file-viewer.js",
+    "setup:file-viewer": "node scripts/setup-file-viewer.js"
   },
   "build": {
     "appId": "com.jrfsoluciones.sgsst",

@@ -17,6 +17,10 @@
 // + el bundle IIFE (~200 KB) + manifests (~27 KB) + fonts + wasm mínimo.
 //
 // Uso:  node scripts/setup-file-viewer.js
+//
+// 📦638e — Defensivo: si no hay @file-viewer instalado (primera install) o
+// si algo falla, logueamos warning pero NO abortamos (importante para el
+// `postinstall` hook de npm). El user puede correrlo manualmente despues.
 
 const path = require('path');
 const fs = require('fs');
@@ -73,50 +77,76 @@ function dirSize(p) {
   return total;
 }
 
-console.log('============================================================');
-console.log('  setup-file-viewer.js — assets de @file-viewer para K+AIR');
-console.log('============================================================');
-console.log('');
-console.log('1) Reinstala assets oficiales (incluye bundle IIFE, renderers, vendor/, wasm/)...');
-try {
-  execSync(
-    `node "${COPY_ASSETS_SCRIPT}" "${ASSETS_DIR}"`,
-    { stdio: 'inherit' }
-  );
-} catch (e) {
-  console.error('  ERROR ejecutando file-viewer-copy-assets:', e.message);
-  process.exit(1);
-}
+(async () => {
+  try {
+    // 📦638e — Guard: si @file-viewer no esta instalado (ej. primera install
+    // antes de resolver peer deps), skip silenciosamente. El user puede
+    // correr este script manualmente despues de `npm install`.
+    if (!fs.existsSync(COPY_ASSETS_SCRIPT)) {
+      console.log('[setup-file-viewer] @file-viewer no instalado aun, skip (correra despues de npm install).');
+      console.log('  Si necesitas regenerar assets, corre: node scripts/setup-file-viewer.js');
+      return;
+    }
 
-console.log('');
-console.log('2) Limpia carpetas y renderers que no usamos con preset-office...');
-let totalRemoved = 0;
-for (const relDir of UNUSED_DIRS) {
-  const absDir = path.join(ASSETS_DIR, relDir);
-  if (!fs.existsSync(absDir)) {
-    console.log(`   - ${relDir.padEnd(20)} (no existe, skip)`);
-    continue;
+    console.log('============================================================');
+    console.log('  setup-file-viewer.js — assets de @file-viewer para K+AIR');
+    console.log('============================================================');
+    console.log('');
+    console.log('1) Reinstala assets oficiales (incluye bundle IIFE, renderers, vendor/, wasm/)...');
+    try {
+      execSync(
+        `node "${COPY_ASSETS_SCRIPT}" "${ASSETS_DIR}"`,
+        { stdio: 'inherit' }
+      );
+    } catch (e) {
+      console.error('  ERROR ejecutando file-viewer-copy-assets:', e.message);
+      console.error('  (continuo igual con el cleanup)');
+    }
+
+    console.log('');
+    console.log('2) Limpia carpetas y renderers que no usamos con preset-office...');
+    let totalRemoved = 0;
+    for (const relDir of UNUSED_DIRS) {
+      const absDir = path.join(ASSETS_DIR, relDir);
+      if (!fs.existsSync(absDir)) {
+        console.log(`   - ${relDir.padEnd(20)} (no existe, skip)`);
+        continue;
+      }
+      const size = dirSize(absDir);
+      try {
+        fs.rmSync(absDir, { recursive: true, force: true });
+        totalRemoved += size;
+        console.log(`   - ${relDir.padEnd(20)} ${fmtMB(size)} borrado`);
+      } catch (e) {
+        console.warn(`   - ${relDir.padEnd(20)} ${fmtMB(size)} no se pudo borrar: ${e.message}`);
+      }
+    }
+
+    const renderersDir = path.join(ASSETS_DIR, 'renderers');
+    if (fs.existsSync(renderersDir)) {
+      for (const r of UNUSED_RENDERERS) {
+        const f = path.join(renderersDir, r + '.iife.js');
+        if (!fs.existsSync(f)) continue;
+        const size = fs.statSync(f).size;
+        try {
+          fs.rmSync(f);
+          totalRemoved += size;
+          console.log(`   - renderers/${r}.iife.js`.padEnd(35) + ' ' + fmtMB(size) + ' borrado');
+        } catch (e) {
+          console.warn(`   - renderers/${r}.iife.js`.padEnd(35) + ' ' + fmtMB(size) + ` no se pudo borrar: ${e.message}`);
+        }
+      }
+    }
+
+    console.log('');
+    console.log('3) Tamaño final de renderer/file-viewer-assets/:');
+    console.log(`   ${fmtMB(dirSize(ASSETS_DIR))}  (se removieron ${fmtMB(totalRemoved)})`);
+    console.log('');
+    console.log('Listo. Estos assets van a quedar en el repo y se empaquetan en el .exe.');
+  } catch (e) {
+    // 📦638e — NUNCA abortar. Si algo falla, logueamos pero el `npm install`
+    // continua. El user puede correr el script manualmente despues.
+    console.error('[setup-file-viewer] WARN: error inesperado (continuo):', e.message);
+    console.error('  Si los assets no se ven bien, corre manualmente: node scripts/setup-file-viewer.js');
   }
-  const size = dirSize(absDir);
-  fs.rmSync(absDir, { recursive: true, force: true });
-  totalRemoved += size;
-  console.log(`   - ${relDir.padEnd(20)} ${fmtMB(size)} borrado`);
-}
-
-const renderersDir = path.join(ASSETS_DIR, 'renderers');
-if (fs.existsSync(renderersDir)) {
-  for (const r of UNUSED_RENDERERS) {
-    const f = path.join(renderersDir, r + '.iife.js');
-    if (!fs.existsSync(f)) continue;
-    const size = fs.statSync(f).size;
-    fs.rmSync(f);
-    totalRemoved += size;
-    console.log(`   - renderers/${r}.iife.js`.padEnd(35) + ' ' + fmtMB(size) + ' borrado');
-  }
-}
-
-console.log('');
-console.log('3) Tamaño final de renderer/file-viewer-assets/:');
-console.log(`   ${fmtMB(dirSize(ASSETS_DIR))}  (se removieron ${fmtMB(totalRemoved)})`);
-console.log('');
-console.log('Listo. Estos assets van a quedar en el repo y se empaquetan en el .exe.');
+})();
