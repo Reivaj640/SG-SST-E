@@ -1022,7 +1022,25 @@
         console.log("[BandejaIntegrada] Cache SQLite retorno " + cacheResult.data.length + " threads (folder=" + folder + ")");
         // F1.B-fix — SIEMPRE actualizar state.mails con el cache del folder actual.
         // Antes solo se hacía en el primer sync, no cuando se cambiaba de folder.
-        state.mails = cacheResult.data.map(threadToMail);
+        // 🐛bug-fix — Preservar cambios locales del user (unread, flagged) al
+        // re-asignar state.mails. Mismo merge que en loadMailsFromCache sync.
+        if (state.mails && state.mails.length > 0) {
+          var _oldMailsById = {};
+          for (var _mi = 0; _mi < state.mails.length; _mi++) {
+            _oldMailsById[state.mails[_mi].id] = state.mails[_mi];
+          }
+          state.mails = cacheResult.data.map(function (thread) {
+            var _newMail = threadToMail(thread);
+            var _oldMail = _oldMailsById[_newMail.id];
+            if (_oldMail) {
+              if (_oldMail.unread === false && _newMail.unread === true) _newMail.unread = false;
+              if (_oldMail.flagged === true && _newMail.flagged === false) _newMail.flagged = true;
+            }
+            return _newMail;
+          });
+        } else {
+          state.mails = cacheResult.data.map(threadToMail);
+        }
         if (forceSync) {
           // Cambio de folder: mostrar YA el cache actual + sync en background para refrescar
           render();
@@ -1107,6 +1125,20 @@
               if (oldMail.attachments) newMail.attachments = oldMail.attachments;
               if (oldMail.to_list) newMail.to_list = oldMail.to_list;
               if (oldMail.cc_list) newMail.cc_list = oldMail.cc_list;
+              // 🐛bug-fix — Preservar cambios locales del user (unread, flagged).
+              // ANTES: el refresh cada 1 min sobrescribia `unread` con el valor del cache
+              // (que aun tenia `true` porque el markMessageRead de Gmail podia estar
+              // pendiente). Resultado: el correo volvia a aparecer como no leido.
+              // AHORA: si el user YA lo marcó como leído localmente (unread=false)
+              // y el cache aún tiene unread=true, preservamos el local. Esto significa
+              // que la llamada a Gmail fallo o está en proceso; el user ya hizo la
+              // acción y no debe perderla. Lo mismo para `flagged` (star).
+              if (oldMail.unread === false && newMail.unread === true) {
+                newMail.unread = false;
+              }
+              if (oldMail.flagged === true && newMail.flagged === false) {
+                newMail.flagged = true;
+              }
             }
             return newMail;
           });
@@ -4433,6 +4465,11 @@
   function selectMail(id) {
     state.selectedMailId = id;
     const mail = state.mails.find((m) => m.id === id);
+    // 🐛bug-fix — Guardar el estado ANTES de cambiar a false, sino el if de la
+    // línea 4447 nunca se ejecuta (mail.unread ya es false) y Gmail nunca se
+    // entera que el correo se leyó. Resultado: el refresh cada 1 min revertia
+    // el estado local a "unread: true" porque Gmail seguia marcando como no leido.
+    const wasUnread = mail && mail.unread;
     if (mail) mail.unread = false;
     // El correo siempre está visible: no tocamos el overlay del calendario.
     render();
@@ -4443,8 +4480,8 @@
       loadMailBodyFromCache(mail);
     }
     // F1-Feature3 — Marcar como leído en Gmail (sync bidireccional)
-    // Si el correo está marcado como no leído, marcarlo en Gmail + actualizar cache local
-    if (mail && mail.unread) {
+    // Si el correo estaba marcado como no leído, marcarlo en Gmail + actualizar cache local
+    if (wasUnread) {
       var api = getElectronAPI();
       if (api && api.googleGmail && api.googleGmail.markMessageRead) {
         // Necesitamos el messageId (no threadId). Lo sacamos del thread.
@@ -5039,7 +5076,24 @@
             return api.emailCache.getThreads({ folder: 'INBOX', maxResults: 50 });
           }).then(function (cacheResult) {
             if (cacheResult && cacheResult.success && Array.isArray(cacheResult.data)) {
-              state.mails = cacheResult.data.map(threadToMail);
+              // 🐛bug-fix — Preservar cambios locales (unread/flagged) en el refresh post-envio.
+              if (state.mails && state.mails.length > 0) {
+                var __oldMailsById = {};
+                for (var __mi = 0; __mi < state.mails.length; __mi++) {
+                  __oldMailsById[state.mails[__mi].id] = state.mails[__mi];
+                }
+                state.mails = cacheResult.data.map(function (thread) {
+                  var __newMail = threadToMail(thread);
+                  var __oldMail = __oldMailsById[__newMail.id];
+                  if (__oldMail) {
+                    if (__oldMail.unread === false && __newMail.unread === true) __newMail.unread = false;
+                    if (__oldMail.flagged === true && __newMail.flagged === false) __newMail.flagged = true;
+                  }
+                  return __newMail;
+                });
+              } else {
+                state.mails = cacheResult.data.map(threadToMail);
+              }
               render();
             }
           }).catch(function (e) {
