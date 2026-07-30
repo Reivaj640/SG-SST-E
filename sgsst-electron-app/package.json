@@ -128,19 +128,7 @@
       "target": "AppImage",
       "icon": "assets/K+AIR-multires.ico",
       "category": "Business"
-    },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "Reivaj640",
-        "repo": "SG-SST-E",
-        "private": false,
-        "releaseType": "release",
-        "releaseInfo": {
-          "releaseNotesFile": "release-notes.md"
-        }
-      }
-    ]
+    }
   },
   "devDependencies": {
     "conventional-changelog-cli": "^5.0.0",
