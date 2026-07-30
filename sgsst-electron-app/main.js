@@ -5020,7 +5020,7 @@ ipcMain.handle('recordatorio-inducciones:get-events', async (event, params) => {
 // 📦543 — Helper que lee las capacitaciones de UNA empresa desde su Excel.
 // Extraido del handler original para poder llamarlo en loop cuando el scope
 // es 'all' (mostrar todas las empresas en el calendario).
-async function _leerCapacitacionesDeEmpresa(currentCompany, start, end) {
+async function _leerCapacitacionesDeEmpresa(currentCompany, start, end, horas) {
   console.log('[CAL-CAP] === _leerCapacitacionesDeEmpresa para', currentCompany, '===');
   try {
     if (!currentCompany || currentCompany === 'default_company') {
@@ -5195,14 +5195,58 @@ async function _leerCapacitacionesDeEmpresa(currentCompany, start, end) {
       const estadoRaw = String(getCell(row[colEstado]) || '').trim();
       const estado = estadoRaw || 'Pendiente';
 
+      // 📦 Fase 2 — Aplicar hora persistida en localStorage (sidecar del adapter).
+      // Mapa {nombreCapacitacion: 'HH:MM'} enviado por el renderer en cada llamada
+      // a `capacitaciones:get-events`. Si la capacitación no tiene hora persistida,
+      // el evento queda con start/end null (compat: el render del calendario le
+      // pone 09:00 por default).
+      const horasSidecar = (typeof horas === 'object' && horas) ? horas : {};
+      // 🐛bug-fix — Normalización robusta del lookup. El Excel puede tener el
+      // nombre en NFD ("ó" = "o" + U+0301) mientras que el HTML input lo guarda
+      // en NFC ("ó" = U+00F3). Visualmente iguales pero `===` falla. También
+      // manejamos: trim, espacios múltiples, y fallback case-insensitive.
+      const _normKey = (k) => (k || '').normalize('NFC').trim().replace(/\s+/g, ' ');
+      const horasNormalized = {};
+      for (const k of Object.keys(horasSidecar)) {
+        horasNormalized[_normKey(k)] = horasSidecar[k];
+      }
+      const nombreNorm = _normKey(nombre);
+      let horaGuardada = horasNormalized[nombreNorm];
+      if (!horaGuardada) {
+        // Fallback: case-insensitive
+        const lower = nombreNorm.toLowerCase();
+        for (const k of Object.keys(horasNormalized)) {
+          if (k.toLowerCase() === lower) { horaGuardada = horasNormalized[k]; break; }
+        }
+      }
+      let start = null, end = null;
+      if (horaGuardada && /^\d{2}:\d{2}$/.test(horaGuardada)) {
+        start = horaGuardada;
+        const [h, m] = horaGuardada.split(':').map(Number);
+        // 🐛bug-fix — Extraer duración del Excel. El código original tenía una
+        // variable `duracion` en otro scope que ya no existe. La leemos
+        // directamente de la celda [colDuracion] si está disponible, sino
+        // fallback a 2h.
+        let durH = 2;
+        if (typeof colDuracion !== 'undefined' && colDuracion >= 0 && row[colDuracion] != null) {
+            const rawDur = getCell(row[colDuracion]);
+            durH = parseFloat(String(rawDur).replace(/[^\d.]/g, '')) || 2;
+        }
+        const startMin = h * 60 + m;
+        const endMin = startMin + Math.round(durH * 60);
+        const endH = Math.floor(endMin / 60) % 24;
+        const endM = endMin % 60;
+        end = `${String(endH).padStart(2,'0')}:${String(endM).padStart(2,'0')}`;
+      }
+
       events.push({
         // 📦543 — Prefijar id con companyKey para que cuando se mezclan
         // empresas en scope='all' no haya colisiones de id.
         id: 'cap-' + currentCompany + '-' + String(i + 1) + '-' + nombre.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 40),
         title: nombre,
         date: fechaProgramada,
-        start: null,
-        end: null,
+        start,
+        end,
         type: 'capacitacion',
         estado,
         // 📦543 — Incluir empresa en el evento para que la UI pueda mostrarlo
@@ -5234,9 +5278,14 @@ ipcMain.handle('capacitaciones:get-events', async (event, payload) => {
 
     console.log('[CAL-CAP] start=', start, 'end=', end, 'currentCompany=', currentCompany);
 
+    // 📦 Fase 2 — Extraer mapa de horas del sidecar del payload. Default {}.
+    const horasSidecar = (payload && payload.horas && typeof payload.horas === 'object')
+      ? payload.horas : {};
+    console.log('[CAL-CAP] horas sidecar:', Object.keys(horasSidecar).length, 'capacitaciones con hora');
+
     // Si hay empresa valida (no null ni 'default_company'), leer solo de ella
     if (currentCompany && currentCompany !== 'default_company') {
-      return _leerCapacitacionesDeEmpresa(currentCompany, start, end);
+      return _leerCapacitacionesDeEmpresa(currentCompany, start, end, horasSidecar);
     }
 
     // 📦543 — Sin empresa actual: si el scope es 'all', leer de TODAS las
@@ -5262,7 +5311,7 @@ ipcMain.handle('capacitaciones:get-events', async (event, payload) => {
 
     const allEvents = [];
     for (const company of allCompanies) {
-      const result = await _leerCapacitacionesDeEmpresa(company, start, end);
+      const result = await _leerCapacitacionesDeEmpresa(company, start, end, horasSidecar);
       if (result && result.success && Array.isArray(result.data)) {
         allEvents.push.apply(allEvents, result.data);
       }

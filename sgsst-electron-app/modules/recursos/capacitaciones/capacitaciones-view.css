@@ -1261,3 +1261,27 @@ select.k-form-control {
 .capacitaciones-container[data-theme="dark"] .k-evidencia-item-icon.is-doc {
     background: rgba(77, 166, 255, 0.15);
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   📦 Fase 3 — Indicador visual de conflicto de horario en la tabla
+   Una capacitación está en conflicto si se solapa con otra del mismo
+   día/empresa. El backend NO valida — esta es validación client-side.
+   ════════════════════════════════════════════════════════════════════════ */
+.capacitaciones-container tr.k-row-conflict {
+    background-color: rgba(220, 53, 69, 0.06);
+    border-left: 3px solid var(--k-danger, #dc3545);
+}
+.capacitaciones-container tr.k-row-conflict:hover {
+    background-color: rgba(220, 53, 69, 0.12);
+}
+.capacitaciones-container tr.k-row-conflict td:first-child::before {
+    content: '⚠️';
+    margin-right: 0.4rem;
+    font-size: 0.85rem;
+}
+.capacitaciones-container[data-theme="dark"] tr.k-row-conflict {
+    background-color: rgba(220, 53, 69, 0.15);
+}
+.capacitaciones-container[data-theme="dark"] tr.k-row-conflict:hover {
+    background-color: rgba(220, 53, 69, 0.22);
+}

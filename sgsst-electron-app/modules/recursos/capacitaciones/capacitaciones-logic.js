@@ -26,6 +26,18 @@ class CapacitacionesComponent {
  this._evidenciaUploading = false;
  // Ubicaciones (NO viene del Excel, solo de la app) — persistidas en localStorage
  this._ubicaciones = this._loadUbicaciones();
+ // 🆕 Horas (mismo patrón que ubicaciones) — persistidas en localStorage
+ this._horas = this._loadHoras();
+ // 📦 Fase 2 — Exponer el mapa de horas al global para que el adapter del
+ // calendario (kair-calendar-adapter.js) pueda incluirlo como sidecar en
+ // cada llamada a api.capacitaciones.getEvents. Mismo patrón que
+ // `window.currentCapacitacionesComponent` (línea 81) y `window.kairDocPreview`.
+ // Mantenemos un getter para que cambios en this._horas se reflejen en el
+ // adapter sin re-asignar manualmente el global.
+ Object.defineProperty(window, 'kairCapHoras', {
+     get: () => this._horas,
+     configurable: true
+ });
     }
 
     /**
@@ -74,6 +86,89 @@ class CapacitacionesComponent {
             delete this._ubicaciones[nombre];
         }
         this._saveUbicaciones();
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // 🆕 HORAS (Fase 1) — Mismo patrón que ubicaciones
+    // Mapa {nombreCapacitacion: 'HH:MM'} persistido en localStorage.
+    // ════════════════════════════════════════════════════════════════════
+    _loadHoras() {
+        try {
+            const raw = localStorage.getItem('kair-cap-horas');
+            const parsed = raw ? JSON.parse(raw) : {};
+            return (parsed && typeof parsed === 'object') ? parsed : {};
+        } catch (e) {
+            console.warn('[CAP] Error cargando horas de localStorage:', e);
+            return {};
+        }
+    }
+
+    _saveHoras() {
+        try {
+            localStorage.setItem('kair-cap-horas', JSON.stringify(this._horas || {}));
+        } catch (e) {
+            console.warn('[CAP] Error guardando horas en localStorage:', e);
+        }
+    }
+
+    _getHora(nombre) {
+        if (!nombre) return '';
+        return (this._horas && this._horas[nombre]) || '';
+    }
+
+    _setHora(nombre, hora) {
+        if (!nombre) return;
+        const val = (hora || '').trim();
+        if (val) {
+            this._horas[nombre] = val;
+        } else {
+            delete this._horas[nombre];
+        }
+        this._saveHoras();
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // 📦 Fase 3 — CONFLICT DETECTION
+    // Detecta solapamientos de horario entre capacitaciones del mismo
+    // día/empresa. No compara entre empresas (scope='all' puede mostrar
+    // eventos simultáneos de distintas empresas, eso NO es conflicto).
+    // ════════════════════════════════════════════════════════════════════
+    _horaToMinutes(hora) {
+        if (!hora || !/^\d{2}:\d{2}$/.test(hora)) return null;
+        const [h, m] = hora.split(':').map(Number);
+        return h * 60 + m;
+    }
+
+    /**
+     * Devuelve array de capacitaciones (excluyendo excludeId) que se
+     * solapan con la fecha+hora+duración dadas. Las que no tienen
+     * `hora` no se cuentan (backward compat con legacy data).
+     */
+    _detectConflicts(fecha, hora, duracionHoras, excludeId = null) {
+        if (!fecha || !hora) return [];
+        const startMin = this._horaToMinutes(hora);
+        if (startMin === null) return [];
+        const durH = parseFloat(duracionHoras) || 0;
+        const endMin = startMin + Math.round(durH * 60);
+
+        return this.capacitaciones.filter(c => {
+            if (excludeId && c.id === excludeId) return false;
+            if (c.fechaProgramada !== fecha) return false;
+            if (!c.hora) return false;
+            const cStart = this._horaToMinutes(c.hora);
+            if (cStart === null) return false;
+            const cEnd = cStart + Math.round((parseFloat(c.duracion) || 0) * 60);
+            // Solapan si los rangos [start, end) se cruzan
+            return startMin < cEnd && cStart < endMin;
+        });
+    }
+
+    /**
+     * Devuelve las capacitaciones que NO tienen hora persistida.
+     * Es la fuente del banner "X sin hora" que se muestra al cargar.
+     */
+    _getCapacitacionesSinHora() {
+        return this.capacitaciones.filter(c => !c.hora);
     }
 
     render() {
@@ -315,6 +410,7 @@ class CapacitacionesComponent {
             document.getElementById('trainingDuration').value     = parseFloat(cap.duracion) || 2;
             document.getElementById('trainingInstructor').value   = cap.instructor;
             document.getElementById('trainingUbicacion').value   = cap.ubicacion || '';
+            document.getElementById('trainingHora').value        = cap.hora      || '09:00';
             document.getElementById('trainingParticipants').value = cap.participantes || 0;
         }
 
@@ -346,7 +442,7 @@ class CapacitacionesComponent {
 
  showConfirmModal({ title, message, warning, acceptLabel, acceptIcon, onAccept }) {
   const modal = document.getElementById('confirmModal');
-  if (!modal) return;
+  if (!modal) return Promise.resolve(false);
 
   const titleEl = document.getElementById('confirm-title');
   const iconEl = document.getElementById('confirm-icon');
@@ -371,15 +467,27 @@ class CapacitacionesComponent {
    if (iconInBtn) iconInBtn.className = `bi ${acceptIcon}`;
   }
 
-  this._confirmCallback = onAccept || null;
-  modal.classList.add('open');
-  if (cancelBtn) cancelBtn.focus();
+  // 📦 Fase 3 — Devuelve Promise<boolean> (true=acepta, false=cancela)
+  return new Promise((resolve) => {
+      this._confirmCallback = () => {
+          if (onAccept) onAccept();
+          resolve(true);
+      };
+      this._confirmCancelCallback = () => resolve(false);
+      modal.classList.add('open');
+      if (cancelBtn) cancelBtn.focus();
+  });
  }
 
  hideConfirmModal() {
   const modal = document.getElementById('confirmModal');
   if (modal) modal.classList.remove('open');
+  // 📦 Fase 3 — Resolver la promise pendiente con false
+  if (this._confirmCancelCallback) {
+      this._confirmCancelCallback();
+  }
   this._confirmCallback = null;
+  this._confirmCancelCallback = null;
  }
 
  acceptConfirm() {
@@ -510,9 +618,23 @@ class CapacitacionesComponent {
             // Enriquecer cada capacitación con su ubicación persistida en localStorage
             // (NO viene del Excel, es metadata local de la app)
             this.capacitaciones.forEach(cap => {
-                if (cap && cap.nombre) cap.ubicacion = this._getUbicacion(cap.nombre);
+                if (cap && cap.nombre) {
+                    cap.ubicacion = this._getUbicacion(cap.nombre);
+                    cap.hora = this._getHora(cap.nombre);
+                }
             });
             this.applyFilters();
+
+            // 📦 Fase 3 — Banner de "capacitaciones sin hora" (legacy data).
+            // Solo se muestra UNA VEZ al cargar el año. Es no-bloqueante.
+            const sinHora = this._getCapacitacionesSinHora();
+            if (sinHora.length > 0) {
+                window.KAIRToast.show(
+                    `${sinHora.length} capacitación(es) sin hora asignada. Editá cada una para que se vean correctamente en el calendario.`,
+                    'warning',
+                    { duration: 8000 }
+                );
+            }
 
             // Cargar el cache de evidencias en background (no bloquea la UI)
             this._loadAllEvidenciaCounts().then(() => {
@@ -749,13 +871,26 @@ class CapacitacionesComponent {
             const hasEv      = evCount > 0;
             const evTooltip  = hasEv ? `${evCount} archivo${evCount === 1 ? '' : 's'} de evidencia` : 'Sin evidencia';
 
+            // 📦 Fase 3 — Detectar conflicto de horario (mismo día + solapamiento)
+            const conflicts = this._detectConflicts(
+                item.fechaProgramada, item.hora,
+                parseFloat(String(item.duracion || '').replace(/[^\d.]/g, '')) || 0,
+                item.id  // excluir a sí mismo
+            );
+            const hasConflict = conflicts.length > 0;
+            if (hasConflict) tr.classList.add('k-row-conflict');
+            const conflictTitle = hasConflict
+                ? `Conflicto con: ${conflicts.map(c => `"${c.nombre}" (${c.hora})`).join(', ')}`
+                : '';
+
             tr.innerHTML = `
-                <td><strong>${item.nombre}</strong></td>
+                <td><strong${hasConflict ? ` title="${conflictTitle}"` : ''}>${item.nombre}</strong></td>
                 <td><span class="k-badge ${typeBadge}">${item.tipo.toUpperCase()}</span></td>
 			<td class="k-cell-date">${this.formatDate(item.fechaProgramada)}</td>
                 <td>${item.instructor}</td>
                 <td>${item.ubicacion || ''}</td>
                 <td>${item.duracion}</td>
+                <td>${item.hora || '—'}</td>
                 <td><span class="k-badge ${badgeClass}">${statusText}</span></td>
                 <td class="text-center">
                   <button class="k-evidencia-btn ${hasEv ? 'has-files' : ''}"
@@ -906,11 +1041,24 @@ class CapacitacionesComponent {
         const type         = document.getElementById('trainingType').value;
         const instructor   = document.getElementById('trainingInstructor').value;
         const ubicacion    = document.getElementById('trainingUbicacion').value;
+        const hora         = document.getElementById('trainingHora').value;
         const duration     = document.getElementById('trainingDuration').value;
         const participants = parseInt(document.getElementById('trainingParticipants').value) || 0;
 
         if (!name || !newDate) {
             window.KAIRToast.show('Nombre y Fecha son obligatorios.', 'warning');
+            return;
+        }
+        if (!hora) {
+            window.KAIRToast.show('La hora es obligatoria.', 'warning');
+            return;
+        }
+        if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(hora)) {
+            window.KAIRToast.show('Formato de hora inválido (HH:MM).', 'warning');
+            return;
+        }
+        if (hora < '06:00' || hora > '20:00') {
+            window.KAIRToast.show('La hora debe estar entre 06:00 y 20:00.', 'warning');
             return;
         }
 
@@ -931,12 +1079,30 @@ class CapacitacionesComponent {
             fechaProgramada,
             instructor,
             ubicacion:     ubicacion,
+            hora:          hora,
             duracion:      `${duration} Horas`,
             participantes: participants,
             estado:        'pending'
         };
 
         this._setUbicacion(name, ubicacion);
+        this._setHora(name, hora);
+
+        // 📦 Fase 3 — Detectar conflictos ANTES de persistir. Si hay solapamiento,
+        // mostrar modal de confirmación. Si el user cancela, abortamos el guardado.
+        const conflicts = this._detectConflicts(fechaProgramada, hora, parseFloat(duration) || 2);
+        if (conflicts.length > 0) {
+            const names = conflicts.map(c => `"${c.nombre}" (${c.hora})`).join(', ');
+            const proceed = await this.showConfirmModal({
+                title: 'Conflicto de horario',
+                message: `Esta capacitación se solapa con: ${names}`,
+                warning: '¿Deseás guardarla de todas formas?',
+                acceptLabel: 'Guardar igual',
+                acceptIcon: 'bi-exclamation-triangle',
+            });
+            if (!proceed) return;  // user canceló
+        }
+
         this.capacitaciones.push(newTraining);
         this.closeModals();
         await this._saveDataToExcel();
@@ -966,6 +1132,7 @@ class CapacitacionesComponent {
 
     const oldNombre = this.capacitaciones[index].nombre;
     const newUbicacion = document.getElementById('trainingUbicacion').value;
+    const newHora      = document.getElementById('trainingHora').value;
     this.capacitaciones[index] = {
       ...this.capacitaciones[index],
       nombre: name,
@@ -973,14 +1140,35 @@ class CapacitacionesComponent {
       fechaProgramada: normalizedDate,
       instructor: document.getElementById('trainingInstructor').value,
       ubicacion: newUbicacion,
+      hora: newHora,
       duracion: `${document.getElementById('trainingDuration').value} Horas`,
       participantes: parseInt(document.getElementById('trainingParticipants').value) || 0
     };
-    // Si el nombre cambió, la key de la ubicación también — migrar el valor
+    // Si el nombre cambió, la key de la ubicación y hora también — migrar el valor
     if (oldNombre && oldNombre !== name) {
         this._setUbicacion(oldNombre, '');   // borrar la key vieja
+        this._setHora(oldNombre, '');
     }
     this._setUbicacion(name, newUbicacion);   // guardar con la key nueva
+    this._setHora(name, newHora);
+
+    // 📦 Fase 3 — Detectar conflictos al editar (excluyendo esta misma capacitación)
+    const conflictsUpdate = this._detectConflicts(
+        normalizedDate, newHora,
+        parseFloat(document.getElementById('trainingDuration').value) || 2,
+        id
+    );
+    if (conflictsUpdate.length > 0) {
+        const namesUpdate = conflictsUpdate.map(c => `"${c.nombre}" (${c.hora})`).join(', ');
+        const proceedUpdate = await this.showConfirmModal({
+            title: 'Conflicto de horario',
+            message: `Esta capacitación se solapa con: ${namesUpdate}`,
+            warning: '¿Deseás guardar los cambios de todas formas?',
+            acceptLabel: 'Guardar igual',
+            acceptIcon: 'bi-exclamation-triangle',
+        });
+        if (!proceedUpdate) return;  // user canceló
+    }
 
         this.closeModals();
         await this._saveDataToExcel();
@@ -1019,6 +1207,7 @@ class CapacitacionesComponent {
    onAccept: async () => {
     this.capacitaciones.splice(index, 1);
     this._setUbicacion(cap.nombre, '');  // limpiar ubicación persistida
+    this._setHora(cap.nombre, '');       // limpiar hora persistida
     await this._saveDataToExcel();
     this.applyFilters();
     window.KAIRToast.show('Capacitación eliminada', 'success', { subtitle: `"${cap.nombre}" eliminada del registro` });

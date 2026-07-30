@@ -143,6 +143,35 @@
     // cuál Excel leer (el calendario es global pero las capacitaciones son
     // por empresa).
     var capPayload = Object.assign({}, range || {}, { currentCompany: companyForBackend });
+    // 📦 Fase 2 — Sidecar del mapa de horas persistido en localStorage.
+    // El componente CapacitacionesComponent mantiene `window.kairCapHoras`
+    // (espejo de su `_horas`) y el adapter lo inyecta en cada llamada para
+    // que el backend `_leerCapacitacionesDeEmpresa` pueda aplicar la hora
+    // a cada evento antes de devolverlo. Si no hay horas, `horas: {}` y
+    // el backend mantiene el comportamiento default (start: null).
+    //
+    // 🐛bug-fix — CapacitacionesComponent corre dentro de un IFRAME, así que
+    // `window.kairCapHoras` que setea está en el window del iframe, NO en el
+    // window del renderer padre donde corre este adapter. Por eso usamos
+    // localStorage como fuente de verdad (mismo origen → compartido entre
+    // iframe y parent). También intentamos `window.kairCapHoras` por si el
+    // adapter se ejecuta dentro del mismo window que el componente.
+    var horasSidecar = {};
+    try {
+      if (typeof window !== 'undefined' && window.kairCapHoras
+          && typeof window.kairCapHoras === 'object'
+          && Object.keys(window.kairCapHoras).length > 0) {
+        horasSidecar = window.kairCapHoras;
+      } else {
+        // Fallback: leer directo de localStorage (compartido iframe ↔ parent)
+        var _stored = localStorage.getItem('kair-cap-horas');
+        if (_stored) {
+          var _parsed = JSON.parse(_stored);
+          if (_parsed && typeof _parsed === 'object') horasSidecar = _parsed;
+        }
+      }
+    } catch (e) { /* silent: sidecar vacío mantiene compatibilidad */ }
+    capPayload.horas = horasSidecar;
     // 📦497 — Pasar currentCompany al backend de gestaciones (BD por empresa).
     var gestPayload = Object.assign({}, range || {}, { currentCompany: companyForBackend });
     // 📦498 — Cumplimientos: por empresa, sin rango (es estado persistente)

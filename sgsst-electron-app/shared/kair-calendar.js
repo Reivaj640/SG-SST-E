@@ -1528,8 +1528,7 @@
     var validIds = (this._typeColorCache && Object.keys(this._typeColorCache).length)
       ? Object.keys(this._typeColorCache)
       : ['primary','success','warning','danger','info'];
-    var t = e.type;
-    var finalType = validIds.indexOf(t) >= 0 ? t : 'primary';
+    var finalType = validIds.indexOf(e.type) >= 0 ? e.type : 'primary';
     return {
       id: safeEl(e.id),
       title: safeEl(e.title) || '(Sin título)',
