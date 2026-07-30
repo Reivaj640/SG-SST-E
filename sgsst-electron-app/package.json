@@ -82,7 +82,23 @@
       "!**/*.bak",
       "!**/*.blockmap",
       "!**/*.log",
-      "!builder-debug.yml"
+      "!builder-debug.yml",
+      "!node_modules/@file-viewer/web/**",
+      "!node_modules/@file-viewer/renderer-typst/**",
+      "!node_modules/@file-viewer/renderer-cad/**",
+      "!node_modules/@file-viewer/renderer-model/**",
+      "!node_modules/@file-viewer/renderer-data/**",
+      "!node_modules/@file-viewer/renderer-drawing/**",
+      "!node_modules/@file-viewer/renderer-ebook/**",
+      "!node_modules/@file-viewer/renderer-eda/**",
+      "!node_modules/@file-viewer/renderer-email/**",
+      "!node_modules/@file-viewer/renderer-geo/**",
+      "!node_modules/@file-viewer/renderer-image/**",
+      "!node_modules/@file-viewer/renderer-media/**",
+      "!node_modules/@file-viewer/renderer-mindmap/**",
+      "!node_modules/@file-viewer/renderer-ofd/**",
+      "!node_modules/@file-viewer/renderer-archive/**",
+      "!node_modules/@file-viewer/ppt/**"
     ],
     "extraResources": [
       {
