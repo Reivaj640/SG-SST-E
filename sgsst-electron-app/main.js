@@ -1594,7 +1594,10 @@ ipcMain.handle('google-gmail:mark-thread-read', async (event, options) => {
       requestBody: { removeLabelIds: ['UNREAD'] }
     });
     try {
-      emailDb.getDb && emailDb.getDb().prepare('UPDATE email_threads SET has_unread = 0 WHERE id = ?').run(threadId);
+      // 🐛bug-fix — Usar helper que actualiza has_unread del thread Y label_ids de
+      // los messages. Antes solo se actualizaba has_unread (correcto para este
+      // handler que SI recibe threadId), pero faltaba sincronizar label_ids.
+      emailDb.propagateUnreadChange && emailDb.propagateUnreadChange(threadId, false);
     } catch (dbErr) {}
     return { success: true };
   } catch (e) {
@@ -1700,10 +1703,15 @@ ipcMain.handle('google-gmail:mark-read', async (event, options) => {
     });
     // Actualizar cache local: has_unread
     try {
+      // 🐛bug-fix — El parametro `messageId` que llega es realmente un threadId
+      // (ver renderer.js:4488: "usamos el threadId como messageId"). El codigo
+      // anterior hacia un subquery `WHERE id = ?` sobre email_messages, que
+      // nunca encontraba nada, asi que has_unread NUNCA se actualizaba. Ahora
+      // el helper propaga correctamente el cambio a has_unread + label_ids.
       if (markAsRead) {
-        emailDb.getDb && emailDb.getDb().prepare('UPDATE email_threads SET has_unread = 0 WHERE id IN (SELECT thread_id FROM email_messages WHERE id = ?)').run(messageId);
+        emailDb.propagateUnreadChange && emailDb.propagateUnreadChange(messageId, false);
       } else {
-        emailDb.getDb && emailDb.getDb().prepare('UPDATE email_threads SET has_unread = 1 WHERE id IN (SELECT thread_id FROM email_messages WHERE id = ?)').run(messageId);
+        emailDb.propagateUnreadChange && emailDb.propagateUnreadChange(messageId, true);
       }
     } catch (dbErr) {
       // No crítico

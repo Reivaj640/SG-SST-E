@@ -84,7 +84,13 @@ const SCOPES = [
   // F1.B-fix — Scopes necesarios para ENVIAR correos (Reply / Reply all / Forward / Nuevo)
   'https://www.googleapis.com/auth/gmail.send',
   // F1.B-fix — Para crear/editar/eliminar borradores (futuro: drafts)
-  'https://www.googleapis.com/auth/gmail.compose'
+  'https://www.googleapis.com/auth/gmail.compose',
+  // 🐛bug-fix — Scope NECESARIO para marcar correos como leídos/no-leídos
+  // (users.messages.modify). Sin este scope, Gmail devuelve 403 "insufficient
+  // authentication scopes" y el correo se queda como no-leído en Gmail aunque
+  // el cache local diga lo contrario. El background sync luego sobrescribe
+  // el cache con el estado de Gmail, revirtiendo el cambio.
+  'https://www.googleapis.com/auth/gmail.modify'
 ];
 
 /**

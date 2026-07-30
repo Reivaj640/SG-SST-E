@@ -299,6 +299,58 @@ function getMessagesFromCache(threadId) {
   return rows.map(deserializeMessage);
 }
 
+/**
+ * Propaga un cambio de label 'UNREAD' a un thread completo (has_unread + label_ids).
+ * Se usa desde los handlers de main.js (mark-read / mark-thread-read) para
+ * mantener el cache SQLite consistente con Gmail.
+ *
+ * CRITICO: el parametro suele ser un threadId (no un messageId), porque el
+ * renderer envia mail.id que viene de threadToMail(thread) (ver
+ * renderer/bandeja-integrada/app.js:1251). El render del mail lee
+ * `unread` desde `thread.has_unread` (línea 1260), asi que actualizar
+ * email_threads.has_unread es OBLIGATORIO para que el cambio persista.
+ *
+ * Tambien actualiza email_messages.label_ids para mantener sincronizados
+ * los labels a nivel de message (usados en getMessagesFromCache).
+ *
+ * Resolucion del threadId: se prueba primero como threadId (caso comun
+ * desde el renderer), y como fallback se busca como messageId.
+ *
+ * @param {string} messageOrThreadId - threadId (caso comun) o messageId
+ * @param {boolean} add - true para agregar 'UNREAD', false para remover
+ */
+function propagateUnreadChange(messageOrThreadId, add) {
+  // Resolver threadId: probar primero como threadId (mas probable desde renderer)
+  let threadId = null;
+  const thread = db().prepare('SELECT id FROM email_threads WHERE id = ? LIMIT 1').get(messageOrThreadId);
+  if (thread) {
+    threadId = thread.id;
+  } else {
+    // Fallback: tratar como messageId y derivar el threadId
+    const msg = db().prepare('SELECT thread_id FROM email_messages WHERE id = ? LIMIT 1').get(messageOrThreadId);
+    if (msg) threadId = msg.thread_id;
+  }
+  if (!threadId) return;
+
+  const now = Date.now();
+
+  // 1. Actualizar has_unread del thread (esto es lo que ve el render)
+  db().prepare('UPDATE email_threads SET has_unread = ? WHERE id = ?').run(add ? 1 : 0, threadId);
+
+  // 2. Actualizar label_ids de todos los messages del thread (sincronizacion completa)
+  const rows = db().prepare('SELECT id, label_ids FROM email_messages WHERE thread_id = ?').all(threadId);
+  for (const row of rows) {
+    let labels = safeJSON(row.label_ids, []);
+    if (add) {
+      if (!labels.includes('UNREAD')) labels.push('UNREAD');
+    } else {
+      labels = labels.filter(l => l !== 'UNREAD');
+    }
+    db().prepare('UPDATE email_messages SET label_ids = ?, updated_at = ? WHERE id = ?')
+      .run(JSON.stringify(labels), now, row.id);
+  }
+}
+
 function deserializeMessage(row) {
   if (!row) return null;
   return {
@@ -431,7 +483,7 @@ module.exports = {
   // Threads
   saveThread, getThreadsFromCache, getThreadFromCache, deleteThreadsByFolder, deleteThreadsByIds,
   // Mensajes
-  saveMessage, getMessagesFromCache,
+  saveMessage, getMessagesFromCache, propagateUnreadChange,
   // Labels
   saveLabel, getLabelsFromCache,
   // Adjuntos (F1-Feature5)
