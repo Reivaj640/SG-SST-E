@@ -81,7 +81,13 @@
       "!.claude/**",
       "!agent/**",
       "!.opencode/**",
-      "!skills-lock.json"
+      "!skills-lock.json",
+      "!dist/**",
+      "!build/**",
+      "!**/*.bak",
+      "!**/*.blockmap",
+      "!**/*.log",
+      "!builder-debug.yml"
     ],
     "extraResources": [
       {
