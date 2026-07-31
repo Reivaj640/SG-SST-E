@@ -348,6 +348,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   readAusentismoData: (companyName) =>
     ipcRenderer.invoke('get-ausentismo-data', companyName),
+  // 🆕 Editar/eliminar fila de ausentismo desde la vista "Ver registros"
+  updateAusentismoRow: (payload) =>
+    ipcRenderer.invoke('update-ausentismo-row', payload),
+  deleteAusentismoRow: (payload) =>
+    ipcRenderer.invoke('delete-ausentismo-row', payload),
   getPriSeguimientoData: (companyName) =>
     ipcRenderer.invoke('get-pri-seguimiento-data', companyName),
 

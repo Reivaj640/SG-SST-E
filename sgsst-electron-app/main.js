@@ -10220,6 +10220,138 @@ ipcMain.handle('read-ausentismo-data', async (event, companyName) => {
 });
 
 // =============================================================================
+// Handlers: update-ausentismo-row + delete-ausentismo-row
+// Mismo patrón que `procesar-ausentismo` (form de registro): delega la
+// lectura/escritura del Excel a `actualizar_ausentismo.py` con openpyxl.
+// Beneficios:
+//   - openpyxl preserva formato visual (fórmulas, estilos) que XLSX.writeFile a veces rompe
+//   - match_header tolera "GENERO" / "GÉNERO" / "SEXO", mayúsculas, tildes
+//   - Búsqueda de hoja robusta: f"{empresa} 2024" → contiene empresa → contiene "2024" → primera
+//   - Headers de fila 7 hardcoded (donde realmente están en ASEL, no en fila 0)
+// =============================================================================
+
+// Mapeo de keys del Excel (lo que envía el renderer) a keys snake_case
+// (lo que espera actualizar_incapacidad en Python).
+const AUS_KEY_MAP = {
+  'GENERO': 'genero',
+  'CLASE DE INCAPACIDAD': 'clase_incapacidad',
+  'TIPO DE INCAPACIDAD': 'tipo_incapacidad',
+  'CODIGO': 'codigo',
+  'F. INICIO': 'fecha_inicio',
+  'F. FIN': 'fecha_finalizacion',
+  'DESCRIPCION': 'descripcion',  // Sin tilde (mismo formato que el header del Excel)
+};
+
+// Helper: spawn Python con un comando del script actualizar_ausentismo.py.
+// Mismo patrón que `procesar-ausentismo` (main.js:11204).
+function spawnAusentismoPython(comando, args) {
+  const { spawn } = require('child_process');
+  const scriptPath = getPythonScriptPath('actualizar_ausentismo.py');
+  if (!fs.existsSync(scriptPath)) {
+    return Promise.reject(new Error(`Script de Python no encontrado: ${scriptPath}`));
+  }
+  return getPython().then((pythonPath) => new Promise((resolve, reject) => {
+    const python = spawn(pythonPath, [scriptPath, comando, ...args], {
+      cwd: path.dirname(scriptPath),
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+      windowsHide: true,
+    });
+    let buffer = '';
+    python.stdout.on('data', (data) => {
+      buffer += data.toString();
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      lines.forEach((line) => {
+        line = line.trim();
+        if (!line) return;
+        try {
+          const obj = JSON.parse(line);
+          if (obj.type === 'log') {
+            console.log(`[AUS-Python] ${obj.message}`);
+          } else if (obj.type === 'result') {
+            resolve(obj.payload);
+          }
+        } catch (e) { /* línea no JSON, ignorar */ }
+      });
+    });
+    python.stderr.on('data', (data) => {
+      console.error(`[AUS-Python STDERR] ${data.toString()}`);
+    });
+    python.on('close', () => {
+      if (buffer?.trim()) {
+        try {
+          const last = JSON.parse(buffer.trim());
+          if (last.type === 'result') return resolve(last.payload);
+        } catch { /* ignore */ }
+      }
+      resolve({ success: false, error: 'Proceso Python cerrado sin resultado.' });
+    });
+    python.on('error', (err) => {
+      console.error(`[AUS-Python] Error al iniciar: ${err.message}`);
+      reject(err);
+    });
+  }));
+}
+
+ipcMain.handle('update-ausentismo-row', async (event, payload) => {
+  const { companyName, rowIndex, fields } = payload || {};
+  console.log(`[AUS-EDIT] === INICIO === empresa=${companyName} rowIndex=${rowIndex} fields=${JSON.stringify(Object.keys(fields || {}))}`);
+
+  try {
+    if (!companyName || typeof rowIndex !== 'number' || !fields || typeof fields !== 'object') {
+      return { success: false, error: 'Parámetros inválidos (companyName, rowIndex, fields requeridos).' };
+    }
+
+    // 1. Misma búsqueda de archivo que el form de registro (obtenerRutaAusentismo)
+    const filePath = await obtenerRutaAusentismo(companyName);
+    console.log(`[AUS-EDIT] Archivo: ${filePath}`);
+
+    // 2. Mapear keys del Excel → snake_case para Python
+    const datosSnake = {};
+    for (const [excelKey, snakeKey] of Object.entries(AUS_KEY_MAP)) {
+      if (excelKey in fields) datosSnake[snakeKey] = fields[excelKey] ?? '';
+    }
+    console.log(`[AUS-EDIT] Datos normalizados: ${JSON.stringify(datosSnake)}`);
+
+    // 3. Spawn Python con actualizar_incapacidad
+    return await spawnAusentismoPython('actualizar_incapacidad', [
+      companyName,
+      filePath,
+      String(rowIndex),
+      JSON.stringify(datosSnake),
+    ]);
+  } catch (err) {
+    console.error('[AUS-EDIT] ❌ Error:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('delete-ausentismo-row', async (event, payload) => {
+  const { companyName, rowIndex } = payload || {};
+  console.log(`[AUS-DEL] === INICIO === empresa=${companyName} rowIndex=${rowIndex}`);
+
+  try {
+    if (!companyName || typeof rowIndex !== 'number') {
+      return { success: false, error: 'Parámetros inválidos (companyName y rowIndex requeridos).' };
+    }
+
+    // 1. Misma búsqueda de archivo que el form de registro
+    const filePath = await obtenerRutaAusentismo(companyName);
+    console.log(`[AUS-DEL] Archivo: ${filePath}`);
+
+    // 2. Spawn Python con eliminar_incapacidad
+    return await spawnAusentismoPython('eliminar_incapacidad', [
+      companyName,
+      filePath,
+      String(rowIndex),
+    ]);
+  } catch (err) {
+    console.error('[AUS-DEL] ❌ Error:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// =============================================================================
 // Handler: registro-estadistico:cargar-datos (Submódulo 3.2.3)
 // =============================================================================
 ipcMain.handle('registro-estadistico:cargar-datos', async (event, { companyName }) => {
@@ -10780,9 +10912,24 @@ async function obtenerRutaAusentismo(companyName) {
   const ausentismoDir = findDirFlexible(gestionSalud.subdirectories, "3.3.6 Medición del ausentismo por causa médica");
   if (!ausentismoDir) throw new Error("No se encontró submódulo de ausentismo");
 
+  // 🆕 Búsqueda inteligente (antes retornaba excelFiles[0] = PRI.xlsx en empresas
+  // como ASEL, que tienen PRI.xlsx + A-FR-31 Ausentismo Laboral.xlsx en la misma
+  // carpeta). Ahora prioriza el archivo con "AUSENTISMO" o "PI-FO-076" en el
+  // nombre; si no, agarra el primer .xlsx que NO sea PRI.
   const excelFiles = (ausentismoDir.files || []).filter(f => f.extension?.toLowerCase() === '.xlsx');
   if (excelFiles.length === 0) throw new Error('No hay archivos .xlsx en la carpeta de ausentismo.');
 
+  // 1. Buscar archivo con "AUSENTISMO" o "PI/PG/GI-FO-076" en el nombre
+  const ausFile = excelFiles.find(f =>
+    /PI-FO-076|PG-FO-076|GI-FO-076|AUSENTISMO/i.test(f.name || '')
+  );
+  if (ausFile) return ausFile.path;
+
+  // 2. Primer .xlsx que NO sea PRI
+  const nonPri = excelFiles.find(f => !/PRI/i.test(f.name || ''));
+  if (nonPri) return nonPri.path;
+
+  // 3. Fallback: el primer .xlsx
   return excelFiles[0].path;
 }
 
@@ -20517,14 +20664,37 @@ app.whenReady().then(() => {
     // 📦 Loop 47b (2026-07-21) — Menú nativo oculto en producción
     // Combinado con autoHideMenuBar: true en el BrowserWindow:
     //   - Modo DESARROLLO: menú OCULTO por defecto, aparece con Alt (estándar Windows)
-    //   - Modo PRODUCCIÓN: menú OCULTO TOTAL (ni Alt lo muestra)
-    // Esto le da al dev acceso rápido al menú con Alt para Reload/DevTools,
-    // y al cliente final una app limpia sin barra del sistema.
+    //   - Modo PRODUCCIÓN: menú OCULTO por defecto, aparece con Alt (mismo comportamiento)
+    // 🐛bug-fix (2026-07-30) — En producción se muestra un menú MINIMALISTA solo
+    // con opciones de debug (Recargar, Forzar Recarga, Herramientas de desarrollo)
+    // en lugar del menú default completo de Electron. El user (consultor) puede
+    // presionar Alt para ver DevTools y diagnosticar errores en la app instalada
+    // del cliente. En dev se mantiene el menú default (que ya tiene esas opciones).
     if (app.isPackaged) {
-        Menu.setApplicationMenu(null);
-        console.log('[MAIN] Menú nativo ocultado TOTALMENTE (app empaquetada / producción)');
+        // Menú debug minimalista para producción. Se muestra con Alt gracias
+        // a autoHideMenuBar: true de la BrowserWindow (comportamiento estándar
+        // de Windows: Discord, Slack, VSCode, etc.).
+        const debugMenu = Menu.buildFromTemplate([
+            {
+                label: 'Debug',
+                submenu: [
+                    { label: 'Recargar', accelerator: 'CmdOrCtrl+R', role: 'reload' },
+                    { label: 'Forzar Recarga (sin caché)', accelerator: 'CmdOrCtrl+Shift+R', role: 'forceReload' },
+                    { type: 'separator' },
+                    { label: 'Herramientas de desarrollo', accelerator: 'F12', role: 'toggleDevTools' },
+                    { type: 'separator' },
+                    { role: 'resetZoom' },
+                    { role: 'zoomIn' },
+                    { role: 'zoomOut' },
+                    { type: 'separator' },
+                    { role: 'togglefullscreen' }
+                ]
+            }
+        ]);
+        Menu.setApplicationMenu(debugMenu);
+        console.log('[MAIN] Menú debug minimalista activo (oculto, Alt para mostrar — app empaquetada / producción)');
     } else {
-        console.log('[MAIN] Menú nativo oculto por defecto (presionar Alt para mostrar — modo desarrollo)');
+        console.log('[MAIN] Menú nativo (default) oculto por defecto, presionar Alt para mostrar — modo desarrollo');
     }
 
     // Iniciar el servidor OnlyOffice Bridge

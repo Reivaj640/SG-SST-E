@@ -7520,11 +7520,12 @@ class MedicionAusentismoComponent {
                     <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5;">Fecha Fin</th>
                     <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5;">Código</th>
                     <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5;">Descripción</th>
+                    <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: center; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5; width: 110px;">Acciones</th>
                 </tr>
             </thead>
             <tbody id="ausentismoTableBody">
                 <tr>
-                    <td colspan="17" class="ks-loading-cell" style="padding: 16px;">
+                    <td colspan="18" class="ks-loading-cell" style="padding: 16px;">
                         ${KairSkeleton.table(12, 17)}
                     </td>
                 </tr>
@@ -7592,12 +7593,12 @@ class MedicionAusentismoComponent {
 
                 this.currentAusentismoData = result.rows.map((row, index) => {
                     const rowObj = {};
-                    
+
                     // Guardar por índice numérico para acceso directo por posición
                     row.forEach((value, i) => {
                         rowObj[String(i)] = value;
                     });
-                    
+
                     // Guardar también por nombre de encabezado
                     result.headers.forEach((header, i) => {
                         const cleanHeader = header ? header.trim() : `col_${i}`;
@@ -7605,8 +7606,12 @@ class MedicionAusentismoComponent {
                         // Guardar también en minúsculas para búsqueda flexible
                         rowObj[cleanHeader.toLowerCase().replace(/\s+/g, '_')] = row[i];
                     });
-                    
+
                     rowObj.no = index + 1;
+                    // 🆕 Guardar el rowIndex real en el Excel (sin contar headers) para
+                    // que las acciones Editar/Eliminar puedan llamar a los IPC handlers
+                    // con el índice correcto incluso después de filtrar la tabla.
+                    rowObj.__rowIndex = index;
                     return rowObj;
                 });
 
@@ -7766,7 +7771,7 @@ class MedicionAusentismoComponent {
         if (!data || data.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="17" style="text-align: center; padding: 40px; color: #64748B;">
+                    <td colspan="18" style="text-align: center; padding: 40px; color: #64748B;">
                         <i class="fas fa-inbox" style="font-size: 48px; margin-bottom: 15px; opacity: 0.3;"></i>
                         <p>No hay registros para mostrar</p>
                     </td>
@@ -7830,6 +7835,16 @@ class MedicionAusentismoComponent {
             // Según headers reales del Excel: "DESCRIPCION" (sin tilde en los datos procesados)
             const descripcion = row['DESCRIPCION'] || row['DESCRIPCIÓN'] || '-';
 
+            // 🆕 rowIndex del Excel para que Editar/Eliminar apunten a la fila correcta
+            // (sobrevive a los filtros porque está guardado en row.__rowIndex, no en el index del array filtrado)
+            const excelRowIndex = row.__rowIndex != null ? row.__rowIndex : index;
+            const rowJson = JSON.stringify({
+                __rowIndex: excelRowIndex,
+                no: no,
+                nombre: nombre,
+                cedula: cedula
+            }).replace(/'/g, '&#39;');
+
             return `
                 <tr style="border-bottom: 1px solid #dee2e6; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#f8fafc'" onmouseout="this.style.backgroundColor='white'">
                     <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; white-space: nowrap;">${no}</td>
@@ -7853,9 +7868,311 @@ class MedicionAusentismoComponent {
                     <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; white-space: nowrap;">${fechaFin}</td>
                     <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; white-space: nowrap;">${codigo}</td>
                     <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; max-width: 200px; overflow: hidden; text-overflow: ellipsis;" title="${descripcion}">${descripcion}</td>
+                    <td style="padding: 12px 15px; text-align: center; white-space: nowrap;">
+                        <button data-row='${rowJson}' class="btn-ausentismo-edit" title="Editar este registro" style="background: #174ea6; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; margin-right: 4px;">
+                            <i class="fas fa-pen"></i>
+                        </button>
+                        <button data-row='${rowJson}' class="btn-ausentismo-delete" title="Eliminar este registro" style="background: #dc2626; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px;">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
                 </tr>
             `;
         }).join('');
+
+        // 🆕 Wire up de los botones de Editar/Eliminar (delegación sobre el tbody)
+        if (tbody) {
+            tbody.onclick = (e) => {
+                const btn = e.target.closest('button.btn-ausentismo-edit, button.btn-ausentismo-delete');
+                if (!btn) return;
+                try {
+                    const rowData = JSON.parse(btn.getAttribute('data-row').replace(/&#39;/g, "'"));
+                    if (btn.classList.contains('btn-ausentismo-edit')) {
+                        this.openEditAusentismoModal(rowData);
+                    } else {
+                        this.openDeleteAusentismoConfirm(rowData);
+                    }
+                } catch (err) {
+                    console.error('[AUSENTISMO] Error parseando data-row:', err);
+                }
+            };
+        }
+    }
+
+    // =========================================================================
+    // 🆕 Editar/Eliminar fila de ausentismo (feature nueva)
+    // El `rowData` viene del data-row del botón (incluye __rowIndex del Excel)
+    // =========================================================================
+
+    /**
+     * Modal de edición. Busca la fila completa en currentAusentismoData por __rowIndex,
+     * prellena el form y al hacer submit llama al IPC update-ausentismo-row.
+     */
+    openEditAusentismoModal(rowData) {
+        const excelRowIndex = rowData.__rowIndex;
+        // Buscar la fila completa (puede haber sido filtrada, pero sigue en currentAusentismoData)
+        const fullRow = (this.currentAusentismoData || []).find(r => r.__rowIndex === excelRowIndex);
+        if (!fullRow) {
+            this.showNotification('No se encontró la fila en memoria. Recargá la tabla.', 'error');
+            return;
+        }
+
+        // 🆕 13 campos visibles (mismos labels del form de registro).
+        // Editables: 6 (Género, Clase, Tipo, F. Inicio, F. Fin, Código Diagnóstico)
+        // Bloqueados (readonly): 7 (Cédula, Nombre, Cargo, Empresa Usuaria, Área,
+        //                          Entidad, Diagnóstico) — se muestran pero no se editan.
+        // Esto alinea con el form de registro: solo se pueden corregir los datos
+        // que el user realmente tipea al registrar.
+        const generoOptions = ['Femenino', 'Masculino'];
+        const claseOptions = ['Temporal', 'Permanente Parcial', 'Permanente Total'];
+        const tipoOptions = [
+            'Enfermedad General', 'Accidente de Trabajo', 'Enfermedad Laboral',
+            'Licencia de Maternidad', 'Licencia Paternidad', 'Calamidad Doméstica',
+            'Vacaciones', 'Otros'
+        ];
+
+        const editFields = [
+            { key: 'CEDULA', label: 'Cédula del Empleado', type: 'text', readonly: true },
+            { key: 'NOMBRE', label: 'Nombre Completo', type: 'text', readonly: true },
+            { key: 'CARGO', label: 'Cargo', type: 'text', readonly: true },
+            { key: 'EMPRESA USUARIA', label: 'Empresa Usuaria', type: 'text', readonly: true },
+            { key: 'ÁREA O DPTO', label: 'Área / Departamento', type: 'text', readonly: true },
+            { key: 'GENERO', label: 'Género', type: 'select', options: generoOptions, readonly: false },
+            { key: 'CLASE DE INCAPACIDAD', label: 'Clase de Incapacidad', type: 'select', options: claseOptions, readonly: false },
+            { key: 'TIPO DE INCAPACIDAD', label: 'Tipo de Incapacidad', type: 'select', options: tipoOptions, readonly: false },
+            { key: 'CODIGO', label: 'Código CIE-10', type: 'text', placeholder: 'Ej: J00X, A050', readonly: false },
+            { key: 'ENTIDAD', label: 'Entidad (EPS/ARL)', type: 'text', readonly: true },
+            { key: 'F. INICIO', label: 'Fecha de Inicio', type: 'text', placeholder: 'M/D/YY (ej: 4/1/24)', readonly: false },
+            { key: 'F. FIN', label: 'Fecha de Finalización', type: 'text', placeholder: 'M/D/YY (ej: 4/1/24)', readonly: false },
+            { key: 'N° DIAS DE INCAPACIDAD', label: 'Días de Incapacidad', type: 'number', placeholder: 'Ej: 5', min: 1, readonly: true },
+            { key: 'DESCRIPCION', label: 'Diagnóstico / Descripción', type: 'textarea', rows: 3, readonly: false }
+        ];
+
+        // Quitar modal previo si existe
+        const prev = document.getElementById('ausentismo-edit-modal');
+        if (prev) prev.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'ausentismo-edit-modal';
+        overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(15,23,42,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 20px;';
+
+        const formHtml = editFields.map(f => {
+            // Buscar el valor por key, intentando varias variantes (con/sin tildes, lowercase)
+            const v = fullRow[f.key] || fullRow[f.key.toLowerCase()] || fullRow[f.key.replace(/[^\w°]/g, '')] || '';
+            const esc = String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+            const isReadonly = !!f.readonly;
+            const roAttr = isReadonly ? 'readonly' : '';
+            // Estilo: readonly se ve "apagado" para indicar que no se puede editar
+            const styleBase = 'padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; font-family: inherit;';
+            const styleEditable = styleBase + ' background: white;';
+            const styleReadonly = styleBase + ' background: #f1f5f9; color: #64748B; cursor: not-allowed;';
+            const fieldStyle = isReadonly ? styleReadonly : styleEditable;
+            const placeholder = f.placeholder ? `placeholder="${f.placeholder}"` : '';
+            const colspan = (f.type === 'textarea') ? 'style="grid-column: span 2;"' : '';
+            let input;
+            if (f.type === 'select') {
+                // 🆕 Generar <select> con las opciones del form. Si el valor actual del
+                // Excel no está en la lista (datos legacy como "EPS" en Clase), se
+                // agrega como option preservado para que no se rompa la edición.
+                const currentVal = String(v).trim();
+                const opts = [...f.options];
+                if (currentVal && !opts.some(o => o.toLowerCase() === currentVal.toLowerCase())) {
+                    opts.unshift(currentVal);  // opción preservada (legacy)
+                }
+                const optionsHtml = opts.map(o => {
+                    const selected = o.toLowerCase() === currentVal.toLowerCase() ? 'selected' : '';
+                    const escO = String(o).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    return `<option value="${escO}" ${selected}>${escO}</option>`;
+                }).join('');
+                input = `<select data-field="${f.key}" ${roAttr} style="${fieldStyle}">${optionsHtml}</select>`;
+            } else if (f.type === 'textarea') {
+                input = `<textarea data-field="${f.key}" ${roAttr} rows="${f.rows || 3}" ${placeholder} style="${fieldStyle} resize: vertical;">${esc}</textarea>`;
+            } else {
+                const extra = f.type === 'number' ? `min="${f.min || 0}"` : '';
+                input = `<input type="${f.type}" data-field="${f.key}" value="${esc}" ${roAttr} ${placeholder} ${extra} style="${fieldStyle}" />`;
+            }
+            return `
+                <div ${colspan} style="display: flex; flex-direction: column; gap: 4px;">
+                    <label style="font-size: 12px; font-weight: 600; color: ${isReadonly ? '#94a3b8' : '#475569'}; text-transform: uppercase;">${f.label}${isReadonly ? ' <span style="color: #94a3b8; font-weight: 400;">(bloqueado)</span>' : ''}</label>
+                    ${input}
+                </div>
+            `;
+        }).join('');
+
+        overlay.innerHTML = `
+            <div style="background: white; border-radius: 12px; max-width: 900px; width: 100%; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+                <div style="padding: 20px 25px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between;">
+                    <div>
+                        <h3 style="margin: 0; font-size: 18px; color: #1E293B;">Editar registro de ausentismo</h3>
+                        <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748B;">Fila #${rowData.no} — ${rowData.nombre} (Cédula ${rowData.cedula})</p>
+                    </div>
+                    <button id="ausentismo-edit-close" style="background: none; border: none; font-size: 20px; color: #64748B; cursor: pointer; padding: 0 8px;">&times;</button>
+                </div>
+                <form id="ausentismo-edit-form" style="padding: 20px 25px; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                    ${formHtml}
+                </form>
+                <div style="padding: 15px 25px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 10px; background: #f8fafc; border-radius: 0 0 12px 12px;">
+                    <button id="ausentismo-edit-cancel" style="padding: 10px 20px; border: 1px solid #cbd5e1; background: white; color: #475569; border-radius: 8px; cursor: pointer; font-size: 14px;">Cancelar</button>
+                    <button id="ausentismo-edit-save" style="padding: 10px 20px; border: none; background: #174ea6; color: white; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600;">Guardar cambios</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        const close = () => overlay.remove();
+        overlay.querySelector('#ausentismo-edit-close').onclick = close;
+        overlay.querySelector('#ausentismo-edit-cancel').onclick = close;
+        overlay.onclick = (e) => { if (e.target === overlay) close(); };
+
+        overlay.querySelector('#ausentismo-edit-save').onclick = async () => {
+            const saveBtn = overlay.querySelector('#ausentismo-edit-save');
+            const cancelBtn = overlay.querySelector('#ausentismo-edit-cancel');
+            const form = overlay.querySelector('#ausentismo-edit-form');
+            const fields = {};
+            // Solo enviar los campos EDITABLES (no los readonly) que EFECTIVAMENTE
+            // cambiaron respecto al valor original. Esto permite que el backend
+            // distinga entre "el user cambió el código y quiere auto-completar la
+            // descripción" vs "el user solo reenvió los valores sin tocar nada".
+            // Antes enviaba TODOS los campos, lo que rompía el auto-completado
+            // del CIE-10 (siempre parecía que la descripción había sido editada).
+            const editableKeys = new Set(editFields.filter(f => !f.readonly).map(f => f.key));
+            form.querySelectorAll('[data-field]').forEach(el => {
+                const key = el.getAttribute('data-field');
+                if (!editableKeys.has(key)) return;
+                const currentVal = String(el.value || '').trim();
+                const originalVal = String(fullRow[key] != null ? fullRow[key] : '').trim();
+                if (currentVal !== originalVal) {
+                    fields[key] = el.value;
+                }
+            });
+            // 📦 Limpieza post-debug: los logs [DEBUG-EDIT-RENDERER] sirvieron
+            // para validar el flujo durante el desarrollo. En producción, los
+            // logs del main process (con prefijo [AUS-EDIT]) son suficientes.
+
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Guardando...';
+            cancelBtn.disabled = true;  // deshabilitar Cancelar durante el save
+
+            // ⏱️ Timeout de 20s en el renderer. Si el IPC no responde (Excel
+            // bloqueado, ruta inaccesible, etc.), el user puede cerrar el
+            // modal en vez de quedarse colgado.
+            const TIMEOUT_MS = 20000;
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('TIMEOUT_RENDERER')), TIMEOUT_MS);
+            });
+
+            try {
+                const result = await Promise.race([
+                    window.electronAPI.updateAusentismoRow({
+                        companyName: this.currentCompany,
+                        rowIndex: excelRowIndex,
+                        fields: fields
+                    }),
+                    timeoutPromise
+                ]);
+
+                if (result && result.success) {
+                    this.showNotification(`Registro #${rowData.no} actualizado.`, 'success');
+                    close();
+                    // Refrescar la tabla (recarga desde el Excel para que se vea el cambio)
+                    const tableEl = document.querySelector('#ausentismoTableBody')?.closest('table');
+                    if (tableEl) await this.loadAusentismoData(tableEl);
+                } else {
+                    const code = result && result.code;
+                    const msg = (result && result.error) || 'Error desconocido';
+                    const hint = code === 'FILE_LOCKED' ? ' (cerrá Excel e intentá de nuevo)'
+                              : code === 'TIMEOUT' ? ' (el servidor de archivos tardó demasiado)'
+                              : '';
+                    this.showNotification(`Error al guardar: ${msg}${hint}`, 'error', 10000);
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = 'Guardar cambios';
+                    cancelBtn.disabled = false;
+                }
+            } catch (err) {
+                const isTimeout = err && err.message === 'TIMEOUT_RENDERER';
+                const msg = isTimeout
+                    ? `La operación tardó más de ${TIMEOUT_MS/1000}s. Probablemente el archivo Excel está bloqueado por otra app o la ruta es inaccesible.`
+                    : `Error inesperado: ${err.message}`;
+                console.error('[AUSENTISMO-EDIT-RENDERER] Error:', err);
+                this.showNotification(msg, 'error', 10000);
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Guardar cambios';
+                cancelBtn.disabled = false;
+            }
+        };
+    }
+
+    /**
+     * Modal de confirmación para eliminar. Pide confirmación al user antes de llamar al IPC.
+     */
+    openDeleteAusentismoConfirm(rowData) {
+        const excelRowIndex = rowData.__rowIndex;
+        const prev = document.getElementById('ausentismo-delete-modal');
+        if (prev) prev.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'ausentismo-delete-modal';
+        overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(15,23,42,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 20px;';
+
+        overlay.innerHTML = `
+            <div style="background: white; border-radius: 12px; max-width: 480px; width: 100%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+                <div style="padding: 20px 25px; border-bottom: 1px solid #e2e8f0;">
+                    <h3 style="margin: 0; font-size: 18px; color: #dc2626; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-exclamation-triangle"></i> Eliminar registro
+                    </h3>
+                </div>
+                <div style="padding: 20px 25px;">
+                    <p style="margin: 0 0 10px 0; font-size: 14px; color: #1E293B;">¿Eliminar el siguiente registro de ausentismo?</p>
+                    <div style="background: #f8fafc; border-left: 3px solid #dc2626; padding: 12px 15px; border-radius: 6px; margin: 12px 0;">
+                        <div style="font-size: 13px; color: #475569;"><strong>Fila #${rowData.no}</strong></div>
+                        <div style="font-size: 14px; color: #1E293B; font-weight: 600; margin-top: 4px;">${rowData.nombre}</div>
+                        <div style="font-size: 13px; color: #64748B; margin-top: 2px;">Cédula: ${rowData.cedula}</div>
+                    </div>
+                    <p style="margin: 12px 0 0 0; font-size: 13px; color: #dc2626;"><i class="fas fa-exclamation-circle"></i> Esta acción no se puede deshacer. El registro se eliminará del Excel original.</p>
+                </div>
+                <div style="padding: 15px 25px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 10px; background: #f8fafc; border-radius: 0 0 12px 12px;">
+                    <button id="ausentismo-delete-cancel" style="padding: 10px 20px; border: 1px solid #cbd5e1; background: white; color: #475569; border-radius: 8px; cursor: pointer; font-size: 14px;">Cancelar</button>
+                    <button id="ausentismo-delete-confirm" style="padding: 10px 20px; border: none; background: #dc2626; color: white; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600;">Sí, eliminar</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        const close = () => overlay.remove();
+        overlay.querySelector('#ausentismo-delete-cancel').onclick = close;
+        overlay.onclick = (e) => { if (e.target === overlay) close(); };
+
+        overlay.querySelector('#ausentismo-delete-confirm').onclick = async () => {
+            const confirmBtn = overlay.querySelector('#ausentismo-delete-confirm');
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = 'Eliminando...';
+
+            try {
+                const result = await window.electronAPI.deleteAusentismoRow({
+                    companyName: this.currentCompany,
+                    rowIndex: excelRowIndex
+                });
+
+                if (result && result.success) {
+                    this.showNotification(`Registro eliminado (${result.removedName || 'sin nombre'}).`, 'success');
+                    close();
+                    const tableEl = document.querySelector('#ausentismoTableBody')?.closest('table');
+                    if (tableEl) await this.loadAusentismoData(tableEl);
+                } else {
+                    const code = result && result.code;
+                    const msg = (result && result.error) || 'Error desconocido';
+                    this.showNotification(`Error al eliminar: ${msg}${code === 'FILE_LOCKED' ? ' (cerrá Excel e intentá de nuevo)' : ''}`, 'error', 8000);
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = 'Sí, eliminar';
+                }
+            } catch (err) {
+                this.showNotification(`Error inesperado: ${err.message}`, 'error', 8000);
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = 'Sí, eliminar';
+            }
+        };
     }
 
     showNotification(message, type = 'success', elementId = 'notification-toast') {
