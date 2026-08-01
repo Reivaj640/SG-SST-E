@@ -174,6 +174,12 @@ class MedicionAusentismoComponent {
             this.iframeMessageCleanup();
             this.iframeMessageCleanup = null;
         }
+        // 📦640 — Destruir el FAB de scroll si quedó activo de una vista anterior
+        // (p.ej. el user pasó de "ver-ausentismo" a "main" o "registrar-ausentismo").
+        if (this.scrollFab && typeof this.scrollFab.destroy === 'function') {
+            this.scrollFab.destroy();
+            this.scrollFab = null;
+        }
 
         this.container.innerHTML = '';
         // Añadir clase específica para identificar este módulo y permitir estilos específicos
@@ -7289,28 +7295,42 @@ class MedicionAusentismoComponent {
 
     renderVerAusentismoView(container) {
         console.log('[DEBUG] renderVerAusentismoView: Iniciando renderizado de lista de registros.');
+        // 📦640 (fix5) — Restaurar `overflow: auto` que `renderMainView` (línea 232)
+        // pone en `hidden` para que el iframe del home ocupe todo. Como
+        // `container` es la misma referencia para TODAS las vistas, el `hidden`
+        // quedaba persistido y bloqueaba el scroll del wrapper/submodule-content.
+        container.style.overflow = 'auto';
+        container.style.padding = '';
         container.innerHTML = '';
 
-        // Contenedor wrapper con scroll condicional
+        // Contenedor wrapper. El scroll real lo hace el padre (.submodule-content)
+        // que tiene `overflow-y: auto` inline en renderer.js. Este wrapper solo
+        // // sirve para mantener los estilos relativos y permitir que el botón
+        // // FAB apunte a un selector estable dentro de la vista.
+        // 📦640 (fix4) — Simplificado. `height: 100%` colapsaba, `flex: 1` no
+        // limitaba. Ahora dejamos que el contenido fluya naturalmente y el
+        // scroll lo maneja el contenedor padre real.
         const scrollWrapper = document.createElement('div');
         scrollWrapper.id = 'ver-ausentismo-scroll-wrapper';
         scrollWrapper.style.cssText = `
             position: relative;
             width: 100%;
-            height: 100%;
-            overflow-y: auto;
-            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
         `;
 
         // Contenedor principal modernizado
+        // 📦640 (fix3) — Quitado `min-height: 100%` que forzaba al scrollWrapper
+        // a expandirse al contenido. Ahora el mainContent crece con su contenido
+        // y el scrollWrapper (con `overflow-y: auto`) muestra la barra interna.
         const mainContent = document.createElement('div');
         mainContent.style.cssText = `
             max-width: 100%;
             margin: 0 auto;
             padding: 20px;
             width: 100%;
-            min-height: 100%;
             box-sizing: border-box;
+            flex-shrink: 0;
         `;
 
         // 📦443 (2026-06-25) — Notificación toast ELIMINADA (sistema legacy).
@@ -7459,6 +7479,11 @@ class MedicionAusentismoComponent {
         listContainer.appendChild(filtersBar);
 
         const tableWrapper = document.createElement('div');
+        // 📦640 (fix6) — ID agregado para que el FAB apunte directamente a este
+        // contenedor (que tiene su propio overflow: auto). Antes el FAB apuntaba
+        // al `submodule-content`, que también scrollea pero mueve TODO (filtros
+        // + tabla). Apuntando al tableWrapper, el botón solo afecta la tabla.
+        tableWrapper.id = 'ausentismo-table-scroll';
         tableWrapper.className = 'ausentismo-table-wrapper';
         tableWrapper.style.cssText = `
             overflow-x: auto;
@@ -7537,6 +7562,24 @@ class MedicionAusentismoComponent {
         mainContent.appendChild(listContainer);
         scrollWrapper.appendChild(mainContent);
         container.appendChild(scrollWrapper);
+
+        // 📦640 (fix6) — Botón flotante scroll-to-top/bottom.
+        // Apuntamos al `#ausentismo-table-scroll` (el tableWrapper), que tiene
+        // `overflow-y: auto` y `max-height: calc(100vh - 400px)`. Así el botón
+        // mueve SOLO la tabla (los filtros quedan fijos arriba).
+        if (this.scrollFab && typeof this.scrollFab.destroy === 'function') {
+            this.scrollFab.destroy();
+            this.scrollFab = null;
+        }
+        if (typeof window.ScrollToTopBottomButton === 'function') {
+            this.scrollFab = new window.ScrollToTopBottomButton({
+                target: '#ausentismo-table-scroll',
+                color: '#174ea6'
+            });
+            this.scrollFab.init();
+        } else {
+            console.warn('[AUS-SCROLL-FAB] ScrollToTopBottomButton no está disponible. ¿index.html cargó modules/shared/scroll-fab.js?');
+        }
 
         // Cargar datos
         this.loadAusentismoData(table);
@@ -7869,10 +7912,10 @@ class MedicionAusentismoComponent {
                     <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; white-space: nowrap;">${codigo}</td>
                     <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; max-width: 200px; overflow: hidden; text-overflow: ellipsis;" title="${descripcion}">${descripcion}</td>
                     <td style="padding: 12px 15px; text-align: center; white-space: nowrap;">
-                        <button data-row='${rowJson}' class="btn-ausentismo-edit" title="Editar este registro" style="background: #174ea6; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; margin-right: 4px;">
+                        <button data-row='${rowJson}' class="btn-ausentismo-edit" title="Editar este registro" style="background: #ffffff; color: #174ea6; border: 1.5px solid #174ea6; padding: 5px 9px; border-radius: 8px; cursor: pointer; font-size: 12px; margin-right: 4px; transition: background 0.15s, color 0.15s;" onmouseover="this.style.background='#eff6ff';" onmouseout="this.style.background='#ffffff';">
                             <i class="fas fa-pen"></i>
                         </button>
-                        <button data-row='${rowJson}' class="btn-ausentismo-delete" title="Eliminar este registro" style="background: #dc2626; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px;">
+                        <button data-row='${rowJson}' class="btn-ausentismo-delete" title="Eliminar este registro" style="background: #ffffff; color: #dc2626; border: 1.5px solid #dc2626; padding: 5px 9px; border-radius: 8px; cursor: pointer; font-size: 12px; transition: background 0.15s, color 0.15s;" onmouseover="this.style.background='#fef2f2';" onmouseout="this.style.background='#ffffff';">
                             <i class="fas fa-trash"></i>
                         </button>
                     </td>
