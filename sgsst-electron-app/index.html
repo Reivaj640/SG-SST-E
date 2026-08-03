@@ -277,6 +277,9 @@
   <script src="modules/gestion-integral/gestion-del-cambio/gestion-cambio-logic.js"></script>
   <script src="modules/gestion-salud/sociodemografica/sociodemografica-component.js"></script>
   <script src="modules/gestion-salud/perfiles-cargo-profesiograma/perfiles-cargo-profesiograma-component.js"></script>
+  <!-- 📦642 — SIDEBAR_ICONS debe cargarse ANTES de los *-home.js porque cada home
+       usa el SVG de su módulo en el header. También usado por renderer.js. -->
+  <script src="shared/sidebar-icons.js"></script>
   <script src="modules/gestion-integral/gestion-integral-home.js"></script>
   <script src="modules/recursos/recursos-home.js"></script>
   <script src="modules/gestion-salud/gestion-salud-home.js"></script>

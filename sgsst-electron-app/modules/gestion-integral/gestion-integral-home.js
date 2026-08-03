@@ -35,7 +35,7 @@ class GestionIntegralHome {
         header.className = 'k-module-header';
         header.innerHTML = `
             <div class="k-module-title">
-                <i class="bi bi-grid-1x2-fill me-2" style="color: #212529;"></i>
+                <span class="k-module-title-icon" style="color: #212529;">${SIDEBAR_ICONS.file_text}</span>
                 <div>
                     <div style="color: #212529; font-weight: 600;">Módulo Gestión Integral</div>
                     <span style="font-size: 0.75rem; font-weight: 400; color: #6c757d;">

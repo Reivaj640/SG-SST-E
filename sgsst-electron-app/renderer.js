@@ -11,15 +11,23 @@ const MODULES_WITH_CALENDAR = [
 // Definir los botones de la barra lateral según la estructura de tu aplicación Python
 // Cada módulo incluye `subtitle` (línea descriptiva debajo del título) e `iconBg`
 // (color de fondo de la caja del icono, en formato hex) para el rediseño tipo card.
+// 📦642 (2026-08-03) — `SIDEBAR_ICONS` está definido en `shared/sidebar-icons.js`
+// (cargado en index.html ANTES de este script y ANTES de los *-home.js).
+// Mismo SVG se usa para: sidebar lateral, panel "Módulos del Sistema" del
+// dashboard, y el header "Módulo X" de cada *-home.js.
+
+// 📦642 (2026-08-03) — Iconos de módulos en SVG inline Lucide. Mismo
+// estilo outline/line que el header superior (un solo color, sin fondo).
+// El color del stroke hereda del `color` del wrapper (currentColor).
 const SIDEBAR_BUTTONS = [
-  { name: "Recursos",                         icon: "kpi.png",                 subtitle: "Capacitación, Roles",     iconBg: "#EEF2FF" },
-  { name: "Gestión Integral",                 icon: "gestion.png",             subtitle: "Política, Planes",        iconBg: "#F0FDF4" },
-  { name: "Gestión de la Salud",              icon: "medico.png",              subtitle: "Ausentismo, AT, EL",      iconBg: "#FEF2F2" },
-  { name: "Gestión de Peligros y Riesgos",    icon: "identificar.png",         subtitle: "IPERC, Controles",        iconBg: "#FFF7ED" },
-  { name: "Gestión de Amenazas",              icon: "amenaza.png",             subtitle: "Emergencias",             iconBg: "#FFFBEB" },
-  { name: "Verificación",                     icon: "seguro-de-salud.png",     subtitle: "Auditorías",              iconBg: "#EFF6FF" },
-  { name: "Mejoramiento",                     icon: "ventas.png",              subtitle: "Acciones Correctivas",    iconBg: "#F5F3FF" },
-  { name: "Salir",                            icon: "superacion-personal.png", subtitle: "Cerrar sesión",           iconBg: "#F3F4F6" }
+  { name: "Recursos",                         icon: "users",          subtitle: "Capacitación, Roles",     },
+  { name: "Gestión Integral",                 icon: "file_text",      subtitle: "Política, Planes",        },
+  { name: "Gestión de la Salud",              icon: "heart_pulse",    subtitle: "Ausentismo, AT, EL",      },
+  { name: "Gestión de Peligros y Riesgos",    icon: "alert_triangle", subtitle: "IPERC, Controles",        },
+  { name: "Gestión de Amenazas",              icon: "siren",          subtitle: "Emergencias",             },
+  { name: "Verificación",                     icon: "shield_check",   subtitle: "Auditorías",              },
+  { name: "Mejoramiento",                     icon: "trending_up",    subtitle: "Acciones Correctivas",    },
+  { name: "Salir",                            icon: "log_out",        subtitle: "Cerrar sesión",           }
 ];
 
 // Submódulos para cada sección principal
@@ -3346,16 +3354,12 @@ function createSidebarButtons(activeModules = null) {
     card.setAttribute('data-module', item.name);
     card.setAttribute('aria-label', item.name);
 
-    // Caja del icono con color de fondo (tono pastel por módulo)
+    // 📦642 — Sin caja de fondo, sin color por módulo. El SVG hereda el color
+    // del texto del sidebar (currentColor). Igual que los iconos del header
+    // (todos en un solo color, sin fondo).
     const iconWrap = document.createElement('span');
     iconWrap.className = 'sidebar-module-icon';
-    iconWrap.style.backgroundColor = item.iconBg || '#F3F4F6';
-
-    const iconImg = document.createElement('img');
-    iconImg.src = `assets/${item.icon}`;
-    iconImg.alt = '';
-    iconImg.className = 'sidebar-module-icon-img';
-    iconWrap.appendChild(iconImg);
+    iconWrap.innerHTML = SIDEBAR_ICONS[item.icon] || '';
 
     // Bloque de texto (título + subtítulo)
     const textWrap = document.createElement('span');
@@ -3955,14 +3959,15 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
   moduleList.setAttribute('data-module-list', 'true');
   moduleList.style.cssText = 'flex: 1; overflow-y: auto; padding: 10px;';
 
+  // 📦642 — Sin color por módulo. El SVG hereda currentColor del wrapper.
   const modulesData = [
-    { name: 'Recursos', subtitle: 'Capacitación, Roles', icon: 'fa-users-cog', badge: 'Cargando...', badgeClass: 'bg-orange', active: false },
-    { name: 'Gestión Integral', subtitle: 'Política, Planes', icon: 'fa-file-contract', badge: '-', badgeClass: 'bg-green', active: false },
-    { name: 'Gestión de la Salud', subtitle: 'Ausentismo, AT, EL', icon: 'fa-heartbeat', badge: '-', badgeClass: 'bg-green', active: false },
-    { name: 'Gestión de Peligros y Riesgos', subtitle: 'IPERC, Controles', icon: 'fa-radiation-alt', badge: '-', badgeClass: null, active: false },
-    { name: 'Gestión de Amenazas', subtitle: 'Emergencias', icon: 'fa-biohazard', badge: '-', badgeClass: null, active: false },
-    { name: 'Verificación', subtitle: 'Auditorías', icon: 'fa-check-double', badge: '-', badgeClass: null, active: false },
-    { name: 'Mejoramiento', subtitle: 'Acciones Correctivas', icon: 'fa-chart-line', badge: '-', badgeClass: null, active: false }
+    { name: 'Recursos', subtitle: 'Capacitación, Roles', icon: 'users', badge: 'Cargando...', badgeClass: 'bg-orange', active: false },
+    { name: 'Gestión Integral', subtitle: 'Política, Planes', icon: 'file_text', badge: '-', badgeClass: 'bg-green', active: false },
+    { name: 'Gestión de la Salud', subtitle: 'Ausentismo, AT, EL', icon: 'heart_pulse', badge: '-', badgeClass: 'bg-green', active: false },
+    { name: 'Gestión de Peligros y Riesgos', subtitle: 'IPERC, Controles', icon: 'alert_triangle', badge: '-', badgeClass: null, active: false },
+    { name: 'Gestión de Amenazas', subtitle: 'Emergencias', icon: 'siren', badge: '-', badgeClass: null, active: false },
+    { name: 'Verificación', subtitle: 'Auditorías', icon: 'shield_check', badge: '-', badgeClass: null, active: false },
+    { name: 'Mejoramiento', subtitle: 'Acciones Correctivas', icon: 'trending_up', badge: '-', badgeClass: null, active: false }
   ];
 
   modulesData.forEach(mod => {
@@ -3992,8 +3997,8 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
     const badgeHtml = mod.badge ? `<span id="${badgeId}" data-module="${mod.name}" style="margin-left: auto; font-size: 10px; padding: 4px 10px; border-radius: 12px; font-weight: 600; background: ${getBadgeColor(mod.badgeClass)}; color: ${getBadgeTextColor(mod.badgeClass)}; cursor: pointer; border: 1px solid rgba(0,0,0,0.1);" title="Click para ver alertas de ${mod.name}"><i class="fas fa-filter" style="font-size: 8px; margin-right: 3px;"></i>${mod.badge}</span>` : '';
 
     item.innerHTML = `
-      <div style="width: 36px; height: 36px; border-radius: 6px; background: #f1f5f9; color: #174ea6; display: flex; align-items: center; justify-content: center; margin-right: 10px; font-size: 14px;">
-        <i class="fas ${mod.icon}"></i>
+      <div style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; margin-right: 10px; font-size: 14px;">
+        ${SIDEBAR_ICONS[mod.icon] || ''}
       </div>
       <div style="flex: 1;">
         <h4 style="font-size: 13px; font-weight: 600; color: #1e293b; margin-bottom: 1px;">${mod.name}</h4>

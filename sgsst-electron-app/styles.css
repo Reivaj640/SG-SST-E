@@ -1098,25 +1098,33 @@ select.form-control {
   border-color: var(--sidebar-border-color);
 }
 
-/* Caja del icono (cuadrado redondeado con color pastel de fondo) */
+/* 📦642 (2026-08-03) — Caja del icono. Sin fondo, sin color propio.
+   El SVG (con stroke="currentColor") hereda el color del texto del item
+   del sidebar. Mismo patrón que los iconos del header superior. */
 .sidebar-module-icon {
   width: 36px;
   height: 36px;
   min-width: 36px;
-  border-radius: var(--border-radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  background-color: var(--sidebar-icon-fallback-bg);
 }
 
+/* Mantenido por compatibilidad con código viejo. */
 .sidebar-module-icon-img {
   width: 22px;
   height: 22px;
   object-fit: contain;
-  /* Sin filter en light mode: los iconos PNG conservan su color natural
-     sobre el fondo pastel, igual que la referencia visual. */
+}
+
+/* 📦642 (2026-08-03) — SVG inline Lucide. stroke="currentColor" hereda del
+   color del wrapper. Tamaño 22x22 para coincidir con el icono anterior. */
+.sidebar-module-icon svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 2;
+  display: block;
 }
 
 /* Bloque de texto (título + subtítulo en columna) */
@@ -3805,8 +3813,20 @@ table.control-remisiones-table tbody td input[type="text"]::placeholder {
 }
 
 .k-module-title i,
-.k-module-title .bi {
+.k-module-title .bi,
+.k-module-title .k-module-title-icon {
     color: var(--k-primary, #174ea6) !important;
+}
+
+/* 📦642 — SVG inline Lucide en el header del módulo. Heredar el color del
+   wrapper (.k-module-title-icon) para que coincida con los iconos del sidebar
+   y del header superior (un solo color, sin fondo). Tamaño 22x22. */
+.k-module-title-icon svg {
+    width: 22px;
+    height: 22px;
+    stroke-width: 2;
+    display: inline-block;
+    vertical-align: middle;
 }
 
 /* Asegurar que los headers de módulo también sean visibles */
