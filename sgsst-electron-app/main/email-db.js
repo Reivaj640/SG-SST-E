@@ -88,10 +88,21 @@ function saveThread(thread) {
       snippet = excluded.snippet,
       participants = excluded.participants,
       message_count = excluded.message_count,
-      has_unread = excluded.has_unread,
+      -- 📦649-fix1 — Proteger flags "positivos" del user contra sync de Gmail.
+      -- ANTES: has_unread/is_starred/is_important se sobrescribían SIEMPRE con
+      -- el valor de Gmail. Si la llamada markMessageRead local había fallado
+      -- (network, token expirado, etc.) o Gmail aún no había propagado el
+      -- cambio, el siguiente syncInbox traía el flag "viejo" y reseteaba el
+      -- local. Resultado: el correo leído volvía a aparecer como no leído.
+      -- AHORA: solo permitimos el cambio "positivo" (de 1 a 0 / de 0 a 1
+      -- desde Gmail). Si el cache local tiene 0 y Gmail dice 1, MANTENEMOS
+      -- el 0 (el user ya lo gestionó, la sync es obsoleta). El flip opuesto
+      -- (de 0 a 1 / de 1 a 0) sí se permite para que cambios REALES
+      -- (mail nuevo no leído, star agregado desde Gmail web) sí se persistan.
+      has_unread = CASE WHEN has_unread = 1 THEN excluded.has_unread ELSE 0 END,
       has_attachment = excluded.has_attachment,
-      is_starred = excluded.is_starred,
-      is_important = excluded.is_important,
+      is_starred = CASE WHEN is_starred = 1 THEN excluded.is_starred ELSE 0 END,
+      is_important = CASE WHEN is_important = 1 THEN excluded.is_important ELSE 0 END,
       is_snoozed = excluded.is_snoozed,
       snooze_until = excluded.snooze_until,
       folder = excluded.folder,

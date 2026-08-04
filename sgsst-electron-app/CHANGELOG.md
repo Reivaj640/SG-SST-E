@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **📦649 · fix(bandeja): correos leídos vuelven a aparecer como no leídos** — Bug crítico del UPSERT en `email_threads`.
+  - **Root cause**: `saveThread` en `main/email-db.js` hacía `has_unread = excluded.has_unread` siempre, sobrescribiendo cualquier cambio local cuando llegaba un sync de Gmail.
+  - **Síntoma**: el user abría un mail (frontend: `mail.unread = false`, backend: Gmail API + `propagateUnreadChange`) y al siguiente sync (1 min después) el flag volvía a `true` porque Gmail aún tenía el label UNREAD (sync fallido o no propagado).
+  - **Fix**: usar `CASE WHEN` en el UPSERT para proteger flags "positivos" del user. Solo se permite el cambio "positivo" (de 1 a 0 / de 0 a 1 desde Gmail). Si el cache local tiene `has_unread=0` y Gmail dice `1`, MANTENEMOS `0` (el user ya lo gestionó). Aplica también a `is_starred` y `is_important`.
+  - **Aplicar cuando**: cualquier proyecto con sync bidireccional donde el flag local puede estar más actualizado que el servidor remoto.
 - **📦648 · fix(installer): icono del escritorio + race condition electron-updater** — Fix de 2 bugs reportados al actualizar a v0.1.144.
   - **📦648-fix1 Icono del escritorio desaparecido**: NSIS oneClick NO recrea accesos directos en updates. Agregado al `installer.nsh` `customInstall` macro: `Delete` + `CreateShortcut` del icono del escritorio (tanto en `C:\Users\Public\Desktop` con `SetShellVarContext all` como en `$DESKTOP` del usuario actual con `SetShellVarContext current`). Ahora cada update recrea el icono.
   - **📦648-fix2 Race condition electron-updater**: el instalador NSIS a veces abre la nueva versión antes de que `node_modules\electron-updater` termine de copiarse. Resultado: crash con "Cannot find module 'electron-updater'". Agregado try/catch al require + stub fallback no-op (mismo shape que el original, todas las funciones son no-ops). La app arranca sin auto-update; en el próximo reinicio el módulo ya está presente.
