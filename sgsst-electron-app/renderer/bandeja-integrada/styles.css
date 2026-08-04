@@ -3456,9 +3456,95 @@ body {
   font-size: 0.75rem;
   cursor: pointer;
   text-align: left;
+  display: inline-block;
 }
 .kair-mail-detail__show-details:hover {
   text-decoration: underline;
+}
+/* 📦647-fix1 — Panel expandible "Mostrar detalles" (estilo Gmail).
+   Aparece debajo del botón, dentro del sender-info. Fondo gris claro,
+   bordes redondeados, padding generoso. dl/dt/dd en 2 columnas:
+   label pequeño a la izquierda, valor a la derecha. Animación de
+   altura sutil al expandir/colapsar. */
+.kair-mail-detail__details-panel {
+  margin: 8px 0 0;
+  padding: 12px 16px;
+  background: #f8f9fa;
+  border: 1px solid #e0e3e7;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  color: var(--kair-text, #202124);
+  animation: kair-details-fade-in 180ms ease-out;
+}
+.kair-mail-detail__details-list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0;
+  padding: 0;
+}
+.kair-mail-detail__details-list dt {
+  color: var(--kair-text-muted, #5f6368);
+  font-weight: 500;
+  text-transform: lowercase;
+  letter-spacing: 0.01em;
+  padding-top: 2px;
+}
+.kair-mail-detail__details-list dd {
+  margin: 0;
+  word-break: break-word;
+  color: var(--kair-text-strong, #202124);
+}
+.kair-mail-detail__details-hint {
+  margin: 10px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid #e0e3e7;
+  font-size: 0.7rem;
+  color: var(--kair-text-muted, #5f6368);
+  font-style: italic;
+}
+@keyframes kair-details-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+/* 📦647-fix2 — Security pills (SPF/DKIM/DMARC/TLS) estilo Gmail.
+   Verde: pass. Amarillo: fail. Gris: none/unknown/sin info.
+   Border-radius generoso, padding pequeño, gap entre pills. */
+.kair-mail-detail__security-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  margin: 2px 4px 2px 0;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  font-family: monospace;
+  line-height: 1.4;
+  border: 1px solid transparent;
+}
+.kair-mail-detail__security-pill--ok {
+  background: #e6f4ea;
+  color: #1e7c3a;
+  border-color: #b7e1c2;
+}
+.kair-mail-detail__security-pill--warn {
+  background: #fef7e0;
+  color: #8a6d00;
+  border-color: #fce8b2;
+}
+.kair-mail-detail__security-pill--unknown {
+  background: #f1f3f4;
+  color: #5f6368;
+  border-color: #dadce0;
+}
+.kair-mail-detail__security-unknown {
+  color: var(--kair-text-muted, #5f6368);
+  font-style: italic;
+}
+/* Dominios de "enviado por" / "firmado por" — monospace + leve emphasis */
+.kair-mail-detail__details-domain {
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: var(--kair-primary, #1a73e8);
 }
 .kair-mail-detail__time-main {
   font-weight: 600;

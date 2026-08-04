@@ -287,6 +287,68 @@
   const initials = (name) =>
     name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
 
+  // 📦647-fix2 — Render del estado de seguridad (iconos + colores).
+  // Devuelve HTML inline con badges de pass/fail para SPF, DKIM, DMARC y TLS.
+  // Estilo Gmail: pill verde para "pass", amarillo para "fail", gris para
+  // "none" / "neutral".
+  function renderMailSecurityStatus(sec) {
+    if (!sec) return '<span class="kair-mail-detail__security-unknown">—</span>';
+    var parts = [];
+    // TLS / cifrado
+    if (sec.encryptedWith) {
+      parts.push('<span class="kair-mail-detail__security-pill kair-mail-detail__security-pill--ok" title="Cifrado en tránsito">🔒 ' + escapeHtml(sec.encryptedWith) + '</span>');
+    } else {
+      parts.push('<span class="kair-mail-detail__security-pill kair-mail-detail__security-pill--unknown" title="Sin información de cifrado">⚪ sin TLS</span>');
+    }
+    // SPF
+    if (sec.spf) {
+      var spfClass = sec.spf === 'pass' ? 'ok' : (sec.spf === 'fail' ? 'warn' : 'unknown');
+      parts.push('<span class="kair-mail-detail__security-pill kair-mail-detail__security-pill--' + spfClass + '">SPF: ' + escapeHtml(sec.spf) + '</span>');
+    }
+    // DKIM
+    if (sec.dkim) {
+      var dkimClass = sec.dkim === 'pass' ? 'ok' : (sec.dkim === 'fail' ? 'warn' : 'unknown');
+      parts.push('<span class="kair-mail-detail__security-pill kair-mail-detail__security-pill--' + dkimClass + '">DKIM: ' + escapeHtml(sec.dkim) + '</span>');
+    }
+    // DMARC
+    if (sec.dmarc) {
+      var dmarcClass = sec.dmarc === 'pass' ? 'ok' : (sec.dmarc === 'fail' ? 'warn' : 'unknown');
+      parts.push('<span class="kair-mail-detail__security-pill kair-mail-detail__security-pill--' + dmarcClass + '">DMARC: ' + escapeHtml(sec.dmarc) + '</span>');
+    }
+    return parts.join(' ');
+  }
+
+  // 📦647-fix2 — Re-render del contenido del panel (usado por el safety net
+  // después de consultar Gmail para los headers). Devuelve el innerHTML del
+  // panel listo para inyectar en el detailsPanel.
+  function buildDetailsPanelHtml(mail) {
+    var toList = (mail.to_list || []).map(function (a) {
+      return escapeHtml(a.name ? a.name + ' <' + a.email + '>' : a.email);
+    }).join(', ');
+    var ccList = (mail.cc_list || []).map(function (a) {
+      return escapeHtml(a.name ? a.name + ' <' + a.email + '>' : a.email);
+    }).join(', ');
+    var html = '<dl class="kair-mail-detail__details-list">';
+    html += '<dt>de</dt><dd>' + escapeHtml(mail.sender || '') + ' &lt;' + escapeHtml(mail.senderEmail || '') + '&gt;</dd>';
+    if (toList) html += '<dt>para</dt><dd>' + toList + '</dd>';
+    if (ccList) html += '<dt>cc</dt><dd>' + ccList + '</dd>';
+    html += '<dt>fecha</dt><dd>' + escapeHtml(formatGmailLongDate(mail.date)) + '</dd>';
+    html += '<dt>asunto</dt><dd>' + escapeHtml(mail.subject || '(sin asunto)') + '</dd>';
+    if (mail.mailSecurity && (mail.mailSecurity.sentBy || mail.mailSecurity.signedBy)) {
+      html += '<dt>enviado por</dt><dd class="kair-mail-detail__details-domain">' + escapeHtml(mail.mailSecurity.sentBy || '—') + '</dd>';
+    }
+    if (mail.mailSecurity && mail.mailSecurity.signedBy) {
+      html += '<dt>firmado por</dt><dd class="kair-mail-detail__details-domain">' + escapeHtml(mail.mailSecurity.signedBy) + '</dd>';
+    }
+    if (mail.mailSecurity) {
+      html += '<dt>seguridad</dt><dd>' + renderMailSecurityStatus(mail.mailSecurity) + '</dd>';
+    }
+    html += '<dt>id del mensaje</dt><dd style="font-family:monospace;font-size:0.7rem;color:var(--kair-text-muted);word-break:break-all;">' + escapeHtml(mail.id || '') + '</dd>';
+    html += '</dl>';
+    html += '<p class="kair-mail-detail__details-hint">Detalles de seguridad provistos por Gmail (SPF/DKIM/DMARC/TLS).</p>';
+    return html;
+  }
+
   // Loop 40 — Sanitizador de HTML para emails.
   // Gmail (y la mayoría de clientes) usan HTML rico en el body de los correos:
   // <img>, <table>, <a>, <div>, <p>, etc. Si lo renderizamos con innerHTML sin
@@ -4281,7 +4343,30 @@
           <div class="kair-mail-detail__recipients">
             ${recipientsHtml}
           </div>
-          <button class="kair-mail-detail__show-details" type="button" aria-label="Mostrar detalles">Mostrar detalles</button>
+          <button class="kair-mail-detail__show-details" type="button" aria-label="Mostrar detalles" aria-expanded="false" data-action="toggle-details">Mostrar detalles</button>
+          <!-- 📦647-fix2 — Panel de detalles con rawHeaders + mailSecurity parseado.
+               Inicia oculto. Al click se toggle. Estilo Gmail: gris claro, dl/dt/dd.
+               El handler de abajo también consulta Gmail on-the-fly (safety net)
+               si el mail no tiene rawHeaders en DB local (caso típico: mensaje viejo
+               cacheado antes del schema migration). -->
+          <div class="kair-mail-detail__details-panel" id="mail-details-panel" hidden>
+            <dl class="kair-mail-detail__details-list">
+              <dt>de</dt>
+              <dd>${escapeHtml(mail.sender || '')} &lt;${escapeHtml(mail.senderEmail || '')}&gt;</dd>
+              ${mail.to_list && mail.to_list.length > 0 ? `<dt>para</dt><dd>${mail.to_list.map(function (a) { return escapeHtml((a.name ? a.name + ' <' + a.email + '>' : a.email)); }).join(', ')}</dd>` : ''}
+              ${mail.cc_list && mail.cc_list.length > 0 ? `<dt>cc</dt><dd>${mail.cc_list.map(function (a) { return escapeHtml((a.name ? a.name + ' <' + a.email + '>' : a.email)); }).join(', ')}</dd>` : ''}
+              <dt>fecha</dt>
+              <dd>${escapeHtml(formatGmailLongDate(mail.date))}</dd>
+              <dt>asunto</dt>
+              <dd>${escapeHtml(mail.subject || '(sin asunto)')}</dd>
+              ${mail.mailSecurity && (mail.mailSecurity.sentBy || mail.mailSecurity.signedBy) ? `<dt>enviado por</dt><dd class="kair-mail-detail__details-domain">${escapeHtml(mail.mailSecurity.sentBy || '—')}</dd>` : ''}
+              ${mail.mailSecurity && mail.mailSecurity.signedBy ? `<dt>firmado por</dt><dd class="kair-mail-detail__details-domain">${escapeHtml(mail.mailSecurity.signedBy)}</dd>` : ''}
+              ${mail.mailSecurity ? `<dt>seguridad</dt><dd>${renderMailSecurityStatus(mail.mailSecurity)}</dd>` : ''}
+              <dt>id del mensaje</dt>
+              <dd style="font-family:monospace;font-size:0.7rem;color:var(--kair-text-muted);word-break:break-all;">${escapeHtml(mail.id || '')}</dd>
+            </dl>
+            <p class="kair-mail-detail__details-hint" data-role="details-hint">${mail.mailSecurity ? 'Detalles de seguridad provistos por Gmail (SPF/DKIM/DMARC/TLS).' : 'Cargando detalles de seguridad desde Gmail…'}</p>
+          </div>
         </div>
         <div class="kair-mail-detail__time">
           <div class="kair-mail-detail__time-main">${formatGmailLongDate(mail.date)}</div>
@@ -4300,6 +4385,49 @@
     // de un loop viejo. Las acciones reales están en el toolbar
     // principal (línea ~2250) con addEventListener directo.
     scroll.appendChild(header);
+
+    // 📦647-fix2 — Handler de click para "Mostrar detalles" con safety net.
+    // Al ABRIR (no al cerrar), si el mail no tiene rawHeaders o mailSecurity
+    // parseados (caso típico: mensaje viejo cacheado antes del schema
+    // migration), consulta a Gmail on-the-fly vía getMessage, actualiza
+    // el mail object y re-renderiza el panel con los datos de seguridad.
+    var toggleBtn = scroll.querySelector("[data-action='toggle-details']");
+    var detailsPanel = scroll.querySelector("#mail-details-panel");
+    if (toggleBtn && detailsPanel) {
+      toggleBtn.addEventListener("click", async function () {
+        var isOpen = !detailsPanel.hidden;
+        if (isOpen) {
+          detailsPanel.hidden = true;
+          toggleBtn.setAttribute("aria-expanded", "false");
+          toggleBtn.textContent = "Mostrar detalles";
+          return;
+        }
+        // Abriendo el panel
+        detailsPanel.hidden = false;
+        toggleBtn.setAttribute("aria-expanded", "true");
+        toggleBtn.textContent = "Ocultar detalles";
+        // Safety net: si no hay headers parseados, traerlos de Gmail
+        if ((!mail.rawHeaders || mail.rawHeaders.length === 0) && !mail.mailSecurity && mail.id) {
+          try {
+            var api = getElectronAPI && getElectronAPI();
+            if (api && api.googleGmail && typeof api.googleGmail.getMessage === "function") {
+              console.log("[BandejaIntegrada][DETAILS] Mail sin rawHeaders, consultando Gmail para", mail.id);
+              var res = await api.googleGmail.getMessage(mail.id);
+              if (res && res.success && res.data) {
+                mail.rawHeaders = res.data.rawHeaders || mail.rawHeaders || [];
+                mail.mailSecurity = res.data.mailSecurity || mail.mailSecurity || null;
+                // Re-renderizar el panel in-place con los nuevos datos
+                var newPanelHtml = buildDetailsPanelHtml(mail);
+                detailsPanel.innerHTML = newPanelHtml;
+                console.log("[BandejaIntegrada][DETAILS] Safety net OK para", mail.id, "— security:", JSON.stringify(mail.mailSecurity));
+              }
+            }
+          } catch (e) {
+            console.warn("[BandejaIntegrada][DETAILS] Safety net error:", e);
+          }
+        }
+      });
+    }
 
     // 📦602-fix — Container para el banner de invitación de Calendar.
     // En Gmail el banner aparece ENTRE el header del correo y el primer mensaje

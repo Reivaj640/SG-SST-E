@@ -236,17 +236,23 @@ function saveMessage(msg) {
     INSERT INTO email_messages
       (id, thread_id, connection_id, from_name, from_email, to_list, cc_list, bcc_list,
        subject, body_plain, body_html, snippet, date, in_reply_to, references_header,
-       has_attachments, label_ids, is_draft, is_sent, created_at, updated_at)
+       has_attachments, label_ids, is_draft, is_sent,
+       raw_headers, mail_security,
+       created_at, updated_at)
     VALUES
       (@id, @thread_id, @connection_id, @from_name, @from_email, @to_list, @cc_list, @bcc_list,
        @subject, @body_plain, @body_html, @snippet, @date, @in_reply_to, @references_header,
-       @has_attachments, @label_ids, @is_draft, @is_sent, @created_at, @updated_at)
+       @has_attachments, @label_ids, @is_draft, @is_sent,
+       @raw_headers, @mail_security,
+       @created_at, @updated_at)
     ON CONFLICT(id) DO UPDATE SET
       body_plain = excluded.body_plain,
       body_html = excluded.body_html,
       snippet = excluded.snippet,
       label_ids = excluded.label_ids,
       has_attachments = excluded.has_attachments,
+      raw_headers = excluded.raw_headers,
+      mail_security = excluded.mail_security,
       updated_at = excluded.updated_at
   `);
   const now = Date.now();
@@ -270,6 +276,10 @@ function saveMessage(msg) {
     label_ids: JSON.stringify(msg.label_ids || []),
     is_draft: msg.is_draft ? 1 : 0,
     is_sent: msg.is_sent ? 1 : 0,
+    // 📦647-fix2 — Persistir headers crudos + info de seguridad parseada.
+    // Array/objeto → JSON stringified. Si no vienen (mensajes viejos), null.
+    raw_headers: msg.raw_headers ? JSON.stringify(msg.raw_headers) : null,
+    mail_security: msg.mail_security ? JSON.stringify(msg.mail_security) : null,
     created_at: msg.created_at || now,
     updated_at: now
   });
@@ -373,6 +383,11 @@ function deserializeMessage(row) {
     label_ids: safeJSON(row.label_ids, []),
     is_draft: !!row.is_draft,
     is_sent: !!row.is_sent,
+    // 📦647-fix2 — Devolver headers crudos + info de seguridad parseada.
+    // Vienen JSON stringified de la DB. safeJSON los parsea con fallback
+    // a array/objeto vacío si algo falla.
+    rawHeaders: safeJSON(row.raw_headers, []),
+    mailSecurity: safeJSON(row.mail_security, null),
     created_at: row.created_at,
     updated_at: row.updated_at
   };

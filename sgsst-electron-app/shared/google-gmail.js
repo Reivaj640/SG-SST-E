@@ -130,6 +130,77 @@ async function getMessage(messageId, options) {
 }
 
 /**
+ * 📦647-fix2 — Parsea info de seguridad del correo desde los headers.
+ * Devuelve un objeto con:
+ *   - sentBy: dominio del Return-Path (quién envió realmente el correo)
+ *   - signedBy: dominio del DKIM-Signature (quién lo firmó)
+ *   - encryptedWith: protocolo TLS usado (de Received o Authentication-Results)
+ *   - spf: 'pass' | 'fail' | 'neutral' | 'softfail' | 'none' | null
+ *   - dkim: 'pass' | 'fail' | 'neutral' | 'none' | null
+ *   - dmarc: 'pass' | 'fail' | 'none' | null
+ *   - arc: 'pass' | 'fail' | 'none' | null (opcional)
+ *
+ * Fuentes:
+ *   - Return-Path: <bounce+xyz@gmail.com> → domain = "gmail.com"
+ *   - DKIM-Signature: ...; d=gmail.com; ... → domain = "gmail.com"
+ *   - Authentication-Results: spf=pass dkim=pass dmarc=pass header.d=gmail.com
+ *
+ * Si falta algún dato, devuelve null para ese campo.
+ */
+function parseMailSecurity(rawHeaders, headersLower) {
+  if (!rawHeaders || rawHeaders.length === 0) return null;
+  var result = { sentBy: null, signedBy: null, encryptedWith: null, spf: null, dkim: null, dmarc: null, arc: null };
+
+  // Return-Path: extraer dominio
+  var returnPath = headersLower['return-path'] || '';
+  var returnPathMatch = returnPath.match(/@([\w.-]+)/);
+  if (returnPathMatch) result.sentBy = returnPathMatch[1].toLowerCase();
+
+  // DKIM-Signature: extraer el parámetro d=
+  var dkimSig = headersLower['dkim-signature'] || '';
+  var dMatch = dkimSig.match(/\bd=([\w.-]+)/);
+  if (dMatch) result.signedBy = dMatch[1].toLowerCase();
+
+  // Authentication-Results: parsear spf, dkim, dmarc
+  var authResults = headersLower['authentication-results'] || '';
+  if (authResults) {
+    // Ejemplo: "mx.google.com; dkim=pass header.i=@gmail.com header.s=20230601 header.b=xxx; spf=pass ...; dmarc=pass ..."
+    var spfMatch = authResults.match(/\bspf=(\w+)/);
+    if (spfMatch) result.spf = spfMatch[1].toLowerCase();
+    var dkimMatch = authResults.match(/\bdkim=(\w+)/);
+    if (dkimMatch) result.dkim = dkimMatch[1].toLowerCase();
+    var dmarcMatch = authResults.match(/\b\bdmarc=(\w+)/);
+    if (dmarcMatch) result.dmarc = dmarcMatch[1].toLowerCase();
+    // ARC-Authentication-Results puede venir separado
+    var arcResults = headersLower['arc-authentication-results'] || '';
+    if (arcResults) {
+      var arcMatch = arcResults.match(/\b(?:spf|dkim|dmarc)=(\w+)/);
+      if (arcMatch) result.arc = arcMatch[1].toLowerCase();
+    }
+  }
+
+  // Encrypted: si el último Received tiene "version=TLSv1.X" o "using TLSv1.X"
+  // Buscar el ÚLTIMO Received (los de servidores que recibieron)
+  var lastReceived = null;
+  for (var i = rawHeaders.length - 1; i >= 0; i--) {
+    if (String(rawHeaders[i].name || '').toLowerCase() === 'received') {
+      lastReceived = String(rawHeaders[i].value || '');
+      break;
+    }
+  }
+  if (lastReceived) {
+    var tlsMatch = lastReceived.match(/\(version=(TLSv[\d.]+)\s+cipher=([\w_-]+)/i)
+                || lastReceived.match(/\busing\s+(TLSv[\d.]+)\b/i)
+                || lastReceived.match(/\(using\s+(TLSv[\d.]+)\)/i);
+    if (tlsMatch) {
+      result.encryptedWith = tlsMatch[1];
+    }
+  }
+
+  return result;
+}
+
+/**
  * Normaliza un mensaje de Gmail API al formato Bandeja Integrada.
  */
 function normalizeMessage(msg, includeBody) {
@@ -175,6 +246,20 @@ function normalizeMessage(msg, includeBody) {
   // Color de avatar derivado del email (consistente)
   var avatarColor = '#' + stringToColor(senderEmail);
 
+  // 📦647-fix2 — Guardar TODOS los headers de Gmail como array crudo.
+  // Antes solo se exponían 4 headers (from, to, subject, date). Ahora se
+  // guarda la lista completa para que el frontend pueda parsear SPF/DKIM/
+  // DMARC/TLS, Return-Path, etc. cuando el user abre "Mostrar detalles".
+  var rawHeaders = (msg.payload && msg.payload.headers || []).map(function (h) {
+    return { name: String(h.name || ''), value: String(h.value || '') };
+  });
+
+  // 📦647-fix2 — Parsear info de seguridad desde los headers de Gmail.
+  // Gmail ya hace SPF/DKIM/DMARC en el header "Authentication-Results".
+  // El header "Return-Path" tiene el dominio que envió. El header
+  // "DKIM-Signature" tiene el dominio firmante (parámetro d=).
+  var mailSecurity = parseMailSecurity(rawHeaders, headers);
+
   var result = {
     id: msg.id,
     threadId: msg.threadId,
@@ -189,7 +274,10 @@ function normalizeMessage(msg, includeBody) {
     hasAttachment: !!(msg.payload && msg.payload.parts && msg.payload.parts.some(function (p) { return p.filename; })),
     meetingSuggestion: meetingSuggestion,
     avatarInitials: initials,
-    avatarColor: avatarColor
+    avatarColor: avatarColor,
+    // 📦647-fix2 — Nuevos campos para el panel "Mostrar detalles"
+    rawHeaders: rawHeaders,
+    mailSecurity: mailSecurity
   };
 
   if (includeBody || true) {

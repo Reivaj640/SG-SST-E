@@ -77,6 +77,15 @@ const EMAIL_SCHEMA_SQL = `
     label_ids TEXT,                             -- JSON array
     is_draft INTEGER NOT NULL DEFAULT 0,
     is_sent INTEGER NOT NULL DEFAULT 0,
+    -- 📦647-fix2 — Headers crudos + info de seguridad parseada, para
+    -- el panel "Mostrar detalles" (SPF/DKIM/DMARC/TLS, Return-Path, etc).
+    -- rawHeaders: array [{name, value}] de TODOS los headers del mensaje.
+    -- mailSecurity: {sentBy, signedBy, encryptedWith, spf, dkim, dmarc, arc}.
+    -- Se guardan como JSON stringified. Para mensajes viejos (sin estos
+    -- datos), el frontend tiene un safety net que los trae on-the-fly
+    -- desde Gmail al abrir el panel.
+    raw_headers TEXT,
+    mail_security TEXT,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
   );
@@ -126,8 +135,11 @@ const EMAIL_SCHEMA_SQL = `
 // Mismo patrón que GESTACION_MIGRATIONS_SQL en main.js.
 // =====================================================================
 const EMAIL_MIGRATIONS_SQL = [
-  // Ejemplo futuro: agregar columna "is_important" a email_threads
-  // 'ALTER TABLE email_threads ADD COLUMN is_important INTEGER NOT NULL DEFAULT 0;',
+  // 📦647-fix2 — Columnas para "Mostrar detalles" (headers + seguridad).
+  // Idempotentes: si la columna ya existe, SQLite lanza "duplicate column"
+  // que se ignora silenciosamente.
+  'ALTER TABLE email_messages ADD COLUMN raw_headers TEXT;',
+  'ALTER TABLE email_messages ADD COLUMN mail_security TEXT;',
 ];
 
 module.exports = {

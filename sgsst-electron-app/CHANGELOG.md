@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **📦647 · feat(bandeja): panel "Mostrar detalles" con seguridad SPF/DKIM/DMARC/TLS** — Implementación estilo Gmail del panel expandible de detalles de correo.
+  - **Paso 1 (UI básica)**: botón "Mostrar detalles" toggle, panel gris claro con campos `de`, `para`, `cc`, `fecha`, `asunto`, `id del mensaje`. CSS grid 2 columnas + animación fade-in 180ms.
+  - **Paso 2 (headers + seguridad)**:
+    - `shared/google-gmail.js`: nueva función `parseMailSecurity(rawHeaders, headersLower)` que extrae `sentBy` (Return-Path domain), `signedBy` (DKIM-Signature `d=`), `encryptedWith` (TLS de último Received), y `spf`/`dkim`/`dmarc`/`arc` desde `Authentication-Results`. `normalizeMessage` ahora devuelve `rawHeaders: [{name, value}]` y `mailSecurity: {...}`.
+    - `main/email-schema-sql.js`: 2 columnas nuevas en `email_messages`: `raw_headers TEXT` y `mail_security TEXT`. 2 migraciones `ALTER TABLE` idempotentes.
+    - `main/email-db.js`: INSERT/UPDATE/SELECT con las 2 columnas. `safeJSON` parsea con fallback.
+    - `renderer/bandeja-integrada/app.js`: render del panel con "enviado por", "firmado por", "seguridad" (solo si hay data). Helpers `renderMailSecurityStatus()` (pills pass/fail estilo Gmail) + `buildDetailsPanelHtml()` (re-render desde safety net).
+    - **Safety net**: al abrir el panel, si el mail no tiene `rawHeaders` locales, llama a `gmailApi.getMessage(id)` on-the-fly y re-renderiza con los datos reales. Los datos luego se persisten en DB (gracias al saveMessage actualizado).
+    - `styles.css`: pills de seguridad (🟢 verde pass, 🟡 amarillo fail, ⚪ gris none/unknown). Dominio "enviado por"/"firmado por" en monospace azul.
 - **🐛 Fixes críticos de Bandeja Integrada + Google Calendar (📦646 series, 13 fixes)** — Lote completo de correcciones para los problemas del calendario y la sincronización con Google Calendar.
   - **📦643 Flicker calendario**: `loadEventsFromGoogle` ya no filtra contra `state.events` (causaba que eventos aceptados alternaran visible/oculto cada polling). Deduplicación al final sobre datos recién obtenidos.
   - **📦644 Día de la semana incorrecto**: `WEEKDAY_LABELS` usaba `(getDay() + 6) % 7` pero el cálculo se hacía con índice de columna en vez del día real. Generaba desfase cuando el mes no empezaba en lunes.
