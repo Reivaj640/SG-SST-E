@@ -1,4 +1,92 @@
-# K+AIR v0.1.138 (working tree, próximo release)
+# K+AIR v0.1.143 (working tree, próximo release)
+
+## 🎉 Novedades principales
+
+### 🐛 Fixes críticos de Bandeja Integrada + Google Calendar (📦646 series)
+
+Lote de 12 fixes que resuelven problemas de flickering, días de la semana incorrectos, attendees no editables, y dedup con Google Calendar.
+
+- **📦643 · Flicker calendario** — `loadEventsFromGoogle` ya no filtra contra `state.events` (causaba que los eventos aceptados alternaran visible/oculto cada polling). Deduplicación se hace al final sobre los datos recién obtenidos.
+- **📦644 · Día de la semana incorrecto** — `WEEKDAY_LABELS` usaba `(getDay() + 6) % 7` (lunes=0). El bug era que el cálculo se hacía con el índice de columna (`i % 7`) en vez de con el día real del mes, generando desfase cuando el mes no empezaba en lunes.
+- **📦646 · Iframe adapter fallback** — `getApi()` helper en `kair-calendar-adapter.js` con fallback a `window.parent.electronAPI`. Antes el `adapter` daba `undefined` dentro del iframe de Bandeja Integrada, rompiendo la creación de eventos.
+- **📦646-fix1 · ID mismatch post-create** — `adapter.create()` asigna un ID nuevo en la DB (puede no coincidir con el `temp` del iframe). `saveEvent()` ahora sincroniza `newEvent.id = res.data.id` para que el `adapter.update()` posterior funcione.
+- **📦646-fix2 · Google Calendar iframe fallback** — `saveEvent()` ahora usa `getGoogleCalendarApi()` (que ya tiene el fallback) en vez de `window.electronAPI.googleCalendar` directo.
+- **📦646-fix3 · `fromGoogleEvent` usa kairId** — Antes generaba `id: 'gcal-' + g.id` (distinto del K+AIR). Ahora `id: kairId || 'gcal-' + g.id` para que el dedup los una naturalmente.
+- **📦646-fix4 · `confirmModal()` reusable** — Reemplaza el `confirm()` nativo del browser. Promise-based, variantes `danger` (rojo sólido) o `primary`, atajos Enter/Esc, z-index 600000 encima del modal de detalle.
+- **📦646-fix5 · Delete handler dual-path** — Detecta formato del ID (`rapido-*` vs `gcal-*`) y elige el handler correcto. `NOT_FOUND` fallback a Google si K+AIR no tiene el evento pero Google sí. Cancelación automática a attendees con `sendUpdates:'all'`.
+- **📦646-fix6 · Dedup con 2 keys** — Usa `googleEventId` Y `id` (cualquiera de las dos). Antes solo `googleEventId || id`, lo que generaba duplicados cuando K+AIR no tenía el `googleEventId` persistido.
+- **📦646-fix7 · Botones del confirm modal prominentes** — Nueva clase `.kair-event-modal__btn--danger-solid` (rojo sólido, no outline). Inline styles con `background: #dc2626` forzando especificidad. Sombra del modal más profunda.
+- **📦646-fix8 · Schema: `google_event_id` en `eventos_rapidos`** — Nueva columna para persistir el ID del evento en Google Calendar. Migración `ALTER TABLE` con try/catch (idempotente). Update inteligente: solo pisa la columna si la key está presente en el payload.
+- **📦646-fix9 · Calendario persistente post-save** — `state.calendarVisible = false` removido después de Guardar. El user puede seguir creando eventos sin reabrir el panel. Foco automático en "+ Crear" para batch event creation.
+- **📦646-fix10 · Edit modal: Asistentes + Google sync** — El modal de edición ahora muestra el campo Asistentes pre-cargado y los sincroniza con Google (UPDATE si ya está, CREATE si es nuevo). Toast diferenciado según haya asistentes nuevos.
+- **📦646-fix11 · Schema: `attendees` en `eventos_rapidos`** — Nueva columna JSON stringificado para persistir los asistentes locales. El bridge parsea el JSON en `_rowToEvent` (con fallback a texto plano legacy).
+- **📦646-fix12 · Bug crítico: bridge no persistía attendees** — El `INSERT` y `UPDATE` del bridge NO incluían `attendees` ni `google_event_id` en el SQL. Solo los LEÍA. Resultado: cualquier evento creado con attendees quedaba con `attendees: []` en la DB aunque Google sí los tuviera. Ahora se persisten correctamente.
+- **📦646-fix13 · Safety net en edit modal** — Si el evento no tiene attendees locales pero tiene `googleEventId`, consulta a Google con el nuevo método `gcalApi.get()` y los trae on-the-fly. Además los persiste en K+AIR para futuras ediciones.
+
+### 🆕 Time Zone Google Calendar (📦646-tz)
+- `toGoogleEvent()` y `upsertFromIcs()` ahora incluyen `timeZone: 'America/Bogota'` en los objetos `start` y `end`. Google Calendar API v3 es estricto con timezones desde 2024: rechaza `dateTime` naive (sin Z ni offset) con error 400 "Missing time zone definition for start time".
+
+### 🆕 Método `gcalApi.get()` (📦646-get)
+- Nuevo handler IPC `google-calendar:get` para traer UN evento específico por su ID. Útil para el safety net del edit modal y para futuros "ver detalle sincrónico".
+
+### 🎨 Iconos SVG Lucide en sidebar y headers (📦642)
+- Reemplazo completo de los iconos PNG del sidebar y los iconos FontAwesome de los headers de módulos por SVGs inline de [Lucide](https://lucide.dev/). Un solo color de iconos (currentColor heredado), más liviano y consistente.
+- `renderer.js:3416` fix: el botón "Salir" usaba `iconImg.src = "assets/${salir.icon}"` (asumía PNG path, daba 404 con el nuevo formato). Ahora `iconWrap.innerHTML = SIDEBAR_ICONS[salir.icon]` (mismo patrón que el resto).
+
+### ⬆️ Botón flotante scroll-to-top/bottom (📦640)
+- Clase reusable `ScrollToTopBottomButton` en `modules/shared/scroll-fab.js`. Aparece automáticamente cuando el contenedor tiene scroll, con animación fade + slight slide. Usado en la tabla de ausentismo.
+
+### ✏️ Editar/Eliminar filas en tabla de ausentismo (📦639)
+- Botones de acción con estilo outline (consistente con el resto de la app). Edit in-place + recálculo de días + auto-completar CIE-10 desde BD local.
+
+### 🆕 Hora visible en calendario semanal/diario (📦638)
+- Los bloques de eventos ahora muestran la hora de inicio junto al título. Antes solo mostraban el título (se perdía la hora al ver el día completo).
+
+---
+
+# K+AIR v0.1.142 (publicado)
+
+## 🎉 Novedades principales
+
+### 🎨 Iconos SVG Lucide en sidebar y headers (📦642)
+Reemplazo completo de los iconos PNG del sidebar y los iconos FontAwesome de los headers de módulos por SVGs inline de Lucide.
+
+- **Un solo color de iconos**: `currentColor` heredado del CSS, se adapta al theme (light/dark).
+- **Más liviano**: 8 SVGs inline ≈ 4 KB vs 8 PNGs ≈ 30 KB.
+- **Consistencia visual**: el sidebar y los headers de módulos usan los mismos iconos (calendar, mail, file-text, etc).
+
+**Componentes nuevos**:
+- `shared/sidebar-icons.js` — constante `SIDEBAR_ICONS` con 8 SVGs Lucide.
+- `renderer.js` actualizado para renderizar SVG inline en sidebar + dashboard.
+- 7 home modules actualizados: recursos, gestion-integral, gestion-salud, gestion-peligros, gestion-amenazas, verificacion, mejoramiento.
+
+---
+
+# K+AIR v0.1.141 (publicado)
+
+### ⬆️ Botón flotante scroll-to-top/bottom (📦640)
+- Clase reusable `ScrollToTopBottomButton` (`modules/shared/scroll-fab.js`).
+- Aparece con animación fade + slight slide cuando hay scroll.
+- Usado en la tabla de ausentismo.
+
+### ✏️ Editar/Eliminar filas en tabla de ausentismo (📦639)
+- Botones con estilo outline.
+- Edit in-place + recálculo de días.
+- Auto-completar CIE-10 desde BD local.
+
+### 🆕 Hora visible en calendario semanal/diario (📦638)
+- Los bloques de eventos muestran la hora de inicio.
+
+---
+
+# K+AIR v0.1.140 (publicado)
+
+### ⬆️ Auto-actualización UX (re-iteración)
+- Mejoras en el flujo de auto-update ya publicado en v0.1.131.
+
+---
+
+# K+AIR v0.1.138 (publicado)
 
 ## 🎉 Novedades principales
 
@@ -44,15 +132,7 @@ Reemplaza los previews de PDF/Word/Excel que dependían de Python + LibreOffice 
 - Resuelve el problema de tener que scrollear la página completa para ver los correos
 
 ### Skills de diseño y animación (📦604)
-- 8 skills de [emilkowalski/skills](https://github.com/emilkowalski/skills) instaladas para opencode/Claude Code:
-  - `emil-design-eng` — skill principal de UI + animación
-  - `review-animations` — review estricto de animaciones
-  - `improve-animations` — audit + planes priorizados
-  - `find-animation-opportunities` — búsqueda de motion
-  - `animation-vocabulary` — glosario correcto
-  - `apple-design` — principios Apple
-  - `pick-ui-library` — picker de UI lib
-  - `prototype` — múltiples versiones de UI
+- 8 skills de [emilkowalski/skills](https://github.com/emilkowalski/skills) instaladas para opencode/Claude Code.
 
 ### Bug crítico del sync corregido (📦603 + 📦603-fix)
 - **Causa 1 (backend)**: `deleteThreadsByFolder` borraba todos los threads antes del re-insert. Ahora solo se eliminan los huérfanos.

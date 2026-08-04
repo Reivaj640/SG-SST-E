@@ -51,16 +51,18 @@ function toGoogleEvent(ev) {
   var endH = sh + dur;
   var ehH = Math.floor(endH);
   var ehM = Math.round((endH - ehH) * 60);
-  // Construir ISO en zona horaria del usuario (Bogotá UTC-5). Sin Z al final = local time.
-  // Google Calendar interpreta strings sin zona como zona del calendario (default del user).
+  // Construir ISO en zona horaria del usuario (Bogotá UTC-5). Sin Z al final = naive.
+  // 🐛bug-fix 📦646 — Google Calendar API RECHAZA dateTime naive sin timeZone
+  // explícito (devuelve 400 "Missing time zone definition for start time").
+  // Hay que pasar AMBOS: el dateTime en local-time + el campo timeZone.
   var startIso = ev.date + 'T' + pad(shH) + ':' + pad(shM) + ':00';
   var endIso = ev.date + 'T' + pad(ehH) + ':' + pad(ehM) + ':00';
   var gEvent = {
     summary: ev.title || '(sin título)',
     description: ev.notes || undefined,
     location: ev.location || undefined,
-    start: { dateTime: startIso },
-    end: { dateTime: endIso }
+    start: { dateTime: startIso, timeZone: 'America/Bogota' },
+    end: { dateTime: endIso, timeZone: 'America/Bogota' }
   };
   if (Array.isArray(ev.attendees) && ev.attendees.length > 0) {
     gEvent.attendees = ev.attendees
@@ -86,16 +88,24 @@ function fromGoogleEvent(g) {
   var startHour = parseInt(sHM[0], 10) + (parseInt(sHM[1], 10) || 0) / 60;
   var endHour = parseInt(eHM[0], 10) + (parseInt(eHM[1], 10) || 0) / 60;
   var durationHours = Math.max(0.5, endHour - startHour);
+  // 📦646-fix3 — Usar el kairId del extendedProperties (que setea toGoogleEvent
+  // al CREAR el evento) como id del evento K+AIR. Esto permite que el dedup
+  // de loadEventsFromIPC (que mira `e.googleEventId || e.id`) matchee el
+  // evento K+AIR con su contraparte de Google y los una en uno solo.
+  // Antes: id = 'gcal-' + g.id → IDs distintos → duplicación visible.
+  // Eventos nativos de Google (sin kairId) siguen usando el prefijo 'gcal-'.
+  var extProps = g.extendedProperties && g.extendedProperties.shared;
+  var kairId = extProps && extProps.kairId;
   return {
-    id: 'gcal-' + g.id,
+    id: kairId || ('gcal-' + g.id),
     title: g.summary || '(sin título)',
     date: date,
     start: pad(Math.floor(startHour)) + ':' + pad(Math.round((startHour % 1) * 60)),
     end: pad(Math.floor(endHour)) + ':' + pad(Math.round((endHour % 1) * 60)),
     startHour: startHour,
     durationHours: durationHours,
-    category: g.extendedProperties && g.extendedProperties.shared && g.extendedProperties.shared.kairCategory
-      ? g.extendedProperties.shared.kairCategory
+    category: extProps && extProps.kairCategory
+      ? extProps.kairCategory
       : 'rapido',
     type: 'gcal',
     location: g.location || '',
@@ -136,6 +146,34 @@ async function listEvents(configPath, timeMin, timeMax) {
   } catch (err) {
     console.error('[google-calendar] listEvents error:', err.message || err);
     return { success: false, error: err.message || 'Error listando eventos' };
+  }
+}
+
+/**
+ * 📦646-fix12 — Trae UN evento específico de Google Calendar por su ID.
+ * Usado como safety net en el edit modal cuando K+AIR no tiene los
+ * attendees guardados (evento creado antes del schema migration) pero
+ * Google sí los tiene. Devuelve el evento mapeado a formato K+AIR.
+ * @param {string} configPath
+ * @param {string} googleEventId
+ * @returns {Promise<{success:boolean, data?:object, error?:string}>}
+ */
+async function getEvent(configPath, googleEventId) {
+  if (!googleEventId) return { success: false, error: 'Falta googleEventId' };
+  try {
+    var g = await getCalendarClient(configPath);
+    if (!g.ok) return { success: false, error: g.error };
+
+    var res = await g.client.events.get({
+      calendarId: 'primary',
+      eventId: googleEventId
+    });
+    var mapped = fromGoogleEvent(res.data);
+    if (!mapped) return { success: false, error: 'No se pudo mapear el evento' };
+    return { success: true, data: mapped };
+  } catch (err) {
+    console.error('[google-calendar] getEvent error:', err.message || err);
+    return { success: false, error: err.message || 'Error trayendo evento' };
   }
 }
 
@@ -357,8 +395,10 @@ async function upsertFromIcs(configPath, icsText, responseStatus, userEmail) {
     summary: ics.summary,
     description: ics.description || undefined,
     location: ics.location || undefined,
-    start: { dateTime: startIso },
-    end: { dateTime: endIso },
+    // 📦646-fix — Mismo fix que toGoogleEvent: timeZone explícito para que
+    // Google no rechace el evento con "Missing time zone definition".
+    start: { dateTime: startIso, timeZone: 'America/Bogota' },
+    end: { dateTime: endIso, timeZone: 'America/Bogota' },
     attendees: (ics.attendees || []).map(function (a) {
       return { email: a.email, displayName: a.cn || undefined };
     })
@@ -487,5 +527,6 @@ module.exports = {
   deleteEvent: deleteEvent,
   syncFromGoogle: syncFromGoogle,
   respondToEvent: respondToEvent,
-  upsertFromIcs: upsertFromIcs
+  upsertFromIcs: upsertFromIcs,
+  getEvent: getEvent
 };

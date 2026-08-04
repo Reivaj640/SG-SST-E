@@ -3408,15 +3408,13 @@ function createSidebarButtons(activeModules = null) {
     card.setAttribute('data-module', salir.name);
     card.setAttribute('aria-label', salir.name);
 
+    // 📦642-fix — Usar SVG inline (mismo patrón que los módulos de arriba)
+    // en vez del viejo `<img src="assets/${salir.icon}">` que fallaba con
+    // ERR_FILE_NOT_FOUND porque "log_out" es el NOMBRE del icono SVG, no
+    // un archivo. La rama de arriba usa SIDEBAR_ICONS[item.icon] correctamente.
     const iconWrap = document.createElement('span');
     iconWrap.className = 'sidebar-module-icon';
-    iconWrap.style.backgroundColor = salir.iconBg || '#F3F4F6';
-
-    const iconImg = document.createElement('img');
-    iconImg.src = `assets/${salir.icon}`;
-    iconImg.alt = '';
-    iconImg.className = 'sidebar-module-icon-img';
-    iconWrap.appendChild(iconImg);
+    iconWrap.innerHTML = SIDEBAR_ICONS[salir.icon] || '';
 
     const textWrap = document.createElement('span');
     textWrap.className = 'sidebar-module-text';

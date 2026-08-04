@@ -37,11 +37,34 @@ function _ensureSchema(db) {
       hora_fin      TEXT,
       tipo          TEXT NOT NULL DEFAULT 'rapido',
       descripcion   TEXT,
+      -- 📦646-fix8 — Columna nueva para persistir el ID del evento en
+      -- Google Calendar cuando se sincroniza. Antes no existía y al hacer
+      -- delete, el código no sabía el googleEventId en el primer click
+      -- (solo se enteraba después del auto-refresh que traía el evento
+      -- de vuelta desde Google), obligando al user a hacer 2 clicks
+      -- para eliminar el evento. Ahora se guarda apenas se crea en Google.
+      google_event_id TEXT,
+      -- 📦646-fix11 — Columna nueva para persistir los asistentes del
+      -- evento. Antes se guardaban solo en Google Calendar pero no en
+      -- K+AIR DB, entonces al editar un evento desde K+AIR el campo
+      -- Asistentes aparecía vacío aunque el evento sí tuviera invitados.
+      -- Se guarda como JSON array stringificado.
+      attendees TEXT,
       created_at    TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS idx_eventos_rapidos_fecha ON eventos_rapidos(fecha);
+    -- 📦646-fix8 — Migración defensiva: ALTER TABLE para DBs creadas antes
+    -- de este cambio. SQLite no tiene IF NOT EXISTS para columnas, así que
+    -- usamos un try/catch silencioso. Si la columna ya existe, falla
+    -- con "duplicate column" y lo ignoramos.
+    -- (mejor-sqlite3 no soporta try/catch alrededor de db.exec en ALTER,
+    --  así que lo hacemos con un prepared statement directo)
   `);
+  // Migración de columnas para DBs existentes. Cada ALTER es idempotente
+  // gracias al try/catch.
+  try { db.exec("ALTER TABLE eventos_rapidos ADD COLUMN google_event_id TEXT"); } catch (e) { /* ya existe */ }
+  try { db.exec("ALTER TABLE eventos_rapidos ADD COLUMN attendees TEXT"); } catch (e) { /* ya existe */ }
 }
 
 function _log(level, msg) {
@@ -50,6 +73,19 @@ function _log(level, msg) {
 
 function _rowToEvent(row) {
   if (!row) return null;
+  // 📦646-fix11 — Parsear el JSON de attendees (string en DB → array en JS).
+  // Si el JSON es inválido o está vacío, devolver array vacío.
+  var attendees = [];
+  if (row.attendees) {
+    try {
+      var parsed = JSON.parse(row.attendees);
+      if (Array.isArray(parsed)) attendees = parsed;
+    } catch (e) {
+      // Fallback: si por alguna razón hay texto plano (ej: viejo de antes
+      // de este fix), tratarlo como un solo attendee.
+      attendees = String(row.attendees).split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+    }
+  }
   return {
     id: row.id,
     title: row.titulo,
@@ -57,7 +93,13 @@ function _rowToEvent(row) {
     start: row.hora_inicio || null,
     end: row.hora_fin || null,
     type: row.tipo || 'rapido',
-    description: row.descripcion || ''
+    description: row.descripcion || '',
+    // 📦646-fix8 — Devolver el googleEventId persistido.
+    googleEventId: row.google_event_id || null,
+    // 📦646-fix11 — Devolver los asistentes como array. La Bandeja
+    // Integrada los usa para el campo "Asistentes" del modal de edición
+    // y para sincronizar con Google Calendar.
+    attendees: attendees
   };
 }
 
@@ -93,12 +135,12 @@ function registerEventosRapidosHandlers(app, deps) {
       var rows;
       if (_isValidISODate(start) && _isValidISODate(end)) {
         rows = db.prepare(
-          'SELECT id, titulo, fecha, hora_inicio, hora_fin, tipo, descripcion, created_at, updated_at ' +
+          'SELECT id, titulo, fecha, hora_inicio, hora_fin, tipo, descripcion, google_event_id, created_at, updated_at ' +
           'FROM eventos_rapidos WHERE fecha BETWEEN ? AND ? ORDER BY fecha ASC, hora_inicio ASC'
         ).all(start, end);
       } else {
         rows = db.prepare(
-          'SELECT id, titulo, fecha, hora_inicio, hora_fin, tipo, descripcion, created_at, updated_at ' +
+          'SELECT id, titulo, fecha, hora_inicio, hora_fin, tipo, descripcion, google_event_id, created_at, updated_at ' +
           'FROM eventos_rapidos ORDER BY fecha ASC, hora_inicio ASC LIMIT 500'
         ).all();
       }
@@ -131,12 +173,24 @@ function registerEventosRapidosHandlers(app, deps) {
 
       var id = _newId();
       var now = _nowIso();
+      // 📦646-fix8 — INSERT con google_event_id. Si el payload lo trae (caso
+      // de re-sincronización), lo persistimos. Si no, queda null y se setea
+      // después en el update post-Google-create.
+      var googleEventId = payload && payload.googleEventId ? String(payload.googleEventId) : null;
+      // 📦646-fix11 — Persistir attendees como JSON stringificado. Si el
+      // payload trae array, lo guardamos. Si trae null/empty, queda null.
+      var attendeesJson = null;
+      if (payload && Array.isArray(payload.attendees) && payload.attendees.length > 0) {
+        attendeesJson = JSON.stringify(payload.attendees.map(function (a) {
+          return String(a || '').trim();
+        }).filter(Boolean));
+      }
       db.prepare(
-        'INSERT INTO eventos_rapidos (id, titulo, fecha, hora_inicio, hora_fin, tipo, descripcion, created_at, updated_at) ' +
-        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
-      ).run(id, titulo, fecha, horaInicio || null, horaFin || null, tipo, descripcion, now, now);
+        'INSERT INTO eventos_rapidos (id, titulo, fecha, hora_inicio, hora_fin, tipo, descripcion, google_event_id, attendees, created_at, updated_at) ' +
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      ).run(id, titulo, fecha, horaInicio || null, horaFin || null, tipo, descripcion, googleEventId, attendeesJson, now, now);
 
-      _log('CREATE', 'id=' + id + ' titulo=' + titulo + ' fecha=' + fecha);
+      _log('CREATE', 'id=' + id + ' titulo=' + titulo + ' fecha=' + fecha + ' attendees=' + (attendeesJson ? attendeesJson.length : 0));
       var row = db.prepare('SELECT * FROM eventos_rapidos WHERE id = ?').get(id);
       return { success: true, data: _rowToEvent(row) };
     } catch (err) {
@@ -172,9 +226,40 @@ function registerEventosRapidosHandlers(app, deps) {
       if (!existing) return { success: false, error: { code: 'NOT_FOUND', message: 'Evento no encontrado' } };
 
       var now = _nowIso();
-      db.prepare(
-        'UPDATE eventos_rapidos SET titulo = ?, fecha = ?, hora_inicio = ?, hora_fin = ?, tipo = ?, descripcion = ?, updated_at = ? WHERE id = ?'
-      ).run(titulo, fecha, horaInicio || null, horaFin || null, tipo, descripcion, now, id);
+      // 📦646-fix8 — Si el payload trae googleEventId, lo actualizamos. Si
+      // trae explícitamente null o cadena vacía, lo limpiamos (caso de
+      // re-sincronización). Si no trae la key, no tocamos la columna
+      // (preservamos el valor anterior).
+      var hasGoogleEventId = payload && Object.prototype.hasOwnProperty.call(payload, 'googleEventId');
+      var googleEventId = hasGoogleEventId
+        ? (payload.googleEventId ? String(payload.googleEventId) : null)
+        : undefined; // undefined = no tocar la columna
+      // 📦646-fix11 — Misma lógica para attendees. Si el payload trae la
+      // key (incluso con array vacío), actualizamos. Si no trae la key,
+      // preservamos el valor anterior en DB.
+      var hasAttendees = payload && Object.prototype.hasOwnProperty.call(payload, 'attendees');
+      var attendeesJson = null;
+      if (hasAttendees && Array.isArray(payload.attendees) && payload.attendees.length > 0) {
+        attendeesJson = JSON.stringify(payload.attendees.map(function (a) {
+          return String(a || '').trim();
+        }).filter(Boolean));
+      }
+      // Construir el UPDATE dinámicamente para no pisar columnas que el
+      // caller no mandó (preservar valor anterior en DB).
+      var sets = ['titulo = ?', 'fecha = ?', 'hora_inicio = ?', 'hora_fin = ?', 'tipo = ?', 'descripcion = ?', 'updated_at = ?'];
+      var params = [titulo, fecha, horaInicio || null, horaFin || null, tipo, descripcion, now];
+      if (hasGoogleEventId) {
+        sets.push('google_event_id = ?');
+        params.push(googleEventId);
+      }
+      if (hasAttendees) {
+        sets.push('attendees = ?');
+        params.push(attendeesJson);
+      }
+      params.push(id);
+      var sql = 'UPDATE eventos_rapidos SET ' + sets.join(', ') + ' WHERE id = ?';
+      var stmt = db.prepare(sql);
+      stmt.run.apply(stmt, params);
 
       _log('UPDATE', 'id=' + id);
       var row = db.prepare('SELECT * FROM eventos_rapidos WHERE id = ?').get(id);

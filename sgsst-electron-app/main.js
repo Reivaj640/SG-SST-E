@@ -1750,6 +1750,19 @@ ipcMain.handle('google-calendar:list', async (event, options) => {
   }
 });
 
+// 📦646-fix12 — Traer UN evento de Google por su ID. Safety net para el
+// edit modal cuando K+AIR no tiene attendees pero Google sí.
+ipcMain.handle('google-calendar:get', async (event, googleEventId) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var result = await googleCalendar.getEvent(configPath, googleEventId);
+    return result;
+  } catch (err) {
+    sendLog('[MAIN] google-calendar:get error: ' + (err.message || err), 'ERROR');
+    return { success: false, error: err.message || 'Error trayendo evento de Calendar' };
+  }
+});
+
 ipcMain.handle('google-calendar:create', async (event, ev) => {
   try {
     var configPath = getGoogleConfigPath();

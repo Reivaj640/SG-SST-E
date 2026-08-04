@@ -8,6 +8,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **🐛 Fixes críticos de Bandeja Integrada + Google Calendar (📦646 series, 13 fixes)** — Lote completo de correcciones para los problemas del calendario y la sincronización con Google Calendar.
+  - **📦643 Flicker calendario**: `loadEventsFromGoogle` ya no filtra contra `state.events` (causaba que eventos aceptados alternaran visible/oculto cada polling). Deduplicación al final sobre datos recién obtenidos.
+  - **📦644 Día de la semana incorrecto**: `WEEKDAY_LABELS` usaba `(getDay() + 6) % 7` pero el cálculo se hacía con índice de columna en vez del día real. Generaba desfase cuando el mes no empezaba en lunes.
+  - **📦646 Iframe adapter fallback**: `getApi()` helper con fallback a `window.parent.electronAPI`. Antes `adapter` era `undefined` dentro del iframe de Bandeja Integrada.
+  - **📦646-fix1 ID mismatch post-create**: `adapter.create()` asigna ID nuevo en DB. `saveEvent()` sincroniza `newEvent.id = res.data.id` para que el `adapter.update()` posterior funcione.
+  - **📦646-fix2 Google Calendar iframe fallback**: `saveEvent()` usa `getGoogleCalendarApi()` (con fallback) en vez de `window.electronAPI.googleCalendar` directo.
+  - **📦646-fix3 `fromGoogleEvent` usa kairId**: antes generaba `id: 'gcal-' + g.id`. Ahora `id: kairId || 'gcal-' + g.id` para que el dedup los una naturalmente.
+  - **📦646-fix4 `confirmModal()` reusable**: reemplaza el `confirm()` nativo. Promise-based, variantes `danger`/`primary`, atajos Enter/Esc, z-index 600000.
+  - **📦646-fix5 Delete handler dual-path**: detecta `rapido-*` vs `gcal-*`. `NOT_FOUND` fallback a Google. Cancelación automática a attendees con `sendUpdates:'all'`.
+  - **📦646-fix6 Dedup con 2 keys**: usa `googleEventId` Y `id` (cualquiera de las dos). Antes solo `googleEventId || id`, generaba duplicados.
+  - **📦646-fix7 Botones confirm modal prominentes**: nueva clase `.kair-event-modal__btn--danger-solid` (rojo sólido). Inline styles forzando especificidad. Sombra del modal más profunda.
+  - **📦646-fix8 Schema: `google_event_id`**: nueva columna en `eventos_rapidos`. Migración `ALTER TABLE` con try/catch. Update inteligente.
+  - **📦646-fix9 Calendario persistente post-save**: removido `state.calendarVisible = false` después de Guardar. Foco automático en "+ Crear" para batch event creation.
+  - **📦646-fix10 Edit modal: Asistentes + Google sync**: campo Asistentes pre-cargado + UPDATE/CREATE en Google con `sendUpdates:'all'`. Toast diferenciado.
+  - **📦646-fix11 Schema: `attendees`**: nueva columna JSON stringificado. Parse en `_rowToEvent` con fallback a texto plano legacy.
+  - **📦646-fix12 Bridge no persistía attendees**: el SQL de `INSERT` y `UPDATE` NO incluía `attendees` ni `google_event_id`. Resultado: cualquier evento con attendees quedaba con `attendees: []` en DB aunque Google sí los tuviera. Ahora se persisten correctamente.
+  - **📦646-fix13 Safety net en edit modal**: si el evento no tiene attendees locales pero tiene `googleEventId`, consulta a Google y los trae on-the-fly. Los persiste para futuras ediciones.
+- **🆕 Time Zone Google Calendar (📦646-tz)** — `toGoogleEvent()` y `upsertFromIcs()` ahora incluyen `timeZone: 'America/Bogota'`. Google Calendar API v3 rechaza `dateTime` naive con 400 desde 2024.
+- **🆕 Método `gcalApi.get()` (📦646-get)** — Nuevo handler IPC `google-calendar:get` para traer UN evento específico por ID.
+- **🎨 Iconos SVG Lucide en sidebar y headers (📦642, publicado v0.1.142)** — Reemplazo completo de PNG/FontAwesome por SVGs inline Lucide. Un solo color (currentColor heredado), más liviano.
+  - `renderer.js:3416` fix: el botón "Salir" usaba `iconImg.src = "assets/${salir.icon}"` (404 con el nuevo formato). Ahora `iconWrap.innerHTML = SIDEBAR_ICONS[salir.icon]`.
+- **⬆️ Botón flotante scroll-to-top/bottom (📦640, publicado v0.1.141)** — Clase reusable `ScrollToTopBottomButton` en `modules/shared/scroll-fab.js`.
+- **✏️ Editar/Eliminar filas en tabla de ausentismo (📦639, publicado v0.1.141)** — Botones outline, edit in-place, recálculo de días, auto-completar CIE-10.
+- **🆕 Hora visible en calendario semanal/diario (📦638, publicado v0.1.141)** — Bloques de eventos muestran la hora de inicio.
+
+### Fixed
+- Bug crítico en `main/eventos-rapidos-bridge.js`: el SQL de `INSERT` y `UPDATE` no incluía `attendees` ni `google_event_id`, por lo que ningún attendee nuevo se persistía en K+AIR.
+- Bug en dedup de `loadEventsFromIPC`: cuando K+AIR no tenía `googleEventId` persistido pero Google sí, los eventos se duplicaban. Ahora mergea attendees/htmlLink desde Google.
+- `renderer.js:3416` log_out 404: SVG icon name usado como path PNG.
+- Días de la semana del calendario se mostraban corridos cuando el mes no empezaba en lunes.
+
+## [0.1.142] - 2026-08-03
+
+### Added
+- **🎨 Iconos SVG Lucide en sidebar y headers (📦642)** — Reemplazo completo de PNG/FontAwesome por SVGs inline Lucide.
+- **🔧 Quitar BOM UTF-8 del package.json (📦641)** — El BOM rompía electron-rebuild. Fix reproducible con Python.
+
+## [0.1.141] - 2026-07-30
+
+### Added
+- **⬆️ Botón flotante scroll-to-top/bottom (📦640)**
+- **✏️ Editar/Eliminar filas en tabla de ausentismo (📦639)**
+- **🆕 Hora visible en calendario semanal/diario (📦638)**
+
+## [0.1.140] - 2026-07-30
+
+### Added
+- **🔄 Re-iteración del update UX** — Ajustes al flujo de auto-update publicado en v0.1.131.
+
+## [0.1.131] - 2026-07-22
+
+### Added
 - **🎯 Submódulo 3.1.3 Perfiles de cargo y Profesiograma (📦589, completo)** — Implementación end-to-end del profesiograma.
   - **Fase 1 (backend)**: Bridge IPC (`main/profesiograma-bridge.js`, 52 KB) con schema SQLite de 10 tablas (kp_*) y 26 handlers (CRUD para Empresa, Profesiograma, GrupoOcupacional, Cargo, TipoExamen, CargoExamen con I/P/R, DescripcionPrueba, Recomendacion, AlturaRequisito, Vacuna, VacunacionCargo, más select-excel y KPIs). Schema idempotente (`CREATE TABLE IF NOT EXISTS`), foreign keys con CASCADE, índices en columnas consultadas.
   - **Fase 2 (UI)**: Viewer con 6 vistas (home + Matriz + Pruebas + Recomendaciones + Vacunación + Alturas) en iframe autocontenido. Header con breadcrumb, tabs de navegación, dialog genérico para CRUD, búsqueda en la matriz, KPIs con skeleton y badges. Botón "Importar Excel" en el header que abre file picker filtrado (.xlsx/.xls) y dispara la importación. Botón "Volver" usa `postMessage` para regresar al home del módulo. CSS custom (no Bootstrap) con design system K+AIR (--primary #174ea6, --success, --warning, etc.).

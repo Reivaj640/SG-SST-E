@@ -290,10 +290,21 @@
     return { success: true, data: merged };
   }
 
+  // 📦646 (2026-08-03) — Fix iframe: el adapter ahora se usa desde la Bandeja
+  // Integrada (un iframe sin preload propio). `global.electronAPI` es `undefined`
+  // dentro del iframe, pero `global.parent.electronAPI` SÍ está disponible
+  // (el renderer padre tiene el preload). El mismo fallback que ya existía en
+  // `list()` ahora se aplica a create/update/remove.
+  function getApi() {
+    return (global.electronAPI)
+      || (global.parent && global.parent.electronAPI)
+      || {};
+  }
+
   // ── create ───────────────────────────────────────────────────────────
   // Solo type === 'rapido' se persiste. Otros se rechazan con error claro.
   async function create(ev) {
-    var api = global.electronAPI;
+    var api = getApi();
     if (!api || !api.eventosRapidos) {
       return { success: false, error: { message: 'eventosRapidos no disponible en electronAPI' } };
     }
@@ -308,7 +319,7 @@
 
   // ── update ───────────────────────────────────────────────────────────
   async function update(ev) {
-    var api = global.electronAPI;
+    var api = getApi();
     if (!api || !api.eventosRapidos) {
       return { success: false, error: { message: 'eventosRapidos no disponible' } };
     }
@@ -323,7 +334,7 @@
 
   // ── remove ───────────────────────────────────────────────────────────
   async function remove(id) {
-    var api = global.electronAPI;
+    var api = getApi();
     if (!api || !api.eventosRapidos) {
       return { success: false, error: { message: 'eventosRapidos no disponible' } };
     }

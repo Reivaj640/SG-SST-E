@@ -168,6 +168,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // calendar ya está en shared/google-auth.js (línea 82), no requiere re-autorización.
   googleCalendar: {
     list: (options) => ipcRenderer.invoke('google-calendar:list', options),
+    get: (googleEventId) => ipcRenderer.invoke('google-calendar:get', googleEventId),
     create: (event) => ipcRenderer.invoke('google-calendar:create', event),
     update: (payload) => ipcRenderer.invoke('google-calendar:update', payload),
     delete: (googleEventId) => ipcRenderer.invoke('google-calendar:delete', googleEventId),

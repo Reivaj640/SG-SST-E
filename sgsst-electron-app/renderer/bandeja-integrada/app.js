@@ -664,7 +664,92 @@
       node.style.opacity = "0";
       node.style.transition = "opacity 200ms ease";
       setTimeout(() => node.remove(), 200);
-    }, 3500);
+    }, (typeof duration === "number" && duration > 0) ? duration : 3500);
+  }
+
+  // 📦646-fix4 — Modal de confirmación moderno (reemplaza confirm() nativo).
+  // Devuelve una Promise<boolean>: true si confirma, false si cancela.
+  // Mismo estilo visual que el resto de los modales de K+AIR (kair-modal-overlay,
+  // kair-modal, kair-modal__header, etc). Se inyecta/elimina dinámicamente.
+  // Variantes: "danger" (botón rojo para eliminar), "primary" (botón azul default).
+  function confirmModal({ title, desc = "", confirmText = "Confirmar", cancelText = "Cancelar", variant = "danger" }) {
+    return new Promise(function (resolve) {
+      // Icono según variant
+      var iconSvg = variant === "danger"
+        ? '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>'
+        : '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+      var iconColor = variant === "danger" ? "var(--kair-danger, #dc2626)" : "var(--kair-primary, #174ea6)";
+      // 📦646-fix7 — Botones con las clases reales del design system de K+AIR.
+      // Antes usaba kair-btn (no existía) → caía al estilo default del browser.
+      // Ahora: Cancelar = .kair-event-modal__btn (base, blanco con border),
+      //        Eliminar = .kair-event-modal__btn--danger-solid (rojo sólido, más prominente)
+      var cancelClass = "kair-event-modal__btn";
+      var confirmClass = variant === "danger"
+        ? "kair-event-modal__btn kair-event-modal__btn--danger-solid"
+        : "kair-event-modal__btn kair-event-modal__btn--primary";
+      // 📦646-fix7 — Padding/font más prominente para que los botones no
+      // queden chiquitos (el base .kair-event-modal__btn tiene 7px 14px / 0.8rem
+      // pensado para chips en una fila, no para acciones críticas).
+      // IMPORTANTE: para el "Eliminar" forzamos background y border-color en
+      // el inline style porque el CSS base .kair-event-modal__btn (background:#fff)
+      // puede ganar por especificidad de orden si el .css se cachea en el
+      // iframe. Inline style > cualquier clase CSS.
+      var btnBaseStyle = "padding: 9px 18px; font-size: 0.875rem; font-weight: 600; border-radius: 6px; min-width: 110px; text-align: center; cursor: pointer;";
+      var cancelStyle = btnBaseStyle + "color: var(--kair-text-strong, #1a1a2e); background: #fff; border-color: var(--kair-border, #d0d5dd);";
+      var confirmStyle = variant === "danger"
+        ? btnBaseStyle + "color: #fff; background: #dc2626; border-color: #dc2626;"
+        : btnBaseStyle + "color: #fff; background: var(--kair-primary, #174ea6); border-color: var(--kair-primary, #174ea6);";
+
+      // Crear el overlay + modal
+      var overlay = el("div", { class: "kair-modal-overlay" });
+      overlay.style.cssText = "z-index: 600000; background: rgba(15, 23, 42, 0.55);"; // encima del modal de detalle (500000), un poco más oscuro para destacar
+      var modal = el("div", { class: "kair-card kair-modal" });
+      modal.style.cssText = "max-width: 440px; width: 100%; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25), 0 4px 12px rgba(0, 0, 0, 0.15); border-radius: 10px;";
+      modal.innerHTML = `
+        <div class="kair-modal__header" style="padding: 16px 20px;">
+          <div class="kair-modal__title" style="font-size: 1.05rem; font-weight: 600; color: var(--kair-text-strong, #202124);">
+            <span style="color:${iconColor}; display:inline-flex; flex-shrink: 0;">${iconSvg}</span>
+            <span>${escapeHtml(title)}</span>
+          </div>
+        </div>
+        <div class="kair-modal__body" style="padding: 8px 20px 20px; color: var(--kair-text-body, #1a1a2e); font-size: 0.9375rem; line-height: 1.5;">
+          ${desc.split('\n').filter(function (l) { return l.trim(); }).map(function (l) {
+            return '<div style="margin-top: 10px;">' + escapeHtml(l).replace(/  /g, '&nbsp;&nbsp;') + '</div>';
+          }).join('')}
+        </div>
+        <div class="kair-modal__footer" style="padding: 14px 20px; background: #f8f9fa; border-top: 1px solid #e9ecef; border-radius: 0 0 10px 10px;">
+          <button type="button" class="${cancelClass}" style="${cancelStyle}" data-kair-confirm="cancel">${escapeHtml(cancelText)}</button>
+          <button type="button" class="${confirmClass}" style="${confirmStyle}" data-kair-confirm="ok">${escapeHtml(confirmText)}</button>
+        </div>
+      `;
+      overlay.appendChild(modal);
+      document.body.appendChild(overlay);
+
+      function cleanup(result) {
+        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        document.removeEventListener("keydown", onKey);
+        resolve(result);
+      }
+      function onKey(e) {
+        if (e.key === "Escape") cleanup(false);
+        if (e.key === "Enter") cleanup(true);
+      }
+      overlay.addEventListener("click", function (e) {
+        // Click en el overlay (fuera del modal) = cancelar
+        if (e.target === overlay) cleanup(false);
+      });
+      modal.addEventListener("click", function (e) {
+        var btn = e.target.closest("[data-kair-confirm]");
+        if (!btn) return;
+        cleanup(btn.getAttribute("data-kair-confirm") === "ok");
+      });
+      document.addEventListener("keydown", onKey);
+      // Focus en el botón de confirmar para que Enter funcione intuitivamente
+      setTimeout(function () {
+        var okBtn = modal.querySelector("[data-kair-confirm='ok']");
+        if (okBtn) okBtn.focus();
+      }, 50);
+    });
   }
 
   // FIX loop 34 — Toast con botón "Deshacer" para undo de envío
@@ -893,8 +978,13 @@
     return null;
   }
 
-  // 📦596 — F3.C: trae eventos de Google Calendar en un rango y los agrega
-  // a state.events (deduplicando por googleEventId). Best-effort.
+  // 📦596 — F3.C: trae eventos de Google Calendar en un rango. Best-effort.
+  // 📦643 (2026-08-03) — Fix flicker: NO filtrar contra `state.events` aquí.
+  // Antes: el filtro contra state.events hacía que los Google aceptados se
+  // perdieran en cada polling (porque state.events cambia con cada `state.events =`
+  // y el filtro los excluía en el siguiente poll). Ahora devolvemos TODOS los
+  // eventos de Google y la deduplicación se hace al FINAL en loadEventsFromIPC
+  // sobre los datos recién obtenidos (no sobre state.events volátil).
   async function loadEventsFromGoogle(rangeStart, rangeEnd) {
     var gcal = getGoogleCalendarApi();
     if (!gcal) return [];
@@ -904,13 +994,11 @@
         timeMax: rangeEnd || new Date(Date.now() + 60 * 86400000).toISOString()
       });
       if (!res || !res.success || !Array.isArray(res.data)) return [];
-      // Filtrar duplicados por googleEventId
-      var existing = {};
-      (state.events || []).forEach(function (e) {
-        if (e && e.googleEventId) existing[e.googleEventId] = true;
-      });
       return res.data.filter(function (e) {
-        return e && e.googleEventId && !existing[e.googleEventId];
+        // Solo descartamos eventos sin googleEventId (no se pueden deduplicar).
+        // El filtro de duplicados se hace en loadEventsFromIPC sobre los datos
+        // recién obtenidos.
+        return e && e.googleEventId;
       });
     } catch (err) {
       console.warn("[BandejaIntegrada] No se pudieron traer eventos de Google Calendar:", err);
@@ -965,7 +1053,64 @@
         } catch (gcErr) {
           console.warn("[BandejaIntegrada] Sync con Google Calendar no completado:", gcErr);
         }
-        return normalized;
+        // 📦643 (2026-08-03) — Deduplicar al FINAL sobre los datos recién
+        // obtenidos (Excel + Google). Antes se deduplicaba contra state.events
+        // en loadEventsFromGoogle, lo que hacía que los Google aceptados
+        // alternaran visible/oculto en cada polling (flicker). Ahora cada
+        // poll trae un set consistente.
+        // 📦646-fix6 — Usar AMBAS keys (googleEventId Y id) para dedup. El
+        // K+AIR event en DB no tiene googleEventId persistido (la tabla
+        // eventos_rapidos no tiene esa columna), así que su key es solo
+        // el id="rapido-...". El Google event (vía kairId en extendedProperties)
+        // tiene id="rapido-..." Y googleEventId="googleXXX". Con la lógica
+        // vieja (googleEventId || id) las keys eran distintas y se duplicaban.
+        // Con esta nueva, si CUALQUIERA de las 2 keys ya está vista → dedup.
+        // 📦646-fix12 — Al descartar el duplicado, MERGEAR campos faltantes
+        // del evento de Google al evento de K+AIR (attendees, htmlLink,
+        // selfResponseStatus). Esto resuelve el caso de eventos viejos
+        // creados ANTES de que existiera la columna `attendees` en la DB:
+        // Google sí tiene los attendees, K+AIR no, y sin merge el edit
+        // modal los mostraba vacíos.
+        var seen = Object.create(null); // key -> event kept (K+AIR usually)
+        var deduped = [];
+        for (var di = 0; di < normalized.length; di++) {
+          var e = normalized[di];
+          if (!e) continue;
+          var keys = [];
+          if (e.googleEventId) keys.push(e.googleEventId);
+          if (e.id) keys.push(e.id);
+          if (keys.length === 0) { deduped.push(e); continue; } // sin id, dejamos pasar
+          // Buscar si alguna key matchea con un evento ya guardado
+          var existing = null;
+          for (var k = 0; k < keys.length; k++) {
+            if (seen[keys[k]]) { existing = seen[keys[k]]; break; }
+          }
+          if (existing) {
+            // Merge: si el evento guardado (K+AIR) le faltan campos que el
+            // nuevo (Google) sí tiene, copiarlos. El criterio "guardado es
+            // K+AIR" se cumple porque el orden es: primero K+AIR (adapter.list),
+            // después Google (loadEventsFromGoogle). Si el orden fuera inverso
+            // (Google primero), el guardado sería Google y la merge sería
+            // simétrica.
+            var mergeFields = ['attendees', 'htmlLink', 'selfResponseStatus', 'organizer', 'hangoutLink', 'conferenceData'];
+            for (var fi = 0; fi < mergeFields.length; fi++) {
+              var field = mergeFields[fi];
+              if (Array.isArray(e[field]) && e[field].length > 0) {
+                if (!Array.isArray(existing[field]) || existing[field].length === 0) {
+                  existing[field] = e[field];
+                }
+              } else if (e[field] && !existing[field]) {
+                existing[field] = e[field];
+              }
+            }
+          } else {
+            deduped.push(e);
+            for (var m = 0; m < keys.length; m++) {
+              seen[keys[m]] = e;
+            }
+          }
+        }
+        return deduped;
       }
       console.warn("[BandejaIntegrada] adapter.list() no retorno datos válidos, usando mocks");
       return D.EVENTS.slice();
@@ -1900,22 +2045,80 @@
         refreshEvents();
       });
     });
-    modal.querySelector("[data-action='delete']").addEventListener("click", function () {
-      if (!confirm("¿Eliminar este evento?\n\n" + titleStr + "\n\nEsta acción no se puede deshacer.")) return;
-      // F4-fix: eliminar via adapter (eventosRapidos solo acepta 'rapido-*')
-      if (adapter && adapter.remove) {
-        adapter.remove(ev.id).then(function (r) {
+    modal.querySelector("[data-action='delete']").addEventListener("click", async function () {
+      // 📦646-fix4 — Reemplazar confirm() nativo con confirmModal moderno.
+      // Antes: confirm() del browser (estilo sistema operativo, anti-patrón UX).
+      // Ahora: modal con el mismo estilo que el resto de los modales K+AIR.
+      const ok = await confirmModal({
+        title: "¿Eliminar este evento?",
+        desc: titleStr + "\n\nEsta acción no se puede deshacer. Si el evento tiene invitados, se les enviará una cancelación automática.",
+        confirmText: "Eliminar",
+        cancelText: "Cancelar",
+        variant: "danger"
+      });
+      if (!ok) return;
+
+      // 📦646-fix4 — Detectar formato del ID y elegir el handler correcto.
+      // Eventos con id "rapido-*" → vienen de K+AIR DB → adapter.remove
+      // Eventos con id "gcal-*" → vienen de Google Calendar (sin contraparte K+AIR
+      //   todavía, ej: eventos duplicados viejos o nativos de Google) → gcalApi.delete
+      const isRapido = typeof ev.id === "string" && ev.id.indexOf("rapido-") === 0;
+      const isGcal = typeof ev.id === "string" && ev.id.indexOf("gcal-") === 0;
+      const googleEventId = ev.googleEventId || (isGcal ? ev.id.replace(/^gcal-/, "") : null);
+
+      try {
+        if (isRapido && adapter && adapter.remove) {
+          // Delete K+AIR primero. Si tiene googleEventId, también borrar de Google
+          // para que la próxima sync no traiga un "fantasma" del evento.
+          const r = await adapter.remove(ev.id);
           if (r && r.success) {
-            toast("Evento eliminado", titleStr, "success");
-            closeModal();
-            if (window.__kairBandejaCalendar) {
-              window.__kairBandejaCalendar._loadEvents().then(function () { window.__kairBandejaCalendar._refresh(); });
+            // K+AIR delete OK. Si hay contraparte en Google, también la borramos
+            // (con sendUpdates:'all' → cancela a los invitados automáticamente)
+            if (googleEventId && getGoogleCalendarApi()) {
+              try {
+                await getGoogleCalendarApi().delete(googleEventId);
+              } catch (gErr) {
+                console.warn("[BandejaIntegrada][DELETE] No se pudo borrar de Google:", gErr);
+              }
             }
-            refreshEvents();
+          } else if (r && r.error && r.error.code === "NOT_FOUND" && googleEventId && getGoogleCalendarApi()) {
+            // 📦646-fix5 — El evento no está en K+AIR DB pero SÍ en Google Calendar
+            // (caso típico: usuario lo borró antes de K+AIR, o el evento solo existe
+            // en Google). Fallback: borrar directamente de Google.
+            const gRes = await getGoogleCalendarApi().delete(googleEventId);
+            if (!gRes || !gRes.success) {
+              toast("No se pudo eliminar de Google", (gRes && gRes.error) || "Error desconocido", "error");
+              return;
+            }
           } else {
-            toast("No se puede eliminar", (r && r.error && r.error.message) || "Solo eventos personales (rapido) son editables", "info");
+            toast("No se puede eliminar", (r && r.error && r.error.message) || "Error desconocido", "error");
+            return;
           }
-        }).catch(function (e) { toast("Error", e.message, "error"); });
+        } else if (isGcal && googleEventId) {
+          // Delete Google directamente (evento nativo o duplicado viejo)
+          const gcalApi = getGoogleCalendarApi();
+          if (!gcalApi) {
+            toast("Google Calendar no disponible", "Conectá Gmail en Configuración para eliminar este evento", "warning");
+            return;
+          }
+          const r = await gcalApi.delete(googleEventId);
+          if (!r || !r.success) {
+            toast("No se pudo eliminar de Google", (r && r.error) || "Error desconocido", "error");
+            return;
+          }
+        } else {
+          toast("No se puede eliminar", "Tipo de evento no soportado para eliminar", "info");
+          return;
+        }
+        toast("Evento eliminado", titleStr, "success");
+        closeModal();
+        if (window.__kairBandejaCalendar) {
+          window.__kairBandejaCalendar._loadEvents().then(function () { window.__kairBandejaCalendar._refresh(); });
+        }
+        refreshEvents();
+      } catch (e) {
+        console.error("[BandejaIntegrada][DELETE] Error:", e);
+        toast("Error eliminando", e && e.message ? e.message : String(e), "error");
       }
     });
   }
@@ -1923,7 +2126,7 @@
   // F4 — Modal de crear/editar evento
   // Usado cuando el user hace click en una celda vacía del calendario
   // o hace click en "Editar" desde el modal de detalle.
-  function openEventCreateModal(ev, adapter, onSaved) {
+  async function openEventCreateModal(ev, adapter, onSaved) {
     // Si `ev` es null → crear nuevo. Si tiene id → editar existente.
     var isEdit = ev && ev.id;
     var titleVal = isEdit ? (ev.title || "") : "";
@@ -1933,6 +2136,40 @@
     var locationVal = (isEdit && ev.location) || "";
     var notesVal = (isEdit && (ev.notes || ev.description)) || "";
     var categoryVal = (isEdit && ev.category) || "rapido";
+    // 📦646-fix10 — Pre-cargar los asistentes actuales como texto separado
+    // por comas. Si el ev tiene attendees array → join. Si es string → usar
+    // directo. Si no tiene → empty.
+    var attendeesVal = "";
+    if (isEdit && ev.attendees) {
+      attendeesVal = Array.isArray(ev.attendees) ? ev.attendees.join(", ") : String(ev.attendees);
+    }
+    // 📦646-fix12 — Safety net: si el evento fue creado ANTES del schema
+    // migration (no tiene attendees en DB) pero sí está en Google Calendar
+    // (tiene googleEventId), traer los attendees de Google como fallback.
+    // Esto pasa con eventos viejos como "Prueba de agenda con varios correos"
+    // que sí tienen attendees en Google pero no en K+AIR.
+    if (isEdit && (!ev.attendees || (Array.isArray(ev.attendees) && ev.attendees.length === 0)) && ev.googleEventId) {
+      try {
+        console.log("[BandejaIntegrada][EDIT-MODAL] attendees vacíos, consultando Google por", ev.googleEventId);
+        var gcalApi = getGoogleCalendarApi();
+        if (gcalApi && typeof gcalApi.get === "function") {
+          var gRes = await gcalApi.get(ev.googleEventId);
+          if (gRes && gRes.success && gRes.data && Array.isArray(gRes.data.attendees) && gRes.data.attendees.length > 0) {
+            ev.attendees = gRes.data.attendees;
+            attendeesVal = gRes.data.attendees.map(function (a) { return a && a.email ? a.email : a; }).filter(Boolean).join(", ");
+            console.log("[BandejaIntegrada][EDIT-MODAL] attendees de Google cargados:", attendeesVal);
+            // Persistir los attendees en K+AIR para futuras ediciones
+            try {
+              await adapter.update(Object.assign({}, ev, { attendees: gRes.data.attendees.map(function (a) { return a && a.email ? a.email : a; }).filter(Boolean) }));
+            } catch (uErr) {
+              console.warn("[BandejaIntegrada][EDIT-MODAL] No se pudieron persistir attendees:", uErr);
+            }
+          }
+        }
+      } catch (gErr) {
+        console.warn("[BandejaIntegrada][EDIT-MODAL] Error trayendo attendees de Google:", gErr);
+      }
+    }
 
     var modal = document.getElementById("event-create-modal");
     if (!modal) {
@@ -1980,6 +2217,10 @@
             </select>
           </label>
           <label class="kair-event-modal__field">
+            <span>Asistentes</span>
+            <input type="text" name="attendees" value="${escapeHtml(attendeesVal)}" placeholder="correos separados por coma" />
+          </label>
+          <label class="kair-event-modal__field">
             <span>Notas</span>
             <textarea name="notes" rows="2" placeholder="Detalles adicionales...">${escapeHtml(notesVal)}</textarea>
           </label>
@@ -1997,12 +2238,29 @@
     modal.querySelector("[data-action='cancel']").addEventListener("click", closeModal);
     modal.addEventListener("click", function (e) { if (e.target === modal) closeModal(); });
 
-    modal.querySelector("[data-action='save']").addEventListener("click", function () {
+    modal.querySelector("[data-action='save']").addEventListener("click", async function () {
       var form = modal.querySelector("[data-form='event']");
       var data = Object.fromEntries(new FormData(form).entries());
       if (!data.title) { toast("Falta el título", "Agregá un título al evento", "warning"); return; }
+      // 📦646-fix10 — Parsear attendees del input (comma-separated) y
+      // detectar cuáles son NUEVOS (no estaban antes) para avisar al user
+      // cuántos se invitaron recién.
+      // 📦646-fix12 — Normalizar oldAttendees a strings (pueden venir como
+      // objetos {email, responseStatus} desde el safety net de Google).
+      var oldAttendeesRaw = (isEdit && ev && Array.isArray(ev.attendees)) ? ev.attendees : [];
+      var oldAttendees = oldAttendeesRaw.map(function (a) {
+        return typeof a === 'string' ? a : (a && a.email ? a.email : '');
+      }).filter(Boolean);
+      var newAttendees = (data.attendees || "")
+        .split(",")
+        .map(function (s) { return s.trim(); })
+        .filter(Boolean);
+      // Detectar los nuevos (los que están en new pero no en old)
+      var addedAttendees = newAttendees.filter(function (email) {
+        return oldAttendees.indexOf(email) === -1;
+      });
       var newEv = Object.assign({}, ev || {}, {
-        id: isEdit ? ev.id : ("rapido-" + Date.now()),
+        id: isEdit ? ev.id : ("rapido-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8)),
         title: data.title,
         date: data.date,
         start: data.start,
@@ -2010,18 +2268,100 @@
         location: data.location || "",
         notes: data.notes || "",
         category: data.category,
-        type: data.category
+        type: data.category,
+        attendees: newAttendees.length > 0 ? newAttendees : undefined
       });
-      var op = isEdit ? adapter.update(newEv) : adapter.create(newEv);
-      op.then(function (r) {
-        if (r && r.success) {
-          toast(isEdit ? "Evento actualizado" : "Evento creado", newEv.title, "success");
-          closeModal();
-          if (typeof onSaved === 'function') onSaved();
-        } else {
+      // Preservar el googleEventId del evento original (si tenía)
+      if (isEdit && ev && ev.googleEventId) {
+        newEv.googleEventId = ev.googleEventId;
+      }
+      try {
+        var op = isEdit ? adapter.update(newEv) : adapter.create(newEv);
+        var r = await op;
+        if (!r || !r.success) {
           toast("No se pudo guardar", (r && r.error && r.error.message) || "Error", "error");
+          return;
         }
-      }).catch(function (e) { toast("Error", e.message, "error"); });
+        // Si es edición, actualizar el id con el que devolvió la DB (en caso de cambio)
+        if (r.data && r.data.id && r.data.id !== newEv.id) {
+          newEv.id = r.data.id;
+        }
+        // 📦646-fix10 — Sync a Google Calendar (UPDATE si ya está en Google,
+        // CREATE si es nuevo). Solo eventos "rapido" o "plan" se sincronizan
+        // (otros tipos como "capacitacion" o "auditoria" no se envían a Google
+        // porque su módulo origen los maneja).
+        var gcalApi = getGoogleCalendarApi();
+        if (gcalApi && (newEv.category === 'rapido' || newEv.category === 'plan')) {
+          try {
+            var gRes;
+            if (newEv.googleEventId) {
+              // UPDATE en Google. sendUpdates:'all' es el default de Google:
+              // notifica a TODOS los attendees (los nuevos reciben "Invitación",
+              // los existentes reciben "Actualización"). Google Calendar API
+              // no permite notificar SOLO a nuevos attendees en un solo call.
+              gRes = await gcalApi.update(newEv);
+            } else {
+              // CREATE en Google. Mismo limit: sendUpdates:'all' notifica a todos.
+              gRes = await gcalApi.create(newEv);
+              if (gRes && gRes.success && gRes.data && gRes.data.googleEventId) {
+                newEv.googleEventId = gRes.data.googleEventId;
+                // Persistir el googleEventId en K+AIR para próximos edits
+                try {
+                  await adapter.update(newEv);
+                } catch (uErr) {
+                  // No crítico
+                }
+              }
+            }
+            // 📦646-fix10 — Toast informativo diferenciado según si hubo
+            // asistentes nuevos o no. Avisa que Google notifica a TODOS
+            // (limitación del API) — el user puede elegir si quiere
+            // notificar manualmente a los nuevos por otro medio.
+            if (addedAttendees.length > 0) {
+              toast(
+                isEdit ? "Evento actualizado + invitación enviada" : "Evento creado + invitación enviada",
+                "Se invitó a " + addedAttendees.length + " asistente(s) nuevo(s). Google notificó a TODOS los attendees (es la única opción del API).",
+                "success",
+                6000
+              );
+            } else if (newAttendees.length > 0) {
+              toast(
+                isEdit ? "Evento actualizado" : "Evento creado",
+                "Los " + newAttendees.length + " asistente(s) existentes fueron notificados del cambio.",
+                "info",
+                4000
+              );
+            } else {
+              toast(isEdit ? "Evento actualizado" : "Evento creado", newEv.title, "success");
+            }
+          } catch (gErr) {
+            // Si falla Google, igual avisamos que K+AIR guardó OK
+            console.warn("[BandejaIntegrada][SAVE] Error sincronizando con Google:", gErr);
+            toast(
+              isEdit ? "Evento actualizado (sin sync Google)" : "Evento creado (sin sync Google)",
+              "Guardado en K+AIR. Error con Google: " + (gErr.message || gErr),
+              "warning"
+            );
+          }
+        } else {
+          // No hay gcalApi o no es categoría sincronizable → toast simple
+          if (addedAttendees.length > 0) {
+            toast(
+              isEdit ? "Evento actualizado" : "Evento creado",
+              "Se invitaron " + addedAttendees.length + " asistente(s) nuevo(s) en K+AIR (no se sincronizó a Google).",
+              "success",
+              5000
+            );
+          } else {
+            toast(isEdit ? "Evento actualizado" : "Evento creado", newEv.title, "success");
+          }
+        }
+        closeModal();
+        if (typeof onSaved === 'function') onSaved();
+      } catch (e) {
+        console.error("[BandejaIntegrada][SAVE] Error:", e);
+        toast("Error guardando", e && e.message ? e.message : String(e), "error");
+      }
     });
   }
 
@@ -5562,7 +5902,19 @@
           <div class="kair-field">
             <label class="kair-field__label">${D.ICONS.calendarPlus} Fecha</label>
             <select class="kair-select" id="draft-date">
-              ${availableDates.map((iso, i) => `<option value="${iso}" ${d.date === iso ? "selected" : ""}>${D.WEEKDAY_LABELS[i % 7]} ${parseInt(iso.split("-")[2], 10)}</option>`).join("")}
+              ${availableDates.map((iso) => {
+                // 📦644 (2026-08-03) — Fix: antes usaba `WEEKDAY_LABELS[i % 7]` con
+                // el índice del array filtrado `availableDates`. Para meses que no
+                // empiezan en lunes (ej: agosto 2026 empieza en sábado), los días
+                // quedaban corridos (ej: día 6 jueves salía como "Sáb"). Ahora
+                // calculamos el día de la semana REAL de la fecha ISO.
+                // Mediodía (T12:00:00) para evitar que zona horaria cambie el día.
+                // getDay(): DOM=0 ... SÁB=6. WEEKDAY_LABELS: LUN=0 ... DOM=6.
+                // Conversión: (getDay() + 6) % 7 → DOM=6, LUN=0, MAR=1, ..., SÁB=5.
+                var parsed = new Date(iso + "T12:00:00");
+                var dow = (parsed.getDay() + 6) % 7;
+                return `<option value="${iso}" ${d.date === iso ? "selected" : ""}>${D.WEEKDAY_LABELS[dow]} ${parseInt(iso.split("-")[2], 10)}</option>`;
+              }).join("")}
             </select>
           </div>
           <div class="kair-field">
@@ -5671,13 +6023,23 @@
     try {
       const res = await adapter.create(newEvent);
       if (res && res.success) {
+        // Actualizar newEvent.id con el ID asignado por la DB (si difiere del temporal)
+        if (res.data && res.data.id && res.data.id !== newEvent.id) {
+          newEvent.id = res.data.id;
+        }
         // Refrescar eventos desde el IPC para que aparezca en el calendario
         state.events = await loadEventsFromIPC();
         // 📦596 — F3.C: si Google Calendar está conectado, también crear el
         // evento allá. Es best-effort: si falla, no bloqueamos al usuario.
-        if (getGoogleCalendarApi()) {
+        // 📦646-fix2 — Usar el helper getGoogleCalendarApi() (que ya tiene
+        // fallback a window.parent.electronAPI para iframes) en vez de
+        // window.electronAPI.googleCalendar directo. Sin esto, dentro del
+        // iframe el global.electronAPI es undefined y la línea 5714 fallaba
+        // con "Cannot read properties of undefined (reading 'googleCalendar')".
+        var gcalApi = getGoogleCalendarApi();
+        if (gcalApi) {
           try {
-            var gRes = await window.electronAPI.googleCalendar.create(newEvent);
+            var gRes = await gcalApi.create(newEvent);
             if (gRes && gRes.success && gRes.data && gRes.data.googleEventId) {
               // Guardar el googleEventId en el evento local para evitar duplicados
               // en próximos syncs. El adapter debe soportar el update con este campo.
@@ -5732,9 +6094,17 @@
       toast("Error guardando el evento", err && err.message ? err.message : "error", "error");
     }
     closeEventModal();
-    // Tras guardar, ocultamos el calendario overlay para volver al correo
-    state.calendarVisible = false;
+    // 📦646-fix9 — Tras guardar, el calendario se MANTIENE visible.
+    // Antes se cerraba (state.calendarVisible = false) y el user tenía que
+    // volver a abrirlo manualmente para crear otro evento. Ahora se queda
+    // abierto + se refresca la grilla para mostrar el evento nuevo.
+    // Si el user quiere volver al correo, hace click en la flecha ← del
+    // sidebar o en el toggle del panel.
     render();
+    // Foco automático en el botón "+ Crear" para que pueda seguir
+    // agendando sin tener que mover el mouse
+    var createBtn = document.querySelector(".kair-cal-create-btn, [data-kair-action='create-event']");
+    if (createBtn) setTimeout(function () { createBtn.focus(); }, 50);
   }
 
   // ====== Footer ======

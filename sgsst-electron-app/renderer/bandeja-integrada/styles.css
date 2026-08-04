@@ -1546,6 +1546,25 @@ body {
   border-color: #dc3545;
 }
 
+/* 📦646-fix7 — Variante "danger solid" del botón para el confirmModal.
+   Antes el "Eliminar" usaba la variante --danger (outline rojo) que era
+   poco prominente para una acción destructiva. Esta variante es la misma
+   paleta pero con fondo rojo sólido + texto blanco, mucho más visible
+   para que el user no la accione por accidente. Hover: rojo más oscuro. */
+.kair-event-modal__btn--danger-solid {
+  background: var(--kair-danger, #dc2626);
+  color: #fff;
+  border-color: var(--kair-danger, #dc2626);
+}
+.kair-event-modal__btn--danger-solid:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
+.kair-event-modal__btn--danger-solid:focus-visible {
+  outline: 2px solid #fca5a5;
+  outline-offset: 2px;
+}
+
 .kair-event-modal__btn--secondary {
   color: var(--kair-text-muted);
   background: transparent;
