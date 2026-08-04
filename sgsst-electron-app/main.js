@@ -15,7 +15,36 @@ try {
   console.warn('[MAIN] ⚠️ xlsx module not available, Excel features disabled:', e.message);
 }
 const os = require('os');
-const { autoUpdater } = require('electron-updater');
+// 📦648-fix2 — Try/catch al require de electron-updater.
+// RACE CONDITION: durante el auto-update, el instalador NSIS reemplaza
+// los archivos de la app. Si la nueva versión arranca antes de que
+// `node_modules\electron-updater` termine de copiarse, el require falla
+// y la app crashea con "Cannot find module 'electron-updater'". Ahora
+// capturamos el error y usamos un STUB no-op para que el resto del código
+// (config + listeners + checkForUpdates + downloadUpdate + quitAndInstall)
+// no crashee. La próxima vez que el user reinicie la app, el módulo ya
+// estará presente y el auto-update funcionará normal.
+let autoUpdater = null;
+try {
+  ({ autoUpdater } = require('electron-updater'));
+} catch (e) {
+  console.warn('[MAIN] ⚠️ electron-updater no disponible (probable update en curso):', e.message);
+  // Stub fallback: misma shape que el original, todas las funciones no-op.
+  // Cualquier setter de propiedad funciona (es un objeto JS normal).
+  autoUpdater = {
+    autoDownload: false,
+    autoInstallOnAppQuit: false,
+    autoRunAppAfterInstall: false,
+    disableDifferentialDownload: false,
+    requestHeaders: {},
+    timeout: 30000,
+    forceDevUpdateConfig: false,
+    on: function () { /* no-op */ },
+    checkForUpdates: function () { return Promise.resolve(null); },
+    downloadUpdate: function () { /* no-op */ },
+    quitAndInstall: function () { /* no-op */ }
+  };
+}
 const log = require('electron-log');
 const ExcelJS = require('exceljs');
 const Database = require('better-sqlite3');

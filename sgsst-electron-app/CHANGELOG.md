@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **📦648 · fix(installer): icono del escritorio + race condition electron-updater** — Fix de 2 bugs reportados al actualizar a v0.1.144.
+  - **📦648-fix1 Icono del escritorio desaparecido**: NSIS oneClick NO recrea accesos directos en updates. Agregado al `installer.nsh` `customInstall` macro: `Delete` + `CreateShortcut` del icono del escritorio (tanto en `C:\Users\Public\Desktop` con `SetShellVarContext all` como en `$DESKTOP` del usuario actual con `SetShellVarContext current`). Ahora cada update recrea el icono.
+  - **📦648-fix2 Race condition electron-updater**: el instalador NSIS a veces abre la nueva versión antes de que `node_modules\electron-updater` termine de copiarse. Resultado: crash con "Cannot find module 'electron-updater'". Agregado try/catch al require + stub fallback no-op (mismo shape que el original, todas las funciones son no-ops). La app arranca sin auto-update; en el próximo reinicio el módulo ya está presente.
 - **📦647 · feat(bandeja): panel "Mostrar detalles" con seguridad SPF/DKIM/DMARC/TLS** — Implementación estilo Gmail del panel expandible de detalles de correo.
   - **Paso 1 (UI básica)**: botón "Mostrar detalles" toggle, panel gris claro con campos `de`, `para`, `cc`, `fecha`, `asunto`, `id del mensaje`. CSS grid 2 columnas + animación fade-in 180ms.
   - **Paso 2 (headers + seguridad)**:
