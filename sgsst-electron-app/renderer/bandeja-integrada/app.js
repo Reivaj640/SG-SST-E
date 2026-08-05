@@ -5168,10 +5168,22 @@
                - El placeholder muestra "Para"/"Asunto" hasta que se escribe
                - Al hacer click o escribir, el placeholder desaparece (browser default)
                - Más limpio y menos elementos visuales -->
-          <input type="email" class="compose-panel__input" id="compose-to" value="${toValue.replace(/"/g, '&quot;')}" placeholder="Para" autocomplete="off" />
+          <div class="compose-panel__recipients" id="compose-to-recipients" data-target="compose-to">
+            ${toValue ? toValue.split(',').map(e => e.trim()).filter(Boolean).map(e => {
+              const display = e.replace(/[<>]/g, '');
+              return `<span class="compose-panel__chip" data-email="${display.replace(/"/g, '&quot;')}"><span class="compose-panel__chip-avatar">${(display.charAt(0) || '?').toUpperCase()}</span><span class="compose-panel__chip-name">${display.replace(/</g, '&lt;')}</span><span class="compose-panel__chip-remove" role="button" aria-label="Quitar">&times;</span></span>`;
+            }).join('') : ''}
+            <input type="text" class="compose-panel__chip-input" id="compose-to" placeholder="Para" autocomplete="off" />
+          </div>
           <div class="compose-panel__autocomplete" id="compose-to-autocomplete" hidden></div>
           ${mode === 'replyAll' ? `
-          <input type="text" class="compose-panel__input" id="compose-cc" value="${ccValue.replace(/"/g, '&quot;')}" placeholder="CC" autocomplete="off" />
+          <div class="compose-panel__recipients" id="compose-cc-recipients" data-target="compose-cc">
+            ${ccValue ? ccValue.split(',').map(e => e.trim()).filter(Boolean).map(e => {
+              const display = e.replace(/[<>]/g, '');
+              return `<span class="compose-panel__chip" data-email="${display.replace(/"/g, '&quot;')}"><span class="compose-panel__chip-avatar">${(display.charAt(0) || '?').toUpperCase()}</span><span class="compose-panel__chip-name">${display.replace(/</g, '&lt;')}</span><span class="compose-panel__chip-remove" role="button" aria-label="Quitar">&times;</span></span>`;
+            }).join('') : ''}
+            <input type="text" class="compose-panel__chip-input" id="compose-cc" placeholder="CC" autocomplete="off" />
+          </div>
           <div class="compose-panel__autocomplete" id="compose-cc-autocomplete" hidden></div>` : ''}
           <input type="text" class="compose-panel__input" id="compose-subject" value="${subjectValue.replace(/"/g, '&quot;')}" placeholder="Asunto" autocomplete="off" />
           <div class="compose-panel__field compose-panel__field--body" id="compose-body-field">
@@ -5460,9 +5472,28 @@
 
     // 7) Acción de enviar
     modal.querySelector("#compose-send-btn").addEventListener("click", function () {
+      // 📦652 — Gather emails from chips + remaining input text
+      function gatherEmails(containerId, inputId) {
+        var container = modal.querySelector("#" + containerId);
+        var input = modal.querySelector("#" + inputId);
+        var emails = [];
+        if (container) {
+          container.querySelectorAll(".compose-panel__chip").forEach(function (chip) {
+            var e = chip.getAttribute("data-email");
+            if (e) emails.push(e);
+          });
+        }
+        if (input && input.value.trim()) {
+          input.value.split(",").forEach(function (e) {
+            var t = e.trim();
+            if (t && emails.indexOf(t) === -1) emails.push(t);
+          });
+        }
+        return emails.join(", ");
+      }
       sendComposedMail({
-        to: modal.querySelector("#compose-to").value,
-        cc: modal.querySelector("#compose-cc") ? modal.querySelector("#compose-cc").value : "",
+        to: gatherEmails("compose-to-recipients", "compose-to"),
+        cc: mode === 'replyAll' ? gatherEmails("compose-cc-recipients", "compose-cc") : "",
         subject: modal.querySelector("#compose-subject").value,
         body: modal.querySelector("#compose-body").value,
         replyToMail: mail,
@@ -5548,17 +5579,18 @@
         // El user prefiere escribir el asunto libremente sin sugerencias.
         return;
       }
-      // Wire up click
+      // Wire up click — 📦652 — crear un chip al seleccionar
       Array.from(dropdownEl.querySelectorAll(".compose-panel__autocomplete-item")).forEach(function (item) {
         item.addEventListener("mousedown", function (e) {
           // mousedown (no click) para que se dispare antes del blur del input
           e.preventDefault();
           if (type === 'contact') {
             var email = item.getAttribute("data-email");
-            var current = (inputEl.value || '').trim();
-            var parts = current.split(',');
-            parts[parts.length - 1] = ' ' + email;
-            inputEl.value = parts.map(function (p) { return p.trim(); }).filter(Boolean).join(', ') + ', ';
+            var name = item.querySelector(".compose-panel__autocomplete-name");
+            var displayName = name ? name.textContent : email;
+            // Limpiar el texto del input y crear chip
+            inputEl.value = "";
+            addChip(inputEl, email, displayName);
           }
           dropdownEl.hidden = true;
           inputEl.focus();
@@ -5567,26 +5599,147 @@
       dropdownEl.hidden = false;
     }
 
+    // 📦652 — Helpers para el sistema de chips
+    function updateContainerHasChips(container) {
+      if (!container) return;
+      if (container.querySelectorAll(".compose-panel__chip").length > 0) {
+        container.classList.add("has-chips");
+      } else {
+        container.classList.remove("has-chips");
+      }
+    }
+    function addChip(inputEl, email, displayName) {
+      var container = inputEl.parentElement;
+      if (!container || !container.classList.contains("compose-panel__recipients")) return;
+      // Evitar duplicados
+      var exists = false;
+      container.querySelectorAll(".compose-panel__chip").forEach(function (c) {
+        if (c.getAttribute("data-email") === email) exists = true;
+      });
+      if (exists) {
+        inputEl.value = "";
+        return;
+      }
+      var chip = document.createElement("span");
+      chip.className = "compose-panel__chip";
+      chip.setAttribute("data-email", email);
+      var initial = (displayName || email).charAt(0).toUpperCase();
+      chip.innerHTML =
+        '<span class="compose-panel__chip-avatar">' + escapeHtml(initial) + '</span>' +
+        '<span class="compose-panel__chip-name">' + escapeHtml(displayName || email) + '</span>' +
+        '<span class="compose-panel__chip-remove" role="button" aria-label="Quitar">&times;</span>';
+      container.insertBefore(chip, inputEl);
+      updateContainerHasChips(container);
+      // Wire up remove
+      chip.querySelector(".compose-panel__chip-remove").addEventListener("mousedown", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        chip.remove();
+        updateContainerHasChips(container);
+      });
+    }
+    // Backspace en input vacío → borrar el último chip
+    function wireBackspaceRemoval(inputEl) {
+      inputEl.addEventListener("keydown", function (e) {
+        if (e.key === "Backspace" && inputEl.value === "") {
+          var container = inputEl.parentElement;
+          if (!container) return;
+          var chips = container.querySelectorAll(".compose-panel__chip");
+          if (chips.length > 0) {
+            chips[chips.length - 1].remove();
+            e.preventDefault();
+          }
+        }
+      });
+    }
+    // Comma o Enter en el input → convertir el texto actual en chip
+    function wireCommitOnSeparator(inputEl) {
+      inputEl.addEventListener("keydown", function (e) {
+        if (e.key === "," || e.key === "Enter") {
+          var text = inputEl.value.trim();
+          if (text) {
+            // Soportar formato "Nombre <email@x.com>" o "email@x.com"
+            var m = text.match(/<([^>]+)>/);
+            var email = m ? m[1] : text;
+            var name = m ? text.replace(/<[^>]+>/, "").trim() : email;
+            addChip(inputEl, email, name);
+            inputEl.value = "";
+            e.preventDefault();
+          }
+        }
+      });
+      // También commit en blur si queda texto
+      inputEl.addEventListener("blur", function () {
+        var text = inputEl.value.trim();
+        if (text) {
+          var m = text.match(/<([^>]+)>/);
+          var email = m ? m[1] : text;
+          var name = m ? text.replace(/<[^>]+>/, "").trim() : email;
+          addChip(inputEl, email, name);
+          inputEl.value = "";
+        }
+      });
+    }
+
     // Wire up autocomplete SOLO en Para y CC (NO en Asunto — el user prefiere escribirlo libre).
     var toInput = modal.querySelector("#compose-to");
     var toDropdown = modal.querySelector("#compose-to-autocomplete");
     var ccInput = modal.querySelector("#compose-cc");
     var ccDropdown = modal.querySelector("#compose-cc-autocomplete");
+    // 📦652 — Inicializar clase .has-chips si ya hay chips renderizados (caso reply)
+    var toContainer = modal.querySelector("#compose-to-recipients");
+    if (toContainer) {
+      updateContainerHasChips(toContainer);
+      // Wire up X en chips pre-renderizados
+      toContainer.querySelectorAll(".compose-panel__chip-remove").forEach(function (btn) {
+        btn.addEventListener("mousedown", function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          btn.closest(".compose-panel__chip").remove();
+          updateContainerHasChips(toContainer);
+        });
+      });
+    }
+    var ccContainer = modal.querySelector("#compose-cc-recipients");
+    if (ccContainer) {
+      updateContainerHasChips(ccContainer);
+      ccContainer.querySelectorAll(".compose-panel__chip-remove").forEach(function (btn) {
+        btn.addEventListener("mousedown", function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          btn.closest(".compose-panel__chip").remove();
+          updateContainerHasChips(ccContainer);
+        });
+      });
+    }
     if (toInput && toDropdown) {
       toInput.addEventListener("input", function () { renderAutocomplete(toInput, toDropdown, 'contact'); });
       toInput.addEventListener("blur", function () { setTimeout(function () { toDropdown.hidden = true; }, 200); });
       toInput.addEventListener("focus", function () { renderAutocomplete(toInput, toDropdown, 'contact'); });
       toInput.addEventListener("keydown", function (e) {
-        if (e.key === "Tab" || e.key === "Enter") {
+        if (e.key === "Tab") {
           var first = toDropdown.querySelector(".compose-panel__autocomplete-item");
           if (first) { e.preventDefault(); first.dispatchEvent(new MouseEvent("mousedown")); }
         }
+        if (e.key === "Enter") {
+          // Si hay dropdown visible, seleccionar el primero
+          if (!toDropdown.hidden) {
+            var firstEnter = toDropdown.querySelector(".compose-panel__autocomplete-item");
+            if (firstEnter) { e.preventDefault(); firstEnter.dispatchEvent(new MouseEvent("mousedown")); }
+          }
+        }
       });
+      // 📦652 — Convertir el texto tipeado en chip al presionar coma/Enter/blur
+      wireCommitOnSeparator(toInput);
+      wireBackspaceRemoval(toInput);
     }
     if (ccInput && ccDropdown) {
       ccInput.addEventListener("input", function () { renderAutocomplete(ccInput, ccDropdown, 'contact'); });
       ccInput.addEventListener("blur", function () { setTimeout(function () { ccDropdown.hidden = true; }, 200); });
       ccInput.addEventListener("focus", function () { renderAutocomplete(ccInput, ccDropdown, 'contact'); });
+      // 📦652 — Chips también para CC
+      wireCommitOnSeparator(ccInput);
+      wireBackspaceRemoval(ccInput);
     }
   }
 

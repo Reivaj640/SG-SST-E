@@ -2389,29 +2389,40 @@ body {
   max-width: 380px;
   min-width: 240px;
   background: #fff;
-  border: 1px solid var(--email-border-soft, #e5e7eb);
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  max-height: 240px;
+  /* 📦652 — Borde + sombra más prominentes para destacar el rectángulo. */
+  border: 1px solid #c4c7c5;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(60, 64, 67, 0.18), 0 1px 3px rgba(60, 64, 67, 0.12);
+  max-height: 280px;
   overflow-y: auto;
   z-index: 1000;
-  margin: 2px 0 0 0;
+  margin: 4px 0 0 0;
+  padding: 4px 0;
 }
 .compose-panel__autocomplete[hidden] { display: none !important; }
 .compose-panel__autocomplete-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
+  gap: 12px;
+  padding: 8px 14px;
   cursor: pointer;
-  border-bottom: 1px solid #f1f3f4;
-  transition: background 80ms ease;
+  /* 📦652 — Sin border-bottom, separador con margin. */
+  border-bottom: none;
+  margin: 0 4px;
+  border-radius: 6px;
+  transition: background 100ms ease;
+}
+.compose-panel__autocomplete-item + .compose-panel__autocomplete-item {
+  margin-top: 2px;
 }
 .compose-panel__autocomplete-item:last-child { border-bottom: none; }
-.compose-panel__autocomplete-item:hover { background: #f8f9fa; }
+.compose-panel__autocomplete-item:hover,
+.compose-panel__autocomplete-item.active {
+  background: #e8f0fe;
+}
 .compose-panel__autocomplete-avatar {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   background: var(--kair-primary, #1a73e8);
   color: #fff;
@@ -2419,7 +2430,7 @@ body {
   align-items: center;
   justify-content: center;
   font-weight: 500;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   flex-shrink: 0;
 }
 .compose-panel__autocomplete-info {
@@ -2427,7 +2438,7 @@ body {
   min-width: 0;
 }
 .compose-panel__autocomplete-name {
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   color: var(--kair-text-strong, #202124);
   font-weight: 500;
   overflow: hidden;
@@ -2435,17 +2446,114 @@ body {
   white-space: nowrap;
 }
 .compose-panel__autocomplete-email {
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   color: var(--kair-text-muted, #5f6368);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .compose-panel__autocomplete-count {
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   color: var(--kair-text-muted, #5f6368);
   font-family: monospace;
   flex-shrink: 0;
+  background: #f1f3f4;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+/* 📦652 — Sistema de chips para destinatarios (Para / CC) estilo Gmail.
+   El input "Para" se reemplaza por un container flex con chips (uno por
+   destinatario seleccionado) + input al final para seguir tipeando. */
+.compose-panel__recipients {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  /* 📦652 — Padding unificado con .compose-panel__input para alinear texto
+     con el campo Asunto. Mismo font-size + line-height + color de placeholder. */
+  padding: 8px 0;
+  margin: 4px 0;
+  min-height: 24px;
+  position: relative;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+.compose-panel__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px 3px 4px;
+  background: #e8f0fe;
+  border: 1px solid #d2e3fc;
+  border-radius: 16px;
+  font-size: 0.85rem;
+  color: var(--kair-text-strong, #202124);
+  max-width: 100%;
+  user-select: none;
+  line-height: 1.2;
+}
+.compose-panel__chip-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--kair-primary, #1a73e8);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.72rem;
+  flex-shrink: 0;
+}
+.compose-panel__chip-name {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-right: 2px;
+}
+.compose-panel__chip-remove {
+  cursor: pointer;
+  color: var(--kair-text-muted, #5f6368);
+  padding: 0 6px;
+  font-size: 1.1rem;
+  line-height: 1;
+  font-weight: 400;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 100ms ease;
+}
+.compose-panel__chip-remove:hover {
+  /* 📦652 — Solo cambio de color, sin fondo (sin look de botón redondo). */
+  color: var(--kair-primary, #1a73e8);
+}
+.compose-panel__chip-input {
+  border: none;
+  outline: none;
+  flex: 1;
+  min-width: 100px;
+  /* 📦652 — Unificado con .compose-panel__input (mismo font-size, color, padding) */
+  font-size: 0.875rem;
+  line-height: 1.5;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  color: var(--email-text-primary);
+  font-family: inherit;
+}
+.compose-panel__chip-input::placeholder {
+  /* 📦652 — Mismo color que .compose-panel__input::placeholder para que coincidan */
+  color: #cbd5e1;
+  font-weight: 400;
+}
+/* 📦652 — Cuando ya hay al menos 1 chip, el placeholder 'Para/CC' no debe
+   verse. Usamos :has() (soportado en Electron/Chromium moderno) + fallback
+   con clase .has-chips para mayor compatibilidad. */
+.compose-panel__recipients:has(> .compose-panel__chip) .compose-panel__chip-input::placeholder,
+.compose-panel__recipients.has-chips .compose-panel__chip-input::placeholder {
+  opacity: 0;
 }
 
 /* ---------- Estado MINIMIZADO (Gmail-style bottom-right) ---------- */

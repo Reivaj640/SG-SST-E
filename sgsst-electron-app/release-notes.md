@@ -1,4 +1,31 @@
-# K+AIR v0.1.149 (próximo release)
+# K+AIR v0.1.150 (próximo release)
+
+## 🎉 Novedades
+
+### ✉️ Modal Redactar: chips estilo Gmail (📦652)
+
+Rediseño completo del campo Para/CC del modal compose:
+
+- **Sistema de chips (pills) estilo Gmail**: cada destinatario seleccionado aparece como una pill con avatar + nombre + ×. El mismo estilo que el item de autocomplete seleccionado (fondo azul claro con borde).
+- **Comportamiento intuitivo**:
+  - Click en item del autocomplete → crea chip
+  - Coma/Enter en el input → convierte el texto tipeado en chip
+  - Backspace con input vacío → borra el último chip
+  - Click en × → elimina el chip
+  - Soporta formato `Nombre <email>` y `email` plano
+- **Placeholder "Para" se oculta** cuando hay al menos 1 chip
+- **Autocomplete con mejor visual**: borde + sombra más prominentes, items con border-radius, avatar más grande, hover azul claro.
+- **Alineación perfecta** entre Para y Asunto (mismo font-size, color, padding, line-height).
+- **X del chip sin look de botón**: solo cambio de color en hover (no círculo de fondo).
+- **Quitada la línea azul** de focus del campo.
+
+## 📦 Commits incluidos (1)
+
+- Próximo commit con bump 0.1.149 → 0.1.150
+
+---
+
+# K+AIR v0.1.149
 
 ## 🎉 Novedades
 

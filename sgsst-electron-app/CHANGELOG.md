@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.150] - 2026-08-05
+
+### Changed
+- **📦652 · feat(bandeja): chips estilo Gmail para destinatarios + autocomplete con mejor visual** — Rediseño completo del campo Para/CC del modal compose.
+  - **Sistema de chips (pills)**: el input de Para/CC se reemplaza por un container flex con chips (uno por destinatario) + input al final. Cada chip muestra avatar circular (1ra letra) + nombre + × para remover. Fondo azul claro (`#e8f0fe`) con borde (`#d2e3fc`), mismo estilo que el item de autocomplete seleccionado.
+  - **Comportamiento de chips**:
+    - Click en item del autocomplete → crea chip, limpia el input
+    - Tipear + coma/Enter → convierte el texto en chip
+    - Tipear + blur → convierte el texto en chip
+    - Backspace en input vacío → borra el último chip
+    - Click en × → elimina el chip
+    - Soporta formato "Nombre \<email\>" y "email@x.com" plano
+  - **Placeholder "Para" se oculta** cuando hay al menos 1 chip (CSS `:has()` + fallback JS `.has-chips` para compatibilidad).
+  - **Al enviar**: recolecta todos los emails (de chips + texto restante del input) y los junta con `, `.
+  - **Autocomplete con mejor visual**:
+    - Borde más prominente (`1px solid #c4c7c5`) + border-radius 8px
+    - Sombra con doble capa (`0 6px 18px ... 0 1px 3px ...`) → efecto elevado
+    - Items con `border-radius: 6px` + `margin: 0 4px` (sin border-bottom)
+    - Avatar 32×32 (antes 28×28)
+    - Hover/activo con fondo azul claro `#e8f0fe` (antes `#f8f9fa`)
+    - Count `9×` ahora en pill con background gris
+  - **Alineación perfecta** entre "Para" y "Asunto": mismo font-size (0.875rem), mismo line-height (1.5), mismo color de placeholder (`#cbd5e1`), mismo margin/padding. Visualmente quedan como un campo continuo.
+  - **Quitada la línea azul de focus** en el campo Para/CC (border-bottom + `:focus-within`). Más limpio.
+  - **X de chip sin look de botón**: hover cambia solo el color (de gris a azul), sin fondo redondo.
+
 ## [0.1.149] - 2026-08-04
 
 ### Changed
