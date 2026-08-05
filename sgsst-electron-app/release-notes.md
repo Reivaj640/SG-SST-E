@@ -1,3 +1,103 @@
+# K+AIR v0.1.148 (próximo release)
+
+## 🎉 Novedades
+
+### 📐 Polish visual del modal Redactar (📦650-ux)
+
+Tres ajustes finos sobre lo publicado en v0.1.147, basados en feedback visual del user:
+
+- **Grip del resize sutil** (estilo Windows) — 14×14 con 2 rayitas diagonales a opacidad 0.32, sin caja blanca, hover sube a opacidad 1. El cursor `nwse-resize` ya da la pista de que es interactivo. Antes: 18×18 amarillo/rojo debug que se veía invasivo.
+- **Autocomplete compacto Gmail-style** — `width: max-content` con `min 240px` y `max 380px`, anclado al input con `left: 16px`. Antes: estirado a todo el ancho del modal (700px). Si el email es muy largo, se trunca con ellipsis.
+- **Autocomplete SOLO en Para/CC, NO en Asunto** — el user prefiere escribir el asunto libremente. Removidos listeners, HTML del dropdown y la rama `type === 'subject'` de `renderAutocomplete`.
+
+## 📦 Commits incluidos (1)
+
+- `be0bd65e` 📦650-ux · fix(bandeja): grip del resize sutil + autocomplete compacto solo Para/CC
+
+---
+
+# K+AIR v0.1.147
+
+## 🎉 Novedades
+
+### ✉️ Modal Redactar potenciado (📦650)
+
+3 mejoras grandes al compose modal estilo Gmail:
+
+#### 📦650-fix1 — Resize custom del modal (drag desde esquina superior-izquierda)
+
+- Resize custom con `mousedown`/`mousemove`/`mouseup` (reemplaza al `resize: both` nativo que ponía el handle en bottom-right).
+- Calcula el espacio disponible del `#mail-detail-container` con `getBoundingClientRect()`. `maxW/maxH = rect - 24px` — el modal NUNCA supera el área del correo seleccionado.
+- `min 400×360` y fallback al viewport si la Bandeja Integrada está oculta.
+- Grip visual en la esquina **superior-izquierda** (per user request, no estándar OS).
+- **Fix bug crítico**: `position: relative` agregado a `.compose-panel` (sin esto, el grip con `position: absolute; top: 0; left: 0` se posicionaba relativo al overlay `position: fixed; inset: 0`, apareciendo en la esquina superior-izquierda del viewport fuera del modal).
+
+#### 📦650-fix2 — Autocomplete Gmail-style en destinatarios
+
+- Índice de contactos y subjects construido desde `state.mails` (instantáneo, sin IPC).
+- Frecuencia basada en apariciones en `sender + to_list + cc_list`.
+- Dropdown con avatar (1ra letra), nombre, email, count.
+- 2+ chars mínimo, click autocompleta, keyboard navigation (Tab/Enter).
+
+#### 📦650-fix3 — Preservar espacios entre párrafos al enviar correos
+
+- **Root cause**: `sendMessage` enviaba solo `text/plain` → Gmail colapsa espacios múltiples (RFC 5322).
+- **Fix**: `multipart/alternative` con `text/plain` + `text/html` (`<div style="white-space: pre-wrap;">`).
+- Soporte attachments con `multipart/mixed > multipart/alternative` anidado.
+- Gmail/Outlook web ahora preservan TODO (espacios, tabs, `\n`).
+
+## 📦 Commits incluidos (1)
+
+- `5041e641` 📦650 · fix(bandeja): resize custom del modal compose + autocomplete + preservar espacios
+
+---
+
+# K+AIR v0.1.146
+
+## 🎉 Novedades
+
+### 🛡️ Panel "Mostrar detalles" con seguridad SPF/DKIM/DMARC/TLS (📦647)
+
+Implementación estilo Gmail del panel expandible de detalles de correo, con análisis automático de la autenticación del mensaje:
+
+- **Paso 1 (UI básica)**: botón "Mostrar detalles" toggle, panel gris claro con campos `de`, `para`, `cc`, `fecha`, `asunto`, `id del mensaje`. CSS grid 2 columnas + animación fade-in 180ms.
+- **Paso 2 (headers + seguridad)**:
+  - `parseMailSecurity()` extrae `sentBy` (Return-Path), `signedBy` (DKIM-Signature `d=`), `encryptedWith` (TLS del último Received), y `spf`/`dkim`/`dmarc`/`arc` desde `Authentication-Results`.
+  - 2 columnas nuevas en `email_messages`: `raw_headers TEXT` y `mail_security TEXT`. Migraciones idempotentes.
+  - Pills de seguridad estilo Gmail (🟢 pass / 🟡 fail / ⚪ unknown).
+  - **Safety net on-the-fly**: al abrir el panel, si no hay headers locales, llama a `gmailApi.getMessage(id)` y re-renderiza con datos reales.
+
+### 🐛 Fix: correos leídos vuelven a aparecer como no leídos (📦649)
+
+Bug crítico del UPSERT en `email_threads`:
+- **Causa**: `saveThread` hacía `has_unread = excluded.has_unread` siempre, sobrescribiendo cualquier cambio local cuando llegaba un sync de Gmail.
+- **Síntoma**: el user abría un mail, al siguiente sync (1 min) el flag volvía a `true` porque Gmail aún tenía el label UNREAD.
+- **Fix**: `CASE WHEN` en el UPSERT para proteger flags "positivos" del user. Si el local tiene `has_unread=0` y Gmail dice `1`, MANTENEMOS `0`. Aplica también a `is_starred` y `is_important`.
+
+### 🐛 Fix: icono del escritorio + race condition electron-updater (📦648)
+
+- **📦648-fix1 Icono del escritorio desaparecido**: NSIS oneClick NO recrea accesos directos en updates. `installer.nsh` `customInstall` macro ahora hace `Delete` + `CreateShortcut` del icono en `C:\Users\Public\Desktop` (perMachine) y `$DESKTOP` del usuario actual.
+- **📦648-fix2 Race condition electron-updater**: el instalador NSIS a veces abre la nueva versión antes de que `node_modules\electron-updater` termine de copiarse. Try/catch al require + STUB fallback no-op. La app arranca sin auto-update hasta el próximo reinicio.
+
+### 🐛 Fixes críticos de Bandeja Integrada + Google Calendar (📦646 series, 13 fixes)
+
+Lote completo de correcciones para los problemas del calendario y la sincronización con Google Calendar:
+
+- 📦643 Flicker calendario — `loadEventsFromGoogle` ya no filtra contra `state.events`. Deduplicación al final sobre datos recién obtenidos.
+- 📦644 Día de la semana incorrecto — `WEEKDAY_LABELS` cálculo corregido.
+- 📦646 Iframe adapter fallback — `getApi()` helper con fallback a `window.parent.electronAPI`.
+- 📦646-fix1 a fix13 — ID mismatch, google calendar iframe fallback, fromGoogleEvent con kairId, confirmModal reusable, delete handler dual-path, dedup con 2 keys, botones confirm prominentes, schema `google_event_id`, calendario persistente, edit modal con attendees, schema `attendees`, bridge que persiste attendees, safety net en edit modal.
+- 📦646-tz — Time zone `America/Bogota` en `toGoogleEvent()` y `upsertFromIcs()`.
+- 📦646-get — Nuevos handlers IPC `google-calendar:get` y `google-gmail:get`.
+
+## 📦 Commits incluidos (3)
+
+- `aeb7a944` 📦647 · feat(bandeja): panel 'Mostrar detalles' con seguridad SPF/DKIM/DMARC/TLS
+- `964ee6ce` 📦648 · fix(installer): icono del escritorio + race condition electron-updater
+- `8e5384ef` 📦649 · fix(bandeja): correos leídos vuelven a aparecer como no leídos
+
+---
+
 # K+AIR v0.1.143 (working tree, próximo release)
 
 ## 🎉 Novedades principales

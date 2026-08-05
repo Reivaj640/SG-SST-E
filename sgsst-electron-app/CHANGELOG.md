@@ -5,17 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.148] - 2026-08-04
+
+### Changed
+- **📦650-ux · fix(bandeja): grip del resize sutil + autocomplete compacto solo Para/CC** — Polish visual post-v0.1.147.
+  - **Grip del resize sutil**: 14×14 (antes 18×18 debug amarillo/rojo), 2 rayitas diagonales a opacidad 0.32 (antes 3 rayitas a 0.55), background transparente sin caja blanca, opacidad general 0.7 que sube a 1 en hover. Mantiene `cursor: nwse-resize` para la pista de interactividad.
+  - **Autocomplete Gmail-style compacto**: `width: max-content` con `min-width: 240px` y `max-width: 380px` (antes estirado a `left:0; right:0` ocupando todo el modal). Anclado al input con `left: 16px`. Si el email es muy largo, se trunca con ellipsis.
+  - **Autocomplete SOLO en Para/CC, NO en Asunto**: el user prefiere escribir el asunto libremente sin sugerencias. Removidos los listeners de input/blur/focus en `#compose-subject`, removido el HTML `#compose-subject-autocomplete`, y la rama `type === 'subject'` en `renderAutocomplete` ahora hace `return` temprano.
+
+## [0.1.147] - 2026-08-04
 
 ### Added
+- **📦650 · feat(bandeja): resize custom del modal compose + autocomplete Gmail-style + preservar espacios** — 3 mejoras grandes al modal Redactar.
+  - **📦650-fix1 Resize custom del modal compose**:
+    - Resize custom con listeners `mousedown`/`mousemove`/`mouseup` (reemplaza al `resize: both` nativo que ponía el handle en bottom-right).
+    - Calcula el espacio disponible del `#mail-detail-container` con `getBoundingClientRect()`. `maxW = rect.width - 24`, `maxH = rect.height - 24` — el modal NUNCA supera el área del correo seleccionado.
+    - `min 400×360` y fallback al `viewport - 48px` si la Bandeja Integrada está oculta.
+    - Grip visual en la esquina **superior-izquierda** (per user request, no estándar OS).
+    - **Fix bug crítico**: `position: relative` agregado a `.compose-panel` (sin esto, el grip con `position: absolute; top: 0; left: 0` se posicionaba relativo al overlay `position: fixed; inset: 0`, no al panel, y aparecía en la esquina superior-izquierda del viewport fuera del modal).
+  - **📦650-fix2 Autocomplete Gmail-style en Para/Asunto**:
+    - Índice de contactos y subjects construido desde `state.mails` (instantáneo, sin IPC).
+    - Frecuencia basada en apariciones en `sender + to_list + cc_list`.
+    - Dropdown con avatar (1ra letra), nombre, email, count.
+    - 2+ chars mínimo, click autocompleta, keyboard navigation (Tab/Enter).
+    - CSS: `.compose-panel__autocomplete` con avatares y metadata.
+  - **📦650-fix3 Preservar espacios entre párrafos al enviar correos**:
+    - **Root cause**: `sendMessage` en `shared/google-gmail.js` enviaba solo `text/plain` → Gmail colapsa espacios múltiples (RFC 5322).
+    - **Fix**: `multipart/alternative` con `text/plain` + `text/html`.
+    - `buildHtmlFromText()`: escapa HTML, convierte `\n` a `<br>`, envuelve en `<div style="white-space: pre-wrap;">`.
+    - Soporte attachments con `multipart/mixed > multipart/alternative` anidado.
+    - Gmail/Outlook web muestran el HTML que preserva TODO (espacios, tabs, `\n`).
+
+## [0.1.146] - 2026-08-04
+
+### Fixed
 - **📦649 · fix(bandeja): correos leídos vuelven a aparecer como no leídos** — Bug crítico del UPSERT en `email_threads`.
   - **Root cause**: `saveThread` en `main/email-db.js` hacía `has_unread = excluded.has_unread` siempre, sobrescribiendo cualquier cambio local cuando llegaba un sync de Gmail.
   - **Síntoma**: el user abría un mail (frontend: `mail.unread = false`, backend: Gmail API + `propagateUnreadChange`) y al siguiente sync (1 min después) el flag volvía a `true` porque Gmail aún tenía el label UNREAD (sync fallido o no propagado).
-  - **Fix**: usar `CASE WHEN` en el UPSERT para proteger flags "positivos" del user. Solo se permite el cambio "positivo" (de 1 a 0 / de 0 a 1 desde Gmail). Si el cache local tiene `has_unread=0` y Gmail dice `1`, MANTENEMOS `0` (el user ya lo gestionó). Aplica también a `is_starred` y `is_important`.
+  - **Fix**: usar `CASE WHEN` en el UPSERT para proteger flags "positivos" del user. Si el cache local tiene `has_unread=0` y Gmail dice `1`, MANTENEMOS `0` (el user ya lo gestionó). Aplica también a `is_starred` y `is_important`.
   - **Aplicar cuando**: cualquier proyecto con sync bidireccional donde el flag local puede estar más actualizado que el servidor remoto.
 - **📦648 · fix(installer): icono del escritorio + race condition electron-updater** — Fix de 2 bugs reportados al actualizar a v0.1.144.
   - **📦648-fix1 Icono del escritorio desaparecido**: NSIS oneClick NO recrea accesos directos en updates. Agregado al `installer.nsh` `customInstall` macro: `Delete` + `CreateShortcut` del icono del escritorio (tanto en `C:\Users\Public\Desktop` con `SetShellVarContext all` como en `$DESKTOP` del usuario actual con `SetShellVarContext current`). Ahora cada update recrea el icono.
   - **📦648-fix2 Race condition electron-updater**: el instalador NSIS a veces abre la nueva versión antes de que `node_modules\electron-updater` termine de copiarse. Resultado: crash con "Cannot find module 'electron-updater'". Agregado try/catch al require + stub fallback no-op (mismo shape que el original, todas las funciones son no-ops). La app arranca sin auto-update; en el próximo reinicio el módulo ya está presente.
+
+### Added
 - **📦647 · feat(bandeja): panel "Mostrar detalles" con seguridad SPF/DKIM/DMARC/TLS** — Implementación estilo Gmail del panel expandible de detalles de correo.
   - **Paso 1 (UI básica)**: botón "Mostrar detalles" toggle, panel gris claro con campos `de`, `para`, `cc`, `fecha`, `asunto`, `id del mensaje`. CSS grid 2 columnas + animación fade-in 180ms.
   - **Paso 2 (headers + seguridad)**:
@@ -43,18 +76,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **📦646-fix12 Bridge no persistía attendees**: el SQL de `INSERT` y `UPDATE` NO incluía `attendees` ni `google_event_id`. Resultado: cualquier evento con attendees quedaba con `attendees: []` en DB aunque Google sí los tuviera. Ahora se persisten correctamente.
   - **📦646-fix13 Safety net en edit modal**: si el evento no tiene attendees locales pero tiene `googleEventId`, consulta a Google y los trae on-the-fly. Los persiste para futuras ediciones.
 - **🆕 Time Zone Google Calendar (📦646-tz)** — `toGoogleEvent()` y `upsertFromIcs()` ahora incluyen `timeZone: 'America/Bogota'`. Google Calendar API v3 rechaza `dateTime` naive con 400 desde 2024.
-- **🆕 Método `gcalApi.get()` (📦646-get)** — Nuevo handler IPC `google-calendar:get` para traer UN evento específico por ID.
+- **🆕 Método `gcalApi.get()` / `gmailApi.get()` (📦646-get)** — Nuevos handlers IPC `google-calendar:get` y `google-gmail:get` para traer UN evento/mensaje específico por ID. Usado por el safety net del edit modal y del Mostrar detalles.
 - **🎨 Iconos SVG Lucide en sidebar y headers (📦642, publicado v0.1.142)** — Reemplazo completo de PNG/FontAwesome por SVGs inline Lucide. Un solo color (currentColor heredado), más liviano.
   - `renderer.js:3416` fix: el botón "Salir" usaba `iconImg.src = "assets/${salir.icon}"` (404 con el nuevo formato). Ahora `iconWrap.innerHTML = SIDEBAR_ICONS[salir.icon]`.
 - **⬆️ Botón flotante scroll-to-top/bottom (📦640, publicado v0.1.141)** — Clase reusable `ScrollToTopBottomButton` en `modules/shared/scroll-fab.js`.
 - **✏️ Editar/Eliminar filas en tabla de ausentismo (📦639, publicado v0.1.141)** — Botones outline, edit in-place, recálculo de días, auto-completar CIE-10.
 - **🆕 Hora visible en calendario semanal/diario (📦638, publicado v0.1.141)** — Bloques de eventos muestran la hora de inicio.
-
-### Fixed
-- Bug crítico en `main/eventos-rapidos-bridge.js`: el SQL de `INSERT` y `UPDATE` no incluía `attendees` ni `google_event_id`, por lo que ningún attendee nuevo se persistía en K+AIR.
-- Bug en dedup de `loadEventsFromIPC`: cuando K+AIR no tenía `googleEventId` persistido pero Google sí, los eventos se duplicaban. Ahora mergea attendees/htmlLink desde Google.
-- `renderer.js:3416` log_out 404: SVG icon name usado como path PNG.
-- Días de la semana del calendario se mostraban corridos cuando el mes no empezaba en lunes.
 
 ## [0.1.142] - 2026-08-03
 
