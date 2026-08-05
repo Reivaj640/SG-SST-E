@@ -1,9 +1,11 @@
 # K+AIR — Contexto del Proyecto
 
 **Última actualización:** 5 de agosto de 2026
-**Versión actual:** 0.1.154 (próximo release) — publicado v0.1.146
+**Versión actual:** 0.1.155 (próximo release) — publicado v0.1.146
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 **Stack:** Electron 37 + vanilla JS + Python 3.11.9 (empaquetado) + SQLite (kair.db)
+
+> **🆕 v0.1.155 (📦657):** Bandeja Integrada — Enviados muestra destinatario en lugar de remitente. Bug de UX clásico: en la carpeta "Enviados", la lista y el detalle mostraban el remitente (siempre "yo") en vez del destinatario. Fix backend: `getThreadsFromCache` y `getThreadFromCache` ahora hacen LEFT JOIN correlated con `email_messages` para traer `to_list`/`cc_list` del último message. Fix frontend: nuevo helper `getMailDisplayContact(mail)` que retorna el contacto correcto según carpeta; avatar/sender name/búsqueda del lista y header/panel del detalle usan el contacto correcto. En SENT, el header muestra el destinatario + "de: yo" en gris, y el panel "Mostrar detalles" tiene orden Gmail-style Para → CC → De.
 
 > **🆕 v0.1.154 (📦656):** Gráfica "Capacitaciones Mensuales" del home de Recursos ahora coincide con el submódulo. Root cause: el algoritmo del home (`getCapacitacionesChartDataForGraph`) hardcodeaba las columnas del Excel (leía `row[3]` cuando la fecha real está en `row[5]`). Fix: reescritura completa del algoritmo con auto-detección de columnas leyendo el header, parser de fecha robusto (DMY/ISO/serial date/fallback), fallback offset ±2 columnas, y filtros estrictos de fila. La gráfica del home ahora muestra exactamente lo mismo que "Ejecución Mensual" del submódulo.
 

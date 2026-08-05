@@ -1,4 +1,26 @@
-# K+AIR v0.1.154 (próximo release)
+# K+AIR v0.1.155 (próximo release)
+
+## 🎉 Novedades
+
+### ✉️ Fix: Enviados muestra destinatario en lugar de remitente (📦657)
+
+Bug de UX clásico: en la carpeta Enviados, la lista y el detalle mostraban el remitente (siempre "yo") en vez del destinatario, igual que en Recibidos. Ahora muestra el destinatario como contacto principal, igual que Gmail/Outlook.
+
+- **Fix backend** (`email-db.js`): `getThreadsFromCache` y `getThreadFromCache` ahora hacen un LEFT JOIN correlated con `email_messages` para traer `to_list`/`cc_list` del último message de cada thread.
+- **Fix frontend** (`app.js`):
+  - Nuevo helper `getMailDisplayContact(mail)` que retorna el contacto correcto según carpeta. En SENT busca el destinatario en `to_list[0]`, después en `participants_list` (excluyendo al user), y como último recurso usa `sender`.
+  - Header del detalle: avatar y name usan el contacto correcto. En SENT, agrega una línea "de: yo" en gris pequeño.
+  - Panel "Mostrar detalles": en SENT el orden es Para → CC → De (estilo Gmail). En otras carpetas mantiene el orden clásico.
+  - Búsqueda de la lista también busca en destinatarios (importante para Enviados).
+- **Beneficio**: en la lista de Enviados el avatar y nombre muestran el destinatario desde el primer render. El detalle lo muestra como contacto principal con "de: yo" en gris.
+
+## 📦 Commits incluidos (1)
+
+- Próximo commit con bump 0.1.154 → 0.1.155
+
+---
+
+# K+AIR v0.1.154
 
 ## 🎉 Novedades
 

@@ -287,6 +287,46 @@
   const initials = (name) =>
     name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
 
+  // 📦657 — Helper: devuelve el "contacto visible" del mail según la carpeta.
+  // En Recibidos/Drafts el contacto principal es el remitente (sender).
+  // En Enviados, el contacto principal es el destinatario (to_list[0]) —
+  // es lo que muestra Gmail/Outlook para que el user identifique rápido
+  // a quién le escribió sin tener que abrir el correo.
+  // Devuelve { name, email, role } donde role es 'from' o 'to'.
+  //
+  // Fallback chain en SENT (porque to_list no siempre está populado):
+  //   1. mail.to_list[0] (viene de email_messages via loadMailBodyFromCache)
+  //   2. mail.participants_list (viene de thread.participants, excluye al user)
+  //   3. mail.sender (último recurso: muestra "yo", como hacía antes)
+  function getMailDisplayContact(mail) {
+    if (!mail) return { name: "", email: "", role: "from" };
+    var isSent = state.mailFolder === "SENT";
+    if (isSent) {
+      // 1. to_list cargado por loadMailBodyFromCache / safety net
+      if (mail.to_list && mail.to_list.length > 0) {
+        var to = mail.to_list[0];
+        return { name: to.name || to.email || "", email: to.email || "", role: "to" };
+      }
+      // 2. participants_list del thread (excluir al user)
+      if (mail.participants_list && mail.participants_list.length > 0) {
+        // Construir set de "yo" emails para excluir: state.gmailEmail (el de
+        // Gmail conectado) + mail.senderEmail (en SENT, el sender siempre
+        // es el user que envió). Si state.gmailEmail no se populó aún
+        // (getProfile async), al menos tenemos senderEmail como heurística.
+        var myEmails = {};
+        if (state.gmailEmail) myEmails[state.gmailEmail.toLowerCase()] = 1;
+        if (mail.senderEmail) myEmails[mail.senderEmail.toLowerCase()] = 1;
+        for (var pi = 0; pi < mail.participants_list.length; pi++) {
+          var p = mail.participants_list[pi];
+          if (p.email && !myEmails[p.email.toLowerCase()]) {
+            return { name: p.name || p.email, email: p.email, role: "to" };
+          }
+        }
+      }
+    }
+    return { name: mail.sender || "", email: mail.senderEmail || "", role: "from" };
+  }
+
   // 📦647-fix2 — Render del estado de seguridad (iconos + colores).
   // Devuelve HTML inline con badges de pass/fail para SPF, DKIM, DMARC y TLS.
   // Estilo Gmail: pill verde para "pass", amarillo para "fail", gris para
@@ -328,10 +368,19 @@
     var ccList = (mail.cc_list || []).map(function (a) {
       return escapeHtml(a.name ? a.name + ' <' + a.email + '>' : a.email);
     }).join(', ');
+    // 📦657 — En Enviados, el panel de detalles muestra primero "para/cc"
+    // y al final "de" (porque el remitente siempre es el user). En Recibidos
+    // y Borradores, mantiene el orden clásico "de → para/cc".
+    var isSentFolder = state.mailFolder === "SENT";
+    var fromRow = '<dt>de</dt><dd>' + escapeHtml(mail.sender || '') + ' &lt;' + escapeHtml(mail.senderEmail || '') + '&gt;</dd>';
+    var paraRow = toList ? '<dt>para</dt><dd>' + toList + '</dd>' : '';
+    var ccRow = ccList ? '<dt>cc</dt><dd>' + ccList + '</dd>' : '';
     var html = '<dl class="kair-mail-detail__details-list">';
-    html += '<dt>de</dt><dd>' + escapeHtml(mail.sender || '') + ' &lt;' + escapeHtml(mail.senderEmail || '') + '&gt;</dd>';
-    if (toList) html += '<dt>para</dt><dd>' + toList + '</dd>';
-    if (ccList) html += '<dt>cc</dt><dd>' + ccList + '</dd>';
+    if (isSentFolder) {
+      html += paraRow + ccRow + fromRow;
+    } else {
+      html += fromRow + paraRow + ccRow;
+    }
     html += '<dt>fecha</dt><dd>' + escapeHtml(formatGmailLongDate(mail.date)) + '</dd>';
     html += '<dt>asunto</dt><dd>' + escapeHtml(mail.subject || '(sin asunto)') + '</dd>';
     if (mail.mailSecurity && (mail.mailSecurity.sentBy || mail.mailSecurity.signedBy)) {
@@ -1471,7 +1520,18 @@
       label_ids: Array.isArray(thread.label_ids) ? thread.label_ids : [],  // F1-Feature1
       body: '',  // Fase 0: vacío. Se carga on-demand al abrir el thread.
       thread: thread,  // Metadatos completos del thread (para el detail panel)
-      messageCount: thread.message_count || 1  // F1-Feature6 — para badge "N mensajes"
+      messageCount: thread.message_count || 1,  // F1-Feature6 — para badge "N mensajes"
+      // 📦657-fix2 — Exponer participants como array normalizado (el backend
+      // guarda [{email, name}] en email_threads.participants). Sirve como
+      // fallback para mostrar el destinatario en SENT cuando aún no se
+      // cargó el body del thread (to_list todavía está vacío).
+      participants_list: Array.isArray(thread.participants) ? thread.participants : [],
+      // 📦657-fix3 — El backend (con el JOIN nuevo) ahora puede traer
+      // to_list/cc_list del último message. Lo guardamos acá para que
+      // getMailDisplayContact lo use directamente sin tener que abrir
+      // el detalle.
+      to_list: _coerceAddressList(thread.last_to_list),
+      cc_list: _coerceAddressList(thread.last_cc_list)
     };
   }
 
@@ -3353,7 +3413,10 @@
     }).filter((m) => {
       if (!state.searchQuery) return true;
       const q = state.searchQuery.toLowerCase();
+      // 📦657 — Búsqueda incluye también los destinatarios (importante para Enviados)
+      var toList = (m.to_list || []).map(function (a) { return (a.name || a.email || '').toLowerCase(); }).join(' ');
       return m.sender.toLowerCase().includes(q) ||
+             toList.includes(q) ||
              m.subject.toLowerCase().includes(q) ||
              m.preview.toLowerCase().includes(q);
     });
@@ -3703,7 +3766,18 @@
           // F1.D-fix3 — Data attributes para que el filtro de búsqueda pueda leer
           // los datos de cada row sin re-renderizar la lista (mantiene el foco del input)
           "data-subject": m.subject || "",
-          "data-sender": (m.sender || "") + " " + (m.senderEmail || ""),
+          // 📦657 — En Enviados, data-sender debe incluir también al destinatario
+          // (porque el "contacto visible" es el destinatario en esa carpeta).
+          "data-sender": (function () {
+            var parts = [(m.sender || ""), (m.senderEmail || "")];
+            if (m.to_list && m.to_list.length > 0) {
+              m.to_list.forEach(function (a) {
+                parts.push(a.name || '');
+                parts.push(a.email || '');
+              });
+            }
+            return parts.join(" ");
+          })(),
           "data-preview": m.preview || m.snippet || "",
           "data-has-attachment": m.hasAttachment ? "true" : "false",  // F1-Feature2
           "data-date": m.date || 0,  // F1-Feature2
@@ -3737,14 +3811,17 @@
 
         // Columna 2 — Avatar (40x40, color de fondo derivado del email)
         // Loop 41 — Tooltip muestra nombre + email (antes solo el nombre).
-        var avatarTitle = (m.sender && m.senderEmail && m.sender !== m.senderEmail)
-          ? m.sender + " <" + m.senderEmail + ">"
-          : (m.sender || m.senderEmail || '');
+        // 📦657 — En Enviados, el avatar usa el destinatario principal (to_list[0])
+        // porque el "contacto visible" es el destinatario, no el remitente.
+        var displayContact = getMailDisplayContact(m);
+        var avatarTitle = (displayContact.name && displayContact.email && displayContact.name !== displayContact.email)
+          ? displayContact.name + " <" + displayContact.email + ">"
+          : (displayContact.name || displayContact.email || '');
         const avatar = el("div", {
           class: "email-row__avatar kair-mail-row__avatar",
           style: { background: m.avatarColor || "#5f6368" },
           title: avatarTitle,
-        }, initials(m.sender || m.senderEmail));
+        }, initials(displayContact.name || displayContact.email));
         row.appendChild(avatar);
 
         // Columna 3 — Content: sender + subject/preview en una línea (estilo Gmail).
@@ -3754,8 +3831,9 @@
         // email distinto, mostrar nombre (bold) + email (gris pequeño) al lado.
         // Si el sender ES el email (caso típico de self-sent), mostrar solo el
         // email. Tooltip (title) siempre tiene el email completo.
-        var senderName = m.sender || '';
-        var senderEmail = m.senderEmail || '';
+        // 📦657 — Usar displayContact (remitente en Recibidos, destinatario en Enviados).
+        var senderName = displayContact.name || '';
+        var senderEmail = displayContact.email || '';
         var isEmailOnly = !senderEmail || senderName === senderEmail;
         var senderTitle = isEmailOnly ? senderName : senderEmail;
         var sender = el("div", {
@@ -4320,6 +4398,9 @@
 
     // FIX loop 26 — Thread header Gmail-style con recipients (De/Para/CC)
     // Mostrar "para mi" + "cc" + "fecha" en el thread header, no solo en cada mensaje.
+    // 📦657 — En Enviados, el "contacto visible" es el destinatario. El header
+    // muestra Para/CC como recipients (igual que en Recibidos muestra Para/CC)
+    // porque el remitente en Enviados siempre sos vos.
     var recipientsHtml = "";
     if (mail.to_list && mail.to_list.length > 0) {
       var toText = mail.to_list.map(function (a) { return a.name || a.email; }).join(", ");
@@ -4330,6 +4411,17 @@
       recipientsHtml += '<div class="kair-mail-detail__recipient-row"><span class="kair-mail-detail__recipient-label">CC:</span> <span class="kair-mail-detail__recipient-value">' + escapeHtml(ccText) + '</span></div>';
     }
 
+    // 📦657 — En Enviados, el header muestra el destinatario como "contacto
+    // principal" (igual que Gmail). El remitente real (yo) se muestra en
+    // gris pequeño abajo, para que el user sepa que el correo salió de su
+    // cuenta pero sepa a quién se lo envió.
+    var detailDisplayContact = getMailDisplayContact(mail);
+    var isSentFolder = state.mailFolder === "SENT";
+    var senderSecondaryLine = "";
+    if (isSentFolder && mail.sender) {
+      senderSecondaryLine = '<p class="kair-mail-detail__sender-meta" style="margin:2px 0 0;font-size:0.7rem;color:var(--kair-text-light);">de: ' + escapeHtml(mail.sender) + (mail.senderEmail ? ' &lt;' + escapeHtml(mail.senderEmail) + '&gt;' : '') + '</p>';
+    }
+
     header.innerHTML = `
       <h2 class="kair-mail-detail__subject">
         <span style="flex:1;">${mail.subject}</span>
@@ -4337,9 +4429,10 @@
         <span class="kair-mail-detail__tags">${tag}</span>
       </h2>
       <div class="kair-mail-detail__sender-row">
-        <div class="kair-mail-detail__avatar" style="background:${mail.avatarColor};">${initials(mail.sender)}</div>
+        <div class="kair-mail-detail__avatar" style="background:${mail.avatarColor};">${initials(detailDisplayContact.name || detailDisplayContact.email)}</div>
         <div class="kair-mail-detail__sender-info">
-          <p class="kair-mail-detail__sender-name">${mail.sender} <span style="font-weight:400;color:var(--kair-text-muted);">&lt;${mail.senderEmail || ''}&gt;</span></p>
+          <p class="kair-mail-detail__sender-name">${escapeHtml(detailDisplayContact.name || detailDisplayContact.email || '')} <span style="font-weight:400;color:var(--kair-text-muted);">&lt;${escapeHtml(detailDisplayContact.email || '')}&gt;</span></p>
+          ${senderSecondaryLine}
           <div class="kair-mail-detail__recipients">
             ${recipientsHtml}
           </div>
@@ -4351,10 +4444,14 @@
                cacheado antes del schema migration). -->
           <div class="kair-mail-detail__details-panel" id="mail-details-panel" hidden>
             <dl class="kair-mail-detail__details-list">
-              <dt>de</dt>
-              <dd>${escapeHtml(mail.sender || '')} &lt;${escapeHtml(mail.senderEmail || '')}&gt;</dd>
-              ${mail.to_list && mail.to_list.length > 0 ? `<dt>para</dt><dd>${mail.to_list.map(function (a) { return escapeHtml((a.name ? a.name + ' <' + a.email + '>' : a.email)); }).join(', ')}</dd>` : ''}
-              ${mail.cc_list && mail.cc_list.length > 0 ? `<dt>cc</dt><dd>${mail.cc_list.map(function (a) { return escapeHtml((a.name ? a.name + ' <' + a.email + '>' : a.email)); }).join(', ')}</dd>` : ''}
+              ${isSentFolder
+                ? (mail.to_list && mail.to_list.length > 0 ? '<dt>para</dt><dd>' + mail.to_list.map(function (a) { return escapeHtml((a.name ? a.name + ' <' + a.email + '>' : a.email)); }).join(', ') + '</dd>' : '') +
+                  (mail.cc_list && mail.cc_list.length > 0 ? '<dt>cc</dt><dd>' + mail.cc_list.map(function (a) { return escapeHtml((a.name ? a.name + ' <' + a.email + '>' : a.email)); }).join(', ') + '</dd>' : '') +
+                  '<dt>de</dt><dd>' + escapeHtml(mail.sender || '') + ' &lt;' + escapeHtml(mail.senderEmail || '') + '&gt;</dd>'
+                : '<dt>de</dt><dd>' + escapeHtml(mail.sender || '') + ' &lt;' + escapeHtml(mail.senderEmail || '') + '&gt;</dd>' +
+                  (mail.to_list && mail.to_list.length > 0 ? '<dt>para</dt><dd>' + mail.to_list.map(function (a) { return escapeHtml((a.name ? a.name + ' <' + a.email + '>' : a.email)); }).join(', ') + '</dd>' : '') +
+                  (mail.cc_list && mail.cc_list.length > 0 ? '<dt>cc</dt><dd>' + mail.cc_list.map(function (a) { return escapeHtml((a.name ? a.name + ' <' + a.email + '>' : a.email)); }).join(', ') + '</dd>' : '')
+              }
               <dt>fecha</dt>
               <dd>${escapeHtml(formatGmailLongDate(mail.date))}</dd>
               <dt>asunto</dt>
@@ -4416,6 +4513,16 @@
               if (res && res.success && res.data) {
                 mail.rawHeaders = res.data.rawHeaders || mail.rawHeaders || [];
                 mail.mailSecurity = res.data.mailSecurity || mail.mailSecurity || null;
+                // 📦657-fix2 — También popular to_list/cc_list parseando el
+                // campo `recipient` que viene como string RFC 2822 desde
+                // google-gmail.js. Esto cubre el caso de mails sin messages
+                // cargados en SQLite (cache miss en email_messages).
+                if (res.data.recipient) {
+                  mail.to_list = _coerceAddressList(res.data.recipient);
+                }
+                if (res.data.cc) {
+                  mail.cc_list = _coerceAddressList(res.data.cc);
+                }
                 // Re-renderizar el panel in-place con los nuevos datos
                 var newPanelHtml = buildDetailsPanelHtml(mail);
                 detailsPanel.innerHTML = newPanelHtml;
@@ -5911,6 +6018,34 @@
     }
   }
 
+  // 📦657-fix2 — Helper: convierte to_list/cc_list (que pueden venir como
+  // array de {name, email} o como JSON string) en un array de {name, email}.
+  // Si el string no es JSON válido, intenta parsearlo como una lista de
+  // direcciones RFC 2822 ("Nombre <email>, Otro <email>").
+  function _coerceAddressList(value) {
+    if (Array.isArray(value)) {
+      return value.map(function (a) {
+        if (typeof a === 'string') return { name: '', email: a };
+        return { name: a.name || '', email: a.email || '' };
+      }).filter(function (a) { return a.email; });
+    }
+    if (typeof value === 'string' && value.trim()) {
+      // Intentar JSON primero
+      try {
+        var parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) return _coerceAddressList(parsed);
+      } catch (e) { /* no es JSON, parsear como lista RFC 2822 */ }
+      // Parsear "Nombre <email>, Otro <email>"
+      return value.split(',').map(function (s) {
+        var trimmed = s.trim();
+        var m = trimmed.match(/^(?:"?([^"<]*)"?\s*)?<([^>]+)>$/);
+        if (m) return { name: (m[1] || '').trim(), email: m[2].trim() };
+        return { name: '', email: trimmed };
+      }).filter(function (a) { return a.email; });
+    }
+    return [];
+  }
+
   // F1.C-fix — Carga el body de un correo desde el cache SQLite (email_messages).
   // Se llama lazy (on-demand) cuando el user selecciona un correo.
   // Ahora trae TODOS los mensajes del thread (no solo el último) para soportar
@@ -5936,6 +6071,16 @@
             mail.body_html = lastMsg.body_html;
           }
           console.log("[BandejaIntegrada] Thread " + threadId + " cargado: " + result.data.messages.length + " mensaje(s)");
+        }
+        // 📦657-fix2 — Popular to_list/cc_list desde el último message.
+        // Antes estos campos quedaban vacíos al abrir el detalle, por eso
+        // la UI no podía mostrar el destinatario en SENT ni el panel "Mostrar
+        // detalles" tenía "para/cc". El backend (email-sync.js:295-306) ya
+        // extrae to_list del recipient cuando es un mensaje enviado.
+        if (lastMsg) {
+          // lastMsg.to_list / cc_list pueden venir como JSON string o array
+          mail.to_list = _coerceAddressList(lastMsg.to_list);
+          mail.cc_list = _coerceAddressList(lastMsg.cc_list);
         }
         // F1-Feature5 — Cargar los adjuntos reales de cada mensaje en paralelo
         // y mergearlos en el thread (mostrar el último mensaje con adjuntos como preview)

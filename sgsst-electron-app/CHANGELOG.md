@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.155] - 2026-08-05
+
+### Fixed
+- **📦657 · fix(bandeja): Enviados muestra destinatario en lugar de remitente** — Bug de UX clásico: en la carpeta "Enviados", la lista y el detalle mostraban el remitente (siempre "yo") en vez del destinatario, igual que en Recibidos. Ahora muestra el destinatario como contacto principal, igual que Gmail/Outlook.
+  - **Root cause**: el código de la Bandeja Integrada solo leía `mail.sender` para mostrar el "contacto principal" en lista y detalle, sin considerar la carpeta. Además, `threadToMail` no cargaba `to_list`/`cc_list` del thread (esos campos están en `email_messages`, no en `email_threads`), y el JOIN del backend no los traía.
+  - **Fix backend** (`main/email-db.js`):
+    - `getThreadsFromCache` y `getThreadFromCache` ahora hacen un LEFT JOIN correlated con `email_messages` para traer `to_list`/`cc_list` del último message de cada thread. La subquery usa `MAX(date)` por `thread_id`.
+    - `deserializeThread` expone los nuevos campos como `last_to_list`/`last_cc_list`.
+  - **Fix frontend** (`renderer/bandeja-integrada/app.js`):
+    - Nuevo helper `getMailDisplayContact(mail)` que retorna `{name, email, role}` correcto según carpeta. En SENT busca primero en `to_list[0]`, después en `participants_list` (excluyendo al user), y como último recurso usa `sender`. El set de "yo emails" se construye con `state.gmailEmail` + `mail.senderEmail` para cubrir el caso de que `getProfile` aún no haya populado el primero.
+    - Nuevo helper `_coerceAddressList(value)` que convierte el `to_list` que puede venir como array de `{name, email}`, JSON string, o string RFC 2822 (`"Nombre <email>, Otro <email>"`).
+    - `threadToMail` ahora expone `participants_list`, `to_list`, `cc_list` desde el cache (sin tener que abrir el detalle).
+    - `renderMailList`: avatar, sender name, búsqueda y data-attribute usan el contacto correcto. La búsqueda también incluye los destinatarios (importante para Enviados).
+    - `renderMailDetail`:
+      - Header: avatar y name usan el contacto correcto. Para SENT agrega una línea pequeña en gris "de: yo" para que quede claro que el correo salió de tu cuenta.
+      - Panel "Mostrar detalles": en SENT el orden es Para → CC → De (estilo Gmail). En otras carpetas mantiene el orden clásico De → Para/CC.
+    - `loadMailBodyFromCache` popula `mail.to_list`/`mail.cc_list` desde el último message cargado.
+    - Safety net (cuando el mail no tiene rawHeaders locales) popula `mail.to_list` parseando el `recipient` que viene como string RFC 2822 desde `googleGmail.getMessage`.
+  - **Beneficio**: en la carpeta Enviados, la lista de correos ahora muestra el avatar y nombre del destinatario desde el primer render (sin tener que abrir el correo). El detalle también muestra el destinatario como contacto principal, con "de: yo" en gris pequeño. El panel "Mostrar detalles" tiene el orden Gmail-style (Para → CC → De).
+
 ## [0.1.154] - 2026-08-05
 
 ### Fixed

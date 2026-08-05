@@ -159,10 +159,23 @@ function getThreadsFromCache(options) {
     params.sq = '%' + searchQuery + '%';
   }
 
+  // 📦657-fix3 — LEFT JOIN con el último message de cada thread para traer
+  // to_list/cc_list. Sin esto, la UI no puede mostrar el destinatario en
+  // SENT sin tener que abrir el detalle (lazy load).
+  // Usamos una subquery correlated que toma el message con la fecha MAX
+  // por thread_id. SQLite soporta esto con row_number() o con MAX+GROUP BY,
+  // pero la forma más portable es la subquery escalar con MAX.
   const rows = db().prepare(`
-    SELECT * FROM email_threads
+    SELECT t.*,
+           (SELECT to_list FROM email_messages
+             WHERE thread_id = t.id AND date = (SELECT MAX(date) FROM email_messages WHERE thread_id = t.id)
+             LIMIT 1) AS last_to_list,
+           (SELECT cc_list FROM email_messages
+             WHERE thread_id = t.id AND date = (SELECT MAX(date) FROM email_messages WHERE thread_id = t.id)
+             LIMIT 1) AS last_cc_list
+    FROM email_threads t
     WHERE ${where}
-    ORDER BY last_message_date DESC
+    ORDER BY t.last_message_date DESC
     LIMIT @maxResults
   `).all(params);
 
@@ -171,7 +184,17 @@ function getThreadsFromCache(options) {
 }
 
 function getThreadFromCache(threadId) {
-  const row = db().prepare('SELECT * FROM email_threads WHERE id = ? LIMIT 1').get(threadId);
+  const row = db().prepare(`
+    SELECT t.*,
+           (SELECT to_list FROM email_messages
+             WHERE thread_id = t.id AND date = (SELECT MAX(date) FROM email_messages WHERE thread_id = t.id)
+             LIMIT 1) AS last_to_list,
+           (SELECT cc_list FROM email_messages
+             WHERE thread_id = t.id AND date = (SELECT MAX(date) FROM email_messages WHERE thread_id = t.id)
+             LIMIT 1) AS last_cc_list
+    FROM email_threads t
+    WHERE t.id = ? LIMIT 1
+  `).get(threadId);
   return row ? deserializeThread(row) : null;
 }
 
@@ -195,6 +218,10 @@ function deserializeThread(row) {
     last_message_date: row.last_message_date,
     last_sender_email: row.last_sender_email,
     last_sender_name: row.last_sender_name,
+    // 📦657-fix3 — to_list/cc_list del último message (puede ser null si
+    // el thread no tiene messages en email_messages todavía).
+    last_to_list: row.last_to_list || null,
+    last_cc_list: row.last_cc_list || null,
     created_at: row.created_at,
     updated_at: row.updated_at
   };
