@@ -1,4 +1,21 @@
-# K+AIR v0.1.150 (próximo release)
+# K+AIR v0.1.151 (próximo release)
+
+## 🎉 Novedades
+
+### 🧮 Presupuesto: números sin ",00" + sistema moderno de notificaciones (📦653)
+
+2 mejoras en el submódulo de Presupuesto:
+
+- **Formato inteligente de números**: `0` se muestra como `0` (no `0,00`), `100` como `100`. Los números con decimales reales (`1.234,56`) se mantienen con sus decimales. Igual para los porcentajes: `0%` en vez de `0,00%`, `100%` en vez de `100,00%`. La columna % ya no se trunca por culpa de los `,00%` repetidos.
+- **Sistema de notificación moderno**: removido el toast viejo del Presupuesto (CSS + HTML + función `showNotification` propios). Ahora usa `window.KAIRToast.show()` (mismo sistema unificado de toda la app). Mismo look, misma posición, mismos iconos que el resto de K+AIR.
+
+## 📦 Commits incluidos (1)
+
+- Próximo commit con bump 0.1.150 → 0.1.151
+
+---
+
+# K+AIR v0.1.150
 
 ## 🎉 Novedades
 

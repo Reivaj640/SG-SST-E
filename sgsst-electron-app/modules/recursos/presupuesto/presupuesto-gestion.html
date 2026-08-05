@@ -247,21 +247,8 @@ HEADER ACTION BUTTONS
         .action-btn:hover { color: var(--k-primary); transform: scale(1.1); }
         .action-btn.delete-btn:hover { color: var(--k-danger); }
 
-        /* NOTIFICACIÓN */
-        .k-toast {
-            position: fixed; bottom: 2rem; right: 2rem;
-            background: white; padding: 1rem 1.5rem;
-            border-radius: var(--k-radius-lg);
-            box-shadow: 0 8px 16px rgba(0,0,0,0.12);
-            display: flex; align-items: center; gap: 0.75rem;
-            transform: translateY(150%); transition: transform 0.3s;
-            z-index: 2000; border-left: 4px solid var(--k-primary); font-weight: 500;
-        }
-        .k-toast.show { transform: translateY(0); }
-        .k-toast.success { border-left-color: var(--k-success); }
-        .k-toast.warning { border-left-color: var(--k-warning); }
-        .k-toast.error { border-left-color: var(--k-danger); }
-        .k-toast.info { border-left-color: var(--k-primary); }
+        /* NOTIFICACIÓN — 📦653 — Removido CSS viejo (.k-toast) y HTML (#notification).
+           Ahora se usa window.KAIRToast.show() de assets/js/kair-toast.js (sistema moderno unificado). */
 
         /* SPINNER */
         .spinner {
@@ -385,11 +372,11 @@ HEADER ACTION BUTTONS
 </div><!-- /.k-section-card -->
 </div>
 
-    <!-- TOAST -->
-    <div class="k-toast" id="notification">
-        <i class="fas fa-info-circle notification-icon"></i>
-        <span class="notification-message">Operación realizada</span>
-    </div>
+    <!-- 📦653 — Cargar sistema moderno de notificaciones (kair-toast.js) en el iframe
+         para que window.KAIRToast.show() esté disponible. El script también se carga
+         en el parent (index.html), pero KAIRToast es una clase que se autoinstancia
+         al final, así que no hay conflicto. -->
+    <script src="../../../assets/js/kair-toast.js"></script>
 
     <script>
         let budgetData = [];
@@ -424,10 +411,11 @@ HEADER ACTION BUTTONS
                 }
 
                 if (event.data.action === 'saveComplete' || (event.data.action === 'saveBudgetChanges' && event.data.success)) {
-                    showNotification('Cambios guardados exitosamente', 'success');
+                    // 📦653 — Usar sistema moderno unificado (assets/js/kair-toast.js)
+                    window.KAIRToast.show('Cambios guardados exitosamente', 'success');
                     markNoPendingChanges();
                 } else if (event.data.action === 'saveError' || (event.data.action === 'saveBudgetChanges' && !event.data.success)) {
-                    showNotification(`Error al guardar: ${event.data.error || 'Error desconocido'}`, 'error');
+                    window.KAIRToast.show(`Error al guardar: ${event.data.error || 'Error desconocido'}`, 'error');
                 }
             });
         });
@@ -462,7 +450,8 @@ function updateFileInfo() {
                 window.parent.postMessage({ action: 'requestBudgetData', file: currentFile }, '*');
             } catch (error) {
                 console.error('Error al cargar datos:', error);
-                showNotification(`Error al cargar datos: ${error.message}`, 'error');
+                // 📦653 — Usar sistema moderno unificado
+                window.KAIRToast.show(`Error al cargar datos: ${error.message}`, 'error');
             }
         }
 
@@ -506,10 +495,28 @@ function parseFormattedNumber(value) {
     return isNaN(parsed) ? 0 : parsed;
   }
 
+        // 📦653 — Formato inteligente: muestra decimales SOLO si el número los tiene.
+        // Antes: "0" se mostraba como "0,00", "100" como "100,00" → ocupaban espacio innecesario.
+        // Ahora: "0" → "0", "100" → "100", "50,5" → "50,5", "1234,56" → "1.234,56".
         function formatNumber(num) {
-            if (num === null || num === undefined || num === '') return '0,00';
+            if (num === null || num === undefined || num === '') return '0';
             const numberValue = isNaN(parseFloat(num)) ? 0 : parseFloat(num);
+            // Entero → sin decimales
+            if (Number.isInteger(numberValue)) {
+                return numberValue.toLocaleString('es-CO', { maximumFractionDigits: 0 });
+            }
+            // Con decimales → 2 dígitos (es-CO usa coma decimal)
             return numberValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        // 📦653 — Igual que formatNumber pero con sufijo % y respetando 2 decimales cuando los hay.
+        function formatPct(num) {
+            if (num === null || num === undefined || isNaN(parseFloat(num))) return '0%';
+            const numberValue = parseFloat(num);
+            if (Number.isInteger(numberValue)) {
+                return numberValue.toLocaleString('es-CO', { maximumFractionDigits: 0 }) + '%';
+            }
+            return numberValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
         }
 
         function renderBudgetTable() {
@@ -533,14 +540,15 @@ function parseFormattedNumber(value) {
 
                 const asignacion = parseFormattedNumber(item.asignacion || 0);
                 const ejecutado = parseFormattedNumber(item.ejecutado_acumulado || 0);
-                const pct = asignacion > 0 ? ((ejecutado / asignacion) * 100).toFixed(2) : 0;
+                // 📦653 — formatPct omite los ,00 cuando el % es entero
+                const pct = asignacion > 0 ? (ejecutado / asignacion) * 100 : 0;
 
                 row.innerHTML = `
                     <td>${isSpecial ? item.id : index + 1}</td>
                     <td>${isSpecial ? item.id : item.detalle || '-'}</td>
                     <td>${isSpecial ? `<span class="formula-cell">${formatNumber(asignacion)}</span>` : `<span onclick="makeCellEditable(event, ${index}, 'asignacion')" class="editable-cell">${formatNumber(asignacion)}</span>`}</td>
                     <td>${isSpecial ? `<span class="formula-cell">${formatNumber(ejecutado)}</span>` : `<span onclick="makeCellEditable(event, ${index}, 'ejecutado_acumulado')" class="editable-cell">${formatNumber(ejecutado)}</span>`}</td>
-                    <td id="pct_${index}">${pct}%</td>
+                    <td id="pct_${index}">${formatPct(pct)}</td>
                     ${monthHTML}
                     <td class="actions-col">
                         ${!isSpecial ? `<button class="action-btn delete-btn" onclick="deleteRow(${index})"><i class="fas fa-trash"></i></button>` : ''}
@@ -560,7 +568,8 @@ function parseFormattedNumber(value) {
 
             document.getElementById('totalPresupuesto').textContent = '$' + formatNumber(totalP);
             document.getElementById('totalEmpresa').textContent = '$' + formatNumber(totalE);
-            document.getElementById('totalArl').textContent = (totalP > 0 ? ((totalE / totalP) * 100) : 0).toFixed(2) + '%';
+            // 📦653 — formatPct omite ,00 cuando el % es entero
+            document.getElementById('totalArl').textContent = formatPct(totalP > 0 ? (totalE / totalP) * 100 : 0);
             document.getElementById('saldoDisponible').textContent = '$' + formatNumber(totalP - totalE);
         }
 
@@ -616,7 +625,8 @@ function parseFormattedNumber(value) {
         }
 
         function saveChanges() {
-            if (!hasPendingChanges) return showNotification('No hay cambios', 'info');
+            // 📦653 — Usar sistema moderno unificado
+            if (!hasPendingChanges) return window.KAIRToast.show('No hay cambios', 'info');
 
             // Convertir todo a número antes de enviar
             const dataToSave = budgetData.map(item => {
@@ -636,12 +646,10 @@ function parseFormattedNumber(value) {
             }, '*');
         }
 
-        function showNotification(msg, type = 'success') {
-            const el = document.getElementById('notification');
-            el.querySelector('.notification-message').textContent = msg;
-            el.className = `k-toast ${type} show`;
-            setTimeout(() => el.classList.remove('show'), 3000);
-        }
+        // 📦653 — Función showNotification removida. Usar window.KAIRToast.show() directamente.
+        //   El sistema moderno está en assets/js/kair-toast.js (clase KAIRToast,
+        //   instanciada como window.KAIRToast, con HTML container #notification-hub en index.html).
+        //   Tipos: 'info' | 'success' | 'warning' | 'error'.
 
         function showLoading() {
             document.getElementById('budgetTableBody').innerHTML = '<tr><td colspan="18"><div class="spinner"></div></td></tr>';

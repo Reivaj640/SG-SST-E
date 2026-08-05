@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.151] - 2026-08-05
+
+### Changed
+- **📦653 · fix(presupuesto): números sin ",00" + sistema de notificación moderno** — 2 mejoras en el submódulo de Presupuesto.
+  - **📦653-fix1 — Formato inteligente de números**: la función `formatNumber` antes mostraba SIEMPRE 2 decimales (`0` → `0,00`, `100` → `100,00`). Ahora detecta si el número es entero y omite los decimales. Los números con decimales reales (ej: `1.234,56`) se mantienen con sus 2 decimales. Nueva función `formatPct` para los porcentajes (mismo comportamiento + sufijo %).
+    - `0` → `0`, `100` → `100`, `776.227` → `776.227`
+    - `0%` → `0%`, `50%` → `50%`, `47,53%` → `47,53%`
+    - Beneficio: la columna % ya no se trunca con `0,00%` repetidos en cada fila
+  - **📦653-fix2 — Sistema de notificación moderno**: el Presupuesto tenía su propio toast viejo (`.k-toast` con CSS + `<div id="notification">` + función `showNotification`). Removido completamente, ahora usa `window.KAIRToast.show()` (mismo sistema unificado de toda la app, definido en `assets/js/kair-toast.js`).
+    - Agregado `<script src="../../../assets/js/kair-toast.js"></script>` al HTML del iframe (la clase se autoinstancia en `window.KAIRToast`)
+    - 4 callsites actualizados: save success, save error, load error, no hay cambios
+    - Removidos: CSS `.k-toast` (15 líneas), HTML `#notification` (5 líneas), función `showNotification` (6 líneas)
+    - Beneficio: consistencia con el resto de la app, mismo look, mismo position, mismos iconos
+
 ## [0.1.150] - 2026-08-05
 
 ### Changed
