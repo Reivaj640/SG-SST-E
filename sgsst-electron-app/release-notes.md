@@ -1,4 +1,22 @@
-# K+AIR v0.1.152 (próximo release)
+# K+AIR v0.1.153 (próximo release)
+
+## 🎉 Novedades
+
+### ✉️ Fix: tildes y eñes en subject de correos enviados (📦655)
+
+Bug clásico de encoding al construir el raw MIME. El subject (y demás headers) se escribían como UTF-8 raw, pero Gmail/clients lo interpretaban como Latin-1 → `ejecución` se mostraba como `ejecucÃ³n`.
+
+- **Fix**: nueva función `encodeMimeHeader(str)` que aplica RFC 2047 encoded-word (`=?UTF-8?B?<base64>?=`) cuando hay caracteres no-ASCII. Si es ASCII puro, lo devuelve tal cual.
+- Aplicada a `From`, `To`, `Cc`, `Bcc`, `Subject`.
+- Ahora subjects con tildes, eñes y acentos se ven correctos en cualquier cliente.
+
+## 📦 Commits incluidos (1)
+
+- Próximo commit con bump 0.1.152 → 0.1.153
+
+---
+
+# K+AIR v0.1.152
 
 ## 🎉 Novedades
 

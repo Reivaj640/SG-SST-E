@@ -548,12 +548,16 @@ async function sendMessage(options) {
 
     // 1) Construir el raw MIME message
     // Loop 38 — Soporte para attachments via multipart/mixed
+    // 📦655 — Aplicar RFC 2047 encoded-word a los headers con posible texto no-ASCII
+    // (Subject, From, To con nombre). Sin esto, escribir `Subject: Registro de
+    // ejecución` (con ó) hace que Gmail/clients interpreten los bytes UTF-8 como
+    // Latin-1 → aparecen `Ã³` en vez de `ó`. Ver encodeMimeHeader() arriba.
     var headers = [
-      'From: ' + from,
-      'To: ' + to,
-      cc ? 'Cc: ' + cc : null,
-      bcc ? 'Bcc: ' + bcc : null,
-      'Subject: ' + subject,
+      from ? 'From: ' + encodeMimeHeader(from) : null,
+      to ? 'To: ' + encodeMimeHeader(to) : null,
+      cc ? 'Cc: ' + encodeMimeHeader(cc) : null,
+      bcc ? 'Bcc: ' + encodeMimeHeader(bcc) : null,
+      'Subject: ' + encodeMimeHeader(subject),
       inReplyTo ? 'In-Reply-To: ' + inReplyTo : null,
       references ? 'References: ' + references : null
     ].filter(function (h) { return h; });
@@ -669,6 +673,26 @@ async function sendMessage(options) {
 function encodeBase64Url(s) {
   var b64 = Buffer.from(s, 'utf8').toString('base64');
   return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/**
+ * 📦655 — Codifica un header MIME con RFC 2047 encoded-word si tiene caracteres
+ * no-ASCII (tildes, eñes, etc.). Si es ASCII puro, lo devuelve tal cual.
+ *
+ * Sin esto, escribir `Subject: Registro de ejecución` (con ó) en el raw MIME
+ * hace que algunos clientes (Gmail web incluido a veces) interpreten los bytes
+ * UTF-8 como Latin-1 → aparecen los Ã³ en lugar de ó.
+ *
+ * Formato RFC 2047: =?UTF-8?B?<base64>?=
+ * Más info: https://datatracker.ietf.org/doc/html/rfc2047
+ */
+function encodeMimeHeader(str) {
+  if (!str) return '';
+  // Si es ASCII puro, devolver tal cual (más legible)
+  if (/^[\x00-\x7F]*$/.test(str)) return str;
+  // Si tiene caracteres no-ASCII, codificar con RFC 2047 Base64
+  var b64 = Buffer.from(str, 'utf8').toString('base64');
+  return '=?UTF-8?B?' + b64 + '?=';
 }
 
 module.exports = {

@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.153] - 2026-08-05
+
+### Fixed
+- **📦655 · fix(gmail): tildes y eñes en subject de correos enviados** — Bug clásico de encoding al construir el raw MIME message.
+  - **Root cause**: el subject (y demás headers) se escribían como UTF-8 raw en el raw MIME. Gmail/clients lo interpretaban como Latin-1, por eso `ejecución` se mostraba como `ejecucÃ³n` (los bytes `0xC3 0xB3` de `ó` en UTF-8, decodificados como Latin-1, dan `Ã³`).
+  - **Fix**: nueva función `encodeMimeHeader(str)` que aplica **RFC 2047 encoded-word** (`=?UTF-8?B?<base64>?=`) cuando el string tiene caracteres no-ASCII. Si es ASCII puro, lo devuelve tal cual (legible en logs).
+  - Aplicada a: `From`, `To`, `Cc`, `Bcc`, `Subject`. Los emails puros (sin nombre) siguen siendo ASCII normal.
+  - **Beneficio**: subjects con tildes (`Reunión de seguimiento`), eñes (`Investigación`), acentos (`Métricas`) y caracteres especiales (`año`, `día`) ahora se ven correctos en Gmail, Outlook y otros clientes.
+
 ## [0.1.152] - 2026-08-05
 
 ### Changed
