@@ -3995,7 +3995,7 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
     const badgeHtml = mod.badge ? `<span id="${badgeId}" data-module="${mod.name}" style="margin-left: auto; font-size: 10px; padding: 4px 10px; border-radius: 12px; font-weight: 600; background: ${getBadgeColor(mod.badgeClass)}; color: ${getBadgeTextColor(mod.badgeClass)}; cursor: pointer; border: 1px solid rgba(0,0,0,0.1);" title="Click para ver alertas de ${mod.name}"><i class="fas fa-filter" style="font-size: 8px; margin-right: 3px;"></i>${mod.badge}</span>` : '';
 
     item.innerHTML = `
-      <div style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; margin-right: 10px; font-size: 14px;">
+      <div style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; margin-right: 10px; font-size: 14px; color: #94a3b8;">
         ${SIDEBAR_ICONS[mod.icon] || ''}
       </div>
       <div style="flex: 1;">

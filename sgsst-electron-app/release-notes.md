@@ -1,4 +1,25 @@
-# K+AIR v0.1.148 (próximo release)
+# K+AIR v0.1.149 (próximo release)
+
+## 🎉 Novedades
+
+### ✨ Polish visual (📦651) — UI más armónica y profesional
+
+3 ajustes visuales pequeños pero que cambian la sensación de la app:
+
+- **📦651-fix1 Iconos del home en gris** — Los iconos SVG de los módulos del panel "Módulos del Sistema" del home (Recursos, Gestión Integral, Gestión de la Salud, etc.) ahora son del mismo color gris claro (`#94a3b8`) que el subtítulo de cada módulo. Antes eran oscuros y desentonaban con la paleta clara.
+- **📦651-fix2 Configuración armonizada** — En Configuración > Ajustes de Usuario, la tabla de usuarios ahora se ve más profesional:
+  - Status "Activo" pasó de "● Activo" (bullet negro aislado) a una **pill verde** con dot y halo.
+  - Botones "Asignar" y "Desactivar" ahora están en **horizontal** con jerarquía: Asignar = azul sólido, Desactivar = outline gris con hover rojo.
+  - El tab activo ahora tiene un **tinte azul sutil** de fondo además del underline.
+- **📦651-fix3 Modal de Usuario con scroll interno** — El modal "Gestión de Usuario" antes se cortaba cuando la ventana era chica. Ahora tiene 3 zonas (header fijo / body scrollable / footer fijo con botones siempre visibles). El modal nunca excede la altura de la ventana.
+
+## 📦 Commits incluidos (1)
+
+- Próximo commit con bump 0.1.148 → 0.1.149
+
+---
+
+# K+AIR v0.1.148
 
 ## 🎉 Novedades
 

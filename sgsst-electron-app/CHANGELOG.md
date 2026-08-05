@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.149] - 2026-08-04
+
+### Changed
+- **📦651 · polish(ux): iconos del home en gris + Configuración armonizada + modal Usuario con scroll interno** — 3 ajustes visuales para que la UI se vea más armónica y profesional.
+  - **📦651-fix1 Iconos del home en gris**: Los iconos SVG de los módulos del panel "Módulos del Sistema" del home ahora son del mismo color gris claro (`#94a3b8`) que el subtítulo de cada módulo ("Capacitación, Roles", "Política, Planes", etc.). Antes eran oscuros (heredaban `currentColor` del título `#1e293b`) y desentonaban. Cambió en `renderer.js:3998` (1 línea, agregado `color: #94a3b8` al wrapper del icono).
+  - **📦651-fix2 Configuración - status pill + acciones armonizadas**: En Configuración > Ajustes de Usuario, pulí la tabla de usuarios con:
+    - **Status pill** (reemplaza el "● Activo" con bullet negro genérico): badge con background tinte + dot con halo. Activo = verde (`rgba(34,197,94,0.1)` + dot `#22c55e` con `box-shadow: 0 0 0 3px rgba(34,197,94,0.2)`). Inactivo = gris.
+    - **Acciones horizontales con jerarquía**: Asignar = botón primario azul sólido (era outline blanco). Desactivar = botón secundario outline gris con hover rojo claro (señaliza que es destructivo). Layout cambió de vertical a horizontal (`flex`, gap 8px) para que no ocupen 2 líneas.
+    - **Active tab con tinte sutil**: El nav-tab activo (ej. "Ajustes de Usuario") ahora tiene background `rgba(23,78,166,0.04)` + border-radius en las esquinas superiores, además del underline azul. Más visible sin romper la sutileza.
+  - **📦651-fix3 Modal de Usuario con scroll interno**: El modal "Gestión de Usuario" (que aparece al click en Asignar) antes se cortaba cuando la ventana era chica. Reestructurado en 3 zonas con CSS flex:
+    - `.modal-header` (fijo) — título siempre visible, con border-bottom sutil.
+    - `.modal-body` (scrollable) — los 5 campos (Nombre, Correo, Contraseña, Rol, Empresas). `overflow-y: auto` para scroll interno cuando no caben.
+    - `.modal-footer` (fijo) — botones Cancelar/Guardar con background `#f8fafc` y border-top. **Siempre visibles** aunque el body scrollee.
+    - `.modal-container` ahora tiene `max-height: calc(100vh - 40px)` y `display: flex; flex-direction: column; overflow: hidden`.
+
 ## [0.1.148] - 2026-08-04
 
 ### Changed

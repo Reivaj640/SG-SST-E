@@ -168,6 +168,8 @@
         .nav-tab.active {
             color: var(--primary);
             font-weight: 600;
+            background-color: rgba(23, 78, 166, 0.04);
+            border-radius: 6px 6px 0 0;
         }
 
         .nav-tab.active::after {
@@ -819,6 +821,81 @@
         .status-active { color: var(--success); }
         .status-inactive { color: var(--text-muted); }
 
+        /* 📦651 — Status pill + acciones armonizadas */
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            line-height: 1;
+        }
+        .status-pill .status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .status-pill--active {
+            background: rgba(34, 197, 94, 0.1);
+            color: #15803d;
+        }
+        .status-pill--active .status-dot {
+            background: #22c55e;
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+        }
+        .status-pill--inactive {
+            background: rgba(100, 116, 139, 0.1);
+            color: #64748b;
+        }
+        .status-pill--inactive .status-dot {
+            background: #94a3b8;
+        }
+
+        /* Acciones: layout horizontal + jerarquía visual (Asignar primario, Desactivar secundario) */
+        .user-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+        .user-actions .btn {
+            margin: 0;
+        }
+        .btn-action-primary {
+            background: var(--primary);
+            color: #fff;
+            border: 1px solid var(--primary);
+            padding: 0.35rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .btn-action-primary:hover {
+            background: #0d3a85;
+            border-color: #0d3a85;
+        }
+        .btn-action-secondary {
+            background: transparent;
+            color: #64748b;
+            border: 1px solid #cbd5e1;
+            padding: 0.35rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .btn-action-secondary:hover {
+            background: #fef2f2;
+            color: #b91c1c;
+            border-color: #fecaca;
+        }
+
         /* --- Configuración IA --- */
         .ai-dashboard {
             display: grid;
@@ -1294,11 +1371,40 @@
             background: var(--bg-card);
             width: 90%;
             max-width: 500px;
+            max-height: calc(100vh - 40px);
             border-radius: var(--radius-lg);
             box-shadow: var(--shadow-lg);
             transform: translateY(20px);
             transition: transform 0.3s;
-            padding: 2rem;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* 📦651 — Header / body / footer del modal con scroll interno.
+           Header + footer fijos, body scrollea. Asi el user siempre ve
+           el titulo y los botones aunque la ventana sea pequena. */
+        .modal-header {
+            padding: 1.5rem 2rem 1rem 2rem;
+            border-bottom: 1px solid var(--border-color, #e2e8f0);
+            flex-shrink: 0;
+        }
+        .modal-body {
+            padding: 1.5rem 2rem;
+            overflow-y: auto;
+            flex: 1 1 auto;
+            min-height: 0;
+        }
+        .modal-footer {
+            padding: 1rem 2rem 1.5rem 2rem;
+            border-top: 1px solid var(--border-color, #e2e8f0);
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+            flex-shrink: 0;
+            background: #f8fafc;
+            border-radius: 0 0 var(--radius-lg, 8px) var(--radius-lg, 8px);
         }
         .modal-overlay.active .modal-container {
             transform: translateY(0);
@@ -1799,35 +1905,39 @@
 <!-- MODAL DE USUARIO (Crear/Editar) -->
 <div class="modal-overlay" id="user-modal">
     <div class="modal-container">
-        <h3 style="font-family: var(--font-heading); margin-bottom: 1.5rem;">Gestión de Usuario</h3>
-        <input type="hidden" id="user-id">
-        <div class="form-group">
-            <label class="form-label">Nombre Completo</label>
-            <input type="text" class="form-control" placeholder="Ej. Juan Pérez" id="user-fullname">
+        <div class="modal-header">
+            <h3 style="font-family: var(--font-heading); margin: 0;">Gestión de Usuario</h3>
         </div>
-        <div class="form-group">
-            <label class="form-label">Correo Electrónico (Login)</label>
-            <input type="email" class="form-control" placeholder="usuario@empresa.com" id="user-email">
+        <div class="modal-body">
+            <input type="hidden" id="user-id">
+            <div class="form-group">
+                <label class="form-label">Nombre Completo</label>
+                <input type="text" class="form-control" placeholder="Ej. Juan Pérez" id="user-fullname">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Correo Electrónico (Login)</label>
+                <input type="email" class="form-control" placeholder="usuario@empresa.com" id="user-email">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Contraseña</label>
+                <input type="password" class="form-control" placeholder="••••••••" id="user-password">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Rol en el Sistema</label>
+                <select class="form-control" id="user-role">
+                    <option>Administrador</option>
+                    <option>Responsable SST</option>
+                    <option>Auditor</option>
+                    <option>Gerencia</option>
+                    <option>Recursos Humanos</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Empresas asignadas</label>
+                <div id="user-companies-list" class="user-companies-list"></div>
+            </div>
         </div>
-        <div class="form-group">
-            <label class="form-label">Contraseña</label>
-            <input type="password" class="form-control" placeholder="••••••••" id="user-password">
-        </div>
-        <div class="form-group">
-            <label class="form-label">Rol en el Sistema</label>
-            <select class="form-control" id="user-role">
-                <option>Administrador</option>
-                <option>Responsable SST</option>
-                <option>Auditor</option>
-                <option>Gerencia</option>
-                <option>Recursos Humanos</option>
-            </select>
-        </div>
-        <div class="form-group">
-            <label class="form-label">Empresas asignadas</label>
-            <div id="user-companies-list" class="user-companies-list"></div>
-        </div>
-        <div style="display: flex; gap: 1rem; margin-top: 2rem; justify-content: flex-end;">
+        <div class="modal-footer">
             <button class="btn btn-outline" onclick="closeUserModal()">Cancelar</button>
             <button class="btn btn-primary" onclick="saveUser()">Guardar Usuario</button>
         </div>
@@ -2832,11 +2942,13 @@
             let actionsHtml = '<span style="color: var(--text-muted); font-size: 0.85rem;">—</span>';
             if (isAdminUser) {
                 const disableButton = (u.status === 'Activo')
-                    ? `<button class="btn btn-sm btn-outline" onclick="disableUser(${u.id})">Desactivar</button>`
+                    ? `<button class="btn-action-secondary" onclick="disableUser(${u.id})">Desactivar</button>`
                     : '';
                 actionsHtml = `
-                    <button class="btn btn-sm btn-outline" onclick="openUserModal(${u.id})">Asignar</button>
-                    ${disableButton}
+                    <div class="user-actions">
+                        <button class="btn-action-primary" onclick="openUserModal(${u.id})">Asignar</button>
+                        ${disableButton}
+                    </div>
                 `;
             }
             
@@ -2854,7 +2966,7 @@
                 <td><span class="role-badge">${roleName}</span></td>
                 <td>${companyList}</td>
                 <td>${u.last}</td>
-                <td><span class="status-${u.status.toLowerCase()}">● ${u.status}</span></td>
+                <td><span class="status-pill status-pill--${u.status.toLowerCase()}"><span class="status-dot"></span>${u.status}</span></td>
                 <td style="text-align: right;">
                     ${actionsHtml}
                 </td>

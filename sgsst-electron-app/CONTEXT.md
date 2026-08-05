@@ -1,10 +1,11 @@
 # K+AIR — Contexto del Proyecto
 
 **Última actualización:** 4 de agosto de 2026
-**Versión actual:** 0.1.148 (próximo release) — publicado v0.1.146
+**Versión actual:** 0.1.149 (próximo release) — publicado v0.1.146
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 **Stack:** Electron 37 + vanilla JS + Python 3.11.9 (empaquetado) + SQLite (kair.db)
 
+> **🆕 v0.1.149 (📦651):** Polish visual — iconos del home en gris claro (mismo color que subtítulos) + Configuración armonizada (status pill verde con dot, acciones horizontales con jerarquía, active tab con tinte sutil) + modal "Gestión de Usuario" con scroll interno (header fijo / body scrollable / footer fijo, max-height calc(100vh-40px)).
 > **🆕 v0.1.148 (📦650-ux):** Polish visual del modal Redactar — grip del resize sutil estilo Windows (14×14, 2 rayitas opacidad 0.32, sin caja blanca) + autocomplete Gmail-style compacto (`width: max-content` min 240px max 380px, anclado al input) + autocomplete SOLO en Para/CC, NO en Asunto.
 > **🆕 v0.1.147 (📦650):** Modal Redactar potenciado — resize custom desde grip top-left con `position: relative` fix (el modal NUNCA supera el área del correo) + autocomplete Gmail-style con índice de contactos desde `state.mails` + preservar espacios entre párrafos al enviar correos (multipart/alternative con text/html `white-space: pre-wrap`).
 > **🆕 v0.1.146 (📦647+648+649):** Panel "Mostrar detalles" con seguridad SPF/DKIM/DMARC/TLS (pills estilo Gmail) + fix correos leídos vuelven a aparecer como no leídos (UPSERT CASE WHEN) + fix icono del escritorio + race condition electron-updater (installer.nsh customInstall + try/catch stub).
