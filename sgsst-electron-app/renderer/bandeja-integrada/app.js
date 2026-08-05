@@ -5174,7 +5174,6 @@
           <input type="text" class="compose-panel__input" id="compose-cc" value="${ccValue.replace(/"/g, '&quot;')}" placeholder="CC" autocomplete="off" />
           <div class="compose-panel__autocomplete" id="compose-cc-autocomplete" hidden></div>` : ''}
           <input type="text" class="compose-panel__input" id="compose-subject" value="${subjectValue.replace(/"/g, '&quot;')}" placeholder="Asunto" autocomplete="off" />
-          <div class="compose-panel__autocomplete" id="compose-subject-autocomplete" hidden></div>
           <div class="compose-panel__field compose-panel__field--body" id="compose-body-field">
             ${quoteHtml}
             <textarea class="compose-panel__textarea" id="compose-body"></textarea>
@@ -5545,22 +5544,9 @@
           '</div>';
         }).join('');
       } else if (type === 'subject') {
-        Object.keys(subjectIndex).forEach(function (s) {
-          if (s.toLowerCase().indexOf(query) >= 0) {
-            suggestions.push({ subject: s, count: subjectIndex[s].count });
-          }
-        });
-        suggestions.sort(function (a, b) { return b.count - a.count; });
-        suggestions = suggestions.slice(0, 5);
-        if (suggestions.length === 0) { dropdownEl.hidden = true; return; }
-        dropdownEl.innerHTML = suggestions.map(function (s) {
-          return '<div class="compose-panel__autocomplete-item" data-subject="' + escapeHtml(s.subject) + '">' +
-            '<div class="compose-panel__autocomplete-info">' +
-              '<div class="compose-panel__autocomplete-name">' + escapeHtml(s.subject) + '</div>' +
-            '</div>' +
-            '<div class="compose-panel__autocomplete-count">' + s.count + '×</div>' +
-          '</div>';
-        }).join('');
+        // 📦650-fix2 — Autocomplete SOLO para destinatarios (Para/CC), NO para Asunto.
+        // El user prefiere escribir el asunto libremente sin sugerencias.
+        return;
       }
       // Wire up click
       Array.from(dropdownEl.querySelectorAll(".compose-panel__autocomplete-item")).forEach(function (item) {
@@ -5573,8 +5559,6 @@
             var parts = current.split(',');
             parts[parts.length - 1] = ' ' + email;
             inputEl.value = parts.map(function (p) { return p.trim(); }).filter(Boolean).join(', ') + ', ';
-          } else if (type === 'subject') {
-            inputEl.value = item.getAttribute("data-subject");
           }
           dropdownEl.hidden = true;
           inputEl.focus();
@@ -5583,13 +5567,11 @@
       dropdownEl.hidden = false;
     }
 
-    // Wire up autocomplete en los 3 inputs
+    // Wire up autocomplete SOLO en Para y CC (NO en Asunto — el user prefiere escribirlo libre).
     var toInput = modal.querySelector("#compose-to");
     var toDropdown = modal.querySelector("#compose-to-autocomplete");
     var ccInput = modal.querySelector("#compose-cc");
     var ccDropdown = modal.querySelector("#compose-cc-autocomplete");
-    var subjectInput = modal.querySelector("#compose-subject");
-    var subjectDropdown = modal.querySelector("#compose-subject-autocomplete");
     if (toInput && toDropdown) {
       toInput.addEventListener("input", function () { renderAutocomplete(toInput, toDropdown, 'contact'); });
       toInput.addEventListener("blur", function () { setTimeout(function () { toDropdown.hidden = true; }, 200); });
@@ -5605,11 +5587,6 @@
       ccInput.addEventListener("input", function () { renderAutocomplete(ccInput, ccDropdown, 'contact'); });
       ccInput.addEventListener("blur", function () { setTimeout(function () { ccDropdown.hidden = true; }, 200); });
       ccInput.addEventListener("focus", function () { renderAutocomplete(ccInput, ccDropdown, 'contact'); });
-    }
-    if (subjectInput && subjectDropdown) {
-      subjectInput.addEventListener("input", function () { renderAutocomplete(subjectInput, subjectDropdown, 'subject'); });
-      subjectInput.addEventListener("blur", function () { setTimeout(function () { subjectDropdown.hidden = true; }, 200); });
-      subjectInput.addEventListener("focus", function () { renderAutocomplete(subjectInput, subjectDropdown, 'subject'); });
     }
   }
 

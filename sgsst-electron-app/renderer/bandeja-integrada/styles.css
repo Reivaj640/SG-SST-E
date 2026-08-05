@@ -2381,8 +2381,13 @@ body {
 }
 .compose-panel__autocomplete {
   position: absolute;
-  left: 0;
-  right: 0;
+  left: 16px;
+  /* 📦650-fix2 — Ancho compacto (Gmail-style): NO estirado a todo el modal.
+     width: max-content se ajusta al contenido, max-width acota si el email
+     es muy largo. right: auto para que no se fuerce a estirarse. */
+  width: max-content;
+  max-width: 380px;
+  min-width: 240px;
   background: #fff;
   border: 1px solid var(--email-border-soft, #e5e7eb);
   border-radius: 6px;
