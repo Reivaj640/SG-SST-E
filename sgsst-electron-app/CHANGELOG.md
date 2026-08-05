@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.152] - 2026-08-05
+
+### Changed
+- **📦654 · fix(presupuesto): tabla más compacta (font-size 12px)** — Reducido el font-size de la tabla del Presupuesto de `0.9rem` (14.4px) a `0.75rem` (12px) para que las celdas sean más compactas y quepan más filas visibles sin scroll. Aplica a todos los datos, headers, celdas editables, celdas calculadas e inputs de la tabla (heredan via `font-size: inherit`).
+
 ## [0.1.151] - 2026-08-05
 
 ### Changed

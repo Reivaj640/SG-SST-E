@@ -1,4 +1,18 @@
-# K+AIR v0.1.151 (próximo release)
+# K+AIR v0.1.152 (próximo release)
+
+## 🎉 Novedades
+
+### 🧮 Presupuesto: tabla más compacta (📦654)
+
+Reducido el font-size de la tabla del Presupuesto de 14.4px a 12px. Las celdas de datos, headers, celdas editables, celdas calculadas e inputs heredan el nuevo tamaño. Resultado: caben más filas visibles sin scroll.
+
+## 📦 Commits incluidos (1)
+
+- Próximo commit con bump 0.1.151 → 0.1.152
+
+---
+
+# K+AIR v0.1.151
 
 ## 🎉 Novedades
 
