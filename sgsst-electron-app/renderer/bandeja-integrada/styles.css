@@ -1,4 +1,4 @@
-/* F4-fix — Este CSS NO usa Tailwind (vanilla JS con tokens propios).
+﻿/* F4-fix — Este CSS NO usa Tailwind (vanilla JS con tokens propios).
    Los imports de Tailwind fueron eliminados porque el proyecto no tiene
    tailwindcss como dependencia (causaba ERR_FILE_NOT_FOUND en consola). */
 
@@ -2325,7 +2325,9 @@ body {
 .compose-panel {
   background: #fff;
   border-radius: 8px 8px 0 0;
-  width: 600px;
+  /* 📦650-fix1 — width inicial más generoso (700px) para arrancar más ancho
+     tipo Gmail. El user lo puede resizear al tamaño que quiera. */
+  width: 700px;
   max-width: calc(100vw - 48px);
   max-height: 80vh;
   display: flex;
@@ -2335,6 +2337,110 @@ body {
   transition: max-height 200ms ease, box-shadow 200ms ease;
   pointer-events: auto;
   margin: 0 24px 0 0;
+  /* 📦650-fix1 — position: relative para que el .compose-panel__resize-grip
+     (position: absolute) se posicione relativo al PANEL, no al overlay.
+     SIN esto, el grip se va a top:0/left:0 del viewport (esquina superior
+     izquierda de la pantalla), no del panel. */
+  position: relative;
+  /* 📦650-fix1 — Resize libre del modal compose (custom, no nativo).
+     ANTES: usaba `resize: both` que pone el handle nativo en bottom-right.
+     AHORA: handle custom en top-left (per user request). Lógica de
+     resize en JS (mousedown/mousemove/mouseup en .compose-panel__resize-grip).
+     min-width/min-height via CSS, max via JS. */
+  min-width: 400px;
+  min-height: 360px;
+}
+/* 📦650-fix1 — Handle visual en la esquina SUPERIOR-IZQUIERDA para resize.
+   Patrón diagonal MUY sutil (2 rayitas finas tipo grip nativo de Windows),
+   sin caja blanca de fondo, baja opacidad para que no distraiga. El
+   cursor nwse-resize ya da la pista de que es interactivo.
+   Hover: leve aumento de opacidad para feedback. */
+.compose-panel__resize-grip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+  background-color: transparent;
+  background-image:
+    linear-gradient(135deg,
+      transparent 48%, rgba(60, 64, 67, 0.32) 48%, rgba(60, 64, 67, 0.32) 52%,
+      transparent 52%, transparent 70%,
+      rgba(60, 64, 67, 0.32) 70%, rgba(60, 64, 67, 0.32) 74%,
+      transparent 74%);
+  z-index: 99999;
+  user-select: none;
+  -webkit-user-select: none;
+  padding: 0;
+  opacity: 0.7;
+  transition: opacity 120ms ease;
+}
+.compose-panel__resize-grip:hover {
+  opacity: 1;
+}
+.compose-panel__autocomplete {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid var(--email-border-soft, #e5e7eb);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  max-height: 240px;
+  overflow-y: auto;
+  z-index: 1000;
+  margin: 2px 0 0 0;
+}
+.compose-panel__autocomplete[hidden] { display: none !important; }
+.compose-panel__autocomplete-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #f1f3f4;
+  transition: background 80ms ease;
+}
+.compose-panel__autocomplete-item:last-child { border-bottom: none; }
+.compose-panel__autocomplete-item:hover { background: #f8f9fa; }
+.compose-panel__autocomplete-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--kair-primary, #1a73e8);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 500;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+.compose-panel__autocomplete-info {
+  flex: 1;
+  min-width: 0;
+}
+.compose-panel__autocomplete-name {
+  font-size: 0.85rem;
+  color: var(--kair-text-strong, #202124);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.compose-panel__autocomplete-email {
+  font-size: 0.75rem;
+  color: var(--kair-text-muted, #5f6368);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.compose-panel__autocomplete-count {
+  font-size: 0.7rem;
+  color: var(--kair-text-muted, #5f6368);
+  font-family: monospace;
+  flex-shrink: 0;
 }
 
 /* ---------- Estado MINIMIZADO (Gmail-style bottom-right) ---------- */
@@ -2379,7 +2485,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  /* 📦650-fix1 — padding-left 36px para que el título "Nuevo correo" no se solape
+     con el grip de resize (24x24) que está en top-left. */
+  padding: 12px 16px 12px 36px;
   border-bottom: 1px solid var(--email-border-soft, #e5e7eb);
   background: #f8f9fa;
   color: #6b7280;

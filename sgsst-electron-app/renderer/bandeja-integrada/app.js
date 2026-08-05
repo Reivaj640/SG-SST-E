@@ -5143,6 +5143,11 @@
     var modal = el("div", { class: "compose-panel-overlay" });
     modal.innerHTML = `
       <div class="compose-panel" role="dialog" aria-modal="true" aria-labelledby="compose-panel-title">
+        <!-- 📦650-fix1 — Grip visual en la esquina SUPERIOR-IZQUIERDA para resize.
+             Patrón diagonal de cuadraditos (mismo estilo que el grip nativo de
+             Windows bottom-right). Solo CSS background-image, no SVG.
+             Drag desde este grip redimensiona el modal. -->
+        <div class="compose-panel__resize-grip" aria-label="Redimensionar" title="Arrastrá para redimensionar"></div>
         <div class="compose-panel__titlebar">
           <h3 class="compose-panel__title" id="compose-panel-title">${isReply ? (mode === 'replyAll' ? 'Responder a todos' : 'Responder') : isForward ? 'Reenviar' : 'Nuevo correo'}</h3>
           <div class="compose-panel__actions">
@@ -5163,10 +5168,13 @@
                - El placeholder muestra "Para"/"Asunto" hasta que se escribe
                - Al hacer click o escribir, el placeholder desaparece (browser default)
                - Más limpio y menos elementos visuales -->
-          <input type="email" class="compose-panel__input" id="compose-to" value="${toValue.replace(/"/g, '&quot;')}" placeholder="Para" />
+          <input type="email" class="compose-panel__input" id="compose-to" value="${toValue.replace(/"/g, '&quot;')}" placeholder="Para" autocomplete="off" />
+          <div class="compose-panel__autocomplete" id="compose-to-autocomplete" hidden></div>
           ${mode === 'replyAll' ? `
-          <input type="text" class="compose-panel__input" id="compose-cc" value="${ccValue.replace(/"/g, '&quot;')}" placeholder="CC" />` : ''}
-          <input type="text" class="compose-panel__input" id="compose-subject" value="${subjectValue.replace(/"/g, '&quot;')}" placeholder="Asunto" />
+          <input type="text" class="compose-panel__input" id="compose-cc" value="${ccValue.replace(/"/g, '&quot;')}" placeholder="CC" autocomplete="off" />
+          <div class="compose-panel__autocomplete" id="compose-cc-autocomplete" hidden></div>` : ''}
+          <input type="text" class="compose-panel__input" id="compose-subject" value="${subjectValue.replace(/"/g, '&quot;')}" placeholder="Asunto" autocomplete="off" />
+          <div class="compose-panel__autocomplete" id="compose-subject-autocomplete" hidden></div>
           <div class="compose-panel__field compose-panel__field--body" id="compose-body-field">
             ${quoteHtml}
             <textarea class="compose-panel__textarea" id="compose-body"></textarea>
@@ -5220,6 +5228,56 @@
     var maximizeBtn = modal.querySelector(".compose-panel__btn--maximize");
     var closeBtn = modal.querySelector(".compose-panel__btn--close");
     var titlebar = modal.querySelector(".compose-panel__titlebar");
+
+    // 📦650-fix1 — Resize custom del modal (drag desde el grip top-left).
+    // ANTES: `resize: both` nativo del browser ponía el handle en bottom-right.
+    // AHORA: handle custom en top-left con listeners mousedown/mousemove/mouseup.
+    // min/max: width 400 → (right panel width), height 360 → (right panel height).
+    // El user pidió que el modal NUNCA supere el área de la sección del correo
+    // seleccionado (panel derecho de la Bandeja Integrada).
+    (function () {
+      var grip = panel.querySelector(".compose-panel__resize-grip");
+      if (!grip) return;
+      var minW = 400, minH = 360;
+      // 📦650-fix1 — Calcular el espacio disponible (right panel de la Bandeja).
+      // Si el right panel no está visible (Bandeja Integrada oculta), fallback
+      // al viewport - 48px de margen.
+      var rightPanel = document.querySelector("#mail-detail-container") || document.querySelector(".kair-mail-detail");
+      var maxW, maxH;
+      if (rightPanel) {
+        var rect = rightPanel.getBoundingClientRect();
+        maxW = Math.max(400, rect.width - 24);
+        maxH = Math.max(360, rect.height - 24);
+      } else {
+        maxW = window.innerWidth - 48;
+        maxH = window.innerHeight * 0.9;
+      }
+      grip.addEventListener("mousedown", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var startX = e.clientX;
+        var startY = e.clientY;
+        var startW = panel.offsetWidth;
+        var startH = panel.offsetHeight;
+        var onMove = function (ev) {
+          // Drag top-left = el lado opuesto (bottom-right) crece con el drag.
+          // deltaX negativo (drag a la izquierda) → ancho aumenta.
+          // deltaY negativo (drag hacia arriba) → alto aumenta.
+          var dx = ev.clientX - startX;
+          var dy = ev.clientY - startY;
+          var newW = Math.max(minW, Math.min(maxW, startW - dx));
+          var newH = Math.max(minH, Math.min(maxH, startH - dy));
+          panel.style.width = newW + "px";
+          panel.style.height = newH + "px";
+        };
+        var onUp = function () {
+          document.removeEventListener("mousemove", onMove);
+          document.removeEventListener("mouseup", onUp);
+        };
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+      });
+    })();
 
     // Toggle minimizado/maximizado
     var setMinimized = function (minimized) {
@@ -5417,6 +5475,142 @@
         closeModal: closeModal
       });
     });
+
+    // 📦650-fix2 — Autocomplete Gmail-style para "Para:", "CC:" y "Asunto:".
+    // Construye un índice de contactos (emails) y subjects desde state.mails,
+    // filtra en tiempo real al escribir y muestra un dropdown de sugerencias
+    // con frecuencia. Click en una sugerencia la inserta en el input.
+    // 100% client-side (sin IPC) — rápido y sin carga al backend.
+    var contactIndex = {};   // email → { name, count }
+    var subjectIndex = {};   // subject → { count }
+    (function () {
+      if (!Array.isArray(state.mails)) return;
+      state.mails.forEach(function (m) {
+        // Remitente
+        if (m.senderEmail) {
+          var k = m.senderEmail.toLowerCase();
+          if (!contactIndex[k]) contactIndex[k] = { name: m.sender || m.senderEmail, count: 0 };
+          contactIndex[k].count++;
+        }
+        // to_list / cc_list (pueden venir como array de {name, email} o string JSON)
+        [['to_list', 'to'], ['cc_list', 'cc']].forEach(function (pair) {
+          var arr = m[pair[0]];
+          if (!Array.isArray(arr)) return;
+          arr.forEach(function (a) {
+            var email = typeof a === 'string' ? a : (a && a.email);
+            var name = typeof a === 'string' ? null : (a && a.name);
+            if (!email) return;
+            var k = email.toLowerCase();
+            if (!contactIndex[k]) contactIndex[k] = { name: name || email, count: 0 };
+            contactIndex[k].count++;
+            // Si tenemos nombre del to_list (más reciente) preferirlo
+            if (name && (!contactIndex[k].name || contactIndex[k].name === email)) {
+              contactIndex[k].name = name;
+            }
+          });
+        });
+        // Subjects
+        if (m.subject) {
+          var s = m.subject.replace(/^(\s*(Re|Fwd|RE|FW)\s*:\s*)+/i, '').trim();
+          if (s && s.length > 3) {
+            if (!subjectIndex[s]) subjectIndex[s] = { count: 0 };
+            subjectIndex[s].count++;
+          }
+        }
+      });
+    })();
+
+    function renderAutocomplete(inputEl, dropdownEl, type) {
+      var query = (inputEl.value || '').split(',').pop().trim().toLowerCase();
+      dropdownEl.innerHTML = "";
+      if (query.length < 2) { dropdownEl.hidden = true; return; }
+      var suggestions = [];
+      if (type === 'contact') {
+        Object.keys(contactIndex).forEach(function (k) {
+          if (k.indexOf(query) >= 0 || (contactIndex[k].name && contactIndex[k].name.toLowerCase().indexOf(query) >= 0)) {
+            suggestions.push({ email: k, name: contactIndex[k].name, count: contactIndex[k].count });
+          }
+        });
+        suggestions.sort(function (a, b) { return b.count - a.count; });
+        suggestions = suggestions.slice(0, 5);
+        if (suggestions.length === 0) { dropdownEl.hidden = true; return; }
+        dropdownEl.innerHTML = suggestions.map(function (s) {
+          return '<div class="compose-panel__autocomplete-item" data-email="' + escapeHtml(s.email) + '">' +
+            '<div class="compose-panel__autocomplete-avatar">' + escapeHtml((s.name || s.email).substring(0, 1).toUpperCase()) + '</div>' +
+            '<div class="compose-panel__autocomplete-info">' +
+              '<div class="compose-panel__autocomplete-name">' + escapeHtml(s.name || s.email) + '</div>' +
+              '<div class="compose-panel__autocomplete-email">' + escapeHtml(s.email) + '</div>' +
+            '</div>' +
+            '<div class="compose-panel__autocomplete-count">' + s.count + '×</div>' +
+          '</div>';
+        }).join('');
+      } else if (type === 'subject') {
+        Object.keys(subjectIndex).forEach(function (s) {
+          if (s.toLowerCase().indexOf(query) >= 0) {
+            suggestions.push({ subject: s, count: subjectIndex[s].count });
+          }
+        });
+        suggestions.sort(function (a, b) { return b.count - a.count; });
+        suggestions = suggestions.slice(0, 5);
+        if (suggestions.length === 0) { dropdownEl.hidden = true; return; }
+        dropdownEl.innerHTML = suggestions.map(function (s) {
+          return '<div class="compose-panel__autocomplete-item" data-subject="' + escapeHtml(s.subject) + '">' +
+            '<div class="compose-panel__autocomplete-info">' +
+              '<div class="compose-panel__autocomplete-name">' + escapeHtml(s.subject) + '</div>' +
+            '</div>' +
+            '<div class="compose-panel__autocomplete-count">' + s.count + '×</div>' +
+          '</div>';
+        }).join('');
+      }
+      // Wire up click
+      Array.from(dropdownEl.querySelectorAll(".compose-panel__autocomplete-item")).forEach(function (item) {
+        item.addEventListener("mousedown", function (e) {
+          // mousedown (no click) para que se dispare antes del blur del input
+          e.preventDefault();
+          if (type === 'contact') {
+            var email = item.getAttribute("data-email");
+            var current = (inputEl.value || '').trim();
+            var parts = current.split(',');
+            parts[parts.length - 1] = ' ' + email;
+            inputEl.value = parts.map(function (p) { return p.trim(); }).filter(Boolean).join(', ') + ', ';
+          } else if (type === 'subject') {
+            inputEl.value = item.getAttribute("data-subject");
+          }
+          dropdownEl.hidden = true;
+          inputEl.focus();
+        });
+      });
+      dropdownEl.hidden = false;
+    }
+
+    // Wire up autocomplete en los 3 inputs
+    var toInput = modal.querySelector("#compose-to");
+    var toDropdown = modal.querySelector("#compose-to-autocomplete");
+    var ccInput = modal.querySelector("#compose-cc");
+    var ccDropdown = modal.querySelector("#compose-cc-autocomplete");
+    var subjectInput = modal.querySelector("#compose-subject");
+    var subjectDropdown = modal.querySelector("#compose-subject-autocomplete");
+    if (toInput && toDropdown) {
+      toInput.addEventListener("input", function () { renderAutocomplete(toInput, toDropdown, 'contact'); });
+      toInput.addEventListener("blur", function () { setTimeout(function () { toDropdown.hidden = true; }, 200); });
+      toInput.addEventListener("focus", function () { renderAutocomplete(toInput, toDropdown, 'contact'); });
+      toInput.addEventListener("keydown", function (e) {
+        if (e.key === "Tab" || e.key === "Enter") {
+          var first = toDropdown.querySelector(".compose-panel__autocomplete-item");
+          if (first) { e.preventDefault(); first.dispatchEvent(new MouseEvent("mousedown")); }
+        }
+      });
+    }
+    if (ccInput && ccDropdown) {
+      ccInput.addEventListener("input", function () { renderAutocomplete(ccInput, ccDropdown, 'contact'); });
+      ccInput.addEventListener("blur", function () { setTimeout(function () { ccDropdown.hidden = true; }, 200); });
+      ccInput.addEventListener("focus", function () { renderAutocomplete(ccInput, ccDropdown, 'contact'); });
+    }
+    if (subjectInput && subjectDropdown) {
+      subjectInput.addEventListener("input", function () { renderAutocomplete(subjectInput, subjectDropdown, 'subject'); });
+      subjectInput.addEventListener("blur", function () { setTimeout(function () { subjectDropdown.hidden = true; }, 200); });
+      subjectInput.addEventListener("focus", function () { renderAutocomplete(subjectInput, subjectDropdown, 'subject'); });
+    }
   }
 
   // F1.B — Envía el correo compuesto via Gmail API.

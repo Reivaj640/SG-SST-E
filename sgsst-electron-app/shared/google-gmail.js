@@ -558,19 +558,51 @@ async function sendMessage(options) {
       references ? 'References: ' + references : null
     ].filter(function (h) { return h; });
 
+    // 📦650-fix3 — multipart/alternative con text/plain + text/html.
+    // ANTES: solo text/plain → los múltiples espacios y tabs se colapsaban
+    // al renderizar (RFC 5322: "Space and tab characters are not permitted
+    // between certain pairs of structured header fields"). El user veía
+    // sus párrafos pegados o sus espacios múltiples colapsados.
+    // AHORA: mandamos ambos formatos. Gmail/Outlook web muestran el HTML
+    // que usa white-space: pre-wrap → preserva TODO (espacios, tabs, \n).
+    // El text/plain queda como fallback para clientes que no soporten HTML.
+    function buildHtmlFromText(text) {
+      // Escapar HTML primero
+      var escaped = String(text || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+      // Convertir saltos de línea a <br>
+      var withBr = escaped.replace(/\r\n|\r|\n/g, '<br>');
+      // Envolver en un div con white-space: pre-wrap → preserva espacios múltiples y tabs
+      return '<div style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; font-size: 14px; line-height: 1.5; color: #202124; white-space: pre-wrap;">' + withBr + '</div>';
+    }
+    var htmlBody = buildHtmlFromText(body);
+
     var raw;
     if (attachments && attachments.length > 0) {
-      // Construir mensaje multipart/mixed con boundary
+      // Construir mensaje multipart/mixed con boundary (contiene multipart/alternative adentro)
       var boundary = '----=_KairBandeja_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+      var altBoundary = '----=_KairBandeja_Alt_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
       // Override del header Content-Type (no incluirlo arriba, lo agregamos con boundary)
       var headerLines = headers.join('\r\n');
       raw = headerLines + '\r\n';
       raw += 'MIME-Version: 1.0\r\n';
       raw += 'Content-Type: multipart/mixed; boundary="' + boundary + '"\r\n\r\n';
-      // Parte 1: body (text/plain)
+      // Parte 1: body (multipart/alternative con text/plain + text/html)
       raw += '--' + boundary + '\r\n';
+      raw += 'Content-Type: multipart/alternative; boundary="' + altBoundary + '"\r\n\r\n';
+      // text/plain
+      raw += '--' + altBoundary + '\r\n';
       raw += 'Content-Type: text/plain; charset=UTF-8\r\n\r\n';
       raw += body + '\r\n';
+      // text/html
+      raw += '--' + altBoundary + '\r\n';
+      raw += 'Content-Type: text/html; charset=UTF-8\r\n\r\n';
+      raw += htmlBody + '\r\n';
+      raw += '--' + altBoundary + '--\r\n';
       // Partes 2..N: cada attachment
       for (var i = 0; i < attachments.length; i++) {
         var att = attachments[i];
@@ -588,9 +620,22 @@ async function sendMessage(options) {
       }
       raw += '--' + boundary + '--\r\n';
     } else {
-      // Sin attachments: mensaje simple text/plain
-      var allHeaders = headers.concat(['Content-Type: text/plain; charset=UTF-8']);
-      raw = allHeaders.join('\r\n') + '\r\n\r\n' + body;
+      // Sin attachments: multipart/alternative con text/plain + text/html
+      var altBoundary2 = '----=_KairBandeja_Alt_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+      var allHeaders = headers.concat([
+        'MIME-Version: 1.0',
+        'Content-Type: multipart/alternative; boundary="' + altBoundary2 + '"'
+      ]);
+      raw = allHeaders.join('\r\n') + '\r\n\r\n';
+      // text/plain
+      raw += '--' + altBoundary2 + '\r\n';
+      raw += 'Content-Type: text/plain; charset=UTF-8\r\n\r\n';
+      raw += body + '\r\n';
+      // text/html
+      raw += '--' + altBoundary2 + '\r\n';
+      raw += 'Content-Type: text/html; charset=UTF-8\r\n\r\n';
+      raw += htmlBody + '\r\n';
+      raw += '--' + altBoundary2 + '--\r\n';
     }
     var encoded = encodeBase64Url(raw);
 
