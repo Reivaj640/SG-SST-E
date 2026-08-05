@@ -1,9 +1,11 @@
 # K+AIR — Contexto del Proyecto
 
 **Última actualización:** 5 de agosto de 2026
-**Versión actual:** 0.1.153 (próximo release) — publicado v0.1.146
+**Versión actual:** 0.1.154 (próximo release) — publicado v0.1.146
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 **Stack:** Electron 37 + vanilla JS + Python 3.11.9 (empaquetado) + SQLite (kair.db)
+
+> **🆕 v0.1.154 (📦656):** Gráfica "Capacitaciones Mensuales" del home de Recursos ahora coincide con el submódulo. Root cause: el algoritmo del home (`getCapacitacionesChartDataForGraph`) hardcodeaba las columnas del Excel (leía `row[3]` cuando la fecha real está en `row[5]`). Fix: reescritura completa del algoritmo con auto-detección de columnas leyendo el header, parser de fecha robusto (DMY/ISO/serial date/fallback), fallback offset ±2 columnas, y filtros estrictos de fila. La gráfica del home ahora muestra exactamente lo mismo que "Ejecución Mensual" del submódulo.
 
 > **🆕 v0.1.153 (📦655):** Gmail — fix encoding tildes/eñes en subject. El raw MIME escribía el subject como UTF-8 raw, que Gmail/clients interpretaban como Latin-1 → `ejecución` → `ejecucÃ³n`. Fix: nueva `encodeMimeHeader()` que aplica RFC 2047 encoded-word (`=?UTF-8?B?<base64>?=`) a From/To/Cc/Bcc/Subject. Subjects con tildes, eñes y acentos ahora se ven correctos.
 > **🆕 v0.1.152 (📦654):** Presupuesto — tabla más compacta (font-size 0.9rem → 0.75rem, 14.4px → 12px). Celdas, headers, editables, calculadas e inputs heredan. Caben más filas sin scroll.

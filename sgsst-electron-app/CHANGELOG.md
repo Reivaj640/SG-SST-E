@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.154] - 2026-08-05
+
+### Fixed
+- **📦656 · fix(recursos-home): gráfica "Capacitaciones Mensuales" del home coincide con submódulo** — Bug que causaba que la gráfica del home de Recursos mostrara datos distintos (y falsos) a la del submódulo "Programa de Capacitación Anual".
+  - **Root cause**: el algoritmo del home (`getCapacitacionesChartDataForGraph` en `recursos-home.js`) **hardcodeaba** las columnas del Excel: `row[1]` para nombre, `row[3]` para fecha y `[9, 8, 7, 10, 11, 6]` para estado (toma el primero no vacío). El log del submódulo reporta `Columnas detectadas: Nombre=1, Fecha=5, Estado=8` — la fecha real está en la columna 5, no en la 3. El home estaba leyendo la columna equivocada, así que mostraba "actividades en abril" cuando el Excel no las tenía programadas en abril.
+  - **Iteración 1** (anterior): cambié las 38 keywords ambiguas de "realizada" por las 9 estrictas del submódulo (`ejecutado`, `completado`, `realizado`, `1`, `3`, `4`, `100`, `si`, `sí`). Eso eliminó falsos positivos como "Próxima", "Excelente", "Vencida", "100%" (de % avance), "v" (de "vencida") que se contaban como realizadas.
+  - **Iteración 2** (este fix): reescribí el algoritmo completo del home para que use **EXACTAMENTE la misma lógica que el submódulo** (`capacitaciones-logic.js:699-807`):
+    1. **Auto-detección de columnas** leyendo las primeras 5 filas del Excel buscando headers que contengan "nombre"/"capacitación", "fecha"/"programada"/"date", "estado"/"indicador"/"status".
+    2. **Parser de fecha robusto** con regex DMY (`24/04/2026` o `24-04-2026`), regex ISO (`2026-04-24` o `2026/04/24`), serial date de Excel (número ≥ 1 → fecha real) y fallback genérico con `new Date()`.
+    3. **Fallback offset ±2 columnas** si la columna de fecha detectada está vacía en alguna fila.
+    4. **Filtros estrictos de fila**: nombre `length < 3` se descarta, "nombre de la" / "contenido de la" se descartan, "total capacitaciones" rompe el loop.
+  - **Beneficio**: la gráfica "Capacitaciones Mensuales" del home de Recursos ahora muestra exactamente los mismos datos que "Ejecución Mensual" del submódulo. Mismas barras, mismos meses, mismas cantidades.
+
 ## [0.1.153] - 2026-08-05
 
 ### Fixed

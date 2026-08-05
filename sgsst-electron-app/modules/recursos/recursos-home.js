@@ -2071,11 +2071,32 @@ parseFormattedNumber(value) {
             const programadasData = Array(12).fill(0);
             const realizadasData = Array(12).fill(0);
 
+            // 📦656-fix — Auto-detección de columnas (igual que el submódulo).
+            // Antes el home hardcodeaba row[1] para nombre, row[3] para fecha y
+            // [9,8,7...] para estado, lo que hacía que se contaran fechas de
+            // columnas equivocadas (la columna 3 del Excel no es la fecha
+            // programada; el submódulo detecta que la fecha real está en col 5).
+            // Esta auto-detección lee el header y encuentra las columnas reales.
+            let colNombre = 1, colFecha = 3, colEstado = 8;
+
+            for (let i = 0; i < Math.min(5, processedData.length); i++) {
+                const row = processedData[i];
+                if (!Array.isArray(row)) continue;
+                for (let j = 0; j < row.length; j++) {
+                    const cell = String(row[j] || '').toLowerCase();
+                    if (cell.includes('nombre') || cell.includes('capacitación')) colNombre = j;
+                    if (cell.includes('fecha') || cell.includes('programada') || cell.includes('date')) colFecha = j;
+                    if (cell.includes('estado') || cell.includes('indicador') || cell.includes('status')) colEstado = j;
+                }
+            }
+
+            console.log(`📊 [getCapacitacionesChartDataForGraph] Columnas detectadas: Nombre=${colNombre}, Fecha=${colFecha}, Estado=${colEstado}`);
+
             console.log('🔍 [getCapacitacionesChartDataForGraph] Procesando filas...');
 
             for (let i = 0; i < dataRows.length; i++) {
                 const row = dataRows[i];
-                if (!Array.isArray(row) || row.length < 9) continue;
+                if (!Array.isArray(row) || row.length < Math.max(colNombre, colFecha, colEstado) + 1) continue;
 
                 const getCellValue = (cell) => {
                     if (cell === null || cell === undefined) return '';
@@ -2083,89 +2104,81 @@ parseFormattedNumber(value) {
                     return String(cell);
                 };
 
-                const nombreRaw = getCellValue(row[1]);
-                const nombre = String(nombreRaw || '').trim();
+                const nombre = String(getCellValue(row[colNombre]) || '').trim();
 
-                if (!nombre || nombre === 'Nombre de la capacitación' || nombre === '') continue;
+                if (!nombre || nombre.length < 3) continue;
+                if (nombre.toLowerCase().includes('nombre de la') || nombre.toLowerCase().includes('contenido de la')) continue;
                 if (nombre.toLowerCase().includes('total capacitaciones')) break;
 
-                // Fecha
+                // Fecha con parser robusto + fallback offset ±2 columnas
                 let fechaProgramada = 'No especificada';
-                const fechaValue = getCellValue(row[3]);
+                let fechaValue = getCellValue(row[colFecha]);
+
+                if (!fechaValue || fechaValue === '') {
+                    for (let offset = -2; offset <= 2; offset++) {
+                        const testCol = colFecha + offset;
+                        if (testCol >= 0 && testCol < row.length) {
+                            const testValue = getCellValue(row[testCol]);
+                            if (testValue && testValue !== '') {
+                                fechaValue = testValue;
+                                colFecha = testCol;
+                                break;
+                            }
+                        }
+                    }
+                }
+
                 if (fechaValue) {
                     if (typeof fechaValue === 'number' && fechaValue >= 1) {
+                        // Serial date de Excel
                         const utcDate = new Date((fechaValue - 25569) * 86400 * 1000);
                         const localDate = new Date(utcDate.getUTCFullYear(), utcDate.getUTCMonth(), utcDate.getUTCDate());
                         fechaProgramada = `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}-${String(localDate.getDate()).padStart(2, '0')}`;
                     } else {
-                        const fechaStr = String(fechaValue);
-                        let parsedDate = new Date(fechaStr);
-                        if (isNaN(parsedDate.getTime())) {
-                            const parts = fechaStr.split('/');
-                            if (parts.length === 3) parsedDate = new Date(parts[2], parts[1] - 1, parts[0]);
+                        const fechaStr = String(fechaValue).trim();
+                        let parsedDate = null;
+
+                        // DMY (24/04/2026 o 24-04-2026)
+                        const dmyMatch = fechaStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+                        if (dmyMatch) {
+                            parsedDate = new Date(parseInt(dmyMatch[3]), parseInt(dmyMatch[2]) - 1, parseInt(dmyMatch[1]));
                         }
-                        if (!isNaN(parsedDate.getTime()) && parsedDate.getFullYear() >= 1900) {
+
+                        // ISO (2026-04-24 o 2026/04/24)
+                        if (!parsedDate) {
+                            const isoMatch = fechaStr.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+                            if (isoMatch) {
+                                parsedDate = new Date(parseInt(isoMatch[1]), parseInt(isoMatch[2]) - 1, parseInt(isoMatch[3]));
+                            }
+                        }
+
+                        // Fallback genérico
+                        if (!parsedDate) {
+                            parsedDate = new Date(fechaStr);
+                        }
+
+                        if (parsedDate && !isNaN(parsedDate.getTime()) && parsedDate.getFullYear() >= 1900) {
                             fechaProgramada = `${parsedDate.getFullYear()}-${String(parsedDate.getMonth() + 1).padStart(2, '0')}-${String(parsedDate.getDate()).padStart(2, '0')}`;
                         }
                     }
                 }
 
-                // Estado: Verificar múltiples columnas posibles
-                const estadoColumnas = [9, 8, 7, 10, 11, 6];
-                let estadoRaw = '';
-
-                for (const colIndex of estadoColumnas) {
-                    if (colIndex < row.length) {
-                        const cellValue = getCellValue(row[colIndex]);
-                        if (cellValue && cellValue.toString().trim() !== '') {
-                            estadoRaw = cellValue;
-                            break;
-                        }
-                    }
-                }
-
+                // Estado usando la columna detectada
+                const estadoRaw = getCellValue(row[colEstado]);
                 const estadoNorm = (estadoRaw || '').toString().toLowerCase().trim();
 
-                console.log(`🔍 Fila ${i}: Nombre="${nombre}", Estado="${estadoRaw}", Fecha="${fechaProgramada}"`);
+                console.log(`🔍 Fila ${i}: Nombre="${nombre}", Estado="${estadoRaw}", Fecha="${fechaProgramada}", colE=${colEstado}`);
 
-                const isRealizada = estadoNorm.includes('100') ||
-                                    estadoNorm.includes('realizada') ||
-                                    estadoNorm.includes('ejecutada') ||
-                                    estadoNorm.includes('completada') ||
-                                    estadoNorm.includes('completadas') ||
-                                    estadoNorm.includes('cumplida') ||
-                                    estadoNorm.includes('si') ||
-                                    estadoNorm.includes('sí') ||
-                                    estadoNorm.includes('ok') ||
-                                    estadoNorm.includes('true') ||
-                                    estadoNorm.includes('activo') ||
-                                    estadoNorm.includes('aprobada') ||
-                                    estadoNorm.includes('exitosa') ||
-                                    estadoNorm.includes('1') ||
-                                    estadoNorm.includes('x') ||
-                                    estadoNorm.includes('v') ||
-                                    estadoNorm.includes('verdadero') ||
-                                    estadoNorm.includes('yes') ||
-                                    estadoNorm.includes('done') ||
-                                    estadoNorm.includes('completa') ||
-                                    estadoNorm.includes('finalizada') ||
-                                    estadoNorm.includes('terminada') ||
-                                    estadoNorm.includes('efectuada') ||
+                // 📦656 — Misma detección de "realizada" que el submódulo
+                const isRealizada = estadoNorm.includes('ejecutado') ||
+                                    estadoNorm.includes('completado') ||
                                     estadoNorm.includes('realizado') ||
-                                    estadoNorm.includes('ejecutado') ||
-                                    estadoNorm.includes('aplicada') ||
-                                    estadoNorm.includes('aplicado') ||
-                                    estadoNorm.includes('asistida') ||
-                                    estadoNorm.includes('asistieron') ||
-                                    estadoNorm.includes('asistencia') ||
-                                    estadoNorm.includes('participaron') ||
-                                    estadoNorm.includes('participación') ||
-                                    estadoNorm.includes('certificada') ||
-                                    estadoNorm.includes('certificado') ||
-                                    estadoNorm.includes('evaluada') ||
-                                    estadoNorm.includes('evaluado') ||
-                                    estadoNorm.includes('verificada') ||
-                                    estadoNorm.includes('verificado');
+                                    estadoNorm === '1' ||
+                                    estadoNorm === '3' ||
+                                    estadoNorm === '4' ||
+                                    estadoNorm === '100' ||
+                                    estadoNorm.includes('si') ||
+                                    estadoNorm.includes('sí');
 
                 const date = new Date(fechaProgramada);
                 if (!isNaN(date.getTime())) {
@@ -2174,9 +2187,6 @@ parseFormattedNumber(value) {
                         programadasData[month]++;
                         if (isRealizada) {
                             realizadasData[month]++;
-                        }
-
-                        if (isRealizada) {
                             console.log(`✅ Capacitación "${nombre}" marcada como realizada en mes ${month + 1}`);
                         }
                     }

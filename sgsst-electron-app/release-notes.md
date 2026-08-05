@@ -1,4 +1,26 @@
-# K+AIR v0.1.153 (próximo release)
+# K+AIR v0.1.154 (próximo release)
+
+## 🎉 Novedades
+
+### 📊 Fix: gráfica "Capacitaciones Mensuales" del home de Recursos (📦656)
+
+La gráfica del home de Recursos mostraba datos distintos (y falsos) a la del submódulo "Programa de Capacitación Anual". El algoritmo del home hardcodeaba las columnas del Excel (leía la columna 3 cuando la fecha real estaba en la columna 5), y tenía 38 keywords ambiguas que matcheaban palabras como "Próxima", "Excelente", "Vencida" como realizadas.
+
+- **Fix**: reescritura completa del algoritmo del home para usar la misma lógica que el submódulo:
+  - Auto-detección de columnas leyendo el header del Excel
+  - Parser de fecha robusto (DMY, ISO, serial date, fallback)
+  - Fallback offset ±2 columnas
+  - Filtros estrictos de fila
+  - Lista estricta de keywords de "realizada" (9, no 38)
+- **Beneficio**: la gráfica del home ahora muestra exactamente lo mismo que "Ejecución Mensual" del submódulo.
+
+## 📦 Commits incluidos (1)
+
+- Próximo commit con bump 0.1.153 → 0.1.154
+
+---
+
+# K+AIR v0.1.153
 
 ## 🎉 Novedades
 
