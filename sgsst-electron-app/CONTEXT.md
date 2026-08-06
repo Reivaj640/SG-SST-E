@@ -1,9 +1,11 @@
 # K+AIR — Contexto del Proyecto
 
-**Última actualización:** 5 de agosto de 2026
-**Versión actual:** 0.1.156 (próximo release) — publicado v0.1.146
+**Última actualización:** 6 de agosto de 2026
+**Versión actual:** 0.1.157 (próximo release) — publicado v0.1.146
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 **Stack:** Electron 37 + vanilla JS + Python 3.11.9 (empaquetado) + SQLite (kair.db)
+
+> **🆕 v0.1.157 (📦690-691 — Bandeja Integrada: scroll + warnings):** 2 bugfixes en Bandeja Integrada. 📦691: preservar scroll de la lista al seleccionar un mail (3 fixes encadenados — el container `#mail-list-container` tiene overflow:hidden, el scroll real está en sub-elemento `.kair-scroll`; `loadMailBodyFromCache` se llamaba en paralelo desde `selectMail`+`renderMailDetail` causando 2-3 renders en cadena que se "pisaban" entre sí; ahora solo se actualiza el detail, no la lista, y se bloquea con flag `_loadingBody`). 📦690: silenciar warnings de `cid:` URIs en imágenes embebidas de emails HTML (reemplazados por GIF transparente 1x1 data URI de 43 bytes — el layout se preserva, no se hace request al browser).
 
 > **🆕 v0.1.156 (📦658-687 — Rediseño completo FURAT 3.2.1):** Header System v2.0 (patrón 3.1.4) + KPI Strip oficial + 40+ inline styles eliminados. Drag-and-drop estilo macOS Finder (drop zone sobre card destino). Upload con metadata + tabla SQL `furat_metadata` (índices por company/date/type/severity/area). Dashboard analítico con 4 charts: Tendencia 12 meses (LÍNEA con PUNTOS, no barras), Por tipo, Por gravedad (colores semánticos), Top áreas. Biblioteca V2: 8+ iteraciones (cards amarillas, breadcrumb unificado, drop zone on card, header card, header 3.1.4, botón "Agregar período" verde, modal crear carpeta). Sub-headers simétricos + divider + fondo gris sutil. Contenedor unificado (Carpetas + Reportes en 1 card). Migración a KAIRToast moderno + kair-fv-modal unificado (mismo visor que Bandeja Integrada, con toolbar search/zoom/pages/rotación). 3 bugfixes críticos: 📦674 handlers IPC sin `ipcMain` importado (No handler registered), 📦673 TypeError setupEventListeners:193, 📦681 CSS con clase vieja. 📦684 fix 18 warnings "Unknown message type". 📦682-683 fix scroll bloqueado en modo ventana. 📦687 análisis con mejor UX para poco data (tendencia con línea, accident_date en Últimos Reportes, ribbon "análisis preliminar"). 📦685 contenedor unificado de Biblioteca. Helper `buildChartPreliminarRibbon()` + CSS `.furat-chart-preliminar + .furat-chart-preliminar { display: none; }` previene duplicación por bug conocido.
 

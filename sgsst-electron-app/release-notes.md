@@ -1,3 +1,30 @@
+# K+AIR v0.1.157
+
+## 🐛 Bugfixes Bandeja Integrada
+
+### 📦691 — Scroll de la lista al seleccionar un mail
+El scroll de la lista de correos subía al top cada vez que el user seleccionaba un correo. Scrolleabas hasta abajo, hacías click, y la lista se iba a arriba — UX muy molesta.
+
+**Causa raíz (3 problemas encadenados):**
+1. El `renderMailList` apuntaba al `container.scrollTop` (`#mail-list-container`) que tiene `overflow: hidden` en CSS, por lo que su `scrollTop` siempre era 0. El scroll real estaba en un sub-elemento con clase `.kair-scroll`.
+2. `loadMailBodyFromCache` se llamaba en paralelo desde `selectMail` y `renderMailDetail`, generando 2-3 renders en cadena que se "pisaban" entre sí.
+3. El rAF de scroll restoration quedaba apuntando a un list con altura 0 (recién creado, vacío).
+
+**Fix:**
+- `renderMailList` ahora busca el `.kair-scroll` viejo antes del `innerHTML = ""` y guarda SU `scrollTop`. El rAF aplica al NUEVO `list.scrollTop` (no al container).
+- `loadMailBodyFromCache` solo actualiza el detail (`renderMailDetail`), no la lista completa (`render()`). Así no se pisa el scroll restoration.
+- Flag `_loadingBody` en `mail` evita cargas paralelas desde `selectMail` y `renderMailDetail`.
+- Filter / sort / search: `state._resetMailListScroll = true` antes del render para ir a top (el contenido sí cambia en esos casos).
+
+### 📦690 — Warnings de `cid:` URIs en imágenes embebidas
+Los emails HTML con `<img src="cid:icon.png">` generaban `net::ERR_UNKNOWN_URL_SCHEME` en consola, saturando DevTools con warnings rojos.
+
+**Causa:** los emails multipart/related referencian imágenes con `cid:` URIs (Content-ID). El navegador no sabe resolverlos.
+
+**Fix:** en `sanitizeHtml()`, cuando un atributo (`src`, `srcset`, `background`) empieza con `cid:`, se reemplaza por un GIF transparente 1x1 (data URI de 43 bytes). El layout del email no cambia (espacio preservado), no hay request al browser, no hay warning. Si en el futuro se quiere mapear los `cid:` a blob URLs de los attachments reales, este es el lugar para hacerlo.
+
+---
+
 # K+AIR v0.1.156
 
 ## 🎉 Novedades

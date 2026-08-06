@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.157] - 2026-08-06
+
+### Fixed
+- **📦691 — fix(bandeja): preservar scroll de la lista al seleccionar un mail** — El scroll de la lista de correos subía al top cada vez que el user seleccionaba un correo. UX muy molesta: scrolleabas hasta abajo, hacías click, y la lista se iba a arriba.
+  - **Root cause**: el `renderMailList` apuntaba al `container.scrollTop` (`#mail-list-container`) que tiene `overflow: hidden` en CSS, por lo que su `scrollTop` siempre era 0. El scroll real estaba en un sub-elemento con clase `.kair-scroll` (creado en línea 3798 con `overflow-y: auto`). Adicionalmente, `loadMailBodyFromCache` se llamaba en paralelo desde `selectMail` y `renderMailDetail` (2-3 renders en cadena que se "pisaban" entre sí, dejando el rAF de scroll restoration apuntando a un list con altura 0).
+  - **Fix 1**: `renderMailList` ahora busca el `.kair-scroll` viejo antes del `container.innerHTML = ""` y guarda SU `scrollTop`. El rAF se aplica al NUEVO `list.scrollTop` (no al container).
+  - **Fix 2**: `loadMailBodyFromCache` ahora solo actualiza el detail (`renderMailDetail`), no la lista completa (`render()`). Así no se pisa el scroll restoration.
+  - **Fix 3**: flag `_loadingBody` en `mail` para evitar que `selectMail` y `renderMailDetail` disparen `loadMailBodyFromCache` en paralelo. Se setea SÍNCRONAMENTE antes del await.
+  - **Filter / sort / search**: `state._resetMailListScroll = true` antes del render para que vaya a top (casos donde el contenido cambia).
+- **📦690 — fix(bandeja): silenciar warnings de `cid:` URIs en imágenes embebidas** — Los emails HTML con `<img src="cid:icon.png">` generaban `net::ERR_UNKNOWN_URL_SCHEME` en consola (rojo saturando DevTools, ~18 warnings por mail).
+  - **Root cause**: los emails multipart/related referencian imágenes con `cid:` URIs (Content-ID). El navegador no sabe resolverlos.
+  - **Fix**: en `sanitizeHtml()`, cuando un atributo (`src`, `srcset`, `background`) empieza con `cid:`, se reemplaza por un GIF transparente 1x1 (data URI de 43 bytes). El layout del email no cambia (espacio preservado), no hay request al browser, no hay warning. Si en el futuro se quiere mapear los cid: a blob URLs de los attachments reales, este es el lugar para hacerlo.
+
 ## [0.1.156] - 2026-08-05
 
 ### Added

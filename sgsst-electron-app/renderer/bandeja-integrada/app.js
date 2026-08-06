@@ -453,6 +453,21 @@
             el.removeAttribute(attr.name);
             continue;
           }
+          // 📦690 — Reemplazar cid: URIs (imágenes embebidas de emails
+          // multipart/related) con un pixel transparente 1x1. El navegador
+          // no sabe resolver `cid:icon.png` (no es una URL válida → ERR_UNKNOWN_URL_SCHEME
+          // en consola, y el warning rojo satura DevTools). Reemplazamos con un
+          // data URI GIF transparente para que el request NO se haga y no aparezca
+          // el warning. La imagen embebida no se muestra, pero el resto del email
+          // (texto, links, layout) sigue funcionando. Si en el futuro queremos
+          // mapear los cid: a blob URLs de los attachments reales del mail,
+          // este es el lugar para hacerlo.
+          if ((name === "src" || name === "srcset" || name === "background") &&
+              /^\s*cid:/i.test(value)) {
+            // 1x1 transparent GIF (43 bytes)
+            el.setAttribute(attr.name,
+              "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7");
+          }
         }
       }
       return doc.body.innerHTML || "";
@@ -2549,6 +2564,8 @@
     updateGmailIndicator();
     $("#search-input").addEventListener("input", (e) => {
       state.searchQuery = e.target.value;
+      // 📦691 — El search cambia la lista, queremos ir al top
+      state._resetMailListScroll = true;
       // Re-renderizamos la lista de correos (siempre visible en el área principal)
       renderMailList($("#mail-list-container"));
     });
@@ -3398,6 +3415,28 @@
 
   // ====== Lista de correos (Gmail style) ======
   function renderMailList(container) {
+    // 📦691 — Preservar scroll position durante re-renders.
+    // ANTES: cada vez que se seleccionaba un mail, `state.selectedMailId` cambiaba,
+    // `render()` se llamaba, `renderMailList` hacía `container.innerHTML = ""`,
+    // y el scroll de la lista saltaba al top. UX horrible: el user scrolleaba
+    // hacia abajo, seleccionaba un mail, y la lista se subía a arriba.
+    //
+    // FIX: guardar el scrollTop antes del re-render y restaurarlo en el próximo
+    // frame de pintado (después de que el DOM esté listo). Por defecto siempre
+    // preservamos el scroll, EXCEPTO cuando el user cambia el filtro / sort /
+    // búsqueda, donde sí queremos ir al top (eso se setea con
+    // `state._resetMailListScroll = true` antes del render).
+    var resetScroll = state._resetMailListScroll;
+    state._resetMailListScroll = false;
+    // 📦691 — El scroll real está en el sub-elemento con clase .kair-scroll
+    // (NO en el container #mail-list-container, que tiene overflow:hidden en
+    // CSS y por eso scrollHeight === clientHeight). El container es un flex
+    // column con header + search + filters + .kair-scroll, y solo el último
+    // (kair-scroll) tiene overflow-y:auto. ANTES de vaciar el container,
+    // buscamos ese .kair-scroll viejo y guardamos SU scrollTop.
+    var oldList = container.querySelector(".kair-scroll");
+    var savedScroll = resetScroll ? 0 : (oldList ? oldList.scrollTop : 0);
+
     container.innerHTML = "";
 
     const filtered = state.mails.filter((m) => {
@@ -3512,6 +3551,8 @@
             // Volver al filter "Todos" cuando se sale del modo unread
             state.mailFilter = "all";
           }
+          // 📦691 — El sort cambia el orden de la lista, queremos ir al top
+          state._resetMailListScroll = true;
           render();
         });
       }
@@ -3720,6 +3761,8 @@
       btn.innerHTML = `${f.icon.replace(/width="\d+" height="\d+"/, 'width="11" height="11"')} ${f.label} ${count > 0 ? `<span class="kair-mail-list-filter__badge">${count}</span>` : ""}`;
       btn.addEventListener("click", () => {
         state.mailFilter = f.id;
+        // 📦691 — El filter cambia la lista, queremos ir al top
+        state._resetMailListScroll = true;
         // F1.B-fix — Si el filtro cambia de folder (Enviados), re-cargar mails desde SENT
         if (f.isFolder) {
           state.mailFolder = f.folder;
@@ -3962,6 +4005,20 @@
       });
     }
     container.appendChild(list);
+
+    // 📦691 — Restaurar el scroll position en el próximo frame de pintado.
+    // requestAnimationFrame garantiza que el DOM ya esté renderizado cuando
+    // asignamos scrollTop. Si lo hiciéramos sincrónicamente, el navegador
+    // podría sobrescribir el scrollTop con 0 cuando termina de pintar.
+    //
+    // Restauramos en el NUEVO `list` (el sub-elemento con clase .kair-scroll
+    // que es el que realmente tiene overflow-y:auto), no en el container.
+    // El container tiene overflow:hidden y su scrollTop siempre es 0.
+    if (savedScroll > 0) {
+      requestAnimationFrame(function () {
+        list.scrollTop = savedScroll;
+      });
+    }
   }
 
   // ====== Detalle de correo (Gmail reading pane) ======
@@ -5051,8 +5108,15 @@
     // F4-fix — Lazy load del body desde email_messages (cache SQLite).
     // Antes el body estaba vacío porque threadToMail no lo cargaba.
     // Ahora: al hacer click, busca el thread en cache y trae el body del último mensaje.
-    if (mail && !mail.body) {
-      loadMailBodyFromCache(mail);
+    // 📦691-fix3 — Usar _loadingBody para evitar carga concurrente.
+    // `renderMailDetail` también dispara `loadMailBodyFromCache` si el mail
+    // no tiene body. Si no chequeamos, tenemos 2 llamadas paralelas que
+    // ambas terminan en `render()`, pisando el scroll restoration.
+    if (mail && !mail.body && !mail._loadingBody) {
+      mail._loadingBody = true;
+      loadMailBodyFromCache(mail).then(function () {
+        if (mail) mail._loadingBody = false;
+      });
     }
     // F1-Feature3 — Marcar como leído en Gmail (sync bidireccional)
     // Si el correo estaba marcado como no leído, marcarlo en Gmail + actualizar cache local
@@ -6053,6 +6117,10 @@
   async function loadMailBodyFromCache(mail) {
     var api = getElectronAPI();
     if (!api || !api.emailCache) return;
+    // 📦691-fix3 — Marcar como loading ANTES del await para que llamadas
+    // concurrentes (ej. selectMail + renderMailDetail) detecten el flag
+    // y no disparen una segunda carga que termine en un render duplicado.
+    if (mail) mail._loadingBody = true;
     try {
       // El mail.threadId es el threadId en SQLite
       var threadId = mail.threadId || mail.id;
@@ -6106,7 +6174,14 @@
         } catch (e) {
           console.warn("[BandejaIntegrada] Error cargando adjuntos:", e.message);
         }
-        render();
+        // 📦691 — SOLO actualizamos el detail (panel derecho), NO la lista.
+        // ANTES: llamábamos a render() que re-renderizaba la lista y reseteaba
+        // el scroll. Como `selectMail` y `renderMailDetail` ambos disparaban
+        // `loadMailBodyFromCache` en paralelo, teníamos 2-3 renders en cadena
+        // que se "pisaban" entre sí (el rAF de scroll restoration del primero
+        // quedaba apuntando a un list con altura 0). AHORA: solo re-renderizamos
+        // el detail. La lista y su scroll quedan intactos.
+        renderMailDetail($("#mail-detail-container"));
       }
     } catch (e) {
       console.warn("[BandejaIntegrada] Error cargando body del thread " + mail.threadId + ":", e.message);
