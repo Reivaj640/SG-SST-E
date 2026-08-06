@@ -1720,11 +1720,20 @@ case 'investigacion-accidentes-read-directory-request':
                   if (
                     type === 'investigacion-home-action' ||
                     type === 'iniciar-investigacion-desde-viewer' ||
-                    type === 'open-file-viewer-modal'
+                    type === 'open-file-viewer-modal' ||
+                    // 📦684 — FURAT: el componente reenvía via electron-api-call-request,
+                    // pero las versiones "-request" también se reciben aquí por seguridad.
+                    type === 'furat-get-dashboard-data-request' ||
+                    type === 'furat-get-analytics-request' ||
+                    type === 'furat-get-library-data-request' ||
+                    type === 'furat-list-metadata-request' ||
+                    type === 'furat-upload-file-request' ||
+                    type === 'furat-create-folder-request'
                   ) {
                     // El componente InvestigacionAccidentesComponent maneja este mensaje
                     // directamente. Ver: modules/gestion-salud/investigacion-accidentes/investigacion-accidentes-logic.js
                     // open-file-viewer-modal: lo maneja ResponsableLogic (1.1.1) — ver responsable-sg-logic.js 📦608-fix13
+                    // FURAT: mensajes manejados via electron-api-call-request — ver reportes-accidentes-logic.js
                     return;
                   }
 

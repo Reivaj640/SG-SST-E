@@ -17,9 +17,11 @@ class ReportesAccidentesComponent {
         const viewerFrame = document.createElement('iframe');
         viewerFrame.id = 'furat-viewer-frame';
         viewerFrame.style.width = '100%';
-        viewerFrame.style.height = '100%';
+        viewerFrame.style.minHeight = '100%';
         viewerFrame.style.border = 'none';
-        viewerFrame.scrolling = 'no';
+        viewerFrame.scrolling = 'auto';
+        // 📦683 — Permitir scroll del iframe cuando el contenido es más grande
+        viewerFrame.style.overflow = 'auto';
 
         // Construir la URL con parámetros de la empresa y módulo
         const viewerUrl = `./modules/gestion-salud/reportes-accidentes/reportes-accidentes-view.html?company=${encodeURIComponent(this.currentCompany)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
@@ -27,8 +29,10 @@ class ReportesAccidentesComponent {
 
         // Limpiar contenedor y agregar iframe
         this.container.innerHTML = '';
-        this.container.style.height = '100%';
-        this.container.style.overflow = 'hidden';
+        this.container.style.height = 'auto';
+        this.container.style.minHeight = '100%';
+        // 📦683 — Permitir scroll del contenedor cuando el iframe es más grande
+        this.container.style.overflow = 'auto';
         this.container.appendChild(viewerFrame);
 
         // Establecer comunicación entre frames
@@ -119,6 +123,39 @@ class ReportesAccidentesComponent {
                     result = await window.electronAPI.openPath(payload);
                     break;
 
+                // 📦658 — Upload de FURAT (drag-and-drop + file picker)
+                case 'furat-upload-file':
+                    // El frontend ya resolvió la ruta del submódulo con findSubmodulePath.
+                    // Solo necesitamos reenviar al IPC del main process.
+                    if (!payload || !payload.submodulePath) {
+                        // Fallback: resolver la ruta acá (en caso de que el frontend no la haya pasado)
+                        const pathRes = await window.electronAPI.findSubmodulePath(
+                            payload.companyName, payload.moduleName, payload.submoduleName
+                        );
+                        if (pathRes && pathRes.success) {
+                            payload.submodulePath = pathRes.path;
+                        } else {
+                            throw new Error('No se pudo resolver la ruta del submódulo');
+                        }
+                    }
+                    result = await window.electronAPI.furatUploadFile(payload);
+                    break;
+
+                // 📦658 — Listar metadata de FURAT (usado en Fase 3)
+                case 'furat-list-metadata':
+                    result = await window.electronAPI.furatListMetadata(payload.companyName);
+                    break;
+
+                // 📦659 — Dashboard analítico (Fase 3)
+                case 'furat-get-analytics':
+                    result = await window.electronAPI.furatGetAnalytics(payload.companyName);
+                    break;
+
+                // 📦680 — Crear nueva carpeta (período)
+                case 'furat-create-folder':
+                    result = await window.electronAPI.furatCreateFolder(payload);
+                    break;
+
                 default:
                     throw new Error(`API type '${requestType}' not supported`);
             }
@@ -174,6 +211,22 @@ class ReportesAccidentesComponent {
                 }
             }
 
+            // 📦687 — Cargar metadata para enriquecer los "Últimos Reportes" con accident_date
+            // (la fecha que muestra es la del accidente, no la de modificación del archivo)
+            let metadataByPath = {};
+            try {
+                const metaResult = await window.electronAPI.furatListMetadata(params.companyName);
+                if (metaResult && metaResult.success && Array.isArray(metaResult.metadata)) {
+                    metaResult.metadata.forEach(function (m) {
+                        if (m.file_path) {
+                            metadataByPath[m.file_path.toLowerCase().replace(/\\/g, '/')] = m;
+                        }
+                    });
+                }
+            } catch (err) {
+                console.warn('[FURAT] No se pudo cargar metadata para "Últimos Reportes":', err);
+            }
+
             // Calcular estadísticas
             const now = new Date();
             const currentYear = now.getFullYear();
@@ -206,17 +259,32 @@ class ReportesAccidentesComponent {
                 }
             });
 
-            // Generar reportes recientes (últimos 8 por fecha de modificación)
+            // 📦687 — Generar reportes recientes (últimos 8).
+            // Prioriza accident_date de la metadata (consistencia con el chart de tendencia).
+            // Si no hay metadata, cae a modified.
             const recentReports = allFiles
-                .sort((a, b) => {
-                    return (b.modified || 0) - (a.modified || 0);
+                .map(file => {
+                    // Buscar metadata por path normalizado
+                    const key = (file.path || '').toLowerCase().replace(/\\/g, '/');
+                    const meta = metadataByPath[key];
+                    // Fecha a mostrar: accident_date si está en metadata, sino modified
+                    const dateForSort = meta && meta.accident_date
+                        ? new Date(meta.accident_date).getTime()
+                        : (file.modified || 0);
+                    const dateForDisplay = meta && meta.accident_date
+                        ? new Date(meta.accident_date).toLocaleDateString('es-ES')
+                        : (file.modified ? new Date(file.modified).toLocaleDateString('es-ES') : '');
+                    return {
+                        name: file.name,
+                        path: file.path,
+                        date: dateForDisplay,
+                        _sortDate: dateForSort,
+                        hasMetadata: !!meta
+                    };
                 })
+                .sort((a, b) => (b._sortDate || 0) - (a._sortDate || 0))
                 .slice(0, 8)
-                .map(file => ({
-                    name: file.name,
-                    path: file.path,
-                    date: file.modified ? new Date(file.modified).toLocaleDateString('es-ES') : ''
-                }));
+                .map(({ _sortDate, hasMetadata, ...rest }) => rest); // limpiar campos internos
 
             return {
                 success: true,

@@ -76,10 +76,10 @@ body {
     background-color: var(--furat-bg-app);
     color: var(--furat-text-primary);
     line-height: 1.6;
-    height: 100vh;
+    min-height: 100vh; /* 📦682 — permitir scroll si el contenido es más grande que el viewport */
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow-y: auto; /* permitir scroll vertical del iframe */
     -webkit-font-smoothing: antialiased;
 }
 
@@ -191,6 +191,7 @@ body {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    min-height: 0; /* 📦682 — necesario para que el hijo flex pueda scrollear */
 }
 
 .k-main-content {
@@ -203,9 +204,9 @@ body {
 .furat-app {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    min-height: 100vh; /* 📦682 — permitir que crezca si el contenido es más grande */
     width: 100%;
-    overflow: hidden;
+    overflow: visible;
 }
 
 /* HEADER (oculto - ahora usa Header System v2.0) */
@@ -372,7 +373,7 @@ body {
     color: var(--furat-primary);
     font-size: 16px;
 }
-.furat-card__body { padding: 20px; }
+.furat-card__body { padding: 20px; position: relative; }
 
 /* STAT CARDS */
 /* Old stat card styles removed — now using k-stats-ribbon inline pattern */
@@ -486,6 +487,8 @@ body {
     flex-direction: column;
     gap: 16px;
     height: 100%;
+    min-height: 0; /* 📦682 — necesario para que los hijos flex puedan scrollear */
+    overflow-y: auto; /* permitir scroll si el contenido es más grande que el viewport */
 }
 .furat-library__toolbar {
     display: flex;
@@ -938,30 +941,9 @@ body {
 .furat-empty-state--large h3 { font-size: 16px; font-weight: 600; color: var(--furat-text-secondary); }
 .furat-empty-state--large p { font-size: 14px; max-width: 350px; }
 
-/* Notification */
-.furat-notification {
-    position: fixed;
-    bottom: 24px;
-    right: 24px;
-    background-color: var(--furat-bg-card);
-    padding: 14px 20px;
-    border-radius: var(--furat-radius-lg);
-    box-shadow: var(--furat-shadow-lg);
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    transform: translateX(calc(100% + 40px));
-    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 9999;
-    border: 1px solid var(--furat-border-light);
-    max-width: 380px;
-}
-.furat-notification.show { transform: translateX(0); }
-.furat-notification__icon { font-size: 20px; flex-shrink: 0; }
-.furat-notification.success .furat-notification__icon { color: var(--furat-success); }
-.furat-notification.error .furat-notification__icon { color: var(--furat-danger); }
-.furat-notification.warning .furat-notification__icon { color: var(--furat-warning); }
-.furat-notification__message { font-size: 14px; color: var(--furat-text-primary); line-height: 1.4; }
+/* Notification (📦676 — migrado a KAIRToast, sistema moderno unificado.
+   El viejo CSS .furat-notification fue removido. Ahora se usa window.KAIRToast.show()
+   que ya tiene sus propios estilos en assets/js/kair-toast.js. */
 
 /* Error Panel */
 .furat-error-panel {
@@ -987,6 +969,2259 @@ body {
 .furat-library__content::-webkit-scrollbar-thumb,
 .furat-recent-list::-webkit-scrollbar-thumb { background-color: var(--furat-border); border-radius: 3px; }
 
+/* ════════════════════════════════════════════════════════════
+   📦658 — FASE 1: REFACTOR VISUAL
+   Header System v2.0 + KPI Strip + Hero
+   Reemplazan los inline styles del HTML
+   ════════════════════════════════════════════════════════════ */
+
+/* ─── 📦678 — Header estandarizado (patrón 3.1.4: k-section-card + header-back-btn) ─── */
+.furat-app .k-section-card {
+    background: #ffffff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    flex-shrink: 0;
+}
+.furat-app .header-back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #5a6378;
+    background: transparent;
+    border: none;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    font-family: inherit;
+}
+.furat-app .header-back-btn:hover {
+    background: #e8f0fe;
+    color: #174ea6;
+}
+.furat-app .k-section-card__company {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.8125rem;
+    font-weight: 400;
+    color: #5a6378;
+    white-space: nowrap;
+}
+.furat-app .k-section-card__company i {
+    font-size: 0.875rem;
+}
+.furat-app .k-section-card__divider {
+    width: 1px;
+    height: 24px;
+    background: #dee2e6;
+    flex-shrink: 0;
+}
+.furat-app .em-tabs {
+    display: flex;
+    gap: 0;
+    border-top: 1px solid #dee2e6;
+    padding: 0 1.5rem;
+    overflow-x: auto;
+}
+.furat-app .em-tab {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.75rem 1rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #5a6378;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+.furat-app .em-tab:hover { color: #174ea6; }
+.furat-app .em-tab--active {
+    color: #174ea6;
+    font-weight: 600;
+    border-bottom-color: #174ea6;
+}
+
+/* ─── KPI Strip oficial ─── */
+.kpi-strip {
+    display: flex;
+    align-items: stretch;
+    background: var(--furat-bg-card);
+    border: 1px solid var(--furat-border);
+    border-radius: 10px;
+    box-shadow: var(--furat-shadow-sm);
+    padding: 1rem 1.25rem;
+    margin-bottom: 1rem;
+    gap: 0;
+    overflow: hidden;
+}
+.kpi-strip__item {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0 0.5rem;
+}
+.kpi-strip__item:first-child { padding-left: 0; }
+.kpi-strip__item:last-child { padding-right: 0; }
+.kpi-strip__divider {
+    width: 1px;
+    align-self: center;
+    height: 40px;
+    background: var(--furat-border);
+    flex-shrink: 0;
+    margin: 0 0.5rem;
+}
+.kpi-strip__icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.0625rem;
+    flex-shrink: 0;
+}
+.kpi-strip__icon--primary {
+    background: var(--furat-primary-light);
+    color: var(--furat-primary);
+}
+.kpi-strip__icon--info {
+    background: var(--furat-info-light);
+    color: var(--furat-info);
+}
+.kpi-strip__icon--warning {
+    background: var(--furat-warning-light);
+    color: #b8860b;
+}
+.kpi-strip__icon--success {
+    background: var(--furat-success-light);
+    color: var(--furat-success);
+}
+.kpi-strip__content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    min-width: 0;
+}
+.kpi-strip__label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    color: var(--furat-text-secondary);
+    font-weight: 500;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.kpi-strip__value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--furat-text-primary);
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ─── Hero de bienvenida ─── */
+.furat-hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding: 1.5rem 1.75rem;
+    background: linear-gradient(135deg, var(--furat-primary-light) 0%, var(--furat-bg-card) 100%);
+    border: 1px solid var(--furat-border);
+    border-left: 4px solid var(--furat-primary);
+    border-radius: 10px;
+    box-shadow: var(--furat-shadow-sm);
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+}
+.furat-hero__content {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex: 1;
+    min-width: 0;
+}
+.furat-hero__icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: var(--furat-primary);
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+.furat-hero__text {
+    min-width: 0;
+}
+.furat-hero__title {
+    font-size: 1.0625rem;
+    font-weight: 600;
+    color: var(--furat-text-primary);
+    margin: 0 0 0.25rem 0;
+    line-height: 1.3;
+}
+.furat-hero__description {
+    font-size: 0.875rem;
+    color: var(--furat-text-secondary);
+    margin: 0;
+    line-height: 1.4;
+}
+.furat-hero__actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+.furat-btn--secondary {
+    background: var(--furat-bg-card);
+    color: var(--furat-primary);
+    border: 1px solid var(--furat-primary);
+}
+.furat-btn--secondary:hover {
+    background: var(--furat-primary-light);
+}
+.furat-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* ─── Card header con hint ─── */
+.furat-card__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.875rem 1.25rem;
+    border-bottom: 1px solid var(--furat-border-light);
+}
+.furat-card__header h3 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--furat-text-primary);
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.furat-card__header h3 i {
+    color: var(--furat-primary);
+    font-size: 0.8125rem;
+}
+.furat-card__hint {
+    font-size: 0.75rem;
+    color: var(--furat-text-secondary);
+    font-weight: 400;
+    font-style: italic;
+}
+
+/* ─── Empty state motivador (con icono grande + texto + CTA opcional) ─── */
+.furat-empty-state--motivational {
+    padding: 2.5rem 1.5rem;
+    text-align: center;
+}
+.furat-empty-state--motivational .furat-empty-state__icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: var(--furat-primary-light);
+    color: var(--furat-primary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.75rem;
+    margin: 0 auto 1rem auto;
+}
+.furat-empty-state--motivational h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--furat-text-primary);
+    margin: 0 0 0.375rem 0;
+}
+.furat-empty-state--motivational p {
+    font-size: 0.875rem;
+    color: var(--furat-text-secondary);
+    margin: 0 0 1rem 0;
+    max-width: 360px;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.5;
+}
+
+/* ─── Year bars mejorados (cards horizontales) ─── */
+.furat-year-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    padding: 1rem 1.25rem;
+}
+.furat-year-bar {
+    display: grid;
+    grid-template-columns: 60px 1fr 50px;
+    align-items: center;
+    gap: 0.875rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--furat-bg-app);
+    border: 1px solid var(--furat-border-light);
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+.furat-year-bar:hover {
+    background: var(--furat-primary-light);
+    border-color: var(--furat-primary);
+    transform: translateX(2px);
+}
+.furat-year-bar__label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--furat-text-primary);
+}
+.furat-year-bar__track {
+    height: 8px;
+    background: var(--furat-border-light);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+}
+.furat-year-bar__fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--furat-primary) 0%, var(--furat-primary-hover) 100%);
+    border-radius: 4px;
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    min-width: 4px;
+}
+.furat-year-bar__count {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--furat-primary);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ─── Recent reports cards ─── */
+.furat-recent-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem 1rem 1.25rem;
+    max-height: 360px;
+    overflow-y: auto;
+}
+.furat-recent-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 0.75rem;
+    background: var(--furat-bg-app);
+    border: 1px solid var(--furat-border-light);
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+.furat-recent-item:hover {
+    background: var(--furat-primary-light);
+    border-color: var(--furat-primary);
+    transform: translateX(2px);
+}
+.furat-recent-item__icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 0.5rem;
+    background: var(--furat-danger-light);
+    color: var(--furat-danger);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+    flex-shrink: 0;
+}
+.furat-recent-item__info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+.furat-recent-item__name {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--furat-text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.furat-recent-item__meta {
+    font-size: 0.75rem;
+    color: var(--furat-text-secondary);
+}
+
+/* ─── Dark mode para los nuevos elementos (header estandarizado 3.1.4) ─── */
+[data-theme="dark"] .furat-app .k-section-card { background: #1e1e2f; border-color: #3a3a4d; }
+[data-theme="dark"] .furat-app .k-section-card h3 { color: #e0e0e0; }
+[data-theme="dark"] .furat-app .k-section-card p { color: #9e9e9e; }
+[data-theme="dark"] .furat-app .k-section-card__company { color: #9e9e9e; }
+[data-theme="dark"] .furat-app .k-section-card__divider { background: #3a3a4d; }
+[data-theme="dark"] .furat-app .header-back-btn { color: #9e9e9e; }
+[data-theme="dark"] .furat-app .header-back-btn:hover { background: rgba(77, 166, 255, 0.15); color: #4da6ff; }
+[data-theme="dark"] .furat-app .em-tabs { border-top-color: #3a3a4d; }
+[data-theme="dark"] .furat-app .em-tab { color: #9e9e9e; }
+[data-theme="dark"] .furat-app .em-tab:hover { color: #4da6ff; }
+[data-theme="dark"] .furat-app .em-tab--active { color: #4da6ff; border-bottom-color: #4da6ff; }
+
+[data-theme="dark"] .kpi-strip { background: var(--furat-bg-card); border-color: var(--furat-border); }
+[data-theme="dark"] .kpi-strip__divider { background: var(--furat-border); }
+[data-theme="dark"] .kpi-strip__label { color: var(--furat-text-secondary); }
+[data-theme="dark"] .kpi-strip__value { color: var(--furat-text-primary); }
+
+[data-theme="dark"] .furat-hero { background: linear-gradient(135deg, rgba(77, 166, 255, 0.1) 0%, var(--furat-bg-card) 100%); border-color: var(--furat-border); border-left-color: var(--furat-primary); }
+[data-theme="dark"] .furat-hero__title { color: var(--furat-text-primary); }
+[data-theme="dark"] .furat-hero__description { color: var(--furat-text-secondary); }
+[data-theme="dark"] .furat-btn--secondary { background: var(--furat-bg-card); color: var(--furat-primary); border-color: var(--furat-primary); }
+[data-theme="dark"] .furat-btn--secondary:hover { background: rgba(77, 166, 255, 0.15); }
+
+[data-theme="dark"] .furat-card__hint { color: var(--furat-text-secondary); }
+[data-theme="dark"] .furat-empty-state--motivational .furat-empty-state__icon { background: rgba(77, 166, 255, 0.15); color: var(--furat-primary); }
+[data-theme="dark"] .furat-empty-state--motivational h3 { color: var(--furat-text-primary); }
+[data-theme="dark"] .furat-empty-state--motivational p { color: var(--furat-text-secondary); }
+
+[data-theme="dark"] .furat-year-bar { background: rgba(255, 255, 255, 0.04); border-color: var(--furat-border); }
+[data-theme="dark"] .furat-year-bar:hover { background: rgba(77, 166, 255, 0.1); border-color: var(--furat-primary); }
+[data-theme="dark"] .furat-year-bar__label { color: var(--furat-text-primary); }
+[data-theme="dark"] .furat-year-bar__track { background: var(--furat-border); }
+
+[data-theme="dark"] .furat-recent-item { background: rgba(255, 255, 255, 0.04); border-color: var(--furat-border); }
+[data-theme="dark"] .furat-recent-item:hover { background: rgba(77, 166, 255, 0.1); border-color: var(--furat-primary); }
+[data-theme="dark"] .furat-recent-item__name { color: var(--furat-text-primary); }
+[data-theme="dark"] .furat-recent-item__meta { color: var(--furat-text-secondary); }
+
+/* ─── Responsive ─── */
+@media (max-width: 1024px) {
+    .kpi-strip { flex-wrap: wrap; }
+    .kpi-strip__item { min-width: 50%; padding: 0.5rem; }
+    .kpi-strip__divider { display: none; }
+    .furat-dashboard__sections { grid-template-columns: 1fr; }
+    .furat-dashboard__section--wide { grid-column: auto; }
+}
+@media (max-width: 768px) {
+    .kpi-strip__item { min-width: 100%; }
+    .furat-hero { flex-direction: column; align-items: stretch; }
+    .furat-hero__actions { width: 100%; }
+    .furat-hero__actions .furat-btn { flex: 1; }
+    .furat-app .k-section-card h3 { font-size: 0.9375rem; }
+}
+
+/* ════════════════════════════════════════════════════════════
+   📦658 — FASE 2: DROP ZONE + UPLOAD MODAL
+   ════════════════════════════════════════════════════════════ */
+
+/* ─── Drop Zone ─── */
+.furat-dropzone {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+    background: var(--furat-bg-card);
+    border: 2px dashed var(--furat-border);
+    border-radius: 10px;
+    margin-bottom: 1rem;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+    user-select: none;
+}
+.furat-dropzone:hover {
+    background: var(--furat-primary-light);
+    border-color: var(--furat-primary);
+}
+.furat-dropzone:focus {
+    outline: 3px solid rgba(23, 78, 166, 0.25);
+    outline-offset: 2px;
+}
+.furat-dropzone--dragover {
+    background: var(--furat-primary-light);
+    border-color: var(--furat-primary);
+    border-style: solid;
+    transform: scale(1.005);
+    box-shadow: 0 4px 16px rgba(23, 78, 166, 0.2);
+}
+.furat-dropzone__icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: var(--furat-primary-light);
+    color: var(--furat-primary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+    transition: background 0.15s ease;
+}
+.furat-dropzone--dragover .furat-dropzone__icon {
+    background: var(--furat-primary);
+    color: #ffffff;
+}
+.furat-dropzone__text {
+    flex: 1;
+    min-width: 0;
+}
+.furat-dropzone__title {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--furat-text-primary);
+    margin: 0 0 0.25rem 0;
+    line-height: 1.3;
+}
+.furat-dropzone__subtitle {
+    font-size: 0.8125rem;
+    color: var(--furat-text-secondary);
+    margin: 0;
+    line-height: 1.4;
+}
+.furat-dropzone__link {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--furat-primary);
+    font: inherit;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: underline;
+}
+.furat-dropzone__link:hover {
+    color: var(--furat-primary-hover);
+}
+
+/* 📦668 — Drop zone COMPACTA: vive en el toolbar superior (al lado del título).
+   Versión reducida en una sola línea horizontal, para no ocupar tanto espacio. */
+.furat-dropzone--compact {
+    padding: 0.5rem 0.875rem;
+    gap: 0.625rem;
+    margin-bottom: 0;
+    border-width: 1px;
+    border-radius: 8px;
+    flex: 0 1 auto;
+    max-width: 420px;
+}
+.furat-dropzone--compact .furat-dropzone__icon {
+    width: 32px;
+    height: 32px;
+    font-size: 1rem;
+    border-radius: 8px;
+}
+.furat-dropzone--compact .furat-dropzone__title {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    margin: 0;
+    line-height: 1.3;
+}
+.furat-dropzone--compact .furat-dropzone__subtitle {
+    font-size: 0.6875rem;
+    margin: 0;
+    line-height: 1.3;
+}
+
+/* 📦668 — Toolbar de la biblioteca: título (izquierda) + drop zone compacta (derecha).
+   Solo se muestra en la raíz (en una carpeta se oculta para dar espacio al card unificado). */
+.furat-library-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.875rem;
+    flex-wrap: wrap;
+}
+.furat-library-toolbar .furat-section-title-v2 {
+    margin: 0;
+}
+.furat-library-toolbar[hidden] { display: none; }
+
+/* ─── Upload Modal ─── */
+.furat-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+.furat-modal.hidden { display: none; }
+.furat-modal__overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(2px);
+}
+.furat-modal__content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 640px;
+    max-height: calc(100vh - 40px);
+    background: var(--furat-bg-card);
+    border-radius: 10px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+    overflow: hidden;
+}
+.furat-modal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--furat-border);
+    flex-shrink: 0;
+    background: var(--furat-bg-card);
+}
+.furat-modal__title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--furat-text-primary);
+}
+.furat-modal__title i {
+    color: var(--furat-primary);
+    font-size: 1.125rem;
+}
+.furat-modal__title h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+}
+.furat-modal__close {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
+    color: var(--furat-text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.furat-modal__close:hover {
+    background: var(--furat-danger-light);
+    color: var(--furat-danger);
+}
+.furat-modal__body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.furat-modal__footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 14px 20px;
+    border-top: 1px solid var(--furat-border);
+    background: var(--furat-bg-app);
+    flex-shrink: 0;
+}
+
+/* ─── File Preview dentro del Modal ─── */
+.furat-modal__file-preview {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    padding: 0.875rem 1rem;
+    background: var(--furat-primary-light);
+    border: 1px solid rgba(23, 78, 166, 0.2);
+    border-radius: 8px;
+}
+.furat-modal__file-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: var(--furat-primary);
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.125rem;
+    flex-shrink: 0;
+}
+.furat-modal__file-icon--pdf { background: var(--furat-danger); }
+.furat-modal__file-icon--excel { background: #16a34a; }
+.furat-modal__file-icon--word { background: #2563eb; }
+.furat-modal__file-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+.furat-modal__file-name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--furat-text-primary);
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.furat-modal__file-meta {
+    font-size: 0.75rem;
+    color: var(--furat-text-secondary);
+    margin: 0;
+}
+.furat-modal__file-remove {
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
+    color: var(--furat-text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+    flex-shrink: 0;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.furat-modal__file-remove:hover {
+    background: var(--furat-danger-light);
+    color: var(--furat-danger);
+}
+
+/* ─── Form ─── */
+.furat-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+.furat-form__row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+.furat-form__row:has(.furat-form__field:only-child) {
+    grid-template-columns: 1fr;
+}
+.furat-form__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    min-width: 0;
+}
+.furat-form__label {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--furat-text-primary);
+}
+.furat-form__required {
+    color: var(--furat-danger);
+    font-weight: 700;
+}
+.furat-form__input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    font-family: inherit;
+    color: var(--furat-text-primary);
+    background: var(--furat-bg-card);
+    border: 1px solid var(--furat-border);
+    border-radius: 6px;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    box-sizing: border-box;
+}
+.furat-form__input:focus {
+    outline: none;
+    border-color: var(--furat-primary);
+    box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.15);
+}
+.furat-form__input:invalid:not(:placeholder-shown) {
+    border-color: var(--furat-danger);
+}
+.furat-form__textarea {
+    resize: vertical;
+    min-height: 60px;
+    font-family: inherit;
+}
+.furat-form__input[type="date"] {
+    font-family: inherit;
+}
+
+/* ─── Segmented control (Gravedad) ─── */
+.furat-form__segmented {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.375rem;
+    background: var(--furat-bg-app);
+    border: 1px solid var(--furat-border);
+    border-radius: 6px;
+    padding: 0.25rem;
+}
+.furat-form__segmented-option {
+    position: relative;
+    cursor: pointer;
+    text-align: center;
+}
+.furat-form__segmented-option input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.furat-form__segmented-option span {
+    display: block;
+    padding: 0.4375rem 0.5rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--furat-text-secondary);
+    border-radius: 4px;
+    transition: background 0.15s ease, color 0.15s ease;
+    user-select: none;
+}
+.furat-form__segmented-option:hover span {
+    color: var(--furat-text-primary);
+}
+.furat-form__segmented-option input[type="radio"]:checked + span {
+    background: var(--furat-primary);
+    color: #ffffff;
+    box-shadow: 0 1px 3px rgba(23, 78, 166, 0.3);
+}
+.furat-form__segmented-option input[type="radio"]:focus-visible + span {
+    box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.25);
+}
+
+/* ─── Drag-over state para el body (cuando el drag está fuera de la dropzone) ─── */
+.furat-app--dragging {
+    position: relative;
+}
+.furat-app--draging::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: rgba(23, 78, 166, 0.08);
+    border: 3px dashed var(--furat-primary);
+    pointer-events: none;
+    z-index: 1500;
+}
+
+/* ─── Dark mode para los nuevos elementos ─── */
+[data-theme="dark"] .furat-dropzone {
+    background: var(--furat-bg-card);
+    border-color: var(--furat-border);
+}
+[data-theme="dark"] .furat-dropzone:hover,
+[data-theme="dark"] .furat-dropzone--dragover {
+    background: rgba(77, 166, 255, 0.1);
+    border-color: var(--furat-primary);
+}
+[data-theme="dark"] .furat-dropzone__icon {
+    background: rgba(77, 166, 255, 0.15);
+    color: var(--furat-primary);
+}
+[data-theme="dark"] .furat-dropzone__title { color: var(--furat-text-primary); }
+[data-theme="dark"] .furat-dropzone__subtitle { color: var(--furat-text-secondary); }
+
+[data-theme="dark"] .furat-modal__content { background: var(--furat-bg-card); }
+[data-theme="dark"] .furat-modal__header,
+[data-theme="dark"] .furat-modal__footer {
+    background: var(--furat-bg-card);
+    border-color: var(--furat-border);
+}
+[data-theme="dark"] .furat-modal__title { color: var(--furat-text-primary); }
+[data-theme="dark"] .furat-modal__footer { background: rgba(0, 0, 0, 0.2); }
+[data-theme="dark"] .furat-modal__file-preview { background: rgba(77, 166, 255, 0.1); border-color: rgba(77, 166, 255, 0.3); }
+[data-theme="dark"] .furat-modal__file-name { color: var(--furat-text-primary); }
+[data-theme="dark"] .furat-modal__file-meta { color: var(--furat-text-secondary); }
+[data-theme="dark"] .furat-modal__close { color: var(--furat-text-secondary); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   📦686 — kair-fv-modal (MIGRADO desde Bandeja Integrada)
+   Modal de preview unificado. Mismo HTML/CSS/JS que el módulo de correo.
+   - Full-screen overlay con header (nombre + extensión + tamaño + cerrar)
+   - Body con el <flyfish-file-viewer> ocupando todo el espacio
+   - Spinner y mensaje de error consistentes con el resto de K+AIR
+   ═══════════════════════════════════════════════════════════════════════ */
+.kair-fv-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9000;
+    background: rgba(15, 23, 42, 0.72);
+    display: flex;
+    align-items: stretch;
+    justify-content: stretch;
+    padding: 24px;
+    animation: kair-fv-fade-in 0.15s ease-out;
+}
+.kair-fv-overlay[hidden] { display: none; }
+
+@keyframes kair-fv-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+.kair-fv-modal {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+    background: var(--kair-surface, #ffffff);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+    border: 1px solid var(--kair-border, #e0e3e7);
+}
+
+.kair-fv-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 18px;
+    background: var(--kair-surface-2, #f7f9fb);
+    border-bottom: 1px solid var(--kair-border, #e0e3e7);
+    flex-shrink: 0;
+    min-height: 56px;
+}
+
+.kair-fv-header__title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.kair-fv-header__ext {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px 9px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    color: #ffffff;
+    background: var(--kair-primary, #1a73e8);
+    border-radius: 6px;
+    flex-shrink: 0;
+    text-transform: uppercase;
+}
+.kair-fv-header__ext[data-ext="pdf"]  { background: #c62828; }
+.kair-fv-header__ext[data-ext="pptx"],
+.kair-fv-header__ext[data-ext="ppt"]  { background: #d84315; }
+.kair-fv-header__ext[data-ext="docx"],
+.kair-fv-header__ext[data-ext="doc"]  { background: #1565c0; }
+.kair-fv-header__ext[data-ext="xlsx"],
+.kair-fv-header__ext[data-ext="xls"]  { background: #2e7d32; }
+
+.kair-fv-header__name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--kair-text, #1f2937);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.kair-fv-header__meta {
+    font-size: 12px;
+    color: var(--kair-text-light, #6b7280);
+    flex-shrink: 0;
+}
+
+.kair-fv-header__actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.kair-fv-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--kair-text, #1f2937);
+    background: transparent;
+    border: 1px solid var(--kair-border, #d1d5db);
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+}
+.kair-fv-btn:hover {
+    background: var(--kair-surface-3, #f3f4f6);
+    border-color: var(--kair-text-light, #9ca3af);
+}
+
+.kair-fv-body {
+    flex: 1 1 auto;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    background: #ffffff;
+}
+
+.kair-fv-loading,
+.kair-fv-error {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 24px;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.92);
+    z-index: 2;
+}
+.kair-fv-error {
+    color: #b91c1c;
+    background: rgba(254, 242, 242, 0.96);
+}
+.kair-fv-error p {
+    max-width: 600px;
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.kair-fv-spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid var(--kair-surface-3, #e5e7eb);
+    border-top-color: var(--kair-primary, #1a73e8);
+    border-radius: 50%;
+    animation: kair-fv-spin 0.9s linear infinite;
+}
+@keyframes kair-fv-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* El custom element <flyfish-file-viewer> ocupa todo el body del modal.
+   Patrón copiado del submódulo 1.1.1 (responsable-sg): flex: 1 1 0% (no height:100%)
+   para que el viewer TOME el alto disponible en vez del alto del contenido. */
+.kair-fv-body flyfish-file-viewer {
+    display: block;
+    width: 100%;
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow: hidden;
+}
+
+[data-theme="dark"] .furat-form__label { color: var(--furat-text-primary); }
+[data-theme="dark"] .furat-form__input {
+    background: var(--furat-bg-app);
+    border-color: var(--furat-border);
+    color: var(--furat-text-primary);
+}
+[data-theme="dark"] .furat-form__input:focus {
+    border-color: var(--furat-primary);
+}
+[data-theme="dark"] .furat-form__segmented {
+    background: rgba(0, 0, 0, 0.2);
+    border-color: var(--furat-border);
+}
+[data-theme="dark"] .furat-form__segmented-option span { color: var(--furat-text-secondary); }
+
+/* ─── Responsive del modal ─── */
+@media (max-width: 640px) {
+    .furat-modal__content { max-width: 100%; }
+    .furat-form__row { grid-template-columns: 1fr; }
+    .furat-form__segmented { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ════════════════════════════════════════════════════════════
+   📦659 — FASE 3: DASHBOARD ANALÍTICO
+   ════════════════════════════════════════════════════════════ */
+
+.furat-dashboard__analytics {
+    margin-top: 1.25rem;
+    background: var(--furat-bg-card);
+    border: 1px solid var(--furat-border);
+    border-radius: 10px;
+    padding: 1.25rem 1.5rem 1.5rem 1.5rem;
+    box-shadow: var(--furat-shadow-sm);
+}
+.furat-dashboard__analytics-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+.furat-dashboard__analytics-title {
+    font-size: 1.0625rem;
+    font-weight: 600;
+    color: var(--furat-text-primary);
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.furat-dashboard__analytics-title i {
+    color: var(--furat-primary);
+}
+.furat-dashboard__analytics-hint {
+    font-size: 0.75rem;
+    color: var(--furat-text-secondary);
+    font-style: italic;
+}
+
+.furat-analytics-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: 1rem;
+}
+.furat-card--chart {
+    margin: 0;
+    border: 1px solid var(--furat-border-light);
+    background: var(--furat-bg-app);
+    box-shadow: none;
+}
+.furat-card--chart .furat-card__header {
+    padding: 0.625rem 0.875rem;
+}
+.furat-card--chart .furat-card__header h3 {
+    font-size: 0.8125rem;
+}
+.furat-card--chart .furat-card__body {
+    padding: 0.75rem 0.875rem 1rem 0.875rem;
+}
+
+/* ─── Chart: Tendencia mensual (📦687 — LÍNEA con PUNTOS, en lugar de barras) ─── */
+.furat-chart-trend {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: relative;
+}
+.furat-chart-trend__main {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    height: 160px;
+    padding-top: 18px;
+    position: relative;
+}
+.furat-chart-trend__col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    height: 100%;
+    justify-content: flex-end;
+    position: relative;
+    z-index: 2;
+}
+.furat-chart-trend__line {
+    position: absolute;
+    inset: 18px 0 20px 0;
+    width: 100%;
+    height: calc(100% - 38px);
+    z-index: 1;
+    pointer-events: none;
+}
+.furat-chart-trend__point {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--furat-border-light);
+    flex-shrink: 0;
+    margin-top: auto;
+    margin-bottom: 2px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.furat-chart-trend__point--empty {
+    width: 6px;
+    height: 6px;
+    background: transparent;
+    border: 1px solid var(--furat-border);
+}
+.furat-chart-trend__point--has-data {
+    background: var(--furat-primary);
+    box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.18);
+    width: 10px;
+    height: 10px;
+}
+.furat-chart-trend__point--latest {
+    background: var(--furat-success);
+    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.22);
+    width: 12px;
+    height: 12px;
+}
+.furat-chart-trend__col:hover .furat-chart-trend__point--has-data {
+    transform: scale(1.3);
+}
+.furat-chart-trend__count {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: var(--furat-text-primary);
+    background: var(--furat-bg-card);
+    border: 1px solid var(--furat-border);
+    border-radius: 3px;
+    padding: 1px 5px;
+    line-height: 1.2;
+    min-width: 14px;
+    text-align: center;
+    margin-bottom: 2px;
+}
+.furat-chart-trend__count:empty { display: none; }
+.furat-chart-trend__label {
+    font-size: 0.625rem;
+    color: var(--furat-text-secondary);
+    line-height: 1;
+    white-space: nowrap;
+    transform: rotate(-30deg);
+    transform-origin: top center;
+    margin-top: 4px;
+}
+.furat-chart-trend__baseline {
+    position: absolute;
+    bottom: 20px;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: var(--furat-border);
+    z-index: 0;
+}
+
+/* ─── 📦687 — Ribbon "análisis preliminar" para charts con poco data ─── */
+.furat-chart-preliminar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 12px;
+    padding: 6px 10px;
+    background: rgba(245, 158, 11, 0.08);
+    border: 1px solid rgba(245, 158, 11, 0.28);
+    border-radius: 6px;
+    font-size: 0.75rem;
+    color: #92400e;
+    line-height: 1.3;
+}
+/* 📦687-fix — Bug fix: si el ribbon se renderiza 2 veces (bug en Por gravedad
+   por doble llamada de renderBySeverity), ocultar el duplicado. */
+.furat-chart-preliminar + .furat-chart-preliminar { display: none; }
+.furat-chart-preliminar i {
+    color: #d97706;
+    font-size: 0.875rem;
+    flex-shrink: 0;
+}
+[data-theme="dark"] .furat-chart-preliminar {
+    background: rgba(245, 158, 11, 0.12);
+    border-color: rgba(245, 158, 11, 0.35);
+    color: #fbbf24;
+}
+[data-theme="dark"] .furat-chart-preliminar i {
+    color: #fbbf24;
+}
+
+/* ─── Chart: Barras horizontales (por tipo, top áreas) ─── */
+.furat-chart-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.furat-chart-bars__row {
+    display: grid;
+    grid-template-columns: 1fr 50px;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+}
+.furat-chart-bars__label {
+    color: var(--furat-text-primary);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.furat-chart-bars__track {
+    grid-column: 1 / 2;
+    grid-row: 2;
+    height: 6px;
+    background: var(--furat-border-light);
+    border-radius: 3px;
+    overflow: hidden;
+}
+.furat-chart-bars__fill {
+    height: 100%;
+    background: var(--furat-primary);
+    border-radius: 3px;
+    transition: width 0.5s ease;
+    min-width: 4px;
+}
+.furat-chart-bars__count {
+    grid-column: 2;
+    grid-row: 1 / 3;
+    text-align: right;
+    font-weight: 700;
+    color: var(--furat-primary);
+    font-variant-numeric: tabular-nums;
+    font-size: 0.8125rem;
+}
+
+/* ─── Chart: Gravedad (stacked bar) ─── */
+.furat-chart-severity {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+}
+.furat-chart-severity__stacked {
+    display: flex;
+    height: 28px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--furat-border-light);
+}
+.furat-chart-severity__seg {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 0.75rem;
+    transition: width 0.5s ease;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    padding: 0 4px;
+}
+.furat-chart-severity__seg--leve { background: var(--furat-success); }
+.furat-chart-severity__seg--moderado { background: #f59e0b; }
+.furat-chart-severity__seg--grave { background: var(--furat-danger); }
+.furat-chart-severity__seg--mortal { background: #7c2d12; }
+.furat-chart-severity__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.875rem;
+    font-size: 0.6875rem;
+    color: var(--furat-text-secondary);
+}
+.furat-chart-severity__legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+.furat-chart-severity__legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+/* ─── Chart empty state (para cards de analytics) ─── */
+.furat-chart-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem 1rem;
+    text-align: center;
+    color: var(--furat-text-secondary);
+    min-height: 120px;
+}
+.furat-chart-empty__icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: var(--furat-primary-light);
+    color: var(--furat-primary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.125rem;
+    margin-bottom: 0.5rem;
+}
+.furat-chart-empty__title {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--furat-text-primary);
+    margin: 0 0 0.25rem 0;
+}
+.furat-chart-empty__text {
+    font-size: 0.75rem;
+    color: var(--furat-text-secondary);
+    margin: 0;
+    line-height: 1.4;
+    max-width: 240px;
+}
+
+/* ─── Dark mode para analytics ─── */
+[data-theme="dark"] .furat-dashboard__analytics { background: var(--furat-bg-card); border-color: var(--furat-border); }
+[data-theme="dark"] .furat-dashboard__analytics-title { color: var(--furat-text-primary); }
+[data-theme="dark"] .furat-dashboard__analytics-hint { color: var(--furat-text-secondary); }
+[data-theme="dark"] .furat-card--chart { background: var(--furat-bg-app); border-color: var(--furat-border); }
+[data-theme="dark"] .furat-chart-trend__point--empty { border-color: var(--furat-border); background: transparent; }
+[data-theme="dark"] .furat-chart-trend__count { background: var(--furat-bg-card); border-color: var(--furat-border); color: var(--furat-text-primary); }
+[data-theme="dark"] .furat-chart-trend__baseline { background: var(--furat-border); }
+[data-theme="dark"] .furat-chart-trend__label { color: var(--furat-text-secondary); }
+[data-theme="dark"] .furat-chart-bars__label { color: var(--furat-text-primary); }
+[data-theme="dark"] .furat-chart-bars__track { background: var(--furat-border); }
+[data-theme="dark"] .furat-chart-severity__stacked { background: var(--furat-border); }
+[data-theme="dark"] .furat-chart-empty__icon { background: rgba(77, 166, 255, 0.15); color: var(--furat-primary); }
+[data-theme="dark"] .furat-chart-empty__title { color: var(--furat-text-primary); }
+[data-theme="dark"] .furat-chart-empty__text { color: var(--furat-text-secondary); }
+
+/* ─── Responsive analytics ─── */
+@media (max-width: 1280px) {
+    .furat-analytics-grid { grid-template-columns: 1fr 1fr; }
+    .furat-analytics-grid > .furat-card:first-child { grid-column: 1 / -1; }
+}
+@media (max-width: 768px) {
+    .furat-analytics-grid { grid-template-columns: 1fr; }
+}
+
+/* ════════════════════════════════════════════════════════════
+   📦660 — BIBLIOTECA V2: toolbar, breadcrumb, folders, tabla
+   ════════════════════════════════════════════════════════════ */
+
+/* ─── 📦666 — Header unificado en UNA SOLA línea: navegación → búsqueda → filtros → info ─── */
+.furat-documents-header-card {
+    background: var(--furat-bg-card);
+    border: 1px solid var(--furat-border);
+    border-radius: 10px;
+    margin-bottom: 0.875rem;
+    overflow: hidden;
+    box-shadow: var(--furat-shadow-sm);
+}
+.furat-documents-header-card[hidden] { display: none; }
+.furat-documents-unified-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding: 0.5rem 0.875rem;
+}
+.furat-documents-unified-row .furat-breadcrumb-v2 {
+    flex: 0 0 auto;
+    border: none;
+    background: transparent;
+    margin: 0;
+    padding: 0;
+    font-size: 0.8125rem;
+}
+.furat-documents-unified-row .furat-search-v2 {
+    flex: 1 1 220px;
+    min-width: 180px;
+}
+.furat-documents-unified-row .furat-filter-chips {
+    flex: 0 1 auto;
+    max-width: 480px;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: thin;
+}
+.furat-documents-unified-row .furat-results-counter {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    padding: 0 0.5rem;
+    border-left: 1px solid var(--furat-border);
+}
+
+.furat-search-v2 {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.furat-search-v2__icon {
+    position: absolute;
+    left: 12px;
+    color: var(--furat-text-secondary);
+    font-size: 0.875rem;
+    pointer-events: none;
+}
+.furat-search-v2 input {
+    width: 100%;
+    padding: 0.5rem 2.25rem 0.5rem 2.25rem;
+    font-size: 0.875rem;
+    font-family: inherit;
+    color: var(--furat-text-primary);
+    background: var(--furat-bg-app);
+    border: 1px solid var(--furat-border);
+    border-radius: 6px;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    box-sizing: border-box;
+}
+.furat-search-v2 input:focus {
+    outline: none;
+    border-color: var(--furat-primary);
+    box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.15);
+    background: var(--furat-bg-card);
+}
+.furat-search-v2__clear {
+    position: absolute;
+    right: 8px;
+    width: 22px;
+    height: 22px;
+    border: none;
+    background: transparent;
+    color: var(--furat-text-secondary);
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.furat-search-v2__clear:hover {
+    background: var(--furat-danger-light);
+    color: var(--furat-danger);
+}
+.furat-search-v2__clear[hidden] { display: none; }
+
+/* ─── Filter chips ─── */
+.furat-filter-chips {
+    display: flex;
+    gap: 0.375rem;
+    flex-wrap: wrap;
+    align-items: center;
+    max-width: 480px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+.furat-chip {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    font-family: inherit;
+    color: var(--furat-text-secondary);
+    background: var(--furat-bg-app);
+    border: 1px solid var(--furat-border);
+    border-radius: 999px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+}
+.furat-chip:hover {
+    border-color: var(--furat-primary);
+    color: var(--furat-primary);
+}
+.furat-chip--active {
+    background: var(--furat-primary);
+    border-color: var(--furat-primary);
+    color: #ffffff;
+}
+.furat-chip--active:hover {
+    background: var(--furat-primary-hover);
+    border-color: var(--furat-primary-hover);
+    color: #ffffff;
+}
+
+/* ─── Results counter ─── */
+.furat-results-counter {
+    font-size: 0.8125rem;
+    color: var(--furat-text-secondary);
+    font-weight: 500;
+    white-space: nowrap;
+    padding: 0 0.5rem;
+    border-left: 1px solid var(--furat-border);
+    min-width: 80px;
+    text-align: right;
+}
+
+/* ─── Breadcrumb V2 ─── */
+.furat-breadcrumb-v2 {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin-bottom: 0.875rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--furat-bg-card);
+    border: 1px solid var(--furat-border-light);
+    border-radius: 6px;
+    font-size: 0.8125rem;
+    flex-wrap: wrap;
+}
+.furat-breadcrumb-v2__root,
+.furat-breadcrumb-v2__item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8125rem;
+    color: var(--furat-primary);
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.furat-breadcrumb-v2__root:hover,
+.furat-breadcrumb-v2__item:hover {
+    background: var(--furat-primary-light);
+}
+.furat-breadcrumb-v2__root.active,
+.furat-breadcrumb-v2__item.active {
+    color: var(--furat-text-primary);
+    font-weight: 500;
+    cursor: default;
+    background: transparent;
+}
+.furat-breadcrumb-v2__root.active:hover,
+.furat-breadcrumb-v2__item.active:hover {
+    background: transparent;
+}
+.furat-breadcrumb-v2__sep {
+    color: var(--furat-text-muted);
+    font-size: 0.75rem;
+}
+.furat-breadcrumb-v2__current {
+    color: var(--furat-text-primary);
+    font-weight: 600;
+}
+
+/* ─── Content V2 layout ─── */
+.furat-library-content-v2 {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+.furat-section-title-v2 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--furat-text-primary);
+    margin: 0 0 0.75rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.furat-section-title-v2 > i {
+    color: var(--furat-primary);
+    font-size: 0.8125rem;
+}
+.furat-section-meta {
+    font-size: 0.75rem;
+    color: var(--furat-text-secondary);
+    font-weight: 400;
+    margin-left: auto;
+}
+
+/* ─── Folders V2: cards con badge contextual (estilo Finder — folder amarillo) ─── */
+/* 📦680 — Migrado a .furat-card (mismo patrón que Distribución/Últimos/Análisis).
+   El wrapper ahora es .furat-card con .furat-card__header (título + botón "Agregar período")
+   y .furat-card__body (grid de folder cards + drop zone). */
+
+/* 📦680 — Botón "Agregar período" con icono verde (folder-plus).
+   El verde comunica mejor la acción de "crear / nuevo". */
+.furat-btn--add-period {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #15803d;
+    background: rgba(22, 163, 74, 0.08);
+    border: 1px solid rgba(22, 163, 74, 0.3);
+    border-radius: 0.375rem;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    font-family: inherit;
+}
+.furat-btn--add-period:hover {
+    background: rgba(22, 163, 74, 0.16);
+    border-color: rgba(22, 163, 74, 0.5);
+    color: #166534;
+}
+.furat-btn--add-period:active {
+    background: rgba(22, 163, 74, 0.24);
+}
+.furat-btn--add-period i {
+    font-size: 0.875rem;
+}
+
+/* 📦671 — Drop zone se posiciona SOBRE la card destino SOLO cuando se arrastra un archivo.
+   JS detecta dragenter/dragover sobre la card y posiciona la dropzone encima.
+   Cuando aparece, la dropzone tiene fondo AZUL OPA sólido para tapar completamente
+   la card destino y confirmar a dónde va el FURAT. */
+.furat-folders-grid-v2 {
+    position: relative;
+}
+/* 📦681 — FIX: el HTML actual usa .furat-card (no .furat-folders-section-v2).
+   Actualizo los selectores para que el CSS aplique a la dropzone actual. */
+.furat-folders-card .furat-dropzone--compact,
+.furat-folders-section-v2 .furat-dropzone--compact,
+.furat-card .furat-dropzone--compact {
+    position: absolute;
+    /* top/left/width/height se actualizan por JS al arrastrar sobre cada card */
+    margin: 0;
+    max-width: none;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.12s ease;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.375rem;
+    /* Fondo SÓLIDO opaco (no la variable light que es rgba 0.08) */
+    background: #dbeafe;
+    border: 1px dashed var(--furat-primary);
+    border-radius: 6px;
+    color: var(--furat-primary);
+    font-weight: 600;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+.furat-folders-card .furat-dropzone--compact.furat-dropzone--visible,
+.furat-folders-section-v2 .furat-dropzone--compact.furat-dropzone--visible,
+.furat-card .furat-dropzone--compact.furat-dropzone--visible {
+    opacity: 1;
+    pointer-events: none; /* siempre none: los eventos van al grid de fondo */
+}
+.furat-folders-card .furat-dropzone--compact .furat-dropzone__icon,
+.furat-folders-section-v2 .furat-dropzone--compact .furat-dropzone__icon,
+.furat-card .furat-dropzone--compact .furat-dropzone__icon {
+    width: 22px;
+    height: 22px;
+    font-size: 0.75rem;
+    border-radius: 4px;
+    background: var(--furat-primary);
+    color: #ffffff;
+}
+.furat-folders-card .furat-dropzone--compact .furat-dropzone__text,
+.furat-folders-section-v2 .furat-dropzone--compact .furat-dropzone__text,
+.furat-card .furat-dropzone--compact .furat-dropzone__text {
+    flex: 0 0 auto;
+    min-width: 0;
+    width: 100%;
+}
+.furat-folders-card .furat-dropzone--compact .furat-dropzone__title,
+.furat-folders-section-v2 .furat-dropzone--compact .furat-dropzone__title,
+.furat-card .furat-dropzone--compact .furat-dropzone__title {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    margin: 0;
+    line-height: 1.2;
+    color: var(--furat-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.furat-folders-card .furat-dropzone--compact .furat-dropzone__subtitle,
+.furat-folders-section-v2 .furat-dropzone--compact .furat-dropzone__subtitle,
+.furat-card .furat-dropzone--compact .furat-dropzone__subtitle {
+    display: none; /* en este contexto compacto, solo mostramos el título */
+}
+.furat-folders-grid-v2 {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(115px, 1fr));
+    gap: 0.5rem;
+}
+.furat-folder-card-v2 {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+    padding: 0.625rem 0.75rem;
+    background: var(--furat-bg-card);
+    border: 1px solid var(--furat-border-light);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+    text-align: left;
+    font-family: inherit;
+}
+.furat-folder-card-v2:hover {
+    background: var(--furat-bg-app);
+    border-color: var(--furat-border);
+}
+.furat-folder-card-v2:focus {
+    outline: 2px solid var(--furat-primary);
+    outline-offset: 2px;
+}
+.furat-folder-card-v2--active {
+    border-color: var(--furat-primary);
+    box-shadow: 0 0 0 1px var(--furat-primary);
+}
+.furat-folder-card-v2__icon {
+    width: 26px;
+    height: 26px;
+    border-radius: 5px;
+    background: #fef3c7;
+    color: #b45309;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+}
+.furat-folder-card-v2__year {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--furat-text-primary);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+.furat-folder-card-v2__name {
+    font-size: 0.6875rem;
+    color: var(--furat-text-secondary);
+    margin: 0;
+}
+.furat-folder-card-v2__count {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.6875rem;
+    color: var(--furat-text-primary);
+    font-weight: 500;
+}
+.furat-folder-card-v2__count strong {
+    font-size: 0.75rem;
+    color: var(--furat-text-primary);
+    font-weight: 700;
+}
+.furat-folder-card-v2__badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.0625rem 0.375rem;
+    font-size: 0.625rem;
+    font-weight: 500;
+    border-radius: 999px;
+    line-height: 1.3;
+    margin-top: 0.0625rem;
+}
+.furat-folder-card-v2__badge--with-meta {
+    background: rgba(40, 167, 69, 0.08);
+    color: var(--furat-success);
+    font-weight: 600;
+}
+.furat-folder-card-v2__badge--no-meta {
+    background: transparent;
+    color: var(--furat-text-muted);
+    font-style: italic;
+    font-weight: 400;
+}
+
+/* ─── 📦685 — Contenedor unificado de Biblioteca ───
+   Agrupa "Carpetas por año" + "Reportes" dentro de UN SOLO card.
+   Las dos sub-secciones mantienen su estructura interna (header + body)
+   pero visualmente viven dentro de un único recuadro con divisor entre ambas. */
+.furat-library__container {
+    background: var(--furat-bg-card);
+    border: 1px solid var(--furat-border);
+    border-radius: 12px;
+    box-shadow: var(--furat-shadow-sm);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Sub-secciones: sin border propio, sin background, sin shadow.
+   Solo padding interno para que el contenido respire. */
+.furat-library__subsection {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: visible;
+}
+.furat-library__subsection.furat-card {
+    /* override del .furat-card estándar (background, border, radius, shadow) */
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+}
+.furat-library__subsection.furat-documents-section-v2 {
+    /* override del .furat-documents-section-v2 estándar (background, border, radius, padding, shadow) */
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0;
+}
+
+/* Sub-header compartido para AMBAS sub-secciones.
+   Provee la misma jerarquía visual: ícono + título + hint + acciones (opcional). */
+.furat-library__subsection-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--furat-border-light);
+    background: var(--furat-bg-app);
+    flex-wrap: wrap;
+}
+.furat-library__subsection-header h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--furat-text-primary);
+    margin: 0;
+    line-height: 1.2;
+}
+.furat-library__subsection-header h3 i {
+    color: var(--furat-primary);
+    font-size: 0.875rem;
+}
+.furat-library__subsection-header .furat-card__hint {
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--furat-text-secondary);
+    margin-left: 0.25rem;
+}
+.furat-library__subsection-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+/* Migrar el .furat-card__header existente (usado en foldersSection) al mismo styling.
+   El botón "Agregar período" se acomoda a la derecha vía flex. */
+.furat-library__subsection.furat-card .furat-card__header {
+    background: var(--furat-bg-app);
+    border-bottom: 1px solid var(--furat-border-light);
+    padding: 1rem 1.25rem;
+    /* el .furat-card__header ya es flex con space-between, lo respetamos */
+}
+.furat-library__subsection.furat-card .furat-card__body {
+    padding: 1rem 1.25rem 1.25rem 1.25rem;
+}
+
+/* Para la sub-sección de Reportes: el body directo no necesita padding lateral
+   porque los hijos (documentsHeaderCard, documentList) ya tienen el suyo */
+.furat-library__subsection.furat-documents-section-v2 > .furat-documents-header-card {
+    margin: 1rem 1.25rem 0 1.25rem;
+}
+.furat-library__subsection.furat-documents-section-v2 > .furat-table-wrapper {
+    margin: 1rem 1.25rem 1.25rem 1.25rem;
+}
+.furat-library__subsection.furat-documents-section-v2 > .furat-empty-state-library {
+    margin: 1.5rem 1.25rem;
+}
+
+/* Divisor entre sub-secciones (Carpetas por año ↔ Reportes) */
+.furat-library__divider {
+    margin: 0;
+    border: 0;
+    border-top: 1px solid var(--furat-border);
+    background: transparent;
+    height: 0;
+    position: relative;
+}
+.furat-library__divider::after {
+    /* indicador visual sutil en el medio del divider para reforzar la separación */
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 2px;
+    background: var(--furat-primary);
+    border-radius: 1px;
+    opacity: 0.5;
+}
+
+/* Cuando la sub-sección de Carpetas está oculta (no hay folders), el divisor igual respira. */
+.furat-library__subsection[hidden] + .furat-library__divider { display: none; }
+
+/* Dark mode: el contenedor unificado usa los mismos tokens */
+[data-theme="dark"] .furat-library__container {
+    background: var(--furat-bg-card);
+    border-color: var(--furat-border);
+}
+[data-theme="dark"] .furat-library__subsection-header,
+[data-theme="dark"] .furat-library__subsection.furat-card .furat-card__header {
+    background: rgba(255, 255, 255, 0.025);
+    border-bottom-color: var(--furat-border);
+}
+[data-theme="dark"] .furat-library__divider {
+    border-top-color: var(--furat-border);
+}
+
+/* ─── Documents V2: tabla enterprise ─── */
+.furat-documents-section-v2 {
+    background: var(--furat-bg-card);
+    border: 1px solid var(--furat-border);
+    border-radius: 10px;
+    padding: 1rem 1.25rem 1.25rem 1.25rem;
+    box-shadow: var(--furat-shadow-sm);
+}
+/* ─── 📦666 — Header unificado en UNA SOLA línea horizontal.
+   Navegación → Búsqueda → Filtros → Info, todo en la misma "array" sin filas separadas. ─── */
+
+/* Tabla */
+.furat-table-wrapper {
+    overflow-x: auto;
+    border: 1px solid var(--furat-border-light);
+    border-radius: 6px;
+    background: var(--furat-bg-card);
+}
+.furat-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.8125rem;
+}
+.furat-table thead th {
+    position: sticky;
+    top: 0;
+    background: var(--furat-bg-app);
+    color: var(--furat-text-secondary);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.625rem 0.875rem;
+    text-align: left;
+    border-bottom: 1px solid var(--furat-border);
+    white-space: nowrap;
+}
+.furat-table tbody tr {
+    transition: background 0.1s ease;
+    cursor: pointer;
+}
+.furat-table tbody tr:hover {
+    background: var(--furat-primary-light);
+}
+.furat-table tbody td {
+    padding: 0.625rem 0.875rem;
+    border-bottom: 1px solid var(--furat-border-light);
+    color: var(--furat-text-primary);
+    vertical-align: middle;
+}
+.furat-table tbody tr:last-child td {
+    border-bottom: none;
+}
+.furat-table__name {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+}
+.furat-table__file-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8125rem;
+    color: #ffffff;
+    flex-shrink: 0;
+}
+.furat-table__file-icon--pdf { background: var(--furat-danger); }
+.furat-table__file-icon--excel { background: #16a34a; }
+.furat-table__file-icon--word { background: #2563eb; }
+.furat-table__file-icon--other { background: var(--furat-text-secondary); }
+.furat-table__name-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 280px;
+}
+.furat-table__date {
+    color: var(--furat-text-secondary);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.furat-table__severity {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.1875rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 4px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+.furat-table__severity--leve { background: rgba(40, 167, 69, 0.12); color: var(--furat-success); }
+.furat-table__severity--moderado { background: rgba(245, 158, 11, 0.12); color: #b45309; }
+.furat-table__severity--grave { background: rgba(220, 53, 69, 0.12); color: var(--furat-danger); }
+.furat-table__severity--mortal { background: rgba(124, 45, 18, 0.15); color: #7c2d12; }
+.furat-table__severity--no-meta { background: var(--furat-border-light); color: var(--furat-text-secondary); }
+.furat-table__type {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--furat-text-secondary);
+}
+.furat-table__actions {
+    display: flex;
+    gap: 0.25rem;
+    justify-content: flex-end;
+}
+.furat-table__action-btn {
+    width: 30px;
+    height: 30px;
+    border: none;
+    background: transparent;
+    color: var(--furat-text-secondary);
+    border-radius: 4px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8125rem;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.furat-table__action-btn:hover {
+    background: var(--furat-primary-light);
+    color: var(--furat-primary);
+}
+.furat-table__action-btn--danger:hover {
+    background: var(--furat-danger-light);
+    color: var(--furat-danger);
+}
+
+/* ─── Empty state motivacional de la librería ─── */
+.furat-empty-state-library {
+    padding: 3rem 2rem;
+    text-align: center;
+    color: var(--furat-text-secondary);
+}
+.furat-empty-state-library__icon {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: var(--furat-primary-light);
+    color: var(--furat-primary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    margin: 0 auto 1rem auto;
+}
+.furat-empty-state-library h3 {
+    font-size: 1.0625rem;
+    font-weight: 600;
+    color: var(--furat-text-primary);
+    margin: 0 0 0.5rem 0;
+}
+.furat-empty-state-library p {
+    font-size: 0.875rem;
+    color: var(--furat-text-secondary);
+    margin: 0;
+    line-height: 1.5;
+    max-width: 360px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* ─── Folders empty (cuando no hay carpetas) ─── */
+.furat-folders-empty-v2 {
+    padding: 2rem 1rem;
+    text-align: center;
+    color: var(--furat-text-secondary);
+    font-size: 0.875rem;
+}
+.furat-folders-empty-v2 i {
+    display: block;
+    font-size: 2rem;
+    color: var(--furat-text-muted);
+    margin-bottom: 0.5rem;
+    opacity: 0.5;
+}
+
+/* ─── Dark mode V2 ─── */
+[data-theme="dark"] .furat-library-toolbar-v2 { background: var(--furat-bg-card); border-color: var(--furat-border); }
+[data-theme="dark"] .furat-search-v2 input {
+    background: var(--furat-bg-app);
+    border-color: var(--furat-border);
+    color: var(--furat-text-primary);
+}
+[data-theme="dark"] .furat-search-v2 input:focus {
+    background: var(--furat-bg-card);
+}
+[data-theme="dark"] .furat-chip { background: var(--furat-bg-app); border-color: var(--furat-border); color: var(--furat-text-secondary); }
+[data-theme="dark"] .furat-chip:hover { border-color: var(--furat-primary); color: var(--furat-primary); }
+[data-theme="dark"] .furat-chip--active { background: var(--furat-primary); border-color: var(--furat-primary); color: #ffffff; }
+[data-theme="dark"] .furat-results-counter { color: var(--furat-text-secondary); border-left-color: var(--furat-border); }
+
+[data-theme="dark"] .furat-breadcrumb-v2 { background: var(--furat-bg-card); border-color: var(--furat-border-light); }
+[data-theme="dark"] .furat-breadcrumb-v2__root,
+[data-theme="dark"] .furat-breadcrumb-v2__item { color: var(--furat-primary); }
+[data-theme="dark"] .furat-breadcrumb-v2__root:hover,
+[data-theme="dark"] .furat-breadcrumb-v2__item:hover { background: rgba(77, 166, 255, 0.15); }
+[data-theme="dark"] .furat-breadcrumb-v2__root.active,
+[data-theme="dark"] .furat-breadcrumb-v2__item.active,
+[data-theme="dark"] .furat-breadcrumb-v2__current { color: var(--furat-text-primary); }
+[data-theme="dark"] .furat-breadcrumb-v2__sep { color: var(--furat-text-muted); }
+
+[data-theme="dark"] .furat-folders-section-v2,
+[data-theme="dark"] .furat-documents-section-v2 { background: var(--furat-bg-card); border-color: var(--furat-border); }
+[data-theme="dark"] .furat-section-title-v2 { color: var(--furat-text-primary); }
+[data-theme="dark"] .furat-section-meta { color: var(--furat-text-secondary); }
+[data-theme="dark"] .furat-folder-card-v2 { background: var(--furat-bg-card); border-color: var(--furat-border-light); }
+[data-theme="dark"] .furat-folder-card-v2:hover { background: rgba(255, 255, 255, 0.04); border-color: var(--furat-border); }
+[data-theme="dark"] .furat-folder-card-v2--active { border-color: var(--furat-primary); }
+[data-theme="dark"] .furat-folder-card-v2__icon { background: rgba(180, 83, 9, 0.18); color: #fbbf24; }
+[data-theme="dark"] .furat-folder-card-v2__year { color: var(--furat-text-primary); }
+[data-theme="dark"] .furat-folder-card-v2__count strong { color: var(--furat-text-primary); }
+[data-theme="dark"] .furat-folder-card-v2__badge--with-meta { background: rgba(40, 167, 69, 0.18); color: #5cb85c; }
+[data-theme="dark"] .furat-folder-card-v2__badge--no-meta { color: var(--furat-text-muted); }
+
+[data-theme="dark"] .furat-table-wrapper { background: var(--furat-bg-card); border-color: var(--furat-border-light); }
+[data-theme="dark"] .furat-table thead th { background: var(--furat-bg-app); color: var(--furat-text-secondary); border-bottom-color: var(--furat-border); }
+[data-theme="dark"] .furat-table tbody tr:hover { background: rgba(77, 166, 255, 0.1); }
+[data-theme="dark"] .furat-table tbody td { color: var(--furat-text-primary); border-bottom-color: var(--furat-border-light); }
+[data-theme="dark"] .furat-table__date { color: var(--furat-text-secondary); }
+[data-theme="dark"] .furat-table__severity--leve { background: rgba(40, 167, 69, 0.2); color: #5cb85c; }
+[data-theme="dark"] .furat-table__severity--moderado { background: rgba(245, 158, 11, 0.2); color: #f0ad4e; }
+[data-theme="dark"] .furat-table__severity--grave { background: rgba(220, 53, 69, 0.2); color: #d9534f; }
+[data-theme="dark"] .furat-table__severity--mortal { background: rgba(124, 45, 18, 0.3); color: #c97c5d; }
+[data-theme="dark"] .furat-table__severity--no-meta { background: var(--furat-border); color: var(--furat-text-secondary); }
+[data-theme="dark"] .furat-table__type { color: var(--furat-text-secondary); }
+[data-theme="dark"] .furat-table__action-btn { color: var(--furat-text-secondary); }
+[data-theme="dark"] .furat-table__action-btn:hover { background: rgba(77, 166, 255, 0.15); color: var(--furat-primary); }
+
+[data-theme="dark"] .furat-empty-state-library__icon { background: rgba(77, 166, 255, 0.15); color: var(--furat-primary); }
+[data-theme="dark"] .furat-empty-state-library h3 { color: var(--furat-text-primary); }
+[data-theme="dark"] .furat-empty-state-library p { color: var(--furat-text-secondary); }
+
+/* ─── Responsive V2 ─── */
+@media (max-width: 1024px) {
+    .furat-library-toolbar-v2 { grid-template-columns: 1fr; }
+    .furat-results-counter { border-left: none; border-top: 1px solid var(--furat-border); padding: 0.5rem 0 0 0; text-align: left; }
+}
+@media (max-width: 768px) {
+    .furat-folders-grid-v2 { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+    .furat-table__name-text { max-width: 160px; }
+}
+
 /* Responsive */
 @media (max-width: 1024px) {
     .furat-app .k-stats-ribbon { flex-wrap: wrap; gap: .5rem; }
@@ -1006,23 +3241,4 @@ body {
     .furat-viewer__controls { flex-wrap: wrap; justify-content: space-between; }
     .furat-folders-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
     .furat-docs-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
-}
-
-
-/* 📦608-fix15 — FILE-VIEWER INLINE dentro del modal del preview (FURAT) */
-.furat-preview-modal { min-height: 0; overflow: hidden; }
-.furat-preview-modal__body:has(flyfish-file-viewer) {
-    background: #fff;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    padding: 0;
-}
-.furat-preview-modal__body flyfish-file-viewer {
-    display: block;
-    width: 100%;
-    flex: 1 1 0%;
-    min-height: 480px;
-    max-height: calc(100vh - 200px);
-    overflow: hidden;
 }

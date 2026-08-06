@@ -93,6 +93,9 @@ const { registerProfesiogramaHandlers, SCHEMA_SQL: PROFESIOGRAMA_SCHEMA_SQL } = 
 // Inspirado en Mail-0/Zero (https://github.com/Mail-0/Zero) — mismo patrón que
 // GESTACION_SCHEMA_SQL: CREATE TABLE IF NOT EXISTS + migraciones idempotentes.
 const { EMAIL_SCHEMA_SQL, EMAIL_MIGRATIONS_SQL } = require('./main/email-schema-sql');
+// 📦658 — FURAT (Reportes de Accidentes) — Schema + handler
+const { FURAT_SCHEMA_SQL, FURAT_MIGRATIONS_SQL } = require('./main/furat-schema-sql');
+const { registerFuratHandlers } = require('./main/furat-bridge');
 // 📦537 — Sync multipc (BD local <-> .kairsync en carpeta compartida)
 const { registerSyncHandlers } = require('./main/sync-bridge');
 // 📦538 — Generador de pcId (ID unico por PC para el sync multipc)
@@ -491,6 +494,18 @@ function initDbOnce() {
       console.log('[DB] 📦 Bandeja Integrada · Tablas de email (connections/threads/messages/labels/attachments) creadas/verificadas');
     } catch (emailErr) {
       console.error('[DB] 📦 Bandeja Integrada · Error creando schema de email:', emailErr.message);
+    }
+    // 📦658 — Schema FURAT (Reportes de Accidentes). Mismo patrón: CREATE TABLE IF NOT EXISTS.
+    try {
+      db.exec(FURAT_SCHEMA_SQL);
+      console.log('[DB] 📦658 · Tabla furat_metadata creada/verificada');
+      if (Array.isArray(FURAT_MIGRATIONS_SQL)) {
+        for (var fmi = 0; fmi < FURAT_MIGRATIONS_SQL.length; fmi++) {
+          try { db.exec(FURAT_MIGRATIONS_SQL[fmi]); } catch (fmErr) { /* skip */ }
+        }
+      }
+    } catch (furatErr) {
+      console.error('[DB] 📦658 · Error creando schema FURAT:', furatErr.message);
     }
     // Migraciones idempotentes para email (mismo patrón que gestacion)
     if (Array.isArray(EMAIL_MIGRATIONS_SQL)) {
@@ -9562,17 +9577,9 @@ ipcMain.on('stop-watching-capacitaciones', () => {
 // ═══════════════════════════════════════════════════════
 // FURAT - Reportes de Accidentes (Submódulo 3.2.1)
 // Handlers IPC para dashboard y biblioteca
+// (📦658 — declaración placeholder eliminada; los handlers reales se importan
+// desde ./main/furat-bridge.js arriba. Ver registerFuratHandlers(app) más abajo.)
 // ═══════════════════════════════════════════════════════
-
-function registerFuratHandlers(appInstance) {
-  sendLog('[FURAT] Registrando handlers IPC...', 'INFO');
-
-  // No necesitamos handlers adicionales porque el logic.js
-  // usa los contracts existentes (get-document-folders, get-pdf-preview, etc.)
-  // El dashboard y biblioteca se calculan en el frontend (renderer)
-
-  sendLog('[FURAT] Handlers registrados correctamente (usa contratos existentes)', 'INFO');
-}
 
 // Manejador para la creación de la ventana principal
 app.whenReady().then(() => {
@@ -9679,6 +9686,8 @@ try {
   registerProfesiogramaHandlers(app, { getDb, getCompanyRootPath });
   registerEvaluacionActionPlansHandlers(app, { getDb });
   registerSyncHandlers(app, { getDb });
+  // 📦658 — Handlers IPC del módulo FURAT (upload-file, list-metadata)
+  registerFuratHandlers(app);
   // 📦538 (FIX orden init) — Generar pcId y arrancar auto-sync DESPUES de
   // que registerSyncHandlers haya llamado a syncService.init() (setea _configPath).
   // Si se llama antes, _getAllCompanies() retorna [] porque _configPath es null
@@ -9700,13 +9709,7 @@ try {
   sendLog(`[MAIN] Error registrando handlers de eventos-rapidos: ${err.message}`, 'ERROR');
 }
 
- // Registrar handlers de FURAT - Reportes de Accidentes (Submódulo 3.2.1)
-  try {
-    registerFuratHandlers(app);
-    sendLog('[MAIN] Handlers de FURAT (3.2.1) registrados correctamente', 'INFO');
-  } catch (err) {
-    sendLog(`[MAIN] Error registrando handlers de FURAT: ${err.message}`, 'ERROR');
-  }
+ // 📦658 — Handlers FURAT ya registrados arriba (línea 9698) — bloque duplicado eliminado.
 
   // Iniciar smart polling de actualizaciones una vez que la app esté lista
   // Esperar 5 segundos para evitar conflictos con la inicialización

@@ -1,4 +1,61 @@
-# K+AIR v0.1.155 (próximo release)
+# K+AIR v0.1.156
+
+## 🎉 Novedades
+
+### 🩹 Rediseño completo del submódulo FURAT (3.2.1 Reportes de Accidentes)
+
+Rediseño total del submódulo FURAT dividido en 4 fases + 3 bugfixes críticos.
+
+#### Fase 1 — Refactor visual
+- **Header System v2.0**: migrado al patrón 3.1.4 (`k-section-card` + `header-back-btn` + `em-tabs`), mismo que Evaluaciones Médicas, Gestión del Cambio, Planes. 116 líneas de CSS viejo eliminadas.
+- **KPI Strip oficial** (Sistema Visual v1.0): 4 métricas (Total FURAT, Este Año, Este Mes, Carpetas) con iconos contextuales.
+- **Hero de bienvenida removido**: CTAs movidos a la drop zone de la Biblioteca.
+- **40+ inline styles eliminados** del HTML.
+
+#### Fase 2 — Drag-and-drop + Upload + Tabla SQL
+- **Drag & drop visual** estilo macOS Finder: la drop zone aparece sobre la card destino específica al arrastrar un archivo (no overlay global).
+- **Upload con metadata**: nuevo modal de upload con fecha, tipo, gravedad, área, descripción, reportado por.
+- **Tabla SQL `furat_metadata`**: schema con índices por company/date/type/severity/area.
+
+#### Fase 3 — Dashboard analítico
+- **4 charts basados en metadata**:
+  - **Tendencia últimos 12 meses**: LÍNEA SVG con PUNTOS prominentes (no más barras).
+  - **Por tipo de accidente**: barras horizontales con label + count.
+  - **Por gravedad**: stacked bar con colores semánticos (verde/amarillo/rojo/marrón) + legend.
+  - **Top áreas**: top 5 con más accidentes.
+- **Ribbon "Análisis preliminar"** cuando hay < 3 reportes con metadata.
+
+#### Biblioteca V2 rediseñada
+- **8+ iteraciones visuales**: cards amarillas tipo Finder, breadcrumb unificado, drop zone on card, header card unificado, header estandarizado 3.1.4, botón "Agregar período" verde, modal "Crear carpeta".
+- **Sub-headers simétricos** con icono + título + hint + acciones.
+- **Header unificado en UNA línea horizontal** (breadcrumb + búsqueda + filtros + info).
+
+#### Visor unificado
+- **📦686**: migrado al `kair-fv-modal` (mismo que Bandeja Integrada). PDFs, Office, imágenes con toolbar completa (search, zoom, pages, rotación, download, print).
+
+#### Sistema de notificaciones
+- **📦676**: migrado a `KAIRToast` moderno unificado (mismo sistema que el resto de la app).
+
+#### Bugfixes críticos
+- **📦674**: handlers IPC sin `ipcMain` importado → "No handler registered". Fix: usar el `ipcMain` importado en vez del parámetro `app` (patrón de los otros bridges).
+- **📦673**: TypeError en `setupEventListeners:193` (listener de viewerBackBtn inexistente). Fix: eliminar listeners del viewer.
+- **📦681**: CSS seguía usando clase vieja `.furat-folders-section-v2` → dropzone caía a `top: 0; left: 0`. Fix: actualizar selectores a `.furat-card`.
+- **📦684**: 18 warnings de "Unknown message type". Fix: agregar los 6 tipos del FURAT al switch del `renderer.js`.
+
+#### Mejoras de UX con poco data (📦687)
+- **Tendencia 12 meses**: cambiada a LÍNEA con PUNTOS (más visual con 1 solo punto).
+- **Últimos Reportes**: ahora muestra `accident_date` (consistencia con el chart de tendencia) en lugar de `modified` del filesystem.
+- **Header hint**: "Análisis preliminar · basado en N reporte(s) con metadata" cuando N < 3.
+
+#### Contenedor unificado de Biblioteca (📦685)
+"Carpetas por año" + "Reportes" dentro de UN SOLO card. Sub-headers compartidos, divider sutil con indicador azul, fondo gris sutil. Simetría con el resto de la app.
+
+#### Scroll bloqueado en modo ventana (📦682-683)
+Cadena de `overflow: hidden` bloqueaba scroll. Fix: `min-height: 100vh` en body y furat-app, `min-height: 0` en kair-container y furat-library, `overflow-y: auto` donde corresponde.
+
+---
+
+# K+AIR v0.1.155
 
 ## 🎉 Novedades
 

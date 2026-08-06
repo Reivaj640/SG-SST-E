@@ -5,6 +5,62 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.156] - 2026-08-05
+
+### Added
+- **📦680 — feat(furat): botón "Agregar período" verde + modal "Crear nueva carpeta"** — Patrón de creación de carpetas con modal dedicado.
+  - HTML: header de "Carpetas por año" migrado a `.furat-card` (mismo patrón que Distribución/Últimos/Análisis). Header con título + botón "Agregar período" verde (folder-plus icon).
+  - Backend (`main/furat-bridge.js`): nueva función `createFuratFolder(params)` + IPC `furat:create-folder` con validación de nombre (`/^[\p{L}\p{N}_\-\s]{1,100}$/u` para letras, números, guiones, guiones bajos, espacios). Validación dual frontend+backend. Errores específicos: `NO_SUBMODULE`, `MISSING_NAME`, `INVALID_NAME`, `ALREADY_EXISTS`, `SUBMODULE_NOT_FOUND`, `INTERNAL`.
+  - Preload: `furatCreateFolder: (payload) => ipcRenderer.invoke('furat:create-folder', payload)`.
+  - Logic: case `furat-create-folder` con manejo de errores estructurado.
+  - Viewer: funciones `setupCreateFolderModal()`, `openCreateFolderModal()`, `closeCreateFolderModal()`, `submitCreateFolder()`, helper `deriveSubmodulePath()` que deduce el path del submódulo eliminando el último segmento del path del primer folder (en vez de hacer un IPC extra).
+  - Color del botón crear: VERDE (`#16a34a` sólido para CTA sólido, `#15803d` para texto hover) — convención visual de la app: verde = crear, morado = editar.
+- **📦659 — feat(furat): dashboard analítico con 4 charts basados en metadata** — Fase 3 del rediseño.
+  - **Tendencia últimos 12 meses** (línea SVG con puntos, en lugar de barras): muestra los meses Sep 25 → Ago 26 con un punto prominente en los meses con data. Puntos vacíos en meses sin data. Último mes con punto verde (`furat-success`).
+  - **Por tipo de accidente**: barras horizontales con label + barra + count. Soporta los 8 tipos del form: caida, golpe, atrapamiento, corte, quemadura, esfuerzo, exposicion, otro.
+  - **Por gravedad**: stacked bar con colores semánticos (verde Leve, amarillo Moderado, rojo Grave, marrón Mortal) + legend con dots de color.
+  - **Top áreas**: top 5 áreas con más accidentes, ordenadas desc.
+  - Helper `buildChartPreliminarRibbon()` que muestra "Análisis preliminar · subí más FURATs con metadata para ver tendencias" cuando hay < 3 reportes con metadata (UX-friendly para casos con poco data).
+  - CSS: ~600 líneas agregadas para los 4 charts (`.furat-chart-trend`, `.furat-chart-bars`, `.furat-chart-severity`, `.furat-chart-preliminar`).
+
+### Changed
+- **📦658 — refactor(furat): Header System v2.0 (k-section-card) + KPI Strip + Hero + 40+ inline styles eliminados** — Fase 1 del rediseño. Header migrado al patrón 3.1.4 (mismo que Evaluaciones Médicas, Gestión del Cambio, Planes). 116 líneas de CSS `.kair-header--furat` eliminadas, 80 líneas de `.k-section-card`/`.header-back-btn`/`.em-tabs` agregadas. KPI strip oficial (Sistema Visual v1.0): 4 métricas (Total FURAT, Este Año, Este Mes, Carpetas) con iconos contextuales. Hero de bienvenida removido (CTAs movidos a drop zone de Biblioteca).
+- **📦664 — refactor(furat): Header unificado en UNA SOLA línea horizontal (breadcrumb + búsqueda + filtros + info)** — Todo en la misma "array" sin filas separadas. Toolbar de Biblioteca con `display: flex` integrado.
+- **📦665-666 — refactor(furat): Drop zone mejora visual** — Fondo opaco `#dbeafe` con `border: 1px dashed` (match con cards), texto corto "Soltá en XXXX", `box-sizing: border-box`.
+- **📦667 — refactor(furat): Breadcrumb standalone eliminado en raíz** — Solo `#breadcrumbInline` dentro del card unificado.
+- **📦668 — refactor(furat): Folders section migrada a `furat-card`** — Header integrado (título + botón "Agregar período"). Folder cards más pequeñas (minmax 115px, padding 0.625rem, font 0.6875rem).
+- **📦669-671 — refactor(furat): Drop zone posicionada sobre la card destino específica al arrastrar archivo** — Estilo macOS Finder. `setupCardDropzone()` usa `dragenter/dragover/dragleave/drop`, calcula `top/left/width/height` con `card.getBoundingClientRect() - card.offsetParent.getBoundingClientRect()`. Logs detallados en consola cuando cambia la card destino.
+- **📦676 — refactor(furat): Migración del sistema de notificaciones a `KAIRToast` moderno unificado** — Eliminado el toast custom viejo del FURAT. Ahora usa `window.KAIRToast.show()` (mismo sistema que el resto de la app, definido en `assets/js/kair-toast.js`). Eliminado `<div class="furat-notification" id="notification">` del HTML. 24 líneas de CSS `.furat-notification*` removidas. Fallback defensivo con `console.warn` si KAIRToast no disponible.
+- **📦677 — refactor(furat): Botón "Subir FURAT" del header removido** — Subida se hace desde la drop zone de la Biblioteca.
+- **📦678 — refactor(furat): Header estandarizado al patrón del 3.1.4** — `<header class="kair-header kair-header--furat">` → `<div class="k-section-card">` con título (izquierda) + company + divider + botón "Volver" (derecha) + tabs como `<nav class="em-tabs">` con `em-tab`.
+- **📦679 — refactor(furat): Hero de bienvenida del dashboard eliminado** — CTAs movidos a: drop zone (subir) y tab "Biblioteca" (explorar).
+- **📦682-683 — fix(furat): Scroll bloqueado en modo ventana** — Cadena de `overflow: hidden` bloqueaba el scroll en windowed mode. Fix: `min-height: 100vh` en body y furat-app, `min-height: 0` en kair-container y furat-library, `overflow-y: auto` donde corresponde, `scrolling = 'auto'` en iframe.
+- **📦685 — refactor(furat): Contenedor unificado de Biblioteca** — "Carpetas por año" + "Reportes" dentro de UN SOLO card. Sub-headers compartidos (ícono + título + hint + acciones), divider sutil con indicador azul al medio, fondo gris sutil en sub-headers. Simetría visual con el resto de la app. CSS: `.furat-library__container`, `.furat-library__subsection`, `.furat-library__subsection-header`, `.furat-library__divider`.
+- **📦686 — refactor(furat): Visor unificado con la Bandeja Integrada (kair-fv-modal)** — Migrado el modal preview del FURAT al mismo modal/estilos/lógica que el preview de adjuntos del correo.
+  - HTML: reemplazado `#previewModal` + `<style>` inline (50 líneas) por `<div class="kair-fv-overlay">` con `.kair-fv-modal` (badge rojo "PDF" + nombre + tamaño + cerrar).
+  - CSS: agregados estilos `.kair-fv-*` completos (overlay, header, body, spinner, error, badges de extensión con color por tipo) — copiados del módulo de correo.
+  - JS: nueva `openFuratPreview(filePath)` que usa `window.kairFV.mountInContainer` (mismo flujo que la bandeja). Soporta `result.data.bytes` (modo file-viewer) y base64 (modo legacy), normaliza ambos. Fallback a iframe blob URL si `kairFV` no está disponible.
+  - Eliminadas funciones obsoletas: `openPreviewModal`, `closePreviewModal`, `displayDocument`, `applyViewerZoom`, `applyViewerOrientation`, `showViewerError`. CSS `.furat-preview-modal__*` removido.
+  - Listeners del nuevo modal: close button, click fuera, tecla ESC.
+  - Beneficio: PDFs, Office (xlsx/docx), imágenes, etc. con toolbar completa (search, zoom, pages, rotación, download, print, theme).
+- **📦687 — refactor(furat): Análisis con mejor UX para poco data** — 3 mejoras en el dashboard de Análisis.
+  - **Chart de Tendencia**: cambiado de barras a LÍNEA con PUNTOS SVG. Meses con data = punto prominente (azul, con halo), meses sin data = punto pequeño vacío. Línea conecta los puntos.
+  - **Últimos Reportes**: ahora muestra `accident_date` de la metadata (consistencia con el chart de tendencia) en lugar de `modified` del filesystem. Si no hay metadata, cae a `modified`.
+  - **Ribbon "Análisis preliminar"** (`:has` selector) para charts con < 3 reportes con metadata. CSS rule `.furat-chart-preliminar + .furat-chart-preliminar { display: none; }` previene duplicación por bug conocido de doble render.
+  - Header hint (`#analyticsHint`) ahora dice "Análisis preliminar · basado en N reporte(s) con metadata" cuando N < 3.
+
+### Fixed
+- **📦674 — fix(furat-bridge): handlers IPC sin `ipcMain` importado** — Bug crítico: `Error invoking remote method 'furat:list-metadata': No handler registered`. La función usaba el parámetro `app` (que no tiene `.handle()`).
+  - **Root cause**: el bridge usaba `ipcMain.handle(...)` en 3 lugares (upload-file, list-metadata, get-analytics) pero **NO importaba `ipcMain` de `electron`**. La función recibía `app` desde main.js (que NO tiene `.handle()`).
+  - **Fix**: otros bridges (sync-bridge.js, gestacion-bridge.js) IGNORAN el primer argumento `app` y usan el `ipcMain` importado. Mismo patrón aplicado en `furat-bridge.js`. La firma cambió a `registerFuratHandlers(appOrIpcMain, deps)` y se usa el `ipcMain` importado. El `console.log` de éxito ahora SÍ se ejecuta porque los handlers se registran correctamente.
+  - **Beneficio**: los 3 handlers IPC del FURAT ahora se registran al iniciar la app, sin errores "No handler registered" en consola.
+- **📦673 — fix(furat): TypeError en `setupEventListeners:193`** — `Uncaught TypeError: Cannot read properties of null (reading 'addEventListener')`.
+  - **Root cause**: el setup intentaba registrar listeners en `viewerBackBtn`, `goToLibraryBtn`, `downloadBtn`, etc. Esos elementos no existían porque el tab "Visor" se eliminó en Fase 1.
+  - **Fix**: eliminados los 23 líneas de listeners del viewer obsoleto.
+- **📦675 — fix(furat): Tab clicks no se registraban después del cambio a `.em-tab`** — Después de cambiar a `.em-tab` en 📦678, el JS seguía usando `.kair-header__tab`. Cambiados 2 lugares en `reportes-accidentes-viewer.js`: `setupEventListeners` y `switchView`.
+- **📦681 — fix(furat): CSS seguía usando clase vieja `.furat-folders-section-v2`** — La dropzone caía a `top: 0; left: 0` por defecto del navegador. Fix: agregué `.furat-card` a TODOS los selectores de la dropzone (8 selectores actualizados).
+- **📦684 — fix(renderer): 18 warnings de "Unknown message type"** — El bridge de mensajes del `renderer.js` no reconocía los tipos del FURAT. Fix: agregué los 6 tipos del FURAT al switch de "mensajes manejados por componentes wrapper": `furat-get-dashboard-data-request`, `furat-get-analytics-request`, `furat-get-library-data-request`, `furat-list-metadata-request`, `furat-upload-file-request`, `furat-create-folder-request`.
+
 ## [0.1.155] - 2026-08-05
 
 ### Fixed

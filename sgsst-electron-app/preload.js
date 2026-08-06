@@ -256,6 +256,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('find-submodule-path', companyName, module, submodule),
   getFilePath: (payload) => ipcRenderer.invoke('get-file-path', payload),
 
+  // --- 📦658 — FURAT (Reportes de Accidentes) ---
+  furatUploadFile: (payload) => ipcRenderer.invoke('furat:upload-file', payload),
+  furatListMetadata: (companyName) => ipcRenderer.invoke('furat:list-metadata', companyName),
+  // 📦659 — Dashboard analítico (Fase 3)
+  furatGetAnalytics: (companyName) => ipcRenderer.invoke('furat:get-analytics', companyName),
+  // 📦680 — Crear nueva carpeta (período) en el filesystem
+  furatCreateFolder: (payload) => ipcRenderer.invoke('furat:create-folder', payload),
+
   // --- Remisiones ---
   getControlRemisionesData: (companyName) =>
     ipcRenderer.invoke('get-control-remisiones-data', companyName),
