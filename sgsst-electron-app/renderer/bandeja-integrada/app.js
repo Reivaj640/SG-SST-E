@@ -2046,6 +2046,56 @@
     inner.style.top = top + "px";
   }
 
+  // 📦694-fix4 — Refresh robusto de cumplidos en el calendario después de marcar.
+  // Re-fetchea SOLO la lista de cumplidos desde el backend, los cruza con
+  // state.events en memoria y dispara el re-render del calendario. No depende
+  // de la instancia __kairBandejaCalendar._loadEvents() (que es costosa y
+  // puede no estar disponible según desde dónde se abra el modal).
+  function _refreshCumplidosEnCalendario() {
+    var api = getElectronAPI();
+    if (!api || !api.eventosCumplidos || !api.eventosCumplidos.listar) {
+      return Promise.resolve(false);
+    }
+    var empresaId = (typeof getActiveCompanyName === 'function') ? getActiveCompanyName() : null;
+    return api.eventosCumplidos.listar({ empresaId: empresaId || null })
+      .then(function (r) {
+        if (!r || !r.success || !Array.isArray(r.data)) return false;
+        var cumMap = {};
+        r.data.forEach(function (c) {
+          cumMap[c.evento_id] = { cumplidoEn: c.cumplido_en, nota: c.nota || '' };
+        });
+        // Aplicar a state.events del calendario (si está disponible)
+        var cal = window.__kairBandejaCalendar;
+        if (cal && cal.state && Array.isArray(cal.state.events)) {
+          cal.state.events.forEach(function (ev) {
+            if (cumMap[ev.id]) {
+              ev.cumplido = true;
+              ev.cumplidoEn = cumMap[ev.id].cumplidoEn;
+              ev.cumplidoNota = cumMap[ev.id].nota;
+            } else {
+              ev.cumplido = false;
+              ev.cumplidoEn = null;
+              ev.cumplidoNota = '';
+            }
+          });
+          // Re-renderizar el calendario
+          if (typeof cal._refresh === 'function') {
+            cal._refresh();
+            return true;
+          }
+          if (typeof cal._render === 'function') {
+            cal._render();
+            return true;
+          }
+        }
+        return false;
+      })
+      .catch(function (e) {
+        console.error('[CUMPLIDOS] Error refrescando:', e.message);
+        return false;
+      });
+  }
+
   function openEventDetailModal(ev, adapter, anchorEl) {
     var cat = getCategoryStyle(ev.category);
     var dateStr = ev.date || "—";
@@ -2118,7 +2168,7 @@
           </div>
         </div>
         <div class="kair-event-modal__actions">
-          <button class="kair-event-modal__btn" data-action="cumplido">${ev.cumplido ? 'Cumplido' : 'Marcar cumplido'}</button>
+          <button class="kair-event-modal__btn ${ev.cumplido ? 'kair-event-modal__btn--cumplido' : ''}" data-action="cumplido">${ev.cumplido ? 'Desmarcar cumplido' : 'Marcar cumplido'}</button>
           <button class="kair-event-modal__btn kair-event-modal__btn--primary" data-action="edit">Editar</button>
           <button class="kair-event-modal__btn kair-event-modal__btn--danger-text" data-action="delete">Eliminar</button>
         </div>
@@ -2151,21 +2201,61 @@
       });
     });
     modal.querySelector("[data-action='cumplido']").addEventListener("click", function () {
-      // F4-fix: marcar como cumplido usa la API de electronAPI (no adapter directo)
+      // F4-fix: marcar/desmarcar cumplido usa la API de electronAPI (no adapter directo).
+      // 📦694-fix7 — Toggle: si ya está cumplido, lo desmarcamos; si no, lo marcamos.
+      // El texto del botón cambia dinámicamente en el openEventDetailModal
+      // (si ev.cumplido, dice "Desmarcar cumplido"; si no, "Marcar cumplido").
       var api = getElectronAPI();
       if (api && api.eventosCumplidos && ev.id) {
-        api.eventosCumplidos.marcar({ evento_id: ev.id, empresaId: getActiveCompanyName() || null })
+        var empresaId = getActiveCompanyName() || null;
+        var isCumplido = !!ev.cumplido;
+        var endpoint = isCumplido ? 'desmarcar' : 'marcar';
+        var payload = { eventoId: ev.id, empresaId: empresaId };
+        api.eventosCumplidos[endpoint](payload)
           .then(function (r) {
             if (r && r.success) {
-              toast("Marcado como cumplido", ev.title, "success");
-              closeModal();
-              if (window.__kairBandejaCalendar) {
-                window.__kairBandejaCalendar._loadEvents().then(function () {
-                  window.__kairBandejaCalendar._refresh();
-                });
+              // 📦694-fix5 — Actualizar state.events del Bandeja Integrada directamente
+              var evState = null;
+              if (state && Array.isArray(state.events)) {
+                evState = state.events.find(function (e) { return e.id === ev.id; });
+                if (evState) {
+                  if (isCumplido) {
+                    // Desmarcar: limpiar flags
+                    evState.cumplido = false;
+                    evState.cumplidoEn = null;
+                    evState.cumplidoNota = '';
+                  } else {
+                    // Marcar: setear flags
+                    evState.cumplido = true;
+                    evState.cumplidoEn = (r.data && r.data.cumplidoEn) || new Date().toISOString();
+                    evState.cumplidoNota = (r.data && r.data.nota) || '';
+                  }
+                }
               }
+              // También actualizar el KairCalendar interno
+              if (window.__kairBandejaCalendar && window.__kairBandejaCalendar.state && Array.isArray(window.__kairBandejaCalendar.state.events)) {
+                var evCal = window.__kairBandejaCalendar.state.events.find(function (e) { return e.id === ev.id; });
+                if (evCal) {
+                  if (isCumplido) {
+                    evCal.cumplido = false;
+                    evCal.cumplidoEn = null;
+                    evCal.cumplidoNota = '';
+                  } else {
+                    evCal.cumplido = true;
+                    evCal.cumplidoEn = (r.data && r.data.cumplidoEn) || new Date().toISOString();
+                    evCal.cumplidoNota = (r.data && r.data.nota) || '';
+                  }
+                }
+              }
+              toast(
+                isCumplido ? "Desmarcado" : "Marcado como cumplido",
+                ev.title,
+                isCumplido ? "info" : "success"
+              );
+              closeModal();
+              render();
             } else {
-              toast("No se pudo marcar cumplido", (r && r.error) || "Error", "error");
+              toast("No se pudo " + (isCumplido ? "desmarcar" : "marcar") + " cumplido", (r && r.error) || "Error", "error");
             }
           })
           .catch(function (e) { toast("Error", e.message, "error"); });
@@ -2875,12 +2965,14 @@
       const banner = el("div", { class: "kair-allday-banner" });
       allDay.forEach((ev) => {
         const cat = getCategoryStyle(ev.category);
-        const chip = el("div", { class: "kair-allday-chip" });
+        // 📦694-fix6 — Soporte cumplido en chips all-day del mes view
+        const cumplidoClass = ev.cumplido ? ' kair-allday-chip--cumplido' : '';
+        const chip = el("div", { class: "kair-allday-chip" + cumplidoClass });
         chip.style.background = cat.bg || "#eef0f3";
         chip.style.borderLeftColor = cat.color || "#6c757d";
         chip.style.color = cat.color || "#333";
-        chip.title = ev.title || "(sin título)";
-        chip.textContent = ev.title || "(sin título)";
+        chip.title = (ev.cumplido ? '✓ ' : '') + (ev.title || "(sin título)");
+        chip.textContent = (ev.cumplido ? '✓ ' : '') + (ev.title || "(sin título)");
         chip.addEventListener("click", (clickEv) => selectEvent(ev, clickEv));
         banner.appendChild(chip);
       });
@@ -3032,12 +3124,14 @@
         const allDayWrap = el("div", { class: "kair-week-day-head__allday" });
         d.allDay.forEach((ev) => {
           const cat = getCategoryStyle(ev.category);
-          const chip = el("div", { class: "kair-week-allday-chip" });
+          // 📦694-fix6 — Soporte cumplido en chips all-day de la semana
+          const cumplidoClass = ev.cumplido ? ' kair-week-allday-chip--cumplido' : '';
+          const chip = el("div", { class: "kair-week-allday-chip" + cumplidoClass });
           chip.style.background = cat.bg || "#eef0f3";
           chip.style.borderLeftColor = cat.color || "#6c757d";
           chip.style.color = cat.color || "#333";
-          chip.title = ev.title || "(sin título)";
-          chip.textContent = ev.title || "(sin título)";
+          chip.title = (ev.cumplido ? '✓ ' : '') + (ev.title || "(sin título)");
+          chip.textContent = (ev.cumplido ? '✓ ' : '') + (ev.title || "(sin título)");
           chip.addEventListener("click", (clickEv) => selectEvent(ev, clickEv));
           allDayWrap.appendChild(chip);
         });
@@ -3352,13 +3446,16 @@
       cellEl.innerHTML = `<div class="kair-month-cell__day">${cell.day}</div>`;
       visible.forEach((ev) => {
         const cat = getCategoryStyle(ev.category);
+        // 📦694-fix6 — Clase extra `--cumplido` cuando el evento está marcado
+        // como cumplido. El CSS aplica opacity 0.55 + line-through al título.
+        const cumplidoClass = ev.cumplido ? ' kair-month-event--cumplido' : '';
         const eventBtn = el("div", {
-          class: "kair-month-event",
+          class: "kair-month-event" + cumplidoClass,
           style: { background: cat.bg, borderLeftColor: cat.color, color: cat.color },
-          title: `${ev.title} · ${fmtHour(ev.startHour)}`,
+          title: `${ev.cumplido ? '✓ ' : ''}${ev.title} · ${fmtHour(ev.startHour)}`,
         });
         eventBtn.innerHTML = `
-          <span class="truncate flex-1 text-left" style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;text-align:left;">${ev.title}</span>
+          <span class="truncate flex-1 text-left kair-month-event__title" style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;text-align:left;">${ev.cumplido ? '✓ ' : ''}${ev.title}</span>
           ${ev.linkedMailId ? D.ICONS.mail.replace('width="13" height="13"', 'width="9" height="9"') : ""}
         `;
         eventBtn.addEventListener("click", (e) => {

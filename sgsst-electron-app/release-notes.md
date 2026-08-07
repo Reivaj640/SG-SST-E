@@ -1,3 +1,44 @@
+# K+AIR v0.1.159
+
+## 🐛 Fix: Botón "Marcar cumplido" del calendario
+
+Bug crítico: el botón del modal de evento no funcionaba. El user hacía click y el cumplimiento **no se guardaba** en la base de datos.
+
+**Causa raíz:** el renderer enviaba `evento_id` (snake_case, como las columnas de SQLite) pero el bridge IPC esperaba `eventoId` (camelCase, como las funciones del bridge). El backend rechazaba silenciosamente con `VALIDATION: empresaId y eventoId son requeridos` y el user solo veía un toast genérico que desaparecía a los 3 segundos. El bug afectaba a **2 de 3 call sites** (`app.js` de la Bandeja Integrada y `renderer.js` del header) — el 3ro (`calendar-detail-panel.js`) ya usaba camelCase correctamente, lo que confirmó la convención.
+
+**Fix:** cambio a `eventoId` (camelCase) en ambos archivos + helper defensivo `_normalizeCumplidoPayload()` en el bridge que acepta ambos formatos.
+
+## 🐛 Fix: empresaId rechazado en modo "Todas las empresas"
+
+Cuando el toggle del calendario está en "Todas las empresas", `getActiveCompanyName()` retorna `null` (porque el view no está en una empresa específica). El bridge rechazaba con `VALIDATION`.
+
+**Fix:** `empresa_id` ahora es nullable en la tabla. Migración defensiva recrea la tabla preservando datos para DBs existentes.
+
+## 🐛 Fix: Sincronización multipc fallaba con "no such column: updated_at"
+
+El `sync-serializer.js` asumía un schema incorrecto para `eventos_cumplidos` y `eventos_rapidos`. Cada vez que se hacía un push multipc, salían 2 errores de columnas inexistentes.
+
+**Fix:** schema real usado en queries. `eventos_rapidos` sync implementado completo (antes era un stub).
+
+## 🆕 Cumplimiento se ve visualmente en el calendario
+
+Cuando un evento está marcado como cumplido, su chip en el calendario se atenúa al 55% de opacidad y el título se tacha con una línea por el medio. Aplica a las 3 vistas:
+
+- **Vista Mes**: chip principal de cada día
+- **All-day Mes**: chips del banner superior
+- **All-day Semana**: chips del header de cada columna
+
+## 🆕 Toggle marcar/desmarcar cumplido
+
+El mismo botón del modal ahora funciona como toggle:
+
+- Si el evento **no** está cumplido → botón dice **"Marcar cumplido"** (estilo neutral) y al hacer click lo marca
+- Si el evento **ya** está cumplido → botón dice **"Desmarcar cumplido"** (borde verde claro) y al hacer click lo desmarca
+
+El chip del calendario se actualiza instantáneamente sin necesidad de recargar la Bandeja Integrada.
+
+---
+
 # K+AIR v0.1.158
 
 ## 🆕 Navegación recursiva de carpetas en FURAT (tipo explorador)

@@ -34,13 +34,51 @@ let _getDb = null;
 const SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS eventos_cumplidos (
     evento_id   TEXT PRIMARY KEY,
-    empresa_id  TEXT NOT NULL,
+    -- 📦694-fix2 — empresa_id ahora es nullable. Un cumplimiento en modo
+    -- "Todas las empresas" (scope=all) no tiene una empresa específica del
+    -- user, pero el evento SÍ pertenece a una empresa. Por ahora se guarda
+    -- null cuando el frontend no puede determinar la empresa activa. La columna
+    -- se mantiene indexada para que listar(null) siga siendo eficiente.
+    empresa_id  TEXT,
     cumplido_en TEXT NOT NULL,
     nota        TEXT DEFAULT ''
   );
   CREATE INDEX IF NOT EXISTS idx_eventos_cumplidos_empresa
     ON eventos_cumplidos(empresa_id);
 `;
+
+// 📦694-fix2 — Migración defensiva para DBs existentes con empresa_id NOT NULL.
+// SQLite NO permite ALTER COLUMN para quitar NOT NULL, así que recreamos la tabla.
+// Es idempotente: si la tabla ya es nullable, no hace nada.
+function _ensureSchemaMigrated(db) {
+  if (!db) return;
+  try {
+    var cols = db.prepare("PRAGMA table_info(eventos_cumplidos)").all();
+    var empresaCol = (cols || []).find(function (c) { return c.name === 'empresa_id'; });
+    if (empresaCol && empresaCol.notnull === 1) {
+      console.log('[📦694-DEBUG][' + MOD + '] Migrando eventos_cumplidos: empresa_id NOT NULL → nullable');
+      db.exec(`
+        BEGIN TRANSACTION;
+        ALTER TABLE eventos_cumplidos RENAME TO eventos_cumplidos__old;
+        CREATE TABLE eventos_cumplidos (
+          evento_id   TEXT PRIMARY KEY,
+          empresa_id  TEXT,
+          cumplido_en TEXT NOT NULL,
+          nota        TEXT DEFAULT ''
+        );
+        INSERT INTO eventos_cumplidos (evento_id, empresa_id, cumplido_en, nota)
+          SELECT evento_id, empresa_id, cumplido_en, nota FROM eventos_cumplidos__old;
+        DROP TABLE eventos_cumplidos__old;
+        CREATE INDEX IF NOT EXISTS idx_eventos_cumplidos_empresa
+          ON eventos_cumplidos(empresa_id);
+        COMMIT;
+      `);
+      console.log('[📦694-DEBUG][' + MOD + '] Migración completada ✓');
+    }
+  } catch (migErr) {
+    console.error('[' + MOD + '] Error en migración de schema:', migErr.message);
+  }
+}
 
 // ---------- Handlers internos (reusables, testeables) ----------
 
@@ -80,12 +118,17 @@ function _handlerListarCumplidos(empresaId) {
  */
 function _handlerMarcarCumplido(empresaId, eventoId, nota) {
   if (!_getDb) {
+    console.error('[📦694-DEBUG][' + MOD + '][MARCAR] NO_DB — base de datos no inyectada');
     return { success: false, error: { code: 'NO_DB', message: 'Base de datos no disponible' } };
   }
-  if (!empresaId || !eventoId) {
+  // 📦694-fix2 — empresaId ahora es OPCIONAL. Un cumplimiento en modo "Todas las
+  // empresas" se guarda con empresa_id=null. eventoId sigue siendo obligatorio
+  // porque es la PK de la tabla.
+  if (!eventoId) {
+    console.error('[📦694-DEBUG][' + MOD + '][MARCAR] VALIDATION — eventoId=' + eventoId);
     return {
       success: false,
-      error: { code: 'VALIDATION', message: 'empresaId y eventoId son requeridos' }
+      error: { code: 'VALIDATION', message: 'eventoId es requerido' }
     };
   }
   try {
@@ -120,22 +163,33 @@ function _handlerDesmarcarCumplido(empresaId, eventoId) {
   if (!_getDb) {
     return { success: false, error: { code: 'NO_DB', message: 'Base de datos no disponible' } };
   }
-  if (!empresaId || !eventoId) {
+  // 📦694-fix2 — empresaId ahora es OPCIONAL. Si llega null, borramos por evento_id
+  // sin filtrar por empresa. Si llega string, filtramos por ambos.
+  if (!eventoId) {
     return {
       success: false,
-      error: { code: 'VALIDATION', message: 'empresaId y eventoId son requeridos' }
+      error: { code: 'VALIDATION', message: 'eventoId es requerido' }
     };
   }
   try {
     var db = _getDb();
-    var result = db.prepare(
-      'DELETE FROM eventos_cumplidos WHERE evento_id = ? AND empresa_id = ?'
-    ).run(eventoId, empresaId);
+    var result;
+    if (empresaId) {
+      result = db.prepare(
+        'DELETE FROM eventos_cumplidos WHERE evento_id = ? AND empresa_id = ?'
+      ).run(eventoId, empresaId);
+    } else {
+      result = db.prepare(
+        'DELETE FROM eventos_cumplidos WHERE evento_id = ?'
+      ).run(eventoId);
+    }
     console.log('[' + MOD + '][DESMARCAR] ' + eventoId + ' (cambios=' + result.changes + ')');
-    // 📦538 — Trigger push al hub multipc
+    // 📦538 — Trigger push al hub multipc (si hay empresaId)
     try {
       var syncService = require('./sync-service');
-      syncService.debouncedPush(empresaId);
+      if (empresaId) {
+        syncService.debouncedPush(empresaId);
+      }
     } catch (syncErr) {
       console.warn('[' + MOD + '] No se pudo triggear sync push: ' + syncErr.message);
     }
@@ -150,13 +204,35 @@ function _handlerDesmarcarCumplido(empresaId, eventoId) {
 function registerEventosCumplidosHandlers(app, deps) {
   _getDb = deps && deps.getDb ? deps.getDb : null;
 
+  // 📦694-fix2 — Migrar tabla de NOT NULL a nullable (idempotente)
+  if (_getDb) {
+    try {
+      _ensureSchemaMigrated(_getDb());
+    } catch (e) {
+      console.error('[' + MOD + '][MIGRATION] ' + e.message);
+    }
+  }
+
   console.log('[' + MOD + '][INIT][INFO] Registrando handlers de cumplimiento de eventos...');
+
+  // 📦694 — Helper: aceptar tanto `eventoId` (camelCase, convención del bridge)
+  // como `evento_id` (snake_case, convención de columnas SQLite) en los payloads.
+  // Defensa en profundidad: si un call site nuevo usa el formato equivocado, NO falla
+  // silenciosamente con "VALIDATION", sigue funcionando.
+  function _normalizeCumplidoPayload(params) {
+    return {
+      empresaId: params.empresaId || params.empresa_id || null,
+      eventoId:  params.eventoId  || params.evento_id  || null,
+      nota:      params.nota      || ''
+    };
+  }
 
   // Listar (consumido por kair-calendar-adapter.js)
   ipcMain.handle('eventos-cumplidos:listar', async function (event, payload) {
     try {
       var params = (payload && typeof payload === 'object') ? payload : {};
-      return _handlerListarCumplidos(params.empresaId || (params && params.empresaId));
+      var norm = _normalizeCumplidoPayload(params);
+      return _handlerListarCumplidos(norm.empresaId);
     } catch (e) {
       console.error('[' + MOD + '][HANDLER-LISTAR]', e.message);
       return { success: false, error: { code: 'INTERNAL', message: e.message } };
@@ -167,7 +243,10 @@ function registerEventosCumplidosHandlers(app, deps) {
   ipcMain.handle('eventos-cumplidos:marcar', async function (event, payload) {
     try {
       var params = (payload && typeof payload === 'object') ? payload : {};
-      return _handlerMarcarCumplido(params.empresaId, params.eventoId, params.nota);
+      console.log('[📦694-DEBUG][' + MOD + '][MARCAR][RECV] payload crudo=' + JSON.stringify(params));
+      var norm = _normalizeCumplidoPayload(params);
+      console.log('[📦694-DEBUG][' + MOD + '][MARCAR][NORM] empresaId=' + norm.empresaId + ' eventoId=' + norm.eventoId);
+      return _handlerMarcarCumplido(norm.empresaId, norm.eventoId, norm.nota);
     } catch (e) {
       console.error('[' + MOD + '][HANDLER-MARCAR]', e.message);
       return { success: false, error: { code: 'INTERNAL', message: e.message } };
@@ -178,7 +257,10 @@ function registerEventosCumplidosHandlers(app, deps) {
   ipcMain.handle('eventos-cumplidos:desmarcar', async function (event, payload) {
     try {
       var params = (payload && typeof payload === 'object') ? payload : {};
-      return _handlerDesmarcarCumplido(params.empresaId, params.eventoId);
+      console.log('[📦694-DEBUG][' + MOD + '][DESMARCAR][RECV] payload crudo=' + JSON.stringify(params));
+      var norm = _normalizeCumplidoPayload(params);
+      console.log('[📦694-DEBUG][' + MOD + '][DESMARCAR][NORM] empresaId=' + norm.empresaId + ' eventoId=' + norm.eventoId);
+      return _handlerDesmarcarCumplido(norm.empresaId, norm.eventoId);
     } catch (e) {
       console.error('[' + MOD + '][HANDLER-DESMARCAR]', e.message);
       return { success: false, error: { code: 'INTERNAL', message: e.message } };

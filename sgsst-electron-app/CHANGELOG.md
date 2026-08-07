@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.159] - 2026-08-07
+
+### Fixed
+- **📦694 — fix(calendar): botón "Marcar cumplido" en Bandeja Integrada no funcionaba** — Bug crítico: el botón del modal de evento llamaba a `api.eventosCumplidos.marcar()` con `evento_id` (snake_case), pero el bridge IPC esperaba `eventoId` (camelCase). El backend rechazaba con `VALIDATION: empresaId y eventoId son requeridos` y el user solo veía un toast genérico que desaparecía a los 3 segundos. **3 archivos rotos** (`app.js`, `renderer.js`, `modules/shared/calendar-detail-panel.js` — este último ya usaba camelCase correctamente, lo que confirmó la convención).
+  - **Root cause**: asimetría entre la convención de columnas SQLite (`snake_case`) y la convención JS del bridge (`camelCase`). El dev asumía que el payload del bridge respetaba el formato de la DB, pero el bridge normaliza a camelCase en sus `_handler*` signatures.
+  - **Fix 1** (`app.js:2157` y `renderer.js:997`): `evento_id: ev.id` → `eventoId: ev.id`.
+  - **Fix 2 (defensa en profundidad)**: helper `_normalizeCumplidoPayload()` en `eventos-cumplidos-bridge.js` que acepta ambos formatos. Si un call site futuro usa snake_case, no falla silenciosamente con "VALIDATION" — sigue funcionando.
+- **📦694 — fix(calendar): `empresaId` rechazado en modo "Todas las empresas"** — Cuando el toggle del calendario está en `scope='all'`, `getActiveCompanyName()` retorna `null` (porque el parent no expone una empresa activa del view, sino todas). El bridge rechazaba con `VALIDATION: empresaId es requerido`.
+  - **Fix**: `empresa_id` ahora es `TEXT` (nullable, antes `NOT NULL`). Migración defensiva recrea la tabla preservando datos para DBs existentes. Validación: `if (!eventoId)` (sin empresaId). `desmarcar` también acepta null y filtra solo por `evento_id` cuando empresaId es null.
+- **📦694 — fix(sync): sync multipc fallaba con "no such column: updated_at"** — El `sync-serializer.js` asumía que `eventos_cumplidos` tenía columna `updated_at` y PK `id`, pero el schema real usa `evento_id` como PK y `cumplido_en` como timestamp. Mismo bug con `eventos_rapidos` (asumía `empresa_id` que no existe).
+  - **Fix**: schema real usado en queries (`evento_id` PK, `cumplido_en` como proxy de `updatedAt`). `eventos_rapidos` sync implementado completo (antes era un stub que solo contaba skipped).
+- **📦694 — fix(calendar): cumplimiento no se reflejaba visualmente en la Bandeja Integrada** — El cumplimiento se guardaba correctamente en DB, pero el chip del calendario NO se tachaba/atenuaba. **Root cause**: la Bandeja Integrada tiene su PROPIO render (`renderBigCalendar` con clases custom `kair-month-event`, `kair-allday-chip`, `kair-week-allday-chip`), y el CSS `--cumplido` solo aplicaba a `kair-cal-event-chip` del componente KairCalendar, que no se usa en la Bandeja.
+  - **Fix 1 (state)**: el modal actualiza `state.events` del Bandeja Integrada directamente (no solo el KairCalendar interno) y llama a `render()` para repintar.
+  - **Fix 2 (CSS)**: agregadas 3 variantes de clase `--cumplido` en `styles.css` con `opacity: 0.55`, `filter: saturate(0.6)` y `text-decoration: line-through` para los chips custom. Aplica a vista Mes, Mes all-day y Semana all-day.
+- **📦694 — fix(calendar): chip del modal decía "Cumplido" y no dejaba desmarcar** — El botón del modal mostraba "Cumplido" cuando ya estaba marcado, pero el handler siempre llamaba a `marcar()`. No había forma de desmarcar.
+  - **Fix**: toggle dinámico. El texto y el estilo del botón cambian según el estado (`Marcar cumplido` con estilo neutral vs `Desmarcar cumplido` con borde verde). El handler detecta el estado y llama a `desmarcar` o `marcar`. Toast diferenciado: "Marcado como cumplido" (success) vs "Desmarcado" (info).
+
 ## [0.1.158] - 2026-08-06
 
 ### Added

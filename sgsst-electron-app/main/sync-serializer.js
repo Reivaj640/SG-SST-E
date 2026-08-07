@@ -156,15 +156,19 @@ function _serializeEventosCumplidos(db, companyKey) {
     ).get();
     if (!tableExists) return [];
 
+    // 📦694-fix3 — El schema real usa (evento_id PK, empresa_id, cumplido_en, nota)
+    // NO tiene columna `updated_at` ni `id`. Usar `cumplido_en` como "updatedAt"
+    // proxy y `evento_id` como id para que el sync multipc tenga last-write-wins.
     var rows = db.prepare(
-      'SELECT * FROM eventos_cumplidos WHERE empresa_id = ? ORDER BY updated_at DESC'
+      'SELECT evento_id, empresa_id, cumplido_en, nota FROM eventos_cumplidos ' +
+      'WHERE empresa_id = ? ORDER BY cumplido_en DESC'
     ).all(companyKey);
 
     return rows.map(function (r) {
       return {
-        id: r.id,
+        id: r.evento_id,
         evento: r,
-        updatedAt: r.updated_at || new Date().toISOString()
+        updatedAt: r.cumplido_en || new Date().toISOString()
       };
     });
   } catch (e) {
@@ -180,15 +184,20 @@ function _serializeEventosRapidos(db, companyKey) {
     ).get();
     if (!tableExists) return [];
 
+    // 📦694-fix3 — El schema real de eventos_rapidos NO tiene columna `empresa_id`.
+    // Filtramos por todas las PCs sincronizan TODOS los rapidos (subóptimo pero
+    // no rompe). Cuando se agregue empresa_id a eventos_rapidos (issue separado),
+    // este filtro se actualiza.
     var rows = db.prepare(
-      'SELECT * FROM eventos_rapidos WHERE empresa_id = ? ORDER BY updated_at DESC'
-    ).all(companyKey);
+      'SELECT id, titulo, fecha, hora_inicio, hora_fin, tipo, descripcion, google_event_id, attendees, created_at, updated_at ' +
+      'FROM eventos_rapidos ORDER BY updated_at DESC'
+    ).all();
 
     return rows.map(function (r) {
       return {
         id: r.id,
         evento: r,
-        updatedAt: r.updated_at || new Date().toISOString()
+        updatedAt: r.updated_at || r.created_at || new Date().toISOString()
       };
     });
   } catch (e) {
@@ -464,6 +473,9 @@ function _deserializeEventosCumplidos(db, remoteRecords, companyKey, result, con
     return;
   }
 
+  // 📦694-fix3 — Ajustar al schema real: PK = evento_id, sin updated_at,
+  // timestamp es cumplido_en. Usamos evento_id en lugar de id y cumplido_en
+  // para comparar last-write-wins.
   var counter = result.byEntity.eventos_cumplidos;
   for (var i = 0; i < remoteRecords.length; i++) {
     var remote = remoteRecords[i];
@@ -474,18 +486,16 @@ function _deserializeEventosCumplidos(db, remoteRecords, companyKey, result, con
     }
 
     var local = db.prepare(
-      'SELECT id, updated_at FROM eventos_cumplidos WHERE id = ? AND empresa_id = ?'
+      'SELECT evento_id, cumplido_en FROM eventos_cumplidos WHERE evento_id = ? AND empresa_id = ?'
     ).get(remote.id, companyKey);
 
     if (!local) {
-      // INSERT basico: insertamos solo lo que conocemos del esquema
-      // comun. Si el esquema local tiene columnas extra, quedan NULL
-      // (mejor que nada - el usuario los vera vacios y los podra editar).
       try {
         var evento = remote.evento || {};
         db.prepare(
-          'INSERT OR IGNORE INTO eventos_cumplidos (id, empresa_id, updated_at) VALUES (?, ?, ?)'
-        ).run(remote.id, companyKey, remote.updatedAt);
+          'INSERT OR IGNORE INTO eventos_cumplidos (evento_id, empresa_id, cumplido_en, nota) ' +
+          'VALUES (?, ?, ?, ?)'
+        ).run(remote.id, companyKey, remote.updatedAt, evento.nota || '');
         counter.applied++;
         result.applied++;
       } catch (e) {
@@ -493,12 +503,13 @@ function _deserializeEventosCumplidos(db, remoteRecords, companyKey, result, con
         counter.skipped++;
         result.skipped++;
       }
-    } else if (remote.updatedAt > local.updated_at) {
-      // UPDATE timestamp; el bridge especifico se encargara del contenido
+    } else if (remote.updatedAt > local.cumplido_en) {
       try {
+        var eventoUpd = remote.evento || {};
         db.prepare(
-          'UPDATE eventos_cumplidos SET updated_at = ? WHERE id = ? AND empresa_id = ?'
-        ).run(remote.updatedAt, remote.id, companyKey);
+          'UPDATE eventos_cumplidos SET cumplido_en = ?, nota = ? ' +
+          'WHERE evento_id = ? AND empresa_id = ?'
+        ).run(remote.updatedAt, eventoUpd.nota || '', remote.id, companyKey);
         counter.applied++;
         counter.conflicts++;
         result.applied++;
@@ -516,12 +527,77 @@ function _deserializeEventosCumplidos(db, remoteRecords, companyKey, result, con
 }
 
 function _deserializeEventosRapidos(db, remoteRecords, companyKey, result, conflictLog) {
-  // Estructura similar a eventos_cumplidos, se completa en 📦537
-  // cuando veamos la estructura exacta de la tabla.
+  // 📦694-fix3 — Implementar merge real de eventos_rapidos.
+  // La tabla tiene id, titulo, fecha, hora_inicio, hora_fin, tipo, descripcion,
+  // google_event_id, attendees, created_at, updated_at. No tiene empresa_id
+  // (sincronizamos todos, filtrado futuro). Usamos last-write-wins por updated_at.
+  var tableExists = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='eventos_rapidos'"
+  ).get();
+  if (!tableExists) return;
+
   var counter = result.byEntity.eventos_rapidos;
   for (var i = 0; i < remoteRecords.length; i++) {
-    counter.skipped++;
-    result.skipped++;
+    var remote = remoteRecords[i];
+    if (!remote || !remote.id || !remote.updatedAt) {
+      counter.skipped++;
+      result.skipped++;
+      continue;
+    }
+    var local = db.prepare(
+      'SELECT id, updated_at FROM eventos_rapidos WHERE id = ?'
+    ).get(remote.id);
+
+    try {
+      if (!local) {
+        var ev = remote.evento || {};
+        db.prepare(
+          'INSERT OR IGNORE INTO eventos_rapidos ' +
+          '(id, titulo, fecha, hora_inicio, hora_fin, tipo, descripcion, google_event_id, attendees, created_at, updated_at) ' +
+          'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        ).run(
+          ev.id || remote.id,
+          ev.titulo || '',
+          ev.fecha || null,
+          ev.hora_inicio || null,
+          ev.hora_fin || null,
+          ev.tipo || 'rapido',
+          ev.descripcion || null,
+          ev.google_event_id || null,
+          ev.attendees || null,
+          ev.created_at || remote.updatedAt,
+          ev.updated_at || remote.updatedAt
+        );
+        counter.applied++;
+        result.applied++;
+      } else if (remote.updatedAt > (local.updated_at || '')) {
+        var evU = remote.evento || {};
+        db.prepare(
+          'UPDATE eventos_rapidos SET titulo = ?, fecha = ?, hora_inicio = ?, hora_fin = ?, ' +
+          'tipo = ?, descripcion = ?, google_event_id = ?, attendees = ?, updated_at = ? ' +
+          'WHERE id = ?'
+        ).run(
+          evU.titulo || '',
+          evU.fecha || null,
+          evU.hora_inicio || null,
+          evU.hora_fin || null,
+          evU.tipo || 'rapido',
+          evU.descripcion || null,
+          evU.google_event_id || null,
+          evU.attendees || null,
+          evU.updated_at || remote.updatedAt,
+          remote.id
+        );
+        counter.applied++;
+        counter.conflicts++;
+        result.applied++;
+        result.conflicts++;
+      }
+    } catch (e) {
+      console.error('[' + MOD + '] Error merge evento_rapido ' + remote.id + ': ' + e.message);
+      counter.skipped++;
+      result.skipped++;
+    }
   }
 }
 

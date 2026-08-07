@@ -993,8 +993,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     modal.querySelector("[data-action='mark-done']").addEventListener('click', function () {
       // Marcar como cumplido via electronAPI
       if (window.electronAPI && window.electronAPI.eventosCumplidos && ev.id) {
+        // 📦694 — Fix: backend espera `eventoId` (camelCase), NO `evento_id` (snake_case).
+        // El bridge en `main/eventos-cumplidos-bridge.js` lee `params.eventoId` y rechaza
+        // si llega undefined. Por eso el botón "Marcar cumplido" del header fallaba.
         window.electronAPI.eventosCumplidos.marcar({
-          evento_id: ev.id,
+          eventoId: ev.id,
           empresaId: (window.currentCompany && window.currentCompany !== 'default_company') ? window.currentCompany : null
         }).then(function (r) {
           if (r && r.success) {

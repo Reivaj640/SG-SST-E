@@ -5077,6 +5077,25 @@ body {
   background: #f3f4f6;
   border-bottom: 1px solid var(--kair-border-soft, #e5e7eb);
 }
+/* 📦694-fix6 — Estado "cumplido" para los chips custom del Bandeja Integrada.
+   El componente KairCalendar del shared/ ya tiene su propio estilo .kair-cal-event-chip--cumplido,
+   pero el Bandeja Integrada usa sus propios chips y necesitan su propio styling. */
+.kair-month-event--cumplido,
+.kair-allday-chip--cumplido,
+.kair-week-allday-chip--cumplido {
+  opacity: 0.55;
+  filter: saturate(0.6);
+}
+.kair-month-event--cumplido .kair-month-event__title {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+.kair-allday-chip--cumplido,
+.kair-week-allday-chip--cumplido {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
 .kair-allday-chip {
   border-left: 3px solid;
   border-radius: 3px;
@@ -5296,6 +5315,17 @@ body {
 .kair-event-modal__btn--primary:hover {
   background: #134a99;
   border-color: #134a99;
+}
+/* 📦694-fix7 — Botón "Desmarcar cumplido" con borde verde sutil para reforzar
+   visualmente que el evento YA está cumplido (y la acción es desmarcar, no marcar). */
+.kair-event-modal__btn--cumplido {
+  color: #15803d;
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+.kair-event-modal__btn--cumplido:hover {
+  background: #dcfce7;
+  border-color: #4ade80;
 }
 .kair-event-modal__btn--danger-text {
   background: transparent;
