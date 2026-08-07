@@ -16196,7 +16196,15 @@ async function calculatePlanTrabajoStats(basePath, currentYear) {
     actividadesProgramadas: 197,
     porcentajeAvance: 0,
     ultimoMesRegistrado: null,
-    estado: 'warning'
+    estado: 'warning',
+    // 📦698 · FIX: conteos por CELDAS (no actividades), consistentes con el
+    // dashboard. Cada celda-mes de cada actividad cuenta 1.
+    celdasEjecutadas: 0,         // celdas 'C'
+    celdasPendientes: 0,         // celdas 'P'
+    celdasVencidas: 0,           // celdas 'P' en mes anterior al vigente
+    celdasProgramadas: 0,        // total celdas con marca (C o P)
+    porcentajeAvanceCeldas: 0,   // % = celdasEjecutadas / celdasProgramadas
+    currentMonthIdx: new Date().getMonth()
   };
 
   const mesesNombres = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
@@ -16443,10 +16451,20 @@ async function calculatePlanTrabajoStats(basePath, currentYear) {
                 const mesValor = String(row[mesCol]).trim().toLowerCase();
                 if (mesValor === 'c') {
                     tieneCompletado = true;
+                    // 📦698 · FIX: contar CELDAS (no actividades)
+                    stats.celdasEjecutadas++;
+                    stats.celdasProgramadas++;
                     // Track último mes
                     if (mIndex > ultimoMesIndex) {
                         ultimoMesIndex = mIndex;
                         stats.ultimoMesRegistrado = `${mesesNombres[mIndex].substring(0, 3)} ${currentYear}`;
+                    }
+                } else if (mesValor === 'p') {
+                    // 📦698 · FIX: contar CELDAS 'P' y vencidas
+                    stats.celdasPendientes++;
+                    stats.celdasProgramadas++;
+                    if (currentYear === new Date().getFullYear() && mIndex < stats.currentMonthIdx) {
+                        stats.celdasVencidas++;
                     }
                 }
             }
@@ -16464,12 +16482,18 @@ async function calculatePlanTrabajoStats(basePath, currentYear) {
         stats.porcentajeAvance = Math.round((stats.actividadesEjecutadas / stats.totalActividades) * 100);
     }
 
+    // 📦698 · FIX: calcular también el % por CELDAS (consistente con el dashboard)
+    if (stats.celdasProgramadas > 0) {
+        stats.porcentajeAvanceCeldas = Math.round((stats.celdasEjecutadas / stats.celdasProgramadas) * 100);
+    }
+
     // 11. Determinar estado
     if (stats.porcentajeAvance >= 80) stats.estado = 'ok';
     else if (stats.porcentajeAvance >= 50) stats.estado = 'warning';
     else stats.estado = 'danger';
 
     sendLog(`[Plan Trabajo] Total: ${stats.totalActividades}, Ejecutadas: ${stats.actividadesEjecutadas}, Avance: ${stats.porcentajeAvance}%`, 'INFO');
+    sendLog(`[Plan Trabajo] Celdas: Programadas=${stats.celdasProgramadas}, Ejecutadas=${stats.celdasEjecutadas}, Pendientes=${stats.celdasPendientes}, Vencidas=${stats.celdasVencidas}, Avance: ${stats.porcentajeAvanceCeldas}%`, 'INFO');
     sendLog(`[Plan Trabajo] Último registro: ${stats.ultimoMesRegistrado || 'N/A'}`, 'INFO');
 
   } catch (error) {

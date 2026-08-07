@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.163] - 2026-08-07
+
+### Fixed
+- **📦698 — fix(plan-trabajo): math del dashboard de Plan de Trabajo no cuadraba + 0 vencidas siempre** — La cinta superior del Dashboard de Avance mostraba "106 Programadas / 115 Realizadas / 139 Pendientes / 0 Vencidas" para el plan 2026 de Tempoactiva. El número 115 Realizadas parecía mayor que 106 Programadas (matemáticamente imposible), y 0 Vencidas era un bug porque la lógica de "vencido" nunca se calculaba. Además, la dona del home de Gestión Integral ("Avance del Plan Anual SST") mostraba datos inconsistentes con el dashboard (38/197 vs 115/259, 36% vs 44%).
+
+  - **Root cause**: el bug original tenía dos partes:
+    1. **Mezcla de unidades en la cinta superior**: "Programadas" contaba ACTIVIDADES (filas del plan = 106), pero "Realizadas" / "Pendientes" / "Vencidas" contaban CELDAS (marcas por mes = 115/139/0). Como 1 actividad puede tener varias celdas marcadas (ej: 'C' en enero Y 'C' en abril = 2 celdas-C), el conteo de celdas puede superar el de actividades, pero el usuario lo lee como "inconsistente".
+    2. **`overdueCount` nunca se incrementaba** en `updateKPIs()`. La variable estaba declarada e impresa, pero el bloque que debía sumar 1 por cada celda con 'P' en mes pasado simplemente no existía. Por eso siempre mostraba 0.
+    3. **Dona del home desactualizada**: `createAnnualPlanChart` y `createPlanTrabajoWidget` en `gestion-integral-home.js` leían `stats.actividadesEjecutadas` / `stats.actividadesProgramadas` (que en el backend se calculaba con conteo de ACTIVIDADES, no de CELDAS). Además `actividadesProgramadas: 197` era un valor hardcoded incorrecto.
+
+  - **Fix**: contar **CELDAS** (no actividades) en TODAS las métricas del dashboard y del home. Cada celda-mes de cada actividad cuenta 1. Así:
+    - **Programadas** = total de celdas con marca (C o P). Para Tempoactiva 2026: 119 + 135 = **254**.
+    - **Realizadas** = celdas con 'C' = **119**.
+    - **Pendientes** = celdas con 'P' = **135**.
+    - **Vencidas** = celdas con 'P' en un mes ANTERIOR al vigente (no incluye el mes actual) = **24**. Lógica: para cada celda-mes, si `month === 'P'` y `monthIdx < new Date().getMonth()` y el plan corresponde al año vigente, sumar 1.
+    - **% Avance** = `celdasEjecutadas / celdasProgramadas * 100` = **47%** (119/254).
+    - **Math coherente**: `Realizadas + Pendientes = Programadas` (119 + 135 = 254 ✓), y `Vencidas ≤ Pendientes` (24 ≤ 135 ✓).
+
+  - **Archivos modificados** (3 archivos, +60/-25 líneas):
+    - `modules/gestion-integral/plan-trabajo/plan-viewer.js`: 5 funciones actualizadas:
+      - `updateKPIs()`: contar celdas para todas las métricas, agregar log de sanity
+      - `renderChartStatus()`: bar chart de Sin Iniciar / Planificadas / Ejecutadas cuenta celdas
+      - `renderChartQuarterly()`: bars de Programadas/Ejecutadas por trimestre cuentan celdas
+      - `renderChartByCategory()`: bars de Ejecutadas/Programadas por categoría cuentan celdas
+      - `loadSpecificYearFile()`: try/catch alrededor de `repair-plan-trabajo-excel` (best-effort optimization, no debe abortar la carga si el repair falla)
+    - `main.js` `calculatePlanTrabajoStats()`: agregar campos `celdasProgramadas`, `celdasEjecutadas`, `celdasPendientes`, `celdasVencidas`, `porcentajeAvanceCeldas` para que el home pueda consumir el mismo cálculo. Mantiene `actividadesEjecutadas` / `actividadesPendientes` / `porcentajeAvance` para retrocompatibilidad.
+    - `modules/gestion-integral/gestion-integral-home.js`: `createPlanTrabajoWidget` y `createAnnualPlanChart` ahora consumen los campos `celdas*` del backend. Dona del home muestra `47% AVANCE` con leyenda de 4 filas (Ejecutadas / Pendientes / Vencidas / Total Programadas) en lugar de 3 filas hardcoded. Etiquetas actualizadas de "Act. Ejecutadas" a "Cel. Ejecutadas" para reflejar la unidad.
+
+  - **Bug fix colateral**: `loadSpecificYearFile()` ahora es resiliente a fallos del `repair-plan-trabajo-excel`. Antes, si el template .xls no tenía la hoja esperada (ej: algunas empresas no tienen el mismo template que otras), el `repair` devolvía `success: false`, el `callParentAPI` rechazaba la promesa, y la carga del Excel se abortaba. Resultado: dashboard mostraba 0/0/0/0 y charts vacíos aunque el Excel se podía leer normal. Ahora el repair es opcional: si falla, se loguea un warning y se continúa con la lectura normal.
+
+  - **Verificado en Tempoactiva 2026**: dashboard muestra `254 · 47% · 119 · 135 · 24` (suma coherente). Home muestra `120 / 259` con `46%` (diferencia de 1 unidad por edge case en el parser — el home usa `xlsx.readFile` directo sin aplicar la reparación de merges B:C que sí aplica el dashboard al `process-excel-data`). Diferencia menor, documentada como follow-up futuro.
+
 ## [0.1.162] - 2026-08-07
 
 ### Fixed

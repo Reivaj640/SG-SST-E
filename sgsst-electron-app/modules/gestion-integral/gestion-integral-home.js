@@ -1225,13 +1225,22 @@ gap: 1rem;
     createPlanTrabajoWidget(stats) {
         const currentYear = new Date().getFullYear();
 
+        // 📦698 · FIX: usar conteos por CELDAS (consistente con el dashboard)
+        //   Programadas = celdas con C o P
+        //   Realizadas = celdas con C
+        //   Pendientes = celdas con P
+        const percentage = stats.porcentajeAvanceCeldas || 0;
+        const executed = stats.celdasEjecutadas || 0;
+        const pending = stats.celdasPendientes || 0;
+        const total = stats.celdasProgramadas || 0;
+
         // Determinar color (semáforo)
         let colorVar = 'var(--k-success)';
         let colorClass = 'bg-success';
-        if (stats.porcentajeAvance < 50) {
+        if (percentage < 50) {
             colorVar = 'var(--k-danger)';
             colorClass = 'bg-danger';
-        } else if (stats.porcentajeAvance < 80) {
+        } else if (percentage < 80) {
             colorVar = 'var(--k-warning)';
             colorClass = 'bg-warning';
         }
@@ -1242,13 +1251,13 @@ gap: 1rem;
         w.innerHTML = `
             <div class="kb-header">
                 <span class="kb-title">Plan de Trabajo</span>
-                <span class="kb-badge ${colorClass}">${stats.porcentajeAvance}%</span>
+                <span class="kb-badge ${colorClass}">${percentage}%</span>
             </div>
 
             <div class="kb-amount" style="font-size: 1.4rem;">
-                ${stats.actividadesEjecutadas} / ${stats.actividadesProgramadas}
+                ${executed} / ${total}
             </div>
-            <div class="kb-description">Actividades del plan anual ejecutadas</div>
+            <div class="kb-description">Celdas del plan anual ejecutadas</div>
 
             <div class="kb-progress-track">
                 <div class="kb-progress-bar" style="width: 0%; background-color: ${colorVar};">
@@ -1259,11 +1268,11 @@ gap: 1rem;
             <div class="kb-footer">
                 <div>
                     <div class="kb-label">Ejecutadas</div>
-                    <div class="kb-value kb-exec" style="color: var(--k-success);">${stats.actividadesEjecutadas}</div>
+                    <div class="kb-value kb-exec" style="color: var(--k-success);">${executed}</div>
                 </div>
                 <div style="text-align: right;">
                     <div class="kb-label">Pendientes</div>
-                    <div class="kb-value kb-rem" style="color: var(--k-text-muted);">${stats.actividadesPendientes}</div>
+                    <div class="kb-value kb-rem" style="color: var(--k-text-muted);">${pending}</div>
                 </div>
             </div>
         `;
@@ -1272,7 +1281,7 @@ gap: 1rem;
         setTimeout(() => {
             const bar = w.querySelector('.kb-progress-bar');
             if (bar) {
-                bar.style.width = `${stats.porcentajeAvance}%`;
+                bar.style.width = `${percentage}%`;
             }
         }, 100);
 
@@ -1514,20 +1523,25 @@ gap: 1rem;
     createAnnualPlanChart(stats) {
         const currentYear = new Date().getFullYear();
         const currentMonth = new Date().getMonth() + 1;
-        
-        const percentage = stats.porcentajeAvance || 0;
-        const executed = stats.actividadesEjecutadas || 0;
-        const pending = stats.actividadesPendientes || 0;
-        const programmed = stats.actividadesProgramadas || 0;
-        const total = stats.totalActividades || programmed;
-        
+
+        // 📦698 · FIX: usar conteos por CELDAS (consistente con el dashboard).
+        //   Programadas = celdas con C o P
+        //   Realizadas = celdas con C
+        //   Pendientes = celdas con P
+        //   Vencidas = celdas con P en mes anterior al vigente
+        const percentage = stats.porcentajeAvanceCeldas || 0;
+        const executed = stats.celdasEjecutadas || 0;
+        const pending = stats.celdasPendientes || 0;
+        const total = stats.celdasProgramadas || 0;
+        const overdue = stats.celdasVencidas || 0;
+
         // Determinar estado y colores
         let statusClass = 'chart-badge-success';
         let statusText = 'En buen camino';
         let progressColor = 'var(--k-success)';
-        
+
         const expectedProgress = Math.round((currentMonth / 12) * 100);
-        
+
         if (percentage < 50) {
             statusClass = 'chart-badge-danger';
             statusText = 'Requiere atención urgente';
@@ -1602,26 +1616,35 @@ gap: 1rem;
                     <div class="legend-item">
                         <div class="legend-dot" style="background: var(--k-success);"></div>
                         <div class="legend-info">
-                            <div class="legend-title" id="legend-title-1">Act. Ejec.</div>
-                            <div class="legend-description">Completadas satisfactoriamente</div>
+                            <div class="legend-title" id="legend-title-1">Cel. Ejecutadas</div>
+                            <div class="legend-description">Marcadas con C (cumplidas)</div>
                         </div>
                         <div class="legend-value" style="color: var(--k-success);">${executed}</div>
                     </div>
-                    
+
                     <div class="legend-item">
                         <div class="legend-dot" style="background: var(--k-warning);"></div>
                         <div class="legend-info">
-                            <div class="legend-title" id="legend-title-2">Act. Pend.</div>
-                            <div class="legend-description">En proceso o por iniciar</div>
+                            <div class="legend-title" id="legend-title-2">Cel. Pendientes</div>
+                            <div class="legend-description">Marcadas con P (en proceso)</div>
                         </div>
                         <div class="legend-value" style="color: var(--k-warning);">${pending}</div>
                     </div>
-                    
+
+                    <div class="legend-item">
+                        <div class="legend-dot" style="background: var(--k-danger);"></div>
+                        <div class="legend-info">
+                            <div class="legend-title" id="legend-title-3">Cel. Vencidas</div>
+                            <div class="legend-description">P en mes anterior al vigente</div>
+                        </div>
+                        <div class="legend-value" style="color: var(--k-danger);">${overdue}</div>
+                    </div>
+
                     <div class="legend-item">
                         <div class="legend-dot" style="background: var(--k-info);"></div>
                         <div class="legend-info">
-                            <div class="legend-title" id="legend-title-3">Total Prog.</div>
-                            <div class="legend-description">Plan anual completo</div>
+                            <div class="legend-title" id="legend-title-4">Total Programadas</div>
+                            <div class="legend-description">Celdas con C o P</div>
                         </div>
                         <div class="legend-value">${total}</div>
                     </div>

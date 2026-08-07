@@ -1,32 +1,59 @@
-# K+AIR v0.1.160
+# K+AIR v0.1.163
 
-## 🆕 Festivos colombianos en el calendario
+## 🔧 Plan de Trabajo Anual — math del dashboard corregido + vencidas reales
 
-Las celdas de los **17 festivos colombianos** ahora se muestran con:
-- **Background sutil rosa/rojo** (gradiente de #fef2f2 a #fff5f5)
-- **Indicador 🇨🇴** al lado del número del día
-- **Día en negrita roja** (en lugar de gris oscuro)
-- **Tooltip al hover** con el nombre del festivo
-- **Click** abre un mini-modal con info completa
+El Dashboard de Avance del Plan de Trabajo (2.4.1) ahora muestra números **matemáticamente coherentes** y finalmente calcula las **actividades vencidas** (siempre mostraba 0).
 
-### ¿Qué festivos se muestran?
-- **Fijos trasladables** (Ley Emiliani 51/1983): Año Nuevo, Día del Trabajo, San Pedro y San Pablo, Asunción, Día de la Raza, Todos los Santos, Indep. de Cartagena, Navidad
-- **Fijos no trasladables**: San José, Independencia, Batalla de Boyacá, Inmaculada Concepción
-- **Religiosos movibles** (calculados desde Pascua): Jueves Santo, Viernes Santo, Ascensión, Corpus Christi, Sagrado Corazón
+### Antes vs Después (Tempoactiva 2026)
 
-### Cobertura
-2020–2030 (10 años), cache en memoria por año. El algoritmo de Pascua (Meeus/Jones/Butcher) calcula las fechas movibles dinámicamente.
+| Métrica | Antes (v0.1.162) | Después (v0.1.163) |
+|---|---|---|
+| Programadas | 106 (actividades) | **254** (celdas con C o P) |
+| Realizadas | 115 (44%) | **119** (47%) |
+| Pendientes | 139 | **135** |
+| Vencidas | **0** ❌ (bug) | **24** ✓ |
 
-### ¿Qué pasa si el festivo cae en martes/miércoles/jueves/domingo?
-Se traslada automáticamente al lunes siguiente (Ley Emiliani). Si cae en lunes/viernes/sábado, se queda en su día.
+### ¿Qué era el bug?
 
-### ¿Cómo se ve?
-- Background rosa muy claro en toda la celda del día
-- Emoji 🇨🇴 al lado del número
-- Día en negrita roja
-- Click → modal con nombre oficial, fecha completa, tipo, y nota sobre el traslado si aplica
+La cinta del dashboard mezclaba dos unidades de medida sin que se notara:
+
+- **"Programadas"** contaba **actividades** (filas del plan = 106)
+- **"Realizadas" / "Pendientes"** contaban **celdas** (marcas por mes = 115/139)
+
+Como una actividad puede tener varias celdas marcadas (ej: 'C' en enero **y** 'C' en abril = 2 celdas-C), el conteo de celdas siempre puede ser mayor que el de actividades. Eso generaba la apariencia de un "115 > 106 imposible" cuando en realidad era correcto.
+
+Además, la métrica **Vencidas siempre mostraba 0** porque la variable `overdueCount` existía pero el bloque que debía sumar 1 por cada celda con 'P' en un mes pasado nunca se implementó. Bug real, no cosmético.
+
+### ¿Qué se arregló?
+
+1. **Conteo por CELDAS en todas las métricas** del dashboard (cada marca por mes cuenta 1):
+   - **Programadas** = total de celdas con marca (C o P)
+   - **Realizadas** = celdas con C
+   - **Pendientes** = celdas con P
+   - **Vencidas** = celdas con P en un mes **anterior** al mes vigente (no incluye el mes actual, porque todavía hay tiempo)
+
+2. **Lógica de Vencidas implementada correctamente**: para cada celda-mes de cada actividad, si `month === 'P'` y el índice del mes (`0-11`) es **menor** que el mes actual (`new Date().getMonth()`), y el plan corresponde al año vigente, se suma 1. Para Tempoactiva en agosto 2026, cuenta los meses enero–julio.
+
+3. **% de Avance = `celdasEjecutadas / celdasProgramadas`**. Para Tempoactiva: 119/254 = **47%** (no 36% ni 44%, que eran los valores anteriores por mezclar unidades).
+
+4. **Math interna coherente**: `Realizadas + Pendientes = Programadas` (119 + 135 = 254 ✓) y `Vencidas ≤ Pendientes` (24 ≤ 135 ✓). Ya no hay sorpresas tipo "115 > 106".
+
+5. **Dona del home de Gestión Integral ("Avance del Plan Anual SST") ahora consistente con el dashboard** — antes mostraba 36% (conteo de actividades) mientras el dashboard mostraba 44% (conteo de celdas). Ahora el backend `calculatePlanTrabajoStats` también calcula `celdasProgramadas/Ejecutadas/Pendientes/Vencidas/porcentajeAvanceCeldas`, y la dona + la card "Plan de Trabajo" del home consumen esos campos. **Se eliminó el valor hardcoded `actividadesProgramadas: 197`**.
+
+6. **Bug colateral resuelto**: `loadSpecificYearFile` ahora es **resiliente a fallos del `repair-plan-trabajo-excel`**. Antes, si el template .xls no tenía la hoja esperada (ej: para empresas con un template distinto), el `repair` devolvía `success: false`, la promesa se rechazaba, y la carga del Excel se abortaba → dashboard quedaba en blanco (0/0/0/0 + charts vacíos) aunque el Excel se podía leer normal. Ahora el repair es **best-effort**: si falla, se loguea un warning y se continúa con la lectura normal.
+
+### Archivos modificados
+
+- `modules/gestion-integral/plan-trabajo/plan-viewer.js` (5 funciones: `updateKPIs`, `renderChartStatus`, `renderChartQuarterly`, `renderChartByCategory`, `loadSpecificYearFile`)
+- `main.js` (`calculatePlanTrabajoStats` ahora también devuelve los conteos por celdas)
+- `modules/gestion-integral/gestion-integral-home.js` (`createPlanTrabajoWidget` y `createAnnualPlanChart` consumen los nuevos campos)
+
+### Nota técnica
+
+El home muestra `120/259` con `46%` mientras el dashboard muestra `119/254` con `47%`. La diferencia de 1 unidad es por un edge case en el parser: el home usa `xlsx.readFile` directo y el dashboard aplica primero la reparación de merges B:C (`repair-plan-trabajo-excel` → `process-excel-data`), así que una fila con merge corrupto se cuenta en uno pero no en el otro. Es un follow-up futuro, no afecta la coherencia interna de cada vista.
 
 ---
+
 
 # K+AIR v0.1.159
 
