@@ -869,10 +869,10 @@
   white-space: nowrap;
   letter-spacing: 0.2px;
 }
-.kb-badge.bg-success { background: #EAF3DE; color: #27500A; }
-.kb-badge.bg-warning { background: #FAEEDA; color: #633806; }
-.kb-badge.bg-danger  { background: #FCEBEB; color: #791F1F; }
-.kb-badge.bg-pending { background: #ECEFF3; color: #4A5568; }
+.kb-badge.bg-success { background: #EAF3DE; color: white; }
+.kb-badge.bg-warning { background: #FAEEDA; color: white; }
+.kb-badge.bg-danger  { background: #FCEBEB; color: white; }
+.kb-badge.bg-pending { background: #ECEFF3; color: white; }
 
 .kb-amount {
   font-size: 28px;

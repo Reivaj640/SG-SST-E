@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.162] - 2026-08-07
+
+### Fixed
+- **📦697 — fix(recursos): texto de burbujas de porcentaje en negro** — En el home del módulo Recursos, las burbujas de porcentaje (verde 90%, amarillo 50.3%, rojo Pendiente) tenían el texto en colores oscuros (#27500A, #633806, #791F1F, #4A5568) que se veían casi negros sobre los fondos pastel. El contraste era malo y se perdía legibilidad.
+  - **Root cause**: `development-styles.css:872-875` define los colores de las burbujas (`.kb-badge.bg-success/warning/danger/pending`) con backgrounds pastel CLAROS y texto OSCURO (estilo "carta de colores Material Light"). El módulo Recursos usa una variante más moderna con backgrounds SÓLIDOS vía `var(--k-success)`, `var(--k-danger)` (con `!important` en `recursos-home.js:300-302`), pero el `color` del texto seguía heredando el valor oscuro del CSS global.
+  - **Fix**: cambiar el `color` de las 4 reglas a `white` (sin `!important`, para que el tema dark pueda sobrescribirlo). El texto blanco sobre fondo sólido (verde, amarillo, rojo, gris) tiene mejor contraste que el texto oscuro sobre fondo pastel. Compatibilidad con tema oscuro preservada: `[data-theme="dark"] .kb-badge.bg-*` tiene mayor especificidad (3) que `.kb-badge.bg-*` (2), así que el dark mantiene sus colores claros (#b7e08c, #f5c98c, #f0a0a0) sobre fondos oscuros.
+  - **Aplica a todos los módulos** que usen la clase `kb-badge`: Recursos, Verificación, Mejoramiento, Gestión Integral, Gestión de Amenazas, etc. El fix está en el CSS global para que el cambio sea consistente.
+
 ## [0.1.161] - 2026-08-07
 
 ### Fixed
