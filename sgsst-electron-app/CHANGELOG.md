@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.160] - 2026-08-07
+
+### Added
+- **📦695 — feat(calendar): festivos colombianos en el calendario** — Las celdas de días festivos colombianos se muestran con un **background sutil rosa/rojo + indicador 🇨🇴 + día en negrita roja**. Click en el festivo abre un mini-modal con info completa (nombre oficial, fecha larga, tipo, observación de traslado).
+  - **Cobertura 2020-2030** (10 años), cache en memoria por año.
+  - **17 festivos soportados** según normativa vigente:
+    - 8 fijos trasladables (Ley Emiliani 51/1983): Año Nuevo, Día del Trabajo, San Pedro y San Pablo, Asunción, Día de la Raza, Todos los Santos, Indep. de Cartagena, Navidad.
+    - 4 fijos no trasladables: San José (19 mar), Independencia (20 jul), Batalla de Boyacá (7 ago), Inmaculada Concepción (8 dic).
+    - 5 religiosos movibles (calculados desde Pascua con algoritmo Meeus): Jueves Santo, Viernes Santo, Ascensión, Corpus Christi, Sagrado Corazón. Los 3 últimos se trasladan al lunes siguiente.
+  - **Algoritmo de Pascua** Meeus/Jones/Butcher (válido para años del calendario gregoriano 1583+).
+  - **Ley Emiliani**: martes/miércoles/jueves/domingo → lunes siguiente. Excluye los 4 civiles + Semana Santa.
+  - **Nuevo archivo** `shared/colombia-festivos.js` (puro JS, sin dependencias). Se carga en el `index.html` antes de `app.js`.
+  - **Validación 2025-2028**: 17 festivos por año, Pascua 2026 = 5 abril (correcto), Año Nuevo 2026 jueves → 5 lunes (correcto), 20 julio 2026 lunes → sin traslado (correcto).
+
 ## [0.1.159] - 2026-08-07
 
 ### Fixed

@@ -1725,6 +1725,35 @@ body {
   color: #fff;
 }
 
+/* 📦695-fix2 — Festivos colombianos: background sutil rosa/rojo + indicador 🇨🇴.
+   Aplica solo a celdas dentro del mes (no a días del mes anterior/siguiente).
+   El data-festivo del cell lo identifica (lo pone JS al renderizar). */
+.kair-month-cell.kair-month-cell--festivo {
+  background: linear-gradient(180deg, #fef2f2 0%, #fff5f5 100%);
+  border-top: 2px solid #fca5a5;
+}
+.kair-month-cell.kair-month-cell--festivo[data-today="true"] {
+  /* Si es festivo Y hoy, combinar ambos estilos (gradient + día actual) */
+  background: linear-gradient(180deg, #fee2e2 0%, #fef2f2 100%);
+  border-top: 2px solid #dc2626;
+}
+.kair-month-cell__festivo-flag {
+  display: inline-block;
+  font-size: 0.7rem;
+  margin-left: 2px;
+  line-height: 1;
+  filter: saturate(0.85);
+  vertical-align: middle;
+}
+.kair-month-cell--festivo .kair-month-cell__day {
+  color: #b91c1c;
+  font-weight: 700;
+}
+.kair-month-cell--festivo[data-today="true"] .kair-month-cell__day {
+  background: #b91c1c;
+  color: #fff;
+}
+
 .kair-month-event {
   display: flex;
   align-items: center;

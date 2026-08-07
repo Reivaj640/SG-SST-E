@@ -1,3 +1,33 @@
+# K+AIR v0.1.160
+
+## 🆕 Festivos colombianos en el calendario
+
+Las celdas de los **17 festivos colombianos** ahora se muestran con:
+- **Background sutil rosa/rojo** (gradiente de #fef2f2 a #fff5f5)
+- **Indicador 🇨🇴** al lado del número del día
+- **Día en negrita roja** (en lugar de gris oscuro)
+- **Tooltip al hover** con el nombre del festivo
+- **Click** abre un mini-modal con info completa
+
+### ¿Qué festivos se muestran?
+- **Fijos trasladables** (Ley Emiliani 51/1983): Año Nuevo, Día del Trabajo, San Pedro y San Pablo, Asunción, Día de la Raza, Todos los Santos, Indep. de Cartagena, Navidad
+- **Fijos no trasladables**: San José, Independencia, Batalla de Boyacá, Inmaculada Concepción
+- **Religiosos movibles** (calculados desde Pascua): Jueves Santo, Viernes Santo, Ascensión, Corpus Christi, Sagrado Corazón
+
+### Cobertura
+2020–2030 (10 años), cache en memoria por año. El algoritmo de Pascua (Meeus/Jones/Butcher) calcula las fechas movibles dinámicamente.
+
+### ¿Qué pasa si el festivo cae en martes/miércoles/jueves/domingo?
+Se traslada automáticamente al lunes siguiente (Ley Emiliani). Si cae en lunes/viernes/sábado, se queda en su día.
+
+### ¿Cómo se ve?
+- Background rosa muy claro en toda la celda del día
+- Emoji 🇨🇴 al lado del número
+- Día en negrita roja
+- Click → modal con nombre oficial, fecha completa, tipo, y nota sobre el traslado si aplica
+
+---
+
 # K+AIR v0.1.159
 
 ## 🐛 Fix: Botón "Marcar cumplido" del calendario

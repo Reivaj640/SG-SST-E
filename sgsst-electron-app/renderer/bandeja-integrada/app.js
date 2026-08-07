@@ -3435,15 +3435,26 @@
       const visible = dayEvents.slice(0, maxVisible);
       const remaining = dayEvents.length - maxVisible;
       const isDropTarget = state.dropTarget && state.dropTarget.date === cell.iso && state.dropTarget.hour === 9;
+      // 📦695-fix1 — Detectar si el día es festivo colombiano
+      const festivo = (typeof window !== 'undefined' && window.ColombiaFestivos)
+        ? window.ColombiaFestivos.getFestivoByDate(cell.iso)
+        : null;
+      const festivoClass = festivo ? ' kair-month-cell--festivo' : '';
 
       const cellEl = el("div", {
-        class: "kair-month-cell",
+        class: "kair-month-cell" + festivoClass,
         "data-out": !cell.inMonth,
         "data-today": cell.isToday,
         "data-droppable": cell.inMonth,
         "data-drop-active": isDropTarget,
+        "data-festivo": festivo ? festivo.name : '',
+        title: festivo ? '🇨🇴 ' + festivo.name + ' — Click para más info' : '',
       });
-      cellEl.innerHTML = `<div class="kair-month-cell__day">${cell.day}</div>`;
+      // Indicador festivo: emoji 🇨🇴 al lado del día (solo si es festivo y del mes)
+      const festivoIndicator = (festivo && cell.inMonth)
+        ? '<span class="kair-month-cell__festivo-flag" title="Festivo colombiano">🇨🇴</span>'
+        : '';
+      cellEl.innerHTML = `<div class="kair-month-cell__day">${cell.day}${festivoIndicator}</div>`;
       visible.forEach((ev) => {
         const cat = getCategoryStyle(ev.category);
         // 📦694-fix6 — Clase extra `--cumplido` cuando el evento está marcado
@@ -3475,7 +3486,14 @@
         cellEl.appendChild(more);
       }
 
-      cellEl.addEventListener("click", () => openCreateEventModal(cell.iso, 9));
+      // 📦695-fix1 — Si el día es festivo, abrir modal de info. Si no, crear evento.
+      cellEl.addEventListener("click", () => {
+        if (festivo) {
+          openFestivoInfoModal(festivo);
+        } else {
+          openCreateEventModal(cell.iso, 9);
+        }
+      });
       cellEl.addEventListener("dragover", (e) => {
         if (!cell.inMonth) return;
         e.preventDefault();
@@ -6600,6 +6618,63 @@
         toast(ev.title, `${cat.label || ev.category} · ${ev.location || "Sin lugar"} · ${ev.date}`, "info");
       }
     }
+  }
+
+  // 📦695-fix1 — Mini-modal con info del festivo colombiano.
+  // Se muestra al hacer click en un día festivo del calendario.
+  // Reutiliza el mismo overlay CSS que openEventDetailModal para consistencia visual.
+  function openFestivoInfoModal(festivo) {
+    if (!festivo) return;
+    var typeLabels = {
+      'fijo':      'Festivo fijo (Ley Emiliani)',
+      'civil':     'Festivo civil (no trasladable)',
+      'religioso': 'Festivo religioso movible'
+    };
+    var typeLabel = typeLabels[festivo.type] || festivo.type;
+    var dow = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'][festivo.date.getDay()];
+    var dateLong = festivo.date.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+    var modal = document.getElementById("festivo-info-modal");
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.id = "festivo-info-modal";
+      modal.className = "kair-event-modal-overlay";
+      document.body.appendChild(modal);
+    }
+    modal.innerHTML = `
+      <div class="kair-event-modal kair-festivo-modal" style="border-top:3px solid #e11d48;">
+        <div class="kair-event-modal__header">
+          <span class="kair-event-modal__category" style="color:#e11d48;">🇨🇴 Festivo colombiano</span>
+          <button class="kair-event-modal__close" data-action="close" aria-label="Cerrar">×</button>
+        </div>
+        <div class="kair-event-modal__body">
+          <h2 class="kair-event-modal__title">${escapeHtml(festivo.name)}</h2>
+          <dl class="kair-event-modal__dl">
+            <dt>Fecha</dt>
+            <dd>${escapeHtml(dateLong)}</dd>
+            <dt>Tipo</dt>
+            <dd>${escapeHtml(typeLabel)}</dd>
+            ${festivo.movable ? '<dt>Observación</dt><dd>Trasladado al lunes siguiente según Ley Emiliani (Ley 51/1983)</dd>' : ''}
+          </dl>
+          <div class="kair-event-modal__meta">
+            <span class="kair-event-modal__source">Colombia · Festivos Nacionales</span>
+          </div>
+        </div>
+        <div class="kair-event-modal__actions">
+          <button class="kair-event-modal__btn kair-event-modal__btn--primary" data-action="close">Cerrar</button>
+        </div>
+      </div>
+    `;
+    modal.classList.add("is-visible");
+    // Helpers de cierre
+    function closeModal() { modal.classList.remove("is-visible"); }
+    function onEsc(e) { if (e.key === "Escape") { closeModal(); document.removeEventListener("keydown", onEsc, true); } }
+    function onOutsideClick(e) { if (!modal.querySelector(".kair-event-modal").contains(e.target)) { closeModal(); document.removeEventListener("mousedown", onOutsideClick, true); } }
+    document.addEventListener("keydown", onEsc, true);
+    document.addEventListener("mousedown", onOutsideClick, true);
+    modal.querySelectorAll("[data-action='close']").forEach(function (btn) {
+      btn.addEventListener("click", function () { closeModal(); document.removeEventListener("keydown", onEsc, true); document.removeEventListener("mousedown", onOutsideClick, true); });
+    });
   }
 
   function openCreateEventModal(date, hour) {

@@ -200,6 +200,9 @@
   <!-- F2 — K+AIR Calendar Component (reutilizado del calendario viejo del header) -->
   <script src="../../shared/kair-calendar.js"></script>
   <script src="../../shared/kair-calendar-adapter.js"></script>
+  <!-- 📦695 — Festivos colombianos (Ley Emiliani + Pascua). Se carga antes
+       de app.js para que `window.ColombiaFestivos` esté disponible al init. -->
+  <script src="../../shared/colombia-festivos.js"></script>
   <script src="app.js?v=682"></script>
   <!-- 📦608 — @file-viewer (preview nativo de Office/PDF/etc en el browser).
        Bundle IIFE "web-full" auto-registra el custom element <flyfish-file-viewer>
