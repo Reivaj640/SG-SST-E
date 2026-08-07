@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.161] - 2026-08-07
+
+### Fixed
+- **📦696 — fix(presupuesto): toast "Cambios guardados" se mostraba sin estilo** — El sistema de notificaciones toast del submódulo de Presupuesto (1.1.3) se renderizaba con estilo genérico, sin border-radius, sin box-shadow, en posición incorrecta (esquina inferior izquierda en lugar de la derecha).
+  - **Root cause**: el iframe `presupuesto-gestion.html` llama `window.KAIRToast.show(...)` para mostrar el toast al guardar. El método `get hub()` de `KAIRToast` busca `#notification-hub` en el document actual y, si no existe, lo crea dinámicamente. Como el iframe NO carga `styles.css` (esos estilos están en el parent), el toast se creaba con las clases CSS correctas (`.toast-card`, `.toast-header`, etc.) pero SIN los estilos aplicados, viéndose genérico y en posición incorrecta.
+  - **Fix**: `kair-toast.js` ahora detecta si está en un iframe (`window.parent !== window`) y, en ese caso, busca el hub en el parent (donde SÍ están los estilos de `styles.css` y el `<div id="notification-hub">` en `index.html:427`). Si el parent no tiene el hub, lo crea dinámicamente en el parent. Beneficio adicional: como el toast se renderiza en el parent, los estilos oscuros y el responsive (media query 480px) también se aplican correctamente.
+  - **Aplica a todos los iframes** que usen `window.KAIRToast.show(...)`: presupuesto, FURAT, evaluaciones iniciales, etc. Antes cada iframe tenía que cargar su propio `kair-toast.js` y duplicar el CSS. Ahora un único hub centralizado en el parent.
+
 ## [0.1.160] - 2026-08-07
 
 ### Added
