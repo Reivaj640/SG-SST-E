@@ -1,9 +1,11 @@
 # K+AIR — Contexto del Proyecto
 
 **Última actualización:** 6 de agosto de 2026
-**Versión actual:** 0.1.157 (próximo release) — publicado v0.1.146
+**Versión actual:** 0.1.158 (próximo release) — publicado v0.1.146
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 **Stack:** Electron 37 + vanilla JS + Python 3.11.9 (empaquetado) + SQLite (kair.db)
+
+> **🆕 v0.1.158 (📦692-693 — FURAT: navegación recursiva + crear/eliminar + metadata legacy):** 2 features grandes del submódulo FURAT 3.2.1. 📦692: navegación recursiva tipo explorador (click en 2019 → muestra Enero/Febrero/...; click en Enero → muestra los PDFs). `getLibraryData` ahora itera recursivamente con `scanFolderRecursive(MAX_DEPTH=5)`. Breadcrumb jerárquico con cada nivel clickeable ("Todos los Reportes > 2019 > Enero"). Crear subcarpeta dentro de carpeta actual (botón "Crear subcarpeta acá" en context menu). Eliminar carpeta con context menu (patrón de 1.1.1 responsable): recursive `fs.rm` + cleanup de metadata en DB. 📦693: editar metadata de PDFs legacy con click derecho sobre fila de tabla → modal pre-llenado → upsert con `INSERT OR REPLACE ON CONFLICT(file_path)`. Después de guardar, se refresca tabla y dashboard para que el PDF entre en los análisis (charts de tendencia, gravedad, top áreas). Ahora los PDFs viejos pueden categorizarse manualmente.
 
 > **🆕 v0.1.157 (📦690-691 — Bandeja Integrada: scroll + warnings):** 2 bugfixes en Bandeja Integrada. 📦691: preservar scroll de la lista al seleccionar un mail (3 fixes encadenados — el container `#mail-list-container` tiene overflow:hidden, el scroll real está en sub-elemento `.kair-scroll`; `loadMailBodyFromCache` se llamaba en paralelo desde `selectMail`+`renderMailDetail` causando 2-3 renders en cadena que se "pisaban" entre sí; ahora solo se actualiza el detail, no la lista, y se bloquea con flag `_loadingBody`). 📦690: silenciar warnings de `cid:` URIs en imágenes embebidas de emails HTML (reemplazados por GIF transparente 1x1 data URI de 43 bytes — el layout se preserva, no se hace request al browser).
 

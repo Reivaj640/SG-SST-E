@@ -2602,6 +2602,87 @@ body {
     font-weight: 600;
 }
 
+/* ─── Folder Context Menu (📦692) ─── */
+.furat-folder-context-menu {
+    position: fixed;
+    z-index: 8000;
+    min-width: 220px;
+    background: var(--furat-bg-card, #ffffff);
+    border: 1px solid var(--furat-border-light, #e2e8f0);
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    padding: 0.375rem;
+    display: none;
+    font-size: 0.8125rem;
+    user-select: none;
+}
+.furat-folder-context-menu.is-visible {
+    display: block;
+}
+.furat-folder-context-menu__header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.625rem 0.375rem;
+    color: var(--furat-text-secondary, #475569);
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+    border-bottom: 1px solid var(--furat-border-light, #e2e8f0);
+    margin-bottom: 0.25rem;
+}
+.furat-folder-context-menu__header i {
+    color: var(--furat-warning, #f59e0b);
+}
+.furat-folder-context-menu__divider {
+    height: 1px;
+    background: var(--furat-border-light, #e2e8f0);
+    margin: 0.25rem 0;
+}
+.furat-folder-context-menu__item {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    width: 100%;
+    padding: 0.5rem 0.625rem;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    color: var(--furat-text-primary, #1e293b);
+    font-size: 0.8125rem;
+    font-family: inherit;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.12s ease, color 0.12s ease;
+}
+.furat-folder-context-menu__item i {
+    width: 14px;
+    text-align: center;
+    color: var(--furat-text-secondary, #475569);
+    font-size: 0.75rem;
+}
+.furat-folder-context-menu__item:hover {
+    background: var(--furat-primary-light, #e7f1ff);
+    color: var(--furat-primary, #2563eb);
+}
+.furat-folder-context-menu__item:hover i {
+    color: var(--furat-primary, #2563eb);
+}
+.furat-folder-context-menu__item--danger {
+    color: #dc2626;
+}
+.furat-folder-context-menu__item--danger i {
+    color: #dc2626;
+}
+.furat-folder-context-menu__item--danger:hover {
+    background: rgba(220, 38, 38, 0.08);
+    color: #dc2626;
+}
+.furat-folder-context-menu__item--danger:hover i {
+    color: #dc2626;
+}
+
 /* ─── Content V2 layout ─── */
 .furat-library-content-v2 {
     display: flex;

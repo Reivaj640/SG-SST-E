@@ -442,7 +442,20 @@ function registerFuratHandlers(appOrIpcMain, deps) {
   ipcMain.handle('furat:create-folder', async (event, params) => {
     return await createFuratFolder(params);
   });
-  console.log('[K+AIRSST][FURAT][IPC][REGISTER][SUCCESS] handlers=4 (upload-file, list-metadata, get-analytics, create-folder)');
+  // 📦692 — Eliminar carpeta (con todo su contenido) y limpiar metadata.
+  ipcMain.handle('furat:delete-folder', async (event, params) => {
+    return await deleteFuratFolder(params);
+  });
+  // 📦693 — Upsert metadata (crear o actualizar) para un archivo PDF.
+  // Usado para editar manualmente la metadata de PDFs viejos que no tienen.
+  ipcMain.handle('furat:upsert-metadata', async (event, params) => {
+    return await upsertFuratMetadata(params);
+  });
+  // 📦693 — Obtener metadata de un solo archivo (para pre-llenar el modal de edición).
+  ipcMain.handle('furat:get-metadata-for-file', async (event, filePath) => {
+    return { success: true, metadata: getFuratMetadataForFile(filePath) };
+  });
+  console.log('[K+AIRSST][FURAT][IPC][REGISTER][SUCCESS] handlers=7 (upload-file, list-metadata, get-analytics, create-folder, delete-folder, upsert-metadata, get-metadata-for-file)');
 }
 
 /**
@@ -489,12 +502,180 @@ async function createFuratFolder(params) {
   }
 }
 
+/**
+ * 📦692 — Elimina una carpeta (y todo su contenido) del filesystem de la empresa.
+ * También limpia la metadata de la DB (furat_metadata) para los archivos que
+ * estaban dentro de esa carpeta.
+ *
+ * @param {Object} params
+ * @param {string} params.folderPath - Ruta absoluta de la carpeta a eliminar
+ * @param {string} params.companyName - Nombre de la empresa (para limpiar metadata)
+ * @returns {Promise<{success: boolean, error?: Object, deletedFiles?: number}>}
+ */
+async function deleteFuratFolder(params) {
+  try {
+    var folderPath = params && params.folderPath;
+    var companyName = params && params.companyName;
+    if (!folderPath) {
+      return { success: false, error: { code: 'NO_PATH', message: 'Falta folderPath' } };
+    }
+    if (!companyName) {
+      return { success: false, error: { code: 'NO_COMPANY', message: 'Falta companyName' } };
+    }
+
+    // 1. Verificar que la carpeta existe
+    if (!fssync.existsSync(folderPath)) {
+      return { success: false, error: { code: 'NOT_FOUND', message: 'La carpeta no existe: ' + folderPath } };
+    }
+    var stat = fssync.statSync(folderPath);
+    if (!stat.isDirectory()) {
+      return { success: false, error: { code: 'NOT_A_FOLDER', message: 'La ruta no es una carpeta' } };
+    }
+
+    // 2. SEGURIDAD: verificar que la carpeta está DENTRO del submódulo 3.2.1
+    // Usamos una heurística simple: el path debe contener el código "3.2.1"
+    // (si la ruta no contiene el código del submódulo, no la borramos).
+    // Esto protege contra paths arbitrarios como C:\Windows\System32.
+    var submoduleCode = '3.2.1';
+    if (folderPath.indexOf(submoduleCode) === -1) {
+      return { success: false, error: { code: 'OUT_OF_SCOPE', message: 'La carpeta no pertenece al submódulo 3.2.1' } };
+    }
+
+    // 3. Limpiar metadata de la DB para los archivos de esta carpeta
+    var db = (function () {
+      try { return require('./db-instance').getDb(); } catch (e) { return null; }
+    })();
+    var deletedMeta = 0;
+    if (db) {
+      try {
+        // Normalizar separadores para la query
+        var normalizedPath = folderPath.replace(/\\/g, '\\\\');
+        var result = db.prepare('DELETE FROM furat_metadata WHERE company_name = ? AND file_path LIKE ?')
+          .run(companyName, normalizedPath + '%');
+        deletedMeta = result.changes || 0;
+        console.log('[FURAT] Metadata eliminada: ' + deletedMeta + ' registros para ' + folderPath);
+      } catch (dbErr) {
+        console.warn('[FURAT] Error limpiando metadata (continúa con filesystem):', dbErr.message);
+      }
+    }
+
+    // 4. Eliminar carpeta recursivamente
+    // force: true para evitar error si la carpeta tiene subcarpetas vacías con permisos raros
+    await fs.rm(folderPath, { recursive: true, force: true });
+    console.log('[FURAT] Carpeta eliminada: ' + folderPath);
+
+    return { success: true, deletedMetadataRecords: deletedMeta };
+  } catch (e) {
+    console.error('[FURAT] Error en deleteFuratFolder:', e);
+    return { success: false, error: { code: 'INTERNAL', message: e.message } };
+  }
+}
+
+/**
+ * 📦693 — Crea o actualiza la metadata de un archivo PDF.
+ * Usa INSERT OR REPLACE (file_path es UNIQUE) para hacer upsert.
+ * Si el registro no existe, lo crea. Si ya existe, lo actualiza.
+ *
+ * @param {Object} params
+ * @param {string} params.filePath - Ruta absoluta del archivo
+ * @param {string} params.companyName - Nombre de la empresa
+ * @param {string} [params.accidentDate] - Fecha del accidente (ISO YYYY-MM-DD)
+ * @param {string} [params.accidentType] - caida|golpe|atrapamiento|corte|quemadura|esfuerzo|exposicion|otro
+ * @param {string} [params.severity] - leve|moderado|grave|mortal
+ * @param {string} [params.area] - Área donde ocurrió
+ * @param {string} [params.description] - Descripción breve
+ * @param {string} [params.reportedBy] - Nombre de quien reportó
+ * @returns {Promise<{success: boolean, error?: Object}>}
+ */
+async function upsertFuratMetadata(params) {
+  try {
+    if (!params || !params.filePath || !params.companyName) {
+      return { success: false, error: { code: 'MISSING_PARAMS', message: 'Falta filePath o companyName' } };
+    }
+    var db = (function () {
+      try { return require('./db-instance').getDb(); } catch (e) { return null; }
+    })();
+    if (!db) {
+      return { success: false, error: { code: 'NO_DB', message: 'No hay conexión a la DB' } };
+    }
+
+    var now = new Date().toISOString();
+    var stmt = db.prepare(`
+      INSERT INTO furat_metadata
+        (file_path, company_name, accident_date, accident_type, severity, area, description, reported_by, upload_date, created_at, updated_at)
+      VALUES
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(file_path) DO UPDATE SET
+        accident_date = excluded.accident_date,
+        accident_type = excluded.accident_type,
+        severity = excluded.severity,
+        area = excluded.area,
+        description = excluded.description,
+        reported_by = excluded.reported_by,
+        updated_at = excluded.updated_at
+    `);
+    stmt.run(
+      params.filePath,
+      params.companyName,
+      params.accidentDate || null,
+      params.accidentType || null,
+      params.severity || null,
+      params.area || null,
+      params.description || null,
+      params.reportedBy || null,
+      now,
+      now,
+      now
+    );
+    console.log('[FURAT] Metadata upserted:', params.filePath);
+    return { success: true };
+  } catch (e) {
+    console.error('[FURAT] Error en upsertFuratMetadata:', e);
+    return { success: false, error: { code: 'INTERNAL', message: e.message } };
+  }
+}
+
+/**
+ * 📦693 — Obtiene la metadata de un solo archivo por file_path.
+ * Devuelve null si no existe metadata para ese archivo.
+ */
+function getFuratMetadataForFile(filePath) {
+  try {
+    if (!filePath) return null;
+    var db = (function () {
+      try { return require('./db-instance').getDb(); } catch (e) { return null; }
+    })();
+    if (!db) return null;
+    var row = db.prepare('SELECT * FROM furat_metadata WHERE file_path = ?').get(filePath);
+    if (!row) return null;
+    return {
+      filePath: row.file_path,
+      companyName: row.company_name,
+      accidentDate: row.accident_date,
+      accidentType: row.accident_type,
+      severity: row.severity,
+      area: row.area,
+      description: row.description,
+      reportedBy: row.reported_by,
+      uploadDate: row.upload_date,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
+  } catch (e) {
+    console.error('[FURAT] Error en getFuratMetadataForFile:', e);
+    return null;
+  }
+}
+
 module.exports = {
   registerFuratHandlers,
   uploadFuratFile,
   listFuratMetadata,
   getFuratAnalytics,
   createFuratFolder,
+  deleteFuratFolder,
+  upsertFuratMetadata,
+  getFuratMetadataForFile,
   // Exportar helpers para tests
   _internal: { extractYearFromText, sanitizeFilename, ensureUniquePath, ALLOWED_EXTENSIONS, MAX_FILE_SIZE_BYTES }
 };

@@ -156,6 +156,21 @@ class ReportesAccidentesComponent {
                     result = await window.electronAPI.furatCreateFolder(payload);
                     break;
 
+                // 📦692 — Eliminar carpeta (y todo su contenido)
+                case 'furat-delete-folder':
+                    result = await window.electronAPI.furatDeleteFolder(payload);
+                    break;
+
+                // 📦693 — Upsert metadata (crear o actualizar) para un PDF
+                case 'furat-upsert-metadata':
+                    result = await window.electronAPI.furatUpsertMetadata(payload);
+                    break;
+
+                // 📦693 — Obtener metadata de un solo archivo (pre-llenar el modal)
+                case 'furat-get-metadata-for-file':
+                    result = await window.electronAPI.furatGetMetadataForFile(payload);
+                    break;
+
                 default:
                     throw new Error(`API type '${requestType}' not supported`);
             }
@@ -325,24 +340,105 @@ class ReportesAccidentesComponent {
             const rootFolders = folderResult.folders || [];
             const rootFiles = folderResult.files || [];
 
-            // Preparar lista de carpetas con metadata
-            const folders = rootFolders.map(f => ({
-                name: f.name,
-                path: f.path,
-                parentPath: null, // Es nivel raíz
-                count: 0 // Se calculará después
-            }));
-
-            // Procesar archivos de la raíz
+            // Estructuras finales: una sola lista de carpetas (plana) con `parentPath`
+            // para que el frontend pueda renderizar el árbol por niveles, y una lista
+            // de archivos con `folderPath` apuntando a su carpeta inmediata.
+            const folders = [];   // TODAS las carpetas (raíz + subcarpetas)
             const allFiles = [];
-            
-            // Agregar archivos del nivel raíz
+
+            // 📦692-fix — Escaneo RECURSIVO de carpetas.
+            // ANTES: el bucle solo leía los archivos DIRECTOS de cada carpeta de año
+            // (readDirectory 1 nivel). Si los PDFs estaban en subcarpetas (ej:
+            // 2019/Enero/archivo.pdf), no aparecían al navegar por "2019" y la UI
+            // mostraba "No hay reportes en esta carpeta". FIX: función recursiva
+            // que desciende en cada subcarpeta, agrega folders con parentPath y
+            // cuenta archivos totales (esta carpeta + descendientes).
+            const MAX_DEPTH = 5; // seguridad contra loops infinitos
+            const scanFolderRecursive = async (folder, parentPath, depth) => {
+                // Agregar esta carpeta a la lista
+                const folderEntry = {
+                    name: folder.name,
+                    path: folder.path,
+                    parentPath: parentPath || null,
+                    count: 0 // se calcula abajo
+                };
+                folders.push(folderEntry);
+
+                if (depth >= MAX_DEPTH) {
+                    console.warn(`[FURAT] Profundidad máxima alcanzada en ${folder.path}, no se escanea más profundo`);
+                    return;
+                }
+
+                let content;
+                try {
+                    content = await window.electronAPI.readDirectory(folder.path);
+                } catch (err) {
+                    console.warn(`[FURAT] No se pudo leer carpeta ${folder.name}:`, err);
+                    return;
+                }
+                if (!content || !content.success) return;
+
+                const subFolders = content.folders || [];
+                const directFiles = content.files || [];
+
+                // 1) Procesar archivos DIRECTOS de esta carpeta
+                directFiles.forEach(f => {
+                    const ext = f.extension || f.name.split('.').pop().toLowerCase();
+                    allFiles.push({
+                        name: f.name,
+                        path: f.path,
+                        folderPath: folder.path, // apunta a la carpeta INMEDIATA
+                        extension: ext,
+                        icon: this.getIconForExtension(ext),
+                        size: f.size ? this.formatFileSize(f.size) : '',
+                        date: f.modified ? new Date(f.modified).toLocaleDateString('es-ES') : '',
+                        year: this.extractYearFromName(f.name, f.path),
+                        month: this.extractMonthFromName(f.name, f.path)
+                    });
+                });
+
+                // 2) Procesar subcarpetas recursivamente
+                for (const sub of subFolders) {
+                    await scanFolderRecursive(sub, folder.path, depth + 1);
+                }
+            };
+
+            // Escanear todas las carpetas raíz (años)
+            for (const folder of rootFolders) {
+                await scanFolderRecursive(folder, null, 0);
+            }
+
+            // Calcular `count` de cada folder = total de archivos en este folder
+            // Y en todos sus descendientes. Recorremos `allFiles` y sumamos.
+            const countByFolder = {};
+            for (const file of allFiles) {
+                if (!file.folderPath) continue;
+                // Normalizar para que el conteo coincida con `folder.path` (que también está normalizado)
+                const fp = file.folderPath.replace(/\\/g, '/').toLowerCase();
+                countByFolder[fp] = (countByFolder[fp] || 0) + 1;
+            }
+            // Propagar el conteo HACIA ARRIBA: cada padre suma los counts de sus hijos
+            const sortedFolders = folders.slice().sort((a, b) => b.path.length - a.path.length);
+            for (const folder of sortedFolders) {
+                const fp = folder.path.replace(/\\/g, '/').toLowerCase();
+                const directCount = countByFolder[fp] || 0;
+                // Sumar counts de hijos que tengan este folder como parent
+                const childCount = folders
+                    .filter(f => (f.parentPath || '').replace(/\\/g, '/').toLowerCase() === fp)
+                    .reduce((sum, child) => {
+                        const childFp = child.path.replace(/\\/g, '/').toLowerCase();
+                        return sum + (countByFolder[childFp] || 0);
+                    }, 0);
+                folder.count = directCount + childCount;
+            }
+
+            // Archivos del nivel raíz
             rootFiles.forEach(f => {
                 const ext = f.extension || f.name.split('.').pop().toLowerCase();
                 allFiles.push({
                     name: f.name,
                     path: f.path,
-                    folderPath: null, // null = nivel raíz
+                    folderPath: null,
                     extension: ext,
                     icon: this.getIconForExtension(ext),
                     size: f.size ? this.formatFileSize(f.size) : '',
@@ -351,35 +447,6 @@ class ReportesAccidentesComponent {
                     month: this.extractMonthFromName(f.name, f.path)
                 });
             });
-
-            // Leer archivos de cada subcarpeta usando read-directory
-            for (const folder of folders) {
-                try {
-                    const folderContent = await window.electronAPI.readDirectory(folder.path);
-
-                    if (folderContent.success) {
-                        const folderFiles = folderContent.files || [];
-                        folder.count = folderFiles.length;
-
-                        folderFiles.forEach(f => {
-                            const ext = f.extension || f.name.split('.').pop().toLowerCase();
-                            allFiles.push({
-                                name: f.name,
-                                path: f.path,
-                                folderPath: folder.path, // Asignar carpeta padre
-                                extension: ext,
-                                icon: this.getIconForExtension(ext),
-                                size: f.size ? this.formatFileSize(f.size) : '',
-                                date: f.modified ? new Date(f.modified).toLocaleDateString('es-ES') : '',
-                                year: this.extractYearFromName(f.name, f.path),
-                                month: this.extractMonthFromName(f.name, f.path)
-                            });
-                        });
-                    }
-                } catch (err) {
-                    console.warn(`[FURAT] No se pudo leer carpeta ${folder.name}:`, err);
-                }
-            }
 
             const availableYears = [...new Set(allFiles.map(f => f.year).filter(Boolean))].sort((a, b) => b - a);
 

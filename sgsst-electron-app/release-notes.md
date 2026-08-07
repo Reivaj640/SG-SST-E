@@ -1,3 +1,49 @@
+# K+AIR v0.1.158
+
+## 🆕 Navegación recursiva de carpetas en FURAT (tipo explorador)
+
+Bug crítico: cuando el user hacía click en una carpeta de año (ej: 2019) que contiene subcarpetas (ej: 2019/Enero, 2019/Febrero), la UI mostraba "No hay reportes en esta carpeta" porque el código solo leía 1 nivel del filesystem.
+
+**Fix:**
+- `getLibraryData` ahora itera recursivamente con `scanFolderRecursive(MAX_DEPTH=5)`
+- Cada folder tiene `parentPath` para renderizar el árbol por niveles
+- Cada archivo tiene `folderPath` apuntando a su carpeta inmediata
+- Conteo de archivos en cada folder suma los descendientes (propagación hacia arriba)
+
+**Resultado:**
+- Click en 2019 → muestra cards de Enero/Febrero/Marzo…
+- Click en Enero → muestra los PDFs de Enero
+- Breadcrumb jerárquico: `Todos los Reportes > 2019 > Enero` (cada nivel clickeable)
+
+## 🆕 Crear subcarpeta dentro de carpeta actual
+
+El botón "Agregar período" ahora funciona también cuando estás dentro de un año. El modal detecta `activeFolder` y muestra el contexto:
+
+> "Se creará dentro de: 2019"
+
+Al confirmar, la nueva carpeta se crea en el path correcto.
+
+## 🆕 Eliminar carpetas (años y meses)
+
+Click derecho sobre folder card → context menu con 3 opciones:
+- **Crear subcarpeta acá** → abre el modal con el contexto
+- **Abrir carpeta** → abre el explorador de Windows
+- **Eliminar carpeta** (rojo) → confirm modal con la cantidad de archivos que se eliminarán
+
+Backend: `deleteFuratFolder` con recursive `fs.rm` + cleanup de metadata en DB (`DELETE FROM furat_metadata WHERE file_path LIKE folderPath%`). Validación: el path debe contener "3.2.1" (submódulo).
+
+## 🆕 Editar metadata de PDFs legacy
+
+Los PDFs viejos que ya están en las carpetas pueden categorizarse manualmente:
+- Click derecho sobre fila de la tabla → context menu → "Editar metadata"
+- Modal pre-llenado con metadata existente (si hay)
+- Campos: fecha accidente, tipo, gravedad, área, reportado por, descripción
+- Backend: `upsertFuratMetadata` con `INSERT OR REPLACE ON CONFLICT(file_path)`
+
+Después de guardar, se refresca la tabla y el dashboard para que el PDF entre en los análisis (charts de tendencia, gravedad, top áreas).
+
+---
+
 # K+AIR v0.1.157
 
 ## 🐛 Bugfixes Bandeja Integrada

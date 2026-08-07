@@ -175,6 +175,50 @@ function setupEventListeners() {
         if (folderCard) selectFolder(folderCard.dataset.path);
     });
 
+    // 📦692 — Context menu en folder cards (click derecho)
+    document.getElementById('folderList').addEventListener('contextmenu', (e) => {
+        var folderCard = e.target.closest('.furat-folder-card-v2');
+        if (!folderCard) return;
+        e.preventDefault();
+        var folder = {
+            name: folderCard.dataset.name || folderCard.dataset.path.split(/[\\/]/).pop(),
+            path: folderCard.dataset.path,
+            count: parseInt(folderCard.dataset.count || '0', 10)
+        };
+        showFolderContextMenu(e.clientX, e.clientY, folder);
+    });
+
+    // Click fuera cierra el context menu
+    document.addEventListener('click', (e) => {
+        var menu = document.getElementById('folderContextMenu');
+        if (menu && menu.classList.contains('is-visible') && !menu.contains(e.target)) {
+            hideFolderContextMenu();
+        }
+    });
+
+    // 📦692 — Setup de los botones del context menu
+    setupFolderContextMenuHandlers();
+
+    // 📦692 — Setup del modal de delete folder
+    setupDeleteFolderModal();
+
+    // 📦693 — Setup del modal de editar metadata + context menu de PDFs
+    setupEditMetadataModal();
+    setupDocumentContextMenu();
+
+    // 📦692-fix — Breadcrumb clicks (jerárquico, soporta navegación multi-nivel)
+    document.getElementById('breadcrumbInline').addEventListener('click', (e) => {
+        var crumb = e.target.closest('.furat-breadcrumb-v2__root, .furat-breadcrumb-v2__item');
+        if (!crumb) return;
+        var targetPath = crumb.dataset.path || null;
+        if (targetPath === null || targetPath === '') {
+            // Click en "Todos los Reportes" → ir a la raíz
+            navigateToPath(null);
+        } else {
+            navigateToPath(targetPath);
+        }
+    });
+
     // Library - Document clicks (V2: tabla)
     document.getElementById('documentList').addEventListener('click', (e) => {
         var tr = e.target.closest('tr[data-path]');
@@ -731,15 +775,53 @@ function renderLibraryBreadcrumb() {
     if (!activeFolder) {
         // Raíz: el card completo está oculto, no hay breadcrumb visible.
         breadcrumbInline.innerHTML = '';
-    } else {
-        // Carpeta: breadcrumb integrado en el header card
-        var folderName = activeFolder.split(/[\\/]/).filter(Boolean).pop() || 'Carpeta';
-        breadcrumbInline.innerHTML = '<button class="furat-breadcrumb-v2__root" data-path="" type="button">' +
-            '<i class="fas fa-home" aria-hidden="true"></i>' +
-            '<span>Todos los Reportes</span></button>' +
-            '<i class="fas fa-chevron-right furat-breadcrumb-v2__sep" aria-hidden="true"></i>' +
-            '<span class="furat-breadcrumb-v2__current">' + escapeHtml(folderName) + '</span>';
+        return;
     }
+
+    // 📦692-fix — Breadcrumb JERÁRQUICO. ANTES solo mostraba el nombre de la
+    // carpeta actual (ej: "Todos los Reportes > Enero"). Ahora muestra la
+    // cadena completa de ancestros ("Todos los Reportes > 2019 > Enero"),
+    // y cada nivel es clickeable para volver atrás. Esto es necesario
+    // porque ahora la navegación soporta subcarpetas (Enero dentro de 2019).
+    //
+    // Estructura: [Home] > [Padre1] > [Padre2] > [Actual]
+    // El último (Actual) NO es clickeable, los demás sí.
+
+    // Construir la jerarquía buscando cada nivel en allFolders
+    var ancestors = [];
+    var lookupPath = activeFolder;
+    while (lookupPath) {
+        var found = allFolders.find(function (f) {
+            return (f.path || '').replace(/\\/g, '/').toLowerCase() ===
+                   lookupPath.replace(/\\/g, '/').toLowerCase();
+        });
+        if (!found) break;
+        ancestors.unshift(found);
+        lookupPath = found.parentPath;
+    }
+
+    var html = '<button class="furat-breadcrumb-v2__root" data-path="" type="button" title="Ir a la raíz">' +
+        '<i class="fas fa-home" aria-hidden="true"></i>' +
+        '<span>Todos los Reportes</span></button>';
+
+    // Cada ancestro es un botón clickeable. El ÚLTIMO ancestro es la carpeta
+    // actual (folder activo) → lo mostramos como texto no clickeable, no como botón.
+    ancestors.forEach(function (folder, idx) {
+        var name = folder.name || folder.path.split(/[\\/]/).pop();
+        var isLast = (idx === ancestors.length - 1);
+        html += '<i class="fas fa-chevron-right furat-breadcrumb-v2__sep" aria-hidden="true"></i>';
+        if (isLast) {
+            // Carpeta actual: solo texto, no botón
+            html += '<span class="furat-breadcrumb-v2__current" title="' + escapeHtml(name) + '">' + escapeHtml(name) + '</span>';
+        } else {
+            // Ancestro: botón clickeable. Usamos __item (NO __crumb) para reusar
+            // los estilos ya definidos en CSS junto con __root.
+            html += '<button class="furat-breadcrumb-v2__item" data-path="' + escapeHtml(folder.path) + '" type="button" title="Ir a ' + escapeHtml(name) + '">' +
+                    escapeHtml(name) + '</button>';
+        }
+    });
+
+    breadcrumbInline.innerHTML = html;
 }
 
 function renderLibraryFolders() {
@@ -778,7 +860,7 @@ function renderLibraryFolders() {
                 : '<span class="furat-folder-card-v2__badge furat-folder-card-v2__badge--no-meta" title="Sin metadata todavía">Sin metadata</span>')
             : '<span class="furat-folder-card-v2__badge furat-folder-card-v2__badge--no-meta">Vacía</span>';
 
-        return '<button class="furat-folder-card-v2' + activeClass + '" data-path="' + escapeHtml(folder.path) + '" type="button">' +
+        return '<button class="furat-folder-card-v2' + activeClass + '" data-path="' + escapeHtml(folder.path) + '" data-name="' + escapeHtml(folder.name) + '" data-count="' + (folder.count || totalInFolder || 0) + '" type="button">' +
             '  <div class="furat-folder-card-v2__icon"><i class="fas fa-folder" aria-hidden="true"></i></div>' +
             '  <div class="furat-folder-card-v2__year">' + escapeHtml(year) + '</div>' +
             '  <div class="furat-folder-card-v2__name">' + escapeHtml(folder.name) + '</div>' +
@@ -1586,6 +1668,329 @@ function renderUploadFilePreview() {
 // 📦680 — MODAL "CREAR NUEVA CARPETA" (período)
 // ═══════════════════════════════════════════════════════
 
+// 📦692 — Context menu de carpetas (click derecho)
+// Patrón similar a 1.1.1 responsable-sg: context menu con show/hide via class
+// + position absolute via style.left/top + click outside para cerrar.
+var folderContextMenuTarget = null; // { name, path, count }
+
+function showFolderContextMenu(x, y, folder) {
+    var menu = document.getElementById('folderContextMenu');
+    if (!menu) return;
+    folderContextMenuTarget = folder;
+    var nameEl = document.getElementById('folderContextMenuName');
+    if (nameEl) nameEl.textContent = folder.name;
+    menu.classList.add('is-visible');
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+    // Ajuste si se sale de pantalla
+    setTimeout(function () {
+        var rect = menu.getBoundingClientRect();
+        if (rect.right > window.innerWidth) {
+            menu.style.left = (window.innerWidth - rect.width - 10) + 'px';
+        }
+        if (rect.bottom > window.innerHeight) {
+            menu.style.top = (window.innerHeight - rect.height - 10) + 'px';
+        }
+    }, 0);
+}
+
+function hideFolderContextMenu() {
+    var menu = document.getElementById('folderContextMenu');
+    if (menu) menu.classList.remove('is-visible');
+    folderContextMenuTarget = null;
+}
+
+function setupFolderContextMenuHandlers() {
+    var addBtn = document.getElementById('folderContextMenuAdd');
+    var openBtn = document.getElementById('folderContextMenuOpen');
+    var deleteBtn = document.getElementById('folderContextMenuDelete');
+
+    if (addBtn) {
+        addBtn.addEventListener('click', function () {
+            var target = folderContextMenuTarget;
+            hideFolderContextMenu();
+            if (!target) return;
+            // Setear activeFolder al target (sin disparar loadLibrary) y abrir modal
+            activeFolder = target.path;
+            // Re-renderizar el breadcrumb para que muestre el contexto
+            renderLibraryBreadcrumb();
+            renderLibraryFolders();
+            renderLibraryDocuments();
+            openCreateFolderModal();
+        });
+    }
+    if (openBtn) {
+        openBtn.addEventListener('click', function () {
+            var target = folderContextMenuTarget;
+            hideFolderContextMenu();
+            if (!target) return;
+            // Abrir carpeta con la app predeterminada (explorador de Windows)
+            callParentAPI('open-path', { path: target.path }).catch(function (err) {
+                console.warn('[FURAT] open-path error:', err);
+            });
+        });
+    }
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', function () {
+            var target = folderContextMenuTarget;
+            hideFolderContextMenu();
+            if (!target) return;
+            openDeleteFolderModal(target);
+        });
+    }
+}
+
+// 📦692 — Modal de confirmación para eliminar carpeta
+function setupDeleteFolderModal() {
+    var closeBtn = document.getElementById('deleteFolderModalClose');
+    var cancelBtn = document.getElementById('deleteFolderModalCancel');
+    var submitBtn = document.getElementById('deleteFolderModalSubmit');
+    var overlay = document.getElementById('deleteFolderModalOverlay');
+    if (closeBtn) closeBtn.addEventListener('click', closeDeleteFolderModal);
+    if (cancelBtn) cancelBtn.addEventListener('click', closeDeleteFolderModal);
+    if (overlay) overlay.addEventListener('click', closeDeleteFolderModal);
+    if (submitBtn) submitBtn.addEventListener('click', submitDeleteFolder);
+}
+
+var deleteFolderTarget = null; // { name, path }
+
+function openDeleteFolderModal(folder) {
+    var modal = document.getElementById('deleteFolderModal');
+    var nameEl = document.getElementById('deleteFolderName');
+    var countEl = document.getElementById('deleteFolderFileCount');
+    if (!modal) return;
+    deleteFolderTarget = folder;
+    if (nameEl) nameEl.textContent = folder.name;
+    if (countEl) countEl.textContent = folder.count || 0;
+    modal.classList.remove('hidden');
+}
+
+function closeDeleteFolderModal() {
+    var modal = document.getElementById('deleteFolderModal');
+    if (modal) modal.classList.add('hidden');
+    deleteFolderTarget = null;
+}
+
+async function submitDeleteFolder() {
+    var submitBtn = document.getElementById('deleteFolderModalSubmit');
+    var target = deleteFolderTarget;
+    if (!target) return;
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Eliminando...';
+    }
+    try {
+        // 📦692 — getModuleParams() lee company/module/submodule de la URL del iframe.
+        // Es la forma estándar de obtener la empresa activa (la que el parent
+        // renderer pasa al iframe cuando lo crea).
+        var params = getModuleParams();
+        var result = await callParentAPI('furat-delete-folder', {
+            folderPath: target.path,
+            companyName: params.companyName
+        });
+        if (result && result.success) {
+            var metaCount = result.deletedMetadataRecords || 0;
+            showNotification(
+                'Carpeta "' + target.name + '" eliminada' +
+                (metaCount > 0 ? ' (incluye ' + metaCount + ' registro(s) de metadata)' : ''),
+                'success'
+            );
+            closeDeleteFolderModal();
+            // Si la carpeta eliminada era la carpeta activa, navegar a la raíz
+            if (activeFolder === target.path) {
+                navigateToPath(null);
+            }
+            // Refrescar la biblioteca
+            loadLibrary();
+        } else {
+            var msg = (result && result.error && result.error.message) || 'Error desconocido';
+            showNotification('Error al eliminar: ' + msg, 'error');
+        }
+    } catch (e) {
+        showNotification('Error al eliminar: ' + (e.message || 'desconocido'), 'error');
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-trash-alt"></i><span> Eliminar definitivamente</span>';
+        }
+    }
+}
+
+// Helper: obtener el nombre de la empresa activa desde el iframe.
+// (Ya no se usa, lo dejamos por compatibilidad. Usar getModuleParams().companyName)
+function getActiveCompanyName() {
+    if (typeof window !== 'undefined' && window.KairData && window.KairData.activeCompany) {
+        return window.KairData.activeCompany;
+    }
+    var companyEl = document.querySelector('[data-company-name]');
+    if (companyEl) return companyEl.getAttribute('data-company-name');
+    if (typeof state !== 'undefined' && state.company) return state.company;
+    return null;
+}
+
+// 📦693 — Modal de edición de metadata
+var editMetadataTarget = null; // { name, path }
+
+function setupEditMetadataModal() {
+    var closeBtn = document.getElementById('editMetadataModalClose');
+    var cancelBtn = document.getElementById('editMetadataModalCancel');
+    var submitBtn = document.getElementById('editMetadataModalSubmit');
+    var overlay = document.getElementById('editMetadataModalOverlay');
+    if (closeBtn) closeBtn.addEventListener('click', closeEditMetadataModal);
+    if (cancelBtn) cancelBtn.addEventListener('click', closeEditMetadataModal);
+    if (overlay) overlay.addEventListener('click', closeEditMetadataModal);
+    if (submitBtn) submitBtn.addEventListener('click', submitEditMetadata);
+}
+
+async function openEditMetadataModal(file) {
+    var modal = document.getElementById('editMetadataModal');
+    var nameEl = document.getElementById('editMetadataFileName');
+    if (!modal) return;
+    editMetadataTarget = file;
+    if (nameEl) nameEl.textContent = file.name;
+
+    // Limpiar campos antes de cargar
+    document.getElementById('editMetadataAccidentDate').value = '';
+    document.getElementById('editMetadataSeverity').value = '';
+    document.getElementById('editMetadataAccidentType').value = '';
+    document.getElementById('editMetadataArea').value = '';
+    document.getElementById('editMetadataReportedBy').value = '';
+    document.getElementById('editMetadataDescription').value = '';
+
+    modal.classList.remove('hidden');
+
+    // Cargar metadata existente (si hay) para pre-llenar el form
+    try {
+        var result = await callParentAPI('furat-get-metadata-for-file', file.path);
+        if (result && result.metadata) {
+            var m = result.metadata;
+            if (m.accidentDate) document.getElementById('editMetadataAccidentDate').value = m.accidentDate;
+            if (m.severity) document.getElementById('editMetadataSeverity').value = m.severity;
+            if (m.accidentType) document.getElementById('editMetadataAccidentType').value = m.accidentType;
+            if (m.area) document.getElementById('editMetadataArea').value = m.area;
+            if (m.reportedBy) document.getElementById('editMetadataReportedBy').value = m.reportedBy;
+            if (m.description) document.getElementById('editMetadataDescription').value = m.description;
+        }
+    } catch (e) {
+        console.warn('[FURAT] No se pudo cargar metadata existente:', e.message);
+    }
+}
+
+function closeEditMetadataModal() {
+    var modal = document.getElementById('editMetadataModal');
+    if (modal) modal.classList.add('hidden');
+    editMetadataTarget = null;
+}
+
+async function submitEditMetadata() {
+    var submitBtn = document.getElementById('editMetadataModalSubmit');
+    var target = editMetadataTarget;
+    if (!target) return;
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+    }
+    try {
+        var params = getModuleParams();
+        var payload = {
+            filePath: target.path,
+            companyName: params.companyName,
+            accidentDate: document.getElementById('editMetadataAccidentDate').value || null,
+            accidentType: document.getElementById('editMetadataAccidentType').value || null,
+            severity: document.getElementById('editMetadataSeverity').value || null,
+            area: document.getElementById('editMetadataArea').value || null,
+            reportedBy: document.getElementById('editMetadataReportedBy').value || null,
+            description: document.getElementById('editMetadataDescription').value || null
+        };
+        var result = await callParentAPI('furat-upsert-metadata', payload);
+        if (result && result.success) {
+            showNotification('Metadata guardada para "' + target.name + '"', 'success');
+            closeEditMetadataModal();
+            // Refrescar la tabla de documentos + el dashboard
+            loadLibrary();
+            if (typeof loadDashboard === 'function') loadDashboard();
+        } else {
+            var msg = (result && result.error && result.error.message) || 'Error desconocido';
+            showNotification('Error: ' + msg, 'error');
+        }
+    } catch (e) {
+        showNotification('Error: ' + (e.message || 'desconocido'), 'error');
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-save"></i><span> Guardar metadata</span>';
+        }
+    }
+}
+
+// 📦693 — Context menu para PDFs (click derecho en fila de la tabla)
+var documentContextMenuTarget = null; // { name, path, hasMetadata }
+
+function setupDocumentContextMenu() {
+    var documentList = document.getElementById('documentList');
+    if (!documentList) return;
+    documentList.addEventListener('contextmenu', (e) => {
+        var tr = e.target.closest('tr[data-path]');
+        if (!tr) return;
+        e.preventDefault();
+        var file = {
+            name: tr.dataset.path.split(/[\\/]/).pop(),
+            path: tr.dataset.path
+        };
+        showDocumentContextMenu(e.clientX, e.clientY, file);
+    });
+    // Botones del menu
+    var viewBtn = document.getElementById('documentContextMenuView');
+    var editBtn = document.getElementById('documentContextMenuEdit');
+    if (viewBtn) {
+        viewBtn.addEventListener('click', function () {
+            var target = documentContextMenuTarget;
+            hideDocumentContextMenu();
+            if (target) selectDocument(target.path);
+        });
+    }
+    if (editBtn) {
+        editBtn.addEventListener('click', function () {
+            var target = documentContextMenuTarget;
+            hideDocumentContextMenu();
+            if (target) openEditMetadataModal(target);
+        });
+    }
+    // Click fuera cierra
+    document.addEventListener('click', (e) => {
+        var menu = document.getElementById('documentContextMenu');
+        if (menu && menu.classList.contains('is-visible') && !menu.contains(e.target)) {
+            hideDocumentContextMenu();
+        }
+    });
+}
+
+function showDocumentContextMenu(x, y, file) {
+    var menu = document.getElementById('documentContextMenu');
+    if (!menu) return;
+    documentContextMenuTarget = file;
+    var nameEl = document.getElementById('documentContextMenuName');
+    if (nameEl) nameEl.textContent = file.name;
+    menu.classList.add('is-visible');
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+    setTimeout(function () {
+        var rect = menu.getBoundingClientRect();
+        if (rect.right > window.innerWidth) {
+            menu.style.left = (window.innerWidth - rect.width - 10) + 'px';
+        }
+        if (rect.bottom > window.innerHeight) {
+            menu.style.top = (window.innerHeight - rect.height - 10) + 'px';
+        }
+    }, 0);
+}
+
+function hideDocumentContextMenu() {
+    var menu = document.getElementById('documentContextMenu');
+    if (menu) menu.classList.remove('is-visible');
+    documentContextMenuTarget = null;
+}
+
 function setupCreateFolderModal() {
     var addPeriodBtn = document.getElementById('addPeriodBtn');
     var modal = document.getElementById('createFolderModal');
@@ -1617,8 +2022,23 @@ function openCreateFolderModal() {
     var modal = document.getElementById('createFolderModal');
     var input = document.getElementById('createFolderInput');
     var submitBtn = document.getElementById('createFolderModalSubmit');
+    var contextEl = document.getElementById('createFolderContext');
+    var parentNameEl = document.getElementById('createFolderParentName');
     if (!modal) return;
     modal.classList.remove('hidden');
+
+    // 📦692 — Si hay activeFolder, mostrar el contexto "Se creará dentro de: X"
+    // y guardar el parentPath para que submitCreateFolder lo use.
+    if (contextEl && parentNameEl) {
+        if (activeFolder) {
+            var parentName = activeFolder.split(/[\\/]/).filter(Boolean).pop() || 'Carpeta';
+            parentNameEl.textContent = parentName;
+            contextEl.style.display = 'block';
+        } else {
+            contextEl.style.display = 'none';
+        }
+    }
+
     if (input) {
         input.value = '';
         setTimeout(function () { input.focus(); }, 50);
@@ -1643,19 +2063,20 @@ async function submitCreateFolder() {
     }
 
     try {
-        // Derivar el submodulePath del path del primer folder
-        var submodulePath = deriveSubmodulePath();
-        if (!submodulePath) {
+        // 📦692 — Determinar el parent path: si hay activeFolder, crear adentro.
+        // Si no, crear en el submódulo raíz.
+        var parentPath = activeFolder || deriveSubmodulePath();
+        if (!parentPath) {
             // Si no hay folders todavía, cargar la library primero
             await loadLibrary();
-            submodulePath = deriveSubmodulePath();
+            parentPath = activeFolder || deriveSubmodulePath();
         }
-        if (!submodulePath) {
+        if (!parentPath) {
             showNotification('No se pudo resolver la ruta del submódulo 3.2.1', 'error');
             return;
         }
         var result = await callParentAPI('furat-create-folder', {
-            submodulePath: submodulePath,
+            submodulePath: parentPath,
             folderName: name
         });
         if (result && result.success) {

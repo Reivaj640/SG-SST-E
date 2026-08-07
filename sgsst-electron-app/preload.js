@@ -263,6 +263,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   furatGetAnalytics: (companyName) => ipcRenderer.invoke('furat:get-analytics', companyName),
   // 📦680 — Crear nueva carpeta (período) en el filesystem
   furatCreateFolder: (payload) => ipcRenderer.invoke('furat:create-folder', payload),
+  // 📦692 — Eliminar carpeta (con todo su contenido) y limpiar metadata
+  furatDeleteFolder: (payload) => ipcRenderer.invoke('furat:delete-folder', payload),
+  // 📦693 — Upsert metadata (crear o actualizar) para un PDF
+  furatUpsertMetadata: (payload) => ipcRenderer.invoke('furat:upsert-metadata', payload),
+  // 📦693 — Obtener metadata de un solo archivo
+  furatGetMetadataForFile: (filePath) => ipcRenderer.invoke('furat:get-metadata-for-file', filePath),
 
   // --- Remisiones ---
   getControlRemisionesData: (companyName) =>

@@ -319,6 +319,10 @@
                         Creá una nueva carpeta (período) para guardar reportes FURAT.
                         El nombre se usa como nombre de carpeta.
                     </p>
+                    <p id="createFolderContext" class="furat-form__hint" style="margin: 0 0 0.75rem 0; padding: 0.5rem 0.625rem; background: var(--furat-bg-app); border-radius: 6px; font-size: 0.8125rem; color: var(--furat-text-secondary); display: none;">
+                        <i class="fas fa-folder-open" style="margin-right: 0.375rem; color: var(--furat-primary);"></i>
+                        Se creará dentro de: <strong id="createFolderParentName"></strong>
+                    </p>
                     <form id="createFolderForm" class="furat-form" onsubmit="return false;">
                         <div class="furat-form__field">
                             <label class="furat-form__label" for="createFolderInput">
@@ -339,6 +343,163 @@
                     </button>
                 </div>
             </div>
+        </div>
+
+        <!-- 📦692 — CONTEXT MENU de carpetas (click derecho sobre folder card) -->
+        <div class="furat-folder-context-menu" id="folderContextMenu" role="menu" aria-hidden="true">
+            <div class="furat-folder-context-menu__header" id="folderContextMenuHeader">
+                <i class="fas fa-folder" aria-hidden="true"></i>
+                <span id="folderContextMenuName">Carpeta</span>
+            </div>
+            <div class="furat-folder-context-menu__divider"></div>
+            <button class="furat-folder-context-menu__item" id="folderContextMenuAdd" role="menuitem">
+                <i class="fas fa-folder-plus" aria-hidden="true"></i>
+                <span>Crear subcarpeta acá</span>
+            </button>
+            <button class="furat-folder-context-menu__item" id="folderContextMenuOpen" role="menuitem">
+                <i class="fas fa-folder-open" aria-hidden="true"></i>
+                <span>Abrir carpeta</span>
+            </button>
+            <div class="furat-folder-context-menu__divider"></div>
+            <button class="furat-folder-context-menu__item furat-folder-context-menu__item--danger" id="folderContextMenuDelete" role="menuitem">
+                <i class="fas fa-trash-alt" aria-hidden="true"></i>
+                <span>Eliminar carpeta</span>
+            </button>
+        </div>
+
+        <!-- 📦692 — MODAL DE CONFIRMACIÓN para eliminar carpeta -->
+        <div id="deleteFolderModal" class="furat-modal hidden" role="dialog" aria-modal="true" aria-labelledby="deleteFolderModalTitle">
+            <div class="furat-modal__overlay" id="deleteFolderModalOverlay"></div>
+            <div class="furat-modal__content" style="max-width: 480px;">
+                <div class="furat-modal__header">
+                    <div class="furat-modal__title">
+                        <i class="fas fa-trash-alt" aria-hidden="true" style="color:#dc2626;"></i>
+                        <h2 id="deleteFolderModalTitle">Eliminar carpeta</h2>
+                    </div>
+                    <button class="furat-modal__close" id="deleteFolderModalClose" aria-label="Cerrar" type="button">
+                        <i class="fas fa-times" aria-hidden="true"></i>
+                    </button>
+                </div>
+                <div class="furat-modal__body">
+                    <p style="margin: 0 0 0.875rem 0; font-size: 0.875rem; color: var(--furat-text-primary);">
+                        ¿Estás seguro de eliminar la carpeta <strong id="deleteFolderName"></strong>?
+                    </p>
+                    <p style="margin: 0 0 0.5rem 0; font-size: 0.8125rem; color: #dc2626;">
+                        <i class="fas fa-exclamation-triangle" aria-hidden="true" style="margin-right: 0.375rem;"></i>
+                        Se eliminarán <strong id="deleteFolderFileCount">0</strong> archivo(s) y todas las subcarpetas. Esta acción no se puede deshacer.
+                    </p>
+                </div>
+                <div class="furat-modal__footer">
+                    <button class="furat-btn furat-btn--secondary" id="deleteFolderModalCancel" type="button">Cancelar</button>
+                    <button class="furat-btn" id="deleteFolderModalSubmit" type="button" style="background:#dc2626; border-color:#dc2626; color:#fff;">
+                        <i class="fas fa-trash-alt"></i>
+                        <span>Eliminar definitivamente</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 📦693 — MODAL DE EDICIÓN DE METADATA (PDF legacy) -->
+        <div id="editMetadataModal" class="furat-modal hidden" role="dialog" aria-modal="true" aria-labelledby="editMetadataModalTitle">
+            <div class="furat-modal__overlay" id="editMetadataModalOverlay"></div>
+            <div class="furat-modal__content" style="max-width: 600px;">
+                <div class="furat-modal__header">
+                    <div class="furat-modal__title">
+                        <i class="fas fa-clipboard-list" aria-hidden="true" style="color:var(--furat-primary);"></i>
+                        <h2 id="editMetadataModalTitle">Editar metadata del reporte</h2>
+                    </div>
+                    <button class="furat-modal__close" id="editMetadataModalClose" aria-label="Cerrar" type="button">
+                        <i class="fas fa-times" aria-hidden="true"></i>
+                    </button>
+                </div>
+                <div class="furat-modal__body">
+                    <p style="margin: 0 0 0.625rem 0; font-size: 0.8125rem; color: var(--furat-text-secondary);">
+                        Archivo: <strong id="editMetadataFileName"></strong>
+                    </p>
+                    <form id="editMetadataForm" class="furat-form" onsubmit="return false;">
+                        <div class="furat-form__row" style="display:grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                            <div class="furat-form__field">
+                                <label class="furat-form__label" for="editMetadataAccidentDate">
+                                    Fecha del accidente
+                                </label>
+                                <input type="date" class="furat-form__input" id="editMetadataAccidentDate">
+                            </div>
+                            <div class="furat-form__field">
+                                <label class="furat-form__label" for="editMetadataSeverity">
+                                    Gravedad
+                                </label>
+                                <select class="furat-form__input" id="editMetadataSeverity">
+                                    <option value="">— Sin especificar —</option>
+                                    <option value="leve">Leve</option>
+                                    <option value="moderado">Moderado</option>
+                                    <option value="grave">Grave</option>
+                                    <option value="mortal">Mortal</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="furat-form__row" style="display:grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                            <div class="furat-form__field">
+                                <label class="furat-form__label" for="editMetadataAccidentType">
+                                    Tipo de accidente
+                                </label>
+                                <select class="furat-form__input" id="editMetadataAccidentType">
+                                    <option value="">— Sin especificar —</option>
+                                    <option value="caida">Caída</option>
+                                    <option value="golpe">Golpe</option>
+                                    <option value="atrapamiento">Atrapamiento</option>
+                                    <option value="corte">Corte/Herida</option>
+                                    <option value="quemadura">Quemadura</option>
+                                    <option value="esfuerzo">Esfuerzo físico</option>
+                                    <option value="exposicion">Exposición</option>
+                                    <option value="otro">Otro</option>
+                                </select>
+                            </div>
+                            <div class="furat-form__field">
+                                <label class="furat-form__label" for="editMetadataArea">
+                                    Área
+                                </label>
+                                <input type="text" class="furat-form__input" id="editMetadataArea" placeholder="ej: Producción, Almacén...">
+                            </div>
+                        </div>
+                        <div class="furat-form__field">
+                            <label class="furat-form__label" for="editMetadataReportedBy">
+                                Reportado por
+                            </label>
+                            <input type="text" class="furat-form__input" id="editMetadataReportedBy" placeholder="Nombre de quien reportó">
+                        </div>
+                        <div class="furat-form__field">
+                            <label class="furat-form__label" for="editMetadataDescription">
+                                Descripción breve
+                            </label>
+                            <textarea class="furat-form__input" id="editMetadataDescription" rows="2" placeholder="Opcional"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="furat-modal__footer">
+                    <button class="furat-btn furat-btn--secondary" id="editMetadataModalCancel" type="button">Cancelar</button>
+                    <button class="furat-btn furat-btn--primary" id="editMetadataModalSubmit" type="button">
+                        <i class="fas fa-save"></i>
+                        <span>Guardar metadata</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 📦693 — Context menu para PDFs (click derecho sobre fila de la tabla) -->
+        <div class="furat-folder-context-menu" id="documentContextMenu" role="menu" aria-hidden="true">
+            <div class="furat-folder-context-menu__header">
+                <i class="fas fa-file-pdf" aria-hidden="true"></i>
+                <span id="documentContextMenuName">Reporte</span>
+            </div>
+            <div class="furat-folder-context-menu__divider"></div>
+            <button class="furat-folder-context-menu__item" id="documentContextMenuView" role="menuitem">
+                <i class="fas fa-eye" aria-hidden="true"></i>
+                <span>Ver reporte</span>
+            </button>
+            <button class="furat-folder-context-menu__item" id="documentContextMenuEdit" role="menuitem">
+                <i class="fas fa-clipboard-list" aria-hidden="true"></i>
+                <span>Editar metadata</span>
+            </button>
         </div>
 
         <!-- NOTIFICATION (📦676 — migrado a KAIRToast, sistema moderno unificado.

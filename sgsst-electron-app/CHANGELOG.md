@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.158] - 2026-08-06
+
+### Added
+- **📦692 — feat(furat): navegación recursiva de carpetas (tipo explorador)** — Bug crítico: cuando el user hacía click en una carpeta de año (ej: 2019) que contiene subcarpetas (ej: 2019/Enero, 2019/Febrero), la UI mostraba "No hay reportes en esta carpeta" porque el código solo leía 1 nivel del filesystem. Fix: `getLibraryData` ahora itera recursivamente (función `scanFolderRecursive`, MAX_DEPTH=5), agrega cada subcarpeta con `parentPath` y asigna cada archivo a su carpeta inmediata. Frontend ya estaba preparado (filtra por `parentPath` y `folderPath`).
+- **📦692 — feat(furat): breadcrumb jerárquico con navegación multi-nivel** — ANTES: el breadcrumb solo mostraba el nombre de la carpeta actual ("Todos los Reportes > Enero"). AHORA muestra la cadena completa de ancestros ("Todos los Reportes > 2019 > Enero") y cada nivel es clickeable para volver atrás. Patrón: el último ancestro es solo texto, los demás son botones con `furat-breadcrumb-v2__item`.
+- **📦692 — feat(furat): crear subcarpetas dentro de carpetas existentes** — ANTES: el botón "Agregar período" solo creaba en el submódulo raíz. AHORA, cuando estás dentro de una carpeta (ej: 2019), el modal muestra "Se creará dentro de: 2019" y crea la nueva subcarpeta dentro de la carpeta actual. Implementado con `activeFolder || deriveSubmodulePath()` como parent path.
+- **📦692 — feat(furat): eliminar carpetas (años y meses) con context menu** — Patrón replicado de 1.1.1 responsable-sg. Click derecho sobre folder card → context menu con 3 opciones: "Crear subcarpeta acá" / "Abrir carpeta" (explorador de Windows) / "Eliminar carpeta" (con confirm modal). Backend: `deleteFuratFolder` con recursive `fs.rm` + cleanup de metadata en DB (`DELETE FROM furat_metadata WHERE file_path LIKE folderPath%`). Validación de seguridad: el path debe contener "3.2.1".
+- **📦693 — feat(furat): editar metadata de PDFs legacy con click derecho** — Permite asignar metadata (fecha accidente, tipo, gravedad, área, reportado por, descripción) a PDFs viejos que no tienen. Click derecho sobre fila de la tabla → context menu → "Editar metadata" → modal pre-llenado con metadata existente (si hay) → guardar. Backend: `upsertFuratMetadata` con `INSERT OR REPLACE ON CONFLICT(file_path)` (file_path es UNIQUE). Después de guardar, se refresca la tabla y el dashboard para que el PDF entre en los análisis.
+
+### Changed
+- **📦692-fix — fix(furat): breadcrumb usa `__item` (no `__crumb`)** — El CSS ya define estilos para `.furat-breadcrumb-v2__root` y `__item`. Mi HTML inicial usaba `__crumb` (clase nueva sin CSS), por eso los botones del año/mes se veían con border del input. Renombrado a `__item` para reusar los estilos existentes.
+
 ## [0.1.157] - 2026-08-06
 
 ### Fixed
