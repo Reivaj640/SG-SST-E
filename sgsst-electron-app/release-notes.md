@@ -1,3 +1,55 @@
+# K+AIR v0.1.164
+
+## 🎨 Dashboard principal — reorganización del home de empresa
+
+El home de empresa cambió de un layout con sidebar vertical a un layout horizontal con **módulos arriba** y **tareas full-width abajo**. Más espacio, mejor balance visual, responsive en ventana y maximizado.
+
+### Antes vs Después
+
+| Modo | Antes (v0.1.163) | Después (v0.1.164) |
+|---|---|---|
+| **Maximizado** | Sidebar 280px con módulos + lista 1 col | Módulos en 1 fila + tasks en 2 cols (4×2 = 8 visibles) |
+| **Ventana** | Sidebar angosto + tasks en 1 col | Módulos en 2 filas compactas + tasks en 2 cols |
+| **Críticas** | Border rojo estándar | Highlight rojo completo (bg + border + área de acción) |
+
+### ¿Qué cambió?
+
+1. **Layout reorganizado**:
+   - Módulos del Sistema: fila horizontal de 7 cards compactas (en vez de sidebar vertical)
+   - Pendientes y Tareas: panel full-width debajo de los módulos
+   - Grid reorganizado: `mainGrid` pasa de 2 columnas (sidebar + tasks) a 2 filas (módulos + tasks)
+
+2. **Highlight rojo de tareas críticas** (4 cards: Afiliación SSSI, COPASST Mayo 2026, Comité Sin Acta, Comité Sin reunión Noviembre):
+   - Background `#fef2f2` + border `#fecaca` + border-left `#ef4444` (4px)
+   - Área de acción con `#fee2e2` para distinguir visualmente el botón de flecha
+   - Una sola barra roja en el lateral (no doble)
+
+3. **Responsive window vs maximizado**:
+   - **Ventana (< 1200px)**: módulos en 2 filas compactas (4+3) sin descripción, tasks en 2 cols con cards compactas (font 11-12px, line-clamp 1)
+   - **Maximizado (≥ 1200px)**: módulos en 1 fila, tasks en 2 cols (4×2 = 8 cards visibles)
+   - CSS inyectado dinámicamente, no toca archivos CSS globales
+
+4. **Fix bug del colapso en ventana**:
+   - Bug: las cards se renderizaban como líneas finas rojas (~3-4px) en modo ventana
+   - Causa: `align-content: start` sin `grid-auto-rows` mínimo dejaba los row tracks colapsados
+   - Fix: `grid-auto-rows: minmax(60px, auto)` fuerza altura mínima de 60px por row
+
+### Antes vs Después (visualmente)
+
+**Modo maximizado** (8 cards visibles en 2 filas × 4 cols):
+- Módulos en 1 fila: Recursos, Gestión Integral, Gestión de la Salud, Gestión de Peligros y Riesgos, Gestión de Amenazas, Verificación, Mejoramiento
+- Tasks en 2×4: 1 warning (Presupuesto) + 2 info (Inducciones, COPASST) + 4 critical (Capacitaciones Vencidas, Afiliación SSSI, COPASST Mayo 2026, Comité Sin Acta, Comité Sin reunión Noviembre) — total 8 cards
+
+**Modo ventana** (~8 cards visibles en 4 filas × 2 cols):
+- Módulos en 2 filas: fila 1 (4 cards) + fila 2 (3 cards)
+- Tasks en 2 cols compactas con scroll si no caben todas
+
+### Archivos modificados (1 archivo, +147/-44 líneas)
+
+- `renderer.js`: `createDashboardHome()` reorganiza `mainGrid` + CSS inyectado con media queries
+
+---
+
 # K+AIR v0.1.163
 
 ## 🔧 Plan de Trabajo Anual — math del dashboard corregido + vencidas reales

@@ -3934,19 +3934,26 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
   dashboardContainer.appendChild(kpiRibbon);
 
   // --- MAIN GRID ---
+  // 📦699 · FIX: layout reorganizado. Antes: 2 columnas (280px sidebar + 1fr tasks).
+  // Ahora: 2 filas (modulesRow horizontal + tasksPanel full-width). El sidebar de
+  // módulos pasa a ser una fila de cards compactas, y la lista de tareas ocupa
+  // todo el ancho debajo. Responsive con flex-wrap (módulos se acomodan a múltiples
+  // filas en ventanas angostas).
   const mainGrid = document.createElement('div');
+  mainGrid.className = 'dashboard-main-grid';
   mainGrid.style.cssText = `
     flex: 1;
     display: grid;
-    grid-template-columns: 280px 1fr;
-    grid-template-rows: 1fr;
-    gap: 20px;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+    gap: 16px;
     padding: 10px 30px 20px;
     min-height: 0;
   `;
 
-  // --- PANEL IZQUIERDO: MÓDULOS ---
-  const modulesPanel = document.createElement('aside');
+  // --- PANEL DE MÓDULOS (fila horizontal) ---
+  const modulesPanel = document.createElement('section');
+  modulesPanel.className = 'dashboard-modules-panel';
   modulesPanel.style.cssText = `
     background: white;
     border-radius: 8px;
@@ -3957,17 +3964,26 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
   `;
 
   const panelHeader = document.createElement('div');
+  panelHeader.className = 'dashboard-modules-header';
   panelHeader.style.cssText = `
-    padding: 15px; border-bottom: 1px solid #e2e8f0; font-size: 12px;
+    padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-size: 12px;
     color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;
     background: #f8fafc;
+    display: flex; align-items: center;
   `;
-  panelHeader.textContent = 'Módulos del Sistema';
+  panelHeader.innerHTML = '<i class="fas fa-th-large" style="margin-right: 8px; color: #174ea6;"></i>Módulos del Sistema';
   modulesPanel.appendChild(panelHeader);
 
   const moduleList = document.createElement('div');
   moduleList.setAttribute('data-module-list', 'true');
-  moduleList.style.cssText = 'flex: 1; overflow-y: auto; padding: 10px;';
+  moduleList.className = 'dashboard-modules-row';
+  moduleList.style.cssText = `
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 12px;
+    align-items: stretch;
+  `;
 
   // 📦642 — Sin color por módulo. El SVG hereda currentColor del wrapper.
   const modulesData = [
@@ -3983,20 +3999,21 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
   modulesData.forEach(mod => {
     const item = document.createElement('div');
     item.setAttribute('data-module-name', mod.name);
+    item.className = 'dashboard-module-card';
     item.style.cssText = `
-      display: flex; align-items: center; padding: 12px;
-      border-radius: 6px; margin-bottom: 5px; cursor: pointer;
-      border: 1px solid transparent; transition: all 0.2s;
-      background: transparent;
-      border-color: transparent;
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 12px; min-width: 160px; flex: 1 1 160px;
+      border-radius: 6px; cursor: pointer;
+      border: 1px solid #e2e8f0; transition: all 0.2s;
+      background: #f8fafc;
     `;
     item.onmouseover = function() {
       const isActive = this.getAttribute('data-module-active') === 'true';
-      if (!isActive) { this.style.background = '#f8fafc'; this.style.borderColor = '#e2e8f0'; }
+      if (!isActive) { this.style.background = '#eff6ff'; this.style.borderColor = '#bfdbfe'; }
     };
     item.onmouseout = function() {
       const isActive = this.getAttribute('data-module-active') === 'true';
-      if (!isActive) { this.style.background = 'transparent'; this.style.borderColor = 'transparent'; }
+      if (!isActive) { this.style.background = '#f8fafc'; this.style.borderColor = '#e2e8f0'; }
     };
     item.onclick = function(e) {
       e.stopPropagation();
@@ -4004,15 +4021,15 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
     };
 
     const badgeId = `module-badge-${mod.name.replace(/\s+/g, '-').toLowerCase()}`;
-    const badgeHtml = mod.badge ? `<span id="${badgeId}" data-module="${mod.name}" style="margin-left: auto; font-size: 10px; padding: 4px 10px; border-radius: 12px; font-weight: 600; background: ${getBadgeColor(mod.badgeClass)}; color: ${getBadgeTextColor(mod.badgeClass)}; cursor: pointer; border: 1px solid rgba(0,0,0,0.1);" title="Click para ver alertas de ${mod.name}"><i class="fas fa-filter" style="font-size: 8px; margin-right: 3px;"></i>${mod.badge}</span>` : '';
+    const badgeHtml = mod.badge ? `<span id="${badgeId}" data-module="${mod.name}" style="font-size: 10px; padding: 3px 8px; border-radius: 12px; font-weight: 600; background: ${getBadgeColor(mod.badgeClass)}; color: ${getBadgeTextColor(mod.badgeClass)}; cursor: pointer; border: 1px solid rgba(0,0,0,0.1); white-space: nowrap;" title="Click para ver alertas de ${mod.name}"><i class="fas fa-filter" style="font-size: 8px; margin-right: 3px;"></i>${mod.badge}</span>` : '';
 
     item.innerHTML = `
-      <div style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; margin-right: 10px; font-size: 14px; color: #94a3b8;">
+      <div style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 13px; color: #174ea6; flex-shrink: 0;">
         ${SIDEBAR_ICONS[mod.icon] || ''}
       </div>
-      <div style="flex: 1;">
-        <h4 style="font-size: 13px; font-weight: 600; color: #1e293b; margin-bottom: 1px;">${mod.name}</h4>
-        <span style="font-size: 11px; color: #94a3b8;">${mod.subtitle}</span>
+      <div style="flex: 1; min-width: 0; overflow: hidden;">
+        <h4 style="font-size: 12px; font-weight: 600; color: #1e293b; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${mod.name}</h4>
+        <span style="font-size: 10px; color: #94a3b8; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${mod.subtitle}</span>
       </div>
       ${badgeHtml}
     `;
@@ -4027,7 +4044,7 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
         filterDashboardTasksByModule(moduleName);
       };
     }
-    
+
     moduleList.appendChild(item);
   });
 
@@ -4066,8 +4083,16 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
   tasksPanel.appendChild(tasksHeader);
 
   const tasksList = document.createElement('div');
+  // 📦699 · FIX v6: container con grid + grid-auto-rows mínimo de 60px.
+  // El problema en modo ventana era que el grid con `align-content: start`
+  // y sin `grid-auto-rows` mínimo colapsaba las cards a alturas muy pequeñas
+  // (~3-4px), mostrando solo el background+border-left como líneas finas.
+  // `grid-auto-rows: minmax(60px, auto)` fuerza a cada row a tener al menos
+  // 60px de altura, y `align-content: start` alinea las rows al top del
+  // container (con overflow-y: auto hace scroll si no caben).
   tasksList.id = 'tasks-container';
-  tasksList.style.cssText = 'flex: 1; overflow-y: auto; padding: 15px 20px;';
+  tasksList.className = 'dashboard-tasks-grid';
+  tasksList.style.cssText = 'flex: 1; min-height: 0; overflow-y: auto; padding: 15px 20px; display: grid; grid-template-columns: 1fr; grid-auto-rows: minmax(60px, auto); gap: 10px; align-content: start;';
   tasksList.innerHTML = `
     <div style="text-align: center; padding: 40px; color: #94a3b8;">
       <i class="fas fa-spinner fa-spin" style="font-size: 32px; margin-bottom: 10px;"></i>
@@ -4092,6 +4117,70 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
     if (cls === 'bg-orange') return '#c2410c';
     if (cls === 'bg-green') return '#166534';
     return '#3730a3';
+  }
+
+  // 📦699 · FIX: CSS responsivo para el dashboard reorganizado.
+  // En modo ventana angosta (< 1200px) los módulos se acomodan en filas más
+  // cortas y la cinta de KPIs se comprime. En modo maximizado (>= 1200px)
+  // los 7 módulos caben en una sola fila horizontal.
+  const dashboardResponsiveStyle = document.createElement('style');
+  dashboardResponsiveStyle.id = 'dashboard-responsive-style';
+  dashboardResponsiveStyle.textContent = `
+    /* Reforzar min-height del task card para evitar colapso en modo ventana.
+       El grid-auto-rows del inline style también lo protege, pero el
+       !important aquí es defensa adicional. */
+    .task-card { min-height: 60px !important; }
+    /* Modo ventana: módulos en 2 filas más compactos (sin descripción),
+       tasks en 2 columnas (auto-fit) para ver más cards sin scroll.
+       Font-sizes reducidos en task cards para que el texto quepa mejor. */
+    @media (max-width: 1199px) {
+      .dashboard-kpi-ribbon { margin: 12px 16px 0 !important; }
+      .dashboard-kpi-ribbon .k-stats-ribbon__value { font-size: 22px !important; }
+      .dashboard-kpi-ribbon .k-stats-ribbon__label { font-size: 11px !important; }
+      /* Reducir padding del mainGrid en ventana: 10/16/10 vs 10/30/20.
+         Eso le da ~20px más de altura al tasksPanel. */
+      .dashboard-main-grid { padding: 10px 16px !important; gap: 10px !important; }
+      .dashboard-modules-row { gap: 6px !important; padding: 8px !important; }
+      /* Módulos en ventana: min-width 220px para que 4 quepan en fila 1
+         (Recursos, Gestión Integral, Gestión de la Salud, Gestión de Peligros
+         y Riesgos) y los 3 restantes bajen a fila 2 (Gestión de Amenazas,
+         Verificación, Mejoramiento). Sin subtitle (oculto abajo). */
+      .dashboard-module-card { min-width: 220px !important; flex: 1 1 220px !important; padding: 6px 10px !important; }
+      .dashboard-module-card h4 { font-size: 12px !important; line-height: 1.2 !important; }
+      /* Ocultar el subtitle (descripción) en ventana para ahorrar altura */
+      .dashboard-module-card span { display: none !important; }
+      .dashboard-module-card > div:first-child { width: 24px !important; height: 24px !important; font-size: 12px !important; }
+      /* Tasks en 2 columnas en ventana (auto-fit, minmax 280px). */
+      .dashboard-tasks-grid { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important; gap: 8px !important; }
+      /* Task card más compacto en ventana: padding y font reducidos */
+      .task-card { min-height: 60px !important; padding: 8px 10px !important; gap: 8px !important; }
+      /* Icon del task card */
+      .task-card > div:first-child { width: 28px !important; height: 28px !important; font-size: 12px !important; }
+      /* Tags (priority + submodule): font más pequeño */
+      .task-card .tag { font-size: 9px !important; padding: 1px 5px !important; }
+      /* Title (segundo div dentro del text container): font más pequeño */
+      .task-card > div:nth-child(2) > div:nth-child(2) { font-size: 12px !important; line-height: 1.2 !important; margin-bottom: 1px !important; }
+      /* Desc (tercer div dentro del text container): font más pequeño, 1 línea */
+      .task-card > div:nth-child(2) > div:nth-child(3) { font-size: 10px !important; line-height: 1.2 !important; -webkit-line-clamp: 1 !important; }
+      /* Action arrow */
+      .task-card > div:last-child { width: 28px !important; height: 28px !important; }
+      .task-card > div:last-child i { font-size: 11px !important; }
+    }
+    /* Modo maximizado: tasks en 2 columnas (auto-fit, minmax 380px), módulos en 1 fila */
+    @media (min-width: 1200px) {
+      .dashboard-modules-row { gap: 12px !important; }
+      .dashboard-module-card { min-width: 165px !important; flex: 1 1 165px !important; }
+      .dashboard-tasks-grid { grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)) !important; gap: 10px !important; }
+    }
+    /* 📦699 · FIX v2: el highlight rojo de tareas críticas se hace con
+       border-left + background (igual que WARNING/INFO), sin pseudo-element
+       adicional que duplicaba la barra roja en el lateral izquierdo.
+       El background #fef2f2 + border #fecaca + border-left #ef4444 dan
+       suficiente distinción visual sin romper la consistencia con las
+       demás cards. */
+  `;
+  if (!document.getElementById('dashboard-responsive-style')) {
+    document.head.appendChild(dashboardResponsiveStyle);
   }
 
   // ==========================================
@@ -4234,22 +4323,22 @@ function filterDashboardTasksByModule(moduleName) {
 function updateModuleSelection(selectedModuleName) {
   const moduleList = document.querySelector('[data-module-list]');
   if (!moduleList) return;
-  
+
   const items = moduleList.querySelectorAll('[data-module-name]');
   items.forEach(item => {
     const moduleName = item.getAttribute('data-module-name');
     const isActive = selectedModuleName && moduleName === selectedModuleName;
-    
+
     // Actualizar atributo data-module-active
     item.setAttribute('data-module-active', isActive ? 'true' : 'false');
-    
-    // Actualizar estilos
+
+    // Actualizar estilos (📦699: layout horizontal — fondo por defecto #f8fafc)
     if (isActive) {
       item.style.background = '#eff6ff';
       item.style.borderColor = '#bfdbfe';
     } else {
-      item.style.background = 'transparent';
-      item.style.borderColor = 'transparent';
+      item.style.background = '#f8fafc';
+      item.style.borderColor = '#e2e8f0';
     }
   });
   
@@ -4324,40 +4413,54 @@ function renderTasks(tasks) {
     `;
     return;
   }
-  
-  container.innerHTML = tasks.map(task => `
-    <div class="task-card ${task.priority || ''}"
+
+  // 📦699 · FIX v5: layout SIMPLIFICADO del task card. Antes usaba flex con
+  // align-items: stretch + overflow: hidden + flex children anidados, lo que
+  // causaba que las cards se colapsaran a líneas finas en modo ventana (el
+  // contenido no se renderizaba). Ahora: flex row simple de 3 elementos
+  // (icon + text + arrow) con align-items: center. Sin overflow hidden, sin
+  // flex children anidados, sin min-width: 0 que cause colapso.
+  container.innerHTML = tasks.map(task => {
+    const isCritical = (task.priority || '').toLowerCase() === 'critical';
+    const taskBg = isCritical ? '#fef2f2' : '#f8fafc';
+    const taskBgHover = isCritical ? '#fee2e2' : 'white';
+    const iconBg = isCritical ? 'rgba(254, 226, 226, 0.6)' : 'rgba(255,255,255,0.7)';
+
+    return `
+    <div class="task-card ${task.priority || ''}${isCritical ? ' task-critical' : ''}"
       data-module="${(task.module || '').replace(/"/g, '&quot;')}"
       data-submodule="${(task.submodule || '').replace(/"/g, '&quot;')}"
       onclick="navigateToModule(this.dataset.module, this.dataset.submodule)"
       style="
-      background: #f8fafc;
+      background: ${taskBg};
       border-radius: 6px;
       margin-bottom: 10px;
       border-left: 4px solid ${getTaskBorderColor(task.priority)};
       padding: 12px 15px;
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       gap: 12px;
-      transition: transform 0.1s, box-shadow 0.1s;
+      transition: transform 0.1s, box-shadow 0.1s, background 0.1s;
       cursor: pointer;
-    " onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 6px rgba(0,0,0,0.05)'; this.style.background='white';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'; this.style.background='#f8fafc';">
-      <div style="width: 36px; height: 36px; border-radius: 6px; background: #f1f5f9; color: #174ea6; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 14px;">
+      min-height: 60px;
+    " onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 6px rgba(0,0,0,0.05)'; this.style.background='${taskBgHover}';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'; this.style.background='${taskBg}';">
+      <div style="width: 36px; height: 36px; border-radius: 6px; background: ${iconBg}; color: #174ea6; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 14px;">
         <i class="${task.icon || 'fas fa-tasks'}"></i>
       </div>
-      <div style="flex: 1; min-width: 0;">
-        <div style="display: flex; gap: 8px; margin-bottom: 4px; flex-wrap: wrap;">
+      <div style="flex: 1; min-width: 0; overflow: hidden;">
+        <div style="display: flex; gap: 6px; margin-bottom: 4px; flex-wrap: wrap;">
           <span class="tag" style="font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; background: ${getTagColor(task.priority)}; color: ${getTagTextColor(task.priority)};">${task.priority ? task.priority.toUpperCase() : 'INFO'}</span>
           ${task.submodule ? `<span style="font-size: 10px; font-weight: 500; padding: 2px 6px; border-radius: 4px; background: #e0e7ff; color: #3730a3;">${task.submodule}</span>` : ''}
         </div>
-        <div style="font-size: 13px; font-weight: 600; color: #1e293b; margin-bottom: 2px;">${task.title || 'Tarea sin título'}</div>
-        <div style="font-size: 12px; color: #64748b; line-height: 1.3;">${task.desc || ''}</div>
+        <div style="font-size: 13px; font-weight: 600; color: #1e293b; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${task.title || 'Tarea sin título'}</div>
+        <div style="font-size: 12px; color: #64748b; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${task.desc || ''}</div>
       </div>
-      <button style="width: 30px; height: 30px; border-radius: 50%; border: none; background: transparent; color: #94a3b8; cursor: pointer; transition: all 0.2s; flex-shrink: 0;" onmouseover="this.style.background='#174ea6'; this.style.color='white'" onmouseout="this.style.background='transparent'; this.style.color='#94a3b8'">
-        <i class="fas fa-arrow-right"></i>
-      </button>
+      <div style="flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: transparent; color: #174ea6; transition: all 0.15s;" onmouseover="this.style.background='#174ea6'; this.style.color='white'" onmouseout="this.style.background='transparent'; this.style.color='#174ea6'">
+        <i class="fas fa-arrow-right" style="font-size: 13px;"></i>
+      </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 // Función para navegar a un módulo desde una tarea

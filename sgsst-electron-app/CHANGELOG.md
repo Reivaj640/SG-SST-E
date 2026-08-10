@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.164] - 2026-08-10
+
+### Changed
+- **📦699 — feat(dashboard): reorganización del home de empresa** — El dashboard principal (home de empresa) cambió de un layout de sidebar vertical a un layout horizontal con 2 filas:
+  - **Fila 1 — Módulos del Sistema**: los 7 módulos pasan de sidebar vertical (280px) a una fila horizontal de cards compactas, con `flex-wrap` para responsivo.
+  - **Fila 2 — Pendientes y Tareas**: la lista de tareas ocupa todo el ancho debajo de los módulos, en grid de 2 columnas (maximizado) o 1-2 columnas (ventana).
+
+  - **Highlight rojo de tareas críticas**: las 4 tareas `critical` (Afiliación SSSI, COPASST Mayo 2026, Comité Sin Acta, Comité Sin reunión Noviembre) ahora tienen `background: #fef2f2` + `border: #fecaca` + `border-left: 4px solid #ef4444` + área de acción con `#fee2e2`. Una sola barra roja en el lateral (no doble, removido `::before` que duplicaba).
+
+  - **Responsive window vs maximizado** (vía CSS inyectado dinámicamente con `<style id="dashboard-responsive-style">`):
+    - **Ventana (`< 1200px`)**: módulos en 2 filas más compactas (sin descripción, solo título + badge) con min-width 220px → 4 en fila 1 + 3 en fila 2. Tasks en 2 columnas con minmax 280px. Cards más compactas (padding 8/10, font 11-12px, line-clamp 1 en descripción).
+    - **Maximizado (`>= 1200px`)**: módulos en 1 fila, tasks en 2 columnas con minmax 380px (4 cards por fila × 2 filas = 8 cards visibles).
+
+  - **Fix bug del colapso en ventana**: el `tasksList` (grid container) colapsaba las cards a líneas finas rojas (~3-4px) en modo ventana porque `align-content: start` sin `grid-auto-rows` mínimo dejaba que los row tracks tuvieran altura ridículamente pequeña. Fix: `grid-auto-rows: minmax(60px, auto)` fuerza altura mínima de 60px por row, y `min-height: 60px !important` en `.task-card` como defensa adicional.
+
+  - **Archivos modificados** (1 archivo, +147/-44 líneas):
+    - `renderer.js`: `createDashboardHome()` reorganiza `mainGrid` de `grid-template-columns: 280px 1fr` a `grid-template-rows: auto 1fr`. CSS inyectado dinámicamente con media queries. `renderTasks()` mantiene el layout flex row simple de 3 elementos (icon + text + arrow) con `min-height: 60px` y `align-items: center` para evitar colapso.
+
+  - **Aplica solo al home de empresa** (`showDashboardHome()`). No afecta el home de login, settings, ni los homes de cada módulo.
+
 ## [0.1.163] - 2026-08-07
 
 ### Fixed
