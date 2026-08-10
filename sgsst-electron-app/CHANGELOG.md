@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.165] - 2026-08-10
+
+### Fixed
+- **📦700 — fix(updater): el auto-updater falla con "Cannot find module 'X'" después de un update** — Cuando la app instalada (ej: v0.1.146) recibe un update a una versión que agrega nuevos módulos a `package.json` (ej: `exceljs`, `docxtemplater`), el update descarga e instala el código nuevo pero los `node_modules/` no se actualizan. Resultado: la app crashea al iniciar con `Cannot find module 'exceljs'`.
+
+  - **Root cause**: 
+    1. La app estaba empaquetada con `"asar": false` — los `node_modules/` van sueltos en `resources/app/`
+    2. El instalador NSIS con differential install (blockmap) **solo reemplaza archivos modificados**, no agrega archivos nuevos
+    3. Si una nueva versión agrega un módulo que la vieja no tenía, el blockmap no lo incluye
+    4. La versión vieja sigue con `node_modules/` viejos (sin el módulo nuevo)
+    5. Cuando el nuevo `main.js` requiere el módulo nuevo, Node no lo encuentra y la app crashea
+
+  - **Fix**: cambiar `"asar": false` → `"asar": true` y agregar `asarUnpack` para los archivos que necesitan acceso directo al filesystem:
+    - `**/node_modules/better-sqlite3/**` — native module (.node binary), node-gyp no puede cargar desde asar
+    - `**/node_modules/@napi-rs/canvas*/**` — native module (skia binding)
+    - `**/node_modules/bcryptjs/**` — puede tener binarios nativos
+    - `**/utils/**` — archivos de plantilla (.xls, .xlsx) que se leen con `fs.existsSync` desde `__dirname`
+    - `**/components/config/**` — config files (.json) que se leen con `fs.existsSync`
+
+  - **Por qué esto resuelve el problema**: con `asar: true`, el código y los `node_modules/` van empaquetados en un solo `app.asar` (excepto los unpacked). Cuando el instalador NSIS reemplaza el .asar, **TODOS** los archivos del .asar se actualizan atómicamente, incluyendo los nuevos módulos. Ya no hay riesgo de archivos viejos sin reemplazar.
+
+  - **Cambio complementario en `main.js`**: `findPython()` ahora usa `process.resourcesPath` cuando la app está empaquetada, en lugar de `__dirname`. Esto es necesario porque con `asar: true`, los archivos dentro del .asar no se pueden ejecutar directamente (los .exe no funcionan desde un .asar). Python está en `process.resourcesPath/python-embed/` (vía `extraResources`).
+
+  - **Archivos modificados** (2 archivos, +13/-4 líneas):
+    - `package.json`: cambiar `asar: false` → `asar: true`, agregar `asarUnpack` con 5 patrones
+    - `main.js`: `findPython()` usa `process.resourcesPath` cuando `app.isPackaged` es true
+
+  - **Nota para el usuario**: si tienes v0.1.146 instalada con el update v0.1.164 descargado pero sin poder aplicar (dot verde "Lista para reiniciar" + error "Cannot find module"), **descarga manualmente** el instalador de v0.1.165 desde el release de GitHub y ejecútalo. El instalador nuevo detectará que ya hay una versión instalada y hará un upgrade limpio, instalando el .asar completo con todos los módulos.
+
 ## [0.1.164] - 2026-08-10
 
 ### Changed

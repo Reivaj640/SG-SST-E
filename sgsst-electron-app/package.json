@@ -1,6 +1,6 @@
 {
   "name": "sgsst-electron-app",
-  "version": "0.1.164",
+  "version": "0.1.165",
   "description": "Sistema de Gestión de Seguridad y Salud en el Trabajo",
   "main": "main.js",
   "author": "Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos.",
@@ -53,7 +53,14 @@
     "productName": "K+AIR",
     "artifactName": "K-AIR-Setup-${version}.${ext}",
     "copyright": "Copyright © 2025 Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos.",
-    "asar": false,
+    "asar": true,
+    "asarUnpack": [
+      "**/node_modules/better-sqlite3/**",
+      "**/node_modules/@napi-rs/canvas*/**",
+      "**/node_modules/bcryptjs/**",
+      "**/utils/**",
+      "**/components/config/**"
+    ],
     "directories": {
       "output": "dist"
     },

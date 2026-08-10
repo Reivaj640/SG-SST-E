@@ -195,10 +195,17 @@ async function findPython() {
 	console.log('[DEBUG] Starting Python path search');
 
 	// 1. Priorizar Python del proyecto (python-embed y .venv) antes que el del sistema
-	// Esto garantiza que se use el Python con todas las dependencias instaladas
+	// Esto garantiza que se use el Python con todas las dependencias instaladas.
+	// 📦700: cuando la app está empaquetada con asar: true, Python se copia
+	// a process.resourcesPath/python-embed/ vía extraResources (FUERA del asar,
+	// porque .exe no se puede ejecutar desde dentro de un .asar). En desarrollo
+	// está en __dirname/Portear/python-embed/.
+	const isPackaged = app && typeof app.isPackaged === 'boolean' ? app.isPackaged : false;
+	const baseDir = isPackaged ? (process.resourcesPath || __dirname) : __dirname;
 	const projectPythonPaths = [
-		path.join(__dirname, 'Portear', 'python-embed', 'python.exe'),
-		path.join(__dirname, 'Portear', '.venv', 'Scripts', 'python.exe')
+		path.join(baseDir, 'python-embed', 'python.exe'),
+		path.join(baseDir, 'Portear', 'python-embed', 'python.exe'),
+		path.join(baseDir, 'Portear', '.venv', 'Scripts', 'python.exe')
 	];
 
 	for (const p of projectPythonPaths) {

@@ -1,3 +1,37 @@
+# K+AIR v0.1.165
+
+## 🔧 Auto-updater — fix del bug "Cannot find module" después de updates
+
+Si tu app estaba en **v0.1.146** (o cualquier versión vieja) y mostraba el dot verde "Lista para reiniciar" + error `Cannot find module 'exceljs'` al abrir, este release lo soluciona.
+
+### ¿Qué pasaba?
+
+El instalador NSIS con `asar: false` solo reemplazaba archivos modificados, no agregaba nuevos. Si una nueva versión agregaba un módulo a `package.json` que la versión vieja no tenía, el `node_modules/` no se actualizaba y la nueva versión crasheaba al iniciar.
+
+### ¿Qué se arregló?
+
+1. **`asar: false` → `asar: true`**: ahora el código y los `node_modules/` van empaquetados en un solo `app.asar` (con `asarUnpack` para native modules y archivos de plantilla). El instalador reemplaza el .asar atómicamente, **todos los archivos se actualizan siempre**.
+
+2. **`asarUnpack` configurado** para:
+   - `better-sqlite3`, `@napi-rs/canvas*`, `bcryptjs` (native modules con binarios .node)
+   - `utils/` (plantillas .xls/.xlsx que se leen directamente)
+   - `components/config/` (config files .json)
+
+3. **`findPython()` corregido** para usar `process.resourcesPath` cuando la app está empaquetada, en lugar de `__dirname` (que apunta al .asar donde los .exe no se pueden ejecutar).
+
+### Si tienes el update roto (v0.1.164 descargado pero no aplicado)
+
+1. **Cerrar la app** (Ctrl+Q)
+2. **Descargar manualmente** el instalador v0.1.165 desde este release
+3. **Ejecutarlo** — el NSIS oneClick detectará la versión instalada y hará un upgrade limpio
+
+### Archivos modificados (2 archivos, +13/-4 líneas)
+
+- `package.json`: `asar: true` + `asarUnpack` con 5 patrones
+- `main.js`: `findPython()` usa `process.resourcesPath` cuando `app.isPackaged` es true
+
+---
+
 # K+AIR v0.1.164
 
 ## 🎨 Dashboard principal — reorganización del home de empresa
