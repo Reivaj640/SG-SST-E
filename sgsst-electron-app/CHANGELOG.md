@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.167] - 2026-08-11
+
+### Added
+- **📦702 (FASE 2) — feat(ausentismo): botón "Exportar a Excel" en la vista de Seguimiento de Incapacidades** — Después de guardar un caso en SQLite, el user puede exportarlo a Excel con un click. El banner BD en la parte superior del formulario muestra el estado actual del caso (Sin guardar / Guardado en BD / Guardado y exportado a Excel / Error) y habilita el botón de export cuando hay caso guardado.
+
+  - **📦703 (FASE 3) — feat(ausentismo): modal "Ver casos en BD"** — Lista todos los casos respaldados en SQLite para la empresa actual. Tabla con cédula, nombre, fechas, diagnóstico, estado, indicador de exportado a Excel (Sí/Fecha o Pendiente). Acciones por caso: Exportar individual a Excel, Eliminar de BD (con confirmación, no afecta el Excel). Botón "Exportar todos pendientes" en la cabecera para sync masiva.
+
+  - **📦704 — feat(ui): header con auto-hide a 30 segundos** — El header de la app se ocultaba automáticamente después de 5s (lógica de hover) PERO cuando había notificaciones quedaba pinned para siempre. Ahora: cuando hay notificaciones, el header aparece pinned por 30 segundos y luego se oculta automáticamente. Si llegan NUEVAS notificaciones (count sube), el timer se resetea. Si el refresh periódico trae el mismo count, el timer NO se resetea (así el header sí se oculta aunque el polling siga activo).
+
+### Changed
+- **📦702 — feat(ausentismo): mensaje de éxito del guardado en BD** — Antes: "Caso ACTUALIZADO en fila X para Y". Ahora: "Caso GUARDADO/ACTUALIZADO en BD para Y. Click 'Exportar a Excel' para sincronizar." (refleja el nuevo flujo SQLite-primario).
+- **📦702 — feat(ausentismo): texto del botón "Guardar en Excel" → "Guardar en BD"** — Refleja que el guardado va a SQLite, no a Excel.
+
+### Files
+- `shared/kair-alerts.js`: `_pinHeader(count)` con timer de 30s, solo resetea si count sube (+32/-2)
+- `modules/gestion-salud/ausentismo/medicion-ausentismo.js`: banner BD + 8 métodos nuevos (exportar, lista, eliminar, helpers) + estilos CSS del banner (+332/-1)
+
 ## [0.1.166] - 2026-08-11
 
 ### Changed

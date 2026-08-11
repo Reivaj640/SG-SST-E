@@ -242,14 +242,44 @@
     }
   }
 
-  // ── Pin / unpin del header ──────────────────────────────────────────
+  // ── Pin / unpin del header con auto-hide ────────────────────────────
+  // 📦703 (2026-08-11) — Comportamiento normal: cuando hay notificaciones,
+  // el header se "anuncia" (pinned) por 30 segundos, luego se oculta aunque
+  // sigan habiendo notificaciones. Si llegan NUEVAS notificaciones (count
+  // sube vs. el último refresh), el timer se resetea y se vuelve a mostrar
+  // por otros 30s. Si el refresh se llama con el mismo count, NO resetea
+  // (así el header sí se oculta a los 30s aunque el polling siga activo).
+  var HEADER_PIN_DURATION_MS = 30 * 1000; // 30 segundos
+  var _headerPinTimer = null;
+  var _lastPinnedCount = 0;
   function _pinHeader(count) {
     var hdr = document.getElementById('app-header');
     if (!hdr) return;
     if (count > 0) {
-      hdr.classList.add('app-header-pinned');
+      if (count > _lastPinnedCount) {
+        // Hay nuevas notificaciones (count subió). Resetear timer y mostrar.
+        if (_headerPinTimer) {
+          clearTimeout(_headerPinTimer);
+          _headerPinTimer = null;
+        }
+        hdr.classList.add('app-header-pinned');
+        _headerPinTimer = setTimeout(function () {
+          hdr.classList.remove('app-header-pinned');
+          _headerPinTimer = null;
+        }, HEADER_PIN_DURATION_MS);
+      }
+      // Si count === _lastPinnedCount, NO hacemos nada: dejar que el timer
+      // actual corra para que el header sí se oculte a los 30s aunque el
+      // refresh periódico siga marcando count > 0.
+      _lastPinnedCount = count;
     } else {
+      // Sin notificaciones → quitar pinned inmediatamente y limpiar timer
+      if (_headerPinTimer) {
+        clearTimeout(_headerPinTimer);
+        _headerPinTimer = null;
+      }
       hdr.classList.remove('app-header-pinned');
+      _lastPinnedCount = 0;
     }
   }
 

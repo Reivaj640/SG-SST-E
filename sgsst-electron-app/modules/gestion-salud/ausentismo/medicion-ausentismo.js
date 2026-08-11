@@ -21,6 +21,10 @@ class MedicionAusentismoComponent {
         this.logMessage = (msg, type) => console.log(`[${type}] ${msg}`); // Placeholder
         this.excelInitialized = false; // Para saber si ya inicializamos el gestor de Excel
 
+        // 📦701 — Estado del caso actual en BD (después de guardar seguimiento de incapacidad)
+        this.currentCasoBdId = null;
+        this.currentCasoBdEsActualizacion = false;
+
         // 📦459 (2026-07-02) — Estado del último load de PI-FO-076. Se llena cada vez
         // que se llama readAusentismoData. Sirve para que el wizard seguimiento sepa
         // si debe mostrar banner preventivo en la Sección 2 cuando los datos de
@@ -2778,6 +2782,35 @@ class MedicionAusentismoComponent {
                     background: var(--sp-primary-light); transform: translateY(-1px);
                 }
 
+                /* 📦701 — Banner BD: estado del caso actual en SQLite + acciones */
+                .sp-bd-banner {
+                    display: flex; align-items: center; gap: 12px;
+                    padding: 10px 16px;
+                    border-radius: 8px;
+                    margin: 0 16px 12px;
+                    transition: all 0.2s ease;
+                }
+                .sp-bd-banner .sp-bd-banner-icon {
+                    width: 32px; height: 32px; border-radius: 6px;
+                    display: flex; align-items: center; justify-content: center;
+                    font-size: 14px; flex-shrink: 0;
+                }
+                .sp-bd-banner .sp-bd-banner-text { flex: 1; line-height: 1.35; font-size: 13px; }
+                .sp-bd-banner .sp-bd-banner-text strong { font-weight: 600; }
+                .sp-bd-banner .sp-bd-banner-text small { display: block; font-size: 11.5px; opacity: 0.8; margin-top: 2px; }
+                .sp-bd-banner .sp-bd-banner-actions { display: flex; gap: 6px; flex-shrink: 0; }
+                .sp-bd-banner.is-unsaved { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+                .sp-bd-banner.is-unsaved .sp-bd-banner-icon { background: #94a3b8; color: white; }
+                .sp-bd-banner.is-saved { background: #ecfdf5; color: #065f46; border: 1px solid #6ee7b7; }
+                .sp-bd-banner.is-saved .sp-bd-banner-icon { background: #10b981; color: white; }
+                .sp-bd-banner.is-exported { background: #eff6ff; color: #1e40af; border: 1px solid #93c5fd; }
+                .sp-bd-banner.is-exported .sp-bd-banner-icon { background: #3b82f6; color: white; }
+                .sp-bd-banner.is-error { background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; }
+                .sp-bd-banner.is-error .sp-bd-banner-icon { background: #ef4444; color: white; }
+                .sp-btn-export { background: #10b981; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; }
+                .sp-btn-export:hover:not(:disabled) { background: #059669; }
+                .sp-btn-export:disabled { background: #10b981; }
+
                 /* Atenuación — sólo aplica a Calificación PCL, que genuinamente requiere
                 ser caso PRI formal. La sección Etapas PRIC nunca se atenúa: el usuario debe
                 poder entrar a diligenciar lo que aplique sin estar bloqueado. */
@@ -2870,6 +2903,23 @@ class MedicionAusentismoComponent {
                     <button class="sp-close-btn" onclick="window.medicAusentismoComponent.closeSeguimientoPanel()">
                         <i class="fas fa-times"></i>
                     </button>
+                </div>
+
+                <!-- 📦701 — Banner BD: estado del caso actual en SQLite + acciones de export -->
+                <div id="sp-bd-banner" class="sp-bd-banner is-unsaved">
+                    <div class="sp-bd-banner-icon"><i class="fas fa-database"></i></div>
+                    <div class="sp-bd-banner-text" id="sp-bd-banner-text">
+                        <strong>📦 Estado en BD: <span id="sp-bd-estado">Sin guardar</span></strong>
+                        <small id="sp-bd-banner-subtext">Guarda el caso primero. Luego puedes exportarlo a Excel con un click.</small>
+                    </div>
+                    <div class="sp-bd-banner-actions">
+                        <button class="sp-btn sp-btn-export" id="sp-btn-export-individual" onclick="window.medicAusentismoComponent.exportarCasoActualAExcel()" disabled style="opacity: 0.5; cursor: not-allowed;">
+                            <i class="fas fa-file-excel"></i> Exportar a Excel
+                        </button>
+                        <button class="sp-btn sp-btn-outline" onclick="window.medicAusentismoComponent.mostrarListaCasosBD()">
+                            <i class="fas fa-list"></i> Ver casos en BD
+                        </button>
+                    </div>
                 </div>
 
                 <!-- 📦 Banner PRI: estado formal del caso (PRIC formal vs seguimiento simple) + control directo -->
@@ -3761,7 +3811,7 @@ class MedicionAusentismoComponent {
                             Siguiente <i class="fas fa-arrow-right"></i>
                         </button>
                         <button class="sp-btn sp-btn-success" onclick="window.medicAusentismoComponent.saveSeguimientoData()">
-                            <i class="fas fa-save"></i> Guardar en Excel
+                            <i class="fas fa-save"></i> Guardar en BD
                         </button>
                     </div>
                 </div>
@@ -3806,6 +3856,281 @@ class MedicionAusentismoComponent {
         if (backdrop) {
             backdrop.classList.remove('active');
         }
+        this.currentCasoBdId = null;
+        this.currentCasoBdEsActualizacion = false;
+    }
+
+    // ================================================================
+    // 📦701 — Métodos del banner BD: export + lista de casos
+    // ================================================================
+
+    /**
+     * Actualiza el banner BD con el estado actual del caso.
+     * @param {string} estado - 'sin-guardar' | 'guardado' | 'exportado' | 'error'
+     * @param {object} extra - datos extra (ej: fila del Excel, fecha de export)
+     */
+    _actualizarBannerBD(estado, extra) {
+        const banner = document.getElementById('sp-bd-banner');
+        const estadoEl = document.getElementById('sp-bd-estado');
+        const subtextEl = document.getElementById('sp-bd-banner-subtext');
+        const btnExport = document.getElementById('sp-btn-export-individual');
+        if (!banner || !estadoEl || !subtextEl || !btnExport) return;
+
+        if (estado === 'guardado') {
+            estadoEl.textContent = '✅ Guardado en BD';
+            subtextEl.textContent = 'El caso está en SQLite. Puedes exportarlo a Excel cuando quieras.';
+            btnExport.disabled = false;
+            btnExport.style.opacity = '1';
+            btnExport.style.cursor = 'pointer';
+            banner.className = 'sp-bd-banner is-saved';
+        } else if (estado === 'exportado') {
+            estadoEl.textContent = '✅ Guardado y exportado a Excel';
+            subtextEl.textContent = extra && extra.fila
+                ? `Exportado en fila ${extra.fila} del Excel el ${new Date().toLocaleDateString()}.`
+                : 'Exportado a Excel correctamente.';
+            btnExport.disabled = true;
+            btnExport.style.opacity = '0.5';
+            btnExport.style.cursor = 'not-allowed';
+            banner.className = 'sp-bd-banner is-exported';
+        } else if (estado === 'error') {
+            estadoEl.textContent = '❌ Error al guardar';
+            subtextEl.textContent = (extra && extra.message) || 'Error desconocido';
+            btnExport.disabled = true;
+            btnExport.style.opacity = '0.5';
+            btnExport.style.cursor = 'not-allowed';
+            banner.className = 'sp-bd-banner is-error';
+        } else {
+            estadoEl.textContent = 'Sin guardar';
+            subtextEl.textContent = 'Guarda el caso primero. Luego puedes exportarlo a Excel con un click.';
+            btnExport.disabled = true;
+            btnExport.style.opacity = '0.5';
+            btnExport.style.cursor = 'not-allowed';
+            banner.className = 'sp-bd-banner is-unsaved';
+        }
+    }
+
+    /**
+     * Exporta el caso actual (que está en BD) a Excel via Python.
+     * Marca el caso como exportado al finalizar.
+     */
+    async exportarCasoActualAExcel() {
+        if (!this.currentCasoBdId) {
+            this.showNotification('⚠️ No hay un caso guardado en BD para exportar. Guarda primero.', 'warning');
+            return;
+        }
+        const segInc = window.electronAPI?.seguimientoIncapacidad || window.parent?.electronAPI?.seguimientoIncapacidad;
+        if (!segInc?.exportarExcel) {
+            this.showNotification('❌ Error: API de export no disponible', 'error');
+            return;
+        }
+
+        this.showNotification('⏳ Exportando caso a Excel...', 'info');
+        console.log('[EXPORTAR EXCEL] Caso:', this.currentCasoBdId, 'Empresa:', this.currentCompany);
+
+        try {
+            const result = await segInc.exportarExcel({ empresaId: this.currentCompany, casoId: this.currentCasoBdId });
+            console.log('[EXPORTAR EXCEL] Resultado:', result);
+            if (result && result.success) {
+                this._actualizarBannerBD('exportado', { fila: result.data?.fila });
+                this.showNotification(`✅ Caso exportado a Excel en fila ${result.data?.fila || '?'}`, 'success');
+            } else {
+                const errorMsg = result?.error?.message || 'Error desconocido';
+                this.showNotification(`❌ Error al exportar: ${errorMsg}`, 'error');
+            }
+        } catch (e) {
+            console.error('[EXPORTAR EXCEL] Error:', e);
+            this.showNotification(`❌ Error: ${e.message}`, 'error');
+        }
+    }
+
+    /**
+     * Exporta TODOS los casos pendientes (exportado_excel_en IS NULL) a Excel.
+     */
+    async exportarTodosCasosBD() {
+        const segInc = window.electronAPI?.seguimientoIncapacidad || window.parent?.electronAPI?.seguimientoIncapacidad;
+        if (!segInc?.exportarTodos) {
+            this.showNotification('❌ Error: API no disponible', 'error');
+            return;
+        }
+        this.showNotification('⏳ Exportando TODOS los casos pendientes a Excel...', 'info');
+        try {
+            const result = await segInc.exportarTodos({ empresaId: this.currentCompany });
+            console.log('[EXPORTAR TODOS] Resultado:', result);
+            if (result && result.success) {
+                const d = result.data || {};
+                this.showNotification(`✅ Exportados: ${d.exitosos || 0} | Fallidos: ${d.fallidos || 0} | Total: ${d.total || 0}`, 'success');
+            } else {
+                this.showNotification(`❌ Error: ${result?.error?.message || 'desconocido'}`, 'error');
+            }
+        } catch (e) {
+            this.showNotification(`❌ Error: ${e.message}`, 'error');
+        }
+    }
+
+    /**
+     * Muestra un modal con la lista de todos los casos en BD para esta empresa.
+     * Cada caso tiene acciones: Re-abrir, Exportar individual, Eliminar.
+     */
+    async mostrarListaCasosBD() {
+        const segInc = window.electronAPI?.seguimientoIncapacidad || window.parent?.electronAPI?.seguimientoIncapacidad;
+        if (!segInc?.listar) {
+            this.showNotification('❌ Error: API no disponible', 'error');
+            return;
+        }
+        // Si ya existe el modal, cerrarlo
+        const existing = document.getElementById('bdCasosModalBackdrop');
+        if (existing) existing.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'bdCasosModalBackdrop';
+        modal.className = 'modal-backdrop active';
+        modal.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center;';
+        modal.innerHTML = `
+            <div style="background: white; border-radius: 8px; max-width: 1100px; width: 95%; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden;">
+                <div style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                    <h2 style="margin: 0; font-size: 18px;">
+                        <i class="fas fa-database" style="color: #174ea6;"></i> Casos en BD — ${this.currentCompany}
+                    </h2>
+                    <div style="display: flex; gap: 8px;">
+                        <button onclick="window.medicAusentismoComponent.exportarTodosCasosBD()" style="padding: 6px 12px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px;">
+                            <i class="fas fa-file-excel"></i> Exportar todos pendientes
+                        </button>
+                        <button onclick="document.getElementById('bdCasosModalBackdrop').remove()" style="padding: 6px 12px; background: #ef4444; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px;">
+                            <i class="fas fa-times"></i> Cerrar
+                        </button>
+                    </div>
+                </div>
+                <div id="bdCasosModalBody" style="padding: 16px 20px; overflow-y: auto; flex: 1;">
+                    <div style="text-align: center; padding: 40px; color: #64748b;">
+                        <i class="fas fa-spinner fa-spin" style="font-size: 32px;"></i><br>
+                        Cargando casos desde SQLite...
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        try {
+            const result = await segInc.listar({ empresaId: this.currentCompany });
+            const body = document.getElementById('bdCasosModalBody');
+            if (!result || !result.success) {
+                body.innerHTML = `<div style="text-align: center; padding: 40px; color: #ef4444;">Error: ${result?.error?.message || 'desconocido'}</div>`;
+                return;
+            }
+            const casos = result.data || [];
+            if (casos.length === 0) {
+                body.innerHTML = `<div style="text-align: center; padding: 40px; color: #64748b;">No hay casos en BD para esta empresa.</div>`;
+                return;
+            }
+            body.innerHTML = `
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                    <thead>
+                        <tr style="background: #f1f5f9; text-align: left;">
+                            <th style="padding: 8px;">Cédula</th>
+                            <th style="padding: 8px;">Nombre</th>
+                            <th style="padding: 8px;">Fechas</th>
+                            <th style="padding: 8px;">Diagnóstico</th>
+                            <th style="padding: 8px;">Estado</th>
+                            <th style="padding: 8px;">Exportado a Excel</th>
+                            <th style="padding: 8px;">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${casos.map(c => {
+                            const exportado = c.exportado_excel_en
+                                ? `<span style="color: #10b981;">✅ Fila ${c.exportado_excel_fila || '?'}</span><br><small>${new Date(c.exportado_excel_en).toLocaleDateString()}</small>`
+                                : `<span style="color: #f59e0b;">⏳ Pendiente</span>`;
+                            const fechas = (c.fecha_inicio || c.fecha_fin) ? `${c.fecha_inicio || '?'} → ${c.fecha_fin || '?'}` : '—';
+                            return `
+                                <tr style="border-bottom: 1px solid #e2e8f0;">
+                                    <td style="padding: 8px;">${this._escapeHtml(c.cedula)}</td>
+                                    <td style="padding: 8px;">${this._escapeHtml(c.nombre || '')}</td>
+                                    <td style="padding: 8px; font-size: 12px;">${fechas}</td>
+                                    <td style="padding: 8px; font-size: 12px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${this._escapeHtml(c.descripcion_diagnostico || '')}">${this._escapeHtml(c.descripcion_diagnostico || '—')}</td>
+                                    <td style="padding: 8px;"><span style="padding: 2px 8px; background: #dcfce7; color: #166534; border-radius: 12px; font-size: 11px;">${c.estado || 'activo'}</span></td>
+                                    <td style="padding: 8px;">${exportado}</td>
+                                    <td style="padding: 8px;">
+                                        <button onclick="window.medicAusentismoComponent.exportarCasoIndividualBD('${c.id}')" title="Exportar a Excel" style="padding: 4px 8px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; margin-right: 4px;">
+                                            <i class="fas fa-file-excel"></i>
+                                        </button>
+                                        <button onclick="window.medicAusentismoComponent.eliminarCasoBD('${c.id}', '${this._escapeHtml(c.nombre || '').replace(/'/g, "\\'")}')" title="Eliminar de BD" style="padding: 4px 8px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px;">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+                <div style="margin-top: 12px; font-size: 12px; color: #64748b;">
+                    Total: ${casos.length} caso(s) en BD
+                </div>
+            `;
+        } catch (e) {
+            const body = document.getElementById('bdCasosModalBody');
+            body.innerHTML = `<div style="text-align: center; padding: 40px; color: #ef4444;">Error: ${e.message}</div>`;
+        }
+    }
+
+    /**
+     * Exporta un caso individual de la lista a Excel.
+     */
+    async exportarCasoIndividualBD(casoId) {
+        const segInc = window.electronAPI?.seguimientoIncapacidad || window.parent?.electronAPI?.seguimientoIncapacidad;
+        if (!segInc?.exportarExcel) {
+            this.showNotification('❌ Error: API no disponible', 'error');
+            return;
+        }
+        this.showNotification('⏳ Exportando a Excel...', 'info');
+        try {
+            const result = await segInc.exportarExcel({ empresaId: this.currentCompany, casoId });
+            if (result && result.success) {
+                this.showNotification(`✅ Exportado en fila ${result.data?.fila || '?'}`, 'success');
+                await this.mostrarListaCasosBD(); // refrescar lista
+            } else {
+                this.showNotification(`❌ Error: ${result?.error?.message || 'desconocido'}`, 'error');
+            }
+        } catch (e) {
+            this.showNotification(`❌ Error: ${e.message}`, 'error');
+        }
+    }
+
+    /**
+     * Elimina un caso de la BD (con confirmación).
+     */
+    async eliminarCasoBD(casoId, nombre) {
+        if (!confirm(`¿Eliminar el caso de "${nombre}" de la BD?\n\nEsta acción no se puede deshacer.\n\nNota: si el caso ya estaba exportado a Excel, NO se borra del Excel.`)) {
+            return;
+        }
+        const segInc = window.electronAPI?.seguimientoIncapacidad || window.parent?.electronAPI?.seguimientoIncapacidad;
+        if (!segInc?.eliminar) {
+            this.showNotification('❌ Error: API no disponible', 'error');
+            return;
+        }
+        try {
+            const result = await segInc.eliminar({ empresaId: this.currentCompany, casoId });
+            if (result && result.success) {
+                this.showNotification('✅ Caso eliminado de BD', 'success');
+                await this.mostrarListaCasosBD(); // refrescar lista
+            } else {
+                this.showNotification(`❌ Error: ${result?.error?.message || 'desconocido'}`, 'error');
+            }
+        } catch (e) {
+            this.showNotification(`❌ Error: ${e.message}`, 'error');
+        }
+    }
+
+    /**
+     * Helper para escapar HTML y evitar XSS en los templates.
+     */
+    _escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     /**
@@ -6261,6 +6586,12 @@ class MedicionAusentismoComponent {
                 if (result && result.success) {
                     console.log('[GUARDAR SEGUIMIENTO] ✅ Datos guardados exitosamente en BD');
                     console.log('[GUARDAR SEGUIMIENTO] EsActualizacion:', result.data?.esActualizacion, 'CasoId:', result.data?.id);
+
+                    // 📦701 — Guardar el casoId en el estado del componente para
+                    // poder exportarlo a Excel después desde el banner.
+                    this.currentCasoBdId = result.data?.id || null;
+                    this.currentCasoBdEsActualizacion = result.data?.esActualizacion || false;
+                    this._actualizarBannerBD('guardado');
 
                     // 📦701 — Mensaje adaptado al nuevo flujo: guardado en BD,
                     // pendiente de exportar a Excel si se desea.

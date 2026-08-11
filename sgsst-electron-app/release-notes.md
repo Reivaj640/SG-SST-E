@@ -1,3 +1,43 @@
+# K+AIR v0.1.167
+
+## 🔧 Seguimiento de Incapacidades — UI completa (FASE 2 + 3) + header auto-hide
+
+Completa el flujo de respaldo en SQLite del seguimiento de incapacidades con la UI para export a Excel + lista de casos + auto-hide del header.
+
+### ¿Qué incluye?
+
+**📦702 (FASE 2) — Banner BD + botón "Exportar a Excel"**:
+- Banner superior en la vista de Seguimiento muestra el estado del caso: `Sin guardar` / `✅ Guardado en BD` / `✅ Guardado y exportado a Excel` / `❌ Error`
+- Botón "📤 Exportar a Excel" se habilita después de guardar
+- Botón "📋 Ver casos en BD" para abrir la lista completa
+- El botón de guardar cambió de "Guardar en Excel" a "Guardar en BD" (refleja el flujo SQLite-primario)
+
+**📦703 (FASE 3) — Modal "Ver casos en BD"**:
+- Tabla con todos los casos respaldados en SQLite
+- Columnas: Cédula, Nombre, Fechas, Diagnóstico, Estado, Indicador de exportado a Excel
+- Acciones por caso: 📤 Exportar individual, 🗑️ Eliminar de BD
+- Botón "Exportar todos pendientes" en la cabecera (sync masiva)
+- Total de casos al final
+
+**📦704 — Header con auto-hide a 30 segundos**:
+- ANTES: el header quedaba pinned para siempre cuando había notificaciones
+- AHORA: aparece por 30s, luego se oculta aunque sigan habiendo notificaciones
+- Si llegan NUEVAS notificaciones (count sube), el timer se resetea
+- Hover normal sigue funcionando (mouseenter = mostrar, mouseleave = ocultar 500ms después)
+
+### Archivos modificados (2 archivos, +364/-3 líneas)
+
+- `shared/kair-alerts.js`: `_pinHeader` con timer 30s (+32/-2)
+- `modules/gestion-salud/ausentismo/medicion-ausentismo.js`: banner BD + 8 métodos + estilos (+332/-1)
+
+### Próximas mejoras (no incluidas)
+
+- ❌ Re-abrir caso en el formulario desde la lista (botón "Cargar") — solo está Exportar y Eliminar
+- ❌ Indicador visual de última fecha de modificación del caso
+- ❌ Filtros en la lista de casos (por estado, por fecha, por exportado sí/no)
+
+---
+
 # K+AIR v0.1.166
 
 ## 🔧 Seguimiento de Incapacidades — respaldo en SQLite (FASE 1/3)
