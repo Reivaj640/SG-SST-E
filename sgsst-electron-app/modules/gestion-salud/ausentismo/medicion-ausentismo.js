@@ -6092,16 +6092,21 @@ class MedicionAusentismoComponent {
 
     /**
      * Ejecuta el guardado real de los datos
+     * 📦701 — ANTES: iba directo a Excel (vía Python saveFollowUp).
+     *         AHORA: va a SQLite (fuente de verdad) via el bridge
+     *         seguimiento-incapacidad:guardar. El Excel se exporta después
+     *         con un botón "Exportar a Excel" desde la UI.
      */
     ejecutarGuardadoReal(seguimientoData, esActualizacion, filaObjetivo) {
-        console.log('[GUARDAR SEGUIMIENTO] Iniciando guardado en PRI.xlsx...');
+        console.log('[GUARDAR SEGUIMIENTO] 📦701 — Guardando en SQLite (fuente de verdad primaria)...');
 
         // Verificar si hay API disponible
-        const apiToUse = window.electronAPI?.saveFollowUp ||
-                        window.parent?.electronAPI?.saveFollowUp;
+        const segInc = window.electronAPI?.seguimientoIncapacidad ||
+                       window.parent?.electronAPI?.seguimientoIncapacidad;
+        const apiToUse = segInc?.guardar;
 
         if (!apiToUse) {
-            console.error('[GUARDAR SEGUIMIENTO] API saveFollowUp no disponible');
+            console.error('[GUARDAR SEGUIMIENTO] API seguimientoIncapacidad.guardar no disponible');
             this.showNotification('❌ Error: Función de guardado no disponible', 'error');
             return;
         }
@@ -6242,7 +6247,9 @@ class MedicionAusentismoComponent {
         console.log('[GUARDAR SEGUIMIENTO] Empresa:', this.currentCompany);
         
         // Llamar a la API
-        apiToUse(followUpData, this.currentCompany)
+        // 📦701 — Cambiado: ahora va al bridge seguimiento-incapacidad:guardar
+        // (SQLite como fuente de verdad). Antes iba a saveFollowUp (Excel).
+        apiToUse({ empresaId: this.currentCompany, data: followUpData })
             .then(result => {
                 console.log('[GUARDAR SEGUIMIENTO] Resultado:', result);
                 
@@ -6252,32 +6259,16 @@ class MedicionAusentismoComponent {
                 }
                 
                 if (result && result.success) {
-                    console.log('[GUARDAR SEGUIMIENTO] ✅ Datos guardados exitosamente');
-                    console.log('[GUARDAR SEGUIMIENTO] ¿Es actualización?', esActualizacion, 'Fila:', filaObjetivo);
-                    
-                    // Mostrar notificación diferente según si actualizó o creó
-                    if (esActualizacion && filaObjetivo) {
-                        // Registro existente actualizado
-                        this.showNotification(
-                            `📝 Registro ACTUALIZADO en fila ${filaObjetivo} para ${followUpData.employeeName}`, 
-                            'success'
-                        );
-                        console.log('[GUARDAR SEGUIMIENTO] 📝 Registro actualizado en fila:', filaObjetivo);
-                    } else if (result.actualizado) {
-                        // Registro existente actualizado (viene del backend)
-                        this.showNotification(
-                            `📝 Registro ACTUALIZADO en fila ${result.fila} para ${followUpData.employeeName}`, 
-                            'success'
-                        );
-                        console.log('[GUARDAR SEGUIMIENTO] 📝 Registro actualizado (backend) en fila:', result.fila);
-                    } else {
-                        // Registro nuevo creado
-                        this.showNotification(
-                            `➕ Registro CREADO para ${followUpData.employeeName}`, 
-                            'success'
-                        );
-                        console.log('[GUARDAR SEGUIMIENTO] ✅ Registro creado');
-                    }
+                    console.log('[GUARDAR SEGUIMIENTO] ✅ Datos guardados exitosamente en BD');
+                    console.log('[GUARDAR SEGUIMIENTO] EsActualizacion:', result.data?.esActualizacion, 'CasoId:', result.data?.id);
+
+                    // 📦701 — Mensaje adaptado al nuevo flujo: guardado en BD,
+                    // pendiente de exportar a Excel si se desea.
+                    var mensaje = result.data?.esActualizacion
+                        ? `📝 Caso ACTUALIZADO en BD para ${followUpData.employeeName}. Click "Exportar a Excel" para sincronizar.`
+                        : `➕ Caso GUARDADO en BD para ${followUpData.employeeName}. Click "Exportar a Excel" para sincronizar.`;
+                    this.showNotification(mensaje, 'success');
+                    console.log('[GUARDAR SEGUIMIENTO] Caso id:', result.data?.id, 'esActualizacion:', result.data?.esActualizacion);
                     
                     // 🆕 ACTUALIZAR LA TABLA AUTOMÁTAMENTE DESPUÉS DE GUARDAR
                     console.log('[GUARDAR SEGUIMIENTO] 🔄 Actualizando tabla de seguimiento...');

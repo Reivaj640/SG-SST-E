@@ -82,6 +82,8 @@ const { registerAuditoriaAnualHandlers } = require('./main/auditoria-anual-bridg
 const { registerAccionesPreventivasCorrectivasHandlers } = require('./main/acciones-preventivas-correctivas-bridge');
 // 📦465 (2026-07-03) — Handlers de Seguimiento de Gestación (Salud Materna)
 const { registerGestacionHandlers, SCHEMA_SQL: GESTACION_SCHEMA_SQL, MIGRATIONS_SQL: GESTACION_MIGRATIONS_SQL } = require('./main/gestacion-bridge');
+// 📦701 (2026-08-11) — Handlers de Seguimiento de Incapacidad (respaldo en SQLite)
+const { registerSeguimientoIncapacidadHandlers, SCHEMA_SQL: SEG_INC_SCHEMA_SQL, MIGRATIONS_SQL: SEG_INC_MIGRATIONS_SQL } = require('./main/seguimiento-incapacidad-bridge');
 const { registerEventosCumplidosHandlers, SCHEMA_SQL: EVENTOS_CUMPLIDOS_SCHEMA_SQL } = require('./main/eventos-cumplidos-bridge');
 // K+AIR Calendar — bridge de eventos rápidos (botón calendario del header)
 const { registerEventosRapidosHandlers } = require('./main/eventos-rapidos-bridge');
@@ -470,6 +472,40 @@ function initDbOnce() {
       console.log('[DB] 📦498 · Tabla eventos_cumplidos creada/verificada');
     } catch (cumErr) {
       console.error('[DB] 📦498 · Error creando tabla eventos_cumplidos:', cumErr.message);
+    }
+
+
+
+
+
+    // 📦701 (2026-08-11) — Schema de Seguimiento de Incapacidad (respaldo en SQLite).
+    // Tablas nuevas, fuente de verdad primaria. El Excel se exporta después
+    // con un botón desde la UI. Patrón idéntico a gestacion.
+    try {
+      db.exec(SEG_INC_SCHEMA_SQL);
+      console.log('[DB] 📦701 · Tablas de seguimiento_incapacidad creadas/verificadas');
+    } catch (segErr) {
+      console.error('[DB] 📦701 · Error creando schema de seguimiento_incapacidad:', segErr.message);
+    }
+    // Migraciones (vacías por ahora, el bridge es nuevo, pero dejamos el
+    // patrón para futura evolución del schema).
+    if (Array.isArray(SEG_INC_MIGRATIONS_SQL) && SEG_INC_MIGRATIONS_SQL.length > 0) {
+      var segIncApplied = 0;
+      var segIncSkipped = 0;
+      for (var smi = 0; smi < SEG_INC_MIGRATIONS_SQL.length; smi++) {
+        var segStmt = SEG_INC_MIGRATIONS_SQL[smi];
+        try {
+          db.exec(segStmt);
+          segIncApplied++;
+        } catch (segMigErr) {
+          if (/duplicate column/i.test(segMigErr.message)) {
+            segIncSkipped++;
+          } else {
+            console.warn('[DB] 📦701 · Migración seguimiento_incapacidad fallida:', segStmt, '-', segMigErr.message);
+          }
+        }
+      }
+      console.log('[DB] 📦701 · Migraciones seguimiento_incapacidad aplicadas=' + segIncApplied + ' omitidas=' + segIncSkipped);
     }
 
     // 📦589 — Submódulo 3.1.3 Perfiles de cargo y Profesiograma
@@ -9688,6 +9724,15 @@ try {
 // Registrar handlers de Seguimiento de Gestación (Salud Materna) — 📦465 (2026-07-03)
 try {
   registerGestacionHandlers(app, { getDb });
+  // 📦701 (2026-08-11) — Seguimiento de Incapacidad: respaldo en SQLite
+  // (fuente de verdad). El Excel ahora es secundario, generado por el
+  // usuario con un botón "Exportar a Excel" desde la UI.
+  registerSeguimientoIncapacidadHandlers(app, {
+    getDb: getDb,
+    getPython: getPython,
+    obtenerRutaPri: obtenerRutaPri,
+    getPythonScriptPath: getPythonScriptPath
+  });
   registerEventosCumplidosHandlers(app, { getDb });
   // 📦589 — Submódulo 3.1.3 Perfiles de cargo y Profesiograma (Salud)
   registerProfesiogramaHandlers(app, { getDb, getCompanyRootPath });

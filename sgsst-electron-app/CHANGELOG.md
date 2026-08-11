@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.166] - 2026-08-11
+
+### Changed
+- **📦701 — feat(ausentismo): Seguimiento de Incapacidad ahora respalda en SQLite (FASE 1/3)** — El submódulo 2.2 "Seguimiento de Incapacidades" (dentro de Medición del Ausentismo) cambió su flujo de persistencia. **ANTES** los datos se guardaban directo en `PRI.xlsx` (vía Python). **AHORA** se guardan en SQLite (kair.db) como fuente de verdad primaria, y el Excel se exporta después con un botón (próxima release).
+
+  - **Razón del cambio**: si `PRI.xlsx` se corrompía, se perdía, o se dañaba la hoja "Casos en seguimiento", se perdían TODOS los seguimientos. Con SQLite como fuente de verdad, los datos están seguros y se pueden re-exportar a un Excel nuevo.
+
+  - **Schema nuevo** (patrón idéntico a 📦465 Seguimiento de Gestación):
+    - `seguimiento_incapacidad_caso`: 1 fila por caso, con todos los campos del JSON normalizados en columnas individuales (~80 columnas). UNIQUE constraint por `(empresa_id, cedula, fecha_inicio, fecha_fin)`. Metadata: `estado`, `recomendaciones_json`, `recomendaciones_count`, `exportado_excel_en`, `exportado_excel_fila`, `creado_en`, `actualizado_en`.
+    - `seguimiento_incapacidad_registro`: FK al caso, para los seguimientos múltiples que el usuario agrega. CASCADE en DELETE.
+    - Índices por `(empresa_id)`, `(empresa_id, estado)`, `(empresa_id, cedula)`, `(exportado_excel_en)`.
+
+  - **Bridge IPC nuevo** `main/seguimiento-incapacidad-bridge.js` con 6 handlers:
+    - `seguimiento-incapacidad:guardar` (insertar/actualizar caso + seguimientos múltiples)
+    - `seguimiento-incapacidad:listar` (resumen de todos los casos de la empresa)
+    - `seguimiento-incapacidad:obtener` (caso completo con seguimientos)
+    - `seguimiento-incapacidad:eliminar` (con CASCADE)
+    - `seguimiento-incapacidad:exportarExcel` (toma de BD → Python → Excel → marca como exportado)
+    - `seguimiento-incapacidad:exportarTodos` (sync masiva)
+
+  - **Exposición en preload.js** como `window.electronAPI.seguimientoIncapacidad.{guardar,listar,obtener,eliminar,exportarExcel,exportarTodos}`.
+
+  - **Frontend actualizado** (`medicion-ausentismo.js`): `saveSeguimientoData()` ahora llama a `seguimientoIncapacidad.guardar` en vez de `saveFollowUp`. El mensaje de éxito cambió para reflejar el nuevo flujo: "Caso GUARDADO en BD para X. Click 'Exportar a Excel' para sincronizar."
+
+  - **Archivos modificados** (4 archivos, +443/-8 líneas):
+    - `main/seguimiento-incapacidad-bridge.js`: NUEVO, 39 KB, schema + 6 handlers + helpers
+    - `main.js`: +2 (require + registerHandlers con getDb, getPython, obtenerRutaPri, getPythonScriptPath) + schema execution
+    - `preload.js`: +8 (exposición del namespace seguimientoIncapacidad)
+    - `modules/gestion-salud/ausentismo/medicion-ausentismo.js`: `saveSeguimientoData()` ahora usa el bridge nuevo
+
+  - **PENDIENTE PRÓXIMA RELEASE** (📦702):
+    - Botón "Exportar a Excel" en la UI (por caso individual + "Exportar todos")
+    - Vista "Lista de casos en BD" con botones de re-abrir, eliminar, exportar individualmente
+    - Indicador visual de qué casos están pendientes de exportar a Excel
+
 ## [0.1.165] - 2026-08-10
 
 ### Fixed

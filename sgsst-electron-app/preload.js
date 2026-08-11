@@ -421,6 +421,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
   gestacionActualizarEstado: (params) =>
     ipcRenderer.invoke('gestacion:actualizarEstado', params),
 
+  // 📦701 (2026-08-11) — Seguimiento de Incapacidad (respaldo en SQLite).
+  // ANTES: el guardado iba directo al Excel (vía Python). AHORA: el guardado
+  // va a SQLite (kair.db) como fuente de verdad primaria, y el Excel se
+  // exporta después con un botón "Exportar a Excel" (vía `exportarExcel`).
+  // Si el Excel se daña, los datos están en SQLite y se pueden re-exportar.
+  seguimientoIncapacidad: {
+    guardar: (params) => ipcRenderer.invoke('seguimiento-incapacidad:guardar', params),
+    listar: (params) => ipcRenderer.invoke('seguimiento-incapacidad:listar', params),
+    obtener: (params) => ipcRenderer.invoke('seguimiento-incapacidad:obtener', params),
+    eliminar: (params) => ipcRenderer.invoke('seguimiento-incapacidad:eliminar', params),
+    exportarExcel: (params) => ipcRenderer.invoke('seguimiento-incapacidad:exportarExcel', params),
+    exportarTodos: (params) => ipcRenderer.invoke('seguimiento-incapacidad:exportarTodos', params)
+  },
+
   // 📦498 — Marcado de eventos del calendario como cumplidos (persistente).
   // Funciona para cualquier tipo de evento del calendario (capacitacion,
   // gestacion, reunion, plan, rapido, etc.). Es solo una marca personal

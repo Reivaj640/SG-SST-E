@@ -1,3 +1,46 @@
+# K+AIR v0.1.166
+
+## 🔧 Seguimiento de Incapacidades — respaldo en SQLite (FASE 1/3)
+
+El submódulo 2.2 **Seguimiento de Incapacidades** (dentro de Medición del Ausentismo) cambió su flujo de persistencia. **ANTES** los datos se guardaban directo en `PRI.xlsx` (vía Python). **AHORA** se guardan en SQLite como fuente de verdad primaria.
+
+### ¿Por qué?
+
+Si el Excel se corrompe o se daña la hoja "Casos en seguimiento", se perdían TODOS los seguimientos. Con SQLite, los datos están seguros.
+
+### ¿Qué cambió?
+
+1. **Schema nuevo en SQLite** (kair.db, vía `main/seguimiento-incapacidad-bridge.js`):
+   - `seguimiento_incapacidad_caso`: 1 fila por caso, con ~80 columnas (todos los campos del JSON normalizados)
+   - `seguimiento_incapacidad_registro`: FK al caso, para los seguimientos múltiples
+   - Índices por empresa, estado, cédula
+
+2. **Bridge IPC nuevo** con 6 handlers:
+   - `guardar`, `listar`, `obtener`, `eliminar`, `exportarExcel`, `exportarTodos`
+
+3. **Frontend actualizado**: al guardar un seguimiento, ahora se guarda en SQLite con un mensaje que dice "Click 'Exportar a Excel' para sincronizar" (botón que viene en la próxima release).
+
+### Lo que NO cambió (todavía)
+
+- Los seguimientos **anteriores** siguen en `PRI.xlsx` (no se migraron)
+- **No hay UI** para ver los casos guardados en SQLite todavía
+- **No hay botón** "Exportar a Excel" todavía
+
+### Próxima release (📦702) — completar el flujo
+
+- Botón "Exportar a Excel" en la UI
+- Vista "Lista de casos en BD" con opciones de re-abrir, eliminar, exportar individualmente
+- Indicador visual de qué casos están pendientes de exportar
+
+### Archivos modificados (4 archivos, +443/-8 líneas)
+
+- `main/seguimiento-incapacidad-bridge.js`: NUEVO (39 KB)
+- `main.js`: registrar bridge + schema
+- `preload.js`: exponer IPC
+- `modules/gestion-salud/ausentismo/medicion-ausentismo.js`: usar bridge nuevo
+
+---
+
 # K+AIR v0.1.165
 
 ## 🔧 Auto-updater — fix del bug "Cannot find module" después de updates
