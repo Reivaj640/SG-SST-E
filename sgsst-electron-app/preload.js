@@ -430,6 +430,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     guardar: (params) => ipcRenderer.invoke('seguimiento-incapacidad:guardar', params),
     listar: (params) => ipcRenderer.invoke('seguimiento-incapacidad:listar', params),
     obtener: (params) => ipcRenderer.invoke('seguimiento-incapacidad:obtener', params),
+    // 📦701-fix4 — Buscar casos por cédula para reabrir uno existente
+    buscarPorCedula: (params) => ipcRenderer.invoke('seguimiento-incapacidad:buscarPorCedula', params),
     eliminar: (params) => ipcRenderer.invoke('seguimiento-incapacidad:eliminar', params),
     exportarExcel: (params) => ipcRenderer.invoke('seguimiento-incapacidad:exportarExcel', params),
     exportarTodos: (params) => ipcRenderer.invoke('seguimiento-incapacidad:exportarTodos', params)

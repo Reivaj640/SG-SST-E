@@ -843,6 +843,30 @@ class MedicionAusentismoComponent {
                 }
                 // ================================================================
 
+                // 📦701-fix5 — Cargar también los casos de seguimiento desde SQLite
+                // (kair.db). Estos casos pueden tener seguimientos guardados que
+                // NO están en el Excel legacy, así que el cálculo del avance debe
+                // considerarlos para reflejar el estado real del caso.
+                let casosBdMap = new Map();
+                try {
+                    const segInc = window.electronAPI?.seguimientoIncapacidad ||
+                                   window.parent?.electronAPI?.seguimientoIncapacidad;
+                    if (segInc && typeof segInc.listar === 'function') {
+                        const bdResult = await segInc.listar({ empresaId: this.currentCompany });
+                        if (bdResult && bdResult.success && Array.isArray(bdResult.data)) {
+                            bdResult.data.forEach(caso => {
+                                const ced = String(caso.cedula || '').replace(/,/g, '').replace(/\./g, '').trim();
+                                if (ced) casosBdMap.set(ced, caso);
+                            });
+                            console.log('[LOAD-BD] Casos de seguimiento en BD:', casosBdMap.size);
+                        }
+                    }
+                } catch (bdErr) {
+                    console.warn('[LOAD-BD] No se pudieron cargar casos de BD (no crítico):', bdErr.message);
+                }
+                // Hacer accesible para el resto de la función
+                this._casosBdSeguimientoMap = casosBdMap;
+
                 // Convertir filas a objetos
                 const allRecords = result.rows.map(row => {
                     const rowObj = {};
@@ -1469,9 +1493,10 @@ class MedicionAusentismoComponent {
      * Calcula el porcentaje de avance del caso basado en hitos del proceso en PRI.xlsx
      * @param {Object} incapacidad - Objeto de incapacidad con fechaInicio, fechaFin y record
      * @param {Object} registroPRI - Registro completo desde PRI.xlsx (opcional)
+     * @param {Object} casoBD - Caso de seguimiento guardado en SQLite (opcional)
      * @returns {Object} { porcentaje: number, color: string, descripcion: string }
      */
-    calcularPorcentajeAvance(incapacidad, registroPRI = null) {
+    calcularPorcentajeAvance(incapacidad, registroPRI = null, casoBD = null) {
         const recordAusentismo = incapacidad?.record || {};
         const recordPRI = registroPRI || {};
         
@@ -1547,7 +1572,17 @@ class MedicionAusentismoComponent {
                 }
             }
         }
-        const cantidadSeguimientos = seguimientos.filter(s => s.fecha && s.fecha.trim() !== '').length;
+        let cantidadSeguimientos = seguimientos.filter(s => s.fecha && s.fecha.trim() !== '').length;
+        // 📦701-fix5 — Si el caso tiene seguimientos guardados en SQLite, sumarlos.
+        // El Excel legacy puede NO tener los seguimientos nuevos (se guardan primero
+        // en BD). Tomar el MÁX entre el conteo del Excel y el de la BD para reflejar
+        // el estado real del caso.
+        if (casoBD && (casoBD.recomendaciones_count || casoBD.exportado_excel_fila)) {
+            const segsBd = Number(casoBD.recomendaciones_count) || 0;
+            if (segsBd > cantidadSeguimientos) {
+                cantidadSeguimientos = segsBd;
+            }
+        }
 
         // 📦459 (2026-07-02) — DIAGNÓSTICO: mostrar qué campos de cierre encuentra y dónde
         if (recordPRI && Object.keys(recordPRI).length > 0) {
@@ -1678,7 +1713,10 @@ class MedicionAusentismoComponent {
             const badgeClass = estadoInfo.badgeClass;
             
             // 🆕 Calcular avance basado en hitos del proceso (seguimientos + cierre)
-            const avanceInfo = this.calcularPorcentajeAvance(incapacidadPrincipal, empleado.registroPRI);
+            // 📦701-fix5 — Pasar también el caso de la BD si existe (cedula normalizada)
+            const cedulaParaAvance = String(empleado.cedula || '').replace(/,/g, '').replace(/\./g, '').trim();
+            const casoBdEmpleado = (this._casosBdSeguimientoMap && this._casosBdSeguimientoMap.get(cedulaParaAvance)) || null;
+            const avanceInfo = this.calcularPorcentajeAvance(incapacidadPrincipal, empleado.registroPRI, casoBdEmpleado);
             const avancePorcentaje = avanceInfo.porcentaje;
             const avanceColor = avanceInfo.color;
             const avanceDescripcion = avanceInfo.descripcion;
@@ -2168,33 +2206,275 @@ class MedicionAusentismoComponent {
             }, 300);
         }
 
-        // === 2. BUSCAR REGISTROS Y MOSTRAR MODAL ANTIGUO ===
-        console.log('[SEGUIMIENTO] Buscando registros existentes...');
-        window.electronAPI.buscarRegistrosCedula(cedula, this.currentCompany)
-            .then(resultado => {
-                console.log('[SEGUIMIENTO] Resultado búsqueda:', resultado);
-                console.log('[SEGUIMIENTO] success:', resultado.success);
-                console.log('[SEGUIMIENTO] registros:', resultado.registros);
-                console.log('[SEGUIMIENTO] total:', resultado.total);
-                console.log('[SEGUIMIENTO] registros.length:', resultado.registros ? resultado.registros.length : 'N/A');
+        // === 2. BUSCAR CASOS EN SQLite (PRIMERO) ===
+        // 📦701-fix4 — El flujo anterior buscaba en el Excel legacy, pero los
+        // datos ahora viven en SQLite (kair.db). Si hay un caso existente en
+        // SQLite para esta cédula, lo cargamos directamente en el panel.
+        // Si no, seguimos con el fallback de Excel legacy.
+        console.log('[SEGUIMIENTO] Buscando casos existentes en SQLite (BD)...');
+        const segInc = window.electronAPI?.seguimientoIncapacidad ||
+                       window.parent?.electronAPI?.seguimientoIncapacidad;
+        const buscarEnBd = (segInc && typeof segInc.buscarPorCedula === 'function')
+            ? segInc.buscarPorCedula({ empresaId: this.currentCompany, cedula: cedula })
+            : Promise.resolve({ success: false, data: [], error: { code: 'NO_API', message: 'buscarPorCedula no disponible' } });
 
-                if (resultado.success && resultado.registros && resultado.registros.length > 0) {
-                    // Hay registros - mostrar modal antiguo adaptado
-                    console.log('[SEGUIMIENTO] Mostrando modal de registros existentes');
-                    this.mostrarModalSeleccionRegistros(resultado.registros, {
-                        trabajador: { nombre: nombre, cedula: cedula }
-                    });
-                } else {
-                    // No hay registros - abrir panel directamente para crear nuevo
-                    console.log('[SEGUIMIENTO] No hay registros, abriendo panel para caso nuevo');
-                    this.abrirPanelSeguimientoConEmpleado(this.currentDetalleEmpleado);
+        buscarEnBd
+            .then(bdResult => {
+                console.log('[SEGUIMIENTO] Resultado búsqueda BD:', bdResult);
+                if (bdResult.success && bdResult.data && bdResult.data.length > 0) {
+                    // ✅ Hay caso(s) en SQLite — cargar el más reciente
+                    const casoExistente = bdResult.data[0]; // El más reciente (ORDER BY actualizado_en DESC)
+                    console.log('[SEGUIMIENTO] ✅ Caso existente encontrado en BD:', casoExistente.id, '— abriendo panel con datos prellenados');
+                    this._abrirPanelConCasoExistente(casoExistente);
+                    return;
                 }
+
+                // No hay en SQLite — buscar fallback en Excel legacy
+                console.log('[SEGUIMIENTO] No hay casos en SQLite, buscando en Excel legacy...');
+                window.electronAPI.buscarRegistrosCedula(cedula, this.currentCompany)
+                    .then(resultado => {
+                        console.log('[SEGUIMIENTO] Resultado búsqueda Excel legacy:', resultado);
+
+                        if (resultado.success && resultado.registros && resultado.registros.length > 0) {
+                            console.log('[SEGUIMIENTO] Mostrando modal de registros existentes (legacy)');
+                            this.mostrarModalSeleccionRegistros(resultado.registros, {
+                                trabajador: { nombre: nombre, cedula: cedula }
+                            });
+                        } else {
+                            console.log('[SEGUIMIENTO] No hay registros en ningún lado, abriendo panel para caso nuevo');
+                            this.abrirPanelSeguimientoConEmpleado(this.currentDetalleEmpleado);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('[SEGUIMIENTO] Error buscando registros legacy:', error);
+                        this.abrirPanelSeguimientoConEmpleado(this.currentDetalleEmpleado);
+                    });
             })
             .catch(error => {
-                console.error('[SEGUIMIENTO] Error buscando registros:', error);
-                // En caso de error, abrir panel directamente
+                console.error('[SEGUIMIENTO] Error buscando en BD:', error);
+                // Si falla BD, intentar legacy
                 this.abrirPanelSeguimientoConEmpleado(this.currentDetalleEmpleado);
             });
+    }
+
+    /**
+     * 📦701-fix4 — Abre el panel de seguimiento con un caso existente cargado
+     * desde SQLite. Carga todos los datos en el formulario y marca la sección 1
+     * como "ya capturada" (bypass de validación) para que el usuario pueda
+     * continuar trabajando desde la sección 2 sin tener que re-llenar todo.
+     */
+    _abrirPanelConCasoExistente(caso) {
+        // 📦701-fix4 (CORRECCIÓN 2): El caso viene con estructura anidada
+        // del bridge (caso.trabajador.*, caso.incapacidad.*, etc.) Y con
+        // algunos campos en raíz (caso.employeeId, caso.employeeName, caso.id).
+        // El log usa los campos correctos.
+        const cedula = caso.employeeId || caso.trabajador?.cedula || caso.cedula;
+        const nombre = caso.employeeName || caso.trabajador?.nombre || caso.nombre || 'Empleado';
+        console.log('[ABRIR CASO BD] Cargando caso existente:', caso.id, '— Cédula:', cedula);
+
+        // Marcar el caso actual como cargado
+        this.currentCasoBdId = caso.id;
+        this.casoActualEsExistente = true;
+
+        // Crear el panel si no existe
+        if (!document.getElementById('seguimientoPanelBackdrop')) {
+            this.createSeguimientoPanel();
+        }
+
+        // 1. Cargar el caso completo en el formulario (PRIMERO)
+        this._cargarCasoBdEnFormulario(caso);
+
+        // 2. 📦 NO llamar a cargarDatosEnPanelSeguimiento — esa función resetea
+        // todos los campos a vacío (es para casos nuevos). Si lo hacemos,
+        // borramos todo lo que acabamos de cargar de la BD.
+        // Solo intentar autollenar campos vacíos desde la BD de personal.
+        if (this.currentDetalleEmpleado) {
+            // Solo completar campos que NO se cargaron del caso
+            this._loadDatosEmpleado(cedula);
+        }
+
+        // 3. Inicializar seguimientos con los del caso
+        this._inicializarSeguimientosDesdeCaso(caso);
+
+        // 4. Marcar la sección 1 como ya capturada
+        this._marcarSeccion1YaCapturada();
+
+        // 5. Actualizar banner PRI con el valor guardado
+        this._actualizarBannerPRI();
+
+        // 6. Actualizar progreso
+        this._aplicarReglasRequeridos();
+        this._actualizarProgresoSeccion();
+
+        // 7. 📦 Actualizar el banner BD para mostrar "Guardado en BD"
+        this._actualizarBannerBD('guardado');
+
+        // 8. Mostrar el panel
+        document.getElementById('seguimientoPanelBackdrop').classList.add('active');
+
+        // 9. Si es un caso existente, abrir directamente en sección 2
+        // (Incapacidad Temporal) para que el usuario continúe con el seguimiento.
+        setTimeout(() => {
+            const navIncapacidad = document.querySelectorAll('.sp-nav-item')[1];
+            if (navIncapacidad && !navIncapacidad.classList.contains('sp-section-dimmed')) {
+                this.showSeguimientoPanelSection('incapacidad', navIncapacidad);
+            }
+        }, 50);
+
+        // 10. Notificación al usuario
+        this.showNotification(`📂 Caso existente cargado: ${nombre}. Continúa desde "Incapacidad Temporal" para nuevos seguimientos.`, 'info', 5000);
+    }
+
+    /**
+     * 📦701-fix4 — Carga todos los campos del caso desde la BD al formulario.
+     * El bridge devuelve el caso con estructura anidada (caso.trabajador.*,
+     * caso.incapacidad.*, caso.pric.*, caso.calificacion.*), por lo que
+     * extraemos los valores de ahí y los mapeamos a los IDs del DOM.
+     */
+    _cargarCasoBdEnFormulario(caso) {
+        console.log('[CARGAR CASO BD] Caso recibido. Keys:', Object.keys(caso).join(', '));
+        const t = caso.trabajador || {};
+        const i = caso.incapacidad || {};
+        const p = caso.pric || {};
+
+        // Mapeo: campo origen → ID del DOM
+        // (Los IDs del HTML son los REALES, no los nombres de la BD)
+        const map = {
+            // Trabajador
+            't.nombre': 'sp-nombre',
+            't.cedula': 'sp-cedula',
+            't.fechaNacimiento': 'sp-fecha-nacimiento',
+            't.genero': 'sp-genero',
+            't.cargo': 'sp-cargo',
+            't.area': 'sp-area',
+            't.fechaIngreso': 'sp-fecha-ingreso',
+            't.antiguedad': 'sp-antiguedad',
+            't.tipoContrato': 'sp-tipo-contrato',
+            't.salario': 'sp-salario',
+            't.eps': 'sp-eps',
+            't.afp': 'sp-afp',
+            't.arl': 'sp-arl',
+            't.peso': 'sp-peso',
+            't.talla': 'sp-talla',
+            't.imc': 'sp-imc',
+            't.actividadesExtralaborales': 'sp-actividades-extralaborales',
+            't.tipoEvento': 'sp-tipo-evento',
+            't.tipoCargo': 'sp-tipo-cargo',
+            't.dominancia': 'sp-dominancia',
+            // Incapacidad (IDs REALES del HTML, sin "inc-" prefix)
+            'i.fechaInicio': 'sp-fecha-inicio',
+            'i.fechaFin': 'sp-fecha-fin',
+            'i.diasAcumulados': 'sp-dias-acumulados',
+            'i.codigoCie10': 'sp-codigo-cie10',
+            'i.descripcionDiagnostico': 'sp-descripcion-diagnostico',
+            'i.numeroProrrogas': 'sp-numero-prorrogas',
+            'i.fechaUltimaProrroga': 'sp-fecha-ultima-prorroga',
+            'i.cie10Dx2': 'sp-cie10-dx2',
+            'i.origenDx2': 'sp-origen-dx2',
+            'i.cie10Dx3': 'sp-cie10-dx3',
+            'i.origenDx3': 'sp-origen-dx3',
+            'i.cie10Dx1': 'sp-cie10-dx1-calificada',
+            'i.origenDX1': 'sp-origen-dx1-calificada',
+            'i.cie10Dx2_calificada': 'sp-cie10-dx2-calificada',
+            'i.origenDX2_calificada': 'sp-origen-dx2-calificada',
+            'i.cie10Dx3_calificada': 'sp-cie10-dx3-calificada',
+            'i.origenDX3_calificada': 'sp-origen-dx3-calificada',
+            'i.cie10Dx4_calificada': 'sp-cie10-dx4-calificada',
+            'i.origenDX4_calificada': 'sp-origen-dx4-calificada',
+            // PRIC
+            'p.casoIngresadoPRIC': 'sp-caso-ingresado-pric',
+            'p.mecanismoDeteccion': 'sp-mecanismo-deteccion',
+            'p.fechaIngresoPRIC': 'sp-fecha-ingreso-pric',
+            'p.fechaExamenMedico': 'sp-fecha-examen-medico',
+            'p.resultadoExamenMedico': 'sp-resultado-examen-medico',
+            'p.fechaExamenPeriodico': 'sp-fecha-examen-periodico',
+            'p.resultadoExamenPostIncapacidad': 'sp-resultado-examen-post-incapacidad',
+            'p.trabajadorRemoto': 'sp-trabajador-remoto',
+            'p.fechaInicioRemoto': 'sp-fecha-inicio-remoto',
+        };
+
+        // Función helper para resolver el valor desde notación "t.campo"
+        const get = (path) => {
+            const [obj, key] = path.split('.');
+            const source = obj === 't' ? t : (obj === 'i' ? i : (obj === 'p' ? p : caso));
+            return source ? source[key] : undefined;
+        };
+
+        // Llenar cada campo si existe
+        let filled = 0;
+        Object.keys(map).forEach(path => {
+            const el = document.getElementById(map[path]);
+            const val = get(path);
+            if (el && val !== undefined && val !== null && val !== '') {
+                el.value = val;
+                filled++;
+            }
+        });
+
+        // Caso ingresado PRIC (controla banner y bloqueo de secciones 3,4,5)
+        // 📦701-fix4 — Si la BD tiene el campo vacío, asumir 'NO' (seguimiento
+        // simple) para que el banner muestre el estado correcto al reabrir.
+        // Es consistente con el fix preventivo del guardado.
+        const casoIngresadoPricEl = document.getElementById('sp-caso-ingresado-pric');
+        if (casoIngresadoPricEl) {
+            casoIngresadoPricEl.value = p.casoIngresadoPRIC || 'NO';
+            filled++;
+        }
+
+        console.log('[CARGAR CASO BD] Formulario llenado:', filled, 'campos');
+    }
+
+    /**
+     * 📦701-fix4 — Inicializa los seguimientos del caso desde la BD.
+     * Usa `agregarSeguimiento(fecha, descripcion)` para cada registro
+     * del caso. La forma del item en el DOM es gestionada por esa función.
+     */
+    _inicializarSeguimientosDesdeCaso(caso) {
+        const container = document.getElementById('sp-seguimientos-container');
+        if (!container) return;
+        // Limpiar contenedor
+        container.innerHTML = '';
+        const lista = Array.isArray(caso.seguimientos) ? caso.seguimientos : [];
+        if (lista.length === 0) {
+            // Si no hay seguimientos, agregar uno vacío como caso nuevo
+            this.agregarSeguimiento();
+        } else {
+            // Agregar uno por cada seguimiento guardado
+            for (let i = 0; i < lista.length; i++) {
+                const s = lista[i];
+                this.agregarSeguimiento(s.fecha || '', s.descripcion || '');
+            }
+        }
+    }
+
+    /**
+     * 📦701-fix4 — Marca la sección 1 como "ya capturada" para que no
+     * requiera validación al navegar. Marca los campos como válidos y
+     * visualmente completa.
+     */
+    _marcarSeccion1YaCapturada() {
+        console.log('[SECCIÓN 1] Marcando como ya capturada (caso existente)');
+
+        // Remover la clase de required error si la tienen
+        const seccion = document.getElementById('sp-section-datos');
+        if (seccion) {
+            // Marcar todos los inputs como "touched" para que no se marquen en rojo
+            seccion.querySelectorAll('input, select, textarea').forEach(el => {
+                if (el.dataset) el.dataset.spTouched = 'true';
+                // Limpiar clases de error visuales
+                el.classList.remove('sp-field-error');
+                el.classList.add('sp-field-ok');
+            });
+        }
+
+        // Marcar el nav item de la sección 1 como "completado"
+        const navItems = document.querySelectorAll('.sp-nav-item');
+        if (navItems[0]) {
+            navItems[0].classList.add('is-section-complete');
+        }
+
+        // Bandera interna: la sección 1 ya fue capturada
+        this.seccion1YaCapturada = true;
     }
 
     renderCondicion1Detalle(nombre, cedula, incapacidadesLargas, totalDias) {
@@ -4530,6 +4810,21 @@ class MedicionAusentismoComponent {
      * Muestra una sección específica del panel
      */
     showSeguimientoPanelSection(sectionId, navElement) {
+        // 📦705-fix2 — Defensa en profundidad: NO navegar a una sección atenuada
+        // (sección 3, 4 o 5 cuando NO es caso PRI formal). Aunque el caller
+        // debería haber validado, esto previene que cualquier otro path
+        // (ej: deep-link, debug) deje al usuario entrar a diligenciar secciones
+        // que no aplican al caso.
+        const targetSec = document.getElementById(`sp-section-${sectionId}`);
+        if (targetSec && targetSec.classList.contains('sp-section-dimmed')) {
+            this.showNotification(
+                'ℹ️ Esta sección está bloqueada porque no es caso PRI formal. ' +
+                'Si necesitas diligenciarla, click "Convertir en caso PRI formal" en el banner amarillo.',
+                'info', 6000
+            );
+            return;
+        }
+
         // Ocultar todas las secciones
         document.querySelectorAll('.sp-form-section').forEach(el => el.classList.remove('active'));
         // Mostrar la sección seleccionada
@@ -4568,9 +4863,18 @@ class MedicionAusentismoComponent {
         const actionsEl = document.getElementById('sp-pri-banner-actions');
         if (!banner || !textEl || !actionsEl) return;
 
+        // 📦705 — Secciones y nav items que se atenúan cuando NO es caso PRI formal.
+        // Etapas PRIC, Seg. Recomendaciones y Calificación PCL solo aplican a
+        // casos PRI formales. Para seguimientos simples NO se deben diligenciar.
+        const secEtapas = document.getElementById('sp-section-etapas');
+        const secRecomendaciones = document.getElementById('sp-section-recomendaciones');
         const secCalificacion = document.getElementById('sp-section-calificacion');
         const navItems = document.querySelectorAll('.sp-nav-item');
+        const navEtapas = navItems[2];
+        const navRecomendaciones = navItems[3];
         const navCalificacion = navItems[4];
+        const priSections = [secEtapas, secRecomendaciones, secCalificacion];
+        const priNavs = [navEtapas, navRecomendaciones, navCalificacion];
 
         const sel = document.getElementById('sp-caso-ingresado-pric');
         const fechaIngreso = document.getElementById('sp-fecha-ingreso-pric');
@@ -4578,13 +4882,14 @@ class MedicionAusentismoComponent {
 
         // Limpiar estado anterior
         banner.classList.remove('is-pri', 'is-no-pri', 'is-unclassified');
-        [secCalificacion, navCalificacion].forEach(el => {
-            if (el) el.classList.remove('sp-section-dimmed', 'is-dimmed');
-        });
+        priSections.forEach(el => { if (el) el.classList.remove('sp-section-dimmed'); });
+        priNavs.forEach(el => { if (el) el.classList.remove('is-dimmed', 'is-locked-step'); });
+        // Quitar el icono de candado de los nav items
+        document.querySelectorAll('.sp-nav-lock-icon').forEach(el => el.remove());
         actionsEl.innerHTML = ''; // limpiar botones del estado previo
 
         if (valor === 'SI') {
-            // Estado: Caso PRI formal
+            // Estado: Caso PRI formal — todo habilitado
             banner.classList.add('is-pri');
             const fechaStr = fechaIngreso && fechaIngreso.value
                 ? new Date(fechaIngreso.value + 'T00:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -4593,30 +4898,48 @@ class MedicionAusentismoComponent {
                 '<small>Ingreso al PRIC: ' + fechaStr + ' — Calificación PCL habilitada. Etapas PRIC siempre están disponibles.</small>';
             // Sin botones: ya está clasificado como PRI formal.
         } else if (valor === 'NO') {
-            // Estado: Seguimiento explícito, no PRI formal
+            // Estado: Seguimiento explícito, no PRI formal.
+            // Atenuar Etapas PRIC, Seg. Recomendaciones y Calificación PCL.
             banner.classList.add('is-no-pri');
             textEl.innerHTML = '<strong>⚠️ Seguimiento (no es caso PRI formal)</strong>' +
-                '<small>Calificación PCL atenuada porque no aplica. Cambia a PRI formal si necesitas diligenciarla.</small>';
+                '<small>Las secciones 3, 4 y 5 (Etapas PRIC, Recomendaciones, Calificación PCL) están bloqueadas. Click "Convertir en caso PRI formal" para habilitarlas.</small>';
             // Ofrecer cambiar a PRI formal (un solo botón, evita clic accidental)
             actionsEl.innerHTML = '<button type="button" class="sp-pri-banner-btn is-ghost" onclick="window.medicAusentismoComponent._setModoPRI(\'SI\')">' +
                 '<i class="fas fa-arrow-up"></i> Convertir en caso PRI formal</button>';
-            // Atenuar Calificación PCL
-            if (secCalificacion) secCalificacion.classList.add('sp-section-dimmed');
-            if (navCalificacion) navCalificacion.classList.add('is-dimmed');
+            // Atenuar secciones 3, 4 y 5 + nav items
+            priSections.forEach(el => { if (el) el.classList.add('sp-section-dimmed'); });
+            priNavs.forEach(el => {
+                if (el) {
+                    el.classList.add('is-dimmed', 'is-locked-step');
+                    // 📦705 — Icono de candado en nav items bloqueados
+                    const lockIcon = document.createElement('span');
+                    lockIcon.className = 'sp-nav-lock-icon';
+                    lockIcon.innerHTML = '<i class="fas fa-lock"></i>';
+                    el.appendChild(lockIcon);
+                }
+            });
         } else {
             // Estado: Sin clasificar (campo vacío) — caso nuevo o recién abierto
             banner.classList.add('is-unclassified');
             textEl.innerHTML = '<strong>Sin clasificar aún</strong>' +
-                '<small>Este caso aún no tiene definido si es un seguimiento simple o un caso PRI formal.</small>';
+                '<small>Este caso aún no tiene definido si es un seguimiento simple o un caso PRI formal. Etapas 3, 4 y 5 bloqueadas hasta que definas.</small>';
             // 2 botones: el usuario decide explícitamente
             actionsEl.innerHTML =
                 '<button type="button" class="sp-pri-banner-btn is-pri" onclick="window.medicAusentismoComponent._setModoPRI(\'SI\')">' +
                 '<i class="fas fa-check"></i> Marcar como PRI formal</button>' +
                 '<button type="button" class="sp-pri-banner-btn is-no-pri" onclick="window.medicAusentismoComponent._setModoPRI(\'NO\')">' +
                 '<i class="fas fa-stethoscope"></i> Solo seguimiento</button>';
-            // Atenuar Calificación PCL (también bloqueada mientras no defina)
-            if (secCalificacion) secCalificacion.classList.add('sp-section-dimmed');
-            if (navCalificacion) navCalificacion.classList.add('is-dimmed');
+            // Atenuar las 3 secciones + nav items hasta que defina
+            priSections.forEach(el => { if (el) el.classList.add('sp-section-dimmed'); });
+            priNavs.forEach(el => {
+                if (el) {
+                    el.classList.add('is-dimmed', 'is-locked-step');
+                    const lockIcon = document.createElement('span');
+                    lockIcon.className = 'sp-nav-lock-icon';
+                    lockIcon.innerHTML = '<i class="fas fa-lock"></i>';
+                    el.appendChild(lockIcon);
+                }
+            });
         }
     }
 
@@ -4816,6 +5139,13 @@ class MedicionAusentismoComponent {
         const section = document.querySelector('.sp-form-section.active');
         if (!section) return { valido: true, vacios: [], total: 0 };
 
+        // 📦701-fix4 — Si la sección 1 ya fue capturada (caso existente cargado
+        // desde BD), NO validar. El usuario no debería tener que re-llenar
+        // los datos de identificación.
+        if (this.seccion1YaCapturada && section.id === 'sp-section-datos') {
+            return { valido: true, vacios: [], total: 0 };
+        }
+
         // 1) Marca universal is-empty en TODOS los .sp-form-control EXCEPTO los que están
         // excluidos (lista base + dinámica según modo PRI).
         const excluidos = this._getCamposExcluidosVacios();
@@ -4950,11 +5280,23 @@ class MedicionAusentismoComponent {
             txt.textContent = (r.total === 0 ? 'Sin campos obligatorios' : dilig + ' campos diligenciados');
         }
         if (btnNext) {
-            // El botón siempre se puede pulsar; al hacer click se valida y se muestra error.
-            // Solo lo deshabilitamos si NO hay sección siguiente (última sección).
+            // 📦701-fix5 — Deshabilitar Siguiente si:
+            // 1) No hay siguiente visible (última sección)
+            // 2) La siguiente está atenuada (sp-section-dimmed) — caso seguimiento
+            //    simple con secciones 3,4,5 bloqueadas
+            // En ambos casos el botón se ve gris y no responde
             const sections = Array.from(document.querySelectorAll('.sp-form-section'));
             const idx = sections.findIndex(s => s.classList.contains('active'));
-            btnNext.disabled = idx < 0 || idx >= sections.length - 1;
+            let hasNextVisible = false;
+            if (idx >= 0) {
+                for (let i = idx + 1; i < sections.length; i++) {
+                    if (!sections[i].classList.contains('sp-section-dimmed')) {
+                        hasNextVisible = true;
+                        break;
+                    }
+                }
+            }
+            btnNext.disabled = idx < 0 || !hasNextVisible;
         }
         if (btnPrev) {
             const sections = Array.from(document.querySelectorAll('.sp-form-section'));
@@ -4991,20 +5333,34 @@ class MedicionAusentismoComponent {
             return false;
         }
 
-        // Avanzar a la siguiente sección visible y habilitada
+        // 📦705 — Avanzar a la siguiente sección VISIBLE (no atenuada).
+        // Si la siguiente está atenuada (por ser solo seguimiento), saltarla
+        // e ir a la próxima visible. Esto respeta la lógica del banner PRI:
+        // las secciones 3/4/5 están bloqueadas si el caso no es PRI formal.
         const sections = Array.from(document.querySelectorAll('.sp-form-section'));
-        const idx = sections.findIndex(s => s.classList.contains('active'));
-        if (idx < 0 || idx >= sections.length - 1) return true;
-        const nextSection = sections[idx + 1];
-        const sectionId = nextSection.id.replace(/^sp-section-/, '');
-        // Saltarse la sección Calificación si está atenuada (no aplica al caso).
-        if (sectionId === 'calificacion' && nextSection.classList.contains('sp-section-dimmed')) {
-            // Si la calificación está atenuada, saltarla e ir a la anterior ya está cubierta
-            // al volver; aquí el flujo natural lleva al usuario al final del wizard.
-            // Igual navegamos porque la atenuación no la hace desaparecer del DOM.
+        const navItems = Array.from(document.querySelectorAll('.sp-nav-item'));
+        let idx = sections.findIndex(s => s.classList.contains('active'));
+        if (idx < 0) return true;
+        // Buscar la siguiente sección NO atenuada
+        let targetIdx = -1;
+        for (let i = idx + 1; i < sections.length; i++) {
+            if (!sections[i].classList.contains('sp-section-dimmed')) {
+                targetIdx = i;
+                break;
+            }
         }
-        const navItems = document.querySelectorAll('.sp-nav-item');
-        const targetNav = navItems[idx + 1];
+        if (targetIdx < 0) {
+            // No hay siguiente sección visible — avisar y no avanzar (info, no error)
+            this.showNotification(
+                'ℹ️ Estás en la última sección disponible. Las secciones 3, 4 y 5 están bloqueadas porque no es caso PRI formal. ' +
+                'Si necesitas diligenciarlas, click "Convertir en caso PRI formal" en el banner amarillo.',
+                'info', 6000
+            );
+            return true;
+        }
+        const targetSection = sections[targetIdx];
+        const sectionId = targetSection.id.replace(/^sp-section-/, '');
+        const targetNav = navItems[targetIdx];
         if (targetNav) {
             this.showSeguimientoPanelSection(sectionId, targetNav);
             this._actualizarProgresoSeccion();
@@ -5054,6 +5410,22 @@ class MedicionAusentismoComponent {
 
         // Click en la misma sección: no hacer nada
         if (targetIdx === idxActual) return;
+
+        // 📦705-fix2 — Bloquear click directo en nav items atenuados.
+        // Las secciones 3, 4, 5 (Etapas PRIC, Recomendaciones, Calificación PCL)
+        // se atenúan cuando NO es caso PRI formal. El click directo sobre su nav
+        // debe ser bloqueado igual que el botón "Siguiente" (que ya las salta).
+        // Antes solo eran visuales (opacity 0.5) y el usuario podía entrar.
+        const targetSection = sections[targetIdx];
+        if (targetSection && targetSection.classList.contains('sp-section-dimmed')) {
+            this.showNotification(
+                'ℹ️ Las secciones 3, 4 y 5 (Etapas PRIC, Recomendaciones, Calificación PCL) ' +
+                'están bloqueadas porque no es caso PRI formal. ' +
+                'Si necesitas diligenciarlas, click "Convertir en caso PRI formal" en el banner amarillo.',
+                'info', 6000
+            );
+            return;
+        }
 
         // Click atrás: siempre permitido
         if (targetIdx < idxActual) {
@@ -5880,7 +6252,10 @@ class MedicionAusentismoComponent {
                 trabajadorRemoto: document.getElementById('sp-trabajador-remoto').value,
                 fechaInicioRemoto: document.getElementById('sp-fecha-inicio-remoto').value,
                 // Etapa 1: Captura de Caso - Columnas BE(56), BF(57), BG(58)
-                casoIngresadoPRIC: document.getElementById('sp-caso-ingresado-pric').value,
+                // 📦701-fix4 — Si el campo está vacío al guardar, default a 'NO'
+                // (seguimiento simple). Evita que casos sin clasificar queden
+                // con el campo NULL en la BD, lo que rompe el banner al reabrir.
+                casoIngresadoPRIC: (document.getElementById('sp-caso-ingresado-pric').value || 'NO'),
                 mecanismoDeteccion: document.getElementById('sp-mecanismo-deteccion').value,
                 fechaIngresoPRIC: document.getElementById('sp-fecha-ingreso-pric').value,
                 // Etapa 2: Plan de Tratamiento - Columnas BH(59), BI(60), BJ(61), BK(62)
@@ -6616,20 +6991,62 @@ class MedicionAusentismoComponent {
                         this.closeSeguimientoPanel();
                     }, 2000);
                 } else {
-                    const errorMsg = result?.error || 'Error desconocido';
-                    console.error('[GUARDAR SEGUIMIENTO] ❌ Error:', errorMsg);
+                    // 📦706-fix2 — El error del bridge viene como { code, message, details },
+                    // no como string. Extraemos .message de forma defensiva
+                    // (try/catch para manejar referencias circulares o tipos raros).
+                    const errObj = result?.error;
+                    let errorMsg = 'Error desconocido';
+                    try {
+                        if (errObj == null) {
+                            errorMsg = 'Error desconocido (sin detalles)';
+                        } else if (typeof errObj === 'string') {
+                            errorMsg = errObj;
+                        } else if (typeof errObj === 'object') {
+                            errorMsg = errObj.message
+                                || (errObj.code ? '[' + errObj.code + '] ' + JSON.stringify(errObj) : null)
+                                || JSON.stringify(errObj)
+                                || 'Error desconocido (objeto sin mensaje)';
+                        } else {
+                            errorMsg = String(errObj);
+                        }
+                    } catch (jsonErr) {
+                        // Si JSON.stringify falla (referencia circular u objeto no serializable)
+                        errorMsg = '[Error no serializable: ' + (errObj?.constructor?.name || typeof errObj) + ']';
+                    }
+                    console.error('[GUARDAR SEGUIMIENTO] ❌ Error completo (objeto result):', result);
+                    console.error('[GUARDAR SEGUIMIENTO] ❌ Error msg extraído:', errorMsg);
                     this.showNotification('❌ Error al guardar: ' + errorMsg, 'error');
                 }
             })
             .catch(error => {
-                console.error('[GUARDAR SEGUIMIENTO] ❌ Error en la llamada:', error);
-                
+                // 📦706-fix2 — Logging detallado del error de IPC.
+                // A veces error.message viene undefined o el error no es un Error nativo.
+                console.error('[GUARDAR SEGUIMIENTO] ❌ Error en la llamada (objeto):', error);
+                console.error('[GUARDAR SEGUIMIENTO] ❌ Error type:', typeof error);
+                console.error('[GUARDAR SEGUIMIENTO] ❌ Error constructor:', error?.constructor?.name);
+                console.error('[GUARDAR SEGUIMIENTO] ❌ Error stack:', error?.stack);
+
                 if (saveButton) {
                     saveButton.disabled = false;
                     saveButton.innerHTML = '<i class="fas fa-save"></i> Guardar Seguimiento';
                 }
-                
-                this.showNotification('❌ Error al guardar: ' + error.message, 'error');
+
+                // Extraer mensaje de forma defensiva
+                let errMsg = 'Error desconocido en la llamada IPC';
+                try {
+                    if (error && typeof error === 'object') {
+                        errMsg = error.message
+                            || error.toString()
+                            || JSON.stringify(error);
+                    } else if (typeof error === 'string') {
+                        errMsg = error;
+                    } else {
+                        errMsg = String(error);
+                    }
+                } catch (_) {
+                    errMsg = '[Error no serializable: ' + (error?.constructor?.name || typeof error) + ']';
+                }
+                this.showNotification('❌ Error al guardar: ' + errMsg, 'error');
             });
     }
 

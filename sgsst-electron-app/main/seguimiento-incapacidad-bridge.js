@@ -134,13 +134,13 @@ const SCHEMA_SQL = `
     porcentaje_pcl_calificacion TEXT,
     -- PRIC · Historial de Diagnóstico
     cie10_calificada_dx1 TEXT,
-    origen_dx1 TEXT,
+    origen_dx_calificada1 TEXT,
     cie10_calificada_dx2 TEXT,
-    origen_dx2 TEXT,
+    origen_dx_calificada2 TEXT,
     cie10_calificada_dx3 TEXT,
-    origen_dx3 TEXT,
+    origen_dx_calificada3 TEXT,
     cie10_calificada_dx4 TEXT,
-    origen_dx4 TEXT,
+    origen_dx_calificada4 TEXT,
     origen_caso TEXT,
     ingreso_sve TEXT,
     anio_ultima_calificacion_pcl TEXT,
@@ -307,13 +307,13 @@ function _aplanarCaso(empresaId, data) {
         fecha_calificacion_pcl: p.fechaCalificacionPCL || '',
         porcentaje_pcl_calificacion: p.porcentajePCLCalificacion || '',
         cie10_calificada_dx1: p.cie10CalificadaDX1 || '',
-        origen_dx1: p.origenDX1 || '',
+        origen_dx_calificada1: p.origenDX1 || '',
         cie10_calificada_dx2: p.cie10CalificadaDX2 || '',
-        origen_dx2: p.origenDX2 || '',
+        origen_dx_calificada2: p.origenDX2 || '',
         cie10_calificada_dx3: p.cie10CalificadaDX3 || '',
-        origen_dx3: p.origenDX3 || '',
+        origen_dx_calificada3: p.origenDX3 || '',
         cie10_calificada_dx4: p.cie10CalificadaDX4 || '',
-        origen_dx4: p.origenDX4 || '',
+        origen_dx_calificada4: p.origenDX4 || '',
         origen_caso: p.origenCaso || '',
         ingreso_sve: p.ingresoSVE || '',
         anio_ultima_calificacion_pcl: p.anioUltimaCalificacionPCL || '',
@@ -445,13 +445,13 @@ function _expandirCaso(row, registros) {
             fechaCalificacionPCL: row.fecha_calificacion_pcl,
             porcentajePCLCalificacion: row.porcentaje_pcl_calificacion,
             cie10CalificadaDX1: row.cie10_calificada_dx1,
-            origenDX1: row.origen_dx1,
+            origenDX1: row.origen_dx_calificada1,
             cie10CalificadaDX2: row.cie10_calificada_dx2,
-            origenDX2: row.origen_dx2,
+            origenDX2: row.origen_dx_calificada2,
             cie10CalificadaDX3: row.cie10_calificada_dx3,
-            origenDX3: row.origen_dx3,
+            origenDX3: row.origen_dx_calificada3,
             cie10CalificadaDX4: row.cie10_calificada_dx4,
-            origenDX4: row.origen_dx4,
+            origenDX4: row.origen_dx_calificada4,
             origenCaso: row.origen_caso,
             ingresoSVE: row.ingreso_sve,
             anioUltimaCalificacionPCL: row.anio_ultima_calificacion_pcl,
@@ -535,8 +535,8 @@ function _handlerGuardar(empresaId, data) {
             'fecha_seguimiento_1', 'descripcion_seguimiento_1', 'fecha_seguimiento_2', 'descripcion_seguimiento_2',
             'fecha_reincorporacion', 'tipo_reintegro', 'adaptaciones', 'fecha_cierre', 'motivo_cierre',
             'fecha_calificacion_pcl', 'porcentaje_pcl_calificacion',
-            'cie10_calificada_dx1', 'origen_dx1', 'cie10_calificada_dx2', 'origen_dx2',
-            'cie10_calificada_dx3', 'origen_dx3', 'cie10_calificada_dx4', 'origen_dx4',
+            'cie10_calificada_dx1', 'origen_dx_calificada1', 'cie10_calificada_dx2', 'origen_dx_calificada2',
+            'cie10_calificada_dx3', 'origen_dx_calificada3', 'cie10_calificada_dx4', 'origen_dx_calificada4',
             'origen_caso', 'ingreso_sve', 'anio_ultima_calificacion_pcl', 'anio_seguimiento_empresa',
             'estado_proceso_regional', 'fecha_solicitud_regional', 'fecha_dictamen_regional',
             'porcentaje_pcl_regional', 'origen_calificacion_regional', 'fecha_estructuracion_regional',
@@ -597,8 +597,13 @@ function _handlerGuardar(empresaId, data) {
             }
         };
     } catch (e) {
-        console.error('[' + MOD + '][GUARDAR]', e.message);
-        return { success: false, error: { code: 'DB_ERROR', message: e.message } };
+        // 📦706 — Log detallado para diagnóstico
+        console.error('[' + MOD + '][GUARDAR] Error completo:', e);
+        console.error('[' + MOD + '][GUARDAR] Stack:', e.stack);
+        // Mensaje más descriptivo (incluye el código SQLite si existe)
+        var msg = e.message || String(e);
+        if (e.code) msg = '[' + e.code + '] ' + msg;
+        return { success: false, error: { code: 'DB_ERROR', message: msg, details: e.stack } };
     }
 }
 
@@ -617,6 +622,72 @@ function _handlerListar(empresaId) {
         return { success: true, data: rows };
     } catch (e) {
         console.error('[' + MOD + '][LISTAR]', e.message);
+        return { success: false, error: { code: 'DB_ERROR', message: e.message } };
+    }
+}
+
+/**
+ * 📦701-fix4 — Buscar TODOS los casos de una cédula en una empresa.
+ * Usado por el renderer cuando el usuario reabre un caso existente desde
+ * la UI de seguimiento. Devuelve los casos completos (con todos los campos)
+ * para que el renderer pueda cargarlos en el formulario.
+ *
+ * Retorna { success, data: [caso, ...] } o { success, data: [] } si no hay.
+ */
+function _handlerBuscarPorCedula(empresaId, cedula) {
+    if (!_getDb) {
+        return { success: false, error: { code: 'NO_DB', message: 'Base de datos no disponible' } };
+    }
+    if (!empresaId) {
+        return { success: false, error: { code: 'NO_COMPANY', message: 'empresaId requerido' } };
+    }
+    if (!cedula) {
+        return { success: false, error: { code: 'NO_CEDULA', message: 'cedula requerida' } };
+    }
+    try {
+        var db = _getDb();
+        // Traer TODOS los casos (con todos los campos) de esta cédula
+        // (puede haber varios: el mismo empleado pudo tener varias incapacidades)
+        var rows = db.prepare(
+            'SELECT * FROM seguimiento_incapacidad_caso WHERE empresa_id = ? AND cedula = ? ORDER BY actualizado_en DESC'
+        ).all(empresaId, cedula);
+        // Expandir cada caso (DB row → frontend JSON) para que el renderer
+        // pueda usarlo directamente en el formulario.
+        var casos = rows.map(function (row) {
+            // Cargar seguimientos del caso también
+            var regs = db.prepare(
+                'SELECT * FROM seguimiento_incapacidad_registro WHERE caso_id = ? ORDER BY fecha ASC, creado_en ASC'
+            ).all(row.id);
+            // 📦701-fix4 (CORRECCIÓN): _expandirCaso espera (row, registros),
+            // NO (empresaId, row) — antes pasaba mal los argumentos y devolvía
+            // un objeto con strings en lugar de los datos correctos.
+            var casoExpandido = _expandirCaso(row, regs);
+            // Sobrescribir seguimientos con el formato plano que espera el
+            // frontend (no el formato de BD row).
+            casoExpandido.seguimientos = regs.map(function (r) {
+                return {
+                    id: r.id,
+                    fecha: r.fecha,
+                    tipo: r.tipo,
+                    descripcion: r.descripcion,
+                    profesional: r.profesional,
+                    recomendaciones: r.recomendaciones,
+                    proximaCita: r.proxima_cita
+                };
+            });
+            casoExpandido.recomendaciones = [];
+            try {
+                if (row.recomendaciones_json) {
+                    casoExpandido.recomendaciones = JSON.parse(row.recomendaciones_json);
+                }
+            } catch (e) {
+                // Ignorar si no se puede parsear
+            }
+            return casoExpandido;
+        });
+        return { success: true, data: casos };
+    } catch (e) {
+        console.error('[' + MOD + '][BUSCAR_POR_CEDULA]', e.message);
         return { success: false, error: { code: 'DB_ERROR', message: e.message } };
     }
 }
@@ -841,6 +912,14 @@ function registerHandlers(app, deps) {
         return _handlerListar(params.empresaId);
     });
 
+    // ── Buscar casos de una cédula (📦701-fix4) ──
+    // Usado por el renderer cuando el usuario reabre un caso existente.
+    // Devuelve TODOS los casos de esa cédula con todos los campos +
+    // sus seguimientos múltiples, listos para cargar en el formulario.
+    ipcMain.handle('seguimiento-incapacidad:buscarPorCedula', async function (event, params) {
+        return _handlerBuscarPorCedula(params.empresaId, params.cedula);
+    });
+
     // ── Obtener un caso completo con sus seguimientos ──
     ipcMain.handle('seguimiento-incapacidad:obtener', async function (event, params) {
         return _handlerObtener(params.empresaId, params.casoId);
@@ -872,7 +951,10 @@ function registerHandlers(app, deps) {
 module.exports = {
     SCHEMA_SQL: SCHEMA_SQL,
     MIGRATIONS_SQL: [], // No migrations needed for new table
+    // 📦701-fix — Exportar también con el nombre largo que usa main.js
+    // (alias del corto para que el destructuring no quede undefined)
     registerHandlers: registerHandlers,
+    registerSeguimientoIncapacidadHandlers: registerHandlers,
     // Exportar internals para testing
     _internals: {
         _aplanarCaso: _aplanarCaso,

@@ -1,31 +1,46 @@
-# K+AIR v0.1.167
+# K+AIR v0.1.168
 
-## 🔧 Seguimiento de Incapacidades — UI completa (FASE 2 + 3) + header auto-hide
+## 🔧 Seguimiento de Incapacidades — Bug fixes críticos (v0.1.166/v0.1.167)
 
-Completa el flujo de respaldo en SQLite del seguimiento de incapacidades con la UI para export a Excel + lista de casos + auto-hide del header.
+Resuelve varios bugs críticos en el flujo de seguimiento de incapacidades en SQLite introducidos en v0.1.166/v0.1.167. **El bug principal** impedía guardar cualquier caso porque el schema de la BD tenía columnas duplicadas y las tablas NUNCA se creaban.
 
 ### ¿Qué incluye?
 
-**📦702 (FASE 2) — Banner BD + botón "Exportar a Excel"**:
-- Banner superior en la vista de Seguimiento muestra el estado del caso: `Sin guardar` / `✅ Guardado en BD` / `✅ Guardado y exportado a Excel` / `❌ Error`
-- Botón "📤 Exportar a Excel" se habilita después de guardar
-- Botón "📋 Ver casos en BD" para abrir la lista completa
-- El botón de guardar cambió de "Guardar en Excel" a "Guardar en BD" (refleja el flujo SQLite-primario)
+**📦701-fix3 — Schema BD arreglado (bug crítico)**:
+- El schema de `seguimiento_incapacidad_caso` tenía 2 columnas duplicadas (`origen_dx2` y `origen_dx3`) en las secciones Incapacidad y Calificación
+- SQLite rechazaba el `CREATE TABLE` con `duplicate column name: origen_dx2`, las tablas NUNCA se creaban, y cada intento de guardar salía con `no such table: seguimiento_incapacidad_caso`
+- **Fix**: renombrar las columnas de la sección Calificación a `origen_dx_calificada{1..4}` (más semántico) + actualizar array de columnas INSERT, `_aplanarCaso()` y `_expandirCaso()`
 
-**📦703 (FASE 3) — Modal "Ver casos en BD"**:
-- Tabla con todos los casos respaldados en SQLite
-- Columnas: Cédula, Nombre, Fechas, Diagnóstico, Estado, Indicador de exportado a Excel
-- Acciones por caso: 📤 Exportar individual, 🗑️ Eliminar de BD
-- Botón "Exportar todos pendientes" en la cabecera (sync masiva)
-- Total de casos al final
+**📦701-fix4 — Reabrir caso existente carga todos los datos desde la BD**:
+- ANTES: al reabrir un caso guardado, el panel se abría VACÍO (buscaba en el Excel legacy, no en la BD nueva)
+- AHORA: nuevo handler `buscarPorCedula` en el bridge + el renderer busca primero en SQLite. Si encuentra un caso, carga el ID, la sección 1 con TODOS los datos del trabajador, la sección 2 con los datos de la incapacidad (fechas, CIE-10, descripción, seguimientos múltiples), marca la sección 1 como "ya capturada" (bypass de validación) y abre directamente en sección 2 para continuar el seguimiento
+- Solución a 3 bugs propios en la primera implementación: argumentos invertidos de `_expandirCaso`, llamada a método inexistente `renderSeguimientos`, mapeo de IDs incorrecto
 
-**📦704 — Header con auto-hide a 30 segundos**:
-- ANTES: el header quedaba pinned para siempre cuando había notificaciones
-- AHORA: aparece por 30s, luego se oculta aunque sigan habiendo notificaciones
-- Si llegan NUEVAS notificaciones (count sube), el timer se resetea
-- Hover normal sigue funcionando (mouseenter = mostrar, mouseleave = ocultar 500ms después)
+**📦701-fix4 — Botón "Siguiente" y banner BD corregidos**:
+- Banner superior: muestra `✅ Guardado en BD` al reabrir (antes decía "Sin guardar" aunque el caso existiera)
+- Botón "Siguiente": se deshabilita correctamente cuando estás en la última sección visible (en seguimiento simple, las secciones 3/4/5 están bloqueadas y el botón se ve gris)
+- Click directo en nav de sección atenuada: ahora SÍ bloquea con toast `ℹ️` (antes podías entrar a sección 3 aunque estuviera bloqueada)
+- Sección 1 marcada como "ya capturada" al reabrir caso existente (no requiere re-llenar ni re-validar)
 
-### Archivos modificados (2 archivos, +364/-3 líneas)
+**📦701-fix4 — Clasificación de caso por default**:
+- Si guardas sin hacer click en "Solo seguimiento" o "Marcar como PRI formal", el campo se llena con `'NO'` (seguimiento simple) por default
+- Al cargar un caso guardado, si la BD tiene el campo vacío, también se asume `'NO'`
+- Banner amarillo correcto al reabrir: `⚠️ Seguimiento (no es caso PRI formal)`
+
+**📦706-fix2 — Error display robusto**:
+- ANTES: el error del bridge salía como `[object Object]` porque concatenaban objeto a string
+- AHORA: extracción defensiva con 4 paths (null, string, object con .message, primitive) + try/catch para referencias circulares
+- El `.catch` del IPC también tiene logging detallado (`type`, `constructor.name`, `stack`)
+
+**📦701-fix5 — Avance de tabla usa datos de la BD**:
+- ANTES: el cálculo del avance usaba solo datos del Excel legacy, así que LORAINNE mostraba `0% Sin iniciar` aunque tuviera 1 seguimiento guardado en la BD
+- AHORA: `loadSeguimientoData()` consulta la BD y construye un mapa `cedula → casoBD`. `calcularPorcentajeAvance(incapacidad, registroPRI, casoBD)` toma el MÁX entre el conteo del Excel y el de la BD. La tabla muestra el avance correcto después de guardar
+
+**📦701-fix — Alias de export en el bridge**:
+- `registerSeguimientoIncapacidadHandlers` era `undefined` porque el bridge solo exportaba `registerHandlers` (corto). Los 6 handlers IPC nunca se registraban
+- **Fix**: exportar AMBOS nombres como alias
+
+### Archivos modificados (3 archivos, +577/-76 líneas)
 
 - `shared/kair-alerts.js`: `_pinHeader` con timer 30s (+32/-2)
 - `modules/gestion-salud/ausentismo/medicion-ausentismo.js`: banner BD + 8 métodos + estilos (+332/-1)
