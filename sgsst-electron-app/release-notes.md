@@ -1,3 +1,37 @@
+# K+AIR v0.1.172
+
+## 🎨 Scroll INTERNO en los home de módulos — sin scroll externo (v0.1.172)
+
+En modo ventana, el home de un módulo (widgets + charts + lista de submódulos) puede no caber en el viewport. Esta versión resuelve el problema con **scroll INTERNO** dentro del home: la scrollbar aparece DENTRO del home (no en el borde de la página), es fina (~8px) y semi-transparente.
+
+### ¿Qué incluye?
+
+**Fix de 2 capas con CSS puro** (sin tocar JS):
+1. **Contenedor padre** (`.module-content-area` + `.main-canvas`): `overflow: hidden !important` — sin scrollbar en el borde de la página
+2. **Contenedor del home** (`.gestion-integral-home`, etc.): `overflow-y: auto !important` + `scrollbar-width: thin` + `scrollbar-color` semi-transparente — scroll INTERNO de ~8px
+
+**Cubre los 7 módulos principales** (4 clases de home):
+- `gestion-integral-home` → Recursos, Gestión Integral, Verificación, Mejoramiento
+- `gestion-salud-home` → Gestión de la Salud
+- `gestion-peligros-home` → Gestión de Peligros
+- `gestion-amenazas-home` → Gestión de Amenazas
+
+**Por qué `:has()`** (no descendant selector): el contenedor del home es hijo del padre, no descendiente. Con `:has()` desde el padre común, la regla matchea sin importar dónde esté el home en el árbol DOM.
+
+### Antes vs después
+
+| Modo | ANTES | AHORA |
+|------|-------|-------|
+| Maximizado (1080p+) | Contenido cabe, sin scroll | Contenido cabe, sin scroll |
+| Ventana (chico) | Sección de submódulos cortada al final, sin scroll para verla | Scrollbar INTERNA fina en el home, podés bajar para ver todo |
+
+### Iteración del approach
+- **Intento 1**: reducir tamaños de widgets/charts (`min-height: 80px`, `canvas: 140px`) → user rechazó porque afectaba legibilidad
+- **Intento 2**: `overflow-y: auto` en el padre → traía de vuelta la scrollbar externa
+- **Final**: `overflow: hidden` en padre + `overflow-y: auto` en home con scrollbar fina → ✅
+
+---
+
 # K+AIR v0.1.171
 
 ## 🎨 Footer minimalista: solo en pantalla de inicio, blanco sobre Vanta (v0.1.171)

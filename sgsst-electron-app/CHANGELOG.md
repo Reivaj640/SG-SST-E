@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.172] - 2026-08-12
+
+### Changed
+- **📦701-fix10 — fix(ui): scroll INTERNO en los home de módulos principales (sin scroll externo)** — En modo ventana, el home de un módulo (widgets + charts + lista de submódulos) puede no caber en el viewport. Antes esto causaba que la sección de submódulos quedara cortada al final. **Fix de 2 capas con CSS puro**:
+  1. **Contenedor padre** (`.module-content-area` y `.main-canvas`): `overflow: hidden` — sin scrollbar en el borde de la página
+  2. **Contenedor del home** (`.gestion-integral-home`, `.gestion-salud-home`, `.gestion-peligros-home`, `.gestion-amenazas-home`): `overflow-y: auto` con `scrollbar-width: thin` y `scrollbar-color: rgba(0,0,0,0.25) transparent` — scrollbar INTERNA de ~8px, semi-transparente, dentro del home
+- **Por qué `:has()`**: el selector original `.vanta-fullscreen #app-footer` enseñó que el patrón de detectar el contenido desde el ancestro común con `:has()` es más confiable que el sibling selector. Acá aplica igual: el home es hijo del padre, y queremos modificar el comportamiento del padre según el contenido del hijo.
+- **Cubre los 7 módulos principales** (4 clases de home): gestion-integral-home (Recursos, Gestión Integral, Verificación, Mejoramiento), gestion-salud-home, gestion-peligros-home, gestion-amenazas-home.
+
+### Iteración
+- Primero intenté reducir los tamaños de los widgets/charts (fix11), pero el user rechazó esa dirección porque afectaba la legibilidad. Revertí fix11 completamente.
+- Después probé `overflow-y: auto` en el contenedor padre, pero eso traía de vuelta la scrollbar externa. Cambié el approach: el padre se queda en `hidden` y la scrollbar vive DENTRO del home.
+
 ## [0.1.171] - 2026-08-12
 
 ### Changed

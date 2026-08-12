@@ -5545,6 +5545,44 @@ aside:has([data-module-list]) > [data-module-list],
   overflow-y: auto;
 }
 
+/* 📦701-fix10 — Sin scroll externo en los home de los módulos principales.
+   Los home usan una de estas 4 clases: gestion-integral-home (Recursos, Gestión
+   Integral, Verificación, Mejoramiento), gestion-salud-home, gestion-peligros-home,
+   gestion-amenazas-home. El contenedor padre (.module-content-area) y .main-canvas
+   tienen overflow: hidden (sin scroll externo en el borde de la página), pero el
+   contenedor del home tiene overflow-y: auto (scroll INTERNO dentro del home).
+   Así el usuario puede bajar para ver widgets + charts + lista de submódulos
+   cuando está en modo ventana, sin que aparezca scrollbar en el borde de la
+   página. Scrollbar fina (8px) para que ocupe poco espacio. */
+.module-content-area:has(.gestion-integral-home),
+.module-content-area:has(.gestion-salud-home),
+.module-content-area:has(.gestion-peligros-home),
+.module-content-area:has(.gestion-amenazas-home) {
+  overflow: hidden !important;
+  overflow-y: hidden !important;
+}
+
+.main-canvas:has(.gestion-integral-home),
+.main-canvas:has(.gestion-salud-home),
+.main-canvas:has(.gestion-peligros-home),
+.main-canvas:has(.gestion-amenazas-home) {
+  overflow: hidden !important;
+}
+
+/* Scroll INTERNO dentro del contenedor del home (NO en el borde de la página).
+   El home ya tiene su propio `height: 100%` y `display: flex`, así que solo
+   cambiamos overflow-y a auto para que el contenido se pueda desplazar
+   internamente. La scrollbar aparece dentro del home, no en la página. */
+.gestion-integral-home,
+.gestion-salud-home,
+.gestion-peligros-home,
+.gestion-amenazas-home {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.25) transparent;
+}
+
 /* Scroll suave para todos los elementos con overflow */
 html {
   scroll-behavior: smooth;
