@@ -244,7 +244,23 @@ Patrones que aprendí corrigiendo problemas visuales. Aplicar a cualquier vista 
 2. Seguir el patrón IIFE + window export
 3. Usar solo clases CSS canónicas (`kair-*`)
 4. Si necesita un componente orquestador (como `auditoria-anual-component.js`), crear uno que cargue CSS + scripts + vistas via cascada
-5. NO commitear sin autorización explícita del usuario ("sí"/"dale"/"commit")
+5. **NO commitear sin autorización explícita del usuario** (ver protocolo completo abajo)
+
+### 🚨 Protocolo de autorización de commits y releases (CRÍTICO — aprendido de incidente 2026-08-11)
+
+El 2026-08-11 se cometieron 2 releases (v0.1.165 y v0.1.166) sin autorización explícita del usuario, sobre-interpretando "procede" como "cambios + commit + release". **Regla sagrada**: cuando hay duda, **PREGUNTAR**. Mejor hacer 1 pregunta extra que 1 commit no autorizado.
+
+| Palabra/frase del user | Significado | Acción permitida |
+|------------------------|------------|------------------|
+| "procede" / "ok procede" | Autoriza hacer cambios de código | Editar archivos, **NO** commitear, **NO** pushear, **NO** release |
+| "dale" / "OK" / "commit" / "perfecto" | Autoriza commit (post-validación visual) | `git commit`, pero **NO** pushear, **NO** release |
+| "realiza solo el commit" | Autoriza commit pero NO push | `git commit` local, sin `git push` |
+| "pushea y procede con el release" | Autoriza push + bump + release | `git push` + `git tag` + `git push --tags` + build + GitHub release |
+| "revierte" | Revertir último commit | `git reset --hard HEAD~1` o `git revert <hash>` |
+| "no committe" / "sin commitear" | Trabajar sin commitear | Hacer cambios, dejar en working tree, esperar validación |
+| "actualiza tu aprendizaje" | Guardar regla durable cross-project en memoria | Llamar `memory` tool |
+
+**Después de cada commit + push + release, redactar el mensaje Y EL RESUMEN, y preguntar "¿procede con commit + release?" antes de ejecutar `git commit && git push && gh release create`.** El output del tool debe terminar con: "Implementé X, Y, Z. ¿Procede con commit + release? (responde 'dale' / 'OK' / 'commit' / 'perfecto' para autorizar)".
 
 ---
 
@@ -334,6 +350,64 @@ b.className = 'footer-update-btn footer-update-available';
 b.click();  // abre el dropdown anclado arriba del dot
 ```
 
+## 🎨 Footer minimalista: solo en pantalla de inicio, blanco sobre Vanta (📦701-fix9, v0.1.171)
+
+A partir de **v0.1.171** el footer negro con copyright y versión se quitó de la app principal y de la Bandeja Integrada. Ahora solo aparece en la pantalla de inicio (splash + login + selección de empresa) flotando sobre el Vanta con texto blanco.
+
+### Patrón de implementación con CSS `:has()`
+
+El selector original `.vanta-fullscreen #app-footer { display: none; }` **NUNCA funcionó** porque la clase `vanta-fullscreen` se aplica a `.main-container` (sibling del footer, no ancestro). Por eso veías el footer negro en la app principal — la regla de ocultarlo nunca matcheó.
+
+**Solución con `:has()` (selector moderno, soportado en Electron 37 / Chromium 118+):**
+
+```css
+/* Default: footer oculto en la app principal */
+#app-footer {
+  display: none !important;
+}
+
+/* Cuando #app tiene un descendiente con vanta-fullscreen, mostrar el footer */
+#app:has(.vanta-fullscreen) #app-footer {
+  display: flex !important;
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 50 !important;
+  background-color: transparent !important;
+  color: rgba(255, 255, 255, 0.85) !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important;
+  padding: var(--spacer-sm) var(--spacer-lg) !important;
+  justify-content: space-between !important;
+  border-top: none !important;
+}
+```
+
+**Por qué `:has()`** en vez de modificar el JS:
+- `vanta-fullscreen` se togglea en 7 lugares del `renderer.js`
+- Con `:has()` desde el padre común (`#app`), una sola regla CSS cubre los 7 casos
+- Cero cambios al JS = cero riesgo de regresión
+
+### Reglas para IAs que extiendan el patrón
+
+1. **Usar `:has()` para elementos siblings del que togglea la clase**: cuando una clase se aplica a un elemento y querés afectar a sus siblings, `:has()` desde el ancestro común es la solución CSS-only.
+2. **`text-shadow` siempre en texto sobre fondos variables**: el Vanta es animado, el color cambia. Sin text-shadow el texto blanco se pierde en zonas claras. Usar `text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5)` para legibilidad consistente.
+3. **`position: fixed` + `bottom: 0` para elementos que overlay contenido**: el footer sigue en el DOM, pero con `position: fixed` no toma espacio en el flow y overlay el contenido (el Vanta en este caso).
+4. **Trade-off del update dot**: el dot de updates vivía en el footer. Al ocultarlo, perdimos el indicador visible. Sigue accesible desde Configuración > Acerca de la App. Si querés re-ubicarlo (botón flotante, header), es un cambio pequeño.
+
+### Bandeja Integrada — patrón más simple
+
+Para la Bandeja Integrada (que es un iframe con su propio scope), la solución fue más simple porque no hay selector de padre:
+
+```css
+/* renderer/bandeja-integrada/styles.css */
+.kair-footer {
+  display: none !important;
+}
+```
+
+El HTML y el JS no se tocaron — el DOM se sigue actualizando (`#footer-events-count`, `#footer-company`, `#footer-view`), solo se oculta visualmente. Si querés recuperarlo, comentás la línea y todo vuelve a funcionar.
+
 ## 🆕 Release flow automatizado (📦585, v0.1.131+)
 
 A partir de **v0.1.131+** el流程 de release está automatizado. Antes había que acordarse de hacer `git tag` + `git push origin <tag>` antes de correr `electron-builder --publish=always`, y si se olvidaba, GitHub devolvía **422 "Published releases must have a valid tag"** y el release quedaba roto con assets huérfanos.
@@ -410,6 +484,66 @@ A partir de **v0.1.130** la barra de menú nativa de Windows (File / Edit / View
 - **NO cambiar el comportamiento** sin preguntarle al usuario. El patrón está validado y funciona bien.
 - Si necesitás exponer un menú custom (ej. para una feature de debug), usá `Menu.buildFromTemplate([...])` y `Menu.setApplicationMenu(menu)` — pero **solo en modo dev** (`if (!app.isPackaged)`).
 - Los atajos de teclado del menú nativo (F12, Ctrl+R, Ctrl+Shift+I) **siguen funcionando** aunque el menú esté oculto, porque Electron los mantiene registrados internamente.
+
+---
+
+## 🆕 Seguimiento de Incapacidades con SQLite (📦701+705+706+702+703+704, v0.1.166-170)
+
+A partir de **v0.1.166** el submódulo 3.3.6 (Medición del Ausentismo por Causa Médica) tiene un **flujo completo de seguimiento de incapacidades (PRIC)** que respalda los datos en SQLite (kair.db) en paralelo al Excel legacy PRI.xlsx. Se entregó en 5 iteraciones:
+
+### Evolución por versión
+
+| Versión | Commit | Foco |
+|---------|--------|------|
+| v0.1.166 | `📦701` | **FASE 1**: schema SQLite + bridge IPC. Tabla `seguimiento_incapacidad_caso` (~80 cols, UNIQUE empresa+cedula+fechas) + `seguimiento_incapacidad_registro` (FK CASCADE). 6 handlers: `guardar`/`listar`/`obtener`/`eliminar`/`exportarExcel`/`exportarTodos`. Sincronización bidireccional SQLite ↔ Excel con botón "Exportar a Excel" desde la UI. |
+| v0.1.167 | `📦702+703+704` | **FASE 2+3**: banner BD con 4 estados visuales (is-unsaved/saved/exported/error), lista de casos en BD con badges, auto-hide header después de 30s de inactividad. |
+| v0.1.168 | `📦701+705+706+fix3+4+5` | **Bugfixes críticos**: schema con columnas duplicadas (origen_dx2/dx3 en 2 secciones), error "[object Object]" al guardar, búsqueda primero en BD, tabla refleja seguimientos nuevos, estado actualizado, botón Siguiente inteligente (considera secciones atenuadas), mapeo de IDs reales del HTML, alias de export en el bridge. |
+| v0.1.169 | `📦701+fix6+fix7` | **Informe PRI**: casos de BD incluidos con sus seguimientos (query separada a `seguimiento_incapacidad_registro WHERE caso_id = ?`). Mapeo: fecha en `colIdx[seguimiento N]`, descripción en `colIdx + 1` (columna adyacente sin header). Timezone fix en `formatDate` (YYYY-MM-DD + T00:00:00 para local). `determinarEstadoCaso` considera el caso de BD. |
+| v0.1.170 | `📦701-fix8` | **Cédula display vs BD**: normalización en 2 capas (renderer + bridge) para que la query matchee siempre. Lección: cualquier query de BD con cédulas/documentos del display debe normalizar antes. |
+
+### Estructura de archivos clave
+
+```
+sgsst-electron-app/
+├── main/
+│   ├── seguimiento-incapacidad-bridge.js  # 6 handlers IPC + schema SQL
+│   └── db-instance.js                     # Singleton de la BD
+├── preload.js                             # Expone window.electronAPI.seguimientoIncapacidad
+├── modules/gestion-salud/ausentismo/
+│   ├── medicion-ausentismo.js             # Renderer: flujo completo de seguimiento
+│   └── informe-pri-builder.html           # Informe PRI (incluye casos de BD)
+└── main.js                                # get-pri-seguimiento-data con casos de BD
+```
+
+### Patrón del bridge IPC (6 handlers)
+
+```js
+// 1. Schema SQL (idempotente, en try/catch)
+const SEG_INC_SCHEMA_SQL = `CREATE TABLE IF NOT EXISTS seguimiento_incapacidad_caso (...)`;
+const SEG_INC_REG_SCHEMA_SQL = `CREATE TABLE IF NOT EXISTS seguimiento_incapacidad_registro (...)`;
+
+// 2. Helpers de transformación
+function _aplanarCaso(caso) { /* frontend JSON → DB row */ }
+function _expandirCaso(row, regs) { /* DB row → frontend JSON anidado {trabajador, incapacidad, pric, ...} */ }
+
+// 3. Handlers
+ipcMain.handle('seguimiento-incapacidad:guardar', (event, { empresaId, data }) => _handlerGuardar(empresaId, data));
+ipcMain.handle('seguimiento-incapacidad:listar', (event, { empresaId }) => _handlerListar(empresaId));
+ipcMain.handle('seguimiento-incapacidad:buscarPorCedula', (event, { empresaId, cedula }) => _handlerBuscarPorCedula(empresaId, cedula));
+// ... + obtener, eliminar, exportarExcel
+```
+
+### Reglas para IAs que extiendan el flujo
+
+1. **Patrón "tabla principal + tabla de detalles"**: `seguimiento_incapacidad_caso` (1 fila por caso) + `seguimiento_incapacidad_registro` (N filas con FK CASCADE). NO asumas que el caso tiene un array embebido de seguimientos — query separada.
+2. **Patrón "Excel column header + adyacente sin header"**: el Excel legacy tiene `SEGUIMIENTO 1` en col N y la descripción en col N+1 (sin header propio). Al mapear de BD a Excel, setea por índice directo: `newRow[colIdx[seguimiento N]] = fecha` y `newRow[colIdx[seguimiento N] + 1] = descripcion`. Verifica `idxDesc < totalCols` antes de escribir.
+3. **Patrón "defense in depth en 2 capas"**: cualquier input de display que vaya a query de BD debe normalizarse TANTO en el renderer (caller) COMO en el bridge (handler). La cédula display `1,044,392,755` no matchea con la BD `1044392755` — `.replace(/,/g, '').replace(/\./g, '').trim()` en ambos lados.
+4. **Patrón "YYYY-MM-DD nativo en backend"**: el `formatDate()` del renderer espera ISO o Date nativo. Si mandas DD/MM/YYYY retorna "Invalid Date". El backend SIEMPRE envía YYYY-MM-DD, el frontend formatea para display.
+5. **Patrón "sección ya capturada"**: cuando un caso ya tiene datos guardados, marcar `seccion1YaCapturada = true` para bypass de validación al reabrir. Caso nuevo → sección 1 (capturar), caso existente → sección 2 (continuar seguimiento).
+6. **Patrón "botón Siguiente inteligente"**: considerar no solo "es la última sección" sino "hay siguiente VISIBLE (no atenuada)?" para el caso seguimiento simple.
+7. **Patrón "exportar alias largo + corto"**: cuando se importa con destructuring, exportar TANTO el nombre largo COMO el corto (`registerSeguimientoIncapacidadHandlers: registerHandlers`) para evitar `undefined` cuando hay inconsistencia.
+8. **Patrón "validar schema con Python sqlite3 antes de integrar"**: el bug del schema con columnas duplicadas pasó 2 versiones porque el try/catch silenciaba el error. Verificar el schema con `python -c "import sqlite3; ..."` antes de mergear.
+9. **NO commitear sin autorización explícita** del usuario. "procede" = SOLO autoriza hacer cambios de código. "dale/OK/commit/perfecto" = autoriza commit. "realiza solo el commit" = autoriza commit sin push. "pushea y procede con el release" = push + bump + release.
 
 ---
 
