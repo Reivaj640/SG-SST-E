@@ -2227,11 +2227,18 @@ class MedicionAusentismoComponent {
         // datos ahora viven en SQLite (kair.db). Si hay un caso existente en
         // SQLite para esta cédula, lo cargamos directamente en el panel.
         // Si no, seguimos con el fallback de Excel legacy.
+        // 📦701-fix8 — Normalizar la cédula (viene formateada con comas/pts
+        // desde el display, ej "1,044,392,755", pero en BD está sin formato,
+        // ej "1044392755"). Sin esta normalización la query no matchea y
+        // siempre cae al fallback del Excel.
+        const cedulaNormalizada = String(cedula || '').replace(/,/g, '').replace(/\./g, '').trim();
+        console.log('[SEGUIMIENTO] Cédula normalizada para BD:', cedulaNormalizada);
+
         console.log('[SEGUIMIENTO] Buscando casos existentes en SQLite (BD)...');
         const segInc = window.electronAPI?.seguimientoIncapacidad ||
                        window.parent?.electronAPI?.seguimientoIncapacidad;
         const buscarEnBd = (segInc && typeof segInc.buscarPorCedula === 'function')
-            ? segInc.buscarPorCedula({ empresaId: this.currentCompany, cedula: cedula })
+            ? segInc.buscarPorCedula({ empresaId: this.currentCompany, cedula: cedulaNormalizada })
             : Promise.resolve({ success: false, data: [], error: { code: 'NO_API', message: 'buscarPorCedula no disponible' } });
 
         buscarEnBd
@@ -2247,7 +2254,7 @@ class MedicionAusentismoComponent {
 
                 // No hay en SQLite — buscar fallback en Excel legacy
                 console.log('[SEGUIMIENTO] No hay casos en SQLite, buscando en Excel legacy...');
-                window.electronAPI.buscarRegistrosCedula(cedula, this.currentCompany)
+                window.electronAPI.buscarRegistrosCedula(cedulaNormalizada, this.currentCompany)
                     .then(resultado => {
                         console.log('[SEGUIMIENTO] Resultado búsqueda Excel legacy:', resultado);
 

@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.170] - 2026-08-12
+
+### Fixed
+- **📦701-fix8 — fix(ausentismo): cédula con formato display no matcheaba al reabrir caso** — El log mostraba `[SEGUIMIENTO] Cédula: 1,044,392,755` (con comas), pero la BD la guarda sin formato (`1044392755`). La query `WHERE cedula = '1,044,392,755'` retornaba 0 filas, el código pensaba que no había caso y abría panel para caso nuevo. **Fix (defense in depth en 2 capas)**:
+  1. **Renderer** (`medicion-ausentismo.js`): normaliza la cédula con `.replace(/,/g, '').replace(/\./g, '').trim()` antes de llamar al bridge
+  2. **Bridge** (`seguimiento-incapacidad-bridge.js`): normaliza también dentro del handler `_handlerBuscarPorCedula` para que cualquier otro caller quede protegido
+
+  **Por qué 2 capas**: si el renderer normaliza pero el bridge no, otro módulo que llame al bridge sin normalizar revienta el flujo. Si el bridge normaliza, está protegido siempre.
+
+  **Lección guardada en memoria cross-project**: cualquier query de BD que reciba cédulas/documentos desde un input de usuario o campo display SIEMPRE debe normalizar a la entrada.
+
+### Files
+- `main/seguimiento-incapacidad-bridge.js`: normalización de cédula en `_handlerBuscarPorCedula` (+6/-0)
+- `modules/gestion-salud/ausentismo/medicion-ausentismo.js`: normalización antes de `buscarPorCedula` y `buscarRegistrosCedula` (+11/-2)
+
 ## [0.1.169] - 2026-08-11
 
 ### Fixed

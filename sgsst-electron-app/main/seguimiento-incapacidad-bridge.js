@@ -646,11 +646,15 @@ function _handlerBuscarPorCedula(empresaId, cedula) {
     }
     try {
         var db = _getDb();
+        // 📦701-fix8 — Normalizar la cédula: viene formateada desde el display
+        // (ej "1,044,392,755") pero en BD está sin formato ("1044392755").
+        // Sin esta normalización la query no matchea y siempre retorna 0 filas.
+        var cedulaNormalizada = String(cedula || '').replace(/,/g, '').replace(/\./g, '').trim();
         // Traer TODOS los casos (con todos los campos) de esta cédula
         // (puede haber varios: el mismo empleado pudo tener varias incapacidades)
         var rows = db.prepare(
             'SELECT * FROM seguimiento_incapacidad_caso WHERE empresa_id = ? AND cedula = ? ORDER BY actualizado_en DESC'
-        ).all(empresaId, cedula);
+        ).all(empresaId, cedulaNormalizada);
         // Expandir cada caso (DB row → frontend JSON) para que el renderer
         // pueda usarlo directamente en el formulario.
         var casos = rows.map(function (row) {

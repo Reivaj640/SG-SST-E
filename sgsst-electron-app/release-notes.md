@@ -1,3 +1,21 @@
+# K+AIR v0.1.170
+
+## 🔧 Seguimiento de Incapacidades — Fix cédula display vs BD (v0.1.170)
+
+Resuelve la regresión donde, al reabrir un caso existente de seguimiento de incapacidades, la cédula con formato de display (`1,044,392,755`) no matcheaba con la cédula sin formato guardada en la BD (`1044392755`), y el panel se abría como caso nuevo (vacío).
+
+### ¿Qué incluye?
+
+**📦701-fix8 — Normalización de cédula en 2 capas (defense in depth)**:
+- ANTES: log mostraba `[SEGUIMIENTO] Cédula: 1,044,392,755` (display) → query `WHERE cedula = '1,044,392,755'` → 0 filas → fallback Excel → tampoco → "abrir caso nuevo"
+- AHORA: la cédula se normaliza con `.replace(/,/g, '').replace(/\./g, '').trim()` en:
+  1. **Renderer** (`medicion-ausentismo.js`) antes de `buscarPorCedula` y `buscarRegistrosCedula`
+  2. **Bridge** (`seguimiento-incapacidad-bridge.js`) dentro de `_handlerBuscarPorCedula` (protege a otros callers)
+
+**Lección guardada en memoria**: cualquier query de BD que reciba cédulas/documentos desde un input de usuario SIEMPRE normalizar a la entrada.
+
+---
+
 # K+AIR v0.1.169
 
 ## 🔧 Informe PRI — Casos de BD incluidos (v0.1.169)
