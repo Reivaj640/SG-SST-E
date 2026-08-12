@@ -1,3 +1,35 @@
+# K+AIR v0.1.171
+
+## 🎨 Footer minimalista: solo en pantalla de inicio, blanco sobre Vanta (v0.1.171)
+
+El footer negro con copyright y versión se quitó de la app principal y de la Bandeja Integrada para ganar espacio vertical (~25px en cada vista). Ahora solo aparece en la pantalla de inicio (splash + login + selección de empresa) flotando sobre el Vanta con texto blanco.
+
+### ¿Qué incluye?
+
+**Main app** — el footer negro ya no aparece en ningún módulo/submódulo/dashboard/home. Solo se ve cuando estás en la pantalla de inicio (donde está el Vanta.js). **Implementación con CSS puro** usando `:has()` (selector moderno soportado en Electron 37 / Chromium 118+):
+- `#app-footer { display: none !important; }` por defecto
+- `#app:has(.vanta-fullscreen) #app-footer { display: flex; position: fixed; bottom: 0; ... }` cuando hay Vanta
+- `position: fixed` + `bottom: 0` + fondo transparente + texto blanco con text-shadow
+- `justify-content: space-between` (copyright izq, versión der) — mismo layout que tenía
+
+**Bandeja Integrada** — el footer de la Bandeja (`K+AIR · Bandeja Integrada v0.1.120 · SG-SST · Resolución 0312 de 2019 · X eventos visibles · Empresa: Todas · Vista: Correo`) también se ocultó. El HTML y el JS quedan intactos — el DOM se sigue actualizando, solo se oculta visualmente con `display: none`. Si querés recuperarlo, comentás la línea y vuelve.
+
+**Bonus** — el bug oculto que se arregló: el selector original `.vanta-fullscreen #app-footer { display: none; }` NUNCA funcionó porque `vanta-fullscreen` se aplica a `.main-container` (sibling del footer, no ancestro). Por eso el footer negro se veía siempre. La regla con `:has()` sí matchea porque `#app` es el ancestro común.
+
+### Antes vs después
+
+| Vista | ANTES (v0.1.170) | AHORA (v0.1.171) |
+|-------|------------------|------------------|
+| Splash + Login | Footer negro al fondo (visible pero desalineado con el diseño) | Texto blanco flotando sobre el Vanta (como el "Haz clic en el logo") |
+| Selección de empresa | Footer negro al fondo | Texto blanco sobre el Vanta |
+| Dashboard / Módulos | Footer negro al fondo (roba ~25px verticales) | Sin footer, todo el espacio para el contenido |
+| Bandeja Integrada | Footer con info + estado | Sin footer, más espacio para el correo |
+
+### Trade-off
+- **El dot de updates del footer desaparece** (estaba ahí en v0.1.131). Si hay update disponible, no se ve en la app principal. Sigue accesible desde **Configuración > Acerca de la App**. Si querés que aparezca en otro lado (header, botón flotante), avisame para moverlo.
+
+---
+
 # K+AIR v0.1.170
 
 ## 🔧 Seguimiento de Incapacidades — Fix cédula display vs BD (v0.1.170)

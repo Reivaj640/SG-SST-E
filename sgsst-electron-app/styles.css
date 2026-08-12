@@ -6518,12 +6518,34 @@ padding: 0 !important;
 background-color: transparent !important;
 }
 
-.vanta-fullscreen #app-footer {
-display: none !important;
+/* 📦701-fix9 — Footer solo visible en Vanta (login/home) para ganar espacio
+   en la app principal. Por defecto display:none. Se activa cuando el .main-container
+   (sibling del footer, ambos dentro de #app) tiene la clase vanta-fullscreen.
+   Usamos :has() para evitar modificar el JS que togglea vanta-fullscreen.
+   Electron 37 usa Chromium 118+ que soporta :has(). */
+#app-footer {
+  display: none !important;
 }
 
-.vanta-fullscreen #app-header {
-display: none !important;
+#app:has(.vanta-fullscreen) #app-footer {
+  /* Mostrar el footer flotando sobre el Vanta con texto blanco y fondo transparente. */
+  display: flex !important;
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 50 !important;
+  background-color: transparent !important;
+  color: rgba(255, 255, 255, 0.85) !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important;
+  padding: var(--spacer-sm) var(--spacer-lg) !important;
+  justify-content: space-between !important;
+  pointer-events: auto !important;
+  border-top: none !important;
+}
+
+#app:has(.vanta-fullscreen) #app-header {
+  display: none !important;
 }
 
 .vanta-fullscreen #header-hover-zone {

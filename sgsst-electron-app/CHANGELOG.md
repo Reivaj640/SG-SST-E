@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.171] - 2026-08-12
+
+### Changed
+- **📦701-fix9 — feat(ui): footer solo visible en pantalla de inicio con texto blanco sobre Vanta** — El footer negro (`© Javier Robles... · v0.1.X`) se quitó de la app principal para ganar espacio vertical (~25px). Ahora solo aparece en la pantalla de inicio (splash + login + selección de empresa) flotando en la parte de abajo con texto blanco sobre el fondo animado de Vanta.js. **Implementación**:
+  - **Main app** (`styles.css`): `#app-footer { display: none !important; }` por defecto. Cuando `#app` tiene un descendiente con clase `vanta-fullscreen` (usando `:has()` de CSS moderno soportado en Electron 37 / Chromium 118+), el footer aparece con `position: fixed; bottom: 0; left: 0; right: 0;`, fondo transparente, texto blanco con text-shadow para legibilidad sobre el Vanta.
+  - **Por qué `:has()`**: el selector original `.vanta-fullscreen #app-footer` NUNCA funcionó porque `vanta-fullscreen` se aplica a `.main-container` (sibling del footer) y no a un ancestro. Por eso el footer negro se veía siempre. La regla `#app:has(.vanta-fullscreen) #app-footer` sí matchea porque `#app` es el ancestro común.
+  - **Header del app**: misma corrección con `:has()` para que se oculte correctamente en la pantalla del Vanta.
+  - **Bandeja Integrada** (`renderer/bandeja-integrada/styles.css`): el footer de la Bandeja (`K+AIR · Bandeja Integrada v0.1.120 · SG-SST · Resolución 0312 de 2019 · X eventos visibles · Empresa: Todas · Vista: Correo`) también se ocultó con `display: none !important` para ganar espacio vertical en el iframe del correo. El HTML y el JS no se tocaron — el DOM sigue actualizándose, solo se oculta visualmente.
+
+### Trade-off
+- **El dot de updates desaparece del footer** (estaba ahí en v0.1.131). Si hay un update disponible, no se ve en la app principal. Sigue accesible desde **Configuración > Acerca de la App**. Si querés que aparezca en otro lado (botón flotante, header), avisame para moverlo.
+
 ## [0.1.170] - 2026-08-12
 
 ### Fixed

@@ -226,17 +226,10 @@ body {
 }
 
 .kair-footer {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding: 8px 20px;
-  background: #ffffff;
-  border-top: 1px solid var(--kair-border);
-  font-size: 0.75rem;
-  color: var(--kair-text-light);
+  /* 📦701-fix9 — Footer oculto para ganar espacio vertical.
+     El JS sigue actualizando el DOM (#footer-events-count, #footer-company, #footer-view)
+     pero el usuario no lo ve. Si querés recuperarlo, comentá la línea display:none. */
+  display: none !important;
 }
 
 .kair-footer__left,
