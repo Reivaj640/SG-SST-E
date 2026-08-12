@@ -1,3 +1,45 @@
+# K+AIR v0.1.169
+
+## 🔧 Informe PRI — Casos de BD incluidos (v0.1.169)
+
+Resuelve el bug donde los casos de seguimiento guardados en SQLite (como LORAINNE) NO aparecían en el Informe de Gestión PRI, o aparecían sin la sección "Historial de Seguimientos" poblada. Ahora el informe muestra TODOS los casos (Excel + BD) con la misma coherencia visual que un caso nativo de Excel.
+
+### ¿Qué incluye?
+
+**📦701-fix6 — El informe ahora incluye los casos de la BD**:
+- ANTES: `get-pri-seguimiento-data` solo leía `PRI.xlsx` → los casos nuevos guardados en SQLite (vía el flujo de seguimiento de incapacidades) NO aparecían en el informe
+- AHORA: el handler consulta `seguimiento_incapacidad_caso WHERE empresa_id = ?` y agrega los casos al final de la lista, evitando duplicados por cédula
+
+**📦701-fix6 — Estado del caso refleja los seguimientos de la BD**:
+- ANTES: LORAINNE aparecía como "Sin Iniciar" aunque tenía 2 seguimientos en la BD
+- AHORA: `determinarEstadoCaso` considera el caso de BD → LORAINNE ahora muestra "En Seguimiento"
+
+**📦701-fix7 — Sección 4 (Historial de Seguimientos) muestra los seguimientos de la BD**:
+- ANTES: la sección se construía desde columnas Excel vacías para casos de BD → no se renderizaba
+- AHORA: query a `seguimiento_incapacidad_registro WHERE caso_id = ?`, fecha en colIdx[seguimiento N], descripción en colIdx + 1 (columna adyacente sin header)
+
+**📦701-fix6 — Timezone fix en `formatDate`**:
+- ANTES: `new Date("2026-04-01")` se interpretaba como UTC midnight → en Colombia mostraba `31/03/2026`
+- AHORA: regex detecta YYYY-MM-DD puro y agrega `T00:00:00` para medianoche local
+
+**📦701-fix7 — Fechas en formato nativo YYYY-MM-DD**:
+- ANTES: el handler convertía a DD/MM/YYYY antes de mandar → `formatDate()` del renderer no las parseaba → "Invalid Date"
+- AHORA: envía YYYY-MM-DD y deja que `formatDate()` haga la conversión → "13/04/2026" correctamente
+
+### Antes vs después
+
+| Caso | ANTES (v0.1.168) | AHORA (v0.1.169) |
+|------|------------------|-------------------|
+| LORAINNE en lista | ❌ NO aparecía | ✅ Aparece con "En Seguimiento" |
+| LORAINNE sección 4 | ❌ No se renderizaba | ✅ Muestra 2 seguimientos con fecha + descripción |
+| Fecha 01/04/2026 | ❌ Mostraba 31/03/2026 (UTC) | ✅ Muestra 01/04/2026 (local) |
+| Estado LORAINNE | ❌ "Sin Iniciar" | ✅ "En Seguimiento" |
+
+### Pendiente para próximos releases
+- Sección 5 (Calificación PCL) y 6 (Recomendaciones) siguen N/A para casos de BD hasta que se llene esa info en la BD (los campos ya existen en la tabla `seguimiento_incapacidad_caso`)
+
+---
+
 # K+AIR v0.1.168
 
 ## 🔧 Seguimiento de Incapacidades — Bug fixes críticos (v0.1.166/v0.1.167)

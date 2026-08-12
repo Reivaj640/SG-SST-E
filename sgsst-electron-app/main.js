@@ -10765,7 +10765,7 @@ ipcMain.handle('get-pri-seguimiento-data', async (event, companyName) => {
     // -------------------------------------------------------------------------
     // 11. Retornar datos procesados
     // -------------------------------------------------------------------------
-    const result = {
+    let result = {
       success: true,
       headers: headers || [],
       rows: rows,
@@ -10774,13 +10774,144 @@ ipcMain.handle('get-pri-seguimiento-data', async (event, companyName) => {
       companyName
     };
 
+    // -------------------------------------------------------------------------
+    // 📦701-fix6 — Combinar también con casos de la BD (kair.db)
+    // Los casos guardados en SQLite (como el flujo nuevo de seguimiento de
+    // incapacidades) NO están en PRI.xlsx. Si no los incluimos, el informe
+    // no los muestra. Aquí consultamos la BD y los convertimos al formato
+    // de array del Excel, insertándolos al final.
+    // -------------------------------------------------------------------------
+    try {
+        const segInc = require('./main/seguimiento-incapacidad-bridge');
+        // Necesitamos acceso a la BD. Usar la misma conexión que el bridge.
+        const dbInstance = require('./main/db-instance').getDb();
+        if (dbInstance) {
+            const casosBd = dbInstance.prepare(
+                'SELECT * FROM seguimiento_incapacidad_caso WHERE empresa_id = ? ORDER BY actualizado_en DESC'
+            ).all(companyKey || companyName);
+
+            // Set de cédulas ya presentes en el Excel (normalizadas)
+            const cedulasEnExcel = new Set();
+            // Mapeo de índice de columna por header
+            const colIdx = {};
+            (headers || []).forEach((h, i) => {
+                if (h) colIdx[String(h).toLowerCase().trim()] = i;
+            });
+            const idxCedula = colIdx['numero de documento de identidad'] !== undefined
+                ? colIdx['numero de documento de identidad']
+                : colIdx['número de documento de identidad'] !== undefined
+                    ? colIdx['número de documento de identidad']
+                    : colIdx['cedula'] !== undefined ? colIdx['cedula'] : -1;
+            if (idxCedula >= 0) {
+                for (const row of rows) {
+                    const ced = String(row[idxCedula] || '').replace(/[^0-9]/g, '');
+                    if (ced) cedulasEnExcel.add(ced);
+                }
+            }
+
+            // 📦701-fix7 — Calcular índices de columnas de seguimientos (fecha + descripción)
+            // El Excel tiene "SEGUIMIENTO N" en una columna y la descripción en la SIGUIENTE
+            // columna (sin header propio). Hay que llenar ambas manualmente.
+            const segFechaIdx = []; // Array de índices de columnas para fecha
+            for (let n = 1; n <= 5; n++) {
+                const idxFecha = colIdx[`seguimiento ${n}`];
+                segFechaIdx.push(idxFecha !== undefined ? idxFecha : -1);
+            }
+
+            // Convertir cada caso de BD a formato de array
+            let casosBdAgregados = 0;
+            for (const caso of casosBd) {
+                const cedLimpia = String(caso.cedula || '').replace(/[^0-9]/g, '');
+                if (!cedLimpia || cedulasEnExcel.has(cedLimpia)) continue;
+
+                // 📦701-fix7 — Consultar seguimientos de la tabla seguimiento_incapacidad_registro
+                // (antes se leía caso.seguimientos que NO existe — los seguimientos están en
+                // una tabla aparte con FK al caso)
+                let seguimientosBd = [];
+                try {
+                    seguimientosBd = dbInstance.prepare(
+                        'SELECT fecha, descripcion FROM seguimiento_incapacidad_registro ' +
+                        'WHERE caso_id = ? AND empresa_id = ? ' +
+                        "AND (tipo = 'seguimiento' OR tipo IS NULL) " +
+                        'ORDER BY fecha ASC, creado_en ASC'
+                    ).all(caso.id, caso.empresa_id);
+                } catch (segErr) {
+                    console.warn(`[PRI][MAIN] No se pudieron leer seguimientos para caso ${caso.id}:`, segErr.message);
+                }
+
+                // Crear un row con null en todas las columnas
+                const totalCols = (headers || []).length;
+                const newRow = new Array(totalCols).fill(null);
+                // Llenar las columnas conocidas según el mapeo
+                const mapear = (header, value) => {
+                    const i = colIdx[header];
+                    if (i !== undefined && value !== null && value !== undefined && value !== '') {
+                        newRow[i] = value;
+                    }
+                };
+                // Identificación
+                mapear('item', casosBdAgregados + 1);
+                mapear('tipo de evento at/el', caso.tipo_evento);
+                mapear('nombre trabajador', caso.nombre);
+                mapear('numero de documento de identidad', caso.cedula);
+                mapear('número de documento de identidad', caso.cedula);
+                mapear('género', caso.genero);
+                mapear('genero', caso.genero);
+                mapear('edad', caso.edad);
+                mapear('sede/area', caso.area);
+                mapear('sede/área', caso.area);
+                mapear('cargo', caso.cargo);
+                mapear('eps', caso.eps);
+                mapear('afp', caso.afp);
+                mapear('días incapacidad acumulados', caso.dias_acumulados);
+                mapear('fecha de inicio de incapacidad', caso.fecha_inicio);
+                mapear('fecha de finalización de incapacidad', caso.fecha_fin);
+                mapear('cie-10 de la incapacidad temporal dx 1', caso.codigo_cie10);
+                mapear('diagnostico', caso.descripcion_diagnostico);
+                mapear('origen incapacidad dx 1', caso.origen_dx1 || '');
+                // 📦701-fix7 — Segimientos: fecha en colIdx[`seguimiento N`], descripción en colIdx + 1
+                if (seguimientosBd && seguimientosBd.length > 0) {
+                    seguimientosBd.forEach((seg, i) => {
+                        if (i >= 5) return; // Máximo 5 slots en el Excel
+                        const idxFecha = segFechaIdx[i];
+                        if (idxFecha === undefined || idxFecha < 0) return;
+                        // 📦701-fix7 — Enviar fecha en formato YYYY-MM-DD (nativo)
+                        // El formatDate() del renderer lo convierte a DD/MM/YYYY.
+                        // Si mandamos DD/MM/YYYY, el new Date() no lo parsea → "Invalid Date".
+                        if (seg.fecha) {
+                            newRow[idxFecha] = seg.fecha;
+                        }
+                        // Descripción va en la columna SIGUIENTE (no tiene header propio)
+                        const idxDesc = idxFecha + 1;
+                        if (idxDesc < totalCols && seg.descripcion) {
+                            newRow[idxDesc] = seg.descripcion;
+                        }
+                    });
+                }
+                // Cierre
+                mapear('fecha de cierre', caso.fecha_cierre);
+                mapear('motivo de cierre', caso.motivo_cierre);
+                mapear('origen del caso', caso.origen_caso);
+                mapear('recomendaciones laborales vigentes', caso.recomendaciones_laborales);
+
+                result.rows.push(newRow);
+                cedulasEnExcel.add(cedLimpia);
+                casosBdAgregados++;
+                console.log(`[PRI][MAIN] 📦701-fix7 — Caso BD ${caso.nombre} (${cedLimpia}) con ${seguimientosBd.length} seguimientos`);
+            }
+            console.log(`[PRI][MAIN] 📦701-fix6 — Casos de BD agregados al informe: ${casosBdAgregados}`);
+        }
+    } catch (bdErr) {
+        console.warn('[PRI][MAIN] No se pudieron cargar casos de BD para el informe (no crítico):', bdErr.message);
+    }
+
     console.log('========================================');
     console.log('[PRI][MAIN] Datos del PRI listos para enviar:');
     console.log(`  - Éxito: ${result.success}`);
     console.log(`  - Encabezados: ${result.headers.length} columnas`);
     console.log(`  - Filas: ${result.rows.length} registros`);
-    console.log(`  - Archivo: ${priFile.path}`);
-    console.log(`  - Hoja: ${sheetName}`);
+    console.log(`  - Archivo: ${result.filePath}`);
+    console.log(`  - Hoja: ${result.sheetName}`);
     console.log('========================================');
 
     return result;

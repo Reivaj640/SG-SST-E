@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.169] - 2026-08-11
+
+### Fixed
+- **📦701-fix6 — feat(ausentismo): el informe PRI ahora incluye los casos guardados en SQLite** — El handler `get-pri-seguimiento-data` solo leía casos del Excel legacy (PRI.xlsx) y los casos que se guardan en SQLite (como el flujo nuevo de seguimiento de incapacidades) NO aparecían en el informe. **Fix**: después de leer el Excel, consulta la BD con `dbInstance.prepare('SELECT * FROM seguimiento_incapacidad_caso WHERE empresa_id = ?')`, convierte cada caso a un row de 173 columnas (mapeando los campos del caso BD a los headers del Excel), y lo inserta al final de `result.rows` solo si la cédula no está ya en el Excel. Los nuevos casos aparecen listados con su badge "En Seguimiento" en la lista de casos detectados.
+- **📦701-fix6 — fix(ausentismo): timezone bug en `formatDate` del informe** — `new Date("2026-04-01")` se interpretaba como medianoche UTC, lo que en zonas horarias como Colombia (UTC-5) mostraba el día anterior (`31/03/2026` en vez de `01/04/2026`). **Fix**: regex detecta formato YYYY-MM-DD puro y agrega `T00:00:00` para que se interprete como medianoche local.
+- **📦701-fix7 — feat(ausentismo): sección 4 (Historial de Seguimientos) del informe ahora muestra los seguimientos de la BD** — El render del informe construía `c.seguimientos` solo desde las columnas Excel (`SEGUIMIENTO 1` a `SEGUIMIENTO 5`). Para casos de BD, esas columnas estaban vacías y la sección no se renderizaba. **Fix**: el handler ahora consulta `seguimiento_incapacidad_registro WHERE caso_id = ?` para cada caso de BD, calcula los índices de las columnas `seguimiento N`, y pone la fecha en `colIdx[seguimiento N]` y la descripción en `colIdx + 1` (la columna adyacente sin header propio). El formato de fecha se envía en YYYY-MM-DD (nativo) y el `formatDate()` del renderer lo convierte a DD/MM/YYYY para mostrar.
+- **📦701-fix7 — fix(ausentismo): seguimientos de BD se renderizaban como "Invalid Date"** — El primer intento convertía la fecha a `DD/MM/YYYY` antes de mandarla, pero el `formatDate()` del renderer solo maneja `YYYY-MM-DD` y otros formatos nativos de Date → `new Date("13/04/2026")` retorna Invalid Date. **Fix**: enviar la fecha en formato `YYYY-MM-DD` y dejar que `formatDate()` haga la conversión a DD/MM/YYYY.
+- **📦701-fix6 — fix(ausentismo): estado del caso no consideraba los seguimientos de la BD** — `determinarEstadoCaso(incapacidad, registroPRI, casoBD)` ignoraba `casoBD` y siempre caía al cálculo del Excel. **Fix**: si `casoBD` tiene seguimientos, el estado es "En Seguimiento" (no "Sin Iniciar"). LORAINNE ahora muestra "En Seguimiento" en vez de "Sin Iniciar".
+
+### Files
+- `main.js`: handler `get-pri-seguimiento-data` extendido para incluir casos de BD + query a `seguimiento_incapacidad_registro` para los seguimientos (+137/-?)
+- `modules/gestion-salud/ausentismo/informe-pri-builder.html`: fix `formatDate` para timezone YYYY-MM-DD (+12/-0)
+- `modules/gestion-salud/ausentismo/medicion-ausentismo.js`: `determinarEstadoCaso` considera el caso de BD para reflejar el estado real (+26/-?)
+
 ## [0.1.168] - 2026-08-11
 
 ### Fixed

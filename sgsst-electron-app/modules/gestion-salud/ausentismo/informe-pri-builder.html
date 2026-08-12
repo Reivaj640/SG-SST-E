@@ -1906,7 +1906,17 @@
 
         function formatDate(dateString) {
             if (!dateString) return 'N/A';
-            const date = new Date(dateString);
+            // 📦701-fix6 — Si la fecha viene solo como "YYYY-MM-DD" (sin hora),
+            // JavaScript la interpreta como medianoche UTC, lo que en zonas
+            // horarias como Colombia (UTC-5) se ve como el DÍA ANTERIOR.
+            // Fix: si NO tiene 'T' (parte de hora), agregar 'T00:00:00' para
+            // que se interprete como medianoche LOCAL.
+            let date;
+            if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateString.trim())) {
+                date = new Date(dateString + 'T00:00:00');
+            } else {
+                date = new Date(dateString);
+            }
             return date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
         }
 

@@ -1236,7 +1236,11 @@ class MedicionAusentismoComponent {
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
             // 🆕 Determinar estado usando la nueva lógica con fechas de cierre
-            const estadoInfo = this.determinarEstadoCaso(incapacidadPrincipal, empleado.registroPRI);
+            // 📦701-fix5 — Pasar también el caso de la BD si existe para considerar
+            // seguimientos guardados en SQLite (no solo del Excel legacy)
+            const cedulaParaEstado = String(empleado.cedula || '').replace(/,/g, '').replace(/\./g, '').trim();
+            const casoBdEmpleadoEstado = (this._casosBdSeguimientoMap && this._casosBdSeguimientoMap.get(cedulaParaEstado)) || null;
+            const estadoInfo = this.determinarEstadoCaso(incapacidadPrincipal, empleado.registroPRI, casoBdEmpleadoEstado);
             const estado = estadoInfo.estado;
 
             //console.log(`[KPIs] ${empleado.nombre}: ${estado} (registroPRI: ${empleado.registroPRI ? 'SÍ' : 'NO'})`);
@@ -1360,7 +1364,7 @@ class MedicionAusentismoComponent {
      * @param {Object} registroPRI - Registro completo desde PRI.xlsx (opcional, contiene fechas de cierre)
      * @returns {Object} { estado: string, badgeClass: string, progressClass: string }
      */
-    determinarEstadoCaso(incapacidad, registroPRI = null) {
+    determinarEstadoCaso(incapacidad, registroPRI = null, casoBD = null) {
         // Los datos del Excel de Ausentismo están en incapacidad.record
         const recordAusentismo = incapacidad?.record || {};
         
@@ -1442,7 +1446,11 @@ class MedicionAusentismoComponent {
             fechaSeguimiento1 = recordAusentismo['FECHA SEGUIMIENTO 1'] || recordAusentismo['fecha_seguimiento_1'] || null;
         }
 
-        const tieneSeguimientos = fechaSeguimiento1 ? true : false;
+        const tieneSeguimientosExcel = fechaSeguimiento1 ? true : false;
+        // 📦701-fix5 — Si el caso de la BD tiene seguimientos (recomendaciones_count > 0),
+        // también considerarlo como "tiene seguimientos" aunque el Excel no los tenga.
+        const tieneSeguimientosBD = !!(casoBD && Number(casoBD.recomendaciones_count) > 0);
+        const tieneSeguimientos = tieneSeguimientosExcel || tieneSeguimientosBD;
 
         // === Verificar si hay cédula (siempre debería haberla si estamos en la tabla) ===
         const tieneCedulaEnExcel = recordAusentismo['CEDULA'] || recordAusentismo['cedula'] ||
@@ -1708,7 +1716,11 @@ class MedicionAusentismoComponent {
             const diasIncapacidad = incapacidadPrincipal?.diasIncapacidad || 0;
 
             // 🆕 Determinar estado usando la nueva lógica con fechas de cierre
-            const estadoInfo = this.determinarEstadoCaso(incapacidadPrincipal, empleado.registroPRI);
+            // 📦701-fix5 — Pasar también el caso de la BD si existe para considerar
+            // seguimientos guardados en SQLite (no solo del Excel legacy)
+            const cedulaParaEstado = String(empleado.cedula || '').replace(/,/g, '').replace(/\./g, '').trim();
+            const casoBdEmpleadoEstado = (this._casosBdSeguimientoMap && this._casosBdSeguimientoMap.get(cedulaParaEstado)) || null;
+            const estadoInfo = this.determinarEstadoCaso(incapacidadPrincipal, empleado.registroPRI, casoBdEmpleadoEstado);
             const estado = estadoInfo.estado;
             const badgeClass = estadoInfo.badgeClass;
             
@@ -1931,7 +1943,11 @@ class MedicionAusentismoComponent {
             }
 
             // 🆕 Determinar estado usando la misma lógica con fechas de cierre
-            const estadoInfo = this.determinarEstadoCaso(incapacidadPrincipal, empleado.registroPRI);
+            // 📦701-fix5 — Pasar también el caso de la BD si existe para considerar
+            // seguimientos guardados en SQLite (no solo del Excel legacy)
+            const cedulaParaEstado = String(empleado.cedula || '').replace(/,/g, '').replace(/\./g, '').trim();
+            const casoBdEmpleadoEstado = (this._casosBdSeguimientoMap && this._casosBdSeguimientoMap.get(cedulaParaEstado)) || null;
+            const estadoInfo = this.determinarEstadoCaso(incapacidadPrincipal, empleado.registroPRI, casoBdEmpleadoEstado);
             const estado = estadoInfo.estado;
 
             console.log(`[KPIs Filtered] ${empleado.nombre}: ${estado} (Tipo: ${tipoPrincipal}, registroPRI: ${empleado.registroPRI ? 'SÍ' : 'NO'})`);
