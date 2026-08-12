@@ -1,3 +1,33 @@
+# K+AIR v0.1.173
+
+## 📧 Bandeja Integrada — Fix reply en Enviados (v0.1.173)
+
+Resuelve el bug donde, al abrir un correo de **Enviados** y hacer click en "Responder" o "Responder a todos", el campo "Para" mostraba un chip con el email del propio usuario (visible como "m" o el primer carácter, porque el chip se truncaba a 180px con ellipsis).
+
+### ¿Qué incluye?
+
+**Fix de causa raíz** (`openComposeModal` usaba el campo incorrecto):
+- ANTES: `toValue = mail.senderEmail || mail.sender` → en Enviados, `senderEmail` es el email del PROPIO user (vos), no el destinatario
+- AHORA: `var replyContact = getMailDisplayContact(mail); toValue = replyContact.email || replyContact.name` → usa la función que ya manejaba este caso correctamente en la lista y el detalle
+
+**`getMailDisplayContact(mail)`** (línea 301) retorna:
+- **INBOX**: el `sender` (a quien respondés) — `to_list[0]`, `participants_list` (excluyéndote), o `sender` como fallback
+- **SENT**: el primer item de `to_list` o `participants_list` (excluyéndote) — el destinatario original, a quien querés responderle
+
+**Reply all también arreglado**:
+- ANTES: el filtro de CC podía incluir tu propio email si eras participante
+- AHORA: con `getMailDisplayContact` + el filtro existente (`e !== toValue && e !== state.gmailEmail`), el "Para" es el destinatario correcto y el "CC" son solo los demás
+
+### Antes vs después
+
+| Acción | ANTES | AHORA |
+|--------|-------|-------|
+| Abrir Enviados → click "Responder" en un correo | Chip con tu propio email (truncado a "m" o similar) | Chip con el destinatario original completo |
+| Abrir Enviados → click "Responder a todos" | CC incluía tu propio email | CC solo los demás destinatarios |
+| Abrir Recibidos → click "Responder" | Chip con el remitente (correcto) | Chip con el remitente (correcto, sin cambios) |
+
+---
+
 # K+AIR v0.1.172
 
 ## 🎨 Scroll INTERNO en los home de módulos — sin scroll externo (v0.1.172)

@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.173] - 2026-08-12
+
+### Fixed
+- **📦701-fix12 — fix(bandeja): reply en Enviados mostraba el email del propio user como destinatario** — En la Bandeja Integrada, al abrir un correo de **Enviados** y click en "Responder" o "Responder a todos", el campo "Para" mostraba un chip con el email del propio usuario (visible como "m" o el primer carácter del email, porque el chip tiene `max-width: 180px` y se truncaba con ellipsis).
+  - **Causa raíz**: `openComposeModal()` usaba `mail.senderEmail || mail.sender` para el "To", pero en Enviados `mail.senderEmail` es el email del PROPIO usuario (el remitente), no el destinatario original. La función `getMailDisplayContact()` ya manejaba este caso correctamente para la lista y el detalle (línea 301), pero no se usaba en el compose.
+  - **Fix**: usar `getMailDisplayContact(mail)` en `openComposeModal()` que retorna:
+    - **INBOX**: el `sender` (a quien respondés)
+    - **SENT**: el primer item de `to_list` o `participants_list` excluyendo al user (el destinatario original, a quien querés responderle)
+  - **Reply all**: también arreglado. Antes podía incluir tu propio email en CC; ahora con `getMailDisplayContact` + el filtro existente, el "Para" es el destinatario correcto y el "CC" son los demás.
+
 ## [0.1.172] - 2026-08-12
 
 ### Changed

@@ -304,6 +304,7 @@ document.body.appendChild(bandejaIntegradaFrame);
 - **BEM refactor 4 componentes**: `.email-row`, `.thread-header`, `.quoted-thread`, `.compose-panel` (con tokens CSS en `:root`).
 - **Sin Tailwind**: el archivo `styles.css` NO debe tener `@import "tailwindcss"`. Si lo ves, elimínalo (causa `ERR_FILE_NOT_FOUND` en consola).
 - **Patrón IIFE + window export**: igual que las vistas de submódulos, pero todo dentro del iframe.
+- **SIEMPRE usar `getMailDisplayContact(mail)`** para resolver el "contacto visible" de un mail (línea 301). En **INBOX** es el `sender` (a quien respondés), en **SENT** es el primer item de `to_list` o `participants_list` excluyendo al user (el destinatario original, a quien le enviaste). **NUNCA** usar `mail.senderEmail` directamente para el "Para" del reply — en SENT eso es tu propio email, y el chip se trunca a 180px mostrando solo la primera letra ("m" o similar). Bug arreglado en v0.1.173 (📦701-fix12).
 
 ### Cómo extender la Bandeja Integrada
 1. Modificar archivos en `renderer/bandeja-integrada/`

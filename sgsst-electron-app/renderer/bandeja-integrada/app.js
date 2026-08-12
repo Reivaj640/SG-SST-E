@@ -5398,11 +5398,19 @@
     }
 
     // 2) Construir los destinatarios
+    // 📦701-fix12 — Usar getMailDisplayContact() para que en Enviados el "To"
+    // sea el destinatario original (no el remitente que es el propio user).
+    // Antes: `toValue = mail.senderEmail || mail.sender` → en Enviados el
+    // "Para" quedaba con el email del propio user (visible como "m" o similar
+    // al ser el primer carácter del email truncado a 180px).
+    // getMailDisplayContact() ya manejaba este caso (línea 301) pero no se
+    // usaba acá. Ahora sí.
     var toValue = '';
     var ccValue = '';
     var bccValue = '';
     if (isReply && mail) {
-      toValue = mail.senderEmail || mail.sender || '';
+      var replyContact = getMailDisplayContact(mail);
+      toValue = replyContact.email || replyContact.name || '';
       // Reply all: agregar al resto de los destinatarios (los guardados en to_list)
       if (mode === 'replyAll') {
         var toList = (mail.thread && mail.thread.participants) || [];
