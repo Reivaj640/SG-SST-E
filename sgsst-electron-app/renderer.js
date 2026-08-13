@@ -1149,6 +1149,84 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.warn('[BandejaIntegrada] Botón #bandeja-integrada-button no encontrado en el DOM.');
   }
 
+  // 📦702 (2026-08-13) — Visibilidad del botón según permisos del user logueado.
+  // Si el user no tiene acceso a la Bandeja Integrada, ocultamos el botón
+  // (y el badge de alertas) del header — es más limpio UX que dejarlo
+  // visible y mostrar un alert al hacer click. Admin global siempre ve
+  // (el backend fuerza enabled=true para admin).
+  //
+  // Se llama:
+  // 1. Al cargar la app (antes del login) → oculta por fail-closed
+  // 2. Después del login exitoso → consulta backend y muestra/oculta
+  // 3. Después del logout → oculta de nuevo
+  //
+  // El gate en checkBandejaIntegradaAccess() queda como defensa en profundidad.
+  applyBandejaIntegradaVisibility(false); // al cargar: ocultar (fail-closed)
+
+  /**
+   * 📦702 (2026-08-13) — Aplica la visibilidad del botón y badge de la
+   * Bandeja Integrada según si el user logueado tiene acceso.
+   * - `allowed === true`   → muestra ambos
+   * - `allowed === false`  → oculta ambos
+   * - `allowed === undefined` → consulta el backend y decide
+   *
+   * Fail-CLOSED: si no hay token, o la API no está disponible, o la
+   * respuesta no es success → OCULTA el botón. Es más seguro: si no
+   * sabemos, no mostramos. (El admin siempre tendrá success=true con
+   * data.enabled=true por el backend, así que el admin no se ve afectado
+   * por bugs del bridge).
+   */
+  async function applyBandejaIntegradaVisibility(allowed) {
+    var btn = document.getElementById('bandeja-integrada-button');
+    var badge = document.getElementById('bandeja-integrada-badge');
+    if (!btn) return;
+
+    if (allowed === undefined) {
+      // Modo "chequear y aplicar": consulta el backend
+      // Sin token (no logueado) → ocultar
+      if (!authToken) {
+        btn.style.display = 'none';
+        if (badge) badge.style.display = 'none';
+        return;
+      }
+      if (!window.electronAPI || !window.electronAPI.usersGetBandejaIntegradaFlag) {
+        // API no disponible (versión vieja del preload) — fail-closed
+        btn.style.display = 'none';
+        if (badge) badge.style.display = 'none';
+        return;
+      }
+      try {
+        var resp = await window.electronAPI.usersGetBandejaIntegradaFlag({ token: authToken });
+        if (resp && resp.success && resp.data && resp.data.enabled) {
+          allowed = true;
+        } else {
+          // Respuesta no exitosa (auth, migración pendiente, enabled=false, etc.)
+          // → ocultar (fail-closed). El caso `enabled=false` para no-admin
+          // es el comportamiento esperado, no un error.
+          var reason = (resp && resp.data) ? 'enabled=false' : ((resp && resp.error && resp.error.code) || 'unknown');
+          console.log('[BandejaIntegrada] Sin acceso, ocultando botón. Razón:', reason);
+          allowed = false;
+        }
+      } catch (e) {
+        console.error('[BandejaIntegrada] Error chequeando visibilidad, fail-closed:', e);
+        allowed = false;
+      }
+    }
+
+    if (allowed) {
+      btn.style.display = '';
+      if (badge) badge.style.display = '';
+      console.log('[BandejaIntegrada] Botón visible (user con acceso)');
+    } else {
+      btn.style.display = 'none';
+      if (badge) badge.style.display = 'none';
+      console.log('[BandejaIntegrada] Botón oculto (user sin acceso)');
+    }
+  }
+
+  // Exponer la función para que pueda ser llamada desde el login y el logout
+  window.applyBandejaIntegradaVisibility = applyBandejaIntegradaVisibility;
+
   // --- BEGIN: Iframe Communication Logic ---
   window.addEventListener('message', async (event) => {
       // IMPORTANT: Validate the origin for security
@@ -3272,6 +3350,13 @@ contentArea.innerHTML = '';
       currentUser = result.data.user;
       assignedCompanies = (result.data.companies || []).map(c => c.company_key || c.company_name || c.company_key);
       companyRoleByKey = {};
+      // 📦702 (2026-08-13) — Ahora que tenemos el token, re-evaluar la
+      // visibilidad del botón de Bandeja Integrada según el permiso del
+      // user logueado. Sin esto, el botón queda en el estado del init
+      // (oculto) y el admin no lo ve.
+      if (typeof window.applyBandejaIntegradaVisibility === 'function') {
+        window.applyBandejaIntegradaVisibility();
+      }
       (result.data.companies || []).forEach(c => {
         const key = c.company_key || c.company_name || c.display_name;
         if (key) companyRoleByKey[key] = c.role;
@@ -3857,6 +3942,12 @@ if (mainContainerLogout) mainContainerLogout.classList.add('vanta-fullscreen');
   assignedCompanies = [];
   companyRoleByKey = {};
   localStorage.removeItem(AUTH_TOKEN_KEY);
+  // 📦702 (2026-08-13) — Después del logout, ocultar el botón de Bandeja
+  // Integrada. No importa quién estaba logueado antes, sin token no se
+  // debe mostrar.
+  if (typeof window.applyBandejaIntegradaVisibility === 'function') {
+    window.applyBandejaIntegradaVisibility(false);
+  }
 
   // Restaurar el sidebar completo (mostrar todos los botones)
   createSidebarButtons(null);
