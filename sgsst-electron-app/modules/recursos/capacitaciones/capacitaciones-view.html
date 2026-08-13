@@ -264,9 +264,23 @@
                                placeholder="2" value="2" min="1">
                     </div>
                     <div>
-                        <label class="k-form-label" for="trainingHora">Hora *</label>
-                        <input type="time" id="trainingHora" class="k-form-control"
-                               required value="09:00" min="06:00" max="20:00">
+                        <label class="k-form-label" for="trainingHora">Hora (opcional)</label>
+                        <div style="display:flex; gap:6px; align-items:stretch;">
+                            <input type="time" id="trainingHora" class="k-form-control"
+                                   style="flex:1;" min="06:00" max="20:00">
+                            <button type="button" id="clearTrainingHora"
+                                    title="Limpiar hora"
+                                    aria-label="Limpiar hora"
+                                    style="background:transparent; border:1px solid #d1d5db; border-radius:6px; padding:0 10px; cursor:pointer; color:#6b7280; display:flex; align-items:center; justify-content:center; min-width:38px;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                     aria-hidden="true">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <small style="display:block; margin-top:4px; color:#6b7280; font-size:0.8rem;">Sin hora → no aparece en el calendario. Click en 🗑️ para quitarla.</small>
                     </div>
                 </div>
 

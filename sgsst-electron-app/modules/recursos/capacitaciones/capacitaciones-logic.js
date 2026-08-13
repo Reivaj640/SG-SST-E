@@ -250,6 +250,20 @@ class CapacitacionesComponent {
   }
 
         console.log('[CapacitacionesComponent] Modal montado en document.body.');
+
+        // 🆕 Wire-up del botón "Limpiar hora" (clearTrainingHora) — al hacer click,
+        // vacía el input #trainingHora. Al guardar, el `_setHora(name, '')` borra la
+        // key del sidecar de localStorage y la cap deja de aparecer en el calendario.
+        const clearHoraBtn = document.getElementById('clearTrainingHora');
+        if (clearHoraBtn) {
+            clearHoraBtn.addEventListener('click', () => {
+                const horaInput = document.getElementById('trainingHora');
+                if (horaInput) {
+                    horaInput.value = '';
+                    horaInput.focus();
+                }
+            });
+        }
     }
 
   updateHeaderContext() {
@@ -410,7 +424,7 @@ class CapacitacionesComponent {
             document.getElementById('trainingDuration').value     = parseFloat(cap.duracion) || 2;
             document.getElementById('trainingInstructor').value   = cap.instructor;
             document.getElementById('trainingUbicacion').value   = cap.ubicacion || '';
-            document.getElementById('trainingHora').value        = cap.hora      || '09:00';
+            document.getElementById('trainingHora').value        = cap.hora      || '';
             document.getElementById('trainingParticipants').value = cap.participantes || 0;
         }
 

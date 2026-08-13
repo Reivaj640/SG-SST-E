@@ -5280,6 +5280,7 @@ async function _leerCapacitacionesDeEmpresa(currentCompany, start, end, horas) {
     const events = [];
     let skippedNoFecha = 0;
     let skippedNoNombre = 0;
+    let skippedNoHora = 0;
     for (let i = 0; i < dataRows.length; i++) {
       const row = dataRows[i];
       if (!Array.isArray(row) || row.length < Math.max(colNombre, colFecha, colEstado)) continue;
@@ -5368,6 +5369,16 @@ async function _leerCapacitacionesDeEmpresa(currentCompany, start, end, horas) {
         end = `${String(endH).padStart(2,'0')}:${String(endM).padStart(2,'0')}`;
       }
 
+      // 📦 Filtro de HORA: solo incluir en el calendario las capacitaciones
+      // que tengan hora persistida en el sidecar. Las que no tienen hora
+      // quedan con start/end null y se excluyen acá. El Listado del módulo
+      // Capacitaciones sigue mostrándolas todas (la UI avisa con un toast
+      // al cargar el año si hay caps sin hora).
+      if (!start || !end) {
+        skippedNoHora++;
+        continue;
+      }
+
       events.push({
         // 📦543 — Prefijar id con companyKey para que cuando se mezclan
         // empresas en scope='all' no haya colisiones de id.
@@ -5384,7 +5395,7 @@ async function _leerCapacitacionesDeEmpresa(currentCompany, start, end, horas) {
       });
     }
 
-    sendLog(`[CAL-CAP] ${events.length} eventos de capacitaciones para ${currentCompany}`, 'INFO');
+    sendLog(`[CAL-CAP] ${events.length} eventos de capacitaciones para ${currentCompany} (omitidas: ${skippedNoNombre} sin nombre, ${skippedNoFecha} sin fecha, ${skippedNoHora} sin hora)`, 'INFO');
     return { success: true, data: events };
   } catch (err) {
     console.error('[CAL-CAP] ERROR inesperado:', err.message);
