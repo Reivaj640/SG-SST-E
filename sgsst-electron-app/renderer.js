@@ -4115,14 +4115,18 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
   `;
 
   // 📦642 — Sin color por módulo. El SVG hereda currentColor del wrapper.
+  // 📦704 (2026-08-13) — shortName para el display del dashboard. El `name` largo
+  // se mantiene porque se usa como key en moduleMap, moduleTaskMap, etc. y
+  // como data-module-name / data-module en los handlers. Cambiar `name` directo
+  // rompería la lógica de filtrado, badges y match con el sidebar.
   const modulesData = [
-    { name: 'Recursos', subtitle: 'Capacitación, Roles', icon: 'users', badge: 'Cargando...', badgeClass: 'bg-orange', active: false },
-    { name: 'Gestión Integral', subtitle: 'Política, Planes', icon: 'file_text', badge: '-', badgeClass: 'bg-green', active: false },
-    { name: 'Gestión de la Salud', subtitle: 'Ausentismo, AT, EL', icon: 'heart_pulse', badge: '-', badgeClass: 'bg-green', active: false },
-    { name: 'Gestión de Peligros y Riesgos', subtitle: 'IPERC, Controles', icon: 'alert_triangle', badge: '-', badgeClass: null, active: false },
-    { name: 'Gestión de Amenazas', subtitle: 'Emergencias', icon: 'siren', badge: '-', badgeClass: null, active: false },
-    { name: 'Verificación', subtitle: 'Auditorías', icon: 'shield_check', badge: '-', badgeClass: null, active: false },
-    { name: 'Mejoramiento', subtitle: 'Acciones Correctivas', icon: 'trending_up', badge: '-', badgeClass: null, active: false }
+    { name: 'Recursos',                       shortName: 'Recursos',                  subtitle: 'Capacitación, Roles',        icon: 'users',          badge: 'Cargando...', badgeClass: 'bg-orange', active: false },
+    { name: 'Gestión Integral',               shortName: 'Gest. Integral',            subtitle: 'Política, Planes',           icon: 'file_text',      badge: '-',          badgeClass: 'bg-green',  active: false },
+    { name: 'Gestión de la Salud',            shortName: 'Gest Salud',                subtitle: 'Ausentismo, AT, EL',         icon: 'heart_pulse',    badge: '-',          badgeClass: 'bg-green',  active: false },
+    { name: 'Gestión de Peligros y Riesgos',  shortName: 'Gest. Pel. y Riesgos',     subtitle: 'IPERC, Controles',           icon: 'alert_triangle', badge: '-',          badgeClass: null,       active: false },
+    { name: 'Gestión de Amenazas',            shortName: 'Gest. Amenazas',            subtitle: 'Emergencias',                icon: 'siren',          badge: '-',          badgeClass: null,       active: false },
+    { name: 'Verificación',                   shortName: 'Verificación',              subtitle: 'Auditorías',                 icon: 'shield_check',   badge: '-',          badgeClass: null,       active: false },
+    { name: 'Mejoramiento',                   shortName: 'Mejoramiento',              subtitle: 'Acciones Correctivas',       icon: 'trending_up',    badge: '-',          badgeClass: null,       active: false }
   ];
 
   modulesData.forEach(mod => {
@@ -4157,7 +4161,7 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
         ${SIDEBAR_ICONS[mod.icon] || ''}
       </div>
       <div style="flex: 1; min-width: 0; overflow: hidden;">
-        <h4 style="font-size: 12px; font-weight: 600; color: #1e293b; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${mod.name}</h4>
+        <h4 style="font-size: 12px; font-weight: 600; color: #1e293b; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${mod.name}">${mod.shortName || mod.name}</h4>
         <span style="font-size: 10px; color: #94a3b8; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${mod.subtitle}</span>
       </div>
       ${badgeHtml}
@@ -4270,15 +4274,16 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
          Eso le da ~20px más de altura al tasksPanel. */
       .dashboard-main-grid { padding: 10px 16px !important; gap: 10px !important; }
       .dashboard-modules-row { gap: 6px !important; padding: 8px !important; }
-      /* Módulos en ventana: min-width 220px para que 4 quepan en fila 1
-         (Recursos, Gestión Integral, Gestión de la Salud, Gestión de Peligros
-         y Riesgos) y los 3 restantes bajen a fila 2 (Gestión de Amenazas,
-         Verificación, Mejoramiento). Sin subtitle (oculto abajo). */
-      .dashboard-module-card { min-width: 220px !important; flex: 1 1 220px !important; padding: 6px 10px !important; }
-      .dashboard-module-card h4 { font-size: 12px !important; line-height: 1.2 !important; }
+      /* 📦704 (2026-08-13) — Módulos en ventana: min-width 135px (antes 220px)
+         para que los 7 quepan en 1 sola fila incluso en ventanas ~1000px de ancho.
+         Con títulos abreviados (Gest. Integral, Gest Salud, etc.) entran sin
+         cortarse. Si la ventana es muy chica (< ~1000px), flex-wrap los baja
+         a fila 2, pero el caso típico es ventana ~1100-1199px → 1 fila OK. */
+      .dashboard-module-card { min-width: 135px !important; flex: 1 1 135px !important; padding: 6px 8px !important; }
+      .dashboard-module-card h4 { font-size: 11px !important; line-height: 1.2 !important; }
       /* Ocultar el subtitle (descripción) en ventana para ahorrar altura */
       .dashboard-module-card span { display: none !important; }
-      .dashboard-module-card > div:first-child { width: 24px !important; height: 24px !important; font-size: 12px !important; }
+      .dashboard-module-card > div:first-child { width: 22px !important; height: 22px !important; font-size: 11px !important; }
       /* Tasks en 2 columnas en ventana (auto-fit, minmax 280px). */
       .dashboard-tasks-grid { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important; gap: 8px !important; }
       /* Task card más compacto en ventana: padding y font reducidos */
@@ -4298,7 +4303,10 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
     /* Modo maximizado: tasks en 2 columnas (auto-fit, minmax 380px), módulos en 1 fila */
     @media (min-width: 1200px) {
       .dashboard-modules-row { gap: 12px !important; }
-      .dashboard-module-card { min-width: 165px !important; flex: 1 1 165px !important; }
+      /* 📦704 (2026-08-13) — Reducido de 165px a 140px para asegurar 1 sola fila
+         incluso con anchos de ventana ~1250px (borde del breakpoint). Con
+         títulos abreviados el texto entra sin cortarse. */
+      .dashboard-module-card { min-width: 140px !important; flex: 1 1 140px !important; }
       .dashboard-tasks-grid { grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)) !important; gap: 10px !important; }
     }
     /* 📦699 · FIX v2: el highlight rojo de tareas críticas se hace con

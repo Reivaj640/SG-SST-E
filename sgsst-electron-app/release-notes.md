@@ -1,3 +1,50 @@
+# K+AIR v0.1.177
+
+## 📦 Abreviaciones de títulos de módulos en el tablero principal (v0.1.177)
+
+Los 7 módulos del tablero principal ahora se muestran con títulos abreviados para que **entren todos en una sola fila** tanto en modo ventana como en modo maximizado.
+
+### ¿Qué incluye?
+
+**Abreviaciones** (campo `shortName` agregado al array `modulesData` en `renderer.js:4117-4126`). El `name` largo se mantiene intacto porque se usa como key lógica en `moduleMap`, `moduleTaskMap`, `filterDashboardTasksByModule`, `data-module-name` y match con el sidebar. Cambiar el `name` directo habría roto toda la lógica de filtrado, badges y match.
+
+| Módulo (name largo) | Abreviación (shortName) |
+|---|---|
+| Recursos | Recursos |
+| Gestión Integral | Gest. Integral |
+| Gestión de la Salud | Gest Salud |
+| Gestión de Peligros y Riesgos | Gest. Pel. y Riesgos |
+| Gestión de Amenazas | Gest. Amenazas |
+| Verificación | Verificación |
+| Mejoramiento | Mejoramiento |
+
+**Tooltip**: al hacer hover sobre cualquier módulo se ve el nombre completo (title attribute).
+
+**Ajuste de min-width** (CSS responsive del dashboard):
+- **Modo ventana** (`max-width: 1199px`): `min-width: 220px → 135px`, padding `6px 10px → 6px 8px`, h4 font `12px → 11px`, icon `24px → 22px`
+- **Modo maximizado** (`min-width: 1200px`): `min-width: 165px → 140px`
+
+### Antes vs después
+
+| Escenario | ANTES | AHORA |
+|---|---|---|
+| Modo ventana (1100-1199px) | 4 módulos en fila 1 + 3 en fila 2 | 7 módulos en 1 sola fila |
+| Modo maximizado (1200+px) | Los 7 en 1 fila PERO con títulos largos cortados con ellipsis | Los 7 en 1 fila con títulos abreviados completos |
+| Hover sobre un módulo | No había tooltip (era el `name` solo) | Tooltip con el nombre completo |
+| Click en módulo o badge | Filtraba las tareas | Sigue filtrando igual (lógica intacta) |
+
+### Lo que NO cambió
+
+- El `name` largo sigue siendo el key lógico de filtrado, badges y match con el sidebar
+- El subtitle sigue oculto en ventana y visible en maximizado
+- La lógica de filtrado (`filterDashboardTasksByModule`) sigue funcionando igual
+
+### Validación visual
+
+El user validó en su ventana real (la imagen que envió) y confirmó que los 7 módulos entran en 1 sola fila. El título "Gest. Pel. y Riesgos" puede verse ligeramente truncado con ellipsis en ventanas cerca del límite — el nombre completo se ve en el tooltip. Si quiere que se vea siempre completo, en una próxima iteración se puede acortar a "Gest. Peligros" o ajustar más el min-width.
+
+---
+
 # K+AIR v0.1.176
 
 ## 🐛 Fix: cumplido se desmarca solo ~60s después de marcar (v0.1.176)

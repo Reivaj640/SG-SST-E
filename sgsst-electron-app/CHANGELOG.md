@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.177] - 2026-08-13
+
+### Changed
+- **📦704 — feat(ui): abreviaciones de títulos de módulos en el tablero principal + ajuste de min-width para 1 fila en ventana y maximizado** — El user pidió que los títulos de los 7 módulos del tablero principal se vieran abreviados para que entren todos en una sola fila. Los títulos largos (`Gestión Integral`, `Gestión de la Salud`, `Gestión de Peligros y Riesgos`, `Gestión de Amenazas`) se cortaban con ellipsis o bajaban a la fila 2 según el ancho de la ventana. **Cambios (1 archivo, `renderer.js`)**:
+  - **Abreviaciones (campo `shortName` agregado al array `modulesData`)** — el `name` largo se mantiene intacto porque se usa como key lógica en `moduleMap`, `moduleTaskMap`, `filterDashboardTasksByModule`, `data-module-name` / `data-module` en handlers, y match con el sidebar. Cambiar el `name` directo habría roto toda la lógica de filtrado, badges y match. **Mapeo aplicado** (respetando lo que pidió el user):
+    - `Recursos` → `Recursos` (sin cambio, ya es corto)
+    - `Gestión Integral` → `Gest. Integral`
+    - `Gestión de la Salud` → `Gest Salud` (sin "de la" y sin punto, como pidió el user)
+    - `Gestión de Peligros y Riesgos` → `Gest. Pel. y Riesgos`
+    - `Gestión de Amenazas` → `Gest. Amenazas`
+    - `Verificación` → `Verificación` (sin cambio, ya es corto)
+    - `Mejoramiento` → `Mejoramiento` (sin cambio, ya es corto)
+  - **Render del `<h4>`** — ahora muestra `${mod.shortName || mod.name}` con `title="${mod.name}"` para que al hacer hover se vea el nombre completo como tooltip. Backward-compatible: si un módulo futuro no tiene `shortName`, fallback a `name`.
+  - **Modo ventana** (`@media (max-width: 1199px)`):
+    - `min-width: 220px → 135px` (era el problema — 4+3)
+    - `flex-basis: 220px → 135px`
+    - `padding: 6px 10px → 6px 8px` (más compacto)
+    - `h4 font-size: 12px → 11px` (encaja el texto abreviado)
+    - `icon: 24px → 22px` (proporcional al min-width más chico)
+    - **Cálculo**: 7 cards × 135 + 6 gaps × 6 = ~981px → entra en ventanas de 1000+px
+  - **Modo maximizado** (`@media (min-width: 1200px)`):
+    - `min-width: 165px → 140px` (un poco más chico por seguridad)
+    - `flex-basis: 165px → 140px`
+    - **Cálculo**: 7 cards × 140 + 6 gaps × 12 = ~1052px → entra en maximizado (1200+px)
+  - **Lo que NO cambió**:
+    - El `name` largo sigue intacto (lógica de filtrado, badges, match con sidebar)
+    - El subtitle sigue oculto en ventana y visible en maximizado
+    - El handler de click en card y badge sigue funcionando (sigue usando `mod.name`)
+- **Antes vs después** (validado visualmente por el user en su ventana real):
+  - **Modo ventana** (la imagen que el user validó): ANTES 4 módulos en fila 1 + 3 en fila 2 → DESPUÉS 7 módulos en 1 sola fila
+  - **Modo maximizado** (la imagen anterior): ANTES los títulos largos se cortaban con ellipsis → DESPUÉS entran todos completos en 1 fila
+  - **Nota visual menor**: en ventana, el título "Gest. Pel. y Riesgos" puede verse ligeramente truncado con ellipsis como "Gest. Pel. y Ries..." si la ventana está cerca del límite. Es aceptable — el nombre completo se ve en el tooltip al hacer hover. Si el user quiere que se vea siempre completo, en una próxima iteración se puede acortar a "Gest. Peligros" o ajustar más el min-width.
+
 ## [0.1.176] - 2026-08-13
 
 ### Fixed
