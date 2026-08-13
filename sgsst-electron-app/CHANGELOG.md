@@ -46,6 +46,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Sin login: fail-closed → **botón oculto**
 - El gate en `checkBandejaIntegradaAccess()` queda como defensa en profundidad (por si el user navega con DevTools)
 
+### Changed
+- **📅 feat(cal-cap): solo mostrar capacitaciones con hora en el calendario** — Hasta ahora el calendario mostraba TODAS las capacitaciones con fecha, asignándoles 09:00 por default a las que no tenían hora en el sidecar de localStorage. Esto llenaba el calendario de "eventos fantasma" a las 9am sin horario real definido. **Causa**: el filtro del backend (`_leerCapacitacionesDeEmpresa` en `main.js`) solo descartaba las caps sin fecha, no las sin hora. **Cambios (3 archivos, +44/-5)**:
+  - **Backend** (`main.js:5377-5380`): nuevo contador `skippedNoHora` + filtro `if (!start || !end) { continue; }` antes del `events.push()`. Log mejorado con el nuevo contador: `[CAL-CAP] N eventos de capacitaciones para X (omitidas: Y sin nombre, Z sin fecha, W sin hora)`. **Bug latente detectado** (no fix acá): `colDuracion` referenciada pero no definida → `durH` siempre queda en 2h. Afecta el `end` del evento calculado.
+  - **UI del modal** (`capacitaciones-view.html:266-284`): input `#trainingHora` removidos `required` y `value="09:00"`. Label: "Hora *" → "Hora (opcional)". Help text nuevo: "Sin hora → no aparece en el calendario". Botón nuevo `#clearTrainingHora` con SVG inline de papelera al lado del input. Click → vacía el campo y devuelve el focus.
+  - **Lógica** (`capacitaciones-logic.js:413, 252-265`): prefill del modal en edit cambió de `cap.hora || '09:00'` a `cap.hora || ''`. Handler del botón nuevo: click → `horaInput.value = '' + focus()`.
+- **Flujo end-to-end** (verificado por el user):
+  1. Cap con hora → aparece en el calendario con su hora real
+  2. Editar cap → click 🗑️ → input vacío → Actualizar → `_setHora(name, '')` borra la key del sidecar → cap desaparece del calendario
+  3. Listado del módulo Capacitaciones sigue mostrando todas (con "—" en la columna Hora)
+- **Antes vs después** (caso de prueba del user, Tempoactiva):
+  - ANTES: 41 eventos capacitación visibles en Bandeja Integrada (todos a 09:00)
+  - DESPUÉS: solo los que tienen hora en el sidecar (2 inicialmente: 14:00 cada uno)
+  - Al borrar la hora de uno: 1 evento menos en el calendario
+- **Lo que NO cambió**:
+  - El Excel no tiene columna HORA — la hora se persiste en localStorage (`kair-cap-horas`) desde el modal
+  - El Listado del módulo Capacitaciones sigue mostrando TODAS (con o sin hora)
+  - El adapter del calendario (`shared/kair-calendar-adapter.js`) no necesitó cambios — el fallback a `localStorage.getItem('kair-cap-horas')` ya funcionaba
+
 ## [0.1.174] - 2026-08-13
 
 ### Fixed

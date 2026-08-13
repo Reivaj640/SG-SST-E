@@ -81,6 +81,45 @@ Después del primer release del feature, el botón del sobre en el header **segu
 
 ---
 
+# K+AIR v0.1.175
+
+## 📅 Calendario: solo capacitaciones con hora (v0.1.175)
+
+Hasta ahora el calendario de la Bandeja Integrada mostraba **TODAS** las capacitaciones que tuvieran fecha, asignándoles 09:00 por default a las que no tenían hora guardada. Resultado: el calendario se llenaba de "eventos fantasma" a las 9am sin horario real definido.
+
+### ¿Qué incluye?
+
+**Cierre del calendario** (3 archivos, +44/-5):
+- **Backend** (`main.js`): filtro nuevo en `_leerCapacitacionesDeEmpresa` que descarta las caps sin hora (`if (!start || !end) { continue; }`). Log mejorado con el nuevo contador `skippedNoHora`.
+- **UI del modal** (`capacitaciones-view.html`): input de hora removidos `required` y `value="09:00"`. Label cambiado a "Hora (opcional)". Botón nuevo con SVG de papelera para limpiar la hora con un click.
+- **Lógica** (`capacitaciones-logic.js`): prefill del modal cambió a string vacío si la cap no tiene hora. Handler del botón nuevo.
+
+### Flujo del user
+
+1. **Cap con hora** → aparece en el calendario con su hora real
+2. **Editar cap** → click 🗑️ → input vacío → Actualizar → cap **desaparece** del calendario (Listado sigue mostrándola con "—")
+3. **Cap sin hora** → NO aparece en el calendario (sigue en el Listado)
+
+### Antes vs después
+
+| Caso | ANTES | AHORA |
+|---|---|---|
+| Cap con fecha + hora | ✅ Visible con su hora | ✅ Visible con su hora |
+| Cap con fecha pero sin hora | ❌ Visible a 09:00 fantasma | ✅ NO visible (Listado sí) |
+| Cap sin fecha | ❌ No visible | ❌ No visible |
+
+### Lo que NO cambió
+
+- El Excel no tiene columna HORA — la hora se persiste en localStorage (`kair-cap-horas`) desde el modal
+- El Listado del módulo Capacitaciones sigue mostrando TODAS (con o sin hora) — la UI ya avisa al cargar el año si hay caps sin hora
+- El adapter del calendario no necesitó cambios — el fallback a `localStorage` ya funcionaba
+
+### Bug latente detectado (no fix acá)
+
+`colDuracion` referenciada pero no definida en `main.js:5359-5363` → `durH` siempre queda en 2h. Afecta el `end` del evento calculado. Fix en otro paquete.
+
+---
+
 # K+AIR v0.1.174
 
 ## 📄 File-viewer: integración completa + 6 fixes críticos (v0.1.174)
