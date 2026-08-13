@@ -137,6 +137,11 @@
                     <span id="docName" title="">Selecciona un documento</span>
                 </div>
                 <div class="kair-preview__actions">
+                    <!-- 📦608-fix15 — Botón "Ver completo" para abrir el file-viewer en modal full-screen -->
+                    <button class="kair-preview__action kair-preview__action--primary" id="expandPreviewBtn" disabled title="Ver documento completo en modal">
+                        <i class="bi bi-arrows-fullscreen"></i>
+                        <span>Ver completo</span>
+                    </button>
                     <button class="kair-preview__action" id="downloadBtn" disabled title="Descargar">
                         <i class="bi bi-download"></i>
                     </button>
@@ -235,6 +240,12 @@
 <!-- ─────────── HIDDEN UPLOAD INPUT ─────────── -->
 <input type="file" id="hiddenFileInput" multiple style="display:none" accept=".pdf,.xls,.xlsx,.doc,.docx,.txt,.jpg,.jpeg,.png">
 
+<!-- 📦608-fix18 — Mismo orden que responsable-sg-view.html (IIFE → helper → viewer).
+     Evita race conditions entre el registro del custom element del file-viewer
+     y el primer mount. Antes el viewer cargaba ANTES del IIFE, lo que podía
+     causar fallos intermitentes al primer click. -->
+<script src="../../../renderer/file-viewer-assets/flyfish-file-viewer-web-full.iife.js"></script>
+<script src="../../../shared/file-viewer.js"></script>
 <script src="remisiones-viewer.js"></script>
 </body>
 </html>

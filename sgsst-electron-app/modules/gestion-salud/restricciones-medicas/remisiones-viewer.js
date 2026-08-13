@@ -59,6 +59,9 @@ var RemisionesViewer = (function () {
         company: '',
         moduleName: '',
         submoduleName: '',
+        // 📦608-fix15 — Estado del file-viewer inline en el panel de preview
+        currentFileBytes: null,           // {bytes, name, ext, size, path} — para "Ver completo"
+        currentFileViewerMount: null,     // {unmount()} — handle del file-viewer inline
         // Listeners de theme (para cleanup en destroy)
         _themeMessageHandler: null,
         _themeObserver: null
@@ -805,7 +808,7 @@ var RemisionesViewer = (function () {
 
     function _loadExcel(filePath) {
         _callParentAPI('get-excel-preview', { filePath: filePath }).then(function (result) {
-            _displayPDF(result.data); // Excel → PDF para preview unificado
+            _handlePreviewResult(result, 'Excel');
         }).catch(function (error) {
             _showErrorInViewer('Error al cargar Excel: ' + error.message);
         });
@@ -813,10 +816,157 @@ var RemisionesViewer = (function () {
 
     function _loadWord(filePath) {
         _callParentAPI('get-word-preview', { filePath: filePath }).then(function (result) {
-            _displayPDF(result.data); // Word → PDF para preview unificado
+            _handlePreviewResult(result, 'Word');
         }).catch(function (error) {
             _showErrorInViewer('Error al cargar Word: ' + error.message);
         });
+    }
+
+    // 📦608-fix15 — Maneja la respuesta del preview. Si el padre indica
+    // `mode: 'file-viewer'` (Office/PDF/etc vía @file-viewer), monta el
+    // Web Component en el panel de preview. Si no, cae al flujo viejo (PDF).
+    function _handlePreviewResult(result, kind) {
+        if (result && result.mode === 'file-viewer' && result.data && result.data.bytes) {
+            _renderFileViewerInPanel(result.data);
+            return;
+        }
+        if (result && result.data) {
+            _displayPDF(result.data); // PDF base64 (flujo viejo)
+            return;
+        }
+        _showErrorInViewer('No se pudo obtener la vista previa de ' + kind);
+    }
+
+    // 📦608-fix15 — Monta el @file-viewer en el panel de preview
+    // (#viewerContainer) con un botón "Ver completo" en el header que abre
+    // el modal full-screen. Patrón copiado de responsable-sg (1.1.1) — 📦608-fix8.
+    function _renderFileViewerInPanel(data) {
+        _hideLoading();
+        var viewerContainer = document.getElementById('viewerContainer');
+        var toolbar = document.getElementById('previewToolbar');
+        if (!viewerContainer) return;
+
+        // 📦608-fix16 — Diagnóstico silencioso en producción (sin console.log).
+        // El _log estructurado sigue disponible para debug con grep, pero sin
+        // spam en consola del usuario.
+        if (data && data.bytes) {
+            var bytesType = (data.bytes.constructor && data.bytes.constructor.name) || typeof data.bytes;
+            var bytesLength = data.bytes.byteLength || data.bytes.length || 0;
+            _log('RENDER_FV', 'START', {
+                ext: data.ext,
+                name: data.name,
+                bytesType: bytesType,
+                bytesLength: bytesLength
+            });
+        }
+
+        // Mostrar el toolbar (mismo patrón que _displayPDF)
+        if (toolbar) toolbar.classList.add('is-visible');
+
+        // Ocultar los controles de zoom del toolbar (file-viewer tiene los suyos)
+        if (toolbar) {
+            toolbar.querySelectorAll('[id^="zoom"], [id^="fit"]').forEach(function (el) {
+                el.style.display = 'none';
+            });
+        }
+
+        // 📦608-fix16 — Cleanup EXHAUSTIVO: vaciar el contenedor para evitar
+        // que residuos (PDF iframe viejo, error messages previos, empty state)
+        // se superpongan con el nuevo file-viewer. mountInContainer solo limpia
+        // elementos flyfish-file-viewer, no otros.
+        if (_state.currentFileViewerMount && typeof _state.currentFileViewerMount.unmount === 'function') {
+            try { _state.currentFileViewerMount.unmount(); } catch (_) {}
+        }
+        _state.currentFileViewerMount = null;
+        // Remover TODOS los hijos del viewerContainer (excepto emptyState que se reusa)
+        Array.from(viewerContainer.children).forEach(function (child) {
+            if (child.id !== 'emptyState') {
+                try { child.remove(); } catch (_) {}
+            }
+        });
+
+        // Guardar bytes para "Ver completo" (con el path del documento si no viene)
+        _state.currentFileBytes = Object.assign({}, data, {
+            path: data.path || (_state.currentDocument && _state.currentDocument.path) || ''
+        });
+
+        // 📦608-fix16 — Montar con try-catch para capturar errores del file-viewer
+        // (ej: bytes con tipo incorrecto, blob creation falla, etc.)
+        var mountResult = null;
+        var mountError = null;
+        try {
+            if (window.kairFV && typeof window.kairFV.mountInContainer === 'function') {
+                mountResult = window.kairFV.mountInContainer(viewerContainer, data);
+            } else if (window.KairDocPreview && typeof window.KairDocPreview.mountInContainer === 'function') {
+                mountResult = window.KairDocPreview.mountInContainer(viewerContainer, { mode: 'file-viewer', data: data });
+            }
+        } catch (e) {
+            mountError = e;
+            _err('MOUNT_FILE_VIEWER', e);
+        }
+        _state.currentFileViewerMount = mountResult;
+
+        // 📦608-fix17 — Capturar errores del file-viewer via eventos DOM
+        // (silencioso en producción, solo loguea si hay error real)
+        if (mountResult && mountResult.el) {
+            mountResult.el.addEventListener('viewer-error', function (e) {
+                var detail = e && e.detail && e.detail.error;
+                var msg = detail && (detail.message || detail.toString()) || 'Error desconocido del file-viewer';
+                _err('FV_VIEWER_ERROR', new Error(msg));
+            });
+        }
+
+        // Si el mount falló, mostrar fallback claro
+        if (!mountResult) {
+            var reason = mountError ? mountError.message : 'Helper window.kairFV no disponible';
+            viewerContainer.innerHTML =
+                '<div class="kair-preview-error" style="padding:24px 20px;text-align:center;">' +
+                '<i class="bi bi-exclamation-triangle" style="font-size:2rem;color:var(--kair-danger);"></i>' +
+                '<h3 style="margin:12px 0 8px;">No se pudo montar el visualizador</h3>' +
+                '<p style="color:var(--kair-text-muted);font-size:0.875rem;margin-bottom:12px;">' +
+                (data && data.name ? _esc(data.name) + ' (' + (data.size || 0) + ' bytes)' : 'archivo') +
+                '</p>' +
+                '<p style="color:var(--kair-text-muted);font-size:0.8125rem;">' + _esc(reason) + '</p>' +
+                '<p style="color:var(--kair-text-muted);font-size:0.8125rem;margin-top:12px;">' +
+                'Usá el botón <i class="bi bi-download"></i> Descargar para abrirlo en otra app.' +
+                '</p>' +
+                '</div>';
+        }
+
+        // Habilitar botón "Ver completo" (para file-viewer)
+        var expandBtn = document.getElementById('expandPreviewBtn');
+        if (expandBtn) {
+            expandBtn.disabled = false;
+            expandBtn.style.display = '';
+        }
+    }
+
+    // 📦608-fix15 — Abre el modal full-screen con el archivo actualmente
+    // mostrado en el panel de preview. El iframe NO tiene electronAPI, así
+    // que enviamos un postMessage al parent (remisiones-logic.js o
+    // restricciones-medicas-logic.js) que SÍ lo tiene, y él abre el modal.
+    function _expandFileViewer() {
+        if (!_state.currentFileBytes) {
+            _showToast('No hay un archivo para expandir', 'warning');
+            return;
+        }
+        var filePath = _state.currentFileBytes.path || (_state.currentDocument && _state.currentDocument.path);
+        if (!filePath) {
+            _showToast('No se encontró la ruta del archivo', 'warning');
+            return;
+        }
+        if (window.top && window.top.postMessage) {
+            window.top.postMessage({
+                type: 'open-file-viewer-modal',
+                filePath: filePath,
+                source: 'remisiones'
+            }, '*');
+        } else {
+            // Fallback extremo: intentar localmente
+            if (window.kairFV && typeof window.kairFV.openWithFileViewerFromPath === 'function') {
+                window.kairFV.openWithFileViewerFromPath(filePath);
+            }
+        }
     }
 
     function _displayPDF(pdfData) {
@@ -824,7 +974,27 @@ var RemisionesViewer = (function () {
         var viewerContainer = document.getElementById('viewerContainer');
         if (!viewerContainer) return;
         var toolbar = document.getElementById('previewToolbar');
-        if (toolbar) toolbar.classList.add('is-visible');
+        if (toolbar) {
+            toolbar.classList.add('is-visible');
+            // Re-mostrar controles de zoom (pueden haber sido ocultados por file-viewer previo)
+            toolbar.querySelectorAll('[id^="zoom"], [id^="fit"]').forEach(function (el) {
+                el.style.display = '';
+            });
+        }
+
+        // 📦608-fix15 — Limpiar cualquier file-viewer inline previo
+        if (_state.currentFileViewerMount && typeof _state.currentFileViewerMount.unmount === 'function') {
+            try { _state.currentFileViewerMount.unmount(); } catch (_) {}
+        }
+        _state.currentFileViewerMount = null;
+        _state.currentFileBytes = null;
+
+        // 📦608-fix15 — Para PDFs, ocultar "Ver completo" (no aplica — PDF ya tiene scroll propio)
+        var expandBtn = document.getElementById('expandPreviewBtn');
+        if (expandBtn) {
+            expandBtn.disabled = true;
+            expandBtn.style.display = 'none';
+        }
 
         viewerContainer.innerHTML =
             '<iframe id="docFrame" class="kair-pdf-frame" src="data:application/pdf;base64,' + pdfData + '"></iframe>';
@@ -881,6 +1051,17 @@ var RemisionesViewer = (function () {
         }
         if (toolbar) toolbar.classList.remove('is-visible');
 
+        // 📦608-fix15 — Limpiar file-viewer mount y bytes cacheados
+        if (_state.currentFileViewerMount && typeof _state.currentFileViewerMount.unmount === 'function') {
+            try { _state.currentFileViewerMount.unmount(); } catch (_) {}
+        }
+        _state.currentFileViewerMount = null;
+        _state.currentFileBytes = null;
+
+        // Ocultar botón "Ver completo" al cerrar
+        var expandBtn = document.getElementById('expandPreviewBtn');
+        if (expandBtn) expandBtn.style.display = 'none';
+
         if (viewerContainer) {
             viewerContainer.innerHTML =
                 '<div class="kair-empty" id="emptyState">' +
@@ -897,7 +1078,7 @@ var RemisionesViewer = (function () {
     }
 
     function _enableDocActions(enable) {
-        var btnIds = ['closeDocBtn', 'downloadBtn', 'printBtn'];
+        var btnIds = ['closeDocBtn', 'downloadBtn', 'printBtn', 'expandPreviewBtn'];
         btnIds.forEach(function (id) {
             var btn = document.getElementById(id);
             if (btn) {
@@ -1389,6 +1570,10 @@ var RemisionesViewer = (function () {
 
         var closeDocBtn = document.getElementById('closeDocBtn');
         if (closeDocBtn) closeDocBtn.addEventListener('click', _closeDocument);
+
+        // 📦608-fix15 — Botón "Ver completo": abre el modal full-screen con el archivo actual
+        var expandPreviewBtn = document.getElementById('expandPreviewBtn');
+        if (expandPreviewBtn) expandPreviewBtn.addEventListener('click', _expandFileViewer);
 
         // Zoom
         var zoomInBtn = document.getElementById('zoomInBtn');

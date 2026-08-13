@@ -207,15 +207,17 @@
     var maxAttempts = 30; // ~3s para encontrar shadowRoot + mountNode
     var customStyle = null;
     var cssText = [
-      '/* === kfv-custom: 1) toolbar siempre visible === */',
-      '.file-viewer-web-toolbar[hidden]{',
+      '/* === kfv-custom: 1) toolbar siempre visible CON FONDO y z-index alto === */',
+      '.file-viewer-web-toolbar,.file-viewer-web-toolbar[hidden]{',
       '  display:inline-flex!important;',
-      '  opacity:0.5;',
-      '  pointer-events:none;',
-      '}',
-      '.file-viewer-web-toolbar:not([hidden]){',
-      '  opacity:1;',
-      '  pointer-events:auto;',
+      '  opacity:1!important;',
+      '  pointer-events:auto!important;',
+      '  background:rgba(255,255,255,0.96)!important;',
+      '  border:1px solid rgba(0,0,0,0.12)!important;',
+      '  border-radius:8px!important;',
+      '  padding:4px 8px!important;',
+      '  box-shadow:0 2px 10px rgba(0,0,0,0.18)!important;',
+      '  z-index:2147483000!important;',
       '  transition:opacity 0.2s ease;',
       '}',
       '',
@@ -225,6 +227,15 @@
       '  left:50%!important;',
       '  transform:translateX(-50%)!important;',
       '  justify-content:center!important;',
+      '  bottom:8px!important;',
+      '}',
+      '',
+      '/* === kfv-custom: 2b) toolbar en modo ventana chico — reducir escala === */',
+      '@media (max-width: 900px){',
+      '  .file-viewer-web-toolbar{',
+      '    transform:scale(0.85);',
+      '    transform-origin:bottom center;',
+      '  }',
       '}',
       '',
       '/* === kfv-custom: 3) search colapsable === */',
@@ -253,22 +264,28 @@
       '}'
     ].join('\n');
 
-    // Funcion helper: agrega nuestro <style> justo despues del <style>
-    // del file-viewer (en el mismo parent). Devuelve true si lo agrego.
-    var appendCustomStyle = function (rootNode) {
-      var fvStyle = rootNode.querySelector('style:not([id])');
-      if (fvStyle && fvStyle.parentNode) {
-        if (fvStyle.parentNode.querySelector('#kfv-custom-css')) return false; // ya esta
-        if (!customStyle) {
-          customStyle = document.createElement('style');
-          customStyle.id = 'kfv-custom-css';
-          customStyle.textContent = cssText;
-        }
-        // Agregar justo despues del <style> del file-viewer (mismo parent)
-        fvStyle.parentNode.insertBefore(customStyle, fvStyle.nextSibling);
-        return true;
+    // Funcion helper: agrega nuestro <style> al mountNode o shadowRoot.
+    // 📦608-fix20 — Cambio de approach: en lugar de buscar un <style> del
+    // file-viewer para insertar DESPUES (que es frágil porque el bundle usa
+    // styles CON id o los inyecta en el shadowRoot, no en el mountNode),
+    // agregamos el kfv-custom directamente al mountNode del viewer. Esto
+    // garantiza que el style esté en el mismo subtree que la toolbar y
+    // nuestras reglas CSS tengan efecto.
+    var appendCustomStyle = function (rootNode, sr) {
+      // Idempotencia: si ya está inyectado en mountNode o shadowRoot, salir
+      if (rootNode.querySelector('#kfv-custom-css')) return true;
+      if (sr && sr.querySelector('#kfv-custom-css')) return true;
+
+      if (!customStyle) {
+        customStyle = document.createElement('style');
+        customStyle.id = 'kfv-custom-css';
+        customStyle.textContent = cssText;
       }
-      return false;
+      // 📦608-fix20 — Append directo al mountNode. Si el browser lo reasigna
+      // al shadowRoot automáticamente (porque mountNode está en un shadowRoot),
+      // el style se inyecta en el subtree correcto.
+      rootNode.appendChild(customStyle);
+      return true;
     };
 
     var tryInject = function () {
@@ -284,28 +301,97 @@
         return;
       }
       // Idempotente
+      if (mountNode.querySelector('#kfv-custom-css')) return;
       if (sr.querySelector('#kfv-custom-css')) return;
 
-      // Intentar agregar inmediatamente
-      if (appendCustomStyle(mountNode)) return;
-
-      // Esperar via MutationObserver a que aparezca el <style> del file-viewer
-      var mo = new MutationObserver(function () {
-        if (appendCustomStyle(mountNode)) {
-          mo.disconnect();
-          if (fallbackInterval) clearInterval(fallbackInterval);
+      // 📦608-fix20 — Inyectar directamente. Si falla (cross-shadow), caer al shadowRoot.
+      try {
+        if (appendCustomStyle(mountNode, sr)) {
+          if (attempts === 1) console.log('[kairFV][FIX20] kfv-custom CSS inyectado en mountNode del viewer');
+          // 📦608-fix21 — NO hacer return aquí: el código del FIX21 debe ejecutarse
+          // SIEMPRE para forzar el estilo de la toolbar y montar el observer.
         }
-      });
-      mo.observe(mountNode, { childList: true, subtree: true });
-
-      // Fallback: reintentar cada 200ms hasta 2s por si el MO no dispara
-      var fallbackCount = 0;
-      var fallbackInterval = setInterval(function () {
-        fallbackCount++;
-        if (appendCustomStyle(mountNode) || fallbackCount > 10) {
-          clearInterval(fallbackInterval);
+      } catch (e) {
+        // Si appendChild cross-tree falla, intentar en el shadowRoot
+        if (!customStyle) {
+          customStyle = document.createElement('style');
+          customStyle.id = 'kfv-custom-css';
+          customStyle.textContent = cssText;
         }
-      }, 200);
+        try { sr.appendChild(customStyle); } catch (_) {}
+      }
+
+      // 📦608-fix21 — Forzar el estilo de la toolbar directamente con
+      // setProperty('display', 'inline-flex', 'important'). El bundle del
+      // file-viewer tiene su propio CSS con !important para [hidden]{display:none}
+      // que GANA a nuestro !important cuando ambos están en el mismo cascade.
+      // setProperty('display', value, 'important') es más fuerte que cualquier
+      // CSS rule y garantiza que la toolbar sea visible.
+      var forceToolbarStyle = function (tb) {
+        if (!tb || !tb.classList || !tb.classList.contains('file-viewer-web-toolbar')) return;
+        var pos = tb.getAttribute('data-toolbar-position') || '';
+        tb.style.setProperty('display', 'inline-flex', 'important');
+        tb.style.setProperty('opacity', '1', 'important');
+        tb.style.setProperty('pointer-events', 'auto', 'important');
+        tb.style.setProperty('visibility', 'visible', 'important');
+        tb.style.setProperty('background', 'rgba(255,255,255,0.96)', 'important');
+        tb.style.setProperty('border', '1px solid rgba(0,0,0,0.12)', 'important');
+        tb.style.setProperty('border-radius', '8px', 'important');
+        tb.style.setProperty('padding', '4px 8px', 'important');
+        tb.style.setProperty('box-shadow', '0 2px 10px rgba(0,0,0,0.18)', 'important');
+        tb.style.setProperty('z-index', '2147483000', 'important');
+        // Posición: centrar horizontalmente si está en bottom-right
+        if (pos === 'bottom-right' || pos === 'top-center' || pos === 'top') {
+          tb.style.setProperty('right', 'auto', 'important');
+          tb.style.setProperty('left', '50%', 'important');
+          tb.style.setProperty('transform', 'translateX(-50%)', 'important');
+          tb.style.setProperty('bottom', '12px', 'important');
+          tb.style.setProperty('top', 'auto', 'important');
+        } else if (pos === 'top') {
+          tb.style.setProperty('top', '12px', 'important');
+          tb.style.setProperty('bottom', 'auto', 'important');
+        }
+      };
+
+      // Buscar la toolbar existente y forzarla
+      var existingToolbar = mountNode.querySelector('.file-viewer-web-toolbar');
+      if (existingToolbar) forceToolbarStyle(existingToolbar);
+
+      // 📦608-fix21 — Observar la toolbar específica (no todo el subtree)
+      // para detectar cuando se agrega/quita el atributo `hidden` y
+      // reaplicar el estilo. El observer solo mira el `hidden` y el `class`
+      // (no `style` para evitar loops cuando reaplicamos nuestros styles).
+      if (typeof MutationObserver !== 'undefined' && !mountNode._kfvToolbarObs) {
+        var applyIfToolbar = function () {
+          var tb = mountNode.querySelector('.file-viewer-web-toolbar');
+          if (!tb) return;
+          // Solo reaplicar si el display NO es el que queremos (evita loops)
+          if (tb.style.display !== 'inline-flex' || tb.hidden) {
+            forceToolbarStyle(tb);
+            if (!tb._kfvObs) {
+              // Observar el hidden específico de la toolbar (más eficiente)
+              var tbObs = new MutationObserver(function (muts) {
+                for (var i = 0; i < muts.length; i++) {
+                  if (muts[i].attributeName === 'hidden' || muts[i].attributeName === 'class') {
+                    forceToolbarStyle(tb);
+                    break;
+                  }
+                }
+              });
+              tbObs.observe(tb, { attributes: true, attributeFilter: ['hidden', 'class'] });
+              tb._kfvObs = tbObs;
+            }
+          }
+        };
+        applyIfToolbar();
+        // Observer en mountNode solo para detectar cuando se AGREGA la toolbar
+        var mountObs = new MutationObserver(function () {
+          applyIfToolbar();
+        });
+        mountObs.observe(mountNode, { childList: true, subtree: true });
+        mountNode._kfvToolbarObs = mountObs;
+        if (attempts === 1) console.log('[kairFV][FIX21] Toolbar watcher instalado en mountNode');
+      }
     };
     tryInject();
   }
@@ -323,7 +409,7 @@
     }
   }
 
-  function mountViewer(blobUrl, fileName) {
+  function mountViewer(blobUrl, fileName, ext) {
     var body = document.getElementById(_bodyId);
     if (!body) return;
     body.innerHTML = '';
@@ -331,6 +417,11 @@
     var v = document.createElement('flyfish-file-viewer');
     v.setAttribute('src', blobUrl);
     v.setAttribute('filename', fileName || 'archivo');
+    // 📦608-fix19 — Pasar `type` (extensión) EXPLÍCITAMENTE al custom element.
+    // La función interna del bundle que extrae la extensión del filename
+    // tiene un bug con caracteres como `#` (interpretado como fragmento de URL)
+    // y no maneja nombres completos. Pasar `type` evita el bug.
+    if (ext) v.setAttribute('type', String(ext).toLowerCase().replace(/^\./, ''));
     v.setAttribute('theme', 'light');
     v.setAttribute('locale', 'es-ES');
     v.setAttribute('toolbar-position', 'bottom-right');
@@ -374,6 +465,17 @@
     var v = document.createElement('flyfish-file-viewer');
     v.setAttribute('src', localUrl);
     v.setAttribute('filename', name);
+    // 📦608-fix19 — BUG FIX CRÍTICO: pasar `type` (extensión) EXPLÍCITAMENTE
+    // al custom element. La función interna del bundle `Ve(filename)` que
+    // extrae la extensión tiene UN BUG: hace `filename.split(/[?#]/)` que
+    // interpreta el `#` como inicio de fragmento de URL. Para filenames
+    // como "Carta Recomendación Médica #20.docx", `Ve()` retorna "" y se
+    // dispara `state:"unsupported"`. Pasar `type="docx"` directamente evita
+    // que el bundle intente extraer la extensión y use la correcta.
+    // Verificado: con `type` set, el bundle usa `e.type || Ve(filename)` y
+    // prioriza el type explícito. Tambien aplica para filenames sin `#`
+    // porque la función interna de matching no maneja nombres completos.
+    v.setAttribute('type', ext);
     v.setAttribute('theme', 'light');
     v.setAttribute('locale', 'es-ES');
     // 📦608-fix11 — Toolbar arriba + modo compacto para que entre en
@@ -464,7 +566,9 @@
     if (_currentUrl) { try { URL.revokeObjectURL(_currentUrl); } catch (_) {} }
     _currentUrl = URL.createObjectURL(blob);
     setMeta(data.name, data.size, data.ext);
-    mountViewer(_currentUrl, data.name);
+    // 📦608-fix19 — Pasar `ext` (tercer argumento) a mountViewer para evitar
+    // el bug de extracción de extensión del filename dentro del bundle.
+    mountViewer(_currentUrl, data.name, data.ext);
     console.log('[kairFV] Viewer montado desde path:', data.name, '(' + fmtBytes(data.size) + ', .' + data.ext + ')');
   }
 
@@ -485,7 +589,8 @@
       if (_currentUrl) { try { URL.revokeObjectURL(_currentUrl); } catch (_) {} }
       _currentUrl = URL.createObjectURL(blob);
       setMeta(file.name, file.size, ext);
-      mountViewer(_currentUrl, file.name);
+      // 📦608-fix19 — Pasar `ext` para evitar bug de extracción interna.
+      mountViewer(_currentUrl, file.name, ext);
       console.log('[kairFV] Viewer montado desde File:', file.name, '(' + fmtBytes(file.size) + ', .' + ext + ')');
     };
     reader.onerror = function () {
@@ -497,9 +602,17 @@
   // -----------------------------------------------------------------------------
   // Inicialización: configurar asset base si está disponible
   // -----------------------------------------------------------------------------
+  // 📦608-fix18 — BUG FIX: el bundle "flyfish-file-viewer-web-full.iife.js"
+  // exporta `window.FlyfishFileViewerWebFull` (CON "Full"), no
+  // `window.FlyfishFileViewerWeb` como estaba antes. Sin este fix, el asset
+  // base NUNCA se configuraba explícitamente y dependíamos 100% de la auto-
+  // detección del IIFE (frágil en iframes con cache o script order raro).
+  // También agregamos preload eager de los renderers lazy (word, pdf, etc.)
+  // para eliminar la race condition entre M() async y el primer render.
+  // ---------------------------------------------------------------
   function tryConfigureAssetBase() {
     try {
-      var F = window.FlyfishFileViewerWeb;
+      var F = window.FlyfishFileViewerWebFull || window.FlyfishFileViewerWeb;  // 📦608-fix18
       if (F && typeof F.setDefaultFullAssetBaseUrl === 'function') {
         // El bundle está en renderer/file-viewer-assets/, los workers también ahí.
         // Como este helper puede correr tanto desde el index.html raíz como desde
@@ -512,12 +625,109 @@
         var helperDir = scriptUrl.substring(0, scriptUrl.lastIndexOf('/shared/') + 1); // incluye el /
         var assetBase = helperDir + 'renderer/file-viewer-assets/';
         F.setDefaultFullAssetBaseUrl(assetBase);
-        console.log('[kairFV] Asset base configurado:', assetBase);
+        console.log('[kairFV][FIX18] Asset base configurado:', assetBase);
+
+        // 📦608-fix18 — PRELOAD EAGER: sin esto, el lazy-load de word.iife.js
+        // (y otros 4 renderers Office) podía no terminar antes del primer render,
+        // y el file-viewer mostraba "current file cannot be previewed online"
+        // (state.unsupported) por no encontrar el renderer registrado.
+        if (typeof F.preloadFullRenderer === 'function') {
+          ['word', 'pdf', 'spreadsheet', 'presentation', 'text'].forEach(function (key) {
+            F.preloadFullRenderer(key).catch(function (e) {
+              console.warn('[kairFV][FIX18] preload ' + key + ' falló:', e && e.message);
+            });
+          });
+        }
+      } else {
+        console.warn('[kairFV][FIX18] FlyfishFileViewerWebFull no disponible — asset base via auto-detección del IIFE');
       }
     } catch (e) {
-      console.warn('[kairFV] No se pudo configurar asset base:', e);
+      console.warn('[kairFV][FIX18] No se pudo configurar asset base:', e);
     }
   }
+
+  // -----------------------------------------------------------------------------
+  // 📦608-fix20 — CSS global para corregir el botón "Ver completo" (#expandPreviewBtn)
+  //
+  // El HTML del botón es:
+  //   <button id="expandPreviewBtn" class="kair-preview__action kair-preview__action--primary">
+  //     <i class="bi bi-arrows-fullscreen"></i>
+  //     <span>Ver completo</span>
+  //   </button>
+  //
+  // El problema: la clase .kair-preview__action es 30x30 (cuadradito para iconos),
+  // pero este botón tiene icono + texto "Ver completo" que no entran en 30px y se
+  // apilan en 2 líneas. Hay 12 visualizadores con este mismo botón (3.1.6,
+  // 1.1.1, sociodemografica, politica, copasst, comite-convivencia, etc).
+  //
+  // Solución: inyectar este CSS al cargar el helper (mismo lugar que
+  // tryConfigureAssetBase) para que aplique a TODOS los visualizadores sin
+  // tocar cada CSS individual.
+  //
+  // 📦608-fix22 — También aplicamos las reglas de sizing de 1.1.1 (responsable-sg)
+  // que permiten que el flyfish-file-viewer ocupe el espacio correctamente.
+  // Sin estas reglas, el preview body tiene `overflow: auto` y `background: gris`
+  // (estilo PDF legacy) que CLIPA la toolbar del file-viewer (que está
+  // position: fixed/absolute en el bundle). 1.1.1 lo tenía resuelto
+  // localmente en su CSS, pero 3.1.6 y los otros 10 visualizadores NO.
+  // Las aplicamos globalmente via :has(flyfish-file-viewer) para que ganen
+  // en especificidad sobre las reglas legacy de cada módulo.
+  // -----------------------------------------------------------------------------
+  (function injectGlobalPreviewBtnCSS() {
+    if (document.getElementById('kfv-preview-btn-css')) return;
+    var s = document.createElement('style');
+    s.id = 'kfv-preview-btn-css';
+    s.textContent = [
+      '/* === kfv-preview-btn: 1) override del botón "Ver completo" === */',
+      '#expandPreviewBtn {',
+      '  width: auto !important;',
+      '  min-width: 30px;',
+      '  padding: 0 10px !important;',
+      '  gap: 5px;',
+      '  white-space: nowrap;',
+      '  font-size: 0.8125rem;',
+      '  font-weight: 500;',
+      '  color: var(--kair-primary, #174ea6);',
+      '}',
+      '#expandPreviewBtn i {',
+      '  font-size: 0.95rem;',
+      '}',
+      '#expandPreviewBtn:hover:not(:disabled) {',
+      '  background: var(--kair-bg-hover, #f3f4f6) !important;',
+      '}',
+      '',
+      '/* === kfv-preview-body: 2) sizing correcto del preview body cuando tiene file-viewer === */',
+      '/* Copiado de 1.1.1 (responsable-sg-view.css) que ya funcionaba. Sin esto, */',
+      '/* el overflow:auto del body CLIPA la toolbar del file-viewer (position:fixed). */',
+      '.kair-preview__body:has(flyfish-file-viewer) {',
+      '  background: #fff !important;',
+      '  display: flex !important;',
+      '  flex-direction: column !important;',
+      '  min-height: 0 !important;',
+      '  overflow: hidden !important;',
+      '}',
+      '',
+      '.kair-preview__body flyfish-file-viewer {',
+      '  display: block;',
+      '  width: 100%;',
+      '  flex: 1 1 0%;             /* flex-basis:0 (NO auto) → toma alto disponible */',
+      '  min-height: 0;            /* permite que se encoja */',
+      '  overflow: hidden;         /* el viewer maneja su scroll interno */',
+      '}',
+      '',
+      '/* === kfv-preview: 3) sizing del panel PADRE cuando tiene file-viewer === */',
+      '/* 📦608-fix22b — CRÍTICO: sin min-height:0 + overflow:hidden en el panel */',
+      '/* padre, el flex no puede distribuir el alto correctamente y el file-viewer */',
+      '/* queda con un alto limitado que CORTA el documento a la mitad. */',
+      '/* Usamos :has() para que el botón de collapse (position:absolute, right:-12px) */',
+      '/* siga sobresaliendo cuando NO hay file-viewer (caso PDF). */',
+      '.kair-preview:has(flyfish-file-viewer) {',
+      '  min-height: 0 !important;',
+      '  overflow: hidden !important;',
+      '}'
+    ].join('\n');
+    document.head.appendChild(s);
+  })();
 
   // Exponer
   window.kairFV = {

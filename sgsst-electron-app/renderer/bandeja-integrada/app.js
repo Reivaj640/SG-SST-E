@@ -7270,8 +7270,12 @@
 
   function wireFileViewerDemo() {
     // Si el bundle IIFE expone setDefaultFullAssetBaseUrl, apuntamos a nuestros assets locales.
+    // 📦608-fix18 — BUG FIX: el bundle "flyfish-file-viewer-web-full.iife.js"
+    // exporta `window.FlyfishFileViewerWebFull` (CON "Full"), no
+    // `window.FlyfishFileViewerWeb` como estaba antes. Mismo bug que en
+    // shared/file-viewer.js:513 — corregido acá también.
     try {
-      var F = window.FlyfishFileViewerWeb;
+      var F = window.FlyfishFileViewerWebFull || window.FlyfishFileViewerWeb;  // 📦608-fix18
       if (F && typeof F.setDefaultFullAssetBaseUrl === 'function') {
         F.setDefaultFullAssetBaseUrl('../file-viewer-assets/');
       }

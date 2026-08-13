@@ -1235,6 +1235,10 @@ document.addEventListener('DOMContentLoaded', async () => {
               case 'get-excel-preview-request':
               case 'get-word-preview-request': {
                   const _fvFilePath = (payload && payload.filePath) || '';
+                  // 📦608-fix17 — forceLegacy: bypass file-viewer y usar el flujo legacy
+                  // (getWordPreview/getExcelPreview con LibreOffice → PDF base64).
+                  // Usado por el fallback automático cuando el file-viewer falla.
+                  const _fvForceLegacy = !!(payload && payload.forceLegacy);
                   const _fvExt = (_fvFilePath.split('.').pop() || '').toLowerCase();
                   const _fvIsOffice = _fvExt && _fvExt !== 'pdf' &&
                       ['pptx','ppt','pptm','potx','ppsx','odp',
@@ -1253,7 +1257,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                        'svgz','epub','xmind','drawio','dio','mermaid','mmd','plantuml','puml',
                        'sqlite','parquet','ttf','otf','woff','woff2','gltf','glb'].indexOf(_fvExt) >= 0;
 
-                  if (_fvIsOffice && window.kairFV && typeof window.kairFV.openWithFileViewerFromPath === 'function') {
+                  if (_fvIsOffice && !_fvForceLegacy && window.kairFV && typeof window.kairFV.openWithFileViewerFromPath === 'function') {
                       // 📦608-fix8 — Devolver los bytes del archivo al módulo para que
                       // pueda renderizar el file-viewer directamente en su panel de
                       // preview. El módulo detecta `mode: 'file-viewer'` y monta el
