@@ -28,6 +28,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `sgsst-electron-app/renderer.js` (+40): `toggleBandejaIntegrada()` con gate de permisos + `checkBandejaIntegradaAccess()` async con fail-open
 - `sgsst-electron-app/components/config/config-viewer.html` (+~90): HTML del toggle + CSS del switch + `openUserModal` carga el flag + `saveUser` persiste el flag
 
+### Fixed (Step 5 — visibilidad del botón)
+- **📦702 — fix(bandeja): botón del header visible para users sin acceso** — Después del primer commit del feature, el botón del sobre en el header quedaba visible para todos los users aunque no tuvieran acceso a la Bandeja Integrada. El gate de `checkBandejaIntegradaAccess()` mostraba un alert al hacer click, pero el botón en sí no se ocultaba. **Causa raíz doble**:
+  1. La función `applyBandejaIntegradaVisibility()` corría al cargar la app, **ANTES del login**, con `authToken = null` → el backend respondía `AUTH_REQUIRED`
+  2. El código original era **fail-open** en ese caso → dejaba el botón visible
+- **Fix** (`renderer.js:1152-1228`):
+  - Nueva función `applyBandejaIntegradaVisibility(allowed)` con 3 modos (`true`/`false`/`undefined` para chequear backend)
+  - **Fail-CLOSED**: si no se puede determinar el permiso (sin token, API no disponible, respuesta no exitosa) → **OCULTA** el botón (más seguro)
+  - Expuesta en `window.applyBandejaIntegradaVisibility` para llamarla desde login/logout
+  - Llamada al cargar la app (inicial: oculta por fail-closed)
+  - Llamada **después del login exitoso** (`renderer.js:3358`) → consulta backend y muestra/oculta
+  - Llamada **después del logout** (`renderer.js:3949`) → oculta de nuevo
+- **Comportamiento esperado**:
+  - Admin global: backend fuerza `enabled: true` → **botón siempre visible**
+  - No-admin con flag=1: backend retorna `enabled: true` → **botón visible**
+  - No-admin con flag=0: backend retorna `enabled: false` → **botón oculto**
+  - Sin login: fail-closed → **botón oculto**
+- El gate en `checkBandejaIntegradaAccess()` queda como defensa en profundidad (por si el user navega con DevTools)
+
 ## [0.1.174] - 2026-08-13
 
 ### Fixed

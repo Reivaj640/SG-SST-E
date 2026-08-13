@@ -58,6 +58,27 @@ La convención del proyecto es `registerXxxHandlers(app, deps)` (ver `eventos-cu
 4. Prender/apagar + Guardar Usuario
 5. El user ahora puede/no puede abrir la Bandeja Integrada
 
+### Visibilidad del botón en el header (Step 5)
+
+Después del primer release del feature, el botón del sobre en el header **seguía visible** para todos los users aunque no tuvieran acceso. El gate mostraba un alert al hacer click, pero el botón en sí no se ocultaba — UX confusa.
+
+**Causa raíz doble**:
+1. La función de visibilidad corría al cargar la app, **ANTES del login**, con `authToken = null` → el backend respondía `AUTH_REQUIRED`
+2. El código original era **fail-open** → dejaba el botón visible
+
+**Fix**:
+- Fail-**CLOSED**: si no se puede determinar el permiso (sin token, API no disponible, respuesta no exitosa) → **oculta** el botón
+- Re-evaluación después del login y después del logout
+
+**Comportamiento esperado por user**:
+
+| User | Botón en header | Click |
+|---|---|---|
+| `admin@kair.local` (admin) | ✅ Visible | Abre Bandeja Integrada |
+| No-admin con acceso | ✅ Visible | Abre Bandeja Integrada |
+| No-admin sin acceso (ej. Valentina) | ❌ **Oculto** | No se puede clickear (no existe en el header) |
+| Sin login | ❌ **Oculto** | No se puede clickear |
+
 ---
 
 # K+AIR v0.1.174
