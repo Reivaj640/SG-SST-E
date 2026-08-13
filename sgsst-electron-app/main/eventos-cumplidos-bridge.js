@@ -78,6 +78,48 @@ function _ensureSchemaMigrated(db) {
   } catch (migErr) {
     console.error('[' + MOD + '] Error en migración de schema:', migErr.message);
   }
+
+  // 📦702-fix3 (2026-08-13) — Migración one-shot para registros huérfanos con
+  // empresa_id IS NULL. El bug histórico del UPSERT (que no actualizaba empresa_id)
+  // dejó registros con empresa_id=NULL cuando el frontend pasaba null al marcar.
+  // Como el WHERE 'empresa_id = ?' en scope='company' nunca matchea NULL en SQL,
+  // esos eventos aparecían tachados en "Todas las empresas" pero NO en la
+  // empresa sola — bug visible para el user.
+  //
+  // El formato del evento_id es `{tipo}-{empresa}-{resto}`, ej:
+  //   cap-Tempoactiva-14-capacitaci-n-en-manejo-de-sustancias
+  //   gest-Tempoactiva-3-...-consulta
+  //   recordatorio-Tempoactiva-copasst-ene-2026
+  //   mto-Tempoactiva-3-...-mantenimiento
+  //   insp-Tempoactiva-3-...-inspeccion
+  //
+  // Extraemos la empresa (entre el 1er y 2do '-') y la asignamos.
+  // Idempotente: solo afecta registros con empresa_id IS NULL, así que correr
+  // la migración múltiples veces no cambia nada.
+  try {
+    var beforeFixCount = db.prepare(
+      "SELECT COUNT(*) as c FROM eventos_cumplidos WHERE empresa_id IS NULL"
+    ).get();
+    if (beforeFixCount && beforeFixCount.c > 0) {
+      console.log('[📦702-DEBUG][' + MOD + '] Migración one-shot: ' + beforeFixCount.c +
+                  ' registros con empresa_id=NULL. Inferyendo empresa del prefijo del evento_id...');
+      var result = db.prepare(`
+        UPDATE eventos_cumplidos
+        SET empresa_id = SUBSTR(
+          evento_id,
+          INSTR(evento_id, '-') + 1,
+          INSTR(SUBSTR(evento_id, INSTR(evento_id, '-') + 1), '-') - 1
+        )
+        WHERE empresa_id IS NULL
+          -- El formato del id tiene al menos 2 guiones: {tipo}-{empresa}-{resto}
+          AND evento_id LIKE '%-%-%'
+      `).run();
+      console.log('[📦702-DEBUG][' + MOD + '] Migración one-shot completada ✓ ' +
+                  '(' + (result && result.changes ? result.changes : 0) + ' registros actualizados)');
+    }
+  } catch (oneShotErr) {
+    console.error('[' + MOD + '] Error en migración one-shot de empresa_id:', oneShotErr.message);
+  }
 }
 
 // ---------- Handlers internos (reusables, testeables) ----------
@@ -138,6 +180,7 @@ function _handlerMarcarCumplido(empresaId, eventoId, nota) {
       INSERT INTO eventos_cumplidos (evento_id, empresa_id, cumplido_en, nota)
       VALUES (?, ?, ?, ?)
       ON CONFLICT(evento_id) DO UPDATE SET
+        empresa_id  = excluded.empresa_id,
         cumplido_en = excluded.cumplido_en,
         nota        = excluded.nota
     `).run(eventoId, empresaId, now, nota || '');

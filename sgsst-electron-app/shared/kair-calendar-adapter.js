@@ -287,7 +287,17 @@
         }
       }
     }
-    return { success: true, data: merged };
+    // 📦702-fix4 (2026-08-13) — Exponer el cumMap en la respuesta para que
+    // loadEventsFromIPC pueda enriquecer los eventos de Google Calendar que
+    // se cargan DESPUÉS via loadEventsFromGoogle. El adapter SÍ tiene el cumMap
+    // correcto (filtrado por empresaId), pero los gcalEvents que llegan
+    // aparte del adapter NO se enriquecen → el renderBigCalendar los muestra
+    // sin ✓. Ahora loadEventsFromIPC usa result.cumMap para enriquecer esos
+    // eventos antes de concatenarlos.
+    //
+    // Compatibilidad: si un caller no necesita el cumMap, simplemente ignora
+    // el campo nuevo. No rompe nada.
+    return { success: true, data: merged, cumMap: cumplidosMap };
   }
 
   // 📦646 (2026-08-03) — Fix iframe: el adapter ahora se usa desde la Bandeja
@@ -352,6 +362,6 @@
     create: create,
     update: update,
     remove: remove,
-    version: '1.2.0'
+    version: '1.3.0'
   };
 })(typeof window !== 'undefined' ? window : this);

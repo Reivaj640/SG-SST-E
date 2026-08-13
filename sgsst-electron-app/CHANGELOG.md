@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.176] - 2026-08-13
+
+### Fixed
+- **🐛 fix(bandeja): cumplido se desmarca solo ~60s después de marcar** — El user reportó que al marcar un evento de Google Calendar (gcal-*) como cumplido en la Bandeja Integrada, el checkmark (✓) aparecía al instante pero desaparecía ~1 minuto después, sin que el user tocara nada. La BD SÍ tenía el registro (`eventos_cumplidos` con `cumplido_en` correcto), así que el problema era de UI/render, no de persistencia. Después de una investigación exhaustiva con test E2E con mock del adapter, se identificó la causa raíz:
+  - **Causa raíz**: el adapter del calendario (`shared/kair-calendar-adapter.js`) SÍ construye un `cumMap` interno con los IDs `gcal-*` desde la BD y enriquece los eventos de SU lista base (capacitaciones, gestación, etc.) con `cumplido: true` cuando hay match. **PERO el adapter NO incluye los eventos de Google Calendar en su lista base** — esos llegan al frontend DESPUÉS via `loadEventsFromGoogle()` en `loadEventsFromIPC()` (línea 1168-1181), y se concatenan al array sin enriquecer. Resultado: los `gcal-*` quedan con `cumplido: undefined` en `state.events` → el `renderBigCalendar()` no muestra el ✓ (`ev.cumplido ? '✓ ' : ''` evalúa como `undefined` → `''`).
+  - **Por qué pasaba después de 60s**: el `autoRefreshInterval` (`renderer/bandeja-integrada/app.js:1460-1480`) llama a `loadEventsFromIPC()` cada 60s y reemplaza `state.events = events`. Cada refresh reconstruye el `state.events` desde el adapter + Google, y los gcalEvents llegan sin enriquecimiento. El ✓ se mantenía solo en el período entre marcar y el primer auto-refresh, porque las líneas 2228-2231 seteaban `ev.cumplido = true` directamente en el `state.events` local — pero ese cambio local se sobrescribía en el próximo refresh.
+  - **Fix (3 archivos, +16/-0)**:
+    1. **`shared/kair-calendar-adapter.js:290`** — el adapter ahora expone el `cumMap` en la respuesta: `return { success: true, data: merged, cumMap: cumplidosMap }`. Cambio **backward-compatible**: el KairCalendar embebido (`kair-calendar.js:1380`) y KairAlerts (`kair-alerts.js:189`) solo leen `res.data` e ignoran el nuevo campo. Version bump 1.2.0 → 1.3.0.
+    2. **`renderer/bandeja-integrada/app.js:1158`** (loadEventsFromIPC) — captura `var cumMapFromAdapter = (result && result.cumMap) || {}` después de `adapter.list()`.
+    3. **`renderer/bandeja-integrada/app.js:1185-1198`** (loadEventsFromIPC) — después de obtener `gcalEvents` via `loadEventsFromGoogle()`, los enriquece con `cumplido: true` si su `id` está en el `cumMapFromAdapter` (los IDs `gcal-...` matchean con los `evento_id` de la BD).
+  - **Antes vs después** (caso real del user, Tempoactiva, 2 eventos gcal-* marcados):
+    - ANTES: `cumMap` se construía y se perdía (solo usado internamente para enriquecer la lista del adapter). Los gcalEvents llegaban al `state.events` con `cumplido: undefined` después de cada refresh. El ✓ se veía en los primeros 60s y desaparecía.
+    - DESPUÉS: `cumMap` se devuelve al caller. `loadEventsFromIPC` lo aplica a los gcalEvents antes de concatenarlos. El ✓ se mantiene en todos los ciclos de auto-refresh.
+  - **Por qué el UPSERT con `empresa_id` también era parte del fix**: el bridge `eventos-cumplidos-bridge.js` solo actualizaba `cumplido_en` y `nota` en el UPSERT, NO `empresa_id`. Si el frontend pasaba `empresaId=null` al marcar (caso de "Todas las empresas" o un estado raro del frontend), el registro quedaba con `empresa_id=NULL`. Como SQL `WHERE empresa_id = 'X'` nunca matchea NULL, los eventos marcados en modo "Todas" se veían tachados en "Todas" pero NO en la empresa sola. **Fix complementario**:
+    - **`eventos-cumplidos-bridge.js:180-186`**: el UPSERT ahora incluye `empresa_id = excluded.empresa_id` → si el frontend pasa null después de pasar un valor real, la BD actualiza al nuevo valor.
+    - **`eventos-cumplidos-bridge.js:99-122`**: migración one-shot idempotente en `_ensureSchemaMigrated` que detecta registros con `empresa_id IS NULL` E `evento_id LIKE '%-%-%'` y les infiere la empresa del prefijo del id (`SUBSTR + INSTR`). Solo afecta NULLs, no toca registros ya seteados.
+  - **Por qué `_refreshCumplidosEnCalendario()` también se llamó desde el marcado**: la función existía del `📦694-fix4` (código huérfano, nadie la llamaba). Después de marcar/desmarcar, re-fetchea el `cumMap` del backend y refresca el KairCalendar embebido. Es defensa en profundidad — la solución principal es el enrichment en `loadEventsFromIPC` que afecta a TODO el flujo de auto-refresh.
+  - **Validación con test E2E (mock del adapter)**: simulé `adapter.list` + `loadEventsFromGoogle` con los IDs reales de la BD. Resultado con el fix:
+    ```
+    ✅ gcal-5bvf8h8gnv2uikietqj29r8goc → cumplido=true cumplidoEn=2026-08-13T21:29:50.082Z
+    ✅ gcal-65nf5uvbcsmidkb8099j9qi62u → cumplido=true cumplidoEn=2026-08-13T21:29:48.011Z
+    ```
+  - **Lección cross-project guardada en agent memory**: cuando un adapter/componente calcula un enrichment (cumMap, colorMap, etc.) para su lista interna, EXPONER ese enrichment en la respuesta si hay OTROS consumidores (Google, sync, etc.) que también quieren enriquecer. Si no se expone, los demás consumidores duplican lógica o quedan sin enrichment. **Patrón**: `return { success, data, derivedMaps }` en vez de `return { success, data }`.
+
 ## [0.1.175] - 2026-08-13
 
 ### Added

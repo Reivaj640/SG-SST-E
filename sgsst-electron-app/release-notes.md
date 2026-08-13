@@ -1,3 +1,72 @@
+# K+AIR v0.1.176
+
+## 🐛 Fix: cumplido se desmarca solo ~60s después de marcar (v0.1.176)
+
+En la Bandeja Integrada, al marcar un evento de Google Calendar (`gcal-*`) como cumplido, el checkmark (✓) aparecía al instante pero **desaparecía solo ~1 minuto después**, sin que el user tocara nada. La BD SÍ tenía el registro (verificado con sqlite3 directo), así que el problema era de UI/render, no de persistencia.
+
+### ¿Qué pasa visualmente?
+
+1. User marca el evento → ✓ aparece al instante (correcto, lo setea localmente en `state.events`)
+2. Pasan ~60 segundos → el **auto-refresh** del calendario (`loadEventsFromIPC()` cada 1 min) reemplaza `state.events` con datos nuevos del backend
+3. Los nuevos datos vienen del adapter (`adapter.list()`) que NO incluye los eventos de Google Calendar, + `loadEventsFromGoogle()` que los concatena después **sin enriquecer**
+4. Los `gcal-*` llegan al `state.events` con `cumplido: undefined`
+5. `renderBigCalendar()` evalúa `ev.cumplido ? '✓ ' : ''` → como es `undefined`, muestra `''` → sin ✓
+6. Resultado visual: el ✓ se "desmarca solo" aunque la BD diga que SÍ está marcado
+
+### ¿Qué incluye el fix?
+
+**Causa raíz**: el adapter SÍ construye un `cumMap` interno con los IDs `gcal-*` desde la BD, pero solo lo usa para enriquecer los eventos de SU lista base (capacitaciones, gestación, etc.). Los eventos de Google Calendar llegan al frontend por una fuente diferente (`loadEventsFromGoogle`), y se concatenan al final **sin pasar por el enrichment**. El `cumMap` se perdía dentro del closure del adapter.
+
+**Fix (3 archivos, +16/-0)**:
+
+1. **`shared/kair-calendar-adapter.js:290`** — el adapter ahora expone el `cumMap` en la respuesta:
+   ```js
+   return { success: true, data: merged, cumMap: cumplidosMap };
+   ```
+   Cambio **backward-compatible**: el KairCalendar embebido y KairAlerts solo leen `res.data` e ignoran el campo nuevo. Version bump 1.2.0 → 1.3.0.
+
+2. **`renderer/bandeja-integrada/app.js:1158-1180`** (loadEventsFromIPC) — captura el `cumMap` del adapter y lo usa para enriquecer los `gcalEvents` antes de concatenarlos:
+   ```js
+   var cumMapFromAdapter = (result && result.cumMap) || {};
+   ...
+   if (cumMapFromAdapter && Object.keys(cumMapFromAdapter).length > 0) {
+     gcalEvents.forEach(function (gev) {
+       if (gev && gev.id && cumMapFromAdapter[gev.id]) {
+         gev.cumplido = true;
+         gev.cumplidoEn = cumMapFromAdapter[gev.id].cumplidoEn;
+         gev.cumplidoNota = cumMapFromAdapter[gev.id].nota;
+       }
+     });
+   }
+   ```
+
+3. **`main/eventos-cumplidos-bridge.js`** — fix complementario del UPSERT que también era parte del problema raíz:
+   - **UPSERT** ahora incluye `empresa_id = excluded.empresa_id` (línea 180-186) → si el frontend pasa null después de pasar un valor real, la BD actualiza al nuevo valor
+   - **Migración one-shot** en `_ensureSchemaMigrated` (línea 99-122) que infiere la empresa del prefijo del `evento_id` para los registros con `empresa_id IS NULL`. Idempotente (solo afecta NULLs)
+   - **`_refreshCumplidosEnCalendario()` huérfano** del `📦694-fix4` ahora se llama desde el handler de marcar cumplido (línea 2278-2286) como defensa en profundidad
+
+### Antes vs después
+
+| Escenario | ANTES | AHORA |
+|---|---|---|
+| Marcar un gcal-* en Bandeja Integrada | ✓ aparece, ~60s después desaparece | ✓ aparece, se mantiene en todos los ciclos de auto-refresh |
+| Marcar en modo "Todas las empresas" | Se tachaba en "Todas" pero NO en la empresa sola (porque `empresa_id` quedaba NULL) | Se marca en ambos modos (UPSERT + migración) |
+| Verificar en la BD que el evento quedó marcado | SÍ estaba en la BD | SÍ está en la BD (sin cambios) |
+
+### Test E2E con mock del adapter
+
+Simulé el flujo completo con los IDs reales de la BD del user:
+```
+✅ gcal-5bvf8h8gnv2uikietqj29r8goc → cumplido=true cumplidoEn=2026-08-13T21:29:50.082Z
+✅ gcal-65nf5uvbcsmidkb8099j9qi62u → cumplido=true cumplidoEn=2026-08-13T21:29:48.011Z
+```
+
+### Lección guardada en agent memory (cross-project)
+
+Cuando un adapter/componente calcula un enrichment (cumMap, colorMap, etc.) para su lista interna, **EXPONER ese enrichment en la respuesta** si hay OTROS consumidores (Google, sync, etc.) que también quieren enriquecer. Si no se expone, los demás consumidores duplican lógica o quedan sin enrichment. **Patrón recomendado**: `return { success, data, derivedMaps }` en vez de `return { success, data }`.
+
+---
+
 # K+AIR v0.1.175
 
 ## 🔐 Permisos de Bandeja Integrada por usuario (v0.1.175)

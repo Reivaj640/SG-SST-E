@@ -1155,6 +1155,15 @@
           console.warn("[BandejaIntegrada] IPC retorno 0 eventos (puede ser que la BD esté vacía o el rango no coincide). Usando mocks.");
           return D.EVENTS.slice();
         }
+        // 📦702-fix4 (2026-08-13) — Capturar el cumMap que devuelve el adapter
+        // (📦498+fix4). Lo necesitamos para enriquecer los eventos de Google
+        // Calendar que se cargan DESPUÉS via loadEventsFromGoogle, porque el
+        // adapter NO incluye los gcal-* en su lista base (vienen por otra
+        // fuente). Sin este enrichment, los gcal-* llegan a state.events con
+        // cumplido=undefined y el renderBigCalendar no muestra el ✓ después
+        // del auto-refresh cada 60s (los marcados se "desmarcan" visualmente,
+        // aunque la BD SÍ los tiene).
+        var cumMapFromAdapter = (result && result.cumMap) || {};
         // Normalizar shape: el adapter devuelve {id, title, date, start, end, type}
         // pero app.js espera {id, title, date, start, end, category, ...}
         var normalized = result.data.map(function (ev) {
@@ -1173,6 +1182,21 @@
             new Date(D.MONTH_VIEW.year, 11, 31, 23, 59, 59).toISOString()
           );
           if (gcalEvents && gcalEvents.length > 0) {
+            // 📦702-fix4 (2026-08-13) — Enriquecer los gcalEvents con cumplido=true
+            // si están en el cumMap del adapter. Sin esto, los gcal-* llegan al
+            // state.events sin el flag de cumplimiento y el renderBigCalendar los
+            // muestra sin ✓ (efecto "se desmarca solo" cada 60s del auto-refresh).
+            // Funciona porque los IDs de Google (gcal-*) matchean los
+            // evento_id que devuelve el bridge de eventos_cumplidos.
+            if (cumMapFromAdapter && Object.keys(cumMapFromAdapter).length > 0) {
+              gcalEvents.forEach(function (gev) {
+                if (gev && gev.id && cumMapFromAdapter[gev.id]) {
+                  gev.cumplido = true;
+                  gev.cumplidoEn = cumMapFromAdapter[gev.id].cumplidoEn;
+                  gev.cumplidoNota = cumMapFromAdapter[gev.id].nota;
+                }
+              });
+            }
             normalized = normalized.concat(gcalEvents);
             console.log("[BandejaIntegrada] Google Calendar agrego " + gcalEvents.length + " eventos (sin duplicar)");
           }
@@ -2254,6 +2278,15 @@
               );
               closeModal();
               render();
+              // 🐛bug-fix (2026-08-13) — Después de marcar/desmarcar, re-sincronizar
+              // el flag de cumplimiento desde el backend. Sin esto, el KairCalendar
+              // embebido tenía su propia copia de state.events con el flag viejo, y
+              // el auto-refresh cada 60s (loadEventsFromIPC) lo sobrescribía, haciendo
+              // que el checkmark desapareciera ~1 min después de marcar.
+              // _refreshCumplidosEnCalendario() re-fetcha el cumMap del backend y
+              // refresca el KairCalendar embebido (es código del fix 📦694-fix4
+              // que estaba huérfano — nadie lo llamaba).
+              _refreshCumplidosEnCalendario();
             } else {
               toast("No se pudo " + (isCumplido ? "desmarcar" : "marcar") + " cumplido", (r && r.error) || "Error", "error");
             }
