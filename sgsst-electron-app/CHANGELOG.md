@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.175] - 2026-08-13
+
+### Added
+- **📦702 — feat(usuarios): permisos de Bandeja Integrada por usuario** — Hasta ahora el iframe de la Bandeja Integrada (correo + calendario) estaba disponible para todos los usuarios logueados. Ahora el admin puede condicionar el acceso por usuario desde **Configuración > Gestión de Usuario**, con un toggle "Acceso a Bandeja Integrada" al lado del campo Rol. **Backend** (`bandeja-integrada-permissions-bridge.js`, nuevo):
+  - 2 handlers IPC: `users-get-bandeja-integrada-flag` y `users-set-bandeja-integrada-flag`
+  - Migración idempotente: `ALTER TABLE users ADD COLUMN bandeja_integrada_enabled INTEGER NOT NULL DEFAULT 0`
+  - **Admin global siempre forzado a `enabled: true`** (no se puede deshabilitar ni a sí mismo ni a otros admins)
+  - Bridge extendido: acepta `userId` opcional para que el admin pueda ver/modificar el flag de otros users; no-admin solo puede ver/modificar el propio
+  - Validaciones de seguridad: `PERMISSION_DENIED` si no-admin intenta leer/modificar flags ajenos; `CANNOT_MODIFY_ADMIN` si admin intenta deshabilitar a otro admin
+  - **Frontend** (`renderer.js:1041-1081`): `toggleBandejaIntegrada()` ahora chequea permisos vía `checkBandejaIntegradaAccess()` antes de abrir el iframe. Si no tiene acceso, muestra un `alert()` claro con instrucciones para contactar al admin. **Fail-open defensivo**: si la API no está disponible o la llamada falla, abre por defecto (no rompe UX)
+  - **UI** (`config-viewer.html:1997-2009`): nuevo toggle switch estilo iOS en el modal de Gestión de Usuario. Si el rol es Administrador, se prende + bloquea + label "🔒 Siempre habilitado para administradores." Si no, se muestra el valor actual de la BD + hint con estado
+  - **Save handler** (`config-viewer.html:3927-4017`): después de guardar user + asignaciones, persiste el flag vía `users-set-bandeja-integrada-flag`. Helper local `persistBandejaIntegradaFlag()` no fatal: si falla el guardado del flag, el user ya quedó guardado (solo log + toast warning)
+
+### Fixed
+- **📦702 — fix(bridge): firma del bridge era `(getDb, validateSession)` pero `main.js` la llamaba como `(app, { getDb, validateSession })`** — Bug introducido en el commit inicial del bridge. La convención del proyecto (ver `eventos-cumplidos-bridge.js`, `gestacion-bridge.js`, etc.) es `registerXxxHandlers(app, deps)`. Por la firma incorrecta, `_validateSession` quedaba como el objeto `{ getDb, validateSession }` (no función), el chequeo `typeof === 'function'` fallaba, y el handler retornaba `AUTH_REQUIRED: validateSession no configurado`. **Síntoma visible para el user admin**: el alert "🔒 No tienes acceso a la Bandeja Integrada" se mostraba incluso siendo admin. **Fix**: 1 línea efectiva — cambiar la firma a `(app, deps)` y leer `deps.getDb` / `deps.validateSession`. Verificado con 12 tests unitarios del bridge (admin, no-admin, casos de borde). **Lección guardada en memoria cross-project**: cualquier bridge nuevo DEBE seguir la convención `(app, deps)` para no caer en este bug.
+
+### Files
+- `sgsst-electron-app/main/bandeja-integrada-permissions-bridge.js` (NEW, 200 lines): bridge con 2 handlers + extensión con `userId` opcional
+- `sgsst-electron-app/main.js` (+34): require del bridge + ALTER TABLE migration con try/catch idempotente + registro de handlers
+- `sgsst-electron-app/preload.js` (+5): expone `usersGetBandejaIntegradaFlag` y `usersSetBandejaIntegradaFlag` en `window.electronAPI`
+- `sgsst-electron-app/renderer.js` (+40): `toggleBandejaIntegrada()` con gate de permisos + `checkBandejaIntegradaAccess()` async con fail-open
+- `sgsst-electron-app/components/config/config-viewer.html` (+~90): HTML del toggle + CSS del switch + `openUserModal` carga el flag + `saveUser` persiste el flag
+
+## [0.1.174] - 2026-08-13
+
+### Fixed
+- **📦608 — fix(file-viewer): integración completa del file-viewer para Remisiones Médicas + 6 fixes críticos (fix15/16/17/18/19/20/21/22/22b)** — 9 fixes iterativos al `file-viewer.js` y a los visualizadores de las 12 secciones (3.1.6, 1.1.1, sociodemografica, politica, copasst, comite-convivencia, capacitacion-copasst, afiliacion, trabajo-alto-riesgo, roles-responsabilidades, curso-virtual, manual-proveedores).
+  - **fix18 (raíz)**: `window.FlyfishFileViewerWeb` no existe — el export real es `FlyfishFileViewerWebFull`. Defense in depth 2 capas con `window.FlyfishFileViewerWebFull || window.FlyfishFileViewerWeb` + preload eager de renderers lazy (elimina race conditions intermitentes) + orden de scripts IIFE → helper → viewer
+  - **fix19**: `Ve(filename)` del bundle hace `filename.split(/[?#]/)` interpretando `#` como fragmento de URL. Para "Carta Recomendación Médica #20.docx" retornaba "" → `state: "unsupported"`. **Fix**: pasar `type` attribute explícito al custom element, el bundle prioriza `e.type || Ve(filename)`
+  - **fix20**: CSS global inyectado en `shared/file-viewer.js` via `injectGlobalPreviewBtnCSS()` IIFE — arregla 12 visualizadores con 1 cambio (botón "Ver completo" 30x30 → auto width con padding)
+  - **fix21**: bug del `return` temprano que saltaba el MutationObserver. **Fix**: removido el return; `forceToolbarStyle()` + MutationObserver ahora SIEMPRE se ejecutan. Toolbar reaplicado con `setProperty(..., 'important')` para sobrescribir `!important` del bundle
+  - **fix22**: reglas de sizing copiadas de 1.1.1 (responsable-sg) que funcionaba
+  - **fix22b (causa raíz del documento cortado)**: panel PADRE `.kair-preview` sin `min-height: 0` + `overflow: hidden` cortaba el file-viewer. **Regla cross-project guardada en memoria**: cuando un hijo tiene `flex: 1` o `flex: 1 1 0%`, TODOS los ancestros flex hasta el que tiene `height` definido necesitan `min-height: 0` + `overflow: hidden`. Sin esto, flexbox no comprime y el hijo queda con el alto natural del contenido
+- **Por qué `:has()`**: el selector aplica solo cuando hay file-viewer presente, no rompe el caso PDF legacy
+
 ## [0.1.173] - 2026-08-12
 
 ### Fixed

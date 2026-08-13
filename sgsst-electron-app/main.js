@@ -91,6 +91,12 @@ const { registerEventosRapidosHandlers } = require('./main/eventos-rapidos-bridg
 const { registerEvaluacionActionPlansHandlers, SCHEMA_SQL: EVAL_ACTION_PLANS_SCHEMA_SQL } = require('./main/evaluacion-action-plans-bridge');
 // 📦589 — Submódulo 3.1.3 Perfiles de cargo y Profesiograma (Salud)
 const { registerProfesiogramaHandlers, SCHEMA_SQL: PROFESIOGRAMA_SCHEMA_SQL } = require('./main/profesiograma-bridge');
+// 📦702 (2026-08-13) — Permisos de Bandeja Integrada por usuario
+// Hasta ahora el iframe de Bandeja Integrada estaba disponible para todos los
+// usuarios. Con este bridge, el admin puede condicionar el acceso por usuario
+// desde Configuración > Ajustes de Usuario > Gestión de Usuario (toggle por user).
+// El admin global SIEMPRE tiene acceso (forzado en el handler).
+const { registerBandejaIntegradaPermissionsHandlers, MIGRATIONS_SQL: BANDEJA_PERMS_MIGRATIONS_SQL } = require('./main/bandeja-integrada-permissions-bridge');
 // 📦 Bandeja Integrada — Schema SQLite para emails (threads, messages, labels, attachments)
 // Inspirado en Mail-0/Zero (https://github.com/Mail-0/Zero) — mismo patrón que
 // GESTACION_SCHEMA_SQL: CREATE TABLE IF NOT EXISTS + migraciones idempotentes.
@@ -460,6 +466,29 @@ function initDbOnce() {
         }
       }
       console.log('[DB] 📦468 · Migraciones gestacion aplicadas=' + applied + ' omitidas=' + skipped);
+    }
+
+    // 📦702 (2026-08-13) — Migraciones de permisos de Bandeja Integrada.
+    // ALTER TABLE idempotente sobre `users` (la tabla ya existe desde el
+    // schema base en líneas 395-404). Si la columna ya existe, SQLite
+    // lanza "duplicate column name" y se ignora silenciosamente.
+    if (Array.isArray(BANDEJA_PERMS_MIGRATIONS_SQL)) {
+      var bp_applied = 0;
+      var bp_skipped = 0;
+      for (var bp_i = 0; bp_i < BANDEJA_PERMS_MIGRATIONS_SQL.length; bp_i++) {
+        var bp_stmt = BANDEJA_PERMS_MIGRATIONS_SQL[bp_i];
+        try {
+          db.exec(bp_stmt);
+          bp_applied++;
+        } catch (bpErr) {
+          if (/duplicate column/i.test(bpErr.message)) {
+            bp_skipped++;
+          } else {
+            console.warn('[DB] 📦702 · Migración bandeja_perms fallida:', bp_stmt, '-', bpErr.message);
+          }
+        }
+      }
+      console.log('[DB] 📦702 · Migraciones bandeja_perms aplicadas=' + bp_applied + ' omitidas=' + bp_skipped);
     }
 
     // 📦498 — Schema de eventos_cumplidos (marcado del calendario).
@@ -9734,6 +9763,11 @@ try {
     getPythonScriptPath: getPythonScriptPath
   });
   registerEventosCumplidosHandlers(app, { getDb });
+  // 📦702 (2026-08-13) — Permisos de Bandeja Integrada por usuario.
+  // Registra 2 handlers: users-get-bandeja-integrada-flag y
+  // users-set-bandeja-integrada-flag. validateSession se pasa para
+  // identificar al user logueado y detectar si es admin global.
+  registerBandejaIntegradaPermissionsHandlers(app, { getDb, validateSession });
   // 📦589 — Submódulo 3.1.3 Perfiles de cargo y Profesiograma (Salud)
   registerProfesiogramaHandlers(app, { getDb, getCompanyRootPath });
   registerEvaluacionActionPlansHandlers(app, { getDb });

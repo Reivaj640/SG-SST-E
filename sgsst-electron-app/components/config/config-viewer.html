@@ -810,6 +810,66 @@
             overflow-y: auto;
         }
 
+        /* 📦702 (2026-08-13) — Switch visual para el toggle de Bandeja Integrada
+           en el modal de Gestión de Usuario. Estilo consistente con el proyecto
+           (usa --primary y --border-color del theme). */
+        .user-bandeja-integrada-row {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: #f8f9fa;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 0.5rem 0.75rem;
+        }
+        .user-bandeja-integrada-hint {
+            font-size: 0.85rem;
+            color: var(--text-secondary, #6b7280);
+            flex: 1;
+        }
+        .kair-switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+        .kair-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .kair-switch__slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #cbd5e0;
+            border-radius: 24px;
+            transition: background-color 0.2s ease;
+        }
+        .kair-switch__slider::before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            top: 3px;
+            background-color: #fff;
+            border-radius: 50%;
+            transition: transform 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        .kair-switch input:checked + .kair-switch__slider {
+            background-color: var(--primary, #3b82f6);
+        }
+        .kair-switch input:checked + .kair-switch__slider::before {
+            transform: translateX(20px);
+        }
+        .kair-switch input:disabled + .kair-switch__slider {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
         .user-company-item {
             display: flex;
             align-items: center;
@@ -1931,6 +1991,21 @@
                     <option>Gerencia</option>
                     <option>Recursos Humanos</option>
                 </select>
+            </div>
+            <!-- 📦702 (2026-08-13) — Toggle de acceso a Bandeja Integrada.
+                 Si el rol es Administrador, el switch se prende y se bloquea
+                 (los admins siempre tienen acceso forzado por el backend). -->
+            <div class="form-group" id="user-bandeja-integrada-group">
+                <label class="form-label">Acceso a Bandeja Integrada</label>
+                <div class="user-bandeja-integrada-row">
+                    <label class="kair-switch" aria-label="Acceso a Bandeja Integrada">
+                        <input type="checkbox" id="user-bandeja-integrada-toggle">
+                        <span class="kair-switch__slider"></span>
+                    </label>
+                    <span class="user-bandeja-integrada-hint" id="user-bandeja-integrada-hint">
+                        Permite al usuario acceder a la Bandeja Integrada (correo + calendario).
+                    </span>
+                </div>
             </div>
             <div class="form-group">
                 <label class="form-label">Empresas asignadas</label>
@@ -3494,6 +3569,17 @@
         document.getElementById('user-password').value = '';
         document.getElementById('user-role').value = 'Administrador';
 
+        // 📦702 (2026-08-13) — Reset del toggle de Bandeja Integrada
+        const bandejaToggle = document.getElementById('user-bandeja-integrada-toggle');
+        const bandejaHint = document.getElementById('user-bandeja-integrada-hint');
+        if (bandejaToggle) {
+            bandejaToggle.checked = false;
+            bandejaToggle.disabled = false;
+        }
+        if (bandejaHint) {
+            bandejaHint.textContent = 'Permite al usuario acceder a la Bandeja Integrada (correo + calendario).';
+        }
+
         await loadCompaniesList();
         renderCompaniesChecklist([]);
 
@@ -3513,6 +3599,35 @@
                     const roleName = assignments[0]?.role ? mapRoleToLabel(assignments[0].role) : 'Administrador';
                     document.getElementById('user-role').value = roleName;
                     renderCompaniesChecklist(selectedCompanies);
+                }
+            }
+
+            // 📦702 (2026-08-13) — Cargar el flag de Bandeja Integrada del user
+            // que se está editando. Solo aplica cuando hay userId (modo edición).
+            if (token && electronAPI && typeof electronAPI.usersGetBandejaIntegradaFlag === 'function') {
+                const bRes = await electronAPI.usersGetBandejaIntegradaFlag({ token, userId: parseInt(userId, 10) });
+                if (bRes.success && bRes.data) {
+                    const enabled = !!bRes.data.enabled;
+                    const forced = !!bRes.data.forced;
+                    if (bandejaToggle) {
+                        bandejaToggle.checked = enabled;
+                        if (forced) {
+                            // Admin: bloqueamos el switch y mostramos hint
+                            bandejaToggle.disabled = true;
+                            if (bandejaHint) {
+                                bandejaHint.textContent = '🔒 Siempre habilitado para administradores.';
+                            }
+                        } else {
+                            bandejaToggle.disabled = false;
+                            if (bandejaHint) {
+                                bandejaHint.textContent = enabled
+                                    ? '✅ Habilitado. El usuario puede acceder a la Bandeja Integrada.'
+                                    : '❌ Deshabilitado. El usuario NO puede acceder a la Bandeja Integrada.';
+                            }
+                        }
+                    }
+                } else if (bRes.error) {
+                    console.warn('[openUserModal] No se pudo cargar el flag de Bandeja Integrada:', bRes.error);
                 }
             }
         }
@@ -3807,6 +3922,12 @@
         const role = mapRoleToDb(roleLabel);
         const selectedCompanies = getSelectedCompaniesFromModal();
 
+        // 📦702 (2026-08-13) — Leer el valor del toggle de Bandeja Integrada.
+        // Si está disabled (admin), el backend ya lo fuerza a true, no enviamos.
+        const bandejaToggle = document.getElementById('user-bandeja-integrada-toggle');
+        const bandejaEnabled = bandejaToggle ? !!bandejaToggle.checked : false;
+        const isBandejaToggleDisabled = bandejaToggle ? !!bandejaToggle.disabled : false;
+
         if (!fullname || !email) {
             showToast('Por favor complete los campos obligatorios', 'error');
             return;
@@ -3817,7 +3938,34 @@
             return;
         }
 
+        // Helper local: persistir el flag de Bandeja Integrada. Si falla,
+        // el user YA se guardó — no tiramos todo a perder, solo logueamos
+        // y mostramos un toast no fatal.
+        async function persistBandejaIntegradaFlag(targetUserId) {
+            if (!electronAPI || typeof electronAPI.usersSetBandejaIntegradaFlag !== 'function') {
+                return; // API no disponible
+            }
+            if (isBandejaToggleDisabled) {
+                // Es admin o el switch está bloqueado — el backend ya fuerza true
+                return;
+            }
+            try {
+                const res = await electronAPI.usersSetBandejaIntegradaFlag({
+                    token,
+                    userId: targetUserId,
+                    enabled: bandejaEnabled
+                });
+                if (!res.success) {
+                    console.warn('[saveUser] No se pudo guardar el flag de Bandeja Integrada:', res.error);
+                    showToast('Usuario guardado, pero el permiso de Bandeja Integrada no se pudo actualizar: ' + (res.error?.message || 'error'), 'warning');
+                }
+            } catch (e) {
+                console.error('[saveUser] Error guardando flag de Bandeja Integrada:', e);
+            }
+        }
+
         try {
+            let targetUserId = null;
             if (!userId) {
                 if (!password) {
                     showToast('La contraseña es obligatoria para nuevos usuarios.', 'error');
@@ -3833,6 +3981,7 @@
                 }
 
                 const newUserId = createRes.data.userId;
+                targetUserId = newUserId;
                 const assignments = selectedCompanies.map(companyKey => ({
                     userId: newUserId,
                     companyKey,
@@ -3848,16 +3997,17 @@
                     return;
                 }
             } else {
+                targetUserId = parseInt(userId, 10);
                 const patch = { full_name: fullname, email };
                 if (password) patch.password = password;
-                const updateRes = await electronAPI.usersUpdateV1({ token, userId: parseInt(userId, 10), patch });
+                const updateRes = await electronAPI.usersUpdateV1({ token, userId: targetUserId, patch });
                 if (!updateRes.success) {
                     showToast(updateRes.error?.message || 'Error al actualizar usuario', 'error');
                     return;
                 }
 
                 const assignments = selectedCompanies.map(companyKey => ({
-                    userId: parseInt(userId, 10),
+                    userId: targetUserId,
                     companyKey,
                     role
                 }));
@@ -3871,6 +4021,10 @@
                     return;
                 }
             }
+
+            // 📦702 (2026-08-13) — Persistir el flag de Bandeja Integrada
+            // DESPUÉS de que el user y las empresas se hayan guardado.
+            await persistBandejaIntegradaFlag(targetUserId);
 
             closeUserModal();
             loadUsers();

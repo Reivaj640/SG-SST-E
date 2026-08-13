@@ -1041,8 +1041,42 @@ document.addEventListener('DOMContentLoaded', async () => {
   function toggleBandejaIntegrada() {
     if (bandejaIntegradaFrame && bandejaIntegradaFrame.style.display !== 'none') {
       hideBandejaIntegrada();
-    } else {
-      showBandejaIntegrada();
+      return;
+    }
+    // 📦702 (2026-08-13) — Gate de permisos antes de abrir el iframe.
+    // Si el user no tiene acceso a la Bandeja Integrada, no se abre el iframe
+    // y se muestra un mensaje claro. Admin global siempre pasa (forzado en backend).
+    checkBandejaIntegradaAccess().then(function (allowed) {
+      if (allowed) {
+        showBandejaIntegrada();
+      }
+    });
+  }
+
+  // 📦702 (2026-08-13) — Chequea si el user logueado tiene acceso a Bandeja Integrada.
+  // Retorna true si puede abrir, false si está bloqueado.
+  // Fail-open defensivo: si la API no está disponible o falla, abre igual (no rompe UX).
+  async function checkBandejaIntegradaAccess() {
+    if (!window.electronAPI || !window.electronAPI.usersGetBandejaIntegradaFlag) {
+      // API no expuesta (versión vieja del preload) — fail-open
+      console.warn('[BandejaIntegrada] API de permisos no disponible, abriendo por defecto.');
+      return true;
+    }
+    try {
+      var resp = await window.electronAPI.usersGetBandejaIntegradaFlag({ token: authToken || '' });
+      if (resp && resp.success && resp.data && resp.data.enabled) {
+        return true;
+      }
+      // Sin acceso
+      logMessage('Bandeja Integrada bloqueada: user sin permiso', 'WARN');
+      alert('🔒 No tienes acceso a la Bandeja Integrada.\n\n' +
+            'Si crees que deberías tenerlo, contacta al administrador del sistema ' +
+            'para que habilite tu permiso desde Configuración > Gestión de Usuario.');
+      return false;
+    } catch (e) {
+      console.error('[BandejaIntegrada] Error chequeando permisos:', e);
+      // Fail-open: si falla la llamada, abrimos igual (la app no se rompe)
+      return true;
     }
   }
 

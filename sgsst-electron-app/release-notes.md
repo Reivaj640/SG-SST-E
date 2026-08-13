@@ -1,3 +1,86 @@
+# K+AIR v0.1.175
+
+## 🔐 Permisos de Bandeja Integrada por usuario (v0.1.175)
+
+Hasta ahora el iframe de la **Bandeja Integrada** (correo + calendario) estaba disponible para todos los usuarios logueados. Esta versión permite al admin condicionar el acceso por usuario desde **Configuración > Gestión de Usuario**, con un toggle "Acceso a Bandeja Integrada" al lado del campo Rol.
+
+### ¿Qué incluye?
+
+**Backend** (`bandeja-integrada-permissions-bridge.js`, nuevo):
+- 2 handlers IPC: `users-get-bandeja-integrada-flag` y `users-set-bandeja-integrada-flag`
+- Migración idempotente sobre tabla `users`: nueva columna `bandeja_integrada_enabled INTEGER NOT NULL DEFAULT 0` (se aplica sola al abrir la app, no rompe si ya existe)
+- **Admin global SIEMPRE forzado a `enabled: true`** — el backend garantiza que un admin NUNCA puede perder acceso (ni a sí mismo ni a otros admins)
+- Bridge extendido: acepta `userId` opcional para que el admin pueda ver/modificar el flag de otros users
+- Validaciones: no-admin no puede leer/modificar flags ajenos (`PERMISSION_DENIED`); admin no puede deshabilitar a otro admin (`CANNOT_MODIFY_ADMIN`)
+
+**Frontend** (`renderer.js:1041-1081`):
+- `toggleBandejaIntegrada()` ahora chequea permisos vía `checkBandejaIntegradaAccess()` antes de abrir el iframe
+- Si no tiene acceso, muestra un `alert()` claro:
+  ```
+  🔒 No tienes acceso a la Bandeja Integrada.
+  
+  Si crees que deberías tenerlo, contacta al administrador del sistema 
+  para que habilite tu permiso desde Configuración > Gestión de Usuario.
+  ```
+- **Fail-open defensivo**: si la API no está disponible o la llamada falla, abre por defecto (no rompe UX)
+
+**UI** (`config-viewer.html:1997-2009`):
+- Nuevo toggle switch estilo iOS en el modal de Gestión de Usuario
+- Si el rol es **Administrador**: switch prendido + bloqueado + label "🔒 Siempre habilitado para administradores."
+- Si no, se muestra el valor actual de la BD + hint con estado ("✅ Habilitado..." o "❌ Deshabilitado...")
+
+**Save handler** (`config-viewer.html:3927-4017`):
+- Después de guardar user + asignaciones, persiste el flag
+- Si falla el guardado del flag, **no tira el guardado** — el user ya quedó guardado, solo log + toast warning
+
+### Bug fix incluido (mismo paquete)
+
+**fix(bridge): firma del bridge era `(getDb, validateSession)` pero `main.js` la llamaba como `(app, { getDb, validateSession })`**
+
+La convención del proyecto es `registerXxxHandlers(app, deps)` (ver `eventos-cumplidos-bridge.js`, `gestacion-bridge.js`). Por la firma incorrecta, `_validateSession` quedaba como el objeto `{ getDb, validateSession }` (no función), el chequeo `typeof === 'function'` fallaba, y el handler retornaba `AUTH_REQUIRED: validateSession no configurado`. **Síntoma visible**: el alert "🔒 No tienes acceso" se mostraba incluso siendo admin. **Fix**: 1 línea efectiva — cambiar a `(app, deps)`. Verificado con 12 tests unitarios.
+
+### Antes vs después
+
+| Escenario | ANTES | AHORA |
+|---|---|---|
+| User no-admin hace click en Bandeja Integrada | Abría el iframe (cualquier logueado tenía acceso) | Muestra alert 🔒 + no abre |
+| Admin abre el modal de Gestión de Usuario de un user no-admin | Sin control de acceso a Bandeja | Switch prendido/apagado según BD + editable |
+| Admin abre el modal de un user Administrador | (no había control) | Switch prendido + disabled con label "🔒 Siempre habilitado" |
+| Admin intenta deshabilitar a otro admin | (no había control) | Backend rechaza con `CANNOT_MODIFY_ADMIN` |
+| User no-admin intenta ver el flag de otro user | (no había control) | Backend rechaza con `PERMISSION_DENIED` |
+| Token de Gmail del user | No se ve afectado | Sigue intacto (los tokens viven en `email_connections` por empresa, no por user) |
+
+### Cómo usar (admin)
+
+1. Configuración > Gestión de Usuario
+2. Click en el ícono de editar de un user (no admin)
+3. Al lado del campo Rol aparece el toggle "Acceso a Bandeja Integrada"
+4. Prender/apagar + Guardar Usuario
+5. El user ahora puede/no puede abrir la Bandeja Integrada
+
+---
+
+# K+AIR v0.1.174
+
+## 📄 File-viewer: integración completa + 6 fixes críticos (v0.1.174)
+
+Resuelve los bugs que impedían previsualizar correctamente documentos (PDF, Word, Excel, PowerPoint, imágenes) en las 12 secciones del proyecto: 3.1.6 Remisiones Médicas, 1.1.1 Responsable SG, sociodemográfica, política, COPASST, comité convivencia, capacitación COPASST, afiliación, trabajo de alto riesgo, roles y responsabilidades, curso virtual, manual de proveedores.
+
+### ¿Qué incluye?
+
+**9 fixes iterativos al file-viewer** (`shared/file-viewer.js`):
+- **fix18 (raíz)**: `window.FlyfishFileViewerWeb` no existe — el export real es `FlyfishFileViewerWebFull`. Defense in depth 2 capas con fallback + preload eager de renderers lazy
+- **fix19**: `Ve(filename)` del bundle interpreta `#` como fragmento de URL. Pasar `type` attribute explícito soluciona "Carta Recomendación Médica #20.docx" (antes retornaba `state: "unsupported"`)
+- **fix20**: CSS global inyectado para arreglar 12 visualizadores con 1 cambio (botón "Ver completo" 30x30 → auto)
+- **fix21**: removido `return` temprano que saltaba el MutationObserver del toolbar
+- **fix22 + 22b**: panel PADRE `.kair-preview` con `min-height: 0` + `overflow: hidden` — sin esto, flexbox no comprime el file-viewer y el documento se cortaba a la mitad
+
+### Lección guardada (cross-project)
+
+Cuando un hijo tiene `flex: 1` o `flex: 1 1 0%`, TODOS los ancestros flex hasta el que tiene `height` definido necesitan `min-height: 0` + `overflow: hidden`. Sin esto, flexbox no comprime y el hijo queda con el alto natural del contenido.
+
+---
+
 # K+AIR v0.1.173
 
 ## 📧 Bandeja Integrada — Fix reply en Enviados (v0.1.173)

@@ -27,6 +27,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   assignmentsSetV1: (payload) => ipcRenderer.invoke('assignments-set-v1', payload),
   assignmentsListV1: (payload) => ipcRenderer.invoke('assignments-list-v1', payload),
   assignmentsListByUserV1: (payload) => ipcRenderer.invoke('assignments-list-by-user-v1', payload),
+  // 📦702 (2026-08-13) — Permisos de Bandeja Integrada por usuario.
+  // Usado por: Bandeja Integrada (chequear acceso antes de abrir iframe) y
+  // modal de Gestión de Usuario (toggle por user).
+  usersGetBandejaIntegradaFlag: (payload) => ipcRenderer.invoke('users-get-bandeja-integrada-flag', payload),
+  usersSetBandejaIntegradaFlag: (payload) => ipcRenderer.invoke('users-set-bandeja-integrada-flag', payload),
   
   // --- Dashboard Scanner ---
   getDashboardSummary: (companyName) => ipcRenderer.invoke('get-dashboard-summary', companyName),
