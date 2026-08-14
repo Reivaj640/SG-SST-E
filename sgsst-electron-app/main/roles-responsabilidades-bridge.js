@@ -78,8 +78,41 @@ const SCHEMA_SQL = `
 
   CREATE INDEX IF NOT EXISTS idx_rr_div_empresa ON roles_responsabilidades_divulgacion(empresa_id);
   CREATE INDEX IF NOT EXISTS idx_rr_div_cedula ON roles_responsabilidades_divulgacion(persona_cedula);
-  CREATE UNIQUE INDEX IF NOT EXISTS uq_rr_div_per_version
-    ON roles_responsabilidades_divulgacion(empresa_id, persona_cedula, version_responsabilidades);
+  -- 📦706-fix17 (2026-08-14) — UNIQUE INDEX PARCIAL: solo las divulgaciones VIGENTES
+  -- son unicas por (empresa, persona_cedula, version). Las archivadas pueden
+  -- tener la misma combinacion sin chocar, porque el WHERE las excluye.
+  -- Esto permite que un trabajador tenga multiples divulgaciones archivadas
+  -- historicamente (cambios de cargo) sin violar el constraint.
+  CREATE UNIQUE INDEX IF NOT EXISTS uq_rr_div_per_version_active
+    ON roles_responsabilidades_divulgacion(empresa_id, persona_cedula, version_responsabilidades)
+    WHERE fecha_vigencia_hasta IS NULL;
+
+  -- 📦706 (2026-08-14) — Multi-documento por divulgacion: 1 divulgacion = N PDFs.
+  -- Append-only de documentos. El vigente es el que tiene es_actual=1.
+  -- Los anteriores quedan en la tabla para auditoria (no se eliminan).
+  CREATE TABLE IF NOT EXISTS roles_responsabilidades_divulgacion_documento (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    divulgacion_id    INTEGER NOT NULL,
+    empresa_id        TEXT NOT NULL,
+    persona_cedula    TEXT NOT NULL,
+    file_path         TEXT NOT NULL,
+    filename          TEXT,
+    bytes             INTEGER,
+    fecha_carga       TEXT NOT NULL,
+    fecha_documento   TEXT,
+    es_actual         INTEGER NOT NULL DEFAULT 1,
+    es_correccion     INTEGER NOT NULL DEFAULT 0,
+    metodo            TEXT NOT NULL DEFAULT 'app',
+    ip                TEXT,
+    user_agent        TEXT,
+    creado_por        TEXT,
+    observaciones     TEXT,
+    FOREIGN KEY (divulgacion_id) REFERENCES roles_responsabilidades_divulgacion(id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_rr_doc_div ON roles_responsabilidades_divulgacion_documento(divulgacion_id);
+  CREATE INDEX IF NOT EXISTS idx_rr_doc_empresa ON roles_responsabilidades_divulgacion_documento(empresa_id, persona_cedula);
+  CREATE INDEX IF NOT EXISTS idx_rr_doc_actual ON roles_responsabilidades_divulgacion_documento(divulgacion_id, es_actual);
 `;
 
 // ---------- Seed de los 8 roles predefinidos (basado en G-OD-006) ----------
@@ -207,6 +240,160 @@ function _ensureSchemaMigrated(db) {
     }
   } catch (migErr) {
     console.error('[' + MOD + '] Error desactivando roles viejos:', migErr.message);
+  }
+  // 📦706 (2026-08-14) — Multi-documento por divulgación: 3 columnas nuevas
+  // en divulgacion. CREATE TABLE IF NOT EXISTS no agrega columnas a tablas
+  // existentes, por eso usamos PRAGMA table_info + ALTER TABLE ADD COLUMN
+  // (idempotente — el check evita agregar 2 veces).
+  try {
+    var colsInfo = db.prepare('PRAGMA table_info(roles_responsabilidades_divulgacion)').all();
+    var existingCols = new Set();
+    colsInfo.forEach(function (c) { existingCols.add(c.name); });
+    if (!existingCols.has('periodo')) {
+      db.exec('ALTER TABLE roles_responsabilidades_divulgacion ADD COLUMN periodo TEXT');
+      console.log('[' + MOD + '][MIGRATION] Agregada columna periodo');
+    }
+    if (!existingCols.has('es_nueva_contratacion')) {
+      db.exec('ALTER TABLE roles_responsabilidades_divulgacion ADD COLUMN es_nueva_contratacion INTEGER NOT NULL DEFAULT 0');
+      console.log('[' + MOD + '][MIGRATION] Agregada columna es_nueva_contratacion');
+    }
+    if (!existingCols.has('fecha_vigencia_hasta')) {
+      db.exec('ALTER TABLE roles_responsabilidades_divulgacion ADD COLUMN fecha_vigencia_hasta TEXT');
+      console.log('[' + MOD + '][MIGRATION] Agregada columna fecha_vigencia_hasta');
+    }
+    // Backfill one-shot: divulgar existentes sin periodo → usar año de creado_en
+    var backfill = db.prepare(
+      "UPDATE roles_responsabilidades_divulgacion SET periodo = strftime('%Y', creado_en) " +
+      "WHERE periodo IS NULL OR periodo = ''"
+    ).run();
+    if (backfill.changes > 0) {
+      console.log('[' + MOD + '][MIGRATION] Backfill de periodo en ' + backfill.changes + ' divulgaciones');
+    }
+  } catch (alterErr) {
+    console.error('[' + MOD + '] Error en ALTER TABLE divulgacion:', alterErr.message);
+  }
+  // 📦706-fix17 (2026-08-14) — Migración del UNIQUE INDEX: borrar el viejo
+  // (que aplicaba a TODAS las divulgaciones, incluyendo archivadas) y
+  // reemplazarlo por el UNIQUE INDEX PARCIAL nuevo (solo vigentes).
+  try {
+    var oldIndex = db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='uq_rr_div_per_version'").get();
+    if (oldIndex) {
+      db.exec('DROP INDEX uq_rr_div_per_version');
+      console.log('[' + MOD + '][MIGRATION] Borrado UNIQUE INDEX viejo uq_rr_div_per_version');
+    }
+    var newIndex = db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='uq_rr_div_per_version_active'").get();
+    if (!newIndex) {
+      db.exec('CREATE UNIQUE INDEX uq_rr_div_per_version_active ON roles_responsabilidades_divulgacion(empresa_id, persona_cedula, version_responsabilidades) WHERE fecha_vigencia_hasta IS NULL');
+      console.log('[' + MOD + '][MIGRATION] Creado UNIQUE INDEX PARCIAL uq_rr_div_per_version_active');
+    }
+  } catch (idxErr) {
+    console.error('[' + MOD + '] Error en migración de UNIQUE INDEX:', idxErr.message);
+  }
+  // 📦706 (2026-08-14) — Migracion one-shot: divulgar existentes con
+  // documento_soporte_path no nulo → crear fila en divulgacion_documento
+  // con es_actual=1. Idempotente: NOT EXISTS evita duplicar si ya se migro.
+  _migrarDocumentosExistentes(db);
+  // 📦706-fix18 (2026-08-14) — Migracion one-shot: consolidar divulgaciones
+  // duplicadas que el bug del upsert (9 values/8 placeholders + crearNueva
+  // por default) dejó en la BD. Archiva las viejas, deja solo la mas
+  // reciente vigente por persona. Idempotente: si no hay duplicados, no
+  // hace nada.
+  _consolidarDivulgacionesDuplicadas(db);
+}
+
+// 📦706 (2026-08-14) — Helper de migracion: divulgar con path → documentos.
+// Solo se ejecuta una vez por divulgacion (chequeado con NOT EXISTS).
+function _migrarDocumentosExistentes(db) {
+  if (!db) return;
+  try {
+    var rows = db.prepare(`
+      SELECT d.id, d.empresa_id, d.persona_cedula, d.documento_soporte_path,
+             d.creado_en, d.fecha_divulgacion
+      FROM roles_responsabilidades_divulgacion d
+      WHERE d.documento_soporte_path IS NOT NULL
+        AND TRIM(d.documento_soporte_path) != ''
+        AND NOT EXISTS (
+          SELECT 1 FROM roles_responsabilidades_divulgacion_documento doc
+          WHERE doc.divulgacion_id = d.id
+        )
+    `).all();
+    if (rows.length === 0) {
+      console.log('[' + MOD + '][MIGRATION-DOCS] No hay divulgaciones pendientes de migrar');
+      return;
+    }
+    var insertStmt = db.prepare(`
+      INSERT INTO roles_responsabilidades_divulgacion_documento
+        (divulgacion_id, empresa_id, persona_cedula, file_path, filename, bytes,
+         fecha_carga, fecha_documento, es_actual, es_correccion, metodo, creado_por, observaciones)
+      VALUES (?, ?, ?, ?, ?, NULL, ?, ?, 1, 0, 'app', 'migration-2026-08-14', 'Migrado desde v0.1.178')
+    `);
+    var pathMod = require('path');
+    var migrados = 0;
+    rows.forEach(function (r) {
+      var filename = pathMod.basename(r.documento_soporte_path);
+      insertStmt.run(
+        r.id, r.empresa_id, r.persona_cedula, r.documento_soporte_path,
+        filename, r.creado_en || new Date().toISOString(), r.fecha_divulgacion || null
+      );
+      migrados++;
+    });
+    console.log('[' + MOD + '][MIGRATION-DOCS] Migrados ' + migrados + ' documentos');
+  } catch (e) {
+    console.error('[' + MOD + '][MIGRATION-DOCS] Error:', e.message);
+  }
+}
+
+// 📦706-fix18 (2026-08-14) — Migracion one-shot: consolidar divulgaciones
+// duplicadas que se crearon durante el bug del upsert (cada vez que el user
+// subia un PDF se creaba una nueva divulgacion, dejando 2+ filas vigentes
+// para la misma persona). Esta migracion:
+//   1. Detecta personas con 2+ divulgaciones VIGENTES (fecha_vigencia_hasta IS NULL)
+//   2. Para cada persona: deja como vigente la MAS RECIENTE (mayor creado_en),
+//      y archiva las demas con fecha_vigencia_hasta = now()
+//   3. Los documentos (divulgacion_documento) ya quedan con la divulgacion
+//      a la que pertenecen, asi que la consolidacion es solo de la cabecera.
+//   4. Idempotente: si no hay duplicados, no hace nada.
+function _consolidarDivulgacionesDuplicadas(db) {
+  if (!db) return;
+  try {
+    // Buscar personas con 2+ divulgaciones vigentes
+    var duplicados = db.prepare(`
+      SELECT empresa_id, persona_cedula, COUNT(*) AS total
+      FROM roles_responsabilidades_divulgacion
+      WHERE fecha_vigencia_hasta IS NULL
+      GROUP BY empresa_id, persona_cedula
+      HAVING COUNT(*) > 1
+    `).all();
+    if (duplicados.length === 0) {
+      console.log('[' + MOD + '][MIGRATION-CONSOLIDATE] No hay divulgaciones duplicadas para consolidar');
+      return;
+    }
+    var now = new Date().toISOString();
+    var archivadas = 0;
+    duplicados.forEach(function (row) {
+      // Obtener las divulgaciones vigentes de esta persona, ordenadas por fecha DESC
+      // La primera (mas reciente) queda vigente; las demas se archivan
+      var divulgaciones = db.prepare(`
+        SELECT id, creado_en
+        FROM roles_responsabilidades_divulgacion
+        WHERE empresa_id = ? AND persona_cedula = ? AND fecha_vigencia_hasta IS NULL
+        ORDER BY datetime(creado_en) DESC, id DESC
+      `).all(row.empresa_id, row.persona_cedula);
+      // Saltar la primera (la mas reciente) y archivar el resto
+      for (var i = 1; i < divulgaciones.length; i++) {
+        db.prepare(
+          'UPDATE roles_responsabilidades_divulgacion SET fecha_vigencia_hasta = ? WHERE id = ?'
+        ).run(now, divulgaciones[i].id);
+        archivadas++;
+      }
+      console.log('[' + MOD + '][MIGRATION-CONSOLIDATE] Persona ' + row.persona_cedula +
+        ' (empresa ' + row.empresa_id + '): ' + divulgaciones.length +
+        ' divulgaciones vigentes → ' + (divulgaciones.length - archivadas > 0 ? '1 vigente, ' : '') +
+        archivadas + ' archivadas');
+    });
+    console.log('[' + MOD + '][MIGRATION-CONSOLIDATE] Total archivadas: ' + archivadas);
+  } catch (e) {
+    console.error('[' + MOD + '][MIGRATION-CONSOLIDATE] Error:', e.message);
   }
 }
 
@@ -373,6 +560,79 @@ function _calcularEstado(documentoSoportePath) {
   return documentoSoportePath && documentoSoportePath.trim() !== '' ? 'aceptado' : 'pendiente';
 }
 
+// 📦706 (2026-08-14) — Multi-documento: marca un documento como vigente
+// (es_actual=1) y desmarca los demás de la misma divulgacion. Se usa
+// para reasignar manualmente el "último" si el orden natural quedó mal.
+function _handlerMarcarDocumentoActual(payload) {
+  if (!_getDb) {
+    return { success: false, error: { code: 'NO_DB', message: 'Base de datos no disponible' } };
+  }
+  if (!payload || !payload.divulgacionId) {
+    return { success: false, error: { code: 'VALIDATION', message: 'divulgacionId es requerido' } };
+  }
+  try {
+    var db = _getDb();
+    var desmarcados = db.prepare(
+      'UPDATE roles_responsabilidades_divulgacion_documento SET es_actual = 0 WHERE divulgacion_id = ?'
+    ).run(payload.divulgacionId);
+    if (payload.documentoId) {
+      db.prepare(
+        'UPDATE roles_responsabilidades_divulgacion_documento SET es_actual = 1 WHERE id = ? AND divulgacion_id = ?'
+      ).run(payload.documentoId, payload.divulgacionId);
+    }
+    return { success: true, data: { desmarcados: desmarcados.changes } };
+  } catch (e) {
+    console.error('[' + MOD + '][DOC-MARCAR-ACTUAL]', e.message);
+    return { success: false, error: { code: 'DB_ERROR', message: e.message } };
+  }
+}
+
+// 📦706 (2026-08-14) — Multi-documento: lista todos los documentos de
+// divulgación de una empresa, con JOIN a divulgacion para mostrar el
+// nombre/cargo/periodo del trabajador. Soporta filtros opcionales por
+// divulgacion_id (un solo "group" de docs) o por persona_cedula (todos
+// los docs de un trabajador, histórico completo).
+function _handlerListarDocumentosDivulgacion(payload) {
+  if (!_getDb) {
+    return { success: false, error: { code: 'NO_DB', message: 'Base de datos no disponible' } };
+  }
+  if (!payload || !payload.empresaId) {
+    return { success: false, error: { code: 'VALIDATION', message: 'empresaId es requerido' } };
+  }
+  try {
+    var db = _getDb();
+    var sql = `
+      SELECT doc.id, doc.divulgacion_id, doc.empresa_id, doc.persona_cedula,
+             doc.file_path, doc.filename, doc.bytes, doc.fecha_carga, doc.fecha_documento,
+             doc.es_actual, doc.es_correccion, doc.metodo, doc.ip, doc.user_agent,
+             doc.creado_por, doc.observaciones,
+             d.persona_nombre, d.persona_cargo, d.periodo
+      FROM roles_responsabilidades_divulgacion_documento doc
+      JOIN roles_responsabilidades_divulgacion d ON doc.divulgacion_id = d.id
+      WHERE doc.empresa_id = ?
+    `;
+    var params = [payload.empresaId];
+    if (payload.divulgacionId) {
+      sql += ' AND doc.divulgacion_id = ?';
+      params.push(payload.divulgacionId);
+    }
+    if (payload.personaCedula) {
+      sql += ' AND doc.persona_cedula = ?';
+      params.push(payload.personaCedula);
+    }
+    sql += ' ORDER BY doc.es_actual DESC, doc.fecha_carga DESC';
+    // 📦706-fix18 (2026-08-14) — Usar spread en vez de .apply(null, params).
+    // Antes: .all.apply(null, params) → "Illegal invocation" porque el método
+    // requiere el `this` correcto (el statement). Con spread, JS pasa los args
+    // sin perder el binding.
+    var rows = db.prepare(sql).all(...params);
+    return { success: true, data: rows };
+  } catch (e) {
+    console.error('[' + MOD + '][DOC-LISTAR]', e.message);
+    return { success: false, error: { code: 'DB_ERROR', message: e.message } };
+  }
+}
+
 function _handlerListarDivulgaciones(empresaId) {
   if (!_getDb) {
     return { success: false, error: { code: 'NO_DB', message: 'Base de datos no disponible' } };
@@ -382,14 +642,37 @@ function _handlerListarDivulgaciones(empresaId) {
   }
   try {
     var db = _getDb();
+    // 📦706-fix18 (2026-08-14) — documento_count y documento_actual ahora
+    // se calculan por persona_cedula (no por divulgacion_id), para que el
+    // badge "+N anteriores" muestre TODOS los PDFs del trabajador aunque
+    // estén en divulgaciones archivadas (cambio de cargo, consolidación).
+    // El documento_actual_path sigue siendo el de la divulgacion VIGENTE
+    // (es_actual=1 AND divulgacion vigente), porque eso es lo que el user
+    // ve en la tabla principal.
     var rows = db.prepare(`
-      SELECT id, empresa_id, persona_cedula, persona_nombre, persona_cargo,
-             version_responsabilidades, estado, fecha_divulgacion, fecha_aceptacion,
-             metodo, ip, user_agent, documento_soporte_path, creado_en,
-             CASE WHEN documento_soporte_path IS NOT NULL AND TRIM(documento_soporte_path) != '' THEN 'aceptado' ELSE 'pendiente' END AS estado_calculado
-      FROM roles_responsabilidades_divulgacion
-      WHERE empresa_id = ?
-      ORDER BY estado_calculado ASC, persona_nombre ASC
+      SELECT d.id, d.empresa_id, d.persona_cedula, d.persona_nombre, d.persona_cargo,
+             d.periodo, d.es_nueva_contratacion, d.fecha_vigencia_hasta,
+             d.version_responsabilidades, d.estado, d.fecha_divulgacion, d.fecha_aceptacion,
+             d.metodo, d.ip, d.user_agent, d.documento_soporte_path, d.creado_en,
+             (SELECT COUNT(*) FROM roles_responsabilidades_divulgacion_documento doc
+              WHERE doc.empresa_id = d.empresa_id AND doc.persona_cedula = d.persona_cedula) AS documento_count,
+             (SELECT file_path FROM roles_responsabilidades_divulgacion_documento doc
+              JOIN roles_responsabilidades_divulgacion d2 ON doc.divulgacion_id = d2.id
+              WHERE doc.persona_cedula = d.persona_cedula AND doc.empresa_id = d.empresa_id
+                AND doc.es_actual = 1 AND d2.fecha_vigencia_hasta IS NULL
+              ORDER BY doc.fecha_carga DESC LIMIT 1) AS documento_actual_path,
+             (SELECT doc.id FROM roles_responsabilidades_divulgacion_documento doc
+              JOIN roles_responsabilidades_divulgacion d2 ON doc.divulgacion_id = d2.id
+              WHERE doc.persona_cedula = d.persona_cedula AND doc.empresa_id = d.empresa_id
+                AND doc.es_actual = 1 AND d2.fecha_vigencia_hasta IS NULL
+              ORDER BY doc.fecha_carga DESC LIMIT 1) AS documento_actual_id,
+             CASE WHEN EXISTS (
+               SELECT 1 FROM roles_responsabilidades_divulgacion_documento doc
+               WHERE doc.divulgacion_id = d.id AND doc.es_actual = 1
+             ) THEN 'aceptado' ELSE 'pendiente' END AS estado_calculado
+      FROM roles_responsabilidades_divulgacion d
+      WHERE d.empresa_id = ?
+      ORDER BY d.fecha_vigencia_hasta IS NULL DESC, d.creado_en DESC, d.persona_nombre ASC
     `).all(empresaId);
     return { success: true, data: rows };
   } catch (e) {
@@ -410,27 +693,118 @@ function _handlerUpsertDivulgacion(payload) {
     var now = new Date().toISOString();
     var version = payload.versionResponsabilidades || CATALOGO_VERSION;
     var fechaDivulgacion = payload.fechaDivulgacion || now;
-    var estado = _calcularEstado(payload.documentoSoportePath);
-    var fechaAceptacion = estado === 'aceptado' ? (payload.fechaAceptacion || now) : null;
-    db.prepare(`
-      INSERT INTO roles_responsabilidades_divulgacion
-        (empresa_id, persona_cedula, persona_nombre, persona_cargo,
-         version_responsabilidades, estado, fecha_divulgacion, fecha_aceptacion,
-         metodo, ip, user_agent, documento_soporte_path, creado_en)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'app', ?, ?, ?, ?)
-      ON CONFLICT(empresa_id, persona_cedula, version_responsabilidades) DO UPDATE SET
-        persona_nombre = excluded.persona_nombre,
-        persona_cargo = excluded.persona_cargo,
-        estado = excluded.estado,
-        fecha_divulgacion = excluded.fecha_divulgacion,
-        fecha_aceptacion = excluded.fecha_aceptacion,
-        documento_soporte_path = excluded.documento_soporte_path
-    `).run(
-      payload.empresaId, payload.personaCedula, payload.personaNombre, payload.personaCargo || null,
-      version, estado, fechaDivulgacion, fechaAceptacion,
-      payload.ip || null, payload.userAgent || null, payload.documentoSoportePath || null, now
-    );
-    return { success: true, data: { estado: estado } };
+    var periodo = payload.periodo || new Date().getFullYear().toString();
+    var esNuevaContratacion = payload.esNuevaContratacion ? 1 : 0;
+
+    // 📦706 (2026-08-14) — Buscar divulgacion vigente (no archivada) del
+    // mismo persona_cedula + empresa. Solo puede haber 1 vigente a la vez.
+    var divulgacionVigente = db.prepare(`
+      SELECT id, persona_cargo FROM roles_responsabilidades_divulgacion
+      WHERE empresa_id = ? AND persona_cedula = ? AND fecha_vigencia_hasta IS NULL
+      ORDER BY creado_en DESC LIMIT 1
+    `).get(payload.empresaId, payload.personaCedula);
+
+    var cargoVigente = divulgacionVigente ? divulgacionVigente.persona_cargo : null;
+    var cargoNuevo = payload.personaCargo || null;
+
+    // 📦706-fix18 (2026-08-14) — REGLAS DE NEGOCIO SIMPLIFICADAS.
+    // Diseño: 1 sola fila de divulgacion por persona. Los PDFs se acumulan
+    // en divulgacion_documento (append-only), el vigente tiene es_actual=1.
+    // Solo se crea una divulgacion NUEVA cuando:
+    //   1. El user tildó "Es nueva contratacion" (forzar nueva manualmente)
+    //   2. NO hay divulgacion previa para esa cedula
+    // Caso normal: subir un PDF del mismo trabajador → actualiza la
+    // divulgacion vigente, el PDF nuevo se inserta como vigente y los
+    // anteriores quedan como "Anterior" (es_actual=0). No se duplica la fila.
+    var crearNueva = esNuevaContratacion === 1 || !divulgacionVigente;
+    var divulgacionId;
+
+    if (crearNueva) {
+      // Archivar la divulgacion vigente anterior (si existe)
+      if (divulgacionVigente) {
+        db.prepare('UPDATE roles_responsabilidades_divulgacion SET fecha_vigencia_hasta = ? WHERE id = ?')
+          .run(now, divulgacionVigente.id);
+      }
+      // Crear la nueva divulgacion
+      var estado = _calcularEstado(payload.documentoSoportePath);
+      var fechaAceptacion = estado === 'aceptado' ? (payload.fechaAceptacion || now) : null;
+      var insertResult = db.prepare(`
+        INSERT INTO roles_responsabilidades_divulgacion
+          (empresa_id, persona_cedula, persona_nombre, persona_cargo,
+           periodo, es_nueva_contratacion, version_responsabilidades, estado,
+           fecha_divulgacion, fecha_aceptacion, metodo, ip, user_agent,
+           documento_soporte_path, creado_en)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        payload.empresaId, payload.personaCedula, payload.personaNombre, cargoNuevo,
+        periodo, esNuevaContratacion, version, estado, fechaDivulgacion,
+        fechaAceptacion, payload.metodo || 'app', payload.ip || null,
+        payload.userAgent || null, payload.documentoSoportePath || null, now
+      );
+      divulgacionId = insertResult.lastInsertRowid;
+    } else {
+      // Actualizar la divulgacion existente (mismo persona_cedula, no es nueva contratacion)
+      if (!divulgacionVigente) {
+        return { success: false, error: { code: 'NOT_FOUND', message: 'No existe divulgacion vigente para actualizar' } };
+      }
+      divulgacionId = divulgacionVigente.id;
+      var estadoAct = _calcularEstado(payload.documentoSoportePath);
+      var fechaAceptAct = estadoAct === 'aceptado' ? (payload.fechaAceptacion || now) : null;
+      // 📦706-fix18 (2026-08-14) — UPDATE correcto: 7 placeholders en SET + 1 en WHERE = 8 total.
+      // Antes tenía 9 values (con un `now` extra) que hacía fallar el UPDATE silenciosamente
+      // y forzaba la creación de una divulgación duplicada.
+      db.prepare(`
+        UPDATE roles_responsabilidades_divulgacion
+        SET persona_nombre = ?, persona_cargo = COALESCE(?, persona_cargo),
+            periodo = COALESCE(NULLIF(?, ''), periodo), estado = ?,
+            fecha_divulgacion = ?, fecha_aceptacion = ?,
+            documento_soporte_path = ?
+        WHERE id = ?
+      `).run(
+        payload.personaNombre, cargoNuevo, periodo, estadoAct,
+        fechaDivulgacion, fechaAceptAct, payload.documentoSoportePath || null,
+        divulgacionId
+      );
+    }
+
+    // 📦706 (2026-08-14) — Si hay path de documento, desmarcar anteriores
+    // e insertar el nuevo como vigente. Append-only de documentos.
+    var documentoId = null;
+    if (payload.documentoSoportePath && String(payload.documentoSoportePath).trim()) {
+      var pathMod = require('path');
+      var fsMod = require('fs');
+      var filename = pathMod.basename(payload.documentoSoportePath);
+      var bytes = null;
+      try { bytes = fsMod.statSync(payload.documentoSoportePath).size; } catch (e) { /* ignore */ }
+      // Desmarcar documentos vigentes anteriores de esta divulgacion
+      db.prepare('UPDATE roles_responsabilidades_divulgacion_documento SET es_actual = 0 WHERE divulgacion_id = ?')
+        .run(divulgacionId);
+      // Insertar el nuevo como vigente
+      var esCorreccion = payload.esCorreccion ? 1 : 0;
+      var insertDocResult = db.prepare(`
+        INSERT INTO roles_responsabilidades_divulgacion_documento
+          (divulgacion_id, empresa_id, persona_cedula, file_path, filename, bytes,
+           fecha_carga, fecha_documento, es_actual, es_correccion, metodo, ip, user_agent,
+           creado_por, observaciones)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)
+      `).run(
+        divulgacionId, payload.empresaId, payload.personaCedula,
+        payload.documentoSoportePath, filename, bytes, now, payload.fechaDocumento || fechaDivulgacion,
+        esCorreccion, payload.metodo || 'app', payload.ip || null, payload.userAgent || null,
+        payload.creadoPor || 'admin', payload.observaciones || null
+      );
+      documentoId = insertDocResult.lastInsertRowid;
+    }
+
+    return {
+      success: true,
+      data: {
+        divulgacionId: divulgacionId,
+        documentoId: documentoId,
+        esNuevaDivulgacion: crearNueva,
+        estado: _calcularEstado(payload.documentoSoportePath)
+      }
+    };
   } catch (e) {
     console.error('[' + MOD + '][DIVULGACION-UPSERT]', e.message);
     return { success: false, error: { code: 'DB_ERROR', message: e.message } };
@@ -794,6 +1168,22 @@ function registerRolesResponsabilidadesHandlers(app, deps) {
     try { return _handlerListarDivulgaciones(payload && payload.empresaId); }
     catch (e) {
       console.error('[' + MOD + '][HANDLER-DIVULGACION-LISTAR]', e.message);
+      return { success: false, error: { code: 'INTERNAL', message: e.message } };
+    }
+  });
+  // 📦706 (2026-08-14) — Multi-documento: lista todos los PDFs de divulgacion
+  ipcMain.handle('roles-resp:divulgacion-documento-listar', async function (event, payload) {
+    try { return _handlerListarDocumentosDivulgacion(payload); }
+    catch (e) {
+      console.error('[' + MOD + '][HANDLER-DOC-LISTAR]', e.message);
+      return { success: false, error: { code: 'INTERNAL', message: e.message } };
+    }
+  });
+  // 📦706 (2026-08-14) — Multi-documento: marcar un documento como vigente
+  ipcMain.handle('roles-resp:divulgacion-documento-marcar-actual', async function (event, payload) {
+    try { return _handlerMarcarDocumentoActual(payload); }
+    catch (e) {
+      console.error('[' + MOD + '][HANDLER-DOC-MARCAR-ACTUAL]', e.message);
       return { success: false, error: { code: 'INTERNAL', message: e.message } };
     }
   });

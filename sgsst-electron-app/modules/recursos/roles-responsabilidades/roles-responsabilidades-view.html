@@ -9,19 +9,22 @@
 </head>
 <body class="kair-rr-body">
     <div class="kair-rr-root">
-        <!-- HEADER CON TABS -->
-        <header class="kair-rr-header">
-            <div class="kair-rr-header__bar">
-                <button class="kair-rr-header__back" id="backBtn" title="Volver al módulo">
-                    <i class="bi bi-arrow-left"></i>
-                </button>
-                <div class="kair-rr-header__center">
-                    <span class="kair-rr-header__pill">1.1.2</span>
-                    <h1 class="kair-rr-header__title">Roles y Responsabilidades</h1>
-                    <p class="kair-rr-header__subtitle" id="headerSubtitle">Cumplimiento del estándar 1.1.2 — Res. 0312/2019 + Dto. 1072/2015</p>
+        <!-- HEADER + TABS — Patrón estandarizado (mismo que 6.1.1) -->
+        <div class="k-section-card kair-rr-header-card">
+            <div class="kair-rr-header-row">
+                <div class="kair-rr-header-left">
+                    <i class="bi bi-person-badge kair-rr-header-icon"></i>
+                    <div>
+                        <h3 class="kair-rr-header-title">Roles y Responsabilidades</h3>
+                        <p class="kair-rr-header-subtitle">Submódulo 1.1.2 — <span id="headerSubtitle">Gestión de roles y responsabilidades del SG-SST</span></p>
+                    </div>
                 </div>
-                <div class="kair-rr-header__right">
-                    <span class="kair-rr-header__company" id="headerCompany">—</span>
+                <div class="kair-rr-header-actions">
+                    <span class="kair-rr-header-company"><i class="bi bi-building"></i> <span id="headerCompany">—</span></span>
+                    <div class="kair-rr-header-divider"></div>
+                    <button class="kair-rr-header-back" id="backBtn" title="Volver al módulo">
+                        <i class="bi bi-arrow-left"></i> Volver
+                    </button>
                 </div>
             </div>
             <nav class="kair-rr-tabs" role="tablist">
@@ -32,7 +35,7 @@
                     <i class="bi bi-folder2"></i> Documentos de soporte
                 </button>
             </nav>
-        </header>
+        </div>
 
         <!-- TAB 1: GESTIÓN DE ROLES -->
         <main class="kair-rr-tab-panel is-active" id="panelGestion" role="tabpanel">
@@ -206,6 +209,26 @@
         </div>
     </div>
 
+    <!-- MODAL: Documentos del trabajador (v0.1.180 - NUEVO desde cero) -->
+    <div class="kair-rr-modal-overlay" id="modalDocumentosTrabajador" hidden>
+        <div class="kair-rr-modal" style="max-width: 720px;">
+            <header class="kair-rr-modal__head">
+                <div>
+                    <h3><i class="bi bi-folder2-open" style="color:#174ea6;margin-right:6px;"></i>Documentos del trabajador</h3>
+                    <p style="margin: 4px 0 0 0; font-size: 11px; color: #64748b;" id="modalDocumentosTrabajadorPersona">—</p>
+                    <p class="kair-rr-modal__subtitle" style="margin: 2px 0 0 0; font-size: 10px; color: #94a3b8; font-weight: 500;"></p>
+                </div>
+                <button class="kair-rr-modal__close" data-action="cerrar-modal-documentos-trabajador">&times;</button>
+            </header>
+            <div class="kair-rr-modal__body">
+                <div id="modalDocumentosTrabajadorList" class="kair-rr-doc-list"></div>
+            </div>
+            <footer class="kair-rr-modal__foot">
+                <button class="kair-rr-btn kair-rr-btn--ghost" data-action="cerrar-modal-documentos-trabajador">Cerrar</button>
+            </footer>
+        </div>
+    </div>
+
     <!-- MODAL: Subir soporte PDF (con drag&drop + examinar + copia a destino) -->
     <div class="kair-rr-modal-overlay" id="modalSubirSoporte" hidden>
         <div class="kair-rr-modal" style="max-width: 680px;">
@@ -217,37 +240,65 @@
                 <button class="kair-rr-modal__close" data-action="cerrar-modal-soporte">&times;</button>
             </header>
             <div class="kair-rr-modal__body">
-                <!-- PASO 1: Seleccionar archivo origen (drag&drop o examinar) -->
-                <div class="kair-rr-step-label">1. Seleccioná el PDF de la divulgación firmada</div>
-                <div class="kair-rr-dropzone" id="dropZoneSoporte">
-                    <i class="bi bi-cloud-upload"></i>
-                    <div class="kair-rr-dropzone__text">Arrastrá el PDF acá</div>
-                    <div class="kair-rr-dropzone__subtext">o usá el botón "Examinar..."</div>
-                </div>
-                <!-- 📦705-fix9 (2026-08-14) — Chip con el nombre del archivo + tooltip con la ruta completa. Mejor visual que un input con texto cortado. -->
-                <div class="kair-rr-file-row">
-                    <div class="kair-rr-chip" id="chipOrigen" data-empty="true">
-                        <i class="bi bi-file-earmark-pdf"></i>
-                        <span class="kair-rr-chip__name" id="chipOrigenName">Ningún archivo seleccionado</span>
-                        <span class="kair-rr-chip__size" id="chipOrigenSize"></span>
+                <!-- 📦706-fix16 (2026-08-14) — Dropzones reactivos + drag&drop destino + textarea full-width -->
+                <div class="kair-rr-step-label">1. PDF de la divulgación firmada y destino</div>
+                <div class="kair-rr-row-2col">
+                    <div>
+                        <div class="kair-rr-dropzone" id="dropZoneSoporte" data-state="empty" style="margin-bottom: 8px; padding: 16px 8px;">
+                            <i class="bi bi-cloud-upload kair-rr-dropzone__icon"></i>
+                            <div class="kair-rr-dropzone__text">Arrastrá el PDF acá</div>
+                            <div class="kair-rr-dropzone__subtext">o usá "Examinar..."</div>
+                        </div>
+                        <div class="kair-rr-file-row">
+                            <div class="kair-rr-chip" id="chipOrigen" data-empty="true" style="min-width: 0;">
+                                <i class="bi bi-file-earmark-pdf"></i>
+                                <span class="kair-rr-chip__name" id="chipOrigenName">Ningún archivo</span>
+                                <span class="kair-rr-chip__size" id="chipOrigenSize"></span>
+                            </div>
+                            <button class="kair-rr-btn kair-rr-btn--small" id="btnExaminarOrigen" title="Examinar PDF origen">
+                                <i class="bi bi-folder2-open"></i>
+                            </button>
+                        </div>
                     </div>
-                    <button class="kair-rr-btn kair-rr-btn--small" id="btnExaminarOrigen">
-                        <i class="bi bi-folder2-open"></i> Examinar...
-                    </button>
+                    <div>
+                        <div class="kair-rr-dropzone kair-rr-dropzone--folder" id="dropZoneDestino" data-state="empty" style="margin-bottom: 8px; padding: 16px 8px;">
+                            <i class="bi bi-folder2 kair-rr-dropzone__icon"></i>
+                            <div class="kair-rr-dropzone__text">Carpeta destino</div>
+                            <div class="kair-rr-dropzone__subtext">arrastrá una carpeta o usá "Examinar..."</div>
+                        </div>
+                        <div class="kair-rr-file-row">
+                            <div class="kair-rr-chip kair-rr-chip--folder" id="chipDestino" style="min-width: 0;">
+                                <i class="bi bi-folder2"></i>
+                                <span class="kair-rr-chip__name" id="chipDestinoName">Sin carpeta</span>
+                            </div>
+                            <button class="kair-rr-btn kair-rr-btn--small" id="btnExaminarDestino" title="Examinar carpeta destino">
+                                <i class="bi bi-folder2-open"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
+                <p class="kair-rr-help" style="margin: 4px 0 12px 0; font-size: 11px;">💡 El archivo se copia con su nombre original (o "nombre (1).pdf" si ya existe).</p>
 
-                <!-- PASO 2: Carpeta destino -->
-                <div class="kair-rr-step-label" style="margin-top: 18px;">2. Elegí dónde querés guardar la copia del soporte</div>
-                <div class="kair-rr-file-row">
-                    <div class="kair-rr-chip kair-rr-chip--folder" id="chipDestino">
-                        <i class="bi bi-folder2"></i>
-                        <span class="kair-rr-chip__name" id="chipDestinoName">Sin carpeta destino</span>
+                <!-- 📦706-fix16 — Opciones + fecha + observaciones full-width -->
+                <div class="kair-rr-step-label" style="margin-top: 4px;">2. Opciones de la divulgación</div>
+                <div class="kair-rr-row-2col">
+                    <div>
+                        <label class="kair-rr-checkbox-label" style="margin-bottom: 0;">
+                            <input type="checkbox" id="inputEsNuevaContratacion" />
+                            Es nueva contratación
+                        </label>
+                        <label class="kair-rr-checkbox-label" style="margin-bottom: 0;">
+                            <input type="checkbox" id="inputEsCorreccion" />
+                            Es corrección
+                        </label>
                     </div>
-                    <button class="kair-rr-btn kair-rr-btn--small" id="btnExaminarDestino">
-                        <i class="bi bi-folder2-open"></i> Examinar...
-                    </button>
+                    <div>
+                        <label style="display:block;font-size:11px;color:#475569;margin-bottom:4px;">Fecha del documento</label>
+                        <input type="date" id="inputFechaDocumento" class="kair-rr-input" style="margin: 0;" />
+                    </div>
                 </div>
-                <p class="kair-rr-help" style="margin-top: 8px; font-size: 11px;">💡 El archivo se copiará con su nombre original (o "nombre (1).pdf" si ya existe).</p>
+                <label style="display:block;margin-top:12px;margin-bottom:4px;font-size:11px;color:#475569;">Observaciones (opcional)</label>
+                <textarea id="inputObservaciones" class="kair-rr-input" rows="2" style="margin: 0; width: 100%; min-height: 50px; max-height: 100px; resize: vertical; font-family: inherit;"></textarea>
             </div>
             <footer class="kair-rr-modal__foot">
                 <button class="kair-rr-btn kair-rr-btn--ghost" data-action="cerrar-modal-soporte">Cancelar</button>

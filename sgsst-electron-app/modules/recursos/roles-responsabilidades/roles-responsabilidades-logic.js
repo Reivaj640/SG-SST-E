@@ -165,6 +165,13 @@ class RolesResponsabilidadesComponent {
                 case 'roles-resp:archivo-descargar':
                     result = await window.electronAPI.rolesResp.descargarArchivo(payload);
                     break;
+                // 📦706 (2026-08-14) — Multi-documento por divulgación
+                case 'roles-resp:divulgacion-documento-listar':
+                    result = await window.electronAPI.rolesResp.listarDocumentosDivulgacion(payload);
+                    break;
+                case 'roles-resp:divulgacion-documento-marcar-actual':
+                    result = await window.electronAPI.rolesResp.marcarDocumentoActual(payload);
+                    break;
                 default:
                     throw new Error('Canal IPC desconocido: ' + channel);
             }

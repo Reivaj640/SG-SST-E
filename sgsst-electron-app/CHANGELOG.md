@@ -5,6 +5,101 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.180] - 2026-08-14
+
+### 📦706-fix18 — feat(roles-resp): 1 fila por persona + modal de selección de PDFs
+
+#### Backend (`main/roles-responsabilidades-bridge.js`)
+- **Regla de negocio simplificada en `_handlerUpsertDivulgacion`**: subir un PDF del mismo `persona_cedula` (sin tildar "Es nueva contratación") SIEMPRE actualiza la divulgación vigente, no crea una nueva. Solo se crea nueva divulgación cuando (a) el user tildó "Es nueva contratación" o (b) NO hay divulgación previa para esa cédula.
+- **Bug crítico corregido en el UPDATE del upsert**: el código tenía 9 values para 8 placeholders (`now` extra al final), lo que hacía fallar el UPDATE silenciosamente y forzaba la creación de divulgaciones duplicadas. Ahora son 8 placeholders / 8 values.
+- **Migración one-shot nueva `_consolidarDivulgacionesDuplicadas`**: detecta personas con 2+ divulgaciones vigentes (dejado por el bug anterior), deja la más reciente como vigente y archiva las demás con `fecha_vigencia_hasta = NOW`. Idempotente (no hace nada si no hay duplicados).
+- **Quitada la detección automática de `cargoCambio`**: el user solo crea nueva divulgación cuando lo tilda explícitamente. Si el cargo del PDF difiere del vigente, se actualiza el campo `persona_cargo` en la divulgación vigente (no se archiva).
+
+#### Frontend (`modules/recursos/roles-responsabilidades/roles-responsabilidades-viewer.js`)
+- **`renderTablaDivulgacion` refactorizado**: agrupa por `persona_cedula` y muestra 1 sola fila por persona (no 1 fila por divulgación). Para cada persona toma la divulgación vigente (o la más reciente si no hay vigente). El conteo de PDFs se calcula sumando `rrState.documentos` para esa cédula (total histórico).
+- **Modal `modalDocumentosTrabajador` rediseñado desde cero**: ahora lista TODOS los PDFs del trabajador (de TODAS sus divulgaciones, vigentes y archivadas), ordenados por fecha DESC. Cada PDF se muestra como una card con borde lateral de color (verde = Vigente, gris = Anterior, amarillo = Corrección), nombre + fecha de carga + fecha del documento + tamaño + observaciones.
+- **Click en la card abre el PDF directamente** (vía `postMessage` al parent para abrir el file-viewer-modal). Iconos de Ver / Descargar son shortcuts.
+- **Subtítulo dinámico**: "N PDFs · más reciente primero" se actualiza según el contenido.
+
+#### HTML (`roles-responsabilidades-view.html`)
+- **Markup del modal completamente reemplazado**: header con ícono + título, persona/subtítulo, subtitle dinámico para el conteo, body con la lista de cards, footer con botón Cerrar.
+
+#### CSS (`roles-responsabilidades-view.css`)
+- **Nuevos estilos `.kair-rr-doc-card`**: layout vertical con border-left de color por estado, hover sutil (cambia background), cursor pointer, transition. Layout interno: ícono PDF + body con nombre+meta+observaciones + acciones (Ver/Descargar).
+- **Estados visuales**: `--vigente` (verde, fondo suave), `--anterior` (gris, opacidad reducida), `--correccion` (amarillo).
+- **Scroll interno**: max-height 60vh con scroll vertical para listas largas.
+
+#### Sync multipc (`main/sync-serializer.js`)
+- **Serialización extendida**: incluye `periodo`, `es_nueva_contratacion`, `fecha_vigencia_hasta` en divulgaciones (necesarios para la regla de "1 fila por persona" entre PCs).
+- **Deserialización extendida**: INSERT y UPDATE respetan las 3 columnas nuevas con COALESCE para no pisar datos locales válidos.
+
+### Changed
+- Antes: subir un PDF del mismo trabajador creaba una divulgación nueva (1 persona = N filas en la tabla).
+- Ahora: subir un PDF del mismo trabajador actualiza la divulgación existente y agrega el PDF como nuevo documento (1 persona = 1 fila, N PDFs en el modal).
+
+### Fixed
+- **UNIQUE constraint failed al subir el 2do PDF del mismo trabajador**: causado por el bug del UPDATE que dejaba la divulgación vieja sin archivar antes de crear la nueva. Corregido.
+- **Tabla "Divulgación a Trabajadores" mostraba 2 filas para la misma persona** cuando se subían 2 PDFs: ahora muestra 1 fila con badge "+N anteriores" y modal con todos los PDFs.
+
+## [0.1.179] - 2026-08-14
+
+### Added
+- **📦706 — feat(roles-resp): multi-documento por divulgación** — Extensión del submódulo 1.1.2 para soportar N PDFs por divulgación (1 divulgación = N documentos, append-only, sin perder histórico). **Causa**: el Decreto 1072 art. 2.2.4.6.8 requiere que la evidencia de divulgación se preserve en el tiempo (cambio de cargo, reintegración, año nuevo). **Cambios (8 archivos, ~700 líneas nuevas, 13 tasks de implementación)**:
+
+### Backend (`main/roles-responsabilidades-bridge.js`, +250 líneas)
+- **Schema (idempotente):** 3 columnas nuevas en `roles_responsabilidades_divulgacion` (`periodo`, `es_nueva_contratacion`, `fecha_vigencia_hasta`) + backfill one-shot de `periodo` desde `creado_en` para divulgar existentes. Tabla nueva `roles_responsabilidades_divulgacion_documento` con FK a divulgación + 3 índices. **Patrón**: `PRAGMA table_info` + `ALTER TABLE ADD COLUMN` (idempotente, auto-corre en próximos deploys).
+- **Handler nuevo `_handlerListarDocumentosDivulgacion`** — Lista todos los PDFs de divulgación de una empresa, con JOIN a divulgación. Soporta filtros opcionales por `divulgacionId` o `personaCedula`. Ordena por `es_actual DESC, fecha_carga DESC` (vigente primero).
+- **Handler nuevo `_handlerMarcarDocumentoActual`** — Marca un documento como vigente (`es_actual=1`) y desmarca los demás de la misma divulgación. Útil para reasignar manualmente el "último" si quedó mal.
+- **Refactor de `_handlerUpsertDivulgacion`** — Detecta cambio de cargo automáticamente (compara con divulgación vigente del mismo `persona_cedula`): si difiere, archiva la anterior (`fecha_vigencia_hasta = NOW`) y crea una nueva. Si el user marca "Es nueva contratación" → siempre crea nueva. Si es mismo cargo → actualiza existente + inserta nuevo documento (append-only).
+- **Migración one-shot `_migrarDocumentosExistentes`** — Para cada divulgación con `documento_soporte_path` no nulo que NO tenga documento migrado, crea una fila en `divulgacion_documento` con `es_actual=1`, `creado_por='migration-2026-08-14'`, `observaciones='Migrado desde v0.1.178'`. Idempotente (chequeado con NOT EXISTS).
+- **Refactor de `_handlerListarDivulgaciones`** — Query con subqueries para `documento_count`, `documento_actual_path`, `documento_actual_id`. Orden por `fecha_vigencia_hasta IS NULL DESC` (vigentes primero), `creado_en DESC`, `persona_nombre ASC`.
+- 17 → 17 handlers IPC totales (3 nuevos).
+
+### Preload (`preload.js`, +3 APIs)
+- `listarDocumentosDivulgacion(payload)` — Lista PDFs con JOIN
+- `marcarDocumentoActual(payload)` — Marca documento como vigente
+- `upsertDivulgacion(payload)` — Refactorizado (mantiene API, agrega campos)
+
+### Parent proxy (`modules/recursos/roles-responsabilidades/roles-responsabilidades-logic.js`, +2 cases)
+- `roles-resp:divulgacion-documento-listar` y `roles-resp:divulgacion-documento-marcar-actual` agregados al switch de `_handleBridgeCall`
+
+### Frontend (`modules/recursos/roles-responsabilidades/`)
+- **Refactor de `cargarDatos()`** — Ahora también carga `rrState.documentos` via el nuevo handler `divulgacion-documento-listar`.
+- **Refactor de `renderTablaDivulgacion()`** — Columna SOPORTE muestra el documento vigente (`documento_actual_path`) con badge amarillo "+N anteriores" (cuando `documento_count > 1`). Click en el badge → modal de selección.
+- **Refactor de `renderTablaSoportes()`** — Ahora itera sobre `rrState.documentos` (1 fila por PDF) en vez de `rrState.divulgaciones` (1 fila por divulgación). Cada fila tiene badge de estado: "Vigente" (verde, `es_actual=1`), "Corrección" (azul, `es_correccion=1`) o "Anterior" (gris).
+- **Modal nuevo `Documentos del trabajador`** (`modalDocumentosTrabajador` en HTML) — Se abre desde el badge "+N anteriores". Lista los PDFs del trabajador ordenados por fecha (vigente primero) con badges y botones Ver/Descargar. Click en Ver → postMessage al parent (`open-file-viewer-modal`) que abre el kairFV file viewer. Click en Descargar → `descargarPDFSoporte` (save dialog nativo).
+- **Refactor del modal `Subir soporte`** — Agrega 4 campos nuevos: 2 checkboxes ("Es nueva contratación", "Es corrección"), 1 date ("Fecha del documento"), 1 textarea ("Observaciones"). Los checkboxes se envian al backend que decide si crear nueva divulgación o actualizar la existente.
+
+### CSS (`roles-responsabilidades-view.css`, +80 líneas)
+- `.kair-rr-anteriores-badge` — Badge amarillo clickeable
+- `.kair-rr-soporte-cell` — Contenedor flex para el doc + badge
+- `.kair-rr-doc-item` — Card de documento en el modal de selección
+- `.kair-rr-doc-badge--vigente / --anterior / --correccion` — Badges de estado (verde/gris/azul)
+- `.kair-rr-checkbox-label` — Estilos de los nuevos checkboxes
+
+### Sync multipc (`main/sync-serializer.js`, +90 líneas)
+- Nueva entidad `roles_responsabilidades_divulgacion_documento` en el payload de sync. **Serializar**: SELECT * WHERE empresa_id = ?. **Deserializar**: INSERT OR IGNORE por id, con validación de FK (la divulgación padre debe existir en el destino, sino skip).
+
+### Patrones aplicados (cross-project)
+- **Schema migration idempotente** — `PRAGMA table_info` + `ALTER TABLE ADD COLUMN`. El bridge auto-detecta columnas faltantes y las agrega sin error.
+- **Migración one-shot con NOT EXISTS** — Para evitar duplicar al ejecutar la migración múltiples veces.
+- **Append-only de documentos** — Los PDFs anteriores NUNCA se eliminan; el "último gana" se marca con `es_actual=1`, los anteriores quedan con `es_actual=0` para auditoría.
+- **Regla 1 vigente por (empresa, persona_cedula)** — Cuando se crea nueva divulgación, la anterior se archiva con `fecha_vigencia_hasta = NOW`. Garantiza el invariante.
+
+### Fixed
+- **📦706 — feat(roles-resp): header estandarizado al patrón 6.1.1** — Header del 1.1.2 ahora usa `k-section-card` (no sticky) con ícono a la izquierda, title + subtítulo, y company + divider + back button a la derecha. Mismo patrón que el 6.1.1.
+- **📦706 — feat(roles-resp): botones solo-íconos en Acciones** — Botones "Ver" y "Descargar" de Documentos de soporte + "Matriz" y "Asignar/Reasignar" de Matriz de Roles ahora son cuadrados 30x30px con solo ícono. Tooltip con texto completo al hacer hover. Se alinean horizontalmente con `white-space: nowrap`.
+
+### Files
+- `sgsst-electron-app/main/roles-responsabilidades-bridge.js` (+250)
+- `sgsst-electron-app/main/sync-serializer.js` (+90)
+- `sgsst-electron-app/preload.js` (+3)
+- `sgsst-electron-app/modules/recursos/roles-responsabilidades/roles-responsabilidades-view.html` (+30)
+- `sgsst-electron-app/modules/recursos/roles-responsabilidades/roles-responsabilidades-viewer.js` (+150)
+- `sgsst-electron-app/modules/recursos/roles-responsabilidades/roles-responsabilidades-view.css` (+80)
+- `sgsst-electron-app/modules/recursos/roles-responsabilidades/roles-responsabilidades-logic.js` (+2 cases)
+- `sgsst-electron-app/CHANGELOG.md`, `CONTEXT.md`, `release-notes.md`, `package.json`
+
 ## [0.1.178] - 2026-08-14
 
 ### Added

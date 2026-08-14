@@ -79,7 +79,9 @@ function serializeEmpresaToSync(db, companyKey, pcId, userName, appVersion) {
       // El catálogo NO se sincroniza (es el mismo para todas las empresas),
       // solo las tablas de asignaciones y divulgaciones por empresa.
       roles_responsabilidades_asignacion: _serializeRolesResponsabilidadesAsignacion(db, companyKey),
-      roles_responsabilidades_divulgacion: _serializeRolesResponsabilidadesDivulgacion(db, companyKey)
+      roles_responsabilidades_divulgacion: _serializeRolesResponsabilidadesDivulgacion(db, companyKey),
+      // 📦706 (2026-08-14) — Multi-documento: sync de los PDFs por divulgación
+      roles_responsabilidades_divulgacion_documento: _serializeRolesResponsabilidadesDivulgacionDocumento(db, companyKey)
       // ausentismo: lo agregamos en 📦538 cuando veamos la estructura
       // real del bridge de medición ausentismo
     }
@@ -215,6 +217,9 @@ function _serializeRolesResponsabilidadesAsignacion(db, companyKey) {
 }
 
 // 📦705 (2026-08-13) — Roles y Responsabilidades (divulgación)
+// 📦706-fix18 (2026-08-14) — Sincroniza también las columnas nuevas:
+// periodo, es_nueva_contratacion, fecha_vigencia_hasta (necesarias para
+// que el cambio de "1 fila por persona" funcione entre PCs).
 function _serializeRolesResponsabilidadesDivulgacion(db, companyKey) {
   try {
     var tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='roles_responsabilidades_divulgacion'").get();
@@ -238,6 +243,10 @@ function _serializeRolesResponsabilidadesDivulgacion(db, companyKey) {
         user_agent: r.user_agent,
         documento_soporte_path: r.documento_soporte_path,
         creado_en: r.creado_en,
+        // 📦706-fix18 — Columnas nuevas del multi-documento
+        periodo: r.periodo,
+        es_nueva_contratacion: r.es_nueva_contratacion,
+        fecha_vigencia_hasta: r.fecha_vigencia_hasta,
         updatedAt: r.creado_en || new Date().toISOString()
       };
     });
@@ -318,7 +327,9 @@ function deserializeSyncToDb(db, syncData, options) {
       eventos_rapidos: { applied: 0, conflicts: 0, skipped: 0 },
       // 📦705 (2026-08-13) — Roles y Responsabilidades
       roles_responsabilidades_asignacion: { applied: 0, conflicts: 0, skipped: 0 },
-      roles_responsabilidades_divulgacion: { applied: 0, conflicts: 0, skipped: 0 }
+      roles_responsabilidades_divulgacion: { applied: 0, conflicts: 0, skipped: 0 },
+      // 📦706 (2026-08-14) — Multi-documento
+      roles_responsabilidades_divulgacion_documento: { applied: 0, conflicts: 0, skipped: 0 }
     }
   };
 
@@ -341,6 +352,10 @@ function deserializeSyncToDb(db, syncData, options) {
   }
   if (entities.roles_responsabilidades_divulgacion) {
     _deserializeRolesResponsabilidadesDivulgacion(db, entities.roles_responsabilidades_divulgacion, syncData.companyKey, result, conflictLog);
+  }
+  // 📦706 (2026-08-14) — Multi-documento
+  if (entities.roles_responsabilidades_divulgacion_documento) {
+    _deserializeRolesResponsabilidadesDivulgacionDocumento(db, entities.roles_responsabilidades_divulgacion_documento, syncData.companyKey, result, conflictLog);
   }
 
   return result;
@@ -660,6 +675,8 @@ function _deserializeRolesResponsabilidadesAsignacion(db, remoteRecords, company
 }
 
 // 📦705 (2026-08-13) — Roles y Responsabilidades (divulgación) — deserialización
+// 📦706-fix18 (2026-08-14) — INSERT/UPDATE incluyen periodo, es_nueva_contratacion,
+// fecha_vigencia_hasta para que el sync respete la regla "1 fila por persona".
 function _deserializeRolesResponsabilidadesDivulgacion(db, remoteRecords, companyKey, result, conflictLog) {
   var tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='roles_responsabilidades_divulgacion'").get();
   if (!tableExists) {
@@ -675,29 +692,37 @@ function _deserializeRolesResponsabilidadesDivulgacion(db, remoteRecords, compan
         'SELECT id, creado_en FROM roles_responsabilidades_divulgacion WHERE id = ? AND empresa_id = ?'
       ).get(remote.id, companyKey);
       if (!local) {
+        // 📦706-fix18 — 16 columnas (3 nuevas: periodo, es_nueva_contratacion, fecha_vigencia_hasta)
         db.prepare(`
           INSERT INTO roles_responsabilidades_divulgacion
             (empresa_id, persona_cedula, persona_nombre, persona_cargo,
              version_responsabilidades, estado, fecha_divulgacion, fecha_aceptacion,
-             metodo, ip, user_agent, documento_soporte_path, creado_en)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             metodo, ip, user_agent, documento_soporte_path, creado_en,
+             periodo, es_nueva_contratacion, fecha_vigencia_hasta)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           remote.empresa_id, remote.persona_cedula, remote.persona_nombre, remote.persona_cargo,
           remote.version_responsabilidades, remote.estado, remote.fecha_divulgacion, remote.fecha_aceptacion,
-          remote.metodo || 'app', remote.ip, remote.user_agent, remote.documento_soporte_path, remote.creado_en
+          remote.metodo || 'app', remote.ip, remote.user_agent, remote.documento_soporte_path, remote.creado_en,
+          remote.periodo || null, remote.es_nueva_contratacion || 0, remote.fecha_vigencia_hasta || null
         );
         counter.applied++;
         result.applied++;
       } else {
+        // 📦706-fix18 — UPDATE incluye las 3 columnas nuevas para mantener consistencia
         db.prepare(`
           UPDATE roles_responsabilidades_divulgacion
           SET persona_nombre = ?, persona_cargo = ?, estado = ?,
               fecha_divulgacion = ?, fecha_aceptacion = ?,
-              documento_soporte_path = ?
+              documento_soporte_path = ?,
+              periodo = COALESCE(?, periodo),
+              es_nueva_contratacion = COALESCE(?, es_nueva_contratacion),
+              fecha_vigencia_hasta = ?
           WHERE id = ? AND empresa_id = ?
         `).run(
           remote.persona_nombre, remote.persona_cargo, remote.estado,
           remote.fecha_divulgacion, remote.fecha_aceptacion, remote.documento_soporte_path,
+          remote.periodo, remote.es_nueva_contratacion, remote.fecha_vigencia_hasta,
           remote.id, companyKey
         );
         counter.applied++;
@@ -709,6 +734,91 @@ function _deserializeRolesResponsabilidadesDivulgacion(db, remoteRecords, compan
       result.skipped++;
     }
   }
+}
+
+// 📦706 (2026-08-14) — Multi-documento: serialización de los PDFs por
+// divulgación. Append-only: cada documento es 1 fila. Sincronizamos por
+// empresa_id y por divulgacion_id (los IDs son globales pero filtramos
+// por empresa para que cada PC solo sincronice sus docs).
+function _serializeRolesResponsabilidadesDivulgacionDocumento(db, companyKey) {
+  try {
+    var tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='roles_responsabilidades_divulgacion_documento'").get();
+    if (!tableExists) return [];
+    var rows = db.prepare(
+      'SELECT * FROM roles_responsabilidades_divulgacion_documento WHERE empresa_id = ?'
+    ).all(companyKey);
+    return rows.map(function (r) {
+      return {
+        id: r.id,
+        divulgacion_id: r.divulgacion_id,
+        empresa_id: r.empresa_id,
+        persona_cedula: r.persona_cedula,
+        file_path: r.file_path,
+        filename: r.filename,
+        bytes: r.bytes,
+        fecha_carga: r.fecha_carga,
+        fecha_documento: r.fecha_documento,
+        es_actual: r.es_actual,
+        es_correccion: r.es_correccion,
+        metodo: r.metodo,
+        ip: r.ip,
+        user_agent: r.user_agent,
+        creado_por: r.creado_por,
+        observaciones: r.observaciones,
+        updated_at: r.fecha_carga // usar fecha_carga como updated_at
+      };
+    });
+  } catch (e) {
+    console.error('[' + MOD + '] Error serializando roles_responsabilidades_divulgacion_documento:', e.message);
+    return [];
+  }
+}
+
+// 📦706 (2026-08-14) — Multi-documento: deserialización. INSERT OR IGNORE
+// por id (PK). Si la divulgacion padre no existe en el destino, el doc
+// queda "huérfano" pero la siguiente divulgación-sync los traerá. Logueamos
+// warning si pasa.
+function _deserializeRolesResponsabilidadesDivulgacionDocumento(db, remoteRecords, companyKey, result, conflictLog) {
+  var tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='roles_responsabilidades_divulgacion_documento'").get();
+  if (!tableExists) {
+    console.warn('[' + MOD + '] Tabla roles_responsabilidades_divulgacion_documento no existe, saltando merge');
+    return;
+  }
+  var counter = result.byEntity.roles_responsabilidades_divulgacion_documento || { applied: 0, conflicts: 0, skipped: 0 };
+  for (var i = 0; i < remoteRecords.length; i++) {
+    var remote = remoteRecords[i];
+    if (!remote.id || !remote.divulgacion_id) { counter.skipped++; result.skipped++; continue; }
+    try {
+      // Verificar que la divulgacion padre existe (FK)
+      var divExists = db.prepare(
+        'SELECT id FROM roles_responsabilidades_divulgacion WHERE id = ?'
+      ).get(remote.divulgacion_id);
+      if (!divExists) {
+        counter.skipped++;
+        result.skipped++;
+        continue;
+      }
+      db.prepare(`
+        INSERT OR IGNORE INTO roles_responsabilidades_divulgacion_documento
+          (id, divulgacion_id, empresa_id, persona_cedula, file_path, filename, bytes,
+           fecha_carga, fecha_documento, es_actual, es_correccion, metodo, ip, user_agent,
+           creado_por, observaciones)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      `).run(
+        remote.id, remote.divulgacion_id, remote.empresa_id, remote.persona_cedula,
+        remote.file_path, remote.filename, remote.bytes, remote.fecha_carga,
+        remote.fecha_documento, remote.es_actual, remote.es_correccion, remote.metodo,
+        remote.ip, remote.user_agent, remote.creado_por, remote.observaciones
+      );
+      counter.applied++;
+      result.applied++;
+    } catch (e) {
+      console.error('[' + MOD + '] Error deserializando doc ' + remote.id + ': ' + e.message);
+      counter.skipped++;
+      result.skipped++;
+    }
+  }
+  result.byEntity.roles_responsabilidades_divulgacion_documento = counter;
 }
 
 function _deserializeEventosRapidos(db, remoteRecords, companyKey, result, conflictLog) {

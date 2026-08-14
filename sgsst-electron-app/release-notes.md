@@ -1,3 +1,84 @@
+# K+AIR v0.1.180
+
+## 📦706-fix18 — 1 fila por persona + modal de selección de PDFs (v0.1.180)
+
+Refactor del flujo multi-documento del v0.1.179 para resolver el bug que creaba una nueva divulgación cada vez que se subía un PDF del mismo trabajador. Ahora **1 sola fila por persona** en la tabla principal, con todos los PDFs accesibles desde un modal rediseñado desde cero.
+
+### ¿Qué cambió?
+
+- **Tabla "Divulgación a Trabajadores" muestra 1 fila por persona** — Aunque haya 3 PDFs del mismo trabajador, la tabla muestra 1 sola fila. El badge "+N anteriores" indica cuántos PDFs más hay. Click en la zona de soporte o en el badge → modal con la lista completa.
+- **Modal "Documentos del trabajador" rediseñado desde cero** — Cards con borde lateral de color (verde = Vigente, gris = Anterior, amarillo = Corrección). Cada card muestra: nombre del PDF, fecha de carga, fecha del documento, tamaño, observaciones. **Click en la card abre el PDF** directamente. Los iconos Ver/Descargar son shortcuts.
+- **Subtítulo dinámico del modal** — "N PDFs · más reciente primero" se actualiza según el contenido.
+- **Migración one-shot automática** — Al actualizar a v0.1.180, se consolidan las divulgaciones duplicadas que dejó el bug del v0.1.179 (archiva las viejas, deja la más reciente vigente). Idempotente: si no hay duplicados, no hace nada.
+- **Sync multipc extendido** — Las columnas `periodo`, `es_nueva_contratacion`, `fecha_vigencia_hasta` ahora se sincronizan entre PCs para que la regla "1 fila por persona" funcione en el multipc.
+
+### Antes vs después
+
+| Escenario | ANTES (v0.1.179) | AHORA (v0.1.180) |
+|---|---|---|
+| Subir el 2do PDF del mismo trabajador | Creaba una nueva divulgación → 2 filas en la tabla, error UNIQUE | Actualiza la divulgación existente, el 2do PDF queda como "Anterior" |
+| Ver PDFs del trabajador | Click en badge "+N anteriores" abría modal atado a 1 divulgación | Modal lista TODOS los PDFs del trabajador (de TODAS las divulgaciones) |
+| Visual del modal | Lista simple con badges inline | Cards con border-left de color, click anywhere abre el PDF |
+| Datos legacy de Tempoactiva | 2 divulgaciones de Javier Robles Fontalvo (14/01/2026 y 14/08/2026) | Migración automática archiva la vieja, deja 1 fila con 2 PDFs en el modal |
+
+### ¿Por qué?
+
+El v0.1.179 tenía un bug crítico: el `UPDATE` en `_handlerUpsertDivulgacion` tenía **9 values para 8 placeholders** (un `now` extra al final). Esto hacía fallar el UPDATE silenciosamente y forzaba la creación de una divulgación nueva en cada subida de PDF. Combinado con la regla `crearNueva = true` por default, esto producía 2+ divulgaciones vigentes para la misma persona, lo que disparaba el error "UNIQUE constraint failed: roles_responsabilidades_divulgacion.empresa_id, persona_cedula, version_responsabilidades" al intentar subir PDFs adicionales.
+
+### Archivos modificados (5)
+
+- `main/roles-responsabilidades-bridge.js` (~50 líneas) — Regla de negocio simplificada + bug del UPDATE corregido + migración one-shot nueva
+- `main/sync-serializer.js` (~30 líneas) — Serialización/deserialización extendida con 3 columnas nuevas
+- `modules/recursos/roles-responsabilidades/roles-responsabilidades-viewer.js` (~80 líneas) — `renderTablaDivulgacion` agrupa por persona + `renderModalDocumentos` rediseñado
+- `modules/recursos/roles-responsabilidades/roles-responsabilidades-view.html` (~15 líneas) — Markup del modal reemplazado
+- `modules/recursos/roles-responsabilidades/roles-responsabilidades-view.css` (~80 líneas) — Estilos `.kair-rr-doc-card` con estados visuales
+
+---
+
+# K+AIR v0.1.179
+
+## 📦 Multi-documento por divulgación 1.1.2 + header estandarizado + icon-buttons (v0.1.179)
+
+Extensión del submódulo 1.1.2 para que una divulgación pueda tener **N PDFs** (append-only, sin perder histórico). Cambio de cargo o reintegración crean una nueva divulgación. Reemplazo del mismo cargo: el "último gana" como vigente, los anteriores quedan para auditoría.
+
+### ¿Qué incluye?
+
+- **Tabla nueva `roles_responsabilidades_divulgacion_documento`** — 1 divulgación = N PDFs con FK. Cada documento tiene: `file_path`, `filename`, `bytes`, `fecha_carga`, `fecha_documento`, `es_actual` (1=vigente), `es_correccion`, `metodo`, `creado_por`, `observaciones`. Append-only: los PDFs anteriores NUNCA se eliminan.
+- **3 columnas nuevas en `roles_responsabilidades_divulgacion`** — `periodo` (año), `es_nueva_contratacion` (flag), `fecha_vigencia_hasta` (cuando se archiva).
+- **Detección automática de cambio de cargo** — Al subir un PDF con cargo diferente al de la divulgación vigente del mismo persona_cedula, se archiva la anterior y se crea una nueva automáticamente.
+- **Tilde "Es nueva contratación"** en el modal Subir → fuerza la creación de una nueva divulgación.
+- **Tilde "Es corrección"** → marca el documento con `es_correccion=1` para distinguirlo en el histórico.
+- **Migración automática** — Al actualizar a v0.1.179, los PDFs existentes (de `documento_soporte_path`) se migran a la tabla nueva con `es_actual=1` y observación "Migrado desde v0.1.178".
+- **Tabla "Divulgación a Trabajadores"** — Columna SOPORTE muestra el doc vigente + badge amarillo "+N anteriores" si hay más PDFs. Click en el badge → modal de selección.
+- **Modal "Documentos del trabajador"** (NUEVO) — Lista todos los PDFs del trabajador con badges (Vigente / Corrección / Anterior) + botones Ver/Descargar. Ver abre el file viewer del proyecto; Descargar hace save dialog nativo.
+- **Tabla "Documentos de soporte" refactorizada** — 1 fila por PDF con badge de estado (Vigente verde / Anterior gris / Corrección azul). Histórico completo visible.
+- **Header del 1.1.2 estandarizado** al patrón del 6.1.1 (k-section-card con ícono a la izquierda, company + divider + back button a la derecha, sin sticky).
+- **Botones Acciones solo-íconos** — Cuadrados 30x30px con tooltip. Se alinean horizontalmente sin apilarse.
+- **Sync multipc** — La nueva tabla se sincroniza con INSERT OR IGNORE por id y validación de FK.
+
+### Antes vs después
+
+| Escenario | ANTES (v0.1.178) | AHORA (v0.1.179) |
+|---|---|---|
+| Cambio de cargo del trabajador | Sobrescribía el cargo y perdía evidencia | Crea nueva divulgación automáticamente. Histórico intacto |
+| Re-firma de un acta | Sobrescribía el path, perdía el original | Append-only. Nuevo doc + viejo queda con es_actual=0 |
+| Auditor pide PDFs de los últimos 3 años | Solo veía el vigente | Ve TODOS los documentos ordenados por fecha |
+| Trabajador tiene 1 PDF vs 3 PDFs | UI no distinguía | Badge "+N anteriores" en la tabla principal + modal de selección |
+| Tabla "Documentos de soporte" | 1 fila por divulgación | 1 fila por PDF, con badge de estado (Vigente/Anterior/Corrección) |
+
+### Archivos
+
+- `main/roles-responsabilidades-bridge.js` (+250 líneas: 3 handlers + migración + refactor del upsert)
+- `main/sync-serializer.js` (+90: serialize/deserialize de la tabla nueva)
+- `preload.js` (+3 APIs)
+- `modules/recursos/roles-responsabilidades/roles-responsabilidades-logic.js` (+2 cases en el proxy)
+- `modules/recursos/roles-responsabilidades/roles-responsabilidades-viewer.js` (+150: refactor de cargarDatos + nuevas funciones del modal de selección)
+- `modules/recursos/roles-responsabilidades/roles-responsabilidades-view.html` (+30: nuevo modal + campos extra)
+- `modules/recursos/roles-responsabilidades/roles-responsabilidades-view.css` (+80: badges, chip, checkbox styles)
+- `package.json` (bump 0.1.178 → 0.1.179)
+
+---
+
 # K+AIR v0.1.178
 
 ## 📦 Cumplimiento del estándar 1.1.2 Roles y Responsabilidades con formato Excel G-OD-006 (v0.1.178)

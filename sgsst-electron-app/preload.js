@@ -468,7 +468,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     seleccionarCarpetaDestino: (payload) => ipcRenderer.invoke('roles-resp:archivo-seleccionar-destino', payload || {}),
     copiarArchivo: (payload) => ipcRenderer.invoke('roles-resp:archivo-copiar', payload),
     // 📦705-fix10 (2026-08-14) — Descargar PDF de soporte
-    descargarArchivo: (payload) => ipcRenderer.invoke('roles-resp:archivo-descargar', payload)
+    descargarArchivo: (payload) => ipcRenderer.invoke('roles-resp:archivo-descargar', payload),
+    // 📦706 (2026-08-14) — Multi-documento por divulgación
+    listarDocumentosDivulgacion: (payload) => ipcRenderer.invoke('roles-resp:divulgacion-documento-listar', payload || {}),
+    marcarDocumentoActual: (payload) => ipcRenderer.invoke('roles-resp:divulgacion-documento-marcar-actual', payload)
   },
   // 📦531 — Persistencia de planes de acción del submódulo 2.3.1 Evaluación
   // Inicial del SG-SST. Antes los planes vivían en memoria y se perdían al
