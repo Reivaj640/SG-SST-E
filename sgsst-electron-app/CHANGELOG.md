@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.185] - 2026-08-14
+
+### 📦706-fix23 — refactor(roles-resp): unificar dropzones origen y destino
+
+**Causa**: el dropzone de destino tenía un tamaño y estilo diferente al de origen (más pequeño, color lila cuando vacío, azul cuando lleno). El user pidió que tuvieran el mismo tamaño y estilo para no desentonar.
+
+### Changed
+- **Antes**: el dropzone de destino usaba un variant `--folder` con colores diferentes (lila/azul) y se veía más pequeño que el de origen.
+- **Ahora**: ambos dropzones usan el mismo estilo base `.kair-rr-dropzone` con el mismo `min-height: 110px`, mismo padding, mismo `display: flex; flex-direction: column; align-items: center; justify-content: center`. Cuando tienen contenido (`data-state="has-file"` o `data-state="has-folder"`), ambos se ven exactamente igual (verde con check).
+
+### Removed
+- **Clase `.kair-rr-dropzone--folder`** del CSS y del HTML — ya no se necesita, el destino usa el mismo estilo base que el origen.
+
+### Migration notes
+- 100% compatible con la implementación existente. No hay cambios de schema, ni de JS, ni de APIs.
+- Los `data-state` (empty/has-file/has-folder) siguen funcionando igual.
+- El padding inline `style="padding: 16px 8px"` se quitó del HTML para que el CSS sea la única fuente del padding (más mantenible).
+
 ## [0.1.184] - 2026-08-14
 
 ### 📦706-fix22 — refactor(roles-resp): modal de confirmación custom para eliminar

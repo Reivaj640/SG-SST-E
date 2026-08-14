@@ -299,6 +299,11 @@
     cursor: pointer;
     transition: all 0.15s;
     margin-bottom: 10px;
+    min-height: 110px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
 }
 .kair-rr-dropzone i {
     font-size: 28px;
@@ -579,45 +584,29 @@
 }
 
 /* 📦706-fix16 (2026-08-14) — Dropzones reactivos: reflejan el estado (vacío/seleccionado) */
-.kair-rr-dropzone--folder {
-    border-style: solid;
-    border-color: #c7d2fe;
-    background: #eef2ff;
-}
-.kair-rr-dropzone--folder:hover,
-.kair-rr-dropzone--folder.is-dragover {
-    border-color: #174ea6;
-    background: #dbeafe;
-}
+/* 📦706-fix23 (2026-08-14) — Unificado: ambos dropzones (origen y destino)
+   usan el mismo estilo base, mismo tamaño y misma animación. El user
+   pidió que no desentonen visualmente. Solo cambia el contenido (ícono +
+   texto), no el contenedor. */
+.kair-rr-dropzone[data-state="has-folder"],
 .kair-rr-dropzone[data-state="has-file"] {
     border-style: solid;
     border-color: #86efac;
     background: #f0fdf4;
     padding: 12px 8px;
 }
+.kair-rr-dropzone[data-state="has-folder"] .kair-rr-dropzone__icon,
 .kair-rr-dropzone[data-state="has-file"] .kair-rr-dropzone__icon {
     color: #16a34a;
 }
-.kair-rr-dropzone[data-state="has-folder"] {
-    border-style: solid;
-    border-color: #93c5fd;
-    background: #dbeafe;
-    padding: 12px 8px;
-}
-.kair-rr-dropzone[data-state="has-folder"] .kair-rr-dropzone__icon {
-    color: #174ea6;
-}
-.kair-rr-dropzone[data-state="has-file"] .kair-rr-dropzone__text,
-.kair-rr-dropzone[data-state="has-folder"] .kair-rr-dropzone__text {
+.kair-rr-dropzone[data-state="has-folder"] .kair-rr-dropzone__text,
+.kair-rr-dropzone[data-state="has-file"] .kair-rr-dropzone__text {
     color: #166534;
     font-weight: 600;
     font-size: 12px;
 }
-.kair-rr-dropzone[data-state="has-folder"] .kair-rr-dropzone__text {
-    color: #174ea6;
-}
-.kair-rr-dropzone[data-state="has-file"] .kair-rr-dropzone__subtext,
-.kair-rr-dropzone[data-state="has-folder"] .kair-rr-dropzone__subtext {
+.kair-rr-dropzone[data-state="has-folder"] .kair-rr-dropzone__subtext,
+.kair-rr-dropzone[data-state="has-file"] .kair-rr-dropzone__subtext {
     display: none;
 }
 

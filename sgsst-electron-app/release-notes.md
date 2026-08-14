@@ -1,3 +1,34 @@
+# K+AIR v0.1.185
+
+## 📦706-fix23 — Unificar dropzones origen y destino (v0.1.185)
+
+Pequeño refactor de UI. Ambos dropzones del modal "Subir soporte PDF" ahora tienen el mismo tamaño y estilo para que no desentonen visualmente. El destino ya no usa un variant especial con colores diferentes.
+
+### ¿Qué cambió?
+
+- **Mismo tamaño**: ambos dropzones tienen `min-height: 110px` y el mismo `padding`
+- **Mismo estilo base**: ambos usan la clase `.kair-rr-dropzone` con borde dashed, fondo `#f8fafc`, border-radius `8px`
+- **Misma alineación**: ambos usan `display: flex; flex-direction: column; align-items: center; justify-content: center` para que el contenido (ícono + texto) quede centrado vertical y horizontalmente
+- **Misma animación cuando se llenan**: `data-state="has-file"` y `data-state="has-folder"` se ven EXACTAMENTE igual (verde con check, padding reducido). El user no puede distinguir visualmente cuál es origen y cuál es destino, lo que es bueno porque es simétrico.
+
+### Antes vs después
+
+| Escenario | ANTES (v0.1.184) | AHORA (v0.1.185) |
+|---|---|---|
+| Dropzone origen (vacío) | dashed, padding 20px 16px, ícono de upload | dashed, padding 20px 16px, ícono de upload (igual) |
+| Dropzone destino (vacío) | lila sólido (--folder), padding 16px 8px (más pequeño), ícono de carpeta | dashed, padding 20px 16px, ícono de carpeta (igual al origen) |
+| Dropzone origen (con file) | verde sólido, padding 12px 8px, check | verde sólido, padding 12px 8px, check (igual) |
+| Dropzone destino (con folder) | azul sólido, padding 12px 8px, check | verde sólido, padding 12px 8px, check (igual al origen) |
+
+### Archivos modificados (2)
+
+- `roles-responsabilidades-view.css` — Quitada la clase `.kair-rr-dropzone--folder`. Unificado el estilo de los dropzones (mismo min-height, mismo flex, mismo border-radius, mismo padding). Mismas animaciones.
+- `roles-responsabilidades-view.html` — Quitada la clase `kair-rr-dropzone--folder` del destino. Quitado el `style="padding: 16px 8px"` inline (el CSS es ahora la única fuente del padding, más mantenible).
+
+**Total**: ~10 líneas modificadas, 0 líneas agregadas (refactor puro). **0 cambios de schema, JS, sync, o APIs**.
+
+---
+
 # K+AIR v0.1.184
 
 ## 📦706-fix22 — Modal de confirmación custom para eliminar (v0.1.184)
