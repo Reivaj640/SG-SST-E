@@ -762,3 +762,22 @@
     color: #475569;
     word-break: break-all;
 }
+
+/* 📦706-fix22 (2026-08-14) — Botones del modal de confirmación.
+   -primary: azul (para acciones positivas, ej. "Confirmar" en general)
+   -danger: rojo (para acciones destructivas, ej. "Eliminar")
+   -ghost: transparente (para "Cancelar") */
+.kair-rr-btn--danger {
+    background: #dc2626;
+    color: white;
+    border: 1px solid #dc2626;
+}
+.kair-rr-btn--danger:hover {
+    background: #b91c1c;
+    border-color: #b91c1c;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(220, 38, 38, 0.3);
+}
+.kair-rr-btn--danger:active {
+    transform: scale(0.97);
+}

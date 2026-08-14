@@ -1,9 +1,11 @@
 # K+AIR — Contexto del Proyecto
 
 **Última actualización:** 14 de agosto de 2026
-**Versión actual:** 0.1.183 (próximo release) — publicado v0.1.166
+**Versión actual:** 0.1.184 (próximo release) — publicado v0.1.166
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
 **Stack:** Electron 37 + vanilla JS + Python 3.11.9 (empaquetado) + SQLite (kair.db)
+
+> **🆕 v0.1.184 (📦706-fix22 — refactor(roles-resp): modal de confirmación custom):** Reemplazo del `confirm()` nativo del navegador en `eliminarDivulgacion` por un modal custom consistente con el resto de la UI. **Causa**: el `confirm()` nativo tiene un dialog feo, sin styling, y rompe la consistencia visual. **Cambios (3 archivos, +80 líneas)**: (1) `roles-responsabilidades-view.html` — Modal `#modalConfirm` con 2 botones (Cancelar/Confirmar) y footer informativo. (2) `roles-responsabilidades-view.css` — Estilos `.kair-rr-btn--danger` (rojo #dc2626 con hover/active). (3) `roles-responsabilidades-viewer.js` — Función `_showConfirm(title, message, options)` que retorna `Promise<boolean>`. API: `acceptText` (default "Confirmar"), `acceptIcon` (default bi-check-lg), `variant` (danger o primary). Función `_hideConfirm(accepted)` que resuelve la Promise y oculta el modal. Listeners agregados en `setupModalEvents`. Refactor de `eliminarDivulgacion` para usar `_showConfirm` con variant danger + ícono bi-trash3 + acceptText Eliminar. Toast de éxito "✅ Divulgación eliminada" después de eliminar. Fallback a `window.confirm()` si el modal no existe (init temprano).
 
 > **🆕 v0.1.183 (📦706-fix21 — refactor(roles-resp): toast notifications):** Reemplazo de los 17 `alert()` nativos por un sistema de toast moderno (mismo patrón que 6.1.2 Política). **Causa**: los alerts bloquean la UI, son feos y rompen el flujo de trabajo. **Cambios (3 archivos, +95 líneas)**: (1) `roles-responsabilidades-view.html` — Container `#kToastContainer` antes del cierre del body. (2) `roles-responsabilidades-view.css` — Estilos `.kair-toast-container` y `.kair-toast` con animación slide-in/out desde la derecha, 4 tipos (success/error/warning/info) con colores y íconos. (3) `roles-responsabilidades-viewer.js` — Función `_showToast(message, type, duration)` con API simple, soporta HTML básico (`<strong>`, `<code>`, `<br>`), 4 tipos. Los 17 `alert()` fueron reemplazados 1-a-1 (validaciones → warning, errores → error con 5s, éxitos con paths → success con 6s, mensajes largos con HTML). `confirm()` se mantiene nativo. Si el container no existe (init temprano), cae a `console.log`.
 

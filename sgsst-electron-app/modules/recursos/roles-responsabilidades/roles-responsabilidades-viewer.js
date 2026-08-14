@@ -60,6 +60,66 @@ function _showToast(message, type, duration) {
   }
 }
 
+// 📦706-fix22 (2026-08-14) — Modal de confirmación custom. Reemplaza
+// el `confirm()` nativo del navegador con un modal consistente con
+// el resto del viewer. Retorna una Promise<boolean>.
+// API: _showConfirm(title, message, options)
+//   title: string (ej. "Eliminar divulgación")
+//   message: string (ej. "¿Estás seguro de eliminar esta divulgación?")
+//   options: { acceptText, acceptIcon, variant }
+//     - acceptText: texto del botón confirmar (default: "Confirmar")
+//     - acceptIcon: clase del ícono (default: "bi-check-lg")
+//     - variant: 'danger' (default) o 'primary' (para confirmaciones no destructivas)
+function _showConfirm(title, message, options) {
+  options = options || {};
+  var acceptText = options.acceptText || 'Confirmar';
+  var acceptIcon = options.acceptIcon || 'bi-check-lg';
+  var variant = options.variant || 'danger';
+
+  return new Promise(function (resolve) {
+    var modal = document.getElementById('modalConfirm');
+    if (!modal) {
+      // Fallback al confirm() nativo si el modal no existe
+      var fallback = window.confirm(message);
+      resolve(fallback);
+      return;
+    }
+    var titleEl = document.getElementById('modalConfirmTitle');
+    var messageEl = document.getElementById('modalConfirmMessage');
+    var acceptTextEl = document.getElementById('modalConfirmAcceptText');
+    var acceptBtn = document.getElementById('btnConfirmAccept');
+
+    if (titleEl) titleEl.textContent = title;
+    if (messageEl) messageEl.textContent = message;
+    if (acceptTextEl) acceptTextEl.textContent = acceptText;
+    if (acceptBtn) {
+      // Cambiar el ícono + variant
+      var iconEl = acceptBtn.querySelector('i');
+      if (iconEl) {
+        iconEl.className = 'bi ' + acceptIcon;
+      }
+      // Toggle variant
+      acceptBtn.classList.remove('kair-rr-btn--danger', 'kair-rr-btn--primary');
+      acceptBtn.classList.add('kair-rr-btn--' + variant);
+    }
+
+    // Guardar el resolve en un atributo del modal para que los handlers
+    // puedan invocarlo
+    modal._resolveConfirm = resolve;
+    modal.removeAttribute('hidden');
+  });
+}
+
+function _hideConfirm(accepted) {
+  var modal = document.getElementById('modalConfirm');
+  if (!modal) return;
+  if (modal._resolveConfirm) {
+    modal._resolveConfirm(!!accepted);
+    modal._resolveConfirm = null;
+  }
+  modal.setAttribute('hidden', '');
+}
+
 function getQueryParam(name) {
   var params = new URLSearchParams(window.location.search);
   return params.get(name);
@@ -207,6 +267,11 @@ function setupModalEvents() {
   });
   $$('[data-action="cerrar-modal-documentos-trabajador"]').forEach(function(b) {
     b.addEventListener('click', cerrarModalDocumentosTrabajador);
+  });
+  // 📦706-fix22 (2026-08-14) — Listeners del modal de confirmación custom
+  $('#btnConfirmAccept').addEventListener('click', function() { _hideConfirm(true); });
+  $$('[data-action="cerrar-modal-confirm"]').forEach(function(b) {
+    b.addEventListener('click', function() { _hideConfirm(false); });
   });
   $('#btnGuardarAsignar').addEventListener('click', guardarAsignar);
   $('#btnGuardarTrabajador').addEventListener('click', guardarTrabajador);
@@ -943,11 +1008,19 @@ async function guardarSoporte() {
 }
 
 async function eliminarDivulgacion(divulgId) {
-  if (!confirm('¿Eliminar esta divulgación? Esta acción no se puede deshacer.')) return;
+  // 📦706-fix22 (2026-08-14) — Modal de confirmación custom (reemplaza
+  // el confirm() nativo). Muestra ícono de papelera + botón "Eliminar" rojo.
+  var confirmado = await _showConfirm(
+    'Eliminar divulgación',
+    '¿Estás seguro de eliminar esta divulgación?',
+    { acceptText: 'Eliminar', acceptIcon: 'bi-trash3', variant: 'danger' }
+  );
+  if (!confirmado) return;
   try {
     var res = await _bridgeCall('roles-resp:divulgacion-eliminar', { id: divulgId });
     if (res && res.success) {
       await cargarDatos();
+      _showToast('✅ Divulgación eliminada', 'success', 3000);
     } else {
       _showToast('Error: ' + (res && res.error && res.error.message), 'error', 5000);
     }

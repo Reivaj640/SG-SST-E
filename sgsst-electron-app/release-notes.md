@@ -1,3 +1,40 @@
+# K+AIR v0.1.184
+
+## 📦706-fix22 — Modal de confirmación custom para eliminar (v0.1.184)
+
+Refactor de UI. El `confirm()` nativo del navegador que se usaba antes de eliminar una divulgación fue reemplazado por un modal custom consistente con el resto de la UI. Mismo patrón que 6.1.2 Política.
+
+### ¿Qué incluye?
+
+- **Función `_showConfirm(title, message, options)`** que retorna `Promise<boolean>`. API:
+  - `title`: string (ej. "Eliminar divulgación")
+  - `message`: string (ej. "¿Estás seguro de eliminar esta divulgación?")
+  - `options: { acceptText, acceptIcon, variant }`
+    - `acceptText`: texto del botón confirmar (default: "Confirmar")
+    - `acceptIcon`: clase del ícono (default: "bi-check-lg")
+    - `variant`: 'danger' (default, rojo) o 'primary' (azul)
+- **Modal `#modalConfirm`** con título dinámico, mensaje, footer informativo ("Esta acción no se puede deshacer"), 2 botones (Cancelar/Confirmar)
+- **Estilos `.kair-rr-btn--danger`** (rojo #dc2626 con hover y active)
+- **Toast de éxito** después de eliminar: "✅ Divulgación eliminada"
+
+### Antes vs después
+
+| Escenario | ANTES (v0.1.183) | AHORA (v0.1.184) |
+|---|---|---|
+| Eliminar divulgación | Dialog nativo del navegador: "sgsst-electron-app / ¿Eliminar esta divulgación? Esta acción no se puede deshacer. / [Aceptar] [Cancelar]" | Modal custom con título "Eliminar divulgación", mensaje, ícono de papelera en el botón, botón "Eliminar" en rojo. Después: toast verde "✅ Divulgación eliminada" |
+| Consistencia visual | Rompía con el resto de la UI (modal nativo del browser) | Igual a los otros modales del viewer (matriz, documentos, etc.) |
+| UX feedback | Solo el dialog del navegador | Modal + toast de éxito (2 puntos de feedback) |
+
+### Archivos modificados (3)
+
+- `roles-responsabilidades-view.html` — Modal `#modalConfirm` con 2 botones
+- `roles-responsabilidades-view.css` — Estilos `.kair-rr-btn--danger` (rojo con hover)
+- `roles-responsabilidades-viewer.js` — Función `_showConfirm()` + `_hideConfirm()` + refactor de `eliminarDivulgacion`
+
+**Total**: ~80 líneas agregadas. **100% compatible** con la implementación existente. **0 cambios de schema**.
+
+---
+
 # K+AIR v0.1.183
 
 ## 📦706-fix21 — Toast notifications (mismo patrón que 6.1.2 Política) (v0.1.183)

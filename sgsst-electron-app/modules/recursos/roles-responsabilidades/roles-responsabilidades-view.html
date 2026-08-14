@@ -284,5 +284,31 @@
          6.1.2 Política). Los toasts aparecen arriba a la derecha y se
          cierran automáticamente. Reemplazan los `alert()` nativos. -->
     <div class="kair-toast-container" id="kToastContainer" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- 📦706-fix22 (2026-08-14) — Modal de confirmación custom. Reemplaza
+         el `confirm()` nativo del navegador. Mismo patrón visual que los
+         otros modales del viewer (kair-rr-modal-overlay). -->
+    <div class="kair-rr-modal-overlay" id="modalConfirm" hidden>
+        <div class="kair-rr-modal" style="max-width: 440px;">
+            <header class="kair-rr-modal__head">
+                <div>
+                    <h3 id="modalConfirmTitle">—</h3>
+                </div>
+                <button class="kair-rr-modal__close" data-action="cerrar-modal-confirm">&times;</button>
+            </header>
+            <div class="kair-rr-modal__body" style="padding: 20px 24px;">
+                <p id="modalConfirmMessage" style="margin: 0 0 12px 0; font-size: 13px; line-height: 1.5; color: #1e293b;">—</p>
+                <p style="margin: 0; font-size: 11px; color: #94a3b8; font-style: italic;">
+                    <i class="bi bi-info-circle"></i> Esta acción no se puede deshacer.
+                </p>
+            </div>
+            <footer class="kair-rr-modal__foot">
+                <button class="kair-rr-btn kair-rr-btn--ghost" data-action="cerrar-modal-confirm" id="btnConfirmCancel">Cancelar</button>
+                <button class="kair-rr-btn kair-rr-btn--danger" id="btnConfirmAccept">
+                    <i class="bi bi-trash3"></i> <span id="modalConfirmAcceptText">Confirmar</span>
+                </button>
+            </footer>
+        </div>
+    </div>
 </body>
 </html>

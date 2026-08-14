@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.184] - 2026-08-14
+
+### 📦706-fix22 — refactor(roles-resp): modal de confirmación custom para eliminar
+
+**Causa**: el `confirm()` nativo del navegador que se usaba antes de eliminar una divulgación tenía un dialog feo, sin styling, y rompía la consistencia visual del resto de la UI. El 6.1.2 Política ya tenía un modal de confirmación custom; no había razón para no usarlo acá.
+
+### Changed
+- **Antes**: `confirm('¿Eliminar esta divulgación? Esta acción no se puede deshacer.')` — dialog nativo del navegador.
+- **Ahora**: modal de confirmación custom con título, mensaje, ícono de papelera en el botón, botón "Eliminar" en rojo (variant danger), y toast de éxito después de eliminar.
+
+### Added
+- **Función `_showConfirm(title, message, options)`** que retorna `Promise<boolean>`. Mismo patrón visual que los otros modales del viewer.
+  - `title`: string (ej. "Eliminar divulgación")
+  - `message`: string (ej. "¿Estás seguro de eliminar esta divulgación?")
+  - `options: { acceptText, acceptIcon, variant }`
+    - `acceptText`: texto del botón confirmar (default: "Confirmar")
+    - `acceptIcon`: clase del ícono (default: "bi-check-lg")
+    - `variant`: 'danger' (default) o 'primary'
+- **Función `_hideConfirm(accepted)`** que resuelve la Promise y oculta el modal
+- **Modal `#modalConfirm`** en el HTML con 2 botones (Cancelar/Confirmar) y un footer informativo "Esta acción no se puede deshacer"
+- **Estilos `.kair-rr-btn--danger`** (rojo #dc2626 con hover y active) para acciones destructivas
+- **Toast de éxito** después de eliminar: "✅ Divulgación eliminada"
+
+### Migration notes
+- Si el modal no existe (ej: durante el init temprano), `_showConfirm` cae a `window.confirm()` nativo (fallback seguro).
+- El `confirm()` nativo de `eliminarDivulgacion` fue reemplazado por `_showConfirm(...)` con variant 'danger'.
+- El user puede cancelar con ESC (futuro) o click fuera del modal (futuro) — por ahora solo con el botón "Cancelar".
+
 ## [0.1.183] - 2026-08-14
 
 ### 📦706-fix21 — refactor(roles-resp): toast notifications (mismo patrón que 6.1.2)
