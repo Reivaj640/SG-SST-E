@@ -693,3 +693,72 @@
 .kair-rr-icon-btn:active {
     transform: scale(0.95);
 }
+
+/* 📦706-fix21 (2026-08-14) — Toast notifications.
+   Mismo patrón que 6.1.2 Política. Reemplazan los alert() nativos.
+   Aparecen arriba a la derecha y se cierran automáticamente. */
+.kair-toast-container {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 9999;
+    pointer-events: none;
+    max-width: 360px;
+}
+.kair-toast {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: #ffffff;
+    border-left: 3px solid #174ea6;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    color: #1e293b;
+    font-size: 13px;
+    pointer-events: auto;
+    animation: kair-toast-in 240ms ease;
+    min-width: 280px;
+}
+@keyframes kair-toast-in {
+    from { transform: translateX(120%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+.kair-toast.is-closing {
+    animation: kair-toast-out 300ms ease forwards;
+}
+@keyframes kair-toast-out {
+    to { transform: translateX(120%); opacity: 0; }
+}
+.kair-toast--success { border-left-color: #10b981; }
+.kair-toast--success .kair-toast__icon { color: #10b981; }
+.kair-toast--error { border-left-color: #dc2626; }
+.kair-toast--error .kair-toast__icon { color: #dc2626; }
+.kair-toast--warning { border-left-color: #f59e0b; }
+.kair-toast--warning .kair-toast__icon { color: #f59e0b; }
+.kair-toast--info { border-left-color: #174ea6; }
+.kair-toast--info .kair-toast__icon { color: #174ea6; }
+.kair-toast__icon {
+    font-size: 18px;
+    flex-shrink: 0;
+}
+.kair-toast__message {
+    flex: 1;
+    line-height: 1.4;
+    word-break: break-word;
+}
+.kair-toast__message strong {
+    font-weight: 600;
+}
+.kair-toast__message code {
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 11px;
+    background: #f1f5f9;
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: #475569;
+    word-break: break-all;
+}

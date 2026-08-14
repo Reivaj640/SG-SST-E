@@ -1,3 +1,43 @@
+# K+AIR v0.1.183
+
+## 📦706-fix21 — Toast notifications (mismo patrón que 6.1.2 Política) (v0.1.183)
+
+Refactor de UI. Los 17 `alert()` nativos que bloqueaban la UI con un dialog feo fueron reemplazados por un sistema de toast moderno. Ahora las notificaciones aparecen arriba a la derecha, se cierran automáticamente, y soportan HTML básico para mejor legibilidad.
+
+### ¿Qué incluye?
+
+- **Función `_showToast(message, type, duration)`** con API simple:
+  - `message`: string con HTML básico permitido (`<strong>`, `<code>`, `<br>`)
+  - `type`: 'success' | 'error' | 'warning' | 'info' (default: 'info')
+  - `duration`: ms (default: 3000). Usar 0 para que no se cierre solo
+- **Container `#kToastContainer`** en el HTML
+- **Animación slide-in/out** desde la derecha
+- **4 tipos con colores e íconos**:
+  - `success` (verde, ✓)
+  - `error` (rojo, ✗)
+  - `warning` (amarillo, ⚠)
+  - `info` (azul, ⓘ)
+- **Soporte de HTML**: `<strong>`, `<code>` (estilo monoespaciado con fondo), `<br>`
+
+### Antes vs después
+
+| Escenario | ANTES (v0.1.182) | AHORA (v0.1.183) |
+|---|---|---|
+| Validación (campo vacío) | `alert("El nombre es obligatorio")` — bloquea la UI | Toast amarillo arriba a la derecha, se cierra en 3s |
+| Error técnico | `alert("Error: ...")` — user tiene que hacer click OK | Toast rojo arriba a la derecha, 5s, HTML formateado |
+| Éxito con path largo | `alert("✅ PDF descargado:\nG:\...\archivo.pdf\n(638 KB)")` — texto plano, feo | Toast verde con `<code>` para el path y `<br>` para saltos de línea, 5s |
+| Carpeta creada | `alert("✅ Trabajador agregado...\n📁 Carpeta creada:\nG:\...")` — texto plano | Toast verde con el path envuelto en `<code>`, 6s |
+
+### Archivos modificados (3)
+
+- `roles-responsabilidades-view.html` — Container `#kToastContainer`
+- `roles-responsabilidades-view.css` — Estilos `.kair-toast-container` y `.kair-toast` con animaciones
+- `roles-responsabilidades-viewer.js` — Función `_showToast()` + 17 `alert()` reemplazados
+
+**Total**: ~95 líneas agregadas, 0 cambios de schema, 0 cambios de sync multipc. **100% compatible** con la implementación existente.
+
+---
+
 # K+AIR v0.1.182
 
 ## 📦706-fix20 — Carpetas automáticas por trabajador (v0.1.182)

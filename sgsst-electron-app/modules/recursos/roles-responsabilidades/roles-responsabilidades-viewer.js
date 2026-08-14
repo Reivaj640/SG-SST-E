@@ -23,6 +23,43 @@ var rrState = {
 function $(sel) { return document.querySelector(sel); }
 function $$(sel) { return Array.from(document.querySelectorAll(sel)); }
 
+// 📦706-fix21 (2026-08-14) — Toast notifications (mismo patrón que 6.1.2
+// Política). Reemplazan los `alert()` nativos con algo más profesional.
+// API: _showToast(message, type, duration)
+//   message: string (puede tener HTML básico como <strong>, <code>, <br>)
+//   type: 'success' | 'error' | 'warning' | 'info' (default: 'info')
+//   duration: ms (default: 3000). Usar 0 para que no se cierre solo.
+function _showToast(message, type, duration) {
+  type = type || 'info';
+  duration = (duration === undefined) ? 3000 : duration;
+  var container = document.getElementById('kToastContainer');
+  if (!container) {
+    // Fallback si el container no existe (ej: durante el init)
+    console.log('[TOAST ' + type.toUpperCase() + ']', message.replace(/<[^>]+>/g, ''));
+    return;
+  }
+  var icons = {
+    success: 'bi-check-circle-fill',
+    error: 'bi-x-circle-fill',
+    warning: 'bi-exclamation-triangle-fill',
+    info: 'bi-info-circle-fill'
+  };
+  var toast = document.createElement('div');
+  toast.className = 'kair-toast kair-toast--' + type;
+  toast.innerHTML =
+    '<i class="bi ' + (icons[type] || icons.info) + ' kair-toast__icon"></i>' +
+    '<span class="kair-toast__message">' + message + '</span>';
+  container.appendChild(toast);
+  if (duration > 0) {
+    setTimeout(function () {
+      toast.classList.add('is-closing');
+      setTimeout(function () {
+        if (toast.parentNode) toast.parentNode.removeChild(toast);
+      }, 320);
+    }, duration);
+  }
+}
+
 function getQueryParam(name) {
   var params = new URLSearchParams(window.location.search);
   return params.get(name);
@@ -204,7 +241,7 @@ function setupModalEvents() {
       if (filePath) {
         onOrigenSeleccionado(filePath, file.size, file.name);
       } else {
-        alert('No se pudo obtener la ruta del archivo. Usá el botón "Examinar..."');
+        _showToast('No se pudo obtener la ruta del archivo. Usá el botón "Examinar..."', 'warning', 4000);
       }
     }
   });
@@ -233,7 +270,7 @@ function setupModalEvents() {
       if (folderPath) {
         setDestino(folderPath);
       } else {
-        alert('No se pudo obtener la ruta de la carpeta. Usá el botón "Examinar..."');
+        _showToast('No se pudo obtener la ruta de la carpeta. Usá el botón "Examinar..."', 'warning', 4000);
       }
     }
   });
@@ -464,14 +501,14 @@ async function descargarPDFSoporte(filePath) {
   try {
     var res = await _bridgeCall('roles-resp:archivo-descargar', { sourcePath: filePath });
     if (res && res.success && res.data) {
-      alert('✅ PDF descargado en:\n' + res.data.path + '\n(' + formatBytes(res.data.bytes) + ')');
+      _showToast('✅ PDF descargado en:<br><code>' + res.data.path + '</code><br>(' + formatBytes(res.data.bytes) + ')', 'success', 5000);
     } else if (res && res.error && res.error.code === 'CANCELED') {
       // User canceló el save dialog, no hacer nada
     } else {
-      alert('Error: ' + (res && res.error && res.error.message));
+      _showToast('Error: ' + (res && res.error && res.error.message), 'error', 5000);
     }
   } catch (e) {
-    alert('Error descargando: ' + e.message);
+    _showToast('Error descargando: ' + e.message, 'error', 5000);
   }
 }
 
@@ -615,9 +652,9 @@ function cerrarModalAsignar() {
 async function guardarAsignar() {
   if (!rrState.editingRol) return;
   var nombre = $('#inputAsignarNombre').value.trim();
-  if (!nombre) { alert('El nombre es obligatorio'); return; }
+  if (!nombre) { _showToast('El nombre es obligatorio', 'warning'); return; }
   var fecha = $('#inputAsignarFecha').value;
-  if (!fecha) { alert('La fecha es obligatoria'); return; }
+  if (!fecha) { _showToast('La fecha es obligatoria', 'warning'); return; }
   try {
     var res = await _bridgeCall('roles-resp:asignacion-upsert', {
       empresaId: rrState.empresaId,
@@ -632,11 +669,11 @@ async function guardarAsignar() {
       cerrarModalAsignar();
       await cargarDatos();
     } else {
-      alert('Error guardando: ' + (res && res.error && res.error.message));
+      _showToast('Error guardando: ' + (res && res.error && res.error.message), 'error', 5000);
     }
   } catch (e) {
     console.error('[RolesResp] Error upsert asignacion:', e.message);
-    alert('Error: ' + e.message);
+    _showToast('Error: ' + e.message, 'error', 5000);
   }
 }
 
@@ -678,7 +715,7 @@ function cerrarModalMatriz() {
 async function guardarTrabajador() {
   var cedula = $('#inputTrabCedula').value.trim();
   var nombre = $('#inputTrabNombre').value.trim();
-  if (!cedula || !nombre) { alert('Cédula y nombre son obligatorios'); return; }
+  if (!cedula || !nombre) { _showToast('Cédula y nombre son obligatorios', 'warning'); return; }
   try {
     var res = await _bridgeCall('roles-resp:divulgacion-upsert', {
       empresaId: rrState.empresaId,
@@ -695,17 +732,20 @@ async function guardarTrabajador() {
       // path. Si fue actualización, carpetaPath es null y solo decimos OK.
       var msg = '✅ Trabajador agregado para divulgación.';
       if (res.data && res.data.carpetaPath) {
-        msg += '\n\n📁 Carpeta creada:\n' + res.data.carpetaPath;
+        msg += '<br><br>📁 Carpeta creada:<br><code>' + res.data.carpetaPath + '</code>';
+        _showToast(msg, 'success', 6000);
       } else if (res.data && res.data.carpetaError) {
-        msg += '\n\n⚠️ No se pudo crear la carpeta:\n' + res.data.carpetaError;
+        msg += '<br><br>⚠️ No se pudo crear la carpeta:<br><code>' + res.data.carpetaError + '</code>';
+        _showToast(msg, 'warning', 6000);
+      } else {
+        _showToast('✅ Trabajador agregado para divulgación.', 'success', 3000);
       }
-      alert(msg);
     } else {
-      alert('Error guardando: ' + (res && res.error && res.error.message));
+      _showToast('Error guardando: ' + (res && res.error && res.error.message), 'error', 5000);
     }
   } catch (e) {
     console.error('[RolesResp] Error upsert divulgacion:', e.message);
-    alert('Error: ' + e.message);
+    _showToast('Error: ' + e.message, 'error', 5000);
   }
 }
 
@@ -825,10 +865,10 @@ async function examinarOrigen() {
     if (res && res.success && res.data) {
       onOrigenSeleccionado(res.data.path, res.data.bytes, res.data.filename);
     } else if (res && res.error && res.error.code !== 'CANCELED') {
-      alert('Error: ' + res.error.message);
+      _showToast('Error: ' + res.error.message, 'error', 4000);
     }
   } catch (e) {
-    alert('Error abriendo explorador: ' + e.message);
+    _showToast('Error abriendo explorador: ' + e.message, 'error', 4000);
   }
 }
 
@@ -839,10 +879,10 @@ async function examinarDestino() {
     if (res && res.success && res.data) {
       setDestino(res.data.path);
     } else if (res && res.error && res.error.code !== 'CANCELED') {
-      alert('Error: ' + res.error.message);
+      _showToast('Error: ' + res.error.message, 'error', 4000);
     }
   } catch (e) {
-    alert('Error abriendo explorador: ' + e.message);
+    _showToast('Error abriendo explorador: ' + e.message, 'error', 4000);
   }
 }
 
@@ -852,9 +892,9 @@ async function guardarSoporte() {
   if (!div) { cerrarModalSoporte(); return; }
   var origen = rrState.origenPath;
   var destino = rrState.destinoPath;
-  if (!origen) { alert('Seleccioná un PDF de origen (arrastrando o con "Examinar...")'); return; }
-  if (!destino) { alert('Indicá la carpeta destino'); return; }
-  if (!origen.toLowerCase().endsWith('.pdf')) { alert('El archivo origen debe ser un PDF (*.pdf)'); return; }
+  if (!origen) { _showToast('Seleccioná un PDF de origen (arrastrando o con "Examinar...")', 'warning'); return; }
+  if (!destino) { _showToast('Indicá la carpeta destino', 'warning'); return; }
+  if (!origen.toLowerCase().endsWith('.pdf')) { _showToast('El archivo origen debe ser un PDF (*.pdf)', 'warning'); return; }
   // 1) Copiar el archivo al destino
   var btn = $('#btnGuardarSoporte');
   btn.setAttribute('disabled', '');
@@ -864,7 +904,7 @@ async function guardarSoporte() {
     if (!copyRes || !copyRes.success) {
       btn.removeAttribute('disabled');
       btn.innerHTML = '<i class="bi bi-upload"></i> Copiar y marcar aceptado';
-      alert('Error copiando: ' + (copyRes && copyRes.error && copyRes.error.message));
+      _showToast('Error copiando: ' + (copyRes && copyRes.error && copyRes.error.message), 'error', 5000);
       return;
     }
     // 2) Guardar la divulgación con el path destino + campos extra (📦706)
@@ -889,16 +929,16 @@ async function guardarSoporte() {
     if (res && res.success) {
       cerrarModalSoporte();
       await cargarDatos();
-      alert('✅ Soporte PDF copiado y divulgado.\n\nOrigen: ' + origen + '\nDestino: ' + copyRes.data.path + '\nEstado: ' + (res.data && res.data.estado ? res.data.estado : 'aceptado'));
+      _showToast('✅ Soporte PDF copiado y divulgado.<br><br>Origen: <code>' + origen + '</code><br>Destino: <code>' + copyRes.data.path + '</code><br>Estado: ' + (res.data && res.data.estado ? res.data.estado : 'aceptado'), 'success', 6000);
     } else {
       btn.removeAttribute('disabled');
       btn.innerHTML = '<i class="bi bi-upload"></i> Copiar y marcar aceptado';
-      alert('Error guardando divulgación: ' + (res && res.error && res.error.message));
+      _showToast('Error guardando divulgación: ' + (res && res.error && res.error.message), 'error', 5000);
     }
   } catch (e) {
     btn.removeAttribute('disabled');
     btn.innerHTML = '<i class="bi bi-upload"></i> Copiar y marcar aceptado';
-    alert('Error: ' + e.message);
+    _showToast('Error: ' + e.message, 'error', 5000);
   }
 }
 
@@ -909,10 +949,10 @@ async function eliminarDivulgacion(divulgId) {
     if (res && res.success) {
       await cargarDatos();
     } else {
-      alert('Error: ' + (res && res.error && res.error.message));
+      _showToast('Error: ' + (res && res.error && res.error.message), 'error', 5000);
     }
   } catch (e) {
-    alert('Error: ' + e.message);
+    _showToast('Error: ' + e.message, 'error', 5000);
   }
 }
 
@@ -935,7 +975,7 @@ async function actualizarFecha(divulgId, fecha) {
 }
 
 async function exportarPDF() {
-  if (!rrState.empresaId) { alert('Selecciona una empresa primero'); return; }
+  if (!rrState.empresaId) { _showToast('Selecciona una empresa primero', 'warning'); return; }
   // 📦705-fix6 (2026-08-14) — No usar `process.env.USERNAME` porque este código
   // corre en el iframe del renderer, donde `process` no existe (eso es del
   // main process de Node). Usamos un placeholder genérico + le pedimos al user
@@ -950,13 +990,13 @@ async function exportarPDF() {
       outputPath: outputPath
     });
     if (res && res.success) {
-      alert('✅ Reporte generado correctamente:\n' + res.data.path + '\n(' + res.data.bytes + ' bytes)');
+      _showToast('✅ Reporte generado correctamente:<br><code>' + res.data.path + '</code><br>(' + res.data.bytes + ' bytes)', 'success', 6000);
     } else {
-      alert('Error generando PDF: ' + (res && res.error && res.error.message));
+      _showToast('Error generando PDF: ' + (res && res.error && res.error.message), 'error', 5000);
     }
   } catch (e) {
     console.error('[RolesResp] Error generando PDF:', e.message);
-    alert('Error: ' + e.message);
+    _showToast('Error: ' + e.message, 'error', 5000);
   }
 }
 

@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.183] - 2026-08-14
+
+### 📦706-fix21 — refactor(roles-resp): toast notifications (mismo patrón que 6.1.2)
+
+**Causa**: el submódulo usaba `alert()` nativos que bloquean la UI, son feos visualmente y rompen el flujo de trabajo del user. El 6.1.2 Política ya tenía un sistema de toast moderno, no había razón para no usarlo acá.
+
+### Changed
+- **Antes**: 17 `alert()` nativos que bloquean la UI con un dialog feo.
+- **Ahora**: sistema de toast que aparece arriba a la derecha, se cierra automáticamente, soporta HTML básico (`<strong>`, `<code>`, `<br>`), tiene 4 tipos (success, error, warning, info) con colores y íconos.
+
+### Added
+- **Función `_showToast(message, type, duration)`** en el viewer. Mismo patrón que 6.1.2 Política. La API:
+  - `message`: string con HTML básico permitido
+  - `type`: 'success' | 'error' | 'warning' | 'info' (default: 'info')
+  - `duration`: ms (default: 3000). Usar 0 para que no se cierre solo
+- **Container `#kToastContainer`** en el HTML, antes del cierre del body
+- **Estilos `.kair-toast-container` y `.kair-toast`** en el CSS (animación slide-in/out desde la derecha)
+
+### Migration notes
+- Los `alert()` fueron reemplazados 1-a-1 por `_showToast()`. Algunos casos especiales:
+  - Mensajes de éxito con `\n\n` (varias líneas) → ahora con `<br><br>` (HTML)
+  - Paths largos → envueltos en `<code>` para mejor lectura
+  - Validaciones (campos vacíos) → tipo `warning`
+  - Errores técnicos → tipo `error` con duración más larga (5s)
+  - Confirmaciones de éxito con paths → tipo `success` con duración más larga (6s)
+- `confirm()` se mantiene como nativo (es OK para confirmaciones destructivas, no se reemplaza con toast)
+- Si el container no existe (ej: durante el init antes de que cargue el HTML), `_showToast` cae a `console.log` (no rompe nada)
+
 ## [0.1.182] - 2026-08-14
 
 ### 📦706-fix20 — feat(roles-resp): carpetas automáticas por trabajador
