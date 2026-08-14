@@ -561,6 +561,49 @@ function _handlerActualizarRol(payload) {
   }
 }
 
+// 📦706-fix24 (2026-08-14) — Edición de matriz desde la app
+// Solo permite editar las 3 columnas del Excel G-OD-006
+// (responsabilidades, autoridad, rendicion_cuentas). El nombre, código y base
+// legal del rol NO son editables (vienen del catálogo y son fijos).
+// Sin versionado: sobreescribe directo, sin tabla de historial.
+function _handlerActualizarMatriz(payload) {
+  if (!_getDb) {
+    return { success: false, error: { code: 'NO_DB', message: 'Base de datos no disponible' } };
+  }
+  if (!payload || !payload.id) {
+    return { success: false, error: { code: 'VALIDATION', message: 'id del rol es requerido' } };
+  }
+  // Los 3 campos son requeridos (pueden ser string vacío para "sin definir").
+  // Esto evita que un UPDATE accidental borre contenido por no enviar el campo.
+  if (payload.responsabilidades === undefined || payload.responsabilidades === null ||
+      payload.autoridad === undefined || payload.autoridad === null ||
+      payload.rendicion_cuentas === undefined || payload.rendicion_cuentas === null) {
+    return { success: false, error: { code: 'VALIDATION', message: 'Las 3 columnas (Responsabilidades, Autoridad, Rendición) son requeridas' } };
+  }
+  try {
+    var db = _getDb();
+    // Verificar que el rol existe antes de actualizar
+    var existe = db.prepare('SELECT id FROM roles_responsabilidades_catalogo WHERE id = ?').get(payload.id);
+    if (!existe) {
+      return { success: false, error: { code: 'NOT_FOUND', message: 'El rol no existe' } };
+    }
+    db.prepare(`
+      UPDATE roles_responsabilidades_catalogo
+      SET responsabilidades = ?, autoridad = ?, rendicion_cuentas = ?
+      WHERE id = ?
+    `).run(
+      String(payload.responsabilidades).trim() || null,
+      String(payload.autoridad).trim() || null,
+      String(payload.rendicion_cuentas).trim() || null,
+      payload.id
+    );
+    return { success: true, data: { id: payload.id } };
+  } catch (e) {
+    console.error('[' + MOD + '][CATALOGO-MATRIZ-ACTUALIZAR]', e.message);
+    return { success: false, error: { code: 'DB_ERROR', message: e.message } };
+  }
+}
+
 function _handlerDesactivarRol(payload) {
   if (!_getDb) {
     return { success: false, error: { code: 'NO_DB', message: 'Base de datos no disponible' } };
@@ -1275,6 +1318,14 @@ function registerRolesResponsabilidadesHandlers(app, deps) {
     try { return _handlerActualizarRol(payload); }
     catch (e) {
       console.error('[' + MOD + '][HANDLER-CATALOGO-ACTUALIZAR]', e.message);
+      return { success: false, error: { code: 'INTERNAL', message: e.message } };
+    }
+  });
+  // 📦706-fix24 (2026-08-14) — Edición de matriz desde la app (3 columnas del Excel)
+  ipcMain.handle('roles-resp:catalogo-matriz-actualizar', async function (event, payload) {
+    try { return _handlerActualizarMatriz(payload); }
+    catch (e) {
+      console.error('[' + MOD + '][HANDLER-CATALOGO-MATRIZ-ACTUALIZAR]', e.message);
       return { success: false, error: { code: 'INTERNAL', message: e.message } };
     }
   });

@@ -1,3 +1,55 @@
+# K+AIR v0.1.186
+
+## 📦706-fix24 — Edición de matriz desde la app (v0.1.186)
+
+Feature nuevo. Ahora podés editar las 3 columnas del catálogo de Roles y Responsabilidades (Responsabilidades / Autoridad / Rendición de Cuentas) directamente desde el modal Matriz, sin tener que volver al Excel G-OD-006.
+
+**¿Cómo se usa?**
+1. Abrí el modal Matriz del rol (botón con ícono de tabla en la tabla de "Roles obligatorios").
+2. Click en "✏️ Editar" (en el footer, al lado de "Asignar persona a este rol").
+3. Los 3 párrafos se transforman en textareas editables (con fondo amarillo para diferenciar del modo lectura).
+4. Modificá lo que necesites en las 3 columnas.
+5. Click en "💾 Guardar cambios" para persistir o "❌ Cancelar" para descartar.
+
+### Antes vs después
+
+| Escenario | ANTES (v0.1.185) | AHORA (v0.1.186) |
+|---|---|---|
+| Editar una responsabilidad del catálogo | Solo lectura. Había que abrir el Excel G-OD-006, modificarlo, y reimportar (o dejarlo desactualizado) | Click en "✏️ Editar" → modificar en textarea → "💾 Guardar cambios". El cambio se persiste y se ve inmediatamente |
+| Editar la autoridad o rendición de cuentas | Mismo problema que arriba | Mismo flujo: textarea editable + Guardar |
+| Cancelar cambios | No aplicable (no había edición) | "❌ Cancelar" descarta los cambios y vuelve a los valores del state |
+
+### Detalles
+
+- **Editable**: solo las 3 columnas del Excel (Responsabilidades, Autoridad, Rendición de Cuentas). El nombre, código y base legal del rol NO son editables (son fijos del catálogo).
+- **Sin versionado**: sobreescribe directo, no hay tabla de historial. Si querés volver a una versión anterior, tendrías que volver a escribirla.
+- **Strings vacíos**: si vacías una columna, se guarda como `NULL` en la BD (el modal muestra "— (sin definir)" en ese caso).
+- **Cancelar descarta cambios**: si escribís algo y le das "Cancelar", se pierden. "Guardar cambios" es el único path que persiste.
+- **Botones deshabilitados durante el guardado**: para evitar doble click mientras se hace el IPC.
+- **Errores**: si el bridge falla, se muestra toast de error y los botones se rehabilitan para reintentar. El modal sigue en modo edición.
+
+### Archivos modificados (6)
+
+1. `main/roles-responsabilidades-bridge.js` — Handler nuevo `_handlerActualizarMatriz` (validación + prepared statement + check de existencia). `ipcMain.handle('roles-resp:catalogo-matriz-actualizar', ...)`.
+2. `preload.js` — API `rolesResp.actualizarMatriz`.
+3. `roles-responsabilidades-logic.js` — Case en el switch del proxy.
+4. `roles-responsabilidades-view.html` — 2 footers (lectura con "Editar" / edición con "Guardar" + "Cancelar").
+5. `roles-responsabilidades-view.css` — Estilos para los textareas y el wrap amarillo de edición.
+6. `roles-responsabilidades-viewer.js` — `rrState.matrizEditMode` + 5 funciones nuevas (`_entrarModoEdicionMatriz`, `_salirModoEdicionMatriz`, `_guardarMatriz`, `_renderModalMatrizLectura`, helpers de reemplazo de elementos).
+
+### Tests
+8 tests aislados del handler pasaron (Node + better-sqlite3 mockeando electron):
+- ✅ Actualización válida
+- ✅ Validación de id faltante
+- ✅ Validación de campo faltante
+- ✅ NOT_FOUND de id inexistente
+- ✅ Strings vacíos → NULL
+- ✅ Nombre/código NO se modifican aunque vengan en el payload
+- ✅ Payload null rechazado
+- ✅ SQL injection se guarda literal y la tabla sigue existiendo (prepared statements)
+
+---
+
 # K+AIR v0.1.185
 
 ## 📦706-fix23 — Unificar dropzones origen y destino (v0.1.185)

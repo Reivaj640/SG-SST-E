@@ -2,6 +2,10 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 .kair-rr-body {
+    /* 📦706-fix24b (2026-08-14) — Fijar el body al alto del iframe para que
+       .kair-rr-root pueda usar height:100% y el scroll interno funcione. */
+    height: 100vh;
+    overflow: hidden;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background: #f8fafc;
     color: #1e293b;
@@ -9,7 +13,7 @@
     min-height: 100vh;
 }
 
-.kair-rr-root { display: flex; flex-direction: column; min-height: 100vh; }
+.kair-rr-root { display: flex; flex-direction: column; height: 100%; }
 
 /* HEADER + TABS — Patrón estandarizado (mismo que 6.1.1) */
 .kair-rr-header-card.k-section-card {
@@ -140,11 +144,37 @@
 }
 
 /* TAB PANELS */
-.kair-rr-tab-panel { display: none; padding: 20px; flex: 1; }
-.kair-rr-tab-panel.is-active { display: block; }
+.kair-rr-tab-panel {
+    display: none;
+    /* 📦706-fix24b (2026-08-14) — flex column para que el banner quede fijo
+       y el wrapper de secciones (.kair-rr-sections-scroll) tome el resto con
+       su propio scroll. El min-height:0 es obligatorio en flex children para
+       que el overflow-y:auto del hijo funcione. */
+    padding: 20px;
+    flex: 1;
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
+}
+.kair-rr-tab-panel.is-active { display: flex; }
+
+/* 📦706-fix24b (2026-08-14) — Wrapper con scroll SOLO para las secciones
+   (Matriz de Roles + Divulgación). El header y el banner quedan fijos arriba. */
+.kair-rr-sections-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
 
 /* BANNER */
 .kair-rr-banner {
+    /* 📦706-fix24b (2026-08-14) — El banner queda fijo arriba, no se comprime
+       ni scrollea junto con las secciones. */
+    flex-shrink: 0;
     background: white;
     border: 1px solid #e2e8f0;
     border-radius: 8px;
@@ -269,6 +299,30 @@
     font-size: 13px; font-family: inherit;
 }
 .kair-rr-input { font-size: 13px; }
+
+/* 📦706-fix24 (2026-08-14) — Textarea de edición de matriz.
+   Estilo consistente con los inputs del modal (border, radius, font) pero
+   permite múltiples líneas y resize vertical para acomodar listas largas. */
+.kair-rr-textarea {
+    display: block; width: 100%;
+    margin-top: 4px; padding: 8px 10px;
+    border: 1px solid #cbd5e1; border-radius: 6px;
+    font-size: 12px; line-height: 1.5;
+    font-family: inherit;
+    background: white; color: #0f172a;
+    resize: vertical; min-height: 80px; max-height: 240px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+.kair-rr-textarea:focus {
+    outline: none; border-color: #174ea6;
+    box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.12);
+}
+/* Indicador visual de que la columna está en modo edición: fondo amarillo suave
+   para diferenciar del modo lectura (gris #f8fafc). */
+.kair-rr-textarea-wrap {
+    background: #fefce8; border: 1px dashed #facc15;
+    border-radius: 6px; padding: 8px 10px;
+}
 .kair-rr-modal__foot {
     padding: 12px 20px;
     border-top: 1px solid #e2e8f0;

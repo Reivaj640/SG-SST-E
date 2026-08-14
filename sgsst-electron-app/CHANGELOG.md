@@ -5,6 +5,53 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.186] - 2026-08-14
+
+### 📦706-fix24 — feat(roles-resp): edición de matriz desde la app
+
+**Causa**: los datos del modal Matriz venían del Excel G-OD-006 y no se podían editar desde la app. Si el user quería ajustar/corregir una responsabilidad, autoridad o rendición de cuentas, tenía que volver al Excel, modificarlo, y reimportar (o dejarlo desactualizado). Quería poder editar/actualizar el contenido desde la app.
+
+### Added
+- **Botón "✏️ Editar"** en el footer del modal Matriz, entre "Asignar persona a este rol" y "Cerrar".
+- **Modo edición**: al hacer click en "Editar", los 3 párrafos (Responsabilidades / Autoridad / Rendición de Cuentas) se transforman en textareas editables con fondo amarillo para diferenciar visualmente del modo lectura.
+- **Botones "💾 Guardar cambios" y "❌ Cancelar"** en el footer de edición (reemplazan a los 3 botones de lectura).
+- **Handler nuevo `_handlerActualizarMatriz`** en el bridge: valida que el id exista y que las 3 columnas vengan (pueden ser string vacío para "sin definir"), rechaza cualquier intento de editar nombre/código/base legal (solo las 3 columnas son editables).
+- **API `rolesResp.actualizarMatriz`** en el preload + case en el logic para conectar el bridge con la UI.
+
+### Changed
+- **Antes**: el modal Matriz era solo de lectura. Para editar el contenido, el user tenía que modificar el Excel G-OD-006 y reimportar.
+- **Ahora**: el user puede editar las 3 columnas directamente desde la app con un click en "Editar" → modifica → "Guardar cambios". El cambio se persiste en la BD y se refleja en el modal inmediatamente (recarga el catálogo del state y repinta el modal en modo lectura).
+
+### Detalles
+- **Sin versionado**: sobreescribe directo. No hay tabla de historial (decisión confirmada con el user).
+- **Editable**: solo las 3 columnas (Responsabilidades, Autoridad, Rendición de Cuentas). El nombre, código y base legal del rol NO son editables (vienen del catálogo y son fijos).
+- **Strings vacíos**: si una columna se vacía, se guarda como `NULL` en la BD (helper de "sin definir").
+- **Cancelar descarta cambios**: NO lee los textareas al volver a modo lectura, usa los valores del state. Si el user escribió cambios y le da "Cancelar", se pierden.
+- **SQL injection safe**: el handler usa prepared statements (test #8 lo confirmó con payloads maliciosos).
+- **Tests**: 8 tests aislados del handler pasaron (actualización válida, validación de id faltante, validación de campo faltante, NOT_FOUND, strings vacíos → NULL, nombre/codigo inmutables, payload null, SQL injection literal).
+
+### Archivos (6 modificados, +200 líneas)
+1. `main/roles-responsabilidades-bridge.js` (+50): handler nuevo + ipcMain.handle
+2. `preload.js` (+2): API `actualizarMatriz`
+3. `roles-responsabilidades-logic.js` (+4): case en el proxy
+4. `roles-responsabilidades-view.html` (+8): 2 footers (lectura con "Editar" / edición con "Guardar" + "Cancelar")
+5. `roles-responsabilidades-view.css` (+20): estilos `.kair-rr-textarea` con focus + `.kair-rr-textarea-wrap` (fondo amarillo)
+6. `roles-responsabilidades-viewer.js` (+115): `rrState.matrizEditMode`, funciones `_entrarModoEdicionMatriz`, `_salirModoEdicionMatriz`, `_guardarMatriz`, `_renderModalMatrizLectura`, helpers `_reemplazarPPorTextarea` / `_reemplazarTextareaPorDiv`. Listeners de los 2 botones nuevos. Refactor de `abrirModalMatriz` para resetear a modo lectura. `cerrarModalMatriz` ahora también sale del modo edición si quedó activo.
+
+### 📦706-fix24b — refactor(roles-resp): scroll solo debajo de la sección de cumplimiento
+
+**Causa**: cuando hay muchas filas en Matriz o Divulgación, todo el documento scrolleaba (incluyendo el header "Roles y Responsabilidades", los tabs y el banner de cumplimiento). El user quería que el scroll estuviera SOLO debajo del banner, sin afectar la zona fija de header+tabs+cumplimiento.
+
+### Changed
+- **Antes**: el body tenía `min-height: 100vh` y el root crecía con el contenido. Todo el documento scrolleaba, incluyendo el header.
+- **Ahora**: el body tiene `height: 100vh; overflow: hidden`. El root usa `height: 100%; display: flex; flex-direction: column`. El main (`panelGestion`) es `flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column`. El banner es `flex-shrink: 0` (queda fijo). Las 2 secciones están envueltas en un nuevo `.kair-rr-sections-scroll` con `flex: 1; min-height: 0; overflow-y: auto` — es el ÚNICO elemento que scrollea.
+
+### Archivos adicionales (2 modificados, +20 líneas)
+1. `roles-responsabilidades-view.html` (+4): wrapper `<div class="kair-rr-sections-scroll">` después del banner, cierre antes de `</main>`.
+2. `roles-responsabilidades-view.css` (+16): `body { height: 100vh; overflow: hidden }`, `root { height: 100% }`, `main { flex column + min-height: 0 + overflow: hidden }`, `banner { flex-shrink: 0 }`, nuevo `.kair-rr-sections-scroll { flex: 1; min-height: 0; overflow-y: auto }`.
+
+---
+
 ## [0.1.185] - 2026-08-14
 
 ### 📦706-fix23 — refactor(roles-resp): unificar dropzones origen y destino

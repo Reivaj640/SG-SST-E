@@ -456,6 +456,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     listarCatalogo: () => ipcRenderer.invoke('roles-resp:catalogo-listar'),
     crearRol: (payload) => ipcRenderer.invoke('roles-resp:catalogo-crear', payload),
     actualizarRol: (payload) => ipcRenderer.invoke('roles-resp:catalogo-actualizar', payload),
+    // 📦706-fix24 (2026-08-14) — Edición de matriz desde la app (3 columnas del Excel)
+    actualizarMatriz: (payload) => ipcRenderer.invoke('roles-resp:catalogo-matriz-actualizar', payload),
     desactivarRol: (payload) => ipcRenderer.invoke('roles-resp:catalogo-desactivar', payload),
     listarAsignaciones: (empresaId) => ipcRenderer.invoke('roles-resp:asignacion-listar', { empresaId }),
     upsertAsignacion: (payload) => ipcRenderer.invoke('roles-resp:asignacion-upsert', payload),

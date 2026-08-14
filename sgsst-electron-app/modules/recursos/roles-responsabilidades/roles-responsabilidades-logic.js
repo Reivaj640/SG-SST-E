@@ -131,6 +131,10 @@ class RolesResponsabilidadesComponent {
                 case 'roles-resp:catalogo-actualizar':
                     result = await window.electronAPI.rolesResp.actualizarRol(payload);
                     break;
+                // 📦706-fix24 (2026-08-14) — Edición de matriz desde la app (3 columnas del Excel)
+                case 'roles-resp:catalogo-matriz-actualizar':
+                    result = await window.electronAPI.rolesResp.actualizarMatriz(payload);
+                    break;
                 case 'roles-resp:catalogo-desactivar':
                     result = await window.electronAPI.rolesResp.desactivarRol(payload);
                     break;

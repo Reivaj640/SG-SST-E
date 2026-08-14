@@ -52,6 +52,10 @@
                 </div>
             </section>
 
+            <!-- 📦706-fix24b (2026-08-14) — Wrapper con scroll SOLO para las 2
+                 secciones. El header y el banner quedan fijos arriba. -->
+            <div class="kair-rr-sections-scroll">
+
             <!-- Sección Matriz de Roles -->
             <section class="kair-rr-section">
                 <header class="kair-rr-section__head">
@@ -102,6 +106,8 @@
                     </table>
                 </div>
             </section>
+
+            </div> <!-- /kair-rr-sections-scroll -->
         </main>
     </div>
 
@@ -131,9 +137,15 @@
                 <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #64748b;" id="modalMatrizBaseLegal">
                 </div>
             </div>
-            <footer class="kair-rr-modal__foot">
+            <footer class="kair-rr-modal__foot" id="modalMatrizFootLectura">
                 <button class="kair-rr-btn kair-rr-btn--primary" id="btnMatrizAsignar">Asignar persona a este rol</button>
+                <button class="kair-rr-btn kair-rr-btn--ghost" id="btnMatrizEditar"><i class="bi bi-pencil"></i> Editar</button>
                 <button class="kair-rr-btn kair-rr-btn--ghost" data-action="cerrar-modal-matriz">Cerrar</button>
+            </footer>
+            <!-- 📦706-fix24 (2026-08-14) — Footer modo edición (oculto por default) -->
+            <footer class="kair-rr-modal__foot" id="modalMatrizFootEdicion" hidden>
+                <button class="kair-rr-btn kair-rr-btn--primary" id="btnMatrizGuardar"><i class="bi bi-check2"></i> Guardar cambios</button>
+                <button class="kair-rr-btn kair-rr-btn--ghost" id="btnMatrizCancelar">Cancelar</button>
             </footer>
         </div>
     </div>

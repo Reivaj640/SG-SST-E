@@ -17,7 +17,11 @@ var rrState = {
   // El badge "+N anteriores" usa d.documento_count del bridge.
   currentTab: 'gestion',
   editingRol: null,
-  editingDivulg: null
+  editingDivulg: null,
+  // 📦706-fix24 (2026-08-14) — Modo edición de la matriz (Responsabilidades /
+  // Autoridad / Rendición de Cuentas). true = los 3 párrafos se muestran como
+  // textareas editables; false = modo lectura con los 3 párrafos de texto.
+  matrizEditMode: false
 };
 
 function $(sel) { return document.querySelector(sel); }
@@ -282,6 +286,10 @@ function setupModalEvents() {
     cerrarModalMatriz();
     if (rrState.editingRol) abrirModalAsignar(rrState.editingRol);
   });
+  // 📦706-fix24 (2026-08-14) — Botones de edición de la matriz
+  $('#btnMatrizEditar').addEventListener('click', _entrarModoEdicionMatriz);
+  $('#btnMatrizCancelar').addEventListener('click', _salirModoEdicionMatriz);
+  $('#btnMatrizGuardar').addEventListener('click', _guardarMatriz);
   // 📦705-fix8 (2026-08-14) — Drag&drop + examinar del modal "Subir soporte"
   $('#dropZoneSoporte').addEventListener('click', examinarOrigen);
   $('#dropZoneSoporte').addEventListener('dragover', function(e) {
@@ -756,6 +764,8 @@ function cerrarModalTrabajador() {
 // 📦705-fix3 (2026-08-14) — Modal Matriz del Excel G-OD-006 (4 columnas:
 // Responsabilidades / Autoridad / Rendición de Cuentas / Base legal).
 // Se abre al hacer click en el botón "Matriz" de la tabla de roles.
+// 📦706-fix24 (2026-08-14) — Edición de las 3 columnas desde la app
+// (sin versionado, sobreescribe directo). Botón "✏️ Editar" en el footer.
 function abrirModalMatriz(rolId) {
   var rol = rrState.catalogo.find(function (c) { return c.id === rolId; });
   if (!rol) {
@@ -763,18 +773,174 @@ function abrirModalMatriz(rolId) {
     return;
   }
   rrState.editingRol = rolId;
+  // Siempre arranca en modo lectura. Si el modal se re-abre después de una
+  // edición, _salirModoEdicionMatriz() ya dejó el footer correcto.
+  if (rrState.matrizEditMode) {
+    _salirModoEdicionMatriz(); // safety: si quedó en true por error, resetear
+  }
+  _renderModalMatrizLectura(rol);
+  $('#modalMatriz').removeAttribute('hidden');
+}
+
+// Helper: pinta los 3 párrafos en modo lectura + muestra el footer de lectura.
+function _renderModalMatrizLectura(rol) {
   $('#modalMatrizNombre').textContent = rol.nombre || '—';
   $('#modalMatrizCodigo').textContent = rol.codigo || '—';
   $('#modalMatrizResponsabilidades').textContent = rol.responsabilidades || '— (sin definir)';
   $('#modalMatrizAutoridad').textContent = rol.autoridad || '— (sin definir)';
   $('#modalMatrizRendicion').textContent = rol.rendicion_cuentas || '— (sin definir)';
   $('#modalMatrizBaseLegal').textContent = rol.base_legal || '';
-  $('#modalMatriz').removeAttribute('hidden');
+  $('#modalMatrizFootLectura').removeAttribute('hidden');
+  $('#modalMatrizFootEdicion').setAttribute('hidden', '');
+}
+
+// 📦706-fix24 (2026-08-14) — Entra en modo edición: 3 textareas + footer con
+// Guardar/Cancelar. Preserva los valores actuales del rol en los textareas.
+function _entrarModoEdicionMatriz() {
+  if (!rrState.editingRol) return;
+  var rol = rrState.catalogo.find(function (c) { return c.id === rrState.editingRol; });
+  if (!rol) return;
+  rrState.matrizEditMode = true;
+  // Reemplazar los 3 <div> por <textarea> usando outerHTML (conserva el id).
+  _reemplazarPPorTextarea('modalMatrizResponsabilidades', rol.responsabilidades || '');
+  _reemplazarPPorTextarea('modalMatrizAutoridad', rol.autoridad || '');
+  _reemplazarPPorTextarea('modalMatrizRendicion', rol.rendicion_cuentas || '');
+  // Footer: ocultar lectura, mostrar edición.
+  $('#modalMatrizFootLectura').setAttribute('hidden', '');
+  $('#modalMatrizFootEdicion').removeAttribute('hidden');
+  // Foco al primer textarea para empezar a tipear de una.
+  var ta = $('#modalMatrizResponsabilidades');
+  if (ta && ta.focus) ta.focus();
+}
+
+function _reemplazarPPorTextarea(elementId, valorActual) {
+  var el = document.getElementById(elementId);
+  if (!el) return;
+  var ta = document.createElement('textarea');
+  ta.id = elementId;
+  ta.className = 'kair-rr-textarea';
+  ta.value = valorActual;
+  // wrapper amarillo solo en edición (se quita al salir)
+  var wrap = document.createElement('div');
+  wrap.className = 'kair-rr-textarea-wrap';
+  wrap.appendChild(ta);
+  el.parentNode.replaceChild(wrap, el);
+}
+
+// 📦706-fix24 (2026-08-14) — Sale de modo edición SIN guardar: revierte los
+// 3 textareas a párrafos usando los valores del state (rrState.catalogo).
+function _salirModoEdicionMatriz() {
+  if (!rrState.editingRol) return;
+  var rol = rrState.catalogo.find(function (c) { return c.id === rrState.editingRol; });
+  if (!rol) return;
+  rrState.matrizEditMode = false;
+  // Reemplazar cada <textarea> (envuelta en wrap) por un <div> con el valor
+  // ORIGINAL del state. NO leemos los textareas porque descartar cambios.
+  _reemplazarTextareaPorDiv('modalMatrizResponsabilidades', rol.responsabilidades || '— (sin definir)');
+  _reemplazarTextareaPorDiv('modalMatrizAutoridad', rol.autoridad || '— (sin definir)');
+  _reemplazarTextareaPorDiv('modalMatrizRendicion', rol.rendicion_cuentas || '— (sin definir)');
+  // Footer: ocultar edición, mostrar lectura.
+  $('#modalMatrizFootEdicion').setAttribute('hidden', '');
+  $('#modalMatrizFootLectura').removeAttribute('hidden');
+}
+
+function _reemplazarTextareaPorDiv(elementId, texto) {
+  var ta = document.getElementById(elementId);
+  if (!ta) return;
+  var div = document.createElement('div');
+  div.id = elementId;
+  div.style.whiteSpace = 'pre-line';
+  div.style.fontSize = '12px';
+  div.style.lineHeight = '1.5';
+  div.style.background = '#f8fafc';
+  div.style.padding = '10px';
+  div.style.borderRadius = '4px';
+  div.textContent = texto;
+  // El textarea está envuelto en un <div class="kair-rr-textarea-wrap">.
+  // Reemplazamos el WRAPPER por el div nuevo, así queda igual que al inicio.
+  var wrap = ta.parentNode;
+  if (wrap && wrap.classList.contains('kair-rr-textarea-wrap')) {
+    wrap.parentNode.replaceChild(div, wrap);
+  } else {
+    ta.parentNode.replaceChild(div, ta);
+  }
+}
+
+// 📦706-fix24 (2026-08-14) — Guarda los 3 textareas via bridge, recarga el
+// catálogo y refresca el modal en modo lectura con los datos nuevos.
+// Si falla, mantiene el modo edición y muestra toast de error.
+async function _guardarMatriz() {
+  if (!rrState.editingRol) return;
+  var taR = $('#modalMatrizResponsabilidades');
+  var taA = $('#modalMatrizAutoridad');
+  var taC = $('#modalMatrizRendicion');
+  if (!taR || !taA || !taC) {
+    _showToast('Error: textareas no encontrados', 'error', 5000);
+    return;
+  }
+  var payload = {
+    id: rrState.editingRol,
+    responsabilidades: taR.value,
+    autoridad: taA.value,
+    rendicion_cuentas: taC.value
+  };
+  // Deshabilitar botones mientras se guarda
+  var btnGuardar = $('#btnMatrizGuardar');
+  var btnCancelar = $('#btnMatrizCancelar');
+  if (btnGuardar) btnGuardar.disabled = true;
+  if (btnCancelar) btnCancelar.disabled = true;
+  try {
+    var res = await _bridgeCall('roles-resp:catalogo-matriz-actualizar', payload);
+    if (res && res.success) {
+      // Recargar el catálogo para que rrState.catalogo tenga los datos nuevos.
+      // Si falla el refresh, al menos actualizamos el rol en memoria para que
+      // el modal muestre los datos que el user acaba de escribir.
+      var catalogoRes = await _bridgeCall('roles-resp:catalogo-listar');
+      if (catalogoRes && catalogoRes.success && Array.isArray(catalogoRes.data)) {
+        rrState.catalogo = catalogoRes.data;
+      } else {
+        // Fallback: actualizar SOLO el rol editado en el state local
+        var idx = rrState.catalogo.findIndex(function (c) { return c.id === payload.id; });
+        if (idx >= 0) {
+          rrState.catalogo[idx].responsabilidades = payload.responsabilidades;
+          rrState.catalogo[idx].autoridad = payload.autoridad;
+          rrState.catalogo[idx].rendicion_cuentas = payload.rendicion_cuentas;
+        }
+      }
+      // Salir del modo edición: ahora _renderModalMatrizLectura leerá del
+      // state actualizado y mostrará los datos nuevos.
+      var rol = rrState.catalogo.find(function (c) { return c.id === rrState.editingRol; });
+      if (rol) {
+        rrState.matrizEditMode = false;
+        _reemplazarTextareaPorDiv('modalMatrizResponsabilidades', rol.responsabilidades || '— (sin definir)');
+        _reemplazarTextareaPorDiv('modalMatrizAutoridad', rol.autoridad || '— (sin definir)');
+        _reemplazarTextareaPorDiv('modalMatrizRendicion', rol.rendicion_cuentas || '— (sin definir)');
+        $('#modalMatrizFootEdicion').setAttribute('hidden', '');
+        $('#modalMatrizFootLectura').removeAttribute('hidden');
+      }
+      _showToast('✅ Matriz actualizada', 'success', 3000);
+    } else {
+      _showToast('Error guardando: ' + (res && res.error && res.error.message || 'desconocido'), 'error', 5000);
+      // Rehabilitar botones para que pueda reintentar
+      if (btnGuardar) btnGuardar.disabled = false;
+      if (btnCancelar) btnCancelar.disabled = false;
+    }
+  } catch (e) {
+    console.error('[RolesResp] Error guardando matriz:', e.message);
+    _showToast('Error: ' + e.message, 'error', 5000);
+    if (btnGuardar) btnGuardar.disabled = false;
+    if (btnCancelar) btnCancelar.disabled = false;
+  }
 }
 
 function cerrarModalMatriz() {
   $('#modalMatriz').setAttribute('hidden', '');
+  // Si estaba en modo edición, descartar cambios (volver a modo lectura)
+  if (rrState.matrizEditMode) {
+    _salirModoEdicionMatriz();
+  }
   rrState.editingRol = null;
+  rrState.matrizEditMode = false;
 }
 
 async function guardarTrabajador() {
