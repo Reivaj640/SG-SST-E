@@ -1,3 +1,33 @@
+# K+AIR v0.1.187
+
+## 📦707 — Regenerar ícono de ventana con fill 90% (v0.1.187)
+
+El ícono de la esquina de la ventana, de la barra de tareas y del acceso directo del escritorio se veía muy chico (fill del 50% del canvas del `.ico`). Ahora se ve mucho más grande.
+
+### Antes vs después
+
+| Contexto | ANTES (v0.1.186) | AHORA (v0.1.187) |
+|---|---|---|
+| Esquina de ventana (16x16) | Logo 8x8 px (50% del canvas) | Logo 14x14 px (90% del canvas) |
+| Taskbar (32x32) | Logo 16x16 px | Logo 28x28 px |
+| Taskbar HiDPI (48x48) | Logo 24x24 px | Logo 43x43 px |
+| Atajo del escritorio | Logo 24x24 px | Logo 43x43 px |
+| Splash / Home inicial | Logo 128x128 px (KIAR256.ico) | **Sin cambio** (usa KIAR256.ico) |
+| Header de la app | Logo 128x128 px (KIAR256.ico) | **Sin cambio** (usa KIAR256.ico) |
+
+### ¿Por qué 2 íconos separados?
+
+- `K+AIR-multires.ico` (7 versiones 16-256) → **Windows** lo usa para ventana, taskbar y shortcut
+- `KIAR256.ico` (1 versión 256) → la **app** lo usa en el splash y en el header HTML
+
+Regenerando SOLO el multires, el logo de la ventana/taskbar/shortcut crece sin tocar el splash ni el header de la app.
+
+### Archivos (1 modificado, 0 nuevos)
+- `assets/K+AIR-multires.ico`: 49KB → 95KB
+- `package.json`: bump 0.1.186 → 0.1.187
+
+---
+
 # K+AIR v0.1.186
 
 ## 📦706-fix24 — Edición de matriz desde la app (v0.1.186)

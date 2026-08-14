@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.187] - 2026-08-14
+
+### 📦707 — feat(icons): regenerar K+AIR-multires.ico con fill 90% (ícono de ventana más grande)
+
+**Causa**: el ícono de la esquina de la ventana, de la barra de tareas y del acceso directo del escritorio se veía muy chico (fill del 50% del canvas del `.ico`, lo que dejaba mucho padding transparente). El user pidió subir el tamaño del logo **SOLO en el ícono de la ventana** (y de la taskbar/shortcut que usan el mismo `.ico`), sin afectar el resto (splash y header usan el `KIAR256.ico` separado).
+
+### Changed
+- **`K+AIR-multires.ico`**: regenerado con fill **90%** (vs 50% original). Logo más grande en todos los tamaños:
+  - 16x16: 8x8 → 14x14 (75% más grande)
+  - 32x32: 16x16 → 28x28 (75% más grande)
+  - 48x48: 24x24 → 43x43 (79% más grande)
+  - 256x256: 128x128 → 230x230 (80% más grande)
+- **`KIAR256.ico`**: **NO modificado**, queda en su estado original (fill 50%). Se usa en el splash y header de la app — no se ve afectado.
+- **Tamaño de archivo**: 49KB → 95KB (casi 2x más grande por más píxeles con color).
+
+### Por qué SOLO el multires
+El proyecto tiene 2 íconos:
+- `K+AIR-multires.ico` (7 versiones: 16-256) → usado por Windows para la **esquina de la ventana, taskbar y shortcut del escritorio**
+- `KIAR256.ico` (1 versión: 256) → usado por la app internamente en el **splash de carga** y en el **header HTML**
+
+Regenerando solo el multires, el logo de la ventana/taskbar/shortcut crece sin tocar lo que se ve dentro de la app.
+
+### Archivos (1 modificado, 0 nuevos)
+1. `assets/K+AIR-multires.ico` — regenerado, 49KB → 95KB
+2. `package.json` — bump 0.1.186 → 0.1.187
+
+---
+
 ## [0.1.186] - 2026-08-14
 
 ### 📦706-fix24 — feat(roles-resp): edición de matriz desde la app
