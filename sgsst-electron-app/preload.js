@@ -451,6 +451,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
     marcar: (params) => ipcRenderer.invoke('eventos-cumplidos:marcar', params),
     desmarcar: (params) => ipcRenderer.invoke('eventos-cumplidos:desmarcar', params)
   },
+  // 📦705 (2026-08-13) — Roles y Responsabilidades (estándar 1.1.2 Res. 0312 + Dto. 1072)
+  rolesResp: {
+    listarCatalogo: () => ipcRenderer.invoke('roles-resp:catalogo-listar'),
+    crearRol: (payload) => ipcRenderer.invoke('roles-resp:catalogo-crear', payload),
+    actualizarRol: (payload) => ipcRenderer.invoke('roles-resp:catalogo-actualizar', payload),
+    desactivarRol: (payload) => ipcRenderer.invoke('roles-resp:catalogo-desactivar', payload),
+    listarAsignaciones: (empresaId) => ipcRenderer.invoke('roles-resp:asignacion-listar', { empresaId }),
+    upsertAsignacion: (payload) => ipcRenderer.invoke('roles-resp:asignacion-upsert', payload),
+    listarDivulgaciones: (empresaId) => ipcRenderer.invoke('roles-resp:divulgacion-listar', { empresaId }),
+    upsertDivulgacion: (payload) => ipcRenderer.invoke('roles-resp:divulgacion-upsert', payload),
+    eliminarDivulgacion: (id) => ipcRenderer.invoke('roles-resp:divulgacion-eliminar', { id }),
+    generarReportePDF: (payload) => ipcRenderer.invoke('roles-resp:reporte-pdf', payload),
+    // 📦705-fix8 (2026-08-14) — File dialogs + copia para el modal "Subir soporte"
+    seleccionarArchivoOrigen: () => ipcRenderer.invoke('roles-resp:archivo-seleccionar-origen'),
+    seleccionarCarpetaDestino: (payload) => ipcRenderer.invoke('roles-resp:archivo-seleccionar-destino', payload || {}),
+    copiarArchivo: (payload) => ipcRenderer.invoke('roles-resp:archivo-copiar', payload),
+    // 📦705-fix10 (2026-08-14) — Descargar PDF de soporte
+    descargarArchivo: (payload) => ipcRenderer.invoke('roles-resp:archivo-descargar', payload)
+  },
   // 📦531 — Persistencia de planes de acción del submódulo 2.3.1 Evaluación
   // Inicial del SG-SST. Antes los planes vivían en memoria y se perdían al
   // cerrar el módulo. Ahora se persisten por (empresaId, year) y se

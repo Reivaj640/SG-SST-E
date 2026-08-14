@@ -1,1579 +1,719 @@
-/* ═══════════════════════════════════════════════════════════════════
-   K+AIR · 1.1.2 Roles y Responsabilidades · Visualizador v2.0
-   v2.0 · 2026-07-10 — Réplica del rediseño Opción C (híbrido incremental)
-   ═══════════════════════════════════════════════════════════════════
-
-   MEJORAS v2.0:
-   - Patrón IIFE con export window (cumple AGENTS.md)
-   - Breadcrumb multinivel real (deriva de basePath ↔ currentFolderPath)
-   - Toggle Lista/Grid con persistencia en localStorage scoped
-   - Búsqueda con debounce 300ms
-   - Sort por nombre / tamaño / fecha
-   - Preview panel lateral colapsable
-   - Skeleton loaders (estilo KairSkeleton)
-   - Empty states canónicos (kair-empty)
-   - Footer con metadata (cantidad, tamaño total, última modificación)
-   - Selección: click = preview, doble-click = abrir externo
-   - Soporte dark mode (sincroniza data-theme del padre)
-   - Atributo title en archivos para ver nombre completo en hover
-   - Logging estructurado [K+AIRSST][ROLES_RESPONSABILIDADES][ACCION][STATUS]
-
-   MIGRACIÓN → v2.0:
-   - Namespace kair-docs-* → kair-* (canónico)
-   - Removida dependencia font-awesome
-   - Theme sync via postMessage('theme-changed') + MutationObserver
-   - Atributo title en archivos y nombre de preview (fix nombres largos)
-
-   CONTRATOS CONSERVADOS (sin cambios):
-   - callParentAPI(type, payload) → 9 canales IPC vía postMessage
-   - Handlers en renderer.js y roles-responsabilidades-logic.js SIN MODIFICAR
-   - main.js, preload.js SIN MODIFICAR
-
-   ═══════════════════════════════════════════════════════════════════ */
-
-var RolesResponsabilidadesViewer = (function () {
-    'use strict';
-
-    /* ═══════════════════════════════════════════════════════════════
-       ESTADO PRIVADO
-       ═══════════════════════════════════════════════════════════════ */
-    var _state = {
-        currentDocument: null,
-        currentFolderPath: '',
-        basePath: '',
-        pathHistory: [],
-        documents: [],          // Cache de documentos en carpeta actual
-        folders: [],            // Cache de carpetas en carpeta actual
-        searchQuery: '',
-        sortBy: 'name-asc',
-        viewMode: 'list',       // 'list' | 'grid'
-        currentZoom: 100,       // Number | 'width'
-        totalPages: 0,
-        currentPage: 1,
-        isSidebarCollapsed: false,
-        isPreviewCollapsed: false,
-        isLoading: false,
-        contextMenuDoc: null,
-        confirmCallback: null,
-        searchDebounceTimer: null,
-        company: '',
-        moduleName: '',
-        submoduleName: '',
-        // Listeners de theme (para cleanup en destroy)
-        _themeMessageHandler: null,
-        _themeObserver: null
-    };
-
-    /* ═══════════════════════════════════════════════════════════════
-       CONSTANTES
-       ═══════════════════════════════════════════════════════════════ */
-    var _LOG_PREFIX = '[K+AIRSST][ROLES_RESPONSABILIDADES]';
-    var _STORAGE_KEY = 'kair-docs-viewer-prefs';
-    var _SEARCH_DEBOUNCE_MS = 300;
-    var _MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
-    var _INVALID_CHARS = /[<>:"/\\|?*]/;
-
-    var _FILE_TYPES = {
-        'pdf':        { className: 'pdf',        icon: 'bi-file-earmark-pdf',       label: 'PDF' },
-        'xls':        { className: 'excel',      icon: 'bi-file-earmark-excel',     label: 'XLS' },
-        'xlsx':       { className: 'excel',      icon: 'bi-file-earmark-excel',     label: 'XLSX' },
-        'doc':        { className: 'word',       icon: 'bi-file-earmark-word',      label: 'DOC' },
-        'docx':       { className: 'word',       icon: 'bi-file-earmark-word',      label: 'DOCX' },
-        'ppt':        { className: 'powerpoint', icon: 'bi-file-earmark-slides',    label: 'PPT' },
-        'pptx':       { className: 'powerpoint', icon: 'bi-file-earmark-slides',    label: 'PPTX' },
-        'jpg':        { className: 'image',      icon: 'bi-file-earmark-image',     label: 'JPG' },
-        'jpeg':       { className: 'image',      icon: 'bi-file-earmark-image',     label: 'JPEG' },
-        'png':        { className: 'image',      icon: 'bi-file-earmark-image',     label: 'PNG' },
-        'txt':        { className: 'text',       icon: 'bi-file-earmark-text',      label: 'TXT' }
-    };
-
-    /* ═══════════════════════════════════════════════════════════════
-       HELPERS PRIVADOS
-       ═══════════════════════════════════════════════════════════════ */
-
-    function _log(action, status, data) {
-        var msg = _LOG_PREFIX + '[' + action + '][' + status + ']';
-        if (data !== undefined) {
-            console.log(msg, data);
-        } else {
-            console.log(msg);
-        }
-    }
-
-    function _err(action, error) {
-        console.error(_LOG_PREFIX + '[' + action + '][ERROR]', error);
-    }
-
-    function _esc(s) {
-        if (s === null || s === undefined) return '';
-        return String(s)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
-
-    function _getFileTypeInfo(extension) {
-        var ext = (extension || '').toLowerCase().replace('.', '');
-        return _FILE_TYPES[ext] || { className: 'default', icon: 'bi-file-earmark', label: ext.toUpperCase() || 'FILE' };
-    }
-
-    function _formatSize(bytes) {
-        if (!bytes || isNaN(bytes)) return '—';
-        if (bytes < 1024) return bytes + ' B';
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-        if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-        return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
-    }
-
-    function _formatDate(iso) {
-        if (!iso) return '—';
-        try {
-            var d = new Date(iso);
-            if (isNaN(d.getTime())) return '—';
-            var now = new Date();
-            var diffMs = now - d;
-            var diffMin = Math.floor(diffMs / 60000);
-            var diffHr = Math.floor(diffMin / 60);
-            var diffDay = Math.floor(diffHr / 24);
-
-            if (diffMin < 1) return 'hace un momento';
-            if (diffMin < 60) return 'hace ' + diffMin + ' min';
-            if (diffHr < 24) return 'hace ' + diffHr + ' h';
-            if (diffDay < 7) return 'hace ' + diffDay + ' día' + (diffDay === 1 ? '' : 's');
-
-            var dd = String(d.getDate()).padStart(2, '0');
-            var mm = String(d.getMonth() + 1).padStart(2, '0');
-            var yyyy = d.getFullYear();
-            return dd + '/' + mm + '/' + yyyy;
-        } catch (e) {
-            return '—';
-        }
-    }
-
-    function _normalizePathSep(path) {
-        if (!path) return '';
-        // Detectar separador dominante
-        var hasBackslash = path.indexOf('\\') !== -1;
-        var hasSlash = path.indexOf('/') !== -1;
-        return hasBackslash && !hasSlash ? '\\' : '/';
-    }
-
-    function _splitPath(path) {
-        if (!path) return [];
-        var sep = _normalizePathSep(path);
-        return path.split(sep).filter(function (p) { return p !== ''; });
-    }
-
-    function _getRelativeSegments(basePath, currentPath) {
-        if (!basePath || !currentPath) return [];
-        var baseSegs = _splitPath(basePath);
-        var currSegs = _splitPath(currentPath);
-        // Si currentPath no empieza con basePath, derivar por nombre
-        var relSegs = [];
-        var matchStart = -1;
-        for (var i = 0; i < currSegs.length; i++) {
-            if (currSegs[i] === baseSegs[0]) { matchStart = i; break; }
-        }
-        if (matchStart === -1) {
-            // No hay coincidencia, devolver últimos 2 segmentos como fallback
-            return currSegs.slice(-2);
-        }
-        return currSegs.slice(matchStart + baseSegs.length);
-    }
-
-    function _savePrefs() {
-        try {
-            var prefs = {
-                viewMode: _state.viewMode,
-                sortBy: _state.sortBy,
-                isSidebarCollapsed: _state.isSidebarCollapsed,
-                isPreviewCollapsed: _state.isPreviewCollapsed
-            };
-            localStorage.setItem(_STORAGE_KEY, JSON.stringify(prefs));
-        } catch (e) {
-            _err('SAVE_PREFS', e);
-        }
-    }
-
-    function _loadPrefs() {
-        try {
-            var raw = localStorage.getItem(_STORAGE_KEY);
-            if (!raw) return;
-            var prefs = JSON.parse(raw);
-            if (prefs.viewMode) _state.viewMode = prefs.viewMode;
-            if (prefs.sortBy) _state.sortBy = prefs.sortBy;
-            if (typeof prefs.isSidebarCollapsed === 'boolean') _state.isSidebarCollapsed = prefs.isSidebarCollapsed;
-            if (typeof prefs.isPreviewCollapsed === 'boolean') _state.isPreviewCollapsed = prefs.isPreviewCollapsed;
-        } catch (e) {
-            _err('LOAD_PREFS', e);
-        }
-    }
-
-    /* ═══════════════════════════════════════════════════════════════
-       THEME SYNC — Escucha cambios del padre y los aplica al iframe
-       El theme-manager del padre propaga el atributo data-theme al
-       iframe via contentDocument + postMessage('theme-changed').
-       ═══════════════════════════════════════════════════════════════ */
-    function _applyThemeToHtml(themeValue) {
-        // themeValue: 'dark-legacy' | 'dark' | null (light = sin atributo)
-        try {
-            var docEl = document.documentElement;
-            if (themeValue) {
-                docEl.setAttribute('data-theme', themeValue);
-            } else {
-                docEl.removeAttribute('data-theme');
-            }
-            _log('THEME', 'APPLIED', { value: themeValue });
-        } catch (e) {
-            _err('THEME_APPLY', e);
-        }
-    }
-
-    function _resolveThemeValue(theme, mode) {
-        // theme: 'light' | 'dark', mode: 'light' | 'dark' | 'system'
-        if (theme !== 'dark') return null; // light
-        // dark:
-        if (mode === 'dark') return 'dark-legacy';
-        if (mode === 'system') return 'dark';
-        return 'dark'; // fallback
-    }
-
-    function _setupThemeSync() {
-        // 1) Leer tema actual del <html> del padre (si está disponible)
-        try {
-            if (window.parent && window.parent.document && window.parent.document.documentElement) {
-                var parentTheme = window.parent.document.documentElement.getAttribute('data-theme');
-                if (parentTheme) {
-                    _applyThemeToHtml(parentTheme);
-                }
-            }
-        } catch (e) {
-            // cross-origin, no se puede leer del padre
-            _log('THEME', 'PARENT_READ_BLOCKED');
-        }
-
-        // 2) Escuchar mensajes de cambio de tema del padre
-        _state._themeMessageHandler = function (event) {
-            if (!event.data || typeof event.data !== 'object') return;
-            if (event.data.type !== 'theme-changed') return;
-            var theme = event.data.theme;
-            var mode = event.data.mode;
-            var themeValue = _resolveThemeValue(theme, mode);
-            _applyThemeToHtml(themeValue);
-        };
-        window.addEventListener('message', _state._themeMessageHandler);
-
-        // 3) MutationObserver como defensa: si el theme-manager cambia
-        //    el atributo data-theme directamente en el iframe, sincronizamos
-        if (typeof MutationObserver !== 'undefined') {
-            _state._themeObserver = new MutationObserver(function (mutations) {
-                mutations.forEach(function (m) {
-                    if (m.type === 'attributes' && m.attributeName === 'data-theme') {
-                        var newVal = document.documentElement.getAttribute('data-theme');
-                        _log('THEME', 'OBSERVED_CHANGE', { value: newVal });
-                    }
-                });
-            });
-            _state._themeObserver.observe(document.documentElement, {
-                attributes: true,
-                attributeFilter: ['data-theme']
-            });
-        }
-    }
-
-    function _teardownThemeSync() {
-        if (_state._themeMessageHandler) {
-            window.removeEventListener('message', _state._themeMessageHandler);
-            _state._themeMessageHandler = null;
-        }
-        if (_state._themeObserver) {
-            _state._themeObserver.disconnect();
-            _state._themeObserver = null;
-        }
-    }
-
-    /* ═══════════════════════════════════════════════════════════════
-       COMUNICACIÓN CON PARENT (contrato conservado)
-       ═══════════════════════════════════════════════════════════════ */
-    function _callParentAPI(type, payload) {
-        _log('CALL_PARENT', 'REQUEST', { type: type });
-        return new Promise(function (resolve, reject) {
-            var requestId = 'req-' + Date.now() + '-' + Math.random();
-
-            function handleResponse(event) {
-                if (event.origin !== 'file://' || event.source !== window.parent) {
-                    return;
-                }
-                var response = event.data;
-                if (response.type === type + '-response' && response.requestId === requestId) {
-                    window.removeEventListener('message', handleResponse);
-                    if (response.payload && response.payload.success) {
-                        _log('CALL_PARENT', 'SUCCESS', { type: type });
-                        resolve(response.payload);
-                    } else {
-                        var errorMessage = (response.payload && response.payload.error) || 'Unknown error from parent';
-                        _err('CALL_PARENT', new Error(errorMessage));
-                        reject(new Error(errorMessage));
-                    }
-                }
-            }
-
-            window.addEventListener('message', handleResponse);
-            window.parent.postMessage({
-                type: type + '-request',
-                payload: payload,
-                requestId: requestId
-            }, 'file://');
-        });
-    }
-
-    /* ═══════════════════════════════════════════════════════════════
-       LOADING / TOAST / NOTIFICATIONS
-       ═══════════════════════════════════════════════════════════════ */
-    function _showLoading(text) {
-        _state.isLoading = true;
-        var overlay = document.getElementById('loadingOverlay');
-        var textEl = document.getElementById('loadingText');
-        if (overlay) overlay.classList.add('is-active');
-        if (textEl) textEl.textContent = text || 'Cargando...';
-    }
-
-    function _hideLoading() {
-        _state.isLoading = false;
-        var overlay = document.getElementById('loadingOverlay');
-        if (overlay) overlay.classList.remove('is-active');
-    }
-
-    function _showToast(message, type, duration) {
-        type = type || 'info';
-        duration = duration || 3000;
-        var container = document.getElementById('kToastContainer');
-        if (!container) return;
-
-        var icons = {
-            success: 'bi-check-circle-fill',
-            error: 'bi-x-circle-fill',
-            warning: 'bi-exclamation-triangle-fill',
-            info: 'bi-info-circle-fill'
-        };
-
-        var toast = document.createElement('div');
-        toast.className = 'kair-toast kair-toast--' + type;
-        toast.innerHTML =
-            '<i class="bi ' + (icons[type] || icons.info) + ' kair-toast__icon"></i>' +
-            '<span class="kair-toast__message">' + message + '</span>';
-        container.appendChild(toast);
-
-        setTimeout(function () {
-            toast.classList.add('is-closing');
-            setTimeout(function () {
-                if (toast.parentNode) toast.parentNode.removeChild(toast);
-            }, 300);
-        }, duration);
-    }
-
-    // Alias legacy para compatibilidad
-    function _showNotification(message, type) {
-        _showToast(message, type || 'success');
-    }
-
-    /* ═══════════════════════════════════════════════════════════════
-       RENDER — BREADCRUMB MULTINIVEL
-       ═══════════════════════════════════════════════════════════════ */
-    function _renderBreadcrumb() {
-        var breadcrumb = document.getElementById('breadcrumb');
-        if (!breadcrumb) return;
-
-        var segments = _getRelativeSegments(_state.basePath, _state.currentFolderPath);
-        var sep = _normalizePathSep(_state.currentFolderPath) || '/';
-
-        var html = '<button class="kair-crumb" data-action="go-root">' +
-            '<i class="bi bi-hdd kair-crumb__icon"></i>' +
-            '<span>Raíz</span>' +
-            '</button>';
-
-        // Reconstruir path acumulativo
-        var accPath = _state.basePath;
-        segments.forEach(function (seg, idx) {
-            accPath = accPath + sep + seg;
-            var isLast = (idx === segments.length - 1);
-            var pathForCrumb = accPath; // capturar
-            html += '<i class="bi bi-chevron-right kair-crumb-sep"></i>';
-            html += '<button class="kair-crumb' + (isLast ? ' is-current' : '') + '" data-action="go-path" data-path="' + _esc(pathForCrumb) + '">' +
-                '<i class="bi bi-folder2 kair-crumb__icon"></i>' +
-                '<span>' + _esc(seg) + '</span>' +
-                '</button>';
-        });
-
-        breadcrumb.innerHTML = html;
-
-        // Bind events
-        var crumbs = breadcrumb.querySelectorAll('[data-action]');
-        crumbs.forEach(function (crumb) {
-            crumb.addEventListener('click', function () {
-                var action = crumb.getAttribute('data-action');
-                var path = crumb.getAttribute('data-path');
-                if (action === 'go-root') {
-                    _navigateToRoot();
-                } else if (action === 'go-path' && path) {
-                    _navigateToPath(path);
-                }
-            });
-        });
-    }
-
-    /* ═══════════════════════════════════════════════════════════════
-       RENDER — SIDEBAR DE CARPETAS
-       ═══════════════════════════════════════════════════════════════ */
-    function _renderFolders() {
-        var folderList = document.getElementById('folderList');
-        if (!folderList) return;
-
-        if (!_state.folders || _state.folders.length === 0) {
-            folderList.innerHTML =
-                '<div class="kair-empty kair-empty--compact">' +
-                '<div class="kair-empty__icon"><i class="bi bi-folder-x"></i></div>' +
-                '<p class="kair-empty__desc">No hay carpetas</p>' +
-                '</div>';
-            return;
-        }
-
-        var html = '';
-        _state.folders.forEach(function (folder) {
-            html +=
-                '<div class="kair-folder" data-path="' + _esc(folder.path) + '">' +
-                '<i class="bi bi-folder-fill kair-folder__icon"></i>' +
-                '<span class="kair-folder__name" title="' + _esc(folder.name) + '">' + _esc(folder.name) + '</span>' +
-                '<div class="kair-folder__drag-overlay">' +
-                '<div class="kair-folder__drag-overlay-content">' +
-                '<i class="bi bi-cloud-upload-fill"></i>' +
-                '<span>Suelta aquí</span>' +
-                '</div>' +
-                '</div>' +
-                '</div>';
-        });
-
-        folderList.innerHTML = html;
-
-        // Bind events a cada carpeta
-        var folderEls = folderList.querySelectorAll('.kair-folder');
-        folderEls.forEach(function (el) {
-            var folderPath = el.getAttribute('data-path');
-            el.addEventListener('click', function () {
-                _selectFolder(folderPath);
-            });
-            _setupFolderDragAndDrop(el, folderPath);
-        });
-    }
-
-    /* ═══════════════════════════════════════════════════════════════
-       RENDER — LISTA / GRID DE DOCUMENTOS
-       ═══════════════════════════════════════════════════════════════ */
-    function _applyFiltersAndSort(docs) {
-        var filtered = docs.slice();
-
-        // Filtro de búsqueda
-        if (_state.searchQuery) {
-            var q = _state.searchQuery.toLowerCase();
-            filtered = filtered.filter(function (d) {
-                return (d.name || '').toLowerCase().indexOf(q) !== -1;
-            });
-        }
-
-        // Sort
-        var sortKey = _state.sortBy;
-        filtered.sort(function (a, b) {
-            switch (sortKey) {
-                case 'name-asc':  return (a.name || '').localeCompare(b.name || '');
-                case 'name-desc': return (b.name || '').localeCompare(a.name || '');
-                case 'size-asc':  return (a.size || 0) - (b.size || 0);
-                case 'size-desc': return (b.size || 0) - (a.size || 0);
-                case 'date-asc':  return new Date(a.lastModified || 0) - new Date(b.lastModified || 0);
-                case 'date-desc': return new Date(b.lastModified || 0) - new Date(a.lastModified || 0);
-                default:          return 0;
-            }
-        });
-
-        return filtered;
-    }
-
-    function _renderDocuments() {
-        var fileList = document.getElementById('fileList');
-        var docCount = document.getElementById('docCount');
-        if (!fileList) return;
-
-        // Aplicar vista mode
-        fileList.setAttribute('data-view', _state.viewMode);
-
-        var filtered = _applyFiltersAndSort(_state.documents);
-
-        // Stats
-        if (docCount) docCount.textContent = filtered.length;
-        _updateFooter(filtered);
-
-        if (filtered.length === 0) {
-            if (_state.searchQuery) {
-                fileList.innerHTML =
-                    '<div class="kair-empty">' +
-                    '<div class="kair-empty__icon"><i class="bi bi-search"></i></div>' +
-                    '<h3 class="kair-empty__title">Sin resultados</h3>' +
-                    '<p class="kair-empty__desc">No se encontraron archivos para "<strong>' + _esc(_state.searchQuery) + '</strong>"</p>' +
-                    '</div>';
-            } else {
-                fileList.innerHTML =
-                    '<div class="kair-empty">' +
-                    '<div class="kair-empty__icon"><i class="bi bi-inbox"></i></div>' +
-                    '<h3 class="kair-empty__title">Carpeta vacía</h3>' +
-                    '<p class="kair-empty__desc">No hay archivos en esta carpeta. Arrastra archivos aquí o usa el botón "Subir".</p>' +
-                    '</div>';
-            }
-            return;
-        }
-
-        var html = '<div class="kair-file-grid">';
-        filtered.forEach(function (doc) {
-            var typeInfo = _getFileTypeInfo(doc.extension);
-            var sizeText = doc.size ? _formatSize(doc.size) : '';
-            var dateText = doc.lastModified ? _formatDate(doc.lastModified) : '';
-
-            html +=
-                '<div class="kair-file" data-path="' + _esc(doc.path) + '">' +
-                '<div class="kair-file__icon kair-file__icon--' + typeInfo.className + '">' +
-                '<i class="bi ' + typeInfo.icon + '"></i>' +
-                '</div>' +
-                '<div class="kair-file__info">' +
-                '<div class="kair-file__name" title="' + _esc(doc.name) + '">' + _esc(doc.name) + '</div>' +
-                '<div class="kair-file__meta">' +
-                '<span class="kair-file__badge">' + _esc(typeInfo.label) + '</span>' +
-                (sizeText ? '<span class="kair-file__size">' + sizeText + '</span>' : '') +
-                (dateText ? '<span class="kair-file__date">· ' + dateText + '</span>' : '') +
-                '</div>' +
-                '</div>' +
-                '</div>';
-        });
-        html += '</div>';
-
-        fileList.innerHTML = html;
-
-        // Bind events a cada archivo
-        var fileEls = fileList.querySelectorAll('.kair-file');
-        fileEls.forEach(function (el) {
-            var docPath = el.getAttribute('data-path');
-            var doc = filtered.find(function (d) { return d.path === docPath; });
-            if (!doc) return;
-
-            el.addEventListener('click', function () {
-                _selectDocument(doc);
-            });
-            el.addEventListener('dblclick', function () {
-                _openFile(doc);
-            });
-            el.addEventListener('contextmenu', function (e) {
-                e.preventDefault();
-                _showContextMenu(e.clientX, e.clientY, doc);
-            });
-        });
-
-        // Re-aplicar selección activa si el doc sigue visible
-        if (_state.currentDocument) {
-            var activeEl = fileList.querySelector('[data-path="' + _state.currentDocument.path.replace(/"/g, '\\"') + '"]');
-            if (activeEl) activeEl.classList.add('is-active');
-        }
-    }
-
-    function _updateFooter(docs) {
-        var footerCount = document.getElementById('footerCount');
-        var footerSize = document.getElementById('footerSize');
-        var footerLastMod = document.getElementById('footerLastMod');
-
-        var count = docs.length;
-        var totalSize = docs.reduce(function (acc, d) { return acc + (d.size || 0); }, 0);
-        var lastMod = docs.reduce(function (latest, d) {
-            if (!d.lastModified) return latest;
-            var t = new Date(d.lastModified).getTime();
-            return (!latest || t > latest.getTime()) ? new Date(d.lastModified) : latest;
-        }, null);
-
-        if (footerCount) footerCount.textContent = count + (count === 1 ? ' archivo' : ' archivos');
-        if (footerSize) footerSize.textContent = _formatSize(totalSize);
-        if (footerLastMod) footerLastMod.textContent = lastMod ? ('última modificación ' + _formatDate(lastMod)) : '—';
-    }
-
-    /* ═══════════════════════════════════════════════════════════════
-       RENDER — SKELETONS
-       ═══════════════════════════════════════════════════════════════ */
-    function _renderSkeletons() {
-        var folderList = document.getElementById('folderList');
-        var fileList = document.getElementById('fileList');
-
-        if (folderList) {
-            var folderHtml = '';
-            for (var i = 0; i < 5; i++) {
-                folderHtml += '<div class="kair-skeleton kair-skeleton--folder"></div>';
-            }
-            folderList.innerHTML = folderHtml;
-        }
-
-        if (fileList) {
-            fileList.setAttribute('data-view', _state.viewMode);
-            var fileHtml = '<div class="kair-file-grid">';
-            for (var j = 0; j < 6; j++) {
-                if (_state.viewMode === 'grid') {
-                    fileHtml += '<div class="kair-skeleton kair-skeleton--grid"></div>';
-                } else {
-                    fileHtml += '<div class="kair-skeleton kair-skeleton--file"></div>';
-                }
-            }
-            fileHtml += '</div>';
-            fileList.innerHTML = fileHtml;
-        }
-    }
-
-    /* ═══════════════════════════════════════════════════════════════
-       NAVEGACIÓN — Carpetas
-       ═══════════════════════════════════════════════════════════════ */
-    function _navigateToRoot() {
-        _log('NAV_ROOT', 'START');
-        if (_state.pathHistory.length > 0 || _state.currentFolderPath !== _state.basePath) {
-            _state.pathHistory = [];
-            _state.currentFolderPath = _state.basePath;
-            _loadFolders(true);
-        }
-    }
-
-    function _navigateToPath(path) {
-        _log('NAV_PATH', 'START', { path: path });
-        if (path === _state.currentFolderPath) return;
-        // Calcular historial correcto: desde currentFolderPath "volver" a path
-        _state.pathHistory.push(_state.currentFolderPath);
-        _state.currentFolderPath = path;
-        _loadDocumentsForCurrent();
-    }
-
-    function _selectFolder(path) {
-        if (path === _state.currentFolderPath) return;
-        _log('SELECT_FOLDER', 'START', { path: path });
-        _state.pathHistory.push(_state.currentFolderPath);
-        _state.currentFolderPath = path;
-
-        // Reset selección visual
-        document.querySelectorAll('.kair-folder').forEach(function (el) {
-            el.classList.remove('is-active');
-        });
-        var selEl = document.querySelector('.kair-folder[data-path="' + path.replace(/"/g, '\\"') + '"]');
-        if (selEl) selEl.classList.add('is-active');
-
-        _loadDocumentsForCurrent();
-    }
-
-    function _goUpLevel() {
-        if (_state.pathHistory.length === 0) {
-            _showToast('Ya estás en la raíz', 'info');
-            return;
-        }
-        _log('GO_UP', 'START');
-        var prevPath = _state.pathHistory.pop();
-        _state.currentFolderPath = prevPath;
-        _loadDocumentsForCurrent();
-    }
-
-    /* ═══════════════════════════════════════════════════════════════
-       CARGA DE DATOS — Carpeta inicial / raíz
-       ═══════════════════════════════════════════════════════════════ */
-    function _loadFolders(isRefresh) {
-        _log('LOAD_FOLDERS', 'START');
-        _showLoading(isRefresh ? 'Refrescando...' : 'Cargando...');
-
-        var urlParams = new URLSearchParams(window.location.search);
-        _state.company = urlParams.get('company') || '';
-        _state.moduleName = urlParams.get('module') || '';
-        _state.submoduleName = urlParams.get('submodule') || '';
-
-        // Actualizar header
-        var companyEl = document.getElementById('companyName');
-        if (companyEl) companyEl.textContent = _state.company || '—';
-
-        if (!_state.company || !_state.moduleName || !_state.submoduleName) {
-            _showToast('Faltan parámetros en la URL (company/module/submodule)', 'error', 5000);
-            _hideLoading();
-            return;
-        }
-
-        _renderSkeletons();
-
-        _callParentAPI('get-document-folders', {
-            companyName: _state.company,
-            moduleName: _state.moduleName,
-            submoduleName: _state.submoduleName
-        }).then(function (result) {
-            _state.basePath = result.basePath;
-            _state.currentFolderPath = result.basePath;
-            _state.pathHistory = [];
-            _state.folders = result.folders || [];
-            _state.documents = result.files || [];
-
-            _renderBreadcrumb();
-            _renderFolders();
-            _renderDocuments();
-            _log('LOAD_FOLDERS', 'SUCCESS', {
-                folders: _state.folders.length,
-                files: _state.documents.length
-            });
-        }).catch(function (error) {
-            _err('LOAD_FOLDERS', error);
-            _showToast('Error al cargar contenido inicial: ' + error.message, 'error', 5000);
-        }).finally(function () {
-            _hideLoading();
-        });
-    }
-
-    function _loadDocumentsForCurrent() {
-        _log('LOAD_DOCS', 'START', { path: _state.currentFolderPath });
-        _showLoading('Cargando documentos...');
-        _renderSkeletons();
-
-        _callParentAPI('get-documents-in-folder', _state.currentFolderPath).then(function (result) {
-            _state.documents = result.files || [];
-            _renderBreadcrumb();
-            _renderFolders();
-            _renderDocuments();
-            _log('LOAD_DOCS', 'SUCCESS', { count: _state.documents.length });
-        }).catch(function (error) {
-            _err('LOAD_DOCS', error);
-            _showToast('Error al cargar documentos: ' + error.message, 'error', 5000);
-        }).finally(function () {
-            _hideLoading();
-        });
-    }
-
-    /* ═══════════════════════════════════════════════════════════════
-       SELECCIÓN Y PREVIEW DE DOCUMENTOS
-       ═══════════════════════════════════════════════════════════════ */
-    function _selectDocument(doc) {
-        _log('SELECT_DOC', 'START', { name: doc.name });
-        _state.currentDocument = doc;
-
-        var docName = document.getElementById('docName');
-        if (docName) {
-            docName.textContent = doc.name;
-            // Atributo title para que el usuario vea el nombre completo en hover
-            // (el nombre se trunca con ellipsis en el header del preview)
-            docName.setAttribute('title', doc.name);
-        }
-
-        // Resaltar selección
-        document.querySelectorAll('.kair-file').forEach(function (el) {
-            el.classList.remove('is-active');
-        });
-        var activeEl = document.querySelector('.kair-file[data-path="' + doc.path.replace(/"/g, '\\"') + '"]');
-        if (activeEl) activeEl.classList.add('is-active');
-
-        // Si preview está colapsado, expandirlo
-        if (_state.isPreviewCollapsed) {
-            _togglePreviewCollapse();
-        }
-
-        // Ocultar empty state
-        var emptyState = document.getElementById('emptyState');
-        if (emptyState) emptyState.style.display = 'none';
-
-        _enableDocActions(true);
-        _showLoading('Cargando vista previa...');
-
-        var extension = (doc.extension || '').toLowerCase().replace('.', '');
-
-        if (extension === 'pdf') {
-            _loadPDF(doc.path);
-        } else if (extension === 'xls' || extension === 'xlsx') {
-            _loadExcel(doc.path);
-        } else if (extension === 'doc' || extension === 'docx') {
-            _loadWord(doc.path);
-        } else {
-            _showUnsupportedMessage(extension);
-        }
-    }
-
-    function _loadPDF(filePath) {
-        _callParentAPI('get-pdf-preview', { filePath: filePath }).then(function (result) {
-            _displayPDF(result.data);
-        }).catch(function (error) {
-            _showErrorInViewer('Error al cargar PDF: ' + error.message);
-        });
-    }
-
-    function _loadExcel(filePath) {
-        _callParentAPI('get-excel-preview', { filePath: filePath }).then(function (result) {
-            _renderPreview(result);
-        }).catch(function (error) {
-            _showErrorInViewer('Error al cargar Excel: ' + error.message);
-        });
-    }
-
-    function _loadWord(filePath) {
-        _callParentAPI('get-word-preview', { filePath: filePath }).then(function (result) {
-            _renderPreview(result);
-        }).catch(function (error) {
-            _showErrorInViewer('Error al cargar Word: ' + error.message);
-        });
-    }
-
-    // 📦608-fix15 — Switch entre file-viewer nativo (Office) e iframe PDF (legacy)
-    function _renderPreview(result) {
-        if (!result) {
-            _showErrorInViewer('Sin respuesta del servidor');
-            return;
-        }
-        if (result.mode === 'file-viewer' && result.data && result.data.bytes) {
-            _hideLoading();
-            var viewerContainer = document.getElementById('viewerContainer');
-            if (viewerContainer && window.KairDocPreview) {
-                window.KairDocPreview.mountInContainer(viewerContainer, result);
-                var expandBtn = document.getElementById('expandPreviewBtn');
-                if (expandBtn) {
-                    expandBtn.style.display = '';
-                    expandBtn.disabled = false;
-                }
-            } else {
-                _showErrorInViewer('file-viewer no disponible');
-            }
-        } else {
-            _displayPDF(result.data);
-            var expandBtnPdf = document.getElementById('expandPreviewBtn');
-            if (expandBtnPdf) {
-                expandBtnPdf.style.display = 'none';
-                expandBtnPdf.disabled = true;
-            }
-        }
-    }
-
-    function _expandFileViewer() {
-        if (!_state.currentDocument) {
-            _showToast('No hay un archivo para expandir', 'warning');
-            return;
-        }
-        var filePath = _state.currentDocument.path;
-        if (!filePath) return;
-        if (window.top && window.top.postMessage) {
-            window.top.postMessage({
-                type: 'open-file-viewer-modal',
-                filePath: filePath,
-                source: 'roles-responsabilidades'
-            }, '*');
-        } else if (window.kairFV && typeof window.kairFV.openWithFileViewerFromPath === 'function') {
-            window.kairFV.openWithFileViewerFromPath(filePath);
-        }
-    }
-
-    function _displayPDF(pdfData) {
-        _hideLoading();
-        var viewerContainer = document.getElementById('viewerContainer');
-        if (!viewerContainer) return;
-        var toolbar = document.getElementById('previewToolbar');
-        if (toolbar) toolbar.classList.add('is-visible');
-
-        viewerContainer.innerHTML =
-            '<iframe id="docFrame" class="kair-pdf-frame" src="data:application/pdf;base64,' + pdfData + '"></iframe>';
-
-        _state.currentZoom = 100;
-        _updateZoomDisplay();
-    }
-
-    function _showUnsupportedMessage(extension) {
-        _hideLoading();
-        var viewerContainer = document.getElementById('viewerContainer');
-        var toolbar = document.getElementById('previewToolbar');
-        if (toolbar) toolbar.classList.remove('is-visible');
-
-        if (viewerContainer) {
-            viewerContainer.innerHTML =
-                '<div class="kair-preview-error">' +
-                '<i class="bi bi-file-earmark" style="font-size: 2rem; color: var(--kair-text-muted);"></i>' +
-                '<h3>Vista previa no disponible</h3>' +
-                '<p>La previsualización interna no está disponible para archivos <strong>.' + _esc(extension) + '</strong>.</p>' +
-                '<p>Puedes usar el botón de descarga para abrirlo externamente.</p>' +
-                '</div>';
-        }
-    }
-
-    function _showErrorInViewer(message) {
-        _hideLoading();
-        var viewerContainer = document.getElementById('viewerContainer');
-        var toolbar = document.getElementById('previewToolbar');
-        if (toolbar) toolbar.classList.remove('is-visible');
-
-        if (viewerContainer) {
-            viewerContainer.innerHTML =
-                '<div class="kair-preview-error">' +
-                '<i class="bi bi-exclamation-triangle" style="font-size: 2rem; color: var(--kair-danger);"></i>' +
-                '<h3>Error de carga</h3>' +
-                '<p>' + _esc(message) + '</p>' +
-                '</div>';
-        }
-    }
-
-    function _closeDocument() {
-        _log('CLOSE_DOC', 'START');
-        _state.currentDocument = null;
-
-        var expandBtn = document.getElementById('expandPreviewBtn');
-        if (expandBtn) {
-            expandBtn.style.display = 'none';
-            expandBtn.disabled = true;
-        }
-
-        var emptyState = document.getElementById('emptyState');
-        var viewerContainer = document.getElementById('viewerContainer');
-        var toolbar = document.getElementById('previewToolbar');
-        var docName = document.getElementById('docName');
-
-        if (docName) {
-            docName.textContent = 'Selecciona un documento';
-            docName.setAttribute('title', '');
-        }
-        if (toolbar) toolbar.classList.remove('is-visible');
-
-        if (viewerContainer) {
-            viewerContainer.innerHTML =
-                '<div class="kair-empty" id="emptyState">' +
-                '<div class="kair-empty__icon"><i class="bi bi-file-earmark-richtext"></i></div>' +
-                '<h3 class="kair-empty__title">Vista previa no disponible</h3>' +
-                '<p class="kair-empty__desc">Selecciona un documento de la lista para visualizarlo aquí.</p>' +
-                '</div>';
-        }
-
-        _enableDocActions(false);
-        document.querySelectorAll('.kair-file').forEach(function (el) {
-            el.classList.remove('is-active');
-        });
-    }
-
-    function _enableDocActions(enable) {
-        var btnIds = ['closeDocBtn', 'downloadBtn', 'printBtn'];
-        btnIds.forEach(function (id) {
-            var btn = document.getElementById(id);
-            if (btn) {
-                btn.disabled = !enable;
-            }
-        });
-    }
-
-    /* ═══════════════════════════════════════════════════════════════
-       DESCARGA / IMPRESIÓN
-       ═══════════════════════════════════════════════════════════════ */
-    function _downloadDocument() {
-        if (!_state.currentDocument) return;
-        _log('DOWNLOAD_DOC', 'START', { name: _state.currentDocument.name });
-        _showToast('Preparando descarga...', 'info');
-
-        _callParentAPI('download-document', _state.currentDocument.path).then(function (result) {
-            var binaryData = atob(result.base64Data);
-            var bytes = new Uint8Array(binaryData.length);
-            for (var i = 0; i < binaryData.length; i++) {
-                bytes[i] = binaryData.charCodeAt(i);
-            }
-
-            var blob = new Blob([bytes], { type: 'application/octet-stream' });
-            var url = URL.createObjectURL(blob);
-            var link = document.createElement('a');
-            link.href = url;
-            link.download = result.fileName;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-
-            _showToast('Descarga completada', 'success');
-            _log('DOWNLOAD_DOC', 'SUCCESS');
-        }).catch(function (error) {
-            _err('DOWNLOAD_DOC', error);
-            _showToast('Error en descarga: ' + error.message, 'error');
-        });
-    }
-
-    function _printDocument() {
-        if (!_state.currentDocument) return;
-        _log('PRINT_DOC', 'START');
-
-        var iframe = document.getElementById('docFrame');
-        if (iframe && iframe.contentWindow) {
-            try {
-                iframe.contentWindow.print();
-                _log('PRINT_DOC', 'SUCCESS');
-                return;
-            } catch (e) {
-                _err('PRINT_DOC', e);
-            }
-        }
-        _printConvertedDocument(_state.currentDocument.path, _state.currentDocument.extension);
-    }
-
-    function _printConvertedDocument(filePath, extension) {
-        _showToast('Preparando impresión...', 'info');
-        var ext = (extension || '').toLowerCase();
-        var apiType = 'get-pdf-preview';
-        if (ext.indexOf('xls') !== -1) apiType = 'get-excel-preview';
-        if (ext.indexOf('doc') !== -1) apiType = 'get-word-preview';
-
-        _callParentAPI(apiType, { filePath: filePath }).then(function (result) {
-            var printWindow = window.open('', '_blank');
-            if (!printWindow) {
-                _showToast('Bloqueador de popups activo. Permite popups para imprimir.', 'warning', 5000);
-                return;
-            }
-            printWindow.document.write(
-                '<html><body style="margin:0;">' +
-                '<iframe src="data:application/pdf;base64,' + result.data + '" ' +
-                'style="width:100%; height:100vh; border:none;" ' +
-                'onload="window.print(); window.onafterprint = function() { window.close(); }">' +
-                '</iframe></body></html>'
-            );
-            printWindow.document.close();
-            _log('PRINT_DOC', 'SUCCESS');
-        }).catch(function (error) {
-            _err('PRINT_DOC', error);
-            _showToast('Error al imprimir: ' + error.message, 'error');
-        });
-    }
-
-    /* ═══════════════════════════════════════════════════════════════
-       ZOOM
-       ═══════════════════════════════════════════════════════════════ */
-    function _zoomIn() {
-        _state.currentZoom = Math.min(_state.currentZoom + 10, 400);
-        _applyZoom();
-    }
-
-    function _zoomOut() {
-        _state.currentZoom = Math.max(_state.currentZoom - 10, 20);
-        _applyZoom();
-    }
-
-    function _fitWidth() {
-        _state.currentZoom = 'width';
-        _applyZoom();
-    }
-
-    function _applyZoom() {
-        var iframe = document.getElementById('docFrame');
-        if (!iframe) return;
-
-        _updateZoomDisplay();
-
-        var src = iframe.src.split('#')[0];
-        var zoomParam = (_state.currentZoom === 'width') ? '#view=FitH' : '#zoom=' + _state.currentZoom;
-        iframe.src = src + zoomParam;
-    }
-
-    function _updateZoomDisplay() {
-        var display = document.getElementById('zoomLevelDisplay');
-        if (display) {
-            display.textContent = (_state.currentZoom === 'width') ? 'Ancho' : _state.currentZoom + '%';
-        }
-    }
-
-    /* ═══════════════════════════════════════════════════════════════
-       DRAG & DROP (conservado por carpeta)
-       ═══════════════════════════════════════════════════════════════ */
-    function _setupFolderDragAndDrop(folderElement, folderPath) {
-        var dragCounter = 0;
-
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function (eventName) {
-            folderElement.addEventListener(eventName, _preventDefaults, false);
-        });
-
-        folderElement.addEventListener('dragenter', function () {
-            dragCounter++;
-            if (dragCounter === 1) {
-                folderElement.classList.add('is-drag-over');
-                _log('DRAG_ENTER', 'START', { folder: folderPath });
-            }
-        }, false);
-
-        folderElement.addEventListener('dragover', function (e) {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'copy';
-        }, false);
-
-        folderElement.addEventListener('dragleave', function () {
-            dragCounter--;
-            if (dragCounter === 0) {
-                folderElement.classList.remove('is-drag-over');
-            }
-        }, false);
-
-        folderElement.addEventListener('drop', function (e) {
-            e.preventDefault();
-            dragCounter = 0;
-            folderElement.classList.remove('is-drag-over');
-
-            var files = e.dataTransfer.files;
-            if (files.length === 0) {
-                _showToast('No se detectaron archivos', 'warning');
-                return;
-            }
-
-            _log('DROP', 'START', { count: files.length, folder: folderPath });
-            Array.from(files).forEach(function (file) {
-                _uploadFile(file, folderPath);
-            });
-        }, false);
-    }
-
-    function _preventDefaults(e) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
-
-    function _uploadFile(file, folderPath) {
-        _log('UPLOAD', 'START', { name: file.name, folder: folderPath });
-
-        // Validación de tamaño
-        if (file.size > _MAX_FILE_SIZE_BYTES) {
-            _showToast('El archivo "' + file.name + '" supera el tamaño máximo de 10MB', 'warning', 5000);
-            return;
-        }
-
-        // Validación de caracteres
-        if (_INVALID_CHARS.test(file.name)) {
-            _showToast('El nombre del archivo contiene caracteres inválidos: &lt;&gt;:&quot;/\\|?*', 'warning', 5000);
-            return;
-        }
-
-        _showToast('Subiendo "' + file.name + '"...', 'info');
-
-        _fileToBase64(file).then(function (base64Data) {
-            var destinationPath = folderPath || _state.currentFolderPath;
-            if (!destinationPath) {
-                _showToast('No hay una carpeta seleccionada', 'error');
-                return;
-            }
-            return _callParentAPI('upload-document', {
-                fileName: file.name,
-                base64Data: base64Data,
-                destinationPath: destinationPath
-            });
-        }).then(function (result) {
-            _showToast(result.message || 'Archivo subido correctamente', 'success');
-            _log('UPLOAD', 'SUCCESS', { name: file.name });
-            _loadDocumentsForCurrent();
-        }).catch(function (error) {
-            _err('UPLOAD', error);
-            _showToast('Error al subir "' + file.name + '": ' + error.message, 'error', 5000);
-        });
-    }
-
-    function _fileToBase64(file) {
-        return new Promise(function (resolve, reject) {
-            var reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = function () { resolve(reader.result); };
-            reader.onerror = function (error) { reject(error); };
-        });
-    }
-
-    /* ═══════════════════════════════════════════════════════════════
-       CONTEXT MENU
-       ═══════════════════════════════════════════════════════════════ */
-    function _showContextMenu(x, y, doc) {
-        var menu = document.getElementById('contextMenu');
-        if (!menu) return;
-
-        _state.contextMenuDoc = doc;
-        menu.classList.add('is-visible');
-        menu.style.left = x + 'px';
-        menu.style.top = y + 'px';
-
-        // Ajuste si se sale de pantalla
-        var rect = menu.getBoundingClientRect();
-        if (rect.right > window.innerWidth) {
-            menu.style.left = (window.innerWidth - rect.width - 10) + 'px';
-        }
-        if (rect.bottom > window.innerHeight) {
-            menu.style.top = (window.innerHeight - rect.height - 10) + 'px';
-        }
-
-        _log('CONTEXT_MENU', 'SHOW', { name: doc.name });
-    }
-
-    function _hideContextMenu() {
-        var menu = document.getElementById('contextMenu');
-        if (menu) menu.classList.remove('is-visible');
-        _state.contextMenuDoc = null;
-    }
-
-    function _openFile(doc) {
-        doc = doc || _state.contextMenuDoc;
-        if (!doc) {
-            _showToast('No hay archivo seleccionado', 'error');
-            return;
-        }
-
-        _log('OPEN_FILE', 'START', { name: doc.name });
-        _callParentAPI('open-file', { filePath: doc.path }).then(function (result) {
-            if (!result.success) {
-                _showToast('Error al abrir archivo: ' + (result.error || ''), 'error');
-            } else {
-                _log('OPEN_FILE', 'SUCCESS', { name: doc.name });
-            }
-        }).catch(function (error) {
-            _err('OPEN_FILE', error);
-            _showToast('Error al abrir: ' + error.message, 'error');
-        });
-
-        _hideContextMenu();
-    }
-
-    function _deleteDocument() {
-        if (!_state.contextMenuDoc) {
-            _showToast('No hay archivo seleccionado', 'error');
-            return;
-        }
-        var doc = _state.contextMenuDoc;
-
-        _log('DELETE_DOC', 'CONFIRM_MODAL', { name: doc.name });
-        _showConfirmModal(doc.name, function () {
-            _log('DELETE_DOC', 'START', { name: doc.name });
-
-            // Cerrar preview primero para liberar el archivo (evita EPERM)
-            _closeDocument();
-
-            _callParentAPI('delete-document', { filePath: doc.path }).then(function (result) {
-                _log('DELETE_DOC', 'SUCCESS', { name: doc.name });
-                _showToast('Archivo eliminado correctamente', 'success');
-                _loadDocumentsForCurrent();
-            }).catch(function (error) {
-                _err('DELETE_DOC', error);
-                var msg = error.message || '';
-                if (msg.indexOf('EPERM') !== -1) {
-                    _showToast('El archivo está abierto en otra aplicación. Ciérralo e intenta nuevamente.', 'warning', 6000);
-                } else if (msg.indexOf('ENOENT') !== -1) {
-                    _showToast('El archivo no existe. Puede que ya haya sido eliminado.', 'info');
-                    _loadDocumentsForCurrent();
-                } else if (msg.indexOf('EACCES') !== -1) {
-                    _showToast('No tienes permisos para eliminar este archivo.', 'error');
-                } else {
-                    _showToast('Error al eliminar: ' + msg, 'error', 5000);
-                }
-            });
-        });
-    }
-
-    /* ═══════════════════════════════════════════════════════════════
-       CONFIRM MODAL
-       ═══════════════════════════════════════════════════════════════ */
-    function _showConfirmModal(fileName, callback) {
-        var modal = document.getElementById('confirmModal');
-        var fileNameEl = document.getElementById('confirmFileName');
-        if (!modal || !fileNameEl) return;
-
-        fileNameEl.textContent = fileName;
-        _state.confirmCallback = callback;
-        modal.classList.add('is-visible');
-
-        var cancelBtn = document.getElementById('confirmCancelBtn');
-        if (cancelBtn) cancelBtn.focus();
-    }
-
-    function _hideConfirmModal() {
-        var modal = document.getElementById('confirmModal');
-        if (modal) modal.classList.remove('is-visible');
-        _state.confirmCallback = null;
-    }
-
-    function _acceptConfirm() {
-        if (typeof _state.confirmCallback === 'function') {
-            _state.confirmCallback();
-        }
-        _hideConfirmModal();
-    }
-
-    /* ═══════════════════════════════════════════════════════════════
-       TOGGLE VISTA / SIDEBAR / PREVIEW
-       ═══════════════════════════════════════════════════════════════ */
-    function _setViewMode(mode) {
-        if (mode !== 'list' && mode !== 'grid') return;
-        if (_state.viewMode === mode) return;
-        _state.viewMode = mode;
-        _savePrefs();
-
-        // Toggle UI buttons + aria-pressed
-        var listBtn = document.getElementById('viewListBtn');
-        var gridBtn = document.getElementById('viewGridBtn');
-        if (listBtn) {
-            listBtn.classList.toggle('is-active', mode === 'list');
-            listBtn.setAttribute('aria-pressed', mode === 'list' ? 'true' : 'false');
-        }
-        if (gridBtn) {
-            gridBtn.classList.toggle('is-active', mode === 'grid');
-            gridBtn.setAttribute('aria-pressed', mode === 'grid' ? 'true' : 'false');
-        }
-
-        _renderDocuments();
-        _log('VIEW_MODE', 'SET', { mode: mode });
-    }
-
-    function _toggleSidebarCollapse() {
-        _state.isSidebarCollapsed = !_state.isSidebarCollapsed;
-        _savePrefs();
-        var layout = document.getElementById('docsLayout');
-        if (layout) layout.classList.toggle('is-sidebar-collapsed', _state.isSidebarCollapsed);
-        _log('SIDEBAR', 'TOGGLE', { collapsed: _state.isSidebarCollapsed });
-    }
-
-    function _togglePreviewCollapse() {
-        _state.isPreviewCollapsed = !_state.isPreviewCollapsed;
-        _savePrefs();
-        var layout = document.getElementById('docsLayout');
-        if (layout) layout.classList.toggle('is-preview-collapsed', _state.isPreviewCollapsed);
-        _log('PREVIEW', 'TOGGLE', { collapsed: _state.isPreviewCollapsed });
-    }
-
-    /* ═══════════════════════════════════════════════════════════════
-       BÚSQUEDA (con debounce)
-       ═══════════════════════════════════════════════════════════════ */
-    function _handleSearchInput(value) {
-        var clearBtn = document.getElementById('searchClearBtn');
-        if (clearBtn) clearBtn.classList.toggle('is-visible', !!value);
-
-        if (_state.searchDebounceTimer) {
-            clearTimeout(_state.searchDebounceTimer);
-        }
-        _state.searchDebounceTimer = setTimeout(function () {
-            _state.searchQuery = value.trim();
-            _renderDocuments();
-            _log('SEARCH', 'EXEC', { query: _state.searchQuery });
-        }, _SEARCH_DEBOUNCE_MS);
-    }
-
-    function _clearSearch() {
-        var input = document.getElementById('searchInput');
-        if (input) input.value = '';
-        _state.searchQuery = '';
-        var clearBtn = document.getElementById('searchClearBtn');
-        if (clearBtn) clearBtn.classList.remove('is-visible');
-        _renderDocuments();
-    }
-
-    /* ═══════════════════════════════════════════════════════════════
-       UPLOAD (botón principal)
-       ═══════════════════════════════════════════════════════════════ */
-    function _handleUploadClick() {
-        var input = document.getElementById('hiddenFileInput');
-        if (!input) return;
-        input.click();
-    }
-
-    function _handleFileInputChange(e) {
-        var files = e.target.files;
-        if (!files || files.length === 0) return;
-        Array.from(files).forEach(function (file) {
-            _uploadFile(file, _state.currentFolderPath);
-        });
-        // Reset para permitir volver a subir el mismo archivo
-        e.target.value = '';
-    }
-
-    /* ═══════════════════════════════════════════════════════════════
-       VOLVER AL MÓDULO PADRE
-       ═══════════════════════════════════════════════════════════════ */
-    function _backToModule() {
-        _log('BACK_TO_MODULE', 'START');
-        if (window.parent && window.parent.postMessage) {
-            window.parent.postMessage({ type: 'back-to-module-request' }, '*');
-        }
-    }
-
-    /* ═══════════════════════════════════════════════════════════════
-       BIND EVENTS
-       ═══════════════════════════════════════════════════════════════ */
-    function _bindEvents() {
-        // Header
-        var backBtn = document.getElementById('backToModuleBtn');
-        if (backBtn) backBtn.addEventListener('click', _backToModule);
-
-        var uploadBtn = document.getElementById('uploadBtn');
-        if (uploadBtn) uploadBtn.addEventListener('click', _handleUploadClick);
-
-        var refreshBtn = document.getElementById('refreshBtn');
-        if (refreshBtn) refreshBtn.addEventListener('click', function () { _loadFolders(true); });
-
-        // Toolbar
-        var searchInput = document.getElementById('searchInput');
-        if (searchInput) {
-            searchInput.addEventListener('input', function (e) {
-                _handleSearchInput(e.target.value);
-            });
-        }
-
-        var searchClearBtn = document.getElementById('searchClearBtn');
-        if (searchClearBtn) searchClearBtn.addEventListener('click', _clearSearch);
-
-        var sortSelect = document.getElementById('sortSelect');
-        if (sortSelect) {
-            sortSelect.value = _state.sortBy;
-            sortSelect.addEventListener('change', function (e) {
-                _state.sortBy = e.target.value;
-                _savePrefs();
-                _renderDocuments();
-            });
-        }
-
-        var viewListBtn = document.getElementById('viewListBtn');
-        if (viewListBtn) viewListBtn.addEventListener('click', function () { _setViewMode('list'); });
-
-        var viewGridBtn = document.getElementById('viewGridBtn');
-        if (viewGridBtn) viewGridBtn.addEventListener('click', function () { _setViewMode('grid'); });
-
-        // Sidebar collapse
-        var sidebarCollapseBtn = document.getElementById('sidebarCollapseBtn');
-        if (sidebarCollapseBtn) sidebarCollapseBtn.addEventListener('click', _toggleSidebarCollapse);
-
-        // Preview
-        var previewCollapseBtn = document.getElementById('previewCollapseBtn');
-        if (previewCollapseBtn) previewCollapseBtn.addEventListener('click', _togglePreviewCollapse);
-
-        var downloadBtn = document.getElementById('downloadBtn');
-        if (downloadBtn) downloadBtn.addEventListener('click', _downloadDocument);
-
-        var printBtn = document.getElementById('printBtn');
-        if (printBtn) printBtn.addEventListener('click', _printDocument);
-
-        var expandPreviewBtn = document.getElementById('expandPreviewBtn');
-        if (expandPreviewBtn) expandPreviewBtn.addEventListener('click', _expandFileViewer);
-
-        var closeDocBtn = document.getElementById('closeDocBtn');
-        if (closeDocBtn) closeDocBtn.addEventListener('click', _closeDocument);
-
-        // Zoom
-        var zoomInBtn = document.getElementById('zoomInBtn');
-        if (zoomInBtn) zoomInBtn.addEventListener('click', _zoomIn);
-        var zoomOutBtn = document.getElementById('zoomOutBtn');
-        if (zoomOutBtn) zoomOutBtn.addEventListener('click', _zoomOut);
-        var fitWidthBtn = document.getElementById('fitWidthBtn');
-        if (fitWidthBtn) fitWidthBtn.addEventListener('click', _fitWidth);
-
-        // Hidden file input
-        var hiddenInput = document.getElementById('hiddenFileInput');
-        if (hiddenInput) hiddenInput.addEventListener('change', _handleFileInputChange);
-
-        // Context menu
-        var openFileBtn = document.getElementById('openFileBtn');
-        if (openFileBtn) openFileBtn.addEventListener('click', function (e) {
-            e.stopPropagation();
-            _openFile();
-        });
-        var deleteFileBtn = document.getElementById('deleteFileBtn');
-        if (deleteFileBtn) deleteFileBtn.addEventListener('click', function (e) {
-            e.stopPropagation();
-            _deleteDocument();
-        });
-
-        // Cerrar context menu al hacer clic fuera
-        document.addEventListener('click', _hideContextMenu);
-        document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape') {
-                _hideContextMenu();
-                var modal = document.getElementById('confirmModal');
-                if (modal && modal.classList.contains('is-visible')) {
-                    _hideConfirmModal();
-                }
-            }
-        });
-
-        // Confirm modal
-        var confirmAcceptBtn = document.getElementById('confirmAcceptBtn');
-        if (confirmAcceptBtn) confirmAcceptBtn.addEventListener('click', _acceptConfirm);
-        var confirmCancelBtn = document.getElementById('confirmCancelBtn');
-        if (confirmCancelBtn) confirmCancelBtn.addEventListener('click', _hideConfirmModal);
-        var confirmModal = document.getElementById('confirmModal');
-        if (confirmModal) {
-            confirmModal.addEventListener('click', function (e) {
-                if (e.target === confirmModal) _hideConfirmModal();
-            });
-        }
-    }
-
-    /* ═══════════════════════════════════════════════════════════════
-       APLICAR PREFERENCIAS UI (al iniciar)
-       ═══════════════════════════════════════════════════════════════ */
-    function _applyPrefsToUI() {
-        // View mode (segmented: is-active + aria-pressed)
-        var listBtn = document.getElementById('viewListBtn');
-        var gridBtn = document.getElementById('viewGridBtn');
-        if (listBtn) {
-            listBtn.classList.toggle('is-active', _state.viewMode === 'list');
-            listBtn.setAttribute('aria-pressed', _state.viewMode === 'list' ? 'true' : 'false');
-        }
-        if (gridBtn) {
-            gridBtn.classList.toggle('is-active', _state.viewMode === 'grid');
-            gridBtn.setAttribute('aria-pressed', _state.viewMode === 'grid' ? 'true' : 'false');
-        }
-
-        // Sort
-        var sortSelect = document.getElementById('sortSelect');
-        if (sortSelect) sortSelect.value = _state.sortBy;
-
-        // Layout collapses
-        var layout = document.getElementById('docsLayout');
-        if (layout) {
-            layout.classList.toggle('is-sidebar-collapsed', _state.isSidebarCollapsed);
-            layout.classList.toggle('is-preview-collapsed', _state.isPreviewCollapsed);
-        }
-    }
-
-    /* ═══════════════════════════════════════════════════════════════
-       API PÚBLICA
-       ═══════════════════════════════════════════════════════════════ */
-    function init() {
-        _log('INIT', 'START');
-        _loadPrefs();
-        _setupThemeSync();
-        _bindEvents();
-        _applyPrefsToUI();
-        _loadFolders(false);
-        _log('INIT', 'SUCCESS');
-    }
-
-    function destroy() {
-        // Limpiar timers
-        if (_state.searchDebounceTimer) {
-            clearTimeout(_state.searchDebounceTimer);
-        }
-        // Limpiar theme sync
-        _teardownThemeSync();
-        // Reset estado
-        _state.currentDocument = null;
-        _state.contextMenuDoc = null;
-        _state.confirmCallback = null;
-        _state.documents = [];
-        _state.folders = [];
-        _log('DESTROY', 'SUCCESS');
-    }
-
-    // Exponer funciones globales para compatibilidad con HTML inline (si las hay)
-    // y para debugging desde la consola del iframe.
-    window.RolesResponsabilidadesViewerGoUp = _goUpLevel;
-    window.RolesResponsabilidadesViewerResetToRoot = _navigateToRoot;
-    window.RolesResponsabilidadesViewerShowToast = _showToast;
-    window.RolesResponsabilidadesViewerShowConfirm = _showConfirmModal;
-    window.RolesResponsabilidadesViewerHideConfirm = _hideConfirmModal;
-
-    return {
-        init: init,
-        destroy: destroy,
-        // Exponer para debugging/testing
-        _callParentAPI: _callParentAPI,
-        _state: _state
-    };
-})();
-
-window.RolesResponsabilidadesViewer = RolesResponsabilidadesViewer;
-
-/* ═══════════════════════════════════════════════════════════════════
-   AUTO-INIT AL CARGAR EL DOM
-   ═══════════════════════════════════════════════════════════════════ */
-document.addEventListener('DOMContentLoaded', function () {
-    RolesResponsabilidadesViewer.init();
-});
+/**
+ * roles-responsabilidades-viewer.js
+ *
+ * Lógica de la vista del submódulo 1.1.2 Roles y Responsabilidades.
+ * Cumple con Decreto 1072 de 2015 art. 2.2.4.6.8 + Resolución 0312/2019.
+ */
+'use strict';
+
+var rrState = {
+  empresaId: null,
+  empresaNombre: null,
+  catalogo: [],
+  asignaciones: [],
+  divulgaciones: [],
+  currentTab: 'gestion',
+  editingRol: null
+};
+
+function $(sel) { return document.querySelector(sel); }
+function $$(sel) { return Array.from(document.querySelectorAll(sel)); }
+
+function getQueryParam(name) {
+  var params = new URLSearchParams(window.location.search);
+  return params.get(name);
+}
+
+function formatDate(iso) {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' });
+  } catch (e) {
+    return iso;
+  }
+}
+
+function escapeHtml(text) {
+  if (text == null) return '';
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+async function init() {
+  rrState.empresaId = getQueryParam('company') || getQueryParam('empresa');
+  rrState.empresaNombre = rrState.empresaId || '—';
+  $('#headerCompany').textContent = rrState.empresaNombre;
+  if (rrState.empresaId) {
+    $('#headerSubtitle').textContent = 'Cumplimiento 1.1.2 — ' + rrState.empresaNombre + ' · Res. 0312/2019 + Dto. 1072/2015';
+  }
+  setupTabs();
+  setupModalEvents();
+  // 📦705-fix2 (2026-08-14) — Comunicación con el parent via postMessage.
+  // El approach anterior (inyectar window.electronAPI directamente) falla en
+  // Electron con contextIsolation: el proxy del contextBridge no se transfiere
+  // correctamente entre contextos. Solución: el iframe le pide al parent
+  // que invoque el IPC. El parent ya tiene el contextBridge funcionando
+  // (lo usa en sus propios handlers), así que es 100% confiable.
+  rrState.bridgeReady = new Promise(function (resolve) {
+    rrState._resolveBridgeReady = resolve;
+  });
+  // 📦705-fix4 (2026-08-14) — El listener DEBE estar en `window` (el iframe
+  // mismo), no en `window.parent`. Cuando el parent hace
+  // `iframe.contentWindow.postMessage(...)`, el mensaje se entrega al
+  // `window` del iframe. Si lo registramos en `window.parent`, el listener
+  // queda en el parent del parent (¡el grandparent!), y nunca recibimos nada.
+  // Bug detectado en consola: el parent enviaba el ack pero el viewer nunca
+  // lo procesaba → bridgeReady quedaba pendiente → "Cargando..." permanente.
+  window.addEventListener('message', _onParentMessage);
+  // Avisarle al parent que estamos listos para recibir el handshake
+  window.parent.postMessage({ type: 'kair-rr-iframe-ready', source: 'roles-resp-viewer' }, '*');
+  await rrState.bridgeReady;
+  await cargarDatos();
+}
+
+function _onParentMessage(event) {
+  if (!event.data || !event.data.type) return;
+  // Handshake: el parent confirma que tiene el electronAPI y nos lo expone
+  if (event.data.type === 'kair-rr-parent-ack' && event.data.electronAPISnapshot) {
+    rrState._electronAPISnapshot = event.data.electronAPISnapshot;
+    if (rrState._resolveBridgeReady) {
+      rrState._resolveBridgeReady();
+      rrState._resolveBridgeReady = null;
+    }
+  }
+  // Respuesta de una llamada IPC
+  if (event.data.type === 'kair-rr-bridge-result') {
+    var pending = rrState._pendingCalls && rrState._pendingCalls[event.data.callId];
+    if (pending) {
+      delete rrState._pendingCalls[event.data.callId];
+      if (event.data.error) {
+        pending.reject(new Error(event.data.error));
+      } else {
+        pending.resolve(event.data.result);
+      }
+    }
+  }
+}
+
+// 📦705-fix2 (2026-08-14) — Wrapper sobre el bridge via postMessage.
+// En lugar de copiar el proxy de electronAPI (que no funciona entre contextos
+// con contextIsolation), el iframe le pide al parent que invoque el IPC.
+// 📦705-fix9 (2026-08-14) — Timeout subido a 60s. Los file dialogs nativos
+// (showOpenDialog/showSaveDialog) pueden tardar más de 10s mientras el user
+// navega carpetas. 60s es suficiente sin bloquear la UI indefinidamente.
+function _bridgeCall(channel, payload) {
+  return new Promise(function (resolve, reject) {
+    var callId = 'call_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    rrState._pendingCalls = rrState._pendingCalls || {};
+    rrState._pendingCalls[callId] = { resolve: resolve, reject: reject };
+    window.parent.postMessage({
+      type: 'kair-rr-bridge-call',
+      source: 'roles-resp-viewer',
+      callId: callId,
+      channel: channel,
+      payload: payload
+    }, '*');
+    // Timeout de seguridad: 60s (los file dialogs pueden tardar)
+    setTimeout(function () {
+      if (rrState._pendingCalls && rrState._pendingCalls[callId]) {
+        delete rrState._pendingCalls[callId];
+        reject(new Error('Timeout: el parent no respondió a ' + channel + ' en 60s. El explorador de archivos puede haberse cerrado o no tenido foco.'));
+      }
+    }, 60000);
+  });
+}
+
+function setupTabs() {
+  $('#tabGestion').addEventListener('click', function() { switchTab('gestion'); });
+  $('#tabDocumentos').addEventListener('click', function() { switchTab('documentos'); });
+  $('#backBtn').addEventListener('click', function() {
+    if (window.parent && typeof window.parent.postMessage === 'function') {
+      window.parent.postMessage({ type: 'back-to-module-request' }, '*');
+    }
+  });
+}
+
+function switchTab(tab) {
+  rrState.currentTab = tab;
+  $$('.kair-rr-tab').forEach(function(t) {
+    t.classList.toggle('is-active', t.getAttribute('data-tab') === tab);
+  });
+  $$('.kair-rr-tab-panel').forEach(function(p) {
+    p.classList.toggle('is-active', p.id === ('panel' + tab.charAt(0).toUpperCase() + tab.slice(1)));
+  });
+}
+
+function setupModalEvents() {
+  $$('[data-action="cerrar-modal-asignar"]').forEach(function(b) {
+    b.addEventListener('click', cerrarModalAsignar);
+  });
+  $$('[data-action="cerrar-modal-trabajador"]').forEach(function(b) {
+    b.addEventListener('click', cerrarModalTrabajador);
+  });
+  $$('[data-action="cerrar-modal-matriz"]').forEach(function(b) {
+    b.addEventListener('click', cerrarModalMatriz);
+  });
+  $$('[data-action="cerrar-modal-soporte"]').forEach(function(b) {
+    b.addEventListener('click', cerrarModalSoporte);
+  });
+  $('#btnGuardarAsignar').addEventListener('click', guardarAsignar);
+  $('#btnGuardarTrabajador').addEventListener('click', guardarTrabajador);
+  $('#btnGuardarSoporte').addEventListener('click', guardarSoporte);
+  $('#btnAnadirTrabajador').addEventListener('click', abrirModalTrabajador);
+  $('#btnExportarPDF').addEventListener('click', exportarPDF);
+  $('#btnMatrizAsignar').addEventListener('click', function() {
+    cerrarModalMatriz();
+    if (rrState.editingRol) abrirModalAsignar(rrState.editingRol);
+  });
+  // 📦705-fix8 (2026-08-14) — Drag&drop + examinar del modal "Subir soporte"
+  $('#dropZoneSoporte').addEventListener('click', examinarOrigen);
+  $('#dropZoneSoporte').addEventListener('dragover', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    $('#dropZoneSoporte').classList.add('is-dragover');
+  });
+  $('#dropZoneSoporte').addEventListener('dragleave', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    $('#dropZoneSoporte').classList.remove('is-dragover');
+  });
+  $('#dropZoneSoporte').addEventListener('drop', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    $('#dropZoneSoporte').classList.remove('is-dragover');
+    var files = e.dataTransfer && e.dataTransfer.files;
+    if (files && files.length > 0) {
+      var file = files[0];
+      // En Electron 32+, file.path está disponible directamente
+      var filePath = file.path || (file.name && '');
+      if (filePath) {
+        onOrigenSeleccionado(filePath, file.size, file.name);
+      } else {
+        alert('No se pudo obtener la ruta del archivo. Usá el botón "Examinar..."');
+      }
+    }
+  });
+  $('#btnExaminarOrigen').addEventListener('click', examinarOrigen);
+  $('#btnExaminarDestino').addEventListener('click', examinarDestino);
+}
+
+async function cargarDatos() {
+  try {
+    var catRes = await _bridgeCall('roles-resp:catalogo-listar', null);
+    if (catRes && catRes.success) {
+      rrState.catalogo = catRes.data || [];
+    } else if (catRes && catRes.error) {
+      console.error('[RolesResp] catalogo error:', catRes.error.message);
+    }
+    if (rrState.empresaId) {
+      var asigRes = await _bridgeCall('roles-resp:asignacion-listar', { empresaId: rrState.empresaId });
+      if (asigRes && asigRes.success) {
+        rrState.asignaciones = asigRes.data || [];
+      }
+      var divRes = await _bridgeCall('roles-resp:divulgacion-listar', { empresaId: rrState.empresaId });
+      if (divRes && divRes.success) {
+        rrState.divulgaciones = divRes.data || [];
+      }
+    }
+    renderBanner();
+    renderTablaRoles();
+    renderTablaDivulgacion();
+    renderTablaSoportes();
+  } catch (e) {
+    console.error('[RolesResp] Error cargando datos:', e.message);
+    // Si falla el bridge, mostramos un mensaje claro en el banner
+    var bannerEl = $('#bannerSummary');
+    if (bannerEl) bannerEl.textContent = 'Error cargando datos: ' + e.message;
+  }
+}
+
+function renderBanner() {
+  var rolesObligatorios = rrState.catalogo.filter(function(c) { return c.obligatorio === 1; });
+  var totalRoles = rolesObligatorios.length;
+  var rolesAsignados = rrState.asignaciones.length;
+  var trabAceptados = rrState.divulgaciones.filter(function(d) {
+    return d.estado_calculado === 'aceptado' || d.estado === 'aceptado';
+  }).length;
+  var totalDivulg = rrState.divulgaciones.length;
+  var pctAsign = totalRoles > 0 ? Math.round((rolesAsignados / totalRoles) * 100) : 0;
+  var pctDiv = totalDivulg > 0 ? Math.round((trabAceptados / totalDivulg) * 100) : 0;
+  var pctGlobal = totalRoles + totalDivulg > 0 ? Math.round((pctAsign + pctDiv) / 2) : 0;
+  $('#bannerSummary').innerHTML =
+    '<strong>' + rolesAsignados + '/' + totalRoles + '</strong> roles obligatorios asignados · ' +
+    '<strong>' + trabAceptados + '/' + totalDivulg + '</strong> trabajadores con soporte PDF · ' +
+    '<strong>' + pctGlobal + '%</strong> de cumplimiento global';
+  $('#bannerProgressBar').style.width = pctGlobal + '%';
+}
+
+function renderTablaRoles() {
+  var tbody = $('#tablaRolesBody');
+  tbody.innerHTML = '';
+  rrState.catalogo.forEach(function(rol) {
+    var asignacion = rrState.asignaciones.find(function(a) { return a.rol_id === rol.id; });
+    var tr = document.createElement('tr');
+    var persona = asignacion ? asignacion.persona_nombre : '—';
+    var cedula = asignacion ? (asignacion.persona_cedula || '—') : '—';
+    var cargo = asignacion ? (asignacion.persona_cargo || '—') : '—';
+    var fecha = asignacion ? formatDate(asignacion.fecha_asignacion) : '—';
+    var estado = asignacion
+      ? '<span class="kair-rr-state kair-rr-state--vigente">✓ Vigente</span>'
+      : (rol.obligatorio === 1
+        ? '<span class="kair-rr-state kair-rr-state--pendiente">⚠ Pte</span>'
+        : '<span class="kair-rr-state kair-rr-state--na">○ N/A</span>');
+    tr.innerHTML =
+      '<td><div class="rol-nombre">' + escapeHtml(rol.nombre) + '</div><div class="rol-codigo">' + escapeHtml(rol.codigo) + '</div></td>' +
+      '<td>' + escapeHtml(persona) + '</td>' +
+      '<td>' + escapeHtml(cedula) + '</td>' +
+      '<td>' + escapeHtml(cargo) + '</td>' +
+      '<td>' + fecha + '</td>' +
+      '<td>' + estado + '</td>' +
+      '<td><button class="kair-rr-btn kair-rr-btn--small" data-action="ver-matriz" data-rol-id="' + escapeHtml(rol.id) + '"><i class="bi bi-table"></i> Matriz</button> <button class="kair-rr-btn kair-rr-btn--small" data-action="reasignar" data-rol-id="' + escapeHtml(rol.id) + '"><i class="bi bi-pencil"></i> ' + (asignacion ? 'Reasignar' : 'Asignar') + '</button></td>';
+    tbody.appendChild(tr);
+  });
+  $$('#tablaRolesBody button[data-action="ver-matriz"]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      abrirModalMatriz(btn.getAttribute('data-rol-id'));
+    });
+  });
+  $$('#tablaRolesBody button[data-action="reasignar"]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      abrirModalAsignar(btn.getAttribute('data-rol-id'));
+    });
+  });
+}
+
+function renderTablaDivulgacion() {
+  var tbody = $('#tablaDivulgacionBody');
+  tbody.innerHTML = '';
+  if (rrState.divulgaciones.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:#94a3b8;">' +
+      'No hay divulgaciones registradas. Use <strong>+ Añadir trabajador</strong> para empezar.</td></tr>';
+    return;
+  }
+  rrState.divulgaciones.forEach(function(d) {
+    var estadoTexto = d.estado_calculado === 'aceptado' || d.estado === 'aceptado'
+      ? '<span class="kair-rr-state kair-rr-state--aceptado">✓ Aceptado</span>'
+      : '<span class="kair-rr-state kair-rr-state--pendiente">⏳ Pendiente</span>';
+    var soporte = d.documento_soporte_path
+      ? '<a href="#" data-action="ver-soporte" data-path="' + escapeHtml(d.documento_soporte_path) + '" style="color:#174ea6;font-size:12px;">📄 ' + escapeHtml(d.documento_soporte_path.split(/[\\/]/).pop()) + '</a>'
+      : '<button class="kair-rr-btn kair-rr-btn--small" data-action="subir-soporte" data-id="' + d.id + '"><i class="bi bi-upload"></i> Subir</button>';
+    var tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td>' + escapeHtml(d.persona_nombre) + '</td>' +
+      '<td>' + escapeHtml(d.persona_cedula || '—') + '</td>' +
+      '<td>' + escapeHtml(d.persona_cargo || '—') + '</td>' +
+      '<td>' + estadoTexto + '</td>' +
+      '<td><input type="date" value="' + (d.fecha_divulgacion || '').substring(0, 10) + '" data-id="' + d.id + '" class="kair-rr-date-input" /></td>' +
+      '<td>' + soporte + '</td>' +
+      '<td><button class="kair-rr-btn kair-rr-btn--small" data-action="eliminar-divulg" data-id="' + d.id + '"><i class="bi bi-trash"></i></button></td>';
+    tbody.appendChild(tr);
+  });
+  $$('#tablaDivulgacionBody button[data-action="subir-soporte"]').forEach(function(btn) {
+    btn.addEventListener('click', function() { subirSoporte(parseInt(btn.getAttribute('data-id'), 10)); });
+  });
+  $$('#tablaDivulgacionBody button[data-action="eliminar-divulg"]').forEach(function(btn) {
+    btn.addEventListener('click', function() { eliminarDivulgacion(parseInt(btn.getAttribute('data-id'), 10)); });
+  });
+  $$('#tablaDivulgacionBody input.kair-rr-date-input').forEach(function(input) {
+    input.addEventListener('change', function() {
+      actualizarFecha(parseInt(input.getAttribute('data-id'), 10), input.value);
+    });
+  });
+}
+
+// 📦705-fix10 (2026-08-14) — Tab "Documentos de soporte": lista los PDFs
+// subidos (divulgaciones con documento_soporte_path no nulo). Botones Ver y
+// Descargar por fila.
+function renderTablaSoportes() {
+  var tbody = $('#tablaDocumentosBody');
+  tbody.innerHTML = '';
+  var soportes = (rrState.divulgaciones || []).filter(function (d) {
+    return d.documento_soporte_path && String(d.documento_soporte_path).trim();
+  });
+  $('#documentosCount').textContent = soportes.length + (soportes.length === 1 ? ' PDF' : ' PDFs');
+  if (soportes.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#94a3b8;">' +
+      'Todavía no hay PDFs de soporte. Andá al tab <strong>Gestión de Roles</strong>, agregá un trabajador en la sección ' +
+      '"Divulgación a Trabajadores" y hacé click en <strong>Subir</strong> en la fila correspondiente.</td></tr>';
+    return;
+  }
+  soportes.forEach(function (d) {
+    var filename = String(d.documento_soporte_path).split(/[\\/]/).pop();
+    var tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td><div class="rol-nombre">' + escapeHtml(d.persona_nombre) + '</div></td>' +
+      '<td>' + escapeHtml(d.persona_cedula || '—') + '</td>' +
+      '<td>' + escapeHtml(d.persona_cargo || '—') + '</td>' +
+      '<td>' + formatDate(d.fecha_divulgacion) + '</td>' +
+      '<td><div class="kair-rr-doc-icon" title="' + escapeHtml(d.documento_soporte_path) + '"><i class="bi bi-file-earmark-pdf"></i><span class="kair-rr-doc-icon__name">' + escapeHtml(filename) + '</span></div></td>' +
+      '<td>' +
+        '<button class="kair-rr-btn kair-rr-btn--small" data-action="ver-pdf-soporte" data-path="' + escapeHtml(d.documento_soporte_path) + '"><i class="bi bi-eye"></i> Ver</button> ' +
+        '<button class="kair-rr-btn kair-rr-btn--small" data-action="descargar-pdf-soporte" data-path="' + escapeHtml(d.documento_soporte_path) + '"><i class="bi bi-download"></i> Descargar</button>' +
+      '</td>';
+    tbody.appendChild(tr);
+  });
+  $$('#tablaDocumentosBody button[data-action="ver-pdf-soporte"]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      verPDFSoporte(btn.getAttribute('data-path'));
+    });
+  });
+  $$('#tablaDocumentosBody button[data-action="descargar-pdf-soporte"]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      descargarPDFSoporte(btn.getAttribute('data-path'));
+    });
+  });
+}
+
+function verPDFSoporte(filePath) {
+  if (!filePath) return;
+  // 📦705-fix10 (2026-08-14) — El parent (roles-responsabilidades-logic.js)
+  // ya tiene un handler para `open-file-viewer-modal` que abre el kairFV.
+  // Le pedimos al parent que lo abra.
+  window.parent.postMessage({
+    type: 'open-file-viewer-modal',
+    filePath: filePath
+  }, '*');
+}
+
+async function descargarPDFSoporte(filePath) {
+  if (!filePath) return;
+  try {
+    var res = await _bridgeCall('roles-resp:archivo-descargar', { sourcePath: filePath });
+    if (res && res.success && res.data) {
+      alert('✅ PDF descargado en:\n' + res.data.path + '\n(' + formatBytes(res.data.bytes) + ')');
+    } else if (res && res.error && res.error.code === 'CANCELED') {
+      // User canceló el save dialog, no hacer nada
+    } else {
+      alert('Error: ' + (res && res.error && res.error.message));
+    }
+  } catch (e) {
+    alert('Error descargando: ' + e.message);
+  }
+}
+
+function abrirModalAsignar(rolId) {
+  var rol = rrState.catalogo.find(function(c) { return c.id === rolId; });
+  if (!rol) return;
+  rrState.editingRol = rolId;
+  var asignacion = rrState.asignaciones.find(function(a) { return a.rol_id === rolId; });
+  $('#modalAsignarRol').textContent = rol.nombre + ' (' + rol.codigo + ')';
+  $('#modalAsignarTitle').textContent = asignacion ? 'Reasignar persona a rol' : 'Asignar persona a rol';
+  $('#inputAsignarNombre').value = asignacion ? asignacion.persona_nombre : '';
+  $('#inputAsignarCedula').value = asignacion ? (asignacion.persona_cedula || '') : '';
+  $('#inputAsignarCargo').value = asignacion ? (asignacion.persona_cargo || '') : '';
+  $('#inputAsignarFecha').value = (asignacion ? asignacion.fecha_asignacion : new Date().toISOString()).substring(0, 10);
+  $('#modalAsignar').removeAttribute('hidden');
+}
+
+function cerrarModalAsignar() {
+  $('#modalAsignar').setAttribute('hidden', '');
+  rrState.editingRol = null;
+}
+
+async function guardarAsignar() {
+  if (!rrState.editingRol) return;
+  var nombre = $('#inputAsignarNombre').value.trim();
+  if (!nombre) { alert('El nombre es obligatorio'); return; }
+  var fecha = $('#inputAsignarFecha').value;
+  if (!fecha) { alert('La fecha es obligatoria'); return; }
+  try {
+    var res = await _bridgeCall('roles-resp:asignacion-upsert', {
+      empresaId: rrState.empresaId,
+      rolId: rrState.editingRol,
+      personaNombre: nombre,
+      personaCedula: $('#inputAsignarCedula').value.trim() || null,
+      personaCargo: $('#inputAsignarCargo').value.trim() || null,
+      fechaAsignacion: fecha,
+      creadoPor: 'admin'
+    });
+    if (res && res.success) {
+      cerrarModalAsignar();
+      await cargarDatos();
+    } else {
+      alert('Error guardando: ' + (res && res.error && res.error.message));
+    }
+  } catch (e) {
+    console.error('[RolesResp] Error upsert asignacion:', e.message);
+    alert('Error: ' + e.message);
+  }
+}
+
+function abrirModalTrabajador() {
+  $('#inputTrabCedula').value = '';
+  $('#inputTrabNombre').value = '';
+  $('#inputTrabCargo').value = '';
+  $('#modalTrabajador').removeAttribute('hidden');
+}
+
+function cerrarModalTrabajador() {
+  $('#modalTrabajador').setAttribute('hidden', '');
+}
+
+// 📦705-fix3 (2026-08-14) — Modal Matriz del Excel G-OD-006 (4 columnas:
+// Responsabilidades / Autoridad / Rendición de Cuentas / Base legal).
+// Se abre al hacer click en el botón "Matriz" de la tabla de roles.
+function abrirModalMatriz(rolId) {
+  var rol = rrState.catalogo.find(function (c) { return c.id === rolId; });
+  if (!rol) {
+    console.warn('[RolesResp] abrirModalMatriz: rol no encontrado', rolId);
+    return;
+  }
+  rrState.editingRol = rolId;
+  $('#modalMatrizNombre').textContent = rol.nombre || '—';
+  $('#modalMatrizCodigo').textContent = rol.codigo || '—';
+  $('#modalMatrizResponsabilidades').textContent = rol.responsabilidades || '— (sin definir)';
+  $('#modalMatrizAutoridad').textContent = rol.autoridad || '— (sin definir)';
+  $('#modalMatrizRendicion').textContent = rol.rendicion_cuentas || '— (sin definir)';
+  $('#modalMatrizBaseLegal').textContent = rol.base_legal || '';
+  $('#modalMatriz').removeAttribute('hidden');
+}
+
+function cerrarModalMatriz() {
+  $('#modalMatriz').setAttribute('hidden', '');
+  rrState.editingRol = null;
+}
+
+async function guardarTrabajador() {
+  var cedula = $('#inputTrabCedula').value.trim();
+  var nombre = $('#inputTrabNombre').value.trim();
+  if (!cedula || !nombre) { alert('Cédula y nombre son obligatorios'); return; }
+  try {
+    var res = await _bridgeCall('roles-resp:divulgacion-upsert', {
+      empresaId: rrState.empresaId,
+      personaCedula: cedula,
+      personaNombre: nombre,
+      personaCargo: $('#inputTrabCargo').value.trim() || null,
+      fechaDivulgacion: new Date().toISOString()
+    });
+    if (res && res.success) {
+      cerrarModalTrabajador();
+      await cargarDatos();
+    } else {
+      alert('Error guardando: ' + (res && res.error && res.error.message));
+    }
+  } catch (e) {
+    console.error('[RolesResp] Error upsert divulgacion:', e.message);
+    alert('Error: ' + e.message);
+  }
+}
+
+async function subirSoporte(divulgId) {
+  // 📦705-fix8 (2026-08-14) — Modal completo con drag&drop + examinar + copia
+  // a destino. El user selecciona el PDF origen (drag/drop o explorador) y la
+  // carpeta destino. La app COPIA el archivo y guarda la divulgación con el
+  // path destino (para tener una copia controlada en la carpeta de la empresa).
+  // 📦705-fix9 (2026-08-14) — Mejor visual: chips con nombre corto + tooltip
+  // con la ruta completa. Default destino: carpeta de la empresa en Google Drive.
+  var div = rrState.divulgaciones.find(function(d) { return d.id === divulgId; });
+  if (!div) return;
+  rrState.editingDivulg = divulgId;
+  rrState.origenPath = null;
+  rrState.origenBytes = null;
+  rrState.destinoPath = null;
+  $('#modalSubirSoportePersona').textContent = 'Trabajador: ' + (div.persona_nombre || '—') + ' (C.C. ' + (div.persona_cedula || '—') + ')';
+  // Reset origen chip
+  $('#chipOrigen').setAttribute('data-empty', 'true');
+  $('#chipOrigen').setAttribute('title', '');
+  $('#chipOrigenName').textContent = 'Ningún archivo seleccionado';
+  $('#chipOrigenSize').textContent = '';
+  // Default destino: Desktop (el user puede cambiarlo con "Examinar...")
+  setDestino('C:\\Users\\usuario\\Desktop');
+  $('#btnGuardarSoporte').setAttribute('disabled', '');
+  $('#modalSubirSoporte').removeAttribute('hidden');
+}
+
+function cerrarModalSoporte() {
+  $('#modalSubirSoporte').setAttribute('hidden', '');
+  rrState.editingDivulg = null;
+  rrState.origenPath = null;
+  rrState.origenBytes = null;
+  rrState.destinoPath = null;
+}
+
+function onOrigenSeleccionado(filePath, bytes, name) {
+  rrState.origenPath = filePath;
+  rrState.origenBytes = bytes;
+  var filename = name || filePath.split(/[\\/]/).pop();
+  $('#chipOrigen').removeAttribute('data-empty');
+  $('#chipOrigen').setAttribute('title', filePath);  // tooltip con la ruta completa
+  $('#chipOrigenName').textContent = filename;
+  $('#chipOrigenSize').textContent = bytes ? formatBytes(bytes) : '';
+  // Si el destino está vacío, sugerimos la carpeta del origen
+  if (!rrState.destinoPath) {
+    var sep = filePath.indexOf('\\') >= 0 ? '\\' : '/';
+    setDestino(filePath.substring(0, filePath.lastIndexOf(sep)));
+  }
+  actualizarBotonGuardar();
+}
+
+function setDestino(path) {
+  rrState.destinoPath = path;
+  if (!path) {
+    $('#chipDestino').setAttribute('data-empty', 'true');
+    $('#chipDestino').setAttribute('title', '');
+    $('#chipDestinoName').textContent = 'Sin carpeta destino';
+  } else {
+    $('#chipDestino').removeAttribute('data-empty');
+    $('#chipDestino').setAttribute('title', path);  // tooltip con la ruta completa
+    // Mostrar solo el último segmento de la ruta (la carpeta)
+    var parts = path.split(/[\\/]/).filter(function (p) { return p; });
+    $('#chipDestinoName').textContent = parts.length > 0 ? parts[parts.length - 1] : path;
+  }
+  actualizarBotonGuardar();
+}
+
+function actualizarBotonGuardar() {
+  if (rrState.origenPath && rrState.destinoPath) {
+    $('#btnGuardarSoporte').removeAttribute('disabled');
+  } else {
+    $('#btnGuardarSoporte').setAttribute('disabled', '');
+  }
+}
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+}
+
+async function examinarOrigen() {
+  try {
+    var res = await _bridgeCall('roles-resp:archivo-seleccionar-origen', null);
+    if (res && res.success && res.data) {
+      onOrigenSeleccionado(res.data.path, res.data.bytes, res.data.filename);
+    } else if (res && res.error && res.error.code !== 'CANCELED') {
+      alert('Error: ' + res.error.message);
+    }
+  } catch (e) {
+    alert('Error abriendo explorador: ' + e.message);
+  }
+}
+
+async function examinarDestino() {
+  try {
+    var currentPath = rrState.destinoPath || undefined;
+    var res = await _bridgeCall('roles-resp:archivo-seleccionar-destino', { defaultPath: currentPath });
+    if (res && res.success && res.data) {
+      setDestino(res.data.path);
+    } else if (res && res.error && res.error.code !== 'CANCELED') {
+      alert('Error: ' + res.error.message);
+    }
+  } catch (e) {
+    alert('Error abriendo explorador: ' + e.message);
+  }
+}
+
+async function guardarSoporte() {
+  if (!rrState.editingDivulg) return;
+  var div = rrState.divulgaciones.find(function(d) { return d.id === rrState.editingDivulg; });
+  if (!div) { cerrarModalSoporte(); return; }
+  var origen = rrState.origenPath;
+  var destino = rrState.destinoPath;
+  if (!origen) { alert('Seleccioná un PDF de origen (arrastrando o con "Examinar...")'); return; }
+  if (!destino) { alert('Indicá la carpeta destino'); return; }
+  if (!origen.toLowerCase().endsWith('.pdf')) { alert('El archivo origen debe ser un PDF (*.pdf)'); return; }
+  // 1) Copiar el archivo al destino
+  var btn = $('#btnGuardarSoporte');
+  btn.setAttribute('disabled', '');
+  btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Copiando...';
+  try {
+    var copyRes = await _bridgeCall('roles-resp:archivo-copiar', { origen: origen, destino: destino });
+    if (!copyRes || !copyRes.success) {
+      btn.removeAttribute('disabled');
+      btn.innerHTML = '<i class="bi bi-upload"></i> Copiar y marcar aceptado';
+      alert('Error copiando: ' + (copyRes && copyRes.error && copyRes.error.message));
+      return;
+    }
+    // 2) Guardar la divulgación con el path destino
+    var res = await _bridgeCall('roles-resp:divulgacion-upsert', {
+      empresaId: rrState.empresaId,
+      personaCedula: div.persona_cedula,
+      personaNombre: div.persona_nombre,
+      personaCargo: div.persona_cargo,
+      fechaDivulgacion: div.fecha_divulgacion,
+      documentoSoportePath: copyRes.data.path,
+      fechaAceptacion: new Date().toISOString()
+    });
+    if (res && res.success) {
+      cerrarModalSoporte();
+      await cargarDatos();
+      alert('✅ Soporte PDF copiado y divulgado.\n\nOrigen: ' + origen + '\nDestino: ' + copyRes.data.path + '\nEstado: ' + (res.data && res.data.estado ? res.data.estado : 'aceptado'));
+    } else {
+      btn.removeAttribute('disabled');
+      btn.innerHTML = '<i class="bi bi-upload"></i> Copiar y marcar aceptado';
+      alert('Error guardando divulgación: ' + (res && res.error && res.error.message));
+    }
+  } catch (e) {
+    btn.removeAttribute('disabled');
+    btn.innerHTML = '<i class="bi bi-upload"></i> Copiar y marcar aceptado';
+    alert('Error: ' + e.message);
+  }
+}
+
+async function eliminarDivulgacion(divulgId) {
+  if (!confirm('¿Eliminar esta divulgación? Esta acción no se puede deshacer.')) return;
+  try {
+    var res = await _bridgeCall('roles-resp:divulgacion-eliminar', { id: divulgId });
+    if (res && res.success) {
+      await cargarDatos();
+    } else {
+      alert('Error: ' + (res && res.error && res.error.message));
+    }
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function actualizarFecha(divulgId, fecha) {
+  var div = rrState.divulgaciones.find(function(d) { return d.id === divulgId; });
+  if (!div) return;
+  try {
+    await _bridgeCall('roles-resp:divulgacion-upsert', {
+      empresaId: rrState.empresaId,
+      personaCedula: div.persona_cedula,
+      personaNombre: div.persona_nombre,
+      personaCargo: div.persona_cargo,
+      fechaDivulgacion: fecha + 'T00:00:00.000Z',
+      documentoSoportePath: div.documento_soporte_path,
+      fechaAceptacion: div.fecha_aceptacion
+    });
+  } catch (e) {
+    console.error('[RolesResp] Error actualizando fecha:', e.message);
+  }
+}
+
+async function exportarPDF() {
+  if (!rrState.empresaId) { alert('Selecciona una empresa primero'); return; }
+  // 📦705-fix6 (2026-08-14) — No usar `process.env.USERNAME` porque este código
+  // corre en el iframe del renderer, donde `process` no existe (eso es del
+  // main process de Node). Usamos un placeholder genérico + le pedimos al user
+  // que confirme/ajuste la ruta en el prompt.
+  var defaultName = 'C:\\Users\\usuario\\Desktop\\1.1.2_Cumplimiento_' + rrState.empresaId + '_' + new Date().toISOString().substring(0, 10) + '.pdf';
+  var outputPath = prompt('Ruta donde guardar el PDF (ajustá el "usuario" si querés):', defaultName);
+  if (!outputPath) return;
+  if (!outputPath.toLowerCase().endsWith('.pdf')) outputPath += '.pdf';
+  try {
+    var res = await _bridgeCall('roles-resp:reporte-pdf', {
+      empresaId: rrState.empresaId,
+      outputPath: outputPath
+    });
+    if (res && res.success) {
+      alert('✅ Reporte generado correctamente:\n' + res.data.path + '\n(' + res.data.bytes + ' bytes)');
+    } else {
+      alert('Error generando PDF: ' + (res && res.error && res.error.message));
+    }
+  } catch (e) {
+    console.error('[RolesResp] Error generando PDF:', e.message);
+    alert('Error: ' + e.message);
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}

@@ -3,245 +3,261 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>K+AIR · 1.1.2 Roles y Responsabilidades · Visualizador</title>
-    <!-- Iconos K+AIR (bootstrap-icons) -->
+    <title>K+AIR · 1.1.2 Roles y Responsabilidades</title>
     <link rel="stylesheet" href="../../../assets/css/bootstrap-icons.css">
-    <!-- Estilos del módulo (namespace canónico kair-*) -->
     <link rel="stylesheet" href="roles-responsabilidades-view.css">
 </head>
-<body class="kair-body">
-
-<!-- ═══════════════════════════════════════════════════════════════════
-     K+AIR · 1.1.2 Roles y Responsabilidades · Visualizador v2.0
-     Rediseño Opción C — Híbrido incremental
-     v2.0 · 2026-07-10 — UX explorador moderno sobre iframe existente
-     Migración → v2.0:
-       - Namespace kair-docs-* → kair-* (canónico)
-       - Removida dependencia font-awesome (no existe en el proyecto)
-       - Soporte dark mode ([data-theme="dark"] y [data-theme="dark-legacy"])
-     ═══════════════════════════════════════════════════════════════════ -->
-
-<div class="kair-root" id="appRoot">
-
-    <!-- ─────────── HEADER K+AIR (Patrón 2) ─────────── -->
-    <header class="kair-header">
-        <div class="kair-header__bar">
-            <div class="kair-header__left">
-                <button class="kair-header__back" id="backToModuleBtn" title="Volver al módulo">
+<body class="kair-rr-body">
+    <div class="kair-rr-root">
+        <!-- HEADER CON TABS -->
+        <header class="kair-rr-header">
+            <div class="kair-rr-header__bar">
+                <button class="kair-rr-header__back" id="backBtn" title="Volver al módulo">
                     <i class="bi bi-arrow-left"></i>
                 </button>
-                <span class="kair-header__pill">1.1.2</span>
-            </div>
-            <div class="kair-header__center">
-                <h1 class="kair-header__title">Roles y Responsabilidades</h1>
-                <p class="kair-header__subtitle" id="headerSubtitle">Documentos de roles y responsabilidades del SG-SST</p>
-            </div>
-            <div class="kair-header__right">
-                <span class="kair-header__company" id="headerCompany">
-                    <i class="kair-icon-building"></i>
-                    <span id="companyName">—</span>
-                </span>
-                <span class="kair-header__divider"></span>
-                <button class="kair-header__action kair-header__action--success" id="uploadBtn" title="Subir archivo">
-                    <i class="bi bi-upload"></i>
-                    <span>Subir</span>
-                </button>
-                <button class="kair-header__action kair-header__action--ghost" id="refreshBtn" title="Refrescar">
-                    <i class="bi bi-arrow-clockwise"></i>
-                </button>
-            </div>
-        </div>
-    </header>
-
-    <!-- ─────────── BREADCRUMB MULTINIVEL ─────────── -->
-    <nav class="kair-breadcrumb" id="breadcrumb" aria-label="Ruta de carpetas">
-        <!-- Generado dinámicamente por _renderBreadcrumb() -->
-    </nav>
-
-    <!-- ─────────── TOOLBAR (búsqueda + sort + vista) ─────────── -->
-    <div class="kair-toolbar">
-        <div class="kair-toolbar__left">
-            <div class="kair-search">
-                <i class="bi bi-search kair-search__icon"></i>
-                <input type="text" id="searchInput" class="kair-search__input"
-                       placeholder="Buscar archivos..." autocomplete="off">
-                <button class="kair-search__clear" id="searchClearBtn" title="Limpiar" aria-hidden="true">
-                    <i class="bi bi-x-circle"></i>
-                </button>
-            </div>
-            <div class="kair-sort">
-                <select id="sortSelect" class="kair-sort__select" title="Ordenar por">
-                    <option value="name-asc">Nombre (A → Z)</option>
-                    <option value="name-desc">Nombre (Z → A)</option>
-                    <option value="size-desc">Tamaño (mayor primero)</option>
-                    <option value="size-asc">Tamaño (menor primero)</option>
-                    <option value="date-desc">Modificado (más reciente)</option>
-                    <option value="date-asc">Modificado (más antiguo)</option>
-                </select>
-            </div>
-        </div>
-        <div class="kair-toolbar__right">
-            <div class="kair-view-toggle" role="group" aria-label="Cambiar vista">
-                <button class="kair-view-toggle__btn is-active" id="viewListBtn"
-                        data-view="list" aria-pressed="true" title="Vista de lista">
-                    <i class="bi bi-list-ul" aria-hidden="true"></i>
-                </button>
-                <button class="kair-view-toggle__btn" id="viewGridBtn"
-                        data-view="grid" aria-pressed="false" title="Vista de cuadrícula">
-                    <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i>
-                </button>
-            </div>
-            <div class="kair-stats" id="docsStats">
-                <span class="kair-stats__count" id="docCount">0</span>
-                <span class="kair-stats__label">archivos</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- ─────────── LAYOUT 3 PANELES ─────────── -->
-    <main class="kair-layout" id="docsLayout">
-
-        <!-- PANEL IZQUIERDO: Árbol de carpetas -->
-        <aside class="kair-sidebar" id="folderSidebar" aria-label="Carpetas">
-            <div class="kair-sidebar__head">
-                <i class="bi bi-folder2-open"></i>
-                <span>Carpetas</span>
-            </div>
-            <div class="kair-sidebar__body" id="folderList">
-                <!-- Skeleton / folders generados dinámicamente -->
-            </div>
-            <button class="kair-sidebar__collapse" id="sidebarCollapseBtn" title="Contraer panel">
-                <span class="kair-collapse-chevron kair-collapse-chevron--left" aria-hidden="true"></span>
-            </button>
-        </aside>
-
-        <!-- PANEL CENTRAL: Lista/Grid de documentos -->
-        <section class="kair-main" id="docsMain" aria-label="Documentos">
-            <div class="kair-main__body" id="fileList">
-                <!-- Skeleton / documentos generados dinámicamente -->
-            </div>
-            <footer class="kair-main__footer" id="docsFooter">
-                <span id="footerCount">0 archivos</span>
-                <span class="kair-main__footer-sep">·</span>
-                <span id="footerSize">0 B</span>
-                <span class="kair-main__footer-sep">·</span>
-                <span id="footerLastMod">—</span>
-            </footer>
-        </section>
-
-        <!-- PANEL DERECHO: Preview PDF -->
-        <aside class="kair-preview" id="previewPanel" aria-label="Vista previa" data-state="empty">
-            <div class="kair-preview__head">
-                <div class="kair-preview__title">
-                    <i class="bi bi-file-earmark-text"></i>
-                    <span id="docName" title="">Selecciona un documento</span>
+                <div class="kair-rr-header__center">
+                    <span class="kair-rr-header__pill">1.1.2</span>
+                    <h1 class="kair-rr-header__title">Roles y Responsabilidades</h1>
+                    <p class="kair-rr-header__subtitle" id="headerSubtitle">Cumplimiento del estándar 1.1.2 — Res. 0312/2019 + Dto. 1072/2015</p>
                 </div>
-                <div class="kair-preview__actions">
-                    <button class="kair-preview__action kair-preview__action--primary" id="expandPreviewBtn" disabled title="Ver documento completo en modal" style="display:none;">
-                        <i class="bi bi-arrows-fullscreen"></i>
-                        <span>Ver completo</span>
-                    </button>
-                    <button class="kair-preview__action" id="downloadBtn" disabled title="Descargar">
-                        <i class="bi bi-download"></i>
-                    </button>
-                    <button class="kair-preview__action" id="printBtn" disabled title="Imprimir">
-                        <i class="bi bi-printer"></i>
-                    </button>
-                    <button class="kair-preview__action" id="closeDocBtn" disabled title="Cerrar">
-                        <i class="bi bi-x-lg"></i>
-                    </button>
-                    <button class="kair-preview__collapse" id="previewCollapseBtn" title="Contraer">
-                        <span class="kair-collapse-chevron kair-collapse-chevron--right" aria-hidden="true"></span>
-                    </button>
+                <div class="kair-rr-header__right">
+                    <span class="kair-rr-header__company" id="headerCompany">—</span>
                 </div>
             </div>
+            <nav class="kair-rr-tabs" role="tablist">
+                <button class="kair-rr-tab is-active" id="tabGestion" data-tab="gestion" role="tab">
+                    <i class="bi bi-clipboard-check"></i> Gestión de Roles
+                </button>
+                <button class="kair-rr-tab" id="tabDocumentos" data-tab="documentos" role="tab">
+                    <i class="bi bi-folder2"></i> Documentos de soporte
+                </button>
+            </nav>
+        </header>
 
-            <!-- Sub-toolbar de zoom (visible solo cuando hay documento) -->
-            <div class="kair-preview__toolbar" id="previewToolbar">
-                <button class="kair-preview__zoom-btn" id="zoomOutBtn" title="Alejar">
-                    <i class="bi bi-dash"></i>
-                </button>
-                <span class="kair-preview__zoom-level" id="zoomLevelDisplay">100%</span>
-                <button class="kair-preview__zoom-btn" id="zoomInBtn" title="Acercar">
-                    <i class="bi bi-plus"></i>
-                </button>
-                <span class="kair-preview__zoom-sep"></span>
-                <button class="kair-preview__zoom-btn" id="fitWidthBtn" title="Ajustar al ancho">
-                    <i class="bi bi-arrows-angle-expand"></i>
-                </button>
-            </div>
-
-            <div class="kair-preview__body" id="viewerContainer">
-                <!-- Empty state -->
-                <div class="kair-empty" id="emptyState">
-                    <div class="kair-empty__icon">
-                        <i class="bi bi-file-earmark-richtext"></i>
+        <!-- TAB 1: GESTIÓN DE ROLES -->
+        <main class="kair-rr-tab-panel is-active" id="panelGestion" role="tabpanel">
+            <!-- Banner de cumplimiento -->
+            <section class="kair-rr-banner">
+                <div class="kair-rr-banner__content">
+                    <h2 class="kair-rr-banner__title">CUMPLIMIENTO 1.1.2</h2>
+                    <p class="kair-rr-banner__summary" id="bannerSummary">Cargando...</p>
+                    <div class="kair-rr-banner__progress">
+                        <div class="kair-rr-banner__progress-bar" id="bannerProgressBar" style="width: 0%;"></div>
                     </div>
-                    <h3 class="kair-empty__title">Vista previa no disponible</h3>
-                    <p class="kair-empty__desc">Selecciona un documento de la lista para visualizarlo aquí.</p>
+                </div>
+                <div class="kair-rr-banner__actions">
+                    <button class="kair-rr-btn kair-rr-btn--primary" id="btnExportarPDF">
+                        <i class="bi bi-file-earmark-pdf"></i> Exportar Reporte PDF
+                    </button>
+                </div>
+            </section>
+
+            <!-- Sección Matriz de Roles -->
+            <section class="kair-rr-section">
+                <header class="kair-rr-section__head">
+                    <h3 class="kair-rr-section__title">Matriz de Roles</h3>
+                </header>
+                <div class="kair-rr-table-wrap">
+                    <table class="kair-rr-table" id="tablaRoles">
+                        <thead>
+                            <tr>
+                                <th>Rol</th>
+                                <th>Persona</th>
+                                <th>Cédula</th>
+                                <th>Cargo</th>
+                                <th>Asignado</th>
+                                <th>Vigente</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaRolesBody"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Sección Divulgación -->
+            <section class="kair-rr-section">
+                <header class="kair-rr-section__head">
+                    <h3 class="kair-rr-section__title">Divulgación a Trabajadores</h3>
+                    <div class="kair-rr-section__actions">
+                        <button class="kair-rr-btn kair-rr-btn--small" id="btnAnadirTrabajador">
+                            <i class="bi bi-person-plus"></i> Añadir trabajador
+                        </button>
+                    </div>
+                </header>
+                <div class="kair-rr-table-wrap">
+                    <table class="kair-rr-table" id="tablaDivulgacion">
+                        <thead>
+                            <tr>
+                                <th>Trabajador</th>
+                                <th>Cédula</th>
+                                <th>Cargo</th>
+                                <th>Estado</th>
+                                <th>Fecha</th>
+                                <th>Soporte</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaDivulgacionBody"></tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+
+        <!-- TAB 2: DOCUMENTOS DE SOPORTE — lista los PDFs subidos -->
+        <main class="kair-rr-tab-panel" id="panelDocumentos" role="tabpanel">
+            <section class="kair-rr-section">
+                <header class="kair-rr-section__head">
+                    <h3 class="kair-rr-section__title">Documentos de soporte</h3>
+                    <div class="kair-rr-section__actions">
+                        <span id="documentosCount" class="kair-rr-count-badge">0 PDFs</span>
+                    </div>
+                </header>
+                <p class="kair-rr-help">Acá ves todos los PDFs de soporte de divulgación subidos. Hacé click en "Ver" para abrir el documento con el visor integrado, o "Descargar" para guardarlo en otra carpeta.</p>
+                <div class="kair-rr-table-wrap">
+                    <table class="kair-rr-table" id="tablaDocumentos">
+                        <thead>
+                            <tr>
+                                <th>Trabajador</th>
+                                <th>Cédula</th>
+                                <th>Cargo</th>
+                                <th>Fecha divulgación</th>
+                                <th>Archivo</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaDocumentosBody"></tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- MODAL: Ver Matriz (4 columnas del Excel G-OD-006) -->
+    <div class="kair-rr-modal-overlay" id="modalMatriz" hidden>
+        <div class="kair-rr-modal" style="max-width: 800px;">
+            <header class="kair-rr-modal__head">
+                <div>
+                    <h3 id="modalMatrizNombre">—</h3>
+                    <p style="margin: 4px 0 0 0; font-size: 11px; color: #64748b;" id="modalMatrizCodigo">—</p>
+                </div>
+                <button class="kair-rr-modal__close" data-action="cerrar-modal-matriz">&times;</button>
+            </header>
+            <div class="kair-rr-modal__body" style="max-height: 60vh; overflow-y: auto;">
+                <div style="margin-bottom: 20px;">
+                    <h4 style="font-size: 12px; color: #174ea6; margin-bottom: 8px; font-weight: 700;">RESPONSABILIDADES</h4>
+                    <div id="modalMatrizResponsabilidades" style="white-space: pre-line; font-size: 12px; line-height: 1.5; background: #f8fafc; padding: 10px; border-radius: 4px;">—</div>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <h4 style="font-size: 12px; color: #174ea6; margin-bottom: 8px; font-weight: 700;">AUTORIDAD</h4>
+                    <div id="modalMatrizAutoridad" style="white-space: pre-line; font-size: 12px; line-height: 1.5; background: #f8fafc; padding: 10px; border-radius: 4px;">—</div>
+                </div>
+                <div>
+                    <h4 style="font-size: 12px; color: #174ea6; margin-bottom: 8px; font-weight: 700;">RENDICIÓN DE CUENTAS</h4>
+                    <div id="modalMatrizRendicion" style="white-space: pre-line; font-size: 12px; line-height: 1.5; background: #f8fafc; padding: 10px; border-radius: 4px;">—</div>
+                </div>
+                <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #64748b;" id="modalMatrizBaseLegal">
                 </div>
             </div>
-        </aside>
-
-    </main>
-</div>
-
-<!-- ─────────── LOADING OVERLAY ─────────── -->
-<div class="kair-loading" id="loadingOverlay" aria-hidden="true">
-    <div class="kair-loading__spinner">
-        <i class="bi bi-arrow-repeat"></i>
-    </div>
-    <p class="kair-loading__text" id="loadingText">Cargando...</p>
-</div>
-
-<!-- ─────────── CONTEXT MENU ─────────── -->
-<div class="kair-context-menu" id="contextMenu" role="menu" aria-hidden="true">
-    <button class="kair-context-menu__item" id="openFileBtn" role="menuitem">
-        <i class="bi bi-box-arrow-up-right"></i>
-        <span>Abrir con app predeterminada</span>
-    </button>
-    <div class="kair-context-menu__divider"></div>
-    <button class="kair-context-menu__item kair-context-menu__item--danger" id="deleteFileBtn" role="menuitem">
-        <i class="bi bi-trash3"></i>
-        <span>Eliminar archivo</span>
-    </button>
-</div>
-
-<!-- ─────────── CONFIRM MODAL ─────────── -->
-<div class="kair-modal-overlay" id="confirmModal" aria-hidden="true" role="dialog" aria-modal="true">
-    <div class="kair-modal">
-        <div class="kair-modal__header">
-            <div class="kair-modal__icon">
-                <i class="bi bi-exclamation-triangle-fill"></i>
-            </div>
-            <h3 class="kair-modal__title">Confirmar eliminación</h3>
-        </div>
-        <div class="kair-modal__body">
-            <p class="kair-modal__text">¿Está seguro de eliminar el siguiente archivo?</p>
-            <div class="kair-modal__file-name" id="confirmFileName">—</div>
-            <div class="kair-modal__warning">
-                <i class="bi bi-info-circle"></i>
-                <span>Esta acción no se puede deshacer.</span>
-            </div>
-        </div>
-        <div class="kair-modal__footer">
-            <button class="kair-modal__btn kair-modal__btn--ghost" id="confirmCancelBtn">Cancelar</button>
-            <button class="kair-modal__btn kair-modal__btn--danger" id="confirmAcceptBtn">
-                <i class="bi bi-trash3"></i> Eliminar
-            </button>
+            <footer class="kair-rr-modal__foot">
+                <button class="kair-rr-btn kair-rr-btn--primary" id="btnMatrizAsignar">Asignar persona a este rol</button>
+                <button class="kair-rr-btn kair-rr-btn--ghost" data-action="cerrar-modal-matriz">Cerrar</button>
+            </footer>
         </div>
     </div>
-</div>
 
-<!-- ─────────── TOAST CONTAINER ─────────── -->
-<div class="kair-toast-container" id="kToastContainer" aria-live="polite" aria-atomic="true"></div>
+    <!-- MODAL: Asignar/Reasignar rol -->
+    <div class="kair-rr-modal-overlay" id="modalAsignar" hidden>
+        <div class="kair-rr-modal">
+            <header class="kair-rr-modal__head">
+                <h3 id="modalAsignarTitle">Asignar persona a rol</h3>
+                <button class="kair-rr-modal__close" data-action="cerrar-modal-asignar">&times;</button>
+            </header>
+            <div class="kair-rr-modal__body">
+                <p class="kair-rr-help" id="modalAsignarRol">—</p>
+                <label>Nombre completo *<input type="text" id="inputAsignarNombre" class="kair-rr-input" required /></label>
+                <label>Cédula<input type="text" id="inputAsignarCedula" class="kair-rr-input" /></label>
+                <label>Cargo<input type="text" id="inputAsignarCargo" class="kair-rr-input" /></label>
+                <label>Fecha de asignación *<input type="date" id="inputAsignarFecha" class="kair-rr-input" required /></label>
+            </div>
+            <footer class="kair-rr-modal__foot">
+                <button class="kair-rr-btn kair-rr-btn--ghost" data-action="cerrar-modal-asignar">Cancelar</button>
+                <button class="kair-rr-btn kair-rr-btn--primary" id="btnGuardarAsignar">Guardar</button>
+            </footer>
+        </div>
+    </div>
 
-<!-- ─────────── HIDDEN UPLOAD INPUT ─────────── -->
-<input type="file" id="hiddenFileInput" multiple style="display:none" accept=".pdf,.xls,.xlsx,.doc,.docx,.txt,.jpg,.jpeg,.png">
+    <!-- MODAL: Añadir trabajador -->
+    <div class="kair-rr-modal-overlay" id="modalTrabajador" hidden>
+        <div class="kair-rr-modal">
+            <header class="kair-rr-modal__head">
+                <h3>Añadir trabajador para divulgación</h3>
+                <button class="kair-rr-modal__close" data-action="cerrar-modal-trabajador">&times;</button>
+            </header>
+            <div class="kair-rr-modal__body">
+                <label>Cédula *<input type="text" id="inputTrabCedula" class="kair-rr-input" required /></label>
+                <label>Nombre completo *<input type="text" id="inputTrabNombre" class="kair-rr-input" required /></label>
+                <label>Cargo<input type="text" id="inputTrabCargo" class="kair-rr-input" /></label>
+            </div>
+            <footer class="kair-rr-modal__foot">
+                <button class="kair-rr-btn kair-rr-btn--ghost" data-action="cerrar-modal-trabajador">Cancelar</button>
+                <button class="kair-rr-btn kair-rr-btn--primary" id="btnGuardarTrabajador">Guardar</button>
+            </footer>
+        </div>
+    </div>
 
-<script src="roles-responsabilidades-viewer.js"></script>
-<!-- 📦608-fix15 — File-viewer bundle (IIFE web-full) + helper genérico -->
-<script src="../../../renderer/file-viewer-assets/flyfish-file-viewer-web-full.iife.js"></script>
-<script src="../../../shared/file-viewer.js"></script>
+    <!-- MODAL: Subir soporte PDF (con drag&drop + examinar + copia a destino) -->
+    <div class="kair-rr-modal-overlay" id="modalSubirSoporte" hidden>
+        <div class="kair-rr-modal" style="max-width: 680px;">
+            <header class="kair-rr-modal__head">
+                <div>
+                    <h3>Subir soporte PDF</h3>
+                    <p style="margin: 4px 0 0 0; font-size: 11px; color: #64748b;" id="modalSubirSoportePersona">—</p>
+                </div>
+                <button class="kair-rr-modal__close" data-action="cerrar-modal-soporte">&times;</button>
+            </header>
+            <div class="kair-rr-modal__body">
+                <!-- PASO 1: Seleccionar archivo origen (drag&drop o examinar) -->
+                <div class="kair-rr-step-label">1. Seleccioná el PDF de la divulgación firmada</div>
+                <div class="kair-rr-dropzone" id="dropZoneSoporte">
+                    <i class="bi bi-cloud-upload"></i>
+                    <div class="kair-rr-dropzone__text">Arrastrá el PDF acá</div>
+                    <div class="kair-rr-dropzone__subtext">o usá el botón "Examinar..."</div>
+                </div>
+                <!-- 📦705-fix9 (2026-08-14) — Chip con el nombre del archivo + tooltip con la ruta completa. Mejor visual que un input con texto cortado. -->
+                <div class="kair-rr-file-row">
+                    <div class="kair-rr-chip" id="chipOrigen" data-empty="true">
+                        <i class="bi bi-file-earmark-pdf"></i>
+                        <span class="kair-rr-chip__name" id="chipOrigenName">Ningún archivo seleccionado</span>
+                        <span class="kair-rr-chip__size" id="chipOrigenSize"></span>
+                    </div>
+                    <button class="kair-rr-btn kair-rr-btn--small" id="btnExaminarOrigen">
+                        <i class="bi bi-folder2-open"></i> Examinar...
+                    </button>
+                </div>
+
+                <!-- PASO 2: Carpeta destino -->
+                <div class="kair-rr-step-label" style="margin-top: 18px;">2. Elegí dónde querés guardar la copia del soporte</div>
+                <div class="kair-rr-file-row">
+                    <div class="kair-rr-chip kair-rr-chip--folder" id="chipDestino">
+                        <i class="bi bi-folder2"></i>
+                        <span class="kair-rr-chip__name" id="chipDestinoName">Sin carpeta destino</span>
+                    </div>
+                    <button class="kair-rr-btn kair-rr-btn--small" id="btnExaminarDestino">
+                        <i class="bi bi-folder2-open"></i> Examinar...
+                    </button>
+                </div>
+                <p class="kair-rr-help" style="margin-top: 8px; font-size: 11px;">💡 El archivo se copiará con su nombre original (o "nombre (1).pdf" si ya existe).</p>
+            </div>
+            <footer class="kair-rr-modal__foot">
+                <button class="kair-rr-btn kair-rr-btn--ghost" data-action="cerrar-modal-soporte">Cancelar</button>
+                <button class="kair-rr-btn kair-rr-btn--primary" id="btnGuardarSoporte" disabled>
+                    <i class="bi bi-upload"></i> Copiar y marcar aceptado
+                </button>
+            </footer>
+        </div>
+    </div>
+
+    <script src="roles-responsabilidades-viewer.js"></script>
 </body>
 </html>

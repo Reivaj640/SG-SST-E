@@ -1,3 +1,58 @@
+# K+AIR v0.1.178
+
+## 📦 Cumplimiento del estándar 1.1.2 Roles y Responsabilidades con formato Excel G-OD-006 (v0.1.178)
+
+Reemplazo completo del file viewer del submódulo 1.1.2 por una vista de gestión que cumple con el estándar 1.1.2 de la Resolución 0312 de 2019 y el Decreto 1072 de 2015 art. 2.2.4.6.8. La matriz ahora se ve como en el Excel G-OD-006 "Matriz de Asignación y Documentación Responsabilidades y Rendición de Cuentas" (REV.02 Enero 2018) que el user maneja en su empresa — con 4 columnas: NIVEL / RESPONSABILIDADES / AUTORIDAD / RENDICION DE CUENTAS.
+
+### ¿Qué incluye?
+
+- **8 roles predefinidos del Excel G-OD-006** (reemplazan los 9 del Decreto 1072 originales): REPRESENTANTES DE LA ALTA DIRECCION, JEFES DE AREA, TRABAJADORES, RESPONSABLE DEL SG SST, VIGIA DE SEGURIDAD Y SALUD EN EL TRABAJO COPASST, COMITÉ DE CONVIVENCIA LABORAL, BRIGADA DE EMERGENCIAS, CONTRATISTAS
+- **Matriz de roles** con asignación de persona, cédula, cargo, fecha y estado (vigente/pendiente/N/A)
+- **Modal Matriz** con las 4 columnas del Excel (Responsabilidades / Autoridad / Rendición / Base legal) por cada rol
+- **Matriz de divulgación** con estado calculado según PDF adjunto (aceptado/pendiente)
+- **Fecha de divulgación editable** por el user
+- **Captura manual de trabajadores** uno-a-uno (sin lista centralizada)
+- **Subir PDF de soporte con drag&drop o "Examinar..."** — la app copia el PDF a la carpeta destino que elijas
+- **Tab "Documentos de soporte"** con todos los PDFs subidos: Ver (con el file viewer integrado) / Descargar (save dialog nativo)
+- **Reporte PDF** con 3 páginas: portada + matriz + divulgación
+- **CRUD de roles personalizados** (los predefinidos no se eliminan, solo editan)
+- **Sync multipc** de las asignaciones y divulgaciones
+
+### Antes vs después
+
+| Escenario | ANTES | AHORA |
+|---|---|---|
+| Auditor pide evidencia del 1.1.2 | "Aquí está la carpeta con PDFs" (no cumple) | PDF de cumplimiento con matriz + divulgaciones + timestamp |
+| Asignar persona a un rol | "Pongan su nombre en el documento" | Click "Asignar" → formulario → guardar |
+| Ver el detalle de un rol | Buscar el rol en otro Excel | Click "Matriz" → modal con 4 columnas (Responsabilidades/Autoridad/Rendición/Base legal) |
+| Divulgar a un trabajador | Sin registro | Añadir trabajador → arrastrar o examinar PDF → app lo copia a la carpeta destino → estado pasa a "Aceptado" |
+| Ver los PDFs subidos | No había forma, había que navegar la carpeta de Windows | Tab "Documentos de soporte" con lista + Ver + Descargar |
+| Cambio de responsable | Reescribir documento | Click "Reasignar" → nueva persona → la anterior queda en histórico |
+| Auditoría de estándares mínimos | Marca "No cumple" (caso Tempoactiva 2024) | Marca "Cumple" con PDF generado |
+
+### 9 fixes aplicados en el mismo batch
+
+1. **Migración idempotente de schema** — `PRAGMA table_info` + `ALTER TABLE ADD COLUMN` para auto-corregir columnas faltantes en installs previos
+2. **BD migrada** — 8 roles del Excel activos, 9 viejos desactivados
+3. **Bridge IPC via postMessage** — el parent actúa como proxy del contextBridge (bypassea el problema de contextIsolation en iframes)
+4. **Listener de mensajes en `window` (no `window.parent`)** — bug crítico que dejaba el `bridgeReady` esperando eternamente
+5. **Funciones abrirModalMatriz/cerrarMatriz** — faltaban y mataban el `init()` con ReferenceError
+6. **`process.env.USERNAME` no existe en iframe** — bug de `exportarPDF` que tiraba error
+7. **prompt() reemplazado por mini-modal con chips** — los prompts nativos no funcionan confiable en iframes de Electron
+8. **Drag&drop + examinar en modal Subir soporte** — UX mejorada, file dialogs nativos con foco correcto
+9. **Tab Documentos de soporte con Ver/Descargar** — antes era un placeholder
+
+### Archivos
+
+- `main/roles-responsabilidades-bridge.js` (NUEVO, ~660 líneas) — 14 handlers IPC + 3 file dialogs + handler de copia
+- `modules/recursos/roles-responsabilidades/roles-responsabilidades-view.{html,css,js}` (NUEVOS, ~1340 líneas totales) — vista completa con 2 tabs + 4 modales
+- `modules/recursos/roles-responsabilidades/roles-responsabilidades-logic.js` (+90) — proxy postMessage
+- `preload.js` (+14) — `window.electronAPI.rolesResp`
+- `main/sync-serializer.js` (+140) — sync multipc
+- `renderer.js` (+5) — filtro de ruido en consola
+
+---
+
 # K+AIR v0.1.177
 
 ## 📦 Abreviaciones de títulos de módulos en el tablero principal (v0.1.177)

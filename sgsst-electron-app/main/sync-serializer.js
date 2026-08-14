@@ -74,7 +74,12 @@ function serializeEmpresaToSync(db, companyKey, pcId, userName, appVersion) {
       planes_accion: _serializePlanesAccion(db, companyKey),
       gestaciones: _serializeGestaciones(db, companyKey),
       eventos_cumplidos: _serializeEventosCumplidos(db, companyKey),
-      eventos_rapidos: _serializeEventosRapidos(db, companyKey)
+      eventos_rapidos: _serializeEventosRapidos(db, companyKey),
+      // 📦705 (2026-08-13) — Roles y Responsabilidades (estándar 1.1.2).
+      // El catálogo NO se sincroniza (es el mismo para todas las empresas),
+      // solo las tablas de asignaciones y divulgaciones por empresa.
+      roles_responsabilidades_asignacion: _serializeRolesResponsabilidadesAsignacion(db, companyKey),
+      roles_responsabilidades_divulgacion: _serializeRolesResponsabilidadesDivulgacion(db, companyKey)
       // ausentismo: lo agregamos en 📦538 cuando veamos la estructura
       // real del bridge de medición ausentismo
     }
@@ -177,6 +182,71 @@ function _serializeEventosCumplidos(db, companyKey) {
   }
 }
 
+// 📦705 (2026-08-13) — Roles y Responsabilidades (asignación)
+function _serializeRolesResponsabilidadesAsignacion(db, companyKey) {
+  try {
+    var tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='roles_responsabilidades_asignacion'").get();
+    if (!tableExists) return [];
+    var rows = db.prepare(
+      'SELECT * FROM roles_responsabilidades_asignacion WHERE empresa_id = ?'
+    ).all(companyKey);
+    return rows.map(function(r) {
+      return {
+        id: r.id,
+        empresa_id: r.empresa_id,
+        rol_id: r.rol_id,
+        persona_cedula: r.persona_cedula,
+        persona_nombre: r.persona_nombre,
+        persona_cargo: r.persona_cargo,
+        fecha_asignacion: r.fecha_asignacion,
+        fecha_vigencia_hasta: r.fecha_vigencia_hasta,
+        documento_soporte_path: r.documento_soporte_path,
+        creado_por: r.creado_por,
+        creado_en: r.creado_en,
+        actualizado_en: r.actualizado_en,
+        activo: r.activo,
+        updatedAt: r.actualizado_en || r.creado_en || new Date().toISOString()
+      };
+    });
+  } catch (e) {
+    console.error('[' + MOD + '] Error serializando roles_responsabilidades_asignacion:', e.message);
+    return [];
+  }
+}
+
+// 📦705 (2026-08-13) — Roles y Responsabilidades (divulgación)
+function _serializeRolesResponsabilidadesDivulgacion(db, companyKey) {
+  try {
+    var tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='roles_responsabilidades_divulgacion'").get();
+    if (!tableExists) return [];
+    var rows = db.prepare(
+      'SELECT * FROM roles_responsabilidades_divulgacion WHERE empresa_id = ?'
+    ).all(companyKey);
+    return rows.map(function(r) {
+      return {
+        id: r.id,
+        empresa_id: r.empresa_id,
+        persona_cedula: r.persona_cedula,
+        persona_nombre: r.persona_nombre,
+        persona_cargo: r.persona_cargo,
+        version_responsabilidades: r.version_responsabilidades,
+        estado: r.estado,
+        fecha_divulgacion: r.fecha_divulgacion,
+        fecha_aceptacion: r.fecha_aceptacion,
+        metodo: r.metodo,
+        ip: r.ip,
+        user_agent: r.user_agent,
+        documento_soporte_path: r.documento_soporte_path,
+        creado_en: r.creado_en,
+        updatedAt: r.creado_en || new Date().toISOString()
+      };
+    });
+  } catch (e) {
+    console.error('[' + MOD + '] Error serializando roles_responsabilidades_divulgacion:', e.message);
+    return [];
+  }
+}
+
 function _serializeEventosRapidos(db, companyKey) {
   try {
     var tableExists = db.prepare(
@@ -245,7 +315,10 @@ function deserializeSyncToDb(db, syncData, options) {
       planes_accion: { applied: 0, conflicts: 0, skipped: 0 },
       gestaciones: { applied: 0, conflicts: 0, skipped: 0 },
       eventos_cumplidos: { applied: 0, conflicts: 0, skipped: 0 },
-      eventos_rapidos: { applied: 0, conflicts: 0, skipped: 0 }
+      eventos_rapidos: { applied: 0, conflicts: 0, skipped: 0 },
+      // 📦705 (2026-08-13) — Roles y Responsabilidades
+      roles_responsabilidades_asignacion: { applied: 0, conflicts: 0, skipped: 0 },
+      roles_responsabilidades_divulgacion: { applied: 0, conflicts: 0, skipped: 0 }
     }
   };
 
@@ -261,6 +334,13 @@ function deserializeSyncToDb(db, syncData, options) {
   }
   if (entities.eventos_rapidos) {
     _deserializeEventosRapidos(db, entities.eventos_rapidos, syncData.companyKey, result, conflictLog);
+  }
+  // 📦705 (2026-08-13) — Roles y Responsabilidades
+  if (entities.roles_responsabilidades_asignacion) {
+    _deserializeRolesResponsabilidadesAsignacion(db, entities.roles_responsabilidades_asignacion, syncData.companyKey, result, conflictLog);
+  }
+  if (entities.roles_responsabilidades_divulgacion) {
+    _deserializeRolesResponsabilidadesDivulgacion(db, entities.roles_responsabilidades_divulgacion, syncData.companyKey, result, conflictLog);
   }
 
   return result;
@@ -520,6 +600,111 @@ function _deserializeEventosCumplidos(db, remoteRecords, companyKey, result, con
         result.skipped++;
       }
     } else {
+      counter.skipped++;
+      result.skipped++;
+    }
+  }
+}
+
+// 📦705 (2026-08-13) — Roles y Responsabilidades (asignación) — deserialización
+function _deserializeRolesResponsabilidadesAsignacion(db, remoteRecords, companyKey, result, conflictLog) {
+  var tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='roles_responsabilidades_asignacion'").get();
+  if (!tableExists) {
+    console.warn('[' + MOD + '] Tabla roles_responsabilidades_asignacion no existe, saltando merge');
+    return;
+  }
+  var counter = result.byEntity.roles_responsabilidades_asignacion || { applied: 0, conflicts: 0, skipped: 0 };
+  for (var i = 0; i < remoteRecords.length; i++) {
+    var remote = remoteRecords[i];
+    if (!remote.id || !remote.rol_id || !remote.empresa_id) { counter.skipped++; result.skipped++; continue; }
+    try {
+      var local = db.prepare(
+        'SELECT id, actualizado_en FROM roles_responsabilidades_asignacion WHERE id = ? AND empresa_id = ?'
+      ).get(remote.id, companyKey);
+      if (!local) {
+        db.prepare(`
+          INSERT INTO roles_responsabilidades_asignacion
+            (empresa_id, rol_id, persona_cedula, persona_nombre, persona_cargo,
+             fecha_asignacion, fecha_vigencia_hasta, documento_soporte_path,
+             creado_por, creado_en, actualizado_en, activo)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          remote.empresa_id, remote.rol_id, remote.persona_cedula, remote.persona_nombre, remote.persona_cargo,
+          remote.fecha_asignacion, remote.fecha_vigencia_hasta, remote.documento_soporte_path,
+          remote.creado_por, remote.creado_en, remote.actualizado_en, remote.activo != null ? remote.activo : 1
+        );
+        counter.applied++;
+        result.applied++;
+      } else {
+        db.prepare(`
+          UPDATE roles_responsabilidades_asignacion
+          SET persona_cedula = ?, persona_nombre = ?, persona_cargo = ?,
+              fecha_asignacion = ?, fecha_vigencia_hasta = ?, documento_soporte_path = ?,
+              actualizado_en = ?, activo = ?
+          WHERE id = ? AND empresa_id = ?
+        `).run(
+          remote.persona_cedula, remote.persona_nombre, remote.persona_cargo,
+          remote.fecha_asignacion, remote.fecha_vigencia_hasta, remote.documento_soporte_path,
+          remote.actualizado_en, remote.activo != null ? remote.activo : 1,
+          remote.id, companyKey
+        );
+        counter.applied++;
+        result.applied++;
+      }
+    } catch (e) {
+      console.error('[' + MOD + '] Error deserializando asignacion ' + remote.id + ': ' + e.message);
+      counter.skipped++;
+      result.skipped++;
+    }
+  }
+}
+
+// 📦705 (2026-08-13) — Roles y Responsabilidades (divulgación) — deserialización
+function _deserializeRolesResponsabilidadesDivulgacion(db, remoteRecords, companyKey, result, conflictLog) {
+  var tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='roles_responsabilidades_divulgacion'").get();
+  if (!tableExists) {
+    console.warn('[' + MOD + '] Tabla roles_responsabilidades_divulgacion no existe, saltando merge');
+    return;
+  }
+  var counter = result.byEntity.roles_responsabilidades_divulgacion || { applied: 0, conflicts: 0, skipped: 0 };
+  for (var i = 0; i < remoteRecords.length; i++) {
+    var remote = remoteRecords[i];
+    if (!remote.id || !remote.persona_cedula || !remote.empresa_id) { counter.skipped++; result.skipped++; continue; }
+    try {
+      var local = db.prepare(
+        'SELECT id, creado_en FROM roles_responsabilidades_divulgacion WHERE id = ? AND empresa_id = ?'
+      ).get(remote.id, companyKey);
+      if (!local) {
+        db.prepare(`
+          INSERT INTO roles_responsabilidades_divulgacion
+            (empresa_id, persona_cedula, persona_nombre, persona_cargo,
+             version_responsabilidades, estado, fecha_divulgacion, fecha_aceptacion,
+             metodo, ip, user_agent, documento_soporte_path, creado_en)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          remote.empresa_id, remote.persona_cedula, remote.persona_nombre, remote.persona_cargo,
+          remote.version_responsabilidades, remote.estado, remote.fecha_divulgacion, remote.fecha_aceptacion,
+          remote.metodo || 'app', remote.ip, remote.user_agent, remote.documento_soporte_path, remote.creado_en
+        );
+        counter.applied++;
+        result.applied++;
+      } else {
+        db.prepare(`
+          UPDATE roles_responsabilidades_divulgacion
+          SET persona_nombre = ?, persona_cargo = ?, estado = ?,
+              fecha_divulgacion = ?, fecha_aceptacion = ?,
+              documento_soporte_path = ?
+          WHERE id = ? AND empresa_id = ?
+        `).run(
+          remote.persona_nombre, remote.persona_cargo, remote.estado,
+          remote.fecha_divulgacion, remote.fecha_aceptacion, remote.documento_soporte_path,
+          remote.id, companyKey
+        );
+        counter.applied++;
+        result.applied++;
+      }
+    } catch (e) {
+      console.error('[' + MOD + '] Error deserializando divulgacion ' + remote.id + ': ' + e.message);
       counter.skipped++;
       result.skipped++;
     }

@@ -97,6 +97,8 @@ const { registerProfesiogramaHandlers, SCHEMA_SQL: PROFESIOGRAMA_SCHEMA_SQL } = 
 // desde Configuración > Ajustes de Usuario > Gestión de Usuario (toggle por user).
 // El admin global SIEMPRE tiene acceso (forzado en el handler).
 const { registerBandejaIntegradaPermissionsHandlers, MIGRATIONS_SQL: BANDEJA_PERMS_MIGRATIONS_SQL } = require('./main/bandeja-integrada-permissions-bridge');
+// 📦705 (2026-08-13) — Roles y Responsabilidades (estándar 1.1.2 Res. 0312 + Dto. 1072)
+const { registerRolesResponsabilidadesHandlers } = require('./main/roles-responsabilidades-bridge');
 // 📦 Bandeja Integrada — Schema SQLite para emails (threads, messages, labels, attachments)
 // Inspirado en Mail-0/Zero (https://github.com/Mail-0/Zero) — mismo patrón que
 // GESTACION_SCHEMA_SQL: CREATE TABLE IF NOT EXISTS + migraciones idempotentes.
@@ -9774,6 +9776,11 @@ try {
     getPythonScriptPath: getPythonScriptPath
   });
   registerEventosCumplidosHandlers(app, { getDb });
+  // 📦705 (2026-08-13) — Roles y Responsabilidades (estándar 1.1.2 Res. 0312 + Dto. 1072).
+  // Reemplaza el file viewer legacy del submódulo 1.1.2 con una vista de gestión
+  // que cumple con Decreto 1072 art. 2.2.4.6.8. Schema SQLite con 3 tablas
+  // (catalogo + asignacion + divulgacion) + seed de 9 roles predefinidos.
+  registerRolesResponsabilidadesHandlers(app, { getDb });
   // 📦702 (2026-08-13) — Permisos de Bandeja Integrada por usuario.
   // Registra 2 handlers: users-get-bandeja-integrada-flag y
   // users-set-bandeja-integrada-flag. validateSession se pasa para

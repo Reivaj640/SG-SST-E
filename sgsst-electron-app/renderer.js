@@ -1847,7 +1847,14 @@ case 'investigacion-accidentes-read-directory-request':
                     type === 'furat-get-library-data-request' ||
                     type === 'furat-list-metadata-request' ||
                     type === 'furat-upload-file-request' ||
-                    type === 'furat-create-folder-request'
+                    type === 'furat-create-folder-request' ||
+                    // 📦705-fix5 (2026-08-14) — Roles y Responsabilidades 1.1.2: el
+                    // RolesResponsabilidadesComponent maneja su propio bridge via
+                    // postMessage. Estos mensajes NO deben procesarse aquí.
+                    type === 'kair-rr-bridge-call' ||
+                    type === 'kair-rr-bridge-result' ||
+                    type === 'kair-rr-iframe-ready' ||
+                    type === 'kair-rr-parent-ack'
                   ) {
                     // El componente InvestigacionAccidentesComponent maneja este mensaje
                     // directamente. Ver: modules/gestion-salud/investigacion-accidentes/investigacion-accidentes-logic.js

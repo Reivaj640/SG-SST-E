@@ -5,6 +5,63 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.178] - 2026-08-14
+
+### Added
+- **📦705 — feat(roles-resp): nueva vista de gestión 1.1.2 Roles y Responsabilidades con formato Excel G-OD-006 de la empresa** — Reemplazo completo del file viewer del submódulo 1.1.2 por una vista de gestión que cumple con el estándar 1.1.2 de la Resolución 0312 de 2019 y el Decreto 1072 de 2015 art. 2.2.4.6.8. **Causa**: el file viewer anterior (carpeta con PDFs sueltos) NO satisfacía los requisitos del estándar; el propio informe de auditoría de Tempoactiva 2024 marcó el 1.1.2 como "No cumple". El user pidió que la matriz se parezca al formato de su empresa (Excel G-OD-006 "Matriz de Asignación y Documentación Responsabilidades y Rendición de Cuentas", REV.02 Enero 2018), 4 columnas: NIVEL / RESPONSABILIDADES / AUTORIDAD / RENDICION DE CUENTAS. **Cambios (8 archivos, ~2900 líneas nuevas, 9 fixes iterativos)**:
+- **Backend** (`main/roles-responsabilidades-bridge.js`, NUEVO, ~660 líneas) — 14 handlers IPC + schema SQLite (3 tablas) + seed de **8 roles predefinidos del Excel G-OD-006** + 3 handlers de file dialogs (origen, destino, descarga) + handler de copia con sufijo automático `(1)`, `(2)`. Patrón `registerXxxHandlers(app, deps)`.
+  - Tablas: `roles_responsabilidades_catalogo` (8 roles predefinidos del Excel + personalizados, con 3 columnas nuevas `responsabilidades` / `autoridad` / `rendicion_cuentas`), `roles_responsabilidades_asignacion` (persona-rol por empresa), `roles_responsabilidades_divulgacion` (estado de aceptación con UNIQUE constraint por versión).
+  - Estado de divulgación **calculado automáticamente** según `documento_soporte_path IS NOT NULL` (aceptado si hay PDF, pendiente si no).
+  - Reporte PDF con `pdf-lib` (3 páginas: portada con cumplimiento + matriz de roles + divulgación a trabajadores).
+  - File dialogs nativos de Electron con `BrowserWindow.fromWebContents()` como parent (foco correcto sobre el modal HTML).
+  - **Migración de schema idempotente** (auto-corre en próximos deploys): `PRAGMA table_info` + `ALTER TABLE ADD COLUMN` para las 3 columnas nuevas.
+- **Frontend** (`modules/recursos/roles-responsabilidades/roles-responsabilidades-view.html` + `viewer.js` + `view.css`, NUEVOS):
+  - 2 tabs: **Gestión de Roles** + **Documentos de soporte** (este último lista los PDFs subidos con Ver/Descargar).
+  - Banner de cumplimiento con barra de progreso.
+  - Matriz de roles con los 8 roles del Excel + estados (vigente/pendiente/N/A) + botones **"Matriz"** y **"Asignar/Reasignar"** por fila.
+  - **Modal Matriz** con las 4 columnas del Excel (Responsabilidades / Autoridad / Rendición / Base legal) por rol.
+  - Matriz de divulgación con captura manual uno-a-uno, fecha editable.
+  - Modales: asignar/reasignar persona, añadir trabajador.
+  - **Modal "Subir soporte PDF"** completo: drag&drop zone + botón "Examinar..." para origen + botón "Examinar..." para destino carpeta + chips visuales con nombre corto + tooltip con ruta completa + botón "Copiar y marcar aceptado" que copia el PDF a la carpeta destino.
+  - Botón "Exportar Reporte PDF" en el banner.
+- **Preload** (`preload.js`, +13): expone 14 APIs en `window.electronAPI.rolesResp` (catalogo + asignacion + divulgacion CRUD + reporte PDF + 3 file dialogs + 1 descarga).
+- **Parent proxy** (`roles-responsabilidades-logic.js`): el iframe se comunica con el parent via `postMessage` (handshake + bridge call) — necesario porque el `contextBridge` proxy no se transfiere correctamente entre contextos del iframe. El parent actúa como proxy del IPC, evitando el problema de contextIsolation.
+- **Sync multipc** (`main/sync-serializer.js`, +140): serialize/deserialize de las 2 tablas (asignacion + divulgacion) por empresa. El catálogo NO se sincroniza — es el mismo para todas las empresas.
+- **Catálogo de 8 roles predefinidos** (basado en Excel G-OD-006 REV.02 Enero 2018 del user):
+  1. REPRESENTANTES DE LA ALTA DIRECCION (1.1.2.R1)
+  2. JEFES DE AREA (1.1.2.R2)
+  3. TRABAJADORES (1.1.2.R3)
+  4. RESPONSABLE DEL SG SST (1.1.2.R4)
+  5. VIGIA DE SEGURIDAD Y SALUD EN EL TRABAJO COPASST (1.1.2.R5)
+  6. COMITÉ DE CONVIVENCIA LABORAL (1.1.2.R6)
+  7. BRIGADA DE EMERGENCIAS (1.1.2.R7)
+  8. CONTRATISTAS (1.1.2.R8)
+- **Filtro de ruido en consola** (`renderer.js`): el listener genérico de `postMessage` ya no loguea "Unknown message type" para los mensajes `kair-rr-*` (que maneja el componente wrapper).
+
+### Fixed
+- **📦705-fix1 — fix(roles-resp): migración idempotente de schema (PRAGMA + ALTER TABLE)** — `CREATE TABLE IF NOT EXISTS` no agrega columnas a una tabla existente, por eso el SEED del Excel v2 fallaba silenciosamente en installs previos. Ahora `_ensureSchemaMigrated()` detecta columnas faltantes con `PRAGMA table_info` y las agrega con `ALTER TABLE ADD COLUMN` (idempotente, sin errores en installs nuevos).
+- **📦705-fix2 — fix(roles-resp): BD migrada con 8 roles del Excel, 9 viejos desactivados** — Los 9 roles del Decreto 1072 del seed original se desactivan con `UPDATE ... WHERE id NOT IN (seedIds) AND es_predefinido = 1`. El user ahora ve solo los 8 roles del Excel en la UI.
+- **📦705-fix3 — refactor(roles-resp): bridge IPC via postMessage (bypassea contextIsolation)** — En Electron con `contextIsolation: true`, copiar el proxy de `electronAPI` al iframe vía `iframe.contentWindow.electronAPI = window.electronAPI` no funciona correctamente. Solución: el iframe le pide al parent que invoque el IPC via `postMessage` (`kair-rr-bridge-call` + `kair-rr-bridge-result`), y el parent (que SÍ tiene el contextBridge funcionando) lo ejecuta. 100% robusto.
+- **📦705-fix4 — fix(roles-resp): listener de mensajes en `window` (no `window.parent`)** — Bug crítico: en el viewer, el listener estaba registrado en `window.parent.addEventListener('message', ...)` cuando debía estar en `window.addEventListener('message', ...)`. Cuando el parent hacía `iframe.contentWindow.postMessage(msg)`, el mensaje se entregaba al `window` del iframe, no al `window.parent`. Resultado: el `bridgeReady` quedaba esperando eternamente → "Cargando..." persistente.
+- **📦705-fix5 — fix(roles-resp): funciones abrirModalMatriz/cerrarModalMatriz faltaban** — `setupModalEvents()` llamaba a `cerrarModalMatriz` que no estaba definida. La excepción mataba el `init()` antes del handshake → "Cargando..." persistente + tablas vacías. Agregadas ambas funciones.
+- **📦705-fix6 — fix(roles-resp): `process.env.USERNAME` no existe en iframe (exportarPDF)** — El código intentaba usar `process.env` (del main process de Node) en el renderer del iframe. Reemplazado por un string fijo + prompt para que el user ajuste.
+- **📦705-fix7 — refactor(roles-resp): prompt() → mini-modal con chips** — `prompt()` no funciona confiable en iframes de Electron con contextIsolation. Reemplazado por un modal visual con chips (ícono + nombre + tooltip con ruta completa) + validación de extensión `.pdf`.
+- **📦705-fix8 — feat(roles-resp): drag&drop + examinar en modal "Subir soporte"** — El modal nuevo permite arrastrar el PDF o usar el botón "Examinar..." para seleccionar el origen. La app copia el PDF a la carpeta destino (que también se elige con "Examinar...") y guarda la divulgación con el path destino.
+- **📦705-fix9 — fix(roles-resp): BrowserWindow parent para file dialogs (foco correcto)** — El `dialog.showOpenDialog` se abría detrás del modal HTML sin foco, dando timeout. Ahora pasa `BrowserWindow.fromWebContents(event.sender)` como parent, así aparece encima del modal. Timeout del bridge subido de 10s a 60s.
+- **📦705-fix10 — feat(roles-resp): tab "Documentos de soporte" con Ver/Descargar** — El tab antes tenía un placeholder. Ahora lista todos los PDFs subidos (divulgaciones con `documento_soporte_path`) con badge de conteo, botón "Ver" (abre con el kairFV file viewer del proyecto) y botón "Descargar" (save dialog nativo + copia).
+
+### Files
+- `sgsst-electron-app/main/roles-responsabilidades-bridge.js` (NEW, ~660 líneas)
+- `sgsst-electron-app/main/sync-serializer.js` (+140)
+- `sgsst-electron-app/main.js` (+7)
+- `sgsst-electron-app/preload.js` (+14)
+- `sgsst-electron-app/modules/recursos/roles-responsabilidades/roles-responsabilidades-view.html` (NEW, ~250 líneas)
+- `sgsst-electron-app/modules/recursos/roles-responsabilidades/roles-responsabilidades-viewer.js` (NEW, ~620 líneas)
+- `sgsst-electron-app/modules/recursos/roles-responsabilidades/roles-responsabilidades-view.css` (NEW, ~470 líneas)
+- `sgsst-electron-app/modules/recursos/roles-responsabilidades/roles-responsabilidades-logic.js` (proxy postMessage, +90)
+- `sgsst-electron-app/renderer.js` (filtro kair-rr-*, +5)
+- `sgsst-electron-app/CHANGELOG.md`, `CONTEXT.md`, `release-notes.md`, `package.json`
+
 ## [0.1.177] - 2026-08-13
 
 ### Changed
