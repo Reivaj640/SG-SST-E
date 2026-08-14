@@ -690,6 +690,16 @@ async function guardarTrabajador() {
     if (res && res.success) {
       cerrarModalTrabajador();
       await cargarDatos();
+      // 📦706-fix20 (2026-08-14) — Mostrar al user la carpeta creada.
+      // Si la divulgación era nueva, el bridge creó la carpeta y devuelve el
+      // path. Si fue actualización, carpetaPath es null y solo decimos OK.
+      var msg = '✅ Trabajador agregado para divulgación.';
+      if (res.data && res.data.carpetaPath) {
+        msg += '\n\n📁 Carpeta creada:\n' + res.data.carpetaPath;
+      } else if (res.data && res.data.carpetaError) {
+        msg += '\n\n⚠️ No se pudo crear la carpeta:\n' + res.data.carpetaError;
+      }
+      alert(msg);
     } else {
       alert('Error guardando: ' + (res && res.error && res.error.message));
     }
@@ -718,8 +728,23 @@ async function subirSoporte(divulgId) {
   $('#chipOrigen').setAttribute('title', '');
   $('#chipOrigenName').textContent = 'Ningún archivo seleccionado';
   $('#chipOrigenSize').textContent = '';
-  // Default destino: Desktop (el user puede cambiarlo con "Examinar...")
-  setDestino('C:\\Users\\usuario\\Desktop');
+  // 📦706-fix20 — Resolver la carpeta del trabajador via bridge y usarla
+  // como destino default. Si el bridge falla, caemos a Desktop.
+  try {
+    var carpetaRes = await _bridgeCall('roles-resp:carpeta-trabajador-resolver', {
+      empresaId: rrState.empresaId,
+      personaCedula: div.persona_cedula,
+      personaNombre: div.persona_nombre
+    });
+    if (carpetaRes && carpetaRes.success && carpetaRes.data && carpetaRes.data.path) {
+      setDestino(carpetaRes.data.path);
+    } else {
+      setDestino('C:\\Users\\usuario\\Desktop');
+    }
+  } catch (eCarpeta) {
+    console.warn('[RolesResp] No se pudo resolver carpeta del trabajador:', eCarpeta.message);
+    setDestino('C:\\Users\\usuario\\Desktop');
+  }
   $('#btnGuardarSoporte').setAttribute('disabled', '');
   // 📦706 (2026-08-14) — Resetear campos extra del modal
   $('#inputEsNuevaContratacion').checked = false;

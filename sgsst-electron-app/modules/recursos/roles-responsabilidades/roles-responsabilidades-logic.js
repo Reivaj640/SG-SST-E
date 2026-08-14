@@ -172,6 +172,10 @@ class RolesResponsabilidadesComponent {
                 case 'roles-resp:divulgacion-documento-marcar-actual':
                     result = await window.electronAPI.rolesResp.marcarDocumentoActual(payload);
                     break;
+                // 📦706-fix20 (2026-08-14) — Resolver carpeta del trabajador
+                case 'roles-resp:carpeta-trabajador-resolver':
+                    result = await window.electronAPI.rolesResp.resolverCarpetaTrabajador(payload);
+                    break;
                 default:
                     throw new Error('Canal IPC desconocido: ' + channel);
             }

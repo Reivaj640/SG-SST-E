@@ -19,6 +19,8 @@ const MOD = 'ROLES-RESP';
 
 // ---------- DB handle inyectada por main.js ----------
 let _getDb = null;
+// 📦706-fix20 (2026-08-14) — App inyectada para resolver rutas de empresa
+let _app = null;
 
 // ---------- Schema (idempotente) ----------
 const SCHEMA_SQL = `
@@ -340,6 +342,89 @@ function _migrarDocumentosExistentes(db) {
     console.log('[' + MOD + '][MIGRATION-DOCS] Migrados ' + migrados + ' documentos');
   } catch (e) {
     console.error('[' + MOD + '][MIGRATION-DOCS] Error:', e.message);
+  }
+}
+
+// 📦706-fix20 (2026-08-14) — Helper: resuelve y crea la carpeta de un
+// trabajador. La estructura es:
+//   {raíz_empresa}/1. Recursos/1.1.2 Roles y Responsabilidades/{[Cédula]} {Nombre}/
+// Ejemplo: G:\Mi unidad\...\1. Tempoactiva Est SAS\1. Recursos\1.1.2 Roles y
+// Responsabilidades\[1044391066] Javier Robles Fontalvo\
+//
+// Devuelve el path de la carpeta creada, o throws si no se puede crear.
+// Idempotente: si la carpeta ya existe, la retorna sin error.
+function _crearCarpetaTrabajador(empresaId, personaCedula, personaNombre) {
+  if (!_app) {
+    throw new Error('App no inyectada en el bridge');
+  }
+  if (!empresaId || !personaCedula || !personaNombre) {
+    throw new Error('empresaId, personaCedula y personaNombre son requeridos');
+  }
+
+  // 1) Leer config.json para obtener la ruta raíz de la empresa
+  var pathMod = require('path');
+  var fsMod = require('fs');
+  var configPath = pathMod.join(_app.getPath('userData'), 'config.json');
+  if (!fsMod.existsSync(configPath)) {
+    throw new Error('config.json no encontrado en: ' + configPath);
+  }
+  var configRaw = fsMod.readFileSync(configPath, 'utf8');
+  var config;
+  try {
+    config = JSON.parse(configRaw);
+  } catch (e) {
+    throw new Error('config.json inválido: ' + e.message);
+  }
+  var companyPaths = config.companyPaths || {};
+  var companyConfig = companyPaths[empresaId];
+  if (!companyConfig || !companyConfig.root) {
+    throw new Error('No se encontró la empresa "' + empresaId + '" en companyPaths');
+  }
+  var raizEmpresa = companyConfig.root;
+
+  // 2) Sanitizar el nombre del trabajador y armar el nombre de la carpeta
+  //    Formato: [Cédula] Nombre  (sin caracteres especiales)
+  var cedulaLimpia = String(personaCedula).replace(/[^a-zA-Z0-9]/g, '');
+  var nombreLimpio = String(personaNombre)
+    .replace(/[<>:"/\\|?*]/g, '')   // quitar caracteres no permitidos en Windows
+    .replace(/\s+/g, ' ')          // colapsar espacios
+    .trim();
+  var nombreCarpeta = '[' + cedulaLimpia + '] ' + nombreLimpio;
+
+  // 3) Construir el path completo
+  //    Estructura esperada: raíz / "1. Recursos" / "1.1.2 Roles y Responsabilidades" / [Cédula] Nombre
+  var carpetaRoles = pathMod.join(raizEmpresa, '1. Recursos', '1.1.2 Roles y Responsabilidades');
+  var carpetaFinal = pathMod.join(carpetaRoles, nombreCarpeta);
+
+  // 4) Crear la carpeta (recursive: true crea los padres si no existen)
+  fsMod.mkdirSync(carpetaFinal, { recursive: true });
+
+  console.log('[' + MOD + '][CARPETA] Creada: ' + carpetaFinal);
+  return carpetaFinal;
+}
+
+// 📦706-fix20 (2026-08-14) — Helper: solo resuelve el path sin crearlo.
+// Útil para mostrar al user antes de confirmar, o para verificar que
+// la carpeta ya existe.
+function _resolverPathCarpetaTrabajador(empresaId, personaCedula, personaNombre) {
+  if (!_app) return null;
+  var pathMod = require('path');
+  var fsMod = require('fs');
+  try {
+    var configPath = pathMod.join(_app.getPath('userData'), 'config.json');
+    if (!fsMod.existsSync(configPath)) return null;
+    var config = JSON.parse(fsMod.readFileSync(configPath, 'utf8'));
+    var companyConfig = (config.companyPaths || {})[empresaId];
+    if (!companyConfig || !companyConfig.root) return null;
+    var cedulaLimpia = String(personaCedula || '').replace(/[^a-zA-Z0-9]/g, '');
+    var nombreLimpio = String(personaNombre || '')
+      .replace(/[<>:"/\\|?*]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    var nombreCarpeta = '[' + cedulaLimpia + '] ' + nombreLimpio;
+    return pathMod.join(companyConfig.root, '1. Recursos', '1.1.2 Roles y Responsabilidades', nombreCarpeta);
+  } catch (e) {
+    return null;
   }
 }
 
@@ -796,17 +881,65 @@ function _handlerUpsertDivulgacion(payload) {
       documentoId = insertDocResult.lastInsertRowid;
     }
 
+    // 📦706-fix20 (2026-08-14) — Crear la carpeta del trabajador cuando
+    // se crea una divulgación nueva. Devolvemos el path en la respuesta
+    // para que el frontend pueda mostrarlo al user. Si la divulgación
+    // es una actualización, NO creamos carpeta (ya existe).
+    var carpetaPath = null;
+    var carpetaError = null;
+    if (crearNueva) {
+      try {
+        carpetaPath = _crearCarpetaTrabajador(
+          payload.empresaId,
+          payload.personaCedula,
+          payload.personaNombre
+        );
+      } catch (eCarpeta) {
+        // No fallamos el upsert por un error de carpeta — solo lo reportamos
+        carpetaError = eCarpeta.message;
+        console.error('[' + MOD + '][DIVULGACION-UPSERT][CARPETA]', carpetaError);
+      }
+    }
+
     return {
       success: true,
       data: {
         divulgacionId: divulgacionId,
         documentoId: documentoId,
         esNuevaDivulgacion: crearNueva,
-        estado: _calcularEstado(payload.documentoSoportePath)
+        estado: _calcularEstado(payload.documentoSoportePath),
+        carpetaPath: carpetaPath,
+        carpetaError: carpetaError
       }
     };
   } catch (e) {
     console.error('[' + MOD + '][DIVULGACION-UPSERT]', e.message);
+    return { success: false, error: { code: 'DB_ERROR', message: e.message } };
+  }
+}
+
+// 📦706-fix20 (2026-08-14) — Handler: resuelve el path de la carpeta del
+// trabajador (sin crearla). Útil para que el modal "Subir soporte" lo use
+// como destino default. Devuelve { path, exists } para que el frontend
+// sepa si la carpeta ya existe.
+function _handlerResolverCarpetaTrabajador(payload) {
+  if (!_getDb) {
+    return { success: false, error: { code: 'NO_DB', message: 'Base de datos no disponible' } };
+  }
+  if (!payload || !payload.empresaId || !payload.personaCedula || !payload.personaNombre) {
+    return { success: false, error: { code: 'VALIDATION', message: 'empresaId, personaCedula y personaNombre son requeridos' } };
+  }
+  try {
+    var path = _resolverPathCarpetaTrabajador(payload.empresaId, payload.personaCedula, payload.personaNombre);
+    if (!path) {
+      return { success: false, error: { code: 'NO_PATH', message: 'No se pudo resolver la ruta de la empresa' } };
+    }
+    var fsMod = require('fs');
+    var exists = false;
+    try { exists = fsMod.existsSync(path); } catch (e) { exists = false; }
+    return { success: true, data: { path: path, exists: exists } };
+  } catch (e) {
+    console.error('[' + MOD + '][CARPETA-RESOLVER]', e.message);
     return { success: false, error: { code: 'DB_ERROR', message: e.message } };
   }
 }
@@ -1110,6 +1243,8 @@ async function _handlerDescargarArchivo(event, sourcePath) {
 
 function registerRolesResponsabilidadesHandlers(app, deps) {
   _getDb = deps && deps.getDb ? deps.getDb : null;
+  // 📦706-fix20 (2026-08-14) — Inyectar app para resolver rutas de empresa
+  _app = app;
 
   // Schema + seed
   if (_getDb) {
@@ -1194,6 +1329,15 @@ function registerRolesResponsabilidadesHandlers(app, deps) {
       return { success: false, error: { code: 'INTERNAL', message: e.message } };
     }
   });
+  // 📦706-fix20 (2026-08-14) — Resolver path de carpeta del trabajador
+  // (sin crearla). Lo usa el modal "Subir soporte" como destino default.
+  ipcMain.handle('roles-resp:carpeta-trabajador-resolver', async function (event, payload) {
+    try { return _handlerResolverCarpetaTrabajador(payload); }
+    catch (e) {
+      console.error('[' + MOD + '][HANDLER-CARPETA-RESOLVER]', e.message);
+      return { success: false, error: { code: 'INTERNAL', message: e.message } };
+    }
+  });
   ipcMain.handle('roles-resp:divulgacion-eliminar', async function (event, payload) {
     try { return _handlerEliminarDivulgacion(payload); }
     catch (e) {
@@ -1259,5 +1403,8 @@ module.exports = {
   _handlerListarDivulgaciones: _handlerListarDivulgaciones,
   _handlerUpsertDivulgacion: _handlerUpsertDivulgacion,
   _handlerEliminarDivulgacion: _handlerEliminarDivulgacion,
+  _handlerResolverCarpetaTrabajador: _handlerResolverCarpetaTrabajador,
+  _crearCarpetaTrabajador: _crearCarpetaTrabajador,
+  _resolverPathCarpetaTrabajador: _resolverPathCarpetaTrabajador,
   _handlerGenerarReportePDF: _handlerGenerarReportePDF
 };

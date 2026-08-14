@@ -1,3 +1,52 @@
+# K+AIR v0.1.182
+
+## 📦706-fix20 — Carpetas automáticas por trabajador (v0.1.182)
+
+Feature nuevo. Al hacer click en "Guardar" en el modal "Añadir trabajador para divulgación", la app crea automáticamente una carpeta específica para el trabajador donde se guardarán los PDFs de soporte. La estructura es:
+
+```
+{raíz_empresa}/
+└── 1. Recursos/
+    └── 1.1.2 Roles y Responsabilidades/
+        └── [1044391066] Javier Robles Fontalvo/  ← Carpeta creada automáticamente
+            ├── OS 2234082 TEMPOACTIVA EST SAS.pdf  ← PDFs subidos después
+            └── ...
+```
+
+### ¿Qué incluye?
+
+- **Carpeta automática al guardar trabajador** — Formato: `[Cédula] Nombre/` (sanitizado para Windows). Se crea con `fs.mkdirSync(path, { recursive: true })`.
+- **Destino default del modal "Subir soporte"** — Antes era Desktop; ahora es la carpeta del trabajador. El user puede cambiarlo con "Examinar...".
+- **Mensaje informativo al guardar** — El alert final muestra la ruta completa de la carpeta creada.
+- **Idempotente** — Si la carpeta ya existe, la abre sin error.
+- **No rompe el flujo** — Si la creación de carpeta falla (por permisos, config roto, etc.), el upsert igual tiene éxito y se reporta el error en la respuesta (`carpetaError`).
+
+### Antes vs después
+
+| Escenario | ANTES (v0.1.181) | AHORA (v0.1.182) |
+|---|---|---|
+| Crear trabajador | Solo crea la divulgación en BD. Los PDFs van a donde el user los ponga. | Crea la divulgación en BD + crea la carpeta automática del trabajador. |
+| Subir PDF | Default destino: Desktop. El user tenía que navegar a la carpeta correcta. | Default destino: la carpeta del trabajador. Click en "Examinar..." si quiere otro lado. |
+| Organización de archivos | PDFs sueltos en cualquier carpeta (Desktop, raíz, etc.) | Cada trabajador tiene su carpeta. Trazabilidad clara. |
+| Backup de la empresa | "Buscar en la carpeta raíz y después filtrar" | "Cada carpeta tiene los PDFs de un solo trabajador" |
+
+### Migration notes
+
+- **Limpieza previa** — Se borraron 5 divulgaciones y 4 documentos legacy de Tempoactiva (backup en `kair.db.backup-pre-fix20`).
+- **Limpieza manual recomendada** — Borrar los PDFs viejos sueltos en `1. Recursos/1.1.2 Roles y Responsabilidades/` antes de empezar con el feature nuevo. Podés hacerlo desde el explorador de Windows.
+- **Requisito de config** — La empresa debe estar configurada en `config.json > companyPaths` con un `root` válido. Si no, el bridge retorna `NO_PATH` y la carpeta no se crea (pero la divulgación sí).
+
+### Archivos modificados (4)
+
+- `main/roles-responsabilidades-bridge.js` (+90 líneas) — 2 helpers + 1 handler nuevo + refactor del upsert
+- `preload.js` (+2 líneas) — API `resolverCarpetaTrabajador`
+- `modules/recursos/roles-responsabilidades/roles-responsabilidades-logic.js` (+3 líneas) — Case del nuevo handler
+- `modules/recursos/roles-responsabilidades/roles-responsabilidades-viewer.js` (+30 líneas) — `guardarTrabajador` y `subirSoporte` extendidos
+
+**Total**: ~125 líneas agregadas, 0 cambios de schema, 0 cambios de sync multipc.
+
+---
+
 # K+AIR v0.1.181
 
 ## 📦706-fix19 — Quitar tab "Documentos de soporte" (v0.1.181)

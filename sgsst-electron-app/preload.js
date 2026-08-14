@@ -471,7 +471,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     descargarArchivo: (payload) => ipcRenderer.invoke('roles-resp:archivo-descargar', payload),
     // 📦706 (2026-08-14) — Multi-documento por divulgación
     listarDocumentosDivulgacion: (payload) => ipcRenderer.invoke('roles-resp:divulgacion-documento-listar', payload || {}),
-    marcarDocumentoActual: (payload) => ipcRenderer.invoke('roles-resp:divulgacion-documento-marcar-actual', payload)
+    marcarDocumentoActual: (payload) => ipcRenderer.invoke('roles-resp:divulgacion-documento-marcar-actual', payload),
+    // 📦706-fix20 (2026-08-14) — Resolver path de carpeta del trabajador
+    // (sin crearla). Lo usa el modal "Subir soporte" como destino default.
+    resolverCarpetaTrabajador: (payload) => ipcRenderer.invoke('roles-resp:carpeta-trabajador-resolver', payload || {})
   },
   // 📦531 — Persistencia de planes de acción del submódulo 2.3.1 Evaluación
   // Inicial del SG-SST. Antes los planes vivían en memoria y se perdían al

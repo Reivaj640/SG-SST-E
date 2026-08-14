@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.182] - 2026-08-14
+
+### 📦706-fix20 — feat(roles-resp): carpetas automáticas por trabajador
+
+**Causa**: el Decreto 1072 art. 2.2.4.6.8 requiere preservar la evidencia de divulgación por trabajador. Antes, los PDFs se guardaban en una carpeta general sin estructura clara. Ahora, al registrar un trabajador para divulgación, la app crea automáticamente una carpeta específica para él/ella donde se guardan los PDFs de soporte.
+
+### Added
+- **Carpeta automática por trabajador** — Al hacer click en "Guardar" en el modal "Añadir trabajador para divulgación", la app crea automáticamente la carpeta `{raíz_empresa}/1. Recursos/1.1.2 Roles y Responsabilidades/[Cédula] Nombre/`. Ejemplo: `G:\Mi unidad\...\1. Tempoactiva Est SAS\1. Recursos\1.1.2 Roles y Responsabilidades\[1044391066] Javier Robles Fontalvo\`
+- **Destino default en modal "Subir soporte"** — Ahora el default del destino es la carpeta del trabajador (antes era Desktop). El user puede cambiarlo con "Examinar..." si quiere.
+- **Mensaje informativo al guardar trabajador** — Después de guardar, el user ve la ruta completa de la carpeta creada. Si algo falla, se muestra el error pero la divulgación igual se guarda (la app no se rompe).
+
+### Backend (`main/roles-responsabilidades-bridge.js`, +90 líneas)
+- **Helper `_crearCarpetaTrabajador(empresaId, cedula, nombre)`** — Lee `config.json` para obtener la ruta raíz de la empresa, construye el path completo, sanitiza el nombre del trabajador (quita caracteres no permitidos en Windows), crea la carpeta con `fs.mkdirSync(path, { recursive: true })`. Idempotente (si la carpeta ya existe, no falla).
+- **Helper `_resolverPathCarpetaTrabajador(empresaId, cedula, nombre)`** — Igual que el anterior pero NO crea la carpeta. Solo resuelve y devuelve el path. Útil para que el modal Subir consulte el destino default sin crear carpetas vacías.
+- **Refactor de `_handlerUpsertDivulgacion`** — Cuando se crea una divulgación nueva, llama a `_crearCarpetaTrabajador` y devuelve `data.carpetaPath` + `data.carpetaError` en la respuesta. Si la divulgación es una actualización, NO crea carpeta.
+- **Handler nuevo `_handlerResolverCarpetaTrabajador`** — Devuelve `{ success, data: { path, exists } }` para que el frontend sepa si la carpeta ya existe o no.
+- **`_app` inyectada** — El bridge ahora guarda `app` para usar `app.getPath('userData')` y leer el config.json.
+
+### Frontend (`modules/recursos/roles-responsabilidades/roles-responsabilidades-viewer.js`, +30 líneas)
+- **`guardarTrabajador()` extendido** — Después del upsert, muestra un alert con "📁 Carpeta creada: {path}" (o el error si falló).
+- **`subirSoporte()` extendido** — Resuelve la carpeta del trabajador via bridge y la usa como destino default en el modal Subir. Si el bridge falla, cae a Desktop.
+
+### Preload + Logic (+5 líneas)
+- API `resolverCarpetaTrabajador(payload)` en preload
+- Case `'roles-resp:carpeta-trabajador-resolver'` en logic
+
+### Changed
+- **Antes**: Los PDFs del modal Subir se guardaban en la carpeta default que el user seleccionaba (generalmente Desktop).
+- **Ahora**: Los PDFs se guardan automáticamente en la carpeta del trabajador (puede cambiarla con "Examinar...").
+
+### Migration notes
+- **Limpieza previa** (ejecutada antes de este release): se borraron 5 divulgaciones y 4 documentos legacy de Tempoactiva. Backup en `kair.db.backup-pre-fix20`.
+- **Limpieza manual recomendada**: borrar los PDFs viejos sueltos en `1. Recursos/1.1.2 Roles y Responsabilidades/` antes de empezar con el feature nuevo.
+
 ## [0.1.181] - 2026-08-14
 
 ### 📦706-fix19 — refactor(roles-resp): quitar tab "Documentos de soporte"
