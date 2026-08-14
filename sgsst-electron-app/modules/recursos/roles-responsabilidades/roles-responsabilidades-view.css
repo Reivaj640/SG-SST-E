@@ -632,6 +632,9 @@
     color: #174ea6;
 }
 
+/* 📦706-fix19 (2026-08-14) — Estilos .kair-rr-doc-icon eliminados (eran
+   del tab "Documentos de soporte" que se quitó). */
+
 .kair-rr-doc-icon {
     display: inline-flex;
     align-items: center;

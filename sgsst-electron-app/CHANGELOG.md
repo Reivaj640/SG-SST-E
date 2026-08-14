@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.181] - 2026-08-14
+
+### 📦706-fix19 — refactor(roles-resp): quitar tab "Documentos de soporte"
+
+**Causa**: el v0.1.180 ya tiene el modal "Documentos del trabajador" que lista TODOS los PDFs del trabajador con cards visuales (border-left de color por estado). El tab "Documentos de soporte" quedó redundante: mostraba 1 fila por PDF plana, mientras que el modal los agrupa por persona con mejor UX.
+
+### Changed
+- **Antes**: 2 tabs ("Gestión de Roles" + "Documentos de soporte"). El segundo mostraba lista plana de TODOS los PDFs de la empresa.
+- **Ahora**: 1 solo tab "Gestión de Roles". Los PDFs se ven en el modal "Documentos del trabajador" que se abre desde la fila de divulgación del trabajador.
+
+### Removed
+- **HTML (`roles-responsabilidades-view.html`)**: tab-button `#tabDocumentos` y panel `#panelDocumentos` con su tabla. 27 líneas eliminadas.
+- **JS (`roles-responsabilidades-viewer.js`)**:
+  - Función `renderTablaSoportes()` completa (50 líneas)
+  - Listener del tab `#tabDocumentos` en `setupTabs()`
+  - Carga inicial de `rrState.documentos` en `cargarDatos()` (ya no se necesita al inicio, solo on-demand cuando se abre el modal)
+  - Estado `rrState.documentos` del state inicial
+- **CSS (`roles-responsabilidades-view.css`)**: estilos `.kair-rr-doc-icon` y `.kair-rr-doc-icon__name` (23 líneas, usados solo en el tab eliminado)
+- **Mantenido**: el bridge `_handlerListarDocumentosDivulgacion`, la API `listarDocumentosDivulgacion` en el preload, y el case en el logic — todo se sigue usando para cargar PDFs cuando se abre el modal.
+
+### Migration notes
+- **No hay cambios de BD** ni de schema. Solo es UI.
+- **No hay riesgo de regresión**: el modal ya tenía su propio handler de carga, independiente de la carga inicial.
+- El badge "+N anteriores" en la fila de divulgación sigue funcionando porque usa `d.documento_count` del bridge (que cuenta por persona desde el fix18), no de `rrState.documentos`.
+
 ## [0.1.180] - 2026-08-14
 
 ### 📦706-fix18 — feat(roles-resp): 1 fila por persona + modal de selección de PDFs

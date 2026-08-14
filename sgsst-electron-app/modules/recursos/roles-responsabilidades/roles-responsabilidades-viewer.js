@@ -12,7 +12,9 @@ var rrState = {
   catalogo: [],
   asignaciones: [],
   divulgaciones: [],
-  documentos: [],
+  // 📦706-fix19 (2026-08-14) — rrState.documentos eliminado. Los PDFs
+  // se cargan on-demand cuando se abre el modal de un trabajador.
+  // El badge "+N anteriores" usa d.documento_count del bridge.
   currentTab: 'gestion',
   editingRol: null,
   editingDivulg: null
@@ -54,6 +56,9 @@ async function init() {
   $('#headerCompany').textContent = rrState.empresaNombre;
   setupTabs();
   setupModalEvents();
+  // 📦706-fix19 (2026-08-14) — El tab "Documentos de soporte" se quitó
+  // (v0.1.181). El setupTabs() ahora solo tiene el botón de Gestión + el
+  // back button. Ver setupTabs() abajo.
   // 📦705-fix2 (2026-08-14) — Comunicación con el parent via postMessage.
   // El approach anterior (inyectar window.electronAPI directamente) falla en
   // Electron con contextIsolation: el proxy del contextBridge no se transfiere
@@ -130,8 +135,9 @@ function _bridgeCall(channel, payload) {
 }
 
 function setupTabs() {
+  // 📦706-fix19 (2026-08-14) — Tab "Documentos de soporte" eliminado.
+  // Solo queda el tab "Gestión de Roles" + el back button.
   $('#tabGestion').addEventListener('click', function() { switchTab('gestion'); });
-  $('#tabDocumentos').addEventListener('click', function() { switchTab('documentos'); });
   $('#backBtn').addEventListener('click', function() {
     if (window.parent && typeof window.parent.postMessage === 'function') {
       window.parent.postMessage({ type: 'back-to-module-request' }, '*');
@@ -250,27 +256,15 @@ async function cargarDatos() {
       if (divRes && divRes.success) {
         rrState.divulgaciones = divRes.data || [];
       }
-      // 📦706-fix18 (2026-08-14) — Cargar documentos ANTES del render de
-      // divulgación para que el cálculo de docCount por persona sea
-      // correcto desde el primer render. Antes se cargaba después y
-      // caía al fallback del bridge (que contaba solo los docs de la
-      // divulgación vigente, perdiendo el histórico).
-      try {
-        var docsRes = await _bridgeCall('roles-resp:divulgacion-documento-listar', { empresaId: rrState.empresaId });
-        if (docsRes && docsRes.success) {
-          rrState.documentos = docsRes.data || [];
-        } else {
-          rrState.documentos = [];
-        }
-      } catch (eDocs) {
-        console.error('[RolesResp] Error cargando documentos:', eDocs.message);
-        rrState.documentos = [];
-      }
+      // 📦706-fix19 (2026-08-14) — Ya no cargamos la lista de documentos
+      // al inicio. El badge "+N anteriores" se calcula desde
+      // d.documento_count (que el bridge trae por persona desde el fix18).
+      // Los documentos solo se cargan cuando se abre el modal de un
+      // trabajador (abrirModalDocumentosTrabajador).
     }
     renderBanner();
     renderTablaRoles();
     renderTablaDivulgacion();
-    renderTablaSoportes();
   } catch (e) {
     console.error('[RolesResp] Error cargando datos:', e.message);
     // Si falla el bridge, mostramos un mensaje claro en el banner
@@ -374,21 +368,19 @@ function renderTablaDivulgacion() {
     }
     // Si la actual es vigente y la nueva no, no la reemplazamos
   });
-  // Contar PDFs por persona (de TODAS las divulgaciones del trabajador)
-  var pdfCountPorPersona = {};
-  (rrState.documentos || []).forEach(function (doc) {
-    var key = doc.persona_cedula || ('_' + doc.divulgacion_id);
-    pdfCountPorPersona[key] = (pdfCountPorPersona[key] || 0) + 1;
-  });
+  // 📦706-fix19 (2026-08-14) — Ya no calculamos pdfCountPorPersona desde
+  // rrState.documentos (que no se carga al inicio). Usamos directamente
+  // d.documento_count que el bridge trae por persona (calculado en la
+  // subquery SQL). El badge "+N anteriores" sigue funcionando.
   // Renderizar 1 fila por persona
   Object.keys(divulgacionesPorPersona).forEach(function (key) {
     var d = divulgacionesPorPersona[key];
     var estadoTexto = d.estado_calculado === 'aceptado' || d.estado === 'aceptado'
       ? '<span class="kair-rr-state kair-rr-state--aceptado">✓ Aceptado</span>'
       : '<span class="kair-rr-state kair-rr-state--pendiente">⏳ Pendiente</span>';
-    // 📦706-fix18 — docCount es el TOTAL de PDFs del trabajador (de cualquier
-    // divulgacion). docActualPath es el path del PDF vigente (es_actual=1).
-    var docCount = pdfCountPorPersona[key] || d.documento_count || 0;
+    // 📦706-fix19 — docCount viene del bridge (cuenta por persona, no por
+    // divulgación). docActualPath es el path del PDF vigente (es_actual=1).
+    var docCount = d.documento_count || 0;
     var docActualPath = d.documento_actual_path || d.documento_soporte_path || null;
     var soporte;
     if (docCount === 0) {
@@ -449,56 +441,12 @@ function renderTablaDivulgacion() {
   });
 }
 
-// 📦706 (2026-08-14) — Tab "Documentos de soporte": lista TODOS los PDFs
-// (1 fila por documento, no por divulgación) usando rrState.documentos que
-// carga el handler divulgacion-documento-listar. Cada fila muestra el
-// badge de estado (Vigente / Corrección / Anterior).
-function renderTablaSoportes() {
-  var tbody = $('#tablaDocumentosBody');
-  tbody.innerHTML = '';
-  var soportes = rrState.documentos || [];
-  $('#documentosCount').textContent = soportes.length + (soportes.length === 1 ? ' PDF' : ' PDFs');
-  if (soportes.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#94a3b8;">' +
-      'Todavía no hay PDFs de soporte. Andá al tab <strong>Gestión de Roles</strong>, agregá un trabajador en la sección ' +
-      '"Divulgación a Trabajadores" y hacé click en <strong>Subir</strong> en la fila correspondiente.</td></tr>';
-    return;
-  }
-  soportes.forEach(function (d) {
-    var badgeEstado = '';
-    if (d.es_actual === 1) {
-      badgeEstado = ' <span class="kair-rr-doc-badge kair-rr-doc-badge--vigente">Vigente</span>';
-    } else if (d.es_correccion === 1) {
-      badgeEstado = ' <span class="kair-rr-doc-badge kair-rr-doc-badge--correccion">Corrección</span>';
-    } else {
-      badgeEstado = ' <span class="kair-rr-doc-badge kair-rr-doc-badge--anterior">Anterior</span>';
-    }
-    var filename = d.filename || (d.file_path ? d.file_path.split(/[\\/]/).pop() : '—');
-    var tr = document.createElement('tr');
-    tr.innerHTML =
-      '<td><div class="rol-nombre">' + escapeHtml(d.persona_nombre) + '</div></td>' +
-      '<td>' + escapeHtml(d.persona_cedula || '—') + '</td>' +
-      '<td>' + escapeHtml(d.persona_cargo || '—') + '</td>' +
-      '<td>' + (d.periodo || '—') + badgeEstado + '</td>' +
-      '<td>' + formatDate(d.fecha_carga) + '</td>' +
-      '<td><div class="kair-rr-doc-icon" title="' + escapeHtml(d.file_path || '') + '"><i class="bi bi-file-earmark-pdf"></i><span class="kair-rr-doc-icon__name">' + escapeHtml(filename) + '</span></div></td>' +
-      '<td class="kair-rr-actions-cell">' +
-        '<button class="kair-rr-icon-btn" data-action="ver-pdf-soporte" data-path="' + escapeHtml(d.file_path || '') + '" title="Ver PDF"><i class="bi bi-eye"></i></button>' +
-        '<button class="kair-rr-icon-btn" data-action="descargar-pdf-soporte" data-path="' + escapeHtml(d.file_path || '') + '" title="Descargar PDF"><i class="bi bi-download"></i></button>' +
-      '</td>';
-    tbody.appendChild(tr);
-  });
-  $$('#tablaDocumentosBody button[data-action="ver-pdf-soporte"]').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      verPDFSoporte(btn.getAttribute('data-path'));
-    });
-  });
-  $$('#tablaDocumentosBody button[data-action="descargar-pdf-soporte"]').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      descargarPDFSoporte(btn.getAttribute('data-path'));
-    });
-  });
-}
+// 📦706-fix19 (2026-08-14) — Tab "Documentos de soporte" ELIMINADO.
+// Antes: lista plana de TODOS los PDFs con badge Vigente/Anterior/Corrección.
+// Ahora: el modal "Documentos del trabajador" (abrirModalDocumentosTrabajador)
+// muestra los PDFs agrupados por persona con cards visuales. Redundante.
+// Las funciones verPDFSoporte / descargarPDFSoporte se mantienen porque
+// las usa el modal.
 
 function verPDFSoporte(filePath) {
   if (!filePath) return;

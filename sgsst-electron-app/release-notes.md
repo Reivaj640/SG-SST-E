@@ -1,3 +1,38 @@
+# K+AIR v0.1.181
+
+## 📦706-fix19 — Quitar tab "Documentos de soporte" (v0.1.181)
+
+Cleanup del v0.1.180. El tab "Documentos de soporte" quedó redundante porque el modal "Documentos del trabajador" ya lista TODOS los PDFs del trabajador con cards visuales (border-left de color por estado: verde = Vigente, gris = Anterior, amarillo = Corrección).
+
+### ¿Qué cambió?
+
+- **Quitado el tab "Documentos de soporte"** — La vista de Gestión de Roles ahora es la única pantalla del submódulo 1.1.2.
+- **Los PDFs se siguen viendo en el modal** — Al hacer click en la zona de soporte de la fila de divulgación (o en el badge "+N anteriores"), se abre el modal con cards visuales.
+- **El badge "+N anteriores" sigue funcionando** — Usa el `documento_count` del bridge (cuenta por persona desde el v0.1.180), no requiere cargar la lista de PDFs al inicio.
+
+### Antes vs después
+
+| Escenario | ANTES (v0.1.180) | AHORA (v0.1.181) |
+|---|---|---|
+| Tabs en el submódulo 1.1.2 | 2 (Gestión + Documentos) | 1 (solo Gestión) |
+| Ver PDFs de un trabajador | Click en badge "+N anteriores" de la fila de divulgación → modal con cards | Igual (sin cambios) |
+| Ver TODOS los PDFs de la empresa (lista plana) | Tab "Documentos de soporte" con 1 fila por PDF | Removido. Si necesitás, abrí el modal de cada persona. |
+| Carga inicial al abrir el submódulo | Carga catálogo + asignaciones + divulgaciones + documentos | Carga solo catálogo + asignaciones + divulgaciones. Los documentos se cargan on-demand. |
+
+### ¿Por qué?
+
+El tab "Documentos de soporte" mostraba una lista plana de TODOS los PDFs de la empresa (1 fila por PDF), con badges de estado. Pero el modal "Documentos del trabajador" que ya existía en el v0.1.180 muestra los PDFs **agrupados por persona** con cards visuales, que es una mejor UX (el user normalmente busca los PDFs de un trabajador específico, no quiere ver una lista plana de todos los PDFs de la empresa).
+
+### Archivos modificados (3)
+
+- `roles-responsabilidades-view.html` (−27 líneas) — Quitados `#tabDocumentos` y `#panelDocumentos`
+- `roles-responsabilidades-viewer.js` (−50 líneas) — Quitada `renderTablaSoportes()`, listener del tab, carga inicial de documentos, estado `documentos`
+- `roles-responsabilidades-view.css` (−23 líneas) — Quitados `.kair-rr-doc-icon` y `.kair-rr-doc-icon__name`
+
+**Total**: 100 líneas eliminadas, 0 líneas agregadas. **0 cambios de BD o schema**. **Sin riesgo de regresión**: el modal ya tenía su propio handler de carga, independiente.
+
+---
+
 # K+AIR v0.1.180
 
 ## 📦706-fix18 — 1 fila por persona + modal de selección de PDFs (v0.1.180)
