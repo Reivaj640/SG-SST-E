@@ -39,10 +39,10 @@
   ; Delete es silencioso si el archivo no existe (no falla).
   SetShellVarContext all
   Delete "$DESKTOP\K+AIR.lnk"
-  CreateShortcut "$DESKTOP\K+AIR.lnk" "$INSTDIR\K+AIR.exe" "" "$INSTDIR\assets\K+AIR-multires.ico" 0
+  CreateShortcut "$DESKTOP\K+AIR.lnk" "$INSTDIR\K+AIR.exe" "" "$INSTDIR\resources\assets\K+AIR-multires.ico" 0
   SetShellVarContext current
   Delete "$DESKTOP\K+AIR.lnk"
-  CreateShortcut "$DESKTOP\K+AIR.lnk" "$INSTDIR\K+AIR.exe" "" "$INSTDIR\assets\K+AIR-multires.ico" 0
+  CreateShortcut "$DESKTOP\K+AIR.lnk" "$INSTDIR\K+AIR.exe" "" "$INSTDIR\resources\assets\K+AIR-multires.ico" 0
 !macroend
 
 !macro customUnInstall

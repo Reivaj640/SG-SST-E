@@ -1,6 +1,14 @@
 // main.js - Proceso principal de la aplicación Electron
 
 const { app, BrowserWindow, ipcMain, dialog, shell, nativeTheme, Menu } = require('electron');
+
+// 📦707-fix24 (2026-08-14) — AUMID debe setearse ANTES del primer BrowserWindow
+// para que Windows registre el ícono K+AIR en la taskbar y en la esquina
+// de la ventana. Sin esto, Windows usa el AUMID default de Electron y
+// muestra un ícono genérico (esquina borrosa + taskbar equivocado).
+// El AUMID debe coincidir con el `appUserModelId` del shortcut (.lnk)
+// y con el `appId` de electron-builder.
+app.setAppUserModelId('com.jrfsoluciones.sgsst');
 const path = require('path');
 const fsp = require('fs').promises;
 const fs = require('fs');           // Para operaciones síncronas
@@ -9668,20 +9676,31 @@ ipcMain.on('stop-watching-capacitaciones', () => {
 
 // Manejador para la creación de la ventana principal
 app.whenReady().then(() => {
-  // 📦465 (2026-07-03) — AUTO-REPARACIÓN SILENCIOSA DEL ACCESO DIRECTO
+  // 📦707-fix24 (2026-08-14) — Re-setear AUMID por si Electron lo perdió durante
+  // el ready. Idempotente: si ya está seteado, es no-op.
+  app.setAppUserModelId('com.jrfsoluciones.sgsst');
+
+  // 📦465 (2026-07-03) — AUTO-REPARACIÓN DEL ACCESO DIRECTO (mejorada en 📦707-fix26)
   // El instalador NSIS oneClick a veces no crea el .lnk (bug conocido de
   // electron-builder ≥ 24 con .nsh custom) y electron-updater/Squirrel.Windows
   // lo BORRA al actualizar sin recrearlo. Si detectamos que estamos en
-  // producción y NO hay shortcut, lo creamos en background sin interrumpir
-  // el arranque. El usuario nunca se entera.
+  // producción, SIEMPRE reescribimos el .lnk (no solo si no existe) para
+  // reflejar el path correcto del .ico. Esto arregla el caso de auto-update
+  // desde v0.1.187 (donde el .lnk apunta a una ruta inexistente) a v0.1.188+
+  // (donde el .ico está en `$INSTDIR\resources\assets/`). El user nunca se entera.
   if (app.isPackaged && process.platform === 'win32') {
     setImmediate(() => {
       try {
         const desktopShortcut = path.join(app.getPath('desktop'), 'K+AIR.lnk');
-        if (!fs.existsSync(desktopShortcut)) {
-          sendLog('[SHORTCUT-AUTOFIX] Shortcut faltante, reparando en background...', 'INFO');
-          _ensureDesktopShortcut();
-        }
+        // 📦707-fix26 (2026-08-14) — SIEMPRE reescribir (no solo si no existe)
+        // porque el .lnk viejo puede tener un path incorrecto (ej. v0.1.187
+        // → v0.1.188: el .ico se movió de $INSTDIR\assets/ a $INSTDIR\resources\assets/,
+        // y el .lnk viejo del escritorio sigue apuntando a la ruta vieja).
+        sendLog('[SHORTCUT-AUTOFIX] Re-creando acceso directo (puede sobrescribir uno viejo con path incorrecto)...', 'INFO');
+        // 📦707-fix26 (2026-08-14) — Quitado `if (!fs.existsSync(desktopShortcut))`.
+        // Antes: solo reparaba si faltaba. Ahora: SIEMPRE reescribe para
+        // reflejar el path correcto del .ico (v0.1.188+ → $INSTDIR\resources\assets\).
+        _ensureDesktopShortcut();
       } catch (autofixErr) {
         sendLog(`[SHORTCUT-AUTOFIX] Error en auto-reparación: ${autofixErr.message}`, 'WARN');
       }
@@ -20963,6 +20982,9 @@ ipcMain.handle('incidencia:escribir-excel', async (event, mes, campos) => {
 
 // Iniciar el servidor OnlyOffice al iniciar la aplicación
 app.whenReady().then(() => {
+    // 📦707-fix24 (2026-08-14) — Idempotente, ver comentario del primer whenReady.
+    app.setAppUserModelId('com.jrfsoluciones.sgsst');
+
     createWindow();
 
     // 📦 Loop 47b (2026-07-21) — Menú nativo oculto en producción

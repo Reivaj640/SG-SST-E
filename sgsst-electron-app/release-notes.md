@@ -1,3 +1,39 @@
+# K+AIR v0.1.188
+
+## 📦707-fix25 — Fix ícono del shortcut del escritorio y taskbar (v0.1.188)
+
+Fix urgente. El release v0.1.187 tenía el ícono regenerado (fill 90%) pero el shortcut del escritorio y la taskbar seguían mostrando un ícono genérico de Windows. **Causa raíz**: 3 fixes que faltaban:
+
+1. **Sin AUMID**: la app nunca le decía a Windows su "DNI" (AppUserModelID). Por eso la taskbar mostraba el ícono default de Electron.
+2. **`.ico` empaquetado en el .asar**: el instalador ponía todo dentro de un archivo `app.asar` (como un ZIP), y el shortcut del escritorio no podía encontrar el ícono adentro.
+3. **Path incorrecto en el instalador**: el `installer.nsh` apuntaba a `$INSTDIR\assets\K+AIR-multires.ico`, una ruta que NO existe en disco.
+
+### ¿Qué hace este fix?
+
+- Registra el AUMID `com.jrfsoluciones.sgsst` en 3 lugares de `main.js` (defense in depth) → Windows muestra el ícono K+AIR en la taskbar cuando la app está abierta.
+- Saca el `.ico` del `.asar` a una carpeta `resources/assets/` en disco (con `build.extraResources` en `package.json`) → el shortcut del escritorio puede encontrar el ícono.
+- Corrige el path en `installer.nsh` (de `$INSTDIR\assets\...` a `$INSTDIR\resources/assets/...`) → el `.lnk` apunta a una ruta real.
+
+### Antes vs después
+
+| Contexto | ANTES (v0.1.187) | AHORA (v0.1.188) |
+|---|---|---|
+| Esquina de ventana | ✓ Logo K+AIR | ✓ Logo K+AIR |
+| Splash / Home inicial | ✓ Logo K+AIR | ✓ Logo K+AIR |
+| Shortcut del escritorio | ✗ Ícono genérico de Windows | ✓ Logo K+AIR |
+| Taskbar de Windows | ✗ Ícono genérico de Electron | ✓ Logo K+AIR |
+| Auto-update (electron-updater) | ✓ Funciona | ✓ Funciona (ya estaba) |
+
+### ⚠️ Importante
+Este fix **solo aplica a instalaciones nuevas o reinstaladas**. Si ya tenías K+AIR v0.1.187 instalado, debés reinstalar para que el .ico esté en disco y el AUMID se registre al primer arranque.
+
+### Archivos modificados (3)
+- `main.js` — 3 llamadas a `app.setAppUserModelId`
+- `package.json` — nueva entrada en `build.extraResources` + bump versión
+- `installer.nsh` — 2 paths corregidos
+
+---
+
 # K+AIR v0.1.187
 
 ## 📦707 — Regenerar ícono de ventana con fill 90% (v0.1.187)

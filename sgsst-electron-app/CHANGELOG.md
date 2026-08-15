@@ -5,6 +5,60 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.189] - 2026-08-14
+
+### 📦707-fix26 — fix(shortcut): auto-reparación SIEMPRE reescribe el .lnk del escritorio (auto-update fix)
+
+**Causa**: v0.1.188 arregla el ícono del shortcut del escritorio y la taskbar para instalaciones nuevas. Pero si el user actualiza via **auto-update** desde v0.1.187 (o cualquier versión anterior) a v0.1.188+, el .lnk viejo del escritorio sigue apuntando a `$INSTDIR\assets/...` (ruta vieja, inexistente) porque:
+- El instalador NSIS SÍ reescribe el .lnk (en instalación nueva o reinstalación)
+- Pero el auto-updater de electron-updater usa Squirrel.Windows, que solo reemplaza archivos del .exe, NO recrea shortcuts
+
+El código de auto-reparación en `main.js` (línea 9693) tenía un check `if (!fs.existsSync(desktopShortcut))` que SOLO reescribía el .lnk si NO existía. Como el .lnk viejo sí existía (con path roto), nunca se reescribía.
+
+### Fixed
+- **`main.js`** (líneas 9683-9704): quitado el check `if (!fs.existsSync(desktopShortcut))`. Ahora `_ensureDesktopShortcut()` se ejecuta SIEMPRE al arrancar (en producción Windows), reescribiendo el .lnk con la ruta nueva. La función usa `shell.writeShortcutLink(shortcutPath, 'replace', ...)` que sobreescribe si existe.
+
+### Comportamiento después del fix
+- **Instalación nueva de v0.1.189** → NSIS crea el .lnk con path correcto. La auto-reparación al primer arranque también lo reescribe (no-op si ya está bien).
+- **Auto-update de v0.1.187 → v0.1.189** → el .exe se actualiza con el nuevo `main.js`. Al primer arranque, la auto-reparación detecta el .lnk viejo y lo reescribe con la ruta nueva. El user ve el cambio sin tocar nada.
+- **Cualquier versión anterior a v0.1.189** → al actualizar, la auto-reparación arregla el .lnk.
+
+### Archivo (1 modificado, +9/-3 líneas)
+1. `main.js` — auto-reparación siempre reescribe
+
+---
+
+## [0.1.188] - 2026-08-14
+
+### 📦707-fix25 — fix(icons): AUMID + extraResources + path del .ico (taskbar y shortcut del escritorio)
+
+**Causa**: el release v0.1.187 tenía el ícono regenerado (fill 90%) pero el shortcut del escritorio y la taskbar seguían mostrando un ícono genérico de Windows. El user reportó que después de instalar la v0.1.187, el .lnk del escritorio no tenía el logo K+AIR.
+
+**Causa raíz**: faltaban 3 fixes que v0.1.188 había tenido y que el user "deshice manualmente" antes del release v0.1.187:
+
+1. **Sin AUMID**: `app.setAppUserModelId('com.jrfsoluciones.sgsst')` no se llamaba. Windows no podía asociar el ícono con la app en la taskbar.
+2. **`.ico` empaquetado en el asar**: el `K+AIR-multires.ico` estaba dentro del `app.asar` (no en disco). El shortcut del escritorio no podía encontrar el ícono.
+3. **Path incorrecto en el instalador**: el `installer.nsh` apuntaba a `$INSTDIR\assets\K+AIR-multires.ico` (ruta inexistente en disco). El .lnk del escritorio apuntaba a un ícono fantasma.
+
+### Fixed
+- **`main.js`**: `app.setAppUserModelId('com.jrfsoluciones.sgsst')` agregado en 3 lugares (defense in depth): al `require('electron')` (antes del primer BrowserWindow), y re-foreado en los 2 `app.whenReady().then(...)`.
+- **`package.json`**: nueva entrada en `build.extraResources` que copia el `.ico` desde `assets/K+AIR-multires.ico` (en el proyecto) a `resources/assets/K+AIR-multires.ico` (en disco, FUERA del asar). Después del build, el ícono existe en `$INSTDIR\resources\assets\K+AIR-multires.ico`.
+- **`installer.nsh`** (líneas 42 y 45): los 2 `CreateShortcut` (Common Desktop + user Desktop) ahora apuntan a `$INSTDIR\resources\assets\K+AIR-multires.ico` (la ruta donde está el ícono realmente).
+
+### Archivos (3 modificados, 0 nuevos)
+1. `main.js` — 3 llamadas a `app.setAppUserModelId`
+2. `package.json` — entrada en `extraResources` + bump 0.1.187 → 0.1.188
+3. `installer.nsh` — 2 paths corregidos
+
+### Resultado después de la próxima instalación
+- **Esquina de la ventana**: logo K+AIR ✓ (ya funcionaba)
+- **Splash / Home inicial**: logo K+AIR ✓ (ya funcionaba)
+- **Shortcut del escritorio** (.lnk): logo K+AIR ✓ (**ARREGLADO**)
+- **Taskbar de Windows**: logo K+AIR ✓ (**ARREGLADO**)
+- **Auto-update** (electron-updater): el `latest.yml` y el `.blockmap` permiten actualizaciones delta a la próxima versión
+
+---
+
 ## [0.1.187] - 2026-08-14
 
 ### 📦707 — feat(icons): regenerar K+AIR-multires.ico con fill 90% (ícono de ventana más grande)
