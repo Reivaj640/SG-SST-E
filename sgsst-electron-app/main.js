@@ -114,6 +114,11 @@ const { EMAIL_SCHEMA_SQL, EMAIL_MIGRATIONS_SQL } = require('./main/email-schema-
 // 📦658 — FURAT (Reportes de Accidentes) — Schema + handler
 const { FURAT_SCHEMA_SQL, FURAT_MIGRATIONS_SQL } = require('./main/furat-schema-sql');
 const { registerFuratHandlers } = require('./main/furat-bridge');
+// 📦708 (2026-08-15) — Presupuesto SG-SST (1.1.3 Asignación de Recursos) — Schema + bridge
+// FASE 0: Bridge registrado, schema creado, handlers stub. La UI sigue usando
+// Excel. El bridge NO está expuesto en preload.js — los canales existen pero
+// nada los llama hasta Fase 1. Plan: docs/plans/presupuesto-bd-migration.md
+const { registerPresupuestoHandlers, SCHEMA_SQL: PRESUPUESTO_SCHEMA_SQL, MIGRATIONS_SQL: PRESUPUESTO_MIGRATIONS_SQL } = require('./main/presupuesto-bridge');
 // 📦537 — Sync multipc (BD local <-> .kairsync en carpeta compartida)
 const { registerSyncHandlers } = require('./main/sync-bridge');
 // 📦538 — Generador de pcId (ID unico por PC para el sync multipc)
@@ -588,6 +593,21 @@ function initDbOnce() {
       }
     } catch (furatErr) {
       console.error('[DB] 📦658 · Error creando schema FURAT:', furatErr.message);
+    }
+    // 📦708 (2026-08-15) — Schema Presupuesto SG-SST (1.1.3 Asignación de Recursos).
+    // 3 tablas: presupuestos + presupuesto_partidas + presupuesto_valores_mensuales.
+    // Mismo patrón que FURAT_SCHEMA_SQL. Migrations vacías en v1.
+    try {
+      db.exec(PRESUPUESTO_SCHEMA_SQL);
+      console.log('[DB] 📦708 · Tablas de presupuesto (presupuestos / partidas / valores_mensuales) creadas/verificadas');
+      if (Array.isArray(PRESUPUESTO_MIGRATIONS_SQL) && PRESUPUESTO_MIGRATIONS_SQL.length > 0) {
+        for (var pmi = 0; pmi < PRESUPUESTO_MIGRATIONS_SQL.length; pmi++) {
+          try { db.exec(PRESUPUESTO_MIGRATIONS_SQL[pmi]); } catch (pmErr) { /* skip */ }
+        }
+        console.log('[DB] 📦708 · ' + PRESUPUESTO_MIGRATIONS_SQL.length + ' migraciones de presupuesto aplicadas');
+      }
+    } catch (presErr) {
+      console.error('[DB] 📦708 · Error creando schema de presupuesto:', presErr.message);
     }
     // Migraciones idempotentes para email (mismo patrón que gestacion)
     if (Array.isArray(EMAIL_MIGRATIONS_SQL)) {
@@ -9811,6 +9831,10 @@ try {
   registerSyncHandlers(app, { getDb });
   // 📦658 — Handlers IPC del módulo FURAT (upload-file, list-metadata)
   registerFuratHandlers(app);
+  // 📦708 (2026-08-15) — Handlers IPC del submódulo Presupuesto (1.1.3).
+  // FASE 0: 15 canales registrados (14 stubs + 1 diag). Ninguno expuesto en
+  // preload.js todavía. La UI sigue usando el flujo viejo (Excel) intacto.
+  registerPresupuestoHandlers(app, { getDb, validateSession });
   // 📦538 (FIX orden init) — Generar pcId y arrancar auto-sync DESPUES de
   // que registerSyncHandlers haya llamado a syncService.init() (setea _configPath).
   // Si se llama antes, _getAllCompanies() retorna [] porque _configPath es null

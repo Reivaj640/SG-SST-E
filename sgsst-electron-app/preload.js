@@ -335,6 +335,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openBudgetWindow: (file) => ipcRenderer.invoke('open-budget-window', file),
   duplicateBudgetFile: (params) => ipcRenderer.invoke('duplicate-budget-file', params),
 
+  // 📦708 (2026-08-15) — Presupuesto SG-SST · FASE 2-3
+  // Canales del bridge nuevo (main/presupuesto-bridge.js). Auth opcional
+  // (soft auth) para alinear con el patrón de los handlers viejos de Excel.
+  // Plan completo: docs/plans/presupuesto-bd-migration.md
+  presupuestoListByEmpresa: (payload) => ipcRenderer.invoke('presupuesto:list-by-empresa', payload),
+  presupuestoGet: (payload) => ipcRenderer.invoke('presupuesto:get', payload),
+  presupuestoGetByEmpresaAnio: (payload) => ipcRenderer.invoke('presupuesto:get-by-empresa-anio', payload),
+  presupuestoCalcularResumen: (payload) => ipcRenderer.invoke('presupuesto:calcular-resumen', payload),
+  presupuestoImportFromExcel: (payload) => ipcRenderer.invoke('presupuesto:import-from-excel', payload),
+  presupuestoExportExcel: (payload) => ipcRenderer.invoke('presupuesto:export-excel', payload),
+  presupuestoCreate: (payload) => ipcRenderer.invoke('presupuesto:create', payload),
+  presupuestoBulkSave: (payload) => ipcRenderer.invoke('presupuesto:bulk-save', payload),
+  // 📦708 (Fase 3.5) — Handlers granulares
+  presupuestoAddPartida: (payload) => ipcRenderer.invoke('presupuesto:add-partida', payload),
+  presupuestoDeletePartida: (payload) => ipcRenderer.invoke('presupuesto:delete-partida', payload),
+  presupuestoSetMesValues: (payload) => ipcRenderer.invoke('presupuesto:set-mes-values', payload),
+  presupuestoUpdateMeta: (payload) => ipcRenderer.invoke('presupuesto:update-meta', payload),
+  presupuestoDiag: (payload) => ipcRenderer.invoke('presupuesto:diag', payload),
+
   // --- Accidentes ---
   selectAccidentPdf: () => ipcRenderer.invoke('investigacion-accidentes-select-accident-pdf'),
   processAccidentPdf: (pdfPath) => ipcRenderer.invoke('investigacion-accidentes-process-accident-pdf', pdfPath),
