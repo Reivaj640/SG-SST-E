@@ -119,6 +119,11 @@ const { registerFuratHandlers } = require('./main/furat-bridge');
 // Excel. El bridge NO está expuesto en preload.js — los canales existen pero
 // nada los llama hasta Fase 1. Plan: docs/plans/presupuesto-bd-migration.md
 const { registerPresupuestoHandlers, SCHEMA_SQL: PRESUPUESTO_SCHEMA_SQL, MIGRATIONS_SQL: PRESUPUESTO_MIGRATIONS_SQL } = require('./main/presupuesto-bridge');
+// 📦709 (2026-08-15) — Gestión Humana (nuevo módulo top-level: Base de Personal + Contratación)
+// FASE 0: Schema con 3 tablas, bridge con 16 handlers stub + 1 diag. La UI aún
+// no existe. Plan: docs/plans/2026-08-15-gestion-humana-design.md
+const { registerGestionHumanaHandlers } = require('./main/gestion-humana-bridge');
+const { SCHEMA_SQL: GH_SCHEMA_SQL } = require('./main/gestion-humana-schema-sql');
 // 📦537 — Sync multipc (BD local <-> .kairsync en carpeta compartida)
 const { registerSyncHandlers } = require('./main/sync-bridge');
 // 📦538 — Generador de pcId (ID unico por PC para el sync multipc)
@@ -608,6 +613,14 @@ function initDbOnce() {
       }
     } catch (presErr) {
       console.error('[DB] 📦708 · Error creando schema de presupuesto:', presErr.message);
+    }
+    // 📦709 (2026-08-15) — Schema Gestión Humana (nuevo módulo: Base de Personal + Contratación)
+    // 3 tablas: contrataciones + base_personal + gh_sedes. Sin migrations en v1.
+    try {
+      db.exec(GH_SCHEMA_SQL);
+      console.log('[DB] 📦709 · Tablas de gestion-humana (contrataciones / base_personal / gh_sedes) creadas/verificadas');
+    } catch (ghErr) {
+      console.error('[DB] 📦709 · Error creando schema de gestion-humana:', ghErr.message);
     }
     // Migraciones idempotentes para email (mismo patrón que gestacion)
     if (Array.isArray(EMAIL_MIGRATIONS_SQL)) {
@@ -9835,6 +9848,13 @@ try {
   // FASE 0: 15 canales registrados (14 stubs + 1 diag). Ninguno expuesto en
   // preload.js todavía. La UI sigue usando el flujo viejo (Excel) intacto.
   registerPresupuestoHandlers(app, { getDb, validateSession });
+  // 📦709 (2026-08-15) — Handlers IPC del módulo Gestión Humana (nuevo top-level).
+  // FASE 0: 16 canales registrados (15 stubs + 1 diag). Ninguno expuesto en
+  // preload.js todavía. La UI no existe aún — viene en Fases 4-6.
+  // Patrón distinto a presupuesto: usa .init(ipcMain) en vez de require('electron')
+  // para que los tests puedan inyectar el mock sin Module._resolveFilename hack.
+  registerGestionHumanaHandlers.init(ipcMain);
+  registerGestionHumanaHandlers(app, { getDb, validateSession });
   // 📦538 (FIX orden init) — Generar pcId y arrancar auto-sync DESPUES de
   // que registerSyncHandlers haya llamado a syncService.init() (setea _configPath).
   // Si se llama antes, _getAllCompanies() retorna [] porque _configPath es null

@@ -354,6 +354,31 @@ contextBridge.exposeInMainWorld('electronAPI', {
   presupuestoUpdateMeta: (payload) => ipcRenderer.invoke('presupuesto:update-meta', payload),
   presupuestoDiag: (payload) => ipcRenderer.invoke('presupuesto:diag', payload),
 
+  // 📦709 (2026-08-15) — Gestión Humana (nuevo módulo top-level) · FASE 0
+  // 16 canales: 5 read + 4 write-contratacion + 4 write-personal + 2 write-sedes + 1 diag
+  // Plan: docs/plans/2026-08-15-gestion-humana-design.md
+  // Read (5)
+  ghListContrataciones: (payload) => ipcRenderer.invoke('gh:list-contrataciones', payload),
+  ghGetContratacion: (payload) => ipcRenderer.invoke('gh:get-contratacion', payload),
+  ghListPersonal: (payload) => ipcRenderer.invoke('gh:list-personal', payload),
+  ghGetPersonal: (payload) => ipcRenderer.invoke('gh:get-personal', payload),
+  ghListSedes: (payload) => ipcRenderer.invoke('gh:list-sedes', payload),
+  // Write Contratación (4)
+  ghCreateContratacion: (payload) => ipcRenderer.invoke('gh:create-contratacion', payload),
+  ghUpdateContratacion: (payload) => ipcRenderer.invoke('gh:update-contratacion', payload),
+  ghDeleteContratacion: (payload) => ipcRenderer.invoke('gh:delete-contratacion', payload),
+  ghMarcarPaso: (payload) => ipcRenderer.invoke('gh:marcar-paso', payload),
+  // Write Personal (4)
+  ghCreatePersonal: (payload) => ipcRenderer.invoke('gh:create-personal', payload),
+  ghUpdatePersonal: (payload) => ipcRenderer.invoke('gh:update-personal', payload),
+  ghDeletePersonal: (payload) => ipcRenderer.invoke('gh:delete-personal', payload),
+  ghCambiarEstado: (payload) => ipcRenderer.invoke('gh:cambiar-estado', payload),
+  // Write Sedes (2)
+  ghCreateSede: (payload) => ipcRenderer.invoke('gh:create-sede', payload),
+  ghUpdateSede: (payload) => ipcRenderer.invoke('gh:update-sede', payload),
+  // Diag (1)
+  ghDiag: () => ipcRenderer.invoke('gh:diag'),
+
   // --- Accidentes ---
   selectAccidentPdf: () => ipcRenderer.invoke('investigacion-accidentes-select-accident-pdf'),
   processAccidentPdf: (pdfPath) => ipcRenderer.invoke('investigacion-accidentes-process-accident-pdf', pdfPath),
