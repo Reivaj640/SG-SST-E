@@ -210,8 +210,14 @@ class GestionHumanaHome {
   }
 
   _renderMain() {
+    var self = this;
     var main = document.createElement('div');
-    main.style.cssText = 'flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden;';
+    // `height: 100%` es necesario para que `flex: 1` en el
+    // `<main id="gh-content">` (hijo flex column) funcione. Sin esto, el
+    // `flex: 1` colapsa a 0 y el contenido del main no se ve.
+    // El sidebar (256px, flex-shrink:0) no necesita height porque su
+    // contenido es intrínseco (suma de brand + nav + userCard).
+    main.style.cssText = 'flex:1; min-width:0; height:100%; display:flex; flex-direction:column; overflow:hidden;';
 
     // ═══ HEADER (sticky) ═══
     var t = this._getCurrentTitle();
