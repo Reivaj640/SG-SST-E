@@ -82,6 +82,7 @@ class GestionHumanaHome {
       try { this.viewInstance.destroy(); } catch (_) { /* noop */ }
     }
     this.viewInstance = null;
+    this._content = null;
     if (this._navHandler) {
       window.removeEventListener('gh-shell-navigate', this._navHandler);
       this._navHandler = null;
@@ -125,6 +126,11 @@ class GestionHumanaHome {
     // ═══ LAYOUT: SIDEBAR + MAIN ═══
     this.container.appendChild(this._renderSidebar());
     this.container.appendChild(this._renderMain());
+    // Importante: ahora que `this.container` (y por tanto el <main id="gh-content">)
+    // YA está en el DOM, podemos montar la vista. Antes las vistas internas hacían
+    // `document.getElementById('bp-back-btn')` que retornaba null porque el wrapper
+    // aún estaba en un nodo detached (getElementById sólo busca en el DOM actual).
+    this._renderViewInto(this._content);
   }
 
   _renderSidebar() {
@@ -239,6 +245,8 @@ class GestionHumanaHome {
     content.id = 'gh-content';
     content.style.cssText = 'flex:1; overflow-y:auto; padding:1.5rem; max-width:1600px; width:100%; margin:0 auto; box-sizing:border-box;';
     main.appendChild(content);
+    // Guardamos la referencia para que `render()` monte la vista DESPUÉS de appendear el shell.
+    this._content = content;
 
     // ═══ FOOTER ═══
     var footer = document.createElement('footer');
@@ -248,8 +256,7 @@ class GestionHumanaHome {
       '<span>v1.0 — Barranquilla, Colombia</span>';
     main.appendChild(footer);
 
-    // Renderizar la vista actual en el content
-    this._renderViewInto(content);
+    // NO llamamos a _renderViewInto aquí — el `render()` lo hace después de appendear `main` al DOM.
 
     return main;
   }
