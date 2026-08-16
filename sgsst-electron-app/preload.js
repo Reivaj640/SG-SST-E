@@ -376,6 +376,41 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Write Sedes (2)
   ghCreateSede: (payload) => ipcRenderer.invoke('gh:create-sede', payload),
   ghUpdateSede: (payload) => ipcRenderer.invoke('gh:update-sede', payload),
+  // 📦710 (2026-08-15) — Gestión Humana (FASE C: handlers para 6 tablas nuevas)
+  // Vacaciones (6)
+  ghListVacaciones: (payload) => ipcRenderer.invoke('gh:list-vacaciones', payload),
+  ghGetVacacion: (payload) => ipcRenderer.invoke('gh:get-vacacion', payload),
+  ghCreateVacacion: (payload) => ipcRenderer.invoke('gh:create-vacacion', payload),
+  ghUpdateVacacion: (payload) => ipcRenderer.invoke('gh:update-vacacion', payload),
+  ghDeleteVacacion: (payload) => ipcRenderer.invoke('gh:delete-vacacion', payload),
+  ghCambiarEstadoVacacion: (payload) => ipcRenderer.invoke('gh:cambiar-estado-vacacion', payload),
+  // Permisos (5)
+  ghListPermisos: (payload) => ipcRenderer.invoke('gh:list-permisos', payload),
+  ghGetPermiso: (payload) => ipcRenderer.invoke('gh:get-permiso', payload),
+  ghCreatePermiso: (payload) => ipcRenderer.invoke('gh:create-permiso', payload),
+  ghUpdatePermiso: (payload) => ipcRenderer.invoke('gh:update-permiso', payload),
+  ghFinalizarPermiso: (payload) => ipcRenderer.invoke('gh:finalizar-permiso', payload),
+  // Documentos (6)
+  ghListDocumentos: (payload) => ipcRenderer.invoke('gh:list-documentos', payload),
+  ghGetDocumento: (payload) => ipcRenderer.invoke('gh:get-documento', payload),
+  ghCreateDocumento: (payload) => ipcRenderer.invoke('gh:create-documento', payload),
+  ghUpdateDocumento: (payload) => ipcRenderer.invoke('gh:update-documento', payload),
+  ghDeleteDocumento: (payload) => ipcRenderer.invoke('gh:delete-documento', payload),
+  ghFirmarDocumento: (payload) => ipcRenderer.invoke('gh:firmar-documento', payload),
+  // Firmas Digitales (2)
+  ghListFirmas: (payload) => ipcRenderer.invoke('gh:list-firmas', payload),
+  ghCreateFirma: (payload) => ipcRenderer.invoke('gh:create-firma', payload),
+  // Anuncios (5)
+  ghListAnuncios: (payload) => ipcRenderer.invoke('gh:list-anuncios', payload),
+  ghGetAnuncio: (payload) => ipcRenderer.invoke('gh:get-anuncio', payload),
+  ghCreateAnuncio: (payload) => ipcRenderer.invoke('gh:create-anuncio', payload),
+  ghUpdateAnuncio: (payload) => ipcRenderer.invoke('gh:update-anuncio', payload),
+  ghDeleteAnuncio: (payload) => ipcRenderer.invoke('gh:delete-anuncio', payload),
+  // Mensajes (4)
+  ghListMensajes: (payload) => ipcRenderer.invoke('gh:list-mensajes', payload),
+  ghGetMensaje: (payload) => ipcRenderer.invoke('gh:get-mensaje', payload),
+  ghCreateMensaje: (payload) => ipcRenderer.invoke('gh:create-mensaje', payload),
+  ghMarcarLeido: (payload) => ipcRenderer.invoke('gh:marcar-leido', payload),
   // Diag (1)
   ghDiag: () => ipcRenderer.invoke('gh:diag'),
 

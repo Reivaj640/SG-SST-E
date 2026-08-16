@@ -1,18 +1,20 @@
 // main/gestion-humana-bridge.js
-// Bridge IPC del módulo Gestión Humana (v0.1.191) — FASE 0
+// Bridge IPC del módulo Gestión Humana (v0.1.191) — FASE 1
 //
 // Patrón: mismo que main/presupuesto-bridge.js
 // Firma: registerGestionHumanaHandlers(app, deps)
-//   - app: electron app instance (en producción, contiene ipcMain via app.on o se pasa por .init())
+//   - app: electron app instance
 //   - deps: { getDb, validateSession }
 //
-// En Fase 0 todos los handlers (excepto diag) son STUB. Retornan NOT_IMPLEMENTED.
-// Fases siguientes implementan:
-//   - Fase 1: read handlers (5)
-//   - Fase 2: write contratacion (4)
-//   - Fase 3: write personal (4) + write sedes (2)
-//   - Fases 4-6: integración UI
-//   - Fase 7: tests end-to-end
+// FASE 1: 5 read handlers implementados:
+//   - gh:list-contrataciones (filtros: companyName, estado)
+//   - gh:get-contratacion (por id)
+//   - gh:list-personal (filtros: companyName, estado, search)
+//   - gh:get-personal (por id)
+//   - gh:list-sedes (filtros: companyName)
+//
+// STUB (Fases 2-3): write contratacion, write personal, write sedes, marcar-paso, cambiar-estado
+// Diag siempre activo.
 
 const MOD = 'GESTION-HUMANA';
 
@@ -27,90 +29,2873 @@ function _err(code, message, extra) {
 function _ok(data) {
   return { success: true, data: data || {} };
 }
-function _stub(payload) {
-  // 📦709 · Fase 0: stub para todos los handlers (excepto diag)
-  console.log('[' + MOD + '] (Fase 0 stub) payload:', JSON.stringify(payload || {}));
-  return _err('NOT_IMPLEMENTED', 'Handler pendiente de implementación (Fase 0)', { phase: 0 });
+function _stub(channel, payload) {
+  // Stub para handlers pendientes
+  console.log('[' + MOD + '][' + channel + '] (stub) payload:', JSON.stringify(payload || {}));
+  return _err('NOT_IMPLEMENTED', 'Handler "' + channel + '" pendiente', { phase: 2 });
 }
 
+// ========== ID GENERATOR ==========
+function _newId(prefix) {
+  return prefix + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+}
+
+// ========== AUTH (soft — mismo patrón que presupuesto) ==========
+function _checkAuth(token) {
+  if (!token) return { ok: true, user: null, softAuth: true };
+  if (!_validateSession || typeof _validateSession !== 'function') {
+    return { ok: true, user: null, softAuth: true };
+  }
+  var session = _validateSession(token);
+  if (!session || !session.ok) {
+    console.warn('[' + MOD + '] Token inválido en handler, continuando con soft auth');
+    return { ok: true, user: null, softAuth: true };
+  }
+  return { ok: true, user: session.user };
+}
+
+// ========== COMPANY LOOKUP ==========
+function _getCompanyByName(companyName) {
+  if (!_getDb) return null;
+  var localDb = _getDb();
+  if (!localDb) return null;
+  var normalized = String(companyName || '').toLowerCase().trim();
+  if (!normalized) return null;
+  try {
+    var row = localDb.prepare(
+      "SELECT id, company_key, display_name FROM companies " +
+      "WHERE LOWER(display_name) = ? OR LOWER(company_key) = ? " +
+      "LIMIT 1"
+    ).get(normalized, normalized);
+    return row || null;
+  } catch (e) {
+    console.error('[' + MOD + '][_getCompanyByName]', e.message);
+    return null;
+  }
+}
+
+// ========== ROW → OBJECT CONVERTERS (snake_case → camelCase) ==========
+function _rowToContratacion(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    empresaId: row.empresa_id,
+    nombres: row.nombres,
+    apellidos: row.apellidos,
+    cedula: row.cedula,
+    telefono: row.telefono,
+    cargo: row.cargo,
+    salario: row.salario,
+    fechaIngreso: row.fecha_ingreso,
+    sedeId: row.sede_id,
+    empresaUsuaria: row.empresa_usuaria,
+    pasoActual: row.paso_actual,
+    memoRecibido: row.memo_recibido,
+    memoFecha: row.memo_fecha,
+    memoNotas: row.memo_notas,
+    contactoRealizado: row.contacto_realizado,
+    contactoFecha: row.contacto_fecha,
+    contactoNotas: row.contacto_notas,
+    examenesProgramados: row.examenes_programados,
+    examenesFecha: row.examenes_fecha,
+    examenesIps: row.examenes_ips,
+    examenesNotas: row.examenes_notas,
+    documentosFirmados: row.documentos_firmados,
+    documentosFecha: row.documentos_fecha,
+    documentosNotas: row.documentos_notas,
+    afiliacionesCompletadas: row.afiliaciones_completadas,
+    afiliacionesFecha: row.afiliaciones_fecha,
+    afiliacionesNotas: row.afiliaciones_notas,
+    s400Activado: row.s400_activado,
+    s400Fecha: row.s400_fecha,
+    s400Notas: row.s400_notas,
+    estado: row.estado,
+    trabajadorId: row.trabajador_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function _rowToPersonal(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    empresaId: row.empresa_id,
+    nombres: row.nombres,
+    apellidos: row.apellidos,
+    cedula: row.cedula,
+    tipoDocumento: row.tipo_documento,
+    fechaExpCedula: row.fecha_exp_cedula,
+    lugarExpCedula: row.lugar_exp_cedula,
+    fechaNacimiento: row.fecha_nacimiento,
+    lugarNacimiento: row.lugar_nacimiento,
+    telefono: row.telefono,
+    celular: row.celular,
+    email: row.email,
+    estadoCivil: row.estado_civil,
+    nivelEducativo: row.nivel_educativo,
+    direccion: row.direccion,
+    barrio: row.barrio,
+    ciudad: row.ciudad,
+    cargo: row.cargo,
+    salario: row.salario,
+    tipoContrato: row.tipo_contrato,
+    fechaIngreso: row.fecha_ingreso,
+    fechaRetiro: row.fecha_retiro,
+    estado: row.estado,
+    eps: row.eps,
+    pension: row.pension,
+    arl: row.arl,
+    cajaCompensacion: row.caja_compensacion,
+    activoS400: row.activo_s400,
+    empresaUsuaria: row.empresa_usuaria,
+    banco: row.banco,
+    numeroCuenta: row.numero_cuenta,
+    activo: row.activo,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function _rowToSede(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    empresaId: row.empresa_id,
+    nombre: row.nombre,
+    direccion: row.direccion,
+    ciudad: row.ciudad,
+    activo: row.activo,
+    createdAt: row.created_at
+  };
+}
+
+// ========== ROW → OBJECT CONVERTERS (Fase 5 — 6 tablas nuevas) ==========
+function _rowToVacacion(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    trabajadorId: row.trabajador_id,
+    empresaId: row.empresa_id,
+    fechaSolicitud: row.fecha_solicitud,
+    fechaInicio: row.fecha_inicio,
+    fechaFin: row.fecha_fin,
+    diasSolicitados: row.dias_solicitados,
+    diasPendientes: row.dias_pendientes,
+    estado: row.estado,
+    aprobadoPor: row.aprobado_por,
+    fechaAprobacion: row.fecha_aprobacion,
+    notas: row.notas,
+    notificarCliente: row.notificar_cliente,
+    clienteNotificado: row.cliente_notificado,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function _rowToPermiso(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    trabajadorId: row.trabajador_id,
+    empresaId: row.empresa_id,
+    tipo: row.tipo,
+    fechaInicio: row.fecha_inicio,
+    fechaFin: row.fecha_fin,
+    dias: row.dias,
+    estado: row.estado,
+    motivo: row.motivo,
+    soporteUrl: row.soporte_url,
+    prorroga: row.prorroga,
+    notas: row.notas,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function _rowToDocumento(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    trabajadorId: row.trabajador_id,
+    empresaId: row.empresa_id,
+    tipo: row.tipo,
+    titulo: row.titulo,
+    contenido: row.contenido,
+    firmaId: row.firma_id,
+    estado: row.estado,
+    fechaFirma: row.fecha_firma,
+    version: row.version,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function _rowToFirma(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    trabajadorId: row.trabajador_id,
+    empresaId: row.empresa_id,
+    documentoTipo: row.documento_tipo,
+    imagenData: row.imagen_data,
+    documentoId: row.documento_id,
+    ip: row.ip,
+    userAgent: row.user_agent,
+    fechaHora: row.fecha_hora,
+    metadata: row.metadata,
+    createdAt: row.created_at
+  };
+}
+
+function _rowToAnuncio(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    empresaId: row.empresa_id,
+    titulo: row.titulo,
+    contenido: row.contenido,
+    tipo: row.tipo,
+    dirigidoA: row.dirigido_a,
+    sedeId: row.sede_id,
+    cargoFiltro: row.cargo_filtro,
+    fechaPublicacion: row.fecha_publicacion,
+    fechaExpiracion: row.fecha_expiracion,
+    publicadoPor: row.publicado_por,
+    activo: row.activo,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function _rowToMensaje(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    empresaId: row.empresa_id,
+    remitenteId: row.remitente_id,
+    destinatarioId: row.destinatario_id,
+    asunto: row.asunto,
+    contenido: row.contenido,
+    leido: row.leido,
+    fechaLectura: row.fecha_lectura,
+    prioridad: row.prioridad,
+    createdAt: row.created_at
+  };
+}
+
+// ========== READ HANDLERS (Fase 1) ==========
+
+/**
+ * gh:list-contrataciones
+ * Filtros: companyName (requerido), estado (opcional: en_proceso | completado | cancelado)
+ * Devuelve todas las contrataciones de la empresa, ordenadas por fecha_ingreso DESC.
+ */
+function _handlerListContrataciones(token, companyName, estado) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!companyName || typeof companyName !== 'string') {
+    return _err('INVALID_INPUT', 'companyName es requerido');
+  }
+
+  var company = _getCompanyByName(companyName);
+  if (!company) {
+    return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var sql = "SELECT * FROM contrataciones WHERE empresa_id = ?";
+    var params = [company.company_key];
+    if (estado && typeof estado === 'string') {
+      sql += " AND estado = ?";
+      params.push(estado);
+    }
+    sql += " ORDER BY fecha_ingreso DESC, created_at DESC";
+
+    var stmtC = localDb.prepare(sql);
+    var rows = stmtC.all.apply(stmtC, params);
+    var contrataciones = rows.map(_rowToContratacion);
+
+    return _ok({
+      contrataciones: contrataciones,
+      company: { id: company.id, companyKey: company.company_key, displayName: company.display_name },
+      count: contrataciones.length
+    });
+  } catch (e) {
+    console.error('[' + MOD + '][list-contrataciones]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:get-contratacion
+ * Devuelve una contratación completa por su ID.
+ */
+function _handlerGetContratacion(token, contratacionId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!contratacionId || typeof contratacionId !== 'string') {
+    return _err('INVALID_INPUT', 'contratacionId es requerido');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var row = localDb.prepare("SELECT * FROM contrataciones WHERE id = ?").get(contratacionId);
+    if (!row) {
+      return _err('NOT_FOUND', 'Contratación "' + contratacionId + '" no encontrada');
+    }
+    return _ok({ contratacion: _rowToContratacion(row) });
+  } catch (e) {
+    console.error('[' + MOD + '][get-contratacion]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:list-personal
+ * Filtros: companyName (requerido), estado (opcional), search (opcional, busca en nombres/apellidos/cedula)
+ * Devuelve todos los trabajadores activos (activo=1) de la empresa.
+ */
+function _handlerListPersonal(token, companyName, estado, search) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!companyName || typeof companyName !== 'string') {
+    return _err('INVALID_INPUT', 'companyName es requerido');
+  }
+
+  var company = _getCompanyByName(companyName);
+  if (!company) {
+    return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var sql = "SELECT * FROM base_personal WHERE empresa_id = ? AND activo = 1";
+    var params = [company.company_key];
+    if (estado && typeof estado === 'string') {
+      sql += " AND estado = ?";
+      params.push(estado);
+    }
+    if (search && typeof search === 'string' && search.trim()) {
+      var like = '%' + search.trim().toLowerCase() + '%';
+      sql += " AND (LOWER(nombres) LIKE ? OR LOWER(apellidos) LIKE ? OR cedula LIKE ?)";
+      params.push(like, like, like);
+    }
+    sql += " ORDER BY nombres, apellidos";
+
+    var stmtP = localDb.prepare(sql);
+    var rows = stmtP.all.apply(stmtP, params);
+    var personales = rows.map(_rowToPersonal);
+
+    return _ok({
+      personales: personales,
+      company: { id: company.id, companyKey: company.company_key, displayName: company.display_name },
+      count: personales.length
+    });
+  } catch (e) {
+    console.error('[' + MOD + '][list-personal]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:get-personal
+ * Devuelve un trabajador completo por su ID.
+ */
+function _handlerGetPersonal(token, personalId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!personalId || typeof personalId !== 'string') {
+    return _err('INVALID_INPUT', 'personalId es requerido');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var row = localDb.prepare("SELECT * FROM base_personal WHERE id = ?").get(personalId);
+    if (!row) {
+      return _err('NOT_FOUND', 'Trabajador "' + personalId + '" no encontrado');
+    }
+    return _ok({ personal: _rowToPersonal(row) });
+  } catch (e) {
+    console.error('[' + MOD + '][get-personal]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:list-sedes
+ * Devuelve las sedes activas de la empresa.
+ */
+function _handlerListSedes(token, companyName) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!companyName || typeof companyName !== 'string') {
+    return _err('INVALID_INPUT', 'companyName es requerido');
+  }
+
+  var company = _getCompanyByName(companyName);
+  if (!company) {
+    return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var rows = localDb.prepare(
+      "SELECT * FROM gh_sedes WHERE empresa_id = ? AND activo = 1 ORDER BY nombre"
+    ).all(company.company_key);
+    var sedes = rows.map(_rowToSede);
+    return _ok({
+      sedes: sedes,
+      company: { id: company.id, companyKey: company.company_key, displayName: company.display_name },
+      count: sedes.length
+    });
+  } catch (e) {
+    console.error('[' + MOD + '][list-sedes]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+// ========== WRITE CONTRATACIÓN HANDLERS (Fase 2) ==========
+
+/**
+ * gh:create-contratacion
+ * Crea una nueva contratación en paso 1 (memo) con estado en_proceso.
+ * Input: { token, companyName, data: { nombres, apellidos, cedula?, telefono?, cargo, salario?, fechaIngreso, sedeId?, empresaUsuaria? } }
+ * Devuelve: { success, data: { contratacionId } }
+ */
+function _handlerCreateContratacion(token, companyName, data) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!companyName || typeof companyName !== 'string') {
+    return _err('INVALID_INPUT', 'companyName es requerido');
+  }
+  if (!data || typeof data !== 'object') {
+    return _err('INVALID_INPUT', 'data es requerido (objeto)');
+  }
+  if (!data.nombres || typeof data.nombres !== 'string') {
+    return _err('INVALID_INPUT', 'nombres es requerido');
+  }
+  if (!data.apellidos || typeof data.apellidos !== 'string') {
+    return _err('INVALID_INPUT', 'apellidos es requerido');
+  }
+  if (!data.cargo || typeof data.cargo !== 'string') {
+    return _err('INVALID_INPUT', 'cargo es requerido');
+  }
+  if (!data.fechaIngreso || typeof data.fechaIngreso !== 'string') {
+    return _err('INVALID_INPUT', 'fechaIngreso es requerido (ISO 8601)');
+  }
+
+  var company = _getCompanyByName(companyName);
+  if (!company) {
+    return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var id = _newId('ct-');
+    var now = new Date().toISOString();
+    localDb.prepare(
+      "INSERT INTO contrataciones (id, empresa_id, nombres, apellidos, cedula, telefono, cargo, salario, " +
+      "  fecha_ingreso, sede_id, empresa_usuaria, paso_actual, estado, created_at, updated_at) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'en_proceso', ?, ?)"
+    ).run(
+      id, company.company_key,
+      data.nombres, data.apellidos,
+      data.cedula || null, data.telefono || null,
+      data.cargo, data.salario || null,
+      data.fechaIngreso,
+      data.sedeId || null, data.empresaUsuaria || null,
+      now, now
+    );
+    return _ok({ contratacionId: id });
+  } catch (e) {
+    console.error('[' + MOD + '][create-contratacion]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:update-contratacion
+ * Actualiza campos básicos de una contratación (whitelist).
+ * NO actualiza campos de pasos del pipeline — usar gh:marcar-paso para eso.
+ * Input: { token, contratacionId, updates: { nombres?, apellidos?, cedula?, telefono?, cargo?, salario?, fechaIngreso?, sedeId?, empresaUsuaria? } }
+ * Devuelve: { success, data: { contratacionId } }
+ */
+function _handlerUpdateContratacion(token, contratacionId, updates) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!contratacionId || typeof contratacionId !== 'string') {
+    return _err('INVALID_INPUT', 'contratacionId es requerido');
+  }
+  if (!updates || typeof updates !== 'object') {
+    return _err('INVALID_INPUT', 'updates es requerido (objeto)');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  // Whitelist: solo estos campos se pueden actualizar via update-contratacion
+  var fieldMap = {
+    nombres: 'nombres',
+    apellidos: 'apellidos',
+    cedula: 'cedula',
+    telefono: 'telefono',
+    cargo: 'cargo',
+    salario: 'salario',
+    fechaIngreso: 'fecha_ingreso',
+    sedeId: 'sede_id',
+    empresaUsuaria: 'empresa_usuaria'
+  };
+
+  try {
+    var existing = localDb.prepare('SELECT id FROM contrataciones WHERE id = ?').get(contratacionId);
+    if (!existing) return _err('NOT_FOUND', 'Contratación no encontrada');
+
+    var sqlParts = [];
+    var values = [];
+    Object.keys(updates).forEach(function (key) {
+      if (fieldMap[key]) {
+        sqlParts.push(fieldMap[key] + ' = ?');
+        values.push(updates[key]);
+      }
+    });
+
+    if (sqlParts.length === 0) {
+      return _err('INVALID_INPUT', 'No hay campos válidos para actualizar. Permitidos: ' + Object.keys(fieldMap).join(', '));
+    }
+
+    sqlParts.push('updated_at = ?');
+    values.push(new Date().toISOString());
+    values.push(contratacionId);
+
+    var stmtU = localDb.prepare('UPDATE contrataciones SET ' + sqlParts.join(', ') + ' WHERE id = ?');
+    stmtU.run.apply(stmtU, values);
+    return _ok({ contratacionId: contratacionId });
+  } catch (e) {
+    console.error('[' + MOD + '][update-contratacion]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:delete-contratacion
+ * Cancela una contratación (soft via estado='cancelado', no se borra la fila).
+ * Input: { token, contratacionId }
+ * Devuelve: { success, data: { contratacionId, cancelled: true } }
+ */
+function _handlerDeleteContratacion(token, contratacionId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!contratacionId || typeof contratacionId !== 'string') {
+    return _err('INVALID_INPUT', 'contratacionId es requerido');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var existing = localDb.prepare('SELECT id, estado FROM contrataciones WHERE id = ?').get(contratacionId);
+    if (!existing) return _err('NOT_FOUND', 'Contratación no encontrada');
+    if (existing.estado === 'cancelado') {
+      return _err('ALREADY_DELETED', 'La contratación ya está cancelada');
+    }
+
+    var now = new Date().toISOString();
+    localDb.prepare(
+      "UPDATE contrataciones SET estado = 'cancelado', updated_at = ? WHERE id = ?"
+    ).run(now, contratacionId);
+    return _ok({ contratacionId: contratacionId, cancelled: true });
+  } catch (e) {
+    console.error('[' + MOD + '][delete-contratacion]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:marcar-paso
+ * Avanza el pipeline de una contratación. Marca el paso como completado
+ * (bool=1) y guarda la fecha + notas del paso.
+ * Si pasoNum=6 (Activación S400), el estado pasa a 'completado'.
+ *
+ * Input: { token, contratacionId, pasoNum (1-6), fecha? (ISO 8601, default=now), notas? }
+ * Devuelve: { success, data: { contratacionId, pasoActual, estado } }
+ */
+function _handlerMarcarPaso(token, contratacionId, pasoNum, fecha, notas) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!contratacionId || typeof contratacionId !== 'string') {
+    return _err('INVALID_INPUT', 'contratacionId es requerido');
+  }
+
+  var pasoInt = parseInt(pasoNum, 10);
+  if (isNaN(pasoInt) || pasoInt < 1 || pasoInt > 6) {
+    return _err('INVALID_INPUT', 'pasoNum debe ser un entero entre 1 y 6');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  // Map pasoNum → columnas del schema
+  var pasoFields = {
+    1: { bool: 'memo_recibido',          fecha: 'memo_fecha',          notas: 'memo_notas' },
+    2: { bool: 'contacto_realizado',     fecha: 'contacto_fecha',      notas: 'contacto_notas' },
+    3: { bool: 'examenes_programados',   fecha: 'examenes_fecha',      notas: 'examenes_notas' },
+    4: { bool: 'documentos_firmados',    fecha: 'documentos_fecha',    notas: 'documentos_notas' },
+    5: { bool: 'afiliaciones_completadas', fecha: 'afiliaciones_fecha', notas: 'afiliaciones_notas' },
+    6: { bool: 's400_activado',          fecha: 's400_fecha',          notas: 's400_notas' }
+  };
+
+  try {
+    var existing = localDb.prepare('SELECT id, paso_actual, estado FROM contrataciones WHERE id = ?').get(contratacionId);
+    if (!existing) return _err('NOT_FOUND', 'Contratación no encontrada');
+    if (existing.estado === 'cancelado') {
+      return _err('ALREADY_DELETED', 'La contratación está cancelada, no se puede marcar pasos');
+    }
+
+    var f = pasoFields[pasoInt];
+    var fechaFinal = (fecha && typeof fecha === 'string') ? fecha : new Date().toISOString();
+    var now = new Date().toISOString();
+    var nuevoEstado = (pasoInt === 6) ? 'completado' : 'en_proceso';
+
+    localDb.prepare(
+      "UPDATE contrataciones SET paso_actual = ?, " + f.bool + " = 1, " + f.fecha + " = ?, " + f.notas + " = ?, " +
+      "estado = ?, updated_at = ? WHERE id = ?"
+    ).run(pasoInt, fechaFinal, notas || null, nuevoEstado, now, contratacionId);
+
+    return _ok({ contratacionId: contratacionId, pasoActual: pasoInt, estado: nuevoEstado });
+  } catch (e) {
+    console.error('[' + MOD + '][marcar-paso]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+// ========== WRITE PERSONAL HANDLERS (Fase 3) ==========
+
+// Whitelist de estados válidos para base_personal
+var _ESTADOS_PERSONAL = ['activo', 'incapacitado', 'vacaciones', 'permiso', 'maternidad', 'paternidad', 'luto', 'retirado'];
+
+/**
+ * gh:create-personal
+ * Crea un nuevo trabajador en base_personal.
+ * Input: { token, companyName, data: { nombres, apellidos, cedula, ...28 más (todos opcionales) } }
+ * Devuelve: { success, data: { personalId } }
+ *
+ * Valida: nombres + apellidos + cedula requeridos, UNIQUE(empresa_id, cedula).
+ */
+function _handlerCreatePersonal(token, companyName, data) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!companyName || typeof companyName !== 'string') {
+    return _err('INVALID_INPUT', 'companyName es requerido');
+  }
+  if (!data || typeof data !== 'object') {
+    return _err('INVALID_INPUT', 'data es requerido (objeto)');
+  }
+  if (!data.nombres || typeof data.nombres !== 'string') {
+    return _err('INVALID_INPUT', 'nombres es requerido');
+  }
+  if (!data.apellidos || typeof data.apellidos !== 'string') {
+    return _err('INVALID_INPUT', 'apellidos es requerido');
+  }
+  if (!data.cedula || typeof data.cedula !== 'string') {
+    return _err('INVALID_INPUT', 'cedula es requerido');
+  }
+
+  var company = _getCompanyByName(companyName);
+  if (!company) {
+    return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    // Verificar UNIQUE(empresa_id, cedula)
+    var existing = localDb.prepare(
+      "SELECT id FROM base_personal WHERE empresa_id = ? AND cedula = ? AND activo = 1"
+    ).get(company.company_key, data.cedula);
+    if (existing) {
+      return _err('ALREADY_EXISTS', 'Ya existe un trabajador con cédula ' + data.cedula + ' en esta empresa', { existingId: existing.id });
+    }
+
+    var id = _newId('bp-');
+    var now = new Date().toISOString();
+    localDb.prepare(
+      "INSERT INTO base_personal (id, empresa_id, nombres, apellidos, cedula, " +
+      "  tipo_documento, fecha_exp_cedula, lugar_exp_cedula, fecha_nacimiento, lugar_nacimiento, " +
+      "  telefono, celular, email, estado_civil, nivel_educativo, " +
+      "  direccion, barrio, ciudad, cargo, salario, tipo_contrato, " +
+      "  fecha_ingreso, fecha_retiro, estado, " +
+      "  eps, pension, arl, caja_compensacion, activo_s400, " +
+      "  empresa_usuaria, banco, numero_cuenta, " +
+      "  activo, created_at, updated_at) " +
+      "VALUES (?, ?, ?, ?, ?, " +
+      "  ?, ?, ?, ?, ?, " +
+      "  ?, ?, ?, ?, ?, " +
+      "  ?, ?, ?, ?, ?, ?, " +
+      "  ?, ?, 'activo', " +
+      "  ?, ?, ?, ?, ?, " +
+      "  ?, ?, ?, " +
+      "  1, ?, ?)"
+    ).run(
+      id, company.company_key, data.nombres, data.apellidos, data.cedula,
+      data.tipoDocumento || 'CC',
+      data.fechaExpCedula || null, data.lugarExpCedula || null,
+      data.fechaNacimiento || null, data.lugarNacimiento || null,
+      data.telefono || null, data.celular || null, data.email || null,
+      data.estadoCivil || null, data.nivelEducativo || null,
+      data.direccion || null, data.barrio || null, data.ciudad || null,
+      data.cargo || null, data.salario || null, data.tipoContrato || null,
+      data.fechaIngreso || null, data.fechaRetiro || null,
+      data.eps || null, data.pension || null, data.arl || null, data.cajaCompensacion || null,
+      data.activoS400 || 0,
+      data.empresaUsuaria || null, data.banco || null, data.numeroCuenta || null,
+      now, now
+    );
+    return _ok({ personalId: id });
+  } catch (e) {
+    console.error('[' + MOD + '][create-personal]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:update-personal
+ * Actualiza campos editables de un trabajador. Whitelist de campos permitidos.
+ * NO permite tocar: id, empresa_id, created_at, activo (usar delete en su lugar).
+ * Input: { token, personalId, updates: { nombres?, apellidos?, ... } }
+ * Devuelve: { success, data: { personalId } }
+ */
+function _handlerUpdatePersonal(token, personalId, updates) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!personalId || typeof personalId !== 'string') {
+    return _err('INVALID_INPUT', 'personalId es requerido');
+  }
+  if (!updates || typeof updates !== 'object') {
+    return _err('INVALID_INPUT', 'updates es requerido (objeto)');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  // Whitelist camelCase → snake_case
+  var fieldMap = {
+    nombres: 'nombres',
+    apellidos: 'apellidos',
+    cedula: 'cedula',
+    tipoDocumento: 'tipo_documento',
+    fechaExpCedula: 'fecha_exp_cedula',
+    lugarExpCedula: 'lugar_exp_cedula',
+    fechaNacimiento: 'fecha_nacimiento',
+    lugarNacimiento: 'lugar_nacimiento',
+    telefono: 'telefono',
+    celular: 'celular',
+    email: 'email',
+    estadoCivil: 'estado_civil',
+    nivelEducativo: 'nivel_educativo',
+    direccion: 'direccion',
+    barrio: 'barrio',
+    ciudad: 'ciudad',
+    cargo: 'cargo',
+    salario: 'salario',
+    tipoContrato: 'tipo_contrato',
+    fechaIngreso: 'fecha_ingreso',
+    fechaRetiro: 'fecha_retiro',
+    estado: 'estado',
+    eps: 'eps',
+    pension: 'pension',
+    arl: 'arl',
+    cajaCompensacion: 'caja_compensacion',
+    activoS400: 'activo_s400',
+    empresaUsuaria: 'empresa_usuaria',
+    banco: 'banco',
+    numeroCuenta: 'numero_cuenta'
+  };
+
+  try {
+    var existing = localDb.prepare('SELECT id FROM base_personal WHERE id = ?').get(personalId);
+    if (!existing) return _err('NOT_FOUND', 'Trabajador no encontrado');
+
+    var sqlParts = [];
+    var values = [];
+    Object.keys(updates).forEach(function (key) {
+      if (fieldMap[key]) {
+        sqlParts.push(fieldMap[key] + ' = ?');
+        values.push(updates[key]);
+      }
+    });
+
+    if (sqlParts.length === 0) {
+      return _err('INVALID_INPUT', 'No hay campos válidos para actualizar. Use gh:cambiar-estado para estado o gh:delete-personal para retirar.');
+    }
+
+    sqlParts.push('updated_at = ?');
+    values.push(new Date().toISOString());
+    values.push(personalId);
+
+    var stmtU2 = localDb.prepare('UPDATE base_personal SET ' + sqlParts.join(', ') + ' WHERE id = ?');
+    stmtU2.run.apply(stmtU2, values);
+    return _ok({ personalId: personalId });
+  } catch (e) {
+    console.error('[' + MOD + '][update-personal]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:delete-personal
+ * Soft delete de un trabajador (activo=0, estado='retirado', fecha_retiro=now).
+ * NO borra la fila, preserva histórico.
+ * Input: { token, personalId }
+ * Devuelve: { success, data: { personalId, retired: true } }
+ */
+function _handlerDeletePersonal(token, personalId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!personalId || typeof personalId !== 'string') {
+    return _err('INVALID_INPUT', 'personalId es requerido');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var existing = localDb.prepare('SELECT id, activo FROM base_personal WHERE id = ?').get(personalId);
+    if (!existing) return _err('NOT_FOUND', 'Trabajador no encontrado');
+    if (existing.activo === 0) {
+      return _err('ALREADY_DELETED', 'El trabajador ya está retirado');
+    }
+
+    var now = new Date().toISOString();
+    localDb.prepare(
+      "UPDATE base_personal SET activo = 0, estado = 'retirado', fecha_retiro = ?, updated_at = ? WHERE id = ?"
+    ).run(now, now, personalId);
+    return _ok({ personalId: personalId, retired: true });
+  } catch (e) {
+    console.error('[' + MOD + '][delete-personal]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:cambiar-estado
+ * Cambia el estado de un trabajador (activo, vacaciones, permiso, etc).
+ * Si estado='retirado' y no se pasa fechaRetiro, se setea automáticamente a now.
+ * Input: { token, personalId, estado, fechaRetiro? (ISO 8601, default=null), notas? }
+ * Devuelve: { success, data: { personalId, estado } }
+ */
+function _handlerCambiarEstado(token, personalId, estado, fechaRetiro, notas) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!personalId || typeof personalId !== 'string') {
+    return _err('INVALID_INPUT', 'personalId es requerido');
+  }
+  if (!estado || typeof estado !== 'string') {
+    return _err('INVALID_INPUT', 'estado es requerido');
+  }
+  if (_ESTADOS_PERSONAL.indexOf(estado) === -1) {
+    return _err('INVALID_INPUT', 'estado debe ser uno de: ' + _ESTADOS_PERSONAL.join(', '));
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var existing = localDb.prepare('SELECT id, activo FROM base_personal WHERE id = ?').get(personalId);
+    if (!existing) return _err('NOT_FOUND', 'Trabajador no encontrado');
+    if (existing.activo === 0) {
+      return _err('ALREADY_DELETED', 'El trabajador está retirado, no se puede cambiar estado');
+    }
+
+    var now = new Date().toISOString();
+    // Si estado=retirado y no hay fecha, auto-set
+    var fechaFinal;
+    if (estado === 'retirado') {
+      fechaFinal = fechaRetiro || now;
+    } else {
+      fechaFinal = fechaRetiro || null;
+    }
+
+    localDb.prepare(
+      "UPDATE base_personal SET estado = ?, fecha_retiro = ?, updated_at = ? WHERE id = ?"
+    ).run(estado, fechaFinal, now, personalId);
+    return _ok({ personalId: personalId, estado: estado, fechaRetiro: fechaFinal });
+  } catch (e) {
+    console.error('[' + MOD + '][cambiar-estado]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+// ========== WRITE SEDES HANDLERS (Fase 3) ==========
+
+/**
+ * gh:create-sede
+ * Crea una nueva sede. UNIQUE(empresa_id, nombre) — no permite duplicados.
+ * Input: { token, companyName, data: { nombre, direccion?, ciudad? } }
+ * Devuelve: { success, data: { sedeId } }
+ */
+function _handlerCreateSede(token, companyName, data) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!companyName || typeof companyName !== 'string') {
+    return _err('INVALID_INPUT', 'companyName es requerido');
+  }
+  if (!data || typeof data !== 'object') {
+    return _err('INVALID_INPUT', 'data es requerido (objeto)');
+  }
+  if (!data.nombre || typeof data.nombre !== 'string') {
+    return _err('INVALID_INPUT', 'nombre es requerido');
+  }
+
+  var company = _getCompanyByName(companyName);
+  if (!company) {
+    return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    // UNIQUE(empresa_id, nombre)
+    var existing = localDb.prepare(
+      "SELECT id FROM gh_sedes WHERE empresa_id = ? AND nombre = ? AND activo = 1"
+    ).get(company.company_key, data.nombre);
+    if (existing) {
+      return _err('ALREADY_EXISTS', 'Ya existe una sede con nombre "' + data.nombre + '" en esta empresa', { existingId: existing.id });
+    }
+
+    var id = _newId('se-');
+    var now = new Date().toISOString();
+    localDb.prepare(
+      "INSERT INTO gh_sedes (id, empresa_id, nombre, direccion, ciudad, activo, created_at) " +
+      "VALUES (?, ?, ?, ?, ?, 1, ?)"
+    ).run(id, company.company_key, data.nombre, data.direccion || null, data.ciudad || null, now);
+    return _ok({ sedeId: id });
+  } catch (e) {
+    console.error('[' + MOD + '][create-sede]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:update-sede
+ * Actualiza una sede. Whitelist: nombre, direccion, ciudad, activo.
+ * Si se cambia el nombre, valida UNIQUE(empresa_id, nombre).
+ * Input: { token, sedeId, updates: { nombre?, direccion?, ciudad?, activo? } }
+ * Devuelve: { success, data: { sedeId } }
+ */
+function _handlerUpdateSede(token, sedeId, updates) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!sedeId || typeof sedeId !== 'string') {
+    return _err('INVALID_INPUT', 'sedeId es requerido');
+  }
+  if (!updates || typeof updates !== 'object') {
+    return _err('INVALID_INPUT', 'updates es requerido (objeto)');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  var fieldMap = {
+    nombre: 'nombre',
+    direccion: 'direccion',
+    ciudad: 'ciudad',
+    activo: 'activo'
+  };
+
+  try {
+    var existing = localDb.prepare('SELECT id, empresa_id, nombre FROM gh_sedes WHERE id = ?').get(sedeId);
+    if (!existing) return _err('NOT_FOUND', 'Sede no encontrada');
+
+    // Si cambia nombre, validar UNIQUE
+    if (updates.nombre && updates.nombre !== existing.nombre) {
+      var dupe = localDb.prepare(
+        "SELECT id FROM gh_sedes WHERE empresa_id = ? AND nombre = ? AND id != ? AND activo = 1"
+      ).get(existing.empresa_id, updates.nombre, sedeId);
+      if (dupe) {
+        return _err('ALREADY_EXISTS', 'Ya existe otra sede con nombre "' + updates.nombre + '" en esta empresa');
+      }
+    }
+
+    var sqlParts = [];
+    var values = [];
+    Object.keys(updates).forEach(function (key) {
+      if (fieldMap[key]) {
+        sqlParts.push(fieldMap[key] + ' = ?');
+        values.push(updates[key]);
+      }
+    });
+
+    if (sqlParts.length === 0) {
+      return _err('INVALID_INPUT', 'No hay campos válidos para actualizar');
+    }
+
+    values.push(sedeId);
+    var stmtU3 = localDb.prepare('UPDATE gh_sedes SET ' + sqlParts.join(', ') + ' WHERE id = ?');
+    stmtU3.run.apply(stmtU3, values);
+    return _ok({ sedeId: sedeId });
+  } catch (e) {
+    console.error('[' + MOD + '][update-sede]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+// ========== VACACIONES HANDLERS (Fase 5) ==========
+
+/**
+ * gh:list-vacaciones
+ * Filtros: companyName (requerido), estado (opcional), trabajadorId (opcional).
+ * Multi-tenant: filtra por empresa_id.
+ */
+function _handlerListVacaciones(token, companyName, estado, trabajadorId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!companyName || typeof companyName !== 'string') {
+    return _err('INVALID_INPUT', 'companyName es requerido');
+  }
+
+  var company = _getCompanyByName(companyName);
+  if (!company) {
+    return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var sql = "SELECT * FROM gh_vacaciones WHERE empresa_id = ?";
+    var params = [company.company_key];
+    if (estado && typeof estado === 'string') {
+      sql += " AND estado = ?";
+      params.push(estado);
+    }
+    if (trabajadorId && typeof trabajadorId === 'string') {
+      sql += " AND trabajador_id = ?";
+      params.push(trabajadorId);
+    }
+    sql += " ORDER BY fecha_inicio DESC, created_at DESC";
+
+    var stmt = localDb.prepare(sql);
+    var rows = stmt.all.apply(stmt, params);
+    var vacaciones = rows.map(_rowToVacacion);
+    return _ok({
+      vacaciones: vacaciones,
+      company: { id: company.id, companyKey: company.company_key, displayName: company.display_name },
+      count: vacaciones.length
+    });
+  } catch (e) {
+    console.error('[' + MOD + '][list-vacaciones]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:get-vacacion
+ */
+function _handlerGetVacacion(token, vacacionId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!vacacionId || typeof vacacionId !== 'string') {
+    return _err('INVALID_INPUT', 'vacacionId es requerido');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var row = localDb.prepare("SELECT * FROM gh_vacaciones WHERE id = ?").get(vacacionId);
+    if (!row) {
+      return _err('NOT_FOUND', 'Vacación "' + vacacionId + '" no encontrada');
+    }
+    return _ok({ vacacion: _rowToVacacion(row) });
+  } catch (e) {
+    console.error('[' + MOD + '][get-vacacion]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:create-vacacion
+ * Crea una solicitud de vacaciones. Multi-tenant valida que el trabajador pertenezca a la empresa.
+ */
+function _handlerCreateVacacion(token, companyName, data) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!companyName || typeof companyName !== 'string') {
+    return _err('INVALID_INPUT', 'companyName es requerido');
+  }
+  if (!data || typeof data !== 'object') {
+    return _err('INVALID_INPUT', 'data es requerido (objeto)');
+  }
+  if (!data.trabajadorId || typeof data.trabajadorId !== 'string') {
+    return _err('INVALID_INPUT', 'trabajadorId es requerido');
+  }
+  if (!data.fechaSolicitud || typeof data.fechaSolicitud !== 'string') {
+    return _err('INVALID_INPUT', 'fechaSolicitud es requerido (ISO 8601)');
+  }
+  if (!data.fechaInicio || typeof data.fechaInicio !== 'string') {
+    return _err('INVALID_INPUT', 'fechaInicio es requerido (ISO 8601)');
+  }
+  if (!data.fechaFin || typeof data.fechaFin !== 'string') {
+    return _err('INVALID_INPUT', 'fechaFin es requerido (ISO 8601)');
+  }
+  if (!data.diasSolicitados || typeof data.diasSolicitados !== 'number') {
+    return _err('INVALID_INPUT', 'diasSolicitados es requerido (número)');
+  }
+
+  var company = _getCompanyByName(companyName);
+  if (!company) {
+    return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    // Validar que el trabajador pertenezca a la empresa (multi-tenant via JOIN)
+    var trab = localDb.prepare(
+      "SELECT id FROM base_personal WHERE id = ? AND empresa_id = ?"
+    ).get(data.trabajadorId, company.company_key);
+    if (!trab) {
+      return _err('TRABAJADOR_NOT_FOUND', 'Trabajador no encontrado en esta empresa', { trabajadorId: data.trabajadorId });
+    }
+
+    var id = _newId('va-');
+    var now = new Date().toISOString();
+    localDb.prepare(
+      "INSERT INTO gh_vacaciones (id, trabajador_id, empresa_id, fecha_solicitud, fecha_inicio, fecha_fin, " +
+      "  dias_solicitados, dias_pendientes, estado, aprobado_por, fecha_aprobacion, notas, " +
+      "  notificar_cliente, cliente_notificado, created_at, updated_at) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).run(
+      id, data.trabajadorId, company.company_key,
+      data.fechaSolicitud, data.fechaInicio, data.fechaFin,
+      data.diasSolicitados, data.diasPendientes || null,
+      data.estado || 'solicitada',
+      data.aprobadoPor || null, data.fechaAprobacion || null, data.notas || null,
+      data.notificarCliente ? 1 : 0,
+      data.clienteNotificado ? 1 : 0,
+      now, now
+    );
+    return _ok({ vacacionId: id });
+  } catch (e) {
+    console.error('[' + MOD + '][create-vacacion]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:update-vacacion
+ * Whitelist: diasPendientes, estado, aprobadoPor, fechaAprobacion, notas, notificarCliente, clienteNotificado.
+ * NO permite cambiar trabajador_id, empresa_id, fechas, dias_solicitados.
+ */
+function _handlerUpdateVacacion(token, vacacionId, updates) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!vacacionId || typeof vacacionId !== 'string') {
+    return _err('INVALID_INPUT', 'vacacionId es requerido');
+  }
+  if (!updates || typeof updates !== 'object') {
+    return _err('INVALID_INPUT', 'updates es requerido (objeto)');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  var fieldMap = {
+    diasPendientes: 'dias_pendientes',
+    estado: 'estado',
+    aprobadoPor: 'aprobado_por',
+    fechaAprobacion: 'fecha_aprobacion',
+    notas: 'notas',
+    notificarCliente: 'notificar_cliente',
+    clienteNotificado: 'cliente_notificado'
+  };
+
+  try {
+    var existing = localDb.prepare('SELECT id, estado FROM gh_vacaciones WHERE id = ?').get(vacacionId);
+    if (!existing) return _err('NOT_FOUND', 'Vacación no encontrada');
+    if (existing.estado === 'cancelado') {
+      return _err('ALREADY_DELETED', 'La vacación está cancelada');
+    }
+
+    var sqlParts = [];
+    var values = [];
+    Object.keys(updates).forEach(function (key) {
+      if (fieldMap[key]) {
+        var v = updates[key];
+        // Normalizar booleans a int (0/1)
+        if (key === 'notificarCliente' || key === 'clienteNotificado') {
+          v = v ? 1 : 0;
+        }
+        sqlParts.push(fieldMap[key] + ' = ?');
+        values.push(v);
+      }
+    });
+
+    if (sqlParts.length === 0) {
+      return _err('INVALID_INPUT', 'No hay campos válidos para actualizar. Use gh:cambiar-estado-vacacion para estado.');
+    }
+
+    sqlParts.push('updated_at = ?');
+    values.push(new Date().toISOString());
+    values.push(vacacionId);
+
+    var stmtU = localDb.prepare('UPDATE gh_vacaciones SET ' + sqlParts.join(', ') + ' WHERE id = ?');
+    stmtU.run.apply(stmtU, values);
+    return _ok({ vacacionId: vacacionId });
+  } catch (e) {
+    console.error('[' + MOD + '][update-vacacion]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:delete-vacacion
+ * Soft delete via estado='cancelado'.
+ */
+function _handlerDeleteVacacion(token, vacacionId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!vacacionId || typeof vacacionId !== 'string') {
+    return _err('INVALID_INPUT', 'vacacionId es requerido');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var existing = localDb.prepare('SELECT id, estado FROM gh_vacaciones WHERE id = ?').get(vacacionId);
+    if (!existing) return _err('NOT_FOUND', 'Vacación no encontrada');
+    if (existing.estado === 'cancelado') {
+      return _err('ALREADY_DELETED', 'La vacación ya está cancelada');
+    }
+
+    var now = new Date().toISOString();
+    localDb.prepare(
+      "UPDATE gh_vacaciones SET estado = 'cancelado', updated_at = ? WHERE id = ?"
+    ).run(now, vacacionId);
+    return _ok({ vacacionId: vacacionId, cancelled: true });
+  } catch (e) {
+    console.error('[' + MOD + '][delete-vacacion]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:cambiar-estado-vacacion
+ * Cambia el estado de una vacación con registro de aprobador.
+ * Estados: solicitada | aprobada | rechazada | programada | disfrutada | cancelado.
+ */
+function _handlerCambiarEstadoVacacion(token, vacacionId, nuevoEstado, aprobadoPor, fechaAprobacion) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!vacacionId || typeof vacacionId !== 'string') {
+    return _err('INVALID_INPUT', 'vacacionId es requerido');
+  }
+  if (!nuevoEstado || typeof nuevoEstado !== 'string') {
+    return _err('INVALID_INPUT', 'nuevoEstado es requerido');
+  }
+
+  var estadosValidos = ['solicitada', 'aprobada', 'rechazada', 'programada', 'disfrutada', 'cancelado'];
+  if (estadosValidos.indexOf(nuevoEstado) === -1) {
+    return _err('INVALID_INPUT', 'estado debe ser uno de: ' + estadosValidos.join(', '));
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var existing = localDb.prepare('SELECT id, estado FROM gh_vacaciones WHERE id = ?').get(vacacionId);
+    if (!existing) return _err('NOT_FOUND', 'Vacación no encontrada');
+
+    var now = new Date().toISOString();
+    var fechaApr = (nuevoEstado === 'aprobada' && !fechaAprobacion) ? now : (fechaAprobacion || null);
+    var aprobador = aprobadoPor || null;
+
+    localDb.prepare(
+      "UPDATE gh_vacaciones SET estado = ?, aprobado_por = ?, fecha_aprobacion = ?, updated_at = ? WHERE id = ?"
+    ).run(nuevoEstado, aprobador, fechaApr, now, vacacionId);
+    return _ok({ vacacionId: vacacionId, estado: nuevoEstado });
+  } catch (e) {
+    console.error('[' + MOD + '][cambiar-estado-vacacion]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+// ========== PERMISOS HANDLERS (Fase 5) ==========
+
+var _TIPOS_PERMISO = ['incapacidad', 'maternidad', 'paternidad', 'luto', 'permiso_personal', 'cita_medica', 'calamidad', 'licencia_no_remunerada'];
+var _ESTADOS_PERMISO = ['activo', 'finalizado', 'prorrogado'];
+
+/**
+ * gh:list-permisos
+ * Filtros: companyName (requerido), tipo (opcional), estado (opcional), trabajadorId (opcional).
+ */
+function _handlerListPermisos(token, companyName, tipo, estado, trabajadorId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!companyName || typeof companyName !== 'string') {
+    return _err('INVALID_INPUT', 'companyName es requerido');
+  }
+
+  var company = _getCompanyByName(companyName);
+  if (!company) {
+    return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var sql = "SELECT * FROM gh_permisos WHERE empresa_id = ?";
+    var params = [company.company_key];
+    if (tipo && typeof tipo === 'string') {
+      sql += " AND tipo = ?";
+      params.push(tipo);
+    }
+    if (estado && typeof estado === 'string') {
+      sql += " AND estado = ?";
+      params.push(estado);
+    }
+    if (trabajadorId && typeof trabajadorId === 'string') {
+      sql += " AND trabajador_id = ?";
+      params.push(trabajadorId);
+    }
+    sql += " ORDER BY fecha_inicio DESC, created_at DESC";
+
+    var stmt = localDb.prepare(sql);
+    var rows = stmt.all.apply(stmt, params);
+    var permisos = rows.map(_rowToPermiso);
+    return _ok({
+      permisos: permisos,
+      company: { id: company.id, companyKey: company.company_key, displayName: company.display_name },
+      count: permisos.length
+    });
+  } catch (e) {
+    console.error('[' + MOD + '][list-permisos]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:get-permiso
+ */
+function _handlerGetPermiso(token, permisoId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!permisoId || typeof permisoId !== 'string') {
+    return _err('INVALID_INPUT', 'permisoId es requerido');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var row = localDb.prepare("SELECT * FROM gh_permisos WHERE id = ?").get(permisoId);
+    if (!row) {
+      return _err('NOT_FOUND', 'Permiso "' + permisoId + '" no encontrado');
+    }
+    return _ok({ permiso: _rowToPermiso(row) });
+  } catch (e) {
+    console.error('[' + MOD + '][get-permiso]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:create-permiso
+ * Crea un permiso/incapacidad/etc. Multi-tenant valida trabajador.
+ */
+function _handlerCreatePermiso(token, companyName, data) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!companyName || typeof companyName !== 'string') {
+    return _err('INVALID_INPUT', 'companyName es requerido');
+  }
+  if (!data || typeof data !== 'object') {
+    return _err('INVALID_INPUT', 'data es requerido (objeto)');
+  }
+  if (!data.trabajadorId || typeof data.trabajadorId !== 'string') {
+    return _err('INVALID_INPUT', 'trabajadorId es requerido');
+  }
+  if (!data.tipo || typeof data.tipo !== 'string') {
+    return _err('INVALID_INPUT', 'tipo es requerido');
+  }
+  if (_TIPOS_PERMISO.indexOf(data.tipo) === -1) {
+    return _err('INVALID_INPUT', 'tipo debe ser uno de: ' + _TIPOS_PERMISO.join(', '));
+  }
+  if (!data.fechaInicio || typeof data.fechaInicio !== 'string') {
+    return _err('INVALID_INPUT', 'fechaInicio es requerido (ISO 8601)');
+  }
+
+  var company = _getCompanyByName(companyName);
+  if (!company) {
+    return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var trab = localDb.prepare(
+      "SELECT id FROM base_personal WHERE id = ? AND empresa_id = ?"
+    ).get(data.trabajadorId, company.company_key);
+    if (!trab) {
+      return _err('TRABAJADOR_NOT_FOUND', 'Trabajador no encontrado en esta empresa', { trabajadorId: data.trabajadorId });
+    }
+
+    var id = _newId('pe-');
+    var now = new Date().toISOString();
+    localDb.prepare(
+      "INSERT INTO gh_permisos (id, trabajador_id, empresa_id, tipo, fecha_inicio, fecha_fin, " +
+      "  dias, estado, motivo, soporte_url, prorroga, notas, created_at, updated_at) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).run(
+      id, data.trabajadorId, company.company_key,
+      data.tipo, data.fechaInicio, data.fechaFin || null,
+      data.dias || null, data.estado || 'activo',
+      data.motivo || null, data.soporteUrl || null,
+      data.prorroga ? 1 : 0, data.notas || null,
+      now, now
+    );
+    return _ok({ permisoId: id });
+  } catch (e) {
+    console.error('[' + MOD + '][create-permiso]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:update-permiso
+ * Whitelist: fechaFin, dias, estado, motivo, soporteUrl, prorroga, notas.
+ */
+function _handlerUpdatePermiso(token, permisoId, updates) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!permisoId || typeof permisoId !== 'string') {
+    return _err('INVALID_INPUT', 'permisoId es requerido');
+  }
+  if (!updates || typeof updates !== 'object') {
+    return _err('INVALID_INPUT', 'updates es requerido (objeto)');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  var fieldMap = {
+    fechaFin: 'fecha_fin',
+    dias: 'dias',
+    estado: 'estado',
+    motivo: 'motivo',
+    soporteUrl: 'soporte_url',
+    prorroga: 'prorroga',
+    notas: 'notas'
+  };
+
+  try {
+    var existing = localDb.prepare('SELECT id FROM gh_permisos WHERE id = ?').get(permisoId);
+    if (!existing) return _err('NOT_FOUND', 'Permiso no encontrado');
+
+    if (updates.estado && _ESTADOS_PERMISO.indexOf(updates.estado) === -1) {
+      return _err('INVALID_INPUT', 'estado debe ser uno de: ' + _ESTADOS_PERMISO.join(', '));
+    }
+
+    var sqlParts = [];
+    var values = [];
+    Object.keys(updates).forEach(function (key) {
+      if (fieldMap[key]) {
+        var v = updates[key];
+        if (key === 'prorroga') v = v ? 1 : 0;
+        sqlParts.push(fieldMap[key] + ' = ?');
+        values.push(v);
+      }
+    });
+
+    if (sqlParts.length === 0) {
+      return _err('INVALID_INPUT', 'No hay campos válidos para actualizar. Use gh:finalizar-permiso para terminar.');
+    }
+
+    sqlParts.push('updated_at = ?');
+    values.push(new Date().toISOString());
+    values.push(permisoId);
+
+    var stmtU = localDb.prepare('UPDATE gh_permisos SET ' + sqlParts.join(', ') + ' WHERE id = ?');
+    stmtU.run.apply(stmtU, values);
+    return _ok({ permisoId: permisoId });
+  } catch (e) {
+    console.error('[' + MOD + '][update-permiso]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:finalizar-permiso
+ * Marca el permiso como finalizado y setea fecha_fin.
+ */
+function _handlerFinalizarPermiso(token, permisoId, fechaFin) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!permisoId || typeof permisoId !== 'string') {
+    return _err('INVALID_INPUT', 'permisoId es requerido');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var existing = localDb.prepare('SELECT id, estado FROM gh_permisos WHERE id = ?').get(permisoId);
+    if (!existing) return _err('NOT_FOUND', 'Permiso no encontrado');
+    if (existing.estado === 'finalizado') {
+      return _err('ALREADY_FINALIZED', 'El permiso ya está finalizado');
+    }
+
+    var now = new Date().toISOString();
+    var fechaFinal = (fechaFin && typeof fechaFin === 'string') ? fechaFin : now;
+
+    localDb.prepare(
+      "UPDATE gh_permisos SET estado = 'finalizado', fecha_fin = ?, updated_at = ? WHERE id = ?"
+    ).run(fechaFinal, now, permisoId);
+    return _ok({ permisoId: permisoId, estado: 'finalizado', fechaFin: fechaFinal });
+  } catch (e) {
+    console.error('[' + MOD + '][finalizar-permiso]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+// ========== DOCUMENTOS HANDLERS (Fase 5) ==========
+
+var _TIPOS_DOCUMENTO = ['autorizacion_datos', 'autorizacion_hojas_vida', 'actualizacion_datos', 'induccion', 'contrato', 'carta_examenes', 'carta_cuenta_bancaria'];
+var _ESTADOS_DOCUMENTO = ['pendiente', 'firmado', 'anulado'];
+
+/**
+ * gh:list-documentos
+ * Filtros: companyName, tipo, estado, trabajadorId.
+ */
+function _handlerListDocumentos(token, companyName, tipo, estado, trabajadorId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!companyName || typeof companyName !== 'string') {
+    return _err('INVALID_INPUT', 'companyName es requerido');
+  }
+
+  var company = _getCompanyByName(companyName);
+  if (!company) {
+    return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var sql = "SELECT * FROM gh_documentos WHERE empresa_id = ?";
+    var params = [company.company_key];
+    if (tipo && typeof tipo === 'string') {
+      sql += " AND tipo = ?";
+      params.push(tipo);
+    }
+    if (estado && typeof estado === 'string') {
+      sql += " AND estado = ?";
+      params.push(estado);
+    }
+    if (trabajadorId && typeof trabajadorId === 'string') {
+      sql += " AND trabajador_id = ?";
+      params.push(trabajadorId);
+    }
+    sql += " ORDER BY created_at DESC";
+
+    var stmt = localDb.prepare(sql);
+    var rows = stmt.all.apply(stmt, params);
+    var documentos = rows.map(_rowToDocumento);
+    return _ok({
+      documentos: documentos,
+      company: { id: company.id, companyKey: company.company_key, displayName: company.display_name },
+      count: documentos.length
+    });
+  } catch (e) {
+    console.error('[' + MOD + '][list-documentos]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:get-documento
+ */
+function _handlerGetDocumento(token, documentoId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!documentoId || typeof documentoId !== 'string') {
+    return _err('INVALID_INPUT', 'documentoId es requerido');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var row = localDb.prepare("SELECT * FROM gh_documentos WHERE id = ?").get(documentoId);
+    if (!row) {
+      return _err('NOT_FOUND', 'Documento "' + documentoId + '" no encontrado');
+    }
+    return _ok({ documento: _rowToDocumento(row) });
+  } catch (e) {
+    console.error('[' + MOD + '][get-documento]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:create-documento
+ * Crea un documento. estado default 'pendiente'. version default 1.
+ */
+function _handlerCreateDocumento(token, companyName, data) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!companyName || typeof companyName !== 'string') {
+    return _err('INVALID_INPUT', 'companyName es requerido');
+  }
+  if (!data || typeof data !== 'object') {
+    return _err('INVALID_INPUT', 'data es requerido (objeto)');
+  }
+  if (!data.trabajadorId || typeof data.trabajadorId !== 'string') {
+    return _err('INVALID_INPUT', 'trabajadorId es requerido');
+  }
+  if (!data.tipo || typeof data.tipo !== 'string') {
+    return _err('INVALID_INPUT', 'tipo es requerido');
+  }
+  if (_TIPOS_DOCUMENTO.indexOf(data.tipo) === -1) {
+    return _err('INVALID_INPUT', 'tipo debe ser uno de: ' + _TIPOS_DOCUMENTO.join(', '));
+  }
+  if (!data.titulo || typeof data.titulo !== 'string') {
+    return _err('INVALID_INPUT', 'titulo es requerido');
+  }
+  if (!data.contenido || typeof data.contenido !== 'string') {
+    return _err('INVALID_INPUT', 'contenido es requerido (JSON string)');
+  }
+
+  var company = _getCompanyByName(companyName);
+  if (!company) {
+    return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var trab = localDb.prepare(
+      "SELECT id FROM base_personal WHERE id = ? AND empresa_id = ?"
+    ).get(data.trabajadorId, company.company_key);
+    if (!trab) {
+      return _err('TRABAJADOR_NOT_FOUND', 'Trabajador no encontrado en esta empresa', { trabajadorId: data.trabajadorId });
+    }
+
+    var id = _newId('do-');
+    var now = new Date().toISOString();
+    localDb.prepare(
+      "INSERT INTO gh_documentos (id, trabajador_id, empresa_id, tipo, titulo, contenido, " +
+      "  firma_id, estado, fecha_firma, version, created_at, updated_at) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).run(
+      id, data.trabajadorId, company.company_key,
+      data.tipo, data.titulo, data.contenido,
+      data.firmaId || null, data.estado || 'pendiente',
+      data.fechaFirma || null, data.version || 1,
+      now, now
+    );
+    return _ok({ documentoId: id });
+  } catch (e) {
+    console.error('[' + MOD + '][create-documento]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:update-documento
+ * Whitelist: titulo, contenido, firmaId, estado, fechaFirma, version.
+ * NO permite cambiar tipo ni trabajador_id.
+ */
+function _handlerUpdateDocumento(token, documentoId, updates) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!documentoId || typeof documentoId !== 'string') {
+    return _err('INVALID_INPUT', 'documentoId es requerido');
+  }
+  if (!updates || typeof updates !== 'object') {
+    return _err('INVALID_INPUT', 'updates es requerido (objeto)');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  var fieldMap = {
+    titulo: 'titulo',
+    contenido: 'contenido',
+    firmaId: 'firma_id',
+    estado: 'estado',
+    fechaFirma: 'fecha_firma',
+    version: 'version'
+  };
+
+  try {
+    var existing = localDb.prepare('SELECT id, estado FROM gh_documentos WHERE id = ?').get(documentoId);
+    if (!existing) return _err('NOT_FOUND', 'Documento no encontrado');
+    if (existing.estado === 'anulado') {
+      return _err('ALREADY_DELETED', 'El documento está anulado');
+    }
+
+    if (updates.estado && _ESTADOS_DOCUMENTO.indexOf(updates.estado) === -1) {
+      return _err('INVALID_INPUT', 'estado debe ser uno de: ' + _ESTADOS_DOCUMENTO.join(', '));
+    }
+
+    var sqlParts = [];
+    var values = [];
+    Object.keys(updates).forEach(function (key) {
+      if (fieldMap[key]) {
+        sqlParts.push(fieldMap[key] + ' = ?');
+        values.push(updates[key]);
+      }
+    });
+
+    if (sqlParts.length === 0) {
+      return _err('INVALID_INPUT', 'No hay campos válidos para actualizar');
+    }
+
+    sqlParts.push('updated_at = ?');
+    values.push(new Date().toISOString());
+    values.push(documentoId);
+
+    var stmtU = localDb.prepare('UPDATE gh_documentos SET ' + sqlParts.join(', ') + ' WHERE id = ?');
+    stmtU.run.apply(stmtU, values);
+    return _ok({ documentoId: documentoId });
+  } catch (e) {
+    console.error('[' + MOD + '][update-documento]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:delete-documento
+ * Soft delete via estado='anulado'.
+ */
+function _handlerDeleteDocumento(token, documentoId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!documentoId || typeof documentoId !== 'string') {
+    return _err('INVALID_INPUT', 'documentoId es requerido');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var existing = localDb.prepare('SELECT id, estado FROM gh_documentos WHERE id = ?').get(documentoId);
+    if (!existing) return _err('NOT_FOUND', 'Documento no encontrado');
+    if (existing.estado === 'anulado') {
+      return _err('ALREADY_DELETED', 'El documento ya está anulado');
+    }
+
+    var now = new Date().toISOString();
+    localDb.prepare(
+      "UPDATE gh_documentos SET estado = 'anulado', updated_at = ? WHERE id = ?"
+    ).run(now, documentoId);
+    return _ok({ documentoId: documentoId, cancelled: true });
+  } catch (e) {
+    console.error('[' + MOD + '][delete-documento]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:firmar-documento
+ * Asocia una firma al documento y lo marca como 'firmado'.
+ */
+function _handlerFirmarDocumento(token, documentoId, firmaId, fechaFirma) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!documentoId || typeof documentoId !== 'string') {
+    return _err('INVALID_INPUT', 'documentoId es requerido');
+  }
+  if (!firmaId || typeof firmaId !== 'string') {
+    return _err('INVALID_INPUT', 'firmaId es requerido');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var existing = localDb.prepare('SELECT id, estado FROM gh_documentos WHERE id = ?').get(documentoId);
+    if (!existing) return _err('NOT_FOUND', 'Documento no encontrado');
+    if (existing.estado === 'anulado') {
+      return _err('ALREADY_DELETED', 'El documento está anulado');
+    }
+    if (existing.estado === 'firmado') {
+      return _err('ALREADY_FINALIZED', 'El documento ya está firmado');
+    }
+
+    // Verificar que la firma existe
+    var firma = localDb.prepare("SELECT id FROM gh_firmas_digitales WHERE id = ?").get(firmaId);
+    if (!firma) {
+      return _err('FIRMA_NOT_FOUND', 'Firma "' + firmaId + '" no encontrada');
+    }
+
+    var now = new Date().toISOString();
+    var fecha = (fechaFirma && typeof fechaFirma === 'string') ? fechaFirma : now;
+
+    localDb.prepare(
+      "UPDATE gh_documentos SET firma_id = ?, estado = 'firmado', fecha_firma = ?, updated_at = ? WHERE id = ?"
+    ).run(firmaId, fecha, now, documentoId);
+    return _ok({ documentoId: documentoId, firmaId: firmaId, estado: 'firmado', fechaFirma: fecha });
+  } catch (e) {
+    console.error('[' + MOD + '][firmar-documento]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+// ========== FIRMAS DIGITALES HANDLERS (Fase 5) ==========
+
+/**
+ * gh:list-firmas
+ * Filtros: companyName, trabajadorId, documentoTipo.
+ */
+function _handlerListFirmas(token, companyName, trabajadorId, documentoTipo) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!companyName || typeof companyName !== 'string') {
+    return _err('INVALID_INPUT', 'companyName es requerido');
+  }
+
+  var company = _getCompanyByName(companyName);
+  if (!company) {
+    return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var sql = "SELECT * FROM gh_firmas_digitales WHERE empresa_id = ?";
+    var params = [company.company_key];
+    if (trabajadorId && typeof trabajadorId === 'string') {
+      sql += " AND trabajador_id = ?";
+      params.push(trabajadorId);
+    }
+    if (documentoTipo && typeof documentoTipo === 'string') {
+      sql += " AND documento_tipo = ?";
+      params.push(documentoTipo);
+    }
+    sql += " ORDER BY fecha_hora DESC, created_at DESC";
+
+    var stmt = localDb.prepare(sql);
+    var rows = stmt.all.apply(stmt, params);
+    var firmas = rows.map(_rowToFirma);
+    return _ok({
+      firmas: firmas,
+      company: { id: company.id, companyKey: company.company_key, displayName: company.display_name },
+      count: firmas.length
+    });
+  } catch (e) {
+    console.error('[' + MOD + '][list-firmas]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:create-firma
+ * Registra una firma digital (base64 PNG) de un trabajador.
+ */
+function _handlerCreateFirma(token, companyName, data) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!companyName || typeof companyName !== 'string') {
+    return _err('INVALID_INPUT', 'companyName es requerido');
+  }
+  if (!data || typeof data !== 'object') {
+    return _err('INVALID_INPUT', 'data es requerido (objeto)');
+  }
+  if (!data.trabajadorId || typeof data.trabajadorId !== 'string') {
+    return _err('INVALID_INPUT', 'trabajadorId es requerido');
+  }
+  if (!data.documentoTipo || typeof data.documentoTipo !== 'string') {
+    return _err('INVALID_INPUT', 'documentoTipo es requerido');
+  }
+  if (!data.imagenData || typeof data.imagenData !== 'string') {
+    return _err('INVALID_INPUT', 'imagenData es requerido (base64 PNG)');
+  }
+  if (!data.fechaHora || typeof data.fechaHora !== 'string') {
+    return _err('INVALID_INPUT', 'fechaHora es requerido (ISO 8601)');
+  }
+
+  var company = _getCompanyByName(companyName);
+  if (!company) {
+    return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var trab = localDb.prepare(
+      "SELECT id FROM base_personal WHERE id = ? AND empresa_id = ?"
+    ).get(data.trabajadorId, company.company_key);
+    if (!trab) {
+      return _err('TRABAJADOR_NOT_FOUND', 'Trabajador no encontrado en esta empresa', { trabajadorId: data.trabajadorId });
+    }
+
+    var id = _newId('fi-');
+    var now = new Date().toISOString();
+    localDb.prepare(
+      "INSERT INTO gh_firmas_digitales (id, trabajador_id, empresa_id, documento_tipo, imagen_data, " +
+      "  documento_id, ip, user_agent, fecha_hora, metadata, created_at) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).run(
+      id, data.trabajadorId, company.company_key,
+      data.documentoTipo, data.imagenData,
+      data.documentoId || null, data.ip || null, data.userAgent || null,
+      data.fechaHora, data.metadata || null,
+      now
+    );
+    return _ok({ firmaId: id });
+  } catch (e) {
+    console.error('[' + MOD + '][create-firma]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+// ========== ANUNCIOS HANDLERS (Fase 5) ==========
+
+var _TIPOS_ANUNCIO = ['info', 'urgente', 'mantenimiento', 'evento'];
+var _DIRIGIDO_A = ['todos', 'sede', 'cargo', 'trabajador'];
+
+/**
+ * gh:list-anuncios
+ * Filtros: companyName, tipo, activo.
+ */
+function _handlerListAnuncios(token, companyName, tipo, activo) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!companyName || typeof companyName !== 'string') {
+    return _err('INVALID_INPUT', 'companyName es requerido');
+  }
+
+  var company = _getCompanyByName(companyName);
+  if (!company) {
+    return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var sql = "SELECT * FROM gh_anuncios WHERE empresa_id = ?";
+    var params = [company.company_key];
+    if (tipo && typeof tipo === 'string') {
+      sql += " AND tipo = ?";
+      params.push(tipo);
+    }
+    if (typeof activo === 'boolean' || activo === 0 || activo === 1) {
+      sql += " AND activo = ?";
+      params.push(activo ? 1 : 0);
+    }
+    sql += " ORDER BY fecha_publicacion DESC, created_at DESC";
+
+    var stmt = localDb.prepare(sql);
+    var rows = stmt.all.apply(stmt, params);
+    var anuncios = rows.map(_rowToAnuncio);
+    return _ok({
+      anuncios: anuncios,
+      company: { id: company.id, companyKey: company.company_key, displayName: company.display_name },
+      count: anuncios.length
+    });
+  } catch (e) {
+    console.error('[' + MOD + '][list-anuncios]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:get-anuncio
+ */
+function _handlerGetAnuncio(token, anuncioId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!anuncioId || typeof anuncioId !== 'string') {
+    return _err('INVALID_INPUT', 'anuncioId es requerido');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var row = localDb.prepare("SELECT * FROM gh_anuncios WHERE id = ?").get(anuncioId);
+    if (!row) {
+      return _err('NOT_FOUND', 'Anuncio "' + anuncioId + '" no encontrado');
+    }
+    return _ok({ anuncio: _rowToAnuncio(row) });
+  } catch (e) {
+    console.error('[' + MOD + '][get-anuncio]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:create-anuncio
+ * Crea un anuncio. activo default 1, tipo default 'info', dirigido_a default 'todos'.
+ */
+function _handlerCreateAnuncio(token, companyName, data) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!companyName || typeof companyName !== 'string') {
+    return _err('INVALID_INPUT', 'companyName es requerido');
+  }
+  if (!data || typeof data !== 'object') {
+    return _err('INVALID_INPUT', 'data es requerido (objeto)');
+  }
+  if (!data.titulo || typeof data.titulo !== 'string') {
+    return _err('INVALID_INPUT', 'titulo es requerido');
+  }
+  if (!data.contenido || typeof data.contenido !== 'string') {
+    return _err('INVALID_INPUT', 'contenido es requerido');
+  }
+  if (!data.fechaPublicacion || typeof data.fechaPublicacion !== 'string') {
+    return _err('INVALID_INPUT', 'fechaPublicacion es requerido (ISO 8601)');
+  }
+  if (!data.publicadoPor || typeof data.publicadoPor !== 'string') {
+    return _err('INVALID_INPUT', 'publicadoPor es requerido');
+  }
+
+  if (data.tipo && _TIPOS_ANUNCIO.indexOf(data.tipo) === -1) {
+    return _err('INVALID_INPUT', 'tipo debe ser uno de: ' + _TIPOS_ANUNCIO.join(', '));
+  }
+  if (data.dirigidoA && _DIRIGIDO_A.indexOf(data.dirigidoA) === -1) {
+    return _err('INVALID_INPUT', 'dirigidoA debe ser uno de: ' + _DIRIGIDO_A.join(', '));
+  }
+
+  var company = _getCompanyByName(companyName);
+  if (!company) {
+    return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var id = _newId('an-');
+    var now = new Date().toISOString();
+    localDb.prepare(
+      "INSERT INTO gh_anuncios (id, empresa_id, titulo, contenido, tipo, dirigido_a, " +
+      "  sede_id, cargo_filtro, fecha_publicacion, fecha_expiracion, publicado_por, activo, " +
+      "  created_at, updated_at) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).run(
+      id, company.company_key,
+      data.titulo, data.contenido,
+      data.tipo || 'info', data.dirigidoA || 'todos',
+      data.sedeId || null, data.cargoFiltro || null,
+      data.fechaPublicacion, data.fechaExpiracion || null,
+      data.publicadoPor, 1, now, now
+    );
+    return _ok({ anuncioId: id });
+  } catch (e) {
+    console.error('[' + MOD + '][create-anuncio]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:update-anuncio
+ * Whitelist: titulo, contenido, tipo, dirigidoA, sedeId, cargoFiltro, fechaExpiracion, activo.
+ */
+function _handlerUpdateAnuncio(token, anuncioId, updates) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!anuncioId || typeof anuncioId !== 'string') {
+    return _err('INVALID_INPUT', 'anuncioId es requerido');
+  }
+  if (!updates || typeof updates !== 'object') {
+    return _err('INVALID_INPUT', 'updates es requerido (objeto)');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  var fieldMap = {
+    titulo: 'titulo',
+    contenido: 'contenido',
+    tipo: 'tipo',
+    dirigidoA: 'dirigido_a',
+    sedeId: 'sede_id',
+    cargoFiltro: 'cargo_filtro',
+    fechaExpiracion: 'fecha_expiracion',
+    activo: 'activo'
+  };
+
+  try {
+    var existing = localDb.prepare('SELECT id FROM gh_anuncios WHERE id = ?').get(anuncioId);
+    if (!existing) return _err('NOT_FOUND', 'Anuncio no encontrado');
+
+    if (updates.tipo && _TIPOS_ANUNCIO.indexOf(updates.tipo) === -1) {
+      return _err('INVALID_INPUT', 'tipo debe ser uno de: ' + _TIPOS_ANUNCIO.join(', '));
+    }
+    if (updates.dirigidoA && _DIRIGIDO_A.indexOf(updates.dirigidoA) === -1) {
+      return _err('INVALID_INPUT', 'dirigidoA debe ser uno de: ' + _DIRIGIDO_A.join(', '));
+    }
+
+    var sqlParts = [];
+    var values = [];
+    Object.keys(updates).forEach(function (key) {
+      if (fieldMap[key]) {
+        var v = updates[key];
+        if (key === 'activo') v = v ? 1 : 0;
+        sqlParts.push(fieldMap[key] + ' = ?');
+        values.push(v);
+      }
+    });
+
+    if (sqlParts.length === 0) {
+      return _err('INVALID_INPUT', 'No hay campos válidos para actualizar');
+    }
+
+    sqlParts.push('updated_at = ?');
+    values.push(new Date().toISOString());
+    values.push(anuncioId);
+
+    var stmtU = localDb.prepare('UPDATE gh_anuncios SET ' + sqlParts.join(', ') + ' WHERE id = ?');
+    stmtU.run.apply(stmtU, values);
+    return _ok({ anuncioId: anuncioId });
+  } catch (e) {
+    console.error('[' + MOD + '][update-anuncio]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:delete-anuncio
+ * Soft delete via activo=0.
+ */
+function _handlerDeleteAnuncio(token, anuncioId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!anuncioId || typeof anuncioId !== 'string') {
+    return _err('INVALID_INPUT', 'anuncioId es requerido');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var existing = localDb.prepare('SELECT id, activo FROM gh_anuncios WHERE id = ?').get(anuncioId);
+    if (!existing) return _err('NOT_FOUND', 'Anuncio no encontrado');
+    if (existing.activo === 0) {
+      return _err('ALREADY_DELETED', 'El anuncio ya está desactivado');
+    }
+
+    var now = new Date().toISOString();
+    localDb.prepare(
+      "UPDATE gh_anuncios SET activo = 0, updated_at = ? WHERE id = ?"
+    ).run(now, anuncioId);
+    return _ok({ anuncioId: anuncioId, cancelled: true });
+  } catch (e) {
+    console.error('[' + MOD + '][delete-anuncio]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+// ========== MENSAJES HANDLERS (Fase 5) ==========
+
+var _PRIORIDADES_MENSAJE = ['baja', 'normal', 'alta'];
+
+/**
+ * gh:list-mensajes
+ * Filtros: companyName, destinatarioId, leido.
+ */
+function _handlerListMensajes(token, companyName, destinatarioId, leido) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!companyName || typeof companyName !== 'string') {
+    return _err('INVALID_INPUT', 'companyName es requerido');
+  }
+
+  var company = _getCompanyByName(companyName);
+  if (!company) {
+    return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var sql = "SELECT * FROM gh_mensajes WHERE empresa_id = ?";
+    var params = [company.company_key];
+    if (destinatarioId && typeof destinatarioId === 'string') {
+      sql += " AND destinatario_id = ?";
+      params.push(destinatarioId);
+    }
+    if (typeof leido === 'boolean' || leido === 0 || leido === 1) {
+      sql += " AND leido = ?";
+      params.push(leido ? 1 : 0);
+    }
+    sql += " ORDER BY created_at DESC";
+
+    var stmt = localDb.prepare(sql);
+    var rows = stmt.all.apply(stmt, params);
+    var mensajes = rows.map(_rowToMensaje);
+    return _ok({
+      mensajes: mensajes,
+      company: { id: company.id, companyKey: company.company_key, displayName: company.display_name },
+      count: mensajes.length
+    });
+  } catch (e) {
+    console.error('[' + MOD + '][list-mensajes]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:get-mensaje
+ */
+function _handlerGetMensaje(token, mensajeId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!mensajeId || typeof mensajeId !== 'string') {
+    return _err('INVALID_INPUT', 'mensajeId es requerido');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var row = localDb.prepare("SELECT * FROM gh_mensajes WHERE id = ?").get(mensajeId);
+    if (!row) {
+      return _err('NOT_FOUND', 'Mensaje "' + mensajeId + '" no encontrado');
+    }
+    return _ok({ mensaje: _rowToMensaje(row) });
+  } catch (e) {
+    console.error('[' + MOD + '][get-mensaje]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:create-mensaje
+ * Crea un mensaje directo. Multi-tenant valida remitente y destinatario.
+ */
+function _handlerCreateMensaje(token, companyName, data) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!companyName || typeof companyName !== 'string') {
+    return _err('INVALID_INPUT', 'companyName es requerido');
+  }
+  if (!data || typeof data !== 'object') {
+    return _err('INVALID_INPUT', 'data es requerido (objeto)');
+  }
+  if (!data.remitenteId || typeof data.remitenteId !== 'string') {
+    return _err('INVALID_INPUT', 'remitenteId es requerido');
+  }
+  if (!data.destinatarioId || typeof data.destinatarioId !== 'string') {
+    return _err('INVALID_INPUT', 'destinatarioId es requerido');
+  }
+  if (!data.asunto || typeof data.asunto !== 'string') {
+    return _err('INVALID_INPUT', 'asunto es requerido');
+  }
+  if (!data.contenido || typeof data.contenido !== 'string') {
+    return _err('INVALID_INPUT', 'contenido es requerido');
+  }
+
+  if (data.remitenteId === data.destinatarioId) {
+    return _err('INVALID_INPUT', 'remitente y destinatario deben ser distintos');
+  }
+
+  if (data.prioridad && _PRIORIDADES_MENSAJE.indexOf(data.prioridad) === -1) {
+    return _err('INVALID_INPUT', 'prioridad debe ser una de: ' + _PRIORIDADES_MENSAJE.join(', '));
+  }
+
+  var company = _getCompanyByName(companyName);
+  if (!company) {
+    return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    // Validar que ambos trabajadores pertenezcan a la empresa
+    var remitente = localDb.prepare(
+      "SELECT id FROM base_personal WHERE id = ? AND empresa_id = ?"
+    ).get(data.remitenteId, company.company_key);
+    if (!remitente) {
+      return _err('REMITENTE_NOT_FOUND', 'Remitente no encontrado en esta empresa', { remitenteId: data.remitenteId });
+    }
+    var destinatario = localDb.prepare(
+      "SELECT id FROM base_personal WHERE id = ? AND empresa_id = ?"
+    ).get(data.destinatarioId, company.company_key);
+    if (!destinatario) {
+      return _err('DESTINATARIO_NOT_FOUND', 'Destinatario no encontrado en esta empresa', { destinatarioId: data.destinatarioId });
+    }
+
+    var id = _newId('me-');
+    var now = new Date().toISOString();
+    localDb.prepare(
+      "INSERT INTO gh_mensajes (id, empresa_id, remitente_id, destinatario_id, asunto, contenido, " +
+      "  leido, fecha_lectura, prioridad, created_at) " +
+      "VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)"
+    ).run(
+      id, company.company_key,
+      data.remitenteId, data.destinatarioId,
+      data.asunto, data.contenido,
+      null, data.prioridad || 'normal', now
+    );
+    return _ok({ mensajeId: id });
+  } catch (e) {
+    console.error('[' + MOD + '][create-mensaje]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:marcar-leido
+ * Marca un mensaje como leído. Si ya estaba leído, retorna ALREADY_READ.
+ */
+function _handlerMarcarLeido(token, mensajeId, fechaLectura) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!mensajeId || typeof mensajeId !== 'string') {
+    return _err('INVALID_INPUT', 'mensajeId es requerido');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var existing = localDb.prepare('SELECT id, leido FROM gh_mensajes WHERE id = ?').get(mensajeId);
+    if (!existing) return _err('NOT_FOUND', 'Mensaje no encontrado');
+    if (existing.leido === 1) {
+      return _err('ALREADY_READ', 'El mensaje ya está marcado como leído');
+    }
+
+    var now = new Date().toISOString();
+    var fecha = (fechaLectura && typeof fechaLectura === 'string') ? fechaLectura : now;
+
+    localDb.prepare(
+      "UPDATE gh_mensajes SET leido = 1, fecha_lectura = ? WHERE id = ?"
+    ).run(fecha, mensajeId);
+    return _ok({ mensajeId: mensajeId, leido: true, fechaLectura: fecha });
+  } catch (e) {
+    console.error('[' + MOD + '][marcar-leido]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+// ========== STUBS (legacy — kept for compat, but all are now real) ==========
+function _stubHandler(channel) {
+  return function (event, payload) {
+    var p = payload || {};
+    return _stub(channel, p);
+  };
+}
+
+// ========== REGISTRATION ==========
 function registerGestionHumanaHandlers(app, deps) {
   _getDb = (deps && typeof deps.getDb === 'function') ? deps.getDb : null;
   _validateSession = (deps && typeof deps.validateSession === 'function') ? deps.validateSession : null;
 
-  // El bridge requiere que init(ipcMain) haya sido llamado antes
   if (!registerGestionHumanaHandlers._ipcMain) {
     throw new Error('ipcMain no configurado. Usar registerGestionHumanaHandlers.init(ipcMain) primero.');
   }
   var ipcMainHandle = registerGestionHumanaHandlers._ipcMain.handle.bind(registerGestionHumanaHandlers._ipcMain);
 
-  // ========== READ (5) ==========
+  // ========== READ (5) — Fase 1 ==========
   ipcMainHandle('gh:list-contrataciones', function (event, payload) {
-    return _stub(payload);
+    try {
+      var p = payload || {};
+      return _handlerListContrataciones(p.token || '', p.companyName, p.estado);
+    } catch (e) {
+      console.error('[' + MOD + '][list-contrataciones]', e.message);
+      return _err('INTERNAL', e.message);
+    }
   });
   ipcMainHandle('gh:get-contratacion', function (event, payload) {
-    return _stub(payload);
+    try {
+      var p = payload || {};
+      return _handlerGetContratacion(p.token || '', p.contratacionId);
+    } catch (e) {
+      console.error('[' + MOD + '][get-contratacion]', e.message);
+      return _err('INTERNAL', e.message);
+    }
   });
   ipcMainHandle('gh:list-personal', function (event, payload) {
-    return _stub(payload);
+    try {
+      var p = payload || {};
+      return _handlerListPersonal(p.token || '', p.companyName, p.estado, p.search);
+    } catch (e) {
+      console.error('[' + MOD + '][list-personal]', e.message);
+      return _err('INTERNAL', e.message);
+    }
   });
   ipcMainHandle('gh:get-personal', function (event, payload) {
-    return _stub(payload);
+    try {
+      var p = payload || {};
+      return _handlerGetPersonal(p.token || '', p.personalId);
+    } catch (e) {
+      console.error('[' + MOD + '][get-personal]', e.message);
+      return _err('INTERNAL', e.message);
+    }
   });
   ipcMainHandle('gh:list-sedes', function (event, payload) {
-    return _stub(payload);
+    try {
+      var p = payload || {};
+      return _handlerListSedes(p.token || '', p.companyName);
+    } catch (e) {
+      console.error('[' + MOD + '][list-sedes]', e.message);
+      return _err('INTERNAL', e.message);
+    }
   });
 
-  // ========== WRITE CONTRATACIÓN (4) ==========
+  // ========== WRITE CONTRATACIÓN (4) — Fase 2 ==========
   ipcMainHandle('gh:create-contratacion', function (event, payload) {
-    return _stub(payload);
+    try {
+      var p = payload || {};
+      return _handlerCreateContratacion(p.token || '', p.companyName, p.data);
+    } catch (e) {
+      console.error('[' + MOD + '][create-contratacion]', e.message);
+      return _err('INTERNAL', e.message);
+    }
   });
   ipcMainHandle('gh:update-contratacion', function (event, payload) {
-    return _stub(payload);
+    try {
+      var p = payload || {};
+      return _handlerUpdateContratacion(p.token || '', p.contratacionId, p.updates);
+    } catch (e) {
+      console.error('[' + MOD + '][update-contratacion]', e.message);
+      return _err('INTERNAL', e.message);
+    }
   });
   ipcMainHandle('gh:delete-contratacion', function (event, payload) {
-    return _stub(payload);
+    try {
+      var p = payload || {};
+      return _handlerDeleteContratacion(p.token || '', p.contratacionId);
+    } catch (e) {
+      console.error('[' + MOD + '][delete-contratacion]', e.message);
+      return _err('INTERNAL', e.message);
+    }
   });
   ipcMainHandle('gh:marcar-paso', function (event, payload) {
-    return _stub(payload);
+    try {
+      var p = payload || {};
+      return _handlerMarcarPaso(p.token || '', p.contratacionId, p.pasoNum, p.fecha, p.notas);
+    } catch (e) {
+      console.error('[' + MOD + '][marcar-paso]', e.message);
+      return _err('INTERNAL', e.message);
+    }
   });
 
-  // ========== WRITE PERSONAL (4) ==========
+  // ========== WRITE PERSONAL (4) — Fase 3 ==========
   ipcMainHandle('gh:create-personal', function (event, payload) {
-    return _stub(payload);
+    try {
+      var p = payload || {};
+      return _handlerCreatePersonal(p.token || '', p.companyName, p.data);
+    } catch (e) {
+      console.error('[' + MOD + '][create-personal]', e.message);
+      return _err('INTERNAL', e.message);
+    }
   });
   ipcMainHandle('gh:update-personal', function (event, payload) {
-    return _stub(payload);
+    try {
+      var p = payload || {};
+      return _handlerUpdatePersonal(p.token || '', p.personalId, p.updates);
+    } catch (e) {
+      console.error('[' + MOD + '][update-personal]', e.message);
+      return _err('INTERNAL', e.message);
+    }
   });
   ipcMainHandle('gh:delete-personal', function (event, payload) {
-    return _stub(payload);
+    try {
+      var p = payload || {};
+      return _handlerDeletePersonal(p.token || '', p.personalId);
+    } catch (e) {
+      console.error('[' + MOD + '][delete-personal]', e.message);
+      return _err('INTERNAL', e.message);
+    }
   });
   ipcMainHandle('gh:cambiar-estado', function (event, payload) {
-    return _stub(payload);
+    try {
+      var p = payload || {};
+      return _handlerCambiarEstado(p.token || '', p.personalId, p.estado, p.fechaRetiro, p.notas);
+    } catch (e) {
+      console.error('[' + MOD + '][cambiar-estado]', e.message);
+      return _err('INTERNAL', e.message);
+    }
   });
 
-  // ========== WRITE SEDES (2) ==========
+  // ========== WRITE SEDES (2) — Fase 3 ==========
   ipcMainHandle('gh:create-sede', function (event, payload) {
-    return _stub(payload);
+    try {
+      var p = payload || {};
+      return _handlerCreateSede(p.token || '', p.companyName, p.data);
+    } catch (e) {
+      console.error('[' + MOD + '][create-sede]', e.message);
+      return _err('INTERNAL', e.message);
+    }
   });
   ipcMainHandle('gh:update-sede', function (event, payload) {
-    return _stub(payload);
+    try {
+      var p = payload || {};
+      return _handlerUpdateSede(p.token || '', p.sedeId, p.updates);
+    } catch (e) {
+      console.error('[' + MOD + '][update-sede]', e.message);
+      return _err('INTERNAL', e.message);
+    }
   });
 
-  // ========== DIAG (1) — único handler real en Fase 0 ==========
+  // ========== VACACIONES (6) — Fase 5 ==========
+  ipcMainHandle('gh:list-vacaciones', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerListVacaciones(p.token || '', p.companyName, p.estado, p.trabajadorId);
+    } catch (e) {
+      console.error('[' + MOD + '][list-vacaciones]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:get-vacacion', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerGetVacacion(p.token || '', p.vacacionId);
+    } catch (e) {
+      console.error('[' + MOD + '][get-vacacion]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:create-vacacion', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerCreateVacacion(p.token || '', p.companyName, p.data);
+    } catch (e) {
+      console.error('[' + MOD + '][create-vacacion]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:update-vacacion', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerUpdateVacacion(p.token || '', p.vacacionId, p.updates);
+    } catch (e) {
+      console.error('[' + MOD + '][update-vacacion]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:delete-vacacion', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerDeleteVacacion(p.token || '', p.vacacionId);
+    } catch (e) {
+      console.error('[' + MOD + '][delete-vacacion]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:cambiar-estado-vacacion', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerCambiarEstadoVacacion(p.token || '', p.vacacionId, p.nuevoEstado, p.aprobadoPor, p.fechaAprobacion);
+    } catch (e) {
+      console.error('[' + MOD + '][cambiar-estado-vacacion]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+
+  // ========== PERMISOS (5) — Fase 5 ==========
+  ipcMainHandle('gh:list-permisos', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerListPermisos(p.token || '', p.companyName, p.tipo, p.estado, p.trabajadorId);
+    } catch (e) {
+      console.error('[' + MOD + '][list-permisos]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:get-permiso', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerGetPermiso(p.token || '', p.permisoId);
+    } catch (e) {
+      console.error('[' + MOD + '][get-permiso]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:create-permiso', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerCreatePermiso(p.token || '', p.companyName, p.data);
+    } catch (e) {
+      console.error('[' + MOD + '][create-permiso]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:update-permiso', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerUpdatePermiso(p.token || '', p.permisoId, p.updates);
+    } catch (e) {
+      console.error('[' + MOD + '][update-permiso]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:finalizar-permiso', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerFinalizarPermiso(p.token || '', p.permisoId, p.fechaFin);
+    } catch (e) {
+      console.error('[' + MOD + '][finalizar-permiso]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+
+  // ========== DOCUMENTOS (6) — Fase 5 ==========
+  ipcMainHandle('gh:list-documentos', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerListDocumentos(p.token || '', p.companyName, p.tipo, p.estado, p.trabajadorId);
+    } catch (e) {
+      console.error('[' + MOD + '][list-documentos]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:get-documento', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerGetDocumento(p.token || '', p.documentoId);
+    } catch (e) {
+      console.error('[' + MOD + '][get-documento]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:create-documento', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerCreateDocumento(p.token || '', p.companyName, p.data);
+    } catch (e) {
+      console.error('[' + MOD + '][create-documento]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:update-documento', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerUpdateDocumento(p.token || '', p.documentoId, p.updates);
+    } catch (e) {
+      console.error('[' + MOD + '][update-documento]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:delete-documento', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerDeleteDocumento(p.token || '', p.documentoId);
+    } catch (e) {
+      console.error('[' + MOD + '][delete-documento]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:firmar-documento', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerFirmarDocumento(p.token || '', p.documentoId, p.firmaId, p.fechaFirma);
+    } catch (e) {
+      console.error('[' + MOD + '][firmar-documento]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+
+  // ========== FIRMAS DIGITALES (2) — Fase 5 ==========
+  ipcMainHandle('gh:list-firmas', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerListFirmas(p.token || '', p.companyName, p.trabajadorId, p.documentoTipo);
+    } catch (e) {
+      console.error('[' + MOD + '][list-firmas]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:create-firma', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerCreateFirma(p.token || '', p.companyName, p.data);
+    } catch (e) {
+      console.error('[' + MOD + '][create-firma]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+
+  // ========== ANUNCIOS (5) — Fase 5 ==========
+  ipcMainHandle('gh:list-anuncios', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerListAnuncios(p.token || '', p.companyName, p.tipo, p.activo);
+    } catch (e) {
+      console.error('[' + MOD + '][list-anuncios]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:get-anuncio', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerGetAnuncio(p.token || '', p.anuncioId);
+    } catch (e) {
+      console.error('[' + MOD + '][get-anuncio]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:create-anuncio', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerCreateAnuncio(p.token || '', p.companyName, p.data);
+    } catch (e) {
+      console.error('[' + MOD + '][create-anuncio]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:update-anuncio', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerUpdateAnuncio(p.token || '', p.anuncioId, p.updates);
+    } catch (e) {
+      console.error('[' + MOD + '][update-anuncio]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:delete-anuncio', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerDeleteAnuncio(p.token || '', p.anuncioId);
+    } catch (e) {
+      console.error('[' + MOD + '][delete-anuncio]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+
+  // ========== MENSAJES (4) — Fase 5 ==========
+  ipcMainHandle('gh:list-mensajes', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerListMensajes(p.token || '', p.companyName, p.destinatarioId, p.leido);
+    } catch (e) {
+      console.error('[' + MOD + '][list-mensajes]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:get-mensaje', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerGetMensaje(p.token || '', p.mensajeId);
+    } catch (e) {
+      console.error('[' + MOD + '][get-mensaje]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:create-mensaje', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerCreateMensaje(p.token || '', p.companyName, p.data);
+    } catch (e) {
+      console.error('[' + MOD + '][create-mensaje]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:marcar-leido', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerMarcarLeido(p.token || '', p.mensajeId, p.fechaLectura);
+    } catch (e) {
+      console.error('[' + MOD + '][marcar-leido]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+
+  // ========== DIAG (1) — siempre activo ==========
   ipcMainHandle('gh:diag', function (event, payload) {
+    var localDb = _getDb ? _getDb() : null;
+    var tables = [];
+    if (localDb) {
+      try {
+        var tablesResult = localDb.prepare(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name IN (" +
+          "  'contrataciones', 'base_personal', 'gh_sedes'," +
+          "  'gh_vacaciones', 'gh_permisos', 'gh_documentos'," +
+          "  'gh_firmas_digitales', 'gh_anuncios', 'gh_mensajes'" +
+          ") ORDER BY name"
+        ).all();
+        tables = tablesResult.map(function(r) { return r.name; });
+      } catch (e) {}
+    }
     return _ok({
       bridge: 'gestion-humana',
-      phase: 0,
+      phase: 5,  // 📦710 · FASE C: 28 handlers nuevos para 6 tablas
       has_getDb: !!_getDb,
       has_validateSession: !!_validateSession,
-      message: 'Gestión Humana bridge en Fase 0 (15 stubs + 1 diag)'
+      tables: tables,
+      message: 'Gestión Humana bridge en Fase 5 (44 handlers reales + 1 diag · 9 tablas)'
     });
   });
 
-  console.log('[' + MOD + '][INIT][SUCCESS] Bridge registrado · 5 read + 4 write-contratacion + 4 write-personal + 2 write-sedes + 1 diag · 16 handlers totales · Fase 0 (15 stubs + 1 diag)');
+  console.log('[' + MOD + '][INIT][SUCCESS] Bridge registrado · 5 read + 4 write-contratacion + 4 write-personal + 2 write-sedes + 6 vacaciones + 5 permisos + 6 documentos + 2 firmas + 5 anuncios + 4 mensajes + 1 diag · 44 handlers totales · Fase 5');
 }
 
-// Inicializa el bridge con el ipcMain real (llamado desde main.js)
 registerGestionHumanaHandlers.init = function(ipcMain) {
   registerGestionHumanaHandlers._ipcMain = ipcMain;
 };

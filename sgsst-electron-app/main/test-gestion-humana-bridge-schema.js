@@ -13,6 +13,45 @@ const { registerGestionHumanaHandlers } = require('./gestion-humana-bridge');
 let _passed = 0;
 let _failed = 0;
 
+// Wrapper para que el bridge pueda usar `db.prepare().all()` como en producción (better-sqlite3)
+function _wrapSqlJsAsBetterSqlite(sqlJsDb) {
+  return {
+    exec: function (sql) { return sqlJsDb.exec(sql); },
+    prepare: function (sql) {
+      return {
+        get: function () {
+          var args = Array.prototype.slice.call(arguments);
+          var stmt = sqlJsDb.prepare(sql);
+          try {
+            if (args.length > 0) stmt.bind(args);
+            if (stmt.step()) return stmt.getAsObject();
+            return undefined;
+          } finally { stmt.reset(); stmt.free(); }
+        },
+        all: function () {
+          var args = Array.prototype.slice.call(arguments);
+          var stmt = sqlJsDb.prepare(sql);
+          try {
+            if (args.length > 0) stmt.bind(args);
+            var rows = [];
+            while (stmt.step()) rows.push(stmt.getAsObject());
+            return rows;
+          } finally { stmt.reset(); stmt.free(); }
+        },
+        run: function () {
+          var args = Array.prototype.slice.call(arguments);
+          var stmt = sqlJsDb.prepare(sql);
+          try {
+            if (args.length > 0) stmt.bind(args);
+            stmt.step();
+          } finally { stmt.reset(); stmt.free(); }
+        }
+      };
+    },
+    close: function () { sqlJsDb.close(); }
+  };
+}
+
 function _assert(cond, label) {
   if (cond) {
     _passed++;
@@ -34,8 +73,9 @@ async function run() {
 
   console.log('');
   console.log('[2] Aplicando schema...');
-  const db = new SQL.Database();
-  db.exec(SCHEMA_SQL);
+  const rawDb = new SQL.Database();
+  rawDb.exec(SCHEMA_SQL);
+  const db = _wrapSqlJsAsBetterSqlite(rawDb);
   console.log('  ✓ Schema aplicado sin errores');
 
   console.log('');
@@ -47,6 +87,13 @@ async function run() {
   _assert(tables.includes('contrataciones'), 'tabla contrataciones existe');
   _assert(tables.includes('base_personal'), 'tabla base_personal existe');
   _assert(tables.includes('gh_sedes'), 'tabla gh_sedes existe');
+  // 📦710 · FASE B: 6 tablas nuevas
+  _assert(tables.includes('gh_vacaciones'), 'tabla gh_vacaciones existe');
+  _assert(tables.includes('gh_permisos'), 'tabla gh_permisos existe');
+  _assert(tables.includes('gh_documentos'), 'tabla gh_documentos existe');
+  _assert(tables.includes('gh_firmas_digitales'), 'tabla gh_firmas_digitales existe');
+  _assert(tables.includes('gh_anuncios'), 'tabla gh_anuncios existe');
+  _assert(tables.includes('gh_mensajes'), 'tabla gh_mensajes existe');
 
   console.log('');
   console.log('[4] Verificando columnas de contrataciones...');
@@ -127,44 +174,66 @@ async function run() {
   console.log('  ✓ Bridge registrado con mocks');
 
   console.log('');
-  console.log('[9] Verificando que los 16 handlers están registrados...');
+  console.log('[9] Verificando que los 44 handlers están registrados...');
   const expectedHandlers = [
-    // Read (5)
+    // Read (5) — Fase 1
     'gh:list-contrataciones', 'gh:get-contratacion', 'gh:list-personal',
     'gh:get-personal', 'gh:list-sedes',
-    // Write Contratación (4)
+    // Write Contratación (4) — Fase 2
     'gh:create-contratacion', 'gh:update-contratacion',
     'gh:delete-contratacion', 'gh:marcar-paso',
-    // Write Personal (4)
+    // Write Personal (4) — Fase 3
     'gh:create-personal', 'gh:update-personal',
     'gh:delete-personal', 'gh:cambiar-estado',
-    // Write Sedes (2)
-    'gh:create-sede', 'gh:update-sede'
+    // Write Sedes (2) — Fase 3
+    'gh:create-sede', 'gh:update-sede',
+    // Vacaciones (6) — Fase 5
+    'gh:list-vacaciones', 'gh:get-vacacion', 'gh:create-vacacion',
+    'gh:update-vacacion', 'gh:delete-vacacion', 'gh:cambiar-estado-vacacion',
+    // Permisos (5) — Fase 5
+    'gh:list-permisos', 'gh:get-permiso', 'gh:create-permiso',
+    'gh:update-permiso', 'gh:finalizar-permiso',
+    // Documentos (6) — Fase 5
+    'gh:list-documentos', 'gh:get-documento', 'gh:create-documento',
+    'gh:update-documento', 'gh:delete-documento', 'gh:firmar-documento',
+    // Firmas Digitales (2) — Fase 5
+    'gh:list-firmas', 'gh:create-firma',
+    // Anuncios (5) — Fase 5
+    'gh:list-anuncios', 'gh:get-anuncio', 'gh:create-anuncio',
+    'gh:update-anuncio', 'gh:delete-anuncio',
+    // Mensajes (4) — Fase 5
+    'gh:list-mensajes', 'gh:get-mensaje', 'gh:create-mensaje', 'gh:marcar-leido'
   ];
-  _assertEq(Object.keys(registeredHandlers).length, 16, 'cantidad de handlers registrados = 16');
+  _assertEq(Object.keys(registeredHandlers).length, 44, 'cantidad de handlers registrados = 44');
   expectedHandlers.forEach(function(ch) {
     _assert(typeof registeredHandlers[ch] === 'function', 'handler "' + ch + '" registrado');
   });
 
   console.log('');
-  console.log('[10] Verificando que los 15 stubs retornan NOT_IMPLEMENTED...');
-  // diag es el único handler real
-  const stubHandlers = expectedHandlers; // los 15 sin contar diag
-  stubHandlers.forEach(function(ch) {
-    const res = registeredHandlers[ch]({}, { token: 'test' });
-    _assert(res.success === false, ch + ' retorna success=false');
-    _assert(res.error.code === 'NOT_IMPLEMENTED', ch + ' retorna error.code = NOT_IMPLEMENTED');
-    _assert(res.error.extra && res.error.extra.phase === 0, ch + ' retorna error.extra.phase = 0');
-  });
+  console.log('[10] Verificando que NO quedan stubs (Fase 5 = 44 handlers reales)...');
+  // Fase 5: 5 reads + 4 write-contratacion + 4 write-personal + 2 write-sedes
+  //        + 6 vacaciones + 5 permisos + 6 documentos + 2 firmas + 5 anuncios + 4 mensajes
+  //        = 43 reales + 1 diag = 44 totales
+  // No hay stubs. Solo el diag (que también es real).
+  // Spot check: create-vacacion con payload inválido debe retornar INVALID_INPUT (no NOT_IMPLEMENTED)
+  var sampleCheck = registeredHandlers['gh:create-vacacion']({}, { token: 'test' });
+  _assert(sampleCheck.success === false, 'create-vacacion sin payload retorna success=false');
+  _assert(sampleCheck.error.code === 'INVALID_INPUT', 'create-vacacion retorna INVALID_INPUT (no NOT_IMPLEMENTED)');
 
   console.log('');
-  console.log('[11] Verificando que diag responde OK...');
+  console.log('[11] Verificando que diag responde OK con metadata de Fase 5...');
   const diagRes = registeredHandlers['gh:diag']({}, {});
   _assert(diagRes.success === true, 'diag retorna success=true');
-  _assert(diagRes.data.phase === 0, 'diag.data.phase = 0');
+  _assert(diagRes.data.phase === 5, 'diag.data.phase = 5 (📦710 FASE C: handlers)');
   _assert(diagRes.data.bridge === 'gestion-humana', 'diag.data.bridge = gestion-humana');
   _assert(diagRes.data.has_getDb === true, 'diag.data.has_getDb = true');
   _assert(diagRes.data.has_validateSession === true, 'diag.data.has_validateSession = true');
+  _assert(Array.isArray(diagRes.data.tables), 'diag.data.tables es array');
+  _assert(diagRes.data.tables.length === 9, 'diag.data.tables tiene 9 tablas (3 originales + 6 nuevas)');
+  // Verificar las 6 tablas nuevas explícitamente
+  ['gh_vacaciones', 'gh_permisos', 'gh_documentos', 'gh_firmas_digitales', 'gh_anuncios', 'gh_mensajes'].forEach(function(t) {
+    _assert(diagRes.data.tables.indexOf(t) >= 0, 'diag.data.tables incluye ' + t);
+  });
 
   console.log('');
   console.log('=====================================================================');
@@ -173,6 +242,7 @@ async function run() {
   console.log('');
 
   try { db.close(); } catch (e) {}
+  try { rawDb.close(); } catch (e) {}
   // Forzar exit para evitar el race condition de libuv con sql.js
   setTimeout(function() { process.exit(_failed > 0 ? 1 : 0); }, 100);
 }

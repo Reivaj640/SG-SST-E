@@ -19,6 +19,7 @@ const MODULES_WITH_CALENDAR = [
 // 📦642 (2026-08-03) — Iconos de módulos en SVG inline Lucide. Mismo
 // estilo outline/line que el header superior (un solo color, sin fondo).
 // El color del stroke hereda del `color` del wrapper (currentColor).
+// 📦709 (2026-08-15) — Agregado "Gestión Humana" (nuevo top-level, v0.1.191)
 const SIDEBAR_BUTTONS = [
   { name: "Recursos",                         icon: "users",          subtitle: "Capacitación, Roles",     },
   { name: "Gestión Integral",                 icon: "file_text",      subtitle: "Política, Planes",        },
@@ -27,6 +28,7 @@ const SIDEBAR_BUTTONS = [
   { name: "Gestión de Amenazas",              icon: "siren",          subtitle: "Emergencias",             },
   { name: "Verificación",                     icon: "shield_check",   subtitle: "Auditorías",              },
   { name: "Mejoramiento",                     icon: "trending_up",    subtitle: "Acciones Correctivas",    },
+  { name: "Gestión Humana",                   icon: "user_plus",      subtitle: "Personal, Contratación",  },
   { name: "Salir",                            icon: "log_out",        subtitle: "Cerrar sesión",           }
 ];
 
@@ -110,6 +112,12 @@ const ALL_SUBMODULES = {
        (Matriz de Control Operacional GI-FO-014).
        Por lo tanto la normativa legal ya no los activa como submódulos separados. */
     "7.1.1 Acciones Preventivas y Correctivas",
+  ],
+  // 📦709 (2026-08-15) — Módulo Gestión Humana (nuevo top-level, v0.1.191).
+  // Backend completo (16 handlers), UI viene en Fases 5 y 6.
+  "Gestión Humana": [
+    "Base de Personal",
+    "Contratación",
   ]
 };
 
@@ -188,6 +196,9 @@ const SUBMODULE_PERMISSION_MAP_UI = new Map([
   ['6.1.2 auditoria anual', 'verificacion.general'],
   ['6.1.3 revision de la alta direccion', 'verificacion.general'],
   ['6.1.4 planificacion de la auditoria', 'verificacion.general'],
+  // 📦709 (2026-08-15) — Gestión Humana submodules
+  ['base de personal', 'gestion-humana.base-personal'],
+  ['contratacion', 'gestion-humana.contratacion'],
   ['7.1.1 acciones preventivas y correctivas', 'mejoramiento.general'],
   /* F21.49 (2026-06-21) — 7.1.2 / 7.1.3 / 7.1.4 ya no son submódulos activos de Mejoramiento */
 ]);
@@ -4997,6 +5008,14 @@ function showModuleHome(container, moduleName) { // 'container' ya es el <div cl
             console.error('RecursosHome component not found');
             showGenericModuleHome(moduleContentContainer, moduleName, submodules);
         }
+    } else if (moduleName === "Gestión Humana") {
+        if (window.GestionHumanaHome) {
+            const ghHome = new window.GestionHumanaHome(moduleContentContainer, moduleName, submodules);
+            ghHome.render();
+        } else {
+            console.error('GestionHumanaHome component not found');
+            showGenericModuleHome(moduleContentContainer, moduleName, submodules);
+        }
     } else if (moduleName === "Gestión de la Salud") {
         if (window.GestionSaludHome) {
             const gestionSaludHome = new window.GestionSaludHome(moduleContentContainer, moduleName, submodules);
@@ -5635,6 +5654,34 @@ if (!window.MantenimientoComponent) {
 
 } else if (submoduleName === "1.1.3 Asignación de Recursos") {
   showAsignacionRecursosContent(submoduleContentDiv);
+
+} else if (submoduleName === "Base de Personal" && moduleName === "Gestión Humana") {
+  // 📦709 (2026-08-15) — Placeholder Fase 5
+  createComponentSafely(window.BasePersonalComponent,
+    submoduleContentDiv,
+    currentCompany,
+    moduleName,
+    submoduleName,
+    safeBackToModuleCallback
+  );
+  if (!window.BasePersonalComponent) {
+    console.error('❌ BasePersonalComponent no encontrado');
+    showDevelopmentMessage(submoduleContentDiv, submoduleName);
+  }
+
+} else if (submoduleName === "Contratación" && moduleName === "Gestión Humana") {
+  // 📦709 (2026-08-15) — Placeholder Fase 6
+  createComponentSafely(window.ContratacionComponent,
+    submoduleContentDiv,
+    currentCompany,
+    moduleName,
+    submoduleName,
+    safeBackToModuleCallback
+  );
+  if (!window.ContratacionComponent) {
+    console.error('❌ ContratacionComponent no encontrado');
+    showDevelopmentMessage(submoduleContentDiv, submoduleName);
+  }
 
 } else if (submoduleName === "5.1.1 Plan de Prevención de Emergencias") {
       createComponentSafely(window.PlanPrevencionComponent,
