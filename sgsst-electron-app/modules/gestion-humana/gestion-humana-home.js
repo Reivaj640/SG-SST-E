@@ -1,20 +1,13 @@
 // modules/gestion-humana/gestion-humana-home.js
-// 📦710 · Módulo "Gestión Humana" con SHELL estandarizado (v0.2.0)
+// 📦713 · Módulo "Gestión Humana" — Shell con HTML+CSS+JS separados (v0.2.0)
 //
-// SHELL: sidebar left (8 items) + header sticky (NIT + Bell) + content + footer
-// Patrón inspirado en el demo de Tempoactiva pero adaptado a K+AIR
-// (Font Awesome icons en lugar de Lucide, sin dependencias externas).
+// Layout: sidebar 8 items (Resumen/Dashboard/Personal/Contratación/Vacaciones/
+//          Permisos/Afiliaciones/Documentos/Comunicación) + header con NIT/Bell
+//          + footer. CSS del shell en `gestion-humana-home.css` (link en index.html).
+// HTML del shell en `gestion-humana-home.html` (cargado via fetch en runtime).
 //
-// 8 vistas:
-//   - home (default — cards de resumen)
-//   - personal (delegado a BasePersonalComponent)
-//   - contratacion (delegado a ContratacionComponent)
-//   - dashboard (placeholder)
-//   - vacaciones (placeholder)
-//   - permisos (placeholder)
-//   - afiliaciones (placeholder)
-//   - documentos (placeholder)
-//   - comunicacion (placeholder)
+// 8 vistas (placeholders "Próximamente" para las que faltan; las reales para
+// Base Personal y Contratación).
 
 var GESTION_HUMANA_NAV = [
   { id: 'home',          label: 'Resumen',          icon: 'fa-grip',             group: 'Principal' },
@@ -48,6 +41,8 @@ class GestionHumanaHome {
     this.currentCompany = null;
     this.currentView = 'home';
     this.viewInstance = null;
+    this.shellEl = null;
+    this.contentEl = null;
     this.kpis = {
       personalActivos: null,
       personalTotal: null,
@@ -82,11 +77,20 @@ class GestionHumanaHome {
       try { this.viewInstance.destroy(); } catch (_) { /* noop */ }
     }
     this.viewInstance = null;
-    this._content = null;
     if (this._navHandler) {
       window.removeEventListener('gh-shell-navigate', this._navHandler);
       this._navHandler = null;
     }
+  }
+
+  _nitFromCompany(name) {
+    var map = {
+      'Tempoactiva': '900.511.178-1',
+      'Temposum':    '800.123.456-7',
+      'Aseplus':     '900.222.333-4',
+      'Asel':        '901.555.666-7'
+    };
+    return map[name] || '900.511.178-1';
   }
 
   // === DATA ===
@@ -120,168 +124,34 @@ class GestionHumanaHome {
 
     await this._loadKpis();
 
-    this.container.innerHTML = '';
-    this.container.style.cssText = 'padding:0; height:100%; overflow:hidden; background:#f8f9fa; display:flex;';
+    // Cargar HTML del shell via fetch (cached después de la primera carga)
+    if (!this._shellHtml) {
+      this._shellHtml = await this._fetchShellHtml();
+    }
 
-    // ═══ LAYOUT: SIDEBAR + MAIN ═══
-    this.container.appendChild(this._renderSidebar());
-    this.container.appendChild(this._renderMain());
-    // Importante: ahora que `this.container` (y por tanto el <main id="gh-content">)
-    // YA está en el DOM, podemos montar la vista. Antes las vistas internas hacían
-    // `document.getElementById('bp-back-btn')` que retornaba null porque el wrapper
-    // aún estaba en un nodo detached (getElementById sólo busca en el DOM actual).
-    this._renderViewInto(this._content);
-  }
+    // Inyectar el HTML en el container
+    this.container.innerHTML = this._shellHtml;
+    // Aislar el shell y el content
+    this.shellEl = this.container.querySelector('.gh-shell');
+    this.contentEl = this.container.querySelector('.gh-content');
+    this._sidebarNav = this.container.querySelector('.gh-sidebar__nav');
+    this._titleEl = this.container.querySelector('.gh-page-title');
+    this._subtitleEl = this.container.querySelector('.gh-header__subtitle');
+    this._nitSpan = this.container.querySelector('.gh-nit-badge span');
 
-  _renderSidebar() {
-    var self = this;
-    var sidebar = document.createElement('aside');
-    sidebar.style.cssText = 'width:256px; flex-shrink:0; background:white; border-right:1px solid #e9ecef; display:flex; flex-direction:column; overflow-y:auto;';
-
-    // Brand
-    var brand = document.createElement('div');
-    brand.style.cssText = 'padding:1rem 1.25rem; border-bottom:1px solid #e9ecef; display:flex; align-items:center; gap:0.75rem;';
-    brand.innerHTML =
-      '<div style="width:40px;height:40px;border-radius:0.5rem;background:#174ea6;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:1.125rem;flex-shrink:0;">T</div>' +
-      '<div style="min-width:0;">' +
-        '<div style="font-weight:600;color:#1a1a2e;font-size:0.875rem;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">TEMPOACTIVA</div>' +
-        '<div style="font-size:0.7rem;color:#5a6378;line-height:1.2;">EST S.A.S.</div>' +
-      '</div>';
-    sidebar.appendChild(brand);
-
-    // Nav (agrupado)
-    var nav = document.createElement('nav');
-    nav.style.cssText = 'flex:1; padding:0.5rem 0;';
-    var lastGroup = null;
-    GESTION_HUMANA_NAV.forEach(function (item) {
-      if (item.group && item.group !== lastGroup) {
-        var groupLabel = document.createElement('div');
-        groupLabel.style.cssText = 'padding:0.875rem 1.25rem 0.375rem; font-size:0.65rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#9ca3af;';
-        groupLabel.textContent = item.group;
-        nav.appendChild(groupLabel);
-        lastGroup = item.group;
-      }
-      var link = document.createElement('a');
-      link.href = '#';
-      var isActive = item.id === self.currentView;
-      link.style.cssText = 'display:flex; align-items:center; gap:0.75rem; padding:0.625rem 1.25rem; color:' + (isActive ? '#174ea6' : '#5a6378') + '; background:' + (isActive ? '#e8f0fe' : 'transparent') + '; font-size:0.875rem; font-weight:' + (isActive ? '600' : '500') + '; text-decoration:none; transition:background 0.15s, color 0.15s;';
-      link.innerHTML =
-        '<i class="fas ' + item.icon + '" style="width:18px; text-align:center;"></i>' +
-        '<span style="flex:1;">' + item.label + '</span>';
-      link.onclick = function (e) {
-        e.preventDefault();
-        if (item.id !== self.currentView) {
-          self.currentView = item.id;
-          self.render();
-        }
-      };
-      link.onmouseenter = function () {
-        if (!isActive) link.style.background = '#f1f3f5';
-      };
-      link.onmouseleave = function () {
-        if (!isActive) link.style.background = 'transparent';
-      };
-      nav.appendChild(link);
-    });
-    sidebar.appendChild(nav);
-
-    // Footer del sidebar (usuario)
-    var userCard = document.createElement('div');
-    userCard.style.cssText = 'padding:0.75rem 1.25rem; border-top:1px solid #e9ecef; display:flex; align-items:center; gap:0.75rem;';
-    userCard.innerHTML =
-      '<div style="width:36px;height:36px;border-radius:50%;background:#e8f0fe;display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
-        '<i class="fas fa-user" style="color:#174ea6;font-size:0.875rem;"></i>' +
-      '</div>' +
-      '<div style="flex:1; min-width:0;">' +
-        '<div id="gh-user-name" style="font-size:0.8125rem; font-weight:500; color:#1a1a2e; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>' +
-        '<div style="font-size:0.7rem; color:#5a6378;">Recursos Humanos</div>' +
-      '</div>';
-    sidebar.appendChild(userCard);
-
-    // Poblamos el nombre del usuario
+    // Pobar info del usuario
     setTimeout(function () {
-      var el = sidebar.querySelector('#gh-user-name');
+      var el = this.container.querySelector('#gh-user-name');
       if (!el) return;
       var name = (window.currentUser && (window.currentUser.nombre || window.currentUser.name)) || (window.user && window.user.nombre) || 'Lilimaré Robles';
       el.textContent = name;
-    }, 0);
+    }.bind(this), 0);
 
-    return sidebar;
-  }
+    // Wire sidebar
+    this._renderSidebar();
 
-  _renderMain() {
+    // Wire shell navigation event (quick access cards en DashboardComponent)
     var self = this;
-    var main = document.createElement('div');
-    // `height: 100%` es necesario para que `flex: 1` en el
-    // `<main id="gh-content">` (hijo flex column) funcione. Sin esto, el
-    // `flex: 1` colapsa a 0 y el contenido del main no se ve.
-    // El sidebar (256px, flex-shrink:0) no necesita height porque su
-    // contenido es intrínseco (suma de brand + nav + userCard).
-    main.style.cssText = 'flex:1; min-width:0; height:100%; display:flex; flex-direction:column; overflow:hidden;';
-
-    // ═══ HEADER (sticky) ═══
-    var t = this._getCurrentTitle();
-    var header = document.createElement('header');
-    header.style.cssText = 'background:white; border-bottom:1px solid #e9ecef; padding:1rem 1.5rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-shrink:0;';
-
-    var leftBlock = document.createElement('div');
-    leftBlock.style.cssText = 'min-width:0;';
-    leftBlock.innerHTML =
-      '<h1 id="gh-page-title" style="margin:0; font-size:1.25rem; color:#1a1a2e; font-weight:600;">' + t.title + '</h1>' +
-      '<p style="margin:0.125rem 0 0; font-size:0.75rem; color:#5a6378;">Sistema de Gestión de Personal — TEMPOACTIVA EST S.A.S.</p>';
-
-    var rightBlock = document.createElement('div');
-    rightBlock.style.cssText = 'display:flex; align-items:center; gap:0.875rem; flex-shrink:0;';
-    rightBlock.innerHTML =
-      '<div id="gh-nit-badge" style="display:flex; align-items:center; gap:0.375rem; padding:0.375rem 0.75rem; background:#f8f9fa; border:1px solid #e9ecef; border-radius:0.375rem; font-size:0.75rem; color:#5a6378;">' +
-        '<i class="fas fa-building" style="font-size:0.7rem;"></i>' +
-        '<span>NIT ' + (this.currentCompany ? this._nitFromCompany(this.currentCompany) : '900.511.178-1') + '</span>' +
-      '</div>' +
-      '<button id="gh-bell-btn" style="position:relative; background:transparent; border:none; padding:0.5rem; cursor:pointer; color:#5a6378; font-size:1rem; border-radius:0.375rem;" title="Notificaciones">' +
-        '<i class="fas fa-bell"></i>' +
-        '<span id="gh-bell-badge" style="position:absolute; top:0.25rem; right:0.25rem; width:8px; height:8px; background:#dc3545; border-radius:50%; display:none;"></span>' +
-      '</button>';
-
-    header.appendChild(leftBlock);
-    header.appendChild(rightBlock);
-    main.appendChild(header);
-
-    // ═══ CONTENT (scrollable) ═══
-    var content = document.createElement('main');
-    content.id = 'gh-content';
-    content.style.cssText = 'flex:1; overflow-y:auto; padding:1.5rem; max-width:1600px; width:100%; margin:0 auto; box-sizing:border-box;';
-    main.appendChild(content);
-    // Guardamos la referencia para que `render()` monte la vista DESPUÉS de appendear el shell.
-    this._content = content;
-
-    // ═══ FOOTER ═══
-    var footer = document.createElement('footer');
-    footer.style.cssText = 'padding:0.625rem 1.5rem; border-top:1px solid #e9ecef; background:white; font-size:0.7rem; color:#5a6378; display:flex; align-items:center; justify-content:space-between; flex-shrink:0;';
-    footer.innerHTML =
-      '<span>© 2026 TEMPOACTIVA EST S.A.S. — Sistema de Gestión de Personal</span>' +
-      '<span>v1.0 — Barranquilla, Colombia</span>';
-    main.appendChild(footer);
-
-    // NO llamamos a _renderViewInto aquí — el `render()` lo hace después de appendear `main` al DOM.
-
-    return main;
-  }
-
-  _nitFromCompany(name) {
-    // Placeholder: en producción leer de companies.nit
-    var map = {
-      'Tempoactiva': '900.511.178-1',
-      'Temposum':    '800.123.456-7',
-      'Aseplus':     '900.222.333-4',
-      'Asel':        '901.555.666-7'
-    };
-    return map[name] || '900.511.178-1';
-  }
-
-  // === VIEW DISPATCH ===
-  _renderViewInto(content) {
-    var self = this;
-    // Escuchar navegación desde quick access (DashboardComponent)
     if (!this._navHandler) {
       this._navHandler = function (e) {
         if (e && e.detail && e.detail.view && e.detail.view !== self.currentView) {
@@ -290,6 +160,104 @@ class GestionHumanaHome {
         }
       };
       window.addEventListener('gh-shell-navigate', this._navHandler);
+    }
+
+    // Set title + NIT
+    var t = this._getCurrentTitle();
+    if (this._titleEl) this._titleEl.textContent = t.title;
+    if (this._subtitleEl) this._subtitleEl.textContent = 'Sistema de Gestión de Personal — TEMPOACTIVA EST S.A.S.';
+    if (this._nitSpan) this._nitSpan.textContent = 'NIT ' + (this.currentCompany ? this._nitFromCompany(this.currentCompany) : '900.511.178-1');
+
+    // Render view in content
+    this._renderViewInto(this.contentEl);
+  }
+
+  async _fetchShellHtml() {
+    // Intentar fetch al HTML; fallback inline si falla
+    try {
+      var r = await fetch('modules/gestion-humana/gestion-humana-home.html');
+      if (r.ok) {
+        return await r.text();
+      }
+    } catch (e) {
+      console.warn('[GestionHumanaHome] fetch HTML falló, usando fallback inline:', e.message);
+    }
+    // Fallback: HTML inline (debe coincidir con gestion-humana-home.html)
+    return '<div class="gh-shell" id="gh-shell">' +
+      '<aside class="gh-sidebar" id="gh-sidebar">' +
+        '<div class="gh-sidebar__brand">' +
+          '<div class="gh-sidebar__brand-logo">T</div>' +
+          '<div class="gh-sidebar__brand-text">' +
+            '<div class="gh-sidebar__brand-title">TEMPOACTIVA</div>' +
+            '<div class="gh-sidebar__brand-subtitle">EST S.A.S.</div>' +
+          '</div>' +
+        '</div>' +
+        '<nav class="gh-sidebar__nav" id="gh-sidebar-nav"></nav>' +
+        '<div class="gh-sidebar__user">' +
+          '<div class="gh-sidebar__user-avatar"><i class="fas fa-user"></i></div>' +
+          '<div class="gh-sidebar__user-text">' +
+            '<div class="gh-sidebar__user-name" id="gh-user-name">—</div>' +
+            '<div class="gh-sidebar__user-role">Recursos Humanos</div>' +
+          '</div>' +
+        '</div>' +
+      '</aside>' +
+      '<main class="gh-main" id="gh-main">' +
+        '<header class="gh-header">' +
+          '<div class="gh-header__left">' +
+            '<h1 class="gh-header__title" id="gh-page-title">Resumen</h1>' +
+            '<p class="gh-header__subtitle">Sistema de Gestión de Personal — TEMPOACTIVA EST S.A.S.</p>' +
+          '</div>' +
+          '<div class="gh-header__right">' +
+            '<div class="gh-nit-badge"><i class="fas fa-building"></i><span>NIT 900.511.178-1</span></div>' +
+            '<button class="gh-bell-btn" id="gh-bell-btn" title="Notificaciones">' +
+              '<i class="fas fa-bell"></i><span class="gh-bell-badge" id="gh-bell-badge"></span>' +
+            '</button>' +
+          '</div>' +
+        '</header>' +
+        '<main class="gh-content" id="gh-content"></main>' +
+        '<footer class="gh-footer">' +
+          '<span>© 2026 TEMPOACTIVA EST S.A.S. — Sistema de Gestión de Personal</span>' +
+          '<span>v1.0 — Barranquilla, Colombia</span>' +
+        '</footer>' +
+      '</main>' +
+    '</div>';
+  }
+
+  _renderSidebar() {
+    if (!this._sidebarNav) return;
+    var self = this;
+    this._sidebarNav.innerHTML = '';
+    var lastGroup = null;
+    GESTION_HUMANA_NAV.forEach(function (item) {
+      if (item.group && item.group !== lastGroup) {
+        var g = document.createElement('div');
+        g.className = 'gh-sidebar__group';
+        g.textContent = item.group;
+        this._sidebarNav.appendChild(g);
+        lastGroup = item.group;
+      }
+      var a = document.createElement('a');
+      a.href = '#';
+      a.className = 'gh-sidebar__item' + (item.id === self.currentView ? ' gh-sidebar__item--active' : '');
+      a.innerHTML =
+        '<i class="fas ' + item.icon + ' gh-sidebar__item-icon"></i>' +
+        '<span class="gh-sidebar__item-label">' + item.label + '</span>';
+      a.onclick = function (e) {
+        e.preventDefault();
+        if (item.id !== self.currentView) {
+          self.currentView = item.id;
+          self.render();
+        }
+      };
+      this._sidebarNav.appendChild(a);
+    }.bind(this));
+  }
+
+  // === VIEW DISPATCH ===
+  _renderViewInto(content) {
+    if (!content) {
+      console.error('[GestionHumanaHome] _renderViewInto: content es null');
+      return;
     }
     switch (this.currentView) {
       case 'home':
@@ -338,6 +306,7 @@ class GestionHumanaHome {
         subName,
         function () { self.currentView = 'home'; self.render(); }
       );
+      var self = this;
       if (typeof this.viewInstance.render === 'function') {
         this.viewInstance.render();
       } else if (typeof this.viewInstance.show === 'function') {
@@ -382,7 +351,7 @@ class GestionHumanaHome {
       title: 'Dashboard', subtitle: 'Vista general',
       description: 'KPIs del módulo, distribuciones (sede, género, cargo, nivel educativo) y acceso rápido a las funciones más usadas.',
       buttonText: 'Abrir Dashboard', buttonColor: '#7c3aed',
-      view: 'dashboard', ready: false
+      view: 'dashboard', ready: true
     }));
     grid.appendChild(this._renderNavCard({
       icon: 'fa-users', iconColor: '#174ea6', iconBg: '#e8f0fe',
@@ -412,39 +381,39 @@ class GestionHumanaHome {
       title: 'Vacaciones', subtitle: 'Programación y aprobaciones',
       description: 'Solicitudes de vacaciones, aprobaciones, programación y notificación a clientes. Flujo mensual con tipos solicitada, aprobada, rechazada y disfrutada.',
       buttonText: 'Abrir Vacaciones', buttonColor: '#ea580c',
-      view: 'vacaciones', ready: false
+      view: 'vacaciones', ready: true
     }));
     grid.appendChild(this._renderNavCard({
       icon: 'fa-file-medical', iconColor: '#be123c', iconBg: '#ffe4e6',
       title: 'Permisos y Estados', subtitle: 'Incapacidades, maternidad, luto',
       description: 'Registro y seguimiento de permisos (incapacidad, maternidad, paternidad, luto, citas médicas, calamidad). Finalización automática y prórroga.',
       buttonText: 'Abrir Permisos', buttonColor: '#be123c',
-      view: 'permisos', ready: false
+      view: 'permisos', ready: true
     }));
     grid.appendChild(this._renderNavCard({
       icon: 'fa-shield-halved', iconColor: '#0891b2', iconBg: '#cffafe',
       title: 'Afiliaciones', subtitle: 'Seguridad social',
       description: 'Estado 4/4 de cada trabajador: EPS, Fondo de Pensión, ARL y Caja de Compensación. Búsqueda por nombre o cédula.',
       buttonText: 'Abrir Afiliaciones', buttonColor: '#0891b2',
-      view: 'afiliaciones', ready: false
+      view: 'afiliaciones', ready: true
     }));
     grid.appendChild(this._renderNavCard({
       icon: 'fa-file-signature', iconColor: '#1d4ed8', iconBg: '#dbeafe',
       title: 'Documentos y Firmas', subtitle: '7 formatos del proceso',
       description: 'Generación y firma digital de los 7 formatos del proceso de contratación: autorización datos, hojas de vida, inducción, contrato, etc.',
       buttonText: 'Abrir Documentos', buttonColor: '#1d4ed8',
-      view: 'documentos', ready: false
+      view: 'documentos', ready: true
     }));
     grid.appendChild(this._renderNavCard({
       icon: 'fa-bullhorn', iconColor: '#a16207', iconBg: '#fef3c7',
       title: 'Comunicación', subtitle: 'Anuncios y mensajes',
       description: 'Tablón de anuncios oficiales (info, urgente, mantenimiento, evento) y mensajes directos entre trabajadores.',
       buttonText: 'Abrir Comunicación', buttonColor: '#a16207',
-      view: 'comunicacion', ready: false
+      view: 'comunicacion', ready: true
     }));
     sec.appendChild(grid);
 
-    // Pipeline preview (solo decorativo)
+    // Pipeline preview
     var pipelinePreview = document.createElement('div');
     pipelinePreview.style.cssText = 'margin-top:1.5rem; background:white; border:1px solid #e9ecef; border-radius:0.5rem; padding:1.25rem;';
     pipelinePreview.innerHTML =
@@ -466,22 +435,22 @@ class GestionHumanaHome {
   _renderKpisBar() {
     var self = this;
     var bar = document.createElement('div');
-    bar.style.cssText = 'background:white; border:1px solid #e9ecef; border-radius:0.5rem; padding:1rem 1.25rem; display:flex; gap:1.5rem; flex-wrap:wrap;';
+    bar.style.cssText = 'background:white; border:1px solid #e9ecef; border-radius:0.5rem; padding:1rem 1.25rem; display:flex; gap:0.875rem; flex-wrap:wrap; align-items:center;';
     var kpis = [
-      { icon: 'fa-user-check',         color: '#28a745', bg: '#d4edda', label: 'Personal Activo',          value: this.kpis.personalActivos },
-      { icon: 'fa-user-clock',         color: '#0d9488', bg: '#ccfbf1', label: 'Contrataciones en Proceso', value: this.kpis.contratacionesEnProceso },
-      { icon: 'fa-user-check-double',  color: '#174ea6', bg: '#e8f0fe', label: 'Completados',              value: this.kpis.completados },
-      { icon: 'fa-user-xmark',         color: '#6c757d', bg: '#e9ecef', label: 'Cancelados',               value: this.kpis.cancelados }
+      { icon: 'fa-user-check',         color: '#28a745', bg: '#d4edda', value: this.kpis.personalActivos,                 label: 'Personal Activo' },
+      { icon: 'fa-user-clock',         color: '#0d9488', bg: '#ccfbf1', value: this.kpis.contratacionesEnProceso,  label: 'Contrataciones en Proceso' },
+      { icon: 'fa-user-check-double',  color: '#174ea6', bg: '#e8f0fe', value: this.kpis.completados,              label: 'Completados' },
+      { icon: 'fa-user-xmark',         color: '#6c757d', bg: '#e9ecef', value: this.kpis.cancelados,               label: 'Cancelados' }
     ];
-    kpis.forEach(function (k) {
+    kpis.forEach(function (i) {
       bar.innerHTML +=
         '<div style="display:flex; align-items:center; gap:0.625rem;">' +
-          '<div style="width:36px; height:36px; border-radius:0.4rem; background:' + k.bg + '; display:flex; align-items:center; justify-content:center;">' +
-            '<i class="fas ' + k.icon + '" style="color:' + k.color + ';"></i>' +
+          '<div style="width:36px; height:36px; border-radius:0.5rem; background:' + i.bg + '; display:flex; align-items:center; justify-content:center;">' +
+            '<i class="fas ' + i.icon + '" style="color:' + i.color + ';"></i>' +
           '</div>' +
           '<div>' +
-            '<div style="font-size:1.125rem; font-weight:700; color:' + k.color + '; line-height:1;">' + self._fmt(k.value) + '</div>' +
-            '<div style="font-size:0.65rem; text-transform:uppercase; color:#5a6378; letter-spacing:0.3px; margin-top:0.2rem;">' + k.label + '</div>' +
+            '<div style="font-size:1.125rem; font-weight:700; color:' + i.color + '; line-height:1;">' + self._fmt(i.value) + '</div>' +
+            '<div style="font-size:0.65rem; text-transform:uppercase; color:#5a6378; letter-spacing:0.3px; margin-top:0.2rem;">' + i.label + '</div>' +
           '</div>' +
         '</div>';
     });
@@ -495,7 +464,6 @@ class GestionHumanaHome {
     card.onmouseenter = function () { card.style.boxShadow = '0 6px 18px rgba(0,0,0,0.08)'; card.style.transform = 'translateY(-2px)'; };
     card.onmouseleave = function () { card.style.boxShadow = ''; card.style.transform = ''; };
 
-    // Banner
     var banner = document.createElement('div');
     banner.style.cssText = 'background:' + opts.iconBg + '; padding:1rem 1.25rem; display:flex; align-items:center; gap:0.75rem;';
     var pill = opts.ready
@@ -512,7 +480,6 @@ class GestionHumanaHome {
       pill;
     card.appendChild(banner);
 
-    // Body
     var body = document.createElement('div');
     body.style.cssText = 'padding:1rem 1.25rem; flex:1; display:flex; flex-direction:column; gap:0.875rem;';
 
@@ -572,6 +539,10 @@ class GestionHumanaHome {
           '<i class="fas fa-clock"></i> Esta vista se implementará en una fase posterior del rediseño de Gestión Humana (v0.2.0).' +
         '</p>' +
       '</div>';
+  }
+
+  destroy() {
+    this._cleanupView();
   }
 }
 
