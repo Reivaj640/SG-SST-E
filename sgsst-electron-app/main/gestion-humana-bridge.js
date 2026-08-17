@@ -691,7 +691,62 @@ function _handlerMarcarPaso(token, contratacionId, pasoNum, fecha, notas) {
       "estado = ?, updated_at = ? WHERE id = ?"
     ).run(pasoInt, fechaFinal, notas || null, nuevoEstado, now, contratacionId);
 
-    return _ok({ contratacionId: contratacionId, pasoActual: pasoInt, estado: nuevoEstado });
+    // 📦775 · Paso 6 (S400 Activado) = crear/vincular en base_personal
+    // Cuando el user completa el pipeline de 6 pasos, el trabajador se "activa" en
+    // base_personal para que aparezca en Base Personal y se actualicen los KPIs.
+    var personalId = null;
+    if (pasoInt === 6) {
+      // Necesitamos el company_key para hacer la búsqueda/insert
+      var companyKey = localDb.prepare('SELECT empresa_id FROM contrataciones WHERE id = ?').get(contratacionId).empresa_id;
+      var ct = localDb.prepare('SELECT * FROM contrataciones WHERE id = ?').get(contratacionId);
+
+      if (!ct.cedula) {
+        // base_personal requiere cedula NOT NULL — sin cédula no se puede crear.
+        // Log warning pero no fallar: el user puede agregar la cédula después
+        // y reactivar manualmente con un nuevo paso 6 (marcando cancelado y reabriendo).
+        console.warn('[marcar-paso] paso 6 sin cedula — no se crea en base_personal:', contratacionId);
+      } else {
+        // 1) Buscar si ya existe en base_personal (caso de re-contratación)
+        var existing2 = localDb.prepare(
+          'SELECT id FROM base_personal WHERE empresa_id = ? AND cedula = ? AND activo = 1'
+        ).get(companyKey, ct.cedula);
+
+        if (existing2) {
+          // Vincular al registro existente (no duplicar)
+          personalId = existing2.id;
+          console.log('[marcar-paso] vinculado a personal existente:', personalId);
+        } else {
+          // 2) Crear nuevo registro en base_personal
+          personalId = _newId('bp-');
+          localDb.prepare(
+            "INSERT INTO base_personal (id, empresa_id, nombres, apellidos, cedula, cargo, salario, " +
+            "  fecha_ingreso, fecha_ingreso_s400, fecha_afiliaciones, sede_id, empresa_usuaria, " +
+            "  activo_s400, estado, activo, created_at, updated_at) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'activo', 1, ?, ?)"
+          ).run(
+            personalId, companyKey,
+            ct.nombres, ct.apellidos, ct.cedula,
+            ct.cargo, ct.salario,
+            ct.fecha_ingreso, fechaFinal, ct.afiliaciones_fecha || null,
+            ct.sede_id, ct.empresa_usuaria,
+            now, now
+          );
+          console.log('[marcar-paso] creado en base_personal:', personalId);
+        }
+
+        // 3) Vincular la contratación con el personal_id
+        localDb.prepare(
+          "UPDATE contrataciones SET trabajador_id = ?, updated_at = ? WHERE id = ?"
+        ).run(personalId, now, contratacionId);
+      }
+    }
+
+    return _ok({
+      contratacionId: contratacionId,
+      pasoActual: pasoInt,
+      estado: nuevoEstado,
+      personalId: personalId
+    });
   } catch (e) {
     console.error('[' + MOD + '][marcar-paso]', e.message);
     return _err('INTERNAL', e.message);

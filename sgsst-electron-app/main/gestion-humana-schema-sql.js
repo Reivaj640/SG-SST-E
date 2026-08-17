@@ -93,6 +93,8 @@ CREATE TABLE IF NOT EXISTS base_personal (
   fecha_ingreso TEXT,
   fecha_retiro TEXT,
   estado TEXT DEFAULT 'activo',              -- activo | incapacitado | vacaciones | permiso | maternidad | paternidad | luto | retirado
+  fecha_ingreso_s400 TEXT,                   -- 📦775 · fecha del paso 6 S400 (activación en sistema Tempoactiva)
+  fecha_afiliaciones TEXT,                   -- 📦775 · fecha del paso 5 (afiliaciones completadas)
   eps TEXT,
   eps_fecha TEXT,
   pension TEXT,
@@ -322,7 +324,10 @@ const MIGRATIONS_SQL = [
   "ALTER TABLE base_personal ADD COLUMN sede_id TEXT;",
   "CREATE INDEX IF NOT EXISTS idx_base_personal_sede ON base_personal(empresa_id, sede_id);",
   "ALTER TABLE gh_documentos ADD COLUMN ruta_archivo TEXT;",
-  "ALTER TABLE gh_documentos ADD COLUMN nombre_archivo TEXT;"
+  "ALTER TABLE gh_documentos ADD COLUMN nombre_archivo TEXT;",
+  // 📦775 · columnas para tracking del flujo de Contratación → Base Personal
+  "ALTER TABLE base_personal ADD COLUMN fecha_ingreso_s400 TEXT;",
+  "ALTER TABLE base_personal ADD COLUMN fecha_afiliaciones TEXT;"
 ];
 
 module.exports = {
