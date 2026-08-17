@@ -83,7 +83,7 @@ class StrictDb {
   exec() {}
 }
 
-const bridge = require('./main/profesiograma-bridge.js');
+const bridge = require('../../main/profesiograma-bridge.js');
 const db = new StrictDb();
 bridge.registerProfesiogramaHandlers(null, {
   getDb: () => db,

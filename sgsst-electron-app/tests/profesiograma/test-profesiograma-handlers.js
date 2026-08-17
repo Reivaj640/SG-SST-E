@@ -145,7 +145,7 @@ Module.prototype.require = function(name) {
   return orig.apply(this, arguments);
 };
 
-const bridge = require('./main/profesiograma-bridge.js');
+const bridge = require('../../main/profesiograma-bridge.js');
 const db = new MockDb();
 bridge.registerProfesiogramaHandlers(null, {
   getDb: () => db,
