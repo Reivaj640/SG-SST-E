@@ -5,6 +5,67 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2026-08-17
+
+### 📦776 — feat(gestion-humana): módulo completo + fix flujo Contratación → Base Personal
+
+#### Módulo de Gestión Humana — vista top-level completa
+
+- **Shell** con header K+AIR (icono + título + subtítulo) y tabs horizontales responsive (modo ventana: nombres abreviados / modo maximizado: nombres completos con iconos)
+- **8 vistas** migradas a HTML+CSS/JS separados: Resumen, Dashboard, Base Personal, Contratación, Vacaciones, Permisos y Estados, Afiliaciones, Documentos y Firmas
+- **Helper compartido `GHKPIBar`** para KPIs estandarizadas
+- **58 handlers IPC** totales, **11 tablas** en BD (3 originales: `contrataciones`, `base_personal`, `gh_sedes` + 8 nuevas: `gh_vacaciones`, `gh_permisos`, `gh_documentos`, `gh_firmas_digitales`, `gh_anuncios`, `gh_mensajes`, `gh_documentos_afiliaciones`, `gh_templates`)
+- **MIGRATIONS_SQL** con 5 ALTER TABLE idempotentes (📦731 + 📦764 + 📦775)
+
+#### Sub-features incluidos
+
+- **Documentos**: sistema de templates administrables (📦764) — sube .docx/.pdf desde el user, los gestiona en modal, los usa al generar documentos. Modal de firma digital en canvas con DPR para nitidez (📦763). Bloque de subida de PDFs de afiliaciones (EPS/Pensión/ARL/Caja) (📦760)
+- **Base Personal**: segmented control "Todos/Activos/Retirados" (📦762) + Trabajador Detalle 360° con edición inline
+- **Afiliaciones**: tabla con 4 slots por trabajador + gestión de PDFs
+- **Contratación**: pipeline de 6 pasos (memo → contacto → exámenes → documentos → afiliaciones → S400) + KPIs por estado
+
+#### 📦775 — fix(contratación): paso 6 (S400) crea/vincula en base_personal
+
+**Causa raíz**: `_handlerMarcarPaso` solo hacía UPDATE en `contrataciones` al marcar paso 6. NO creaba registro en `base_personal`, así que los nuevos trabajadores no aparecían en Base Personal y los KPIs no se actualizaban.
+
+**Fix aplicado** (`gestion-humana-bridge.js` `_handlerMarcarPaso`, paso 6):
+1. SELECT contratacion
+2. Si no tiene cedula: warning + skip (base_personal requiere cedula NOT NULL)
+3. Buscar existente en base_personal por `(empresa_id, cedula, activo=1)`
+4. Si existe: usar personal_id (no duplica, vincula)
+5. Si no: INSERT nuevo en base_personal con datos de la contratacion
+6. UPDATE `contrataciones SET trabajador_id = personal_id`
+7. Response incluye `personalId`
+
+**Schema actualizado** (`gestion-humana-schema-sql.js`):
+- `base_personal`: 2 columnas nuevas (`fecha_ingreso_s400`, `fecha_afiliaciones`)
+- `MIGRATIONS_SQL`: 2 ALTER TABLE (lazy, idempotente)
+
+**Validación E2E manual**: Contratación de Javier Robles Fontalvo (cédula 104439066) completada en 6 pasos. Aparece en Base Personal con todos los datos correctos. KPIs: 753→754 total, 128→129 activos.
+
+#### Otros cambios
+
+- **📦774** — `shared/sidebar-icons.js`: agregado SVG `user_plus` (Lucide = 1 persona + plus) para Gestión Humana en el sidebar. Antes el icono estaba `undefined` (espacio vacío)
+- **📦776** — Footer inferior del shell de Gestión Humana **removido** (HTML + CSS + JS fallback). El user lo pidió porque quitaba espacio sin aportar info crítica
+
+#### Archivos
+
+- Nuevos: 8 vistas × 3 archivos (HTML+CSS+JS) + `shared/kpi-bar.{js,css}` + 8 smoke tests en `Temp/`
+- Backend: `main/gestion-humana-bridge.js`, `main/gestion-humana-schema-sql.js`
+- Wireup: `preload.js`, `index.html`, `main.js`
+- Tests: `main/test-gestion-humana-bridge-{schema,import}.js` + 8 smoke tests
+- Version: rollback 0.2.0 → 0.1.189 (sin bumpear, sigue en 0.1.189)
+- Cleanup: 40 `test-fixes-loop*.js` eliminados, scripts basura movidos a `C:\Temp\kair-garbage-2026-08-17\`
+- `.gitignore` actualizado con patrones `temp-*/`, `__*-*.js`, `_*.js`, `commit-msg*.txt`
+
+#### Métricas
+
+- 2 commits locales: `66106d63` (módulo) + `62c6f9ad` (fix paso 6) — 8 commits ahead of `origin/Dev-Pc`
+- 644+ tests pasando, 0 failures
+- 753 → 754 trabajadores en Base Personal después del test E2E con Javier Robles
+
+---
+
 ## [0.1.189] - 2026-08-14
 
 ### 📦707-fix26 — fix(shortcut): auto-reparación SIEMPRE reescribe el .lnk del escritorio (auto-update fix)
