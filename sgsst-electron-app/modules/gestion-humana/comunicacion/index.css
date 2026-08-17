@@ -1,0 +1,240 @@
+/* modules/gestion-humana/comunicacion/index.css
+   📦723 · Estilos de la vista "Comunicación" (v0.2.0)
+   Scope: prefijo `cm-` para evitar colisiones con styles.css global. */
+
+.cm-wrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: #f8f9fa;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* ═══ KPI SECTION ═══ */
+.cm-kpi-section {
+  padding: 0 2rem;
+  flex-shrink: 0;     /* 📦727 · Igualado al Resumen */
+}
+
+/* ═══ BUTTONS ═══ */
+.cm-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.875rem;
+  border-radius: 0.4rem;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s;
+}
+.cm-btn--primary {
+  background: #174ea6;
+  color: white;
+  border-color: #174ea6;
+}
+.cm-btn--primary:hover { background: #11367a; border-color: #0e2a5e; }
+.cm-btn--danger {
+  background: transparent;
+  border: none;
+  color: #dc3545;
+  cursor: pointer;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.8rem;
+  font-family: inherit;
+}
+.cm-btn--danger:hover { color: #b02a37; }
+
+/* ═══ TABS ═══ */
+.cm-tabs {
+  background: white;
+  border-bottom: 1px solid #e9ecef;
+  display: flex;
+  gap: 1rem;
+  padding: 0 1.5rem;
+  flex-shrink: 0;
+}
+.cm-tab {
+  background: transparent;
+  border: none;
+  padding: 0.875rem 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #5a6378;
+  border-bottom: 2px solid transparent;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.cm-tab:hover { color: #174ea6; }
+.cm-tab--active {
+  color: #174ea6;
+  border-bottom-color: #174ea6;
+  font-weight: 600;
+}
+
+/* ═══ CONTENT ═══ */
+.cm-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 1.5rem;
+}
+
+/* ═══ SECTION HEAD (anuncios/mensajes) ═══ */
+.cm-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.875rem;
+  flex-wrap: wrap;
+}
+.cm-section-head__text { flex: 1; min-width: 0; }
+.cm-section-head__title {
+  margin: 0;
+  font-size: 1.05rem;
+  color: #1a1a2e;
+  font-weight: 600;
+}
+.cm-section-head__subtitle {
+  margin: 0.125rem 0 0;
+  font-size: 0.75rem;
+  color: #5a6378;
+}
+
+/* ═══ ANUNCIOS GRID ═══ */
+.cm-anuncios-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 0.875rem;
+}
+.cm-anuncio {
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 0.5rem;
+  padding: 1rem 1.125rem;
+  transition: box-shadow 0.2s;
+  position: relative;
+}
+.cm-anuncio:hover { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); }
+.cm-anuncio__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  margin-bottom: 0.5rem;
+}
+.cm-anuncio__icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 0.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.cm-anuncio__title {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+.cm-anuncio__type {
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.875rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+}
+.cm-anuncio__meta {
+  font-size: 0.7rem;
+  color: #5a6378;
+  margin-bottom: 0.5rem;
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.cm-anuncio__content {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: #1a1a2e;
+  line-height: 1.5;
+  max-height: 6.5em;
+  overflow: hidden;
+}
+.cm-anuncio__footer {
+  margin-top: 0.625rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #f1f3f5;
+  text-align: right;
+}
+
+/* ═══ MENSAJES LIST ═══ */
+.cm-mensajes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.cm-mensaje {
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 0.5rem;
+  padding: 0.875rem 1rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+.cm-mensaje__avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #e8f0fe;
+  color: #174ea6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.cm-mensaje__body { flex: 1; min-width: 0; }
+.cm-mensaje__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+.cm-mensaje__from { font-size: 0.875rem; font-weight: 600; color: #1a1a2e; }
+.cm-mensaje__date { font-size: 0.7rem; color: #5a6378; }
+.cm-mensaje__subject { font-size: 0.8125rem; font-weight: 500; color: #174ea6; margin-bottom: 0.125rem; }
+.cm-mensaje__text { font-size: 0.8125rem; color: #495057; line-height: 1.45; margin: 0; }
+.cm-mensaje__badge {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.5rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  background: #fef3cd;
+  color: #856404;
+  margin-left: 0.4rem;
+}
+.cm-mensaje__actions { display: flex; gap: 0.4rem; margin-top: 0.4rem; }
+
+/* ═══ EMPTY STATE ═══ */
+.cm-empty {
+  padding: 2rem;
+  text-align: center;
+  color: #5a6378;
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 0.5rem;
+}

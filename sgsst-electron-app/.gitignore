@@ -14,7 +14,9 @@ Thumbs.db
 *.log
 
 # Archivos temporales
-temp/
+# 📦773 · Antes era "temp/" pero en Windows (case-insensitive) ignoraba también Temp/
+# donde están los smoke tests del módulo. Cambiado a "temp-*/" (más específico).
+temp-*/
 tmp/
 
 # Archivos de configuración de IDE
@@ -64,6 +66,17 @@ __pycache__/
 test-tmp-*.js
 test-tmp-*.xlsx
 test-tmp-*.html
+
+# 📦773 · Scripts one-off con guión bajo al inicio (raíz de sgsst-electron-app/)
+# Patrones: __fix-test-*.js, __old-test-*.js, _*.js (inspección, scripts temporales)
+__*-*.js
+_*.js
+
+# 📦773 · Mensajes de commit temporales (raíz del repo)
+/commit-msg*.txt
+
+# 📦773 · Dirs temp-* en raíz del repo (proyectos antiguos de prueba)
+/temp-*/
 
 # Archivos de configuración generados
 config.json

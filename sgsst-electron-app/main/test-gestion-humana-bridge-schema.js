@@ -174,7 +174,7 @@ async function run() {
   console.log('  ✓ Bridge registrado con mocks');
 
   console.log('');
-  console.log('[9] Verificando que los 44 handlers están registrados...');
+  console.log('[9] Verificando que los 52 handlers están registrados...');
   const expectedHandlers = [
     // Read (5) — Fase 1
     'gh:list-contrataciones', 'gh:get-contratacion', 'gh:list-personal',
@@ -202,18 +202,28 @@ async function run() {
     'gh:list-anuncios', 'gh:get-anuncio', 'gh:create-anuncio',
     'gh:update-anuncio', 'gh:delete-anuncio',
     // Mensajes (4) — Fase 5
-    'gh:list-mensajes', 'gh:get-mensaje', 'gh:create-mensaje', 'gh:marcar-leido'
+    'gh:list-mensajes', 'gh:get-mensaje', 'gh:create-mensaje', 'gh:marcar-leido',
+    // 📦760 · Documentos de Afiliaciones (5) — Fase 6
+    'gh:list-documentos-afiliaciones', 'gh:subir-documento-afiliacion',
+    'gh:eliminar-documento-afiliacion', 'gh:obtener-documento-afiliacion',
+    'gh:abrir-documento-afiliacion',
+    // 📦764 · Templates de Documentos (5) — Fase 7
+    'gh:list-templates', 'gh:subir-template', 'gh:eliminar-template',
+    'gh:obtener-template', 'gh:abrir-template',
+    // 📦732 · Import Excel (3)
+    'gh:select-excel', 'gh:parse-excel', 'gh:import-personal'
   ];
-  _assertEq(Object.keys(registeredHandlers).length, 44, 'cantidad de handlers registrados = 44');
+  _assertEq(Object.keys(registeredHandlers).length, 58, 'cantidad de handlers registrados = 58');
   expectedHandlers.forEach(function(ch) {
     _assert(typeof registeredHandlers[ch] === 'function', 'handler "' + ch + '" registrado');
   });
 
   console.log('');
-  console.log('[10] Verificando que NO quedan stubs (Fase 5 = 44 handlers reales)...');
-  // Fase 5: 5 reads + 4 write-contratacion + 4 write-personal + 2 write-sedes
+  console.log('[10] Verificando que NO quedan stubs (Fase 7 = 57 handlers reales)...');
+  // Fase 7 + 📦764: 5 reads + 4 write-contratacion + 4 write-personal + 2 write-sedes
   //        + 6 vacaciones + 5 permisos + 6 documentos + 2 firmas + 5 anuncios + 4 mensajes
-  //        = 43 reales + 1 diag = 44 totales
+  //        + 5 docs-afiliaciones + 5 templates + 3 import-excel
+  //        = 56 reales + 1 diag = 57 totales
   // No hay stubs. Solo el diag (que también es real).
   // Spot check: create-vacacion con payload inválido debe retornar INVALID_INPUT (no NOT_IMPLEMENTED)
   var sampleCheck = registeredHandlers['gh:create-vacacion']({}, { token: 'test' });
@@ -221,17 +231,17 @@ async function run() {
   _assert(sampleCheck.error.code === 'INVALID_INPUT', 'create-vacacion retorna INVALID_INPUT (no NOT_IMPLEMENTED)');
 
   console.log('');
-  console.log('[11] Verificando que diag responde OK con metadata de Fase 5...');
+  console.log('[11] Verificando que diag responde OK con metadata de Fase 7...');
   const diagRes = registeredHandlers['gh:diag']({}, {});
   _assert(diagRes.success === true, 'diag retorna success=true');
-  _assert(diagRes.data.phase === 5, 'diag.data.phase = 5 (📦710 FASE C: handlers)');
+  _assert(diagRes.data.phase === 7, 'diag.data.phase = 7 (📦764 FASE G: templates de documentos)');
   _assert(diagRes.data.bridge === 'gestion-humana', 'diag.data.bridge = gestion-humana');
   _assert(diagRes.data.has_getDb === true, 'diag.data.has_getDb = true');
   _assert(diagRes.data.has_validateSession === true, 'diag.data.has_validateSession = true');
   _assert(Array.isArray(diagRes.data.tables), 'diag.data.tables es array');
-  _assert(diagRes.data.tables.length === 9, 'diag.data.tables tiene 9 tablas (3 originales + 6 nuevas)');
-  // Verificar las 6 tablas nuevas explícitamente
-  ['gh_vacaciones', 'gh_permisos', 'gh_documentos', 'gh_firmas_digitales', 'gh_anuncios', 'gh_mensajes'].forEach(function(t) {
+  _assert(diagRes.data.tables.length === 11, 'diag.data.tables tiene 11 tablas (3 originales + 8 nuevas)');
+  // Verificar las 8 tablas nuevas explícitamente
+  ['gh_vacaciones', 'gh_permisos', 'gh_documentos', 'gh_firmas_digitales', 'gh_anuncios', 'gh_mensajes', 'gh_documentos_afiliaciones', 'gh_templates'].forEach(function(t) {
     _assert(diagRes.data.tables.indexOf(t) >= 0, 'diag.data.tables incluye ' + t);
   });
 

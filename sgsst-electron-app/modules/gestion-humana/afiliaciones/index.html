@@ -1,0 +1,40 @@
+<!-- modules/gestion-humana/afiliaciones/index.html
+     📦759 · Vista "Afiliaciones" — Estilo demo Tempoactiva
+     Estructura:
+       - 5 KPIs (Completos 4/4, Sin EPS, Sin Pensión, Sin ARL, Sin Caja)
+       - Header sección + subtítulo + 2 botones filtro (Todos, Completos) + búsqueda
+       - Tabla con Trabajador, Cédula, EPS, Pensión, ARL, Caja Comp., Estado, Acción
+       - Modal de detalle al hacer clic en el ojo (info del personal estilo Base Personal)
+     IDs con prefijo `af-` para evitar colisiones. -->
+
+<div class="af-wrapper" id="af-wrapper">
+  <div class="af-kpi-section">
+    <div id="af-kpi-bar" class="af-kpi-bar"></div>
+  </div>
+
+  <div class="af-section-head">
+    <div class="af-section-head__text">
+      <h2 class="af-section-head__title">Afiliaciones de Seguridad Social</h2>
+      <p class="af-section-head__subtitle">EPS, Fondo de Pensión, ARL y Caja de Compensación</p>
+    </div>
+    <div class="af-section-head__actions">
+      <div class="af-seg" role="tablist" aria-label="Filtro por estado del trabajador">
+        <button id="af-filter-todos" class="af-seg-btn af-seg-btn--active" type="button" data-filter="todos" role="tab" aria-selected="true">
+          Todos <span id="af-count-todos" class="af-seg-count">0</span>
+        </button>
+        <button id="af-filter-activos" class="af-seg-btn" type="button" data-filter="activos" role="tab" aria-selected="false">
+          Activos <span id="af-count-activos" class="af-seg-count">0</span>
+        </button>
+        <button id="af-filter-retirados" class="af-seg-btn" type="button" data-filter="retirados" role="tab" aria-selected="false">
+          Retirados <span id="af-count-retirados" class="af-seg-count">0</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="af-search-bar">
+    <input id="af-search" type="text" class="af-search-input" placeholder="Buscar trabajador..." />
+  </div>
+
+  <div id="af-table-wrap" class="af-table-wrap"></div>
+</div>

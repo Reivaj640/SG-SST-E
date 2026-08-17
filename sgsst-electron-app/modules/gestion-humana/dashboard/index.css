@@ -1,0 +1,285 @@
+/* modules/gestion-humana/dashboard/index.css
+   📦720 · Estilos de la vista "Dashboard" (v0.2.0)
+   Scope: prefijo `db-` para evitar colisiones con styles.css global. */
+
+.db-wrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: #f8f9fa;
+  box-sizing: border-box;
+  overflow-y: auto;
+  gap: 1rem;
+  padding: 0 0 1.5rem;
+}
+
+/* ═══ KPI SECTION ═══ */
+.db-kpi-section {
+  padding: 0 2rem;            /* 📦727 · Igualado al Resumen (sin padding-top) */
+}
+
+/* ═══ CHARTS ROW ═══ */
+.db-charts-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 1rem;
+  padding: 0 2rem;
+}
+
+.db-chart-card {
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+  /* 📦756 · Altura FIJA 240px (reducida para eliminar espacio vacío excesivo).
+  Charts con 5 items (Antigüedad, Top 5 EPS) quedan justos, charts con 22+
+  items (Personal por Cargo) hacen scroll interno. */
+  display: flex;
+  flex-direction: column;
+  height: 240px;
+  min-height: 0;
+}
+.db-chart-card__head { margin-bottom: 0.875rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; flex-shrink: 0; }
+.db-chart-card__head-text { flex: 1 1 auto; min-width: 0; }
+.db-chart-card__head h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #1a1a2e;
+  font-weight: 600;
+}
+.db-chart-card__head p {
+  margin: 0.125rem 0 0;
+  font-size: 0.7rem;
+  color: #5a6378;
+}
+.db-chart-card__body {
+  /* 📦753 · Scroll vertical cuando hay muchos items. min-height: 0 es CRÍTICO
+  para que flex permita al body encojerse y aparezca el scroll. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  /* Padding-right para que la scrollbar no tape el contenido */
+  padding-right: 4px;
+}
+/* 📦753 · Scrollbar discreto en los charts (no llamar la atención) */
+.db-chart-card__body::-webkit-scrollbar { width: 6px; }
+.db-chart-card__body::-webkit-scrollbar-track { background: transparent; }
+.db-chart-card__body::-webkit-scrollbar-thumb { background: #d0d4d9; border-radius: 3px; }
+.db-chart-card__body::-webkit-scrollbar-thumb:hover { background: #adb3b8; }
+.db-chart-empty {
+  color: #5a6378;
+  font-size: 0.8125rem;
+  margin: 1rem 0;
+  text-align: center;
+}
+
+/* === 📦750 · Toggle de filtro dentro de los charts === */
+.db-chart-toggle {
+  display: inline-flex;
+  background: #f1f3f5;
+  border-radius: 0.375rem;
+  padding: 2px;
+  flex-shrink: 0;
+}
+.db-chart-toggle__btn {
+  background: transparent;
+  border: none;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #5a6378;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, color 0.15s;
+}
+.db-chart-toggle__btn:hover:not(.is-active) {
+  color: #1a1a2e;
+}
+.db-chart-toggle__btn.is-active {
+  background: white;
+  color: #174ea6;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* Bar charts */
+.db-bar-row {
+  display: grid;
+  grid-template-columns: 120px 1fr 40px;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.db-bar-row__name {
+  font-size: 0.75rem;
+  color: #1a1a2e;
+  text-transform: capitalize;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.25;
+}
+.db-bar-row__pct {
+  font-size: 0.62rem;
+  color: #5a6378;
+  font-weight: 500;
+  margin-top: 1px;
+}
+.db-bar-row__track {
+  height: 18px;
+  background: #f1f3f5;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.db-bar-row__fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+.db-bar-row__value {
+  font-size: 0.75rem;
+  color: #1a1a2e;
+  text-align: right;
+  font-weight: 600;
+}
+
+/* Vertical bar (horizontal layout for value) */
+.db-bar-vert {
+  margin-bottom: 0.5rem;
+}
+.db-bar-vert__head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: #1a1a2e;
+  margin-bottom: 0.2rem;
+}
+.db-bar-vert__head span:first-child { text-transform: capitalize; }
+.db-bar-vert__track {
+  height: 8px;
+  background: #f1f3f5;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.db-bar-vert__fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+
+/* Donut */
+.db-donut {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1.25rem;
+  align-items: center;
+}
+.db-donut__svg { display: block; margin: 0 auto; }
+.db-donut__legend {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.db-donut__legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: #1a1a2e;
+}
+.db-donut__legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.db-donut__legend-name {
+  text-transform: capitalize;
+  flex: 1;
+}
+.db-donut__legend-value { font-weight: 600; }
+
+/* Pipeline */
+.db-pipeline {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.4rem;
+}
+.db-pipeline-step {
+  background: #f8f9fa;
+  border-left: 3px solid #0d9488;
+  padding: 0.5rem 0.5rem;
+  border-radius: 0.3rem;
+}
+.db-pipeline-step__num {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: #0d9488;
+}
+.db-pipeline-step__val {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+.db-pipeline-step__label {
+  font-size: 0.6rem;
+  color: #5a6378;
+}
+
+/* ═══ QUICK ACCESS ═══ */
+.db-quick-access {
+  padding: 0 2rem;
+}
+.db-section-title {
+  margin: 0 0 0.875rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: #5a6378;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+.db-quick-access-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+.db-quick-card {
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 0.5rem;
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  cursor: pointer;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+.db-quick-card:hover {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+.db-quick-card__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.db-quick-card__body { flex: 1; min-width: 0; }
+.db-quick-card__title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+.db-quick-card__meta {
+  font-size: 0.7rem;
+  color: #5a6378;
+}
+.db-quick-card__arrow {
+  color: #5a6378;
+  font-size: 0.875rem;
+}

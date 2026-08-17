@@ -1,8 +1,16 @@
 // modules/gestion-humana/contratacion/index.js
-// 📦709 · Submódulo "Contratación" — UI completa (Fase 6)
+// 📦756 · Contratación — Cards EN PROCESO + COMPLETADOS (vista moderna)
 //
-// Tabla con filtros + CRUD básico + detalle de 6 pasos + marcar paso.
-// Backend: 5 read + 4 write handlers (probados con 155+ tests).
+// Layout:
+//   - 4 KPIs: Total Procesos, En Proceso, Completados, Ingresan Esta Semana
+//   - Header de sección + botón "Nueva Contratación"
+//   - Grid 2 cols: "EN PROCESO" (cards grandes con pipeline)
+//   - Lista: "COMPLETADOS RECIENTEMENTE" (cards simples)
+//   - Modal "Nueva Contratación" (9 campos)
+//   - Modal "Detalle" (6 pasos verticales expandibles)
+//
+// Backend: gh:list-contrataciones, gh:list-sedes, gh:create-contratacion,
+//          gh:update-contratacion, gh:marcar-paso, gh:delete-contratacion
 
 class ContratacionComponent {
   constructor(container, companyName, moduleName, submoduleName, onBack) {
@@ -12,437 +20,533 @@ class ContratacionComponent {
     this.submoduleName = submoduleName;
     this.onBack = onBack;
     this.contrataciones = [];
-    this.filtered = [];
-    this.search = '';
-    this.filterEstado = 'all';
+    this.sedes = [];
+    this.sedesById = {};
   }
 
+  // ─── Constantes de los 6 pasos del pipeline ───
   static get PASOS() {
     return [
-      { num: 1, label: 'Memo / Correo', desc: 'Recepción del memo con datos del trabajador', icon: 'fa-envelope', color: '#3b82f6' },
-      { num: 2, label: 'Contacto Aspirante', desc: 'Llamar/WhatsApp para citar el día antes del ingreso', icon: 'fa-phone', color: '#3b82f6' },
-      { num: 3, label: 'Exámenes Médicos', desc: 'Coordinar con IPS según fecha de ingreso', icon: 'fa-stethoscope', color: '#3b82f6' },
-      { num: 4, label: 'Firma de Documentos', desc: '7 formatos: autorizaciones, datos, contrato, cartas', icon: 'fa-pen', color: '#3b82f6' },
-      { num: 5, label: 'Afiliaciones', desc: 'EPS, Pensión, ARL, Caja de Compensación', icon: 'fa-shield-check', color: '#3b82f6' },
-      { num: 6, label: 'Activación S400', desc: 'Activación en sistema interno tras autorización', icon: 'fa-microchip', color: '#3b82f6' }
+      { num: 1, label: 'Memo / Correo',          desc: 'Recepción del memo con datos del trabajador',  icon: 'fa-envelope' },
+      { num: 2, label: 'Contacto Aspirante',     desc: 'Llamar/WhatsApp para citar el día antes del ingreso', icon: 'fa-phone' },
+      { num: 3, label: 'Exámenes Médicos',       desc: 'Coordinar con IPS según fecha de ingreso',     icon: 'fa-stethoscope' },
+      { num: 4, label: 'Firma de Documentos',    desc: '7 formatos: autorizaciones, datos, contrato, cartas', icon: 'fa-pen' },
+      { num: 5, label: 'Afiliaciones',           desc: 'EPS, Pensión, ARL, Caja de Compensación',     icon: 'fa-shield-halved' },
+      { num: 6, label: 'Activación S400',        desc: 'Activación en sistema interno tras autorización', icon: 'fa-microchip' }
     ];
   }
 
-  // === HELPERS ===
+  // ─── Helpers ───
+  _toast() { return (window.parent && window.parent.KAIRToast) ? window.parent.KAIRToast : window.KAIRToast; }
+  _showToast(msg, type) { var t = this._toast(); if (t) t.show(msg, type || 'info'); }
+  _escHtml(s) { if (s == null) return ''; return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+  _initials(nombres, apellidos) {
+    var n = (nombres || '').trim();
+    var a = (apellidos || '').trim();
+    var i1 = n ? n.charAt(0) : '';
+    var i2 = a ? a.charAt(0) : '';
+    return (i1 + i2).toUpperCase() || '?';
+  }
+  _avatarColor(seed) {
+    var s = String(seed || '');
+    var hash = 0;
+    for (var i = 0; i < s.length; i++) hash = ((hash << 5) - hash + s.charCodeAt(i)) | 0;
+    var hue = Math.abs(hash) % 360;
+    return 'hsl(' + hue + ', 55%, 45%)';
+  }
+  _fmtCurrency(v) {
+    if (v == null || v === '') return '—';
+    var n = Number(v);
+    if (isNaN(n)) return '—';
+    return '$' + n.toLocaleString('es-CO');
+  }
   _fmtDate(iso) {
     if (!iso) return '—';
     try {
       var d = new Date(iso);
-      return d.toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' });
+      if (isNaN(d.getTime())) return '—';
+      return d.toLocaleDateString('es-CO', { year: 'numeric', month: '2-digit', day: '2-digit' });
     } catch (e) { return iso; }
   }
-  _toast() {
-    return (window.parent && window.parent.KAIRToast) ? window.parent.KAIRToast : window.KAIRToast;
+  _isoToInputDate(iso) {
+    if (!iso) return '';
+    try { return new Date(iso).toISOString().slice(0, 10); } catch (e) { return ''; }
   }
-  _confirmDialog() {
-    return (window.parent && window.parent.KairConfirm) ? window.parent.KairConfirm : window.KairConfirm;
+  _inputDateToIso(s) {
+    if (!s) return '';
+    try { return new Date(s + 'T12:00:00').toISOString(); } catch (e) { return ''; }
   }
-  _showToast(msg, type) {
-    var t = this._toast();
-    if (t) t.show(msg, type || 'info');
-  }
-  _escHtml(s) {
-    if (s == null) return '';
-    return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
-  }
-  _estadoColor(estado) {
-    var colors = {
-      'en_proceso': '#0d9488',
-      'completado': '#28a745',
-      'cancelado': '#868e96'
-    };
-    return colors[estado] || '#6c757d';
-  }
-  _estadoLabel(estado) {
-    var labels = { 'en_proceso': 'En Proceso', 'completado': 'Completado', 'cancelado': 'Cancelado' };
-    return labels[estado] || estado;
-  }
-  _pasoBoolKey(pasoNum) {
-    return ['', 'memo_recibido', 'contacto_realizado', 'examenes_programados', 'documentos_firmados', 'afiliaciones_completadas', 's400_activado'][pasoNum];
-  }
-  _pasoFechaKey(pasoNum) {
-    return ['', 'memo_fecha', 'contacto_fecha', 'examenes_fecha', 'documentos_fecha', 'afiliaciones_fecha', 's400_fecha'][pasoNum];
+  _todayIso() { return new Date().toISOString().slice(0, 10); }
+  _isSameWeek(iso) {
+    if (!iso) return false;
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return false;
+    var now = new Date();
+    var start = new Date(now);
+    start.setHours(0, 0, 0, 0);
+    start.setDate(now.getDate() - now.getDay()); // domingo
+    var end = new Date(start);
+    end.setDate(start.getDate() + 7);
+    return d >= start && d < end;
   }
 
-  // === DATA ===
-  async _load() {
+  // ─── Cálculos KPI ───
+  _kpis() {
+    var self = this;
+    var enProceso   = this.contrataciones.filter(function (c) { return c.estado === 'en_proceso'; });
+    var completados = this.contrataciones.filter(function (c) { return c.estado === 'completado'; });
+    var total       = this.contrataciones.filter(function (c) { return c.estado !== 'cancelado'; }).length;
+    var estaSemana  = this.contrataciones.filter(function (c) { return self._isSameWeek(c.fechaIngreso); }).length;
+    return {
+      total:        total,
+      enProceso:    enProceso.length,
+      completados:  completados.length,
+      estaSemana:   estaSemana,
+      enProcesoList: enProceso,
+      completadosList: completados
+    };
+  }
+
+  // ─── Carga de datos ───
+  async _loadSedes() {
     if (!window.electronAPI || !this.companyName) return;
     try {
+      var r = await window.electronAPI.ghListSedes({ companyName: this.companyName });
+      if (r && r.success && r.data && r.data.sedes) {
+        this.sedes = r.data.sedes;
+        this.sedesById = {};
+        this.sedes.forEach(function (s) { self.sedesById[s.id] = s; });
+      }
+    } catch (e) { /* noop */ }
+  }
+
+  async _loadContrataciones() {
+    if (!window.electronAPI || !this.companyName) return;
+    var self = this;
+    try {
       var r = await window.electronAPI.ghListContrataciones({ companyName: this.companyName });
-      if (r && r.success) {
+      if (r && r.success && r.data && r.data.contrataciones) {
         this.contrataciones = r.data.contrataciones;
-        this._applyFilter();
-        this._render();
+        this._renderAll();
       } else {
-        this._showToast('Error: ' + (r.error ? r.error.message : 'desconocido'), 'error');
+        this._showToast('Error: ' + ((r && r.error && r.error.message) || 'desconocido'), 'error');
       }
     } catch (e) {
       this._showToast('Error: ' + e.message, 'error');
     }
   }
 
-  _applyFilter() {
-    var s = this.search.toLowerCase().trim();
-    this.filtered = this.contrataciones.filter(function (c) {
-      var matchSearch = !s || (c.nombres && c.nombres.toLowerCase().indexOf(s) >= 0)
-        || (c.apellidos && c.apellidos.toLowerCase().indexOf(s) >= 0)
-        || (c.cedula && c.cedula.indexOf(s) >= 0)
-        || (c.cargo && c.cargo.toLowerCase().indexOf(s) >= 0);
-      var matchEstado = this.filterEstado === 'all' || c.estado === this.filterEstado;
-      return matchSearch && matchEstado;
-    }.bind(this));
+  // ─── Fetch + fallback HTML ───
+  async _fetchHtml() {
+    try {
+      var r = await fetch('modules/gestion-humana/contratacion/index.html');
+      if (r.ok) return await r.text();
+    } catch (e) { console.warn('[Contratacion] fetch HTML falló, usando fallback inline:', e.message); }
+    return '<div class="ct-wrapper" id="ct-wrapper">' +
+      '<div class="ct-kpi-section"><div id="ct-kpi-bar" class="ct-kpi-bar"></div></div>' +
+      '<div class="ct-section-head">' +
+        '<div class="ct-section-head__text"><h2 class="ct-section-head__title">Procesos de Contratación</h2>' +
+        '<p class="ct-section-head__sub">Workflow paso a paso desde recepción del memo hasta activación en S400</p></div>' +
+        '<button id="ct-new-btn" class="ct-btn ct-btn--primary" type="button"><i class="fas fa-plus"></i> Nueva Contratación</button>' +
+      '</div>' +
+      '<div class="ct-block"><h3 class="ct-block__title">EN PROCESO</h3><div id="ct-en-proceso" class="ct-cards-grid"></div></div>' +
+      '<div class="ct-block"><h3 class="ct-block__title">COMPLETADOS RECIENTEMENTE</h3><div id="ct-completados" class="ct-cards-list"></div></div>' +
+    '</div>';
   }
 
-  // === RENDER ===
-  render() {
+  // ─── Render principal ───
+  async render() {
     var self = this;
-    this.container.innerHTML = '';
+    if (!this._html) this._html = await this._fetchHtml();
+    this.container.innerHTML = this._html;
 
-    var wrapper = document.createElement('div');
-    wrapper.style.cssText = 'padding:0;height:100%;overflow-y:auto;background:#f8f9fa;display:flex;flex-direction:column;';
+    var newBtn = this.container.querySelector('#ct-new-btn');
+    if (newBtn) newBtn.onclick = function () { self._openCreateModal(); };
 
-    // ═══ HEADER ═══
-    var header = document.createElement('div');
-    header.style.cssText = 'background:white;border-bottom:1px solid #e9ecef;padding:1rem 2rem;display:flex;align-items:center;gap:1rem;flex-shrink:0;';
-    header.innerHTML =
-      '<button id="ct-back-btn" style="background:#f8f9fa;border:1px solid #dee2e6;padding:0.4rem 0.75rem;border-radius:0.5rem;cursor:pointer;color:#6c757d;font-size:0.8rem;display:inline-flex;align-items:center;gap:0.375rem;">' +
-        '<i class="fas fa-arrow-left"></i> Volver' +
-      '</button>' +
-      '<div style="flex:1;">' +
-        '<h1 style="margin:0;font-size:1.25rem;color:#1a1a2e;display:flex;align-items:center;gap:0.5rem;">' +
-          '<i class="fas fa-user-plus" style="color:#0d9488;"></i> Contratación' +
-        '</h1>' +
-        '<div style="font-size:0.7rem;color:#6c757d;">' + this.companyName + ' · Pipeline de onboarding (6 pasos)</div>' +
-      '</div>' +
-      '<button id="ct-new-btn" style="background:#0d9488;color:white;border:none;padding:0.5rem 1rem;border-radius:0.4rem;cursor:pointer;font-size:0.85rem;font-weight:500;display:inline-flex;align-items:center;gap:0.4rem;">' +
-        '<i class="fas fa-plus"></i> Nueva Contratación' +
-      '</button>';
-    wrapper.appendChild(header);
+    this._renderKpiBar();
+    this._renderEnProceso();
+    this._renderCompletados();
 
-    // ═══ STATS BAR ═══
-    var statsBar = document.createElement('div');
-    statsBar.id = 'ct-stats-bar';
-    statsBar.style.cssText = 'background:#f8f9fa;padding:0.75rem 2rem;border-bottom:1px solid #e9ecef;display:flex;gap:1rem;flex-wrap:wrap;flex-shrink:0;';
-    wrapper.appendChild(statsBar);
-
-    // ═══ FILTERS BAR ═══
-    var filtersBar = document.createElement('div');
-    filtersBar.style.cssText = 'background:white;padding:0.75rem 2rem;border-bottom:1px solid #e9ecef;display:flex;gap:0.75rem;align-items:center;flex-shrink:0;';
-    filtersBar.innerHTML =
-      '<div style="flex:1;position:relative;">' +
-        '<i class="fas fa-search" style="position:absolute;left:0.75rem;top:50%;transform:translateY(-50%);color:#6c757d;font-size:0.85rem;"></i>' +
-        '<input id="ct-search" type="text" placeholder="Buscar por cédula, nombre, apellido o cargo..." value="' + this._escHtml(this.search) + '" style="width:100%;padding:0.5rem 0.75rem 0.5rem 2.25rem;border:1px solid #dee2e6;border-radius:0.4rem;font-size:0.85rem;outline:none;" />' +
-      '</div>' +
-      '<select id="ct-filter-estado" style="padding:0.5rem 0.75rem;border:1px solid #dee2e6;border-radius:0.4rem;font-size:0.85rem;background:white;outline:none;cursor:pointer;">' +
-        '<option value="all">Todos los estados</option>' +
-        '<option value="en_proceso">En Proceso</option>' +
-        '<option value="completado">Completados</option>' +
-        '<option value="cancelado">Cancelados</option>' +
-      '</select>';
-    wrapper.appendChild(filtersBar);
-
-    // ═══ TABLE CONTAINER ═══
-    var tableContainer = document.createElement('div');
-    tableContainer.id = 'ct-table-container';
-    tableContainer.style.cssText = 'flex:1;overflow-y:auto;background:white;';
-    wrapper.appendChild(tableContainer);
-
-    this.container.appendChild(wrapper);
-
-    // Wire up
-    document.getElementById('ct-back-btn').onclick = function () { if (self.onBack) self.onBack(); };
-    document.getElementById('ct-new-btn').onclick = function () { self._openCreateModal(); };
-    document.getElementById('ct-search').oninput = function (e) { self.search = e.target.value; self._applyFilter(); self._renderTable(); };
-    document.getElementById('ct-filter-estado').value = this.filterEstado;
-    document.getElementById('ct-filter-estado').onchange = function (e) { self.filterEstado = e.target.value; self._applyFilter(); self._renderTable(); };
-
-    this._load();
+    this._loadSedes();
+    this._loadContrataciones();
   }
 
-  _renderStatsBar() {
-    var total = this.contrataciones.length;
-    var enProceso = this.contrataciones.filter(function (c) { return c.estado === 'en_proceso'; }).length;
-    var completados = this.contrataciones.filter(function (c) { return c.estado === 'completado'; }).length;
-    var cancelados = this.contrataciones.filter(function (c) { return c.estado === 'cancelado'; }).length;
-    var stats = [
-      { label: 'Total', value: total, color: '#174ea6' },
-      { label: 'En Proceso', value: enProceso, color: '#0d9488' },
-      { label: 'Completados', value: completados, color: '#28a745' },
-      { label: 'Cancelados', value: cancelados, color: '#868e96' }
+  _renderAll() {
+    this._renderKpiBar();
+    this._renderEnProceso();
+    this._renderCompletados();
+  }
+
+  _renderKpiBar() {
+    var bar = this.container.querySelector('#ct-kpi-bar');
+    if (!bar || !window.GHKPIBar) return;
+    var k = this._kpis();
+    var kpis = [
+      { icon: 'fa-folder-open',  color: '#174ea6', bg: '#e8f0fe', value: k.total,        label: 'Total Procesos' },
+      { icon: 'fa-spinner',      color: '#b06000', bg: '#fff3cd', value: k.enProceso,    label: 'En Proceso' },
+      { icon: 'fa-circle-check', color: '#28a745', bg: '#d4edda', value: k.completados,  label: 'Completados' },
+      { icon: 'fa-calendar-day', color: '#0d9488', bg: '#ccfbf1', value: k.estaSemana,   label: 'Ingresan Esta Semana' }
     ];
-    var html = '';
-    stats.forEach(function (s) {
-      html += '<div style="display:flex;align-items:center;gap:0.5rem;padding:0.25rem 0.75rem;border-right:1px solid #dee2e6;">' +
-        '<div style="font-size:1.1rem;font-weight:700;color:' + s.color + ';">' + s.value + '</div>' +
-        '<div style="font-size:0.65rem;text-transform:uppercase;color:#6c757d;letter-spacing:0.3px;">' + s.label + '</div>' +
-      '</div>';
-    });
-    document.getElementById('ct-stats-bar').innerHTML = html;
+    window.GHKPIBar.render(bar, kpis);
   }
 
-  _renderTable() {
-    var container = document.getElementById('ct-table-container');
-    if (!container) return;
+  // ─── Render: EN PROCESO (grid de cards) ───
+  _renderEnProceso() {
+    var cont = this.container.querySelector('#ct-en-proceso');
+    if (!cont) return;
+    var self = this;
+    var list = this.contrataciones.filter(function (c) { return c.estado === 'en_proceso'; });
 
-    if (this.filtered.length === 0) {
-      container.innerHTML =
-        '<div style="padding:4rem 2rem;text-align:center;color:#6c757d;">' +
-          '<i class="fas fa-inbox" style="font-size:3rem;margin-bottom:1rem;color:#dee2e6;"></i>' +
-          '<p style="font-size:1rem;margin:0;">' + (this.contrataciones.length === 0 ? 'No hay procesos de contratación.' : 'No se encontraron procesos con esos filtros.') + '</p>' +
-          (this.contrataciones.length === 0 ? '<p style="font-size:0.85rem;margin:0.5rem 0 0;">Hacé click en <strong>Nueva Contratación</strong> para empezar un proceso.</p>' : '') +
-        '</div>';
+    if (list.length === 0) {
+      cont.innerHTML = '<div class="ct-empty">No hay procesos en curso. Iniciá uno con "Nueva Contratación".</div>';
       return;
     }
 
-    var rows = '';
+    var html = list.map(function (c) { return self._renderEnProcesoCard(c); }).join('');
+    cont.innerHTML = html;
+
+    cont.querySelectorAll('.ct-card').forEach(function (card) {
+      card.onclick = function () { self._openDetailModal(card.getAttribute('data-id')); };
+    });
+  }
+
+  _renderEnProcesoCard(c) {
     var self = this;
-    this.filtered.forEach(function (c) {
-      var estadoColor = self._estadoColor(c.estado);
-      var paso = c.pasoActual || 1;
-      var pasoLabel = paso + '/6';
-      rows += '<tr style="border-bottom:1px solid #f1f3f5;">' +
-        '<td style="padding:0.625rem 1rem;color:#6c757d;font-family:monospace;font-size:0.8rem;">' + self._escHtml(c.cedula || '—') + '</td>' +
-        '<td style="padding:0.625rem 1rem;">' +
-          '<div style="font-weight:500;color:#1a1a2e;">' + self._escHtml(c.nombres + ' ' + c.apellidos) + '</div>' +
-          '<div style="font-size:0.7rem;color:#6c757d;">' + self._escHtml(c.cargo || '—') + '</div>' +
-        '</td>' +
-        '<td style="padding:0.625rem 1rem;color:#495057;">' + self._fmtDate(c.fechaIngreso) + '</td>' +
-        '<td style="padding:0.625rem 1rem;">' +
-          '<div style="display:flex;align-items:center;gap:0.5rem;">' +
-            '<div style="background:#e9ecef;height:6px;width:80px;border-radius:3px;overflow:hidden;">' +
-              '<div style="background:#0d9488;height:100%;width:' + ((paso / 6) * 100) + '%;"></div>' +
+    var paso = c.pasoActual || 1;
+    var pasoLabel = this._pasoLabel(paso);
+    var pasoIcon = this._pasoIcon(paso);
+    var sedeNombre = c.sedeId && this.sedesById[c.sedeId] ? this.sedesById[c.sedeId].nombre : (c.sedeId || '');
+    var initials = this._initials(c.nombres, c.apellidos);
+    var avatarBg = this._avatarColor(c.cedula || c.id);
+
+    return '<div class="ct-card ct-card--en_proceso" data-id="' + this._escHtml(c.id) + '">' +
+      '<div class="ct-card__head">' +
+        '<div class="ct-avatar" style="background:' + avatarBg + ';">' + this._escHtml(initials) + '</div>' +
+        '<div class="ct-card__head-text">' +
+          '<div class="ct-card__name">' + this._escHtml((c.nombres || '') + ' ' + (c.apellidos || '')) + '</div>' +
+          '<div class="ct-card__cargo">' + this._escHtml((c.cargo || '—') + ' · ' + (sedeNombre || 'Sin sede')) + '</div>' +
+        '</div>' +
+        '<span class="ct-paso-chip"><i class="fas ' + pasoIcon + '"></i> Paso ' + paso + '/6</span>' +
+      '</div>' +
+      '<div class="ct-card__grid">' +
+        '<div><div class="ct-card__field-label">Fecha Ingreso</div><div class="ct-card__field-value">' + this._fmtDate(c.fechaIngreso) + '</div></div>' +
+        '<div><div class="ct-card__field-label">Salario</div><div class="ct-card__field-value">' + this._fmtCurrency(c.salario) + '</div></div>' +
+        '<div><div class="ct-card__field-label">Teléfono</div><div class="ct-card__field-value ct-card__field-value--mono">' + (c.telefono ? this._escHtml(c.telefono) : '—') + '</div></div>' +
+        '<div><div class="ct-card__field-label">Empresa Usuaria</div><div class="ct-card__field-value">' + (c.empresaUsuaria ? this._escHtml(c.empresaUsuaria) : '—') + '</div></div>' +
+      '</div>' +
+      '<div class="ct-card__progress">' +
+        '<div class="ct-card__progress-label"><span>Progreso del proceso</span><span>' + Math.round((paso / 6) * 100) + '%</span></div>' +
+        '<div class="ct-card__progress-bar"><div class="ct-card__progress-fill" style="width:' + ((paso / 6) * 100) + '%;"></div></div>' +
+      '</div>' +
+      '<div class="ct-card__paso-actual"><i class="fas ' + pasoIcon + '"></i> Paso actual: ' + pasoLabel + '<i class="fas fa-chevron-right ct-card__arrow"></i></div>' +
+    '</div>';
+  }
+
+  _pasoLabel(n) { return (ContratacionComponent.PASOS[n - 1] || {}).label || '—'; }
+  _pasoIcon(n)  { return (ContratacionComponent.PASOS[n - 1] || {}).icon  || 'fa-circle'; }
+
+  // ─── Render: COMPLETADOS (lista) ───
+  _renderCompletados() {
+    var cont = this.container.querySelector('#ct-completados');
+    if (!cont) return;
+    var self = this;
+    var list = this.contrataciones.filter(function (c) { return c.estado === 'completado'; });
+
+    if (list.length === 0) {
+      cont.innerHTML = '<div class="ct-empty">Aún no hay contrataciones completadas.</div>';
+      return;
+    }
+
+    // Limitar a las 6 más recientes
+    list = list.slice(0, 6);
+
+    var html = list.map(function (c) {
+      var initials = self._initials(c.nombres, c.apellidos);
+      var avatarBg = self._avatarColor(c.cedula || c.id);
+      var cargo = c.cargo || '—';
+      return '<div class="ct-card-row" data-id="' + self._escHtml(c.id) + '">' +
+        '<div class="ct-avatar" style="background:' + avatarBg + ';">' + self._escHtml(initials) + '</div>' +
+        '<div class="ct-card-row__text">' +
+          '<div class="ct-card-row__name">' + self._escHtml((c.nombres || '') + ' ' + (c.apellidos || '')) + '</div>' +
+          '<div class="ct-card-row__meta">' + self._escHtml(cargo) + ' · ' + self._fmtDate(c.fechaIngreso) + '</div>' +
+        '</div>' +
+        '<span class="ct-card-row__badge"><i class="fas fa-check"></i> Completado</span>' +
+        '<div class="ct-card-row__date">' + self._fmtDate(c.s400Fecha || c.updatedAt) + '</div>' +
+      '</div>';
+    }).join('');
+    cont.innerHTML = html;
+
+    cont.querySelectorAll('.ct-card-row').forEach(function (row) {
+      row.onclick = function () { self._openDetailModal(row.getAttribute('data-id')); };
+    });
+  }
+
+  // ─── Modal: Nueva Contratación (9 campos) ───
+  _openCreateModal() {
+    var self = this;
+    var sedeOptions = this.sedes.map(function (s) {
+      return '<option value="' + self._escHtml(s.id) + '">' + self._escHtml(s.nombre) + '</option>';
+    }).join('');
+
+    var html =
+      '<div class="ct-modal-backdrop" id="ct-create-backdrop">' +
+        '<div class="ct-modal" role="dialog" aria-modal="true">' +
+          '<div class="ct-modal__head">' +
+            '<div>' +
+              '<h2 class="ct-modal__title">Nueva Contratación</h2>' +
+              '<p class="ct-modal__sub">Datos del memo/correo inicial</p>' +
             '</div>' +
-            '<span style="font-size:0.7rem;color:#6c757d;font-weight:600;">' + pasoLabel + '</span>' +
+            '<button class="ct-modal__close" type="button" aria-label="Cerrar">×</button>' +
           '</div>' +
-        '</td>' +
-        '<td style="padding:0.625rem 1rem;">' +
-          '<span style="background:' + estadoColor + ';color:white;padding:0.15rem 0.5rem;border-radius:0.75rem;font-size:0.7rem;font-weight:600;">' + self._escHtml(self._estadoLabel(c.estado)) + '</span>' +
-        '</td>' +
-        '<td style="padding:0.625rem 1rem;text-align:right;">' +
-          '<button class="ct-view" data-id="' + self._escHtml(c.id) + '" style="background:#e8f0fe;color:#174ea6;border:none;padding:0.3rem 0.6rem;border-radius:0.3rem;cursor:pointer;font-size:0.75rem;margin-right:0.25rem;" title="Ver detalle">' +
-            '<i class="fas fa-eye"></i>' +
-          '</button>' +
-          (c.estado !== 'cancelado' ? '<button class="ct-cancel" data-id="' + self._escHtml(c.id) + '" data-nombre="' + self._escHtml(c.nombres + " " + c.apellidos) + '" style="background:#f8d7da;color:#dc3545;border:none;padding:0.3rem 0.6rem;border-radius:0.3rem;cursor:pointer;font-size:0.75rem;" title="Cancelar">' +
-            '<i class="fas fa-ban"></i>' +
-          '</button>' : '') +
-        '</td>' +
-      '</tr>';
-    });
-
-    container.innerHTML =
-      '<table style="width:100%;border-collapse:collapse;font-size:0.85rem;">' +
-        '<thead style="background:#f8f9fa;position:sticky;top:0;z-index:1;">' +
-          '<tr style="border-bottom:2px solid #dee2e6;">' +
-            '<th style="padding:0.75rem 1rem;text-align:left;font-size:0.7rem;text-transform:uppercase;color:#6c757d;letter-spacing:0.3px;font-weight:600;">Cédula</th>' +
-            '<th style="padding:0.75rem 1rem;text-align:left;font-size:0.7rem;text-transform:uppercase;color:#6c757d;letter-spacing:0.3px;font-weight:600;">Aspirante</th>' +
-            '<th style="padding:0.75rem 1rem;text-align:left;font-size:0.7rem;text-transform:uppercase;color:#6c757d;letter-spacing:0.3px;font-weight:600;">Ingreso</th>' +
-            '<th style="padding:0.75rem 1rem;text-align:left;font-size:0.7rem;text-transform:uppercase;color:#6c757d;letter-spacing:0.3px;font-weight:600;">Pipeline</th>' +
-            '<th style="padding:0.75rem 1rem;text-align:left;font-size:0.7rem;text-transform:uppercase;color:#6c757d;letter-spacing:0.3px;font-weight:600;">Estado</th>' +
-            '<th style="padding:0.75rem 1rem;text-align:right;font-size:0.7rem;text-transform:uppercase;color:#6c757d;letter-spacing:0.3px;font-weight:600;">Acciones</th>' +
-          '</tr>' +
-        '</thead>' +
-        '<tbody>' + rows + '</tbody>' +
-      '</table>';
-
-    this._renderStatsBar();
-
-    // Wire up row actions
-    var viewBtns = container.querySelectorAll('.ct-view');
-    viewBtns.forEach(function (btn) {
-      btn.onclick = function () { self._openDetailModal(btn.getAttribute('data-id')); };
-    });
-    var cancelBtns = container.querySelectorAll('.ct-cancel');
-    cancelBtns.forEach(function (btn) {
-      btn.onclick = function () { self._openCancelConfirm(btn.getAttribute('data-id'), btn.getAttribute('data-nombre')); };
-    });
-  }
-
-  _render() {
-    this._renderStatsBar();
-    this._renderTable();
-  }
-
-  // === MODALS ===
-  async _openCreateModal() {
-    var values = await this._confirmDialog().input({
-      title: '➕ Nueva Contratación',
-      message: 'Iniciá un nuevo proceso de contratación. Los campos marcados con * son obligatorios.',
-      fields: [
-        { key: 'nombres', label: 'Nombres', type: 'text', required: true, placeholder: 'Ej: María' },
-        { key: 'apellidos', label: 'Apellidos', type: 'text', required: true, placeholder: 'Ej: López García' },
-        { key: 'cedula', label: 'Cédula', type: 'text', placeholder: '1234567890' },
-        { key: 'telefono', label: 'Teléfono', type: 'text', placeholder: '3001234567' },
-        { key: 'cargo', label: 'Cargo', type: 'text', required: true, placeholder: 'Ej: Operario de mantenimiento' },
-        { key: 'salario', label: 'Salario (COP)', type: 'number', placeholder: '1500000' },
-        { key: 'fechaIngreso', label: 'Fecha de Ingreso (YYYY-MM-DD)', type: 'text', required: true, placeholder: '2026-09-01' }
-      ],
-      confirmText: 'Crear Contratación',
-      type: 'info'
-    });
-    if (!values) return;
-    this._create(values);
-  }
-
-  async _openCancelConfirm(contratacionId, nombre) {
-    var confirmed = await this._confirmDialog().confirm({
-      title: '🚫 Cancelar Contratación',
-      message: '¿Cancelar la contratación de "' + nombre + '"?',
-      details: 'Esto cambia el estado a "cancelado" (soft via estado). El registro se preserva para histórico.',
-      confirmText: 'Sí, cancelar',
-      cancelText: 'No, volver',
-      type: 'warning'
-    });
-    if (!confirmed) return;
-    this._cancel(contratacionId);
-  }
-
-  async _openDetailModal(contratacionId) {
-    var c = this.contrataciones.find(function (x) { return x.id === contratacionId; });
-    if (!c) {
-      this._showToast('Contratación no encontrada', 'error');
-      return;
-    }
-
-    // Construir el contenido del modal con los 6 pasos
-    var pasosHtml = '';
-    var pasos = ContratacionComponent.PASOS;
-    var self = this;
-    pasos.forEach(function (p) {
-      var boolKey = self._pasoBoolKey(p.num);
-      var fechaKey = self._pasoFechaKey(p.num);
-      var completado = c[boolKey] === 1;
-      var fecha = c[fechaKey];
-      var isCurrent = c.pasoActual === p.num;
-      var isPast = c.pasoActual > p.num;
-      var bg = completado ? '#d4edda' : (isCurrent ? '#fff3cd' : '#f8f9fa');
-      var borderColor = completado ? '#28a745' : (isCurrent ? '#ffc107' : '#dee2e6');
-      var iconBg = completado ? '#28a745' : (isCurrent ? '#ffc107' : '#adb5bd');
-      var iconClass = completado ? 'fa-check' : (isCurrent ? 'fa-clock' : String(p.num));
-
-      pasosHtml += '<div style="background:' + bg + ';border-left:4px solid ' + borderColor + ';border-radius:0.4rem;padding:0.875rem;margin-bottom:0.5rem;display:flex;align-items:center;gap:0.75rem;">' +
-        '<div style="width:36px;height:36px;border-radius:50%;background:' + iconBg + ';color:white;display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
-          (completado ? '<i class="fas fa-check"></i>' : (isCurrent ? '<i class="fas fa-clock"></i>' : '<span style="font-weight:700;">' + p.num + '</span>')) +
-        '</div>' +
-        '<div style="flex:1;">' +
-          '<div style="font-weight:600;color:#1a1a2e;">' + p.label + '</div>' +
-          '<div style="font-size:0.75rem;color:#6c757d;">' + p.desc + '</div>' +
-          (fecha ? '<div style="font-size:0.7rem;color:#28a745;margin-top:0.25rem;"><i class="fas fa-calendar-check"></i> ' + self._fmtDate(fecha) + '</div>' : '') +
-        '</div>' +
-        (c.estado !== 'cancelado' ? '<button class="ct-marcar-paso" data-paso="' + p.num + '" data-contratacion-id="' + self._escHtml(c.id) + '" style="background:' + (completado ? '#6c757d' : '#0d9488') + ';color:white;border:none;padding:0.4rem 0.75rem;border-radius:0.3rem;cursor:pointer;font-size:0.75rem;white-space:nowrap;">' +
-          (completado ? '<i class="fas fa-undo"></i> Revertir' : '<i class="fas fa-check"></i> Marcar') +
-        '</button>' : '') +
-      '</div>';
-    });
-
-    // Crear overlay
-    var overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:2rem;';
-    overlay.innerHTML =
-      '<div style="background:white;border-radius:0.5rem;max-width:700px;width:100%;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">' +
-        '<div style="padding:1.25rem 1.5rem;border-bottom:1px solid #dee2e6;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:white;z-index:1;">' +
-          '<div>' +
-            '<h2 style="margin:0;font-size:1.1rem;color:#1a1a2e;">' + self._escHtml(c.nombres + ' ' + c.apellidos) + '</h2>' +
-            '<div style="font-size:0.75rem;color:#6c757d;">' + self._escHtml(c.cargo || '—') + ' · Ingreso: ' + self._fmtDate(c.fechaIngreso) + '</div>' +
+          '<div class="ct-modal__body">' +
+            '<form id="ct-create-form" class="ct-form-grid">' +
+              '<div class="ct-field"><label>Nombres <span class="req">*</span></label><input type="text" name="nombres" required /></div>' +
+              '<div class="ct-field"><label>Apellidos <span class="req">*</span></label><input type="text" name="apellidos" required /></div>' +
+              '<div class="ct-field"><label>Cédula</label><input type="text" name="cedula" inputmode="numeric" /></div>' +
+              '<div class="ct-field"><label>Teléfono</label><input type="text" name="telefono" inputmode="numeric" /></div>' +
+              '<div class="ct-field"><label>Cargo <span class="req">*</span></label><input type="text" name="cargo" placeholder="Ej: Salvavidas, Recepcionista" required /></div>' +
+              '<div class="ct-field"><label>Salario (COP)</label><input type="number" name="salario" placeholder="1300000" /></div>' +
+              '<div class="ct-field"><label>Fecha Ingreso <span class="req">*</span></label><input type="date" name="fechaIngreso" required /></div>' +
+              '<div class="ct-field"><label>Sede</label><select name="sedeId"><option value="">— sin asignar —</option>' + sedeOptions + '</select></div>' +
+              '<div class="ct-field ct-field--full"><label>Empresa Usuaria (Cliente)</label><input type="text" name="empresaUsuaria" placeholder="Ej: COMFAMILIAR ATLANTICO" /></div>' +
+            '</form>' +
           '</div>' +
-          '<button id="ct-detail-close" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:#6c757d;padding:0 0.5rem;">&times;</button>' +
-        '</div>' +
-        '<div style="padding:1.5rem;">' +
-          '<div style="margin-bottom:1rem;font-size:0.85rem;color:#6c757d;">Pipeline de 6 pasos: ' +
-            '<span style="background:' + self._estadoColor(c.estado) + ';color:white;padding:0.15rem 0.5rem;border-radius:0.75rem;font-size:0.7rem;font-weight:600;">' + self._escHtml(self._estadoLabel(c.estado)) + '</span>' +
+          '<div class="ct-modal__foot">' +
+            '<button class="ct-btn ct-btn--ghost" type="button" data-action="cancel">Cancelar</button>' +
+            '<button class="ct-btn ct-btn--primary" type="button" data-action="submit"><i class="fas fa-play"></i> Iniciar Proceso</button>' +
           '</div>' +
-          pasosHtml +
         '</div>' +
       '</div>';
-    document.body.appendChild(overlay);
 
-    document.getElementById('ct-detail-close').onclick = function () { overlay.remove(); };
-    overlay.onclick = function (e) { if (e.target === overlay) overlay.remove(); };
+    var wrap = document.createElement('div');
+    wrap.innerHTML = html;
+    var backdrop = wrap.firstChild;
+    document.body.appendChild(backdrop);
 
-    // Wire up "Marcar paso" buttons
-    var marcarBtns = overlay.querySelectorAll('.ct-marcar-paso');
-    marcarBtns.forEach(function (btn) {
-      btn.onclick = function () {
-        var paso = parseInt(btn.getAttribute('data-paso'), 10);
-        var ctId = btn.getAttribute('data-contratacion-id');
-        overlay.remove();
-        self._openMarcarPasoModal(ctId, paso, c);
+    var close = function () { if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop); };
+    backdrop.querySelector('.ct-modal__close').onclick = close;
+    backdrop.querySelector('[data-action="cancel"]').onclick = close;
+    backdrop.onclick = function (e) { if (e.target === backdrop) close(); };
+
+    backdrop.querySelector('[data-action="submit"]').onclick = function () {
+      var form = backdrop.querySelector('#ct-create-form');
+      if (!form.checkValidity()) { form.reportValidity(); return; }
+      var data = {
+        nombres:       form.nombres.value.trim(),
+        apellidos:     form.apellidos.value.trim(),
+        cedula:        form.cedula.value.trim() || null,
+        telefono:      form.telefono.value.trim() || null,
+        cargo:         form.cargo.value.trim(),
+        salario:       form.salario.value ? Number(form.salario.value) : null,
+        fechaIngreso:  self._inputDateToIso(form.fechaIngreso.value),
+        sedeId:        form.sedeId.value || null,
+        empresaUsuaria: form.empresaUsuaria.value.trim() || null
       };
-    });
+      close();
+      self._create(data);
+    };
   }
 
-  async _openMarcarPasoModal(contratacionId, pasoNum, c) {
-    var paso = ContratacionComponent.PASOS.find(function (p) { return p.num === pasoNum; });
-    var nuevoEstado = pasoNum === 6;
-    var titlePrefix = c[this._pasoBoolKey(pasoNum)] === 1 ? 'Revertir' : 'Marcar';
-    var values = await this._confirmDialog().input({
-      title: titlePrefix + ' paso ' + pasoNum + ': ' + paso.label,
-      message: paso.desc + (nuevoEstado ? '\n\n✅ Marcar el paso 6 cambia el estado a "completado".' : ''),
-      fields: [
-        { key: 'fecha', label: 'Fecha (YYYY-MM-DD)', type: 'text', required: true, value: new Date().toISOString().slice(0, 10), placeholder: '2026-08-15' },
-        { key: 'notas', label: 'Notas (opcional)', type: 'textarea', placeholder: 'Detalles del paso...' }
-      ],
-      confirmText: titlePrefix + ' paso',
-      type: nuevoEstado ? 'success' : 'info'
-    });
-    if (!values) return;
-    this._marcarPaso(contratacionId, pasoNum, values.fecha, values.notas);
-  }
-
-  // === IPC CALLS ===
   async _create(data) {
+    var self = this;
     try {
       var r = await window.electronAPI.ghCreateContratacion({ companyName: this.companyName, data: data });
       if (r && r.success) {
-        this._showToast('✅ Contratación creada: ' + data.nombres + ' ' + data.apellidos, 'success');
-        await this._load();
+        this._showToast('Proceso de contratación iniciado', 'success');
+        await this._loadContrataciones();
       } else {
-        this._showToast('❌ Error: ' + (r.error ? r.error.message : 'desconocido'), 'error');
+        this._showToast('Error: ' + ((r && r.error && r.error.message) || 'desconocido'), 'error');
       }
     } catch (e) {
-      this._showToast('❌ Error: ' + e.message, 'error');
+      this._showToast('Error: ' + e.message, 'error');
     }
   }
 
-  async _cancel(contratacionId) {
+  // ─── Modal: Detalle de Contratación (6 pasos) ───
+  _openDetailModal(id) {
+    var c = this.contrataciones.find(function (x) { return x.id === id; });
+    if (!c) { this._showToast('Contratación no encontrada', 'error'); return; }
+    var self = this;
+    var sedeNombre = c.sedeId && this.sedesById[c.sedeId] ? this.sedesById[c.sedeId].nombre : (c.sedeId || '—');
+
+    var badgeClass = 'ct-detail-badge';
+    if (c.estado === 'completado') badgeClass += ' ct-detail-badge--completado';
+    if (c.estado === 'cancelado')  badgeClass += ' ct-detail-badge--cancelado';
+    var badgeLabel = { 'en_proceso': 'En proceso', 'completado': 'Completado', 'cancelado': 'Cancelado' }[c.estado] || c.estado;
+
+    var html =
+      '<div class="ct-modal-backdrop" id="ct-detail-backdrop">' +
+        '<div class="ct-modal" role="dialog" aria-modal="true" style="max-width:780px;">' +
+          '<div class="ct-modal__head">' +
+            '<div>' +
+              '<h2 class="ct-modal__title">' + this._escHtml((c.nombres || '') + ' ' + (c.apellidos || '')) +
+                ' <span class="' + badgeClass + '">' + badgeLabel + '</span></h2>' +
+              '<p class="ct-modal__sub">' + this._escHtml((c.cargo || '—') + ' · ' + sedeNombre + ' · Ingreso: ' + this._fmtDate(c.fechaIngreso) + ' · Salario: ' + this._fmtCurrency(c.salario)) + '</p>' +
+            '</div>' +
+            '<button class="ct-modal__close" type="button" aria-label="Cerrar">×</button>' +
+          '</div>' +
+          '<div class="ct-modal__body" id="ct-steps-body"></div>' +
+          '<div class="ct-modal__foot">' +
+            (c.estado !== 'cancelado' ?
+              '<button class="ct-btn ct-btn--ghost" type="button" data-action="cancel-ct"><i class="fas fa-ban"></i> Cancelar Contratación</button>' :
+              '') +
+            '<button class="ct-btn ct-btn--primary" type="button" data-action="close">Cerrar</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    var wrap = document.createElement('div');
+    wrap.innerHTML = html;
+    var backdrop = wrap.firstChild;
+    document.body.appendChild(backdrop);
+
+    var close = function () { if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop); };
+    backdrop.querySelector('.ct-modal__close').onclick = close;
+    backdrop.querySelector('[data-action="close"]').onclick = close;
+    backdrop.onclick = function (e) { if (e.target === backdrop) close(); };
+    var cancelBtn = backdrop.querySelector('[data-action="cancel-ct"]');
+    if (cancelBtn) cancelBtn.onclick = function () { close(); self._openCancelConfirm(c.id, (c.nombres || '') + ' ' + (c.apellidos || '')); };
+
+    var body = backdrop.querySelector('#ct-steps-body');
+    body.innerHTML = this._renderPasos(c);
+
+    // Eventos de los pasos (delegación)
+    body.querySelectorAll('.ct-step').forEach(function (step) {
+      var pasoNum = parseInt(step.getAttribute('data-paso'), 10);
+      var boolKey = self._pasoBoolKey(pasoNum);
+      var isDone = c[boolKey] === 1;
+      var header = step.querySelector('.ct-step__head');
+      if (header) {
+        header.style.cursor = (c.estado !== 'cancelado') ? 'pointer' : 'default';
+        header.onclick = function () {
+          if (c.estado === 'cancelado') return;
+          if (isDone) return; // no expandir pasos ya completados
+          step.classList.toggle('ct-step--expanded');
+        };
+      }
+      var submitBtn = step.querySelector('[data-action="marcar-paso"]');
+      if (submitBtn) {
+        submitBtn.onclick = function () {
+          var fechaVal = step.querySelector('input[name="fecha"]').value;
+          var notasVal = step.querySelector('textarea[name="notas"]').value;
+          var extraField = step.querySelector('input[name="ips"]');
+          var ipsVal = extraField ? extraField.value : null;
+          var payload = {
+            contratacionId: c.id,
+            pasoNum: pasoNum,
+            fecha: fechaVal ? self._inputDateToIso(fechaVal) : null,
+            notas: notasVal || null
+          };
+          if (ipsVal !== null) payload.fecha = fechaVal ? self._inputDateToIso(fechaVal) : null; // ips se guarda en notas como contexto si hace falta
+          // NOTA: el backend gh:marcar-paso solo persiste fecha+notas. Si el paso es
+          // Exámenes Médicos, también guardamos el nombre de la IPS en notas (sufijo).
+          if (pasoNum === 3 && ipsVal) {
+            payload.notas = (notasVal ? (notasVal + ' · ') : '') + 'IPS: ' + ipsVal;
+          }
+          close();
+          self._marcarPaso(payload);
+        };
+      }
+    });
+  }
+
+  _pasoBoolKey(n) { return ['', 'memoRecibido', 'contactoRealizado', 'examenesProgramados', 'documentosFirmados', 'afiliacionesCompletadas', 's400Activado'][n]; }
+  _pasoFechaKey(n) { return ['', 'memoFecha', 'contactoFecha', 'examenesFecha', 'documentosFecha', 'afiliacionesFecha', 's400Fecha'][n]; }
+  _pasoNotasKey(n) { return ['', 'memoNotas', 'contactoNotas', 'examenesNotas', 'documentosNotas', 'afiliacionesNotas', 's400Notas'][n]; }
+
+  _renderPasos(c) {
+    var self = this;
+    return ContratacionComponent.PASOS.map(function (p) {
+      var isDone = c[self._pasoBoolKey(p.num)] === 1;
+      var fecha = c[self._pasoFechaKey(p.num)];
+      var notas = c[self._pasoNotasKey(p.num)];
+      var isCurrent = c.pasoActual === p.num && !isDone;
+      var isCanceled = c.estado === 'cancelado';
+
+      var cls = 'ct-step';
+      if (isDone) cls += ' ct-step--done';
+      else if (isCurrent) cls += ' ct-step--current';
+      else cls += ' ct-step--pending';
+
+      var numHtml = isDone ? '<i class="fas fa-check"></i>' : (isCurrent ? '<i class="fas fa-clock"></i>' : String(p.num));
+      var badge = isDone
+        ? '<span class="ct-step__badge"><i class="fas fa-check"></i> Completado</span>'
+        : (isCurrent ? '<span class="ct-step__badge ct-step__badge--pending"><i class="fas fa-hourglass-half"></i> Pendiente</span>' : '');
+
+      var meta = '';
+      if (isDone && fecha) meta = '<div class="ct-step__meta"><i class="fas fa-calendar-check"></i> Fecha: ' + self._fmtDate(fecha) + '</div>';
+      if (notas && isDone) meta += '<div class="ct-step__meta ct-step__meta--neutral" style="margin-top:0.15rem;"><i class="fas fa-note-sticky"></i> ' + self._escHtml(notas) + '</div>';
+
+      // Solo expandir pasos NO completados Y no cancelados
+      var expandible = (!isDone && !isCanceled);
+      var fechaInputId = 'ct-step-' + p.num + '-fecha';
+      var notasInputId = 'ct-step-' + p.num + '-notas';
+      var ipsInputId = 'ct-step-' + p.num + '-ips';
+
+      var expand = '';
+      if (expandible) {
+        var defaultFecha = fecha ? self._isoToInputDate(fecha) : self._todayIso();
+        expand = '<div class="ct-step__expand">' +
+          '<div class="ct-step__expand-row">' +
+            '<div class="ct-field"><label>Fecha</label><input type="date" name="fecha" id="' + fechaInputId + '" value="' + defaultFecha + '" /></div>' +
+            (p.num === 3 ? '<div class="ct-field"><label>IPS</label><input type="text" name="ips" id="' + ipsInputId + '" placeholder="Ej: IPS Compensar" /></div>' : '<div></div>') +
+          '</div>' +
+          '<div class="ct-field"><label>Notas</label><textarea name="notas" id="' + notasInputId + '" rows="2" placeholder="Registrar detalles del paso..." style="width:100%;padding:0.5rem 0.7rem;border:1px solid #dee2e6;border-radius:0.35rem;font-size:0.85rem;font-family:inherit;outline:none;resize:vertical;box-sizing:border-box;">' + self._escHtml(notas || '') + '</textarea></div>' +
+          '<div class="ct-step__expand-actions">' +
+            '<button class="ct-btn ct-btn--success ct-btn--small" type="button" data-action="marcar-paso"><i class="fas fa-check-circle"></i> Marcar como completado</button>' +
+          '</div>' +
+        '</div>';
+      }
+
+      return '<div class="' + cls + '" data-paso="' + p.num + '">' +
+        '<div class="ct-step__num">' + numHtml + '</div>' +
+        '<div class="ct-step__body">' +
+          '<div class="ct-step__head">' +
+            '<div><div class="ct-step__title"><i class="fas ' + p.icon + '"></i> ' + p.label + '</div>' +
+            '<div class="ct-step__desc">' + p.desc + '</div></div>' +
+            badge +
+          '</div>' +
+          meta +
+          expand +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  async _marcarPaso(payload) {
     try {
-      var r = await window.electronAPI.ghDeleteContratacion({ contratacionId: contratacionId });
+      var r = await window.electronAPI.ghMarcarPaso(payload);
       if (r && r.success) {
-        this._showToast('✅ Contratación cancelada', 'success');
-        await this._load();
+        this._showToast('Paso marcado como completado', 'success');
+        await this._loadContrataciones();
+        // Re-abrir el modal con la versión actualizada
+        if (payload.contratacionId) this._openDetailModal(payload.contratacionId);
       } else {
-        this._showToast('❌ Error: ' + (r.error ? r.error.message : 'desconocido'), 'error');
+        this._showToast('Error: ' + ((r && r.error && r.error.message) || 'desconocido'), 'error');
       }
     } catch (e) {
-      this._showToast('❌ Error: ' + e.message, 'error');
+      this._showToast('Error: ' + e.message, 'error');
     }
   }
 
-  async _marcarPaso(contratacionId, pasoNum, fecha, notas) {
+  async _openCancelConfirm(id, nombre) {
+    var confirmed = window.confirm('¿Cancelar la contratación de "' + nombre + '"?\n\nEl registro se preserva como cancelado para histórico.');
+    if (!confirmed) return;
     try {
-      var r = await window.electronAPI.ghMarcarPaso({ contratacionId: contratacionId, pasoNum: pasoNum, fecha: fecha, notas: notas });
+      var r = await window.electronAPI.ghDeleteContratacion({ contratacionId: id });
       if (r && r.success) {
-        if (pasoNum === 6) {
-          this._showToast('🎉 ¡Proceso de contratación completado! Paso 6 marcado.', 'success');
-        } else {
-          this._showToast('✅ Paso ' + pasoNum + ' marcado correctamente', 'success');
-        }
-        await this._load();
+        this._showToast('Contratación cancelada', 'success');
+        await this._loadContrataciones();
       } else {
-        this._showToast('❌ Error: ' + (r.error ? r.error.message : 'desconocido'), 'error');
+        this._showToast('Error: ' + ((r && r.error && r.error.message) || 'desconocido'), 'error');
       }
     } catch (e) {
-      this._showToast('❌ Error: ' + e.message, 'error');
+      this._showToast('Error: ' + e.message, 'error');
     }
   }
 
-  destroy() {
-    if (this.container) this.container.innerHTML = '';
-  }
+  destroy() { /* noop */ }
 }
 
 window.ContratacionComponent = ContratacionComponent;

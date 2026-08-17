@@ -144,13 +144,18 @@ function _rowToPersonal(row) {
     fechaRetiro: row.fecha_retiro,
     estado: row.estado,
     eps: row.eps,
+    epsFecha: row.eps_fecha,
     pension: row.pension,
+    pensionFecha: row.pension_fecha,
     arl: row.arl,
+    arlFecha: row.arl_fecha,
     cajaCompensacion: row.caja_compensacion,
+    cajaFecha: row.caja_fecha,
     activoS400: row.activo_s400,
     empresaUsuaria: row.empresa_usuaria,
     banco: row.banco,
     numeroCuenta: row.numero_cuenta,
+    sedeId: row.sede_id,
     activo: row.activo,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -226,6 +231,8 @@ function _rowToDocumento(row) {
     estado: row.estado,
     fechaFirma: row.fecha_firma,
     version: row.version,
+    rutaArchivo: row.ruta_archivo,         // 📦764 · ruta del archivo generado
+    nombreArchivo: row.nombre_archivo,     // 📦764 · nombre del archivo generado
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -750,7 +757,7 @@ function _handlerCreatePersonal(token, companyName, data) {
       "  direccion, barrio, ciudad, cargo, salario, tipo_contrato, " +
       "  fecha_ingreso, fecha_retiro, estado, " +
       "  eps, pension, arl, caja_compensacion, activo_s400, " +
-      "  empresa_usuaria, banco, numero_cuenta, " +
+      "  empresa_usuaria, banco, numero_cuenta, sede_id, " +
       "  activo, created_at, updated_at) " +
       "VALUES (?, ?, ?, ?, ?, " +
       "  ?, ?, ?, ?, ?, " +
@@ -758,7 +765,7 @@ function _handlerCreatePersonal(token, companyName, data) {
       "  ?, ?, ?, ?, ?, ?, " +
       "  ?, ?, 'activo', " +
       "  ?, ?, ?, ?, ?, " +
-      "  ?, ?, ?, " +
+      "  ?, ?, ?, ?, " +
       "  1, ?, ?)"
     ).run(
       id, company.company_key, data.nombres, data.apellidos, data.cedula,
@@ -773,6 +780,7 @@ function _handlerCreatePersonal(token, companyName, data) {
       data.eps || null, data.pension || null, data.arl || null, data.cajaCompensacion || null,
       data.activoS400 || 0,
       data.empresaUsuaria || null, data.banco || null, data.numeroCuenta || null,
+      data.sedeId || null,
       now, now
     );
     return _ok({ personalId: id });
@@ -834,7 +842,8 @@ function _handlerUpdatePersonal(token, personalId, updates) {
     activoS400: 'activo_s400',
     empresaUsuaria: 'empresa_usuaria',
     banco: 'banco',
-    numeroCuenta: 'numero_cuenta'
+    numeroCuenta: 'numero_cuenta',
+    sedeId: 'sede_id'
   };
 
   try {
@@ -1734,18 +1743,52 @@ function _handlerCreateDocumento(token, companyName, data) {
 
     var id = _newId('do-');
     var now = new Date().toISOString();
+    // 📦764 · Si viene templateId, copiamos el archivo del template a una
+    // nueva ubicación para el documento generado. Así el template queda
+    // intacto y el user puede tener múltiples documentos del mismo template.
+    var rutaArchivo = data.rutaArchivo || null;
+    var nombreArchivo = data.nombreArchivo || null;
+    if (data.templateId && !rutaArchivo) {
+      var fs2 = registerGestionHumanaHandlers._fs;
+      var path2 = registerGestionHumanaHandlers._path;
+      if (fs2 && path2) {
+        try {
+          var tplRow = localDb.prepare('SELECT * FROM gh_templates WHERE id = ?').get(data.templateId);
+          if (tplRow && tplRow.ruta_archivo && fs2.existsSync(tplRow.ruta_archivo)) {
+            var srcPath = tplRow.ruta_archivo;
+            var ext = path2.extname(srcPath) || '.docx';
+            var app = registerGestionHumanaHandlers._app;
+            var baseDir = app ? app.getPath('userData') : require('os').tmpdir();
+            var docDir = path2.join(baseDir, 'gh-docs', company.company_key);
+            if (!fs2.existsSync(docDir)) fs2.mkdirSync(docDir, { recursive: true });
+            var destPath = path2.join(docDir, id + ext);
+            fs2.copyFileSync(srcPath, destPath);
+            rutaArchivo = destPath;
+            nombreArchivo = tplRow.nombre_archivo;
+            console.log('[' + MOD + '] Template ' + data.templateId + ' copiado a ' + destPath);
+          } else {
+            console.warn('[' + MOD + '] Template ' + data.templateId + ' no encontrado o sin archivo');
+          }
+        } catch (e) {
+          console.error('[' + MOD + '][copy-template]', e.message);
+          // No fatal: el documento se crea igual sin archivo adjunto
+        }
+      }
+    }
     localDb.prepare(
       "INSERT INTO gh_documentos (id, trabajador_id, empresa_id, tipo, titulo, contenido, " +
-      "  firma_id, estado, fecha_firma, version, created_at, updated_at) " +
-      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      "  firma_id, estado, fecha_firma, version, ruta_archivo, nombre_archivo, " +
+      "  created_at, updated_at) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     ).run(
       id, data.trabajadorId, company.company_key,
       data.tipo, data.titulo, data.contenido,
       data.firmaId || null, data.estado || 'pendiente',
       data.fechaFirma || null, data.version || 1,
+      rutaArchivo, nombreArchivo,
       now, now
     );
-    return _ok({ documentoId: id });
+    return _ok({ documentoId: id, rutaArchivo: rutaArchivo, nombreArchivo: nombreArchivo });
   } catch (e) {
     console.error('[' + MOD + '][create-documento]', e.message);
     return _err('INTERNAL', e.message);
@@ -2442,6 +2485,628 @@ function _handlerMarcarLeido(token, mensajeId, fechaLectura) {
   }
 }
 
+// ========== 📦760 · DOCUMENTOS DE AFILIACIONES — certificados EPS / Pensión / ARL / Caja ==========
+// 1 documento por slot (trabajador + tipo_afiliacion). El archivo se guarda en el
+// filesystem (AppData) y esta tabla solo guarda la metadata + ruta absoluta.
+
+var _TIPOS_AFIL = ['eps', 'pension', 'arl', 'caja'];
+
+function _rowToDocAfil(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    empresaId: row.empresa_id,
+    trabajadorId: row.trabajador_id,
+    tipoAfiliacion: row.tipo_afiliacion,
+    nombreArchivo: row.nombre_archivo,
+    rutaArchivo: row.ruta_archivo,
+    tamanoBytes: row.tamano_bytes,
+    mimeType: row.mime_type,
+    subidoPor: row.subido_por,
+    fechaSubida: row.fecha_subida,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+// Construye la ruta de storage para el documento.
+// Path: <userData>/gh-docs-afil/<empresaId>/<trabajadorId>/<tipoAfiliacion>.pdf
+function _docsAfilPath(empresaId, trabajadorId, tipoAfiliacion) {
+  var app = registerGestionHumanaHandlers._app;
+  var path = registerGestionHumanaHandlers._path;
+  if (!app || !path) return null;
+  var base = app.getPath('userData');
+  return path.join(base, 'gh-docs-afil', String(empresaId), String(trabajadorId), String(tipoAfiliacion) + '.pdf');
+}
+
+// Asegura que el directorio exista (mkdir -p recursivo).
+function _ensureDirSync(dirPath) {
+  var fs = registerGestionHumanaHandlers._fs;
+  if (!fs) return;
+  try {
+    if (!fs.existsSync(dirPath)) {
+      fs.mkdirSync(dirPath, { recursive: true });
+    }
+  } catch (e) {
+    console.error('[' + MOD + '][_ensureDirSync]', e.message);
+  }
+}
+
+// Borra un archivo si existe, sin throw.
+function _safeUnlinkSync(filePath) {
+  var fs = registerGestionHumanaHandlers._fs;
+  if (!fs || !filePath) return false;
+  try {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      return true;
+    }
+  } catch (e) {
+    console.warn('[' + MOD + '][_safeUnlinkSync] No se pudo borrar', filePath, ':', e.message);
+  }
+  return false;
+}
+
+/**
+ * gh:list-documentos-afiliaciones
+ * Lista los 4 documentos del trabajador (uno por tipo_afiliacion).
+ * Devuelve un array de 4 elementos (uno por slot, con doc=null si no hay).
+ * Input: { token, companyName, trabajadorId }
+ * Devuelve: { success, data: { documentos: [{ tipoAfiliacion, doc|null }] } }
+ */
+function _handlerListDocsAfil(token, companyName, trabajadorId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!companyName || typeof companyName !== 'string') {
+    return _err('INVALID_INPUT', 'companyName es requerido');
+  }
+  if (!trabajadorId || typeof trabajadorId !== 'string') {
+    return _err('INVALID_INPUT', 'trabajadorId es requerido');
+  }
+
+  var company = _getCompanyByName(companyName);
+  if (!company) {
+    return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var stmtL = localDb.prepare(
+      "SELECT * FROM gh_documentos_afiliaciones WHERE empresa_id = ? AND trabajador_id = ? ORDER BY tipo_afiliacion"
+    );
+    var rows = stmtL.all(company.company_key, trabajadorId);
+    var docsByTipo = {};
+    rows.forEach(function (r) {
+      docsByTipo[r.tipo_afiliacion] = _rowToDocAfil(r);
+    });
+
+    // Devolver SIEMPRE 4 slots (uno por tipo), con doc=null si no hay
+    var documentos = _TIPOS_AFIL.map(function (tipo) {
+      return { tipoAfiliacion: tipo, doc: docsByTipo[tipo] || null };
+    });
+
+    return _ok({ documentos: documentos, count: rows.length });
+  } catch (e) {
+    console.error('[' + MOD + '][list-documentos-afiliaciones]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:subir-documento-afiliacion
+ * Sube (o reemplaza) el documento PDF de un slot (trabajador + tipo_afiliacion).
+ * Usa dialog.showOpenDialog para que el usuario seleccione el PDF.
+ * El archivo se copia a <userData>/gh-docs-afil/<empresaId>/<trabajadorId>/<tipoAfiliacion>.pdf
+ * Input: { token, companyName, trabajadorId, tipoAfiliacion }
+ * Devuelve: { success, data: { doc: { id, nombreArchivo, tamanoBytes, ... } } }
+ */
+function _handlerSubirDocAfil(token, companyName, trabajadorId, tipoAfiliacion) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!companyName || typeof companyName !== 'string') {
+    return _err('INVALID_INPUT', 'companyName es requerido');
+  }
+  if (!trabajadorId || typeof trabajadorId !== 'string') {
+    return _err('INVALID_INPUT', 'trabajadorId es requerido');
+  }
+  if (!tipoAfiliacion || _TIPOS_AFIL.indexOf(tipoAfiliacion) < 0) {
+    return _err('INVALID_INPUT', 'tipoAfiliacion inválido. Permitidos: ' + _TIPOS_AFIL.join(', '));
+  }
+
+  var company = _getCompanyByName(companyName);
+  if (!company) {
+    return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+  var dialog = registerGestionHumanaHandlers._dialog;
+  var fs = registerGestionHumanaHandlers._fs;
+  if (!dialog || !fs) return _err('NO_DIALOG', 'dialog/fs no disponibles');
+
+  // Verificar que el trabajador existe
+  try {
+    var trabRow = localDb.prepare('SELECT id FROM base_personal WHERE id = ? AND empresa_id = ?').get(trabajadorId, company.company_key);
+    if (!trabRow) return _err('NOT_FOUND', 'Trabajador "' + trabajadorId + '" no encontrado');
+  } catch (e) {
+    return _err('INTERNAL', e.message);
+  }
+
+  // Abrir dialog
+  return dialog.showOpenDialog({
+    title: 'Seleccionar PDF de ' + tipoAfiliacion.toUpperCase(),
+    filters: [
+      { name: 'Documentos PDF', extensions: ['pdf'] },
+      { name: 'Todos los archivos', extensions: ['*'] }
+    ],
+    properties: ['openFile']
+  }).then(function (result) {
+    if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+      return _ok({ canceled: true });
+    }
+    var sourcePath = result.filePaths[0];
+
+    // Verificar tamaño (max 10MB)
+    var stats;
+    try { stats = fs.statSync(sourcePath); } catch (e) { return _err('FILE_ERROR', 'No se pudo leer el archivo: ' + e.message); }
+    var tamanoBytes = stats.size;
+    if (tamanoBytes > 10 * 1024 * 1024) {
+      return _err('FILE_TOO_LARGE', 'El PDF es demasiado grande (max 10MB). Tamaño actual: ' + Math.round(tamanoBytes / 1024 / 1024) + 'MB');
+    }
+
+    // Construir ruta destino y copiar
+    var destPath = _docsAfilPath(company.company_key, trabajadorId, tipoAfiliacion);
+    if (!destPath) return _err('NO_PATH', 'No se pudo construir la ruta de destino');
+    _ensureDirSync(require('path').dirname(destPath));
+
+    // Si ya existe un doc en este slot, eliminarlo antes
+    _safeUnlinkSync(destPath);
+
+    try {
+      fs.copyFileSync(sourcePath, destPath);
+    } catch (e) {
+      return _err('COPY_ERROR', 'No se pudo copiar el archivo: ' + e.message);
+    }
+
+    // Extraer nombre original
+    var path = require('path');
+    var nombreArchivo = path.basename(sourcePath);
+    var now = new Date().toISOString();
+
+    // UPSERT: si ya existe un doc para este slot, actualizar; si no, insertar
+    var existing = localDb.prepare(
+      'SELECT id FROM gh_documentos_afiliaciones WHERE empresa_id = ? AND trabajador_id = ? AND tipo_afiliacion = ?'
+    ).get(company.company_key, trabajadorId, tipoAfiliacion);
+
+    var stmtU;
+    if (existing) {
+      stmtU = localDb.prepare(
+        'UPDATE gh_documentos_afiliaciones SET nombre_archivo = ?, ruta_archivo = ?, tamano_bytes = ?, fecha_subida = ?, updated_at = ? WHERE id = ?'
+      );
+      var stmtUx = stmtU;  // Capturar para apply con this correcto
+      stmtUx.run.apply(stmtUx, [nombreArchivo, destPath, tamanoBytes, now, now, existing.id]);
+    } else {
+      var id = _newId('daf-');
+      stmtU = localDb.prepare(
+        'INSERT INTO gh_documentos_afiliaciones (id, empresa_id, trabajador_id, tipo_afiliacion, nombre_archivo, ruta_archivo, tamano_bytes, mime_type, fecha_subida, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      );
+      var stmtIx = stmtU;
+      stmtIx.run.apply(stmtIx, [id, company.company_key, trabajadorId, tipoAfiliacion, nombreArchivo, destPath, tamanoBytes, 'application/pdf', now, now, now]);
+    }
+
+    // Leer el doc final
+    var finalRow = localDb.prepare(
+      'SELECT * FROM gh_documentos_afiliaciones WHERE empresa_id = ? AND trabajador_id = ? AND tipo_afiliacion = ?'
+    ).get(company.company_key, trabajadorId, tipoAfiliacion);
+
+    return _ok({ doc: _rowToDocAfil(finalRow), replaced: !!existing });
+  }).catch(function (e) {
+    console.error('[' + MOD + '][subir-documento-afiliacion]', e.message);
+    return _err('INTERNAL', e.message);
+  });
+}
+
+/**
+ * gh:eliminar-documento-afiliacion
+ * Borra el archivo del FS + el registro de la BD.
+ * Input: { token, documentoId }
+ * Devuelve: { success, data: { documentoId } }
+ */
+function _handlerEliminarDocAfil(token, documentoId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!documentoId || typeof documentoId !== 'string') {
+    return _err('INVALID_INPUT', 'documentoId es requerido');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var row = localDb.prepare('SELECT * FROM gh_documentos_afiliaciones WHERE id = ?').get(documentoId);
+    if (!row) return _err('NOT_FOUND', 'Documento no encontrado');
+
+    // Borrar archivo del FS (no fatal si falla)
+    if (row.ruta_archivo) _safeUnlinkSync(row.ruta_archivo);
+
+    // Borrar registro
+    var stmtD = localDb.prepare('DELETE FROM gh_documentos_afiliaciones WHERE id = ?');
+    stmtD.run(documentoId);
+    return _ok({ documentoId: documentoId });
+  } catch (e) {
+    console.error('[' + MOD + '][eliminar-documento-afiliacion]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:obtener-documento-afiliacion
+ * Devuelve el doc con la ruta + tamano (para que el frontend pueda abrirlo o hacer preview).
+ * Input: { token, documentoId }
+ * Devuelve: { success, data: { doc: { ... rutaArchivo, tamanoBytes, ... } } }
+ */
+function _handlerObtenerDocAfil(token, documentoId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!documentoId || typeof documentoId !== 'string') {
+    return _err('INVALID_INPUT', 'documentoId es requerido');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var row = localDb.prepare('SELECT * FROM gh_documentos_afiliaciones WHERE id = ?').get(documentoId);
+    if (!row) return _err('NOT_FOUND', 'Documento no encontrado');
+    return _ok({ doc: _rowToDocAfil(row) });
+  } catch (e) {
+    console.error('[' + MOD + '][obtener-documento-afiliacion]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:abrir-documento-afiliacion
+ * Abre el PDF con la aplicación por defecto del sistema (Windows: Edge, Acrobat, etc.).
+ * Input: { token, documentoId }
+ * Devuelve: { success, data: { rutaArchivo } }
+ */
+function _handlerAbrirDocAfil(token, documentoId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!documentoId || typeof documentoId !== 'string') {
+    return _err('INVALID_INPUT', 'documentoId es requerido');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+  var shell = registerGestionHumanaHandlers._shell;
+  if (!shell) return _err('NO_SHELL', 'shell no disponible');
+
+  try {
+    var row = localDb.prepare('SELECT ruta_archivo FROM gh_documentos_afiliaciones WHERE id = ?').get(documentoId);
+    if (!row) return _err('NOT_FOUND', 'Documento no encontrado');
+    if (!row.ruta_archivo) return _err('NO_PATH', 'Documento sin ruta');
+    return shell.openPath(row.ruta_archivo).then(function (errMsg) {
+      if (errMsg) return _err('OPEN_FAILED', errMsg);
+      return _ok({ rutaArchivo: row.ruta_archivo });
+    });
+  } catch (e) {
+    console.error('[' + MOD + '][abrir-documento-afiliacion]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+// 📦764 · Abre el archivo generado de un documento (gh_documentos.ruta_archivo)
+// con la app por defecto del sistema (Word, Acrobat, etc.)
+function _handlerAbrirDocumento(token, documentoId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+  if (!documentoId || typeof documentoId !== 'string') {
+    return _err('INVALID_INPUT', 'documentoId es requerido');
+  }
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+  var shell = registerGestionHumanaHandlers._shell;
+  if (!shell) return _err('NO_SHELL', 'shell no disponible');
+  try {
+    var row = localDb.prepare('SELECT ruta_archivo FROM gh_documentos WHERE id = ?').get(documentoId);
+    if (!row) return _err('NOT_FOUND', 'Documento no encontrado');
+    if (!row.ruta_archivo) return _err('NO_PATH', 'Documento sin archivo adjunto');
+    return shell.openPath(row.ruta_archivo).then(function (errMsg) {
+      if (errMsg) return _err('OPEN_FAILED', errMsg);
+      return _ok({ rutaArchivo: row.ruta_archivo });
+    });
+  } catch (e) {
+    console.error('[' + MOD + '][abrir-documento]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+// ========== 📦764 · TEMPLATES DE DOCUMENTOS — .docx/.pdf subidos por el user ==========
+// Cada template está asociado a un tipo de documento (autorizacion_datos, contrato, etc.)
+// y se guarda el archivo en el filesystem (AppData) y metadata en gh_templates.
+// Al generar un documento, se copia el template seleccionado como archivo del documento.
+
+var _TIPOS_DOC = ['autorizacion_datos', 'autorizacion_hojas_vida', 'actualizacion_datos', 'induccion', 'contrato', 'carta_examenes', 'carta_cuenta_bancaria'];
+
+function _rowToTemplate(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    empresaId: row.empresa_id,
+    tipoDocumento: row.tipo_documento,
+    nombre: row.nombre,
+    nombreArchivo: row.nombre_archivo,
+    rutaArchivo: row.ruta_archivo,
+    tamanoBytes: row.tamano_bytes,
+    mimeType: row.mime_type,
+    subidoPor: row.subido_por,
+    fechaSubida: row.fecha_subida,
+    activo: row.activo,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+// Construye la ruta de storage para el template.
+// Path: <userData>/gh-templates/<empresaId>/<templateId>.<ext>
+function _templatePath(empresaId, templateId, ext) {
+  var app = registerGestionHumanaHandlers._app;
+  var path = registerGestionHumanaHandlers._path;
+  if (!app || !path) return null;
+  var base = app.getPath('userData');
+  return path.join(base, 'gh-templates', String(empresaId), templateId + '.' + ext);
+}
+
+/**
+ * gh:list-templates
+ * Lista los templates activos de la empresa, opcionalmente filtrados por tipo.
+ * Input: { token, companyName, tipoDocumento? }
+ * Devuelve: { success, data: { templates: [...] } }
+ */
+function _handlerListTemplates(token, companyName, tipoDocumento) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!companyName || typeof companyName !== 'string') {
+    return _err('INVALID_INPUT', 'companyName es requerido');
+  }
+
+  var company = _getCompanyByName(companyName);
+  if (!company) {
+    return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var sql = "SELECT * FROM gh_templates WHERE empresa_id = ? AND activo = 1";
+    var params = [company.company_key];
+    if (tipoDocumento && typeof tipoDocumento === 'string') {
+      sql += " AND tipo_documento = ?";
+      params.push(tipoDocumento);
+    }
+    sql += " ORDER BY fecha_subida DESC";
+
+    var stmt = localDb.prepare(sql);
+    var rows = stmt.all.apply(stmt, params);
+    var templates = rows.map(_rowToTemplate);
+
+    return _ok({ templates: templates, count: templates.length });
+  } catch (e) {
+    console.error('[' + MOD + '][list-templates]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:subir-template
+ * Sube un nuevo template (PDF o DOCX). Usa dialog.showOpenDialog para que el
+ * user seleccione el archivo. El archivo se copia a AppData y se crea un
+ * registro en gh_templates.
+ * Input: { token, companyName, tipoDocumento, nombre, subidoPor? }
+ * Devuelve: { success, data: { template: {...} } }
+ */
+function _handlerSubirTemplate(token, companyName, tipoDocumento, nombre, subidoPor) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!companyName || typeof companyName !== 'string') {
+    return _err('INVALID_INPUT', 'companyName es requerido');
+  }
+  if (!tipoDocumento || _TIPOS_DOC.indexOf(tipoDocumento) < 0) {
+    return _err('INVALID_INPUT', 'tipoDocumento inválido. Permitidos: ' + _TIPOS_DOC.join(', '));
+  }
+  if (!nombre || typeof nombre !== 'string' || nombre.trim().length === 0) {
+    return _err('INVALID_INPUT', 'nombre es requerido');
+  }
+
+  var company = _getCompanyByName(companyName);
+  if (!company) {
+    return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+  var dialog = registerGestionHumanaHandlers._dialog;
+  var fs = registerGestionHumanaHandlers._fs;
+  var path = registerGestionHumanaHandlers._path;
+  if (!dialog || !fs || !path) return _err('NO_DIALOG', 'dialog/fs/path no disponibles');
+
+  // Filtrar por extensiones permitidas: .pdf, .docx, .doc
+  return dialog.showOpenDialog({
+    title: 'Seleccionar template de documento',
+    filters: [
+      { name: 'Documentos Office y PDF', extensions: ['pdf', 'docx', 'doc'] },
+      { name: 'Todos los archivos', extensions: ['*'] }
+    ],
+    properties: ['openFile']
+  }).then(function (result) {
+    if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+      return _ok({ canceled: true });
+    }
+    var sourcePath = result.filePaths[0];
+    var ext = path.extname(sourcePath).toLowerCase().replace(/^\./, '') || 'docx';
+    if (['pdf', 'docx', 'doc'].indexOf(ext) < 0) {
+      return _err('INVALID_FORMAT', 'Solo se permiten archivos .pdf, .docx o .doc');
+    }
+
+    // Verificar tamaño (max 10MB)
+    var stats;
+    try { stats = fs.statSync(sourcePath); } catch (e) { return _err('FILE_ERROR', 'No se pudo leer el archivo: ' + e.message); }
+    var tamanoBytes = stats.size;
+    if (tamanoBytes > 10 * 1024 * 1024) {
+      return _err('FILE_TOO_LARGE', 'El template es demasiado grande (max 10MB). Tamaño actual: ' + Math.round(tamanoBytes / 1024 / 1024) + 'MB');
+    }
+
+    // Crear ID y ruta destino
+    var templateId = _newId('tp-');
+    var destPath = _templatePath(company.company_key, templateId, ext);
+    if (!destPath) return _err('NO_PATH', 'No se pudo construir la ruta de destino');
+
+    // Crear directorio si no existe
+    var destDir = path.dirname(destPath);
+    if (!fs.existsSync(destDir)) {
+      fs.mkdirSync(destDir, { recursive: true });
+    }
+
+    // Copiar archivo
+    try {
+      fs.copyFileSync(sourcePath, destPath);
+    } catch (e) {
+      return _err('COPY_ERROR', 'No se pudo copiar el archivo: ' + e.message);
+    }
+
+    var nombreArchivo = path.basename(sourcePath);
+    var mimeType = ext === 'pdf' ? 'application/pdf'
+      : (ext === 'docx' ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      : 'application/msword');
+    var now = new Date().toISOString();
+
+    // Insertar en BD
+    localDb.prepare(
+      'INSERT INTO gh_templates (id, empresa_id, tipo_documento, nombre, nombre_archivo, ruta_archivo, tamano_bytes, mime_type, subido_por, fecha_subida, activo, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)'
+    ).run(
+      templateId, company.company_key, tipoDocumento, nombre.trim(), nombreArchivo, destPath, tamanoBytes, mimeType,
+      subidoPor || null, now, now, now
+    );
+
+    // Leer el template recién creado
+    var row = localDb.prepare('SELECT * FROM gh_templates WHERE id = ?').get(templateId);
+    return _ok({ template: _rowToTemplate(row) });
+  }).catch(function (e) {
+    console.error('[' + MOD + '][subir-template]', e.message);
+    return _err('INTERNAL', e.message);
+  });
+}
+
+/**
+ * gh:eliminar-template
+ * Borra el archivo del FS y el registro de la BD (soft delete).
+ * Input: { token, templateId }
+ * Devuelve: { success, data: { templateId } }
+ */
+function _handlerEliminarTemplate(token, templateId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!templateId || typeof templateId !== 'string') {
+    return _err('INVALID_INPUT', 'templateId es requerido');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+  var fs = registerGestionHumanaHandlers._fs;
+  if (!fs) return _err('NO_FS', 'fs no disponible');
+
+  try {
+    var row = localDb.prepare('SELECT * FROM gh_templates WHERE id = ?').get(templateId);
+    if (!row) return _err('NOT_FOUND', 'Template no encontrado');
+
+    // Borrar archivo del FS (no fatal si falla)
+    if (row.ruta_archivo) _safeUnlinkSync(row.ruta_archivo);
+
+    // Soft delete (activo = 0) para mantener historial
+    var stmt = localDb.prepare('UPDATE gh_templates SET activo = 0, updated_at = ? WHERE id = ?');
+    var stmtExec = stmt;  // capturar para apply con this correcto
+    stmtExec.run.apply(stmtExec, [new Date().toISOString(), templateId]);
+    return _ok({ templateId: templateId });
+  } catch (e) {
+    console.error('[' + MOD + '][eliminar-template]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:obtener-template
+ * Retorna metadata del template (incluida la ruta del archivo) para que el
+ * frontend pueda descargarlo o hacer preview.
+ * Input: { token, templateId }
+ * Devuelve: { success, data: { template: {...} } }
+ */
+function _handlerObtenerTemplate(token, templateId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!templateId || typeof templateId !== 'string') {
+    return _err('INVALID_INPUT', 'templateId es requerido');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var row = localDb.prepare('SELECT * FROM gh_templates WHERE id = ?').get(templateId);
+    if (!row) return _err('NOT_FOUND', 'Template no encontrado');
+    return _ok({ template: _rowToTemplate(row) });
+  } catch (e) {
+    console.error('[' + MOD + '][obtener-template]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:abrir-template
+ * Abre el archivo del template con la aplicación por defecto del sistema.
+ * Input: { token, templateId }
+ * Devuelve: { success, data: { rutaArchivo } }
+ */
+function _handlerAbrirTemplate(token, templateId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!templateId || typeof templateId !== 'string') {
+    return _err('INVALID_INPUT', 'templateId es requerido');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+  var shell = registerGestionHumanaHandlers._shell;
+  if (!shell) return _err('NO_SHELL', 'shell no disponible');
+
+  try {
+    var row = localDb.prepare('SELECT ruta_archivo FROM gh_templates WHERE id = ?').get(templateId);
+    if (!row) return _err('NOT_FOUND', 'Template no encontrado');
+    if (!row.ruta_archivo) return _err('NO_PATH', 'Template sin ruta');
+    return shell.openPath(row.ruta_archivo).then(function (errMsg) {
+      if (errMsg) return _err('OPEN_FAILED', errMsg);
+      return _ok({ rutaArchivo: row.ruta_archivo });
+    });
+  } catch (e) {
+    console.error('[' + MOD + '][abrir-template]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
 // ========== STUBS (legacy — kept for compat, but all are now real) ==========
 function _stubHandler(channel) {
   return function (event, payload) {
@@ -2877,7 +3542,8 @@ function registerGestionHumanaHandlers(app, deps) {
           "SELECT name FROM sqlite_master WHERE type='table' AND name IN (" +
           "  'contrataciones', 'base_personal', 'gh_sedes'," +
           "  'gh_vacaciones', 'gh_permisos', 'gh_documentos'," +
-          "  'gh_firmas_digitales', 'gh_anuncios', 'gh_mensajes'" +
+          "  'gh_firmas_digitales', 'gh_anuncios', 'gh_mensajes'," +
+          "  'gh_documentos_afiliaciones', 'gh_templates'" +
           ") ORDER BY name"
         ).all();
         tables = tablesResult.map(function(r) { return r.name; });
@@ -2885,19 +3551,404 @@ function registerGestionHumanaHandlers(app, deps) {
     }
     return _ok({
       bridge: 'gestion-humana',
-      phase: 5,  // 📦710 · FASE C: 28 handlers nuevos para 6 tablas
+      phase: 7,  // 📦764 · FASE G: 5 handlers nuevos para templates de documentos
       has_getDb: !!_getDb,
       has_validateSession: !!_validateSession,
       tables: tables,
-      message: 'Gestión Humana bridge en Fase 5 (44 handlers reales + 1 diag · 9 tablas)'
+      message: 'Gestión Humana bridge en Fase 7 (54 handlers reales + 1 diag · 11 tablas)'
     });
   });
 
-  console.log('[' + MOD + '][INIT][SUCCESS] Bridge registrado · 5 read + 4 write-contratacion + 4 write-personal + 2 write-sedes + 6 vacaciones + 5 permisos + 6 documentos + 2 firmas + 5 anuncios + 4 mensajes + 1 diag · 44 handlers totales · Fase 5');
+  // ========== 📦760 · DOCUMENTOS DE AFILIACIONES (5) — Fase 6 ==========
+  ipcMainHandle('gh:list-documentos-afiliaciones', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerListDocsAfil(p.token || '', p.companyName, p.trabajadorId);
+    } catch (e) {
+      console.error('[' + MOD + '][list-documentos-afiliaciones]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:subir-documento-afiliacion', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerSubirDocAfil(p.token || '', p.companyName, p.trabajadorId, p.tipoAfiliacion);
+    } catch (e) {
+      console.error('[' + MOD + '][subir-documento-afiliacion]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:eliminar-documento-afiliacion', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerEliminarDocAfil(p.token || '', p.documentoId);
+    } catch (e) {
+      console.error('[' + MOD + '][eliminar-documento-afiliacion]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:obtener-documento-afiliacion', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerObtenerDocAfil(p.token || '', p.documentoId);
+    } catch (e) {
+      console.error('[' + MOD + '][obtener-documento-afiliacion]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:abrir-documento-afiliacion', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerAbrirDocAfil(p.token || '', p.documentoId);
+    } catch (e) {
+      console.error('[' + MOD + '][abrir-documento-afiliacion]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  // 📦764 · Abrir documento generado (gh_documentos.ruta_archivo)
+  ipcMainHandle('gh:abrir-documento', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerAbrirDocumento(p.token || '', p.documentoId);
+    } catch (e) {
+      console.error('[' + MOD + '][abrir-documento]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+
+  // ========== 📦764 · TEMPLATES (5) — Fase 7 ==========
+  ipcMainHandle('gh:list-templates', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerListTemplates(p.token || '', p.companyName, p.tipoDocumento);
+    } catch (e) {
+      console.error('[' + MOD + '][list-templates]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:subir-template', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerSubirTemplate(p.token || '', p.companyName, p.tipoDocumento, p.nombre, p.subidoPor);
+    } catch (e) {
+      console.error('[' + MOD + '][subir-template]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:eliminar-template', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerEliminarTemplate(p.token || '', p.templateId);
+    } catch (e) {
+      console.error('[' + MOD + '][eliminar-template]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:obtener-template', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerObtenerTemplate(p.token || '', p.templateId);
+    } catch (e) {
+      console.error('[' + MOD + '][obtener-template]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:abrir-template', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerAbrirTemplate(p.token || '', p.templateId);
+    } catch (e) {
+      console.error('[' + MOD + '][abrir-template]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+
+  // ========== 📦732 · IMPORT EXCEL (3 handlers nuevos) ==========
+
+  // gh:select-excel — abre el dialogo del sistema para seleccionar .xlsx/.xls/.csv
+  ipcMainHandle('gh:select-excel', function (event, payload) {
+    try {
+      var dialog = registerGestionHumanaHandlers._dialog;
+      if (!dialog) return _err('NO_DIALOG', 'Dialog no disponible');
+      var opts = {
+        title: 'Seleccionar archivo Excel de trabajadores',
+        filters: [
+          { name: 'Archivos Excel', extensions: ['xlsx', 'xls', 'csv'] },
+          { name: 'Todos los archivos', extensions: ['*'] }
+        ],
+        properties: ['openFile']
+      };
+      return dialog.showOpenDialog(opts).then(function (result) {
+        if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+          return _ok({ canceled: true, filePath: null });
+        }
+        return _ok({ canceled: false, filePath: result.filePaths[0] });
+      });
+    } catch (e) {
+      console.error('[' + MOD + '][select-excel]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+
+  // gh:parse-excel — lee el archivo y devuelve headers + rows como JSON.
+  // El renderer usa estos datos para mostrar un preview y mapear columnas.
+  ipcMainHandle('gh:parse-excel', function (event, payload) {
+    try {
+      var xlsx = registerGestionHumanaHandlers._xlsx;
+      if (!xlsx) return _err('XLSX_NOT_AVAILABLE', 'xlsx no disponible');
+      var p = payload || {};
+      var filePath = p.filePath;
+      if (!filePath) return _err('INVALID_INPUT', 'filePath requerido');
+
+      var workbook = xlsx.readFile(filePath, { cellDates: true });
+      var sheetName = workbook.SheetNames[0];
+      var sheet = workbook.Sheets[sheetName];
+      var json = xlsx.utils.sheet_to_json(sheet, { defval: '', raw: false });
+
+      if (json.length === 0) {
+        return _err('EMPTY_FILE', 'El archivo no tiene filas con datos');
+      }
+
+      var headers = Object.keys(json[0]);
+      return _ok({
+        sheetName: sheetName,
+        headers: headers,
+        rows: json,
+        totalRows: json.length
+      });
+    } catch (e) {
+      console.error('[' + MOD + '][parse-excel]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+
+  // gh:import-personal — recibe rows ya mapeadas, valida y crea/actualiza bulk.
+  // 📦736 · duplicateMode = 'skip' (default) | 'update' | 'error'
+  //   - 'skip': si la cédula existe, la fila se omite (no se crea ni se actualiza)
+  //   - 'update': si existe, se actualizan los campos (whitelist, preservando retirado)
+  //   - 'error': si existe, se reporta como error (rollback implícito por no-insert)
+  ipcMainHandle('gh:import-personal', function (event, payload) {
+    try {
+      var p = payload || {};
+      var companyName = p.companyName;
+      var rows = p.rows || [];
+      var duplicateMode = p.duplicateMode || 'skip';
+      if (['skip', 'update', 'error'].indexOf(duplicateMode) < 0) duplicateMode = 'skip';
+      // Back-compat: si el cliente viejo envía skipDuplicates boolean
+      if (typeof p.skipDuplicates === 'boolean') {
+        duplicateMode = p.skipDuplicates ? 'skip' : 'error';
+      }
+
+      if (!companyName) return _err('INVALID_INPUT', 'companyName requerido');
+      if (!Array.isArray(rows) || rows.length === 0) return _err('INVALID_INPUT', 'rows requerido (array no vacío)');
+
+      var localDb = _getDb();
+      if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+      // 📦743 · Lazy migration: si la BD no tiene la columna sede_id
+      // (porque el usuario tenía la BD antes de la migración 📦731),
+      // la creamos ahora antes de cualquier INSERT/UPDATE. Antes este bloque
+      // corría antes de definir localDb, lo que hacía fallar la migración en
+      // silencio y provocaba el error "table base_personal has no column
+      // named sede_id" al intentar el INSERT.
+      try { localDb.exec("ALTER TABLE base_personal ADD COLUMN sede_id TEXT;"); } catch (e) { /* ya existe */ }
+      try { localDb.exec("CREATE INDEX IF NOT EXISTS idx_base_personal_sede ON base_personal(empresa_id, sede_id);"); } catch (e) { /* ya existe */ }
+      // 📦759 · Lazy migration: agregar columnas de fecha de afiliaciones
+      try { localDb.exec("ALTER TABLE base_personal ADD COLUMN eps_fecha TEXT;"); } catch (e) { /* ya existe */ }
+      try { localDb.exec("ALTER TABLE base_personal ADD COLUMN pension_fecha TEXT;"); } catch (e) { /* ya existe */ }
+      try { localDb.exec("ALTER TABLE base_personal ADD COLUMN arl_fecha TEXT;"); } catch (e) { /* ya existe */ }
+      try { localDb.exec("ALTER TABLE base_personal ADD COLUMN caja_fecha TEXT;"); } catch (e) { /* ya existe */ }
+
+      var company = _getCompanyByName(companyName);
+      if (!company) return _err('NOT_FOUND', 'Empresa no encontrada');
+
+      var created = 0;
+      var updated = 0;
+      var skipped = [];
+      var errors = [];
+      var sedesCreated = [];
+
+      // 📦742 · Auto-resolver nombres de sede a IDs (y crear las que no existan).
+      // Si una row trae `sede` (string, nombre), se auto-crea una sede en gh_sedes
+      // si no existe y se mapea a su id. Esto permite reimportar Excels legacy
+      // que tienen una columna "Unidad" o "Sucursal" como TUBDES.
+      var stmtFindSede = localDb.prepare(
+        "SELECT id FROM gh_sedes WHERE empresa_id = ? AND nombre = ? AND activo = 1"
+      );
+      var stmtInsertSede = localDb.prepare(
+        "INSERT INTO gh_sedes (id, empresa_id, nombre, activo, created_at) VALUES (?, ?, ?, 1, ?)"
+      );
+      var sedeNombreToId = {};
+      // Cargar las sedes existentes (cache)
+      var stmtAllSedes = localDb.prepare(
+        "SELECT id, nombre FROM gh_sedes WHERE empresa_id = ? AND activo = 1"
+      );
+      var sedesExistentes = stmtAllSedes.all(company.company_key);
+      sedesExistentes.forEach(function (s) { sedeNombreToId[s.nombre] = s.id; });
+
+      // Usar transacción para que el import sea atómico
+      var stmtFind = localDb.prepare(
+        "SELECT id, estado FROM base_personal WHERE empresa_id = ? AND cedula = ? AND activo = 1"
+      );
+      // 📦747 · INSERT ampliado con TODOS los campos del schema para que el modal
+      // muestre información completa desde el import. Los campos no enviados
+      // desde el frontend quedan como null (que es el default).
+      var stmtInsert = localDb.prepare(
+        "INSERT INTO base_personal (id, empresa_id, nombres, apellidos, cedula, " +
+        "  tipo_documento, fecha_exp_cedula, lugar_exp_cedula, " +
+        "  fecha_nacimiento, lugar_nacimiento, " +
+        "  telefono, celular, email, " +
+        "  estado_civil, nivel_educativo, " +
+        "  direccion, barrio, ciudad, " +
+        "  cargo, salario, tipo_contrato, " +
+        "  fecha_ingreso, fecha_retiro, estado, " +
+        "  eps, pension, arl, caja_compensacion, " +
+        "  empresa_usuaria, banco, numero_cuenta, sede_id, " +
+        "  activo, created_at, updated_at) " +
+        "VALUES (?, ?, ?, ?, ?, " +
+        "  ?, ?, ?, " +
+        "  ?, ?, " +
+        "  ?, ?, ?, " +
+        "  ?, ?, " +
+        "  ?, ?, ?, " +
+        "  ?, ?, ?, " +
+        "  ?, ?, ?, " +
+        "  ?, ?, ?, ?, " +
+        "  ?, ?, ?, ?, " +
+        "  1, ?, ?)"
+      );
+      // 📦747 · UPDATE whitelist ampliado con los mismos campos que el INSERT.
+      // No se tocan id/empresa_id/cedula/created_at/activo.
+      // Si el existente está 'retirado', el estado NO se actualiza (preservar histórico).
+      var stmtUpdate = localDb.prepare(
+        "UPDATE base_personal SET " +
+        "  nombres = ?, apellidos = ?, " +
+        "  tipo_documento = ?, fecha_exp_cedula = ?, lugar_exp_cedula = ?, " +
+        "  fecha_nacimiento = ?, lugar_nacimiento = ?, " +
+        "  telefono = ?, celular = ?, email = ?, " +
+        "  estado_civil = ?, nivel_educativo = ?, " +
+        "  direccion = ?, barrio = ?, ciudad = ?, " +
+        "  cargo = ?, salario = ?, tipo_contrato = ?, " +
+        "  fecha_ingreso = ?, fecha_retiro = ?, " +
+        "  eps = ?, pension = ?, arl = ?, caja_compensacion = ?, " +
+        "  empresa_usuaria = ?, banco = ?, numero_cuenta = ?, " +
+        "  sede_id = ?, " +
+        "  estado = CASE WHEN estado = 'retirado' THEN estado ELSE ? END, " +
+        "  updated_at = ? " +
+        "WHERE id = ?"
+      );
+
+      localDb.transaction(function () {
+        // 📦742 · Resolver nombres de sede a IDs antes del loop (crear si no existen)
+        rows.forEach(function (row) {
+          if (row.sede && !row.sedeId) {
+            var nombre = String(row.sede).trim();
+            if (nombre && !sedeNombreToId[nombre]) {
+              var existingSede = stmtFindSede.get(company.company_key, nombre);
+              if (existingSede) {
+                sedeNombreToId[nombre] = existingSede.id;
+              } else {
+                var newSedeId = _newId('se-');
+                var sedeNow = new Date().toISOString();
+                stmtInsertSede.run(newSedeId, company.company_key, nombre, sedeNow);
+                sedeNombreToId[nombre] = newSedeId;
+                sedesCreated.push({ id: newSedeId, nombre: nombre });
+              }
+            }
+            row.sedeId = sedeNombreToId[nombre] || null;
+            delete row.sede;
+          }
+        });
+
+        rows.forEach(function (row, index) {
+          try {
+            if (!row.cedula || !row.nombres || !row.apellidos) {
+              errors.push({ row: index + 1, error: 'Faltan campos requeridos (cedula, nombres, apellidos)', data: row });
+              return;
+            }
+
+            var existing = stmtFind.get(company.company_key, row.cedula);
+            if (existing) {
+              if (duplicateMode === 'skip') {
+                skipped.push({ row: index + 1, cedula: row.cedula, id: existing.id });
+                return;
+              } else if (duplicateMode === 'error') {
+                errors.push({ row: index + 1, error: 'Cédula ya existe (id=' + existing.id + ')', data: row });
+                return;
+              } else if (duplicateMode === 'update') {
+                // Whitelist: no toca id, empresa_id, cedula, created_at, activo
+                // Si el existente ya está retirado, no cambia el estado (preservar histórico)
+                var now = new Date().toISOString();
+                stmtUpdate.run(
+                  row.nombres, row.apellidos,
+                  row.tipoDocumento || 'CC', row.fechaExpCedula || null, row.lugarExpCedula || null,
+                  row.fechaNacimiento || null, row.lugarNacimiento || null,
+                  row.telefono || null, row.celular || null, row.email || null,
+                  row.estadoCivil || null, row.nivelEducativo || null,
+                  row.direccion || null, row.barrio || null, row.ciudad || null,
+                  row.cargo || null, row.salario || null, row.tipoContrato || null,
+                  row.fechaIngreso || null, row.fechaRetiro || null,
+                  row.eps || null, row.pension || null, row.arl || null, row.cajaCompensacion || null,
+                  row.empresaUsuaria || null, row.banco || null, row.numeroCuenta || null,
+                  row.sedeId || null,
+                  row.estado || 'activo',
+                  now,
+                  existing.id
+                );
+                updated++;
+                return;
+              }
+            }
+
+            var id = _newId('bp-');
+            var now = new Date().toISOString();
+            stmtInsert.run(
+              id, company.company_key,
+              row.nombres, row.apellidos, row.cedula,
+              row.tipoDocumento || 'CC', row.fechaExpCedula || null, row.lugarExpCedula || null,
+              row.fechaNacimiento || null, row.lugarNacimiento || null,
+              row.telefono || null, row.celular || null, row.email || null,
+              row.estadoCivil || null, row.nivelEducativo || null,
+              row.direccion || null, row.barrio || null, row.ciudad || null,
+              row.cargo || null, row.salario || null, row.tipoContrato || null,
+              row.fechaIngreso || null, row.fechaRetiro || null, row.estado || 'activo',
+              row.eps || null, row.pension || null, row.arl || null, row.cajaCompensacion || null,
+              row.empresaUsuaria || null, row.banco || null, row.numeroCuenta || null, row.sedeId || null,
+              now, now
+            );
+            created++;
+          } catch (e) {
+            errors.push({ row: index + 1, error: e.message, data: row });
+          }
+        });
+      })();
+
+      return _ok({ created: created, updated: updated, skipped: skipped, errors: errors, total: rows.length, sedesCreated: sedesCreated.length });
+    } catch (e) {
+      console.error('[' + MOD + '][import-personal]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+
+  console.log('[' + MOD + '][INIT][SUCCESS] Bridge registrado · 5 read + 4 write-contratacion + 4 write-personal + 2 write-sedes + 6 vacaciones + 5 permisos + 7 documentos + 2 firmas + 5 anuncios + 4 mensajes + 5 docs-afiliaciones + 5 templates + 3 import-excel + 1 diag · 58 handlers totales · Fase 7');
 }
 
 registerGestionHumanaHandlers.init = function(ipcMain) {
   registerGestionHumanaHandlers._ipcMain = ipcMain;
+  // 📦732 — Patrón mismo que profesiograma: inyectar dialog y xlsx via init
+  // para que los tests puedan mockearlos fácilmente.
+  var electron = require('electron');
+  registerGestionHumanaHandlers._dialog = electron.dialog;
+  registerGestionHumanaHandlers._shell = electron.shell;  // 📦760 · Para abrir PDFs
+  registerGestionHumanaHandlers._app = electron.app;      // 📦760 · Para getPath('userData')
+  registerGestionHumanaHandlers._fs = require('fs');        // 📦760 · Para mover/borrar archivos
+  registerGestionHumanaHandlers._path = require('path');    // 📦760 · Para construir rutas
+  try {
+    registerGestionHumanaHandlers._xlsx = require('xlsx');
+  } catch (e) {
+    console.warn('[' + MOD + '] xlsx no disponible:', e.message);
+    registerGestionHumanaHandlers._xlsx = null;
+  }
 };
 
 module.exports = {

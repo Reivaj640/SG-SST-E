@@ -1,0 +1,638 @@
+/* modules/gestion-humana/documentos/index.css
+   📦722 · Estilos de la vista "Documentos y Firmas" (v0.2.0)
+   Scope: prefijo `doc-` para evitar colisiones con styles.css global. */
+
+.doc-wrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;                   /* misma altura que .db-wrapper (📦770 patrón del Dashboard) */
+  min-height: 0;                  /* fix flexbox: permite que flex item se encoja */
+  background: #f8f9fa;
+  box-sizing: border-box;
+  overflow-y: auto;              /* scroll en el wrapper */
+  overflow-x: hidden;
+  padding: 0 0 1.5rem;
+  gap: 1rem;                      /* espacio entre secciones (consistente con .db-wrapper) */
+}
+
+/* 📦770 · Scrollbar visible estilo K+AIR (consistente con .gh-content y .db-wrapper) */
+.doc-wrapper::-webkit-scrollbar { width: 10px; }
+.doc-wrapper::-webkit-scrollbar-track { background: transparent; }
+.doc-wrapper::-webkit-scrollbar-thumb { background: #c1c8d0; border-radius: 5px; border: 2px solid #f8f9fa; }
+.doc-wrapper::-webkit-scrollbar-thumb:hover { background: #9aa3ad; }
+.doc-wrapper { scrollbar-width: thin; scrollbar-color: #c1c8d0 transparent; }
+
+/* ═══ KPI SECTION ═══ */
+.doc-kpi-section {
+  padding: 0 2rem;
+  flex-shrink: 0;     /* 📦727 · Igualado al Resumen */
+}
+
+/* ═══ BUTTONS ═══ */
+.doc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.875rem;
+  border-radius: 0.4rem;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s;
+}
+.doc-btn--primary {
+  background: #1d4ed8;
+  color: white;
+  border-color: #1d4ed8;
+}
+.doc-btn--primary:hover { background: #1e40af; border-color: #1e3a8a; }
+
+/* ═══ SECTION HEAD ═══ */
+.doc-section-head {
+  background: white;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #e9ecef;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  position: sticky;             /* 📦772 · sticky al top — siempre visible al scrollear */
+  top: 0;                        /* 📦772 */
+  z-index: 5;                    /* 📦772 · por encima del contenido que scrollea */
+}
+.doc-section-head__text { flex: 1; min-width: 0; }
+.doc-section-head__actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
+.doc-section-head__title {
+  margin: 0;
+  font-size: 1.05rem;
+  color: #1a1a2e;
+  font-weight: 600;
+}
+.doc-section-head__subtitle {
+  margin: 0.125rem 0 0;
+  font-size: 0.75rem;
+  color: #5a6378;
+}
+
+/* ═══ SECTION TITLE (catálogo, recientes) ═══ */
+.doc-section {
+  padding: 1.5rem;
+  flex-shrink: 0;
+}
+.doc-section:last-child {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.doc-section-title {
+  margin: 0 0 0.875rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: #5a6378;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* ═══ CATÁLOGO ═══ */
+.doc-catalogo {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.875rem;
+}
+.doc-catalogo__card {
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 0.5rem;
+  padding: 1rem 1.125rem;
+  cursor: pointer;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+.doc-catalogo__card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+.doc-catalogo__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  margin-bottom: 0.625rem;
+}
+.doc-catalogo__icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 0.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.doc-catalogo__title {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+.doc-catalogo__desc {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #5a6378;
+  line-height: 1.45;
+  min-height: 2.6em;
+}
+.doc-catalogo__count {
+  margin-top: 0.625rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #f1f3f5;
+  font-size: 0.7rem;
+}
+
+/* ═══ RECIENTES ═══ */
+.doc-recientes {
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.doc-recientes__empty {
+  padding: 2rem;
+  text-align: center;
+  color: #5a6378;
+}
+.doc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+.doc-table thead {
+  background: #f8f9fa;
+  flex-shrink: 0;
+}
+.doc-table th {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: #5a6378;
+  letter-spacing: 0.4px;
+  font-weight: 600;
+  border-bottom: 2px solid #dee2e6;
+}
+.doc-table th--center { text-align: center; }
+.doc-table th--right { text-align: right; }
+.doc-table tbody tr {
+  border-top: 1px solid #f1f3f5;
+  transition: background 0.1s;
+}
+.doc-table tbody tr:hover { background: #f8f9fa; }
+.doc-table td {
+  padding: 0.75rem 1rem;
+  color: #1a1a2e;
+  vertical-align: middle;
+}
+.doc-table td--center { text-align: center; }
+.doc-table td--right { text-align: right; }
+.doc-table__type {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.doc-table__date { color: #5a6378; }
+.doc-table__empty { color: #9ca3af; }
+
+.doc-badge {
+  display: inline-block;
+  padding: 0.2rem 0.625rem;
+  border-radius: 0.875rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+.doc-badge--firmado { background: #d4edda; color: #155724; }
+.doc-badge--pendiente { background: #fff3cd; color: #856404; }
+.doc-badge--anulado { background: #e9ecef; color: #6c757d; }
+
+.doc-row-action {
+  background: #28a745;
+  color: white;
+  border: none;
+  padding: 0.3rem 0.625rem;
+  border-radius: 0.3rem;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 500;
+  font-family: inherit;
+  transition: opacity 0.15s;
+}
+.doc-row-action:hover { opacity: 0.85; }
+.doc-row-empty {
+  color: #9ca3af;
+  font-size: 0.7rem;
+}
+
+/* Tabla con scroll propio si hay muchos items */
+.doc-recientes .doc-table-wrap {
+  flex: 1;
+  min-height: 0;
+  max-height: 480px;  /* 📦767 · altura máxima — activa scroll interno cuando hay muchas filas */
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;  /* reserva espacio para el scrollbar (no salta contenido) */
+}
+
+/* 📦767 · Header sticky — siempre visible al hacer scroll dentro de la tabla */
+.doc-recientes .doc-table thead {
+  position: sticky;
+  top: 0;
+  background: #f8f9fa;
+  z-index: 1;
+  box-shadow: 0 1px 0 #dee2e6;
+}
+
+/* 📦767 · Scrollbar visible estilo demo (la línea roja) */
+.doc-recientes .doc-table-wrap::-webkit-scrollbar { width: 8px; }
+.doc-recientes .doc-table-wrap::-webkit-scrollbar-track { background: #f1f3f5; border-radius: 4px; }
+.doc-recientes .doc-table-wrap::-webkit-scrollbar-thumb { background: #c1c8d0; border-radius: 4px; }
+.doc-recientes .doc-table-wrap::-webkit-scrollbar-thumb:hover { background: #9aa3ad; }
+/* Firefox */
+.doc-recientes .doc-table-wrap { scrollbar-width: thin; scrollbar-color: #c1c8d0 #f1f3f5; }
+
+/* ═══ 📦763 · MODALES (Generar Documento + Firma Digital) ═══ */
+.doc-modal {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+.doc-modal[hidden] { display: none; }
+.doc-modal__backdrop {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(15, 23, 42, 0.45);
+  animation: doc-fade-in 0.18s ease-out;
+}
+@keyframes doc-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+.doc-modal__panel {
+  position: relative;
+  background: white;
+  border-radius: 0.5rem;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: doc-slide-up 0.22s ease-out;
+}
+@keyframes doc-slide-up { from { transform: translateY(8px); opacity: 0.6; } to { transform: translateY(0); opacity: 1; } }
+.doc-modal__panel--generar { max-width: 560px; }
+.doc-modal__panel--firma   { max-width: 700px; }
+.doc-modal__panel--admin   { max-width: 820px; }
+
+/* 📦766 · Header del modal "Administrar Templates" con texto a la izquierda y botón a la derecha */
+.doc-tpl-admin-header {
+  display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+  padding: 0.75rem 1rem; margin-bottom: 1rem;
+  background: #f8f9fb; border: 1px solid #e9ecef; border-radius: 8px;
+}
+.doc-tpl-admin-header__text { margin: 0; color: #5a6378; font-size: 0.88rem; line-height: 1.4; flex: 1; }
+
+.doc-modal__header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #e9ecef;
+  flex-shrink: 0;
+}
+.doc-modal__title { margin: 0; font-size: 1rem; color: #1a1a2e; font-weight: 600; }
+.doc-modal__close {
+  background: transparent; border: none;
+  color: #5a6378; cursor: pointer;
+  font-size: 1rem; padding: 0.25rem 0.5rem; line-height: 1;
+  border-radius: 0.25rem;
+}
+.doc-modal__close:hover { color: #1a1a2e; background: #f1f3f5; }
+.doc-modal__body {
+  padding: 1rem 1.25rem;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+.doc-modal__footer {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid #e9ecef;
+  background: #f8f9fa;
+  flex-shrink: 0;
+  gap: 0.5rem;
+}
+.doc-modal__footer-right { display: flex; gap: 0.5rem; }
+
+/* Field */
+.doc-field { margin-bottom: 0.875rem; }
+.doc-field:last-child { margin-bottom: 0; }
+.doc-field__label {
+  display: block;
+  font-size: 0.75rem; font-weight: 600;
+  color: #5a6378;
+  margin-bottom: 0.3rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.doc-field__req { color: #be123c; }
+.doc-field__select {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #dee2e6;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-family: inherit;
+  background: white;
+  cursor: pointer;
+  outline: none;
+  color: #1a1a2e;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%236c757d'><path d='M3.204 5h9.592L8 10.481 3.204 5zm-.753.659 4.796 5.48a1 1 0 0 0 1.506 0l4.796-5.48c.566-.647.106-1.659-.753-1.659H3.204a1 1 0 0 0-.753 1.659z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 0.65rem center;
+  background-size: 14px 12px;
+  padding-right: 1.85rem;
+}
+.doc-field__select:focus { border-color: #174ea6; box-shadow: 0 0 0 2px rgba(23, 78, 166, 0.12); }
+
+/* Cards de tipos en el modal Generar */
+.doc-gen-tipos {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.doc-gen-tipo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #dee2e6;
+  border-radius: 0.4rem;
+  cursor: pointer;
+  background: white;
+  transition: border-color 0.12s, background 0.12s, box-shadow 0.12s;
+}
+.doc-gen-tipo:hover { border-color: #b6c2e3; background: #f8f9ff; }
+.doc-gen-tipo--selected {
+  border-color: #174ea6;
+  background: #e8f0fe;
+  box-shadow: 0 0 0 2px rgba(23, 78, 166, 0.1);
+}
+.doc-gen-tipo__icon {
+  width: 36px; height: 36px;
+  border-radius: 0.5rem;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+.doc-gen-tipo__body { flex: 1; min-width: 0; }
+.doc-gen-tipo__title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 0.1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.doc-gen-tipo__tpl-badge {
+  font-size: 0.65rem;
+  color: #28a745;
+  background: #d4edda;
+  padding: 0.05rem 0.4rem;
+  border-radius: 0.7rem;
+  font-weight: 600;
+}
+.doc-gen-tipo__tpl-badge--empty {
+  color: #6b7280;
+  background: #e9ecef;
+  font-weight: 400;
+}
+.doc-gen-tipo__desc {
+  font-size: 0.72rem;
+  color: #6b7280;
+  line-height: 1.3;
+}
+
+/* Firma Digital (canvas) */
+.doc-firma__hint {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: #5a6378;
+  margin: 0 0 0.75rem;
+  background: #e8f0fe;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
+}
+.doc-firma__hint i { color: #174ea6; }
+.doc-firma__canvas-wrap {
+  position: relative;
+  width: 100%;
+  height: 200px;
+  border: 2px dashed #c4c9d1;
+  border-radius: 0.4rem;
+  background: white;
+  margin-bottom: 0.6rem;
+  overflow: hidden;
+}
+.doc-firma__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+  touch-action: none;  /* evitar scroll en touch mientras se dibuja */
+}
+.doc-firma__placeholder {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: #b6c2e3;
+  font-size: 0.95rem;
+  font-weight: 500;
+  pointer-events: none;
+}
+.doc-firma__placeholder i { font-size: 1.2rem; }
+.doc-firma__meta {
+  font-size: 0.78rem;
+  color: #5a6378;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  background: #f8f9fa;
+  border-radius: 0.375rem;
+}
+.doc-firma__meta i { color: #174ea6; margin-right: 0.15rem; }
+.doc-firma__meta span { color: #1a1a2e; font-weight: 500; }
+
+/* ═══ 📦764 · MIS TEMPLATES (sección) ═══ */
+.doc-section-head--sub {
+  padding: 0;
+  margin-bottom: 0.75rem;
+}
+.doc-section-head--sub .doc-section-title {
+  font-size: 0.92rem;
+  margin: 0;
+  display: flex; align-items: center; gap: 0.4rem;
+}
+.doc-section-head--sub .doc-section-title i { color: #174ea6; }
+.doc-section-head--sub .doc-section-head__subtitle {
+  margin: 0.15rem 0 0;
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+.doc-templates {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.75rem;
+}
+.doc-template {
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 0.4rem;
+  padding: 0.75rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.doc-template:hover { border-color: #b6c2e3; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04); }
+.doc-template__head {
+  display: flex; align-items: flex-start; gap: 0.6rem;
+}
+.doc-template__icon {
+  width: 36px; height: 36px;
+  border-radius: 0.4rem;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem;
+  background: #fef3c7; color: #b45309;
+  flex-shrink: 0;
+}
+.doc-template__body { flex: 1; min-width: 0; }
+.doc-template__title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #1a1a2e;
+  line-height: 1.2;
+  overflow: hidden; text-overflow: ellipsis;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.doc-template__tipo {
+  font-size: 0.7rem;
+  color: #174ea6;
+  background: #e8f0fe;
+  padding: 0.1rem 0.45rem;
+  border-radius: 0.7rem;
+  display: inline-block;
+  margin-top: 0.25rem;
+  font-weight: 500;
+}
+.doc-template__meta {
+  font-size: 0.7rem;
+  color: #6b7280;
+}
+.doc-template__actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.3rem;
+}
+.doc-template__empty {
+  background: white;
+  border: 1px dashed #dee2e6;
+  border-radius: 0.4rem;
+  padding: 1.5rem 1rem;
+  text-align: center;
+  color: #6c757d;
+  font-size: 0.85rem;
+}
+.doc-template__empty i { color: #b6c2e3; font-size: 1.5rem; display: block; margin-bottom: 0.5rem; }
+.doc-template__empty strong { color: #1a1a2e; display: block; margin-bottom: 0.25rem; }
+
+/* Field input (para el nombre del template) */
+.doc-field__input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #dee2e6;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-family: inherit;
+  background: white;
+  outline: none;
+  color: #1a1a2e;
+  box-sizing: border-box;
+}
+.doc-field__input:focus { border-color: #174ea6; box-shadow: 0 0 0 2px rgba(23, 78, 166, 0.12); }
+.doc-field__hint {
+  font-size: 0.72rem;
+  color: #6b7280;
+  margin: 0.25rem 0 0;
+  font-style: italic;
+}
+
+/* Hint grande del modal de templates */
+.doc-template-helper {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: #5a6378;
+  margin: 0.5rem 0 0;
+  background: #e8f0fe;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.375rem;
+  line-height: 1.4;
+}
+.doc-template-helper i { color: #174ea6; flex-shrink: 0; margin-top: 0.1rem; }
+
+/* Botón mini (para acciones del template) */
+.doc-btn-mini {
+  background: #f1f3f5;
+  border: 1px solid #dee2e6;
+  color: #5a6378;
+  padding: 0.3rem 0.55rem;
+  border-radius: 0.3rem;
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 500;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: 1;
+  justify-content: center;
+}
+.doc-btn-mini:hover { background: #e9ecef; color: #1a1a2e; }
+.doc-btn-mini--primary { background: #1a73e8; color: white; border-color: #1a73e8; }
+.doc-btn-mini--primary:hover { background: #1557b0; color: white; }
+.doc-btn-mini--danger:hover { background: #fef2f2; color: #b91c1c; border-color: #fca5a5; }
+
+/* Panel de template (más chico que el de generar) */
+.doc-modal__panel--template { max-width: 480px; }

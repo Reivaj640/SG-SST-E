@@ -123,7 +123,7 @@ const { registerPresupuestoHandlers, SCHEMA_SQL: PRESUPUESTO_SCHEMA_SQL, MIGRATI
 // FASE 0: Schema con 3 tablas, bridge con 16 handlers stub + 1 diag. La UI aún
 // no existe. Plan: docs/plans/2026-08-15-gestion-humana-design.md
 const { registerGestionHumanaHandlers } = require('./main/gestion-humana-bridge');
-const { SCHEMA_SQL: GH_SCHEMA_SQL } = require('./main/gestion-humana-schema-sql');
+const { SCHEMA_SQL: GH_SCHEMA_SQL, MIGRATIONS_SQL: GH_MIGRATIONS_SQL } = require('./main/gestion-humana-schema-sql');
 // 📦537 — Sync multipc (BD local <-> .kairsync en carpeta compartida)
 const { registerSyncHandlers } = require('./main/sync-bridge');
 // 📦538 — Generador de pcId (ID unico por PC para el sync multipc)
@@ -619,6 +619,15 @@ function initDbOnce() {
     try {
       db.exec(GH_SCHEMA_SQL);
       console.log('[DB] 📦709 · Tablas de gestion-humana (contrataciones / base_personal / gh_sedes) creadas/verificadas');
+      // 📦731 · Migrations idempotentes (mismo patrón que Presupuesto). Cada ALTER se
+      // aplica individualmente; "duplicate column name" se ignora (skip).
+      if (Array.isArray(GH_MIGRATIONS_SQL) && GH_MIGRATIONS_SQL.length > 0) {
+        for (var ghmi = 0; ghmi < GH_MIGRATIONS_SQL.length; ghmi++) {
+          try { db.exec(GH_MIGRATIONS_SQL[ghmi]); }
+          catch (ghmErr) { /* skip — duplicate column / index ya existe */ }
+        }
+        console.log('[DB] 📦731 · ' + GH_MIGRATIONS_SQL.length + ' migraciones de gestion-humana aplicadas');
+      }
     } catch (ghErr) {
       console.error('[DB] 📦709 · Error creando schema de gestion-humana:', ghErr.message);
     }
