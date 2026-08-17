@@ -1,10 +1,15 @@
 // modules/gestion-humana/vacaciones/index.js
-// 📦710 · Vacaciones (v0.2.0) — UI completa
+// 📦757 · Vacaciones — Estilo demo Tempoactiva
 //
-// KPIs (4): Pendientes, Aprobadas, Disfrutadas, Por Notificar
-// Tabs: Todas | Solicitada | Aprobada | Rechazada | Disfrutada
-// Acciones inline: Aprobar, Rechazar, Notificar cliente
-// Backend: 6 handlers (list, get, create, update, delete, cambiar-estado)
+// Layout:
+//   - 4 KPIs: Pendientes, Aprobadas, Disfrutadas, Por Notificar a Cliente
+//   - Header sección + botones (Listado Mensual, Solicitar Vacaciones)
+//   - Tabs: Todas / Solicitada / Aprobada / Rechazada / Disfrutada
+//   - Tabla: Trabajador, Cargo, Sede, Fechas, Días, Estado, Cliente, Acciones
+//   - Info box "Flujo de Vacaciones" (instrucciones del proceso)
+//   - Modal "Solicitar Vacaciones" (trabajador + fechas + días)
+//
+// Backend: 6 handlers (list/get/create/update/delete/cambiar-estado)
 
 class VacacionesComponent {
   constructor(container, companyName, moduleName, subName, onBack) {
@@ -16,26 +21,42 @@ class VacacionesComponent {
     this.items = [];
     this.trabajadores = [];
     this.sedes = [];
+    this._trabajadorById = {};
+    this._sedeById = {};
     this.tab = 'todas';
     this.loading = true;
   }
 
-  _fmt(n) {
-    if (n == null) return '—';
-    return new Intl.NumberFormat('es-CO').format(n);
+  // ─── Helpers ───
+  _toast() { return (window.parent && window.parent.KAIRToast) ? window.parent.KAIRToast : window.KAIRToast; }
+  _showToast(msg, type) { var t = this._toast(); if (t) t.show(msg, type || 'info'); }
+  _escHtml(s) { if (s == null) return ''; return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+  _fmtDate(iso) {
+    if (!iso) return '—';
+    try {
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return '—';
+      return d.toLocaleDateString('es-CO', { year: 'numeric', month: '2-digit', day: '2-digit' });
+    } catch (e) { return iso; }
+  }
+  _isoToInputDate(iso) {
+    if (!iso) return '';
+    try { return new Date(iso).toISOString().slice(0, 10); } catch (e) { return ''; }
+  }
+  _inputDateToIso(s) {
+    if (!s) return '';
+    try { return new Date(s + 'T12:00:00').toISOString(); } catch (e) { return ''; }
+  }
+  _diffDias(inicio, fin) {
+    if (!inicio || !fin) return null;
+    var a = new Date(inicio);
+    var b = new Date(fin);
+    if (isNaN(a.getTime()) || isNaN(b.getTime())) return null;
+    return Math.round((b - a) / 86400000) + 1;
   }
 
-  _toast() {
-    return (window.parent && window.parent.KAIRToast) ? window.parent.KAIRToast : window.KAIRToast;
-  }
-  _confirmDialog() {
-    return (window.parent && window.parent.KairConfirm) ? window.parent.KairConfirm : window.KairConfirm;
-  }
-  _showToast(msg, type) {
-    var t = this._toast();
-    if (t) t.show(msg, type || 'info');
-  }
-
+  // ─── Carga de datos ───
   async _load() {
     if (!window.electronAPI || !this.companyName) { this.loading = false; return; }
     try {
@@ -44,276 +65,334 @@ class VacacionesComponent {
         window.electronAPI.ghListPersonal({ companyName: this.companyName }).catch(function () { return { success: false }; }),
         window.electronAPI.ghListSedes({ companyName: this.companyName }).catch(function () { return { success: false }; })
       ]);
-      this.items        = results[0].success ? (results[0].data.vacaciones || []) : [];
-      this.trabajadores = results[1].success ? (results[1].data.personales || []) : [];
-      this.sedes        = results[2].success ? (results[2].data.sedes || []) : [];
-      // Index helpers
-      this._trabajadorById = {};
-      this.trabajadores.forEach(function (t) { this._trabajadorById[t.id] = t; }.bind(this));
-      this._sedeById = {};
-      this.sedes.forEach(function (s) { this._sedeById[s.id] = s; }.bind(this));
-    } catch (e) {
-      this._showToast('Error cargando vacaciones: ' + e.message, 'error');
-    }
+      this.items = (results[0].success && results[0].data) ? (results[0].data.vacaciones || []) : [];
+      this.trabajadores = (results[1].success && results[1].data) ? (results[1].data.personales || []) : [];
+      this.sedes = (results[2].success && results[2].data) ? (results[2].data.sedes || []) : [];
+      this._trabajadorById = {}; this._sedeById = {};
+      var self = this;
+      this.trabajadores.forEach(function (t) { self._trabajadorById[t.id] = t; });
+      this.sedes.forEach(function (s) { self._sedeById[s.id] = s; });
+    } catch (e) { this._showToast('Error cargando vacaciones: ' + e.message, 'error'); }
     this.loading = false;
   }
 
+  // ─── Cálculos ───
   _kpis() {
-    var i = this.items;
+    var self = this;
     return {
-      pendientes:   i.filter(function (x) { return x.estado === 'solicitada'; }).length,
-      aprobadas:    i.filter(function (x) { return x.estado === 'aprobada'; }).length,
-      disfrutadas:  i.filter(function (x) { return x.estado === 'disfrutada'; }).length,
-      porNotificar: i.filter(function (x) { return x.estado === 'aprobada' && !x.clienteNotificado; }).length
+      pendientes:   this.items.filter(function (x) { return x.estado === 'solicitada'; }).length,
+      aprobadas:    this.items.filter(function (x) { return x.estado === 'aprobada'; }).length,
+      disfrutadas:  this.items.filter(function (x) { return x.estado === 'disfrutada'; }).length,
+      porNotificar: this.items.filter(function (x) { return x.estado === 'aprobada' && !x.clienteNotificado; }).length
     };
   }
-
-  _trabajador(id) { return this._trabajadorById && this._trabajadorById[id]; }
-
+  _countByEstado(id) {
+    if (id === 'todas') return this.items.length;
+    return this.items.filter(function (x) { return x.estado === id; }).length;
+  }
   _filtered() {
     if (this.tab === 'todas') return this.items;
-    return this.items.filter(function (x) { return x.estado === this.tab; }.bind(this));
+    return this.items.filter(function (x) { return x.estado === this.tab; });
   }
 
-  render() {
+  // ─── Fetch + fallback HTML ───
+  async _fetchHtml() {
+    try {
+      var r = await fetch('modules/gestion-humana/vacaciones/index.html');
+      if (r.ok) return await r.text();
+    } catch (e) { console.warn('[Vacaciones] fetch HTML falló, usando fallback inline:', e.message); }
+    return '<div class="va-wrapper" id="va-wrapper">' +
+      '<div class="va-kpi-section"><div id="va-kpi-bar" class="va-kpi-bar"></div></div>' +
+      '<div class="va-section-head">' +
+        '<div class="va-section-head__text"><h2 class="va-section-head__title">Gestión de Vacaciones</h2>' +
+        '<p class="va-section-head__subtitle">Programación, aprobaciones y notificación a clientes</p></div>' +
+        '<div class="va-section-head__actions">' +
+          '<button id="va-listado-mes" class="va-btn va-btn--ghost" type="button"><i class="fas fa-download"></i> Listado Mensual</button>' +
+          '<button id="va-solicitar" class="va-btn va-btn--primary" type="button"><i class="fas fa-plus"></i> Solicitar Vacaciones</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="va-tabs" id="va-tabs"></div>' +
+      '<div id="va-table-wrap" class="va-table-wrap"></div>' +
+      '<div class="va-info-box"><div class="va-info-box__icon"><i class="fas fa-info-circle"></i></div>' +
+        '<div class="va-info-box__body"><h4 class="va-info-box__title">Flujo de Vacaciones — TEMPOACTIVA</h4>' +
+        '<p class="va-info-box__text">Mensualmente (ej: en julio se envían las de agosto), Recursos Humanos genera el listado de personal próximo a salir de vacaciones. Los jefes inmediatos son quienes programan las vacaciones de su personal según la operación. Idealmente, debe notificarse a los clientes cuando un trabajador saldrá de vacaciones para que ellos resuelvan la cobertura.</p>' +
+        '<p class="va-info-box__text">Usa el botón <strong>"Listado Mensual"</strong> para exportar el reporte del próximo mes (formato similar al que enviaba Lilimare por correo).</p>' +
+        '</div></div>' +
+    '</div>';
+  }
+
+  // ─── Render principal ───
+  async render() {
     var self = this;
-    this.container.innerHTML = '';
-    var wrapper = document.createElement('div');
-    wrapper.style.cssText = 'padding:0; height:100%; overflow-y:auto; background:#f8f9fa;';
+    if (!this._html) this._html = await this._fetchHtml();
+    this.container.innerHTML = this._html;
 
     if (this.loading) {
-      wrapper.innerHTML = '<div style="padding:3rem; text-align:center; color:#5a6378;"><i class="fas fa-spinner fa-spin"></i> Cargando vacaciones…</div>';
-      this.container.appendChild(wrapper);
-      this._load().then(function () { self.render(); });
-      return;
+      var kpiBar = this.container.querySelector('#va-kpi-bar');
+      if (kpiBar) kpiBar.innerHTML = '<div class="va-loading"><i class="fas fa-spinner fa-spin"></i> Cargando vacaciones…</div>';
+      var tw = this.container.querySelector('#va-table-wrap');
+      if (tw) tw.innerHTML = '<div class="va-loading"><i class="fas fa-spinner fa-spin"></i> Cargando…</div>';
+      await this._load();
     }
 
-    var k = this._kpis();
+    this._renderKpiBar();
+    this._renderTabs();
+    this._renderTable();
 
-    // KPIs strip
-    wrapper.appendChild(this._renderKpiStrip(k));
-
-    // Header acciones
-    var head = document.createElement('div');
-    head.style.cssText = 'display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1rem 1.5rem; background:white; border-bottom:1px solid #e9ecef; flex-wrap:wrap;';
-    head.innerHTML =
-      '<div>' +
-        '<h2 style="margin:0; font-size:1.05rem; color:#1a1a2e;">Gestión de Vacaciones</h2>' +
-        '<p style="margin:0.125rem 0 0; font-size:0.75rem; color:#5a6378;">Programación, aprobaciones y notificación a clientes</p>' +
-      '</div>' +
-      '<div style="display:flex; gap:0.5rem;">' +
-        '<button id="vac-listado-mes" style="background:white; color:#174ea6; border:1px solid #174ea6; padding:0.5rem 0.875rem; border-radius:0.4rem; cursor:pointer; font-size:0.8125rem; font-weight:500; display:inline-flex; align-items:center; gap:0.4rem;">' +
-          '<i class="fas fa-download"></i> Listado Mensual' +
-        '</button>' +
-        '<button id="vac-solicitar" style="background:#174ea6; color:white; border:none; padding:0.5rem 0.875rem; border-radius:0.4rem; cursor:pointer; font-size:0.8125rem; font-weight:500; display:inline-flex; align-items:center; gap:0.4rem;">' +
-          '<i class="fas fa-plus"></i> Solicitar Vacaciones' +
-        '</button>' +
-      '</div>';
-    wrapper.appendChild(head);
-
-    // Tabs
-    wrapper.appendChild(this._renderTabs());
-
-    // Tabla
-    wrapper.appendChild(this._renderTable());
-
-    // Flujo card
-    wrapper.appendChild(this._renderFlujoCard());
-
-    this.container.appendChild(wrapper);
-
-    // Wire actions
-    var btnListado = document.getElementById('vac-listado-mes');
+    var btnListado = this.container.querySelector('#va-listado-mes');
     if (btnListado) btnListado.onclick = function () { self._exportListadoMensual(); };
-    var btnSolicitar = document.getElementById('vac-solicitar');
-    if (btnSolicitar) btnSolicitar.onclick = function () { self._showSolicitarDialog(); };
+    var btnSolicitar = this.container.querySelector('#va-solicitar');
+    if (btnSolicitar) btnSolicitar.onclick = function () { self._openSolicitarModal(); };
   }
 
-  _renderKpiStrip(k) {
-    var bar = document.createElement('div');
-    bar.style.cssText = 'display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:0; background:white; border-bottom:1px solid #e9ecef;';
-    var items = [
-      { value: k.pendientes,   label: 'PENDIENTES',      color: '#ffc107' },
-      { value: k.aprobadas,    label: 'APROBADAS',       color: '#28a745' },
-      { value: k.disfrutadas,  label: 'DISFRUTADAS',     color: '#0d9488' },
-      { value: k.porNotificar, label: 'POR NOTIFICAR A CLIENTE', color: '#dc3545' }
+  _renderAll() {
+    this._renderKpiBar();
+    this._renderTabs();
+    this._renderTable();
+  }
+
+  _renderKpiBar() {
+    var bar = this.container.querySelector('#va-kpi-bar');
+    if (!bar || !window.GHKPIBar) return;
+    var k = this._kpis();
+    var kpis = [
+      { icon: 'fa-clock',          color: '#a16207', bg: '#fff3cd', value: k.pendientes,   label: 'Pendientes' },
+      { icon: 'fa-check',          color: '#28a745', bg: '#d4edda', value: k.aprobadas,    label: 'Aprobadas' },
+      { icon: 'fa-umbrella-beach', color: '#0d9488', bg: '#ccfbf1', value: k.disfrutadas,  label: 'Disfrutadas' },
+      { icon: 'fa-bell',           color: '#dc3545', bg: '#f8d7da', value: k.porNotificar, label: 'Por Notificar a Cliente' }
     ];
-    items.forEach(function (i, idx) {
-      bar.innerHTML +=
-        '<div style="padding:1rem 1.25rem; display:flex; align-items:center; gap:0.625rem; ' + (idx > 0 ? 'border-left:1px solid #e9ecef;' : '') + '">' +
-          '<div style="width:36px; height:36px; border-radius:50%; background:' + i.color + '22; color:' + i.color + '; display:flex; align-items:center; justify-content:center; font-size:0.95rem; font-weight:700;">' +
-            '<i class="fas fa-' + (idx === 0 ? 'clock' : idx === 1 ? 'check' : idx === 2 ? 'umbrella-beach' : 'bell') + '"></i>' +
-          '</div>' +
-          '<div>' +
-            '<div style="font-size:1.5rem; font-weight:700; color:#1a1a2e; line-height:1;">' + i.value + '</div>' +
-            '<div style="font-size:0.65rem; color:#5a6378; letter-spacing:0.4px; margin-top:0.2rem;">' + i.label + '</div>' +
-          '</div>' +
-        '</div>';
-    });
-    return bar;
+    window.GHKPIBar.render(bar, kpis);
   }
 
   _renderTabs() {
     var self = this;
-    var tabsBar = document.createElement('div');
-    tabsBar.style.cssText = 'padding:0.75rem 1.5rem 0; background:white; border-bottom:1px solid #e9ecef; display:flex; gap:0.25rem; overflow-x:auto;';
+    var tabsBar = this.container.querySelector('#va-tabs');
+    if (!tabsBar) return;
     var tabs = [
-      { id: 'todas',       label: 'Todas' },
-      { id: 'solicitada',  label: 'Solicitada' },
-      { id: 'aprobada',    label: 'Aprobada' },
-      { id: 'rechazada',   label: 'Rechazada' },
-      { id: 'disfrutada',  label: 'Disfrutada' }
+      { id: 'todas',      label: 'Todas' },
+      { id: 'solicitada', label: 'Solicitada' },
+      { id: 'aprobada',   label: 'Aprobada' },
+      { id: 'rechazada',  label: 'Rechazada' },
+      { id: 'disfrutada', label: 'Disfrutada' }
     ];
-    var count = function (id) {
-      return id === 'todas' ? self.items.length : self.items.filter(function (x) { return x.estado === id; }).length;
-    };
-    tabs.forEach(function (t) {
-      var active = self.tab === t.id;
-      var b = document.createElement('button');
-      b.style.cssText = 'background:' + (active ? '#174ea6' : 'transparent') + '; color:' + (active ? 'white' : '#5a6378') + '; border:none; padding:0.5rem 0.875rem; border-radius:0.4rem; cursor:pointer; font-size:0.8125rem; font-weight:' + (active ? '600' : '500') + '; white-space:nowrap;';
-      b.innerHTML = t.label + ' (' + count(t.id) + ')';
-      b.onclick = function () { self.tab = t.id; self.render(); };
-      tabsBar.appendChild(b);
+    var html = tabs.map(function (t) {
+      var count = self._countByEstado(t.id);
+      return '<button class="va-tab ' + (self.tab === t.id ? 'va-tab--active' : '') + '" data-tab="' + t.id + '" type="button">' +
+        self._escHtml(t.label) + ' (' + count + ')</button>';
+    }).join('');
+    tabsBar.innerHTML = html;
+    tabsBar.querySelectorAll('.va-tab').forEach(function (b) {
+      b.onclick = function () { self.tab = b.getAttribute('data-tab'); self._renderTabs(); self._renderTable(); };
     });
-    return tabsBar;
   }
 
   _renderTable() {
     var self = this;
-    var wrap = document.createElement('div');
-    wrap.style.cssText = 'padding:0 1.5rem 1rem; background:#f8f9fa;';
-    var card = document.createElement('div');
-    card.style.cssText = 'background:white; border:1px solid #e9ecef; border-radius:0.5rem; overflow:hidden; margin-top:1rem;';
+    var wrap = this.container.querySelector('#va-table-wrap');
+    if (!wrap) return;
     var filtered = this._filtered();
     if (filtered.length === 0) {
-      card.innerHTML = '<div style="padding:2rem; text-align:center; color:#5a6378;">No hay vacaciones en este estado aún.</div>';
-      wrap.appendChild(card);
-      return wrap;
+      wrap.innerHTML = '<div class="va-table-card">' +
+        '<table class="va-table"><thead><tr>' +
+        '<th>Trabajador</th><th>Cargo</th><th>Sede</th>' +
+        '<th>Fecha Inicio</th><th>Fecha Fin</th><th>Días</th>' +
+        '<th>Estado</th><th>Cliente</th><th class="va-table th--right">Acciones</th>' +
+        '</tr></thead><tbody><tr><td colspan="9" class="va-empty-row">No hay vacaciones en este estado.</td></tr></tbody></table></div>';
+      return;
     }
-    var table = document.createElement('table');
-    table.style.cssText = 'width:100%; border-collapse:collapse; font-size:0.8125rem;';
-    table.innerHTML =
-      '<thead>' +
-        '<tr style="background:#f8f9fa; color:#5a6378; text-transform:uppercase; font-size:0.65rem; letter-spacing:0.4px;">' +
-          '<th style="text-align:left; padding:0.75rem 1rem;">Trabajador</th>' +
-          '<th style="text-align:left; padding:0.75rem 1rem;">Cargo</th>' +
-          '<th style="text-align:left; padding:0.75rem 1rem;">Sede</th>' +
-          '<th style="text-align:left; padding:0.75rem 1rem;">Inicio</th>' +
-          '<th style="text-align:left; padding:0.75rem 1rem;">Fin</th>' +
-          '<th style="text-align:right; padding:0.75rem 1rem;">Días</th>' +
-          '<th style="text-align:center; padding:0.75rem 1rem;">Estado</th>' +
-          '<th style="text-align:center; padding:0.75rem 1rem;">Cliente</th>' +
-          '<th style="text-align:right; padding:0.75rem 1rem;">Acciones</th>' +
-        '</tr>' +
-      '</thead>' +
-      '<tbody></tbody>';
-    var tbody = table.querySelector('tbody');
-    filtered.forEach(function (v) {
-      var t = self._trabajador(v.trabajadorId);
-      var s = t && t.sedeId ? self._sedeById[t.sedeId] : null;
-      var tr = document.createElement('tr');
-      tr.style.cssText = 'border-top:1px solid #f1f3f5;';
-      var estadoBadge = self._estadoBadge(v.estado);
-      var clienteBadge = v.clienteNotificado
-        ? '<span style="background:#d4edda; color:#155724; padding:0.2rem 0.5rem; border-radius:0.875rem; font-size:0.65rem; font-weight:600;">Notificado</span>'
-        : (v.estado === 'aprobada' ? '<span style="background:#fff3cd; color:#856404; padding:0.2rem 0.5rem; border-radius:0.875rem; font-size:0.65rem; font-weight:600;">Pendiente</span>' : '<span style="color:#9ca3af; font-size:0.7rem;">—</span>');
-      var acciones = self._renderAcciones(v);
-      tr.innerHTML =
-        '<td style="padding:0.75rem 1rem;">' +
-          '<div style="font-weight:600; color:#1a1a2e;">' + (t ? (t.nombres + ' ' + t.apellidos) : '—') + '</div>' +
-          (t && t.cedula ? '<div style="font-size:0.7rem; color:#5a6378;">CC ' + t.cedula + '</div>' : '') +
-        '</td>' +
-        '<td style="padding:0.75rem 1rem;">' + (t ? (t.cargo || '—') : '—') + '</td>' +
-        '<td style="padding:0.75rem 1rem;">' + (s ? s.nombre : '—') + '</td>' +
-        '<td style="padding:0.75rem 1rem; white-space:nowrap;">' + (v.fechaInicio || '—') + '</td>' +
-        '<td style="padding:0.75rem 1rem; white-space:nowrap;">' + (v.fechaFin || '—') + '</td>' +
-        '<td style="padding:0.75rem 1rem; text-align:right; font-weight:600;">' + self._fmt(v.diasSolicitados) + '</td>' +
-        '<td style="padding:0.75rem 1rem; text-align:center;">' + estadoBadge + '</td>' +
-        '<td style="padding:0.75rem 1rem; text-align:center;">' + clienteBadge + '</td>' +
-        '<td style="padding:0.75rem 1rem; text-align:right;">' + acciones + '</td>';
-      tbody.appendChild(tr);
+    var rows = filtered.map(function (v) { return self._renderRow(v); }).join('');
+    wrap.innerHTML = '<div class="va-table-card">' +
+      '<table class="va-table"><thead><tr>' +
+      '<th>Trabajador</th><th>Cargo</th><th>Sede</th>' +
+      '<th>Fecha Inicio</th><th>Fecha Fin</th><th>Días</th>' +
+      '<th>Estado</th><th>Cliente</th><th class="va-table th--right">Acciones</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+
+    wrap.querySelectorAll('button[data-accion]').forEach(function (b) {
+      b.onclick = function () {
+        var accion = b.getAttribute('data-accion');
+        var id = b.getAttribute('data-id');
+        if (accion === 'aprobar')        self._cambiarEstado(id, 'aprobada');
+        else if (accion === 'rechazar')  self._cambiarEstado(id, 'rechazada');
+        else if (accion === 'programar') self._programar(id);
+        else if (accion === 'notificar') self._notificarCliente(id);
+      };
     });
-    card.appendChild(table);
-    wrap.appendChild(card);
-    return wrap;
   }
 
-  _estadoBadge(estado) {
-    var colors = {
-      'solicitada':  { bg: '#fff3cd', fg: '#856404', label: 'Solicitada' },
-      'aprobada':    { bg: '#cce5ff', fg: '#004085', label: 'Aprobada' },
-      'rechazada':   { bg: '#f8d7da', fg: '#721c24', label: 'Rechazada' },
-      'programada':  { bg: '#d1ecf1', fg: '#0c5460', label: 'Programada' },
-      'disfrutada':  { bg: '#d4edda', fg: '#155724', label: 'Disfrutada' }
-    };
-    var c = colors[estado] || { bg: '#e9ecef', fg: '#5a6378', label: estado };
-    return '<span style="background:' + c.bg + '; color:' + c.fg + '; padding:0.2rem 0.625rem; border-radius:0.875rem; font-size:0.7rem; font-weight:600;">' + c.label + '</span>';
-  }
-
-  _renderAcciones(v) {
+  _renderRow(v) {
     var self = this;
-    var btns = '';
-    if (v.estado === 'solicitada') {
-      btns += '<button data-act="aprobar" data-id="' + v.id + '" style="background:transparent; border:none; color:#28a745; cursor:pointer; padding:0.25rem 0.4rem; font-size:0.9rem;" title="Aprobar"><i class="fas fa-check"></i></button>';
-      btns += '<button data-act="rechazar" data-id="' + v.id + '" style="background:transparent; border:none; color:#dc3545; cursor:pointer; padding:0.25rem 0.4rem; font-size:0.9rem;" title="Rechazar"><i class="fas fa-times"></i></button>';
-    }
-    if (v.estado === 'aprobada' && !v.clienteNotificado) {
-      btns += '<button data-act="notificar" data-id="' + v.id + '" style="background:transparent; border:none; color:#0d9488; cursor:pointer; padding:0.25rem 0.4rem; font-size:0.9rem;" title="Marcar cliente notificado"><i class="fas fa-bell"></i></button>';
-    }
-    if (v.estado === 'solicitada' || v.estado === 'aprobada') {
-      btns += '<button data-act="cancelar" data-id="' + v.id + '" style="background:transparent; border:none; color:#6c757d; cursor:pointer; padding:0.25rem 0.4rem; font-size:0.9rem;" title="Cancelar"><i class="fas fa-ban"></i></button>';
-    }
-    setTimeout(function () {
-      var card = self.container;
-      card.querySelectorAll('button[data-act]').forEach(function (b) {
-        b.onclick = function () {
-          var act = b.getAttribute('data-act');
-          var id = b.getAttribute('data-id');
-          if (act === 'aprobar') self._cambiarEstado(id, 'aprobada');
-          if (act === 'rechazar') self._cambiarEstado(id, 'rechazada');
-          if (act === 'notificar') self._notificarCliente(id);
-          if (act === 'cancelar') self._cancelar(id);
-        };
-      });
-    }, 0);
-    return btns || '<span style="color:#9ca3af;">—</span>';
-  }
+    var t = this._trabajadorById[v.trabajadorId] || {};
+    var s = this._sedeById[t.sedeId] || {};
 
-  _renderFlujoCard() {
-    var wrap = document.createElement('div');
-    wrap.style.cssText = 'padding:0.5rem 1.5rem 1.5rem;';
-    var card = document.createElement('div');
-    card.style.cssText = 'background:#fff8e1; border:1px solid #ffe082; border-radius:0.5rem; padding:1rem 1.25rem; display:flex; gap:0.875rem; align-items:flex-start;';
-    card.innerHTML =
-      '<div style="color:#a16207; font-size:1.1rem;"><i class="fas fa-info-circle"></i></div>' +
-      '<div>' +
-        '<div style="font-weight:600; color:#1a1a2e; font-size:0.9rem; margin-bottom:0.25rem;">Flujo de Vacaciones — TEMPOACTIVA</div>' +
-        '<p style="margin:0; font-size:0.8rem; color:#5a6378; line-height:1.5;">' +
-          'Mensualmente (ej: en julio se envían las de agosto), Recursos Humanos genera el listado de personal próximo a salir de vacaciones. Los jefes inmediatos (como Cabo Roberto en Turipaná) son quienes programan las vacaciones de su personal según la operación. Idealmente, debe notificarse a los clientes cuando un trabajador se va de vacaciones para que ellos reevalúen la cobertura.' +
-        '</p>' +
-      '</div>';
-    wrap.appendChild(card);
-    return wrap;
-  }
-
-  // === ACTIONS ===
-  async _cambiarEstado(id, nuevoEstado) {
-    try {
-      var payload = { contratacionId: null, vacacionId: id, nuevoEstado: nuevoEstado };
-      if (nuevoEstado === 'aprobada') {
-        payload.aprobadoPor = (window.currentUser && window.currentUser.nombre) || 'Recursos Humanos';
-        payload.fechaAprobacion = new Date().toISOString().split('T')[0];
-      }
-      var r = await window.electronAPI.ghCambiarEstadoVacacion(payload);
-      if (r && r.success) {
-        this._showToast('Vacación ' + nuevoEstado + ' correctamente', 'success');
-        await this._load(); this.render();
+    // Badge de cliente
+    var clienteHtml = '';
+    if (v.estado === 'aprobada') {
+      if (v.clienteNotificado) {
+        clienteHtml = '<span class="va-cliente-badge va-cliente-badge--notificado"><i class="fas fa-check"></i> Notificado</span>';
       } else {
-        this._showToast('Error: ' + (r && r.error && r.error.message || 'desconocido'), 'error');
+        clienteHtml = '<span class="va-cliente-badge va-cliente-badge--pendiente"><i class="fas fa-clock"></i> Pendiente</span>';
       }
-    } catch (e) {
-      this._showToast('Error: ' + e.message, 'error');
+    } else {
+      clienteHtml = '<span class="va-cliente-badge va-cliente-badge--na">—</span>';
     }
+
+    // Acciones por estado
+    var actions = '';
+    if (v.estado === 'solicitada') {
+      actions += '<button class="va-btn--icon success" data-accion="aprobar" data-id="' + self._escHtml(v.id) + '" title="Aprobar"><i class="fas fa-check"></i></button>';
+      actions += '<button class="va-btn--icon danger"  data-accion="rechazar" data-id="' + self._escHtml(v.id) + '" title="Rechazar"><i class="fas fa-times"></i></button>';
+    } else if (v.estado === 'aprobada') {
+      actions += '<button class="va-btn--icon info"    data-accion="programar" data-id="' + self._escHtml(v.id) + '" title="Programar"><i class="fas fa-calendar-alt"></i></button>';
+      if (!v.clienteNotificado) {
+        actions += '<button class="va-btn--icon info"    data-accion="notificar" data-id="' + self._escHtml(v.id) + '" title="Notificar al cliente"><i class="fas fa-envelope"></i></button>';
+      }
+    }
+
+    return '<tr>' +
+      '<td>' +
+        '<div class="va-table__name">' + self._escHtml((t.nombres || '') + ' ' + (t.apellidos || '')) + '</div>' +
+        '<div class="va-table__cargo">' + self._escHtml(t.cedula || '—') + '</div>' +
+      '</td>' +
+      '<td>' + self._escHtml(t.cargo || '—') + '</td>' +
+      '<td>' + self._escHtml(s.nombre || '—') + '</td>' +
+      '<td class="va-table__date">' + self._fmtDate(v.fechaInicio) + '</td>' +
+      '<td class="va-table__date">' + self._fmtDate(v.fechaFin) + '</td>' +
+      '<td class="va-table__date">' + (v.diasSolicitados || '—') + '</td>' +
+      '<td><span class="va-badge va-badge--' + v.estado + '">' + self._escHtml(v.estado) + '</span></td>' +
+      '<td>' + clienteHtml + '</td>' +
+      '<td class="va-table td--right"><div class="va-table__actions">' + actions + '</div></td>' +
+    '</tr>';
+  }
+
+  // ─── Modal: Solicitar Vacaciones ───
+  _openSolicitarModal() {
+    var self = this;
+    if (this.trabajadores.length === 0) {
+      this._showToast('No hay trabajadores registrados. Carga la Base Personal primero.', 'warning');
+      return;
+    }
+    var today = new Date().toISOString().slice(0, 10);
+    var choices = this.trabajadores
+      .slice()
+      .sort(function (a, b) { return ((a.nombres || '') + ' ' + (a.apellidos || '')).localeCompare((b.nombres || '') + ' ' + (b.apellidos || '')); })
+      .map(function (t) { return '<option value="' + self._escHtml(t.id) + '">' + self._escHtml((t.nombres || '') + ' ' + (t.apellidos || '') + (t.cedula ? ' · CC ' + t.cedula : '')) + '</option>'; })
+      .join('');
+
+    var html =
+      '<div class="va-modal-backdrop" id="va-solicitar-backdrop">' +
+        '<div class="va-modal" role="dialog" aria-modal="true">' +
+          '<div class="va-modal__head">' +
+            '<div>' +
+              '<h2 class="va-modal__title">Solicitar Vacaciones</h2>' +
+              '<p class="va-modal__sub">Inicia un proceso de solicitud. Quedará en estado <strong>Solicitada</strong> hasta que sea aprobada o rechazada.</p>' +
+            '</div>' +
+            '<button class="va-modal__close" type="button" aria-label="Cerrar">×</button>' +
+          '</div>' +
+          '<div class="va-modal__body">' +
+            '<form id="va-solicitar-form" class="va-form-grid">' +
+              '<div class="va-field va-field--full"><label>Trabajador <span class="req">*</span></label>' +
+                '<select name="trabajadorId" required><option value="">— Selecciona un trabajador —</option>' + choices + '</select></div>' +
+              '<div class="va-field"><label>Fecha Inicio <span class="req">*</span></label><input type="date" name="fechaInicio" required value="' + today + '" /></div>' +
+              '<div class="va-field"><label>Fecha Fin <span class="req">*</span></label><input type="date" name="fechaFin" required /></div>' +
+              '<div class="va-field"><label>Días hábiles <span class="req">*</span></label><input type="number" name="dias" min="1" required value="8" /></div>' +
+              '<div class="va-field"><label>Fecha Solicitud</label><input type="date" name="fechaSolicitud" value="' + today + '" /></div>' +
+              '<div class="va-field va-field--full"><label>Observaciones</label><textarea name="notas" rows="2" placeholder="Opcional"></textarea></div>' +
+            '</form>' +
+          '</div>' +
+          '<div class="va-modal__foot">' +
+            '<button class="va-btn va-btn--ghost" type="button" data-action="cancel">Cancelar</button>' +
+            '<button class="va-btn va-btn--primary" type="button" data-action="submit"><i class="fas fa-paper-plane"></i> Enviar Solicitud</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    var wrap = document.createElement('div');
+    wrap.innerHTML = html;
+    var backdrop = wrap.firstChild;
+    document.body.appendChild(backdrop);
+
+    var close = function () { if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop); };
+    backdrop.querySelector('.va-modal__close').onclick = close;
+    backdrop.querySelector('[data-action="cancel"]').onclick = close;
+    backdrop.onclick = function (e) { if (e.target === backdrop) close(); };
+
+    // Auto-calcular días al cambiar fechas
+    var fechaInicioEl = backdrop.querySelector('input[name="fechaInicio"]');
+    var fechaFinEl    = backdrop.querySelector('input[name="fechaFin"]');
+    var diasEl        = backdrop.querySelector('input[name="dias"]');
+    var syncDias = function () {
+      var d = self._diffDias(fechaInicioEl.value, fechaFinEl.value);
+      if (d && d > 0) diasEl.value = d;
+    };
+    fechaInicioEl.onchange = syncDias;
+    fechaFinEl.onchange    = syncDias;
+
+    backdrop.querySelector('[data-action="submit"]').onclick = function () {
+      var form = backdrop.querySelector('#va-solicitar-form');
+      if (!form.checkValidity()) { form.reportValidity(); return; }
+      var d = self._diffDias(form.fechaInicio.value, form.fechaFin.value);
+      if (!d || d <= 0) {
+        self._showToast('La fecha de fin debe ser posterior a la fecha de inicio', 'error');
+        return;
+      }
+      var data = {
+        trabajadorId:      form.trabajadorId.value,
+        fechaSolicitud:    self._inputDateToIso(form.fechaSolicitud.value) || new Date().toISOString(),
+        fechaInicio:       self._inputDateToIso(form.fechaInicio.value),
+        fechaFin:          self._inputDateToIso(form.fechaFin.value),
+        diasSolicitados:   parseInt(form.dias.value, 10) || d,
+        notas:             form.notas.value || null,
+        estado:            'solicitada',
+        notificarCliente:  0
+      };
+      close();
+      self._create(data);
+    };
+  }
+
+  async _create(data) {
+    try {
+      var r = await window.electronAPI.ghCreateVacacion({ companyName: this.companyName, data: data });
+      if (r && r.success) {
+        this._showToast('Solicitud enviada', 'success');
+        await this._load();
+        this._renderAll();
+      } else {
+        this._showToast('Error: ' + ((r && r.error && r.error.message) || 'desconocido'), 'error');
+      }
+    } catch (e) { this._showToast('Error: ' + e.message, 'error'); }
+  }
+
+  async _cambiarEstado(id, estado) {
+    try {
+      var r = await window.electronAPI.ghCambiarEstadoVacacion({ vacacionId: id, estado: estado });
+      if (r && r.success) {
+        this._showToast('Vacación ' + estado, 'success');
+        await this._load();
+        this._renderAll();
+      } else {
+        this._showToast('Error: ' + ((r && r.error && r.error.message) || 'desconocido'), 'error');
+      }
+    } catch (e) { this._showToast('Error: ' + e.message, 'error'); }
+  }
+
+  async _programar(id) {
+    // Programar = marcar como "disfrutada" (salió en esas fechas). Alternativa:
+    // cambiar a 'programada' si se quiere representar como paso previo a disfrutada.
+    var self = this;
+    var ok = window.confirm('¿Marcar esta vacación como programada (lista para el período de inicio)?');
+    if (!ok) return;
+    try {
+      var r = await window.electronAPI.ghCambiarEstadoVacacion({ vacacionId: id, estado: 'programada' });
+      if (r && r.success) {
+        self._showToast('Vacación programada', 'success');
+        await self._load();
+        self._renderAll();
+      } else {
+        self._showToast('Error: ' + ((r && r.error && r.error.message) || 'desconocido'), 'error');
+      }
+    } catch (e) { self._showToast('Error: ' + e.message, 'error'); }
   }
 
   async _notificarCliente(id) {
@@ -321,96 +400,42 @@ class VacacionesComponent {
       var r = await window.electronAPI.ghUpdateVacacion({ vacacionId: id, updates: { clienteNotificado: 1 } });
       if (r && r.success) {
         this._showToast('Cliente notificado', 'success');
-        await this._load(); this.render();
+        await this._load();
+        this._renderAll();
       } else {
-        this._showToast('Error: ' + (r && r.error && r.error.message || 'desconocido'), 'error');
-      }
-    } catch (e) { this._showToast('Error: ' + e.message, 'error'); }
-  }
-
-  async _cancelar(id) {
-    var ok = await this._confirmDialog().confirm('¿Cancelar esta solicitud de vacaciones? El estado cambiará a cancelado.', { title: 'Cancelar vacaciones', okText: 'Sí, cancelar', okType: 'danger' });
-    if (!ok) return;
-    try {
-      var r = await window.electronAPI.ghDeleteVacacion({ vacacionId: id });
-      if (r && r.success) {
-        this._showToast('Vacación cancelada', 'success');
-        await this._load(); this.render();
-      } else {
-        this._showToast('Error: ' + (r && r.error && r.error.message || 'desconocido'), 'error');
-      }
-    } catch (e) { this._showToast('Error: ' + e.message, 'error'); }
-  }
-
-  async _showSolicitarDialog() {
-    var self = this;
-    if (this.trabajadores.length === 0) {
-      this._showToast('No hay trabajadores registrados. Agrega uno en Base de Personal primero.', 'warning');
-      return;
-    }
-    var choices = this.trabajadores.map(function (t) {
-      return { value: t.id, label: (t.nombres + ' ' + t.apellidos + ' — ' + (t.cargo || '—') + ' (' + t.cedula + ')') };
-    });
-    var data = await this._confirmDialog().input({
-      title: 'Solicitar Vacaciones',
-      fields: [
-        { name: 'trabajadorId', label: 'Trabajador', type: 'select', required: true, options: choices },
-        { name: 'fechaInicio', label: 'Fecha inicio', type: 'date', required: true },
-        { name: 'fechaFin', label: 'Fecha fin', type: 'date', required: true },
-        { name: 'diasSolicitados', label: 'Días solicitados', type: 'number', required: true, default: 8 },
-        { name: 'diasPendientes', label: 'Días pendientes (opcional)', type: 'number', required: false },
-        { name: 'notificarCliente', label: '¿Notificar al cliente cuando se apruebe?', type: 'checkbox', required: false, default: true },
-        { name: 'notas', label: 'Notas', type: 'textarea', required: false }
-      ]
-    });
-    if (!data) return;
-    try {
-      var r = await window.electronAPI.ghCreateVacacion({
-        companyName: this.companyName,
-        data: {
-          trabajadorId: data.trabajadorId,
-          fechaSolicitud: new Date().toISOString().split('T')[0],
-          fechaInicio: data.fechaInicio,
-          fechaFin: data.fechaFin,
-          diasSolicitados: parseInt(data.diasSolicitados, 10),
-          diasPendientes: data.diasPendientes ? parseInt(data.diasPendientes, 10) : null,
-          notificarCliente: data.notificarCliente ? 1 : 0,
-          notas: data.notas || null
-        }
-      });
-      if (r && r.success) {
-        this._showToast('Vacación solicitada', 'success');
-        await this._load(); this.render();
-      } else {
-        this._showToast('Error: ' + (r && r.error && r.error.message || 'desconocido'), 'error');
+        this._showToast('Error: ' + ((r && r.error && r.error.message) || 'desconocido'), 'error');
       }
     } catch (e) { this._showToast('Error: ' + e.message, 'error'); }
   }
 
   _exportListadoMensual() {
-    var mes = new Date();
-    mes.setMonth(mes.getMonth() + 1);
-    var mesLabel = mes.toLocaleString('es-CO', { month: 'long', year: 'numeric' }).toUpperCase();
-    var proximas = this.items.filter(function (v) {
-      var f = new Date(v.fechaInicio);
-      return f.getMonth() === mes.getMonth() && f.getFullYear() === mes.getFullYear();
+    // Generar CSV del mes actual / próximo con vacaciones aprobadas y pendientes
+    var rows = [['TRABAJADOR', 'CARGO', 'SEDE', 'FECHA INICIO', 'FECHA FIN', 'DIAS', 'ESTADO', 'CLIENTE NOTIFICADO']];
+    var self = this;
+    this.items.forEach(function (v) {
+      var t = self._trabajadorById[v.trabajadorId] || {};
+      var s = self._sedeById[t.sedeId] || {};
+      rows.push([
+        ((t.nombres || '') + ' ' + (t.apellidos || '')).trim(),
+        t.cargo || '',
+        s.nombre || '',
+        self._isoToInputDate(v.fechaInicio),
+        self._isoToInputDate(v.fechaFin),
+        v.diasSolicitados || '',
+        v.estado,
+        v.clienteNotificado ? 'Si' : 'No'
+      ]);
     });
-    var lines = ['LISTADO DE VACACIONES — ' + mesLabel, this.companyName.toUpperCase(), '========================================', ''];
-    if (proximas.length === 0) {
-      lines.push('No hay vacaciones programadas para el próximo mes.');
-    } else {
-      proximas.forEach(function (v) {
-        var t = this._trabajador(v.trabajadorId);
-        lines.push((t ? (t.nombres + ' ' + t.apellidos) : '—') + ' — ' + (t ? t.cargo : '—') + ' — ' + v.fechaInicio + ' al ' + v.fechaFin + ' (' + v.diasSolicitados + ' días) — ' + v.estado);
-      }.bind(this));
-    }
-    var blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url; a.download = 'vacaciones_' + mes.getFullYear() + '_' + String(mes.getMonth() + 1).padStart(2, '0') + '.txt';
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    this._showToast('Listado generado', 'success');
+    var csv = rows.map(function (r) { return r.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(','); }).join('\n');
+    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement('a');
+    a.href = url;
+    a.download = 'listado-vacaciones-' + new Date().toISOString().slice(0, 10) + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+    this._showToast('Listado exportado', 'success');
   }
 
   destroy() { /* noop */ }

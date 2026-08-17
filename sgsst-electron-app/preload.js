@@ -363,6 +363,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   ghListPersonal: (payload) => ipcRenderer.invoke('gh:list-personal', payload),
   ghGetPersonal: (payload) => ipcRenderer.invoke('gh:get-personal', payload),
   ghListSedes: (payload) => ipcRenderer.invoke('gh:list-sedes', payload),
+  // 📦760 · Documentos de Afiliaciones (5) — certificados EPS / Pensión / ARL / Caja
+  ghListDocumentosAfiliaciones: (payload) => ipcRenderer.invoke('gh:list-documentos-afiliaciones', payload),
+  ghSubirDocumentoAfiliacion: (payload) => ipcRenderer.invoke('gh:subir-documento-afiliacion', payload),
+  ghEliminarDocumentoAfiliacion: (payload) => ipcRenderer.invoke('gh:eliminar-documento-afiliacion', payload),
+  ghObtenerDocumentoAfiliacion: (payload) => ipcRenderer.invoke('gh:obtener-documento-afiliacion', payload),
+  ghAbrirDocumentoAfiliacion: (payload) => ipcRenderer.invoke('gh:abrir-documento-afiliacion', payload),
+  // 📦764 · Templates de Documentos (5) — .docx/.pdf subidos por el user
+  ghListTemplates: (payload) => ipcRenderer.invoke('gh:list-templates', payload),
+  ghSubirTemplate: (payload) => ipcRenderer.invoke('gh:subir-template', payload),
+  ghEliminarTemplate: (payload) => ipcRenderer.invoke('gh:eliminar-template', payload),
+  ghObtenerTemplate: (payload) => ipcRenderer.invoke('gh:obtener-template', payload),
+  ghAbrirTemplate: (payload) => ipcRenderer.invoke('gh:abrir-template', payload),
+  // 📦732 · Import Excel (3)
+  ghSelectExcel: (payload) => ipcRenderer.invoke('gh:select-excel', payload),
+  ghParseExcel: (payload) => ipcRenderer.invoke('gh:parse-excel', payload),
+  ghImportPersonal: (payload) => ipcRenderer.invoke('gh:import-personal', payload),
   // Write Contratación (4)
   ghCreateContratacion: (payload) => ipcRenderer.invoke('gh:create-contratacion', payload),
   ghUpdateContratacion: (payload) => ipcRenderer.invoke('gh:update-contratacion', payload),
@@ -397,6 +413,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   ghUpdateDocumento: (payload) => ipcRenderer.invoke('gh:update-documento', payload),
   ghDeleteDocumento: (payload) => ipcRenderer.invoke('gh:delete-documento', payload),
   ghFirmarDocumento: (payload) => ipcRenderer.invoke('gh:firmar-documento', payload),
+  // 📦764 · Abrir archivo generado del documento
+  ghAbrirDocumento: (payload) => ipcRenderer.invoke('gh:abrir-documento', payload),
   // Firmas Digitales (2)
   ghListFirmas: (payload) => ipcRenderer.invoke('gh:list-firmas', payload),
   ghCreateFirma: (payload) => ipcRenderer.invoke('gh:create-firma', payload),

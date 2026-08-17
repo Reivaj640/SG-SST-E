@@ -1,0 +1,112 @@
+<!-- modules/gestion-humana/base-personal/index.html
+     📦730 · Vista "Base de Personal" — HTML separado (v0.2.0)
+     Estructura:
+       - KPIs (5) via #bp-kpi-bar (helper GHKPIBar)
+       - Toolbar unificada (búsqueda + 3 botones en fila 1; filtros Sede/Estado + contador en fila 2 colapsable)
+       - Table container
+     IDs con prefijo `bp-` para evitar colisiones. -->
+
+<div class="bp-wrapper" id="bp-wrapper">
+  <!-- ═══ KPIs (5) — via helper GHKPIBar ═══ -->
+  <div class="bp-kpi-section">
+    <div id="bp-kpi-bar" class="bp-kpi-bar"></div>
+  </div>
+
+  <!-- ═══ TOOLBAR UNIFICADO (📦730 · card única con 2 filas) ═══ -->
+  <div class="bp-toolbar" id="bp-toolbar">
+    <!-- FILA 1: búsqueda + segmented control + botones -->
+    <div class="bp-toolbar__row bp-toolbar__row--main">
+      <div class="bp-toolbar__search">
+        <i class="fas fa-search bp-toolbar__search-icon"></i>
+        <input id="bp-search" type="text" class="bp-toolbar__search-input"
+               placeholder="Buscar por nombre, cédula, cargo o email…" />
+      </div>
+      <div class="bp-seg" role="tablist" aria-label="Filtro por estado del trabajador">
+        <button id="bp-filter-todos" class="bp-seg-btn bp-seg-btn--active" type="button" data-filter="todos" role="tab" aria-selected="true">
+          Todos <span id="bp-count-todos" class="bp-seg-count">0</span>
+        </button>
+        <button id="bp-filter-activos" class="bp-seg-btn" type="button" data-filter="activos" role="tab" aria-selected="false">
+          Activos <span id="bp-count-activos" class="bp-seg-count">0</span>
+        </button>
+        <button id="bp-filter-retirados" class="bp-seg-btn" type="button" data-filter="retirados" role="tab" aria-selected="false">
+          Retirados <span id="bp-count-retirados" class="bp-seg-count">0</span>
+        </button>
+      </div>
+      <div class="bp-toolbar__actions">
+        <div class="bp-filter-group bp-filter-group--inline">
+          <label class="bp-filter-group__label" for="bp-filter-sede">Sede</label>
+          <select id="bp-filter-sede" class="bp-filter-select">
+            <option value="all">Todas las sedes</option>
+          </select>
+        </div>
+        <button id="bp-importar-btn" class="bp-btn bp-btn--ghost" type="button" title="Importar trabajadores desde Excel">
+          <i class="fas fa-file-import"></i> Importar Excel
+        </button>
+        <button id="bp-exportar-btn" class="bp-btn bp-btn--ghost" type="button">
+          <i class="fas fa-download"></i> Exportar CSV
+        </button>
+        <button id="bp-new-btn" class="bp-btn bp-btn--primary" type="button">
+          <i class="fas fa-plus"></i> Nuevo Trabajador
+        </button>
+      </div>
+    </div>
+
+    <!-- FILA 2: contador de resultados -->
+    <div class="bp-toolbar__row bp-toolbar__row--count">
+      <div id="bp-filter-count" class="bp-filter-count">
+        Mostrando <strong id="bp-filter-count-num">0</strong> trabajador(es)
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ TABLE CONTAINER ═══ -->
+  <div id="bp-table-container" class="bp-table-container"></div>
+</div>
+
+<!-- ═══ MODAL: PREVIEW DE IMPORTACIÓN EXCEL (📦732) ═══ -->
+<div id="bp-import-modal" class="bp-modal" hidden>
+  <div class="bp-modal__backdrop" data-close-modal="1"></div>
+  <div class="bp-modal__panel">
+    <header class="bp-modal__header">
+      <h3 class="bp-modal__title">
+        <i class="fas fa-file-import"></i> Vista previa de importación
+      </h3>
+      <button type="button" class="bp-modal__close" data-close-modal="1" aria-label="Cerrar">
+        <i class="fas fa-times"></i>
+      </button>
+    </header>
+    <div class="bp-modal__body">
+      <div id="bp-import-summary" class="bp-import-summary"></div>
+      <h4 class="bp-import-section-title">Mapeo de columnas</h4>
+      <div id="bp-import-mapping" class="bp-import-mapping"></div>
+      <h4 class="bp-import-section-title">Primeras filas (preview)</h4>
+      <div id="bp-import-preview" class="bp-import-preview"></div>
+    </div>
+    <footer class="bp-modal__footer">
+      <fieldset class="bp-import-duplicate-mode">
+        <legend>Si la cédula ya existe:</legend>
+        <label class="bp-import-duplicate-mode__opt">
+          <input type="radio" name="bp-import-dup-mode" value="skip" checked />
+          <span class="bp-import-duplicate-mode__opt-label">Omitir</span>
+          <span class="bp-import-duplicate-mode__opt-hint">no crear ni actualizar</span>
+        </label>
+        <label class="bp-import-duplicate-mode__opt">
+          <input type="radio" name="bp-import-dup-mode" value="update" />
+          <span class="bp-import-duplicate-mode__opt-label">Actualizar</span>
+          <span class="bp-import-duplicate-mode__opt-hint">reemplaza los datos (preserva retirado)</span>
+        </label>
+        <label class="bp-import-duplicate-mode__opt">
+          <input type="radio" name="bp-import-dup-mode" value="error" />
+          <span class="bp-import-duplicate-mode__opt-label">Reportar error</span>
+          <span class="bp-import-duplicate-mode__opt-hint">no inserta ni actualiza</span>
+        </label>
+      </fieldset>
+      <div class="bp-modal__footer-actions">
+        <button type="button" class="bp-btn bp-btn--ghost" data-close-modal="1">Cancelar</button>
+        <button type="button" id="bp-import-confirm" class="bp-btn bp-btn--primary">
+          <i class="fas fa-file-import"></i> <span id="bp-import-confirm-text">Importar</span>
+        </button>
+      </div>
+    </footer>
+  </div>
+</div>

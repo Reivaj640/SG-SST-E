@@ -1,57 +1,39 @@
 <!-- modules/gestion-humana/gestion-humana-home.html
-     📦713 · Shell del módulo Gestión Humana con layout CSS garantizado
-     Estructura: sidebar (256px) + main (flex:1, height:100%) con header + content + footer.
-     La altura del main es 100% para que flex:1 en el content funcione correctamente. -->
+     📦717 · Shell del módulo Gestión Humana con header K+AIR (patrón Programa de Capacitación)
+     Header unificado: icono + título + subtítulo (izq) / badge + NIT + Bell (der).
+     Tabs horizontales debajo con 9 sub-módulos (responsive: con/sin iconos según ancho).
+     Migrado de top bar (brand T + NIT) a header unificado con icono del módulo. -->
+
 <div class="gh-shell" id="gh-shell">
-  <aside class="gh-sidebar" id="gh-sidebar">
-    <div class="gh-sidebar__brand">
-      <div class="gh-sidebar__brand-logo">T</div>
-      <div class="gh-sidebar__brand-text">
-        <div class="gh-sidebar__brand-title">TEMPOACTIVA</div>
-        <div class="gh-sidebar__brand-subtitle">EST S.A.S.</div>
-      </div>
+  <!-- ═══ HEADER K+AIR (patrón Programa de Capacitación) ═══ -->
+  <header class="gh-header">
+    <div class="gh-header__left">
+      <h1 class="gh-header__title">
+        <i class="fas fa-people-group gh-header__icon"></i> Gestión Humana
+      </h1>
+      <p class="gh-header__subtitle">Sistema de Gestión de Personal — TEMPOACTIVA EST S.A.S.</p>
     </div>
-
-    <nav class="gh-sidebar__nav" id="gh-sidebar-nav">
-      <!-- nav items se inyectan via JS -->
-    </nav>
-
-    <div class="gh-sidebar__user">
-      <div class="gh-sidebar__user-avatar">
-        <i class="fas fa-user"></i>
-      </div>
-      <div class="gh-sidebar__user-text">
-        <div class="gh-sidebar__user-name" id="gh-user-name">—</div>
-        <div class="gh-sidebar__user-role">Recursos Humanos</div>
-      </div>
+    <div class="gh-header__right">
+      <button class="gh-bell-btn" id="gh-bell-btn" title="Notificaciones">
+        <i class="fas fa-bell"></i>
+        <span class="gh-bell-badge" id="gh-bell-badge"></span>
+      </button>
     </div>
-  </aside>
+  </header>
 
-  <main class="gh-main" id="gh-main">
-    <header class="gh-header">
-      <div class="gh-header__left">
-        <h1 class="gh-header__title" id="gh-page-title">Resumen</h1>
-        <p class="gh-header__subtitle">Sistema de Gestión de Personal — TEMPOACTIVA EST S.A.S.</p>
-      </div>
-      <div class="gh-header__right">
-        <div class="gh-nit-badge" id="gh-nit-badge">
-          <i class="fas fa-building"></i>
-          <span>NIT 900.511.178-1</span>
-        </div>
-        <button class="gh-bell-btn" id="gh-bell-btn" title="Notificaciones">
-          <i class="fas fa-bell"></i>
-          <span class="gh-bell-badge" id="gh-bell-badge"></span>
-        </button>
-      </div>
-    </header>
+  <!-- ═══ TABS HORIZONTALES (9 sub-módulos, responsive) ═══ -->
+  <nav class="gh-tabs" id="gh-tabs" role="tablist">
+    <!-- tabs se inyectan via JS -->
+  </nav>
 
-    <main class="gh-content" id="gh-content">
-      <!-- Contenido de la vista activa se inyecta via JS -->
-    </main>
-
-    <footer class="gh-footer">
-      <span>© 2026 TEMPOACTIVA EST S.A.S. — Sistema de Gestión de Personal</span>
-      <span>v1.0 — Barranquilla, Colombia</span>
-    </footer>
+  <!-- ═══ CONTENIDO: vista activa se inyecta via JS ═══ -->
+  <main class="gh-content" id="gh-content">
+    <!-- vista activa -->
   </main>
+
+  <!-- ═══ FOOTER ═══ -->
+  <footer class="gh-footer">
+    <span>© 2026 TEMPOACTIVA EST S.A.S. — Sistema de Gestión de Personal</span>
+    <span>v1.0 — Barranquilla, Colombia</span>
+  </footer>
 </div>

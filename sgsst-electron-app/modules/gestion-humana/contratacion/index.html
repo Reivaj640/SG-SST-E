@@ -1,0 +1,34 @@
+<!-- modules/gestion-humana/contratacion/index.html
+     📦756 · Vista "Contratación" — Cards EN PROCESO + COMPLETADOS
+     Estructura:
+       - 4 KPIs (Total Procesos, En Proceso, Completados, Ingresan Esta Semana)
+       - Header de sección + botón "Nueva Contratación"
+       - Sección "EN PROCESO" con grid de cards (2 columnas)
+       - Sección "COMPLETADOS RECIENTEMENTE" con cards (1 columna)
+     IDs con prefijo `ct-` para evitar colisiones. -->
+
+<div class="ct-wrapper" id="ct-wrapper">
+  <div class="ct-kpi-section">
+    <div id="ct-kpi-bar" class="ct-kpi-bar"></div>
+  </div>
+
+  <div class="ct-section-head">
+    <div class="ct-section-head__text">
+      <h2 class="ct-section-head__title">Procesos de Contratación</h2>
+      <p class="ct-section-head__sub">Workflow paso a paso desde recepción del memo hasta activación en S400</p>
+    </div>
+    <button id="ct-new-btn" class="ct-btn ct-btn--primary" type="button">
+      <i class="fas fa-plus"></i> Nueva Contratación
+    </button>
+  </div>
+
+  <div class="ct-block">
+    <h3 class="ct-block__title">EN PROCESO</h3>
+    <div id="ct-en-proceso" class="ct-cards-grid"></div>
+  </div>
+
+  <div class="ct-block">
+    <h3 class="ct-block__title">COMPLETADOS RECIENTEMENTE</h3>
+    <div id="ct-completados" class="ct-cards-list"></div>
+  </div>
+</div>

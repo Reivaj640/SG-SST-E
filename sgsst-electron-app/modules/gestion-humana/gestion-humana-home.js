@@ -10,15 +10,15 @@
 // Base Personal y Contratación).
 
 var GESTION_HUMANA_NAV = [
-  { id: 'home',          label: 'Resumen',          icon: 'fa-grip',             group: 'Principal' },
-  { id: 'dashboard',     label: 'Dashboard',        icon: 'fa-chart-line',       group: 'Gestión' },
-  { id: 'personal',      label: 'Base de Personal', icon: 'fa-users',            group: 'Gestión' },
-  { id: 'contratacion',  label: 'Contratación',     icon: 'fa-user-plus',        group: 'Gestión' },
-  { id: 'vacaciones',    label: 'Vacaciones',       icon: 'fa-umbrella-beach',   group: 'Gestión' },
-  { id: 'permisos',      label: 'Permisos y Estados', icon: 'fa-file-medical',   group: 'Gestión' },
-  { id: 'afiliaciones',  label: 'Afiliaciones',     icon: 'fa-shield-halved',    group: 'Gestión' },
-  { id: 'documentos',    label: 'Documentos y Firmas', icon: 'fa-file-signature', group: 'Documentos' },
-  { id: 'comunicacion',  label: 'Comunicación',     icon: 'fa-bullhorn',         group: 'Colaboración' }
+  { id: 'home',          label: 'Resumen',          shortLabel: 'Resumen',     icon: 'fa-grip',             group: 'Principal' },
+  { id: 'dashboard',     label: 'Dashboard',        shortLabel: 'Dashboard',   icon: 'fa-chart-line',       group: 'Gestión' },
+  { id: 'personal',      label: 'Base de Personal', shortLabel: 'B. Pers.',    icon: 'fa-users',            group: 'Gestión' },
+  { id: 'contratacion',  label: 'Contratación',     shortLabel: 'Contratación', icon: 'fa-user-plus',       group: 'Gestión' },
+  { id: 'vacaciones',    label: 'Vacaciones',       shortLabel: 'Vacaciones',  icon: 'fa-umbrella-beach',   group: 'Gestión' },
+  { id: 'permisos',      label: 'Permisos y Estados', shortLabel: 'P. y Est.', icon: 'fa-file-medical',     group: 'Gestión' },
+  { id: 'afiliaciones',  label: 'Afiliaciones',     shortLabel: 'Afiliaciones', icon: 'fa-shield-halved',   group: 'Gestión' },
+  { id: 'documentos',    label: 'Documentos y Firmas', shortLabel: 'Doc. y Fir.', icon: 'fa-file-signature', group: 'Documentos' },
+  { id: 'comunicacion',  label: 'Comunicación',     shortLabel: 'Comunicación', icon: 'fa-bullhorn',        group: 'Colaboración' }
 ];
 
 var GESTION_HUMANA_TITLES = {
@@ -129,26 +129,34 @@ class GestionHumanaHome {
       this._shellHtml = await this._fetchShellHtml();
     }
 
+    // 📦714 · Limpiar estilos del container padre (#content-area tiene padding,
+    // border-radius y box-shadow que interfieren con el layout del shell).
+    // Aplicar en CADA render (idempotente, no causa daño).
+    this.container.style.padding = '0';
+    this.container.style.background = 'transparent';
+    this.container.style.borderRadius = '0';
+    this.container.style.boxShadow = 'none';
+    this.container.style.overflow = 'hidden';
+    this.container.style.position = 'relative';
+
+    // 📦719 · Prevenir scroll del container padre (#main-content tiene
+    // overflow-y: auto que hace scroll cuando el shell es más alto que el viewport).
+    // Guardamos el valor original para restaurarlo en destroy().
+    if (!this._prevBodyOverflow) {
+      this._prevBodyOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+    }
+
     // Inyectar el HTML en el container
     this.container.innerHTML = this._shellHtml;
     // Aislar el shell y el content
     this.shellEl = this.container.querySelector('.gh-shell');
     this.contentEl = this.container.querySelector('.gh-content');
-    this._sidebarNav = this.container.querySelector('.gh-sidebar__nav');
-    this._titleEl = this.container.querySelector('.gh-page-title');
-    this._subtitleEl = this.container.querySelector('.gh-header__subtitle');
-    this._nitSpan = this.container.querySelector('.gh-nit-badge span');
+    this._tabsEl = this.container.querySelector('.gh-tabs');
 
-    // Pobar info del usuario
-    setTimeout(function () {
-      var el = this.container.querySelector('#gh-user-name');
-      if (!el) return;
-      var name = (window.currentUser && (window.currentUser.nombre || window.currentUser.name)) || (window.user && window.user.nombre) || 'Lilimaré Robles';
-      el.textContent = name;
-    }.bind(this), 0);
-
-    // Wire sidebar
-    this._renderSidebar();
+    // Wire tabs
+    this._renderTabs();
+    this._wireResizeTabs();
 
     // Wire shell navigation event (quick access cards en DashboardComponent)
     var self = this;
@@ -162,11 +170,8 @@ class GestionHumanaHome {
       window.addEventListener('gh-shell-navigate', this._navHandler);
     }
 
-    // Set title + NIT
-    var t = this._getCurrentTitle();
-    if (this._titleEl) this._titleEl.textContent = t.title;
-    if (this._subtitleEl) this._subtitleEl.textContent = 'Sistema de Gestión de Personal — TEMPOACTIVA EST S.A.S.';
-    if (this._nitSpan) this._nitSpan.textContent = 'NIT ' + (this.currentCompany ? this._nitFromCompany(this.currentCompany) : '900.511.178-1');
+    // Set NIT badge (si existiera)
+    // (Removido por pedido del user — ya no se muestra el badge de empresa ni el NIT en el header)
 
     // Render view in content
     this._renderViewInto(this.contentEl);
@@ -184,73 +189,77 @@ class GestionHumanaHome {
     }
     // Fallback: HTML inline (debe coincidir con gestion-humana-home.html)
     return '<div class="gh-shell" id="gh-shell">' +
-      '<aside class="gh-sidebar" id="gh-sidebar">' +
-        '<div class="gh-sidebar__brand">' +
-          '<div class="gh-sidebar__brand-logo">T</div>' +
-          '<div class="gh-sidebar__brand-text">' +
-            '<div class="gh-sidebar__brand-title">TEMPOACTIVA</div>' +
-            '<div class="gh-sidebar__brand-subtitle">EST S.A.S.</div>' +
-          '</div>' +
+      '<header class="gh-header">' +
+        '<div class="gh-header__left">' +
+          '<h1 class="gh-header__title">' +
+            '<i class="fas fa-people-group gh-header__icon"></i> Gestión Humana' +
+          '</h1>' +
+          '<p class="gh-header__subtitle">Sistema de Gestión de Personal — TEMPOACTIVA EST S.A.S.</p>' +
         '</div>' +
-        '<nav class="gh-sidebar__nav" id="gh-sidebar-nav"></nav>' +
-        '<div class="gh-sidebar__user">' +
-          '<div class="gh-sidebar__user-avatar"><i class="fas fa-user"></i></div>' +
-          '<div class="gh-sidebar__user-text">' +
-            '<div class="gh-sidebar__user-name" id="gh-user-name">—</div>' +
-            '<div class="gh-sidebar__user-role">Recursos Humanos</div>' +
-          '</div>' +
+        '<div class="gh-header__right">' +
+          '<button class="gh-bell-btn" id="gh-bell-btn" title="Notificaciones">' +
+            '<i class="fas fa-bell"></i><span class="gh-bell-badge" id="gh-bell-badge"></span>' +
+          '</button>' +
         '</div>' +
-      '</aside>' +
-      '<main class="gh-main" id="gh-main">' +
-        '<header class="gh-header">' +
-          '<div class="gh-header__left">' +
-            '<h1 class="gh-header__title" id="gh-page-title">Resumen</h1>' +
-            '<p class="gh-header__subtitle">Sistema de Gestión de Personal — TEMPOACTIVA EST S.A.S.</p>' +
-          '</div>' +
-          '<div class="gh-header__right">' +
-            '<div class="gh-nit-badge"><i class="fas fa-building"></i><span>NIT 900.511.178-1</span></div>' +
-            '<button class="gh-bell-btn" id="gh-bell-btn" title="Notificaciones">' +
-              '<i class="fas fa-bell"></i><span class="gh-bell-badge" id="gh-bell-badge"></span>' +
-            '</button>' +
-          '</div>' +
-        '</header>' +
-        '<main class="gh-content" id="gh-content"></main>' +
-        '<footer class="gh-footer">' +
-          '<span>© 2026 TEMPOACTIVA EST S.A.S. — Sistema de Gestión de Personal</span>' +
-          '<span>v1.0 — Barranquilla, Colombia</span>' +
-        '</footer>' +
-      '</main>' +
+      '</header>' +
+      '<nav class="gh-tabs" id="gh-tabs" role="tablist"></nav>' +
+      '<main class="gh-content" id="gh-content"></main>' +
+      '<footer class="gh-footer">' +
+        '<span>© 2026 TEMPOACTIVA EST S.A.S. — Sistema de Gestión de Personal</span>' +
+        '<span>v1.0 — Barranquilla, Colombia</span>' +
+      '</footer>' +
     '</div>';
   }
 
-  _renderSidebar() {
-    if (!this._sidebarNav) return;
+  _renderTabs() {
+    if (!this._tabsEl) return;
     var self = this;
-    this._sidebarNav.innerHTML = '';
-    var lastGroup = null;
+    this._tabsEl.innerHTML = '';
+
+    // 📦716 · Modo ventana: < 1200px → solo shortLabel sin iconos
+    //      Modo maximizado: ≥ 1200px → icono + label completo
+    var expanded = window.innerWidth >= 1200;
+
     GESTION_HUMANA_NAV.forEach(function (item) {
-      if (item.group && item.group !== lastGroup) {
-        var g = document.createElement('div');
-        g.className = 'gh-sidebar__group';
-        g.textContent = item.group;
-        this._sidebarNav.appendChild(g);
-        lastGroup = item.group;
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'gh-tab' + (item.id === self.currentView ? ' gh-tab--active' : '');
+      btn.setAttribute('role', 'tab');
+      btn.setAttribute('aria-selected', item.id === self.currentView ? 'true' : 'false');
+      btn.setAttribute('title', item.label);
+      if (expanded) {
+        // Maximizado: icono + label completo
+        btn.innerHTML =
+          '<i class="fas ' + item.icon + ' gh-tab__icon"></i>' +
+          '<span>' + item.label + '</span>';
+      } else {
+        // Modo ventana: solo shortLabel (abreviado) sin iconos
+        var text = item.shortLabel || item.label;
+        btn.innerHTML = '<span>' + text + '</span>';
       }
-      var a = document.createElement('a');
-      a.href = '#';
-      a.className = 'gh-sidebar__item' + (item.id === self.currentView ? ' gh-sidebar__item--active' : '');
-      a.innerHTML =
-        '<i class="fas ' + item.icon + ' gh-sidebar__item-icon"></i>' +
-        '<span class="gh-sidebar__item-label">' + item.label + '</span>';
-      a.onclick = function (e) {
-        e.preventDefault();
+      btn.onclick = function () {
         if (item.id !== self.currentView) {
           self.currentView = item.id;
           self.render();
         }
       };
-      this._sidebarNav.appendChild(a);
+      this._tabsEl.appendChild(btn);
     }.bind(this));
+  }
+
+  // 📦716 · Escuchar cambios de tamaño de ventana para re-renderizar tabs
+  _wireResizeTabs() {
+    if (this._resizeTabsHandler) return;
+    var self = this;
+    var lastExpanded = window.innerWidth >= 1200;
+    this._resizeTabsHandler = function () {
+      var expanded = window.innerWidth >= 1200;
+      if (expanded !== lastExpanded) {
+        lastExpanded = expanded;
+        self._renderTabs();
+      }
+    };
+    window.addEventListener('resize', this._resizeTabsHandler);
   }
 
   // === VIEW DISPATCH ===
@@ -433,27 +442,16 @@ class GestionHumanaHome {
   }
 
   _renderKpisBar() {
+    // 📦720 · Usa el helper compartido GHKPIBar (patrón Programa de Capacitación)
     var self = this;
     var bar = document.createElement('div');
-    bar.style.cssText = 'background:white; border:1px solid #e9ecef; border-radius:0.5rem; padding:1rem 1.25rem; display:flex; gap:0.875rem; flex-wrap:wrap; align-items:center;';
     var kpis = [
-      { icon: 'fa-user-check',         color: '#28a745', bg: '#d4edda', value: this.kpis.personalActivos,                 label: 'Personal Activo' },
-      { icon: 'fa-user-clock',         color: '#0d9488', bg: '#ccfbf1', value: this.kpis.contratacionesEnProceso,  label: 'Contrataciones en Proceso' },
-      { icon: 'fa-user-check-double',  color: '#174ea6', bg: '#e8f0fe', value: this.kpis.completados,              label: 'Completados' },
-      { icon: 'fa-user-xmark',         color: '#6c757d', bg: '#e9ecef', value: this.kpis.cancelados,               label: 'Cancelados' }
+      { icon: 'fa-user-check',         color: '#28a745', bg: '#d4edda', value: this._fmt(this.kpis.personalActivos),         label: 'Personal Activo' },
+      { icon: 'fa-user-clock',         color: '#0d9488', bg: '#ccfbf1', value: this._fmt(this.kpis.contratacionesEnProceso), label: 'Contrataciones en Proceso' },
+      { icon: 'fa-user-check-double',  color: '#174ea6', bg: '#e8f0fe', value: this._fmt(this.kpis.completados),             label: 'Completados' },
+      { icon: 'fa-user-xmark',         color: '#6c757d', bg: '#e9ecef', value: this._fmt(this.kpis.cancelados),              label: 'Cancelados' }
     ];
-    kpis.forEach(function (i) {
-      bar.innerHTML +=
-        '<div style="display:flex; align-items:center; gap:0.625rem;">' +
-          '<div style="width:36px; height:36px; border-radius:0.5rem; background:' + i.bg + '; display:flex; align-items:center; justify-content:center;">' +
-            '<i class="fas ' + i.icon + '" style="color:' + i.color + ';"></i>' +
-          '</div>' +
-          '<div>' +
-            '<div style="font-size:1.125rem; font-weight:700; color:' + i.color + '; line-height:1;">' + self._fmt(i.value) + '</div>' +
-            '<div style="font-size:0.65rem; text-transform:uppercase; color:#5a6378; letter-spacing:0.3px; margin-top:0.2rem;">' + i.label + '</div>' +
-          '</div>' +
-        '</div>';
-    });
+    window.GHKPIBar.render(bar, kpis);
     return bar;
   }
 
@@ -543,6 +541,15 @@ class GestionHumanaHome {
 
   destroy() {
     this._cleanupView();
+    if (this._resizeTabsHandler) {
+      window.removeEventListener('resize', this._resizeTabsHandler);
+      this._resizeTabsHandler = null;
+    }
+    // 📦719 · Restaurar overflow del body que modificamos en render()
+    if (this._prevBodyOverflow !== undefined) {
+      document.body.style.overflow = this._prevBodyOverflow;
+      this._prevBodyOverflow = undefined;
+    }
   }
 }
 
