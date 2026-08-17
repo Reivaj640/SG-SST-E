@@ -86,7 +86,7 @@ Module.prototype.require = function(name) {
 };
 
 // Cargar el bridge
-const bridge = require('./main/profesiograma-bridge.js');
+const bridge = require('../../main/profesiograma-bridge.js');
 
 // Registrar handlers con DB mock
 const db = new MockDb();
