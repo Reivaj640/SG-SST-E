@@ -145,15 +145,4 @@
   padding: 2rem 2rem 1.5rem;       /* 📦718 · Más espacio entre header y stats */
 }
 
-/* ═══ FOOTER ═══ */
-.gh-footer {
-  padding: 0.5rem 1.5rem;
-  border-top: 1px solid #e9ecef;
-  background: white;
-  font-size: 0.7rem;
-  color: #5a6378;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-shrink: 0;
-}
+/* FOOTER removido (📦776 · usuario no lo quiere — quita espacio) */

@@ -204,10 +204,6 @@ class GestionHumanaHome {
       '</header>' +
       '<nav class="gh-tabs" id="gh-tabs" role="tablist"></nav>' +
       '<main class="gh-content" id="gh-content"></main>' +
-      '<footer class="gh-footer">' +
-        '<span>© 2026 TEMPOACTIVA EST S.A.S. — Sistema de Gestión de Personal</span>' +
-        '<span>v1.0 — Barranquilla, Colombia</span>' +
-      '</footer>' +
     '</div>';
   }
 
