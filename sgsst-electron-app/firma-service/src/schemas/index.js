@@ -62,6 +62,11 @@ const signRequestBody = z.object({
   id_trabajador: z.string().min(1).max(64),
   id_empresa: z.string().min(1).max(64),
   tipo_firma: z.enum(['presencial', 'remoto']),
+  // agreement_version: identifica la versión del Acuerdo que el cliente afirma usar.
+  // Es OBLIGATORIO: cada sign request debe quedar vinculado server-side a una
+  // versión publicada en gh_firma_acuerdo_versiones. La validación de existencia,
+  // activación, vigencia y coincidencia de hash se hace en services/signRequest.js.
+  agreement_version: z.string().min(1).max(32),
   agreement_hash: z.string().regex(/^[0-9a-f]{64}$/, 'agreement_hash debe ser SHA-256 hex'),
   document_hash: z.string().regex(/^[0-9a-f]{64}$/, 'document_hash debe ser SHA-256 hex'),
   ttl_horas: z.coerce.number().int().min(1).max(168).optional(),

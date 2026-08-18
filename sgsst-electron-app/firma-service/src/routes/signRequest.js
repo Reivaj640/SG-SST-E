@@ -72,6 +72,7 @@ router.post('/sign-requests', internalApiAuth(), uploadPdf(), (req, res, next) =
       id_trabajador: meta.id_trabajador,
       id_empresa: meta.id_empresa,
       tipo_firma: meta.tipo_firma,
+      agreement_version: meta.agreement_version,
       agreement_hash: meta.agreement_hash,
       document_hash: meta.document_hash,
       pdf_buffer: req.file.buffer,

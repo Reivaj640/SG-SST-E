@@ -49,13 +49,19 @@ function sha256Hex(buffer) {
   return sha256(buffer);
 }
 
-function buildMetadata(overrides = {}) {
+/**
+ * Construye metadata con el hash y la versión del Acuerdo sembrado.
+ * Cada test que crea un sign request debe llamar antes a seedActiveAgreement()
+ * para que esta función tenga un Acuerdo del cual tomar agreement_hash/agreement_version.
+ */
+function buildMetadata(acuerdo, overrides = {}) {
   return {
     id_documento: 'doc-001',
     id_trabajador: '1234567890',
     id_empresa: '900123456',
     tipo_firma: 'presencial',
-    agreement_hash: 'a'.repeat(64),
+    agreement_hash: acuerdo.texto_hash,
+    agreement_version: acuerdo.version,
     document_hash: null, // se calcula
     version_kair: '0.1.189',
     ...overrides,
@@ -68,9 +74,10 @@ function buildMetadata(overrides = {}) {
 
 test('POST /internal/sign-requests: PDF válido → 201 + token + url', async () => {
   resetDb();
+  const acuerdo = seedActiveAgreement();
   const app = makeApp();
   const pdf = makePdf();
-  const meta = buildMetadata();
+  const meta = buildMetadata(acuerdo);
   meta.document_hash = sha256Hex(pdf);
 
   const res = await request(app)
@@ -97,9 +104,10 @@ test('POST /internal/sign-requests: PDF válido → 201 + token + url', async ()
 
 test('POST /internal/sign-requests: token NO se almacena en plano en BD', async () => {
   resetDb();
+  const acuerdo = seedActiveAgreement();
   const app = makeApp();
   const pdf = makePdf();
-  const meta = buildMetadata();
+  const meta = buildMetadata(acuerdo);
   meta.document_hash = sha256Hex(pdf);
 
   const res = await request(app)
@@ -119,9 +127,10 @@ test('POST /internal/sign-requests: token NO se almacena en plano en BD', async 
 
 test('POST /internal/sign-requests: PDF guardado en storage', async () => {
   resetDb();
+  const acuerdo = seedActiveAgreement();
   const app = makeApp();
   const pdf = makePdf();
-  const meta = buildMetadata();
+  const meta = buildMetadata(acuerdo);
   meta.document_hash = sha256Hex(pdf);
 
   const res = await request(app)
@@ -141,9 +150,10 @@ test('POST /internal/sign-requests: PDF guardado en storage', async () => {
 
 test('POST /internal/sign-requests: evento CREATED registrado', async () => {
   resetDb();
+  const acuerdo = seedActiveAgreement();
   const app = makeApp();
   const pdf = makePdf();
-  const meta = buildMetadata();
+  const meta = buildMetadata(acuerdo);
   meta.document_hash = sha256Hex(pdf);
 
   const res = await request(app)
@@ -168,9 +178,10 @@ test('POST /internal/sign-requests: evento CREATED registrado', async () => {
 
 test('POST /internal/sign-requests: estado inicial PENDING + sesión creada', async () => {
   resetDb();
+  const acuerdo = seedActiveAgreement();
   const app = makeApp();
   const pdf = makePdf();
-  const meta = buildMetadata();
+  const meta = buildMetadata(acuerdo);
   meta.document_hash = sha256Hex(pdf);
 
   const res = await request(app)
@@ -189,9 +200,10 @@ test('POST /internal/sign-requests: estado inicial PENDING + sesión creada', as
 
 test('POST /internal/sign-requests: hash mismatch → 422', async () => {
   resetDb();
+  const acuerdo = seedActiveAgreement();
   const app = makeApp();
   const pdf = makePdf();
-  const meta = buildMetadata({ document_hash: 'f'.repeat(64) }); // hash incorrecto
+  const meta = buildMetadata(acuerdo, { document_hash: 'f'.repeat(64) }); // hash incorrecto
 
   const res = await request(app)
     .post('/internal/sign-requests')
@@ -207,9 +219,10 @@ test('POST /internal/sign-requests: hash mismatch → 422', async () => {
 
 test('POST /internal/sign-requests: PDF sin magic bytes → 400', async () => {
   resetDb();
+  const acuerdo = seedActiveAgreement();
   const app = makeApp();
   const pdf = Buffer.from('NO ES UN PDF'); // no empieza con %PDF-
-  const meta = buildMetadata();
+  const meta = buildMetadata(acuerdo);
   meta.document_hash = sha256Hex(pdf);
 
   const res = await request(app)
@@ -224,8 +237,9 @@ test('POST /internal/sign-requests: PDF sin magic bytes → 400', async () => {
 
 test('POST /internal/sign-requests: sin archivo → 400', async () => {
   resetDb();
+  const acuerdo = seedActiveAgreement();
   const app = makeApp();
-  const meta = buildMetadata();
+  const meta = buildMetadata(acuerdo);
   meta.document_hash = 'a'.repeat(64);
 
   const res = await request(app)
@@ -257,9 +271,10 @@ test('POST /internal/sign-requests: body inválido (sin agreement_hash) → 400'
 
 test('POST /internal/sign-requests: API key incorrecta → 401', async () => {
   resetDb();
+  const acuerdo = seedActiveAgreement();
   const app = makeApp();
   const pdf = makePdf();
-  const meta = buildMetadata();
+  const meta = buildMetadata(acuerdo);
   meta.document_hash = sha256Hex(pdf);
 
   const res = await request(app)
@@ -274,9 +289,10 @@ test('POST /internal/sign-requests: API key incorrecta → 401', async () => {
 
 test('POST /internal/sign-requests: tipo_firma=remoto tiene TTL 72h', async () => {
   resetDb();
+  const acuerdo = seedActiveAgreement();
   const app = makeApp();
   const pdf = makePdf();
-  const meta = buildMetadata({ tipo_firma: 'remoto' });
+  const meta = buildMetadata(acuerdo, { tipo_firma: 'remoto' });
   meta.document_hash = sha256Hex(pdf);
 
   const res = await request(app)
@@ -298,9 +314,10 @@ test('POST /internal/sign-requests: tipo_firma=remoto tiene TTL 72h', async () =
 
 test('GET /internal/sign-requests/:id por id_solicitud → 200', async () => {
   resetDb();
+  const acuerdo = seedActiveAgreement();
   const app = makeApp();
   const pdf = makePdf();
-  const meta = buildMetadata();
+  const meta = buildMetadata(acuerdo);
   meta.document_hash = sha256Hex(pdf);
 
   const r1 = await request(app)
@@ -317,9 +334,10 @@ test('GET /internal/sign-requests/:id por id_solicitud → 200', async () => {
 
 test('GET /internal/sign-requests/:id por id interno → 200', async () => {
   resetDb();
+  const acuerdo = seedActiveAgreement();
   const app = makeApp();
   const pdf = makePdf();
-  const meta = buildMetadata();
+  const meta = buildMetadata(acuerdo);
   meta.document_hash = sha256Hex(pdf);
 
   const r1 = await request(app)
@@ -354,11 +372,12 @@ test('GET /internal/sign-requests lista vacía → 200 total=0', async () => {
 
 test('GET /internal/sign-requests lista con filtros', async () => {
   resetDb();
+  const acuerdo = seedActiveAgreement();
   const app = makeApp();
   // Crear 2 solicitudes
   for (let i = 0; i < 2; i++) {
     const pdf = makePdf();
-    const meta = buildMetadata({
+    const meta = buildMetadata(acuerdo, {
       id_documento: `doc-${i}`,
       document_hash: sha256Hex(pdf),
     });
@@ -380,4 +399,190 @@ test('GET /internal/sign-requests lista con filtros', async () => {
   assert.equal(r2.status, 200);
   assert.equal(r2.body.total, 1);
   assert.equal(r2.body.items[0].id_documento, 'doc-0');
+});
+
+// =================================================================
+// Bloque A — agreement_version obligatorio
+// =================================================================
+
+test('POST /internal/sign-requests: sin agreement_version → 400 (zod)', async () => {
+  resetDb();
+  const acuerdo = seedActiveAgreement();
+  const app = makeApp();
+  const pdf = makePdf();
+  // Construir metadata SIN agreement_version
+  const meta = buildMetadata(acuerdo);
+  delete meta.agreement_version;
+  meta.document_hash = sha256Hex(pdf);
+
+  const res = await request(app)
+    .post('/internal/sign-requests')
+    .set(HEADERS)
+    .field('metadata', JSON.stringify(meta))
+    .attach('documento', pdf, 'x.pdf');
+
+  assert.equal(res.status, 400);
+  assert.equal(res.body.error.code, 'INVALID_REQUEST_BODY');
+  assert.ok(res.body.error.details.issues.some(i => i.path.includes('agreement_version')),
+    'El issue debe mencionar agreement_version');
+});
+
+test('POST /internal/sign-requests: agreement_version inexistente → 422 ACUERDO_INVALIDO', async () => {
+  resetDb();
+  const acuerdo = seedActiveAgreement();
+  const app = makeApp();
+  const pdf = makePdf();
+  const meta = buildMetadata(acuerdo, { agreement_version: 'v999.0' });
+  meta.document_hash = sha256Hex(pdf);
+
+  const res = await request(app)
+    .post('/internal/sign-requests')
+    .set(HEADERS)
+    .field('metadata', JSON.stringify(meta))
+    .attach('documento', pdf, 'x.pdf');
+
+  assert.equal(res.status, 422);
+  assert.equal(res.body.error.code, 'ACUERDO_INVALIDO');
+  assert.equal(res.body.error.details.reason, 'version_not_found');
+  assert.equal(res.body.error.details.agreement_version, 'v999.0');
+});
+
+test('POST /internal/sign-requests: agreement_version inactiva → 422 ACUERDO_INVALIDO', async () => {
+  resetDb();
+  const acuerdoV1 = seedActiveAgreement({ version: 'v1.0', texto: 'texto v1' });
+  // Crear v2.0 y marcarla activa (auto-desactiva v1.0)
+  const agreementService = require('../../src/services/agreement');
+  agreementService.createVersion({ version: 'v2.0', texto: 'texto v2', activa: true });
+  const app = makeApp();
+  const pdf = makePdf();
+  // Intentar firmar con v1.0 (que ya no es activa)
+  const meta = buildMetadata(acuerdoV1); // acuerdoV1 es v1.0
+  meta.document_hash = sha256Hex(pdf);
+
+  const res = await request(app)
+    .post('/internal/sign-requests')
+    .set(HEADERS)
+    .field('metadata', JSON.stringify(meta))
+    .attach('documento', pdf, 'x.pdf');
+
+  assert.equal(res.status, 422);
+  assert.equal(res.body.error.code, 'ACUERDO_INVALIDO');
+  assert.equal(res.body.error.details.reason, 'inactive');
+  assert.equal(res.body.error.details.agreement_version, 'v1.0');
+  assert.equal(res.body.error.details.active_version, 'v2.0');
+});
+
+test('POST /internal/sign-requests: agreement_hash ≠ texto_hash → 422 ACUERDO_INVALIDO', async () => {
+  resetDb();
+  const acuerdo = seedActiveAgreement();
+  const app = makeApp();
+  const pdf = makePdf();
+  // Hash falso (correcto formato, valor incorrecto)
+  const meta = buildMetadata(acuerdo, { agreement_hash: 'f'.repeat(64) });
+  meta.document_hash = sha256Hex(pdf);
+
+  const res = await request(app)
+    .post('/internal/sign-requests')
+    .set(HEADERS)
+    .field('metadata', JSON.stringify(meta))
+    .attach('documento', pdf, 'x.pdf');
+
+  assert.equal(res.status, 422);
+  assert.equal(res.body.error.code, 'ACUERDO_INVALIDO');
+  assert.equal(res.body.error.details.reason, 'hash_mismatch');
+  assert.equal(res.body.error.details.agreement_version, acuerdo.version);
+});
+
+test('POST /internal/sign-requests: sin Acuerdo activo → 422 ACUERDO_INVALIDO', async () => {
+  resetDb();
+  // NO sembrar Acuerdo
+  const app = makeApp();
+  const pdf = makePdf();
+  const meta = {
+    id_documento: 'd',
+    id_trabajador: 't',
+    id_empresa: 'e',
+    tipo_firma: 'presencial',
+    agreement_version: 'v1.0',
+    agreement_hash: 'a'.repeat(64),
+    document_hash: sha256Hex(pdf),
+    version_kair: '0.1.189',
+  };
+
+  const res = await request(app)
+    .post('/internal/sign-requests')
+    .set(HEADERS)
+    .field('metadata', JSON.stringify(meta))
+    .attach('documento', pdf, 'x.pdf');
+
+  assert.equal(res.status, 422);
+  assert.equal(res.body.error.code, 'ACUERDO_INVALIDO');
+  assert.equal(res.body.error.details.reason, 'version_not_found');
+});
+
+test('POST /internal/sign-requests: persiste agreement_version en BD', async () => {
+  resetDb();
+  const acuerdo = seedActiveAgreement();
+  const app = makeApp();
+  const pdf = makePdf();
+  const meta = buildMetadata(acuerdo);
+  meta.document_hash = sha256Hex(pdf);
+
+  const res = await request(app)
+    .post('/internal/sign-requests')
+    .set(HEADERS)
+    .field('metadata', JSON.stringify(meta))
+    .attach('documento', pdf, 'x.pdf');
+
+  assert.equal(res.status, 201);
+  const row = db.prepare('SELECT agreement_version, agreement_hash FROM gh_firmas_electronicas WHERE id = ?').get(res.body.id_interno);
+  assert.equal(row.agreement_version, acuerdo.version);
+  assert.equal(row.agreement_hash, acuerdo.texto_hash);
+});
+
+test('POST /internal/sign-requests: evento CREATED incluye agreement_version en metadata', async () => {
+  resetDb();
+  const acuerdo = seedActiveAgreement();
+  const app = makeApp();
+  const pdf = makePdf();
+  const meta = buildMetadata(acuerdo);
+  meta.document_hash = sha256Hex(pdf);
+
+  const res = await request(app)
+    .post('/internal/sign-requests')
+    .set(HEADERS)
+    .field('metadata', JSON.stringify(meta))
+    .attach('documento', pdf, 'x.pdf');
+
+  const eventos = db.prepare(`
+    SELECT evento, metadata FROM gh_firma_eventos
+    WHERE firma_id = ? ORDER BY id
+  `).all(res.body.id_interno);
+  assert.equal(eventos.length, 1);
+  const metaEvento = JSON.parse(eventos[0].metadata);
+  assert.equal(metaEvento.agreement_version, acuerdo.version);
+});
+
+test('POST /internal/sign-requests: Acuerdo vencido (fecha_vigencia_fin < now) → 422', async () => {
+  resetDb();
+  const acuerdo = seedActiveAgreement();
+  // Forzar Acuerdo vencido (ayer)
+  const ayer = new Date(Date.now() - 86400000).toISOString();
+  db.prepare('UPDATE gh_firma_acuerdo_versiones SET fecha_vigencia_fin = ?')
+    .run(ayer);
+  const app = makeApp();
+  const pdf = makePdf();
+  const meta = buildMetadata(acuerdo);
+  meta.document_hash = sha256Hex(pdf);
+
+  const res = await request(app)
+    .post('/internal/sign-requests')
+    .set(HEADERS)
+    .field('metadata', JSON.stringify(meta))
+    .attach('documento', pdf, 'x.pdf');
+
+  assert.equal(res.status, 422);
+  assert.equal(res.body.error.code, 'ACUERDO_INVALIDO');
+  // El servicio detecta que NO hay activa vigente → reason no_active_version
+  assert.equal(res.body.error.details.reason, 'no_active_version');
 });
