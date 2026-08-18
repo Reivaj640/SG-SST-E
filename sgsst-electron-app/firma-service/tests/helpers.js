@@ -4,9 +4,14 @@
  * - resetDb: limpia todas las tablas gh_* (entre tests).
  * - seedActiveAgreement: crea una versión activa del Acuerdo.
  * - makeApp: crea una app Express con todas las rutas (para tests E2E).
+ *
+ * NOTA: El aislamiento de tests contra la BD de desarrollo se hace en
+ * tests/setup.js, que se carga con --require ANTES que este archivo.
+ * Ver package.json script "test".
  */
 'use strict';
 
+const path = require('path');
 const express = require('express');
 const request = require('supertest');
 const db = require('../src/db/connection');
@@ -19,6 +24,9 @@ const { errorHandler } = require('../src/middleware/errors');
 const agreementService = require('../src/services/agreement');
 const mailer = require('../src/services/mailer');
 const storage = require('../src/services/storage');
+
+// Mini-app estática (mismo directorio que server.js)
+const MINI_APP_DIR = path.resolve(__dirname, '..', 'web', 'firma');
 
 const TEST_API_KEY = 'test-internal-api-key-32-bytes-min!!';
 
@@ -66,6 +74,11 @@ function seedActiveAgreement({ version = 'v1.0', texto = 'ACUERDO DE PRUEBA\nVer
 function makeApp() {
   const app = express();
   app.use(express.json());
+  // Mini-app estática (mismo comportamiento que server.js)
+  app.use('/s', express.static(MINI_APP_DIR, {
+    index: false,
+    fallthrough: true,
+  }));
   app.use('/', publicRouter);
   app.use('/internal', agreementRouter);
   app.use('/internal', consentRouter);

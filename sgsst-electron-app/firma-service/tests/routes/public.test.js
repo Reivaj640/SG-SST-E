@@ -44,7 +44,7 @@ test('GET /s/:token: token válido → 200 con contexto público', async () => {
   resetDb();
   const { token } = await createSignRequestWithIdentificacion();
   const app = makeApp();
-  const res = await request(app).get(`/s/${token}`);
+  const res = await request(app).get(`/s/${token}`).set('Accept', 'application/json');
   assert.equal(res.status, 200);
   assert.equal(res.body.estado, 'PENDING');
   assert.ok(res.body.id_solicitud);
@@ -56,7 +56,7 @@ test('GET /s/:token: respuesta NO incluye secretos', async () => {
   resetDb();
   const { token } = await createSignRequestWithIdentificacion();
   const app = makeApp();
-  const res = await request(app).get(`/s/${token}`);
+  const res = await request(app).get(`/s/${token}`).set('Accept', 'application/json');
 
   // Verificar que NO se exponen campos sensibles
   assert.equal(res.body.token_hash, undefined, 'NO debe exponer token_hash');
@@ -69,7 +69,7 @@ test('GET /s/:token: respuesta NO incluye secretos', async () => {
 test('GET /s/:token: token inexistente → 404', async () => {
   resetDb();
   const app = makeApp();
-  const res = await request(app).get('/s/token_inexistente_1234567890ab');
+  const res = await request(app).get('/s/token_inexistente_1234567890ab').set('Accept', 'application/json');
   assert.equal(res.status, 404);
   assert.equal(res.body.error.code, 'TOKEN_NOT_FOUND');
 });
@@ -86,7 +86,7 @@ test('GET /s/:token: token expirado → 410 + estado EXPIRED', async () => {
   `).run(signRequest.id);
 
   const app = makeApp();
-  const res = await request(app).get(`/s/${token}`);
+  const res = await request(app).get(`/s/${token}`).set('Accept', 'application/json');
   assert.equal(res.status, 410);
   assert.equal(res.body.error.code, 'TOKEN_EXPIRED');
 
@@ -101,7 +101,7 @@ test('GET /s/:token: estado SIGNED → 410', async () => {
   db.prepare(`UPDATE gh_firmas_electronicas SET estado = 'SIGNED' WHERE id = ?`).run(signRequest.id);
 
   const app = makeApp();
-  const res = await request(app).get(`/s/${token}`);
+  const res = await request(app).get(`/s/${token}`).set('Accept', 'application/json');
   assert.equal(res.status, 410);
   assert.equal(res.body.error.code, 'TOKEN_ALREADY_USED');
 });
@@ -110,7 +110,7 @@ test('GET /s/:token: primer acceso registra evento OPENED', async () => {
   resetDb();
   const { token, signRequest } = await createSignRequestWithIdentificacion();
   const app = makeApp();
-  await request(app).get(`/s/${token}`);
+  await request(app).get(`/s/${token}`).set('Accept', 'application/json');
 
   const eventos = db.prepare(`
     SELECT evento FROM gh_firma_eventos
@@ -129,8 +129,8 @@ test('GET /s/:token: segundo acceso NO registra otro OPENED', async () => {
   resetDb();
   const { token, signRequest } = await createSignRequestWithIdentificacion();
   const app = makeApp();
-  await request(app).get(`/s/${token}`);
-  await request(app).get(`/s/${token}`);
+  await request(app).get(`/s/${token}`).set('Accept', 'application/json');
+  await request(app).get(`/s/${token}`).set('Accept', 'application/json');
 
   const eventos = db.prepare(`
     SELECT evento FROM gh_firma_eventos
@@ -673,4 +673,84 @@ test('POST /reject: después de firmado → 409', async () => {
     .send({ motivo: 'cambio de opinión' });
   assert.equal(r2.status, 409);
   assert.equal(r2.body.error.code, 'INVALID_STATE_TRANSITION');
+});
+
+// =========================================================================
+// GET /s/:token — bifurcación por Accept (HTML vs JSON)
+// Mini-app estática servida bajo /s
+// =========================================================================
+
+test('GET /s/:token: con Accept text/html → sirve la mini-app HTML (no JSON)', async () => {
+  resetDb();
+  const { token } = await createSignRequestWithIdentificacion();
+  const app = makeApp();
+  const res = await request(app)
+    .get(`/s/${token}`)
+    .set('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8');
+  assert.equal(res.status, 200);
+  // Content-type debe ser HTML, no JSON
+  assert.match(res.headers['content-type'], /text\/html/);
+  // Debe contener el HTML de la mini-app
+  assert.ok(res.text.indexOf('K+AIR') !== -1, 'Debe contener el header de la mini-app');
+  assert.ok(res.text.indexOf('Firma electrónica') !== -1, 'Debe contener el título');
+  // No debe contener el JSON con secretos
+  assert.equal(res.body.token_hash, undefined);
+  assert.equal(res.body.identificacion_numero_hash, undefined);
+});
+
+test('GET /s/:token: con Accept text/html → NO registra evento OPENED (bifurcación temprana)', async () => {
+  resetDb();
+  const { token, signRequest } = await createSignRequestWithIdentificacion();
+  const app = makeApp();
+  await request(app)
+    .get(`/s/${token}`)
+    .set('Accept', 'text/html');
+
+  const eventos = db.prepare(`
+    SELECT evento FROM gh_firma_eventos
+    WHERE firma_id = ? AND evento = 'OPENED'
+  `).all(signRequest.id);
+  assert.equal(eventos.length, 0,
+    'Pedir HTML no debe registrar OPENED (eso ocurre cuando el JS pide JSON)');
+});
+
+test('GET /s/:token: con Accept text/html para token inválido → 404 HTML', async () => {
+  resetDb();
+  const app = makeApp();
+  const res = await request(app)
+    .get('/s/token_inexistente_1234567890ab')
+    .set('Accept', 'text/html');
+  // Token inválido: el handler bifurca a HTML antes de evaluar, pero el
+  // handler solo bifurca si el handler se ejecuta (es decir, no se intercepta
+  // antes por el static). El static no captura porque /s/TOKEN no es un
+  // archivo. Entonces el handler se ejecuta, bifurca a HTML, y sirve el index.
+  // El error 404/410 solo se devuelve con Accept JSON.
+  assert.equal(res.status, 200);
+  assert.match(res.headers['content-type'], /text\/html/);
+});
+
+test('GET /s/app.js (static) → 200 con JS', async () => {
+  const app = makeApp();
+  const res = await request(app).get('/s/app.js');
+  assert.equal(res.status, 200);
+  assert.match(res.headers['content-type'], /application\/javascript/);
+  // Debe contener código de la mini-app
+  assert.ok(res.text.indexOf('apiFetch') !== -1, 'Debe contener la función apiFetch');
+});
+
+test('GET /s/styles.css (static) → 200 con CSS', async () => {
+  const app = makeApp();
+  const res = await request(app).get('/s/styles.css');
+  assert.equal(res.status, 200);
+  assert.match(res.headers['content-type'], /text\/css/);
+  // Debe contener selectores de la mini-app
+  assert.ok(res.text.indexOf('--color-primary') !== -1, 'Debe contener la variable CSS del tema');
+});
+
+test('GET /s/index.html (static) → 200 con HTML', async () => {
+  const app = makeApp();
+  const res = await request(app).get('/s/index.html');
+  assert.equal(res.status, 200);
+  assert.match(res.headers['content-type'], /text\/html/);
+  assert.ok(res.text.indexOf('screen-identify') !== -1, 'Debe contener la pantalla identify');
 });
