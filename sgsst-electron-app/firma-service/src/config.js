@@ -30,13 +30,22 @@ function bool(key, fallback) {
   return v === 'true' || v === '1';
 }
 
+// Resuelve paths relativos al directorio del Servicio (firma-service/),
+// no al CWD. Esto evita que la BD se cree en paths incorrectos cuando
+// el CWD cambia (ej. cuando se ejecuta desde otro directorio o vía npm).
+const SERVICE_ROOT = path.resolve(__dirname, '..');
+function resolvePath(p) {
+  if (path.isAbsolute(p)) return p;
+  return path.resolve(SERVICE_ROOT, p);
+}
+
 const config = {
   env: required('NODE_ENV', 'development'),
   port: int('PORT', 3001),
   publicUrl: required('PUBLIC_URL', 'http://localhost:3001'),
 
   db: {
-    path: required('DB_PATH', './data/firma.sqlite'),
+    path: resolvePath(required('DB_PATH', './data/firma.sqlite')),
   },
 
   auth: {
@@ -73,7 +82,7 @@ const config = {
   },
 
   storage: {
-    pdfPath: required('PDF_STORAGE_PATH', './storage/pdfs'),
+    pdfPath: resolvePath(required('PDF_STORAGE_PATH', './storage/pdfs')),
   },
 };
 
