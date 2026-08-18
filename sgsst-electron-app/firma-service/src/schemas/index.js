@@ -66,6 +66,8 @@ const signRequestBody = z.object({
   document_hash: z.string().regex(/^[0-9a-f]{64}$/, 'document_hash debe ser SHA-256 hex'),
   ttl_horas: z.coerce.number().int().min(1).max(168).optional(),
   version_kair: z.string().min(1).max(32),
+  identificacion_tipo: z.enum(['CC', 'CE', 'TI', 'PPT', 'PA']).optional(),
+  identificacion_numero_hash: z.string().regex(/^[0-9a-f]{64}$/).optional(),
   metadata: signRequestMetadata,
 });
 

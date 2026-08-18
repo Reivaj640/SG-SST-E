@@ -51,6 +51,7 @@ function create({
   id_documento, id_trabajador, id_empresa, tipo_firma,
   agreement_hash, document_hash, pdf_buffer, pdf_filename,
   version_kair, ip, user_agent, metadata,
+  identificacion_tipo, identificacion_numero_hash,
 }) {
   // Validar PDF
   if (!Buffer.isBuffer(pdf_buffer)) {
@@ -99,16 +100,18 @@ function create({
     const result = db.prepare(`
       INSERT INTO gh_firmas_electronicas
         (id_solicitud, id_documento, id_trabajador, id_empresa,
-         tipo_firma, estado, document_hash_original, agreement_hash,
-         token_hash, sesion_id, fecha_creacion, fecha_expiracion, version_kair,
+         tipo_firma, document_hash_original, agreement_hash,
+         token_hash, sesion_id, identificacion_tipo, identificacion_numero_hash,
+         fecha_creacion, fecha_expiracion, version_kair,
          ip_origen, user_agent, pdf_original_path, metadata,
          verification_channel)
-      VALUES (?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'email')
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id_solicitud, id_documento, id_trabajador, id_empresa,
       tipo_firma, calculated_hash, agreement_hash,
-      token_hash, sesion_id, now.toISOString(), fecha_expiracion, version_kair,
-      ip || null, user_agent || null, pdf_original_path, metadata || null,
+      token_hash, sesion_id, identificacion_tipo || null, identificacion_numero_hash || null,
+      now.toISOString(), fecha_expiracion, version_kair,
+      ip || null, user_agent || null, pdf_original_path, metadata || null, 'email',
     );
     const firmaId = result.lastInsertRowid;
 

@@ -20,6 +20,7 @@ const healthRouter = require('./routes/health');
 const agreementRouter = require('./routes/agreement');
 const consentRouter = require('./routes/consent');
 const signRequestRouter = require('./routes/signRequest');
+const publicRouter = require('./routes/public');
 const { migrate } = require('./db/migrate');
 
 function createApp() {
@@ -73,6 +74,7 @@ function createApp() {
 
   // Rutas
   app.use('/', healthRouter);
+  app.use('/', publicRouter);
   app.use('/internal', agreementRouter);
   app.use('/internal', consentRouter);
   app.use('/internal', signRequestRouter);
