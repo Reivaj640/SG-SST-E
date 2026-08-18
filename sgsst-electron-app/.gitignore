@@ -102,4 +102,5 @@ renderer/file-viewer-assets/flyfish-viewer-assets.json
 # Solo ignora el subdirectorio docs/ (mockups PNG de iconos y otros disenos).
 # Los iconos reales ya estan embebidos en renderer/bandeja-integrada/icons.js,
 # asi que el mockup de attachment-icons-mockup-svg.png ya no se necesita.
-docs/
+docs/attachment-icons-mockup-svg.png
+docs/superpowers/
