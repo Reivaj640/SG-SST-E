@@ -11,7 +11,7 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "migrate": "node src/db/migrate.js",
-    "test": "node --test --require ./tests/setup.js --test-concurrency=1 tests/*.test.js tests/routes/*.test.js"
+    "test": "node --test --require ./tests/setup.js --test-concurrency=1 tests/*.test.js tests/routes/*.test.js tests/scripts/*.test.js"
   },
   "dependencies": {
     "better-sqlite3": "^11.3.0",
