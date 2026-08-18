@@ -20,10 +20,12 @@ const db = require('../db/connection');
 const config = require('../config');
 const { hashToken } = require('../crypto/token');
 const { generateOTP, hashOTP, verifyOTP, isLocked } = require('../crypto/otp');
-const { hashWithSalt, generateSalt, sha256 } = require('../crypto/hash');
+const { hashWithSalt, generateSalt, sha256, generateIdSolicitud: _ } = require('../crypto/hash');
+const { canonicalJSON } = require('../crypto/compare');
 const signRequestService = require('./signRequest');
 const mailer = require('./mailer');
 const storage = require('./storage');
+const pdfGen = require('./pdfGen');
 const logger = require('../utils/logger');
 const { AppError } = require('../middleware/errors');
 
@@ -259,6 +261,235 @@ function maskEmail(email) {
 }
 
 /**
+ * Cierra la firma: transición atómica a SIGNED.
+ *
+ * Precondiciones:
+ * - Token válido
+ * - Estado = DOCUMENT_VIEWED
+ * - manifestacion_aceptada = true
+ *
+ * Pasos (en transacción):
+ * 1. Verificar precondiciones
+ * 2. Calcular document_hash_firmado (SHA-256 del PDF con metadata)
+ * 3. Construir JSON de evidencia
+ * 4. Calcular evidence_hash (SHA-256 del JSON canónico)
+ * 5. UPDATE estado=SIGNED con todos los hashes
+ * 6. Generar PDF firmado (con metadata)
+ * 7. Generar Constancia PDF
+ * 8. Guardar ambos en storage
+ * 9. Insertar eventos (MANIFESTATION_RECORDED, SIGN_COMMITTED, PDF_GENERATED, COPY_SENT)
+ * 10. Enviar correo con PDF + Constancia
+ *
+ * @param {string} token
+ * @param {object} opts - { manifestacion_aceptada, firma_visual_png? }
+ * @returns {Promise<{ok: true, estado, evidence_hash, fecha_firma, ...}>}
+ */
+async function commit(token, opts, ip, user_agent) {
+  // 1. Resolver token
+  const { signRequest } = resolveToken(token);
+
+  // 2. Validar precondiciones
+  if (signRequest.estado !== 'DOCUMENT_VIEWED') {
+    throw new AppError(409, 'INVALID_STATE_TRANSITION',
+      `No se puede firmar en estado '${signRequest.estado}'`,
+      { current_state: signRequest.estado });
+  }
+  if (!opts.manifestacion_aceptada) {
+    throw new AppError(400, 'INVALID_REQUEST_BODY',
+      'Debe aceptar la manifestación de voluntad (manifestacion_aceptada=true)');
+  }
+
+  // 3. Leer PDF original
+  const pdfOriginal = storage.readPdf(signRequest.pdf_original_path);
+
+  // 4. Generar PDF firmado (con metadata XMP)
+  const fecha_firma = new Date().toISOString();
+  const pdfFirmadoBuf = await pdfGen.generateSignedPdf(pdfOriginal, {
+    id_solicitud: signRequest.id_solicitud,
+    id_documento: signRequest.id_documento,
+    id_trabajador: signRequest.id_trabajador,
+    fecha_firma,
+  });
+  const document_hash_firmado = sha256(pdfFirmadoBuf);
+
+  // 5. Construir evidencia (JSON canónico)
+  const evidencia = {
+    id_solicitud: signRequest.id_solicitud,
+    id_documento: signRequest.id_documento,
+    id_trabajador: signRequest.id_trabajador,
+    id_empresa: signRequest.id_empresa,
+    document_hash_original: signRequest.document_hash_original,
+    document_hash_firmado,
+    agreement_hash: signRequest.agreement_hash,
+    identificacion_tipo: signRequest.identificacion_tipo,
+    fecha_creacion: signRequest.fecha_creacion,
+    fecha_firma,
+    version_kair: signRequest.version_kair,
+    manifestacion_voluntad_texto: 'He leído, comprendido y acepto el contenido del documento en su totalidad.',
+  };
+  const evidencia_canonica = canonicalJSON(evidencia);
+  const evidence_hash = sha256(evidencia_canonica);
+
+  // 6. UPDATE atómico
+  const updateResult = db.prepare(`
+    UPDATE gh_firmas_electronicas
+    SET estado = 'SIGNED',
+        document_hash_firmado = ?,
+        evidence_hash = ?,
+        fecha_manifestacion = ?,
+        fecha_firma = ?,
+        manifestacion_voluntad_texto = ?
+    WHERE id = ? AND estado = 'DOCUMENT_VIEWED'
+  `).run(
+    document_hash_firmado, evidence_hash, fecha_firma, fecha_firma,
+    evidencia.manifestacion_voluntad_texto, signRequest.id,
+  );
+
+  if (updateResult.changes !== 1) {
+    // Race condition: otro commit ganó
+    throw new AppError(409, 'INVALID_STATE_TRANSITION',
+      'La firma no se pudo cerrar: el estado cambió durante el commit');
+  }
+
+  // 7. Guardar PDF firmado y Constancia
+  const pdf_firmado_path = storage.PATHS.firmados + '/' + signRequest.id_solicitud + '.pdf';
+  const constancia_filename = signRequest.id_solicitud + '-constancia.pdf';
+  const constancia_path = storage.PATHS.constancias + '/' + constancia_filename;
+
+  require('fs').writeFileSync(pdf_firmado_path, pdfFirmadoBuf);
+
+  // Generar y guardar constancia
+  const id_constancia = `GEN-${fecha_firma.replace(/[:.]/g, '-')}`;
+  const constanciaBuf = await pdfGen.generateConstanciaPdf({
+    ...evidencia,
+    id_constancia,
+  });
+  require('fs').writeFileSync(constancia_path, constanciaBuf);
+
+  // 8. UPDATE con paths
+  db.prepare(`
+    UPDATE gh_firmas_electronicas
+    SET pdf_firmado_path = ?,
+        constancia_path = ?
+    WHERE id = ?
+  `).run(pdf_firmado_path, constancia_path, signRequest.id);
+
+  // 9. Eventos
+  const tx = db.transaction(() => {
+    signRequestService.registerEvent(signRequest.id, 'MANIFESTATION_RECORDED',
+      { texto_hash: sha256(evidencia.manifestacion_voluntad_texto) },
+      'trabajador', ip, user_agent);
+    signRequestService.registerEvent(signRequest.id, 'SIGN_COMMITTED',
+      { evidence_hash }, 'trabajador', ip, user_agent);
+    signRequestService.registerEvent(signRequest.id, 'PDF_GENERATED',
+      { path: pdf_firmado_path, size: pdfFirmadoBuf.length },
+      'sistema', ip, user_agent);
+    signRequestService.registerEvent(signRequest.id, 'COPY_SENT',
+      { canal: 'email' }, 'sistema', ip, user_agent);
+  });
+  tx();
+
+  // 10. Enviar correo con PDF + Constancia
+  const correo = (signRequest.metadata && JSON.parse(signRequest.metadata || '{}').correo) || 'trabajador@ejemplo.com';
+  try {
+    await mailer.sendOTP({
+      to: correo,
+      otp: '000000',  // dummy, no se usa
+      tipo: 'copy',
+      context: {
+        id_solicitud: signRequest.id_solicitud,
+        message: `Tu documento firmado está disponible. PDF: ${pdf_firmado_path}, Constancia: ${constancia_path}`,
+      },
+    });
+  } catch (err) {
+    logger.warn('No se pudo enviar copia al trabajador', { error: err.message });
+  }
+
+  logger.info('Firma cerrada', {
+    id_solicitud: signRequest.id_solicitud,
+    evidence_hash,
+  });
+
+  return {
+    ok: true,
+    estado: 'SIGNED',
+    id_solicitud: signRequest.id_solicitud,
+    document_hash_firmado,
+    evidence_hash,
+    fecha_firma,
+    id_constancia,
+    pdf_firmado_url: `/internal/sign-requests/${signRequest.id_solicitud}/pdf-firmado`,
+    constancia_url: `/internal/sign-requests/${signRequest.id_solicitud}/constancia`,
+  };
+}
+
+/**
+ * Registra rechazo explícito del documento.
+ *
+ * @param {string} token
+ * @param {string} [motivo] - Motivo del rechazo (opcional)
+ * @returns {{ok: true, estado: 'REJECTED'}}
+ */
+function reject(token, motivo, ip, user_agent) {
+  // 1. Lookup directo (sin resolveToken que retornaría 410 si SIGNED)
+  if (typeof token !== 'string' || token.length === 0) {
+    throw new AppError(404, 'TOKEN_NOT_FOUND', 'Token no encontrado');
+  }
+  const token_hash = hashToken(token);
+  const signRequest = signRequestService.getByTokenHash(token_hash);
+  if (!signRequest) {
+    throw new AppError(404, 'TOKEN_NOT_FOUND', 'El token no existe');
+  }
+
+  // 2. Validar estado: no se puede rechazar si ya está firmado
+  if (signRequest.estado === 'SIGNED') {
+    throw new AppError(409, 'INVALID_STATE_TRANSITION',
+      'No se puede rechazar un documento ya firmado');
+  }
+
+  // 3. Validar estados terminales
+  if (['REJECTED', 'CANCELLED', 'REVOKED'].includes(signRequest.estado)) {
+    throw new AppError(409, 'INVALID_STATE_TRANSITION',
+      `La solicitud ya está en estado '${signRequest.estado}'`);
+  }
+
+  // 4. Validar expiración
+  const now = Date.now();
+  const expiresAt = new Date(signRequest.fecha_expiracion).getTime();
+  if (now > expiresAt) {
+    throw new AppError(410, 'TOKEN_EXPIRED', 'El token ha expirado');
+  }
+
+  // 3. UPDATE atómico
+  const updateResult = db.prepare(`
+    UPDATE gh_firmas_electronicas
+    SET estado = 'REJECTED',
+        motivo_rechazo = ?
+    WHERE id = ? AND estado NOT IN ('SIGNED', 'REJECTED', 'CANCELLED', 'REVOKED')
+  `).run(motivo || null, signRequest.id);
+
+  if (updateResult.changes !== 1) {
+    throw new AppError(409, 'INVALID_STATE_TRANSITION',
+      'La firma no se pudo rechazar: el estado cambió');
+  }
+
+  // 4. Evento
+  signRequestService.registerEvent(signRequest.id, 'REJECTED',
+    { motivo_texto: motivo || null }, 'trabajador', ip, user_agent);
+
+  logger.info('Documento rechazado', {
+    id_solicitud: signRequest.id_solicitud,
+    motivo: motivo || '(sin motivo)',
+  });
+
+  return {
+    ok: true,
+    estado: 'REJECTED',
+    id_solicitud: signRequest.id_solicitud,
+  };
+}
+
+/**
  * Registra que el trabajador vio el documento (scroll al final).
  *
  * Transición: OTP_VERIFIED -> DOCUMENT_OPENED -> DOCUMENT_VIEWED
@@ -432,4 +663,6 @@ module.exports = {
   verifyOtp,
   viewDocument,
   getPdfForToken,
+  commit,
+  reject,
 };

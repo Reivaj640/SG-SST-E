@@ -40,6 +40,15 @@ const viewDocumentBody = z.object({
   scroll_al_final: z.boolean(),
 });
 
+const commitBody = z.object({
+  manifestacion_aceptada: z.literal(true),
+  firma_visual_png: z.string().optional(),
+});
+
+const rejectBody = z.object({
+  motivo: z.string().max(1000).optional(),
+});
+
 /**
  * GET /s/:token
  * Devuelve el contexto público para cargar la mini-app.
@@ -139,6 +148,42 @@ router.get('/api/sign/:token/document.pdf', (req, res, next) => {
     res.set('Content-Disposition', `inline; filename="${filename}"`);
     res.set('X-Content-Type-Options', 'nosniff');
     res.send(buffer);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/sign/:token/commit
+ * Cierra la firma (transición atómica a SIGNED).
+ */
+router.post('/api/sign/:token/commit', validateBody(commitBody), async (req, res, next) => {
+  try {
+    const result = await publicFlow.commit(
+      req.params.token,
+      req.body,
+      req.ip,
+      req.get('User-Agent'),
+    );
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/sign/:token/reject
+ * Registra rechazo explícito del documento.
+ */
+router.post('/api/sign/:token/reject', validateBody(rejectBody), (req, res, next) => {
+  try {
+    const result = publicFlow.reject(
+      req.params.token,
+      req.body.motivo,
+      req.ip,
+      req.get('User-Agent'),
+    );
+    res.json(result);
   } catch (err) {
     next(err);
   }

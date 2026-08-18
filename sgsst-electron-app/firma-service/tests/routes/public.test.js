@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests del flujo público (sub-bloque 1: token + identify).
  *
  * Cubre:
@@ -22,13 +22,27 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
+const { PDFDocument } = require('pdf-lib');
 const db = require('../../src/db/connection');
 const { resetDb, makeApp, createSignRequestWithIdentificacion } = require('../helpers');
 const mailer = require('../../src/services/mailer');
 
+/**
+ * Crea un PDF válido con pdf-lib para tests.
+ * Antes creaba texto plano con magic bytes, pero pdf-lib
+ * necesita un PDF estructuralmente correcto.
+ */
+async function makeValidPdf() {
+  const pdf = await PDFDocument.create();
+  const page = pdf.addPage([300, 200]);
+  page.drawText('Documento de prueba');
+  const bytes = await pdf.save();
+  return Buffer.from(bytes);
+}
+
 test('GET /s/:token: token válido → 200 con contexto público', async () => {
   resetDb();
-  const { token } = createSignRequestWithIdentificacion();
+  const { token } = await createSignRequestWithIdentificacion();
   const app = makeApp();
   const res = await request(app).get(`/s/${token}`);
   assert.equal(res.status, 200);
@@ -40,7 +54,7 @@ test('GET /s/:token: token válido → 200 con contexto público', async () => {
 
 test('GET /s/:token: respuesta NO incluye secretos', async () => {
   resetDb();
-  const { token } = createSignRequestWithIdentificacion();
+  const { token } = await createSignRequestWithIdentificacion();
   const app = makeApp();
   const res = await request(app).get(`/s/${token}`);
 
@@ -62,7 +76,7 @@ test('GET /s/:token: token inexistente → 404', async () => {
 
 test('GET /s/:token: token expirado → 410 + estado EXPIRED', async () => {
   resetDb();
-  const { token, signRequest } = createSignRequestWithIdentificacion();
+  const { token, signRequest } = await createSignRequestWithIdentificacion();
 
   // Forzar expiración modificando fecha_expiracion
   db.prepare(`
@@ -83,7 +97,7 @@ test('GET /s/:token: token expirado → 410 + estado EXPIRED', async () => {
 
 test('GET /s/:token: estado SIGNED → 410', async () => {
   resetDb();
-  const { token, signRequest } = createSignRequestWithIdentificacion();
+  const { token, signRequest } = await createSignRequestWithIdentificacion();
   db.prepare(`UPDATE gh_firmas_electronicas SET estado = 'SIGNED' WHERE id = ?`).run(signRequest.id);
 
   const app = makeApp();
@@ -94,7 +108,7 @@ test('GET /s/:token: estado SIGNED → 410', async () => {
 
 test('GET /s/:token: primer acceso registra evento OPENED', async () => {
   resetDb();
-  const { token, signRequest } = createSignRequestWithIdentificacion();
+  const { token, signRequest } = await createSignRequestWithIdentificacion();
   const app = makeApp();
   await request(app).get(`/s/${token}`);
 
@@ -113,7 +127,7 @@ test('GET /s/:token: primer acceso registra evento OPENED', async () => {
 
 test('GET /s/:token: segundo acceso NO registra otro OPENED', async () => {
   resetDb();
-  const { token, signRequest } = createSignRequestWithIdentificacion();
+  const { token, signRequest } = await createSignRequestWithIdentificacion();
   const app = makeApp();
   await request(app).get(`/s/${token}`);
   await request(app).get(`/s/${token}`);
@@ -131,7 +145,7 @@ test('GET /s/:token: segundo acceso NO registra otro OPENED', async () => {
 
 test('POST /api/sign/:token/identify: cédula correcta → 200 + OTP_SENT', async () => {
   resetDb();
-  const { token } = createSignRequestWithIdentificacion({
+  const { token } = await createSignRequestWithIdentificacion({
     identificacion_numero: '1234567890',
   });
   const app = makeApp();
@@ -153,7 +167,7 @@ test('POST /api/sign/:token/identify: cédula correcta → 200 + OTP_SENT', asyn
 
 test('POST /api/sign/:token/identify: cédula incorrecta → 422', async () => {
   resetDb();
-  const { token } = createSignRequestWithIdentificacion({
+  const { token } = await createSignRequestWithIdentificacion({
     identificacion_numero: '1234567890',
   });
   const app = makeApp();
@@ -167,7 +181,7 @@ test('POST /api/sign/:token/identify: cédula incorrecta → 422', async () => {
 
 test('POST /api/sign/:token/identify: tipo de doc incorrecto → 422', async () => {
   resetDb();
-  const { token } = createSignRequestWithIdentificacion();
+  const { token } = await createSignRequestWithIdentificacion();
   const app = makeApp();
   const res = await request(app)
     .post(`/api/sign/${token}/identify`)
@@ -189,7 +203,7 @@ test('POST /api/sign/:token/identify: token inválido → 404', async () => {
 
 test('POST /api/sign/:token/identify: body inválido → 400', async () => {
   resetDb();
-  const { token } = createSignRequestWithIdentificacion();
+  const { token } = await createSignRequestWithIdentificacion();
   const app = makeApp();
   const res = await request(app)
     .post(`/api/sign/${token}/identify`)
@@ -200,7 +214,7 @@ test('POST /api/sign/:token/identify: body inválido → 400', async () => {
 
 test('POST /api/sign/:token/identify: registra eventos IDENTIFICATION_COMPLETED y OTP_SENT', async () => {
   resetDb();
-  const { token, signRequest } = createSignRequestWithIdentificacion({
+  const { token, signRequest } = await createSignRequestWithIdentificacion({
     identificacion_numero: '1234567890',
   });
   const app = makeApp();
@@ -224,7 +238,7 @@ test('POST /api/sign/:token/identify: registra eventos IDENTIFICATION_COMPLETED 
 
 test('POST /api/sign/:token/verify-otp: OTP correcto → 200', async () => {
   resetDb();
-  const { token } = createSignRequestWithIdentificacion();
+  const { token } = await createSignRequestWithIdentificacion();
   const app = makeApp();
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)
@@ -242,7 +256,7 @@ test('POST /api/sign/:token/verify-otp: OTP correcto → 200', async () => {
 
 test('POST /api/sign/:token/verify-otp: OTP incorrecto → 422 + attempts', async () => {
   resetDb();
-  const { token } = createSignRequestWithIdentificacion();
+  const { token } = await createSignRequestWithIdentificacion();
   const app = makeApp();
   await request(app)
     .post(`/api/sign/${token}/identify`)
@@ -260,7 +274,7 @@ test('POST /api/sign/:token/verify-otp: OTP incorrecto → 422 + attempts', asyn
 
 test('POST /api/sign/:token/verify-otp: 5 intentos → OTP_LOCKED', async () => {
   resetDb();
-  const { token } = createSignRequestWithIdentificacion();
+  const { token } = await createSignRequestWithIdentificacion();
   const app = makeApp();
   await request(app)
     .post(`/api/sign/${token}/identify`)
@@ -289,7 +303,7 @@ test('POST /api/sign/:token/verify-otp: 5 intentos → OTP_LOCKED', async () => 
 
 test('POST /api/sign/:token/verify-otp: formato inválido → 400', async () => {
   resetDb();
-  const { token } = createSignRequestWithIdentificacion();
+  const { token } = await createSignRequestWithIdentificacion();
   const app = makeApp();
   await request(app)
     .post(`/api/sign/${token}/identify`)
@@ -313,7 +327,7 @@ test('POST /api/sign/:token/verify-otp: token inválido → 404', async () => {
 
 test('POST /api/sign/:token/verify-otp: sin identify previo → 409', async () => {
   resetDb();
-  const { token } = createSignRequestWithIdentificacion();
+  const { token } = await createSignRequestWithIdentificacion();
   const app = makeApp();
   // NO hace identify antes
   const r = await request(app)
@@ -330,7 +344,7 @@ test('POST /api/sign/:token/verify-otp: sin identify previo → 409', async () =
 
 test('POST /view-document: scroll al final → 200 DOCUMENT_VIEWED', async () => {
   resetDb();
-  const { token } = createSignRequestWithIdentificacion();
+  const { token } = await createSignRequestWithIdentificacion();
   const app = makeApp();
   // identify + verify-otp
   const r1 = await request(app)
@@ -352,7 +366,7 @@ test('POST /view-document: scroll al final → 200 DOCUMENT_VIEWED', async () =>
 
 test('POST /view-document: sin scroll_al_final → 422', async () => {
   resetDb();
-  const { token } = createSignRequestWithIdentificacion();
+  const { token } = await createSignRequestWithIdentificacion();
   const app = makeApp();
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)
@@ -369,7 +383,7 @@ test('POST /view-document: sin scroll_al_final → 422', async () => {
 
 test('POST /view-document: sin OTP verificado → 409', async () => {
   resetDb();
-  const { token } = createSignRequestWithIdentificacion();
+  const { token } = await createSignRequestWithIdentificacion();
   const app = makeApp();
   const r = await request(app)
     .post(`/api/sign/${token}/view-document`)
@@ -380,7 +394,7 @@ test('POST /view-document: sin OTP verificado → 409', async () => {
 
 test('POST /view-document: registra evento DOCUMENT_VIEWED', async () => {
   resetDb();
-  const { token, signRequest } = createSignRequestWithIdentificacion();
+  const { token, signRequest } = await createSignRequestWithIdentificacion();
   const app = makeApp();
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)
@@ -405,7 +419,7 @@ test('POST /view-document: registra evento DOCUMENT_VIEWED', async () => {
 
 test('GET /document.pdf: con OTP verificado → 200 con PDF', async () => {
   resetDb();
-  const { token } = createSignRequestWithIdentificacion();
+  const { token } = await createSignRequestWithIdentificacion();
   const app = makeApp();
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)
@@ -423,9 +437,240 @@ test('GET /document.pdf: con OTP verificado → 200 con PDF', async () => {
 
 test('GET /document.pdf: sin OTP verificado → 409', async () => {
   resetDb();
-  const { token } = createSignRequestWithIdentificacion();
+  const { token } = await createSignRequestWithIdentificacion();
   const app = makeApp();
   const r = await request(app).get(`/api/sign/${token}/document.pdf`);
   assert.equal(r.status, 409);
   assert.equal(r.body.error.code, 'INVALID_STATE_TRANSITION');
+});
+
+// =========================================================================
+// POST /api/sign/:token/commit
+// POST /api/sign/:token/reject
+// =========================================================================
+
+test('POST /commit: firma válida → 200 SIGNED + evidencia', async () => {
+  resetDb();
+  const { token, signRequest } = await createSignRequestWithIdentificacion();
+  console.log('DEBUG: signRequest.id =', signRequest.id, 'token =', token);
+  const app = makeApp();
+  // identify + verify-otp + view-document
+  const r1 = await request(app)
+    .post(`/api/sign/${token}/identify`)
+    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+  await request(app)
+    .post(`/api/sign/${token}/verify-otp`)
+    .send({ otp: r1.body.devOtp });
+  await request(app)
+    .post(`/api/sign/${token}/view-document`)
+    .send({ scroll_al_final: true });
+
+  // commit
+  const r2 = await request(app)
+    .post(`/api/sign/${token}/commit`)
+    .send({ manifestacion_aceptada: true });
+
+  console.log('DEBUG: r2.status =', r2.status, 'r2.body =', r2.body);
+
+  assert.equal(r2.status, 200);
+  assert.equal(r2.body.ok, true);
+  assert.equal(r2.body.estado, 'SIGNED');
+  assert.ok(r2.body.evidence_hash);
+  assert.equal(r2.body.evidence_hash.length, 64);
+  assert.ok(r2.body.document_hash_firmado);
+  assert.equal(r2.body.document_hash_firmado.length, 64);
+  assert.ok(r2.body.fecha_firma);
+  assert.ok(r2.body.pdf_firmado_url);
+  assert.ok(r2.body.constancia_url);
+
+  // El estado en BD debe ser SIGNED
+  const row = db.prepare('SELECT estado, document_hash_firmado, evidence_hash, pdf_firmado_path, constancia_path FROM gh_firmas_electronicas WHERE id = ?').get(signRequest.id);
+  console.log('DEBUG: row =', row);
+  assert.equal(row.estado, 'SIGNED');
+  assert.equal(row.document_hash_firmado, r2.body.document_hash_firmado);
+  assert.equal(row.evidence_hash, r2.body.evidence_hash);
+
+  // El PDF firmado y la constancia deben existir en storage
+  const storage = require('../../src/services/storage');
+  assert.ok(row.pdf_firmado_path);
+  assert.ok(storage.exists(row.pdf_firmado_path));
+  assert.ok(row.constancia_path);
+  assert.ok(storage.exists(row.constancia_path));
+});
+
+test('POST /commit: sin manifestacion_aceptada → 400', async () => {
+  resetDb();
+  const { token } = await createSignRequestWithIdentificacion();
+  const app = makeApp();
+  const r1 = await request(app)
+    .post(`/api/sign/${token}/identify`)
+    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+  await request(app)
+    .post(`/api/sign/${token}/verify-otp`)
+    .send({ otp: r1.body.devOtp });
+  await request(app)
+    .post(`/api/sign/${token}/view-document`)
+    .send({ scroll_al_final: true });
+
+  const r2 = await request(app)
+    .post(`/api/sign/${token}/commit`)
+    .send({ manifestacion_aceptada: false });
+  // Zod rechaza con 400 (literal value: expected true)
+  assert.equal(r2.status, 400);
+  assert.equal(r2.body.error.code, 'INVALID_REQUEST_BODY');
+});
+
+test('POST /commit: sin view-document → 409', async () => {
+  resetDb();
+  const { token } = await createSignRequestWithIdentificacion();
+  const app = makeApp();
+  const r1 = await request(app)
+    .post(`/api/sign/${token}/identify`)
+    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+  await request(app)
+    .post(`/api/sign/${token}/verify-otp`)
+    .send({ otp: r1.body.devOtp });
+  // NO view-document
+
+  const r2 = await request(app)
+    .post(`/api/sign/${token}/commit`)
+    .send({ manifestacion_aceptada: true });
+  assert.equal(r2.status, 409);
+  assert.equal(r2.body.error.code, 'INVALID_STATE_TRANSITION');
+});
+
+test('POST /commit: registra eventos MANIFESTATION_RECORDED, SIGN_COMMITTED, PDF_GENERATED, COPY_SENT', async () => {
+  resetDb();
+  const { token, signRequest } = await createSignRequestWithIdentificacion();
+  const app = makeApp();
+  const r1 = await request(app)
+    .post(`/api/sign/${token}/identify`)
+    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+  await request(app)
+    .post(`/api/sign/${token}/verify-otp`)
+    .send({ otp: r1.body.devOtp });
+  await request(app)
+    .post(`/api/sign/${token}/view-document`)
+    .send({ scroll_al_final: true });
+  await request(app)
+    .post(`/api/sign/${token}/commit`)
+    .send({ manifestacion_aceptada: true });
+
+  const eventos = db.prepare(`
+    SELECT evento FROM gh_firma_eventos
+    WHERE firma_id = ? ORDER BY id
+  `).all(signRequest.id).map(e => e.evento);
+
+  assert.ok(eventos.includes('MANIFESTATION_RECORDED'));
+  assert.ok(eventos.includes('SIGN_COMMITTED'));
+  assert.ok(eventos.includes('PDF_GENERATED'));
+  assert.ok(eventos.includes('COPY_SENT'));
+});
+
+test('POST /commit: evidence_hash verificable (canonicalJSON)', async () => {
+  resetDb();
+  const { token, signRequest } = await createSignRequestWithIdentificacion();
+  const app = makeApp();
+  const r1 = await request(app)
+    .post(`/api/sign/${token}/identify`)
+    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+  await request(app)
+    .post(`/api/sign/${token}/verify-otp`)
+    .send({ otp: r1.body.devOtp });
+  await request(app)
+    .post(`/api/sign/${token}/view-document`)
+    .send({ scroll_al_final: true });
+  const r2 = await request(app)
+    .post(`/api/sign/${token}/commit`)
+    .send({ manifestacion_aceptada: true });
+
+  // Reproducir la evidencia y recalcular hash
+  const { canonicalJSON } = require('../../src/crypto/compare');
+  const { sha256 } = require('../../src/crypto/hash');
+  const row = db.prepare(`
+    SELECT id_solicitud, id_documento, id_trabajador, id_empresa,
+           document_hash_original, document_hash_firmado,
+           agreement_hash, identificacion_tipo,
+           fecha_creacion, fecha_firma, version_kair,
+           manifestacion_voluntad_texto
+    FROM gh_firmas_electronicas WHERE id = ?
+  `).get(signRequest.id);
+
+  const evidencia = {
+    id_solicitud: row.id_solicitud,
+    id_documento: row.id_documento,
+    id_trabajador: row.id_trabajador,
+    id_empresa: row.id_empresa,
+    document_hash_original: row.document_hash_original,
+    document_hash_firmado: row.document_hash_firmado,
+    agreement_hash: row.agreement_hash,
+    identificacion_tipo: row.identificacion_tipo,
+    fecha_creacion: row.fecha_creacion,
+    fecha_firma: row.fecha_firma,
+    version_kair: row.version_kair,
+    manifestacion_voluntad_texto: row.manifestacion_voluntad_texto,
+  };
+  const evidenciaHash = sha256(canonicalJSON(evidencia));
+
+  assert.equal(evidenciaHash, r2.body.evidence_hash,
+    'evidence_hash debe ser reproducible por terceros con JSON canónico');
+});
+
+test('POST /reject: rechazo válido → 200 REJECTED', async () => {
+  resetDb();
+  const { token, signRequest } = await createSignRequestWithIdentificacion();
+  const app = makeApp();
+  const r1 = await request(app)
+    .post(`/api/sign/${token}/identify`)
+    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+  await request(app)
+    .post(`/api/sign/${token}/verify-otp`)
+    .send({ otp: r1.body.devOtp });
+
+  const r2 = await request(app)
+    .post(`/api/sign/${token}/reject`)
+    .send({ motivo: 'No estoy de acuerdo con la cláusula de exclusividad' });
+
+  assert.equal(r2.status, 200);
+  assert.equal(r2.body.estado, 'REJECTED');
+
+  const row = db.prepare('SELECT estado, motivo_rechazo FROM gh_firmas_electronicas WHERE id = ?').get(signRequest.id);
+  assert.equal(row.estado, 'REJECTED');
+  assert.equal(row.motivo_rechazo, 'No estoy de acuerdo con la cláusula de exclusividad');
+});
+
+test('POST /reject: rechazo sin motivo → 200 (motivo opcional)', async () => {
+  resetDb();
+  const { token } = await createSignRequestWithIdentificacion();
+  const app = makeApp();
+  const r = await request(app)
+    .post(`/api/sign/${token}/reject`)
+    .send({});
+  assert.equal(r.status, 200);
+  assert.equal(r.body.estado, 'REJECTED');
+});
+
+test('POST /reject: después de firmado → 409', async () => {
+  resetDb();
+  const { token } = await createSignRequestWithIdentificacion();
+  const app = makeApp();
+  const r1 = await request(app)
+    .post(`/api/sign/${token}/identify`)
+    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+  await request(app)
+    .post(`/api/sign/${token}/verify-otp`)
+    .send({ otp: r1.body.devOtp });
+  await request(app)
+    .post(`/api/sign/${token}/view-document`)
+    .send({ scroll_al_final: true });
+  await request(app)
+    .post(`/api/sign/${token}/commit`)
+    .send({ manifestacion_aceptada: true });
+
+  // Intentar rechazar después de firmado
+  const r2 = await request(app)
+    .post(`/api/sign/${token}/reject`)
+    .send({ motivo: 'cambio de opinión' });
+  assert.equal(r2.status, 409);
+  assert.equal(r2.body.error.code, 'INVALID_STATE_TRANSITION');
 });
