@@ -77,6 +77,8 @@ router.post('/sign-requests', internalApiAuth(), uploadPdf(), (req, res, next) =
       pdf_buffer: req.file.buffer,
       pdf_filename: req.file.originalname,
       version_kair: meta.version_kair,
+      identificacion_tipo: meta.identificacion_tipo,
+      identificacion_numero_hash: meta.identificacion_numero_hash,
       metadata: meta.metadata,
       ip: req.ip,
       user_agent: req.get('User-Agent') || null,

@@ -14,6 +14,7 @@ const config = require('../src/config');
 const agreementRouter = require('../src/routes/agreement');
 const consentRouter = require('../src/routes/consent');
 const signRequestRouter = require('../src/routes/signRequest');
+const publicRouter = require('../src/routes/public');
 const { errorHandler } = require('../src/middleware/errors');
 const agreementService = require('../src/services/agreement');
 const mailer = require('../src/services/mailer');
@@ -65,11 +66,47 @@ function seedActiveAgreement({ version = 'v1.0', texto = 'ACUERDO DE PRUEBA\nVer
 function makeApp() {
   const app = express();
   app.use(express.json());
+  app.use('/', publicRouter);
   app.use('/internal', agreementRouter);
   app.use('/internal', consentRouter);
   app.use('/internal', signRequestRouter);
   app.use(errorHandler());
   return app;
+}
+
+const { sha256 } = require('../src/crypto/hash');
+
+/**
+ * Crea un Sign Request con datos de identificación.
+ * Helper para tests del flujo público.
+ */
+function createSignRequestWithIdentificacion({
+  id_documento = 'doc-001',
+  id_trabajador = '1234567890',
+  id_empresa = '900123456',
+  tipo_firma = 'presencial',
+  identificacion_tipo = 'CC',
+  identificacion_numero = '1234567890',
+  ...overrides
+} = {}) {
+  const signRequestService = require('../src/services/signRequest');
+  // Crear PDF dummy
+  const pdf = Buffer.concat([
+    Buffer.from('%PDF-1.4\n'),
+    Buffer.from('1 0 obj\n<< /Type /Catalog >>\nendobj\n'),
+    Buffer.from('%%EOF\n'),
+  ]);
+  return signRequestService.create({
+    id_documento, id_trabajador, id_empresa, tipo_firma,
+    agreement_hash: 'a'.repeat(64),
+    document_hash: sha256(pdf),
+    pdf_buffer: pdf,
+    pdf_filename: 'test.pdf',
+    version_kair: '0.1.189-test',
+    identificacion_tipo,
+    identificacion_numero_hash: sha256(identificacion_numero),
+    ...overrides,
+  });
 }
 
 function withApiKey(req) {
@@ -81,5 +118,6 @@ module.exports = {
   seedActiveAgreement,
   makeApp,
   withApiKey,
+  createSignRequestWithIdentificacion,
   TEST_API_KEY,
 };
