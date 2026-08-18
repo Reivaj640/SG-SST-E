@@ -13,9 +13,11 @@ const db = require('../src/db/connection');
 const config = require('../src/config');
 const agreementRouter = require('../src/routes/agreement');
 const consentRouter = require('../src/routes/consent');
+const signRequestRouter = require('../src/routes/signRequest');
 const { errorHandler } = require('../src/middleware/errors');
 const agreementService = require('../src/services/agreement');
 const mailer = require('../src/services/mailer');
+const storage = require('../src/services/storage');
 
 const TEST_API_KEY = 'test-internal-api-key-32-bytes-min!!';
 
@@ -37,6 +39,17 @@ function resetDb() {
     db.prepare(`DELETE FROM ${t}`).run();
   }
   mailer.clearDevInbox();
+  // Borrar PDFs del storage
+  for (const dir of [storage.PATHS.originales, storage.PATHS.firmados, storage.PATHS.constancias]) {
+    try {
+      const fs = require('fs');
+      for (const f of fs.readdirSync(dir)) {
+        if (f.endsWith('.pdf') || f.endsWith('.bin')) {
+          fs.unlinkSync(require('path').join(dir, f));
+        }
+      }
+    } catch (e) { /* ignore */ }
+  }
 }
 
 function seedActiveAgreement({ version = 'v1.0', texto = 'ACUERDO DE PRUEBA\nVersión v1.0' } = {}) {
@@ -54,6 +67,7 @@ function makeApp() {
   app.use(express.json());
   app.use('/internal', agreementRouter);
   app.use('/internal', consentRouter);
+  app.use('/internal', signRequestRouter);
   app.use(errorHandler());
   return app;
 }

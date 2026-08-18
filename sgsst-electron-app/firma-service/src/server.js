@@ -19,6 +19,7 @@ const { errorHandler } = require('./middleware/errors');
 const healthRouter = require('./routes/health');
 const agreementRouter = require('./routes/agreement');
 const consentRouter = require('./routes/consent');
+const signRequestRouter = require('./routes/signRequest');
 const { migrate } = require('./db/migrate');
 
 function createApp() {
@@ -74,6 +75,7 @@ function createApp() {
   app.use('/', healthRouter);
   app.use('/internal', agreementRouter);
   app.use('/internal', consentRouter);
+  app.use('/internal', signRequestRouter);
 
   // 404 para rutas no existentes
   app.use((req, res) => {
