@@ -80,7 +80,7 @@ const { sha256 } = require('../src/crypto/hash');
  * Crea un Sign Request con datos de identificación.
  * Helper para tests del flujo público.
  */
-function createSignRequestWithIdentificacion({
+async function createSignRequestWithIdentificacion({
   id_documento = 'doc-001',
   id_trabajador = '1234567890',
   id_empresa = '900123456',
@@ -90,12 +90,12 @@ function createSignRequestWithIdentificacion({
   ...overrides
 } = {}) {
   const signRequestService = require('../src/services/signRequest');
-  // Crear PDF dummy
-  const pdf = Buffer.concat([
-    Buffer.from('%PDF-1.4\n'),
-    Buffer.from('1 0 obj\n<< /Type /Catalog >>\nendobj\n'),
-    Buffer.from('%%EOF\n'),
-  ]);
+  const { PDFDocument } = require('pdf-lib');
+  // Crear PDF válido con pdf-lib
+  const pdfDoc = await PDFDocument.create();
+  const page = pdfDoc.addPage([300, 200]);
+  page.drawText('Documento de prueba');
+  const pdf = Buffer.from(await pdfDoc.save());
   return signRequestService.create({
     id_documento, id_trabajador, id_empresa, tipo_firma,
     agreement_hash: 'a'.repeat(64),
