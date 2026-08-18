@@ -217,3 +217,108 @@ test('POST /api/sign/:token/identify: registra eventos IDENTIFICATION_COMPLETED 
   assert.ok(eventos.includes('IDENTIFICATION_COMPLETED'));
   assert.ok(eventos.includes('OTP_SENT'));
 });
+
+// =========================================================================
+// POST /api/sign/:token/verify-otp
+// =========================================================================
+
+test('POST /api/sign/:token/verify-otp: OTP correcto → 200', async () => {
+  resetDb();
+  const { token } = createSignRequestWithIdentificacion();
+  const app = makeApp();
+  const r1 = await request(app)
+    .post(`/api/sign/${token}/identify`)
+    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+  const otp = r1.body.devOtp;
+
+  const r2 = await request(app)
+    .post(`/api/sign/${token}/verify-otp`)
+    .send({ otp });
+
+  assert.equal(r2.status, 200);
+  assert.equal(r2.body.ok, true);
+  assert.equal(r2.body.estado, 'OTP_VERIFIED');
+});
+
+test('POST /api/sign/:token/verify-otp: OTP incorrecto → 422 + attempts', async () => {
+  resetDb();
+  const { token } = createSignRequestWithIdentificacion();
+  const app = makeApp();
+  await request(app)
+    .post(`/api/sign/${token}/identify`)
+    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+
+  const r = await request(app)
+    .post(`/api/sign/${token}/verify-otp`)
+    .send({ otp: '000000' });
+
+  assert.equal(r.status, 422);
+  assert.equal(r.body.error.code, 'OTP_INVALID');
+  assert.equal(r.body.error.details.attempts, 1);
+  assert.equal(r.body.error.details.max_attempts, 5);
+});
+
+test('POST /api/sign/:token/verify-otp: 5 intentos → OTP_LOCKED', async () => {
+  resetDb();
+  const { token } = createSignRequestWithIdentificacion();
+  const app = makeApp();
+  await request(app)
+    .post(`/api/sign/${token}/identify`)
+    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+
+  for (let i = 0; i < 5; i++) {
+    const r = await request(app)
+      .post(`/api/sign/${token}/verify-otp`)
+      .send({ otp: '000000' });
+    if (i < 4) {
+      assert.equal(r.status, 422);
+      assert.equal(r.body.error.code, 'OTP_INVALID');
+    } else {
+      assert.equal(r.status, 422);
+      assert.equal(r.body.error.code, 'OTP_LOCKED');
+    }
+  }
+
+  // 6to intento: ya bloqueado
+  const r6 = await request(app)
+    .post(`/api/sign/${token}/verify-otp`)
+    .send({ otp: '000000' });
+  assert.equal(r6.status, 422);
+  assert.equal(r6.body.error.code, 'OTP_LOCKED');
+});
+
+test('POST /api/sign/:token/verify-otp: formato inválido → 400', async () => {
+  resetDb();
+  const { token } = createSignRequestWithIdentificacion();
+  const app = makeApp();
+  await request(app)
+    .post(`/api/sign/${token}/identify`)
+    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+
+  const r = await request(app)
+    .post(`/api/sign/${token}/verify-otp`)
+    .send({ otp: 'abc' });
+  assert.equal(r.status, 400);
+  assert.equal(r.body.error.code, 'INVALID_REQUEST_BODY');
+});
+
+test('POST /api/sign/:token/verify-otp: token inválido → 404', async () => {
+  resetDb();
+  const app = makeApp();
+  const r = await request(app)
+    .post('/api/sign/token_inexistente/verify-otp')
+    .send({ otp: '123456' });
+  assert.equal(r.status, 404);
+});
+
+test('POST /api/sign/:token/verify-otp: sin identify previo → 409', async () => {
+  resetDb();
+  const { token } = createSignRequestWithIdentificacion();
+  const app = makeApp();
+  // NO hace identify antes
+  const r = await request(app)
+    .post(`/api/sign/${token}/verify-otp`)
+    .send({ otp: '123456' });
+  assert.equal(r.status, 409);
+  assert.equal(r.body.error.code, 'INVALID_STATE_TRANSITION');
+});

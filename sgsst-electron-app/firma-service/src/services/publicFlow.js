@@ -258,9 +258,91 @@ function maskEmail(email) {
   return `${visible}${'*'.repeat(Math.max(0, local.length - visible.length))}@${domain}`;
 }
 
+/**
+ * Verifica el OTP de una solicitud.
+ *
+ * @param {string} token
+ * @param {string} otp - 6 dígitos
+ * @param {string} ip
+ * @param {string} user_agent
+ * @returns {{ok: true, estado: 'OTP_VERIFIED'} |
+ *           {ok: false, code, message, attempts?}}
+ */
+function verifyOtp(token, otp, ip, user_agent) {
+  // 1. Resolver token
+  const { signRequest } = resolveToken(token);
+
+  // 2. Verificar bloqueo (antes del estado, porque OTP_LOCKED es terminal)
+  if (signRequest.estado === 'OTP_LOCKED' || signRequest.otp_bloqueado) {
+    throw new AppError(422, 'OTP_LOCKED',
+      'Demasiados intentos. El OTP está bloqueado.',
+      { attempts: signRequest.otp_intentos, max_attempts: config.ttl.otpMaxAttempts });
+  }
+
+  // 3. Validar estado actual
+  if (signRequest.estado !== 'OTP_SENT' && signRequest.estado !== 'OTP_VERIFIED') {
+    throw new AppError(409, 'INVALID_STATE_TRANSITION',
+      `No se puede verificar OTP en estado '${signRequest.estado}'`,
+      { current_state: signRequest.estado });
+  }
+
+  // 4. Verificar OTP
+  if (!signRequest.otp_hash || !signRequest.otp_sal) {
+    throw new AppError(500, 'MISSING_OTP_DATA', 'No hay OTP almacenado para esta solicitud');
+  }
+
+  const result = verifyOTP(otp, signRequest.otp_hash, signRequest.otp_sal, signRequest.otp_intentos);
+
+  if (result.valid) {
+    // 5. OTP correcto
+    const tx = db.transaction(() => {
+      db.prepare(`
+        UPDATE gh_firmas_electronicas
+        SET estado = 'OTP_VERIFIED',
+            otp_intentos = ?,
+            fecha_otp_verificado = ?
+        WHERE id = ?
+      `).run(result.attempts, new Date().toISOString(), signRequest.id);
+      signRequestService.registerEvent(signRequest.id, 'OTP_VERIFIED',
+        { intentos: result.attempts }, 'trabajador', ip, user_agent);
+    });
+    tx();
+
+    logger.info('OTP verificado', { id_solicitud: signRequest.id_solicitud });
+    return { ok: true, estado: 'OTP_VERIFIED' };
+  }
+
+  // 6. OTP incorrecto
+  const locked = isLocked(result.attempts, config.ttl.otpMaxAttempts);
+  const newEstado = locked ? 'OTP_LOCKED' : 'OTP_SENT';
+  const tx = db.transaction(() => {
+    db.prepare(`
+      UPDATE gh_firmas_electronicas
+      SET otp_intentos = ?,
+          estado = ?,
+          otp_bloqueado = ?
+      WHERE id = ?
+    `).run(result.attempts, newEstado, locked ? 1 : 0, signRequest.id);
+    signRequestService.registerEvent(signRequest.id, locked ? 'OTP_LOCKED' : 'OTP_FAILED',
+      { intentos: result.attempts, locked }, 'trabajador', ip, user_agent);
+  });
+  tx();
+
+  if (locked) {
+    throw new AppError(422, 'OTP_LOCKED',
+      `Demasiados intentos (${result.attempts}). OTP bloqueado.`,
+      { attempts: result.attempts, max_attempts: config.ttl.otpMaxAttempts });
+  }
+
+  throw new AppError(422, 'OTP_INVALID',
+    'El código ingresado no es correcto',
+    { attempts: result.attempts, max_attempts: config.ttl.otpMaxAttempts });
+}
+
 module.exports = {
   resolveToken,
   registerOpenedIfFirst,
   transitionToIdentificationStarted,
   identify,
+  verifyOtp,
 };

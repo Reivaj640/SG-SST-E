@@ -31,6 +31,10 @@ const identifyBody = z.object({
   numero_documento: z.string().min(4).max(20).regex(/^\d+$/, 'Solo dígitos'),
 });
 
+const verifyOtpBody = z.object({
+  otp: z.string().regex(/^\d{6}$/, 'OTP debe ser 6 dígitos numéricos'),
+});
+
 /**
  * GET /s/:token
  * Devuelve el contexto público para cargar la mini-app.
@@ -70,6 +74,24 @@ router.post('/api/sign/:token/identify', validateBody(identifyBody), async (req,
       req.params.token,
       req.body.tipo_documento,
       req.body.numero_documento,
+      req.ip,
+      req.get('User-Agent'),
+    );
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/sign/:token/verify-otp
+ * Verifica el OTP. Si es correcto, marca estado=OTP_VERIFIED.
+ */
+router.post('/api/sign/:token/verify-otp', validateBody(verifyOtpBody), (req, res, next) => {
+  try {
+    const result = publicFlow.verifyOtp(
+      req.params.token,
+      req.body.otp,
       req.ip,
       req.get('User-Agent'),
     );
