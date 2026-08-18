@@ -10,6 +10,7 @@
  */
 'use strict';
 
+const path = require('path');
 const express = require('express');
 const helmet = require('helmet');
 const config = require('./config');
@@ -22,6 +23,9 @@ const consentRouter = require('./routes/consent');
 const signRequestRouter = require('./routes/signRequest');
 const publicRouter = require('./routes/public');
 const { migrate } = require('./db/migrate');
+
+// Ruta a la mini-app estática (HTML+CSS+JS)
+const MINI_APP_DIR = path.resolve(__dirname, '..', 'web', 'firma');
 
 function createApp() {
   const app = express();
@@ -40,8 +44,16 @@ function createApp() {
         connectSrc: ["'self'"],
         fontSrc: ["'self'"],
         objectSrc: ["'none'"],
+        // Permitir iframes del mismo origen para mostrar el PDF del documento
+        // en la mini-app. Mantenemos object-src 'none' (no plugins).
+        // No se permite contenido cross-origin.
+        frameSrc: ["'self'"],
         baseUri: ["'self'"],
         formAction: ["'self'"],
+        // NOTA: frame-ancestors se mantiene 'none' globalmente.
+        // El endpoint /api/sign/:token/document.pdf lo sobreescribe a 'self'
+        // porque la mini-app SÍ necesita incrustar ese PDF.
+        // Ver src/routes/public.js (router.get('/api/sign/:token/document.pdf', ...))
         frameAncestors: ["'none'"],
       },
     },
@@ -74,6 +86,21 @@ function createApp() {
 
   // Rutas
   app.use('/', healthRouter);
+
+  // Mini-app estática servida bajo /s (mismo origen que el endpoint /s/:token).
+  // Esto permite que el HTML con paths relativos ("styles.css", "app.js")
+  // se resuelvan a /s/styles.css y /s/app.js. Si la URL no coincide con un
+  // archivo estático, la petición pasa al publicRouter (que sirve el HTML
+  // cuando el Accept es text/html, o JSON cuando es application/json).
+  app.use('/s', express.static(MINI_APP_DIR, {
+    index: false, // no servir index.html automáticamente
+    fallthrough: true,
+    setHeaders: (res) => {
+      res.set('X-Content-Type-Options', 'nosniff');
+      res.set('Cache-Control', 'no-cache');
+    },
+  }));
+
   app.use('/', publicRouter);
   app.use('/internal', agreementRouter);
   app.use('/internal', consentRouter);

@@ -15,6 +15,7 @@
  */
 'use strict';
 
+const path = require('path');
 const express = require('express');
 const router = express.Router();
 const { validateBody } = require('../middleware/validate');
@@ -25,6 +26,9 @@ const logger = require('../utils/logger');
 const { AppError } = require('../middleware/errors');
 
 const { z } = require('zod');
+
+// Ruta al HTML estático de la mini-app (resuelta desde SERVICE_ROOT)
+const MINI_APP_HTML = path.resolve(__dirname, '..', '..', 'web', 'firma', 'index.html');
 
 const identifyBody = z.object({
   tipo_documento: z.enum(['CC', 'CE', 'TI', 'PPT', 'PA']),
@@ -51,10 +55,27 @@ const rejectBody = z.object({
 
 /**
  * GET /s/:token
- * Devuelve el contexto público para cargar la mini-app.
- * Registra OPENED si es la primera vez.
+ *
+ * Bifurcación por Accept:
+ *   - text/html: sirve la mini-app (index.html). El JS extrae el token del path
+ *     y luego hace fetch con Accept: application/json para obtener el contexto.
+ *   - application/json (o cualquier otro): devuelve el contexto público.
+ *
+ * Registrar OPENED solo cuando se devuelve el contexto JSON, NO en cada recarga
+ * del HTML (sería ruido de auditoría).
  */
 router.get('/s/:token', (req, res, next) => {
+  // Si el cliente quiere HTML (navegador), servir la mini-app estática.
+  // Importante: el JS hace fetch con Accept: application/json explícito.
+  if (req.accepts(['html', 'json']) === 'html') {
+    return res.sendFile(MINI_APP_HTML, {
+      headers: {
+        'X-Content-Type-Options': 'nosniff',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+      },
+    });
+  }
+
   try {
     const { signRequest, estado } = publicFlow.resolveToken(req.params.token);
     publicFlow.registerOpenedIfFirst(signRequest, req.ip, req.get('User-Agent'));
@@ -140,10 +161,31 @@ router.post('/api/sign/:token/view-document', validateBody(viewDocumentBody), (r
 /**
  * GET /api/sign/:token/document.pdf
  * Devuelve el PDF del documento.
+ *
+ * NOTA sobre CSP: para este endpoint especifico, relajamos la directiva
+ * `frame-ancestors` de 'none' a 'self'. Esto permite que la mini-app
+ * (mismo origen) incruste el PDF en su visor iframe. La CSP global de
+ * server.js mantiene 'none', por lo que las demas respuestas siguen
+ * protegidas contra incrustacion externa (anti-clickjacking).
+ * Solo sobreescribimos la directiva `frame-ancestors`; las demas
+ * directivas de la CSP (default-src, script-src, etc.) permanecen
+ * identicas a las del helmet global.
  */
 router.get('/api/sign/:token/document.pdf', (req, res, next) => {
   try {
     const { buffer, filename } = publicFlow.getPdfForToken(req.params.token);
+
+    // Override quirurgico: solo cambiamos `frame-ancestors` de 'none' a 'self'.
+    // Conservamos el resto de directivas CSP de helmet intactas.
+    const currentCsp = res.getHeader('Content-Security-Policy');
+    if (typeof currentCsp === 'string' && currentCsp.includes("frame-ancestors 'none'")) {
+      const newCsp = currentCsp.replace(
+        /frame-ancestors 'none'/,
+        "frame-ancestors 'self'"
+      );
+      res.set('Content-Security-Policy', newCsp);
+    }
+
     res.set('Content-Type', 'application/pdf');
     res.set('Content-Disposition', `inline; filename="${filename}"`);
     res.set('X-Content-Type-Options', 'nosniff');
