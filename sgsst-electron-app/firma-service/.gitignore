@@ -1,0 +1,31 @@
+# Variables de entorno
+.env
+.env.local
+.env.*.local
+
+# Datos locales (BD + PDFs generados)
+data/
+storage/pdfs/originales/*
+storage/pdfs/firmados/*
+storage/pdfs/constancias/*
+!storage/pdfs/originales/.gitkeep
+!storage/pdfs/firmados/.gitkeep
+!storage/pdfs/constancias/.gitkeep
+
+# Logs
+logs/
+*.log
+
+# Dependencias
+node_modules/
+
+# Archivos temporales
+tmp/
+*.tmp
+*.swp
+.DS_Store
+Thumbs.db
+
+# Cobertura de tests
+coverage/
+.nyc_output/
