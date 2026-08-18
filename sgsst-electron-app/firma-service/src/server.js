@@ -17,6 +17,8 @@ const logger = require('./utils/logger');
 const requestId = require('./middleware/requestId');
 const { errorHandler } = require('./middleware/errors');
 const healthRouter = require('./routes/health');
+const agreementRouter = require('./routes/agreement');
+const consentRouter = require('./routes/consent');
 const { migrate } = require('./db/migrate');
 
 function createApp() {
@@ -70,6 +72,8 @@ function createApp() {
 
   // Rutas
   app.use('/', healthRouter);
+  app.use('/internal', agreementRouter);
+  app.use('/internal', consentRouter);
 
   // 404 para rutas no existentes
   app.use((req, res) => {
