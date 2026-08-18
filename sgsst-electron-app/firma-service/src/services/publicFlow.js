@@ -259,6 +259,91 @@ function maskEmail(email) {
 }
 
 /**
+ * Registra que el trabajador vio el documento (scroll al final).
+ *
+ * Transición: OTP_VERIFIED -> DOCUMENT_OPENED -> DOCUMENT_VIEWED
+ *
+ * @param {string} token
+ * @param {object} opts - { segundosEnPagina, scrollAlFinal }
+ * @returns {{ok: true, estado, manifestacion_voluntad_texto}}
+ */
+function viewDocument(token, { segundosEnPagina, scrollAlFinal }, ip, user_agent) {
+  // 1. Resolver token
+  const { signRequest } = resolveToken(token);
+
+  // 2. Validar estado: debe estar al menos en OTP_VERIFIED
+  const estadosPermitidos = ['OTP_VERIFIED', 'DOCUMENT_OPENED', 'DOCUMENT_VIEWED', 'MANIFESTATION_RECORDED'];
+  if (!estadosPermitidos.includes(signRequest.estado)) {
+    throw new AppError(409, 'INVALID_STATE_TRANSITION',
+      `No se puede ver el documento en estado '${signRequest.estado}'`,
+      { current_state: signRequest.estado });
+  }
+
+  // 3. Validar que vio el documento hasta el final
+  if (!scrollAlFinal) {
+    throw new AppError(422, 'INVALID_REQUEST_BODY',
+      'Debe scrollear al final del documento antes de continuar');
+  }
+
+  // 4. Transición de estado
+  const now = new Date().toISOString();
+  const nuevoEstado = signRequest.estado === 'OTP_VERIFIED'
+    ? 'DOCUMENT_VIEWED'  // primera vez: salta a VIEWED si trae scroll=true
+    : 'DOCUMENT_VIEWED';
+  // NOTA: en el flujo real, DOCUMENT_OPENED y DOCUMENT_VIEWED son separados
+  // (uno cuando abre el visor, otro cuando scrollea al final).
+  // Para v1 simplificamos: viewDocument con scroll=true marca VIEWED.
+
+  const tx = db.transaction(() => {
+    db.prepare(`
+      UPDATE gh_firmas_electronicas
+      SET estado = ?,
+          fecha_documento_visto = COALESCE(fecha_documento_visto, ?)
+      WHERE id = ?
+    `).run(nuevoEstado, now, signRequest.id);
+    signRequestService.registerEvent(signRequest.id, 'DOCUMENT_VIEWED',
+      { segundos_en_pagina: segundosEnPagina || 0 }, 'trabajador', ip, user_agent);
+  });
+  tx();
+
+  logger.info('Documento visto', { id_solicitud: signRequest.id_solicitud });
+
+  return {
+    ok: true,
+    estado: nuevoEstado,
+  };
+}
+
+/**
+ * Devuelve el PDF del documento para descarga/visualización.
+ *
+ * Solo accesible en estados donde se ha verificado OTP.
+ */
+function getPdfForToken(token) {
+  // 1. Resolver token
+  const { signRequest } = resolveToken(token);
+
+  // 2. Validar estado
+  const estadosPermitidos = ['OTP_VERIFIED', 'DOCUMENT_OPENED', 'DOCUMENT_VIEWED', 'MANIFESTATION_RECORDED', 'SIGNED'];
+  if (!estadosPermitidos.includes(signRequest.estado)) {
+    throw new AppError(409, 'INVALID_STATE_TRANSITION',
+      `El PDF no está disponible en estado '${signRequest.estado}'`,
+      { current_state: signRequest.estado });
+  }
+
+  // 3. Leer PDF
+  if (!signRequest.pdf_original_path) {
+    throw new AppError(500, 'PDF_NOT_FOUND', 'No se encontró el PDF original');
+  }
+
+  const pdfBuffer = storage.readPdf(signRequest.pdf_original_path);
+  return {
+    buffer: pdfBuffer,
+    filename: `${signRequest.id_solicitud}.pdf`,
+  };
+}
+
+/**
  * Verifica el OTP de una solicitud.
  *
  * @param {string} token
@@ -345,4 +430,6 @@ module.exports = {
   transitionToIdentificationStarted,
   identify,
   verifyOtp,
+  viewDocument,
+  getPdfForToken,
 };

@@ -322,3 +322,110 @@ test('POST /api/sign/:token/verify-otp: sin identify previo → 409', async () =
   assert.equal(r.status, 409);
   assert.equal(r.body.error.code, 'INVALID_STATE_TRANSITION');
 });
+
+// =========================================================================
+// POST /api/sign/:token/view-document
+// GET  /api/sign/:token/document.pdf
+// =========================================================================
+
+test('POST /view-document: scroll al final → 200 DOCUMENT_VIEWED', async () => {
+  resetDb();
+  const { token } = createSignRequestWithIdentificacion();
+  const app = makeApp();
+  // identify + verify-otp
+  const r1 = await request(app)
+    .post(`/api/sign/${token}/identify`)
+    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+  await request(app)
+    .post(`/api/sign/${token}/verify-otp`)
+    .send({ otp: r1.body.devOtp });
+
+  // view-document
+  const r2 = await request(app)
+    .post(`/api/sign/${token}/view-document`)
+    .send({ segundos_en_pagina: 47, scroll_al_final: true });
+
+  assert.equal(r2.status, 200);
+  assert.equal(r2.body.estado, 'DOCUMENT_VIEWED');
+  assert.equal(r2.body.ok, true);
+});
+
+test('POST /view-document: sin scroll_al_final → 422', async () => {
+  resetDb();
+  const { token } = createSignRequestWithIdentificacion();
+  const app = makeApp();
+  const r1 = await request(app)
+    .post(`/api/sign/${token}/identify`)
+    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+  await request(app)
+    .post(`/api/sign/${token}/verify-otp`)
+    .send({ otp: r1.body.devOtp });
+
+  const r2 = await request(app)
+    .post(`/api/sign/${token}/view-document`)
+    .send({ scroll_al_final: false });
+  assert.equal(r2.status, 422);
+});
+
+test('POST /view-document: sin OTP verificado → 409', async () => {
+  resetDb();
+  const { token } = createSignRequestWithIdentificacion();
+  const app = makeApp();
+  const r = await request(app)
+    .post(`/api/sign/${token}/view-document`)
+    .send({ scroll_al_final: true });
+  assert.equal(r.status, 409);
+  assert.equal(r.body.error.code, 'INVALID_STATE_TRANSITION');
+});
+
+test('POST /view-document: registra evento DOCUMENT_VIEWED', async () => {
+  resetDb();
+  const { token, signRequest } = createSignRequestWithIdentificacion();
+  const app = makeApp();
+  const r1 = await request(app)
+    .post(`/api/sign/${token}/identify`)
+    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+  await request(app)
+    .post(`/api/sign/${token}/verify-otp`)
+    .send({ otp: r1.body.devOtp });
+  await request(app)
+    .post(`/api/sign/${token}/view-document`)
+    .send({ segundos_en_pagina: 60, scroll_al_final: true });
+
+  const eventos = db.prepare(`
+    SELECT evento, metadata FROM gh_firma_eventos
+    WHERE firma_id = ? ORDER BY id
+  `).all(signRequest.id);
+
+  const docViewedEvent = eventos.find(e => e.evento === 'DOCUMENT_VIEWED');
+  assert.ok(docViewedEvent);
+  const meta = JSON.parse(docViewedEvent.metadata);
+  assert.equal(meta.segundos_en_pagina, 60);
+});
+
+test('GET /document.pdf: con OTP verificado → 200 con PDF', async () => {
+  resetDb();
+  const { token } = createSignRequestWithIdentificacion();
+  const app = makeApp();
+  const r1 = await request(app)
+    .post(`/api/sign/${token}/identify`)
+    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+  await request(app)
+    .post(`/api/sign/${token}/verify-otp`)
+    .send({ otp: r1.body.devOtp });
+
+  const r = await request(app).get(`/api/sign/${token}/document.pdf`);
+  assert.equal(r.status, 200);
+  assert.match(r.headers['content-type'], /application\/pdf/);
+  assert.ok(r.body);
+  assert.ok(r.body.slice(0, 5).equals(Buffer.from('%PDF-')));
+});
+
+test('GET /document.pdf: sin OTP verificado → 409', async () => {
+  resetDb();
+  const { token } = createSignRequestWithIdentificacion();
+  const app = makeApp();
+  const r = await request(app).get(`/api/sign/${token}/document.pdf`);
+  assert.equal(r.status, 409);
+  assert.equal(r.body.error.code, 'INVALID_STATE_TRANSITION');
+});

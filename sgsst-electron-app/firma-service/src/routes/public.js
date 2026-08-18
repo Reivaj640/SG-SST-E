@@ -35,6 +35,11 @@ const verifyOtpBody = z.object({
   otp: z.string().regex(/^\d{6}$/, 'OTP debe ser 6 dígitos numéricos'),
 });
 
+const viewDocumentBody = z.object({
+  segundos_en_pagina: z.number().int().min(0).max(3600).optional(),
+  scroll_al_final: z.boolean(),
+});
+
 /**
  * GET /s/:token
  * Devuelve el contexto público para cargar la mini-app.
@@ -96,6 +101,44 @@ router.post('/api/sign/:token/verify-otp', validateBody(verifyOtpBody), (req, re
       req.get('User-Agent'),
     );
     res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/sign/:token/view-document
+ * Registra que el trabajador vio el documento (scroll al final).
+ * Transiciona a DOCUMENT_VIEWED.
+ */
+router.post('/api/sign/:token/view-document', validateBody(viewDocumentBody), (req, res, next) => {
+  try {
+    const result = publicFlow.viewDocument(
+      req.params.token,
+      {
+        segundosEnPagina: req.body.segundos_en_pagina,
+        scrollAlFinal: req.body.scroll_al_final,
+      },
+      req.ip,
+      req.get('User-Agent'),
+    );
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/sign/:token/document.pdf
+ * Devuelve el PDF del documento.
+ */
+router.get('/api/sign/:token/document.pdf', (req, res, next) => {
+  try {
+    const { buffer, filename } = publicFlow.getPdfForToken(req.params.token);
+    res.set('Content-Type', 'application/pdf');
+    res.set('Content-Disposition', `inline; filename="${filename}"`);
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.send(buffer);
   } catch (err) {
     next(err);
   }
