@@ -23,6 +23,7 @@ const config = require('../config');
 const { sha256 } = require('../crypto/hash');
 const { generateToken, hashToken, generateIdSolicitud } = require('../crypto/token');
 const storage = require('./storage');
+const agreementService = require('./agreement');
 const logger = require('../utils/logger');
 const { AppError } = require('../middleware/errors');
 
@@ -37,6 +38,7 @@ const PDF_MAGIC = Buffer.from('%PDF-');
  * @param {string} opts.id_trabajador
  * @param {string} opts.id_empresa
  * @param {string} opts.tipo_firma - 'presencial' | 'remoto'
+ * @param {string} opts.agreement_version - Versión del Acuerdo (ej. 'v1.0')
  * @param {string} opts.agreement_hash - SHA-256 del Acuerdo
  * @param {string} opts.document_hash - SHA-256 declarado por K+AIR
  * @param {Buffer} opts.pdf_buffer - Bytes del PDF
@@ -49,7 +51,7 @@ const PDF_MAGIC = Buffer.from('%PDF-');
  */
 function create({
   id_documento, id_trabajador, id_empresa, tipo_firma,
-  agreement_hash, document_hash, pdf_buffer, pdf_filename,
+  agreement_version, agreement_hash, document_hash, pdf_buffer, pdf_filename,
   version_kair, ip, user_agent, metadata,
   identificacion_tipo, identificacion_numero_hash,
 }) {
@@ -78,6 +80,11 @@ function create({
       { declared: document_hash, calculated: calculated_hash });
   }
 
+  // Validar Acuerdo (Bloque A — agreement_version obligatorio, 5 pasos).
+  // Esta validación se hace ANTES de generar token/ID para no consumir IDs
+  // en solicitudes inválidas.
+  validateAcuerdo(agreement_version, agreement_hash);
+
   // Generar token y IDs
   const token = generateToken();
   const token_hash = hashToken(token);
@@ -100,15 +107,15 @@ function create({
     const result = db.prepare(`
       INSERT INTO gh_firmas_electronicas
         (id_solicitud, id_documento, id_trabajador, id_empresa,
-         tipo_firma, document_hash_original, agreement_hash,
+         tipo_firma, document_hash_original, agreement_hash, agreement_version,
          token_hash, sesion_id, identificacion_tipo, identificacion_numero_hash,
          fecha_creacion, fecha_expiracion, version_kair,
          ip_origen, user_agent, pdf_original_path, metadata,
          verification_channel)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id_solicitud, id_documento, id_trabajador, id_empresa,
-      tipo_firma, calculated_hash, agreement_hash,
+      tipo_firma, calculated_hash, agreement_hash, agreement_version,
       token_hash, sesion_id, identificacion_tipo || null, identificacion_numero_hash || null,
       now.toISOString(), fecha_expiracion, version_kair,
       ip || null, user_agent || null, pdf_original_path, metadata || null, 'email',
@@ -131,6 +138,7 @@ function create({
       firmaId, now.toISOString(), ip || null, user_agent || null,
       'rh:system', JSON.stringify({
         id_documento, tipo_firma, ttl_horas, document_hash: calculated_hash,
+        agreement_version,
       }),
     );
 
@@ -146,10 +154,78 @@ function create({
     id_trabajador,
     tipo_firma,
     ttl_horas,
+    agreement_version,
   });
 
   const signRequest = getById(firmaId);
   return { signRequest, token, url_publica };
+}
+
+/**
+ * Valida que el Acuerdo referenciado por el cliente existe, es la versión
+ * activa y vigente, y que el agreement_hash coincide con su texto_hash.
+ *
+ * 5 pasos:
+ *   1. agreement_version es string no vacío
+ *   2. existe en gh_firma_acuerdo_versiones (getByVersion)
+ *   3. esa versión es la activa y vigente (getActive la retorna)
+ *   4. fecha_vigencia_inicio <= now
+ *   5. fecha_vigencia_fin IS NULL o fecha_vigencia_fin > now
+ *      (esto lo aplica getActive() en su WHERE; aquí solo validamos hash)
+ *   + agreement_hash === texto_hash de esa versión
+ *
+ * Nota: getActive() ya implementa la regla "activa + vigente por fecha"
+ * (cambiada en Bloque A), por lo que comparar getByVersion(v).version
+ * con getActive()?.version es suficiente para "existe y es la activa".
+ *
+ * @throws AppError 422 ACUERDO_INVALIDO si algo falla.
+ */
+function validateAcuerdo(agreement_version, agreement_hash) {
+  if (typeof agreement_version !== 'string' || agreement_version.length === 0) {
+    throw new AppError(400, 'INVALID_REQUEST_BODY',
+      'agreement_version es requerido');
+  }
+  if (typeof agreement_hash !== 'string' || agreement_hash.length === 0) {
+    throw new AppError(400, 'INVALID_REQUEST_BODY',
+      'agreement_hash es requerido');
+  }
+
+  // Paso 1: lookup por versión
+  const acuerdoPorVersion = agreementService.getByVersion(agreement_version);
+  if (!acuerdoPorVersion) {
+    throw new AppError(422, 'ACUERDO_INVALIDO',
+      'La versión del Acuerdo no existe',
+      { reason: 'version_not_found', agreement_version });
+  }
+
+  // Pasos 2-5: verificar que es la activa y vigente
+  const acuerdoActivo = agreementService.getActive();
+  if (!acuerdoActivo) {
+    throw new AppError(422, 'ACUERDO_INVALIDO',
+      'No hay versión activa y vigente del Acuerdo',
+      { reason: 'no_active_version', agreement_version });
+  }
+  if (acuerdoActivo.version !== agreement_version) {
+    throw new AppError(422, 'ACUERDO_INVALIDO',
+      'La versión del Acuerdo no es la activa y vigente',
+      {
+        reason: 'inactive',
+        agreement_version,
+        active_version: acuerdoActivo.version,
+      });
+  }
+
+  // Paso extra: agreement_hash debe coincidir con texto_hash
+  if (agreement_hash !== acuerdoPorVersion.texto_hash) {
+    throw new AppError(422, 'ACUERDO_INVALIDO',
+      'El agreement_hash no coincide con el texto_hash de la versión',
+      {
+        reason: 'hash_mismatch',
+        agreement_version,
+        expected_hash: acuerdoPorVersion.texto_hash,
+        received_hash: agreement_hash,
+      });
+  }
 }
 
 /**

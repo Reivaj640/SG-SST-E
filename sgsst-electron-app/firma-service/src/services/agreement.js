@@ -13,19 +13,33 @@ const { sha256 } = require('../crypto/hash');
 const logger = require('../utils/logger');
 
 /**
- * Obtiene la versión activa del Acuerdo.
+ * Obtiene la versión activa Y vigente del Acuerdo.
  *
- * @returns {object|null} La versión activa, o null si no existe ninguna.
+ * Reglas de vigencia (Bloque A — agreement_version obligatorio):
+ *  - activa = 1 (la marca de activa)
+ *  - fecha_vigencia_inicio <= now (ya entró en vigencia)
+ *  - fecha_vigencia_fin IS NULL OR fecha_vigencia_fin > now
+ *    (no ha vencido; NULL = sin fecha de fin = válida indefinidamente)
+ *
+ * El índice único parcial idx_acuerdo_activa_unica (creado en migración 002)
+ * garantiza "máximo 1 activa" a nivel de BD. Este filtro de vigencia va
+ * a nivel de aplicación y puede evolucionar (ej. requerir aprobación
+ * jurídica explícita antes de activar).
+ *
+ * @returns {object|null} La versión activa y vigente, o null si no hay.
  */
 function getActive() {
+  const now = new Date().toISOString();
   const row = db.prepare(`
     SELECT id, version, texto, texto_hash, fecha_vigencia_inicio,
            fecha_vigencia_fin, activa, creado_por, kair_version,
            fecha_creacion
     FROM gh_firma_acuerdo_versiones
     WHERE activa = 1
+      AND fecha_vigencia_inicio <= @now
+      AND (fecha_vigencia_fin IS NULL OR fecha_vigencia_fin > @now)
     LIMIT 1
-  `).get();
+  `).get({ now });
   return row || null;
 }
 

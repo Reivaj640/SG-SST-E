@@ -92,6 +92,11 @@ const { sha256 } = require('../src/crypto/hash');
 /**
  * Crea un Sign Request con datos de identificación.
  * Helper para tests del flujo público.
+ *
+ * Siembra automáticamente un Acuerdo activo v1.0 con texto fijo, de modo que
+ * la validación 5-pasos de agreement_version obligatorio (Bloque A) pase.
+ * Si el test quiere usar una versión o hash diferente, puede sobreescribirlo
+ * con `agreement_version` o `agreement_hash` en overrides.
  */
 async function createSignRequestWithIdentificacion({
   id_documento = 'doc-001',
@@ -102,6 +107,11 @@ async function createSignRequestWithIdentificacion({
   identificacion_numero = '1234567890',
   ...overrides
 } = {}) {
+  // Sembrar Acuerdo activo (si no hay uno) y usar su texto_hash/version reales.
+  // El helper de tests/testAgreementFixture v1.0 usa texto fijo, así que el
+  // texto_hash es estable entre llamadas que parten de BD limpia (resetDb).
+  const acuerdo = agreementService.getActive() || seedActiveAgreement();
+
   const signRequestService = require('../src/services/signRequest');
   const { PDFDocument } = require('pdf-lib');
   // Crear PDF válido con pdf-lib
@@ -111,7 +121,8 @@ async function createSignRequestWithIdentificacion({
   const pdf = Buffer.from(await pdfDoc.save());
   return signRequestService.create({
     id_documento, id_trabajador, id_empresa, tipo_firma,
-    agreement_hash: 'a'.repeat(64),
+    agreement_version: acuerdo.version,
+    agreement_hash: acuerdo.texto_hash,
     document_hash: sha256(pdf),
     pdf_buffer: pdf,
     pdf_filename: 'test.pdf',
