@@ -106,7 +106,7 @@ test('GET /s/:token: estado SIGNED → 410', async () => {
   assert.equal(res.body.error.code, 'TOKEN_ALREADY_USED');
 });
 
-test('GET /s/:token: primer acceso registra evento OPENED', async () => {
+test('GET /s/:token: primer acceso registra evento OPENED y setea estado=OPENED (E8.1)', async () => {
   resetDb();
   const { token, signRequest } = await createSignRequestWithIdentificacion();
   const app = makeApp();
@@ -120,9 +120,15 @@ test('GET /s/:token: primer acceso registra evento OPENED', async () => {
   // El segundo debe ser OPENED
   assert.equal(eventos[eventos.length - 1].evento, 'OPENED');
 
-  // fecha_apertura debe estar populada
-  const row = db.prepare('SELECT fecha_apertura FROM gh_firmas_electronicas WHERE id = ?').get(signRequest.id);
-  assert.ok(row.fecha_apertura);
+  // E8.1 (fix bug): antes del fix, fecha_apertura se seteaba pero
+  // estado quedaba en 'PENDING' (el estado OPENED del CHECK era zombie).
+  // Ahora ambos se setean atómicamente en el mismo UPDATE.
+  const row = db.prepare(`
+    SELECT estado, fecha_apertura FROM gh_firmas_electronicas WHERE id = ?
+  `).get(signRequest.id);
+  assert.equal(row.estado, 'OPENED',
+    'estado debe ser OPENED después del primer acceso (E8.1)');
+  assert.ok(row.fecha_apertura, 'fecha_apertura debe estar poblada');
 });
 
 test('GET /s/:token: segundo acceso NO registra otro OPENED', async () => {
