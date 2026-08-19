@@ -17,6 +17,12 @@ const config = require('./config');
 const logger = require('./utils/logger');
 const requestId = require('./middleware/requestId');
 const { errorHandler } = require('./middleware/errors');
+const {
+  globalLimiter,
+  otpLimiter,
+  commitLimiter,
+  signRequestLimiter,
+} = require('./middleware/rateLimit');
 const healthRouter = require('./routes/health');
 const agreementRouter = require('./routes/agreement');
 const consentRouter = require('./routes/consent');
@@ -32,8 +38,12 @@ const MINI_APP_DIR = path.resolve(__dirname, '..', 'web', 'firma');
 function createApp() {
   const app = express();
 
-  // Confiar en el proxy (para IP correcta detrás de nginx/cloudflare)
-  app.set('trust proxy', true);
+  // SEGURIDAD (P1-6): 'true' confía en CUALQUIER proxy → permite spoofing
+  // de X-Forwarded-For y bypass de rate limit (E9.1) y de la cadena de
+  // custodia forense de ip_origen. Usar config.trustProxy (env TRUST_PROXY).
+  // Default 'loopback' (solo 127.0.0.1, ::1). En prod: TRUST_PROXY=1 (último hop)
+  // o TRUST_PROXY=<ip-del-proxy>.
+  app.set('trust proxy', config.trustProxy);
 
   // Seguridad: headers HTTP estrictos
   app.use(helmet({
@@ -86,6 +96,10 @@ function createApp() {
     next();
   });
 
+  // Rate limiting global por IP (E9.1). skip salta /health (monitoring).
+  // Se registra ANTES de las rutas para que aplique a todo.
+  app.use(globalLimiter);
+
   // Rutas
   app.use('/', healthRouter);
 
@@ -103,9 +117,19 @@ function createApp() {
     },
   }));
 
+  // Rate limiters por endpoint público (E9.1).
+  // Se registran ANTES de publicRouter para que limiten el acceso.
+  // otp: 10/h por IP+token — anti fuerza bruta de OTP.
+  // commit: 3/min por IP+token — anti spam de commits.
+  app.use('/api/sign/:token/verify-otp', otpLimiter);
+  app.use('/api/sign/:token/commit', commitLimiter);
+
   app.use('/', publicRouter);
   app.use('/internal', agreementRouter);
   app.use('/internal', consentRouter);
+  // Rate limiter para creación de sign requests (E9.1): 30/min por IP.
+  // Anti-abuso de creación masiva. Se registra ANTES de signRequestRouter.
+  app.use('/internal/sign-requests', signRequestLimiter);
   app.use('/internal', signRequestRouter);
   app.use('/internal', internalAuditRouter);
   // Endpoints administrativos: protegidos por X-Admin-API-Key
