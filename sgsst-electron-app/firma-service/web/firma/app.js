@@ -195,7 +195,7 @@
       e.preventDefault();
       hideFormError('identify-error');
 
-      const tipo_documento = $('#tipo_documento').value;
+      const tipo_identificacion = $('#tipo_identificacion').value;
       const numero_documento = $('#numero_documento').value.trim();
 
       if (!numero_documento) {
@@ -206,7 +206,7 @@
       try {
         const result = await apiFetch('/api/sign/' + state.token + '/identify', {
           method: 'POST',
-          body: { tipo_documento: tipo_documento, numero_documento: numero_documento },
+          body: { tipo_identificacion: tipo_identificacion, numero_documento: numero_documento },
         });
         state.correoEnmascarado = result.correo_destino_enmascarado;
         $('#correo-enmascarado').textContent = result.correo_destino_enmascarado;
