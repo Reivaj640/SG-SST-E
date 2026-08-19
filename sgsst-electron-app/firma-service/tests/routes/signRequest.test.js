@@ -589,3 +589,104 @@ test('POST /internal/sign-requests: Acuerdo vencido (fecha_vigencia_fin < now) �
   // El servicio detecta que NO hay activa vigente → reason no_active_version
   assert.equal(res.body.error.details.reason, 'no_active_version');
 });
+
+// =================================================================
+// I-002 end-to-end: tipo_identificacion se propaga del body al service
+// a la BD y a las responses (POST 201 + GET /:id).
+//
+// Cierra el gap detectado por Agentes B/C/E: el route POST no propagaba
+// `tipo_identificacion` desde `meta` validado por zod al service, por lo
+// que el valor llegaba como `undefined` → `null` en BD silencioso.
+//
+// Con este fix, el flujo end-to-end es:
+//   Zod valida el campo → ✅
+//   Route lo lee de meta y lo pasa al service → ✅ (este fix)
+//   Service valida + INSERT → ✅
+//   Service retorna el valor en getById → ✅
+//   POST 201 response incluye el valor → ✅ (este fix)
+//   GET /:id response incluye el valor → ✅ (este fix)
+// =================================================================
+
+test('I-002 e2e: POST con tipo_identificacion=CONTRATO → 201 + persiste + GET /:id retorna', async () => {
+  resetDb();
+  const acuerdo = seedActiveAgreement();
+  const app = makeApp();
+  const pdf = makePdf();
+  const meta = buildMetadata(acuerdo);
+  meta.document_hash = sha256Hex(pdf);
+  meta.tipo_identificacion = 'CONTRATO';
+
+  const res = await request(app)
+    .post('/internal/sign-requests')
+    .set(HEADERS)
+    .field('metadata', JSON.stringify(meta))
+    .attach('documento', pdf, 'contrato.pdf');
+
+  assert.equal(res.status, 201);
+  // 1. La respuesta POST confirma el valor persistido
+  assert.equal(res.body.tipo_identificacion, 'CONTRATO',
+    'POST 201 debe incluir tipo_identificacion en la respuesta');
+
+  // 2. La fila en BD tiene la columna poblada (no quedó undefined → null)
+  const fila = db.prepare(
+    "SELECT tipo_identificacion FROM gh_firmas_electronicas WHERE id_solicitud = ?"
+  ).get(res.body.id_solicitud);
+  assert.equal(fila.tipo_identificacion, 'CONTRATO',
+    'la fila en BD debe tener tipo_identificacion=CONTRATO (gap B/C/E cerrado)');
+
+  // 3. GET /:id retorna el valor para que el cliente lo lea
+  const get = await request(app)
+    .get(`/internal/sign-requests/${res.body.id_solicitud}`)
+    .set(HEADERS);
+  assert.equal(get.status, 200);
+  assert.equal(get.body.tipo_identificacion, 'CONTRATO',
+    'GET /:id debe incluir tipo_identificacion en la respuesta');
+});
+
+test('I-002 e2e: POST sin tipo_identificacion → 201 + null (backward compat legacy pre-007)', async () => {
+  resetDb();
+  const acuerdo = seedActiveAgreement();
+  const app = makeApp();
+  const pdf = makePdf();
+  const meta = buildMetadata(acuerdo);
+  meta.document_hash = sha256Hex(pdf);
+  // tipo_identificacion NO se envía (sign request legacy pre-007)
+
+  const res = await request(app)
+    .post('/internal/sign-requests')
+    .set(HEADERS)
+    .field('metadata', JSON.stringify(meta))
+    .attach('documento', pdf, 'doc.pdf');
+
+  assert.equal(res.status, 201);
+  assert.equal(res.body.tipo_identificacion, null,
+    'POST 201 debe incluir tipo_identificacion=null cuando no se envía');
+
+  const fila = db.prepare(
+    "SELECT tipo_identificacion FROM gh_firmas_electronicas WHERE id_solicitud = ?"
+  ).get(res.body.id_solicitud);
+  assert.equal(fila.tipo_identificacion, null,
+    'BD debe tener tipo_identificacion=null para sign requests legacy');
+});
+
+test('I-002 e2e: POST con tipo_identificacion inválido → 400 INVALID_REQUEST_BODY (zod)', async () => {
+  resetDb();
+  const acuerdo = seedActiveAgreement();
+  const app = makeApp();
+  const pdf = makePdf();
+  const meta = buildMetadata(acuerdo);
+  meta.document_hash = sha256Hex(pdf);
+  meta.tipo_identificacion = 'NO_ES_VALIDO';  // no está en TIPOS_IDENTIFICACION
+
+  const res = await request(app)
+    .post('/internal/sign-requests')
+    .set(HEADERS)
+    .field('metadata', JSON.stringify(meta))
+    .attach('documento', pdf, 'doc.pdf');
+
+  assert.equal(res.status, 400);
+  assert.equal(res.body.error.code, 'INVALID_REQUEST_BODY');
+  // No se crea fila en BD
+  const fila = db.prepare("SELECT COUNT(*) AS n FROM gh_firmas_electronicas").get();
+  assert.equal(fila.n, 0, 'ningún sign request debe haberse creado');
+});
