@@ -107,7 +107,11 @@ function create({
   const safe_filename = `${id_solicitud}.pdf`;
   const pdf_original_path = storage.saveOriginal(safe_filename, pdf_buffer);
 
-  // Insertar en BD + sesión en transacción
+  // Insertar en BD + sesión en transacción.
+  // Si la tx falla (UNIQUE collision, FK fail, BD busy, etc.), el PDF ya
+  // está escrito al disco. Sin cleanup, queda huérfano. Ver E9.2.
+  //   - storage.deletePdf() es silencioso: si el archivo no existe, no throw.
+  //   - Relanzamos el error original para no cambiar la API pública.
   const tx = db.transaction(() => {
     const result = db.prepare(`
       INSERT INTO gh_firmas_electronicas
@@ -151,7 +155,24 @@ function create({
 
     return firmaId;
   });
-  const firmaId = tx();
+
+  let firmaId;
+  try {
+    firmaId = tx();
+  } catch (txErr) {
+    // Cleanup del PDF huérfano. deletePdf es silencioso: si el archivo ya
+    // no existe (otra ruta lo borró), no throw. Si el unlink falla por
+    // permisos o BD, logueamos pero NO ocultamos el error original.
+    const cleaned = storage.deletePdf(pdf_original_path);
+    logger.warn('SignRequest: tx BD falló, PDF huérfano cleanup', {
+      id_solicitud,
+      pdf_original_path,
+      cleaned,
+      tx_error_code: txErr.code,
+      tx_error_message: txErr.message,
+    });
+    throw txErr;
+  }
 
   // URL pública
   const url_publica = `${config.publicUrl}/s/${token}`;
