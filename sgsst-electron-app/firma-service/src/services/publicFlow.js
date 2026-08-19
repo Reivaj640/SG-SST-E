@@ -26,6 +26,7 @@ const signRequestService = require('./signRequest');
 const mailer = require('./mailer');
 const storage = require('./storage');
 const pdfGen = require('./pdfGen');
+const agreementService = require('./agreement');  // D2: re-validar Acuerdo en view/commit
 const logger = require('../utils/logger');
 const { AppError } = require('../middleware/errors');
 
@@ -92,6 +93,37 @@ function resolveToken(token) {
   }
 
   return { signRequest, estado: signRequest.estado };
+}
+
+/**
+ * Re-valida que la versión del Acuerdo vinculada al sign request sigue
+ * siendo la activa y vigente (Bloque D2).
+ *
+ * Si la `agreement_version` del sign request NO coincide con la versión
+ * activa del Acuerdo, lanza 409 AGREEMENT_VERSION_NO_LONGER_ACTIVE.
+ *
+ * Sign requests legacy (pre-Bloque A) tienen `agreement_version = null`.
+ * Esos se firmaron antes de la introducción de versiones, así que NO se
+ * pueden re-validar contra el Acuerdo actual. Se dejan pasar para
+ * preservar la trazabilidad histórica.
+ *
+ * @param {object} signRequest - fila de gh_firmas_electronicas
+ * @throws AppError 409 AGREEMENT_VERSION_NO_LONGER_ACTIVE
+ */
+function validateAgreementStillActive(signRequest) {
+  // Sign request legacy sin agreement_version → no se puede re-validar
+  if (!signRequest.agreement_version) {
+    return;
+  }
+  const acuerdoActivo = agreementService.getActive();
+  if (!acuerdoActivo || acuerdoActivo.version !== signRequest.agreement_version) {
+    throw new AppError(409, 'AGREEMENT_VERSION_NO_LONGER_ACTIVE',
+      'La versión del Acuerdo de esta solicitud ya no está activa',
+      {
+        sign_request_version: signRequest.agreement_version,
+        active_version: acuerdoActivo ? acuerdoActivo.version : null,
+      });
+  }
 }
 
 /**
@@ -288,7 +320,10 @@ async function commit(token, opts, ip, user_agent) {
   // 1. Resolver token
   const { signRequest } = resolveToken(token);
 
-  // 2. Validar precondiciones
+  // 2. Re-validar que el Acuerdo vinculado sigue siendo el activo (D2)
+  validateAgreementStillActive(signRequest);
+
+  // 3. Validar precondiciones
   if (signRequest.estado !== 'DOCUMENT_VIEWED') {
     throw new AppError(409, 'INVALID_STATE_TRANSITION',
       `No se puede firmar en estado '${signRequest.estado}'`,
@@ -313,6 +348,11 @@ async function commit(token, opts, ip, user_agent) {
   const document_hash_firmado = sha256(pdfFirmadoBuf);
 
   // 5. Construir evidencia (JSON canónico)
+  //    IMPORTANTE: incluir `agreement_version` para que un verificador externo
+  //    pueda reproducir el hash y probar "qué versión del Acuerdo" rigió
+  //    la firma, no solo "qué hash del Acuerdo" (ver explore E Gap 3.1).
+  const manifestacion_voluntad_texto = 'He leído, comprendido y acepto el contenido del documento en su totalidad.';
+  const manifestacion_voluntad_hash = sha256(manifestacion_voluntad_texto);
   const evidencia = {
     id_solicitud: signRequest.id_solicitud,
     id_documento: signRequest.id_documento,
@@ -321,16 +361,19 @@ async function commit(token, opts, ip, user_agent) {
     document_hash_original: signRequest.document_hash_original,
     document_hash_firmado,
     agreement_hash: signRequest.agreement_hash,
+    agreement_version: signRequest.agreement_version,  // ← D1 fix
     identificacion_tipo: signRequest.identificacion_tipo,
     fecha_creacion: signRequest.fecha_creacion,
     fecha_firma,
     version_kair: signRequest.version_kair,
-    manifestacion_voluntad_texto: 'He leído, comprendido y acepto el contenido del documento en su totalidad.',
+    manifestacion_voluntad_texto,
   };
   const evidencia_canonica = canonicalJSON(evidencia);
   const evidence_hash = sha256(evidencia_canonica);
 
   // 6. UPDATE atómico
+  //    Persistimos `manifestacion_voluntad_hash` que antes quedaba NULL
+  //    aunque la columna existía (ver explore E Gap 4.1).
   const updateResult = db.prepare(`
     UPDATE gh_firmas_electronicas
     SET estado = 'SIGNED',
@@ -338,11 +381,12 @@ async function commit(token, opts, ip, user_agent) {
         evidence_hash = ?,
         fecha_manifestacion = ?,
         fecha_firma = ?,
-        manifestacion_voluntad_texto = ?
+        manifestacion_voluntad_texto = ?,
+        manifestacion_voluntad_hash = ?
     WHERE id = ? AND estado = 'DOCUMENT_VIEWED'
   `).run(
     document_hash_firmado, evidence_hash, fecha_firma, fecha_firma,
-    evidencia.manifestacion_voluntad_texto, signRequest.id,
+    manifestacion_voluntad_texto, manifestacion_voluntad_hash, signRequest.id,
   );
 
   if (updateResult.changes !== 1) {
@@ -502,7 +546,10 @@ function viewDocument(token, { segundosEnPagina, scrollAlFinal }, ip, user_agent
   // 1. Resolver token
   const { signRequest } = resolveToken(token);
 
-  // 2. Validar estado: debe estar al menos en OTP_VERIFIED
+  // 2. Re-validar que el Acuerdo vinculado sigue siendo el activo (D2)
+  validateAgreementStillActive(signRequest);
+
+  // 3. Validar estado: debe estar al menos en OTP_VERIFIED
   const estadosPermitidos = ['OTP_VERIFIED', 'DOCUMENT_OPENED', 'DOCUMENT_VIEWED', 'MANIFESTATION_RECORDED'];
   if (!estadosPermitidos.includes(signRequest.estado)) {
     throw new AppError(409, 'INVALID_STATE_TRANSITION',
