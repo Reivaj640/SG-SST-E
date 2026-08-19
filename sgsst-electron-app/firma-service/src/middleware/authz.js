@@ -43,13 +43,25 @@
  *    body/query. Los handlers deben usar req.id_empresa como fuente
  *    autoritativa.
  *
- * Ver docs/kair-firma-integration/I-010-design.md y SECURITY.md §8.
+ * Composición con rate limit (I-008, C-20 v5):
+ *  - `_runAuthz` es el helper interno: corre la lógica de authz y entrega
+ *    el resultado vía callback (err). NO toca rate limit.
+ *  - `requireEmpresaScope({...})` es el wrapper que SOLO hace authz y luego
+ *    next(). Comportamiento idéntico al pre-I-008.
+ *  - `requireEmpresaScopeAndLimit({...})` es la COMPOSICIÓN: corre authz
+ *    y, si pasa, encadena los 4 limiters del rate limit interno. Los
+ *    limiters LEEN `req.id_empresa` (seteado por authz) — NO re-resuelven
+ *    la API key. Esto evita que authz y rate limit "vean" empresas
+ *    distintas si el cache de internalClient diverge.
+ *
+ * Ver docs/kair-firma-integration/I-010-design.md, SECURITY.md §8, §9.
  */
 'use strict';
 
 const internalClientService = require('../services/internalClient');
 const { AppError } = require('./errors');
 const logger = require('../utils/logger');
+const { internalServerLimiter } = require('./rateLimit');
 
 /**
  * Parsea el CSV de allowed_operations en un array.
@@ -77,99 +89,169 @@ function _extractRequestedEmpresa(req) {
 }
 
 /**
- * Crea el middleware de autorización per-empresa.
+ * Helper interno: corre la lógica de authz (authn + per-company + ops check)
+ * y notifica el resultado vía callback (err). NO toca next() ni rate limit.
+ *
+ * I-008: la firma es `(req, opts, cb)` en lugar de `(req, res, next)` para
+ * que pueda ser reutilizada por `requireEmpresaScope` (sin rate limit) y
+ * `requireEmpresaScopeAndLimit` (con rate limit), sin tener que duplicar
+ * la lógica. La compatibilidad semántica con `requireEmpresaScope` pre-I-008
+ * se preserva exactamente.
+ *
+ * @param {object} req      - Request de Express.
+ * @param {object} opts     - { allowedOperations, checkIdEmpresa }.
+ * @param {function} cb     - (err) => void. err es null o un AppError.
+ */
+function _runAuthz(req, opts, cb) {
+  const { allowedOperations = [], checkIdEmpresa = false } = opts || {};
+
+  // 1. Leer header
+  const provided = req.get('X-Internal-API-Key');
+  if (typeof provided !== 'string' || provided.length === 0) {
+    return cb(new AppError(401, 'INVALID_API_KEY',
+      'Falta el header X-Internal-API-Key'));
+  }
+
+  // 2. Buscar cliente activo (cache 30s)
+  const client = internalClientService.getActiveClientByApiKey(provided);
+
+  if (client) {
+    // 3a. Cliente normal
+    const ops = _parseOps(client.allowed_operations);
+
+    // 3a-i. Verificar operación permitida (solo si se especificaron ops)
+    if (Array.isArray(allowedOperations) && allowedOperations.length > 0) {
+      const hasPermission = allowedOperations.some(op => ops.includes(op));
+      if (!hasPermission) {
+        return cb(new AppError(403, 'FORBIDDEN',
+          'Operación no permitida para este cliente',
+          {
+            required_operations: allowedOperations,
+            client_operations: ops,
+            id_empresa: client.id_empresa,
+          }));
+      }
+    }
+
+    // 3a-ii. Setear req.auth context
+    req.authSource = 'client';
+    req.id_empresa = client.id_empresa;
+    req.clientOperations = ops;
+    // Hash fingerprint (8 chars) para logging/auditoría
+    req.api_key_hash_prefix = client.api_key_hash.slice(0, 8);
+  } else {
+    // 3b. Intentar fallback legacy
+    const legacy = internalClientService.lookupLegacyClient(provided);
+    if (!legacy) {
+      return cb(new AppError(401, 'INVALID_API_KEY',
+        'API key inválida o revocada'));
+    }
+
+    // 3b-i. Setear req.auth context legacy
+    // En legacy mode, la operación y el id_empresa check son PERMISIVOS
+    // durante el período de deprecation. Esto preserva la compatibilidad
+    // con K+AIR mientras migra a claves per-empresa. El route handler
+    // puede hacer su propio check post-lookup si lo necesita (ver
+    // signRequest.js GET /:id, internal-audit.js GET eventos).
+    req.authSource = 'legacy';
+    req.id_empresa = null;  // ← NO '*' (ver ajuste #1 del design doc)
+    req.clientOperations = ['legacy'];
+    req.api_key_hash_prefix = legacy.api_key_hash.slice(0, 8);
+
+    // 3b-ii. Log de deprecation warning (1 release, después se elimina)
+    logger.warn('DEPRECATION: cliente legacy accedió endpoint protegido por requireEmpresaScope', {
+      request_id: req.id,
+      method: req.method,
+      path: req.path,
+      allowed_operations: allowedOperations,
+      checkIdEmpresa,
+    });
+  }
+
+  // 4. Check id_empresa del body/query/params (solo en client mode)
+  if (checkIdEmpresa && req.authSource === 'client' && req.id_empresa) {
+    const requested = _extractRequestedEmpresa(req);
+    if (requested !== null && requested !== req.id_empresa) {
+      return cb(new AppError(403, 'EMPRESA_MISMATCH',
+        'El id_empresa de la solicitud no coincide con la identidad autenticada',
+        {
+          auth_id_empresa: req.id_empresa,
+          requested_id_empresa: requested,
+        }));
+    }
+  }
+  // En legacy mode: NO se chequea (deprecation period).
+  // Si el route handler necesita check post-lookup (ej. GET /:id),
+  // lo hace con req.authSource === 'legacy' como señal.
+
+  cb(null);
+}
+
+/**
+ * Crea el middleware de autorización per-empresa (SOLO authz, sin rate limit).
+ *
+ * Comportamiento pre-I-008, preservado íntegro. Ver _runAuthz para la
+ * semántica detallada.
  *
  * @param {object} [opts]
- * @param {string[]} [opts.allowedOperations=[]] - Lista de operaciones permitidas
- *        (ej. ['sign_request:create']). Si está vacía, no se chequea.
- * @param {boolean} [opts.checkIdEmpresa=false] - Si true, verifica que el
- *        id_empresa del body/query/params coincida con req.id_empresa.
- *        En legacy mode se ignora (deprecation period).
+ * @param {string[]} [opts.allowedOperations=[]] - Lista de operaciones permitidas.
+ * @param {boolean} [opts.checkIdEmpresa=false] - Si true, valida body/query/params.
  * @returns {Function} Middleware Express.
  */
 function requireEmpresaScope({ allowedOperations = [], checkIdEmpresa = false } = {}) {
   return function (req, res, next) {
-    // 1. Leer header
-    const provided = req.get('X-Internal-API-Key');
-    if (typeof provided !== 'string' || provided.length === 0) {
-      return next(new AppError(401, 'INVALID_API_KEY',
-        'Falta el header X-Internal-API-Key'));
-    }
-
-    // 2. Buscar cliente activo (cache 30s)
-    const client = internalClientService.getActiveClientByApiKey(provided);
-
-    if (client) {
-      // 3a. Cliente normal
-      const ops = _parseOps(client.allowed_operations);
-
-      // 3a-i. Verificar operación permitida (solo si se especificaron ops)
-      if (Array.isArray(allowedOperations) && allowedOperations.length > 0) {
-        const hasPermission = allowedOperations.some(op => ops.includes(op));
-        if (!hasPermission) {
-          return next(new AppError(403, 'FORBIDDEN',
-            'Operación no permitida para este cliente',
-            {
-              required_operations: allowedOperations,
-              client_operations: ops,
-              id_empresa: client.id_empresa,
-            }));
-        }
-      }
-
-      // 3a-ii. Setear req.auth context
-      req.authSource = 'client';
-      req.id_empresa = client.id_empresa;
-      req.clientOperations = ops;
-      // Hash fingerprint (8 chars) para logging/auditoría
-      req.api_key_hash_prefix = client.api_key_hash.slice(0, 8);
-    } else {
-      // 3b. Intentar fallback legacy
-      const legacy = internalClientService.lookupLegacyClient(provided);
-      if (!legacy) {
-        return next(new AppError(401, 'INVALID_API_KEY',
-          'API key inválida o revocada'));
-      }
-
-      // 3b-i. Setear req.auth context legacy
-      // En legacy mode, la operación y el id_empresa check son PERMISIVOS
-      // durante el período de deprecation. Esto preserva la compatibilidad
-      // con K+AIR mientras migra a claves per-empresa. El route handler
-      // puede hacer su propio check post-lookup si lo necesita (ver
-      // signRequest.js GET /:id, internal-audit.js GET eventos).
-      req.authSource = 'legacy';
-      req.id_empresa = null;  // ← NO '*' (ver ajuste #1 del design doc)
-      req.clientOperations = ['legacy'];
-      req.api_key_hash_prefix = legacy.api_key_hash.slice(0, 8);
-
-      // 3b-ii. Log de deprecation warning (1 release, después se elimina)
-      logger.warn('DEPRECATION: cliente legacy accedió endpoint protegido por requireEmpresaScope', {
-        request_id: req.id,
-        method: req.method,
-        path: req.path,
-        allowed_operations: allowedOperations,
-        checkIdEmpresa,
-      });
-    }
-
-    // 4. Check id_empresa del body/query/params (solo en client mode)
-    if (checkIdEmpresa && req.authSource === 'client' && req.id_empresa) {
-      const requested = _extractRequestedEmpresa(req);
-      if (requested !== null && requested !== req.id_empresa) {
-        return next(new AppError(403, 'EMPRESA_MISMATCH',
-          'El id_empresa de la solicitud no coincide con la identidad autenticada',
-          {
-            auth_id_empresa: req.id_empresa,
-            requested_id_empresa: requested,
-          }));
-      }
-    }
-    // En legacy mode: NO se chequea (deprecation period).
-    // Si el route handler necesita check post-lookup (ej. GET /:id),
-    // lo hace con req.authSource === 'legacy' como señal.
-
-    next();
+    _runAuthz(req, { allowedOperations, checkIdEmpresa }, (err) => {
+      if (err) return next(err);
+      next();
+    });
   };
 }
 
-module.exports = { requireEmpresaScope };
+/**
+ * Crea el middleware COMPUESTO: authz per-empresa + rate limit interno
+ * (4 capas de I-008 / C-20 v5).
+ *
+ * Composición:
+ *   1. Corre _runAuthz (misma lógica que requireEmpresaScope).
+ *      - Si authz falla (401, 403, EMPRESA_MISMATCH) → corta acá, NO consume rate limit.
+ *   2. Si authz pasa, encadena las 4 capas de rate limit:
+ *      - Capa 4 (anomalía): si una empresa tiene > 10 X-Client-Instance-Id
+ *        distintos en 24h, se bloquea con 429 RATE_LIMIT_EXCEEDED.
+ *      - Capa 1 (id_empresa): 720/h por id_empresa (autoritativa).
+ *      - Capa 2 (instance): 240/h por id_empresa + X-Client-Instance-Id.
+ *        Si X-Client-Instance-Id no viene, se SKIP.
+ *      - Capa 3 (IP): 480/h por IP (fallback / legacy).
+ *
+ * **Decisión clave**: el rate limit LEE `req.id_empresa` (seteado por
+ * _runAuthz), NO re-resuelve la API key. Esto evita divergencia entre
+ * authz y rate limit si el cache de internalClient diverge.
+ *
+ * **Falla cerrado**: si por alguna razón `req.id_empresa` no está seteado
+ * (bug en authz) en una ruta que NO es legacy, el rate limit rechaza la
+ * request en lugar de hacer fallback a IP. Esto es defensa en profundidad
+ * (no debería pasar porque _runAuthz SIEMPRE setea `req.id_empresa` o
+ * marca `req.authSource = 'legacy'`).
+ *
+ * @param {object} [opts]
+ * @param {string[]} [opts.allowedOperations=[]]
+ * @param {boolean} [opts.checkIdEmpresa=false]
+ * @param {object} [opts.rateLimit]
+ * @param {boolean} [opts.rateLimit.enabled=true] - Si false, NO se aplica
+ *        el rate limit (útil para tests de authz puro). El authz corre igual.
+ * @returns {Function} Middleware Express.
+ */
+function requireEmpresaScopeAndLimit({ allowedOperations = [], checkIdEmpresa = false, rateLimit = {} } = {}) {
+  const rateLimitEnabled = rateLimit.enabled !== false;
+  return function (req, res, next) {
+    _runAuthz(req, { allowedOperations, checkIdEmpresa }, (err) => {
+      if (err) return next(err);
+      if (!rateLimitEnabled) {
+        return next();
+      }
+      // Delega al internalServerLimiter que usa req.id_empresa, req.get('X-Client-Instance-Id'), req.ip
+      internalServerLimiter(req, res, next);
+    });
+  };
+}
+
+module.exports = { requireEmpresaScope, requireEmpresaScopeAndLimit };
