@@ -16,11 +16,23 @@ const fs = require('fs');
 /**
  * Toma el PDF original (Buffer) y le añade metadata de firma.
  * El contenido visual NO se modifica.
+ *
+ * IMPORTANTE: los keywords XMP NO incluyen `document_hash_firmado` ni
+ * `evidence_hash` por una razón técnica: ambos dependen del buffer final
+ * del PDF firmado (chicken-and-egg). Se calculan DESPUÉS de generar el
+ * PDF y se persisten en la BD, no en el XMP del archivo. El XMP incluye
+ * solo metadatos verificables visualmente: id_solicitud, agreement_version,
+ * fecha_firma, id_trabajador.
+ *
+ * @param {Buffer} originalBuffer
+ * @param {object} metadata - { id_solicitud, id_documento, id_trabajador,
+ *                              agreement_version, fecha_firma }
+ * @returns {Promise<Buffer>}
  */
 async function generateSignedPdf(originalBuffer, metadata) {
   const pdfDoc = await PDFDocument.load(originalBuffer);
 
-  // Metadata XMP
+  // Metadata XMP (solo datos verificables; los hashes van en BD)
   pdfDoc.setProducer('K+AIR Firma Electrónica v1.0');
   pdfDoc.setCreator('K+AIR');
   pdfDoc.setAuthor(metadata.id_trabajador || 'trabajador');
@@ -29,8 +41,8 @@ async function generateSignedPdf(originalBuffer, metadata) {
     'K+AIR',
     'Firma Electrónica',
     `solicitud:${metadata.id_solicitud}`,
-    `hash:${metadata.document_hash_firmado}`,
-    `evidence:${metadata.evidence_hash}`,
+    `documento:${metadata.id_documento}`,
+    `acuerdo:${metadata.agreement_version || 'legacy'}`,
     `fecha:${metadata.fecha_firma}`,
   ]);
   pdfDoc.setModificationDate(new Date(metadata.fecha_firma));

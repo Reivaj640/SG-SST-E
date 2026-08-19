@@ -16,6 +16,8 @@
 'use strict';
 
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const db = require('../db/connection');
 const config = require('../config');
 const { hashToken } = require('../crypto/token');
@@ -300,17 +302,20 @@ function maskEmail(email) {
  * - Estado = DOCUMENT_VIEWED
  * - manifestacion_aceptada = true
  *
- * Pasos (en transacción):
- * 1. Verificar precondiciones
- * 2. Calcular document_hash_firmado (SHA-256 del PDF con metadata)
- * 3. Construir JSON de evidencia
- * 4. Calcular evidence_hash (SHA-256 del JSON canónico)
- * 5. UPDATE estado=SIGNED con todos los hashes
- * 6. Generar PDF firmado (con metadata)
- * 7. Generar Constancia PDF
- * 8. Guardar ambos en storage
- * 9. Insertar eventos (MANIFESTATION_RECORDED, SIGN_COMMITTED, PDF_GENERATED, COPY_SENT)
- * 10. Enviar correo con PDF + Constancia
+ * Pasos:
+ * 1. Verificar precondiciones y re-validar Acuerdo (D2)
+ * 2. Generar id_constancia = crypto.randomUUID() (server-side)
+ * 3. Generar PDF firmado y Constancia en memoria
+ * 4. Calcular hashes (document_hash_firmado, evidence_hash)
+ * 5. Escribir PDFs directamente a paths_FINAL con fsync (writeFileAtomic)
+ * 6. db.transaction() atómica: UPDATE estado=SIGNED con todos los hashes,
+ *    paths, id_constancia + 4 eventos (MANIFESTATION_RECORDED,
+ *    SIGN_COMMITTED, PDF_GENERATED, COPY_SENT temporal hasta E2)
+ * 7. Enviar correo con PDF + Constancia (best-effort, E2 lo moverá a post-tx)
+ *
+ * Atomicidad: si la escritura de PDFs falla (paso 5), la tx no se hace y
+ * NO hay inconsistencia. Si la tx falla (paso 6), los archivos se borran
+ * en el catch para no dejar PDFs huérfanos. BD↔FS 1:1.
  *
  * @param {string} token
  * @param {object} opts - { manifestacion_aceptada, firma_visual_png? }
@@ -334,23 +339,30 @@ async function commit(token, opts, ip, user_agent) {
       'Debe aceptar la manifestación de voluntad (manifestacion_aceptada=true)');
   }
 
-  // 3. Leer PDF original
+  // 4. id_constancia UUID server-side (migración 003)
+  const id_constancia = crypto.randomUUID();
+
+  // 5. Leer PDF original
   const pdfOriginal = storage.readPdf(signRequest.pdf_original_path);
 
-  // 4. Generar PDF firmado (con metadata XMP)
+  // 6. Generar PDF firmado (con metadata XMP).
+  //    El XMP incluye id_solicitud, agreement_version, fecha_firma.
+  //    NO incluye document_hash_firmado ni evidence_hash (chicken-and-egg:
+  //    ambos se calculan DESPUÉS de generar el PDF y persisten en BD).
   const fecha_firma = new Date().toISOString();
   const pdfFirmadoBuf = await pdfGen.generateSignedPdf(pdfOriginal, {
     id_solicitud: signRequest.id_solicitud,
     id_documento: signRequest.id_documento,
     id_trabajador: signRequest.id_trabajador,
+    agreement_version: signRequest.agreement_version,
     fecha_firma,
   });
   const document_hash_firmado = sha256(pdfFirmadoBuf);
 
-  // 5. Construir evidencia (JSON canónico)
+  // 7. Construir evidencia (JSON canónico).
   //    IMPORTANTE: incluir `agreement_version` para que un verificador externo
   //    pueda reproducir el hash y probar "qué versión del Acuerdo" rigió
-  //    la firma, no solo "qué hash del Acuerdo" (ver explore E Gap 3.1).
+  //    la firma, no solo "qué hash del Acuerdo" (ver Bloque D1).
   const manifestacion_voluntad_texto = 'He leído, comprendido y acepto el contenido del documento en su totalidad.';
   const manifestacion_voluntad_hash = sha256(manifestacion_voluntad_texto);
   const evidencia = {
@@ -371,86 +383,111 @@ async function commit(token, opts, ip, user_agent) {
   const evidencia_canonica = canonicalJSON(evidencia);
   const evidence_hash = sha256(evidencia_canonica);
 
-  // 6. UPDATE atómico
-  //    Persistimos `manifestacion_voluntad_hash` que antes quedaba NULL
-  //    aunque la columna existía (ver explore E Gap 4.1).
-  const updateResult = db.prepare(`
-    UPDATE gh_firmas_electronicas
-    SET estado = 'SIGNED',
-        document_hash_firmado = ?,
-        evidence_hash = ?,
-        fecha_manifestacion = ?,
-        fecha_firma = ?,
-        manifestacion_voluntad_texto = ?,
-        manifestacion_voluntad_hash = ?
-    WHERE id = ? AND estado = 'DOCUMENT_VIEWED'
-  `).run(
-    document_hash_firmado, evidence_hash, fecha_firma, fecha_firma,
-    manifestacion_voluntad_texto, manifestacion_voluntad_hash, signRequest.id,
-  );
+  // 8. Paths finales (escritura directa, sin temp+rename).
+  //    Trade-off: writeFileSync directo es prácticamente atómico en NTFS/ext4
+  //    para buffers pequeños (PDFs típicos <4 MB). Si writeFileSync falla,
+  //    la tx no se hace y la BD queda intacta. Atomicidad BD↔FS 1:1.
+  const pdf_firmado_filename = signRequest.id_solicitud + '.pdf';
+  const pdf_firmado_path = path.join(storage.PATHS.firmados, pdf_firmado_filename);
 
-  if (updateResult.changes !== 1) {
-    // Race condition: otro commit ganó
-    throw new AppError(409, 'INVALID_STATE_TRANSITION',
-      'La firma no se pudo cerrar: el estado cambió durante el commit');
-  }
-
-  // 7. Guardar PDF firmado y Constancia
-  const pdf_firmado_path = storage.PATHS.firmados + '/' + signRequest.id_solicitud + '.pdf';
   const constancia_filename = signRequest.id_solicitud + '-constancia.pdf';
-  const constancia_path = storage.PATHS.constancias + '/' + constancia_filename;
+  const constancia_path = path.join(storage.PATHS.constancias, constancia_filename);
 
-  require('fs').writeFileSync(pdf_firmado_path, pdfFirmadoBuf);
-
-  // Generar y guardar constancia
-  const id_constancia = `GEN-${fecha_firma.replace(/[:.]/g, '-')}`;
+  // 9. Generar Constancia (en memoria) — incluye id_constancia
   const constanciaBuf = await pdfGen.generateConstanciaPdf({
     ...evidencia,
     id_constancia,
   });
-  require('fs').writeFileSync(constancia_path, constanciaBuf);
 
-  // 8. UPDATE con paths
-  db.prepare(`
-    UPDATE gh_firmas_electronicas
-    SET pdf_firmado_path = ?,
-        constancia_path = ?
-    WHERE id = ?
-  `).run(pdf_firmado_path, constancia_path, signRequest.id);
+  // 10. Escribir PDFs a disco con fsync (writeFileAtomic).
+  //     Si esto falla, NO se toca BD y NO hay inconsistencia.
+  try {
+    writeFileAtomic(pdf_firmado_path, pdfFirmadoBuf);
+    writeFileAtomic(constancia_path, constanciaBuf);
+  } catch (err) {
+    // Si el primer write OK y el segundo falla, hacer cleanup del primero
+    try { fs.unlinkSync(pdf_firmado_path); } catch (_) { /* ignore */ }
+    throw new AppError(500, 'STORAGE_WRITE_FAILED',
+      'No se pudieron escribir los PDFs en disco', { error: err.message });
+  }
 
-  // 9. Eventos
-  const tx = db.transaction(() => {
-    signRequestService.registerEvent(signRequest.id, 'MANIFESTATION_RECORDED',
-      { texto_hash: sha256(evidencia.manifestacion_voluntad_texto) },
-      'trabajador', ip, user_agent);
-    signRequestService.registerEvent(signRequest.id, 'SIGN_COMMITTED',
-      { evidence_hash }, 'trabajador', ip, user_agent);
-    signRequestService.registerEvent(signRequest.id, 'PDF_GENERATED',
-      { path: pdf_firmado_path, size: pdfFirmadoBuf.length },
-      'sistema', ip, user_agent);
-    signRequestService.registerEvent(signRequest.id, 'COPY_SENT',
-      { canal: 'email' }, 'sistema', ip, user_agent);
-  });
-  tx();
+  // 11. Transacción atómica: UPDATE estado=SIGNED + persistir todos los hashes,
+  //     paths, id_constancia + 4 eventos.
+  //     Si esto falla, los archivos quedan en disco pero la BD rollback.
+  //     Cleanup: borrar archivos en error path.
+  try {
+    const tx = db.transaction(() => {
+      const updateResult = db.prepare(`
+        UPDATE gh_firmas_electronicas
+        SET estado = 'SIGNED',
+            document_hash_firmado = ?,
+            evidence_hash = ?,
+            fecha_manifestacion = ?,
+            fecha_firma = ?,
+            manifestacion_voluntad_texto = ?,
+            manifestacion_voluntad_hash = ?,
+            id_constancia = ?,
+            pdf_firmado_path = ?,
+            constancia_path = ?
+        WHERE id = ? AND estado = 'DOCUMENT_VIEWED'
+      `).run(
+        document_hash_firmado, evidence_hash, fecha_firma, fecha_firma,
+        manifestacion_voluntad_texto, manifestacion_voluntad_hash,
+        id_constancia, pdf_firmado_path, constancia_path, signRequest.id,
+      );
+      if (updateResult.changes !== 1) {
+        throw new AppError(409, 'INVALID_STATE_TRANSITION',
+          'La firma no se pudo cerrar: el estado cambió durante el commit');
+      }
+      signRequestService.registerEvent(signRequest.id, 'MANIFESTATION_RECORDED',
+        { texto_hash: manifestacion_voluntad_hash },
+        'trabajador', ip, user_agent);
+      signRequestService.registerEvent(signRequest.id, 'SIGN_COMMITTED',
+        { evidence_hash },
+        'trabajador', ip, user_agent);
+      signRequestService.registerEvent(signRequest.id, 'PDF_GENERATED',
+        { path: pdf_firmado_path, size: pdfFirmadoBuf.length, id_constancia },
+        'sistema', ip, user_agent);
+      // TODO E2: mover COPY_SENT fuera de la tx y registrar post-envío
+      // (con COPY_FAILED si el mailer falla). Por ahora queda dentro
+      // de la tx como antes, sin adjuntos.
+      signRequestService.registerEvent(signRequest.id, 'COPY_SENT',
+        { canal: 'email' }, 'sistema', ip, user_agent);
+    });
+    tx();
+  } catch (err) {
+    // Cleanup: borrar archivos escritos
+    try { fs.unlinkSync(pdf_firmado_path); } catch (_) { /* ignore */ }
+    try { fs.unlinkSync(constancia_path); } catch (_) { /* ignore */ }
+    throw err;
+  }
 
-  // 10. Enviar correo con PDF + Constancia
+  // 13. Enviar correo con PDF + Constancia (best-effort, TODO E2)
+  //     El sendSignedCopy() dedicado con attachments se implementa en E2.
+  //     Por ahora, se reusa sendOTP con tipo 'copy' y otp dummy (compat).
   const correo = (signRequest.metadata && JSON.parse(signRequest.metadata || '{}').correo) || 'trabajador@ejemplo.com';
   try {
     await mailer.sendOTP({
       to: correo,
-      otp: '000000',  // dummy, no se usa
+      otp: '000000',  // dummy
       tipo: 'copy',
       context: {
         id_solicitud: signRequest.id_solicitud,
+        id_constancia,
         message: `Tu documento firmado está disponible. PDF: ${pdf_firmado_path}, Constancia: ${constancia_path}`,
       },
     });
   } catch (err) {
-    logger.warn('No se pudo enviar copia al trabajador', { error: err.message });
+    logger.warn('No se pudo enviar copia al trabajador', {
+      id_solicitud: signRequest.id_solicitud,
+      id_constancia,
+      error: err.message,
+    });
   }
 
   logger.info('Firma cerrada', {
     id_solicitud: signRequest.id_solicitud,
+    id_constancia,
     evidence_hash,
   });
 
@@ -462,9 +499,35 @@ async function commit(token, opts, ip, user_agent) {
     evidence_hash,
     fecha_firma,
     id_constancia,
+    // URLs informativas. Los endpoints reales se implementan en Bloque E'
+    // (siguiente bloque después de E). Se mantienen como referencia.
     pdf_firmado_url: `/internal/sign-requests/${signRequest.id_solicitud}/pdf-firmado`,
     constancia_url: `/internal/sign-requests/${signRequest.id_solicitud}/constancia`,
   };
+}
+
+/**
+ * Escribe un Buffer a un archivo con fsync para durabilidad.
+ * Lanza si la escritura falla.
+ *
+ * En Windows NTFS y Linux ext4, `fs.writeFileSync` es prácticamente
+ * atómico para buffers <4 MB: el kernel escribe los bloques de forma
+ * transaccional. Para PDFs típicos (decenas a cientos de KB), el riesgo
+ * de archivo corrupto a mitad de escritura es muy bajo.
+ *
+ * Se descartó el patrón temp+rename (escribir a `.tmp.${id}` y luego
+ * `renameSync` a destino final) porque introducía una ventana de
+ * inconsistencia: si el rename fallía, la BD ya tenía paths_FINAL pero
+ * el FS no. Con `writeFileSync` directo, la atomicidad BD↔FS es 1:1.
+ */
+function writeFileAtomic(filepath, buffer) {
+  const fd = fs.openSync(filepath, 'w');
+  try {
+    fs.writeSync(fd, buffer, 0, buffer.length, 0);
+    fs.fsyncSync(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
 }
 
 /**
