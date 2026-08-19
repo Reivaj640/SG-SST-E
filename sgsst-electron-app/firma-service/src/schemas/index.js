@@ -73,6 +73,11 @@ const signRequestBody = z.object({
   version_kair: z.string().min(1).max(32),
   identificacion_tipo: z.enum(['CC', 'CE', 'TI', 'PPT', 'PA']).optional(),
   identificacion_numero_hash: z.string().regex(/^[0-9a-f]{64}$/).optional(),
+  // P1-2: sal aleatoria por sign request para hashear la cédula.
+  //   hash = SHA-256(sal || numero_documento)
+  // Si el cliente no la envía, el servicio genera una automáticamente.
+  // 32 bytes hex = 64 chars.
+  identificacion_numero_sal: z.string().regex(/^[0-9a-f]{64}$/).optional(),
   // consent_id (Bloque E6): vínculo con gh_consentimientos_firma.id.
   // Opcional a nivel schema; la obligatoriedad REAL depende de
   // signRequest.agreement_version: si está presente, el sign request
