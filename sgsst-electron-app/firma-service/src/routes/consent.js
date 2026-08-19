@@ -4,8 +4,8 @@
  * - POST /internal/consentimientos
  * - POST /internal/consentimientos/:id/verify-otp
  *
- * Auth (I-010, D-13): ambos endpoints usan `requireEmpresaScope` para
- * scope per-empresa.
+ * Auth (I-010, D-13, I-008): ambos endpoints usan `requireEmpresaScopeAndLimit`
+ * para scope per-empresa + rate limit interno (4 capas, I-008 / C-20 v5).
  *
  * Ver API.md §6.10 y §6.11 y docs/kair-firma-integration/I-010-design.md.
  */
@@ -13,7 +13,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { requireEmpresaScope } = require('../middleware/authz');
+const { requireEmpresaScopeAndLimit } = require('../middleware/authz');
 const { validateBody } = require('../middleware/validate');
 const { createConsentBody, verifyOtpBody } = require('../schemas');
 const consentService = require('../services/consent');
@@ -30,9 +30,10 @@ const logger = require('../utils/logger');
  * En legacy mode (deprecation), se permite cualquier id_empresa.
  */
 router.post('/consentimientos',
-  requireEmpresaScope({
+  requireEmpresaScopeAndLimit({
     allowedOperations: ['consent:create'],
     checkIdEmpresa: true,
+    rateLimit: { tier: 'standard' },
   }),
   validateBody(createConsentBody),
   async (req, res, next) => {
@@ -109,8 +110,9 @@ router.post('/consentimientos',
  * En legacy mode (deprecation), se permite el acceso.
  */
 router.post('/consentimientos/:id/verify-otp',
-  requireEmpresaScope({
+  requireEmpresaScopeAndLimit({
     allowedOperations: ['consent:verify'],
+    rateLimit: { tier: 'standard' },
   }),
   validateBody(verifyOtpBody),
   (req, res, next) => {

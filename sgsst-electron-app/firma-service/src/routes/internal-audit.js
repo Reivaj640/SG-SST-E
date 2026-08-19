@@ -7,9 +7,10 @@
  * - POST /internal/sign-requests/:id/revoke
  *     Revoca una solicitud activa (operación humana, admin-only).
  *
- * Auth:
- *   - eventos → requireEmpresaScope (X-Internal-API-Key, K+AIR, per-company D-13)
- *   - revoke  → adminApiAuth        (X-Admin-API-Key, operador humano)
+ * Auth (I-010, D-13, I-008):
+ *   - eventos → requireEmpresaScopeAndLimit (X-Internal-API-Key, K+AIR, per-company D-13,
+ *                                            + rate limit interno I-008 / C-20 v5)
+ *   - revoke  → adminApiAuth                (X-Admin-API-Key, operador humano)
  *
  * Ver API.md §6.4 (revoke) y §6.7 (eventos). Ver C:\Temp\e7-design.md
  * y docs/kair-firma-integration/I-010-design.md.
@@ -21,7 +22,7 @@ const { z } = require('zod');
 const router = express.Router();
 const db = require('../db/connection');
 const { adminApiAuth } = require('../middleware/auth');
-const { requireEmpresaScope } = require('../middleware/authz');
+const { requireEmpresaScopeAndLimit } = require('../middleware/authz');
 const { validateBody } = require('../middleware/validate');
 const { AppError } = require('../middleware/errors');
 const signRequestService = require('../services/signRequest');
@@ -154,8 +155,9 @@ const revokeBody = z.object({
  * - 200 con array (posiblemente vacío) si existe
  */
 router.get('/sign-requests/:id/eventos',
-  requireEmpresaScope({
+  requireEmpresaScopeAndLimit({
     allowedOperations: ['audit:read'],
+    rateLimit: { tier: 'standard' },
   }),
   (req, res, next) => {
     try {
