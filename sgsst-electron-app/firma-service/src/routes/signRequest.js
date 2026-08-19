@@ -81,6 +81,11 @@ router.post('/sign-requests', internalApiAuth(), uploadPdf(), (req, res, next) =
       identificacion_tipo: meta.identificacion_tipo,
       identificacion_numero_hash: meta.identificacion_numero_hash,
       consent_id: meta.consent_id,  // Bloque E6
+      // I-002 (D-1): categoría del documento que se firma. DISTINTA de
+      // `identificacion_tipo` (CC, CE, etc. del firmante). Hasta I-002 el
+      // route no propagaba este campo; zod lo validaba y el service lo
+      // aceptaba, pero terminaba en `undefined` → `null` en BD silencioso.
+      tipo_identificacion: meta.tipo_identificacion,
       metadata: meta.metadata,
       ip: req.ip,
       user_agent: req.get('User-Agent') || null,
@@ -100,6 +105,9 @@ router.post('/sign-requests', internalApiAuth(), uploadPdf(), (req, res, next) =
       fecha_creacion: result.signRequest.fecha_creacion,
       fecha_expiracion: result.signRequest.fecha_expiracion,
       estado: result.signRequest.estado,
+      // I-002: confirmamos al cliente que el campo fue persistido (o null
+      // si no se envió, en sign requests legacy pre-007).
+      tipo_identificacion: result.signRequest.tipo_identificacion,
     });
   } catch (err) {
     next(err);
@@ -152,6 +160,8 @@ router.get('/sign-requests/:id', internalApiAuth(), (req, res, next) => {
       version_kair: signRequest.version_kair,
       agreement_version: signRequest.agreement_version,
       consent_id: signRequest.consent_id,  // Bloque E6
+      // I-002: categoría del documento firmado. Null para legacy pre-007.
+      tipo_identificacion: signRequest.tipo_identificacion,
     });
   } catch (err) {
     next(err);
