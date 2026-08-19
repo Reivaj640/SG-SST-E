@@ -35,9 +35,10 @@
 - [5. Defensa en profundidad](#5-defensa-en-profundidad)
 - [6. Gestión de secretos](#6-gestión-de-secretos)
 - [7. Checklist pre-producción](#7-checklist-pre-producción)
-- [8. Pentesting post-implementación](#8-pentesting-post-implementación)
-- [9. Bug bounty (futuro)](#9-bug-bounty-futuro)
-- [10. Anexo: matriz de riesgos](#10-anexo-matriz-de-riesgos)
+- [8. Autorización per-empresa (D-13, I-010)](#8-autorización-per-empresa-d-13-i-010)
+- [9. Pentesting post-implementación](#9-pentesting-post-implementación)
+- [10. Bug bounty (futuro)](#10-bug-bounty-futuro)
+- [11. Anexo: matriz de riesgos](#11-anexo-matriz-de-riesgos)
 
 ---
 
@@ -611,19 +612,221 @@ Antes de habilitar el Servicio en producción, verificar:
 
 ---
 
-## 8. Pentesting post-implementación
+## 8. Autorización per-empresa (D-13, I-010)
+
+> **Estado**: implementado en `firma-service` v0.2.0 (I-010).
+> **Diseño completo**: ver
+> [`docs/kair-firma-integration/I-010-design.md`](../../kair-firma-integration/I-010-design.md).
+
+### 8.1. Contexto y motivación
+
+Antes de I-010, el Servicio tenía **una sola API key global** (`INTERNAL_API_KEY`).
+Cualquier actor con esa key podía firmar para **cualquier empresa**. Esto
+escala privilegios cross-company: un atacante que compromete la key
+compromete TODAS las empresas cliente.
+
+I-010 reemplaza el modelo "1 key global" por **"1 key por empresa"** con
+scope explícito de operaciones:
+
+| Aspecto | Antes (pre-I-010) | Después (I-010) |
+|---|---|---|
+| API keys | 1 global | 1 por cliente (per-empresa) |
+| Scope de empresa | Sin scope (cualquiera) | Atado a `id_empresa` |
+| Scope de operación | Todas | Declarado en `allowed_operations` |
+| Persistencia | Variable de entorno | Tabla `gh_internal_clients` con SHA-256 hash |
+| Cache | N/A | 30s en memoria |
+
+### 8.2. Tabla `gh_internal_clients`
+
+```sql
+CREATE TABLE gh_internal_clients (
+  api_key_hash TEXT PRIMARY KEY,        -- SHA-256 hex (64 chars)
+  id_empresa TEXT NOT NULL,             -- Empresa a la que está atado
+  allowed_operations TEXT NOT NULL,     -- CSV: "sign_request:create,sign_request:read"
+  description TEXT,                     -- Auditoría libre
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  revoked_at TEXT                       -- NULL = activa, ISO8601 = revocada
+);
+```
+
+**Decisiones críticas**:
+
+1. **SHA-256 en vez de bcrypt/argon2**: las API keys son strings ≥32
+   chars con **256 bits de entropía** (generadas con `crypto.randomBytes`).
+   No son contraseñas humanas. bcrypt/argon2 están diseñados para
+   contraseñas humanas (~20-40 bits efectivos) y agregan latencia
+   innecesaria. SHA-256 es suficiente y rápido.
+
+2. **`api_key_hash` como PK**: el lookup siempre es por hash, no
+   necesitamos un surrogate key. Esto simplifica el código y elimina
+   una indirección.
+
+3. **NO usar `id_empresa='*'`** para "legacy global". En su lugar, en
+   código se usa `authSource='legacy'` + `id_empresa=null`. Esto hace
+   explícita la "ausencia de identidad empresarial" y evita lógica
+   especial con wildcards en cada handler.
+
+4. **Soft-delete con `revoked_at`**: preserva el historial. Un cliente
+   que cambia de empresa puede ser revocado sin perder el registro de
+   quién usó esa key.
+
+5. **Índice parcial `idx_internal_clients_empresa_active`** con
+   `WHERE revoked_at IS NULL`: queries más rápidas sobre el set activo
+   solamente.
+
+### 8.3. Modelo de amenaza
+
+**Amenaza mitigada**: E.1 cross-company privilege escalation. Un cliente
+con la key de la empresa A intenta firmar/consultar recursos de la
+empresa B.
+
+**Vector residual**: dentro del mismo `id_empresa`, el cliente puede
+actuar sobre cualquier recurso (firma de cualquier documento de cualquier
+trabajador de su empresa). Esto es **por diseño** — el cliente es
+interno de la empresa y se asume confianza. La mitigación es
+operacional: el `id_empresa` se asigna con criterio y se monitorea el
+uso.
+
+### 8.4. `req.id_empresa` autoritativo
+
+**Regla**: `req.id_empresa` SIEMPRE viene de la identidad autenticada,
+NUNCA del body/query. Para el listado, en `client` mode IGNORAMOS
+`?id_empresa=` del query y FORZAMOS `req.id_empresa`. No hay forma de
+escapar el scope.
+
+**Razón**: si el handler usara `body.id_empresa || query.id_empresa`, un
+atacante con la key de la empresa A podría inyectar `id_empresa=B` en el
+body o query y acceder a recursos de B. `req.id_empresa` autoritativo
+cierra ese vector.
+
+**Caso excepción (legacy)**: durante la ventana de deprecation (1
+release), el listado en `legacy` mode USA `?id_empresa=` del query para
+mantener compatibilidad con K+AIR. Esto se elimina en una release futura.
+
+### 8.5. Status codes de authz
+
+| Status | Significado | Cuándo |
+|---|---|---|
+| **401 INVALID_API_KEY** | No autenticado | Header ausente, key inválida o revocada |
+| **403 FORBIDDEN** | Sin permiso de operación | Cliente autenticado, sin la operación permitida |
+| **403 EMPRESA_MISMATCH** | Cross-company | Cliente autenticado, body/query con `id_empresa` que no es la suya |
+| **404 NOT_FOUND** (silent) | Recurso no accesible | GET /:id, GET /:id/eventos cuando el recurso pertenece a OTRA empresa (no filtra existencia) |
+
+### 8.6. Cache 30s y ventana de revocación
+
+La lookup `apiKey → cliente activo` se cachea 30s en memoria (Map).
+**Implicación**: si se revoca una key, hay hasta 30s de ventana antes
+de que el cache expire y la revocación sea efectiva.
+
+**Riesgo aceptado**: un atacante con la key robada tiene 30s de uso
+después de la revocación. Mitigado por:
+
+- Rate limit 60 req/min/IP (config.rateLimit.perMinute).
+- Log de uso post-revocación detectable.
+- TTL puede bajarse a 5s si la revocación inmediata es crítica.
+
+### 8.7. Legacy compat (1 release)
+
+Durante **1 release** (v0.2.0), el sistema acepta la `INTERNAL_API_KEY`
+legacy (pre-I-010) con `authSource='legacy'`. Esto preserva la
+compatibilidad con K+AIR mientras migra a claves per-empresa.
+
+**Comportamiento legacy**:
+
+- `req.authSource = 'legacy'`
+- `req.id_empresa = null` (NO `'*'`)
+- `req.clientOperations = ['legacy']` (marca especial)
+- **El middleware NO bloquea** operaciones ni check de id_empresa.
+- **El handler hace su propio check post-lookup** si lo necesita
+  (ej. GET /:id, GET eventos).
+- **Log de deprecation warning** por cada request legacy:
+  ```
+  DEPRECATION: cliente legacy accedió endpoint protegido por requireEmpresaScope
+  ```
+
+**Plan de eliminación**:
+
+| Release | Acción |
+|---|---|
+| v0.2.0 (I-010) | Legacy mode activo. K+AIR sigue con la key global. |
+| v0.3.0 | K+AIR migra a keys per-empresa. Legacy mode sigue activo. |
+| v0.4.0 (futuro) | Se elimina el fallback legacy. Keys no encontradas en `gh_internal_clients` → 401. |
+
+### 8.8. Migración de K+AIR
+
+K+AIR debe generar 1 API key por empresa y almacenarla en
+`gh_internal_clients`:
+
+```bash
+# 1. Generar key (ejecutar una vez por empresa)
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+# Output: 4f8a2c... (64 chars hex)
+
+# 2. Calcular hash SHA-256
+node -e "console.log(require('crypto').createHash('sha256').update('4f8a2c...').digest('hex'))"
+# Output: <64 chars hex>
+
+# 3. Insertar en BD (vía admin o script)
+INSERT INTO gh_internal_clients
+  (api_key_hash, id_empresa, allowed_operations, description)
+VALUES
+  ('<hash>', '900123456', 'sign_request:create,sign_request:read,consent:create,consent:verify,audit:read',
+   'K+AIR empresa 900123456 - prod');
+```
+
+**Actualizar `secrets.enc`** en K+AIR con la nueva key (no el hash).
+La key NUNCA debe quedar en la BD; solo el hash.
+
+### 8.9. `TRUST_PROXY` — OBLIGATORIO en producción
+
+**Esta sección es crítica para la seguridad del rate limiting y de la
+cadena de custodia forense.**
+
+`config.trustProxy` controla cómo Express resuelve `req.ip` cuando hay
+un proxy reverso (nginx, Cloudflare, etc.) entre el cliente y el
+Servicio. Si está mal configurado:
+
+- Un atacante puede falsificar `X-Forwarded-For` y bypasear el rate
+  limit.
+- Los logs forenses de `ip_origen` quedan contaminados.
+- `req.ip` no refleja la IP real del cliente.
+
+**Configuración obligatoria por entorno**:
+
+| Entorno | TRUST_PROXY | Razón |
+|---|---|---|
+| **Desarrollo** (sin proxy) | `'loopback'` (default) | Solo 127.0.0.1 y ::1. No acepta X-Forwarded-For. |
+| **Producción con nginx** (1 hop) | `TRUST_PROXY=1` | El último hop (nginx). |
+| **Producción con Cloudflare** | `TRUST_PROXY=<ip-cloudflare>` | Lista explícita de IPs de Cloudflare. |
+| **Producción multi-hop** | `TRUST_PROXY=<ip-proxy-inmediato>` | Solo el proxy inmediato, no cualquiera. |
+
+**NUNCA usar `TRUST_PROXY=true`**: confía en CUALQUIER proxy,
+incluyendo el header `X-Forwarded-For` enviado por el cliente. Esto
+rompe el rate limit y la cadena de custodia.
+
+**Verificación pre-producción** (checklist §7.1):
+- [ ] `TRUST_PROXY` configurado explícitamente.
+- [ ] `TRUST_PROXY` NO es `true`.
+- [ ] El valor refleja la topología real (1 hop vs multi-hop).
+
+Ver `src/middleware/rateLimit.js` (líneas 19-25) y `src/config.js` para
+la implementación. Hallazgo documentado como P1-6.
+
+---
+
+## 9. Pentesting post-implementación
 
 Antes del go-live, se recomienda contratar un **pentesting
 externo** que cubra:
 
-### 8.1. Alcance
+### 9.1. Alcance
 
 - Caja negra contra `https://firma.k-air.com`.
 - Caja gris contra los endpoints internos (con API key
   proporcionada por el equipo).
 - Caja blanca con acceso al código.
 
-### 8.2. Áreas a probar
+### 9.2. Áreas a probar
 
 - [ ] Inyección SQL en todos los endpoints.
 - [ ] Cross-Site Scripting (XSS) en la mini-app.
@@ -631,6 +834,10 @@ externo** que cubra:
 - [ ] Manipulación de tokens y OTPs.
 - [ ] Bypass del rate limit.
 - [ ] Bypass de autenticación.
+- [ ] **Bypass de autorización per-empresa** (I-010): un cliente con
+      key de empresa A intenta acceder a recursos de empresa B.
+- [ ] **Escapa de scope via query `?id_empresa=B`** en GET /sign-requests
+      (debe ser IGNORADO en client mode).
 - [ ] Manipulación de estados.
 - [ ] Race conditions en el commit.
 - [ ] Filtración de información en mensajes de error.
@@ -638,8 +845,10 @@ externo** que cubra:
 - [ ] Seguridad del endpoint de descarga de PDFs.
 - [ ] Validación de JSON canónico.
 - [ ] Path traversal.
+- [ ] **Hash de API key timing-safe**: comparar `constantTimeEqual`,
+      no `===`.
 
-### 8.3. Criterio de aceptación
+### 9.3. Criterio de aceptación
 
 - 0 vulnerabilidades altas o críticas sin resolver.
 - Todas las vulnerabilidades medias con plan de remediación
@@ -647,7 +856,7 @@ externo** que cubra:
 
 ---
 
-## 9. Bug bounty (futuro)
+## 10. Bug bounty (futuro)
 
 En **v1.1 o v2.0** se puede considerar un programa de bug bounty:
 
@@ -660,7 +869,7 @@ En **v1.1 o v2.0** se puede considerar un programa de bug bounty:
 
 ---
 
-## 10. Anexo: matriz de riesgos
+## 11. Anexo: matriz de riesgos
 
 | ID | Amenaza | Probabilidad | Impacto | Riesgo | Mitigación principal | Riesgo residual |
 |---|---|---|---|---|---|---|
