@@ -20,6 +20,7 @@ const agreementRouter = require('../src/routes/agreement');
 const consentRouter = require('../src/routes/consent');
 const signRequestRouter = require('../src/routes/signRequest');
 const publicRouter = require('../src/routes/public');
+const adminRouter = require('../src/routes/admin');
 const { errorHandler } = require('../src/middleware/errors');
 const agreementService = require('../src/services/agreement');
 const mailer = require('../src/services/mailer');
@@ -29,10 +30,12 @@ const storage = require('../src/services/storage');
 const MINI_APP_DIR = path.resolve(__dirname, '..', 'web', 'firma');
 
 const TEST_API_KEY = 'test-internal-api-key-32-bytes-min!!';
+const TEST_ADMIN_API_KEY = 'test-admin-api-key-32-bytes-min!!!!!';
 
-// Sobrescribir la API key en config (objeto mutable) para que el
-// middleware de auth use la key de test.
+// Sobrescribir las API keys en config (objeto mutable) para que los
+// middlewares de auth usen las keys de test.
 config.auth.internalApiKey = TEST_API_KEY;
+config.auth.adminApiKey = TEST_ADMIN_API_KEY;
 
 const TABLES = [
   'gh_consentimientos_firma',
@@ -83,6 +86,9 @@ function makeApp() {
   app.use('/internal', agreementRouter);
   app.use('/internal', consentRouter);
   app.use('/internal', signRequestRouter);
+  // Endpoints administrativos: deben estar en makeApp para tests
+  // de tests/routes/admin.test.js.
+  app.use('/internal/admin', adminRouter);
   app.use(errorHandler());
   return app;
 }
@@ -137,11 +143,17 @@ function withApiKey(req) {
   return req.set('X-Internal-API-Key', TEST_API_KEY);
 }
 
+function withAdminApiKey(req) {
+  return req.set('X-Admin-API-Key', TEST_ADMIN_API_KEY);
+}
+
 module.exports = {
   resetDb,
   seedActiveAgreement,
   makeApp,
   withApiKey,
+  withAdminApiKey,
   createSignRequestWithIdentificacion,
   TEST_API_KEY,
+  TEST_ADMIN_API_KEY,
 };

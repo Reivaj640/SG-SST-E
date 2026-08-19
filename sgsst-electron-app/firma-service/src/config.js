@@ -50,6 +50,10 @@ const config = {
 
   auth: {
     internalApiKey: required('INTERNAL_API_KEY'),
+    // adminApiKey: independiente de internalApiKey. K+AIR NO debe tener
+    // esta key. Se usa solo para /internal/admin/* (publicar/gestionar
+    // versiones del Acuerdo de uso, operación humana).
+    adminApiKey: required('ADMIN_API_KEY'),
   },
 
   smtp: {
@@ -90,6 +94,12 @@ const config = {
 if (config.env === 'production' &&
     config.auth.internalApiKey.startsWith('cambiar-')) {
   throw new Error('INTERNAL_API_KEY debe cambiarse en producción');
+}
+
+// Advertencia si ADMIN_API_KEY es el valor por defecto
+if (config.env === 'production' &&
+    config.auth.adminApiKey.startsWith('cambiar-')) {
+  throw new Error('ADMIN_API_KEY debe cambiarse en producción');
 }
 
 module.exports = config;

@@ -36,6 +36,29 @@ if (!process.env.DB_PATH) {
 if (!process.env.PDF_STORAGE_PATH) {
   process.env.PDF_STORAGE_PATH = TEST_PDF_PATH;
 }
+// 2b. API keys para tests (Bloque A: internal, Bloque B: admin).
+//     tests/helpers.js los reescribirá con valores específicos, pero
+//     necesitamos que estén seteados ANTES de que config.js los lea
+//     en su `required()`.
+if (!process.env.INTERNAL_API_KEY) {
+  process.env.INTERNAL_API_KEY = 'test-setup-internal-key';
+}
+if (!process.env.ADMIN_API_KEY) {
+  process.env.ADMIN_API_KEY = 'test-setup-admin-key';
+}
+// 2c. SMTP placeholders (no se usan en tests, pero config.js los requiere).
+if (!process.env.SMTP_HOST) {
+  process.env.SMTP_HOST = 'localhost';
+}
+if (!process.env.SMTP_USER) {
+  process.env.SMTP_USER = 'test@example.com';
+}
+if (!process.env.SMTP_PASS) {
+  process.env.SMTP_PASS = 'test-pass';
+}
+if (!process.env.SMTP_FROM_EMAIL) {
+  process.env.SMTP_FROM_EMAIL = 'no-reply@example.com';
+}
 
 // 3. BARRERA: si la BD efectiva resuelve a la DEV DB, BLOQUEAR.
 //    No hay override: la barrera siempre se activa. Si necesitas
