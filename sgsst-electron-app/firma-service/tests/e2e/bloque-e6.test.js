@@ -58,7 +58,7 @@ async function recorrerFlujoHastaViewed(token, identificacion_numero) {
   // 1. Identify
   const r3 = await request(require('../helpers').makeApp())
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_documento: 'CC', numero_documento: identificacion_numero });
+    .send({ tipo_identificacion: 'CC', numero_documento: identificacion_numero });
   if (r3.status !== 200) {
     throw new Error(`identify falló: status=${r3.status} body=${JSON.stringify(r3.body)}`);
   }

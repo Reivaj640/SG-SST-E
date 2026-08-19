@@ -6,6 +6,7 @@
 'use strict';
 
 const { z } = require('zod');
+const { TIPOS_IDENTIFICACION } = require('../services/signRequest');  // I-002: single source of truth
 
 /**
  * Schema del body de POST /internal/consentimientos.
@@ -85,6 +86,14 @@ const signRequestBody = z.object({
   // (trabajador, empresa, version_acuerdo). La validación se hace en
   // commit() (services/publicFlow.js).
   consent_id: z.coerce.number().int().positive().optional(),
+  // I-002 (D-1, A1/A2, migration 007): categoría del documento que se firma.
+  // DISTINTO de `identificacion_tipo` (CC, CE, TI, PPT, PA) que es el
+  // tipo de documento de IDENTIFICACIÓN del firmante. Esta columna es
+  // sobre el documento que se está FIRMANDO (categoría legal/administrativa).
+  // Valores en TIPOS_IDENTIFICACION (single source of truth en signRequest.js).
+  // Opcional en v1: si K+AIR no lo envía, queda NULL (compatibilidad con
+  // sign requests legacy pre-migration 007).
+  tipo_identificacion: z.enum(TIPOS_IDENTIFICACION).optional(),
   metadata: signRequestMetadata,
 });
 

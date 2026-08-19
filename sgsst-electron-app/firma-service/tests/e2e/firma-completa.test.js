@@ -125,7 +125,7 @@ test('E2E: Acuerdo v1.0 → POST sign-requests → flujo público completo → S
   // 5. POST /api/sign/:token/identify
   const r3 = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' });
   assert.equal(r3.status, 200);
   assert.equal(r3.body.estado, 'OTP_SENT');
   assert.equal(r3.body.otp_ttl_seconds, 600);

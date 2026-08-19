@@ -198,6 +198,9 @@ async function createSignRequestWithIdentificacion({
   tipo_firma = 'presencial',
   identificacion_tipo = 'CC',
   identificacion_numero = '1234567890',
+  // I-002: categoría del documento que se firma (CONTRATO, OTROSI, etc.).
+  // Por defecto null (compatibilidad con sign requests legacy pre-007).
+  tipo_identificacion = null,
   ...overrides
 } = {}) {
   // Sembrar Acuerdo activo (si no hay uno) y usar su texto_hash/version reales.
@@ -222,6 +225,7 @@ async function createSignRequestWithIdentificacion({
     version_kair: '0.1.189-test',
     identificacion_tipo,
     identificacion_numero_hash: sha256(identificacion_numero),
+    tipo_identificacion,
     ...overrides,
   });
 }

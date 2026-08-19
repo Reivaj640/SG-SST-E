@@ -31,6 +31,43 @@ const MAX_PDF_SIZE = 10 * 1024 * 1024; // 10 MB
 const PDF_MAGIC = Buffer.from('%PDF-');
 
 /**
+ * Tipos válidos de documento que se firma (categoría legal/administrativa).
+ *
+ * Es la categoría del DOCUMENTO QUE SE FIRMA, NO del documento de
+ * identificación del firmante (eso es `identificacion_tipo`: CC, CE, TI, etc.).
+ *
+ * Decisión D-1 (aprobada): la palabra `tipo_documento` se reemplaza por
+ * `tipo_identificacion` en todo el código y esquema. La columna
+ * `gh_firmas_electronicas.tipo_identificacion` (migration 007) usa estos
+ * valores.
+ *
+ * Validación:
+ *   - zod schema (src/schemas/index.js) lo usa como enum en la frontera HTTP.
+ *   - Este service re-valida en create() para defenderse de bypass (e.g. tests
+ *     que llaman signRequestService.create() directamente, o un futuro caller
+ *     interno que no pase por HTTP).
+ *   - BD NO tiene CHECK ni dominio (consistente con agreement_version,
+ *     consent_id, id_constancia).
+ *
+ * Sub-tipo (D-2): string libre en `metadata.subtipo_identificacion` (e.g.
+ * 'autorizacion_datos', 'contrato_fijo'). NO se valida acá.
+ *
+ * @type {readonly ['CONTRATO', 'OTROSI', 'ACTA', 'CONSENTIMIENTO', 'AUTORIZACION', 'REGLAMENTO', 'POLITICA', 'CERTIFICADO', 'FORMATO', 'OTRO']}
+ */
+const TIPOS_IDENTIFICACION = Object.freeze([
+  'CONTRATO',
+  'OTROSI',
+  'ACTA',
+  'CONSENTIMIENTO',
+  'AUTORIZACION',
+  'REGLAMENTO',
+  'POLITICA',
+  'CERTIFICADO',
+  'FORMATO',
+  'OTRO',
+]);
+
+/**
  * Crea una nueva solicitud de firma.
  *
  * @param {object} opts
@@ -47,6 +84,12 @@ const PDF_MAGIC = Buffer.from('%PDF-');
  * @param {string} [opts.ip]
  * @param {string} [opts.user_agent]
  * @param {string} [opts.metadata] - JSON string
+ * @param {string} [opts.tipo_identificacion] - Categoría del documento que
+ *        se firma (CONTRATO, OTROSI, ACTA, etc.). DISTINTO de
+ *        `identificacion_tipo` (CC, CE, TI, PPT, PA) que es el tipo de
+ *        documento de identificación del firmante. Ver TIPOS_IDENTIFICACION.
+ *        Opcional en v1: si no se envía, queda NULL (sign requests legacy
+ *        pre-migration 007).
  * @param {number} [opts.consent_id] - id de gh_consentimientos_firma (Bloque E6).
  *        Se persiste en la fila; la validación contra manifestacion_aceptada
  *        y (id_trabajador, id_empresa, agreement_version) se hace en
@@ -59,6 +102,7 @@ function create({
   version_kair, ip, user_agent, metadata,
   identificacion_tipo, identificacion_numero_hash,
   identificacion_numero_sal,  // P1-2: opcional, server genera si falta
+  tipo_identificacion,  // I-002: categoría del doc que se firma (CONTRATO, OTROSI, etc.)
   consent_id,
 }) {
   // Validar PDF
@@ -90,6 +134,15 @@ function create({
   // Esta validación se hace ANTES de generar token/ID para no consumir IDs
   // en solicitudes inválidas.
   validateAcuerdo(agreement_version, agreement_hash);
+
+  // Validar tipo_identificacion si se proporciona (I-002).
+  // Defensa contra bypass de zod (e.g. tests que llaman create() directo).
+  // Si no se proporciona, queda NULL (sign requests legacy pre-007 son válidos).
+  if (tipo_identificacion != null && !TIPOS_IDENTIFICACION.includes(tipo_identificacion)) {
+    throw new AppError(400, 'INVALID_REQUEST_BODY',
+      `tipo_identificacion debe ser uno de: ${TIPOS_IDENTIFICACION.join(', ')}`,
+      { provided: tipo_identificacion });
+  }
 
   // Generar token y IDs
   const token = generateToken();
@@ -129,8 +182,9 @@ function create({
          identificacion_numero_sal,  -- P1-2
          fecha_creacion, fecha_expiracion, version_kair,
          ip_origen, user_agent, pdf_original_path, metadata,
-         verification_channel, consent_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         verification_channel, consent_id,
+         tipo_identificacion)  -- I-002 (migration 007)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id_solicitud, id_documento, id_trabajador, id_empresa,
       tipo_firma, calculated_hash, agreement_hash, agreement_version,
@@ -139,6 +193,7 @@ function create({
       now.toISOString(), fecha_expiracion, version_kair,
       ip || null, user_agent || null, pdf_original_path, metadata || null, 'email',
       consent_id || null,
+      tipo_identificacion || null,  // I-002
     );
     const firmaId = result.lastInsertRowid;
 
@@ -160,6 +215,7 @@ function create({
         id_documento, tipo_firma, ttl_horas, document_hash: calculated_hash,
         agreement_version,
         consent_id: consent_id || null,
+        tipo_identificacion: tipo_identificacion || null,  // I-002
       }),
     );
 
@@ -285,7 +341,8 @@ function getById(id) {
            fecha_revocacion, motivo_revocacion, motivo_rechazo,
            version_kair, manifestacion_voluntad_texto,
            manifestacion_voluntad_hash, pdf_original_path, pdf_firmado_path,
-           constancia_path, metadata, consent_id
+           constancia_path, metadata, consent_id,
+           tipo_identificacion  -- I-002 (migration 007)
     FROM gh_firmas_electronicas
     WHERE id = ?
     LIMIT 1
@@ -399,4 +456,5 @@ module.exports = {
   list,
   registerEvent,
   MAX_PDF_SIZE,
+  TIPOS_IDENTIFICACION,  // I-002: single source of truth (zod + service)
 };
