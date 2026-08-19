@@ -286,3 +286,160 @@ function countPdfsEnOriginalesSafe() {
     return 0;
   }
 }
+
+// =====================================================================
+// I-002: tipo_identificacion (categoría del doc que se firma)
+// =====================================================================
+//
+// D-1 (aprobada): `tipo_documento` se reemplaza por `tipo_identificacion`.
+// La columna `gh_firmas_electronicas.tipo_identificacion` (migration 007)
+// almacena la categoría legal/administrativa del documento QUE SE FIRMA
+// (CONTRATO, OTROSI, ACTA, etc.) — DISTINTA de `identificacion_tipo`
+// (CC, CE, TI, PPT, PA) que es el tipo de documento de IDENTIFICACIÓN
+// del firmante.
+//
+// Single source of truth: TIPOS_IDENTIFICACION exportado desde
+// services/signRequest.js. El zod schema (src/schemas/index.js) lo usa
+// como enum en la frontera HTTP. El service re-valida en create() para
+// defenderse de bypass (e.g. tests que llaman create() directo).
+
+const { TIPOS_IDENTIFICACION } = require('../../src/services/signRequest');
+
+test('I-002: tipo_identificacion se persiste en BD cuando se pasa', () => {
+  resetDb();
+  const acuerdo = seedActiveAgreement();
+  const opts = buildOpts(acuerdo, {
+    id_documento: 'doc-tipo-001',
+    tipo_identificacion: 'CONTRATO',
+  });
+
+  const result = signRequestService.create(opts);
+
+  // 1. El campo está en el signRequest retornado
+  assert.equal(result.signRequest.tipo_identificacion, 'CONTRATO',
+    'signRequest.tipo_identificacion debe ser CONTRATO');
+
+  // 2. La fila en BD tiene la columna poblada
+  const fila = db.prepare(
+    'SELECT tipo_identificacion FROM gh_firmas_electronicas WHERE id_solicitud = ?'
+  ).get(result.signRequest.id_solicitud);
+  assert.equal(fila.tipo_identificacion, 'CONTRATO',
+    'la fila en BD debe tener tipo_identificacion = CONTRATO');
+});
+
+test('I-002: tipo_identificacion es NULL cuando no se pasa (backward compat legacy)', () => {
+  resetDb();
+  const acuerdo = seedActiveAgreement();
+  const opts = buildOpts(acuerdo, { id_documento: 'doc-tipo-002' });
+  // No pasamos tipo_identificacion (omisión deliberada, no = null explícito)
+
+  const result = signRequestService.create(opts);
+
+  // 1. getById retorna null
+  assert.equal(result.signRequest.tipo_identificacion, null,
+    'signRequest.tipo_identificacion debe ser null cuando no se pasa');
+
+  // 2. La fila en BD tiene null
+  const fila = db.prepare(
+    'SELECT tipo_identificacion FROM gh_firmas_electronicas WHERE id_solicitud = ?'
+  ).get(result.signRequest.id_solicitud);
+  assert.equal(fila.tipo_identificacion, null,
+    'la fila en BD debe tener tipo_identificacion NULL (compat legacy pre-007)');
+});
+
+test('I-002: tipo_identificacion inválido lanza AppError 400 INVALID_REQUEST_BODY', () => {
+  resetDb();
+  const acuerdo = seedActiveAgreement();
+  const opts = buildOpts(acuerdo, {
+    id_documento: 'doc-tipo-003',
+    tipo_identificacion: 'NO_ES_VALIDO',  // no está en TIPOS_IDENTIFICACION
+  });
+
+  let thrown = null;
+  try {
+    signRequestService.create(opts);
+  } catch (e) {
+    thrown = e;
+  }
+
+  assert.ok(thrown, 'Debe lanzar error');
+  assert.equal(thrown.statusCode, 400, 'status debe ser 400');
+  assert.equal(thrown.code, 'INVALID_REQUEST_BODY', 'código debe ser INVALID_REQUEST_BODY');
+  assert.match(thrown.message, /tipo_identificacion/);
+
+  // No debe haber fila en BD
+  const fila = db.prepare(
+    "SELECT * FROM gh_firmas_electronicas WHERE id_documento = 'doc-tipo-003'"
+  ).get();
+  assert.equal(fila, undefined, 'No debe haber fila en BD');
+});
+
+test('I-002: tipo_identificacion se incluye en evento CREATED metadata', () => {
+  resetDb();
+  const acuerdo = seedActiveAgreement();
+  const opts = buildOpts(acuerdo, {
+    id_documento: 'doc-tipo-004',
+    tipo_identificacion: 'OTROSI',
+  });
+
+  const result = signRequestService.create(opts);
+
+  const evento = db.prepare(`
+    SELECT metadata FROM gh_firma_eventos
+    WHERE firma_id = ? AND evento = 'CREATED'
+  `).get(result.signRequest.id);
+
+  const meta = JSON.parse(evento.metadata);
+  assert.equal(meta.tipo_identificacion, 'OTROSI',
+    'evento CREATED debe incluir tipo_identificacion en metadata');
+});
+
+test('I-002: getById retorna tipo_identificacion', () => {
+  resetDb();
+  const acuerdo = seedActiveAgreement();
+  const opts = buildOpts(acuerdo, {
+    id_documento: 'doc-tipo-005',
+    tipo_identificacion: 'POLITICA',
+  });
+
+  const result = signRequestService.create(opts);
+  const fetched = signRequestService.getById(result.signRequest.id);
+
+  assert.equal(fetched.tipo_identificacion, 'POLITICA',
+    'getById debe retornar tipo_identificacion en el resultado');
+});
+
+test('I-002: cada valor del enum TIPOS_IDENTIFICACION se acepta', () => {
+  resetDb();
+  const acuerdo = seedActiveAgreement();
+
+  for (const tipo of TIPOS_IDENTIFICACION) {
+    const opts = buildOpts(acuerdo, {
+      id_documento: `doc-tipo-${tipo}`,
+      tipo_identificacion: tipo,
+    });
+
+    const result = signRequestService.create(opts);
+    assert.equal(result.signRequest.tipo_identificacion, tipo,
+      `tipo_identificacion = ${tipo} debe persistirse correctamente`);
+  }
+
+  // 10 sign requests creados
+  const total = db.prepare('SELECT COUNT(*) AS n FROM gh_firmas_electronicas').get().n;
+  assert.equal(total, TIPOS_IDENTIFICACION.length,
+    `deben existir ${TIPOS_IDENTIFICACION.length} sign requests (uno por enum value)`);
+});
+
+test('I-002: TIPOS_IDENTIFICACION exportado contiene los 10 valores esperados', () => {
+  const expected = [
+    'CONTRATO', 'OTROSI', 'ACTA', 'CONSENTIMIENTO', 'AUTORIZACION',
+    'REGLAMENTO', 'POLITICA', 'CERTIFICADO', 'FORMATO', 'OTRO',
+  ];
+  assert.deepEqual([...TIPOS_IDENTIFICACION], expected,
+    'TIPOS_IDENTIFICACION debe tener exactamente los 10 valores aprobados en D-1');
+  assert.equal(TIPOS_IDENTIFICACION.length, 10,
+    'TIPOS_IDENTIFICACION debe tener 10 elementos (no más, no menos)');
+  // Verificar que está frozen (inmutable)
+  assert.ok(Object.isFrozen(TIPOS_IDENTIFICACION),
+    'TIPOS_IDENTIFICACION debe estar Object.freeze() para evitar mutación accidental');
+});

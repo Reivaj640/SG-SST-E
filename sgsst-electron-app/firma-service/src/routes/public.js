@@ -31,7 +31,11 @@ const { z } = require('zod');
 const MINI_APP_HTML = path.resolve(__dirname, '..', '..', 'web', 'firma', 'index.html');
 
 const identifyBody = z.object({
-  tipo_documento: z.enum(['CC', 'CE', 'TI', 'PPT', 'PA']),
+  // D-1 (I-002): rename tipo_documento → tipo_identificacion.
+  // Es el tipo de documento de IDENTIFICACIÓN del firmante (CC, CE, TI,
+  // PPT, PA). NO se debe confundir con el campo del sign request
+  // `tipo_identificacion` (categoría del doc que se firma: CONTRATO, etc.).
+  tipo_identificacion: z.enum(['CC', 'CE', 'TI', 'PPT', 'PA']),
   numero_documento: z.string().min(4).max(20).regex(/^\d+$/, 'Solo dígitos'),
 });
 
@@ -92,7 +96,13 @@ router.get('/s/:token', (req, res, next) => {
       tipo_firma: signRequest.tipo_firma,
       estado: estado,
       fecha_expiracion: signRequest.fecha_expiracion,
+      // Tipo de documento de IDENTIFICACIÓN del firmante (CC, CE, TI, PPT, PA).
+      // Es lo que la mini-app muestra/usa para la pantalla de identify.
       identificacion_tipo: signRequest.identificacion_tipo,
+      // I-002: categoría del documento QUE SE FIRMA (CONTRATO, OTROSI, ACTA, etc.).
+      // La mini-app lo muestra como contexto ("Estás firmando un CONTRATO").
+      // Puede ser null para sign requests legacy pre-migration 007.
+      tipo_identificacion: signRequest.tipo_identificacion,
     });
   } catch (err) {
     next(err);
@@ -107,7 +117,7 @@ router.post('/api/sign/:token/identify', validateBody(identifyBody), async (req,
   try {
     const result = await publicFlow.identify(
       req.params.token,
-      req.body.tipo_documento,
+      req.body.tipo_identificacion,  // D-1 (I-002): antes tipo_documento
       req.body.numero_documento,
       req.ip,
       req.get('User-Agent'),

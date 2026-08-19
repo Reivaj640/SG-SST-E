@@ -185,13 +185,16 @@ function registerOpenedIfFirst(signRequest, ip, user_agent) {
  * y envía por correo.
  *
  * @param {string} token
- * @param {string} tipo_documento
+ * @param {string} tipo_identificacion - Tipo de documento de IDENTIFICACIÓN
+ *        del firmante (CC, CE, TI, PPT, PA). D-1 (I-002): antes `tipo_documento`.
+ *        NO confundir con el campo del sign request `tipo_identificacion`
+ *        (categoría del doc que se firma: CONTRATO, etc.).
  * @param {string} numero_documento
  * @param {string} ip
  * @param {string} user_agent
  * @returns {Promise<{ok: true, estado, otp_ttl_seconds, correo_destino_enmascarado, devOtp?}>}
  */
-async function identify(token, tipo_documento, numero_documento, ip, user_agent) {
+async function identify(token, tipo_identificacion, numero_documento, ip, user_agent) {
   // 1. Resolver token
   const { signRequest } = resolveToken(token);
 
@@ -209,11 +212,11 @@ async function identify(token, tipo_documento, numero_documento, ip, user_agent)
       'La solicitud no tiene datos de identificación del trabajador');
   }
 
-  // 4. Validar tipo de documento
-  if (signRequest.identificacion_tipo !== tipo_documento) {
+  // 4. Validar tipo de documento de identificación del firmante
+  if (signRequest.identificacion_tipo !== tipo_identificacion) {
     throw new AppError(422, 'IDENTIFICATION_FAILED',
       'El tipo de documento no coincide',
-      { expected: signRequest.identificacion_tipo, provided: tipo_documento });
+      { expected: signRequest.identificacion_tipo, provided: tipo_identificacion });
   }
 
   // 5. Calcular hash de la cédula con sal (P1-2).
@@ -240,7 +243,7 @@ async function identify(token, tipo_documento, numero_documento, ip, user_agent)
       WHERE id = ?
     `).run(signRequest.id);
     signRequestService.registerEvent(signRequest.id, 'IDENTIFICATION_FAILED',
-      { tipo_documento }, 'trabajador', ip, user_agent);
+      { tipo_identificacion }, 'trabajador', ip, user_agent);
 
     throw new AppError(422, 'IDENTIFICATION_FAILED',
       'La identificación no coincide con nuestros registros');
@@ -272,7 +275,7 @@ async function identify(token, tipo_documento, numero_documento, ip, user_agent)
       WHERE id = ?
     `).run(ip || null, user_agent || null, otp_hash, otp_sal, now_iso, signRequest.id);
     signRequestService.registerEvent(signRequest.id, 'IDENTIFICATION_COMPLETED',
-      { tipo_documento }, 'trabajador', ip, user_agent);
+      { tipo_identificacion }, 'trabajador', ip, user_agent);
     signRequestService.registerEvent(signRequest.id, 'OTP_SENT',
       { canal: 'email' }, 'sistema', ip, user_agent);
   });
@@ -294,7 +297,7 @@ async function identify(token, tipo_documento, numero_documento, ip, user_agent)
 
   logger.info('Identificación exitosa, OTP enviado', {
     id_solicitud: signRequest.id_solicitud,
-    tipo_documento,
+    tipo_identificacion,
   });
 
   // 11. Respuesta pública

@@ -443,7 +443,7 @@ test('GET /eventos: filtra identificacion_numero_hash → [REDACTED]', async () 
   insertCustomEvent(sr.id, 'IDENTIF_LEAK_TEST', {
     identificacion_numero: '1234567890',
     identificacion_numero_hash: 'a'.repeat(64),
-    tipo_documento: 'CC',
+    tipo_identificacion: 'CC',
   });
   const app = makeApp();
 
@@ -453,7 +453,7 @@ test('GET /eventos: filtra identificacion_numero_hash → [REDACTED]', async () 
   const ev = res.body.eventos.find(e => e.tipo_evento === 'IDENTIF_LEAK_TEST');
   assert.equal(ev.metadata.identificacion_numero, '[REDACTED]');
   assert.equal(ev.metadata.identificacion_numero_hash, '[REDACTED]');
-  assert.equal(ev.metadata.tipo_documento, 'CC');
+  assert.equal(ev.metadata.tipo_identificacion, 'CC');
 });
 
 test('GET /eventos: filtra firma_visual_png → [REDACTED]', async () => {

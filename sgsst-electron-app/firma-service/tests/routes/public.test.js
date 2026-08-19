@@ -157,7 +157,7 @@ test('POST /api/sign/:token/identify: cédula correcta → 200 + OTP_SENT', asyn
   const app = makeApp();
   const res = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' });
 
   assert.equal(res.status, 200);
   assert.equal(res.body.estado, 'OTP_SENT');
@@ -179,7 +179,7 @@ test('POST /api/sign/:token/identify: cédula incorrecta → 422', async () => {
   const app = makeApp();
   const res = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_documento: 'CC', numero_documento: '9999999999' });
+    .send({ tipo_identificacion: 'CC', numero_documento: '9999999999' });
 
   assert.equal(res.status, 422);
   assert.equal(res.body.error.code, 'IDENTIFICATION_FAILED');
@@ -191,7 +191,7 @@ test('POST /api/sign/:token/identify: tipo de doc incorrecto → 422', async () 
   const app = makeApp();
   const res = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_documento: 'CE', numero_documento: '1234567890' });
+    .send({ tipo_identificacion: 'CE', numero_documento: '1234567890' });
 
   assert.equal(res.status, 422);
   assert.equal(res.body.error.code, 'IDENTIFICATION_FAILED');
@@ -203,7 +203,7 @@ test('POST /api/sign/:token/identify: token inválido → 404', async () => {
   const app = makeApp();
   const res = await request(app)
     .post('/api/sign/token_invalido_xxxxxxxxxxxxxx/identify')
-    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' });
   assert.equal(res.status, 404);
 });
 
@@ -213,7 +213,7 @@ test('POST /api/sign/:token/identify: body inválido → 400', async () => {
   const app = makeApp();
   const res = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_documento: 'INVALID', numero_documento: '123' });
+    .send({ tipo_identificacion: 'INVALID', numero_documento: '123' });
   assert.equal(res.status, 400);
   assert.equal(res.body.error.code, 'INVALID_REQUEST_BODY');
 });
@@ -226,7 +226,7 @@ test('POST /api/sign/:token/identify: registra eventos IDENTIFICATION_COMPLETED 
   const app = makeApp();
   await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' });
 
   const eventos = db.prepare(`
     SELECT evento FROM gh_firma_eventos
@@ -248,7 +248,7 @@ test('POST /api/sign/:token/verify-otp: OTP correcto → 200', async () => {
   const app = makeApp();
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' });
   const otp = r1.body.devOtp;
 
   const r2 = await request(app)
@@ -266,7 +266,7 @@ test('POST /api/sign/:token/verify-otp: OTP incorrecto → 422 + attempts', asyn
   const app = makeApp();
   await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' });
 
   const r = await request(app)
     .post(`/api/sign/${token}/verify-otp`)
@@ -284,7 +284,7 @@ test('POST /api/sign/:token/verify-otp: 5 intentos → OTP_LOCKED', async () => 
   const app = makeApp();
   await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' });
 
   for (let i = 0; i < 5; i++) {
     const r = await request(app)
@@ -313,7 +313,7 @@ test('POST /api/sign/:token/verify-otp: formato inválido → 400', async () => 
   const app = makeApp();
   await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' });
 
   const r = await request(app)
     .post(`/api/sign/${token}/verify-otp`)
@@ -355,7 +355,7 @@ test('POST /view-document: scroll al final → 200 DOCUMENT_VIEWED', async () =>
   // identify + verify-otp
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' });
   await request(app)
     .post(`/api/sign/${token}/verify-otp`)
     .send({ otp: r1.body.devOtp });
@@ -376,7 +376,7 @@ test('POST /view-document: sin scroll_al_final → 422', async () => {
   const app = makeApp();
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' });
   await request(app)
     .post(`/api/sign/${token}/verify-otp`)
     .send({ otp: r1.body.devOtp });
@@ -404,7 +404,7 @@ test('POST /view-document: registra evento DOCUMENT_VIEWED', async () => {
   const app = makeApp();
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' });
   await request(app)
     .post(`/api/sign/${token}/verify-otp`)
     .send({ otp: r1.body.devOtp });
@@ -429,7 +429,7 @@ test('GET /document.pdf: con OTP verificado → 200 con PDF', async () => {
   const app = makeApp();
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' });
   await request(app)
     .post(`/api/sign/${token}/verify-otp`)
     .send({ otp: r1.body.devOtp });
@@ -470,7 +470,7 @@ test('POST /commit: firma válida → 200 SIGNED + evidencia', async () => {
   // identify + verify-otp + view-document
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' });
   await request(app)
     .post(`/api/sign/${token}/verify-otp`)
     .send({ otp: r1.body.devOtp });
@@ -523,7 +523,7 @@ test('POST /commit: sin manifestacion_aceptada → 400', async () => {
   const app = makeApp();
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' });
   await request(app)
     .post(`/api/sign/${token}/verify-otp`)
     .send({ otp: r1.body.devOtp });
@@ -551,7 +551,7 @@ test('POST /commit: sin view-document → 409', async () => {
   const app = makeApp();
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' });
   await request(app)
     .post(`/api/sign/${token}/verify-otp`)
     .send({ otp: r1.body.devOtp });
@@ -576,7 +576,7 @@ test('POST /commit: registra eventos MANIFESTATION_RECORDED, SIGN_COMMITTED, PDF
   const app = makeApp();
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' });
   await request(app)
     .post(`/api/sign/${token}/verify-otp`)
     .send({ otp: r1.body.devOtp });
@@ -610,7 +610,7 @@ test('POST /commit: evidence_hash verificable (canonicalJSON)', async () => {
   const app = makeApp();
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' });
   await request(app)
     .post(`/api/sign/${token}/verify-otp`)
     .send({ otp: r1.body.devOtp });
@@ -675,7 +675,7 @@ test('POST /commit: manifestacion_voluntad_hash se persiste (D1 fix)', async () 
   const app = makeApp();
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' });
   await request(app)
     .post(`/api/sign/${token}/verify-otp`)
     .send({ otp: r1.body.devOtp });
@@ -713,7 +713,7 @@ test('POST /view-document: Acuerdo desactivado → 409 AGREEMENT_VERSION_NO_LONG
   // identify + verify-otp (para llegar a view-document)
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' });
   await request(app)
     .post(`/api/sign/${token}/verify-otp`)
     .send({ otp: r1.body.devOtp });
@@ -739,7 +739,7 @@ test('POST /commit: Acuerdo desactivado → 409 AGREEMENT_VERSION_NO_LONGER_ACTI
   const app = makeApp();
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' });
   await request(app)
     .post(`/api/sign/${token}/verify-otp`)
     .send({ otp: r1.body.devOtp });
@@ -769,7 +769,7 @@ test('POST /commit: sign request legacy (agreement_version=NULL) pasa el helper 
   const app = makeApp();
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' });
   await request(app)
     .post(`/api/sign/${token}/verify-otp`)
     .send({ otp: r1.body.devOtp });
@@ -795,7 +795,7 @@ test('POST /reject: rechazo válido → 200 REJECTED', async () => {
   const app = makeApp();
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' });
   await request(app)
     .post(`/api/sign/${token}/verify-otp`)
     .send({ otp: r1.body.devOtp });
@@ -835,7 +835,7 @@ test('POST /reject: después de firmado → 409', async () => {
   const app = makeApp();
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)
-    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+    .send({ tipo_identificacion: 'CC', numero_documento: '1234567890' });
   await request(app)
     .post(`/api/sign/${token}/verify-otp`)
     .send({ otp: r1.body.devOtp });
