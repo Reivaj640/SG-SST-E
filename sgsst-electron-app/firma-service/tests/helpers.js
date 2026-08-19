@@ -44,7 +44,14 @@ const TABLES = [
   'gh_firma_eventos',
   'gh_firma_sesiones',
   'gh_firmas_electronicas',
-  'gh_firma_schema_migrations',
+  // NO incluir gh_firma_schema_migrations:
+  //   - Es metadata del schema (qué migraciones se aplicaron), NO data de test.
+  //   - Si resetDb() la limpia, el siguiente proceso ve la tabla vacía y
+  //     migrate() intenta reaplicar TODAS las migraciones, incluyendo 005
+  //     (12-step) que NO es idempotente → falla con "46 cols vs 47 vals".
+  //   - El pretest (scripts/migrate-test.js) regenera la BD desde cero
+  //     al inicio de `npm test`, así que el estado del schema se establece
+  //     una sola vez y se preserva durante toda la suite.
 ];
 
 function resetDb() {

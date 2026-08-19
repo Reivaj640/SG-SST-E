@@ -28,6 +28,7 @@ const assert = require('node:assert/strict');
 const crypto = require('crypto');
 const request = require('supertest');
 const { sha256 } = require('../../src/crypto/hash');
+const config = require('../../src/config');
 const db = require('../../src/db/connection');
 const {
   resetDb, seedActiveAgreement, makeApp, TEST_API_KEY,
@@ -96,7 +97,9 @@ test('POST /internal/sign-requests: PDF válido → 201 + token + url', async ()
   assert.equal(res.body.agreement_hash, meta.agreement_hash);
   assert.ok(res.body.token);
   assert.equal(res.body.token.length, 32);
-  assert.equal(res.body.url_publica, `http://localhost:3001/s/${res.body.token}`);
+  // Validar contra config.publicUrl (no hardcoded) para que el test sea
+  // robusto a diferentes entornos (3001, 3737, prod, etc.).
+  assert.equal(res.body.url_publica, `${config.publicUrl}/s/${res.body.token}`);
   assert.equal(res.body.qr_payload, res.body.url_publica);
   assert.ok(res.body.fecha_creacion);
   assert.ok(res.body.fecha_expiracion);

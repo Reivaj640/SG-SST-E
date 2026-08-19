@@ -31,7 +31,7 @@ const { PDFDocument } = require('pdf-lib');
 const db = require('../../src/db/connection');
 const {
   resetDb, seedActiveAgreement, makeApp,
-  withApiKey, createSignRequestWithIdentificacion, createAcceptedConsent,
+  createSignRequestWithIdentificacion, createAcceptedConsent,
   TEST_API_KEY,
 } = require('../helpers');
 const { sha256 } = require('../../src/crypto/hash');
