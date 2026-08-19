@@ -132,20 +132,41 @@ function validateAgreementStillActive(signRequest) {
 /**
  * Registra el evento OPENED si es la primera vez que se carga el token.
  *
- * No transiciona de estado a menos que sea el primer OPENED.
+ * Bloque E8.1 (fix bug): antes solo seteaba `fecha_apertura` pero NO
+ * transicionaba `estado` a 'OPENED', dejando al sign request en 'PENDING'
+ * después del primer acceso. Esto causaba:
+ *   - El estado 'OPENED' del CHECK era inalcanzable (quedaba zombie).
+ *   - identify() veía `estado === 'PENDING'` (no 'OPENED') y operaba
+ *     en un estado "pre-apertura" engañoso.
+ *
+ * Fix: el primer UPDATE ahora setea `estado = 'OPENED'` Y
+ * `fecha_apertura` simultáneamente, con un WHERE `estado = 'PENDING'`
+ * para evitar race con `identify()` (que cambia estado a IDENTIFIED).
+ * Si `updateResult.changes !== 1`, significa que otro proceso (ej. un
+ * identify concurrente en otra tab) ya transicionó, así que NO
+ * registramos OPENED — la concurrencia es segura.
+ *
+ * Si el sign request ya tenía `fecha_apertura`, es un segundo acceso
+ * (recarga del HTML / nuevo GET /s/:token) → no hacemos nada.
  */
 function registerOpenedIfFirst(signRequest, ip, user_agent) {
   if (signRequest.fecha_apertura) {
     return; // ya estaba abierto
   }
   const tx = db.transaction(() => {
-    db.prepare(`
+    const updateResult = db.prepare(`
       UPDATE gh_firmas_electronicas
-      SET fecha_apertura = ?
-      WHERE id = ?
+      SET estado = 'OPENED',
+          fecha_apertura = ?
+      WHERE id = ? AND estado = 'PENDING'
     `).run(new Date().toISOString(), signRequest.id);
-    signRequestService.registerEvent(signRequest.id, 'OPENED',
-      { token_prefix: signRequest.id_solicitud }, 'trabajador', ip, user_agent);
+    // Si changes !== 1, otro proceso ya transicionó (ej. identify() en
+    // otra tab). No es un error — solo significa que OPENED fue "ganado"
+    // por la otra transición. NO registramos evento OPENED duplicado.
+    if (updateResult.changes === 1) {
+      signRequestService.registerEvent(signRequest.id, 'OPENED',
+        { token_prefix: signRequest.id_solicitud }, 'trabajador', ip, user_agent);
+    }
   });
   tx();
 }
