@@ -9,10 +9,10 @@
 
 | # | Tema | Estado |
 |---|------|--------|
-| C-1 | Índices `tipo_documento` (1 vs 2) | ✅ Aceptado (2 índices) |
+| C-1 | Índices `tipo_identificacion` (1 vs 2, originalmente `tipo_documento`, renombrado por D-1) | ✅ Aceptado (2 índices) |
 | C-2 | Rename `tipo_documento` → `tipo_identificacion` | 🟡 Pendiente (D-1) |
 | C-3 | `subtipo_documento` en `metadata` libre | 🟡 Pendiente (D-2) |
-| C-4 | `evidence_hash` con `tipo_documento` | ✅ Aceptado |
+| C-4 | `evidence_hash` con `tipo_identificacion` (originalmente `tipo_documento`, renombrado por D-1) | ✅ Aceptado |
 | C-5 | Storage paths planos | ✅ Aceptado |
 | C-6 | Contrato completo de webhook (8 piezas) | 🟡 Pendiente (D-11) |
 | C-7 | "Electron puede recibir HTTP" cierra alcanzabilidad segura | 🟡 **REABIERTA** |
@@ -25,7 +25,7 @@
 | C-14 | `id_constancia` en `SignRequestDetail` | ✅ Aceptado |
 | C-15 | Reconciliación batch `?ids=` | ✅ Aceptado |
 | C-16 | Multi-tenant rate limit por `id_empresa` | ✅ NO en v1 (v2) |
-| C-17 | Rate limit awareness de `tipo_documento` | ✅ NO diferenciar |
+| C-17 | Rate limit awareness de `tipo_identificacion` (originalmente `tipo_documento`, renombrado por D-1) | ✅ NO diferenciar |
 | C-18 | API key estática suficiente | 🟡 Sub-divida (D-13) |
 | C-19 | `version_kair` en payload webhook (multi-instancia) | 🟡 Pendiente (D-6) |
 | C-20 | I-008 batch sin rate limit | 🟡 **CORREGIDO v5**: 4 capas, `id_empresa` autoritativo |
@@ -140,7 +140,7 @@
 
 | Tarea | Migración v3 | Migración v4 |
 |-------|--------------|--------------|
-| I-001: tipo_documento | 007 | 007 (sin cambio) |
+| I-001: tipo_identificacion | 007_tipo_identificacion | 007 (renombrado de `007_tipo_documento` por D-1) |
 | I-003: gh_idempotency_keys | 008 | 008 (sin cambio) |
 | **I-010: gh_internal_clients** | **010** | **009** (renumerada) |
 | **I-201: gh_webhook_deliveries** | **009** | **010** (renumerada) |

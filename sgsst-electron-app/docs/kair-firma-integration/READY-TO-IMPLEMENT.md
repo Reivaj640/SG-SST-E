@@ -43,17 +43,17 @@
 14. I-011 (paso 14, paralelo)
 
 **Numeración de migraciones v4**:
-- Migration 007: tipo_documento (I-001)
+- Migration 007: tipo_identificacion (I-001)
 - Migration 008: gh_idempotency_keys (I-003)
 - **Migration 009: gh_internal_clients (I-010)**
 - Migration 010: gh_webhook_deliveries (Fase 2 I-201)
 
 ---
 
-### I-001: Migration 007 — `tipo_documento` columna + índices
+### I-001: Migration 007 — `tipo_identificacion` columna + índices (renombrado de `tipo_documento` por D-1)
 - Sin cambios v4. Tests prueban el registry (C-21).
 
-### I-002: zod schema + service aceptan `tipo_documento`
+### I-002: zod schema + service aceptan `tipo_identificacion`
 - Sin cambios.
 
 ### I-003: Migration 008 — `gh_idempotency_keys`
