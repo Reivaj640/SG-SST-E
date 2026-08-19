@@ -153,7 +153,8 @@ async function create({
 
   logger.info('Consentimiento creado, OTP enviado', {
     consent_id: consentId,
-    id_trabajador,
+    // P1-5: NO loguear id_trabajador (PII: cédula).
+    // Quedamos con consent_id + version_acuerdo para correlación.
     version_acuerdo,
   });
 
