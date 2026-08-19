@@ -656,7 +656,9 @@ function reject(token, motivo, ip, user_agent) {
 
   logger.info('Documento rechazado', {
     id_solicitud: signRequest.id_solicitud,
-    motivo: motivo || '(sin motivo)',
+    // P1-5: NO loguear motivo completo (texto libre del trabajador, PII).
+    // Solo logueamos la longitud para análisis sin exponer contenido.
+    motivo_length: motivo ? motivo.length : 0,
   });
 
   return {

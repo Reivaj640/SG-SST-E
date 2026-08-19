@@ -179,7 +179,7 @@ function create({
 
   logger.info('SignRequest creado', {
     id_solicitud,
-    id_trabajador,
+    // P1-5: NO loguear id_trabajador (PII: cédula).
     tipo_firma,
     ttl_horas,
     agreement_version,
