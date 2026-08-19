@@ -5,8 +5,9 @@
  * - GET  /internal/sign-requests/:id  (consulta por id_solicitud o id interno)
  * - GET  /internal/sign-requests  (lista con filtros)
  *
- * Auth (I-010, D-13): los 3 endpoints usan `requireEmpresaScope` para
- * scope per-empresa. El middleware hace authn (API key) + authz (per-empresa).
+ * Auth (I-010, D-13, I-008): los 3 endpoints usan `requireEmpresaScopeAndLimit`
+ * para scope per-empresa + rate limit interno (4 capas, I-008 / C-20 v5).
+ * El middleware hace authn (API key) + authz (per-empresa) + rate limit.
  * Reemplaza al antiguo `internalApiAuth` en estos 3 endpoints.
  *
  * Ver API.md §6.1, §6.2, §6.8 y docs/kair-firma-integration/I-010-design.md.
@@ -15,7 +16,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { requireEmpresaScope } = require('../middleware/authz');
+const { requireEmpresaScopeAndLimit } = require('../middleware/authz');
 const { uploadPdf } = require('../middleware/upload');
 const { signRequestBody, signRequestListQuery } = require('../schemas');
 const signRequestService = require('../services/signRequest');
@@ -31,11 +32,12 @@ const logger = require('../utils/logger');
  *   - metadata: JSON string con id_documento, id_trabajador, etc.
  */
 router.post('/sign-requests',
-  requireEmpresaScope({
+  requireEmpresaScopeAndLimit({
     allowedOperations: ['sign_request:create'],
     // checkIdEmpresa NO se puede usar acá: el body es multipart y multer
     // lo parsea DESPUÉS de este middleware. El handler hace el check
     // post-parse (ver bloque "I-010 check body id_empresa" más abajo).
+    rateLimit: { tier: 'standard' },
   }),
   uploadPdf(),
   (req, res, next) => {
@@ -67,7 +69,7 @@ router.post('/sign-requests',
     }
 
     // I-010 (D-13): per-company authz post-parse del body multipart.
-    // El middleware requireEmpresaScope corrió ANTES de multer, así que
+    // El middleware requireEmpresaScopeAndLimit corrió ANTES de multer, así que
     // no pudo checkar body.id_empresa. Lo hacemos acá, ya con metaObj.
     // En client mode + meta.id_empresa !== req.id_empresa → 403 EMPRESA_MISMATCH.
     // En legacy mode (deprecation), se permite cualquier id_empresa.
@@ -154,8 +156,9 @@ router.post('/sign-requests',
  * Consulta por id_solicitud (SIGN-YYYY-NNNNNN) o por id interno numérico.
  */
 router.get('/sign-requests/:id',
-  requireEmpresaScope({
+  requireEmpresaScopeAndLimit({
     allowedOperations: ['sign_request:read'],
+    rateLimit: { tier: 'standard' },
   }),
   (req, res, next) => {
     try {
@@ -234,8 +237,9 @@ router.get('/sign-requests/:id',
  *    para mantener compatibilidad con K+AIR durante la migración.
  */
 router.get('/sign-requests',
-  requireEmpresaScope({
+  requireEmpresaScopeAndLimit({
     allowedOperations: ['sign_request:read'],
+    rateLimit: { tier: 'standard' },
   }),
   (req, res, next) => {
     try {
