@@ -639,22 +639,28 @@ function reject(token, motivo, ip, user_agent) {
     throw new AppError(410, 'TOKEN_EXPIRED', 'El token ha expirado');
   }
 
-  // 3. UPDATE atómico
-  const updateResult = db.prepare(`
-    UPDATE gh_firmas_electronicas
-    SET estado = 'REJECTED',
-        motivo_rechazo = ?
-    WHERE id = ? AND estado NOT IN ('SIGNED', 'REJECTED', 'CANCELLED', 'REVOKED')
-  `).run(motivo || null, signRequest.id);
+  // 3. UPDATE + evento en una sola tx atómica (P1-1).
+  //    Antes: UPDATE corría primero, luego registerEvent. Si el evento
+  //    fallaba, el estado quedaba en REJECTED sin evento registrado
+  //    (desfase en auditoría). Ahora, si CUALQUIERA falla, rollback total.
+  //    Consistencia con commit() e identify() que ya usan este patrón.
+  const tx = db.transaction(() => {
+    const updateResult = db.prepare(`
+      UPDATE gh_firmas_electronicas
+      SET estado = 'REJECTED',
+          motivo_rechazo = ?
+      WHERE id = ? AND estado NOT IN ('SIGNED', 'REJECTED', 'CANCELLED', 'REVOKED')
+    `).run(motivo || null, signRequest.id);
 
-  if (updateResult.changes !== 1) {
-    throw new AppError(409, 'INVALID_STATE_TRANSITION',
-      'La firma no se pudo rechazar: el estado cambió');
-  }
+    if (updateResult.changes !== 1) {
+      throw new AppError(409, 'INVALID_STATE_TRANSITION',
+        'La firma no se pudo rechazar: el estado cambió');
+    }
 
-  // 4. Evento
-  signRequestService.registerEvent(signRequest.id, 'REJECTED',
-    { motivo_texto: motivo || null }, 'trabajador', ip, user_agent);
+    signRequestService.registerEvent(signRequest.id, 'REJECTED',
+      { motivo_texto: motivo || null }, 'trabajador', ip, user_agent);
+  });
+  tx();
 
   logger.info('Documento rechazado', {
     id_solicitud: signRequest.id_solicitud,
