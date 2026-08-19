@@ -8,11 +8,11 @@
  *     Revoca una solicitud activa (operación humana, admin-only).
  *
  * Auth:
- *   - eventos → internalApiAuth (X-Internal-API-Key, K+AIR)
- *   - revoke  → adminApiAuth    (X-Admin-API-Key,  operador humano)
+ *   - eventos → requireEmpresaScope (X-Internal-API-Key, K+AIR, per-company D-13)
+ *   - revoke  → adminApiAuth        (X-Admin-API-Key, operador humano)
  *
  * Ver API.md §6.4 (revoke) y §6.7 (eventos). Ver C:\Temp\e7-design.md
- * para decisiones de diseño completas.
+ * y docs/kair-firma-integration/I-010-design.md.
  */
 'use strict';
 
@@ -20,7 +20,8 @@ const express = require('express');
 const { z } = require('zod');
 const router = express.Router();
 const db = require('../db/connection');
-const { internalApiAuth, adminApiAuth } = require('../middleware/auth');
+const { adminApiAuth } = require('../middleware/auth');
+const { requireEmpresaScope } = require('../middleware/authz');
 const { validateBody } = require('../middleware/validate');
 const { AppError } = require('../middleware/errors');
 const signRequestService = require('../services/signRequest');
@@ -152,24 +153,39 @@ const revokeBody = z.object({
  * - 404 si el sign request no existe
  * - 200 con array (posiblemente vacío) si existe
  */
-router.get('/sign-requests/:id/eventos', internalApiAuth(), (req, res, next) => {
-  try {
-    const parsed = parseSignRequestId(req.params.id);
-    if (parsed === null) {
-      // Distinguir formato inválido (400) vs no existe (404).
-      // Si el id matchea uno de los formatos regex pero el lookup no
-      // encontró nada → 404. Si no matchea ningún formato → 400.
-      if (/^SIGN-\d{4}-\d{6}$/.test(req.params.id) || /^\d+$/.test(req.params.id)) {
+router.get('/sign-requests/:id/eventos',
+  requireEmpresaScope({
+    allowedOperations: ['audit:read'],
+  }),
+  (req, res, next) => {
+    try {
+      const parsed = parseSignRequestId(req.params.id);
+      if (parsed === null) {
+        // Distinguir formato inválido (400) vs no existe (404).
+        // Si el id matchea uno de los formatos regex pero el lookup no
+        // encontró nada → 404. Si no matchea ningún formato → 400.
+        if (/^SIGN-\d{4}-\d{6}$/.test(req.params.id) || /^\d+$/.test(req.params.id)) {
+          throw new AppError(404, 'NOT_FOUND',
+            `Solicitud ${req.params.id} no encontrada`,
+            { id: req.params.id });
+        }
+        throw new AppError(400, 'INVALID_REQUEST_BODY',
+          'id debe ser SIGN-YYYY-NNNNNN o entero positivo',
+          { received_id: req.params.id });
+      }
+
+      // I-010 (D-13): per-company authz post-lookup.
+      // Si el cliente es per-empresa y la solicitud pertenece a OTRA
+      // empresa, retornar 404 (silent) en vez de 403 para no filtrar
+      // la existencia del recurso. En legacy mode, se permite el acceso.
+      if (req.authSource === 'client' &&
+          parsed.row.id_empresa !== req.id_empresa) {
         throw new AppError(404, 'NOT_FOUND',
           `Solicitud ${req.params.id} no encontrada`,
           { id: req.params.id });
       }
-      throw new AppError(400, 'INVALID_REQUEST_BODY',
-        'id debe ser SIGN-YYYY-NNNNNN o entero positivo',
-        { received_id: req.params.id });
-    }
 
-    // Query a gh_firma_eventos (índice idx_eventos_firma_fecha).
+      // Query a gh_firma_eventos (índice idx_eventos_firma_fecha).
     const rows = db.prepare(`
       SELECT id, evento, fecha_hora, ip, user_agent, metadata, id_actor
       FROM gh_firma_eventos
