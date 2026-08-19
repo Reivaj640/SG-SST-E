@@ -172,23 +172,11 @@ function registerOpenedIfFirst(signRequest, ip, user_agent) {
 }
 
 /**
- * Transiciona el estado a IDENTIFICATION_STARTED.
+ * NOTA: La función `transitionToIdentificationStarted` fue eliminada en
+ * Bloque E8.3. Era dead code: exportada pero nunca usada.
+ * Si en el futuro se necesita un paso explícito entre OPENED y
+ * IDENTIFIED, se puede reintroducir con tests.
  */
-function transitionToIdentificationStarted(signRequest, ip, user_agent) {
-  const now = new Date().toISOString();
-  const tx = db.transaction(() => {
-    db.prepare(`
-      UPDATE gh_firmas_electronicas
-      SET estado = 'IDENTIFICATION_STARTED',
-          ip_origen = COALESCE(?, ip_origen),
-          user_agent = COALESCE(?, user_agent)
-      WHERE id = ? AND estado IN ('PENDING', 'OPENED', 'IDENTIFICATION_STARTED')
-    `).run(ip || null, user_agent || null, signRequest.id);
-    signRequestService.registerEvent(signRequest.id, 'IDENTIFICATION_STARTED',
-      null, 'trabajador', ip, user_agent);
-  });
-  tx();
-}
 
 /**
  * Identifica al trabajador. Valida cédula contra el hash guardado.
@@ -853,7 +841,6 @@ function verifyOtp(token, otp, ip, user_agent) {
 module.exports = {
   resolveToken,
   registerOpenedIfFirst,
-  transitionToIdentificationStarted,
   identify,
   verifyOtp,
   viewDocument,
