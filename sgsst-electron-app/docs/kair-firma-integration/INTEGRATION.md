@@ -25,7 +25,7 @@ K+AIR (Electron desktop para consultoría SG-SST colombiana) está integrando `f
 1. Idempotency-Key con tabla `gh_idempotency_keys`, TTL 24h, 409 si payload cambia, **REPLAY sin token** (C-22) + **endpoint de recovery** (I-013).
 2. Versionado `/v1/` con política de deprecación (D-14).
 3. Webhook outbox con HMAC, retries 1s→1h, dead-letter (diseño listo; integración bloqueada por D-11).
-4. `tipo_documento` con enum 10 valores + 2 índices.
+4. `tipo_identificacion` con enum 10 valores + 2 índices (originalmente propuesto como `tipo_documento` en A1, renombrado por D-1 antes de I-001).
 5. Contract testing con OpenAPI source of truth (Ajv + Prism), E2E real NO en Fase 1.
 6. **Modelo de custodia 3 dominios** (D-12): firma-service = evidencia legal autoritativa, empleador = responsabilidad documental, K+AIR = copia operativa.
 7. **Contrato de carga PDF** (C-23): max 10MB, MIME + magic bytes + parse real con pdf-lib, anti-malicious, hash SHA-256.
@@ -63,7 +63,7 @@ K+AIR (Electron desktop para consultoría SG-SST colombiana) está integrando `f
 | Webhook saliente | NO implementado | I-201 a I-207 (Fase 2, depende D-11) |
 | Idempotency-Key | NO implementado | I-003, I-004, I-005 |
 | Versionado `/v1/` | NO implementado | I-006 |
-| `tipo_documento` (enum 10 valores) | NO existe | I-001, I-002 |
+| `tipo_identificacion` (enum 10 valores) | NO existe | I-001, I-002 |
 | Per-empresa authz (D-13) | NO existe | I-010 (migration 009) |
 | `internalServerLimiter` 4 capas (C-20 v5) | NO existe | I-008 |
 | Upload contract C-23 (10MB, pdf-lib, anti-malicious) | Parcial (MIME + magic básico) | I-012 |
@@ -218,7 +218,7 @@ K+AIR (Electron desktop para consultoría SG-SST colombiana) está integrando `f
 
 ## 6. Hallazgos consolidados de los 7 agentes
 
-### 6.1 A1 — `tipo_documento`
+### 6.1 A1 — `tipo_identificacion` (originalmente `tipo_documento` en A1, renombrado por D-1)
 Enum 10 valores, modelo 2 niveles, migración 007, validación en zod + service, sin CHECK SQL, OQ rename.
 
 ### 6.2 A2 — Impacto sistémico
@@ -247,7 +247,7 @@ OpenAPI source of truth, Ajv + Prism, 50 contract tests, E2E real NO en Fase 1, 
 |---|----------|--------|
 | 1-7 | Idempotency-Key (header, tabla, TTL 24h, conflicts, retry, **REPLAY sin token, recovery I-013**) | B + C-22 |
 | 8-9 | Prefijo `/v1/`, 4 endpoints nuevos | C + O4 |
-| 10-15 | `tipo_documento` enum, 2 índices, evidence_hash, XMP, Constancia, storage plano | A1 + A2 |
+| 10-15 | `tipo_identificacion` enum, 2 índices, evidence_hash, XMP, Constancia, storage plano | A1 + A2 |
 | 16-21 | Webhook HMAC, outbox, 5 eventos, retries, idempotencia doble, SIN PII | E + C-6 |
 | 22-23 | OpenAPI source of truth, Ajv + Prism | C + F |
 | 24 | E2E real NO en Fase 1 | F |
@@ -298,8 +298,8 @@ OpenAPI source of truth, Ajv + Prism, 50 contract tests, E2E real NO en Fase 1, 
 ## 9. Fases de implementación (corregidas post-auditoría 2)
 
 ### Fase 1.1 — Fundaciones (orden de ejecución)
-1. I-001: Migration 007 (tipo_documento + 2 índices)
-2. I-002: zod schema + service aceptan tipo_documento
+1. I-001: Migration 007 (tipo_identificacion + 2 índices)
+2. I-002: zod schema + service aceptan tipo_identificacion
 3. I-003: Migration 008 (gh_idempotency_keys)
 4. I-004: idempotency service
 5. I-010: firma-service per-company authz (D-13) → **Migration 009** (renumerada v4)
@@ -314,7 +314,7 @@ OpenAPI source of truth, Ajv + Prism, 50 contract tests, E2E real NO en Fase 1, 
 14. I-011: Discovery de sincronización de binarios al hub Drive
 
 **Numeración de migraciones v4**:
-- Migration 007: tipo_documento (I-001)
+- Migration 007: tipo_identificacion (I-001)
 - Migration 008: gh_idempotency_keys (I-003)
 - **Migration 009: gh_internal_clients (I-010, antes era 010)**
 - Migration 010: gh_webhook_deliveries (Fase 2 I-201, antes era 009)
