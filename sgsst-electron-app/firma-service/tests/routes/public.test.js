@@ -24,7 +24,7 @@ const assert = require('node:assert/strict');
 const request = require('supertest');
 const { PDFDocument } = require('pdf-lib');
 const db = require('../../src/db/connection');
-const { resetDb, makeApp, createSignRequestWithIdentificacion } = require('../helpers');
+const { resetDb, makeApp, seedActiveAgreement, createSignRequestWithIdentificacion } = require('../helpers');
 const mailer = require('../../src/services/mailer');
 
 /**
@@ -584,13 +584,13 @@ test('POST /commit: evidence_hash verificable (canonicalJSON)', async () => {
     .post(`/api/sign/${token}/commit`)
     .send({ manifestacion_aceptada: true });
 
-  // Reproducir la evidencia y recalcular hash
+  // Reproducir la evidencia y recalcular hash (D1 fix: incluir agreement_version)
   const { canonicalJSON } = require('../../src/crypto/compare');
   const { sha256 } = require('../../src/crypto/hash');
   const row = db.prepare(`
     SELECT id_solicitud, id_documento, id_trabajador, id_empresa,
            document_hash_original, document_hash_firmado,
-           agreement_hash, identificacion_tipo,
+           agreement_hash, agreement_version, identificacion_tipo,
            fecha_creacion, fecha_firma, version_kair,
            manifestacion_voluntad_texto
     FROM gh_firmas_electronicas WHERE id = ?
@@ -604,6 +604,7 @@ test('POST /commit: evidence_hash verificable (canonicalJSON)', async () => {
     document_hash_original: row.document_hash_original,
     document_hash_firmado: row.document_hash_firmado,
     agreement_hash: row.agreement_hash,
+    agreement_version: row.agreement_version,  // ← D1 fix
     identificacion_tipo: row.identificacion_tipo,
     fecha_creacion: row.fecha_creacion,
     fecha_firma: row.fecha_firma,
@@ -614,6 +615,126 @@ test('POST /commit: evidence_hash verificable (canonicalJSON)', async () => {
 
   assert.equal(evidenciaHash, r2.body.evidence_hash,
     'evidence_hash debe ser reproducible por terceros con JSON canónico');
+});
+
+test('POST /commit: manifestacion_voluntad_hash se persiste (D1 fix)', async () => {
+  resetDb();
+  const { token, signRequest } = await createSignRequestWithIdentificacion();
+  const app = makeApp();
+  const r1 = await request(app)
+    .post(`/api/sign/${token}/identify`)
+    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+  await request(app)
+    .post(`/api/sign/${token}/verify-otp`)
+    .send({ otp: r1.body.devOtp });
+  await request(app)
+    .post(`/api/sign/${token}/view-document`)
+    .send({ scroll_al_final: true });
+  await request(app)
+    .post(`/api/sign/${token}/commit`)
+    .send({ manifestacion_aceptada: true });
+
+  // Verificar que la columna se popula (antes era siempre NULL)
+  const row = db.prepare(`
+    SELECT manifestacion_voluntad_texto, manifestacion_voluntad_hash
+    FROM gh_firmas_electronicas WHERE id = ?
+  `).get(signRequest.id);
+
+  const { sha256 } = require('../../src/crypto/hash');
+  assert.notEqual(row.manifestacion_voluntad_hash, null,
+    'manifestacion_voluntad_hash NO debe ser NULL después del commit');
+  assert.equal(row.manifestacion_voluntad_hash, sha256(row.manifestacion_voluntad_texto),
+    'manifestacion_voluntad_hash debe ser SHA-256 del texto');
+  assert.equal(row.manifestacion_voluntad_hash.length, 64);
+  assert.match(row.manifestacion_voluntad_hash, /^[0-9a-f]{64}$/);
+});
+
+// =================================================================
+// Bloque D2 — Re-validar Acuerdo en view y commit
+// =================================================================
+
+test('POST /view-document: Acuerdo desactivado → 409 AGREEMENT_VERSION_NO_LONGER_ACTIVE', async () => {
+  resetDb();
+  seedActiveAgreement({ version: 'v1.0', texto: 'texto v1' });
+  const { token } = await createSignRequestWithIdentificacion();
+  const app = makeApp();
+  // identify + verify-otp (para llegar a view-document)
+  const r1 = await request(app)
+    .post(`/api/sign/${token}/identify`)
+    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+  await request(app)
+    .post(`/api/sign/${token}/verify-otp`)
+    .send({ otp: r1.body.devOtp });
+
+  // Desactivar v1.0 publicando v2.0 como activa
+  const agreementService = require('../../src/services/agreement');
+  agreementService.createVersion({ version: 'v2.0', texto: 'texto v2', activa: true });
+
+  // view-document debe ser rechazado con 409
+  const r2 = await request(app)
+    .post(`/api/sign/${token}/view-document`)
+    .send({ scroll_al_final: true });
+  assert.equal(r2.status, 409);
+  assert.equal(r2.body.error.code, 'AGREEMENT_VERSION_NO_LONGER_ACTIVE');
+  assert.equal(r2.body.error.details.sign_request_version, 'v1.0');
+  assert.equal(r2.body.error.details.active_version, 'v2.0');
+});
+
+test('POST /commit: Acuerdo desactivado → 409 AGREEMENT_VERSION_NO_LONGER_ACTIVE', async () => {
+  resetDb();
+  seedActiveAgreement({ version: 'v1.0', texto: 'texto v1' });
+  const { token } = await createSignRequestWithIdentificacion();
+  const app = makeApp();
+  const r1 = await request(app)
+    .post(`/api/sign/${token}/identify`)
+    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+  await request(app)
+    .post(`/api/sign/${token}/verify-otp`)
+    .send({ otp: r1.body.devOtp });
+  // llegar a DOCUMENT_VIEWED
+  await request(app)
+    .post(`/api/sign/${token}/view-document`)
+    .send({ scroll_al_final: true });
+
+  // Desactivar v1.0
+  const agreementService = require('../../src/services/agreement');
+  agreementService.createVersion({ version: 'v2.0', texto: 'texto v2', activa: true });
+
+  // commit debe ser rechazado con 409
+  const r2 = await request(app)
+    .post(`/api/sign/${token}/commit`)
+    .send({ manifestacion_aceptada: true });
+  assert.equal(r2.status, 409);
+  assert.equal(r2.body.error.code, 'AGREEMENT_VERSION_NO_LONGER_ACTIVE');
+  assert.equal(r2.body.error.details.sign_request_version, 'v1.0');
+  assert.equal(r2.body.error.details.active_version, 'v2.0');
+});
+
+test('POST /commit: sign request legacy (agreement_version=NULL) pasa el helper sin error (D2)', async () => {
+  resetDb();
+  seedActiveAgreement({ version: 'v1.0', texto: 'texto v1' });
+  const { token, signRequest } = await createSignRequestWithIdentificacion();
+  const app = makeApp();
+  const r1 = await request(app)
+    .post(`/api/sign/${token}/identify`)
+    .send({ tipo_documento: 'CC', numero_documento: '1234567890' });
+  await request(app)
+    .post(`/api/sign/${token}/verify-otp`)
+    .send({ otp: r1.body.devOtp });
+  await request(app)
+    .post(`/api/sign/${token}/view-document`)
+    .send({ scroll_al_final: true });
+
+  // Simular sign request legacy: poner agreement_version=NULL directamente
+  db.prepare('UPDATE gh_firmas_electronicas SET agreement_version = NULL WHERE id = ?')
+    .run(signRequest.id);
+
+  // commit debe proceder (helper skip para legacy)
+  const r2 = await request(app)
+    .post(`/api/sign/${token}/commit`)
+    .send({ manifestacion_aceptada: true });
+  assert.equal(r2.status, 200);
+  assert.equal(r2.body.estado, 'SIGNED');
 });
 
 test('POST /reject: rechazo válido → 200 REJECTED', async () => {
