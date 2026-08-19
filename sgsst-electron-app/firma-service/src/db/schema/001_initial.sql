@@ -100,10 +100,19 @@ CREATE TABLE IF NOT EXISTS gh_firmas_electronicas (
   pdf_firmado_path TEXT,
   constancia_path TEXT,
   metadata TEXT,
+  -- Bloque E8.4: estados zombie eliminados.
+  --   - 'DOCUMENT_OPENED' removido: no se usa en código (v1 salta de
+  --     OTP_VERIFIED directo a DOCUMENT_VIEWED).
+  --   - 'MANIFESTATION_RECORDED' removido: solo se registra como evento,
+  --     el commit va directo a SIGNED.
+  -- Estados válidos restantes: 14.
+  --   'OPENED'        — bug E8.1 (queda válido una vez se arregle el fix)
+  --   'IDENTIFICATION_STARTED' — reservado para flujo futuro
+  -- Los demás son los que efectivamente se usan en v0.1.x.
   CHECK (estado IN (
     'PENDING', 'OPENED', 'IDENTIFICATION_STARTED', 'IDENTIFIED',
-    'OTP_SENT', 'OTP_VERIFIED', 'DOCUMENT_OPENED', 'DOCUMENT_VIEWED',
-    'MANIFESTATION_RECORDED', 'SIGNED', 'REJECTED', 'EXPIRED',
+    'OTP_SENT', 'OTP_VERIFIED', 'DOCUMENT_VIEWED',
+    'SIGNED', 'REJECTED', 'EXPIRED',
     'REVOKED', 'CANCELLED', 'OTP_LOCKED', 'IDENTIFICATION_FAILED'
   ))
 );
