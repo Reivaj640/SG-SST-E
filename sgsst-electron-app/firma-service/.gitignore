@@ -29,3 +29,14 @@ Thumbs.db
 # Cobertura de tests
 coverage/
 .nyc_output/
+
+# Scripts de verificación temporales (verificación E2E/atomicidad standalone)
+verify-*.js
+clean-verify.js
+clone-acuerdo.js
+make-test-pdf.js
+start-parallel-3738.ps1
+audit-bloque-*.js
+storage-verify-*/
+data/verify-*.sqlite
+data/verify-*.sqlite-*
