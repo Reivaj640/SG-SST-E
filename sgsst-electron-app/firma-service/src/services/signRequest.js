@@ -58,6 +58,7 @@ function create({
   agreement_version, agreement_hash, document_hash, pdf_buffer, pdf_filename,
   version_kair, ip, user_agent, metadata,
   identificacion_tipo, identificacion_numero_hash,
+  identificacion_numero_sal,  // P1-2: opcional, server genera si falta
   consent_id,
 }) {
   // Validar PDF
@@ -96,6 +97,13 @@ function create({
   const id_solicitud = generateIdSolicitud();
   const sesion_id = require('crypto').randomUUID();
 
+  // P1-2: sal aleatoria para hashear la cédula del trabajador.
+  // Si K+AIR no la envía, sal es NULL (compatibilidad con tests legacy
+  // y con sign requests pre-migración 006). identify() usa sha256(raw)
+  // como fallback cuando sal es NULL.
+  // K+AIR DEBE migrar para enviar sal en nuevos sign requests (ver docs).
+  const sal = identificacion_numero_sal || null;
+
   // TTL
   const ttl_horas = tipo_firma === 'presencial'
     ? config.ttl.tokenHoursPresencial
@@ -118,14 +126,16 @@ function create({
         (id_solicitud, id_documento, id_trabajador, id_empresa,
          tipo_firma, document_hash_original, agreement_hash, agreement_version,
          token_hash, sesion_id, identificacion_tipo, identificacion_numero_hash,
+         identificacion_numero_sal,  -- P1-2
          fecha_creacion, fecha_expiracion, version_kair,
          ip_origen, user_agent, pdf_original_path, metadata,
          verification_channel, consent_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id_solicitud, id_documento, id_trabajador, id_empresa,
       tipo_firma, calculated_hash, agreement_hash, agreement_version,
       token_hash, sesion_id, identificacion_tipo || null, identificacion_numero_hash || null,
+      sal,  // P1-2: sal aleatoria por sign request
       now.toISOString(), fecha_expiracion, version_kair,
       ip || null, user_agent || null, pdf_original_path, metadata || null, 'email',
       consent_id || null,
@@ -265,7 +275,8 @@ function getById(id) {
     SELECT id, id_solicitud, id_documento, id_trabajador, id_empresa,
            tipo_firma, estado, document_hash_original, document_hash_firmado,
            agreement_hash, agreement_version, evidence_hash, token_hash, identificacion_tipo,
-           identificacion_numero_hash, identificacion_coincidio,
+           identificacion_numero_hash, identificacion_numero_sal,  -- P1-2
+           identificacion_coincidio,
            correo_verificacion, correo_hash, otp_hash, otp_sal,
            otp_intentos, otp_bloqueado, ip_origen, user_agent,
            sesion_id, verification_channel, fecha_creacion, fecha_expiracion,

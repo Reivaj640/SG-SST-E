@@ -216,9 +216,22 @@ async function identify(token, tipo_documento, numero_documento, ip, user_agent)
       { expected: signRequest.identificacion_tipo, provided: tipo_documento });
   }
 
-  // 5. Calcular hash SHA-256 de la cédula ingresada y comparar.
-  //    K+AIR debe hashear con el mismo método (SHA-256 sin sal).
-  const provided_hash = sha256(numero_documento);
+  // 5. Calcular hash de la cédula con sal (P1-2).
+  //    Si el sign request tiene sal → SHA-256(sal || numero_documento).
+  //    Si es legacy (sal = NULL) → SHA-256(numero_documento) (fallback).
+  //    Esto preserva compatibilidad con sign requests pre-migración 006.
+  const sal = signRequest.identificacion_numero_sal;
+  let provided_hash;
+  if (sal) {
+    // Con sal: SHA-256(sal_hex || numero_documento).
+    // Concatenamos los strings y hasheamos.
+    provided_hash = require('crypto').createHash('sha256')
+      .update(sal + numero_documento)
+      .digest('hex');
+  } else {
+    // Legacy sin sal.
+    provided_hash = sha256(numero_documento);
+  }
   if (provided_hash !== signRequest.identificacion_numero_hash) {
     // Incrementar intentos
     db.prepare(`
