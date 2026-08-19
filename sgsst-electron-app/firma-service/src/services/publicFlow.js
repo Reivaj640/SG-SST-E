@@ -246,48 +246,37 @@ async function identify(token, tipo_documento, numero_documento, ip, user_agent)
       'La identificación no coincide con nuestros registros');
   }
 
-  // 6. Identificación exitosa
+  // 6+7+8. Identificación + generación OTP + guardado, TODO en una sola tx.
+  //    P1-3: antes había 2 tx separadas (IDENTIFIED y OTP_SENT) con una
+  //    ventana de 20-30ms donde el estado podía quedar en IDENTIFIED sin
+  //    OTP guardado. Ahora todo es atómico: si algo falla, rollback total.
   //    Persistimos ip_origen y user_agent del firmante en la fila.
   //    Estos valores se usan luego en el evidence_hash del commit.
   //    COALESCE: si ya hay IP/UA de una identificación previa, los
   //    preservamos (no sobrescribimos). El FAILED no persiste IP/UA
   //    porque un intento fallido puede venir de cualquier red.
-  const tx = db.transaction(() => {
-    db.prepare(`
-      UPDATE gh_firmas_electronicas
-      SET estado = 'IDENTIFIED',
-          identificacion_coincidio = 1,
-          ip_origen = COALESCE(?, ip_origen),
-          user_agent = COALESCE(?, user_agent),
-          fecha_otp_enviado = ?
-      WHERE id = ?
-    `).run(ip || null, user_agent || null, new Date().toISOString(), signRequest.id);
-    signRequestService.registerEvent(signRequest.id, 'IDENTIFICATION_COMPLETED',
-      { tipo_documento }, 'trabajador', ip, user_agent);
-  });
-  tx();
-
-  // 7. Generar OTP
   const otp = generateOTP();
   const otp_sal = generateSalt();
   const otp_hash = hashWithSalt(otp, otp_sal);
-
-  // 8. Guardar OTP
-  const tx2 = db.transaction(() => {
+  const now_iso = new Date().toISOString();
+  const tx = db.transaction(() => {
     db.prepare(`
       UPDATE gh_firmas_electronicas
       SET estado = 'OTP_SENT',
-          otp_hash = ?,
-          otp_sal = ?,
-          otp_intentos = 0,
-          otp_bloqueado = 0,
+          identificacion_coincidio = 1,
+          ip_origen = COALESCE(?, ip_origen),
+          user_agent = COALESCE(?, user_agent),
+          otp_hash = ?, otp_sal = ?,
+          otp_intentos = 0, otp_bloqueado = 0,
           fecha_otp_enviado = ?
       WHERE id = ?
-    `).run(otp_hash, otp_sal, new Date().toISOString(), signRequest.id);
+    `).run(ip || null, user_agent || null, otp_hash, otp_sal, now_iso, signRequest.id);
+    signRequestService.registerEvent(signRequest.id, 'IDENTIFICATION_COMPLETED',
+      { tipo_documento }, 'trabajador', ip, user_agent);
     signRequestService.registerEvent(signRequest.id, 'OTP_SENT',
       { canal: 'email' }, 'sistema', ip, user_agent);
   });
-  tx2();
+  tx();
 
   // 9. Obtener correo (lo guardamos en la solicitud o en consentimiento)
   // Por ahora, usamos un placeholder. K+AIR lo enviará en el flujo.
