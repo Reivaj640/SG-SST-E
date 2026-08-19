@@ -57,6 +57,15 @@ const TABLES = [
   // Se limpia entre tests para que cada test arme sus propios clientes
   // (o use los sembrados por seedTestClients() que se llama explícitamente).
   'gh_internal_clients',
+  // I-003 (idempotency): la tabla gh_idempotency_keys NO se limpiaba antes
+  // en cada test (los tests del service lo hacían manualmente con
+  // `db.prepare('DELETE FROM gh_idempotency_keys').run()`). I-003.3 (middleware
+  // tests) necesita que la BD esté limpia entre tests porque el middleware
+  // corre sobre el service: una fila de un test anterior haría que un test
+  // nuevo vea isReplay=true cuando esperaba isNew. Se añade acá para que
+  // resetDb() sea completo y los tests del middleware no necesiten
+  // duplicar la limpieza. Modificación mínima y aislada a tests/helpers.js.
+  'gh_idempotency_keys',
   // NO incluir gh_firma_schema_migrations:
   //   - Es metadata del schema (qué migraciones se aplicaron), NO data de test.
   //   - Si resetDb() la limpia, el siguiente proceso ve la tabla vacía y
