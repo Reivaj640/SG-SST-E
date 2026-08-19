@@ -44,15 +44,17 @@ const ALLOWED_STATES = [
   'DOCUMENT_VIEWED',
 ];
 
-// Estados prohibidos (terminales + intermedios no listados en enunciado)
+// Estados prohibidos (terminales + intermedios no listados en enunciado).
+// Post-migration 005: DOCUMENT_OPENED y MANIFESTATION_RECORDED fueron
+// removidos del CHECK constraint (Bloque E8.4 proper) y ya no se pueden
+// insertar en gh_firmas_electronicas.estado, por lo que el helper
+// createSignRequestInState fallaría antes de poder probar REVOKE_NOT_ALLOWED.
 const FORBIDDEN_STATES = [
   'SIGNED',                   // inmutable
   'REJECTED',                 // decisión del trabajador
   'EXPIRED',                  // cerrado por el sistema
   'CANCELLED',                // terminal
   'OTP_SENT',                 // gap a discutir con usuario
-  'DOCUMENT_OPENED',          // gap a discutir
-  'MANIFESTATION_RECORDED',   // voluntad ya registrada
   'OTP_LOCKED',               // gap a discutir
   'IDENTIFICATION_FAILED',    // ya falló; crear otra
 ];
