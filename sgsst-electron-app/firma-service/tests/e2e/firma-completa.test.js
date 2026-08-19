@@ -32,7 +32,8 @@ const { PDFDocument } = require('pdf-lib');
 const db = require('../../src/db/connection');
 const {
   resetDb, seedActiveAgreement, makeApp,
-  TEST_API_KEY, withApiKey, withAdminApiKey,
+  createAcceptedConsent,
+  TEST_API_KEY,
 } = require('../helpers');
 const { sha256 } = require('../../src/crypto/hash');
 const { canonicalJSON } = require('../../src/crypto/compare');
@@ -57,12 +58,20 @@ test('E2E: Acuerdo v1.0 → POST sign-requests → flujo público completo → S
     version: 'v1.0',
     texto: 'ACUERDO E2E v1.0 — texto de prueba para el flujo completo',
   });
+  // Bloque E6: con agreement_version, el sign request requiere un consent
+  // aceptado del mismo (trabajador, empresa, version_acuerdo). Antes de
+  // crear el sign request, creamos el consentimiento aceptado.
+  const { consent_id } = await createAcceptedConsent({
+    id_trabajador: '1234567890',
+    id_empresa: '900123456',
+    version_acuerdo: 'v1.0',
+  });
   const app = makeApp();
 
   // 2. GET /internal/acuerdo-activo (K+AIR consulta el Acuerdo antes de crear)
   const r0 = await request(app)
     .get('/internal/acuerdo-activo')
-    .set(withApiKey({}));
+    .set('X-Internal-API-Key', TEST_API_KEY);
   assert.equal(r0.status, 200);
   assert.equal(r0.body.version, 'v1.0');
   assert.equal(r0.body.activa, true);
@@ -84,11 +93,12 @@ test('E2E: Acuerdo v1.0 → POST sign-requests → flujo público completo → S
     version_kair: '0.1.189',
     identificacion_tipo: 'CC',
     identificacion_numero_hash,
+    consent_id,  // Bloque E6: vínculo con el consentimiento aceptado
   };
 
   const r1 = await request(app)
     .post('/internal/sign-requests')
-    .set(withApiKey({}))
+    .set('X-Internal-API-Key', TEST_API_KEY)
     .field('metadata', JSON.stringify(metadata))
     .attach('documento', pdf, 'contrato-e2e.pdf');
 
@@ -157,10 +167,11 @@ test('E2E: Acuerdo v1.0 → POST sign-requests → flujo público completo → S
   // 9. Verificación final en BD
   const row = db.prepare(`
     SELECT id, id_solicitud, id_documento, id_trabajador, id_empresa,
-           estado, agreement_version, agreement_hash,
+           estado, agreement_version, agreement_hash, consent_id,
            document_hash_original, document_hash_firmado, evidence_hash,
-           identificacion_tipo, version_kair,
+           identificacion_tipo, version_kair, tipo_firma,
            manifestacion_voluntad_texto, manifestacion_voluntad_hash,
+           ip_origen, user_agent,
            pdf_firmado_path, constancia_path,
            fecha_creacion, fecha_firma
     FROM gh_firmas_electronicas WHERE id_solicitud = ?
@@ -169,6 +180,8 @@ test('E2E: Acuerdo v1.0 → POST sign-requests → flujo público completo → S
   assert.equal(row.estado, 'SIGNED');
   assert.equal(row.agreement_version, 'v1.0');
   assert.equal(row.agreement_hash, agreement_hash);
+  // Bloque E6: consent_id debe estar asociado al sign request firmado
+  assert.equal(row.consent_id, consent_id, 'consent_id debe persistirse en el sign request');
   assert.equal(row.document_hash_original, document_hash);
   assert.equal(row.document_hash_firmado, document_hash_firmado);
   assert.equal(row.evidence_hash, evidence_hash);
@@ -181,17 +194,25 @@ test('E2E: Acuerdo v1.0 → POST sign-requests → flujo público completo → S
   assert.ok(fs.existsSync(row.pdf_firmado_path), 'PDF firmado debe existir en disco');
   assert.ok(fs.existsSync(row.constancia_path), 'Constancia debe existir en disco');
 
-  // 10. evidence_hash reproducible con canonicalJSON (D1 fix: incluye agreement_version)
+  // 10. evidence_hash reproducible con canonicalJSON.
+  //    Composición actual (post-E3, 14 campos) — mismo orden y keys que
+  //    src/services/publicFlow.js#commit() para garantizar que la
+  //    reproducción por terceros produzca el mismo hash.
   const evidencia = {
     id_solicitud: row.id_solicitud,
-    id_documento: metadata.id_documento,
+    id_documento: row.id_documento,
     id_trabajador: row.id_trabajador,
-    id_empresa: metadata.id_empresa,
+    id_empresa: row.id_empresa,
     document_hash_original: row.document_hash_original,
     document_hash_firmado: row.document_hash_firmado,
     agreement_hash: row.agreement_hash,
     agreement_version: row.agreement_version,  // ← D1 fix
     identificacion_tipo: row.identificacion_tipo,
+    // === E3 nuevos campos ===
+    tipo_firma: row.tipo_firma,
+    manifestacion_voluntad_hash: row.manifestacion_voluntad_hash,
+    ip_origen: row.ip_origen || null,
+    user_agent: row.user_agent || null,
     fecha_creacion: row.fecha_creacion,
     fecha_firma: row.fecha_firma,
     version_kair: row.version_kair,
@@ -199,7 +220,7 @@ test('E2E: Acuerdo v1.0 → POST sign-requests → flujo público completo → S
   };
   const evidenciaHash = sha256(canonicalJSON(evidencia));
   assert.equal(evidenciaHash, evidence_hash,
-    'evidence_hash debe ser reproducible por terceros con canonicalJSON (incluyendo agreement_version)');
+    'evidence_hash debe ser reproducible por terceros con canonicalJSON (14 campos, post-E3)');
 
   // 11. Eventos en orden
   const eventos = db.prepare(`
