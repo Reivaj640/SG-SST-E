@@ -51,6 +51,21 @@ function resetDb() {
   for (const t of TABLES) {
     db.prepare(`DELETE FROM ${t}`).run();
   }
+  // Resetear AUTOINCREMENT para evitar que IDs acumulen entre tests
+  // (causa de flakiness cuando un test asume id=1 pero el siguiente
+  // test ve id=N del test anterior).
+  try {
+    db.prepare(`
+      DELETE FROM sqlite_sequence
+      WHERE name IN (
+        'gh_firmas_electronicas',
+        'gh_consentimientos_firma',
+        'gh_firma_eventos',
+        'gh_firma_sesiones',
+        'gh_firma_acuerdo_versiones'
+      )
+    `).run();
+  } catch (e) { /* sqlite_sequence no existe en algunas BDs */ }
   mailer.clearDevInbox();
   // Borrar PDFs del storage
   for (const dir of [storage.PATHS.originales, storage.PATHS.firmados, storage.PATHS.constancias]) {
