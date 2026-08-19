@@ -44,6 +44,13 @@ const config = {
   port: int('PORT', 3001),
   publicUrl: required('PUBLIC_URL', 'http://localhost:3001'),
 
+  // P1-6: trust proxy para Express. Por seguridad NO usar 'true' (bypass de
+  // X-Forwarded-For). Default seguro 'loopback' (solo 127.0.0.1, ::1).
+  // En producción detrás de nginx/cloudflare, setear TRUST_PROXY=<ip-proxy>
+  // o TRUST_PROXY=1 (último hop).
+  // Ver src/middleware/rateLimit.js (líneas 19-25) y SECURITY.md.
+  trustProxy: process.env.TRUST_PROXY || 'loopback',
+
   db: {
     path: resolvePath(required('DB_PATH', './data/firma.sqlite')),
   },
@@ -77,6 +84,7 @@ const config = {
     perMinute: int('RATE_LIMIT_PER_MINUTE', 60),
     otpPerHour: int('RATE_LIMIT_OTP_PER_HOUR', 10),
     commitPerMinute: int('RATE_LIMIT_COMMIT_PER_MINUTE', 3),
+    signRequestPerMinute: int('RATE_LIMIT_SIGN_REQUEST_PER_MINUTE', 30),
   },
 
   email: {
