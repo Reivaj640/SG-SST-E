@@ -24,7 +24,7 @@ const assert = require('node:assert/strict');
 const request = require('supertest');
 const { PDFDocument } = require('pdf-lib');
 const db = require('../../src/db/connection');
-const { resetDb, makeApp, seedActiveAgreement, createSignRequestWithIdentificacion } = require('../helpers');
+const { resetDb, makeApp, seedActiveAgreement, createSignRequestWithIdentificacion, createAcceptedConsent } = require('../helpers');
 const mailer = require('../../src/services/mailer');
 
 /**
@@ -451,7 +451,14 @@ test('GET /document.pdf: sin OTP verificado → 409', async () => {
 
 test('POST /commit: firma válida → 200 SIGNED + evidencia', async () => {
   resetDb();
-  const { token, signRequest } = await createSignRequestWithIdentificacion();
+  // Bloque E6: con agreement_version, el sign request requiere consent_id
+  // vinculado a un consentimiento ACEPTADO.
+  const { consent_id } = await createAcceptedConsent({
+    id_trabajador: '1234567890',
+    id_empresa: '900123456',
+    version_acuerdo: 'v1.0',
+  });
+  const { token, signRequest } = await createSignRequestWithIdentificacion({ consent_id });
   console.log('DEBUG: signRequest.id =', signRequest.id, 'token =', token);
   const app = makeApp();
   // identify + verify-otp + view-document
@@ -500,7 +507,13 @@ test('POST /commit: firma válida → 200 SIGNED + evidencia', async () => {
 
 test('POST /commit: sin manifestacion_aceptada → 400', async () => {
   resetDb();
-  const { token } = await createSignRequestWithIdentificacion();
+  // Bloque E6: con agreement_version, requiere consent_id
+  const { consent_id } = await createAcceptedConsent({
+    id_trabajador: '1234567890',
+    id_empresa: '900123456',
+    version_acuerdo: 'v1.0',
+  });
+  const { token } = await createSignRequestWithIdentificacion({ consent_id });
   const app = makeApp();
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)
@@ -522,7 +535,13 @@ test('POST /commit: sin manifestacion_aceptada → 400', async () => {
 
 test('POST /commit: sin view-document → 409', async () => {
   resetDb();
-  const { token } = await createSignRequestWithIdentificacion();
+  // Bloque E6: con agreement_version, requiere consent_id
+  const { consent_id } = await createAcceptedConsent({
+    id_trabajador: '1234567890',
+    id_empresa: '900123456',
+    version_acuerdo: 'v1.0',
+  });
+  const { token } = await createSignRequestWithIdentificacion({ consent_id });
   const app = makeApp();
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)
@@ -541,7 +560,13 @@ test('POST /commit: sin view-document → 409', async () => {
 
 test('POST /commit: registra eventos MANIFESTATION_RECORDED, SIGN_COMMITTED, PDF_GENERATED, COPY_SENT', async () => {
   resetDb();
-  const { token, signRequest } = await createSignRequestWithIdentificacion();
+  // Bloque E6: con agreement_version, requiere consent_id
+  const { consent_id } = await createAcceptedConsent({
+    id_trabajador: '1234567890',
+    id_empresa: '900123456',
+    version_acuerdo: 'v1.0',
+  });
+  const { token, signRequest } = await createSignRequestWithIdentificacion({ consent_id });
   const app = makeApp();
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)
@@ -569,7 +594,13 @@ test('POST /commit: registra eventos MANIFESTATION_RECORDED, SIGN_COMMITTED, PDF
 
 test('POST /commit: evidence_hash verificable (canonicalJSON)', async () => {
   resetDb();
-  const { token, signRequest } = await createSignRequestWithIdentificacion();
+  // Bloque E6: con agreement_version, requiere consent_id
+  const { consent_id } = await createAcceptedConsent({
+    id_trabajador: '1234567890',
+    id_empresa: '900123456',
+    version_acuerdo: 'v1.0',
+  });
+  const { token, signRequest } = await createSignRequestWithIdentificacion({ consent_id });
   const app = makeApp();
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)
@@ -628,7 +659,13 @@ test('POST /commit: evidence_hash verificable (canonicalJSON)', async () => {
 
 test('POST /commit: manifestacion_voluntad_hash se persiste (D1 fix)', async () => {
   resetDb();
-  const { token, signRequest } = await createSignRequestWithIdentificacion();
+  // Bloque E6: con agreement_version, requiere consent_id
+  const { consent_id } = await createAcceptedConsent({
+    id_trabajador: '1234567890',
+    id_empresa: '900123456',
+    version_acuerdo: 'v1.0',
+  });
+  const { token, signRequest } = await createSignRequestWithIdentificacion({ consent_id });
   const app = makeApp();
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)
@@ -782,7 +819,13 @@ test('POST /reject: rechazo sin motivo → 200 (motivo opcional)', async () => {
 
 test('POST /reject: después de firmado → 409', async () => {
   resetDb();
-  const { token } = await createSignRequestWithIdentificacion();
+  // Bloque E6: con agreement_version, requiere consent_id
+  const { consent_id } = await createAcceptedConsent({
+    id_trabajador: '1234567890',
+    id_empresa: '900123456',
+    version_acuerdo: 'v1.0',
+  });
+  const { token } = await createSignRequestWithIdentificacion({ consent_id });
   const app = makeApp();
   const r1 = await request(app)
     .post(`/api/sign/${token}/identify`)

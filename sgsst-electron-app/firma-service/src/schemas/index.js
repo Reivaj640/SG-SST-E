@@ -73,6 +73,13 @@ const signRequestBody = z.object({
   version_kair: z.string().min(1).max(32),
   identificacion_tipo: z.enum(['CC', 'CE', 'TI', 'PPT', 'PA']).optional(),
   identificacion_numero_hash: z.string().regex(/^[0-9a-f]{64}$/).optional(),
+  // consent_id (Bloque E6): vínculo con gh_consentimientos_firma.id.
+  // Opcional a nivel schema; la obligatoriedad REAL depende de
+  // signRequest.agreement_version: si está presente, el sign request
+  // debe estar vinculado a un consentimiento ACEPTADO del mismo
+  // (trabajador, empresa, version_acuerdo). La validación se hace en
+  // commit() (services/publicFlow.js).
+  consent_id: z.coerce.number().int().positive().optional(),
   metadata: signRequestMetadata,
 });
 
