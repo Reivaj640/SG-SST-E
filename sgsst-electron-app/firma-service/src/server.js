@@ -22,6 +22,10 @@ const {
   otpLimiter,
   commitLimiter,
   signRequestLimiter,
+  // I-008 (C-20 v5): el internalServerLimiter NO se monta a nivel de app.
+  // Se aplica DENTRO de cada router vía requireEmpresaScopeAndLimit(),
+  // porque necesita `req.id_empresa` (seteado por authz) y `X-Client-Instance-Id`.
+  // Ver SECURITY.md §9.
 } = require('./middleware/rateLimit');
 const healthRouter = require('./routes/health');
 const agreementRouter = require('./routes/agreement');
@@ -96,8 +100,10 @@ function createApp() {
     next();
   });
 
-  // Rate limiting global por IP (E9.1). skip salta /health (monitoring).
-  // Se registra ANTES de las rutas para que aplique a todo.
+  // Rate limiting global por IP (E9.1). skip salta /health (monitoring)
+  // y /internal/* (que se rate-limitea con el internalServerLimiter de
+  // 4 capas, I-008 / C-20 v5, aplicado DENTRO de cada router vía
+  // requireEmpresaScopeAndLimit). Ver SECURITY.md §9.
   app.use(globalLimiter);
 
   // Rutas
@@ -129,6 +135,8 @@ function createApp() {
   app.use('/internal', consentRouter);
   // Rate limiter para creación de sign requests (E9.1): 30/min por IP.
   // Anti-abuso de creación masiva. Se registra ANTES de signRequestRouter.
+  // I-008 (C-20 v5): se mantiene como defensa ADICIONAL al internalServerLimiter
+  // (4 capas, aplicado DENTRO del router). NO se elimina.
   app.use('/internal/sign-requests', signRequestLimiter);
   app.use('/internal', signRequestRouter);
   app.use('/internal', internalAuditRouter);
