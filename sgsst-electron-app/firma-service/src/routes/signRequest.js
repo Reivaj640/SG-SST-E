@@ -80,6 +80,7 @@ router.post('/sign-requests', internalApiAuth(), uploadPdf(), (req, res, next) =
       version_kair: meta.version_kair,
       identificacion_tipo: meta.identificacion_tipo,
       identificacion_numero_hash: meta.identificacion_numero_hash,
+      consent_id: meta.consent_id,  // Bloque E6
       metadata: meta.metadata,
       ip: req.ip,
       user_agent: req.get('User-Agent') || null,
@@ -149,6 +150,8 @@ router.get('/sign-requests/:id', internalApiAuth(), (req, res, next) => {
       fecha_manifestacion: signRequest.fecha_manifestacion,
       fecha_firma: signRequest.fecha_firma,
       version_kair: signRequest.version_kair,
+      agreement_version: signRequest.agreement_version,
+      consent_id: signRequest.consent_id,  // Bloque E6
     });
   } catch (err) {
     next(err);

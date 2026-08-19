@@ -93,6 +93,69 @@ function makeApp() {
   return app;
 }
 
+/**
+ * Crea un consentimiento ACEPTADO para (id_trabajador, id_empresa, version).
+ * Helper para tests del Bloque E6 (sign request ↔ consent linkage).
+ *
+ * Si el Acuerdo activo no está sembrado, llama a seedActiveAgreement().
+ * Crea el consentimiento vía API (POST /internal/consentimientos) y
+ * acepta el OTP vía API (POST /internal/consentimientos/:id/verify-otp).
+ *
+ * Retorna { consent_id, ... } con el id del consentimiento aceptado.
+ */
+async function createAcceptedConsent({
+  id_trabajador = '1234567890',
+  id_empresa = '900123456',
+  version_acuerdo = 'v1.0',
+  correo = 'trabajador@example.com',
+  kair_version = '0.1.189-test',
+} = {}) {
+  const request = require('supertest');
+  const app = makeApp();
+  const apiKey = TEST_API_KEY;
+
+  // Asegurar Acuerdo activo
+  const acuerdo = require('../src/services/agreement').getActive();
+  if (!acuerdo) seedActiveAgreement({ version: version_acuerdo });
+
+  // Crear consentimiento
+  const r1 = await request(app)
+    .post('/internal/consentimientos')
+    .set('X-Internal-API-Key', apiKey)
+    .send({
+      id_trabajador,
+      id_empresa,
+      version_acuerdo,
+      correo_verificacion: correo,
+      kair_version,
+    });
+
+  if (r1.status !== 201) {
+    throw new Error(
+      `createAcceptedConsent: no se pudo crear consentimiento ` +
+      `(status=${r1.status}, body=${JSON.stringify(r1.body)})`
+    );
+  }
+
+  const consentId = r1.body.consent_id;
+  const otp = r1.body.devOtp;
+
+  // Aceptar el OTP
+  const r2 = await request(app)
+    .post(`/internal/consentimientos/${consentId}/verify-otp`)
+    .set('X-Internal-API-Key', apiKey)
+    .send({ otp, kair_version });
+
+  if (r2.status !== 200 || r2.body.manifestacion_aceptada !== true) {
+    throw new Error(
+      `createAcceptedConsent: no se pudo aceptar OTP ` +
+      `(status=${r2.status}, body=${JSON.stringify(r2.body)})`
+    );
+  }
+
+  return { consent_id: consentId, id_trabajador, id_empresa, version_acuerdo };
+}
+
 const { sha256 } = require('../src/crypto/hash');
 
 /**
@@ -154,6 +217,7 @@ module.exports = {
   withApiKey,
   withAdminApiKey,
   createSignRequestWithIdentificacion,
+  createAcceptedConsent,
   TEST_API_KEY,
   TEST_ADMIN_API_KEY,
 };

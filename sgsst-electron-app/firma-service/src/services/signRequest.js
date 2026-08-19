@@ -47,6 +47,10 @@ const PDF_MAGIC = Buffer.from('%PDF-');
  * @param {string} [opts.ip]
  * @param {string} [opts.user_agent]
  * @param {string} [opts.metadata] - JSON string
+ * @param {number} [opts.consent_id] - id de gh_consentimientos_firma (Bloque E6).
+ *        Se persiste en la fila; la validación contra manifestacion_aceptada
+ *        y (id_trabajador, id_empresa, agreement_version) se hace en
+ *        commit() (services/publicFlow.js#validateConsentForCommit).
  * @returns {{signRequest: object, token: string, url_publica: string}}
  */
 function create({
@@ -54,6 +58,7 @@ function create({
   agreement_version, agreement_hash, document_hash, pdf_buffer, pdf_filename,
   version_kair, ip, user_agent, metadata,
   identificacion_tipo, identificacion_numero_hash,
+  consent_id,
 }) {
   // Validar PDF
   if (!Buffer.isBuffer(pdf_buffer)) {
@@ -111,14 +116,15 @@ function create({
          token_hash, sesion_id, identificacion_tipo, identificacion_numero_hash,
          fecha_creacion, fecha_expiracion, version_kair,
          ip_origen, user_agent, pdf_original_path, metadata,
-         verification_channel)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         verification_channel, consent_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id_solicitud, id_documento, id_trabajador, id_empresa,
       tipo_firma, calculated_hash, agreement_hash, agreement_version,
       token_hash, sesion_id, identificacion_tipo || null, identificacion_numero_hash || null,
       now.toISOString(), fecha_expiracion, version_kair,
       ip || null, user_agent || null, pdf_original_path, metadata || null, 'email',
+      consent_id || null,
     );
     const firmaId = result.lastInsertRowid;
 
@@ -139,6 +145,7 @@ function create({
       'rh:system', JSON.stringify({
         id_documento, tipo_firma, ttl_horas, document_hash: calculated_hash,
         agreement_version,
+        consent_id: consent_id || null,
       }),
     );
 
@@ -246,7 +253,7 @@ function getById(id) {
            fecha_revocacion, motivo_revocacion, motivo_rechazo,
            version_kair, manifestacion_voluntad_texto,
            manifestacion_voluntad_hash, pdf_original_path, pdf_firmado_path,
-           constancia_path, metadata
+           constancia_path, metadata, consent_id
     FROM gh_firmas_electronicas
     WHERE id = ?
     LIMIT 1

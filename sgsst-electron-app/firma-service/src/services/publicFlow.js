@@ -25,6 +25,7 @@ const { generateOTP, hashOTP, verifyOTP, isLocked } = require('../crypto/otp');
 const { hashWithSalt, generateSalt, sha256, generateIdSolicitud: _ } = require('../crypto/hash');
 const { canonicalJSON } = require('../crypto/compare');
 const signRequestService = require('./signRequest');
+const consentService = require('./consent');
 const mailer = require('./mailer');
 const storage = require('./storage');
 const pdfGen = require('./pdfGen');
@@ -334,6 +335,23 @@ async function commit(token, opts, ip, user_agent) {
 
   // 2. Re-validar que el Acuerdo vinculado sigue siendo el activo (D2)
   validateAgreementStillActive(signRequest);
+
+  // 2.5. Validar consentimiento del Acuerdo (Bloque E6).
+  //      Demuestra la cadena legal: Acuerdo v1.0 → Consentimiento ACEPTADO
+  //      → Sign Request → Firma. Si signRequest.agreement_version IS NULL
+  //      (legacy pre-Bloque A), validateForCommit retorna skip:true y
+  //      no aplica esta validación (compatibilidad histórica, igual que
+  //      validateAgreementStillActive).
+  //      Si signRequest.agreement_version IS NOT NULL, el consentimiento
+  //      debe existir, estar aceptado, y coincidir con (trabajador,
+  //      empresa, version_acuerdo). Cualquier falla lanza 409 con código
+  //      específico (CONSENT_NOT_FOUND, CONSENT_NOT_ACCEPTED, etc.).
+  //
+  //      Decisión de diseño: se valida ANTES de generar PDFs/id_constancia
+  //      para fallar rápido. En la práctica de K+AIR actual,
+  //      manifestacion_aceptada solo cambia 0→1 (no hay endpoint de
+  //      revocación), por lo que la ventana de race es teórica.
+  consentService.validateForCommit(signRequest);
 
   // 3. Validar precondiciones
   if (signRequest.estado !== 'DOCUMENT_VIEWED') {

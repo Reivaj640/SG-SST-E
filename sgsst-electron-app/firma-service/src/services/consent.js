@@ -251,11 +251,128 @@ function verifyOtp({ consentId, otp, kair_version }) {
     { attempts: newAttempts, max_attempts: config.ttl.otpMaxAttempts });
 }
 
+/**
+ * Valida un consentimiento para ser usado en commit() de un sign request.
+ *
+ * Esta es la pieza clave del Bloque E6: demuestra la cadena legal
+ *   Acuerdo v1.0 → Consentimiento ACEPTADO → Sign Request → Firma
+ *
+ * Reglas (en orden de evaluación, cada una con código de error específico):
+ *
+ *   1. signRequest.agreement_version IS NULL
+ *      → retornar { skip: true } (compatibilidad legacy, no se valida)
+ *      Nota: esta rama se decide en el caller (publicFlow.js#commit)
+ *      para mantener validateForCommit enfocado en la validación.
+ *      Si llegara aquí con agreement_version=NULL, también sería skip
+ *      por seguridad (defensa en profundidad).
+ *
+ *   2. signRequest.consent_id IS NULL
+ *      → 409 CONSENT_REQUIRED
+ *      "Falta consent_id en un sign request con agreement_version"
+ *
+ *   3. El consentimiento con id = consent_id NO existe
+ *      → 409 CONSENT_NOT_FOUND
+ *
+ *   4. El consentimiento NO está aceptado (manifestacion_aceptada != 1)
+ *      → 409 CONSENT_NOT_ACCEPTED
+ *
+ *   5. El consentimiento es de OTRO trabajador
+ *      → 409 CONSENT_WORKER_MISMATCH
+ *
+ *   6. El consentimiento es de OTRA empresa
+ *      → 409 CONSENT_COMPANY_MISMATCH
+ *
+ *   7. El consentimiento es de OTRA versión del Acuerdo
+ *      → 409 CONSENT_VERSION_MISMATCH
+ *
+ * Si todo OK, retorna { skip: false, consent: <fila> }.
+ *
+ * @param {object} signRequest - fila de gh_firmas_electronicas
+ * @returns {{skip: true} | {skip: false, consent: object}}
+ * @throws AppError 409 con código específico en cualquier falla.
+ */
+function validateForCommit(signRequest) {
+  // Defensa en profundidad: si llegan sign requests legacy,
+  // también saltamos (no deberían llegar aquí — el caller decide).
+  if (!signRequest.agreement_version) {
+    return { skip: true };
+  }
+
+  // Paso 2: consent_id obligatorio
+  if (signRequest.consent_id === null || signRequest.consent_id === undefined) {
+    throw new AppError(409, 'CONSENT_REQUIRED',
+      'El sign request requiere un consent_id (Bloque E6) vinculado a un consentimiento ACEPTADO del Acuerdo',
+      {
+        id_solicitud: signRequest.id_solicitud,
+        agreement_version: signRequest.agreement_version,
+      });
+  }
+
+  // Paso 3: el consentimiento existe
+  const consent = getById(signRequest.consent_id);
+  if (!consent) {
+    throw new AppError(409, 'CONSENT_NOT_FOUND',
+      `El consentimiento ${signRequest.consent_id} no existe`,
+      {
+        consent_id: signRequest.consent_id,
+        id_solicitud: signRequest.id_solicitud,
+      });
+  }
+
+  // Paso 4: manifestacion_aceptada = 1
+  if (consent.manifestacion_aceptada !== 1) {
+    throw new AppError(409, 'CONSENT_NOT_ACCEPTED',
+      'El consentimiento no está aceptado (manifestacion_aceptada != 1)',
+      {
+        consent_id: consent.id,
+        manifestacion_aceptada: consent.manifestacion_aceptada,
+        estado: consent.estado,
+        id_solicitud: signRequest.id_solicitud,
+      });
+  }
+
+  // Paso 5: mismo trabajador
+  if (consent.id_trabajador !== signRequest.id_trabajador) {
+    throw new AppError(409, 'CONSENT_WORKER_MISMATCH',
+      'El consentimiento pertenece a otro trabajador',
+      {
+        consent_id: consent.id,
+        consent_id_trabajador: consent.id_trabajador,
+        sign_request_id_trabajador: signRequest.id_trabajador,
+      });
+  }
+
+  // Paso 6: misma empresa
+  if (consent.id_empresa !== signRequest.id_empresa) {
+    throw new AppError(409, 'CONSENT_COMPANY_MISMATCH',
+      'El consentimiento pertenece a otra empresa',
+      {
+        consent_id: consent.id,
+        consent_id_empresa: consent.id_empresa,
+        sign_request_id_empresa: signRequest.id_empresa,
+      });
+  }
+
+  // Paso 7: misma versión del Acuerdo
+  if (consent.version_acuerdo !== signRequest.agreement_version) {
+    throw new AppError(409, 'CONSENT_VERSION_MISMATCH',
+      'El consentimiento es de otra versión del Acuerdo',
+      {
+        consent_id: consent.id,
+        consent_version_acuerdo: consent.version_acuerdo,
+        sign_request_agreement_version: signRequest.agreement_version,
+      });
+  }
+
+  return { skip: false, consent };
+}
+
 module.exports = {
   create,
   verifyOtp,
   getById,
   getExisting,
+  validateForCommit,
   ESTADO_PENDING,
   ESTADO_ACCEPTED,
   ESTADO_LOCKED,
