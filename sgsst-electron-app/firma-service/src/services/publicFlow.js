@@ -195,9 +195,8 @@ async function identify(token, tipo_documento, numero_documento, ip, user_agent)
   // 1. Resolver token
   const { signRequest } = resolveToken(token);
 
-  // 2. Validar que la solicitud está en estado adecuado para identify.
-  //    Bloque E8.4: 'DOCUMENT_OPENED' removido del CHECK (estado zombie, no se usa en código).
-  const estadosPermitidos = ['PENDING', 'OPENED', 'IDENTIFICATION_STARTED', 'IDENTIFIED', 'OTP_SENT', 'OTP_VERIFIED', 'DOCUMENT_VIEWED'];
+  // 2. Validar que la solicitud está en estado adecuado para identify
+  const estadosPermitidos = ['PENDING', 'OPENED', 'IDENTIFICATION_STARTED', 'IDENTIFIED', 'OTP_SENT', 'OTP_VERIFIED', 'DOCUMENT_OPENED', 'DOCUMENT_VIEWED'];
   if (!estadosPermitidos.includes(signRequest.estado)) {
     throw new AppError(409, 'INVALID_STATE_TRANSITION',
       `No se puede identificar en estado '${signRequest.estado}'`,
@@ -670,8 +669,7 @@ function reject(token, motivo, ip, user_agent) {
 /**
  * Registra que el trabajador vio el documento (scroll al final).
  *
- * Transición (v1 simplificada, Bloque E8.4): OTP_VERIFIED -> DOCUMENT_VIEWED
- *   (v1 salta el estado intermedio DOCUMENT_OPENED — no se usa en código).
+ * Transición: OTP_VERIFIED -> DOCUMENT_OPENED -> DOCUMENT_VIEWED
  *
  * @param {string} token
  * @param {object} opts - { segundosEnPagina, scrollAlFinal }
@@ -684,10 +682,8 @@ function viewDocument(token, { segundosEnPagina, scrollAlFinal }, ip, user_agent
   // 2. Re-validar que el Acuerdo vinculado sigue siendo el activo (D2)
   validateAgreementStillActive(signRequest);
 
-  // 3. Validar estado: debe estar al menos en OTP_VERIFIED.
-  //    Bloque E8.4: 'DOCUMENT_OPENED' y 'MANIFESTATION_RECORDED' removidos del CHECK
-  //    (estados zombie). En el flujo real, v1 salta OTP_VERIFIED → DOCUMENT_VIEWED directo.
-  const estadosPermitidos = ['OTP_VERIFIED', 'DOCUMENT_VIEWED'];
+  // 3. Validar estado: debe estar al menos en OTP_VERIFIED
+  const estadosPermitidos = ['OTP_VERIFIED', 'DOCUMENT_OPENED', 'DOCUMENT_VIEWED', 'MANIFESTATION_RECORDED'];
   if (!estadosPermitidos.includes(signRequest.estado)) {
     throw new AppError(409, 'INVALID_STATE_TRANSITION',
       `No se puede ver el documento en estado '${signRequest.estado}'`,
@@ -700,11 +696,14 @@ function viewDocument(token, { segundosEnPagina, scrollAlFinal }, ip, user_agent
       'Debe scrollear al final del documento antes de continuar');
   }
 
-  // 4. Transición de estado (v1 simplificada, Bloque E8.4).
-  //    DOCUMENT_OPENED fue removido del CHECK (estado zombie, no se usa en código).
-  //    El flujo va directo: OTP_VERIFIED -> DOCUMENT_VIEWED.
+  // 4. Transición de estado
   const now = new Date().toISOString();
-  const nuevoEstado = 'DOCUMENT_VIEWED';  // siempre VIEWED (v1)
+  const nuevoEstado = signRequest.estado === 'OTP_VERIFIED'
+    ? 'DOCUMENT_VIEWED'  // primera vez: salta a VIEWED si trae scroll=true
+    : 'DOCUMENT_VIEWED';
+  // NOTA: en el flujo real, DOCUMENT_OPENED y DOCUMENT_VIEWED son separados
+  // (uno cuando abre el visor, otro cuando scrollea al final).
+  // Para v1 simplificamos: viewDocument con scroll=true marca VIEWED.
 
   const tx = db.transaction(() => {
     db.prepare(`
@@ -735,10 +734,8 @@ function getPdfForToken(token) {
   // 1. Resolver token
   const { signRequest } = resolveToken(token);
 
-  // 2. Validar estado.
-  //    Bloque E8.4: 'DOCUMENT_OPENED' y 'MANIFESTATION_RECORDED' removidos del CHECK
-  //    (estados zombie). El PDF se sirve desde OTP_VERIFIED en adelante.
-  const estadosPermitidos = ['OTP_VERIFIED', 'DOCUMENT_VIEWED', 'SIGNED'];
+  // 2. Validar estado
+  const estadosPermitidos = ['OTP_VERIFIED', 'DOCUMENT_OPENED', 'DOCUMENT_VIEWED', 'MANIFESTATION_RECORDED', 'SIGNED'];
   if (!estadosPermitidos.includes(signRequest.estado)) {
     throw new AppError(409, 'INVALID_STATE_TRANSITION',
       `El PDF no está disponible en estado '${signRequest.estado}'`,
