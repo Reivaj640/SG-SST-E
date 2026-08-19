@@ -4,13 +4,16 @@
  * - POST /internal/consentimientos
  * - POST /internal/consentimientos/:id/verify-otp
  *
- * Ver API.md §6.10 y §6.11.
+ * Auth (I-010, D-13): ambos endpoints usan `requireEmpresaScope` para
+ * scope per-empresa.
+ *
+ * Ver API.md §6.10 y §6.11 y docs/kair-firma-integration/I-010-design.md.
  */
 'use strict';
 
 const express = require('express');
 const router = express.Router();
-const { internalApiAuth } = require('../middleware/auth');
+const { requireEmpresaScope } = require('../middleware/authz');
 const { validateBody } = require('../middleware/validate');
 const { createConsentBody, verifyOtpBody } = require('../schemas');
 const consentService = require('../services/consent');
@@ -20,8 +23,19 @@ const logger = require('../utils/logger');
 /**
  * POST /internal/consentimientos
  * Crea un consentimiento y envía OTP.
+ *
+ * I-010 (D-13): per-company authz. `checkIdEmpresa: true` valida que el
+ * id_empresa del body coincida con la empresa del cliente autenticado.
+ * En client mode mismatch → 403 EMPRESA_MISMATCH.
+ * En legacy mode (deprecation), se permite cualquier id_empresa.
  */
-router.post('/consentimientos', internalApiAuth(), validateBody(createConsentBody), async (req, res, next) => {
+router.post('/consentimientos',
+  requireEmpresaScope({
+    allowedOperations: ['consent:create'],
+    checkIdEmpresa: true,
+  }),
+  validateBody(createConsentBody),
+  async (req, res, next) => {
   try {
     const { id_trabajador, id_empresa, version_acuerdo, correo_verificacion, kair_version } = req.body;
     const ip = req.ip;
@@ -88,30 +102,56 @@ router.post('/consentimientos', internalApiAuth(), validateBody(createConsentBod
 /**
  * POST /internal/consentimientos/:id/verify-otp
  * Verifica el OTP y acepta el consentimiento.
+ *
+ * I-010 (D-13): per-company authz post-lookup. Después de obtener el
+ * consentimiento, si el cliente es per-empresa y el consentimiento
+ * pertenece a OTRA empresa, retornar 404 (silent) en vez de 403.
+ * En legacy mode (deprecation), se permite el acceso.
  */
-router.post('/consentimientos/:id/verify-otp', internalApiAuth(), validateBody(verifyOtpBody), (req, res, next) => {
-  try {
-    const consentId = parseInt(req.params.id, 10);
-    if (!Number.isInteger(consentId) || consentId <= 0) {
-      throw new (require('../middleware/errors').AppError)(400, 'INVALID_REQUEST_BODY',
-        'El id del consentimiento debe ser un entero positivo');
+router.post('/consentimientos/:id/verify-otp',
+  requireEmpresaScope({
+    allowedOperations: ['consent:verify'],
+  }),
+  validateBody(verifyOtpBody),
+  (req, res, next) => {
+    try {
+      const consentId = parseInt(req.params.id, 10);
+      if (!Number.isInteger(consentId) || consentId <= 0) {
+        throw new (require('../middleware/errors').AppError)(400, 'INVALID_REQUEST_BODY',
+          'El id del consentimiento debe ser un entero positivo');
+      }
+
+      // Lookup preliminar para check per-empresa post-lookup.
+      // Esto NO es un cambio de comportamiento para legacy mode.
+      const { AppError } = require('../middleware/errors');
+      const db = require('../db/connection');
+      const consentRow = db.prepare(
+        'SELECT id, id_empresa, estado FROM gh_consentimientos_firma WHERE id = ?'
+      ).get(consentId);
+      if (!consentRow) {
+        // Dejar que el service lance el 404 nativo (CONSENT_NOT_FOUND).
+      } else if (req.authSource === 'client' &&
+                 consentRow.id_empresa !== req.id_empresa) {
+        throw new AppError(404, 'NOT_FOUND',
+          `Consentimiento ${consentId} no encontrado`,
+          { consent_id: consentId });
+      }
+
+      const { otp, kair_version } = req.body;
+      const result = consentService.verifyOtp({ consentId, otp, kair_version });
+
+      res.json({
+        ok: true,
+        consent_id: result.consent.id,
+        version_acuerdo: result.consent.version_acuerdo,
+        estado: result.consent.estado,
+        fecha_aceptacion: result.consent.fecha_aceptacion,
+        manifestacion_aceptada: result.consent.manifestacion_aceptada === 1,
+      });
+    } catch (err) {
+      next(err);
     }
-
-    const { otp, kair_version } = req.body;
-    const result = consentService.verifyOtp({ consentId, otp, kair_version });
-
-    res.json({
-      ok: true,
-      consent_id: result.consent.id,
-      version_acuerdo: result.consent.version_acuerdo,
-      estado: result.consent.estado,
-      fecha_aceptacion: result.consent.fecha_aceptacion,
-      manifestacion_aceptada: result.consent.manifestacion_aceptada === 1,
-    });
-  } catch (err) {
-    next(err);
-  }
-});
+  });
 
 function maskEmail(email) {
   const [local, domain] = email.split('@');

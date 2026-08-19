@@ -5,16 +5,21 @@
  * - GET  /internal/sign-requests/:id  (consulta por id_solicitud o id interno)
  * - GET  /internal/sign-requests  (lista con filtros)
  *
- * Ver API.md §6.1, §6.2, §6.8.
+ * Auth (I-010, D-13): los 3 endpoints usan `requireEmpresaScope` para
+ * scope per-empresa. El middleware hace authn (API key) + authz (per-empresa).
+ * Reemplaza al antiguo `internalApiAuth` en estos 3 endpoints.
+ *
+ * Ver API.md §6.1, §6.2, §6.8 y docs/kair-firma-integration/I-010-design.md.
  */
 'use strict';
 
 const express = require('express');
 const router = express.Router();
-const { internalApiAuth } = require('../middleware/auth');
+const { requireEmpresaScope } = require('../middleware/authz');
 const { uploadPdf } = require('../middleware/upload');
 const { signRequestBody, signRequestListQuery } = require('../schemas');
 const signRequestService = require('../services/signRequest');
+const { AppError } = require('../middleware/errors');
 const logger = require('../utils/logger');
 
 /**
@@ -25,7 +30,15 @@ const logger = require('../utils/logger');
  *   - documento: archivo PDF
  *   - metadata: JSON string con id_documento, id_trabajador, etc.
  */
-router.post('/sign-requests', internalApiAuth(), uploadPdf(), (req, res, next) => {
+router.post('/sign-requests',
+  requireEmpresaScope({
+    allowedOperations: ['sign_request:create'],
+    // checkIdEmpresa NO se puede usar acá: el body es multipart y multer
+    // lo parsea DESPUÉS de este middleware. El handler hace el check
+    // post-parse (ver bloque "I-010 check body id_empresa" más abajo).
+  }),
+  uploadPdf(),
+  (req, res, next) => {
   try {
     // Parsear el campo 'metadata' (viene como JSON string en multipart)
     const metadataRaw = req.body.metadata;
@@ -48,6 +61,28 @@ router.post('/sign-requests', internalApiAuth(), uploadPdf(), (req, res, next) =
           code: 'INVALID_REQUEST_BODY',
           message: 'El campo "metadata" debe ser JSON válido',
           details: { parse_error: e.message },
+          request_id: req.id,
+        },
+      });
+    }
+
+    // I-010 (D-13): per-company authz post-parse del body multipart.
+    // El middleware requireEmpresaScope corrió ANTES de multer, así que
+    // no pudo checkar body.id_empresa. Lo hacemos acá, ya con metaObj.
+    // En client mode + meta.id_empresa !== req.id_empresa → 403 EMPRESA_MISMATCH.
+    // En legacy mode (deprecation), se permite cualquier id_empresa.
+    if (req.authSource === 'client' &&
+        typeof metaObj.id_empresa === 'string' &&
+        metaObj.id_empresa.length > 0 &&
+        metaObj.id_empresa !== req.id_empresa) {
+      return res.status(403).json({
+        error: {
+          code: 'EMPRESA_MISMATCH',
+          message: 'El id_empresa de la solicitud no coincide con la identidad autenticada',
+          details: {
+            auth_id_empresa: req.id_empresa,
+            requested_id_empresa: metaObj.id_empresa,
+          },
           request_id: req.id,
         },
       });
@@ -118,30 +153,50 @@ router.post('/sign-requests', internalApiAuth(), uploadPdf(), (req, res, next) =
  * GET /internal/sign-requests/:id
  * Consulta por id_solicitud (SIGN-YYYY-NNNNNN) o por id interno numérico.
  */
-router.get('/sign-requests/:id', internalApiAuth(), (req, res, next) => {
-  try {
-    const { id } = req.params;
-    let signRequest;
+router.get('/sign-requests/:id',
+  requireEmpresaScope({
+    allowedOperations: ['sign_request:read'],
+  }),
+  (req, res, next) => {
+    try {
+      const { id } = req.params;
+      let signRequest;
 
-    if (/^SIGN-\d{4}-\d{6}$/.test(id)) {
-      signRequest = signRequestService.getByIdSolicitud(id);
-    } else if (/^\d+$/.test(id)) {
-      signRequest = signRequestService.getById(parseInt(id, 10));
-    } else {
-      signRequest = null;
-    }
+      if (/^SIGN-\d{4}-\d{6}$/.test(id)) {
+        signRequest = signRequestService.getByIdSolicitud(id);
+      } else if (/^\d+$/.test(id)) {
+        signRequest = signRequestService.getById(parseInt(id, 10));
+      } else {
+        signRequest = null;
+      }
 
-    if (!signRequest) {
-      return res.status(404).json({
-        error: {
-          code: 'NOT_FOUND',
-          message: `Solicitud ${id} no encontrada`,
-          request_id: req.id,
-        },
-      });
-    }
+      if (!signRequest) {
+        return res.status(404).json({
+          error: {
+            code: 'NOT_FOUND',
+            message: `Solicitud ${id} no encontrada`,
+            request_id: req.id,
+          },
+        });
+      }
 
-    res.json({
+      // I-010 (D-13): per-company authz post-lookup.
+      // Si el cliente es per-empresa (authSource='client') y la solicitud
+      // pertenece a OTRA empresa, retornar 404 (silent) en vez de 403
+      // para no filtrar la existencia del recurso.
+      // En legacy mode (deprecation), se permite el acceso sin check.
+      if (req.authSource === 'client' &&
+          signRequest.id_empresa !== req.id_empresa) {
+        return res.status(404).json({
+          error: {
+            code: 'NOT_FOUND',
+            message: `Solicitud ${id} no encontrada`,
+            request_id: req.id,
+          },
+        });
+      }
+
+      res.json({
       id_solicitud: signRequest.id_solicitud,
       id_interno: signRequest.id,
       id_documento: signRequest.id_documento,
@@ -171,54 +226,71 @@ router.get('/sign-requests/:id', internalApiAuth(), (req, res, next) => {
 /**
  * GET /internal/sign-requests
  * Lista con filtros.
+ *
+ * I-010 (D-13): per-company authz.
+ *  - En `client` mode: se PISA `q.id_empresa` con `req.id_empresa`. No hay
+ *    forma de escapar el scope via query (?id_empresa=B es ignorado).
+ *  - En `legacy` mode (deprecation): se respeta el `?id_empresa=` del query
+ *    para mantener compatibilidad con K+AIR durante la migración.
  */
-router.get('/sign-requests', internalApiAuth(), (req, res, next) => {
-  try {
-    // Parsear manualmente porque express.query es todo string
-    const result = signRequestListQuery.safeParse(req.query);
-    if (!result.success) {
-      return res.status(400).json({
-        error: {
-          code: 'INVALID_REQUEST_BODY',
-          message: 'Query params inválidos',
-          details: { issues: result.error.issues },
-          request_id: req.id,
-        },
+router.get('/sign-requests',
+  requireEmpresaScope({
+    allowedOperations: ['sign_request:read'],
+  }),
+  (req, res, next) => {
+    try {
+      // Parsear manualmente porque express.query es todo string
+      const result = signRequestListQuery.safeParse(req.query);
+      if (!result.success) {
+        return res.status(400).json({
+          error: {
+            code: 'INVALID_REQUEST_BODY',
+            message: 'Query params inválidos',
+            details: { issues: result.error.issues },
+            request_id: req.id,
+          },
+        });
+      }
+      const q = result.data;
+
+      // I-010: forzar id_empresa desde la identidad autenticada en client mode.
+      // En legacy mode, respetar el query (compat con K+AIR pre-I-010).
+      let effectiveEmpresa = q.id_empresa;
+      if (req.authSource === 'client') {
+        effectiveEmpresa = req.id_empresa;
+      }
+
+      const { items, total, limit, offset } = signRequestService.list({
+        id_empresa: effectiveEmpresa,
+        estado: q.estado,
+        id_trabajador: q.id_trabajador,
+        id_documento: q.id_documento,
+        desde: q.desde,
+        hasta: q.hasta,
+        limit: q.limit,
+        offset: q.offset,
       });
+
+      res.json({
+        total,
+        limit,
+        offset,
+        items: items.map(it => ({
+          id_solicitud: it.id_solicitud,
+          id_interno: it.id,
+          id_documento: it.id_documento,
+          id_trabajador: it.id_trabajador,
+          id_empresa: it.id_empresa,
+          tipo_firma: it.tipo_firma,
+          estado: it.estado,
+          fecha_creacion: it.fecha_creacion,
+          fecha_expiracion: it.fecha_expiracion,
+          fecha_firma: it.fecha_firma,
+        })),
+      });
+    } catch (err) {
+      next(err);
     }
-    const q = result.data;
-
-    const { items, total, limit, offset } = signRequestService.list({
-      id_empresa: q.id_empresa,
-      estado: q.estado,
-      id_trabajador: q.id_trabajador,
-      id_documento: q.id_documento,
-      desde: q.desde,
-      hasta: q.hasta,
-      limit: q.limit,
-      offset: q.offset,
-    });
-
-    res.json({
-      total,
-      limit,
-      offset,
-      items: items.map(it => ({
-        id_solicitud: it.id_solicitud,
-        id_interno: it.id,
-        id_documento: it.id_documento,
-        id_trabajador: it.id_trabajador,
-        id_empresa: it.id_empresa,
-        tipo_firma: it.tipo_firma,
-        estado: it.estado,
-        fecha_creacion: it.fecha_creacion,
-        fecha_expiracion: it.fecha_expiracion,
-        fecha_firma: it.fecha_firma,
-      })),
-    });
-  } catch (err) {
-    next(err);
-  }
-});
+  });
 
 module.exports = router;

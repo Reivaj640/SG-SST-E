@@ -33,6 +33,15 @@ const MINI_APP_DIR = path.resolve(__dirname, '..', 'web', 'firma');
 const TEST_API_KEY = 'test-internal-api-key-32-bytes-min!!';
 const TEST_ADMIN_API_KEY = 'test-admin-api-key-32-bytes-min!!!!!';
 
+// I-010 (D-13): API keys per-company para tests de cross-company.
+// TEST_API_KEY sigue siendo la legacy key (en config.auth.internalApiKey).
+// TEST_API_KEY_CLIENT_A y TEST_API_KEY_CLIENT_B son keys de clientes
+// per-empresa sembrados en gh_internal_clients vía seedTestClients().
+const TEST_API_KEY_CLIENT_A = 'test-clientA-internal-api-key-32bytes!!';
+const TEST_API_KEY_CLIENT_B = 'test-clientB-internal-api-key-32bytes!!';
+const TEST_EMPRESA_A = '900123456';
+const TEST_EMPRESA_B = '900999999';
+
 // Sobrescribir las API keys en config (objeto mutable) para que los
 // middlewares de auth usen las keys de test.
 config.auth.internalApiKey = TEST_API_KEY;
@@ -44,6 +53,10 @@ const TABLES = [
   'gh_firma_eventos',
   'gh_firma_sesiones',
   'gh_firmas_electronicas',
+  // I-010 (D-13): tabla de clientes internos per-company authz.
+  // Se limpia entre tests para que cada test arme sus propios clientes
+  // (o use los sembrados por seedTestClients() que se llama explícitamente).
+  'gh_internal_clients',
   // NO incluir gh_firma_schema_migrations:
   //   - Es metadata del schema (qué migraciones se aplicaron), NO data de test.
   //   - Si resetDb() la limpia, el siguiente proceso ve la tabla vacía y
@@ -74,6 +87,11 @@ function resetDb() {
     `).run();
   } catch (e) { /* sqlite_sequence no existe en algunas BDs */ }
   mailer.clearDevInbox();
+  // I-010: limpiar cache de internalClient para que no haya entradas stale
+  // de tests anteriores. El cache es por proceso (no por test).
+  try {
+    require('../src/services/internalClient').clearCache();
+  } catch (e) { /* ignore si internalClient no está cargado todavía */ }
   // Borrar PDFs del storage
   for (const dir of [storage.PATHS.originales, storage.PATHS.firmados, storage.PATHS.constancias]) {
     try {
@@ -238,14 +256,71 @@ function withAdminApiKey(req) {
   return req.set('X-Admin-API-Key', TEST_ADMIN_API_KEY);
 }
 
+// I-010 (D-13): helpers per-empresa. Usan las API keys sembradas por
+// seedTestClients(). El cache del service se limpia en resetDb().
+function withClientAApiKey(req) {
+  return req.set('X-Internal-API-Key', TEST_API_KEY_CLIENT_A);
+}
+
+function withClientBApiKey(req) {
+  return req.set('X-Internal-API-Key', TEST_API_KEY_CLIENT_B);
+}
+
+function withLegacyApiKey(req) {
+  return req.set('X-Internal-API-Key', TEST_API_KEY);
+}
+
+/**
+ * Siembra 2 clientes per-empresa en gh_internal_clients.
+ *   - Cliente A: id_empresa=900123456, allowed_operations=todas
+ *   - Cliente B: id_empresa=900999999, allowed_operations=todas
+ *
+ * Se llama explícitamente en tests que necesitan el nuevo authz per-empresa
+ * (cross-company). Los tests existentes siguen usando withApiKey() (legacy)
+ * y no necesitan este helper.
+ *
+ * Idempotente: si los clientes ya existen (mismo hash), no duplica.
+ * Llamar después de resetDb() (que limpia la tabla).
+ */
+function seedTestClients() {
+  const internalClient = require('../src/services/internalClient');
+  const ALL_OPS = [
+    'sign_request:create',
+    'sign_request:read',
+    'consent:create',
+    'consent:verify',
+    'audit:read',
+  ].join(',');
+  internalClient.createClient({
+    id_empresa: TEST_EMPRESA_A,
+    allowed_operations: ALL_OPS,
+    description: 'TEST client A (empresa 900123456)',
+    apiKey: TEST_API_KEY_CLIENT_A,
+  });
+  internalClient.createClient({
+    id_empresa: TEST_EMPRESA_B,
+    allowed_operations: ALL_OPS,
+    description: 'TEST client B (empresa 900999999)',
+    apiKey: TEST_API_KEY_CLIENT_B,
+  });
+}
+
 module.exports = {
   resetDb,
   seedActiveAgreement,
   makeApp,
   withApiKey,
   withAdminApiKey,
+  withClientAApiKey,
+  withClientBApiKey,
+  withLegacyApiKey,
+  seedTestClients,
   createSignRequestWithIdentificacion,
   createAcceptedConsent,
   TEST_API_KEY,
   TEST_ADMIN_API_KEY,
+  TEST_API_KEY_CLIENT_A,
+  TEST_API_KEY_CLIENT_B,
+  TEST_EMPRESA_A,
+  TEST_EMPRESA_B,
 };
