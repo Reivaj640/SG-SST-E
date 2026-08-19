@@ -22,6 +22,7 @@ const agreementRouter = require('./routes/agreement');
 const consentRouter = require('./routes/consent');
 const signRequestRouter = require('./routes/signRequest');
 const publicRouter = require('./routes/public');
+const adminRouter = require('./routes/admin');
 const { migrate } = require('./db/migrate');
 
 // Ruta a la mini-app estática (HTML+CSS+JS)
@@ -105,6 +106,9 @@ function createApp() {
   app.use('/internal', agreementRouter);
   app.use('/internal', consentRouter);
   app.use('/internal', signRequestRouter);
+  // Endpoints administrativos: protegidos por X-Admin-API-Key
+  // (no expuestos a K+AIR, solo operador humano con acceso físico).
+  app.use('/internal/admin', adminRouter);
 
   // 404 para rutas no existentes
   app.use((req, res) => {
