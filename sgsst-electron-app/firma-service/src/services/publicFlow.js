@@ -448,11 +448,7 @@ async function commit(token, opts, ip, user_agent) {
       signRequestService.registerEvent(signRequest.id, 'PDF_GENERATED',
         { path: pdf_firmado_path, size: pdfFirmadoBuf.length, id_constancia },
         'sistema', ip, user_agent);
-      // TODO E2: mover COPY_SENT fuera de la tx y registrar post-envío
-      // (con COPY_FAILED si el mailer falla). Por ahora queda dentro
-      // de la tx como antes, sin adjuntos.
-      signRequestService.registerEvent(signRequest.id, 'COPY_SENT',
-        { canal: 'email' }, 'sistema', ip, user_agent);
+      // COPY_SENT se registra post-tx (Bloque E2) — ver paso 13 abajo
     });
     tx();
   } catch (err) {
@@ -462,20 +458,34 @@ async function commit(token, opts, ip, user_agent) {
     throw err;
   }
 
-  // 13. Enviar correo con PDF + Constancia (best-effort, TODO E2)
-  //     El sendSignedCopy() dedicado con attachments se implementa en E2.
-  //     Por ahora, se reusa sendOTP con tipo 'copy' y otp dummy (compat).
+  // 13. Enviar copia firmada al correo (Bloque E2).
+  //     Best-effort: si el envío falla, el sign request sigue en SIGNED
+  //     (la firma es válida legalmente), pero se registra COPY_FAILED en
+  //     la auditoría para que RH pueda intervenir (reenviar, escalar).
+  //     El PDF y la Constancia se adjuntan al correo vía sendSignedCopy().
   const correo = (signRequest.metadata && JSON.parse(signRequest.metadata || '{}').correo) || 'trabajador@ejemplo.com';
   try {
-    await mailer.sendOTP({
+    const sendResult = await mailer.sendSignedCopy({
       to: correo,
-      otp: '000000',  // dummy
-      tipo: 'copy',
+      pdfPath: pdf_firmado_path,
+      constanciaPath: constancia_path,
       context: {
         id_solicitud: signRequest.id_solicitud,
         id_constancia,
-        message: `Tu documento firmado está disponible. PDF: ${pdf_firmado_path}, Constancia: ${constancia_path}`,
       },
+    });
+    signRequestService.registerEvent(signRequest.id, 'COPY_SENT',
+      {
+        canal: 'email',
+        messageId: sendResult.messageId,
+        size_pdf: pdfFirmadoBuf.length,
+        size_constancia: constanciaBuf.length,
+      },
+      'sistema', ip, user_agent);
+    logger.info('Copia firmada enviada', {
+      id_solicitud: signRequest.id_solicitud,
+      id_constancia,
+      messageId: sendResult.messageId,
     });
   } catch (err) {
     logger.warn('No se pudo enviar copia al trabajador', {
@@ -483,6 +493,14 @@ async function commit(token, opts, ip, user_agent) {
       id_constancia,
       error: err.message,
     });
+    signRequestService.registerEvent(signRequest.id, 'COPY_FAILED',
+      {
+        canal: 'email',
+        error: err.message,
+        code: err.code || 'SEND_ERROR',
+      },
+      'sistema', ip, user_agent);
+    // NO throw: la firma es válida. COPY_FAILED es informativo.
   }
 
   logger.info('Firma cerrada', {
