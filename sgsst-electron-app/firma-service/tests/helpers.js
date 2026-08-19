@@ -21,6 +21,7 @@ const consentRouter = require('../src/routes/consent');
 const signRequestRouter = require('../src/routes/signRequest');
 const publicRouter = require('../src/routes/public');
 const adminRouter = require('../src/routes/admin');
+const internalAuditRouter = require('../src/routes/internal-audit');
 const { errorHandler } = require('../src/middleware/errors');
 const agreementService = require('../src/services/agreement');
 const mailer = require('../src/services/mailer');
@@ -86,6 +87,7 @@ function makeApp() {
   app.use('/internal', agreementRouter);
   app.use('/internal', consentRouter);
   app.use('/internal', signRequestRouter);
+  app.use('/internal', internalAuditRouter);
   // Endpoints administrativos: deben estar en makeApp para tests
   // de tests/routes/admin.test.js.
   app.use('/internal/admin', adminRouter);
