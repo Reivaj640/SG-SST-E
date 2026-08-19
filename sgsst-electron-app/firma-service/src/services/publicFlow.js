@@ -224,14 +224,21 @@ async function identify(token, tipo_documento, numero_documento, ip, user_agent)
   }
 
   // 6. Identificación exitosa
+  //    Persistimos ip_origen y user_agent del firmante en la fila.
+  //    Estos valores se usan luego en el evidence_hash del commit.
+  //    COALESCE: si ya hay IP/UA de una identificación previa, los
+  //    preservamos (no sobrescribimos). El FAILED no persiste IP/UA
+  //    porque un intento fallido puede venir de cualquier red.
   const tx = db.transaction(() => {
     db.prepare(`
       UPDATE gh_firmas_electronicas
       SET estado = 'IDENTIFIED',
           identificacion_coincidio = 1,
+          ip_origen = COALESCE(?, ip_origen),
+          user_agent = COALESCE(?, user_agent),
           fecha_otp_enviado = ?
       WHERE id = ?
-    `).run(new Date().toISOString(), signRequest.id);
+    `).run(ip || null, user_agent || null, new Date().toISOString(), signRequest.id);
     signRequestService.registerEvent(signRequest.id, 'IDENTIFICATION_COMPLETED',
       { tipo_documento }, 'trabajador', ip, user_agent);
   });
@@ -359,10 +366,21 @@ async function commit(token, opts, ip, user_agent) {
   });
   const document_hash_firmado = sha256(pdfFirmadoBuf);
 
-  // 7. Construir evidencia (JSON canónico).
-  //    IMPORTANTE: incluir `agreement_version` para que un verificador externo
-  //    pueda reproducir el hash y probar "qué versión del Acuerdo" rigió
-  //    la firma, no solo "qué hash del Acuerdo" (ver Bloque D1).
+  // 7. Construir evidencia (JSON canónico) — Bloque E3.
+  //
+  //    El evidence_hash compromete TODOS los elementos que un
+  //    auditor forense necesita para reproducir y verificar la firma.
+  //    Cualquier cambio en estos campos produce un hash distinto,
+  //    demostrando criptográficamente que la firma está vinculada
+  //    a esos datos.
+  //
+  //    Política de IP/UA (decisión E3.2): `ip_origen` y `user_agent`
+  //    representan el contexto del FIRMANTE, capturado en identify().
+  //    El commit NO los sobrescribe. Si el firmante cambia de red
+  //    entre identificar y firmar, el hash sigue anclado al contexto
+  //    de identificación (que es donde se validó la identidad).
+  //    El contexto del commit se preserva en `gh_firma_eventos.ip/user_agent`
+  //    de los eventos post-identificación.
   const manifestacion_voluntad_texto = 'He leído, comprendido y acepto el contenido del documento en su totalidad.';
   const manifestacion_voluntad_hash = sha256(manifestacion_voluntad_texto);
   const evidencia = {
@@ -375,6 +393,13 @@ async function commit(token, opts, ip, user_agent) {
     agreement_hash: signRequest.agreement_hash,
     agreement_version: signRequest.agreement_version,  // ← D1 fix
     identificacion_tipo: signRequest.identificacion_tipo,
+    // === E3 nuevos campos ===
+    tipo_firma: signRequest.tipo_firma,
+    manifestacion_voluntad_hash,
+    // IP/UA del firmante, persistidos en identify() (no en commit).
+    // Si es null (caso legacy o bug de plomería HTTP), el hash usa null.
+    ip_origen: signRequest.ip_origen || null,
+    user_agent: signRequest.user_agent || null,
     fecha_creacion: signRequest.fecha_creacion,
     fecha_firma,
     version_kair: signRequest.version_kair,

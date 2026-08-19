@@ -584,17 +584,22 @@ test('POST /commit: evidence_hash verificable (canonicalJSON)', async () => {
     .post(`/api/sign/${token}/commit`)
     .send({ manifestacion_aceptada: true });
 
-  // Reproducir la evidencia y recalcular hash (D1 fix: incluir agreement_version)
+  // Reproducir la evidencia y recalcular hash
+  // (D1 fix: agreement_version; E3 fix: tipo_firma, manifestacion_voluntad_hash, ip_origen, user_agent)
   const { canonicalJSON } = require('../../src/crypto/compare');
   const { sha256 } = require('../../src/crypto/hash');
   const row = db.prepare(`
     SELECT id_solicitud, id_documento, id_trabajador, id_empresa,
            document_hash_original, document_hash_firmado,
            agreement_hash, agreement_version, identificacion_tipo,
-           fecha_creacion, fecha_firma, version_kair,
-           manifestacion_voluntad_texto
+           tipo_firma, manifestacion_voluntad_texto, ip_origen, user_agent,
+           fecha_creacion, fecha_firma, version_kair
     FROM gh_firmas_electronicas WHERE id = ?
   `).get(signRequest.id);
+
+  // E3: manifestacion_voluntad_hash se calcula desde el texto (mismo método que commit)
+  const mvt = row.manifestacion_voluntad_texto;
+  const mvh = sha256(mvt);
 
   const evidencia = {
     id_solicitud: row.id_solicitud,
@@ -606,10 +611,14 @@ test('POST /commit: evidence_hash verificable (canonicalJSON)', async () => {
     agreement_hash: row.agreement_hash,
     agreement_version: row.agreement_version,  // ← D1 fix
     identificacion_tipo: row.identificacion_tipo,
+    tipo_firma: row.tipo_firma, // ← E3
+    manifestacion_voluntad_hash: mvh, // ← E3
+    ip_origen: row.ip_origen || null, // ← E3 (puede ser null en test sin HTTP)
+    user_agent: row.user_agent || null, // ← E3 (puede ser null en test sin HTTP)
     fecha_creacion: row.fecha_creacion,
     fecha_firma: row.fecha_firma,
     version_kair: row.version_kair,
-    manifestacion_voluntad_texto: row.manifestacion_voluntad_texto,
+    manifestacion_voluntad_texto: mvt,
   };
   const evidenciaHash = sha256(canonicalJSON(evidencia));
 

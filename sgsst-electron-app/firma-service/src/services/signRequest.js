@@ -236,7 +236,7 @@ function getById(id) {
   return db.prepare(`
     SELECT id, id_solicitud, id_documento, id_trabajador, id_empresa,
            tipo_firma, estado, document_hash_original, document_hash_firmado,
-           agreement_hash, evidence_hash, token_hash, identificacion_tipo,
+           agreement_hash, agreement_version, evidence_hash, token_hash, identificacion_tipo,
            identificacion_numero_hash, identificacion_coincidio,
            correo_verificacion, correo_hash, otp_hash, otp_sal,
            otp_intentos, otp_bloqueado, ip_origen, user_agent,
