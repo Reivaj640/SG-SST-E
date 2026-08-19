@@ -12,6 +12,7 @@
 
 const config = require('../config');
 const logger = require('../utils/logger');
+const fs = require('fs');
 
 let _transporter = null;
 let _devInbox = []; // solo en dev, contiene últimos envíos
@@ -40,6 +41,94 @@ function getTransporter() {
     jsonTransport: true,
   });
   return _transporter;
+}
+
+/**
+ * Envía la copia firmada del documento al correo del firmante.
+ *
+ * Adjunta el PDF firmado y la Constancia como attachments.
+ *
+ * - Producción: nodemailer con SMTP + attachments reales.
+ * - Dev: nodemailer jsonTransport (no envía), pero los attachments
+ *   se persisten en `_devInbox` con metadata para que los tests
+ *   puedan verificar que la copia incluye los PDFs esperados.
+ *
+ * @param {object} opts
+ * @param {string} opts.to - Correo destino
+ * @param {string} opts.pdfPath - Path absoluto al PDF firmado
+ * @param {string} opts.constanciaPath - Path absoluto a la Constancia
+ * @param {object} opts.context - Metadata adicional
+ *
+ * @returns {Promise<{ok: boolean, messageId: string}>}
+ * @throws Error si los archivos no existen o falla el envío
+ */
+async function sendSignedCopy({ to, pdfPath, constanciaPath, context }) {
+  if (typeof to !== 'string' || !to.includes('@')) {
+    throw new Error('sendSignedCopy: `to` debe ser un correo válido');
+  }
+  if (typeof pdfPath !== 'string' || !fs.existsSync(pdfPath)) {
+    throw new Error(`sendSignedCopy: PDF firmado no existe: ${pdfPath}`);
+  }
+  if (typeof constanciaPath !== 'string' || !fs.existsSync(constanciaPath)) {
+    throw new Error(`sendSignedCopy: Constancia no existe: ${constanciaPath}`);
+  }
+
+  const subject = 'K+AIR — Copia de tu documento firmado';
+  const id_solicitud = (context && context.id_solicitud) || 'desconocido';
+  const id_constancia = (context && context.id_constancia) || 'desconocido';
+  const body = [
+    'Hola,',
+    '',
+    'Tu documento firmado en K+AIR está disponible.',
+    '',
+    `ID de solicitud: ${id_solicitud}`,
+    `ID de constancia: ${id_constancia}`,
+    '',
+    'Adjuntamos el PDF firmado y la Constancia de firma electrónica.',
+    'Conserva ambos documentos como evidencia legal de la firma.',
+    '',
+    'Si no reconoces esta operación, contacta a RRHH de inmediato.',
+    '',
+    '— K+AIR',
+  ].join('\n');
+
+  if (config.env === 'production') {
+    const transporter = getTransporter();
+    const info = await transporter.sendMail({
+      from: `"${config.smtp.fromName}" <${config.smtp.fromEmail}>`,
+      to,
+      subject,
+      text: body,
+      attachments: [
+        { filename: 'documento-firmado.pdf', path: pdfPath },
+        { filename: 'constancia.pdf', path: constanciaPath },
+      ],
+    });
+    return { ok: true, messageId: info.messageId };
+  }
+
+  // Dev: jsonTransport no envía, pero guardamos los attachments en inbox
+  const pdfStat = fs.statSync(pdfPath);
+  const conStat = fs.statSync(constanciaPath);
+  logger.info('[DEV-COPY] Copia firmada simulada', {
+    to: to.replace(/(.{2}).*(@.*)/, '$1***$2'),
+    id_solicitud,
+    id_constancia,
+    pdf_size: pdfStat.size,
+    constancia_size: conStat.size,
+    message_id_preview: `<${Math.random().toString(36).slice(2)}@dev>`,
+  });
+  const entry = {
+    to, subject, body, tipo: 'copy_signed', context, sentAt: new Date().toISOString(),
+    attachments: [
+      { filename: 'documento-firmado.pdf', path: pdfPath, size: pdfStat.size },
+      { filename: 'constancia.pdf', path: constanciaPath, size: conStat.size },
+    ],
+  };
+  _devInbox.push(entry);
+  if (_devInbox.length > 50) _devInbox.shift();
+
+  return { ok: true, messageId: 'dev-copy-' + Date.now() };
 }
 
 /**
@@ -159,6 +248,7 @@ function makeBody({ otp, tipo, context }) {
 
 module.exports = {
   sendOTP,
+  sendSignedCopy,
   getDevInbox,
   clearDevInbox,
 };
