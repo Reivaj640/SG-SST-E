@@ -36,9 +36,25 @@
 - [6. Gestión de secretos](#6-gestión-de-secretos)
 - [7. Checklist pre-producción](#7-checklist-pre-producción)
 - [8. Autorización per-empresa (D-13, I-010)](#8-autorización-per-empresa-d-13-i-010)
-- [9. Pentesting post-implementación](#9-pentesting-post-implementación)
-- [10. Bug bounty (futuro)](#10-bug-bounty-futuro)
-- [11. Anexo: matriz de riesgos](#11-anexo-matriz-de-riesgos)
+- [9. Rate limit interno por empresa (I-008, C-20 v5)](#9-rate-limit-interno-por-empresa-i-008-c-20-v5)
+  - [9.1. Contexto y motivación](#91-contexto-y-motivación)
+  - [9.2. Las 4 capas](#92-las-4-capas)
+  - [9.3. Decisión de límites (720 / 240 / 480)](#93-decisión-de-límites-720--240--480)
+  - [9.4. `X-Client-Instance-Id` — OPCIONAL](#94-x-client-instance-id--opcional)
+  - [9.5. Capa 4: heurística, NO prueba de ataque](#95-capa-4-heurística-no-prueba-de-ataque)
+  - [9.6. Legacy mode — IP fallback](#96-legacy-mode--ip-fallback)
+  - [9.7. `req.id_empresa` autoritativo (nunca del body)](#97-reqid_empresa-autoritativo-nunca-del-body)
+  - [9.8. Relación con I-010: composición, no duplicación](#98-relación-con-i-010-composición-no-duplicación)
+  - [9.9. `globalLimiter` ya NO aplica a `/internal/*`](#99-globallimiter-ya-no-aplica-a-internal)
+  - [9.10. Aplicación en routers](#910-aplicación-en-routers)
+  - [9.11. Status code de rate limit](#911-status-code-de-rate-limit)
+  - [9.12. Tests (388 + 27 nuevos = 415 passing)](#912-tests-388--27-nuevos--415-passing)
+  - [9.13. Configuración por env vars](#913-configuración-por-env-vars)
+  - [9.14. Riesgos aceptados](#914-riesgos-aceptados)
+  - [9.15. Plan de migración a v2 (futuro)](#915-plan-de-migración-a-v2-futuro)
+- [10. Pentesting post-implementación](#10-pentesting-post-implementación)
+- [11. Bug bounty (futuro)](#11-bug-bounty-futuro)
+- [12. Anexo: matriz de riesgos](#12-anexo-matriz-de-riesgos)
 
 ---
 
@@ -814,19 +830,257 @@ la implementación. Hallazgo documentado como P1-6.
 
 ---
 
-## 9. Pentesting post-implementación
+## 9. Rate limit interno por empresa (I-008, C-20 v5)
+
+> **Estado**: implementado en `firma-service` v0.3.0 (I-008).
+> **Diseño completo**: ver este documento y `src/middleware/rateLimit.js`,
+> `src/middleware/authz.js`.
+
+### 9.1. Contexto y motivación
+
+Antes de I-008, los endpoints `/internal/*` se protegían con el rate limit
+**global** (`globalLimiter`, 60 req/min por IP) y, para creación de sign
+requests, con `signRequestLimiter` (30 req/min por IP). Esto tiene dos
+problemas:
+
+1. **Por IP, no por empresa**: una empresa con varias sucursales detrás
+   de la misma IP (NAT corporativo, VPN, etc.) comparte el bucket con
+   cualquier otra empresa en la misma IP. Inversamente, una empresa
+   con granjas de dispositivos puede bypasear el límite rotando IPs.
+
+2. **Sin defensa contra anomalías**: no hay detección de uso anómalo
+   (e.g. una key que se usa desde muchos `X-Client-Instance-Id`
+   distintos en poco tiempo, lo cual sugiere compromiso o scraping).
+
+I-008 reemplaza este modelo por **4 capas de rate limit por empresa** que
+resuelven ambos problemas, manteniendo compatibilidad con el rate limit
+público (60 req/min/IP) y con `signRequestLimiter` (30 req/min/IP,
+defensa adicional).
+
+### 9.2. Las 4 capas
+
+| # | Capa | Límite | Key | Skip | Justificación |
+|---|------|--------|-----|------|---------------|
+| 1 | **Por `id_empresa`** | 720/h | `empresa:<id_empresa>` (o `legacy-ip:<ip>` en legacy mode) | No | Autoritativa. Aísla empresas entre sí. |
+| 2 | **Por `id_empresa` + `X-Client-Instance-Id`** | 240/h | `empresa:<id>:<instance>` (o `legacy-ip:<ip>`) | Si falta `X-Client-Instance-Id` o en legacy mode | Permite rate limit por dispositivo. Opcional. |
+| 3 | **Por IP** | 480/h | `req.ip` | No | Fallback. Aplicar siempre. |
+| 4 | **Anomalía (>10 instance ids / 24h)** | 10 | `id_empresa` + set de `instance_id` | Si falta `X-Client-Instance-Id` o en legacy mode | Heurística de uso anómalo. En memoria v1. |
+
+**Capas 1, 2 y 3** usan `express-rate-limit` v7 con `MemoryStore` interna.
+**Capa 4** es una heurística custom en memoria (Map de Map).
+
+### 9.3. Decisión de límites (720 / 240 / 480)
+
+| Capa | Límite | Justificación |
+|---|---|---|
+| 1 | 720/h por empresa | Permite picos normales de RH (e.g. 12 requests/min sostenidos × 60 min = 720). Más alto que el rate limit público (60/min × 60min = 3600/h) para no limitar empresas activas legítimamente. |
+| 2 | 240/h por instance | 1 dispositivo activo ≈ 4 requests/min sostenidos. Permite uso normal (crear + consultar + estado). |
+| 3 | 480/h por IP | Balance entre defensa DoS y no limitar offices corporativos detrás de NAT. 480/h = 8 req/min promedio, con picos permitidos. |
+| 4 | 10 instance / 24h | Una empresa típica usa 1-3 dispositivos. 10 es margen amplio para sucursales y PWA sincronizadas. Más allá, alta probabilidad de anomalía. |
+
+### 9.4. `X-Client-Instance-Id` — OPCIONAL
+
+Este header identifica el dispositivo/instancia que hace la request.
+**Es opcional**: si el cliente no lo envía, las capas 2 y 4 se SKIP.
+Las capas 1 y 3 siguen aplicando.
+
+**Propósito del header**: K+AIR (o cualquier cliente) genera un UUID v4
+en la primera ejecución y lo persiste localmente. Esto permite:
+- Rate limiting por dispositivo (capa 2).
+- Detección de anomalías (capa 4): si una empresa tiene >10 instance ids
+  distintos en 24h, probablemente una key fue comprometida o hay scraping.
+
+**NO contiene PII**: el header es un identificador opaco. No incluir
+nombres, correos, IPs u otra información personal en su valor.
+
+### 9.5. Capa 4: heurística, NO prueba de ataque
+
+> **Importante**: el límite de 10 `X-Client-Instance-Id` distintos en 24h
+> es una **heurística**, no una prueba de ataque. Una empresa grande con
+> muchos dispositivos legítimos (sucursales, puntos de venta, apps móviles
+> en muchos dispositivos) podría ser flagged.
+
+En v1, el bloqueo es **aceptado** (es la opción más conservadora). En v2
+podría ser solo **alerta** (notificar al admin pero no bloquear).
+
+**Limitaciones conocidas**:
+- Estado en memoria: se pierde en restart del servicio. Aceptable para v1.
+- Cleanup lazy: las entradas > 24h se eliminan en el próximo request.
+  No hay timer periódico.
+- No distingue entre instance ids "maliciosos" y "legítimos".
+
+### 9.6. Legacy mode — IP fallback
+
+En **legacy mode** (`authSource='legacy'`, `req.id_empresa === null`):
+
+- **Capa 1** cae a `legacy-ip:<req.ip>` (NO por empresa).
+- **Capa 2** se SKIP (no hay id_empresa para componer la key).
+- **Capa 3** aplica normalmente (IP).
+- **Capa 4** se SKIP (no hay id_empresa para trackear).
+
+Esto preserva el comportamiento pre-I-008 (rate limit por IP) durante
+la ventana de deprecation legacy. Cuando se elimine el legacy mode, las
+capas 1-4 operarán exclusivamente por `id_empresa`.
+
+### 9.7. `req.id_empresa` autoritativo (nunca del body)
+
+El rate limit **LEE** `req.id_empresa` (seteado por `_runAuthz` en
+`requireEmpresaScope` o `requireEmpresaScopeAndLimit`). **NO**
+re-resuelve la API key para determinar el id_empresa.
+
+**Razón**: si authz y rate limit hicieran lookups independientes de la
+API key, podrían divergir si el cache de `internalClient` cambia entre
+el momento del authz y el del rate limit. Esto causaría que authz y rate
+limit "vean" empresas distintas para la misma request.
+
+**Defensa en profundidad**: si por alguna razón `req.id_empresa` no está
+seteado en una ruta que NO es legacy, los `keyGenerator` de las capas 1
+y 2 usan `legacy-ip:<ip>` como fallback (no crashean). El comportamiento
+queda documentado y testeado en `tests/middleware/internalServerLimiter.test.js`.
+
+### 9.8. Relación con I-010: composición, no duplicación
+
+I-008 NO duplica la lógica de authz. La compone:
+
+```
+requireEmpresaScopeAndLimit({ allowedOperations, checkIdEmpresa, rateLimit })
+  ├─ 1. _runAuthz (mismo helper que requireEmpresaScope)
+  │     ├─ 401 INVALID_API_KEY si key falta/inválida/revocada
+  │     ├─ 403 FORBIDDEN si operación no permitida
+  │     └─ 403 EMPRESA_MISMATCH si id_empresa del body !== req.id_empresa
+  │
+  └─ 2. Si authz OK → internalServerLimiter (4 capas de rate limit)
+        ├─ Capa 4 (anomalía)
+        ├─ Capa 1 (id_empresa)
+        ├─ Capa 2 (id_empresa + instance)
+        └─ Capa 3 (IP)
+```
+
+**Garantía**: si authz falla, NO se consume rate limit. Esto evita que
+un atacante con una key inválida pueda consumir tokens de otro usuario
+(sería un side channel).
+
+### 9.9. `globalLimiter` ya NO aplica a `/internal/*`
+
+A partir de I-008, `globalLimiter` (60 req/min por IP) se skipea para
+todas las rutas que empiezan con `/internal/`. El rate limit de esas rutas
+queda cubierto por `internalServerLimiter` (4 capas).
+
+`/health`, `/`, `/s/*` y `/api/sign/*` siguen aplicando el `globalLimiter`.
+`signRequestLimiter` (30 req/min por IP) sigue aplicando a
+`POST /internal/sign-requests` como **defensa adicional** (decisión del
+user, NO se elimina en I-008).
+
+### 9.10. Aplicación en routers
+
+| Router | Endpoint | ¿Usa `requireEmpresaScopeAndLimit`? |
+|---|---|---|
+| `signRequest.js` | POST /internal/sign-requests | ✅ |
+| `signRequest.js` | GET /internal/sign-requests/:id | ✅ |
+| `signRequest.js` | GET /internal/sign-requests | ✅ |
+| `internal-audit.js` | GET /internal/sign-requests/:id/eventos | ✅ |
+| `internal-audit.js` | POST /internal/sign-requests/:id/revoke | ❌ (usa `adminApiAuth`, no aplica) |
+| `consent.js` | POST /internal/consentimientos | ✅ |
+| `consent.js` | POST /internal/consentimientos/:id/verify-otp | ✅ |
+| `agreement.js` | (varios) | ❌ (público, sin per-empresa scope) |
+| `admin.js` | /internal/admin/* | ❌ (usa `adminApiAuth`, no aplica) |
+
+### 9.11. Status code de rate limit
+
+Todas las capas devuelven `429 RATE_LIMIT_EXCEEDED` con:
+
+```json
+{
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "Demasiadas solicitudes. Intenta de nuevo más tarde.",
+    "details": {
+      "limiter": "internal-capa1" | "internal-capa2" | "internal-capa3" | "anomaly",
+      "limit": <número>,
+      "window_ms": <ventana en ms>
+    },
+    "request_id": "..."
+  }
+}
+```
+
+El campo `limiter` permite al cliente identificar qué capa se disparó.
+**No revela internals** (e.g. el id_empresa o el instance id) para evitar
+side channels.
+
+### 9.12. Tests (388 + 27 nuevos = 415 passing)
+
+Los tests del rate limit interno viven en dos archivos:
+
+- `tests/middleware/authz.test.js`: 7 tests de composición
+  (`requireEmpresaScopeAndLimit`) + 8 tests adversariales
+  (cross-company, instance buckets, legacy mode, key revocada,
+  `allowed_operations`, `checkIdEmpresa`, regression).
+- `tests/middleware/internalServerLimiter.test.js`: 12 tests de las
+  4 capas (capa 1: 3 tests, capa 2: 2 tests, capa 3: 1 test,
+  capa 4: 5 tests, composición: 1 test).
+
+### 9.13. Configuración por env vars
+
+Los límites de las 4 capas son **hardcoded en producción** (no se pueden
+cambiar sin un deploy). Para entornos de tests, ajustes puntuales o
+tuning pre-producción, se aceptan env vars que se leen **al cargar el
+módulo** (`src/middleware/rateLimit.js`). NO se usa `config.js` para no
+acoplar el módulo a la config central — el módulo se mantiene
+self-contained.
+
+| Env var | Default | Capa que afecta |
+|---|---|---|
+| `RATE_LIMIT_INTERNAL_EMPRESA_PER_HOUR` | `720` | Capa 1 (id_empresa) |
+| `RATE_LIMIT_INTERNAL_EMPRESA_INSTANCE_PER_HOUR` | `240` | Capa 2 (id_empresa + instance) |
+| `RATE_LIMIT_INTERNAL_IP_PER_HOUR` | `480` | Capa 3 (IP fallback) |
+| `RATE_LIMIT_INTERNAL_ANOMALY_MAX_INSTANCES` | `10` | Capa 4 (umbral de anomalía) |
+| `RATE_LIMIT_INTERNAL_ANOMALY_WINDOW_MS` | `86400000` (24h) | Capa 4 (ventana de la heurística) |
+
+**Validación**: si una env var es inválida (no entero, o < 1), se usa
+el default. Esto evita que un typo en `.env` haga crashear el servicio
+al arrancar.
+
+**Importante para tests**: como las env vars se leen al cargar el
+módulo, deben setearse **antes** del primer `require('./rateLimit')`.
+Los tests del rate limit interno (chunk 3) usan la Opción C del
+briefing: instancian los limiters directamente con `max: 3` en lugar
+de agotar buckets de 720/240/480 requests.
+
+### 9.14. Riesgos aceptados
+
+| ID | Riesgo | Aceptación |
+|---|---|---|
+| D.4 | Empresa grande con muchos dispositivos es flagged por capa 4 | Aceptado v1; en v2 pasar a alerta |
+| D.5 | Estado de capa 4 se pierde en restart | Aceptado v1; mitigado por rate limits por IP persistentes (capas 1-3) |
+| D.6 | Bucket de capa 3 (IP) compartido entre empresas | Aceptado (es fallback; capa 1 es la autoritativa) |
+| D.7 | X-Client-Instance-Id falsificado evade capa 4 | Aceptado (es heurística; la defensa real es revocar la key en I-010) |
+
+### 9.15. Plan de migración a v2 (futuro)
+
+| Mejora | Descripción |
+|---|---|
+| Capa 4 → alerta | Notificar al admin en lugar de bloquear |
+| Persistir capa 4 | Mover el Map a BD o Redis para sobrevivir restarts |
+| Tier por operación | `audit:read` con límite más alto que `sign_request:create` |
+| Dashboard | Visualizar el uso por empresa y por instance |
+| Cleanup activo | Timer periódico en lugar de cleanup lazy |
+
+---
+
+## 10. Pentesting post-implementación
 
 Antes del go-live, se recomienda contratar un **pentesting
 externo** que cubra:
 
-### 9.1. Alcance
+### 10.1. Alcance
 
 - Caja negra contra `https://firma.k-air.com`.
 - Caja gris contra los endpoints internos (con API key
   proporcionada por el equipo).
 - Caja blanca con acceso al código.
 
-### 9.2. Áreas a probar
+### 10.2. Áreas a probar
 
 - [ ] Inyección SQL en todos los endpoints.
 - [ ] Cross-Site Scripting (XSS) en la mini-app.
@@ -838,6 +1092,11 @@ externo** que cubra:
       key de empresa A intenta acceder a recursos de empresa B.
 - [ ] **Escapa de scope via query `?id_empresa=B`** en GET /sign-requests
       (debe ser IGNORADO en client mode).
+- [ ] **Bypass del rate limit interno de 4 capas** (I-008):
+      ¿se puede bypasear X-Client-Instance-Id cambiando el valor?
+      ¿se puede bypasear req.id_empresa inyectándolo en el body?
+- [ ] **Anomalía de instance ids** (I-008, capa 4): ¿se puede evitar
+      el límite de 10 usando la misma instance repetidamente?
 - [ ] Manipulación de estados.
 - [ ] Race conditions en el commit.
 - [ ] Filtración de información en mensajes de error.
@@ -848,7 +1107,7 @@ externo** que cubra:
 - [ ] **Hash de API key timing-safe**: comparar `constantTimeEqual`,
       no `===`.
 
-### 9.3. Criterio de aceptación
+### 10.3. Criterio de aceptación
 
 - 0 vulnerabilidades altas o críticas sin resolver.
 - Todas las vulnerabilidades medias con plan de remediación
@@ -856,7 +1115,7 @@ externo** que cubra:
 
 ---
 
-## 10. Bug bounty (futuro)
+## 11. Bug bounty (futuro)
 
 En **v1.1 o v2.0** se puede considerar un programa de bug bounty:
 
@@ -869,7 +1128,7 @@ En **v1.1 o v2.0** se puede considerar un programa de bug bounty:
 
 ---
 
-## 11. Anexo: matriz de riesgos
+## 12. Anexo: matriz de riesgos
 
 | ID | Amenaza | Probabilidad | Impacto | Riesgo | Mitigación principal | Riesgo residual |
 |---|---|---|---|---|---|---|
@@ -889,6 +1148,10 @@ En **v1.1 o v2.0** se puede considerar un programa de bug bounty:
 | D.1 | DoS por rate limit | Media | Medio | 🟡 | Rate limit + espacio | 🟢 Muy bajo |
 | D.2 | DoS por crecimiento de BD | Baja | Medio | 🟢 | Monitoreo + cuota | 🟢 Muy bajo |
 | D.3 | Caída del SMTP | Media | Alto | 🟠 | Reintentos + cola | 🟡 Bajo |
+| D.4 | Empresa grande flagged por anomalía (capa 4) | Baja | Medio | 🟢 | Aceptado v1; alerta en v2 | 🟢 Muy bajo |
+| D.5 | Estado de capa 4 se pierde en restart | Media | Bajo | 🟢 | Capas 1-3 persisten (express-rate-limit) | 🟢 Muy bajo |
+| D.6 | Bucket IP compartido entre empresas (capa 3) | Media | Bajo | 🟢 | Capa 1 es autoritativa; capa 3 es fallback | 🟢 Muy bajo |
+| D.7 | X-Client-Instance-Id falsificado evade capa 4 | Media | Bajo | 🟢 | Defensa real: revocar key en I-010 | 🟢 Muy bajo |
 | E.1 | Mini-app a internos | Alta | Bajo | 🟢 | API key + middleware | 🟢 Muy bajo |
 | E.2 | Token cruzado | Baja | Bajo | 🟢 | Routers separados | 🟢 Muy bajo |
 | E.3 | Manipulación de mini-app | Alta | Bajo | 🟢 | Backend re-valida | 🟢 Muy bajo |
@@ -897,7 +1160,7 @@ En **v1.1 o v2.0** se puede considerar un programa de bug bounty:
 
 - **5 amenazas** con riesgo 🟠 que requieren mitigación continua.
 - **9 amenazas** con riesgo 🟡 que son aceptables para v1.
-- **5 amenazas** con riesgo 🟢 que son residuales y aceptables.
+- **9 amenazas** con riesgo 🟢 que son residuales y aceptables.
 - **0 amenazas** sin mitigar.
 
 ### Plan de mitigación continua
