@@ -386,6 +386,9 @@ test('F5.3 pdfGen.generateSignedPdf falla durante commit → atomicidad preserva
   // Status
   assert.equal(rCommit.status, 500,
     `debe ser 500, obtuve ${rCommit.status}: ${JSON.stringify(rCommit.body)}`);
+  // I-008.4: el error específico ahora es PDF_GENERATION_FAILED (cierra
+  // HALLAZGO #3 con I-008.3). Antes era INTERNAL_ERROR genérico.
+  assert.equal(rCommit.body.error.code, 'PDF_GENERATION_FAILED');
   // Patch fue invocado 1 vez
   assert.equal(callCount, 1, 'pdfGen.generateSignedPdf debe haberse llamado 1 vez');
 
@@ -499,6 +502,9 @@ test('F5.4 pdfGen.generateConstanciaPdf falla durante commit → atomicidad pres
 
   assert.equal(rCommit.status, 500,
     `debe ser 500, obtuve ${rCommit.status}: ${JSON.stringify(rCommit.body)}`);
+  // I-008.4: el error específico ahora es PDF_GENERATION_FAILED (cierra
+  // HALLAZGO #3 con I-008.3). Antes era INTERNAL_ERROR genérico.
+  assert.equal(rCommit.body.error.code, 'PDF_GENERATION_FAILED');
   assert.equal(constCallCount, 1, 'pdfGen.generateConstanciaPdf debe haberse llamado 1 vez');
 
   // BD: estado sigue DOCUMENT_VIEWED
