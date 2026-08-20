@@ -96,6 +96,16 @@ const config = {
   storage: {
     pdfPath: resolvePath(required('PDF_STORAGE_PATH', './storage/pdfs')),
   },
+
+  // I-012.1: limites para validacion estructural de PDFs subidos por K+AIR
+  // al endpoint POST /v1/internal/sign-requests. Es un parser estructural,
+  // NO un sandbox/AV: un PDF "valido" solo significa "parsea como PDF".
+  pdf: {
+    maxBytes: int('PDF_MAX_BYTES', 52428800),            // 50 MB
+    maxPages: int('PDF_MAX_PAGES', 200),
+    parseTimeoutMs: int('PDF_PARSE_TIMEOUT_MS', 5000),
+    maxMetadataBytes: int('PDF_MAX_METADATA_BYTES', 1048576),  // 1 MB
+  },
 };
 
 // Advertencia si INTERNAL_API_KEY es el valor por defecto
