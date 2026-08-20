@@ -218,3 +218,97 @@ test('withAppErrorWrapping: no altera el resultado exitoso (objetos, arrays, etc
   assert.equal(resultBuf, buf, 'Buffer preservado por referencia');
   assert.equal(resultBuf.toString(), 'hello');
 });
+
+// ============================================================================
+// Tests de withAppErrorWrappingSync (I-008.3)
+// ============================================================================
+// Variante síncrona del helper, para callbacks sync como la callback de
+// `db.transaction(() => { ... })` en better-sqlite3 v11 (que no soporta
+// callbacks que retornan Promise). Misma semántica que la versión async,
+// pero pensada para envolver registerEvent() dentro de la tx de commit.
+const { withAppErrorWrappingSync } = require('../../src/utils/errorWrap');
+
+test('withAppErrorWrappingSync: error genérico → envuelve como AppError(500, code, message)', () => {
+  const genericErr = new Error('Boom sync');
+  let caught;
+  try {
+    withAppErrorWrappingSync(() => { throw genericErr; }, 'EVENT_REGISTRATION_FAILED', 'No se pudo registrar el evento');
+  } catch (err) {
+    caught = err;
+  }
+  assert.ok(caught, 'debe lanzar');
+  assert.ok(caught instanceof AppError, 'debe ser AppError');
+  assert.equal(caught.statusCode, 500);
+  assert.equal(caught.code, 'EVENT_REGISTRATION_FAILED');
+  assert.equal(caught.message, 'No se pudo registrar el evento');
+  assert.equal(caught.details.original_error, 'Boom sync');
+  assert.equal(caught.details.original_code, null);
+});
+
+test('withAppErrorWrappingSync: preserva el code pasado al helper', () => {
+  let caught;
+  try {
+    withAppErrorWrappingSync(() => { throw new Error('X'); }, 'CUSTOM_SYNC_CODE_1', 'M1');
+  } catch (err) {
+    caught = err;
+  }
+  assert.equal(caught.code, 'CUSTOM_SYNC_CODE_1');
+});
+
+test('withAppErrorWrappingSync: AppError existente se preserva sin re-envolver (mismo objeto)', () => {
+  const originalAppErr = new AppError(503, 'ORIGINAL_CODE', 'Original message', { foo: 'bar' });
+  let caught;
+  try {
+    withAppErrorWrappingSync(() => { throw originalAppErr; }, 'WRAP_CODE', 'WRAP_MESSAGE');
+  } catch (err) {
+    caught = err;
+  }
+  assert.equal(caught, originalAppErr, 'debe ser el mismo objeto (no copia)');
+  assert.equal(caught.code, 'ORIGINAL_CODE', 'NO se re-envuelve: code preservado del original');
+  assert.equal(caught.statusCode, 503);
+  assert.deepEqual(caught.details, { foo: 'bar' }, 'details NO se modifican');
+});
+
+test('withAppErrorWrappingSync: error con .code → preserva como original_code', () => {
+  const sqliteErr = new Error('UNIQUE constraint failed');
+  sqliteErr.code = 'SQLITE_CONSTRAINT_UNIQUE';
+  let caught;
+  try {
+    withAppErrorWrappingSync(() => { throw sqliteErr; }, 'EVENT_REGISTRATION_FAILED', 'M');
+  } catch (err) {
+    caught = err;
+  }
+  assert.equal(caught.details.original_code, 'SQLITE_CONSTRAINT_UNIQUE');
+  assert.equal(caught.details.original_error, 'UNIQUE constraint failed');
+});
+
+test('withAppErrorWrappingSync: función sync que retorna → retorna valor tal cual', () => {
+  // Caso típico: registerEvent() retorna undefined cuando OK.
+  const result = withAppErrorWrappingSync(() => 'ok', 'C', 'M');
+  assert.equal(result, 'ok');
+
+  // Función que retorna un objeto (como registerEvent, que no retorna nada
+  // útil pero la firma del helper lo permite).
+  const obj = { a: 1 };
+  const resultObj = withAppErrorWrappingSync(() => obj, 'C', 'M');
+  assert.equal(resultObj, obj, 'mismo objeto por referencia');
+});
+
+test('withAppErrorWrappingSync: no altera el resultado exitoso (objetos, primitivos, undefined)', () => {
+  // object
+  const obj = { x: [1, 2] };
+  assert.equal(withAppErrorWrappingSync(() => obj, 'C', 'M'), obj);
+  // array
+  const arr = [1, 2, 3];
+  assert.deepEqual(withAppErrorWrappingSync(() => arr, 'C', 'M'), arr);
+  // null
+  assert.equal(withAppErrorWrappingSync(() => null, 'C', 'M'), null);
+  // undefined
+  assert.equal(withAppErrorWrappingSync(() => undefined, 'C', 'M'), undefined);
+  // number
+  assert.equal(withAppErrorWrappingSync(() => 42, 'C', 'M'), 42);
+  // string
+  assert.equal(withAppErrorWrappingSync(() => 'hello', 'C', 'M'), 'hello');
+  // boolean
+  assert.equal(withAppErrorWrappingSync(() => true, 'C', 'M'), true);
+});

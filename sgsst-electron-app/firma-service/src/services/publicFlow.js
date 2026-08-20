@@ -32,6 +32,7 @@ const pdfGen = require('./pdfGen');
 const agreementService = require('./agreement');  // D2: re-validar Acuerdo en view/commit
 const logger = require('../utils/logger');
 const { AppError } = require('../middleware/errors');
+const { withAppErrorWrapping, withAppErrorWrappingSync } = require('../utils/errorWrap');
 
 /**
  * Resultado de resolver un token.
@@ -389,13 +390,17 @@ async function commit(token, opts, ip, user_agent) {
   //    NO incluye document_hash_firmado ni evidence_hash (chicken-and-egg:
   //    ambos se calculan DESPUÉS de generar el PDF y persisten en BD).
   const fecha_firma = new Date().toISOString();
-  const pdfFirmadoBuf = await pdfGen.generateSignedPdf(pdfOriginal, {
-    id_solicitud: signRequest.id_solicitud,
-    id_documento: signRequest.id_documento,
-    id_trabajador: signRequest.id_trabajador,
-    agreement_version: signRequest.agreement_version,
-    fecha_firma,
-  });
+  const pdfFirmadoBuf = await withAppErrorWrapping(
+    () => pdfGen.generateSignedPdf(pdfOriginal, {
+      id_solicitud: signRequest.id_solicitud,
+      id_documento: signRequest.id_documento,
+      id_trabajador: signRequest.id_trabajador,
+      agreement_version: signRequest.agreement_version,
+      fecha_firma,
+    }),
+    'PDF_GENERATION_FAILED',
+    'No se pudo generar el PDF firmado',
+  );
   const document_hash_firmado = sha256(pdfFirmadoBuf);
 
   // 7. Construir evidencia (JSON canónico) — Bloque E3.
@@ -451,10 +456,14 @@ async function commit(token, opts, ip, user_agent) {
   const constancia_path = path.join(storage.PATHS.constancias, constancia_filename);
 
   // 9. Generar Constancia (en memoria) — incluye id_constancia
-  const constanciaBuf = await pdfGen.generateConstanciaPdf({
-    ...evidencia,
-    id_constancia,
-  });
+  const constanciaBuf = await withAppErrorWrapping(
+    () => pdfGen.generateConstanciaPdf({
+      ...evidencia,
+      id_constancia,
+    }),
+    'PDF_GENERATION_FAILED',
+    'No se pudo generar la constancia',
+  );
 
   // 10. Escribir PDFs a disco con fsync (writeFileAtomic).
   //     Si esto falla, NO se toca BD y NO hay inconsistencia.
@@ -496,15 +505,33 @@ async function commit(token, opts, ip, user_agent) {
         throw new AppError(409, 'INVALID_STATE_TRANSITION',
           'La firma no se pudo cerrar: el estado cambió durante el commit');
       }
-      signRequestService.registerEvent(signRequest.id, 'MANIFESTATION_RECORDED',
-        { texto_hash: manifestacion_voluntad_hash },
-        'trabajador', ip, user_agent);
-      signRequestService.registerEvent(signRequest.id, 'SIGN_COMMITTED',
-        { evidence_hash },
-        'trabajador', ip, user_agent);
-      signRequestService.registerEvent(signRequest.id, 'PDF_GENERATED',
-        { path: pdf_firmado_path, size: pdfFirmadoBuf.length, id_constancia },
-        'sistema', ip, user_agent);
+      // I-008.3: usar withAppErrorWrappingSync (no la versión async) porque
+      // estamos DENTRO de la callback sync de db.transaction (better-sqlite3
+      // v11 no soporta await en esa callback). Errores no-AppError ahora se
+      // convierten en AppError(500, 'EVENT_REGISTRATION_FAILED', ...) →
+      // rollback atómico + cliente recibe código específico en vez de
+      // INTERNAL_ERROR genérico (HALLAZGO #2).
+      withAppErrorWrappingSync(
+        () => signRequestService.registerEvent(signRequest.id, 'MANIFESTATION_RECORDED',
+          { texto_hash: manifestacion_voluntad_hash },
+          'trabajador', ip, user_agent),
+        'EVENT_REGISTRATION_FAILED',
+        'No se pudo registrar el evento MANIFESTATION_RECORDED',
+      );
+      withAppErrorWrappingSync(
+        () => signRequestService.registerEvent(signRequest.id, 'SIGN_COMMITTED',
+          { evidence_hash },
+          'trabajador', ip, user_agent),
+        'EVENT_REGISTRATION_FAILED',
+        'No se pudo registrar el evento SIGN_COMMITTED',
+      );
+      withAppErrorWrappingSync(
+        () => signRequestService.registerEvent(signRequest.id, 'PDF_GENERATED',
+          { path: pdf_firmado_path, size: pdfFirmadoBuf.length, id_constancia },
+          'sistema', ip, user_agent),
+        'EVENT_REGISTRATION_FAILED',
+        'No se pudo registrar el evento PDF_GENERATED',
+      );
       // COPY_SENT se registra post-tx (Bloque E2) — ver paso 13 abajo
     });
     tx();
