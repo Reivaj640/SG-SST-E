@@ -111,9 +111,43 @@ const signRequestListQuery = z.object({
   offset: z.coerce.number().int().min(0).optional(),
 });
 
+/**
+ * Schema de query params para GET /internal/sign-requests?ids=batch (I-008).
+ *
+ * Acepta `ids` como string separado por comas. Cada id puede ser
+ * `SIGN-YYYY-NNNNNN` o entero positivo. Máximo 200 ids (control de carga
+ * para no permitir batches gigantes que agoten la BD).
+ *
+ * Si `ids` no viene → 400 INVALID_REQUEST_BODY.
+ * Si después de trim/filter la lista está vacía → 400 INVALID_REQUEST_BODY.
+ * Si algún id no matchea los formatos permitidos → 400 INVALID_REQUEST_BODY
+ *   con details.invalid_ids para que K+AIR sepa cuáles rechazó.
+ */
+const signRequestIdsQuery = z.object({
+  ids: z.string()
+    .min(1, 'ids es requerido')
+    .max(20000, 'ids demasiado largo (máx 20000 chars)')
+    .refine(
+      (v) => {
+        const parts = v.split(',').map(s => s.trim()).filter(Boolean);
+        return parts.length > 0;
+      },
+      { message: 'ids no puede estar vacío' },
+    )
+    .refine(
+      (v) => {
+        const parts = v.split(',').map(s => s.trim()).filter(Boolean);
+        if (parts.length > 200) return false;
+        return parts.every(p => /^SIGN-\d{4}-\d{6}$/.test(p) || /^\d+$/.test(p));
+      },
+      { message: 'ids contiene entradas inválidas o más de 200 ids' },
+    ),
+});
+
 module.exports = {
   createConsentBody,
   verifyOtpBody,
   signRequestBody,
   signRequestListQuery,
+  signRequestIdsQuery,  // I-008: batch query
 };

@@ -26,6 +26,142 @@ const storage = require('./storage');
 const agreementService = require('./agreement');
 const logger = require('../utils/logger');
 const { AppError } = require('../middleware/errors');
+const crypto = require('crypto');
+
+// =============================================================================
+// I-013b (C-22): cifrado del token para recuperación.
+// =============================================================================
+// El token se retorna en plaintext SOLO en la respuesta de create(). Después
+// se almacena hasheado (token_hash) en BD. Para permitir que K+AIR recupere
+// el token si perdió la respuesta de create, se cifra con AES-256-GCM y se
+// guarda en `metadata._server_metadata.token_encrypted` (sub-objeto con
+// prefijo underscore para evitar colisión con campos que K+AIR pueda poner
+// en metadata al hacer POST).
+//
+// La key de cifrado se lee de `TOKEN_ENCRYPTION_KEY` (32 bytes hex = 64 chars).
+// Si NO está seteada, se genera una al boot y se loguea warning (solo dev).
+// En prod, se requiere la env var — falla al boot si no está.
+//
+// Ver docs/kair-firma-integration/READY-TO-IMPLEMENT.md §C.I-013b.
+let _tokenEncryptionKey = null;
+function _getTokenEncryptionKey() {
+  if (_tokenEncryptionKey) return _tokenEncryptionKey;
+  const fromEnv = process.env.TOKEN_ENCRYPTION_KEY;
+  if (typeof fromEnv === 'string' && /^[0-9a-fA-F]{64}$/.test(fromEnv)) {
+    _tokenEncryptionKey = Buffer.from(fromEnv, 'hex');
+    return _tokenEncryptionKey;
+  }
+  if (config.env === 'production') {
+    throw new Error(
+      'TOKEN_ENCRYPTION_KEY requerida en producción (32 bytes hex = 64 chars). ' +
+      'Generar con: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
+    );
+  }
+  // Dev: generar y loguear warning para que el operador sepa.
+  _tokenEncryptionKey = crypto.randomBytes(32);
+  logger.warn('TOKEN_ENCRYPTION_KEY no seteada, usando key efímera (solo dev)', {
+    hint: 'Setea TOKEN_ENCRYPTION_KEY en .env para que el cifrado persista entre reinicios',
+  });
+  return _tokenEncryptionKey;
+}
+
+/**
+ * Cifra un token con AES-256-GCM y retorna {iv, authTag, ciphertext} en hex.
+ * El output es un objeto plain que se serializa a JSON dentro de metadata.
+ */
+function encryptToken(token) {
+  const key = _getTokenEncryptionKey();
+  const iv = crypto.randomBytes(12); // 96 bits recomendado para GCM
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const ciphertext = Buffer.concat([cipher.update(token, 'utf8'), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return {
+    iv: iv.toString('hex'),
+    authTag: authTag.toString('hex'),
+    ciphertext: ciphertext.toString('hex'),
+  };
+}
+
+/**
+ * Descifra un token previamente cifrado con encryptToken().
+ * Lanza Error si la estructura es inválida o la autenticación GCM falla.
+ */
+function decryptToken(enc) {
+  if (!enc || typeof enc !== 'object') throw new Error('encrypted token inválido');
+  const { iv, authTag, ciphertext } = enc;
+  if (typeof iv !== 'string' || typeof authTag !== 'string' || typeof ciphertext !== 'string') {
+    throw new Error('encrypted token: campos faltantes');
+  }
+  const key = _getTokenEncryptionKey();
+  const decipher = crypto.createDecipheriv(
+    'aes-256-gcm', key,
+    Buffer.from(iv, 'hex'),
+  );
+  decipher.setAuthTag(Buffer.from(authTag, 'hex'));
+  const plain = Buffer.concat([
+    decipher.update(Buffer.from(ciphertext, 'hex')),
+    decipher.final(),
+  ]);
+  return plain.toString('utf8');
+}
+
+/**
+ * Resetea la key cacheada (usado en tests para inyectar una key nueva).
+ */
+function _resetTokenEncryptionKey() {
+  _tokenEncryptionKey = null;
+}
+
+/**
+ * Lee el token cifrado de un sign request (I-013b, recovery).
+ *
+ * Retorna { found: true, token, url_publica } si el sign request tiene
+ * `metadata._server_metadata.token_encrypted` y se puede descifrar.
+ * Retorna { found: false, reason } si no hay token cifrado (legacy
+ * pre-I-013b) o si el descifrado falla (corrupción, key rotada).
+ *
+ * El handler HTTP es responsable de aplicar el cross-company check y el
+ * check de estado terminal ANTES de llamar esta función.
+ *
+ * @param {object} signRequest - fila de gh_firmas_electronicas (de getById o getByIdSolicitud).
+ * @returns {{found: true, token: string, url_publica: string} | {found: false, reason: string}}
+ */
+function getTokenForRecovery(signRequest) {
+  if (!signRequest || !signRequest.id_solicitud) {
+    return { found: false, reason: 'invalid_signrequest' };
+  }
+  if (!signRequest.metadata) {
+    return { found: false, reason: 'legacy_no_token_recovery' };
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(signRequest.metadata);
+  } catch {
+    return { found: false, reason: 'corrupt_metadata' };
+  }
+  if (!parsed || typeof parsed !== 'object') {
+    return { found: false, reason: 'corrupt_metadata' };
+  }
+  const serverMeta = parsed._server_metadata;
+  if (!serverMeta || typeof serverMeta !== 'object' || !serverMeta.token_encrypted) {
+    return { found: false, reason: 'legacy_no_token_recovery' };
+  }
+  let token;
+  try {
+    token = decryptToken(serverMeta.token_encrypted);
+  } catch (e) {
+    logger.warn('I-013b: descifrado de token falló', {
+      id_solicitud: signRequest.id_solicitud,
+      error: e.message,
+    });
+    return { found: false, reason: 'decrypt_failed' };
+  }
+  return {
+    found: true,
+    token,
+    url_publica: `${config.publicUrl}/s/${token}`,
+  };
+}
 
 const MAX_PDF_SIZE = 10 * 1024 * 1024; // 10 MB
 const PDF_MAGIC = Buffer.from('%PDF-');
@@ -168,6 +304,48 @@ function create({
   const safe_filename = `${id_solicitud}.pdf`;
   const pdf_original_path = storage.saveOriginal(safe_filename, pdf_buffer);
 
+  // I-013b: cifrar el token para futura recuperación (C-22).
+  // Se guarda en `metadata._server_metadata.token_encrypted`. El prefijo
+  // underscore es convención: K+AIR no debería pisar esta sub-clave al
+  // enviar su propio metadata. Si la pisa, la recuperación se pierde para
+  // ese sign request (no es breaking: el sign request sigue funcionando,
+  // solo no se puede recuperar el link).
+  const tokenEncrypted = encryptToken(token);
+  // Merge con metadata del cliente: parseamos el metadata entrante (si es
+  // string JSON) y le inyectamos _server_metadata. Si ya viene
+  // _server_metadata, lo preservamos.
+  let metadataToStore = null;
+  if (metadata && typeof metadata === 'string' && metadata.length > 0) {
+    try {
+      const parsed = JSON.parse(metadata);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        // Preservar _server_metadata entrante si existe (defensa), pero
+        // sobreescribir token_encrypted con el nuestro.
+        const serverMeta = (parsed._server_metadata && typeof parsed._server_metadata === 'object')
+          ? { ...parsed._server_metadata }
+          : {};
+        serverMeta.token_encrypted = tokenEncrypted;
+        parsed._server_metadata = serverMeta;
+        metadataToStore = JSON.stringify(parsed);
+      } else {
+        // metadata es un primitivo (raro, no debería pasar por zod) → wrappear
+        metadataToStore = JSON.stringify({
+          value: parsed,
+          _server_metadata: { token_encrypted: tokenEncrypted },
+        });
+      }
+    } catch {
+      // metadata corrupto (zod no lo aceptaría, pero defensa en profundidad)
+      metadataToStore = JSON.stringify({
+        _server_metadata: { token_encrypted: tokenEncrypted },
+      });
+    }
+  } else {
+    metadataToStore = JSON.stringify({
+      _server_metadata: { token_encrypted: tokenEncrypted },
+    });
+  }
+
   // Insertar en BD + sesión en transacción.
   // Si la tx falla (UNIQUE collision, FK fail, BD busy, etc.), el PDF ya
   // está escrito al disco. Sin cleanup, queda huérfano. Ver E9.2.
@@ -191,7 +369,7 @@ function create({
       token_hash, sesion_id, identificacion_tipo || null, identificacion_numero_hash || null,
       sal,  // P1-2: sal aleatoria por sign request
       now.toISOString(), fecha_expiracion, version_kair,
-      ip || null, user_agent || null, pdf_original_path, metadata || null, 'email',
+      ip || null, user_agent || null, pdf_original_path, metadataToStore, 'email',
       consent_id || null,
       tipo_identificacion || null,  // I-002
     );
@@ -434,6 +612,79 @@ function list({
 }
 
 /**
+ * Batch lookup de sign requests por ids mixtos (I-008).
+ *
+ * Acepta ids en formato `SIGN-YYYY-NNNNNN` o enteros positivos. Retorna un
+ * Map indexado por el id normalizado (string canónico) para que el handler
+ * HTTP pueda correlacionar input con output sin re-normalizar.
+ *
+ * Características:
+ *  - Dedup: si el mismo id aparece N veces, se retorna 1 fila.
+ *  - Mixto: `SIGN-2026-000001` y `42` se buscan en sus respectivas columnas.
+ *  - Cap de 200 ids (validado por el handler con zod antes de llamar).
+ *  - Filtra por id_empresa en client mode (NO se filtra acá — el handler
+ *    HTTP aplica el cross-company check usando req.id_empresa y separa
+ *    los items en `items` vs `forbidden`).
+ *
+ * @param {string[]} ids - Lista de ids crudos (SIN normalizar).
+ * @returns {Map<string, object>} key=id normalizado (`SIGN-...` o string(num)),
+ *          value=fila de gh_firmas_electronicas. Los ids no encontrados NO
+ *          aparecen en el Map.
+ */
+function getByIds(ids) {
+  if (!Array.isArray(ids) || ids.length === 0) return new Map();
+
+  // Separar ids SIGN-... vs numéricos
+  const signIds = [];
+  const numericIds = [];
+  for (const id of ids) {
+    if (typeof id !== 'string') continue;
+    if (/^SIGN-\d{4}-\d{6}$/.test(id)) {
+      signIds.push(id);
+    } else if (/^\d+$/.test(id)) {
+      const n = parseInt(id, 10);
+      if (n > 0) numericIds.push(n);
+    }
+  }
+
+  const result = new Map();
+  if (signIds.length === 0 && numericIds.length === 0) return result;
+
+  // Query con IN clause parametrizada (anti SQL-injection)
+  const allRows = [];
+
+  if (signIds.length > 0) {
+    const placeholders = signIds.map(() => '?').join(',');
+    const rows = db.prepare(
+      `SELECT id, id_solicitud, id_documento, id_trabajador, id_empresa,
+              tipo_firma, estado, fecha_creacion, fecha_expiracion, fecha_firma
+       FROM gh_firmas_electronicas
+       WHERE id_solicitud IN (${placeholders})`
+    ).all(...signIds);
+    allRows.push(...rows);
+  }
+
+  if (numericIds.length > 0) {
+    const placeholders = numericIds.map(() => '?').join(',');
+    const rows = db.prepare(
+      `SELECT id, id_solicitud, id_documento, id_trabajador, id_empresa,
+              tipo_firma, estado, fecha_creacion, fecha_expiracion, fecha_firma
+       FROM gh_firmas_electronicas
+       WHERE id IN (${placeholders})`
+    ).all(...numericIds);
+    allRows.push(...rows);
+  }
+
+  // Indexar por ambas claves (id_solicitud y string(id)) para que el
+  // handler pueda buscar el id original.
+  for (const row of allRows) {
+    result.set(row.id_solicitud, row);
+    result.set(String(row.id), row);
+  }
+  return result;
+}
+
+/**
  * Registra un evento en gh_firma_eventos.
  */
 function registerEvent(firmaId, evento, metadata, actor, ip, user_agent) {
@@ -453,8 +704,14 @@ module.exports = {
   getById,
   getByIdSolicitud,
   getByTokenHash,
+  getByIds,  // I-008: batch lookup
   list,
   registerEvent,
+  getTokenForRecovery,  // I-013b: descifrar token de metadata
+  // Exports para tests
+  _resetTokenEncryptionKey,  // I-013b
+  encryptToken,  // I-013b
+  decryptToken,  // I-013b
   MAX_PDF_SIZE,
   TIPOS_IDENTIFICACION,  // I-002: single source of truth (zod + service)
 };
