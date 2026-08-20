@@ -1470,19 +1470,193 @@ de v1.x. Si el patrón "throw after res.json" se vuelve común
 
 ---
 
-## 11. Pentesting post-implementación
+## 11. PDF Security (I-012)
+
+### 11.1. Contexto y motivación
+
+Cuando K+AIR crea una solicitud de firma, sube un PDF al Servicio
+(`POST /v1/internal/sign-requests`). Ese PDF será:
+
+1. Almacenado como `originales/<id_solicitud>.pdf`.
+2. Enviado al trabajador vía `GET /s/:token/document.pdf`.
+3. Firmado (overlay con metadatos), generando `firmados/<id_solicitud>.pdf`.
+4. Soporte de la constancia (`constancias/<id_solicitud>.pdf`).
+
+Antes de I-012, el Servicio confiaba en la auto-declaración del cliente:
+el `metadata.document_hash` enviado en el body era el que se persistía.
+Esto permitía que un cliente mintiera sobre el hash del PDF, o subiera
+un PDF que parecía válido pero no lo era (corrupto, cifrado, demasiado
+grande, etc.).
+
+I-012 introduce una validación estructural obligatoria en el Servicio, y
+garantiza que el hash persistido es el calculado por el servidor, no el
+declarado por el cliente.
+
+### 11.2. Lo que SÍ se hace (G11–G15) — implementado en I-012
+
+#### 11.2.1. G11 — Validación estructural
+
+Cada PDF subido pasa por `services/pdfValidator.js` (I-012.1), que usa
+`pdf-lib v1.17.1` para:
+
+- Verificar el header mágico `%PDF-` (ISO 32000-1 §7.5.2).
+- Caminar la tabla cross-reference.
+- Detectar la presencia de una entrada `/Encrypt` en el trailer.
+- Contar páginas.
+- Extraer el diccionario `/Info` (Title, Author, Subject, etc.).
+
+El servicio es una **capa pura, sin HTTP**. Lanza errores tipados con
+`code` y `details` (sin PII: nunca bytes del PDF, nunca Title/Author).
+El mapeo a HTTP vive en `middleware/pdfValidation.js` (I-012.2).
+
+**Punto crítico**: la validación ocurre **antes** de
+`services/signRequest.create()`. Si la validación falla, el PDF **nunca**
+se persiste en `storage/originales/`.
+
+#### 11.2.2. G12 — Límites configurables
+
+Cuatro variables de entorno (sección `pdf:` de `src/config.js`):
+
+| Env var | Default | Significado |
+|---|---|---|
+| `PDF_MAX_BYTES` | 52428800 (50 MB) | Tamaño máximo del buffer. Antes de cualquier parseo. |
+| `PDF_MAX_PAGES` | 200 | Máximo de páginas. |
+| `PDF_PARSE_TIMEOUT_MS` | 5000 | Timeout del parseo (Promise.race + setTimeout). |
+| `PDF_MAX_METADATA_BYTES` | 1048576 (1 MB) | Suma de bytes del `/Info` dictionary (anti metadata-bomb). |
+
+Si el buffer excede el límite de tamaño, el rechazo ocurre **antes** de
+iniciar el parseo (chequeo O(1)), protegiendo contra ataques de
+"troll" (50 MB de zeros).
+
+#### 11.2.3. G13 — Timeout y errores tipificados (HTTP 422)
+
+`Promise.race` envuelve `PDFDocument.load()` con un `setTimeout` que
+rechaza primero. Si el timeout se dispara, el servicio retorna
+`PDF_PARSE_TIMEOUT` y la promesa perdedora sigue corriendo hasta que
+termine (el PDF no será aceptado de todas formas).
+
+Seis errores tipados del service, todos mapeados a **HTTP 422** por
+`middleware/pdfValidation.js`:
+
+| code | Causa |
+|---|---|
+| `PDF_INVALID` | Buffer no parseable como PDF (header inválido, truncado, basura). |
+| `PDF_ENCRYPTED` | PDF con entrada `/Encrypt` (cifrado). pdf-lib no soporta desencriptar. Se RECHAZA, no se descifra. |
+| `PDF_TOO_LARGE` | Buffer.length > `PDF_MAX_BYTES`. |
+| `PDF_TOO_MANY_PAGES` | pageCount > `PDF_MAX_PAGES`. |
+| `PDF_PARSE_TIMEOUT` | parseo excedió `PDF_PARSE_TIMEOUT_MS`. |
+| `PDF_METADATA_TOO_LARGE` | Suma de bytes del `/Info` > `PDF_MAX_METADATA_BYTES`. |
+
+**Caso especial**: `PDF_REQUIRED` (no se envió archivo) → **HTTP 400**
+(malformed request, no unprocessable). Defense in depth: el middleware
+`upload.js` ya retorna 400 para `LIMIT_*` antes de llegar aquí, pero
+`PDF_REQUIRED` queda documentado para tests unitarios y rutas futuras
+que invoquen `pdfValidation()` directamente.
+
+#### 11.2.4. G14 — SHA-256 server-computed
+
+El hash que se persiste es el calculado por el servidor, no el declarado
+por el cliente en `metadata.document_hash`.
+
+- **Service** (`src/services/pdfValidator.js`): usa `sha256()` de
+  `src/crypto/hash.js` (mismo módulo que consume
+  `src/services/idempotency.js` y `src/services/signRequest.js`).
+- **Middleware** (`src/middleware/pdfValidation.js`): expone el resultado
+  en `req.pdfValidation.sha256` para el handler.
+- **Route** (`src/routes/signRequest.js` líneas 44-49): propaga
+  `req.pdfValidation.sha256` a `services/signRequest.create()`. El
+  handler **no** usa el `metadata.document_hash` que envió el cliente.
+
+Resultado: un cliente no puede mentir sobre el hash. Si el
+`document_hash` del body no coincide con el del PDF realmente subido, se
+rechaza en zod antes de llegar al service.
+
+#### 11.2.5. G15 — Disclaimer: pdfValidator detecta condiciones estructurales, no contenido activo
+
+`pdfValidator` es un **parser estructural**, no un control de seguridad
+del contenido. Detecta **determinadas condiciones estructurales y límites
+definidos** (header inválido, entrada `/Encrypt`, tamaño, páginas,
+timeout, tamaño de metadata). **No constituye una garantía de seguridad
+del contenido activo ni de protección contra explotación de
+vulnerabilidades del parser o del renderizador.**
+
+Un PDF que pasa la validación puede contener estructuras complejas que
+un parser específico no maneje bien, o patrones que un visor (Chromium,
+PDF.js, Adobe Reader) renderice de forma diferente a pdf-lib.
+
+**Implicaciones operativas**:
+- El contenido activo del PDF es responsabilidad del **renderizador
+  del firmante** (Chromium en la mini-app), no del Servicio.
+- Para validación más profunda del contenido se requiere una capa
+  adicional (ver §11.3).
+
+### 11.3. Lo que NO se hace (controles recomendados para producción)
+
+Esta sección documenta controles que **no** forman parte de I-012 y que
+quedan fuera del alcance del Servicio en v1. Listarlos explícitamente
+es necesario para evitar la falsa conclusión "el Servicio valida
+contenido activo del PDF".
+
+| Control | Estado | Recomendación |
+|---|---|---|
+| Análisis antivirus (AV) de los bytes del PDF | **No implementado** | Evaluar ClamAV u otro AV offline en el futuro. |
+| Sandboxing del renderizador del PDF | **No implementado** | Depende del visor (Chromium en mini-app). v1 confía en sandbox de Chromium. |
+| Detección de exploits conocidos (zero-day) del parser | **No implementado** | Depende de mantener pdf-lib actualizado y de CVEs públicos. |
+| Firma digital criptográfica del PDF (X.509, PAdES) | **Fuera de alcance v1** | El Servicio genera "constancia" del evento, no firma criptográfica del PDF. |
+| Listas de revocación (CRL) o respuestas OCSP | **Fuera de alcance v1** | Solo aplica si se usa firma criptográfica X.509. |
+| Detección de "metadata bombs" más allá de `/Info` | **No implementado** | Solo se valida el tamaño del `/Info`. Otros streams (XMP, JavaScript embebido) no se inspeccionan. |
+
+**Recomendación pre-producción**: ejecutar un pentest del Servicio con
+una batería de PDFs adversariales que incluya documentos con contenido
+activo (JavaScript, acciones PDF, streams embebidos, polyglotas
+válidos como PDF y otro formato). El pentest validará las afirmaciones
+de este documento. Ver §12 (Pentesting post-implementación).
+
+### 11.4. Disclaimers legales
+
+Esta sección documenta controles implementados en el Servicio, no
+asesoría jurídica. La validación estructural implementada en I-012 es
+un control técnico; **no certifica** que el Servicio cumpla con algún
+marco normativo específico. La validación jurídica del Servicio y su
+operación corresponde a un profesional del derecho colombiano.
+
+Ver `LEGAL.md` para el marco normativo aplicable (Ley 527 de 1999,
+Decreto 2364 de 2012, Decreto 1072 de 2015, Decreto 526 de 2021) y la
+cláusula de validación jurídica externa pendiente.
+
+### 11.5. Referencias a código
+
+- `src/services/pdfValidator.js` (526 líneas) — capa pura con pdf-lib.
+- `src/middleware/pdfValidation.js` (126 líneas) — adaptador HTTP, mapea
+  errores tipados a HTTP 422.
+- `src/config.js` líneas 100-108 (sección `pdf:`) — 4 env vars.
+- `src/routes/signRequest.js` líneas 21, 44-49 — cableado del
+  middleware y comentario explícito sobre hash server-computed.
+- `tests/services/pdfValidator.test.js` (582 líneas, 25 tests) — §S1-§S6.
+- `tests/middleware/pdfValidation.test.js` (490 líneas, 14 tests).
+- `tests/routes/signRequest-pdf-validation.test.js` (375 líneas, 8 pass
+  + 1 skip pre-existente) — integración HTTP.
+- `tests/routes/signRequest-pdf-validation-adversarial.test.js`
+  (494 líneas, 20 tests) — §M1-§M8.
+
+**Verificación post-I-012.3**: 663/664 pass, 0 fail, 1 skip pre-existente,
+3× corridas consecutivas en ~19s.
+
+---
+
+## 12. Pentesting post-implementación
 
 Antes del go-live, se recomienda contratar un **pentesting
 externo** que cubra:
 
-### 11.1. Alcance
+### 12.1. Alcance
 
 - Caja negra contra `https://firma.k-air.com`.
 - Caja gris contra los endpoints internos (con API key
   proporcionada por el equipo).
 - Caja blanca con acceso al código.
 
-### 11.2. Áreas a probar
+### 12.2. Áreas a probar
 
 - [ ] Inyección SQL en todos los endpoints.
 - [ ] Cross-Site Scripting (XSS) en la mini-app.
@@ -1509,7 +1683,7 @@ externo** que cubra:
 - [ ] **Hash de API key timing-safe**: comparar `constantTimeEqual`,
       no `===`.
 
-### 11.3. Criterio de aceptación
+### 12.3. Criterio de aceptación
 
 - 0 vulnerabilidades altas o críticas sin resolver.
 - Todas las vulnerabilidades medias con plan de remediación
@@ -1517,7 +1691,7 @@ externo** que cubra:
 
 ---
 
-## 12. Bug bounty (futuro)
+## 13. Bug bounty (futuro)
 
 En **v1.1 o v2.0** se puede considerar un programa de bug bounty:
 
@@ -1530,7 +1704,7 @@ En **v1.1 o v2.0** se puede considerar un programa de bug bounty:
 
 ---
 
-## 13. Anexo: matriz de riesgos
+## 14. Anexo: matriz de riesgos
 
 | ID | Amenaza | Probabilidad | Impacto | Riesgo | Mitigación principal | Riesgo residual |
 |---|---|---|---|---|---|---|
