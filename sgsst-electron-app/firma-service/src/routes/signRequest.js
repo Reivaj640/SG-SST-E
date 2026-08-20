@@ -1,16 +1,20 @@
 /**
  * Rutas de Sign Request.
  *
- * - POST /internal/sign-requests  (multipart, crea)
- * - GET  /internal/sign-requests/:id  (consulta por id_solicitud o id interno)
- * - GET  /internal/sign-requests  (lista con filtros)
+ * - POST /internal/sign-requests                                 (multipart, crea)
+ * - GET  /internal/sign-requests/:id                             (consulta por id_solicitud o id interno)
+ * - GET  /internal/sign-requests                                 (lista con filtros)
+ * - GET  /internal/sign-requests?ids=id1,id2,id3                 (I-008: batch, internalServerLimiter 4 capas)
+ * - GET  /internal/sign-requests/:id/document.pdf                (I-103: PDF descargable autenticado)
+ * - GET  /internal/sign-requests/:id/constancia.pdf              (I-104: Constancia descargable autenticada)
+ * - GET  /internal/sign-requests/:id/link                        (I-013b: link recovery)
  *
- * Auth (I-010, D-13, I-008): los 3 endpoints usan `requireEmpresaScopeAndLimit`
+ * Auth (I-010, D-13, I-008): los 7 endpoints usan `requireEmpresaScopeAndLimit`
  * para scope per-empresa + rate limit interno (4 capas, I-008 / C-20 v5).
- * El middleware hace authn (API key) + authz (per-empresa) + rate limit.
- * Reemplaza al antiguo `internalApiAuth` en estos 3 endpoints.
  *
- * Ver API.md §6.1, §6.2, §6.8 y docs/kair-firma-integration/I-010-design.md.
+ * Ver API.md §6.1, §6.2, §6.8 y docs/kair-firma-integration/I-010-design.md,
+ * docs/kair-firma-integration/READY-TO-IMPLEMENT.md (I-007, I-008, I-103,
+ * I-104, I-013b).
  */
 'use strict';
 
@@ -20,10 +24,12 @@ const { requireEmpresaScopeAndLimit } = require('../middleware/authz');
 const { requireIdempotencyKey } = require('../middleware/idempotency');
 const { uploadPdf } = require('../middleware/upload');
 const pdfValidation = require('../middleware/pdfValidation');
-const { signRequestBody, signRequestListQuery } = require('../schemas');
+const { signRequestBody, signRequestListQuery, signRequestIdsQuery } = require('../schemas');
 const signRequestService = require('../services/signRequest');
+const storage = require('../services/storage');
 const { AppError } = require('../middleware/errors');
 const logger = require('../utils/logger');
+const config = require('../config');
 
 /**
  * POST /internal/sign-requests
@@ -250,6 +256,34 @@ router.get('/sign-requests/:id',
       consent_id: signRequest.consent_id,  // Bloque E6
       // I-002: categoría del documento firmado. Null para legacy pre-007.
       tipo_identificacion: signRequest.tipo_identificacion,
+      // I-007: campos para UI. Se exponen en el response body pero el
+      // token real NUNCA se reconstruye (está hasheado en BD, ver C-22).
+      //   - qr_payload, link: null en GET /:id. Si K+AIR los necesita,
+      //     debe llamar I-013b (GET /:id/link) que retorna el token
+      //     descifrado de metadata._server_metadata con auditoría.
+      //   - tiene_pdf_firmado / tiene_constancia: flags booleanos que
+      //     indican si los archivos están disponibles para descarga vía
+      //     I-103 / I-104. NO exponemos los paths internos (riesgo de
+      //     fuga de info sobre el filesystem del servidor).
+      qr_payload: null,
+      link: null,
+      tiene_pdf_original: !!signRequest.pdf_original_path,
+      tiene_pdf_firmado: !!signRequest.pdf_firmado_path,
+      tiene_constancia: !!signRequest.constancia_path,
+      // I-007: hashes de evidencia forense (post-SIGNED).
+      // Solo se exponen si están calculados (estado SIGNED).
+      // En estados anteriores son null (no se han calculado todavía).
+      ...(signRequest.document_hash_firmado
+          ? { document_hash_firmado: signRequest.document_hash_firmado } : {}),
+      ...(signRequest.evidence_hash
+          ? { evidence_hash: signRequest.evidence_hash } : {}),
+      ...(signRequest.id_constancia
+          ? { id_constancia: signRequest.id_constancia } : {}),
+      ...(signRequest.manifestacion_voluntad_hash
+          ? { manifestacion_voluntad_hash: signRequest.manifestacion_voluntad_hash } : {}),
+      // motivo_rechazo solo si estado=REJECTED (relevante para UI).
+      ...(signRequest.estado === 'REJECTED' && signRequest.motivo_rechazo
+          ? { motivo_rechazo: signRequest.motivo_rechazo } : {}),
     });
   } catch (err) {
     next(err);
@@ -321,6 +355,430 @@ router.get('/sign-requests',
           fecha_expiracion: it.fecha_expiracion,
           fecha_firma: it.fecha_firma,
         })),
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+// =============================================================================
+// I-008: GET /internal/sign-requests?ids=id1,id2,id3 (batch)
+// =============================================================================
+// Polling optimizado para K+AIR (cada 30s con todos los sign requests activos
+// en UN solo request). Reemplaza el polling individual que haría N requests
+// por tanda y agotaría la Capa 1 (720/h por id_empresa).
+//
+// Comportamiento:
+//   - Acepta `ids` como CSV. Cada id puede ser `SIGN-YYYY-NNNNNN` o entero.
+//   - Retorna 200 con { total, items, missing, forbidden }.
+//     - items: sign requests encontrados Y autorizados (pertenecen al cliente).
+//     - missing: ids que no existen en BD (404 silent).
+//     - forbidden: ids que existen pero pertenecen a OTRA empresa. K+AIR
+//       recibe este feedback para mostrar UI coherente sin revelar la
+//       existencia del recurso cross-company (404 silent del lado server).
+//   - El batch cuenta como UN solo hit en el rate limit (4 capas).
+//
+// Casos de error:
+//   - 400 INVALID_REQUEST_BODY si ids falta, está vacío o tiene >200 entradas.
+//   - 401, 403, 429: manejados por el middleware.
+
+router.get('/sign-requests-batch',
+  requireEmpresaScopeAndLimit({
+    allowedOperations: ['sign_request:read'],
+    rateLimit: { tier: 'standard' },
+  }),
+  (req, res, next) => {
+    try {
+      // 1. Validar query
+      const result = signRequestIdsQuery.safeParse(req.query);
+      if (!result.success) {
+        return res.status(400).json({
+          error: {
+            code: 'INVALID_REQUEST_BODY',
+            message: 'Query params inválidos para batch',
+            details: { issues: result.error.issues },
+            request_id: req.id,
+          },
+        });
+      }
+      const ids = result.data.ids.split(',').map(s => s.trim()).filter(Boolean);
+
+      // 2. Batch lookup (service layer)
+      const byId = signRequestService.getByIds(ids);
+
+      // 3. Separar en items / missing / forbidden
+      //    Regla cross-company: en client mode, los sign requests de otra
+      //    empresa van a `forbidden` (no se filtra la existencia al cliente
+      //    de otra empresa). En legacy mode, todos van a `items` (compat).
+      const items = [];
+      const missing = [];
+      const forbidden = [];
+      const seen = new Set();
+
+      for (const rawId of ids) {
+        if (seen.has(rawId)) continue;  // dedup en el response
+        seen.add(rawId);
+
+        const row = byId.get(rawId);
+        if (!row) {
+          missing.push(rawId);
+          continue;
+        }
+        if (req.authSource === 'client' && row.id_empresa !== req.id_empresa) {
+          forbidden.push(rawId);
+          continue;
+        }
+        items.push(row);
+      }
+
+      // 4. Response
+      res.json({
+        total: items.length,
+        missing_count: missing.length,
+        forbidden_count: forbidden.length,
+        items: items.map(it => ({
+          id_solicitud: it.id_solicitud,
+          id_interno: it.id,
+          id_documento: it.id_documento,
+          id_trabajador: it.id_trabajador,
+          id_empresa: it.id_empresa,
+          tipo_firma: it.tipo_firma,
+          estado: it.estado,
+          fecha_creacion: it.fecha_creacion,
+          fecha_expiracion: it.fecha_expiracion,
+          fecha_firma: it.fecha_firma,
+        })),
+        missing,
+        forbidden,
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+// =============================================================================
+// I-103: GET /internal/sign-requests/:id/document.pdf
+// =============================================================================
+// Descarga autenticada del PDF (firmado post-SIGNED, original pre-SIGNED).
+// Sustituye el placeholder `pdf_firmado_url` que el commit() retorna pero
+// que NO apuntaba a un endpoint real (ver INTEGRATION.md §2.2, gap I-103).
+//
+// Lógica:
+//   - Si signRequest.estado === 'SIGNED' y pdf_firmado_path existe:
+//     devuelve el PDF firmado.
+//   - Si signRequest NO está en SIGNED y pdf_original_path existe:
+//     devuelve el PDF original (preview sin firmar). Útil para que K+AIR
+//     muestre el documento antes de la firma.
+//   - Si no hay PDF disponible: 404 PDF_NOT_FOUND.
+//
+// Auth: requiereEmpresaScopeAndLimit con sign_request:read. Cross-company → 404.
+
+router.get('/sign-requests/:id/document.pdf',
+  requireEmpresaScopeAndLimit({
+    allowedOperations: ['sign_request:read'],
+    rateLimit: { tier: 'standard' },
+  }),
+  (req, res, next) => {
+    try {
+      const { id } = req.params;
+      let signRequest;
+      if (/^SIGN-\d{4}-\d{6}$/.test(id)) {
+        signRequest = signRequestService.getByIdSolicitud(id);
+      } else if (/^\d+$/.test(id)) {
+        signRequest = signRequestService.getById(parseInt(id, 10));
+      } else {
+        return res.status(400).json({
+          error: {
+            code: 'INVALID_REQUEST_BODY',
+            message: 'id debe ser SIGN-YYYY-NNNNNN o entero positivo',
+            request_id: req.id,
+          },
+        });
+      }
+
+      if (!signRequest) {
+        return res.status(404).json({
+          error: {
+            code: 'NOT_FOUND',
+            message: `Solicitud ${id} no encontrada`,
+            request_id: req.id,
+          },
+        });
+      }
+
+      // Cross-company silent 404
+      if (req.authSource === 'client' && signRequest.id_empresa !== req.id_empresa) {
+        return res.status(404).json({
+          error: {
+            code: 'NOT_FOUND',
+            message: `Solicitud ${id} no encontrada`,
+            request_id: req.id,
+          },
+        });
+      }
+
+      // Determinar qué PDF servir
+      const isSigned = signRequest.estado === 'SIGNED';
+      const pathToServe = isSigned ? signRequest.pdf_firmado_path : signRequest.pdf_original_path;
+      const fileLabel = isSigned ? 'firmado' : 'original';
+
+      if (!pathToServe) {
+        return res.status(404).json({
+          error: {
+            code: 'PDF_NOT_FOUND',
+            message: `El PDF (${fileLabel}) no está disponible para esta solicitud`,
+            request_id: req.id,
+          },
+        });
+      }
+
+      const result = storage.readPdfIfExists(pathToServe);
+      if (!result.found) {
+        return res.status(404).json({
+          error: {
+            code: 'PDF_NOT_FOUND',
+            message: `El archivo del PDF (${fileLabel}) no existe en disco`,
+            request_id: req.id,
+          },
+        });
+      }
+
+      const filename = isSigned
+        ? `${signRequest.id_solicitud}.pdf`
+        : `${signRequest.id_solicitud}-original.pdf`;
+
+      res.set('Content-Type', 'application/pdf');
+      res.set('Content-Disposition', `${isSigned ? 'inline' : 'attachment'}; filename="${filename}"`);
+      res.set('X-Content-Type-Options', 'nosniff');
+      res.set('Cache-Control', 'private, no-cache');
+      res.send(result.buffer);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+// =============================================================================
+// I-104: GET /internal/sign-requests/:id/constancia.pdf
+// =============================================================================
+// Descarga autenticada de la Constancia. Solo disponible si el sign request
+// está en estado SIGNED (la constancia se genera en commit()).
+//
+// Lógica:
+//   - Si signRequest.estado !== 'SIGNED' → 409 CONSTANCIA_NOT_AVAILABLE.
+//   - Si constancia_path está null o el archivo no existe en disco → 404.
+//   - Cross-company → 404 silent.
+
+router.get('/sign-requests/:id/constancia.pdf',
+  requireEmpresaScopeAndLimit({
+    allowedOperations: ['sign_request:read'],
+    rateLimit: { tier: 'standard' },
+  }),
+  (req, res, next) => {
+    try {
+      const { id } = req.params;
+      let signRequest;
+      if (/^SIGN-\d{4}-\d{6}$/.test(id)) {
+        signRequest = signRequestService.getByIdSolicitud(id);
+      } else if (/^\d+$/.test(id)) {
+        signRequest = signRequestService.getById(parseInt(id, 10));
+      } else {
+        return res.status(400).json({
+          error: {
+            code: 'INVALID_REQUEST_BODY',
+            message: 'id debe ser SIGN-YYYY-NNNNNN o entero positivo',
+            request_id: req.id,
+          },
+        });
+      }
+
+      if (!signRequest) {
+        return res.status(404).json({
+          error: {
+            code: 'NOT_FOUND',
+            message: `Solicitud ${id} no encontrada`,
+            request_id: req.id,
+          },
+        });
+      }
+
+      // Cross-company silent 404
+      if (req.authSource === 'client' && signRequest.id_empresa !== req.id_empresa) {
+        return res.status(404).json({
+          error: {
+            code: 'NOT_FOUND',
+            message: `Solicitud ${id} no encontrada`,
+            request_id: req.id,
+          },
+        });
+      }
+
+      // Solo post-SIGNED
+      if (signRequest.estado !== 'SIGNED') {
+        return res.status(409).json({
+          error: {
+            code: 'CONSTANCIA_NOT_AVAILABLE',
+            message: `La constancia solo está disponible cuando la solicitud está en estado SIGNED`,
+            details: { current_state: signRequest.estado },
+            request_id: req.id,
+          },
+        });
+      }
+
+      if (!signRequest.constancia_path) {
+        return res.status(404).json({
+          error: {
+            code: 'PDF_NOT_FOUND',
+            message: 'La ruta de la constancia no está registrada en BD',
+            request_id: req.id,
+          },
+        });
+      }
+
+      const result = storage.readPdfIfExists(signRequest.constancia_path);
+      if (!result.found) {
+        return res.status(404).json({
+          error: {
+            code: 'PDF_NOT_FOUND',
+            message: 'El archivo de la constancia no existe en disco',
+            request_id: req.id,
+          },
+        });
+      }
+
+      const filename = `${signRequest.id_solicitud}-constancia.pdf`;
+
+      res.set('Content-Type', 'application/pdf');
+      res.set('Content-Disposition', `inline; filename="${filename}"`);
+      res.set('X-Content-Type-Options', 'nosniff');
+      res.set('Cache-Control', 'private, no-cache');
+      res.send(result.buffer);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+// =============================================================================
+// I-013b: GET /internal/sign-requests/:id/link (recuperación)
+// =============================================================================
+// Recupera el token perdido (C-22) para K+AIR. El token se almacena cifrado
+// con AES-256-GCM en `metadata._server_metadata.token_encrypted` (ver
+// signRequest.js create()). Solo accesible si el sign request NO está en
+// estado terminal.
+//
+// Comportamiento:
+//   - 200 con { id_solicitud, token, url_publica, qr_payload,
+//     fecha_expiracion, estado } si se puede descifrar.
+//   - 410 GONE con code LINK_NOT_AVAILABLE si estado terminal.
+//   - 410 GONE con code LINK_NOT_AVAILABLE y reason='legacy_no_token_recovery'
+//     si el sign request es pre-I-013b (no tiene token cifrado).
+//   - 404 NOT_FOUND si no existe o cross-company (silent).
+//   - Registra evento LINK_RETRIEVED en gh_firma_eventos (auditoría Bloque E7).
+
+router.get('/sign-requests/:id/link',
+  requireEmpresaScopeAndLimit({
+    allowedOperations: ['sign_request:read'],
+    rateLimit: { tier: 'standard' },
+  }),
+  (req, res, next) => {
+    try {
+      const { id } = req.params;
+      let signRequest;
+      if (/^SIGN-\d{4}-\d{6}$/.test(id)) {
+        signRequest = signRequestService.getByIdSolicitud(id);
+      } else if (/^\d+$/.test(id)) {
+        signRequest = signRequestService.getById(parseInt(id, 10));
+      } else {
+        return res.status(400).json({
+          error: {
+            code: 'INVALID_REQUEST_BODY',
+            message: 'id debe ser SIGN-YYYY-NNNNNN o entero positivo',
+            request_id: req.id,
+          },
+        });
+      }
+
+      if (!signRequest) {
+        return res.status(404).json({
+          error: {
+            code: 'NOT_FOUND',
+            message: `Solicitud ${id} no encontrada`,
+            request_id: req.id,
+          },
+        });
+      }
+
+      // Cross-company silent 404
+      if (req.authSource === 'client' && signRequest.id_empresa !== req.id_empresa) {
+        return res.status(404).json({
+          error: {
+            code: 'NOT_FOUND',
+            message: `Solicitud ${id} no encontrada`,
+            request_id: req.id,
+          },
+        });
+      }
+
+      // Estado terminal → 410
+      const terminalStates = ['SIGNED', 'REJECTED', 'REVOKED', 'EXPIRED', 'CANCELLED'];
+      if (terminalStates.includes(signRequest.estado)) {
+        return res.status(410).json({
+          error: {
+            code: 'LINK_NOT_AVAILABLE',
+            message: `El link no está disponible en estado terminal '${signRequest.estado}'`,
+            details: { current_state: signRequest.estado, reason: 'terminal_state' },
+            request_id: req.id,
+          },
+        });
+      }
+
+      // Intentar recuperar el token
+      const recovery = signRequestService.getTokenForRecovery(signRequest);
+      if (!recovery.found) {
+        return res.status(410).json({
+          error: {
+            code: 'LINK_NOT_AVAILABLE',
+            message: 'El link no se puede recuperar (sign request legacy o cifrado corrupto)',
+            details: { reason: recovery.reason },
+            request_id: req.id,
+          },
+        });
+      }
+
+      // Auditoría: registrar evento LINK_RETRIEVED
+      try {
+        signRequestService.registerEvent(
+          signRequest.id,
+          'LINK_RETRIEVED',
+          {
+            via: 'I-013b',
+            api_key_hash_prefix: req.api_key_hash_prefix || null,
+          },
+          `rh:${req.api_key_hash_prefix || 'system'}`,
+          req.ip,
+          req.get('User-Agent') || null,
+        );
+      } catch (e) {
+        // Loguear pero no fallar — la recuperación es exitosa aunque la
+        // auditoría falle.
+        logger.warn('I-013b: no se pudo registrar evento LINK_RETRIEVED', {
+          id_solicitud: signRequest.id_solicitud,
+          error: e.message,
+        });
+      }
+
+      logger.info('Link recuperado', {
+        id_solicitud: signRequest.id_solicitud,
+        actor: req.api_key_hash_prefix || 'system',
+        ip: req.ip,
+      });
+
+      res.json({
+        id_solicitud: signRequest.id_solicitud,
+        token: recovery.token,
+        url_publica: recovery.url_publica,
+        qr_payload: recovery.url_publica,
+        fecha_expiracion: signRequest.fecha_expiracion,
+        estado: signRequest.estado,
       });
     } catch (err) {
       next(err);

@@ -78,6 +78,27 @@ function readPdf(filepath) {
 }
 
 /**
+ * Lee un PDF del storage con manejo explícito de "no existe".
+ *
+ * Usado por los endpoints internos I-103 (document.pdf) e I-104 (constancia.pdf)
+ * para distinguir 404 PDF_NOT_FOUND (archivo no está en disco, p.ej. huérfano
+ * o sign request legacy) de 500 INTERNAL_ERROR. Ver docs/kair-firma-integration
+ * INTEGRATION.md §2.2 (I-103, I-104 pendientes).
+ *
+ * @param {string|null|undefined} filepath - Ruta absoluta al archivo.
+ * @returns {{found: true, buffer: Buffer} | {found: false}}
+ */
+function readPdfIfExists(filepath) {
+  if (typeof filepath !== 'string' || filepath.length === 0) {
+    return { found: false };
+  }
+  if (!fs.existsSync(filepath)) {
+    return { found: false };
+  }
+  return { found: true, buffer: fs.readFileSync(filepath) };
+}
+
+/**
  * Verifica que un archivo existe.
  */
 function exists(filepath) {
@@ -119,6 +140,7 @@ module.exports = {
   PATHS,
   saveOriginal,
   readPdf,
+  readPdfIfExists,
   exists,
   deletePdf,
   size,
