@@ -124,6 +124,12 @@ const { registerPresupuestoHandlers, SCHEMA_SQL: PRESUPUESTO_SCHEMA_SQL, MIGRATI
 // no existe. Plan: docs/plans/2026-08-15-gestion-humana-design.md
 const { registerGestionHumanaHandlers } = require('./main/gestion-humana-bridge');
 const { SCHEMA_SQL: GH_SCHEMA_SQL, MIGRATIONS_SQL: GH_MIGRATIONS_SQL } = require('./main/gestion-humana-schema-sql');
+// 📦101 (2026-08-20) — Firma Electrónica K+AIR v1 (I-101).
+// Cliente HTTP + safeStorage para firma-service. 13 canales `firma:*` (4 config +
+// 6 sign-request + 2 consent + 1 agreement). Patrón .init(ipcMain) como GH.
+// Plan: docs/kair-firma-integration/READY-TO-IMPLEMENT.md §D (I-101).
+// Spec: docs/gestion-humana/firma-electronica/API.md.
+const { registerFirmaHandlers } = require('./main/firma-bridge');
 // 📦537 — Sync multipc (BD local <-> .kairsync en carpeta compartida)
 const { registerSyncHandlers } = require('./main/sync-bridge');
 // 📦538 — Generador de pcId (ID unico por PC para el sync multipc)
@@ -9864,6 +9870,11 @@ try {
   // para que los tests puedan inyectar el mock sin Module._resolveFilename hack.
   registerGestionHumanaHandlers.init(ipcMain);
   registerGestionHumanaHandlers(app, { getDb, validateSession });
+  // 📦101 (2026-08-20) — Firma Electrónica K+AIR v1 (I-101).
+  // Registra 13 canales `firma:*`. Usa safeStorage para apiKey + client_instance_id.
+  // NO pisa nada del submódulo GH; canales con prefijo distinto (`firma:` vs `gh:`).
+  registerFirmaHandlers.init(ipcMain);
+  registerFirmaHandlers(app, { appVersion: app.getVersion() });
   // 📦538 (FIX orden init) — Generar pcId y arrancar auto-sync DESPUES de
   // que registerSyncHandlers haya llamado a syncService.init() (setea _configPath).
   // Si se llama antes, _getAllCompanies() retorna [] porque _configPath es null
