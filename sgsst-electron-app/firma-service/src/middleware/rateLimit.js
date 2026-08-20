@@ -74,9 +74,28 @@ const _INTERNAL_IP_LIMIT = _envInt('RATE_LIMIT_INTERNAL_IP_PER_HOUR', 480);
  * NO se usa el handler por defecto de express-rate-limit (que escribe
  * res.status(429).json({...}) directamente) para mantener el contrato
  * de error consistente con el resto del servicio.
+ *
+ * I-008.2 (HALLAZGO #1): setea manualmente los headers IETF draft-7
+ * (RateLimit-Policy, RateLimit) antes de llamar next(err). Esto es
+ * necesario porque express-rate-limit solo setea estos headers cuando
+ * su handler interno escribe la respuesta directamente; con un handler
+ * custom que llama next(err), los headers no se setean automáticamente.
+ * El contrato IETF draft-7 permite a K+AIR hacer backoff inteligente
+ * y conocer el estado de su cuota.
+ *
+ * @see https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/
  */
 function makeHandler(limiterName) {
   return function (req, res, next, optionsUsed) {
+    // I-008.2: setear headers IETF draft-7 ANTES de next(err).
+    // En un 429, remaining=0 y reset=window (peor caso: el cliente
+    // debe esperar el window completo). Los headers siguen el formato
+    // definido en el draft-ietf-httpapi-ratelimit-headers.
+    const limit = optionsUsed.limit;
+    const windowSec = Math.ceil(optionsUsed.windowMs / 1000);
+    res.setHeader('RateLimit-Policy', `${limit};w=${windowSec}`);
+    res.setHeader('RateLimit', `limit=${limit}, remaining=0, reset=${windowSec}`);
+
     // express-rate-limit pasa el `next` de Express como 3er argumento
     // (compatible con RateLimitExceededEventHandler).
     return next(new AppError(
@@ -355,6 +374,12 @@ function internalServerLimiter(req, res, next) {
   // consumir tokens de las otras capas.
   const instance = _getInstanceId(req);
   if (_checkAnomaly(req.id_empresa, instance)) {
+    // I-008.2 (HALLAZGO #1): setear headers IETF draft-7 manualmente
+    // para mantener consistencia con makeHandler. Sin esto, los 429
+    // de Capa 4 no llevarían headers (no pasan por express-rate-limit).
+    const windowSec = Math.ceil(INSTANCE_ANOMALY_WINDOW_MS / 1000);
+    res.setHeader('RateLimit-Policy', `${INSTANCE_ANOMALY_LIMIT};w=${windowSec}`);
+    res.setHeader('RateLimit', `limit=${INSTANCE_ANOMALY_LIMIT}, remaining=0, reset=${windowSec}`);
     return next(new AppError(
       429,
       'RATE_LIMIT_EXCEEDED',
