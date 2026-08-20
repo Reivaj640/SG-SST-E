@@ -1,15 +1,16 @@
 <!-- modules/gestion-humana/documentos/index.html
-     📦722 · Vista "Documentos y Firmas" — HTML separado (sin header secundario)
+     📦722 · Vista "Documentos" — HTML separado (sin header secundario)
      📦765 · Reorden: Documentos Recientes AHORA es lo 2do (después del header)
      📦766 · Mis Templates se mueve a MODAL (botón en header) — ya no es sección permanente
+     LEGACY-SIGN-REMOVE (2026-08-20): eliminado modal "Firma Digital" con canvas.
+     La firma se hace ahora únicamente por vía electrónica (firma-service, I-101+).
      Estructura:
        - KPIs (4) via #doc-kpi-bar (helper GHKPIBar)
        - Section head (título + botón "Mis Templates" (ghost) + botón "Generar Documento" (primary))
-       - Documentos recientes (tabla con tipo, trabajador, fecha, estado, fecha firma, firmar) — primero
+       - Documentos recientes (tabla con tipo, trabajador, fecha, estado, fecha firma, descargar) — primero
        - Catálogo (7 tipos de documentos) — referencia
        - Modal "Administrar Templates" (📦766 · Mis Templates) — se abre con botón
        - Modal "Generar Documento" con dropdown Trabajador + cards de tipos + templates
-       - Modal "Firma Digital" con canvas
        - Modal "Subir Template" (📦764)
      IDs con prefijo `doc-` para evitar colisiones. -->
 
@@ -22,8 +23,8 @@
   <!-- ═══ 📦772 · SECTION HEAD (sticky al top cuando scrollea) ═══ -->
   <div class="doc-section-head">
     <div class="doc-section-head__text">
-      <h2 class="doc-section-head__title">Documentos y Firmas Digitales</h2>
-      <p class="doc-section-head__subtitle">7 tipos de documentos del proceso de contratación — firma en pantalla</p>
+      <h2 class="doc-section-head__title">Documentos</h2>
+      <p class="doc-section-head__subtitle">7 tipos de documentos del proceso de contratación — la firma es electrónica</p>
     </div>
     <div class="doc-section-head__actions">
       <button id="doc-tpl-abrir" class="doc-btn doc-btn--ghost" type="button">
@@ -145,45 +146,7 @@
   </div>
 </div>
 
-<!-- ═══ MODAL: FIRMA DIGITAL EN PANTALLA (📦763) ═══ -->
-<div id="doc-firma-modal" class="doc-modal" hidden>
-  <div class="doc-modal__backdrop" data-close-doc-modal="1"></div>
-  <div class="doc-modal__panel doc-modal__panel--firma">
-    <header class="doc-modal__header">
-      <h3 class="doc-modal__title">Firma Digital</h3>
-      <button type="button" class="doc-modal__close" data-close-doc-modal="1" aria-label="Cerrar">
-        <i class="fas fa-times"></i>
-      </button>
-    </header>
-    <div class="doc-modal__body">
-      <p class="doc-firma__hint">
-        <i class="fas fa-info-circle"></i>
-        Dibuja tu firma en el recuadro con el ratón (o el dedo en pantalla táctil).
-        Se registrará con fecha y hora exactas.
-      </p>
-      <div class="doc-firma__canvas-wrap">
-        <canvas id="doc-firma-canvas" class="doc-firma__canvas" width="600" height="200"></canvas>
-        <div class="doc-firma__placeholder" id="doc-firma-placeholder">
-          <i class="fas fa-pen-nib"></i>
-          <span>Firma aquí</span>
-        </div>
-      </div>
-      <p class="doc-firma__meta">
-        <i class="fas fa-user"></i> <span id="doc-firma-trabajador">—</span>
-        &nbsp;·&nbsp;
-        <i class="fas fa-file-alt"></i> <span id="doc-firma-tipo">—</span>
-      </p>
-    </div>
-    <footer class="doc-modal__footer">
-      <button type="button" id="doc-firma-limpiar" class="doc-btn doc-btn--ghost">
-        <i class="fas fa-eraser"></i> Limpiar
-      </button>
-      <div class="doc-modal__footer-right">
-        <button type="button" class="doc-btn doc-btn--ghost" data-close-doc-modal="1">Cancelar</button>
-        <button type="button" id="doc-firma-confirm" class="doc-btn doc-btn--primary" disabled>
-          <i class="fas fa-check"></i> Guardar Firma
-        </button>
-      </div>
-    </footer>
-  </div>
-</div>
+<!-- ═══ MODAL: FIRMA DIGITAL — ELIMINADO en LEGACY-SIGN-REMOVE (2026-08-20) ═══
+     La firma canvas operativa interna (base64 PNG) se reemplazó por firma
+     electrónica vía firma-service (I-101+). El modal de firma en pantalla
+     ya no existe. La nueva UI de firma electrónica llegará con I-102. -->

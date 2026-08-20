@@ -227,7 +227,8 @@ function _rowToDocumento(row) {
     tipo: row.tipo,
     titulo: row.titulo,
     contenido: row.contenido,
-    firmaId: row.firma_id,
+    // firmaId eliminado en LEGACY-SIGN-REMOVE (2026-08-20). El estado 'firmado'
+    // ahora se popula desde firma-service (ver I-101 / I-105).
     estado: row.estado,
     fechaFirma: row.fecha_firma,
     version: row.version,
@@ -235,23 +236,6 @@ function _rowToDocumento(row) {
     nombreArchivo: row.nombre_archivo,     // 📦764 · nombre del archivo generado
     createdAt: row.created_at,
     updatedAt: row.updated_at
-  };
-}
-
-function _rowToFirma(row) {
-  if (!row) return null;
-  return {
-    id: row.id,
-    trabajadorId: row.trabajador_id,
-    empresaId: row.empresa_id,
-    documentoTipo: row.documento_tipo,
-    imagenData: row.imagen_data,
-    documentoId: row.documento_id,
-    ip: row.ip,
-    userAgent: row.user_agent,
-    fechaHora: row.fecha_hora,
-    metadata: row.metadata,
-    createdAt: row.created_at
   };
 }
 
@@ -1832,13 +1816,13 @@ function _handlerCreateDocumento(token, companyName, data) {
     }
     localDb.prepare(
       "INSERT INTO gh_documentos (id, trabajador_id, empresa_id, tipo, titulo, contenido, " +
-      "  firma_id, estado, fecha_firma, version, ruta_archivo, nombre_archivo, " +
+      "  estado, fecha_firma, version, ruta_archivo, nombre_archivo, " +
       "  created_at, updated_at) " +
-      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     ).run(
       id, data.trabajadorId, company.company_key,
       data.tipo, data.titulo, data.contenido,
-      data.firmaId || null, data.estado || 'pendiente',
+      data.estado || 'pendiente',
       data.fechaFirma || null, data.version || 1,
       rutaArchivo, nombreArchivo,
       now, now
@@ -1852,8 +1836,10 @@ function _handlerCreateDocumento(token, companyName, data) {
 
 /**
  * gh:update-documento
- * Whitelist: titulo, contenido, firmaId, estado, fechaFirma, version.
+ * Whitelist: titulo, contenido, estado, fechaFirma, version.
  * NO permite cambiar tipo ni trabajador_id.
+ * (firmaId eliminado en LEGACY-SIGN-REMOVE — el estado 'firmado' lo setea
+ *  firma-service vía I-105 al recibir SIGN_COMMITTED.)
  */
 function _handlerUpdateDocumento(token, documentoId, updates) {
   var auth = _checkAuth(token);
@@ -1872,7 +1858,6 @@ function _handlerUpdateDocumento(token, documentoId, updates) {
   var fieldMap = {
     titulo: 'titulo',
     contenido: 'contenido',
-    firmaId: 'firma_id',
     estado: 'estado',
     fechaFirma: 'fecha_firma',
     version: 'version'
@@ -1949,163 +1934,16 @@ function _handlerDeleteDocumento(token, documentoId) {
 }
 
 /**
- * gh:firmar-documento
- * Asocia una firma al documento y lo marca como 'firmado'.
+ * SECCIÓN ELIMINADA EN LEGACY-SIGN-REMOVE (2026-08-20):
+ *   - _handlerFirmarDocumento  (gh:firmar-documento)
+ *   - _handlerListFirmas       (gh:list-firmas)
+ *   - _handlerCreateFirma      (gh:create-firma)
+ *   - _rowToFirma
+ * La firma canvas operativa interna (base64 PNG) ya no se usa. La firma
+ * jurídica es únicamente electrónica, vía firma-service (I-101+).
+ * Las funciones de UPDATE del estado 'firmado' las dispara firma-service
+ * al recibir el evento SIGN_COMMITTED (ver I-105).
  */
-function _handlerFirmarDocumento(token, documentoId, firmaId, fechaFirma) {
-  var auth = _checkAuth(token);
-  if (!auth.ok) return _err(auth.error.code, auth.error.message);
-
-  if (!documentoId || typeof documentoId !== 'string') {
-    return _err('INVALID_INPUT', 'documentoId es requerido');
-  }
-  if (!firmaId || typeof firmaId !== 'string') {
-    return _err('INVALID_INPUT', 'firmaId es requerido');
-  }
-
-  var localDb = _getDb();
-  if (!localDb) return _err('NO_DB', 'BD no disponible');
-
-  try {
-    var existing = localDb.prepare('SELECT id, estado FROM gh_documentos WHERE id = ?').get(documentoId);
-    if (!existing) return _err('NOT_FOUND', 'Documento no encontrado');
-    if (existing.estado === 'anulado') {
-      return _err('ALREADY_DELETED', 'El documento está anulado');
-    }
-    if (existing.estado === 'firmado') {
-      return _err('ALREADY_FINALIZED', 'El documento ya está firmado');
-    }
-
-    // Verificar que la firma existe
-    var firma = localDb.prepare("SELECT id FROM gh_firmas_digitales WHERE id = ?").get(firmaId);
-    if (!firma) {
-      return _err('FIRMA_NOT_FOUND', 'Firma "' + firmaId + '" no encontrada');
-    }
-
-    var now = new Date().toISOString();
-    var fecha = (fechaFirma && typeof fechaFirma === 'string') ? fechaFirma : now;
-
-    localDb.prepare(
-      "UPDATE gh_documentos SET firma_id = ?, estado = 'firmado', fecha_firma = ?, updated_at = ? WHERE id = ?"
-    ).run(firmaId, fecha, now, documentoId);
-    return _ok({ documentoId: documentoId, firmaId: firmaId, estado: 'firmado', fechaFirma: fecha });
-  } catch (e) {
-    console.error('[' + MOD + '][firmar-documento]', e.message);
-    return _err('INTERNAL', e.message);
-  }
-}
-
-// ========== FIRMAS DIGITALES HANDLERS (Fase 5) ==========
-
-/**
- * gh:list-firmas
- * Filtros: companyName, trabajadorId, documentoTipo.
- */
-function _handlerListFirmas(token, companyName, trabajadorId, documentoTipo) {
-  var auth = _checkAuth(token);
-  if (!auth.ok) return _err(auth.error.code, auth.error.message);
-
-  if (!companyName || typeof companyName !== 'string') {
-    return _err('INVALID_INPUT', 'companyName es requerido');
-  }
-
-  var company = _getCompanyByName(companyName);
-  if (!company) {
-    return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
-  }
-
-  var localDb = _getDb();
-  if (!localDb) return _err('NO_DB', 'BD no disponible');
-
-  try {
-    var sql = "SELECT * FROM gh_firmas_digitales WHERE empresa_id = ?";
-    var params = [company.company_key];
-    if (trabajadorId && typeof trabajadorId === 'string') {
-      sql += " AND trabajador_id = ?";
-      params.push(trabajadorId);
-    }
-    if (documentoTipo && typeof documentoTipo === 'string') {
-      sql += " AND documento_tipo = ?";
-      params.push(documentoTipo);
-    }
-    sql += " ORDER BY fecha_hora DESC, created_at DESC";
-
-    var stmt = localDb.prepare(sql);
-    var rows = stmt.all.apply(stmt, params);
-    var firmas = rows.map(_rowToFirma);
-    return _ok({
-      firmas: firmas,
-      company: { id: company.id, companyKey: company.company_key, displayName: company.display_name },
-      count: firmas.length
-    });
-  } catch (e) {
-    console.error('[' + MOD + '][list-firmas]', e.message);
-    return _err('INTERNAL', e.message);
-  }
-}
-
-/**
- * gh:create-firma
- * Registra una firma digital (base64 PNG) de un trabajador.
- */
-function _handlerCreateFirma(token, companyName, data) {
-  var auth = _checkAuth(token);
-  if (!auth.ok) return _err(auth.error.code, auth.error.message);
-
-  if (!companyName || typeof companyName !== 'string') {
-    return _err('INVALID_INPUT', 'companyName es requerido');
-  }
-  if (!data || typeof data !== 'object') {
-    return _err('INVALID_INPUT', 'data es requerido (objeto)');
-  }
-  if (!data.trabajadorId || typeof data.trabajadorId !== 'string') {
-    return _err('INVALID_INPUT', 'trabajadorId es requerido');
-  }
-  if (!data.documentoTipo || typeof data.documentoTipo !== 'string') {
-    return _err('INVALID_INPUT', 'documentoTipo es requerido');
-  }
-  if (!data.imagenData || typeof data.imagenData !== 'string') {
-    return _err('INVALID_INPUT', 'imagenData es requerido (base64 PNG)');
-  }
-  if (!data.fechaHora || typeof data.fechaHora !== 'string') {
-    return _err('INVALID_INPUT', 'fechaHora es requerido (ISO 8601)');
-  }
-
-  var company = _getCompanyByName(companyName);
-  if (!company) {
-    return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
-  }
-
-  var localDb = _getDb();
-  if (!localDb) return _err('NO_DB', 'BD no disponible');
-
-  try {
-    var trab = localDb.prepare(
-      "SELECT id FROM base_personal WHERE id = ? AND empresa_id = ?"
-    ).get(data.trabajadorId, company.company_key);
-    if (!trab) {
-      return _err('TRABAJADOR_NOT_FOUND', 'Trabajador no encontrado en esta empresa', { trabajadorId: data.trabajadorId });
-    }
-
-    var id = _newId('fi-');
-    var now = new Date().toISOString();
-    localDb.prepare(
-      "INSERT INTO gh_firmas_digitales (id, trabajador_id, empresa_id, documento_tipo, imagen_data, " +
-      "  documento_id, ip, user_agent, fecha_hora, metadata, created_at) " +
-      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    ).run(
-      id, data.trabajadorId, company.company_key,
-      data.documentoTipo, data.imagenData,
-      data.documentoId || null, data.ip || null, data.userAgent || null,
-      data.fechaHora, data.metadata || null,
-      now
-    );
-    return _ok({ firmaId: id });
-  } catch (e) {
-    console.error('[' + MOD + '][create-firma]', e.message);
-    return _err('INTERNAL', e.message);
-  }
-}
 
 // ========== ANUNCIOS HANDLERS (Fase 5) ==========
 
@@ -3472,35 +3310,10 @@ function registerGestionHumanaHandlers(app, deps) {
       return _err('INTERNAL', e.message);
     }
   });
-  ipcMainHandle('gh:firmar-documento', function (event, payload) {
-    try {
-      var p = payload || {};
-      return _handlerFirmarDocumento(p.token || '', p.documentoId, p.firmaId, p.fechaFirma);
-    } catch (e) {
-      console.error('[' + MOD + '][firmar-documento]', e.message);
-      return _err('INTERNAL', e.message);
-    }
-  });
-
-  // ========== FIRMAS DIGITALES (2) — Fase 5 ==========
-  ipcMainHandle('gh:list-firmas', function (event, payload) {
-    try {
-      var p = payload || {};
-      return _handlerListFirmas(p.token || '', p.companyName, p.trabajadorId, p.documentoTipo);
-    } catch (e) {
-      console.error('[' + MOD + '][list-firmas]', e.message);
-      return _err('INTERNAL', e.message);
-    }
-  });
-  ipcMainHandle('gh:create-firma', function (event, payload) {
-    try {
-      var p = payload || {};
-      return _handlerCreateFirma(p.token || '', p.companyName, p.data);
-    } catch (e) {
-      console.error('[' + MOD + '][create-firma]', e.message);
-      return _err('INTERNAL', e.message);
-    }
-  });
+  // ========== FIRMAS DIGITALES (3) — ELIMINADO en LEGACY-SIGN-REMOVE (2026-08-20) ==========
+  // gh:firmar-documento, gh:list-firmas, gh:create-firma → ya no existen.
+  // La firma canvas operativa interna se reemplazó por firma electrónica
+  // vía firma-service (I-101). Ver comentario en sección de handlers.
 
   // ========== ANUNCIOS (5) — Fase 5 ==========
   ipcMainHandle('gh:list-anuncios', function (event, payload) {
@@ -3597,7 +3410,7 @@ function registerGestionHumanaHandlers(app, deps) {
           "SELECT name FROM sqlite_master WHERE type='table' AND name IN (" +
           "  'contrataciones', 'base_personal', 'gh_sedes'," +
           "  'gh_vacaciones', 'gh_permisos', 'gh_documentos'," +
-          "  'gh_firmas_digitales', 'gh_anuncios', 'gh_mensajes'," +
+          "  'gh_anuncios', 'gh_mensajes'," +
           "  'gh_documentos_afiliaciones', 'gh_templates'" +
           ") ORDER BY name"
         ).all();
@@ -3610,7 +3423,7 @@ function registerGestionHumanaHandlers(app, deps) {
       has_getDb: !!_getDb,
       has_validateSession: !!_validateSession,
       tables: tables,
-      message: 'Gestión Humana bridge en Fase 7 (54 handlers reales + 1 diag · 11 tablas)'
+      message: 'Gestión Humana bridge en Fase 7 (54 handlers reales + 1 diag · 10 tablas) · LEGACY-SIGN-REMOVE 2026-08-20'
     });
   });
 
@@ -3985,7 +3798,7 @@ function registerGestionHumanaHandlers(app, deps) {
     }
   });
 
-  console.log('[' + MOD + '][INIT][SUCCESS] Bridge registrado · 5 read + 4 write-contratacion + 4 write-personal + 2 write-sedes + 6 vacaciones + 5 permisos + 7 documentos + 2 firmas + 5 anuncios + 4 mensajes + 5 docs-afiliaciones + 5 templates + 3 import-excel + 1 diag · 58 handlers totales · Fase 7');
+  console.log('[' + MOD + '][INIT][SUCCESS] Bridge registrado · 5 read + 4 write-contratacion + 4 write-personal + 2 write-sedes + 6 vacaciones + 5 permisos + 5 documentos + 5 anuncios + 4 mensajes + 5 docs-afiliaciones + 5 templates + 3 import-excel + 1 diag · 55 handlers totales · LEGACY-SIGN-REMOVE (sin firma canvas)');
 }
 
 registerGestionHumanaHandlers.init = function(ipcMain) {

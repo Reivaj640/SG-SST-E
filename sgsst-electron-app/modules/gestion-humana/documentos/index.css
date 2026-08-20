@@ -303,7 +303,6 @@
 }
 @keyframes doc-slide-up { from { transform: translateY(8px); opacity: 0.6; } to { transform: translateY(0); opacity: 1; } }
 .doc-modal__panel--generar { max-width: 560px; }
-.doc-modal__panel--firma   { max-width: 700px; }
 .doc-modal__panel--admin   { max-width: 820px; }
 
 /* 📦766 · Header del modal "Administrar Templates" con texto a la izquierda y botón a la derecha */
@@ -439,59 +438,10 @@
   line-height: 1.3;
 }
 
-/* Firma Digital (canvas) */
-.doc-firma__hint {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.78rem;
-  color: #5a6378;
-  margin: 0 0 0.75rem;
-  background: #e8f0fe;
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.375rem;
-}
-.doc-firma__hint i { color: #174ea6; }
-.doc-firma__canvas-wrap {
-  position: relative;
-  width: 100%;
-  height: 200px;
-  border: 2px dashed #c4c9d1;
-  border-radius: 0.4rem;
-  background: white;
-  margin-bottom: 0.6rem;
-  overflow: hidden;
-}
-.doc-firma__canvas {
-  display: block;
-  width: 100%;
-  height: 100%;
-  cursor: crosshair;
-  touch-action: none;  /* evitar scroll en touch mientras se dibuja */
-}
-.doc-firma__placeholder {
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  color: #b6c2e3;
-  font-size: 0.95rem;
-  font-weight: 500;
-  pointer-events: none;
-}
-.doc-firma__placeholder i { font-size: 1.2rem; }
-.doc-firma__meta {
-  font-size: 0.78rem;
-  color: #5a6378;
-  margin: 0;
-  padding: 0.5rem 0.75rem;
-  background: #f8f9fa;
-  border-radius: 0.375rem;
-}
-.doc-firma__meta i { color: #174ea6; margin-right: 0.15rem; }
-.doc-firma__meta span { color: #1a1a2e; font-weight: 500; }
+/* ═══ FIRMA DIGITAL — ELIMINADO en LEGACY-SIGN-REMOVE (2026-08-20) ═══
+   El bloque CSS de canvas de firma (.doc-firma__*) ya no se usa.
+   La firma es únicamente electrónica vía firma-service (I-101+).
+   La nueva UI de firma llegará con I-102. */
 
 /* ═══ 📦764 · MIS TEMPLATES (sección) ═══ */
 .doc-section-head--sub {

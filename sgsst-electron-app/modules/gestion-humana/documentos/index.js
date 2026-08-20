@@ -1,9 +1,12 @@
 // modules/gestion-humana/documentos/index.js
-// 📦722 · Documentos y Firmas — HTML+CSS+JS separados (v0.2.0)
+// 📦722 · Documentos — HTML+CSS+JS separados (v0.3.0 POST-LEGACY-SIGN-REMOVE)
 //
-// Catálogo de 7 tipos + tabla de documentos recientes + flujo de firma
-// Backend: ghListDocumentos, ghGetDocumento, ghCreateDocumento, ghUpdateDocumento,
-//          ghDeleteDocumento, ghFirmarDocumento, ghListFirmas, ghCreateFirma
+// Catálogo de 7 tipos + tabla de documentos recientes + generación
+// LEGACY-SIGN-REMOVE (2026-08-20): la firma canvas operativa interna
+// (gh:firmar-documento, gh:create-firma, gh:list-firmas) se eliminó.
+// La firma es únicamente electrónica vía firma-service (I-101+).
+// Backend actual: ghListDocumentos, ghGetDocumento, ghCreateDocumento,
+//                 ghUpdateDocumento, ghDeleteDocumento
 
 class DocumentosComponent {
   constructor(container, companyName, moduleName, subName, onBack) {
@@ -118,8 +121,8 @@ class DocumentosComponent {
       // 📦772 · Section head después (sticky al scrollear)
       '<div class="doc-section-head">' +
         '<div class="doc-section-head__text">' +
-          '<h2 class="doc-section-head__title">Documentos y Firmas Digitales</h2>' +
-          '<p class="doc-section-head__subtitle">7 tipos de documentos del proceso de contratación — firma en pantalla</p>' +
+          '<h2 class="doc-section-head__title">Documentos</h2>' +
+          '<p class="doc-section-head__subtitle">7 tipos de documentos del proceso de contratación — la firma es electrónica</p>' +
         '</div>' +
         '<div class="doc-section-head__actions">' +
           '<button id="doc-tpl-abrir" class="doc-btn doc-btn--ghost" type="button"><i class="fas fa-folder-open"></i> Mis Templates</button>' +
@@ -177,7 +180,9 @@ class DocumentosComponent {
           '</div>' +
           '<footer class="doc-modal__footer">' +
             '<button type="button" class="doc-btn doc-btn--ghost" data-close-doc-modal="1">Cancelar</button>' +
-            '<button type="button" id="doc-gen-confirm" class="doc-btn doc-btn--primary"><i class="fas fa-plus"></i> Generar y Firmar</button>' +
+            // LEGACY-SIGN-REMOVE: era "Generar y Firmar". Ahora solo "Generar".
+            // La firma se hace luego desde la tabla via firma-service (I-102).
+            '<button type="button" id="doc-gen-confirm" class="doc-btn doc-btn--primary" title="Genera el documento. La firma electrónica se hace luego desde la tabla."><i class="fas fa-plus"></i> Generar</button>' +
           '</footer>' +
         '</div>' +
       '</div>' +
@@ -206,30 +211,10 @@ class DocumentosComponent {
           '</footer>' +
         '</div>' +
       '</div>' +
-      // 📦763 · Modal Firma Digital
-      '<div id="doc-firma-modal" class="doc-modal" hidden>' +
-        '<div class="doc-modal__backdrop" data-close-doc-modal="1"></div>' +
-        '<div class="doc-modal__panel doc-modal__panel--firma">' +
-          '<header class="doc-modal__header"><h3 class="doc-modal__title">Firma Digital</h3>' +
-            '<button type="button" class="doc-modal__close" data-close-doc-modal="1" aria-label="Cerrar"><i class="fas fa-times"></i></button>' +
-          '</header>' +
-          '<div class="doc-modal__body">' +
-            '<p class="doc-firma__hint"><i class="fas fa-info-circle"></i> Dibuja tu firma con el ratón (o el dedo en pantalla táctil).</p>' +
-            '<div class="doc-firma__canvas-wrap">' +
-              '<canvas id="doc-firma-canvas" class="doc-firma__canvas" width="600" height="200"></canvas>' +
-              '<div class="doc-firma__placeholder" id="doc-firma-placeholder"><i class="fas fa-pen-nib"></i><span>Firma aquí</span></div>' +
-            '</div>' +
-            '<p class="doc-firma__meta"><i class="fas fa-user"></i> <span id="doc-firma-trabajador">—</span> · <i class="fas fa-file-alt"></i> <span id="doc-firma-tipo">—</span></p>' +
-          '</div>' +
-          '<footer class="doc-modal__footer">' +
-            '<button type="button" id="doc-firma-limpiar" class="doc-btn doc-btn--ghost"><i class="fas fa-eraser"></i> Limpiar</button>' +
-            '<div class="doc-modal__footer-right">' +
-              '<button type="button" class="doc-btn doc-btn--ghost" data-close-doc-modal="1">Cancelar</button>' +
-              '<button type="button" id="doc-firma-confirm" class="doc-btn doc-btn--primary" disabled><i class="fas fa-check"></i> Guardar Firma</button>' +
-            '</div>' +
-          '</footer>' +
-        '</div>' +
-      '</div>' +
+      // MODAL FIRMA DIGITAL — ELIMINADO en LEGACY-SIGN-REMOVE (2026-08-20).
+      // La firma canvas ya no se usa. La nueva UI de firma electrónica
+      // llegará con I-102 (firma-service). Por ahora, el botón "Generar"
+      // solo crea el documento (estado='pendiente'); la firma se hace luego.
     '</div>';
   }
 
@@ -335,13 +320,13 @@ class DocumentosComponent {
       var t = self._trabajadorById[d.trabajadorId];
       var tp = DocumentosComponent.TIPOS.find(function (x) { return x.value === d.tipo; }) || { label: d.tipo, color: '#5a6378', icon: 'fa-file' };
       var badgeClass = d.estado === 'firmado' ? 'doc-badge--firmado' : d.estado === 'anulado' ? 'doc-badge--anulado' : 'doc-badge--pendiente';
-      // 📦764 · Acciones: descargar (si tiene archivo) + firmar (si está pendiente)
+      // LEGACY-SIGN-REMOVE (2026-08-20): la acción "Firmar" se eliminó porque
+      // la firma canvas operativa interna ya no existe. Por ahora solo se
+      // permite Descargar. La nueva acción "Firmar electrónicamente" llegará
+      // con I-102 (firma-service).
       var acciones = [];
       if (d.rutaArchivo) {
         acciones.push('<button class="doc-btn-mini doc-btn-mini--primary" data-descargar="' + self._esc(d.id) + '" title="Descargar ' + self._esc(d.nombreArchivo || 'archivo') + '"><i class="fas fa-download"></i> Descargar</button>');
-      }
-      if (d.estado === 'pendiente') {
-        acciones.push('<button class="doc-btn-mini" data-firmar="' + self._esc(d.id) + '"><i class="fas fa-pen"></i> Firmar</button>');
       }
       var actionCell = acciones.length > 0
         ? '<div class="doc-template__actions">' + acciones.join('') + '</div>'
@@ -372,9 +357,7 @@ class DocumentosComponent {
         '</table>' +
       '</div>';
 
-    wrap.querySelectorAll('button[data-firmar]').forEach(function (b) {
-      b.onclick = function () { self._firmar(b.getAttribute('data-firmar')); };
-    });
+    // LEGACY-SIGN-REMOVE: wireup de button[data-firmar] eliminado (no se renderiza).
     wrap.querySelectorAll('button[data-descargar]').forEach(function (b) {
       b.onclick = function () { self._descargarDocumento(b.getAttribute('data-descargar')); };
     });
@@ -562,7 +545,6 @@ class DocumentosComponent {
   }
 
   async _showGenerarDialog(tipoDefault) {
-    // 📦763 · Mantener firma por compat con clicks del catálogo
     return this._openGenerarModal(tipoDefault);
   }
 
@@ -645,22 +627,24 @@ class DocumentosComponent {
       templateSel.onchange = function (e) { self._selectedTemplateId = e.target.value; };
     }
 
-    // Wireup del botón "Generar y Firmar"
+    // Wireup del botón "Generar" (LEGACY-SIGN-REMOVE: antes "Generar y Firmar").
     var btnConfirm = modal.querySelector('#doc-gen-confirm');
     if (btnConfirm) {
       btnConfirm.onclick = function () {
         var trabajadorId = sel ? sel.value : null;
         if (!trabajadorId) { self._showToast('Selecciona un trabajador', 'warning'); return; }
         if (!self._selectedTipo) { self._showToast('Selecciona un tipo de documento', 'warning'); return; }
-        self._generarYAbrirFirma(trabajadorId, self._selectedTipo, modal);
+        self._generarDocumento(trabajadorId, self._selectedTipo, modal);
       };
     }
 
     modal.removeAttribute('hidden');
   }
 
-  // 📦763+📦764 · Genera el documento en BD y abre el modal de firma
-  async _generarYAbrirFirma(trabajadorId, tipo, generarModal) {
+  // 📦764 · Genera el documento en BD (sin firma — LEGACY-SIGN-REMOVE).
+  // El documento queda en estado='pendiente'. La firma electrónica se hace
+  // luego desde la tabla via firma-service (I-102).
+  async _generarDocumento(trabajadorId, tipo, generarModal) {
     var self = this;
     var tp = DocumentosComponent.TIPOS.find(function (t) { return t.value === tipo; });
     try {
@@ -682,173 +666,19 @@ class DocumentosComponent {
         return;
       }
       // El bridge retorna { documentoId, rutaArchivo, nombreArchivo }
-      await this._load();
-      var docNuevo = self.items.find(function (d) { return d.id === r.data.documentoId; });
-      if (!docNuevo) {
-        this._showToast('Error: no se encontró el documento recién creado', 'error');
-        return;
-      }
       this._closeDocModal(generarModal);
-      this._openFirmaModal(docNuevo, tp);
-    } catch (e) { this._showToast('Error: ' + e.message, 'error'); }
-  }
-
-  // 📦763 · Modal de Firma Digital con canvas
-  _openFirmaModal(documento, tipo) {
-    var self = this;
-    var modal = this.container.querySelector('#doc-firma-modal');
-    if (!modal) return;
-    document.body.style.overflow = 'hidden';
-
-    // Set meta info
-    var t = this._trabajadorById[documento.trabajadorId];
-    var nombreT = t ? (t.nombres + ' ' + t.apellidos) : '—';
-    var trabSpan = modal.querySelector('#doc-firma-trabajador');
-    var tipoSpan = modal.querySelector('#doc-firma-tipo');
-    if (trabSpan) trabSpan.textContent = nombreT;
-    if (tipoSpan) tipoSpan.textContent = tipo.label;
-
-    // Set up canvas
-    var canvas = modal.querySelector('#doc-firma-canvas');
-    var placeholder = modal.querySelector('#doc-firma-placeholder');
-    var btnConfirm = modal.querySelector('#doc-firma-confirm');
-    var btnLimpiar = modal.querySelector('#doc-firma-limpiar');
-    var ctx = canvas.getContext('2d');
-    var drawing = false;
-    var hasDrawn = false;
-    var last = null;
-
-    // Ajustar canvas al DPR del device para que no se vea borroso
-    function _setupCanvas() {
-      var dpr = window.devicePixelRatio || 1;
-      var w = canvas.clientWidth || 600;
-      var h = canvas.clientHeight || 200;
-      canvas.width = w * dpr;
-      canvas.height = h * dpr;
-      canvas.style.width = w + 'px';
-      canvas.style.height = h + 'px';
-      ctx.scale(dpr, dpr);
-      ctx.lineWidth = 2.2;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.strokeStyle = '#1a1a2e';
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, w, h);
-    }
-    _setupCanvas();
-    if (btnConfirm) btnConfirm.disabled = true;
-
-    function _pointFromEvent(e) {
-      var rect = canvas.getBoundingClientRect();
-      var t = (e.touches && e.touches[0]) ? e.touches[0] : e;
-      return { x: t.clientX - rect.left, y: t.clientY - rect.top };
-    }
-    function _start(e) {
-      e.preventDefault();
-      drawing = true;
-      last = _pointFromEvent(e);
-      if (placeholder) placeholder.style.display = 'none';
-    }
-    function _move(e) {
-      if (!drawing) return;
-      e.preventDefault();
-      var p = _pointFromEvent(e);
-      ctx.beginPath();
-      ctx.moveTo(last.x, last.y);
-      ctx.lineTo(p.x, p.y);
-      ctx.stroke();
-      last = p;
-      if (!hasDrawn) {
-        hasDrawn = true;
-        if (btnConfirm) btnConfirm.disabled = false;
-      }
-    }
-    function _end(e) {
-      if (!drawing) return;
-      e.preventDefault();
-      drawing = false;
-    }
-    // Mouse events
-    canvas.onmousedown = _start;
-    canvas.onmousemove = _move;
-    canvas.onmouseup = _end;
-    canvas.onmouseleave = _end;
-    // Touch events (móvil / tablet con stylus)
-    canvas.ontouchstart = _start;
-    canvas.ontouchmove = _move;
-    canvas.ontouchend = _end;
-    canvas.ontouchcancel = _end;
-
-    if (btnLimpiar) {
-      btnLimpiar.onclick = function () {
-        var w = canvas.clientWidth;
-        var h = canvas.clientHeight;
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, w, h);
-        hasDrawn = false;
-        if (btnConfirm) btnConfirm.disabled = true;
-        if (placeholder) placeholder.style.display = '';
-      };
-    }
-
-    if (btnConfirm) {
-      btnConfirm.onclick = function () {
-        if (!hasDrawn) { self._showToast('Dibuja tu firma antes de guardar', 'warning'); return; }
-        // Exportar canvas a PNG base64
-        var dataUrl = canvas.toDataURL('image/png');
-        // Quitar el prefijo "data:image/png;base64," para guardar solo el base64
-        var base64 = dataUrl.replace(/^data:image\/png;base64,/, '');
-        self._saveFirma(documento, base64, modal);
-      };
-    }
-
-    modal.removeAttribute('hidden');
-  }
-
-  // 📦763 · Guarda la firma (gh:create-firma) + la asocia al documento (gh:firmar-documento)
-  async _saveFirma(documento, imagenBase64, firmaModal) {
-    var self = this;
-    try {
-      // 1. Crear firma
-      var r1 = await window.electronAPI.ghCreateFirma({
-        companyName: this.companyName,
-        data: {
-          trabajadorId: documento.trabajadorId,
-          documentoTipo: documento.tipo,
-          documentoId: documento.id,
-          imagenData: imagenBase64,
-          fechaHora: new Date().toISOString(),
-          metadata: JSON.stringify({ fuente: 'firma-pantalla-kair', anchoCanvas: 600, altoCanvas: 200 })
-        }
-      });
-      if (!r1 || !r1.success) {
-        this._showToast('Error creando firma: ' + (r1 && r1.error && r1.error.message || 'desconocido'), 'error');
-        return;
-      }
-      // 2. Firmar documento
-      var r2 = await window.electronAPI.ghFirmarDocumento({
-        documentoId: documento.id,
-        firmaId: r1.data.firmaId,  // 📦763 · bridge retorna { firmaId: id } (no anidado)
-        fechaFirma: new Date().toISOString()
-      });
-      if (!r2 || !r2.success) {
-        this._showToast('Error firmando: ' + (r2 && r2.error && r2.error.message || 'desconocido'), 'error');
-        return;
-      }
-      this._closeDocModal(firmaModal);
-      this._showToast('Documento firmado correctamente', 'success');
+      this._showToast('Documento generado. Pendiente de firma electrónica.', 'success');
       await this._load();
       this.render();
     } catch (e) { this._showToast('Error: ' + e.message, 'error'); }
   }
 
-  // 📦763 · Reemplazo de _firmar — ahora abre el modal de canvas
-  async _firmar(id) {
-    var doc = this.items.find(function (d) { return d.id === id; });
-    if (!doc) { this._showToast('Documento no encontrado', 'error'); return; }
-    var tp = DocumentosComponent.TIPOS.find(function (t) { return t.value === doc.tipo; }) || { label: doc.tipo, color: '#5a6378', icon: 'fa-file' };
-    this._openFirmaModal(doc, tp);
-  }
+  // FUNCIONES ELIMINADAS en LEGACY-SIGN-REMOVE (2026-08-20):
+  //   - _openFirmaModal (modal de canvas)
+  //   - _saveFirma (gh:create-firma + gh:firmar-documento)
+  //   - _firmar (entry point desde botón Firmar en tabla)
+  //   - _generarYAbrirFirma (renombrada a _generarDocumento, ya no abre firma)
+  // La firma se hace ahora únicamente por vía electrónica (firma-service, I-101+).
 
   destroy() { /* noop */ }
 }

@@ -462,85 +462,16 @@ async function run() {
   });
   _assertEq(d5.data.count, 1, '1 doc pendiente');
 
-  // ========== TEST 34: FIRMAS — create OK ==========
-  console.log('');
-  console.log('[34] create-firma — caso OK');
-  var f1 = registeredHandlers['gh:create-firma']({}, {
-    token: 'valid-token',
-    companyName: 'TEMPOACTIVA EST S.A.S.',
-    data: {
-      trabajadorId: bpId1,
-      documentoTipo: 'autorizacion_datos',
-      imagenData: 'iVBORw0KGgoAAAANSUhEUgAA...FAKE_BASE64',
-      fechaHora: '2026-08-15T10:00:00.000Z',
-      ip: '192.168.1.10',
-      userAgent: 'Mozilla/5.0'
-    }
-  });
-  _assert(f1.success === true, 'create-firma OK');
-  _assert(f1.data.firmaId.indexOf('fi-') === 0, 'firmaId empieza con fi-');
-  var fiId1 = f1.data.firmaId;
-
-  // ========== TEST 35: FIRMAS — create sin imagenData ==========
-  console.log('');
-  console.log('[35] create-firma — sin imagenData');
-  var f2 = registeredHandlers['gh:create-firma']({}, {
-    token: 'valid-token', companyName: 'TEMP',
-    data: { trabajadorId: bpId1, documentoTipo: 't', fechaHora: '2026-08-15T10:00:00.000Z' }
-  });
-  _assertEq(f2.error.code, 'INVALID_INPUT', 'error.code = INVALID_INPUT');
-
-  // ========== TEST 36: FIRMAS — list con filtro trabajadorId ==========
-  console.log('');
-  console.log('[36] list-firmas — filtro trabajadorId');
-  var f3 = registeredHandlers['gh:list-firmas']({}, {
-    token: 'valid-token', companyName: 'TEMPOACTIVA EST S.A.S.', trabajadorId: bpId1
-  });
-  _assertEq(f3.data.count, 1, '1 firma del trabajador 1');
-  _assertEq(f3.data.firmas[0].documentoTipo, 'autorizacion_datos', 'documentoTipo correcto');
-
-  // ========== TEST 37: FIRMAS — list con filtro documentoTipo ==========
-  console.log('');
-  console.log('[37] list-firmas — filtro documentoTipo');
-  var f4 = registeredHandlers['gh:list-firmas']({}, {
-    token: 'valid-token', companyName: 'TEMPOACTIVA EST S.A.S.', documentoTipo: 'autorizacion_datos'
-  });
-  _assertEq(f4.data.count, 1, '1 firma de tipo autorizacion_datos');
-
-  // ========== TEST 38: DOCUMENTOS — firmar con firma existente ==========
-  console.log('');
-  console.log('[38] firmar-documento — caso OK');
-  var sg1 = registeredHandlers['gh:firmar-documento']({}, {
-    token: 'valid-token', documentoId: doId1, firmaId: fiId1, fechaFirma: '2026-08-15T10:05:00.000Z'
-  });
-  _assert(sg1.success === true, 'firmar OK');
-  _assertEq(sg1.data.estado, 'firmado', 'estado = firmado');
-  var sg1Check = registeredHandlers['gh:get-documento']({}, { token: 'valid-token', documentoId: doId1 });
-  _assertEq(sg1Check.data.documento.estado, 'firmado', 'estado guardado');
-  _assertEq(sg1Check.data.documento.firmaId, fiId1, 'firmaId guardado');
-  _assertEq(sg1Check.data.documento.fechaFirma, '2026-08-15T10:05:00.000Z', 'fechaFirma guardado');
-
-  // ========== TEST 39: DOCUMENTOS — firmar ya firmado ==========
-  console.log('');
-  console.log('[39] firmar-documento — ya firmado');
-  var sg2 = registeredHandlers['gh:firmar-documento']({}, {
-    token: 'valid-token', documentoId: doId1, firmaId: fiId1
-  });
-  _assertEq(sg2.error.code, 'ALREADY_FINALIZED', 'error.code = ALREADY_FINALIZED');
-
-  // ========== TEST 40: DOCUMENTOS — firmar con firma inexistente ==========
-  console.log('');
-  console.log('[40] firmar-documento — firma inexistente');
-  // Crear otro documento para probar
+  // LEGACY-SIGN-REMOVE (2026-08-20): tests 34-40 (firma canvas + firmar-documento) eliminados.
+  // La firma canvas operativa interna ya no existe; la firma es únicamente electrónica
+  // vía firma-service (I-101+). La numeración de tests siguientes NO se renumera
+  // para mantener traceability con el histórico de cambios (v1.0.x).
+  // doId2 era creado en el test 40 eliminado; lo recreamos aquí para que test 41+ siga funcionando.
   var d6 = registeredHandlers['gh:create-documento']({}, {
     token: 'valid-token', companyName: 'TEMPOACTIVA EST S.A.S.',
     data: { trabajadorId: bpId1, tipo: 'induccion', titulo: 'Inducción', contenido: '{}' }
   });
   var doId2 = d6.data.documentoId;
-  var sg3 = registeredHandlers['gh:firmar-documento']({}, {
-    token: 'valid-token', documentoId: doId2, firmaId: 'fi-noexiste'
-  });
-  _assertEq(sg3.error.code, 'FIRMA_NOT_FOUND', 'error.code = FIRMA_NOT_FOUND');
 
   // ========== TEST 41: DOCUMENTOS — update OK ==========
   console.log('');
@@ -944,13 +875,7 @@ async function run() {
   // Después de marcar meId1 como leído, hay 2 no leídos (m2 + m3 de 4 totales si los hubo)
   _assert(mL0.data.count >= 1, 'al menos 1 mensaje no leído');
 
-  // ========== TEST 82: FIRMAS — list sin filtros ==========
-  console.log('');
-  console.log('[82] list-firmas — sin filtros');
-  var fAll = registeredHandlers['gh:list-firmas']({}, {
-    token: 'valid-token', companyName: 'TEMPOACTIVA EST S.A.S.'
-  });
-  _assertEq(fAll.data.count, 1, '1 firma total');
+  // LEGACY-SIGN-REMOVE (2026-08-20): test 82 (list-firmas sin filtros) eliminado.
 
   // ========== TEST 83: VACACIONES — get sin id devuelve INVALID_INPUT ==========
   console.log('');
@@ -982,14 +907,7 @@ async function run() {
   var mNoId = registeredHandlers['gh:get-mensaje']({}, { token: 'valid-token' });
   _assertEq(mNoId.error.code, 'INVALID_INPUT', 'error.code = INVALID_INPUT');
 
-  // ========== TEST 88: FIRMAS — get no existe ==========
-  console.log('');
-  console.log('[88] create-firma — fechaHora es requerido');
-  var fNoFecha = registeredHandlers['gh:create-firma']({}, {
-    token: 'valid-token', companyName: 'TEMP',
-    data: { trabajadorId: bpId1, documentoTipo: 't', imagenData: 'x' }
-  });
-  _assertEq(fNoFecha.error.code, 'INVALID_INPUT', 'error.code = INVALID_INPUT');
+  // LEGACY-SIGN-REMOVE (2026-08-20): test 88 (create-firma fechaHora requerido) eliminado.
 
   // ========== TEST 89: list-vacaciones sin companyName ==========
   console.log('');
@@ -1009,11 +927,7 @@ async function run() {
   var dNoComp = registeredHandlers['gh:list-documentos']({}, { token: 'valid-token' });
   _assertEq(dNoComp.error.code, 'INVALID_INPUT', 'error.code = INVALID_INPUT');
 
-  // ========== TEST 92: list-firmas sin companyName ==========
-  console.log('');
-  console.log('[92] list-firmas — sin companyName');
-  var fNoComp = registeredHandlers['gh:list-firmas']({}, { token: 'valid-token' });
-  _assertEq(fNoComp.error.code, 'INVALID_INPUT', 'error.code = INVALID_INPUT');
+  // LEGACY-SIGN-REMOVE (2026-08-20): test 92 (list-firmas sin companyName) eliminado.
 
   // ========== TEST 93: list-anuncios sin companyName ==========
   console.log('');
@@ -1039,14 +953,7 @@ async function run() {
   var pNoComp2 = registeredHandlers['gh:create-permiso']({}, { token: 'valid-token', data: {} });
   _assertEq(pNoComp2.error.code, 'INVALID_INPUT', 'error.code = INVALID_INPUT');
 
-  // ========== TEST 97: create-firma — multi-tenant ==========
-  console.log('');
-  console.log('[97] create-firma — multi-tenant (trabajador de OTRA EMPRESA)');
-  var fMulti = registeredHandlers['gh:create-firma']({}, {
-    token: 'valid-token', companyName: 'TEMPOACTIVA EST S.A.S.',
-    data: { trabajadorId: bpId3, documentoTipo: 't', imagenData: 'x', fechaHora: '2026-08-15T10:00:00.000Z' }
-  });
-  _assertEq(fMulti.error.code, 'TRABAJADOR_NOT_FOUND', 'error.code = TRABAJADOR_NOT_FOUND');
+  // LEGACY-SIGN-REMOVE (2026-08-20): test 97 (create-firma multi-tenant) eliminado.
 
   // ========== TEST 98: create-documento — multi-tenant ==========
   console.log('');
@@ -1116,14 +1023,7 @@ async function run() {
   });
   _assertEq(mFp.data.count, 1, '1 mensaje leído para bpId2');
 
-  // ========== TEST 106: list-firmas con filtro tipo y trabajador ==========
-  console.log('');
-  console.log('[106] list-firmas — filtros combinados');
-  var fComb = registeredHandlers['gh:list-firmas']({}, {
-    token: 'valid-token', companyName: 'TEMPOACTIVA EST S.A.S.',
-    trabajadorId: bpId2, documentoTipo: 'autorizacion_datos'
-  });
-  _assertEq(fComb.data.count, 0, 'bpId2 no tiene firmas');
+  // LEGACY-SIGN-REMOVE (2026-08-20): test 106 (list-firmas filtros combinados) eliminado.
 
   // ========== TEST 107: ANUNCIOS — update con varios campos válidos ==========
   console.log('');
@@ -1225,17 +1125,7 @@ async function run() {
   var mNoId3 = registeredHandlers['gh:marcar-leido']({}, { token: 'valid-token', mensajeId: 'me-noexiste' });
   _assertEq(mNoId3.error.code, 'NOT_FOUND', 'error.code = NOT_FOUND');
 
-  // ========== TEST 119: firmar-documento id inexistente ==========
-  console.log('');
-  console.log('[119] firmar-documento — id inexistente');
-  var sgNoId = registeredHandlers['gh:firmar-documento']({}, { token: 'valid-token', documentoId: 'do-noexiste', firmaId: fiId1 });
-  _assertEq(sgNoId.error.code, 'NOT_FOUND', 'error.code = NOT_FOUND');
-
-  // ========== TEST 120: firmar-documento sin firmaId ==========
-  console.log('');
-  console.log('[120] firmar-documento — sin firmaId');
-  var sgNoFirma = registeredHandlers['gh:firmar-documento']({}, { token: 'valid-token', documentoId: dNewId });
-  _assertEq(sgNoFirma.error.code, 'INVALID_INPUT', 'error.code = INVALID_INPUT');
+  // LEGACY-SIGN-REMOVE (2026-08-20): tests 119, 120 (firmar-documento error cases) eliminados.
 
   // ========== TEST 121: PERMISOS — create con tipo=licencia_no_remunerada ==========
   console.log('');
