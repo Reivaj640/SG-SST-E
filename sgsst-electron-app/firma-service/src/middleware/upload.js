@@ -42,6 +42,13 @@ function uploadPdf() {
           return next(new (require('./errors').AppError)(400, 'INVALID_REQUEST_BODY',
             err.message));
         }
+        // I-012.3: multer rechaza múltiples archivos con LIMIT_UNEXPECTED_FILE.
+        // Lo mapeamos a 400 (request malformado) en vez del 500 que produce
+        // el errorHandler central cuando recibe un MulterError no-AppError.
+        if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+          return next(new (require('./errors').AppError)(400, 'INVALID_REQUEST_BODY',
+            'Solo se acepta un archivo en el campo "documento"'));
+        }
         return next(err);
       }
       if (!req.file) {
