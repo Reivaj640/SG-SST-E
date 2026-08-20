@@ -226,6 +226,36 @@ function requireIdempotencyKey(options = {}) {
     }
 
     // -------------------------------------------------------------------
+    // I-005: legacy mode (INTERNAL_API_KEY deprecation, I-010) no soporta
+    // Idempotency-Key. La razón: requireIdempotencyKey requiere
+    // req.id_empresa no vacío (defense in depth del Paso 2 más abajo), y
+    // en legacy mode id_empresa es null por diseño. Sin este check
+    // explícito, el cliente legacy recibiría 500 INTERNAL_ERROR (que parece
+    // un fallo del servidor). Mejor documentar la incompatibilidad con
+    // un 400 explícito para que K+AIR sepa que debe migrar a per-empresa
+    // key para usar idempotencia.
+    //
+    // Este check NO afecta a clientes per-empresa (authSource='client'):
+    // el flujo normal continúa con el Paso 2.
+    //
+    // Preserva backward compat (G3): legacy + SIN header → next() (sin
+    // tocar BD), comportamiento histórico intacto.
+    // -------------------------------------------------------------------
+    if (req.authSource === 'legacy') {
+      logger.info('Idempotency middleware: legacy mode no soporta Idempotency-Key', {
+        request_id: req.id,
+        idempotency_key_prefix: idempotencyKey.slice(0, 8),
+        authSource: 'legacy',
+      });
+      return next(new AppError(
+        400,
+        'IDEMPOTENCY_LEGACY_NOT_SUPPORTED',
+        'Idempotency-Key no soportado en legacy mode. K+AIR debe migrar a per-empresa key (I-010) para usar idempotencia.',
+        { reason: 'legacy_mode_unsupported' }
+      ));
+    }
+
+    // -------------------------------------------------------------------
     // Paso 2: verificar req.id_empresa. Defense in depth.
     // -------------------------------------------------------------------
     // requireEmpresaScope (I-010) DEBE haber corrido antes. Si no, es un

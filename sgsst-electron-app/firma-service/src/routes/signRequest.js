@@ -17,6 +17,7 @@
 const express = require('express');
 const router = express.Router();
 const { requireEmpresaScopeAndLimit } = require('../middleware/authz');
+const { requireIdempotencyKey } = require('../middleware/idempotency');
 const { uploadPdf } = require('../middleware/upload');
 const pdfValidation = require('../middleware/pdfValidation');
 const { signRequestBody, signRequestListQuery } = require('../schemas');
@@ -47,6 +48,19 @@ router.post('/sign-requests',
   // excedido / metadata bomb → 422. El hash se expone en req.pdfValidation.sha256
   // y es el que se persiste (NO el que el cliente envio en metadata).
   pdfValidation(),
+  // I-005: cableado de requireIdempotencyKey (I-003.3). Insertado DESPUES
+  // de pdfValidation() porque el extractor de pdf_sha256 necesita
+  // req.pdfValidation.sha256 (server-computed). El metadata se parsea del
+  // mismo modo que el handler (JSON.parse del campo multipart) para que
+  // el fingerprint sea consistente. Sin header Idempotency-Key el
+  // middleware hace next() inmediatamente (G3, backward compat).
+  requireIdempotencyKey({
+    extractMetadata: (req) => {
+      try { return JSON.parse(req.body.metadata || '{}'); }
+      catch { return {}; }
+    },
+    extractPdfSha256: (req) => (req.pdfValidation && req.pdfValidation.sha256),
+  }),
   (req, res, next) => {
   try {
     // Parsear el campo 'metadata' (viene como JSON string en multipart)

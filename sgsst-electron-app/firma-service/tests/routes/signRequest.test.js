@@ -32,7 +32,8 @@ const { sha256 } = require('../../src/crypto/hash');
 const config = require('../../src/config');
 const db = require('../../src/db/connection');
 const {
-  resetDb, seedActiveAgreement, makeApp, TEST_API_KEY,
+  resetDb, seedActiveAgreement, makeApp, TEST_API_KEY, TEST_API_KEY_CLIENT_A,
+  TEST_EMPRESA_A, seedTestClients,
 } = require('../helpers');
 const storage = require('../../src/services/storage');
 
@@ -333,6 +334,227 @@ test('POST /internal/sign-requests: tipo_firma=remoto tiene TTL 72h', async () =
   const fecha_expiracion = new Date(res.body.fecha_expiracion);
   const horas = (fecha_expiracion - fecha_creacion) / 3600000;
   assert.equal(horas, 72);
+});
+
+// =================================================================
+// POST /internal/sign-requests — I-005 Idempotency-Key (I-003.3)
+// =================================================================
+//
+// Estos tests verifican el CABLEADO de requireIdempotencyKey en el route
+// (no la lógica del middleware, que ya está cubierta en
+// tests/middleware/idempotency.test.js). Los casos cubiertos:
+//
+// 1. Sin header → backward compat (G3): el middleware hace next() sin tocar
+//    BD. Verificamos que el flujo normal sigue funcionando idéntico.
+// 2. Misma key + mismo body → 2º request tiene X-Idempotency-Replay: true
+//    y body idéntico al 1º (REPLAY, G9).
+// 3. Misma key + distinto PDF → 409 IDEMPOTENCY_KEY_CONFLICT (fingerprint
+//    cambia porque pdf_sha256 es server-computed y difiere).
+// 4. Misma key + mismo body en IN_PROGRESS (insertado manualmente) → 409
+//    IDEMPOTENCY_KEY_IN_PROGRESS con header Retry-After.
+// 5. Header inválido (no UUID v4) → 400 IDEMPOTENCY_KEY_INVALID.
+//
+// C-22 (REPLAY sin token) queda explícitamente fuera de I-005 — I-013b.
+//
+// IMPORTANTE: tests 2-5 usan seedTestClients() + TEST_API_KEY_CLIENT_A.
+// requireIdempotencyKey requiere req.id_empresa no vacío (defense in
+// depth, §12 del middleware). En legacy mode (TEST_API_KEY) id_empresa es
+// null → 500. Idempotency-Key solo está soportado para clientes per-empresa.
+
+function withClientAApiKeyHeaders() {
+  return { 'X-Internal-API-Key': TEST_API_KEY_CLIENT_A };
+}
+
+// Crea un PDF único con un texto distinto en la página (para que el
+// SHA-256 server-computed difiera entre PDFs). El helper global makePdf()
+// genera PDFs estructuralmente idénticos → mismo hash.
+async function makeUniquePdf(seed) {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([300, 200]);
+  page.drawText(`unique-pdf-${seed}`);
+  return Buffer.from(await doc.save());
+}
+
+test('POST I-005: sin Idempotency-Key → backward compat (G3, 201 normal)', async () => {
+  resetDb();
+  const acuerdo = seedActiveAgreement();
+  const app = makeApp();
+  const pdf = await makePdf();
+  const meta = buildMetadata(acuerdo);
+  meta.document_hash = sha256Hex(pdf);
+
+  // Sin set('Idempotency-Key', ...) — el middleware hace next() sin tocar BD.
+  const res = await request(app)
+    .post('/internal/sign-requests')
+    .set(HEADERS)
+    .field('metadata', JSON.stringify(meta))
+    .attach('documento', pdf, 'contrato.pdf');
+
+  assert.equal(res.status, 201);
+  assert.ok(res.body.id_solicitud);
+  assert.ok(res.body.token);
+  // Sin header, NO debe haber X-Idempotency-Replay.
+  assert.equal(res.headers['x-idempotency-replay'], undefined);
+});
+
+test('POST I-005: misma key + mismo body → 2º request es REPLAY (G9)', async () => {
+  resetDb();
+  const acuerdo = seedActiveAgreement();
+  // I-010: idempotency requiere req.id_empresa no vacío (defense in depth).
+  // En legacy mode, id_empresa es null → 500. Usamos clientA (per-empresa).
+  seedTestClients();
+  const app = makeApp();
+  const pdf = await makePdf();
+  const meta = buildMetadata(acuerdo, { id_empresa: TEST_EMPRESA_A });
+  meta.document_hash = sha256Hex(pdf);
+
+  const idemKey = crypto.randomUUID();
+  const headers = { ...withClientAApiKeyHeaders(), 'Idempotency-Key': idemKey };
+
+  // 1º request: crea la fila PENDING y completa a COMPLETED via res.on('finish').
+  const res1 = await request(app)
+    .post('/internal/sign-requests')
+    .set(headers)
+    .field('metadata', JSON.stringify(meta))
+    .attach('documento', pdf, 'contrato.pdf');
+  assert.equal(res1.status, 201);
+  const idSolicitud1 = res1.body.id_solicitud;
+
+  // 2º request: misma key + mismo body (mismo PDF) → REPLAY.
+  // El response body es IDÉNTICO al 1º (mismo id_solicitud, mismo token).
+  // El header X-Idempotency-Replay: true está presente.
+  const res2 = await request(app)
+    .post('/internal/sign-requests')
+    .set(headers)
+    .field('metadata', JSON.stringify(meta))
+    .attach('documento', pdf, 'contrato.pdf');
+  assert.equal(res2.status, 201);
+  assert.equal(res2.headers['x-idempotency-replay'], 'true');
+  assert.equal(res2.body.id_solicitud, idSolicitud1);
+  assert.equal(res2.body.token, res1.body.token);
+
+  // Solo se creó UN sign request en BD (REPLAY no duplica).
+  const count = db.prepare('SELECT COUNT(*) AS n FROM gh_firmas_electronicas').get().n;
+  assert.equal(count, 1);
+});
+
+test('POST I-005: misma key + distinto PDF → 409 IDEMPOTENCY_KEY_CONFLICT', async () => {
+  resetDb();
+  const acuerdo = seedActiveAgreement();
+  seedTestClients();
+  const app = makeApp();
+  const pdf1 = await makeUniquePdf('v1');
+  const pdf2 = await makeUniquePdf('v2');
+  assert.notEqual(sha256Hex(pdf1), sha256Hex(pdf2), 'sanity: PDFs distintos → hashes distintos');
+  const meta1 = buildMetadata(acuerdo, { id_empresa: TEST_EMPRESA_A });
+  meta1.document_hash = sha256Hex(pdf1);
+  const meta2 = buildMetadata(acuerdo, { id_empresa: TEST_EMPRESA_A });
+  meta2.document_hash = sha256Hex(pdf2);
+
+  const idemKey = crypto.randomUUID();
+  const headers = { ...withClientAApiKeyHeaders(), 'Idempotency-Key': idemKey };
+
+  // 1º request: pdf1.
+  const res1 = await request(app)
+    .post('/internal/sign-requests')
+    .set(headers)
+    .field('metadata', JSON.stringify(meta1))
+    .attach('documento', pdf1, 'contrato-v1.pdf');
+  assert.equal(res1.status, 201);
+
+  // 2º request: misma key, distinto PDF → fingerprint difiere (pdf_sha256
+  // server-computed) → CONFLICT.
+  const res2 = await request(app)
+    .post('/internal/sign-requests')
+    .set(headers)
+    .field('metadata', JSON.stringify(meta2))
+    .attach('documento', pdf2, 'contrato-v2.pdf');
+  assert.equal(res2.status, 409);
+  assert.equal(res2.body.error.code, 'IDEMPOTENCY_KEY_CONFLICT');
+});
+
+test('POST I-005: misma key con fila PENDING pre-existente → 409 IN_PROGRESS con Retry-After', async () => {
+  resetDb();
+  const acuerdo = seedActiveAgreement();
+  seedTestClients();
+  const app = makeApp();
+  const pdf = await makePdf();
+  const meta = buildMetadata(acuerdo, { id_empresa: TEST_EMPRESA_A });
+  meta.document_hash = sha256Hex(pdf);
+
+  const idemKey = crypto.randomUUID();
+  const headers = { ...withClientAApiKeyHeaders(), 'Idempotency-Key': idemKey };
+
+  // Insertar manualmente una fila PENDING con la misma key para simular
+  // el estado de in-progress (otra request en curso). El service la
+  // detectará por la PK compuesta (id_empresa, idempotency_key) y retornará
+  // IdempotencyKeyInProgress, que el middleware mapea a 409 con Retry-After.
+  const fingerprint = sha256Hex(JSON.stringify({ test: 'pre-existing' }));
+  db.prepare(`
+    INSERT INTO gh_idempotency_keys
+      (id_empresa, idempotency_key, request_fingerprint, pdf_sha256, status, created_at, expires_at)
+    VALUES (?, ?, ?, ?, 'PENDING', strftime('%Y-%m-%dT%H:%M:%fZ','now'),
+            strftime('%Y-%m-%dT%H:%M:%fZ','now', '+24 hours'))
+  `).run(TEST_EMPRESA_A, idemKey, fingerprint, sha256Hex(pdf));
+
+  const res = await request(app)
+    .post('/internal/sign-requests')
+    .set(headers)
+    .field('metadata', JSON.stringify(meta))
+    .attach('documento', pdf, 'contrato.pdf');
+
+  assert.equal(res.status, 409);
+  assert.equal(res.body.error.code, 'IDEMPOTENCY_KEY_IN_PROGRESS');
+  // El middleware setea el header Retry-After (>= 1s).
+  const retryAfter = parseInt(res.headers['retry-after'], 10);
+  assert.ok(retryAfter >= 1, `Retry-After debe ser >= 1, obtuve ${retryAfter}`);
+});
+
+test('POST I-005: Idempotency-Key inválido (no UUID v4) → 400 IDEMPOTENCY_KEY_INVALID', async () => {
+  resetDb();
+  const acuerdo = seedActiveAgreement();
+  seedTestClients();
+  const app = makeApp();
+  const pdf = await makePdf();
+  const meta = buildMetadata(acuerdo, { id_empresa: TEST_EMPRESA_A });
+  meta.document_hash = sha256Hex(pdf);
+
+  // Header con valor que NO es UUID v4 → 400 con code IDEMPOTENCY_KEY_INVALID.
+  const headers = { ...withClientAApiKeyHeaders(), 'Idempotency-Key': 'not-a-uuid-at-all' };
+  const res = await request(app)
+    .post('/internal/sign-requests')
+    .set(headers)
+    .field('metadata', JSON.stringify(meta))
+    .attach('documento', pdf, 'contrato.pdf');
+
+  assert.equal(res.status, 400);
+  assert.equal(res.body.error.code, 'IDEMPOTENCY_KEY_INVALID');
+});
+
+test('POST I-005: legacy mode (TEST_API_KEY) + Idempotency-Key → 400 IDEMPOTENCY_LEGACY_NOT_SUPPORTED (no 500)', async () => {
+  resetDb();
+  const acuerdo = seedActiveAgreement();
+  const app = makeApp();
+  const pdf = await makePdf();
+  const meta = buildMetadata(acuerdo);
+  meta.document_hash = sha256Hex(pdf);
+
+  // I-010: legacy mode usa TEST_API_KEY (deprecation). En legacy, id_empresa
+  // es null por diseño. requireIdempotencyKey (I-003.3) requiere
+  // req.id_empresa no vacío → sin el check de I-005, devolvería 500
+  // INTERNAL_ERROR. Con I-005, devolvemos 400 explícito
+  // IDEMPOTENCY_LEGACY_NOT_SUPPORTED para que K+AIR sepa que debe migrar
+  // a per-empresa key para usar idempotencia.
+  const headers = { ...HEADERS, 'Idempotency-Key': crypto.randomUUID() };
+  const res = await request(app)
+    .post('/internal/sign-requests')
+    .set(headers)
+    .field('metadata', JSON.stringify(meta))
+    .attach('documento', pdf, 'contrato.pdf');
+
+  assert.equal(res.status, 400);
+  assert.equal(res.body.error.code, 'IDEMPOTENCY_LEGACY_NOT_SUPPORTED');
+  assert.match(res.body.error.message, /legacy/i);
 });
 
 // =================================================================
