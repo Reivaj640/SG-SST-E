@@ -1,7 +1,7 @@
 # K+AIR ↔ firma-service — Integración v1
 
 **Estado**: docs canónicos, Fase 0 cerrada, pendientes de implementación.
-**Versión firma-service**: 0.1.189
+**Versión firma-service**: 0.1.190
 **Fecha de canonización**: 2026-08-19
 
 ## Documentos

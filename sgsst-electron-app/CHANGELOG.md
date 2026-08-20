@@ -5,6 +5,72 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.190] - 2026-08-20
+
+### I-008.x — feat(firma): observabilidad operativa transversal (3 hallazgos cerrados)
+
+Cierra 3 HALLAZGOS de observabilidad operativa en `firma-service` que afectaban a K+AIR como cliente:
+
+- **HALLAZGO #1**: Headers IETF draft-7 (`RateLimit-Policy`, `RateLimit`) NO se entregaban en respuestas 429 — el cliente no podía hacer backoff inteligente.
+- **HALLAZGO #2**: `signRequestService.registerEvent()` fallando dentro de la tx → respondía `INTERNAL_ERROR` genérico en vez de un código diagnóstico específico.
+- **HALLAZGO #3**: `pdfGen.generateSignedPdf()` o `pdfGen.generateConstanciaPdf()` fallando → respondía `INTERNAL_ERROR` genérico.
+
+#### I-008.1 — feat(util): helper `withAppErrorWrapping` (async)
+
+- Nuevo helper en `firma-service/src/utils/errorWrap.js` que envuelve funciones async: errores no-AppError se convierten en `AppError(500, code, message, {original_error, original_code})`. Preserva `AppError` existente (no doble-wrapping).
+- 10 tests unitarios en `tests/utils/errorWrap.test.js`.
+- Pensado para HALLAZGO #2 y #3.
+
+#### I-008.2 — feat(rate-limit): IETF draft-7 headers en 429
+
+- `makeHandler(limiterName)` setea los 2 headers ANTES de `next(err)`:
+  - `RateLimit-Policy: <limit>;w=<windowSec>`
+  - `RateLimit: limit=<limit>, remaining=0, reset=<windowSec>`
+- `internalServerLimiter` (Capa 4 manual) setea los headers con `INSTANCE_ANOMALY_LIMIT=10` y `INSTANCE_ANOMALY_WINDOW_MS=24h=86400s`.
+- 7 tests nuevos en `tests/middleware/rateLimit-headers.test.js` (6 pass + 1 SKIP justificado).
+- E2E-RL.3 re-habilitado en `tests/e2e/firma-rate-limit-e2e.test.js` (verifica headers IETF con stack HTTP completo).
+- Cierra HALLAZGO #1.
+
+#### I-008.3 — feat(publicFlow): wrap pdfGen + registerEvent con códigos específicos
+
+- `pdfGen.generateSignedPdf()` envuelto con `withAppErrorWrapping` (async) → `PDF_GENERATION_FAILED` (500).
+- `pdfGen.generateConstanciaPdf()` envuelto con `withAppErrorWrapping` (async) → `PDF_GENERATION_FAILED` (500).
+- 3 calls a `signRequestService.registerEvent()` dentro de la tx envueltos con `withAppErrorWrappingSync` (nuevo helper sync) → `EVENT_REGISTRATION_FAILED` (500).
+- Helper sync agregado a `errorWrap.js` porque `db.transaction(() => { ... })` en better-sqlite3 v11 espera callback síncrona (rechaza callbacks que retornan Promise, lo cual rompería atomicidad).
+- 6 tests unitarios nuevos en `errorWrap.test.js` para `withAppErrorWrappingSync`.
+- Cierra HALLAZGO #2 y #3.
+
+#### I-008.4 — test(e2e): assert specific error codes
+
+- F5.3, F5.4 (`firma-pdf-failure-paths.test.js`): assertean `rCommit.body.error.code === 'PDF_GENERATION_FAILED'`.
+- F6.3 (`firma-atomicidad.test.js`): assertea `res.body.error.code === 'EVENT_REGISTRATION_FAILED'`. Reemplaza el comentario "el error específico puede variar" (que documentaba el comportamiento pre-I-008.3).
+- `package.json`: agrega `tests/utils/*.test.js` al glob del runner (cerraba el gap que dejaba los 16 tests del helper sin ejecutar en CI).
+
+#### Archivos (9 modificados, +851/-28)
+
+| Categoría | Archivos |
+|---|---|
+| Producción | `package.json`, `src/middleware/rateLimit.js`, `src/services/publicFlow.js`, `src/utils/errorWrap.js` |
+| Tests | `tests/e2e/firma-atomicidad.test.js`, `tests/e2e/firma-pdf-failure-paths.test.js`, `tests/e2e/firma-rate-limit-e2e.test.js`, `tests/middleware/rateLimit-headers.test.js`, `tests/utils/errorWrap.test.js` |
+
+#### Métricas
+
+- 4 commits locales: `c90589df`, `92a22990`, `2206908c`, `f7e34290` — 4 commits ahead of `origin/Dev-Pc` pre-merge
+- **39/39 E2E tests verdes** (8 archivos E2E)
+- Suite: 719 tests / 717 pass / 0 fail / 2 skip / ~24s
+- 16 tests del helper (10 async + 6 sync) ejecutándose en CI
+- Atomicidad de la tx preservada: cualquier throw se propaga al catch existente que hace cleanup de PDFs + rollback atómico
+- No doble-wrapping (AppError existente preservado por el helper)
+- Bump: 0.1.189 → 0.1.190
+
+#### Decisiones clave
+
+- **H2 + H3 comparten solución transversal**: un solo helper (`withAppErrorWrapping`) cubre ambos hallazgos.
+- **Versión sync del helper es necesaria** porque la callback de `db.transaction()` en better-sqlite3 v11 es síncrona (rechaza callbacks async / que retornan Promise).
+- **PR #4 mergeado con rebase** (preserva historial lineal en Dev-Pc).
+
+---
+
 ## [Unreleased] - 2026-08-17
 
 ### 📦776 — feat(gestion-humana): módulo completo + fix flujo Contratación → Base Personal

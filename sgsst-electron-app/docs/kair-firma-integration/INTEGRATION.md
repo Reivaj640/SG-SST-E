@@ -16,7 +16,7 @@ K+AIR (Electron desktop para consultoría SG-SST colombiana) está integrando `f
 **Mañana (Fase 1+)**: K+AIR envía el PDF a `firma-service` vía HTTPS, recibe `id_solicitud` + URL pública mini-app + token; el trabajador abre el link, identifica con cédula, recibe OTP por correo, ve el documento, firma; `firma-service` genera PDF firmado + Constancia, los archiva, notifica a K+AIR vía webhook o polling batch. K+AIR descarga los PDFs, los archiva localmente, opcionalmente sincroniza al hub del cliente (PENDIENTE validar, ver §3 y §5).
 
 **Stack**:
-- firma-service v0.1.189 (HEAD, 0 commits ahead de origin/Dev-Pc). 18 endpoints, 5 tablas, 341 tests verdes, 0 P0 abiertos.
+- firma-service v0.1.190 (HEAD, 0 commits ahead of origin/Dev-Pc). 18 endpoints, 5 tablas, 341 tests verdes, 0 P0 abiertos.
 - K+AIR Electron desktop con Express embebido (onlyoffice-bridge en port 3011 — NO directamente reutilizable para webhooks, ver D-11).
 - HTTPS en LAN/cloud, API key estática (`X-Internal-API-Key`) + scope por empresa (D-13), webhook con HMAC SHA-256 estilo Stripe **o polling batch como fallback inicial** (D-11).
 - Storage: filesystem local (`<userData>/firmas/`) como copia operativa. Sync al hub Drive del cliente: **PENDIENTE DE VALIDAR** para binarios (no se afirma como plan completo).
@@ -37,7 +37,7 @@ K+AIR (Electron desktop para consultoría SG-SST colombiana) está integrando `f
 
 ---
 
-## 2. Estado actual del firma-service v0.1.189
+## 2. Estado actual del firma-service v0.1.190
 
 ### 2.1 Implementado y operativo
 
