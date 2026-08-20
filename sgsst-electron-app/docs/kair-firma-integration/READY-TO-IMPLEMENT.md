@@ -2,7 +2,7 @@
 
 **Fecha**: 2026-08-19 (v5 — incorpora correcciones finales de cuarta auditoría)
 **Propósito**: criterios de salida de Fase 0 + tareas priorizadas para Fase 1+.
-**Estado**: Pendiente aprobación de 8 decisiones activas (D-1, D-2, D-5, D-9, D-11, D-12, D-13, D-14).
+**Estado**: Fase 1.1 backend cerrada (2026-08-20, post I-008.x + bump 0.1.190). Pendiente: Fase 1.2 frontend K+AIR (I-101 a I-107) y 5 decisiones activas (D-5, D-9, D-11, D-12, D-14). D-1, D-2, D-13 ya implementadas en código (no requieren aprobación formal).
 
 ---
 
@@ -18,7 +18,8 @@
 
 ## B. Decisiones del user
 
-### Activas (8): D-1, D-2, D-5, D-9, D-11, D-12, D-13, D-14.
+### Activas (5): D-5, D-9, D-11, D-12, D-14.
+### Ya implementadas en código (3): D-1, D-2, D-13 — no requieren aprobación formal.
 ### Diferidas (4): D-3, D-4, D-6, D-10.
 ### Retiradas (2): D-7, D-8.
 
