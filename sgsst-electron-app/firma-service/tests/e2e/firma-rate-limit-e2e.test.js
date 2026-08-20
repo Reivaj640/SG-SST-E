@@ -7,7 +7,8 @@
  * (`POST /internal/sign-requests`) con `makeApp()` y el stack HTTP
  * completo, NO con una mini-app.
  *
- * Alcance I-E2E.4 (4 tests + 1 HALLAZGO documentado):
+ * Alcance I-E2E.4 (4 tests + 1 HALLAZGO documentado en I-E2E.4).
+ * I-008.2 (re-habilita E2E-RL.3 + cierra HALLAZGO #1). Total actual: 5 tests.
  *
  *   E2E-RL.1  clientA POST /internal/sign-requests 11 veces con 11
  *             X-Client-Instance-Id distintos → la 11ª debe ser 429 con
@@ -18,11 +19,13 @@
  *   E2E-RL.2  Cross-company: la anomalía generada por empresa A NO
  *             afecta a empresa B. Verifica que el tracker de capa 4
  *             está scopeado por id_empresa.
- *   E2E-RL.3  *** NO IMPLEMENTADO — ver HALLAZGO #1 más abajo.***
- *             Originalmente iba a verificar headers IETF draft-7
- *             (`RateLimit-Policy`, `RateLimit`). La implementación
- *             reveló que NO se entregan en respuestas 429 (ver HALLAZGO).
- *             El HALLAZGO se programa como fix futuro fuera de I-E2E.4.
+ *   E2E-RL.3  (REHABILITADO en I-008.2) 429 incluye headers IETF draft-7
+ *             (`RateLimit-Policy`, `RateLimit`). Originalmente iba a
+ *             verificar estos headers pero la implementación reveló que
+ *             NO se entregaban (HALLAZGO #1, documentado originalmente
+ *             en este archivo). I-008.2 corrige el bug setteando los
+ *             headers manualmente antes de next(err). Ver HALLAZGO #1
+ *             más abajo para detalles de la causa raíz.
  *   E2E-RL.4  El cuerpo del 429 sigue el contrato estándar de error:
  *             `error.code = 'RATE_LIMIT_EXCEEDED'`, `error.message` no
  *             vacío, `error.request_id` presente, `error.details` con
@@ -431,4 +434,81 @@ test('E2E-RL.5: sin X-Client-Instance-Id → SKIP de capa 4 (50 requests sin 429
   }
   assert.equal(anomalyCount, 0,
     `Capa 4 debe SKIP sin X-Client-Instance-Id, pero ${anomalyCount} requests dispararon anomalía`);
+});
+
+/**
+ * E2E-RL.3 (REHABILITADO en I-008.2): 429 incluye headers IETF draft-7.
+ *
+ * HALLAZGO #1 documentado en I-E2E.4: los headers IETF NO se entregaban
+ * en respuestas 429 porque el handler custom en makeHandler() llamaba
+ * next(err) en lugar de enviar la respuesta directamente. I-008.2 corrige
+ * el bug setteando los headers manualmente antes de next(err).
+ *
+ * Verifica con stack E2E completo (authz + rate limit + 429 response)
+ * que:
+ *   - Status 429
+ *   - Header `RateLimit-Policy: <limit>;w=<windowSec>` presente
+ *   - Header `RateLimit: limit=<limit>, remaining=0, reset=<windowSec>` presente
+ *   - Body sigue siendo RATE_LIMIT_EXCEEDED (contrato estándar)
+ *
+ * Usa Capa 4 (anomaly) con 11 instance ids distintos — más rápido
+ * que 720 requests de Capa 1.
+ */
+test('E2E-RL.3 (rehabilitado I-008.2): 429 de Capa 4 incluye headers IETF draft-7', async () => {
+  resetDb();
+  const acuerdo = seedActiveAgreement();
+  seedTestClients();
+  rateLimitModule._clearInstanceTracker();
+  const app = makeApp();
+  const forwardedFor = '10.99.2.1';
+
+  // Disparar anomalía: ANOMALY_LIMIT=10 requests OK, la 11ª dispara 429.
+  // Capa 4 verifica: tras registrar la 11ª instance, instances.size=11 > 10.
+  for (let i = 0; i < ANOMALY_LIMIT; i++) {
+    const pdf = await makePdf(`rl3-${i}`);
+    const meta = buildMetadata(acuerdo);
+    meta.document_hash = sha256(pdf);
+    const r = await withClientAApiKey(
+      request(app)
+        .post('/internal/sign-requests')
+        .set('X-Forwarded-For', forwardedFor)
+        .set('X-Client-Instance-Id', `instance-rl3-${i}`)
+        .set('Idempotency-Key', crypto.randomUUID())
+        .field('metadata', JSON.stringify(meta))
+        .attach('documento', pdf, 'contrato.pdf')
+    );
+    assert.equal(r.status, 201, `request #${i + 1} debería ser 201, obtuve ${r.status}`);
+  }
+
+  // Request #ANOMALY_LIMIT + 1 (i=10) es la 11ª instance distinta
+  // → dispara la anomalía → 429
+  const pdfTrig = await makePdf('rl3-trigger');
+  const metaTrig = buildMetadata(acuerdo);
+  metaTrig.document_hash = sha256(pdfTrig);
+  const rTrig = await withClientAApiKey(
+    request(app)
+      .post('/internal/sign-requests')
+      .set('X-Forwarded-For', forwardedFor)
+      .set('X-Client-Instance-Id', 'instance-rl3-trigger')
+      .set('Idempotency-Key', crypto.randomUUID())
+      .field('metadata', JSON.stringify(metaTrig))
+      .attach('documento', pdfTrig, 'contrato.pdf')
+  );
+
+  assert.equal(rTrig.status, 429, `debe ser 429, obtuve ${rTrig.status}`);
+  assert.equal(rTrig.body.error.code, 'RATE_LIMIT_EXCEEDED');
+  assert.equal(rTrig.body.error.details.limiter, 'anomaly');
+
+  // Headers IETF draft-7 (lowercase en Node.js)
+  const policy = rTrig.headers['ratelimit-policy'];
+  const rateLimit = rTrig.headers['ratelimit'];
+
+  assert.ok(policy, 'header RateLimit-Policy debe estar presente');
+  // INSTANCE_ANOMALY_LIMIT=10, INSTANCE_ANOMALY_WINDOW_MS=24h=86400s
+  assert.match(policy, /^10;w=86400$/,
+    `RateLimit-Policy debe ser "10;w=86400", recibido "${policy}"`);
+
+  assert.ok(rateLimit, 'header RateLimit debe estar presente');
+  assert.match(rateLimit, /^limit=10, remaining=0, reset=86400$/,
+    `RateLimit debe ser "limit=10, remaining=0, reset=86400", recibido "${rateLimit}"`);
 });
