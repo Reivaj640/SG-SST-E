@@ -489,7 +489,9 @@ test('F6.3 commit con evento SIGN_COMMITTED fallando → tx rollback atómico', 
     patch.dispose();
   }
   assert.equal(res.status, 500, `Debe ser 500, obtuve ${res.status} ${JSON.stringify(res.body)}`);
-  // El error específico puede variar; lo importante es 500.
+  // I-008.4: el error específico ahora es EVENT_REGISTRATION_FAILED (cierra
+  // HALLAZGO #2 con I-008.3). Antes era INTERNAL_ERROR genérico.
+  assert.equal(res.body.error.code, 'EVENT_REGISTRATION_FAILED');
   assert.equal(patch.getMatchingCalls(), 1,
     'El patch debe haberse llamado exactamente 1 vez (SIGN_COMMITTED)');
 
