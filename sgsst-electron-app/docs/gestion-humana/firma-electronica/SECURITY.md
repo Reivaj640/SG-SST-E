@@ -52,9 +52,22 @@
   - [9.13. Configuración por env vars](#913-configuración-por-env-vars)
   - [9.14. Riesgos aceptados](#914-riesgos-aceptados)
   - [9.15. Plan de migración a v2 (futuro)](#915-plan-de-migración-a-v2-futuro)
-- [10. Pentesting post-implementación](#10-pentesting-post-implementación)
-- [11. Bug bounty (futuro)](#11-bug-bounty-futuro)
-- [12. Anexo: matriz de riesgos](#12-anexo-matriz-de-riesgos)
+- [10. Idempotency-Key (I-003)](#10-idempotency-key-i-003)
+  - [10.1. Contexto y motivación](#101-contexto-y-motivación)
+  - [10.2. Header `Idempotency-Key` (G1–G4)](#102-header-idempotency-key-g1g4)
+  - [10.3. Fingerprint del payload (G5–G6 refinado)](#103-fingerprint-del-payload-g5g6-refinado)
+  - [10.4. Estados y máquina de transiciones (G8 refinado)](#104-estados-y-máquina-de-transiciones-g8-refinado)
+  - [10.5. TTL de 24 horas (lazy cleanup)](#105-ttl-de-24-horas-lazy-cleanup)
+  - [10.6. Timeout de PENDING de 5 minutos (G7)](#106-timeout-de-pending-de-5-minutos-g7)
+  - [10.7. Manejo de concurrencia y race conditions](#107-manejo-de-concurrencia-y-race-conditions)
+  - [10.8. REPLAY y redacción del token (C-22, G9, G10)](#108-replay-y-redacción-del-token-c-22-g9-g10)
+  - [10.9. Separación por `id_empresa` (frontera I-003 + I-010)](#109-separación-por-id_empresa-frontera-i-003--i-010)
+  - [10.10. Amenazas cubiertas por I-003.4 (batería adversarial)](#1010-amenazas-cubiertas-por-i-0034-batería-adversarial)
+  - [10.11. Lo que NO protege la idempotencia](#1011-lo-que-no-protege-la-idempotencia)
+  - [10.12. HALLAZGO M5.4 — Edge case documentado](#1012-hallazgo-m54--edge-case-documentado)
+- [11. Pentesting post-implementación](#11-pentesting-post-implementación)
+- [12. Bug bounty (futuro)](#12-bug-bounty-futuro)
+- [13. Anexo: matriz de riesgos](#13-anexo-matriz-de-riesgos)
 
 ---
 
@@ -1068,19 +1081,408 @@ de agotar buckets de 720/240/480 requests.
 
 ---
 
-## 10. Pentesting post-implementación
+## 10. Idempotency-Key (I-003)
+
+### 10.1. Contexto y motivación
+
+K+AIR (cliente) llama a `POST /v1/internal/sign-requests` para crear
+solicitudes de firma. El canal entre K+AIR y `firma-service` no es
+confiable por construcción: timeouts, retries automáticos del lado del
+cliente, conexiones que se cierran a mitad de request. Sin
+idempotencia, un retry podría crear **duplicados** del mismo SignRequest
+(mismo `id_trabajador`, mismo `id_documento`, misma `agreement_version`),
+lo cual deriva en:
+
+- Doble envío de correo al trabajador.
+- Múltiples tokens de firma activos.
+- Confusión en la auditoría (¿cuál es el evento canónico?).
+- Posible denegación de servicio si el operador reintenta agresivamente.
+
+I-003 introduce el header estándar HTTP `Idempotency-Key` (similar al
+de Stripe) para que K+AIR pueda hacer retries seguros. El servidor
+garantiza que **misma key + mismo payload = una sola operación** y
+devuelve el mismo resultado en cada retry.
+
+**Alcance:** aplica a `POST /v1/internal/sign-requests` (escrito por
+I-003.5 una vez cableado por I-005). **No aplica** a:
+
+- GET endpoints (son naturalmente idempotentes).
+- `/s/:id` (flujo público del trabajador).
+- Webhooks (I-201, tiene su propio mecanismo de retry).
+
+**Versión afectada:** v1. Backward compat: clientes sin el header
+siguen funcionando (G3, §10.2).
+
+### 10.2. Header `Idempotency-Key` (G1–G4)
+
+**Decisiones de diseño congeladas en I-003:**
+
+- **G1** — Nombre del header: `Idempotency-Key` (case-insensitive en
+  HTTP, pero el cliente DEBE usar esa grafía exacta). Estándar
+  propuesto por IETF (`draft-ietf-httpapi-idempotency-key-header`).
+- **G2** — Formato: UUID v4 validado por regex
+  `/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i`.
+  Máximo 255 chars (alineado con HTTP header size limits).
+- **G3** — **Opcional**: si el header no viene, el middleware hace
+  `next()` inmediatamente sin tocar la BD. Backward compat con clientes
+  pre-I-003.
+- **G4** — **Scope por empresa**: PK compuesta `(id_empresa,
+  idempotency_key)`. La misma string-key puede existir en distintas
+  empresas sin colisión. `id_empresa` viene de I-010 (D-13) — autoritativo,
+  nunca del body ni del query.
+
+**Manejo de header inválido (`IdempotencyKeyInvalid` → HTTP 400):**
+
+| Caso | Comportamiento |
+|---|---|
+| Header ausente | `next()` sin tocar BD (G3). |
+| Header presente pero string vacío `''` | 400 `IDEMPOTENCY_KEY_INVALID` (`reason: empty`). |
+| Header con > 255 chars | 400 `IDEMPOTENCY_KEY_INVALID` (`reason: too_long`). |
+| Header no es UUID v4 (regex fail) | 400 `IDEMPOTENCY_KEY_INVALID` (`reason: not_uuid_v4`). |
+| Header no es string (e.g. array) | 400 `IDEMPOTENCY_KEY_INVALID` (`reason: not_a_string`). |
+| Header con whitespace leading/trailing | HTTP parser LO TRIM (RFC 7230 §3.2.4) — key válida. |
+| Header con dos ocurrencias | Express concatena con `, ` → key inválida → 400. |
+| Header con null byte | `ERR_INVALID_CHAR` de Node HTTP parser, no llega al middleware. |
+
+### 10.3. Fingerprint del payload (G5–G6 refinado)
+
+El fingerprint es la representación canónica de la **intención** del
+cliente. Si dos requests tienen el mismo fingerprint, el servidor
+asume que es la misma operación lógica.
+
+**Decisiones de diseño:**
+
+- **G5** — Algoritmo: `SHA-256(canonical_json({...metadata, pdf_sha256}))`,
+  donde `canonical_json` ordena las keys alfabéticamente de forma
+  recursiva, no añade espacios, y **preserva el orden de los arrays**.
+- **G6 refinado** — El fingerprint **incluye** `pdf_sha256` (hex de
+  64 chars, lowercase defensivo). Esto cierra un vector de ataque:
+  si el cliente cambia el PDF pero mantiene el metadata, el
+  fingerprint cambia → 409 `IDEMPOTENCY_KEY_CONFLICT`. NO se almacena
+  el PDF binario (solo el hash), preservando la decisión original de
+  no duplicar archivos grandes.
+
+**Casos cubiertos (verificado en §S2 y §M8 de la batería adversarial):**
+
+| Caso | Mismo fingerprint |
+|---|---|
+| `{a:1, b:2}` vs `{b:2, a:1}` | ✅ Sí (orden de keys) |
+| Arrays `[1,2,3]` vs `[3,2,1]` | ❌ No (orden de arrays SÍ importa) |
+| `'ABCDEF...'` vs `'abcdef...'` (sha256 hex) | ✅ Sí (lowercase) |
+| Number `1` vs String `'1'` | ❌ No (tipo importa) |
+| `null` vs missing key | ❌ No (semántica distinta) |
+| Mismo metadata, distinto `pdf_sha256` | ❌ No (fingerprint cambia) |
+| Distinto metadata, mismo `pdf_sha256` | ❌ No (fingerprint cambia) |
+
+### 10.4. Estados y máquina de transiciones (G8 refinado)
+
+La fila de `gh_idempotency_keys` puede estar en uno de cuatro estados.
+El CHECK constraint del schema 008 valida que el valor pertenezca al
+whitelist `PENDING | COMPLETED | FAILED | TERMINAL`.
+
+```
+                  ┌──────────────┐
+   getOrCreate    │              │   handler OK
+   ────────────▶  │   PENDING    │ ────────────▶ COMPLETED  (2xx)
+                  │              │                    │
+                  │              │   handler 4xx     │   + body cacheado
+                  │              │   sin opt-in      │   + response_status
+                  │              │ ────────────▶ FAILED
+                  │              │                    │
+                  │              │   handler llama    │   + body cacheado
+                  │              │   res.idempotency  │   + response_status
+                  │              │   .terminal(b,s)  │
+                  │              │ ────────────▶ TERMINAL
+                  └──────┬───────┘
+                         │
+            5xx/uncaught│ (no transición — PENDING se mantiene
+                         │  para que el in-flight timeout recupere)
+                         ▼
+                    (sin cambio)
+```
+
+**Semántica por estado:**
+
+| Estado | Significado | ¿Retry con mismo fingerprint? | Body cacheado? |
+|---|---|---|---|
+| **PENDING** | Operación en curso o crasheó sin marcar | Solo si in-flight timeout (>5 min) | No |
+| **COMPLETED** | Operación exitosa 2xx | ✅ Sí → REPLAY (mismo body, mismo status) | Sí |
+| **FAILED** | Error 4xx recuperable (default) | ✅ Sí → nueva ejecución | No (NO se popula) |
+| **TERMINAL** | Rechazo deliberado (opt-in handler) | ❌ No, aunque fingerprint idéntico | Sí |
+
+**Decisión crítica G8 refinado**: la clasificación `TERMINAL` **NO es
+automática** para cualquier 4xx. Es decisión explícita del handler vía
+`res.idempotency.terminal(body, statusCode)` ANTES de `res.json(...)`.
+El default 4xx es `FAILED` (retry permitido). Esto evita que rechazos
+transitorios bloqueen retries legítimos.
+
+### 10.5. TTL de 24 horas (lazy cleanup)
+
+**Decisión:** `expires_at = created_at + 24h`, formato ISO 8601 estricto.
+
+**Requisito técnico explícito (no es opcional):**
+
+La columna `expires_at` se almacena en formato `YYYY-MM-DDTHH:MM:SS.mmmZ`
+(strftime ISO 8601). La columna `created_at` usa el formato default de
+SQLite (`YYYY-MM-DD HH:MM:SS`). **Comparar lexicográficamente estos
+dos formatos falla** porque `' ' (0x20) < 'T' (0x54)`. Por lo tanto:
+
+- ✅ Comparación correcta: `WHERE expires_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`
+- ❌ Comparación rota: `WHERE expires_at < datetime('now')`
+
+Esta regla está documentada en el JSDoc de
+`src/services/idempotency.js` (línea 47-51) y fue verificada
+atómicamente antes de commit.
+
+**Limpieza:** LAZY (no hay timer/cron). Se ejecuta en cada
+`getOrCreate()` y vía `cleanup()` explícito. Si la fila está
+expirada al momento del lookup, se borra y se reemplaza con un
+nuevo PENDING.
+
+**Justificación del TTL 24h:** suficiente para que un cliente que
+hizo un retry varias horas después (e.g. operador que reintenta al
+día siguiente) reciba el mismo resultado, pero corto para que la
+tabla no crezca indefinidamente.
+
+### 10.6. Timeout de PENDING de 5 minutos (G7)
+
+Una fila PENDING puede existir por dos razones legítimas:
+
+1. La operación está corriendo (handler en await).
+2. El proceso crasheó o se olvidó de cerrar la key.
+
+**Decisión G7:** Si `created_at` de una fila PENDING es **mayor a 5
+minutos**, se interpreta como crash y se permite retry limpio. El
+siguiente `getOrCreate` la reemplaza con un nuevo PENDING.
+
+**Por qué 5 minutos:** suficiente para que un handler legítimo
+(I/O de BD, envío de correo, generación de PDF) complete, pero corto
+para que un cliente que ve `IN_PROGRESS` sepa cuándo reintentar
+(`Retry-After: 300` segundos, §10.7).
+
+**Comparación de tiempo (requisito técnico explícito):**
+
+`created_at` está en formato SQLite default. Para compararlo contra
+"now - 5min" en ISO 8601, el service hace:
+
+```sql
+(strftime('%Y-%m-%dT%H:%M:%fZ', created_at)
+ < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-300 seconds'))
+```
+
+Esto convierte `created_at` a ISO 8601 antes de comparar, evitando el
+problema lexicográfico.
+
+### 10.7. Manejo de concurrencia y race conditions
+
+**Garantías:**
+
+- **Una sola ejecución del handler** por `(id_empresa, idempotency_key)`
+  mientras la fila esté PENDING. Requests concurrentes con la misma
+  key: el primero crea PENDING, los siguientes reciben 409
+  `IDEMPOTENCY_KEY_IN_PROGRESS` con header `Retry-After: <segs>`.
+- **No hay deadlocks** entre las 4 capas (authz, rate limit,
+  idempotency) — verificado en test §M1.1 (2 calls paralelos) y
+  §M1.3 (5 calls paralelos): handler corre 1 vez, resto es 409 o
+  REPLAY.
+- **PK compuesta (UNIQUE constraint)** previene INSERT duplicado. Si
+  dos requests llegan en exactamente el mismo tick, el segundo
+  recibe UNIQUE error del driver, se re-SELECT, y se propaga
+  IdempotencyKeyInProgress o IdempotencyKeyConflict según el caso
+  (verificado en §S5 y §M1).
+
+**Comportamiento ante `Retry-After`:** la cabecera HTTP se setea
+en la respuesta 409 con el tiempo restante hasta que la fila
+expiraría (mínimo 1 segundo). El cliente PUEDE reintentar después
+de ese tiempo, pero también PUEDE reintentar antes (recibirá el
+mismo 409 si la fila sigue PENDING). NO se penaliza por retries
+agresivos (eso es rate limit, I-008).
+
+### 10.8. REPLAY y redacción del token (C-22, G9, G10)
+
+**G9** — Cuando una request llega con misma key + mismo fingerprint
+y la fila está COMPLETED, el middleware:
+
+1. Parsea `response_body` (almacenado como JSON string) de vuelta a
+   objeto.
+2. Setea el header `X-Idempotency-Replay: true`.
+3. Envía `res.status(response_status).json(parsedBody)`.
+4. **NO** ejecuta el handler (verificado con counter en §M3.3).
+
+**C-22** — El token del SignRequest (`token`, `url_publica`,
+`qr_payload`) se cachea en la fila COMPLETED. En REPLAY, el cliente
+recibe el **mismo token** que recibió en la 1ª ejecución. Esto es
+crítico: si el cliente hace retry por timeout y el servidor
+re-generara el token, el cliente no podría usarlo (el token nuevo
+estaría en una fila distinta).
+
+**Recuperación explícita (I-013b)**: si el cliente perdió el token
+del 1st response, hay un endpoint dedicado
+`GET /v1/internal/sign-requests/:id` (I-002 ya provee esto) que
+permite re-fetchear la fila canónica.
+
+**G10** — Header de respuesta `X-Idempotency-Replay: true`:
+- ✅ Set en REPLAY.
+- ❌ NO set en 1ª ejecución (NEW).
+- ❌ NO set en errores (4xx, 5xx).
+- Verificado en §M3.3 y §M14 (4 escenarios).
+
+### 10.9. Separación por `id_empresa` (frontera I-003 + I-010)
+
+La PK compuesta `(id_empresa, idempotency_key)` garantiza
+**aislamiento total entre empresas**:
+
+```
+Empresa A  id_empresa=900123456  key="abc-123"  → fila #1
+Empresa B  id_empresa=900999999  key="abc-123"  → fila #2 (independiente)
+```
+
+Misma string-key en distintas empresas son **filas distintas**, no
+hay colisión. Esto fue verificado exhaustivamente en la batería
+adversarial §S1 (7 sub-tests) que cubre:
+
+- Empresa A + key + payload X → COMPLETED.
+- Empresa B + misma key + mismo payload → también COMPLETED (fila #2).
+- Empresa A + misma key + payload Y → 409 CONFLICT (no afecta B).
+- Empresa A marcada TERMINAL → Empresa B sigue REPLAY-eable.
+- Empresa A re-intenta con misma key + mismo fingerprint tras
+  TERMINAL → 409 `IDEMPOTENCY_KEY_TERMINAL` (G8 refinado, dentro
+  de A).
+
+**Fuente de `id_empresa`:** siempre `req.id_empresa` (seteado por
+`requireEmpresaScope`, I-010/D-13). **NUNCA** del body ni de query
+params. Si por alguna razón `req.id_empresa` no está presente, el
+middleware falla cerrado con 500 `INTERNAL_ERROR` (defense in depth,
+verificado en §M7).
+
+### 10.10. Amenazas cubiertas por I-003.4 (batería adversarial)
+
+68 tests adversariales (33 service-level + 35 middleware-level)
+ataques documentados en `tests/services/idempotency-adversarial.test.js`
+y `tests/middleware/idempotency-adversarial.test.js`:
+
+| Amenaza | Sección |
+|---|---|
+| Cross-company attack (misma key en 2 empresas) | §S1 |
+| JSON canonicalization (orden de keys, tipos, arrays) | §S2 |
+| pdf_sha256 case collision (G6 refinado) | §S3 |
+| TTL 24h expiry | §S4 |
+| UNIQUE constraint race (2 inserts simultáneos) | §S5 |
+| In-flight timeout boundary (4/5/6/10 min, G7) | §S6 |
+| Concurrencia HTTP (2 / 5 requests paralelos, sin doble handler) | §M1 |
+| PENDING blocking + Retry-After | §M2 |
+| REPLAY body idéntico + X-Idempotency-Replay | §M3 |
+| Header attacks (case, length, unicode, dos, null, whitespace) | §M4 |
+| 5xx/uncaught no marca FAILED (incluye HALLAZGO M5.4) | §M5 |
+| PII en responses y logs (incluye 100-requests stress) | §M6 |
+| id_empresa missing / null / empty | §M7 |
+| pdf_sha256 contribution al fingerprint + validación | §M8 |
+
+**Resultado:** 569/569 tests verdes (501 baseline + 68 adversarial),
+3 corridas consecutivas sin flakiness (post-fix: 17s, 15.6s, 15.3s).
+
+### 10.11. Lo que NO protege la idempotencia
+
+Documentar lo que la idempotencia **no** hace es tan importante como
+lo que hace, para no generar falsa sensación de seguridad.
+
+| Capacidad | Cubierta por |
+|---|---|
+| Autenticación del cliente (API key, IP, instance) | I-010 (D-13) |
+| Autorización per-empresa (allowed_operations) | I-010 (D-13) |
+| Rate limit (720/h por empresa, 240/h por instance) | I-008 (C-20 v5) |
+| Cifrado del PDF binario en storage | TLS + filesystem |
+| Validación del schema/estructura del PDF | I-012 (C-23) |
+| Detección de malware en el PDF | I-012 (C-23) |
+| Persistencia del PDF en disco | `signRequest` service |
+| Notificación al trabajador (correo, OTP) | `mailer` service |
+| Webhook delivery a K+AIR | I-201 (futuro) |
+| Audit log inmutable de eventos | I-002 + `gh_firma_eventos` |
+| Compliance con Decreto 1072 / Ley 1581 | LEGAL.md |
+
+La idempotencia es **una capa adicional** sobre las demás, no un
+reemplazo. El cliente sigue siendo responsable de:
+
+- Generar UUIDs v4 únicos por intento de SignRequest.
+- Respetar el header `Retry-After` cuando recibe 409 IN_PROGRESS.
+- No reintentar más allá del TTL 24h (el servidor habrá olvidado la
+  key).
+
+### 10.12. HALLAZGO M5.4 — Edge case documentado
+
+**Descripción:**
+
+Cuando un handler hace `res.status(201).json({...})` y **luego**
+lanza una excepción, el comportamiento observado es:
+
+1. Cliente recibe 201 (la response original).
+2. Express invoca `errorHandler` que intenta `res.status(500).json(...)`
+   sobre la response ya enviada.
+3. Internamente `res.statusCode` queda en **500** (errorHandler lo
+   setea antes de fallar al enviar) y el `captured` body en el wrap
+   de `res.json` se sobreescribe con el body del error.
+4. El lifecycle hook de `'finish'` corre con `statusCode=500` →
+   el middleware ve 5xx, no marca COMPLETED (regla "no blanket
+   FAILED", §9 / C-20 v5).
+5. La fila queda PENDING. Cliente que recibió 201 no puede hacer
+   REPLAY — una llamada subsecuente con misma key + fingerprint
+   verá 409 IN_PROGRESS en lugar del 201 cacheado.
+
+**Severidad:** edge case (handler con bug de programación que tira
+después de `res.json`). El comportamiento actual es **conservador**
+(no marca COMPLETED con state corrupto, no se arriesga a escribir
+un body incorrecto), pero deja al cliente sin opción de REPLAY.
+
+**Likelihood:** muy baja. Requiere que un handler explícitamente
+haga `res.json()` y LUEGO `throw` (patrón de bug, no de uso normal).
+En la práctica, los handlers correctos NO tiran después de
+`res.json` — el patrón canónico es tirar ANTES para que
+errorHandler decida el status.
+
+**Decisión (v1):**
+
+- ✅ **Aceptar como riesgo documentado** para v1.
+- **Razón 1:** la lógica defensiva del middleware (no escribir
+  state con datos potencialmente corruptos) es más valiosa que
+  garantizar REPLAY en un caso que nunca debería ocurrir en código
+  correcto.
+- **Razón 2:** el fix requiere instrumentación adicional
+  (capturar `statusCode` original antes de pasar a errorHandler,
+  o escuchar el evento `error` además de `finish`/`close`). Es
+  un cambio de baja prioridad con respecto al resto del bloque
+  funcional.
+- **Razón 3:** I-013b (recovery endpoint) ya provee una vía
+  explícita para que el cliente recupere el estado canónico vía
+  `GET /v1/internal/sign-requests/:id`, sin depender de REPLAY.
+
+**Plan de mitigación (post-v1):**
+
+| Paso | Descripción | Owner |
+|---|---|---|
+| Tracking | Crear ticket `TECH-DEBT: M5.4 fix en middleware` con link a este hallazgo | Mavis |
+| Diseño | Capturar `statusCode` original en variable local cuando se llama `res.json()`, usar esa variable (no `res.statusCode`) en el lifecycle hook | Mavis |
+| Test | Re-correr §M5.4 con el fix: cliente debe ver 201 Y fila COMPLETED | Mavis |
+| Eval. Production Gate | Antes del go-live: si M5.4 sigue abierto, agregar al checklist como riesgo aceptado con plan de mitigación a 30 días | Mavis |
+
+**Revisión periódica:** este hallazgo se re-evalúa en cada release
+de v1.x. Si el patrón "throw after res.json" se vuelve común
+(e.g. por adopción de un framework que lo promueva), se re-prioriza.
+
+---
+
+## 11. Pentesting post-implementación
 
 Antes del go-live, se recomienda contratar un **pentesting
 externo** que cubra:
 
-### 10.1. Alcance
+### 11.1. Alcance
 
 - Caja negra contra `https://firma.k-air.com`.
 - Caja gris contra los endpoints internos (con API key
   proporcionada por el equipo).
 - Caja blanca con acceso al código.
 
-### 10.2. Áreas a probar
+### 11.2. Áreas a probar
 
 - [ ] Inyección SQL en todos los endpoints.
 - [ ] Cross-Site Scripting (XSS) en la mini-app.
@@ -1107,7 +1509,7 @@ externo** que cubra:
 - [ ] **Hash de API key timing-safe**: comparar `constantTimeEqual`,
       no `===`.
 
-### 10.3. Criterio de aceptación
+### 11.3. Criterio de aceptación
 
 - 0 vulnerabilidades altas o críticas sin resolver.
 - Todas las vulnerabilidades medias con plan de remediación
@@ -1115,7 +1517,7 @@ externo** que cubra:
 
 ---
 
-## 11. Bug bounty (futuro)
+## 12. Bug bounty (futuro)
 
 En **v1.1 o v2.0** se puede considerar un programa de bug bounty:
 
@@ -1128,7 +1530,7 @@ En **v1.1 o v2.0** se puede considerar un programa de bug bounty:
 
 ---
 
-## 12. Anexo: matriz de riesgos
+## 13. Anexo: matriz de riesgos
 
 | ID | Amenaza | Probabilidad | Impacto | Riesgo | Mitigación principal | Riesgo residual |
 |---|---|---|---|---|---|---|
