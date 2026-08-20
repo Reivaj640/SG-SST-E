@@ -1,7 +1,14 @@
 // main/gestion-humana-schema-sql.js
-// Schema del módulo Gestión Humana (v0.2.0) — FASE B
-// 9 tablas: contrataciones, base_personal, gh_sedes, vacaciones, permisos, documentos,
-//           firmas_digitales, anuncios, mensajes
+// Schema del módulo Gestión Humana (v0.3.0) — POST-LEGACY-SIGN-REMOVE
+// 8 tablas: contrataciones, base_personal, gh_sedes, vacaciones, permisos, documentos,
+//           anuncios, mensajes  (📦710 + 📦760 + 📦764)
+//
+// Cambio v0.3.0 (LEGACY-SIGN-REMOVE 2026-08-20):
+//   - Eliminada tabla gh_firmas_digitales (firma canvas operativa interna sin valor
+//     jurídico). La firma ahora es únicamente electrónica vía firma-service (I-101).
+//   - Eliminada columna gh_documentos.firma_id.
+//   - Mantenidos gh_documentos.estado y gh_documentos.fecha_firma: se re-poblan desde
+//     firma-service cuando llega un evento SIGN_COMMITTED (ver I-105).
 //
 // Patrón: mismo estilo que main/presupuesto-schema-sql.js.
 // Se ejecuta con sql.js en tests, better-sqlite3 en producción.
@@ -16,7 +23,6 @@
 //   va-{nanoid}   vacaciones
 //   pe-{nanoid}   permisos
 //   do-{nanoid}   documentos
-//   fi-{nanoid}   firmas_digitales
 //   an-{nanoid}   anuncios
 //   me-{nanoid}   mensajes
 //   daf-{nanoid}  documentos_afiliaciones   (📦760)
@@ -189,8 +195,7 @@ CREATE TABLE IF NOT EXISTS gh_documentos (
   tipo TEXT NOT NULL,                        -- autorizacion_datos | autorizacion_hojas_vida | actualizacion_datos | induccion | contrato | carta_examenes | carta_cuenta_bancaria
   titulo TEXT NOT NULL,
   contenido TEXT NOT NULL,                   -- JSON con datos capturados al generar
-  firma_id TEXT,                             -- referencia a firmas_digitales.id cuando se firma
-  estado TEXT DEFAULT 'pendiente',           -- pendiente | firmado | anulado
+  estado TEXT DEFAULT 'pendiente',           -- pendiente | firmado | anulado  (firmado: vía firma-service, ver I-101/I-105)
   fecha_firma TEXT,
   version INTEGER DEFAULT 1,
   created_at TEXT NOT NULL,
@@ -201,25 +206,6 @@ CREATE INDEX IF NOT EXISTS idx_gh_documentos_trabajador ON gh_documentos(trabaja
 CREATE INDEX IF NOT EXISTS idx_gh_documentos_empresa ON gh_documentos(empresa_id);
 CREATE INDEX IF NOT EXISTS idx_gh_documentos_tipo ON gh_documentos(tipo);
 CREATE INDEX IF NOT EXISTS idx_gh_documentos_estado ON gh_documentos(estado);
-
--- 📦710 · FIRMAS DIGITALES — registro de firma en pantalla (base64 PNG)
-CREATE TABLE IF NOT EXISTS gh_firmas_digitales (
-  id TEXT PRIMARY KEY,                       -- formato fi-{nanoid}
-  trabajador_id TEXT NOT NULL,
-  empresa_id TEXT NOT NULL,
-  documento_tipo TEXT NOT NULL,              -- tipo del documento firmado
-  imagen_data TEXT NOT NULL,                 -- base64 PNG de la firma dibujada en pantalla
-  documento_id TEXT,                         -- referencia opcional a gh_documentos.id
-  ip TEXT,
-  user_agent TEXT,
-  fecha_hora TEXT NOT NULL,                  -- ISO 8601
-  metadata TEXT,                             -- JSON: cedula, nombre
-  created_at TEXT NOT NULL,
-  FOREIGN KEY (trabajador_id) REFERENCES base_personal(id) ON DELETE CASCADE
-);
-CREATE INDEX IF NOT EXISTS idx_gh_firmas_trabajador ON gh_firmas_digitales(trabajador_id);
-CREATE INDEX IF NOT EXISTS idx_gh_firmas_empresa ON gh_firmas_digitales(empresa_id);
-CREATE INDEX IF NOT EXISTS idx_gh_firmas_documento ON gh_firmas_digitales(documento_id);
 
 -- 📦710 · ANUNCIOS — tablón de anuncios oficiales (info, urgente, mantenimiento, evento)
 CREATE TABLE IF NOT EXISTS gh_anuncios (
@@ -311,7 +297,7 @@ CREATE INDEX IF NOT EXISTS idx_gh_templates_tipo ON gh_templates(empresa_id, tip
 CREATE INDEX IF NOT EXISTS idx_gh_templates_activo ON gh_templates(empresa_id, activo);
 `;
 
-// ========== MIGRATIONS · 📦731/📦764 — idempotentes (se ejecutan una por una con try/catch) ==========
+// ========== MIGRATIONS · 📦731/📦764 + LEGACY-SIGN-REMOVE — idempotentes (se ejecutan una por una con try/catch) ==========
 // Cada ALTER se aplica individualmente; si la columna ya existe SQLite lanza
 // "duplicate column name" que main.js ignora. Esto permite upgrades en caliente
 // de una BD que ya tiene tablas de la versión anterior.
@@ -320,6 +306,11 @@ CREATE INDEX IF NOT EXISTS idx_gh_templates_activo ON gh_templates(empresa_id, a
 // trabajadores existentes quedan sin sede asignada hasta que se actualice).
 // Migración 2-3: agregar ruta_archivo + nombre_archivo a gh_documentos (📦764)
 // para guardar el archivo del documento generado desde un template.
+// Migración 4-5: tracking del flujo de Contratación → Base Personal (📦775).
+// Migración 6 (LEGACY-SIGN-REMOVE 2026-08-20): eliminar firma canvas.
+//   - DROP COLUMN firma_id de gh_documentos (la firma canvas ya no se usa).
+//   - DROP TABLE gh_firmas_digitales (no tiene valor jurídico).
+//   - DROP INDEX de los 3 índices de la tabla eliminada.
 const MIGRATIONS_SQL = [
   "ALTER TABLE base_personal ADD COLUMN sede_id TEXT;",
   "CREATE INDEX IF NOT EXISTS idx_base_personal_sede ON base_personal(empresa_id, sede_id);",
@@ -327,17 +318,24 @@ const MIGRATIONS_SQL = [
   "ALTER TABLE gh_documentos ADD COLUMN nombre_archivo TEXT;",
   // 📦775 · columnas para tracking del flujo de Contratación → Base Personal
   "ALTER TABLE base_personal ADD COLUMN fecha_ingreso_s400 TEXT;",
-  "ALTER TABLE base_personal ADD COLUMN fecha_afiliaciones TEXT;"
+  "ALTER TABLE base_personal ADD COLUMN fecha_afiliaciones TEXT;",
+  // LEGACY-SIGN-REMOVE · eliminar firma canvas (try/catch en main.js hace skip si la columna/tabla no existe)
+  "ALTER TABLE gh_documentos DROP COLUMN firma_id;",
+  "DROP INDEX IF EXISTS idx_gh_firmas_trabajador;",
+  "DROP INDEX IF EXISTS idx_gh_firmas_empresa;",
+  "DROP INDEX IF EXISTS idx_gh_firmas_documento;",
+  "DROP TABLE IF EXISTS gh_firmas_digitales;"
 ];
 
 module.exports = {
   SCHEMA_SQL: SCHEMA_SQL,
   MIGRATIONS_SQL: MIGRATIONS_SQL,
-  // Conteos esperados para validación en tests
-  EXPECTED_TABLES: 11,
-  EXPECTED_INDEXES: 39  // 3 contrataciones + 5 base_personal (era 4, +1 sede) + 1 gh_sedes
+  // Conteos esperados para validación en tests (post-LEGACY-SIGN-REMOVE: -1 tabla, -3 índices)
+  EXPECTED_TABLES: 10,  // era 11, -1 gh_firmas_digitales
+  EXPECTED_INDEXES: 36  // era 39, -3 idx_gh_firmas_*
+                        // 3 contrataciones + 5 base_personal (era 4, +1 sede) + 1 gh_sedes
                         // + 4 vacaciones + 5 permisos + 4 documentos
-                        // + 3 firmas + 4 anuncios + 4 mensajes
+                        // + 4 anuncios + 4 mensajes
                         // + 3 documentos_afiliaciones (📦760)
                         // + 3 templates (📦764)
 };

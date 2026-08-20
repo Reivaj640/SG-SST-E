@@ -91,7 +91,7 @@ async function run() {
   _assert(tables.includes('gh_vacaciones'), 'tabla gh_vacaciones existe');
   _assert(tables.includes('gh_permisos'), 'tabla gh_permisos existe');
   _assert(tables.includes('gh_documentos'), 'tabla gh_documentos existe');
-  _assert(tables.includes('gh_firmas_digitales'), 'tabla gh_firmas_digitales existe');
+  // LEGACY-SIGN-REMOVE (2026-08-20): gh_firmas_digitales eliminada.
   _assert(tables.includes('gh_anuncios'), 'tabla gh_anuncios existe');
   _assert(tables.includes('gh_mensajes'), 'tabla gh_mensajes existe');
 
@@ -193,11 +193,9 @@ async function run() {
     // Permisos (5) — Fase 5
     'gh:list-permisos', 'gh:get-permiso', 'gh:create-permiso',
     'gh:update-permiso', 'gh:finalizar-permiso',
-    // Documentos (6) — Fase 5
+    // Documentos (5) — Fase 5 — LEGACY-SIGN-REMOVE: -1 (gh:firmar-documento)
     'gh:list-documentos', 'gh:get-documento', 'gh:create-documento',
-    'gh:update-documento', 'gh:delete-documento', 'gh:firmar-documento',
-    // Firmas Digitales (2) — Fase 5
-    'gh:list-firmas', 'gh:create-firma',
+    'gh:update-documento', 'gh:delete-documento',
     // Anuncios (5) — Fase 5
     'gh:list-anuncios', 'gh:get-anuncio', 'gh:create-anuncio',
     'gh:update-anuncio', 'gh:delete-anuncio',
@@ -213,17 +211,18 @@ async function run() {
     // 📦732 · Import Excel (3)
     'gh:select-excel', 'gh:parse-excel', 'gh:import-personal'
   ];
-  _assertEq(Object.keys(registeredHandlers).length, 58, 'cantidad de handlers registrados = 58');
+  _assertEq(Object.keys(registeredHandlers).length, 55, 'cantidad de handlers registrados = 55 (LEGACY-SIGN-REMOVE: era 58, -3 firma)');
   expectedHandlers.forEach(function(ch) {
     _assert(typeof registeredHandlers[ch] === 'function', 'handler "' + ch + '" registrado');
   });
 
   console.log('');
-  console.log('[10] Verificando que NO quedan stubs (Fase 7 = 57 handlers reales)...');
-  // Fase 7 + 📦764: 5 reads + 4 write-contratacion + 4 write-personal + 2 write-sedes
-  //        + 6 vacaciones + 5 permisos + 6 documentos + 2 firmas + 5 anuncios + 4 mensajes
-  //        + 5 docs-afiliaciones + 5 templates + 3 import-excel
-  //        = 56 reales + 1 diag = 57 totales
+  console.log('[10] Verificando que NO quedan stubs (post-LEGACY-SIGN-REMOVE)...');
+  // LEGACY-SIGN-REMOVE (2026-08-20): -2 firmas + -1 firmar-documento
+  // 5 reads + 4 write-contratacion + 4 write-personal + 2 write-sedes
+  // + 6 vacaciones + 5 permisos + 5 documentos + 5 anuncios + 4 mensajes
+  // + 5 docs-afiliaciones + 5 templates + 3 import-excel
+  // = 54 reales + 1 diag = 55 totales
   // No hay stubs. Solo el diag (que también es real).
   // Spot check: create-vacacion con payload inválido debe retornar INVALID_INPUT (no NOT_IMPLEMENTED)
   var sampleCheck = registeredHandlers['gh:create-vacacion']({}, { token: 'test' });
@@ -239,9 +238,9 @@ async function run() {
   _assert(diagRes.data.has_getDb === true, 'diag.data.has_getDb = true');
   _assert(diagRes.data.has_validateSession === true, 'diag.data.has_validateSession = true');
   _assert(Array.isArray(diagRes.data.tables), 'diag.data.tables es array');
-  _assert(diagRes.data.tables.length === 11, 'diag.data.tables tiene 11 tablas (3 originales + 8 nuevas)');
-  // Verificar las 8 tablas nuevas explícitamente
-  ['gh_vacaciones', 'gh_permisos', 'gh_documentos', 'gh_firmas_digitales', 'gh_anuncios', 'gh_mensajes', 'gh_documentos_afiliaciones', 'gh_templates'].forEach(function(t) {
+  _assert(diagRes.data.tables.length === 10, 'diag.data.tables tiene 10 tablas (3 originales + 7 nuevas) · LEGACY-SIGN-REMOVE: -1 gh_firmas_digitales');
+  // Verificar las 7 tablas nuevas explícitamente
+  ['gh_vacaciones', 'gh_permisos', 'gh_documentos', 'gh_anuncios', 'gh_mensajes', 'gh_documentos_afiliaciones', 'gh_templates'].forEach(function(t) {
     _assert(diagRes.data.tables.indexOf(t) >= 0, 'diag.data.tables incluye ' + t);
   });
 

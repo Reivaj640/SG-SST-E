@@ -406,18 +406,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   ghCreatePermiso: (payload) => ipcRenderer.invoke('gh:create-permiso', payload),
   ghUpdatePermiso: (payload) => ipcRenderer.invoke('gh:update-permiso', payload),
   ghFinalizarPermiso: (payload) => ipcRenderer.invoke('gh:finalizar-permiso', payload),
-  // Documentos (6)
+  // Documentos (5 — LEGACY-SIGN-REMOVE: eliminado ghFirmarDocumento 2026-08-20)
+  // La firma canvas operativa interna se reemplazó por firma electrónica
+  // vía firma-service. Ver canales firma:* más abajo.
   ghListDocumentos: (payload) => ipcRenderer.invoke('gh:list-documentos', payload),
   ghGetDocumento: (payload) => ipcRenderer.invoke('gh:get-documento', payload),
   ghCreateDocumento: (payload) => ipcRenderer.invoke('gh:create-documento', payload),
   ghUpdateDocumento: (payload) => ipcRenderer.invoke('gh:update-documento', payload),
   ghDeleteDocumento: (payload) => ipcRenderer.invoke('gh:delete-documento', payload),
-  ghFirmarDocumento: (payload) => ipcRenderer.invoke('gh:firmar-documento', payload),
   // 📦764 · Abrir archivo generado del documento
   ghAbrirDocumento: (payload) => ipcRenderer.invoke('gh:abrir-documento', payload),
-  // Firmas Digitales (2)
-  ghListFirmas: (payload) => ipcRenderer.invoke('gh:list-firmas', payload),
-  ghCreateFirma: (payload) => ipcRenderer.invoke('gh:create-firma', payload),
   // Anuncios (5)
   ghListAnuncios: (payload) => ipcRenderer.invoke('gh:list-anuncios', payload),
   ghGetAnuncio: (payload) => ipcRenderer.invoke('gh:get-anuncio', payload),
@@ -431,6 +429,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
   ghMarcarLeido: (payload) => ipcRenderer.invoke('gh:marcar-leido', payload),
   // Diag (1)
   ghDiag: () => ipcRenderer.invoke('gh:diag'),
+
+  // 📦101 (2026-08-20) — Firma Electrónica K+AIR v1 (I-101)
+  // 13 canales: 4 config + 7 sign-request + 2 consent + 1 agreement
+  // Plan: docs/kair-firma-integration/READY-TO-IMPLEMENT.md §D (I-101)
+  // Spec: docs/gestion-humana/firma-electronica/API.md
+  // Config (4)
+  firmaConfigGet: () => ipcRenderer.invoke('firma:config:get'),
+  firmaConfigSetApiKey: (apiKey) => ipcRenderer.invoke('firma:config:set-api-key', { apiKey }),
+  firmaConfigSetUrl: (url) => ipcRenderer.invoke('firma:config:set-url', { url }),
+  firmaConfigDiag: () => ipcRenderer.invoke('firma:config:diag'),
+  // Sign request (6)
+  firmaSignRequestCreate: (payload) => ipcRenderer.invoke('firma:sign-request:create', payload),
+  firmaSignRequestGet: (id) => ipcRenderer.invoke('firma:sign-request:get', { id }),
+  firmaSignRequestList: (ids) => ipcRenderer.invoke('firma:sign-request:list', { ids }),
+  firmaSignRequestDocument: (id) => ipcRenderer.invoke('firma:sign-request:document', { id }),
+  firmaSignRequestConstancia: (id) => ipcRenderer.invoke('firma:sign-request:constancia', { id }),
+  firmaSignRequestLink: (id) => ipcRenderer.invoke('firma:sign-request:link', { id }),
+  // Consent (2)
+  firmaConsentCreate: (payload) => ipcRenderer.invoke('firma:consent:create', payload),
+  firmaConsentVerifyOtp: (consentId, otp) => ipcRenderer.invoke('firma:consent:verify-otp', { consentId, otp }),
+  // Agreement (1)
+  firmaAgreementGet: () => ipcRenderer.invoke('firma:agreement:get'),
 
   // --- Accidentes ---
   selectAccidentPdf: () => ipcRenderer.invoke('investigacion-accidentes-select-accident-pdf'),
