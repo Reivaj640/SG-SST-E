@@ -18,6 +18,7 @@ const express = require('express');
 const router = express.Router();
 const { requireEmpresaScopeAndLimit } = require('../middleware/authz');
 const { uploadPdf } = require('../middleware/upload');
+const pdfValidation = require('../middleware/pdfValidation');
 const { signRequestBody, signRequestListQuery } = require('../schemas');
 const signRequestService = require('../services/signRequest');
 const { AppError } = require('../middleware/errors');
@@ -40,6 +41,12 @@ router.post('/sign-requests',
     rateLimit: { tier: 'standard' },
   }),
   uploadPdf(),
+  // I-012.2: validacion estructural del PDF (servicio services/pdfValidator.js,
+  // I-012.1). Calcula SHA-256 server-side y rechaza PDFs invalidos /
+  // encriptados / demasiado grandes / con muchas paginas / parseo
+  // excedido / metadata bomb → 422. El hash se expone en req.pdfValidation.sha256
+  // y es el que se persiste (NO el que el cliente envio en metadata).
+  pdfValidation(),
   (req, res, next) => {
   try {
     // Parsear el campo 'metadata' (viene como JSON string en multipart)
@@ -111,7 +118,16 @@ router.post('/sign-requests',
       tipo_firma: meta.tipo_firma,
       agreement_version: meta.agreement_version,
       agreement_hash: meta.agreement_hash,
-      document_hash: meta.document_hash,
+      // I-012.2: el hash del documento se calcula server-side en
+      // pdfValidation() a partir de los bytes que multer nos entrego.
+      // El cliente envia `meta.document_hash` para mantener compatibilidad
+      // de schema, pero NO se usa: el cliente podria mentir sobre el hash
+      // para bypassear el control de idempotencia (e.g. forzar colisiones
+      // o evadir conflictos). El contrato de signRequest.create() exige
+      // que document_hash coincida con el calculado, asi que pasarle el
+      // server-computed garantiza que el check pasa y que document_hash
+      // persistido es realmente el fingerprint del PDF recibido.
+      document_hash: req.pdfValidation.sha256,
       pdf_buffer: req.file.buffer,
       pdf_filename: req.file.originalname,
       version_kair: meta.version_kair,
