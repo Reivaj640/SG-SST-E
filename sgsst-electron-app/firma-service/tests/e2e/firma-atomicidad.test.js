@@ -542,3 +542,71 @@ test('F6.3 commit con evento SIGN_COMMITTED fallando → tx rollback atómico', 
       `NO debe existir el evento del commit ${ev} (rollback), eventos vistos: ${eventos.join(',')}`);
   }
 });
+
+// ============================================================================
+// HALLAZGO #2 — INTERNAL_ERROR genérico cuando registerEvent() falla dentro
+// de la tx de commit (publicFlow.js:511-516)
+// ============================================================================
+//
+// Severidad: BAJA-MEDIA (deuda de observabilidad operativa; NO afecta
+// atomicidad ni correctness).
+//
+// Ubicación: src/services/publicFlow.js líneas 511-516 (catch del bloque
+// `db.transaction(() => { ... })` en commit()).
+//
+// Síntoma: cuando registerEvent() lanza un error dentro de la tx de
+// commit, el errorHandler central loguea el error como "Error no
+// controlado" y el cliente recibe 500 con `error.code = 'INTERNAL_ERROR'`.
+// El operador que revisa logs NO puede distinguir:
+//   - Fallo del INSERT en gh_firma_eventos (BD)
+//   - Fallo de foreign key (signRequest.id no existe)
+//   - Constraint violation (e.g. CHECK de evento enum)
+//
+// Causa: el catch en publicFlow.js:511-516 hace cleanup de archivos
+// (`fs.unlinkSync`) y re-lanza el error original (`throw err`),
+// preservando el `Error` genérico. El errorHandler central solo
+// distingue `AppError` (envolvente) de `Error` (genérico → INTERNAL_ERROR).
+// registerEvent no envuelve sus errores como AppError; por lo tanto
+// cualquier falla interna se propaga como Error genérico.
+//
+// Decisión: NO se corrige producción en este bloque (fuera de scope de
+// I-E2E.5). Se programa como fix futuro en un bloque transversal de
+// observabilidad/errores (I-008.x). El test F6.3 verifica SOLO status=500
+// (atomicidad preservada) y NO assertea el `error.code` específico,
+// justamente porque el código actual es INTERNAL_ERROR.
+//
+// Impacto para K+AIR operador:
+//   - Los logs de error no distinguen la causa específica.
+//   - El cliente recibe "Error interno del servidor" sin código diagnóstico.
+//   - La auditoría forense (F6.3) tiene que correlacionar con logs
+//     internos del servidor para entender qué falló.
+//
+// F6.3 cubre este hallazgo: el test F6.3 assertea status=500 + atomicidad
+// preservada (BD rollback, FS cleanup), pero NO assertea error.code. Esto
+// es DELIBERADO: documenta el comportamiento actual (INTERNAL_ERROR) sin
+// convertir el test en algo que verifique un comportamiento que aún no
+// existe.
+//
+// NOTA: HALLAZGO #3 (firma-pdf-failure-paths.test.js) comparte el mismo
+// patrón (errores de pdfGen tampoco se envuelven como AppError). Ambos
+// podrían resolverse en un mismo bloque I-008.x con una mejora transversal
+// del manejo de errores en publicFlow.js commit().
+//
+// Reproducción:
+//   1. resetDb(); seedActiveAgreement({...}); seedTestClients();
+//   2. Crear sign request + llevar a DOCUMENT_VIEWED.
+//   3. Monkey-patch selectivo de signRequestService.registerEvent para
+//      que lance cuando evento === 'SIGN_COMMITTED'.
+//   4. POST /api/sign/:token/commit → 500 con error.code = 'INTERNAL_ERROR'
+//      (no 'EVENT_REGISTRATION_FAILED' como sería ideal).
+//
+// FIX PROPUESTO (fuera de scope de I-E2E.5):
+//   En publicFlow.js:511-516, envolver el `throw err` con un check:
+//     if (err instanceof AppError) throw err;
+//     throw new AppError(500, 'EVENT_REGISTRATION_FAILED',
+//       'Fallo al registrar evento de auditoría en la tx de commit',
+//       { original_error: err.message });
+//   Alternativa transversal: helper `withAppErrorWrapping(fn, code, msg)`
+//   que envuelva cualquier error de una callback como AppError tipado.
+//   Esta segunda opción cubre HALLAZGO #3 (pdfGen) en el mismo helper.
+// ============================================================================

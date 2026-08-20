@@ -547,3 +547,81 @@ test('F5.4 pdfGen.generateConstanciaPdf falla durante commit → atomicidad pres
       `NO debe existir el evento del commit ${ev}, eventos vistos: ${eventos.join(',')}`);
   }
 });
+
+// ============================================================================
+// HALLAZGO #3 — INTERNAL_ERROR genérico cuando pdfGen falla durante commit
+// (publicFlow.js:392, 454)
+// ============================================================================
+//
+// Severidad: BAJA-MEDIA (deuda de observabilidad operativa; NO afecta
+// atomicidad ni correctness).
+//
+// Ubicación: src/services/publicFlow.js:
+//   - Línea 392: `pdfFirmadoBuf = await pdfGen.generateSignedPdf(...)`
+//   - Línea 454: `constanciaBuf = await pdfGen.generateConstanciaPdf(...)`
+//
+// Síntoma: cuando pdfGen lanza un error (e.g. PDF corrupto, XMP
+// malformado, OOM durante generación), el errorHandler central loguea
+// el error como "Error no controlado" y el cliente recibe 500 con
+// `error.code = 'INTERNAL_ERROR'`. El operador que revisa logs NO puede
+// distinguir:
+//   - Fallo en generateSignedPdf (generación del PDF firmado)
+//   - Fallo en generateConstanciaPdf (generación de la Constancia)
+//   - Fallo en writeFileAtomic (storage, ya cubierto por F6.2 con
+//     código específico STORAGE_WRITE_FAILED)
+//
+// Causa: las llamadas a `pdfGen.generateSignedPdf` y
+// `pdfGen.generateConstanciaPdf` NO están envueltas en try/catch que
+// las envuelva como AppError. Si pdfGen lanza un `Error` genérico
+// (e.g. "Cannot read properties of undefined (reading 'Pages')"),
+// el error se propaga al errorHandler como `Error` no-AppError, y este
+// responde INTERNAL_ERROR. Mismo patrón que HALLAZGO #2 (registerEvent).
+//
+// Decisión: NO se corrige producción en este bloque (fuera de scope de
+// I-E2E.7). Se programa como fix futuro en un bloque transversal de
+// observabilidad/errores (I-008.x). Los tests F5.3 y F5.4 verifican
+// SOLO status=500 (atomicidad preservada) y NO assertean el `error.code`
+// específico, justamente porque el código actual es INTERNAL_ERROR.
+//
+// Impacto para K+AIR operador:
+//   - Los logs de error no distinguen "firma PDF" vs "constancia".
+//   - El cliente recibe "Error interno del servidor" sin código diagnóstico.
+//   - La causa raíz requiere inspección de logs internos del servidor
+//     o un re-run manual del commit.
+//
+// F5.3 y F5.4 cubren este hallazgo: ambos tests assertean status=500 +
+// atomicidad preservada, pero NO assertean error.code. Esto es
+// DELIBERADO: documenta el comportamiento actual (INTERNAL_ERROR) sin
+// convertir los tests en algo que verifique un comportamiento que aún
+// no existe.
+//
+// NOTA: HALLAZGO #2 (firma-atomicidad.test.js) comparte el mismo patrón
+// (errores de registerEvent tampoco se envuelven como AppError). Ambos
+// podrían resolverse en un mismo bloque I-008.x con una mejora
+// transversal del manejo de errores en publicFlow.js commit(), p.ej.
+// un helper `withAppErrorWrapping(fn, code, msg)` que envuelva cualquier
+// error de una callback como AppError tipado.
+//
+// Reproducción:
+//   1. resetDb(); seedActiveAgreement({...}); seedTestClients();
+//   2. Crear sign request + llevar a DOCUMENT_VIEWED.
+//   3. Monkey-patch selectivo de pdfGen.generateSignedPdf (o
+//      generateConstanciaPdf) para que lance.
+//   4. POST /api/sign/:token/commit → 500 con error.code = 'INTERNAL_ERROR'
+//      (no 'PDF_GENERATION_FAILED' como sería ideal).
+//
+// FIX PROPUESTO (fuera de scope de I-E2E.7):
+//   En publicFlow.js:392 y :454, envolver las llamadas a pdfGen:
+//     let pdfFirmadoBuf;
+//     try {
+//       pdfFirmadoBuf = await pdfGen.generateSignedPdf(pdfOriginal, {...});
+//     } catch (err) {
+//       throw new AppError(500, 'PDF_GENERATION_FAILED',
+//         'Fallo al generar el PDF firmado', { original_error: err.message });
+//     }
+//   Y análogamente para generateConstanciaPdf con código
+//   'CONSTANCIA_GENERATION_FAILED' (o un código compartido si se
+//   prefiere un único "PDF_GENERATION_FAILED").
+//   Alternativa transversal: helper `withAppErrorWrapping(fn, code, msg)`
+//   que cubra también HALLAZGO #2 (registerEvent).
+// ============================================================================
