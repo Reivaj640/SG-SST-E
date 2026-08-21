@@ -304,6 +304,7 @@
 @keyframes doc-slide-up { from { transform: translateY(8px); opacity: 0.6; } to { transform: translateY(0); opacity: 1; } }
 .doc-modal__panel--generar { max-width: 560px; }
 .doc-modal__panel--admin   { max-width: 820px; }
+.doc-modal__panel--firma   { max-width: 560px; }
 
 /* 📦766 · Header del modal "Administrar Templates" con texto a la izquierda y botón a la derecha */
 .doc-tpl-admin-header {
@@ -586,3 +587,67 @@
 
 /* Panel de template (más chico que el de generar) */
 .doc-modal__panel--template { max-width: 480px; }
+
+/* 📦102.2.C · Modal de envío a firma */
+.doc-firma-summary {
+  padding: 0.625rem 0.75rem;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  color: #1a1a2e;
+  line-height: 1.45;
+}
+.doc-firma-summary strong { color: #174ea6; font-weight: 600; }
+.doc-firma-confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  background: #fff8e1;
+  border: 1px solid #f5deb3;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  color: #5a4500;
+  cursor: pointer;
+  user-select: none;
+}
+.doc-firma-confirm input[type="checkbox"] {
+  margin: 0.15rem 0 0 0;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.doc-field__error {
+  margin: 0.375rem 0 0 0;
+  font-size: 0.8125rem;
+  color: #b91c1c;
+}
+.doc-field__error[hidden] { display: none; }
+.doc-field__input.is-invalid,
+.doc-field__select.is-invalid {
+  border-color: #b91c1c;
+  box-shadow: 0 0 0 2px rgba(185, 28, 28, 0.12);
+}
+.doc-btn:disabled,
+.doc-btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 📦102.2.F · Sub-estado de firma-service (polling) */
+.doc-firma-sub {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: #5a6378;
+}
+.doc-firma-sub--pendiente i { color: #1a73e8; }
+.doc-firma-sub--terminal i { color: #28a745; }
+.doc-firma-sub code {
+  font-size: 0.6875rem;
+  background: #f1f3f5;
+  padding: 0 0.25rem;
+  border-radius: 3px;
+}

@@ -8,6 +8,23 @@
 // Backend actual: ghListDocumentos, ghGetDocumento, ghCreateDocumento,
 //                 ghUpdateDocumento, ghDeleteDocumento
 
+// I-102.2.G · Mapa de estados terminales de firma-service → estado persistente
+// de gh_documentos. Declarado como constante a NIVEL DE MÓDULO (fuera de la
+// clase) porque una class body de JS no admite object literals con coma
+// suelta como class member. Si retorna null en 'estado', no se hace
+// transición de estado (casos como OTP_LOCKED donde el documento sigue
+// técnicamente esperando_firma). 'toast' es el mensaje al usuario.
+// 'success' marca el toast como positivo (verde) o warning (amarillo).
+const _TRANSICION_FIRMA = {
+  'SIGNED':                { estado: 'firmado',   incluirFechaFirma: true,  toast: 'Documento firmado correctamente.',                                success: true  },
+  'REJECTED':              { estado: 'rechazado', incluirFechaFirma: false, toast: 'El firmante rechazó el documento.',                                 success: false },
+  'EXPIRED':               { estado: 'expirado',  incluirFechaFirma: false, toast: 'La solicitud de firma expiró.',                                    success: false },
+  'CANCELLED':             { estado: 'anulado',   incluirFechaFirma: false, toast: 'La solicitud de firma fue cancelada.',                             success: false },
+  'REVOKED':               { estado: 'anulado',   incluirFechaFirma: false, toast: 'La solicitud de firma fue revocada.',                              success: false },
+  'OTP_LOCKED':            { estado: null,        incluirFechaFirma: false, toast: 'OTP bloqueado por intentos. La solicitud no progresó.',            success: false },
+  'IDENTIFICATION_FAILED': { estado: null,        incluirFechaFirma: false, toast: 'Falló la identificación del firmante. La solicitud no progresó.', success: false }
+};
+
 class DocumentosComponent {
   constructor(container, companyName, moduleName, subName, onBack) {
     this.container = container;
@@ -85,6 +102,10 @@ class DocumentosComponent {
       this._showToast('Error cargando documentos: ' + e.message, 'error');
     }
     this.loading = false;
+    // I-102.2.F · Iniciar polling de firma-service. Idempotente.
+    if (typeof this._iniciarPolling === 'function') {
+      this._iniciarPolling();
+    }
   }
 
   // 📦764 · Devuelve los templates de un tipo de documento específico
@@ -320,22 +341,42 @@ class DocumentosComponent {
       var t = self._trabajadorById[d.trabajadorId];
       var tp = DocumentosComponent.TIPOS.find(function (x) { return x.value === d.tipo; }) || { label: d.tipo, color: '#5a6378', icon: 'fa-file' };
       var badgeClass = d.estado === 'firmado' ? 'doc-badge--firmado' : d.estado === 'anulado' ? 'doc-badge--anulado' : 'doc-badge--pendiente';
-      // LEGACY-SIGN-REMOVE (2026-08-20): la acción "Firmar" se eliminó porque
-      // la firma canvas operativa interna ya no existe. Por ahora solo se
-      // permite Descargar. La nueva acción "Firmar electrónicamente" llegará
-      // con I-102 (firma-service).
+      // I-102.2.B · Acciones por documento:
+      //   - "Descargar"          → siempre que tenga rutaArchivo.
+      //   - "Firmar electrónicamente" → SOLO si estado === 'pendiente' Y tiene
+      //     rutaArchivo (sin archivo no se puede firmar). La accion NO crea
+      //     la solicitud de firma todavia (eso es I-102.2.D). Primero valida
+      //     que la empresa tenga firma configurada via firma:empresa:list.
       var acciones = [];
       if (d.rutaArchivo) {
         acciones.push('<button class="doc-btn-mini doc-btn-mini--primary" data-descargar="' + self._esc(d.id) + '" title="Descargar ' + self._esc(d.nombreArchivo || 'archivo') + '"><i class="fas fa-download"></i> Descargar</button>');
       }
+      if (d.estado === 'pendiente' && d.rutaArchivo) {
+        acciones.push('<button class="doc-btn-mini doc-btn-mini--secondary" data-firmar-electronico="' + self._esc(d.id) + '" title="Iniciar firma electrónica vía firma-service"><i class="fas fa-signature"></i> Firmar electrónicamente</button>');
+      }
       var actionCell = acciones.length > 0
         ? '<div class="doc-template__actions">' + acciones.join('') + '</div>'
         : '<span class="doc-row-empty">—</span>';
+
+      // I-102.2.F · Sub-estado de firma-service (si lo hemos polledo).
+      // Se muestra como un subtexto debajo del badge principal, SOLO si difiere
+      // del estado local del documento. El observador (F) NO modifica el
+      // estado local — solo refleja lo que firma-service reporta.
+      var subEstado = '';
+      var statusLocal = (self._signRequestStatus || {})[d.id];
+      if (statusLocal && statusLocal.estado && statusLocal.estado !== d.estado && d.estado === 'esperando_firma') {
+        var estadoClass = self._esEstadoTerminal(statusLocal.estado) ? 'doc-firma-sub--terminal' : 'doc-firma-sub--pendiente';
+        subEstado = '<div class="doc-firma-sub ' + estadoClass + '">' +
+          '<i class="fas fa-' + (self._esEstadoTerminal(statusLocal.estado) ? 'check-circle' : 'circle-notch') + '"></i> ' +
+          self._esc(statusLocal.estado) +
+        '</div>';
+      }
+
       rows += '<tr>' +
         '<td><div class="doc-table__type"><i class="fas ' + tp.icon + '" style="color:' + tp.color + ';"></i><span>' + self._esc(tp.label) + '</span></div></td>' +
         '<td>' + (t ? self._esc(t.nombres + ' ' + t.apellidos) : '<span class="doc-table__empty">—</span>') + '</td>' +
         '<td class="doc-table__date">' + (d.createdAt ? d.createdAt.split('T')[0] : '<span class="doc-table__empty">—</span>') + '</td>' +
-        '<td class="doc-table td--center"><span class="doc-badge ' + badgeClass + '">' + d.estado + '</span></td>' +
+        '<td class="doc-table td--center"><span class="doc-badge ' + badgeClass + '">' + d.estado + '</span>' + subEstado + '</td>' +
         '<td class="doc-table__date">' + (d.fechaFirma ? d.fechaFirma.split('T')[0] : '<span class="doc-table__empty">—</span>') + '</td>' +
         '<td class="doc-table td--right">' + actionCell + '</td>' +
       '</tr>';
@@ -357,10 +398,520 @@ class DocumentosComponent {
         '</table>' +
       '</div>';
 
-    // LEGACY-SIGN-REMOVE: wireup de button[data-firmar] eliminado (no se renderiza).
+    // Wireup de las acciones
     wrap.querySelectorAll('button[data-descargar]').forEach(function (b) {
       b.onclick = function () { self._descargarDocumento(b.getAttribute('data-descargar')); };
     });
+    wrap.querySelectorAll('button[data-firmar-electronico]').forEach(function (b) {
+      b.onclick = function () { self._firmarElectronico(b.getAttribute('data-firmar-electronico')); };
+    });
+  }
+
+  // I-102.2.F · Determina si un estado de firma-service es terminal
+  // (no transicionará más). Los estados terminales NO se siguen polleando.
+  // G se encargará de aplicar la transición de negocio cuando lo detecte.
+  _esEstadoTerminal(estado) {
+    if (!estado) return false;
+    return ['SIGNED', 'REJECTED', 'REVOKED', 'EXPIRED', 'CANCELLED', 'OTP_LOCKED', 'IDENTIFICATION_FAILED'].indexOf(estado) !== -1;
+  }
+
+  // I-102.2.G · Aplica la transición de negocio cuando el polling detecta un
+  // estado terminal. Hace el update optimista (local + BD), muestra toast,
+  // marca el docId como procesado y refresca la tabla. NO descarga el PDF
+  // firmado (eso será otra fase).
+  async _aplicarTransicionFirma(docId, statusInfo) {
+    var self = this;
+    var doc = (this.items || []).find(function (d) { return d.id === docId; });
+    if (!doc) return;
+
+    // Idempotencia: si ya procesamos esta transición, no repetir.
+    if (statusInfo && statusInfo.procesado) return;
+
+    var estadoFS = statusInfo && statusInfo.estado;
+    if (!estadoFS) return;
+
+    var regla = _TRANSICION_FIRMA[estadoFS];
+    if (!regla) {
+      // Estado terminal desconocido (futuro). No hacer nada automático.
+      console.warn('[I-102.2.G] Estado terminal firma-service no mapeado:', estadoFS);
+      return;
+    }
+
+    // Casos sin transición de estado (OTP_LOCKED, IDENTIFICATION_FAILED):
+    // solo mostrar feedback y marcar como procesado (para no re-procesar).
+    if (!regla.estado) {
+      self._showToast(regla.toast, regla.success ? 'success' : 'warning');
+      self._signRequestStatus[docId] = Object.assign({}, statusInfo, { procesado: true });
+      return;
+    }
+
+    // Construir el update para ghUpdateDocumento.
+    var updates = { estado: regla.estado };
+    if (regla.incluirFechaFirma && statusInfo.data && statusInfo.data.fecha_firma) {
+      // La fecha que viene de firma-service es ISO 8601 (e.g. "2026-08-20T15:30:00.000Z").
+      // gh_documentos.fecha_firma es TEXT, acepta ISO. Pasamos directo.
+      updates.fechaFirma = statusInfo.data.fecha_firma;
+    }
+    // Si es REJECTED, podríamos guardar motivoRechazo. PERO el bridge no lo
+    // soporta en la whitelist todavía. Lo dejamos en statusInfo (memoria)
+    // para futuro. NO es bloqueante.
+
+    try {
+      var r = await window.electronAPI.ghUpdateDocumento({
+        documentoId: docId,
+        updates: updates
+      });
+      if (!r || !r.success) {
+        // No mostramos toast destructivo: el polling reintentará en 30s.
+        // Solo log para diagnóstico.
+        console.warn('[I-102.2.G] ghUpdateDocumento falló para', docId, ':', r && r.error);
+        return;
+      }
+      // Update optimista del doc local (sin recargar todo).
+      doc.estado = regla.estado;
+      if (updates.fechaFirma) doc.fechaFirma = updates.fechaFirma;
+      // Marcar como procesado (idempotencia) y guardar en el status.
+      self._signRequestStatus[docId] = Object.assign({}, statusInfo, { procesado: true });
+      // Feedback al usuario.
+      self._showToast(regla.toast, regla.success ? 'success' : 'warning');
+      // Re-render para reflejar el nuevo estado en la tabla.
+      self._renderRecientes();
+    } catch (e) {
+      console.warn('[I-102.2.G] Error inesperado en transición para', docId, ':', e && e.message);
+    }
+  }
+
+  // I-102.2.F · Inicia el polling de firma-service (idempotente).
+  // Solo consulta documentos con estado='esperando_firma' y idSolicitudFirma.
+  _iniciarPolling() {
+    if (this._pollHandle) return; // ya está activo
+    this._signRequestStatus = this._signRequestStatus || {};
+    var self = this;
+    // Primer tick inmediato (no esperar 30s la primera vez)
+    setTimeout(function () { self._tickPolling(); }, 100);
+    this._pollHandle = setInterval(function () { self._tickPolling(); }, 30000);
+  }
+
+  // I-102.2.F · Detiene el polling. Llamar en destroy() y cuando el componente
+  // se desmonte del DOM.
+  _detenerPolling() {
+    if (this._pollHandle) {
+      clearInterval(this._pollHandle);
+      this._pollHandle = null;
+    }
+  }
+
+  // I-102.2.F · Tick del polling. Evita concurrencia con _pollEnCurso.
+  // Solo consulta docs que están 'esperando_firma' con idSolicitudFirma válido.
+  // Para docs en estado terminal (visto anteriormente), NO los vuelve a consultar.
+  async _tickPolling() {
+    if (this._pollEnCurso) return;
+    if (!this.items || this.items.length === 0) return;
+    var self = this;
+    // Identificar candidatos: esperando_firma + idSolicitudFirma + NO terminal previo
+    var candidatos = this.items.filter(function (d) {
+      if (d.estado !== 'esperando_firma') return false;
+      if (!d.idSolicitudFirma) return false;
+      var prev = (self._signRequestStatus || {})[d.id];
+      if (prev && self._esEstadoTerminal(prev.estado)) return false;
+      return true;
+    });
+    if (candidatos.length === 0) return;
+
+    this._pollEnCurso = true;
+    try {
+      // Lanzar todas las consultas en paralelo (con Promise.allSettled para
+      // que un error individual no aborte el batch).
+      var results = await Promise.allSettled(candidatos.map(function (d) {
+        return window.electronAPI.firmaSignRequestGet(d.idSolicitudFirma)
+          .then(function (r) { return { doc: d, r: r }; });
+      }));
+
+      var huboCambios = false;
+      var ahora = new Date().toISOString();
+
+      for (var i = 0; i < results.length; i++) {
+        var res = results[i];
+        if (res.status !== 'fulfilled') continue;
+        var doc = res.value.doc;
+        var r = res.value.r;
+
+        if (!r || !r.success) {
+          // Error individual: ignorar este ciclo. Próximo tick reintenta.
+          // (Loggear al console para diagnóstico; no toasts por polling.)
+          if (typeof console !== 'undefined' && console.warn) {
+            console.warn('[I-102.2.F] firmaSignRequestGet falló para', doc.id, ':', r && r.error);
+          }
+          continue;
+        }
+
+        var estadoAnterior = (self._signRequestStatus[doc.id] || {}).estado;
+        var estadoNuevo = r.data && r.data.estado;
+        if (!estadoNuevo) continue;
+
+        if (estadoAnterior !== estadoNuevo) {
+          huboCambios = true;
+        }
+        self._signRequestStatus[doc.id] = {
+          estado: estadoNuevo,
+          lastCheckedAt: ahora,
+          data: r.data
+        };
+
+        // I-102.2.G · Si firma-service reporta un estado terminal, delegamos
+        // al reactor _aplicarTransicionFirma. F (este polling) SOLO observa;
+        // G (esa función) es quien ejecuta la transición de negocio
+        // (ghUpdateDocumento + UI + toast). Se lanza en background para
+        // no bloquear el tick de los demás documentos. _aplicarTransicionFirma
+        // ya tiene try/catch interno; el .catch() es defensa en profundidad.
+        if (self._esEstadoTerminal(estadoNuevo)) {
+          self._aplicarTransicionFirma(doc.id, self._signRequestStatus[doc.id])
+            .catch(function (e) {
+              if (typeof console !== 'undefined' && console.warn) {
+                console.warn('[I-102.2.G] transición error inesperado:', doc.id, e && e.message);
+              }
+            });
+        }
+      }
+
+      if (huboCambios) {
+        // Re-renderizar tabla para mostrar el sub-estado.
+        self._renderRecientes();
+      }
+    } catch (e) {
+      if (typeof console !== 'undefined' && console.warn) {
+        console.warn('[I-102.2.F] _tickPolling error:', e && e.message);
+      }
+    } finally {
+      this._pollEnCurso = false;
+    }
+  }
+
+  // I-102.2.B · Punto de entrada para "Firmar electrónicamente" desde la tabla.
+  // Esta funcion SOLO valida pre-condiciones. NO crea la solicitud de firma
+  // (eso es I-102.2.D via firma:sign-request:create). Tampoco abre el modal
+  // de envio (eso es I-102.2.C). Por ahora muestra un toast con el estado
+  // de la validacion para confirmar que el path end-to-end esta conectado.
+  async _firmarElectronico(docId) {
+    var self = this;
+    try {
+      // 1) Obtener el documento completo (incluye rutaArchivo, idSolicitudFirma, etc.)
+      var r1 = await window.electronAPI.ghGetDocumento({ documentoId: docId });
+      if (!r1 || !r1.success || !r1.data || !r1.data.documento) {
+        self._showToast('No se encontró el documento: ' + docId, 'error');
+        return;
+      }
+      var doc = r1.data.documento;
+
+      // 2) Verificar que tenga archivo asociado (sin archivo no se puede firmar)
+      if (!doc.rutaArchivo) {
+        self._showToast('El documento no tiene archivo adjunto. Genera el documento con un template primero.', 'warning');
+        return;
+      }
+
+      // 3) Verificar que la empresa actual tiene firma electrónica configurada
+      var r2 = await window.electronAPI.firmaEmpresaList({});
+      if (!r2 || !r2.success) {
+        self._showToast('Error consultando configuración de firma: ' + (r2 && r2.error && r2.error.message || 'desconocido'), 'error');
+        return;
+      }
+      var configured = (r2.data && r2.data.configured) || [];
+      var match = configured.find(function (c) { return c.companyKey === self.companyName; });
+      if (!match) {
+        self._showToast(
+          'La firma electrónica no está configurada para esta empresa (' + self.companyName + '). Configúrala primero en Configuración → Firma Electrónica.',
+          'warning'
+        );
+        return;
+      }
+
+      // 4) Pre-condiciones OK. Abrir el modal de envío (I-102.2.C). La
+      // creación de la solicitud se hace en I-102.2.D.
+      self._abrirModalFirma(doc, match);
+    } catch (e) {
+      self._showToast('Error: ' + e.message, 'error');
+    }
+  }
+
+  // I-102.2.C · Modal de envío a firma. Recoge el documento completo
+  // (ya validado por _firmarElectronico) + la empresa configurada (match).
+  // La creación de la solicitud de firma via firma:sign-request:create
+  // se implementa en I-102.2.D.
+  _abrirModalFirma(doc, match) {
+    var self = this;
+    var modal = this.container.querySelector('#doc-firma-modal');
+    if (!modal) return;
+    document.body.style.overflow = 'hidden';
+
+    // Buscar info del trabajador (viene del listado cargado en _load).
+    var t = this._trabajadorById[doc.trabajadorId];
+    var tp = DocumentosComponent.TIPOS.find(function (x) { return x.value === doc.tipo; }) || { label: doc.tipo };
+
+    // Resumen del documento (read-only).
+    var docSummary = modal.querySelector('#doc-firma-doc-summary');
+    if (docSummary) {
+      docSummary.innerHTML =
+        '<strong>' + self._esc(tp.label) + '</strong> · ' +
+        'ID <code>' + self._esc(doc.id) + '</code><br>' +
+        '<small style="color:#5a6378">Creado: ' + self._esc((doc.createdAt || '').split('T')[0] || '—') + '</small>';
+    }
+
+    // Resumen del firmante (read-only).
+    var trabSummary = modal.querySelector('#doc-firma-trab-summary');
+    if (trabSummary) {
+      if (t) {
+        trabSummary.innerHTML =
+          '<strong>' + self._esc(t.nombres + ' ' + t.apellidos) + '</strong><br>' +
+          '<small style="color:#5a6378">' +
+            self._esc(t.cargo || '—') + ' · ' +
+            'Cédula ' + self._esc(t.cedula || '—') +
+          '</small>';
+      } else {
+        trabSummary.innerHTML = '<em style="color:#5a6378">Trabajador no encontrado (id=' + self._esc(doc.trabajadorId) + ')</em>';
+      }
+    }
+
+    // Pre-llenar el correo si el trabajador ya tiene email en base_personal.
+    var correoInput = modal.querySelector('#doc-firma-correo');
+    if (correoInput) {
+      correoInput.value = (t && t.email) ? t.email : '';
+      correoInput.classList.remove('is-invalid');
+      var correoErr = modal.querySelector('#doc-firma-correo-error');
+      if (correoErr) correoErr.hidden = true;
+    }
+
+    // Checkbox de confirmación: desmarcar y deshabilitar el botón.
+    var confirmInput = modal.querySelector('#doc-firma-confirmar');
+    if (confirmInput) confirmInput.checked = false;
+    var btnEnviar = modal.querySelector('#doc-firma-enviar');
+    if (btnEnviar) btnEnviar.disabled = true;
+
+    // Guardar referencia al doc+match en el modal para uso del wireup.
+    modal._docFirmaCtx = { doc: doc, match: match, modal: modal };
+
+    // Wireup de cierre: backdrop, X, Cancelar, Escape.
+    modal.querySelectorAll('[data-close-doc-firma="1"]').forEach(function (el) {
+      el.onclick = function () { self._cerrarModalFirma(modal); };
+    });
+    // Click en backdrop (no en panel) cierra.
+    var backdrop = modal.querySelector('.doc-modal__backdrop');
+    if (backdrop) {
+      backdrop.onclick = function (e) {
+        if (e.target === backdrop) self._cerrarModalFirma(modal);
+      };
+    }
+    // Escape cierra.
+    modal._onEscape = function (e) {
+      if (e.key === 'Escape') self._cerrarModalFirma(modal);
+    };
+    document.addEventListener('keydown', modal._onEscape);
+
+    // Wireup de validación en tiempo real: cada cambio en correo/checkbox
+    // revalida y habilita/deshabilita el botón.
+    function _revalidar() {
+      var ok = self._validarFormularioFirma(modal);
+      if (btnEnviar) btnEnviar.disabled = !ok;
+    }
+    if (correoInput) correoInput.addEventListener('input', _revalidar);
+    if (confirmInput) confirmInput.addEventListener('change', _revalidar);
+
+    // Wireup del botón Enviar a firma (I-102.2.D).
+    if (btnEnviar) {
+      btnEnviar.onclick = function () {
+        if (!self._validarFormularioFirma(modal)) return;
+        var ctx = modal._docFirmaCtx;
+        self._enviarAFirma(modal, ctx, correoInput.value.trim());
+      };
+    }
+
+    modal.removeAttribute('hidden');
+    // Foco inicial en el campo correo.
+    if (correoInput) setTimeout(function () { correoInput.focus(); correoInput.select(); }, 50);
+  }
+
+  // I-102.2.C · Cierra el modal de envío a firma.
+  _cerrarModalFirma(modal) {
+    if (!modal) return;
+    if (modal._onEscape) {
+      document.removeEventListener('keydown', modal._onEscape);
+      modal._onEscape = null;
+    }
+    modal._docFirmaCtx = null;
+    modal.setAttribute('hidden', '');
+    document.body.style.overflow = '';
+  }
+
+  // I-102.2.C · Valida el formulario de envío. Retorna true si está OK.
+  // Reglas:
+  //   - correo: regex simple (no perfecto, suficiente para v1)
+  //   - checkbox: debe estar marcado
+  // Marca errores visuales con .is-invalid y muestra .doc-field__error.
+  _validarFormularioFirma(modal) {
+    var correoInput = modal.querySelector('#doc-firma-correo');
+    var correoErr = modal.querySelector('#doc-firma-correo-error');
+    var confirmInput = modal.querySelector('#doc-firma-confirmar');
+
+    var correo = (correoInput && correoInput.value || '').trim();
+    var re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    var correoOk = re.test(correo);
+
+    if (correoInput) {
+      correoInput.classList.toggle('is-invalid', !correoOk);
+    }
+    if (correoErr) {
+      correoErr.hidden = correoOk;
+    }
+
+    var confirmOk = !!(confirmInput && confirmInput.checked);
+    return correoOk && confirmOk;
+  }
+
+  // I-102.2.D · Convierte bytes del PDF en base64.
+  // Devuelve un Uint8Array para que crypto.subtle.digest opere.
+  _base64ToBytes(b64) {
+    var bin = atob(b64);
+    var len = bin.length;
+    var bytes = new Uint8Array(len);
+    for (var i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes;
+  }
+
+  _bytesToHex(buf) {
+    var hex = '';
+    for (var i = 0; i < buf.length; i++) {
+      var b = buf[i].toString(16);
+      if (b.length === 1) hex += '0';
+      hex += b;
+    }
+    return hex;
+  }
+
+  // I-102.2.D · Convierte errores tipados del backend/firma-service a mensajes
+  // comprensibles para el usuario. Mapea códigos AppError a español.
+  _traducirErrorFirma(r) {
+    if (!r || !r.error) return 'Error desconocido al enviar a firma';
+    var code = r.error.code || 'INTERNAL';
+    var msg = r.error.message || '';
+    var map = {
+      'INVALID_REQUEST_BODY': 'Datos de la solicitud incompletos o inválidos.',
+      'CONFIG_MISSING': 'La firma electrónica no está configurada. Configúrala primero en Configuración → Firma Electrónica.',
+      'ADMIN_TOKEN_REQUIRED': 'Falta el admin token. Configúralo en Configuración → Firma Electrónica.',
+      'EMPRESA_MISMATCH': 'La empresa del documento no coincide con la firma configurada.',
+      'INVALID_API_KEY': 'API key inválida o revocada. Configura una nueva.',
+      'NOT_FOUND': 'Recurso no encontrado en firma-service.',
+      'RATE_LIMIT_EXCEEDED': 'Demasiadas solicitudes. Espera un momento e intenta de nuevo.',
+      'PAYLOAD_TOO_LARGE': 'El PDF es demasiado grande (>50 MB).',
+      'INVALID_INPUT': 'Datos inválidos: ' + msg,
+      'NO_DB': 'BD local no disponible. Reinstala K+AIR.',
+      'TRABAJADOR_NOT_FOUND': 'El trabajador ya no existe en esta empresa.',
+      'CLIENT_NOT_FOUND': 'No hay firma configurada para esta empresa.',
+      'INTERNAL': 'Error interno del servicio de firma.'
+    };
+    return map[code] || ('Error al enviar a firma: ' + (msg || code));
+  }
+
+  // I-102.2.D · Envía el documento a firma: crea la sign request, guarda
+  // idSolicitudFirma y cambia estado a 'esperando_firma'.
+  // No hace polling, no descarga documento firmado, no detecta SIGN_COMMITTED
+  // (todo eso es I-102.2.F/G).
+  async _enviarAFirma(modal, ctx, correoFirmante) {
+    var self = this;
+    var btnEnviar = modal.querySelector('#doc-firma-enviar');
+    var doc = ctx.doc;
+    var match = ctx.match;
+    var t = this._trabajadorById[doc.trabajadorId];
+
+    // 1) UI: deshabilitar botón y mostrar "Enviando..."
+    if (btnEnviar) {
+      btnEnviar.disabled = true;
+      btnEnviar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+    }
+
+    try {
+      // 2) Obtener acuerdo activo (texto_hash + version)
+      var rAgr = await window.electronAPI.firmaAgreementGet();
+      if (!rAgr || !rAgr.success) {
+        self._showToast(self._traducirErrorFirma(rAgr), 'error');
+        return;
+      }
+      var agreement = rAgr.data;
+      if (!agreement || !agreement.texto_hash) {
+        self._showToast('El acuerdo activo no tiene hash. Contacta al administrador.', 'error');
+        return;
+      }
+
+      // 3) Leer bytes del PDF desde el disco (bridge hace fs.readFileSync)
+      var rRead = await window.electronAPI.firmaDocumentoReadBytes({ rutaArchivo: doc.rutaArchivo });
+      if (!rRead || !rRead.success) {
+        self._showToast('No se pudo leer el PDF: ' + (rRead && rRead.error && rRead.error.message || 'desconocido'), 'error');
+        return;
+      }
+
+      // 4) Calcular SHA-256 del PDF con Web Crypto
+      var pdfBytes = self._base64ToBytes(rRead.data.data);
+      var hashBuf = await crypto.subtle.digest('SHA-256', pdfBytes);
+      var documentHash = self._bytesToHex(new Uint8Array(hashBuf));
+
+      // 5) Construir metadata del sign request
+      var metadata = {
+        id_documento: doc.id,
+        id_trabajador: (t && (t.cedula || t.id)) || doc.trabajadorId,
+        id_empresa: match.idEmpresa,
+        tipo_firma: 'remoto',
+        agreement_version: agreement.version,
+        agreement_hash: agreement.texto_hash,
+        document_hash: documentHash,
+        version_kair: '0.1.190',
+        ttl_horas: 24,
+        // Metadatos extra (no en schema backend, pero lo aceptamos como
+        // "metadata" y el backend los ignora si no los usa).
+        correo_firmante: correoFirmante
+      };
+
+      // 6) Crear la sign request
+      var rCreate = await window.electronAPI.firmaSignRequestCreate({
+        companyName: self.companyName,
+        metadata: metadata,
+        pdfBuffer: pdfBytes,
+        pdfName: (doc.nombreArchivo || (doc.id + '.pdf'))
+      });
+      if (!rCreate || !rCreate.success) {
+        self._showToast(self._traducirErrorFirma(rCreate), 'error');
+        return;
+      }
+      var idSolicitud = rCreate.data && (rCreate.data.id_solicitud || rCreate.data.id);
+      if (!idSolicitud) {
+        self._showToast('firma-service no devolvió id_solicitud. Revisa el backend.', 'error');
+        return;
+      }
+
+      // 7) Persistir la relación y cambiar estado a 'esperando_firma'
+      var rUpd = await window.electronAPI.ghUpdateDocumento({
+        documentoId: doc.id,
+        updates: {
+          idSolicitudFirma: idSolicitud,
+          estado: 'esperando_firma'
+        }
+      });
+      if (!rUpd || !rUpd.success) {
+        self._showToast('Solicitud creada (id=' + idSolicitud + ') pero NO se pudo persistir la relación. ' +
+          (rUpd && rUpd.error && rUpd.error.message || ''), 'error');
+        return;
+      }
+
+      // 8) Cerrar modal y refrescar tabla
+      self._cerrarModalFirma(modal);
+      self._showToast('Solicitud de firma creada: ' + idSolicitud + '. Documento en estado "esperando_firma".', 'success');
+      await self._load();
+      self.render();
+    } catch (e) {
+      self._showToast('Error inesperado: ' + (e && e.message || e), 'error');
+    } finally {
+      if (btnEnviar) {
+        btnEnviar.disabled = false;
+        btnEnviar.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar a firma';
+      }
+    }
   }
 
   // 📦764 · Renderiza la lista de templates subidos por el user
@@ -521,7 +1072,7 @@ class DocumentosComponent {
   // 📦764 · Abre el archivo del documento generado (descarga)
   async _descargarDocumento(docId) {
     try {
-      var r = await window.electronAPI.ghObtenerDocumento({ documentoId: docId });
+      var r = await window.electronAPI.ghGetDocumento({ documentoId: docId });
       if (!r || !r.success || !r.data || !r.data.documento) {
         this._showToast('Error: no se encontró el documento', 'error');
         return;
@@ -680,7 +1231,12 @@ class DocumentosComponent {
   //   - _generarYAbrirFirma (renombrada a _generarDocumento, ya no abre firma)
   // La firma se hace ahora únicamente por vía electrónica (firma-service, I-101+).
 
-  destroy() { /* noop */ }
+  destroy() {
+    // I-102.2.F · Detener polling al desmontar el componente.
+    if (typeof this._detenerPolling === 'function') {
+      this._detenerPolling();
+    }
+  }
 }
 
 window.DocumentosComponent = DocumentosComponent;

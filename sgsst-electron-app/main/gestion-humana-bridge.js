@@ -232,6 +232,10 @@ function _rowToDocumento(row) {
     estado: row.estado,
     fechaFirma: row.fecha_firma,
     version: row.version,
+    // 📦102.2.E · id de la solicitud de firma en firma-service. Se setea
+    // cuando se llama POST /sign-requests desde la UI (I-102.2.D). El polling
+    // consulta este id para actualizar estado y fecha_firma.
+    idSolicitudFirma: row.id_solicitud_firma,
     rutaArchivo: row.ruta_archivo,         // 📦764 · ruta del archivo generado
     nombreArchivo: row.nombre_archivo,     // 📦764 · nombre del archivo generado
     createdAt: row.created_at,
@@ -1655,7 +1659,7 @@ function _handlerFinalizarPermiso(token, permisoId, fechaFin) {
 // ========== DOCUMENTOS HANDLERS (Fase 5) ==========
 
 var _TIPOS_DOCUMENTO = ['autorizacion_datos', 'autorizacion_hojas_vida', 'actualizacion_datos', 'induccion', 'contrato', 'carta_examenes', 'carta_cuenta_bancaria'];
-var _ESTADOS_DOCUMENTO = ['pendiente', 'firmado', 'anulado'];
+var _ESTADOS_DOCUMENTO = ['pendiente', 'esperando_firma', 'firmado', 'rechazado', 'expirado', 'anulado'];
 
 /**
  * gh:list-documentos
@@ -1678,6 +1682,12 @@ function _handlerListDocumentos(token, companyName, tipo, estado, trabajadorId) 
   if (!localDb) return _err('NO_DB', 'BD no disponible');
 
   try {
+    // 📦102.2.E · Lazy migration: columna id_solicitud_firma para relacionar
+    // gh_documentos.id con firma-service (id devuelto por POST /sign-requests).
+    // Idempotente: falla silenciosamente si la columna ya existe.
+    try { localDb.exec("ALTER TABLE gh_documentos ADD COLUMN id_solicitud_firma TEXT;"); } catch (e) { /* ya existe */ }
+    try { localDb.exec("CREATE INDEX IF NOT EXISTS idx_gh_documentos_id_solicitud_firma ON gh_documentos(id_solicitud_firma);"); } catch (e) { /* ya existe */ }
+
     var sql = "SELECT * FROM gh_documentos WHERE empresa_id = ?";
     var params = [company.company_key];
     if (tipo && typeof tipo === 'string') {
@@ -1860,7 +1870,11 @@ function _handlerUpdateDocumento(token, documentoId, updates) {
     contenido: 'contenido',
     estado: 'estado',
     fechaFirma: 'fecha_firma',
-    version: 'version'
+    version: 'version',
+    // 📦102.2.E · id de la solicitud de firma (firm-service POST /sign-requests).
+    // Se setea en I-102.2.D al crear la sign request. No se permite cambiar
+    // una vez que el documento está firmado.
+    idSolicitudFirma: 'id_solicitud_firma'
   };
 
   try {
