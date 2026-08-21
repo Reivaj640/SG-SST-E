@@ -377,6 +377,200 @@
             font-size: 0.95rem;
         }
 
+        /* --- I-103.A0 · Firma Electrónica (cards + badges) --- */
+        .firma-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            box-shadow: var(--shadow-sm);
+        }
+        .firma-card__header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 0.75rem;
+        }
+        .firma-card__icon {
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius-md);
+            background: var(--bg-muted, #f3f4f6);
+            color: var(--text-muted);
+            flex-shrink: 0;
+        }
+        .firma-card__icon--service { color: #1d4ed8; background: #dbeafe; }
+        .firma-card__icon--admin { color: #7c3aed; background: #ede9fe; }
+        .firma-card__info { flex: 1; min-width: 0; }
+        .firma-card__title {
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--text-primary, #1f2937);
+            margin-bottom: 0.25rem;
+        }
+        .firma-card__detail {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            word-break: break-all;
+        }
+        .firma-card__status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding-top: 0.5rem;
+            border-top: 1px solid var(--border-color);
+        }
+        .firma-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.3rem 0.7rem;
+            border-radius: 999px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+        .firma-badge--configured {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .firma-badge--env {
+            background: #fed7aa;
+            color: #9a3412;
+        }
+        .firma-badge--not-configured {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .firma-badge--loading {
+            background: #e5e7eb;
+            color: #4b5563;
+        }
+        .firma-badge--ok {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .firma-badge--error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .firma-card--form {
+            background: var(--bg-muted, #f9fafb);
+        }
+        .firma-card__form-title {
+            font-weight: 600;
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary, #1f2937);
+        }
+        .firma-card__form-help {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+            line-height: 1.5;
+        }
+        .firma-card__form-help code {
+            background: #e5e7eb;
+            padding: 0.1rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.85em;
+        }
+        .firma-form-row {
+            margin-bottom: 1rem;
+        }
+        .firma-form-label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-bottom: 0.35rem;
+            color: var(--text-primary, #1f2937);
+        }
+        .firma-form-input {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            font-size: 0.9rem;
+            font-family: monospace;
+            background: var(--bg-card);
+            color: var(--text-primary, #1f2937);
+        }
+        .firma-form-input:focus {
+            outline: 2px solid var(--primary, #1d4ed8);
+            outline-offset: 1px;
+        }
+        .firma-form-hint {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+        .firma-form-actions {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        .firma-action-result {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            border-radius: var(--radius-md);
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+        .firma-action-result--ok {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .firma-action-result--error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .firma-action-result--info {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        .firma-card--placeholder {
+            background: var(--bg-muted, #f9fafb);
+            border-style: dashed;
+        }
+        .firma-card__placeholder-title {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+        .firma-card__placeholder-text {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+            margin: 0;
+        }
+        .firma-card__placeholder-text code {
+            background: #e5e7eb;
+            padding: 0.1rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.85em;
+        }
+            margin-bottom: 1.5rem;
+        }
+
+        .section-title {
+            font-family: var(--font-heading);
+            font-size: 1.3rem;
+            color: var(--primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .section-subtitle {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
         .company-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
@@ -1554,6 +1748,7 @@
     <!-- NAVEGACIÓN DE CONFIGURACIÓN -->
     <nav class="settings-top-nav">
         <div class="nav-tab" onclick="switchTab('empresas', this)">Gestión de Empresas</div>
+        <div class="nav-tab" onclick="switchTab('firma', this)">Firma Electrónica</div>
         <div class="nav-tab active" onclick="switchTab('usuarios', this)">Ajustes de Usuario</div>
         <div class="nav-tab" onclick="switchTab('ia', this)">Configuración IA</div>
         <div class="nav-tab" onclick="switchTab('interfaz', this)">Interfaz de Usuario</div>
@@ -1612,6 +1807,100 @@
 
             <div class="company-grid" id="company-grid">
                 <!-- Se rellena con JS -->
+            </div>
+        </div>
+
+        <!-- SECCIÓN 1B: FIRMA ELECTRÓNICA (I-103.A0)
+             Configuración global del servicio de firma (firma-service).
+             La configuración por empresa viene en I-103.A1. -->
+        <div id="tab-firma" class="section-container">
+            <div class="section-header">
+                <h2 class="section-title">Firma Electrónica</h2>
+                <p class="section-subtitle">Configuración global del servicio de firma (firma-service) y credencial administrativa</p>
+            </div>
+
+            <!-- Estado del servicio -->
+            <div class="firma-card">
+                <div class="firma-card__header">
+                    <div class="firma-card__icon firma-card__icon--service" aria-hidden="true">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+                    </div>
+                    <div class="firma-card__info">
+                        <div class="firma-card__title">Servicio de firma</div>
+                        <div class="firma-card__detail" id="firma-servicio-url">Cargando…</div>
+                    </div>
+                </div>
+                <div class="firma-card__status" id="firma-servicio-status">
+                    <span class="firma-badge firma-badge--loading">Cargando…</span>
+                </div>
+                <!-- I-103.A0+ · Form para persistir la URL del servicio -->
+                <div class="firma-card__form-section">
+                    <div class="firma-form-row">
+                        <label class="firma-form-label" for="firma-servicio-url-input">URL del servicio de firma</label>
+                        <input type="url" id="firma-servicio-url-input" class="firma-form-input" placeholder="https://firma.example.com o http://localhost:3001" autocomplete="off" />
+                        <div class="firma-form-hint">Se guarda cifrada en <code>secrets.enc</code>. Si la variable de entorno <code>FIRMA_SERVICE_URL</code> está definida, tiene precedencia.</div>
+                    </div>
+                    <div class="firma-form-actions">
+                        <button id="firma-btn-save-url" class="btn btn-primary" onclick="saveFirmaUrl()">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                            Guardar URL
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- adminApiKey -->
+            <div class="firma-card">
+                <div class="firma-card__header">
+                    <div class="firma-card__icon firma-card__icon--admin" aria-hidden="true">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    </div>
+                    <div class="firma-card__info">
+                        <div class="firma-card__title">Credencial administrativa</div>
+                        <div class="firma-card__detail" id="firma-admin-detail">Verificando…</div>
+                    </div>
+                </div>
+                <div class="firma-card__status" id="firma-admin-status">
+                    <span class="firma-badge firma-badge--loading">Cargando…</span>
+                </div>
+            </div>
+
+            <!-- Form para guardar nueva adminApiKey -->
+            <div class="firma-card firma-card--form">
+                <div class="firma-card__form-title">Configurar nueva credencial administrativa</div>
+                <p class="firma-card__form-help">
+                    La credencial administrativa permite a K+AIR administrar clientes de firma-service (crear, rotar, revocar).
+                    Se guarda cifrada en <code>secrets.enc</code> (safeStorage) y nunca se muestra en pantalla después de guardarla.
+                </p>
+                <div class="firma-form-row">
+                    <label class="firma-form-label" for="firma-admin-key-input">Admin API Key</label>
+                    <input type="password" id="firma-admin-key-input" class="firma-form-input" placeholder="Mínimo 32 caracteres" autocomplete="off" />
+                    <div class="firma-form-hint">No se muestra al guardar. Solo se valida su hash (primeros 8 chars SHA-256).</div>
+                </div>
+                <div class="firma-form-actions">
+                    <button id="firma-btn-save" class="btn btn-primary" onclick="saveAdminKey()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                        Guardar credencial
+                    </button>
+                    <button id="firma-btn-test" class="btn btn-outline" onclick="testConnection()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                        Probar conexión
+                    </button>
+                </div>
+                <div id="firma-action-result" class="firma-action-result" style="display:none;"></div>
+            </div>
+
+            <!-- Placeholder para I-103.A1 (por empresa) -->
+            <div class="firma-card firma-card--placeholder">
+                <div class="firma-card__placeholder-title">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    Próximamente: configuración por empresa
+                </div>
+                <p class="firma-card__placeholder-text">
+                    La gestión de firma por empresa (NIT, estado de configuración, crear cliente) llegará en
+                    <strong>I-103.A1</strong>, una vez resuelto el modelo de identificación fiscal de empresa
+                    (<code>config.companyPaths[].nit</code>).
+                </p>
             </div>
         </div>
 
@@ -2218,7 +2507,7 @@
             showToast('Acceso denegado. Se requiere rol de administrador.', 'error');
             return;
         }
-    
+
         // Remover clase activa de todos los tabs
         document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
         // Agregar clase activa al elemento clickeado
@@ -2228,6 +2517,212 @@
         document.querySelectorAll('.section-container').forEach(s => s.classList.remove('active'));
         // Mostrar la sección correspondiente
         document.getElementById('tab-' + tabId).classList.add('active');
+
+        // I-103.A0 · Cargar estado de firma al entrar a la tab
+        if (tabId === 'firma') {
+            loadFirmaStatus();
+        }
+    }
+
+    /* ================= I-103.A0 · FIRMA ELECTRÓNICA (UI) ================= */
+    // Funciones que conectan la UI con el bridge de firma-service.
+    // DR-2: la adminApiKey NUNCA se lee del renderer; solo el bridge la maneja.
+    // La UI recibe metadata (source + hash prefix) para mostrar estado.
+
+    // Carga el estado del servicio de firma y de la adminApiKey.
+    // Llama a firma:empresa:list que retorna { adminKeySource, adminKeyHashPrefix, ... }
+    async function loadFirmaStatus() {
+        var urlEl = document.getElementById('firma-servicio-url');
+        var statusEl = document.getElementById('firma-servicio-status');
+        var detailEl = document.getElementById('firma-admin-detail');
+        var adminEl = document.getElementById('firma-admin-status');
+        if (!urlEl || !statusEl || !detailEl || !adminEl) return;
+
+        // Estado inicial
+        statusEl.innerHTML = '<span class="firma-badge firma-badge--loading">Cargando…</span>';
+        adminEl.innerHTML = '<span class="firma-badge firma-badge--loading">Cargando…</span>';
+        detailEl.textContent = 'Verificando…';
+
+        try {
+            if (!window.electronAPI || !window.electronAPI.firmaEmpresaList) {
+                statusEl.innerHTML = '<span class="firma-badge firma-badge--error">Bridge no disponible</span>';
+                detailEl.textContent = 'firma-bridge no cargado. Reinicia K+AIR.';
+                return;
+            }
+            var r = await window.electronAPI.firmaEmpresaList({});
+            if (!r || !r.success) {
+                statusEl.innerHTML = '<span class="firma-badge firma-badge--error">Error</span>';
+                detailEl.textContent = (r && r.error && r.error.message) || 'Error desconocido';
+                return;
+            }
+            var data = r.data || {};
+
+            // Servicio
+            urlEl.textContent = data.firmaServiceUrl || '(URL no configurada)';
+            if (data.firmaServiceUrl) {
+                statusEl.innerHTML = '<span class="firma-badge firma-badge--ok">✓ Conectado</span>';
+            } else {
+                statusEl.innerHTML = '<span class="firma-badge firma-badge--not-configured">URL no configurada</span>';
+            }
+            // I-103.A0+ · Pre-llenar el input con la URL actual (o vacía si no hay)
+            var urlInput = document.getElementById('firma-servicio-url-input');
+            if (urlInput && document.activeElement !== urlInput) {
+                urlInput.value = data.firmaServiceUrl || '';
+            }
+
+            // adminApiKey
+            if (data.adminKeySource === 'secrets') {
+                adminEl.innerHTML = '<span class="firma-badge firma-badge--configured">✓ Configurada</span>';
+                detailEl.textContent = 'Almacenamiento seguro · hash: ' + (data.adminKeyHashPrefix || '????');
+            } else if (data.adminKeySource === 'env') {
+                adminEl.innerHTML = '<span class="firma-badge firma-badge--env">⚠ Variable de entorno</span>';
+                detailEl.textContent = 'Disponible vía FIRMA_SERVICE_ADMIN_KEY (fallback). No persistida. hash: ' + (data.adminKeyHashPrefix || '????');
+            } else {
+                adminEl.innerHTML = '<span class="firma-badge firma-badge--not-configured">No configurada</span>';
+                detailEl.textContent = 'Configure una credencial administrativa abajo para empezar.';
+            }
+        } catch (e) {
+            statusEl.innerHTML = '<span class="firma-badge firma-badge--error">Error</span>';
+            adminEl.innerHTML = '<span class="firma-badge firma-badge--error">Error</span>';
+            detailEl.textContent = 'Excepción: ' + (e && e.message || e);
+        }
+    }
+
+    // Guarda una nueva adminApiKey. Llama firma:config:set-admin-key (DR-2).
+    // El bridge cifra con safeStorage y nunca expone la key al renderer.
+    async function saveAdminKey() {
+        var input = document.getElementById('firma-admin-key-input');
+        var btn = document.getElementById('firma-btn-save');
+        var resultEl = document.getElementById('firma-action-result');
+        if (!input || !btn || !resultEl) return;
+
+        var key = (input.value || '').trim();
+        if (!key) {
+            _showFirmaResult(resultEl, 'error', 'Por favor ingresa una admin API key.');
+            return;
+        }
+        if (key.length < 32) {
+            _showFirmaResult(resultEl, 'error', 'La key debe tener al menos 32 caracteres (actual: ' + key.length + ').');
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando…';
+
+        try {
+            var r = await window.electronAPI.firmaConfigSetAdminKey(key);
+            if (!r || !r.success) {
+                var msg = (r && r.error && r.error.message) || 'Error desconocido';
+                var code = (r && r.error && r.error.code) || '';
+                _showFirmaResult(resultEl, 'error', 'Error guardando: ' + msg + (code ? ' (' + code + ')' : ''));
+            } else {
+                _showFirmaResult(resultEl, 'ok',
+                    '✓ Credencial guardada. Hash: ' + (r.data.adminKeyHashPrefix || '????') +
+                    '. Ya puedes configurar empresas (próximamente: I-103.A1).');
+                input.value = '';
+                // Refrescar estado
+                await loadFirmaStatus();
+            }
+        } catch (e) {
+            _showFirmaResult(resultEl, 'error', 'Excepción: ' + (e && e.message || e));
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Guardar credencial';
+        }
+    }
+
+    // Prueba la conexión: llama firma:empresa:list y reporta.
+    // Si retorna success, la adminApiKey funciona contra el backend.
+    async function testConnection() {
+        var btn = document.getElementById('firma-btn-test');
+        var resultEl = document.getElementById('firma-action-result');
+        if (!btn || !resultEl) return;
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Probando…';
+
+        try {
+            var r = await window.electronAPI.firmaEmpresaList({});
+            if (!r || !r.success) {
+                var code = (r && r.error && r.error.code) || '';
+                var msg = (r && r.error && r.error.message) || 'Error desconocido';
+                if (code === 'ADMIN_TOKEN_REQUIRED') {
+                    _showFirmaResult(resultEl, 'error',
+                        '✗ Falta adminApiKey. Configúrala arriba antes de probar.');
+                } else if (code === 'BACKEND_REJECTED' || code === 'INVALID_API_KEY') {
+                    _showFirmaResult(resultEl, 'error',
+                        '✗ La adminApiKey es inválida o fue revocada. Genera una nueva en firma-service y configúrala arriba.');
+                } else {
+                    _showFirmaResult(resultEl, 'error', '✗ ' + msg + (code ? ' (' + code + ')' : ''));
+                }
+            } else {
+                var count = (r.data && r.data.configured) ? r.data.configured.length : 0;
+                _showFirmaResult(resultEl, 'ok',
+                    '✓ Conexión exitosa. Servicio responde correctamente. ' +
+                    (count > 0 ? 'Empresas configuradas: ' + count + '.' : 'Sin empresas configuradas todavía.'));
+            }
+        } catch (e) {
+            _showFirmaResult(resultEl, 'error', '✗ Excepción: ' + (e && e.message || e));
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Probar conexión';
+        }
+    }
+
+    // Helper: muestra un resultado (ok/error/info) en el bloque firma-action-result.
+    function _showFirmaResult(el, type, msg) {
+        el.className = 'firma-action-result firma-action-result--' + type;
+        el.innerHTML = msg;
+        el.style.display = 'block';
+        // Auto-ocultar después de 10s solo para ok/info
+        if (type === 'ok' || type === 'info') {
+            setTimeout(function () {
+                el.style.display = 'none';
+            }, 10000);
+        }
+    }
+
+    // I-103.A0+ · Guarda la URL del servicio de firma en secrets.enc.
+    // Llama firma:config:set-url (DR-1: persiste cifrado, NUNCA propaga plaintext).
+    async function saveFirmaUrl() {
+        var input = document.getElementById('firma-servicio-url-input');
+        var btn = document.getElementById('firma-btn-save-url');
+        var resultEl = document.getElementById('firma-action-result');
+        if (!input || !btn || !resultEl) return;
+
+        var url = (input.value || '').trim();
+        if (!url) {
+            _showFirmaResult(resultEl, 'error', 'Por favor ingresa la URL del servicio de firma.');
+            return;
+        }
+        // Validación básica cliente (el bridge re-valida con _validateUrl)
+        if (!/^https?:\/\/.+/i.test(url)) {
+            _showFirmaResult(resultEl, 'error', 'La URL debe empezar con http:// o https://');
+            return;
+        }
+
+        btn.disabled = true;
+        var originalLabel = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando…';
+
+        try {
+            var r = await window.electronAPI.firmaConfigSetUrl(url);
+            if (!r || !r.success) {
+                var msg = (r && r.error && r.error.message) || 'Error desconocido';
+                var code = (r && r.error && r.error.code) || '';
+                _showFirmaResult(resultEl, 'error', 'Error guardando URL: ' + msg + (code ? ' (' + code + ')' : ''));
+            } else {
+                _showFirmaResult(resultEl, 'ok',
+                    '✓ URL guardada en almacenamiento seguro: ' + r.data.url);
+                // Refrescar estado (badge y status)
+                await loadFirmaStatus();
+            }
+        } catch (e) {
+            _showFirmaResult(resultEl, 'error', 'Excepción: ' + (e && e.message || e));
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalLabel;
+        }
     }
 
     /* ================= GESTIÓN DE EMPRESAS ================= */
