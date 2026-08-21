@@ -104,3 +104,9 @@ renderer/file-viewer-assets/flyfish-viewer-assets.json
 # asi que el mockup de attachment-icons-mockup-svg.png ya no se necesita.
 docs/attachment-icons-mockup-svg.png
 docs/superpowers/
+
+# 📦 I-010 — Mock file temporal creado por storage-backup/e2e-multicompany.js
+# (intercepción de require('electron') para correr el bridge sin Electron runtime).
+# El script lo borra en su finally, pero por si acaso:
+/storage-backup/__mock_*.js
+/storage-backup/*.log
