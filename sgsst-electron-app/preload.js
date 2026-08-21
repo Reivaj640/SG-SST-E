@@ -452,6 +452,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Agreement (1)
   firmaAgreementGet: () => ipcRenderer.invoke('firma:agreement:get'),
 
+  // 📦101-extra (2026-08-20) — Per-empresa admin (I-010 per-company authz, AUD-04)
+  // 7 canales: 6 firma:empresa:* + 1 firma:config:set-admin-key
+  // DR-1..6 binding. Ver storage-backup/specs/kair-auth-spec.md §5.6/5.7
+  // y AUD-04 §13. Sin lógica acá: solo delegación ipcRenderer.invoke.
+  // Per-empresa (6)
+  firmaEmpresaList: (args) => ipcRenderer.invoke('firma:empresa:list', args || {}),
+  firmaEmpresaCreate: (args) => ipcRenderer.invoke('firma:empresa:create', args),
+  firmaEmpresaSetApiKey: (args) => ipcRenderer.invoke('firma:empresa:set-api-key', args),
+  firmaEmpresaRotateApiKey: (args) => ipcRenderer.invoke('firma:empresa:rotate-api-key', args),
+  firmaEmpresaRevokeApiKey: (args) => ipcRenderer.invoke('firma:empresa:revoke-api-key', args),
+  firmaEmpresaListFirmaRemote: (args) => ipcRenderer.invoke('firma:empresa:list-firma-remote', args || {}),
+  // Admin token persistido (DR-2)
+  firmaConfigSetAdminKey: (adminApiKey) => ipcRenderer.invoke('firma:config:set-admin-key', { adminApiKey }),
+
   // --- Accidentes ---
   selectAccidentPdf: () => ipcRenderer.invoke('investigacion-accidentes-select-accident-pdf'),
   processAccidentPdf: (pdfPath) => ipcRenderer.invoke('investigacion-accidentes-process-accident-pdf', pdfPath),

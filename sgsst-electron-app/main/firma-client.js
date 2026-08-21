@@ -251,6 +251,11 @@ async function _parseResponse(response, expectedContentType) {
  * @param {string} opts.baseUrl          - URL base del firma-service (sin trailing slash).
  * @param {string} opts.apiKey           - API key (X-Internal-API-Key).
  * @param {string} opts.clientInstanceId - UUID v4 (X-Client-Instance-Id).
+ * @param {string} [opts.adminApiKey]    - Admin key (X-Admin-API-Key). Si está presente,
+ *                                          habilita los endpoints admin (firma:empresa:create,
+ *                                          rotate, revoke, list-firma-remote). Si NO está
+ *                                          presente, los métodos admin lanzan
+ *                                          `ADMIN_TOKEN_REQUIRED` sin hacer HTTP.
  * @param {string} [opts.appVersion]     - Versión de K+AIR (User-Agent).
  * @param {function} [opts._fetch]       - DEPRECADO. Override de fetch para tests. Usar
  *                                          en lugar de mockear globalThis.fetch.
@@ -272,6 +277,12 @@ function createFirmaClient(opts) {
   var apiKey = opts.apiKey;
   var clientInstanceId = opts.clientInstanceId;
   var appVersion = opts.appVersion || 'dev';
+  // adminApiKey es OPCIONAL. Si no se pasa, los métodos admin lanzan
+  // ADMIN_TOKEN_REQUIRED sin hacer HTTP. Si se pasa, se usa como
+  // X-Admin-API-Key en los endpoints admin (DR-2: independiente de apiKey).
+  var adminApiKey = (opts.adminApiKey && typeof opts.adminApiKey === 'string')
+    ? opts.adminApiKey
+    : null;
 
   // Override de fetch y sleep para tests (sustituye a mockear globalThis).
   // Mantenerlo opcional: si no se pasa, se usa el fetch global de Node 20+.
@@ -539,6 +550,207 @@ function createFirmaClient(opts) {
       .then(function (r) { return _parseResult(r, 'application/json'); });
   }
 
+  // ============================================================
+  //  Endpoints ADMIN (per-company clients) — DR-1..6
+  //  Usa `X-Admin-API-Key` (NO `X-Internal-API-Key`) — DR-2.
+  //  Si adminApiKey no está configurado en el factory, los métodos
+  //  retornan `ADMIN_TOKEN_REQUIRED` sin hacer HTTP (DR-2).
+  // ============================================================
+
+  /**
+   * Construye headers para endpoints admin (X-Admin-API-Key en lugar de
+   * X-Internal-API-Key). Lanza si adminApiKey no está configurado.
+   *
+   * @param {object} [extraOpts]
+   * @returns {object} headers
+   */
+  function _buildAdminHeaders(extraOpts) {
+    if (!adminApiKey) {
+      throw new Error('adminApiKey required for admin endpoints (configure via opts.adminApiKey)');
+    }
+    var headers = _buildHeaders(adminApiKey, clientInstanceId, extraOpts);
+    // _buildHeaders pone 'X-Internal-API-Key' por default. Para admin,
+    // lo reemplazamos por 'X-Admin-API-Key' (DR-2: header distinto).
+    delete headers['X-Internal-API-Key'];
+    headers['X-Admin-API-Key'] = adminApiKey;
+    return headers;
+  }
+
+  /**
+   * Helper: helper interno para métodos admin. Construye el path, headers
+   * y body, y delega a _doRequestRaw + _parseResult. Si adminApiKey falta,
+   * retorna ADMIN_TOKEN_REQUIRED sin hacer HTTP.
+   *
+   * @param {string} method
+   * @param {string} path
+   * @param {object} [body]
+   * @returns {Promise<{success,data}|{success:false,error}>}
+   */
+  function _adminRequest(method, path, body) {
+    if (!adminApiKey) {
+      return Promise.resolve(_fail(
+        'ADMIN_TOKEN_REQUIRED',
+        'adminApiKey no configurado. Configure via firma:config:set-admin-key.',
+        { remediationHint: 'firma:config:set-admin-key' }
+      ));
+    }
+    var headers;
+    try {
+      headers = _buildAdminHeaders({ appVersion: appVersion });
+    } catch (e) {
+      return Promise.resolve(_fail('ADMIN_TOKEN_REQUIRED', e.message));
+    }
+    headers['Content-Type'] = 'application/json; charset=utf-8';
+    var bodyStr = (body === undefined || body === null) ? undefined : JSON.stringify(body);
+    var url = baseUrl + path;
+    return _doRequestRaw(method, url, headers, bodyStr, DEFAULT_TIMEOUT_MS)
+      .then(function (r) { return _parseResult(r, 'application/json'); });
+  }
+
+  /**
+   * POST /internal/admin/clientes (DR-1, DR-3)
+   *
+   * Crea un per-company client. Retorna la api_key en plaintext (UNA sola
+   * vez). El bridge es responsable de NO propagar el plaintext al renderer.
+   *
+   * @param {object} args
+   * @param {string} args.id_empresa       - 1-64 chars (NIT, EXT-XXX, etc.)
+   * @param {string[]} args.allowed_operations - 1-10 items del enum I-010
+   * @param {string} [args.description]   - 1-200 chars (opcional)
+   * @returns {Promise<{success,data}|{success:false,error}>}
+   *   data: { id_empresa, api_key, api_key_hash_prefix, allowed_operations,
+   *           description, created_at, message }
+   *   errors: ADMIN_TOKEN_REQUIRED, INVALID_REQUEST_BODY, INVALID_API_KEY,
+   *           CLIENT_EXISTS_FOR_EMPRESA (409)
+   */
+  function adminCreateClient(args) {
+    args = args || {};
+    if (!args.id_empresa || typeof args.id_empresa !== 'string') {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY', 'id_empresa requerido (string, 1-64 chars)'));
+    }
+    if (!Array.isArray(args.allowed_operations) || args.allowed_operations.length === 0) {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY', 'allowed_operations requerido (array, 1-10 items)'));
+    }
+    var body = {
+      id_empresa: args.id_empresa,
+      allowed_operations: args.allowed_operations
+    };
+    if (args.description !== undefined && args.description !== null) {
+      body.description = args.description;
+    }
+    return _adminRequest('POST', '/internal/admin/clientes', body);
+  }
+
+  /**
+   * GET /internal/admin/clientes (DR-1, DR-2)
+   *
+   * Lista per-company clients con filtros opcionales. NUNCA expone el
+   * api_key_hash completo en el response (solo `api_key_hash_prefix` 8 chars).
+   *
+   * @param {object} [args]
+   * @param {string} [args.id_empresa]       - filtro exacto (1-64 chars)
+   * @param {boolean} [args.include_revoked] - default false
+   * @param {number} [args.limit]            - 1-200, default 100
+   * @param {number} [args.offset]           - >=0, default 0
+   * @returns {Promise<{success,data}|{success:false,error}>}
+   *   data: { total, limit, offset, items: [{id_empresa, api_key_hash_prefix,
+   *           allowed_operations, description, created_at, revoked_at, is_active}] }
+   */
+  function adminListClients(args) {
+    args = args || {};
+    var params = [];
+    if (args.id_empresa) params.push('id_empresa=' + encodeURIComponent(args.id_empresa));
+    if (args.include_revoked === true) params.push('include_revoked=true');
+    if (typeof args.limit === 'number' && args.limit > 0) {
+      params.push('limit=' + encodeURIComponent(String(args.limit)));
+    }
+    if (typeof args.offset === 'number' && args.offset >= 0) {
+      params.push('offset=' + encodeURIComponent(String(args.offset)));
+    }
+    var path = '/internal/admin/clientes' + (params.length > 0 ? '?' + params.join('&') : '');
+    return _adminRequest('GET', path, null);
+  }
+
+  /**
+   * GET /internal/admin/clientes/:id (DR-1, DR-2)
+   *
+   * Devuelve el cliente ACTIVO de la empresa `:id`. Si no hay activo y
+   * `include_revoked=true`, devuelve todos (historial). Si no hay ninguno,
+   * el backend retorna 404 CLIENT_NOT_FOUND.
+   *
+   * @param {string} id_empresa
+   * @param {object} [opts]
+   * @param {boolean} [opts.include_revoked]
+   * @returns {Promise<{success,data}|{success:false,error}>}
+   */
+  function adminGetClient(id_empresa, opts) {
+    if (!id_empresa || typeof id_empresa !== 'string') {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY', 'id_empresa requerido (string)'));
+    }
+    opts = opts || {};
+    var path = '/internal/admin/clientes/' + encodeURIComponent(id_empresa);
+    if (opts.include_revoked === true) {
+      path += '?include_revoked=true';
+    }
+    return _adminRequest('GET', path, null);
+  }
+
+  /**
+   * POST /internal/admin/clientes/:id/rotate (DR-1, DR-4, DR-6.D)
+   *
+   * Rota la API key del cliente activo de la empresa `:id`. La key vieja
+   * se marca como revocada. Retorna la NUEVA api_key en plaintext (UNA vez).
+   *
+   * @param {string} id_empresa
+   * @param {object} [args]
+   * @param {string} [args.motivo] - default 'Rotación programada'
+   * @param {string} [args.actor]  - default 'admin'
+   * @returns {Promise<{success,data}|{success:false,error}>}
+   *   data: { id_empresa, old_api_key_hash_prefix, new_api_key,
+   *           new_api_key_hash_prefix, allowed_operations, description,
+   *           rotated_at, motivo, actor, message }
+   *   errors: CLIENT_NOT_FOUND (404), INVALID_REQUEST_BODY
+   */
+  function adminRotateClient(id_empresa, args) {
+    if (!id_empresa || typeof id_empresa !== 'string') {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY', 'id_empresa requerido (string)'));
+    }
+    var body = {};
+    if (args && typeof args === 'object') {
+      if (typeof args.motivo === 'string') body.motivo = args.motivo;
+      if (typeof args.actor === 'string') body.actor = args.actor;
+    }
+    var path = '/internal/admin/clientes/' + encodeURIComponent(id_empresa) + '/rotate';
+    return _adminRequest('POST', path, body);
+  }
+
+  /**
+   * Revoca el cliente activo de una empresa vía backend.
+   *
+   * En V1, "revocar" se hace así: borrar la key en `secrets.enc` local +
+   * opcionalmente rotar en backend (la rotación SÍ marca la key vieja como
+   * revocada). El endpoint `DELETE /internal/admin/clientes/:id` queda
+   * para V2 (DR-4).
+   *
+   * Esta función NO está expuesta como IPC del bridge (DR-4: V1 = borrar
+   * local + opcionalmente rotar). Se exporta solo para que el bridge pueda
+   * coordinar la rotación al revocar.
+   *
+   * @param {string} id_empresa
+   * @returns {Promise<{success,data}|{success:false,error}>}
+   */
+  function adminRevokeClient(id_empresa) {
+    // V1: revocar = rotar (DR-4). La rotación marca la key vieja como
+    // revocada. NO hay endpoint DELETE en V1.
+    if (!id_empresa || typeof id_empresa !== 'string') {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY', 'id_empresa requerido (string)'));
+    }
+    return adminRotateClient(id_empresa, {
+      motivo: 'Revocación manual (V1: usa rotate para marcar como revocada)',
+      actor: 'admin'
+    });
+  }
+
   return {
     createSignRequest: createSignRequest,
     getSignRequest: getSignRequest,
@@ -549,8 +761,19 @@ function createFirmaClient(opts) {
     createConsent: createConsent,
     verifyConsentOtp: verifyConsentOtp,
     getActiveAgreement: getActiveAgreement,
+    // Admin endpoints (per-company clients) — DR-1..6
+    adminCreateClient: adminCreateClient,
+    adminListClients: adminListClients,
+    adminGetClient: adminGetClient,
+    adminRotateClient: adminRotateClient,
+    adminRevokeClient: adminRevokeClient,
     // Expose for tests
-    _internals: { _buildHeaders: _buildHeaders, _mapBackendError: _mapBackendError, baseUrl: baseUrl }
+    _internals: {
+      _buildHeaders: _buildHeaders,
+      _buildAdminHeaders: _buildAdminHeaders,
+      _mapBackendError: _mapBackendError,
+      baseUrl: baseUrl
+    }
   };
 }
 
