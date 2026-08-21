@@ -13,6 +13,7 @@ const { _internals } = fc;
 
 const BASE_URL = 'http://firma.test.local:3001';
 const API_KEY = 'test-api-key-32chars-minimum-len-XXXXX';
+const ADMIN_API_KEY = 'test-admin-key-32-chars-minimum-padd!!';
 const CLIENT_INSTANCE_ID = '550e8400-e29b-41d4-a716-446655440000';
 
 // Helper: crear un Response mock (subset de fetch Response)
@@ -58,6 +59,19 @@ function makeClient(overrides) {
   return fc.createFirmaClient({
     baseUrl: BASE_URL,
     apiKey: API_KEY,
+    clientInstanceId: CLIENT_INSTANCE_ID,
+    appVersion: '0.1.190-test',
+    _fetch: overrides._fetch || globalThis.fetch,
+    _sleep: overrides._sleep || (function () { return Promise.resolve(); })
+  });
+}
+
+function makeAdminClient(overrides) {
+  overrides = overrides || {};
+  return fc.createFirmaClient({
+    baseUrl: BASE_URL,
+    apiKey: API_KEY,
+    adminApiKey: ADMIN_API_KEY,
     clientInstanceId: CLIENT_INSTANCE_ID,
     appVersion: '0.1.190-test',
     _fetch: overrides._fetch || globalThis.fetch,
@@ -506,4 +520,357 @@ test('_internals._getRetryAfterMs: parsea Retry-After en segundos', function () 
   assert.equal(_internals._getRetryAfterMs(r2), 5000);
   var r3 = makeResponse(429, {}, 'application/json', {});
   assert.equal(_internals._getRetryAfterMs(r3), null);
+});
+
+// =====================================================================
+//  Suite: Admin endpoints (per-company clients) — DR-1..6
+//  Prueban que los métodos admin usan X-Admin-API-Key, validan input,
+//  propagan errores del backend, y devuelven ADMIN_TOKEN_REQUIRED
+//  si adminApiKey no está configurado.
+// =====================================================================
+
+const ADMIN_ALL_OPS = [
+  'sign_request:create',
+  'sign_request:read',
+  'consent:create',
+  'consent:verify',
+  'audit:read'
+];
+
+test('adminCreateClient: retorna 201 con api_key, api_key_hash_prefix, allowed_operations', function () {
+  var mockFetch = makeFetchMock(function (call) {
+    return makeResponse(201, {
+      id_empresa: '900123456',
+      api_key: 'kair_test_seedABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abc',
+      api_key_hash_prefix: '5d41402a',
+      allowed_operations: ADMIN_ALL_OPS,
+      description: 'K+AIR empresa 900123456 - test',
+      created_at: '2026-08-20T15:00:00.000Z',
+      message: 'API key generada. Guárdala AHORA.'
+    }, 'application/json');
+  });
+  var c = makeAdminClient({ _fetch: mockFetch });
+  return c.adminCreateClient({
+    id_empresa: '900123456',
+    allowed_operations: ADMIN_ALL_OPS,
+    description: 'K+AIR empresa 900123456 - test'
+  }).then(function (r) {
+    assert.equal(r.success, true);
+    assert.equal(r.data.id_empresa, '900123456');
+    assert.ok(r.data.api_key);
+    assert.equal(r.data.api_key_hash_prefix, '5d41402a');
+    assert.deepEqual(r.data.allowed_operations, ADMIN_ALL_OPS);
+  });
+});
+
+test('adminCreateClient: usa X-Admin-API-Key (NO X-Internal-API-Key)', function () {
+  var mockFetch = makeFetchMock(function (call) {
+    return makeResponse(201, {
+      id_empresa: '900123456', api_key: 'kair_test_aaa', api_key_hash_prefix: 'aaaa1111',
+      allowed_operations: ADMIN_ALL_OPS, description: null, created_at: '2026-08-20T15:00:00.000Z',
+      message: 'OK'
+    }, 'application/json');
+  });
+  var c = makeAdminClient({ _fetch: mockFetch });
+  return c.adminCreateClient({ id_empresa: '900123456', allowed_operations: ADMIN_ALL_OPS })
+    .then(function () {
+      var h = mockFetch.calls[0].opts.headers;
+      assert.equal(h['X-Admin-API-Key'], ADMIN_API_KEY,
+        'debe enviar X-Admin-API-Key con la admin key');
+      assert.ok(!h['X-Internal-API-Key'],
+        'NO debe enviar X-Internal-API-Key (DR-2)');
+      assert.equal(h['X-Client-Instance-Id'], CLIENT_INSTANCE_ID);
+      assert.ok(h['X-Request-Id'], 'debe enviar X-Request-Id');
+    });
+});
+
+test('adminCreateClient: sin adminApiKey retorna ADMIN_TOKEN_REQUIRED sin llamar fetch', function () {
+  var called = false;
+  var c = makeClient({ _fetch: function () { called = true; throw new Error('NO'); } });
+  return c.adminCreateClient({ id_empresa: '900123456', allowed_operations: ADMIN_ALL_OPS })
+    .then(function (r) {
+      assert.equal(r.success, false);
+      assert.equal(r.error.code, 'ADMIN_TOKEN_REQUIRED');
+      assert.equal(r.error.remediationHint, 'firma:config:set-admin-key');
+      assert.equal(called, false);
+    });
+});
+
+test('adminCreateClient: sin id_empresa retorna INVALID_REQUEST_BODY', function () {
+  var c = makeAdminClient({ _fetch: function () { throw new Error('NO'); } });
+  return c.adminCreateClient({ allowed_operations: ADMIN_ALL_OPS })
+    .then(function (r) {
+      assert.equal(r.success, false);
+      assert.equal(r.error.code, 'INVALID_REQUEST_BODY');
+    });
+});
+
+test('adminCreateClient: sin allowed_operations retorna INVALID_REQUEST_BODY', function () {
+  var c = makeAdminClient({ _fetch: function () { throw new Error('NO'); } });
+  return c.adminCreateClient({ id_empresa: '900123456' })
+    .then(function (r) {
+      assert.equal(r.success, false);
+      assert.equal(r.error.code, 'INVALID_REQUEST_BODY');
+    });
+});
+
+test('adminCreateClient: 409 CLIENT_EXISTS_FOR_EMPRESA propaga código del backend', function () {
+  var mockFetch = makeFetchMock(function () {
+    return makeResponse(409, {
+      error: {
+        code: 'CLIENT_EXISTS_FOR_EMPRESA',
+        message: 'Ya existe un cliente activo para la empresa 900123456',
+        details: { id_empresa: '900123456', existing_hash_prefix: '5d41402a', created_at: '2026-08-20T15:00:00.000Z' },
+        request_id: 'req_123'
+      }
+    }, 'application/json');
+  });
+  var c = makeAdminClient({ _fetch: mockFetch });
+  return c.adminCreateClient({ id_empresa: '900123456', allowed_operations: ADMIN_ALL_OPS })
+    .then(function (r) {
+      assert.equal(r.success, false);
+      assert.equal(r.error.code, 'CLIENT_EXISTS_FOR_EMPRESA');
+      assert.equal(r.error.details.id_empresa, '900123456');
+      assert.equal(r.error.requestId, 'req_123');
+    });
+});
+
+test('adminListClients: 200 con items, NUNCA expone api_key_hash completo', function () {
+  var mockFetch = makeFetchMock(function () {
+    return makeResponse(200, {
+      total: 2, limit: 100, offset: 0,
+      items: [
+        { id_empresa: '900111111', api_key_hash_prefix: 'aaaa1111', allowed_operations: ['sign_request:create'],
+          description: null, created_at: '2026-08-20T15:00:00.000Z', revoked_at: null, is_active: true },
+        { id_empresa: '900222222', api_key_hash_prefix: 'bbbb2222', allowed_operations: ['sign_request:read'],
+          description: 'X', created_at: '2026-08-20T15:01:00.000Z', revoked_at: null, is_active: true }
+      ]
+    }, 'application/json');
+  });
+  var c = makeAdminClient({ _fetch: mockFetch });
+  return c.adminListClients().then(function (r) {
+    assert.equal(r.success, true);
+    assert.equal(r.data.total, 2);
+    assert.equal(r.data.items.length, 2);
+    // Verifica que el response NO contiene el hash completo de 64 chars
+    var bodyStr = JSON.stringify(r.data);
+    assert.ok(!/[0-9a-f]{64}/.test(bodyStr), 'no debe contener hash SHA-256 completo');
+  });
+});
+
+test('adminListClients: filtros generan query string correcta', function () {
+  var mockFetch = makeFetchMock(function () {
+    return makeResponse(200, { total: 0, limit: 50, offset: 10, items: [] }, 'application/json');
+  });
+  var c = makeAdminClient({ _fetch: mockFetch });
+  return c.adminListClients({
+    id_empresa: '900123456', include_revoked: true, limit: 50, offset: 10
+  }).then(function () {
+    var url = mockFetch.calls[0].url;
+    assert.ok(url.indexOf('id_empresa=900123456') !== -1);
+    assert.ok(url.indexOf('include_revoked=true') !== -1);
+    assert.ok(url.indexOf('limit=50') !== -1);
+    assert.ok(url.indexOf('offset=10') !== -1);
+  });
+});
+
+test('adminListClients: sin adminApiKey retorna ADMIN_TOKEN_REQUIRED', function () {
+  var c = makeClient({ _fetch: function () { throw new Error('NO'); } });
+  return c.adminListClients().then(function (r) {
+    assert.equal(r.success, false);
+    assert.equal(r.error.code, 'ADMIN_TOKEN_REQUIRED');
+  });
+});
+
+test('adminGetClient: 200 con shape de cliente activo', function () {
+  var mockFetch = makeFetchMock(function () {
+    return makeResponse(200, {
+      id_empresa: '900123456', api_key_hash_prefix: '5d41402a',
+      allowed_operations: ADMIN_ALL_OPS, description: 'Test', created_at: '2026-08-20T15:00:00.000Z',
+      revoked_at: null, is_active: true
+    }, 'application/json');
+  });
+  var c = makeAdminClient({ _fetch: mockFetch });
+  return c.adminGetClient('900123456').then(function (r) {
+    assert.equal(r.success, true);
+    assert.equal(r.data.id_empresa, '900123456');
+    assert.equal(r.data.is_active, true);
+    var bodyStr = JSON.stringify(r.data);
+    assert.ok(!/[0-9a-f]{64}/.test(bodyStr), 'no debe exponer api_key_hash completo');
+  });
+});
+
+test('adminGetClient: 404 CLIENT_NOT_FOUND propaga código del backend', function () {
+  var mockFetch = makeFetchMock(function () {
+    return makeResponse(404, {
+      error: {
+        code: 'CLIENT_NOT_FOUND',
+        message: 'No existe un cliente para esta empresa.',
+        details: { id_empresa: '900000000', hint: 'Use POST /internal/admin/clientes' },
+        request_id: 'req_404'
+      }
+    }, 'application/json');
+  });
+  var c = makeAdminClient({ _fetch: mockFetch });
+  return c.adminGetClient('900000000').then(function (r) {
+    assert.equal(r.success, false);
+    assert.equal(r.error.code, 'CLIENT_NOT_FOUND');
+    assert.equal(r.error.details.hint, 'Use POST /internal/admin/clientes');
+  });
+});
+
+test('adminGetClient: sin adminApiKey retorna ADMIN_TOKEN_REQUIRED', function () {
+  var c = makeClient({ _fetch: function () { throw new Error('NO'); } });
+  return c.adminGetClient('900123456').then(function (r) {
+    assert.equal(r.success, false);
+    assert.equal(r.error.code, 'ADMIN_TOKEN_REQUIRED');
+  });
+});
+
+test('adminRotateClient: 200 con new_api_key, motivo, actor', function () {
+  var mockFetch = makeFetchMock(function () {
+    return makeResponse(200, {
+      id_empresa: '900123456',
+      old_api_key_hash_prefix: 'oldhash01',
+      new_api_key: 'kair_test_NEWkey1234567890abcdefghijABCDEFGHIJ',
+      new_api_key_hash_prefix: 'newhash02',
+      allowed_operations: ADMIN_ALL_OPS,
+      description: 'Test rotate',
+      rotated_at: '2026-08-20T16:00:00.000Z',
+      motivo: 'Rotación trimestral',
+      actor: 'ops@example.com',
+      message: 'API key rotada'
+    }, 'application/json');
+  });
+  var c = makeAdminClient({ _fetch: mockFetch });
+  return c.adminRotateClient('900123456', { motivo: 'Rotación trimestral', actor: 'ops@example.com' })
+    .then(function (r) {
+      assert.equal(r.success, true);
+      assert.ok(r.data.new_api_key, 'debe retornar new_api_key');
+      assert.equal(r.data.old_api_key_hash_prefix, 'oldhash01');
+      assert.equal(r.data.motivo, 'Rotación trimestral');
+      assert.equal(r.data.actor, 'ops@example.com');
+    });
+});
+
+test('adminRotateClient: body vacío (defaults del backend)', function () {
+  var mockFetch = makeFetchMock(function () {
+    return makeResponse(200, {
+      id_empresa: '900123456',
+      old_api_key_hash_prefix: 'oldhash01',
+      new_api_key: 'kair_test_NEWkey1234567890abcdefghijABCDEFGHIJ',
+      new_api_key_hash_prefix: 'newhash02',
+      allowed_operations: ADMIN_ALL_OPS,
+      description: null, rotated_at: '2026-08-20T16:00:00.000Z',
+      motivo: 'Rotación programada', actor: 'admin',
+      message: 'OK'
+    }, 'application/json');
+  });
+  var c = makeAdminClient({ _fetch: mockFetch });
+  return c.adminRotateClient('900123456').then(function (r) {
+    assert.equal(r.success, true);
+    assert.equal(r.data.motivo, 'Rotación programada');
+    assert.equal(r.data.actor, 'admin');
+  });
+});
+
+test('adminRotateClient: sin adminApiKey retorna ADMIN_TOKEN_REQUIRED', function () {
+  var c = makeClient({ _fetch: function () { throw new Error('NO'); } });
+  return c.adminRotateClient('900123456').then(function (r) {
+    assert.equal(r.success, false);
+    assert.equal(r.error.code, 'ADMIN_TOKEN_REQUIRED');
+  });
+});
+
+test('adminRotateClient: sin id_empresa retorna INVALID_REQUEST_BODY', function () {
+  var c = makeAdminClient({ _fetch: function () { throw new Error('NO'); } });
+  return c.adminRotateClient(null).then(function (r) {
+    assert.equal(r.success, false);
+    assert.equal(r.error.code, 'INVALID_REQUEST_BODY');
+  });
+});
+
+test('adminRevokeClient: en V1 = adminRotateClient con motivo de revocación', function () {
+  var mockFetch = makeFetchMock(function () {
+    return makeResponse(200, {
+      id_empresa: '900123456',
+      old_api_key_hash_prefix: 'oldhash01',
+      new_api_key: 'kair_test_NEWkey1234567890abcdefghijABCDEFGHIJ',
+      new_api_key_hash_prefix: 'newhash02',
+      allowed_operations: ADMIN_ALL_OPS, description: null,
+      rotated_at: '2026-08-20T16:00:00.000Z',
+      motivo: 'Revocación manual (V1: usa rotate para marcar como revocada)',
+      actor: 'admin',
+      message: 'OK'
+    }, 'application/json');
+  });
+  var c = makeAdminClient({ _fetch: mockFetch });
+  return c.adminRevokeClient('900123456').then(function (r) {
+    assert.equal(r.success, true);
+    var url = mockFetch.calls[0].url;
+    assert.ok(url.indexOf('/rotate') !== -1, 'adminRevokeClient V1 debe llamar /rotate');
+    var body = JSON.parse(mockFetch.calls[0].opts.body);
+    assert.match(body.motivo, /Revocación/);
+  });
+});
+
+test('adminRevokeClient: sin id_empresa retorna INVALID_REQUEST_BODY', function () {
+  var c = makeAdminClient({ _fetch: function () { throw new Error('NO'); } });
+  return c.adminRevokeClient(null).then(function (r) {
+    assert.equal(r.success, false);
+    assert.equal(r.error.code, 'INVALID_REQUEST_BODY');
+  });
+});
+
+test('_internals._buildAdminHeaders: usa X-Admin-API-Key, NO X-Internal-API-Key', function () {
+  var c = makeAdminClient();
+  var h = c._internals._buildAdminHeaders();
+  assert.equal(h['X-Admin-API-Key'], ADMIN_API_KEY);
+  assert.ok(!h['X-Internal-API-Key']);
+  assert.equal(h['X-Client-Instance-Id'], CLIENT_INSTANCE_ID);
+  assert.ok(h['X-Request-Id']);
+});
+
+test('adminCreateClient: api_key en response (DR-3) — el bridge NO debe propagarlo al renderer', function () {
+  var mockFetch = makeFetchMock(function () {
+    return makeResponse(201, {
+      id_empresa: '900123456',
+      api_key: 'kair_test_AAAAA_43chars_aaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      api_key_hash_prefix: 'abc12345',
+      allowed_operations: ADMIN_ALL_OPS,
+      description: null, created_at: '2026-08-20T15:00:00.000Z',
+      message: 'Guárdala AHORA'
+    }, 'application/json');
+  });
+  var c = makeAdminClient({ _fetch: mockFetch });
+  return c.adminCreateClient({ id_empresa: '900123456', allowed_operations: ADMIN_ALL_OPS })
+    .then(function (r) {
+      // El cliente SÍ expone api_key en la respuesta (es responsabilidad
+      // del bridge NO propagarlo al renderer). Esto se valida en el bridge.
+      assert.ok(r.data.api_key);
+      assert.match(r.data.api_key, /^kair_test_/);
+    });
+});
+
+test('adminListClients: omitir filtros no agrega query string', function () {
+  var mockFetch = makeFetchMock(function () {
+    return makeResponse(200, { total: 0, limit: 100, offset: 0, items: [] }, 'application/json');
+  });
+  var c = makeAdminClient({ _fetch: mockFetch });
+  return c.adminListClients().then(function () {
+    var url = mockFetch.calls[0].url;
+    assert.equal(url, BASE_URL + '/internal/admin/clientes');
+  });
+});
+
+test('adminListClients: include_revoked=false NO agrega query string (default backend)', function () {
+  var mockFetch = makeFetchMock(function () {
+    return makeResponse(200, { total: 0, limit: 100, offset: 0, items: [] }, 'application/json');
+  });
+  var c = makeAdminClient({ _fetch: mockFetch });
+  return c.adminListClients({ include_revoked: false }).then(function () {
+    var url = mockFetch.calls[0].url;
+    assert.ok(url.indexOf('include_revoked') === -1,
+      'include_revoked=false NO debe agregarse al query');
+  });
 });
