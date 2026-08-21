@@ -396,6 +396,11 @@ function sendLog(message, level = 'INFO') {
 // Ruta del archivo de configuración
 const configPath = path.join(app.getPath('userData'), 'config.json');
 
+// 📦103.A1.1 · Helper para persistir/recuperar config.companyPaths[companyKey].nit
+// Usa el patrón atómico (tmp + rename + backup) heredado de sync-config-writer.
+// Reutilizado por los handlers IPC company-nit:get / company-nit:set abajo.
+const companyConfigWriter = require('./main/company-config-writer');
+
 // ===============================
 // 🗄️ BASE DE DATOS LOCAL (SQLite)
 // ===============================
@@ -1270,6 +1275,46 @@ ipcMain.handle('load-config', async () => {
     }
     console.error('Error loading config:', error);
     return {};
+  }
+});
+
+// 📦103.A1.1 · IPC: leer NIT de una empresa desde config.json
+// NO usa el peligroso save-config (que sobrescribe todo el config). Solo lee.
+// Retorna { success: true, data: { nit: string|null } } o { success: false, error }.
+ipcMain.handle('company-nit:get', async (event, args) => {
+  try {
+    if (!args || !args.companyKey) {
+      return { success: false, error: { code: 'NO_COMPANY', message: 'companyKey requerido' } };
+    }
+    const nit = await companyConfigWriter.readCompanyNit(configPath, args.companyKey);
+    return { success: true, data: { nit: nit } }; // nit es null si no existe
+  } catch (error) {
+    console.error('[COMPANY-NIT][GET] Error:', error);
+    return { success: false, error: { code: 'READ_FAILED', message: error.message } };
+  }
+});
+
+// 📦103.A1.1 · IPC: guardar NIT de una empresa en config.json
+// Usa company-config-writer.writeCompanyNit() que internamente:
+//   1. Normaliza el NIT (quita espacios, guiones, puntos)
+//   2. Valida (9-15 dígitos)
+//   3. Lee config.json
+//   4. Hace backup .bak
+//   5. Merge (solo actualiza nit, NO toca otros campos)
+//   6. Escritura atómica (tmp + rename)
+// NO usa el peligroso save-config. Evita el read-modify-write inseguro de la UI.
+// Nota: la serialización global de escrituras concurrentes al mismo config.json
+// queda fuera de A1.1 (es un riesgo de platform, no de A1.1).
+ipcMain.handle('company-nit:set', async (event, args) => {
+  try {
+    if (!args || !args.companyKey) {
+      return { success: false, error: { code: 'NO_COMPANY', message: 'companyKey requerido' } };
+    }
+    // writeCompanyNit ya retorna {success, data} o {success, false, error: {code, message}}
+    return await companyConfigWriter.writeCompanyNit(configPath, args.companyKey, args.nit);
+  } catch (error) {
+    console.error('[COMPANY-NIT][SET] Error:', error);
+    return { success: false, error: { code: 'WRITE_FAILED', message: error.message } };
   }
 });
 

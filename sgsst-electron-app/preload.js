@@ -15,6 +15,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getRecursosStats: (companyName) => ipcRenderer.invoke('get-recursos-stats', companyName),
   getGestionIntegralStats: (companyName) => ipcRenderer.invoke('get-gestion-integral-stats', companyName),
   saveConfig: (config) => ipcRenderer.invoke('save-config', config),
+  // 📦103.A1.1 · NIT por empresa (config.companyPaths[companyKey].nit)
+  // Usa company-config-writer.js en main process. NO usa save-config.
+  companyNitGet: (companyKey) => ipcRenderer.invoke('company-nit:get', { companyKey }),
+  companyNitSet: (companyKey, nit) => ipcRenderer.invoke('company-nit:set', { companyKey, nit }),
   loadConfig: () => ipcRenderer.invoke('load-config'),
   loadNormativa: () => ipcRenderer.invoke('load-normativa'),
   authLoginV1: (payload) => ipcRenderer.invoke('auth-login-v1', payload),

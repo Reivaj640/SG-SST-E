@@ -606,6 +606,53 @@
             border: 1px solid #e0e7ff;
         }
 
+        /* 📦103.A1.1 · El modal NIT ahora usa el mismo patrón que #link-modal
+           (.modal-overlay + .modal-container + .form-group + .form-control),
+           así que no necesita CSS propio — todo viene de los estilos existentes. */
+
+        /* 📦103.A1.1 · Estados visuales del botón NIT en la tarjeta.
+           - Pendiente:  gris, badge "Pendiente" amarillo
+           - Configurado: verde con check, valor truncado del NIT */
+        .nit-btn-pending {
+            color: #92400e;
+            border-color: #fbbf24;
+            background: #fffbeb;
+        }
+        .nit-btn-pending:hover {
+            background: #fef3c7;
+        }
+        .nit-btn-pending .nit-btn-badge {
+            display: inline-block;
+            margin-left: 0.4rem;
+            padding: 0.1rem 0.45rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            background: #f59e0b;
+            color: #fff;
+            border-radius: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+        .nit-btn-configured {
+            color: #065f46;
+            border-color: #10b981;
+            background: #f0fdf4;
+        }
+        .nit-btn-configured:hover {
+            background: #d1fae5;
+        }
+        .nit-btn-configured .nit-btn-value {
+            display: inline-block;
+            margin-left: 0.4rem;
+            padding: 0.1rem 0.45rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            font-family: monospace;
+            background: #10b981;
+            color: #fff;
+            border-radius: 10px;
+        }
+
         /* F4-fix — Sección de conexión Gmail (Bandeja Integrada). Igual look que .sync-section
            pero con colores Gmail (rojo Google) y email del usuario conectado visible. */
         .gmail-section {
@@ -1810,6 +1857,46 @@
             </div>
         </div>
 
+        <!-- ═══ I-103.A1.1 · MODAL: CONFIGURAR NIT DE EMPRESA ═══
+             Mismo patrón visual que el modal de Gestión de Usuario:
+             .modal-header + .modal-body + .modal-footer (con border-bottom,
+             border-top y background gris claro en el footer).
+             Se abre con classList.add('active').
+             NO configura firma electrónica (eso es A1.2+). Solo persiste
+             config.companyPaths[companyKey].nit vía company-config-writer. -->
+        <div class="modal-overlay" id="nit-modal">
+            <div class="modal-container">
+                <div class="modal-header">
+                    <h3 style="font-family: var(--font-heading); margin: 0;">
+                        <i class="fas fa-id-card"></i> Configurar NIT de la empresa
+                    </h3>
+                </div>
+                <div class="modal-body">
+                    <p id="nit-modal-company-info" style="margin-bottom: 1rem; color: var(--text-muted);">Empresa: —</p>
+                    <div class="form-group">
+                        <label class="form-label" for="nit-modal-input">NIT canónico</label>
+                        <input type="text" class="form-control" id="nit-modal-input"
+                               placeholder="9001234567" autocomplete="off" inputmode="numeric" />
+                        <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.35rem; margin-bottom: 0;">
+                            Solo dígitos, 9-15 caracteres. Se aceptan guiones y espacios
+                            (se normalizan automáticamente). Ejemplo: <code>900.123.456-7</code>
+                            → <code>9001234567</code>.
+                        </p>
+                        <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem; margin-bottom: 0;">
+                            El NIT se guarda en <code>config.companyPaths[].nit</code>.
+                        </p>
+                    </div>
+                    <div id="nit-modal-result" style="display:none; margin-top: 1rem; padding: 0.75rem; border-radius: 6px;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline" id="nit-modal-cancel">Cancelar</button>
+                    <button class="btn btn-primary" id="nit-modal-save" disabled>
+                        <i class="fas fa-save"></i> Guardar NIT
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- SECCIÓN 1B: FIRMA ELECTRÓNICA (I-103.A0)
              Configuración global del servicio de firma (firma-service).
              La configuración por empresa viene en I-103.A1. -->
@@ -2212,39 +2299,43 @@
 <!-- MODAL DE VINCULACIÓN Y EDICIÓN DE EMPRESA -->
 <div class="modal-overlay" id="link-modal">
     <div class="modal-container">
-        <h3 style="font-family: var(--font-heading); margin-bottom: 1.5rem;">Configuración de Empresa</h3>
-        <div class="form-group">
-            <label class="form-label">Nombre de la Empresa</label>
-            <input type="text" class="form-control" placeholder="Ingrese el nombre de la empresa" id="selected-company">
+        <div class="modal-header">
+            <h3 style="font-family: var(--font-heading); margin: 0;">Configuración de Empresa</h3>
         </div>
-        <div class="form-group">
-            <label class="form-label">Número de Empleados</label>
-            <input type="number" class="form-control" id="edit-employees" min="0" value="0">
-        </div>
-        <div class="form-group">
-            <label class="form-label">Nivel de Riesgo</label>
-            <select class="form-control" id="edit-risk">
-                <option value="">Seleccione...</option>
-                <option value="I">I - Mínimo</option>
-                <option value="II">II - Bajo</option>
-                <option value="III">III - Medio</option>
-                <option value="IV">IV - Alto</option>
-                <option value="V">V - Muy Alto</option>
-            </select>
-        </div>
-        <div class="form-group">
-            <label class="form-label">
-                <input type="checkbox" id="edit-agropecuaria"> ¿Es Agropecuaria?
-            </label>
-        </div>
-        <div class="form-group">
-            <label class="form-label">Ruta de Documentos</label>
-            <div style="display: flex; gap: 0.5rem;">
-                <input type="text" class="form-control" placeholder="C:/" readonly id="link-path">
-                <button class="btn btn-primary" onclick="selectDirectory()">Buscar</button>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Nombre de la Empresa</label>
+                <input type="text" class="form-control" placeholder="Ingrese el nombre de la empresa" id="selected-company">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Número de Empleados</label>
+                <input type="number" class="form-control" id="edit-employees" min="0" value="0">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Nivel de Riesgo</label>
+                <select class="form-control" id="edit-risk">
+                    <option value="">Seleccione...</option>
+                    <option value="I">I - Mínimo</option>
+                    <option value="II">II - Bajo</option>
+                    <option value="III">III - Medio</option>
+                    <option value="IV">IV - Alto</option>
+                    <option value="V">V - Muy Alto</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">
+                    <input type="checkbox" id="edit-agropecuaria"> ¿Es Agropecuaria?
+                </label>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Ruta de Documentos</label>
+                <div style="display: flex; gap: 0.5rem;">
+                    <input type="text" class="form-control" placeholder="C:/" readonly id="link-path">
+                    <button class="btn btn-primary" onclick="selectDirectory()">Buscar</button>
+                </div>
             </div>
         </div>
-        <div style="display: flex; gap: 1rem; margin-top: 2rem; justify-content: flex-end;">
+        <div class="modal-footer">
             <button class="btn btn-outline" onclick="closeModal()">Cancelar</button>
             <button class="btn btn-primary" onclick="saveLink()" id="btn-save-link">Guardar y Vincular</button>
         </div>
@@ -2992,9 +3083,33 @@
             buttonsDiv.appendChild(vincularButton);
             buttonsDiv.appendChild(eliminarButton);
 
+            // 📦103.A1.1 · Botón NIT (abre modal al estilo "Reconfigurar")
+            // Va en una segunda fila, debajo de los botones principales, para no
+            // competir visualmente con el botón "Reconfigurar" de Vincular.
+            // El estado inicial es "Pendiente" (gris). Al detectar que ya hay NIT
+            // guardado, el helper _checkAndUpdateNitButton lo cambia a "Configurado"
+            // (verde con check).
+            const nitButtonRow = document.createElement('div');
+            nitButtonRow.style.display = 'flex';
+            nitButtonRow.style.gap = '0.5rem';
+            nitButtonRow.style.marginTop = '0.5rem';
+
+            const nitButton = document.createElement('button');
+            nitButton.className = 'btn btn-outline nit-btn-pending';
+            nitButton.style.flex = '1';
+            nitButton.innerHTML = '<i class="fas fa-id-card"></i> <span class="nit-btn-text">Configurar NIT</span> <span class="nit-btn-badge">Pendiente</span>';
+            nitButton.setAttribute('data-nit-button', comp.name);
+            nitButton.onclick = () => prepareNitModal(comp.name);
+
+            nitButtonRow.appendChild(nitButton);
+
+            // Verificar si ya tiene NIT guardado y actualizar el estado del botón
+            _checkAndUpdateNitButton(nitButton, comp.name);
+
             cardBody.appendChild(cardTitleRow);
             cardBody.appendChild(companyStats);
             cardBody.appendChild(buttonsDiv);
+            cardBody.appendChild(nitButtonRow);
 
             // 📦537 — Switch de sincronizacion multipc por empresa
             const syncSection = _buildSyncSection(comp.name);
@@ -3066,6 +3181,182 @@
     }
 
     // 📦537 — Switch de sincronizacion multipc por empresa
+    // 📦103.A1.1 · Modal NIT — sigue el patrón de #link-modal (modal-overlay + modal-container).
+    // Se abre con classList.add('active') desde el botón "Configurar NIT" de cada tarjeta.
+    var _nitModalCtx = null;
+    var _NIT_REGEX = /^\d{9,15}$/;
+
+    // 📦103.A1.1 · Aplica el estado visual al botón NIT de una tarjeta.
+    //   - Sin NIT guardado → botón gris "Configurar NIT" + badge "Pendiente"
+    //   - Con NIT guardado  → botón verde "Reconfigurar NIT" + check + valor truncado
+    // Se llama al render de la tarjeta y también después de guardar exitosamente.
+    function _renderNitButtonState(button, hasNit, nitValue) {
+        if (!button) return;
+        if (hasNit) {
+            button.classList.remove('nit-btn-pending');
+            button.classList.add('nit-btn-configured');
+            // Mostrar últimos 4 dígitos del NIT (privacidad + identificación rápida)
+            var masked = nitValue ? (nitValue.length > 4 ? '…' + nitValue.slice(-4) : nitValue) : '';
+            button.innerHTML = '<i class="fas fa-check-circle"></i> <span class="nit-btn-text">Reconfigurar NIT</span> <span class="nit-btn-value">' + masked + '</span>';
+        } else {
+            button.classList.remove('nit-btn-configured');
+            button.classList.add('nit-btn-pending');
+            button.innerHTML = '<i class="fas fa-id-card"></i> <span class="nit-btn-text">Configurar NIT</span> <span class="nit-btn-badge">Pendiente</span>';
+        }
+    }
+
+    // 📦103.A1.1 · Verifica vía IPC si la empresa tiene NIT guardado y aplica
+    // el estado visual correspondiente al botón. Es idempotente y silencioso
+    // (no muestra error si el IPC falla — simplemente deja el botón en
+    // estado "Pendiente").
+    function _checkAndUpdateNitButton(button, companyName) {
+        if (!button || !window.electronAPI || !window.electronAPI.companyNitGet) return;
+        window.electronAPI.companyNitGet(companyName).then(function (r) {
+            if (!button) return;
+            if (r && r.success && r.data && r.data.nit && _NIT_REGEX.test(r.data.nit)) {
+                _renderNitButtonState(button, true, r.data.nit);
+            } else {
+                _renderNitButtonState(button, false, null);
+            }
+        }).catch(function () { /* dejar en estado Pendiente */ });
+    }
+
+    function prepareNitModal(companyName) {
+        _nitModalCtx = { companyName: companyName };
+        var modal = document.getElementById('nit-modal');
+        if (!modal) return;
+        var infoEl = document.getElementById('nit-modal-company-info');
+        if (infoEl) infoEl.textContent = 'Empresa: ' + companyName;
+        var input = document.getElementById('nit-modal-input');
+        if (input) {
+            // Defensive: limpiar input primero (puede tener basura de un error previo)
+            input.value = '';
+            input.style.borderColor = '';
+        }
+        var saveBtn = document.getElementById('nit-modal-save');
+        if (saveBtn) saveBtn.disabled = false;
+        var resultEl = document.getElementById('nit-modal-result');
+        if (resultEl) {
+            resultEl.style.display = 'none';
+            resultEl.className = '';
+            resultEl.innerHTML = '';
+        }
+
+        // Cargar NIT actual desde IPC (autoritativo, no del DOM)
+        if (input && window.electronAPI && window.electronAPI.companyNitGet) {
+            window.electronAPI.companyNitGet(companyName).then(function (r) {
+                if (!input) return; // modal ya cerrado
+                if (r && r.success && r.data && r.data.nit && _NIT_REGEX.test(r.data.nit)) {
+                    input.value = r.data.nit;
+                }
+                // Si no hay NIT o el formato es inválido, input queda vacío (placeholder visible)
+            }).catch(function () { /* input queda vacío */ });
+        }
+
+        // Abrir modal con el mismo patrón que #link-modal
+        modal.classList.add('active');
+        setTimeout(function () { if (input) input.focus(); }, 50);
+    }
+
+    function closeNitModal() {
+        var modal = document.getElementById('nit-modal');
+        if (!modal) return;
+        modal.classList.remove('active');
+        _nitModalCtx = null;
+    }
+
+    // 📦103.A1.1 · Guarda el NIT. Llama companyNitSet (preload) → company-nit:set (IPC)
+    // → writeCompanyNit (writer). Valida formato, normaliza, persiste.
+    async function saveNitFromModal() {
+        if (!_nitModalCtx) return;
+        var input = document.getElementById('nit-modal-input');
+        var btn = document.getElementById('nit-modal-save');
+        var resultEl = document.getElementById('nit-modal-result');
+        if (!input || !btn || !resultEl) return;
+
+        var rawNit = (input.value || '').trim();
+        if (!rawNit) {
+            input.style.borderColor = '#b91c1c';
+            resultEl.style.display = 'block';
+            resultEl.style.background = '#fee2e2';
+            resultEl.style.color = '#991b1b';
+            resultEl.textContent = 'Por favor ingresa un NIT.';
+            return;
+        }
+
+        btn.disabled = true;
+        var originalLabel = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando…';
+
+        try {
+            var r = await window.electronAPI.companyNitSet(_nitModalCtx.companyName, rawNit);
+            if (!r || !r.success) {
+                var msg = (r && r.error && r.error.message) || 'Error desconocido';
+                var code = (r && r.error && r.error.code) || '';
+                input.style.borderColor = '#b91c1c';
+                resultEl.style.display = 'block';
+                resultEl.style.background = '#fee2e2';
+                resultEl.style.color = '#991b1b';
+                resultEl.textContent = 'Error guardando: ' + msg + (code ? ' (' + code + ')' : '');
+                btn.innerHTML = originalLabel;
+                btn.disabled = false;
+                return;
+            }
+            // Éxito: mostrar feedback en el modal, toast, actualizar botón de tarjeta
+            resultEl.style.display = 'block';
+            resultEl.style.background = '#d1fae5';
+            resultEl.style.color = '#065f46';
+            resultEl.textContent = '✓ NIT guardado: ' + r.data.nit;
+
+            // Toast global (esquina inferior derecha) — feedback claro al user
+            if (typeof showToast === 'function') {
+                showToast('NIT guardado para ' + _nitModalCtx.companyName, 'success');
+            }
+
+            // Actualizar el botón NIT de la tarjeta al estado "Configurado"
+            var companyName = _nitModalCtx.companyName;
+            var nitBtn = document.querySelector('[data-nit-button="' + companyName.replace(/"/g, '\\"') + '"]');
+            if (nitBtn) {
+                _renderNitButtonState(nitBtn, true, r.data.nit);
+            }
+
+            // Cerrar modal después de 1.2s (da tiempo a leer el feedback)
+            setTimeout(function () { closeNitModal(); }, 1200);
+        } catch (e) {
+            resultEl.style.display = 'block';
+            resultEl.style.background = '#fee2e2';
+            resultEl.style.color = '#991b1b';
+            resultEl.textContent = 'Excepción: ' + (e && e.message || e);
+            btn.innerHTML = originalLabel;
+            btn.disabled = false;
+        }
+    }
+
+    // 📦103.A1.1 · Wireup del modal: cierre con Cancelar, click en overlay, Escape
+    // (se registra una sola vez al cargar la tab de empresas, pero como el
+    // modal vive en el DOM global, se puede wirear desde aquí sin problema).
+    // Mismo patrón que el wireup de #link-modal.
+    document.addEventListener('DOMContentLoaded', function () {
+        var modal = document.getElementById('nit-modal');
+        if (!modal) return;
+        // Botón Guardar
+        var saveBtn = document.getElementById('nit-modal-save');
+        if (saveBtn) saveBtn.onclick = saveNitFromModal;
+        // Botón Cancelar
+        var cancelBtn = document.getElementById('nit-modal-cancel');
+        if (cancelBtn) cancelBtn.onclick = closeNitModal;
+        // Click en el overlay (fuera del .modal-container) cierra
+        modal.addEventListener('click', function (e) {
+            if (e.target === modal) closeNitModal();
+        });
+        // Escape cierra
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && modal.classList.contains('active')) {
+                closeNitModal();
+            }
+        });
+    });
+
     function _buildSyncSection(companyName) {
         const syncConfig = (currentConfig && currentConfig.companyPaths && currentConfig.companyPaths[companyName])
             ? currentConfig.companyPaths[companyName].sync
