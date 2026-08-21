@@ -453,8 +453,9 @@ function _getClientForCompany(companyName) {
     return { client: _clientCache.get(key), config: cfg };
   }
   // Si adminApiKey está disponible, pasarla al factory (DR-2).
-  var s2 = _readSecretsV2();
-  var adminKey = (s2 && s2.adminApiKey) || null;
+  // I-103.A0: usar _resolveAdminApiKey() (jerarquía secrets.enc > env).
+  var resolvedAdmin = _resolveAdminApiKey();
+  var adminKey = resolvedAdmin ? resolvedAdmin.key : null;
   var client = _clientFactory({
     baseUrl: cfg.url,
     apiKey: cfg.apiKey,
@@ -814,6 +815,38 @@ function _handlerAgreementGet(args) {
   return r.client.getActiveAgreement();
 }
 
+// -------- I-102.2.D · firma:documento:read-bytes --------
+// Lee los bytes de un archivo (PDF) del disco local. Usado por la UI
+// para calcular el document_hash antes de enviar el sign request.
+// Validacion: archivo existe, es regular, no excede 50 MB.
+function _handlerDocumentoReadBytes(args) {
+  args = args || {};
+  if (!args.rutaArchivo || typeof args.rutaArchivo !== 'string') {
+    return _err('INVALID_REQUEST_BODY', 'rutaArchivo requerido (string)');
+  }
+  try {
+    if (!fs.existsSync(args.rutaArchivo)) {
+      return _err('NOT_FOUND', 'Archivo no encontrado: ' + args.rutaArchivo);
+    }
+    var stat = fs.statSync(args.rutaArchivo);
+    if (!stat.isFile()) {
+      return _err('INVALID_INPUT', 'No es un archivo regular');
+    }
+    if (stat.size > 50 * 1024 * 1024) {
+      return _err('PAYLOAD_TOO_LARGE', 'Archivo demasiado grande: ' + stat.size + ' bytes');
+    }
+    var buffer = fs.readFileSync(args.rutaArchivo);
+    return _ok({
+      data: buffer.toString('base64'),
+      bytes: buffer.length,
+      contentType: 'application/pdf'
+    });
+  } catch (e) {
+    console.error('[' + MOD + '][documento:read-bytes]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
 // =====================================================================
 //  HANDLERS — IPC per-empresa (firma:empresa:*) y admin (firma:config:set-admin-key)
 //  DR-1..6, binding.
@@ -835,13 +868,56 @@ function _requireSecretsV2WithUrl() {
 }
 
 /**
+ * I-103.A0 · Resuelve la adminApiKey con jerarquía:
+ *   1) secrets.enc.adminApiKey (si existe)  ← fuente preferida
+ *   2) process.env.FIRMA_SERVICE_ADMIN_KEY (fallback) ← solo dev/operación
+ *   3) null (quien llama retorna ADMIN_TOKEN_REQUIRED)
+ *
+ * Retorna { key, source: 'secrets' | 'env' } o null. NUNCA expone el valor al
+ * renderer — solo se usa internamente en el bridge. La UI ve el source y un
+ * hash no-reversible (SHA-256[0:8]) para verificación.
+ *
+ * Loggea WARN una sola vez por boot si la key viene de env (para que el
+ * operador sepa que está usando un fallback y no secrets.enc).
+ */
+var _adminKeyEnvWarned = false;
+function _resolveAdminApiKey() {
+  var s2 = _readSecretsV2();
+  if (s2 && s2.adminApiKey) {
+    return { key: s2.adminApiKey, source: 'secrets' };
+  }
+  if (process.env.FIRMA_SERVICE_ADMIN_KEY) {
+    if (!_adminKeyEnvWarned) {
+      console.warn('[' + MOD + '] adminApiKey no está en secrets.enc; usando process.env.FIRMA_SERVICE_ADMIN_KEY como fallback. Configure via firma:config:set-admin-key para uso persistente.');
+      _adminKeyEnvWarned = true;
+    }
+    return { key: process.env.FIRMA_SERVICE_ADMIN_KEY, source: 'env' };
+  }
+  return null;
+}
+
+/**
+ * I-103.A0 · Hash no-reversible de la adminApiKey para que la UI verifique
+ * la key sin ver el secreto. SHA-256 primeros 8 chars hex.
+ * NUNCA una porción de la key original (que sería reversible).
+ */
+function _hashAdminApiKey(key) {
+  if (!key) return null;
+  try {
+    var cryptoMod = require('crypto');
+    return cryptoMod.createHash('sha256').update(key).digest('hex').slice(0, 8);
+  } catch (e) { return null; }
+}
+
+/**
  * Helper: valida que haya un adminApiKey configurado (DR-2). Si no, retorna
- * ADMIN_TOKEN_REQUIRED.
+ * ADMIN_TOKEN_REQUIRED. Usa _resolveAdminApiKey() que prioriza secrets.enc
+ * sobre env var (I-103.A0).
  */
 function _requireAdminToken() {
-  var s2 = _readSecretsV2();
-  if (!s2 || !s2.adminApiKey) {
-    return _err('ADMIN_TOKEN_REQUIRED', 'adminApiKey no configurado. Configure via firma:config:set-admin-key.', {
+  var resolved = _resolveAdminApiKey();
+  if (!resolved) {
+    return _err('ADMIN_TOKEN_REQUIRED', 'adminApiKey no configurado. Configure via firma:config:set-admin-key o FIRMA_SERVICE_ADMIN_KEY.', {
       remediationHint: 'firma:config:set-admin-key'
     });
   }
@@ -854,8 +930,9 @@ function _requireAdminToken() {
  * SIEMPRE la adminApiKey actual.
  */
 function _createAdminClient(url, clientInstanceId) {
-  var s2 = _readSecretsV2();
-  var adminKey = (s2 && s2.adminApiKey) || null;
+  // I-103.A0: usar _resolveAdminApiKey() (jerarquía secrets.enc > env).
+  var resolvedAdmin = _resolveAdminApiKey();
+  var adminKey = resolvedAdmin ? resolvedAdmin.key : null;
   return _clientFactory({
     baseUrl: url,
     apiKey: '__admin__',  // dummy; el factory va a usar adminApiKey
@@ -887,6 +964,13 @@ function _handlerEmpresaList(args) {
       };
     });
 
+  // I-103.A0 · Exponer source de adminApiKey + hash no-reversible a la UI.
+  // El renderer usa esto para mostrar el badge "Configurada (secrets) | (env) | No configurada".
+  // NUNCA exponemos el valor de la key (DR-2).
+  var resolvedAdmin = _resolveAdminApiKey();
+  var adminKeySource = resolvedAdmin ? resolvedAdmin.source : null;
+  var adminKeyHashPrefix = resolvedAdmin ? _hashAdminApiKey(resolvedAdmin.key) : null;
+
   return _ok({
     configured: configured,
     available: [],  // requiere DB lookup; el renderer hace JOIN con tabla companies
@@ -895,7 +979,10 @@ function _handlerEmpresaList(args) {
     firmaServiceUrl: url,
     clientInstanceId: clientInstanceId,
     source: _hasEnv() ? 'env' : 'secrets',
-    encryptionAvailable: !!(safeStorage && safeStorage.isEncryptionAvailable && safeStorage.isEncryptionAvailable())
+    encryptionAvailable: !!(safeStorage && safeStorage.isEncryptionAvailable && safeStorage.isEncryptionAvailable()),
+    // I-103.A0 · Estado de la credencial administrativa (sin exponer el secret).
+    adminKeySource: adminKeySource,           // 'secrets' | 'env' | null
+    adminKeyHashPrefix: adminKeyHashPrefix    // SHA-256[0:8] hex | null
   });
 }
 
@@ -1305,6 +1392,15 @@ function registerFirmaHandlers(appArg, deps) {
       return _err('INTERNAL', e.message);
     }
   });
+  // I-102.2.D · Helper para que la UI lea bytes del PDF y calcule document_hash
+  handle('firma:documento:read-bytes', function (event, payload) {
+    try {
+      return _handlerDocumentoReadBytes(payload || {});
+    } catch (e) {
+      console.error('[' + MOD + '][documento:read-bytes]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
   handle('firma:sign-request:get', function (event, payload) {
     try {
       return _handlerSignRequestGet(payload || {});
@@ -1443,4 +1539,8 @@ registerFirmaHandlers._test_setGenerateClientInstanceId = function (fn) {
   _generateClientInstanceIdFn = fn;
 };
 
+// Export dual: la función misma (compat con tests) Y el objeto con .registerFirmaHandlers
+// (compat con main.js que hace `const { registerFirmaHandlers } = require('./main/firma-bridge')`).
+// Sin esto, el destructuring devuelve undefined y los 20 handlers firma:* NUNCA se registran.
 module.exports = registerFirmaHandlers;
+module.exports.registerFirmaHandlers = registerFirmaHandlers;
