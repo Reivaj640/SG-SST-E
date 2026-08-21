@@ -40,3 +40,12 @@ audit-bloque-*.js
 storage-verify-*/
 data/verify-*.sqlite
 data/verify-*.sqlite-*
+
+# 📦 I-010 — Artefactos de E2E multi-company + subagentes previos
+# storage-e2e*/ lo crea el script storage-backup/e2e-multicompany.js al arrancar
+storage-e2e*/
+storage-audit-e3/
+storage-test/
+# BD de E2E multi-company (separada de test.sqlite)
+data/e2e-test-mc.sqlite
+data/e2e-test-mc.sqlite-*
