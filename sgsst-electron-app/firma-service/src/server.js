@@ -33,6 +33,7 @@ const consentRouter = require('./routes/consent');
 const signRequestRouter = require('./routes/signRequest');
 const publicRouter = require('./routes/public');
 const adminRouter = require('./routes/admin');
+const adminClientesRouter = require('./routes/admin-clientes');
 const internalAuditRouter = require('./routes/internal-audit');
 const { migrate } = require('./db/migrate');
 
@@ -142,7 +143,9 @@ function createApp() {
   app.use('/internal', internalAuditRouter);
   // Endpoints administrativos: protegidos por X-Admin-API-Key
   // (no expuestos a K+AIR, solo operador humano con acceso físico).
+  // Hay 2 routers: el viejo (acuerdo-versiones) y el nuevo (per-company clientes).
   app.use('/internal/admin', adminRouter);
+  app.use('/internal/admin', adminClientesRouter);
 
   // 404 para rutas no existentes
   app.use((req, res) => {
