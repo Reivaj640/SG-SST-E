@@ -441,6 +441,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   firmaConfigDiag: () => ipcRenderer.invoke('firma:config:diag'),
   // Sign request (6)
   firmaSignRequestCreate: (payload) => ipcRenderer.invoke('firma:sign-request:create', payload),
+  // I-102.2.D · Lectura de bytes del PDF para calcular document_hash
+  firmaDocumentoReadBytes: (rutaArchivo) => ipcRenderer.invoke('firma:documento:read-bytes', { rutaArchivo }),
   firmaSignRequestGet: (id) => ipcRenderer.invoke('firma:sign-request:get', { id }),
   firmaSignRequestList: (ids) => ipcRenderer.invoke('firma:sign-request:list', { ids }),
   firmaSignRequestDocument: (id) => ipcRenderer.invoke('firma:sign-request:document', { id }),

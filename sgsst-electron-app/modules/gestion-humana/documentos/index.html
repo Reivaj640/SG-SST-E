@@ -150,3 +150,58 @@
      La firma canvas operativa interna (base64 PNG) se reemplazó por firma
      electrónica vía firma-service (I-101+). El modal de firma en pantalla
      ya no existe. La nueva UI de firma electrónica llegará con I-102. -->
+
+<!-- ═══ I-102.2.C · MODAL: ENVIAR DOCUMENTO A FIRMA ═══
+     Modal que permite configurar el envío de un documento a firma electrónica
+     vía firma-service. Recoge el correo del firmante y la confirmación explícita.
+     La creación de la solicitud de firma se hace en I-102.2.D (firma:sign-request:create). -->
+<div id="doc-firma-modal" class="doc-modal" hidden>
+  <div class="doc-modal__backdrop" data-close-doc-firma="1"></div>
+  <div class="doc-modal__panel doc-modal__panel--firma">
+    <header class="doc-modal__header">
+      <h3 class="doc-modal__title"><i class="fas fa-signature"></i> Enviar documento a firma</h3>
+      <button type="button" class="doc-modal__close" data-close-doc-firma="1" aria-label="Cerrar">
+        <i class="fas fa-times"></i>
+      </button>
+    </header>
+    <div class="doc-modal__body">
+      <!-- Resumen del documento (read-only) -->
+      <div class="doc-field" id="doc-firma-doc-info">
+        <label class="doc-field__label">Documento</label>
+        <div class="doc-firma-summary" id="doc-firma-doc-summary">—</div>
+      </div>
+      <!-- Resumen del firmante (read-only, viene del trabajador) -->
+      <div class="doc-field" id="doc-firma-trab-info">
+        <label class="doc-field__label">Firmante</label>
+        <div class="doc-firma-summary" id="doc-firma-trab-summary">—</div>
+      </div>
+      <!-- Correo del firmante -->
+      <div class="doc-field">
+        <label class="doc-field__label" for="doc-firma-correo">
+          Correo del firmante <span class="doc-field__req">*</span>
+        </label>
+        <input id="doc-firma-correo" type="email" class="doc-field__input"
+               placeholder="firmante@empresa.com" autocomplete="email" />
+        <p class="doc-field__hint" id="doc-firma-correo-hint">
+          El firmante recibirá un enlace único para revisar y firmar el documento.
+        </p>
+        <p class="doc-field__error" id="doc-firma-correo-error" hidden>
+          Ingresa un correo válido.
+        </p>
+      </div>
+      <!-- Checkbox de confirmación -->
+      <div class="doc-field">
+        <label class="doc-firma-confirm" for="doc-firma-confirmar">
+          <input id="doc-firma-confirmar" type="checkbox" />
+          <span>Confirmo que este documento será enviado para firma electrónica.</span>
+        </label>
+      </div>
+    </div>
+    <footer class="doc-modal__footer">
+      <button type="button" class="doc-btn doc-btn--ghost" data-close-doc-firma="1">Cancelar</button>
+      <button type="button" id="doc-firma-enviar" class="doc-btn doc-btn--primary" disabled>
+        <i class="fas fa-paper-plane"></i> Enviar a firma
+      </button>
+    </footer>
+  </div>
+</div>
