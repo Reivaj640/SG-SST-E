@@ -653,6 +653,47 @@
             border-radius: 10px;
         }
 
+        /* 📦103.A1.2 · Estados visuales del botón Firma Electrónica en la tarjeta.
+           - Pendiente:  outline neutro "Configurar Firma" (NIT ya configurado)
+           - Configurado: verde con check, badge con idEmpresa (últimos 4 chars)
+           - Deshabilitado: gris claro, NIT pendiente (no permite configurar firma) */
+        .firma-btn-pending {
+            color: var(--text-primary, #1f2937);
+            border-color: var(--border-color);
+            background: var(--bg-card, #fff);
+        }
+        .firma-btn-pending:hover {
+            background: #f3f4f6;
+        }
+        .firma-btn-configured {
+            color: #065f46;
+            border-color: #10b981;
+            background: #f0fdf4;
+        }
+        .firma-btn-configured:hover {
+            background: #d1fae5;
+        }
+        .firma-btn-configured .firma-btn-id {
+            display: inline-block;
+            margin-left: 0.4rem;
+            padding: 0.1rem 0.45rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            font-family: monospace;
+            background: #10b981;
+            color: #fff;
+            border-radius: 10px;
+        }
+        .firma-btn-disabled {
+            color: #9ca3af;
+            border-color: #e5e7eb;
+            background: #f9fafb;
+            cursor: not-allowed;
+        }
+        .firma-btn-disabled:hover {
+            background: #f9fafb;
+        }
+
         /* F4-fix — Sección de conexión Gmail (Bandeja Integrada). Igual look que .sync-section
            pero con colores Gmail (rojo Google) y email del usuario conectado visible. */
         .gmail-section {
@@ -2820,6 +2861,10 @@
     let companies = [];
     let originalCompanyName = null; // ← Variable para almacenar el nombre original al editar
     let currentConfig = null; // ← Variable global para almacenar la configuración completa
+    // 📦103.A1.2 · Cache local de empresas con Firma Electrónica configurada.
+    // Se llena UNA vez en loadCompanies() con firmaEmpresaList({}) y se consulta
+    // por companyKey para cada tarjeta. NO se hace una llamada IPC por empresa.
+    let _firmaConfiguredCache = [];
 
     // Función para cargar las empresas
     async function loadCompanies() {
@@ -2969,6 +3014,9 @@
                 });
 
                 console.log('✅ Empresas procesadas con escenarios normativos:', companies);
+                // 📦103.A1.2 · Cargar UNA vez la lista de empresas con firma configurada
+                // antes de renderizar. NO se hace una llamada IPC por tarjeta.
+                _firmaConfiguredCache = await _loadFirmaCache();
                 renderCompanyCards();
             } else {
                 console.warn('⚠️ No se encontró electronAPI, usando datos de ejemplo');
@@ -2979,6 +3027,9 @@
                     { name: "Aseplus", risk: "V", employees: 210, isAgropecuaria: false, items: 50, path: "D:/Aseplus", escenarioNormativo: "COMPLETO_CAP_III" },
                     { name: "Asel", risk: "I", employees: 15, isAgropecuaria: true, items: 28, path: "", escenarioNormativo: "SIMPLIFICADO_≤10_R1-3" }
                 ];
+                // 📦103.A1.2 · Sin electronAPI, el cache queda vacío (botones se renderizan
+                // en estado "NIT pendiente" hasta que se confirme NIT).
+                _firmaConfiguredCache = [];
                 renderCompanyCards();
             }
         } catch (error) {
@@ -3106,10 +3157,32 @@
             // Verificar si ya tiene NIT guardado y actualizar el estado del botón
             _checkAndUpdateNitButton(nitButton, comp.name);
 
+            // 📦103.A1.2 · Botón Firma Electrónica (3ra fila, debajo del NIT).
+            // Estado inicial: disabled (asume sin NIT). Se actualiza a "Pendiente"
+            // o "Configurado" cuando _checkAndUpdateNitButton confirma el NIT y
+            // consulta el cache _firmaConfiguredCache (cargado UNA vez en loadCompanies).
+            const firmaButtonRow = document.createElement('div');
+            firmaButtonRow.style.display = 'flex';
+            firmaButtonRow.style.gap = '0.5rem';
+            firmaButtonRow.style.marginTop = '0.5rem';
+
+            const firmaButton = document.createElement('button');
+            firmaButton.className = 'btn btn-outline firma-btn-disabled';
+            firmaButton.style.flex = '1';
+            firmaButton.setAttribute('data-firma-button', comp.name);
+            // El estado inicial es "NIT pendiente" (disabled). Se re-evalúa en cuanto
+            // _checkAndUpdateNitButton confirma si hay NIT o no.
+            firmaButton.innerHTML = '<i class="fas fa-lock"></i> <span class="firma-btn-text">NIT pendiente</span>';
+            firmaButton.disabled = true;
+            firmaButton.title = 'Configura primero el NIT para poder configurar la Firma Electrónica';
+
+            firmaButtonRow.appendChild(firmaButton);
+
             cardBody.appendChild(cardTitleRow);
             cardBody.appendChild(companyStats);
             cardBody.appendChild(buttonsDiv);
             cardBody.appendChild(nitButtonRow);
+            cardBody.appendChild(firmaButtonRow);
 
             // 📦537 — Switch de sincronizacion multipc por empresa
             const syncSection = _buildSyncSection(comp.name);
@@ -3213,12 +3286,121 @@
         if (!button || !window.electronAPI || !window.electronAPI.companyNitGet) return;
         window.electronAPI.companyNitGet(companyName).then(function (r) {
             if (!button) return;
+            var hasNit = false;
             if (r && r.success && r.data && r.data.nit && _NIT_REGEX.test(r.data.nit)) {
                 _renderNitButtonState(button, true, r.data.nit);
+                hasNit = true;
             } else {
                 _renderNitButtonState(button, false, null);
             }
+            // 📦103.A1.2 · Una vez conocido el estado del NIT, actualizar también
+            // el botón de Firma Electrónica de la misma empresa. El botón de firma
+            // se renderiza disabled por default; al confirmar NIT se evalúa firma.
+            var firmaBtn = document.querySelector('[data-firma-button="' + companyName.replace(/"/g, '\\"') + '"]');
+            if (firmaBtn) {
+                _renderFirmaButtonState(firmaBtn, hasNit);
+            }
         }).catch(function () { /* dejar en estado Pendiente */ });
+    }
+
+    // 📦103.A1.2 · Llama firmaEmpresaList({}) UNA vez y retorna el array
+    // `configured` con metadata de cada empresa. En caso de error retorna []
+    // y muestra un toast informativo (no rompe el render de las tarjetas).
+    async function _loadFirmaCache() {
+        if (!window.electronAPI || !window.electronAPI.firmaEmpresaList) return [];
+        try {
+            var r = await window.electronAPI.firmaEmpresaList({});
+            if (r && r.success && r.data && Array.isArray(r.data.configured)) {
+                return r.data.configured;
+            }
+            if (r && !r.success) {
+                if (typeof showToast === 'function') {
+                    showToast('No se pudo consultar el estado de Firma Electrónica', 'warning');
+                }
+            }
+            return [];
+        } catch (e) {
+            console.warn('[A1.2] firmaEmpresaList falló:', e);
+            return [];
+        }
+    }
+
+    // 📦103.A1.2 · Función PURA: a partir del array `configuredEmpresas` (de
+    // firmaEmpresaList) y el nombre de la empresa, devuelve el estado de firma
+    // para esa empresa. Se usa para renderizar el botón de firma en la tarjeta.
+    function _getFirmaStateForCompany(companyName, configuredEmpresas) {
+        if (!companyName || !Array.isArray(configuredEmpresas)) {
+            return { hasFirma: false, firmaInfo: null };
+        }
+        for (var i = 0; i < configuredEmpresas.length; i++) {
+            var entry = configuredEmpresas[i];
+            if (entry && entry.companyKey === companyName) {
+                return { hasFirma: true, firmaInfo: entry };
+            }
+        }
+        return { hasFirma: false, firmaInfo: null };
+    }
+
+    // 📦103.A1.2 · Aplica el estado visual al botón de Firma Electrónica de la
+    // tarjeta. Tres estados:
+    //   - hasNit=false → .firma-btn-disabled, tooltip "Configura primero el NIT"
+    //   - hasNit=true, hasFirma=false → .firma-btn-pending, "Configurar Firma"
+    //   - hasNit=true, hasFirma=true  → .firma-btn-configured, "Firma Configurada"
+    // El click es un STUB en A1.2: muestra un toast. A1.3 lo reemplaza con el
+    // modal real que llama a firmaEmpresaCreate o firmaEmpresaSetApiKey.
+    function _renderFirmaButtonState(button, hasNit) {
+        if (!button) return;
+        // Limpiar estados previos
+        button.classList.remove('firma-btn-pending', 'firma-btn-configured', 'firma-btn-disabled');
+        button.removeAttribute('title');
+
+        if (!hasNit) {
+            button.classList.add('firma-btn-disabled');
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-lock"></i> <span class="firma-btn-text">NIT pendiente</span>';
+            button.title = 'Configura primero el NIT para poder configurar la Firma Electrónica';
+            button.onclick = null;
+            return;
+        }
+
+        var state = _getFirmaStateForCompany(
+            button.getAttribute('data-firma-button'),
+            _firmaConfiguredCache
+        );
+        button.disabled = false;
+        if (state.hasFirma && state.firmaInfo) {
+            // Estado: Configurado (verde, check, idEmpresa truncado)
+            button.classList.add('firma-btn-configured');
+            var idMasked = state.firmaInfo.idEmpresa
+                ? (state.firmaInfo.idEmpresa.length > 4
+                    ? '…' + state.firmaInfo.idEmpresa.slice(-4)
+                    : state.firmaInfo.idEmpresa)
+                : '';
+            button.innerHTML = '<i class="fas fa-check-circle"></i> <span class="firma-btn-text">Firma Configurada</span>' +
+                (idMasked ? ' <span class="firma-btn-id">' + idMasked + '</span>' : '');
+            if (state.firmaInfo.activatedAt) {
+                var actDate = new Date(state.firmaInfo.activatedAt);
+                if (!isNaN(actDate.getTime())) {
+                    button.title = 'Configurada el ' + actDate.toLocaleDateString('es-CO', {
+                        year: 'numeric', month: 'short', day: 'numeric'
+                    });
+                }
+            }
+        } else {
+            // Estado: Pendiente (outline, "Configurar Firma")
+            button.classList.add('firma-btn-pending');
+            button.innerHTML = '<i class="fas fa-pen-fancy"></i> <span class="firma-btn-text">Configurar Firma</span>';
+            button.title = 'Configurar Firma Electrónica para esta empresa (disponible en A1.3)';
+        }
+        // Click stub para A1.2 — A1.3 lo reemplaza con el modal real.
+        var companyName = button.getAttribute('data-firma-button');
+        button.onclick = function () {
+            if (typeof showToast === 'function') {
+                showToast('Configuración de Firma Electrónica disponible en A1.3', 'info');
+            } else {
+                console.log('[A1.2 stub] Click en Firma para ' + companyName);
+            }
+        };
     }
 
     function prepareNitModal(companyName) {
