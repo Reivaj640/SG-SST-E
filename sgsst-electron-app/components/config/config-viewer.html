@@ -1938,6 +1938,102 @@
             </div>
         </div>
 
+        <!-- ═══ I-103.A1.3 · MODAL: CONFIGURAR FIRMA ELECTRÓNICA DE EMPRESA ═══
+             Mismo patrón visual que el modal de NIT. Tres modos según estado:
+             - Sin NIT: error, no permite configurar.
+             - Con NIT, sin firma: Crear nuevo cliente / Pegar API key existente.
+             - Con NIT + firma: estado actual + acciones Rotar / Eliminar.
+             API key NUNCA se muestra después de guardar. companyKey canónico. -->
+        <div class="modal-overlay" id="firma-empresa-modal">
+            <div class="modal-container">
+                <div class="modal-header">
+                    <h3 style="font-family: var(--font-heading); margin: 0;">
+                        <i class="fas fa-pen-fancy"></i> Configurar Firma Electrónica
+                    </h3>
+                </div>
+                <div class="modal-body">
+                    <p id="firma-modal-company-info" style="margin-bottom: 0.5rem; color: var(--text-muted);">Empresa: —</p>
+                    <p id="firma-modal-nit-info" style="margin-bottom: 1rem; color: var(--text-muted);">NIT: —</p>
+
+                    <!-- Bloque: error si no hay NIT -->
+                    <div id="firma-modal-no-nit-block" style="display:none; padding: 0.75rem; border-radius: 6px; background: #fee2e2; color: #991b1b;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Primero debes configurar el NIT de esta empresa antes de poder configurar la Firma Electrónica.
+                    </div>
+
+                    <!-- Bloque: modo (radio) para empresa SIN firma -->
+                    <div id="firma-modal-mode-block" class="form-group" style="display:none;">
+                        <label class="form-label">Modo de configuración</label>
+                        <label style="display:block; margin-bottom: 0.4rem;">
+                            <input type="radio" name="firma-mode" value="create" checked>
+                            <span>Crear nuevo cliente de firma (requiere adminApiKey)</span>
+                        </label>
+                        <label style="display:block;">
+                            <input type="radio" name="firma-mode" value="paste">
+                            <span>Pegar API key pre-existente</span>
+                        </label>
+                    </div>
+
+                    <!-- Bloque: display name (solo cuando NO tiene firma aún) -->
+                    <div id="firma-modal-displayname-block" class="form-group" style="display:none;">
+                        <label class="form-label" for="firma-modal-display-name">Display name</label>
+                        <input type="text" class="form-control" id="firma-modal-display-name"
+                               placeholder="K+AIR empresa Mi Empresa" autocomplete="off" />
+                        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.3rem; margin-bottom: 0;">
+                            Nombre visible que verá el servicio de firma. Default: nombre de la empresa.
+                        </p>
+                    </div>
+
+                    <!-- Bloque: API key (solo cuando modo = "paste") -->
+                    <div id="firma-modal-apikey-block" class="form-group" style="display:none;">
+                        <label class="form-label" for="firma-modal-apikey">API key</label>
+                        <input type="password" class="form-control" id="firma-modal-apikey"
+                               placeholder="kair_live_..." autocomplete="off" />
+                        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.3rem; margin-bottom: 0;">
+                            Mínimo 32 caracteres. Se guarda cifrada en <code>secrets.enc</code>.
+                            Después de guardar NO se muestra más.
+                        </p>
+                        <label style="display:block; margin-top: 0.5rem;">
+                            <input type="checkbox" id="firma-modal-validate">
+                            <span>Validar contra firma-service al guardar (requiere adminApiKey)</span>
+                        </label>
+                    </div>
+
+                    <!-- Bloque: estado actual (solo cuando YA tiene firma) -->
+                    <div id="firma-modal-existing-block" class="form-group" style="display:none;">
+                        <label class="form-label">Estado actual</label>
+                        <div style="background: #f0fdf4; border: 1px solid #10b981; border-radius: 6px; padding: 0.75rem; font-size: 0.85rem;">
+                            <div style="margin-bottom: 0.3rem;"><strong>idEmpresa:</strong> <span id="firma-modal-existing-idEmpresa">—</span></div>
+                            <div style="margin-bottom: 0.3rem;"><strong>Activada:</strong> <span id="firma-modal-existing-activatedAt">—</span></div>
+                            <div style="margin-bottom: 0.3rem;"><strong>Última validación:</strong> <span id="firma-modal-existing-lastValidatedAt">—</span></div>
+                            <div><strong>Hash:</strong> <code id="firma-modal-existing-hash">—</code></div>
+                        </div>
+                        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem; margin-bottom: 0;">
+                            "Rotar" reemplaza la API key (requiere adminApiKey). "Eliminar" borra la configuración local
+                            y marca la key como revocada en firma-service.
+                        </p>
+                    </div>
+
+                    <!-- Banner resultado -->
+                    <div id="firma-modal-result" style="display:none; margin-top: 1rem; padding: 0.75rem; border-radius: 6px;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline" id="firma-modal-cancel">Cancelar</button>
+                    <!-- Acciones para empresa YA configurada -->
+                    <button class="btn btn-danger-ghost" id="firma-modal-revoke-btn" style="display:none;">
+                        <i class="fas fa-trash"></i> Eliminar
+                    </button>
+                    <button class="btn btn-outline" id="firma-modal-rotate-btn" style="display:none;">
+                        <i class="fas fa-sync"></i> Rotar API key
+                    </button>
+                    <!-- Acción principal (Crear o Pegar) -->
+                    <button class="btn btn-primary" id="firma-modal-save">
+                        <i class="fas fa-save"></i> Guardar configuración
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- SECCIÓN 1B: FIRMA ELECTRÓNICA (I-103.A0)
              Configuración global del servicio de firma (firma-service).
              La configuración por empresa viene en I-103.A1. -->
@@ -3390,15 +3486,13 @@
             // Estado: Pendiente (outline, "Configurar Firma")
             button.classList.add('firma-btn-pending');
             button.innerHTML = '<i class="fas fa-pen-fancy"></i> <span class="firma-btn-text">Configurar Firma</span>';
-            button.title = 'Configurar Firma Electrónica para esta empresa (disponible en A1.3)';
+            button.title = 'Configurar Firma Electrónica para esta empresa';
         }
-        // Click stub para A1.2 — A1.3 lo reemplaza con el modal real.
+        // 📦103.A1.3 · Click → abre el modal real (antes era un stub con toast).
         var companyName = button.getAttribute('data-firma-button');
         button.onclick = function () {
-            if (typeof showToast === 'function') {
-                showToast('Configuración de Firma Electrónica disponible en A1.3', 'info');
-            } else {
-                console.log('[A1.2 stub] Click en Firma para ' + companyName);
+            if (typeof prepareFirmaModal === 'function') {
+                prepareFirmaModal(companyName);
             }
         };
     }
@@ -3445,6 +3539,394 @@
         if (!modal) return;
         modal.classList.remove('active');
         _nitModalCtx = null;
+    }
+
+    // 📦103.A1.3 · Modal de configuración de Firma Electrónica por empresa.
+    // Reutiliza los 4 handlers ya implementados en firma-bridge.js:
+    //   - firma:empresa:create        (empresa SIN firma, modo "Crear nuevo")
+    //   - firma:empresa:set-api-key   (empresa SIN firma, modo "Pegar key")
+    //   - firma:empresa:rotate-api-key (empresa YA configurada → Rotar)
+    //   - firma:empresa:revoke-api-key (empresa YA configurada → Eliminar)
+    // NUNCA confundir create con rotate. La apiKey NUNCA se muestra después de guardar.
+    var _firmaModalCtx = null; // {companyName, hasFirma, firmaInfo, mode}
+    var _firmaModalBusy = false; // previene doble envío mientras hay petición en curso
+
+    // Helper: formatea ISO date a string user-friendly en es-CO
+    function _formatFirmaDate(iso) {
+        if (!iso) return '—';
+        try {
+            var d = new Date(iso);
+            if (isNaN(d.getTime())) return '—';
+            return d.toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' }) +
+                ' ' + d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+        } catch (e) { return '—'; }
+    }
+
+    // Helper: muestra resultado (ok/error) en #firma-modal-result
+    function _showFirmaModalResult(type, msg) {
+        var el = document.getElementById('firma-modal-result');
+        if (!el) return;
+        el.style.display = 'block';
+        if (type === 'ok') {
+            el.style.background = '#d1fae5';
+            el.style.color = '#065f46';
+        } else {
+            el.style.background = '#fee2e2';
+            el.style.color = '#991b1b';
+        }
+        el.textContent = msg;
+    }
+
+    // Helper: oculta el banner de resultado
+    function _hideFirmaModalResult() {
+        var el = document.getElementById('firma-modal-result');
+        if (el) {
+            el.style.display = 'none';
+            el.textContent = '';
+        }
+    }
+
+    // Helper: muestra/oculta bloques según el modo seleccionado en los radios
+    function _setFirmaModalMode(mode) {
+        var apikeyBlock = document.getElementById('firma-modal-apikey-block');
+        if (apikeyBlock) apikeyBlock.style.display = (mode === 'paste') ? '' : 'none';
+    }
+
+    // Helper: mapea códigos de error del bridge a mensaje user-friendly (NO loggea apiKey)
+    function _firmaErrorToMessage(code, fallbackMsg) {
+        switch (code) {
+            case 'ADMIN_TOKEN_REQUIRED':
+                return 'Falta configurar la credencial administrativa. Ve a Configuración → Firma Electrónica y configúrala.';
+            case 'ALREADY_CONFIGURED':
+                return 'Esta empresa ya tiene firma configurada. Usa "Rotar" para reemplazar la key.';
+            case 'BACKEND_REJECTED':
+                return 'El servicio de firma rechazó la solicitud. Detalle: ' + (fallbackMsg || '');
+            case 'INVALID_API_KEY':
+                return 'La credencial administrativa no es válida o fue revocada. Genera una nueva en firma-service.';
+            case 'CLIENT_EXISTS_FOR_EMPRESA':
+                return 'Ya existe un cliente con este NIT en firma-service. Contacta al administrador.';
+            case 'CLIENT_NOT_FOUND':
+                return 'Esta empresa no tiene firma configurada localmente.';
+            case 'INVALID_REQUEST_BODY':
+                return 'Faltan datos requeridos: ' + (fallbackMsg || '');
+            case 'CONFIG_MISSING':
+                return 'Falta configurar el servicio de firma. Ve a Configuración → Firma Electrónica.';
+            case 'ENCRYPTION_UNAVAILABLE':
+                return 'Tu sistema no soporta cifrado seguro. Configura FIRMA_SERVICE_API_KEY en env.';
+            case 'INTERNAL':
+                return 'Error interno: ' + (fallbackMsg || 'desconocido');
+            default:
+                return fallbackMsg || ('Error: ' + (code || 'desconocido'));
+        }
+    }
+
+    // Helper: refresca el cache de empresas con firma y aplica al botón de la tarjeta
+    async function _refreshFirmaStateAfterChange(companyName) {
+        _firmaConfiguredCache = await _loadFirmaCache();
+        // Determinar hasNit consultando el botón NIT actual (es la fuente de UI)
+        var nitBtn = document.querySelector('[data-nit-button="' + companyName.replace(/"/g, '\\"') + '"]');
+        var hasNit = !!(nitBtn && nitBtn.classList.contains('nit-btn-configured'));
+        var firmaBtn = document.querySelector('[data-firma-button="' + companyName.replace(/"/g, '\\"') + '"]');
+        if (firmaBtn) {
+            _renderFirmaButtonState(firmaBtn, hasNit);
+        }
+    }
+
+    // 📦103.A1.3 · Abre el modal de Firma Electrónica para la empresa indicada.
+    // Lee el NIT canónico desde currentConfig.companyPaths[companyKey].nit
+    // (NO desde el DOM, NO desde el input del modal de NIT).
+    function prepareFirmaModal(companyName) {
+        if (!window.electronAPI || !window.electronAPI.firmaEmpresaCreate) {
+            showToast('Bridge de firma no disponible. Reinicia K+AIR.', 'error');
+            return;
+        }
+        var modal = document.getElementById('firma-empresa-modal');
+        if (!modal) return;
+        _firmaModalCtx = { companyName: companyName, hasFirma: false, firmaInfo: null, mode: 'create' };
+        _firmaModalBusy = false;
+
+        // Limpiar estado del modal
+        _hideFirmaModalResult();
+        var displayInput = document.getElementById('firma-modal-display-name');
+        if (displayInput) displayInput.value = companyName;
+        var apikeyInput = document.getElementById('firma-modal-apikey');
+        if (apikeyInput) apikeyInput.value = ''; // defensivo: NUNCA persistir en el DOM
+        var validateInput = document.getElementById('firma-modal-validate');
+        if (validateInput) validateInput.checked = false;
+        var modeRadio = document.querySelector('input[name="firma-mode"][value="create"]');
+        if (modeRadio) modeRadio.checked = true;
+        _setFirmaModalMode('create');
+
+        // 1. Leer NIT canónico desde currentConfig (autoritativo, NO del DOM)
+        var companyConfig = currentConfig && currentConfig.companyPaths && currentConfig.companyPaths[companyName];
+        var nit = companyConfig && companyConfig.nit;
+        var infoCompany = document.getElementById('firma-modal-company-info');
+        var infoNit = document.getElementById('firma-modal-nit-info');
+        if (infoCompany) infoCompany.textContent = 'Empresa: ' + companyName;
+        if (infoNit) infoNit.textContent = 'NIT: ' + (nit || '— (no configurado)');
+
+        // 2. Buscar estado de firma en cache
+        var firmaState = _getFirmaStateForCompany(companyName, _firmaConfiguredCache);
+        _firmaModalCtx.hasFirma = firmaState.hasFirma;
+        _firmaModalCtx.firmaInfo = firmaState.firmaInfo;
+        _firmaModalCtx.nit = nit;
+
+        // 3. Mostrar bloques según estado
+        var noNitBlock = document.getElementById('firma-modal-no-nit-block');
+        var modeBlock = document.getElementById('firma-modal-mode-block');
+        var displayBlock = document.getElementById('firma-modal-displayname-block');
+        var existingBlock = document.getElementById('firma-modal-existing-block');
+        var saveBtn = document.getElementById('firma-modal-save');
+        var rotateBtn = document.getElementById('firma-modal-rotate-btn');
+        var revokeBtn = document.getElementById('firma-modal-revoke-btn');
+
+        if (!nit) {
+            // SIN NIT: mostrar error, bloquear todo
+            if (noNitBlock) noNitBlock.style.display = 'block';
+            if (modeBlock) modeBlock.style.display = 'none';
+            if (displayBlock) displayBlock.style.display = 'none';
+            if (existingBlock) existingBlock.style.display = 'none';
+            if (saveBtn) saveBtn.disabled = true;
+            if (rotateBtn) rotateBtn.style.display = 'none';
+            if (revokeBtn) revokeBtn.style.display = 'none';
+        } else if (!firmaState.hasFirma) {
+            // CON NIT, SIN firma: mostrar formulario Crear/Pegar
+            if (noNitBlock) noNitBlock.style.display = 'none';
+            if (modeBlock) modeBlock.style.display = 'block';
+            if (displayBlock) displayBlock.style.display = 'block';
+            if (existingBlock) existingBlock.style.display = 'none';
+            if (saveBtn) { saveBtn.disabled = false; saveBtn.style.display = ''; }
+            if (rotateBtn) rotateBtn.style.display = 'none';
+            if (revokeBtn) revokeBtn.style.display = 'none';
+        } else {
+            // CON NIT + firma: mostrar estado + acciones Rotar / Eliminar
+            if (noNitBlock) noNitBlock.style.display = 'none';
+            if (modeBlock) modeBlock.style.display = 'none';
+            if (displayBlock) displayBlock.style.display = 'none';
+            if (existingBlock) existingBlock.style.display = 'block';
+            if (saveBtn) saveBtn.style.display = 'none';
+            if (rotateBtn) rotateBtn.style.display = '';
+            if (revokeBtn) revokeBtn.style.display = '';
+            // Pintar estado actual
+            var info = firmaState.firmaInfo || {};
+            var elIdEmp = document.getElementById('firma-modal-existing-idEmpresa');
+            var elAct = document.getElementById('firma-modal-existing-activatedAt');
+            var elLastVal = document.getElementById('firma-modal-existing-lastValidatedAt');
+            var elHash = document.getElementById('firma-modal-existing-hash');
+            if (elIdEmp) elIdEmp.textContent = info.idEmpresa || '—';
+            if (elAct) elAct.textContent = _formatFirmaDate(info.activatedAt);
+            if (elLastVal) elLastVal.textContent = info.lastValidatedAt ? _formatFirmaDate(info.lastValidatedAt) : 'Nunca';
+            if (elHash) elHash.textContent = '—'; // bridge no expone hash prefix por ahora en list
+        }
+
+        // 4. Abrir modal
+        modal.classList.add('active');
+    }
+
+    function closeFirmaModal() {
+        var modal = document.getElementById('firma-empresa-modal');
+        if (!modal) return;
+        modal.classList.remove('active');
+        // Limpiar inputs sensibles (defensivo)
+        var apikeyInput = document.getElementById('firma-modal-apikey');
+        if (apikeyInput) apikeyInput.value = '';
+        _firmaModalCtx = null;
+        _firmaModalBusy = false;
+    }
+
+    // 📦103.A1.3 · Guarda configuración de firma (Crear o Pegar).
+    // Si la empresa YA tiene firma, NO entra aquí (eso es Rotar/Eliminar).
+    async function saveFirmaFromModal() {
+        if (!_firmaModalCtx || _firmaModalBusy) return;
+        var companyName = _firmaModalCtx.companyName;
+        var nit = _firmaModalCtx.nit;
+        if (!nit) {
+            _showFirmaModalResult('error', 'Falta NIT. Configura el NIT primero.');
+            return;
+        }
+        if (_firmaModalCtx.hasFirma) {
+            // Salvaguarda: si entra aquí con firma configurada, NO llamar create.
+            _showFirmaModalResult('error', 'Esta empresa ya tiene firma. Usa "Rotar" o "Eliminar".');
+            return;
+        }
+
+        // Leer modo seleccionado
+        var modeRadio = document.querySelector('input[name="firma-mode"]:checked');
+        var mode = modeRadio ? modeRadio.value : 'create';
+        var displayInput = document.getElementById('firma-modal-display-name');
+        var displayName = (displayInput && displayInput.value || '').trim() || companyName;
+
+        var saveBtn = document.getElementById('firma-modal-save');
+        var originalLabel = saveBtn ? saveBtn.innerHTML : '';
+        _firmaModalBusy = true;
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando…';
+        }
+        _hideFirmaModalResult();
+
+        try {
+            var r;
+            if (mode === 'paste') {
+                var apikeyInput = document.getElementById('firma-modal-apikey');
+                var firmaApiKey = (apikeyInput && apikeyInput.value || '').trim();
+                if (!firmaApiKey) {
+                    _showFirmaModalResult('error', 'Por favor ingresa la API key.');
+                    _firmaModalBusy = false;
+                    if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = originalLabel; }
+                    return;
+                }
+                if (firmaApiKey.length < 32) {
+                    _showFirmaModalResult('error', 'La API key debe tener al menos 32 caracteres (actual: ' + firmaApiKey.length + ').');
+                    _firmaModalBusy = false;
+                    if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = originalLabel; }
+                    return;
+                }
+                var validateInput = document.getElementById('firma-modal-validate');
+                var validateRemote = !!(validateInput && validateInput.checked);
+                r = await window.electronAPI.firmaEmpresaSetApiKey({
+                    companyName: companyName,
+                    idEmpresa: nit,
+                    firmaApiKey: firmaApiKey,
+                    validateRemote: validateRemote
+                });
+                // ⚠️ Seguridad: limpiar el input inmediatamente (NUNCA dejar la key en el DOM)
+                if (apikeyInput) apikeyInput.value = '';
+                firmaApiKey = null; // sobreescribir la referencia
+            } else {
+                r = await window.electronAPI.firmaEmpresaCreate({
+                    companyName: companyName,
+                    idEmpresa: nit,
+                    displayName: displayName
+                });
+            }
+
+            if (!r || !r.success) {
+                var code = (r && r.error && r.error.code) || '';
+                var rawMsg = (r && r.error && r.error.message) || 'Error desconocido';
+                _showFirmaModalResult('error', _firmaErrorToMessage(code, rawMsg));
+                _firmaModalBusy = false;
+                if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = originalLabel; }
+                return;
+            }
+
+            // Éxito
+            _showFirmaModalResult('ok', '✓ Configuración guardada. idEmpresa: ' + (r.data.idEmpresa || nit));
+            if (typeof showToast === 'function') {
+                showToast('Firma configurada para ' + companyName, 'success');
+            }
+            // Refrescar cache + tarjeta
+            await _refreshFirmaStateAfterChange(companyName);
+            // Cerrar modal después de 1.2s
+            setTimeout(function () { closeFirmaModal(); }, 1200);
+        } catch (e) {
+            _showFirmaModalResult('error', 'Excepción: ' + (e && e.message || e));
+            _firmaModalBusy = false;
+            if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = originalLabel; }
+        }
+    }
+
+    // 📦103.A1.3 · Rota la API key de la empresa YA configurada.
+    // Usa firmaEmpresaRotateApiKey (NO firmaEmpresaCreate).
+    async function rotateFirmaFromModal() {
+        if (!_firmaModalCtx || _firmaModalBusy) return;
+        var companyName = _firmaModalCtx.companyName;
+        if (!_firmaModalCtx.hasFirma) {
+            _showFirmaModalResult('error', 'Esta empresa no tiene firma configurada. Usa "Guardar" primero.');
+            return;
+        }
+        var rotateBtn = document.getElementById('firma-modal-rotate-btn');
+        var originalLabel = rotateBtn ? rotateBtn.innerHTML : '';
+        _firmaModalBusy = true;
+        if (rotateBtn) {
+            rotateBtn.disabled = true;
+            rotateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Rotando…';
+        }
+        _hideFirmaModalResult();
+
+        try {
+            var r = await window.electronAPI.firmaEmpresaRotateApiKey({
+                companyName: companyName,
+                motivo: 'Rotación manual desde K+AIR (A1.3 UI)',
+                actor: 'kair-ui'
+            });
+            if (!r || !r.success) {
+                var code = (r && r.error && r.error.code) || '';
+                var rawMsg = (r && r.error && r.error.message) || 'Error desconocido';
+                _showFirmaModalResult('error', _firmaErrorToMessage(code, rawMsg));
+                _firmaModalBusy = false;
+                if (rotateBtn) { rotateBtn.disabled = false; rotateBtn.innerHTML = originalLabel; }
+                return;
+            }
+            _showFirmaModalResult('ok', '✓ API key rotada. Nuevo hash: ' + (r.data.newApiKeyHashPrefix || '—'));
+            if (typeof showToast === 'function') {
+                showToast('API key rotada para ' + companyName, 'success');
+            }
+            await _refreshFirmaStateAfterChange(companyName);
+            // Re-pintar el modal con el nuevo estado (rotar mantiene la firma)
+            prepareFirmaModal(companyName);
+            _firmaModalBusy = false;
+            if (rotateBtn) { rotateBtn.disabled = false; rotateBtn.innerHTML = originalLabel; }
+        } catch (e) {
+            _showFirmaModalResult('error', 'Excepción: ' + (e && e.message || e));
+            _firmaModalBusy = false;
+            if (rotateBtn) { rotateBtn.disabled = false; rotateBtn.innerHTML = originalLabel; }
+        }
+    }
+
+    // 📦103.A1.3 · Revoca la configuración de firma de la empresa.
+    // Usa firmaEmpresaRevokeApiKey con revokeRemote=true para marcar la key
+    // como revocada en firma-service (V1: revoke = rotate con motivo).
+    async function revokeFirmaFromModal() {
+        if (!_firmaModalCtx || _firmaModalBusy) return;
+        var companyName = _firmaModalCtx.companyName;
+        if (!_firmaModalCtx.hasFirma) {
+            _showFirmaModalResult('error', 'Esta empresa no tiene firma configurada.');
+            return;
+        }
+        // Confirmación explícita antes de revocar
+        if (!window.confirm('¿Eliminar la configuración de Firma Electrónica de "' + companyName + '"?\n\n' +
+            'Esto borrará la firma local Y marcará la API key como revocada en firma-service.\n' +
+            'La acción NO se puede deshacer.')) {
+            return;
+        }
+        var revokeBtn = document.getElementById('firma-modal-revoke-btn');
+        var originalLabel = revokeBtn ? revokeBtn.innerHTML : '';
+        _firmaModalBusy = true;
+        if (revokeBtn) {
+            revokeBtn.disabled = true;
+            revokeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Eliminando…';
+        }
+        _hideFirmaModalResult();
+
+        try {
+            var r = await window.electronAPI.firmaEmpresaRevokeApiKey({
+                companyName: companyName,
+                revokeRemote: true,
+                motivo: 'Revocación manual desde K+AIR (A1.3 UI)'
+            });
+            if (!r || !r.success) {
+                var code = (r && r.error && r.error.code) || '';
+                var rawMsg = (r && r.error && r.error.message) || 'Error desconocido';
+                _showFirmaModalResult('error', _firmaErrorToMessage(code, rawMsg));
+                _firmaModalBusy = false;
+                if (revokeBtn) { revokeBtn.disabled = false; revokeBtn.innerHTML = originalLabel; }
+                return;
+            }
+            _showFirmaModalResult('ok', '✓ Configuración eliminada. Hash revocado: ' + (r.data.oldApiKeyHashPrefix || '—'));
+            if (typeof showToast === 'function') {
+                showToast('Firma eliminada para ' + companyName, 'success');
+            }
+            await _refreshFirmaStateAfterChange(companyName);
+            // Re-pintar el modal sin firma
+            prepareFirmaModal(companyName);
+            _firmaModalBusy = false;
+            if (revokeBtn) { revokeBtn.disabled = false; revokeBtn.innerHTML = originalLabel; }
+        } catch (e) {
+            _showFirmaModalResult('error', 'Excepción: ' + (e && e.message || e));
+            _firmaModalBusy = false;
+            if (revokeBtn) { revokeBtn.disabled = false; revokeBtn.innerHTML = originalLabel; }
+        }
     }
 
     // 📦103.A1.1 · Guarda el NIT. Llama companyNitSet (preload) → company-nit:set (IPC)
@@ -3519,22 +4001,51 @@
     // modal vive en el DOM global, se puede wirear desde aquí sin problema).
     // Mismo patrón que el wireup de #link-modal.
     document.addEventListener('DOMContentLoaded', function () {
-        var modal = document.getElementById('nit-modal');
-        if (!modal) return;
-        // Botón Guardar
-        var saveBtn = document.getElementById('nit-modal-save');
-        if (saveBtn) saveBtn.onclick = saveNitFromModal;
-        // Botón Cancelar
-        var cancelBtn = document.getElementById('nit-modal-cancel');
-        if (cancelBtn) cancelBtn.onclick = closeNitModal;
-        // Click en el overlay (fuera del .modal-container) cierra
-        modal.addEventListener('click', function (e) {
-            if (e.target === modal) closeNitModal();
-        });
-        // Escape cierra
+        // Wireup modal NIT (A1.1)
+        var nitModal = document.getElementById('nit-modal');
+        if (nitModal) {
+            var saveBtn = document.getElementById('nit-modal-save');
+            if (saveBtn) saveBtn.onclick = saveNitFromModal;
+            var cancelBtn = document.getElementById('nit-modal-cancel');
+            if (cancelBtn) cancelBtn.onclick = closeNitModal;
+            nitModal.addEventListener('click', function (e) {
+                if (e.target === nitModal) closeNitModal();
+            });
+        }
+
+        // 📦103.A1.3 · Wireup modal Firma (mismo patrón que NIT)
+        var firmaModal = document.getElementById('firma-empresa-modal');
+        if (firmaModal) {
+            var firmaSaveBtn = document.getElementById('firma-modal-save');
+            if (firmaSaveBtn) firmaSaveBtn.onclick = saveFirmaFromModal;
+            var firmaCancelBtn = document.getElementById('firma-modal-cancel');
+            if (firmaCancelBtn) firmaCancelBtn.onclick = closeFirmaModal;
+            var firmaRotateBtn = document.getElementById('firma-modal-rotate-btn');
+            if (firmaRotateBtn) firmaRotateBtn.onclick = rotateFirmaFromModal;
+            var firmaRevokeBtn = document.getElementById('firma-modal-revoke-btn');
+            if (firmaRevokeBtn) firmaRevokeBtn.onclick = revokeFirmaFromModal;
+            // Cambio de modo (radio buttons) → muestra/oculta bloque de API key
+            var modeRadios = firmaModal.querySelectorAll('input[name="firma-mode"]');
+            for (var i = 0; i < modeRadios.length; i++) {
+                modeRadios[i].addEventListener('change', function (e) {
+                    if (e && e.target && e.target.value) {
+                        _setFirmaModalMode(e.target.value);
+                    }
+                });
+            }
+            // Click en el overlay (fuera del .modal-container) cierra
+            firmaModal.addEventListener('click', function (e) {
+                if (e.target === firmaModal) closeFirmaModal();
+            });
+        }
+
+        // Escape cierra AMBOS modales (NIT o Firma, el que esté activo)
         document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape' && modal.classList.contains('active')) {
+            if (e.key !== 'Escape') return;
+            if (nitModal && nitModal.classList.contains('active')) {
                 closeNitModal();
+            } else if (firmaModal && firmaModal.classList.contains('active')) {
+                closeFirmaModal();
             }
         });
     });
