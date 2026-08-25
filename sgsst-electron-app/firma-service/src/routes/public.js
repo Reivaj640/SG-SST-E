@@ -30,6 +30,20 @@ const { z } = require('zod');
 // Ruta al HTML estático de la mini-app (resuelta desde SERVICE_ROOT)
 const MINI_APP_HTML = path.resolve(__dirname, '..', '..', 'web', 'firma', 'index.html');
 
+/**
+ * Enmascara un correo para exposición pública: "jrf2011@live.com" → "jrf****@live.com".
+ * Helper local (presentación); NO se importa de publicFlow.js para evitar
+ * acoplamiento entre la ruta y la lógica de negocio.
+ * Retorna '' si el correo es null/undefined/inválido.
+ */
+function _maskEmailPublico(email) {
+  if (typeof email !== 'string' || !email.includes('@')) return '';
+  const [local, domain] = email.split('@');
+  if (!local || !domain) return '';
+  if (local.length <= 2) return local[0] + '****@' + domain;
+  return local.slice(0, 2) + '****@' + domain;
+}
+
 const identifyBody = z.object({
   // D-1 (I-002): rename tipo_documento → tipo_identificacion.
   // Es el tipo de documento de IDENTIFICACIÓN del firmante (CC, CE, TI,
@@ -103,6 +117,19 @@ router.get('/s/:token', (req, res, next) => {
       // La mini-app lo muestra como contexto ("Estás firmando un CONTRATO").
       // Puede ser null para sign requests legacy pre-migration 007.
       tipo_identificacion: signRequest.tipo_identificacion,
+      // I-103.A1.6 · Correo enmascarado del firmante, para mostrar en la
+      // pantalla OTP cuando el firmante re-abre el enlace y ya pasó por
+      // identificación. Solo se expone si estado >= IDENTIFIED (después
+      // de identificar); antes de eso, el firmante aún no ha confirmado
+      // a qué correo se envió el OTP, así que no lo exponemos.
+      correo_enmascarado: (estado === 'IDENTIFIED' ||
+                           estado === 'OTP_SENT' ||
+                           estado === 'OTP_VERIFIED' ||
+                           estado === 'DOCUMENT_OPENED' ||
+                           estado === 'DOCUMENT_VIEWED' ||
+                           estado === 'SIGNED')
+        ? _maskEmailPublico(signRequest.correo_verificacion)
+        : null,
     });
   } catch (err) {
     next(err);
