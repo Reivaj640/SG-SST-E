@@ -150,6 +150,8 @@
     correoEnmascarado: null,   // respuesta de identify
     pdfViewed: false,          // true después de llamar view-document con éxito
     viewDocumentAttempted: false, // para evitar reintentos
+    consentAccepted: false,    // true después de POST /consent/accept exitoso (Bloque E6.5)
+    consentAcceptInProgress: false, // evita doble POST al marcar/desmarcar rápido
   };
 
   // ============================================================
@@ -427,14 +429,114 @@
     // Habilitar botón FIRMAR solo cuando ambos checkboxes estén marcados
     const check1 = $('#manifestacion_leido');
     const check2 = $('#manifestacion_voluntad');
+    const check3 = $('#consentimiento_aceptado');   // Bloque E6.5: 3ª casilla
     const btnCommit = $('#btn-commit');
     const btnReject = $('#btn-reject');
 
+
     const updateCommitButton = function () {
-      btnCommit.disabled = !(check1.checked && check2.checked);
+      const c1 = check1 && check1.checked;
+      const c2 = check2 && check2.checked;
+      // check3 es solo el trigger visual: el botón depende del estado
+      // de aceptación en backend (state.consentAccepted), no del .checked.
+      // Esto evita que un click rápido sin esperar el POST habilite el botón.
+      const c3Accepted = state.consentAccepted === true;
+      // PDF debe haber sido visto (view-document exitoso).
+      const pdfOk = state.pdfViewed === true;
+      const newDisabled = !(c1 && c2 && c3Accepted && pdfOk);
+      btnCommit.disabled = newDisabled;
     };
-    check1.addEventListener('change', updateCommitButton);
-    check2.addEventListener('change', updateCommitButton);
+    check1.addEventListener('change', () => {
+      updateCommitButton();
+    });
+    check2.addEventListener('change', () => {
+      updateCommitButton();
+    });
+
+    // Bloque E6.5: handler del 3er checkbox (Acepto el Acuerdo v1.0).
+    //
+    // Reglas:
+    //   - Al MARCAR: POST /api/sign/:token/consent/accept
+    //     · 200 (idempotente=false o true) → state.consentAccepted = true
+    //     · 4xx → check3.checked = false, state.consentAccepted = false,
+    //              mostrar error, permitir reintentar
+    //   - Al DESMARCAR: NO hacer "desaceptar" en BD (el consentimiento ya
+    //     aceptado permanece aceptado). Solo resetear el estado local
+    //     para deshabilitar el botón. El usuario puede volver a marcar
+    //     y el endpoint se llamará de nuevo (será idempotente).
+    if (check3) {
+      check3.addEventListener('change', async () => {
+        if (check3.checked) {
+          // Evitar doble POST si el usuario marca/desmarca rápido
+          if (state.consentAcceptInProgress) {
+            check3.checked = false;
+            return;
+          }
+          state.consentAcceptInProgress = true;
+          hideFormError('commit-error');
+          try {
+            const result = await apiFetch(
+              '/api/sign/' + state.token + '/consent/accept',
+              { method: 'POST', body: {} }
+            );
+            state.consentAccepted = true;
+          } catch (err) {
+            // Revertir el checkbox a false (el consentimiento NO fue aceptado)
+            check3.checked = false;
+            state.consentAccepted = false;
+            // Mensajes específicos por código de error
+            let msg;
+            if (err.status === 410) {
+              // Token expirado o ya usado → ir a pantalla de error fatal
+              return showError('Este enlace ha expirado o ya fue utilizado.');
+            } else if (err.status === 404) {
+              return showError('El enlace que usaste no es válido o ya no existe.');
+            } else if (err.code === 'CONSENT_ACCEPT_TOO_EARLY') {
+              msg = 'No se puede aceptar el Acuerdo en este momento. Intenta recargar la página.';
+            } else if (err.code === 'CONSENT_REQUIRED') {
+              msg = 'Esta solicitud no requiere aceptación de Acuerdo. Contacta a tu empleador.';
+            } else if (err.code === 'CONSENT_LOCKED') {
+              msg = 'El Acuerdo está bloqueado por intentos previos. Contacta al área de RRHH.';
+            } else if (err.code === 'CONSENT_INCONSISTENT_STATE') {
+              msg = 'El Acuerdo tiene un estado inconsistente. Contacta al área de RRHH.';
+            } else if (err.code === 'CONSENT_NOT_FOUND') {
+              msg = 'No se encontró el consentimiento. Contacta al área de RRHH.';
+            } else if (err.code === 'CONSENT_VERSION_MISMATCH' ||
+                       err.code === 'CONSENT_WORKER_MISMATCH' ||
+                       err.code === 'CONSENT_COMPANY_MISMATCH') {
+              msg = 'El Acuerdo no corresponde a esta solicitud. Contacta al área de RRHH.';
+            } else {
+              msg = err.message || 'No se pudo registrar la aceptación del Acuerdo.';
+            }
+            showFormError('commit-error', msg);
+          } finally {
+            state.consentAcceptInProgress = false;
+            updateCommitButton();
+          }
+        } else {
+          // Desmarcar: solo resetear estado local, NO tocar backend
+          state.consentAccepted = false;
+          updateCommitButton();
+        }
+      });
+    }
+
+    check1.addEventListener('input', () => {
+    });
+    check2.addEventListener('input', () => {
+    });
+    if (check3) {
+      check3.addEventListener('input', () => {
+      });
+    }
+    check1.addEventListener('click', () => {
+    });
+    check2.addEventListener('click', () => {
+    });
+    if (check3) {
+      check3.addEventListener('click', () => {
+      });
+    }
     updateCommitButton();
 
     // Confirmación explícita antes de rechazar

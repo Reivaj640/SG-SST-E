@@ -293,6 +293,58 @@ function withLegacyApiKey(req) {
  * Idempotente: si los clientes ya existen (mismo hash), no duplica.
  * Llamar después de resetDb() (que limpia la tabla).
  */
+/**
+ * Crea un consentimiento en estado OTP_PENDING (sin verificar OTP).
+ * Helper para tests del Bloque E6.5 (POST /api/sign/:token/consent/accept).
+ *
+ * A diferencia de `createAcceptedConsent`, esta función NO llama a
+ * /verify-otp, así que el consentimiento queda listo para ser aceptado
+ * por el endpoint /consent/accept (la 3ª casilla de la mini-app).
+ *
+ * Retorna { consent_id, ... } con el id del consentimiento pending.
+ */
+async function createPendingConsent({
+  id_trabajador = '1234567890',
+  id_empresa = '900123456',
+  version_acuerdo = 'v1.0',
+  correo = 'trabajador@example.com',
+  kair_version = '0.1.189-test',
+} = {}) {
+  const request = require('supertest');
+  const app = makeApp();
+  const apiKey = TEST_API_KEY;
+
+  // Asegurar Acuerdo activo
+  const acuerdo = require('../src/services/agreement').getActive();
+  if (!acuerdo) seedActiveAgreement({ version: version_acuerdo });
+
+  // Crear consentimiento
+  const r1 = await request(app)
+    .post('/internal/consentimientos')
+    .set('X-Internal-API-Key', apiKey)
+    .send({
+      id_trabajador,
+      id_empresa,
+      version_acuerdo,
+      correo_verificacion: correo,
+      kair_version,
+    });
+
+  if (r1.status !== 201) {
+    throw new Error(
+      `createPendingConsent: no se pudo crear consentimiento ` +
+      `(status=${r1.status}, body=${JSON.stringify(r1.body)})`
+    );
+  }
+
+  return {
+    consent_id: r1.body.consent_id,
+    id_trabajador,
+    id_empresa,
+    version_acuerdo,
+  };
+}
+
 function seedTestClients() {
   const internalClient = require('../src/services/internalClient');
   const ALL_OPS = [
@@ -328,6 +380,7 @@ module.exports = {
   seedTestClients,
   createSignRequestWithIdentificacion,
   createAcceptedConsent,
+  createPendingConsent,
   TEST_API_KEY,
   TEST_ADMIN_API_KEY,
   TEST_API_KEY_CLIENT_A,

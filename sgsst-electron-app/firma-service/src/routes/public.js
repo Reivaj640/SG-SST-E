@@ -1,9 +1,10 @@
 /**
  * Rutas públicas del flujo de firma.
  *
- * - GET  /s/:token              (carga contexto público)
+ * - GET  /s/:token                          (carga contexto público)
  * - POST /api/sign/:token/identify
  * - POST /api/sign/:token/verify-otp
+ * - POST /api/sign/:token/consent/accept    (Bloque E6.5: 3ª casilla UI)
  * - POST /api/sign/:token/view-document
  * - GET  /api/sign/:token/document.pdf
  * - POST /api/sign/:token/commit
@@ -164,6 +165,35 @@ router.post('/api/sign/:token/verify-otp', validateBody(verifyOtpBody), (req, re
     const result = publicFlow.verifyOtp(
       req.params.token,
       req.body.otp,
+      req.ip,
+      req.get('User-Agent'),
+    );
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/sign/:token/consent/accept
+ * Acepta el consentimiento del Acuerdo vinculado al sign request.
+ * Disparado por la 3ª casilla de la mini-app después del OTP.
+ *
+ * Precondiciones (validadas por publicFlow.consentAccept):
+ * - Token válido y NO terminal
+ * - signRequest.estado ∈ {OTP_VERIFIED, DOCUMENT_VIEWED}
+ * - signRequest.consent_id IS NOT NULL
+ * - El consentimiento existe y coincide en (trabajador, empresa, version)
+ * - El consentimiento está en estado OTP_PENDING
+ *
+ * Idempotente: la 1ª aceptación marca consent + crea evento
+ * CONSENT_ACCEPTED. Las siguientes retornan 200 con idempotente: true
+ * sin crear otro evento.
+ */
+router.post('/api/sign/:token/consent/accept', (req, res, next) => {
+  try {
+    const result = publicFlow.consentAccept(
+      req.params.token,
       req.ip,
       req.get('User-Agent'),
     );
