@@ -415,6 +415,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // vía firma-service. Ver canales firma:* más abajo.
   ghListDocumentos: (payload) => ipcRenderer.invoke('gh:list-documentos', payload),
   ghGetDocumento: (payload) => ipcRenderer.invoke('gh:get-documento', payload),
+  // I-103.A1.6 · Consulta mínima de un consentimiento por ID (Fase 3).
+  // Usado por el módulo Firma electrónica para obtener correo_verificacion
+  // sin pedirlo de nuevo al usuario. Retorna solo campos mínimos.
+  ghGetConsentimiento: (consentId, args) => ipcRenderer.invoke('gh:get-consentimiento', Object.assign({ consentId }, args || {})),
+  // I-103.A1.6 · Consulta mínima de un sign request por id_solicitud (Fase 3).
+  // Complementa firmaSignRequestGet (datos generales) y firmaSignRequestLink
+  // (url_publica). Retorna correo_verificacion (de metadata) y fecha_envio
+  // (último INVITE_SENT). Lectura READ-ONLY, no modifica firma.sqlite.
+  ghGetSignRequest: (id, args) => ipcRenderer.invoke('gh:get-sign-request', Object.assign({ id }, args || {})),
   ghCreateDocumento: (payload) => ipcRenderer.invoke('gh:create-documento', payload),
   ghUpdateDocumento: (payload) => ipcRenderer.invoke('gh:update-documento', payload),
   ghDeleteDocumento: (payload) => ipcRenderer.invoke('gh:delete-documento', payload),
@@ -446,17 +455,32 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Sign request (6)
   firmaSignRequestCreate: (payload) => ipcRenderer.invoke('firma:sign-request:create', payload),
   // I-102.2.D · Lectura de bytes del PDF para calcular document_hash
-  firmaDocumentoReadBytes: (rutaArchivo) => ipcRenderer.invoke('firma:documento:read-bytes', { rutaArchivo }),
-  firmaSignRequestGet: (id) => ipcRenderer.invoke('firma:sign-request:get', { id }),
-  firmaSignRequestList: (ids) => ipcRenderer.invoke('firma:sign-request:list', { ids }),
+  firmaDocumentoReadBytes: (args) => {
+    // I-103.A1.5.4-B · DIAGNÓSTICO TEMPORAL (visible en DevTools Console)
+    try {
+      console.log('[A154] preload.firmaDocumentoReadBytes ARGS', JSON.stringify({
+        arg_typeof: typeof args,
+        arg_isString: typeof args === 'string',
+        arg_isObject: (typeof args === 'object' && args !== null),
+        arg_length: (typeof args === 'string') ? args.length : 'n/a',
+        arg_keys: (typeof args === 'object' && args !== null) ? Object.keys(args) : []
+      }));
+    } catch (_diagE) { /* noop */ }
+    return ipcRenderer.invoke('firma:documento:read-bytes', args || {});
+  },
+  firmaSignRequestGet: (id, args) => ipcRenderer.invoke('firma:sign-request:get', Object.assign({ id }, args || {})),
+  firmaSignRequestList: (ids, args) => ipcRenderer.invoke('firma:sign-request:list', Object.assign({ ids }, args || {})),
   firmaSignRequestDocument: (id) => ipcRenderer.invoke('firma:sign-request:document', { id }),
   firmaSignRequestConstancia: (id) => ipcRenderer.invoke('firma:sign-request:constancia', { id }),
-  firmaSignRequestLink: (id) => ipcRenderer.invoke('firma:sign-request:link', { id }),
+  firmaSignRequestLink: (id, args) => ipcRenderer.invoke('firma:sign-request:link', Object.assign({ id }, args || {})),
+  // I-103.A1.5.2 · Enviar invitación de firma al firmante por correo.
+  // Args: { id: 'SIGN-YYYY-NNNNNN' | <int>, correo: 'firmante@x.com', context?: { ... } }
+  firmaSignRequestNotifyRemote: (id, args) => ipcRenderer.invoke('firma:sign-request:notify-remote', Object.assign({ id }, args || {})),
   // Consent (2)
   firmaConsentCreate: (payload) => ipcRenderer.invoke('firma:consent:create', payload),
   firmaConsentVerifyOtp: (consentId, otp) => ipcRenderer.invoke('firma:consent:verify-otp', { consentId, otp }),
   // Agreement (1)
-  firmaAgreementGet: () => ipcRenderer.invoke('firma:agreement:get'),
+  firmaAgreementGet: (args) => ipcRenderer.invoke('firma:agreement:get', args || {}),
 
   // 📦101-extra (2026-08-20) — Per-empresa admin (I-010 per-company authz, AUD-04)
   // 7 canales: 6 firma:empresa:* + 1 firma:config:set-admin-key

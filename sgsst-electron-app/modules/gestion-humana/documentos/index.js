@@ -283,6 +283,26 @@ class DocumentosComponent {
         };
       }
     });
+
+    // I-103.A1.5.3 · Wireup específico del modal de éxito.
+    // Necesita su propio _cerrarModalExito (limpia listener de Escape).
+    // Sobreescribe el wireup genérico del backdrop + data-close.
+    var modalExito = this.container.querySelector('#doc-firma-success-modal');
+    if (modalExito) {
+      modalExito.querySelectorAll('[data-close-doc-firma-success="1"]').forEach(function (el) {
+        el.onclick = function () { self._cerrarModalExito(modalExito); };
+      });
+      var backdropExito = modalExito.querySelector('.doc-modal__backdrop');
+      if (backdropExito) {
+        backdropExito.onclick = function (e) {
+          if (e.target === backdropExito) self._cerrarModalExito(modalExito);
+        };
+      }
+      var btnCopy = modalExito.querySelector('#doc-firma-success-copy');
+      if (btnCopy) btnCopy.onclick = function () { self._copiarEnlace(modalExito); };
+      var btnSend = modalExito.querySelector('#doc-firma-success-send');
+      if (btnSend) btnSend.onclick = function () { self._enviarCorreoFirmante(modalExito); };
+    }
   }
 
   // 📦763 · Cierra cualquier modal de documento
@@ -594,6 +614,8 @@ class DocumentosComponent {
   // de la validacion para confirmar que el path end-to-end esta conectado.
   async _firmarElectronico(docId) {
     var self = this;
+    // I-103.A1.5.4-B · DIAGNÓSTICO TEMPORAL (visible en DevTools Console)
+    console.log('[A154] _firmarElectronico ENTER docId=' + docId + ' self.companyName=' + JSON.stringify(self.companyName));
     try {
       // 1) Obtener el documento completo (incluye rutaArchivo, idSolicitudFirma, etc.)
       var r1 = await window.electronAPI.ghGetDocumento({ documentoId: docId });
@@ -616,6 +638,29 @@ class DocumentosComponent {
         return;
       }
       var configured = (r2.data && r2.data.configured) || [];
+      // I-103.A1.5.4-B · DIAGNÓSTICO TEMPORAL (visible en DevTools Console)
+      console.log('[A154] _firmarElectronico · firmaEmpresaList OK configured_count=' + configured.length + ' configured_keys=' + JSON.stringify(configured.map(function (c) { return c && c.companyKey; })));
+      // I-103.A1.5.4-B · DIAGNÓSTICO TEMPORAL — NO COMMITEAR
+      // Registra self.companyName vs configured[].companyKey, con la misma
+      // normalización que usa el bridge (lowercase + NFD + strip diacritics).
+      // El agente CLI lee 'kair_doc_match' después.
+      try {
+        var _normMatch = function (s) {
+          return (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        };
+        var _diagMatch = {
+          ts: new Date().toISOString(),
+          self_companyName: self.companyName,
+          self_companyName_typeof: typeof self.companyName,
+          self_companyName_norm: _normMatch(self.companyName),
+          configured_count: configured.length,
+          configured_keys: configured.map(function (c) { return c && c.companyKey; }),
+          configured_keys_norm: configured.map(function (c) { return _normMatch(c && c.companyKey); }),
+          match_will_be_found: configured.some(function (c) { return c && c.companyKey === self.companyName; }),
+          match_will_be_found_norm: configured.some(function (c) { return _normMatch(c && c.companyKey) === _normMatch(self.companyName); })
+        };
+        localStorage.setItem('kair_doc_match', JSON.stringify(_diagMatch));
+      } catch (_diagE) { /* noop */ }
       var match = configured.find(function (c) { return c.companyKey === self.companyName; });
       if (!match) {
         self._showToast(
@@ -718,6 +763,8 @@ class DocumentosComponent {
     // Wireup del botón Enviar a firma (I-102.2.D).
     if (btnEnviar) {
       btnEnviar.onclick = function () {
+        // I-103.A1.5.4-B · DIAGNÓSTICO TEMPORAL (visible en DevTools Console)
+        console.log('[A154] btnEnviar.onclick FIRED self.companyName=' + JSON.stringify(self.companyName));
         if (!self._validarFormularioFirma(modal)) return;
         var ctx = modal._docFirmaCtx;
         self._enviarAFirma(modal, ctx, correoInput.value.trim());
@@ -816,6 +863,8 @@ class DocumentosComponent {
   // (todo eso es I-102.2.F/G).
   async _enviarAFirma(modal, ctx, correoFirmante) {
     var self = this;
+    // I-103.A1.5.4-B · DIAGNÓSTICO TEMPORAL (visible en DevTools Console)
+    console.log('[A154] _enviarAFirma ENTER self.companyName=' + JSON.stringify(self.companyName) + ' correoFirmante_length=' + (correoFirmante || '').length);
     var btnEnviar = modal.querySelector('#doc-firma-enviar');
     var doc = ctx.doc;
     var match = ctx.match;
@@ -829,20 +878,39 @@ class DocumentosComponent {
 
     try {
       // 2) Obtener acuerdo activo (texto_hash + version)
-      var rAgr = await window.electronAPI.firmaAgreementGet();
+      // I-103.A1.5.4-B · fix: pasar companyName explícitamente para que el
+      // bridge entre al path per-empresa (no legacy). Sin esto, _resolveClientForRequest
+      // cae al modo legacy y retorna CONFIG_MISSING (legacy key vacía en __default__).
+      var rAgr = await window.electronAPI.firmaAgreementGet({ companyName: self.companyName });
+      // I-103.A1.5.4-B · DIAGNÓSTICO TEMPORAL (visible en DevTools Console)
+      console.log('[A154] _enviarAFirma · firmaAgreementGet result: success=' + (rAgr && rAgr.success) + ' has_data=' + !!(rAgr && rAgr.data) + ' has_texto_hash=' + !!(rAgr && rAgr.data && rAgr.data.texto_hash));
       if (!rAgr || !rAgr.success) {
+        console.log('[A154] _enviarAFirma · EXIT in firmaAgreementGet (no success). Toast: ' + self._traducirErrorFirma(rAgr));
         self._showToast(self._traducirErrorFirma(rAgr), 'error');
         return;
       }
       var agreement = rAgr.data;
       if (!agreement || !agreement.texto_hash) {
+        console.log('[A154] _enviarAFirma · EXIT (no agreement.texto_hash)');
         self._showToast('El acuerdo activo no tiene hash. Contacta al administrador.', 'error');
         return;
       }
 
       // 3) Leer bytes del PDF desde el disco (bridge hace fs.readFileSync)
+      // I-103.A1.5.4-B · DIAGNÓSTICO TEMPORAL (visible en DevTools Console)
+      console.log('[A154] _enviarAFirma · firmaDocumentoReadBytes CALL', JSON.stringify({
+        doc_rutaArchivo_present: !!(doc && doc.rutaArchivo),
+        doc_rutaArchivo_typeof: typeof (doc && doc.rutaArchivo),
+        doc_rutaArchivo_length: ((doc && doc.rutaArchivo) || '').length,
+        arg_sent_typeof: typeof ({ rutaArchivo: doc.rutaArchivo }),
+        arg_sent_isObject: (typeof { rutaArchivo: doc.rutaArchivo }) === 'object',
+        arg_sent_keys: Object.keys({ rutaArchivo: doc.rutaArchivo })
+      }));
       var rRead = await window.electronAPI.firmaDocumentoReadBytes({ rutaArchivo: doc.rutaArchivo });
+      // I-103.A1.5.4-B · DIAGNÓSTICO TEMPORAL (visible en DevTools Console)
+      console.log('[A154] _enviarAFirma · firmaDocumentoReadBytes result: success=' + (rRead && rRead.success) + ' has_data=' + !!(rRead && rRead.data) + ' rutaArchivo_length=' + (doc.rutaArchivo || '').length);
       if (!rRead || !rRead.success) {
+        console.log('[A154] _enviarAFirma · EXIT in firmaDocumentoReadBytes. Toast: No se pudo leer el PDF');
         self._showToast('No se pudo leer el PDF: ' + (rRead && rRead.error && rRead.error.message || 'desconocido'), 'error');
         return;
       }
@@ -852,10 +920,121 @@ class DocumentosComponent {
       var hashBuf = await crypto.subtle.digest('SHA-256', pdfBytes);
       var documentHash = self._bytesToHex(new Uint8Array(hashBuf));
 
-      // 5) Construir metadata del sign request
+      // 5) I-103.A1.5.3.1 (Bug 2 fix) · Crear y aceptar consentimiento del Acuerdo.
+      //    El Bloque E6 requiere que el sign request con agreement_version
+      //    esté vinculado a un consent_id ACEPTADO. Sin esto, el commit
+      //    del firmante falla con 409 CONSENT_NOT_ACCEPTED.
+      //
+      //    Contratos verificados (firma-bridge.js + firma-client.js +
+      //    routes/consent.js + services/consent.js):
+      //      firmaConsentCreate({id_trabajador, id_empresa, version_acuerdo,
+      //                          correo_verificacion, kair_version})
+      //        - 201: {consent_id, ..., devOtp? (solo dev)}
+      //        - 200: {already_accepted: true, consent_id}
+      //        - 409 CONSENT_PENDING: ya existe uno pendiente
+      //        - 404 ACUERDO_NOT_FOUND: no hay acuerdo activo con esa version
+      //        - 409 CONSENT_LOCKED: OTP bloqueado por intentos
+      //      firmaConsentVerifyOtp(consentId, otp)
+      //        - 200: {consent_id, estado: 'ACCEPTED'}
+      //        - 404/409/422 según estado
+      //
+      //    IMPORTANTE: id_trabajador es la CÉDULA del firmante (por
+      //    convención del proyecto, ver comment en signRequest.js línea 27).
+      //    Lo tomamos del trabajador asociado al documento.
+      var cedulaFirmante = (t && (t.cedula || t.id)) || doc.trabajadorId;
+      var rConsent = await window.electronAPI.firmaConsentCreate({
+        // I-103.A1.5.4-B · fix: pasar companyName explícitamente para que el
+        // bridge entre al path per-empresa (no legacy). Sin esto, _resolveClientForRequest
+        // cae al modo legacy y retorna CONFIG_MISSING (legacy key vacía en __default__).
+        companyName: self.companyName,
+        id_trabajador: cedulaFirmante,
+        id_empresa: match.idEmpresa,
+        version_acuerdo: agreement.version,
+        correo_verificacion: correoFirmante,
+        kair_version: '0.1.190'
+      });
+      // I-103.A1.5.4-B · DIAGNÓSTICO TEMPORAL (visible en DevTools Console)
+      console.log('[A154] _enviarAFirma · firmaConsentCreate result: success=' + (rConsent && rConsent.success) + ' already_accepted=' + !!(rConsent && rConsent.data && rConsent.data.already_accepted) + ' has_devOtp=' + !!(rConsent && rConsent.data && rConsent.data.devOtp) + ' error_code=' + (rConsent && rConsent.error && rConsent.error.code));
+      var consentId = null;
+      if (rConsent && rConsent.success) {
+        if (rConsent.data.already_accepted) {
+          // Caso 200: ya estaba aceptado previamente. Usar el consent_id
+          // existente (idempotente).
+          consentId = rConsent.data.consent_id;
+          console.log('[A154] _enviarAFirma · consent already_accepted consentId=' + consentId);
+          // No mostramos toast — el flujo continúa normal.
+        } else {
+          // Caso 201: nuevo. Aceptar con devOtp si está disponible (dev).
+          consentId = rConsent.data.consent_id;
+          console.log('[A154] _enviarAFirma · consent nuevo consentId=' + consentId + ' has_devOtp=' + !!rConsent.data.devOtp);
+          if (rConsent.data.devOtp) {
+            var rVerify = await window.electronAPI.firmaConsentVerifyOtp(consentId, rConsent.data.devOtp);
+            console.log('[A154] _enviarAFirma · firmaConsentVerifyOtp result: success=' + (rVerify && rVerify.success));
+            if (!rVerify || !rVerify.success) {
+              console.log('[A154] _enviarAFirma · EXIT in firmaConsentVerifyOtp. Toast: Error aceptando consentimiento');
+              self._showToast('Error aceptando consentimiento: ' +
+                (rVerify && rVerify.error && rVerify.error.message || 'desconocido'), 'error');
+              return;
+            }
+          } else {
+            // Caso production: el OTP se envió al correo del firmante vía
+            // mailer.sendOTP (consume el flujo de K+AIR). K+AIR NO puede
+            // aceptar el consent sin el OTP. El sign request se creará con
+            // consent_id PENDING y el commit del firmante fallará con
+            // CONSENT_NOT_ACCEPTED hasta que se implemente un flujo de
+            // aceptación en la mini-app del firmante. Esto es un gap
+            // conocido del producto (fuera de scope de A1.5.3.1).
+            // Lo logueamos con WARN para que sea visible en operación.
+            console.warn(
+              '[A1.5.3.1][production] Consent OTP enviado al firmante (' +
+              correoFirmante + '). K+AIR NO puede aceptar el consent sin ' +
+              'el OTP. El sign request se creará con consent_id PENDING y ' +
+              'el commit() del firmante fallará con CONSENT_NOT_ACCEPTED. ' +
+              'Pendiente: flujo de aceptación en la mini-app del firmante.'
+            );
+          }
+        }
+      } else if (rConsent && rConsent.error) {
+        if (rConsent.error.code === 'CONSENT_PENDING') {
+          console.log('[A154] _enviarAFirma · EXIT in consent (CONSENT_PENDING). Toast: Ya existe un consentimiento en proceso');
+          // Ya existe un consent PENDING. El OTP se envió al firmante
+          // previamente. NO podemos continuar sin el OTP. Mostramos mensaje
+          // claro al user para que sepa qué hacer.
+          self._showToast(
+            'Ya existe un consentimiento en proceso para este trabajador. ' +
+            'Espera a que el firmante acepte el código OTP enviado a su correo, ' +
+            'o contacta a RRHH para reintentar.', 'warning'
+          );
+          return;
+        } else if (rConsent.error.code === 'CONSENT_LOCKED') {
+          console.log('[A154] _enviarAFirma · EXIT in consent (CONSENT_LOCKED). Toast: Consentimiento bloqueado');
+          self._showToast(
+            'El consentimiento del Acuerdo está bloqueado por exceso de intentos. ' +
+            'Contacta a RRHH para desbloquearlo.', 'error'
+          );
+          return;
+        } else if (rConsent.error.code === 'ACUERDO_NOT_FOUND') {
+          console.log('[A154] _enviarAFirma · EXIT in consent (ACUERDO_NOT_FOUND). Toast: No hay Acuerdo activo');
+          self._showToast(
+            'No hay Acuerdo activo con la versión ' + agreement.version + '. ' +
+            'Contacta al administrador.', 'error'
+          );
+          return;
+        } else {
+          console.log('[A154] _enviarAFirma · EXIT in consent (otro error: ' + rConsent.error.code + ')');
+          self._showToast(self._traducirErrorFirma(rConsent), 'error');
+          return;
+        }
+      } else {
+        console.log('[A154] _enviarAFirma · EXIT in consent (error desconocido creando consentimiento)');
+        self._showToast('Error desconocido creando consentimiento.', 'error');
+        return;
+      }
+
+      // 6) Construir metadata del sign request
       var metadata = {
         id_documento: doc.id,
-        id_trabajador: (t && (t.cedula || t.id)) || doc.trabajadorId,
+        id_trabajador: cedulaFirmante,
         id_empresa: match.idEmpresa,
         tipo_firma: 'remoto',
         agreement_version: agreement.version,
@@ -863,29 +1042,103 @@ class DocumentosComponent {
         document_hash: documentHash,
         version_kair: '0.1.190',
         ttl_horas: 24,
-        // Metadatos extra (no en schema backend, pero lo aceptamos como
-        // "metadata" y el backend los ignora si no los usa).
-        correo_firmante: correoFirmante
+        // I-103.A1.5.3.1 (Bug 2 fix) · consent_id REQUERIDO cuando el sign
+        // request tiene agreement_version. El Bloque E6 valida que el
+        // consent esté ACEPTADO en el mismo (id_trabajador, id_empresa,
+        // version_acuerdo). Si no, commit() retorna 409 CONSENT_NOT_ACCEPTED.
+        consent_id: consentId,
+        // I-103.A1.5.3.1 (Bug adicional encontrado en A1.5.4-A) ·
+        // identificacion_tipo y identificacion_numero_hash son REQUERIDOS
+        // para que publicFlow.identify pueda validar la cédula del firmante.
+        // Sin ellos, el commit del firmante falla con 500
+        // MISSING_IDENTIFICATION_DATA. La cédula del firmante es la misma
+        // que id_trabajador (convención del proyecto). El hash es SHA-256
+        // del número de documento en plano (sin sal en v1).
+        // K+AIR ya conoce la cédula (viene del trabajador asociado al
+        // documento), así que la calculamos acá.
+        identificacion_tipo: 'CC',
+        identificacion_numero_hash: self._bytesToHex(
+          new Uint8Array(await crypto.subtle.digest('SHA-256',
+            new TextEncoder().encode(cedulaFirmante)))
+        ),
+        // I-103.A1.5.3 + A1.5.4 fix · `correo` va DENTRO del sub-objeto
+        // `metadata` (JSON string), NO top-level. El contrato del backend
+        // (services/signRequest.js#create, líneas 318-347) es:
+        //   - `metadata` es un JSON string con campos extra
+        //   - el service hace JSON.parse y los preserva en la columna
+        //     `metadata` de la BD junto con `_server_metadata`
+        // El backend (services/publicFlow.js líneas 289 y 550) lee
+        // `signRequest.metadata.correo` para enviar el OTP al firmante.
+        // Si mandamos `correo` top-level, zod lo acepta como campo extra
+        // PERO el service solo guarda `meta.metadata` (que es undefined),
+        // entonces el `correo` se pierde y el OTP va al placeholder
+        // 'trabajador@ejemplo.com' (bug encontrado en A1.5.4-A).
+        metadata: JSON.stringify({ correo: correoFirmante })
       };
 
-      // 6) Crear la sign request
+      // 7) Crear la sign request
+      // I-103.A1.5.4-B · Defensa en profundidad: validar header mágico %PDF-
+      // ANTES de enviar a firma-service. No confiamos solo en la extensión
+      // del archivo (renombrar .doc a .pdf no lo convierte en PDF). Si los
+      // primeros 5 bytes no son 25 50 44 46 2D, detenemos con mensaje claro
+      // en vez de gastar una request que firma-service rechazará con
+      // PDF_INVALID ("Header mágico inválido").
+      try {
+        var _isPdfHeader = pdfBytes && pdfBytes.length >= 5
+          && pdfBytes[0] === 0x25 && pdfBytes[1] === 0x50
+          && pdfBytes[2] === 0x44 && pdfBytes[3] === 0x46
+          && pdfBytes[4] === 0x2D;
+        if (!_isPdfHeader) {
+          console.log('[A154] _enviarAFirma · EXIT (no es PDF) first_bytes_hex=' + self._bytesToHex(pdfBytes.slice(0, 8)) + ' nombreArchivo=' + doc.nombreArchivo);
+          self._showToast('El documento "' + (doc.nombreArchivo || doc.id) + '" no es un PDF válido. Solo se pueden firmar PDFs.', 'error');
+          return;
+        }
+      } catch (_pdfHeaderE) { /* noop */ }
+      // I-103.A1.5.4-B · DIAGNÓSTICO TEMPORAL (visible en DevTools Console)
+      console.log('[A154] _enviarAFirma · about to call firmaSignRequestCreate args_companyName=' + JSON.stringify(self.companyName) + ' args_pdfBuffer_length=' + pdfBytes.length);
+      // I-103.A1.5.4-B · DIAGNÓSTICO TEMPORAL — NO COMMITEAR
+      // Registra el estado de self.companyName y del objeto args ANTES de
+      // enviarlo al bridge. Usa localStorage porque el renderer no tiene
+      // acceso a fs. El agente CLI lee 'kair_doc_diag' después.
+      try {
+        var _diagArgs = {
+          ts: new Date().toISOString(),
+          self_companyName_present: typeof self.companyName === 'string' && self.companyName.length > 0,
+          self_companyName_length: typeof self.companyName === 'string' ? self.companyName.length : 0,
+          self_companyName_typeof: typeof self.companyName,
+          args_keys: ['companyName', 'metadata', 'pdfBuffer', 'pdfName'],
+          args_companyName_present: typeof self.companyName === 'string' && self.companyName.length > 0,
+          args_companyName_typeof: typeof self.companyName,
+          args_companyName_length: typeof self.companyName === 'string' ? self.companyName.length : 0
+        };
+        localStorage.setItem('kair_doc_diag', JSON.stringify(_diagArgs));
+      } catch (_diagE) { /* noop */ }
       var rCreate = await window.electronAPI.firmaSignRequestCreate({
         companyName: self.companyName,
         metadata: metadata,
         pdfBuffer: pdfBytes,
         pdfName: (doc.nombreArchivo || (doc.id + '.pdf'))
       });
+      // I-103.A1.5.4-B · DIAGNÓSTICO TEMPORAL (visible en DevTools Console)
+      console.log('[A154] _enviarAFirma · firmaSignRequestCreate RETURNED: success=' + (rCreate && rCreate.success) + ' error_code=' + (rCreate && rCreate.error && rCreate.error.code) + ' has_id_solicitud=' + !!(rCreate && rCreate.data && rCreate.data.id_solicitud) + ' has_url_publica=' + !!(rCreate && rCreate.data && rCreate.data.url_publica));
       if (!rCreate || !rCreate.success) {
+        console.log('[A154] _enviarAFirma · EXIT in firmaSignRequestCreate (no success). Toast: ' + self._traducirErrorFirma(rCreate));
         self._showToast(self._traducirErrorFirma(rCreate), 'error');
         return;
       }
       var idSolicitud = rCreate.data && (rCreate.data.id_solicitud || rCreate.data.id);
       if (!idSolicitud) {
+        console.log('[A154] _enviarAFirma · EXIT (no idSolicitud en response)');
         self._showToast('firma-service no devolvió id_solicitud. Revisa el backend.', 'error');
         return;
       }
+      console.log('[A154] _enviarAFirma · sign request OK id_solicitud=' + idSolicitud + ' url_publica_present=' + !!(rCreate.data && rCreate.data.url_publica));
+      // I-103.A1.5.3 · Capturar url_publica de la respuesta para mostrarla
+      // en el modal de éxito. Es la URL que el firmante usará para abrir
+      // la mini-app de firma.
+      var urlPublica = rCreate.data && rCreate.data.url_publica;
 
-      // 7) Persistir la relación y cambiar estado a 'esperando_firma'
+      // 8) Persistir la relación y cambiar estado a 'esperando_firma'
       var rUpd = await window.electronAPI.ghUpdateDocumento({
         documentoId: doc.id,
         updates: {
@@ -893,23 +1146,238 @@ class DocumentosComponent {
           estado: 'esperando_firma'
         }
       });
+      console.log('[A154] _enviarAFirma · ghUpdateDocumento result: success=' + (rUpd && rUpd.success) + ' error_code=' + (rUpd && rUpd.error && rUpd.error.code));
       if (!rUpd || !rUpd.success) {
+        console.log('[A154] _enviarAFirma · EXIT in ghUpdateDocumento');
         self._showToast('Solicitud creada (id=' + idSolicitud + ') pero NO se pudo persistir la relación. ' +
           (rUpd && rUpd.error && rUpd.error.message || ''), 'error');
         return;
       }
 
-      // 8) Cerrar modal y refrescar tabla
+      // 9) Cerrar modal de envío, refrescar tabla y abrir modal de éxito
+      //    con id + url_publica + correo. El documento YA está persistido
+      //    en 'esperando_firma' antes de este punto, así que cerrar el
+      //    modal de éxito NO afecta la solicitud.
       self._cerrarModalFirma(modal);
-      self._showToast('Solicitud de firma creada: ' + idSolicitud + '. Documento en estado "esperando_firma".', 'success');
+      self._showToast('Solicitud de firma creada: ' + idSolicitud, 'success');
+      // Refrescar tabla para que el doc aparezca como 'esperando_firma'
+      // ANTES de mostrar el modal de éxito. Si el polling F/G detecta
+      // un cambio de estado mientras el modal está abierto, _renderRecientes
+      // se llama y la tabla se actualiza en vivo.
       await self._load();
       self.render();
+      // Abrir modal de éxito con la info del sign request
+      self._abrirModalExito({
+        companyName: self.companyName,
+        id_solicitud: idSolicitud,
+        url_publica: urlPublica || '',
+        correo: correoFirmante
+      });
     } catch (e) {
+      // I-103.A1.5.4-B · DIAGNÓSTICO TEMPORAL (visible en DevTools Console)
+      console.log('[A154] _enviarAFirma · CATCH exception: ' + (e && e.message || e));
       self._showToast('Error inesperado: ' + (e && e.message || e), 'error');
     } finally {
       if (btnEnviar) {
         btnEnviar.disabled = false;
         btnEnviar.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar a firma';
+      }
+    }
+  }
+
+  // I-103.A1.5.3 · Modal de éxito de solicitud de firma.
+  // Muestra: id de la solicitud, URL pública, correo del firmante.
+  // Ofrece: Copiar enlace + Enviar por correo (vía notify-remote) + Listo.
+  // El modal es INDEPENDIENTE del modal de envío (usa data-close-doc-firma-success).
+  // El modal de envío se cierra ANTES de llamar a esta función.
+  _abrirModalExito(info) {
+    var self = this;
+    var modal = this.container.querySelector('#doc-firma-success-modal');
+    if (!modal) return;
+    document.body.style.overflow = 'hidden';
+
+    // Setear campos (read-only, ya vienen del flujo de envío).
+    var idEl = modal.querySelector('#doc-firma-success-id');
+    if (idEl) idEl.textContent = info.id_solicitud || '—';
+    var urlInput = modal.querySelector('#doc-firma-success-url');
+    if (urlInput) urlInput.value = info.url_publica || '';
+    var correoInput = modal.querySelector('#doc-firma-success-correo');
+    if (correoInput) correoInput.value = info.correo || '';
+
+    // Limpiar feedback previo (por si se reusa el modal en un re-envío).
+    var feedback = modal.querySelector('#doc-firma-success-feedback');
+    if (feedback) {
+      feedback.hidden = true;
+      feedback.textContent = '';
+      feedback.className = 'doc-field__hint';
+    }
+
+    // Resetear estado de los botones (por si vienen de un re-envío previo).
+    var btnCopy = modal.querySelector('#doc-firma-success-copy');
+    if (btnCopy) {
+      btnCopy.disabled = false;
+      btnCopy.innerHTML = '<i class="fas fa-copy"></i> Copiar';
+    }
+    var btnSend = modal.querySelector('#doc-firma-success-send');
+    if (btnSend) {
+      btnSend.disabled = false;
+      btnSend.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar por correo';
+    }
+
+    // Guardar contexto para uso de los handlers.
+    modal._docFirmaSuccessCtx = { info: info, modal: modal };
+
+    // Escape handler (mismo patrón que _abrirModalFirma).
+    modal._onEscape = function (e) {
+      if (e.key === 'Escape') self._cerrarModalExito(modal);
+    };
+    document.addEventListener('keydown', modal._onEscape);
+
+    modal.removeAttribute('hidden');
+    // Foco en el botón "Enviar por correo" (acción primaria esperada).
+    setTimeout(function () { if (btnSend) btnSend.focus(); }, 50);
+  }
+
+  // I-103.A1.5.3 · Cierra el modal de éxito. Limpia el listener de Escape.
+  // NO recarga la tabla — eso ya se hizo en _enviarAFirma antes de
+  // abrir este modal. El modal de éxito es puramente informativo +
+  // acciones secundarias (copiar, enviar correo, cerrar).
+  _cerrarModalExito(modal) {
+    if (!modal) return;
+    if (modal._onEscape) {
+      document.removeEventListener('keydown', modal._onEscape);
+      modal._onEscape = null;
+    }
+    modal._docFirmaSuccessCtx = null;
+    modal.setAttribute('hidden', '');
+    document.body.style.overflow = '';
+  }
+
+  // I-103.A1.5.3 · Copia la URL pública al portapapeles usando
+  // navigator.clipboard.writeText. Fallback a execCommand si la
+  // Clipboard API no está disponible (electron viejos / contextos
+  // inseguros).
+  _copiarEnlace(modal) {
+    var self = this;
+    if (!modal) return;
+    var ctx = modal._docFirmaSuccessCtx;
+    if (!ctx || !ctx.info || !ctx.info.url_publica) {
+      self._showToast('No hay enlace para copiar.', 'warning');
+      return;
+    }
+    var url = ctx.info.url_publica;
+    var feedback = modal.querySelector('#doc-firma-success-feedback');
+    var btnCopy = modal.querySelector('#doc-firma-success-copy');
+    function _onSuccess() {
+      if (btnCopy) {
+        btnCopy.innerHTML = '<i class="fas fa-check"></i> Copiado';
+        setTimeout(function () {
+          if (btnCopy) btnCopy.innerHTML = '<i class="fas fa-copy"></i> Copiar';
+        }, 2000);
+      }
+      if (feedback) {
+        feedback.textContent = 'Enlace copiado al portapapeles.';
+        feedback.className = 'doc-field__hint';
+        feedback.style.color = '#28a745';
+        feedback.hidden = false;
+      }
+    }
+    function _onFallback() {
+      // Fallback para contextos sin Clipboard API: crear un textarea
+      // temporal, seleccionar y copiar.
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = url;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        var ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        if (ok) {
+          _onSuccess();
+        } else {
+          if (feedback) {
+            feedback.textContent = 'No se pudo copiar automáticamente. Selecciona y copia manualmente.';
+            feedback.style.color = '#fd7e14';
+            feedback.hidden = false;
+          }
+        }
+      } catch (e) {
+        if (feedback) {
+          feedback.textContent = 'No se pudo copiar. Error: ' + (e && e.message || 'desconocido');
+          feedback.style.color = '#dc3545';
+          feedback.hidden = false;
+        }
+      }
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(_onSuccess).catch(_onFallback);
+    } else {
+      _onFallback();
+    }
+  }
+
+  // I-103.A1.5.3 · Llama al IPC firma:sign-request:notify-remote (A1.5.2)
+  // para enviar la invitación por correo al firmante. Muestra feedback
+  // inline en el modal (no toast — el user está mirando el modal).
+  // Si el envío falla, NO cierra el modal: el user puede reintentar o
+  // cerrar manualmente.
+  async _enviarCorreoFirmante(modal) {
+    var self = this;
+    if (!modal) return;
+    var ctx = modal._docFirmaSuccessCtx;
+    if (!ctx || !ctx.info) return;
+    var info = ctx.info;
+    var feedback = modal.querySelector('#doc-firma-success-feedback');
+    var btnSend = modal.querySelector('#doc-firma-success-send');
+
+    // UI: spinner mientras se envía
+    if (btnSend) {
+      btnSend.disabled = true;
+      btnSend.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+    }
+    if (feedback) {
+      feedback.textContent = '';
+      feedback.hidden = true;
+    }
+
+    try {
+      var r = await window.electronAPI.firmaSignRequestNotifyRemote(
+        info.id_solicitud,
+        { companyName: info.companyName, correo: info.correo, context: { via: 'kair-documentos-ui', button: 'enviar-correo' } }
+      );
+      if (r && r.success) {
+        if (feedback) {
+          feedback.textContent = 'Correo enviado a ' + info.correo + '. El firmante recibirá el enlace para firmar.';
+          feedback.style.color = '#28a745';
+          feedback.hidden = false;
+        }
+        if (btnSend) {
+          btnSend.innerHTML = '<i class="fas fa-check"></i> Enviado';
+        }
+      } else {
+        // Mapear error a mensaje user-friendly usando el helper existente.
+        if (feedback) {
+          feedback.textContent = 'Error al enviar: ' + (self._traducirErrorFirma(r) || 'desconocido');
+          feedback.style.color = '#dc3545';
+          feedback.hidden = false;
+        }
+        if (btnSend) {
+          btnSend.disabled = false;
+          btnSend.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar por correo';
+        }
+      }
+    } catch (e) {
+      if (feedback) {
+        feedback.textContent = 'Error inesperado: ' + (e && e.message || e);
+        feedback.style.color = '#dc3545';
+        feedback.hidden = false;
+      }
+      if (btnSend) {
+        btnSend.disabled = false;
+        btnSend.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar por correo';
       }
     }
   }

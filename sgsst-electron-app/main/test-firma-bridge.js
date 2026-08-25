@@ -74,6 +74,8 @@ function _resetClientMock() {
     getSignRequestDocument: function (id) { _clientCallLog.push({ m: 'getSignRequestDocument', id: id }); return Promise.resolve({ success: true, data: { base64: 'BESE64', contentType: 'application/pdf' } }); },
     getSignRequestConstancia: function (id) { _clientCallLog.push({ m: 'getSignRequestConstancia', id: id }); return Promise.resolve({ success: true, data: { base64: 'BESE64' } }); },
     getSignRequestLink: function (id) { _clientCallLog.push({ m: 'getSignRequestLink', id: id }); return Promise.resolve({ success: true, data: { token: 'mock-token', url_publica: 'http://test/s/mock' } }); },
+    // I-103.A1.5.2 · notifySignRequestRemote mock
+    notifySignRequestRemote: function (id, args) { _clientCallLog.push({ m: 'notifySignRequestRemote', id: id, args: args }); return Promise.resolve({ success: true, data: { mocked: true, m: 'notifySignRequestRemote', messageId: 'mock-msg-id', sent_at: '2026-08-24T15:00:00.000Z' } }); },
     createConsent: function (p) { _clientCallLog.push({ m: 'createConsent', payload: p }); return Promise.resolve({ success: true, data: { consent_id: 'cons_mock', estado: 'OTP_SENT' } }); },
     verifyConsentOtp: function (cid, otp) { _clientCallLog.push({ m: 'verifyConsentOtp', consentId: cid, otp: otp }); return Promise.resolve({ success: true, data: { ok: true, estado: 'ACEPTADO' } }); },
     getActiveAgreement: function () { _clientCallLog.push({ m: 'getActiveAgreement' }); return Promise.resolve({ success: true, data: { version: 'v1.0', texto_hash: 'abc' } }); }
@@ -149,7 +151,7 @@ async function _call(channel, payload) {
 //  Suite: Registro de handlers
 // =====================================================================
 
-test('registro: 20 canales firma:* están registrados (13 v0.1.190 + 7 nuevos v0.1.191)', function () {
+test('registro: 21 canales firma:* están registrados (13 v0.1.190 + 7 nuevos v0.1.191 + 1 nuevo I-103.A1.5.2)', function () {
   setup();
   var expected = [
     'firma:config:get',
@@ -163,6 +165,7 @@ test('registro: 20 canales firma:* están registrados (13 v0.1.190 + 7 nuevos v0
     'firma:sign-request:document',
     'firma:sign-request:constancia',
     'firma:sign-request:link',
+    'firma:sign-request:notify-remote',  // NUEVO I-103.A1.5.2
     'firma:consent:create',
     'firma:consent:verify-otp',
     'firma:agreement:get',
@@ -407,6 +410,167 @@ test('sign-request:link delega a client.getSignRequestLink', async function () {
   var r = await _call('firma:sign-request:link', { id: 'SIGN-1' });
   assert.equal(r.success, true);
   assert.equal(r.data.token, 'mock-token');
+  teardown();
+});
+
+// =====================================================================
+//  Suite: I-103.A1.5.2 · firma:sign-request:notify-remote (5 tests)
+// =====================================================================
+
+test('sign-request:notify-remote: delega a client.notifySignRequestRemote con id + correo', async function () {
+  setup();
+  process.env.FIRMA_SERVICE_URL = 'http://localhost:3001';
+  process.env.FIRMA_SERVICE_API_KEY = 'env-key-1234567890';
+  var r = await _call('firma:sign-request:notify-remote', {
+    id: 'SIGN-2026-000001',
+    correo: 'firmante@example.com'
+  });
+  assert.equal(r.success, true);
+  var calls = _clientCallLog.filter(function (c) { return c.m === 'notifySignRequestRemote'; });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].id, 'SIGN-2026-000001');
+  assert.equal(calls[0].args.correo, 'firmante@example.com');
+  teardown();
+});
+
+test('sign-request:notify-remote: pasa context al client cuando se incluye', async function () {
+  setup();
+  process.env.FIRMA_SERVICE_URL = 'http://localhost:3001';
+  process.env.FIRMA_SERVICE_API_KEY = 'env-key-1234567890';
+  var r = await _call('firma:sign-request:notify-remote', {
+    id: 'SIGN-1',
+    correo: 'firmante@example.com',
+    context: { via: 'kair-documentos-ui', button: 'enviar-correo' }
+  });
+  assert.equal(r.success, true);
+  var calls = _clientCallLog.filter(function (c) { return c.m === 'notifySignRequestRemote'; });
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].args.context, {
+    via: 'kair-documentos-ui',
+    button: 'enviar-correo'
+  });
+  teardown();
+});
+
+test('sign-request:notify-remote: sin id retorna INVALID_REQUEST_BODY sin HTTP', function () {
+  setup();
+  process.env.FIRMA_SERVICE_URL = 'http://localhost:3001';
+  process.env.FIRMA_SERVICE_API_KEY = 'env-key-1234567890';
+  // Caso sync: el handler retorna {success:false} directo (sin HTTP).
+  // Usamos _mockIpcHandlers[...]() directamente (NO _call que es async).
+  var r = _mockIpcHandlers['firma:sign-request:notify-remote']({}, {
+    correo: 'x@example.com'
+  });
+  assert.equal(r.success, false);
+  assert.equal(r.error.code, 'INVALID_REQUEST_BODY');
+  assert.match(r.error.message, /id requerido/);
+  // No se debe haber llamado al client
+  var calls = _clientCallLog.filter(function (c) { return c.m === 'notifySignRequestRemote'; });
+  assert.equal(calls.length, 0);
+  teardown();
+});
+
+test('sign-request:notify-remote: sin correo retorna INVALID_REQUEST_BODY sin HTTP', function () {
+  setup();
+  process.env.FIRMA_SERVICE_URL = 'http://localhost:3001';
+  process.env.FIRMA_SERVICE_API_KEY = 'env-key-1234567890';
+  // sin correo
+  var r1 = _mockIpcHandlers['firma:sign-request:notify-remote']({}, { id: 'SIGN-1' });
+  assert.equal(r1.success, false);
+  assert.equal(r1.error.code, 'INVALID_REQUEST_BODY');
+  assert.match(r1.error.message, /correo requerido/);
+  // correo vacío
+  var r2 = _mockIpcHandlers['firma:sign-request:notify-remote']({}, { id: 'SIGN-1', correo: '' });
+  assert.equal(r2.success, false);
+  assert.equal(r2.error.code, 'INVALID_REQUEST_BODY');
+  // correo sin @
+  var r3 = _mockIpcHandlers['firma:sign-request:notify-remote']({}, { id: 'SIGN-1', correo: 'not-an-email' });
+  assert.equal(r3.success, false);
+  assert.equal(r3.error.code, 'INVALID_REQUEST_BODY');
+  assert.match(r3.error.message, /sin @/);
+  // No se debe haber llamado al client
+  var calls = _clientCallLog.filter(function (c) { return c.m === 'notifySignRequestRemote'; });
+  assert.equal(calls.length, 0);
+  teardown();
+});
+
+test('sign-request:notify-remote: con companyName usa el cliente per-empresa', async function () {
+  setup();
+  _setSecretsV2({
+    'TEMPOACTIVA EST S.A.S.': {
+      idEmpresa: '900123456',
+      firmaApiKey: 'kair_live_tempoactiva_key_32chars_minimum_padding_X',
+      activatedAt: '2026-08-20T15:00:00Z',
+      lastValidatedAt: null
+    }
+  }, { url: 'https://firma.test.k-air.com' });
+  var r = await _call('firma:sign-request:notify-remote', {
+    companyName: 'TEMPOACTIVA EST S.A.S.',
+    id: 'SIGN-1',
+    correo: 'firmante@example.com'
+  });
+  assert.equal(r.success, true);
+  // Se llamó al client (mock retorna success). El test importante es
+  // que NO retornó CONFIG_MISSING — eso prueba que se usó el per-empresa.
+  assert.notEqual(r.error && r.error.code, 'CONFIG_MISSING');
+  var calls = _clientCallLog.filter(function (c) { return c.m === 'notifySignRequestRemote'; });
+  assert.equal(calls.length, 1);
+  teardown();
+});
+
+test('sign-request:notify-remote: con companyName sin configurar → CONFIG_MISSING sin HTTP', function () {
+  setup();
+  _setSecretsV2({}, { url: 'https://firma.test.k-air.com' });
+  // Caso sync: CONFIG_MISSING se retorna sin HTTP (no hay cliente per-empresa).
+  var r = _mockIpcHandlers['firma:sign-request:notify-remote']({}, {
+    companyName: 'EMPRESA NO CONFIGURADA S.A.S.',
+    id: 'SIGN-1',
+    correo: 'firmante@example.com'
+  });
+  assert.equal(r.success, false);
+  assert.equal(r.error.code, 'CONFIG_MISSING');
+  // El error menciona la empresa
+  assert.ok(r.error.message && r.error.message.indexOf('EMPRESA NO CONFIGURADA') !== -1);
+  // No se debe haber llamado al backend
+  var calls = _clientCallLog.filter(function (c) { return c.m === 'notifySignRequestRemote'; });
+  assert.equal(calls.length, 0);
+  teardown();
+});
+
+test('sign-request:notify-remote: error del client propaga {success:false, error}', async function () {
+  setup();
+  process.env.FIRMA_SERVICE_URL = 'http://localhost:3001';
+  process.env.FIRMA_SERVICE_API_KEY = 'env-key-1234567890';
+  // Reemplazar el mock con uno que retorna error
+  _lastMockedClient = {
+    notifySignRequestRemote: function (id, args) {
+      return Promise.resolve({ success: false, error: { code: 'INVITE_NOT_AVAILABLE', message: 'estado terminal SIGNED' } });
+    }
+  };
+  registerFirmaHandlers._test_setClientFactory(function () { return _lastMockedClient; });
+  var r = await _call('firma:sign-request:notify-remote', {
+    id: 'SIGN-1',
+    correo: 'firmante@example.com'
+  });
+  assert.equal(r.success, false);
+  assert.equal(r.error.code, 'INVITE_NOT_AVAILABLE');
+  teardown();
+});
+
+test('sign-request:notify-remote: throw del client → try/catch del bridge devuelve INTERNAL', async function () {
+  setup();
+  process.env.FIRMA_SERVICE_URL = 'http://localhost:3001';
+  process.env.FIRMA_SERVICE_API_KEY = 'env-key-1234567890';
+  _lastMockedClient = {
+    notifySignRequestRemote: function () { throw new Error('boom from client'); }
+  };
+  registerFirmaHandlers._test_setClientFactory(function () { return _lastMockedClient; });
+  var r = await _call('firma:sign-request:notify-remote', {
+    id: 'SIGN-1',
+    correo: 'firmante@example.com'
+  });
+  assert.equal(r.success, false);
+  assert.equal(r.error.code, 'INTERNAL');
   teardown();
 });
 

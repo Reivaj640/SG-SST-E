@@ -473,6 +473,159 @@ test('createConsent: sin payload retorna INVALID_REQUEST_BODY', function () {
   });
 });
 
+// =====================================================================
+//  Suite: I-103.A1.5.2 · notifySignRequestRemote (5 tests)
+// =====================================================================
+
+test('notifySignRequestRemote: con id+correo → POST al path correcto con body', function () {
+  var c = makeClient();
+  var mockFetch = makeFetchMock(function (call) {
+    return makeResponse(200, {
+      ok: true, id_solicitud: call.opts.body && JSON.parse(call.opts.body).correo ? 'SIGN-1' : null,
+      messageId: 'srv-msg-1', sent_at: '2026-08-24T15:00:00.000Z'
+    }, 'application/json');
+  });
+  c._internals; // sanity
+  return Promise.resolve()
+    .then(function () {
+      // Re-crear el client con el fetch mockeado
+      return fc.createFirmaClient({
+        baseUrl: BASE_URL, apiKey: API_KEY, clientInstanceId: CLIENT_INSTANCE_ID,
+        appVersion: '0.1.190-test', _fetch: mockFetch, _sleep: function () { return Promise.resolve(); }
+      });
+    })
+    .then(function (clientWithMock) {
+      return clientWithMock.notifySignRequestRemote('SIGN-2026-000001', {
+        correo: 'firmante@example.com',
+        context: { via: 'kair-ui' }
+      });
+    })
+    .then(function (r) {
+      assert.equal(r.success, true);
+      assert.equal(mockFetch.calls.length, 1);
+      var call = mockFetch.calls[0];
+      assert.equal(call.url, BASE_URL + '/internal/sign-requests/SIGN-2026-000001/notify-remote');
+      assert.equal(call.opts.method, 'POST');
+      assert.equal(call.opts.headers['X-Internal-API-Key'], API_KEY);
+      var body = JSON.parse(call.opts.body);
+      assert.equal(body.correo, 'firmante@example.com');
+      assert.deepEqual(body.context, { via: 'kair-ui' });
+    });
+});
+
+test('notifySignRequestRemote: URL-encodea el id (SIGN-2026-000001 mantiene formato)', function () {
+  var capturedUrl = null;
+  var mockFetch = makeFetchMock(function (call) {
+    capturedUrl = call.url;
+    return makeResponse(200, { ok: true, id_solicitud: 'SIGN-2026-000001' }, 'application/json');
+  });
+  var c = fc.createFirmaClient({
+    baseUrl: BASE_URL, apiKey: API_KEY, clientInstanceId: CLIENT_INSTANCE_ID,
+    appVersion: '0.1.190-test', _fetch: mockFetch, _sleep: function () { return Promise.resolve(); }
+  });
+  return c.notifySignRequestRemote('SIGN-2026-000001', { correo: 'x@example.com' })
+    .then(function (r) {
+      assert.equal(r.success, true);
+      assert.ok(capturedUrl.endsWith('/internal/sign-requests/SIGN-2026-000001/notify-remote'),
+        'URL debe terminar con el path correcto: ' + capturedUrl);
+    });
+});
+
+test('notifySignRequestRemote: sin id → INVALID_REQUEST_BODY sin HTTP', function () {
+  var called = false;
+  var c = makeClient({ _fetch: function () { called = true; throw new Error('NO'); } });
+  return c.notifySignRequestRemote(null, { correo: 'x@example.com' }).then(function (r) {
+    assert.equal(r.success, false);
+    assert.equal(r.error.code, 'INVALID_REQUEST_BODY');
+    assert.match(r.error.message, /id requerido/);
+    assert.equal(called, false);
+  });
+});
+
+test('notifySignRequestRemote: sin correo (o vacío o sin @) → INVALID_REQUEST_BODY sin HTTP', function () {
+  var called = false;
+  var c = makeClient({ _fetch: function () { called = true; throw new Error('NO'); } });
+  return Promise.resolve()
+    .then(function () { return c.notifySignRequestRemote('SIGN-1', null); })
+    .then(function (r) {
+      assert.equal(r.success, false);
+      assert.equal(r.error.code, 'INVALID_REQUEST_BODY');
+      assert.match(r.error.message, /correo y context requeridos/);
+    })
+    .then(function () { return c.notifySignRequestRemote('SIGN-1', { correo: '' }); })
+    .then(function (r) {
+      assert.equal(r.success, false);
+      assert.equal(r.error.code, 'INVALID_REQUEST_BODY');
+      assert.match(r.error.message, /correo requerido/);
+    })
+    .then(function () { return c.notifySignRequestRemote('SIGN-1', { correo: 'not-an-email' }); })
+    .then(function (r) {
+      assert.equal(r.success, false);
+      assert.equal(r.error.code, 'INVALID_REQUEST_BODY');
+      assert.match(r.error.message, /sin @/);
+    })
+    .then(function () { assert.equal(called, false); });
+});
+
+test('notifySignRequestRemote: respuesta 410 del backend propaga error.code', function () {
+  var mockFetch = makeFetchMock(function () {
+    return makeResponse(410, {
+      error: { code: 'INVITE_NOT_AVAILABLE', message: 'No se puede enviar invitación en estado terminal' }
+    }, 'application/json');
+  });
+  var c = fc.createFirmaClient({
+    baseUrl: BASE_URL, apiKey: API_KEY, clientInstanceId: CLIENT_INSTANCE_ID,
+    appVersion: '0.1.190-test', _fetch: mockFetch, _sleep: function () { return Promise.resolve(); }
+  });
+  return c.notifySignRequestRemote('SIGN-1', { correo: 'x@example.com' })
+    .then(function (r) {
+      assert.equal(r.success, false);
+      assert.equal(r.error.code, 'INVITE_NOT_AVAILABLE');
+      assert.match(r.error.message, /estado terminal/);
+    });
+});
+
+test('notifySignRequestRemote: respuesta 200 → retorna {success, data}', function () {
+  var mockFetch = makeFetchMock(function () {
+    return makeResponse(200, {
+      ok: true,
+      id_solicitud: 'SIGN-2026-000001',
+      messageId: 'srv-msg-xyz',
+      sent_at: '2026-08-24T15:00:00.000Z',
+      evento_id: 42
+    }, 'application/json');
+  });
+  var c = fc.createFirmaClient({
+    baseUrl: BASE_URL, apiKey: API_KEY, clientInstanceId: CLIENT_INSTANCE_ID,
+    appVersion: '0.1.190-test', _fetch: mockFetch, _sleep: function () { return Promise.resolve(); }
+  });
+  return c.notifySignRequestRemote('SIGN-2026-000001', { correo: 'x@example.com' })
+    .then(function (r) {
+      assert.equal(r.success, true);
+      assert.equal(r.data.id_solicitud, 'SIGN-2026-000001');
+      assert.equal(r.data.messageId, 'srv-msg-xyz');
+      assert.equal(r.data.sent_at, '2026-08-24T15:00:00.000Z');
+      assert.equal(r.data.evento_id, 42);
+    });
+});
+
+test('notifySignRequestRemote: context undefined NO se envía en el body', function () {
+  var mockFetch = makeFetchMock(function () {
+    return makeResponse(200, { ok: true, id_solicitud: 'SIGN-1' }, 'application/json');
+  });
+  var c = fc.createFirmaClient({
+    baseUrl: BASE_URL, apiKey: API_KEY, clientInstanceId: CLIENT_INSTANCE_ID,
+    appVersion: '0.1.190-test', _fetch: mockFetch, _sleep: function () { return Promise.resolve(); }
+  });
+  return c.notifySignRequestRemote('SIGN-1', { correo: 'x@example.com' })
+    .then(function (r) {
+      assert.equal(r.success, true);
+      var body = JSON.parse(mockFetch.calls[0].opts.body);
+      // El body solo debe tener `correo` (NO `context` undefined)
+      assert.deepEqual(Object.keys(body), ['correo']);
+    });
+});
+
 test('verifyConsentOtp: sin otp retorna INVALID_REQUEST_BODY', function () {
   var c = makeClient({ _fetch: function () { throw new Error('NO'); } });
   return c.verifyConsentOtp('cons_1', null).then(function (r) {
