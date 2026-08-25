@@ -33,12 +33,11 @@
  *        si lo necesita.
  *
  * **IMPORTANTE**:
- *  - Este middleware REEMPLAZA `internalApiAuth()` en las rutas que necesitan
- *    scope per-empresa. NO se usan ambos (sería redundante y rompería tests
- *    con claves que NO son la legacy).
- *  - Para rutas que NO necesitan per-company authz (ej. health, admin
- *    endpoints con X-Admin-API-Key), se sigue usando `internalApiAuth()` o
- *    `adminApiAuth()`.
+ *  - Este middleware es el ÚNICO sistema de authz per-empresa para K+AIR.
+ *    Toda ruta /internal/* que necesita scope per-empresa usa
+ *    requireEmpresaScope o requireEmpresaScopeAndLimit.
+ *  - Para rutas admin (operación humana, NO expuesta a K+AIR) se usa
+ *    `adminApiAuth()` de middleware/auth.js (X-Admin-API-Key).
  *  - `req.id_empresa` SIEMPRE viene de la identidad autenticada, NUNCA del
  *    body/query. Los handlers deben usar req.id_empresa como fuente
  *    autoritativa.
