@@ -112,6 +112,30 @@ const signRequestListQuery = z.object({
 });
 
 /**
+ * Schema del body de POST /internal/sign-requests/:id/notify-remote
+ * (I-103.A1.5.1: enviar invitación al firmante).
+ *
+ * Ver docs/gestion-humana/firma-electronica/API.md §6.X.
+ */
+const signRequestNotifyBody = z.object({
+  // Correo del firmante. Validado como email (RFC 5322 simplificado por zod).
+  // z.string().email() rechaza 'foo@bar' (sin TLD) y similares — suficiente
+  // para v1. Si el SMTP rebota, publicFlow.identify() caerá al placeholder
+  // 'trabajador@ejemplo.com' (ver §"Por ahora, usamos un placeholder" en
+  // publicFlow.js). La UI debe pre-validar antes de enviar.
+  correo: z.string().email().max(254),
+  // Metadata libre: lo que el caller quiera pasar para auditoría
+  // (ej. { ip_origen: '...', user_agent: '...' }). NO se loggea en plaintext.
+  // Cap de 20 keys y 4KB total para evitar abuse.
+  context: z.record(z.string().max(256), z.unknown())
+    .refine(
+      (v) => Object.keys(v).length <= 20,
+      { message: 'context tiene más de 20 keys' },
+    )
+    .optional(),
+});
+
+/**
  * Schema de query params para GET /internal/sign-requests?ids=batch (I-008).
  *
  * Acepta `ids` como string separado por comas. Cada id puede ser
@@ -150,4 +174,5 @@ module.exports = {
   signRequestBody,
   signRequestListQuery,
   signRequestIdsQuery,  // I-008: batch query
+  signRequestNotifyBody,  // I-103.A1.5.1: notify-remote
 };
