@@ -875,6 +875,129 @@ function verifyOtp(token, otp, ip, user_agent) {
     { attempts: result.attempts, max_attempts: config.ttl.otpMaxAttempts });
 }
 
+/**
+ * Acepta el consentimiento del Acuerdo vinculado a un sign request
+ * desde la UI de la mini-app (tercera casilla "Acepto el Acuerdo").
+ *
+ * Esta función es el orquestador de Bloque E6.5 — la pieza que cierra
+ * el flujo de firma en sign requests con `agreement_version` (es decir,
+ * sign requests que requieren consentimiento del Acuerdo v1.0 explícito).
+ *
+ * Precondiciones (validadas aquí, en orden):
+ *
+ *   1. El token es válido y la solicitud NO está en estado terminal
+ *      (validado por `resolveToken` → 404 / 410).
+ *
+ *   2. La solicitud está en `OTP_VERIFIED` o `DOCUMENT_VIEWED`.
+ *      Lista INEQUÍVOCA — solo estos 2 estados:
+ *        - OTP_VERIFIED  : el firmante ya pasó identify() + verify-otp().
+ *        - DOCUMENT_VIEWED: el firmante también vio el documento.
+ *      NO se permite aceptar el consentimiento ANTES del OTP (PENDING,
+ *      OPENED, IDENTIFICATION_STARTED, IDENTIFIED, OTP_SENT → 409).
+ *      Esto cumple el requisito legal: el consentimiento es post-
+ *      autenticación, no la reemplaza.
+ *
+ *      NOTA: `SIGNED` es estado terminal manejado por resolveToken (410).
+ *      `DOCUMENT_OPENED` no existe en el CHECK constraint de la tabla
+ *      (estado intermedio eliminado en migración 005_reduce_check).
+ *
+ *   3. El sign request tiene `consent_id` vinculado.
+ *      Sign requests legacy (pre-Bloque A, sin agreement_version) NO
+ *      requieren consentimiento. Si llegamos aquí con uno, es un bug.
+ *
+ *   4. Delega en `consentService.accept(consentId, { signRequest })`:
+ *      - El service hace el UPDATE atómico con WHERE de protección TOCTOU.
+ *      - El service retorna `{ ok, idempotente, consent }`.
+ *      - Si `idempotente: false` (primera aceptación), registramos el
+ *        evento `CONSENT_ACCEPTED` en `gh_firma_eventos` con metadata:
+ *          · id_consentimiento
+ *          · version_acuerdo
+ *          · hash_texto_acuerdo
+ *          · id_solicitud
+ *          · idempotente: false
+ *      - Si `idempotente: true` (ya aceptado), NO se crea otro evento
+ *        (decisión de auditoría: una sola entrada CONSENT_ACCEPTED por
+ *        consentimiento).
+ *
+ * Garantías:
+ *
+ *   - Idempotencia: el service tiene doble protección (lectura previa +
+ *     WHERE en UPDATE) + manejo de estado inconsistente. Si el evento
+ *     de registro falla, no se afecta el estado del consentimiento.
+ *
+ *   - Anti-aceptación-pre-OTP: solo se permite aceptar desde estados
+ *     POST-autenticación. Lista cerrada de 2 estados (OTP_VERIFIED,
+ *     DOCUMENT_VIEWED). Cualquier otro estado (incluido PENDING, OPENED,
+ *     IDENTIFIED, OTP_SENT) → 409 CONSENT_ACCEPT_TOO_EARLY.
+ *
+ *   - Atomicidad del UPDATE: el service usa `db.transaction(() => ...)`
+ *     con `WHERE manifestacion_aceptada = 0 AND estado = 'OTP_PENDING'`
+ *     para que un UPDATE concurrente desde otra tab/request no duplique.
+ *
+ * @param {string} token
+ * @param {string} ip
+ * @param {string} user_agent
+ * @returns {{ok: true, idempotente: boolean, consent: object}}
+ * @throws AppError 404/409/410 según la regla que falle.
+ */
+const ESTADOS_PERMITIDOS_PARA_CONSENT = ['OTP_VERIFIED', 'DOCUMENT_VIEWED'];
+
+function consentAccept(token, ip, user_agent) {
+  // 1. Resolver token (404 / 410)
+  const { signRequest } = resolveToken(token);
+
+  // 2. Validar estado de la solicitud (lista INEQUÍVOCA)
+  if (!ESTADOS_PERMITIDOS_PARA_CONSENT.includes(signRequest.estado)) {
+    throw new AppError(409, 'CONSENT_ACCEPT_TOO_EARLY',
+      `No se puede aceptar el consentimiento en estado '${signRequest.estado}'. ` +
+      `La solicitud debe estar en OTP_VERIFIED o DOCUMENT_VIEWED.`,
+      {
+        current_state: signRequest.estado,
+        required_states: ESTADOS_PERMITIDOS_PARA_CONSENT,
+        id_solicitud: signRequest.id_solicitud,
+      });
+  }
+
+  // 3. Validar consent_id
+  if (!signRequest.consent_id) {
+    throw new AppError(409, 'CONSENT_REQUIRED',
+      'El sign request no tiene consent_id vinculado (legado sin Acuerdo?)',
+      { id_solicitud: signRequest.id_solicitud });
+  }
+
+  // 4. Llamar al service (UPDATE atómico en consentimiento)
+  const result = consentService.accept(signRequest.consent_id, { signRequest });
+
+  // 5. Registrar evento CONSENT_ACCEPTED SOLO en la primera aceptación.
+  //    Si fue idempotente, ya existe un evento previo (o un reintento que
+  //    no debe duplicar la auditoría).
+  if (!result.idempotente) {
+    const updatedConsent = result.consent;
+    signRequestService.registerEvent(signRequest.id, 'CONSENT_ACCEPTED', {
+      id_consentimiento: updatedConsent.id,
+      version_acuerdo: updatedConsent.version_acuerdo,
+      hash_texto_acuerdo: updatedConsent.hash_texto_acuerdo,
+      id_solicitud: signRequest.id_solicitud,
+      idempotente: false,
+    }, 'trabajador', ip, user_agent);
+  }
+
+  // 6. Aplanar respuesta para conveniencia del frontend.
+  //    El service retorna { ok, idempotente, consent }; el frontend prefiere
+  //    campos top-level (consent_id, manifestacion_aceptada, estado, etc.).
+  const c = result.consent;
+  return {
+    ok: result.ok,
+    consent_id: c.id,
+    manifestacion_aceptada: c.manifestacion_aceptada === 1,
+    estado: c.estado,
+    fecha_aceptacion: c.fecha_aceptacion,
+    version_acuerdo: c.version_acuerdo,
+    hash_texto_acuerdo: c.hash_texto_acuerdo,
+    idempotente: result.idempotente,
+  };
+}
+
 module.exports = {
   resolveToken,
   registerOpenedIfFirst,
@@ -884,4 +1007,5 @@ module.exports = {
   getPdfForToken,
   commit,
   reject,
+  consentAccept,
 };

@@ -4,6 +4,9 @@
  * Maneja el ciclo de vida del consentimiento:
  * - create: crea un consentimiento PENDING, genera OTP, lo envía.
  * - verifyOtp: verifica el OTP y marca como aceptado.
+ * - accept: acepta el consentimiento desde la mini-app (UI, sin OTP).
+ *   Usado por el Bloque E6.5 (tercera casilla "Acepto el Acuerdo" en
+ *   el flujo del firmante). Idempotente.
  *
  * Ver DATA_MODEL.md §3.2 (tabla gh_consentimientos_firma).
  * Ver API.md §6.10 y §6.11.
@@ -253,6 +256,195 @@ function verifyOtp({ consentId, otp, kair_version }) {
 }
 
 /**
+ * Acepta un consentimiento del Acuerdo de uso desde la mini-app (UI, sin OTP).
+ *
+ * Esta función es el camino alterno a `verifyOtp` para que el firmante
+ * pueda aceptar el Acuerdo v1.0 desde la UI de la mini-app (tercera
+ * casilla "Acepto el Acuerdo") en sign requests que ya fueron
+ * autenticados por OTP en una sesión previa (Bloque E6.5).
+ *
+ * A diferencia de `verifyOtp`, este flujo NO usa OTP: la aceptación
+ * queda registrada en BD por decisión explícita del firmante (click
+ * en checkbox 3), después de que el firmante ya pasó por identify() +
+ * verify-otp() para autenticarse. La precondición de estado se valida
+ * en el orquestador (publicFlow.consentAccept), que exige que la
+ * solicitud esté en OTP_VERIFIED o DOCUMENT_VIEWED.
+ *
+ * Reglas (en orden de evaluación, cada una con código de error específico):
+ *
+ *   1. El consentimiento con id = consentId NO existe
+ *      → 404 CONSENT_NOT_FOUND
+ *
+ *   2. signRequest.consent_id !== consentId
+ *      → 409 CONSENT_ID_MISMATCH
+ *      Defensa contra que un cliente envíe un consentId arbitrario.
+ *
+ *   3. El consentimiento es de OTRO trabajador
+ *      → 409 CONSENT_WORKER_MISMATCH
+ *
+ *   4. El consentimiento es de OTRA empresa
+ *      → 409 CONSENT_COMPANY_MISMATCH
+ *
+ *   5. El consentimiento es de OTRA versión del Acuerdo
+ *      → 409 CONSENT_VERSION_MISMATCH
+ *
+ *   6. El consentimiento está LOCKED
+ *      → 409 CONSENT_LOCKED
+ *
+ *   7. El consentimiento está manifestacion_aceptada=1
+ *      - Si estado = ACCEPTED → idempotente: true (sin UPDATE, sin evento)
+ *      - Si estado != ACCEPTED → 409 CONSENT_INCONSISTENT_STATE
+ *        (NO corregimos silenciosamente, reportamos el estado)
+ *
+ *   8. El consentimiento está en estado != OTP_PENDING
+ *      → 409 INVALID_STATE
+ *
+ *   9. UPDATE atómico en transacción con WHERE adicional
+ *      (`manifestacion_aceptada = 0 AND estado = 'OTP_PENDING'`)
+ *      para protección contra TOCTOU races:
+ *      - Si WHERE no matchea (otro request ya aceptó) → idempotente: true
+ *      - Si WHERE matchea → marca aceptado y retorna manifestacion_aceptada: true
+ *
+ *  10. El evento CONSENT_ACCEPTED se registra desde el orquestador
+ *      (`publicFlow.consentAccept`), NO aquí, para mantener este
+ *      servicio desacoplado de `signRequestService` (consent.js no
+ *      debe importar signRequest.js — ese es el patrón del proyecto).
+ *      El orquestador lo registra SOLO si esta función retorna
+ *      `idempotente: false` (primera aceptación).
+ *
+ * Si todo OK, retorna { ok: true, idempotente: boolean, consent }.
+ *
+ * @param {number} consentId
+ * @param {object} opts
+ * @param {object} opts.signRequest - fila de gh_firmas_electronicas
+ *        (necesaria para cross-validate y para que el orquestador
+ *        pueda registrar el evento CONSENT_ACCEPTED con firma_id).
+ * @returns {{ok: true, idempotente: boolean, consent: object}}
+ * @throws AppError 404 / 409 según la regla que falle.
+ */
+function accept(consentId, { signRequest } = {}) {
+  if (!signRequest) {
+    throw new AppError(500, 'INTERNAL_ERROR',
+      'consentService.accept requiere opts.signRequest');
+  }
+
+  // 1. Consentimiento existe
+  const consent = getById(consentId);
+  if (!consent) {
+    throw new AppError(404, 'CONSENT_NOT_FOUND',
+      `Consentimiento ${consentId} no encontrado`);
+  }
+
+  // 2. Coincide con signRequest.consent_id (defensa contra consentId arbitrario)
+  if (signRequest.consent_id !== consentId) {
+    throw new AppError(409, 'CONSENT_ID_MISMATCH',
+      'El consentimiento no está vinculado a esta solicitud',
+      {
+        sign_request_id: signRequest.id,
+        sign_request_consent_id: signRequest.consent_id,
+        provided_consent_id: consentId,
+      });
+  }
+
+  // 3. Cross-validate mismo trabajador
+  if (consent.id_trabajador !== signRequest.id_trabajador) {
+    throw new AppError(409, 'CONSENT_WORKER_MISMATCH',
+      'El consentimiento pertenece a otro trabajador',
+      { consent_id: consent.id });
+  }
+
+  // 4. Cross-validate misma empresa
+  if (consent.id_empresa !== signRequest.id_empresa) {
+    throw new AppError(409, 'CONSENT_COMPANY_MISMATCH',
+      'El consentimiento pertenece a otra empresa',
+      { consent_id: consent.id });
+  }
+
+  // 5. Cross-validate misma versión del Acuerdo
+  if (consent.version_acuerdo !== signRequest.agreement_version) {
+    throw new AppError(409, 'CONSENT_VERSION_MISMATCH',
+      'El consentimiento es de otra versión del Acuerdo',
+      { consent_id: consent.id });
+  }
+
+  // 6. Locked
+  if (consent.estado === ESTADO_LOCKED) {
+    throw new AppError(409, 'CONSENT_LOCKED',
+      'Consentimiento bloqueado por exceso de intentos. Contacta a RRHH.',
+      { consent_id: consent.id });
+  }
+
+  // 7. Ya aceptado (idempotente)
+  if (consent.manifestacion_aceptada === 1) {
+    if (consent.estado !== ESTADO_ACCEPTED) {
+      // Inconsistencia detectada: manifestacion_aceptada=1 pero estado != ACCEPTED
+      // NO corregimos silenciosamente, reportamos el estado para auditoría.
+      throw new AppError(409, 'CONSENT_INCONSISTENT_STATE',
+        `Consentimiento marcado como aceptado (manifestacion_aceptada=1) pero con estado '${consent.estado}'`,
+        {
+          consent_id: consent.id,
+          manifestacion_aceptada: 1,
+          estado: consent.estado,
+          id_solicitud: signRequest.id_solicitud,
+        });
+    }
+    // Idempotente: ya estaba aceptado y estado consistente
+    logger.info('Consentimiento ya aceptado (idempotente)', {
+      consent_id: consent.id,
+      id_solicitud: signRequest.id_solicitud,
+    });
+    return { ok: true, idempotente: true, consent };
+  }
+
+  // 8. Estado debe ser OTP_PENDING
+  if (consent.estado !== ESTADO_PENDING) {
+    throw new AppError(409, 'INVALID_STATE',
+      `Estado actual '${consent.estado}' no permite aceptación`,
+      {
+        consent_id: consent.id,
+        current_state: consent.estado,
+        id_solicitud: signRequest.id_solicitud,
+      });
+  }
+
+  // 9. UPDATE atómico con WHERE para protección TOCTOU.
+  //    El WHERE garantiza que si otra request aceptó mientras tanto,
+  //    el UPDATE no haga nada y detectemos el race.
+  const fecha_aceptacion = new Date().toISOString();
+  let wasIdempotent = false;
+  const tx = db.transaction(() => {
+    const updateResult = db.prepare(`
+      UPDATE gh_consentimientos_firma
+      SET manifestacion_aceptada = 1,
+          fecha_aceptacion = ?,
+          estado = ?,
+          updated_at = datetime('now')
+      WHERE id = ? AND manifestacion_aceptada = 0 AND estado = ?
+    `).run(fecha_aceptacion, ESTADO_ACCEPTED, consentId, ESTADO_PENDING);
+
+    if (updateResult.changes === 0) {
+      // Otro request aceptó mientras tanto (TOCTOU race)
+      wasIdempotent = true;
+    }
+  });
+  tx();
+
+  if (wasIdempotent) {
+    logger.info('Consentimiento ya aceptado (race detectada por WHERE)', {
+      consent_id: consentId,
+      id_solicitud: signRequest.id_solicitud,
+    });
+    return { ok: true, idempotente: true, consent: getById(consentId) };
+  }
+
+  logger.info('Consentimiento aceptado (vía UI)', {
+    consent_id: consentId,
+    id_solicitud: signRequest.id_solicitud,
+  });
+  return { ok: true, idempotente: false, consent: getById(consentId) };
+}
+
+/**
  * Valida un consentimiento para ser usado en commit() de un sign request.
  *
  * Esta es la pieza clave del Bloque E6: demuestra la cadena legal
@@ -371,6 +563,7 @@ function validateForCommit(signRequest) {
 module.exports = {
   create,
   verifyOtp,
+  accept,
   getById,
   getExisting,
   validateForCommit,
