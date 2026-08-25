@@ -24,7 +24,11 @@ const { requireEmpresaScopeAndLimit } = require('../middleware/authz');
 const { requireIdempotencyKey } = require('../middleware/idempotency');
 const { uploadPdf } = require('../middleware/upload');
 const pdfValidation = require('../middleware/pdfValidation');
-const { signRequestBody, signRequestListQuery, signRequestIdsQuery } = require('../schemas');
+const { validateBody } = require('../middleware/validate');
+const {
+  signRequestBody, signRequestListQuery, signRequestIdsQuery,
+  signRequestNotifyBody,  // I-103.A1.5.1
+} = require('../schemas');
 const signRequestService = require('../services/signRequest');
 const storage = require('../services/storage');
 const { AppError } = require('../middleware/errors');
@@ -784,5 +788,130 @@ router.get('/sign-requests/:id/link',
       next(err);
     }
   });
+
+// =============================================================================
+// I-103.A1.5.1: POST /internal/sign-requests/:id/notify-remote
+// =============================================================================
+// Envía (o re-envía) la invitación al firmante por correo. Es el "primer
+// contacto" con el firmante después de que K+AIR creó el sign request. NO
+// genera ni envía OTP (eso ocurre en publicFlow.identify cuando el firmante
+// abre la URL).
+//
+// Auth: requireEmpresaScopeAndLimit con sign_request:read (mismo que /link).
+// Re-uso de operation porque semánticamente es "leer el sign request para
+// obtener su link cifrado y enviarlo". NO requiere nueva operation.
+//
+// Status codes:
+//   - 200: invitación enviada (con messageId + sent_at)
+//   - 400: body inválido (sin correo, formato inválido, etc.) — zod
+//   - 401/403/429: manejados por el middleware
+//   - 404 NOT_FOUND: sign request no existe O cross-company (silent)
+//   - 410 GONE INVITE_NOT_AVAILABLE:
+//       - sign request en estado terminal (SIGNED/REJECTED/REVOKED/EXPIRED/CANCELLED)
+//       - sign request sin token cifrado (legacy pre-I-013b)
+//   - 502 BAD_GATEWAY INVITE_EMAIL_FAILED: mailer lanzó (SMTP caído, red, etc.)
+//
+// Side effects:
+//   - INSERT en gh_firma_eventos (evento=INVITE_SENT)
+//   - SMTP send (dev: jsonTransport, prod: nodemailer real)
+//
+// Idempotencia: NO se implementa explícita (cada llamada genera un nuevo
+// INVITE_SENT en auditoría + potencialmente un correo nuevo). Rate limit
+// del middleware (4 capas) previene abuse.
+
+router.post('/sign-requests/:id/notify-remote',
+  requireEmpresaScopeAndLimit({
+    allowedOperations: ['sign_request:read'],
+    rateLimit: { tier: 'standard' },
+  }),
+  validateBody(signRequestNotifyBody),
+  async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      let signRequest;
+
+      // Mismo patrón que /link: aceptar SIGN-YYYY-NNNNNN o entero positivo.
+      if (/^SIGN-\d{4}-\d{6}$/.test(id)) {
+        signRequest = signRequestService.getByIdSolicitud(id);
+      } else if (/^\d+$/.test(id)) {
+        signRequest = signRequestService.getById(parseInt(id, 10));
+      } else {
+        return res.status(400).json({
+          error: {
+            code: 'INVALID_REQUEST_BODY',
+            message: 'id debe ser SIGN-YYYY-NNNNNN o entero positivo',
+            request_id: req.id,
+          },
+        });
+      }
+
+      if (!signRequest) {
+        return res.status(404).json({
+          error: {
+            code: 'NOT_FOUND',
+            message: `Solicitud ${id} no encontrada`,
+            request_id: req.id,
+          },
+        });
+      }
+
+      // Cross-company silent 404 (no revelar existencia de recurso cross-company).
+      if (req.authSource === 'client' &&
+          signRequest.id_empresa !== req.id_empresa) {
+        return res.status(404).json({
+          error: {
+            code: 'NOT_FOUND',
+            message: `Solicitud ${id} no encontrada`,
+            request_id: req.id,
+          },
+        });
+      }
+
+      // Estado terminal: 410. Mismo set que /link (no se re-envía invitación
+      // a un sign request que ya firmó, rechazó, expiró, fue revocado o
+      // cancelado).
+      const terminalStates = ['SIGNED', 'REJECTED', 'REVOKED', 'EXPIRED', 'CANCELLED'];
+      if (terminalStates.includes(signRequest.estado)) {
+        return res.status(410).json({
+          error: {
+            code: 'INVITE_NOT_AVAILABLE',
+            message: `No se puede enviar invitación en estado terminal '${signRequest.estado}'`,
+            details: { current_state: signRequest.estado, reason: 'terminal_state' },
+            request_id: req.id,
+          },
+        });
+      }
+
+      // Llamar al service. Él se encarga de:
+      //   - Recuperar el token vía getTokenForRecovery (lanza 410 si legacy)
+      //   - Enviar el correo vía mailer.sendInvite (lanza 502 si SMTP falla)
+      //   - Registrar evento INVITE_SENT (best-effort)
+      const result = await signRequestService.notifyRemote(
+        signRequest,
+        req.body.correo,
+        {
+          actor: req.api_key_hash_prefix
+            ? `rh:${req.api_key_hash_prefix}`
+            : 'sistema',
+          ip: req.ip,
+          user_agent: req.get('User-Agent') || null,
+          context: req.body.context || null,
+        }
+      );
+
+      res.json({
+        ok: true,
+        id_solicitud: signRequest.id_solicitud,
+        messageId: result.messageId,
+        sent_at: result.sent_at,
+        evento_id: result.evento_id,
+      });
+    } catch (err) {
+      // AppError: el service lo lanza con códigos ricos (410, 502, etc.).
+      // Dejamos que el errorHandler central los traduzca.
+      next(err);
+    }
+  }
+);
 
 module.exports = router;

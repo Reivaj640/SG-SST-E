@@ -132,6 +132,100 @@ async function sendSignedCopy({ to, pdfPath, constanciaPath, context }) {
 }
 
 /**
+ * Envía una invitación de firma al correo del firmante.
+ *
+ * A diferencia de sendOTP (que se usa durante la identification) y
+ * sendSignedCopy (post-commit, adjunta el PDF firmado), sendInvite es
+ * el "primer contacto" con el firmante: le notifica que tiene un documento
+ * para firmar y le entrega la URL pública única de la mini-app.
+ *
+ * El firmante aún NO tiene OTP — el OTP se genera en publicFlow.identify()
+ * cuando abre la URL y se identifica con su cédula. Esta función NO genera
+ * ni envía OTP; solo la URL de invitación.
+ *
+ * subject: "K+AIR — Tienes un documento para firmar"
+ * body: incluye id_solicitud, URL pública, instrucciones (abrir link,
+ *       identificar con cédula, esperar OTP, firmar).
+ * attachments: ninguno (es solo la invitación; el PDF no se envía por
+ *              correo — el firmante lo VE en la mini-app y luego lo recibe
+ *              firmado vía sendSignedCopy() post-commit).
+ *
+ * En dev (jsonTransport): se guarda en _devInbox con tipo='invite' para
+ * que los tests puedan verificar.
+ *
+ * @param {object} opts
+ * @param {string} opts.to - Correo destino (validado por el handler; acá
+ *                           solo sanity check).
+ * @param {string} opts.url_publica - URL pública completa de la mini-app
+ *                                    (formato: `${publicUrl}/s/<token>`).
+ * @param {string} opts.id_solicitud - Identificador legible (SIGN-YYYY-NNNNNN)
+ *                                     para que el firmante pueda referirse al doc.
+ * @param {object} [opts.context] - Metadata adicional (NO se loggea en plaintext).
+ *
+ * @returns {Promise<{ok: true, messageId: string}>}
+ * @throws Error si `to` no parece correo, o si falla el envío.
+ */
+async function sendInvite({ to, url_publica, id_solicitud, context }) {
+  if (typeof to !== 'string' || !to.includes('@')) {
+    throw new Error('sendInvite: `to` debe ser un correo válido');
+  }
+  if (typeof url_publica !== 'string' || url_publica.length === 0) {
+    throw new Error('sendInvite: `url_publica` requerida');
+  }
+  if (typeof id_solicitud !== 'string' || id_solicitud.length === 0) {
+    throw new Error('sendInvite: `id_solicitud` requerido');
+  }
+
+  const subject = 'K+AIR — Tienes un documento para firmar';
+  const body = [
+    'Hola,',
+    '',
+    'Tienes un documento de K+AIR esperándote para firma electrónica.',
+    '',
+    `ID de solicitud: ${id_solicitud}`,
+    '',
+    'Para firmarlo:',
+    `1. Abre este enlace en tu navegador: ${url_publica}`,
+    '2. Identifícate con tu tipo y número de documento de identidad.',
+    '3. Recibirás un código (OTP) en este mismo correo.',
+    '4. Ingrésalo en la página para ver el documento y firmar.',
+    '',
+    'El enlace expira según la configuración del documento (típicamente 24-72h).',
+    'Si no reconoces esta operación, contacta al área de RRHH de inmediato.',
+    '',
+    '— K+AIR',
+  ].join('\n');
+
+  if (config.env === 'production') {
+    const transporter = getTransporter();
+    const info = await transporter.sendMail({
+      from: `"${config.smtp.fromName}" <${config.smtp.fromEmail}>`,
+      to,
+      subject,
+      text: body,
+    });
+    return { ok: true, messageId: info.messageId };
+  }
+
+  // Dev: jsonTransport no envía, pero guardamos en inbox para tests.
+  logger.info('[DEV-INVITE] Invitación simulada', {
+    to: to.replace(/(.{2}).*(@.*)/, '$1***$2'),
+    id_solicitud,
+    message_id_preview: `<${Math.random().toString(36).slice(2)}@dev>`,
+  });
+  const entry = {
+    to, subject, body, tipo: 'invite',
+    id_solicitud, url_publica,
+    context: context || null,
+    sentAt: new Date().toISOString(),
+  };
+  _devInbox.push(entry);
+  if (_devInbox.length > 50) _devInbox.shift();
+
+  return { ok: true, messageId: 'dev-invite-' + Date.now() };
+}
+
+/**
  * Envía un OTP al correo del trabajador.
  *
  * @param {object} opts
@@ -204,6 +298,8 @@ function makeSubject(tipo) {
       return 'K+AIR — Tu código para aceptar el Acuerdo de firma';
     case 'signature':
       return 'K+AIR — Tu código para firmar el documento';
+    case 'invite':
+      return 'K+AIR — Tienes un documento para firmar';
     case 'notification':
       return 'K+AIR — Tienes un documento para firmar';
     case 'copy':
@@ -249,6 +345,7 @@ function makeBody({ otp, tipo, context }) {
 module.exports = {
   sendOTP,
   sendSignedCopy,
+  sendInvite,
   getDevInbox,
   clearDevInbox,
 };

@@ -166,6 +166,159 @@ function getTokenForRecovery(signRequest) {
 const MAX_PDF_SIZE = 10 * 1024 * 1024; // 10 MB
 const PDF_MAGIC = Buffer.from('%PDF-');
 
+// I-103.A1.5.1 · Importar mailer localmente (lazy para evitar ciclos en
+// tests que mockean storage antes que mailer). El require vive dentro de
+// notifyRemote(), no a nivel de módulo, para no crear dependencia circular
+// si mailer.js en el futuro importa algo de signRequest.js.
+
+/**
+ * Máscara determinística de un correo para logging seguro.
+ *
+ * `ab***@cd.com` (4 chars visibles a la izquierda, dominio completo).
+ * El logger del proyecto YA redacta `correo`/`email` por nombre de campo
+ * (SENSITIVE_KEYS en utils/logger.js) — esto es redundancia explícita para
+ * los eventos de auditoría que se persisten en gh_firma_eventos.metadata
+ * (donde el campo NO se llama `correo` y podría bypasear la redacción por
+ * nombre de campo del logger runtime, pero la query SELECT del audit sí
+ * lo vería).
+ */
+function _maskEmail(email) {
+  if (typeof email !== 'string' || !email.includes('@')) return '[INVALID_EMAIL]';
+  const [local, domain] = email.split('@');
+  if (!local || !domain) return '[INVALID_EMAIL]';
+  const visible = local.slice(0, Math.min(2, local.length));
+  const stars = '*'.repeat(Math.max(0, local.length - visible.length));
+  return `${visible}${stars}@${domain}`;
+}
+
+/**
+ * I-103.A1.5.1 · Envía (o re-envía) la invitación de firma al correo del firmante.
+ *
+ * Es el "primer contacto" con el firmante. La URL se reconstruye a partir
+ * del token cifrado en metadata._server_metadata.token_encrypted (mismo
+ * mecanismo que /link, I-013b). NO genera ni envía OTP — el OTP se
+ * genera en publicFlow.identify() cuando el firmante abre la URL.
+ *
+ * Auditoría: registra evento INVITE_SENT con metadata que incluye
+ * `correo_destino_enmascarado` (no plaintext), `messageId`, contexto del
+ * request. Si la auditoría falla, se loguea WARN pero el envío se considera
+ * exitoso (la invitación YA salió).
+ *
+ * Side effects:
+ *   - Llama mailer.sendInvite() (dev mode: jsonTransport, prod: SMTP real)
+ *   - INSERT en gh_firma_eventos (evento=INVITE_SENT, actor=`rh:<prefix>` o sistema)
+ *
+ * Errores:
+ *   - 410 INVITE_NOT_AVAILABLE: sign request sin token cifrado (legacy pre-I-013b)
+ *   - 410 INVITE_NOT_AVAILABLE: estado terminal (SIGNED/REJECTED/REVOKED/EXPIRED/CANCELLED)
+ *   - 502 INVITE_EMAIL_FAILED: mailer lanzó (SMTP caído, red, etc.)
+ *
+ * Pre-condiciones (validadas por el handler ANTES de llamar):
+ *   - signRequest existe y pertenece a la empresa autenticada
+ *   - signRequest NO está en estado terminal
+ *
+ * @param {object} signRequest - fila de gh_firmas_electronicas (de getById o getByIdSolicitud)
+ * @param {string} correo - correo destino del firmante
+ * @param {object} [opts]
+ * @param {string} [opts.actor] - actor que dispara el envío (default 'sistema')
+ * @param {string} [opts.ip] - IP del caller (para auditoría)
+ * @param {string} [opts.user_agent] - User-Agent del caller (para auditoría)
+ * @param {object} [opts.context] - metadata libre para el evento
+ * @returns {Promise<{ok: true, messageId: string, sent_at: string, evento_id?: number}>}
+ */
+async function notifyRemote(signRequest, correo, opts = {}) {
+  if (!signRequest || !signRequest.id_solicitud) {
+    throw new AppError(500, 'INTERNAL_ERROR', 'signRequest inválido en notifyRemote');
+  }
+  if (typeof correo !== 'string' || !correo.includes('@') || correo.length > 254) {
+    throw new AppError(400, 'INVALID_REQUEST_BODY', 'correo inválido');
+  }
+
+  // 1) Recuperar el token cifrado (mismo helper que /link).
+  const recovery = getTokenForRecovery(signRequest);
+  if (!recovery.found) {
+    throw new AppError(410, 'INVITE_NOT_AVAILABLE',
+      'No se puede recuperar el link para enviar la invitación',
+      { reason: recovery.reason });
+  }
+
+  // 2) Enviar el correo vía mailer.
+  const mailer = require('./mailer');
+  let sendResult;
+  try {
+    sendResult = await mailer.sendInvite({
+      to: correo,
+      url_publica: recovery.url_publica,
+      id_solicitud: signRequest.id_solicitud,
+      context: opts.context || null,
+    });
+  } catch (e) {
+    logger.error('notifyRemote: mailer.sendInvite falló', {
+      id_solicitud: signRequest.id_solicitud,
+      error: e.message,
+      code: e.code || 'SEND_ERROR',
+    });
+    throw new AppError(502, 'INVITE_EMAIL_FAILED',
+      'No se pudo enviar la invitación por correo',
+      { reason: 'smtp_failure', upstream_error: e.message });
+  }
+
+  const sent_at = new Date().toISOString();
+
+  // 3) Auditoría: registrar evento INVITE_SENT (best-effort — si falla,
+  // la invitación YA salió, se loguea WARN).
+  let evento_id;
+  try {
+    registerEvent(
+      signRequest.id,
+      'INVITE_SENT',
+      {
+        // PII segura: el correo se enmascara antes de persistir.
+        correo_destino_enmascarado: _maskEmail(correo),
+        messageId: sendResult.messageId,
+        canal: 'email',
+        context: opts.context || undefined,
+      },
+      opts.actor || 'sistema',
+      opts.ip || null,
+      opts.user_agent || null,
+    );
+    // Obtener el id del evento recién insertado (lastInsertRowid sobre la
+    // misma tabla). registerEvent no retorna el id, pero como acabamos de
+    // insertar, podemos leerlo de la conexión.
+    const evtRow = db.prepare(`
+      SELECT id FROM gh_firma_eventos
+      WHERE firma_id = ? AND evento = 'INVITE_SENT'
+      ORDER BY id DESC LIMIT 1
+    `).get(signRequest.id);
+    evento_id = evtRow ? evtRow.id : undefined;
+  } catch (auditErr) {
+    logger.warn('notifyRemote: auditoría INVITE_SENT falló (invitación ya enviada)', {
+      id_solicitud: signRequest.id_solicitud,
+      messageId: sendResult.messageId,
+      audit_error: auditErr.message,
+    });
+    // No relanzamos — el envío fue exitoso.
+  }
+
+  logger.info('Invitación enviada', {
+    id_solicitud: signRequest.id_solicitud,
+    // PII: el logger redacta `correo` por nombre, pero acá usamos
+    // explícitamente el campo renombrado para que el dato persistido en
+    // log sea siempre enmascarado.
+    correo_destino_enmascarado: _maskEmail(correo),
+    messageId: sendResult.messageId,
+    evento_id,
+  });
+
+  return {
+    ok: true,
+    messageId: sendResult.messageId,
+    sent_at,
+    evento_id,
+  };
+}
+
 /**
  * Tipos válidos de documento que se firma (categoría legal/administrativa).
  *
@@ -708,10 +861,12 @@ module.exports = {
   list,
   registerEvent,
   getTokenForRecovery,  // I-013b: descifrar token de metadata
+  notifyRemote,  // I-103.A1.5.1: enviar invitación al firmante
   // Exports para tests
   _resetTokenEncryptionKey,  // I-013b
   encryptToken,  // I-013b
   decryptToken,  // I-013b
+  _maskEmail,  // I-103.A1.5.1: helper de auditoría
   MAX_PDF_SIZE,
   TIPOS_IDENTIFICACION,  // I-002: single source of truth (zod + service)
 };
