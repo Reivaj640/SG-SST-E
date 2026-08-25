@@ -167,7 +167,66 @@
     try {
       const contexto = await apiFetch('/s/' + token);
       state.contexto = contexto;
-      // Validar que el estado sea adecuado para identificar
+
+      // I-103.A1.6 · FIX: respetar el estado real del sign request.
+      // Sin este fix, si el firmante cierra el navegador y re-abre el
+      // enlace, la mini-app lo mandaba a identify incluso si ya estaba
+      // en OTP_SENT. Ahora dispatchamos a la pantalla correcta.
+      //
+      // Máquina de estados (alineada con publicFlow.js + CHECK de
+      // gh_firmas_electronicas.estado):
+      //
+      //   PENDING / OPENED / IDENTIFICATION_STARTED / IDENTIFICATION_FAILED
+      //     → screen-identify
+      //   IDENTIFIED / OTP_SENT
+      //     → screen-otp
+      //   OTP_VERIFIED / DOCUMENT_OPENED / DOCUMENT_VIEWED
+      //     → screen-document
+      //   SIGNED
+      //     → screen-signed
+      //   REJECTED
+      //     → screen-rejected
+      //   EXPIRED / REVOKED / CANCELLED / OTP_LOCKED
+      //     → showError con mensaje específico
+      const estado = contexto && contexto.estado;
+
+      if (estado === 'SIGNED') return showScreen('signed');
+      if (estado === 'REJECTED') return showScreen('rejected');
+
+      if (estado === 'IDENTIFIED' || estado === 'OTP_SENT') {
+        if (contexto.correo_enmascarado) {
+          $('#correo-enmascarado').textContent = contexto.correo_enmascarado;
+        }
+        return showScreen('otp');
+      }
+
+      if (estado === 'OTP_VERIFIED' ||
+          estado === 'DOCUMENT_OPENED' ||
+          estado === 'DOCUMENT_VIEWED') {
+        // I-103.A1.6 fix · al recargar la página con la mini-app ya en estado
+        // post-OTP, init() dispatchaba a 'document' sin llamar a setupDocumentScreen().
+        // Eso dejaba el iframe sin src, sin listeners en checkboxes y sin view-document.
+        // Solución: llamar a setupDocumentScreen() aquí también.
+        showScreen('document');
+        setupDocumentScreen();
+        return;
+      }
+
+      if (estado === 'EXPIRED') {
+        return showError('Este enlace ha expirado. Solicita uno nuevo a tu empleador.');
+      }
+      if (estado === 'REVOKED') {
+        return showError('Esta solicitud fue revocada. Contacta al área de RRHH.');
+      }
+      if (estado === 'CANCELLED') {
+        return showError('Esta solicitud fue cancelada. Contacta al área de RRHH.');
+      }
+      if (estado === 'OTP_LOCKED') {
+        return showError('El código de verificación fue bloqueado por demasiados intentos. Solicita uno nuevo a tu empleador.');
+      }
+
+      // Estados iniciales (PENDING, OPENED, IDENTIFICATION_STARTED,
+      // IDENTIFICATION_FAILED) → pantalla de identificación.
       showScreen('identify');
     } catch (err) {
       if (err.status === 404) {
@@ -311,17 +370,18 @@
   // ============================================================
 
   function setupDocumentScreen() {
+
     const pdfViewer = $('#pdf-viewer');
     const pdfDownloadLink = $('#pdf-download-link');
     const pdfUrl = '/api/sign/' + state.token + '/document.pdf';
 
-    // Cargar PDF en el visor
-    pdfViewer.setAttribute('src', pdfUrl);
-    pdfDownloadLink.setAttribute('href', pdfUrl);
 
-    // Llamar view-document cuando el PDF se carga (o como fallback tras timeout).
-    // El backend valida el estado y registra DOCUMENT_VIEWED.
-    // Hacemos UNA llamada: el primero que dispare (load o timeout) gana.
+    // I-103.A1.6 fix · CRÍTICO: declarar triggerChosen y callViewDocument
+    // ANTES de registrar el listener 'load' y ANTES de asignar el src del
+    // iframe. El setAttribute('src', ...) puede disparar el evento 'load'
+    // inmediatamente (PDF en caché, localhost, o navegador rápido), y si
+    // callViewDocument aún no está inicializado, JavaScript lanza
+    // "Cannot access 'callViewDocument' before initialization" (TDZ).
     let triggerChosen = false;
     const callViewDocument = function (source) {
       if (state.viewDocumentAttempted) return;
@@ -337,13 +397,27 @@
         .catch((err) => {
           // Si falla, permitimos un reintento en el próximo commit
           state.viewDocumentAttempted = false;
-          // No mostramos error aquí: el botón FIRMAR seguirá bloqueado
-          // por los checkboxes, y si el commit falla, mostraremos el error.
           // eslint-disable-next-line no-console
-          console.warn('view-document (' + source + ') falló:', err);
         });
     };
+
+    // I-103.A1.6 fix · listener 'load' registrado DESPUÉS de inicializar
+    // callViewDocument, pero ANTES de asignar el src del iframe. Esto
+    // garantiza que cuando el iframe dispare 'load' (inmediatamente o
+    // después), el callback ya tiene la función disponible.
     pdfViewer.addEventListener('load', () => callViewDocument('object-load'), { once: true });
+
+    // Cargar PDF en el visor (ahora el listener ya está listo y la función
+    // callViewDocument ya está inicializada).
+    pdfViewer.setAttribute('src', pdfUrl);
+    // I-103.A1.6 fix · pdfDownloadLink es null porque el <a id="pdf-download-link">
+    // está DENTRO del iframe (línea 88 de index.html). Cuando el iframe carga
+    // el PDF, el navegador reemplaza su contenido y el <a> desaparece del DOM
+    // accesible desde el documento principal. Por eso necesitamos el null-check.
+    if (pdfDownloadLink) {
+      pdfDownloadLink.setAttribute('href', pdfUrl);
+    }
+
     // Fallback si el evento load no dispara (navegadores sin visor PDF nativo,
     // o si el usuario llegó a esta pantalla muy rápido)
     setTimeout(() => {
