@@ -1,7 +1,7 @@
 /**
  * Rutas del Acuerdo de uso de firma electrónica.
  *
- * - GET /internal/acuerdo-activo  (protegida por internalApiAuth)
+ * - GET /internal/acuerdo-activo  (protegida por requireEmpresaScope)
  *
  * Ver API.md §6.9.
  */
@@ -9,11 +9,11 @@
 
 const express = require('express');
 const router = express.Router();
-const { internalApiAuth } = require('../middleware/auth');
+const { requireEmpresaScope } = require('../middleware/authz');
 const { AppError } = require('../middleware/errors');
 const agreementService = require('../services/agreement');
 
-router.get('/acuerdo-activo', internalApiAuth(), (req, res, next) => {
+router.get('/acuerdo-activo', requireEmpresaScope(), (req, res, next) => {
   try {
     const acuerdo = agreementService.getActive();
     if (!acuerdo) {
