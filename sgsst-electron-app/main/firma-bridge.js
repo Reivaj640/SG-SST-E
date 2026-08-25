@@ -394,8 +394,39 @@ function _getClient() {
  *     lastValidatedAt, companyName, companyKey
  *   }
  */
+// =========================================================================
+// I-103.A1.5.4-B · DIAGNÓSTICO TEMPORAL — NO COMMITEAR
+// =========================================================================
+// Registra 5-7 campos NO SECRETOS sobre el estado de secrets.enc y la
+// resolución de empresa. El log va a un archivo en %TEMP% para que el
+// agente CLI pueda leerlo sin ver la consola de Electron.
+//
+// NO registra: API keys, admin keys, tokens, secretos, correos.
+// =========================================================================
+var KAIR_DIAG_LOG_PATH = path.join(
+  (process.env.TEMP || process.env.TMP || 'C:\\Windows\\Temp'),
+  'kair-bridge-diag.log'
+);
+function _diagLog(step, fields) {
+  try {
+    // Sanitizar: nunca imprimir nada que parezca key/token/secret
+    var safe = {
+      ts: new Date().toISOString(),
+      step: step,
+      fields: fields || {}
+    };
+    fs.appendFileSync(KAIR_DIAG_LOG_PATH, JSON.stringify(safe) + '\n', 'utf-8');
+  } catch (_) { /* noop */ }
+}
+
 function _resolveConfigForCompany(companyName) {
-  if (!companyName || typeof companyName !== 'string') return null;
+  var _diag = { companyName_requested: companyName || null };
+  if (!companyName || typeof companyName !== 'string') {
+    _diag.outcome = 'CONFIG_MISSING';
+    _diag.reason = 'companyName no es string';
+    _diagLog('resolveConfigForCompany', _diag);
+    return null;
+  }
 
   // 1) Env vars: NO se implementa per-empresa en v1. El modo env
   //    (FIRMA_SERVICE_URL + FIRMA_SERVICE_API_KEY) sigue siendo "global",
@@ -403,6 +434,13 @@ function _resolveConfigForCompany(companyName) {
   //    sin idEmpresa (dispara CONFIG_MISSING en handlers per-empresa).
   if (_hasEnv()) {
     var env = _envConfig();
+    _diag.outcome = 'FOUND_env_global';
+    _diag.idEmpresa = null;  // env mode nunca tiene id_empresa
+    _diag.firmaApiKey_present = !!(env.apiKey && env.apiKey.length > 0);
+    _diag.firmaApiKey_length = (env.apiKey || '').length;
+    _diag.firmaServiceUrl_present = !!(env.url && env.url.length > 0);
+    _diag.normalizedKey = _normalizeCompanyKey(companyName);
+    _diagLog('resolveConfigForCompany', _diag);
     return {
       url: env.url,
       apiKey: env.apiKey,
@@ -418,17 +456,47 @@ function _resolveConfigForCompany(companyName) {
   // 2) secrets.enc v2
   var s2 = _readSecretsV2();
   if (!s2) {
+    _diag.outcome = 'CONFIG_MISSING';
+    _diag.reason = 's2 = _readSecretsV2() retornó null (secrets.enc no leíble o vacío)';
+    _diag.firmaApiKey_present = false;
+    _diag.firmaApiKey_length = 0;
+    _diag.firmaServiceUrl_present = false;
+    _diagLog('resolveConfigForCompany', _diag);
     return null;  // secrets no accesible — caller decide qué hacer
   }
 
   var found = _resolveEmpresa(s2.empresas, companyName);
   if (!found) {
+    _diag.outcome = 'CONFIG_MISSING';
+    _diag.reason = 'empresa no encontrada en secrets.enc.empresas';
+    _diag.empresas_keys = Object.keys(s2.empresas || {}).map(function (k) {
+      // mostrar solo idEmpresa + companyKey, nunca la key
+      return {
+        companyKey: k,
+        idEmpresa: (s2.empresas[k] || {}).idEmpresa || null
+      };
+    });
+    _diag.normalizedKey = _normalizeCompanyKey(companyName);
+    _diag.firmaApiKey_present = false;
+    _diag.firmaApiKey_length = 0;
+    _diag.firmaServiceUrl_present = !!(s2.firmaServiceUrl && s2.firmaServiceUrl.length > 0);
+    _diagLog('resolveConfigForCompany', _diag);
     return null;  // empresa no configurada — caller retorna CONFIG_MISSING
   }
   var entry = found.entry;
+  var apiKey = entry.firmaApiKey || '';
+  _diag.outcome = 'FOUND_secrets';
+  _diag.companyName_encontrado = found.companyKey;
+  _diag.idEmpresa = entry.idEmpresa || null;
+  _diag.firmaApiKey_present = apiKey.length > 0;
+  _diag.firmaApiKey_length = apiKey.length;
+  _diag.firmaApiKey_first4 = apiKey.length > 0 ? apiKey.slice(0, 4) + '***' : null;  // pista, no la key
+  _diag.firmaServiceUrl_present = !!(s2.firmaServiceUrl && s2.firmaServiceUrl.length > 0);
+  _diag.normalizedKey = _normalizeCompanyKey(companyName);
+  _diagLog('resolveConfigForCompany', _diag);
   return {
     url: s2.firmaServiceUrl || '',
-    apiKey: entry.firmaApiKey || '',
+    apiKey: apiKey,
     clientInstanceId: s2.firmaServiceClientInstanceId || _generateClientInstanceIdFn(),
     idEmpresa: entry.idEmpresa || null,
     source: 'secrets',
@@ -650,8 +718,15 @@ function _handlerConfigDiag() {
 }
 
 function _requireClient() {
+  _diagLog('requireClient.ENTER');
   var r = _getClient();
   if (!r.client) {
+    _diagLog('requireClient.exit', {
+      outcome: 'CONFIG_MISSING',
+      source: r.config && r.config.source,
+      hasApiKey: r.config && r.config.hasApiKey === true,
+      hasUrl: r.config && r.config.hasUrl === true
+    });
     return {
       ok: false,
       response: _err('CONFIG_MISSING', 'firma-service no configurado. Configure URL + API key primero.', {
@@ -662,6 +737,10 @@ function _requireClient() {
       })
     };
   }
+  _diagLog('requireClient.exit', {
+    outcome: 'OK',
+    source: r.config && r.config.source
+  });
   return { ok: true, client: r.client, config: r.config };
 }
 
@@ -672,12 +751,22 @@ function _requireClient() {
  * Retorna { client, config, source } o un error response.
  */
 function _resolveClientForRequest(args) {
+  _diagLog('resolveClientForRequest.ENTER', {
+    companyName_present: !!(args && args.companyName && args.companyName.length > 0),
+    companyName_length: args && args.companyName ? args.companyName.length : 0
+  });
   if (args && typeof args.companyName === 'string' && args.companyName.length > 0) {
     // Modo per-empresa (K+AIR v0.1.191+)
     // Primero verificar que firma-service esté configurado a nivel global.
     var s2 = _readSecretsV2();
     var urlOk = s2 && s2.firmaServiceUrl;
     if (!urlOk) {
+      _diagLog('resolveClientForRequest.exit', {
+        outcome: 'CONFIG_MISSING',
+        reason: 'sin URL en secrets.enc',
+        companyName: args.companyName,
+        s2_null: !s2
+      });
       return {
         ok: false,
         response: _err('CONFIG_MISSING',
@@ -689,6 +778,12 @@ function _resolveClientForRequest(args) {
     }
     var r = _getClientForCompany(args.companyName);
     if (!r.client) {
+      _diagLog('resolveClientForRequest.exit', {
+        outcome: 'CONFIG_MISSING',
+        reason: '_getClientForCompany no retornó client',
+        companyName: args.companyName,
+        r_config_source: r.config && r.config.source
+      });
       return {
         ok: false,
         response: _err('CONFIG_MISSING',
@@ -698,37 +793,220 @@ function _resolveClientForRequest(args) {
           })
       };
     }
+    _diagLog('resolveClientForRequest.exit', {
+      outcome: 'OK',
+      path: 'per-empresa',
+      companyName: args.companyName,
+      companyKey: r.config && r.config.companyKey,
+      idEmpresa: r.config && r.config.idEmpresa,
+      firmaApiKey_present: !!(r.config && r.config.apiKey && r.config.apiKey.length > 0),
+      firmaApiKey_length: r.config && r.config.apiKey ? r.config.apiKey.length : 0,
+      url_present: !!(r.config && r.config.url && r.config.url.length > 0)
+    });
     return { ok: true, client: r.client, config: r.config, source: 'per-empresa' };
   }
   // Modo LEGACY (renderer v0.1.190 con firma:config:set-api-key)
+  _diagLog('resolveClientForRequest.exit', {
+    outcome: 'legacy_path',
+    reason: 'sin companyName en args'
+  });
   return _requireClient();
 }
 
 function _handlerSignRequestCreate(args) {
   args = args || {};
+  // I-103.A1.5.4-B · DIAGNÓSTICO TEMPORAL — NO COMMITEAR
+  var _md = args.metadata || {};
+  _diagLog('handlerSignRequestCreate.ENTER', {
+    args_companyName_present: !!(args.companyName && args.companyName.length > 0),
+    args_companyName_length: args.companyName ? args.companyName.length : 0,
+    args_metadata_present: !!args.metadata,
+    args_metadata_typeof: typeof args.metadata,
+    args_metadata_keys: args.metadata && typeof args.metadata === 'object' ? Object.keys(args.metadata) : [],
+    args_metadata_id_documento_present: !!(_md.id_documento),
+    args_metadata_id_documento_length: (_md.id_documento || '').length,
+    args_metadata_id_trabajador_present: !!(_md.id_trabajador),
+    args_metadata_id_trabajador_length: (_md.id_trabajador || '').length,
+    args_metadata_id_empresa_present: !!(_md.id_empresa),
+    args_metadata_id_empresa_length: (_md.id_empresa || '').length,
+    args_metadata_tipo_firma_present: !!(_md.tipo_firma),
+    args_metadata_tipo_firma_value: _md.tipo_firma || null,
+    args_metadata_agreement_hash_present: !!(_md.agreement_hash),
+    args_metadata_agreement_hash_length: (_md.agreement_hash || '').length,
+    args_metadata_ttl_horas_present: !!(_md.ttl_horas),
+    args_metadata_ttl_horas_value: _md.ttl_horas || null,
+    args_metadata_metadata_present: !!(_md.metadata),
+    args_metadata_metadata_keys: _md.metadata && typeof _md.metadata === 'object' ? Object.keys(_md.metadata) : [],
+    args_pdfBuffer_present: !!args.pdfBuffer,
+    args_pdfBuffer_typeof: typeof args.pdfBuffer,
+    args_pdfBuffer_constructor: args.pdfBuffer ? (args.pdfBuffer.constructor && args.pdfBuffer.constructor.name) : null,
+    args_pdfBuffer_isBuffer: !!(args.pdfBuffer && Buffer.isBuffer(args.pdfBuffer)),
+    args_pdfBuffer_isUint8Array: !!(args.pdfBuffer && typeof Uint8Array !== 'undefined' && args.pdfBuffer instanceof Uint8Array),
+    args_pdfBuffer_isArrayBuffer: !!(args.pdfBuffer && typeof ArrayBuffer !== 'undefined' && args.pdfBuffer instanceof ArrayBuffer),
+    args_pdfBuffer_isArray: !!(args.pdfBuffer && Array.isArray(args.pdfBuffer)),
+    args_pdfBuffer_length: args.pdfBuffer ? (args.pdfBuffer.length || (typeof args.pdfBuffer === 'string' ? args.pdfBuffer.length : 0)) : 0,
+    args_pdfBuffer_byteLength: args.pdfBuffer && typeof args.pdfBuffer.byteLength === 'number' ? args.pdfBuffer.byteLength : null,
+    args_pdfBuffer_keys: args.pdfBuffer && typeof args.pdfBuffer === 'object' ? Object.keys(args.pdfBuffer).slice(0, 10) : [],
+    args_pdfBuffer_has_type_field: !!(args.pdfBuffer && args.pdfBuffer.type),
+    args_pdfBuffer_type_field: args.pdfBuffer && args.pdfBuffer.type ? String(args.pdfBuffer.type) : null,
+    args_pdfBuffer_has_data_field: !!(args.pdfBuffer && args.pdfBuffer.data),
+    args_pdfBuffer_data_field_isArray: !!(args.pdfBuffer && Array.isArray(args.pdfBuffer.data)),
+    args_pdfBuffer_data_field_length: args.pdfBuffer && args.pdfBuffer.data && args.pdfBuffer.data.length ? args.pdfBuffer.data.length : null,
+    args_pdfBase64_present: !!(args.pdfBase64 && args.pdfBase64.length > 0),
+    args_pdfName_present: !!(args.pdfName && args.pdfName.length > 0),
+    args_keys: Object.keys(args || {})
+  });
   if (!args.metadata) {
+    _diagLog('handlerSignRequestCreate.exit', {
+      outcome: 'INVALID_REQUEST_BODY',
+      reason: 'metadata faltante',
+      source: 'bridge'
+    });
     return _err('INVALID_REQUEST_BODY', 'metadata requerida');
   }
   var r = _resolveClientForRequest(args);
-  if (!r.ok) return r.response;
+  if (!r.ok) {
+    _diagLog('handlerSignRequestCreate.exit', {
+      outcome: r.response && r.response.error && r.response.error.code,
+      error_message: r.response && r.response.error && r.response.error.message,
+      error_hint: r.response && r.response.error && r.response.error.hint,
+      currentSource: r.response && r.response.error && r.response.error.currentSource,
+      hasApiKey: r.response && r.response.error && r.response.error.hasApiKey,
+      hasUrl: r.response && r.response.error && r.response.error.hasUrl,
+      companyName_param: r.response && r.response.error && r.response.error.companyName,
+      source: 'bridge'
+    });
+    return r.response;
+  }
+  // I-103.A1.5.4-B · DIAGNÓSTICO TEMPORAL — NO COMMITEAR
+  _diagLog('handlerSignRequestCreate.resolve', {
+    outcome: 'OK',
+    path: r.config && r.config.source,
+    companyName: args.companyName,
+    idEmpresa: r.config && r.config.idEmpresa,
+    firmaApiKey_present: !!(r.config && r.config.apiKey),
+    firmaApiKey_length: r.config && r.config.apiKey ? r.config.apiKey.length : 0,
+    firmaServiceUrl_present: !!(r.config && r.config.url)
+  });
   // Aceptar pdfBase64 (string) o pdfBuffer (Buffer). Convertir a Buffer
   // antes de pasar al client para que el contrato sea uniforme.
+  // I-103.A1.5.4-B · DIAGNÓSTICO TEMPORAL — NO COMMITEAR
+  // Inspecciona el tipo real de args.pdfBuffer JUSTO antes de la validación
+  // para confirmar si llega como Buffer, Uint8Array, ArrayBuffer, objeto
+  // serializado {type:"Buffer",data:[...]} u otra estructura.
+  _diagLog('handlerSignRequestCreate.pdfBufferInspect', {
+    pdfBuffer_present: !!args.pdfBuffer,
+    pdfBuffer_typeof: typeof args.pdfBuffer,
+    pdfBuffer_constructor: args.pdfBuffer && args.pdfBuffer.constructor ? args.pdfBuffer.constructor.name : null,
+    pdfBuffer_isBuffer: !!(args.pdfBuffer && Buffer.isBuffer(args.pdfBuffer)),
+    pdfBuffer_isUint8Array: !!(args.pdfBuffer && typeof Uint8Array !== 'undefined' && args.pdfBuffer instanceof Uint8Array),
+    pdfBuffer_isArrayBuffer: !!(args.pdfBuffer && typeof ArrayBuffer !== 'undefined' && args.pdfBuffer instanceof ArrayBuffer),
+    pdfBuffer_isArray: !!(args.pdfBuffer && Array.isArray(args.pdfBuffer)),
+    pdfBuffer_length: args.pdfBuffer ? (args.pdfBuffer.length || 0) : 0,
+    pdfBuffer_byteLength: args.pdfBuffer && typeof args.pdfBuffer.byteLength === 'number' ? args.pdfBuffer.byteLength : null,
+    pdfBuffer_keys_first10: args.pdfBuffer && typeof args.pdfBuffer === 'object' ? Object.keys(args.pdfBuffer).slice(0, 10) : [],
+    pdfBuffer_has_type_field: !!(args.pdfBuffer && args.pdfBuffer.type),
+    pdfBuffer_type_field: args.pdfBuffer && args.pdfBuffer.type ? String(args.pdfBuffer.type) : null,
+    pdfBuffer_has_data_field: !!(args.pdfBuffer && args.pdfBuffer.data),
+    pdfBuffer_data_isArray: !!(args.pdfBuffer && Array.isArray(args.pdfBuffer.data)),
+    pdfBuffer_data_length: args.pdfBuffer && args.pdfBuffer.data && args.pdfBuffer.data.length ? args.pdfBuffer.data.length : null,
+    pdfBase64_present: !!(args.pdfBase64 && args.pdfBase64.length > 0),
+    pdfBase64_typeof: typeof args.pdfBase64,
+    pdfBase64_length: args.pdfBase64 ? args.pdfBase64.length : 0,
+    will_take_Buffer_branch: !!(args.pdfBuffer && Buffer.isBuffer(args.pdfBuffer)),
+    will_take_pdfBase64_branch: !(args.pdfBuffer && Buffer.isBuffer(args.pdfBuffer)) && typeof args.pdfBase64 === 'string' && args.pdfBase64.length > 0,
+    will_take_else_branch: !(args.pdfBuffer && Buffer.isBuffer(args.pdfBuffer)) && !(typeof args.pdfBase64 === 'string' && args.pdfBase64.length > 0)
+  });
   var pdfBuffer;
   if (Buffer.isBuffer(args.pdfBuffer)) {
     pdfBuffer = args.pdfBuffer;
+  } else if (args.pdfBuffer && typeof Uint8Array !== 'undefined' && args.pdfBuffer instanceof Uint8Array) {
+    // I-103.A1.5.4-B · FIX: aceptar Uint8Array. Electron serializa Buffer
+    // a Uint8Array al cruzar el puente IPC, así que el renderer envía un
+    // Uint8Array con los bytes del PDF. Buffer.from(uint8array) copia los
+    // datos tal cual a un Buffer nativo. Compatible con el contrato de
+    // firma-service (sigue recibiendo un Buffer).
+    try {
+      pdfBuffer = Buffer.from(args.pdfBuffer);
+      _diagLog('handlerSignRequestCreate.pdfBufferConverted', {
+        from_type: 'Uint8Array',
+        from_byteLength: args.pdfBuffer.byteLength,
+        to_buffer_length: pdfBuffer.length,
+        to_isBuffer: Buffer.isBuffer(pdfBuffer)
+      });
+    } catch (e) {
+      _diagLog('handlerSignRequestCreate.exit', {
+        outcome: 'INVALID_REQUEST_BODY',
+        reason: 'Uint8Array inválido: ' + e.message,
+        source: 'bridge'
+      });
+      return _err('INVALID_REQUEST_BODY', 'pdfBuffer (Uint8Array) inválido: ' + e.message);
+    }
   } else if (typeof args.pdfBase64 === 'string' && args.pdfBase64.length > 0) {
     try {
       pdfBuffer = Buffer.from(args.pdfBase64, 'base64');
     } catch (e) {
+      _diagLog('handlerSignRequestCreate.exit', {
+        outcome: 'INVALID_REQUEST_BODY',
+        reason: 'pdfBase64 inválido: ' + e.message,
+        source: 'bridge'
+      });
       return _err('INVALID_REQUEST_BODY', 'pdfBase64 inválido: ' + e.message);
     }
   } else {
-    return _err('INVALID_REQUEST_BODY', 'pdfBuffer o pdfBase64 requerido');
+    _diagLog('handlerSignRequestCreate.exit', {
+      outcome: 'INVALID_REQUEST_BODY',
+      reason: 'sin pdfBuffer, Uint8Array ni pdfBase64',
+      source: 'bridge'
+    });
+    return _err('INVALID_REQUEST_BODY', 'pdfBuffer, Uint8Array o pdfBase64 requerido');
   }
-  return r.client.createSignRequest({
+  // I-103.A1.5.4-B · DIAGNÓSTICO TEMPORAL — NO COMMITEAR
+  // Log pre-HTTP: hash de la API key, URL, endpoint, método. NO se loguea la key.
+  try {
+    var _cryptoMod = require('crypto');
+    var _apiKeyHash = r.config && r.config.apiKey
+      ? _cryptoMod.createHash('sha256').update(r.config.apiKey).digest('hex').slice(0, 8)
+      : null;
+    _diagLog('handlerSignRequestCreate.aboutToHttp', {
+      apiKeyHashPrefix: _apiKeyHash,
+      apiKey_length: r.config && r.config.apiKey ? r.config.apiKey.length : 0,
+      url: r.config && r.config.url,
+      endpoint: '/internal/sign-requests',
+      method: 'POST',
+      id_empresa_in_metadata: _md.id_empresa || null,
+      tipo_firma_in_metadata: _md.tipo_firma || null,
+      agreement_hash_in_metadata_present: !!_md.agreement_hash,
+      agreement_hash_in_metadata_length: (_md.agreement_hash || '').length,
+      pdfBuffer_length: pdfBuffer.length
+    });
+  } catch (_diagE) { /* noop */ }
+  return Promise.resolve(r.client.createSignRequest({
     metadata: args.metadata,
     pdfBuffer: pdfBuffer,
     pdfName: args.pdfName || 'documento.pdf'
+  })).then(function (resp) {
+    // I-103.A1.5.4-B · DIAGNÓSTICO TEMPORAL — NO COMMITEAR
+    var _err = resp && resp.error;
+    _diagLog('handlerSignRequestCreate.afterHttp', {
+      success: !!(resp && resp.success),
+      error_code: _err && _err.code,
+      error_message: _err && _err.message,
+      httpStatus: _err && _err.details && _err.details.httpStatus,
+      has_data: !!(resp && resp.data),
+      has_id_solicitud: !!(resp && resp.data && (resp.data.id_solicitud || resp.data.id)),
+      has_url_publica: !!(resp && resp.data && resp.data.url_publica),
+      id_solicitud: resp && resp.data && (resp.data.id_solicitud || resp.data.id),
+      validation_error_names: _err && _err.details && _err.details.missing,
+      validation_error_codes: _err && _err.details && _err.details.validationErrors
+    });
+    return resp;
+  }).catch(function (err) {
+    _diagLog('handlerSignRequestCreate.afterHttp', {
+      success: false,
+      exception: err && err.message
+    });
+    throw err;
   });
 }
 
@@ -782,19 +1060,120 @@ function _handlerSignRequestLink(args) {
   return r.client.getSignRequestLink(args.id);
 }
 
-function _handlerConsentCreate(args) {
+// I-103.A1.5.2 · firma:sign-request:notify-remote
+// Handler para POST /internal/sign-requests/:id/notify-remote en firma-service.
+// Patrón idéntico a los otros sign-request handlers: valida, delega al client.
+// El client resuelve la per-empresa authz via _resolveClientForRequest() —
+// NO toca _resolveClientForRequest ni la infra per-empresa.
+//
+// Valida:
+//   - args.id: requerido (string o entero)
+//   - args.correo: requerido (string no vacío, formato básico con @)
+//
+// NO valida formato estricto de correo (eso lo hace zod en el backend con
+// .email()). Acá solo evitamos 400 triviales por typo antes del HTTP.
+function _handlerSignRequestNotifyRemote(args) {
   args = args || {};
-  if (!args.id_trabajador || !args.id_empresa || !args.version_acuerdo || !args.correo_verificacion) {
-    return _err('INVALID_REQUEST_BODY', 'id_trabajador, id_empresa, version_acuerdo, correo_verificacion requeridos');
+  if (!args.id) {
+    return _err('INVALID_REQUEST_BODY', 'id requerido');
+  }
+  if (typeof args.correo !== 'string' || args.correo.length === 0) {
+    return _err('INVALID_REQUEST_BODY', 'correo requerido (string)');
+  }
+  if (!args.correo.includes('@')) {
+    return _err('INVALID_REQUEST_BODY', 'correo inválido (sin @)');
   }
   var r = _resolveClientForRequest(args);
   if (!r.ok) return r.response;
+  return r.client.notifySignRequestRemote(args.id, {
+    correo: args.correo,
+    context: args.context && typeof args.context === 'object' ? args.context : undefined
+  });
+}
+
+function _handlerConsentCreate(args) {
+  args = args || {};
+  // I-103.A1.5.4-B · DIAGNÓSTICO TEMPORAL — NO COMMITEAR
+  _diagLog('handlerConsentCreate.ENTER', {
+    args_companyName_present: !!(args && args.companyName && args.companyName.length > 0),
+    args_companyName_length: args && args.companyName ? args.companyName.length : 0,
+    args_id_trabajador_present: !!(args && args.id_trabajador),
+    args_id_empresa_present: !!(args && args.id_empresa),
+    args_id_empresa_length: args && args.id_empresa ? String(args.id_empresa).length : 0,
+    args_version_acuerdo_present: !!(args && args.version_acuerdo),
+    args_correo_verificacion_present: !!(args && args.correo_verificacion),
+    args_correo_verificacion_length: args && args.correo_verificacion ? String(args.correo_verificacion).length : 0,
+    args_kair_version_present: !!(args && args.kair_version),
+    args_keys: Object.keys(args || {})
+  });
+  if (!args.id_trabajador || !args.id_empresa || !args.version_acuerdo || !args.correo_verificacion) {
+    _diagLog('handlerConsentCreate.ERROR', {
+      error_code: 'INVALID_REQUEST_BODY',
+      reason: 'campos requeridos faltantes',
+      missing: {
+        id_trabajador: !args.id_trabajador,
+        id_empresa: !args.id_empresa,
+        version_acuerdo: !args.version_acuerdo,
+        correo_verificacion: !args.correo_verificacion
+      }
+    });
+    return _err('INVALID_REQUEST_BODY', 'id_trabajador, id_empresa, version_acuerdo, correo_verificacion requeridos');
+  }
+  var r = _resolveClientForRequest(args);
+  if (!r.ok) {
+    _diagLog('handlerConsentCreate.ERROR', {
+      error_code: r.response && r.response.error && r.response.error.code,
+      error_message: r.response && r.response.error && r.response.error.message,
+      error_hint: r.response && r.response.error && r.response.error.hint,
+      currentSource: r.response && r.response.error && r.response.error.currentSource,
+      hasApiKey: r.response && r.response.error && r.response.error.hasApiKey,
+      hasUrl: r.response && r.response.error && r.response.error.hasUrl,
+      companyName_param: r.response && r.response.error && r.response.error.companyName
+    });
+    return r.response;
+  }
+  // I-103.A1.5.4-B · DIAGNÓSTICO TEMPORAL — NO COMMITEAR
+  _diagLog('handlerConsentCreate.resolve', {
+    outcome: 'OK',
+    path: r.config && r.config.source,
+    companyName: args.companyName,
+    idEmpresa: r.config && r.config.idEmpresa,
+    firmaApiKey_present: !!(r.config && r.config.apiKey),
+    firmaApiKey_length: r.config && r.config.apiKey ? r.config.apiKey.length : 0,
+    firmaServiceUrl_present: !!(r.config && r.config.url)
+  });
+  // I-103.A1.5.4-B · DIAGNÓSTICO TEMPORAL — NO COMMITEAR
+  // Log pre-HTTP: hash de la API key, URL, endpoint, método. NO se loguea la key.
+  try {
+    var _cryptoMod = require('crypto');
+    var _apiKeyHash = r.config && r.config.apiKey
+      ? _cryptoMod.createHash('sha256').update(r.config.apiKey).digest('hex').slice(0, 8)
+      : null;
+    _diagLog('handlerConsentCreate.aboutToHttp', {
+      apiKeyHashPrefix: _apiKeyHash,
+      apiKey_length: r.config && r.config.apiKey ? r.config.apiKey.length : 0,
+      url: r.config && r.config.url,
+      endpoint: '/internal/consentimientos',
+      method: 'POST',
+      id_empresa_sent: args.id_empresa
+    });
+  } catch (_diagE) { /* noop */ }
   return r.client.createConsent({
     id_trabajador: args.id_trabajador,
     id_empresa: args.id_empresa,
     version_acuerdo: args.version_acuerdo,
     correo_verificacion: args.correo_verificacion,
     kair_version: args.kair_version || _appVersion
+  }).then(function (result) {
+    // I-103.A1.5.4-B · DIAGNÓSTICO TEMPORAL — NO COMMITEAR
+    _diagLog('handlerConsentCreate.OK', {
+      success: !!(result && result.success),
+      error_code: result && result.error && result.error.code,
+      error_message: result && result.error && result.error.message,
+      has_data: !!(result && result.data),
+      httpStatus: result && result.error && result.error.details && result.error.details.httpStatus
+    });
+    return result;
   });
 }
 
@@ -810,8 +1189,43 @@ function _handlerConsentVerifyOtp(args) {
 
 function _handlerAgreementGet(args) {
   args = args || {};
+  // I-103.A1.5.4-B · DIAGNÓSTICO TEMPORAL — NO COMMITEAR
+  // Registra el estado de args + error completo (sin secretos) cuando falla.
+  _diagLog('handlerAgreementGet.ENTER', {
+    args_companyName_present: !!(args && args.companyName && args.companyName.length > 0),
+    args_companyName_length: args && args.companyName ? args.companyName.length : 0,
+    args_keys: Object.keys(args || {})
+  });
   var r = _resolveClientForRequest(args);
-  if (!r.ok) return r.response;
+  if (!r.ok) {
+    _diagLog('handlerAgreementGet.ERROR', {
+      error_code: r.response && r.response.error && r.response.error.code,
+      error_message: r.response && r.response.error && r.response.error.message,
+      error_hint: r.response && r.response.error && r.response.error.hint,
+      currentSource: r.response && r.response.error && r.response.error.currentSource,
+      hasApiKey: r.response && r.response.error && r.response.error.hasApiKey,
+      hasUrl: r.response && r.response.error && r.response.error.hasUrl,
+      companyName_param: r.response && r.response.error && r.response.error.companyName
+    });
+    return r.response;
+  }
+  _diagLog('handlerAgreementGet.OK', {
+    source: r.config && r.config.source
+  });
+  // I-103.A1.5.4-B · DIAGNÓSTICO TEMPORAL — NO COMMITEAR
+  // Log del hash SHA-256 (8 chars) de la API key que se va a usar,
+  // y de la URL. NO se loguea la key en plaintext.
+  try {
+    var _cryptoMod = require('crypto');
+    var _apiKeyHash = r.config && r.config.apiKey
+      ? _cryptoMod.createHash('sha256').update(r.config.apiKey).digest('hex').slice(0, 8)
+      : null;
+    _diagLog('handlerAgreementGet.aboutToHttp', {
+      apiKeyHashPrefix: _apiKeyHash,
+      apiKey_length: r.config && r.config.apiKey ? r.config.apiKey.length : 0,
+      url: r.config && r.config.url
+    });
+  } catch (_diagE) { /* noop */ }
   return r.client.getActiveAgreement();
 }
 
@@ -821,6 +1235,14 @@ function _handlerAgreementGet(args) {
 // Validacion: archivo existe, es regular, no excede 50 MB.
 function _handlerDocumentoReadBytes(args) {
   args = args || {};
+  // I-103.A1.5.4-B · DIAGNÓSTICO TEMPORAL — NO COMMITEAR
+  _diagLog('handlerDocumentoReadBytes.ENTER', {
+    args_rutaArchivo_present: !!(args && args.rutaArchivo),
+    args_rutaArchivo_typeof: args && typeof args.rutaArchivo,
+    args_rutaArchivo_length: (args && typeof args.rutaArchivo === 'string') ? args.rutaArchivo.length : 'n/a',
+    args_rutaArchivo_isObject: !!(args && typeof args.rutaArchivo === 'object' && args.rutaArchivo !== null),
+    args_keys: Object.keys(args || {})
+  });
   if (!args.rutaArchivo || typeof args.rutaArchivo !== 'string') {
     return _err('INVALID_REQUEST_BODY', 'rutaArchivo requerido (string)');
   }
@@ -836,6 +1258,32 @@ function _handlerDocumentoReadBytes(args) {
       return _err('PAYLOAD_TOO_LARGE', 'Archivo demasiado grande: ' + stat.size + ' bytes');
     }
     var buffer = fs.readFileSync(args.rutaArchivo);
+    // I-103.A1.5.4-B · DIAGNÓSTICO TEMPORAL — NO COMMITEAR
+    // Inspecciona los primeros bytes del archivo ANTES de convertir a base64
+    // para confirmar si el archivo en disco es realmente un PDF o si llega
+    // otro tipo de contenido (JSON, ZIP, etc).
+    try {
+      var _first16 = buffer.length >= 16 ? buffer.subarray(0, 16) : buffer;
+      var _last8 = buffer.length >= 8 ? buffer.subarray(buffer.length - 8) : buffer;
+      var _firstAsciiSafe = _first16.toString('ascii').replace(/[^\x20-\x7E]/g, '.');
+      var _isPdf = buffer.length >= 5 && buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46 && buffer[4] === 0x2D;
+      var _isZip = buffer.length >= 4 && buffer[0] === 0x50 && buffer[1] === 0x4B && (buffer[2] === 0x03 || buffer[2] === 0x05) && (buffer[3] === 0x04 || buffer[3] === 0x06);
+      var _isJson = buffer.length >= 1 && (buffer[0] === 0x7B || buffer[0] === 0x5B);
+      var _tailSlice = buffer.length > 1024 ? buffer.subarray(buffer.length - 1024) : buffer;
+      var _hasEof = _tailSlice.indexOf(Buffer.from('%EOF', 'ascii')) !== -1 || _tailSlice.indexOf(Buffer.from('%%EOF', 'ascii')) !== -1;
+      _diagLog('handlerDocumentoReadBytes.inspect', {
+        buffer_length: buffer.length,
+        buffer_constructor: buffer.constructor ? buffer.constructor.name : null,
+        first_bytes_hex: _first16.toString('hex'),
+        first_ascii_safe: _firstAsciiSafe,
+        last_bytes_hex: _last8.toString('hex'),
+        is_pdf_signature: _isPdf,
+        is_zip_signature: _isZip,
+        is_json_signature: _isJson,
+        has_eof_marker: _hasEof,
+        rutaArchivo_basename: args.rutaArchivo.split(/[\\/]/).pop()
+      });
+    } catch (_inspectE) { /* noop */ }
     return _ok({
       data: buffer.toString('base64'),
       bytes: buffer.length,
@@ -1161,22 +1609,49 @@ function _handlerEmpresaSetApiKey(args) {
 function _handlerEmpresaRotateApiKey(args) {
   args = args || {};
   if (!args.companyName || typeof args.companyName !== 'string') {
+    _diagLog('rotateApiKey.entry', { outcome: 'INVALID_REQUEST_BODY', reason: 'companyName no es string' });
     return _err('INVALID_REQUEST_BODY', 'companyName requerido (string)');
   }
+  _diagLog('rotateApiKey.entry', {
+    companyName: args.companyName,
+    motivo_present: !!(args.motivo && args.motivo.length > 0),
+    actor_present: !!(args.actor && args.actor.length > 0)
+  });
   var adminErr = _requireAdminToken();
-  if (adminErr) return adminErr;
+  if (adminErr) {
+    _diagLog('rotateApiKey.step', { step: 'adminToken', outcome: adminErr.error && adminErr.error.code });
+    return adminErr;
+  }
   var sec = _requireSecretsV2WithUrl();
-  if (!sec.ok) return sec.response;
+  if (!sec.ok) {
+    _diagLog('rotateApiKey.step', { step: 'secretsV2WithUrl', outcome: sec.response && sec.response.error && sec.response.error.code });
+    return sec.response;
+  }
 
   var s2 = sec.s2;
   var found = _resolveEmpresa(s2.empresas, args.companyName);
   if (!found) {
+    _diagLog('rotateApiKey.step', {
+      step: 'resolveEmpresa',
+      outcome: 'CLIENT_NOT_FOUND',
+      empresas_disponibles: Object.keys(s2.empresas || {}).map(function (k) {
+        return { companyKey: k, idEmpresa: (s2.empresas[k] || {}).idEmpresa || null };
+      })
+    });
     return _err('CLIENT_NOT_FOUND', 'No hay firma configurada para esta empresa.', {
       companyKey: args.companyName,
       hint: 'Use firma:empresa:create o firma:empresa:set-api-key primero.'
     });
   }
   var oldIdEmpresa = found.entry.idEmpresa;
+  _diagLog('rotateApiKey.step', {
+    step: 'beforeHttp',
+    companyName_encontrado: found.companyKey,
+    idEmpresa: oldIdEmpresa,
+    firmaApiKey_present: !!(found.entry.firmaApiKey && found.entry.firmaApiKey.length > 0),
+    firmaApiKey_length: (found.entry.firmaApiKey || '').length,
+    firmaServiceUrl_present: !!(sec.s2.firmaServiceUrl && sec.s2.firmaServiceUrl.length > 0)
+  });
 
   // Llamar al backend
   var client = _createAdminClient(sec.s2.firmaServiceUrl, sec.s2.firmaServiceClientInstanceId);
@@ -1184,7 +1659,16 @@ function _handlerEmpresaRotateApiKey(args) {
     motivo: args.motivo || 'Rotación manual desde K+AIR',
     actor: args.actor || 'kair-bridge'
   })).then(function (r) {
-    if (!r.success) return r;
+    if (!r.success) {
+      _diagLog('rotateApiKey.step', {
+        step: 'httpResponse',
+        outcome: 'ERROR',
+        http_success: r.success,
+        error_code: r.error && r.error.code,
+        error_message: r.error && r.error.message
+      });
+      return r;
+    }
     // Actualizar secrets.enc con la nueva key (DR-3: solo en secrets.enc).
     s2.empresas[found.companyKey] = {
       idEmpresa: oldIdEmpresa,
@@ -1194,9 +1678,17 @@ function _handlerEmpresaRotateApiKey(args) {
     };
     var w = _writeSecrets(s2);
     if (!w.ok) {
+      _diagLog('rotateApiKey.step', { step: 'writeSecrets', outcome: 'INTERNAL', writeError: w.error || 'unknown' });
       return _err('INTERNAL', 'Error guardando key rotada en secrets.enc: ' + (w.error || 'unknown'));
     }
     _invalidateAllClients();
+    _diagLog('rotateApiKey.done', {
+      outcome: 'OK',
+      companyKey: found.companyKey,
+      idEmpresa: oldIdEmpresa,
+      newApiKeyHashPrefix: r.data.new_api_key_hash_prefix,
+      oldApiKeyHashPrefix: r.data.old_api_key_hash_prefix
+    });
     return _ok({
       rotated: true,
       companyKey: found.companyKey,
@@ -1438,6 +1930,16 @@ function registerFirmaHandlers(appArg, deps) {
       return _handlerSignRequestLink(payload || {});
     } catch (e) {
       console.error('[' + MOD + '][sign-request:link]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  // I-103.A1.5.2 · 7mo handler de sign-request. Misma protección que
+  // sign-request:link (re-uso de sign_request:read en backend).
+  handle('firma:sign-request:notify-remote', function (event, payload) {
+    try {
+      return _handlerSignRequestNotifyRemote(payload || {});
+    } catch (e) {
+      console.error('[' + MOD + '][sign-request:notify-remote]', e.message);
       return _err('INTERNAL', e.message);
     }
   });

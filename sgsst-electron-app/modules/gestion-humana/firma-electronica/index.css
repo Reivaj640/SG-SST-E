@@ -1,0 +1,1053 @@
+/* modules/gestion-humana/firma-electronica/index.css
+   Firma electrónica — Centro de control del proceso de firma por trabajador.
+   Prefijos `fe-` para evitar colisiones con el resto del módulo GH. */
+
+.fe-wrapper {
+  padding: 1.25rem 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* ═══ Section Head ═══ */
+.fe-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.fe-section-head__text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fe-section-head__title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 0.25rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.fe-section-head__title i {
+  color: #174ea6;
+}
+
+.fe-section-head__subtitle {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+/* ═══ Buscador ═══ */
+.fe-search-section {
+  margin-bottom: 0.875rem;
+}
+
+.fe-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 0 0.875rem;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.fe-search:focus-within {
+  border-color: #174ea6;
+  box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.12);
+}
+
+.fe-search__icon {
+  color: #9ca3af;
+  font-size: 0.875rem;
+  margin-right: 0.5rem;
+}
+
+.fe-search__input {
+  flex: 1 1 auto;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  padding: 0.625rem 0;
+  font-size: 0.9375rem;
+  color: #1f2937;
+}
+
+.fe-search__input::placeholder {
+  color: #9ca3af;
+}
+
+/* ═══ Filtros pills ═══ */
+.fe-filters-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.fe-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fe-pill {
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  padding: 0.375rem 0.875rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #4b5563;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.fe-pill:hover {
+  background: #e5e7eb;
+  color: #1f2937;
+}
+
+.fe-pill--active {
+  background: #174ea6;
+  border-color: #174ea6;
+  color: #fff;
+}
+
+.fe-pill--active:hover {
+  background: #174ea6;
+  color: #fff;
+}
+
+.fe-pill__dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: #9ca3af;
+}
+
+.fe-pill__dot--pendiente  { background: #9ca3af; }
+.fe-pill__dot--preparacion { background: #2563eb; }
+.fe-pill__dot--proceso    { background: #f59e0b; }
+.fe-pill__dot--completado { background: #16a34a; }
+.fe-pill__dot--rechazado  { background: #dc2626; }
+.fe-pill__dot--vencido    { background: #1f2937; }
+.fe-pill__dot--cancelado  { background: #d1d5db; }
+.fe-pill__dot--error      { background: #b91c1c; }
+
+.fe-btn {
+  border: 1px solid #d1d5db;
+  background: #fff;
+  border-radius: 6px;
+  padding: 0.4375rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #4b5563;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  transition: all 0.15s;
+}
+
+.fe-btn:hover:not(:disabled) {
+  background: #f9fafb;
+  color: #1f2937;
+}
+
+.fe-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.fe-btn--ghost {
+  background: transparent;
+  border-color: #d1d5db;
+}
+
+.fe-btn--sm {
+  font-size: 0.75rem;
+  padding: 0.3125rem 0.625rem;
+}
+
+/* ═══ Contador ═══ */
+.fe-count-section {
+  margin-bottom: 0.5rem;
+}
+
+.fe-count {
+  font-size: 0.8125rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+/* ═══ Tabla principal ═══ */
+.fe-table-section {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.fe-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.fe-table__th {
+  background: #f9fafb;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  color: #6b7280;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.fe-table__th--trabajador { width: 32%; }
+.fe-table__th--cedula { width: 12%; }
+.fe-table__th--estado { width: 32%; }
+.fe-table__th--solicitudes { width: 12%; }
+.fe-table__th--accion { width: 12%; text-align: center; }
+
+.fe-table__row {
+  border-bottom: 1px solid #f3f4f6;
+  transition: background 0.1s;
+}
+
+.fe-table__row:hover {
+  background: #fafbfc;
+}
+
+.fe-table__row:last-child {
+  border-bottom: 0;
+}
+
+.fe-table__td {
+  padding: 0.875rem 1rem;
+  vertical-align: top;
+  color: #1f2937;
+}
+
+.fe-table__td--center {
+  text-align: center;
+}
+
+/* Trabajador */
+.fe-trabajador {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.fe-trabajador__nombre {
+  font-weight: 600;
+  color: #1f2937;
+  text-transform: uppercase;
+  font-size: 0.8125rem;
+  letter-spacing: 0.02em;
+}
+
+.fe-trabajador__correo {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+/* Cédula */
+.fe-cedula {
+  font-variant-numeric: tabular-nums;
+  color: #4b5563;
+  font-size: 0.8125rem;
+}
+
+/* Estado del proceso */
+.fe-estado {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.fe-estado__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.1875rem 0.625rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  width: fit-content;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.fe-estado__badge--pendiente   { background: #f3f4f6; color: #4b5563; }
+.fe-estado__badge--en_preparacion { background: #dbeafe; color: #1e40af; }
+.fe-estado__badge--en_proceso  { background: #fef3c7; color: #92400e; }
+.fe-estado__badge--completado  { background: #d1fae5; color: #065f46; }
+.fe-estado__badge--rechazado   { background: #fee2e2; color: #991b1b; }
+.fe-estado__badge--vencido     { background: #1f2937; color: #f9fafb; }
+.fe-estado__badge--cancelado   { background: #e5e7eb; color: #6b7280; }
+.fe-estado__badge--error       { background: #b91c1c; color: #fff; }
+
+.fe-estado__badge-dot {
+  display: inline-block;
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.fe-estado__desglose {
+  font-size: 0.75rem;
+  color: #4b5563;
+  line-height: 1.3;
+}
+
+.fe-estado__progreso {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.fe-estado__barra {
+  flex: 1 1 auto;
+  height: 6px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  overflow: hidden;
+  min-width: 60px;
+  max-width: 160px;
+}
+
+.fe-estado__barra-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb 0%, #16a34a 100%);
+  border-radius: 999px;
+  transition: width 0.3s;
+}
+
+.fe-estado__barra-fill--completado {
+  background: linear-gradient(90deg, #16a34a 0%, #15803d 100%);
+}
+
+.fe-estado__barra-fill--en_proceso {
+  background: linear-gradient(90deg, #f59e0b 0%, #ea580c 100%);
+}
+
+.fe-estado__progreso-text {
+  font-size: 0.75rem;
+  color: #4b5563;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Solicitudes */
+.fe-solicitudes {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.fe-solicitudes__count {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 0.875rem;
+}
+
+.fe-solicitudes__hint {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+/* Acción */
+.fe-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  background: #174ea6;
+  color: #fff;
+  border: 0;
+  border-radius: 6px;
+  padding: 0.4375rem 0.875rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.fe-action:hover {
+  background: #1740a0;
+}
+
+.fe-action i {
+  font-size: 0.75rem;
+}
+
+/* Estados vacíos */
+.fe-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #6b7280;
+}
+
+.fe-empty__icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.75rem;
+  color: #d1d5db;
+}
+
+.fe-empty__title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #4b5563;
+  margin: 0 0 0.25rem 0;
+}
+
+.fe-empty__text {
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+/* ═══ Modal placeholder (Fase 2) ═══ */
+.fe-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fe-modal[hidden] {
+  display: none !important;
+}
+
+.fe-modal__overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.5);
+  backdrop-filter: blur(2px);
+}
+
+.fe-modal__panel {
+  position: relative;
+  background: #fff;
+  border-radius: 12px;
+  max-width: 720px;
+  width: calc(100% - 2rem);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+.fe-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.fe-modal__title {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.fe-modal__title i {
+  color: #174ea6;
+}
+
+.fe-modal__close {
+  background: transparent;
+  border: 0;
+  font-size: 1.125rem;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 0.375rem 0.5rem;
+  border-radius: 4px;
+}
+
+.fe-modal__close:hover {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+.fe-modal__body {
+  padding: 1.25rem 1.5rem;
+  overflow-y: auto;
+}
+
+.fe-modal__placeholder {
+  text-align: center;
+  color: #4b5563;
+}
+
+.fe-modal__placeholder-icon {
+  font-size: 3rem;
+  color: #f59e0b;
+  margin-bottom: 0.75rem;
+}
+
+.fe-modal__placeholder h4 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 0.5rem 0;
+}
+
+.fe-modal__placeholder p {
+  font-size: 0.875rem;
+  margin: 0.5rem 0;
+}
+
+.fe-modal__placeholder ul {
+  text-align: left;
+  max-width: 380px;
+  margin: 0.75rem auto 1rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: #4b5563;
+}
+
+.fe-modal__placeholder ul li {
+  padding-left: 0.25rem;
+}
+
+.fe-modal__placeholder-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  color: #1e40af;
+  font-size: 0.8125rem;
+  margin-top: 1rem;
+  text-align: left;
+}
+
+.fe-modal__placeholder-note i {
+  flex-shrink: 0;
+}
+
+/* ═══ Toast ═══ */
+.fe-toast {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  background: #1f2937;
+  color: #fff;
+  padding: 0.75rem 1.125rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.15);
+  z-index: 10000;
+  max-width: 360px;
+}
+
+.fe-toast[hidden] {
+  display: none !important;
+}
+
+.fe-toast--success { background: #065f46; }
+.fe-toast--error   { background: #991b1b; }
+.fe-toast--info    { background: #1e40af; }
+
+/* ═══ Responsive ═══ */
+@media (max-width: 768px) {
+  .fe-wrapper {
+    padding: 1rem;
+  }
+  .fe-table {
+    font-size: 0.8125rem;
+  }
+  .fe-table__th--trabajador { width: 40%; }
+  .fe-table__th--cedula { width: 18%; }
+  .fe-table__th--estado { width: 30%; }
+  .fe-table__th--solicitudes { display: none; }
+  .fe-table__th--accion { width: 12%; }
+  .fe-solicitudes {
+    display: none;
+  }
+  .fe-filters-section {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   FASE 2 · MODAL DE EXPEDIENTE (secciones completas)
+   ═══════════════════════════════════════════════════════ */
+
+/* Loading & error del modal */
+.fe-modal__loading {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #174ea6;
+}
+.fe-modal__loading i {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+.fe-modal__loading p {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.fe-modal__error {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: #991b1b;
+}
+.fe-modal__error i {
+  font-size: 2.5rem;
+  color: #dc2626;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+.fe-modal__error h4 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 0.5rem 0;
+}
+.fe-modal__error p {
+  font-size: 0.875rem;
+  margin: 0.25rem 0;
+}
+.fe-modal__error-hint {
+  color: #6b7280;
+  font-style: italic;
+  margin-top: 0.5rem;
+}
+
+/* Sección del modal */
+.fe-exp-section {
+  padding: 1.125rem 1.25rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+.fe-exp-section:last-child {
+  border-bottom: 0;
+}
+.fe-exp-section--header {
+  background: #f9fafb;
+  padding: 1.25rem 1.5rem;
+}
+.fe-exp-section--actions {
+  background: #fafbfc;
+}
+
+.fe-exp-section__title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #374151;
+  margin: 0 0 0.75rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.fe-exp-section__title i {
+  color: #174ea6;
+  font-size: 0.875rem;
+}
+
+.fe-exp-section__note {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  color: #4b5563;
+  font-size: 0.75rem;
+  margin: 0.75rem 0 0;
+  line-height: 1.4;
+}
+.fe-exp-section__note i {
+  flex-shrink: 0;
+  color: #6b7280;
+}
+
+/* Header del expediente */
+.fe-exp-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.fe-exp-header__avatar {
+  width: 56px;
+  height: 56px;
+  background: #174ea6;
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+.fe-exp-header__info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.fe-exp-header__name {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 0.25rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.fe-exp-header__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.8125rem;
+  color: #6b7280;
+}
+.fe-exp-header__meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.fe-exp-header__meta i {
+  color: #9ca3af;
+}
+.fe-exp-header__state {
+  flex-shrink: 0;
+}
+
+/* Resumen */
+.fe-exp-resumen__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+.fe-exp-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  min-width: 70px;
+}
+.fe-exp-stat__value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #174ea6;
+  font-variant-numeric: tabular-nums;
+}
+.fe-exp-stat__label {
+  font-size: 0.6875rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.fe-exp-resumen__desglose {
+  font-size: 0.875rem;
+  color: #4b5563;
+  margin: 0;
+}
+
+/* Documentos */
+.fe-exp-docs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.fe-exp-doc {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  background: #fafbfc;
+  border: 1px solid #f3f4f6;
+  border-radius: 6px;
+  padding: 0.625rem 0.75rem;
+}
+.fe-exp-doc__icon {
+  width: 32px;
+  height: 32px;
+  background: #dbeafe;
+  color: #174ea6;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  flex-shrink: 0;
+}
+.fe-exp-doc__info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.fe-exp-doc__title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 0.125rem;
+}
+.fe-exp-doc__meta {
+  font-size: 0.75rem;
+  color: #6b7280;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  align-items: center;
+}
+.fe-exp-doc__sep {
+  color: #d1d5db;
+}
+.fe-exp-doc__estado {
+  text-transform: lowercase;
+}
+.fe-exp-doc__sr {
+  font-family: monospace;
+  color: #174ea6;
+  font-size: 0.6875rem;
+}
+.fe-exp-doc__sr-detail {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+}
+.fe-exp-doc__sr-estado {
+  display: inline-block;
+  background: #dbeafe;
+  color: #1e40af;
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.6875rem;
+}
+.fe-exp-doc__sr-estado--error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* Warning inline (errores de carga) */
+.fe-exp-warning {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 6px;
+  padding: 0.625rem 0.875rem;
+  color: #92400e;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+.fe-exp-warning i {
+  color: #f59e0b;
+  flex-shrink: 0;
+}
+
+/* Solicitudes de firma (cards) */
+.fe-exp-solicitudes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.fe-exp-sr {
+  background: #fafbfc;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.875rem 1rem;
+}
+.fe-exp-sr--error {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+.fe-exp-sr__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.625rem;
+  flex-wrap: wrap;
+}
+.fe-exp-sr__id {
+  font-family: monospace;
+  font-weight: 700;
+  color: #1f2937;
+  font-size: 0.9375rem;
+}
+.fe-exp-sr__badge {
+  display: inline-block;
+  padding: 0.1875rem 0.625rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.fe-exp-sr__badge--ok        { background: #d1fae5; color: #065f46; }
+.fe-exp-sr__badge--info     { background: #dbeafe; color: #1e40af; }
+.fe-exp-sr__badge--warning  { background: #fef3c7; color: #92400e; }
+.fe-exp-sr__badge--rejected { background: #fee2e2; color: #991b1b; }
+.fe-exp-sr__badge--expired  { background: #1f2937; color: #f9fafb; }
+.fe-exp-sr__badge--error    { background: #b91c1c; color: #fff; }
+.fe-exp-sr__msg {
+  font-size: 0.8125rem;
+  color: #991b1b;
+  margin: 0;
+}
+.fe-exp-sr__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.5rem 1rem;
+}
+.fe-exp-sr__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+.fe-exp-sr__label {
+  font-size: 0.6875rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+.fe-exp-sr__value {
+  font-size: 0.8125rem;
+  color: #1f2937;
+  word-break: break-word;
+}
+.fe-exp-sr__link {
+  color: #174ea6;
+  text-decoration: none;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.fe-exp-sr__link:hover {
+  text-decoration: underline;
+}
+.fe-exp-sr__error-code {
+  font-family: monospace;
+  background: #fee2e2;
+  color: #991b1b;
+  padding: 0.0625rem 0.375rem;
+  border-radius: 3px;
+  font-size: 0.75rem;
+}
+
+/* Consentimiento */
+.fe-exp-consent {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.fe-exp-consent__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  background: #fafbfc;
+  border: 1px solid #f3f4f6;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+}
+.fe-exp-consent__label {
+  font-size: 0.6875rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+.fe-exp-consent__value {
+  font-size: 0.875rem;
+  color: #1f2937;
+}
+
+/* Acciones (placeholders) */
+.fe-exp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.fe-exp-action {
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 0.5rem 0.875rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: not-allowed;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  opacity: 0.5;
+}
+.fe-exp-action i {
+  color: #9ca3af;
+}
+.fe-exp-action--danger {
+  border-color: #fecaca;
+  color: #991b1b;
+}
+.fe-exp-action--danger i {
+  color: #f87171;
+}
+
+/* Ajustes al modal para que el body scrollee bien con secciones largas */
+.fe-modal__panel {
+  max-width: 880px;
+}
+@media (max-width: 768px) {
+  .fe-exp-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .fe-exp-header__avatar {
+    width: 48px;
+    height: 48px;
+    font-size: 1.25rem;
+  }
+  .fe-exp-resumen__stats {
+    flex-wrap: wrap;
+  }
+  .fe-exp-sr__grid {
+    grid-template-columns: 1fr;
+  }
+  .fe-exp-section {
+    padding: 0.875rem 1rem;
+  }
+  .fe-exp-section--header {
+    padding: 1rem 1.125rem;
+  }
+}

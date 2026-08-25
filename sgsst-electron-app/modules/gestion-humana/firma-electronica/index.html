@@ -1,0 +1,135 @@
+<!-- modules/gestion-humana/firma-electronica/index.html
+     Firma electrónica — Centro de control del proceso de firma por trabajador.
+     I-103.A1.6 · Fase 1: tabla principal trabajador-céntrica + buscador + pills.
+     Fase 2 (próxima): modal de expediente con documentos + consentimiento + trazabilidad + acciones.
+     IDs con prefijo `fe-` para evitar colisiones.
+     Sin consultas a firma-service en Fase 1 (datos locales: gh_documentos + gh_personal). -->
+
+<div class="fe-wrapper" id="fe-wrapper">
+  <!-- ═══ HEADER (sticky al top cuando scrollea) ═══ -->
+  <div class="fe-section-head">
+    <div class="fe-section-head__text">
+      <h2 class="fe-section-head__title">
+        <i class="fas fa-file-signature"></i> Firma electrónica
+      </h2>
+      <p class="fe-section-head__subtitle">
+        Centro de control del proceso de firma por trabajador · la firma es electrónica (firma-service)
+      </p>
+    </div>
+  </div>
+
+  <!-- ═══ BUSCADOR ═══ -->
+  <div class="fe-search-section">
+    <div class="fe-search">
+      <i class="fas fa-search fe-search__icon"></i>
+      <input
+        id="fe-search-input"
+        class="fe-search__input"
+        type="search"
+        placeholder="Buscar trabajador, cédula, correo o ID de solicitud (ej. 548905)"
+        autocomplete="off"
+        spellcheck="false"
+      />
+    </div>
+  </div>
+
+  <!-- ═══ FILTROS RÁPIDOS (pills) ═══ -->
+  <div class="fe-filters-section">
+    <div class="fe-pills" id="fe-pills">
+      <button class="fe-pill fe-pill--active" data-filter="todos" type="button">
+        Todos
+      </button>
+      <button class="fe-pill" data-filter="pendiente" type="button">
+        <span class="fe-pill__dot fe-pill__dot--pendiente"></span> Pendientes
+      </button>
+      <button class="fe-pill" data-filter="en_preparacion" type="button">
+        <span class="fe-pill__dot fe-pill__dot--preparacion"></span> En preparación
+      </button>
+      <button class="fe-pill" data-filter="en_proceso" type="button">
+        <span class="fe-pill__dot fe-pill__dot--proceso"></span> En proceso
+      </button>
+      <button class="fe-pill" data-filter="completado" type="button">
+        <span class="fe-pill__dot fe-pill__dot--completado"></span> Completados
+      </button>
+      <button class="fe-pill" data-filter="rechazado" type="button">
+        <span class="fe-pill__dot fe-pill__dot--rechazado"></span> Rechazados
+      </button>
+      <button class="fe-pill" data-filter="vencido" type="button">
+        <span class="fe-pill__dot fe-pill__dot--vencido"></span> Vencidos
+      </button>
+      <button class="fe-pill" data-filter="cancelado" type="button">
+        <span class="fe-pill__dot fe-pill__dot--cancelado"></span> Cancelados
+      </button>
+      <button class="fe-pill" data-filter="error" type="button">
+        <span class="fe-pill__dot fe-pill__dot--error"></span> Errores
+      </button>
+    </div>
+    <button id="fe-filtros-avanzados" class="fe-btn fe-btn--ghost fe-btn--sm" type="button" disabled
+      title="Filtros avanzados — disponible en Fase 2">
+      <i class="fas fa-sliders"></i> Filtros avanzados
+    </button>
+  </div>
+
+  <!-- ═══ CONTADOR ═══ -->
+  <div class="fe-count-section">
+    <span class="fe-count" id="fe-count">Cargando…</span>
+  </div>
+
+  <!-- ═══ TABLA PRINCIPAL ═══ -->
+  <div class="fe-table-section">
+    <table class="fe-table" id="fe-table">
+      <thead>
+        <tr>
+          <th class="fe-table__th fe-table__th--trabajador">Trabajador</th>
+          <th class="fe-table__th fe-table__th--cedula">Cédula</th>
+          <th class="fe-table__th fe-table__th--estado">Estado del proceso</th>
+          <th class="fe-table__th fe-table__th--solicitudes">Solicitudes</th>
+          <th class="fe-table__th fe-table__th--accion">Acción</th>
+        </tr>
+      </thead>
+      <tbody id="fe-tbody">
+        <!-- Renderizado por JS -->
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ MODAL PLACEHOLDER DE EXPEDIENTE (Fase 2) ═══ -->
+<div id="fe-expediente-modal" class="fe-modal" hidden>
+  <div class="fe-modal__overlay" data-close-modal="true"></div>
+  <div class="fe-modal__panel" role="dialog" aria-labelledby="fe-expediente-title">
+    <header class="fe-modal__header">
+      <h3 id="fe-expediente-title" class="fe-modal__title">
+        <i class="fas fa-file-signature"></i> Firma electrónica — Expediente
+      </h3>
+      <button class="fe-modal__close" data-close-modal="true" type="button" aria-label="Cerrar">
+        <i class="fas fa-times"></i>
+      </button>
+    </header>
+    <div class="fe-modal__body" id="fe-expediente-body">
+      <!-- Placeholder Fase 1 — contenido real en Fase 2 -->
+      <div class="fe-modal__placeholder">
+        <i class="fas fa-hard-hat fe-modal__placeholder-icon"></i>
+        <h4>Expediente de firma (Fase 2)</h4>
+        <p>Aquí se mostrará:</p>
+        <ul>
+          <li>Datos del trabajador</li>
+          <li>Estado general del proceso</li>
+          <li>Documentos involucrados con su estado individual</li>
+          <li>Solicitudes de firma (SIGN-...) con su estado técnico</li>
+          <li>Consentimiento</li>
+          <li>Trazabilidad (línea de tiempo de eventos)</li>
+          <li>Acciones contextuales al estado (enviar, reenviar, cancelar, etc.)</li>
+        </ul>
+        <p class="fe-modal__placeholder-note">
+          <i class="fas fa-info-circle"></i>
+          Esta pantalla está en construcción. El modal se llena con datos en la siguiente fase
+          una vez confirmemos el contrato con firma-service.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TOAST ═══ -->
+<div id="fe-toast" class="fe-toast" hidden></div>

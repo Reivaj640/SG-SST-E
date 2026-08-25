@@ -515,6 +515,56 @@ function createFirmaClient(opts) {
   }
 
   /**
+   * I-103.A1.5.2 · POST /internal/sign-requests/:id/notify-remote
+   *
+   * Envía (o re-envía) la invitación al firmante por correo. Es el "primer
+   * contacto" con el firmante después de que K+AIR creó el sign request.
+   *
+   * Status codes (mapeados por el backend en routes/signRequest.js):
+   *   - 200: invitación enviada → retorna {ok, id_solicitud, messageId, sent_at, evento_id}
+   *   - 400: body inválido (sin correo, formato inválido) → INVALID_REQUEST_BODY
+   *   - 404: sign request no existe O cross-company (silent) → NOT_FOUND
+   *   - 410: estado terminal (SIGNED/REJECTED/REVOKED/EXPIRED/CANCELLED) o legacy
+   *          sin token cifrado → INVITE_NOT_AVAILABLE
+   *   - 502: SMTP caído → INVITE_EMAIL_FAILED
+   *
+   * Auth: X-Internal-API-Key (per-empresa). El bridge se encarga de resolver
+   * la empresa activa y delegar al cliente per-empresa correspondiente.
+   *
+   * @param {string} id - id_solicitud (SIGN-YYYY-NNNNNN) o id interno (entero positivo)
+   * @param {object} args
+   * @param {string} args.correo - correo destino del firmante
+   * @param {object} [args.context] - metadata libre para auditoría
+   * @returns {Promise<{success,data}|{success:false,error}>}
+   */
+  function notifySignRequestRemote(id, args) {
+    if (!id) {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY', 'id requerido'));
+    }
+    if (!args || typeof args !== 'object') {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY', 'correo y context requeridos (object)'));
+    }
+    if (typeof args.correo !== 'string' || args.correo.length === 0) {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY', 'correo requerido (string)'));
+    }
+    // Validación de formato: liviana. El backend (zod) hace la validación
+    // estricta con .email(). Acá solo evitamos 400 triviales por typo.
+    if (!args.correo.includes('@')) {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY', 'correo inválido (sin @)'));
+    }
+    var body = { correo: args.correo };
+    if (args.context && typeof args.context === 'object') {
+      body.context = args.context;
+    }
+    return _doRequest(
+      'POST',
+      '/internal/sign-requests/' + encodeURIComponent(id) + '/notify-remote',
+      body,
+      null
+    ).then(function (r) { return _parseResult(r, 'application/json'); });
+  }
+
+  /**
    * POST /internal/consentimientos
    * @param {object} payload { id_trabajador, id_empresa, version_acuerdo, correo_verificacion, kair_version }
    */
@@ -758,6 +808,7 @@ function createFirmaClient(opts) {
     getSignRequestDocument: getSignRequestDocument,
     getSignRequestConstancia: getSignRequestConstancia,
     getSignRequestLink: getSignRequestLink,
+    notifySignRequestRemote: notifySignRequestRemote,  // I-103.A1.5.2
     createConsent: createConsent,
     verifyConsentOtp: verifyConsentOtp,
     getActiveAgreement: getActiveAgreement,

@@ -5010,7 +5010,7 @@ function showModuleHome(container, moduleName) { // 'container' ya es el <div cl
         }
     } else if (moduleName === "Gestión Humana") {
         if (window.GestionHumanaHome) {
-            const ghHome = new window.GestionHumanaHome(moduleContentContainer, moduleName, submodules);
+            const ghHome = new window.GestionHumanaHome(moduleContentContainer, moduleName, submodules, currentCompany);
             ghHome.render();
         } else {
             console.error('GestionHumanaHome component not found');

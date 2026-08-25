@@ -205,3 +205,63 @@
     </footer>
   </div>
 </div>
+
+<!-- ═══ I-103.A1.5.3 · MODAL: ÉXITO DE SOLICITUD DE FIRMA ═══
+     Modal que se muestra cuando firma-service creó exitosamente el sign
+     request. Muestra el id de la solicitud, la URL pública única y el
+     correo del firmante. Ofrece 2 acciones:
+       1) Copiar enlace (al portapapeles)
+       2) Enviar por correo (via firma:sign-request:notify-remote,
+          A1.5.1 + A1.5.2)
+     Y un botón "Listo" para cerrar. El documento YA quedó en estado
+     'esperando_firma' en la BD local antes de abrir este modal, así que
+     cerrar este modal NO modifica la solicitud. -->
+<div id="doc-firma-success-modal" class="doc-modal" hidden>
+  <div class="doc-modal__backdrop" data-close-doc-firma-success="1"></div>
+  <div class="doc-modal__panel doc-modal__panel--success">
+    <header class="doc-modal__header doc-modal__header--success">
+      <h3 class="doc-modal__title">
+        <i class="fas fa-check-circle"></i> Solicitud de firma creada
+      </h3>
+      <button type="button" class="doc-modal__close" data-close-doc-firma-success="1" aria-label="Cerrar">
+        <i class="fas fa-times"></i>
+      </button>
+    </header>
+    <div class="doc-modal__body">
+      <!-- ID de la solicitud (read-only) -->
+      <div class="doc-field">
+        <label class="doc-field__label">ID de solicitud</label>
+        <div class="doc-firma-success-id" id="doc-firma-success-id">—</div>
+      </div>
+      <!-- URL pública (read-only + botón copiar) -->
+      <div class="doc-field">
+        <label class="doc-field__label" for="doc-firma-success-url">Enlace único para el firmante</label>
+        <div class="doc-firma-success-link">
+          <input id="doc-firma-success-url" type="text" class="doc-field__input doc-firma-success-link__input"
+                 readonly />
+          <button type="button" id="doc-firma-success-copy" class="doc-btn doc-btn--ghost doc-firma-success-link__copy"
+                  title="Copiar enlace al portapapeles">
+            <i class="fas fa-copy"></i> Copiar
+          </button>
+        </div>
+        <p class="doc-field__hint">
+          El firmante tiene 24h para abrir el enlace, identificarse con su cédula y firmar.
+        </p>
+      </div>
+      <!-- Correo del firmante (read-only) -->
+      <div class="doc-field">
+        <label class="doc-field__label" for="doc-firma-success-correo">
+          Correo del firmante
+        </label>
+        <input id="doc-firma-success-correo" type="email" class="doc-field__input" readonly />
+        <p class="doc-field__hint" id="doc-firma-success-feedback" hidden></p>
+      </div>
+    </div>
+    <footer class="doc-modal__footer">
+      <button type="button" class="doc-btn doc-btn--ghost" data-close-doc-firma-success="1">Listo</button>
+      <button type="button" id="doc-firma-success-send" class="doc-btn doc-btn--primary">
+        <i class="fas fa-paper-plane"></i> Enviar por correo
+      </button>
+    </footer>
+  </div>
+</div>

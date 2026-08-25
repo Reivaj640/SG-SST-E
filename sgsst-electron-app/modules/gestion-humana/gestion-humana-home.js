@@ -18,6 +18,7 @@ var GESTION_HUMANA_NAV = [
   { id: 'permisos',      label: 'Permisos y Estados', shortLabel: 'P. y Est.', icon: 'fa-file-medical',     group: 'Gestión' },
   { id: 'afiliaciones',  label: 'Afiliaciones',     shortLabel: 'Afiliaciones', icon: 'fa-shield-halved',   group: 'Gestión' },
   { id: 'documentos',    label: 'Documentos y Firmas', shortLabel: 'Doc. y Fir.', icon: 'fa-file-signature', group: 'Documentos' },
+  { id: 'firma-electronica', label: 'Firma electrónica', shortLabel: 'Firma electr.', icon: 'fa-file-signature', group: 'Documentos' },
   { id: 'comunicacion',  label: 'Comunicación',     shortLabel: 'Comunicación', icon: 'fa-bullhorn',        group: 'Colaboración' }
 ];
 
@@ -30,15 +31,17 @@ var GESTION_HUMANA_TITLES = {
   permisos:     { title: 'Permisos y Estados', subtitle: 'Incapacidades, maternidad, luto y permisos diversos' },
   afiliaciones: { title: 'Afiliaciones',     subtitle: 'EPS, Pensión, ARL y Caja de Compensación' },
   documentos:   { title: 'Documentos y Firmas', subtitle: '7 tipos de documentos del proceso de contratación' },
+  'firma-electronica': { title: 'Firma electrónica', subtitle: 'Centro de control del proceso de firma por trabajador' },
   comunicacion: { title: 'Comunicación',     subtitle: 'Anuncios y mensajes oficiales' }
 };
 
 class GestionHumanaHome {
-  constructor(container, moduleName, submodules) {
+  constructor(container, moduleName, submodules, companyName) {
     this.container = container;
     this.moduleName = moduleName;
     this.submodules = submodules || [];
-    this.currentCompany = null;
+    this.currentCompany = companyName || null;
+    this.companyName = this.currentCompany;
     this.currentView = 'home';
     this.viewInstance = null;
     this.shellEl = null;
@@ -118,9 +121,8 @@ class GestionHumanaHome {
 
   // === RENDER ===
   async render() {
-    this.currentCompany = this._getCurrentCompany();
     this._cleanupView();
-    console.log('🏢 [GestionHumanaHome] Renderizando view=' + this.currentView + ' company=' + this.currentCompany);
+    console.log('🏢 [GestionHumanaHome] Renderizando view=' + this.currentView + ' company=' + this.companyName);
 
     await this._loadKpis();
 
@@ -289,6 +291,9 @@ class GestionHumanaHome {
       case 'documentos':
         this._mountExistingView(content, 'DocumentosComponent', 'Documentos y Firmas');
         break;
+      case 'firma-electronica':
+        this._mountExistingView(content, 'FirmaElectronicaComponent', 'Firma electrónica');
+        break;
       case 'comunicacion':
         this._mountExistingView(content, 'ComunicacionComponent', 'Comunicación');
         break;
@@ -306,7 +311,7 @@ class GestionHumanaHome {
     try {
       this.viewInstance = new window[className](
         content,
-        this.currentCompany,
+        this.companyName,
         'Gestión Humana',
         subName,
         function () { self.currentView = 'home'; self.render(); }
@@ -408,6 +413,13 @@ class GestionHumanaHome {
       description: 'Generación y firma digital de los 7 formatos del proceso de contratación: autorización datos, hojas de vida, inducción, contrato, etc.',
       buttonText: 'Abrir Documentos', buttonColor: '#1d4ed8',
       view: 'documentos', ready: true
+    }));
+    grid.appendChild(this._renderNavCard({
+      icon: 'fa-file-signature', iconColor: '#f59e0b', iconBg: '#fef3c7',
+      title: 'Firma electrónica', subtitle: 'Centro de control por trabajador',
+      description: 'Vista unificada del proceso de firma por trabajador. Tabla con estado agregado (pendiente, en proceso, completado), buscador por ID de solicitud y drill-down a expediente.',
+      buttonText: 'Abrir Firma electrónica', buttonColor: '#f59e0b',
+      view: 'firma-electronica', ready: true
     }));
     grid.appendChild(this._renderNavCard({
       icon: 'fa-bullhorn', iconColor: '#a16207', iconBg: '#fef3c7',

@@ -20,6 +20,9 @@ const MOD = 'GESTION-HUMANA';
 
 let _getDb = null;
 let _validateSession = null;
+let _app = null;             // electron app instance (set en registerGestionHumanaHandlers)
+let _firmaDb = null;         // conexión read-only a firma-service/data/firma.sqlite (singleton lazy)
+let _path = null;            // require('path') cacheado
 
 function _err(code, message, extra) {
   var e = { success: false, error: { code: code, message: message } };
@@ -1745,6 +1748,294 @@ function _handlerGetDocumento(token, documentoId) {
 }
 
 /**
+ * I-103.A1.6 · Acceso read-only a firma-service/data/firma.sqlite.
+ * Devuelve una conexión singleton en modo readonly. Si la BD no existe
+ * (firma-service no corriendo o instalado en otra ruta), retorna
+ * { ok: false, code: 'FIRMA_DB_UNAVAILABLE', message: ... }.
+ *
+ * Ruta: <app.getAppPath()>/firma-service/data/firma.sqlite
+ *
+ * NO modifica firma-service. Solo abre la BD en modo read-only para
+ * resolver el correo_verificacion del consentimiento. Patrón singleton
+ * lazy: la primera llamada abre la BD, las siguientes reusan.
+ */
+function _getFirmaDb() {
+  if (_firmaDb) {
+    try {
+      // sanity check: si la BD se cerró externamente, mejor reabrir
+      _firmaDb.prepare('SELECT 1').get();
+      return { ok: true, db: _firmaDb };
+    } catch (e) {
+      _firmaDb = null;
+    }
+  }
+  if (!_app || !_path) {
+    return { ok: false, code: 'NOT_INITIALIZED', message: 'app/path no disponibles' };
+  }
+  var dbPath = _path.join(_app.getAppPath(), 'firma-service', 'data', 'firma.sqlite');
+  var fs = require('fs');
+  if (!fs.existsSync(dbPath)) {
+    return { ok: false, code: 'FIRMA_DB_UNAVAILABLE', message: 'BD de firma-service no encontrada en ' + dbPath };
+  }
+  try {
+    var Database = require('better-sqlite3');
+    _firmaDb = new Database(dbPath, { readonly: true, fileMustExist: true });
+    return { ok: true, db: _firmaDb };
+  } catch (e) {
+    return { ok: false, code: 'FIRMA_DB_OPEN_FAILED', message: 'No se pudo abrir la BD de firma-service: ' + e.message };
+  }
+}
+
+/**
+ * I-103.A1.6 · Resuelve idEmpresa de secrets.enc para una empresa K+AIR.
+ * NO toca firma-bridge.js. Lee directamente userData/secrets.enc con safeStorage
+ * (misma fuente que firma-bridge) y retorna solo el idEmpresa (dato no secreto).
+ * Si no encuentra la empresa en secrets.enc, retorna { ok: false, code: 'NO_ID_EMPRESA' }.
+ *
+ * Esto es necesario porque la BD de firma-service guarda id_empresa (NIT), pero
+ * el bridge de GH solo conoce companyName/companyKey. La traducción requiere
+ * leer el registro per-empresa de secrets.enc.
+ */
+function _resolveIdEmpresaFromSecrets(companyName) {
+  if (!_app || !_path) {
+    return { ok: false, code: 'NOT_INITIALIZED', message: 'app/path no disponibles' };
+  }
+  var safeStorage = _app.safeStorage || (_app.getSafeStorage && _app.getSafeStorage());
+  // Si _app es electron.app, safeStorage viene de require('electron')
+  if (!safeStorage) {
+    try {
+      safeStorage = require('electron').safeStorage;
+    } catch (e) {
+      return { ok: false, code: 'NO_SAFE_STORAGE', message: 'safeStorage no disponible: ' + e.message };
+    }
+  }
+  if (!safeStorage || !safeStorage.isEncryptionAvailable || !safeStorage.isEncryptionAvailable()) {
+    return { ok: false, code: 'NO_SAFE_STORAGE', message: 'safeStorage no disponible en este OS' };
+  }
+  var fs = require('fs');
+  var secretsPath = _path.join(_app.getPath('userData'), 'secrets.enc');
+  if (!fs.existsSync(secretsPath)) {
+    return { ok: false, code: 'SECRETS_NOT_FOUND', message: 'secrets.enc no existe en ' + secretsPath };
+  }
+  var raw;
+  try {
+    var buf = fs.readFileSync(secretsPath);
+    var json = safeStorage.decryptString(buf);
+    raw = JSON.parse(json);
+  } catch (e) {
+    return { ok: false, code: 'SECRETS_DECRYPT_FAILED', message: 'Error descifrando secrets.enc: ' + e.message };
+  }
+  if (!raw || !raw.empresas || typeof raw.empresas !== 'object') {
+    return { ok: false, code: 'SECRETS_EMPTY', message: 'secrets.enc sin bloque empresas' };
+  }
+  // Match exacto primero, luego case-insensitive
+  if (raw.empresas[companyName] && raw.empresas[companyName].idEmpresa) {
+    return { ok: true, idEmpresa: String(raw.empresas[companyName].idEmpresa) };
+  }
+  var target = String(companyName || '').toLowerCase().trim();
+  var keys = Object.keys(raw.empresas);
+  for (var i = 0; i < keys.length; i++) {
+    if (String(keys[i]).toLowerCase().trim() === target) {
+      var entry = raw.empresas[keys[i]];
+      if (entry && entry.idEmpresa) {
+        return { ok: true, idEmpresa: String(entry.idEmpresa) };
+      }
+    }
+  }
+  return { ok: false, code: 'NO_ID_EMPRESA', message: 'Empresa "' + companyName + '" no tiene idEmpresa configurado en secrets.enc' };
+}
+
+/**
+ * gh:get-consentimiento
+ * I-103.A1.6 · Consulta MÍNIMA de un consentimiento de firma por ID.
+ *
+ * Retorna solo los campos necesarios para el flujo "Enviar correo" del
+ * módulo Firma electrónica: id, correo_verificacion, estado.
+ *
+ * Valida que el consentimiento pertenezca a la empresa solicitada
+ * comparando gh_consentimientos_firma.id_empresa (NIT) contra el
+ * idEmpresa resuelto de secrets.enc.
+ * No expone correo_hash, otp_hash ni otp_sal.
+ *
+ * NOTA: gh_consentimientos_firma vive en firma-service/data/firma.sqlite
+ * (BD separada de kair.db). Se abre read-only via _getFirmaDb().
+ *
+ * @param {string} token         - token de sesión
+ * @param {number} consentId    - ID del consentimiento (INTEGER PK en gh_consentimientos_firma)
+ * @param {string} companyName  - nombre (display_name o company_key) de la empresa
+ */
+function _handlerGetConsentimiento(token, consentId, companyName) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!consentId || (typeof consentId !== 'number' && typeof consentId !== 'string')) {
+    return _err('INVALID_INPUT', 'consentId es requerido');
+  }
+  if (!companyName || typeof companyName !== 'string') {
+    return _err('INVALID_INPUT', 'companyName es requerido');
+  }
+
+  var company = _getCompanyByName(companyName);
+  if (!company) {
+    return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+  }
+
+  var idEmpRes = _resolveIdEmpresaFromSecrets(companyName);
+  if (!idEmpRes.ok) {
+    return _err(idEmpRes.code, idEmpRes.message);
+  }
+  var idEmpresa = idEmpRes.idEmpresa;
+
+  var firmaDbRes = _getFirmaDb();
+  if (!firmaDbRes.ok) {
+    return _err(firmaDbRes.code, firmaDbRes.message);
+  }
+  var firmaDb = firmaDbRes.db;
+
+  try {
+    // Solo exponemos campos mínimos: no se retornan hashes, salts ni OTPs.
+    // Scope multi-empresa: comparamos id_empresa de la BD (NIT) contra
+    // el idEmpresa resuelto de secrets.enc (mismo NIT, NO contra company_key
+    // porque company_key en kair.companies es "Tempoactiva" mientras que
+    // firma-service guarda el NIT como id_empresa).
+    var row = firmaDb.prepare(
+      "SELECT id, id_empresa, estado, correo_verificacion " +
+      "FROM gh_consentimientos_firma WHERE id = ? LIMIT 1"
+    ).get(Number(consentId));
+
+    if (!row) {
+      return _err('NOT_FOUND', 'Consentimiento #' + consentId + ' no encontrado');
+    }
+    if (String(row.id_empresa) !== idEmpresa) {
+      return _err('NOT_FOUND', 'Consentimiento #' + consentId + ' no pertenece a la empresa "' + companyName + '"');
+    }
+    return _ok({
+      consentimiento: {
+        id: row.id,
+        correo_verificacion: row.correo_verificacion,
+        estado: row.estado
+      }
+    });
+  } catch (e) {
+    console.error('[' + MOD + '][get-consentimiento]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:get-sign-request
+ * I-103.A1.6 · Consulta MÍNIMA de un sign request de firma por id_solicitud.
+ *
+ * Retorna los datos que el modal de expediente necesita pero firma-service
+ * NO expone en GET /sign-requests/:id (que omite metadata y link deliberadamente).
+ *
+ * Datos que retorna (todos desde la BD local, READ-ONLY):
+ *   - id_solicitud, estado, id_empresa, fecha_creacion, fecha_expiracion
+ *   - correo_verificacion: parseado de gh_firmas_electronicas.metadata.correo
+ *   - fecha_envio: del último evento INVITE_SENT en gh_firma_eventos
+ *
+ * NO retorna url_publica / qr_payload (esos vienen de firma:sign-request:link,
+ * endpoint que descifra el token con la clave del servidor — único punto donde
+ * se puede construir el link de forma segura).
+ *
+ * Valida scope multi-empresa: gh_firmas_electronicas.id_empresa debe coincidir
+ * con el idEmpresa resuelto de secrets.enc.
+ *
+ * @param {string} token         - token de sesión
+ * @param {string} idSolicitud   - id_solicitud (formato SIGN-YYYY-NNNNNN)
+ * @param {string} companyName   - nombre (display_name o company_key) de la empresa
+ */
+function _handlerGetSignRequest(token, idSolicitud, companyName) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!idSolicitud || typeof idSolicitud !== 'string') {
+    return _err('INVALID_INPUT', 'idSolicitud es requerido (formato SIGN-YYYY-NNNNNN)');
+  }
+  // Validación de formato ligera (no exhaustiva; firma-service valida la real)
+  if (!/^SIGN-\d{4}-\d{6}$/.test(idSolicitud)) {
+    return _err('INVALID_INPUT', 'idSolicitud debe tener formato SIGN-YYYY-NNNNNN');
+  }
+  if (!companyName || typeof companyName !== 'string') {
+    return _err('INVALID_INPUT', 'companyName es requerido');
+  }
+
+  var company = _getCompanyByName(companyName);
+  if (!company) {
+    return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+  }
+
+  var idEmpRes = _resolveIdEmpresaFromSecrets(companyName);
+  if (!idEmpRes.ok) {
+    return _err(idEmpRes.code, idEmpRes.message);
+  }
+  var idEmpresa = idEmpRes.idEmpresa;
+
+  var firmaDbRes = _getFirmaDb();
+  if (!firmaDbRes.ok) {
+    return _err(firmaDbRes.code, firmaDbRes.message);
+  }
+  var firmaDb = firmaDbRes.db;
+
+  try {
+    // 1) Datos del sign request desde gh_firmas_electronicas
+    var sr = firmaDb.prepare(
+      "SELECT id, id_solicitud, id_empresa, estado, metadata, " +
+      "fecha_creacion, fecha_expiracion " +
+      "FROM gh_firmas_electronicas WHERE id_solicitud = ? LIMIT 1"
+    ).get(idSolicitud);
+
+    if (!sr) {
+      return _err('NOT_FOUND', 'Sign request "' + idSolicitud + '" no encontrado');
+    }
+    if (String(sr.id_empresa) !== idEmpresa) {
+      return _err('NOT_FOUND', 'Sign request "' + idSolicitud + '" no pertenece a la empresa "' + companyName + '"');
+    }
+
+    // 2) Parsear metadata (JSON) → extraer correo_verificacion
+    //    El correo NO se persiste en columna plana; solo dentro de metadata.
+    //    Estructura típica: { "correo": "user@x.com", "_server_metadata": {...} }
+    var correoVerificacion = null;
+    if (sr.metadata) {
+      try {
+        var md = JSON.parse(sr.metadata);
+        if (md && typeof md.correo === 'string') {
+          correoVerificacion = md.correo;
+        }
+      } catch (_) {
+        // metadata corrupto; continuamos sin correo (no es fatal)
+      }
+    }
+
+    // 3) Último evento INVITE_SENT desde gh_firma_eventos (para fecha_envio)
+    var lastInvite = firmaDb.prepare(
+      "SELECT fecha_hora, metadata FROM gh_firma_eventos " +
+      "WHERE firma_id = ? AND evento = 'INVITE_SENT' " +
+      "ORDER BY fecha_hora DESC LIMIT 1"
+    ).get(sr.id);
+
+    var fechaEnvio = null;
+    if (lastInvite) {
+      fechaEnvio = lastInvite.fecha_hora;
+    }
+
+    return _ok({
+      signRequest: {
+        id_solicitud: sr.id_solicitud,
+        estado: sr.estado,
+        correo_verificacion: correoVerificacion,
+        fecha_envio: fechaEnvio,
+        fecha_creacion: sr.fecha_creacion,
+        fecha_expiracion: sr.fecha_expiracion
+      }
+    });
+  } catch (e) {
+    console.error('[' + MOD + '][get-sign-request]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
  * gh:create-documento
  * Crea un documento. estado default 'pendiente'. version default 1.
  */
@@ -2849,11 +3140,14 @@ function _handlerSubirTemplate(token, companyName, tipoDocumento, nombre, subido
   var path = registerGestionHumanaHandlers._path;
   if (!dialog || !fs || !path) return _err('NO_DIALOG', 'dialog/fs/path no disponibles');
 
-  // Filtrar por extensiones permitidas: .pdf, .docx, .doc
+  // I-103.A1.5.4-B · Restringido a PDF. El flujo de firma electrónica
+  // (firma-service) solo acepta PDFs (valida header %PDF-). Aceptar DOCX/DOC
+  // aquí generaba documentos no firmables. Conversión DOCX→PDF queda fuera
+  // de scope (fase propia posterior).
   return dialog.showOpenDialog({
     title: 'Seleccionar template de documento',
     filters: [
-      { name: 'Documentos Office y PDF', extensions: ['pdf', 'docx', 'doc'] },
+      { name: 'Documentos PDF', extensions: ['pdf'] },
       { name: 'Todos los archivos', extensions: ['*'] }
     ],
     properties: ['openFile']
@@ -3026,6 +3320,8 @@ function _stubHandler(channel) {
 function registerGestionHumanaHandlers(app, deps) {
   _getDb = (deps && typeof deps.getDb === 'function') ? deps.getDb : null;
   _validateSession = (deps && typeof deps.validateSession === 'function') ? deps.validateSession : null;
+  _app = app || null;
+  _path = require('path');
 
   if (!registerGestionHumanaHandlers._ipcMain) {
     throw new Error('ipcMain no configurado. Usar registerGestionHumanaHandlers.init(ipcMain) primero.');
@@ -3294,6 +3590,32 @@ function registerGestionHumanaHandlers(app, deps) {
       return _handlerGetDocumento(p.token || '', p.documentoId);
     } catch (e) {
       console.error('[' + MOD + '][get-documento]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  // I-103.A1.6 · IPC mínimo para consulta de consentimiento de firma
+  // (Fase 3). Usado por el módulo Firma electrónica para obtener
+  // correo_verificacion sin pedirlo de nuevo al user.
+  ipcMainHandle('gh:get-consentimiento', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerGetConsentimiento(p.token || '', p.consentId, p.companyName);
+    } catch (e) {
+      console.error('[' + MOD + '][get-consentimiento]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  // I-103.A1.6 · IPC mínimo para consulta de sign request desde la BD local.
+  // Complementa firma:sign-request:get (datos generales) y firma:sign-request:link
+  // (url_publica + qr_payload). Este handler retorna: correo_verificacion (parseado
+  // de metadata) y fecha_envio (último INVITE_SENT). Lectura READ-ONLY, no
+  // modifica firma.sqlite. Validación de scope por id_empresa vs secrets.enc.
+  ipcMainHandle('gh:get-sign-request', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerGetSignRequest(p.token || '', p.id, p.companyName);
+    } catch (e) {
+      console.error('[' + MOD + '][get-sign-request]', e.message);
       return _err('INTERNAL', e.message);
     }
   });

@@ -651,3 +651,44 @@
   padding: 0 0.25rem;
   border-radius: 3px;
 }
+
+/* I-103.A1.5.3 · Modal de éxito de solicitud de firma
+   (panel diferenciado del modal de envío con borde verde). */
+.doc-modal__header--success {
+  border-bottom: 1px solid #d4edda;
+  background: #f1faf3;
+}
+.doc-modal__panel--success {
+  border-top: 3px solid #28a745;
+}
+.doc-firma-success-id {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #174ea6;
+  background: #f1f3f5;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  word-break: break-all;
+}
+.doc-firma-success-link {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+.doc-firma-success-link__input {
+  flex: 1;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.8125rem;
+  background: #f8f9fa;
+  /* readonly + sin focus halo (look de "info" no de "input editable") */
+  cursor: text;
+}
+.doc-firma-success-link__input:focus {
+  outline: 2px solid #174ea6;
+  outline-offset: -2px;
+}
+.doc-firma-success-link__copy {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
