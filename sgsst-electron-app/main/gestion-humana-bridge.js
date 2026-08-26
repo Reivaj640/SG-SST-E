@@ -330,6 +330,44 @@ function _handlerListContrataciones(token, companyName, estado) {
 }
 
 /**
+ * gh:list-trabajadores-con-contratacion-activa
+ * FASE 2 (A1.5.4-B) · Devuelve los bp-ids que tienen una contratación
+ * en estado 'en_proceso' vinculada. Usado por Firma Electrónica
+ * para mostrar los trabajadores recién creados desde Nueva Contratación
+ * que aún no tienen documentos.
+ * Input: { token, companyName }
+ * Devuelve: { success, data: { bpIds: string[], count: number } }
+ */
+function _handlerListTrabajadoresConContratacionActiva(token, companyName) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!companyName || typeof companyName !== 'string') {
+    return _err('INVALID_INPUT', 'companyName es requerido');
+  }
+
+  var company = _getCompanyByName(companyName);
+  if (!company) {
+    return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var rows = localDb.prepare(
+      "SELECT DISTINCT trabajador_id AS bpId FROM contrataciones " +
+      "WHERE empresa_id = ? AND estado = 'en_proceso' AND trabajador_id IS NOT NULL"
+    ).all(company.company_key);
+    var bpIds = rows.map(function (r) { return r.bpId; }).filter(function (x) { return !!x; });
+    return _ok({ bpIds: bpIds, count: bpIds.length });
+  } catch (e) {
+    console.error('[' + MOD + '][list-trabajadores-con-contratacion-activa]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
  * gh:get-contratacion
  * Devuelve una contratación completa por su ID.
  */
@@ -524,7 +562,47 @@ function _handlerCreateContratacion(token, companyName, data) {
       data.sedeId || null, data.empresaUsuaria || null,
       now, now
     );
-    return _ok({ contratacionId: id });
+
+    // FASE 1 (A1.5.4-B) · Crear/vincular bp-id en base_personal.
+    // Si la contratación trae cédula, busca el trabajador en base_personal
+    // (UNIQUE empresa_id + cedula con activo=1) y lo reutiliza, o lo crea
+    // si no existe. Vincula contrataciones.trabajador_id para que aparezca
+    // en Firma Electrónica. NO crea gh_documentos, gh_firmas_electronicas
+    // ni gh_consentimientos_firma (esos los crea el admin manualmente
+    // desde la pantalla de Firma Electrónica).
+    var personalId = null;
+    if (data.cedula) {
+      try {
+        var existingPersonal = localDb.prepare(
+          "SELECT id FROM base_personal WHERE empresa_id = ? AND cedula = ? AND activo = 1"
+        ).get(company.company_key, data.cedula);
+        if (existingPersonal) {
+          personalId = existingPersonal.id;
+        } else {
+          personalId = _newId('bp-');
+          localDb.prepare(
+            "INSERT INTO base_personal (id, empresa_id, nombres, apellidos, cedula, " +
+            "  cargo, salario, fecha_ingreso, sede_id, empresa_usuaria, " +
+            "  estado, activo, created_at, updated_at) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'activo', 1, ?, ?)"
+          ).run(
+            personalId, company.company_key,
+            data.nombres, data.apellidos, data.cedula,
+            data.cargo, data.salario || null,
+            data.fechaIngreso,
+            data.sedeId || null, data.empresaUsuaria || null,
+            now, now
+          );
+        }
+        localDb.prepare(
+          "UPDATE contrataciones SET trabajador_id = ? WHERE id = ?"
+        ).run(personalId, id);
+      } catch (innerErr) {
+        console.warn('[' + MOD + '][create-contratacion] vinculacion base_personal fallo:', innerErr.message);
+        personalId = null;
+      }
+    }
+    return _ok({ contratacionId: id, trabajadorId: personalId });
   } catch (e) {
     console.error('[' + MOD + '][create-contratacion]', e.message);
     return _err('INTERNAL', e.message);
@@ -3344,6 +3422,15 @@ function registerGestionHumanaHandlers(app, deps) {
       return _handlerGetContratacion(p.token || '', p.contratacionId);
     } catch (e) {
       console.error('[' + MOD + '][get-contratacion]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:list-trabajadores-con-contratacion-activa', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerListTrabajadoresConContratacionActiva(p.token || '', p.companyName);
+    } catch (e) {
+      console.error('[' + MOD + '][list-trabajadores-con-contratacion-activa]', e.message);
       return _err('INTERNAL', e.message);
     }
   });

@@ -279,10 +279,17 @@
         window.electronAPI.ghListDocumentos({ companyName: self.companyName })
           .catch(function () { return { success: false }; }),
         window.electronAPI.ghListPersonal({ companyName: self.companyName })
+          .catch(function () { return { success: false }; }),
+        // FASE 2 (A1.5.4-B) · bp-ids con contratación en_proceso.
+        // Solo esos se muestran como "Pendiente" en la tabla cuando no
+        // tienen documentos aún. Esto evita que los 754 trabajadores sin
+        // contratacion saturen la tabla.
+        window.electronAPI.ghListTrabajadoresConContratacionActiva({ companyName: self.companyName })
           .catch(function () { return { success: false }; })
       ]);
       self._documentos = results[0].success ? (results[0].data.documentos || []) : [];
       self._trabajadores = results[1].success ? (results[1].data.personales || []) : [];
+      self._bpsConContratacionActiva = results[2].success && results[2].data ? (results[2].data.bpIds || []) : [];
       self._trabajadorById = {};
       self._trabajadores.forEach(function (t) {
         self._trabajadorById[t.id] = t;
@@ -339,6 +346,34 @@
       });
       proceso.numSolicitudes = Object.keys(idsSolicitudSet).length;
       procesos.push(proceso);
+    });
+
+    // FASE 2 (A1.5.4-B) · Incluir los bp-ids con contratacion en_proceso
+    // que NO tienen documentos aún. Aparecen como "Pendiente" y permiten
+    // que el admin entre a su expediente para generar los documentos
+    // desde la pantalla de Firma Electrónica. Esto cubre el caso
+    // de Nueva Contratación: el bp-id se crea/vincula con la contratación
+    // (FASE 1) y queda visible inmediatamente en esta tabla. NO se
+    // incluyen los 748 trabajadores que existen en base_personal sin
+    // tener una contratación activa.
+    var bpsConContratacion = self._bpsConContratacionActiva || [];
+    var bpsConContratacionSet = {};
+    bpsConContratacion.forEach(function (bpId) { bpsConContratacionSet[bpId] = true; });
+    var trabajadoresConProceso = {};
+    procesos.forEach(function (p) { trabajadoresConProceso[p.trabajadorId] = true; });
+    self._trabajadores.forEach(function (t) {
+      if (!t || !t.id) return;
+      if (trabajadoresConProceso[t.id]) return; // ya tiene docs, no duplicar
+      if (!bpsConContratacionSet[t.id]) return; // solo bp-ids con contratacion activa
+      procesos.push({
+        estado: ESTADOS_PROCESO.PENDIENTE,
+        total: 0, firmados: 0, esperando: 0, pendientes: 0, anulados: 0,
+        conSolicitud: 0, progreso: 0,
+        trabajador: t,
+        trabajadorId: t.id,
+        documentos: [],
+        numSolicitudes: 0
+      });
     });
 
     // Orden: En proceso primero, luego Pendientes, luego Completados al final
