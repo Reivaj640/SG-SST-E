@@ -968,7 +968,7 @@ class DocumentosComponent {
           consentId = rConsent.data.consent_id;
           console.log('[A154] _enviarAFirma · consent nuevo consentId=' + consentId + ' has_devOtp=' + !!rConsent.data.devOtp);
           if (rConsent.data.devOtp) {
-            var rVerify = await window.electronAPI.firmaConsentVerifyOtp(consentId, rConsent.data.devOtp);
+            var rVerify = await window.electronAPI.firmaConsentVerifyOtp(self.companyName, consentId, rConsent.data.devOtp);
             console.log('[A154] _enviarAFirma · firmaConsentVerifyOtp result: success=' + (rVerify && rVerify.success));
             if (!rVerify || !rVerify.success) {
               console.log('[A154] _enviarAFirma · EXIT in firmaConsentVerifyOtp. Toast: Error aceptando consentimiento');

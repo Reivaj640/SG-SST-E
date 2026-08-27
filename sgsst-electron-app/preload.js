@@ -480,7 +480,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   firmaSignRequestNotifyRemote: (id, args) => ipcRenderer.invoke('firma:sign-request:notify-remote', Object.assign({ id }, args || {})),
   // Consent (2)
   firmaConsentCreate: (payload) => ipcRenderer.invoke('firma:consent:create', payload),
-  firmaConsentVerifyOtp: (consentId, otp) => ipcRenderer.invoke('firma:consent:verify-otp', { consentId, otp }),
+  firmaConsentVerifyOtp: (companyName, consentId, otp) => ipcRenderer.invoke('firma:consent:verify-otp', { companyName, consentId, otp }),
   // Agreement (1)
   firmaAgreementGet: (args) => ipcRenderer.invoke('firma:agreement:get', args || {}),
 
