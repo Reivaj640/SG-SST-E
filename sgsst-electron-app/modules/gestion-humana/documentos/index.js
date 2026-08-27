@@ -21,8 +21,8 @@ const _TRANSICION_FIRMA = {
   'EXPIRED':               { estado: 'expirado',  incluirFechaFirma: false, toast: 'La solicitud de firma expiró.',                                    success: false },
   'CANCELLED':             { estado: 'anulado',   incluirFechaFirma: false, toast: 'La solicitud de firma fue cancelada.',                             success: false },
   'REVOKED':               { estado: 'anulado',   incluirFechaFirma: false, toast: 'La solicitud de firma fue revocada.',                              success: false },
-  'OTP_LOCKED':            { estado: null,        incluirFechaFirma: false, toast: 'OTP bloqueado por intentos. La solicitud no progresó.',            success: false },
-  'IDENTIFICATION_FAILED': { estado: null,        incluirFechaFirma: false, toast: 'Falló la identificación del firmante. La solicitud no progresó.', success: false }
+  'OTP_LOCKED':            { estado: 'anulado',   incluirFechaFirma: false, toast: 'OTP bloqueado por intentos. La solicitud no progresó. Contacta a RRHH.',  success: false },
+  'IDENTIFICATION_FAILED': { estado: 'rechazado', incluirFechaFirma: false, toast: 'Falló la identificación del firmante. La solicitud no se completó.',                 success: false }
 };
 
 class DocumentosComponent {
@@ -102,7 +102,15 @@ class DocumentosComponent {
       this._showToast('Error cargando documentos: ' + e.message, 'error');
     }
     this.loading = false;
-    // I-102.2.F · Iniciar polling de firma-service. Idempotente.
+    // I-102.2.F · Mecanismo B: sync one-shot ANTES de iniciar el polling.
+    // Esto garantiza que si el usuario tuvo K+AIR cerrado mientras el
+    // firmante firmó/rechazó/expiró, al abrir el módulo el estado local
+    // se actualice INMEDIATAMENTE (no espera 30s al primer tick).
+    if (typeof this._syncFirmaService === 'function') {
+      this._syncFirmaService();
+    }
+    // I-102.2.F · Mecanismo A: polling continuo cada 30s mientras el módulo
+    // está activo. Complementa al sync inicial.
     if (typeof this._iniciarPolling === 'function') {
       this._iniciarPolling();
     }
@@ -507,9 +515,119 @@ class DocumentosComponent {
     if (this._pollHandle) return; // ya está activo
     this._signRequestStatus = this._signRequestStatus || {};
     var self = this;
-    // Primer tick inmediato (no esperar 30s la primera vez)
+    // Mecanismo A: polling cada 30s mientras el usuario está activo en este
+    // módulo. Complementa (no reemplaza) el sync inicial de _load().
+    // Primer tick inmediato (no esperar 30s la primera vez) para detectar
+    // rápidamente SRs que pasaron a estado terminal durante el tiempo
+    // que el módulo estuvo cerrado.
     setTimeout(function () { self._tickPolling(); }, 100);
     this._pollHandle = setInterval(function () { self._tickPolling(); }, 30000);
+  }
+
+  // I-102.2.F · Sincronización ONE-SHOT al cargar el módulo o refrescar
+  // datos. Garantiza que aunque el usuario haya tenido K+AIR cerrado mientras
+  // el firmante terminó la firma, al abrir el módulo el doc se actualice
+  // al estado real (firmado, rechazado, expirado, etc.).
+  //
+  // Es el "Mecanismo B" del diseño de polling. Complementa al polling
+  // continuo (Mecanismo A). Se llama:
+  //   - Al final de _load() (primera carga)
+  //   - Cada vez que se hace un _load() explícito (refresh, post-create, etc.)
+  //
+  // A diferencia de _tickPolling, este método:
+  //   - Es ONE-SHOT (no periódico)
+  //   - NO modifica _signRequestStatus (lo deja limpio para el polling)
+  //   - Loguea explícitamente cualquier cambio de estado (no silencioso)
+  //   - Aplica transiciones a TODOS los docs con idSolicitudFirma, incluso
+  //     si el polling los marcó como "ya procesados" (defensa contra
+  //     perder cambios entre sesiones)
+  async _syncFirmaService() {
+    if (!this.items || this.items.length === 0) return;
+    if (this._syncEnCurso) return; // evitar concurrencia
+    this._syncEnCurso = true;
+    try {
+      var self = this;
+      // Candidatos: cualquier doc con idSolicitudFirma (no solo esperando_firma).
+      // Esto es más amplio que _tickPolling porque queremos detectar casos
+      // donde el doc local quedó desactualizado (ej: doc en 'firmado' local
+      // pero el SR fue revocado después; o doc en 'esperando_firma' pero
+      // el SR ya está firmado).
+      var candidatos = this.items.filter(function (d) {
+        return !!d.idSolicitudFirma;
+      });
+      if (candidatos.length === 0) return;
+
+      var results = await Promise.allSettled(candidatos.map(function (d) {
+        return window.electronAPI.firmaSignRequestGet(d.idSolicitudFirma)
+          .then(function (r) { return { doc: d, r: r }; });
+      }));
+
+      var huboCambios = false;
+      for (var i = 0; i < results.length; i++) {
+        var res = results[i];
+        if (res.status !== 'fulfilled') continue;
+        var doc = res.value.doc;
+        var r = res.value.r;
+
+        if (!r || !r.success) {
+          if (typeof console !== 'undefined' && console.warn) {
+            console.warn('[I-102.2.F-sync] firmaSignRequestGet falló para', doc.id, ':', r && r.error);
+          }
+          continue;
+        }
+
+        var estadoFS = r.data && r.data.estado;
+        if (!estadoFS) continue;
+
+        // Si el doc local está en 'firmado' pero el SR remoto está en
+        // un estado distinto (ej: REVOKED después), el polling ya no lo
+        // consulta (filtro por estado='esperando_firma'). El sync
+        // one-shot cubre ese gap.
+        if (doc.estado === 'firmado' && estadoFS !== 'SIGNED') {
+          // El doc local está firmado pero el SR remoto no. Loguear para
+          // diagnóstico. Por ahora no hacemos nada (no queremos perder
+          // la firma local si el SR fue revocado). Solo informamos.
+          if (typeof console !== 'undefined' && console.info) {
+            console.info('[I-102.2.F-sync] doc firmado local pero SR remoto en', estadoFS, '(docId=' + doc.id + ')');
+          }
+          continue;
+        }
+
+        // Si el SR está en estado terminal, aplicar la transición al doc
+        // local. _aplicarTransicionFirma ya hace UPDATE en BD + render + toast.
+        if (self._esEstadoTerminal(estadoFS) && doc.estado !== 'firmado') {
+          huboCambios = true;
+          if (typeof console !== 'undefined' && console.info) {
+            console.info('[I-102.2.F-sync] detectada transición para doc', doc.id, '→', estadoFS);
+          }
+          // Reutilizamos el reactor existente. Pasamos la data del SR
+          // como statusInfo (formato esperado por _aplicarTransicionFirma).
+          self._aplicarTransicionFirma(doc.id, {
+            estado: estadoFS,
+            data: r.data,
+            procesado: false,
+            source: 'sync-inicial',
+          }).catch(function (e) {
+            if (typeof console !== 'undefined' && console.warn) {
+              console.warn('[I-102.2.F-sync] transición falló para', doc.id, ':', e && e.message);
+            }
+          });
+        }
+      }
+
+      if (huboCambios) {
+        // Pequeño delay para que las transiciones async terminen antes del render.
+        // Las transiciones ya actualizan this.items en su callback (.then),
+        // pero el render explícito asegura que la UI se refresque.
+        setTimeout(function () { self._renderRecientes(); }, 250);
+      }
+    } catch (e) {
+      if (typeof console !== 'undefined' && console.warn) {
+        console.warn('[I-102.2.F-sync] error inesperado:', e && e.message);
+      }
+    } finally {
+      this._syncEnCurso = false;
+    }
   }
 
   // I-102.2.F · Detiene el polling. Llamar en destroy() y cuando el componente
@@ -521,11 +639,13 @@ class DocumentosComponent {
     }
   }
 
-  // I-102.2.F · Tick del polling. Evita concurrencia con _pollEnCurso.
-  // Solo consulta docs que están 'esperando_firma' con idSolicitudFirma válido.
-  // Para docs en estado terminal (visto anteriormente), NO los vuelve a consultar.
+  // I-102.2.F · Tick del polling. Evita concurrencia con _pollEnCurso y
+  // _syncEnCurso. Solo consulta docs que están 'esperando_firma' con
+  // idSolicitudFirma válido. Para docs en estado terminal (visto
+  // anteriormente), NO los vuelve a consultar.
   async _tickPolling() {
     if (this._pollEnCurso) return;
+    if (this._syncEnCurso) return; // esperar a que termine el sync one-shot
     if (!this.items || this.items.length === 0) return;
     var self = this;
     // Identificar candidatos: esperando_firma + idSolicitudFirma + NO terminal previo
@@ -558,9 +678,10 @@ class DocumentosComponent {
 
         if (!r || !r.success) {
           // Error individual: ignorar este ciclo. Próximo tick reintenta.
-          // (Loggear al console para diagnóstico; no toasts por polling.)
+          // Log explícito (no silencioso) para diagnóstico.
           if (typeof console !== 'undefined' && console.warn) {
-            console.warn('[I-102.2.F] firmaSignRequestGet falló para', doc.id, ':', r && r.error);
+            console.warn('[I-102.2.F] firmaSignRequestGet falló para', doc.id,
+              '(id_solicitud=' + doc.idSolicitudFirma + '):', r && r.error);
           }
           continue;
         }
@@ -571,6 +692,10 @@ class DocumentosComponent {
 
         if (estadoAnterior !== estadoNuevo) {
           huboCambios = true;
+          if (typeof console !== 'undefined' && console.info) {
+            console.info('[I-102.2.F] cambio de estado para', doc.id,
+              ':', estadoAnterior || '(sin previo)', '→', estadoNuevo);
+          }
         }
         self._signRequestStatus[doc.id] = {
           estado: estadoNuevo,
@@ -587,6 +712,8 @@ class DocumentosComponent {
         if (self._esEstadoTerminal(estadoNuevo)) {
           self._aplicarTransicionFirma(doc.id, self._signRequestStatus[doc.id])
             .catch(function (e) {
+              // Log explícito (no silencioso): si la transición falla, RRHH
+              // necesita saberlo para diagnosticar.
               if (typeof console !== 'undefined' && console.warn) {
                 console.warn('[I-102.2.G] transición error inesperado:', doc.id, e && e.message);
               }
