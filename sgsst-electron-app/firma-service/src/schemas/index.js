@@ -32,6 +32,27 @@ const verifyOtpBody = z.object({
 });
 
 /**
+ * Schema del body de POST /internal/consentimientos/:id/expire
+ * (FASE 3 · A1.5.4-B).
+ *
+ * Auth: X-Admin-API-Key (operación humana, NO expuesta a K+AIR).
+ *
+ * Ver API.md §6.12.
+ */
+const expireConsentBody = z.object({
+  motivo: z.string()
+    .min(10, 'motivo debe tener al menos 10 caracteres')
+    .max(500, 'motivo debe tener máximo 500 caracteres')
+    .refine(
+      (v) => v.trim().length >= 10,
+      'motivo no puede ser solo espacios en blanco',
+    ),
+  actor: z.string()
+    .min(1, 'actor es requerido')
+    .max(100, 'actor debe tener máximo 100 caracteres'),
+}).strict();
+
+/**
  * Schema del campo 'metadata' (JSON) en POST /internal/sign-requests.
  * Se valida como JSON string; el service lo parsea.
  *
@@ -168,11 +189,21 @@ const signRequestIdsQuery = z.object({
     ),
 });
 
+/**
+ * Schema del body de POST /api/sign/:token/resend-otp
+ *
+ * Body vacío (resend no necesita parámetros adicionales).
+ * El token en la URL es la credencial.
+ */
+const resendOtpBody = z.object({});
+
 module.exports = {
   createConsentBody,
   verifyOtpBody,
+  expireConsentBody,  // FASE 3 · A1.5.4-B: admin expire
   signRequestBody,
   signRequestListQuery,
   signRequestIdsQuery,  // I-008: batch query
   signRequestNotifyBody,  // I-103.A1.5.1: notify-remote
+  resendOtpBody,
 };

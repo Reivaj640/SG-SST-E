@@ -597,11 +597,14 @@ test('consent:create: valida campos requeridos', async function () {
 
 test('consent:verify-otp: valida consentId y otp', async function () {
   setup();
+  // I-103.A1.5.4-B · fix: per-empresa path requiere URL en secrets.enc.
+  // Env vars definen apiKey real (env > secrets en _resolveConfigForCompany).
+  _setupCompanyTempoactiva();
   process.env.FIRMA_SERVICE_URL = 'http://localhost:3001';
   process.env.FIRMA_SERVICE_API_KEY = 'env-key-1234567890';
   var r1 = await _call('firma:consent:verify-otp', { consentId: 'c-1' });
   assert.equal(r1.error.code, 'INVALID_REQUEST_BODY');
-  var r2 = await _call('firma:consent:verify-otp', { consentId: 'c-1', otp: '123456' });
+  var r2 = await _call('firma:consent:verify-otp', { companyName: 'Tempoactiva', consentId: 'c-1', otp: '123456' });
   assert.equal(r2.success, true);
   assert.equal(_clientCallLog[0].m, 'verifyConsentOtp');
   assert.equal(_clientCallLog[0].otp, '123456');

@@ -3,19 +3,27 @@
  *
  * - POST /internal/consentimientos
  * - POST /internal/consentimientos/:id/verify-otp
+ * - POST /internal/consentimientos/:id/expire      (FASE 3 · A1.5.4-B, admin)
  *
- * Auth (I-010, D-13, I-008): ambos endpoints usan `requireEmpresaScopeAndLimit`
- * para scope per-empresa + rate limit interno (4 capas, I-008 / C-20 v5).
+ * Auth (I-010, D-13, I-008):
+ *   - create / verify-otp: `requireEmpresaScopeAndLimit`
+ *     (per-empresa + rate limit interno, 4 capas, I-008 / C-20 v5).
+ *   - expire: `adminApiAuth` (operación humana, no expuesta a K+AIR).
  *
- * Ver API.md §6.10 y §6.11 y docs/kair-firma-integration/I-010-design.md.
+ * Ver API.md §6.10, §6.11, §6.12 (expire) y docs/kair-firma-integration/I-010-design.md.
  */
 'use strict';
 
 const express = require('express');
+const { z } = require('zod');
 const router = express.Router();
 const { requireEmpresaScopeAndLimit } = require('../middleware/authz');
+const { adminApiAuth } = require('../middleware/auth');
 const { validateBody } = require('../middleware/validate');
-const { createConsentBody, verifyOtpBody } = require('../schemas');
+const { AppError } = require('../middleware/errors');
+const {
+  createConsentBody, verifyOtpBody, expireConsentBody,
+} = require('../schemas');
 const consentService = require('../services/consent');
 const config = require('../config');
 const logger = require('../utils/logger');
@@ -80,19 +88,17 @@ router.post('/consentimientos',
     }
 
     // Caso 3: nuevo
+    // FASE 4 · A1.5.4-B: el consent ya no tiene OTP. No se envía
+    // correo en este paso. La aceptación del Acuerdo ocurre en la
+    // mini-app (3ª casilla) vía POST /api/sign/:token/consent/accept.
     const response = {
       consent_id: result.consent.id,
       version_acuerdo: result.consent.version_acuerdo,
       hash_texto_acuerdo: result.consent.hash_texto_acuerdo,
       estado: result.consent.estado,
-      otp_ttl_seconds: config.ttl.otpSeconds,
+      manifestacion_aceptada: result.consent.manifestacion_aceptada === 1,
       correo_destino_enmascarado: maskEmail(correo_verificacion),
     };
-
-    // En dev, devolver el OTP solo si lo capturamos
-    if (result.devOtp) {
-      response.devOtp = result.devOtp;
-    }
 
     res.status(201).json(response);
   } catch (err) {
@@ -161,5 +167,72 @@ function maskEmail(email) {
   const visible = local.slice(0, Math.min(4, local.length));
   return `${visible}${'*'.repeat(Math.max(0, local.length - visible.length))}@${domain}`;
 }
+
+// =================================================================
+// POST /internal/consentimientos/:id/expire   (FASE 3 · A1.5.4-B)
+// =================================================================
+
+/**
+ * Expira un consentimiento administrativamente. Operación humana, admin-only.
+ *
+ * Caso de uso: un consentimiento quedó colgado en OTP_PENDING (OTP nunca
+ * llegó al firmante, typo en el correo, buzón lleno, etc.) y bloquea la
+ * creación de un nuevo consentimiento para la misma key por la UNIQUE
+ * constraint de gh_consentimientos_firma.
+ *
+ * Auth: X-Admin-API-Key (operación humana, NO expuesta a K+AIR).
+ * Body: { motivo: string(>=10,<=500), actor: string(>=1,<=100) }
+ *
+ * - 401 si falta o es incorrecto X-Admin-API-Key
+ * - 400 si body inválido o :id mal formado
+ * - 404 si el consentimiento no existe
+ * - 409 CONSENT_EXPIRE_NOT_ALLOWED si el estado es terminal (ACCEPTED/EXPIRED)
+ * - 200 con estado EXPIRED si se expiró exitosamente
+ * - 200 con already_expired=true si ya estaba EXPIRED (idempotente)
+ */
+router.post('/consentimientos/:id/expire',
+  adminApiAuth(),
+  validateBody(expireConsentBody),
+  (req, res, next) => {
+    try {
+      const consentId = parseInt(req.params.id, 10);
+      if (!Number.isInteger(consentId) || consentId <= 0) {
+        throw new AppError(400, 'INVALID_REQUEST_BODY',
+          'El id del consentimiento debe ser un entero positivo');
+      }
+      const { motivo, actor } = req.body;
+      const ip = req.ip;
+      const user_agent = req.get('User-Agent') || null;
+
+      const result = consentService.expireConsent({
+        consentId, motivo, actor, ip, user_agent,
+      });
+
+      logger.info('Consentimiento expirado por admin', {
+        consent_id: consentId,
+        estado_anterior: result.estado_anterior,
+        already_expired: result.already_expired,
+        actor,
+        ip,
+      });
+
+      const response = {
+        ok: true,
+        consent_id: result.consent.id,
+        version_acuerdo: result.consent.version_acuerdo,
+        estado: result.consent.estado,
+        estado_anterior: result.estado_anterior,
+        fecha_expiracion: result.consent.updated_at,
+        actor,
+      };
+      if (result.already_expired) {
+        response.already_expired = true;
+      }
+      res.status(200).json(response);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 module.exports = router;

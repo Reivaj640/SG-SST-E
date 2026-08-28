@@ -85,6 +85,7 @@ const config = {
     otpPerHour: int('RATE_LIMIT_OTP_PER_HOUR', 10),
     commitPerMinute: int('RATE_LIMIT_COMMIT_PER_MINUTE', 3),
     signRequestPerMinute: int('RATE_LIMIT_SIGN_REQUEST_PER_MINUTE', 30),
+    resendOtpPerHour: int('RATE_LIMIT_RESEND_OTP_PER_HOUR', 5),
   },
 
   email: {

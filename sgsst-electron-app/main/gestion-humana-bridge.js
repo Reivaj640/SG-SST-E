@@ -2221,6 +2221,14 @@ function _handlerCreateDocumento(token, companyName, data) {
  *  firma-service vía I-105 al recibir SIGN_COMMITTED.)
  */
 function _handlerUpdateDocumento(token, documentoId, updates) {
+  // FASE 2 INSTRUMENTACIÓN FORENSE — log BRIDGE-GH-UPDATE (entry)
+  try {
+    console.info('[BRIDGE-GH-UPDATE]', JSON.stringify({
+      ts: new Date().toISOString(),
+      docId: documentoId,
+      updatesKeys: updates && typeof updates === 'object' ? Object.keys(updates) : null
+    }));
+  } catch (_) {}
   var auth = _checkAuth(token);
   if (!auth.ok) return _err(auth.error.code, auth.error.message);
 
@@ -2248,6 +2256,15 @@ function _handlerUpdateDocumento(token, documentoId, updates) {
 
   try {
     var existing = localDb.prepare('SELECT id, estado FROM gh_documentos WHERE id = ?').get(documentoId);
+    // FASE 2 INSTRUMENTACIÓN FORENSE — log BRIDGE-PRECHECK
+    try {
+      console.info('[BRIDGE-PRECHECK]', JSON.stringify({
+        ts: new Date().toISOString(),
+        docId: documentoId,
+        documentoEncontrado: !!existing,
+        estadoAntes: existing ? existing.estado : null
+      }));
+    } catch (_) {}
     if (!existing) return _err('NOT_FOUND', 'Documento no encontrado');
     if (existing.estado === 'anulado') {
       return _err('ALREADY_DELETED', 'El documento está anulado');
@@ -2275,9 +2292,58 @@ function _handlerUpdateDocumento(token, documentoId, updates) {
     values.push(documentoId);
 
     var stmtU = localDb.prepare('UPDATE gh_documentos SET ' + sqlParts.join(', ') + ' WHERE id = ?');
-    stmtU.run.apply(stmtU, values);
+    // FASE 2 INSTRUMENTACIÓN FORENSE — log BRIDGE-RUN (justo antes de stmtU.run)
+    try {
+      console.info('[BRIDGE-RUN]', JSON.stringify({
+        ts: new Date().toISOString(),
+        docId: documentoId,
+        sqlParts: sqlParts
+      }));
+    } catch (_) {}
+    // FASE 2 INSTRUMENTACIÓN FORENSE — Capturar result del run.
+    // .run() en better-sqlite3 retorna {changes, lastInsertRowid}.
+    var _runResult = stmtU.run.apply(stmtU, values);
+    // FASE 2 INSTRUMENTACIÓN FORENSE — log BRIDGE-RUN-RESULT
+    try {
+      console.info('[BRIDGE-RUN-RESULT]', JSON.stringify({
+        ts: new Date().toISOString(),
+        docId: documentoId,
+        changes: _runResult && typeof _runResult.changes !== 'undefined' ? _runResult.changes : null,
+        lastInsertRowid: _runResult && _runResult.lastInsertRowid ? _runResult.lastInsertRowid : null
+      }));
+    } catch (_) {}
+    // FASE 2 INSTRUMENTACIÓN FORENSE — log BRIDGE-VERIFY (SELECT posterior)
+    try {
+      var _verifyRow = localDb.prepare('SELECT id, estado, fecha_firma, updated_at FROM gh_documentos WHERE id = ?').get(documentoId);
+      console.info('[BRIDGE-VERIFY]', JSON.stringify({
+        ts: new Date().toISOString(),
+        docId: documentoId,
+        estadoDespues: _verifyRow ? _verifyRow.estado : null,
+        fechaFirmaDespues: _verifyRow ? (_verifyRow.fecha_firma ? 'PRESENTE' : 'NULL') : null,
+        updatedAtDespues: _verifyRow ? _verifyRow.updated_at : null
+        // NO loguear fecha_firma completa (es timestamp de negocio)
+      }));
+    } catch (_) {}
+    // FASE 2 INSTRUMENTACIÓN FORENSE — log BRIDGE-RETURN
+    try {
+      console.info('[BRIDGE-RETURN]', JSON.stringify({
+        ts: new Date().toISOString(),
+        docId: documentoId,
+        success: true,
+        changes: _runResult && _runResult.changes
+      }));
+    } catch (_) {}
     return _ok({ documentoId: documentoId });
   } catch (e) {
+    // FASE 2 INSTRUMENTACIÓN FORENSE — log BRIDGE-ERROR
+    try {
+      console.info('[BRIDGE-ERROR]', JSON.stringify({
+        ts: new Date().toISOString(),
+        docId: documentoId,
+        errName: e && e.name,
+        errMessage: e && e.message ? String(e.message).slice(0, 100) : null
+      }));
+    } catch (_) {}
     console.error('[' + MOD + '][update-documento]', e.message);
     return _err('INTERNAL', e.message);
   }
