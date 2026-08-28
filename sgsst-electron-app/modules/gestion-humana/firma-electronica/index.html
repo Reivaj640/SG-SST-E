@@ -6,18 +6,6 @@
      Sin consultas a firma-service en Fase 1 (datos locales: gh_documentos + gh_personal). -->
 
 <div class="fe-wrapper" id="fe-wrapper">
-  <!-- ═══ HEADER (sticky al top cuando scrollea) ═══ -->
-  <div class="fe-section-head">
-    <div class="fe-section-head__text">
-      <h2 class="fe-section-head__title">
-        <i class="fas fa-file-signature"></i> Firma electrónica
-      </h2>
-      <p class="fe-section-head__subtitle">
-        Centro de control del proceso de firma por trabajador · la firma es electrónica (firma-service)
-      </p>
-    </div>
-  </div>
-
   <!-- ═══ BUSCADOR ═══ -->
   <div class="fe-search-section">
     <div class="fe-search">
@@ -33,41 +21,45 @@
     </div>
   </div>
 
-  <!-- ═══ FILTROS RÁPIDOS (pills) ═══ -->
+  <!-- ═══ FILTROS (dropdown único) ═══ -->
   <div class="fe-filters-section">
-    <div class="fe-pills" id="fe-pills">
-      <button class="fe-pill fe-pill--active" data-filter="todos" type="button">
-        Todos
+    <div class="fe-filter-dropdown" id="fe-filter-dropdown">
+      <button id="fe-filtros-avanzados" class="fe-btn fe-btn--primary fe-btn--sm fe-filter-dropdown__toggle"
+              type="button" aria-haspopup="listbox" aria-expanded="false">
+        <i class="fas fa-sliders"></i>
+        <span id="fe-filtros-label">Filtros: Todos</span>
+        <i class="fas fa-chevron-down fe-filter-dropdown__chevron"></i>
       </button>
-      <button class="fe-pill" data-filter="pendiente" type="button">
-        <span class="fe-pill__dot fe-pill__dot--pendiente"></span> Pendientes
-      </button>
-      <button class="fe-pill" data-filter="en_preparacion" type="button">
-        <span class="fe-pill__dot fe-pill__dot--preparacion"></span> En preparación
-      </button>
-      <button class="fe-pill" data-filter="en_proceso" type="button">
-        <span class="fe-pill__dot fe-pill__dot--proceso"></span> En proceso
-      </button>
-      <button class="fe-pill" data-filter="completado" type="button">
-        <span class="fe-pill__dot fe-pill__dot--completado"></span> Completados
-      </button>
-      <button class="fe-pill" data-filter="rechazado" type="button">
-        <span class="fe-pill__dot fe-pill__dot--rechazado"></span> Rechazados
-      </button>
-      <button class="fe-pill" data-filter="vencido" type="button">
-        <span class="fe-pill__dot fe-pill__dot--vencido"></span> Vencidos
-      </button>
-      <button class="fe-pill" data-filter="cancelado" type="button">
-        <span class="fe-pill__dot fe-pill__dot--cancelado"></span> Cancelados
-      </button>
-      <button class="fe-pill" data-filter="error" type="button">
-        <span class="fe-pill__dot fe-pill__dot--error"></span> Errores
-      </button>
+      <div id="fe-filter-dropdown-menu" class="fe-filter-dropdown__menu" role="listbox" hidden>
+        <button class="fe-filter-option fe-filter-option--active" data-filter="todos" type="button" role="option">
+          Todos
+        </button>
+        <button class="fe-filter-option" data-filter="pendiente" type="button" role="option">
+          <span class="fe-pill__dot fe-pill__dot--pendiente"></span> Pendientes
+        </button>
+        <button class="fe-filter-option" data-filter="en_preparacion" type="button" role="option">
+          <span class="fe-pill__dot fe-pill__dot--preparacion"></span> En preparación
+        </button>
+        <button class="fe-filter-option" data-filter="en_proceso" type="button" role="option">
+          <span class="fe-pill__dot fe-pill__dot--proceso"></span> En proceso
+        </button>
+        <button class="fe-filter-option" data-filter="completado" type="button" role="option">
+          <span class="fe-pill__dot fe-pill__dot--completado"></span> Completados
+        </button>
+        <button class="fe-filter-option" data-filter="rechazado" type="button" role="option">
+          <span class="fe-pill__dot fe-pill__dot--rechazado"></span> Rechazados
+        </button>
+        <button class="fe-filter-option" data-filter="vencido" type="button" role="option">
+          <span class="fe-pill__dot fe-pill__dot--vencido"></span> Vencidos
+        </button>
+        <button class="fe-filter-option" data-filter="cancelado" type="button" role="option">
+          <span class="fe-pill__dot fe-pill__dot--cancelado"></span> Cancelados
+        </button>
+        <button class="fe-filter-option" data-filter="error" type="button" role="option">
+          <span class="fe-pill__dot fe-pill__dot--error"></span> Errores
+        </button>
+      </div>
     </div>
-    <button id="fe-filtros-avanzados" class="fe-btn fe-btn--ghost fe-btn--sm" type="button" disabled
-      title="Filtros avanzados — disponible en Fase 2">
-      <i class="fas fa-sliders"></i> Filtros avanzados
-    </button>
   </div>
 
   <!-- ═══ CONTADOR ═══ -->
