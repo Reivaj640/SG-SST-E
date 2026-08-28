@@ -48,6 +48,10 @@
  */
 'use strict';
 
+// Ensure test env before any requires (dotenv may set production from .env)
+if (process.env.NODE_ENV !== 'test') process.env.NODE_ENV = 'test';
+delete require.cache[require.resolve('../../src/config')];
+
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('crypto');

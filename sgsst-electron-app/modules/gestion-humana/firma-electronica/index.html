@@ -131,5 +131,154 @@
   </div>
 </div>
 
+<!-- ═══ MODAL ADMINISTRAR TEMPLATES ═══ -->
+<div id="fe-tpl-admin-modal" class="fe-modal" hidden>
+  <div class="fe-modal__overlay" data-close-modal="true"></div>
+  <div class="fe-modal__panel fe-modal__panel--admin" role="dialog">
+    <header class="fe-modal__header">
+      <h3 class="fe-modal__title"><i class="fas fa-folder-open"></i> Mis Templates</h3>
+      <button class="fe-modal__close" data-close-modal="true" type="button" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+    </header>
+    <div class="fe-modal__body">
+      <div class="fe-tpl-admin-header">
+        <p class="fe-tpl-admin-header__text">Sube tus propios .docx o .pdf para usar al generar documentos.</p>
+        <button id="fe-tpl-subir" class="fe-btn fe-btn--primary" type="button"><i class="fas fa-cloud-upload-alt"></i> Subir Template</button>
+      </div>
+      <div id="fe-templates" class="fe-templates"></div>
+    </div>
+    <div class="fe-modal__footer">
+      <button class="fe-btn fe-btn--ghost" data-close-modal="true" type="button">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL SUBIR TEMPLATE ═══ -->
+<div id="fe-tpl-upload-modal" class="fe-modal" hidden>
+  <div class="fe-modal__overlay" data-close-modal="true"></div>
+  <div class="fe-modal__panel fe-modal__panel--template" role="dialog">
+    <header class="fe-modal__header">
+      <h3 class="fe-modal__title"><i class="fas fa-cloud-upload-alt"></i> Subir Template</h3>
+      <button class="fe-modal__close" data-close-modal="true" type="button" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+    </header>
+    <div class="fe-modal__body">
+      <div class="fe-field">
+        <label class="fe-field__label" for="fe-tpl-tipo">Tipo de documento <span class="fe-field__req">*</span></label>
+        <select id="fe-tpl-tipo" class="fe-field__select"></select>
+      </div>
+      <div class="fe-field">
+        <label class="fe-field__label" for="fe-tpl-nombre">Nombre del template <span class="fe-field__req">*</span></label>
+        <input id="fe-tpl-nombre" class="fe-field__input" type="text" placeholder="Ej: Contrato base 2026" />
+        <p class="fe-field__hint">Nombre legible para identificar este template.</p>
+      </div>
+      <p class="fe-tpl-helper"><i class="fas fa-info-circle"></i> Al confirmar, se abrirá el explorador de archivos para que elijas el .docx o .pdf.</p>
+    </div>
+    <div class="fe-modal__footer">
+      <button class="fe-btn fe-btn--ghost" data-close-modal="true" type="button">Cancelar</button>
+      <button id="fe-tpl-confirm" class="fe-btn fe-btn--primary" type="button">Seleccionar archivo...</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL GENERAR DOCUMENTO ═══ -->
+<div id="fe-gen-modal" class="fe-modal" hidden>
+  <div class="fe-modal__overlay" data-close-modal="true"></div>
+  <div class="fe-modal__panel fe-modal__panel--generar" role="dialog">
+    <header class="fe-modal__header">
+      <h3 class="fe-modal__title"><i class="fas fa-plus-circle"></i> Generar Documento</h3>
+      <button class="fe-modal__close" data-close-modal="true" type="button" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+    </header>
+    <div class="fe-modal__body">
+      <div class="fe-field">
+        <label class="fe-field__label">Trabajador</label>
+        <div id="fe-gen-trabajador-info" class="fe-firma-summary"></div>
+      </div>
+      <div class="fe-field">
+        <label class="fe-field__label">Tipo de documento <span class="fe-field__req">*</span></label>
+        <div id="fe-gen-tipos" class="fe-gen-tipos"></div>
+      </div>
+      <div class="fe-field" id="fe-gen-template-field" hidden>
+        <label class="fe-field__label" for="fe-gen-template">Template</label>
+        <select id="fe-gen-template" class="fe-field__select"></select>
+        <p class="fe-field__hint" id="fe-gen-template-hint"></p>
+      </div>
+    </div>
+    <div class="fe-modal__footer">
+      <button class="fe-btn fe-btn--ghost" data-close-modal="true" type="button">Cancelar</button>
+      <button id="fe-gen-confirm" class="fe-btn fe-btn--primary" type="button"><i class="fas fa-plus"></i> Generar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL ENVIAR A FIRMA ═══ -->
+<div id="fe-firma-modal" class="fe-modal" hidden>
+  <div class="fe-modal__overlay" data-close-firma-modal="true"></div>
+  <div class="fe-modal__panel fe-modal__panel--firma" role="dialog">
+    <header class="fe-modal__header">
+      <h3 class="fe-modal__title"><i class="fas fa-file-signature"></i> Enviar documento a firma</h3>
+      <button class="fe-modal__close" data-close-firma-modal="true" type="button" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+    </header>
+    <div class="fe-modal__body">
+      <div class="fe-field">
+        <label class="fe-field__label">Documento</label>
+        <div id="fe-firma-doc-summary" class="fe-firma-summary"></div>
+      </div>
+      <div class="fe-field">
+        <label class="fe-field__label">Firmante</label>
+        <div id="fe-firma-trab-summary" class="fe-firma-summary"></div>
+      </div>
+      <div class="fe-field">
+        <label class="fe-field__label" for="fe-firma-correo">Correo del firmante <span class="fe-field__req">*</span></label>
+        <input id="fe-firma-correo" class="fe-field__input" type="email" placeholder="correo@empresa.com" />
+        <p class="fe-field__hint" id="fe-firma-correo-hint"></p>
+        <p class="fe-field__error" id="fe-firma-correo-error" hidden></p>
+      </div>
+      <div class="fe-field">
+        <label class="fe-firma-confirm">
+          <input id="fe-firma-confirmar" type="checkbox" />
+          <span>Confirmo que este documento será enviado a firma electrónica</span>
+        </label>
+      </div>
+    </div>
+    <div class="fe-modal__footer">
+      <button class="fe-btn fe-btn--ghost" data-close-firma-modal="true" type="button">Cancelar</button>
+      <button id="fe-firma-enviar" class="fe-btn fe-btn--primary" disabled type="button"><i class="fas fa-paper-plane"></i> Enviar a firma</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL ÉXITO FIRMA ═══ -->
+<div id="fe-firma-success-modal" class="fe-modal" hidden>
+  <div class="fe-modal__overlay" data-close-success-modal="true"></div>
+  <div class="fe-modal__panel fe-modal__panel--success" role="dialog">
+    <header class="fe-modal__header fe-modal__header--success">
+      <h3 class="fe-modal__title"><i class="fas fa-check-circle"></i> Solicitud de firma creada</h3>
+      <button class="fe-modal__close" data-close-success-modal="true" type="button" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+    </header>
+    <div class="fe-modal__body">
+      <div class="fe-field">
+        <label class="fe-field__label">ID de solicitud</label>
+        <div id="fe-success-id" class="fe-success-id"></div>
+      </div>
+      <div class="fe-field">
+        <label class="fe-field__label">Enlace único para el firmante</label>
+        <div class="fe-success-link">
+          <input id="fe-success-url" class="fe-success-link__input" type="text" readonly />
+          <button id="fe-success-copy" class="fe-btn fe-btn--ghost" type="button">Copiar</button>
+        </div>
+        <p class="fe-field__hint">El enlace vence en 24 horas.</p>
+      </div>
+      <div class="fe-field">
+        <label class="fe-field__label">Correo del firmante</label>
+        <input id="fe-success-correo" class="fe-field__input" type="text" readonly />
+        <p id="fe-success-feedback" class="fe-field__hint" hidden></p>
+      </div>
+    </div>
+    <div class="fe-modal__footer">
+      <button class="fe-btn fe-btn--ghost" data-close-success-modal="true" type="button">Listo</button>
+      <button id="fe-success-send" class="fe-btn fe-btn--primary" type="button"><i class="fas fa-paper-plane"></i> Enviar por correo</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ TOAST ═══ -->
 <div id="fe-toast" class="fe-toast" hidden></div>

@@ -17,7 +17,6 @@ var GESTION_HUMANA_NAV = [
   { id: 'vacaciones',    label: 'Vacaciones',       shortLabel: 'Vacaciones',  icon: 'fa-umbrella-beach',   group: 'Gestión' },
   { id: 'permisos',      label: 'Permisos y Estados', shortLabel: 'P. y Est.', icon: 'fa-file-medical',     group: 'Gestión' },
   { id: 'afiliaciones',  label: 'Afiliaciones',     shortLabel: 'Afiliaciones', icon: 'fa-shield-halved',   group: 'Gestión' },
-  { id: 'documentos',    label: 'Documentos y Firmas', shortLabel: 'Doc. y Fir.', icon: 'fa-file-signature', group: 'Documentos' },
   { id: 'firma-electronica', label: 'Firma electrónica', shortLabel: 'Firma electr.', icon: 'fa-file-signature', group: 'Documentos' },
   { id: 'comunicacion',  label: 'Comunicación',     shortLabel: 'Comunicación', icon: 'fa-bullhorn',        group: 'Colaboración' }
 ];
@@ -30,8 +29,7 @@ var GESTION_HUMANA_TITLES = {
   vacaciones:   { title: 'Vacaciones',       subtitle: 'Programación, aprobaciones y notificaciones' },
   permisos:     { title: 'Permisos y Estados', subtitle: 'Incapacidades, maternidad, luto y permisos diversos' },
   afiliaciones: { title: 'Afiliaciones',     subtitle: 'EPS, Pensión, ARL y Caja de Compensación' },
-  documentos:   { title: 'Documentos y Firmas', subtitle: '7 tipos de documentos del proceso de contratación' },
-  'firma-electronica': { title: 'Firma electrónica', subtitle: 'Centro de control del proceso de firma por trabajador' },
+  'firma-electronica': { title: 'Firma electrónica', subtitle: 'Centro de control del proceso documental y firma electrónica' },
   comunicacion: { title: 'Comunicación',     subtitle: 'Anuncios y mensajes oficiales' }
 };
 
@@ -287,9 +285,6 @@ class GestionHumanaHome {
         break;
       case 'afiliaciones':
         this._mountExistingView(content, 'AfiliacionesComponent', 'Afiliaciones');
-        break;
-      case 'documentos':
-        this._mountExistingView(content, 'DocumentosComponent', 'Documentos y Firmas');
         break;
       case 'firma-electronica':
         this._mountExistingView(content, 'FirmaElectronicaComponent', 'Firma electrónica');

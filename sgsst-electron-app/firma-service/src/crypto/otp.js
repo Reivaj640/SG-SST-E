@@ -79,11 +79,36 @@ function isLocked(attempts, maxAttempts) {
 
 /**
  * Verifica si el OTP expiró.
+ *
+ * Acepta tanto formato ISO 8601 (e.g. "2026-08-26T13:42:14.486Z") como
+ * formato SQLite "YYYY-MM-DD HH:MM:SS" (e.g. "2026-08-26 12:42:14").
+ *
+ * NOTA sobre el formato SQLite: SQLite NO almacena timezone, y el driver
+ * better-sqlite3 retorna los TEXT columns TAL CUAL están en la BD. Si la
+ * BD tiene "2026-08-26 12:42:14" (formato SQLite), `Date.parse` lo
+ * interpreta como hora LOCAL (no UTC), lo que produce un bug sutil cuando
+ * el servidor está en una zona horaria distinta de UTC. Para evitarlo,
+ * normalizamos el formato SQLite a ISO 8601 con timezone UTC antes de
+ * hacer `Date.parse`.
+ *
+ * Si el string ya parece ISO 8601 (contiene 'T' o termina en 'Z' o tiene
+ * un offset ±HH:MM), lo dejamos pasar tal cual.
  */
 function isExpired(sentAt, ttlSeconds, now) {
   if (!sentAt) return true;
+  let normalized = sentAt;
+  if (typeof sentAt === 'string' &&
+      !sentAt.includes('T') &&  // no es ISO 8601 con T
+      !sentAt.endsWith('Z') &&   // no es UTC explícito
+      !/[+-]\d{2}:?\d{2}$/.test(sentAt)) {  // no tiene offset
+    // Formato SQLite "YYYY-MM-DD HH:MM:SS" → interpretamos como UTC
+    // (es la convención del proyecto: BD almacena UTC, generado con
+    // `datetime('now')` que es UTC en SQLite). Lo convertimos a ISO 8601
+    // con Z para que `Date.parse` lo trate como UTC.
+    normalized = sentAt.replace(' ', 'T') + 'Z';
+  }
   const nowMs = (now || Date.now());
-  const sentMs = typeof sentAt === 'string' ? Date.parse(sentAt) : sentAt;
+  const sentMs = typeof normalized === 'string' ? Date.parse(normalized) : normalized;
   if (Number.isNaN(sentMs)) return true;
   return (nowMs - sentMs) > (ttlSeconds * 1000);
 }

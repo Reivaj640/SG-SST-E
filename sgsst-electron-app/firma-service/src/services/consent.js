@@ -28,6 +28,15 @@ const { AppError } = require('../middleware/errors');
 const ESTADO_PENDING = 'OTP_PENDING';
 const ESTADO_ACCEPTED = 'ACCEPTED';
 const ESTADO_LOCKED = 'OTP_LOCKED';
+const ESTADO_EXPIRED = 'EXPIRED';
+
+// Estados terminales para consentimientos: no admiten más transiciones.
+// (ACCEPTED se considera terminal a efectos de /expire: un consentimiento
+//  aceptado NO puede ser expirado administrativamente — el Acuerdo ya fue
+//  firmado y la trazabilidad debe preservarse. Para revocar un consentimiento
+//  ya aceptado se necesitaría un flujo de revocación distinto que está
+//  fuera del alcance de esta fase.)
+const TERMINAL_STATES = new Set([ESTADO_ACCEPTED, ESTADO_EXPIRED]);
 
 /**
  * Busca un consentimiento por su ID interno.
@@ -38,8 +47,8 @@ function getById(id) {
     SELECT id, id_trabajador, id_empresa, version_acuerdo,
            hash_texto_acuerdo, correo_verificacion, correo_hash,
            otp_hash, otp_sal, otp_intentos, ip, user_agent,
-           fecha_aceptacion, kair_version, manifestacion_aceptada,
-           estado, created_at, updated_at
+           fecha_aceptacion, fecha_otp_enviado, kair_version,
+           manifestacion_aceptada, estado, created_at, updated_at
     FROM gh_consentimientos_firma
     WHERE id = ?
     LIMIT 1
@@ -50,14 +59,24 @@ function getById(id) {
  * Busca un consentimiento existente para (trabajador, empresa, versión).
  */
 function getExisting({ id_trabajador, id_empresa, version_acuerdo }) {
+  // FASE 4 · A1.5.4-B: ORDER BY id DESC para que el consent más reciente
+  // gane. Sin ORDER BY, SQLite retorna por ROWID ascendente, lo que causaba
+  // que se agarrara un EXPIRED viejo y se ocultara el OTP_PENDING que sí
+  // bloquea el UNIQUE INDEX PARCIAL (id_trabajador+id_empresa+version_acuerdo,
+  // WHERE estado IN ('OTP_PENDING','OTP_LOCKED')). El bug se manifestaba como
+  // 500 INTERNAL_ERROR al intentar crear un nuevo consent cuando coexistían
+  // EXPIRED viejos y un OTP_PENDING nuevo. El branching posterior en create()
+  // ya distingue EXPIRED/ACCEPTED/OTP_PENDING/OTP_LOCKED correctamente;
+  // este ORDER BY solo garantiza que se inspeccione el registro correcto.
   return db.prepare(`
     SELECT id, id_trabajador, id_empresa, version_acuerdo,
            manifestacion_aceptada, estado, otp_intentos,
-           fecha_aceptacion
+           fecha_aceptacion, fecha_otp_enviado
     FROM gh_consentimientos_firma
     WHERE id_trabajador = ?
       AND id_empresa = ?
       AND version_acuerdo = ?
+    ORDER BY id DESC
     LIMIT 1
   `).get(id_trabajador, id_empresa, version_acuerdo);
 }
@@ -109,7 +128,67 @@ async function create({
       return { alreadyAccepted: true, consent: existing };
     }
     if (existing.estado === ESTADO_PENDING) {
-      return { alreadyPending: true, consent: existing };
+      // FASE 2 · A1.5.4-B · RECUPERACIÓN CONSENT_PENDING:
+      // si el OTP del consent previo está vencido, expirar atómicamente
+      // y dejar caer al flujo de creación normal (nuevo OTP, nuevo mail).
+      // Si el OTP sigue vigente, mantener el comportamiento CONSENT_PENDING.
+      // Formato del evento CONSENT_EXPIRED consistente con verifyOtp
+      // (lines ~239-246): actor='sistema:*', motivo, fecha_otp_enviado, ttl.
+      // El UNIQUE INDEX parcial (idx_consentimientos_key_activo, migración 011)
+      // solo aplica a estado IN ('OTP_PENDING','OTP_LOCKED'), así que expirar
+      // el viejo libera el slot para que el INSERT de abajo no choque.
+      if (existing.fecha_otp_enviado &&
+          isExpired(existing.fecha_otp_enviado, config.ttl.otpSeconds)) {
+        logger.info('Consent previo con OTP vencido; auto-expirando y recreando', {
+          consent_id: existing.id,
+        });
+        try {
+          const tx = db.transaction(() => {
+            // Re-leer estado DENTRO de la transacción (TOCTOU safety):
+            // si otro proceso cambió el estado entre el getExisting y
+            // aquí, no auto-expiramos (el caller manejará el caso).
+            const current = db.prepare(
+              'SELECT estado FROM gh_consentimientos_firma WHERE id = ?'
+            ).get(existing.id);
+            if (current && current.estado !== ESTADO_PENDING) {
+              return;
+            }
+            db.prepare(`
+              UPDATE gh_consentimientos_firma
+              SET estado = ?, updated_at = datetime('now')
+              WHERE id = ? AND estado = ?
+            `).run(ESTADO_EXPIRED, existing.id, ESTADO_PENDING);
+            db.prepare(`
+              INSERT INTO gh_consentimientos_eventos
+                (consent_id, evento, fecha_hora, id_actor, ip, user_agent, metadata)
+              VALUES (?, ?, datetime('now'), ?, NULL, NULL, ?)
+            `).run(
+              existing.id,
+              'CONSENT_EXPIRED',
+              'sistema:recreate-on-expired',
+              JSON.stringify({
+                motivo: 'recreate_on_expired_create',
+                fecha_otp_enviado: existing.fecha_otp_enviado,
+                ttl_seconds: config.ttl.otpSeconds,
+              }),
+            );
+          });
+          tx();
+        } catch (e) {
+          logger.error('Auto-expira falló', {
+            consent_id: existing.id,
+            error: e.message,
+            error_code: e.code,
+            stack: e.stack,
+          });
+          throw new AppError(500, 'AUTO_EXPIRE_FAILED',
+            `No se pudo auto-expirar el consentimiento ${existing.id}: ${e.message}`);
+        }
+        // Continúa al flujo de creación normal (genera nuevo OTP,
+        // envía mail, retorna 201 con nuevo consent_id).
+      } else {
+        return { alreadyPending: true, consent: existing };
+      }
     }
     // Si está LOCKED, podemos crear uno nuevo (después de un tiempo
     // de espera, o si RH lo resetea). Por ahora rechazamos.
@@ -119,50 +198,46 @@ async function create({
     }
   }
 
-  // 3. Generar OTP y hashes
-  const otp = generateOTP();
-  const otp_sal = generateSalt();
-  const otp_hash = hashWithSalt(otp, otp_sal);
+  // 3. Generar hashes (NO OTP — FASE 4 rediseño)
+  //    El consent del Acuerdo ya no tiene OTP propio. La aceptación
+  //    ocurre en la mini-app vía POST /api/sign/:token/consent/accept
+  //    (3ª casilla "He leído y acepto el Acuerdo de Firma Electrónica v1.0").
   const correo_sal = generateSalt();
   const correo_hash = hashWithSalt(correo_verificacion, correo_sal);
-  const hash_texto_acuerdo = acuerdo.texto_hash; // ya calculado
+  const hash_texto_acuerdo = acuerdo.texto_hash;
 
-  // 4. Insertar consentimiento
+  // 4. Insertar consentimiento (sin OTP)
+  //    otp_hash, otp_sal, fecha_otp_enviado quedan NULL.
+  //    El estado default del schema es 'OTP_PENDING' (legacy, no se renombra
+  //    en esta migración para evitar recreación de tabla; el significado
+  //    actual es simplemente "pendiente de aceptación en la mini-app").
+  const now = new Date().toISOString();
   const tx = db.transaction(() => {
     const result = db.prepare(`
       INSERT INTO gh_consentimientos_firma
         (id_trabajador, id_empresa, version_acuerdo,
          hash_texto_acuerdo, correo_verificacion, correo_hash,
          otp_hash, otp_sal, otp_intentos, ip, user_agent,
-         kair_version, manifestacion_aceptada, estado)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 0, ?)
+         kair_version, manifestacion_aceptada, estado,
+         fecha_otp_enviado)
+      VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, 0, ?, ?, ?, 0, ?, NULL)
     `).run(
       id_trabajador, id_empresa, version_acuerdo,
       hash_texto_acuerdo, correo_verificacion, correo_hash,
-      otp_hash, otp_sal, ip || null, user_agent || null,
+      ip || null, user_agent || null,
       kair_version, ESTADO_PENDING,
     );
     return result.lastInsertRowid;
   });
   const consentId = tx();
 
-  // 5. Enviar OTP (fuera de la transacción)
-  const sendResult = await mailer.sendOTP({
-    to: correo_verificacion,
-    otp,
-    tipo: 'consent',
-    context: { consentId, version: version_acuerdo },
-  });
-
-  logger.info('Consentimiento creado, OTP enviado', {
+  logger.info('Consentimiento creado (pendiente de aceptación en mini-app)', {
     consent_id: consentId,
-    // P1-5: NO loguear id_trabajador (PII: cédula).
-    // Quedamos con consent_id + version_acuerdo para correlación.
     version_acuerdo,
   });
 
   const consent = getById(consentId);
-  return { consent, devOtp: sendResult.devOtp };
+  return { consent, devOtp: null };
 }
 
 /**
@@ -198,6 +273,45 @@ function verifyOtp({ consentId, otp, kair_version }) {
   if (consent.estado !== ESTADO_PENDING) {
     throw new AppError(409, 'INVALID_STATE',
       `Estado actual '${consent.estado}' no permite verificación`);
+  }
+
+  // FASE 3 (A1.5.4-B): OTP vencido → transición a EXPIRED.
+  // Si fecha_otp_enviado está seteado y (now - fecha_otp_enviado) > TTL,
+  // el OTP ya no es válido. Transicionamos a EXPIRED y emitimos evento.
+  // Si fecha_otp_enviado es NULL (consentimiento legacy pre-migración 010),
+  // no podemos calcular expiración → no aplicamos esta rama (fallback
+  // seguro, evita romper consentimientos legacy).
+  if (consent.fecha_otp_enviado &&
+      isExpired(consent.fecha_otp_enviado, config.ttl.otpSeconds)) {
+    const tx = db.transaction(() => {
+      db.prepare(`
+        UPDATE gh_consentimientos_firma
+        SET estado = ?, updated_at = datetime('now')
+        WHERE id = ? AND estado = ?
+      `).run(ESTADO_EXPIRED, consentId, ESTADO_PENDING);
+      db.prepare(`
+        INSERT INTO gh_consentimientos_eventos
+          (consent_id, evento, fecha_hora, id_actor, ip, user_agent, metadata)
+        VALUES (?, ?, datetime('now'), ?, NULL, NULL, ?)
+      `).run(
+        consentId,
+        'CONSENT_EXPIRED',
+        'sistema:otp-expiry',
+        JSON.stringify({
+          motivo: 'otp_expired',
+          fecha_otp_enviado: consent.fecha_otp_enviado,
+          ttl_seconds: config.ttl.otpSeconds,
+        }),
+      );
+    });
+    tx();
+    logger.info('Consentimiento expirado por OTP vencido', {
+      consent_id: consentId,
+      fecha_otp_enviado: consent.fecha_otp_enviado,
+    });
+    throw new AppError(422, 'OTP_EXPIRED',
+      'El código OTP ha vencido. Solicita uno nuevo.',
+      { consent_id: consentId });
   }
 
   // Verificar OTP
@@ -560,14 +674,177 @@ function validateForCommit(signRequest) {
   return { skip: false, consent };
 }
 
+/**
+ * Expira un consentimiento administrativamente (FASE 3 · A1.5.4-B).
+ *
+ * Caso de uso: un consentimiento quedó colgado en OTP_PENDING porque
+ *   (a) el OTP nunca llegó al correo del firmante (typo, SMTP rebotado,
+ *       buzón lleno, etc.),
+ *   (b) el firmante nunca introdujo el OTP, o
+ *   (c) el OTP se envió pero está vencido y nadie intentó verificarlo.
+ *
+ * Sin esta función, ese consentimiento OTP_PENDING bloquea la creación
+ * de un nuevo consentimiento para la misma key
+ * (trabajador, empresa, version_acuerdo) por la UNIQUE constraint, y la
+ * única forma de "liberarlo" sería hacer UPDATE manual a EXPIRED (lo
+ * que hicimos en FASE 1 para consent_id=2 con el typo de correo).
+ *
+ * Reglas (en orden de evaluación, cada una con código de error específico):
+ *
+ *   1. Consentimiento no existe
+ *      → 404 CONSENT_NOT_FOUND
+ *
+ *   2. Estado terminal (ACCEPTED o EXPIRED)
+ *      → 409 CONSENT_EXPIRE_NOT_ALLOWED
+ *      Defensa: no se puede "expirar" un consentimiento que ya fue
+ *      aceptado por el firmante (cadena legal rota) ni uno que ya
+ *      está expirado (idempotencia vía estado, no vía endpoint).
+ *
+ *   3. UPDATE atómico con WHERE adicional (`estado NOT IN (terminal)`)
+ *      para protección contra TOCTOU races. Si WHERE no matchea,
+ *      otro proceso cambió el estado → 409 CONSENT_EXPIRE_NOT_ALLOWED.
+ *
+ *   4. Insertar evento CONSENT_EXPIRED en gh_consentimientos_eventos
+ *      con metadata completa (motivo, actor, estado_anterior, timestamp).
+ *
+ * Retorna { ok, consent, estado_anterior, already_expired }.
+ *
+ * @param {object} opts
+ * @param {number} opts.consentId
+ * @param {string} opts.motivo - Justificación (>=10 chars, <=500)
+ * @param {string} opts.actor  - Quién ejecuta la acción (<=100)
+ * @param {string} [opts.ip]
+ * @param {string} [opts.user_agent]
+ * @returns {{ok: true, consent: object, estado_anterior: string,
+ *           already_expired: boolean}}
+ * @throws AppError 404 / 409 según la regla que falle.
+ */
+function expireConsent({ consentId, motivo, actor, ip, user_agent }) {
+  // Validación de argumentos (defensa en profundidad — el route también
+  // valida con zod, pero aquí somos estrictos por si llaman al service
+  // directamente).
+  if (typeof motivo !== 'string' || motivo.trim().length < 10) {
+    throw new AppError(400, 'INVALID_REQUEST_BODY',
+      'motivo es requerido (mínimo 10 caracteres)');
+  }
+  if (typeof actor !== 'string' || actor.length < 1 || actor.length > 100) {
+    throw new AppError(400, 'INVALID_REQUEST_BODY',
+      'actor es requerido (1-100 caracteres)');
+  }
+
+  // 1. Consentimiento existe
+  const consent = getById(consentId);
+  if (!consent) {
+    throw new AppError(404, 'CONSENT_NOT_FOUND',
+      `Consentimiento ${consentId} no encontrado`);
+  }
+
+  // 2. Estado terminal: ACCEPTED se rechaza, EXPIRED es idempotente.
+  //    Diferenciamos ANTES de la transacción para no tener que hacer
+  //    un SELECT extra dentro de la tx. La verificación de TOCTOU
+  //    se hace dentro de la tx (paso 3).
+  if (consent.estado === ESTADO_ACCEPTED) {
+    throw new AppError(409, 'CONSENT_EXPIRE_NOT_ALLOWED',
+      `No se puede expirar un consentimiento en estado ${consent.estado}`,
+      {
+        consent_id: consent.id,
+        current_state: consent.estado,
+        allowed_states: [ESTADO_PENDING, ESTADO_LOCKED, ESTADO_EXPIRED],
+      });
+  }
+
+  // 3. UPDATE atómico con guard de estado.
+  //    WHERE excluye explícitamente los estados terminales para protección
+  //    contra TOCTOU races (otro proceso cambió el estado entre el SELECT
+  //    y el UPDATE).
+  const now = new Date().toISOString();
+  const estadoAnterior = consent.estado;
+  let alreadyExpired = false;
+  const tx = db.transaction(() => {
+    // Re-leer estado DENTRO de la transacción por la misma razón que
+    // internal-audit.js#revoke: si el estado cambió entre el SELECT
+    // externo y aquí, la transición puede no ser segura.
+    const current = db.prepare(
+      'SELECT estado FROM gh_consentimientos_firma WHERE id = ?'
+    ).get(consentId);
+    if (!current) {
+      throw new AppError(404, 'CONSENT_NOT_FOUND',
+        `Consentimiento ${consentId} no encontrado`);
+    }
+    if (TERMINAL_STATES.has(current.estado)) {
+      // Idempotencia: si ya está EXPIRED, devolver éxito sin cambios.
+      if (current.estado === ESTADO_EXPIRED) {
+        alreadyExpired = true;
+        return;
+      }
+      // ACCEPTED: rechazar.
+      throw new AppError(409, 'CONSENT_EXPIRE_NOT_ALLOWED',
+        `No se puede expirar un consentimiento en estado ${current.estado}`,
+        { consent_id: consentId, current_state: current.estado });
+    }
+    db.prepare(`
+      UPDATE gh_consentimientos_firma
+      SET estado = ?, updated_at = datetime('now')
+      WHERE id = ? AND estado NOT IN (?, ?)
+    `).run(ESTADO_EXPIRED, consentId, ESTADO_ACCEPTED, ESTADO_EXPIRED);
+    // Insertar evento de auditoría
+    db.prepare(`
+      INSERT INTO gh_consentimientos_eventos
+        (consent_id, evento, fecha_hora, id_actor, ip, user_agent, metadata)
+      VALUES (?, ?, datetime('now'), ?, ?, ?, ?)
+    `).run(
+      consentId,
+      'CONSENT_EXPIRED',
+      `admin:${actor}`,
+      ip || null,
+      user_agent || null,
+      JSON.stringify({
+        motivo,
+        actor,
+        estado_anterior: current.estado,
+        timestamp: now,
+        source: 'admin-endpoint',
+      }),
+    );
+  });
+  tx();
+
+  if (alreadyExpired) {
+    logger.info('Consentimiento ya expirado (idempotente)', {
+      consent_id: consentId,
+      actor,
+    });
+    return {
+      ok: true,
+      consent: getById(consentId),
+      estado_anterior: ESTADO_EXPIRED,
+      already_expired: true,
+    };
+  }
+
+  logger.info('Consentimiento expirado por admin', {
+    consent_id: consentId,
+    estado_anterior: estadoAnterior,
+    actor,
+  });
+  return {
+    ok: true,
+    consent: getById(consentId),
+    estado_anterior: estadoAnterior,
+    already_expired: false,
+  };
+}
+
 module.exports = {
   create,
   verifyOtp,
   accept,
+  expireConsent,
   getById,
   getExisting,
   validateForCommit,
   ESTADO_PENDING,
   ESTADO_ACCEPTED,
   ESTADO_LOCKED,
+  ESTADO_EXPIRED,
 };

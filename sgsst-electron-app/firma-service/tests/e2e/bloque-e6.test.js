@@ -22,6 +22,11 @@
  */
 'use strict';
 
+// Ensure test env before any requires (dotenv may set production from .env)
+if (process.env.NODE_ENV !== 'test') process.env.NODE_ENV = 'test';
+// Bust config cache so it re-reads NODE_ENV=test
+delete require.cache[require.resolve('../../src/config')];
+
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('path');
@@ -496,6 +501,7 @@ test('E6 caso 7: sign request legacy (agreement_version=NULL) → salta validaci
     version_kair: '0.1.189-test',
     identificacion_tipo: 'CC',
     identificacion_numero_hash,
+    metadata: JSON.stringify({ correo: 'trabajador@test.com' }),
   });
 
   // 4. Simular sign request legacy: nulificar agreement_version y consent_id

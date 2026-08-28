@@ -27,6 +27,7 @@ const logger = require('../utils/logger');
 const { AppError } = require('../middleware/errors');
 
 const { z } = require('zod');
+const { resendOtpBody } = require('../schemas');
 
 // Ruta al HTML estático de la mini-app (resuelta desde SERVICE_ROOT)
 const MINI_APP_HTML = path.resolve(__dirname, '..', '..', 'web', 'firma', 'index.html');
@@ -165,6 +166,26 @@ router.post('/api/sign/:token/verify-otp', validateBody(verifyOtpBody), (req, re
     const result = publicFlow.verifyOtp(
       req.params.token,
       req.body.otp,
+      req.ip,
+      req.get('User-Agent'),
+    );
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/sign/:token/resend-otp
+ * Reenvía OTP a una solicitud que ya pasó por identify().
+ *
+ * Estados permitidos: OTP_SENT (OTP expirado) o OTP_LOCKED (desbloquear).
+ * Body vacío — el token en la URL es la credencial.
+ */
+router.post('/api/sign/:token/resend-otp', validateBody(resendOtpBody), (req, res, next) => {
+  try {
+    const result = publicFlow.resendOtp(
+      req.params.token,
       req.ip,
       req.get('User-Agent'),
     );

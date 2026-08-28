@@ -11,6 +11,14 @@
  */
 'use strict';
 
+// Ensure test environment when loaded directly (not via setup.js).
+// dotenv may have set NODE_ENV=production from .env.
+if (process.env.NODE_ENV !== 'test') {
+  process.env.NODE_ENV = 'test';
+  // Bust config cache so it re-reads NODE_ENV=test
+  delete require.cache[require.resolve('../src/config')];
+}
+
 const path = require('path');
 const express = require('express');
 const request = require('supertest');
@@ -49,6 +57,11 @@ config.auth.internalApiKey = TEST_API_KEY;
 config.auth.adminApiKey = TEST_ADMIN_API_KEY;
 
 const TABLES = [
+  // FASE 3 (A1.5.4-B): gh_consentimientos_eventos debe borrarse ANTES de
+  // gh_consentimientos_firma porque tiene FK a ella. Si se borrara al revés,
+  // el DELETE FROM gh_consentimientos_firma fallaría con FOREIGN KEY
+  // constraint failed.
+  'gh_consentimientos_eventos',
   'gh_consentimientos_firma',
   'gh_firma_acuerdo_versiones',
   'gh_firma_eventos',
@@ -92,7 +105,8 @@ function resetDb() {
         'gh_consentimientos_firma',
         'gh_firma_eventos',
         'gh_firma_sesiones',
-        'gh_firma_acuerdo_versiones'
+        'gh_firma_acuerdo_versiones',
+        'gh_consentimientos_eventos'
       )
     `).run();
   } catch (e) { /* sqlite_sequence no existe en algunas BDs */ }
@@ -230,6 +244,7 @@ async function createSignRequestWithIdentificacion({
   // I-002: categoría del documento que se firma (CONTRATO, OTROSI, etc.).
   // Por defecto null (compatibilidad con sign requests legacy pre-007).
   tipo_identificacion = null,
+  metadata = JSON.stringify({ correo: 'trabajador@test.com' }),
   ...overrides
 } = {}) {
   // Sembrar Acuerdo activo (si no hay uno) y usar su texto_hash/version reales.
@@ -255,6 +270,7 @@ async function createSignRequestWithIdentificacion({
     identificacion_tipo,
     identificacion_numero_hash: sha256(identificacion_numero),
     tipo_identificacion,
+    metadata,
     ...overrides,
   });
 }

@@ -427,7 +427,42 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // (último INVITE_SENT). Lectura READ-ONLY, no modifica firma.sqlite.
   ghGetSignRequest: (id, args) => ipcRenderer.invoke('gh:get-sign-request', Object.assign({ id }, args || {})),
   ghCreateDocumento: (payload) => ipcRenderer.invoke('gh:create-documento', payload),
-  ghUpdateDocumento: (payload) => ipcRenderer.invoke('gh:update-documento', payload),
+  // FASE 2 INSTRUMENTACIÓN FORENSE — wrapper de ghUpdateDocumento.
+  // NO altera el comportamiento: retorna la MISMA Promise que antes.
+  // Solo agrega .then/.catch de OBSERVACIÓN (no afectan el resultado).
+  ghUpdateDocumento: (payload) => {
+    try {
+      var _docId = payload && payload.documentoId;
+      var _docUpdatesKeys = payload && payload.updates ? Object.keys(payload.updates) : [];
+      console.info('[PRELOAD-GH-UPDATE]', JSON.stringify({
+        ts: new Date().toISOString(),
+        docId: _docId,
+        updatesKeys: _docUpdatesKeys
+        // NO loguear contenido de updates
+      }));
+    } catch (_) {}
+    var _p = ipcRenderer.invoke('gh:update-documento', payload);
+    _p.then(function (r) {
+      try {
+        console.info('[PRELOAD-GH-UPDATE-RES]', JSON.stringify({
+          ts: new Date().toISOString(),
+          docId: payload && payload.documentoId,
+          success: !!(r && r.success)
+          // NO loguear r.error completo
+        }));
+      } catch (_) {}
+    }).catch(function (err) {
+      try {
+        console.info('[PRELOAD-GH-UPDATE-ERR]', JSON.stringify({
+          ts: new Date().toISOString(),
+          docId: payload && payload.documentoId,
+          errName: err && err.name,
+          errMessage: err && err.message ? String(err.message).slice(0, 100) : null
+        }));
+      } catch (_) {}
+    });
+    return _p;
+  },
   ghDeleteDocumento: (payload) => ipcRenderer.invoke('gh:delete-documento', payload),
   // 📦764 · Abrir archivo generado del documento
   ghAbrirDocumento: (payload) => ipcRenderer.invoke('gh:abrir-documento', payload),
@@ -470,7 +505,54 @@ contextBridge.exposeInMainWorld('electronAPI', {
     } catch (_diagE) { /* noop */ }
     return ipcRenderer.invoke('firma:documento:read-bytes', args || {});
   },
-  firmaSignRequestGet: (id, args) => ipcRenderer.invoke('firma:sign-request:get', Object.assign({ id }, args || {})),
+  // FASE 3 INSTRUMENTACIÓN FORENSE — wrapper de firmaSignRequestGet.
+  // NO altera el comportamiento: retorna la MISMA Promise que antes.
+  // Solo agrega 4 puntos de log: entry, pre-invoke, post-resolve, post-reject.
+  // Objetivo: localizar dónde se corta el flujo entre POLL-START y POLL-GET.
+  firmaSignRequestGet: (id, args) => {
+    var _id = id;
+    // LOG 1: entry del wrapper
+    try {
+      console.info('[PRELOAD-SR-GET-ENTRY]', JSON.stringify({
+        ts: new Date().toISOString(),
+        id: _id,
+        hasArgs: !!(args && Object.keys(args || {}).length)
+      }));
+    } catch (_) {}
+    // LOG 2: pre-invoke (inmediatamente antes del IPC)
+    try {
+      console.info('[PRELOAD-SR-GET-INVOKE]', JSON.stringify({
+        ts: new Date().toISOString(),
+        id: _id,
+        channel: 'firma:sign-request:get'
+      }));
+    } catch (_) {}
+    var _p = ipcRenderer.invoke('firma:sign-request:get', Object.assign({ id }, args || {}));
+    _p.then(function (r) {
+      // LOG 3: IPC resolvió (renderer-side)
+      try {
+        console.info('[PRELOAD-SR-GET-RES]', JSON.stringify({
+          ts: new Date().toISOString(),
+          id: _id,
+          success: !!(r && r.success),
+          hasData: !!(r && r.data),
+          estadoRemoto: r && r.data ? r.data.estado : null
+          // NO loguear r completo (puede contener metadata)
+        }));
+      } catch (_) {}
+    }).catch(function (err) {
+      // LOG 4: IPC rechazó (renderer-side)
+      try {
+        console.info('[PRELOAD-SR-GET-ERR]', JSON.stringify({
+          ts: new Date().toISOString(),
+          id: _id,
+          errName: err && err.name,
+          errMessage: err && err.message ? String(err.message).slice(0, 100) : null
+        }));
+      } catch (_) {}
+    });
+    return _p;
+  },
   firmaSignRequestList: (ids, args) => ipcRenderer.invoke('firma:sign-request:list', Object.assign({ ids }, args || {})),
   firmaSignRequestDocument: (id) => ipcRenderer.invoke('firma:sign-request:document', { id }),
   firmaSignRequestConstancia: (id) => ipcRenderer.invoke('firma:sign-request:constancia', { id }),

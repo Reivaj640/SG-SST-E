@@ -33,6 +33,12 @@ const agreementService = require('./agreement');  // D2: re-validar Acuerdo en v
 const logger = require('../utils/logger');
 const { AppError } = require('../middleware/errors');
 const { withAppErrorWrapping, withAppErrorWrappingSync } = require('../utils/errorWrap');
+const { isExpired } = require('../crypto/otp');
+
+// Rate limiter en memoria para resend-otp.
+// Key: signRequest.id → array de timestamps (ms) de llamadas recientes.
+// Se limpia automáticamente cuando la ventana expira.
+const _resendOtpTimestamps = new Map();
 
 /**
  * Resultado de resolver un token.
@@ -277,16 +283,15 @@ async function identify(token, tipo_identificacion, numero_documento, ip, user_a
     `).run(ip || null, user_agent || null, otp_hash, otp_sal, now_iso, signRequest.id);
     signRequestService.registerEvent(signRequest.id, 'IDENTIFICATION_COMPLETED',
       { tipo_identificacion }, 'trabajador', ip, user_agent);
-    signRequestService.registerEvent(signRequest.id, 'OTP_SENT',
-      { canal: 'email' }, 'sistema', ip, user_agent);
   });
   tx();
 
-  // 9. Obtener correo (lo guardamos en la solicitud o en consentimiento)
-  // Por ahora, usamos un placeholder. K+AIR lo enviará en el flujo.
-  // TODO: integrar con la BD de trabajadores cuando exista.
-  // Por ahora, lo dejamos en metadata si está disponible.
-  const correo = (signRequest.metadata && JSON.parse(signRequest.metadata || '{}').correo) || 'trabajador@ejemplo.com';
+  // 9. Obtener correo desde consentimiento (fuente de verdad) o metadata (legacy)
+  const correo = resolveCorreo(signRequest);
+  if (!correo) {
+    throw new AppError(400, 'MISSING_EMAIL',
+      'No hay correo de verificación disponible para esta solicitud');
+  }
 
   // 10. Enviar OTP
   const sendResult = await mailer.sendOTP({
@@ -296,12 +301,23 @@ async function identify(token, tipo_identificacion, numero_documento, ip, user_a
     context: { id_solicitud: signRequest.id_solicitud },
   });
 
+  // 11. Enriquecer auditoría SMTP del evento OTP_SENT (ya registrado en la tx)
+  //     con messageId real y correo destino enmascarado.
+  signRequestService.registerEvent(signRequest.id, 'OTP_SENT',
+    {
+      canal: 'email',
+      correo_destino_enmascarado: maskEmail(correo),
+      messageId: sendResult.messageId || null,
+      envio_exitoso: sendResult.ok === true,
+    }, 'sistema', ip, user_agent);
+
   logger.info('Identificación exitosa, OTP enviado', {
     id_solicitud: signRequest.id_solicitud,
     tipo_identificacion,
+    correo_destino: maskEmail(correo),
   });
 
-  // 11. Respuesta pública
+  // 12. Respuesta pública
   return {
     estado: 'OTP_SENT',
     otp_ttl_seconds: config.ttl.otpSeconds,
@@ -315,6 +331,73 @@ function maskEmail(email) {
   if (!local || !domain) return email;
   const visible = local.slice(0, Math.min(4, local.length));
   return `${visible}${'*'.repeat(Math.max(0, local.length - visible.length))}@${domain}`;
+}
+
+/**
+ * Resuelve el correo de verificación del firmante.
+ *
+ * FASE 4 · A1.5.4-B · ARQUITECTURA CORREO:
+ *
+ *   - signRequest.metadata.correo es la FUENTE PRIMARIA.
+ *     Cada sign request tiene su propio correo destino. Es el dato vivo:
+ *     refleja el último correo que el operador introdujo en el modal de
+ *     K+AIR al crear ESTA solicitud específica. Cuando hay 1 consent y N
+ *     sign requests vinculados, cada SR puede tener un correo distinto
+ *     y el OTP va al correo del SR, no del consent.
+ *
+ *   - consent.correo_verificacion queda como FALLBACK y dato histórico.
+ *     Se conserva para trazabilidad (saber a qué correo se refería el
+ *     operador cuando creó el consentimiento del Acuerdo), pero NO se
+ *     usa para enviar el OTP de la firma si el SR tiene su propio
+ *     correo en metadata. Esto evita la dependencia incorrecta entre
+ *     consent y sign_request que rompía el flujo cuando el operador
+ *     cambiaba el correo entre envíos.
+ *
+ *   - Para SR legacy sin metadata.correo, se usa el consent como
+ *     fallback. Esto preserva compatibilidad con sign requests creados
+ *     antes del fix A1.5.4-A.
+ *
+ * Si ambos fallan, retorna null (el caller debe decidir si lanzar error
+ * o usar un placeholder).
+ *
+ * @param {object} signRequest - fila de gh_firmas_electronicas
+ * @returns {string|null} correo o null
+ */
+function resolveCorreo(signRequest) {
+  // 1. Fuente primaria: metadata del sign request (correo del operador
+  //    al momento de crear ESTA solicitud). Si el operador cambió el
+  //    correo entre envíos, este es el que vale.
+  if (signRequest.metadata) {
+    try {
+      const meta = JSON.parse(signRequest.metadata);
+      if (meta && typeof meta.correo === 'string' && meta.correo.includes('@')) {
+        return meta.correo;
+      }
+    } catch (_) {
+      // metadata corrupto, ignorar y caer al fallback
+    }
+  }
+
+  // 2. Fallback: consentimiento asociado (dato histórico / SR legacy).
+  //    Si el SR no tiene metadata.correo, usamos el correo del consent
+  //    con el que se vinculó. Esto preserva el comportamiento para
+  //    sign requests creados antes de que K+AIR empezara a enviar
+  //    `correo` dentro del sub-objeto metadata.
+  if (signRequest.consent_id) {
+    try {
+      const consent = db.prepare(
+        'SELECT correo_verificacion FROM gh_consentimientos_firma WHERE id = ?'
+      ).get(signRequest.consent_id);
+      if (consent && consent.correo_verificacion) {
+        return consent.correo_verificacion;
+      }
+    } catch (_) {
+      // Si la query falla (consent no existe, DB corrupta), continuamos
+    }
+  }
+
+  // 3. Sin fuente válida
+  return null;
 }
 
 /**
@@ -547,44 +630,57 @@ async function commit(token, opts, ip, user_agent) {
   //     (la firma es válida legalmente), pero se registra COPY_FAILED en
   //     la auditoría para que RH pueda intervenir (reenviar, escalar).
   //     El PDF y la Constancia se adjuntan al correo vía sendSignedCopy().
-  const correo = (signRequest.metadata && JSON.parse(signRequest.metadata || '{}').correo) || 'trabajador@ejemplo.com';
-  try {
-    const sendResult = await mailer.sendSignedCopy({
-      to: correo,
-      pdfPath: pdf_firmado_path,
-      constanciaPath: constancia_path,
-      context: {
-        id_solicitud: signRequest.id_solicitud,
-        id_constancia,
-      },
-    });
-    signRequestService.registerEvent(signRequest.id, 'COPY_SENT',
-      {
-        canal: 'email',
-        messageId: sendResult.messageId,
-        size_pdf: pdfFirmadoBuf.length,
-        size_constancia: constanciaBuf.length,
-      },
-      'sistema', ip, user_agent);
-    logger.info('Copia firmada enviada', {
+  const correo = resolveCorreo(signRequest);
+  if (!correo) {
+    logger.warn('No hay correo para enviar copia firmada', {
       id_solicitud: signRequest.id_solicitud,
-      id_constancia,
-      messageId: sendResult.messageId,
-    });
-  } catch (err) {
-    logger.warn('No se pudo enviar copia al trabajador', {
-      id_solicitud: signRequest.id_solicitud,
-      id_constancia,
-      error: err.message,
     });
     signRequestService.registerEvent(signRequest.id, 'COPY_FAILED',
       {
         canal: 'email',
-        error: err.message,
-        code: err.code || 'SEND_ERROR',
+        error: 'No hay correo de verificación disponible',
+        code: 'MISSING_EMAIL',
       },
       'sistema', ip, user_agent);
-    // NO throw: la firma es válida. COPY_FAILED es informativo.
+  } else {
+    try {
+      const sendResult = await mailer.sendSignedCopy({
+        to: correo,
+        pdfPath: pdf_firmado_path,
+        constanciaPath: constancia_path,
+        context: {
+          id_solicitud: signRequest.id_solicitud,
+          id_constancia,
+        },
+      });
+      signRequestService.registerEvent(signRequest.id, 'COPY_SENT',
+        {
+          canal: 'email',
+          messageId: sendResult.messageId,
+          size_pdf: pdfFirmadoBuf.length,
+          size_constancia: constanciaBuf.length,
+        },
+        'sistema', ip, user_agent);
+      logger.info('Copia firmada enviada', {
+        id_solicitud: signRequest.id_solicitud,
+        id_constancia,
+        messageId: sendResult.messageId,
+      });
+    } catch (err) {
+      logger.warn('No se pudo enviar copia al trabajador', {
+        id_solicitud: signRequest.id_solicitud,
+        id_constancia,
+        error: err.message,
+      });
+      signRequestService.registerEvent(signRequest.id, 'COPY_FAILED',
+        {
+          canal: 'email',
+          error: err.message,
+          code: err.code || 'SEND_ERROR',
+        },
+        'sistema', ip, user_agent);
+      // NO throw: la firma es válida. COPY_FAILED es informativo.
+    }
   }
 
   logger.info('Firma cerrada', {
@@ -998,14 +1094,180 @@ function consentAccept(token, ip, user_agent) {
   };
 }
 
+/**
+ * Reenvía OTP a una solicitud que ya pasó por identify().
+ *
+ * Estados permitidos:
+ *   - OTP_SENT: el OTP anterior expiró o está por expirar
+ *   - OTP_LOCKED: desbloquear y generar OTP nuevo
+ *
+ * Estados NO permitidos (lanzan 409):
+ *   - PENDING, OPENED, IDENTIFICATION_STARTED, IDENTIFIED: aún no se ha identificado
+ *   - OTP_VERIFIED, DOCUMENT_OPENED, DOCUMENT_VIEWED: ya pasó el OTP
+ *   - SIGNED, REJECTED, REVOKED, CANCELLED, EXPIRED: estados terminales
+ *
+ * Comportamiento:
+ *   1. Valida estado del SR (resolveToken valida token + expiración)
+ *   2. Si OTP_LOCKED: desbloquear (otp_bloqueado=0, estado→OTP_SENT)
+ *   3. Si OTP_SENT: verificar que el OTP anterior expiró
+ *   4. Generar nuevo OTP (hash + salt)
+ *   5. Obtener correo desde consentimiento o metadata
+ *   6. Enviar OTP vía mailer
+ *   7. Registrar evento OTP_RESENT con metadata completa
+ *   8. Retornar estado + TTL + correo enmascarado
+ *
+ * @param {string} token
+ * @param {string} ip
+ * @param {string} user_agent
+ * @returns {{ok: true, estado, otp_ttl_seconds, correo_destino_enmascarado, devOtp?}}
+ * @throws AppError 404/409/410/422 según la regla que falle.
+ */
+function resendOtp(token, ip, user_agent) {
+  // 1. Resolver token (valida existencia, expiración, estados terminales)
+  const { signRequest } = resolveToken(token);
+
+  // 2. Validar estado actual
+  const ESTADOS_RESEND_PERMITIDOS = ['OTP_SENT', 'OTP_LOCKED'];
+  if (!ESTADOS_RESEND_PERMITIDOS.includes(signRequest.estado)) {
+    throw new AppError(409, 'INVALID_STATE_TRANSITION',
+      `No se puede reenviar OTP en estado '${signRequest.estado}'`,
+      { current_state: signRequest.estado, allowed_states: ESTADOS_RESEND_PERMITIDOS });
+  }
+
+  // 2.5. Rate limiting: máx N reenvíos por ventana de 1 hora por SR.
+  const now = Date.now();
+  const WINDOW_MS = 60 * 60 * 1000; // 1 hora
+  const MAX_RESENDS = config.rateLimit.resendOtpPerHour;
+  let timestamps = _resendOtpTimestamps.get(signRequest.id);
+  if (!timestamps) {
+    timestamps = [];
+    _resendOtpTimestamps.set(signRequest.id, timestamps);
+  }
+  // Limpiar timestamps fuera de la ventana
+  while (timestamps.length > 0 && timestamps[0] <= now - WINDOW_MS) {
+    timestamps.shift();
+  }
+  if (timestamps.length >= MAX_RESENDS) {
+    throw new AppError(429, 'RATE_LIMIT_EXCEEDED',
+      `Demasiados reenvíos de OTP. Máximo ${MAX_RESENDS} por hora.`,
+      { max: MAX_RESENDS, window_seconds: 3600, retry_after_seconds: Math.ceil((timestamps[0] + WINDOW_MS - now) / 1000) });
+  }
+
+  // 3. Si OTP_SENT, verificar que el OTP anterior expiró
+  if (signRequest.estado === 'OTP_SENT' && signRequest.fecha_otp_enviado) {
+    const otpExpirado = isExpired(signRequest.fecha_otp_enviado, config.ttl.otpSeconds);
+    if (!otpExpirado) {
+      throw new AppError(400, 'OTP_NOT_EXPIRED',
+        'El OTP actual aún está vigente. Espere a que expire o use el OTP existente.',
+        {
+          fecha_otp_enviado: signRequest.fecha_otp_enviado,
+          ttl_seconds: config.ttl.otpSeconds,
+        });
+    }
+  }
+
+  // 4. Generar nuevo OTP
+  const otp = generateOTP();
+  const otp_sal = generateSalt();
+  const otp_hash = hashWithSalt(otp, otp_sal);
+  const now_iso = new Date().toISOString();
+
+  // 5. Obtener correo
+  const correo = resolveCorreo(signRequest);
+  if (!correo) {
+    throw new AppError(400, 'MISSING_EMAIL',
+      'No hay correo de verificación disponible para reenviar OTP');
+  }
+
+  // 6. Actualizar BD + registrar evento en transacción atómica
+  const tx = db.transaction(() => {
+    // Si estaba bloqueado, desbloquear
+    const wasLocked = signRequest.estado === 'OTP_LOCKED';
+    db.prepare(`
+      UPDATE gh_firmas_electronicas
+      SET estado = 'OTP_SENT',
+          otp_hash = ?, otp_sal = ?,
+          otp_intentos = 0,
+          otp_bloqueado = 0,
+          fecha_otp_enviado = ?
+      WHERE id = ?
+    `).run(otp_hash, otp_sal, now_iso, signRequest.id);
+
+    signRequestService.registerEvent(signRequest.id, 'OTP_RESENT', {
+      canal: 'email',
+      correo_destino_enmascarado: maskEmail(correo),
+      OTP_ANTERIOR_BLOQUEADO: wasLocked,
+    }, 'sistema', ip, user_agent);
+  });
+  tx();
+
+  // 6.1. Registrar timestamp para rate limiting
+  timestamps.push(Date.now());
+
+  // 7. Enviar OTP vía mailer (post-tx, best-effort)
+  //    Si el envío falla, el OTP ya quedó generado en BD. El frontend puede
+  //    reintentar resend o el usuario puede reportar el problema a RH.
+  mailer.sendOTP({
+    to: correo,
+    otp,
+    tipo: 'signature',
+    context: { id_solicitud: signRequest.id_solicitud },
+  }).then((sendResult) => {
+    // Enriquecer auditoría con messageId real
+    signRequestService.registerEvent(signRequest.id, 'OTP_RESENT',
+      {
+        canal: 'email',
+        correo_destino_enmascarado: maskEmail(correo),
+        messageId: sendResult.messageId || null,
+        envio_exitoso: sendResult.ok === true,
+      }, 'sistema', ip, user_agent);
+  }).catch((err) => {
+    logger.warn('Error enviando OTP reenviado', {
+      id_solicitud: signRequest.id_solicitud,
+      error: err.message,
+    });
+    signRequestService.registerEvent(signRequest.id, 'OTP_SEND_FAILED',
+      {
+        canal: 'email',
+        error: err.message,
+        code: err.code || 'SEND_ERROR',
+      }, 'sistema', ip, user_agent);
+  });
+
+  logger.info('OTP reenviado', {
+    id_solicitud: signRequest.id_solicitud,
+    correo_destino: maskEmail(correo),
+  });
+
+  // 8. Respuesta pública
+  return {
+    ok: true,
+    estado: 'OTP_SENT',
+    otp_ttl_seconds: config.ttl.otpSeconds,
+    correo_destino_enmascarado: maskEmail(correo),
+  };
+}
+
+function clearResendOtpRateLimit() {
+  _resendOtpTimestamps.clear();
+}
+
 module.exports = {
   resolveToken,
   registerOpenedIfFirst,
   identify,
   verifyOtp,
+  resendOtp,
   viewDocument,
   getPdfForToken,
   commit,
   reject,
   consentAccept,
+  clearResendOtpRateLimit,
+  // FASE 4 · A1.5.4-B: expuesto con prefijo _ para auditoría de consistencia
+  // de correo. No es parte del contrato público, pero permite a los scripts
+  // de auditoría (audit-consistency-5puntos.js, audit-multi-sr-correos.js)
+  // verificar el orden de prioridad metadata > consent sin tener que
+  // replicar la lógica.
+  _resolveCorreo: resolveCorreo,
 };
