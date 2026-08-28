@@ -142,17 +142,6 @@
   FirmaElectronicaComponent.prototype._getShellHtml = function () {
     return [
       '<div class="fe-wrapper" id="fe-wrapper">',
-      '  <div class="fe-section-head">',
-      '    <div class="fe-section-head__text">',
-      '      <h2 class="fe-section-head__title">',
-      '        <i class="fas fa-file-signature"></i> Firma electrónica',
-      '      </h2>',
-      '      <p class="fe-section-head__subtitle">',
-      '        Centro de control del proceso de firma por trabajador · la firma es electrónica (firma-service)',
-      '      </p>',
-      '    </div>',
-      '  </div>',
-      '',
       '  <div class="fe-search-section">',
       '    <div class="fe-search">',
       '      <i class="fas fa-search fe-search__icon"></i>',
@@ -163,21 +152,24 @@
       '  </div>',
       '',
       '  <div class="fe-filters-section">',
-      '    <div class="fe-pills" id="fe-pills">',
-      '      <button class="fe-pill fe-pill--active" data-filter="todos" type="button">Todos</button>',
-      '      <button class="fe-pill" data-filter="pendiente" type="button"><span class="fe-pill__dot fe-pill__dot--pendiente"></span> Pendientes</button>',
-      '      <button class="fe-pill" data-filter="en_preparacion" type="button"><span class="fe-pill__dot fe-pill__dot--preparacion"></span> En preparación</button>',
-      '      <button class="fe-pill" data-filter="en_proceso" type="button"><span class="fe-pill__dot fe-pill__dot--proceso"></span> En proceso</button>',
-      '      <button class="fe-pill" data-filter="completado" type="button"><span class="fe-pill__dot fe-pill__dot--completado"></span> Completados</button>',
-      '      <button class="fe-pill" data-filter="rechazado" type="button"><span class="fe-pill__dot fe-pill__dot--rechazado"></span> Rechazados</button>',
-      '      <button class="fe-pill" data-filter="vencido" type="button"><span class="fe-pill__dot fe-pill__dot--vencido"></span> Vencidos</button>',
-      '      <button class="fe-pill" data-filter="cancelado" type="button"><span class="fe-pill__dot fe-pill__dot--cancelado"></span> Cancelados</button>',
-      '      <button class="fe-pill" data-filter="error" type="button"><span class="fe-pill__dot fe-pill__dot--error"></span> Errores</button>',
+      '    <div class="fe-filter-dropdown" id="fe-filter-dropdown">',
+      '      <button id="fe-filtros-avanzados" class="fe-btn fe-btn--primary fe-btn--sm fe-filter-dropdown__toggle" type="button" aria-haspopup="listbox" aria-expanded="false">',
+      '        <i class="fas fa-sliders"></i>',
+      '        <span id="fe-filtros-label">Filtros: Todos</span>',
+      '        <i class="fas fa-chevron-down fe-filter-dropdown__chevron"></i>',
+      '      </button>',
+      '      <div id="fe-filter-dropdown-menu" class="fe-filter-dropdown__menu" role="listbox" hidden>',
+      '        <button class="fe-filter-option fe-filter-option--active" data-filter="todos" type="button" role="option">Todos</button>',
+      '        <button class="fe-filter-option" data-filter="pendiente" type="button" role="option"><span class="fe-pill__dot fe-pill__dot--pendiente"></span> Pendientes</button>',
+      '        <button class="fe-filter-option" data-filter="en_preparacion" type="button" role="option"><span class="fe-pill__dot fe-pill__dot--preparacion"></span> En preparación</button>',
+      '        <button class="fe-filter-option" data-filter="en_proceso" type="button" role="option"><span class="fe-pill__dot fe-pill__dot--proceso"></span> En proceso</button>',
+      '        <button class="fe-filter-option" data-filter="completado" type="button" role="option"><span class="fe-pill__dot fe-pill__dot--completado"></span> Completados</button>',
+      '        <button class="fe-filter-option" data-filter="rechazado" type="button" role="option"><span class="fe-pill__dot fe-pill__dot--rechazado"></span> Rechazados</button>',
+      '        <button class="fe-filter-option" data-filter="vencido" type="button" role="option"><span class="fe-pill__dot fe-pill__dot--vencido"></span> Vencidos</button>',
+      '        <button class="fe-filter-option" data-filter="cancelado" type="button" role="option"><span class="fe-pill__dot fe-pill__dot--cancelado"></span> Cancelados</button>',
+      '        <button class="fe-filter-option" data-filter="error" type="button" role="option"><span class="fe-pill__dot fe-pill__dot--error"></span> Errores</button>',
+      '      </div>',
       '    </div>',
-      '    <button id="fe-filtros-avanzados" class="fe-btn fe-btn--ghost fe-btn--sm" type="button" disabled',
-      '      title="Filtros avanzados — disponible en Fase 2">',
-      '      <i class="fas fa-sliders"></i> Filtros avanzados',
-      '    </button>',
       '  </div>',
       '',
       '  <div class="fe-count-section">',
@@ -370,12 +362,34 @@
 
   FirmaElectronicaComponent.prototype._cacheRefs = function () {
     this._searchInput = this.container.querySelector('#fe-search-input');
-    this._pillsContainer = this.container.querySelector('#fe-pills');
+    this._filterDropdown = this.container.querySelector('#fe-filter-dropdown');
+    this._filterDropdownToggle = this.container.querySelector('#fe-filtros-avanzados');
+    this._filterDropdownMenu = this.container.querySelector('#fe-filter-dropdown-menu');
+    this._filterLabel = this.container.querySelector('#fe-filtros-label');
     this._countEl = this.container.querySelector('#fe-count');
     this._tbody = this.container.querySelector('#fe-tbody');
     this._modal = this.container.querySelector('#fe-expediente-modal');
     this._modalBody = this.container.querySelector('#fe-expediente-body');
     this._toast = this.container.querySelector('#fe-toast');
+  };
+
+  // Etiqueta humana del filtro de estado del proceso.
+  FirmaElectronicaComponent.prototype._FILTRO_LABELS = {
+    todos: 'Todos',
+    pendiente: 'Pendientes',
+    en_preparacion: 'En preparación',
+    en_proceso: 'En proceso',
+    completado: 'Completados',
+    rechazado: 'Rechazados',
+    vencido: 'Vencidos',
+    cancelado: 'Cancelados',
+    error: 'Errores'
+  };
+
+  FirmaElectronicaComponent.prototype._actualizarFiltroLabel = function () {
+    if (!this._filterLabel) return;
+    var lbl = this._FILTRO_LABELS[this._filtroEstado] || 'Todos';
+    this._filterLabel.textContent = 'Filtros: ' + lbl;
   };
 
   FirmaElectronicaComponent.prototype._setupListeners = function () {
@@ -393,18 +407,50 @@
       });
     }
 
-    // Pills de filtros
-    if (self._pillsContainer) {
-      self._pillsContainer.addEventListener('click', function (ev) {
-        var btn = ev.target.closest('.fe-pill');
+    // Dropdown de filtros (sustituye a los pills anteriores)
+    if (self._filterDropdownToggle && self._filterDropdownMenu) {
+      // Toggle al hacer click en el botón
+      self._filterDropdownToggle.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        var isOpen = !self._filterDropdownMenu.hidden;
+        self._filterDropdownMenu.hidden = isOpen;
+        self._filterDropdownToggle.setAttribute('aria-expanded', String(!isOpen));
+        self._filterDropdown.classList.toggle('fe-filter-dropdown--open', !isOpen);
+      });
+      // Click en una opción: aplicar filtro + cerrar
+      self._filterDropdownMenu.addEventListener('click', function (ev) {
+        var btn = ev.target.closest('.fe-filter-option');
         if (!btn) return;
+        ev.stopPropagation();
         var filter = btn.getAttribute('data-filter');
         if (!filter) return;
         self._filtroEstado = filter;
-        var pills = self._pillsContainer.querySelectorAll('.fe-pill');
-        pills.forEach(function (p) { p.classList.remove('fe-pill--active'); });
-        btn.classList.add('fe-pill--active');
+        // Marcar visualmente la opción activa
+        var opts = self._filterDropdownMenu.querySelectorAll('.fe-filter-option');
+        opts.forEach(function (o) { o.classList.remove('fe-filter-option--active'); });
+        btn.classList.add('fe-filter-option--active');
+        // Cerrar dropdown y refrescar
+        self._filterDropdownMenu.hidden = true;
+        self._filterDropdownToggle.setAttribute('aria-expanded', 'false');
+        self._filterDropdown.classList.remove('fe-filter-dropdown--open');
+        self._actualizarFiltroLabel();
         self._renderTabla();
+      });
+      // Click fuera del dropdown: cerrar
+      document.addEventListener('click', function (ev) {
+        if (self._filterDropdownMenu.hidden) return;
+        if (self._filterDropdown && self._filterDropdown.contains(ev.target)) return;
+        self._filterDropdownMenu.hidden = true;
+        self._filterDropdownToggle.setAttribute('aria-expanded', 'false');
+        self._filterDropdown.classList.remove('fe-filter-dropdown--open');
+      });
+      // ESC: cerrar también
+      document.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Escape' && !self._filterDropdownMenu.hidden) {
+          self._filterDropdownMenu.hidden = true;
+          self._filterDropdownToggle.setAttribute('aria-expanded', 'false');
+          self._filterDropdown.classList.remove('fe-filter-dropdown--open');
+        }
       });
     }
 
