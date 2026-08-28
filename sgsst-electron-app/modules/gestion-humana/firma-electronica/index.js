@@ -2079,155 +2079,29 @@
   FirmaElectronicaComponent.prototype._tickPolling = async function () {
     var self = this;
     if (!window.electronAPI) return;
-    // FASE 2 INSTRUMENTACIÓN FORENSE — log POLL-START (no altera lógica)
-    var pollTickId = 'POLL-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
     var candidates = self._documentos.filter(function (d) {
       return d.estado === 'esperando_firma' && d.idSolicitudFirma && !self._pollingProcessed[d.idSolicitudFirma];
     });
-    try {
-      console.info('[POLL-START]', JSON.stringify({
-        pollTickId: pollTickId,
-        ts: new Date().toISOString(),
-        candidatosCount: candidates.length,
-        docIds: candidates.map(function (d) { return d.id; }),
-        idSolicitudes: candidates.map(function (d) { return d.idSolicitudFirma; })
-      }));
-    } catch (_) {}
     if (candidates.length === 0) return;
-    // FASE 3 INSTRUMENTACIÓN FORENSE — log POLL-PROMISEALL-PRE (antes del await)
-    try {
-      console.info('[POLL-PROMISEALL-PRE]', JSON.stringify({
-        pollTickId: pollTickId,
-        ts: new Date().toISOString(),
-        promisesCount: candidates.length,
-        docIds: candidates.map(function (d) { return d.id; }),
-        idSolicitudes: candidates.map(function (d) { return d.idSolicitudFirma; })
-      }));
-    } catch (_) {}
     var promises = candidates.map(function (d) {
-      // FASE 3 INSTRUMENTACIÓN FORENSE — log POLL-GET-CALL (justo antes de la llamada)
-      try {
-        console.info('[POLL-GET-CALL]', JSON.stringify({
-          pollTickId: pollTickId,
-          ts: new Date().toISOString(),
-          docId: d.id,
-          idSolicitudFirma: d.idSolicitudFirma
-        }));
-      } catch (_) {}
       return window.electronAPI.firmaSignRequestGet(d.idSolicitudFirma, { companyName: self.companyName })
-        .then(function (r) {
-          // FASE 3 INSTRUMENTACIÓN FORENSE — log POLL-GET-THEN (entrada al .then por candidato)
-          try {
-            console.info('[POLL-GET-THEN]', JSON.stringify({
-              pollTickId: pollTickId,
-              ts: new Date().toISOString(),
-              docId: d.id,
-              idSolicitudFirma: d.idSolicitudFirma,
-              success: !!(r && r.success),
-              hasData: !!(r && r.data),
-              estadoRemoto: r && r.data ? r.data.estado : null
-            }));
-          } catch (_) {}
-          return { doc: d, result: r };
-        })
-        .catch(function (err) {
-          // FASE 3 INSTRUMENTACIÓN FORENSE — log POLL-GET-CATCH (entrada al .catch por candidato)
-          try {
-            console.info('[POLL-GET-CATCH]', JSON.stringify({
-              pollTickId: pollTickId,
-              ts: new Date().toISOString(),
-              docId: d.id,
-              idSolicitudFirma: d.idSolicitudFirma,
-              errName: err && err.name,
-              errMessage: err && err.message ? String(err.message).slice(0, 100) : null
-            }));
-          } catch (_) {}
-          return { doc: d, result: { success: false } };
-        });
+        .then(function (r) { return { doc: d, result: r }; })
+        .catch(function () { return { doc: d, result: { success: false } }; });
     });
     var results = await Promise.all(promises);
-    // FASE 3 INSTRUMENTACIÓN FORENSE — log POLL-PROMISEALL-POST (después del await)
-    try {
-      console.info('[POLL-PROMISEALL-POST]', JSON.stringify({
-        pollTickId: pollTickId,
-        ts: new Date().toISOString(),
-        resultsCount: results.length
-      }));
-    } catch (_) {}
     var changed = false;
     results.forEach(function (item) {
       if (!item.result || !item.result.success || !item.result.data) return;
-      // FASE 2 INSTRUMENTACIÓN FORENSE — log POLL-GET (estado remoto observado)
-      try {
-        console.info('[POLL-GET]', JSON.stringify({
-          pollTickId: pollTickId,
-          ts: new Date().toISOString(),
-          docId: item.doc.id,
-          idSolicitudFirma: item.doc.idSolicitudFirma,
-          success: !!item.result.success,
-          estadoRemoto: item.result.data.estado,
-          fechaFirma: item.result.data.fecha_firma || null
-        }));
-      } catch (_) {}
       var estado = item.result.data.estado;
       var transicion = _TRANSICION_FIRMA[estado];
       if (!transicion) return;
-      // FASE 2 INSTRUMENTACIÓN FORENSE — log POLL-TRANS (transición detectada)
-      try {
-        console.info('[POLL-TRANS]', JSON.stringify({
-          pollTickId: pollTickId,
-          ts: new Date().toISOString(),
-          docId: item.doc.id,
-          idSolicitudFirma: item.doc.idSolicitudFirma,
-          estadoRemoto: estado,
-          estadoDestino: transicion.estado
-        }));
-      } catch (_) {}
       self._pollingProcessed[item.doc.idSolicitudFirma] = true;
       if (transicion.estado) {
         var updates = { estado: transicion.estado };
         if (transicion.estado === 'firmado' && item.result.data.fecha_firma) {
           updates.fechaFirma = item.result.data.fecha_firma;
         }
-        // FASE 2 INSTRUMENTACIÓN FORENSE — log POLL-IPC-CALL (antes de la llamada)
-        try {
-          console.info('[POLL-IPC-CALL]', JSON.stringify({
-            pollTickId: pollTickId,
-            ts: new Date().toISOString(),
-            docId: item.doc.id,
-            idSolicitudFirma: item.doc.idSolicitudFirma,
-            updatesKeys: Object.keys(updates)
-            // NO loguear contenido de updates.estado (es PII)
-            // NO loguear fechaFirma completa (es timestamp de negocio)
-          }));
-        } catch (_) {}
-        // FASE 2 INSTRUMENTACIÓN FORENSE — Capturar la promesa SIN await.
-        // NO alteramos el flujo actual (fire-and-forget); solo observamos.
-        var updatePromise = window.electronAPI.ghUpdateDocumento({ documentoId: item.doc.id, updates: updates });
-        updatePromise.then(function (r) {
-          try {
-            console.info('[POLL-IPC-RES]', JSON.stringify({
-              pollTickId: pollTickId,
-              ts: new Date().toISOString(),
-              docId: item.doc.id,
-              idSolicitudFirma: item.doc.idSolicitudFirma,
-              success: !!(r && r.success),
-              hasError: !!(r && r.error)
-              // NO loguear r.error.message (puede contener PII)
-            }));
-          } catch (_) {}
-        }).catch(function (err) {
-          try {
-            console.info('[POLL-IPC-ERR]', JSON.stringify({
-              pollTickId: pollTickId,
-              ts: new Date().toISOString(),
-              docId: item.doc.id,
-              idSolicitudFirma: item.doc.idSolicitudFirma,
-              errName: err && err.name,
-              errMessage: err && err.message ? String(err.message).slice(0, 100) : null
-            }));
-          } catch (_) {}
-        });
+        window.electronAPI.ghUpdateDocumento({ documentoId: item.doc.id, updates: updates });
         item.doc.estado = transicion.estado;
         changed = true;
       }
