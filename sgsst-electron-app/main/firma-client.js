@@ -844,6 +844,7 @@ function createFirmaClient(opts) {
     getSignRequestConstancia: getSignRequestConstancia,
     getSignRequestLink: getSignRequestLink,
     notifySignRequestRemote: notifySignRequestRemote,  // I-103.A1.5.2
+    resendSignRequestOtp: resendSignRequestOtp,  // I-103.A1.6.B
     createConsent: createConsent,
     verifyConsentOtp: verifyConsentOtp,
     getActiveAgreement: getActiveAgreement,

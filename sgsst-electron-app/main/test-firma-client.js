@@ -110,6 +110,45 @@ test('createFirmaClient: normaliza trailing slash en baseUrl', function () {
   assert.equal(c._internals.baseUrl, BASE_URL);
 });
 
+// I-103.A1.6.B · Regresión: el método resendSignRequestOtp debe estar
+// expuesto en la instancia retornada por createFirmaClient(). Si un
+// commit futuro omite esta línea del return, el bridge fallará con
+// `r.client.resendSignRequestOtp is not a function` al hacer click en
+// "Reenviar OTP" desde K+AIR (bug detectado 2026-08-29).
+test('regresion: createFirmaClient expone resendSignRequestOtp como función (I-103.A1.6.B)', function () {
+  var c = fc.createFirmaClient({
+    baseUrl: BASE_URL,
+    apiKey: API_KEY,
+    clientInstanceId: CLIENT_INSTANCE_ID
+  });
+  assert.equal(typeof c.resendSignRequestOtp, 'function',
+    'resendSignRequestOtp debe estar expuesto en el return de createFirmaClient');
+});
+
+test('regresion: resendSignRequestOtp hace POST al endpoint /resend-otp (I-103.A1.6.B)', function () {
+  var captured = null;
+  var mockFetch = function (url, opts) {
+    captured = { url: url, opts: opts };
+    return Promise.resolve(makeResponse(200, {
+      ok: true,
+      id_solicitud: 'SIGN-2026-746647',
+      estado: 'OTP_SENT',
+      otp_ttl_seconds: 600,
+      correo_destino_enmascarado: 'jr****@live.com'
+    }, 'application/json'));
+  };
+  var c = makeClient({ _fetch: mockFetch });
+  return c.resendSignRequestOtp('SIGN-2026-746647', { companyName: 'Tempoactiva' }).then(function (r) {
+    assert.equal(captured.opts.method, 'POST');
+    assert.ok(captured.url.indexOf('/internal/sign-requests/SIGN-2026-746647/resend-otp') !== -1,
+      'URL debe incluir el path del nuevo endpoint: ' + captured.url);
+    assert.equal(r.success, true);
+    assert.equal(r.data.estado, 'OTP_SENT');
+    // Cuerpo: vacío (o con context). No debe filtrar el OTP.
+    assert.ok(!captured.opts.body || captured.opts.body === '{}' || captured.opts.body === '');
+  });
+});
+
 // =====================================================================
 //  Suite: Headers
 // =====================================================================
