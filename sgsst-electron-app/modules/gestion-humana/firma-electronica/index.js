@@ -102,6 +102,42 @@
       .replace(/'/g, '&#39;');
   }
 
+  // I-103.A1.6 · Validación de correo antes de reenviar invitación.
+  // Filtra valores obviamente placeholder para evitar enviar al destinatario
+  // equivocado. NO hace validación completa RFC 5321; usa regex razonable +
+  // listas cortas de dominios/locales placeholder conocidos.
+  var _PLACEHOLDER_DOMAINS = [
+    'ejemplo.com', 'ejemplo.org', 'ejemplo.net',
+    'example.com', 'example.org', 'example.net',
+    'test.com', 'test.org', 'test.net', 'test.local',
+    'localhost', 'local',
+    'tu-correo.com', 'tucorreo.com', 'correo.com', 'email.com',
+    'foo.com', 'bar.com', 'baz.com', 'qux.com',
+    'dominio.com', 'midominio.com', 'miempresa.com',
+    'mail.com', 'prueba.com',
+    'cambiar.com', 'cambiarme.com', 'temp.com', 'tmp.com'
+  ];
+  var _PLACEHOLDER_LOCALS = [
+    'test', 'ejemplo', 'example', 'foo', 'bar', 'baz', 'qux',
+    'tu_correo', 'tucorreo', 'tu-usuario', 'usuario',
+    'cambiar', 'cambiarme', 'temp', 'tmp', 'prueba', 'placeholder',
+    'trabajador', 'empleado', 'anonymous', 'anonimo'
+  ];
+  function _isValidEmail(email) {
+    if (!email || typeof email !== 'string') return false;
+    var trimmed = email.trim().toLowerCase();
+    if (trimmed.length < 3 || trimmed.length > 254) return false;
+    // Formato básico: local@dominio.tld
+    var re = /^[a-z0-9._%+\-]+@[a-z0-9](?:[a-z0-9.\-]*[a-z0-9])?\.[a-z]{2,}$/i;
+    if (!re.test(trimmed)) return false;
+    var at = trimmed.indexOf('@');
+    var local = trimmed.substring(0, at);
+    var domain = trimmed.substring(at + 1);
+    if (_PLACEHOLDER_DOMAINS.indexOf(domain) !== -1) return false;
+    if (_PLACEHOLDER_LOCALS.indexOf(local) !== -1) return false;
+    return true;
+  }
+
   function FirmaElectronicaComponent(container, companyName, moduleName, subName, onBack) {
     this.container = container;
     this.companyName = companyName || null;
@@ -1388,10 +1424,23 @@
     var srFirmado = data.signRequests.find(function (sr) { return sr.ok && sr.data && sr.data.estado === 'SIGNED'; });
     var hayPdfFirmado = proceso.documentos.some(function (d) { return d.estado === 'firmado'; });
 
-    // El botón de enviar correo solo se habilita si hay un sr activo que NO esté firmado/cancelado/vencido/revocado
-    var puedeEnviar = !!srActivo && srActivoEstado !== 'SIGNED' && srActivoEstado !== 'CANCELLED' && srActivoEstado !== 'EXPIRED' && srActivoEstado !== 'REVOKED';
-    // El botón de copiar enlace solo se habilita si hay url_publica
-    var puedeCopiar = !!srActivo && srActivo.data && srActivo.data.url_publica;
+    // El botón de enviar correo solo se habilita si hay un sr activo que NO esté
+    // firmado/cancelado/vencido/revocado/rechazado (alineado con el backend en
+    // routes/signRequest.js:873). notify-remote envía una INVITACIÓN, no un
+    // documento firmado; la rama "Reenviar correo (firmado)" se eliminó porque
+    // era código muerto (botón deshabilitado justo en SIGNED).
+    var puedeEnviar = !!srActivo && srActivoEstado !== 'SIGNED' && srActivoEstado !== 'CANCELLED' && srActivoEstado !== 'EXPIRED' && srActivoEstado !== 'REVOKED' && srActivoEstado !== 'REJECTED';
+    // El botón de copiar enlace se evalúa contra un ÚNICO sign request que
+    // tenga url_publica disponible. Antes se mezclaban dos SR distintos: el
+    // `puedeCopiar` se basaba en `srActivo` (primer SR ok), pero `data-sr-id`
+    // podía venir de `srFirmado` o del documento firmado local — en expedientes
+    // con varios SR eso producía un mismatch (botón habilitado con un SR y
+    // copia/consulta de otro). Un solo origen de verdad: `srConEnlace`.
+    var srConEnlace = data.signRequests.find(function (sr) {
+      return sr && sr.ok && sr.data && sr.data.url_publica;
+    });
+    var srIdParaEnlace = srConEnlace ? srConEnlace.id : '';
+    var puedeCopiar = !!srConEnlace;
     // Ver documento / descargar constancia solo si hay un firmado (estado SIGNED o doc local firmado)
     var puedeVerPdf = !!srFirmado || hayPdfFirmado;
 
@@ -1416,12 +1465,12 @@
       '<section class="fe-exp-section fe-exp-section--actions">',
       '  <h4 class="fe-exp-section__title"><i class="fas fa-bolt"></i> Acciones disponibles</h4>',
       '  <div class="fe-exp-actions">',
-      // Enviar / reenviar correo
+      // Enviar / reenviar invitación
       '    <button class="fe-exp-action" type="button" data-action="enviar-correo" data-sr-id="' + _esc(srId) + '"' + (puedeEnviar ? '' : ' disabled title="Solicitud no activa o sin firma-service"') + '>',
-      '      <i class="fas ' + (srActivoEstado === 'SIGNED' ? 'fa-check' : 'fa-paper-plane') + '"></i> ' + (srActivoEstado === 'PENDING' ? 'Enviar correo inicial' : srActivoEstado === 'SIGNED' ? 'Reenviar correo (firmado)' : 'Reenviar correo'),
+      '      <i class="fas fa-paper-plane"></i> ' + (srActivoEstado === 'PENDING' ? 'Enviar correo inicial' : 'Reenviar invitación'),
       '    </button>',
-      // Copiar enlace público
-      '    <button class="fe-exp-action" type="button" data-action="copiar-enlace" data-sr-id="' + _esc(srId) + '"' + (puedeCopiar ? '' : ' disabled title="Aún no se ha generado el enlace público (envía primero el correo)"') + '>',
+      // Copiar enlace público — usa srIdParaEnlace (mismo SR que validó puedeCopiar)
+      '    <button class="fe-exp-action" type="button" data-action="copiar-enlace" data-sr-id="' + _esc(srIdParaEnlace) + '"' + (puedeCopiar ? '' : ' disabled title="Aún no se ha generado el enlace público (envía primero el correo)"') + '>',
       '      <i class="fas fa-link"></i> Copiar enlace público',
       '    </button>',
       // Reenviar OTP — Próximamente (no hay IPC público; pendiente decisión arquitectura)
@@ -1500,6 +1549,13 @@
         self._showToast('No hay correo disponible para esta solicitud', 'error');
         return;
       }
+    }
+    // 1b. Validar formato del correo (rechaza vacíos, placeholders obvios y
+    //     formato inválido). No enviamos al destinatario equivocado por un valor
+    //     mal persistido en metadata.
+    if (!_isValidEmail(correo)) {
+      self._showToast('El correo almacenado (' + (correo || 'vacío') + ') no es válido. Corrígelo antes de reenviar.', 'error');
+      return;
     }
     // 2. Llamar a firma-service con companyName (fix A1.5.4-B) + correo + context
     var r;
