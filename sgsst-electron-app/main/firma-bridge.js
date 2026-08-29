@@ -1143,6 +1143,31 @@ function _handlerSignRequestNotifyRemote(args) {
   });
 }
 
+// I-103.A1.6.B · firma:sign-request:resend-otp
+// Handler para POST /internal/sign-requests/:id/resend-otp en firma-service.
+// Wrapper per-empresa de publicFlow.resendOtp() (mismo endpoint público
+// /api/sign/:token/resend-otp pero con auth X-Internal-API-Key).
+//
+// Patrón idéntico a _handlerSignRequestNotifyRemote: solo valida args.id
+// (no requiere cuerpo — el endpoint acepta body vacío), delega al client
+// per-empresa. El backend gestiona estado, rate-limit, OTP_NOT_EXPIRED,
+// generación atómica, invalidación del OTP anterior y envío.
+//
+// El renderer NO debe ver el OTP en ningún caso; el response solo trae
+// estado, otp_ttl_seconds y correo_destino_enmascarado.
+function _handlerSignRequestResendOtp(args) {
+  args = args || {};
+  if (!args.id) {
+    return _err('INVALID_REQUEST_BODY', 'id requerido');
+  }
+  var r = _resolveClientForRequest(args);
+  if (!r.ok) return r.response;
+  return r.client.resendSignRequestOtp(args.id, {
+    companyName: args.companyName,
+    context: args.context && typeof args.context === 'object' ? args.context : undefined
+  });
+}
+
 function _handlerConsentCreate(args) {
   args = args || {};
   // I-103.A1.5.4-B · DIAGNÓSTICO TEMPORAL — NO COMMITEAR
@@ -2217,6 +2242,17 @@ function registerFirmaHandlers(appArg, deps) {
       return _handlerSignRequestNotifyRemote(payload || {});
     } catch (e) {
       console.error('[' + MOD + '][sign-request:notify-remote]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  // I-103.A1.6.B · 8vo handler de sign-request. Reenvío de OTP desde K+AIR
+  // (wrapper per-empresa de publicFlow.resendOtp). El renderer habilita el
+  // botón solo en estados {OTP_SENT, OTP_LOCKED} y aplica cooldown visual.
+  handle('firma:sign-request:resend-otp', function (event, payload) {
+    try {
+      return _handlerSignRequestResendOtp(payload || {});
+    } catch (e) {
+      console.error('[' + MOD + '][sign-request:resend-otp]', e.message);
       return _err('INTERNAL', e.message);
     }
   });

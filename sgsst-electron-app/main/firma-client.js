@@ -565,6 +565,41 @@ function createFirmaClient(opts) {
   }
 
   /**
+   * POST /internal/sign-requests/:id/resend-otp
+   * Wrapper per-empresa de publicFlow.resendOtp() (I-103.A1.6.B).
+   * Permite a K+AIR reenviar el OTP al firmante desde el panel de Firma
+   * Electrónica sin tener el token URL del firmante.
+   *
+   * El backend resuelve el token server-side vía getTokenForRecovery (I-013b,
+   * mismo mecanismo que /link) y delega a publicFlow.resendOtp() que
+   * gestiona estado, rate-limit, OTP_NOT_EXPIRED, generación atómica y
+   * envío por mailer. Este wrapper es un espejo per-empresa del endpoint
+   * público /api/sign/:token/resend-otp (mini-app).
+   *
+   * Auth: X-Internal-API-Key (per-empresa). El bridge se encarga de resolver
+   * la empresa activa y delegar al cliente per-empresa correspondiente.
+   *
+   * @param {string} id - id_solicitud (SIGN-YYYY-NNNNNN) o id interno (entero positivo)
+   * @param {object} [args] - { companyName, context? }
+   * @returns {Promise<{success,data}|{success:false,error}>}
+   */
+  function resendSignRequestOtp(id, args) {
+    if (!id) {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY', 'id requerido'));
+    }
+    var body = {};
+    if (args && args.context && typeof args.context === 'object') {
+      body.context = args.context;
+    }
+    return _doRequest(
+      'POST',
+      '/internal/sign-requests/' + encodeURIComponent(id) + '/resend-otp',
+      body,
+      null
+    ).then(function (r) { return _parseResult(r, 'application/json'); });
+  }
+
+  /**
    * POST /internal/consentimientos
    * @param {object} payload { id_trabajador, id_empresa, version_acuerdo, correo_verificacion, kair_version }
    */

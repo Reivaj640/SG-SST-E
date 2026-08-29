@@ -482,6 +482,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // I-103.A1.5.2 · Enviar invitación de firma al firmante por correo.
   // Args: { id: 'SIGN-YYYY-NNNNNN' | <int>, correo: 'firmante@x.com', context?: { ... } }
   firmaSignRequestNotifyRemote: (id, args) => ipcRenderer.invoke('firma:sign-request:notify-remote', Object.assign({ id }, args || {})),
+  // I-103.A1.6.B · Reenviar OTP al firmante desde K+AIR (wrapper per-empresa
+  // de publicFlow.resendOtp). Body vacío (el backend no requiere params).
+  // El renderer habilita este botón solo en estados {OTP_SENT, OTP_LOCKED}
+  // y aplica cooldown visual de 60s.
+  // Args: { id: 'SIGN-YYYY-NNNNNN' | <int>, companyName?: string, context?: { ... } }
+  firmaSignRequestResendOtp: (id, args) => ipcRenderer.invoke('firma:sign-request:resend-otp', Object.assign({ id }, args || {})),
   // Consent (2)
   firmaConsentCreate: (payload) => ipcRenderer.invoke('firma:consent:create', payload),
   firmaConsentVerifyOtp: (companyName, consentId, otp) => ipcRenderer.invoke('firma:consent:verify-otp', { companyName, consentId, otp }),

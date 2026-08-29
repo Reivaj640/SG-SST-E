@@ -514,6 +514,8 @@
           self._actionEnviarCorreo(srId);
         } else if (action === 'copiar-enlace') {
           self._actionCopiarEnlace(srId);
+        } else if (action === 'reenviar-otp') {
+          self._actionReenviarOtp(srId);
         } else if (action === 'ver-documento-firmado') {
           self._actionVerDocumentoFirmado(srId);
         } else if (action === 'descargar-constancia') {
@@ -1441,6 +1443,14 @@
     });
     var srIdParaEnlace = srConEnlace ? srConEnlace.id : '';
     var puedeCopiar = !!srConEnlace;
+    // I-103.A1.6.B · Reenviar OTP. Solo se permite en estados donde
+    // publicFlow.resendOtp() acepta la transición: {OTP_SENT, OTP_LOCKED}.
+    // (PENDING/IDENTIFIED → el firmante aún no tiene OTP; SIGNED/terminales
+    // → no aplica). El mismo `srActivo` se usa para data-sr-id, igual que
+    // el botón de enviar correo.
+    var ESTADOS_PERMITIDOS_RESEND = ['OTP_SENT', 'OTP_LOCKED'];
+    var puedeReenviarOtp = !!srActivo && ESTADOS_PERMITIDOS_RESEND.indexOf(srActivoEstado) !== -1;
+    var srIdParaResend = srActivo ? srActivo.id : '';
     // Ver documento / descargar constancia solo si hay un firmado (estado SIGNED o doc local firmado)
     var puedeVerPdf = !!srFirmado || hayPdfFirmado;
 
@@ -1459,6 +1469,7 @@
     var accionesHabilitadas = 0;
     if (puedeEnviar) accionesHabilitadas++;
     if (puedeCopiar) accionesHabilitadas++;
+    if (puedeReenviarOtp) accionesHabilitadas++;
     if (puedeVerPdf) accionesHabilitadas += 2; // Ver documento + Descargar constancia
 
     return [
@@ -1473,8 +1484,11 @@
       '    <button class="fe-exp-action" type="button" data-action="copiar-enlace" data-sr-id="' + _esc(srIdParaEnlace) + '"' + (puedeCopiar ? '' : ' disabled title="Aún no se ha generado el enlace público (envía primero el correo)"') + '>',
       '      <i class="fas fa-link"></i> Copiar enlace público',
       '    </button>',
-      // Reenviar OTP — Próximamente (no hay IPC público; pendiente decisión arquitectura)
-      '    <button class="fe-exp-action" type="button" disabled title="Próximamente: requiere nuevo endpoint en firma-service">',
+      // I-103.A1.6.B · Reenviar OTP. Habilitado solo en {OTP_SENT, OTP_LOCKED}.
+      // El cooldown visual de 60s se aplica en el handler _actionReenviarOtp
+      // tras un envío exitoso (no es autoridad; la autoridad es el rate-limit
+      // 5/h del backend).
+      '    <button class="fe-exp-action" type="button" data-action="reenviar-otp" data-sr-id="' + _esc(srIdParaResend) + '"' + (puedeReenviarOtp ? '' : ' disabled title="Solo disponible en estados OTP_SENT u OTP_LOCKED"') + '>',
       '      <i class="fas fa-redo"></i> Reenviar OTP',
       '    </button>',
       // Cancelar solicitud — Próximamente (requiere adminApiKey, decisión de modelo de autorización)
@@ -1494,7 +1508,7 @@
         '    </button>'
       ].join('\n') : '',
       '  </div>',
-      '  <p class="fe-exp-section__note"><i class="fas fa-info-circle"></i> <strong>' + accionesHabilitadas + (accionesHabilitadas === 1 ? ' acción habilitada' : ' acciones habilitadas') + '</strong> según el estado actual del sign request. Reenviar OTP y Cancelar solicitud quedan como Próximamente.</p>',
+      '  <p class="fe-exp-section__note"><i class="fas fa-info-circle"></i> <strong>' + accionesHabilitadas + (accionesHabilitadas === 1 ? ' acción habilitada' : ' acciones habilitadas') + '</strong> según el estado actual del sign request. Cancelar solicitud queda como Próximamente.</p>',
       '</section>'
     ].join('\n');
   };
@@ -1613,6 +1627,111 @@
       self._showToast('Enlace público copiado al portapapeles', 'success');
     } catch (e) {
       self._showToast('Error copiando enlace: ' + e.message, 'error');
+    }
+  };
+
+  /**
+   * I-103.A1.6.B · Handler del botón "Reenviar OTP".
+   *
+   * Llama al nuevo endpoint per-empresa firma:sign-request:resend-otp.
+   * El backend (publicFlow.resendOtp) gestiona:
+   *   - Validación de estado ∈ {OTP_SENT, OTP_LOCKED}
+   *   - Rate-limit 5/h por SR (compartido con endpoint público)
+   *   - OTP_NOT_EXPIRED (si el OTP vigente aún no expiró)
+   *   - Generación de OTP nuevo + UPDATE atómico + invalidación del anterior
+   *   - Envío por mailer + eventos OTP_RESENT / OTP_SEND_FAILED
+   *
+   * Esta función solo se encarga de:
+   *   - Llamar al IPC y propagar errores al usuario
+   *   - Cooldown visual de 60s (UX preventiva, NO autoridad)
+   *   - Refetch del expediente al terminar para reflejar el nuevo estado
+   *
+   * El renderer NO debe ver ni almacenar el OTP. El response solo trae
+   * estado, otp_ttl_seconds y correo_destino_enmascarado.
+   */
+  FirmaElectronicaComponent.prototype._actionReenviarOtp = async function (srId) {
+    var self = this;
+    if (!srId) return;
+    var data = self._lastExpedienteData;
+    var proceso = self._lastExpedienteProceso;
+    if (!data || !proceso) return;
+
+    // Re-leer el SR del estado actual (puede haber cambiado tras un refetch).
+    var sr = (data.signRequests || []).find(function (s) { return s.id === srId; });
+    if (!sr || !sr.ok || !sr.data) {
+      self._showToast('No se puede reenviar OTP: solicitud no disponible', 'error');
+      return;
+    }
+    var estado = sr.data.estado;
+    if (estado !== 'OTP_SENT' && estado !== 'OTP_LOCKED') {
+      // Backend lo rechazará también, pero evitamos un HTTP round-trip obvio.
+      self._showToast('Reenviar OTP solo disponible en estados OTP_SENT u OTP_LOCKED (estado actual: ' + estado + ')', 'error');
+      return;
+    }
+
+    // Cooldown visual: 60s. Se deshabilita el botón y se actualiza el texto.
+    var COOLDOWN_MS = 60 * 1000;
+    var btn = self._modalBody && self._modalBody.querySelector('[data-action="reenviar-otp"][data-sr-id="' + srId + '"]');
+    var btnOriginalHtml = btn ? btn.innerHTML : null;
+    function _setCooldown(remainingMs) {
+      if (!btn) return;
+      var secs = Math.max(0, Math.ceil(remainingMs / 1000));
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-hourglass-half"></i> Reenviar OTP (' + secs + 's)';
+      btn.setAttribute('title', 'Espera ' + secs + 's antes de reenviar de nuevo');
+    }
+    if (btn) {
+      _setCooldown(COOLDOWN_MS);
+    }
+
+    var r;
+    try {
+      r = await window.electronAPI.firmaSignRequestResendOtp(srId, {
+        companyName: self.companyName,
+        context: { via: 'firma-electronica', button: 'reenviar-otp' }
+      });
+    } catch (e) {
+      // Reactivar el botón inmediatamente ante una excepción
+      if (btn && btnOriginalHtml !== null) { btn.disabled = false; btn.innerHTML = btnOriginalHtml; btn.removeAttribute('title'); }
+      self._showToast('Excepción reenviando OTP: ' + e.message, 'error');
+      return;
+    }
+
+    if (r && r.success) {
+      var masked = (r.data && r.data.correo_destino_enmascarado) || 'firmante';
+      var ttl = (r.data && r.data.otp_ttl_seconds) || 600;
+      self._showToast('OTP reenviado a ' + masked + ' (válido ' + Math.floor(ttl / 60) + ' min)', 'success');
+      // Mantener el botón en cooldown (no reactivar btnOriginalHtml)
+      var startMs = Date.now();
+      var tick = setInterval(function () {
+        var elapsed = Date.now() - startMs;
+        var remaining = COOLDOWN_MS - elapsed;
+        if (remaining <= 0) {
+          clearInterval(tick);
+          if (btn) {
+            btn.disabled = false;
+            if (btnOriginalHtml !== null) btn.innerHTML = btnOriginalHtml;
+            btn.removeAttribute('title');
+          }
+          return;
+        }
+        _setCooldown(remaining);
+      }, 1000);
+      // Refetch del expediente para reflejar el nuevo estado
+      await self._refetchExpediente(proceso);
+    } else {
+      // Error: reactivar el botón inmediatamente
+      if (btn && btnOriginalHtml !== null) { btn.disabled = false; btn.innerHTML = btnOriginalHtml; btn.removeAttribute('title'); }
+      var errCode = r && r.error && r.error.code;
+      var errMsg = r && r.error && r.error.message;
+      var errDetails = r && r.error && r.error.details;
+      // Mensaje específico para 429
+      if (errCode === 'RATE_LIMIT_EXCEEDED' && errDetails && errDetails.retry_after_seconds) {
+        var mins = Math.ceil(errDetails.retry_after_seconds / 60);
+        self._showToast('Demasiados reenvíos. Espera ' + mins + ' min antes de intentar de nuevo.', 'error');
+      } else {
+        self._showToast('Error reenviando OTP: ' + (errCode ? errCode + ' — ' : '') + (errMsg || 'desconocido'), 'error');
+      }
     }
   };
 
