@@ -472,8 +472,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   firmaSignRequestGet: (id, args) => ipcRenderer.invoke('firma:sign-request:get', Object.assign({ id }, args || {})),
   firmaSignRequestList: (ids, args) => ipcRenderer.invoke('firma:sign-request:list', Object.assign({ ids }, args || {})),
-  firmaSignRequestDocument: (id) => ipcRenderer.invoke('firma:sign-request:document', { id }),
-  firmaSignRequestConstancia: (id) => ipcRenderer.invoke('firma:sign-request:constancia', { id }),
+  firmaSignRequestDocument: (id, args) => {
+    return ipcRenderer.invoke('firma:sign-request:document', Object.assign({ id }, args || {}));
+  },
+  firmaSignRequestConstancia: (id, args) => ipcRenderer.invoke('firma:sign-request:constancia', Object.assign({ id }, args || {})),
+  // I-104 (SaveAs): bridge hace dialog.showSaveDialog, retorna solo la ruta final.
+  firmaSignRequestConstanciaSaveAs: (id, args) => ipcRenderer.invoke('firma:sign-request:constancia-save-as', Object.assign({ id }, args || {})),
   firmaSignRequestLink: (id, args) => ipcRenderer.invoke('firma:sign-request:link', Object.assign({ id }, args || {})),
   // I-103.A1.5.2 · Enviar invitación de firma al firmante por correo.
   // Args: { id: 'SIGN-YYYY-NNNNNN' | <int>, correo: 'firmante@x.com', context?: { ... } }
@@ -495,6 +499,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   firmaEmpresaRotateApiKey: (args) => ipcRenderer.invoke('firma:empresa:rotate-api-key', args),
   firmaEmpresaRevokeApiKey: (args) => ipcRenderer.invoke('firma:empresa:revoke-api-key', args),
   firmaEmpresaListFirmaRemote: (args) => ipcRenderer.invoke('firma:empresa:list-firma-remote', args || {}),
+  // I-104 RECOVERY: lista empresas del backend con metadata no sensible.
+  firmaEmpresaListBackend: (args) => ipcRenderer.invoke('firma:empresa:list-backend', args || {}),
+  // I-104 RECOVERY: rota una empresa que existe en backend pero no en secrets.enc.
+  firmaEmpresaRecoverAndRotate: (args) => ipcRenderer.invoke('firma:empresa:recover-and-rotate', args || {}),
   // Admin token persistido (DR-2)
   firmaConfigSetAdminKey: (adminApiKey) => ipcRenderer.invoke('firma:config:set-admin-key', { adminApiKey }),
 

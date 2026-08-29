@@ -3635,14 +3635,17 @@
     // 📦103.A1.3 · Abre el modal de Firma Electrónica para la empresa indicada.
     // Lee el NIT canónico desde currentConfig.companyPaths[companyKey].nit
     // (NO desde el DOM, NO desde el input del modal de NIT).
-    function prepareFirmaModal(companyName) {
+    // I-104 RECOVERY: detecta también si la empresa existe en el backend
+    // (vía firmaEmpresaListBackend) para ofrecer "Recuperar y rotar" cuando
+    // la empresa existe en backend pero NO en secrets.enc local.
+    async function prepareFirmaModal(companyName) {
         if (!window.electronAPI || !window.electronAPI.firmaEmpresaCreate) {
             showToast('Bridge de firma no disponible. Reinicia K+AIR.', 'error');
             return;
         }
         var modal = document.getElementById('firma-empresa-modal');
         if (!modal) return;
-        _firmaModalCtx = { companyName: companyName, hasFirma: false, firmaInfo: null, mode: 'create' };
+        _firmaModalCtx = { companyName: companyName, hasFirma: false, firmaInfo: null, mode: 'create', backendFirma: null };
         _firmaModalBusy = false;
 
         // Limpiar estado del modal
@@ -3671,7 +3674,20 @@
         _firmaModalCtx.firmaInfo = firmaState.firmaInfo;
         _firmaModalCtx.nit = nit;
 
-        // 3. Mostrar bloques según estado
+        // 3. I-104 RECOVERY: si NO tiene firma local y tenemos NIT, consultar
+        // backend para detectar si la empresa existe allí. READ-ONLY.
+        if (!firmaState.hasFirma && nit && window.electronAPI.firmaEmpresaListBackend) {
+            try {
+                var lr = await window.electronAPI.firmaEmpresaListBackend({ id_empresa: nit });
+                if (lr && lr.success && Array.isArray(lr.data.items) && lr.data.items.length > 0) {
+                    _firmaModalCtx.backendFirma = lr.data.items[0];
+                }
+            } catch (_) {
+                // Si falla la consulta, no bloqueamos; mostramos el flujo normal Crear/Pegar.
+            }
+        }
+
+        // 4. Mostrar bloques según estado
         var noNitBlock = document.getElementById('firma-modal-no-nit-block');
         var modeBlock = document.getElementById('firma-modal-mode-block');
         var displayBlock = document.getElementById('firma-modal-displayname-block');
@@ -3689,17 +3705,8 @@
             if (saveBtn) saveBtn.disabled = true;
             if (rotateBtn) rotateBtn.style.display = 'none';
             if (revokeBtn) revokeBtn.style.display = 'none';
-        } else if (!firmaState.hasFirma) {
-            // CON NIT, SIN firma: mostrar formulario Crear/Pegar
-            if (noNitBlock) noNitBlock.style.display = 'none';
-            if (modeBlock) modeBlock.style.display = 'block';
-            if (displayBlock) displayBlock.style.display = 'block';
-            if (existingBlock) existingBlock.style.display = 'none';
-            if (saveBtn) { saveBtn.disabled = false; saveBtn.style.display = ''; }
-            if (rotateBtn) rotateBtn.style.display = 'none';
-            if (revokeBtn) revokeBtn.style.display = 'none';
-        } else {
-            // CON NIT + firma: mostrar estado + acciones Rotar / Eliminar
+        } else if (firmaState.hasFirma) {
+            // CON NIT + firma LOCAL: mostrar estado + acciones Rotar / Eliminar
             if (noNitBlock) noNitBlock.style.display = 'none';
             if (modeBlock) modeBlock.style.display = 'none';
             if (displayBlock) displayBlock.style.display = 'none';
@@ -3716,10 +3723,103 @@
             if (elIdEmp) elIdEmp.textContent = info.idEmpresa || '—';
             if (elAct) elAct.textContent = _formatFirmaDate(info.activatedAt);
             if (elLastVal) elLastVal.textContent = info.lastValidatedAt ? _formatFirmaDate(info.lastValidatedAt) : 'Nunca';
-            if (elHash) elHash.textContent = '—'; // bridge no expone hash prefix por ahora en list
+            if (elHash) elHash.textContent = '—';
+        } else {
+            // CON NIT, SIN firma LOCAL.
+            // Sub-estados según backend:
+            //   - Backend tiene empresa ACTIVA: ofrecer "Recuperar configuración y generar nueva API key"
+            //   - Backend tiene empresa REVOCADA: mostrar estado, no permitir recover automático
+            //   - Backend NO tiene empresa: flujo normal Crear/Pegar
+            var backendItem = _firmaModalCtx.backendFirma;
+            if (backendItem && backendItem.is_active) {
+                // BACKEND ACTIVO: ofrecer recover (texto claro + solo 1 acción lógica)
+                if (noNitBlock) noNitBlock.style.display = 'none';
+                if (modeBlock) {
+                    modeBlock.style.display = 'block';
+                    modeBlock.innerHTML = ''
+                        + '<div class="firma-modal-recover-block" style="padding: 0.75rem; border-radius: 6px; background: #fef3c7; border: 1px solid #fbbf24; margin-bottom: 0.75rem;">'
+                        + '<div style="font-weight: 600; color: #92400e; margin-bottom: 0.5rem;">'
+                        + '<i class="fas fa-exclamation-triangle"></i> Empresa ya registrada en Firma Electrónica'
+                        + '</div>'
+                        + '<div style="font-size: 0.875rem; color: #78350f;">'
+                        + '<div>Empresa: <strong>' + _escapeHtml(companyName) + '</strong></div>'
+                        + '<div>NIT: <strong>' + _escapeHtml(nit) + '</strong></div>'
+                        + '<div>Estado: <strong style="color: #15803d;">🟢 Activa</strong></div>'
+                        + '<div>Hash activo: <code>' + _escapeHtml(backendItem.api_key_hash_prefix || '—') + '</code></div>'
+                        + '</div>'
+                        + '</div>'
+                        + '<label class="firma-mode-option" style="display: block; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; background: #eff6ff; cursor: pointer;">'
+                        + '<input type="radio" name="firma-mode" value="recover" checked style="margin-right: 0.5rem;">'
+                        + '<strong>Recuperar configuración y generar nueva API key</strong>'
+                        + '</label>'
+                        + '<p style="font-size: 0.8125rem; color: #4b5563; margin: 0.5rem 0 0 1.5rem;">'
+                        + 'Esto revocará la API key actualmente activa y generará una nueva. '
+                        + 'La nueva clave será almacenada cifrada en K+AIR.'
+                        + '</p>';
+                }
+                if (displayBlock) displayBlock.style.display = 'none';
+                if (existingBlock) existingBlock.style.display = 'none';
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.style.display = '';
+                    saveBtn.textContent = 'Recuperar y rotar';
+                }
+                if (rotateBtn) rotateBtn.style.display = 'none';
+                if (revokeBtn) revokeBtn.style.display = 'none';
+                _firmaModalCtx.mode = 'recover';
+            } else if (backendItem && !backendItem.is_active) {
+                // BACKEND REVOCADO: mostrar estado, no permitir recover automático
+                if (noNitBlock) noNitBlock.style.display = 'none';
+                if (modeBlock) {
+                    modeBlock.style.display = 'block';
+                    modeBlock.innerHTML = ''
+                        + '<div class="firma-modal-revoked-block" style="padding: 0.75rem; border-radius: 6px; background: #fee2e2; border: 1px solid #fca5a5; margin-bottom: 0.75rem;">'
+                        + '<div style="font-weight: 600; color: #991b1b; margin-bottom: 0.5rem;">'
+                        + '<i class="fas fa-ban"></i> Empresa revocada en firma-service'
+                        + '</div>'
+                        + '<div style="font-size: 0.875rem; color: #7f1d1d;">'
+                        + '<div>Empresa: <strong>' + _escapeHtml(companyName) + '</strong></div>'
+                        + '<div>NIT: <strong>' + _escapeHtml(nit) + '</strong></div>'
+                        + '<div>Estado: <strong>⚫ Inactiva (revocada)</strong></div>'
+                        + '<div>Hash revocado: <code>' + _escapeHtml(backendItem.api_key_hash_prefix || '—') + '</code></div>'
+                        + '</div>'
+                        + '</div>'
+                        + '<p style="font-size: 0.8125rem; color: #4b5563; margin: 0.5rem 0;">'
+                        + 'Esta empresa existe en el backend pero su API key está revocada. '
+                        + 'No se puede recuperar automáticamente. Contacta al administrador de firma-service.'
+                        + '</p>';
+                }
+                if (displayBlock) displayBlock.style.display = 'none';
+                if (existingBlock) existingBlock.style.display = 'none';
+                if (saveBtn) saveBtn.disabled = true;
+                if (rotateBtn) rotateBtn.style.display = 'none';
+                if (revokeBtn) revokeBtn.style.display = 'none';
+            } else {
+                // BACKEND NO TIENE: flujo normal Crear/Pegar
+                if (noNitBlock) noNitBlock.style.display = 'none';
+                if (modeBlock) modeBlock.style.display = 'block';
+                // Restaurar el HTML original de los radios Crear/Pegar (pudo haber sido sobreescrito)
+                if (modeBlock) {
+                    modeBlock.innerHTML = ''
+                        + '<label class="firma-mode-option"><input type="radio" name="firma-mode" value="create" checked> Crear nuevo cliente de firma (requiere adminApiKey)</label>'
+                        + '<label class="firma-mode-option"><input type="radio" name="firma-mode" value="paste"> Pegar API key pre-existente</label>';
+                }
+                if (displayBlock) displayBlock.style.display = 'block';
+                if (existingBlock) existingBlock.style.display = 'none';
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.style.display = '';
+                    saveBtn.textContent = 'Guardar configuración';
+                }
+                if (rotateBtn) rotateBtn.style.display = 'none';
+                if (revokeBtn) revokeBtn.style.display = 'none';
+                var modeRadioCreate = document.querySelector('input[name="firma-mode"][value="create"]');
+                if (modeRadioCreate) modeRadioCreate.checked = true;
+                _setFirmaModalMode('create');
+            }
         }
 
-        // 4. Abrir modal
+        // 5. Abrir modal
         modal.classList.add('active');
     }
 
@@ -3793,6 +3893,17 @@
                 // ⚠️ Seguridad: limpiar el input inmediatamente (NUNCA dejar la key en el DOM)
                 if (apikeyInput) apikeyInput.value = '';
                 firmaApiKey = null; // sobreescribir la referencia
+            } else if (mode === 'recover') {
+                // I-104 RECOVERY: rota la empresa en el backend y crea la entrada
+                // local con la nueva key. NO requiere que la empresa exista en
+                // secrets.enc previamente. El bridge hace todas las validaciones
+                // de protección (adminToken, safeStorage, write+verify).
+                r = await window.electronAPI.firmaEmpresaRecoverAndRotate({
+                    companyName: companyName,
+                    idEmpresa: nit,
+                    motivo: 'Recuperación + rotación desde K+AIR (modo recover)',
+                    actor: 'kair-ui'
+                });
             } else {
                 r = await window.electronAPI.firmaEmpresaCreate({
                     companyName: companyName,
@@ -3811,7 +3922,11 @@
             }
 
             // Éxito
-            _showFirmaModalResult('ok', '✓ Configuración guardada. idEmpresa: ' + (r.data.idEmpresa || nit));
+            if (mode === 'recover' && r.data && r.data.newApiKeyHashPrefix) {
+                _showFirmaModalResult('ok', '✓ Configuración recuperada. Nuevo hash: ' + r.data.newApiKeyHashPrefix);
+            } else {
+                _showFirmaModalResult('ok', '✓ Configuración guardada. idEmpresa: ' + (r.data.idEmpresa || nit));
+            }
             if (typeof showToast === 'function') {
                 showToast('Firma configurada para ' + companyName, 'success');
             }
