@@ -8,6 +8,7 @@
  * - GET  /internal/sign-requests/:id/document.pdf                (I-103: PDF descargable autenticado)
  * - GET  /internal/sign-requests/:id/constancia.pdf              (I-104: Constancia descargable autenticada)
  * - GET  /internal/sign-requests/:id/link                        (I-013b: link recovery)
+ * - POST /internal/sign-requests/:id/resend-otp                  (I-103.A1.6.B: reenvío OTP desde K+AIR)
  *
  * Auth (I-010, D-13, I-008): los 7 endpoints usan `requireEmpresaScopeAndLimit`
  * para scope per-empresa + rate limit interno (4 capas, I-008 / C-20 v5).
@@ -30,6 +31,7 @@ const {
   signRequestNotifyBody,  // I-103.A1.5.1
 } = require('../schemas');
 const signRequestService = require('../services/signRequest');
+const publicFlow = require('../services/publicFlow');
 const storage = require('../services/storage');
 const { AppError } = require('../middleware/errors');
 const logger = require('../utils/logger');
@@ -908,6 +910,130 @@ router.post('/sign-requests/:id/notify-remote',
       });
     } catch (err) {
       // AppError: el service lo lanza con códigos ricos (410, 502, etc.).
+      // Dejamos que el errorHandler central los traduzca.
+      next(err);
+    }
+  }
+);
+
+/**
+ * POST /internal/sign-requests/:id/resend-otp
+ * Wrapper per-empresa de publicFlow.resendOtp() para que K+AIR pueda
+ * reenviar el OTP al firmante desde el panel de Firma Electrónica.
+ *
+ * Patrón espejo de POST /api/sign/:token/resend-otp (mini-app, auth por
+ * token en URL). Aquí la auth es per-empresa (X-Internal-API-Key) y se
+ * resuelve el token server-side vía getTokenForRecovery (mismo mecanismo
+ * que GET /:id/link, I-013b).
+ *
+ * Reutiliza 100% de la lógica de publicFlow.resendOtp():
+ *   - Validación de estado ∈ {OTP_SENT, OTP_LOCKED}
+ *   - Rate-limit in-memory 5/h por SR
+ *   - Verificación de OTP_NOT_EXPIRED para OTP_SENT
+ *   - Generación de OTP nuevo + UPDATE atómico + invalidación del anterior
+ *   - Envío por mailer + eventos de auditoría
+ *
+ * No modifica la semántica de resendOtp(). El wrapper solo resuelve el
+ * token a partir del id y delega.
+ *
+ * Respuestas:
+ *   - 200 {ok, id_solicitud, estado, otp_ttl_seconds, correo_destino_enmascarado, evento_id}
+ *   - 400 INVALID_REQUEST_BODY (id malformado)
+ *   - 401 INVALID_API_KEY (falta o es inválido X-Internal-API-Key)
+ *   - 403 FORBIDDEN (operación no permitida)
+ *   - 404 NOT_FOUND (SR no existe o cross-company)
+ *   - 410 LINK_NOT_AVAILABLE (SR sin token cifrado / legacy pre-I-013b)
+ *   - 409 INVALID_STATE_TRANSITION (estado no permite resend)
+ *   - 400 OTP_NOT_EXPIRED (OTP vigente aún no expiró)
+ *   - 422 OTP_LOCKED (resuelto automáticamente por resendOtp; ver 200)
+ *   - 429 RATE_LIMIT_EXCEEDED con retry_after_seconds
+ *   - 502 OTP_EMAIL_FAILED (mailer lanzó)
+ */
+router.post('/sign-requests/:id/resend-otp',
+  requireEmpresaScopeAndLimit({
+    allowedOperations: ['sign_request:resend_otp'],
+    rateLimit: { tier: 'standard' },
+  }),
+  (req, res, next) => {
+    try {
+      // 1. Resolver id (SIGN-YYYY-NNNNNN o entero positivo)
+      const { id } = req.params;
+      let signRequest;
+      if (/^SIGN-\d{4}-\d{6}$/.test(id)) {
+        signRequest = signRequestService.getByIdSolicitud(id);
+      } else if (/^\d+$/.test(id)) {
+        signRequest = signRequestService.getById(parseInt(id, 10));
+      } else {
+        return res.status(400).json({
+          error: {
+            code: 'INVALID_REQUEST_BODY',
+            message: 'id debe ser SIGN-YYYY-NNNNNN o entero positivo',
+            request_id: req.id,
+          },
+        });
+      }
+
+      if (!signRequest) {
+        return res.status(404).json({
+          error: {
+            code: 'NOT_FOUND',
+            message: `Solicitud ${id} no encontrada`,
+            request_id: req.id,
+          },
+        });
+      }
+
+      // Cross-company silent 404 (mismo patrón que GET /:id/link)
+      if (req.authSource === 'client' && signRequest.id_empresa !== req.id_empresa) {
+        return res.status(404).json({
+          error: {
+            code: 'NOT_FOUND',
+            message: `Solicitud ${id} no encontrada`,
+            request_id: req.id,
+          },
+        });
+      }
+
+      // 2. Recuperar el token (server-side, I-013b)
+      const recovery = signRequestService.getTokenForRecovery(signRequest);
+      if (!recovery.found) {
+        return res.status(410).json({
+          error: {
+            code: 'LINK_NOT_AVAILABLE',
+            message: 'No se puede recuperar el token para reenviar OTP',
+            details: { reason: recovery.reason },
+            request_id: req.id,
+          },
+        });
+      }
+
+      // 3. Delegar a publicFlow.resendOtp() (reutiliza 100% de la lógica:
+      //    estado, rate-limit, OTP_NOT_EXPIRED, generación, UPDATE atómico,
+      //    mailer, eventos de auditoría)
+      const result = publicFlow.resendOtp(
+        recovery.token,
+        req.ip,
+        req.get('User-Agent') || null,
+      );
+
+      logger.info('OTP reenviado via K+AIR', {
+        id_solicitud: signRequest.id_solicitud,
+        actor: req.api_key_hash_prefix
+          ? `rh:${req.api_key_hash_prefix}`
+          : 'sistema',
+        ip: req.ip,
+      });
+
+      res.json({
+        ok: true,
+        id_solicitud: signRequest.id_solicitud,
+        estado: result.estado,
+        otp_ttl_seconds: result.otp_ttl_seconds,
+        correo_destino_enmascarado: result.correo_destino_enmascarado,
+      });
+    } catch (err) {
+      // AppError: resendOtp lanza códigos ricos (409 INVALID_STATE_TRANSITION,
+      // 400 OTP_NOT_EXPIRED, 422 OTP_LOCKED, 429 RATE_LIMIT_EXCEEDED).
       // Dejamos que el errorHandler central los traduzca.
       next(err);
     }
