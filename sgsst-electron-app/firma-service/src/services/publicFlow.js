@@ -364,9 +364,18 @@ function maskEmail(email) {
  * @returns {string|null} correo o null
  */
 function resolveCorreo(signRequest) {
-  // 1. Fuente primaria: metadata del sign request (correo del operador
-  //    al momento de crear ESTA solicitud). Si el operador cambió el
-  //    correo entre envíos, este es el que vale.
+  // I-103.A1.6.C · RF-FIRMA-CORREO-01: prioridad 1 es la columna directa
+  // gh_firmas_electronicas.correo_verificacion, persistida al momento
+  // de crear el SR con el correo ingresado por el operador. Es la fuente
+  // de verdad para INVITE, OTP inicial y reenvíos de OTP. Si el operador
+  // cambió el correo del consent después, el SR sigue usando el correo
+  // original (congelado).
+  if (typeof signRequest.correo_verificacion === 'string' && signRequest.correo_verificacion.includes('@')) {
+    return signRequest.correo_verificacion;
+  }
+
+  // 2. Fuente secundaria: metadata del sign request (compatibilidad con
+  //    código que enviaba `correo` dentro del sub-objeto metadata).
   if (signRequest.metadata) {
     try {
       const meta = JSON.parse(signRequest.metadata);
@@ -378,11 +387,10 @@ function resolveCorreo(signRequest) {
     }
   }
 
-  // 2. Fallback: consentimiento asociado (dato histórico / SR legacy).
-  //    Si el SR no tiene metadata.correo, usamos el correo del consent
-  //    con el que se vinculó. Esto preserva el comportamiento para
-  //    sign requests creados antes de que K+AIR empezara a enviar
-  //    `correo` dentro del sub-objeto metadata.
+  // 3. Fallback: consentimiento asociado (dato histórico / SR legacy).
+  //    Si el SR no tiene metadata.correo ni correo_verificacion, usamos
+  //    el correo del consent con el que se vinculó. Esto preserva el
+  //    comportamiento para sign requests legacy.
   if (signRequest.consent_id) {
     try {
       const consent = db.prepare(
@@ -396,7 +404,7 @@ function resolveCorreo(signRequest) {
     }
   }
 
-  // 3. Sin fuente válida
+  // 4. Sin fuente válida
   return null;
 }
 

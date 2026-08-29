@@ -91,6 +91,12 @@ const signRequestBody = z.object({
   agreement_version: z.string().min(1).max(32),
   agreement_hash: z.string().regex(/^[0-9a-f]{64}$/, 'agreement_hash debe ser SHA-256 hex'),
   document_hash: z.string().regex(/^[0-9a-f]{64}$/, 'document_hash debe ser SHA-256 hex'),
+  // I-103.A1.6.C · RF-FIRMA-CORREO-01: correo del firmante persistido
+  // explícitamente en gh_firmas_electronicas.correo_verificacion al crear
+  // la solicitud. Es la fuente de verdad para INVITE, OTP inicial y reenvíos
+  // de OTP. Optional por retrocompatibilidad (SRs legacy sin este campo
+  // caen al fallback de metadata.correo / consent.correo_verificacion).
+  correo_verificacion: z.string().email().max(254).optional(),
   ttl_horas: z.coerce.number().int().min(1).max(168).optional(),
   version_kair: z.string().min(1).max(32),
   identificacion_tipo: z.enum(['CC', 'CE', 'TI', 'PPT', 'PA']).optional(),
