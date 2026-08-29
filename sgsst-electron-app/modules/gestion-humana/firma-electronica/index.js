@@ -478,6 +478,10 @@
           self._actionEnviarCorreo(srId);
         } else if (action === 'copiar-enlace') {
           self._actionCopiarEnlace(srId);
+        } else if (action === 'ver-documento-firmado') {
+          self._actionVerDocumentoFirmado(srId);
+        } else if (action === 'descargar-constancia') {
+          self._actionDescargarConstancia(srId);
         } else if (action === 'generar-documento') {
           self._openGenerarModal();
         } else if (action === 'firmar-electronico') {
@@ -1388,42 +1392,60 @@
     var puedeEnviar = !!srActivo && srActivoEstado !== 'SIGNED' && srActivoEstado !== 'CANCELLED' && srActivoEstado !== 'EXPIRED' && srActivoEstado !== 'REVOKED';
     // El botón de copiar enlace solo se habilita si hay url_publica
     var puedeCopiar = !!srActivo && srActivo.data && srActivo.data.url_publica;
-    // Ver documento / descargar evidencia solo si hay un firmado
+    // Ver documento / descargar constancia solo si hay un firmado (estado SIGNED o doc local firmado)
     var puedeVerPdf = !!srFirmado || hayPdfFirmado;
 
-    var srId = srActivo ? srActivo.id : '';
+    var srId = srFirmado
+      ? srFirmado.id
+      : (
+          hayPdfFirmado
+            ? ((proceso.documentos.find(function (d) {
+                  return d.estado === 'firmado';
+                }) || {}).idSolicitudFirma || '')
+            : (srActivo ? srActivo.id : '')
+        );
+
+    // Contador dinámico: cuenta cuántas acciones quedan realmente habilitadas.
+    // (No asumir "4": depende de si url_publica existe, etc.)
+    var accionesHabilitadas = 0;
+    if (puedeEnviar) accionesHabilitadas++;
+    if (puedeCopiar) accionesHabilitadas++;
+    if (puedeVerPdf) accionesHabilitadas += 2; // Ver documento + Descargar constancia
 
     return [
       '<section class="fe-exp-section fe-exp-section--actions">',
       '  <h4 class="fe-exp-section__title"><i class="fas fa-bolt"></i> Acciones disponibles</h4>',
       '  <div class="fe-exp-actions">',
-      // Enviar / reenviar correo — HABILITADO
+      // Enviar / reenviar correo
       '    <button class="fe-exp-action" type="button" data-action="enviar-correo" data-sr-id="' + _esc(srId) + '"' + (puedeEnviar ? '' : ' disabled title="Solicitud no activa o sin firma-service"') + '>',
       '      <i class="fas ' + (srActivoEstado === 'SIGNED' ? 'fa-check' : 'fa-paper-plane') + '"></i> ' + (srActivoEstado === 'PENDING' ? 'Enviar correo inicial' : srActivoEstado === 'SIGNED' ? 'Reenviar correo (firmado)' : 'Reenviar correo'),
       '    </button>',
-      // Copiar enlace público — HABILITADO
+      // Copiar enlace público
       '    <button class="fe-exp-action" type="button" data-action="copiar-enlace" data-sr-id="' + _esc(srId) + '"' + (puedeCopiar ? '' : ' disabled title="Aún no se ha generado el enlace público (envía primero el correo)"') + '>',
       '      <i class="fas fa-link"></i> Copiar enlace público',
       '    </button>',
-      // Reenviar OTP — PLACEHOLDER (no hay IPC público)
-      '    <button class="fe-exp-action" type="button" disabled title="No expuesto en preload (pendiente IPC público para reenvío de OTP)">',
+      // Reenviar OTP — Próximamente (no hay IPC público; pendiente decisión arquitectura)
+      '    <button class="fe-exp-action" type="button" disabled title="Próximamente: requiere nuevo endpoint en firma-service">',
       '      <i class="fas fa-redo"></i> Reenviar OTP',
       '    </button>',
-      // Cancelar solicitud — PLACEHOLDER (endpoint backend existe pero requiere adminApiKey)
-      '    <button class="fe-exp-action fe-exp-action--danger" type="button" disabled title="Endpoint backend existe pero no está expuesto en preload (requiere adminApiKey)">',
+      // Cancelar solicitud — Próximamente (requiere adminApiKey, decisión de modelo de autorización)
+      '    <button class="fe-exp-action fe-exp-action--danger" type="button" disabled title="Próximamente: requiere decisión de autorización (adminApiKey)">',
       '      <i class="fas fa-ban"></i> Cancelar solicitud',
       '    </button>',
-      // Ver documento firmado / Descargar evidencia — PLACEHOLDER
+      // Ver documento firmado — habilitado cuando SIGNED
       puedeVerPdf ? [
-        '    <button class="fe-exp-action" type="button" disabled title="Disponible en una fase posterior (requiere abrir PDF desde firma-service)">',
+        '    <button class="fe-exp-action" type="button" data-action="ver-documento-firmado" data-sr-id="' + _esc(srId) + '">',
         '      <i class="fas fa-file-pdf"></i> Ver documento firmado',
-        '    </button>',
-        '    <button class="fe-exp-action" type="button" disabled title="Disponible en una fase posterior (requiere descargar evidencia desde firma-service)">',
-        '      <i class="fas fa-download"></i> Descargar evidencia',
+        '    </button>'
+      ].join('\n') : '',
+      // Descargar constancia de firma — habilitado cuando SIGNED (usa cache local)
+      puedeVerPdf ? [
+        '    <button class="fe-exp-action" type="button" data-action="descargar-constancia" data-sr-id="' + _esc(srId) + '">',
+        '      <i class="fas fa-download"></i> Descargar constancia de firma',
         '    </button>'
       ].join('\n') : '',
       '  </div>',
-      '  <p class="fe-exp-section__note"><i class="fas fa-info-circle"></i> <strong>2 acciones habilitadas</strong> (enviar correo, copiar enlace). Las demás quedan como placeholder hasta exponer los IPCs correspondientes en el preload.</p>',
+      '  <p class="fe-exp-section__note"><i class="fas fa-info-circle"></i> <strong>' + accionesHabilitadas + (accionesHabilitadas === 1 ? ' acción habilitada' : ' acciones habilitadas') + '</strong> según el estado actual del sign request. Reenviar OTP y Cancelar solicitud quedan como Próximamente.</p>',
       '</section>'
     ].join('\n');
   };
@@ -1535,6 +1557,59 @@
       self._showToast('Enlace público copiado al portapapeles', 'success');
     } catch (e) {
       self._showToast('Error copiando enlace: ' + e.message, 'error');
+    }
+  };
+
+  /**
+   * Handler del botón "Ver documento firmado".
+   * Pide al bridge que obtenga el PDF firmado (cache local primero), luego
+   * invoca electronAPI.openPath para abrirlo con el visor predeterminado.
+   * Verifica success/error de openPath.
+   */
+  FirmaElectronicaComponent.prototype._actionVerDocumentoFirmado = async function (srId) {
+    var self = this;
+    if (!srId) {
+      return;
+    }
+    try {
+      var r = await window.electronAPI.firmaSignRequestDocument(srId, { companyName: self.companyName });
+      if (!r || !r.success || !r.data || !r.data.rutaArchivo) {
+        self._showToast('No se pudo obtener el documento firmado', 'error');
+        return;
+      }
+      var openResult = await window.electronAPI.openPath(r.data.rutaArchivo);
+      if (!openResult || !openResult.success) {
+        self._showToast('No se pudo abrir el documento: ' + ((openResult && openResult.error) || 'error desconocido'), 'error');
+        return;
+      }
+      var origen = r.data.desdeCache ? ' (desde caché local)' : '';
+      self._showToast('Documento firmado abierto' + origen, 'success');
+    } catch (e) {
+      self._showToast('Error abriendo documento: ' + e.message, 'error');
+    }
+  };
+
+  /**
+   * Handler del botón "Descargar constancia de firma".
+   * Pide al bridge que muestre dialog.showSaveDialog y guarde el PDF.
+   * El renderer NO recibe bytes.
+   */
+  FirmaElectronicaComponent.prototype._actionDescargarConstancia = async function (srId) {
+    var self = this;
+    if (!srId) return;
+    try {
+      var r = await window.electronAPI.firmaSignRequestConstanciaSaveAs(srId, { companyName: self.companyName });
+      if (r && r.canceled) {
+        self._showToast('Descarga cancelada', 'info');
+        return;
+      }
+      if (!r || !r.success || !r.data || !r.data.rutaArchivo) {
+        self._showToast('No se pudo guardar la constancia', 'error');
+        return;
+      }
+      self._showToast('Constancia guardada en ' + r.data.rutaArchivo, 'success');
+    } catch (e) {
+      self._showToast('Error guardando constancia: ' + e.message, 'error');
     }
   };
 

@@ -26,7 +26,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { app, safeStorage } = require('electron');
+const { app, safeStorage, dialog } = require('electron');
 
 const firmaClientModule = require('./firma-client');
 
@@ -1035,9 +1035,28 @@ function _handlerSignRequestDocument(args) {
   if (!args.id) {
     return _err('INVALID_REQUEST_BODY', 'id requerido');
   }
+  // Verifica cache local primero. Si existe, NO llama al backend.
+  // (Caché operativa, no confundir con el futuro expediente probatorio local.)
+  var cacheDir = path.join(_app && _app.getPath ? _app.getPath('userData') : '', 'firma-cache');
+  var rutaArchivo = path.join(cacheDir, args.id + '-firmado.pdf');
+  if (cacheDir && (() => { try { return fs.existsSync(rutaArchivo); } catch (_) { return false; } })()) {
+    return Promise.resolve({ success: true, data: { rutaArchivo: rutaArchivo, desdeCache: true } });
+  }
   var r = _resolveClientForRequest(args);
-  if (!r.ok) return r.response;
-  return r.client.getSignRequestDocument(args.id);
+  if (!r.ok) {
+    return r.response;
+  }
+  return r.client.getSignRequestDocument(args.id).then(function (result) {
+    if (!result.success) return result;
+    try {
+      if (cacheDir) fs.mkdirSync(cacheDir, { recursive: true });
+      var pdfBytes = Buffer.from(result.data.base64, 'base64');
+      fs.writeFileSync(rutaArchivo, pdfBytes);
+      return { success: true, data: { rutaArchivo: rutaArchivo, desdeCache: false } };
+    } catch (e) {
+      return _err('CACHE_WRITE_FAILED', 'No se pudo escribir cache local: ' + e.message);
+    }
+  });
 }
 
 function _handlerSignRequestConstancia(args) {
@@ -1048,6 +1067,39 @@ function _handlerSignRequestConstancia(args) {
   var r = _resolveClientForRequest(args);
   if (!r.ok) return r.response;
   return r.client.getSignRequestConstancia(args.id);
+}
+
+/**
+ * I-104 (SaveAs): handler que obtiene la constancia del backend y la
+ * guarda en disco vía dialog.showSaveDialog(). El renderer NO recibe
+ * bytes; solo recibe la ruta final. Si el usuario cancela, retorna
+ * { success: false, canceled: true }.
+ */
+function _handlerSignRequestConstanciaSaveAs(args) {
+  args = args || {};
+  if (!args.id) {
+    return _err('INVALID_REQUEST_BODY', 'id requerido');
+  }
+  var r = _resolveClientForRequest(args);
+  if (!r.ok) return r.response;
+  return r.client.getSignRequestConstancia(args.id).then(async function (result) {
+    if (!result.success) return result;
+    var saveResult = await dialog.showSaveDialog({
+      title: 'Guardar constancia de firma',
+      defaultPath: args.id + '-constancia.pdf',
+      filters: [{ name: 'PDF', extensions: ['pdf'] }]
+    });
+    if (saveResult.canceled || !saveResult.filePath) {
+      return { success: false, canceled: true };
+    }
+    try {
+      var pdfBytes = Buffer.from(result.data.base64, 'base64');
+      fs.writeFileSync(saveResult.filePath, pdfBytes);
+      return { success: true, data: { rutaArchivo: saveResult.filePath } };
+    } catch (e) {
+      return _err('WRITE_FAILED', 'No se pudo escribir el archivo: ' + e.message);
+    }
+  });
 }
 
 function _handlerSignRequestLink(args) {
@@ -1702,6 +1754,177 @@ function _handlerEmpresaRotateApiKey(args) {
   });
 }
 
+// -------- firma:empresa:recover-and-rotate (I-104 RECOVERY) --------
+// Resuelve el huevo-gallina: la empresa existe en el backend pero NO en
+// secrets.enc.empresas. NO se puede usar firma:empresa:rotate-api-key porque
+// requiere _resolveEmpresa(s2.empresas, companyName) (devuelve CLIENT_NOT_FOUND).
+//
+// Política de protección (orden estricto, aborta lo antes posible):
+//   1. Validar args
+//   2. Validar adminToken (si falla, aborta ANTES del rotate)
+//   3. Validar secrets.enc con URL (si falla, aborta ANTES del rotate)
+//   4. Validar safeStorage disponible (CRÍTICO: si no, aborta ANTES del rotate
+//      para no perder la key generada por el backend)
+//   5. Comprobar que la empresa NO exista localmente (si existe, retornar
+//      ALREADY_CONFIGURED y sugerir usar rotate-api-key normal)
+//   6. ⚠️ SOLO DESPUÉS de las 5 validaciones: llamar al rotate del backend
+//   7. Escribir secrets.enc INMEDIATAMENTE con la nueva key
+//   8. Verificar leyendo secrets.enc y comparando con la key recibida
+//   9. SOLO si verify OK: invalidar cache de clientes
+//
+// Si write o verify fallan: retorna INTERNAL CRÍTICO con info de qué se perdió
+// (la key nueva del backend, que ya no es recuperable sin otro rotate).
+function _handlerEmpresaRecoverAndRotate(args) {
+  args = args || {};
+  // 1. Validar args
+  if (!args.companyName || typeof args.companyName !== 'string') {
+    return _err('INVALID_REQUEST_BODY', 'companyName requerido (string)');
+  }
+  if (!args.idEmpresa || typeof args.idEmpresa !== 'string') {
+    return _err('INVALID_REQUEST_BODY', 'idEmpresa requerido (string)');
+  }
+  if (!args.motivo || typeof args.motivo !== 'string') {
+    args.motivo = 'Recuperación + rotación desde K+AIR';
+  }
+  if (!args.actor || typeof args.actor !== 'string') {
+    args.actor = 'kair-ui';
+  }
+
+  // 2. Validar adminToken
+  var adminErr = _requireAdminToken();
+  if (adminErr) {
+    _diagLog('recoverAndRotate.step', { step: 'adminToken', outcome: 'FAIL' });
+    return adminErr;  // NO llama al backend
+  }
+
+  // 3. Validar secrets.enc con URL
+  var sec = _requireSecretsV2WithUrl();
+  if (!sec.ok) {
+    _diagLog('recoverAndRotate.step', { step: 'secretsV2WithUrl', outcome: 'FAIL' });
+    return sec.response;  // NO llama al backend
+  }
+
+  // 4. Validar safeStorage disponible
+  if (!safeStorage || !safeStorage.isEncryptionAvailable || !safeStorage.isEncryptionAvailable()) {
+    _diagLog('recoverAndRotate.CRITICAL', {
+      step: 'safeStorage',
+      outcome: 'UNAVAILABLE',
+      impact: 'NO_ROTATE_PERFORMED_BUT_KEY_WOULD_BE_LOST'
+    });
+    return _err('ENCRYPTION_UNAVAILABLE',
+      'safeStorage no disponible; no se puede persistir key. ABORTANDO para no perder credencial.', {
+        hint: 'No se ha ejecutado ningún rotate en el backend.'
+      });
+  }
+
+  // 5. Comprobar que la empresa NO exista localmente
+  if (sec.s2.empresas[args.companyName]) {
+    _diagLog('recoverAndRotate.step', { step: 'alreadyExists', outcome: 'CLIENT_FOUND' });
+    return _err('ALREADY_CONFIGURED',
+      'La empresa ya está configurada localmente. Use firma:empresa:rotate-api-key en su lugar.', {
+        companyKey: args.companyName,
+        idEmpresa: args.idEmpresa,
+        hint: 'Si quiere reemplazar la key actual, use el flujo normal de Rotar.'
+      });
+  }
+
+  _diagLog('recoverAndRotate.step', {
+    step: 'preconditionsOK',
+    companyName: args.companyName,
+    idEmpresa: args.idEmpresa,
+    motivo: args.motivo,
+    actor: args.actor
+  });
+
+  // 6. AHORA sí: llamar al rotate del backend
+  var client = _createAdminClient(sec.s2.firmaServiceUrl, sec.s2.firmaServiceClientInstanceId);
+  return Promise.resolve(client.adminRotateClient(args.idEmpresa, {
+    motivo: args.motivo,
+    actor: args.actor
+  })).then(function (r) {
+    if (!r.success) {
+      _diagLog('recoverAndRotate.step', {
+        step: 'backendRotate',
+        outcome: 'FAIL',
+        error_code: r.error && r.error.code,
+        error_message: r.error && r.error.message
+      });
+      return r;  // El backend rechazó, no se hace nada más
+    }
+
+    _diagLog('recoverAndRotate.step', {
+      step: 'backendRotate.OK',
+      oldApiKeyHashPrefix: r.data.old_api_key_hash_prefix,
+      newApiKeyHashPrefix: r.data.new_api_key_hash_prefix
+    });
+
+    // 7. CRÍTICO: write secrets.enc INMEDIATAMENTE
+    var s2 = sec.s2;
+    s2.empresas[args.companyName] = {
+      idEmpresa: args.idEmpresa,
+      firmaApiKey: r.data.new_api_key,  // SOLO en memoria de s2
+      activatedAt: r.data.rotated_at,
+      lastValidatedAt: null
+    };
+    var w = _writeSecrets(s2);
+    if (!w.ok) {
+      // ⚠️ CRÍTICO: el backend ya rotó, pero no pudimos escribir localmente.
+      // La key nueva se va cuando el proceso termine. No hay forma de recuperarla.
+      _diagLog('recoverAndRotate.CRITICAL', {
+        step: 'writeSecrets.FAIL',
+        impact: 'BACKEND_ROTATED_BUT_LOCAL_WRITE_FAILED',
+        error: w.error,
+        oldApiKeyHashPrefix: r.data.old_api_key_hash_prefix,
+        newApiKeyHashPrefix: r.data.new_api_key_hash_prefix
+      });
+      return _err('INTERNAL',
+        'CRÍTICO: El backend rotó la key pero no se pudo escribir secrets.enc. ' +
+        'Key perdida. Contacta al admin. Error: ' + w.error, {
+          backendRotated: true,
+          oldApiKeyHashPrefix: r.data.old_api_key_hash_prefix,
+          newApiKeyHashPrefix: r.data.new_api_key_hash_prefix,
+          hint: 'La nueva key no se guardó localmente. Se requeriría otro rotate para recuperarla.'
+        });
+    }
+
+    // 8. Verificar leyendo de vuelta
+    var verify = _readSecretsV2();
+    if (!verify || !verify.empresas || !verify.empresas[args.companyName] ||
+        verify.empresas[args.companyName].firmaApiKey !== r.data.new_api_key) {
+      _diagLog('recoverAndRotate.CRITICAL', {
+        step: 'verifyRead.FAIL',
+        companyName: args.companyName
+      });
+      return _err('INTERNAL',
+        'CRÍTICO: write secrets.enc exitoso pero verificación de lectura FALLÓ. ' +
+        'Posible corrupción. Contacta al admin.');
+    }
+
+    // 9. Invalidar cache de clientes SOLO después de verify OK
+    _invalidateAllClients();
+
+    _diagLog('recoverAndRotate.done', {
+      outcome: 'OK',
+      companyKey: args.companyName,
+      idEmpresa: args.idEmpresa,
+      oldApiKeyHashPrefix: r.data.old_api_key_hash_prefix,
+      newApiKeyHashPrefix: r.data.new_api_key_hash_prefix
+    });
+
+    return _ok({
+      recovered: true,
+      rotated: true,
+      companyKey: args.companyName,
+      idEmpresa: args.idEmpresa,
+      oldApiKeyHashPrefix: r.data.old_api_key_hash_prefix,
+      newApiKeyHashPrefix: r.data.new_api_key_hash_prefix,
+      rotatedAt: r.data.rotated_at,
+      motivo: r.data.motivo,
+      actor: r.data.actor
+    });
+  });
+}
+
 // -------- firma:empresa:revoke-api-key --------
 // DR-4: V1 = borrar local + opcionalmente rotar en backend (la rotación
 //       SÍ marca la key vieja como revocada).
@@ -1782,6 +2005,51 @@ function _handlerEmpresaListFirmaRemote(args) {
     id_empresa: args.idEmpresa,
     include_revoked: args.include_revoked
   }));
+}
+
+// -------- firma:empresa:list-backend (I-104 RECOVERY: READ-ONLY) --------
+// Lista per-company clients del backend con metadata NO sensible, para
+// que el UI de Configuración pueda detectar:
+//   - Empresa NO existe en backend (candidates: Crear / Pegar)
+//   - Empresa existe en backend + is_active=true (candidates: Recuperar+Rotar)
+//   - Empresa existe en backend + is_active=false (candidates: mostrar estado)
+//
+// El backend YA expone solo api_key_hash_prefix (8 chars del SHA-256, no es
+// secreto reversible). NO incluye api_key ni api_key_hash completo.
+// Esta función es READ-ONLY pura: no modifica nada.
+function _handlerEmpresaListBackend(args) {
+  args = args || {};
+  var adminErr = _requireAdminToken();
+  if (adminErr) return adminErr;
+  var sec = _requireSecretsV2WithUrl();
+  if (!sec.ok) return sec.response;
+  var client = _createAdminClient(sec.s2.firmaServiceUrl, sec.s2.firmaServiceClientInstanceId);
+  return Promise.resolve(client.adminListClients({
+    id_empresa: args.id_empresa || null,
+    include_revoked: args.include_revoked === true,
+    limit: typeof args.limit === 'number' ? args.limit : 200
+  })).then(function (r) {
+    if (!r.success) return r;
+    var items = (r.data && r.data.items) || [];
+    // ⚠️ Defensa en profundidad: aunque el backend ya enmascara, filtramos
+    // explícitamente a campos seguros antes de pasar al renderer.
+    var safeItems = items.map(function (it) {
+      return {
+        id_empresa: it.id_empresa,
+        description: it.description || null,
+        is_active: it.is_active,
+        api_key_hash_prefix: it.api_key_hash_prefix || null,
+        allowed_operations: it.allowed_operations || null,
+        created_at: it.created_at || null,
+        revoked_at: it.revoked_at || null
+        // ⚠️ NO se exponen: api_key, api_key_hash completo, client_instance_id
+      };
+    });
+    return _ok({
+      items: safeItems,
+      total: (r.data && r.data.total) || safeItems.length
+    });
+  });
 }
 
 // -------- firma:config:set-admin-key --------
@@ -1925,6 +2193,15 @@ function registerFirmaHandlers(appArg, deps) {
       return _err('INTERNAL', e.message);
     }
   });
+  // I-104 (SaveAs): guarda la constancia con dialog.showSaveDialog.
+  handle('firma:sign-request:constancia-save-as', function (event, payload) {
+    try {
+      return _handlerSignRequestConstanciaSaveAs(payload || {});
+    } catch (e) {
+      console.error('[' + MOD + '][sign-request:constancia-save-as]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
   handle('firma:sign-request:link', function (event, payload) {
     try {
       return _handlerSignRequestLink(payload || {});
@@ -1998,6 +2275,19 @@ function registerFirmaHandlers(appArg, deps) {
   handle('firma:empresa:list-firma-remote', function (event, payload) {
     try { return _handlerEmpresaListFirmaRemote(payload || {}); }
     catch (e) { console.error('[' + MOD + '][empresa:list-firma-remote]', e.message); return _err('INTERNAL', e.message); }
+  });
+  // I-104 RECOVERY: list-backend (READ-ONLY) para que la UI detecte
+  // empresas que existen en el backend pero no en secrets.enc.
+  handle('firma:empresa:list-backend', function (event, payload) {
+    try { return _handlerEmpresaListBackend(payload || {}); }
+    catch (e) { console.error('[' + MOD + '][empresa:list-backend]', e.message); return _err('INTERNAL', e.message); }
+  });
+  // I-104 RECOVERY: recover-and-rotate.
+  // Resuelve huevo-gallina: rota una empresa que existe en backend pero NO
+  // en secrets.enc. NO rota si safeStorage/adminToken/URL no están OK.
+  handle('firma:empresa:recover-and-rotate', function (event, payload) {
+    try { return _handlerEmpresaRecoverAndRotate(payload || {}); }
+    catch (e) { console.error('[' + MOD + '][empresa:recover-and-rotate]', e.message); return _err('INTERNAL', e.message); }
   });
   handle('firma:config:set-admin-key', function (event, payload) {
     try { return _handlerConfigSetAdminKey(payload || {}); }
