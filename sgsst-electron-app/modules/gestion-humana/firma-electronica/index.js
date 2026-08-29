@@ -2194,17 +2194,12 @@
         consent_id: consentId,
         identificacion_tipo: 'CC',
         identificacion_numero_hash: self._bytesToHex(cedulaHash),
-        // I-103.A1.5.4-B · REGLA ÚNICA DEL CORREO:
-        //   Toda solicitud de firma creada desde K+AIR debe guardar el correo
-        //   introducido por el operador en `metadata.correo`. El backend
-        //   (services/publicFlow.js#resolveCorreo) usa esto como fuente
-        //   primaria para enviar la invitación y el OTP. El
-        //   `consent.correo_verificacion` queda como dato histórico
-        //   (fallback solo para SR legacy sin metadata.correo).
-        //   Sin esta línea, el OTP del firmante se enviaría al correo del
-        //   consent (viejo) en lugar del correo actual del operador.
-        //   Estructura resultante en BD: `metadata = {"correo": "...", "_server_metadata": {...}}`
-        metadata: JSON.stringify({ correo: correoFirmante })
+        // I-103.A1.6.C · RF-FIRMA-CORREO-01: correo del firmante persistido
+        // explícitamente en gh_firmas_electronicas.correo_verificacion al
+        // crear el SR. Es la fuente de verdad (prioridad 1) para INVITE,
+        // OTP inicial y reenvíos de OTP. Queda congelado al momento de
+        // crear el SR (no cambia aunque cambie el correo del consent).
+        correo_verificacion: correoFirmante
       };
       // 6. Create sign request
       var srR = await window.electronAPI.firmaSignRequestCreate({

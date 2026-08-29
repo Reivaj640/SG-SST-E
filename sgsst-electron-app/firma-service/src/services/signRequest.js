@@ -20,7 +20,7 @@
 
 const db = require('../db/connection');
 const config = require('../config');
-const { sha256 } = require('../crypto/hash');
+const { sha256, generateSalt, hashWithSalt } = require('../crypto/hash');
 const { generateToken, hashToken, generateIdSolicitud } = require('../crypto/token');
 const storage = require('./storage');
 const agreementService = require('./agreement');
@@ -393,6 +393,7 @@ function create({
   identificacion_numero_sal,  // P1-2: opcional, server genera si falta
   tipo_identificacion,  // I-002: categoría del doc que se firma (CONTRATO, OTROSI, etc.)
   consent_id,
+  correo_verificacion,  // I-103.A1.6.C · RF-FIRMA-CORREO-01
 }) {
   // Validar PDF
   if (!Buffer.isBuffer(pdf_buffer)) {
@@ -499,6 +500,23 @@ function create({
     });
   }
 
+  // I-103.A1.6.C · RF-FIRMA-CORREO-01: hashear el correo del firmante al
+  // momento de crear el sign request. Se persiste en
+  // gh_firmas_electronicas.correo_verificacion (columna directa) +
+  // correo_hash (para búsqueda/comparación sin plaintext).
+  // El salt es por sign request (P1-2 patrón).
+  // Validación mínima: el string debe contener '@'. Validación completa
+  // de email (RFC) la hace zod en el schema de la ruta; acá solo evitamos
+  // persistir basura que pase la validación de zod pero no se parezca a email.
+  let correo_persisted = null;
+  let correo_sal_persisted = null;
+  let correo_hash_persisted = null;
+  if (typeof correo_verificacion === 'string' && correo_verificacion.includes('@')) {
+    correo_persisted = correo_verificacion;
+    correo_sal_persisted = generateSalt();
+    correo_hash_persisted = hashWithSalt(correo_verificacion, correo_sal_persisted);
+  }
+
   // Insertar en BD + sesión en transacción.
   // Si la tx falla (UNIQUE collision, FK fail, BD busy, etc.), el PDF ya
   // está escrito al disco. Sin cleanup, queda huérfano. Ver E9.2.
@@ -514,8 +532,9 @@ function create({
          fecha_creacion, fecha_expiracion, version_kair,
          ip_origen, user_agent, pdf_original_path, metadata,
          verification_channel, consent_id,
-         tipo_identificacion)  -- I-002 (migration 007)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         tipo_identificacion,  -- I-002 (migration 007)
+         correo_verificacion, correo_hash)  -- I-103.A1.6.C · RF-FIRMA-CORREO-01
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id_solicitud, id_documento, id_trabajador, id_empresa,
       tipo_firma, calculated_hash, agreement_hash, agreement_version,
@@ -524,7 +543,9 @@ function create({
       now.toISOString(), fecha_expiracion, version_kair,
       ip || null, user_agent || null, pdf_original_path, metadataToStore, 'email',
       consent_id || null,
-      tipo_identificacion || null,  // I-002
+      tipo_identificacion || null,
+      correo_persisted,
+      correo_hash_persisted
     );
     const firmaId = result.lastInsertRowid;
 
