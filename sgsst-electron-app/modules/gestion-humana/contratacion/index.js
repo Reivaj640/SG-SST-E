@@ -303,7 +303,14 @@ class ContratacionComponent {
             '<form id="ct-create-form" class="ct-form-grid">' +
               '<div class="ct-field"><label>Nombres <span class="req">*</span></label><input type="text" name="nombres" required /></div>' +
               '<div class="ct-field"><label>Apellidos <span class="req">*</span></label><input type="text" name="apellidos" required /></div>' +
-              '<div class="ct-field"><label>Cédula</label><input type="text" name="cedula" inputmode="numeric" /></div>' +
+              '<div class="ct-field" id="ct-cedula-field">' +
+                '<label>Cédula</label>' +
+                '<input type="text" name="cedula" id="ct-cedula-input" inputmode="numeric" autocomplete="off" />' +
+                '<div class="ct-cedula-warning" id="ct-cedula-warning" hidden>' +
+                  '<i class="fas fa-exclamation-triangle"></i>' +
+                  '<span id="ct-cedula-warning-msg"></span>' +
+                '</div>' +
+              '</div>' +
               '<div class="ct-field"><label>Teléfono</label><input type="text" name="telefono" inputmode="numeric" /></div>' +
               '<div class="ct-field"><label>Cargo <span class="req">*</span></label><input type="text" name="cargo" placeholder="Ej: Salvavidas, Recepcionista" required /></div>' +
               '<div class="ct-field"><label>Salario (COP)</label><input type="number" name="salario" placeholder="1300000" /></div>' +
@@ -329,9 +336,114 @@ class ContratacionComponent {
     backdrop.querySelector('[data-action="cancel"]').onclick = close;
     backdrop.onclick = function (e) { if (e.target === backdrop) close(); };
 
-    backdrop.querySelector('[data-action="submit"]').onclick = function () {
+    // 📦767 · Validación de cédula duplicada (primera barrera UI)
+    // Mientras el user tipea: debounce 400ms → consulta exacta.
+    // Al hacer submit: validación final sincrónica (carrera-safe).
+    var cedulaInput = backdrop.querySelector('#ct-cedula-input');
+    var cedulaField = backdrop.querySelector('#ct-cedula-field');
+    var cedulaWarning = backdrop.querySelector('#ct-cedula-warning');
+    var cedulaWarningMsg = backdrop.querySelector('#ct-cedula-warning-msg');
+    var warningActive = false;     // true cuando hay coincidencia
+    var lastCheckedCedula = '';    // para no re-consultar el mismo valor
+    var debounceTimer = null;
+    var CEDULA_DEBOUNCE_MS = 400;
+
+    function _formatEstado(estado) {
+      // Normalizar estados legacy (A/activo, R/retirado) que la BD trae del Excel
+      var e = (estado || '').toLowerCase();
+      if (e === 'a' || e === 'act' || e === 'activo') return 'Activo';
+      if (e === 'r' || e === 'ret' || e === 'retirado') return 'Retirado';
+      if (e === 'incapacitado') return 'Incapacitado';
+      if (e === 'vacaciones') return 'Vacaciones';
+      if (e === 'permiso') return 'Permiso';
+      if (e === 'maternidad') return 'Maternidad';
+      if (e === 'paternidad') return 'Paternidad';
+      if (e === 'luto') return 'Luto';
+      return estado ? (estado.charAt(0).toUpperCase() + estado.slice(1)) : 'Sin estado';
+    }
+
+    function showCedulaWarning(personal) {
+      warningActive = true;
+      cedulaField.classList.add('ct-cedula-field--warning');
+      var nombre = ((personal.nombres || '') + ' ' + (personal.apellidos || '')).trim() || '(sin nombre)';
+      cedulaWarningMsg.textContent =
+        'Cédula ya registrada — Trabajador encontrado: ' + nombre +
+        ' (CC ' + personal.cedula + ', Estado: ' + _formatEstado(personal.estado) + ').' +
+        ' Verifica antes de continuar.';
+      cedulaWarning.hidden = false;
+    }
+    function hideCedulaWarning() {
+      warningActive = false;
+      cedulaField.classList.remove('ct-cedula-field--warning');
+      cedulaWarningMsg.textContent = '';
+      cedulaWarning.hidden = true;
+    }
+
+    async function checkCedulaExact(cedulaVal) {
+      if (!cedulaVal) { hideCedulaWarning(); return; }
+      if (cedulaVal === lastCheckedCedula) return;  // ya validado este valor
+      lastCheckedCedula = cedulaVal;
+      try {
+        var r = await window.electronAPI.ghGetPersonalByCedula({
+          companyName: self.companyName,
+          cedula: cedulaVal
+        });
+        if (r && r.success && r.data && r.data.personal) {
+          showCedulaWarning(r.data.personal);
+        } else {
+          hideCedulaWarning();
+        }
+      } catch (e) {
+        // Falla silenciosa: no bloquear al user si la red/BD tiene un traspié
+        hideCedulaWarning();
+      }
+    }
+
+    cedulaInput.addEventListener('input', function () {
+      // Cualquier cambio → resetear caché y warning
+      hideCedulaWarning();
+      lastCheckedCedula = '';
+      if (debounceTimer) clearTimeout(debounceTimer);
+      var val = cedulaInput.value.trim();
+      if (!val) return;  // cédula vacía → no validar
+      debounceTimer = setTimeout(function () { checkCedulaExact(val); }, CEDULA_DEBOUNCE_MS);
+    });
+    cedulaInput.addEventListener('blur', function () {
+      // Validación final al salir del campo (sin debounce)
+      if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; }
+      var val = cedulaInput.value.trim();
+      if (!val) { hideCedulaWarning(); return; }
+      checkCedulaExact(val);
+    });
+
+    backdrop.querySelector('[data-action="submit"]').onclick = async function () {
       var form = backdrop.querySelector('#ct-create-form');
       if (!form.checkValidity()) { form.reportValidity(); return; }
+      var cedulaVal = form.cedula.value.trim();
+
+      // 📦767 · Doble validación en submit (carrera-safe)
+      // Si el user dejó el form abierto mucho tiempo, otro proceso pudo haber
+      // creado un bp-id con esa cédula. Re-consultamos antes de avanzar.
+      if (cedulaVal) {
+        try {
+          var r2 = await window.electronAPI.ghGetPersonalByCedula({
+            companyName: self.companyName,
+            cedula: cedulaVal
+          });
+          if (r2 && r2.success && r2.data && r2.data.personal) {
+            // Actualizar warning y abrir modal de advertencia
+            showCedulaWarning(r2.data.personal);
+            self._openCedulaWarningModal(cedulaInput, r2.data.personal, function () {
+              // onCorregir: enfocar el input de cédula
+              if (cedulaInput) { cedulaInput.focus(); cedulaInput.select(); }
+            });
+            return;  // ← bloquea el submit
+          }
+        } catch (e) {
+          // Si falla la verificación, dejamos pasar (no bloquear por error de transporte)
+        }
+      }
+
       var data = {
         nombres:       form.nombres.value.trim(),
         apellidos:     form.apellidos.value.trim(),
@@ -346,6 +458,65 @@ class ContratacionComponent {
       close();
       self._create(data);
     };
+  }
+
+  // 📦767 · Modal de advertencia cuando la cédula ya está registrada.
+  // Primera barrera UI. NO ofrece re-vincular todavía — esa acción requiere
+  // la Fase 1 del backend (decidir explícitamente entre NO EXISTE / RETIRADO / ACTIVO).
+  // Solo permite corregir la cédula o cancelar la operación.
+  _openCedulaWarningModal(cedulaInput, existingPersonal, onCorregir) {
+    var self = this;
+    var nombre = ((existingPersonal.nombres || '') + ' ' + (existingPersonal.apellidos || '')).trim() || '(sin nombre)';
+    var estadoFmt = (function () {
+      var e = (existingPersonal.estado || '').toLowerCase();
+      if (e === 'a' || e === 'act' || e === 'activo') return 'Activo';
+      if (e === 'r' || e === 'ret' || e === 'retirado') return 'Retirado';
+      return existingPersonal.estado ? (existingPersonal.estado.charAt(0).toUpperCase() + existingPersonal.estado.slice(1)) : 'Sin estado';
+    })();
+    var cargoFmt = existingPersonal.cargo || '—';
+
+    var html =
+      '<div class="ct-modal-backdrop" id="ct-cedula-warn-backdrop">' +
+        '<div class="ct-modal ct-modal--warning" role="alertdialog" aria-modal="true" aria-labelledby="ct-cedula-warn-title" style="max-width:520px;">' +
+          '<div class="ct-modal__head ct-modal__head--warning">' +
+            '<div>' +
+              '<h2 class="ct-modal__title" id="ct-cedula-warn-title">' +
+                '<i class="fas fa-exclamation-triangle"></i> Cédula ya registrada' +
+              '</h2>' +
+              '<p class="ct-modal__sub">No se puede iniciar este proceso con esta cédula</p>' +
+            '</div>' +
+            '<button class="ct-modal__close" type="button" data-action="close" aria-label="Cerrar">×</button>' +
+          '</div>' +
+          '<div class="ct-modal__body">' +
+            '<div class="ct-cedula-warn-card">' +
+              '<div class="ct-cedula-warn-card__row"><span class="ct-cedula-warn-card__label">Trabajador encontrado:</span><span class="ct-cedula-warn-card__value">' + this._escHtml(nombre) + '</span></div>' +
+              '<div class="ct-cedula-warn-card__row"><span class="ct-cedula-warn-card__label">Cédula:</span><span class="ct-cedula-warn-card__value">' + this._escHtml(existingPersonal.cedula) + '</span></div>' +
+              '<div class="ct-cedula-warn-card__row"><span class="ct-cedula-warn-card__label">Estado:</span><span class="ct-cedula-warn-card__value">' + this._escHtml(estadoFmt) + '</span></div>' +
+              '<div class="ct-cedula-warn-card__row"><span class="ct-cedula-warn-card__label">Cargo:</span><span class="ct-cedula-warn-card__value">' + this._escHtml(cargoFmt) + '</span></div>' +
+            '</div>' +
+            '<p class="ct-cedula-warn-msg">Verifica que la cédula corresponda al trabajador que estás contratando. Si se trata de un registro equivocado, corrige la cédula.</p>' +
+          '</div>' +
+          '<div class="ct-modal__foot">' +
+            '<button class="ct-btn ct-btn--ghost" type="button" data-action="cancel">Cancelar</button>' +
+            '<button class="ct-btn ct-btn--primary" type="button" data-action="corregir"><i class="fas fa-pen"></i> Corregir cédula</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    var wrap = document.createElement('div');
+    wrap.innerHTML = html;
+    var backdrop = wrap.firstChild;
+    document.body.appendChild(backdrop);
+
+    function closeWarn() { if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop); }
+
+    backdrop.querySelector('.ct-modal__close').onclick = closeWarn;
+    backdrop.querySelector('[data-action="cancel"]').onclick = closeWarn;
+    backdrop.querySelector('[data-action="corregir"]').onclick = function () {
+      closeWarn();
+      if (typeof onCorregir === 'function') onCorregir();
+    };
+    backdrop.onclick = function (e) { if (e.target === backdrop) closeWarn(); };
   }
 
   async _create(data) {

@@ -472,6 +472,57 @@ function _handlerGetPersonal(token, personalId) {
 }
 
 /**
+ * gh:get-personal-by-cedula
+ * 📦767 · Buscar un bp-id activo por (empresa_id, cedula) — coincidencia EXACTA.
+ * Usado por la UI de Contratación como primera barrera para detectar
+ * cédulas duplicadas ANTES de submit. Devuelve { personal: {...} | null }.
+ *
+ * Diferencias con gh:list-personal (search):
+ *   - Búsqueda EXACTA por cédula (no LIKE)
+ *   - Solo activo=1
+ *   - O(1) gracias al UNIQUE(empresa_id, cedula)
+ *   - Retorna 1 fila o null (no array)
+ *
+ * Input:  { token, companyName, cedula }
+ * Output: { success, data: { personal } }
+ *   - cedula vacía/null → { success: true, data: { personal: null } } (no warning)
+ *   - sin match         → { success: true, data: { personal: null } }
+ *   - con match activo=1 → { success: true, data: { personal: { id, nombres, apellidos, cedula, estado, ... } } }
+ */
+function _handlerGetPersonalByCedula(token, companyName, cedula) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+
+  if (!companyName || typeof companyName !== 'string') {
+    return _err('INVALID_INPUT', 'companyName es requerido');
+  }
+
+  // Cédula vacía/no-enviada: no es error, simplemente no hay nada que buscar.
+  // La UI usa esto para limpiar el banner de advertencia.
+  if (!cedula || typeof cedula !== 'string' || !cedula.trim()) {
+    return _ok({ personal: null });
+  }
+
+  var company = _getCompanyByName(companyName);
+  if (!company) {
+    return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+  }
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var row = localDb.prepare(
+      "SELECT * FROM base_personal WHERE empresa_id = ? AND cedula = ? AND activo = 1 LIMIT 1"
+    ).get(company.company_key, cedula.trim());
+    return _ok({ personal: row ? _rowToPersonal(row) : null });
+  } catch (e) {
+    console.error('[' + MOD + '][get-personal-by-cedula]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
  * gh:list-sedes
  * Devuelve las sedes activas de la empresa.
  */
@@ -3449,6 +3500,16 @@ function registerGestionHumanaHandlers(app, deps) {
       return _handlerGetPersonal(p.token || '', p.personalId);
     } catch (e) {
       console.error('[' + MOD + '][get-personal]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  // 📦767 · Validación de cédula en UI de Contratación (búsqueda exacta)
+  ipcMainHandle('gh:get-personal-by-cedula', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerGetPersonalByCedula(p.token || '', p.companyName, p.cedula);
+    } catch (e) {
+      console.error('[' + MOD + '][get-personal-by-cedula]', e.message);
       return _err('INTERNAL', e.message);
     }
   });

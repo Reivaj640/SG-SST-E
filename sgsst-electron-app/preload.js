@@ -366,6 +366,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   ghGetContratacion: (payload) => ipcRenderer.invoke('gh:get-contratacion', payload),
   ghListPersonal: (payload) => ipcRenderer.invoke('gh:list-personal', payload),
   ghGetPersonal: (payload) => ipcRenderer.invoke('gh:get-personal', payload),
+  // 📦767 · Validación de cédula en UI de Contratación (búsqueda exacta antes de submit)
+  ghGetPersonalByCedula: (payload) => ipcRenderer.invoke('gh:get-personal-by-cedula', payload),
   ghListSedes: (payload) => ipcRenderer.invoke('gh:list-sedes', payload),
   // 📦760 · Documentos de Afiliaciones (5) — certificados EPS / Pensión / ARL / Caja
   ghListDocumentosAfiliaciones: (payload) => ipcRenderer.invoke('gh:list-documentos-afiliaciones', payload),
