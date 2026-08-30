@@ -384,3 +384,88 @@
 .ct-step__expand-actions {
   display: flex; gap: 0.4rem; justify-content: flex-end;
 }
+
+/* ═══ 📦767 · CÉDULA WARNING (barrera UI contra duplicados) ═══ */
+.ct-cedula-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  margin-top: 0.45rem;
+  padding: 0.55rem 0.7rem;
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-left: 4px solid #b06000;
+  border-radius: 0.35rem;
+  font-size: 0.75rem;
+  color: #664d03;
+  line-height: 1.4;
+}
+.ct-cedula-warning i {
+  color: #b06000;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+  margin-top: 0.05rem;
+}
+.ct-cedula-warning[hidden] { display: none; }
+
+.ct-cedula-field--warning > input,
+.ct-cedula-field--warning > input:focus {
+  border-color: #b06000;
+  box-shadow: 0 0 0 2px rgba(176, 96, 0, 0.15);
+  background: #fffbf0;
+}
+
+/* ═══ 📦767 · MODAL DE ADVERTENCIA (cédula duplicada) ═══ */
+.ct-modal--warning {
+  border-top: 4px solid #b06000;
+}
+.ct-modal__head--warning {
+  background: linear-gradient(180deg, #fff8e1 0%, #ffffff 100%);
+  border-bottom: 1px solid #ffe082;
+}
+.ct-modal__head--warning .ct-modal__title {
+  color: #b06000;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.ct-modal__head--warning .ct-modal__title i {
+  font-size: 1.1rem;
+}
+
+.ct-cedula-warn-card {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 0.4rem;
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.85rem;
+}
+.ct-cedula-warn-card__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.3rem 0;
+  font-size: 0.82rem;
+  border-bottom: 1px dashed #e9ecef;
+}
+.ct-cedula-warn-card__row:last-child { border-bottom: none; }
+.ct-cedula-warn-card__label {
+  color: #5a6378;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+.ct-cedula-warn-card__value {
+  color: #1a1a2e;
+  font-weight: 600;
+  text-align: right;
+  word-break: break-word;
+}
+
+.ct-cedula-warn-msg {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #5a6378;
+  line-height: 1.45;
+  padding: 0 0.25rem;
+}
