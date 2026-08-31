@@ -1081,13 +1081,26 @@ function _handlerUpdatePersonal(token, personalId, updates) {
 }
 
 /**
- * gh:delete-personal
- * Soft delete de un trabajador (activo=0, estado='retirado', fecha_retiro=now).
- * NO borra la fila, preserva histórico.
- * Input: { token, personalId }
- * Devuelve: { success, data: { personalId, retired: true } }
+ * gh:delete-personal (📦767 · I-103.A1.0-F-1)
+ * Soft delete puro de un trabajador. SOLO pone activo=0.
+ * NO modifica estado (debe seguir su ciclo laboral: activo/vacaciones/retirado/etc.).
+ * NO modifica fecha_retiro (la fecha del ciclo se preserva).
+ * NO inserta evento en gh_eventos_personal (el ocultamiento no es un evento laboral).
+ * NO borra FKs CASCADE (vacaciones, permisos, documentos, mensajes, afiliaciones se preservan).
+ *
+ * El ciclo laboral va por:
+ *   - Retiro laboral → gh:cambiar-estado → estado='retirado' + fecha_retiro + evento RETIRO
+ *   - Reingreso → gh:cambiar-estado → estado='activo' + evento REINGRESO
+ *   - Recontratación → gh:recontratar-personal (atómico con CT)
+ *
+ * Regla arquitectónica: Activo → Retirado → [Ocultar].
+ * Por eso: solo se puede ocultar un bp YA RETIRADO. Un bp activo debe pasar primero
+ * por gh:cambiar-estado. Si se intenta ocultar un bp activo, se rechaza con BP_NOT_RETIRED.
+ *
+ * Input: { token, personalId, usuarioId? }
+ * Devuelve: { success, data: { personalId, activo, estado (intacto), fechaRetiro (intacto) } }
  */
-function _handlerDeletePersonal(token, personalId) {
+function _handlerDeletePersonal(token, personalId, usuarioId) {
   var auth = _checkAuth(token);
   if (!auth.ok) return _err(auth.error.code, auth.error.message);
 
@@ -1099,17 +1112,28 @@ function _handlerDeletePersonal(token, personalId) {
   if (!localDb) return _err('NO_DB', 'BD no disponible');
 
   try {
-    var existing = localDb.prepare('SELECT id, activo FROM base_personal WHERE id = ?').get(personalId);
+    var existing = localDb.prepare('SELECT id, empresa_id, estado, activo, fecha_retiro FROM base_personal WHERE id = ?').get(personalId);
     if (!existing) return _err('NOT_FOUND', 'Trabajador no encontrado');
     if (existing.activo === 0) {
-      return _err('ALREADY_DELETED', 'El trabajador ya está retirado');
+      return _err('BP_DELETED', 'El bp ya está oculto');
+    }
+    // 📦767 · F-1 · Solo se puede ocultar un bp retirado
+    if (existing.estado !== 'retirado') {
+      return _err('BP_NOT_RETIRED', 'Solo se puede ocultar un bp retirado. Use gh:cambiar-estado primero.');
     }
 
+    // Soft delete PURO: solo activo=0, sin tocar estado ni fecha_retiro
     var now = new Date().toISOString();
     localDb.prepare(
-      "UPDATE base_personal SET activo = 0, estado = 'retirado', fecha_retiro = ?, updated_at = ? WHERE id = ?"
-    ).run(now, now, personalId);
-    return _ok({ personalId: personalId, retired: true });
+      "UPDATE base_personal SET activo = 0, updated_at = ? WHERE id = ?"
+    ).run(now, personalId);
+
+    return _ok({
+      personalId:  personalId,
+      activo:      0,
+      estado:      existing.estado,       // sin cambios, se preserva
+      fechaRetiro: existing.fecha_retiro  // sin cambios, se preserva
+    });
   } catch (e) {
     console.error('[' + MOD + '][delete-personal]', e.message);
     return _err('INTERNAL', e.message);

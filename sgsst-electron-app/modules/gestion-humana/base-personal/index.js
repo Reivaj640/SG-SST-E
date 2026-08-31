@@ -747,7 +747,7 @@ class BasePersonalComponent {
       btn.onclick = function () { self._openDetail(btn.getAttribute('data-id')); };
     });
     container.querySelectorAll('.bp-row-action--del').forEach(function (btn) {
-      btn.onclick = function () { self._openDeleteConfirm(btn.getAttribute('data-id'), btn.getAttribute('data-nombre')); };
+      btn.onclick = function () { self._openOcultarConfirm(btn.getAttribute('data-id'), btn.getAttribute('data-nombre')); };
     });
 
     this._updateCount();
@@ -802,12 +802,15 @@ class BasePersonalComponent {
     this._update(personalId, values);
   }
 
-  async _openDeleteConfirm(personalId, nombre) {
+  // 📦767 · I-103.A1.0-F-1 · Acción administrativa (NO retiro laboral).
+  // Solo oculta el bp. NO modifica estado ni fecha_retiro. NO genera evento.
+  // El bp debe estar retirado previamente (validado en el backend con BP_NOT_RETIRED).
+  async _openOcultarConfirm(personalId, nombre) {
     var confirmed = await this._confirmDialog().confirm({
-      title: '🗑️ Retirar Trabajador',
-      message: '¿Querés retirar a "' + nombre + '"?',
-      details: 'Esto hace un soft delete (activo=0, estado=retirado). El registro se preserva para histórico. Después podés volver a activarlo cambiándole el estado.',
-      confirmText: 'Sí, retirar',
+      title: '🗑️ Ocultar Trabajador',
+      message: '¿Querés ocultar a "' + nombre + '"?',
+      details: 'Acción administrativa: solo se oculta el registro (activo=0). Su estado, fecha de retiro, vacaciones, permisos, documentos, mensajes y afiliaciones se conservan íntegros. Para retirar laboralmente, use la opción "Retirar".',
+      confirmText: 'Sí, ocultar',
       cancelText: 'Cancelar',
       type: 'warning'
     });
@@ -880,7 +883,8 @@ class BasePersonalComponent {
     try {
       var r = await window.electronAPI.ghDeletePersonal({ personalId: personalId });
       if (r && r.success) {
-        this._showToast('✅ Trabajador retirado', 'success');
+        // 📦767 · F-1 · Toast refleja la nueva semántica: ocultar (no retirar)
+        this._showToast('✅ Trabajador ocultado (historial preservado)', 'success');
         await this._load();
       } else {
         this._showToast('❌ Error: ' + (r.error ? r.error.message : 'desconocido'), 'error');
