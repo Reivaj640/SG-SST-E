@@ -1141,17 +1141,25 @@ function _handlerCambiarEstado(token, personalId, estado, fechaRetiro, notas) {
   if (!localDb) return _err('NO_DB', 'BD no disponible');
 
   try {
-    var existing = localDb.prepare('SELECT id, activo FROM base_personal WHERE id = ?').get(personalId);
+    // 📦767 · FASE 1.0-C · SELECT incluye estado y fecha_retiro para
+    // distinguir "retiro" de "reactivación" sin necesidad de un SELECT extra.
+    var existing = localDb.prepare('SELECT id, estado, activo, fecha_retiro FROM base_personal WHERE id = ?').get(personalId);
     if (!existing) return _err('NOT_FOUND', 'Trabajador no encontrado');
     if (existing.activo === 0) {
       return _err('ALREADY_DELETED', 'El trabajador está retirado, no se puede cambiar estado');
     }
 
     var now = new Date().toISOString();
-    // Si estado=retirado y no hay fecha, auto-set
+    // Semántica de fecha_retiro:
+    //   - estado="retirado"            → fecha_retiro = fechaRetiro || now (auto-set)
+    //   - estado="activo" desde retirado → fecha_retiro = NULL (reactivación)
+    //   - cualquier otro estado (vacaciones/permiso/etc) → fecha_retiro = NULL
+    // NO se preserva histórico aquí: eso es responsabilidad de gh_eventos_personal (Fase 1.0-D).
     var fechaFinal;
     if (estado === 'retirado') {
       fechaFinal = fechaRetiro || now;
+    } else if (estado === 'activo' && existing.estado === 'retirado') {
+      fechaFinal = null;
     } else {
       fechaFinal = fechaRetiro || null;
     }
