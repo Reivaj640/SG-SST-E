@@ -1710,11 +1710,16 @@ class BasePersonalComponent {
           ? p.fechaRetiro.substring(0, 10) : p.fechaRetiro)
       : '—';
     // Botón de acción según el estado (solo visible si no es retirado actualmente)
+    // 📦767 · I-103.A1.0-G.2.1 · Estilo badge clickeable (mismo aspecto que "Retirado"/"Inactivo"):
+    //   - clases bp-badge bp-badge--muted (mismo gris que el badge del estado)
+    //   - cursor pointer + hover sutil (inline style, sin tocar CSS)
+    //   - sin border default del navegador (border:none)
+    //   - font-family:inherit para que respete la fuente del sistema
     var accionCicloBoton = '';
     if (estadoNorm === 'activo') {
-      accionCicloBoton = '<button type="button" class="bp-detail-action bp-detail-action--danger" data-action="retirar-trabajador" data-personal-id="' + self._escHtml(p.id) + '" data-nombre="' + self._escHtml((p.nombres || '') + ' ' + (p.apellidos || '')) + '"><i class="fas fa-user-minus"></i> Retirar trabajador</button>';
+      accionCicloBoton = '<button type="button" class="bp-badge bp-badge--muted" style="cursor:pointer; border:none; font-family:inherit; margin-top: 0.5rem;" data-action="retirar-trabajador" data-personal-id="' + self._escHtml(p.id) + '" data-nombre="' + self._escHtml((p.nombres || '') + ' ' + (p.apellidos || '')) + '"><i class="fas fa-user-minus"></i> Retirar trabajador</button>';
     } else if (estadoNorm === 'retirado') {
-      accionCicloBoton = '<button type="button" class="bp-detail-action bp-detail-action--success" data-action="reingresar-trabajador" data-personal-id="' + self._escHtml(p.id) + '" data-nombre="' + self._escHtml((p.nombres || '') + ' ' + (p.apellidos || '')) + '"><i class="fas fa-user-plus"></i> Reingresar</button>';
+      accionCicloBoton = '<button type="button" class="bp-badge bp-badge--muted" style="cursor:pointer; border:none; font-family:inherit; margin-top: 0.5rem;" data-action="reingresar-trabajador" data-personal-id="' + self._escHtml(p.id) + '" data-nombre="' + self._escHtml((p.nombres || '') + ' ' + (p.apellidos || '')) + '"><i class="fas fa-user-plus"></i> Reingresar</button>';
     }
     var laboralTab = '<div class="bp-detail-grid" data-panel="laboral" hidden>' +
       field('fa-briefcase', 'Cargo', 'cargo', p.cargo) +
@@ -1722,13 +1727,17 @@ class BasePersonalComponent {
       select('fa-file-contract', 'Tipo de Contrato', 'tipoContrato', p.tipoContrato,
         ['', 'indefinido', 'fijo', 'prestacion', 'obra_labor', 'aprendizaje']) +
       // 📦767 · I-103.A1.0-G.2 · fechaIngreso READ-ONLY: se muestra el valor actual, sin input.
-      '<div class="bp-detail-field"><div class="bp-detail-field__label"><i class="fas fa-calendar-check"></i> Fecha de Ingreso</div><div class="bp-detail-field__value" data-view>' + self._escHtml(self._fmtDateDisplay(fechaIngresoDisplay) || fechaIngresoDisplay) + '</div></div>' +
+      // 📦767 · I-103.A1.0-G.2.1 · Sin `data-view`: visible en modo view y edit (no desaparece al alternar).
+      '<div class="bp-detail-field"><div class="bp-detail-field__label"><i class="fas fa-calendar-check"></i> Fecha de Ingreso</div><div class="bp-detail-field__value">' + self._escHtml(self._fmtDateDisplay(fechaIngresoDisplay) || fechaIngresoDisplay) + '</div></div>' +
       // 📦767 · I-103.A1.0-G.2 · fechaRetiro READ-ONLY.
-      '<div class="bp-detail-field"><div class="bp-detail-field__label"><i class="fas fa-calendar-times"></i> Fecha de Retiro</div><div class="bp-detail-field__value" data-view>' + self._escHtml(self._fmtDateDisplay(fechaRetiroDisplay) || fechaRetiroDisplay) + '</div></div>' +
+      // 📦767 · I-103.A1.0-G.2.1 · Sin `data-view`: visible en modo view y edit.
+      '<div class="bp-detail-field"><div class="bp-detail-field__label"><i class="fas fa-calendar-times"></i> Fecha de Retiro</div><div class="bp-detail-field__value">' + self._escHtml(self._fmtDateDisplay(fechaRetiroDisplay) || fechaRetiroDisplay) + '</div></div>' +
       field('fa-building', 'Empresa Usuaria', 'empresaUsuaria', p.empresaUsuaria) +
       field('fa-map-marker-alt', 'Sede', 'sedeId', sedeName) +
       // 📦767 · I-103.A1.0-G.2 · Estado READ-ONLY como badge, con botón de acción al lado.
-      '<div class="bp-detail-field"><div class="bp-detail-field__label"><i class="fas fa-toggle-on"></i> Estado</div><div class="bp-detail-field__value" data-view>' + estadoBadge + (accionCicloBoton ? ' ' + accionCicloBoton : '') + '</div></div>' +
+      // 📦767 · I-103.A1.0-G.2.1 · Sin `data-view`: badge + botón Retirar/Reingresar visibles
+      // en modo view Y edit, para que el usuario pueda ejecutar la transición desde cualquier modo.
+      '<div class="bp-detail-field"><div class="bp-detail-field__label"><i class="fas fa-toggle-on"></i> Estado</div><div class="bp-detail-field__value">' + estadoBadge + (accionCicloBoton ? ' ' + accionCicloBoton : '') + '</div></div>' +
       field('fa-university', 'Banco', 'banco', p.banco) +
       field('fa-credit-card', 'Número de Cuenta', 'numeroCuenta', p.numeroCuenta) +
       select('fa-hard-hat', 'S400', 'activoS400', p.activoS400 == 1 ? 'Si' : 'No', ['No', 'Si']) +
