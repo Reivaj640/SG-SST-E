@@ -390,6 +390,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   ghUpdateContratacion: (payload) => ipcRenderer.invoke('gh:update-contratacion', payload),
   ghDeleteContratacion: (payload) => ipcRenderer.invoke('gh:delete-contratacion', payload),
   ghMarcarPaso: (payload) => ipcRenderer.invoke('gh:marcar-paso', payload),
+  // 📦767 · I-103.A1.0-D-2 · Recontratar bp retirado + vincular CT
+  ghRecontratarPersonal: (payload) => ipcRenderer.invoke('gh:recontratar-personal', payload),
   // Read adicional FASE 2 (A1.5.4-B) · bp-ids con contratación en_proceso
   ghListTrabajadoresConContratacionActiva: (payload) => ipcRenderer.invoke('gh:list-trabajadores-con-contratacion-activa', payload),
   // Write Personal (4)
