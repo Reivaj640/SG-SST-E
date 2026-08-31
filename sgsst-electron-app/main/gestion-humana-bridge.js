@@ -598,6 +598,35 @@ function _handlerCreateContratacion(token, companyName, data) {
   if (!localDb) return _err('NO_DB', 'BD no disponible');
 
   try {
+    // 📦767 · FASE 1.0-B · Pre-validación del BP antes de crear la CT.
+    // Si la cédula ya existe en base_personal:
+    //   - estado='retirado'  → NO auto-reactivar. Devolver recontratacionRequerida=true.
+    //   - estado='activo'    → BLOQUEAR con CEDULA_DUPLICADA.
+    //   - no existe          → continuar normal.
+    // Si no hay cédula, también continuar normal.
+    if (data.cedula) {
+      var existingBp = localDb.prepare(
+        "SELECT id, estado FROM base_personal WHERE empresa_id = ? AND cedula = ? AND activo = 1"
+      ).get(company.company_key, data.cedula);
+      if (existingBp) {
+        if (existingBp.estado === 'retirado') {
+          // Persona retirada: NO auto-reactivar.
+          // La UI debe llamar explícitamente a gh:recontratar-personal.
+          return _ok({
+            contratacionId: null,
+            trabajadorId: null,
+            recontratacionRequerida: true,
+            bpIdRetirado: existingBp.id
+          });
+        }
+        // BP activo: BLOQUEAR. Devolver error claro con metadata.
+        return _err('CEDULA_DUPLICADA',
+          'Ya existe un trabajador activo con esa cédula (estado: ' + existingBp.estado + ')',
+          { existingId: existingBp.id, existingEstado: existingBp.estado });
+      }
+      // No existe: continuar normal (se creará el bp más abajo)
+    }
+
     var id = _newId('ct-');
     var now = new Date().toISOString();
     localDb.prepare(
@@ -614,37 +643,28 @@ function _handlerCreateContratacion(token, companyName, data) {
       now, now
     );
 
-    // FASE 1 (A1.5.4-B) · Crear/vincular bp-id en base_personal.
-    // Si la contratación trae cédula, busca el trabajador en base_personal
-    // (UNIQUE empresa_id + cedula con activo=1) y lo reutiliza, o lo crea
-    // si no existe. Vincula contrataciones.trabajador_id para que aparezca
-    // en Firma Electrónica. NO crea gh_documentos, gh_firmas_electronicas
-    // ni gh_consentimientos_firma (esos los crea el admin manualmente
-    // desde la pantalla de Firma Electrónica).
+    // FASE 1 (A1.5.4-B) · Crear bp-id en base_personal.
+    // Si la contratación trae cédula, lo crea nuevo (ya validamos arriba que no existe).
+    // Vincula contrataciones.trabajador_id para que aparezca en Firma Electrónica.
+    // NO crea gh_documentos, gh_firmas_electronicas ni gh_consentimientos_firma
+    // (esos los crea el admin manualmente desde la pantalla de Firma Electrónica).
     var personalId = null;
     if (data.cedula) {
       try {
-        var existingPersonal = localDb.prepare(
-          "SELECT id FROM base_personal WHERE empresa_id = ? AND cedula = ? AND activo = 1"
-        ).get(company.company_key, data.cedula);
-        if (existingPersonal) {
-          personalId = existingPersonal.id;
-        } else {
-          personalId = _newId('bp-');
-          localDb.prepare(
-            "INSERT INTO base_personal (id, empresa_id, nombres, apellidos, cedula, " +
-            "  cargo, salario, fecha_ingreso, sede_id, empresa_usuaria, " +
-            "  estado, activo, created_at, updated_at) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'activo', 1, ?, ?)"
-          ).run(
-            personalId, company.company_key,
-            data.nombres, data.apellidos, data.cedula,
-            data.cargo, data.salario || null,
-            data.fechaIngreso,
-            data.sedeId || null, data.empresaUsuaria || null,
-            now, now
-          );
-        }
+        personalId = _newId('bp-');
+        localDb.prepare(
+          "INSERT INTO base_personal (id, empresa_id, nombres, apellidos, cedula, " +
+          "  cargo, salario, fecha_ingreso, sede_id, empresa_usuaria, " +
+          "  estado, activo, created_at, updated_at) " +
+          "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'activo', 1, ?, ?)"
+        ).run(
+          personalId, company.company_key,
+          data.nombres, data.apellidos, data.cedula,
+          data.cargo, data.salario || null,
+          data.fechaIngreso,
+          data.sedeId || null, data.empresaUsuaria || null,
+          now, now
+        );
         localDb.prepare(
           "UPDATE contrataciones SET trabajador_id = ? WHERE id = ?"
         ).run(personalId, id);
@@ -826,13 +846,22 @@ function _handlerMarcarPaso(token, contratacionId, pasoNum, fecha, notas) {
         // y reactivar manualmente con un nuevo paso 6 (marcando cancelado y reabriendo).
         console.warn('[marcar-paso] paso 6 sin cedula — no se crea en base_personal:', contratacionId);
       } else {
-        // 1) Buscar si ya existe en base_personal (caso de re-contratación)
+        // 1) Buscar si ya existe en base_personal
         var existing2 = localDb.prepare(
-          'SELECT id FROM base_personal WHERE empresa_id = ? AND cedula = ? AND activo = 1'
+          "SELECT id, estado FROM base_personal WHERE empresa_id = ? AND cedula = ? AND activo = 1"
         ).get(companyKey, ct.cedula);
 
         if (existing2) {
-          // Vincular al registro existente (no duplicar)
+          if (existing2.estado === 'retirado') {
+            // BP retirado: NO auto-reactivar.
+            // La CT se conserva con trabajador_id=NULL (la CT ya está en paso 6).
+            // El user debe usar gh:recontratar-personal para reactivar el bp,
+            // y luego re-marcar paso 6 para vincular.
+            return _err('RECONTRATACION_REQUERIDA',
+              'El bp está retirado. Use gh:recontratar-personal para reactivar antes de continuar.',
+              { bpId: existing2.id, ctId: contratacionId });
+          }
+          // BP activo: vincular normalmente
           personalId = existing2.id;
           console.log('[marcar-paso] vinculado a personal existente:', personalId);
         } else {
