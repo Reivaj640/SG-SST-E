@@ -934,6 +934,14 @@ function _handlerCreatePersonal(token, companyName, data) {
   if (!data.cedula || typeof data.cedula !== 'string') {
     return _err('INVALID_INPUT', 'cedula es requerido');
   }
+  // 📦767 · FASE 1.0-G.2 · Un trabajador nuevo no puede nacer con fecha_retiro.
+  // El estado se inicializa a 'activo' (hardcoded más abajo) y la fecha_retiro
+  // es consecuencia exclusiva de una transición via gh:cambiar-estado.
+  if (data.fechaRetiro) {
+    return _err('INVALID_INPUT',
+      'fechaRetiro no puede establecerse al crear un trabajador. ' +
+      'El estado inicial siempre es "activo"; use gh:cambiar-estado para registrar un retiro.');
+  }
 
   var company = _getCompanyByName(companyName);
   if (!company) {
@@ -1056,6 +1064,25 @@ function _handlerUpdatePersonal(token, personalId, updates) {
 
     var sqlParts = [];
     var values = [];
+    // 📦767 · FASE 1.0-G.2 · Campos de ciclo laboral están PROTEGIDOS en update-personal.
+    // Solo gh:cambiar-estado, gh:recontratar-personal y gh:import-personal pueden
+    // modificar estado, fecha_retiro y fecha_ingreso (con sus respectivas reglas atómicas
+    // y eventos en gh_eventos_personal). update-personal es SOLO para datos
+    // administrativos/personales.
+    var PROTECTED_UPDATE_FIELDS = ['estado', 'fechaRetiro', 'fechaIngreso'];
+    var blocked = [];
+    Object.keys(updates).forEach(function (key) {
+      if (PROTECTED_UPDATE_FIELDS.indexOf(key) !== -1) {
+        blocked.push(key);
+      }
+    });
+    if (blocked.length > 0) {
+      return _err('PROTECTED_FIELD',
+        'Los campos ' + JSON.stringify(blocked) + ' no pueden modificarse via gh:update-personal. ' +
+        'Use gh:cambiar-estado para estado, gh:recontratar-personal para recontratación. ' +
+        'Estos campos requieren una transición atómica con evento en gh_eventos_personal.',
+        { blockedFields: blocked });
+    }
     Object.keys(updates).forEach(function (key) {
       if (fieldMap[key]) {
         sqlParts.push(fieldMap[key] + ' = ?');
@@ -4454,7 +4481,12 @@ function registerGestionHumanaHandlers(app, deps) {
       );
       // 📦747 · UPDATE whitelist ampliado con los mismos campos que el INSERT.
       // No se tocan id/empresa_id/cedula/created_at/activo.
-      // Si el existente está 'retirado', el estado NO se actualiza (preservar histórico).
+      // 📦767 · FASE 1.0-G.2 · Política estricta de campos de ciclo en import-update:
+      //   - estado: CASE WHEN estado='retirado' THEN estado ELSE ? END  (preserva retirado)
+      //   - fecha_ingreso: CASE WHEN fecha_ingreso IS NOT NULL THEN fecha_ingreso ELSE ? END
+      //                    (preserva histórico, completa si NULL)
+      //   - fecha_retiro: NUNCA se modifica. Conserva el valor de la BD siempre.
+      //                    Import NO puede crear/modificar ciclo laboral de bp existente.
       var stmtUpdate = localDb.prepare(
         "UPDATE base_personal SET " +
         "  nombres = ?, apellidos = ?, " +
@@ -4464,7 +4496,10 @@ function registerGestionHumanaHandlers(app, deps) {
         "  estado_civil = ?, nivel_educativo = ?, " +
         "  direccion = ?, barrio = ?, ciudad = ?, " +
         "  cargo = ?, salario = ?, tipo_contrato = ?, " +
-        "  fecha_ingreso = ?, fecha_retiro = ?, " +
+        "  fecha_ingreso = CASE WHEN fecha_ingreso IS NOT NULL THEN fecha_ingreso ELSE ? END, " +
+        "  fecha_retiro = CASE WHEN fecha_retiro IS NOT NULL THEN fecha_retiro " +
+        "                       WHEN estado = 'retirado' THEN NULL " +
+        "                       ELSE NULL END, " +
         "  eps = ?, pension = ?, arl = ?, caja_compensacion = ?, " +
         "  empresa_usuaria = ?, banco = ?, numero_cuenta = ?, " +
         "  sede_id = ?, " +
@@ -4513,6 +4548,18 @@ function registerGestionHumanaHandlers(app, deps) {
               } else if (duplicateMode === 'update') {
                 // Whitelist: no toca id, empresa_id, cedula, created_at, activo
                 // Si el existente ya está retirado, no cambia el estado (preservar histórico)
+                // 📦767 · FASE 1.0-G.2 · Detección de inconsistencia: bp activo + fecha_retiro en Excel.
+                // El import NO aborta toda la importación por una fila mala — solo reporta la fila y
+                // continúa con las demás. La fila inconsistente se procesa con fecha_retiro=NULL
+                // (un bp activo no debe tener fecha_retiro).
+                if (existing.estado === 'activo' && row.fechaRetiro) {
+                  errors.push({
+                    row: index + 1,
+                    error: 'BP activo con fecha_retiro en Excel (inconsistencia): se omitirá fecha_retiro para este BP',
+                    data: { cedula: row.cedula, excelFechaRetiro: row.fechaRetiro },
+                    warning: true
+                  });
+                }
                 var now = new Date().toISOString();
                 stmtUpdate.run(
                   row.nombres, row.apellidos,
@@ -4522,7 +4569,9 @@ function registerGestionHumanaHandlers(app, deps) {
                   row.estadoCivil || null, row.nivelEducativo || null,
                   row.direccion || null, row.barrio || null, row.ciudad || null,
                   row.cargo || null, row.salario || null, row.tipoContrato || null,
-                  row.fechaIngreso || null, row.fechaRetiro || null,
+                  row.fechaIngreso || null,         // CASE WHEN: solo aplica si BD está NULL
+                  // 📦767 · I-103.A1.0-G.2 · fecha_retiro: NO se pasa valor.
+                  // El CASE WHEN usa solo columnas de la BD (regla estricta).
                   row.eps || null, row.pension || null, row.arl || null, row.cajaCompensacion || null,
                   row.empresaUsuaria || null, row.banco || null, row.numeroCuenta || null,
                   row.sedeId || null,

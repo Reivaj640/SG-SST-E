@@ -501,6 +501,139 @@ async function run() {
   _assertEq(_countEventos(), eventosAntes11, 'T11.9 0 eventos nuevos (rollback)');
 
   // ============================================================
+  // TEST 12 · gh:update-personal rechaza estado='retirado' (PROTECTED_FIELD)
+  // 📦767 · FASE 1.0-G.2 · Bypass cerrado: update-personal no puede tocar ciclo.
+  // ============================================================
+  console.log('');
+  console.log('[T12] gh:update-personal rechaza estado=retirado (PROTECTED_FIELD)');
+  // Reactivar bp-ACTIVO-001 para tener un bp activo
+  call('gh:cambiar-estado', {
+    token: 't', companyName: 'TEMPOACTIVA EST S.A.S.',
+    personalId: 'bp-ACTIVO-001', estado: 'activo'
+  });
+  const estadoT12Pre = db.prepare('SELECT estado, fecha_retiro FROM base_personal WHERE id = ?').get('bp-ACTIVO-001');
+  const eventosT12Pre = _countEventos();
+  const r12 = call('gh:update-personal', {
+    personalId: 'bp-ACTIVO-001', updates: { estado: 'retirado' }
+  });
+  _assertEq(r12 && r12.success, false, 'T12.1 success=false');
+  _assertEq(r12.error.code, 'PROTECTED_FIELD', 'T12.2 error.code=PROTECTED_FIELD');
+  _assert(r12.error.extra && r12.error.extra.blockedFields && r12.error.extra.blockedFields.indexOf('estado') >= 0,
+    'T12.3 error.extra.blockedFields incluye "estado"');
+  const bpT12Post = db.prepare('SELECT estado, fecha_retiro FROM base_personal WHERE id = ?').get('bp-ACTIVO-001');
+  _assertEq(bpT12Post.estado, estadoT12Pre.estado, 'T12.4 bp.estado intacto');
+  _assertEq(bpT12Post.fecha_retiro, estadoT12Pre.fecha_retiro, 'T12.5 bp.fecha_retiro intacto');
+  _assertEq(_countEventos(), eventosT12Pre, 'T12.6 0 eventos nuevos');
+
+  // ============================================================
+  // TEST 13 · gh:update-personal rechaza fechaRetiro (PROTECTED_FIELD)
+  // ============================================================
+  console.log('');
+  console.log('[T13] gh:update-personal rechaza fechaRetiro (PROTECTED_FIELD)');
+  const eventosT13Pre = _countEventos();
+  const r13 = call('gh:update-personal', {
+    personalId: 'bp-ACTIVO-001', updates: { fechaRetiro: '2024-08-15T00:00:00.000Z' }
+  });
+  _assertEq(r13 && r13.success, false, 'T13.1 success=false');
+  _assertEq(r13.error.code, 'PROTECTED_FIELD', 'T13.2 error.code=PROTECTED_FIELD');
+  _assert(r13.error.extra && r13.error.extra.blockedFields && r13.error.extra.blockedFields.indexOf('fechaRetiro') >= 0,
+    'T13.3 error.extra.blockedFields incluye "fechaRetiro"');
+  _assertEq(_countEventos(), eventosT13Pre, 'T13.4 0 eventos nuevos');
+
+  // ============================================================
+  // TEST 14 · gh:create-personal rechaza fechaRetiro (INVALID_INPUT)
+  // ============================================================
+  console.log('');
+  console.log('[T14] gh:create-personal rechaza fechaRetiro (INVALID_INPUT)');
+  const bpT14Pre = _countBp();
+  const r14 = call('gh:create-personal', {
+    token: 't', companyName: 'TEMPOACTIVA EST S.A.S.',
+    data: {
+      nombres: 'Test', apellidos: 'FechaRetiro', cedula: '8888888888',
+      cargo: 'X', salario: 1000000, fechaIngreso: '2026-01-01',
+      fechaRetiro: '2024-01-01'  // ← NO permitido
+    }
+  });
+  _assertEq(r14 && r14.success, false, 'T14.1 success=false');
+  _assertEq(r14.error.code, 'INVALID_INPUT', 'T14.2 error.code=INVALID_INPUT');
+  _assertEq(_countBp(), bpT14Pre, 'T14.3 bp no creado');
+
+  // ============================================================
+  // TEST 15 · gh:update-personal rechaza fechaIngreso (PROTECTED_FIELD)
+  // ============================================================
+  console.log('');
+  console.log('[T15] gh:update-personal rechaza fechaIngreso (PROTECTED_FIELD)');
+  const r15 = call('gh:update-personal', {
+    personalId: 'bp-ACTIVO-001', updates: { fechaIngreso: '2020-01-01' }
+  });
+  _assertEq(r15 && r15.success, false, 'T15.1 success=false');
+  _assertEq(r15.error.code, 'PROTECTED_FIELD', 'T15.2 error.code=PROTECTED_FIELD');
+  _assert(r15.error.extra && r15.error.extra.blockedFields && r15.error.extra.blockedFields.indexOf('fechaIngreso') >= 0,
+    'T15.3 error.extra.blockedFields incluye "fechaIngreso"');
+
+  // ============================================================
+  // TEST 16 · gh:update-personal acepta campo normal (cargo)
+  // ============================================================
+  console.log('');
+  console.log('[T16] gh:update-personal acepta cargo (campo normal)');
+  const cargoT16Pre = db.prepare('SELECT cargo FROM base_personal WHERE id = ?').get('bp-ACTIVO-001').cargo;
+  const r16 = call('gh:update-personal', {
+    personalId: 'bp-ACTIVO-001', updates: { cargo: 'Nuevo Cargo T16' }
+  });
+  _assertEq(r16 && r16.success, true, 'T16.1 success=true');
+  const cargoT16Post = db.prepare('SELECT cargo FROM base_personal WHERE id = ?').get('bp-ACTIVO-001').cargo;
+  _assertEq(cargoT16Post, 'Nuevo Cargo T16', 'T16.2 cargo actualizado');
+  // Restaurar
+  call('gh:update-personal', { personalId: 'bp-ACTIVO-001', updates: { cargo: cargoT16Pre } });
+
+  // ============================================================
+  // TEST 17 · gh:update-personal acepta campo normal (email)
+  // ============================================================
+  console.log('');
+  console.log('[T17] gh:update-personal acepta email (campo normal)');
+  const r17 = call('gh:update-personal', {
+    personalId: 'bp-ACTIVO-001', updates: { email: 't17@example.com' }
+  });
+  _assertEq(r17 && r17.success, true, 'T17.1 success=true');
+  const emailT17 = db.prepare('SELECT email FROM base_personal WHERE id = ?').get('bp-ACTIVO-001').email;
+  _assertEq(emailT17, 't17@example.com', 'T17.2 email actualizado');
+
+  // ============================================================
+  // TEST 18 · gh:update-personal rechaza payload mixto (nombre + estado) + ROLLBACK
+  // 📦767 · I-103.A1.0-G.2 · El rechazo debe ser atómico: no se aplica nada.
+  // ============================================================
+  console.log('');
+  console.log('[T18] gh:update-personal rechaza mixto (nombre + estado) con ROLLBACK completo');
+  const nombreT18Pre = db.prepare('SELECT nombres FROM base_personal WHERE id = ?').get('bp-ACTIVO-001').nombres;
+  const eventosT18Pre = _countEventos();
+  const r18 = call('gh:update-personal', {
+    personalId: 'bp-ACTIVO-001', updates: { nombres: 'Nuevo Nombre T18', estado: 'retirado' }
+  });
+  _assertEq(r18 && r18.success, false, 'T18.1 success=false');
+  _assertEq(r18.error.code, 'PROTECTED_FIELD', 'T18.2 error.code=PROTECTED_FIELD');
+  const nombreT18Post = db.prepare('SELECT nombres FROM base_personal WHERE id = ?').get('bp-ACTIVO-001').nombres;
+  _assertEq(nombreT18Post, nombreT18Pre, 'T18.3 nombre NO cambió (rollback completo)');
+  _assertEq(_countEventos(), eventosT18Pre, 'T18.4 0 eventos nuevos');
+
+  // ============================================================
+  // TEST 19 · gh:update-personal rechaza mixto (cargo + salario + fechaIngreso) + ROLLBACK
+  // ============================================================
+  console.log('');
+  console.log('[T19] gh:update-personal rechaza mixto (cargo + salario + fechaIngreso) con ROLLBACK');
+  const cargoT19Pre = db.prepare('SELECT cargo FROM base_personal WHERE id = ?').get('bp-ACTIVO-001').cargo;
+  const salarioT19Pre = db.prepare('SELECT salario FROM base_personal WHERE id = ?').get('bp-ACTIVO-001').salario;
+  const r19 = call('gh:update-personal', {
+    personalId: 'bp-ACTIVO-001',
+    updates: { cargo: 'T19 Cargo', salario: 9999, fechaIngreso: '2020-01-01' }
+  });
+  _assertEq(r19 && r19.success, false, 'T19.1 success=false');
+  _assertEq(r19.error.code, 'PROTECTED_FIELD', 'T19.2 error.code=PROTECTED_FIELD');
+  const cargoT19Post = db.prepare('SELECT cargo FROM base_personal WHERE id = ?').get('bp-ACTIVO-001').cargo;
+  const salarioT19Post = db.prepare('SELECT salario FROM base_personal WHERE id = ?').get('bp-ACTIVO-001').salario;
+  _assertEq(cargoT19Post, cargoT19Pre, 'T19.3 cargo NO cambió (rollback)');
+  _assertEq(salarioT19Post, salarioT19Pre, 'T19.4 salario NO cambió (rollback)');
+
+  // ============================================================
   // RESUMEN
   // ============================================================
   console.log('');
