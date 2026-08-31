@@ -9,7 +9,7 @@
 
 const initSqlJs = require('sql.js');
 
-const { SCHEMA_SQL } = require('./gestion-humana-schema-sql');
+const { SCHEMA_SQL, MIGRATIONS_SQL } = require('./gestion-humana-schema-sql');
 const { registerGestionHumanaHandlers } = require('./gestion-humana-bridge');
 
 let _passed = 0;
@@ -38,10 +38,15 @@ function _logSection(n, title) {
   const SQL = await initSqlJs();
   const rawDb = new SQL.Database();
   rawDb.exec(SCHEMA_SQL);
+  // 📦767 · FASE 1.0-G.2 · Aplicar MIGRATIONS_SQL (idempotente, mismo patrón que test-e2e)
+  // Incluye gh_eventos_personal necesaria para gh:cambiar-estado en TEST 9.6.
+  MIGRATIONS_SQL.forEach(function (sql) {
+    try { rawDb.exec(sql); } catch (e) { /* idempotent: ignore */ }
+  });
   rawDb.exec("CREATE TABLE IF NOT EXISTS companies (id TEXT PRIMARY KEY, company_key TEXT UNIQUE NOT NULL, display_name TEXT NOT NULL);");
   rawDb.run("INSERT INTO companies (id, company_key, display_name) VALUES (?, ?, ?)",
     ['co-tempoactiva', 'tempoactiva', 'TEMPOACTIVA EST S.A.S.']);
-  console.log('  ✓ BD en memoria inicializada');
+  console.log('  ✓ BD en memoria inicializada (schema + migrations)');
 
   // Wrap sql.js en una API compatible con better-sqlite3 (mismo patrón que test-newtables)
   const db = {
@@ -234,9 +239,18 @@ function _logSection(n, title) {
   console.log('  ✓ Duplicado actualizado, nuevo creado');
 
   // ========== TEST 9.6: import-personal — update preserva retirado ==========
-  _logSection('9.6', 'gh:import-personal — update preserva estado=retirado');
-  // Marcar manualmente al 1009 como retirado via update-personal
-  registeredHandlers['gh:update-personal']({}, { token: 'test', personalId: getRes.data.personal.id, updates: { estado: 'retirado' } });
+  // 📦767 · FASE 1.0-G.2 · Antes: usaba gh:update-personal({estado:'retirado'}) — bypass prohibido.
+  // Ahora: usa gh:cambiar-estado (camino correcto) + verifica que se generó el evento RETIRO.
+  _logSection('9.6', 'gh:import-personal — update preserva estado=retirado (via gh:cambiar-estado)');
+  // Marcar al 1009 como retirado via gh:cambiar-estado (camino correcto)
+  var r96prep = registeredHandlers['gh:cambiar-estado']({}, {
+    token: 'test', personalId: getRes.data.personal.id, estado: 'retirado', fechaRetiro: '2024-08-15T00:00:00.000Z'
+  });
+  _assert(r96prep && r96prep.success === true, 'prep: gh:cambiar-estado a retirado retorna success=true');
+  _assertEq(r96prep.data.estado, 'retirado', 'prep: data.estado=retirado');
+  // Verificar que se generó el evento RETIRO (consistencia 1.0-D-1)
+  var evtCount96 = db.prepare("SELECT COUNT(*) AS n FROM gh_eventos_personal WHERE trabajador_id = ? AND tipo_evento = 'RETIRO'").get(getRes.data.personal.id).n;
+  _assertEq(evtCount96, 1, 'prep: 1 evento RETIRO generado por gh:cambiar-estado');
   // Ahora intentar "actualizar" ese registro con estado=activo (debería preservar retirado)
   var r96 = await registeredHandlers['gh:import-personal']({}, {
     companyName: 'TEMPOACTIVA EST S.A.S.',
@@ -249,7 +263,10 @@ function _logSection(n, title) {
   var getRes2 = registeredHandlers['gh:get-personal']({}, { token: 'test', personalId: r8.data.skipped[0].id });
   _assertEq(getRes2.data.personal.estado, 'retirado', 'estado preservado como retirado');
   _assertEq(getRes2.data.personal.nombres, 'Juan Cambiado', 'pero nombres sí se actualizaron');
-  console.log('  ✓ Estado retirado preservado, otros campos sí actualizados');
+  // Verificar que el evento RETIRO sigue existiendo (no se duplicó ni eliminó)
+  var evtCount96b = db.prepare("SELECT COUNT(*) AS n FROM gh_eventos_personal WHERE trabajador_id = ? AND tipo_evento = 'RETIRO'").get(getRes.data.personal.id).n;
+  _assertEq(evtCount96b, 1, 'evento RETIRO sigue existiendo tras import-update');
+  console.log('  ✓ Estado retirado preservado, otros campos sí actualizados, evento RETIRO intacto');
 
   // ========== TEST 10: import-personal — validación de campos requeridos ==========
   _logSection('10', 'gh:import-personal — validación de campos requeridos');
@@ -274,6 +291,108 @@ function _logSection(n, title) {
   // En este test ya validamos que funciona — no testeamos el "sin token" porque
   // requeriría un mock más complejo de validateSession.
   console.log('  ✓ (cubierto por los tests anteriores que usan token=test)');
+
+  // ========== TEST 20-25: FASE 1.0-G.2 — política estricta de campos de ciclo en import-update ==========
+  // 📦767 · I-103.A1.0-G.2 · Estas pruebas verifican que import-update NUNCA modifica
+  // el ciclo laboral de un bp existente, solo completa datos faltantes.
+  var _testIdCounter = 3000;
+
+  // ========== TEST 20: activo + fecha_ingreso existente + Excel con fecha distinta → CONSERVAR ==========
+  _logSection('20', 'gh:import-personal — activo con fecha_ingreso existente: Excel NO pisa');
+  // Crear bp activo con fecha_ingreso conocida
+  var bpT20Id = 'bp-test-t20-' + (++_testIdCounter);
+  rawDb.exec("INSERT INTO base_personal (id, empresa_id, nombres, apellidos, cedula, estado, activo, fecha_ingreso, created_at, updated_at) VALUES ('" + bpT20Id + "', 'tempoactiva', 'Test T20', 'Ingreso', '2020', 'activo', 1, '2020-05-10', '2025-09-01', '2025-09-01')");
+  // Intentar update con fecha_ingreso distinta
+  var r20 = await registeredHandlers['gh:import-personal']({}, {
+    token: 'test',
+    companyName: 'TEMPOACTIVA EST S.A.S.',
+    rows: [{ cedula: '2020', nombres: 'Test T20', apellidos: 'Cambiado', fechaIngreso: '2021-01-01' }],
+    duplicateMode: 'update'
+  });
+  _assert(r20.success === true, 'T20.1 import update retorna success=true');
+  _assertEq(r20.data.updated, 1, 'T20.2 updated = 1');
+  var bpT20Post = db.prepare("SELECT fecha_ingreso FROM base_personal WHERE id = ?").get(bpT20Id);
+  _assertEq(bpT20Post.fecha_ingreso, '2020-05-10', 'T20.3 fecha_ingreso se CONSERVA (no se pisa con Excel)');
+  console.log('  ✓ fecha_ingreso existente se conserva');
+
+  // ========== TEST 21: retirado + fecha_retiro existente + Excel con fecha distinta → CONSERVAR ==========
+  _logSection('21', 'gh:import-personal — retirado con fecha_retiro existente: Excel NO pisa');
+  // Crear bp retirado con fecha_retiro histórica
+  var bpT21Id = 'bp-test-t21-' + (++_testIdCounter);
+  rawDb.exec("INSERT INTO base_personal (id, empresa_id, nombres, apellidos, cedula, estado, activo, fecha_ingreso, fecha_retiro, created_at, updated_at) VALUES ('" + bpT21Id + "', 'tempoactiva', 'Test T21', 'Retiro', '2021', 'retirado', 1, '2018-01-01', '20240101', '2025-09-01', '2025-09-01')");
+  var r21 = await registeredHandlers['gh:import-personal']({}, {
+    token: 'test',
+    companyName: 'TEMPOACTIVA EST S.A.S.',
+    rows: [{ cedula: '2021', nombres: 'Test T21', apellidos: 'Cambiado', fechaRetiro: '20240201' }],
+    duplicateMode: 'update'
+  });
+  _assert(r21.success === true, 'T21.1 import update retorna success=true');
+  var bpT21Post = db.prepare("SELECT fecha_retiro, estado FROM base_personal WHERE id = ?").get(bpT21Id);
+  _assertEq(bpT21Post.fecha_retiro, '20240101', 'T21.2 fecha_retiro se CONSERVA (no se pisa)');
+  _assertEq(bpT21Post.estado, 'retirado', 'T21.3 estado se CONSERVA');
+  console.log('  ✓ fecha_retiro existente se conserva (regla estricta)');
+
+  // ========== TEST 22: retirado con fecha_retiro=NULL + Excel con fecha → CONSERVAR NULL ==========
+  _logSection('22', 'gh:import-personal — retirado con fecha_retiro=NULL: Excel NO completa');
+  var bpT22Id = 'bp-test-t22-' + (++_testIdCounter);
+  rawDb.exec("INSERT INTO base_personal (id, empresa_id, nombres, apellidos, cedula, estado, activo, fecha_ingreso, fecha_retiro, created_at, updated_at) VALUES ('" + bpT22Id + "', 'tempoactiva', 'Test T22', 'SinFecha', '2022', 'retirado', 1, '2018-01-01', NULL, '2025-09-01', '2025-09-01')");
+  var r22 = await registeredHandlers['gh:import-personal']({}, {
+    token: 'test',
+    companyName: 'TEMPOACTIVA EST S.A.S.',
+    rows: [{ cedula: '2022', nombres: 'Test T22', apellidos: 'Cambiado', fechaRetiro: '20240101' }],
+    duplicateMode: 'update'
+  });
+  _assert(r22.success === true, 'T22.1 import update retorna success=true');
+  var bpT22Post = db.prepare("SELECT fecha_retiro FROM base_personal WHERE id = ?").get(bpT22Id);
+  _assertEq(bpT22Post.fecha_retiro, null, 'T22.2 fecha_retiro se CONSERVA NULL (NO se completa con Excel)');
+  console.log('  ✓ fecha_retiro NULL se conserva (regla estricta)');
+
+  // ========== TEST 23: retirado con fecha_ingreso existente + Excel distinto → CONSERVAR ==========
+  _logSection('23', 'gh:import-personal — retirado con fecha_ingreso existente: Excel NO pisa');
+  var bpT23Id = 'bp-test-t23-' + (++_testIdCounter);
+  rawDb.exec("INSERT INTO base_personal (id, empresa_id, nombres, apellidos, cedula, estado, activo, fecha_ingreso, fecha_retiro, created_at, updated_at) VALUES ('" + bpT23Id + "', 'tempoactiva', 'Test T23', 'RetIng', '2023', 'retirado', 1, '2018-01-01', '20240101', '2025-09-01', '2025-09-01')");
+  var r23 = await registeredHandlers['gh:import-personal']({}, {
+    token: 'test',
+    companyName: 'TEMPOACTIVA EST S.A.S.',
+    rows: [{ cedula: '2023', nombres: 'Test T23', apellidos: 'Cambiado', fechaIngreso: '2019-01-01' }],
+    duplicateMode: 'update'
+  });
+  _assert(r23.success === true, 'T23.1 import update retorna success=true');
+  var bpT23Post = db.prepare("SELECT fecha_ingreso FROM base_personal WHERE id = ?").get(bpT23Id);
+  _assertEq(bpT23Post.fecha_ingreso, '2018-01-01', 'T23.2 fecha_ingreso se CONSERVA (no se pisa)');
+  console.log('  ✓ fecha_ingreso de retirado se conserva');
+
+  // ========== TEST 24: activo + Excel con fecha_retiro → REPORTE + no asigna ==========
+  _logSection('24', 'gh:import-personal — activo con fecha_retiro en Excel: warning + no asigna');
+  var bpT24Id = 'bp-test-t24-' + (++_testIdCounter);
+  rawDb.exec("INSERT INTO base_personal (id, empresa_id, nombres, apellidos, cedula, estado, activo, fecha_ingreso, created_at, updated_at) VALUES ('" + bpT24Id + "', 'tempoactiva', 'Test T24', 'ActivoConRet', '2024', 'activo', 1, '2020-01-01', '2025-09-01', '2025-09-01')");
+  var r24 = await registeredHandlers['gh:import-personal']({}, {
+    token: 'test',
+    companyName: 'TEMPOACTIVA EST S.A.S.',
+    rows: [{ cedula: '2024', nombres: 'Test T24', apellidos: 'Activo', fechaRetiro: '20240101' }],
+    duplicateMode: 'update'
+  });
+  _assert(r24.success === true, 'T24.1 import update retorna success=true (no aborta)');
+  _assert(r24.data.errors.length >= 1, 'T24.2 errors >= 1 (warning reportado)');
+  var bpT24Post = db.prepare("SELECT fecha_retiro, estado FROM base_personal WHERE id = ?").get(bpT24Id);
+  _assertEq(bpT24Post.fecha_retiro, null, 'T24.3 fecha_retiro sigue NULL (no se asignó)');
+  _assertEq(bpT24Post.estado, 'activo', 'T24.4 estado sigue activo');
+  console.log('  ✓ BP activo con fecha_retiro en Excel: warning + no asigna');
+
+  // ========== TEST 25: activo con fecha_ingreso=NULL + Excel con fecha → COMPLETAR ==========
+  _logSection('25', 'gh:import-personal — activo con fecha_ingreso=NULL: Excel SÍ completa');
+  var bpT25Id = 'bp-test-t25-' + (++_testIdCounter);
+  rawDb.exec("INSERT INTO base_personal (id, empresa_id, nombres, apellidos, cedula, estado, activo, fecha_ingreso, created_at, updated_at) VALUES ('" + bpT25Id + "', 'tempoactiva', 'Test T25', 'SinIng', '2025', 'activo', 1, NULL, '2025-09-01', '2025-09-01')");
+  var r25 = await registeredHandlers['gh:import-personal']({}, {
+    token: 'test',
+    companyName: 'TEMPOACTIVA EST S.A.S.',
+    rows: [{ cedula: '2025', nombres: 'Test T25', apellidos: 'ConIng', fechaIngreso: '2020-01-15' }],
+    duplicateMode: 'update'
+  });
+  _assert(r25.success === true, 'T25.1 import update retorna success=true');
+  var bpT25Post = db.prepare("SELECT fecha_ingreso FROM base_personal WHERE id = ?").get(bpT25Id);
+  _assertEq(bpT25Post.fecha_ingreso, '2020-01-15', 'T25.2 fecha_ingreso se COMPLETA con Excel');
+  console.log('  ✓ fecha_ingreso NULL se completa con Excel (única excepción)');
 
   // ========== RESUMEN ==========
   console.log('');

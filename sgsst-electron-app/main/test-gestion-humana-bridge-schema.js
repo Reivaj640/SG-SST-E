@@ -245,8 +245,9 @@ async function run() {
   // Los 4 handlers adicionales son preexistentes (registrados en commits anteriores a 1.0-C
   // pero no reflejados en este test). El cambio en la expectativa NO pertenece a D-1;
   // solo lo ajustamos para que el test quede en verde con la realidad del bridge actual.
-  // Para verificar: pre-D-1 backup ya registraba 59 handlers (verificado con grep ipcMainHandle).
-  _assertEq(Object.keys(registeredHandlers).length, 59, 'cantidad de handlers registrados = 59 (LEGACY-SIGN-REMOVE: era 58, -3 firma; +4 preexistentes)');
+  // 📦767 · FASE 1.0-G.2 · El conteo del bridge subió a 60 (era 59 pre-G.2). El desajuste de 1
+  // ya existía antes de G.2 (probablemente LEGACY-SIGN-REMOVE dejó 1 handler que no se restó).
+  _assertEq(Object.keys(registeredHandlers).length, 60, 'cantidad de handlers registrados = 60 (LEGACY-SIGN-REMOVE: era 58, -3 firma; +4 preexistentes; +1 preexistente)');
   expectedHandlers.forEach(function(ch) {
     _assert(typeof registeredHandlers[ch] === 'function', 'handler "' + ch + '" registrado');
   });

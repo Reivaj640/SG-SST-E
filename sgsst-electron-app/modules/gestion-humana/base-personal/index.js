@@ -775,33 +775,6 @@ class BasePersonalComponent {
     this._create(values);
   }
 
-  async _openEditModal(personalId) {
-    var p = this.personales.find(function (x) { return x.id === personalId; });
-    if (!p) {
-      this._showToast('Trabajador no encontrado', 'error');
-      return;
-    }
-    var values = await this._confirmDialog().input({
-      title: '✏️ Editar Trabajador',
-      message: 'Modificá los campos que necesites. Dejá vacío lo que no cambia.',
-      fields: [
-        { key: 'nombres', label: 'Nombres', type: 'text', required: true, value: p.nombres || '' },
-        { key: 'apellidos', label: 'Apellidos', type: 'text', required: true, value: p.apellidos || '' },
-        { key: 'cedula', label: 'Cédula', type: 'text', required: true, value: p.cedula || '' },
-        { key: 'cargo', label: 'Cargo', type: 'text', required: true, value: p.cargo || '' },
-        { key: 'salario', label: 'Salario (COP)', type: 'number', value: p.salario || '' },
-        { key: 'telefono', label: 'Teléfono', type: 'text', value: p.telefono || '' },
-        { key: 'email', label: 'Email', type: 'text', value: p.email || '' },
-        { key: 'fechaIngreso', label: 'Fecha de Ingreso (YYYY-MM-DD)', type: 'text', value: p.fechaIngreso || '' },
-        { key: 'estado', label: 'Estado', type: 'text', value: p.estado || 'activo' }
-      ],
-      confirmText: 'Guardar Cambios',
-      type: 'info'
-    });
-    if (!values) return;
-    this._update(personalId, values);
-  }
-
   // 📦767 · I-103.A1.0-F-1 · Acción administrativa (NO retiro laboral).
   // Solo oculta el bp. NO modifica estado ni fecha_retiro. NO genera evento.
   // El bp debe estar retirado previamente (validado en el backend con BP_NOT_RETIRED).
@@ -816,6 +789,73 @@ class BasePersonalComponent {
     });
     if (!confirmed) return;
     this._delete(personalId);
+  }
+
+  // 📦767 · FASE 1.0-G.2 · Retiro laboral via gh:cambiar-estado.
+  // Esta acción es la única vía para retirar un bp en producción.
+  // El backend (1.0-B/C/D-1) registra el evento RETIRO atómicamente.
+  async _openRetirarConfirm(personalId, nombre, parentModal) {
+    var self = this;
+    var confirmed = await this._confirmDialog().confirm({
+      title: '🔴 Retirar Trabajador',
+      message: '¿Querés retirar a "' + nombre + '"?',
+      details: 'Cambio laboral: estado → retirado, fecha_retiro → hoy, evento RETIRO registrado. La acción se puede revertir con un Reingreso posterior. Para ocultar sin retirar, use la acción administrativa "Ocultar".',
+      confirmText: 'Sí, retirar',
+      cancelText: 'Cancelar',
+      type: 'warning'
+    });
+    if (!confirmed) return;
+    try {
+      var today = new Date().toISOString();
+      var r = await window.electronAPI.ghCambiarEstado({
+        personalId: personalId,
+        estado: 'retirado',
+        fechaRetiro: today,
+        notas: 'Retiro desde Ver/Editar Trabajador'
+      });
+      if (!r || !r.success) {
+        self._showToast('Error: ' + (r && r.error ? r.error.message : 'desconocido'), 'error');
+        return;
+      }
+      self._showToast('🔴 Trabajador retirado. Evento RETIRO registrado.', 'success');
+      // Cerrar el modal y refrescar la lista
+      if (parentModal) parentModal.remove();
+      await self._load();
+    } catch (e) {
+      self._showToast('Error: ' + e.message, 'error');
+    }
+  }
+
+  // 📦767 · FASE 1.0-G.2 · Reingreso laboral via gh:cambiar-estado.
+  // El backend (1.0-C/D-1) limpia fecha_retiro y registra evento REINGRESO atómicamente.
+  async _openReingresarConfirm(personalId, nombre, parentModal) {
+    var self = this;
+    var confirmed = await this._confirmDialog().confirm({
+      title: '🟢 Reingresar Trabajador',
+      message: '¿Querés reingresar a "' + nombre + '"?',
+      details: 'Cambio laboral: estado → activo, fecha_retiro → NULL, evento REINGRESO registrado. Si necesitás una nueva contratación, use el flujo "Nueva contratación" desde Gestión Humana → Contrataciones.',
+      confirmText: 'Sí, reingresar',
+      cancelText: 'Cancelar',
+      type: 'info'
+    });
+    if (!confirmed) return;
+    try {
+      var r = await window.electronAPI.ghCambiarEstado({
+        personalId: personalId,
+        estado: 'activo',
+        notas: 'Reingreso desde Ver/Editar Trabajador'
+      });
+      if (!r || !r.success) {
+        self._showToast('Error: ' + (r && r.error ? r.error.message : 'desconocido'), 'error');
+        return;
+      }
+      self._showToast('🟢 Trabajador reingresado. Evento REINGRESO registrado.', 'success');
+      // Cerrar el modal y refrescar la lista
+      if (parentModal) parentModal.remove();
+      await self._load();
+    } catch (e) {
+      self._showToast('Error: ' + e.message, 'error');
+    }
   }
 
   _exportarCSV() {
@@ -1405,6 +1445,20 @@ class BasePersonalComponent {
     if (cancelBtn) cancelBtn.onclick = function () { modal.remove(); self._openDetail(personalId); };
     var saveBtn = modal.querySelector('[data-action="save"]');
     if (saveBtn) saveBtn.onclick = function () { self._saveDetailEdit(modal, personalId); };
+    // 📦767 · FASE 1.0-G.2 · Wire up de los botones de transición de ciclo.
+    // Retirar trabajador / Reingresar invocan gh:cambiar-estado (no update-personal).
+    var retirarBtn = modal.querySelector('[data-action="retirar-trabajador"]');
+    if (retirarBtn) retirarBtn.onclick = function () {
+      var pid = retirarBtn.getAttribute('data-personal-id');
+      var nombre = retirarBtn.getAttribute('data-nombre') || '';
+      self._openRetirarConfirm(pid, nombre, modal);
+    };
+    var reingresarBtn = modal.querySelector('[data-action="reingresar-trabajador"]');
+    if (reingresarBtn) reingresarBtn.onclick = function () {
+      var pid = reingresarBtn.getAttribute('data-personal-id');
+      var nombre = reingresarBtn.getAttribute('data-nombre') || '';
+      self._openReingresarConfirm(pid, nombre, modal);
+    };
     // 📦748 · Cargar datos de los tabs relacionados (vacaciones, permisos, documentos) en background
     self._loadDetailTabs(modal, personalId);
   }
@@ -1521,11 +1575,20 @@ class BasePersonalComponent {
   }
 
   // 📦739 · Lee los inputs del modal y llama a ghUpdatePersonal
+  // 📦767 · FASE 1.0-G.2 · Los campos de ciclo (estado, fechaRetiro, fechaIngreso)
+  // NO se incluyen en `updates` — se manejan exclusivamente via Retirar/Reingresar/Recontratar.
   async _saveDetailEdit(modal, personalId) {
     var self = this;
     var updates = {};
+    // 📦767 · I-103.A1.0-G.2 · Campos de ciclo excluidos explícitamente de update-personal.
+    // Si la UI los incluye por error, el bridge los rechazará con PROTECTED_FIELD,
+    // pero igual los limpiamos aquí para mantener el contrato claro en el frontend.
+    var PROTECTED_FIELDS = ['estado', 'fechaRetiro', 'fechaIngreso'];
     modal.querySelectorAll('input[data-edit], select[data-edit]').forEach(function (inp) {
       var name = inp.getAttribute('name');
+      if (!name) return;
+      // Bloquear campos de ciclo aunque estén en el DOM
+      if (PROTECTED_FIELDS.indexOf(name) !== -1) return;
       var v = inp.value;
       // Mapear campos a los nombres del bridge
       if (name === 'activoS400') {
@@ -1534,10 +1597,6 @@ class BasePersonalComponent {
         updates[name] = v;
       }
     });
-    // Si la fecha de retiro quedó vacía, la mandamos como null
-    if (updates.fechaRetiro === '') updates.fechaRetiro = null;
-    // Si el estado quedó vacío, no tocar (preservar histórico)
-    if (updates.estado === '' || updates.estado == null) delete updates.estado;
     // Si cambió el nombre del header, re-renderizarlo después
     var newName = (updates.nombres || '') + ' ' + (updates.apellidos || '');
     // Deshabilitar el botón Guardar mientras se procesa
@@ -1638,17 +1697,38 @@ class BasePersonalComponent {
     '</div>';
 
     // Tab: Datos Laborales
+    // 📦767 · FASE 1.0-G.2 · Campos de ciclo (fechaIngreso, fechaRetiro, estado) son READ-ONLY
+    // en este modal. La UI expone acciones (Retirar/Reingresar) en lugar de inputs.
+    // El cambio de ciclo pasa por los handlers correspondientes con sus eventos atómicos.
+    var estadoNorm = p.estado || 'activo';
+    var fechaIngresoDisplay = p.fechaIngreso
+      ? (typeof p.fechaIngreso === 'string' && p.fechaIngreso.indexOf('T') > 0
+          ? p.fechaIngreso.substring(0, 10) : p.fechaIngreso)
+      : '—';
+    var fechaRetiroDisplay = p.fechaRetiro
+      ? (typeof p.fechaRetiro === 'string' && p.fechaRetiro.indexOf('T') > 0
+          ? p.fechaRetiro.substring(0, 10) : p.fechaRetiro)
+      : '—';
+    // Botón de acción según el estado (solo visible si no es retirado actualmente)
+    var accionCicloBoton = '';
+    if (estadoNorm === 'activo') {
+      accionCicloBoton = '<button type="button" class="bp-detail-action bp-detail-action--danger" data-action="retirar-trabajador" data-personal-id="' + self._escHtml(p.id) + '" data-nombre="' + self._escHtml((p.nombres || '') + ' ' + (p.apellidos || '')) + '"><i class="fas fa-user-minus"></i> Retirar trabajador</button>';
+    } else if (estadoNorm === 'retirado') {
+      accionCicloBoton = '<button type="button" class="bp-detail-action bp-detail-action--success" data-action="reingresar-trabajador" data-personal-id="' + self._escHtml(p.id) + '" data-nombre="' + self._escHtml((p.nombres || '') + ' ' + (p.apellidos || '')) + '"><i class="fas fa-user-plus"></i> Reingresar</button>';
+    }
     var laboralTab = '<div class="bp-detail-grid" data-panel="laboral" hidden>' +
       field('fa-briefcase', 'Cargo', 'cargo', p.cargo) +
       field('fa-dollar-sign', 'Salario', 'salario', p.salario, 'number') +
       select('fa-file-contract', 'Tipo de Contrato', 'tipoContrato', p.tipoContrato,
         ['', 'indefinido', 'fijo', 'prestacion', 'obra_labor', 'aprendizaje']) +
-      field('fa-calendar-check', 'Fecha de Ingreso', 'fechaIngreso', p.fechaIngreso, 'date-display') +
-      field('fa-calendar-times', 'Fecha de Retiro', 'fechaRetiro', p.fechaRetiro, 'date-display') +
+      // 📦767 · I-103.A1.0-G.2 · fechaIngreso READ-ONLY: se muestra el valor actual, sin input.
+      '<div class="bp-detail-field"><div class="bp-detail-field__label"><i class="fas fa-calendar-check"></i> Fecha de Ingreso</div><div class="bp-detail-field__value" data-view>' + self._escHtml(self._fmtDateDisplay(fechaIngresoDisplay) || fechaIngresoDisplay) + '</div></div>' +
+      // 📦767 · I-103.A1.0-G.2 · fechaRetiro READ-ONLY.
+      '<div class="bp-detail-field"><div class="bp-detail-field__label"><i class="fas fa-calendar-times"></i> Fecha de Retiro</div><div class="bp-detail-field__value" data-view>' + self._escHtml(self._fmtDateDisplay(fechaRetiroDisplay) || fechaRetiroDisplay) + '</div></div>' +
       field('fa-building', 'Empresa Usuaria', 'empresaUsuaria', p.empresaUsuaria) +
       field('fa-map-marker-alt', 'Sede', 'sedeId', sedeName) +
-      select('fa-toggle-on', 'Estado', 'estado', p.estado,
-        ['activo', 'incapacitado', 'vacaciones', 'permiso', 'maternidad', 'paternidad', 'luto', 'retirado']) +
+      // 📦767 · I-103.A1.0-G.2 · Estado READ-ONLY como badge, con botón de acción al lado.
+      '<div class="bp-detail-field"><div class="bp-detail-field__label"><i class="fas fa-toggle-on"></i> Estado</div><div class="bp-detail-field__value" data-view>' + estadoBadge + (accionCicloBoton ? ' ' + accionCicloBoton : '') + '</div></div>' +
       field('fa-university', 'Banco', 'banco', p.banco) +
       field('fa-credit-card', 'Número de Cuenta', 'numeroCuenta', p.numeroCuenta) +
       select('fa-hard-hat', 'S400', 'activoS400', p.activoS400 == 1 ? 'Si' : 'No', ['No', 'Si']) +
