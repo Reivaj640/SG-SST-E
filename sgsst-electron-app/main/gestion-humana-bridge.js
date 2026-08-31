@@ -1143,7 +1143,12 @@ function _handlerCambiarEstado(token, personalId, estado, fechaRetiro, notas) {
   try {
     // 📦767 · FASE 1.0-C · SELECT incluye estado y fecha_retiro para
     // distinguir "retiro" de "reactivación" sin necesidad de un SELECT extra.
-    var existing = localDb.prepare('SELECT id, estado, activo, fecha_retiro FROM base_personal WHERE id = ?').get(personalId);
+    // 📦767 · FASE 1.0-D-1 · SELECT también incluye empresa_id, cargo, salario,
+    // fecha_ingreso para registrar el evento RETIRO/REINGRESO en gh_eventos_personal
+    // sin necesidad de un segundo SELECT.
+    var existing = localDb.prepare(
+      'SELECT id, empresa_id, estado, activo, fecha_retiro, cargo, salario, fecha_ingreso FROM base_personal WHERE id = ?'
+    ).get(personalId);
     if (!existing) return _err('NOT_FOUND', 'Trabajador no encontrado');
     if (existing.activo === 0) {
       return _err('ALREADY_DELETED', 'El trabajador está retirado, no se puede cambiar estado');
@@ -1154,7 +1159,8 @@ function _handlerCambiarEstado(token, personalId, estado, fechaRetiro, notas) {
     //   - estado="retirado"            → fecha_retiro = fechaRetiro || now (auto-set)
     //   - estado="activo" desde retirado → fecha_retiro = NULL (reactivación)
     //   - cualquier otro estado (vacaciones/permiso/etc) → fecha_retiro = NULL
-    // NO se preserva histórico aquí: eso es responsabilidad de gh_eventos_personal (Fase 1.0-D).
+    // En transiciones RETIRO/REINGRESO la fecha_retiro anterior se preserva
+    // en gh_eventos_personal.fecha_referencia antes de cualquier limpieza.
     var fechaFinal;
     if (estado === 'retirado') {
       fechaFinal = fechaRetiro || now;
@@ -1164,9 +1170,54 @@ function _handlerCambiarEstado(token, personalId, estado, fechaRetiro, notas) {
       fechaFinal = fechaRetiro || null;
     }
 
-    localDb.prepare(
-      "UPDATE base_personal SET estado = ?, fecha_retiro = ?, updated_at = ? WHERE id = ?"
-    ).run(estado, fechaFinal, now, personalId);
+    // 📦767 · FASE 1.0-D-1 · Detección de transiciones de ciclo laboral.
+    // RETIRO:    estado != 'retirado'  &&  estado_input == 'retirado'
+    // REINGRESO: estado == 'retirado'  &&  estado_input == 'activo'
+    // Solo estas dos transiciones generan evento en gh_eventos_personal.
+    // Cambios a vacaciones/permiso/etc NO son transiciones de ciclo → no se registran.
+    var esRetiro    = estado === 'retirado' && existing.estado !== 'retirado';
+    var esReingreso = estado === 'activo'   && existing.estado === 'retirado';
+    var hayTransicion = esRetiro || esReingreso;
+
+    if (hayTransicion) {
+      // Transacción atómica: o se aplican UPDATE bp + INSERT evento, o ninguno.
+      localDb.exec('BEGIN TRANSACTION');
+      try {
+        localDb.prepare(
+          "UPDATE base_personal SET estado = ?, fecha_retiro = ?, updated_at = ? WHERE id = ?"
+        ).run(estado, fechaFinal, now, personalId);
+
+        var tipoEvento = esRetiro ? 'RETIRO' : 'REINGRESO';
+        // fecha_referencia: para REINGRESO se preserva la fecha_retiro previa
+        //                  (que estamos a punto de limpiar). Para RETIRO queda NULL
+        //                  (no se limpia fecha_retiro en retiros).
+        var fechaRef = esReingreso ? existing.fecha_retiro : null;
+        var metadata = JSON.stringify({
+          cargoAnterior:        existing.cargo,
+          salarioAnterior:      existing.salario,
+          fechaIngresoAnterior: existing.fecha_ingreso,
+          fechaRetiroAnterior:  esReingreso ? existing.fecha_retiro : null,
+          fuente:               'cambiar-estado',
+          notas:                notas || null
+        });
+        var eventoId = _newId('ev-');
+        localDb.prepare(
+          "INSERT INTO gh_eventos_personal (id, empresa_id, trabajador_id, tipo_evento, fecha_evento, " +
+          "  estado_anterior, estado_nuevo, fecha_referencia, contratacion_id, metadata, usuario_id, created_at) " +
+          "VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)"
+        ).run(eventoId, existing.empresa_id, personalId, tipoEvento, now, existing.estado, estado, fechaRef, metadata, 'system', now);
+
+        localDb.exec('COMMIT');
+      } catch (innerErr) {
+        localDb.exec('ROLLBACK');
+        throw innerErr;
+      }
+    } else {
+      // Cambio administrativo (ej. activo → vacaciones): sin evento.
+      localDb.prepare(
+        "UPDATE base_personal SET estado = ?, fecha_retiro = ?, updated_at = ? WHERE id = ?"
+      ).run(estado, fechaFinal, now, personalId);
+    }
     return _ok({ personalId: personalId, estado: estado, fechaRetiro: fechaFinal });
   } catch (e) {
     console.error('[' + MOD + '][cambiar-estado]', e.message);
