@@ -1117,28 +1117,38 @@ function _handlerDeletePersonal(token, personalId) {
 }
 
 /**
- * gh:recontratar-personal (📦767 · I-103.A1.0-D-2)
- * Reactiva un bp retirado vinculándolo a una nueva CT. Registra evento RECONTRATACION.
+ * gh:recontratar-personal (📦767 · I-103.A1.0-E-refactor)
+ * Operación atómica de alto nivel: crea la nueva CT + reactiva el BP + vincula + registra RECONTRATACION.
  * RECONTRATACION siempre = BP retirado + nueva CT (sin CT es REINGRESO via gh:cambiar-estado).
- * Transacción atómica: UPDATE bp + INSERT evento + UPDATE ct = un solo commit lógico.
+ * Una sola transacción: o se aplica TODO (CT + BP + evento) o NADA.
  *
  * Input: {
- *   token, companyName, bpId, fechaRecontratacion? (default=now),
- *   contratacionId (obligatorio), cargo? (default=conserva anterior), salario?,
- *   motivo?, usuarioId? (default='system')
+ *   token, companyName, bpId,
+ *   contratacionData: {  // OBLIGATORIO — reemplaza contratacionId
+ *     nombres, apellidos, cedula, telefono?, cargo, salario?, fechaIngreso,
+ *     sedeId?, empresaUsuaria?
+ *   },
+ *   fechaRecontratacion? (default=now), motivo?, usuarioId? (default='system')
  * }
- * Devuelve: { success, data: { bpId, estado, fechaRetiro, fechaRecontratacion, eventoId, contratacionId } }
+ * Devuelve: { success, data: { bpId, estado, fechaRetiro, fechaRecontratacion, eventoId, contratacionId, contratacion: {...} } }
  */
-function _handlerRecontratarPersonal(token, companyName, bpId, fechaRecontratacion, contratacionId, cargo, salario, motivo, usuarioId) {
+function _handlerRecontratarPersonal(token, companyName, bpId, contratacionData, fechaRecontratacion, motivo, usuarioId) {
   var auth = _checkAuth(token);
   if (!auth.ok) return _err(auth.error.code, auth.error.message);
 
   if (!companyName || typeof companyName !== 'string') return _err('INVALID_INPUT', 'companyName es requerido');
   if (!bpId || typeof bpId !== 'string') return _err('INVALID_INPUT', 'bpId es requerido');
-  // 📦767 · D-2 · RECONTRATACION exige contratacionId. Sin CT no es recontratación, es REINGRESO via gh:cambiar-estado.
-  if (!contratacionId || typeof contratacionId !== 'string') {
-    return _err('CONTRATACION_ID_REQUIRED', 'gh:recontratar-personal requiere una contratacionId. Para reingresos sin CT use gh:cambiar-estado.');
+  // 📦767 · E-refactor · RECONTRATACION ahora exige contratacionData (objeto con datos de la nueva CT)
+  if (!contratacionData || typeof contratacionData !== 'object') {
+    return _err('CONTRATACION_DATA_REQUIRED', 'gh:recontratar-personal requiere contratacionData (objeto con datos de la nueva CT). Para reingresos sin CT use gh:cambiar-estado.');
   }
+  var cd = contratacionData;
+  if (!cd.nombres || typeof cd.nombres !== 'string') return _err('CONTRATACION_DATA_REQUIRED', 'contratacionData.nombres es requerido');
+  if (!cd.apellidos || typeof cd.apellidos !== 'string') return _err('CONTRATACION_DATA_REQUIRED', 'contratacionData.apellidos es requerido');
+  if (!cd.cedula || typeof cd.cedula !== 'string') return _err('CONTRATACION_DATA_REQUIRED', 'contratacionData.cedula es requerido');
+  if (!cd.cargo || typeof cd.cargo !== 'string') return _err('CONTRATACION_DATA_REQUIRED', 'contratacionData.cargo es requerido');
+  if (!cd.fechaIngreso || typeof cd.fechaIngreso !== 'string') return _err('CONTRATACION_DATA_REQUIRED', 'contratacionData.fechaIngreso es requerido (ISO 8601)');
+
   var fecha = (fechaRecontratacion && typeof fechaRecontratacion === 'string') ? fechaRecontratacion : new Date().toISOString();
 
   var company = _getCompanyByName(companyName);
@@ -1152,62 +1162,86 @@ function _handlerRecontratarPersonal(token, companyName, bpId, fechaRecontrataci
   try {
     // 1. SELECT bp (con lock implícito por SQLite — serializa)
     var bp = localDb.prepare(
-      'SELECT id, empresa_id, estado, activo, fecha_retiro, cargo, salario, fecha_ingreso FROM base_personal WHERE id = ?'
+      'SELECT id, empresa_id, estado, activo, fecha_retiro, cedula, cargo, salario, fecha_ingreso, sede_id, empresa_usuaria, telefono FROM base_personal WHERE id = ?'
     ).get(bpId);
     if (!bp) { localDb.exec('ROLLBACK'); return _err('NOT_FOUND', 'BP no encontrado'); }
     if (bp.empresa_id !== company.company_key) { localDb.exec('ROLLBACK'); return _err('BP_WRONG_COMPANY', 'El BP no pertenece a esta empresa'); }
     if (bp.activo === 0) { localDb.exec('ROLLBACK'); return _err('BP_DELETED', 'El BP está eliminado lógicamente'); }
     if (bp.estado !== 'retirado') { localDb.exec('ROLLBACK'); return _err('BP_NOT_RETIRED', 'El BP no está retirado (estado=' + bp.estado + ')'); }
+    // 📦767 · E-refactor · Defensiva: la cédula del form debe coincidir con la del bp
+    if (cd.cedula !== bp.cedula) {
+      localDb.exec('ROLLBACK');
+      return _err('CEDULA_MISMATCH', 'La cédula del form (' + cd.cedula + ') no coincide con la del bp (' + bp.cedula + ')');
+    }
 
-    // 2. Preservar fecha_retiro anterior (clave para auditoría)
+    // 2. Preservar históricos del ciclo anterior (clave para auditoría)
     var fechaRetiroAnterior = bp.fecha_retiro;
     var cargoAnterior = bp.cargo;
     var salarioAnterior = bp.salario;
     var fechaIngresoAnterior = bp.fecha_ingreso;
+    var telefonoAnterior = bp.telefono;
+    var sedeAnterior = bp.sede_id;
+    var empresaUsuariaAnterior = bp.empresa_usuaria;
 
-    // 3. Validar CT (obligatoria) ANTES del UPDATE bp
-    var ctValidated = localDb.prepare('SELECT id, empresa_id, estado, trabajador_id FROM contrataciones WHERE id = ?').get(contratacionId);
-    if (!ctValidated) { localDb.exec('ROLLBACK'); return _err('CT_NOT_FOUND', 'CT no encontrada'); }
-    if (ctValidated.empresa_id !== company.company_key) { localDb.exec('ROLLBACK'); return _err('CT_WRONG_COMPANY', 'La CT no pertenece a esta empresa'); }
-    if (ctValidated.estado === 'cancelado') { localDb.exec('ROLLBACK'); return _err('CT_CANCELED', 'La CT está cancelada, no se puede recontratar con ella'); }
-    if (ctValidated.trabajador_id && ctValidated.trabajador_id !== bpId) {
-      localDb.exec('ROLLBACK');
-      return _err('CT_ALREADY_LINKED', 'La CT ya está vinculada a otro bp activo', { linkedTo: ctValidated.trabajador_id });
-    }
-
-    // 4. Buscar CTs previas en_proceso del mismo bp (excluyendo la que se va a vincular)
-    var ctsPrevias = localDb.prepare("SELECT id FROM contrataciones WHERE trabajador_id = ? AND estado = 'en_proceso' AND id <> ?").all(bpId, ctValidated.id);
-
-    // 5. UPDATE bp: reactivar
-    var newCargo = cargo || cargoAnterior;
-    var newSalario = (salario !== undefined && salario !== null) ? salario : salarioAnterior;
+    // 3. INSERT INTO contrataciones (sin trabajador_id — se vincula después)
+    var ctId = _newId('ct-');
     var now = new Date().toISOString();
     localDb.prepare(
-      "UPDATE base_personal SET estado = 'activo', fecha_retiro = NULL, cargo = ?, salario = ?, updated_at = ? WHERE id = ?"
-    ).run(newCargo, newSalario, now, bpId);
+      "INSERT INTO contrataciones (id, empresa_id, nombres, apellidos, cedula, telefono, cargo, salario, " +
+      "  fecha_ingreso, sede_id, empresa_usuaria, paso_actual, estado, created_at, updated_at) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'en_proceso', ?, ?)"
+    ).run(
+      ctId, company.company_key,
+      cd.nombres, cd.apellidos,
+      cd.cedula, cd.telefono || null,
+      cd.cargo, cd.salario || null,
+      cd.fechaIngreso,
+      cd.sedeId || null, cd.empresaUsuaria || null,
+      now, now
+    );
 
-    // 6. INSERT evento (en la misma transacción)
+    // 4. UPDATE base_personal: reactivar + aplicar nuevos datos del form
+    //    - fecha_retiro = NULL (limpieza)
+    //    - estado = 'activo'
+    //    - cargo/salario/fecha_ingreso/sede_id/empresa_usuaria/telefono = del form (pueden cambiar)
+    var newCargo = cd.cargo;
+    var newSalario = (cd.salario !== undefined && cd.salario !== null) ? cd.salario : salarioAnterior;
+    var newFechaIngreso = cd.fechaIngreso;
+    var newSede = cd.sedeId || sedeAnterior;
+    var newEmpresaUsuaria = cd.empresaUsuaria || empresaUsuariaAnterior;
+    var newTelefono = cd.telefono || telefonoAnterior;
+    localDb.prepare(
+      "UPDATE base_personal SET estado = 'activo', fecha_retiro = NULL, cargo = ?, salario = ?, " +
+      "  fecha_ingreso = ?, sede_id = ?, empresa_usuaria = ?, telefono = ?, updated_at = ? WHERE id = ?"
+    ).run(newCargo, newSalario, newFechaIngreso, newSede, newEmpresaUsuaria, newTelefono, now, bpId);
+
+    // 5. UPDATE contrataciones SET trabajador_id = bpId (vincular)
+    localDb.prepare("UPDATE contrataciones SET trabajador_id = ?, updated_at = ? WHERE id = ?").run(bpId, now, ctId);
+
+    // 6. INSERT evento RECONTRATACION (en la misma transacción)
     var eventoId = _newId('ev-');
     var metadata = JSON.stringify({
-      cargoAnterior:         cargoAnterior,
-      salarioAnterior:       salarioAnterior,
-      fechaIngresoAnterior:  fechaIngresoAnterior,
-      fechaRetiroAnterior:   fechaRetiroAnterior,
-      cargoNuevo:            newCargo,
-      salarioNuevo:          newSalario,
-      fuente:                'recontratacion-personal',
-      motivo:                motivo || null,
-      ctPreviaEnProceso:     ctsPrevias.length > 0,
-      ctPreviasEnProcesoIds: ctsPrevias.map(function(c) { return c.id; })
+      cargoAnterior:           cargoAnterior,
+      salarioAnterior:         salarioAnterior,
+      fechaIngresoAnterior:    fechaIngresoAnterior,
+      fechaRetiroAnterior:     fechaRetiroAnterior,
+      telefonoAnterior:        telefonoAnterior,
+      sedeAnterior:            sedeAnterior,
+      empresaUsuariaAnterior:  empresaUsuariaAnterior,
+      cargoNuevo:              newCargo,
+      salarioNuevo:            newSalario,
+      fechaIngresoNueva:       newFechaIngreso,
+      sedeNueva:               newSede,
+      empresaUsuariaNueva:     newEmpresaUsuaria,
+      telefonoNuevo:           newTelefono,
+      fuente:                  'recontratacion-personal',
+      motivo:                  motivo || null
     });
     localDb.prepare(
       "INSERT INTO gh_eventos_personal (id, empresa_id, trabajador_id, tipo_evento, fecha_evento, " +
       "  estado_anterior, estado_nuevo, fecha_referencia, contratacion_id, metadata, usuario_id, created_at) " +
       "VALUES (?, ?, ?, 'RECONTRATACION', ?, 'retirado', 'activo', ?, ?, ?, ?, ?)"
-    ).run(eventoId, company.company_key, bpId, fecha, fechaRetiroAnterior, ctValidated.id, metadata, usuarioId || 'system', now);
-
-    // 7. UPDATE ct: vincular (dentro de la misma transacción)
-    localDb.prepare("UPDATE contrataciones SET trabajador_id = ?, updated_at = ? WHERE id = ?").run(bpId, now, ctValidated.id);
+    ).run(eventoId, company.company_key, bpId, fecha, fechaRetiroAnterior, ctId, metadata, usuarioId || 'system', now);
 
     // ====== COMMIT ======
     localDb.exec('COMMIT');
@@ -1218,7 +1252,15 @@ function _handlerRecontratarPersonal(token, companyName, bpId, fechaRecontrataci
       fechaRetiro:         null,
       fechaRecontratacion: fecha,
       eventoId:            eventoId,
-      contratacionId:      ctValidated.id
+      contratacionId:      ctId,
+      contratacion: {
+        id:            ctId,
+        nombres:      cd.nombres,
+        apellidos:    cd.apellidos,
+        cedula:       cd.cedula,
+        cargo:        newCargo,
+        fechaIngreso: newFechaIngreso
+      }
     });
   } catch (e) {
     localDb.exec('ROLLBACK');
@@ -3732,7 +3774,7 @@ function registerGestionHumanaHandlers(app, deps) {
       return _err('INTERNAL', e.message);
     }
   });
-  // 📦767 · I-103.A1.0-D-2 · IPC para reactivar bp retirado + vincular CT
+  // 📦767 · I-103.A1.0-E-refactor · IPC para recontratación atómica (crea CT + reactiva BP + inserta evento)
   ipcMainHandle('gh:recontratar-personal', function (event, payload) {
     try {
       var p = payload || {};
@@ -3740,10 +3782,8 @@ function registerGestionHumanaHandlers(app, deps) {
         p.token || '',
         p.companyName,
         p.bpId,
+        p.contratacionData,
         p.fechaRecontratacion,
-        p.contratacionId,
-        p.cargo,
-        p.salario,
         p.motivo,
         p.usuarioId
       );
