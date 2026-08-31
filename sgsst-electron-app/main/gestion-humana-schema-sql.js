@@ -27,6 +27,7 @@
 //   me-{nanoid}   mensajes
 //   daf-{nanoid}  documentos_afiliaciones   (📦760)
 //   tp-{nanoid}   templates                  (📦764)
+//   ev-{nanoid}   eventos_personal           (I-103.A1.0-D-1 · trazabilidad de ciclos laborales)
 // Fechas: ISO 8601 strings, nunca Date objects
 // Soft delete: activo=0 en base_personal. contrataciones usa estado='cancelado' (decisión validada con usuario 2026-08-15)
 
@@ -311,6 +312,10 @@ CREATE INDEX IF NOT EXISTS idx_gh_templates_activo ON gh_templates(empresa_id, a
 //   - DROP COLUMN firma_id de gh_documentos (la firma canvas ya no se usa).
 //   - DROP TABLE gh_firmas_digitales (no tiene valor jurídico).
 //   - DROP INDEX de los 3 índices de la tabla eliminada.
+// Migración 7 (I-103.A1.0-D-1): gh_eventos_personal — trazabilidad de ciclos laborales.
+//   Permite registrar RETIRO / REINGRESO / RECONTRATACION sin alterar base_personal ni
+//   contrataciones. Los CHECK constraints blindan la coherencia semántica. Los eventos
+//   NO se generan retroactivamente para los 625 bp retirados históricos — solo a partir del deploy.
 const MIGRATIONS_SQL = [
   "ALTER TABLE base_personal ADD COLUMN sede_id TEXT;",
   "CREATE INDEX IF NOT EXISTS idx_base_personal_sede ON base_personal(empresa_id, sede_id);",
@@ -324,19 +329,53 @@ const MIGRATIONS_SQL = [
   "DROP INDEX IF EXISTS idx_gh_firmas_trabajador;",
   "DROP INDEX IF EXISTS idx_gh_firmas_empresa;",
   "DROP INDEX IF EXISTS idx_gh_firmas_documento;",
-  "DROP TABLE IF EXISTS gh_firmas_digitales;"
+  "DROP TABLE IF EXISTS gh_firmas_digitales;",
+  // I-103.A1.0-D-1 · gh_eventos_personal + 4 índices
+  "CREATE TABLE IF NOT EXISTS gh_eventos_personal (" +
+  " id TEXT PRIMARY KEY," +
+  " empresa_id TEXT NOT NULL," +
+  " trabajador_id TEXT NOT NULL," +
+  " tipo_evento TEXT NOT NULL," +
+  " fecha_evento TEXT NOT NULL," +
+  " estado_anterior TEXT NOT NULL," +
+  " estado_nuevo TEXT NOT NULL," +
+  " fecha_referencia TEXT," +
+  " contratacion_id TEXT," +
+  " metadata TEXT," +
+  " usuario_id TEXT," +
+  " created_at TEXT NOT NULL," +
+  " CHECK (tipo_evento IN ('RETIRO','REINGRESO','RECONTRATACION'))," +
+  " CHECK (estado_anterior IN ('activo','incapacitado','vacaciones','permiso','maternidad','paternidad','luto','retirado'))," +
+  " CHECK (estado_nuevo IN ('activo','retirado'))," +
+  " CHECK (" +
+  "  (tipo_evento='RETIRO'         AND estado_anterior<>'retirado' AND estado_nuevo='retirado'                                  ) OR" +
+  "  (tipo_evento='REINGRESO'      AND estado_anterior ='retirado' AND estado_nuevo='activo'  AND contratacion_id IS NULL     ) OR" +
+  "  (tipo_evento='RECONTRATACION' AND estado_anterior ='retirado' AND estado_nuevo='activo'  AND contratacion_id IS NOT NULL )" +
+  " )," +
+  " CHECK (" +
+  "  (tipo_evento IN ('REINGRESO','RECONTRATACION') AND fecha_referencia IS NOT NULL) OR" +
+  "  (tipo_evento='RETIRO')" +
+  " )" +
+  ");",
+  "CREATE INDEX IF NOT EXISTS idx_gh_eventos_trabajador   ON gh_eventos_personal(trabajador_id, fecha_evento DESC);",
+  "CREATE INDEX IF NOT EXISTS idx_gh_eventos_empresa      ON gh_eventos_personal(empresa_id, fecha_evento DESC);",
+  "CREATE INDEX IF NOT EXISTS idx_gh_eventos_tipo         ON gh_eventos_personal(tipo_evento);",
+  "CREATE INDEX IF NOT EXISTS idx_gh_eventos_contratacion ON gh_eventos_personal(contratacion_id) WHERE contratacion_id IS NOT NULL;"
 ];
 
 module.exports = {
   SCHEMA_SQL: SCHEMA_SQL,
   MIGRATIONS_SQL: MIGRATIONS_SQL,
-  // Conteos esperados para validación en tests (post-LEGACY-SIGN-REMOVE: -1 tabla, -3 índices)
-  EXPECTED_TABLES: 10,  // era 11, -1 gh_firmas_digitales
-  EXPECTED_INDEXES: 36  // era 39, -3 idx_gh_firmas_*
+  // Conteos esperados para validación en tests
+  // (post-LEGACY-SIGN-REMOVE: -1 tabla, -3 índices)
+  // (post-I-103.A1.0-D-1: +1 tabla, +4 índices)
+  EXPECTED_TABLES: 11,  // era 10, +1 gh_eventos_personal
+  EXPECTED_INDEXES: 40  // era 36, +4 idx_gh_eventos_*
                         // 3 contrataciones + 5 base_personal (era 4, +1 sede) + 1 gh_sedes
                         // + 4 vacaciones + 5 permisos + 4 documentos
                         // + 4 anuncios + 4 mensajes
                         // + 3 documentos_afiliaciones (📦760)
                         // + 3 templates (📦764)
+                        // + 4 eventos_personal (I-103.A1.0-D-1)
 };
 
