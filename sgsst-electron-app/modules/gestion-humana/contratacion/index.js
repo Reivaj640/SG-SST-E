@@ -421,30 +421,8 @@ class ContratacionComponent {
       if (!form.checkValidity()) { form.reportValidity(); return; }
       var cedulaVal = form.cedula.value.trim();
 
-      // 📦767 · Doble validación en submit (carrera-safe)
-      // Si el user dejó el form abierto mucho tiempo, otro proceso pudo haber
-      // creado un bp-id con esa cédula. Re-consultamos antes de avanzar.
-      if (cedulaVal) {
-        try {
-          var r2 = await window.electronAPI.ghGetPersonalByCedula({
-            companyName: self.companyName,
-            cedula: cedulaVal
-          });
-          if (r2 && r2.success && r2.data && r2.data.personal) {
-            // Actualizar warning y abrir modal de advertencia
-            showCedulaWarning(r2.data.personal);
-            self._openCedulaWarningModal(cedulaInput, r2.data.personal, function () {
-              // onCorregir: enfocar el input de cédula
-              if (cedulaInput) { cedulaInput.focus(); cedulaInput.select(); }
-            });
-            return;  // ← bloquea el submit
-          }
-        } catch (e) {
-          // Si falla la verificación, dejamos pasar (no bloquear por error de transporte)
-        }
-      }
-
-      var data = {
+      // Construir el formData UNA sola vez (fuente única de verdad)
+      var formData = {
         nombres:       form.nombres.value.trim(),
         apellidos:     form.apellidos.value.trim(),
         cedula:        form.cedula.value.trim() || null,
@@ -455,8 +433,41 @@ class ContratacionComponent {
         sedeId:        form.sedeId.value || null,
         empresaUsuaria: form.empresaUsuaria.value.trim() || null
       };
+
+      // 📦767 · Doble validación en submit (carrera-safe)
+      // Si el user dejó el form abierto mucho tiempo, otro proceso pudo haber
+      // creado un bp-id con esa cédula. Re-consultamos antes de avanzar.
+      if (cedulaVal) {
+        try {
+          var r2 = await window.electronAPI.ghGetPersonalByCedula({
+            companyName: self.companyName,
+            cedula: cedulaVal
+          });
+          if (r2 && r2.success && r2.data && r2.data.personal) {
+            var bpEncontrado = r2.data.personal;
+            // 📦767 · I-103.A1.0-E-frontend · Bifurcación según estado del BP
+            if (bpEncontrado.estado === 'retirado') {
+              // BP retirado → modal de decisión (Reingreso / Recontratar / Corregir / Cancelar)
+              showCedulaWarning(bpEncontrado);
+              self._openRecontratacionDecisionModal(bpEncontrado, formData, function () {
+                if (cedulaInput) { cedulaInput.focus(); cedulaInput.select(); }
+              });
+            } else {
+              // BP activo (u otro) → modal de advertencia actual (bloqueante)
+              showCedulaWarning(bpEncontrado);
+              self._openCedulaWarningModal(cedulaInput, bpEncontrado, function () {
+                if (cedulaInput) { cedulaInput.focus(); cedulaInput.select(); }
+              });
+            }
+            return;  // ← bloquea el submit
+          }
+        } catch (e) {
+          // Si falla la verificación, dejamos pasar (no bloquear por error de transporte)
+        }
+      }
+
       close();
-      self._create(data);
+      self._create(formData);
     };
   }
 
@@ -517,6 +528,117 @@ class ContratacionComponent {
       if (typeof onCorregir === 'function') onCorregir();
     };
     backdrop.onclick = function (e) { if (e.target === backdrop) closeWarn(); };
+  }
+
+  // 📦767 · I-103.A1.0-E-frontend · Modal de decisión cuando se detecta un BP RETIRADO
+  // Ofrece 4 acciones: Reingreso, Recontratar, Corregir, Cancelar.
+  // - Reingreso: gh:cambiar-estado (1.0-D-1) → reactiva el bp SIN crear CT
+  // - Recontratar: gh:recontratar-personal (a6cba571 refactor) → crea CT + reactiva + inserta RECONTRATACION
+  // - Corregir: cierra modal + enfoca el input de cédula
+  // - Cancelar: cierra modal sin acciones
+  // El formData se pasa para construir contratacionData del mismo formulario actual
+  // (sin duplicar la fuente de verdad: nombres, cargo, salario, sede, etc. vienen del form).
+  _openRecontratacionDecisionModal(personal, formData, onCorregir) {
+    var self = this;
+    var nombre = ((personal.nombres || '') + ' ' + (personal.apellidos || '')).trim() || '(sin nombre)';
+    var fechaRetiroFmt = personal.fecha_retiro ? self._fmtDate(personal.fecha_retiro) : '—';
+    var cargoFmt = personal.cargo || '—';
+
+    var html =
+      '<div class="ct-modal-backdrop" id="ct-recontratacion-backdrop">' +
+        '<div class="ct-modal ct-modal--warning" role="alertdialog" aria-modal="true" aria-labelledby="ct-recontratacion-title" style="max-width:560px;">' +
+          '<div class="ct-modal__head ct-modal__head--warning">' +
+            '<div>' +
+              '<h2 class="ct-modal__title" id="ct-recontratacion-title">' +
+                '<i class="fas fa-user-clock"></i> Trabajador retirado' +
+              '</h2>' +
+              '<p class="ct-modal__sub">Esta persona requiere una decisión explícita</p>' +
+            '</div>' +
+            '<button class="ct-modal__close" type="button" data-action="close" aria-label="Cerrar">×</button>' +
+          '</div>' +
+          '<div class="ct-modal__body">' +
+            '<div class="ct-cedula-warn-card">' +
+              '<div class="ct-cedula-warn-card__row"><span class="ct-cedula-warn-card__label">Trabajador:</span><span class="ct-cedula-warn-card__value">' + self._escHtml(nombre) + '</span></div>' +
+              '<div class="ct-cedula-warn-card__row"><span class="ct-cedula-warn-card__label">Cédula:</span><span class="ct-cedula-warn-card__value">' + self._escHtml(personal.cedula) + '</span></div>' +
+              '<div class="ct-cedula-warn-card__row"><span class="ct-cedula-warn-card__label">Retirado desde:</span><span class="ct-cedula-warn-card__value">' + self._escHtml(fechaRetiroFmt) + '</span></div>' +
+              '<div class="ct-cedula-warn-card__row"><span class="ct-cedula-warn-card__label">Cargo anterior:</span><span class="ct-cedula-warn-card__value">' + self._escHtml(cargoFmt) + '</span></div>' +
+            '</div>' +
+            '<p class="ct-cedula-warn-msg">Elige una opción:</p>' +
+          '</div>' +
+          '<div class="ct-modal__foot" style="flex-wrap:wrap;gap:0.5rem;">' +
+            '<button class="ct-btn ct-btn--ghost" type="button" data-action="cancel"><i class="fas fa-times"></i> Cancelar</button>' +
+            '<button class="ct-btn ct-btn--ghost" type="button" data-action="corregir"><i class="fas fa-pen"></i> Corregir cédula</button>' +
+            '<button class="ct-btn ct-btn--success" type="button" data-action="reingreso"><i class="fas fa-user-check"></i> Reingresar (sin nueva CT)</button>' +
+            '<button class="ct-btn ct-btn--primary" type="button" data-action="recontratar"><i class="fas fa-file-contract"></i> Recontratar (con nueva CT)</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    var wrap = document.createElement('div');
+    wrap.innerHTML = html;
+    var backdrop = wrap.firstChild;
+    document.body.appendChild(backdrop);
+
+    function closeModal() { if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop); }
+
+    backdrop.querySelector('.ct-modal__close').onclick = closeModal;
+    backdrop.querySelector('[data-action="cancel"]').onclick = closeModal;
+    backdrop.querySelector('[data-action="corregir"]').onclick = function () {
+      closeModal();
+      if (typeof onCorregir === 'function') onCorregir();
+    };
+    backdrop.querySelector('[data-action="reingreso"]').onclick = async function () {
+      closeModal();
+      // 📦767 · Reingreso: SOLO gh:cambiar-estado (1.0-D-1) → reactiva bp + inserta evento REINGRESO. NO crea CT.
+      try {
+        var r = await window.electronAPI.ghCambiarEstado({
+          personalId: personal.id,
+          estado: 'activo',
+          notas: 'Reingreso desde UI de contratación'
+        });
+        if (r && r.success) {
+          self._showToast('Trabajador reactivado (sin nueva CT)', 'success');
+          await self._loadContrataciones();
+        } else {
+          self._showToast('Error: ' + ((r && r.error && r.error.message) || 'desconocido'), 'error');
+        }
+      } catch (e) {
+        self._showToast('Error: ' + e.message, 'error');
+      }
+    };
+    backdrop.querySelector('[data-action="recontratar"]').onclick = async function () {
+      closeModal();
+      // 📦767 · Recontratar: gh:recontratar-personal (a6cba571) con contratacionData del mismo formulario
+      // (sin duplicar la fuente de verdad: los campos vienen de formData ya construido en submit)
+      var contratacionData = {
+        nombres:       formData.nombres,
+        apellidos:     formData.apellidos,
+        cedula:        formData.cedula,
+        telefono:      formData.telefono,
+        cargo:         formData.cargo,
+        salario:       formData.salario,
+        fechaIngreso:  formData.fechaIngreso,
+        sedeId:        formData.sedeId,
+        empresaUsuaria: formData.empresaUsuaria
+      };
+      try {
+        var r2 = await window.electronAPI.ghRecontratarPersonal({
+          companyName: self.companyName,
+          bpId: personal.id,
+          contratacionData: contratacionData,
+          motivo: 'Recontratación desde UI de contratación'
+        });
+        if (r2 && r2.success) {
+          self._showToast('Recontratación exitosa. CT: ' + r2.data.contratacionId, 'success');
+          await self._loadContrataciones();
+        } else {
+          self._showToast('Error: ' + ((r2 && r2.error && r2.error.message) || 'desconocido'), 'error');
+        }
+      } catch (e) {
+        self._showToast('Error: ' + e.message, 'error');
+      }
+    };
+    backdrop.onclick = function (e) { if (e.target === backdrop) closeModal(); };
   }
 
   async _create(data) {
