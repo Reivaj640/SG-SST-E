@@ -254,7 +254,7 @@
       '    <div class="fe-modal__body">',
       '      <div class="fe-tpl-admin-header">',
       '        <p class="fe-tpl-admin-header__text">Sube tus propios .docx o .pdf para usar al generar documentos.</p>',
-      '        <button id="fe-tpl-subir" class="fe-btn fe-btn--primary" type="button"><i class="fas fa-cloud-upload-alt"></i> Subir Template</button>',
+      '        <button id="fe-tpl-subir" class="fe-btn fe-btn--primary" data-action="subir-template" type="button"><i class="fas fa-cloud-upload-alt"></i> Subir Template</button>',
       '      </div>',
       '      <div id="fe-templates" class="fe-templates"></div>',
       '    </div>',
@@ -1821,7 +1821,27 @@
   FirmaElectronicaComponent.prototype._openTemplatesAdminModal = function () {
     var modal = this.container.querySelector('#fe-tpl-admin-modal');
     if (!modal) return;
+    var self = this;
     this._renderTemplates();
+    // FIX: los listeners de data-action del componente viven en _modalBody
+    // (modal del expediente) y NO alcanzan este overlay hermano. Sin este
+    // listener local, "Subir Template", "Abrir" y "Eliminar" del modal
+    // "Mis Templates" eran botones muertos.
+    var body = modal.querySelector('.fe-modal__body');
+    if (body) {
+      body.onclick = function (ev) {
+        var btn = ev.target.closest('[data-action]');
+        if (!btn || btn.disabled) return;
+        var action = btn.getAttribute('data-action');
+        if (action === 'subir-template') {
+          self._openSubirTemplateModal();
+        } else if (action === 'abrir-template') {
+          self._abrirTemplate(btn.getAttribute('data-tpl-id'));
+        } else if (action === 'eliminar-template') {
+          self._eliminarTemplate(btn.getAttribute('data-tpl-id'));
+        }
+      };
+    }
     modal.hidden = false;
   };
 
@@ -2025,9 +2045,16 @@
         self._showToast('Documento generado. Pendiente de firma electrónica.', 'success');
         await self._reloadData();
         self._renderTabla();
-        // Re-open expediente if modal was open
+        // Refrescar el modal del expediente con el proceso FRESCO (post-reload).
+        // FIX: antes se pasaba _lastExpedienteProceso (objeto viejo, sin el doc
+        // nuevo) — por eso el documento recién generado no aparecía hasta
+        // cerrar y reabrir el modal.
         if (self._modal && !self._modal.hidden && self._lastExpedienteProceso) {
-          await self._refetchExpediente(self._lastExpedienteProceso);
+          var trabIdGen = self._lastExpedienteProceso.trabajadorId;
+          var freshProcesoGen = self._procesosPorTrabajador.find(function (p) { return p.trabajadorId === trabIdGen; });
+          if (freshProcesoGen) {
+            await self._refetchExpediente(freshProcesoGen);
+          }
         }
       } else {
         self._showToast('Error generando documento: ' + (r && r.error && r.error.message || 'desconocido'), 'error');
@@ -2238,7 +2265,17 @@
       modal.hidden = true;
       await self._reloadData();
       self._renderTabla();
-      if (self._lastExpedienteProceso) await self._refetchExpediente(self._lastExpedienteProceso);
+      // FIX (mismo patrón que _generarDocumento): usar el proceso FRESCO
+      // post-reload. Antes se pasaba _lastExpedienteProceso (objeto viejo, sin
+      // el idSolicitudFirma recién asignado) y el expediente quedaba mostrando
+      // el documento sin su solicitud de firma hasta cerrar/reabrir el modal.
+      if (self._lastExpedienteProceso) {
+        var trabIdFirma = self._lastExpedienteProceso.trabajadorId;
+        var freshProcesoFirma = self._procesosPorTrabajador.find(function (p) { return p.trabajadorId === trabIdFirma; });
+        if (freshProcesoFirma) {
+          await self._refetchExpediente(freshProcesoFirma);
+        }
+      }
       self._abrirModalExito(srR.data, correoFirmante, autoInviteOk);
     } catch (e) {
       self._showToast('Error en flujo de firma: ' + e.message, 'error');
@@ -2401,6 +2438,16 @@
     if (changed) {
       self._calcularProcesos();
       self._renderTabla();
+      // FIX: si el modal del expediente está abierto, refrescarlo también con
+      // el proceso FRESCO (post-recálculo). Antes solo se actualizaba la tabla
+      // del fondo y el modal quedaba con el estado viejo hasta cerrar/reabrir.
+      if (self._modal && !self._modal.hidden && self._lastExpedienteProceso) {
+        var trabIdPoll = self._lastExpedienteProceso.trabajadorId;
+        var freshProcesoPoll = self._procesosPorTrabajador.find(function (p) { return p.trabajadorId === trabIdPoll; });
+        if (freshProcesoPoll) {
+          await self._refetchExpediente(freshProcesoPoll);
+        }
+      }
     }
   };
 
