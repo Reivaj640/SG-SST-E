@@ -1,17 +1,13 @@
 <!-- modules/gestion-humana/base-personal/index.html
      📦730 · Vista "Base de Personal" — HTML separado (v0.2.0)
      Estructura:
-       - KPIs (5) via #bp-kpi-bar (helper GHKPIBar)
        - Toolbar unificada (búsqueda + 3 botones en fila 1; filtros Sede/Estado + contador en fila 2 colapsable)
        - Table container
+     Nota: la barra de KPIs superior se eliminó (los conteos viven en los
+     filtros segmentados Todos/Activos/Retirados).
      IDs con prefijo `bp-` para evitar colisiones. -->
 
 <div class="bp-wrapper" id="bp-wrapper">
-  <!-- ═══ KPIs (5) — via helper GHKPIBar ═══ -->
-  <div class="bp-kpi-section">
-    <div id="bp-kpi-bar" class="bp-kpi-bar"></div>
-  </div>
-
   <!-- ═══ TOOLBAR UNIFICADO (📦730 · card única con 2 filas) ═══ -->
   <div class="bp-toolbar" id="bp-toolbar">
     <!-- FILA 1: búsqueda + segmented control + botones -->

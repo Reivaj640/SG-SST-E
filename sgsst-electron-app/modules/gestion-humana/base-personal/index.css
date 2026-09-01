@@ -1,7 +1,9 @@
 /* modules/gestion-humana/base-personal/index.css
    📦730 · Estilos de la vista "Base de Personal" (v0.2.0)
    Scope: prefijo `bp-` para evitar colisiones con styles.css global.
-   Layout: vertical (KPIs + toolbar unificada + table) ocupando 100% del container. */
+   Layout: vertical (toolbar unificada + table) ocupando 100% del container.
+   Nota: la sección de KPIs superior fue retirada — los conteos viven en el
+   segmented control (Todos/Activos/Retirados). */
 
 .bp-wrapper {
   display: flex;
@@ -11,11 +13,6 @@
   background: #f8f9fa;
   box-sizing: border-box;
   overflow: hidden;
-}
-
-/* ═══ KPI SECTION ═══ */
-.bp-kpi-section {
-  padding: 0 2rem;            /* 📦727 · Igualado al Resumen (sin padding-top) */
 }
 
 /* ═══ BUTTONS ═══ */
