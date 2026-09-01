@@ -5,6 +5,110 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.191] - 2026-08-31
+
+### 📦767 · I-103.A1.0 — Gestión Humana: ciclo laboral del bp cerrado (fases B a G.2.1)
+
+Cierra el ciclo laboral completo de un bp en el módulo de Gestión Humana, con reglas arquitectónicas estrictas para evitar regresiones futuras en el bypass que unificó RETIRO/REINGRESO/RECONTRATACION con sus eventos transaccionales.
+
+#### Por qué importa
+
+Una auditoría manual detectó que el modal "Ver/Editar" de Base Personal permitía cambiar `estado`, `fechaRetiro` y `fechaIngreso` directamente vía `gh:update-personal`, bypaseando la lógica atómica de `gh:cambiar-estado`. Resultado: un bp podía terminar con `estado=retirado` sin `fecha_retiro` y sin evento RETIRO. **Causa raíz**: `_handlerUpdatePersonal` tenía un whitelist demasiado permisivo y la UI exponía esos campos como editables ordinarios. La fase 1.0 corrige esto en 3 capas (bridge, import, frontend).
+
+#### Cambios
+
+##### 1.0-B · backend blindado contra bp retirado (📦767)
+
+- `_handlerCreateContratacion` y `_handlerMarcarPaso` detectan si la cédula pertenece a un bp retirado. Si lo es, devuelven `recontratacionRequerida: true` (frontend abre modal "¿Recontratar?") o `RECONTRATACION_REQUERIDA` (tests).
+
+##### 1.0-C · limpiar fecha_retiro al reactivar bp (📦767)
+
+- `_handlerCambiarEstado` ahora limpia `fecha_retiro=NULL` en la transición `retirado → activo` (reactivación o reingreso). Antes quedaba la fecha histórica contaminando el nuevo ciclo.
+
+##### 1.0-D-1 · tabla `gh_eventos_personal` con triggers (📦767)
+
+- Nueva tabla `gh_eventos_personal` con 12 columnas, 4 CHECK constraints (incluyendo uno que valida que RETIRO/REINGRESO/RECONTRATACION tengan `estado_anterior` y `estado_nuevo` coherentes), 4 índices, 2 FKs.
+- Triggers transaccionales en `_handlerCambiarEstado` que insertan automáticamente el evento RETIRO o REINGRESO en la misma transacción que el UPDATE del bp (atomicidad garantizada con COMMIT/ROLLBACK).
+- Convención de IDs: prefijo `ev-` para eventos.
+
+##### 1.0-D-2 · recontratación atómica (📦767)
+
+- Nuevo handler `gh:recontratar-personal` que crea la nueva CT + reactiva el bp + inserta el evento RECONTRATACION, todo en una sola transacción. Validación previa: `cedula` del form debe coincidir con la del bp (defensa contra typos).
+
+##### 1.0-E · refactor de recontratación (📦767)
+
+- `gh:recontratar-personal` ahora exige `contratacionData` (objeto) en vez de `contratacionId` separado. Crea la CT internamente, sin estado provisional. Atomicidad preservada.
+
+##### 1.0-E · frontend modal "¿Recontratar?" (📦767)
+
+- Modal en `modules/gestion-humana/contratacion/index.js` con 4 acciones: **Reingresar** (sin CT), **Recontratar** (con CT), **Corregir cédula**, **Cancelar**. Bifurcación según `bp.estado`.
+
+##### 1.0-F-1 · soft delete puro (📦767)
+
+- `gh:delete-personal` ahora hace SOLO `activo=0`. NO toca `estado` (preserva el ciclo laboral: activo/vacaciones/retirado/etc.), NO toca `fecha_retiro` (preserva la fecha histórica), NO inserta evento (no es un evento laboral). Las FKs CASCADE NO se activan (vacaciones, permisos, documentos, mensajes, afiliaciones se preservan).
+- Si el bp está activo → `BP_NOT_RETIRED` (rechazo).
+- El frontend cambia el botón "Eliminar" por "Ocultar" con un `confirmDialog` que explica la semántica administrativa.
+
+##### 1.0-G · tests E2E integrales (📦767)
+
+- `main/test-gestion-humana-bridge-e2e.js` con 11 escenarios y 109 asserts: ACTIVO→RETIRO con evento, RETIRADO→REINGRESO, RETIRADO→RECONTRATACION atómico, ROLLBACK ante CEDULA_MISMATCH, ACTIVO+crear CT bloqueado por CEDULA_DUPLICADA, RETIRADO+ocultar preservando historial, ACTIVO+ocultar→BP_NOT_RETIRED, BP oculto+recontratar→BP_DELETED, aislamiento (kair.db nunca se abre), las 3 fechas distintas (CT.fecha_ingreso ≠ evento.fecha_evento ≠ evento.fecha_referencia), CEDULA_MISMATCH con rollback completo.
+
+#### Cambios
+
+##### 1.0-G.2 · cerrar bypass `gh:update-personal` (📦767-fix) — CRÍTICO
+
+**Problema**: el modal Ver/Editar de Base Personal permitía editar `estado`, `fechaRetiro` y `fechaIngreso` directamente vía `gh:update-personal`, bypaseando la lógica de `gh:cambiar-estado`. Esto producía bp con `estado=retirado` sin `fecha_retiro` ni evento RETIRO.
+
+**Solución en 3 capas**:
+
+1. **Bridge `_handlerUpdatePersonal`** (defensa en backend):
+   - Rechaza `estado`, `fechaRetiro`, `fechaIngreso` con `PROTECTED_FIELD`.
+   - El rechazo es atómico: si llega un campo protegido junto a campos válidos (ej. `cargo + estado`), no se aplica NADA. Rollback completo.
+
+2. **Bridge `_handlerCreatePersonal`**:
+   - Rechaza `data.fechaRetiro` con `INVALID_INPUT`. Un bp nuevo no puede nacer con fecha de retiro.
+
+3. **Bridge `gh:import-personal`** (modo `update`):
+   - `estado`: `CASE WHEN estado='retirado' THEN estado ELSE ? END` (preserva retirado).
+   - `fecha_ingreso`: `CASE WHEN fecha_ingreso IS NOT NULL THEN fecha_ingreso ELSE ? END` (preserva histórico, completa solo si NULL).
+   - `fecha_retiro`: `NUNCA modifica`. Conserva el valor de la BD siempre. Import NO puede crear/modificar ciclo laboral de bp existente.
+   - bp activo + `fechaRetiro` en Excel → warning en `errors` sin abortar la fila.
+
+**Frontend `base-personal/index.js`**:
+- Borrada `_openEditModal` (código muerto confirmado por grep).
+- `_saveDetailEdit` filtra `PROTECTED_FIELDS = ['estado', 'fechaRetiro', 'fechaIngreso']` antes de enviar a `ghUpdatePersonal`.
+- Tab "Datos Laborales" muestra `estado`, `fechaIngreso`, `fechaRetiro` como read-only (sin `data-view` para que se vean en modo View y Edit).
+- Botones explícitos "Retirar trabajador" y "Reingresar" en la sección Estado, que llaman a `ghCambiarEstado` (no a `ghUpdatePersonal`).
+
+**Tests E2E nuevos** (44 asserts):
+- T12-T19 (8 tests): protección de `ghUpdatePersonal` con `PROTECTED_FIELD` + rollback completo en payload mixto.
+- T20-T25 (6 tests): política estricta de `ghImportPersonal` para los 3 campos de ciclo, incluyendo bp activo con `fechaRetiro` en Excel que NO se asigna.
+
+#### Regla arquitectónica (no violar en futuras sesiones de AI)
+
+**`gh:cambiar-estado` es la única autoridad para transiciones de ciclo laboral** (RETIRO, REINGRESO). **`gh:recontratar-personal` es la única autoridad para recontratación** (RECONTRATACION, que crea una nueva CT en el mismo acto). Toda transición debe generar su evento correspondiente en `gh_eventos_personal` dentro de la misma transacción.
+
+`gh:update-personal` SOLO puede modificar datos personales/administrativos (nombres, cargo, salario, teléfono, email, dirección, banco, etc.). Está terminantemente prohibido usar `gh:update-personal` para `estado`, `fechaRetiro` o `fechaIngreso`. El bridge rechaza con `PROTECTED_FIELD` y rollback atómico.
+
+`gh:create-personal` rechaza `fechaRetiro`. Un bp nuevo no puede nacer con fecha de retiro.
+
+`gh:import-personal` (modo `update`) NUNCA puede pisar `fecha_retiro` ni el `estado` retirado de un bp existente. Solo completa `fecha_ingreso` cuando está NULL. Cualquier inconsistencia entre Excel y BD (ej. bp activo con fecha_retiro en Excel) se reporta como warning sin abortar la importación.
+
+#### Auditoría
+
+- G.2.2 (pre-push): auditoría READ-ONLY completa de los 5 handlers, frontend, eventos, BD. Resultado: 0 regresiones nuevas, 514 OK / 2 FAIL preexistentes (verificados contra backup pre-G.2).
+- Auditoría manual M1-M5: el flujo Retirar → Reingreso quedó correctamente persistido con 1 evento RETIRO + 1 evento REINGRESO en `bp-mthtoza2-owsv` (CC 1111111111).
+- 153 asserts E2E pasan (109 originales + 28 nuevos de T12-T19 + 16 nuevos de T20-T25).
+- kair.db: 765 bp (139 activos + 626 retirados), 0 inconsistencias, 0 estados imposibles.
+- BP de evidencia del bypass (`bp-mthobzc0-uvkk`, CC 9999999999) preservado como registro histórico.
+
+#### Cambios totales
+
+- 11 commits en cadena (1.0-B → 1.0-G.2.1)
+- 5 archivos productivos modificados (bridge, schema SQL, 2 tests, frontend)
+- ~570 insertions / ~50 deletions
+- 0 cambios a `firma-service` (intacto)
+
 ## [0.1.190] - 2026-08-20
 
 ### I-008.x — feat(firma): observabilidad operativa transversal (3 hallazgos cerrados)

@@ -1,3 +1,59 @@
+# K+AIR v0.1.191
+
+## 📦767 + fix — feat(gh): Ciclo Laboral 1.0 cerrado en Gestión Humana (v0.1.191)
+
+Cierre del ciclo laboral completo del bp en el submódulo de Base Personal: ACTIVO → RETIRADO → ACTIVO (vía REINGRESO o RECONTRATACION), con eventos transaccionales en `gh_eventos_personal` y barrera en backend, import y frontend.
+
+### Componentes del release
+
+- **1.0-B** — Barrera backend: `gh:create-contratacion` y `gh:marcar-paso` detectan bp retirado y devuelven `recontratacionRequerida: true` / `RECONTRATACION_REQUERIDA`.
+- **1.0-C** — `_handlerCambiarEstado` limpia `fecha_retiro=NULL` en transición `retirado → activo`.
+- **1.0-D-1** — Nueva tabla `gh_eventos_personal` con 12 columnas, 4 CHECK constraints, 4 índices, 2 FKs. Triggers transaccionales en `_handlerCambiarEstado` insertan evento RETIRO/REINGRESO en la misma transacción que el UPDATE del bp.
+- **1.0-D-2** — `gh:recontratar-personal` crea CT + reactiva bp + inserta evento RECONTRATACION atómicamente.
+- **1.0-E** — Refactor: `gh:recontratar-personal` exige `contratacionData` (objeto). Frontend modal "¿Recontratar?" con 4 acciones.
+- **1.0-F-1** — `gh:delete-personal` hace soft delete puro (solo `activo=0`). NO toca `estado`, `fecha_retiro`, NO inserta evento. Rechaza bp activo con `BP_NOT_RETIRED`.
+- **1.0-G** — Tests E2E integrales: 11 escenarios + 109 asserts.
+- **1.0-G.2** — **CRÍTICO**: cerrar bypass `gh:update-personal → ciclo laboral`. El modal Ver/Editar permitía editar `estado/fechaRetiro/fechaIngreso` directamente, bypaseando la lógica atómica de `gh:cambiar-estado`. Solución en 3 capas:
+  - **Bridge**: `_handlerUpdatePersonal` rechaza los 3 campos con `PROTECTED_FIELD` (rollback atómico en payload mixto).
+  - **Bridge**: `_handlerCreatePersonal` rechaza `fechaRetiro` con `INVALID_INPUT`.
+  - **Bridge**: `gh:import-personal` con `CASE WHEN` estricto (no pisa `fecha_retiro` de bp existente, completa `fecha_ingreso` solo si NULL, preserva `estado` retirado).
+  - **Frontend**: `_openEditModal` borrado (código muerto). `_saveDetailEdit` filtra `PROTECTED_FIELDS`. Tab "Datos Laborales" muestra los 3 campos como read-only. Botones "Retirar/Reingresar" llaman a `ghCambiarEstado`.
+  - **Tests**: T12-T19 (28 asserts) + T20-T25 (16 asserts) = 44 nuevos asserts.
+- **1.0-G.2.1** — Fix visual: botón Reingresar/Retirar con estilo badge `bp-badge bp-badge--muted` (mismo gris que "Retirado") + `cursor:pointer` + `border:none` inline. Sin CSS nuevo.
+
+### Por qué importa
+
+Una auditoría manual detectó que el modal "Ver/Editar" de Base Personal permitía cambiar `estado`, `fechaRetiro` y `fechaIngreso` directamente vía `gh:update-personal`, bypaseando la lógica atómica de `gh:cambiar-estado`. Resultado: un bp podía terminar con `estado=retirado` sin `fecha_retiro` y sin evento RETIRO. **Causa raíz**: `_handlerUpdatePersonal` tenía un whitelist demasiado permisivo y la UI exponía esos campos como editables ordinarios. La fase 1.0 corrige esto en 3 capas (bridge, import, frontend) y documenta la regla arquitectónica para que no se reabra el bypass en futuras sesiones de AI.
+
+### Regla arquitectónica
+
+**`gh:cambiar-estado` es la única autoridad para RETIRO y REINGRESO.**
+**`gh:recontratar-personal` es la única autoridad para RECONTRATACION.**
+
+`gh:update-personal` SOLO puede modificar datos personales/administrativos (nombres, cargo, salario, teléfono, email, dirección, banco, etc.). Está terminantemente prohibido usar `gh:update-personal` para `estado`, `fechaRetiro` o `fechaIngreso`. El bridge rechaza con `PROTECTED_FIELD` y rollback atómico.
+
+### Auditoría
+
+- **G.2.2** (pre-push) confirmó 0 regresiones nuevas, 514 OK / 2 FAIL preexistentes (verificados contra backup pre-G.2).
+- **Auditoría manual M1-M5** del user: el flujo Retirar → Reingreso quedó correctamente persistido con 1 evento RETIRO + 1 evento REINGRESO en `bp-mthtoza2-owsv` (CC 1111111111).
+- **kair.db**: 765 bp (139 activos + 626 retirados), 0 inconsistencias, 0 estados imposibles.
+- **BP de evidencia** del bypass (`bp-mthobzc0-uvkk`, CC 9999999999) preservado como registro histórico.
+
+### Archivos modificados (5)
+
+- `main/gestion-humana-bridge.js` — `_handlerUpdatePersonal`, `_handlerCreatePersonal`, `gh:import-personal` con CASE WHEN estricto
+- `main/gestion-humana-schema-sql.js` — tabla `gh_eventos_personal` (en MIGRATIONS)
+- `main/test-gestion-humana-bridge-e2e.js` — +28 asserts (T12-T19)
+- `main/test-gestion-humana-bridge-import.js` — +16 asserts (T20-T25)
+- `modules/gestion-humana/base-personal/index.js` — borrar `_openEditModal`, filtrar PROTECTED_FIELDS, tab "Datos Laborales" read-only, botones Retirar/Reingresar con estilo badge
+
+### Pendiente (decisión del user)
+
+- `bp-mthobzc0-uvkk` (CC 9999999999) — bp de evidencia del bypass. Decidir: restaurar / ocultar / dejar.
+- Re-build del instalador para v0.1.191.
+
+---
+
 # K+AIR v0.1.188
 
 ## 📦707-fix25 — Fix ícono del shortcut del escritorio y taskbar (v0.1.188)

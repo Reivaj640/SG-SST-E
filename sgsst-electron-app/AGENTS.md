@@ -1115,3 +1115,89 @@ queda como 2910 archivos untracked que el `.gitignore` del subdir no cubría.
    - Paso 4: calendar slide con scroll interno
    - Paso 5: resize handler en renderer.js para ajustar iframe al cambiar tamaño
 
+## 🆕 Ciclo Laboral 1.0 cerrado en Gestión Humana (📦767 + fix, v0.1.191, 2026-08-31)
+
+A partir de **v0.1.191** el submódulo de Base Personal (Gestión Humana) tiene el **ciclo laboral completo del bp** cerrado: ACTIVO → RETIRADO → ACTIVO (vía REINGRESO o RECONTRATACION), con eventos transaccionales en `gh_eventos_personal` y barrera en backend, import y frontend. **Esta es la única fuente de verdad para reglas de transición de ciclo. Si una futura sesión de AI tiene que tocar algo de esto, léase esta sección primero.**
+
+### Arquitectura de las 4 transiciones atómicas
+
+| Handler | Transición | Tabla afectada | Evento generado | Atomicidad |
+|---|---|---|---|---|
+| `gh:cambiar-estado` (estado=retirado) | ACTIVO → RETIRADO | UPDATE `estado='retirado', fecha_retiro=...` | `RETIRO` en `gh_eventos_personal` | BEGIN+UPDATE+INSERT+COMMIT (ROLLBACK ante error) |
+| `gh:cambiar-estado` (estado=activo) | RETIRADO → ACTIVO | UPDATE `estado='activo', fecha_retiro=NULL` | `REINGRESO` en `gh_eventos_personal` | BEGIN+UPDATE+INSERT+COMMIT |
+| `gh:recontratar-personal` | RETIRADO → ACTIVO + nueva CT | UPDATE bp + INSERT `contrataciones` + UPDATE vincula | `RECONTRATACION` en `gh_eventos_personal` (con `contratacion_id`) | BEGIN+INSERT+UPDATE+UPDATE+INSERT+COMMIT |
+| `gh:delete-personal` | (ninguna de ciclo) | UPDATE `activo=0` | (ninguno) | atómico pero NO genera evento |
+
+### REGLA DE ORO (no violar en futuras sesiones de AI)
+
+**`gh:cambiar-estado` es la ÚNICA autoridad para RETIRO y REINGRESO.**
+**`gh:recontratar-personal` es la ÚNICA autoridad para RECONTRATACION.**
+
+`gh:update-personal` **NO puede** modificar:
+- `estado` (ciclo) — bridge rechaza con `PROTECTED_FIELD`
+- `fechaRetiro` (ciclo) — bridge rechaza con `PROTECTED_FIELD`
+- `fechaIngreso` (ciclo) — bridge rechaza con `PROTECTED_FIELD`
+
+El rechazo es **atómico**: si llega un campo protegido junto a campos válidos (`cargo`, `salario`, `email`, etc.), no se aplica NADA. Rollback completo. Esto evita que un payload mixto actualice parcialmente la BD.
+
+### Defensa en 3 capas
+
+1. **Bridge (`main/gestion-humana-bridge.js`)**: autoridad. Rechaza en backend.
+2. **Frontend (`modules/gestion-humana/base-personal/index.js`)**: UX. `_saveDetailEdit` filtra `PROTECTED_FIELDS`. Tab "Datos Laborales" muestra los 3 campos como read-only.
+3. **Import (`gh:import-personal`)**:的政策 estricta CASE WHEN. No pisa `fecha_retiro` ni `estado retirado` de bp existente.
+
+### Reglas de import (crítico, fácil de romper)
+
+| Campo del bp existente | Valor en Excel | Acción del import-update |
+|---|---|---|
+| `estado = retirado` | (cualquier) | **CONSERVAR** (no pisar) |
+| `estado = activo` | (cualquier) | Actualizar (revisión administrativa legítima) |
+| `fecha_ingreso` con valor | (cualquier) | **CONSERVAR** |
+| `fecha_ingreso` NULL | nueva fecha | **COMPLETAR** (excepción permitida) |
+| `fecha_retiro` con valor | (cualquier) | **CONSERVAR SIEMPRE** (incluso si Excel trae otra fecha) |
+| `fecha_retiro` NULL | nueva fecha | **NO COMPLETAR** (preservar NULL) |
+| bp activo + `fechaRetiro` en Excel | (cualquier) | **REPORTAR WARNING** (no asignar, no abortar la fila) |
+
+### Estructura de `gh_eventos_personal`
+
+- **12 columnas**: id (prefijo `ev-`), empresa_id, trabajador_id, tipo_evento, fecha_evento, estado_anterior, estado_nuevo, fecha_referencia, contratacion_id, metadata (JSON), usuario_id, created_at.
+- **3 tipos**: RETIRO, REINGRESO, RECONTRATACION.
+- **4 CHECK constraints** que validan coherencia (ej. RETIRO requiere `estado_anterior<>'retirado' AND estado_nuevo='retirado'`; RECONTRATACION requiere `contratacion_id IS NOT NULL`; REINGRESO/RECONTRATACION requieren `fecha_referencia IS NOT NULL`).
+- **4 índices** para performance.
+- **2 FKs**: empresa_id y trabajador_id.
+
+### Tests E2E (153 asserts distribuidos en 3 archivos)
+
+- `test-gestion-humana-bridge-e2e.js` (137 asserts): 11 escenarios base (T1-T11) + 8 de protección (T12-T19).
+- `test-gestion-humana-bridge-import.js` (67 asserts): 11 escenarios base + 6 de política estricta (T20-T25).
+- `test-gestion-humana-bridge-schema.js` (154 asserts): schema, índices, FKs, conteo de handlers.
+
+### Flujo de UI correcto (lo que debe hacer el user)
+
+1. **Retirar**: Base Personal → Trabajador → botón "Retirar trabajador" (visible si `estado=activo`) → confirma → backend ejecuta `gh:cambiar-estado` → se genera evento RETIRO.
+2. **Reingresar**: Base Personal → Trabajador → botón "Reingresar" (visible si `estado=retirado`) → confirma → backend ejecuta `gh:cambiar-estado` → se genera evento REINGRESO.
+3. **Recontratar**: Gestión Humana → Contrataciones → Nueva contratación → al escribir la cédula de un bp retirado aparece el modal "¿Recontratar?" con 4 opciones (Reingresar / Recontratar / Corregir cédula / Cancelar).
+
+### BP de evidencia histórico
+
+`bp-mthobzc0-uvkk` (CC 9999999999) es el bp que el user creó durante la prueba manual que descubrió el bypass. Tiene `estado=retirado, activo=1, fecha_retiro=NULL` y NO tiene evento RETIRO. Es la **evidencia** de que el bypass existió y fue cerrado. **No tocarlo a menos que se decida explícitamente restaurarlo u ocultarlo.**
+
+### Auditoría de regresiones
+
+Antes de cualquier cambio futuro que toque estos handlers, ejecutar:
+- `node main/test-gestion-humana-bridge-e2e.js` (debe dar 137 OK)
+- `node main/test-gestion-humana-bridge-import.js` (debe dar 67 OK)
+- `node main/test-gestion-humana-bridge-schema.js` (debe dar 154 OK)
+
+Si alguno da FAIL, parar y revisar antes de commitear. Los 2 fails preexistentes en `test-gestion-humana-bridge-write-extra.js` y `test-gestion-humana-bridge-newtables.js` son histórico y NO son de este módulo.
+
+### Lo que NO se debe hacer
+
+- ❌ NO agregar `estado`, `fechaRetiro` o `fechaIngreso` al whitelist de `_handlerUpdatePersonal` (re-abre el bypass)
+- ❌ NO permitir `data.fechaRetiro` en `_handlerCreatePersonal`
+- ❌ NO quitar los `CASE WHEN` de `gh:import-personal` (re-abre el bypass en import)
+- ❌ NO quitar el filtro `PROTECTED_FIELDS` de `_saveDetailEdit` en el frontend
+- ❌ NO restaurar `_openEditModal` (código muerto, pero si alguien lo reactiva sin filtro, es un bypass)
+- ❌ NO borrar la tabla `gh_eventos_personal` ni los CHECK constraints
+- ❌ NO usar `gh:update-personal` para transiciones de ciclo (es el bypass original)
+
