@@ -1018,17 +1018,26 @@
         window.electronAPI.ghGetSignRequest(id, { companyName: self.companyName })
           .catch(function () { return { success: false, error: { code: 'FETCH_ERROR', message: 'No se pudo obtener gh-data de ' + id } }; })
       );
+      // B4) Eventos de auditoría (trazabilidad). Tolerante: si falla, la SR
+      // sigue ok y la sección de trazabilidad muestra lo disponible.
+      idForPromise.push({ id: id, source: 'eventos' });
+      promises.push(
+        (window.electronAPI.firmaSignRequestEventos
+          ? window.electronAPI.firmaSignRequestEventos(id, { companyName: self.companyName })
+          : Promise.resolve({ success: false, error: { code: 'IPC_MISSING', message: 'IPC firma:sign-request:eventos no disponible' } })
+        ).catch(function () { return { success: false, error: { code: 'FETCH_ERROR', message: 'No se pudieron obtener eventos de ' + id } }; })
+      );
     });
 
     return Promise.all(promises).then(function (results) {
       var agreementResult = results[0];
       var srResults = results.slice(1);
 
-      // Agrupar por id_solicitud (3 promesas por id)
+      // Agrupar por id_solicitud (4 promesas por id)
       var byId = {};
       srResults.forEach(function (r, i) {
         var meta = idForPromise[i];
-        if (!byId[meta.id]) byId[meta.id] = { get: null, link: null, gh: null };
+        if (!byId[meta.id]) byId[meta.id] = { get: null, link: null, gh: null, eventos: null };
         byId[meta.id][meta.source] = r;
       });
 
@@ -1037,10 +1046,15 @@
         var getR = parts.get;
         var linkR = parts.link;
         var ghR = parts.gh;
+        var evR = parts.eventos;
 
         // Merge tolerante: si al menos firmaSignRequestGet funcionó, ok=true
         if (getR && getR.success && getR.data) {
           var data = Object.assign({}, getR.data);
+          // Sumar eventos de auditoría si están disponibles
+          if (evR && evR.success && evR.data && Array.isArray(evR.data.eventos)) {
+            data._eventos = evR.data.eventos;
+          }
           // Sumar link si está disponible
           if (linkR && linkR.success && linkR.data) {
             data.url_publica = linkR.data.url_publica || null;
@@ -1072,6 +1086,9 @@
           partialData.estado = partialData.estado || g2.estado || null;
         }
         if (Object.keys(partialData).length > 0) {
+          if (evR && evR.success && evR.data && Array.isArray(evR.data.eventos)) {
+            partialData._eventos = evR.data.eventos;
+          }
           return { id: id, ok: true, data: partialData, partial: true };
         }
         var firstErr = (getR && getR.error && getR.error.message) || 'No disponible';
@@ -1415,14 +1432,68 @@
     ].join('\n');
   };
 
+  // Mapa de tipos de evento de auditoría → etiqueta e icono (es-CO)
+  var _EVENTO_LABELS = {
+    CREATED:              { label: 'Solicitud creada',              icon: 'fa-plus-circle',      color: '#1d4ed8' },
+    INVITE_SENT:          { label: 'Invitación enviada por correo', icon: 'fa-paper-plane',      color: '#0d9488' },
+    INVITE_RESENT:        { label: 'Invitación reenviada',          icon: 'fa-paper-plane',      color: '#0d9488' },
+    IDENTIFIED:           { label: 'Firmante identificado',         icon: 'fa-id-card',          color: '#7c3aed' },
+    IDENTIFICATION_FAILED:{ label: 'Identificación fallida',        icon: 'fa-user-times',       color: '#dc2626' },
+    OTP_SENT:             { label: 'Código de verificación enviado',icon: 'fa-key',              color: '#b45309' },
+    OTP_RESENT:           { label: 'Código reenviado',              icon: 'fa-redo',             color: '#b45309' },
+    OTP_VERIFIED:         { label: 'Código verificado',             icon: 'fa-check-circle',     color: '#059669' },
+    OTP_LOCKED:           { label: 'Código bloqueado por intentos', icon: 'fa-lock',             color: '#dc2626' },
+    CONSENT_ACCEPTED:     { label: 'Acuerdo aceptado',              icon: 'fa-file-signature',   color: '#059669' },
+    VIEWED:               { label: 'Documento visualizado',         icon: 'fa-eye',              color: '#6b7280' },
+    SIGNED:               { label: 'Documento firmado',             icon: 'fa-signature',        color: '#065f46' },
+    REJECTED:             { label: 'Documento rechazado',           icon: 'fa-times-circle',     color: '#dc2626' },
+    EXPIRED:              { label: 'Solicitud expirada',            icon: 'fa-hourglass-end',    color: '#9a3412' },
+    CANCELLED:            { label: 'Solicitud cancelada',           icon: 'fa-ban',              color: '#9a3412' },
+    REVOKED:              { label: 'Solicitud revocada',            icon: 'fa-ban',              color: '#9a3412' }
+  };
+
   FirmaElectronicaComponent.prototype._renderExpedienteTrazabilidad = function (data) {
+    var self = this;
+    // Reunir eventos de todas las solicitudes cargadas
+    var todos = [];
+    (data.signRequests || []).forEach(function (sr) {
+      if (sr && sr.ok && sr.data && Array.isArray(sr.data._eventos)) {
+        sr.data._eventos.forEach(function (ev) {
+          todos.push({ srId: sr.id, ev: ev });
+        });
+      }
+    });
+    // Orden cronológico ASC (el backend ya ordena por SR; aquí mezclamos SRs)
+    todos.sort(function (a, b) {
+      return String(a.ev.fecha_evento || '').localeCompare(String(b.ev.fecha_evento || ''));
+    });
+
+    var bodyHtml;
+    if (todos.length === 0) {
+      bodyHtml = '<p style="color:#6b7280;font-size:0.875rem;padding:0.5rem 0;">' +
+        'Aún no hay eventos de auditoría para este expediente. Aparecerán cuando se cree o avance una solicitud de firma.</p>';
+    } else {
+      bodyHtml = '<div class="fe-timeline">' + todos.map(function (item) {
+        var ev = item.ev;
+        var info = _EVENTO_LABELS[ev.tipo_evento] || { label: ev.tipo_evento, icon: 'fa-circle', color: '#6b7280' };
+        var fecha = self._fmtFechaHora(ev.fecha_evento);
+        var detalles = [];
+        if (ev.actor) detalles.push('actor: ' + ev.actor);
+        if (item.srId) detalles.push(item.srId);
+        return '<div class="fe-timeline__item">' +
+          '<div class="fe-timeline__dot" style="background:' + info.color + '15;color:' + info.color + ';"><i class="fas ' + info.icon + '"></i></div>' +
+          '<div class="fe-timeline__content">' +
+            '<div class="fe-timeline__title">' + _esc(info.label) + '</div>' +
+            '<div class="fe-timeline__meta">' + _esc(fecha) + (detalles.length ? ' · ' + _esc(detalles.join(' · ')) : '') + '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('') + '</div>';
+    }
+
     return [
       '<section class="fe-exp-section">',
-      '  <h4 class="fe-exp-section__title"><i class="fas fa-stream"></i> Trazabilidad / eventos</h4>',
-      '  <div class="fe-exp-warning">',
-      '    <i class="fas fa-clock"></i>',
-      '    <span>La línea de tiempo detallada de eventos (CREATED, INVITE_SENT, IDENTIFIED, OTP_VERIFIED, SIGNED, etc.) requiere un endpoint adicional en el bridge de firma. Se añadirá en una versión posterior.</span>',
-      '  </div>',
+      '  <h4 class="fe-exp-section__title"><i class="fas fa-stream"></i> Trazabilidad / eventos (' + todos.length + ')</h4>',
+      bodyHtml,
       '</section>'
     ].join('\n');
   };
@@ -2522,7 +2593,17 @@
       var estado = item.result.data.estado;
       var transicion = _TRANSICION_FIRMA[estado];
       if (!transicion) return;
-      self._pollingProcessed[item.doc.idSolicitudFirma] = true;
+      if (transicion.estado) {
+        // Higiene: el doc sale de 'esperando_firma' aquí abajo; el filtro de
+        // candidatos ya lo excluye, así que la marca se puede soltar (antes
+        // se acumulaba en memoria por toda la sesión del componente).
+        delete self._pollingProcessed[item.doc.idSolicitudFirma];
+      } else {
+        // Transición SIN cambio de estado (OTP_LOCKED, IDENTIFICATION_FAILED):
+        // el doc sigue en 'esperando_firma' — conservar la marca para no
+        // repetir el toast en cada tick de 30s.
+        self._pollingProcessed[item.doc.idSolicitudFirma] = true;
+      }
       if (transicion.estado) {
         var updates = { estado: transicion.estado };
         if (transicion.estado === 'firmado' && item.result.data.fecha_firma) {
@@ -2600,6 +2681,7 @@
   FirmaElectronicaComponent.prototype.destroy = function () {
     var self = this;
     self._stopPolling();
+    self._pollingProcessed = {};  // liberar marcadores de SRs procesados
     if (self._toastTimer) clearTimeout(self._toastTimer);
     if (self._escKeyHandler) {
       document.removeEventListener('keydown', self._escKeyHandler);
