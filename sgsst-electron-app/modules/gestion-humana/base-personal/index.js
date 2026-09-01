@@ -2,11 +2,12 @@
 // 📦730 · Submódulo "Base de Personal" — UI con HTML+CSS+JS separados (v0.2.0)
 //
 // Estructura visual:
-//   - KPIs (5) via #bp-kpi-bar (helper GHKPIBar)
 //   - Toolbar unificada (📦730 · card única con 2 filas)
-//     · Fila 1: búsqueda + 3 botones (Filtros, Exportar CSV, Nuevo Trabajador)
+//     · Fila 1: búsqueda + segmented control (Todos/Activos/Retirados con conteos) + botones
 //     · Fila 2 (colapsable): filtros Sede/Estado + contador "Mostrando X trabajador(es)"
 //   - Table container (con sticky header + acciones inline)
+//   Nota: la barra de KPIs superior se eliminó — los conteos viven en el
+//   segmented control (_renderSegButtons).
 //
 // HTML: base-personal/index.html (cargado via fetch con fallback inline)
 // CSS:  base-personal/index.css (link en index.html)
@@ -245,7 +246,6 @@ class BasePersonalComponent {
     }
     // Fallback inline — debe coincidir con index.html
     return '<div class="bp-wrapper" id="bp-wrapper">' +
-      '<div class="bp-kpi-section"><div id="bp-kpi-bar" class="bp-kpi-bar"></div></div>' +
       '<div class="bp-toolbar" id="bp-toolbar">' +
         '<div class="bp-toolbar__row bp-toolbar__row--main">' +
           '<div class="bp-toolbar__search">' +
@@ -354,7 +354,7 @@ class BasePersonalComponent {
       this._renderSedeOptions();
 
       this._applyFilter();
-      this._renderKpiBar();
+      this._renderSegButtons();  // FIX: los contadores Todos/Activos/Retirados se actualizan tras cada carga de datos
       this._renderTable();
     } catch (e) {
       this._showToast('Error: ' + e.message, 'error');
@@ -611,7 +611,6 @@ class BasePersonalComponent {
     }
 
     // Initial render + load data
-    this._renderKpiBar();
     this._renderSegButtons();  // 📦762 · actualizar conteos del segmented control
     this._renderTable();
     this._load();
@@ -631,29 +630,6 @@ class BasePersonalComponent {
     if (cTodos) cTodos.textContent = counts.todos;
     if (cActivos) cActivos.textContent = counts.activos;
     if (cRetirados) cRetirados.textContent = counts.retirados;
-  }
-
-  _renderKpiBar() {
-    var bar = this.container.querySelector('#bp-kpi-bar');
-    if (!bar) return;
-
-    var total = this.personales.length;
-    var activos = this.personales.filter(function (p) { return p.estado === 'activo'; }).length;
-    var retirados = this.personales.filter(function (p) { return p.estado === 'retirado'; }).length;
-    var vacaciones = this.personales.filter(function (p) { return p.estado === 'vacaciones'; }).length;
-    var permisos = this.personales.filter(function (p) {
-      return p.estado === 'permiso' || p.estado === 'maternidad' || p.estado === 'paternidad' ||
-             p.estado === 'luto' || p.estado === 'incapacitado';
-    }).length;
-
-    var kpis = [
-      { icon: 'fa-users',         color: '#174ea6', bg: '#e8f0fe', value: this._fmt(total),      label: 'Total' },
-      { icon: 'fa-user-check',    color: '#28a745', bg: '#d4edda', value: this._fmt(activos),   label: 'Activos' },
-      { icon: 'fa-umbrella-beach', color: '#fd7e14', bg: '#ffe5d0', value: this._fmt(vacaciones), label: 'Vacaciones' },
-      { icon: 'fa-file-medical',   color: '#6f42c1', bg: '#e7d6ff', value: this._fmt(permisos),   label: 'Permisos / Otros' },
-      { icon: 'fa-user-xmark',     color: '#868e96', bg: '#e9ecef', value: this._fmt(retirados),  label: 'Retirados' }
-    ];
-    window.GHKPIBar.render(bar, kpis);
   }
 
   _renderTable() {
