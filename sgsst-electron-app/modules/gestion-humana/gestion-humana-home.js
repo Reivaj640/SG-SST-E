@@ -1,9 +1,10 @@
 // modules/gestion-humana/gestion-humana-home.js
 // 📦713 · Módulo "Gestión Humana" — Shell con HTML+CSS+JS separados (v0.2.0)
 //
-// Layout: sidebar 8 items (Resumen/Dashboard/Personal/Contratación/Vacaciones/
-//          Permisos/Afiliaciones/Documentos/Comunicación) + header con NIT/Bell
-//          + footer. CSS del shell en `gestion-humana-home.css` (link en index.html).
+// Layout: sidebar 9 items (Resumen/Dashboard/Contratación/Firma electrónica/
+//          Afiliaciones/Base de Personal/Vacaciones/Permisos/Comunicación)
+//          + header con NIT/Bell + footer. CSS del shell en
+//          `gestion-humana-home.css` (link en index.html).
 // HTML del shell en `gestion-humana-home.html` (cargado via fetch en runtime).
 //
 // 8 vistas (placeholders "Próximamente" para las que faltan; las reales para
@@ -12,12 +13,12 @@
 var GESTION_HUMANA_NAV = [
   { id: 'home',          label: 'Resumen',          shortLabel: 'Resumen',     icon: 'fa-grip',             group: 'Principal' },
   { id: 'dashboard',     label: 'Dashboard',        shortLabel: 'Dashboard',   icon: 'fa-chart-line',       group: 'Gestión' },
-  { id: 'personal',      label: 'Base de Personal', shortLabel: 'B. Pers.',    icon: 'fa-users',            group: 'Gestión' },
   { id: 'contratacion',  label: 'Contratación',     shortLabel: 'Contratación', icon: 'fa-user-plus',       group: 'Gestión' },
+  { id: 'firma-electronica', label: 'Firma electrónica', shortLabel: 'Firma electr.', icon: 'fa-file-signature', group: 'Documentos' },
+  { id: 'afiliaciones',  label: 'Afiliaciones',     shortLabel: 'Afiliaciones', icon: 'fa-shield-halved',   group: 'Gestión' },
+  { id: 'personal',      label: 'Base de Personal', shortLabel: 'B. Pers.',    icon: 'fa-users',            group: 'Gestión' },
   { id: 'vacaciones',    label: 'Vacaciones',       shortLabel: 'Vacaciones',  icon: 'fa-umbrella-beach',   group: 'Gestión' },
   { id: 'permisos',      label: 'Permisos y Estados', shortLabel: 'P. y Est.', icon: 'fa-file-medical',     group: 'Gestión' },
-  { id: 'afiliaciones',  label: 'Afiliaciones',     shortLabel: 'Afiliaciones', icon: 'fa-shield-halved',   group: 'Gestión' },
-  { id: 'firma-electronica', label: 'Firma electrónica', shortLabel: 'Firma electr.', icon: 'fa-file-signature', group: 'Documentos' },
   { id: 'comunicacion',  label: 'Comunicación',     shortLabel: 'Comunicación', icon: 'fa-bullhorn',        group: 'Colaboración' }
 ];
 

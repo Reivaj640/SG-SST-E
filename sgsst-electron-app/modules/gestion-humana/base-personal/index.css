@@ -43,7 +43,6 @@
   border-radius: 0.5rem;
   margin: 0 2rem 0.75rem;
   flex-shrink: 0;
-  overflow: hidden;
 }
 
 .bp-toolbar__row {
@@ -54,13 +53,6 @@
   flex-wrap: wrap;
 }
 .bp-toolbar__row--main { gap: 0.5rem; align-items: center; flex-wrap: wrap; }
-.bp-toolbar__row--count {
-  border-top: 1px solid #f1f3f5;
-  background: #fcfcfd;
-  align-items: center;
-  padding-top: 0.4rem;
-  padding-bottom: 0.4rem;
-}
 
 .bp-toolbar__search {
   flex: 1 1 280px;
@@ -131,15 +123,6 @@
   padding-right: 1.85rem;
 }
 .bp-filter-select:focus { border-color: #174ea6; box-shadow: 0 0 0 2px rgba(23, 78, 166, 0.15); }
-
-.bp-filter-count {
-  margin-left: auto;
-  font-size: 0.8rem;
-  color: #6c757d;
-  padding-bottom: 0.4rem;
-  white-space: nowrap;
-}
-.bp-filter-count strong { color: #1a1a2e; font-weight: 700; }
 
 /* ═══ SEGMENTED CONTROL (📦762 · Todos/Activos/Retirados) ═══ */
 .bp-seg {
@@ -917,3 +900,96 @@
 .bp-import-duplicate-mode__opt input { cursor: pointer; flex-shrink: 0; }
 .bp-import-duplicate-mode__opt-label { font-weight: 600; }
 .bp-import-duplicate-mode__opt-hint { color: #6c757d; font-size: 0.75rem; }
+
+/* ═══ DROPDOWN PERSONALIZADO DE SEDE (clon visual de fe-filter-dropdown) ═══ */
+.bp-sede-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.bp-sede-dropdown__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-width: 220px;
+  padding: 0.5rem 0.75rem;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #374151;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.bp-sede-dropdown__toggle:hover {
+  border-color: #9ca3af;
+}
+.bp-sede-dropdown--open .bp-sede-dropdown__toggle {
+  border-color: #174ea6;
+  box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.12);
+}
+
+.bp-sede-dropdown__chevron {
+  margin-left: 0.25rem;
+  font-size: 0.7rem;
+  color: #6b7280;
+  transition: transform 0.15s;
+}
+.bp-sede-dropdown--open .bp-sede-dropdown__chevron {
+  transform: rotate(180deg);
+}
+
+.bp-sede-dropdown__menu {
+  position: absolute;
+  top: calc(100% + 0.375rem);
+  right: 0;
+  min-width: 260px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  padding: 0.375rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  z-index: 100;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.bp-sede-option {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 0.4375rem 0.625rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #4b5563;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  font-family: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bp-sede-option:hover:not(:disabled) {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+.bp-sede-option--active {
+  background: #174ea6;
+  color: #fff;
+}
+.bp-sede-option--active:hover:not(:disabled) {
+  background: #174ea6;
+  color: #fff;
+}
+.bp-sede-option:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

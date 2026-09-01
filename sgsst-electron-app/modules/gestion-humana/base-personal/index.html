@@ -1,10 +1,12 @@
 <!-- modules/gestion-humana/base-personal/index.html
      📦730 · Vista "Base de Personal" — HTML separado (v0.2.0)
      Estructura:
-       - Toolbar unificada (búsqueda + 3 botones en fila 1; filtros Sede/Estado + contador en fila 2 colapsable)
+       - Toolbar unificada (búsqueda + segmented + Sede + Importar/Exportar en una sola fila)
        - Table container
      Nota: la barra de KPIs superior se eliminó (los conteos viven en los
-     filtros segmentados Todos/Activos/Retirados).
+     filtros segmentados Todos/Activos/Retirados). La fila de contador de
+     resultados y el botón "Nuevo Trabajador" se retiraron (altas solo por
+     Importar Excel).
      IDs con prefijo `bp-` para evitar colisiones. -->
 
 <div class="bp-wrapper" id="bp-wrapper">
@@ -30,10 +32,16 @@
       </div>
       <div class="bp-toolbar__actions">
         <div class="bp-filter-group bp-filter-group--inline">
-          <label class="bp-filter-group__label" for="bp-filter-sede">Sede</label>
-          <select id="bp-filter-sede" class="bp-filter-select">
-            <option value="all">Todas las sedes</option>
-          </select>
+          <label class="bp-filter-group__label" id="bp-sede-label-text">Sede</label>
+          <!-- Dropdown personalizado (estilo fe-filter-dropdown de Firma Electrónica) -->
+          <div class="bp-sede-dropdown" id="bp-sede-dropdown">
+            <button id="bp-sede-toggle" class="bp-sede-dropdown__toggle" type="button"
+                    aria-haspopup="listbox" aria-expanded="false" aria-labelledby="bp-sede-label-text bp-sede-label">
+              <span id="bp-sede-label">Todas las sedes</span>
+              <i class="fas fa-chevron-down bp-sede-dropdown__chevron"></i>
+            </button>
+            <div id="bp-sede-menu" class="bp-sede-dropdown__menu" role="listbox" aria-labelledby="bp-sede-label-text" hidden></div>
+          </div>
         </div>
         <button id="bp-importar-btn" class="bp-btn bp-btn--ghost" type="button" title="Importar trabajadores desde Excel">
           <i class="fas fa-file-import"></i> Importar Excel
@@ -41,16 +49,6 @@
         <button id="bp-exportar-btn" class="bp-btn bp-btn--ghost" type="button">
           <i class="fas fa-download"></i> Exportar CSV
         </button>
-        <button id="bp-new-btn" class="bp-btn bp-btn--primary" type="button">
-          <i class="fas fa-plus"></i> Nuevo Trabajador
-        </button>
-      </div>
-    </div>
-
-    <!-- FILA 2: contador de resultados -->
-    <div class="bp-toolbar__row bp-toolbar__row--count">
-      <div id="bp-filter-count" class="bp-filter-count">
-        Mostrando <strong id="bp-filter-count-num">0</strong> trabajador(es)
       </div>
     </div>
   </div>

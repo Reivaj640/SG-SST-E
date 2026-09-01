@@ -259,16 +259,18 @@ class BasePersonalComponent {
           '</div>' +
           '<div class="bp-toolbar__actions">' +
             '<div class="bp-filter-group bp-filter-group--inline">' +
-              '<label class="bp-filter-group__label" for="bp-filter-sede">Sede</label>' +
-              '<select id="bp-filter-sede" class="bp-filter-select"><option value="all">Todas las sedes</option></select>' +
+              '<label class="bp-filter-group__label" id="bp-sede-label-text">Sede</label>' +
+              '<div class="bp-sede-dropdown" id="bp-sede-dropdown">' +
+                '<button id="bp-sede-toggle" class="bp-sede-dropdown__toggle" type="button" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="bp-sede-label-text bp-sede-label">' +
+                  '<span id="bp-sede-label">Todas las sedes</span>' +
+                  '<i class="fas fa-chevron-down bp-sede-dropdown__chevron"></i>' +
+                '</button>' +
+                '<div id="bp-sede-menu" class="bp-sede-dropdown__menu" role="listbox" aria-labelledby="bp-sede-label-text" hidden></div>' +
+              '</div>' +
             '</div>' +
             '<button id="bp-importar-btn" class="bp-btn bp-btn--ghost" type="button" title="Importar trabajadores desde Excel"><i class="fas fa-file-import"></i> Importar Excel</button>' +
             '<button id="bp-exportar-btn" class="bp-btn bp-btn--ghost" type="button"><i class="fas fa-download"></i> Exportar CSV</button>' +
-            '<button id="bp-new-btn" class="bp-btn bp-btn--primary" type="button"><i class="fas fa-plus"></i> Nuevo Trabajador</button>' +
           '</div>' +
-        '</div>' +
-        '<div class="bp-toolbar__row bp-toolbar__row--count">' +
-          '<div id="bp-filter-count" class="bp-filter-count">Mostrando <strong id="bp-filter-count-num">0</strong> trabajador(es)</div>' +
         '</div>' +
       '</div>' +
       '<div id="bp-table-container" class="bp-table-container"></div>' +
@@ -362,8 +364,11 @@ class BasePersonalComponent {
   }
 
   _renderSedeOptions() {
-    var select = this.container.querySelector('#bp-filter-sede');
-    if (!select) return;
+    // Dropdown personalizado (reemplaza al <select id="bp-filter-sede"> nativo).
+    // Mantiene EXACTAMENTE los mismos valores de filtrado: 'all', sedeId, '__none__'.
+    var menu = this.container.querySelector('#bp-sede-menu');
+    if (!menu) return;
+    var label = this.container.querySelector('#bp-sede-label');
     var self = this;
 
     // 📦735 · Construir un mapa sedeId → nombre desde ghListSedes (si hay)
@@ -384,28 +389,38 @@ class BasePersonalComponent {
     // Sin asignar (personales con sedeId null o vacío)
     var sinSedeCount = this.personales.filter(function (p) { return !p.sedeId; }).length;
 
-    // 📦741 · Renderizar opciones. Si no hay sedes en los datos, mostrar
-    // un mensaje claro (en vez de "Todas" y "(Sin sede)" con el mismo conteo).
-    var opts = '';
+    // 📦741 · Opciones (mismo set de reglas que el <select> previo).
+    var items = [];
     if (usedSedes.length === 0 && sinSedeCount === 0) {
-      opts = '<option value="all" disabled>Sin trabajadores</option>';
+      items.push({ value: 'all', text: 'Sin trabajadores', disabled: true });
     } else if (usedSedes.length === 0) {
-      // Solo hay trabajadores sin sede
-      opts = '<option value="all">Todas las sedes (' + this.personales.length + ')</option>';
-      opts += '<option value="__none__">(Sin sede) (' + sinSedeCount + ')</option>';
+      items.push({ value: 'all', text: 'Todas las sedes (' + this.personales.length + ')' });
+      items.push({ value: '__none__', text: '(Sin sede) (' + sinSedeCount + ')' });
     } else {
-      opts = '<option value="all">Todas las sedes (' + this.personales.length + ')</option>';
+      items.push({ value: 'all', text: 'Todas las sedes (' + this.personales.length + ')' });
       usedSedes.forEach(function (sid) {
         var count = self.personales.filter(function (p) { return p.sedeId === sid; }).length;
         var nombre = sedeNombre[sid] || sid;
-        opts += '<option value="' + self._escHtml(sid) + '">' + self._escHtml(nombre) + ' (' + count + ')</option>';
+        items.push({ value: sid, text: nombre + ' (' + count + ')' });
       });
       if (sinSedeCount > 0) {
-        opts += '<option value="__none__">(Sin sede) (' + sinSedeCount + ')</option>';
+        items.push({ value: '__none__', text: '(Sin sede) (' + sinSedeCount + ')' });
       }
     }
-    select.innerHTML = opts;
-    select.value = this.filterSede;
+
+    // Pintar el menú (botones con marca activa según this.filterSede)
+    var current = this.filterSede;
+    menu.innerHTML = items.map(function (it) {
+      var active = it.value === current;
+      return '<button type="button" role="option" aria-selected="' + (active ? 'true' : 'false') + '"' +
+        ' class="bp-sede-option' + (active ? ' bp-sede-option--active' : '') + '"' +
+        ' data-value="' + self._escHtml(it.value) + '"' + (it.disabled ? ' disabled' : '') + '>' +
+        self._escHtml(it.text) + '</button>';
+    }).join('');
+
+    // Etiqueta visible del toggle = texto de la opción activa
+    var activeItem = items.find(function (it) { return it.value === current; });
+    if (label) label.textContent = activeItem ? activeItem.text : 'Todas las sedes';
   }
 
   _applyFilter() {
@@ -425,11 +440,6 @@ class BasePersonalComponent {
       else matchSede = p.sedeId === self.filterSede;
       return matchSearch && matchEstado && matchSede;
     });
-  }
-
-  _updateCount() {
-    var numEl = this.container.querySelector('#bp-filter-count-num');
-    if (numEl) numEl.textContent = this.filtered.length;
   }
 
   // === HELPERS DE FORMATO (📦737 · rediseño tabla) ===
@@ -576,15 +586,11 @@ class BasePersonalComponent {
           });
           self._applyFilter();
           self._renderTable();
-          self._updateCount();
         };
       });
     }
 
     // Wire up
-    var newBtn = this.container.querySelector('#bp-new-btn');
-    if (newBtn) newBtn.onclick = function () { self._openCreateModal(); };
-
     var exportarBtn = this.container.querySelector('#bp-exportar-btn');
     if (exportarBtn) exportarBtn.onclick = function () { self._exportarCSV(); };
 
@@ -602,12 +608,49 @@ class BasePersonalComponent {
     if (importConfirm) importConfirm.onclick = function () { self._confirmImport(); };
 
     if (searchInput) {
-      searchInput.oninput = function (e) { self.search = e.target.value; self._applyFilter(); self._renderTable(); self._updateCount(); };
+      searchInput.oninput = function (e) { self.search = e.target.value; self._applyFilter(); self._renderTable(); };
     }
 
-    var sedeSelect = this.container.querySelector('#bp-filter-sede');
-    if (sedeSelect) {
-      sedeSelect.onchange = function (e) { self.filterSede = e.target.value; self._applyFilter(); self._renderTable(); self._updateCount(); };
+    // Dropdown personalizado de sede (estilo fe-filter-dropdown de Firma Electrónica)
+    var sedeToggle = this.container.querySelector('#bp-sede-toggle');
+    var sedeMenu = this.container.querySelector('#bp-sede-menu');
+    var sedeDropdown = this.container.querySelector('#bp-sede-dropdown');
+    if (sedeToggle && sedeMenu && sedeDropdown) {
+      var closeSedeMenu = function () {
+        sedeMenu.hidden = true;
+        sedeToggle.setAttribute('aria-expanded', 'false');
+        sedeDropdown.classList.remove('bp-sede-dropdown--open');
+      };
+      this._closeSedeMenu = closeSedeMenu;
+      // Toggle abrir/cerrar
+      sedeToggle.onclick = function (ev) {
+        ev.stopPropagation();
+        var isOpen = !sedeMenu.hidden;
+        if (isOpen) { closeSedeMenu(); return; }
+        sedeMenu.hidden = false;
+        sedeToggle.setAttribute('aria-expanded', 'true');
+        sedeDropdown.classList.add('bp-sede-dropdown--open');
+      };
+      // Clic en una opción (delegación dentro del menú)
+      sedeMenu.onclick = function (ev) {
+        var btn = ev.target.closest('.bp-sede-option');
+        if (!btn || btn.disabled) return;
+        self.filterSede = btn.getAttribute('data-value');
+        self._renderSedeOptions();  // re-pinta marca activa + etiqueta del toggle
+        self._applyFilter();
+        self._renderTable();
+        closeSedeMenu();
+      };
+      // Clic fuera: cerrar
+      document.addEventListener('click', function (ev) {
+        if (sedeMenu.hidden) return;
+        if (sedeDropdown.contains(ev.target)) return;
+        closeSedeMenu();
+      });
+      // Escape: cerrar
+      document.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Escape' && !sedeMenu.hidden) closeSedeMenu();
+      });
     }
 
     // Initial render + load data
@@ -642,7 +685,7 @@ class BasePersonalComponent {
         ? 'No hay trabajadores registrados todavía.'
         : 'No se encontraron trabajadores con esos filtros.';
       var emptyHint = this.personales.length === 0
-        ? '<p class="bp-empty-state__hint">Hacé click en <strong>Nuevo Trabajador</strong> para empezar.</p>'
+        ? '<p class="bp-empty-state__hint">Usá <strong>Importar Excel</strong> para cargar trabajadores.</p>'
         : '';
       container.innerHTML =
         '<div class="bp-empty-state">' +
@@ -650,7 +693,6 @@ class BasePersonalComponent {
           '<p class="bp-empty-state__title">' + emptyMsg + '</p>' +
           emptyHint +
         '</div>';
-      this._updateCount();
       return;
     }
 
@@ -725,30 +767,6 @@ class BasePersonalComponent {
     container.querySelectorAll('.bp-row-action--del').forEach(function (btn) {
       btn.onclick = function () { self._openOcultarConfirm(btn.getAttribute('data-id'), btn.getAttribute('data-nombre')); };
     });
-
-    this._updateCount();
-  }
-
-  // === CREATE / EDIT MODAL via KairConfirm.input() ===
-  async _openCreateModal() {
-    var values = await this._confirmDialog().input({
-      title: '➕ Nuevo Trabajador',
-      message: 'Completá los datos del nuevo trabajador. Cédula, nombres y apellidos son obligatorios.',
-      fields: [
-        { key: 'nombres', label: 'Nombres', type: 'text', required: true, placeholder: 'Ej: Juan Carlos' },
-        { key: 'apellidos', label: 'Apellidos', type: 'text', required: true, placeholder: 'Ej: Pérez García' },
-        { key: 'cedula', label: 'Cédula', type: 'text', required: true, placeholder: '1234567890' },
-        { key: 'cargo', label: 'Cargo', type: 'text', required: true, placeholder: 'Ej: Operario' },
-        { key: 'salario', label: 'Salario (COP)', type: 'number', placeholder: '1500000' },
-        { key: 'telefono', label: 'Teléfono', type: 'text', placeholder: '3001234567' },
-        { key: 'email', label: 'Email', type: 'text', placeholder: 'email@empresa.com' },
-        { key: 'fechaIngreso', label: 'Fecha de Ingreso (YYYY-MM-DD)', type: 'text', placeholder: '2026-01-15' }
-      ],
-      confirmText: 'Crear Trabajador',
-      type: 'info'
-    });
-    if (!values) return;
-    this._create(values);
   }
 
   // 📦767 · I-103.A1.0-F-1 · Acción administrativa (NO retiro laboral).
@@ -867,20 +885,6 @@ class BasePersonalComponent {
   }
 
   // === IPC CALLS ===
-  async _create(data) {
-    try {
-      var r = await window.electronAPI.ghCreatePersonal({ companyName: this.companyName, data: data });
-      if (r && r.success) {
-        this._showToast('✅ Trabajador creado: ' + data.nombres + ' ' + data.apellidos, 'success');
-        await this._load();
-      } else {
-        this._showToast('❌ Error: ' + (r.error ? r.error.message : 'desconocido'), 'error');
-      }
-    } catch (e) {
-      this._showToast('❌ Error: ' + e.message, 'error');
-    }
-  }
-
   async _update(personalId, data) {
     try {
       var r = await window.electronAPI.ghUpdatePersonal({ personalId: personalId, updates: data });
