@@ -492,6 +492,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // y aplica cooldown visual de 60s.
   // Args: { id: 'SIGN-YYYY-NNNNNN' | <int>, companyName?: string, context?: { ... } }
   firmaSignRequestResendOtp: (id, args) => ipcRenderer.invoke('firma:sign-request:resend-otp', Object.assign({ id }, args || {})),
+  // Trazabilidad — línea de tiempo de auditoría de la solicitud de firma.
+  // Requiere op audit:read. Backend ya redacta secretos de metadata.
+  firmaSignRequestEventos: (id, args) => ipcRenderer.invoke('firma:sign-request:eventos', Object.assign({ id }, args || {})),
   // Consent (2)
   firmaConsentCreate: (payload) => ipcRenderer.invoke('firma:consent:create', payload),
   firmaConsentVerifyOtp: (companyName, consentId, otp) => ipcRenderer.invoke('firma:consent:verify-otp', { companyName, consentId, otp }),

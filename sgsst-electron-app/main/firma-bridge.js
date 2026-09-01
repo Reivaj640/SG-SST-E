@@ -1020,6 +1020,18 @@ function _handlerSignRequestGet(args) {
   return r.client.getSignRequest(args.id);
 }
 
+// -------- firma:sign-request:eventos --------
+// Línea de tiempo de auditoría (Trazabilidad del expediente).
+function _handlerSignRequestEventos(args) {
+  args = args || {};
+  if (!args.id) {
+    return _err('INVALID_REQUEST_BODY', 'id requerido');
+  }
+  var r = _resolveClientForRequest(args);
+  if (!r.ok) return r.response;
+  return r.client.getSignRequestEvents(args.id);
+}
+
 function _handlerSignRequestList(args) {
   args = args || {};
   if (!Array.isArray(args.ids) || args.ids.length === 0) {
@@ -2191,6 +2203,14 @@ function registerFirmaHandlers(appArg, deps) {
       return _handlerSignRequestGet(payload || {});
     } catch (e) {
       console.error('[' + MOD + '][sign-request:get]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  handle('firma:sign-request:eventos', function (event, payload) {
+    try {
+      return _handlerSignRequestEventos(payload || {});
+    } catch (e) {
+      console.error('[' + MOD + '][sign-request:eventos]', e.message);
       return _err('INTERNAL', e.message);
     }
   });

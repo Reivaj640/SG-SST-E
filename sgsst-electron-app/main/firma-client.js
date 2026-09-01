@@ -600,6 +600,28 @@ function createFirmaClient(opts) {
   }
 
   /**
+   * GET /internal/sign-requests/:id/eventos
+   * Línea de tiempo de auditoría del sign request (CREATED, INVITE_SENT,
+   * IDENTIFIED, OTP_VERIFIED, SIGNED, REJECTED, etc.).
+   * Requiere la operación audit:read (los clientes per-empresa la traen).
+   * El backend ya redacta secretos de metadata (no expone OTPs).
+   *
+   * @param {string} id - id_solicitud (SIGN-YYYY-NNNNNN) o id interno
+   * @returns {Promise<{success,data:{id_solicitud,total,eventos[]}}|{success:false,error}>}
+   */
+  function getSignRequestEvents(id) {
+    if (!id) {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY', 'id requerido'));
+    }
+    return _doRequest(
+      'GET',
+      '/internal/sign-requests/' + encodeURIComponent(id) + '/eventos',
+      null,
+      null
+    ).then(function (r) { return _parseResult(r, 'application/json'); });
+  }
+
+  /**
    * POST /internal/consentimientos
    * @param {object} payload { id_trabajador, id_empresa, version_acuerdo, correo_verificacion, kair_version }
    */
@@ -845,6 +867,7 @@ function createFirmaClient(opts) {
     getSignRequestLink: getSignRequestLink,
     notifySignRequestRemote: notifySignRequestRemote,  // I-103.A1.5.2
     resendSignRequestOtp: resendSignRequestOtp,  // I-103.A1.6.B
+    getSignRequestEvents: getSignRequestEvents,  // Trazabilidad (audit:read)
     createConsent: createConsent,
     verifyConsentOtp: verifyConsentOtp,
     getActiveAgreement: getActiveAgreement,

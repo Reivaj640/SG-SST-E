@@ -1426,3 +1426,42 @@
     padding: 1rem 1.125rem;
   }
 }
+
+/* ═══ Trazabilidad — línea de tiempo de eventos de auditoría ═══ */
+.fe-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0.25rem 0;
+}
+.fe-timeline__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding: 0.4rem 0;
+  position: relative;
+}
+.fe-timeline__item + .fe-timeline__item {
+  border-top: 1px dashed #e5e7eb;
+}
+.fe-timeline__dot {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+}
+.fe-timeline__content { min-width: 0; }
+.fe-timeline__title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #111827;
+}
+.fe-timeline__meta {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-top: 0.1rem;
+}
