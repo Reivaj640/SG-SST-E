@@ -526,6 +526,8 @@
           self._firmarElectronico(docId);
         } else if (action === 'descargar-documento') {
           self._descargarDocumento(docId);
+        } else if (action === 'anular-documento') {
+          self._anularDocumento(docId);
         } else if (action === 'ver-documento') {
           self._verDocumento(docId);
         } else if (action === 'abrir-template') {
@@ -1211,6 +1213,13 @@
       }
       if (d.estado === 'pendiente' && d.rutaArchivo) {
         actions.push('<button class="fe-doc-action fe-doc-action--primary" data-action="firmar-electronico" data-doc-id="' + _esc(d.id) + '" type="button"><i class="fas fa-file-signature"></i> Firmar electrónicamente</button>');
+      }
+      // Anular: SOLO documentos pendientes SIN solicitud de firma enviada.
+      // Si ya hay SR viva en firma-service, anular local dejaría la solicitud
+      // activa en el servidor (el firmante aún podría firmar) → inconsistencia.
+      // Ese caso requiere la revocación remota (Fase C, pendiente).
+      if (d.estado === 'pendiente' && !d.idSolicitudFirma) {
+        actions.push('<button class="fe-doc-action fe-doc-action--danger" data-action="anular-documento" data-doc-id="' + _esc(d.id) + '" type="button"><i class="fas fa-ban"></i> Anular</button>');
       }
       var badgeClass = 'fe-doc-badge--' + (d.estado || 'pendiente');
       return [
@@ -1914,6 +1923,9 @@
     tipoSelect.innerHTML = TIPOS.map(function (t) {
       return '<option value="' + t.value + '">' + _esc(t.label) + '</option>';
     }).join('');
+    // Si venimos del bloqueo "Subir template ahora" del modal de Generar,
+    // preseleccionar el tipo que le faltaba template al usuario.
+    if (self._selectedTipo) { tipoSelect.value = self._selectedTipo; }
     nombreInput.value = '';
     modal.hidden = false;
     confirmBtn.onclick = function () {
@@ -1937,6 +1949,12 @@
       this._showToast('Template subido correctamente', 'success');
       await this._reloadData();
       this._renderTemplates();
+      // Si el modal de Generar Documento está abierto detrás, refrescar su
+      // campo de template (ej. venía del bloqueo "Subir template ahora").
+      var genModal = this.container.querySelector('#fe-gen-modal');
+      if (genModal && !genModal.hidden) {
+        this._updateTemplateField(genModal);
+      }
     } else {
       this._showToast('Error subiendo template: ' + (r && r.error && r.error.message || 'desconocido'), 'error');
     }
@@ -1999,31 +2017,71 @@
   };
 
   FirmaElectronicaComponent.prototype._updateTemplateField = function (modal) {
+    var self = this;
     var field = modal.querySelector('#fe-gen-template-field');
     var select = modal.querySelector('#fe-gen-template');
     var hint = modal.querySelector('#fe-gen-template-hint');
+    var confirmBtn = modal.querySelector('#fe-gen-confirm');
     if (!field || !select) return;
     var templates = this._templatesByTipo(this._selectedTipo);
+    var tipoObj = TIPOS.find(function (t) { return t.value === self._selectedTipo; });
+    var tipoLabel = tipoObj ? tipoObj.label : self._selectedTipo;
+
+    // BLOQUEO: sin template no se puede generar (evita documentos huérfanos
+    // sin archivo adjunto — antes se permitía y el doc quedaba inutilizable).
     if (templates.length === 0) {
-      field.hidden = true;
+      field.hidden = false;
+      select.hidden = true;
       this._selectedTemplateId = null;
+      if (confirmBtn) { confirmBtn.disabled = true; }
+      if (hint) {
+        hint.innerHTML =
+          '<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:0.75rem;color:#92400e;font-size:0.8125rem;line-height:1.5;">' +
+          '  <div style="font-weight:600;margin-bottom:0.25rem;"><i class="fas fa-exclamation-triangle"></i> Este tipo de documento no tiene template</div>' +
+          '  <div style="margin-bottom:0.5rem;">Para generar "' + _esc(tipoLabel) + '" primero debes subir un template (.docx o .pdf).</div>' +
+          '  <button id="fe-gen-subir-ahora" class="fe-btn fe-btn--primary fe-btn--sm" type="button"><i class="fas fa-cloud-upload-alt"></i> Subir template ahora</button>' +
+          '</div>';
+        var subirAhoraBtn = hint.querySelector('#fe-gen-subir-ahora');
+        if (subirAhoraBtn) {
+          subirAhoraBtn.onclick = function (ev) {
+            ev.stopPropagation();
+            self._openSubirTemplateModal();
+          };
+        }
+      }
       return;
     }
+
+    // Con templates: la opción "contenido genérico" se eliminó — SIEMPRE se
+    // requiere un template real para generar.
     field.hidden = false;
-    select.innerHTML = '<option value="">— Sin template (contenido genérico) —</option>' +
-      templates.map(function (t) {
-        return '<option value="' + _esc(t.id) + '">' + _esc(t.nombre) + ' (' + _esc(t.nombreArchivo || '') + ')</option>';
-      }).join('');
-    this._selectedTemplateId = null;
+    select.hidden = false;
+    select.innerHTML = templates.map(function (t) {
+      return '<option value="' + _esc(t.id) + '">' + _esc(t.nombre) + ' (' + _esc(t.nombreArchivo || '') + ')</option>';
+    }).join('');
+    this._selectedTemplateId = templates[0].id;  // select queda en la primera opción por defecto
     select.onchange = function () {
-      this._selectedTemplateId = select.value || null;
-    }.bind(this);
-    if (hint) hint.textContent = 'Selecciona un template o deja vacío para contenido genérico.';
+      self._selectedTemplateId = select.value || null;
+    };
+    if (confirmBtn) { confirmBtn.disabled = false; }
+    if (hint) hint.textContent = 'El documento se generará a partir del template seleccionado.';
   };
 
   FirmaElectronicaComponent.prototype._generarDocumento = async function (trabajadorId, tipo, modal) {
     var self = this;
     if (!window.electronAPI || !self.companyName) return;
+    // Defensa en profundidad: TODO documento requiere un template real.
+    // Aunque el botón "Generar" ya se deshabilita cuando falta, esta guardia
+    // cubre cualquier llamada inesperada (evita documentos huérfanos sin archivo).
+    var templatesDelTipo = self._templatesByTipo(tipo);
+    if (templatesDelTipo.length === 0) {
+      self._showToast('No se puede generar: este tipo no tiene template. Sube uno primero.', 'warning');
+      return;
+    }
+    if (!self._selectedTemplateId) {
+      self._showToast('Selecciona un template para generar el documento.', 'warning');
+      return;
+    }
     var tipoObj = TIPOS.find(function (t) { return t.value === tipo; });
     var titulo = tipoObj ? tipoObj.label : tipo;
     var contenido = JSON.stringify({ tipoDocumento: tipo, generadoEn: new Date().toISOString() });
@@ -2359,8 +2417,42 @@
   };
 
   // ═══════════════════════════════════════════════════════════
-  // DESCARGAR / VER DOCUMENTO
+  // DESCARGAR / VER / ANULAR DOCUMENTO
   // ═══════════════════════════════════════════════════════════
+
+  /**
+   * Anula un documento pendiente SIN solicitud de firma (soft delete local:
+   * estado='anulado' en gh_documentos vía gh:delete-documento).
+   * No toca firma-service (no hay SR que revocar).
+   */
+  FirmaElectronicaComponent.prototype._anularDocumento = async function (docId) {
+    var self = this;
+    if (!docId || !window.electronAPI) return;
+    var doc = self._documentos.find(function (d) { return d.id === docId; });
+    var titulo = (doc && (doc.titulo || doc.tipo)) || 'este documento';
+    var ok = confirm('¿Anular "' + titulo + '"?\n\nEl documento quedará marcado como anulado (no se borra de la base de datos). Esta acción no se puede deshacer desde la interfaz.');
+    if (!ok) return;
+    try {
+      var r = await window.electronAPI.ghDeleteDocumento({ documentoId: docId });
+      if (r && r.success) {
+        self._showToast('Documento anulado', 'success');
+        await self._reloadData();
+        self._renderTabla();
+        // Refrescar el modal del expediente con el proceso FRESCO (post-reload).
+        if (self._modal && !self._modal.hidden && self._lastExpedienteProceso) {
+          var trabIdAnular = self._lastExpedienteProceso.trabajadorId;
+          var freshProcesoAnular = self._procesosPorTrabajador.find(function (p) { return p.trabajadorId === trabIdAnular; });
+          if (freshProcesoAnular) {
+            await self._refetchExpediente(freshProcesoAnular);
+          }
+        }
+      } else {
+        self._showToast('Error anulando: ' + (r && r.error && r.error.message || 'desconocido'), 'error');
+      }
+    } catch (e) {
+      self._showToast('Error anulando documento: ' + e.message, 'error');
+    }
+  };
 
   FirmaElectronicaComponent.prototype._descargarDocumento = async function (docId) {
     if (!docId || !window.electronAPI) return;
@@ -2384,7 +2476,14 @@
   FirmaElectronicaComponent.prototype._verDocumento = async function (docId) {
     if (!docId || !window.electronAPI) return;
     try {
-      await window.electronAPI.ghAbrirDocumento({ documentoId: docId });
+      var r = await window.electronAPI.ghAbrirDocumento({ documentoId: docId });
+      // Antes tragaba el error en silencio (ej. documentos antiguos sin
+      // archivo adjunto). Ahora avisa claramente al usuario.
+      if (r && !r.success) {
+        var msg = (r.error && r.error.message) || 'No se pudo abrir el documento';
+        this._showToast(msg, 'warning');
+        return;
+      }
     } catch (e) {
       this._showToast('Error abriendo documento: ' + e.message, 'error');
     }
