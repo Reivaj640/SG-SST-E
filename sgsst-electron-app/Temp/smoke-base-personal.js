@@ -35,15 +35,13 @@ if (!Comp) process.exit(1);
 
 const html = fs.readFileSync(htmlPath, 'utf8');
 const htmlChecks = [
-  { re: /bp-kpi-bar/,            label: 'KPI bar container' },
   { re: /bp-search/,             label: 'Search input' },
   { re: /bp-filter-todos/,        label: 'Segmented Todos' },
   { re: /bp-filter-activos/,      label: 'Segmented Activos' },
   { re: /bp-filter-retirados/,    label: 'Segmented Retirados' },
-  { re: /bp-filter-sede/,         label: 'Sede select' },
+  { re: /bp-sede-dropdown/,       label: 'Sede custom dropdown' },
   { re: /bp-importar-btn/,        label: 'Importar btn' },
   { re: /bp-exportar-btn/,        label: 'Exportar btn' },
-  { re: /bp-new-btn/,             label: 'Nuevo btn' },
   { re: /bp-count-todos/,         label: 'Count Todos' },
   { re: /bp-count-activos/,       label: 'Count Activos' },
   { re: /bp-count-retirados/,     label: 'Count Retirados' }
@@ -55,7 +53,11 @@ htmlChecks.forEach(c => console.log('  ' + (c.re.test(html) ? '✅' : '❌') + '
 const oldChecks = [
   { re: /bp-filtros-btn/, label: 'Old Filtros button' },
   { re: /bp-filters-row/, label: 'Old filters row' },
-  { re: /bp-filter-estado/, label: 'Old estado select' }
+  { re: /bp-filter-estado/, label: 'Old estado select' },
+  { re: /id="bp-filter-sede"/, label: 'Old sede native select' },
+  { re: /bp-kpi-bar/, label: 'Removed KPI bar' },
+  { re: /bp-new-btn/, label: 'Removed Nuevo Trabajador btn' },
+  { re: /bp-filter-count/, label: 'Removed count row' }
 ];
 console.log('\n🗑️  Old elements (deberían estar ausentes):');
 oldChecks.forEach(c => console.log('  ' + (c.re.test(html) ? '❌ AÚN PRESENTE' : '✅ Removido') + ' ' + c.label));
@@ -66,7 +68,7 @@ const cssChecks = [
   { re: /\.bp-seg-btn--active/,   label: 'Active seg btn' },
   { re: /\.bp-seg-count/,         label: 'Seg count badge' },
   { re: /\.bp-filter-group--inline/, label: 'Inline filter group' },
-  { re: /\.bp-toolbar__row--count/, label: 'Count row' }
+  { re: /\.bp-sede-dropdown/,     label: 'Sede custom dropdown' }
 ];
 console.log('\n🎨 CSS checks:');
 cssChecks.forEach(c => console.log('  ' + (c.re.test(css) ? '✅' : '❌') + ' ' + c.label));
