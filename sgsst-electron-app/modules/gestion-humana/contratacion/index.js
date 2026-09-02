@@ -675,6 +675,18 @@ class ContratacionComponent {
       }
     } catch (e) { console.warn('[Contratacion] No se pudieron cargar soportes:', e.message); }
 
+    // Documentos de Firma Electrónica (para el paso 4 — la evidencia digital ya
+    // generada/firmada por el candidato). Solo si hay bp vinculado.
+    c._documentosFirma = [];
+    if (c.trabajadorId) {
+      try {
+        var rd = await window.electronAPI.ghListDocumentos({ companyName: this.companyName, trabajadorId: c.trabajadorId });
+        if (rd && rd.success && rd.data && rd.data.documentos) {
+          c._documentosFirma = rd.data.documentos;
+        }
+      } catch (e) { console.warn('[Contratacion] No se pudieron cargar documentos de firma:', e.message); }
+    }
+
     var sedeNombre = c.sedeId && this.sedesById[c.sedeId] ? this.sedesById[c.sedeId].nombre : (c.sedeId || '—');
 
     var badgeClass = 'ct-detail-badge';
@@ -795,9 +807,14 @@ class ContratacionComponent {
       var expand = '';
       if (expandible) {
         var defaultFecha = fecha ? self._isoToInputDate(fecha) : self._todayIso();
-        // Regla: sin soporte no se puede completar — botón deshabilitado + ayuda
+        // Regla: sin evidencia no se puede completar. En paso 4 la evidencia puede ser
+        // un documento FIRMADO de Firma Electrónica (digital) o un soporte manual.
         var soportesDelPaso = (c._soportesPorPaso && c._soportesPorPaso[p.num]) || [];
-        var sinSoporte = soportesDelPaso.length === 0;
+        var firmadosP4 = (p.num === 4) ? (c._documentosFirma || []).filter(function (d) { return d.estado === 'firmado'; }).length : 0;
+        var sinEvidencia = soportesDelPaso.length === 0 && firmadosP4 === 0;
+        var hintSinEvidencia = (p.num === 4)
+          ? 'Firmá un documento en Firma Electrónica o adjuntá un soporte manual para poder completar este paso.'
+          : 'Adjuntá al menos un soporte para poder completar este paso.';
         expand = '<div class="ct-step__expand">' +
           '<div class="ct-step__expand-row">' +
             '<div class="ct-field"><label>Fecha</label><input type="date" name="fecha" id="' + fechaInputId + '" value="' + defaultFecha + '" /></div>' +
@@ -805,8 +822,8 @@ class ContratacionComponent {
           '</div>' +
           '<div class="ct-field"><label>Notas</label><textarea name="notas" id="' + notasInputId + '" rows="2" placeholder="Registrar detalles del paso..." style="width:100%;padding:0.5rem 0.7rem;border:1px solid #dee2e6;border-radius:0.35rem;font-size:0.85rem;font-family:inherit;outline:none;resize:vertical;box-sizing:border-box;">' + self._escHtml(notas || '') + '</textarea></div>' +
           '<div class="ct-step__expand-actions">' +
-            (sinSoporte
-              ? '<span class="ct-step__require-soporte"><i class="fas fa-paperclip"></i> Adjuntá al menos un soporte para poder completar este paso.</span>'
+            (sinEvidencia
+              ? '<span class="ct-step__require-soporte"><i class="fas fa-paperclip"></i> ' + hintSinEvidencia + '</span>'
               : '<button class="ct-btn ct-btn--success ct-btn--small" type="button" data-action="marcar-paso"><i class="fas fa-check-circle"></i> Marcar como completado</button>') +
           '</div>' +
         '</div>';
@@ -822,10 +839,58 @@ class ContratacionComponent {
           '</div>' +
           meta +
           expand +
+          (p.num === 4 ? self._renderDocumentosFirma(c) : '') +
           self._renderSoportes(c, p.num, isCanceled) +
         '</div>' +
       '</div>';
     }).join('');
+  }
+
+  // ─── Documentos de Firma Electrónica (solo paso 4, solo lectura) ───
+  _renderDocumentosFirma(c) {
+    var self = this;
+    var docs = c._documentosFirma || [];
+
+    if (!c.trabajadorId) {
+      return '<div class="ct-firma-docs ct-firma-docs--empty">' +
+        '<div class="ct-soportes__head"><span class="ct-soportes__label"><i class="fas fa-file-signature"></i> Documentos de Firma Electrónica</span></div>' +
+        '<div class="ct-soportes__empty">Vinculá la cédula al crear la contratación para ver los documentos de Firma Electrónica aquí.</div>' +
+      '</div>';
+    }
+
+    var estadoMeta = {
+      'firmado':         { label: 'Firmado',   cls: 'ct-firma-doc__badge--ok' },
+      'pendiente':       { label: 'Pendiente', cls: 'ct-firma-doc__badge--muted' },
+      'esperando_firma': { label: 'En proceso', cls: 'ct-firma-doc__badge--pending' },
+      'rechazado':       { label: 'Rechazado', cls: 'ct-firma-doc__badge--danger' },
+      'expirado':        { label: 'Expirado',  cls: 'ct-firma-doc__badge--muted' },
+      'anulado':         { label: 'Anulado',   cls: 'ct-firma-doc__badge--danger' }
+    };
+
+    var items = docs.map(function (d) {
+      var meta = estadoMeta[d.estado] || estadoMeta['pendiente'];
+      var puedeAbrir = !!d.rutaArchivo;
+      return '<div class="ct-firma-doc" data-doc-id="' + self._escHtml(d.id) + '">' +
+        '<i class="fas fa-file-signature ct-firma-doc__icon"></i>' +
+        '<span class="ct-firma-doc__name" title="' + self._escHtml(d.titulo) + '">' + self._escHtml(d.titulo) + '</span>' +
+        '<span class="ct-firma-doc__badge ' + meta.cls + '">' + meta.label + '</span>' +
+        (puedeAbrir
+          ? '<button class="ct-soporte__btn" type="button" data-doc-action="abrir" title="Abrir documento"><i class="fas fa-up-right-from-square"></i></button>'
+          : '') +
+      '</div>';
+    }).join('');
+
+    var firmados = docs.filter(function (d) { return d.estado === 'firmado'; }).length;
+    var resumen = docs.length === 0
+      ? '<div class="ct-soportes__empty">Sin documentos generados aún. Generalos desde Firma Electrónica.</div>'
+      : '';
+
+    return '<div class="ct-firma-docs">' +
+      '<div class="ct-soportes__head">' +
+        '<span class="ct-soportes__label"><i class="fas fa-file-signature"></i> Documentos de Firma Electrónica (' + firmados + ' firmado' + (firmados === 1 ? '' : 's') + ')</span>' +
+      '</div>' +
+      '<div class="ct-firma-docs__list">' + items + resumen + '</div>' +
+    '</div>';
   }
 
   // ─── Soportes (evidencias) por paso ───
@@ -877,6 +942,17 @@ class ContratacionComponent {
   _wireSoportes(body, c) {
     var self = this;
     body.addEventListener('click', async function (ev) {
+      // Abrir documento de Firma Electrónica (paso 4)
+      var docBtn = ev.target.closest('[data-doc-action="abrir"]');
+      if (docBtn) {
+        var docEl = docBtn.closest('.ct-firma-doc');
+        var docId = docEl ? docEl.getAttribute('data-doc-id') : null;
+        if (!docId) return;
+        var rDoc = await window.electronAPI.ghAbrirDocumento({ documentoId: docId });
+        if (rDoc && !rDoc.success) self._showToast('No se pudo abrir: ' + ((rDoc.error && rDoc.error.message) || ''), 'error');
+        return;
+      }
+
       var btn = ev.target.closest('[data-sop-action]');
       if (!btn) return;
       var action = btn.getAttribute('data-sop-action');

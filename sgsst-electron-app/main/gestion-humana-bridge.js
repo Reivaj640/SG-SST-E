@@ -822,13 +822,32 @@ function _handlerMarcarPaso(token, contratacionId, pasoNum, fecha, notas) {
     }
 
     // REGLA "sin soporte = sin completar": el paso exige al menos 1 evidencia adjunta.
+    // Paso 4 (Firma de Documentos) tiene un atajo: un documento FIRMADO en
+    // gh_documentos (vía Firma Electrónica) cuenta como evidencia equivalente.
     var cntSop = localDb.prepare(
       'SELECT COUNT(*) AS n FROM gh_contratacion_soportes WHERE contratacion_id = ? AND paso_num = ?'
     ).get(contratacionId, pasoInt).n;
+
     if (cntSop === 0) {
-      return _err('SOPORTE_REQUERIDO',
-        'El paso ' + pasoInt + ' requiere al menos un soporte adjunto antes de marcarse como completado.',
-        { contratacionId: contratacionId, pasoNum: pasoInt });
+      if (pasoInt === 4) {
+        // Chequear documentos firmados del trabajador vinculado
+        var ctRow = localDb.prepare('SELECT trabajador_id, empresa_id FROM contrataciones WHERE id = ?').get(contratacionId);
+        var cntFirmados = 0;
+        if (ctRow && ctRow.trabajador_id) {
+          cntFirmados = localDb.prepare(
+            "SELECT COUNT(*) AS n FROM gh_documentos WHERE trabajador_id = ? AND empresa_id = ? AND estado = 'firmado'"
+          ).get(ctRow.trabajador_id, ctRow.empresa_id).n;
+        }
+        if (cntFirmados === 0) {
+          return _err('SOPORTE_REQUERIDO',
+            'El paso 4 requiere un documento firmado (Firma Electrónica) o un soporte adjunto antes de completarse.',
+            { contratacionId: contratacionId, pasoNum: pasoInt });
+        }
+      } else {
+        return _err('SOPORTE_REQUERIDO',
+          'El paso ' + pasoInt + ' requiere al menos un soporte adjunto antes de marcarse como completado.',
+          { contratacionId: contratacionId, pasoNum: pasoInt });
+      }
     }
 
     var f = pasoFields[pasoInt];
@@ -3685,6 +3704,20 @@ function _handlerEliminarSoporte(token, soporteId) {
         if (row.paso_num === 6) {
           return _err('PASO6_NO_REVERTIBLE',
             'El paso 6 (Activación S400) ya creó al trabajador en Base Personal y no se puede revertir. No se puede eliminar su último soporte.');
+        }
+
+        // Paso 4: si hay ≥1 documento firmado en Firma Electrónica, la evidencia
+        // digital persiste aunque se borre el soporte manual → NO se revierte.
+        if (row.paso_num === 4 && ct.trabajador_id) {
+          var firmadosP4 = localDb.prepare(
+            "SELECT COUNT(*) AS n FROM gh_documentos WHERE trabajador_id = ? AND empresa_id = ? AND estado = 'firmado'"
+          ).get(ct.trabajador_id, ct.empresa_id).n;
+          if (firmadosP4 > 0) {
+            // Solo borrar el soporte, el paso queda completado
+            if (row.ruta_archivo) _safeUnlinkSync(row.ruta_archivo);
+            localDb.prepare('DELETE FROM gh_contratacion_soportes WHERE id = ?').run(soporteId);
+            return _ok({ soporteId: soporteId, pasoRevertido: false, evidenciaFirma: true });
+          }
         }
 
         // Reversión atómica: borrar soporte + destildar paso + recalcular paso_actual
