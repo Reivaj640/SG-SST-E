@@ -556,8 +556,6 @@
             border-radius: 4px;
             font-size: 0.85em;
         }
-            margin-bottom: 1.5rem;
-        }
 
         .section-title {
             font-family: var(--font-heading);
@@ -2014,11 +2012,31 @@
                         </p>
                     </div>
 
+                    <!-- Bloque: vínculo huérfano (app tiene firma local, el servicio NO la reconoce) -->
+                    <div id="firma-modal-orphan-block" style="display:none; padding: 0.75rem; border-radius: 6px; background: #fef3c7; border: 1px solid #fbbf24; margin-bottom: 0.75rem;">
+                        <div style="font-weight: 600; color: #92400e; margin-bottom: 0.5rem;">
+                            <i class="fas fa-link-slash"></i> Vínculo desincronizado
+                        </div>
+                        <div style="font-size: 0.875rem; color: #78350f;">
+                            Esta app recuerda una configuración de firma que el servicio <strong>ya no reconoce</strong>
+                            (la API key guardada ya no es válida). Los botones "Rotar" y "Eliminar" no funcionan en este estado
+                            porque ambos asumen que el vínculo existe de ambos lados.
+                            <br><br>
+                            <strong>"Recrear vínculo"</strong> limpia la configuración local rota y registra la empresa de nuevo
+                            en firma-service con una API key nueva (se guarda cifrada automáticamente).
+                            Requiere la <strong>Admin API Key</strong> guardada en esta misma pestaña.
+                        </div>
+                    </div>
+
                     <!-- Banner resultado -->
                     <div id="firma-modal-result" style="display:none; margin-top: 1rem; padding: 0.75rem; border-radius: 6px;"></div>
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-outline" id="firma-modal-cancel">Cancelar</button>
+                    <!-- Acción para vínculo huérfano (mutuamente excluyente con Rotar/Eliminar) -->
+                    <button class="btn btn-primary" id="firma-modal-recreate-btn" style="display:none;">
+                        <i class="fas fa-wrench"></i> Recrear vínculo
+                    </button>
                     <!-- Acciones para empresa YA configurada -->
                     <button class="btn btn-danger-ghost" id="firma-modal-revoke-btn" style="display:none;">
                         <i class="fas fa-trash"></i> Eliminar
@@ -3592,6 +3610,15 @@
         if (apikeyBlock) apikeyBlock.style.display = (mode === 'paste') ? '' : 'none';
     }
 
+    // KairConfirm vive en el parent (index.html); este archivo es un iframe.
+    // Patrón 📦708 Fase 3.5 (contratacion, base-personal, documentos): si el
+    // parent lo tiene, el dialog moderno se dibuja en la ventana principal.
+    function _kairConfirm() {
+        return (window.parent && window.parent.KairConfirm)
+            ? window.parent.KairConfirm
+            : (window.KairConfirm || null);
+    }
+
     // Helper: mapea códigos de error del bridge a mensaje user-friendly (NO loggea apiKey)
     function _firmaErrorToMessage(code, fallbackMsg) {
         switch (code) {
@@ -3606,7 +3633,7 @@
             case 'CLIENT_EXISTS_FOR_EMPRESA':
                 return 'Ya existe un cliente con este NIT en firma-service. Contacta al administrador.';
             case 'CLIENT_NOT_FOUND':
-                return 'Esta empresa no tiene firma configurada localmente.';
+                return 'El servicio no reconoce esta empresa (la API key guardada es de otra base de datos o fue eliminada). Usa "Recrear vínculo".';
             case 'INVALID_REQUEST_BODY':
                 return 'Faltan datos requeridos: ' + (fallbackMsg || '');
             case 'CONFIG_MISSING':
@@ -3687,14 +3714,37 @@
             }
         }
 
+        // 3b. ORPHAN (vínculo huérfano): si SÍ tiene firma local y tenemos NIT,
+        // consultar igual al backend. Si el servicio NO tiene cliente activo para
+        // este NIT, la key local es huérfana (Rotar y Eliminar fallarían con
+        // CLIENT_NOT_FOUND) → mostramos la acción "Recrear vínculo" en su lugar.
+        // Si la consulta falla (sin admin key, servicio caído), no bloqueamos:
+        // se muestra el estado normal con Rotar/Eliminar como antes.
+        _firmaModalCtx.isOrphan = false;
+        if (firmaState.hasFirma && nit && window.electronAPI.firmaEmpresaListBackend) {
+            try {
+                var lr2 = await window.electronAPI.firmaEmpresaListBackend({ id_empresa: nit });
+                if (lr2 && lr2.success && Array.isArray(lr2.data.items)) {
+                    var activo = lr2.data.items.find(function (it) { return it && it.is_active; });
+                    _firmaModalCtx.isOrphan = !activo;
+                }
+            } catch (_) { /* noop: falla la consulta → comportamiento legacy */ }
+        }
+
         // 4. Mostrar bloques según estado
         var noNitBlock = document.getElementById('firma-modal-no-nit-block');
         var modeBlock = document.getElementById('firma-modal-mode-block');
         var displayBlock = document.getElementById('firma-modal-displayname-block');
         var existingBlock = document.getElementById('firma-modal-existing-block');
+        var orphanBlock = document.getElementById('firma-modal-orphan-block');
         var saveBtn = document.getElementById('firma-modal-save');
         var rotateBtn = document.getElementById('firma-modal-rotate-btn');
         var revokeBtn = document.getElementById('firma-modal-revoke-btn');
+        var recreateBtn = document.getElementById('firma-modal-recreate-btn');
+        // Default defensivo: el bloque huérfano y su botón arrancan ocultos en
+        // cada apertura del modal (el estado es por-apertura).
+        if (orphanBlock) orphanBlock.style.display = 'none';
+        if (recreateBtn) recreateBtn.style.display = 'none';
 
         if (!nit) {
             // SIN NIT: mostrar error, bloquear todo
@@ -3712,8 +3762,18 @@
             if (displayBlock) displayBlock.style.display = 'none';
             if (existingBlock) existingBlock.style.display = 'block';
             if (saveBtn) saveBtn.style.display = 'none';
-            if (rotateBtn) rotateBtn.style.display = '';
-            if (revokeBtn) revokeBtn.style.display = '';
+            if (_firmaModalCtx.isOrphan) {
+                // ORPHAN: el servicio ya no conoce esta empresa. Rotar y Eliminar
+                // fallarían con CLIENT_NOT_FOUND (ambos hablan con el backend);
+                // solo ofrecemos "Recrear vínculo".
+                if (orphanBlock) orphanBlock.style.display = 'block';
+                if (rotateBtn) rotateBtn.style.display = 'none';
+                if (revokeBtn) revokeBtn.style.display = 'none';
+                if (recreateBtn) recreateBtn.style.display = '';
+            } else {
+                if (rotateBtn) rotateBtn.style.display = '';
+                if (revokeBtn) revokeBtn.style.display = '';
+            }
             // Pintar estado actual
             var info = firmaState.firmaInfo || {};
             var elIdEmp = document.getElementById('firma-modal-existing-idEmpresa');
@@ -3999,12 +4059,24 @@
             _showFirmaModalResult('error', 'Esta empresa no tiene firma configurada.');
             return;
         }
-        // Confirmación explícita antes de revocar
-        if (!window.confirm('¿Eliminar la configuración de Firma Electrónica de "' + companyName + '"?\n\n' +
-            'Esto borrará la firma local Y marcará la API key como revocada en firma-service.\n' +
-            'La acción NO se puede deshacer.')) {
-            return;
+        // Confirmación explícita antes de revocar (KairConfirm moderno,
+        // con fallback defensivo al confirm nativo si el parent no lo expone)
+        var kc = _kairConfirm();
+        var ok;
+        if (kc) {
+            ok = await kc.confirm({
+                title: '¿Eliminar Firma Electrónica de "' + companyName + '"?',
+                message: 'Esto borra la configuración local y marca la API key como revocada en firma-service.\nLa acción no se puede deshacer.',
+                confirmText: 'Eliminar',
+                cancelText: 'Cancelar',
+                type: 'danger'
+            });
+        } else {
+            ok = window.confirm('¿Eliminar la configuración de Firma Electrónica de "' + companyName + '"?\n\n' +
+                'Esto borrará la firma local Y marcará la API key como revocada en firma-service.\n' +
+                'La acción NO se puede deshacer.');
         }
+        if (!ok) return;
         var revokeBtn = document.getElementById('firma-modal-revoke-btn');
         var originalLabel = revokeBtn ? revokeBtn.innerHTML : '';
         _firmaModalBusy = true;
@@ -4041,6 +4113,93 @@
             _showFirmaModalResult('error', 'Excepción: ' + (e && e.message || e));
             _firmaModalBusy = false;
             if (revokeBtn) { revokeBtn.disabled = false; revokeBtn.innerHTML = originalLabel; }
+        }
+    }
+
+    // VÍNCULO HUÉRFANO (firma local existe, el servicio NO la reconoce).
+    // Caso cubierto: p.ej. la BD de firma-service se recreó/reseteó y perdió
+    // el cliente per-empresa; Rotar y Eliminar fallan porque ambos hablan con
+    // el backend. Recrear = (1) borrar SOLO la entrada local (la key vieja ya es
+    // inválida de todas formas) + (2) firma:empresa:create para generar key nueva
+    // en el servicio y guardarla cifrada. Requiere adminApiKey.
+    async function recreateFirmaFromModal() {
+        if (!_firmaModalCtx || _firmaModalBusy) return;
+        var companyName = _firmaModalCtx.companyName;
+        var nit = _firmaModalCtx.nit;
+        if (!nit) {
+            _showFirmaModalResult('error', 'Falta NIT. Configura el NIT primero.');
+            return;
+        }
+        var kc = _kairConfirm();
+        var ok;
+        if (kc) {
+            ok = await kc.confirm({
+                title: '¿Recrear vínculo de Firma Electrónica de "' + companyName + '"?',
+                message: 'Borra la configuración local actual (ya inválida) y crea una nueva en firma-service con una API key nueva, que se guarda cifrada automáticamente.\nLa API key vieja queda inutilizable (ya lo está).',
+                confirmText: 'Recrear vínculo',
+                cancelText: 'Cancelar',
+                type: 'warning'
+            });
+        } else {
+            ok = window.confirm('¿Recrear el vínculo de Firma Electrónica de "' + companyName + '"?\n\n' +
+                'Esto borra la configuración local actual (ya inválida) y crea una nueva en ' +
+                'firma-service con una API key nueva, que se guarda automáticamente.\n' +
+                'La API key vieja queda inutilizable (ya lo está).');
+        }
+        if (!ok) return;
+        var recreateBtn = document.getElementById('firma-modal-recreate-btn');
+        var originalLabel = recreateBtn ? recreateBtn.innerHTML : '';
+        _firmaModalBusy = true;
+        if (recreateBtn) {
+            recreateBtn.disabled = true;
+            recreateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Recreando…';
+        }
+        _hideFirmaModalResult();
+        function _restore() {
+            _firmaModalBusy = false;
+            if (recreateBtn) { recreateBtn.disabled = false; recreateBtn.innerHTML = originalLabel; }
+        }
+        try {
+            // Paso 1: limpiar SOLO local (revokeRemote: false — NO tocar el backend,
+            // que justamente no conoce esta empresa y respondería CLIENT_NOT_FOUND).
+            var rv = await window.electronAPI.firmaEmpresaRevokeApiKey({
+                companyName: companyName,
+                revokeRemote: false,
+                motivo: 'Limpieza de vínculo huérfano (recreate desde UI)'
+            });
+            if (!rv || !rv.success) {
+                var rvCode = (rv && rv.error && rv.error.code) || '';
+                // CLIENT_NOT_FOUND = ya estaba limpio localmente → OK, seguimos.
+                if (rvCode !== 'CLIENT_NOT_FOUND') {
+                    _showFirmaModalResult('error', _firmaErrorToMessage(rvCode, rv && rv.error && rv.error.message));
+                    _restore();
+                    return;
+                }
+            }
+            // Paso 2: crear el vínculo nuevo (genera key en backend + guarda cifrada local).
+            var r = await window.electronAPI.firmaEmpresaCreate({
+                companyName: companyName,
+                idEmpresa: nit,
+                displayName: companyName
+            });
+            if (!r || !r.success) {
+                var code = (r && r.error && r.error.code) || '';
+                var rawMsg = (r && r.error && r.error.message) || 'Error desconocido';
+                _showFirmaModalResult('error', _firmaErrorToMessage(code, rawMsg));
+                _restore();
+                return;
+            }
+            _showFirmaModalResult('ok', '✓ Vínculo recreado. Nuevo hash: ' + (r.data && r.data.apiKeyHashPrefix || '—'));
+            if (typeof showToast === 'function') {
+                showToast('Firma recreada para ' + companyName, 'success');
+            }
+            await _refreshFirmaStateAfterChange(companyName);
+            // Re-pintar el modal (ahora es estado normal: local + backend sincronizados)
+            prepareFirmaModal(companyName);
+            _restore();
+        } catch (e) {
+            _showFirmaModalResult('error', 'Excepción: ' + (e && e.message || e));
+            _restore();
         }
     }
 
@@ -4139,6 +4298,8 @@
             if (firmaRotateBtn) firmaRotateBtn.onclick = rotateFirmaFromModal;
             var firmaRevokeBtn = document.getElementById('firma-modal-revoke-btn');
             if (firmaRevokeBtn) firmaRevokeBtn.onclick = revokeFirmaFromModal;
+            var firmaRecreateBtn = document.getElementById('firma-modal-recreate-btn');
+            if (firmaRecreateBtn) firmaRecreateBtn.onclick = recreateFirmaFromModal;
             // Cambio de modo (radio buttons) → muestra/oculta bloque de API key
             var modeRadios = firmaModal.querySelectorAll('input[name="firma-mode"]');
             for (var i = 0; i < modeRadios.length; i++) {

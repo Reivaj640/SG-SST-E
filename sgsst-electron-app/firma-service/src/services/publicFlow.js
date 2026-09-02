@@ -561,16 +561,100 @@ async function commit(token, opts, ip, user_agent) {
   // para que NO salga "undefined" en el PDF.
   let _srMeta = {};
   try { _srMeta = signRequest.metadata ? JSON.parse(signRequest.metadata) : {}; } catch (e) { _srMeta = {}; }
+
+  // Fallback para SRs legacy (creados antes de que K+AIR enviara los nombres):
+  // buscar en el consentimiento vinculado o en OTRO sign request del mismo
+  // trabajador/empresa que sí los tenga. Cero migración de BD.
+  let nombreEmpresa = _srMeta.nombre_empresa || null;
+  let nombreTrabajador = _srMeta.nombre_trabajador || null;
+
+  function _parseMetaSafe(m) {
+    try { return m ? JSON.parse(m) : {}; } catch (e) { return {}; }
+  }
+
+  // Fuente 2: consentimiento vinculado
+  if ((!nombreEmpresa || !nombreTrabajador) && signRequest.consent_id) {
+    try {
+      const consent = db.prepare(
+        'SELECT metadata FROM gh_consentimientos_firma WHERE id = ?'
+      ).get(signRequest.consent_id);
+      const cm = _parseMetaSafe(consent && consent.metadata);
+      if (!nombreEmpresa && cm.nombre_empresa) nombreEmpresa = cm.nombre_empresa;
+      if (!nombreTrabajador && cm.nombre_trabajador) nombreTrabajador = cm.nombre_trabajador;
+    } catch (e) { /* noop — fallback best-effort */ }
+  }
+
+  // Fuente 3: otro sign request del mismo trabajador (misma empresa)
+  if (!nombreEmpresa || !nombreTrabajador) {
+    try {
+      const siblings = db.prepare(
+        "SELECT metadata FROM gh_firmas_electronicas WHERE id_trabajador = ? AND id_empresa = ? AND metadata IS NOT NULL AND metadata != '' ORDER BY fecha_creacion DESC LIMIT 5"
+      ).all(signRequest.id_trabajador, signRequest.id_empresa);
+      for (const sib of siblings) {
+        const sm = _parseMetaSafe(sib.metadata);
+        if (!nombreEmpresa && sm.nombre_empresa) nombreEmpresa = sm.nombre_empresa;
+        if (!nombreTrabajador && sm.nombre_trabajador) nombreTrabajador = sm.nombre_trabajador;
+        if (nombreEmpresa && nombreTrabajador) break;
+      }
+    } catch (e) { /* noop */ }
+  }
+
   const correoConstancia = resolveCorreo(signRequest); // ya tiene fallback a consent
+
+  // 9b. Trazabilidad para la Constancia: leer historial de eventos y anexar
+  //     sintéticamente los 3 que la transacción de commit (paso 11) va a
+  //     persistir con estos mismos datos (fecha_firma/ip/ua). La constancia
+  //     se genera ANTES de la tx (diseño E1: archivos primero, BD después),
+  //     así que sin este anexo la línea de tiempo quedaría sin el cierre.
+  //     Se muestran los últimos 20 (los más recientes, incluidos los 3 del
+  //     cierre) para mantener el PDF en 1-2 páginas; el historial completo
+  //     queda en gh_firma_eventos / endpoint interno de auditoría.
+  let eventosConstancia = [];
+  let eventosTotal = 0;
+  try {
+    const _rows = db.prepare(`
+      SELECT evento, fecha_hora, ip, id_actor
+      FROM gh_firma_eventos
+      WHERE firma_id = ?
+      ORDER BY fecha_hora ASC, id ASC
+    `).all(signRequest.id);
+    eventosTotal = _rows.length + 3; // +3 eventos sintéticos del commit
+    _rows.push(
+      { evento: 'MANIFESTATION_RECORDED', fecha_hora: fecha_firma, ip: ip || null, id_actor: 'trabajador' },
+      { evento: 'SIGN_COMMITTED', fecha_hora: fecha_firma, ip: ip || null, id_actor: 'trabajador' },
+      { evento: 'PDF_GENERATED', fecha_hora: fecha_firma, ip: ip || null, id_actor: 'sistema' },
+    );
+    // Si hay más de 20, conservar los primeros (contexto inicial: creación,
+    // apertura, identificación) + los últimos (verificación, firma) sin
+    // perder el cierre — el rango medio (p.ej. reenvíos masivos de OTP)
+    // queda en la BD. El header de la sección indica el total real.
+    if (_rows.length > 20) {
+      const head = _rows.slice(0, 10);
+      const tail = _rows.slice(-10);
+      eventosConstancia = head.concat(tail);
+    } else {
+      eventosConstancia = _rows;
+    }
+  } catch (e) {
+    // No bloquear la firma por un fallo de lectura del historial; la
+    // constancia sale sin auditoría (mejor que nada) y queda en log.
+    logger.warn('No se pudo leer gh_firma_eventos para la constancia', {
+      id_solicitud: signRequest.id_solicitud,
+      error: e.message,
+    });
+  }
+
   const constanciaBuf = await withAppErrorWrapping(
     () => pdfGen.generateConstanciaPdf({
       ...evidencia,
       evidence_hash,          // fix: el objeto evidencia no lo trae de fábrica
       id_constancia,
-      nombre_empresa: _srMeta.nombre_empresa || null,
-      nombre_trabajador: _srMeta.nombre_trabajador || null,
+      nombre_empresa: nombreEmpresa,
+      nombre_trabajador: nombreTrabajador,
       correo_trabajador: correoConstancia || null,
       correo_emisor: config.smtp.fromEmail || null,
+      eventos: eventosConstancia,
+      eventos_total: eventosTotal,
     }),
     'PDF_GENERATION_FAILED',
     'No se pudo generar la constancia',
