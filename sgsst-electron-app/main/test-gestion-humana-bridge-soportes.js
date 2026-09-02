@@ -244,7 +244,67 @@ async function run() {
   _assert(fs.existsSync(rUp6.data.soporte.rutaArchivo), 'T-C: el archivo del paso 6 sigue en disco');
 
   console.log('');
-  console.log('[6] Limpieza...');
+  console.log('[6] Paso 4 — documento firmado de Firma Electrónica cuenta como evidencia...');
+
+  function seedDocFirmado(bpId, estado) {
+    var id = 'do-test-' + Math.random().toString(36).slice(2, 8);
+    rawDb.run(
+      "INSERT INTO gh_documentos (id, trabajador_id, empresa_id, tipo, titulo, contenido, estado, created_at, updated_at) VALUES (?, ?, 'tempoactiva', 'contrato', 'Contrato test', '{}', ?, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')",
+      [id, bpId, estado]
+    );
+    return id;
+  }
+
+  // T-F y T-H usan una contratación LIMPIA (ctId tiene soportes de T-D en paso 4)
+  var rCtA = registeredHandlers['gh:create-contratacion']({}, {
+    token: 't', companyName: 'TEMPOACTIVA EST S.A.S.',
+    data: { nombres: 'Con', apellidos: 'Firma', cedula: '997', cargo: 'QA', fechaIngreso: '2026-09-01' }
+  });
+  var ctIdA = rCtA.data.contratacionId;
+  var bpRowA = db.prepare('SELECT trabajador_id FROM contrataciones WHERE id = ?').get(ctIdA);
+
+  // T-F: paso 4 con documento firmado, sin soporte manual → marcar OK
+  seedDocFirmado(bpRowA.trabajador_id, 'firmado');
+  var cntSopP4 = db.prepare('SELECT COUNT(*) AS n FROM gh_contratacion_soportes WHERE contratacion_id = ? AND paso_num = 4').get(ctIdA).n;
+  _assert(cntSopP4 === 0, 'T-F setup: paso 4 sin soportes manuales');
+  var rMark4b = registeredHandlers['gh:marcar-paso']({}, { token: 't', contratacionId: ctIdA, pasoNum: 4 });
+  _assert(rMark4b.success === true, 'T-F: paso 4 se completa con documento firmado (sin soporte manual)');
+
+  // T-H: eliminar soporte manual del paso 4 habiendo firmado → NO se revierte
+  var f6 = path.join(tmpRoot, 'manual4.pdf'); fs.writeFileSync(f6, 'm');
+  mockDialog._nextFile = f6;
+  var rUp4 = await registeredHandlers['gh:subir-soporte-paso']({}, { token: 't', companyName: 'TEMPOACTIVA EST S.A.S.', contratacionId: ctIdA, pasoNum: 4 });
+  var rDel4b = registeredHandlers['gh:eliminar-soporte-paso']({}, { token: 't', soporteId: rUp4.data.soporte.id });
+  _assert(rDel4b.success === true && rDel4b.data.pasoRevertido === false && rDel4b.data.evidenciaFirma === true,
+    'T-H: eliminar soporte manual con firmado existente → no se revierte (evidenciaFirma=true)');
+  var ctH = db.prepare('SELECT documentos_firmados FROM contrataciones WHERE id = ?').get(ctIdA);
+  _assert(ctH.documentos_firmados === 1, 'T-H: paso 4 sigue completado');
+
+  // Para T-G y T-I usamos una contratación nueva sin documentos firmados
+  var rCt2 = registeredHandlers['gh:create-contratacion']({}, {
+    token: 't', companyName: 'TEMPOACTIVA EST S.A.S.',
+    data: { nombres: 'Sin', apellidos: 'Firma', cedula: '998', cargo: 'QA', fechaIngreso: '2026-09-01' }
+  });
+  var ctId2b = rCt2.data.contratacionId;
+
+  // T-G: paso 4 sin firmados ni soportes → SOPORTE_REQUERIDO
+  var rG = registeredHandlers['gh:marcar-paso']({}, { token: 't', contratacionId: ctId2b, pasoNum: 4 });
+  _assert(rG.success === false && rG.error.code === 'SOPORTE_REQUERIDO',
+    'T-G: paso 4 sin firma ni soporte → SOPORTE_REQUERIDO');
+
+  // T-I: paso 4 con 1 soporte manual, SIN firmados → marcar OK → borrar soporte → se revierte
+  var f7 = path.join(tmpRoot, 'solo-manual.pdf'); fs.writeFileSync(f7, 's');
+  mockDialog._nextFile = f7;
+  var rUpI = await registeredHandlers['gh:subir-soporte-paso']({}, { token: 't', companyName: 'TEMPOACTIVA EST S.A.S.', contratacionId: ctId2b, pasoNum: 4 });
+  var rMarkI = registeredHandlers['gh:marcar-paso']({}, { token: 't', contratacionId: ctId2b, pasoNum: 4 });
+  _assert(rMarkI.success === true, 'T-I setup: paso 4 completado con soporte manual');
+  var rDelI = registeredHandlers['gh:eliminar-soporte-paso']({}, { token: 't', soporteId: rUpI.data.soporte.id });
+  _assert(rDelI.success === true && rDelI.data.pasoRevertido === true, 'T-I: sin firma, borrar último soporte revierte el paso 4');
+  var ctI = db.prepare('SELECT documentos_firmados FROM contrataciones WHERE id = ?').get(ctId2b);
+  _assert(ctI.documentos_firmados === 0, 'T-I: paso 4 volvió a pendiente');
+
+  console.log('');
+  console.log('[7] Limpieza...');
   try { fs.rmSync(tmpRoot, { recursive: true, force: true }); } catch (e) {}
   console.log('  ✓ tmp dir limpiado');
 

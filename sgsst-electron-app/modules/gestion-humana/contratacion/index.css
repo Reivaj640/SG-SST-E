@@ -550,3 +550,47 @@
   border-radius: 6px;
   padding: 0.4rem 0.65rem;
 }
+
+/* ═══ DOCUMENTOS DE FIRMA ELECTRÓNICA (paso 4, solo lectura) ═══ */
+.ct-firma-docs {
+  margin-top: 0.625rem;
+  border-top: 1px dashed #e5e7eb;
+  padding-top: 0.5rem;
+}
+.ct-firma-docs__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.4rem;
+}
+.ct-firma-doc {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  border-radius: 6px;
+  padding: 0.3rem 0.5rem;
+}
+.ct-firma-doc__icon { color: #1d4ed8; font-size: 0.8rem; flex-shrink: 0; }
+.ct-firma-doc__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.8rem;
+  color: #1f2937;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ct-firma-doc__badge {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.ct-firma-doc__badge--ok      { background: #dcfce7; color: #166534; }
+.ct-firma-doc__badge--pending { background: #dbeafe; color: #1d4ed8; }
+.ct-firma-doc__badge--muted   { background: #f3f4f6; color: #6b7280; }
+.ct-firma-doc__badge--danger  { background: #fee2e2; color: #b91c1c; }
