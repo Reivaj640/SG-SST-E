@@ -87,6 +87,15 @@ async function run() {
   });
   console.log('  ✓ Bridge registrado');
 
+  // Helper: inserta un soporte dummy directo en BD (la regla "sin soporte = sin completar"
+  // exige evidencia antes de marcar un paso). Atajo para no pasar por el dialog en tests.
+  function seedSoporte(contratacionId, pasoNum) {
+    rawDb.run(
+      "INSERT INTO gh_contratacion_soportes (id, empresa_id, contratacion_id, paso_num, nombre_archivo, ruta_archivo, fecha_subida, created_at, updated_at) VALUES (?, 'tempoactiva', ?, ?, 'test.pdf', '/tmp/test.pdf', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')",
+      ['sop-test-' + contratacionId + '-' + pasoNum, contratacionId, pasoNum]
+    );
+  }
+
   // ========== TEST 1: create-contratacion caso OK ==========
   console.log('');
   console.log('[1] create-contratacion — caso OK');
@@ -248,6 +257,7 @@ async function run() {
     data: { nombres: 'Test', apellidos: 'Paso1', cargo: 'Dev', fechaIngreso: '2026-09-01' }
   });
   var ctId2 = r11Create.data.contratacionId;
+  seedSoporte(ctId2, 1);
   var r11 = registeredHandlers['gh:marcar-paso']({}, {
     token: 'valid-token',
     contratacionId: ctId2,
@@ -270,6 +280,7 @@ async function run() {
   console.log('[12] marcar-paso — pasos 2-5 secuenciales');
   ['contacto_realizado', 'examenes_programados', 'documentos_firmados', 'afiliaciones_completadas'].forEach(function (boolCol, i) {
     var pasoNum = i + 2;
+    seedSoporte(ctId2, pasoNum);
     var r = registeredHandlers['gh:marcar-paso']({}, {
       token: 'valid-token', contratacionId: ctId2, pasoNum: pasoNum,
       fecha: '2026-08-2' + pasoNum + 'T10:00:00.000Z', notas: 'Paso ' + pasoNum
@@ -291,6 +302,7 @@ async function run() {
   // ========== TEST 13: marcar-paso 6 (S400) — cambia estado a completado ==========
   console.log('');
   console.log('[13] marcar-paso 6 (S400) — estado → completado');
+  seedSoporte(ctId2, 6);
   var r13 = registeredHandlers['gh:marcar-paso']({}, {
     token: 'valid-token', contratacionId: ctId2, pasoNum: 6,
     fecha: '2026-08-30T10:00:00.000Z', notas: 'S400 activado'
@@ -325,6 +337,7 @@ async function run() {
     data: { nombres: 'Test', apellidos: 'Default', cargo: 'Dev', fechaIngreso: '2026-09-01' }
   });
   var ctId3 = r15Create.data.contratacionId;
+  seedSoporte(ctId3, 1);
   var before = new Date().toISOString();
   var r15 = registeredHandlers['gh:marcar-paso']({}, {
     token: 'valid-token', contratacionId: ctId3, pasoNum: 1

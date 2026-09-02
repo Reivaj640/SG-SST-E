@@ -296,6 +296,31 @@ CREATE TABLE IF NOT EXISTS gh_templates (
 CREATE INDEX IF NOT EXISTS idx_gh_templates_empresa ON gh_templates(empresa_id);
 CREATE INDEX IF NOT EXISTS idx_gh_templates_tipo ON gh_templates(empresa_id, tipo_documento);
 CREATE INDEX IF NOT EXISTS idx_gh_templates_activo ON gh_templates(empresa_id, activo);
+
+-- SOPORTES DE CONTRATACIÓN — evidencias adjuntas por paso del pipeline (memo,
+-- orden de exámenes, constancias de afiliación, etc.). Patrón idéntico a
+-- gh_documentos_afiliaciones: el binario vive en el filesystem
+-- (<userData>/gh-soportes-contratacion/<empresa>/<contratacion>/paso-N/<archivo>)
+-- y esta tabla solo guarda metadata + ruta.
+-- A diferencia de afiliaciones (1 doc por slot), un paso puede tener N soportes.
+CREATE TABLE IF NOT EXISTS gh_contratacion_soportes (
+  id TEXT PRIMARY KEY,                       -- formato sop-{nanoid}
+  empresa_id TEXT NOT NULL,
+  contratacion_id TEXT NOT NULL,             -- FK a contrataciones.id
+  paso_num INTEGER NOT NULL CHECK (paso_num BETWEEN 1 AND 6),
+  nombre_archivo TEXT NOT NULL,              -- nombre original del archivo subido
+  ruta_archivo TEXT NOT NULL,                -- ruta absoluta en el filesystem
+  tamano_bytes INTEGER,
+  mime_type TEXT,
+  subido_por TEXT,                           -- user_id o nombre
+  fecha_subida TEXT NOT NULL,                -- ISO 8601
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (contratacion_id) REFERENCES contrataciones(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_gh_soportes_contratacion ON gh_contratacion_soportes(contratacion_id);
+CREATE INDEX IF NOT EXISTS idx_gh_soportes_empresa ON gh_contratacion_soportes(empresa_id);
+CREATE INDEX IF NOT EXISTS idx_gh_soportes_paso ON gh_contratacion_soportes(contratacion_id, paso_num);
 `;
 
 // ========== MIGRATIONS · 📦731/📦764 + LEGACY-SIGN-REMOVE — idempotentes (se ejecutan una por una con try/catch) ==========
@@ -369,8 +394,8 @@ module.exports = {
   // Conteos esperados para validación en tests
   // (post-LEGACY-SIGN-REMOVE: -1 tabla, -3 índices)
   // (post-I-103.A1.0-D-1: +1 tabla, +4 índices)
-  EXPECTED_TABLES: 11,  // era 10, +1 gh_eventos_personal
-  EXPECTED_INDEXES: 40  // era 36, +4 idx_gh_eventos_*
+  EXPECTED_TABLES: 12,  // era 11, +1 gh_contratacion_soportes (soportes por paso)
+  EXPECTED_INDEXES: 43  // era 40, +3 idx_gh_soportes_*
                         // 3 contrataciones + 5 base_personal (era 4, +1 sede) + 1 gh_sedes
                         // + 4 vacaciones + 5 permisos + 4 documentos
                         // + 4 anuncios + 4 mensajes

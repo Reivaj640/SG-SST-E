@@ -1641,7 +1641,7 @@ class DocumentosComponent {
     var nombre = tpl ? tpl.nombre : 'este template';
     var ok;
     if (window.KairConfirm) {
-      ok = await window.KairConfirm.show({
+      ok = await window.KairConfirm.confirm({
         title: 'Eliminar template',
         message: '¿Eliminar "' + nombre + '"? El archivo se borrará del disco y el template ya no estará disponible para generar documentos.',
         confirmText: 'Eliminar',

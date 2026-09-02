@@ -492,7 +492,7 @@ class AfiliacionesComponent {
           if (!window.KairConfirm) {
             if (!confirm('¿Eliminar "' + nombre + '"?')) return;
           } else {
-            var ok = await window.KairConfirm.show({
+            var ok = await window.KairConfirm.confirm({
               title: 'Eliminar documento',
               message: '¿Eliminar "' + nombre + '"? Esta acción no se puede deshacer.',
               confirmText: 'Eliminar',

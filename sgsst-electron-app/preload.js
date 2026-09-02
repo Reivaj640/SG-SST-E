@@ -375,6 +375,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   ghEliminarDocumentoAfiliacion: (payload) => ipcRenderer.invoke('gh:eliminar-documento-afiliacion', payload),
   ghObtenerDocumentoAfiliacion: (payload) => ipcRenderer.invoke('gh:obtener-documento-afiliacion', payload),
   ghAbrirDocumentoAfiliacion: (payload) => ipcRenderer.invoke('gh:abrir-documento-afiliacion', payload),
+  // Soportes de Contratación (4) — evidencias adjuntas por paso del pipeline
+  ghListarSoportesContratacion: (payload) => ipcRenderer.invoke('gh:listar-soportes-contratacion', payload),
+  ghSubirSoportePaso: (payload) => ipcRenderer.invoke('gh:subir-soporte-paso', payload),
+  ghAbrirSoportePaso: (payload) => ipcRenderer.invoke('gh:abrir-soporte-paso', payload),
+  ghEliminarSoportePaso: (payload) => ipcRenderer.invoke('gh:eliminar-soporte-paso', payload),
   // 📦764 · Templates de Documentos (5) — .docx/.pdf subidos por el user
   ghListTemplates: (payload) => ipcRenderer.invoke('gh:list-templates', payload),
   ghSubirTemplate: (payload) => ipcRenderer.invoke('gh:subir-template', payload),

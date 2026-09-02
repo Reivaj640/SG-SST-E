@@ -39,6 +39,7 @@ class ContratacionComponent {
   // ─── Helpers ───
   _toast() { return (window.parent && window.parent.KAIRToast) ? window.parent.KAIRToast : window.KAIRToast; }
   _showToast(msg, type) { var t = this._toast(); if (t) t.show(msg, type || 'info'); }
+  _confirmDialog() { return (window.parent && window.parent.KairConfirm) ? window.parent.KairConfirm : window.KairConfirm; }
   _escHtml(s) { if (s == null) return ''; return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 
   _initials(nombres, apellidos) {
@@ -657,10 +658,23 @@ class ContratacionComponent {
   }
 
   // ─── Modal: Detalle de Contratación (6 pasos) ───
-  _openDetailModal(id) {
+  async _openDetailModal(id) {
     var c = this.contrataciones.find(function (x) { return x.id === id; });
     if (!c) { this._showToast('Contratación no encontrada', 'error'); return; }
     var self = this;
+
+    // Soportes del pipeline (memo, orden de exámenes, etc.) — 1 llamada, agrupada por paso
+    c._soportesPorPaso = {};
+    try {
+      var rs = await window.electronAPI.ghListarSoportesContratacion({ companyName: this.companyName, contratacionId: id });
+      if (rs && rs.success && rs.data && rs.data.soportes) {
+        rs.data.soportes.forEach(function (s) {
+          if (!c._soportesPorPaso[s.pasoNum]) c._soportesPorPaso[s.pasoNum] = [];
+          c._soportesPorPaso[s.pasoNum].push(s);
+        });
+      }
+    } catch (e) { console.warn('[Contratacion] No se pudieron cargar soportes:', e.message); }
+
     var sedeNombre = c.sedeId && this.sedesById[c.sedeId] ? this.sedesById[c.sedeId].nombre : (c.sedeId || '—');
 
     var badgeClass = 'ct-detail-badge';
@@ -703,6 +717,7 @@ class ContratacionComponent {
 
     var body = backdrop.querySelector('#ct-steps-body');
     body.innerHTML = this._renderPasos(c);
+    this._wireSoportes(body, c);
 
     // Eventos de los pasos (delegación)
     body.querySelectorAll('.ct-step').forEach(function (step) {
@@ -780,6 +795,9 @@ class ContratacionComponent {
       var expand = '';
       if (expandible) {
         var defaultFecha = fecha ? self._isoToInputDate(fecha) : self._todayIso();
+        // Regla: sin soporte no se puede completar — botón deshabilitado + ayuda
+        var soportesDelPaso = (c._soportesPorPaso && c._soportesPorPaso[p.num]) || [];
+        var sinSoporte = soportesDelPaso.length === 0;
         expand = '<div class="ct-step__expand">' +
           '<div class="ct-step__expand-row">' +
             '<div class="ct-field"><label>Fecha</label><input type="date" name="fecha" id="' + fechaInputId + '" value="' + defaultFecha + '" /></div>' +
@@ -787,7 +805,9 @@ class ContratacionComponent {
           '</div>' +
           '<div class="ct-field"><label>Notas</label><textarea name="notas" id="' + notasInputId + '" rows="2" placeholder="Registrar detalles del paso..." style="width:100%;padding:0.5rem 0.7rem;border:1px solid #dee2e6;border-radius:0.35rem;font-size:0.85rem;font-family:inherit;outline:none;resize:vertical;box-sizing:border-box;">' + self._escHtml(notas || '') + '</textarea></div>' +
           '<div class="ct-step__expand-actions">' +
-            '<button class="ct-btn ct-btn--success ct-btn--small" type="button" data-action="marcar-paso"><i class="fas fa-check-circle"></i> Marcar como completado</button>' +
+            (sinSoporte
+              ? '<span class="ct-step__require-soporte"><i class="fas fa-paperclip"></i> Adjuntá al menos un soporte para poder completar este paso.</span>'
+              : '<button class="ct-btn ct-btn--success ct-btn--small" type="button" data-action="marcar-paso"><i class="fas fa-check-circle"></i> Marcar como completado</button>') +
           '</div>' +
         '</div>';
       }
@@ -802,9 +822,124 @@ class ContratacionComponent {
           '</div>' +
           meta +
           expand +
+          self._renderSoportes(c, p.num, isCanceled) +
         '</div>' +
       '</div>';
     }).join('');
+  }
+
+  // ─── Soportes (evidencias) por paso ───
+  _renderSoportes(c, pasoNum, isCanceled) {
+    var self = this;
+    var lista = (c._soportesPorPaso && c._soportesPorPaso[pasoNum]) || [];
+    var items = lista.map(function (s) {
+      var kb = s.tamanoBytes ? (s.tamanoBytes / 1024) : 0;
+      var tam = kb >= 1024 ? (kb / 1024).toFixed(1) + ' MB' : Math.max(1, Math.round(kb)) + ' KB';
+      return '<div class="ct-soporte" data-soporte-id="' + self._escHtml(s.id) + '">' +
+        '<i class="fas fa-paperclip ct-soporte__icon"></i>' +
+        '<span class="ct-soporte__name" title="' + self._escHtml(s.nombreArchivo) + '">' + self._escHtml(s.nombreArchivo) + '</span>' +
+        '<span class="ct-soporte__size">' + tam + '</span>' +
+        '<button class="ct-soporte__btn" type="button" data-sop-action="abrir" title="Abrir"><i class="fas fa-up-right-from-square"></i></button>' +
+        '<button class="ct-soporte__btn ct-soporte__btn--danger" type="button" data-sop-action="eliminar" title="Eliminar"><i class="fas fa-trash"></i></button>' +
+      '</div>';
+    }).join('');
+    var empty = lista.length === 0 ? '<div class="ct-soportes__empty">Sin soportes adjuntos</div>' : '';
+    return '<div class="ct-soportes" data-paso-soportes="' + pasoNum + '">' +
+      '<div class="ct-soportes__head">' +
+        '<span class="ct-soportes__label"><i class="fas fa-folder-open"></i> Soportes' + (lista.length ? ' (' + lista.length + ')' : '') + '</span>' +
+        (isCanceled ? '' : '<button class="ct-btn ct-btn--ghost ct-btn--small" type="button" data-sop-action="subir"><i class="fas fa-paperclip"></i> Adjuntar</button>') +
+      '</div>' +
+      '<div class="ct-soportes__list">' + items + empty + '</div>' +
+    '</div>';
+  }
+
+  // Recarga solo la sección de soportes de un paso dentro del modal abierto
+  async _refreshSoportes(c, pasoNum, modalBody) {
+    try {
+      var rs = await window.electronAPI.ghListarSoportesContratacion({ companyName: this.companyName, contratacionId: c.id });
+      if (rs && rs.success && rs.data && rs.data.soportes) {
+        c._soportesPorPaso = {};
+        rs.data.soportes.forEach(function (s) {
+          if (!c._soportesPorPaso[s.pasoNum]) c._soportesPorPaso[s.pasoNum] = [];
+          c._soportesPorPaso[s.pasoNum].push(s);
+        });
+      }
+    } catch (e) { console.warn('[Contratacion] refresh soportes:', e.message); }
+    var zone = modalBody.querySelector('[data-paso-soportes="' + pasoNum + '"]');
+    if (zone) {
+      var tmp = document.createElement('div');
+      tmp.innerHTML = this._renderSoportes(c, pasoNum, c.estado === 'cancelado');
+      zone.replaceWith(tmp.firstChild);
+    }
+  }
+
+  // Wire de botones de soportes (delegación en el body del modal)
+  _wireSoportes(body, c) {
+    var self = this;
+    body.addEventListener('click', async function (ev) {
+      var btn = ev.target.closest('[data-sop-action]');
+      if (!btn) return;
+      var action = btn.getAttribute('data-sop-action');
+      var stepEl = btn.closest('.ct-step');
+      var pasoNum = stepEl ? parseInt(stepEl.getAttribute('data-paso'), 10) : null;
+      var sopEl = btn.closest('.ct-soporte');
+      var soporteId = sopEl ? sopEl.getAttribute('data-soporte-id') : null;
+
+      if (action === 'subir' && pasoNum) {
+        btn.disabled = true;
+        try {
+          var r = await window.electronAPI.ghSubirSoportePaso({ companyName: self.companyName, contratacionId: c.id, pasoNum: pasoNum });
+          if (r && r.success && !r.data.canceled) {
+            self._showToast('Soporte adjuntado', 'success');
+            await self._refreshSoportes(c, pasoNum, body);
+          } else if (r && !r.success) {
+            self._showToast('Error: ' + ((r.error && r.error.message) || 'desconocido'), 'error');
+          }
+        } catch (e) { self._showToast('Error: ' + e.message, 'error'); }
+        btn.disabled = false;
+      } else if (action === 'abrir' && soporteId) {
+        window.electronAPI.ghAbrirSoportePaso({ soporteId: soporteId }).then(function (r) {
+          if (r && !r.success) self._showToast('No se pudo abrir: ' + ((r.error && r.error.message) || ''), 'error');
+        });
+      } else if (action === 'eliminar' && soporteId) {
+        var confirmRef = self._confirmDialog();
+        var okDel;
+        if (confirmRef) {
+          okDel = await confirmRef.confirm({
+            title: 'Eliminar soporte',
+            message: '¿Eliminar este soporte? El archivo se borra definitivamente del computador.',
+            confirmText: 'Eliminar',
+            cancelText: 'Cancelar',
+            type: 'danger'
+          });
+        } else {
+          okDel = window.confirm('¿Eliminar este soporte? El archivo se borra definitivamente.');
+        }
+        if (!okDel) return;
+        var rd = await window.electronAPI.ghEliminarSoportePaso({ soporteId: soporteId });
+        if (rd && rd.success) {
+          // Si el backend revirtió el paso (se eliminó el último soporte), hay que
+          // re-renderizar todo el pipeline → cerrar, recargar y reabrir el modal.
+          if (rd.data && rd.data.pasoRevertido) {
+            self._showToast('Paso ' + rd.data.pasoNum + ' revertido a pendiente: se eliminó su último soporte', 'warning');
+            var backdrop = body.closest('.ct-modal-backdrop');
+            if (backdrop && backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+            await self._loadContrataciones();
+            self._openDetailModal(c.id);
+          } else {
+            self._showToast('Soporte eliminado', 'success');
+            await self._refreshSoportes(c, pasoNum, body);
+          }
+        } else {
+          var code = rd && rd.error && rd.error.code;
+          if (code === 'PASO6_NO_REVERTIBLE') {
+            self._showToast((rd.error && rd.error.message), 'warning');
+          } else {
+            self._showToast('Error: ' + ((rd && rd.error && rd.error.message) || 'desconocido'), 'error');
+          }
+        }
+      }
+    });
   }
 
   async _marcarPaso(payload) {
@@ -816,7 +951,12 @@ class ContratacionComponent {
         // Re-abrir el modal con la versión actualizada
         if (payload.contratacionId) this._openDetailModal(payload.contratacionId);
       } else {
-        this._showToast('Error: ' + ((r && r.error && r.error.message) || 'desconocido'), 'error');
+        var mpCode = r && r.error && r.error.code;
+        if (mpCode === 'SOPORTE_REQUERIDO') {
+          this._showToast('⚠️ ' + (r.error.message || 'Adjuntá al menos un soporte antes de completar el paso'), 'warning');
+        } else {
+          this._showToast('Error: ' + ((r && r.error && r.error.message) || 'desconocido'), 'error');
+        }
       }
     } catch (e) {
       this._showToast('Error: ' + e.message, 'error');
@@ -824,7 +964,19 @@ class ContratacionComponent {
   }
 
   async _openCancelConfirm(id, nombre) {
-    var confirmed = window.confirm('¿Cancelar la contratación de "' + nombre + '"?\n\nEl registro se preserva como cancelado para histórico.');
+    var confirmRef = this._confirmDialog();
+    var confirmed;
+    if (confirmRef) {
+      confirmed = await confirmRef.confirm({
+        title: 'Cancelar Contratación',
+        message: '¿Cancelar la contratación de "' + nombre + '"? El registro se preserva como cancelado para histórico.',
+        confirmText: 'Cancelar contratación',
+        cancelText: 'Volver',
+        type: 'danger'
+      });
+    } else {
+      confirmed = window.confirm('¿Cancelar la contratación de "' + nombre + '"?\n\nEl registro se preserva como cancelado para histórico.');
+    }
     if (!confirmed) return;
     try {
       var r = await window.electronAPI.ghDeleteContratacion({ contratacionId: id });
