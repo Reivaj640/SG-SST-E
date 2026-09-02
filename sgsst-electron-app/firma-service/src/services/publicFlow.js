@@ -509,7 +509,15 @@ async function commit(token, opts, ip, user_agent) {
   //    de identificación (que es donde se validó la identidad).
   //    El contexto del commit se preserva en `gh_firma_eventos.ip/user_agent`
   //    de los eventos post-identificación.
-  const manifestacion_voluntad_texto = 'He leído, comprendido y acepto el contenido del documento en su totalidad.';
+  // Texto de manifestación reforzado (robustez jurídica):
+  // - Pacto de método (art. 2.2.2.47.7 D.1074/2015): activa la presunción
+  //   de confiabilidad del mecanismo OTP+correo.
+  // - Aviso de evidencia: el firmante sabe que IP/dispositivo quedan grabados.
+  // - Autorización Ley 1581/2012 para el tratamiento de esos datos.
+  // ATENCIÓN: si cambias este texto, revisá el checkbox #manifestacion_voluntad
+  // en web/firma/index.html — lo que el trabajador LEE debe coincidir con lo
+  // que aquí se hashea como evidencia.
+  const manifestacion_voluntad_texto = 'He leído, comprendido y acepto el contenido del documento en su totalidad. Acepto firmar este documento electrónicamente mediante verificación de mi correo electrónico (código OTP), conforme al art. 2.2.2.47.7 del Decreto 1074 de 2015. Reconozco que mi identificación, dirección IP y datos del dispositivo quedan registrados como evidencia de esta firma, y autorizo su tratamiento conforme a la Ley 1581 de 2012.';
   const manifestacion_voluntad_hash = sha256(manifestacion_voluntad_texto);
   const evidencia = {
     id_solicitud: signRequest.id_solicitud,
@@ -546,11 +554,23 @@ async function commit(token, opts, ip, user_agent) {
   const constancia_filename = signRequest.id_solicitud + '-constancia.pdf';
   const constancia_path = path.join(storage.PATHS.constancias, constancia_filename);
 
-  // 9. Generar Constancia (en memoria) — incluye id_constancia
+  // 9. Generar Constancia (en memoria) — incluye id_constancia.
+  // Los datos visibles de empresa/trabajador se sacan del metadata del SR
+  // (K+AIR los envía: nombre_empresa, nombre_trabajador). El correo del
+  // firmante ya existe en correo_verificacion. evidence_hash se pasa aparte
+  // para que NO salga "undefined" en el PDF.
+  let _srMeta = {};
+  try { _srMeta = signRequest.metadata ? JSON.parse(signRequest.metadata) : {}; } catch (e) { _srMeta = {}; }
+  const correoConstancia = resolveCorreo(signRequest); // ya tiene fallback a consent
   const constanciaBuf = await withAppErrorWrapping(
     () => pdfGen.generateConstanciaPdf({
       ...evidencia,
+      evidence_hash,          // fix: el objeto evidencia no lo trae de fábrica
       id_constancia,
+      nombre_empresa: _srMeta.nombre_empresa || null,
+      nombre_trabajador: _srMeta.nombre_trabajador || null,
+      correo_trabajador: correoConstancia || null,
+      correo_emisor: config.smtp.fromEmail || null,
     }),
     'PDF_GENERATION_FAILED',
     'No se pudo generar la constancia',

@@ -2355,7 +2355,11 @@
         // crear el SR. Es la fuente de verdad (prioridad 1) para INVITE,
         // OTP inicial y reenvíos de OTP. Queda congelado al momento de
         // crear el SR (no cambia aunque cambie el correo del consent).
-        correo_verificacion: correoFirmante
+        correo_verificacion: correoFirmante,
+        // Campos legales para la Constancia (viajan en gh_firmas_electronicas.metadata,
+        // no requieren migración de schema en firma-service).
+        nombre_empresa: self.companyName,   // display name completo (ej: TEMPOACTIVA EST S.A.S.)
+        nombre_trabajador: ((trab.nombres || '') + ' ' + (trab.apellidos || '')).trim()
       };
       // 6. Create sign request
       var srR = await window.electronAPI.firmaSignRequestCreate({
