@@ -18,14 +18,43 @@ const fs = require('fs');
 // compila Decreto 2364/2012) + Decreto 526/2021 (arts. 2.2.1.1.8–15 del
 // D.1072/2015, firma electrónica del contrato de trabajo) + CGP Ley
 // 1564/2012 arts. 243–247 + Ley 1581/2012 (datos personales).
+// Nombre legible (es-CO, registro legal) para cada tipo de evento de
+// auditoría (gh_firma_eventos.evento). Espejo del mapa del frontend
+// modules/gestion-humana/firma-electronica/index.js _EVENTO_LABELS, sin
+// iconos (el PDF es plano).
+const EVENTO_LABEL = {
+  CREATED: 'Solicitud creada',
+  INVITE_SENT: 'Invitación enviada por correo',
+  INVITE_RESENT: 'Invitación reenviada',
+  LINK_RETRIEVED: 'Enlace de firma consultado',
+  OPENED: 'Documento abierto',
+  IDENTIFICATION_STARTED: 'Identificación iniciada',
+  IDENTIFIED: 'Identificación completada',
+  IDENTIFICATION_COMPLETED: 'Identificación completada',
+  IDENTIFICATION_FAILED: 'Identificación fallida',
+  OTP_SENT: 'Código de verificación enviado',
+  OTP_RESENT: 'Código de verificación reenviado',
+  OTP_VERIFIED: 'Código verificado',
+  OTP_LOCKED: 'Código bloqueado por intentos',
+  DOCUMENT_OPENED: 'Documento visualizado',
+  DOCUMENT_VIEWED: 'Documento leído completo',
+  CONSENT_ACCEPTED: 'Acuerdo de firma electrónica aceptado',
+  MANIFESTATION_RECORDED: 'Manifestación de voluntad registrada',
+  SIGN_COMMITTED: 'Firma confirmada',
+  PDF_GENERATED: 'PDF firmado generado',
+  COPY_SENT: 'Copia firmada enviada por correo',
+  COPY_FAILED: 'Falla al enviar copia firmada',
+  REJECTED: 'Firma rechazada por el firmante',
+  EXPIRED: 'Solicitud expirada',
+  REVOKED: 'Solicitud revocada',
+  CANCELLED: 'Solicitud cancelada',
+};
+
 const MARCO_LEGAL_LINEAS = [
   'Ley 527 de 1999 — Ley Marco de comercio electrónico.',
-  'Decreto 1074 de 2015, Cap. 47 (arts. 2.2.2.47.1 a 2.2.2.47.10)',
-  '  — Régimen de la firma electrónica (compila el Decreto 2364 de 2012).',
-  'Decreto 526 de 2021 — Arts. 2.2.1.1.8 a 2.2.1.1.15 del Decreto 1072 de',
-  '  2015: firma electrónica del contrato individual de trabajo.',
-  'Ley 1564 de 2012 (C.G.P.), arts. 243-247 — Presunción de autenticidad',
-  '  de los mensajes de datos como medio de prueba.',
+  'Decreto 1074 de 2015, Cap. 47 (arts. 2.2.2.47.1 a 2.2.2.47.10) — Régimen de la firma electrónica (compila el Decreto 2364 de 2012).',
+  'Decreto 526 de 2021 — Arts. 2.2.1.1.8 a 2.2.1.1.15 del Decreto 1072 de 2015: firma electrónica del contrato individual de trabajo.',
+  'Ley 1564 de 2012 (C.G.P.), arts. 243-247 — Presunción de autenticidad de los mensajes de datos como medio de prueba.',
   'Ley 1581 de 2012 y Decreto 1377 de 2013 — Protección de datos personales.',
 ];
 
@@ -127,111 +156,216 @@ async function generateSignedPdf(originalBuffer, metadata) {
 /**
  * Genera un PDF de Constancia de firma electrónica.
  * Es la evidencia legal que se entrega al firmante.
+ * Layout inspirado en certificados de DocuSign: secciones con banda gris,
+ * pares label:valor alineados, hashes criptográficos truncados, footer.
  */
 async function generateConstanciaPdf(metadata) {
   const pdfDoc = await PDFDocument.create();
-  const page = pdfDoc.addPage([612, 792]); // Letter size
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-  // Wrap de texto: pdf-lib no tiene auto-wrap; partir por palabras al
-  // ancho máximo disponible (en caracteres aprox).
-  function wrapText(text, maxChars) {
-    const words = String(text).split(' ');
+  // Paleta (pdf-lib rgb 0-1)
+  const C = {
+    primario: rgb(0.09, 0.31, 0.65),   // azul marca
+    texto: rgb(0.12, 0.14, 0.20),
+    gris: rgb(0.42, 0.46, 0.52),
+    grisClaro: rgb(0.62, 0.65, 0.69),
+    bandaBg: rgb(0.955, 0.96, 0.97),   // #f3f4f6 aprox
+    regla: rgb(0.88, 0.90, 0.92),
+  };
+
+  const PAGE_W = 612, PAGE_H = 792;
+  const MAR_L = 50, MAR_R = 562; // content width 512
+  let page = pdfDoc.addPage([PAGE_W, PAGE_H]);
+  let y = PAGE_H - 64;
+
+  // ═══ Helpers ═══
+
+  function nuevaPaginaSiBajo(minY) {
+    if (y < minY) {
+      page = pdfDoc.addPage([PAGE_W, PAGE_H]);
+      y = PAGE_H - 64;
+    }
+  }
+
+  // Texto con wrap por ancho real (font.widthOfTextAtSize)
+  function wrapText(text, fnt, size, maxWidth) {
+    const words = String(text).split(/\s+/);
     const lines = [];
-    let current = '';
+    let cur = '';
     for (const w of words) {
-      if ((current + ' ' + w).trim().length <= maxChars) {
-        current = (current + ' ' + w).trim();
+      const test = cur ? cur + ' ' + w : w;
+      if (fnt.widthOfTextAtSize(test, size) <= maxWidth) {
+        cur = test;
       } else {
-        if (current) lines.push(current);
-        current = w;
+        if (cur) lines.push(cur);
+        cur = w;
       }
     }
-    if (current) lines.push(current);
-    return lines;
+    if (cur) lines.push(cur);
+    return lines.length ? lines : [''];
   }
 
-  const MAX_X = 612 - 50; // margen derecho en x=50
-  const lineHeight = 14;
-  let y = 750;
+  // Trunca hash largo: primeros 24 + '…' + últimos 24
+  function truncHash(h) {
+    if (!h) return 'N/D';
+    const s = String(h);
+    if (s.length <= 50) return s;
+    return s.slice(0, 24) + '…' + s.slice(-24);
+  }
 
-  function drawLine(text, opts = {}) {
-    // Helvet ~ 10pt ≈ ~5.1px por char. maxChars conservador para tamaño.
-    const maxChars = opts.maxChars || Math.floor((612 - 100) / 5.2);
-    const indent = opts.x || 50;
-    const lines = wrapText(text, maxChars);
+  // Trunca User-Agent (largo) a N chars para que entre en una línea.
+  function truncUA(ua, maxLen) {
+    if (!ua) return 'N/D';
+    const s = String(ua);
+    const lim = maxLen || 90;
+    if (s.length <= lim) return s;
+    return s.slice(0, lim - 1) + '…';
+  }
+
+  // ISO → 'DD/MM/YYYY, HH:mm:ss' (hora local del servidor; la precisión
+  // legal la da el ISO crudo en BD, la constancia es la lectura humana).
+  function fmtFechaHora(iso) {
+    if (!iso) return 'N/D';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return String(iso);
+    const p = (n) => String(n).padStart(2, '0');
+    return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}, `
+      + `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  }
+
+  // Banda de sección: rect gris + texto bold
+  function seccion(titulo) {
+    nuevaPaginaSiBajo(120);
+    y -= 6;
+    page.drawRectangle({ x: MAR_L, y: y - 4, width: MAR_R - MAR_L, height: 18, color: C.bandaBg });
+    page.drawText(titulo, { x: MAR_L + 8, y, size: 10, font: fontBold, color: C.primario });
+    y -= 26;
+  }
+
+  // Par label:valor con alineación (label bold a la izquierda, valor con wrap)
+  function campo(label, valor, opts = {}) {
+    const size = opts.size || 9.5;
+    const labelX = MAR_L + 12;
+    const valueX = MAR_L + 170; // columna fija estilo formulario
+    const labelText = label;
+    nuevaPaginaSiBajo(80);
+    page.drawText(labelText, { x: labelX, y, size, font: fontBold, color: C.gris });
+    const lines = wrapText(valor == null || valor === '' ? '—' : String(valor), font, size, MAR_R - valueX - 8);
     for (const ln of lines) {
-      page.drawText(ln, {
-        x: indent, y,
-        size: opts.size || 10,
-        font: opts.bold ? fontBold : font,
-        color: opts.color || rgb(0, 0, 0),
-      });
-      y -= opts.lh || lineHeight;
+      page.drawText(ln, { x: valueX, y, size, font, color: C.texto });
+      y -= 13;
     }
+    y -= 1;
   }
 
-  // Header
-  drawLine('CONSTANCIA DE FIRMA ELECTRÓNICA', { bold: true, size: 14 });
-  drawLine('K+AIR', { bold: true, size: 12 });
-  y -= 10;
+  // Párrafo de texto plano con wrap (para marco legal y declaración)
+  function parrafo(texto, opts = {}) {
+    const size = opts.size || 8.5;
+    const lines = wrapText(texto, font, size, MAR_R - MAR_L - 24);
+    nuevaPaginaSiBajo(80);
+    for (const ln of lines) {
+      page.drawText(ln, { x: MAR_L + 12, y, size, font, color: opts.color || C.gris });
+      y -= opts.lh || 12;
+    }
+    y += 2;
+  }
 
-  // Documento
-  drawLine('DOCUMENTO FIRMADO', { bold: true });
-  drawLine(`  ID Solicitud:    ${metadata.id_solicitud}`);
-  drawLine(`  ID Documento:     ${metadata.id_documento}`);
-  drawLine(`  Tipo de firma:    ${metadata.tipo_firma}`);
-  drawLine(`  Hash original:    ${metadata.document_hash_original}`);
-  drawLine(`  Hash firmado:     ${metadata.document_hash_firmado}`);
-  y -= 10;
-
-  // Trabajador
-  drawLine('TRABAJADOR (FIRMANTE)', { bold: true });
-  drawLine(`  Nombre completo:  ${metadata.nombre_trabajador || 'N/D (no proporcionado)'}`);
-  drawLine(`  Identificación:   ${metadata.identificacion_tipo || 'N/D'} (hash guardado)`);
-  drawLine(`  Correo:           ${metadata.correo_trabajador || 'N/D (no proporcionado)'}`);
-  y -= 10;
-
-  // Empresa
-  drawLine('EMPRESA (REQUIRENTE)', { bold: true });
-  drawLine(`  Nombre:           ${metadata.nombre_empresa || 'N/D (no proporcionado)'}`);
-  drawLine(`  ID / NIT:         ${metadata.id_empresa}`);
-  drawLine(`  Correo de envío:  ${metadata.correo_emisor || 'N/D (no configurado)'}`);
-  y -= 10;
-
-  // Fecha y método
-  drawLine('FECHA Y MÉTODO', { bold: true });
-  drawLine(`  Fecha firma:      ${metadata.fecha_firma}`);
-  drawLine(`  Mecanismo:        Firma electrónica K+AIR`);
-  drawLine(`  Autenticación:    OTP al correo`);
-  drawLine(`  Manifestación:    Aceptación explícita por checkbox + botón`);
-  y -= 10;
-
-  // Evidencia
-  drawLine('EVIDENCIA', { bold: true });
-  drawLine(`  Evidence hash:    ${metadata.evidence_hash}`);
-  drawLine(`  K+AIR version:    ${metadata.version_kair}`);
-  y -= 10;
-
-  // Marco normativo (con wrapControl para que no se desborde)
-  drawLine('MARCO LEGAL', { bold: true });
-  MARCO_LEGAL_LINEAS.forEach(function (l) {
-    drawLine(l.trim(), { size: 8 });
+  // ═══ HEADER: marca + título ═══
+  page.drawText('K+AIR', { x: MAR_R - 90, y: PAGE_H - 56, size: 13, font: fontBold, color: C.primario });
+  page.drawText('CONSTANCIA DE FIRMA ELECTRÓNICA', { x: MAR_L, y, size: 16, font: fontBold, color: C.texto });
+  y -= 16;
+  page.drawText('Documento de evidencia de firma electrónica — Ley 527 de 1999', {
+    x: MAR_L, y, size: 9, font, color: C.grisClaro
   });
-  drawLine('La validación jurídica definitiva del mecanismo corresponde al', { size: 8 });
-  drawLine('operador jurídico del empleador en su implementación concreta.', { size: 8 });
+  y -= 14;
+  page.drawLine({
+    start: { x: MAR_L, y }, end: { x: MAR_R, y },
+    thickness: 1.2, color: C.primario,
+  });
   y -= 10;
 
-  // Verificación
-  drawLine('VERIFICACIÓN', { bold: true });
-  drawLine(`  ID de generación: ${metadata.id_constancia}`);
-  y -= 20;
+  // ═══ RESUMEN ═══
+  seccion('Resumen');
+  campo('ID de Solicitud', metadata.id_solicitud);
+  campo('Documento', metadata.id_documento);
+  campo('Estado', 'Completado — firmado electrónicamente');
+  campo('Tipo de firma', metadata.tipo_firma === 'remoto' ? 'Remota (verificación OTP por correo)' : metadata.tipo_firma);
+  campo('Fecha de firma', metadata.fecha_firma, {});
 
-  // Footer
-  drawLine('_____________________________________________', { x: 50 });
-  drawLine('Generado automáticamente por K+AIR Firma Electrónica v1.0', {
-    size: 8, color: rgb(0.5, 0.5, 0.5),
+  // ═══ FIRMANTE ═══
+  seccion('Firmante');
+  campo('Nombre completo', metadata.nombre_trabajador);
+  campo('Identificación', (metadata.identificacion_tipo ? metadata.identificacion_tipo + ' ' : '') + '(número protegido — hash en evidencia)');
+  campo('Correo verificado', metadata.correo_trabajador);
+
+  // ═══ EMPRESA ═══
+  seccion('Empresa requirente');
+  campo('Razón social', metadata.nombre_empresa);
+  campo('NIT / ID', metadata.id_empresa);
+  campo('Correo de envío', metadata.correo_emisor);
+
+  // ═══ VERIFICACIÓN CRIPTOGRÁFICA ═══
+  seccion('Verificación criptográfica');
+  campo('Hash doc. original (SHA-256)', truncHash(metadata.document_hash_original));
+  campo('Hash doc. firmado (SHA-256)', truncHash(metadata.document_hash_firmado));
+  campo('Hash de evidencia (auditoría)', truncHash(metadata.evidence_hash));
+  campo('IP del firmante', metadata.ip_origen || 'N/D');
+  campo('Dispositivo del firmante', truncUA(metadata.user_agent));
+  parrafo('Cualquier modificación posterior al PDF firmado produce un hash distinto y es detectable contra estos valores.', { size: 8, color: C.grisClaro });
+
+  // ═══ DECLARACIÓN DEL FIRMANTE ═══
+  seccion('Manifestación de voluntad del firmante');
+  parrafo(metadata.manifestacion_voluntad_texto ||
+    'El firmante aceptó expresamente el contenido y el método de firma electrónica.',
+    { size: 9, color: C.texto });
+
+  // ═══ MARCO LEGAL ═══
+  seccion('Marco legal');
+  MARCO_LEGAL_LINEAS.forEach(function (l, i) {
+    parrafo(l, { size: 9, color: C.texto });
+    if (i < MARCO_LEGAL_LINEAS.length - 1) y -= 2;
+  });
+  parrafo('La validación jurídica definitiva del mecanismo corresponde al operador jurídico del empleador en su implementación concreta.', { size: 8, color: C.grisClaro, lh: 11 });
+
+  // ═══ AUDITORÍA / TRAZABILIDAD DE EVENTOS ═══
+  // Línea de tiempo de gh_firma_eventos (append-only). Si hay más de 20,
+  // el caller envía los primeros ~10 (contexto inicial) y los últimos ~10
+  // (cierre de la firma) para mantener el PDF en 1-2 páginas; el historial
+  // completo queda en la BD / endpoint interno de auditoría.
+  const eventos = Array.isArray(metadata.eventos) ? metadata.eventos : [];
+  const totalEventos = metadata.eventos_total != null ? metadata.eventos_total : eventos.length;
+  seccion('Auditoría / Trazabilidad de eventos (' + totalEventos + ')');
+  if (eventos.length === 0) {
+    parrafo('No hay eventos registrados para esta solicitud.', { size: 9, color: C.texto });
+  } else {
+    if (totalEventos > eventos.length) {
+      parrafo('Se muestran los ' + eventos.length + ' eventos principales (primeros y últimos de la línea de tiempo); '
+        + 'los ' + (totalEventos - eventos.length) + ' eventos intermedios quedan conservados en el registro de auditoría interno.',
+        { size: 8, color: C.grisClaro, lh: 11 });
+      y -= 2;
+    }
+    eventos.forEach(function (ev) {
+      const label = EVENTO_LABEL[ev.evento] || ev.evento;
+      const meta = 'actor: ' + (ev.id_actor || 'sistema') + ' · IP: ' + (ev.ip || 'N/D');
+      nuevaPaginaSiBajo(70);
+      page.drawText(fmtFechaHora(ev.fecha_hora), { x: MAR_L + 12, y, size: 9, font, color: C.gris });
+      page.drawText(label, { x: MAR_L + 140, y, size: 9, font: fontBold, color: C.texto });
+      y -= 12;
+      page.drawText(meta, { x: MAR_L + 140, y, size: 8, font, color: C.grisClaro });
+      y -= 14;
+    });
+  }
+
+  // ═══ FOOTER ═══
+  nuevaPaginaSiBajo(70);
+  y = Math.min(y, 70);
+  page.drawLine({ start: { x: MAR_L, y }, end: { x: MAR_R, y }, thickness: 0.8, color: C.regla });
+  y -= 12;
+  page.drawText('ID de esta constancia: ' + metadata.id_constancia, { x: MAR_L, y, size: 8, font, color: C.grisClaro });
+  y -= 12;
+  page.drawText('Generado automáticamente por K+AIR Firma Electrónica · K+AIR ' + (metadata.version_kair || ''), {
+    x: MAR_L, y, size: 8, font, color: C.grisClaro
   });
 
   const bytes = await pdfDoc.save();
