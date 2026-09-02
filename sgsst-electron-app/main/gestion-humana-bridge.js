@@ -821,6 +821,16 @@ function _handlerMarcarPaso(token, contratacionId, pasoNum, fecha, notas) {
       return _err('ALREADY_DELETED', 'La contratación está cancelada, no se puede marcar pasos');
     }
 
+    // REGLA "sin soporte = sin completar": el paso exige al menos 1 evidencia adjunta.
+    var cntSop = localDb.prepare(
+      'SELECT COUNT(*) AS n FROM gh_contratacion_soportes WHERE contratacion_id = ? AND paso_num = ?'
+    ).get(contratacionId, pasoInt).n;
+    if (cntSop === 0) {
+      return _err('SOPORTE_REQUERIDO',
+        'El paso ' + pasoInt + ' requiere al menos un soporte adjunto antes de marcarse como completado.',
+        { contratacionId: contratacionId, pasoNum: pasoInt });
+    }
+
     var f = pasoFields[pasoInt];
     var fechaFinal = (fecha && typeof fecha === 'string') ? fecha : new Date().toISOString();
     var now = new Date().toISOString();
@@ -3449,6 +3459,272 @@ function _handlerAbrirDocumento(token, documentoId) {
   }
 }
 
+// ========== SOPORTES DE CONTRATACIÓN (evidencias por paso del pipeline) ==========
+// Patrón replicado de gh_documentos_afiliaciones (📦760): el binario vive en el
+// filesystem (<userData>/gh-soportes-contratacion/<empresa>/<contratacion>/paso-N/<archivo>)
+// y la BD guarda solo metadata. A diferencia de afiliaciones, un paso admite
+// VARIOS archivos (no hay UNIQUE por slot).
+
+var _SOPORTE_MAX_BYTES = 10 * 1024 * 1024; // 10 MB (igual que afiliaciones)
+var _SOPORTE_FILTERS = [
+  { name: 'Documentos e imágenes', extensions: ['pdf', 'png', 'jpg', 'jpeg', 'doc', 'docx', 'xls', 'xlsx', 'eml'] },
+  { name: 'Todos los archivos', extensions: ['*'] }
+];
+
+function _rowToSoporte(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    empresaId: row.empresa_id,
+    contratacionId: row.contratacion_id,
+    pasoNum: row.paso_num,
+    nombreArchivo: row.nombre_archivo,
+    rutaArchivo: row.ruta_archivo,
+    tamanoBytes: row.tamano_bytes,
+    mimeType: row.mime_type,
+    subidoPor: row.subido_por,
+    fechaSubida: row.fecha_subida,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+// Path: <userData>/gh-soportes-contratacion/<empresaId>/<contratacionId>/paso-<N>/<timestamp>-<nombre>
+// El timestamp evita colisiones de nombre cuando el user sube el mismo archivo 2 veces.
+function _soportePasoPath(empresaId, contratacionId, pasoNum, nombreArchivo) {
+  var app = registerGestionHumanaHandlers._app;
+  var path = registerGestionHumanaHandlers._path;
+  if (!app || !path) return null;
+  var base = app.getPath('userData');
+  var safeName = String(nombreArchivo).replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
+  return path.join(base, 'gh-soportes-contratacion', String(empresaId), String(contratacionId), 'paso-' + pasoNum, Date.now() + '-' + safeName);
+}
+
+/**
+ * gh:listar-soportes-contratacion
+ * Lista los soportes de una contratación (todos los pasos) o de un paso puntual.
+ * Input: { token, companyName, contratacionId, pasoNum? }
+ * Devuelve: { success, data: { soportes: [...] } } — ordenado por paso, luego fecha_subida
+ */
+function _handlerListarSoportes(token, companyName, contratacionId, pasoNum) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+  if (!companyName || typeof companyName !== 'string') return _err('INVALID_INPUT', 'companyName es requerido');
+  if (!contratacionId || typeof contratacionId !== 'string') return _err('INVALID_INPUT', 'contratacionId es requerido');
+
+  var company = _getCompanyByName(companyName);
+  if (!company) return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var rows;
+    if (pasoNum) {
+      var p = parseInt(pasoNum, 10);
+      if (isNaN(p) || p < 1 || p > 6) return _err('INVALID_INPUT', 'pasoNum debe ser un entero entre 1 y 6');
+      rows = localDb.prepare(
+        'SELECT * FROM gh_contratacion_soportes WHERE empresa_id = ? AND contratacion_id = ? AND paso_num = ? ORDER BY fecha_subida ASC'
+      ).all(company.company_key, contratacionId, p);
+    } else {
+      rows = localDb.prepare(
+        'SELECT * FROM gh_contratacion_soportes WHERE empresa_id = ? AND contratacion_id = ? ORDER BY paso_num ASC, fecha_subida ASC'
+      ).all(company.company_key, contratacionId);
+    }
+    return _ok({ soportes: rows.map(_rowToSoporte) });
+  } catch (e) {
+    console.error('[' + MOD + '][listar-soportes-contratacion]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:subir-soporte-paso
+ * Abre dialog nativo, valida tipo/tamaño, copia a AppData e INSERTA en BD.
+ * Input: { token, companyName, contratacionId, pasoNum }
+ * Devuelve: { success, data: { soporte } } o { success: true, data: { canceled: true } }
+ */
+function _handlerSubirSoporte(token, companyName, contratacionId, pasoNum) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+  if (!companyName || typeof companyName !== 'string') return _err('INVALID_INPUT', 'companyName es requerido');
+  if (!contratacionId || typeof contratacionId !== 'string') return _err('INVALID_INPUT', 'contratacionId es requerido');
+
+  var p = parseInt(pasoNum, 10);
+  if (isNaN(p) || p < 1 || p > 6) return _err('INVALID_INPUT', 'pasoNum debe ser un entero entre 1 y 6');
+
+  var company = _getCompanyByName(companyName);
+  if (!company) return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+  var dialog = registerGestionHumanaHandlers._dialog;
+  var fs = registerGestionHumanaHandlers._fs;
+  var path = registerGestionHumanaHandlers._path;
+  if (!dialog || !fs || !path) return _err('NO_DIALOG', 'dialog/fs/path no disponibles');
+
+  // Verificar que la contratación existe y pertenece a la empresa
+  try {
+    var ct = localDb.prepare('SELECT id FROM contrataciones WHERE id = ? AND empresa_id = ?').get(contratacionId, company.company_key);
+    if (!ct) return _err('NOT_FOUND', 'Contratación no encontrada');
+  } catch (e) {
+    return _err('INTERNAL', e.message);
+  }
+
+  return dialog.showOpenDialog({
+    title: 'Adjuntar soporte — Paso ' + p,
+    filters: _SOPORTE_FILTERS,
+    properties: ['openFile']
+  }).then(function (result) {
+    if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+      return _ok({ canceled: true });
+    }
+    var sourcePath = result.filePaths[0];
+
+    var stats;
+    try { stats = fs.statSync(sourcePath); } catch (e) { return _err('FILE_ERROR', 'No se pudo leer el archivo: ' + e.message); }
+    if (stats.size > _SOPORTE_MAX_BYTES) {
+      return _err('FILE_TOO_LARGE', 'El archivo supera el máximo de 10 MB. Tamaño: ' + Math.round(stats.size / 1024 / 1024) + ' MB');
+    }
+
+    var nombreArchivo = path.basename(sourcePath);
+    var destPath = _soportePasoPath(company.company_key, contratacionId, p, nombreArchivo);
+    if (!destPath) return _err('NO_PATH', 'No se pudo construir la ruta de destino');
+    _ensureDirSync(path.dirname(destPath));
+
+    try {
+      fs.copyFileSync(sourcePath, destPath);
+    } catch (e) {
+      return _err('COPY_ERROR', 'No se pudo copiar el archivo: ' + e.message);
+    }
+
+    var id = _newId('sop-');
+    var now = new Date().toISOString();
+    localDb.prepare(
+      'INSERT INTO gh_contratacion_soportes (id, empresa_id, contratacion_id, paso_num, nombre_archivo, ruta_archivo, tamano_bytes, mime_type, subido_por, fecha_subida, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(id, company.company_key, contratacionId, p, nombreArchivo, destPath, stats.size, null, null, now, now, now);
+
+    var row = localDb.prepare('SELECT * FROM gh_contratacion_soportes WHERE id = ?').get(id);
+    return _ok({ soporte: _rowToSoporte(row) });
+  }).catch(function (e) {
+    console.error('[' + MOD + '][subir-soporte-paso]', e.message);
+    return _err('INTERNAL', e.message);
+  });
+}
+
+/**
+ * gh:abrir-soporte-paso
+ * Abre el soporte con la app por defecto del sistema.
+ * Input: { token, soporteId }
+ * Devuelve: { success, data: { rutaArchivo } }
+ */
+function _handlerAbrirSoporte(token, soporteId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+  if (!soporteId || typeof soporteId !== 'string') return _err('INVALID_INPUT', 'soporteId es requerido');
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+  var shell = registerGestionHumanaHandlers._shell;
+  if (!shell) return _err('NO_SHELL', 'shell no disponible');
+
+  try {
+    var row = localDb.prepare('SELECT ruta_archivo FROM gh_contratacion_soportes WHERE id = ?').get(soporteId);
+    if (!row) return _err('NOT_FOUND', 'Soporte no encontrado');
+    if (!row.ruta_archivo) return _err('NO_PATH', 'Soporte sin ruta');
+    return shell.openPath(row.ruta_archivo).then(function (errMsg) {
+      if (errMsg) return _err('OPEN_FAILED', errMsg);
+      return _ok({ rutaArchivo: row.ruta_archivo });
+    });
+  } catch (e) {
+    console.error('[' + MOD + '][abrir-soporte-paso]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:eliminar-soporte-paso
+ * Borra el archivo del FS + el registro de la BD.
+ * Input: { token, soporteId }
+ * Devuelve: { success, data: { soporteId } }
+ */
+function _handlerEliminarSoporte(token, soporteId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+  if (!soporteId || typeof soporteId !== 'string') return _err('INVALID_INPUT', 'soporteId es requerido');
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  var pasoFields = {
+    1: { bool: 'memo_recibido',            fecha: 'memo_fecha',          notas: 'memo_notas' },
+    2: { bool: 'contacto_realizado',      fecha: 'contacto_fecha',      notas: 'contacto_notas' },
+    3: { bool: 'examenes_programados',    fecha: 'examenes_fecha',      notas: 'examenes_notas' },
+    4: { bool: 'documentos_firmados',     fecha: 'documentos_fecha',    notas: 'documentos_notas' },
+    5: { bool: 'afiliaciones_completadas', fecha: 'afiliaciones_fecha', notas: 'afiliaciones_notas' },
+    6: { bool: 's400_activado',           fecha: 's400_fecha',          notas: 's400_notas' }
+  };
+
+  try {
+    var row = localDb.prepare('SELECT * FROM gh_contratacion_soportes WHERE id = ?').get(soporteId);
+    if (!row) return _err('NOT_FOUND', 'Soporte no encontrado');
+
+    // Contar soportes restantes del paso (excluyendo este)
+    var restantes = localDb.prepare(
+      'SELECT COUNT(*) AS n FROM gh_contratacion_soportes WHERE contratacion_id = ? AND paso_num = ? AND id != ?'
+    ).get(row.contratacion_id, row.paso_num, soporteId).n;
+
+    // Si quedan 0, verificar si el paso está completado → regla reactiva
+    if (restantes === 0) {
+      var ct = localDb.prepare('SELECT * FROM contrataciones WHERE id = ?').get(row.contratacion_id);
+      var f = pasoFields[row.paso_num];
+      var pasoCompletado = ct && f && ct[f.bool] === 1;
+
+      if (pasoCompletado) {
+        // Excepción: paso 6 completado NO se revierte (el trabajador ya nació en base_personal)
+        if (row.paso_num === 6) {
+          return _err('PASO6_NO_REVERTIBLE',
+            'El paso 6 (Activación S400) ya creó al trabajador en Base Personal y no se puede revertir. No se puede eliminar su último soporte.');
+        }
+
+        // Reversión atómica: borrar soporte + destildar paso + recalcular paso_actual
+        var now = new Date().toISOString();
+        localDb.exec('BEGIN');
+        try {
+          if (row.ruta_archivo) _safeUnlinkSync(row.ruta_archivo);
+          localDb.prepare('DELETE FROM gh_contratacion_soportes WHERE id = ?').run(soporteId);
+
+          // Recalcular paso_actual = mayor paso completado restante, o 1 si ninguno
+          var nuevoPasoActual = 1;
+          for (var i = 5; i >= 1; i--) {
+            if (ct[pasoFields[i].bool] === 1 && i !== row.paso_num) { nuevoPasoActual = i + 1; break; }
+          }
+          // El paso revertido queda como el actual si es menor que lo calculado
+          if (row.paso_num < nuevoPasoActual) nuevoPasoActual = row.paso_num;
+
+          localDb.prepare(
+            "UPDATE contrataciones SET " + f.bool + " = 0, " + f.fecha + " = NULL, " + f.notas + " = NULL, paso_actual = ?, estado = 'en_proceso', updated_at = ? WHERE id = ?"
+          ).run(nuevoPasoActual, now, row.contratacion_id);
+          localDb.exec('COMMIT');
+        } catch (e) {
+          try { localDb.exec('ROLLBACK'); } catch (e2) {}
+          throw e;
+        }
+
+        return _ok({ soporteId: soporteId, pasoRevertido: true, pasoNum: row.paso_num, pasoActual: nuevoPasoActual });
+      }
+    }
+
+    // Caso normal: solo borrar
+    if (row.ruta_archivo) _safeUnlinkSync(row.ruta_archivo);
+    localDb.prepare('DELETE FROM gh_contratacion_soportes WHERE id = ?').run(soporteId);
+    return _ok({ soporteId: soporteId, pasoRevertido: false });
+  } catch (e) {
+    console.error('[' + MOD + '][eliminar-soporte-paso]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
 // ========== 📦764 · TEMPLATES DE DOCUMENTOS — .docx/.pdf subidos por el user ==========
 // Cada template está asociado a un tipo de documento (autorizacion_datos, contrato, etc.)
 // y se guarda el archivo en el filesystem (AppData) y metadata en gh_templates.
@@ -4205,7 +4481,8 @@ function registerGestionHumanaHandlers(app, deps) {
           "  'contrataciones', 'base_personal', 'gh_sedes'," +
           "  'gh_vacaciones', 'gh_permisos', 'gh_documentos'," +
           "  'gh_anuncios', 'gh_mensajes'," +
-          "  'gh_documentos_afiliaciones', 'gh_templates'" +
+          "  'gh_documentos_afiliaciones', 'gh_templates'," +
+          "  'gh_contratacion_soportes'" +
           ") ORDER BY name"
         ).all();
         tables = tablesResult.map(function(r) { return r.name; });
@@ -4219,6 +4496,44 @@ function registerGestionHumanaHandlers(app, deps) {
       tables: tables,
       message: 'Gestión Humana bridge en Fase 7 (54 handlers reales + 1 diag · 10 tablas) · LEGACY-SIGN-REMOVE 2026-08-20'
     });
+  });
+
+  // ========== SOPORTES DE CONTRATACIÓN (4) ==========
+  ipcMainHandle('gh:listar-soportes-contratacion', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerListarSoportes(p.token || '', p.companyName, p.contratacionId, p.pasoNum);
+    } catch (e) {
+      console.error('[' + MOD + '][listar-soportes-contratacion]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:subir-soporte-paso', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerSubirSoporte(p.token || '', p.companyName, p.contratacionId, p.pasoNum);
+    } catch (e) {
+      console.error('[' + MOD + '][subir-soporte-paso]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:abrir-soporte-paso', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerAbrirSoporte(p.token || '', p.soporteId);
+    } catch (e) {
+      console.error('[' + MOD + '][abrir-soporte-paso]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:eliminar-soporte-paso', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerEliminarSoporte(p.token || '', p.soporteId);
+    } catch (e) {
+      console.error('[' + MOD + '][eliminar-soporte-paso]', e.message);
+      return _err('INTERNAL', e.message);
+    }
   });
 
   // ========== 📦760 · DOCUMENTOS DE AFILIACIONES (5) — Fase 6 ==========
@@ -4614,7 +4929,7 @@ function registerGestionHumanaHandlers(app, deps) {
     }
   });
 
-  console.log('[' + MOD + '][INIT][SUCCESS] Bridge registrado · 5 read + 4 write-contratacion + 4 write-personal + 2 write-sedes + 6 vacaciones + 5 permisos + 5 documentos + 5 anuncios + 4 mensajes + 5 docs-afiliaciones + 5 templates + 3 import-excel + 1 diag · 55 handlers totales · LEGACY-SIGN-REMOVE (sin firma canvas)');
+  console.log('[' + MOD + '][INIT][SUCCESS] Bridge registrado · 5 read + 4 write-contratacion + 4 write-personal + 2 write-sedes + 6 vacaciones + 5 permisos + 5 documentos + 5 anuncios + 4 mensajes + 5 docs-afiliaciones + 5 templates + 3 import-excel + 4 soportes-contratacion + 1 diag · 59 handlers totales · LEGACY-SIGN-REMOVE (sin firma canvas)');
 }
 
 registerGestionHumanaHandlers.init = function(ipcMain) {

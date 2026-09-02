@@ -204,7 +204,7 @@ async function run() {
   console.log('  ✓ Bridge registrado con mocks');
 
   console.log('');
-  console.log('[9] Verificando que los 52 handlers están registrados...');
+  console.log('[9] Verificando que los handlers esperados están registrados...');
   const expectedHandlers = [
     // Read (5) — Fase 1
     'gh:list-contrataciones', 'gh:get-contratacion', 'gh:list-personal',
@@ -239,7 +239,10 @@ async function run() {
     'gh:list-templates', 'gh:subir-template', 'gh:eliminar-template',
     'gh:obtener-template', 'gh:abrir-template',
     // 📦732 · Import Excel (3)
-    'gh:select-excel', 'gh:parse-excel', 'gh:import-personal'
+    'gh:select-excel', 'gh:parse-excel', 'gh:import-personal',
+    // Soportes de Contratación (4) — evidencias por paso
+    'gh:listar-soportes-contratacion', 'gh:subir-soporte-paso',
+    'gh:abrir-soporte-paso', 'gh:eliminar-soporte-paso'
   ];
   // I-103.A1.0-D-1 · EXPECTED_HANDLERS actualizado de 55 a 59.
   // Los 4 handlers adicionales son preexistentes (registrados en commits anteriores a 1.0-C
@@ -247,7 +250,7 @@ async function run() {
   // solo lo ajustamos para que el test quede en verde con la realidad del bridge actual.
   // 📦767 · FASE 1.0-G.2 · El conteo del bridge subió a 60 (era 59 pre-G.2). El desajuste de 1
   // ya existía antes de G.2 (probablemente LEGACY-SIGN-REMOVE dejó 1 handler que no se restó).
-  _assertEq(Object.keys(registeredHandlers).length, 60, 'cantidad de handlers registrados = 60 (LEGACY-SIGN-REMOVE: era 58, -3 firma; +4 preexistentes; +1 preexistente)');
+  _assertEq(Object.keys(registeredHandlers).length, 64, 'cantidad de handlers registrados = 64 (era 60; +4 soportes-contratacion)');
   expectedHandlers.forEach(function(ch) {
     _assert(typeof registeredHandlers[ch] === 'function', 'handler "' + ch + '" registrado');
   });
@@ -274,9 +277,9 @@ async function run() {
   _assert(diagRes.data.has_getDb === true, 'diag.data.has_getDb = true');
   _assert(diagRes.data.has_validateSession === true, 'diag.data.has_validateSession = true');
   _assert(Array.isArray(diagRes.data.tables), 'diag.data.tables es array');
-  _assert(diagRes.data.tables.length === 10, 'diag.data.tables tiene 10 tablas (3 originales + 7 nuevas) · LEGACY-SIGN-REMOVE: -1 gh_firmas_digitales');
-  // Verificar las 7 tablas nuevas explícitamente
-  ['gh_vacaciones', 'gh_permisos', 'gh_documentos', 'gh_anuncios', 'gh_mensajes', 'gh_documentos_afiliaciones', 'gh_templates'].forEach(function(t) {
+  _assert(diagRes.data.tables.length === 11, 'diag.data.tables tiene 11 tablas (era 10; +1 gh_contratacion_soportes)');
+  // Verificar las 8 tablas nuevas explícitamente
+  ['gh_vacaciones', 'gh_permisos', 'gh_documentos', 'gh_anuncios', 'gh_mensajes', 'gh_documentos_afiliaciones', 'gh_templates', 'gh_contratacion_soportes'].forEach(function(t) {
     _assert(diagRes.data.tables.indexOf(t) >= 0, 'diag.data.tables incluye ' + t);
   });
 
