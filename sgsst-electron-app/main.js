@@ -17918,6 +17918,7 @@ function startOnlyOfficeBridge() {
 
 // --- SERVIDOR LLM PARA ANÁLISIS DE ACCIDENTES ---
 let llmServerProcess = null;
+let firmaServiceProcess = null; // firma-service auto-start (puerto 3001)
 
 // Función para limpiar procesos hijos antes de salir
 function cleanupProcesses() {
@@ -17940,6 +17941,23 @@ function cleanupProcesses() {
         llmServerProcess = null;
     }
 
+    // firma-service (auto-start puerto 3001)
+    if (firmaServiceProcess && firmaServiceProcess.exitCode === null) {
+        console.log('[MAIN] Cerrando firma-service por PID...');
+        try {
+            if (process.platform === 'win32') {
+                const { execSync } = require('child_process');
+                execSync(`taskkill /pid ${firmaServiceProcess.pid} /T /F`);
+            } else {
+                firmaServiceProcess.kill('SIGKILL');
+            }
+            console.log('[MAIN] ✅ firma-service cerrado');
+        } catch (e) {
+            console.warn('[MAIN] ⚠️ Error al cerrar firma-service (puede que ya no exista):', e.message);
+        }
+        firmaServiceProcess = null;
+    }
+
     // 2. En Windows, hacer un barrido de procesos de Python residuales
     if (process.platform === 'win32') {
         try {
@@ -17959,6 +17977,81 @@ function cleanupProcesses() {
 app.on('before-quit', (e) => {
     cleanupProcesses();
 });
+
+// ==========================================================================
+// firma-service auto-start (puerto 3001) — patrón copiado de startLlmServer.
+// Solo aplica en desarrollo: el servicio aún no viaja en el instalador.
+// En producción (app empaquetada) falta la carpeta → se omite en silencio.
+// IMPORTANTE: se spawnea con el `node` del sistema (no process.execPath)
+// porque firma-service/node_modules (better-sqlite3 nativo) fue compilado
+// contra Node del sistema; correrlo con el binario de Electron rompería
+// el módulo nativo por ABI distinta.
+// ==========================================================================
+async function startFirmaService() {
+    const http = require('http');
+
+    const firmaDir = app.isPackaged
+        ? path.join(process.resourcesPath, 'firma-service')
+        : path.join(__dirname, 'firma-service');
+    if (!fs.existsSync(path.join(firmaDir, 'src', 'server.js'))) {
+        console.log('[MAIN][FIRMA] firma-service no presente en este build — se omite auto-arranque');
+        return;
+    }
+
+    const checkHealth = () => new Promise((resolve) => {
+        const req = http.request({
+            hostname: '127.0.0.1', port: 3001, path: '/health', method: 'GET', timeout: 2000
+        }, (res) => {
+            let data = '';
+            res.on('data', (c) => data += c);
+            res.on('end', () => {
+                // Solo /health da JSON con status — otro ocupante del puerto no lo tiene
+                try { resolve(!!JSON.parse(data).status); } catch (e) { resolve(false); }
+            });
+        });
+        req.on('error', () => resolve(false));
+        req.on('timeout', () => { req.destroy(); resolve(false); });
+        req.end();
+    });
+
+    try {
+        if (await checkHealth()) {
+            console.log('[MAIN][FIRMA] firma-service ya está corriendo (manual o previo) — no se duplica');
+            return;
+        }
+
+        console.log('[MAIN][FIRMA] Iniciando firma-service en background (puerto 3001)...');
+        firmaServiceProcess = spawn('node', [path.join('src', 'server.js')], {
+            cwd: firmaDir,
+            windowsHide: true,
+            stdio: 'ignore'
+        });
+        firmaServiceProcess.on('error', (err) => {
+            // Típico: 'node' no está en el PATH del sistema
+            console.error('[MAIN][FIRMA] No se pudo spawner:', err.message);
+            firmaServiceProcess = null;
+        });
+
+        // Esperar a que levante (Express + migraciones SQLite: rápido, max 15s)
+        const MAX_MS = 15000;
+        const t0 = Date.now();
+        while (Date.now() - t0 < MAX_MS) {
+            await new Promise(r => setTimeout(r, 400));
+            if (await checkHealth()) {
+                console.log('[MAIN][FIRMA] ✅ firma-service listo en ' + ((Date.now() - t0) / 1000).toFixed(1) + 's (PID ' + firmaServiceProcess.pid + ')');
+                return;
+            }
+            if (firmaServiceProcess.exitCode !== null) {
+                console.error('[MAIN][FIRMA] El proceso murió al arrancar (exit ' + firmaServiceProcess.exitCode + '). Posible: mejor-sqlite3 incompatible con el Node del PATH. Correr "npm install" dentro de firma-service.');
+                firmaServiceProcess = null;
+                return;
+            }
+        }
+        console.warn('[MAIN][FIRMA] Timeout esperando a firma-service (' + MAX_MS / 1000 + 's). Firma Electrónica no estará disponible hasta levantarlo manual.');
+    } catch (err) {
+        console.error('[MAIN][FIRMA] Error en auto-arranque:', err.message);
+    }
+}
 
 async function startLlmServer() {
     const http = require('http');
@@ -21134,6 +21227,9 @@ app.whenReady().then(() => {
 
     // Iniciar el servidor OnlyOffice Bridge
     startOnlyOfficeBridge();
+
+    // Auto-arranque de firma-service (solo si la carpeta existe; dev o build con el servicio incluido)
+    startFirmaService();
     
     // NOTA: El servidor LLM ya no se inicia automáticamente.
     // El análisis de accidentes usa spawn directo con Invest_APP_V_3.py
