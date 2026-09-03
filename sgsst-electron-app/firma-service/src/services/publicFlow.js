@@ -408,6 +408,49 @@ function resolveCorreo(signRequest) {
   return null;
 }
 
+// Busca el primer evento de una línea de tiempo para un set de nombres.
+function _firstEvent(rows, names) {
+  const wanted = new Set(names);
+  const list = Array.isArray(rows) ? rows : [];
+  for (const row of list) {
+    if (row && wanted.has(row.evento)) return row;
+  }
+  return null;
+}
+
+// Resume la línea de tiempo en los hitos que una persona espera ver primero.
+function _buildHitosFirma(rows, signRequest, fechaFirma) {
+  const enviado = _firstEvent(rows, ['INVITE_SENT', 'CREATED']);
+  const visto = _firstEvent(rows, ['DOCUMENT_VIEWED', 'DOCUMENT_OPENED', 'OPENED']);
+  const acuerdo = _firstEvent(rows, ['CONSENT_ACCEPTED']);
+  const manifestacion = _firstEvent(rows, ['MANIFESTATION_RECORDED']);
+  const firmado = _firstEvent(rows, ['SIGN_COMMITTED']);
+  const constancia = _firstEvent(rows, ['PDF_GENERATED']);
+
+  return [
+    { label: 'Solicitud enviada', fecha_hora: enviado ? enviado.fecha_hora : signRequest.fecha_creacion, estado: 'Registrada' },
+    { label: 'Documento visualizado', fecha_hora: visto ? visto.fecha_hora : signRequest.fecha_documento_visto, estado: 'Lectura confirmada' },
+    { label: 'Acuerdo aceptado', fecha_hora: acuerdo ? acuerdo.fecha_hora : null, estado: 'Consentimiento registrado' },
+    { label: 'Manifestación registrada', fecha_hora: manifestacion ? manifestacion.fecha_hora : fechaFirma, estado: 'Voluntad confirmada' },
+    { label: 'Firma completada', fecha_hora: firmado ? firmado.fecha_hora : fechaFirma, estado: 'Integridad verificada' },
+    { label: 'Constancia generada', fecha_hora: constancia ? constancia.fecha_hora : fechaFirma, estado: 'Constancia emitida' },
+  ];
+}
+
+// Lee el consentimiento vinculado (si existe) para mostrarlo en la constancia.
+function _getConsentResumen(consentId) {
+  if (!consentId) return null;
+  try {
+    return db.prepare(`
+      SELECT id, version_acuerdo, hash_texto_acuerdo, fecha_aceptacion
+      FROM gh_consentimientos_firma
+      WHERE id = ?
+    `).get(consentId) || null;
+  } catch (_) {
+    return null;
+  }
+}
+
 /**
  * Cierra la firma: transición atómica a SIGNED.
  *
@@ -475,6 +518,11 @@ async function commit(token, opts, ip, user_agent) {
 
   // 5. Leer PDF original
   const pdfOriginal = storage.readPdf(signRequest.pdf_original_path);
+  const paginasDocumentoOriginal = await withAppErrorWrapping(
+    () => pdfGen.getPdfPageCount(pdfOriginal),
+    'PDF_GENERATION_FAILED',
+    'No se pudo leer el número de páginas del PDF original',
+  );
 
   // 6. Generar PDF firmado (con metadata XMP).
   //    El XMP incluye id_solicitud, agreement_version, fecha_firma.
@@ -600,6 +648,7 @@ async function commit(token, opts, ip, user_agent) {
   }
 
   const correoConstancia = resolveCorreo(signRequest); // ya tiene fallback a consent
+  const consentResumen = _getConsentResumen(signRequest.consent_id);
 
   // 9b. Trazabilidad para la Constancia: leer historial de eventos y anexar
   //     sintéticamente los 3 que la transacción de commit (paso 11) va a
@@ -611,6 +660,7 @@ async function commit(token, opts, ip, user_agent) {
   //     queda en gh_firma_eventos / endpoint interno de auditoría.
   let eventosConstancia = [];
   let eventosTotal = 0;
+  let hitosFirma = [];
   try {
     const _rows = db.prepare(`
       SELECT evento, fecha_hora, ip, id_actor
@@ -624,6 +674,7 @@ async function commit(token, opts, ip, user_agent) {
       { evento: 'SIGN_COMMITTED', fecha_hora: fecha_firma, ip: ip || null, id_actor: 'trabajador' },
       { evento: 'PDF_GENERATED', fecha_hora: fecha_firma, ip: ip || null, id_actor: 'sistema' },
     );
+    hitosFirma = _buildHitosFirma(_rows, signRequest, fecha_firma);
     // Si hay más de 20, conservar los primeros (contexto inicial: creación,
     // apertura, identificación) + los últimos (verificación, firma) sin
     // perder el cierre — el rango medio (p.ej. reenvíos masivos de OTP)
@@ -644,18 +695,35 @@ async function commit(token, opts, ip, user_agent) {
     });
   }
 
+  const constanciaMetadata = {
+    ...evidencia,
+    evidence_hash,            // fix: el objeto evidencia no lo trae de fábrica
+    id_constancia,
+    nombre_empresa: nombreEmpresa,
+    nombre_trabajador: nombreTrabajador,
+    correo_trabajador: correoConstancia || null,
+    correo_emisor: config.smtp.fromEmail || null,
+    asunto_documento: _srMeta.asunto_documento || _srMeta.titulo_documento || signRequest.id_documento,
+    paginas_documento_original: paginasDocumentoOriginal,
+    hitos_firma: hitosFirma,
+    consent_id: consentResumen ? consentResumen.id : null,
+    fecha_aceptacion_acuerdo: consentResumen ? consentResumen.fecha_aceptacion : null,
+    zona_horaria: Intl.DateTimeFormat().resolvedOptions().timeZone || null,
+    nivel_seguridad: 'Correo verificado + código temporal por correo + manifestación expresa',
+    control_registro: {
+      estado: 'Original firmado',
+      titular: nombreEmpresa || signRequest.id_empresa,
+      ubicacion: 'K+AIR Firma Electrónica',
+      generado_en: fecha_firma,
+    },
+    eventos: eventosConstancia,
+    eventos_total: eventosTotal,
+  };
+
+  // Una sola generación: el número de páginas de la constancia lo cierra
+  // pdfGen internamente justo antes de guardar el buffer.
   const constanciaBuf = await withAppErrorWrapping(
-    () => pdfGen.generateConstanciaPdf({
-      ...evidencia,
-      evidence_hash,          // fix: el objeto evidencia no lo trae de fábrica
-      id_constancia,
-      nombre_empresa: nombreEmpresa,
-      nombre_trabajador: nombreTrabajador,
-      correo_trabajador: correoConstancia || null,
-      correo_emisor: config.smtp.fromEmail || null,
-      eventos: eventosConstancia,
-      eventos_total: eventosTotal,
-    }),
+    () => pdfGen.generateConstanciaPdf(constanciaMetadata),
     'PDF_GENERATION_FAILED',
     'No se pudo generar la constancia',
   );

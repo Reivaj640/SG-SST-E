@@ -101,6 +101,10 @@ const signRequestBody = z.object({
   version_kair: z.string().min(1).max(32),
   identificacion_tipo: z.enum(['CC', 'CE', 'TI', 'PPT', 'PA']).optional(),
   identificacion_numero_hash: z.string().regex(/^[0-9a-f]{64}$/).optional(),
+  // Campos visibles para la Constancia. No afectan evidence_hash; solo
+  // alimentan la legibilidad humana del certificado.
+  nombre_trabajador: z.string().max(255).optional(),
+  nombre_empresa: z.string().max(255).optional(),
   // P1-2: sal aleatoria por sign request para hashear la cédula.
   //   hash = SHA-256(sal || numero_documento)
   // Si el cliente no la envía, el servicio genera una automáticamente.

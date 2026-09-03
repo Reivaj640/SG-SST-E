@@ -178,6 +178,13 @@ async function generateConstanciaPdf(metadata) {
   const MAR_L = 50, MAR_R = 562; // content width 512
   let page = pdfDoc.addPage([PAGE_W, PAGE_H]);
   let y = PAGE_H - 64;
+  let paginasConstanciaSlot = null;
+
+  const zonaHoraria = metadata.zona_horaria
+    || Intl.DateTimeFormat().resolvedOptions().timeZone
+    || null;
+  const hitosFirma = Array.isArray(metadata.hitos_firma) ? metadata.hitos_firma : [];
+  const controlRegistro = metadata.control_registro || {};
 
   // ═══ Helpers ═══
 
@@ -223,6 +230,16 @@ async function generateConstanciaPdf(metadata) {
     return s.slice(0, lim - 1) + '…';
   }
 
+  // Muestra la identificación sin exponer el número completo:
+  // conserva el tipo y solo los últimos 4 dígitos del documento.
+  function fmtIdentificacionParcial(tipo, referencia) {
+    const digits = String(referencia || '').replace(/\D/g, '');
+    if (digits.length < 4) {
+      return (tipo ? tipo + ' ' : '') + '(número protegido — hash en evidencia)';
+    }
+    return (tipo || 'ID') + ' **' + digits.slice(-4) + ' — número protegido';
+  }
+
   // ISO → 'DD/MM/YYYY, HH:mm:ss' (hora local del servidor; la precisión
   // legal la da el ISO crudo en BD, la constancia es la lectura humana).
   function fmtFechaHora(iso) {
@@ -259,6 +276,19 @@ async function generateConstanciaPdf(metadata) {
     y -= 1;
   }
 
+  // Variante con valor diferido: deja marcada la zona y al final se reemplaza
+  // por el número real de páginas. Así no hace falta renderizar 2 veces.
+  function campoValorPaginas(label, placeholder) {
+    const size = 9.5;
+    const labelX = MAR_L + 12;
+    const valueX = MAR_L + 170;
+    nuevaPaginaSiBajo(80);
+    page.drawText(label, { x: labelX, y, size, font: fontBold, color: C.gris });
+    page.drawText(placeholder, { x: valueX, y, size, font, color: C.grisClaro });
+    paginasConstanciaSlot = { ref: page, x: valueX, y };
+    y -= 14;
+  }
+
   // Párrafo de texto plano con wrap (para marco legal y declaración)
   function parrafo(texto, opts = {}) {
     const size = opts.size || 8.5;
@@ -269,6 +299,18 @@ async function generateConstanciaPdf(metadata) {
       y -= opts.lh || 12;
     }
     y += 2;
+  }
+
+  // Hito de firma estilo resumen ejecutivo: fecha | hito | estado.
+  function hito(label, fechaIso, estado) {
+    const fechaTxt = fmtFechaHora(fechaIso);
+    const estadoTxt = estado || 'Registrado';
+    const estadoWidth = font.widthOfTextAtSize(estadoTxt, 8);
+    nuevaPaginaSiBajo(70);
+    page.drawText(fechaTxt, { x: MAR_L + 12, y, size: 8.5, font, color: C.gris });
+    page.drawText(label || 'Hito', { x: MAR_L + 145, y, size: 9, font: fontBold, color: C.texto });
+    page.drawText(estadoTxt, { x: MAR_R - estadoWidth, y, size: 8, font, color: C.gris });
+    y -= 16;
   }
 
   // ═══ HEADER: marca + título ═══
@@ -288,16 +330,37 @@ async function generateConstanciaPdf(metadata) {
   // ═══ RESUMEN ═══
   seccion('Resumen');
   campo('ID de Solicitud', metadata.id_solicitud);
+  campo('Asunto', metadata.asunto_documento || metadata.id_documento);
   campo('Documento', metadata.id_documento);
   campo('Estado', 'Completado — firmado electrónicamente');
   campo('Tipo de firma', metadata.tipo_firma === 'remoto' ? 'Remota (verificación OTP por correo)' : metadata.tipo_firma);
   campo('Fecha de firma', metadata.fecha_firma, {});
+  campo('Páginas del documento original', metadata.paginas_documento_original || 'N/D');
+  campoValorPaginas('Páginas de esta constancia', '…');
+  campo('Zona horaria de referencia', zonaHoraria);
+  campo('Originado por', metadata.nombre_empresa || metadata.id_empresa);
+
+  // ═══ HITOS DE FIRMA ═══
+  seccion('Hitos de la firma');
+  if (hitosFirma.length === 0) {
+    parrafo('No hay hitos resumidos disponibles para esta solicitud.', { size: 9, color: C.texto });
+  } else {
+    hitosFirma.forEach(function (h) { hito(h.label, h.fecha_hora, h.estado); });
+  }
+
+  // ═══ CONTROL DEL REGISTRO ═══
+  seccion('Control del registro');
+  campo('Estado del registro', controlRegistro.estado || 'Original');
+  campo('Titular del registro', controlRegistro.titular || metadata.nombre_empresa || metadata.id_empresa);
+  campo('Ubicación', controlRegistro.ubicacion || 'K+AIR Firma Electrónica');
+  campo('Registro generado', controlRegistro.generado_en ? fmtFechaHora(controlRegistro.generado_en) : fmtFechaHora(metadata.fecha_firma));
 
   // ═══ FIRMANTE ═══
   seccion('Firmante');
   campo('Nombre completo', metadata.nombre_trabajador);
-  campo('Identificación', (metadata.identificacion_tipo ? metadata.identificacion_tipo + ' ' : '') + '(número protegido — hash en evidencia)');
+  campo('Identificación', fmtIdentificacionParcial(metadata.identificacion_tipo, metadata.id_trabajador));
   campo('Correo verificado', metadata.correo_trabajador);
+  campo('Nivel de seguridad', metadata.nivel_seguridad || 'Correo verificado + código temporal por correo + manifestación expresa');
 
   // ═══ EMPRESA ═══
   seccion('Empresa requirente');
@@ -314,8 +377,12 @@ async function generateConstanciaPdf(metadata) {
   campo('Dispositivo del firmante', truncUA(metadata.user_agent));
   parrafo('Cualquier modificación posterior al PDF firmado produce un hash distinto y es detectable contra estos valores.', { size: 8, color: C.grisClaro });
 
-  // ═══ DECLARACIÓN DEL FIRMANTE ═══
-  seccion('Manifestación de voluntad del firmante');
+  // ═══ CONSENTIMIENTO Y MANIFESTACIÓN DEL FIRMANTE ═══
+  seccion('Consentimiento y manifestación del firmante');
+  campo('Versión del acuerdo', metadata.agreement_version || 'legacy');
+  campo('ID de consentimiento', metadata.consent_id || 'N/D');
+  campo('Aceptado el', metadata.fecha_aceptacion_acuerdo ? fmtFechaHora(metadata.fecha_aceptacion_acuerdo) : 'N/D');
+  campo('Hash del acuerdo', truncHash(metadata.agreement_hash));
   parrafo(metadata.manifestacion_voluntad_texto ||
     'El firmante aceptó expresamente el contenido y el método de firma electrónica.',
     { size: 9, color: C.texto });
@@ -368,11 +435,44 @@ async function generateConstanciaPdf(metadata) {
     x: MAR_L, y, size: 8, font, color: C.grisClaro
   });
 
+  // Cierra el valor diferido "Páginas de esta constancia" en UNA sola pasada.
+  if (paginasConstanciaSlot) {
+    const totalPaginasConstancia = pdfDoc.getPageCount();
+    paginasConstanciaSlot.ref.drawRectangle({
+      x: paginasConstanciaSlot.x,
+      y: paginasConstanciaSlot.y - 2,
+      width: 90,
+      height: 12,
+      color: rgb(1, 1, 1),
+    });
+    paginasConstanciaSlot.ref.drawText(String(totalPaginasConstancia), {
+      x: paginasConstanciaSlot.x,
+      y: paginasConstanciaSlot.y,
+      size: 9.5,
+      font,
+      color: C.texto,
+    });
+  }
+
   const bytes = await pdfDoc.save();
   return Buffer.from(bytes);
+}
+
+/**
+ * Devuelve la cantidad de páginas de un PDF sin modificarlo.
+ * Se usa para mostrar en la constancia el tamaño del documento original
+ * y para cerrar el ciclo "certificate pages" estilo DocuSign.
+ *
+ * @param {Buffer} pdfBuffer
+ * @returns {Promise<number>}
+ */
+async function getPdfPageCount(pdfBuffer) {
+  const pdfDoc = await PDFDocument.load(pdfBuffer);
+  return pdfDoc.getPageCount();
 }
 
 module.exports = {
   generateSignedPdf,
   generateConstanciaPdf,
+  getPdfPageCount,
 };
