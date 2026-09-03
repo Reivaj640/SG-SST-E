@@ -502,6 +502,32 @@ function createFirmaClient(opts) {
   }
 
   /**
+   * GET /internal/expedientes/:idTrabajador/constancia-consolidada.pdf
+   * Constancia GENERAL del expediente: todas las solicitudes de firma del
+   * trabajador (firmadas y pendientes), generada al vuelo por el backend.
+   * @param {string} idTrabajador - cédula del trabajador (identificador del expediente)
+   */
+  function getExpedienteConstanciaConsolidada(idTrabajador, opts) {
+    if (!idTrabajador) {
+      return Promise.resolve(_fail('INVALID_REQUEST_BODY', 'idTrabajador requerido'));
+    }
+    var headers = _buildHeaders(apiKey, clientInstanceId, {
+      accept: 'application/pdf',
+      appVersion: appVersion
+    });
+    var url = baseUrl + '/internal/expedientes/' + encodeURIComponent(idTrabajador) + '/constancia-consolidada.pdf';
+    // Títulos reales de documentos (viven en K+AIR; firma-service solo
+    // conoce el id interno). Query param JSON, tolerado por el backend.
+    if (opts && opts.titulos) {
+      try {
+        url += '?titulos=' + encodeURIComponent(JSON.stringify(opts.titulos));
+      } catch (e) { /* noop — cosmético */ }
+    }
+    return _doRequestRaw('GET', url, headers, undefined, DEFAULT_TIMEOUT_MS)
+      .then(function (r) { return _parseResult(r, 'application/pdf'); });
+  }
+
+  /**
    * GET /internal/sign-requests/:id/link (C-22 recovery)
    * (puede NO existir hasta I-013b backend)
    * @param {string} id
@@ -864,6 +890,7 @@ function createFirmaClient(opts) {
     listSignRequests: listSignRequests,
     getSignRequestDocument: getSignRequestDocument,
     getSignRequestConstancia: getSignRequestConstancia,
+    getExpedienteConstanciaConsolidada: getExpedienteConstanciaConsolidada,
     getSignRequestLink: getSignRequestLink,
     notifySignRequestRemote: notifySignRequestRemote,  // I-103.A1.5.2
     resendSignRequestOtp: resendSignRequestOtp,  // I-103.A1.6.B

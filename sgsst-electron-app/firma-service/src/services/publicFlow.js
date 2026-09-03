@@ -1450,4 +1450,9 @@ module.exports = {
   // verificar el orden de prioridad metadata > consent sin tener que
   // replicar la lógica.
   _resolveCorreo: resolveCorreo,
+  // Expuestos para la constancia consolidada del expediente
+  // (routes/constancia.js): resume la línea de tiempo de cada solicitud
+  // en los 6 hitos legibles, sin duplicar la lógica de prioridad.
+  _buildHitosFirma: _buildHitosFirma,
+  _getConsentResumen: _getConsentResumen,
 };

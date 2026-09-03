@@ -487,6 +487,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   firmaSignRequestConstancia: (id, args) => ipcRenderer.invoke('firma:sign-request:constancia', Object.assign({ id }, args || {})),
   // I-104 (SaveAs): bridge hace dialog.showSaveDialog, retorna solo la ruta final.
   firmaSignRequestConstanciaSaveAs: (id, args) => ipcRenderer.invoke('firma:sign-request:constancia-save-as', Object.assign({ id }, args || {})),
+  // Constancia GENERAL del expediente (SaveAs): `id` = cédula del trabajador.
+  // El bridge pide el PDF consolidado (al vuelo) y muestra dialog.showSaveDialog.
+  firmaExpedienteConstanciaSaveAs: (id, args) => ipcRenderer.invoke('firma:expediente:constancia-save-as', Object.assign({ id }, args || {})),
   firmaSignRequestLink: (id, args) => ipcRenderer.invoke('firma:sign-request:link', Object.assign({ id }, args || {})),
   // I-103.A1.5.2 · Enviar invitación de firma al firmante por correo.
   // Args: { id: 'SIGN-YYYY-NNNNNN' | <int>, correo: 'firmante@x.com', context?: { ... } }
