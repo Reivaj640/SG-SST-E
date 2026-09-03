@@ -1188,19 +1188,11 @@ class DocumentosComponent {
           new Uint8Array(await crypto.subtle.digest('SHA-256',
             new TextEncoder().encode(cedulaFirmante)))
         ),
-        // I-103.A1.5.3 + A1.5.4 fix · `correo` va DENTRO del sub-objeto
-        // `metadata` (JSON string), NO top-level. El contrato del backend
-        // (services/signRequest.js#create, líneas 318-347) es:
-        //   - `metadata` es un JSON string con campos extra
-        //   - el service hace JSON.parse y los preserva en la columna
-        //     `metadata` de la BD junto con `_server_metadata`
-        // El backend (services/publicFlow.js líneas 289 y 550) lee
-        // `signRequest.metadata.correo` para enviar el OTP al firmante.
-        // Si mandamos `correo` top-level, zod lo acepta como campo extra
-        // PERO el service solo guarda `meta.metadata` (que es undefined),
-        // entonces el `correo` se pierde y el OTP va al placeholder
-        // 'trabajador@ejemplo.com' (bug encontrado en A1.5.4-A).
-        metadata: JSON.stringify({ correo: correoFirmante })
+        // Correo y datos visibles para la Constancia. Mantener en el body raíz:
+        // el schema de firma-service ya los reconoce y los persiste.
+        correo_verificacion: correoFirmante,
+        nombre_empresa: self.companyName,
+        nombre_trabajador: ((t && t.nombres || '') + ' ' + (t && t.apellidos || '')).trim()
       };
 
       // 7) Crear la sign request

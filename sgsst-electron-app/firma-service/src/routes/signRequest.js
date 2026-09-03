@@ -137,6 +137,23 @@ router.post('/sign-requests',
     }
     const meta = validation.data;
 
+    // Los campos visibles de la Constancia no deben perderse: zod quita
+    // campos desconocidos del body raíz, así que los guardamos explícitamente
+    // dentro del metadata persistido del sign request.
+    let metadataExtra = {};
+    if (meta.metadata) {
+      try {
+        metadataExtra = JSON.parse(meta.metadata) || {};
+      } catch (e) {
+        metadataExtra = {};
+      }
+    }
+    if (meta.nombre_trabajador) metadataExtra.nombre_trabajador = meta.nombre_trabajador;
+    if (meta.nombre_empresa) metadataExtra.nombre_empresa = meta.nombre_empresa;
+    const metadataToPersist = Object.keys(metadataExtra).length > 0
+      ? JSON.stringify(metadataExtra)
+      : meta.metadata;
+
     const result = signRequestService.create({
       id_documento: meta.id_documento,
       id_trabajador: meta.id_trabajador,
@@ -165,7 +182,10 @@ router.post('/sign-requests',
       // route no propagaba este campo; zod lo validaba y el service lo
       // aceptaba, pero terminaba en `undefined` → `null` en BD silencioso.
       tipo_identificacion: meta.tipo_identificacion,
-      metadata: meta.metadata,
+      // I-103.A1.6.C · El correo del firmante viaja top-level; si K+AIR no lo
+      // envía, cae al fallback histórico de metadata.correo / consent.
+      correo_verificacion: meta.correo_verificacion,
+      metadata: metadataToPersist,
       ip: req.ip,
       user_agent: req.get('User-Agent') || null,
     });
