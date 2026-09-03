@@ -520,6 +520,12 @@
           self._actionVerDocumentoFirmado(srId);
         } else if (action === 'descargar-constancia') {
           self._actionDescargarConstancia(srId);
+        } else if (action === 'descargar-constancia-doc') {
+          // Constancia del documento específico (botón por tarjeta).
+          self._actionDescargarConstancia(srId);
+        } else if (action === 'descargar-constancia-expediente') {
+          // Constancia GENERAL del expediente (todas las solicitudes).
+          self._actionDescargarConstanciaExpediente();
         } else if (action === 'generar-documento') {
           self._openGenerarModal();
         } else if (action === 'firmar-electronico') {
@@ -1225,7 +1231,14 @@
       // Per-document actions
       var actions = [];
       actions.push('<button class="fe-doc-action" data-action="ver-documento" data-doc-id="' + _esc(d.id) + '" type="button"><i class="fas fa-eye"></i> Ver</button>');
-      if (d.rutaArchivo) {
+      // Si la solicitud está SIGNED, el segundo botón descarga LA CONSTANCIA
+      // de ESE documento (evidencia legal enviada al firmante). Si aún no
+      // está firmado, se mantiene el comportamiento anterior (descargar
+      // el archivo local generado).
+      var srFirmado = !!(sr && sr.ok && sr.data && sr.data.estado === 'SIGNED');
+      if (srFirmado) {
+        actions.push('<button class="fe-doc-action" data-action="descargar-constancia-doc" data-sr-id="' + _esc(d.idSolicitudFirma) + '" type="button"><i class="fas fa-file-signature"></i> Constancia</button>');
+      } else if (d.rutaArchivo) {
         actions.push('<button class="fe-doc-action" data-action="descargar-documento" data-doc-id="' + _esc(d.id) + '" type="button"><i class="fas fa-download"></i> Descargar</button>');
       }
       if (d.estado === 'pendiente' && d.rutaArchivo) {
@@ -1533,6 +1546,10 @@
     var srIdParaResend = srActivo ? srActivo.id : '';
     // Ver documento / descargar constancia solo si hay un firmado (estado SIGNED o doc local firmado)
     var puedeVerPdf = !!srFirmado || hayPdfFirmado;
+    // Constancia general del expediente: habilitada si hay AL MENOS UNA
+    // solicitud de firma cargada (el PDF se genera al vuelo en el backend
+    // e incluye TODAS, firmadas y pendientes, con su trazabilidad).
+    var haySolicitudes = data.signRequests.some(function (sr) { return sr && sr.ok; });
 
     var srId = srFirmado
       ? srFirmado.id
@@ -1550,7 +1567,8 @@
     if (puedeEnviar) accionesHabilitadas++;
     if (puedeCopiar) accionesHabilitadas++;
     if (puedeReenviarOtp) accionesHabilitadas++;
-    if (puedeVerPdf) accionesHabilitadas += 2; // Ver documento + Descargar constancia
+    if (puedeVerPdf) accionesHabilitadas++;   // Ver documento firmado
+    if (haySolicitudes) accionesHabilitadas++; // Descargar constancia general del expediente
 
     return [
       '<section class="fe-exp-section fe-exp-section--actions">',
@@ -1581,10 +1599,14 @@
         '      <i class="fas fa-file-pdf"></i> Ver documento firmado',
         '    </button>'
       ].join('\n') : '',
-      // Descargar constancia de firma — habilitado cuando SIGNED (usa cache local)
-      puedeVerPdf ? [
-        '    <button class="fe-exp-action" type="button" data-action="descargar-constancia" data-sr-id="' + _esc(srId) + '">',
-        '      <i class="fas fa-download"></i> Descargar constancia de firma',
+      // Descargar constancia GENERAL del expediente — habilitada si hay al
+      // menos una solicitud. Cubre TODAS las solicitudes (firmadas y
+      // pendientes) con trazabilidad por documento. Las constancias
+      // individuales de cada documento firmado se descargan desde la tarjeta
+      // del documento en la sección "Documentos".
+      haySolicitudes ? [
+        '    <button class="fe-exp-action fe-exp-action--enabled" type="button" data-action="descargar-constancia-expediente">',
+        '      <i class="fas fa-file-invoice"></i> Descargar constancia general del expediente',
         '    </button>'
       ].join('\n') : '',
       '  </div>',
@@ -1865,6 +1887,48 @@
       self._showToast('Constancia guardada en ' + r.data.rutaArchivo, 'success');
     } catch (e) {
       self._showToast('Error guardando constancia: ' + e.message, 'error');
+    }
+  };
+
+  /**
+   * Handler del botón "Descargar constancia general del expediente".
+   * Pide al backend un PDF consolidado (generado al vuelo) con TODAS las
+   * solicitudes del trabajador — firmadas y pendientes — y el bridge lo
+   * guarda vía dialog.showSaveDialog. El renderer NO recibe bytes.
+   * La cédula (id_trabajador) es el identificador del expediente.
+   */
+  FirmaElectronicaComponent.prototype._actionDescargarConstanciaExpediente = async function () {
+    var self = this;
+    var proceso = self._lastExpedienteProceso;
+    var trabajador = proceso && proceso.trabajador;
+    var cedula = trabajador ? (trabajador.cedula || trabajador.id) : null;
+    if (!cedula) {
+      self._showToast('No se encontró la cédula del trabajador del expediente', 'error');
+      return;
+    }
+    // Mapa de títulos reales de los documentos (K+AIR los conoce; firma-service
+    // solo guarda el id interno do-xxxx). El backend los usa en la constancia
+    // consolidada para mostrar "Contrato Laboral" en vez de solo el id cifrado.
+    var titulos = { porSolicitud: {}, porDocId: {} };
+    (proceso.documentos || []).forEach(function (d) {
+      var titulo = d.titulo || d.tipo || null;
+      if (!titulo) return;
+      if (d.idSolicitudFirma) titulos.porSolicitud[d.idSolicitudFirma] = titulo;
+      if (d.id) titulos.porDocId[d.id] = titulo;
+    });
+    try {
+      var r = await window.electronAPI.firmaExpedienteConstanciaSaveAs(cedula, { companyName: self.companyName, titulos: titulos });
+      if (r && r.canceled) {
+        self._showToast('Descarga cancelada', 'info');
+        return;
+      }
+      if (!r || !r.success || !r.data || !r.data.rutaArchivo) {
+        self._showToast('No se pudo guardar la constancia general', 'error');
+        return;
+      }
+      self._showToast('Constancia general guardada en ' + r.data.rutaArchivo, 'success');
+    } catch (e) {
+      self._showToast('Error guardando constancia general: ' + e.message, 'error');
     }
   };
 

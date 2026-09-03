@@ -1114,6 +1114,40 @@ function _handlerSignRequestConstanciaSaveAs(args) {
   });
 }
 
+/**
+ * Constancia GENERAL del expediente (SaveAs): pide al backend el PDF
+ * consolidado de TODAS las solicitudes del trabajador (generado al vuelo)
+ * y lo guarda vía dialog.showSaveDialog(). Mismo patrón que
+ * _handlerSignRequestConstanciaSaveAs; el renderer solo recibe la ruta.
+ * `args.id` = cédula del trabajador (identificador del expediente).
+ */
+function _handlerExpedienteConstanciaSaveAs(args) {
+  args = args || {};
+  if (!args.id) {
+    return _err('INVALID_REQUEST_BODY', 'id (cédula del trabajador) requerido');
+  }
+  var r = _resolveClientForRequest(args);
+  if (!r.ok) return r.response;
+  return r.client.getExpedienteConstanciaConsolidada(args.id, { titulos: args.titulos || null }).then(async function (result) {
+    if (!result.success) return result;
+    var saveResult = await dialog.showSaveDialog({
+      title: 'Guardar constancia general del expediente',
+      defaultPath: 'expediente-' + args.id + '-constancia-consolidada.pdf',
+      filters: [{ name: 'PDF', extensions: ['pdf'] }]
+    });
+    if (saveResult.canceled || !saveResult.filePath) {
+      return { success: false, canceled: true };
+    }
+    try {
+      var pdfBytes = Buffer.from(result.data.base64, 'base64');
+      fs.writeFileSync(saveResult.filePath, pdfBytes);
+      return { success: true, data: { rutaArchivo: saveResult.filePath } };
+    } catch (e) {
+      return _err('WRITE_FAILED', 'No se pudo escribir el archivo: ' + e.message);
+    }
+  });
+}
+
 function _handlerSignRequestLink(args) {
   args = args || {};
   if (!args.id) {
@@ -2244,6 +2278,16 @@ function registerFirmaHandlers(appArg, deps) {
       return _handlerSignRequestConstanciaSaveAs(payload || {});
     } catch (e) {
       console.error('[' + MOD + '][sign-request:constancia-save-as]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  // Constancia GENERAL del expediente (SaveAs): PDF consolidado al vuelo
+  // con todas las solicitudes de firma del trabajador (firmadas y pendientes).
+  handle('firma:expediente:constancia-save-as', function (event, payload) {
+    try {
+      return _handlerExpedienteConstanciaSaveAs(payload || {});
+    } catch (e) {
+      console.error('[' + MOD + '][expediente:constancia-save-as]', e.message);
       return _err('INTERNAL', e.message);
     }
   });

@@ -35,6 +35,7 @@ const publicRouter = require('./routes/public');
 const adminRouter = require('./routes/admin');
 const adminClientesRouter = require('./routes/admin-clientes');
 const internalAuditRouter = require('./routes/internal-audit');
+const constanciaRouter = require('./routes/constancia');
 const { migrate } = require('./db/migrate');
 
 // Ruta a la mini-app estática (HTML+CSS+JS)
@@ -141,6 +142,8 @@ function createApp() {
   app.use('/internal/sign-requests', signRequestLimiter);
   app.use('/internal', signRequestRouter);
   app.use('/internal', internalAuditRouter);
+  // Constancia general del expediente (generada al vuelo; sign_request:read).
+  app.use('/internal', constanciaRouter);
   // Endpoints administrativos: protegidos por X-Admin-API-Key
   // (no expuestos a K+AIR, solo operador humano con acceso físico).
   // Hay 2 routers: el viejo (acuerdo-versiones) y el nuevo (per-company clientes).

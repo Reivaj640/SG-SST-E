@@ -58,6 +58,66 @@ const MARCO_LEGAL_LINEAS = [
   'Ley 1581 de 2012 y Decreto 1377 de 2013 — Protección de datos personales.',
 ];
 
+// ─── Helpers puras compartidas (pdfGen + pdfGenConsolidado) ──────────────
+// Se definen a nivel de módulo para reutilizarlas en el generador de la
+// constancia consolidada del expediente. Son puras: no tocan estado.
+
+// Texto con wrap por ancho real (font.widthOfTextAtSize)
+function wrapText(text, fnt, size, maxWidth) {
+  const words = String(text).split(/\s+/);
+  const lines = [];
+  let cur = '';
+  for (const w of words) {
+    const test = cur ? cur + ' ' + w : w;
+    if (fnt.widthOfTextAtSize(test, size) <= maxWidth) {
+      cur = test;
+    } else {
+      if (cur) lines.push(cur);
+      cur = w;
+    }
+  }
+  if (cur) lines.push(cur);
+  return lines.length ? lines : [''];
+}
+
+// Trunca hash largo: primeros 24 + '…' + últimos 24
+function truncHash(h) {
+  if (!h) return 'N/D';
+  const s = String(h);
+  if (s.length <= 50) return s;
+  return s.slice(0, 24) + '…' + s.slice(-24);
+}
+
+// Trunca User-Agent (largo) a N chars para que entre en una línea.
+function truncUA(ua, maxLen) {
+  if (!ua) return 'N/D';
+  const s = String(ua);
+  const lim = maxLen || 90;
+  if (s.length <= lim) return s;
+  return s.slice(0, lim - 1) + '…';
+}
+
+// Muestra la identificación sin exponer el número completo:
+// conserva el tipo y solo los últimos 4 dígitos del documento.
+function fmtIdentificacionParcial(tipo, referencia) {
+  const digits = String(referencia || '').replace(/\D/g, '');
+  if (digits.length < 4) {
+    return (tipo ? tipo + ' ' : '') + '(número protegido — hash en evidencia)';
+  }
+  return (tipo || 'ID') + ' **' + digits.slice(-4) + ' — número protegido';
+}
+
+// ISO → 'DD/MM/YYYY, HH:mm:ss' (hora local del servidor; la precisión
+// legal la da el ISO crudo en BD, la constancia es la lectura humana).
+function fmtFechaHora(iso) {
+  if (!iso) return 'N/D';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return String(iso);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}, `
+    + `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
 /**
  * Agrega la página de sello visible al final del PDF firmado.
  * Hace la evidencia "legible a ojo humano": un inspector o un juez que abra
@@ -187,68 +247,16 @@ async function generateConstanciaPdf(metadata) {
   const controlRegistro = metadata.control_registro || {};
 
   // ═══ Helpers ═══
+  // Nota: wrapText, truncHash, truncUA, fmtIdentificacionParcial y
+  // fmtFechaHora están a nivel de módulo (puras, compartidas con
+  // pdfGenConsolidado). A continuación solo quedan los helpers de dibujo
+  // acoplados al estado de página (page/y/pdfDoc).
 
   function nuevaPaginaSiBajo(minY) {
     if (y < minY) {
       page = pdfDoc.addPage([PAGE_W, PAGE_H]);
       y = PAGE_H - 64;
     }
-  }
-
-  // Texto con wrap por ancho real (font.widthOfTextAtSize)
-  function wrapText(text, fnt, size, maxWidth) {
-    const words = String(text).split(/\s+/);
-    const lines = [];
-    let cur = '';
-    for (const w of words) {
-      const test = cur ? cur + ' ' + w : w;
-      if (fnt.widthOfTextAtSize(test, size) <= maxWidth) {
-        cur = test;
-      } else {
-        if (cur) lines.push(cur);
-        cur = w;
-      }
-    }
-    if (cur) lines.push(cur);
-    return lines.length ? lines : [''];
-  }
-
-  // Trunca hash largo: primeros 24 + '…' + últimos 24
-  function truncHash(h) {
-    if (!h) return 'N/D';
-    const s = String(h);
-    if (s.length <= 50) return s;
-    return s.slice(0, 24) + '…' + s.slice(-24);
-  }
-
-  // Trunca User-Agent (largo) a N chars para que entre en una línea.
-  function truncUA(ua, maxLen) {
-    if (!ua) return 'N/D';
-    const s = String(ua);
-    const lim = maxLen || 90;
-    if (s.length <= lim) return s;
-    return s.slice(0, lim - 1) + '…';
-  }
-
-  // Muestra la identificación sin exponer el número completo:
-  // conserva el tipo y solo los últimos 4 dígitos del documento.
-  function fmtIdentificacionParcial(tipo, referencia) {
-    const digits = String(referencia || '').replace(/\D/g, '');
-    if (digits.length < 4) {
-      return (tipo ? tipo + ' ' : '') + '(número protegido — hash en evidencia)';
-    }
-    return (tipo || 'ID') + ' **' + digits.slice(-4) + ' — número protegido';
-  }
-
-  // ISO → 'DD/MM/YYYY, HH:mm:ss' (hora local del servidor; la precisión
-  // legal la da el ISO crudo en BD, la constancia es la lectura humana).
-  function fmtFechaHora(iso) {
-    if (!iso) return 'N/D';
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return String(iso);
-    const p = (n) => String(n).padStart(2, '0');
-    return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}, `
-      + `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
   }
 
   // Banda de sección: rect gris + texto bold
@@ -475,4 +483,12 @@ module.exports = {
   generateSignedPdf,
   generateConstanciaPdf,
   getPdfPageCount,
+  // Constantes y helpers puras compartidos con pdfGenConsolidado.
+  EVENTO_LABEL,
+  MARCO_LEGAL_LINEAS,
+  wrapText,
+  truncHash,
+  truncUA,
+  fmtIdentificacionParcial,
+  fmtFechaHora,
 };
