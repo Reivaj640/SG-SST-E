@@ -1,0 +1,3 @@
+# Los scripts de la VM (Linux) DEBEN conservar finales de línea LF.
+# Si git los convierte a CRLF al checkout en Windows, bash se rompe.
+*.sh text eol=lf

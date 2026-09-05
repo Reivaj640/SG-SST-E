@@ -3604,6 +3604,54 @@
         }
     }
 
+    // Helper: muestra resultado con la API key visible (una sola vez).
+    // Renderiza HTML con escape XSS para que el operador pueda copiarla
+    // y pasársela al cliente. Usado después de firmaEmpresaCreate y
+    // firmaEmpresaRecoverAndRotate cuando el handler retorna apiKey.
+    function _showFirmaApiKeyResult(type, baseMsg, apiKey, hashPrefix, idEmpresa, companyName) {
+        var el = document.getElementById('firma-modal-result');
+        if (!el) return;
+        el.style.display = 'block';
+        el.style.background = (type === 'ok') ? '#d1fae5' : '#fee2e2';
+        el.style.color = (type === 'ok') ? '#065f46' : '#991b1b';
+        // Escape HTML entities (defensa XSS aunque apiKey venga del backend)
+        function esc(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+        var safeKey = esc(apiKey);
+        var safeMsg = esc(baseMsg);
+        var safeHash = esc(hashPrefix);
+        var safeIdEmp = esc(idEmpresa);
+        var safeCompany = esc(companyName);
+        // Boton copia al portapapeles con feedback visual de "copiado".
+        // Usamos IIFE inline para no contaminar scope global.
+        var copyFn = "(function(btn,key){navigator.clipboard.writeText(key).then(function(){var o=btn.innerHTML;btn.innerHTML='\\u2713 Copiado';setTimeout(function(){btn.innerHTML=o;},2000);}).catch(function(){btn.innerHTML='No se pudo copiar (Ctrl+A y Ctrl+C manual)';});})";
+        el.innerHTML =
+            '<div style="margin-bottom:0.5rem;"><strong>' + safeMsg + '</strong></div>' +
+            '<div style="background:#fef3c7; border:1px solid #fbbf24; border-radius:6px; padding:0.75rem; margin-bottom:0.75rem;">' +
+                '<div style="font-weight:600; color:#92400e; margin-bottom:0.5rem;">' +
+                    '&#9888;&#65039; API Key de <code>' + safeCompany + '</code> (SOLO SE MUESTRA UNA VEZ)' +
+                '</div>' +
+                '<code id="firma-modal-apikey-shown" style="display:block; background:#fffbeb; padding:0.6rem; border-radius:4px; word-break:break-all; font-size:0.78rem; user-select:all; font-family:monospace;">' +
+                    safeKey +
+                '</code>' +
+                '<button type="button" data-apikey="' + safeKey + '" onclick="' + copyFn + '(this,this.getAttribute(\'data-apikey\'))" ' +
+                    'style="margin-top:0.6rem; padding:0.5rem 1rem; background:#1f2937; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:0.85rem; font-weight:500;">' +
+                    '&#128203; Copiar al portapapeles' +
+                '</button>' +
+                '<div style="margin-top:0.5rem; font-size:0.75rem; color:#78350f;">' +
+                    'Pasale esta key al cliente por canal seguro (1Password / llamada).<br>' +
+                    'El cliente la pega en su K+AIR en Configuraci&oacute;n &rarr; Firma Electr&oacute;nica &rarr; "Pegar API key".' +
+                '</div>' +
+            '</div>' +
+            '<div style="font-size:0.8rem; color:var(--text-muted);">' +
+                'idEmpresa: <code>' + safeIdEmp + '</code> &middot; ' +
+                'Hash (referencia): <code>' + safeHash + '</code>' +
+            '</div>';
+    }
+
     // Helper: muestra/oculta bloques según el modo seleccionado en los radios
     function _setFirmaModalMode(mode) {
         var apikeyBlock = document.getElementById('firma-modal-apikey-block');
@@ -3981,19 +4029,35 @@
                 return;
             }
 
-            // Éxito
-            if (mode === 'recover' && r.data && r.data.newApiKeyHashPrefix) {
+            // Éxito — si el handler retornó apiKey (caso create / recover-and-rotate),
+            // la mostramos UNA vez con botón copiar. Si no, mensaje genérico.
+            if (r.data && r.data.apiKey) {
+                var okMsg = (mode === 'recover')
+                    ? '✓ Vínculo recuperado. Key regenerada.'
+                    : '✓ Configuración creada. Key nueva generada.';
+                _showFirmaApiKeyResult('ok', okMsg, r.data.apiKey, r.data.apiKeyHashPrefix || r.data.newApiKeyHashPrefix, (r.data.idEmpresa || nit), companyName);
+                // NO cerrar el modal automáticamente: el operador tiene que copiar
+                // la key antes. Se cierra con el botón "Cancelar" o la X.
+                if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '✓ Listo (cerrar manualmente)'; }
+            } else if (mode === 'recover' && r.data && r.data.newApiKeyHashPrefix) {
                 _showFirmaModalResult('ok', '✓ Configuración recuperada. Nuevo hash: ' + r.data.newApiKeyHashPrefix);
+                if (typeof showToast === 'function') {
+                    showToast('Firma configurada para ' + companyName, 'success');
+                }
+                // Refrescar cache + tarjeta
+                await _refreshFirmaStateAfterChange(companyName);
+                // Cerrar modal después de 1.2s
+                setTimeout(function () { closeFirmaModal(); }, 1200);
             } else {
                 _showFirmaModalResult('ok', '✓ Configuración guardada. idEmpresa: ' + (r.data.idEmpresa || nit));
+                if (typeof showToast === 'function') {
+                    showToast('Firma configurada para ' + companyName, 'success');
+                }
+                // Refrescar cache + tarjeta
+                await _refreshFirmaStateAfterChange(companyName);
+                // Cerrar modal después de 1.2s
+                setTimeout(function () { closeFirmaModal(); }, 1200);
             }
-            if (typeof showToast === 'function') {
-                showToast('Firma configurada para ' + companyName, 'success');
-            }
-            // Refrescar cache + tarjeta
-            await _refreshFirmaStateAfterChange(companyName);
-            // Cerrar modal después de 1.2s
-            setTimeout(function () { closeFirmaModal(); }, 1200);
         } catch (e) {
             _showFirmaModalResult('error', 'Excepción: ' + (e && e.message || e));
             _firmaModalBusy = false;
@@ -4189,14 +4253,26 @@
                 _restore();
                 return;
             }
-            _showFirmaModalResult('ok', '✓ Vínculo recreado. Nuevo hash: ' + (r.data && r.data.apiKeyHashPrefix || '—'));
-            if (typeof showToast === 'function') {
-                showToast('Firma recreada para ' + companyName, 'success');
+            if (r.data && r.data.apiKey) {
+                // Misma logica que saveFirmaFromModal: mostrar la key para copiar
+                _showFirmaApiKeyResult('ok', '✓ Vínculo recreado. Key nueva generada.', r.data.apiKey, r.data.apiKeyHashPrefix, (r.data.idEmpresa || nit), companyName);
+                if (typeof showToast === 'function') {
+                    showToast('Firma recreada para ' + companyName + ' — key lista para copiar', 'success');
+                }
+                await _refreshFirmaStateAfterChange(companyName);
+                // Re-pintar el modal (estado normal: local + backend sincronizados)
+                prepareFirmaModal(companyName);
+                // NO cerrar automaticamente: operador tiene que copiar
+                _restore();
+            } else {
+                _showFirmaModalResult('ok', '✓ Vínculo recreado. Nuevo hash: ' + (r.data && r.data.apiKeyHashPrefix || '—'));
+                if (typeof showToast === 'function') {
+                    showToast('Firma recreada para ' + companyName, 'success');
+                }
+                await _refreshFirmaStateAfterChange(companyName);
+                prepareFirmaModal(companyName);
+                _restore();
             }
-            await _refreshFirmaStateAfterChange(companyName);
-            // Re-pintar el modal (ahora es estado normal: local + backend sincronizados)
-            prepareFirmaModal(companyName);
-            _restore();
         } catch (e) {
             _showFirmaModalResult('error', 'Excepción: ' + (e && e.message || e));
             _restore();
@@ -4256,6 +4332,22 @@
             var nitBtn = document.querySelector('[data-nit-button="' + companyName.replace(/"/g, '\\"') + '"]');
             if (nitBtn) {
                 _renderNitButtonState(nitBtn, true, r.data.nit);
+            }
+
+            // FIX bug "NIT guardado pero modal de Firma dice 'configura primero el NIT'":
+            // 1) Actualizar currentConfig.companyPaths[companyName].nit en memoria
+            //    (el modal de Firma lee el NIT de acá, no del DOM).
+            // 2) Re-renderizar el botón de Firma con hasNit=true.
+            // Sin esto, el botón de Firma quedaba "NIT pendiente" aunque el NIT ya
+            // estuviera guardado, y al abrir el modal se mostraba el error rojo.
+            if (currentConfig) {
+                if (!currentConfig.companyPaths) currentConfig.companyPaths = {};
+                if (!currentConfig.companyPaths[companyName]) currentConfig.companyPaths[companyName] = {};
+                currentConfig.companyPaths[companyName].nit = r.data.nit;
+            }
+            var firmaBtn = document.querySelector('[data-firma-button="' + companyName.replace(/"/g, '\\"') + '"]');
+            if (firmaBtn) {
+                _renderFirmaButtonState(firmaBtn, true);
             }
 
             // Cerrar modal después de 1.2s (da tiempo a leer el feedback)
