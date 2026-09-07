@@ -155,6 +155,37 @@ Reason: ${reason instanceof Error ? reason.stack : JSON.stringify(reason)}
   }
 }); 
 
+// --- Helper: Retry con exponential backoff para rate limiting (HTTP 429) ---
+// Usado en handlers de Gmail API para evitar quota exceeded.
+function withRetry(fn, options) {
+  options = options || {};
+  var maxRetries = options.maxRetries || 3;
+  var baseDelay = options.baseDelay || 1000;
+  var maxDelay = options.maxDelay || 30000;
+  var attempt = 0;
+
+  return new Promise(function (resolve, reject) {
+    function attemptFn() {
+      fn().then(resolve).catch(function (e) {
+        var isRateLimit = e && e.code === 429;
+        var isQuotaExceeded = e && e.message && e.message.indexOf('Quota exceeded') >= 0;
+        var isRetryable = isRateLimit || isQuotaExceeded || (e && e.code >= 500);
+
+        if (!isRetryable || attempt >= maxRetries) {
+          reject(e);
+          return;
+        }
+
+        attempt++;
+        var delay = Math.min(baseDelay * Math.pow(2, attempt - 1) + Math.random() * 1000, maxDelay);
+        console.warn('[MAIN] Rate limit/quota hit (attempt ' + attempt + '/' + maxRetries + '), reintentando en ' + Math.round(delay) + 'ms:', e.message);
+        setTimeout(attemptFn, delay);
+      });
+    }
+    attemptFn();
+  });
+}
+
 // --- Configuración del Auto-Updater ---
 log.transports.file.level = 'info';
 autoUpdater.logger = log;
@@ -1781,10 +1812,15 @@ ipcMain.handle('google-gmail:archive-thread', async (event, options) => {
     }
     var gmail = googleAuth.getGmailClient(auth);
     var threadId = options.threadId;
-    await gmail.users.threads.modify({
-      userId: 'me',
-      id: threadId,
-      requestBody: { removeLabelIds: ['INBOX'] }
+    // Rate limiter global + retry con exponential backoff
+    await googleGmail.GmailRateLimiter.run(function () {
+      return googleGmail.withRetry(function () {
+        return gmail.users.threads.modify({
+          userId: 'me',
+          id: threadId,
+          requestBody: { removeLabelIds: ['INBOX'] }
+        });
+      }, { maxRetries: 3, baseDelay: 1000 });
     });
     // Actualizar cache: cambiar folder a ARCHIVED (no INBOX ni SENT)
     try {
@@ -1807,10 +1843,15 @@ ipcMain.handle('google-gmail:mark-thread-read', async (event, options) => {
     }
     var gmail = googleAuth.getGmailClient(auth);
     var threadId = options.threadId;
-    await gmail.users.threads.modify({
-      userId: 'me',
-      id: threadId,
-      requestBody: { removeLabelIds: ['UNREAD'] }
+    // Rate limiter global + retry con exponential backoff
+    await googleGmail.GmailRateLimiter.run(function () {
+      return googleGmail.withRetry(function () {
+        return gmail.users.threads.modify({
+          userId: 'me',
+          id: threadId,
+          requestBody: { removeLabelIds: ['UNREAD'] }
+        });
+      }, { maxRetries: 3, baseDelay: 1000 });
     });
     try {
       // 🐛bug-fix — Usar helper que actualiza has_unread del thread Y label_ids de
@@ -1913,13 +1954,16 @@ ipcMain.handle('google-gmail:mark-read', async (event, options) => {
     var gmail = googleAuth.getGmailClient(auth);
     var messageId = options.messageId;
     var markAsRead = options.read !== false;  // default: marcar como leído
-    var modifyRes = await gmail.users.messages.modify({
-      userId: 'me',
-      id: messageId,
-      requestBody: markAsRead
-        ? { removeLabelIds: ['UNREAD'] }
-        : { addLabelIds: ['UNREAD'] }
-    });
+    // Retry con exponential backoff para rate limiting
+    var modifyRes = await withRetry(function () {
+      return gmail.users.messages.modify({
+        userId: 'me',
+        id: messageId,
+        requestBody: markAsRead
+          ? { removeLabelIds: ['UNREAD'] }
+          : { addLabelIds: ['UNREAD'] }
+      });
+    }, { maxRetries: 3, baseDelay: 1000 });
     // Actualizar cache local: has_unread
     try {
       // 🐛bug-fix — El parametro `messageId` que llega es realmente un threadId

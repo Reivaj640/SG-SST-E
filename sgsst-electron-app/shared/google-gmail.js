@@ -30,6 +30,100 @@ const { google } = require('googleapis');
 const googleAuth = require('./google-auth');
 
 /**
+ * 📦 P1-2 fix — Rate Limiter GLOBAL para Gmail API.
+ * Serializa TODAS las llamadas a Gmail API (listInbox, getMessage, sendMessage, etc.)
+ * para no exceder el quota de 250 units/user/min.
+ * Patrón: cola FIFO + token bucket (max 20 req/min = margen seguro).
+ */
+var GmailRateLimiter = (function () {
+  var queue = [];
+  var processing = false;
+  var tokens = 20; // max requests per minute (conservador vs 250 quota)
+  var lastRefill = Date.now();
+  var REFILL_RATE = 20; // tokens por minuto
+  var REFILL_INTERVAL_MS = 60000; // 1 minuto
+
+  function refillTokens() {
+    var now = Date.now();
+    var elapsed = now - lastRefill;
+    if (elapsed >= REFILL_INTERVAL_MS) {
+      tokens = REFILL_RATE;
+      lastRefill = now;
+    }
+  }
+
+  function takeToken() {
+    refillTokens();
+    if (tokens > 0) {
+      tokens--;
+      return true;
+    }
+    return false;
+  }
+
+  function waitForToken() {
+    return new Promise(function (resolve) {
+      function check() {
+        if (takeToken()) {
+          resolve();
+        } else {
+          // Esperar hasta el siguiente refill (máx 60s, pero usualmente menos)
+          var waitMs = Math.max(100, REFILL_INTERVAL_MS - (Date.now() - lastRefill));
+          setTimeout(check, waitMs);
+        }
+      }
+      check();
+    });
+  }
+
+  return {
+    /**
+     * Ejecuta fn() respetando el rate limit global.
+     * @param {Function} fn - async function
+     * @returns {Promise<any>}
+     */
+    run: async function (fn) {
+      await waitForToken();
+      return fn();
+    }
+  };
+})();
+
+/**
+ * Retry con exponential backoff para rate limiting (HTTP 429).
+ * Gmail API quota: 250 units/user/sec. Batch requests pueden excederlo.
+ * @param {Function} fn - función async a ejecutar
+ * @param {Object} options - { maxRetries: 3, baseDelay: 1000, maxDelay: 30000 }
+ * @returns {Promise<any>}
+ */
+async function withRetry(fn, options) {
+  options = options || {};
+  var maxRetries = options.maxRetries || 3;
+  var baseDelay = options.baseDelay || 1000; // 1s
+  var maxDelay = options.maxDelay || 30000; // 30s
+  var attempt = 0;
+
+  while (true) {
+    try {
+      return await fn();
+    } catch (e) {
+      var isRateLimit = e && e.code === 429;
+      var isQuotaExceeded = e && e.message && e.message.indexOf('Quota exceeded') >= 0;
+      var isRetryable = isRateLimit || isQuotaExceeded || (e && e.code >= 500);
+
+      if (!isRetryable || attempt >= maxRetries) {
+        throw e;
+      }
+
+      attempt++;
+      var delay = Math.min(baseDelay * Math.pow(2, attempt - 1) + Math.random() * 1000, maxDelay);
+      console.warn('[GoogleGmail] Rate limit/quota hit (attempt ' + attempt + '/' + maxRetries + '), reintentando en ' + Math.round(delay) + 'ms:', e.message);
+      await new Promise(function (resolve) { setTimeout(resolve, delay); });
+    }
+  }
+}
+
+/**
  * Lista los últimos N mensajes de la bandeja de entrada.
  * Por defecto solo del inbox principal (label INBOX), excluyendo spam/trash.
  *
@@ -54,20 +148,35 @@ async function listInbox(options) {
 
   try {
     // 1) Listar IDs de mensajes
-    // F1.B-fix — Soporte para folder SENT (correos enviados).
-    // Antes solo filtraba por `in:inbox`. Ahora si options.folder === 'SENT' usa `in:sent`.
-    var query;
+    // F1.B-fix — Soporte para folder SENT, DRAFT, TRASH, SPAM, STARRED, IMPORTANT, ARCHIVE
+    // Default seguro: INBOX
+    var query = ['in:inbox'].concat(extraQuery).join(' ');
     if (options.folder === 'SENT') {
       query = ['in:sent'].concat(extraQuery).join(' ');
-    } else if (options.folder === 'DRAFTS') {
+    } else if (options.folder === 'DRAFT') {
       query = ['in:drafts'].concat(extraQuery).join(' ');
-    } else {
-      query = ['in:inbox'].concat(extraQuery).join(' ');
+    } else if (options.folder === 'TRASH') {
+      query = ['in:trash'].concat(extraQuery).join(' ');
+    } else if (options.folder === 'SPAM') {
+      query = ['in:spam'].concat(extraQuery).join(' ');
+    } else if (options.folder === 'STARRED') {
+      query = ['is:starred'].concat(extraQuery).join(' ');
+    } else if (options.folder === 'IMPORTANT') {
+      query = ['is:important'].concat(extraQuery).join(' ');
+    } else if (options.folder === 'ARCHIVE') {
+      query = ['-in:inbox -in:sent -in:draft -in:trash -in:spam'].concat(extraQuery).join(' ');
     }
-    var listRes = await gmail.users.messages.list({
-      userId: 'me',
-      q: query,
-      maxResults: maxResults
+    // query YA tiene valor por defecto (INBOX), no necesita else final
+
+    // Listar con rate limiter global
+    var listRes = await GmailRateLimiter.run(function () {
+      return withRetry(function () {
+        return gmail.users.messages.list({
+          userId: 'me',
+          q: query,
+          maxResults: maxResults
+        });
+      }, { maxRetries: 3, baseDelay: 1000 });
     });
 
     var messages = listRes.data.messages || [];
@@ -75,25 +184,46 @@ async function listInbox(options) {
       return { success: true, data: [] };
     }
 
-    // 2) Obtener detalles de cada mensaje en paralelo
+    // 2) Obtener detalles de cada mensaje CON RETRY, RATE LIMITER GLOBAL y batching.
     // F4 — Usar format:'full' en vez de 'metadata' para traer el body del correo.
     // El body es necesario para que la Bandeja Integrada muestre el contenido
     // real del correo (no solo headers + snippet).
-    var detailPromises = messages.map(function (m) {
-      return gmail.users.messages.get({
-        userId: 'me',
-        id: m.id,
-        format: 'full'
-      }).catch(function (e) {
-        console.warn('[GoogleGmail] Error en message.get ' + m.id + ':', e.message);
-        return null;
+    // 📦 P1-2 fix: Procesar en lotes pequeños (3 a la vez) con delay entre lotes
+    // para no exceder el límite de 250 units/user/min de Gmail API.
+    var BATCH_SIZE = 3;
+    var BATCH_DELAY_MS = 500; // 500ms entre lotes = ~360 req/min máx (con rate limiter global)
+    var allDetails = [];
+
+    for (var batchStart = 0; batchStart < messages.length; batchStart += BATCH_SIZE) {
+      var batch = messages.slice(batchStart, batchStart + BATCH_SIZE);
+      var batchPromises = batch.map(function (m) {
+        return GmailRateLimiter.run(function () {
+          return withRetry(function () {
+            return gmail.users.messages.get({
+              userId: 'me',
+              id: m.id,
+              format: 'full'
+            });
+          }, { maxRetries: 3, baseDelay: 1000 });
+        }).then(function (res) {
+          return res.data;
+        }).catch(function (e) {
+          console.warn('[GoogleGmail] Error en message.get ' + m.id + ' (tras retries):', e.message);
+          return null;
+        });
       });
-    });
-    var details = await Promise.all(detailPromises);
+      var batchDetails = await Promise.all(batchPromises);
+      allDetails = allDetails.concat(batchDetails);
+
+      // Delay entre lotes para respetar quota (excepto en el último)
+      if (batchStart + BATCH_SIZE < messages.length) {
+        await new Promise(function (resolve) { setTimeout(resolve, BATCH_DELAY_MS); });
+      }
+    }
 
     // 3) Normalizar al formato Bandeja Integrada
-    var normalized = details.filter(function (d) { return d !== null; }).map(function (d) {
-      return normalizeMessage(d.data);
+    var normalized = allDetails.filter(function (d) { return d !== null; }).map(function (d) {
+      return normalizeMessage(d);
     });
 
     return { success: true, data: normalized };
@@ -117,10 +247,14 @@ async function getMessage(messageId, options) {
 
   var gmail = google.gmail({ version: 'v1', auth: auth });
   try {
-    var res = await gmail.users.messages.get({
-      userId: 'me',
-      id: messageId,
-      format: 'full'
+    var res = await GmailRateLimiter.run(function () {
+      return withRetry(function () {
+        return gmail.users.messages.get({
+          userId: 'me',
+          id: messageId,
+          format: 'full'
+        });
+      }, { maxRetries: 3, baseDelay: 1000 });
     });
     return { success: true, data: normalizeMessage(res.data, true) };
   } catch (e) {
@@ -315,7 +449,11 @@ async function getProfile(configPath) {
       return { success: false, error: 'No hay cliente OAuth autorizado. Conectá Gmail primero.' };
     }
     var gmail = google.gmail({ version: 'v1', auth: auth });
-    var profile = await gmail.users.getProfile({ userId: 'me' });
+    var profile = await GmailRateLimiter.run(function () {
+      return withRetry(function () {
+        return gmail.users.getProfile({ userId: 'me' });
+      }, { maxRetries: 3, baseDelay: 1000 });
+    });
     return {
       success: true,
       data: {
@@ -346,7 +484,11 @@ async function listLabels(configPath) {
       return { success: false, error: 'No hay cliente OAuth autorizado. Conectá Gmail primero.' };
     }
     var gmail = google.gmail({ version: 'v1', auth: auth });
-    var res = await gmail.users.labels.list({ userId: 'me' });
+    var res = await GmailRateLimiter.run(function () {
+      return withRetry(function () {
+        return gmail.users.labels.list({ userId: 'me' });
+      }, { maxRetries: 3, baseDelay: 1000 });
+    });
     var labels = (res.data.labels || []).map(function (l) {
       return {
         id: l.id,
@@ -382,10 +524,14 @@ async function downloadAttachment(messageId, attachmentId, configPath) {
       return { success: false, error: 'No autorizado' };
     }
     var gmail = google.gmail({ version: 'v1', auth: auth });
-    var res = await gmail.users.messages.attachments.get({
-      userId: 'me',
-      messageId: messageId,
-      id: attachmentId
+    var res = await GmailRateLimiter.run(function () {
+      return withRetry(function () {
+        return gmail.users.messages.attachments.get({
+          userId: 'me',
+          messageId: messageId,
+          id: attachmentId
+        });
+      }, { maxRetries: 3, baseDelay: 1000 });
     });
     return {
       success: true,
@@ -643,13 +789,17 @@ async function sendMessage(options) {
     }
     var encoded = encodeBase64Url(raw);
 
-    // 2) Enviar via Gmail API
-    var res = await gmail.users.messages.send({
-      userId: 'me',
-      requestBody: {
-        raw: encoded,
-        threadId: options.threadId || undefined  // Mantiene la conversación agrupada si es reply
-      }
+    // 2) Enviar via Gmail API con rate limiter global + retry
+    var res = await GmailRateLimiter.run(function () {
+      return withRetry(function () {
+        return gmail.users.messages.send({
+          userId: 'me',
+          requestBody: {
+            raw: encoded,
+            threadId: options.threadId || undefined  // Mantiene la conversación agrupada si es reply
+          }
+        });
+      }, { maxRetries: 3, baseDelay: 1000 });
     });
 
     return {
@@ -703,5 +853,8 @@ module.exports = {
   // F1-Feature1
   listLabels: listLabels,
   // F1-Feature5
-  downloadAttachment: downloadAttachment
+  downloadAttachment: downloadAttachment,
+  // Rate limiter global (para uso en main.js handlers)
+  GmailRateLimiter: GmailRateLimiter,
+  withRetry: withRetry
 };

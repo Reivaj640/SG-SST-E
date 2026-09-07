@@ -1124,6 +1124,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function hideBandejaIntegrada() {
     if (bandejaIntegradaFrame) {
+      // 📦 P1-5 fix — Llamar destroy() en el iframe ANTES de ocultarlo
+      // para limpiar listeners, intervals, timeouts y evitar memory leaks/double-fire
+      try {
+        if (bandejaIntegradaFrame.contentWindow && bandejaIntegradaFrame.contentWindow.BandejaIntegrada && typeof bandejaIntegradaFrame.contentWindow.BandejaIntegrada.destroy === 'function') {
+          bandejaIntegradaFrame.contentWindow.BandejaIntegrada.destroy();
+        }
+      } catch (e) {
+        logMessage('Error llamando destroy() en iframe: ' + e.message, 'WARN');
+      }
       bandejaIntegradaFrame.style.display = 'none';
       logMessage('Bandeja Integrada cerrada (iframe oculto).', 'INFO');
     }
@@ -1135,17 +1144,30 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.addEventListener('message', (event) => {
     if (!event.data || typeof event.data !== 'object') return;
     if (event.data.type === 'bandeja-integrada-back') {
+      event.stopImmediatePropagation();
       hideBandejaIntegrada();
     }
     // F4-fix — El iframe pide abrir Configuración (cuando el user hace click en
     // el indicador Gmail del header, para ir al switch de conectar/desconectar).
     else if (event.data.type === 'bandeja-integrada-open-config') {
+      event.stopImmediatePropagation();
       hideBandejaIntegrada();
       // Abrir Configuración. Si el section es "empresas", navegar a esa tab
       if (event.data.section && typeof showSettingsPage === 'function') {
         showSettingsPage(event.data.section);
       } else if (typeof showSettingsPage === 'function') {
         showSettingsPage();
+      }
+    }
+    // 📦 P1-5 fix — Confirmación visual de destroy ejecutado
+    else if (event.data.type === 'bandeja-integrada-destroyed') {
+      event.stopImmediatePropagation();
+      if (typeof updateNotifier !== 'undefined' && updateNotifier.show) {
+        updateNotifier.show({
+          type: 'info',
+          title: 'Bandeja Integrada',
+          subtitle: 'Destroy ejecutado - cleanup OK'
+        });
       }
     }
   });
@@ -1865,7 +1887,10 @@ case 'investigacion-accidentes-read-directory-request':
                     type === 'kair-rr-bridge-call' ||
                     type === 'kair-rr-bridge-result' ||
                     type === 'kair-rr-iframe-ready' ||
-                    type === 'kair-rr-parent-ack'
+                    type === 'kair-rr-parent-ack' ||
+                    // 📦 P1-5 fix — Bandeja Integrada: mensajes de destroy y back
+                    type === 'bandeja-integrada-back' ||
+                    type === 'bandeja-integrada-destroyed'
                   ) {
                     // El componente InvestigacionAccidentesComponent maneja este mensaje
                     // directamente. Ver: modules/gestion-salud/investigacion-accidentes/investigacion-accidentes-logic.js

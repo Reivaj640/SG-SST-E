@@ -1312,7 +1312,7 @@
     }
     try {
       // 1. Leer del cache SQLite (instantáneo, sin API call)
-      var cacheResult = await api.emailCache.getThreads({ folder: folder, maxResults: 50 });
+      var cacheResult = await api.emailCache.getThreads({ folder: folder, maxResults: 25 }); // 📦 P1-2 fix: reducir de 50 a 25
       if (cacheResult && cacheResult.success && Array.isArray(cacheResult.data) && cacheResult.data.length > 0) {
         console.log("[BandejaIntegrada] Cache SQLite retorno " + cacheResult.data.length + " threads (folder=" + folder + ")");
         // F1.B-fix — SIEMPRE actualizar state.mails con el cache del folder actual.
@@ -1347,10 +1347,10 @@
       }
       // 4. Cache vacío → primer sync (esperamos el resultado)
       console.log("[BandejaIntegrada] Cache vacío, sincronizando con Gmail por primera vez (folder=" + folder + ")...");
-      var syncResult = await api.emailCache.syncInbox({ folder: folder, maxResults: 50 });
+      var syncResult = await api.emailCache.syncInbox({ folder: folder, maxResults: 25 }); // 📦 P1-2 fix: reducir de 50 a 25
       if (syncResult && syncResult.success && syncResult.data) {
         console.log("[BandejaIntegrada] Primer sync: " + syncResult.data.synced + " threads guardados en SQLite");
-        var afterResult = await api.emailCache.getThreads({ folder: folder, maxResults: 50 });
+        var afterResult = await api.emailCache.getThreads({ folder: folder, maxResults: 25 }); // 📦 P1-2 fix: reducir de 50 a 25
         if (afterResult && afterResult.success && Array.isArray(afterResult.data)) {
           return afterResult.data.map(threadToMail);
         }
@@ -1376,12 +1376,12 @@
     var api = getElectronAPI();
     if (!api || !api.emailCache) return;
     var currentFolder = state.mailFolder || 'INBOX';
-    api.emailCache.syncInbox({ folder: currentFolder, maxResults: 50 }).then(function (r) {
+    api.emailCache.syncInbox({ folder: currentFolder, maxResults: 25 }).then(function (r) { // 📦 P1-2 fix: reducir de 50 a 25
       if (r && r.success) {
         console.log("[BandejaIntegrada] Background sync OK: " + r.data.synced + " threads (folder=" + currentFolder + ")");
         // F4-fix — Re-leer el cache (ahora con datos completos: subject, sender, etc.)
         // y re-renderizar. Sin esto, el user ve los datos vacíos del cache anterior.
-        return api.emailCache.getThreads({ folder: currentFolder, maxResults: 50 });
+        return api.emailCache.getThreads({ folder: currentFolder, maxResults: 25 }); // 📦 P1-2 fix: reducir de 50 a 25
       } else {
         console.warn("[BandejaIntegrada] Background sync failed:", r && r.error);
         // 📦614-fix — Notificar al user con un toast claro + acción sugerida.
@@ -1777,7 +1777,7 @@
       setTimeout(function () {
         var api = getElectronAPI();
         if (api && api.emailCache && api.emailCache.syncInbox) {
-          api.emailCache.syncInbox({ folder: "SENT", maxResults: 50 }).then(function (r) {
+          api.emailCache.syncInbox({ folder: "SENT", maxResults: 25 }).then(function (r) { // 📦 P1-2 fix: reducir de 50 a 25
             if (r && r.success) {
               console.log("[BandejaIntegrada] SENT pre-cargado en background: " + r.data.synced + " threads");
             }
@@ -3898,6 +3898,13 @@
       { id: "meeting", label: "Reuniones", icon: D.ICONS.calendarPlus },
       // F1.B-fix — Filtro "Enviados" — cambia el folder Gmail a SENT y re-sincroniza.
       { id: "sent", label: "Enviados", icon: D.ICONS.send, isFolder: true, folder: "SENT" },
+      // 📦 Fix: Carpetas Gmail faltantes (Drafts, Trash, Spam, Starred, Important, Archive)
+      { id: "drafts", label: "Borradores", icon: D.ICONS.folder, isFolder: true, folder: "DRAFT" },
+      { id: "trash", label: "Papelera", icon: D.ICONS.trash, isFolder: true, folder: "TRASH" },
+      { id: "spam", label: "Spam", icon: D.ICONS.alertTriangle, isFolder: true, folder: "SPAM" },
+      { id: "starred", label: "Destacados", icon: D.ICONS.star, isFolder: true, folder: "STARRED" },
+      { id: "important", label: "Importantes", icon: D.ICONS.alertTriangle, isFolder: true, folder: "IMPORTANT" },
+      { id: "archive", label: "Archivados", icon: D.ICONS.archive, isFolder: true, folder: "ARCHIVE" },
     ];
     filterDefs.forEach((f) => {
       const isActive = state.mailFilter === f.id;
@@ -4594,7 +4601,17 @@
     }
     // FIX 2026-07-18 — Label del folder (Recibidos/Enviados) como chip al lado del subject (estilo Gmail)
     // FIX 2026-07-19 (loop 18) — Restaurar el chip (Gmail SÍ lo tiene visible)
-    var folderLabel = (state.mailFolder === 'SENT') ? 'Enviados' : (state.mailFolder === 'DRAFT') ? 'Borradores' : 'Recibidos';
+    var folderLabelMap = {
+      'INBOX': 'Recibidos',
+      'SENT': 'Enviados',
+      'DRAFT': 'Borradores',
+      'TRASH': 'Papelera',
+      'SPAM': 'Spam',
+      'STARRED': 'Destacados',
+      'IMPORTANT': 'Importantes',
+      'ARCHIVE': 'Archivados'
+    };
+    var folderLabel = folderLabelMap[state.mailFolder] || 'Recibidos';
     var folderChipHtml = '<span class="kair-mail-detail__folder-label" title="Click para quitar el filtro de carpeta">' +
       folderLabel +
       '<button class="kair-mail-detail__folder-remove" type="button" aria-label="Quitar filtro" title="Quitar">' +
@@ -6130,8 +6147,20 @@
       var inReplyTo = '';
       var references = '';
       if (opts.isReply && opts.replyToMail) {
-        // Gmail no siempre expone el Message-ID, pero podemos usar el threadId
-        // para mantener la conversación agrupada
+        // Para threading correcto en Gmail: usar el Message-ID del último mensaje del thread
+        // y construir References concatenando el References original + el Message-ID
+        var lastMsg = null;
+        if (opts.replyToMail.messages && opts.replyToMail.messages.length > 0) {
+          lastMsg = opts.replyToMail.messages[opts.replyToMail.messages.length - 1];
+        } else if (opts.replyToMail.thread && opts.replyToMail.thread.messages && opts.replyToMail.thread.messages.length > 0) {
+          lastMsg = opts.replyToMail.thread.messages[opts.replyToMail.thread.messages.length - 1];
+        }
+        if (lastMsg && lastMsg.id) {
+          inReplyTo = lastMsg.id;
+          // References = References originales + Message-ID del mensaje al que respondemos
+          var refs = (lastMsg.references_header || '').trim();
+          references = refs ? refs + ' ' + lastMsg.id : lastMsg.id;
+        }
       }
 
       // F1-Feature4 — Agregar la firma al body si existe
@@ -6191,8 +6220,8 @@
         opts.closeModal();
         // Refrescar el cache para mostrar el nuevo mensaje
         if (api.emailCache && api.emailCache.syncInbox) {
-          api.emailCache.syncInbox({ folder: 'INBOX', maxResults: 50 }).then(function () {
-            return api.emailCache.getThreads({ folder: 'INBOX', maxResults: 50 });
+          api.emailCache.syncInbox({ folder: 'INBOX', maxResults: 25 }).then(function () { // 📦 P1-2 fix: reducir de 50 a 25
+            return api.emailCache.getThreads({ folder: 'INBOX', maxResults: 25 }); // 📦 P1-2 fix: reducir de 50 a 25
           }).then(function (cacheResult) {
             if (cacheResult && cacheResult.success && Array.isArray(cacheResult.data)) {
               // 🐛bug-fix — Preservar cambios locales (unread/flagged) en el refresh post-envio.
@@ -7345,4 +7374,74 @@
 
     console.log('[FV][Bandeja] Demo de file-viewer wireado. Buscá "Probar FV" en el header.');
   }
+
+  // 📦 P1-5 fix — Cleanup al cerrar el iframe (evita memory leaks + double-fire)
+  function destroy() {
+    // 1. Detener auto-refresh
+    stopAutoRefresh();
+
+    // 2. Remover listener de visibilitychange
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+
+    // 3. Limpiar timeouts/intervals pendientes
+    if (state._resizeTimeout) {
+      clearTimeout(state._resizeTimeout);
+      state._resizeTimeout = null;
+    }
+
+    // 4. Limpiar event listeners del file-viewer demo (si están wireados)
+    var fvOverlay = document.getElementById('fv-overlay');
+    if (fvOverlay) {
+      document.removeEventListener('keydown', handleFvKeydown);
+    }
+
+    // 5. Limpiar referencias de estado
+    state.mails = [];
+    state.events = [];
+    state.labels = [];
+    state.checkedIds.clear();
+
+    console.log('[BandejaIntegrada] Destroy completado - cleanup de listeners/intervals');
+
+    // 📦 P1-5 fix — Notificar al parent (renderer principal) para toast allí
+    try {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: 'bandeja-integrada-destroyed' }, '*');
+      }
+    } catch (_) {}
+  }
+
+  // Helper para remover el visibilitychange listener (necesita referencia a la función)
+  function handleVisibilityChange() {
+    if (document.visibilityState === 'visible') {
+      startAutoRefresh();
+    } else {
+      stopAutoRefresh();
+    }
+  }
+
+  // Helper para remover el keydown del file-viewer
+  function handleFvKeydown(e) {
+    var overlay = document.getElementById('fv-overlay');
+    if (e.key === 'Escape' && overlay && !overlay.hasAttribute('hidden')) {
+      closeFileViewer();
+    }
+  }
+
+  // Reemplazar el listener original de visibilitychange por uno referenciable
+  document.removeEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') {
+      startAutoRefresh();
+    } else {
+      stopAutoRefresh();
+    }
+  });
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+
+  // Exponer API pública en window para que renderer.js pueda llamar destroy()
+  window.BandejaIntegrada = {
+    destroy: destroy,
+    init: init,
+    render: render
+  };
 })();

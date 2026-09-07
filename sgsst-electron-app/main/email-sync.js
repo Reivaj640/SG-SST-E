@@ -201,7 +201,7 @@ async function syncInbox(options) {
     catch (e) { return null; }
   })();
   var folder = options.folder || 'INBOX';
-  var maxResults = options.maxResults || 50;
+  var maxResults = options.maxResults || 25; // 📦 P1-2 fix: reducir de 50 a 25 para quota
 
   if (!configPath) {
     return { success: false, error: 'configPath es requerido (no se pudo derivar del app.getPath)' };

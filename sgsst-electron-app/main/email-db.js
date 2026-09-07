@@ -294,6 +294,19 @@ function saveMessage(msg) {
       updated_at = excluded.updated_at
   `);
   const now = Date.now();
+
+  // Loop2-fix — Marcar el thread como NO LEÍDO si el mensaje NO es del user.
+  // Si el user recibió un correo nuevo (o le respondieron), el thread debe
+  // marcarse como no leído para que aparezca con el dot azul.
+  // Si el mensaje es del user (is_sent=true), NO marcar como no leído.
+  if (msg.thread_id && !msg.is_sent) {
+    try {
+      db().prepare('UPDATE email_threads SET has_unread = 1 WHERE id = ?').run(msg.thread_id);
+    } catch (e) {
+      // No crítico, solo es un flag
+    }
+  }
+
   return stmt.run({
     id: msg.id,
     thread_id: msg.thread_id,
@@ -321,18 +334,6 @@ function saveMessage(msg) {
     created_at: msg.created_at || now,
     updated_at: now
   });
-
-  // Loop2-fix — Marcar el thread como NO LEÍDO si el mensaje NO es del user.
-  // Si el user recibió un correo nuevo (o le respondieron), el thread debe
-  // marcarse como no leído para que aparezca con el dot azul.
-  // Si el mensaje es del user (is_sent=true), NO marcar como no leído.
-  if (msg.thread_id && !msg.is_sent) {
-    try {
-      db().prepare('UPDATE email_threads SET has_unread = 1 WHERE id = ?').run(msg.thread_id);
-    } catch (e) {
-      // No crítico, solo es un flag
-    }
-  }
 }
 
 /**
