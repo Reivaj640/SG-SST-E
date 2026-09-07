@@ -203,7 +203,24 @@
   <!-- 📦695 — Festivos colombianos (Ley Emiliani + Pascua). Se carga antes
        de app.js para que `window.ColombiaFestivos` esté disponible al init. -->
   <script src="../../shared/colombia-festivos.js"></script>
-  <script src="app.js?v=682"></script>
+  <!-- 📦625 — Iconos de tipos de archivo embebidos (Material Design via mallowigi/iconGenerator, MIT).
+       Expone window.KAIR_FILE_TYPE_ICONS con los SVGs como strings para usar con innerHTML.
+       Es la solución 100% confiable para evitar problemas de rutas/seguridad con <img src> en iframes de Electron. -->
+  <script src="icons.js"></script>
+  <!-- Modular Bandeja Integrada — Carga en orden de dependencias -->
+  <script src="state.js"></script>
+  <script src="helpers.js"></script>
+  <script src="render-header.js"></script>
+  <script src="render-mail-list.js"></script>
+  <script src="render-mail-detail.js"></script>
+  <script src="render-calendar.js"></script>
+  <script src="render-sidebar.js"></script>
+  <script src="mail-operations.js"></script>
+  <script src="calendar-operations.js"></script>
+  <script src="compose-modal.js"></script>
+  <script src="event-modal.js"></script>
+  <script src="handlers.js"></script>
+  <script src="init.js"></script>
   <!-- 📦608 — @file-viewer (preview nativo de Office/PDF/etc en el browser).
        Bundle IIFE "web-full" auto-registra el custom element <flyfish-file-viewer>
        CON todos los renderers adentro. La versión "web" sin -full no incluye
