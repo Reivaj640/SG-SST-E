@@ -38,6 +38,7 @@
     allCompanies: true,
     searchQuery: "",
     checkedIds: new Set(),
+    activeLabelIds: new Set(),   // 📦 P2-5 — Labels de usuario activos como filtro adicional
     selectedDate: null,
     userEmail: null,           // 📦600 — email del usuario autenticado (para RSVP)
     activeCategories: new Set(),
@@ -2701,18 +2702,49 @@
   }
 
   function refresh() {
+    var api = getElectronAPI();
+    if (!api || !api.emailCache) {
+      toast("Error", "Sin conexión a electronAPI", "error");
+      return;
+    }
     state.refreshing = true;
     state.mailLoading = true;
-    $("#refresh-icon").classList.add("kair-spin");
+    if ($("#refresh-icon")) $("#refresh-icon").classList.add("kair-spin");
     render();
-    setTimeout(() => {
-      state.refreshing = false;
-      state.mailLoading = false;
-      $("#refresh-icon").classList.remove("kair-spin");
-      const unread = state.mails.filter((m) => m.unread).length;
-      toast("Bandeja sincronizada", `${state.mails.length} mensajes · ${unread} no leídos`, "success");
-      render();
-    }, 1200);
+    // Sync con IPC real + spinner
+    api.emailCache.syncInbox({ folder: state.mailFolder || 'INBOX', maxResults: 25 })
+      .then(function (r) {
+        if (r && r.success) return api.emailCache.getThreads({ folder: state.mailFolder || 'INBOX', maxResults: 25 });
+        throw new Error((r && r.error) || 'sync falló');
+      })
+      .then(function (cacheResult) {
+        if (cacheResult && cacheResult.success && Array.isArray(cacheResult.data)) {
+          // Merge con cambios locales preservados (unread/flagged)
+          var oldById = {};
+          state.mails.forEach(function (m) { oldById[m.id] = m; });
+          state.mails = cacheResult.data.map(function (thread) {
+            var newMail = threadToMail(thread);
+            var old = oldById[newMail.id];
+            if (old) {
+              if (old.unread === false && newMail.unread === true) newMail.unread = false;
+              if (old.flagged === true && newMail.flagged === false) newMail.flagged = true;
+            }
+            return newMail;
+          });
+        }
+      })
+      .catch(function (e) {
+        console.warn('[BandejaIntegrada] Refresh error:', e.message);
+        toast("Error al sincronizar", e.message, "error");
+      })
+      .finally(function () {
+        state.refreshing = false;
+        state.mailLoading = false;
+        if ($("#refresh-icon")) $("#refresh-icon").classList.remove("kair-spin");
+        render();
+        const unread = state.mails.filter((m) => m.unread).length;
+        toast("Bandeja sincronizada", `${state.mails.length} mensajes · ${unread} no leídos`, "success");
+      });
   }
 
   // ====== Render principal ======
@@ -3606,6 +3638,14 @@
              toList.includes(q) ||
              m.subject.toLowerCase().includes(q) ||
              m.preview.toLowerCase().includes(q);
+    }).filter((m) => {
+      // 📦 P2-5 — Filtro por labels de usuario (si hay alguna seleccionada)
+      if (!state.activeLabelIds || state.activeLabelIds.size === 0) return true;
+      var mailLabelIds = m.label_ids || [];
+      // Un mail pasa el filtro si tiene AL MENOS UNO de los labels activos
+      return Array.from(state.activeLabelIds).some(function (lid) {
+        return mailLabelIds.indexOf(lid) >= 0;
+      });
     });
 
     // AUDITORIA 2026-07-18 — Sort por fecha según preferencia del user
@@ -3934,7 +3974,42 @@
       });
       filters.appendChild(btn);
     });
-    container.appendChild(filters);
+        container.appendChild(filters);
+
+    // 📦 P2-5 — Labels de usuario como filtros clickeables
+    var userLabelsSection = el("div", { class: "kair-labels-section", style: { padding: "8px 14px", borderTop: "1px solid var(--kair-border-soft, #e9ecef)" } });
+    var userLabels = state.labels.filter(function (l) { return l.type === 'user'; });
+    if (userLabels.length > 0) {
+      var lblTitle = el("div", { html: "<span style='font-size:0.75rem;font-weight:600;color:var(--kair-text-light);text-transform:uppercase;letter-spacing:0.5px;'>Etiquetas</span>" });
+      userLabelsSection.appendChild(lblTitle);
+      userLabels.forEach(function (lbl) {
+        var isActive = state.activeLabelIds && state.activeLabelIds.has(lbl.id);
+        var btn = el("button", {
+          class: "kair-label-chip-btn",
+          style: {
+            display: "flex", alignItems: "center", gap: "6px", width: "100%",
+            padding: "4px 8px", borderRadius: "4px", border: "none", background: "transparent",
+            fontSize: "0.8125rem", cursor: "pointer", textAlign: "left",
+            color: isActive ? lbl.color_text : "var(--kair-text-muted)"
+          }
+        });
+        btn.innerHTML = '<span class="kair-label-dot" style="width:8px;height:8px;border-radius:50%;background:' + lbl.color_background + ';flex-shrink:0;"></span>' +
+          '<span class="kair-label-name" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + lbl.name + '</span>' +
+          (lbl.unread_count > 0 ? '<span class="kair-label-badge" style="font-size:0.6875rem;background:var(--kair-bg-hover);padding:1px 5px;border-radius:9px;">' + lbl.unread_count + '</span>' : '');
+        btn.addEventListener("click", function () {
+          if (state.activeLabelIds && state.activeLabelIds.has(lbl.id)) {
+            state.activeLabelIds.delete(lbl.id);
+          } else {
+            if (!state.activeLabelIds) state.activeLabelIds = new Set();
+            state.activeLabelIds.add(lbl.id);
+          }
+          state._resetMailListScroll = true;
+          render();
+        });
+        userLabelsSection.appendChild(btn);
+      });
+    }
+    container.appendChild(userLabelsSection);
 
     // Lista
     const list = el("div", { class: "kair-scroll overflow-y-auto overflow-x-hidden flex-1 min-h-0", style: { flex: "1", overflowY: "auto", overflowX: "hidden", minHeight: "0" } });
