@@ -139,24 +139,72 @@ function saveThread(thread) {
 /**
  * Lee los threads del cache local, ordenados por last_message_date DESC.
  * Filtros opcionales: folder (default 'INBOX'), maxResults, searchQuery.
+ * 📦 P2-4 fix: Soporte de operadores de búsqueda estilo Gmail.
+ *   Operadores soportados:
+ *   - from:email   — remitente
+ *   - to:email     — destinatario (en SENT)
+ *   - subject:texto — asunto
+ *   - has:attachment — con adjuntos
+ *   - is:unread    — no leídos
+ *   - is:starred   — marcados
+ *   - is:important — importantes
+ *   - before:YYYY-MM-DD — antes de fecha
+ *   - after:YYYY-MM-DD  — después de fecha
+ *   - texto libre  — busca en subject, snippet, sender
  */
 function getThreadsFromCache(options) {
   options = options || {};
   const folder = options.folder || 'INBOX';
   const maxResults = options.maxResults || 50;
   const onlyUnread = options.onlyUnread || false;
-  const searchQuery = (options.searchQuery || '').toLowerCase().trim();
+  const rawSearchQuery = options.searchQuery || '';
 
-  // Filtro de búsqueda básico: subject, snippet, last_sender_email, last_sender_name
-  // Para Fase 4 (búsqueda con operadores) lo extendemos.
+  // 📦 P2-4 fix: Parsear operadores de búsqueda
+  const searchTokens = parseSearchQuery(rawSearchQuery);
+
+  // Construir WHERE clause
   let where = 'folder = @folder';
   const params = { folder: folder, maxResults: maxResults };
   if (onlyUnread) {
     where += ' AND has_unread = 1';
   }
-  if (searchQuery) {
+  if (searchTokens.text) {
     where += ' AND (LOWER(subject) LIKE @sq OR LOWER(snippet) LIKE @sq OR LOWER(last_sender_email) LIKE @sq OR LOWER(last_sender_name) LIKE @sq)';
-    params.sq = '%' + searchQuery + '%';
+    params.sq = '%' + searchTokens.text + '%';
+  }
+  if (searchTokens.from) {
+    where += ' AND LOWER(last_sender_email) LIKE @from';
+    params.from = '%' + searchTokens.from.toLowerCase() + '%';
+  }
+  if (searchTokens.to) {
+    // Buscar en to_list del último mensaje (requiere JOIN)
+    // Usamos una aproximación: buscar en last_to_list que trae el JOIN
+    where += ' AND LOWER(last_to_list) LIKE @to';
+    params.to = '%' + searchTokens.to.toLowerCase() + '%';
+  }
+  if (searchTokens.subject) {
+    where += ' AND LOWER(subject) LIKE @subject';
+    params.subject = '%' + searchTokens.subject.toLowerCase() + '%';
+  }
+  if (searchTokens.hasAttachment) {
+    where += ' AND has_attachment = 1';
+  }
+  if (searchTokens.isUnread) {
+    where += ' AND has_unread = 1';
+  }
+  if (searchTokens.isStarred) {
+    where += ' AND is_starred = 1';
+  }
+  if (searchTokens.isImportant) {
+    where += ' AND is_important = 1';
+  }
+  if (searchTokens.before) {
+    where += ' AND last_message_date < @before';
+    params.before = new Date(searchTokens.before).getTime();
+  }
+  if (searchTokens.after) {
+    where += ' AND last_message_date > @after';
+    params.after = new Date(searchTokens.after).getTime();
   }
 
   // 📦657-fix3 — LEFT JOIN con el último message de cada thread para traer
@@ -519,6 +567,85 @@ function safeJSON(s, fallback) {
 }
 
 /**
+ * 📦 P2-4 fix: Parser de operadores de búsqueda estilo Gmail.
+ * Convierte una query string en un objeto estructurado.
+ * @param {string} query - Query string (ej: "from:juan subject:reunión has:attachment")
+ * @returns {Object} Objeto con tokens parseados
+ */
+function parseSearchQuery(query) {
+  if (!query) return { text: '', from: null, to: null, subject: null, hasAttachment: null, isUnread: null, isStarred: null, isImportant: null, before: null, after: null };
+  
+  var tokens = {
+    text: '',
+    from: null,
+    to: null,
+    subject: null,
+    hasAttachment: null,
+    isUnread: null,
+    isStarred: null,
+    isImportant: null,
+    before: null,
+    after: null
+  };
+  
+  var operatorRegex = /(\w+):([^\s]+)/g;
+  var textParts = [];
+  var lastIndex = 0;
+  var match;
+  
+  while ((match = operatorRegex.exec(query)) !== null) {
+    // Texto libre entre operadores
+    if (match.index > lastIndex) {
+      var between = query.substring(lastIndex, match.index).trim();
+      if (between) textParts.push(between);
+    }
+    
+    var key = match[1].toLowerCase();
+    var value = match[2];
+    
+    switch (key) {
+      case 'from':
+        tokens.from = value.toLowerCase();
+        break;
+      case 'to':
+        tokens.to = value.toLowerCase();
+        break;
+      case 'subject':
+        tokens.subject = value.toLowerCase();
+        break;
+      case 'has':
+        if (value.toLowerCase() === 'attachment') tokens.hasAttachment = true;
+        break;
+      case 'is':
+        var v = value.toLowerCase();
+        if (v === 'unread') tokens.isUnread = true;
+        else if (v === 'starred') tokens.isStarred = true;
+        else if (v === 'important') tokens.isImportant = true;
+        break;
+      case 'before':
+        tokens.before = value;
+        break;
+      case 'after':
+        tokens.after = value;
+        break;
+      default:
+        // Operador desconocido → tratarlo como texto libre
+        textParts.push(match[0]);
+    }
+    lastIndex = match.index + match[0].length;
+  }
+  
+  // El resto del query después del último operador
+  if (lastIndex < query.length) {
+    var rest = query.substring(lastIndex).trim();
+    if (rest) textParts.push(rest);
+  }
+  
+  tokens.text = textParts.join(' ').toLowerCase();
+  return tokens;
+}
+
+/**
  * Estadísticas del cache local (para mostrar "157 correos" en el footer).
  */
 function getCacheStats(connectionId) {
@@ -543,5 +670,7 @@ module.exports = {
   // Adjuntos (F1-Feature5)
   saveAttachment, deleteAttachmentsByMessage, getAttachmentsByMessage,
   // Utilidades
-  getCacheStats
+  getCacheStats,
+  // 📦 P2-4 fix: Parser de búsqueda
+  parseSearchQuery
 };

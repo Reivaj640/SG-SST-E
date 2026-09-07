@@ -230,13 +230,15 @@ async function syncInbox(options) {
     expires_at: null
   });
 
-  // 4. Listar threads de Gmail
+  // 4. Listar threads de Gmail (con paginación automática para traer todos)
   var labelIds = folder === 'INBOX' ? ['INBOX'] : (folder === 'SENT' ? ['SENT'] : null);
   var listResult = await googleGmail.listInbox({
     configPath: configPath,
     folder: folder,  // F1.B-fix — Pasar folder al listInbox para que use el query correcto
     maxResults: maxResults,
-    extraQuery: labelIds ? ['label:' + folder.toLowerCase()] : []
+    extraQuery: labelIds ? ['label:' + folder.toLowerCase()] : [],
+    fetchAll: true,              // 📦 P1-1 fix: Recorrer todas las páginas automáticamente
+    maxTotalResults: 500         // Límite de seguridad
   });
 
   if (!listResult.success || !Array.isArray(listResult.data)) {

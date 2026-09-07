@@ -126,18 +126,25 @@ async function withRetry(fn, options) {
 /**
  * Lista los últimos N mensajes de la bandeja de entrada.
  * Por defecto solo del inbox principal (label INBOX), excluyendo spam/trash.
+ * 📦 P1-1 fix: Soporte de paginación con nextPageToken.
  *
  * @param {Object} options
  * @param {string} options.configPath - ruta al config.json
- * @param {number} options.maxResults - cuántos correos traer (default 20)
+ * @param {number} options.maxResults - cuántos correos traer por página (default 20, máx 100)
  * @param {string[]} options.extraQuery - parámetros extra de búsqueda (ej: ['is:unread'])
- * @returns {Promise<{success, data?: Array, error?: string}>}
+ * @param {string} [options.pageToken] - token de página para paginación (nextPageToken anterior)
+ * @param {boolean} [options.fetchAll] - si true, recorre todas las páginas hasta maxTotalResults
+ * @param {number} [options.maxTotalResults] - límite total al usar fetchAll (default 500)
+ * @returns {Promise<{success, data?: Array, nextPageToken?: string, error?: string}>}
  */
 async function listInbox(options) {
   options = options || {};
   var configPath = options.configPath;
-  var maxResults = options.maxResults || 20;
+  var maxResults = Math.min(options.maxResults || 20, 100); // Gmail API máx 100 por página
   var extraQuery = options.extraQuery || [];
+  var pageToken = options.pageToken || null;
+  var fetchAll = options.fetchAll === true;
+  var maxTotalResults = options.maxTotalResults || 500;
 
   var auth = await googleAuth.getAuthorizedClient(configPath);
   if (!auth) {
@@ -147,7 +154,7 @@ async function listInbox(options) {
   var gmail = google.gmail({ version: 'v1', auth: auth });
 
   try {
-    // 1) Listar IDs de mensajes
+    // 1) Listar IDs de mensajes con soporte de paginación
     // F1.B-fix — Soporte para folder SENT, DRAFT, TRASH, SPAM, STARRED, IMPORTANT, ARCHIVE
     // Default seguro: INBOX
     var query = ['in:inbox'].concat(extraQuery).join(' ');
@@ -168,20 +175,49 @@ async function listInbox(options) {
     }
     // query YA tiene valor por defecto (INBOX), no necesita else final
 
-    // Listar con rate limiter global
-    var listRes = await GmailRateLimiter.run(function () {
-      return withRetry(function () {
-        return gmail.users.messages.list({
-          userId: 'me',
-          q: query,
-          maxResults: maxResults
-        });
-      }, { maxRetries: 3, baseDelay: 1000 });
-    });
+    var allMessages = [];
+    var nextPageToken = pageToken;
+    var totalFetched = 0;
 
-    var messages = listRes.data.messages || [];
+    do {
+      // Listar con rate limiter global
+      var listRes = await GmailRateLimiter.run(function () {
+        return withRetry(function () {
+          return gmail.users.messages.list({
+            userId: 'me',
+            q: query,
+            maxResults: maxResults,
+            pageToken: nextPageToken
+          });
+        }, { maxRetries: 3, baseDelay: 1000 });
+      });
+
+      var messages = listRes.data.messages || [];
+      var messagesArray = Array.isArray(messages) ? messages : [];
+
+      // Acumular mensajes
+      for (var i = 0; i < messagesArray.length; i++) {
+        allMessages.push(messagesArray[i]);
+        totalFetched++;
+        if (totalFetched >= maxTotalResults) break;
+      }
+
+      // Obtener siguiente token
+      nextPageToken = listRes.data.nextPageToken || null;
+
+      // Si no hay más páginas, o alcanzamos el límite, o no estamos en modo fetchAll, salimos
+      if (!nextPageToken || totalFetched >= maxTotalResults || !fetchAll) {
+        break;
+      }
+
+      // Pequeño delay entre páginas para respetar quota
+      await new Promise(function (resolve) { setTimeout(resolve, 200); });
+
+    } while (nextPageToken);
+
+    var messages = allMessages;
     if (messages.length === 0) {
-      return { success: true, data: [] };
+      return { success: true, data: [], nextPageToken: null };
     }
 
     // 2) Obtener detalles de cada mensaje CON RETRY, RATE LIMITER GLOBAL y batching.
@@ -226,7 +262,7 @@ async function listInbox(options) {
       return normalizeMessage(d);
     });
 
-    return { success: true, data: normalized };
+    return { success: true, data: normalized, nextPageToken: nextPageToken };
   } catch (e) {
     console.error('[GoogleGmail] Error en listInbox:', e);
     return { success: false, error: e.message || 'Error leyendo bandeja' };
@@ -605,16 +641,25 @@ function walkPartsForBody(payload, mimeType, stripHtml) {
 function extractAttachments(payload) {
   var atts = [];
   if (!payload || !payload.parts) return atts;
-  payload.parts.forEach(function (p) {
-    if (p.filename && p.body && p.body.attachmentId) {
+
+  function walkParts(part) {
+    if (!part) return;
+    // Si esta parte tiene un archivo adjunto, agregarlo
+    if (part.filename && part.body && part.body.attachmentId) {
       atts.push({
-        name: p.filename,
-        size: p.body.size || 0,
-        mimeType: p.mimeType || 'application/octet-stream',
-        attachmentId: p.body.attachmentId
+        name: part.filename,
+        size: part.body.size || 0,
+        mimeType: part.mimeType || 'application/octet-stream',
+        attachmentId: part.body.attachmentId
       });
     }
-  });
+    // Recursivamente procesar sub-partes (multipart anidados)
+    if (part.parts && part.parts.length > 0) {
+      part.parts.forEach(walkParts);
+    }
+  }
+
+  payload.parts.forEach(walkParts);
   return atts;
 }
 
