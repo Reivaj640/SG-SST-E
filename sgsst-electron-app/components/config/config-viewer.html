@@ -532,30 +532,8 @@
             background: #dbeafe;
             color: #1e40af;
         }
-        .firma-card--placeholder {
-            background: var(--bg-muted, #f9fafb);
-            border-style: dashed;
-        }
-        .firma-card__placeholder-title {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-weight: 600;
-            color: var(--text-muted);
-            margin-bottom: 0.5rem;
-        }
-        .firma-card__placeholder-text {
-            font-size: 0.875rem;
-            color: var(--text-muted);
-            line-height: 1.5;
-            margin: 0;
-        }
-        .firma-card__placeholder-text code {
-            background: #e5e7eb;
-            padding: 0.1rem 0.4rem;
-            border-radius: 4px;
-            font-size: 0.85em;
-        }
+        /* Legacy: .firma-card--placeholder y selectores hijos eliminados en I-103.A1
+           (el bloque HTML que usaba estas clases fue removido). */
 
         .section-title {
             font-family: var(--font-heading);
@@ -2132,18 +2110,10 @@
                 <div id="firma-action-result" class="firma-action-result" style="display:none;"></div>
             </div>
 
-            <!-- Placeholder para I-103.A1 (por empresa) -->
-            <div class="firma-card firma-card--placeholder">
-                <div class="firma-card__placeholder-title">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                    Próximamente: configuración por empresa
-                </div>
-                <p class="firma-card__placeholder-text">
-                    La gestión de firma por empresa (NIT, estado de configuración, crear cliente) llegará en
-                    <strong>I-103.A1</strong>, una vez resuelto el modelo de identificación fiscal de empresa
-                    (<code>config.companyPaths[].nit</code>).
-                </p>
-            </div>
+            <!-- 📦715 · I-103.A1 ya implementado: la configuración per-empresa
+                 (NIT, estado de firma, crear cliente) se gestiona desde la tab
+                 "Gestión de Empresas" → cada tarjeta tiene sus botones NIT y Firma.
+                 Este bloque ya no es necesario. -->
         </div>
 
         <!-- SECCIÓN 2: AJUSTES DE USUARIO (Gestión de Perfiles) -->
@@ -2864,7 +2834,7 @@
             } else {
                 _showFirmaResult(resultEl, 'ok',
                     '✓ Credencial guardada. Hash: ' + (r.data.adminKeyHashPrefix || '????') +
-                    '. Ya puedes configurar empresas (próximamente: I-103.A1).');
+                    '. Ya puedes configurar empresas desde la tab "Gestión de Empresas" → Firma Electrónica.');
                 input.value = '';
                 // Refrescar estado
                 await loadFirmaStatus();

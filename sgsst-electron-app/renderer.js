@@ -793,12 +793,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   // F4-fix — Handler del badge: al hacer click, abre el popover de "Pendientes"
   // (mismo patrón que el calendario viejo). Usa stopPropagation para que el
   // click NO se propague al botón padre (que abriría el iframe de Bandeja Integrada).
+  // P0-KAIRALERTS-UI (2026-09-07) — Popover grande (Bandeja pendientes) DESHABILITADO
+  // a pedido del user. Ahora solo se muestra el popover chico de kair-alerts.
+  // Para volver a activarlo, reemplazar el cuerpo de la función con el código
+  // original: showBandejaIntegradaPendientesPopover();
   function onBandejaIntegradaBadgeClick(e) {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
-    showBandejaIntegradaPendientesPopover();
+    // P0-KAIRALERTS-UI: popover grande deshabilitado — solo se muestra el de kair-alerts.
   }
 
   // F4-fix — Popover de pendientes (idéntico patrón al de KairAlerts en el

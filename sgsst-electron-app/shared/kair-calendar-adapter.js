@@ -138,6 +138,17 @@
     // que el backend devuelva eventos de TODAS las empresas. Las fuentes
     // globales (recordatorios, plan de trabajo) siempre se incluyen.
     var scope = (range && range.scope) || 'company';
+    // P0-CRO-1 fix — Si el scope es 'company' pero no hay empresa activa
+    // (currentCompany es null/'default_company'), el código antiguo pasaba
+    // null al backend, que por el soporte de scope='all' (📦543) devolvía
+    // eventos de TODAS las empresas → el switch "Todas las empresas" se
+    // volvía un no-op silencioso. Ahora devolvemos [] y loggeamos warning
+    // para que sea explícito. La UI muestra el toast "Mostrando solo la
+    // empresa actual" sin tener empresa real, lo cual es confuso.
+    if (scope === 'company' && !currentCompany) {
+      _warn('SCOPE_NO_COMPANY', 'scope=company pero currentCompany es null. Devolviendo [] (no hay empresa activa, no se puede filtrar).');
+      return { success: true, data: [] };
+    }
     var companyForBackend = (scope === 'all') ? null : currentCompany;
     // 📦495 — Pasar currentCompany al backend de capacitaciones para que sepa
     // cuál Excel leer (el calendario es global pero las capacitaciones son
@@ -202,11 +213,17 @@
     var afiliacionPayload = Object.assign({}, recRange);
     // 📦525 — Recordatorio Inducciones: idem. Comparte el mismo rango anual.
     var induccionesPayload = Object.assign({}, recRange);
+    // P0-FILTER-2 (2026-09-07) — Payload de eventos rápidos con currentCompany.
+    // ANTES: pasaba solo `range` al bridge → el handler no sabía qué empresa
+    // filtrar y devolvía TODOS los eventos rápidos (bug del switch).
+    // AHORA: pasamos currentCompany para que el bridge filtre correctamente.
+    var rapidosPayload = Object.assign({}, range || {}, { currentCompany: companyForBackend });
     var results = await Promise.all([
       _safe(function () { return api.planTrabajo && api.planTrabajo.getEvents(range); }),
       _safe(function () { return api.capacitaciones && api.capacitaciones.getEvents(capPayload); }),
       _safe(function () { return api.auditoria && api.auditoria.getFases(range); }),
-      _safe(function () { return api.eventosRapidos && api.eventosRapidos.list(range); }),
+      // P0-FILTER-2 — Ahora pasa currentCompany al handler de eventos rápidos.
+      _safe(function () { return api.eventosRapidos && api.eventosRapidos.list(rapidosPayload); }),
       _safe(function () { return api.gestaciones && api.gestaciones.getEvents(gestPayload); }),
       // 📦506 — Inspecciones planificadas del programa anual
       _safe(function () {

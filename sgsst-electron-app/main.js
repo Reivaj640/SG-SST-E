@@ -4819,9 +4819,22 @@ ipcMain.handle('repair-plan-trabajo-excel', async (event, { filePath, templatePa
 // ── K+AIR Calendar: Plan de Trabajo (placeholder v1) ──────────────────
 // TODO v2: leer el cronograma del Plan de Trabajo Anual (Excel GI-FO-062 o similar)
 // y mapear cada actividad con fecha a un evento { id, title, date, start, end, type: 'plan' }.
-// Por ahora devuelve [] para que el calendario muestre solo auditoría + eventos rápidos.
+// P0-CRO-AUDIT-3 (2026-09-07) — Limitación conocida: el Excel "Plan de Trabajo
+// Anual" tiene un formato variable por empresa (filas con año, actividad,
+// responsable, fecha) y NO está documentado. Implementar el mapper sin spec
+// es riesgoso. Por ahora devolvemos [] con log explícito para que el calendario
+// muestre solo las otras 11 fuentes. Requiere acción del usuario: documentar
+// el formato del Excel o aportar un archivo de muestra para implementar.
+//
+// TODO (requiere user input):
+//   1. User documenta estructura del Excel de Plan de Trabajo Anual:
+//      - ¿En qué hoja están los eventos del año actual?
+//      - ¿Qué columnas tienen (fecha, actividad, responsable, ...)?
+//      - ¿Cómo se marca si está cumplido?
+//   2. Con la spec, implementar el mapper similar a _leerCapacitacionesDeEmpresa
+//      (main.js:5299) que ya tiene el patrón para leer Excels de cronogramas.
 ipcMain.handle('plan-trabajo:get-events', async (event, range) => {
-  sendLog('[CAL-PLAN-TRABAJO] placeholder v1 — devolviendo [] (TODO: implementar mapper Excel)', 'INFO');
+  sendLog('[CAL-PLAN-TRABAJO] STUB — requiere spec del Excel Plan de Trabajo. Devolviendo [] hasta entonces.', 'INFO');
   return { success: true, data: [] };
 });
 

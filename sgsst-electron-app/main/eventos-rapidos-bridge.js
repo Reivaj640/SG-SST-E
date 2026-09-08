@@ -65,6 +65,12 @@ function _ensureSchema(db) {
   // gracias al try/catch.
   try { db.exec("ALTER TABLE eventos_rapidos ADD COLUMN google_event_id TEXT"); } catch (e) { /* ya existe */ }
   try { db.exec("ALTER TABLE eventos_rapidos ADD COLUMN attendees TEXT"); } catch (e) { /* ya existe */ }
+  // P0-FILTER-1 (2026-09-07) — Agregar columna empresa_id para que el filtro
+  // por empresa del switch "Todas las empresas" funcione. Antes, eventos
+  // creados en cualquier empresa quedaban mezclados y se mostraban siempre
+  // (sin filtro de empresa al listarlos).
+  try { db.exec("ALTER TABLE eventos_rapidos ADD COLUMN empresa_id TEXT"); } catch (e) { /* ya existe */ }
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_eventos_rapidos_empresa ON eventos_rapidos(empresa_id)"); } catch (e) { /* ya existe */ }
 }
 
 function _log(level, msg) {
@@ -99,7 +105,11 @@ function _rowToEvent(row) {
     // 📦646-fix11 — Devolver los asistentes como array. La Bandeja
     // Integrada los usa para el campo "Asistentes" del modal de edición
     // y para sincronizar con Google Calendar.
-    attendees: attendees
+    attendees: attendees,
+    // P0-FILTER-1 (2026-09-07) — Devolver empresa_id para que el adapter y
+    // la UI puedan filtrar/agrupar por empresa cuando se muestran eventos
+    // de múltiples empresas (scope='all' en el switch).
+    empresa: row.empresa_id || null
   };
 }
 
@@ -123,6 +133,9 @@ function registerEventosRapidosHandlers(app, deps) {
   _ensureSchema(getDb());
 
   // ── list ────────────────────────────────────────────────────────────
+  // P0-FILTER-1 (2026-09-07) — Aceptar `currentCompany` en el payload para
+  // filtrar por empresa. Sin empresa válida → todos (compatibilidad con
+  // scope='all' o sin empresa activa). Con empresa → solo de esa empresa.
   ipcMain.handle('eventos-rapidos:list', async function (event, range) {
     try {
       var db = getDb();
@@ -131,20 +144,39 @@ function registerEventosRapidosHandlers(app, deps) {
 
       var start = range && range.start;
       var end = range && range.end;
+      // Aceptar tanto `currentCompany` (convención del adapter) como
+      // `empresa` (convención del frontend) por defensa.
+      var empresaId = (range && (range.currentCompany || range.empresa)) || null;
+      // Si la empresa es el placeholder 'default_company' o vacío, tratar como null
+      if (empresaId === 'default_company' || empresaId === '') empresaId = null;
 
       var rows;
       if (_isValidISODate(start) && _isValidISODate(end)) {
-        rows = db.prepare(
-          'SELECT id, titulo, fecha, hora_inicio, hora_fin, tipo, descripcion, google_event_id, created_at, updated_at ' +
-          'FROM eventos_rapidos WHERE fecha BETWEEN ? AND ? ORDER BY fecha ASC, hora_inicio ASC'
-        ).all(start, end);
+        if (empresaId) {
+          rows = db.prepare(
+            'SELECT id, titulo, fecha, hora_inicio, hora_fin, tipo, descripcion, google_event_id, empresa_id, created_at, updated_at ' +
+            'FROM eventos_rapidos WHERE empresa_id = ? AND fecha BETWEEN ? AND ? ORDER BY fecha ASC, hora_inicio ASC'
+          ).all(empresaId, start, end);
+        } else {
+          rows = db.prepare(
+            'SELECT id, titulo, fecha, hora_inicio, hora_fin, tipo, descripcion, google_event_id, empresa_id, created_at, updated_at ' +
+            'FROM eventos_rapidos WHERE fecha BETWEEN ? AND ? ORDER BY fecha ASC, hora_inicio ASC'
+          ).all(start, end);
+        }
       } else {
-        rows = db.prepare(
-          'SELECT id, titulo, fecha, hora_inicio, hora_fin, tipo, descripcion, google_event_id, created_at, updated_at ' +
-          'FROM eventos_rapidos ORDER BY fecha ASC, hora_inicio ASC LIMIT 500'
-        ).all();
+        if (empresaId) {
+          rows = db.prepare(
+            'SELECT id, titulo, fecha, hora_inicio, hora_fin, tipo, descripcion, google_event_id, empresa_id, created_at, updated_at ' +
+            'FROM eventos_rapidos WHERE empresa_id = ? ORDER BY fecha ASC, hora_inicio ASC LIMIT 500'
+          ).all(empresaId);
+        } else {
+          rows = db.prepare(
+            'SELECT id, titulo, fecha, hora_inicio, hora_fin, tipo, descripcion, google_event_id, empresa_id, created_at, updated_at ' +
+            'FROM eventos_rapidos ORDER BY fecha ASC, hora_inicio ASC LIMIT 500'
+          ).all();
+        }
       }
-      _log('LIST', 'rango=' + (start || '*') + '..' + (end || '*') + ' count=' + rows.length);
+      _log('LIST', 'empresa=' + (empresaId || '*') + ' rango=' + (start || '*') + '..' + (end || '*') + ' count=' + rows.length);
       return { success: true, data: rows.map(_rowToEvent) };
     } catch (err) {
       _log('LIST', 'ERROR ' + err.message);
@@ -185,12 +217,18 @@ function registerEventosRapidosHandlers(app, deps) {
           return String(a || '').trim();
         }).filter(Boolean));
       }
+      // P0-FILTER-1 (2026-09-07) — Persistir empresa_id para que el evento
+      // pueda filtrarse correctamente. Aceptar `empresa` (frontend) o
+      // `currentCompany` (adapter) por compatibilidad. Si el caller no
+      // manda ninguno, queda null (evento global — comportamiento legacy).
+      var empresaId = (payload && (payload.empresa || payload.currentCompany)) || null;
+      if (empresaId === 'default_company' || empresaId === '') empresaId = null;
       db.prepare(
-        'INSERT INTO eventos_rapidos (id, titulo, fecha, hora_inicio, hora_fin, tipo, descripcion, google_event_id, attendees, created_at, updated_at) ' +
-        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-      ).run(id, titulo, fecha, horaInicio || null, horaFin || null, tipo, descripcion, googleEventId, attendeesJson, now, now);
+        'INSERT INTO eventos_rapidos (id, titulo, fecha, hora_inicio, hora_fin, tipo, descripcion, google_event_id, attendees, empresa_id, created_at, updated_at) ' +
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      ).run(id, titulo, fecha, horaInicio || null, horaFin || null, tipo, descripcion, googleEventId, attendeesJson, empresaId, now, now);
 
-      _log('CREATE', 'id=' + id + ' titulo=' + titulo + ' fecha=' + fecha + ' attendees=' + (attendeesJson ? attendeesJson.length : 0));
+      _log('CREATE', 'id=' + id + ' titulo=' + titulo + ' empresa=' + (empresaId || '*') + ' fecha=' + fecha + ' attendees=' + (attendeesJson ? attendeesJson.length : 0));
       var row = db.prepare('SELECT * FROM eventos_rapidos WHERE id = ?').get(id);
       return { success: true, data: _rowToEvent(row) };
     } catch (err) {
@@ -244,6 +282,14 @@ function registerEventosRapidosHandlers(app, deps) {
           return String(a || '').trim();
         }).filter(Boolean));
       }
+      // P0-FILTER-1 (2026-09-07) — empresa_id se PRESERVA en update (igual
+      // que googleEventId/attendees). Si el caller no manda la key, no
+      // tocamos la columna. Esto evita que un update accidental mueva el
+      // evento a otra empresa.
+      var hasEmpresa = payload && Object.prototype.hasOwnProperty.call(payload, 'empresa');
+      var empresaUpdate = hasEmpresa
+        ? ((payload.empresa && payload.empresa !== 'default_company') ? String(payload.empresa) : null)
+        : undefined;
       // Construir el UPDATE dinámicamente para no pisar columnas que el
       // caller no mandó (preservar valor anterior en DB).
       var sets = ['titulo = ?', 'fecha = ?', 'hora_inicio = ?', 'hora_fin = ?', 'tipo = ?', 'descripcion = ?', 'updated_at = ?'];
@@ -255,6 +301,10 @@ function registerEventosRapidosHandlers(app, deps) {
       if (hasAttendees) {
         sets.push('attendees = ?');
         params.push(attendeesJson);
+      }
+      if (hasEmpresa) {
+        sets.push('empresa_id = ?');
+        params.push(empresaUpdate);
       }
       params.push(id);
       var sql = 'UPDATE eventos_rapidos SET ' + sets.join(', ') + ' WHERE id = ?';

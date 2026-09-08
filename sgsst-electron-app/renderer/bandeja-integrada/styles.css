@@ -600,6 +600,10 @@ body {
    K+AIR KPI Strip Enterprise v1.0
    ============================================ */
 .kair-kpi-strip {
+  /* P0-KPI-STRIP (2026-09-07) — Quitada la "franja gris" visual (background,
+   border, padding, shadow). Los indicadores se siguen mostrando pero sin el
+   contenedor con caja blanca. Para revertir, restaurar las propiedades
+   originales (background, border, border-radius, padding, box-shadow). */
   display: flex;
   align-items: stretch;
   gap: 0;

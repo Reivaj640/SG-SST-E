@@ -1143,9 +1143,16 @@
     }
 
     try {
+      // P3-CRO-1 fix — Usar state.viewYear (que respeta la navegación del
+      // mini-cal) en vez de D.MONTH_VIEW.year (hardcoded al año actual al
+      // cargar el módulo). Antes, si el usuario navegaba a otro año en el
+      // mini-cal, app.js seguía consultando el año hardcoded y los eventos
+      // de otros años desaparecían. Fallback a D.MONTH_VIEW.year si init()
+      // no se ejecutó todavía (state.viewYear null).
+      var viewYear = state.viewYear || D.MONTH_VIEW.year;
       var range = {
-        start: D.MONTH_VIEW.year + "-01-01",  // Rango anual (adapter lo requiere)
-        end: D.MONTH_VIEW.year + "-12-31",
+        start: viewYear + "-01-01",  // Rango anual (adapter lo requiere)
+        end: viewYear + "-12-31",
         scope: state.allCompanies ? "all" : "company"
       };
       console.log("[BandejaIntegrada] loadEventsFromIPC: range=", range);
@@ -1617,7 +1624,6 @@
     state.refreshing = true;
     state.mailLoading = true;
     if ($("#refresh-icon")) $("#refresh-icon").classList.add("kair-spin");
-    render();
     try {
       state.events = await loadEventsFromIPC();
       // Re-armar activeCategories con las categorías de los nuevos eventos
@@ -3373,11 +3379,8 @@
         }
         // Persistir preferencia en localStorage
         try { localStorage.setItem("kair-bandeja.allCompanies", state.allCompanies ? "1" : "0"); } catch (e) {}
-        // Actualizar el footer con el nombre de la empresa
-        var footer = $("#footer-company");
-        if (footer) {
-          footer.textContent = "Empresa: " + (state.allCompanies ? "Todas" : (getActiveCompanyName() || "—"));
-        }
+        // Actualizar header (#company-name) + footer + label del toggle
+        updateCompanyDisplay();
         // Recargar eventos con el nuevo scope (la pieza clave que faltaba)
         reloadEventsForScope();
       });

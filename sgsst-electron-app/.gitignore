@@ -110,3 +110,14 @@ docs/superpowers/
 # El script lo borra en su finally, pero por si acaso:
 /storage-backup/__mock_*.js
 /storage-backup/*.log
+
+# 📦 Cleanup 2026-09-07 — Directorios de backup temporales con archivos
+# movidos antes de un commit (scripts throwaway, .bak de sesiones anteriores,
+# audit docs, etc.). NO trackear — son de uso temporal del agente.
+/.git-archive-cleanup-*/
+
+# 📦 Cleanup 2026-09-07 — Archivos de runtime del tunnel de Firma Electrónica
+# (estado actual del proceso cloudflared, logs de operación). Se regeneran
+# en cada ejecución del tunnel y no deben commitearse.
+scripts/firma-tunnel/estado.txt
+scripts/firma-tunnel/logs/

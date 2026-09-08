@@ -132,8 +132,120 @@
       });
     },
 
-    renderWeek: function (grid) { grid.innerHTML = '<div style="padding:20px;text-align:center;color:var(--kair-text-muted);">Vista semana - pendiente</div>'; },
-    renderDay: function (grid) { grid.innerHTML = '<div style="padding:20px;text-align:center;color:var(--kair-text-muted);">Vista día - pendiente</div>'; },
-    renderSchedule: function (grid) { grid.innerHTML = '<div style="padding:20px;text-align:center;color:var(--kair-text-muted);">Vista agenda - pendiente</div>'; }
+    // P0-CRO-AUDIT-2 fix (2026-09-07) — Implementadas las 3 vistas que antes eran
+    // STUB ("pendiente"). Ahora muestran los eventos reales de state.events con
+    // el mismo formato visual que renderMonth. Usan el mismo set de categorías
+    // (EVENT_CATEGORIES) y la misma función getCategoryStyle().
+
+    // Vista SEMANA: 7 columnas (Lun-Dom) de la semana actual, con eventos
+    // listados debajo del header de cada día.
+    renderWeek: function (grid) {
+      var S = window.BandejaState;
+      var D = window.KairData;
+      var today = new Date();
+      var dayOfWeek = (today.getDay() - 1 + 7) % 7; // Monday = 0
+      var monday = new Date(today);
+      monday.setDate(today.getDate() - dayOfWeek);
+      monday.setHours(0, 0, 0, 0);
+
+      var todayIso = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, "0") + "-" + String(today.getDate()).padStart(2, "0");
+      var monthLabel = D.MONTH_LABELS_ES[monday.getMonth()] + " " + monday.getFullYear();
+
+      var html = '<div class="kair-cal-week"><div class="kair-cal-week__header"><h2 class="kair-cal-week__title">' + monthLabel + '</h2></div><div class="kair-cal-week__grid">';
+      for (var i = 0; i < 7; i++) {
+        var d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+        var iso = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+        var isToday = iso === todayIso;
+        var dayEvents = S.events.filter(function (e) { return e && e.date === iso; });
+        var eventList = dayEvents.map(function (e) {
+          var style = H.getCategoryStyle(e.category) || {};
+          var color = style.color || "#888";
+          return '<div class="kair-cal-week-event" style="border-left:3px solid ' + color + '">' +
+            '<div class="kair-cal-week-event__time">' + (e.start || "") + '</div>' +
+            '<div class="kair-cal-week-event__title">' + H.esc(e.title || "Sin título") + '</div>' +
+            '</div>';
+        }).join("");
+        html += '<div class="kair-cal-week-day' + (isToday ? " kair-cal-week-day--today" : "") + '">' +
+          '<div class="kair-cal-week-day__header">' + D.WEEKDAY_LABELS[d.getDay()] + ' ' + d.getDate() + '</div>' +
+          '<div class="kair-cal-week-day__events">' + (eventList || '<div class="kair-cal-week-day__empty">—</div>') + '</div>' +
+          '</div>';
+      }
+      html += '</div></div>';
+      grid.innerHTML = html;
+    },
+
+    // Vista DÍA: slots horarios (0-23) con eventos posicionados por hora de inicio.
+    renderDay: function (grid) {
+      var S = window.BandejaState;
+      var D = window.KairData;
+      var selected = S.selectedDate || (function () {
+        var t = new Date();
+        return t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" + String(t.getDate()).padStart(2, "0");
+      })();
+      var dateObj = new Date(selected + "T00:00:00");
+      var dayEvents = S.events.filter(function (e) { return e && e.date === selected; });
+
+      var html = '<div class="kair-cal-day-view">';
+      html += '<div class="kair-cal-day-view__header"><h2>' + selected + ' (' + D.WEEKDAY_LABELS[dateObj.getDay()] + ')</h2></div>';
+      html += '<div class="kair-cal-day-view__body">';
+      for (var h = 0; h < 24; h++) {
+        var hourEvents = dayEvents.filter(function (e) {
+          if (!e.start) return false;
+          var eh = parseInt(String(e.start).split(":")[0], 10);
+          return eh === h;
+        });
+        var eventBlocks = hourEvents.map(function (e) {
+          var style = H.getCategoryStyle(e.category) || {};
+          var color = style.color || "#888";
+          return '<div class="kair-cal-day-event" style="border-left:3px solid ' + color + ';background:' + (style.bg || "transparent") + '">' +
+            '<strong>' + (e.start || "") + '–' + (e.end || "") + '</strong> ' + H.esc(e.title || "Sin título") +
+            (e.location ? ' <small>· ' + H.esc(e.location) + '</small>' : '') +
+            '</div>';
+        }).join("");
+        html += '<div class="kair-cal-day-slot"><div class="kair-cal-day-slot__hour">' + String(h).padStart(2, "0") + ':00</div><div class="kair-cal-day-slot__events">' + eventBlocks + '</div></div>';
+      }
+      html += '</div></div>';
+      grid.innerHTML = html;
+    },
+
+    // Vista AGENDA (schedule): lista de próximos N eventos a partir de hoy,
+    // ordenados por fecha y hora. Útil para ver "qué viene" sin entrar al mes.
+    renderSchedule: function (grid) {
+      var S = window.BandejaState;
+      var D = window.KairData;
+      var today = new Date();
+      today.setHours(0, 0, 0, 0);
+      var todayIso = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, "0") + "-" + String(today.getDate()).padStart(2, "0");
+
+      var upcoming = (S.events || [])
+        .filter(function (e) { return e && e.date && e.date >= todayIso; })
+        .sort(function (a, b) {
+          if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+          return (a.start || "") < (b.start || "") ? -1 : 1;
+        })
+        .slice(0, 50);
+
+      if (upcoming.length === 0) {
+        grid.innerHTML = '<div style="padding:40px;text-align:center;color:var(--kair-text-muted);">No hay eventos próximos.</div>';
+        return;
+      }
+
+      var html = '<div class="kair-cal-schedule"><div class="kair-cal-schedule__header"><h2>Próximos eventos</h2></div><ul class="kair-cal-schedule__list">';
+      upcoming.forEach(function (e) {
+        var style = H.getCategoryStyle(e.category) || {};
+        var color = style.color || "#888";
+        var d = new Date(e.date + "T00:00:00");
+        var dayLabel = d.getDate() + " " + D.MONTH_LABELS_ES[d.getMonth()].toLowerCase().slice(0, 3);
+        html += '<li class="kair-cal-schedule__item" style="border-left:3px solid ' + color + '">' +
+          '<span class="kair-cal-schedule__date">' + dayLabel + '</span>' +
+          '<span class="kair-cal-schedule__time">' + (e.start || "—") + '</span>' +
+          '<span class="kair-cal-schedule__title">' + H.esc(e.title || "Sin título") + '</span>' +
+          '<span class="kair-cal-schedule__cat">' + (style.label || e.category || "Otro") + '</span>' +
+          '</li>';
+      });
+      html += '</ul></div>';
+      grid.innerHTML = html;
+    }
   };
 })();

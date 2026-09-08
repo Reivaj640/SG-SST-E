@@ -95,5 +95,6 @@
     };
     window.BandejaState.linkedMailSubject = undefined;
     window.BandejaState.gmailConnected = false;
+    window.BandejaState.allCompanies = true;
   };
 })();

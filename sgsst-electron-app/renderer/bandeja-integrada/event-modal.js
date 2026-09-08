@@ -60,7 +60,10 @@
             '<button class="kair-header__action--ghost" id="modal-cancel">Cancelar</button>' +
             '<button class="kair-header__action--primary" id="modal-save" ' + (!draft.title.trim() ? "disabled" : "") + ' style="' + (!draft.title.trim() ? "opacity:0.5;cursor:not-allowed;" : "") + '">' + (isEdit ? "Guardar cambios" : "Crear evento") + '</button>' +
           '</div>';
-        card.innerHTML = modalContent;
+
+        // P0-CRO-AUDIT-1 fix — Eliminado `card.innerHTML = modalContent;` que sobrescribía
+        // con undefined (modalContent no estaba definido en ningún lugar del archivo).
+        // El modal ahora muestra el HTML construido en líneas 46-62 correctamente.
 
         // Bindings
         var closeModal = function () { if (modal.parentNode) modal.parentNode.removeChild(modal); };
@@ -78,11 +81,11 @@
         card.querySelectorAll(".kair-chip-select__option").forEach(function (b) { b.addEventListener("click", function () { S.draft.category = b.getAttribute("data-cat"); render(); }); });
         card.querySelectorAll(".kair-duration-row__btn").forEach(function (b) { b.addEventListener("click", function () { S.draft.durationHours = parseFloat(b.getAttribute("data-dur")); render(); }); });
 
-        card.querySelector("#draft-location").addEventListener("input", function (e) { S.draft.location = e.target.value; });
-        card.querySelector("#draft-attendees").addEventListener("input", function (e) { S.draft.attendees = e.target.value; });
-        card.querySelector("#draft-notes").addEventListener("input", function (e) { S.draft.notes = e.target.value; });
+        // P1-CRO-AUDIT-3 fix — Eliminados listeners duplicados que estaban en líneas 81-85.
+        // Antes: location/attendees/notes tenían 2 listeners cada uno (idempotentes pero
+        // wasteful), y modal-close tenía 2 listeners (duplicaba closeModal al hacer click).
+        // Ahora: cada elemento tiene 1 solo listener, registrado en líneas 75-79 y 70.
 
-        card.querySelector("#modal-close").addEventListener("click", closeModal);
         card.querySelector("#modal-cancel").addEventListener("click", closeModal);
         card.querySelector("#modal-save").addEventListener("click", function () { saveEvent(); });
 
@@ -124,24 +127,38 @@
           adapter.create(newEvent).then(function (res) {
             if (res && res.success) {
               if (res.data && res.data.id && res.data.id !== newEvent.id) newEvent.id = res.data.id;
-              S.events = loadEventsFromIPC().then(function (evs) { S.events = evs; });
+              // P1-CRO-AUDIT-2 fix — Antes: `S.events = loadEventsFromIPC().then(...)` reasignaba
+              // S.events a una Promise, y la línea siguiente `S.events.forEach(...)` lanzaba TypeError.
+              // Ahora: solo agregamos el newEvent al array (en background) y agregamos su categoría
+              // a activeCategories de forma sincrónica.
+              loadEventsFromIPC().then(function (evs) { S.events = evs; });
               var gcalApi = window.BandejaHelpers.getGoogleCalendarApi();
               if (gcalApi) {
                 try {
                   var gRes = gcalApi.create(newEvent);
                   if (gRes && gRes.success && gRes.data && gRes.data.googleEventId) {
                     newEvent.googleEventId = gRes.data.googleEventId; newEvent.source = "kair";
-                    try { adapter.update(newEvent); S.events = loadEventsFromIPC().then(function (evs) { S.events = evs; }); window.BandejaHelpers.toast("Evento guardado y sincronizado", newEvent.title + " · " + newEvent.date + " · Google Calendar ✓", "success"); } catch (uErr) { console.warn("[BandejaIntegrada][SAVE] No se pudo guardar googleEventId local:", uErr); window.BandejaHelpers.toast("Evento guardado y sincronizado", newEvent.title + " · " + newEvent.date + " · Google Calendar ✓", "success"); }
+                    try {
+                      adapter.update(newEvent).then(function () {
+                        loadEventsFromIPC().then(function (evs) { S.events = evs; });
+                      });
+                      window.BandejaHelpers.toast("Evento guardado y sincronizado", newEvent.title + " · " + newEvent.date + " · Google Calendar ✓", "success");
+                    } catch (uErr) { console.warn("[BandejaIntegrada][SAVE] No se pudo guardar googleEventId local:", uErr); window.BandejaHelpers.toast("Evento guardado y sincronizado", newEvent.title + " · " + newEvent.date + " · Google Calendar ✓", "success"); }
                   } else { window.BandejaHelpers.toast("Evento guardado y sincronizado", newEvent.title + " · " + newEvent.date, "success"); }
                 } catch (gErr) { console.warn("[BandejaIntegrada][SAVE] No se pudo sincronizar con Google Calendar:", gErr); window.BandejaHelpers.toast("Evento guardado localmente", newEvent.title + " · " + newEvent.date + " · Calendar no disponible", "warning"); }
               } else { window.BandejaHelpers.toast("Evento guardado y sincronizado", newEvent.title + " · " + newEvent.date, "success"); }
             } else { window.BandejaHelpers.toast("Evento guardado y sincronizado", newEvent.title + " · " + newEvent.date, "success"); }
 
-            S.events.forEach(function (ev) { if (ev && ev.category && !S.activeCategories.has(ev.category)) S.activeCategories.add(ev.category); });
+            // P1-CRO-AUDIT-2 fix — El forEach anterior iteraba sobre S.events (que era una
+            // Promise). Ahora agregamos solo la categoría del newEvent directamente, que es lo
+            // que realmente importa para el render (los filtros de categoría del sidebar).
+            if (newEvent.category && !S.activeCategories.has(newEvent.category)) {
+              S.activeCategories.add(newEvent.category);
+            }
             closeModal();
             S.calendarVisible = false;
             window.BandejaRenderCalendar.render(document.getElementById("calendar-slide"));
-          }).catch(function (err) { S.events.push(newEvent); closeModal(); window.BandejaHelpers.toast("No se pudo persistir el evento", (res && res.error) || "error desconocido", "error"); });
+          }).catch(function (err) { S.events.push(newEvent); closeModal(); window.BandejaHelpers.toast("No se pudo persistir el evento", (err && err.message) || "error desconocido", "error"); });
         }
 
         function closeModal() { if (modal.parentNode) modal.parentNode.removeChild(modal); S.eventModalOpen = false; }
