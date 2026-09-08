@@ -125,6 +125,19 @@ const signRequestBody = z.object({
   // Opcional en v1: si K+AIR no lo envía, queda NULL (compatibilidad con
   // sign requests legacy pre-migration 007).
   tipo_identificacion: z.enum(TIPOS_IDENTIFICACION).optional(),
+  // I-FIRMA-DUAL (migration 013, v0.1.180): opt-in para que el commit()
+  // del worker dispare automáticamente un sign request hijo (tipo_firmante='EMPRESA')
+  // para que firme el representante legal. Si requiere_firma_empresa=1, el route
+  // exige representante_legal_snapshot (validación inline en signRequest.js).
+  // .optional() por compat: sign requests legacy NO pasan estos campos.
+  requiere_firma_empresa: z.union([z.literal(0), z.literal(1)]).optional(),
+  representante_legal_snapshot: z.object({
+    nombre: z.string().min(1),
+    tipo_identificacion: z.enum(['CC', 'CE', 'TI', 'PPT', 'PA']),
+    numero_identificacion: z.string().min(4).max(20),
+    correo: z.string().email(),
+    cargo: z.string().optional(),
+  }).optional(),
   metadata: signRequestMetadata,
 });
 

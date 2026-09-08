@@ -2459,6 +2459,57 @@
                     <button class="btn btn-primary" onclick="selectDirectory()">Buscar</button>
                 </div>
             </div>
+
+            <!-- 📦 I-FIRMA-DUAL · v0.1.180 — Sección Representante Legal.
+                 Requerido para habilitar firma dual (firma empresa + firma rep legal).
+                 Los handlers IPC rep-legal:get / rep-legal:upsert están en
+                 main/empresa-representante-legal-bridge.js. -->
+            <div id="empresa-rep-legal-section" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
+                <h3 style="font-family: var(--font-heading); font-size: 1.05rem; color: var(--primary); margin-bottom: 0.5rem;">
+                    <i class="fas fa-user-tie"></i> Representante Legal
+                </h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; line-height: 1.4;">
+                    Requerido si vas a enviar documentos que requieran firma de la empresa.
+                    El representante legal firmará con su cédula + código al correo.
+                </p>
+
+                <div class="form-group">
+                    <label class="form-label">Nombre completo *</label>
+                    <input type="text" class="form-control" id="empresa-rep-legal-nombre" autocomplete="off" />
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label class="form-label">Tipo ID *</label>
+                        <select class="form-control" id="empresa-rep-legal-tipo-id">
+                            <option value="CC">Cédula de Ciudadanía</option>
+                            <option value="CE">Cédula de Extranjería</option>
+                            <option value="TI">Tarjeta de Identidad</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Número *</label>
+                        <input type="text" class="form-control" id="empresa-rep-legal-num-id" inputmode="numeric" pattern="[0-9]+" autocomplete="off" />
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Correo * <span style="font-weight: 400; color: var(--text-muted); font-size: 0.8rem;">(obligatorio para firma)</span></label>
+                    <input type="email" class="form-control" id="empresa-rep-legal-correo" autocomplete="off" />
+                    <span id="empresa-rep-legal-correo-error" style="display: none; color: var(--danger); font-size: 0.8rem; margin-top: 0.3rem;"></span>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label class="form-label">Teléfono</label>
+                        <input type="tel" class="form-control" id="empresa-rep-legal-telefono" autocomplete="off" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Cargo</label>
+                        <input type="text" class="form-control" id="empresa-rep-legal-cargo" placeholder="Representante Legal" autocomplete="off" />
+                    </div>
+                </div>
+            </div>
         </div>
         <div class="modal-footer">
             <button class="btn btn-outline" onclick="closeModal()">Cancelar</button>
@@ -4646,7 +4697,149 @@
         document.getElementById('edit-agropecuaria').checked = false;
         document.getElementById('link-path').value = '';
 
+        // 📦 I-FIRMA-DUAL · v0.1.180 — limpiar sección de Representante Legal
+        // (empresa nueva todavía no existe → no hay rep que cargar)
+        _clearRepLegalForm();
+
         openLinkModal();
+    }
+
+    // 📦 I-FIRMA-DUAL · v0.1.180 — Limpia los inputs de la sección Representante Legal
+    // en el modal de empresa. Usado al abrir "Nueva Empresa" y como fallback de carga.
+    function _clearRepLegalForm() {
+        const ids = [
+            'empresa-rep-legal-nombre',
+            'empresa-rep-legal-num-id',
+            'empresa-rep-legal-correo',
+            'empresa-rep-legal-telefono',
+            'empresa-rep-legal-cargo'
+        ];
+        ids.forEach(function (id) {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+        const tipoEl = document.getElementById('empresa-rep-legal-tipo-id');
+        if (tipoEl) tipoEl.value = 'CC';
+        const errEl = document.getElementById('empresa-rep-legal-correo-error');
+        if (errEl) {
+            errEl.textContent = '';
+            errEl.style.display = 'none';
+        }
+    }
+
+    // 📦 I-FIRMA-DUAL · v0.1.180 — Carga el representante legal de la empresa en
+    // los inputs del modal. Si no hay rep configurado, limpia los inputs.
+    // empresaKey = company_key (mismo valor que usa el bridge IPC).
+    async function _loadRepLegalIntoForm(empresaKey) {
+        _clearRepLegalForm();
+        if (!empresaKey) return;
+        if (!electronAPI || typeof electronAPI.repLegalGet !== 'function') {
+            console.warn('[CONFIG][REP-LEGAL] electronAPI.repLegalGet no disponible, se omite carga');
+            return;
+        }
+        try {
+            const res = await electronAPI.repLegalGet(empresaKey);
+            if (res && res.success && res.data && res.data.representante) {
+                const r = res.data.representante;
+                const setVal = function (id, v) {
+                    const el = document.getElementById(id);
+                    if (el) el.value = v || '';
+                };
+                setVal('empresa-rep-legal-nombre', r.nombre);
+                setVal('empresa-rep-legal-tipo-id', r.tipoIdentificacion || 'CC');
+                setVal('empresa-rep-legal-num-id', r.numeroIdentificacion);
+                setVal('empresa-rep-legal-correo', r.correo);
+                setVal('empresa-rep-legal-telefono', r.telefono);
+                setVal('empresa-rep-legal-cargo', r.cargo);
+            }
+            // Si no hay rep activo, los inputs quedan limpios (no es error)
+        } catch (e) {
+            console.warn('[CONFIG][REP-LEGAL] Error al cargar rep legal de', empresaKey, e);
+        }
+    }
+
+    // 📦 I-FIRMA-DUAL · v0.1.180 — Persiste el Representante Legal de la empresa
+    // leyendo los inputs del modal. Si no hay datos, retorna true sin hacer nada
+    // (no es obligatorio configurar rep legal al guardar la empresa).
+    // Si el correo no tiene formato válido, muestra error inline y retorna false.
+    async function _saveRepLegalForEmpresa(empresaKey) {
+        if (!empresaKey) return true;
+        const get = function (id) {
+            const el = document.getElementById(id);
+            return el ? String(el.value || '').trim() : '';
+        };
+        const nombre = get('empresa-rep-legal-nombre');
+        const correo = get('empresa-rep-legal-correo');
+        const numId = get('empresa-rep-legal-num-id');
+
+        // Si el usuario no rellenó nada en la sección, no tocamos el rep legal
+        if (!nombre && !correo && !numId) {
+            const errEl = document.getElementById('empresa-rep-legal-correo-error');
+            if (errEl) {
+                errEl.textContent = '';
+                errEl.style.display = 'none';
+            }
+            return true;
+        }
+
+        // Si rellenó nombre o número, el correo es obligatorio (regla de firma dual)
+        const errEl = document.getElementById('empresa-rep-legal-correo-error');
+        if (!correo) {
+            if (errEl) {
+                errEl.textContent = 'El correo es obligatorio si defines un representante legal.';
+                errEl.style.display = 'block';
+            }
+            return false;
+        }
+        // Validación simple: contiene @ y un punto después del @
+        if (!/^[^@]+@[^@]+\.[^@]+$/.test(correo)) {
+            if (errEl) {
+                errEl.textContent = 'Correo inválido';
+                errEl.style.display = 'block';
+            }
+            return false;
+        }
+        if (errEl) {
+            errEl.textContent = '';
+            errEl.style.display = 'none';
+        }
+
+        if (!electronAPI || typeof electronAPI.repLegalUpsert !== 'function') {
+            console.warn('[CONFIG][REP-LEGAL] electronAPI.repLegalUpsert no disponible, se omite guardado');
+            return true;
+        }
+
+        const repData = {
+            empresaId: empresaKey,
+            nombre: nombre,
+            tipoId: get('empresa-rep-legal-tipo-id') || 'CC',
+            numId: numId,
+            correo: correo,
+            telefono: get('empresa-rep-legal-telefono'),
+            cargo: get('empresa-rep-legal-cargo') || 'Representante Legal'
+        };
+
+        try {
+            const res = await electronAPI.repLegalUpsert({ data: repData });
+            if (res && res.success) {
+                console.log('[CONFIG][REP-LEGAL] Representante legal guardado para', empresaKey);
+                return true;
+            }
+            // Si el bridge devolvió error, mostrarlo inline y abortar
+            const msg = (res && res.error && res.error.message) ? res.error.message : 'Error al guardar representante legal';
+            if (errEl) {
+                errEl.textContent = msg;
+                errEl.style.display = 'block';
+            }
+            return false;
+        } catch (e) {
+            console.error('[CONFIG][REP-LEGAL] Error al guardar rep legal:', e);
+            if (errEl) {
+                errEl.textContent = 'Error al guardar representante legal: ' + (e.message || e);
+                errEl.style.display = 'block';
+            }
+            return false;
+        }
     }
 
     function getRiskColor(risk) {
@@ -4685,12 +4878,18 @@
             document.getElementById('link-path').value = '';
         }
 
+        // 📦 I-FIRMA-DUAL · v0.1.180 — Cargar Representante Legal de la empresa
+        _loadRepLegalIntoForm(companyName);
+
         openLinkModal();
     }
 
     function viewCompanyDetails(companyName) {
         // Buscar la empresa en la lista de compañías
         const company = companies.find(c => c.name === companyName);
+
+        // Guardar el nombre original (viewCompanyDetails se comporta como edit)
+        originalCompanyName = companyName;
 
         if (company) {
             // Rellenar el formulario con los datos actuales de la empresa
@@ -4714,6 +4913,9 @@
             document.getElementById('edit-agropecuaria').checked = false;
             document.getElementById('link-path').value = '';
         }
+
+        // 📦 I-FIRMA-DUAL · v0.1.180 — Cargar Representante Legal de la empresa
+        _loadRepLegalIntoForm(companyName);
 
         // Abrir el modal
         openLinkModal();
@@ -5640,7 +5842,22 @@
                             hasStructureStructure: !!(config.companyPaths[targetKeyName].structure?.structure)
                         });
 
-                        return electronAPI.saveConfig(config);
+                        // 📦 I-FIRMA-DUAL · v0.1.180 — Persistir Representante Legal
+                        // (después de la config de la empresa, usando el key final).
+                        // Solo se persiste si el usuario rellenó al menos un campo.
+                        // Si la validación de correo falla, abortamos y mostramos error inline.
+                        const repSavePromise = _saveRepLegalForEmpresa(targetKeyName).then(function (saveOk) {
+                            if (!saveOk) {
+                                // Cancelar el guardado de la config para no dejar la empresa
+                                // persistida sin rep legal válido (consistencia referencial débil).
+                                throw new Error('El correo del Representante Legal no tiene formato válido.');
+                            }
+                        });
+
+                        return Promise.all([
+                            electronAPI.saveConfig(config),
+                            repSavePromise
+                        ]).then(function (results) { return results[0]; });
                     });
                 })
                 .then(() => {

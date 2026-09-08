@@ -137,6 +137,20 @@ router.post('/sign-requests',
     }
     const meta = validation.data;
 
+    // I-FIRMA-DUAL: si el cliente pidió firma de empresa, debe traer el
+    // snapshot del representante. Validación inline para devolver 400 limpio
+    // con código semántico en vez de fallar después en createForCompany().
+    if (meta.requiere_firma_empresa === 1 && !meta.representante_legal_snapshot) {
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_REQUEST_BODY',
+          message: 'requiere_firma_empresa=1 exige representante_legal_snapshot',
+          details: { missing: 'representante_legal_snapshot' },
+          request_id: req.id,
+        },
+      });
+    }
+
     // Los campos visibles de la Constancia no deben perderse: zod quita
     // campos desconocidos del body raíz, así que los guardamos explícitamente
     // dentro del metadata persistido del sign request.
@@ -185,6 +199,12 @@ router.post('/sign-requests',
       // I-103.A1.6.C · El correo del firmante viaja top-level; si K+AIR no lo
       // envía, cae al fallback histórico de metadata.correo / consent.
       correo_verificacion: meta.correo_verificacion,
+      // I-FIRMA-DUAL (migration 013, v0.1.180): opt-in para que commit() del
+      // worker cree automáticamente un sign request hijo (tipo_firmante='EMPRESA')
+      // con el snapshot del representante legal. Si K+AIR no los envía, caen
+      // al default 0/null (legacy compat).
+      requiere_firma_empresa: meta.requiere_firma_empresa || 0,
+      representante_legal_snapshot: meta.representante_legal_snapshot || null,
       metadata: metadataToPersist,
       ip: req.ip,
       user_agent: req.get('User-Agent') || null,

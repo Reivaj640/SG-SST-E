@@ -394,6 +394,8 @@ function create({
   tipo_identificacion,  // I-002: categoría del doc que se firma (CONTRATO, OTROSI, etc.)
   consent_id,
   correo_verificacion,  // I-103.A1.6.C · RF-FIRMA-CORREO-01
+  requiere_firma_empresa,        // I-FIRMA-DUAL: opt-in para firma de empresa (v0.1.180)
+  representante_legal_snapshot,  // I-FIRMA-DUAL: snapshot del representante legal al crear el padre
 }) {
   // Validar PDF
   if (!Buffer.isBuffer(pdf_buffer)) {
@@ -533,8 +535,10 @@ function create({
          ip_origen, user_agent, pdf_original_path, metadata,
          verification_channel, consent_id,
          tipo_identificacion,  -- I-002 (migration 007)
-         correo_verificacion, correo_hash)  -- I-103.A1.6.C · RF-FIRMA-CORREO-01
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         correo_verificacion, correo_hash,  -- I-103.A1.6.C · RF-FIRMA-CORREO-01
+         requiere_firma_empresa, tipo_firmante,  -- I-FIRMA-DUAL (migration 013)
+         representante_legal_snapshot)  -- I-FIRMA-DUAL (migration 013)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id_solicitud, id_documento, id_trabajador, id_empresa,
       tipo_firma, calculated_hash, agreement_hash, agreement_version,
@@ -545,7 +549,10 @@ function create({
       consent_id || null,
       tipo_identificacion || null,
       correo_persisted,
-      correo_hash_persisted
+      correo_hash_persisted,
+      requiere_firma_empresa ? 1 : 0,  // I-FIRMA-DUAL: default 0 (legacy compat)
+      'TRABAJADOR',  // I-FIRMA-DUAL: el padre siempre es TRABAJADOR
+      representante_legal_snapshot ? JSON.stringify(representante_legal_snapshot) : null,
     );
     const firmaId = result.lastInsertRowid;
 
@@ -605,6 +612,244 @@ function create({
 
   const signRequest = getById(firmaId);
   return { signRequest, token, url_publica };
+}
+
+/**
+ * I-FIRMA-DUAL (v0.1.180) · Crea el sign request HIJO (tipo_firmante='EMPRESA')
+ * vinculado a un sign request PADRE mediante parent_id_solicitud.
+ *
+ * Pre-condiciones (validadas en este orden, ANTES de cualquier INSERT):
+ *   1. parent_id_solicitud y representante.correo presentes
+ *   2. El padre existe en BD
+ *   3. El padre tiene requiere_firma_empresa=1 (opt-in explícito del RH)
+ *   4. No existe ya un hijo para este padre (UNIQUE idx_gh_firmas_unico_hijo)
+ *   5. El Acuerdo del padre sigue siendo válido (re-validación 5-pasos)
+ *
+ * El hijo REUSA el PDF original del padre (NO copia el archivo en disco).
+ * Esto es por diseño: ambas firmas se aplican al mismo PDF; el padre es la
+ * fuente de verdad del documento.
+ *
+ * El hijo se inserta con:
+ *   - tipo_firmante = 'EMPRESA'
+ *   - id_trabajador = padre.id_trabajador (el documento es SOBRE ese trabajador;
+ *     el firmante es la empresa, no el trabajador. El esquema mantiene
+ *     id_trabajador NOT NULL por diseño: el padre es siempre la fuente
+ *     de verdad del sujeto del documento)
+ *   - parent_id_solicitud = padre.id_solicitud
+ *   - requiere_firma_empresa = 0 (el flag es del padre; el hijo lo hereda por contexto)
+ *   - representante_legal_snapshot = JSON.stringify(representante) (snapshot inmutable)
+ *   - estado = 'PENDING' (default)
+ *   - version_kair = padre.version_kair (el mismo flujo K+AIR)
+ *
+ * NOTA: el objeto JS retornado expone `id_trabajador: null` para que los
+ * callers distingan semánticamente "firma de empresa" vs "firma de trabajador"
+ * (la DB mantiene el id del trabajador del padre por la restricción NOT NULL).
+ *
+ * Notificación al representante: fire-and-forget vía notifyRemote (no bloquea
+ * la respuesta del create). Si la notificación falla (sync o async), se
+ * loguea pero NO se propaga — el hijo ya está persistido y la invitación
+ * puede re-enviarse después vía el endpoint /notify.
+ *
+ * Retorna el objeto del hijo SIN el token en claro (el token solo viaja en
+ * el correo de invitación al representante, no en la respuesta HTTP).
+ *
+ * @param {object} opts
+ * @param {string} opts.parent_id_solicitud - id_solicitud del padre (SIGN-YYYY-NNNNNN)
+ * @param {string} opts.id_empresa - empresa que firma
+ * @param {string} opts.id_documento - id del documento (mismo que el padre)
+ * @param {object} opts.representante - snapshot del representante legal
+ * @param {string} opts.representante.correo
+ * @param {string} opts.representante.nombre
+ * @param {string} [opts.representante.tipo_identificacion] - default 'CC'
+ * @param {string} [opts.representante.numero_identificacion]
+ * @param {string} [opts.representante.cargo]
+ * @returns {object} - el hijo creado (sin token en claro)
+ * @throws AppError 400 INVALID_REQUEST_BODY si faltan params
+ * @throws AppError 404 PARENT_NOT_FOUND si el padre no existe
+ * @throws AppError 409 INVALID_STATE si el padre no requiere firma de empresa
+ * @throws AppError 409 COMPANY_FIRMA_ALREADY_EXISTS si ya hay un hijo
+ * @throws AppError 422 ACUERDO_INVALIDO si el Acuerdo del padre ya no es válido
+ */
+function createForCompany({ parent_id_solicitud, id_empresa, id_documento, representante }) {
+  if (!parent_id_solicitud) {
+    throw new AppError(400, 'INVALID_REQUEST_BODY', 'parent_id_solicitud es requerido');
+  }
+  if (!representante || !representante.correo) {
+    throw new AppError(400, 'INVALID_REQUEST_BODY', 'representante.correo es requerido');
+  }
+
+  // 1. Leer el padre
+  //    📦 v0.1.180 (Task 1.14): incluimos `consent_id` en el SELECT para
+  //    poder heredarlo al hijo. La cadena legal del Bloque E6 es la misma
+  //    para ambas firmas (mismo Acuerdo v1.0 → mismo consentimiento
+  //    ACEPTADO). Sin este link, el commit del rep falla en
+  //    `consentService.validateForCommit` con 409 CONSENT_REQUIRED
+  //    porque el hijo tiene `agreement_version` heredada pero
+  //    `consent_id = NULL`.
+  const padre = db.prepare(`
+    SELECT id_solicitud, id_empresa, id_documento, id_trabajador, version_kair,
+           pdf_original_path, document_hash_original,
+           agreement_version, agreement_hash, requiere_firma_empresa,
+           consent_id
+    FROM gh_firmas_electronicas
+    WHERE id_solicitud = ?
+  `).get(parent_id_solicitud);
+
+  if (!padre) {
+    throw new AppError(404, 'PARENT_NOT_FOUND', `Sign request padre '${parent_id_solicitud}' no existe`);
+  }
+
+  // 2. Validar que requiere firma de empresa
+  if (padre.requiere_firma_empresa !== 1) {
+    throw new AppError(409, 'INVALID_STATE',
+      `El sign request padre no requiere firma de empresa (requiere_firma_empresa=${padre.requiere_firma_empresa})`);
+  }
+
+  // 3. Validar que no existe ya un hijo (UNIQUE constraint idx_gh_firmas_unico_hijo).
+  //    Pre-check defensivo para devolver un 409 limpio con código semántico
+  //    en vez de propagar el error crudo de SQLite ("UNIQUE constraint failed").
+  const existingHijo = db.prepare(
+    'SELECT id_solicitud FROM gh_firmas_electronicas WHERE parent_id_solicitud = ?'
+  ).get(parent_id_solicitud);
+  if (existingHijo) {
+    throw new AppError(409, 'COMPANY_FIRMA_ALREADY_EXISTS',
+      `Ya existe un sign request hijo (${existingHijo.id_solicitud}) para este padre (UNIQUE idx_gh_firmas_unico_hijo)`);
+  }
+
+  // 4. Validar Acuerdo del padre (re-validación 5-pasos; misma función que create)
+  validateAcuerdo(padre.agreement_version, padre.agreement_hash);
+
+  // 5. Generar token + IDs
+  const token = generateToken();
+  const token_hash = hashToken(token);
+  const id_solicitud = generateIdSolicitud();
+  const sesion_id = require('crypto').randomUUID();
+
+  // 6. TTL (mismo que el padre: remote, es firma remota por definición)
+  const ttl_horas = config.ttl.tokenHoursRemote;
+  const now = new Date();
+  const fecha_expiracion = new Date(now.getTime() + ttl_horas * 3600 * 1000).toISOString();
+
+  // 7. Insertar (reusando el PDF original del padre).
+  //    metadata contiene el token cifrado para futura recuperación del link
+  //    (mismo patrón I-013b que create()).
+  const tokenEncrypted = encryptToken(token);
+  const metadataToStore = JSON.stringify({
+    _server_metadata: {
+      token_encrypted: tokenEncrypted,
+      parent_id_solicitud,
+      tipo_firmante: 'EMPRESA',
+    },
+  });
+
+  const result = db.prepare(`
+    INSERT INTO gh_firmas_electronicas (
+      id_solicitud, id_documento, id_empresa, id_trabajador,
+      tipo_firma, agreement_version, agreement_hash, document_hash_original,
+      pdf_original_path, fecha_creacion, fecha_expiracion, estado,
+      token_hash, sesion_id, correo_verificacion, metadata,
+      version_kair,
+      requiere_firma_empresa, tipo_firmante, parent_id_solicitud,
+      representante_legal_snapshot, identificacion_tipo,
+      consent_id,  -- 📦 v0.1.180 (Task 1.14): heredado del padre (misma cadena legal Bloque E6)
+      identificacion_numero_hash  -- 📦 v0.1.180 (Task 1.14): pre-poblado del snapshot
+    ) VALUES (
+      ?, ?, ?, ?,
+      'remoto', ?, ?, ?,
+      ?, ?, ?, 'PENDING',
+      ?, ?, ?, ?,
+      ?,
+      0, 'EMPRESA', ?,
+      ?, ?,
+      ?,
+      ?
+    )
+  `).run(
+    id_solicitud, id_documento, id_empresa, padre.id_trabajador,
+    padre.agreement_version, padre.agreement_hash, padre.document_hash_original,
+    padre.pdf_original_path, now.toISOString(), fecha_expiracion,
+    token_hash, sesion_id, representante.correo, metadataToStore,
+    padre.version_kair,
+    parent_id_solicitud,
+    JSON.stringify(representante),
+    representante.tipo_identificacion || 'CC',
+    padre.consent_id,
+    // 📦 v0.1.180 (Task 1.14): hash de la cédula del rep para que
+    // publicFlow.identify() pase el precheck de MISSING_IDENTIFICATION_DATA.
+    // El rep debe ingresar exactamente este CC en la mini-app. Si RH captura
+    // un CC distinto en el snapshot (numero_identificacion), el rep no
+    // podrá identificarse — diseño conservador: el rep ES la persona del
+    // snapshot, no cualquier persona que sepa la URL.
+    representante.numero_identificacion ? sha256(representante.numero_identificacion) : null
+  );
+  const childId = result.lastInsertRowid;
+
+  // 8. Notificar al representante legal (I-FIRMA-DUAL, v0.1.180).
+  //    Se usa `mailer.sendInviteForCompany` (correo DIFERENCIADO al del
+  //    worker) en vez de `notifyRemote` (que es el flujo del worker).
+  //    El token se recupera del metadata cifrado que acabamos de
+  //    persistir (mismo patrón I-013b que `create()` y `notifyRemote`).
+  //    Fire-and-forget: la notificación NO bloquea el create. Si la
+  //    notificación falla, se loguea error pero el create ya quedó
+  //    persistido y se retorna exitosamente al caller.
+  //
+  //    Se usa una IIFE async + .catch() en vez de await para NO cambiar
+  //    la firma de createForCompany a async (mantiene backward compat
+  //    con callers que esperan retorno sync).
+  const mailer = require('./mailer');
+  // Re-leer el signRequest del hijo (ahora tiene el metadata con token cifrado).
+  const hijoRow = db.prepare(
+    'SELECT id_solicitud, metadata FROM gh_firmas_electronicas WHERE id_solicitud = ?'
+  ).get(id_solicitud);
+  (async () => {
+    try {
+      const recovery = getTokenForRecovery(hijoRow);
+      if (recovery.found) {
+        await mailer.sendInviteForCompany({
+          to: representante.correo,
+          url_publica: recovery.url_publica,
+          id_solicitud: id_solicitud,
+          id_documento: id_documento,
+          rep_nombre: representante.nombre,
+          context: { parent_id_solicitud, tipo_firmante: 'EMPRESA' },
+        });
+        logger.info('firma-dual: invitación enviada al rep', {
+          id_solicitud,
+          rep_correo: representante.correo,
+        });
+      } else {
+        logger.error('firma-dual: no se pudo recuperar el token para notificar', {
+          id_solicitud,
+          reason: recovery.reason,
+        });
+      }
+    } catch (err) {
+      logger.error('firma-dual: notify falló', {
+        id_solicitud,
+        error: err.message,
+      });
+      // No fallar el create por un error de notificación.
+    }
+  })().catch(err => {
+    // Catch final por si la IIFE misma lanza (no debería, pero defensivo).
+    logger.error('firma-dual: notify IIFE failed', {
+      id_solicitud,
+      error: err.message,
+    });
+  });
+
+  // 9. Retornar el hijo (sin token en claro)
+  return {
+    id_solicitud,
+    id_documento,
+    id_empresa,
+    id_trabajador: null,
+    tipo_firmante: 'EMPRESA',
+    parent_id_solicitud,
+    correo_verificacion: representante.correo,
+    estado: 'PENDING',
+    fecha_expiracion,
+  };
 }
 
 /**
@@ -694,7 +939,10 @@ function getById(id) {
            version_kair, manifestacion_voluntad_texto,
            manifestacion_voluntad_hash, pdf_original_path, pdf_firmado_path,
            constancia_path, metadata, consent_id,
-           tipo_identificacion  -- I-002 (migration 007)
+           tipo_identificacion,  -- I-002 (migration 007)
+           requiere_firma_empresa, tipo_firmante,  -- I-FIRMA-DUAL (migration 013)
+           parent_id_solicitud,  -- I-FIRMA-DUAL (migration 013)
+           representante_legal_snapshot  -- I-FIRMA-DUAL (migration 013)
     FROM gh_firmas_electronicas
     WHERE id = ?
     LIMIT 1
@@ -875,6 +1123,7 @@ function registerEvent(firmaId, evento, metadata, actor, ip, user_agent) {
 
 module.exports = {
   create,
+  createForCompany,  // I-FIRMA-DUAL: sign request hijo (tipo_firmante='EMPRESA')
   getById,
   getByIdSolicitud,
   getByTokenHash,

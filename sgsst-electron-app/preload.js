@@ -509,6 +509,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Agreement (1)
   firmaAgreementGet: (args) => ipcRenderer.invoke('firma:agreement:get', args || {}),
 
+  // --- I-FIRMA-DUAL · v0.1.180 — Representante Legal por empresa ---
+  // Bridge: main/empresa-representante-legal-bridge.js (canal 'rep-legal:get').
+  // Multi-tenant: el bridge recibe `empresaId` (= company_key).
+  // Soft auth: el handler acepta sin token; no se requiere enviar credenciales.
+  // Retorna: { success, data: { representante: { id, empresaId, nombre,
+  //   tipoIdentificacion, numeroIdentificacion, correo, telefono, cargo,
+  //   activo, creadoEn, actualizadoEn } | null } }
+  repLegalGet: (empresaId) => ipcRenderer.invoke('rep-legal:get', { empresaId }),
+
+  // 📦 I-FIRMA-DUAL · v0.1.180 — Upsert del Representante Legal.
+  // Bridge: main/empresa-representante-legal-bridge.js (canal 'rep-legal:upsert').
+  // Input:  { data: { empresaId, nombre, tipoId, numId, correo, telefono?, cargo? } }
+  // Output: { success, data: { id, updated: bool } } | { success: false, error }
+  repLegalUpsert: (args) => ipcRenderer.invoke('rep-legal:upsert', args || {}),
+
   // 📦101-extra (2026-08-20) — Per-empresa admin (I-010 per-company authz, AUD-04)
   // 7 canales: 6 firma:empresa:* + 1 firma:config:set-admin-key
   // DR-1..6 binding. Ver storage-backup/specs/kair-auth-spec.md §5.6/5.7

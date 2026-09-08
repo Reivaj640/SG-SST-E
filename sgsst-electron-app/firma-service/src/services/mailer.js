@@ -226,6 +226,90 @@ async function sendInvite({ to, url_publica, id_solicitud, context }) {
 }
 
 /**
+ * Envía invitación al representante legal de la empresa para firmar
+ * como 2da firma (I-FIRMA-DUAL).
+ *
+ * El correo es DIFERENCIADO al del worker:
+ * - Subject menciona "representante legal" / "firma dual"
+ * - Body explica que el worker ya firmó y el rep es la 2da firma
+ * - Body identifica al rep por nombre
+ *
+ * @param {object} opts
+ * @param {string} opts.to - Correo del rep
+ * @param {string} opts.url_publica - URL completa del link de firma
+ * @param {string} opts.id_solicitud - ID del sign request
+ * @param {string} opts.id_documento - ID del documento
+ * @param {string} opts.rep_nombre - Nombre del representante legal
+ * @param {object} opts.context - Metadata adicional
+ *
+ * @returns {Promise<{ok: boolean, messageId?: string}>}
+ */
+async function sendInviteForCompany({ to, url_publica, id_solicitud, id_documento, rep_nombre, context }) {
+  if (typeof to !== 'string' || !to.includes('@')) {
+    throw new Error('sendInviteForCompany: `to` debe ser un correo válido');
+  }
+  if (typeof url_publica !== 'string' || url_publica.length === 0) {
+    throw new Error('sendInviteForCompany: `url_publica` requerida');
+  }
+  if (typeof id_solicitud !== 'string' || id_solicitud.length === 0) {
+    throw new Error('sendInviteForCompany: `id_solicitud` requerido');
+  }
+  if (typeof id_documento !== 'string' || id_documento.length === 0) {
+    throw new Error('sendInviteForCompany: `id_documento` requerido');
+  }
+
+  const subject = `K+AIR — Firma como representante legal — ${id_documento}`;
+  const body = [
+    `Hola ${rep_nombre || 'Representante Legal'},`,
+    '',
+    'Has sido designado como representante legal de la empresa para firmar',
+    'un documento como SEGUNDA FIRMA (la primera ya fue firmada por el trabajador).',
+    '',
+    `ID de solicitud: ${id_solicitud}`,
+    `ID de documento: ${id_documento}`,
+    '',
+    'Para firmar:',
+    `1. Abre este enlace en tu navegador: ${url_publica}`,
+    '2. Identifícate con tu tipo y número de documento de identidad (CC, CE, etc.).',
+    '3. Recibirás un código (OTP) en este mismo correo.',
+    '4. Ingrésalo en la página para ver el documento y firmar como representante legal.',
+    '',
+    'El enlace expira según la configuración del documento (típicamente 24-72h).',
+    'Si no reconoces esta operación, contacta al área de RRHH de inmediato.',
+    '',
+    '— K+AIR Firma Dual',
+  ].join('\n');
+
+  if (config.env === 'production') {
+    const transporter = getTransporter();
+    const info = await transporter.sendMail({
+      from: `"${config.smtp.fromName}" <${config.smtp.fromEmail}>`,
+      to,
+      subject,
+      text: body,
+    });
+    return { ok: true, messageId: info.messageId };
+  }
+
+  // Dev: jsonTransport no envía, pero guardamos en inbox para tests.
+  logger.info('[DEV-INVITE-COMPANY] Invitación al rep simulada', {
+    to: to.replace(/(.{2}).*(@.*)/, '$1***$2'),
+    id_solicitud,
+    message_id_preview: `<${Math.random().toString(36).slice(2)}@dev>`,
+  });
+  const entry = {
+    to, subject, body, tipo: 'invite-company',
+    id_solicitud, id_documento, rep_nombre, url_publica,
+    context: context || null,
+    sentAt: new Date().toISOString(),
+  };
+  _devInbox.push(entry);
+  if (_devInbox.length > 50) _devInbox.shift();
+
+  return { ok: true, messageId: 'dev-invite-company-' + Date.now() };
+}
+
+/**
  * Envía un OTP al correo del trabajador.
  *
  * @param {object} opts
@@ -346,6 +430,7 @@ module.exports = {
   sendOTP,
   sendSignedCopy,
   sendInvite,
+  sendInviteForCompany,  // I-FIRMA-DUAL: invitación al rep legal (2da firma)
   getDevInbox,
   clearDevInbox,
 };

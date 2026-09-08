@@ -482,6 +482,13 @@ async function commit(token, opts, ip, user_agent) {
   // 1. Resolver token
   const { signRequest } = resolveToken(token);
 
+  // 📦 I-FIRMA-DUAL (v0.1.180): detectar si este commit es del representante
+  // legal (sign request hijo con tipo_firmante='EMPRESA'). Si lo es, el PDF
+  // generado lleva las 2 firmas (trabajador del padre + empresa del rep) y al
+  // final del commit ambos sign requests (padre e hijo) quedan en estado
+  // DUAL_FIRMADO. Si NO lo es, flujo legacy intacto (1 firma del worker).
+  const isCompanyCommit = signRequest.tipo_firmante === 'EMPRESA';
+
   // 2. Re-validar que el Acuerdo vinculado sigue siendo el activo (D2)
   validateAgreementStillActive(signRequest);
 
@@ -530,13 +537,75 @@ async function commit(token, opts, ip, user_agent) {
   //    ambos se calculan DESPUÉS de generar el PDF y persisten en BD).
   const fecha_firma = new Date().toISOString();
   const pdfFirmadoBuf = await withAppErrorWrapping(
-    () => pdfGen.generateSignedPdf(pdfOriginal, {
-      id_solicitud: signRequest.id_solicitud,
-      id_documento: signRequest.id_documento,
-      id_trabajador: signRequest.id_trabajador,
-      agreement_version: signRequest.agreement_version,
-      fecha_firma,
-    }),
+    async () => {
+      if (isCompanyCommit) {
+        // 📦 I-FIRMA-DUAL: el rep está firmando (hijo con tipo_firmante='EMPRESA').
+        // Construir array de 2 firmas: el worker del PADRE (ya firmó) + la
+        // empresa del rep actual. El PDF sale con 3 páginas (original + sello
+        // + constancia dual visible). Usamos el padreRow para recuperar la
+        // fecha_firma del worker y sus datos identificativos.
+        const padreRow = db.prepare(
+          'SELECT * FROM gh_firmas_electronicas WHERE id_solicitud = ?'
+        ).get(signRequest.parent_id_solicitud);
+        const padreMeta = padreRow?.metadata ? JSON.parse(padreRow.metadata) : {};
+
+        const firmasParaPdf = [
+          {
+            tipo: 'TRABAJADOR',
+            firmante: {
+              id_trabajador: padreRow?.id_trabajador,
+              nombre: padreMeta.nombre_trabajador || padreRow?.id_trabajador,
+              identificacion: (padreRow?.identificacion_tipo || '')
+                + ' '
+                + (padreRow?.identificacion_numero_hash?.substring(0, 6) || '***'),
+            },
+            fecha_firma: padreRow?.fecha_manifestacion || padreRow?.fecha_firma,
+            id_solicitud_firmante: padreRow?.id_solicitud,
+          },
+          {
+            tipo: 'EMPRESA',
+            firmante: {
+              id_trabajador: null,
+              nombre: 'Representante legal',
+              // Los datos del rep están en representante_legal_snapshot del
+              // padre (se snapshotearon al crear el padre con la flag activa);
+              // pero para identificar al firmante actual usamos la
+              // identificación que ÉL ingresó durante identify() en este
+              // commit (signRequest.identificacion_*).
+              identificacion: (signRequest.identificacion_tipo || '')
+                + ' '
+                + (signRequest.identificacion_numero_hash?.substring(0, 6) || '***'),
+            },
+            fecha_firma: signRequest.fecha_manifestacion || new Date().toISOString(),
+            id_solicitud_firmante: signRequest.id_solicitud,
+          },
+        ];
+
+        return pdfGen.generateSignedPdf(pdfOriginal, {
+          id_solicitud: signRequest.id_solicitud,
+          id_documento: signRequest.id_documento,
+          agreement_version: signRequest.agreement_version,
+          fecha_firma: new Date().toISOString(),
+          firmas: firmasParaPdf,
+          // Pasar también `firmante_display` para que addSelloPage muestre
+          // al rep (firmante actual de este commit), NO al worker del padre.
+          firmante_display: firmasParaPdf[1].firmante,
+        });
+      } else {
+        // Flujo legacy (1 firma del worker). Se pasa también `firmante_display`
+        // poblado con el id_trabajador para que addSelloPage lo use (el
+        // render visual es idéntico a v0.1.179 porque usa el id_trabajador
+        // como fallback).
+        return pdfGen.generateSignedPdf(pdfOriginal, {
+          id_solicitud: signRequest.id_solicitud,
+          id_documento: signRequest.id_documento,
+          id_trabajador: signRequest.id_trabajador,
+          agreement_version: signRequest.agreement_version,
+          fecha_firma,
+          firmante_display: { id_trabajador: signRequest.id_trabajador, nombre: signRequest.id_trabajador },
+        });
+      }
+    },
     'PDF_GENERATION_FAILED',
     'No se pudo generar el PDF firmado',
   );
@@ -868,6 +937,94 @@ async function commit(token, opts, ip, user_agent) {
     id_constancia,
     evidence_hash,
   });
+
+  // 📦 I-FIRMA-DUAL: trigger para crear el hijo si requiere_firma_empresa=1
+  // Va DESPUÉS de la firma del padre (paso 11) y del envío de copia (paso 13).
+  // Si falla la creación del hijo, NO revertir el commit del padre — el padre
+  // ya firmó legalmente y el snapshot permite reproceso manual por RH.
+  if (signRequest.requiere_firma_empresa === 1) {
+    try {
+      const representante = signRequest.representante_legal_snapshot
+        ? JSON.parse(signRequest.representante_legal_snapshot)
+        : null;
+
+      if (!representante || !representante.correo) {
+        logger.error('firma-dual: padre requiere firma empresa pero sin snapshot del representante', {
+          id_solicitud: signRequest.id_solicitud,
+        });
+        // NO fallar el commit del worker — el padre ya firmó
+      } else {
+        await signRequestService.createForCompany({
+          parent_id_solicitud: signRequest.id_solicitud,
+          id_empresa: signRequest.id_empresa,
+          id_documento: signRequest.id_documento,
+          representante,
+        });
+
+        // 📦 Registrar evento de auditoría
+        signRequestService.registerEvent(
+          signRequest.id,
+          'COMPANY_FIRMA_DISPARADA',
+          { parent: signRequest.id_solicitud, rep_correo: representante.correo },
+          'server', null, null
+        );
+
+        logger.info('firma-dual: hijo creado automáticamente', {
+          padre: signRequest.id_solicitud,
+          rep_correo: representante.correo,
+        });
+      }
+    } catch (err) {
+      // Si falla la creación del hijo, NO revertir el commit del padre
+      logger.error('firma-dual: error creando hijo', {
+        padre: signRequest.id_solicitud,
+        error: err.message,
+        stack: err.stack,
+      });
+    }
+  }
+
+  // 📦 I-FIRMA-DUAL (v0.1.180): cierre de la firma dual.
+  // Si este commit es del rep (tipo_firmante='EMPRESA'), el PDF ya fue
+  // generado con las 2 firmas y enviado. Ahora: marcar AMBOS sign requests
+  // (padre e hijo) como DUAL_FIRMADO y registrar COMPANY_FIRMA_COMPLETADA.
+  // Se hace en try/catch separado: si falla, NO revertir el commit — el PDF
+  // ya está firmado y enviado al correo; el estado DUAL_FIRMADO puede
+  // corregirse por reproceso manual de RH sin perder la firma legal.
+  if (isCompanyCommit) {
+    try {
+      db.prepare(
+        "UPDATE gh_firmas_electronicas SET estado = 'DUAL_FIRMADO' WHERE id_solicitud = ?"
+      ).run(signRequest.parent_id_solicitud);
+      db.prepare(
+        "UPDATE gh_firmas_electronicas SET estado = 'DUAL_FIRMADO' WHERE id_solicitud = ?"
+      ).run(signRequest.id_solicitud);
+
+      signRequestService.registerEvent(
+        signRequest.id,
+        'COMPANY_FIRMA_COMPLETADA',
+        {
+          parent: signRequest.parent_id_solicitud,
+          hijo: signRequest.id_solicitud,
+          documento_hash_dual: document_hash_firmado,
+        },
+        'server', null, null
+      );
+
+      logger.info('firma-dual: DUAL_FIRMADO', {
+        padre: signRequest.parent_id_solicitud,
+        hijo: signRequest.id_solicitud,
+      });
+    } catch (err) {
+      logger.error('firma-dual: error marcando DUAL_FIRMADO', {
+        error: err.message,
+        stack: err.stack,
+        padre: signRequest.parent_id_solicitud,
+        hijo: signRequest.id_solicitud,
+      });
+      // NO fallar el commit — el PDF ya está generado y enviado
+    }
+  }
 
   return {
     ok: true,

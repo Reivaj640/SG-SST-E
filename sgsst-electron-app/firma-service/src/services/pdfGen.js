@@ -147,7 +147,16 @@ async function addSelloPage(pdfDoc, metadata) {
   line('DOCUMENTO FIRMADO ELECTRONICAMENTE', { x: 60, bold: true, size: 15, color: azul, lh: 22 });
   line('=========================================================================', { color: azul, lh: 26 });
 
-  line(`Firmante:        ${metadata.id_trabajador}`, { bold: true });
+  // 📦 I-FIRMA-DUAL (v0.1.180): si el metadata trae `firmante_display`
+  // (caso del commit del rep, que pasa el firmante actual), mostrarlo
+  // en vez de `id_trabajador`. Esto evita que el PDF del rep diga
+  // "Firmante: <id_trabajador del worker>" cuando quien está firmando
+  // AHORA es el representante legal. Si NO viene (legacy / 1 firma del
+  // worker), fallback idéntico a v0.1.179: muestra el id_trabajador.
+  const displayFirmante = metadata.firmante_display
+    ? (metadata.firmante_display.nombre || metadata.firmante_display.id_trabajador || 'N/A')
+    : (metadata.id_trabajador || 'N/A');
+  line(`Firmante:        ${displayFirmante}`, { bold: true });
   line(`Documento:       ${metadata.id_documento}`);
   line(`ID Solicitud:    ${metadata.id_solicitud}`);
   line(`Fecha de firma:  ${metadata.fecha_firma}`);
@@ -173,31 +182,195 @@ async function addSelloPage(pdfDoc, metadata) {
 }
 
 /**
+ * Construye un array de firmas a partir del metadata legacy (sin `firmas`).
+ * Backward compat: callers que aún pasan el shape v0.1.179 (id_trabajador,
+ * fecha_firma, id_solicitud a pelo) siguen funcionando idéntico. El PDF
+ * resultante tiene 1 firma del worker (sin página de constancia dual).
+ */
+function buildLegacyFirmasFromMetadata(metadata) {
+  return [{
+    tipo: 'TRABAJADOR',
+    firmante: {
+      id_trabajador: metadata.id_trabajador,
+      nombre: metadata.id_trabajador, // fallback al id si no hay nombre
+    },
+    fecha_firma: metadata.fecha_firma,
+    id_solicitud_firmante: metadata.id_solicitud,
+  }];
+}
+
+/**
+ * Normaliza una firma a la forma canónica { tipo, firmante, fecha_firma }.
+ * Acepta tanto el shape del brief (f.tipo, f.firmante.nombre, ...) como
+ * el shape que llega del frontend (f.tipo_firmante, f.nombre a pelo).
+ * Devuelve null si la entrada es vacía (filtro posterior).
+ */
+function normalizeFirma(f) {
+  if (!f) return null;
+  return {
+    tipo: f.tipo || f.tipo_firmante || 'TRABAJADOR',
+    firmante: {
+      nombre: f.firmante?.nombre || f.nombre || 'N/A',
+      identificacion: f.firmante?.identificacion || f.identificacion || null,
+      id_trabajador: f.firmante?.id_trabajador || f.id_trabajador || f.identificacion || null,
+      correo: f.firmante?.correo || f.correo || null,
+    },
+    fecha_firma: f.fecha_firma || null,
+    id_solicitud_firmante: f.id_solicitud_firmante || null,
+  };
+}
+
+/**
+ * Escapa una cadena para usarla como string literal PDF `(...)`:
+ * - paréntesis y backslash se escapan con backslash
+ * - chars no-ASCII (acentos, etc.) se escapan con octal `\nnn`
+ *   usando WinAnsiEncoding (que es lo que entiende Helvetica por defecto).
+ * Esto evita que un nombre con acentos rompa el content stream.
+ */
+function escapePdfLiteralString(s) {
+  if (s == null) return '';
+  return String(s).replace(/[\\()\r\n]/g, function (m) {
+    if (m === '\\') return '\\\\';
+    if (m === '(') return '\\(';
+    if (m === ')') return '\\)';
+    if (m === '\r') return '\\r';
+    if (m === '\n') return '\\n';
+    return m;
+  }).replace(/[^\x20-\x7e]/g, function (m) {
+    // Chars fuera de ASCII imprimible → octal de 1-3 dígitos (\nnn)
+    const code = m.charCodeAt(0) & 0xFF;
+    return '\\' + code.toString(8).padStart(3, '0');
+  });
+}
+
+/**
+ * Agrega la página visible de "Constancia de firma dual" al final del
+ * PDF firmado. Solo se invoca cuando hay 2+ firmas (firma dual o múltiple).
+ * Lista cada firmante con su tipo, nombre, identificación y fecha de firma.
+ *
+ * Implementación: el content stream se construye manualmente como
+ * `PDFRawStream` (sin compresión FlateDecode) con texto literal
+ * `(...) Tj` (sin codificación hex de pdf-lib). Esto es necesario para
+ * que los nombres de los firmantes queden buscables en los bytes crudos
+ * del PDF (lo requiere el test GREEN de pdfGen-firma-dual.test.js).
+ */
+async function addConstanciaDualPage(pdfDoc, firmas) {
+  // 1. Construir el content stream como string con sintaxis PDF literal.
+  const ops = [];
+  ops.push('BT');
+  ops.push('/F1 18 Tf');
+  ops.push('50 750 Td');
+  ops.push('(' + escapePdfLiteralString('CONSTANCIA DE FIRMA DUAL') + ') Tj');
+  ops.push('0 -30 Td');
+  ops.push('/F1 11 Tf');
+  ops.push('(' + escapePdfLiteralString('Documento firmado por ' + firmas.length + ' partes:') + ') Tj');
+
+  for (let i = 0; i < firmas.length; i++) {
+    const f = firmas[i];
+    const nombre = f.firmante?.nombre || f.firmante?.id_trabajador || 'N/A';
+    ops.push('0 -30 Td');
+    ops.push('/F1 12 Tf');
+    ops.push('(' + escapePdfLiteralString('Firma ' + (i + 1) + ': ' + f.tipo) + ') Tj');
+    ops.push('0 -18 Td');
+    ops.push('/F1 10 Tf');
+    ops.push('(' + escapePdfLiteralString('  Firmante: ' + nombre) + ') Tj');
+    if (f.firmante?.identificacion) {
+      ops.push('0 -14 Td');
+      ops.push('(' + escapePdfLiteralString('  Identificacion: ' + f.firmante.identificacion) + ') Tj');
+    }
+    ops.push('0 -14 Td');
+    ops.push('(' + escapePdfLiteralString('  Fecha: ' + (f.fecha_firma || 'N/A')) + ') Tj');
+  }
+  ops.push('ET');
+  const contentStr = ops.join('\n');
+  const contentBuffer = Buffer.from(contentStr, 'latin1');
+
+  // 2. Crear un stream CRUDO (sin compresión) — pdf.context.stream() devuelve
+  //    PDFRawStream por defecto cuando se le pasa un Buffer. NO usar
+  //    pdf.context.flateStream() ni PDFContentStream (que sí comprimen).
+  const contentStream = pdfDoc.context.stream(contentBuffer, {});
+
+  // 2b. REGISTRAR el stream como objeto indirecto. Sin esto, el stream
+  //     queda "in-line" y pdf-lib no lo serializa (PDF requiere streams
+  //     como objetos indirectos). El ref es lo que va en `Contents`.
+  const contentStreamRef = pdfDoc.context.register(contentStream);
+
+  // 3. Registrar un font dictionary para esta página (Helvetica con WinAnsi).
+  const fontRef = pdfDoc.context.nextRef();
+  pdfDoc.context.assign(fontRef, pdfDoc.context.obj({
+    Type: 'Font',
+    Subtype: 'Type1',
+    BaseFont: 'Helvetica',
+    Encoding: 'WinAnsiEncoding',
+  }));
+
+  // 4. Agregar la página al PDF y SOBREESCRIBIR su Contents + Resources
+  //    con el stream crudo (vía ref) y el font. El page ref queda en el
+  //    Pages tree (eso lo hace addPage por sí solo).
+  const page = pdfDoc.addPage([612, 792]);
+  const resources = pdfDoc.context.obj({
+    Font: pdfDoc.context.obj({ F1: fontRef }),
+  });
+  pdfDoc.context.assign(page.ref, pdfDoc.context.obj({
+    Type: 'Page',
+    Parent: pdfDoc.context.trailerInfo.Root,
+    MediaBox: [0, 0, 612, 792],
+    Contents: contentStreamRef,
+    Resources: resources,
+  }));
+}
+
+/**
  * Toma el PDF original (Buffer), le agrega la página de sello visible
  * y le añade metadata XMP de firma electrónica.
+ *
+ * Backward compat: si `metadata.firmas` NO está presente (o es []), se
+ * construye 1 firma desde los campos legacy (id_trabajador, fecha_firma,
+ * id_solicitud) y el PDF sale con 2 páginas (1 original + 1 sello).
+ *
+ * Firma dual: si `metadata.firmas` tiene 2+ entradas, se agrega además
+ * una página visible de "Constancia de firma dual" y los XMP keywords
+ * llevan prefijos `firma_1_`, `firma_2_`, ... con tipo y nombre de cada
+ * firmante (1 original + 1 sello + 1 constancia = 3 páginas).
  *
  * IMPORTANTE: los keywords XMP NO incluyen `document_hash_firmado` ni
  * `evidence_hash` por una razón técnica: ambos dependen del buffer final
  * del PDF firmado (chicken-and-egg). Se calculan DESPUÉS de generar el
- * PDF y se persisten en la BD, no en el XMP del archivo. El XMP incluye
- * solo metadatos verificables visualmente: id_solicitud, agreement_version,
- * fecha_firma, id_trabajador.
+ * PDF y se persisten en la BD, no en el XMP del archivo.
  *
  * @param {Buffer} originalBuffer
  * @param {object} metadata - { id_solicitud, id_documento, id_trabajador,
- *                              agreement_version, fecha_firma }
+ *                              agreement_version, fecha_firma, firmas? }
  * @returns {Promise<Buffer>}
  */
 async function generateSignedPdf(originalBuffer, metadata) {
   const pdfDoc = await PDFDocument.load(originalBuffer);
 
-  // Página de sello visible (antes de guardar, para que quede embebida)
+  // Construir array de firmas (backward compat).
+  // Si el caller NO pasa `firmas` (o pasa []), se construye 1 firma del
+  // worker desde los campos legacy. Se normaliza cada firma para aceptar
+  // tanto el shape { tipo, firmante: {...} } como el shape "frontend"
+  // { tipo_firmante, nombre, identificacion, ... } a pelo.
+  const rawFirmas = metadata.firmas && metadata.firmas.length > 0
+    ? metadata.firmas
+    : buildLegacyFirmasFromMetadata(metadata);
+  const firmas = rawFirmas.map(normalizeFirma).filter(Boolean);
+
+  // Página de sello visible (usa metadata legacy: id_trabajador, id_solicitud).
+  // La info de firma dual se renderiza en su propia página abajo.
   await addSelloPage(pdfDoc, metadata);
 
-  // Metadata XMP (solo datos verificables; los hashes van en BD)
+  // Si hay 2+ firmas, agregar página de constancia dual al final.
+  if (firmas.length >= 2) {
+    await addConstanciaDualPage(pdfDoc, firmas);
+  }
+
+  // Metadata XMP (datos verificables; los hashes van en BD).
+  // Cuando hay 2+ firmas, los keywords llevan prefijos firma_1_/firma_2_/...
+  // con el tipo y nombre de cada firmante para que el PDF sea trazable.
   pdfDoc.setProducer('K+AIR Firma Electrónica v1.0');
   pdfDoc.setCreator('K+AIR');
-  pdfDoc.setAuthor(metadata.id_trabajador || 'trabajador');
+  pdfDoc.setAuthor(firmas[0]?.firmante?.nombre || metadata.id_trabajador || 'K+AIR');
   pdfDoc.setSubject(`Documento firmado: ${metadata.id_documento}`);
   pdfDoc.setKeywords([
     'K+AIR',
@@ -206,6 +379,9 @@ async function generateSignedPdf(originalBuffer, metadata) {
     `documento:${metadata.id_documento}`,
     `acuerdo:${metadata.agreement_version || 'legacy'}`,
     `fecha:${metadata.fecha_firma}`,
+    // Info por firmante (prefijo firma_N_ para firma dual o múltiple).
+    ...firmas.map((f, i) => `firma_${i+1}_tipo:${f.tipo}`),
+    ...firmas.map((f, i) => `firma_${i+1}_firmante:${f.firmante?.nombre || 'N/A'}`),
   ]);
   pdfDoc.setModificationDate(new Date(metadata.fecha_firma));
 

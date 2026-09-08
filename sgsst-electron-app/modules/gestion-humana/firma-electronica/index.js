@@ -220,6 +220,8 @@
       '          <th class="fe-table__th fe-table__th--cedula">Cédula</th>',
       '          <th class="fe-table__th fe-table__th--estado">Estado del proceso</th>',
       '          <th class="fe-table__th fe-table__th--solicitudes">Solicitudes</th>',
+      // I-FIRMA-DUAL · Columna "Firmantes" en el listado (K+AIR Firma Dual · v0.1.180)
+      '          <th class="fe-table__th fe-table__th--firmantes">Firmantes</th>',
       '          <th class="fe-table__th fe-table__th--accion">Acción</th>',
       '        </tr>',
       '      </thead>',
@@ -349,6 +351,28 @@
       '          <input id="fe-firma-confirmar" type="checkbox" />',
       '          <span>Confirmo que este documento será enviado a firma electrónica</span>',
       '        </label>',
+      '      </div>',
+      // I-FIRMA-DUAL · Checkbox de firma dual (K+AIR Firma Dual · v0.1.180)
+      '      <div class="fe-field" style="margin-top: 0.5rem;">',
+      '        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">',
+      '          <input id="fe-firma-requiere-empresa" type="checkbox" />',
+      '          <span>☐ Requiere firma de la empresa</span>',
+      '        </label>',
+      '      </div>',
+      '      <div id="fe-firma-rep-preview" class="fe-firma-rep-preview" style="display: none; margin-top: 0.5rem; padding: 0.75rem; background: #f8f9fa; border-radius: 4px;">',
+      '        <p style="margin: 0 0 0.5rem 0; font-size: 0.875rem;">',
+      '          <i class="fas fa-info-circle"></i>',
+      '          El representante legal de <strong id="fe-firma-rep-empresa-nombre"></strong> también firmará este documento.',
+      '        </p>',
+      '        <p style="margin: 0 0 0.25rem 0; font-size: 0.875rem;">',
+      '          <strong>Firmante:</strong> <span id="fe-firma-rep-nombre"></span>',
+      '        </p>',
+      '        <p style="margin: 0; font-size: 0.875rem;">',
+      '          <strong>Correo:</strong> <span id="fe-firma-rep-correo"></span>',
+      '        </p>',
+      '        <p style="margin: 0.5rem 0 0 0; font-size: 0.75rem; color: #6b7280;">',
+      '          Notificación: por correo al representante. El representante debe estar configurado en Gestión de Empresas.',
+      '        </p>',
       '      </div>',
       '    </div>',
       '    <div class="fe-modal__footer">',
@@ -845,6 +869,12 @@
       '  <td class="fe-table__td fe-cedula">' + cedula + '</td>',
       '  <td class="fe-table__td">' + self._renderEstado(p) + '</td>',
       '  <td class="fe-table__td">' + solicitudesHtml + '</td>',
+      // I-FIRMA-DUAL · Celda "Firmantes" (K+AIR Firma Dual · v0.1.180)
+      // NOTA: requiere_firma_empresa vive en la metadata del SR remoto (firma-service),
+      // no en gh_documentos local. La detección "Dual" sin red requiere persistir el
+      // flag en gh_documentos (futura migración). Por ahora se muestra el badge por
+      // defecto. La rama "Dual" se activará cuando ese dato esté disponible.
+      '  <td class="fe-table__td fe-firmantes-cell">' + self._renderFirmantesBadge(p) + '</td>',
       '  <td class="fe-table__td fe-table__td--center">',
       '    <button class="fe-action" data-action="ver-expediente" data-trabajador-id="' + _esc(t.id) + '" type="button">',
       '      <i class="fas fa-folder-open"></i> Ver',
@@ -882,11 +912,31 @@
     ].join('\n');
   };
 
+  // I-FIRMA-DUAL · Renderiza el badge "Firmantes" en la fila del listado
+  // (K+AIR Firma Dual · v0.1.180). Sin flag local persistido en gh_documentos,
+  // solo podemos mostrar el badge por defecto. La rama "Dual" se conectará
+  // cuando `requiere_firma_empresa` esté disponible localmente.
+  FirmaElectronicaComponent.prototype._renderFirmantesBadge = function (proceso) {
+    var self = this;
+    var badgeStyle = 'display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; margin-right: 4px;';
+    var tieneDual = false;
+    if (proceso && proceso.documentos && proceso.documentos.length) {
+      // Hook de detección: por ahora ningún doc tiene el flag local.
+      // Cuando se persista requiere_firma_empresa en gh_documentos, leer acá.
+      tieneDual = false;
+    }
+    if (tieneDual) {
+      return '<span style="' + badgeStyle + 'background: #e3f2fd; color: #1976d2;">👤 Trabajador</span>' +
+             '<span style="' + badgeStyle + 'background: #fff3e0; color: #e65100;">🏢 Empresa</span>';
+    }
+    return '<span style="' + badgeStyle + 'background: #e3f2fd; color: #1976d2;">👤 Trabajador</span>';
+  };
+
   FirmaElectronicaComponent.prototype._renderEmpty = function () {
     var self = this;
     if (self._procesosPorTrabajador.length === 0) {
       return [
-        '<tr><td colspan="5">',
+        '<tr><td colspan="6">',
         '  <div class="fe-empty">',
         '    <div class="fe-empty__icon"><i class="fas fa-inbox"></i></div>',
         '    <h3 class="fe-empty__title">Sin documentos en proceso</h3>',
@@ -897,7 +947,7 @@
       ].join('\n');
     }
     return [
-      '<tr><td colspan="5">',
+      '<tr><td colspan="6">',
       '  <div class="fe-empty">',
       '    <div class="fe-empty__icon"><i class="fas fa-search"></i></div>',
       '    <h3 class="fe-empty__title">Sin resultados</h3>',
@@ -2328,6 +2378,40 @@
     if (enviarBtn) {
       enviarBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar a firma';
     }
+    // I-FIRMA-DUAL: wire checkbox de firma dual + preview del representante (v0.1.180)
+    var requiereEmpresaCheck = modal.querySelector('#fe-firma-requiere-empresa');
+    var repPreview = modal.querySelector('#fe-firma-rep-preview');
+    if (requiereEmpresaCheck) {
+      requiereEmpresaCheck.checked = false;
+      if (repPreview) repPreview.style.display = 'none';
+      requiereEmpresaCheck.onchange = async function () {
+        if (requiereEmpresaCheck.checked) {
+          // Cargar representante de la empresa via IPC bridge
+          var repResult = await window.electronAPI.repLegalGet(self.companyName);
+          var rep = repResult && repResult.success && repResult.data && repResult.data.representante;
+          if (!rep) {
+            self._showToast('Esta empresa no tiene representante legal configurado. Agregalo en Gestión de Empresas.', 'error');
+            requiereEmpresaCheck.checked = false;
+            return;
+          }
+          if (!rep.correo) {
+            self._showToast('El representante legal no tiene correo. La firma dual requiere correo.', 'error');
+            requiereEmpresaCheck.checked = false;
+            return;
+          }
+          // Mostrar preview
+          var empresaNombreEl = modal.querySelector('#fe-firma-rep-empresa-nombre');
+          var nombreEl = modal.querySelector('#fe-firma-rep-nombre');
+          var correoEl = modal.querySelector('#fe-firma-rep-correo');
+          if (empresaNombreEl) empresaNombreEl.textContent = self.companyName;
+          if (nombreEl) nombreEl.textContent = rep.nombre;
+          if (correoEl) correoEl.textContent = rep.correo;
+          if (repPreview) repPreview.style.display = 'block';
+        } else {
+          if (repPreview) repPreview.style.display = 'none';
+        }
+      };
+    }
     // Wire validation
     function validate() {
       var correo = (correoInput.value || '').trim();
@@ -2425,6 +2509,24 @@
         nombre_empresa: self.companyName,   // display name completo (ej: TEMPOACTIVA EST S.A.S.)
         nombre_trabajador: ((trab.nombres || '') + ' ' + (trab.apellidos || '')).trim()
       };
+      // I-FIRMA-DUAL · v0.1.180: si el checkbox de firma dual está marcado,
+      // agregar los 2 campos nuevos al metadata. El bridge ya pasa metadata
+      // tal cual al firma-service, así que no se requieren cambios en firma-bridge.js.
+      var requiereEmpresaCheck2 = modal.querySelector('#fe-firma-requiere-empresa');
+      if (requiereEmpresaCheck2 && requiereEmpresaCheck2.checked) {
+        var repResult2 = await window.electronAPI.repLegalGet(self.companyName);
+        var rep2 = repResult2 && repResult2.success && repResult2.data && repResult2.data.representante;
+        if (rep2) {
+          metadata.requiere_firma_empresa = 1;
+          metadata.representante_legal_snapshot = {
+            nombre: rep2.nombre,
+            tipo_identificacion: rep2.tipoIdentificacion || 'CC',
+            numero_identificacion: rep2.numeroIdentificacion || '',
+            correo: rep2.correo,
+            cargo: rep2.cargo || 'Representante Legal',
+          };
+        }
+      }
       // 6. Create sign request
       var srR = await window.electronAPI.firmaSignRequestCreate({
         companyName: self.companyName,

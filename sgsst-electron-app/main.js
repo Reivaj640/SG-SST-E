@@ -130,6 +130,11 @@ const { SCHEMA_SQL: GH_SCHEMA_SQL, MIGRATIONS_SQL: GH_MIGRATIONS_SQL } = require
 // Plan: docs/kair-firma-integration/READY-TO-IMPLEMENT.md §D (I-101).
 // Spec: docs/gestion-humana/firma-electronica/API.md.
 const { registerFirmaHandlers } = require('./main/firma-bridge');
+// 📦2.1 + 📦2.2 (2026-09-08) — Representante Legal por empresa (K+AIR Firma Dual).
+// Tabla + bridge IPC con 4 handlers: get / upsert / delete / validateForFirma.
+// empresaId = company_key (mismo multi-tenant que gestion-humana). Plan: docs/kair-firma-dual/.
+const { registerRepLegalHandlers } = require('./main/empresa-representante-legal-bridge');
+const { SCHEMA_SQL: REPLEGAL_SCHEMA_SQL, MIGRATIONS_SQL: REPLEGAL_MIGRATIONS_SQL } = require('./main/empresa-representante-legal-schema-sql');
 // 📦537 — Sync multipc (BD local <-> .kairsync en carpeta compartida)
 const { registerSyncHandlers } = require('./main/sync-bridge');
 // 📦538 — Generador de pcId (ID unico por PC para el sync multipc)
@@ -672,6 +677,21 @@ function initDbOnce() {
       }
     } catch (ghErr) {
       console.error('[DB] 📦709 · Error creando schema de gestion-humana:', ghErr.message);
+    }
+    // 📦2.1 (2026-09-08) — Schema Representante Legal por empresa (K+AIR Firma Dual).
+    // 1 tabla: empresa_representante_legal. Mismo patrón que gestion-humana (try/catch + migrations idempotentes).
+    try {
+      db.exec(REPLEGAL_SCHEMA_SQL);
+      console.log('[DB] 📦2.1 · Tabla de representante legal (empresa_representante_legal) creada/verificada');
+      if (Array.isArray(REPLEGAL_MIGRATIONS_SQL) && REPLEGAL_MIGRATIONS_SQL.length > 0) {
+        for (var rlmi = 0; rlmi < REPLEGAL_MIGRATIONS_SQL.length; rlmi++) {
+          try { db.exec(REPLEGAL_MIGRATIONS_SQL[rlmi]); }
+          catch (rlmErr) { /* skip — duplicate column / index ya existe */ }
+        }
+        console.log('[DB] 📦2.1 · ' + REPLEGAL_MIGRATIONS_SQL.length + ' migraciones de representante legal aplicadas');
+      }
+    } catch (rlErr) {
+      console.error('[DB] 📦2.1 · Error creando schema de representante legal:', rlErr.message);
     }
     // Migraciones idempotentes para email (mismo patrón que gestacion)
     if (Array.isArray(EMAIL_MIGRATIONS_SQL)) {
@@ -9977,6 +9997,11 @@ try {
   // NO pisa nada del submódulo GH; canales con prefijo distinto (`firma:` vs `gh:`).
   registerFirmaHandlers.init(ipcMain);
   registerFirmaHandlers(app, { appVersion: app.getVersion() });
+  // 📦2.2 (2026-09-08) — Handlers IPC del módulo Representante Legal (K+AIR Firma Dual).
+  // 5 canales: rep-legal:get / upsert / delete / validateForFirma / diag.
+  // Patrón .init(ipcMain) + register(app, { getDb, validateSession }) como GH.
+  registerRepLegalHandlers.init(ipcMain);
+  registerRepLegalHandlers(app, { getDb, validateSession });
   // 📦538 (FIX orden init) — Generar pcId y arrancar auto-sync DESPUES de
   // que registerSyncHandlers haya llamado a syncService.init() (setea _configPath).
   // Si se llama antes, _getAllCompanies() retorna [] porque _configPath es null
