@@ -594,3 +594,123 @@
 .ct-firma-doc__badge--pending { background: #dbeafe; color: #1d4ed8; }
 .ct-firma-doc__badge--muted   { background: #f3f4f6; color: #6b7280; }
 .ct-firma-doc__badge--danger  { background: #fee2e2; color: #b91c1c; }
+
+/* ═══ COMPLETADOS POR TIEMPO (4 períodos en grid 2x2, full-width) ═══ */
+.ct-completados-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+.ct-completados-periodo { min-width: 0; }
+.ct-completados-periodo .ct-cards-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+.ct-completados-periodo .ct-card-row {
+  padding: 0.5rem 0.75rem;
+  gap: 0.6rem;
+}
+.ct-completados-periodo .ct-card-row__name { font-size: 0.8rem; }
+.ct-completados-periodo .ct-card-row__meta { font-size: 0.68rem; }
+.ct-completados-periodo .ct-card-row__badge { font-size: 0.62rem; padding: 0.1rem 0.4rem; }
+.ct-completados-periodo__title {
+  margin: 0 0 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #5a6378;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.ct-completados-count {
+  background: #e9ecef;
+  color: #5a6378;
+  padding: 0.1rem 0.5rem;
+  border-radius: 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.ct-completados-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+}
+.ct-completados-stats .ct-completados-topcargos {
+  grid-column: 1 / -1;
+}
+.ct-completados-stat {
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 0.4rem;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.ct-completados-stat__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+.ct-completados-stat__icon--blue   { background: #d6e9f8; color: #1c5d99; }
+.ct-completados-stat__icon--green  { background: #d4edda; color: #155724; }
+.ct-completados-stat__icon--orange { background: #ffe5cc; color: #b35900; }
+.ct-completados-stat__icon--purple { background: #e2d6f0; color: #5a3a8a; }
+.ct-completados-stat__text { flex: 1; min-width: 0; }
+.ct-completados-stat__value {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #1a1a2e;
+  line-height: 1.1;
+}
+.ct-completados-stat__label {
+  font-size: 0.7rem;
+  color: #5a6378;
+  margin-top: 0.1rem;
+}
+.ct-completados-topcargos {
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 0.4rem;
+  padding: 0.75rem 1rem;
+}
+.ct-completados-topcargos__title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #5a6378;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin: 0 0 0.5rem;
+}
+.ct-completados-topcargos__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.35rem 0;
+  font-size: 0.8rem;
+  color: #1a1a2e;
+}
+.ct-completados-topcargos__row + .ct-completados-topcargos__row {
+  border-top: 1px solid #f1f3f5;
+}
+.ct-completados-topcargos__count {
+  background: #e9ecef;
+  color: #5a6378;
+  padding: 0.1rem 0.5rem;
+  border-radius: 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  flex-shrink: 0;
+  margin-left: 0.5rem;
+}

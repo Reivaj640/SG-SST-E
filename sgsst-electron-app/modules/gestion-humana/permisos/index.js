@@ -49,8 +49,25 @@ class PermisosComponent {
   }
 
   // ─── Helpers ───
-  _toast() { return (window.parent && window.parent.KAIRToast) ? window.parent.KAIRToast : window.KAIRToast; }
-  _showToast(msg, type) { var t = this._toast(); if (t) t.show(msg, type || 'info'); }
+  _toast() {
+    // 📦GESTION-HUMANA-TOAST — Helper estandarizado con title+subtitle+type.
+    if (window.parent && window.parent.GestionHumanaToast) return window.parent.GestionHumanaToast;
+    if (window.GestionHumanaToast) return window.GestionHumanaToast;
+    // Fallback: KAIRToast directo (compatibilidad si el helper no cargó).
+    return (window.parent && window.parent.KAIRToast) ? window.parent.KAIRToast : window.KAIRToast;
+  }
+  _showToast(msg, type) {
+    var t = this._toast();
+    if (!t) return;
+    // Si el helper está disponible, partir "X: Y" en title/subtitle para mejor legibilidad.
+    if (t.success && msg.indexOf(':') > 0 && msg.indexOf(':') < 60) {
+      var idx = msg.indexOf(':');
+      var title = msg.substring(0, idx).trim();
+      var subtitle = msg.substring(idx + 1).trim();
+      if (typeof t[type] === 'function') { t[type](title, subtitle); return; }
+    }
+    if (typeof t.show === 'function') t.show(msg, type || 'info');
+  }
   _escHtml(s) { if (s == null) return ''; return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 
   _fmtDate(iso) {
@@ -90,7 +107,7 @@ class PermisosComponent {
       this._trabajadorById = {};
       var self = this;
       this.trabajadores.forEach(function (t) { self._trabajadorById[t.id] = t; });
-    } catch (e) { this._showToast('Error cargando permisos: ' + e.message, 'error'); }
+    } catch (e) { this._toast.error('Error cargando permisos', e.message); }
     this.loading = false;
   }
 
@@ -265,7 +282,7 @@ class PermisosComponent {
   _openNuevoModal() {
     var self = this;
     if (this.trabajadores.length === 0) {
-      this._showToast('No hay trabajadores registrados. Carga la Base Personal primero.', 'warning');
+      this._toast.warning('No hay trabajadores registrados. Carga la Base Personal primero.');
       return;
     }
     var choices = this.trabajadores
@@ -351,26 +368,26 @@ class PermisosComponent {
     try {
       var r = await window.electronAPI.ghCreatePermiso({ companyName: this.companyName, data: data });
       if (r && r.success) {
-        this._showToast('Permiso registrado', 'success');
+        this._toast.success('Permiso registrado');
         await this._load();
         this._renderAll();
       } else {
-        this._showToast('Error: ' + ((r && r.error && r.error.message) || 'desconocido'), 'error');
+        this._toast.error('Error', ((r && r.error && r.error.message) || 'desconocido'));
       }
-    } catch (e) { this._showToast('Error: ' + e.message, 'error'); }
+    } catch (e) { this._toast.error('Error', e.message); }
   }
 
   async _finalizar(id) {
     try {
       var r = await window.electronAPI.ghFinalizarPermiso({ permisoId: id, fechaFin: new Date().toISOString().split('T')[0] });
       if (r && r.success) {
-        this._showToast('Permiso finalizado', 'success');
+        this._toast.success('Permiso finalizado');
         await this._load();
         this._renderAll();
       } else {
-        this._showToast('Error: ' + ((r && r.error && r.error.message) || 'desconocido'), 'error');
+        this._toast.error('Error', ((r && r.error && r.error.message) || 'desconocido'));
       }
-    } catch (e) { this._showToast('Error: ' + e.message, 'error'); }
+    } catch (e) { this._toast.error('Error', e.message); }
   }
 
   destroy() { /* noop */ }

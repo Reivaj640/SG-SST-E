@@ -143,7 +143,7 @@
   border-bottom: 1px solid #e9ecef;
 }
 .va-table th--center { text-align: center; }
-.va-table th--right { text-align: right; }
+.va-table .th--right { text-align: right; }
 .va-table tbody tr {
   border-top: 1px solid #f1f3f5;
   transition: background 0.1s;
@@ -155,7 +155,7 @@
   vertical-align: middle;
 }
 .va-table td--center { text-align: center; }
-.va-table td--right { text-align: right; }
+.va-table .td--right { text-align: right; }
 .va-table__name { font-weight: 600; color: #1a1a2e; }
 .va-table__cargo { font-size: 0.7rem; color: #5a6378; margin-top: 0.1rem; }
 .va-table__date { color: #5a6378; white-space: nowrap; }
@@ -164,6 +164,15 @@
   gap: 0.3rem;
   justify-content: flex-end;
 }
+
+/* ═══ TABLA PERSONAL: anchos fijos para aprovechar el espacio ═══ */
+.va-table-wrap { overflow-x: auto; }
+.va-table--personal { table-layout: fixed; }
+.va-table--personal th,
+.va-table--personal td { padding: 0.6rem 0.75rem; overflow: hidden; }
+.va-table--personal td { overflow-wrap: anywhere; }
+.va-table--personal .va-table__name { line-height: 1.3; }
+.va-table--personal .va-table__sub { font-size: 0.7rem; color: #5a6378; margin-top: 0.1rem; white-space: nowrap; }
 
 /* ═══ BADGES ═══ */
 .va-badge {

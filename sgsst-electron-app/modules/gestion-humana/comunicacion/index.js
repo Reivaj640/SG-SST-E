@@ -24,9 +24,26 @@ class ComunicacionComponent {
     this.loading = true;
   }
 
-  _toast() { return (window.parent && window.parent.KAIRToast) ? window.parent.KAIRToast : window.KAIRToast; }
+  _toast() {
+    // 📦GESTION-HUMANA-TOAST — Helper estandarizado con title+subtitle+type.
+    if (window.parent && window.parent.GestionHumanaToast) return window.parent.GestionHumanaToast;
+    if (window.GestionHumanaToast) return window.GestionHumanaToast;
+    // Fallback: KAIRToast directo (compatibilidad si el helper no cargó).
+    return (window.parent && window.parent.KAIRToast) ? window.parent.KAIRToast : window.KAIRToast;
+  }
   _confirmDialog() { return (window.parent && window.parent.KairConfirm) ? window.parent.KairConfirm : window.KairConfirm; }
-  _showToast(msg, type) { var t = this._toast(); if (t) t.show(msg, type || 'info'); }
+  _showToast(msg, type) {
+    var t = this._toast();
+    if (!t) return;
+    // Si el helper está disponible, partir "X: Y" en title/subtitle para mejor legibilidad.
+    if (t.success && msg.indexOf(':') > 0 && msg.indexOf(':') < 60) {
+      var idx = msg.indexOf(':');
+      var title = msg.substring(0, idx).trim();
+      var subtitle = msg.substring(idx + 1).trim();
+      if (typeof t[type] === 'function') { t[type](title, subtitle); return; }
+    }
+    if (typeof t.show === 'function') t.show(msg, type || 'info');
+  }
   _escHtml(s) { if (s == null) return ''; return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 
   static get TIPOS_ANUNCIO() {
@@ -54,7 +71,7 @@ class ComunicacionComponent {
       this._trabajadorById = {}; this._sedeById = {};
       this.trabajadores.forEach(function (t) { this._trabajadorById[t.id] = t; }.bind(this));
       this.sedes.forEach(function (s) { this._sedeById[s.id] = s; }.bind(this));
-    } catch (e) { this._showToast('Error cargando: ' + e.message, 'error'); }
+    } catch (e) { this._toast.error('Error cargando', e.message); }
     this.loading = false;
   }
 
@@ -265,7 +282,7 @@ class ComunicacionComponent {
 
   // === ACCIONES (placeholders mínimos — la lógica completa se mantiene del original si se necesita) ===
   async _showAnuncioDialog() {
-    if (this.trabajadores.length === 0) { this._showToast('No hay trabajadores. Carga uno primero.', 'warning'); return; }
+    if (this.trabajadores.length === 0) { this._toast.warning('No hay trabajadores. Carga uno primero.'); return; }
     var choices = this.trabajadores.map(function (t) { return { value: t.id, label: (t.nombres + ' ' + t.apellidos) }; });
     var data = await this._confirmDialog().input({
       title: 'Nuevo Anuncio',
@@ -284,9 +301,9 @@ class ComunicacionComponent {
         companyName: this.companyName,
         data: { titulo: data.titulo, tipo: data.tipo, dirigidoA: data.dirigidoA, contenido: data.contenido, activo: true, publicadoPor: 'Admin', fechaPublicacion: new Date().toISOString().split('T')[0] }
       });
-      if (r && r.success) { this._showToast('Anuncio publicado', 'success'); await this._load(); this.render(); }
-      else { this._showToast('Error: ' + (r && r.error && r.error.message || 'desconocido'), 'error'); }
-    } catch (e) { this._showToast('Error: ' + e.message, 'error'); }
+      if (r && r.success) { this._toast.success('Anuncio publicado'); await this._load(); this.render(); }
+      else { this._toast.error('Error', (r && r.error && r.error.message || 'desconocido')); }
+    } catch (e) { this._toast.error('Error', e.message); }
   }
 
   async _eliminarAnuncio(id) {
@@ -298,13 +315,13 @@ class ComunicacionComponent {
     if (!ok) return;
     try {
       var r = await window.electronAPI.ghDeleteAnuncio({ anuncioId: id });
-      if (r && r.success) { this._showToast('Anuncio eliminado', 'success'); await this._load(); this.render(); }
-      else { this._showToast('Error: ' + (r && r.error && r.error.message || 'desconocido'), 'error'); }
-    } catch (e) { this._showToast('Error: ' + e.message, 'error'); }
+      if (r && r.success) { this._toast.success('Anuncio eliminado'); await this._load(); this.render(); }
+      else { this._toast.error('Error', (r && r.error && r.error.message || 'desconocido')); }
+    } catch (e) { this._toast.error('Error', e.message); }
   }
 
   async _showMensajeDialog() {
-    if (this.trabajadores.length === 0) { this._showToast('No hay trabajadores.', 'warning'); return; }
+    if (this.trabajadores.length === 0) { this._toast.warning('No hay trabajadores.'); return; }
     var choices = this.trabajadores.map(function (t) { return { value: t.id, label: (t.nombres + ' ' + t.apellidos) }; });
     var data = await this._confirmDialog().input({
       title: 'Nuevo Mensaje',
@@ -320,17 +337,17 @@ class ComunicacionComponent {
         companyName: this.companyName,
         data: { destinatarioId: data.destinatarioId, asunto: data.asunto, contenido: data.contenido, remitenteId: 'admin', estado: 'enviado', fechaHora: new Date().toISOString() }
       });
-      if (r && r.success) { this._showToast('Mensaje enviado', 'success'); await this._load(); this.render(); }
-      else { this._showToast('Error: ' + (r && r.error && r.error.message || 'desconocido'), 'error'); }
-    } catch (e) { this._showToast('Error: ' + e.message, 'error'); }
+      if (r && r.success) { this._toast.success('Mensaje enviado'); await this._load(); this.render(); }
+      else { this._toast.error('Error', (r && r.error && r.error.message || 'desconocido')); }
+    } catch (e) { this._toast.error('Error', e.message); }
   }
 
   async _marcarLeido(id) {
     try {
       var r = await window.electronAPI.ghMarcarLeido({ mensajeId: id });
-      if (r && r.success) { this._showToast('Mensaje marcado como leído', 'success'); await this._load(); this.render(); }
-      else { this._showToast('Error: ' + (r && r.error && r.error.message || 'desconocido'), 'error'); }
-    } catch (e) { this._showToast('Error: ' + e.message, 'error'); }
+      if (r && r.success) { this._toast.success('Mensaje marcado como leído'); await this._load(); this.render(); }
+      else { this._toast.error('Error', (r && r.error && r.error.message || 'desconocido')); }
+    } catch (e) { this._toast.error('Error', e.message); }
   }
 
   destroy() { /* noop */ }

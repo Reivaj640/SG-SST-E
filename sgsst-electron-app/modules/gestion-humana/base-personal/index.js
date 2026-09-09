@@ -149,6 +149,10 @@ class BasePersonalComponent {
     return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n);
   }
   _toast() {
+    // 📦GESTION-HUMANA-TOAST — Helper estandarizado con title+subtitle+type.
+    if (window.parent && window.parent.GestionHumanaToast) return window.parent.GestionHumanaToast;
+    if (window.GestionHumanaToast) return window.GestionHumanaToast;
+    // Fallback: KAIRToast directo (compatibilidad si el helper no cargó).
     return (window.parent && window.parent.KAIRToast) ? window.parent.KAIRToast : window.KAIRToast;
   }
   _confirmDialog() {
@@ -156,7 +160,15 @@ class BasePersonalComponent {
   }
   _showToast(msg, type) {
     var t = this._toast();
-    if (t) t.show(msg, type || 'info');
+    if (!t) return;
+    // Si el helper está disponible, partir "X: Y" en title/subtitle para mejor legibilidad.
+    if (t.success && msg.indexOf(':') > 0 && msg.indexOf(':') < 60) {
+      var idx = msg.indexOf(':');
+      var title = msg.substring(0, idx).trim();
+      var subtitle = msg.substring(idx + 1).trim();
+      if (typeof t[type] === 'function') { t[type](title, subtitle); return; }
+    }
+    if (typeof t.show === 'function') t.show(msg, type || 'info');
   }
   _escHtml(s) {
     if (s == null) return '';
@@ -341,7 +353,8 @@ class BasePersonalComponent {
         // para que los filtros y badges funcionen con Excels legacy.
         this.personales = (rPersonal.data.personales || []).map(this._normalizePersonalEstado, this);
       } else {
-        this._showToast('Error cargando personal: ' + (rPersonal && rPersonal.error ? rPersonal.error.message : 'desconocido'), 'error');
+        var perErrMsg = (rPersonal && rPersonal.error ? rPersonal.error.message : 'desconocido');
+        this._toast.error('Error cargando personal', perErrMsg);
         this.personales = [];
       }
 
@@ -359,7 +372,7 @@ class BasePersonalComponent {
       this._renderSegButtons();  // FIX: los contadores Todos/Activos/Retirados se actualizan tras cada carga de datos
       this._renderTable();
     } catch (e) {
-      this._showToast('Error: ' + e.message, 'error');
+      this._toast.error('Error', e.message);
     }
   }
 
@@ -808,15 +821,15 @@ class BasePersonalComponent {
         notas: 'Retiro desde Ver/Editar Trabajador'
       });
       if (!r || !r.success) {
-        self._showToast('Error: ' + (r && r.error ? r.error.message : 'desconocido'), 'error');
+        self._toast.error('Error', (r && r.error ? r.error.message : 'desconocido'));
         return;
       }
-      self._showToast('🔴 Trabajador retirado. Evento RETIRO registrado.', 'success');
+      self._toast.success('🔴 Trabajador retirado', 'Evento RETIRO registrado');
       // Cerrar el modal y refrescar la lista
       if (parentModal) parentModal.remove();
       await self._load();
     } catch (e) {
-      self._showToast('Error: ' + e.message, 'error');
+      self._toast.error('Error', e.message);
     }
   }
 
@@ -840,21 +853,21 @@ class BasePersonalComponent {
         notas: 'Reingreso desde Ver/Editar Trabajador'
       });
       if (!r || !r.success) {
-        self._showToast('Error: ' + (r && r.error ? r.error.message : 'desconocido'), 'error');
+        self._toast.error('Error', (r && r.error ? r.error.message : 'desconocido'));
         return;
       }
-      self._showToast('🟢 Trabajador reingresado. Evento REINGRESO registrado.', 'success');
+      self._toast.success('🟢 Trabajador reingresado. Evento REINGRESO registrado.');
       // Cerrar el modal y refrescar la lista
       if (parentModal) parentModal.remove();
       await self._load();
     } catch (e) {
-      self._showToast('Error: ' + e.message, 'error');
+      self._toast.error('Error', e.message);
     }
   }
 
   _exportarCSV() {
     if (this.filtered.length === 0) {
-      this._showToast('No hay trabajadores para exportar', 'warning');
+      this._toast.warning('No hay trabajadores para exportar');
       return;
     }
     var headers = ['Cédula', 'Nombres', 'Apellidos', 'Cargo', 'Estado', 'Salario', 'Email', 'Teléfono', 'Fecha Ingreso'];
@@ -881,7 +894,7 @@ class BasePersonalComponent {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    this._showToast('Exportadas ' + this.filtered.length + ' filas a CSV', 'success');
+    this._toast.success('Exportación completa', this.filtered.length + ' filas exportadas a CSV');
   }
 
   // === IPC CALLS ===
@@ -889,13 +902,13 @@ class BasePersonalComponent {
     try {
       var r = await window.electronAPI.ghUpdatePersonal({ personalId: personalId, updates: data });
       if (r && r.success) {
-        this._showToast('✅ Trabajador actualizado', 'success');
+        this._toast.success('✅ Trabajador actualizado');
         await this._load();
       } else {
-        this._showToast('❌ Error: ' + (r.error ? r.error.message : 'desconocido'), 'error');
+        this._toast.error('❌ Error', (r.error ? r.error.message : 'desconocido'));
       }
     } catch (e) {
-      this._showToast('❌ Error: ' + e.message, 'error');
+      this._toast.error('❌ Error', e.message);
     }
   }
 
@@ -904,25 +917,25 @@ class BasePersonalComponent {
       var r = await window.electronAPI.ghDeletePersonal({ personalId: personalId });
       if (r && r.success) {
         // 📦767 · F-1 · Toast refleja la nueva semántica: ocultar (no retirar)
-        this._showToast('✅ Trabajador ocultado (historial preservado)', 'success');
+        this._toast.success('✅ Trabajador ocultado (historial preservado)');
         await this._load();
       } else {
-        this._showToast('❌ Error: ' + (r.error ? r.error.message : 'desconocido'), 'error');
+        this._toast.error('❌ Error', (r.error ? r.error.message : 'desconocido'));
       }
     } catch (e) {
-      this._showToast('❌ Error: ' + e.message, 'error');
+      this._toast.error('❌ Error', e.message);
     }
   }
 
   // === IMPORT EXCEL (📦732) ===
   async _openImport() {
     if (!window.electronAPI || !window.electronAPI.ghSelectExcel) {
-      this._showToast('Función de import no disponible', 'error');
+      this._toast.error('Función de import no disponible');
       return;
     }
     var selectRes = await window.electronAPI.ghSelectExcel({});
     if (!selectRes || !selectRes.success) {
-      this._showToast('Error abriendo selector: ' + (selectRes && selectRes.error ? selectRes.error.message : 'desconocido'), 'error');
+      this._toast.error('Error abriendo selector', (selectRes && selectRes.error ? selectRes.error.message : 'desconocido'));
       return;
     }
     if (selectRes.data.canceled || !selectRes.data.filePath) {
@@ -931,7 +944,7 @@ class BasePersonalComponent {
     var filePath = selectRes.data.filePath;
     var parseRes = await window.electronAPI.ghParseExcel({ filePath: filePath });
     if (!parseRes || !parseRes.success) {
-      this._showToast('Error leyendo Excel: ' + (parseRes && parseRes.error ? parseRes.error.message : 'desconocido'), 'error');
+      this._toast.error('Error leyendo Excel', (parseRes && parseRes.error ? parseRes.error.message : 'desconocido'));
       return;
     }
     this._importData = parseRes.data; // { sheetName, headers, rows, totalRows }
@@ -1242,7 +1255,7 @@ class BasePersonalComponent {
     // Validar requeridos
     var missingRequired = ['cedula', 'nombres', 'apellidos'].filter(function (k) { return !mapping[k]; });
     if (missingRequired.length > 0) {
-      this._showToast('Faltan columnas obligatorias: ' + missingRequired.join(', '), 'error');
+      this._toast.error('Faltan columnas obligatorias', missingRequired.join(', '));
       return;
     }
 
@@ -1331,7 +1344,7 @@ class BasePersonalComponent {
       var msg = companyFilter
         ? 'Ninguna fila de ' + companyFilter + ' tiene los 3 campos requeridos'
         : 'Ninguna fila tiene los 3 campos requeridos (cédula, nombres, apellidos)';
-      this._showToast(msg, 'warning');
+      this._toast.warning(msg);
       return;
     }
 
@@ -1356,7 +1369,7 @@ class BasePersonalComponent {
     if (confirmText) confirmText.textContent = 'Importar';
 
     if (!res || !res.success) {
-      this._showToast('Error importando: ' + (res && res.error ? res.error.message : 'desconocido'), 'error');
+      this._toast.error('Error importando', (res && res.error ? res.error.message : 'desconocido'));
       return;
     }
 
@@ -1367,7 +1380,7 @@ class BasePersonalComponent {
     if (d.skipped && d.skipped.length > 0) parts.push(d.skipped.length + ' omitido(s)');
     if (d.errors && d.errors.length > 0) parts.push(d.errors.length + ' con error');
     var msg = parts.join(', ');
-    this._showToast(msg, d.errors && d.errors.length > 0 ? 'warning' : 'success');
+    if (d.errors && d.errors.length > 0) this._toast.warning(msg); else this._toast.success(msg);
 
     // Cerrar modal
     var modal = this.container.querySelector('#bp-import-modal');
@@ -1386,12 +1399,12 @@ class BasePersonalComponent {
   async _openDetail(personalId) {
     var self = this;
     if (!window.electronAPI || !window.electronAPI.ghGetPersonal) {
-      this._showToast('Función no disponible', 'error');
+      this._toast.error('Función no disponible');
       return;
     }
     var res = await window.electronAPI.ghGetPersonal({ personalId: personalId });
     if (!res || !res.success) {
-      this._showToast('Error: ' + (res && res.error ? res.error.message : 'desconocido'), 'error');
+      this._toast.error('Error', (res && res.error ? res.error.message : 'desconocido'));
       return;
     }
     var p = res.data.personal;
@@ -1585,10 +1598,10 @@ class BasePersonalComponent {
     var res = await window.electronAPI.ghUpdatePersonal({ personalId: personalId, updates: updates });
     if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="fas fa-save"></i> Guardar'; }
     if (!res || !res.success) {
-      this._showToast('Error: ' + (res && res.error ? res.error.message : 'desconocido'), 'error');
+      this._toast.error('Error', (res && res.error ? res.error.message : 'desconocido'));
       return;
     }
-    this._showToast('✅ Trabajador actualizado', 'success');
+    this._toast.success('✅ Trabajador actualizado');
     // Re-renderizar el modal con los datos frescos
     modal.remove();
     await this._openDetail(personalId);

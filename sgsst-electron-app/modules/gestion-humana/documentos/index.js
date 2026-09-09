@@ -41,6 +41,10 @@ class DocumentosComponent {
   }
 
   _toast() {
+    // 📦GESTION-HUMANA-TOAST — Helper estandarizado con title+subtitle+type.
+    if (window.parent && window.parent.GestionHumanaToast) return window.parent.GestionHumanaToast;
+    if (window.GestionHumanaToast) return window.GestionHumanaToast;
+    // Fallback: KAIRToast directo (compatibilidad si el helper no cargó).
     return (window.parent && window.parent.KAIRToast) ? window.parent.KAIRToast : window.KAIRToast;
   }
   _confirmDialog() {
@@ -48,7 +52,15 @@ class DocumentosComponent {
   }
   _showToast(msg, type) {
     var t = this._toast();
-    if (t) t.show(msg, type || 'info');
+    if (!t) return;
+    // Si el helper está disponible, partir "X: Y" en title/subtitle para mejor legibilidad.
+    if (t.success && msg.indexOf(':') > 0 && msg.indexOf(':') < 60) {
+      var idx = msg.indexOf(':');
+      var title = msg.substring(0, idx).trim();
+      var subtitle = msg.substring(idx + 1).trim();
+      if (typeof t[type] === 'function') { t[type](title, subtitle); return; }
+    }
+    if (typeof t.show === 'function') t.show(msg, type || 'info');
   }
   _esc(s) {
     if (s == null) return '';
@@ -99,7 +111,7 @@ class DocumentosComponent {
       this._templateById = {};
       this.templates.forEach(function (t) { this._templateById[t.id] = t; }.bind(this));
     } catch (e) {
-      this._showToast('Error cargando documentos: ' + e.message, 'error');
+      this._toast.error('Error cargando documentos', e.message);
     }
     this.loading = false;
     // I-102.2.F · Mecanismo B: sync one-shot ANTES de iniciar el polling.
@@ -468,7 +480,8 @@ class DocumentosComponent {
     // Casos sin transición de estado (OTP_LOCKED, IDENTIFICATION_FAILED):
     // solo mostrar feedback y marcar como procesado (para no re-procesar).
     if (!regla.estado) {
-      self._showToast(regla.toast, regla.success ? 'success' : 'warning');
+      var t = regla.success ? self._toast.success.bind(self._toast) : self._toast.warning.bind(self._toast);
+      t(regla.toast);
       self._signRequestStatus[docId] = Object.assign({}, statusInfo, { procesado: true });
       return;
     }
@@ -501,7 +514,8 @@ class DocumentosComponent {
       // Marcar como procesado (idempotencia) y guardar en el status.
       self._signRequestStatus[docId] = Object.assign({}, statusInfo, { procesado: true });
       // Feedback al usuario.
-      self._showToast(regla.toast, regla.success ? 'success' : 'warning');
+      var t = regla.success ? self._toast.success.bind(self._toast) : self._toast.warning.bind(self._toast);
+      t(regla.toast);
       // Re-render para reflejar el nuevo estado en la tabla.
       self._renderRecientes();
     } catch (e) {
@@ -747,21 +761,21 @@ class DocumentosComponent {
       // 1) Obtener el documento completo (incluye rutaArchivo, idSolicitudFirma, etc.)
       var r1 = await window.electronAPI.ghGetDocumento({ documentoId: docId });
       if (!r1 || !r1.success || !r1.data || !r1.data.documento) {
-        self._showToast('No se encontró el documento: ' + docId, 'error');
+        self._toast.error('No se encontró el documento', docId);
         return;
       }
       var doc = r1.data.documento;
 
       // 2) Verificar que tenga archivo asociado (sin archivo no se puede firmar)
       if (!doc.rutaArchivo) {
-        self._showToast('El documento no tiene archivo adjunto. Genera el documento con un template primero.', 'warning');
+        self._toast.warning('El documento no tiene archivo adjunto. Genera el documento con un template primero.');
         return;
       }
 
       // 3) Verificar que la empresa actual tiene firma electrónica configurada
       var r2 = await window.electronAPI.firmaEmpresaList({});
       if (!r2 || !r2.success) {
-        self._showToast('Error consultando configuración de firma: ' + (r2 && r2.error && r2.error.message || 'desconocido'), 'error');
+        self._toast.error('Error consultando configuración de firma', (r2 && r2.error && r2.error.message || 'desconocido'));
         return;
       }
       var configured = (r2.data && r2.data.configured) || [];
@@ -790,9 +804,8 @@ class DocumentosComponent {
       } catch (_diagE) { /* noop */ }
       var match = configured.find(function (c) { return c.companyKey === self.companyName; });
       if (!match) {
-        self._showToast(
-          'La firma electrónica no está configurada para esta empresa (' + self.companyName + '). Configúrala primero en Configuración → Firma Electrónica.',
-          'warning'
+        self._toast.warning(
+          'La firma electrónica no está configurada para esta empresa (' + self.companyName + '). Configúrala primero en Configuración → Firma Electrónica.'
         );
         return;
       }
@@ -801,7 +814,7 @@ class DocumentosComponent {
       // creación de la solicitud se hace en I-102.2.D.
       self._abrirModalFirma(doc, match);
     } catch (e) {
-      self._showToast('Error: ' + e.message, 'error');
+      self._toast.error('Error', e.message);
     }
   }
 
@@ -1013,13 +1026,13 @@ class DocumentosComponent {
       console.log('[A154] _enviarAFirma · firmaAgreementGet result: success=' + (rAgr && rAgr.success) + ' has_data=' + !!(rAgr && rAgr.data) + ' has_texto_hash=' + !!(rAgr && rAgr.data && rAgr.data.texto_hash));
       if (!rAgr || !rAgr.success) {
         console.log('[A154] _enviarAFirma · EXIT in firmaAgreementGet (no success). Toast: ' + self._traducirErrorFirma(rAgr));
-        self._showToast(self._traducirErrorFirma(rAgr), 'error');
+        self._toast.error(self._traducirErrorFirma(rAgr));
         return;
       }
       var agreement = rAgr.data;
       if (!agreement || !agreement.texto_hash) {
         console.log('[A154] _enviarAFirma · EXIT (no agreement.texto_hash)');
-        self._showToast('El acuerdo activo no tiene hash. Contacta al administrador.', 'error');
+        self._toast.error('El acuerdo activo no tiene hash. Contacta al administrador.');
         return;
       }
 
@@ -1038,7 +1051,7 @@ class DocumentosComponent {
       console.log('[A154] _enviarAFirma · firmaDocumentoReadBytes result: success=' + (rRead && rRead.success) + ' has_data=' + !!(rRead && rRead.data) + ' rutaArchivo_length=' + (doc.rutaArchivo || '').length);
       if (!rRead || !rRead.success) {
         console.log('[A154] _enviarAFirma · EXIT in firmaDocumentoReadBytes. Toast: No se pudo leer el PDF');
-        self._showToast('No se pudo leer el PDF: ' + (rRead && rRead.error && rRead.error.message || 'desconocido'), 'error');
+        self._toast.error('No se pudo leer el PDF', (rRead && rRead.error && rRead.error.message || 'desconocido'));
         return;
       }
 
@@ -1099,8 +1112,7 @@ class DocumentosComponent {
             console.log('[A154] _enviarAFirma · firmaConsentVerifyOtp result: success=' + (rVerify && rVerify.success));
             if (!rVerify || !rVerify.success) {
               console.log('[A154] _enviarAFirma · EXIT in firmaConsentVerifyOtp. Toast: Error aceptando consentimiento');
-              self._showToast('Error aceptando consentimiento: ' +
-                (rVerify && rVerify.error && rVerify.error.message || 'desconocido'), 'error');
+              self._toast.error('Error aceptando consentimiento', (rVerify && rVerify.error && rVerify.error.message || 'desconocido'));
               return;
             }
           } else {
@@ -1127,34 +1139,34 @@ class DocumentosComponent {
           // Ya existe un consent PENDING. El OTP se envió al firmante
           // previamente. NO podemos continuar sin el OTP. Mostramos mensaje
           // claro al user para que sepa qué hacer.
-          self._showToast(
+          self._toast.warning(
             'Ya existe un consentimiento en proceso para este trabajador. ' +
             'Espera a que el firmante acepte el código OTP enviado a su correo, ' +
-            'o contacta a RRHH para reintentar.', 'warning'
+            'o contacta a RRHH para reintentar.'
           );
           return;
         } else if (rConsent.error.code === 'CONSENT_LOCKED') {
           console.log('[A154] _enviarAFirma · EXIT in consent (CONSENT_LOCKED). Toast: Consentimiento bloqueado');
-          self._showToast(
+          self._toast.error(
             'El consentimiento del Acuerdo está bloqueado por exceso de intentos. ' +
-            'Contacta a RRHH para desbloquearlo.', 'error'
+            'Contacta a RRHH para desbloquearlo.'
           );
           return;
         } else if (rConsent.error.code === 'ACUERDO_NOT_FOUND') {
           console.log('[A154] _enviarAFirma · EXIT in consent (ACUERDO_NOT_FOUND). Toast: No hay Acuerdo activo');
-          self._showToast(
+          self._toast.error(
             'No hay Acuerdo activo con la versión ' + agreement.version + '. ' +
-            'Contacta al administrador.', 'error'
+            'Contacta al administrador.'
           );
           return;
         } else {
           console.log('[A154] _enviarAFirma · EXIT in consent (otro error: ' + rConsent.error.code + ')');
-          self._showToast(self._traducirErrorFirma(rConsent), 'error');
+          self._toast.error(self._traducirErrorFirma(rConsent));
           return;
         }
       } else {
         console.log('[A154] _enviarAFirma · EXIT in consent (error desconocido creando consentimiento)');
-        self._showToast('Error desconocido creando consentimiento.', 'error');
+        self._toast.error('Error desconocido creando consentimiento.');
         return;
       }
 
@@ -1209,7 +1221,7 @@ class DocumentosComponent {
           && pdfBytes[4] === 0x2D;
         if (!_isPdfHeader) {
           console.log('[A154] _enviarAFirma · EXIT (no es PDF) first_bytes_hex=' + self._bytesToHex(pdfBytes.slice(0, 8)) + ' nombreArchivo=' + doc.nombreArchivo);
-          self._showToast('El documento "' + (doc.nombreArchivo || doc.id) + '" no es un PDF válido. Solo se pueden firmar PDFs.', 'error');
+          self._toast.error('El documento "' + (doc.nombreArchivo || doc.id) + '" no es un PDF válido. Solo se pueden firmar PDFs.');
           return;
         }
       } catch (_pdfHeaderE) { /* noop */ }
@@ -1242,13 +1254,13 @@ class DocumentosComponent {
       console.log('[A154] _enviarAFirma · firmaSignRequestCreate RETURNED: success=' + (rCreate && rCreate.success) + ' error_code=' + (rCreate && rCreate.error && rCreate.error.code) + ' has_id_solicitud=' + !!(rCreate && rCreate.data && rCreate.data.id_solicitud) + ' has_url_publica=' + !!(rCreate && rCreate.data && rCreate.data.url_publica));
       if (!rCreate || !rCreate.success) {
         console.log('[A154] _enviarAFirma · EXIT in firmaSignRequestCreate (no success). Toast: ' + self._traducirErrorFirma(rCreate));
-        self._showToast(self._traducirErrorFirma(rCreate), 'error');
+        self._toast.error(self._traducirErrorFirma(rCreate));
         return;
       }
       var idSolicitud = rCreate.data && (rCreate.data.id_solicitud || rCreate.data.id);
       if (!idSolicitud) {
         console.log('[A154] _enviarAFirma · EXIT (no idSolicitud en response)');
-        self._showToast('firma-service no devolvió id_solicitud. Revisa el backend.', 'error');
+        self._toast.error('firma-service no devolvió id_solicitud. Revisa el backend.');
         return;
       }
       console.log('[A154] _enviarAFirma · sign request OK id_solicitud=' + idSolicitud + ' url_publica_present=' + !!(rCreate.data && rCreate.data.url_publica));
@@ -1268,8 +1280,7 @@ class DocumentosComponent {
       console.log('[A154] _enviarAFirma · ghUpdateDocumento result: success=' + (rUpd && rUpd.success) + ' error_code=' + (rUpd && rUpd.error && rUpd.error.code));
       if (!rUpd || !rUpd.success) {
         console.log('[A154] _enviarAFirma · EXIT in ghUpdateDocumento');
-        self._showToast('Solicitud creada (id=' + idSolicitud + ') pero NO se pudo persistir la relación. ' +
-          (rUpd && rUpd.error && rUpd.error.message || ''), 'error');
+        self._toast.error('Solicitud creada (id=' + idSolicitud + ') pero NO se pudo persistir la relación', (rUpd && rUpd.error && rUpd.error.message || ''));
         return;
       }
 
@@ -1278,7 +1289,7 @@ class DocumentosComponent {
       //    en 'esperando_firma' antes de este punto, así que cerrar el
       //    modal de éxito NO afecta la solicitud.
       self._cerrarModalFirma(modal);
-      self._showToast('Solicitud de firma creada: ' + idSolicitud, 'success');
+      self._toast.success('Solicitud de firma creada', 'id=' + idSolicitud);
       // Refrescar tabla para que el doc aparezca como 'esperando_firma'
       // ANTES de mostrar el modal de éxito. Si el polling F/G detecta
       // un cambio de estado mientras el modal está abierto, _renderRecientes
@@ -1295,7 +1306,7 @@ class DocumentosComponent {
     } catch (e) {
       // I-103.A1.5.4-B · DIAGNÓSTICO TEMPORAL (visible en DevTools Console)
       console.log('[A154] _enviarAFirma · CATCH exception: ' + (e && e.message || e));
-      self._showToast('Error inesperado: ' + (e && e.message || e), 'error');
+      self._toast.error('Error inesperado', (e && e.message || e));
     } finally {
       if (btnEnviar) {
         btnEnviar.disabled = false;
@@ -1381,7 +1392,7 @@ class DocumentosComponent {
     if (!modal) return;
     var ctx = modal._docFirmaSuccessCtx;
     if (!ctx || !ctx.info || !ctx.info.url_publica) {
-      self._showToast('No hay enlace para copiar.', 'warning');
+      self._toast.warning('No hay enlace para copiar.');
       return;
     }
     var url = ctx.info.url_publica;
@@ -1550,9 +1561,9 @@ class DocumentosComponent {
     try {
       var r = await window.electronAPI.ghAbrirTemplate({ templateId: templateId });
       if (!r || !r.success) {
-        this._showToast('Error abriendo template: ' + (r && r.error && r.error.message || 'desconocido'), 'error');
+        this._toast.error('Error abriendo template', (r && r.error && r.error.message || 'desconocido'));
       }
-    } catch (e) { this._showToast('Error: ' + e.message, 'error'); }
+    } catch (e) { this._toast.error('Error', e.message); }
   }
 
   // 📦766 · Modal "Administrar Templates" (Mis Templates) — abre desde el header
@@ -1590,8 +1601,8 @@ class DocumentosComponent {
       btnConfirm.onclick = function () {
         var tipo = selTipo ? selTipo.value : null;
         var nombre = inputNombre ? inputNombre.value.trim() : '';
-        if (!tipo) { self._showToast('Selecciona un tipo de documento', 'warning'); return; }
-        if (!nombre) { self._showToast('Escribe un nombre para el template', 'warning'); return; }
+        if (!tipo) { self._toast.warning('Selecciona un tipo de documento'); return; }
+        if (!nombre) { self._toast.warning('Escribe un nombre para el template'); return; }
         self._subirTemplate(tipo, nombre, modal);
       };
     }
@@ -1613,16 +1624,16 @@ class DocumentosComponent {
       if (btnConfirm) { btnConfirm.disabled = false; btnConfirm.innerHTML = '<i class="fas fa-folder-open"></i> Seleccionar archivo…'; }
       if (!r || !r.success) {
         if (r && r.data && r.data.canceled) { return; }  // user canceló el dialog
-        this._showToast('Error subiendo: ' + (r && r.error && r.error.message || 'desconocido'), 'error');
+        this._toast.error('Error subiendo', (r && r.error && r.error.message || 'desconocido'));
         return;
       }
       this._closeDocModal(modal);
-      this._showToast('Template subido correctamente', 'success');
+      this._toast.success('Template subido correctamente');
       await this._load();
       this.render();
     } catch (e) {
       if (btnConfirm) { btnConfirm.disabled = false; btnConfirm.innerHTML = '<i class="fas fa-folder-open"></i> Seleccionar archivo…'; }
-      this._showToast('Error: ' + e.message, 'error');
+      this._toast.error('Error', e.message);
     }
   }
 
@@ -1647,13 +1658,13 @@ class DocumentosComponent {
     try {
       var r = await window.electronAPI.ghEliminarTemplate({ templateId: templateId });
       if (!r || !r.success) {
-        this._showToast('Error eliminando: ' + (r && r.error && r.error.message || 'desconocido'), 'error');
+        this._toast.error('Error eliminando', (r && r.error && r.error.message || 'desconocido'));
         return;
       }
-      this._showToast('Template eliminado', 'success');
+      this._toast.success('Template eliminado');
       await this._load();
       this.render();
-    } catch (e) { this._showToast('Error: ' + e.message, 'error'); }
+    } catch (e) { this._toast.error('Error', e.message); }
   }
 
   // 📦764 · Abre el archivo del documento generado (descarga)
@@ -1661,12 +1672,12 @@ class DocumentosComponent {
     try {
       var r = await window.electronAPI.ghGetDocumento({ documentoId: docId });
       if (!r || !r.success || !r.data || !r.data.documento) {
-        this._showToast('Error: no se encontró el documento', 'error');
+        this._toast.error('No se encontró el documento');
         return;
       }
       var doc = r.data.documento;
       if (!doc.rutaArchivo) {
-        this._showToast('El documento no tiene archivo adjunto (usa "Generar Documento" con un template)', 'warning');
+        this._toast.warning('El documento no tiene archivo adjunto (usa "Generar Documento" con un template)');
         return;
       }
       // Abrir con la app por defecto del sistema
@@ -1676,10 +1687,10 @@ class DocumentosComponent {
         if (window.electronAPI.openPath) {
           await window.electronAPI.openPath(doc.rutaArchivo);
         } else {
-          this._showToast('No se puede abrir el archivo: ' + doc.rutaArchivo, 'warning');
+          this._toast.warning('No se puede abrir el archivo: ' + doc.rutaArchivo);
         }
       }
-    } catch (e) { this._showToast('Error: ' + e.message, 'error'); }
+    } catch (e) { this._toast.error('Error', e.message); }
   }
 
   async _showGenerarDialog(tipoDefault) {
@@ -1690,7 +1701,7 @@ class DocumentosComponent {
   async _openGenerarModal(tipoDefault) {
     var self = this;
     if (this.trabajadores.length === 0) {
-      this._showToast('No hay trabajadores. Agrega uno en Base de Personal primero.', 'warning');
+      this._toast.warning('No hay trabajadores. Agrega uno en Base de Personal primero.');
       return;
     }
 
@@ -1770,8 +1781,8 @@ class DocumentosComponent {
     if (btnConfirm) {
       btnConfirm.onclick = function () {
         var trabajadorId = sel ? sel.value : null;
-        if (!trabajadorId) { self._showToast('Selecciona un trabajador', 'warning'); return; }
-        if (!self._selectedTipo) { self._showToast('Selecciona un tipo de documento', 'warning'); return; }
+        if (!trabajadorId) { self._toast.warning('Selecciona un trabajador'); return; }
+        if (!self._selectedTipo) { self._toast.warning('Selecciona un tipo de documento'); return; }
         self._generarDocumento(trabajadorId, self._selectedTipo, modal);
       };
     }
@@ -1800,15 +1811,15 @@ class DocumentosComponent {
         }
       });
       if (!r || !r.success) {
-        this._showToast('Error generando: ' + (r && r.error && r.error.message || 'desconocido'), 'error');
+        this._toast.error('Error generando', (r && r.error && r.error.message || 'desconocido'));
         return;
       }
       // El bridge retorna { documentoId, rutaArchivo, nombreArchivo }
       this._closeDocModal(generarModal);
-      this._showToast('Documento generado. Pendiente de firma electrónica.', 'success');
+      this._toast.success('Documento generado. Pendiente de firma electrónica.');
       await this._load();
       this.render();
-    } catch (e) { this._showToast('Error: ' + e.message, 'error'); }
+    } catch (e) { this._toast.error('Error', e.message); }
   }
 
   // FUNCIONES ELIMINADAS en LEGACY-SIGN-REMOVE (2026-08-20):

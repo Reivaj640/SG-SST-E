@@ -23,8 +23,25 @@ class AfiliacionesComponent {
   }
 
   // ─── Helpers ───
-  _toast() { return (window.parent && window.parent.KAIRToast) ? window.parent.KAIRToast : window.KAIRToast; }
-  _showToast(msg, type) { var t = this._toast(); if (t) t.show(msg, type || 'info'); }
+  _toast() {
+    // 📦GESTION-HUMANA-TOAST — Helper estandarizado con title+subtitle+type.
+    if (window.parent && window.parent.GestionHumanaToast) return window.parent.GestionHumanaToast;
+    if (window.GestionHumanaToast) return window.GestionHumanaToast;
+    // Fallback: KAIRToast directo (compatibilidad si el helper no cargó).
+    return (window.parent && window.parent.KAIRToast) ? window.parent.KAIRToast : window.KAIRToast;
+  }
+  _showToast(msg, type) {
+    var t = this._toast();
+    if (!t) return;
+    // Si el helper está disponible, partir "X: Y" en title/subtitle para mejor legibilidad.
+    if (t.success && msg.indexOf(':') > 0 && msg.indexOf(':') < 60) {
+      var idx = msg.indexOf(':');
+      var title = msg.substring(0, idx).trim();
+      var subtitle = msg.substring(idx + 1).trim();
+      if (typeof t[type] === 'function') { t[type](title, subtitle); return; }
+    }
+    if (typeof t.show === 'function') t.show(msg, type || 'info');
+  }
   _escHtml(s) { if (s == null) return ''; return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   _normalizeEstado(e) {
     if (e == null) return 'activo';  // null / undefined / '' → activo (default conservador)
@@ -93,7 +110,7 @@ class AfiliacionesComponent {
       var r = await window.electronAPI.ghListPersonal({ companyName: this.companyName });
       this.personales = r && r.success ? (r.data.personales || []) : [];
     } catch (e) {
-      this._showToast('Error cargando: ' + e.message, 'error');
+      this._toast.error('Error cargando', e.message);
     }
     this.loading = false;
   }
@@ -297,7 +314,7 @@ class AfiliacionesComponent {
   async _openDetailModal(personalId) {
     var self = this;
     var p = this.personales.find(function (x) { return x.id === personalId; });
-    if (!p) { this._showToast('Trabajador no encontrado', 'error'); return; }
+    if (!p) { this._toast.error('Trabajador no encontrado'); return; }
     // Si no tenemos todos los datos (por ejemplo, fechas de nacimiento), hacer fetch
     var full = p;
     if (!p.fechaNacimiento) {
@@ -463,8 +480,8 @@ class AfiliacionesComponent {
         if (action === 'ver') {
           try {
             var r = await window.electronAPI.ghAbrirDocumentoAfiliacion({ documentoId: docId });
-            if (r && !r.success) self._showToast('Error abriendo PDF: ' + (r.error && r.error.message || ''), 'error');
-          } catch (e) { self._showToast('Error: ' + e.message, 'error'); }
+            if (r && !r.success) self._toast.error('Error abriendo PDF', (r.error && r.error.message || ''));
+          } catch (e) { self._toast.error('Error', e.message); }
         } else if (action === 'subir' || action === 'reemplazar') {
           try {
             btn.disabled = true;
@@ -479,14 +496,14 @@ class AfiliacionesComponent {
             btn.innerHTML = originalHtml;
             if (r && r.success) {
               if (r.data && r.data.canceled) return;
-              self._showToast(action === 'reemplazar' ? 'Documento reemplazado' : 'Documento subido', 'success');
+              self._toast.success(action === 'reemplazar' ? 'Documento reemplazado' : 'Documento subido');
               onChange && onChange();
             } else {
-              self._showToast('Error: ' + (r && r.error && r.error.message || 'desconocido'), 'error');
+              self._toast.error('Error', (r && r.error && r.error.message || 'desconocido'));
             }
           } catch (e) {
             btn.disabled = false;
-            self._showToast('Error: ' + e.message, 'error');
+            self._toast.error('Error', e.message);
           }
         } else if (action === 'eliminar') {
           if (!window.KairConfirm) {
@@ -504,12 +521,12 @@ class AfiliacionesComponent {
           try {
             var r = await window.electronAPI.ghEliminarDocumentoAfiliacion({ documentoId: docId });
             if (r && r.success) {
-              self._showToast('Documento eliminado', 'success');
+              self._toast.success('Documento eliminado');
               onChange && onChange();
             } else {
-              self._showToast('Error: ' + (r && r.error && r.error.message || 'desconocido'), 'error');
+              self._toast.error('Error', (r && r.error && r.error.message || 'desconocido'));
             }
-          } catch (e) { self._showToast('Error: ' + e.message, 'error'); }
+          } catch (e) { self._toast.error('Error', e.message); }
         }
       };
     });

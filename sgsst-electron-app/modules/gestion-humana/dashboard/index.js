@@ -61,11 +61,23 @@ class DashboardComponent {
   }
 
   _toast() {
+    // 📦GESTION-HUMANA-TOAST — Helper estandarizado con title+subtitle+type.
+    if (window.parent && window.parent.GestionHumanaToast) return window.parent.GestionHumanaToast;
+    if (window.GestionHumanaToast) return window.GestionHumanaToast;
+    // Fallback: KAIRToast directo (compatibilidad si el helper no cargó).
     return (window.parent && window.parent.KAIRToast) ? window.parent.KAIRToast : window.KAIRToast;
   }
   _showToast(msg, type) {
     var t = this._toast();
-    if (t) t.show(msg, type || 'info');
+    if (!t) return;
+    // Si el helper está disponible, partir "X: Y" en title/subtitle para mejor legibilidad.
+    if (t.success && msg.indexOf(':') > 0 && msg.indexOf(':') < 60) {
+      var idx = msg.indexOf(':');
+      var title = msg.substring(0, idx).trim();
+      var subtitle = msg.substring(idx + 1).trim();
+      if (typeof t[type] === 'function') { t[type](title, subtitle); return; }
+    }
+    if (typeof t.show === 'function') t.show(msg, type || 'info');
   }
 
   async _load() {
@@ -97,7 +109,7 @@ class DashboardComponent {
       });
     } catch (e) {
       console.error('[Dashboard] Error cargando datos:', e);
-      this._showToast('Error cargando dashboard: ' + e.message, 'error');
+      this._toast.error('Error cargando dashboard', e.message);
     }
     this.loading = false;
   }

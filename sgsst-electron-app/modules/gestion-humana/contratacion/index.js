@@ -37,8 +37,32 @@ class ContratacionComponent {
   }
 
   // ─── Helpers ───
-  _toast() { return (window.parent && window.parent.KAIRToast) ? window.parent.KAIRToast : window.KAIRToast; }
-  _showToast(msg, type) { var t = this._toast(); if (t) t.show(msg, type || 'info'); }
+  // Getter (NO método): todo el módulo lo usa como propiedad
+  // (this._toast.success(...)). Si fuera método, cada acceso lanzaría
+  // TypeError y abortaría los refrescos que vienen después del aviso.
+  get _toast() {
+    // 📦GESTION-HUMANA-TOAST — Helper estandarizado con title+subtitle+type.
+    if (window.parent && window.parent.GestionHumanaToast) return window.parent.GestionHumanaToast;
+    if (window.GestionHumanaToast) return window.GestionHumanaToast;
+    // Fallback: KAIRToast directo (compatibilidad si el helper no cargó).
+    var k = (window.parent && window.parent.KAIRToast) ? window.parent.KAIRToast : window.KAIRToast;
+    if (k) return k;
+    // Última red: objeto nulo para que un helper ausente nunca bloquee
+    // las recargas de la lista ni los refrescos del modal.
+    return { success: function () {}, error: function () {}, warning: function () {}, info: function () {}, show: function () {} };
+  }
+  _showToast(msg, type) {
+    var t = this._toast;
+    if (!t) return;
+    // Si el helper está disponible, partir "X: Y" en title/subtitle para mejor legibilidad.
+    if (t.success && msg.indexOf(':') > 0 && msg.indexOf(':') < 60) {
+      var idx = msg.indexOf(':');
+      var title = msg.substring(0, idx).trim();
+      var subtitle = msg.substring(idx + 1).trim();
+      if (typeof t[type] === 'function') { t[type](title, subtitle); return; }
+    }
+    if (typeof t.show === 'function') t.show(msg, type || 'info');
+  }
   _confirmDialog() { return (window.parent && window.parent.KairConfirm) ? window.parent.KairConfirm : window.KairConfirm; }
   _escHtml(s) { if (s == null) return ''; return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 
@@ -131,10 +155,10 @@ class ContratacionComponent {
         this.contrataciones = r.data.contrataciones;
         this._renderAll();
       } else {
-        this._showToast('Error: ' + ((r && r.error && r.error.message) || 'desconocido'), 'error');
+        this._toast.error('Error', ((r && r.error && r.error.message) || 'desconocido'));
       }
     } catch (e) {
-      this._showToast('Error: ' + e.message, 'error');
+      this._toast.error('Error', e.message);
     }
   }
 
@@ -247,40 +271,160 @@ class ContratacionComponent {
   _pasoLabel(n) { return (ContratacionComponent.PASOS[n - 1] || {}).label || '—'; }
   _pasoIcon(n)  { return (ContratacionComponent.PASOS[n - 1] || {}).icon  || 'fa-circle'; }
 
-  // ─── Render: COMPLETADOS (lista) ───
+  // ─── Render: COMPLETADOS (agrupados por tiempo + stats) ───
   _renderCompletados() {
-    var cont = this.container.querySelector('#ct-completados');
-    if (!cont) return;
     var self = this;
-    var list = this.contrataciones.filter(function (c) { return c.estado === 'completado'; });
+    var completados = this.contrataciones.filter(function (c) { return c.estado === 'completado'; });
 
-    if (list.length === 0) {
-      cont.innerHTML = '<div class="ct-empty">Aún no hay contrataciones completadas.</div>';
+    // Definir períodos (basados en fecha_ingreso)
+    var periodos = {
+      semana:    { label: 'Última semana',   days: 7,   items: [] },
+      mes:       { label: 'Último mes',      days: 30,  items: [] },
+      '3meses':  { label: 'Últimos 3 meses', days: 90,  items: [] },
+      semestre:  { label: 'Último semestre', days: 180, items: [] }
+    };
+
+    // Agrupar contrataciones por tiempo desde fecha_ingreso
+    var now = new Date();
+    completados.forEach(function (c) {
+      if (!c.fechaIngreso) return;
+      var fecha = new Date(c.fechaIngreso);
+      if (isNaN(fecha.getTime())) return;
+      var diffDays = (now - fecha) / (1000 * 60 * 60 * 24);
+      if (diffDays <= 7)        periodos.semana.items.push(c);
+      else if (diffDays <= 30)  periodos.mes.items.push(c);
+      else if (diffDays <= 90)  periodos['3meses'].items.push(c);
+      else if (diffDays <= 180) periodos.semestre.items.push(c);
+    });
+
+    // Renderizar cada período en su contenedor
+    Object.keys(periodos).forEach(function (key) {
+      var p = periodos[key];
+      var cont = self.container.querySelector('#ct-completados-' + key);
+      var countEl = self.container.querySelector('#ct-completados-' + key + '-count');
+      if (countEl) countEl.textContent = '(' + p.items.length + ')';
+      if (!cont) return;
+      if (p.items.length === 0) {
+        cont.innerHTML = '<div class="ct-empty">—</div>';
+        return;
+      }
+      cont.innerHTML = p.items.map(function (c) { return self._renderCompletadoRow(c); }).join('');
+    });
+
+    // Bind clicks en todas las listas
+    Object.keys(periodos).forEach(function (key) {
+      var cont = self.container.querySelector('#ct-completados-' + key);
+      if (!cont) return;
+      cont.querySelectorAll('.ct-card-row').forEach(function (row) {
+        row.onclick = function () { self._openDetailModal(row.getAttribute('data-id')); };
+      });
+    });
+
+    // Renderizar stats (mitad derecha)
+    this._renderCompletadosStats(completados, periodos);
+  }
+
+  // Render de un row de completado (reutilizable)
+  _renderCompletadoRow(c) {
+    var initials = this._initials(c.nombres, c.apellidos);
+    var avatarBg = this._avatarColor(c.cedula || c.id);
+    var cargo = c.cargo || '—';
+    return '<div class="ct-card-row" data-id="' + this._escHtml(c.id) + '">' +
+      '<div class="ct-avatar" style="background:' + avatarBg + ';">' + this._escHtml(initials) + '</div>' +
+      '<div class="ct-card-row__text">' +
+        '<div class="ct-card-row__name">' + this._escHtml((c.nombres || '') + ' ' + (c.apellidos || '')) + '</div>' +
+        '<div class="ct-card-row__meta">' + this._escHtml(cargo) + ' · Ingresó ' + this._fmtDate(c.fechaIngreso) + '</div>' +
+      '</div>' +
+      '<span class="ct-card-row__badge"><i class="fas fa-check"></i> Completado</span>' +
+    '</div>';
+  }
+
+  // Render de stats (mitad derecha): total + semana + mes + promedio + top cargos
+  _renderCompletadosStats(completados, periodos) {
+    var self = this;
+    var stats = this.container.querySelector('#ct-completados-stats');
+    if (!stats) return;
+
+    if (completados.length === 0) {
+      // Dejar la columna derecha vacía cuando no hay datos — el empty box grande
+      // se ve desalineado vs las 4 sub-secciones de la izquierda. Mejor ausencia.
+      stats.innerHTML = '';
       return;
     }
 
-    // Limitar a las 6 más recientes
-    list = list.slice(0, 6);
+    // Métricas
+    var total = completados.length;
+    var thisWeek = periodos.semana.items.length;
+    var thisMonth = periodos.mes.items.length;
 
-    var html = list.map(function (c) {
-      var initials = self._initials(c.nombres, c.apellidos);
-      var avatarBg = self._avatarColor(c.cedula || c.id);
-      var cargo = c.cargo || '—';
-      return '<div class="ct-card-row" data-id="' + self._escHtml(c.id) + '">' +
-        '<div class="ct-avatar" style="background:' + avatarBg + ';">' + self._escHtml(initials) + '</div>' +
-        '<div class="ct-card-row__text">' +
-          '<div class="ct-card-row__name">' + self._escHtml((c.nombres || '') + ' ' + (c.apellidos || '')) + '</div>' +
-          '<div class="ct-card-row__meta">' + self._escHtml(cargo) + ' · ' + self._fmtDate(c.fechaIngreso) + '</div>' +
-        '</div>' +
-        '<span class="ct-card-row__badge"><i class="fas fa-check"></i> Completado</span>' +
-        '<div class="ct-card-row__date">' + self._fmtDate(c.s400Fecha || c.updatedAt) + '</div>' +
-      '</div>';
-    }).join('');
-    cont.innerHTML = html;
-
-    cont.querySelectorAll('.ct-card-row').forEach(function (row) {
-      row.onclick = function () { self._openDetailModal(row.getAttribute('data-id')); };
+    // Promedio de días entre memo (createdAt) e ingreso (fecha_ingreso)
+    var tiempos = [];
+    completados.forEach(function (c) {
+      if (c.createdAt && c.fechaIngreso) {
+        var d1 = new Date(c.createdAt);
+        var d2 = new Date(c.fechaIngreso);
+        if (!isNaN(d1.getTime()) && !isNaN(d2.getTime())) {
+          var diff = (d2 - d1) / (1000 * 60 * 60 * 24);
+          if (diff >= 0) tiempos.push(diff);
+        }
+      }
     });
+    var promedio = tiempos.length > 0
+      ? Math.round(tiempos.reduce(function (a, b) { return a + b; }, 0) / tiempos.length)
+      : null;
+
+    // Top 5 cargos
+    var cargoCount = {};
+    completados.forEach(function (c) {
+      if (c.cargo) cargoCount[c.cargo] = (cargoCount[c.cargo] || 0) + 1;
+    });
+    var topCargos = Object.keys(cargoCount)
+      .map(function (k) { return { nombre: k, count: cargoCount[k] }; })
+      .sort(function (a, b) { return b.count - a.count; })
+      .slice(0, 5);
+
+    var html = '' +
+      '<div class="ct-completados-stat">' +
+        '<div class="ct-completados-stat__icon ct-completados-stat__icon--blue"><i class="fas fa-check-double"></i></div>' +
+        '<div class="ct-completados-stat__text">' +
+          '<div class="ct-completados-stat__value">' + total + '</div>' +
+          '<div class="ct-completados-stat__label">Total completados</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="ct-completados-stat">' +
+        '<div class="ct-completados-stat__icon ct-completados-stat__icon--green"><i class="fas fa-calendar-week"></i></div>' +
+        '<div class="ct-completados-stat__text">' +
+          '<div class="ct-completados-stat__value">' + thisWeek + '</div>' +
+          '<div class="ct-completados-stat__label">Esta semana</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="ct-completados-stat">' +
+        '<div class="ct-completados-stat__icon ct-completados-stat__icon--orange"><i class="fas fa-calendar-alt"></i></div>' +
+        '<div class="ct-completados-stat__text">' +
+          '<div class="ct-completados-stat__value">' + thisMonth + '</div>' +
+          '<div class="ct-completados-stat__label">Este mes</div>' +
+        '</div>' +
+      '</div>' +
+      (promedio !== null ?
+      '<div class="ct-completados-stat">' +
+        '<div class="ct-completados-stat__icon ct-completados-stat__icon--purple"><i class="fas fa-hourglass-half"></i></div>' +
+        '<div class="ct-completados-stat__text">' +
+          '<div class="ct-completados-stat__value">' + promedio + ' días</div>' +
+          '<div class="ct-completados-stat__label">Promedio memo → ingreso</div>' +
+        '</div>' +
+      '</div>' : '') +
+      (topCargos.length > 0 ?
+      '<div class="ct-completados-topcargos">' +
+        '<div class="ct-completados-topcargos__title">Top cargos completados</div>' +
+        topCargos.map(function (c) {
+          return '<div class="ct-completados-topcargos__row">' +
+            '<span>' + self._escHtml(c.nombre) + '</span>' +
+            '<span class="ct-completados-topcargos__count">' + c.count + '</span>' +
+          '</div>';
+        }).join('') +
+      '</div>' : '');
+
+    stats.innerHTML = html;
   }
 
   // ─── Modal: Nueva Contratación (9 campos) ───
@@ -598,13 +742,13 @@ class ContratacionComponent {
           notas: 'Reingreso desde UI de contratación'
         });
         if (r && r.success) {
-          self._showToast('Trabajador reactivado (sin nueva CT)', 'success');
+          self._toast.success('Trabajador reactivado (sin nueva CT)');
           await self._loadContrataciones();
         } else {
-          self._showToast('Error: ' + ((r && r.error && r.error.message) || 'desconocido'), 'error');
+          self._toast.error('Error', ((r && r.error && r.error.message) || 'desconocido'));
         }
       } catch (e) {
-        self._showToast('Error: ' + e.message, 'error');
+        self._toast.error('Error', e.message);
       }
     };
     backdrop.querySelector('[data-action="recontratar"]').onclick = async function () {
@@ -630,13 +774,13 @@ class ContratacionComponent {
           motivo: 'Recontratación desde UI de contratación'
         });
         if (r2 && r2.success) {
-          self._showToast('Recontratación exitosa. CT: ' + r2.data.contratacionId, 'success');
+          self._toast.success('Recontratación exitosa', 'CT: ' + r2.data.contratacionId);
           await self._loadContrataciones();
         } else {
-          self._showToast('Error: ' + ((r2 && r2.error && r2.error.message) || 'desconocido'), 'error');
+          self._toast.error('Error', ((r2 && r2.error && r2.error.message) || 'desconocido'));
         }
       } catch (e) {
-        self._showToast('Error: ' + e.message, 'error');
+        self._toast.error('Error', e.message);
       }
     };
     backdrop.onclick = function (e) { if (e.target === backdrop) closeModal(); };
@@ -647,20 +791,20 @@ class ContratacionComponent {
     try {
       var r = await window.electronAPI.ghCreateContratacion({ companyName: this.companyName, data: data });
       if (r && r.success) {
-        this._showToast('Proceso de contratación iniciado', 'success');
+        this._toast.success('Proceso de contratación iniciado');
         await this._loadContrataciones();
       } else {
-        this._showToast('Error: ' + ((r && r.error && r.error.message) || 'desconocido'), 'error');
+        this._toast.error('Error', ((r && r.error && r.error.message) || 'desconocido'));
       }
     } catch (e) {
-      this._showToast('Error: ' + e.message, 'error');
+      this._toast.error('Error', e.message);
     }
   }
 
   // ─── Modal: Detalle de Contratación (6 pasos) ───
   async _openDetailModal(id) {
     var c = this.contrataciones.find(function (x) { return x.id === id; });
-    if (!c) { this._showToast('Contratación no encontrada', 'error'); return; }
+    if (!c) { this._toast.error('Contratación no encontrada'); return; }
     var self = this;
 
     // Soportes del pipeline (memo, orden de exámenes, etc.) — 1 llamada, agrupada por paso
@@ -728,10 +872,16 @@ class ContratacionComponent {
     if (cancelBtn) cancelBtn.onclick = function () { close(); self._openCancelConfirm(c.id, (c.nombres || '') + ' ' + (c.apellidos || '')); };
 
     var body = backdrop.querySelector('#ct-steps-body');
+    body._ctData = c;
     body.innerHTML = this._renderPasos(c);
     this._wireSoportes(body, c);
+    this._wirePasos(body, c);
+  }
 
-    // Eventos de los pasos (delegación)
+  // Eventos de los pasos: cabecera expande + botón completar.
+  // Se reconecta en cada refresco porque _refreshContratacionUI reescribe el body.
+  _wirePasos(body, c) {
+    var self = this;
     body.querySelectorAll('.ct-step').forEach(function (step) {
       var pasoNum = parseInt(step.getAttribute('data-paso'), 10);
       var boolKey = self._pasoBoolKey(pasoNum);
@@ -748,8 +898,10 @@ class ContratacionComponent {
       var submitBtn = step.querySelector('[data-action="marcar-paso"]');
       if (submitBtn) {
         submitBtn.onclick = function () {
-          var fechaVal = step.querySelector('input[name="fecha"]').value;
-          var notasVal = step.querySelector('textarea[name="notas"]').value;
+          var fechaInput = step.querySelector('input[name="fecha"]');
+          var notasInput = step.querySelector('textarea[name="notas"]');
+          var fechaVal = fechaInput ? fechaInput.value : '';
+          var notasVal = notasInput ? notasInput.value : '';
           var extraField = step.querySelector('input[name="ips"]');
           var ipsVal = extraField ? extraField.value : null;
           var payload = {
@@ -764,8 +916,9 @@ class ContratacionComponent {
           if (pasoNum === 3 && ipsVal) {
             payload.notas = (notasVal ? (notasVal + ' · ') : '') + 'IPS: ' + ipsVal;
           }
-          close();
-          self._marcarPaso(payload);
+          // No se cierra la ventana: se confirma y se refresca en el mismo sitio
+          // para que la marca de completado se vea sin salir y volver a entrar.
+          self._marcarPaso(payload, submitBtn);
         };
       }
     });
@@ -938,10 +1091,112 @@ class ContratacionComponent {
     }
   }
 
-  // Wire de botones de soportes (delegación en el body del modal)
+  // Refresca TODO después de una mutación (subir doc, eliminar doc, marcar paso):
+  // 1) Recarga la lista de contrataciones desde el backend (esto re-renderiza la card
+  //    del background con la barra de progreso actualizada).
+  // 2) Si hay un modal de detalle abierto, actualiza su body con datos frescos del
+  //    objeto nuevo (en lugar de crear un modal nuevo apilado).
+  // 3) Preserva los caches `_soportesPorPaso` y `_documentosFirma` del modal viejo
+  //    en el objeto nuevo (porque la API list-soportes ya los refrescó vía
+  //    _refreshSoportes en el flujo de subir/eliminar).
+  async _refreshContratacionUI(c, opts) {
+    var self = this;
+    if (!c) return;
+    var id = c.id;
+    var forcedExpand = opts && opts.expandPaso;
+    // Preservar caches del objeto viejo (que se va a descartar al reasignar this.contrataciones)
+    var oldSoportes = c._soportesPorPaso;
+    var oldDocsFirma = c._documentosFirma;
+
+    // Preservar la sección abierta y lo escrito antes de reescribir el modal,
+    // para que el documento nuevo se vea sin salir y volver a entrar.
+    var existingBackdrop = document.getElementById('ct-detail-backdrop');
+    var openBody = existingBackdrop ? existingBackdrop.querySelector('#ct-steps-body') : null;
+    var openPaso = null;
+    var draftVals = null;
+    if (openBody) {
+      var openStep = openBody.querySelector('.ct-step--expanded[data-paso]');
+      if (openStep) {
+        openPaso = parseInt(openStep.getAttribute('data-paso'), 10);
+        var fI = openStep.querySelector('input[name="fecha"]');
+        var nI = openStep.querySelector('textarea[name="notas"]');
+        var ipsI = openStep.querySelector('input[name="ips"]');
+        draftVals = {
+          fecha: fI ? fI.value : '',
+          notas: nI ? nI.value : '',
+          ips: ipsI ? ipsI.value : null
+        };
+      }
+    }
+
+    await this._loadContrataciones();
+
+    var cFresh = this.contrataciones.find(function (x) { return x.id === id; });
+    if (!cFresh) return;
+    // Restaurar caches si los teníamos
+    if (oldSoportes) cFresh._soportesPorPaso = oldSoportes;
+    if (oldDocsFirma) cFresh._documentosFirma = oldDocsFirma;
+
+    // Refrescar documentos de firma con datos nuevos para que la regla del
+    // paso 4 ("sin evidencia no se puede completar") use información actual.
+    if (cFresh.trabajadorId) {
+      try {
+        var rd = await window.electronAPI.ghListDocumentos({ companyName: this.companyName, trabajadorId: cFresh.trabajadorId });
+        if (rd && rd.success && rd.data && rd.data.documentos) {
+          cFresh._documentosFirma = rd.data.documentos;
+        }
+      } catch (e) { console.warn('[Contratacion] refresh documentos firma:', e.message); }
+    }
+
+    // Si el modal de detalle está abierto, actualizar su body (no crear uno nuevo)
+    if (existingBackdrop) {
+      var body = existingBackdrop.querySelector('#ct-steps-body');
+      if (body) {
+        body._ctData = cFresh;
+        body.innerHTML = this._renderPasos(cFresh);
+        this._wireSoportes(body, cFresh);
+        this._wirePasos(body, cFresh);
+        // Decidir qué sección abrir: la forzada (tras adjuntar/completar)
+        // tiene prioridad sobre la que estaba abierta.
+        var targetPaso = openPaso;
+        if (forcedExpand === 'auto') {
+          targetPaso = null;
+          for (var ap = 1; ap <= 6; ap++) {
+            if (cFresh[self._pasoBoolKey(ap)] !== 1) { targetPaso = ap; break; }
+          }
+        } else if (forcedExpand) {
+          targetPaso = forcedExpand;
+        }
+        // Reabrir la sección objetivo y devolver lo escrito
+        if (targetPaso) {
+          var newStep = body.querySelector('.ct-step[data-paso="' + targetPaso + '"]');
+          if (newStep && !newStep.classList.contains('ct-step--done')) {
+            newStep.classList.add('ct-step--expanded');
+            if (draftVals && targetPaso === openPaso) {
+              var nf = newStep.querySelector('input[name="fecha"]');
+              var nn = newStep.querySelector('textarea[name="notas"]');
+              var ni = newStep.querySelector('input[name="ips"]');
+              if (nf && draftVals.fecha) nf.value = draftVals.fecha;
+              if (nn && draftVals.notas !== null && nn.value !== draftVals.notas && !nn.value) nn.value = draftVals.notas;
+              if (ni && draftVals.ips !== null) ni.value = draftVals.ips;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Wire de botones de soportes (delegación en el body del modal).
+  // Se conecta una sola vez por ventana: el body persiste entre refrescos
+  // (solo cambia su innerHTML), así que sin esta guarda cada refresco
+  // acumulaba una escucha más y las acciones se disparaban repetidas.
   _wireSoportes(body, c) {
     var self = this;
+    if (c) body._ctData = c;
+    if (body.dataset.sopWired === '1') return;
+    body.dataset.sopWired = '1';
     body.addEventListener('click', async function (ev) {
+      var live = body._ctData || c;
       // Abrir documento de Firma Electrónica (paso 4)
       var docBtn = ev.target.closest('[data-doc-action="abrir"]');
       if (docBtn) {
@@ -949,7 +1204,7 @@ class ContratacionComponent {
         var docId = docEl ? docEl.getAttribute('data-doc-id') : null;
         if (!docId) return;
         var rDoc = await window.electronAPI.ghAbrirDocumento({ documentoId: docId });
-        if (rDoc && !rDoc.success) self._showToast('No se pudo abrir: ' + ((rDoc.error && rDoc.error.message) || ''), 'error');
+        if (rDoc && !rDoc.success) self._toast.error('No se pudo abrir', ((rDoc.error && rDoc.error.message) || ''));
         return;
       }
 
@@ -962,20 +1217,24 @@ class ContratacionComponent {
       var soporteId = sopEl ? sopEl.getAttribute('data-soporte-id') : null;
 
       if (action === 'subir' && pasoNum) {
+        if (!live) return;
         btn.disabled = true;
         try {
-          var r = await window.electronAPI.ghSubirSoportePaso({ companyName: self.companyName, contratacionId: c.id, pasoNum: pasoNum });
+          var r = await window.electronAPI.ghSubirSoportePaso({ companyName: self.companyName, contratacionId: live.id, pasoNum: pasoNum });
           if (r && r.success && !r.data.canceled) {
-            self._showToast('Soporte adjuntado', 'success');
-            await self._refreshSoportes(c, pasoNum, body);
+            self._toast.success('Soporte adjuntado');
+            // Refresca cache de soportes del paso + re-renderiza card de fondo + modal,
+            // abriendo la sección del paso para que el papel y el botón se vean juntos
+            await self._refreshSoportes(live, pasoNum, body);
+            await self._refreshContratacionUI(live, { expandPaso: pasoNum });
           } else if (r && !r.success) {
-            self._showToast('Error: ' + ((r.error && r.error.message) || 'desconocido'), 'error');
+            self._toast.error('Error', ((r.error && r.error.message) || 'desconocido'));
           }
-        } catch (e) { self._showToast('Error: ' + e.message, 'error'); }
+        } catch (e) { self._toast.error('Error', e.message); }
         btn.disabled = false;
       } else if (action === 'abrir' && soporteId) {
         window.electronAPI.ghAbrirSoportePaso({ soporteId: soporteId }).then(function (r) {
-          if (r && !r.success) self._showToast('No se pudo abrir: ' + ((r.error && r.error.message) || ''), 'error');
+          if (r && !r.success) self._toast.error('No se pudo abrir', ((r.error && r.error.message) || ''));
         });
       } else if (action === 'eliminar' && soporteId) {
         var confirmRef = self._confirmDialog();
@@ -995,47 +1254,58 @@ class ContratacionComponent {
         var rd = await window.electronAPI.ghEliminarSoportePaso({ soporteId: soporteId });
         if (rd && rd.success) {
           // Si el backend revirtió el paso (se eliminó el último soporte), hay que
-          // re-renderizar todo el pipeline → cerrar, recargar y reabrir el modal.
+          // re-renderizar todo el pipeline → recargar + actualizar modal actual.
           if (rd.data && rd.data.pasoRevertido) {
-            self._showToast('Paso ' + rd.data.pasoNum + ' revertido a pendiente: se eliminó su último soporte', 'warning');
-            var backdrop = body.closest('.ct-modal-backdrop');
-            if (backdrop && backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
-            await self._loadContrataciones();
-            self._openDetailModal(c.id);
+            self._toast.warning('Paso ' + rd.data.pasoNum + ' revertido a pendiente', 'se eliminó su último soporte');
+            await self._refreshContratacionUI(live);
           } else {
-            self._showToast('Soporte eliminado', 'success');
-            await self._refreshSoportes(c, pasoNum, body);
+            self._toast.success('Soporte eliminado');
+            await self._refreshSoportes(live, pasoNum, body);
+            await self._refreshContratacionUI(live);
           }
         } else {
           var code = rd && rd.error && rd.error.code;
           if (code === 'PASO6_NO_REVERTIBLE') {
-            self._showToast((rd.error && rd.error.message), 'warning');
+            self._toast.warning((rd.error && rd.error.message));
           } else {
-            self._showToast('Error: ' + ((rd && rd.error && rd.error.message) || 'desconocido'), 'error');
+            self._toast.error('Error', ((rd && rd.error && rd.error.message) || 'desconocido'));
           }
         }
       }
     });
   }
 
-  async _marcarPaso(payload) {
+  async _marcarPaso(payload, btn) {
+    // La ventana se mantiene abierta para que la marca de completado se vea
+    // en el mismo sitio (antes se cerraba y había que salir y volver a entrar).
+    if (btn) btn.disabled = true;
     try {
       var r = await window.electronAPI.ghMarcarPaso(payload);
       if (r && r.success) {
-        this._showToast('Paso marcado como completado', 'success');
-        await this._loadContrataciones();
-        // Re-abrir el modal con la versión actualizada
-        if (payload.contratacionId) this._openDetailModal(payload.contratacionId);
+        this._toast.success('Paso marcado como completado');
+        // Refresca card del background + actualiza el modal actual in-place
+        // (en vez de crear uno nuevo, que causaba el bug del "paso sin completar al re-entrar"),
+        // abriendo el siguiente paso pendiente para que se note el avance
+        var c = this.contrataciones.find(function (x) { return x.id === payload.contratacionId; });
+        await this._refreshContratacionUI(c, { expandPaso: 'auto' });
       } else {
         var mpCode = r && r.error && r.error.code;
         if (mpCode === 'SOPORTE_REQUERIDO') {
-          this._showToast('⚠️ ' + (r.error.message || 'Adjuntá al menos un soporte antes de completar el paso'), 'warning');
+          this._toast.warning('⚠️ ' + (r.error.message || 'Adjuntá al menos un soporte antes de completar el paso'));
+          // Mantener la ventana abierta con la sección a la vista para adjuntar evidencia
+          var bd = document.getElementById('ct-detail-backdrop');
+          if (bd) {
+            var st = bd.querySelector('.ct-step[data-paso="' + payload.pasoNum + '"]');
+            if (st) st.classList.add('ct-step--expanded');
+          }
         } else {
-          this._showToast('Error: ' + ((r && r.error && r.error.message) || 'desconocido'), 'error');
+          this._toast.error('Error', ((r && r.error && r.error.message) || 'desconocido'));
         }
       }
     } catch (e) {
-      this._showToast('Error: ' + e.message, 'error');
+      this._toast.error('Error', e.message);
+    } finally {
+      if (btn) btn.disabled = false;
     }
   }
 
@@ -1057,13 +1327,26 @@ class ContratacionComponent {
     try {
       var r = await window.electronAPI.ghDeleteContratacion({ contratacionId: id });
       if (r && r.success) {
-        this._showToast('Contratación cancelada', 'success');
+        this._toast.success('Contratación cancelada');
         await this._loadContrataciones();
+        // Verificación: la tarjeta cancelada no debe seguir visible en EN PROCESO.
+        // Si la recarga devolvió datos viejos o falló en silencio, quitar el nodo
+        // directamente para no dejar una tarjeta activa de algo ya cancelado.
+        var stale = this.contrataciones.find(function (x) { return x.id === id && x.estado === 'en_proceso'; });
+        var cardNode = this.container ? this.container.querySelector('.ct-card[data-id="' + id + '"]') : null;
+        if (stale && cardNode) {
+          console.warn('[Contratacion] tarjeta cancelada seguía visible, se quita del DOM:', id);
+          if (cardNode.parentNode) cardNode.parentNode.removeChild(cardNode);
+          var grid = this.container.querySelector('#ct-en-proceso');
+          if (grid && !grid.querySelector('.ct-card')) {
+            grid.innerHTML = '<div class="ct-empty">No hay procesos en curso. Iniciá uno con "Nueva Contratación".</div>';
+          }
+        }
       } else {
-        this._showToast('Error: ' + ((r && r.error && r.error.message) || 'desconocido'), 'error');
+        this._toast.error('Error', ((r && r.error && r.error.message) || 'desconocido'));
       }
     } catch (e) {
-      this._showToast('Error: ' + e.message, 'error');
+      this._toast.error('Error', e.message);
     }
   }
 

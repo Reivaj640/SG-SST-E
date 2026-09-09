@@ -860,6 +860,25 @@ function _handlerMarcarPaso(token, contratacionId, pasoNum, fecha, notas) {
       "estado = ?, updated_at = ? WHERE id = ?"
     ).run(pasoInt, fechaFinal, notas || null, nuevoEstado, now, contratacionId);
 
+    // 📦FIX-paso-actual · Recalcular paso_actual al primer paso NO completado.
+    // Antes: paso_actual quedaba en el último pasoInt marcado, lo que causaba
+    // que la card de progreso mostrara "Paso 1/6, 17%" cuando los pasos 1 y 2
+    // estaban hechos pero el user marcó primero el 2 y después el 1.
+    // Ahora: siempre apunta al primer paso pendiente (o 6 si todos están completos).
+    if (pasoInt < 6) {
+      var ctRefreshed = localDb.prepare('SELECT * FROM contrataciones WHERE id = ?').get(contratacionId);
+      var primerPendiente = 1;
+      var encontrado = false;
+      for (var p = 1; p <= 6; p++) {
+        if (ctRefreshed[pasoFields[p].bool] !== 1) { primerPendiente = p; encontrado = true; break; }
+      }
+      if (!encontrado) primerPendiente = 6; // todos los pasos completados
+      if (primerPendiente !== pasoInt) {
+        localDb.prepare("UPDATE contrataciones SET paso_actual = ?, updated_at = ? WHERE id = ?")
+          .run(primerPendiente, new Date().toISOString(), contratacionId);
+      }
+    }
+
     // 📦775 · Paso 6 (S400 Activado) = crear/vincular en base_personal
     // Cuando el user completa el pipeline de 6 pasos, el trabajador se "activa" en
     // base_personal para que aparezca en Base Personal y se actualicen los KPIs.
@@ -1698,6 +1717,11 @@ function _handlerCreateVacacion(token, companyName, data) {
       return _err('TRABAJADOR_NOT_FOUND', 'Trabajador no encontrado en esta empresa', { trabajadorId: data.trabajadorId });
     }
 
+    // La fecha de fin no puede ser anterior a la de inicio (comparación ISO yyyy-mm-dd)
+    if (String(data.fechaFin).slice(0, 10) < String(data.fechaInicio).slice(0, 10)) {
+      return _err('FECHAS_INVALIDAS', 'La fecha de fin debe ser posterior a la fecha de inicio.');
+    }
+
     var id = _newId('va-');
     var now = new Date().toISOString();
     localDb.prepare(
@@ -1709,7 +1733,7 @@ function _handlerCreateVacacion(token, companyName, data) {
       id, data.trabajadorId, company.company_key,
       data.fechaSolicitud, data.fechaInicio, data.fechaFin,
       data.diasSolicitados, data.diasPendientes || null,
-      data.estado || 'solicitada',
+      'solicitada', // toda solicitud nace en solicitada; el estado avanza por gh:cambiar-estado-vacacion
       data.aprobadoPor || null, data.fechaAprobacion || null, data.notas || null,
       data.notificarCliente ? 1 : 0,
       data.clienteNotificado ? 1 : 0,

@@ -152,7 +152,6 @@
     this._filtroEstado = 'todos';
     this._busqueda = '';
     this._cargando = false;
-    this._toastTimer = null;
     this._escKeyHandler = null;
     this._templates = [];
     this._templateById = {};
@@ -356,7 +355,7 @@
       '      <div class="fe-field" style="margin-top: 0.5rem;">',
       '        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">',
       '          <input id="fe-firma-requiere-empresa" type="checkbox" />',
-      '          <span>☐ Requiere firma de la empresa</span>',
+      '          <span>Requiere firma de la empresa</span>',
       '        </label>',
       '      </div>',
       '      <div id="fe-firma-rep-preview" class="fe-firma-rep-preview" style="display: none; margin-top: 0.5rem; padding: 0.75rem; background: #f8f9fa; border-radius: 4px;">',
@@ -415,8 +414,7 @@
       '    </div>',
       '  </div>',
       '</div>',
-      '',
-      '<div id="fe-toast" class="fe-toast" hidden></div>'
+      ''
     ].join('\n');
   };
 
@@ -430,7 +428,6 @@
     this._tbody = this.container.querySelector('#fe-tbody');
     this._modal = this.container.querySelector('#fe-expediente-modal');
     this._modalBody = this.container.querySelector('#fe-expediente-body');
-    this._toast = this.container.querySelector('#fe-toast');
   };
 
   // Etiqueta humana del filtro de estado del proceso.
@@ -643,7 +640,7 @@
         self._templateById[t.id] = t;
       });
     } catch (e) {
-      self._showToast('Error cargando datos: ' + e.message, 'error');
+      self._toast.error('Error cargando datos', e.message);
       self._documentos = [];
       self._trabajadores = [];
     }
@@ -1682,7 +1679,7 @@
     if (!data || !proceso) return;
     var sr = (data.signRequests || []).find(function (s) { return s.id === srId; });
     if (!sr || !sr.ok || !sr.data) {
-      self._showToast('No se puede reenviar: solicitud no disponible', 'error');
+      self._toast.error('No se puede reenviar: solicitud no disponible');
       return;
     }
     // 1. Leer el correo del sign request desde signRequest.metadata.correo
@@ -1692,7 +1689,7 @@
     var srResult = await window.electronAPI.ghGetSignRequest(srId, { companyName: self.companyName });
     if (!srResult || !srResult.success || !srResult.data || !srResult.data.signRequest) {
       var errMsg = srResult && srResult.error && srResult.error.message || 'desconocido';
-      self._showToast('No se pudo obtener el sign request ' + srId + ': ' + errMsg, 'error');
+      self._toast.error('No se pudo obtener el sign request ' + srId, errMsg);
       return;
     }
     var correo = srResult.data.signRequest.correo_verificacion;
@@ -1702,17 +1699,17 @@
       // sign requests creados antes del fix A1.5.4-A.
       var consentId = sr.data.consent_id;
       if (!consentId) {
-        self._showToast('El sign request ' + srId + ' no tiene correo (ni en metadata ni en consent)', 'error');
+        self._toast.error('El sign request ' + srId + ' no tiene correo', '(ni en metadata ni en consent)');
         return;
       }
       var consentResult = await window.electronAPI.ghGetConsentimiento(consentId, { companyName: self.companyName });
       if (!consentResult || !consentResult.success || !consentResult.data || !consentResult.data.consentimiento) {
-        self._showToast('No se pudo obtener el correo (ni de metadata ni del consent #' + consentId + ')', 'error');
+        self._toast.error('No se pudo obtener el correo', '(ni de metadata ni del consent #' + consentId + ')');
         return;
       }
       correo = consentResult.data.consentimiento.correo_verificacion;
       if (!correo) {
-        self._showToast('No hay correo disponible para esta solicitud', 'error');
+        self._toast.error('No hay correo disponible para esta solicitud');
         return;
       }
     }
@@ -1720,7 +1717,7 @@
     //     formato inválido). No enviamos al destinatario equivocado por un valor
     //     mal persistido en metadata.
     if (!_isValidEmail(correo)) {
-      self._showToast('El correo almacenado (' + (correo || 'vacío') + ') no es válido. Corrígelo antes de reenviar.', 'error');
+      self._toast.error('El correo almacenado no es válido', '(' + (correo || 'vacío') + '). Corrígelo antes de reenviar.');
       return;
     }
     // 2. Llamar a firma-service con companyName (fix A1.5.4-B) + correo + context
@@ -1732,18 +1729,18 @@
         context: { via: 'firma-electronica', button: 'enviar-correo' }
       });
     } catch (e) {
-      self._showToast('Excepción enviando correo: ' + e.message, 'error');
+      self._toast.error('Excepción enviando correo', e.message);
       return;
     }
     if (r && r.success) {
       var sent = r.data && r.data.messageId ? ' (messageId: ' + r.data.messageId + ')' : '';
-      self._showToast('Correo enviado a ' + correo + sent, 'success');
+      self._toast.success('Correo enviado a ' + correo + sent);
       // 3. Refetch del expediente para mostrar el nuevo estado
       await self._refetchExpediente(proceso);
     } else {
       var errCode = r && r.error && r.error.code;
       var errMsg2 = r && r.error && r.error.message;
-      self._showToast('Error enviando correo: ' + (errCode ? errCode + ' — ' : '') + (errMsg2 || 'desconocido'), 'error');
+      self._toast.error('Error enviando correo', (errCode ? errCode + ' — ' : '') + (errMsg2 || 'desconocido'));
     }
   };
 
@@ -1758,7 +1755,7 @@
     if (!data) return;
     var sr = (data.signRequests || []).find(function (s) { return s.id === srId; });
     if (!sr || !sr.ok || !sr.data || !sr.data.url_publica) {
-      self._showToast('Aún no se ha generado el enlace público. Envía primero el correo.', 'info');
+      self._toast.info('Aún no se ha generado el enlace público. Envía primero el correo.');
       return;
     }
     var url = sr.data.url_publica;
@@ -1776,9 +1773,9 @@
         document.execCommand('copy');
         document.body.removeChild(ta);
       }
-      self._showToast('Enlace público copiado al portapapeles', 'success');
+      self._toast.success('Enlace público copiado al portapapeles');
     } catch (e) {
-      self._showToast('Error copiando enlace: ' + e.message, 'error');
+      self._toast.error('Error copiando enlace', e.message);
     }
   };
 
@@ -1811,13 +1808,13 @@
     // Re-leer el SR del estado actual (puede haber cambiado tras un refetch).
     var sr = (data.signRequests || []).find(function (s) { return s.id === srId; });
     if (!sr || !sr.ok || !sr.data) {
-      self._showToast('No se puede reenviar OTP: solicitud no disponible', 'error');
+      self._toast.error('No se puede reenviar OTP: solicitud no disponible');
       return;
     }
     var estado = sr.data.estado;
     if (estado !== 'OTP_SENT' && estado !== 'OTP_LOCKED') {
       // Backend lo rechazará también, pero evitamos un HTTP round-trip obvio.
-      self._showToast('Reenviar OTP solo disponible en estados OTP_SENT u OTP_LOCKED (estado actual: ' + estado + ')', 'error');
+      self._toast.error('Reenviar OTP solo disponible en estados OTP_SENT u OTP_LOCKED', 'estado actual: ' + estado);
       return;
     }
 
@@ -1845,14 +1842,14 @@
     } catch (e) {
       // Reactivar el botón inmediatamente ante una excepción
       if (btn && btnOriginalHtml !== null) { btn.disabled = false; btn.innerHTML = btnOriginalHtml; btn.removeAttribute('title'); }
-      self._showToast('Excepción reenviando OTP: ' + e.message, 'error');
+      self._toast.error('Excepción reenviando OTP', e.message);
       return;
     }
 
     if (r && r.success) {
       var masked = (r.data && r.data.correo_destino_enmascarado) || 'firmante';
       var ttl = (r.data && r.data.otp_ttl_seconds) || 600;
-      self._showToast('OTP reenviado a ' + masked + ' (válido ' + Math.floor(ttl / 60) + ' min)', 'success');
+      self._toast.success('OTP reenviado a ' + masked, '(válido ' + Math.floor(ttl / 60) + ' min)');
       // Mantener el botón en cooldown (no reactivar btnOriginalHtml)
       var startMs = Date.now();
       var tick = setInterval(function () {
@@ -1880,9 +1877,9 @@
       // Mensaje específico para 429
       if (errCode === 'RATE_LIMIT_EXCEEDED' && errDetails && errDetails.retry_after_seconds) {
         var mins = Math.ceil(errDetails.retry_after_seconds / 60);
-        self._showToast('Demasiados reenvíos. Espera ' + mins + ' min antes de intentar de nuevo.', 'error');
+        self._toast.error('Demasiados reenvíos. Espera ' + mins + ' min antes de intentar de nuevo.');
       } else {
-        self._showToast('Error reenviando OTP: ' + (errCode ? errCode + ' — ' : '') + (errMsg || 'desconocido'), 'error');
+        self._toast.error('Error reenviando OTP', (errCode ? errCode + ' — ' : '') + (errMsg || 'desconocido'));
       }
     }
   };
@@ -1901,18 +1898,18 @@
     try {
       var r = await window.electronAPI.firmaSignRequestDocument(srId, { companyName: self.companyName });
       if (!r || !r.success || !r.data || !r.data.rutaArchivo) {
-        self._showToast('No se pudo obtener el documento firmado', 'error');
+        self._toast.error('No se pudo obtener el documento firmado');
         return;
       }
       var openResult = await window.electronAPI.openPath(r.data.rutaArchivo);
       if (!openResult || !openResult.success) {
-        self._showToast('No se pudo abrir el documento: ' + ((openResult && openResult.error) || 'error desconocido'), 'error');
+        self._toast.error('No se pudo abrir el documento', ((openResult && openResult.error) || 'error desconocido'));
         return;
       }
       var origen = r.data.desdeCache ? ' (desde caché local)' : '';
-      self._showToast('Documento firmado abierto' + origen, 'success');
+      self._toast.success('Documento firmado abierto' + origen);
     } catch (e) {
-      self._showToast('Error abriendo documento: ' + e.message, 'error');
+      self._toast.error('Error abriendo documento', e.message);
     }
   };
 
@@ -1927,16 +1924,16 @@
     try {
       var r = await window.electronAPI.firmaSignRequestConstanciaSaveAs(srId, { companyName: self.companyName });
       if (r && r.canceled) {
-        self._showToast('Descarga cancelada', 'info');
+        self._toast.info('Descarga cancelada');
         return;
       }
       if (!r || !r.success || !r.data || !r.data.rutaArchivo) {
-        self._showToast('No se pudo guardar la constancia', 'error');
+        self._toast.error('No se pudo guardar la constancia');
         return;
       }
-      self._showToast('Constancia guardada en ' + r.data.rutaArchivo, 'success');
+      self._toast.success('Constancia guardada en ' + r.data.rutaArchivo);
     } catch (e) {
-      self._showToast('Error guardando constancia: ' + e.message, 'error');
+      self._toast.error('Error guardando constancia', e.message);
     }
   };
 
@@ -1953,7 +1950,7 @@
     var trabajador = proceso && proceso.trabajador;
     var cedula = trabajador ? (trabajador.cedula || trabajador.id) : null;
     if (!cedula) {
-      self._showToast('No se encontró la cédula del trabajador del expediente', 'error');
+      self._toast.error('No se encontró la cédula del trabajador del expediente');
       return;
     }
     // Mapa de títulos reales de los documentos (K+AIR los conoce; firma-service
@@ -1969,16 +1966,16 @@
     try {
       var r = await window.electronAPI.firmaExpedienteConstanciaSaveAs(cedula, { companyName: self.companyName, titulos: titulos });
       if (r && r.canceled) {
-        self._showToast('Descarga cancelada', 'info');
+        self._toast.info('Descarga cancelada');
         return;
       }
       if (!r || !r.success || !r.data || !r.data.rutaArchivo) {
-        self._showToast('No se pudo guardar la constancia general', 'error');
+        self._toast.error('No se pudo guardar la constancia general');
         return;
       }
-      self._showToast('Constancia general guardada en ' + r.data.rutaArchivo, 'success');
+      self._toast.success('Constancia general guardada en ' + r.data.rutaArchivo);
     } catch (e) {
-      self._showToast('Error guardando constancia general: ' + e.message, 'error');
+      self._toast.error('Error guardando constancia general', e.message);
     }
   };
 
@@ -1996,7 +1993,7 @@
         self._modalBody.innerHTML = self._renderExpediente(proceso, data);
       }
     } catch (e) {
-      self._showToast('Error refrescando expediente: ' + e.message, 'error');
+      self._toast.error('Error refrescando expediente', e.message);
     }
   };
 
@@ -2078,7 +2075,7 @@
     if (!templateId || !window.electronAPI) return;
     var r = await window.electronAPI.ghAbrirTemplate({ templateId: templateId });
     if (r && !r.success) {
-      self._showToast('Error abriendo template: ' + (r.error && r.error.message || 'desconocido'), 'error');
+      self._toast.error('Error abriendo template', (r.error && r.error.message || 'desconocido'));
     }
   };
 
@@ -2090,11 +2087,11 @@
     if (!ok) return;
     var r = await window.electronAPI.ghEliminarTemplate({ templateId: templateId });
     if (r && r.success) {
-      this._showToast('Template eliminado', 'success');
+      this._toast.success('Template eliminado');
       await this._reloadData();
       this._renderTemplates();
     } else {
-      this._showToast('Error eliminando template: ' + (r && r.error && r.error.message || 'desconocido'), 'error');
+      this._toast.error('Error eliminando template', (r && r.error && r.error.message || 'desconocido'));
     }
   };
 
@@ -2116,7 +2113,7 @@
     confirmBtn.onclick = function () {
       var tipo = tipoSelect.value;
       var nombre = (nombreInput.value || '').trim();
-      if (!nombre) { self._showToast('Escribe un nombre para el template', 'warning'); return; }
+      if (!nombre) { self._toast.warning('Escribe un nombre para el template'); return; }
       self._subirTemplate(tipo, nombre, modal);
     };
   };
@@ -2131,7 +2128,7 @@
     if (r && r.data && r.data.canceled) return;
     if (r && r.success) {
       modal.hidden = true;
-      this._showToast('Template subido correctamente', 'success');
+      this._toast.success('Template subido correctamente');
       await this._reloadData();
       this._renderTemplates();
       // Si el modal de Generar Documento está abierto detrás, refrescar su
@@ -2141,7 +2138,7 @@
         this._updateTemplateField(genModal);
       }
     } else {
-      this._showToast('Error subiendo template: ' + (r && r.error && r.error.message || 'desconocido'), 'error');
+      this._toast.error('Error subiendo template', (r && r.error && r.error.message || 'desconocido'));
     }
   };
 
@@ -2154,7 +2151,7 @@
     var modal = self.container.querySelector('#fe-gen-modal');
     if (!modal) return;
     var proceso = self._lastExpedienteProceso;
-    if (!proceso) { self._showToast('No hay trabajador seleccionado', 'warning'); return; }
+    if (!proceso) { self._toast.warning('No hay trabajador seleccionado'); return; }
     var trab = proceso.trabajador;
     // Pre-fill trabajador
     var infoEl = modal.querySelector('#fe-gen-trabajador-info');
@@ -2260,11 +2257,11 @@
     // cubre cualquier llamada inesperada (evita documentos huérfanos sin archivo).
     var templatesDelTipo = self._templatesByTipo(tipo);
     if (templatesDelTipo.length === 0) {
-      self._showToast('No se puede generar: este tipo no tiene template. Sube uno primero.', 'warning');
+      self._toast.warning('No se puede generar: este tipo no tiene template. Sube uno primero.');
       return;
     }
     if (!self._selectedTemplateId) {
-      self._showToast('Selecciona un template para generar el documento.', 'warning');
+      self._toast.warning('Selecciona un template para generar el documento.');
       return;
     }
     var tipoObj = TIPOS.find(function (t) { return t.value === tipo; });
@@ -2285,7 +2282,7 @@
       });
       if (r && r.success) {
         modal.hidden = true;
-        self._showToast('Documento generado. Pendiente de firma electrónica.', 'success');
+        self._toast.success('Documento generado. Pendiente de firma electrónica.');
         await self._reloadData();
         self._renderTabla();
         // Refrescar el modal del expediente con el proceso FRESCO (post-reload).
@@ -2300,10 +2297,10 @@
           }
         }
       } else {
-        self._showToast('Error generando documento: ' + (r && r.error && r.error.message || 'desconocido'), 'error');
+        self._toast.error('Error generando documento', (r && r.error && r.error.message || 'desconocido'));
       }
     } catch (e) {
-      self._showToast('Error generando documento: ' + e.message, 'error');
+      self._toast.error('Error generando documento', e.message);
     }
     if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.innerHTML = '<i class="fas fa-plus"></i> Generar'; }
   };
@@ -2318,12 +2315,12 @@
     try {
       var docResult = await window.electronAPI.ghGetDocumento({ documentoId: docId });
       if (!docResult || !docResult.success || !docResult.data || !docResult.data.documento) {
-        self._showToast('No se pudo obtener el documento', 'error');
+        self._toast.error('No se pudo obtener el documento');
         return;
       }
       var doc = docResult.data.documento;
       if (!doc.rutaArchivo) {
-        self._showToast('El documento no tiene archivo adjunto. Genera el documento con un template primero.', 'warning');
+        self._toast.warning('El documento no tiene archivo adjunto. Genera el documento con un template primero.');
         return;
       }
       var empresas = await window.electronAPI.firmaEmpresaList({});
@@ -2332,12 +2329,12 @@
         match = empresas.data.configured.find(function (c) { return c.companyKey === self.companyName; });
       }
       if (!match) {
-        self._showToast('La empresa no tiene firma-service configurado', 'error');
+        self._toast.error('La empresa no tiene firma-service configurado');
         return;
       }
       self._abrirModalFirma(doc, match);
     } catch (e) {
-      self._showToast('Error validando documento: ' + e.message, 'error');
+      self._toast.error('Error validando documento', e.message);
     }
   };
 
@@ -2390,12 +2387,12 @@
           var repResult = await window.electronAPI.repLegalGet(self.companyName);
           var rep = repResult && repResult.success && repResult.data && repResult.data.representante;
           if (!rep) {
-            self._showToast('Esta empresa no tiene representante legal configurado. Agregalo en Gestión de Empresas.', 'error');
+            self._toast.error('Esta empresa no tiene representante legal configurado. Agregalo en Gestión de Empresas.');
             requiereEmpresaCheck.checked = false;
             return;
           }
           if (!rep.correo) {
-            self._showToast('El representante legal no tiene correo. La firma dual requiere correo.', 'error');
+            self._toast.error('El representante legal no tiene correo. La firma dual requiere correo.');
             requiereEmpresaCheck.checked = false;
             return;
           }
@@ -2444,11 +2441,11 @@
       // 1. Get agreement
       var agr = await window.electronAPI.firmaAgreementGet({ companyName: self.companyName });
       var agreement = (agr && agr.success && agr.data) || null;
-      if (!agreement) { self._showToast('No se pudo obtener el acuerdo activo', 'error'); self._restoreEnviarButton(enviarBtn); return; }
+      if (!agreement) { self._toast.error('No se pudo obtener el acuerdo activo'); self._restoreEnviarButton(enviarBtn); return; }
       // 2. Read PDF bytes
       var pdfResult = await window.electronAPI.firmaDocumentoReadBytes({ rutaArchivo: self._firmaDoc.rutaArchivo });
       if (!pdfResult || !pdfResult.success || !pdfResult.data) {
-        self._showToast('Error leyendo el archivo PDF: ' + (pdfResult && pdfResult.error && pdfResult.error.message || 'desconocido'), 'error');
+        self._toast.error('Error leyendo el archivo PDF', (pdfResult && pdfResult.error && pdfResult.error.message || 'desconocido'));
         self._restoreEnviarButton(enviarBtn); return;
       }
       var pdfBytes = pdfResult.data.data; // base64
@@ -2474,11 +2471,11 @@
         // Si ya hay un consent PENDING (legacy u otro caso), reusar su id.
         consentId = consentR.error.details && consentR.error.details.consent_id;
       } else {
-        self._showToast('Error creando consentimiento: ' + (consentR && consentR.error && consentR.error.message || 'desconocido'), 'error');
+        self._toast.error('Error creando consentimiento', (consentR && consentR.error && consentR.error.message || 'desconocido'));
         self._restoreEnviarButton(enviarBtn); return;
       }
       if (!consentId) {
-        self._showToast('No se obtuvo consent_id. Contacta a RRHH.', 'error');
+        self._toast.error('No se obtuvo consent_id. Contacta a RRHH.');
         self._restoreEnviarButton(enviarBtn); return;
       }
       // 5. Build metadata (Nombres de campos según schema del backend firma-service.
@@ -2535,7 +2532,7 @@
         pdfName: self._firmaDoc.titulo || 'documento.pdf'
       });
       if (!srR || !srR.success || !srR.data) {
-        self._showToast('Error creando solicitud de firma: ' + (srR && srR.error && srR.error.message || 'desconocido'), 'error');
+        self._toast.error('Error creando solicitud de firma', (srR && srR.error && srR.error.message || 'desconocido'));
         self._restoreEnviarButton(enviarBtn); return;
       }
       // 7. Auto-invitar al firmante con la URL pública.
@@ -2550,10 +2547,10 @@
         });
         autoInviteOk = !!(inviteR && inviteR.success === true);
         if (!autoInviteOk) {
-          self._showToast('No se pudo enviar la invitación automáticamente. Usa "Enviar por correo" en el modal de éxito.', 'warning');
+          self._toast.warning('No se pudo enviar la invitación automáticamente. Usa "Enviar por correo" en el modal de éxito.');
         }
       } catch (e) {
-        self._showToast('Error en auto-invitación (no bloquea): ' + (e && e.message || 'desconocido'), 'warning');
+        self._toast.warning('Error en auto-invitación (no bloquea): ' + (e && e.message || 'desconocido'));
       }
       // 7. Update doc state
       await window.electronAPI.ghUpdateDocumento({
@@ -2577,7 +2574,7 @@
       }
       self._abrirModalExito(srR.data, correoFirmante, autoInviteOk);
     } catch (e) {
-      self._showToast('Error en flujo de firma: ' + e.message, 'error');
+      self._toast.error('Error en flujo de firma', e.message);
       self._restoreEnviarButton(modal.querySelector('#fe-firma-enviar'));
     }
   };
@@ -2625,14 +2622,14 @@
         if (!url) return;
         if (navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText(url).then(function () {
-            self._showToast('Enlace copiado al portapapeles', 'success');
+            self._toast.success('Enlace copiado al portapapeles');
           });
         } else {
           var ta = document.createElement('textarea');
           ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
           document.body.appendChild(ta); ta.select();
           document.execCommand('copy'); document.body.removeChild(ta);
-          self._showToast('Enlace copiado al portapapeles', 'success');
+          self._toast.success('Enlace copiado al portapapeles');
         }
       };
     }
@@ -2676,7 +2673,7 @@
     try {
       var r = await window.electronAPI.ghDeleteDocumento({ documentoId: docId });
       if (r && r.success) {
-        self._showToast('Documento anulado', 'success');
+        self._toast.success('Documento anulado');
         await self._reloadData();
         self._renderTabla();
         // Refrescar el modal del expediente con el proceso FRESCO (post-reload).
@@ -2688,10 +2685,10 @@
           }
         }
       } else {
-        self._showToast('Error anulando: ' + (r && r.error && r.error.message || 'desconocido'), 'error');
+        self._toast.error('Error anulando', (r && r.error && r.error.message || 'desconocido'));
       }
     } catch (e) {
-      self._showToast('Error anulando documento: ' + e.message, 'error');
+      self._toast.error('Error anulando documento', e.message);
     }
   };
 
@@ -2700,17 +2697,17 @@
     try {
       var r = await window.electronAPI.ghGetDocumento({ documentoId: docId });
       if (!r || !r.success || !r.data || !r.data.documento) {
-        this._showToast('No se pudo obtener el documento', 'error');
+        this._toast.error('No se pudo obtener el documento');
         return;
       }
       var doc = r.data.documento;
       if (!doc.rutaArchivo) {
-        this._showToast('El documento no tiene archivo adjunto', 'warning');
+        this._toast.warning('El documento no tiene archivo adjunto');
         return;
       }
       await window.electronAPI.ghAbrirDocumento({ documentoId: docId });
     } catch (e) {
-      this._showToast('Error descargando: ' + e.message, 'error');
+      this._toast.error('Error descargando', e.message);
     }
   };
 
@@ -2722,11 +2719,11 @@
       // archivo adjunto). Ahora avisa claramente al usuario.
       if (r && !r.success) {
         var msg = (r.error && r.error.message) || 'No se pudo abrir el documento';
-        this._showToast(msg, 'warning');
+        this._toast.warning(msg);
         return;
       }
     } catch (e) {
-      this._showToast('Error abriendo documento: ' + e.message, 'error');
+      this._toast.error('Error abriendo documento', e.message);
     }
   };
 
@@ -2783,7 +2780,8 @@
         item.doc.estado = transicion.estado;
         changed = true;
       }
-      self._showToast(transicion.toast, transicion.success ? 'success' : 'warning');
+      var t = transicion.success ? self._toast.success.bind(self._toast) : self._toast.warning.bind(self._toast);
+      t(transicion.toast);
     });
     if (changed) {
       self._calcularProcesos();
@@ -2836,23 +2834,30 @@
     return Array.from(new Uint8Array(buf)).map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
   };
 
+  FirmaElectronicaComponent.prototype._toast = function () {
+    // 📦GESTION-HUMANA-TOAST — Helper estandarizado con title+subtitle+type.
+    if (window.parent && window.parent.GestionHumanaToast) return window.parent.GestionHumanaToast;
+    if (window.GestionHumanaToast) return window.GestionHumanaToast;
+    // Fallback: KAIRToast directo (compatibilidad si el helper no cargó).
+    return (window.parent && window.parent.KAIRToast) ? window.parent.KAIRToast : window.KAIRToast;
+  };
   FirmaElectronicaComponent.prototype._showToast = function (msg, type) {
-    var self = this;
-    if (!self._toast) return;
-    self._toast.className = 'fe-toast fe-toast--' + (type || 'info');
-    self._toast.textContent = msg;
-    self._toast.hidden = false;
-    clearTimeout(self._toastTimer);
-    self._toastTimer = setTimeout(function () {
-      self._toast.hidden = true;
-    }, 3500);
+    var t = this._toast();
+    if (!t) return;
+    // Si el helper está disponible, partir "X: Y" en title/subtitle para mejor legibilidad.
+    if (t.success && msg.indexOf(':') > 0 && msg.indexOf(':') < 60) {
+      var idx = msg.indexOf(':');
+      var title = msg.substring(0, idx).trim();
+      var subtitle = msg.substring(idx + 1).trim();
+      if (typeof t[type] === 'function') { t[type](title, subtitle); return; }
+    }
+    if (typeof t.show === 'function') t.show(msg, type || 'info');
   };
 
   FirmaElectronicaComponent.prototype.destroy = function () {
     var self = this;
     self._stopPolling();
     self._pollingProcessed = {};  // liberar marcadores de SRs procesados
-    if (self._toastTimer) clearTimeout(self._toastTimer);
     if (self._escKeyHandler) {
       document.removeEventListener('keydown', self._escKeyHandler);
       self._escKeyHandler = null;
