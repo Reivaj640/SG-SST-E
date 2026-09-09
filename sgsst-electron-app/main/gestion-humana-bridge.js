@@ -3089,12 +3089,17 @@ function _handlerCreateMensaje(token, companyName, data) {
   if (!localDb) return _err('NO_DB', 'BD no disponible');
 
   try {
+    // Remitente institucional RRHH (id reservado, no es fila de base_personal).
+    // Se valida explícito para no depender del estado de las claves foráneas.
+    var esRRHH = data.remitenteId === 'RRHH';
     // Validar que ambos trabajadores pertenezcan a la empresa
-    var remitente = localDb.prepare(
-      "SELECT id FROM base_personal WHERE id = ? AND empresa_id = ?"
-    ).get(data.remitenteId, company.company_key);
-    if (!remitente) {
-      return _err('REMITENTE_NOT_FOUND', 'Remitente no encontrado en esta empresa', { remitenteId: data.remitenteId });
+    if (!esRRHH) {
+      var remitente = localDb.prepare(
+        "SELECT id FROM base_personal WHERE id = ? AND empresa_id = ?"
+      ).get(data.remitenteId, company.company_key);
+      if (!remitente) {
+        return _err('REMITENTE_NOT_FOUND', 'Remitente no encontrado en esta empresa', { remitenteId: data.remitenteId });
+      }
     }
     var destinatario = localDb.prepare(
       "SELECT id FROM base_personal WHERE id = ? AND empresa_id = ?"
@@ -3153,6 +3158,224 @@ function _handlerMarcarLeido(token, mensajeId, fechaLectura) {
     return _ok({ mensajeId: mensajeId, leido: true, fechaLectura: fecha });
   } catch (e) {
     console.error('[' + MOD + '][marcar-leido]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:registrar-envios
+ * Guarda la bitácora de envíos externos (correo/WhatsApp) en lote.
+ * Input: { token, companyName, envios: [{ tipo, referenciaId, canal, destinatarioId?, destino, estado, detalle? }] }
+ */
+function _handlerRegistrarEnvios(token, companyName, envios) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+  if (!companyName || typeof companyName !== 'string') return _err('INVALID_INPUT', 'companyName es requerido');
+  if (!Array.isArray(envios) || envios.length === 0) return _err('INVALID_INPUT', 'envios debe ser un arreglo no vacío');
+  if (envios.length > 1000) return _err('INVALID_INPUT', 'máximo 1000 envíos por lote');
+
+  var company = _getCompanyByName(companyName);
+  if (!company) return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var now = new Date().toISOString();
+    var stmt = localDb.prepare(
+      "INSERT INTO gh_envios (id, empresa_id, tipo, referencia_id, canal, destinatario_id, destino, estado, detalle, created_at) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    );
+    var n = 0;
+    for (var i = 0; i < envios.length; i++) {
+      var e = envios[i] || {};
+      if (!e.referenciaId || !e.destino) continue;
+      if (e.canal !== 'email' && e.canal !== 'whatsapp') continue;
+      stmt.run(_newId('ev-'), company.company_key,
+        e.tipo === 'mensaje' ? 'mensaje' : 'anuncio',
+        e.referenciaId, e.canal,
+        e.destinatarioId || null, e.destino,
+        e.estado === 'fallido' ? 'fallido' : 'enviado',
+        e.detalle || null, now);
+      n++;
+    }
+    return _ok({ registrados: n });
+  } catch (e) {
+    console.error('[' + MOD + '][registrar-envios]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:list-envios
+ * Bitácora de envíos, opcionalmente filtrada por referencia.
+ */
+function _handlerListEnvios(token, companyName, referenciaId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+  if (!companyName || typeof companyName !== 'string') return _err('INVALID_INPUT', 'companyName es requerido');
+
+  var company = _getCompanyByName(companyName);
+  if (!company) return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var rows;
+    if (referenciaId) {
+      rows = localDb.prepare(
+        "SELECT * FROM gh_envios WHERE empresa_id = ? AND referencia_id = ? ORDER BY created_at DESC"
+      ).all(company.company_key, referenciaId);
+    } else {
+      rows = localDb.prepare(
+        "SELECT * FROM gh_envios WHERE empresa_id = ? ORDER BY created_at DESC LIMIT 500"
+      ).all(company.company_key);
+    }
+    return _ok({ envios: rows, count: rows.length });
+  } catch (e) {
+    console.error('[' + MOD + '][list-envios]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+// ========== 📦727 · ADJUNTOS DE COMUNICACIÓN — archivos de anuncios y mensajes ==========
+// El archivo vive en filesystem (AppData); la tabla guarda metadata + ruta.
+// Path: <userData>/gh-comunicacion-adjuntos/<empresaId>/<referenciaId>/<id>-<nombre>
+
+function _comAdjPath(empresaId, referenciaId, adjId, nombre) {
+  var app = registerGestionHumanaHandlers._app;
+  var path = registerGestionHumanaHandlers._path;
+  if (!app || !path) return null;
+  var safe = String(nombre || 'archivo').replace(/[\\/:*?"<>|]/g, '_').slice(0, 120) || 'archivo';
+  return path.join(app.getPath('userData'), 'gh-comunicacion-adjuntos', String(empresaId), String(referenciaId), adjId + '-' + safe);
+}
+
+function _rowToComAdj(row) {
+  if (!row) return null;
+  return {
+    id: row.id, empresaId: row.empresa_id,
+    tipo: row.tipo, referenciaId: row.referencia_id,
+    nombreArchivo: row.nombre_archivo, rutaArchivo: row.ruta_archivo,
+    tamanoBytes: row.tamano_bytes, mimeType: row.mime_type,
+    createdAt: row.created_at
+  };
+}
+
+/**
+ * gh:subir-adjunto-comunicacion
+ * Guarda un archivo (base64) para un anuncio/mensaje. Límite 25 MB (Gmail).
+ * Input: { token, companyName, tipo, referenciaId, nombre, mimeType, base64 }
+ */
+function _handlerSubirAdjuntoCom(token, companyName, tipo, referenciaId, nombre, mimeType, base64) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+  if (!companyName || typeof companyName !== 'string') return _err('INVALID_INPUT', 'companyName es requerido');
+  if (tipo !== 'anuncio' && tipo !== 'mensaje') return _err('INVALID_INPUT', 'tipo debe ser anuncio o mensaje');
+  if (!referenciaId || typeof referenciaId !== 'string') return _err('INVALID_INPUT', 'referenciaId es requerido');
+  if (!nombre || typeof nombre !== 'string') return _err('INVALID_INPUT', 'nombre es requerido');
+  if (!base64 || typeof base64 !== 'string') return _err('INVALID_INPUT', 'base64 es requerido');
+
+  var company = _getCompanyByName(companyName);
+  if (!company) return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+
+  var fs = registerGestionHumanaHandlers._fs;
+  var path = registerGestionHumanaHandlers._path;
+  if (!fs || !path) return _err('NO_FS', 'fs/path no disponibles');
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var buf;
+    try { buf = Buffer.from(base64, 'base64'); } catch (e) { return _err('INVALID_INPUT', 'base64 inválido'); }
+    if (buf.length > 25 * 1024 * 1024) return _err('FILE_TOO_LARGE', 'El archivo supera 25 MB.');
+    var id = _newId('ca-');
+    var dest = _comAdjPath(company.company_key, referenciaId, id, nombre);
+    if (!dest) return _err('NO_PATH', 'No se pudo construir la ruta de destino');
+    _ensureDirSync(path.dirname(dest));
+    fs.writeFileSync(dest, buf);
+    var now = new Date().toISOString();
+    localDb.prepare(
+      "INSERT INTO gh_comunicacion_adjuntos (id, empresa_id, tipo, referencia_id, nombre_archivo, ruta_archivo, tamano_bytes, mime_type, created_at) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).run(id, company.company_key, tipo, referenciaId, String(nombre).slice(0, 120), dest, buf.length, mimeType || null, now);
+    return _ok({ adjunto: _rowToComAdj({ id: id, empresa_id: company.company_key, tipo: tipo, referencia_id: referenciaId, nombre_archivo: nombre, ruta_archivo: dest, tamano_bytes: buf.length, mime_type: mimeType || null, created_at: now }) });
+  } catch (e) {
+    console.error('[' + MOD + '][subir-adjunto-comunicacion]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:listar-adjuntos-comunicacion — metadata (sin bytes).
+ */
+function _handlerListarAdjuntosCom(token, companyName, tipo, referenciaId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+  if (!companyName || typeof companyName !== 'string') return _err('INVALID_INPUT', 'companyName es requerido');
+  if (!referenciaId || typeof referenciaId !== 'string') return _err('INVALID_INPUT', 'referenciaId es requerido');
+
+  var company = _getCompanyByName(companyName);
+  if (!company) return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada en la BD');
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var rows = localDb.prepare(
+      "SELECT id, empresa_id, tipo, referencia_id, nombre_archivo, ruta_archivo, tamano_bytes, mime_type, created_at " +
+      "FROM gh_comunicacion_adjuntos WHERE empresa_id = ? AND referencia_id = ? ORDER BY created_at ASC"
+    ).all(company.company_key, referenciaId);
+    return _ok({ adjuntos: rows.map(_rowToComAdj) });
+  } catch (e) {
+    console.error('[' + MOD + '][listar-adjuntos-comunicacion]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:leer-adjunto-comunicacion — devuelve el archivo en base64 para adjuntarlo al correo.
+ */
+function _handlerLeerAdjuntoCom(token, adjuntoId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+  if (!adjuntoId || typeof adjuntoId !== 'string') return _err('INVALID_INPUT', 'adjuntoId es requerido');
+
+  var fs = registerGestionHumanaHandlers._fs;
+  if (!fs) return _err('NO_FS', 'fs no disponible');
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var row = localDb.prepare('SELECT * FROM gh_comunicacion_adjuntos WHERE id = ?').get(adjuntoId);
+    if (!row) return _err('NOT_FOUND', 'Adjunto no encontrado');
+    if (!fs.existsSync(row.ruta_archivo)) return _err('FILE_MISSING', 'El archivo ya no está en disco');
+    var buf = fs.readFileSync(row.ruta_archivo);
+    return _ok({ nombre: row.nombre_archivo, mimeType: row.mime_type, base64: buf.toString('base64'), tamanoBytes: buf.length });
+  } catch (e) {
+    console.error('[' + MOD + '][leer-adjunto-comunicacion]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:eliminar-adjunto-comunicacion — borra fila + archivo.
+ */
+function _handlerEliminarAdjuntoCom(token, adjuntoId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+  if (!adjuntoId || typeof adjuntoId !== 'string') return _err('INVALID_INPUT', 'adjuntoId es requerido');
+
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var row = localDb.prepare('SELECT * FROM gh_comunicacion_adjuntos WHERE id = ?').get(adjuntoId);
+    if (!row) return _err('NOT_FOUND', 'Adjunto no encontrado');
+    _safeUnlinkSync(row.ruta_archivo);
+    localDb.prepare('DELETE FROM gh_comunicacion_adjuntos WHERE id = ?').run(adjuntoId);
+    return _ok({ eliminado: true });
+  } catch (e) {
+    console.error('[' + MOD + '][eliminar-adjunto-comunicacion]', e.message);
     return _err('INTERNAL', e.message);
   }
 }
@@ -4523,6 +4746,60 @@ function registerGestionHumanaHandlers(app, deps) {
       return _handlerMarcarLeido(p.token || '', p.mensajeId, p.fechaLectura);
     } catch (e) {
       console.error('[' + MOD + '][marcar-leido]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:registrar-envios', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerRegistrarEnvios(p.token || '', p.companyName, p.envios);
+    } catch (e) {
+      console.error('[' + MOD + '][registrar-envios]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:list-envios', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerListEnvios(p.token || '', p.companyName, p.referenciaId);
+    } catch (e) {
+      console.error('[' + MOD + '][list-envios]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:subir-adjunto-comunicacion', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerSubirAdjuntoCom(p.token || '', p.companyName, p.tipo, p.referenciaId, p.nombre, p.mimeType, p.base64);
+    } catch (e) {
+      console.error('[' + MOD + '][subir-adjunto-comunicacion]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:listar-adjuntos-comunicacion', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerListarAdjuntosCom(p.token || '', p.companyName, p.tipo, p.referenciaId);
+    } catch (e) {
+      console.error('[' + MOD + '][listar-adjuntos-comunicacion]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:leer-adjunto-comunicacion', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerLeerAdjuntoCom(p.token || '', p.adjuntoId);
+    } catch (e) {
+      console.error('[' + MOD + '][leer-adjunto-comunicacion]', e.message);
+      return _err('INTERNAL', e.message);
+    }
+  });
+  ipcMainHandle('gh:eliminar-adjunto-comunicacion', function (event, payload) {
+    try {
+      var p = payload || {};
+      return _handlerEliminarAdjuntoCom(p.token || '', p.adjuntoId);
+    } catch (e) {
+      console.error('[' + MOD + '][eliminar-adjunto-comunicacion]', e.message);
       return _err('INTERNAL', e.message);
     }
   });

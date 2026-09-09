@@ -490,6 +490,12 @@ function initDbOnce() {
         role_id INTEGER NOT NULL,
         PRIMARY KEY (user_id, company_id, role_id)
       );
+      CREATE TABLE IF NOT EXISTS usuario_modulos (
+        user_id INTEGER NOT NULL,
+        modulo TEXT NOT NULL,
+        permitido INTEGER NOT NULL DEFAULT 1,
+        PRIMARY KEY (user_id, modulo)
+      );
       CREATE TABLE IF NOT EXISTS sessions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
@@ -1674,6 +1680,71 @@ ipcMain.handle('assignments-set-v1', async (event, payload = {}) => {
   } catch (error) {
     console.error('[ASSIGNMENTS] Error asignando:', error);
     return { success: false, error: { code: 'ASSIGNMENTS_ERROR', message: error.message } };
+  }
+});
+
+// Módulos explícitos por usuario (sección "Módulos permitidos" del modal
+// Gestión de Usuario). Vacío = rige la matriz por rol (sin cambio de conducta).
+// Solo admin global puede leer/escribir los de otros usuarios.
+const MODULOS_VALIDOS = [
+  'Recursos', 'Gestión Integral', 'Gestión de la Salud', 'Gestión de Peligros y Riesgos',
+  'Gestión de Amenazas', 'Verificación', 'Mejoramiento', 'Gestión Humana'
+];
+
+ipcMain.handle('users-get-modulos', async (event, payload = {}) => {
+  try {
+    const { token, userId } = payload;
+    const sessionCheck = validateSession(token);
+    if (!sessionCheck.ok) return { success: false, error: sessionCheck.error };
+    if (!userId) {
+      return { success: false, error: { code: 'INVALID_INPUT', message: 'userId es requerido.' } };
+    }
+    const me = sessionCheck.user || {};
+    const targetId = Number(userId);
+    if (targetId !== Number(me.id) && !me.isAdmin) {
+      return { success: false, error: { code: 'PERMISSION_DENIED', message: 'Solo el administrador puede ver los módulos de otros usuarios.' } };
+    }
+    const localDb = getDb();
+    const rows = localDb.prepare('SELECT modulo, permitido FROM usuario_modulos WHERE user_id = ?').all(targetId);
+    const modulos = {};
+    rows.forEach(r => { modulos[r.modulo] = r.permitido === 1; });
+    return { success: true, data: { modulos, tieneExplicitos: rows.length > 0 } };
+  } catch (error) {
+    console.error('[USERS] Error leyendo módulos:', error);
+    return { success: false, error: { code: 'USERS_MODULOS_ERROR', message: error.message } };
+  }
+});
+
+ipcMain.handle('users-set-modulos', async (event, payload = {}) => {
+  try {
+    const { token, userId, modulos } = payload;
+    const sessionCheck = validateSession(token);
+    if (!sessionCheck.ok) return { success: false, error: sessionCheck.error };
+    const me = sessionCheck.user || {};
+    if (!me.isAdmin) {
+      return { success: false, error: { code: 'PERMISSION_DENIED', message: 'Solo el administrador global puede cambiar módulos.' } };
+    }
+    if (!userId || !modulos || typeof modulos !== 'object') {
+      return { success: false, error: { code: 'INVALID_INPUT', message: 'userId y modulos son requeridos.' } };
+    }
+    const localDb = getDb();
+    const target = localDb.prepare('SELECT id FROM users WHERE id = ?').get(Number(userId));
+    if (!target) {
+      return { success: false, error: { code: 'USER_NOT_FOUND', message: 'Usuario no encontrado.' } };
+    }
+    const tx = localDb.transaction((entries) => {
+      localDb.prepare('DELETE FROM usuario_modulos WHERE user_id = ?').run(Number(userId));
+      const ins = localDb.prepare('INSERT INTO usuario_modulos (user_id, modulo, permitido) VALUES (?, ?, ?)');
+      entries.forEach(([mod, val]) => {
+        if (!MODULOS_VALIDOS.includes(mod)) throw new Error('Módulo inválido: ' + mod);
+        ins.run(Number(userId), mod, val ? 1 : 0);
+      });
+    });
+    tx(Object.entries(modulos));
+    return { success: true };
+  } catch (error) {
+    console.error('[USERS] Error guardando módulos:', error);
+    return { success: false, error: { code: 'USERS_MODULOS_ERROR', message: error.message } };
   }
 });
 

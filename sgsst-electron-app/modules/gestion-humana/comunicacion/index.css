@@ -174,7 +174,11 @@
   margin-top: 0.625rem;
   padding-top: 0.5rem;
   border-top: 1px solid #f1f3f5;
-  text-align: right;
+  display: flex;
+  gap: 0.4rem;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 /* ═══ MENSAJES LIST ═══ */

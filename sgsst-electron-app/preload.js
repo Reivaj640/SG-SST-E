@@ -36,6 +36,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // modal de Gestión de Usuario (toggle por user).
   usersGetBandejaIntegradaFlag: (payload) => ipcRenderer.invoke('users-get-bandeja-integrada-flag', payload),
   usersSetBandejaIntegradaFlag: (payload) => ipcRenderer.invoke('users-set-bandeja-integrada-flag', payload),
+  // Módulos explícitos por usuario (sección "Módulos permitidos" del modal).
+  usersGetModulos: (payload) => ipcRenderer.invoke('users-get-modulos', payload),
+  usersSetModulos: (payload) => ipcRenderer.invoke('users-set-modulos', payload),
   
   // --- Dashboard Scanner ---
   getDashboardSummary: (companyName) => ipcRenderer.invoke('get-dashboard-summary', companyName),
@@ -451,6 +454,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   ghGetMensaje: (payload) => ipcRenderer.invoke('gh:get-mensaje', payload),
   ghCreateMensaje: (payload) => ipcRenderer.invoke('gh:create-mensaje', payload),
   ghMarcarLeido: (payload) => ipcRenderer.invoke('gh:marcar-leido', payload),
+  // Envíos externos (bitácora correo/WhatsApp)
+  ghRegistrarEnvios: (payload) => ipcRenderer.invoke('gh:registrar-envios', payload),
+  ghListEnvios: (payload) => ipcRenderer.invoke('gh:list-envios', payload),
+  // Adjuntos de comunicación (archivos de anuncios y mensajes)
+  ghSubirAdjuntoCom: (payload) => ipcRenderer.invoke('gh:subir-adjunto-comunicacion', payload),
+  ghListarAdjuntosCom: (payload) => ipcRenderer.invoke('gh:listar-adjuntos-comunicacion', payload),
+  ghLeerAdjuntoCom: (payload) => ipcRenderer.invoke('gh:leer-adjunto-comunicacion', payload),
+  ghEliminarAdjuntoCom: (payload) => ipcRenderer.invoke('gh:eliminar-adjunto-comunicacion', payload),
   // Diag (1)
   ghDiag: () => ipcRenderer.invoke('gh:diag'),
 

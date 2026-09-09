@@ -102,8 +102,12 @@ class KairConfirm {
    *   - Si el usuario confirma: Promise<{[key]: value}>
    *   - Si el usuario cancela: Promise<null>
    *
-   * fields: array de { key, label, type, value, placeholder, required }
-   *   - type: 'text' | 'number' | 'textarea'
+   * fields: array de { key, label, type, value, placeholder, required, options, default, multiple, accept }
+   *   - type: 'text' | 'number' | 'textarea' | 'select' | 'file'
+   *   - key: nombre de la clave devuelta (alias: name)
+   *   - options (solo select): [{ value, label }] — value '' = opción vacía
+   *   - default (solo select): valor preseleccionado
+   *   - multiple/accept (solo file): selección múltiple y filtro (devuelve File[])
    */
   input({
     title = 'Ingresar datos',
@@ -121,10 +125,29 @@ class KairConfirm {
         var value = (f.value != null) ? String(f.value) : '';
         var placeholder = f.placeholder || '';
         var labelText = f.label + (f.required ? ' *' : '');
+        if (inputType === 'file') {
+          return '<div class="kair-input-group">' +
+            '<label class="kair-input-label" for="kair-input-' + i + '">' + this._escapeHtml(labelText) + '</label>' +
+            '<input class="kair-input" type="file" id="kair-input-' + i + '"' + (f.multiple ? ' multiple' : '') + (f.accept ? ' accept="' + this._escapeHtml(f.accept) + '"' : '') + ' />' +
+          '</div>';
+        }
         if (inputType === 'textarea') {
           return '<div class="kair-input-group">' +
             '<label class="kair-input-label" for="kair-input-' + i + '">' + this._escapeHtml(labelText) + '</label>' +
-            '<textarea class="kair-input kair-textarea" id="kair-input-' + i + '" placeholder="' + this._escapeHtml(placeholder) + '" ' + required + '>' + this._escapeHtml(value) + '</textarea>' +
+            '<textarea class="kair-input kair-textarea" id="kair-input-' + i + '" rows="' + (f.rows || 3) + '" placeholder="' + this._escapeHtml(placeholder) + '" ' + required + '>' + this._escapeHtml(value) + '</textarea>' +
+          '</div>';
+        }
+        if (inputType === 'select') {
+          var current = (f.value != null && f.value !== '') ? String(f.value) : (f.default != null ? String(f.default) : '');
+          var opts = (f.options || []).map(function (o) {
+            var v = (o && typeof o === 'object') ? o.value : o;
+            var l = (o && typeof o === 'object') ? (o.label != null ? o.label : o.value) : o;
+            var sel = String(v) === current ? ' selected' : '';
+            return '<option value="' + this._escapeHtml(String(v == null ? '' : v)) + '"' + sel + '>' + this._escapeHtml(String(l == null ? '' : l)) + '</option>';
+          }.bind(this)).join('');
+          return '<div class="kair-input-group">' +
+            '<label class="kair-input-label" for="kair-input-' + i + '">' + this._escapeHtml(labelText) + '</label>' +
+            '<select class="kair-input" id="kair-input-' + i + '" ' + required + '>' + opts + '</select>' +
           '</div>';
         }
         return '<div class="kair-input-group">' +
@@ -158,6 +181,17 @@ class KairConfirm {
           fields.forEach(function (f, i) {
             var inputEl = document.getElementById('kair-input-' + i);
             if (!inputEl) return;
+            var key = f.key || f.name || ('field' + i);
+            if (f.type === 'file') {
+              var picked = inputEl.files ? Array.prototype.slice.call(inputEl.files) : [];
+              if (f.required && picked.length === 0) {
+                inputEl.style.borderColor = '#dc3545';
+                valid = false;
+                return;
+              }
+              values[key] = picked;
+              return;
+            }
             var raw = inputEl.value.trim();
             if (f.required && !raw) {
               inputEl.style.borderColor = '#dc3545';
@@ -166,9 +200,9 @@ class KairConfirm {
             }
             if (f.type === 'number') {
               var n = parseFloat(raw);
-              values[f.key] = isNaN(n) ? 0 : n;
+              values[key] = isNaN(n) ? 0 : n;
             } else {
-              values[f.key] = raw;
+              values[key] = raw;
             }
           });
           if (valid) resolve(values);

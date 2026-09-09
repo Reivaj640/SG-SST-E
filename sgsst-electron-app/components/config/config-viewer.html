@@ -2567,6 +2567,13 @@
                 <label class="form-label">Empresas asignadas</label>
                 <div id="user-companies-list" class="user-companies-list"></div>
             </div>
+            <div class="form-group">
+                <label class="form-label">Módulos permitidos</label>
+                <div class="user-bandeja-integrada-hint" style="margin-bottom:0.4rem;">
+                    Vale para todas sus empresas. Sin marcas explícitas rige su rol.
+                </div>
+                <div id="user-modules-list" class="user-companies-list"></div>
+            </div>
         </div>
         <div class="modal-footer">
             <button class="btn btn-outline" onclick="closeUserModal()">Cancelar</button>
@@ -4980,6 +4987,51 @@
             .map(cb => cb.value);
     }
 
+    // Módulos permitidos por usuario (vale para todas sus empresas).
+    // Sin marcas explícitas rige la matriz por rol (sin cambio de conducta).
+    const MODULOS_USUARIO = [
+        'Recursos', 'Gestión Integral', 'Gestión de la Salud', 'Gestión de Peligros y Riesgos',
+        'Gestión de Amenazas', 'Verificación', 'Mejoramiento', 'Gestión Humana'
+    ];
+    const MODULOS_POR_ROL = {
+        'Administrador': MODULOS_USUARIO.slice(),
+        'Responsable SST': MODULOS_USUARIO.slice(),
+        'Auditor': [],
+        'Gerencia': ['Gestión Integral', 'Verificación', 'Mejoramiento'],
+        'Recursos Humanos': ['Recursos', 'Gestión de la Salud', 'Gestión Humana']
+    };
+
+    function renderModulesChecklist(selectedKeys = []) {
+        const container = document.getElementById('user-modules-list');
+        if (!container) return;
+        container.innerHTML = '';
+        MODULOS_USUARIO.forEach(name => {
+            const item = document.createElement('label');
+            item.className = 'user-company-item';
+            item.innerHTML = `
+                <input type="checkbox" value="${name}">
+                <span>${name}</span>
+            `;
+            const checkbox = item.querySelector('input');
+            if (selectedKeys.includes(name)) checkbox.checked = true;
+            container.appendChild(item);
+        });
+    }
+
+    function getSelectedModulesFromModal() {
+        const container = document.getElementById('user-modules-list');
+        if (!container) return null;
+        const out = {};
+        Array.from(container.querySelectorAll('input[type="checkbox"]')).forEach(cb => {
+            out[cb.value] = cb.checked;
+        });
+        return out;
+    }
+
+    function defaultModulesForRole(roleLabel) {
+        return (MODULOS_POR_ROL[roleLabel] || []).slice();
+    }
+
     // Función para cargar los usuarios
     async function loadUsers() {
         try {
@@ -5601,6 +5653,15 @@
 
         await loadCompaniesList();
         renderCompaniesChecklist([]);
+        // Módulos: por defecto los del rol elegido; al cambiar de rol se
+        // re-sugieren (el admin puede ajustar casillas antes de guardar).
+        const roleSelect = document.getElementById('user-role');
+        renderModulesChecklist(defaultModulesForRole(roleSelect ? roleSelect.value : 'Administrador'));
+        if (roleSelect) {
+            roleSelect.onchange = function () {
+                renderModulesChecklist(defaultModulesForRole(roleSelect.value));
+            };
+        }
 
         if (userId) {
             const user = users.find(u => u.id === userId);
@@ -5618,6 +5679,24 @@
                     const roleName = assignments[0]?.role ? mapRoleToLabel(assignments[0].role) : 'Administrador';
                     document.getElementById('user-role').value = roleName;
                     renderCompaniesChecklist(selectedCompanies);
+                }
+            }
+
+            // Módulos explícitos del user (si no tiene, rigen los de su rol).
+            if (token && electronAPI && typeof electronAPI.usersGetModulos === 'function') {
+                try {
+                    const mRes = await electronAPI.usersGetModulos({ token, userId: parseInt(userId, 10) });
+                    if (mRes.success && mRes.data) {
+                        if (mRes.data.tieneExplicitos) {
+                            const checked = Object.keys(mRes.data.modulos || {}).filter(k => mRes.data.modulos[k]);
+                            renderModulesChecklist(checked);
+                        } else {
+                            const roleNow = document.getElementById('user-role').value;
+                            renderModulesChecklist(defaultModulesForRole(roleNow));
+                        }
+                    }
+                } catch (e) {
+                    console.warn('[openUserModal] No se pudieron cargar los módulos:', e.message);
                 }
             }
 
@@ -5972,6 +6051,29 @@
             return;
         }
 
+        // Persistir módulos explícitos (no fatal: si falla, el user ya quedó
+        // guardado; se avisa y se puede reintentar abriendo el modal de nuevo).
+        async function persistUserModulos(targetUserId) {
+            if (!electronAPI || typeof electronAPI.usersSetModulos !== 'function') {
+                return; // API no disponible
+            }
+            const modulos = getSelectedModulesFromModal();
+            if (!modulos) return;
+            try {
+                const res = await electronAPI.usersSetModulos({
+                    token,
+                    userId: targetUserId,
+                    modulos
+                });
+                if (!res.success) {
+                    console.warn('[saveUser] No se pudieron guardar los módulos:', res.error);
+                    showToast('Usuario guardado, pero los módulos no se pudieron actualizar: ' + (res.error?.message || 'error'), 'warning');
+                }
+            } catch (e) {
+                console.error('[saveUser] Error guardando módulos:', e);
+            }
+        }
+
         // Helper local: persistir el flag de Bandeja Integrada. Si falla,
         // el user YA se guardó — no tiramos todo a perder, solo logueamos
         // y mostramos un toast no fatal.
@@ -6059,6 +6161,7 @@
             // 📦702 (2026-08-13) — Persistir el flag de Bandeja Integrada
             // DESPUÉS de que el user y las empresas se hayan guardado.
             await persistBandejaIntegradaFlag(targetUserId);
+            await persistUserModulos(targetUserId);
 
             closeUserModal();
             loadUsers();

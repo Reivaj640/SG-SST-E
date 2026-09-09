@@ -250,6 +250,37 @@ CREATE INDEX IF NOT EXISTS idx_gh_mensajes_destinatario ON gh_mensajes(destinata
 CREATE INDEX IF NOT EXISTS idx_gh_mensajes_remitente ON gh_mensajes(remitente_id);
 CREATE INDEX IF NOT EXISTS idx_gh_mensajes_leido ON gh_mensajes(destinatario_id, leido);
 
+-- 📦726 · ENVÍOS — bitácora de envíos externos (correo/WhatsApp) de anuncios y mensajes
+CREATE TABLE IF NOT EXISTS gh_envios (
+  id TEXT PRIMARY KEY,                       -- formato ev-{nanoid}
+  empresa_id TEXT NOT NULL,
+  tipo TEXT NOT NULL,                        -- anuncio | mensaje
+  referencia_id TEXT NOT NULL,               -- gh_anuncios.id o gh_mensajes.id
+  canal TEXT NOT NULL,                       -- email | whatsapp
+  destinatario_id TEXT,                      -- base_personal.id (puede ser null si solo hay destino)
+  destino TEXT NOT NULL,                     -- correo o teléfono usado
+  estado TEXT NOT NULL,                      -- enviado | fallido
+  detalle TEXT,                              -- mensaje de error o message-id
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_gh_envios_empresa ON gh_envios(empresa_id);
+CREATE INDEX IF NOT EXISTS idx_gh_envios_ref ON gh_envios(referencia_id);
+CREATE INDEX IF NOT EXISTS idx_gh_envios_dest ON gh_envios(destinatario_id);
+
+-- 📦727 · ADJUNTOS DE COMUNICACIÓN — archivos de anuncios y mensajes (van en cada correo)
+CREATE TABLE IF NOT EXISTS gh_comunicacion_adjuntos (
+  id TEXT PRIMARY KEY,                       -- formato ca-{nanoid}
+  empresa_id TEXT NOT NULL,
+  tipo TEXT NOT NULL,                        -- anuncio | mensaje
+  referencia_id TEXT NOT NULL,               -- gh_anuncios.id o gh_mensajes.id
+  nombre_archivo TEXT NOT NULL,
+  ruta_archivo TEXT NOT NULL,
+  tamano_bytes INTEGER DEFAULT 0,
+  mime_type TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_gh_comadj_ref ON gh_comunicacion_adjuntos(referencia_id);
+
 -- 📦760 · DOCUMENTOS DE AFILIACIONES — certificados de EPS / Pensión / ARL / Caja
 -- Un único documento por slot (trabajador + tipo de afiliación). Reemplaza el anterior.
 -- Los archivos se almacenan en el filesystem (AppData/Roaming/sgsst-electron-app/gh-docs-afil/<empresa>/<trabajador>/<tipo>.pdf)

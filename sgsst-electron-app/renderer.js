@@ -250,6 +250,15 @@ function roleAllowsResource(roleName, resource) {
 }
 
 function isSubmoduleAllowed(roleName, moduleName, submoduleName) {
+  // Roles con acceso total nunca se restringen (evita auto-bloqueos).
+  const roleKey = normalizeRoleKey(roleName);
+  if (ROLE_UI_RULES[roleKey] && ROLE_UI_RULES[roleKey].allowAll) return true;
+  // Módulos explícitos del usuario (modal Gestión de Usuario).
+  // Sin marcas explícitas rige la matriz por rol (sin cambio de conducta).
+  if (userModuleOverrides && Object.keys(userModuleOverrides).length > 0 &&
+      Object.prototype.hasOwnProperty.call(userModuleOverrides, moduleName)) {
+    return !!userModuleOverrides[moduleName];
+  }
   const resource = getResourceForSubmodule(moduleName, submoduleName);
   if (!resource) return false;
   return roleAllowsResource(roleName, resource);
@@ -467,6 +476,23 @@ let currentSubmodule = null; // ✅ NUEVA VARIABLE
 // --- Auth & Sesión ---
 let authToken = null;
 let currentUser = null;
+// Módulos explícitos del user logueado (null = rige la matriz por rol).
+let userModuleOverrides = null;
+
+async function loadUserModuleOverrides() {
+  userModuleOverrides = null;
+  try {
+    if (typeof authToken === 'undefined' || !authToken) return;
+    if (!currentUser || !currentUser.id) return;
+    if (typeof window.electronAPI === 'undefined' || typeof window.electronAPI.usersGetModulos !== 'function') return;
+    const res = await window.electronAPI.usersGetModulos({ token: authToken, userId: currentUser.id });
+    if (res && res.success && res.data && res.data.tieneExplicitos) {
+      userModuleOverrides = res.data.modulos || {};
+    }
+  } catch (e) {
+    console.warn('[Permisos] No se pudieron cargar los módulos del usuario, rige la matriz por rol:', e.message);
+  }
+}
 let assignedCompanies = [];
 let companyRoleByKey = {};
 const AUTH_TOKEN_KEY = 'kair-auth-token';
@@ -3395,6 +3421,8 @@ contentArea.innerHTML = '';
       // Login exitoso - ejecutar transición
       authToken = result.data.token;
       currentUser = result.data.user;
+      // Módulos explícitos del usuario (si no tiene, rige la matriz por rol).
+      await loadUserModuleOverrides();
       assignedCompanies = (result.data.companies || []).map(c => c.company_key || c.company_name || c.company_key);
       companyRoleByKey = {};
       // 📦702 (2026-08-13) — Ahora que tenemos el token, re-evaluar la
@@ -3469,6 +3497,7 @@ async function loadAssignedCompaniesFromSession(token) {
 async function initializeAuthFlow() {
   authToken = null;
   currentUser = null;
+  userModuleOverrides = null;
   assignedCompanies = [];
   companyRoleByKey = {};
   localStorage.removeItem(AUTH_TOKEN_KEY);
@@ -3986,6 +4015,7 @@ if (mainContainerLogout) mainContainerLogout.classList.add('vanta-fullscreen');
 
   authToken = null;
   currentUser = null;
+  userModuleOverrides = null;
   assignedCompanies = [];
   companyRoleByKey = {};
   localStorage.removeItem(AUTH_TOKEN_KEY);
