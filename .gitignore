@@ -35,3 +35,7 @@ __pycache__/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Herramientas locales de BD (solo dev, no van al repo; clean-dbs BORRA datos)
+sgsst-electron-app/firma-service/scripts/clean-dbs.js
+sgsst-electron-app/firma-service/scripts/inspect-dbs.js
