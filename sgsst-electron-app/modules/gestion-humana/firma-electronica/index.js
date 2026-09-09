@@ -2301,8 +2301,9 @@
       }
     } catch (e) {
       self._toast.error('Error generando documento', e.message);
+    } finally {
+      if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.innerHTML = '<i class="fas fa-plus"></i> Generar'; }
     }
-    if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.innerHTML = '<i class="fas fa-plus"></i> Generar'; }
   };
 
   // ═══════════════════════════════════════════════════════════
@@ -2834,15 +2835,25 @@
     return Array.from(new Uint8Array(buf)).map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
   };
 
-  FirmaElectronicaComponent.prototype._toast = function () {
-    // 📦GESTION-HUMANA-TOAST — Helper estandarizado con title+subtitle+type.
-    if (window.parent && window.parent.GestionHumanaToast) return window.parent.GestionHumanaToast;
-    if (window.GestionHumanaToast) return window.GestionHumanaToast;
-    // Fallback: KAIRToast directo (compatibilidad si el helper no cargó).
-    return (window.parent && window.parent.KAIRToast) ? window.parent.KAIRToast : window.KAIRToast;
-  };
+  // Getter (NO método): todo el módulo lo usa como propiedad
+  // (self._toast.success(...)). Si fuera método, cada acceso lanzaría
+  // TypeError y abortaría los flujos que vienen después del aviso
+  // (incluido reactivar botones como el de "Generar").
+  Object.defineProperty(FirmaElectronicaComponent.prototype, '_toast', {
+    get: function () {
+      // 📦GESTION-HUMANA-TOAST — Helper estandarizado con title+subtitle+type.
+      if (window.parent && window.parent.GestionHumanaToast) return window.parent.GestionHumanaToast;
+      if (window.GestionHumanaToast) return window.GestionHumanaToast;
+      // Fallback: KAIRToast directo (compatibilidad si el helper no cargó).
+      var k = (window.parent && window.parent.KAIRToast) ? window.parent.KAIRToast : window.KAIRToast;
+      if (k) return k;
+      // Última red: objeto nulo para que un helper ausente nunca bloquee flujos.
+      return { success: function () {}, error: function () {}, warning: function () {}, info: function () {}, show: function () {} };
+    },
+    configurable: true
+  });
   FirmaElectronicaComponent.prototype._showToast = function (msg, type) {
-    var t = this._toast();
+    var t = this._toast;
     if (!t) return;
     // Si el helper está disponible, partir "X: Y" en title/subtitle para mejor legibilidad.
     if (t.success && msg.indexOf(':') > 0 && msg.indexOf(':') < 60) {

@@ -181,7 +181,9 @@ router.get('/expedientes/:idTrabajador/constancia-consolidada.pdf',
         };
       });
 
-      const firmados = documentos.filter(function (d) { return d.estado === 'SIGNED'; }).length;
+      // SIGNED (firma simple) y DUAL_FIRMADO (trabajador + empresa) cuentan como firmados
+      var esFirmado = function (d) { return d.estado === 'SIGNED' || d.estado === 'DUAL_FIRMADO'; };
+      const firmados = documentos.filter(esFirmado).length;
 
       // 4. Generación al vuelo (no se persiste en disco).
       const pdfBuffer = await pdfGenConsolidado.generateConstanciaConsolidadaPdf({

@@ -31,6 +31,7 @@ const {
 // Traducción de estados técnicos a etiquetas legibles para el lector.
 const ESTADO_LABEL = {
   SIGNED: 'Firmado',
+  DUAL_FIRMADO: 'Firmado (doble firma)',
   PENDING: 'Pendiente de envío al firmante',
   OPENED: 'En proceso — enlace abierto',
   IDENTIFICATION_STARTED: 'En proceso — identificación iniciada',
@@ -50,6 +51,12 @@ const ESTADO_LABEL = {
 
 function estadoLabel(estado) {
   return ESTADO_LABEL[estado] || estado || 'Desconocido';
+}
+
+// Estados que cuentan como firmado (SIGNED = firma simple,
+// DUAL_FIRMADO = firma de trabajador + empresa).
+function esFirmado(estado) {
+  return estado === 'SIGNED' || estado === 'DUAL_FIRMADO';
 }
 
 /**
@@ -100,8 +107,8 @@ async function generateConstanciaConsolidadaPdf(data) {
   const documentos = Array.isArray(data.documentos) ? data.documentos : [];
   const totales = data.totales || {
     documentos: documentos.length,
-    firmados: documentos.filter(function (d) { return d.estado === 'SIGNED'; }).length,
-    pendientes: documentos.filter(function (d) { return d.estado !== 'SIGNED'; }).length,
+    firmados: documentos.filter(function (d) { return esFirmado(d.estado); }).length,
+    pendientes: documentos.filter(function (d) { return !esFirmado(d.estado); }).length,
   };
   const trabajador = data.trabajador || {};
   const zonaHoraria = data.zona_horaria
@@ -197,7 +204,7 @@ async function generateConstanciaConsolidadaPdf(data) {
   }
   let idx = 1;
   for (const doc of documentos) {
-    const firmado = doc.estado === 'SIGNED';
+    const firmado = esFirmado(doc.estado);
     nuevaPaginaSiBajo(100);
     page.drawText('#' + idx, { x: MAR_L + 2, y, size: 9, font: fontBold, color: C.gris });
     // Nombre real del documento (ej. "Contrato Laboral"); el identificador
@@ -239,7 +246,7 @@ async function generateConstanciaConsolidadaPdf(data) {
     campo('Documento', doc.nombre_documento || doc.asunto_documento || '—');
     if (doc.id_documento) campo('ID interno del documento', doc.id_documento);
     campo('ID de la solicitud', doc.id_solicitud || '—');
-    campo('Estado', estadoLabel(doc.estado), { color: doc.estado === 'SIGNED' ? C.verde : C.ambar });
+    campo('Estado', estadoLabel(doc.estado), { color: esFirmado(doc.estado) ? C.verde : C.ambar });
     campo('Correo del firmante (invitación)', doc.correo_trabajador || '—');
     campo('Correo del emisor', doc.correo_emisor || '—');
     campo('Creada', fmtFechaHora(doc.fecha_creacion));
@@ -256,7 +263,10 @@ async function generateConstanciaConsolidadaPdf(data) {
     }
 
     // --- Evidencia criptográfica (solo si está firmado) ---
-    if (doc.estado === 'SIGNED') {
+    // NOTA: la constancia individual solo existe para SIGNED (la ruta
+    // /constancia.pdf responde 409 para DUAL_FIRMADO), por eso el campo
+    // "ID de constancia individual" queda en '—' en ese caso.
+    if (esFirmado(doc.estado)) {
       seccion('Evidencia criptográfica');
       campo('Hash SHA-256 (original)', truncHash(doc.document_hash_original));
       campo('Hash SHA-256 (firmado)', truncHash(doc.document_hash_firmado));
