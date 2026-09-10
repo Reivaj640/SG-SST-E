@@ -5,8 +5,9 @@
 ; NSIS oneClick NO recrea accesos directos en updates, solo reemplaza
 ; archivos. Resultado: el icono del escritorio queda apuntando al .exe
 ; viejo (que ya no existe) o desaparece. Solución: eliminar + recrear
-; en C:\Users\Public\Desktop (perMachine) y en el escritorio del usuario
-; actual ($DESKTOP). Ambos son no-op si ya existen correctamente.
+; en C:\Users\Public\Desktop (Common Desktop, perMachine). No-op si ya
+; existe correctamente. v0.1.197: ya NO se crea en el user Desktop
+; porque causa duplicados visibles con OneDrive Desktop Backup activo.
 
 !macro customInit
   ; Esperar a que la app se cierre completamente
@@ -49,15 +50,31 @@
   ; 📦648-fix1 — Recrear acceso directo del escritorio.
   ; NSIS oneClick NO recrea iconos en updates. Si el icono viejo quedó
   ; apuntando al .exe anterior, queda "roto". Solución: eliminar el viejo
-  ; + crear uno nuevo. Aplicamos en Common Desktop (perMachine) Y en el
-  ; escritorio del usuario actual ($DESKTOP), por si hay uno y el otro no.
+  ; + crear uno nuevo.
+  ;
+  ; 🔄 RE-AUDIT-2026-09-10 (v0.1.197) — ANTES se creaban 2 shortcuts:
+  ; uno en Common Desktop (perMachine) y otro en el user Desktop
+  ; (per-user). Esto causaba DUPLICADOS VISIBLES cuando el user tenía
+  ; OneDrive Desktop Backup activo: OneDrive intercepta el per-user
+  ; .lnk y lo mueve a OneDrive/Escritorio, creando un segundo ícono
+  ; en el escritorio. Ahora SOLO creamos en Common Desktop porque:
+  ; 1) perMachine=true en package.json (instalamos como admin)
+  ; 2) Common Desktop es visible para todos los users sin duplicación
+  ; 3) El _ensureDesktopShortcut() de main.js se encarga del per-user
+  ;    si fuera necesario en el futuro
   ; Delete es silencioso si el archivo no existe (no falla).
   SetShellVarContext all
   Delete "$DESKTOP\K+AIR.lnk"
   CreateShortcut "$DESKTOP\K+AIR.lnk" "$INSTDIR\K+AIR.exe" "" "$INSTDIR\resources\assets\K+AIR-multires.ico" 0
-  SetShellVarContext current
-  Delete "$DESKTOP\K+AIR.lnk"
-  CreateShortcut "$DESKTOP\K+AIR.lnk" "$INSTDIR\K+AIR.exe" "" "$INSTDIR\resources\assets\K+AIR-multires.ico" 0
+
+  ; 🔄 RE-AUDIT-2026-09-10 (v0.1.197) — También arreglar el Start Menu
+  ; shortcut que tenía icono malo (K+AIR.exe,0) en vez del K+AIR-multires.ico.
+  ; Bug pre-existente de installs antiguos (v0.1.187 o anterior).
+  ; Delete + CreateShortcut asegura que el ícono sea el correcto siempre.
+  ; Mismo context "all" para que quede en C:\ProgramData\... (visible
+  ; para todos los users, igual que el original).
+  Delete "$SMPROGRAMS\K+AIR.lnk"
+  CreateShortcut "$SMPROGRAMS\K+AIR.lnk" "$INSTDIR\K+AIR.exe" "" "$INSTDIR\resources\assets\K+AIR-multires.ico" 0
 !macroend
 
 !macro customUnInstall
