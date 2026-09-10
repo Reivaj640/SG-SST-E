@@ -34,6 +34,65 @@
   const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
   /**
+   * Helpers DOM agregados para I-VERIFICACION-PUBLICA.
+   * setButtonBusy/clearButtonYa existen arriba (sección de firma normal).
+   */
+
+  // Escapa HTML para evitar XSS al inyectar strings en innerHTML.
+  function escHtml(s) {
+    if (s == null) return '';
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  // Set text content del selector (selector, valor). Si no existe, no hace nada.
+  function setText(sel, val) {
+    var el = $(sel);
+    if (el) el.textContent = (val == null) ? '—' : String(val);
+  }
+
+  // Oculta un elemento (helper semántico para el flujo de verificación).
+  // Doble fix: atributo `hidden` (semántico) + `style.display = 'none'`
+  // (defensa contra CSS que pueda sobrescribir el `hidden` con reglas tipo
+  // `.spinner { display: block }` o cache de CSS desactualizado del browser).
+  // Bug encontrado 2026-09-10: el spinner de verify-loading seguía visible
+  // después de cargar los datos porque el CSS `.spinner { display: block }`
+  // ganaba sobre el atributo `hidden`.
+  function hideEl(el) {
+    if (!el) return;
+    if ('hidden' in el) el.hidden = true;
+    el.style.display = 'none';
+  }
+
+  // Muestra un elemento (helper simétrico a hideEl). Restaura el display
+  // por defecto (block para div, '' para heredar del CSS).
+  function showEl(el) {
+    if (!el) return;
+    if ('hidden' in el) el.hidden = false;
+    el.style.display = '';
+  }
+
+  // Formatea una fecha ISO a un string legible en zona horaria local.
+  // Ej: "2026-09-09T19:49:02.908Z" → "9/9/2026, 7:49:02 p. m."
+  function formatDateTime(iso) {
+    if (!iso) return '—';
+    try {
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return iso;
+      return d.toLocaleString('es-CO', {
+        year: 'numeric', month: 'numeric', day: 'numeric',
+        hour: 'numeric', minute: '2-digit', second: '2-digit',
+      });
+    } catch (e) {
+      return iso;
+    }
+  }
+
+  /**
    * Extrae el token del path. La URL es /s/TOKEN.
    * Retorna null si el path no tiene la forma esperada.
    */
@@ -186,13 +245,32 @@
       //     → screen-document
       //   SIGNED
       //     → screen-signed
+      //   DUAL_FIRMADO (I-FIRMA-DUAL v0.1.180)
+      //     → screen-signed con variante "firmado por ambas partes".
+      //     Hasta v0.1.180 DUAL_FIRMADO caía al branch de estados iniciales
+      //     y mostraba screen-identify, lo que llevaba al usuario a intentar
+      //     re-firmar — el backend rechazaba con "No se puede identificar
+      //     en estado 'DUAL_FIRMADO'". Ahora se trata igual que SIGNED
+      //     porque la firma dual YA está completa; lo único que tiene sentido
+      //     desde el link público es VERIFICAR la autenticidad (que es
+      //     exactamente lo que ofrece el botón "Verificar autenticidad" en
+      //     screen-signed).
       //   REJECTED
       //     → screen-rejected
       //   EXPIRED / REVOKED / CANCELLED / OTP_LOCKED
       //     → showError con mensaje específico
       const estado = contexto && contexto.estado;
 
-      if (estado === 'SIGNED') return showScreen('signed');
+      if (estado === 'SIGNED') {
+        setSignedMessageVariant('single');
+        return showScreen('signed');
+      }
+      if (estado === 'DUAL_FIRMADO') {
+        // I-FIRMA-DUAL · diferenciar visualmente el caso de firma dual
+        // (trabajador + representante legal) del caso de firma simple.
+        setSignedMessageVariant('dual');
+        return showScreen('signed');
+      }
       if (estado === 'REJECTED') return showScreen('rejected');
 
       if (estado === 'IDENTIFIED' || estado === 'OTP_SENT') {
@@ -628,6 +706,247 @@
   }
 
   // ============================================================
+  // 6. Pantalla: Verificación pública (I-VERIFICACION-PUBLICA)
+  // ============================================================
+  // Vista de solo lectura accesible SOLO desde el botón "Verificar
+  // autenticidad" en screen-signed. NO permite identificar, pedir OTP ni
+  // firmar — solo muestra metadata verificable y permite subir el PDF
+  // para comparar SHA-256 contra el original firmado.
+
+  function showVerifyScreen() {
+    showScreen('verify');
+    // Reset UI
+    var loading = $('#verify-loading');
+    var content = $('#verify-content');
+    showEl(loading);
+    hideEl(content);
+    hideEl($('#verify-status'));
+    hideEl($('#verify-error'));
+    hideEl($('#verify-pdf-result'));
+    hideEl($('#verify-pdf-error'));
+
+    // Cargar metadata via GET /api/sign/:token/verify
+    apiFetch('/api/sign/' + state.token + '/verify')
+      .then(function (ctx) {
+        state.verifyContext = ctx;
+        renderVerifyContext(ctx);
+        hideEl(loading);
+        showEl(content);
+      })
+      .catch(function (err) {
+        hideEl(loading);
+        showEl(content);
+        showVerifyError('No se pudo cargar la información de verificación: ' + (err.message || 'Error desconocido'));
+      });
+  }
+
+  function renderVerifyContext(ctx) {
+    // Status badge
+    var statusEl = $('#verify-status');
+    if (statusEl) {
+      var isSigned = (ctx.estado === 'SIGNED' || ctx.estado === 'DUAL_FIRMADO');
+      statusEl.className = 'alert ' + (isSigned ? 'alert-success' : 'alert-info');
+      statusEl.innerHTML = isSigned
+        ? '<h3>✅ Firma verificada — documento íntegro</h3>'
+        : '<h3>⏳ Documento aún no firmado</h3><p>Estado actual: ' + escHtml(ctx.estado) + '</p>';
+      statusEl.hidden = false;
+    }
+
+    // Metadata
+    setText('#verify-id-solicitud', ctx.id_solicitud);
+    setText('#verify-estado', ctx.estado);
+    setText('#verify-fecha-firma', ctx.fecha_firma ? formatDateTime(ctx.fecha_firma) : '—');
+
+    // Hashes
+    setText('#verify-hash-original', ctx.document_hash_original || '—');
+    setText('#verify-hash-firmado', ctx.document_hash_firmado || '—');
+    setText('#verify-hash-evidencia', ctx.evidence_hash || '—');
+
+    // Firmantes
+    var firmantesEl = $('#verify-firmantes');
+    if (firmantesEl) {
+      firmantesEl.innerHTML = renderFirmanteList(ctx);
+    }
+  }
+
+  function renderFirmanteList(ctx) {
+    var parts = [];
+    // Si es DUAL, mostrar ambos firmantes (trabajador + rep)
+    if (ctx.firmante_trabajador) {
+      parts.push(renderFirmanteCard('Trabajador', ctx.firmante_trabajador));
+    }
+    if (ctx.firmante) {
+      parts.push(renderFirmanteCard(ctx.firmante.tipo || 'Firmante', ctx.firmante));
+    }
+    if (parts.length === 0) {
+      return '<p class="instructions">Sin información de firmante disponible.</p>';
+    }
+    return parts.join('');
+  }
+
+  function renderFirmanteCard(tipo, f) {
+    var lines = [
+      '<dt>Tipo</dt><dd>' + escHtml(tipo) + '</dd>'
+    ];
+    if (f.nombre) lines.push('<dt>Nombre</dt><dd>' + escHtml(f.nombre) + '</dd>');
+    if (f.cargo) lines.push('<dt>Cargo</dt><dd>' + escHtml(f.cargo) + '</dd>');
+    if (f.identificacion_enmascarada) lines.push('<dt>Identificación</dt><dd>' + escHtml(f.identificacion_enmascarada) + '</dd>');
+    if (f.correo_enmascarado) lines.push('<dt>Correo verificado</dt><dd>' + escHtml(f.correo_enmascarado) + '</dd>');
+    if (f.fecha_firma) lines.push('<dt>Fecha firma</dt><dd>' + escHtml(formatDateTime(f.fecha_firma)) + '</dd>');
+    return '<dl class="verify-info verify-firmante"><dt>Rol</dt><dd><strong>' + escHtml(tipo) + '</strong></dd>' + lines.slice(1).join('') + '</dl>';
+  }
+
+  function showVerifyError(message) {
+    var errEl = $('#verify-error');
+    if (errEl) {
+      errEl.textContent = message;
+      errEl.hidden = false;
+    }
+  }
+
+  /**
+   * I-FIRMA-DUAL · Adapta el contenido de screen-signed según el estado.
+   * - 'single' (SIGNED): firma simple del trabajador.
+   * - 'dual'   (DUAL_FIRMADO): firma dual (trabajador + representante legal).
+   *
+   * La pantalla y el botón "Verificar autenticidad" son los mismos; solo
+   * cambia el copy para que el usuario entienda qué tipo de firma se completó.
+   */
+  function setSignedMessageVariant(variant) {
+    var singleTitle = $('#signed-title-single');
+    var dualTitle = $('#signed-title-dual');
+    var singleMsg = $('#signed-msg-single');
+    var dualMsg = $('#signed-msg-dual');
+    if (variant === 'dual') {
+      if (singleTitle) singleTitle.hidden = true;
+      if (dualTitle) dualTitle.hidden = false;
+      if (singleMsg) singleMsg.hidden = true;
+      if (dualMsg) dualMsg.hidden = false;
+    } else {
+      if (singleTitle) singleTitle.hidden = false;
+      if (dualTitle) dualTitle.hidden = true;
+      if (singleMsg) singleMsg.hidden = false;
+      if (dualMsg) dualMsg.hidden = true;
+    }
+  }
+
+  function setupVerifyScreen() {
+    // Botón "Verificar autenticidad" en screen-signed → abre screen-verify
+    var btnGo = $('#btn-go-verify');
+    if (btnGo) {
+      btnGo.addEventListener('click', function () { showVerifyScreen(); });
+    }
+
+    // Botón "Volver" → regresa a screen-signed
+    var btnBack = $('#btn-back-to-signed');
+    if (btnBack) {
+      btnBack.addEventListener('click', function () { showScreen('signed'); });
+    }
+
+    // Form de upload de PDF
+    var formPdf = $('#form-verify-pdf');
+    if (formPdf) {
+      formPdf.addEventListener('submit', function (ev) {
+        ev.preventDefault();
+        submitVerifyPdf();
+      });
+    }
+
+    // Validación cliente del tamaño (50MB del backend, validamos a 45MB
+    // para tener margen contra base64 que infla ~33%)
+    var fileInput = $('#verify-pdf-input');
+    if (fileInput) {
+      fileInput.addEventListener('change', function () {
+        var f = fileInput.files && fileInput.files[0];
+        var info = $('#verify-pdf-info');
+        if (!f) {
+          if (info) info.textContent = 'Máx. 45 MB. Solo archivos PDF.';
+          return;
+        }
+        var sizeMB = (f.size / (1024 * 1024)).toFixed(1);
+        if (f.size > 45 * 1024 * 1024) {
+          if (info) info.textContent = '❌ Archivo demasiado grande (' + sizeMB + ' MB). Máximo 45 MB.';
+          fileInput.value = '';
+        } else {
+          if (info) info.textContent = '✅ ' + f.name + ' (' + sizeMB + ' MB)';
+        }
+      });
+    }
+  }
+
+  function submitVerifyPdf() {
+    var fileInput = $('#verify-pdf-input');
+    var btn = $('#btn-verify-pdf');
+    var errEl = $('#verify-pdf-error');
+    var resultEl = $('#verify-pdf-result');
+    hideEl(errEl);
+    hideEl(resultEl);
+
+    var file = fileInput && fileInput.files && fileInput.files[0];
+    if (!file) {
+      if (errEl) { errEl.textContent = 'Selecciona un archivo PDF primero.'; errEl.hidden = false; }
+      return;
+    }
+
+    // Validar tipo MIME (defensa adicional al accept="application/pdf")
+    if (file.type && file.type !== 'application/pdf') {
+      if (errEl) { errEl.textContent = 'El archivo debe ser un PDF.'; errEl.hidden = false; }
+      return;
+    }
+
+    setButtonBusy(btn, 'VERIFICANDO...', 'VERIFICAR PDF');
+
+    // Leer como ArrayBuffer y convertir a base64
+    var reader = new FileReader();
+    reader.onload = function () {
+      var bytes = new Uint8Array(reader.result);
+      // base64 encoding (unicode-safe)
+      var binary = '';
+      for (var i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      var base64 = btoa(binary);
+
+      apiFetch('/api/sign/' + state.token + '/verify-pdf', {
+        method: 'POST',
+        body: JSON.stringify({ pdf_base64: base64 }),
+      })
+        .then(function (result) {
+          clearButtonBusy(btn);
+          renderVerifyPdfResult(result);
+        })
+        .catch(function (err) {
+          clearButtonBusy(btn);
+          if (errEl) { errEl.textContent = 'Error: ' + (err.message || 'desconocido'); errEl.hidden = false; }
+        });
+    };
+    reader.onerror = function () {
+      clearButtonBusy(btn);
+      if (errEl) { errEl.textContent = 'No se pudo leer el archivo.'; errEl.hidden = false; }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function renderVerifyPdfResult(result) {
+    var resultEl = $('#verify-pdf-result');
+    if (!resultEl) return;
+    resultEl.className = 'alert ' + (result.matches ? 'alert-success' : 'alert-error');
+    if (result.matches) {
+      resultEl.innerHTML =
+        '<h3>✅ El archivo coincide con el original firmado</h3>' +
+        '<p>El SHA-256 del PDF que subiste es idéntico al hash registrado al momento de la firma.</p>' +
+        '<p><small>Hash calculado: <code>' + escHtml(result.computed_hash) + '</code></small></p>';
+    } else {
+      resultEl.innerHTML =
+        '<h3>❌ El archivo NO coincide con el original firmado</h3>' +
+        '<p>El PDF que tienes puede haber sido alterado, o no es el mismo archivo que se firmó.</p>' +
+        '<p><small>Hash del servidor: <code>' + escHtml(result.server_hash || '—') + '</code></small></p>' +
+        '<p><small>Hash calculado: <code>' + escHtml(result.computed_hash) + '</code></small></p>';
+    }
+    resultEl.hidden = false;
+  }
+
+  // ============================================================
   // Inicialización (DOMContentLoaded)
   // ============================================================
 
@@ -640,6 +959,7 @@
   function startApp() {
     setupIdentifyForm();
     setupOtpForm();
+    setupVerifyScreen();  // I-VERIFICACION-PUBLICA
     init();
   }
 })();

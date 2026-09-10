@@ -83,8 +83,15 @@ function createApp() {
   app.use(requestId());
 
   // Body parsing
-  app.use(express.json({ limit: '100kb' }));
-  app.use(express.urlencoded({ extended: false, limit: '100kb' }));
+  // Límite: 10MB. Necesario para /api/sign/:token/verify-pdf que recibe un
+  // PDF base64-encoded (PDF de 5MB → ~7MB en base64). El global corre ANTES
+  // del middleware route-level, así que no se puede subir por endpoint —
+  // hay que fijar el límite aquí. 10MB es suficiente para PDFs legales
+  // típicos (0.1-2MB) y previene abuso DoS básico.
+  // Bug encontrado 2026-09-10: con 100KB los PDFs de 0.1MB (~117KB base64)
+  // devolvían 413 PayloadTooLargeError → "Error interno del servidor".
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
   // Log de cada request
   app.use((req, res, next) => {

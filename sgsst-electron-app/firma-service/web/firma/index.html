@@ -114,11 +114,19 @@
     <!-- Pantalla: firmado -->
     <section id="screen-signed" class="screen">
       <div class="alert alert-success">
-        <h2>✓ Documento firmado</h2>
-        <p>Tu documento ha sido firmado electrónicamente.</p>
+        <!-- I-FIRMA-DUAL · dos variantes de copy según estado (SIGNED simple vs
+             DUAL_FIRMADO). El JS (setSignedMessageVariant) muestra/oculta según
+             contexto.estado. La pantalla y el botón "Verificar" son los mismos. -->
+        <h2 id="signed-title-single">✓ Documento firmado</h2>
+        <h2 id="signed-title-dual" hidden>✓ Documento firmado por ambas partes</h2>
+        <p id="signed-msg-single">Tu documento ha sido firmado electrónicamente.</p>
+        <p id="signed-msg-dual" hidden>Este documento fue firmado por el trabajador y por el representante legal de la empresa (firma dual). La firma dual cumple los requisitos del Decreto 1072 de 2015 y la Circular 008 de 2020 de la UGPP para la validación de la manifestación de la voluntad del trabajador.</p>
         <p id="signed-info">Se enviará una copia a tu correo.</p>
       </div>
       <a id="constancia-link" class="btn btn-secondary" target="_blank" rel="noopener">VER CONSTANCIA</a>
+      <!-- I-VERIFICACION-PUBLICA: botón adicional para abrir la vista de
+           verificación (solo lectura, no permite acciones sobre el doc). -->
+      <button type="button" class="btn-link" id="btn-go-verify">Verificar autenticidad de este documento →</button>
     </section>
 
     <!-- Pantalla: rechazado -->
@@ -126,6 +134,64 @@
       <div class="alert alert-info">
         <h2>Has decidido no firmar</h2>
         <p>El documento no fue firmado. Tu decisión ha sido registrada.</p>
+      </div>
+    </section>
+
+    <!-- I-VERIFICACION-PUBLICA: pantalla de solo lectura. Acceso desde
+         screen-signed (botón "Verificar autenticidad"). NO permite
+         identificar, pedir OTP ni firmar — solo muestra metadata verificable
+         y permite subir el PDF para comparar SHA-256 contra el original. -->
+    <section id="screen-verify" class="screen">
+      <h2>Verificación de autenticidad</h2>
+      <p class="instructions">
+        Esta es una vista de solo lectura. Aquí puedes confirmar la integridad
+        del documento comparando los hashes criptográficos. Si tienes el PDF
+        original en tu poder, súbelo para verificar que coincide con el firmado.
+      </p>
+
+      <div id="verify-loading" class="spinner" aria-label="Cargando"></div>
+
+      <div id="verify-content" hidden>
+        <div class="alert alert-success" id="verify-status" hidden></div>
+        <div class="alert alert-error" id="verify-error" hidden></div>
+
+        <h3>Información del documento</h3>
+        <dl class="verify-info">
+          <dt>ID de solicitud</dt><dd id="verify-id-solicitud">—</dd>
+          <dt>Estado</dt><dd id="verify-estado">—</dd>
+          <dt>Fecha de firma</dt><dd id="verify-fecha-firma">—</dd>
+        </dl>
+
+        <h3>Hashes criptográficos (SHA-256)</h3>
+        <dl class="verify-info">
+          <dt>Hash doc. original</dt><dd><code id="verify-hash-original">—</code></dd>
+          <dt>Hash doc. firmado</dt><dd><code id="verify-hash-firmado">—</code></dd>
+          <dt>Hash de evidencia</dt><dd><code id="verify-hash-evidencia">—</code></dd>
+        </dl>
+
+        <h3>Firmante(s)</h3>
+        <div id="verify-firmantes"></div>
+
+        <h3>Verifica tu copia del PDF</h3>
+        <p class="instructions">
+          Sube el PDF que tienes en tu poder. El servidor recalculará su SHA-256
+          y lo comparará con el hash del documento firmado.
+        </p>
+        <form id="form-verify-pdf">
+          <div class="form-group">
+            <label for="verify-pdf-input">Archivo PDF</label>
+            <input type="file" id="verify-pdf-input" name="pdf"
+                   accept="application/pdf,.pdf" required>
+            <small id="verify-pdf-info">Máx. 45 MB. Solo archivos PDF.</small>
+          </div>
+          <div id="verify-pdf-error" class="alert alert-error" hidden></div>
+          <button type="submit" class="btn btn-primary" id="btn-verify-pdf">VERIFICAR PDF</button>
+        </form>
+        <div id="verify-pdf-result" class="alert" hidden></div>
+
+        <div class="actions">
+          <button type="button" class="btn-link" id="btn-back-to-signed">← Volver</button>
+        </div>
       </div>
     </section>
   </main>

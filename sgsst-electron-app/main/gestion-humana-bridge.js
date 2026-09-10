@@ -2398,19 +2398,29 @@ function _handlerGetConsentimiento(token, consentId, companyName) {
 
 /**
  * gh:get-sign-request
- * I-103.A1.6 · Consulta MÍNIMA de un sign request de firma por id_solicitud.
+ * I-103.A1.6 · Consulta de un sign request de firma por id_solicitud.
  *
- * Retorna los datos que el modal de expediente necesita pero firma-service
- * NO expone en GET /sign-requests/:id (que omite metadata y link deliberadamente).
+ * Retorna los datos que el modal de expediente necesita. El SELECT trae
+ * TODOS los campos útiles desde la BD local (READ-ONLY); firma-service
+ * NO expone metadata ni link en GET /sign-requests/:id (omisión deliberada).
  *
- * Datos que retorna (todos desde la BD local, READ-ONLY):
- *   - id_solicitud, estado, id_empresa, fecha_creacion, fecha_expiracion
- *   - correo_verificacion: parseado de gh_firmas_electronicas.metadata.correo
+ * Campos retornados (todos desde gh_firmas_electronicas local):
+ *   - Identidad: id_solicitud, id_empresa, id_trabajador, id_documento
+ *   - Estado: estado, tipo_firma, consent_id, agreement_version
+ *   - Fechas del flujo: fecha_creacion, fecha_expiracion, fecha_apertura,
+ *     fecha_otp_enviado, fecha_otp_verificado, fecha_documento_visto,
+ *     fecha_manifestacion, fecha_firma
+ *   - Correo: correo_verificacion (columna autoritativa, fallback a metadata.correo)
+ *   - Artefactos: id_constancia, pdf_firmado_path, constancia_path,
+ *     document_hash_firmado
  *   - fecha_envio: del último evento INVITE_SENT en gh_firma_eventos
  *
- * NO retorna url_publica / qr_payload (esos vienen de firma:sign-request:link,
- * endpoint que descifra el token con la clave del servidor — único punto donde
- * se puede construir el link de forma segura).
+ * NO retorna url_publica / qr_payload. Para construir el link se requiere
+ * descifrar metadata._server_metadata.token_encrypted, lo cual solo puede
+ * hacer firma-service (posee la clave). El endpoint /sign-requests/:id/link
+ * hace ese trabajo — el frontend puede llamarlo en paralelo si necesita el
+ * link. Para estados terminales (SIGNED, DUAL_FIRMADO, etc.) el link NO
+ * está disponible de todos modos (410 GONE), así que el "—" es correcto.
  *
  * Valida scope multi-empresa: gh_firmas_electronicas.id_empresa debe coincidir
  * con el idEmpresa resuelto de secrets.enc.
@@ -2452,10 +2462,20 @@ function _handlerGetSignRequest(token, idSolicitud, companyName) {
   var firmaDb = firmaDbRes.db;
 
   try {
-    // 1) Datos del sign request desde gh_firmas_electronicas
+    // 1) Datos del sign request desde gh_firmas_electronicas.
+    //    El SELECT trae 23 columnas para que el modal de detalle tenga
+    //    TODO lo necesario (tipo_firma, consent_id, agreement_version,
+    //    fecha_firma, id_constancia, fechas del flujo, hashes, etc.).
     var sr = firmaDb.prepare(
-      "SELECT id, id_solicitud, id_empresa, estado, metadata, " +
-      "fecha_creacion, fecha_expiracion " +
+      "SELECT id, id_solicitud, id_empresa, id_trabajador, id_documento, " +
+      "tipo_firma, estado, metadata, " +
+      "consent_id, agreement_version, " +
+      "fecha_creacion, fecha_expiracion, fecha_apertura, " +
+      "fecha_otp_enviado, fecha_otp_verificado, fecha_documento_visto, " +
+      "fecha_manifestacion, fecha_firma, " +
+      "correo_verificacion, " +
+      "id_constancia, pdf_firmado_path, constancia_path, " +
+      "document_hash_firmado " +
       "FROM gh_firmas_electronicas WHERE id_solicitud = ? LIMIT 1"
     ).get(idSolicitud);
 
@@ -2466,11 +2486,11 @@ function _handlerGetSignRequest(token, idSolicitud, companyName) {
       return _err('NOT_FOUND', 'Sign request "' + idSolicitud + '" no pertenece a la empresa "' + companyName + '"');
     }
 
-    // 2) Parsear metadata (JSON) → extraer correo_verificacion
-    //    El correo NO se persiste en columna plana; solo dentro de metadata.
-    //    Estructura típica: { "correo": "user@x.com", "_server_metadata": {...} }
-    var correoVerificacion = null;
-    if (sr.metadata) {
+    // 2) correo_verificacion: columna autoritativa, fallback a metadata.correo.
+    //    La columna existe desde schema 001; el parseo de metadata se mantiene
+    //    por compatibilidad con filas legacy donde la columna está NULL.
+    var correoVerificacion = sr.correo_verificacion || null;
+    if (!correoVerificacion && sr.metadata) {
       try {
         var md = JSON.parse(sr.metadata);
         if (md && typeof md.correo === 'string') {
@@ -2495,12 +2515,40 @@ function _handlerGetSignRequest(token, idSolicitud, companyName) {
 
     return _ok({
       signRequest: {
+        // Identidad
         id_solicitud: sr.id_solicitud,
+        id_empresa: sr.id_empresa,
+        id_trabajador: sr.id_trabajador,
+        id_documento: sr.id_documento,
+        // Estado y tipo
         estado: sr.estado,
-        correo_verificacion: correoVerificacion,
-        fecha_envio: fechaEnvio,
+        tipo_firma: sr.tipo_firma,
+        // Trazabilidad legal
+        consent_id: sr.consent_id,
+        agreement_version: sr.agreement_version,
+        // Fechas del flujo
         fecha_creacion: sr.fecha_creacion,
-        fecha_expiracion: sr.fecha_expiracion
+        fecha_expiracion: sr.fecha_expiracion,
+        fecha_apertura: sr.fecha_apertura,
+        fecha_otp_enviado: sr.fecha_otp_enviado,
+        fecha_otp_verificado: sr.fecha_otp_verificado,
+        fecha_documento_visto: sr.fecha_documento_visto,
+        fecha_manifestacion: sr.fecha_manifestacion,
+        fecha_firma: sr.fecha_firma,
+        fecha_envio: fechaEnvio,
+        // Contacto
+        correo_verificacion: correoVerificacion,
+        // Artefactos persistidos
+        id_constancia: sr.id_constancia,
+        pdf_firmado_path: sr.pdf_firmado_path,
+        constancia_path: sr.constancia_path,
+        document_hash_firmado: sr.document_hash_firmado,
+        // Link público: null por diseño (ver docstring del handler).
+        // Para construirlo se necesita descifrar el token con la clave del
+        // servidor — eso vive solo en firma-service. El frontend puede llamar
+        // en paralelo al endpoint /sign-requests/:id/link si lo requiere.
+        url_publica: null,
+        qr_payload: null
       }
     });
   } catch (e) {

@@ -362,7 +362,16 @@ router.get('/api/sign/:token/verify', (req, res, next) => {
  *
  * Límite: 50MB. Magic bytes: %PDF-.
  */
-router.post('/api/sign/:token/verify-pdf', (req, res, next) => {
+router.post(
+  '/api/sign/:token/verify-pdf',
+  // Body parser específico con límite alto (50MB) para aceptar PDFs
+  // base64-encoded. El global en server.js es 100KB para no permitir DoS
+  // en el resto de endpoints. Sin este middleware local, el verify-pdf
+  // devuelve 413 PayloadTooLargeError que el error handler genérico
+  // convierte en "Error interno del servidor" — bug real encontrado
+  // en validación 2026-09-10 con PDF de 0.1 MB (~140KB en base64).
+  express.json({ limit: '50mb' }),
+  (req, res, next) => {
   try {
     // multipart/form-data parsing nativo de Express. No usamos multer para
     // mantener el bundle limpio. El frontend envía el PDF como un Blob
