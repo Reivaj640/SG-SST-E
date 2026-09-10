@@ -147,3 +147,16 @@ CREATE INDEX idx_gh_firmas_tipo_firmante
 CREATE UNIQUE INDEX idx_gh_firmas_unico_hijo
   ON gh_firmas_electronicas(parent_id_solicitud)
   WHERE parent_id_solicitud IS NOT NULL;
+
+-- I-AUDIT-2026-09-10 (C-21 fix): la migración 014 usa el patrón 12-step
+-- (CREATE TABLE _new + INSERT SELECT + DROP + RENAME) que recrea la tabla
+-- pero pierde los índices definidos por migraciones ANTERIORES. El test
+-- C-21 de migration-007.test.js fallaba porque al re-aplicar migrate() los
+-- 2 índices de 007 desaparecían. Los agregamos explícitamente aquí con
+-- IF NOT EXISTS (idempotente). Si 014 se vuelve a aplicar sobre una BD
+-- que ya tiene estos índices, el IF NOT EXISTS evita duplicados.
+-- (Cubre la query Q1/Q2 de A2: "firmas por tipo" y "firmas por empresa+tipo+estado".)
+CREATE INDEX IF NOT EXISTS idx_firmas_tipo_identificacion
+  ON gh_firmas_electronicas(tipo_identificacion);
+CREATE INDEX IF NOT EXISTS idx_firmas_empresa_tipo_estado
+  ON gh_firmas_electronicas(id_empresa, tipo_identificacion, estado, fecha_creacion DESC);

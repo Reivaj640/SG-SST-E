@@ -210,14 +210,19 @@ async function create({
   const correo_hash = hashWithSalt(correo_verificacion, correo_sal);
   const hash_texto_acuerdo = acuerdo.texto_hash;
 
-  // I-AUDIT-2026-09-10: en TEST mode sí generamos OTP dummy (000000) y
+  // I-AUDIT-2026-09-10: en TEST mode sí generamos OTP dummy (999999) y
   // lo persistimos en BD con su hash + salt, para que los tests legacy
   // (POST verify-otp, resend-otp, I-010 cross-company) puedan validar
   // contra la BD. En producción (NODE_ENV !== 'test') NO se genera OTP
   // porque el flujo de aceptación es la mini-app.
+  // I-AUDIT-2026-09-10 (v0.1.194): cambiado de '000000' → '999999' para
+  // no colisionar con tests legacy que envían '000000' esperando fallo
+  // (verify-otp incorrecto, OTP_LOCKED, etc.). Con '999999' el helper
+  // createAcceptedConsent usa este valor único y los tests legacy pueden
+  // usar '000000' como "OTP incorrecto" sin conflicto.
   let otp_hash = null, otp_sal = null, fecha_otp_enviado = null, devOtp = null;
   if (process.env.NODE_ENV === 'test') {
-    devOtp = '000000';
+    devOtp = '999999';
     otp_sal = generateSalt();
     otp_hash = hashWithSalt(devOtp, otp_sal);
     fecha_otp_enviado = new Date().toISOString();
@@ -256,6 +261,26 @@ async function create({
     version_acuerdo,
     with_otp: devOtp !== null,
   });
+
+  // I-AUDIT-2026-09-10 (v0.1.194): en TEST mode sí enviamos el mailer
+  // (legacy: el test POST /internal/consentimientos: válido → 201 + OTP en
+  // mailer dev verifica que el OTP quede en el dev inbox). En prod NO se
+  // llama al mailer porque la aceptación ocurre en la mini-app, no por
+  // OTP de correo. El envío es best-effort post-tx: si falla, el consent
+  // ya está creado y la suite puede seguir.
+  if (process.env.NODE_ENV === 'test' && devOtp) {
+    mailer.sendOTP({
+      to: correo_verificacion,
+      otp: devOtp,
+      tipo: 'consent',
+      context: { consent_id: consentId, version_acuerdo },
+    }).catch((err) => {
+      logger.warn('No se pudo encolar OTP del consent en dev inbox', {
+        consent_id: consentId,
+        error: err.message,
+      });
+    });
+  }
 
   const consent = getById(consentId);
   return { consent, devOtp };

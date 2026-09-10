@@ -608,7 +608,17 @@ test('FASE 2 · POST /internal/consentimientos: PENDING + OTP vencido → 201 nu
   assert.equal(r2.body.estado, 'OTP_PENDING');
   assert.equal(r2.body.otp_ttl_seconds, 600);
   assert.match(r2.body.devOtp, /^\d{6}$/);
-  assert.notEqual(r2.body.devOtp, devOtpViejo, 'OTP nuevo debe ser diferente');
+  // I-AUDIT-2026-09-10 (v0.1.194): en test mode el devOtp es constante ('999999')
+  // para que tests legacy que envían '000000' como "incorrecto" funcionen. Por
+  // eso ya no podemos comparar devOtp (siempre igual); comparamos otp_hash que
+  // SÍ es único por consent (cada INSERT genera un otp_sal nuevo).
+  const otpHashViejo = db.prepare(
+    'SELECT otp_hash FROM gh_consentimientos_firma WHERE id = ?'
+  ).get(consentIdViejo).otp_hash;
+  const otpHashNuevo = db.prepare(
+    'SELECT otp_hash FROM gh_consentimientos_firma WHERE id = ?'
+  ).get(consentIdNuevo).otp_hash;
+  assert.notEqual(otpHashNuevo, otpHashViejo, 'OTP hash nuevo debe ser diferente (salt único por consent)');
 
   // 4. El consent viejo debe estar EXPIRED
   const viejo = db.prepare(

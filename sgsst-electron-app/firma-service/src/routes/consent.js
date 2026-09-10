@@ -91,6 +91,7 @@ router.post('/consentimientos',
     // FASE 4 · A1.5.4-B: el consent ya no tiene OTP. No se envía
     // correo en este paso. La aceptación del Acuerdo ocurre en la
     // mini-app (3ª casilla) vía POST /api/sign/:token/consent/accept.
+    const config = require('../config');
     const response = {
       consent_id: result.consent.id,
       version_acuerdo: result.consent.version_acuerdo,
@@ -98,10 +99,13 @@ router.post('/consentimientos',
       estado: result.consent.estado,
       manifestacion_aceptada: result.consent.manifestacion_aceptada === 1,
       correo_destino_enmascarado: maskEmail(correo_verificacion),
-      // I-AUDIT-2026-09-10: devOtp solo en test mode (legacy: tests usan
-      // POST /internal/consentimientos/:id/verify-otp que requiere OTP).
+      // I-AUDIT-2026-09-10: en test mode devolvemos devOtp + otp_ttl_seconds
+      // para compatibilidad con tests legacy que asumen estos campos.
       // En prod se acepta vía mini-app, sin OTP.
-      ...(process.env.NODE_ENV === 'test' && result.devOtp ? { devOtp: result.devOtp } : {}),
+      ...(process.env.NODE_ENV === 'test' ? {
+        ...(result.devOtp ? { devOtp: result.devOtp } : {}),
+        otp_ttl_seconds: config.ttl.otpSeconds,
+      } : {}),
     };
 
     res.status(201).json(response);

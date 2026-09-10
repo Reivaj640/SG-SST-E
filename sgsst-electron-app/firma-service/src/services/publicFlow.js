@@ -1609,7 +1609,24 @@ function resendOtp(token, ip, user_agent) {
   const now_iso = new Date().toISOString();
 
   // 5. Obtener correo
-  const correo = resolveCorreo(signRequest);
+  // I-AUDIT-2026-09-10 (v0.1.194): en resend-otp, la fuente autoritativa es
+  // el correo del CONSENTIMIENTO vinculado (no metadata.correo ni la columna
+  // del SR). Razón: el operador introduce un solo correo al crear el consent
+  // y el OTP debe ir siempre a ese correo, aunque el SR traiga su propio
+  // metadata. Si NO hay consent vinculado, caemos al resolveCorreo estándar
+  // (columna > metadata) para preservar comportamiento de SR legacy.
+  let correo = null;
+  if (signRequest.consent_id) {
+    const consentRow = db.prepare(
+      'SELECT correo_verificacion FROM gh_consentimientos_firma WHERE id = ?'
+    ).get(signRequest.consent_id);
+    if (consentRow && consentRow.correo_verificacion) {
+      correo = consentRow.correo_verificacion;
+    }
+  }
+  if (!correo) {
+    correo = resolveCorreo(signRequest);
+  }
   if (!correo) {
     throw new AppError(400, 'MISSING_EMAIL',
       'No hay correo de verificación disponible para reenviar OTP');
