@@ -65,6 +65,12 @@
   // I-102.2.G · Mapa de estados terminales de firma-service → estado persistente
   var _TRANSICION_FIRMA = {
     'SIGNED':                { estado: 'firmado',   toast: 'Documento firmado correctamente.',                                success: true  },
+    // I-FIRMA-DUAL · 2026-09-10: si el polling detecta DUAL_FIRMADO, el doc
+    // pasa a 'firmado' local (igual que SIGNED) y disparamos el refetch del
+    // modal del expediente. ANTES faltaba esta entrada → _TRANSICION_FIRMA
+    // ['DUAL_FIRMADO'] era undefined → el tick hacía early-return (línea
+    // _tickPolling) → el modal quedaba con estado viejo hasta cerrar/reabrir.
+    'DUAL_FIRMADO':          { estado: 'firmado',   toast: 'Documento firmado por firma dual (trabajador + representante).',  success: true  },
     'REJECTED':              { estado: 'rechazado', toast: 'El firmante rechazó el documento.',                                 success: false },
     'EXPIRED':               { estado: 'expirado',  toast: 'La solicitud de firma expiró.',                                    success: false },
     'CANCELLED':             { estado: 'anulado',   toast: 'La solicitud de firma fue cancelada.',                             success: false },
