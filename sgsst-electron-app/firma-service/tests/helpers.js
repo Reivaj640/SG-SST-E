@@ -31,6 +31,7 @@ const publicRouter = require('../src/routes/public');
 const adminRouter = require('../src/routes/admin');
 const adminClientesRouter = require('../src/routes/admin-clientes');
 const internalAuditRouter = require('../src/routes/internal-audit');
+const constanciaRouter = require('../src/routes/constancia');
 const { errorHandler } = require('../src/middleware/errors');
 const agreementService = require('../src/services/agreement');
 const mailer = require('../src/services/mailer');
@@ -151,6 +152,7 @@ function makeApp() {
   app.use('/internal', agreementRouter);
   app.use('/internal', consentRouter);
   app.use('/internal', signRequestRouter);
+  app.use('/internal', constanciaRouter);
   app.use('/internal', internalAuditRouter);
   // Endpoints administrativos: deben estar en makeApp para tests.
   // Hay 2 routers: el viejo (acuerdo-versiones) y el nuevo (per-company clientes).

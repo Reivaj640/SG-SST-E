@@ -59,6 +59,9 @@ const checks = [];
   ['ruta: Content-Disposition attachment con nombre del expediente', /attachment; filename="\$\{filename\}"/],
   ['ruta: reutiliza _buildHitosFirma de publicFlow', /publicFlow\._buildHitosFirma/],
   ['ruta: reutiliza _getConsentResumen de publicFlow', /publicFlow\._getConsentResumen/],
+  ['ruta: hash SHA-256 de la constancia en header', /X-Constancia-SHA256/],
+  ['ruta: lee snapshot del representante', /representante_legal_snapshot/],
+  ['ruta: enlace de verificación por documento', /url_verificacion/],
 ].forEach(function (c) { checks.push({ name: c[0], ok: c[1].test(routeSrc) }); });
 
 // ── publicFlow: helpers exportados ──────────────────────────────────────
@@ -98,6 +101,11 @@ const checks = [];
   ['consolidado: evidencia criptográfica si firmado (SIGNED o DUAL_FIRMADO)', /if \(esFirmado\(doc\.estado\)\) \{\s*seccion\('Evidencia criptográfica'\)/],
   ['consolidado: DUAL_FIRMADO cuenta como firmado', /DUAL_FIRMADO/],
   ['consolidado: etiqueta legible doble firma', /DUAL_FIRMADO: 'Firmado \(doble firma\)'/],
+  ['consolidado: bloque Firmante empresa desde snapshot', /Firmante empresa/],
+  ['consolidado: consent con rol del firmante', /consent_rol/],
+  ['consolidado: nota régimen anterior compartido', /régimen anterior/],
+  ['consolidado: enlace de verificación por documento', /url_verificacion/],
+  ['consolidado: pie encargado en nombre de (Ley 1581)', /encargado del tratamiento en nombre de/],
   ['consolidado: trazabilidad con total', /seccion\('Trazabilidad de eventos'/],
   ['consolidado: marco legal incluido', /MARCO_LEGAL_LINEAS\.forEach/],
   ['consolidado: declaración de integridad', /seccion\('Declaración de integridad'\)/],

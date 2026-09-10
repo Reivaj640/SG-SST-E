@@ -208,6 +208,14 @@ async function recorrerFlujoCompleto(app, token, identificacion = WORKER_CC_PLAI
   assert.equal(r3.status, 200,
     `view-document falló: status=${r3.status} body=${JSON.stringify(r3.body)}`);
 
+  // 3b. Aceptar Acuerdo (3ª casilla de la mini-app). El worker acepta su
+  // consentimiento; el rep acepta el SUYO propio (rama EMPRESA).
+  const r35 = await request(app)
+    .post(`/api/sign/${token}/consent/accept`)
+    .send({});
+  assert.equal(r35.status, 200,
+    `consent/accept falló: status=${r35.status} body=${JSON.stringify(r35.body)}`);
+
   // 4. Commit
   const r4 = await request(app)
     .post(`/api/sign/${token}/commit`)
@@ -338,9 +346,11 @@ test('F-FINAL flujo dual completo: padre firma → trigger crea hijo → rep fir
   // 📦 Schema design: id_trabajador se hereda del padre (es el mismo documento).
   assert.equal(hijo.id_trabajador, WORKER_CC_PLAIN,
     'hijo debe heredar el id_trabajador del padre');
-  // 📦 Consent: el hijo hereda el consent_id del padre (misma cadena legal)
-  assert.equal(hijo.consent_id, consent_id,
-    'hijo debe heredar el consent_id del padre (misma cadena legal)');
+  // Consentimiento PROPIO del rep: el hijo nace SIN consent heredado
+  // (heredarlo generaba dato falso en constancia: ID/fecha del trabajador
+  // como si fueran del rep). Se vincula el suyo en consentAccept().
+  assert.equal(hijo.consent_id, null,
+    'hijo debe nacer sin consent_id (su consentimiento propio se vincula al aceptar)');
   assert.ok(hijo.agreement_version,
     'hijo debe tener agreement_version (necesario para validateForCommit)');
 
@@ -402,6 +412,39 @@ test('F-FINAL flujo dual completo: padre firma → trigger crea hijo → rep fir
   assert.equal(hijoDual.pdf_firmado_path, pdfFinalPath,
     `pdf_firmado_path del hijo debe ser ${pdfFinalPath} ` +
     `(storage.PATHS.firmados/<hijo>.pdf). Actual: ${hijoDual.pdf_firmado_path}`);
+
+  // =========================================================================
+  // STEP 7b — Consentimiento PROPIO del representante (no heredado)
+  // =========================================================================
+  const hijoPost = db.prepare(
+    'SELECT consent_id FROM gh_firmas_electronicas WHERE id_solicitud = ?'
+  ).get(hijoId);
+  const padrePost = db.prepare(
+    'SELECT consent_id FROM gh_firmas_electronicas WHERE id_solicitud = ?'
+  ).get(padreId);
+  assert.ok(hijoPost.consent_id, 'hijo debe tener consent_id vinculado tras aceptar');
+  assert.notEqual(hijoPost.consent_id, padrePost.consent_id,
+    'el consent del hijo NO debe ser el del trabajador');
+  const consentRep = db.prepare(
+    'SELECT id, rol_firmante, nombre_aceptante, cargo_aceptante, fecha_aceptacion, manifestacion_aceptada, estado ' +
+    'FROM gh_consentimientos_firma WHERE id = ?'
+  ).get(hijoPost.consent_id);
+  assert.equal(consentRep.rol_firmante, 'EMPRESA',
+    'consent del hijo debe tener rol_firmante=EMPRESA');
+  assert.equal(consentRep.nombre_aceptante, REP.nombre,
+    'consent del hijo debe llevar el nombre del rep');
+  assert.equal(consentRep.cargo_aceptante, REP.cargo,
+    'consent del hijo debe llevar el cargo del rep');
+  assert.equal(consentRep.manifestacion_aceptada, 1,
+    'consent del rep debe estar aceptado');
+  assert.ok(consentRep.fecha_aceptacion,
+    'consent del rep debe tener fecha_aceptacion propia');
+  const consentPadre = db.prepare(
+    'SELECT fecha_aceptacion FROM gh_consentimientos_firma WHERE id = ?'
+  ).get(padrePost.consent_id);
+  assert.notEqual(consentRep.fecha_aceptacion, consentPadre.fecha_aceptacion,
+    'las fechas de aceptación de rep y trabajador deben ser distintas ' +
+    '(cada uno aceptó en su momento)');
 
   // =========================================================================
   // STEP 8 — Verificar evento COMPANY_FIRMA_COMPLETADA en gh_firma_eventos

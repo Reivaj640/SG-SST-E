@@ -658,13 +658,16 @@ router.get('/sign-requests/:id/constancia.pdf',
         });
       }
 
-      // Solo post-SIGNED
-      if (signRequest.estado !== 'SIGNED') {
+      // FIX I-FIRMA-DUAL: la constancia individual SÍ existe para DUAL_FIRMADO
+      // (se genera en commit() junto con el PDF firmado, y el constancia_path
+      // se persiste igual que para SIGNED). Antes del fix, este endpoint
+      // rechazaba DUAL_FIRMADO con 409 aunque el archivo existiera en disco.
+      if (signRequest.estado !== 'SIGNED' && signRequest.estado !== 'DUAL_FIRMADO') {
         return res.status(409).json({
           error: {
             code: 'CONSTANCIA_NOT_AVAILABLE',
-            message: `La constancia solo está disponible cuando la solicitud está en estado SIGNED`,
-            details: { current_state: signRequest.estado },
+            message: `La constancia solo está disponible cuando la solicitud está en estado SIGNED o DUAL_FIRMADO`,
+            details: { current_state: signRequest.estado, allowed_states: ['SIGNED', 'DUAL_FIRMADO'] },
             request_id: req.id,
           },
         });

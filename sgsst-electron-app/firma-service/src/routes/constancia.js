@@ -32,6 +32,7 @@ const crypto = require('crypto');
 const { requireEmpresaScopeAndLimit } = require('../middleware/authz');
 const db = require('../db/connection');
 const publicFlow = require('../services/publicFlow');
+const signRequestService = require('../services/signRequest');
 const pdfGenConsolidado = require('../services/pdfGenConsolidado');
 const config = require('../config');
 const logger = require('../utils/logger');
@@ -65,7 +66,9 @@ router.get('/expedientes/:idTrabajador/constancia-consolidada.pdf',
           SELECT id, id_solicitud, id_documento, id_trabajador, id_empresa,
                  estado, document_hash_original, document_hash_firmado,
                  evidence_hash, identificacion_tipo, correo_verificacion,
-                 consent_id, metadata, fecha_creacion, fecha_firma
+                 consent_id, id_constancia, metadata, fecha_creacion, fecha_firma,
+                 tipo_firmante, parent_id_solicitud,
+                 representante_legal_snapshot
           FROM gh_firmas_electronicas
           WHERE id_trabajador = ? AND id_empresa = ?
           ORDER BY fecha_creacion ASC, id ASC
@@ -77,7 +80,9 @@ router.get('/expedientes/:idTrabajador/constancia-consolidada.pdf',
           SELECT id, id_solicitud, id_documento, id_trabajador, id_empresa,
                  estado, document_hash_original, document_hash_firmado,
                  evidence_hash, identificacion_tipo, correo_verificacion,
-                 consent_id, metadata, fecha_creacion, fecha_firma
+                 consent_id, id_constancia, metadata, fecha_creacion, fecha_firma,
+                 tipo_firmante, parent_id_solicitud,
+                 representante_legal_snapshot
           FROM gh_firmas_electronicas
           WHERE id_trabajador = ?
           ORDER BY fecha_creacion ASC, id ASC
@@ -106,6 +111,16 @@ router.get('/expedientes/:idTrabajador/constancia-consolidada.pdf',
         if (!nombreEmpresa && m.nombre_empresa) nombreEmpresa = m.nombre_empresa;
         if (!nombreTrabajador && m.nombre_trabajador) nombreTrabajador = m.nombre_trabajador;
         if (!correoEmpresa && m.correo_empresa) correoEmpresa = m.correo_empresa;
+        // FIX I-FIRMA-DUAL: si la metadata no trae correo_empresa, caer al
+        // snapshot del representante legal (firma dual). El snapshot se popula
+        // al crear el SR con requiere_firma_empresa=1, así que cuando hay
+        // firma dual es la fuente autoritativa del correo corporativo.
+        if (!correoEmpresa && sr.representante_legal_snapshot) {
+          try {
+            const snap = JSON.parse(sr.representante_legal_snapshot);
+            if (snap && snap.correo) correoEmpresa = snap.correo;
+          } catch (e) { /* snapshot corrupto: se omite, no bloquea */ }
+        }
         if (!correoTrabajadorInvitacion && sr.correo_verificacion) {
           correoTrabajadorInvitacion = sr.correo_verificacion;
         }
@@ -136,6 +151,27 @@ router.get('/expedientes/:idTrabajador/constancia-consolidada.pdf',
 
       const documentos = rows.map((sr) => {
         const meta = _parseMetaSafe(sr.metadata);
+        // Firmante empresa (I-FIRMA-DUAL): nombre/cargo/identificación desde
+        // el snapshot. La consolidada nunca lo leía y solo mostraba el correo.
+        let firmanteEmpresa = null;
+        try {
+          const snap = sr.representante_legal_snapshot ? JSON.parse(sr.representante_legal_snapshot) : null;
+          if (snap && (snap.nombre || snap.correo)) {
+            firmanteEmpresa = {
+              nombre: snap.nombre || null,
+              cargo: snap.cargo || 'Representante Legal',
+              tipo_identificacion: snap.tipo_identificacion || 'CC',
+              numero_identificacion: snap.numero_identificacion || null,
+              correo: snap.correo || null,
+            };
+          }
+        } catch (e) { /* snapshot corrupto: se omite el bloque, no bloquea */ }
+        // Enlace de verificación (token muerto post-firma: solo informa estado).
+        let urlVerificacion = null;
+        try {
+          const rec = signRequestService.getTokenForRecovery(sr);
+          if (rec && rec.found) urlVerificacion = rec.url_publica;
+        } catch (e) { /* legacy sin token recuperable: se omite */ }
         let eventos = [];
         try {
           eventos = stmtEventos.all(sr.id);
@@ -172,9 +208,25 @@ router.get('/expedientes/:idTrabajador/constancia-consolidada.pdf',
           document_hash_original: sr.document_hash_original,
           document_hash_firmado: sr.document_hash_firmado,
           evidence_hash: sr.evidence_hash,
-          id_constancia: sr.estado === 'SIGNED' ? (sr.id_solicitud + ' (ver constancia individual)') : null,
+          // FIX I-FIRMA-DUAL: la constancia individual SÍ existe para DUAL_FIRMADO
+          // (se genera en commit() igual que para SIGNED). Antes del fix, este
+          // handler retornaba null para DUAL_FIRMADO, dejando el campo "ID de
+          // constancia individual" del consolidado en "—". Aceptamos ambos
+          // estados terminales como "con constancia disponible".
+          id_constancia: (sr.estado === 'SIGNED' || sr.estado === 'DUAL_FIRMADO')
+            ? (sr.id_constancia || (sr.id_solicitud + ' (UUID no persistido)'))
+            : null,
           consent_id: consentResumen ? consentResumen.id : null,
           fecha_aceptacion_acuerdo: consentResumen ? consentResumen.fecha_aceptacion : null,
+          // Rol del consentimiento: distingue el propio del rep del heredado.
+          // DUAL histórico con consent de TRABAJADOR = régimen anterior.
+          consent_rol: (consentResumen && consentResumen.rol_firmante) || null,
+          consent_nombre_aceptante: (consentResumen && consentResumen.nombre_aceptante) || null,
+          consent_regimen_anterior: sr.tipo_firmante === 'EMPRESA' &&
+            !(consentResumen && consentResumen.rol_firmante === 'EMPRESA'),
+          tipo_firmante: sr.tipo_firmante || 'TRABAJADOR',
+          firmante_empresa: firmanteEmpresa,
+          url_verificacion: urlVerificacion,
           hitos_firma: hitos,
           eventos,
           eventos_total: eventos.length,
@@ -208,11 +260,21 @@ router.get('/expedientes/:idTrabajador/constancia-consolidada.pdf',
         },
       });
 
+      // Sello de la constancia misma: SHA-256 del PDF generado, en header
+      // (el contenido no puede llevar su propio hash) + log de auditoría.
+      const shaConstancia = crypto.createHash('sha256').update(pdfBuffer).digest('hex');
+      logger.info('Constancia consolidada generada', {
+        id_trabajador: idTrabajador,
+        documentos: documentos.length,
+        firmados,
+        sha256: shaConstancia,
+      });
       const filename = `expediente-${idTrabajador}-constancia-consolidada.pdf`;
       res.set('Content-Type', 'application/pdf');
       res.set('Content-Disposition', `attachment; filename="${filename}"`);
       res.set('X-Content-Type-Options', 'nosniff');
       res.set('Cache-Control', 'private, no-cache');
+      res.set('X-Constancia-SHA256', shaConstancia);
       res.send(pdfBuffer);
     } catch (err) {
       next(err);

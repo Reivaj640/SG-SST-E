@@ -263,9 +263,10 @@ async function generateConstanciaConsolidadaPdf(data) {
     }
 
     // --- Evidencia criptográfica (solo si está firmado) ---
-    // NOTA: la constancia individual solo existe para SIGNED (la ruta
-    // /constancia.pdf responde 409 para DUAL_FIRMADO), por eso el campo
-    // "ID de constancia individual" queda en '—' en ese caso.
+    // FIX I-FIRMA-DUAL: la constancia individual SÍ existe para DUAL_FIRMADO
+    // (se genera en commit() y se persiste en constancia_path). El handler
+    // routes/constancia.js ahora expone el id_constancia para ambos estados
+    // terminales; el PDF del consolidado lo imprime aquí.
     if (esFirmado(doc.estado)) {
       seccion('Evidencia criptográfica');
       campo('Hash SHA-256 (original)', truncHash(doc.document_hash_original));
@@ -274,11 +275,32 @@ async function generateConstanciaConsolidadaPdf(data) {
       campo('ID de constancia individual', doc.id_constancia || '—');
     }
 
+    // --- Firmantes (identidad de cada parte) ---
+    (function () {
+      var hayEmpresa = doc.firmante_empresa && (doc.firmante_empresa.nombre || doc.firmante_empresa.correo);
+      if (!hayEmpresa) return;
+      seccion('Firmante empresa');
+      campo('Nombre', doc.firmante_empresa.nombre || '—');
+      campo('Cargo', doc.firmante_empresa.cargo || '—');
+      campo('Identificación', (doc.firmante_empresa.tipo_identificacion || 'CC') + ' ' + (doc.firmante_empresa.numero_identificacion || '—'));
+      campo('Correo (invitación)', doc.firmante_empresa.correo || '—');
+    })();
+
     // --- Consentimiento ---
     if (doc.consent_id) {
-      seccion('Consentimiento del firmante');
+      var esRep = doc.consent_rol === 'EMPRESA';
+      seccion(esRep ? 'Consentimiento del representante legal' : 'Consentimiento del firmante');
       campo('ID de consentimiento', doc.consent_id);
+      if (doc.consent_nombre_aceptante) campo('Aceptado por', doc.consent_nombre_aceptante);
       campo('Fecha de aceptación', fmtFechaHora(doc.fecha_aceptacion_acuerdo));
+      if (doc.consent_regimen_anterior) {
+        parrafo('Nota: documento firmado bajo régimen anterior (consentimiento compartido con el trabajador).', { size: 8, color: C.gris });
+      }
+    }
+
+    // --- Enlace de verificación (token sin efecto post-firma: solo informa estado) ---
+    if (doc.url_verificacion) {
+      campo('Enlace de verificación', doc.url_verificacion);
     }
 
     // --- Trazabilidad completa ---
@@ -338,6 +360,11 @@ async function generateConstanciaConsolidadaPdf(data) {
   page.drawText(
     'K+AIR Firma Electrónica — Constancia general del expediente. Documento informativo consolidado.',
     { x: MAR_L, y: 46, size: 7.5, font, color: C.gris }
+  );
+  page.drawText(
+    'K+AIR actúa como encargado del tratamiento en nombre de ' + (data.nombre_empresa || 'la empresa cliente') +
+    ', responsable del tratamiento (Ley 1581 de 2012).',
+    { x: MAR_L, y: 36, size: 7.5, font, color: C.gris }
   );
 
   const bytes = await pdfDoc.save();

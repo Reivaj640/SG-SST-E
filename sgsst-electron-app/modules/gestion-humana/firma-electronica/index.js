@@ -2502,10 +2502,11 @@
         // OTP inicial y reenvíos de OTP. Queda congelado al momento de
         // crear el SR (no cambia aunque cambie el correo del consent).
         correo_verificacion: correoFirmante,
-        // Campos legales para la Constancia (viajan en gh_firmas_electronicas.metadata,
-        // no requieren migración de schema en firma-service).
-        nombre_empresa: self.companyName,   // display name completo (ej: TEMPOACTIVA EST S.A.S.)
-        nombre_trabajador: ((trab.nombres || '') + ' ' + (trab.apellidos || '')).trim()
+// Campos legales para la Constancia (viajan en gh_firmas_electronicas.metadata,
+      // no requieren migración de schema en firma-service).
+      nombre_empresa: self.companyName,   // display name completo (ej: TEMPOACTIVA EST S.A.S.)
+      nombre_trabajador: ((trab.nombres || '') + ' ' + (trab.apellidos || '')).trim(),
+      correo_empresa: ''  // se llena abajo si hay representante legal
       };
       // I-FIRMA-DUAL · v0.1.180: si el checkbox de firma dual está marcado,
       // agregar los 2 campos nuevos al metadata. El bridge ya pasa metadata
@@ -2523,6 +2524,8 @@
             correo: rep2.correo,
             cargo: rep2.cargo || 'Representante Legal',
           };
+          // Agregar correo_empresa usando el correo del representante legal
+          metadata.correo_empresa = rep2.correo;
         }
       }
       // 6. Create sign request

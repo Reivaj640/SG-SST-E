@@ -48,7 +48,9 @@ function getById(id) {
            hash_texto_acuerdo, correo_verificacion, correo_hash,
            otp_hash, otp_sal, otp_intentos, ip, user_agent,
            fecha_aceptacion, fecha_otp_enviado, kair_version,
-           manifestacion_aceptada, estado, created_at, updated_at
+           manifestacion_aceptada, estado, created_at, updated_at,
+           rol_firmante, nombre_aceptante, cargo_aceptante,
+           identificacion_aceptante
     FROM gh_consentimientos_firma
     WHERE id = ?
     LIMIT 1
@@ -58,7 +60,8 @@ function getById(id) {
 /**
  * Busca un consentimiento existente para (trabajador, empresa, versión).
  */
-function getExisting({ id_trabajador, id_empresa, version_acuerdo }) {
+function getExisting({ id_trabajador, id_empresa, version_acuerdo, rol_firmante }) {
+  var rol = rol_firmante || 'TRABAJADOR';
   // FASE 4 · A1.5.4-B: ORDER BY id DESC para que el consent más reciente
   // gane. Sin ORDER BY, SQLite retorna por ROWID ascendente, lo que causaba
   // que se agarrara un EXPIRED viejo y se ocultara el OTP_PENDING que sí
@@ -71,14 +74,15 @@ function getExisting({ id_trabajador, id_empresa, version_acuerdo }) {
   return db.prepare(`
     SELECT id, id_trabajador, id_empresa, version_acuerdo,
            manifestacion_aceptada, estado, otp_intentos,
-           fecha_aceptacion, fecha_otp_enviado
+           fecha_aceptacion, fecha_otp_enviado, rol_firmante
     FROM gh_consentimientos_firma
     WHERE id_trabajador = ?
       AND id_empresa = ?
       AND version_acuerdo = ?
+      AND rol_firmante = ?
     ORDER BY id DESC
     LIMIT 1
-  `).get(id_trabajador, id_empresa, version_acuerdo);
+  `).get(id_trabajador, id_empresa, version_acuerdo, rol);
 }
 
 /**
@@ -238,6 +242,78 @@ async function create({
 
   const consent = getById(consentId);
   return { consent, devOtp: null };
+}
+
+/**
+ * Garantiza el consentimiento PROPIO del representante legal para un
+ * sign request hijo (tipo_firmante='EMPRESA').
+ *
+ * Motivación (I-FIRMA-DUAL): el hijo se creaba con el consent_id DEL
+ * TRABAJADOR y el rep lo "aceptaba" de forma idempotente, sin dejar
+ * registro propio (fecha/IP/identidad). La constancia mostraba datos
+ * del trabajador como si fueran del rep.
+ *
+ * - Reutiliza uno existente (mismo trío + rol EMPRESA) si está activo
+ *   o ya aceptado (idempotencia entre documentos del mismo expediente).
+ * - Si no existe (o el último está expirado), crea uno nuevo PENDING con
+ *   los datos del snapshot del representante. Sin envío de correo: el rep
+ *   ya se autentica con el OTP del propio sign request hijo.
+ *
+ * @param {object} opts
+ * @param {string} opts.id_trabajador - id del trabajador (vínculo expediente)
+ * @param {string} opts.id_empresa
+ * @param {string} opts.version_acuerdo
+ * @param {string} opts.hash_texto_acuerdo
+ * @param {object} opts.rep - { nombre, cargo, correo, tipo_identificacion }
+ * @param {string} [opts.ip]
+ * @param {string} [opts.user_agent]
+ * @param {string} [opts.kair_version]
+ * @returns {{consent: object, reused: boolean}}
+ */
+function ensureRepConsent({
+  id_trabajador, id_empresa, version_acuerdo,
+  hash_texto_acuerdo, rep, ip, user_agent, kair_version,
+}) {
+  if (!rep || !rep.correo) {
+    throw new AppError(400, 'INVALID_INPUT',
+      'Se requieren los datos del representante (snapshot) para su consentimiento propio');
+  }
+  const existing = getExisting({
+    id_trabajador, id_empresa, version_acuerdo, rol_firmante: 'EMPRESA',
+  });
+  if (existing && (existing.estado === ESTADO_ACCEPTED || existing.estado === ESTADO_PENDING || existing.estado === ESTADO_LOCKED)) {
+    logger.info('Consentimiento del representante reutilizado', {
+      consent_id: existing.id,
+      estado: existing.estado,
+    });
+    return { consent: getById(existing.id), reused: true };
+  }
+  const now = new Date().toISOString();
+  const correo_sal = generateSalt();
+  const result = db.prepare(`
+    INSERT INTO gh_consentimientos_firma
+      (id_trabajador, id_empresa, version_acuerdo,
+       hash_texto_acuerdo, correo_verificacion, correo_hash,
+       otp_hash, otp_sal, otp_intentos, ip, user_agent,
+       kair_version, manifestacion_aceptada, estado,
+       fecha_otp_enviado,
+       rol_firmante, nombre_aceptante, cargo_aceptante,
+       identificacion_aceptante)
+    VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, 0, ?, ?, ?, 0, ?, NULL, ?, ?, ?, ?)
+  `).run(
+    id_trabajador, id_empresa, version_acuerdo,
+    hash_texto_acuerdo, rep.correo, hashWithSalt(rep.correo, correo_sal),
+    ip || null, user_agent || null,
+    kair_version, ESTADO_PENDING,
+    'EMPRESA', rep.nombre || null, rep.cargo || null,
+    rep.numero_identificacion || null,
+  );
+  const consent = getById(result.lastInsertRowid);
+  logger.info('Consentimiento propio del representante creado', {
+    consent_id: consent.id,
+    version_acuerdo,
+  });
+  return { consent, reused: false };
 }
 
 /**
@@ -842,6 +918,7 @@ module.exports = {
   expireConsent,
   getById,
   getExisting,
+  ensureRepConsent,
   validateForCommit,
   ESTADO_PENDING,
   ESTADO_ACCEPTED,

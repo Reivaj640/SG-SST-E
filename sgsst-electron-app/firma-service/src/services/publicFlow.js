@@ -442,7 +442,8 @@ function _getConsentResumen(consentId) {
   if (!consentId) return null;
   try {
     return db.prepare(`
-      SELECT id, version_acuerdo, hash_texto_acuerdo, fecha_aceptacion
+      SELECT id, version_acuerdo, hash_texto_acuerdo, fecha_aceptacion,
+             rol_firmante, nombre_aceptante, cargo_aceptante
       FROM gh_consentimientos_firma
       WHERE id = ?
     `).get(consentId) || null;
@@ -488,6 +489,11 @@ async function commit(token, opts, ip, user_agent) {
   // final del commit ambos sign requests (padre e hijo) quedan en estado
   // DUAL_FIRMADO. Si NO lo es, flujo legacy intacto (1 firma del worker).
   const isCompanyCommit = signRequest.tipo_firmante === 'EMPRESA';
+
+  // Helper para determinar el rol del firmante según tipo_firmante
+  function getActorRole(signRequest) {
+    return signRequest.tipo_firmante === 'EMPRESA' ? 'empresa' : 'trabajador';
+  }
 
   // 2. Re-validar que el Acuerdo vinculado sigue siendo el activo (D2)
   validateAgreementStillActive(signRequest);
@@ -566,7 +572,15 @@ async function commit(token, opts, ip, user_agent) {
             tipo: 'EMPRESA',
             firmante: {
               id_trabajador: null,
-              nombre: 'Representante legal',
+              // Nombre real desde el snapshot (antes: literal genérico).
+              nombre: (function () {
+                try {
+                  var s = signRequest.representante_legal_snapshot
+                    ? JSON.parse(signRequest.representante_legal_snapshot) : null;
+                  if (s && s.nombre) return s.nombre;
+                } catch (e) { /* noop */ }
+                return 'Representante legal';
+              })(),
               // Los datos del rep están en representante_legal_snapshot del
               // padre (se snapshotearon al crear el padre con la flag activa);
               // pero para identificar al firmante actual usamos la
@@ -738,9 +752,10 @@ async function commit(token, opts, ip, user_agent) {
       ORDER BY fecha_hora ASC, id ASC
     `).all(signRequest.id);
     eventosTotal = _rows.length + 3; // +3 eventos sintéticos del commit
+    const actorRole = signRequest.tipo_firmante === 'EMPRESA' ? 'empresa' : 'trabajador';
     _rows.push(
-      { evento: 'MANIFESTATION_RECORDED', fecha_hora: fecha_firma, ip: ip || null, id_actor: 'trabajador' },
-      { evento: 'SIGN_COMMITTED', fecha_hora: fecha_firma, ip: ip || null, id_actor: 'trabajador' },
+      { evento: 'MANIFESTATION_RECORDED', fecha_hora: fecha_firma, ip: ip || null, id_actor: actorRole },
+      { evento: 'SIGN_COMMITTED', fecha_hora: fecha_firma, ip: ip || null, id_actor: actorRole },
       { evento: 'PDF_GENERATED', fecha_hora: fecha_firma, ip: ip || null, id_actor: 'sistema' },
     );
     hitosFirma = _buildHitosFirma(_rows, signRequest, fecha_firma);
@@ -843,17 +858,18 @@ async function commit(token, opts, ip, user_agent) {
       // convierten en AppError(500, 'EVENT_REGISTRATION_FAILED', ...) →
       // rollback atómico + cliente recibe código específico en vez de
       // INTERNAL_ERROR genérico (HALLAZGO #2).
+      const actorRole = signRequest.tipo_firmante === 'EMPRESA' ? 'empresa' : 'trabajador';
       withAppErrorWrappingSync(
         () => signRequestService.registerEvent(signRequest.id, 'MANIFESTATION_RECORDED',
           { texto_hash: manifestacion_voluntad_hash },
-          'trabajador', ip, user_agent),
+          actorRole, ip, user_agent),
         'EVENT_REGISTRATION_FAILED',
         'No se pudo registrar el evento MANIFESTATION_RECORDED',
       );
       withAppErrorWrappingSync(
         () => signRequestService.registerEvent(signRequest.id, 'SIGN_COMMITTED',
           { evidence_hash },
-          'trabajador', ip, user_agent),
+          actorRole, ip, user_agent),
         'EVENT_REGISTRATION_FAILED',
         'No se pudo registrar el evento SIGN_COMMITTED',
       );
@@ -1391,28 +1407,105 @@ function consentAccept(token, ip, user_agent) {
       });
   }
 
-  // 3. Validar consent_id
-  if (!signRequest.consent_id) {
+  // 3b. Rama EMPRESA (I-FIRMA-DUAL): el representante acepta SU consentimiento,
+  // no el del trabajador. Va ANTES del chequeo de nulo porque el hijo ya no
+  // hereda consent_id (se vincula aquí mismo).
+  // no el del trabajador. Garantizarlo (crearlo si no existe), vincularlo al
+  // hijo y aceptar sobre él. Antes se aceptaba el consent del worker de forma
+  // idempotente y no quedaba registro propio del rep (dato falso en constancia).
+  let effectiveConsentId = signRequest.consent_id;
+  let esRepFlow = signRequest.tipo_firmante === 'EMPRESA';
+  if (esRepFlow) {
+    let repSnapshot = null;
+    try { repSnapshot = signRequest.representante_legal_snapshot ? JSON.parse(signRequest.representante_legal_snapshot) : null; } catch (e) { repSnapshot = null; }
+    // El hijo también puede no traer snapshot propio: fallback al del padre.
+    if ((!repSnapshot || !repSnapshot.correo) && signRequest.parent_id_solicitud) {
+      try {
+        const padreSnap = db.prepare(
+          'SELECT representante_legal_snapshot FROM gh_firmas_electronicas WHERE id_solicitud = ?'
+        ).get(signRequest.parent_id_solicitud);
+        if (padreSnap && padreSnap.representante_legal_snapshot) {
+          repSnapshot = JSON.parse(padreSnap.representante_legal_snapshot);
+        }
+      } catch (e) { /* noop — se valida abajo */ }
+    }
+    if (!repSnapshot || !repSnapshot.correo) {
+      throw new AppError(409, 'REP_SNAPSHOT_MISSING',
+        'Falta el snapshot del representante legal para su consentimiento propio',
+        { id_solicitud: signRequest.id_solicitud });
+    }
+    // Hash del acuerdo: el del consent del trabajador (misma versión) o la tabla.
+    let hashAcuerdo = null;
+    try {
+      const cTrab = db.prepare(
+        `SELECT hash_texto_acuerdo FROM gh_consentimientos_firma
+         WHERE id_trabajador = ? AND id_empresa = ? AND version_acuerdo = ?
+           AND (rol_firmante IS NULL OR rol_firmante = 'TRABAJADOR')
+         ORDER BY id DESC LIMIT 1`
+      ).get(signRequest.id_trabajador, signRequest.id_empresa, signRequest.agreement_version);
+      if (cTrab) hashAcuerdo = cTrab.hash_texto_acuerdo;
+    } catch (e) { /* noop — fallback abajo */ }
+    if (!hashAcuerdo) {
+      const ac = db.prepare(
+        'SELECT texto_hash FROM gh_firma_acuerdo_versiones WHERE version = ? AND activa = 1 LIMIT 1'
+      ).get(signRequest.agreement_version);
+      if (ac) hashAcuerdo = ac.texto_hash;
+    }
+    if (!hashAcuerdo) {
+      throw new AppError(409, 'ACUERDO_HASH_MISSING',
+        'No se pudo resolver el hash del Acuerdo para el consentimiento del representante',
+        { id_solicitud: signRequest.id_solicitud });
+    }
+    const ensured = consentService.ensureRepConsent({
+      id_trabajador: signRequest.id_trabajador,
+      id_empresa: signRequest.id_empresa,
+      version_acuerdo: signRequest.agreement_version,
+      hash_texto_acuerdo: hashAcuerdo,
+      rep: {
+        nombre: repSnapshot.nombre || null,
+        cargo: repSnapshot.cargo || 'Representante Legal',
+        numero_identificacion: repSnapshot.numero_identificacion || null,
+        correo: repSnapshot.correo,
+      },
+      ip: ip || null,
+      user_agent: user_agent || null,
+      kair_version: signRequest.version_kair,
+    });
+    effectiveConsentId = ensured.consent.id;
+    if (signRequest.consent_id !== effectiveConsentId) {
+      db.prepare(
+        'UPDATE gh_firmas_electronicas SET consent_id = ? WHERE id = ?'
+      ).run(effectiveConsentId, signRequest.id);
+      signRequest.consent_id = effectiveConsentId;
+    }
+  }
+
+  // 3c. Validar consent_id efectivo (tras la rama EMPRESA ya quedó vinculado).
+  if (!effectiveConsentId) {
     throw new AppError(409, 'CONSENT_REQUIRED',
       'El sign request no tiene consent_id vinculado (legado sin Acuerdo?)',
       { id_solicitud: signRequest.id_solicitud });
   }
 
   // 4. Llamar al service (UPDATE atómico en consentimiento)
-  const result = consentService.accept(signRequest.consent_id, { signRequest });
+  const result = consentService.accept(effectiveConsentId, { signRequest });
 
   // 5. Registrar evento CONSENT_ACCEPTED SOLO en la primera aceptación.
   //    Si fue idempotente, ya existe un evento previo (o un reintento que
   //    no debe duplicar la auditoría).
-  if (!result.idempotente) {
+  //    Excepción rama EMPRESA: el consent del rep se reutiliza entre
+  //    documentos del mismo expediente, así que se registra SIEMPRE (con
+  //    marca idempotente) para dejar rastro por documento.
+  if (!result.idempotente || esRepFlow) {
     const updatedConsent = result.consent;
     signRequestService.registerEvent(signRequest.id, 'CONSENT_ACCEPTED', {
       id_consentimiento: updatedConsent.id,
       version_acuerdo: updatedConsent.version_acuerdo,
       hash_texto_acuerdo: updatedConsent.hash_texto_acuerdo,
       id_solicitud: signRequest.id_solicitud,
-      idempotente: false,
-    }, 'trabajador', ip, user_agent);
+      idempotente: !!result.idempotente,
+      rol_firmante: updatedConsent.rol_firmante || 'TRABAJADOR',
+    }, esRepFlow ? 'empresa' : 'trabajador', ip, user_agent);
   }
 
   // 6. Aplanar respuesta para conveniencia del frontend.

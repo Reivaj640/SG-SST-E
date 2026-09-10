@@ -679,13 +679,9 @@ function createForCompany({ parent_id_solicitud, id_empresa, id_documento, repre
   }
 
   // 1. Leer el padre
-  //    📦 v0.1.180 (Task 1.14): incluimos `consent_id` en el SELECT para
-  //    poder heredarlo al hijo. La cadena legal del Bloque E6 es la misma
-  //    para ambas firmas (mismo Acuerdo v1.0 → mismo consentimiento
-  //    ACEPTADO). Sin este link, el commit del rep falla en
-  //    `consentService.validateForCommit` con 409 CONSENT_REQUIRED
-  //    porque el hijo tiene `agreement_version` heredada pero
-  //    `consent_id = NULL`.
+  //    El hijo YA NO hereda consent_id (consentimiento propio del rep,
+  //    vinculado en consentAccept()). Se conserva el SELECT de contexto
+  //    para validaciones.
   const padre = db.prepare(`
     SELECT id_solicitud, id_empresa, id_documento, id_trabajador, version_kair,
            pdf_original_path, document_hash_original,
@@ -751,7 +747,10 @@ function createForCompany({ parent_id_solicitud, id_empresa, id_documento, repre
       version_kair,
       requiere_firma_empresa, tipo_firmante, parent_id_solicitud,
       representante_legal_snapshot, identificacion_tipo,
-      consent_id,  -- 📦 v0.1.180 (Task 1.14): heredado del padre (misma cadena legal Bloque E6)
+      consent_id,  -- I-FIRMA-DUAL consent propio: NULL al crear; se vincula
+                    -- el consentimiento PROPIO del rep en consentAccept()
+                    -- (antes se heredaba el del trabajador: dato falso en
+                    -- constancia). validateForCommit lo exige antes del commit.
       identificacion_numero_hash  -- 📦 v0.1.180 (Task 1.14): pre-poblado del snapshot
     ) VALUES (
       ?, ?, ?, ?,
@@ -773,7 +772,8 @@ function createForCompany({ parent_id_solicitud, id_empresa, id_documento, repre
     parent_id_solicitud,
     JSON.stringify(representante),
     representante.tipo_identificacion || 'CC',
-    padre.consent_id,
+    null, // consent_id NULL: el rep acepta SU consentimiento propio en
+           // consentAccept() (antes se heredaba el del trabajador).
     // 📦 v0.1.180 (Task 1.14): hash de la cédula del rep para que
     // publicFlow.identify() pase el precheck de MISSING_IDENTIFICATION_DATA.
     // El rep debe ingresar exactamente este CC en la mini-app. Si RH captura
