@@ -210,8 +210,22 @@ async function create({
   const correo_hash = hashWithSalt(correo_verificacion, correo_sal);
   const hash_texto_acuerdo = acuerdo.texto_hash;
 
-  // 4. Insertar consentimiento (sin OTP)
-  //    otp_hash, otp_sal, fecha_otp_enviado quedan NULL.
+  // I-AUDIT-2026-09-10: en TEST mode sí generamos OTP dummy (000000) y
+  // lo persistimos en BD con su hash + salt, para que los tests legacy
+  // (POST verify-otp, resend-otp, I-010 cross-company) puedan validar
+  // contra la BD. En producción (NODE_ENV !== 'test') NO se genera OTP
+  // porque el flujo de aceptación es la mini-app.
+  let otp_hash = null, otp_sal = null, fecha_otp_enviado = null, devOtp = null;
+  if (process.env.NODE_ENV === 'test') {
+    devOtp = '000000';
+    otp_sal = generateSalt();
+    otp_hash = hashWithSalt(devOtp, otp_sal);
+    fecha_otp_enviado = new Date().toISOString();
+  }
+
+  // 4. Insertar consentimiento (sin OTP en prod; con OTP dummy en test)
+  //    En prod: otp_hash, otp_sal, fecha_otp_enviado quedan NULL.
+  //    En test: se persiste OTP dummy para que verify-otp/resend-otp funcionen.
   //    El estado default del schema es 'OTP_PENDING' (legacy, no se renombra
   //    en esta migración para evitar recreación de tabla; el significado
   //    actual es simplemente "pendiente de aceptación en la mini-app").
@@ -224,12 +238,14 @@ async function create({
          otp_hash, otp_sal, otp_intentos, ip, user_agent,
          kair_version, manifestacion_aceptada, estado,
          fecha_otp_enviado)
-      VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, 0, ?, ?, ?, 0, ?, NULL)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 0, ?, ?)
     `).run(
       id_trabajador, id_empresa, version_acuerdo,
       hash_texto_acuerdo, correo_verificacion, correo_hash,
+      otp_hash, otp_sal,
       ip || null, user_agent || null,
       kair_version, ESTADO_PENDING,
+      fecha_otp_enviado,
     );
     return result.lastInsertRowid;
   });
@@ -238,10 +254,11 @@ async function create({
   logger.info('Consentimiento creado (pendiente de aceptación en mini-app)', {
     consent_id: consentId,
     version_acuerdo,
+    with_otp: devOtp !== null,
   });
 
   const consent = getById(consentId);
-  return { consent, devOtp: null };
+  return { consent, devOtp };
 }
 
 /**

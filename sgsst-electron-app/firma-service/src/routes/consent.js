@@ -98,6 +98,10 @@ router.post('/consentimientos',
       estado: result.consent.estado,
       manifestacion_aceptada: result.consent.manifestacion_aceptada === 1,
       correo_destino_enmascarado: maskEmail(correo_verificacion),
+      // I-AUDIT-2026-09-10: devOtp solo en test mode (legacy: tests usan
+      // POST /internal/consentimientos/:id/verify-otp que requiere OTP).
+      // En prod se acepta vía mini-app, sin OTP.
+      ...(process.env.NODE_ENV === 'test' && result.devOtp ? { devOtp: result.devOtp } : {}),
     };
 
     res.status(201).json(response);
