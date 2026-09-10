@@ -18,6 +18,8 @@
  */
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
 const db = require('../db/connection');
 const config = require('../config');
 const { sha256, generateSalt, hashWithSalt } = require('../crypto/hash');
@@ -783,6 +785,43 @@ function createForCompany({ parent_id_solicitud, id_empresa, id_documento, repre
     representante.numero_identificacion ? sha256(representante.numero_identificacion) : null
   );
   const childId = result.lastInsertRowid;
+
+  // 7.5 I-AUDIT-2026-09-10: copiar el PDF original del padre al path del hijo
+  //     para que el hijo tenga su propia copia física en disco. ANTES el
+  //     registro del hijo apuntaba al MISMO archivo del padre (decisión de
+  //     diseño documentada en línea 628-630), lo que causaba:
+  //       - si el archivo del padre se borraba (cleanup/rotación), el
+  //         registro del hijo quedaba con path roto
+  //       - para auditoría legal "qué vio el rep antes de firmar", no
+  //         había rastro físico del PDF que vio el rep, solo del que vio
+  //         el trabajador (el padre)
+  //     Ahora cada SR tiene su propio archivo en originales/{id_solicitud}.pdf.
+  //     Si la copia falla (permisos, espacio), NO se aborta el create — el
+  //     SR sigue siendo válido (el padre es la fuente de verdad del contenido,
+  //     document_hash_original ya está en BD). Solo se loguea warning.
+  if (padre.pdf_original_path) {
+    try {
+      const hijoOriginalPath = path.join(storage.PATHS.originales, `${id_solicitud}.pdf`);
+      fs.copyFileSync(padre.pdf_original_path, hijoOriginalPath);
+      db.prepare(
+        'UPDATE gh_firmas_electronicas SET pdf_original_path = ? WHERE id = ?'
+      ).run(hijoOriginalPath, childId);
+      logger.info('SignRequest: PDF original copiado para hijo', {
+        parent: padre.id_solicitud,
+        child: id_solicitud,
+        src: padre.pdf_original_path,
+        dst: hijoOriginalPath,
+      });
+    } catch (copyErr) {
+      // No fallar el create — el hash y el path del padre siguen siendo válidos.
+      logger.warn('SignRequest: no se pudo copiar PDF original al hijo (no fatal)', {
+        parent: padre.id_solicitud,
+        child: id_solicitud,
+        error: copyErr.message,
+        code: copyErr.code,
+      });
+    }
+  }
 
   // 8. Notificar al representante legal (I-FIRMA-DUAL, v0.1.180).
   //    Se usa `mailer.sendInviteForCompany` (correo DIFERENCIADO al del

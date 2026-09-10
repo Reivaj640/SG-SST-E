@@ -184,6 +184,25 @@ const commitLimiter = rateLimit({
 });
 
 // -----------------------------------------------------------------------------
+// I-AUDIT-2026-09-10: Verify: 30 req/min por IP+token. Anti-enumeración de
+// tokens y DoS en verify-pdf. ANTES el rate limit era solo el global (60
+// req/min por IP), demasiado permisivo: un atacante podía enumerar tokens
+// a 60/min y hacer DoS enviando PDFs grandes a 60/min. Ahora con key por
+// IP+token, cada par (IP, token) tiene su propio cubo — un atacante no
+// puede enumerar tokens de un SR que no le pertenece. Y el verify-pdf
+// (que hashea PDFs grandes) está limitado a 30/min por token, suficiente
+// para uso legítimo y muy restrictivo para DoS.
+// -----------------------------------------------------------------------------
+const verifyLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 30,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: ipAndTokenKey,
+  handler: makeHandler('verify'),
+});
+
+// -----------------------------------------------------------------------------
 // Sign Request: 30 req/min por IP. Anti-abuso de creación.
 // Se mantiene como defensa adicional (decisión #8 del user). NO se elimina
 // en I-008. Aplica ADEMÁS de internalServerLimiter (capa 3 también es IP,
@@ -410,6 +429,7 @@ module.exports = {
   otpLimiter,
   commitLimiter,
   signRequestLimiter,
+  verifyLimiter,  // I-AUDIT-2026-09-10: para /verify y /verify-pdf
   internalServerLimiter,
   // Exportados para tests
   _ipKey: ipKey,

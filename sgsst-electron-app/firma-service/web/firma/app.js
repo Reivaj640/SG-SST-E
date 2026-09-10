@@ -56,24 +56,21 @@
   }
 
   // Oculta un elemento (helper semántico para el flujo de verificación).
-  // Doble fix: atributo `hidden` (semántico) + `style.display = 'none'`
-  // (defensa contra CSS que pueda sobrescribir el `hidden` con reglas tipo
-  // `.spinner { display: block }` o cache de CSS desactualizado del browser).
-  // Bug encontrado 2026-09-10: el spinner de verify-loading seguía visible
-  // después de cargar los datos porque el CSS `.spinner { display: block }`
-  // ganaba sobre el atributo `hidden`.
+  // Usa el atributo `hidden` del HTML. La regla CSS universal
+  // `[hidden] { display: none !important; }` en styles.css garantiza que
+  // se oculte aunque haya reglas con `display: block/flex` que en otro
+  // momento sobrescribían el hidden (bug del spinner, 2026-09-10).
+  // NOTA: NO seteamos `style.display = 'none'` inline porque rompe otros
+  // lugares que hacen `el.hidden = false` esperando que el elemento
+  // vuelva a su display por defecto. El CSS universal es suficiente.
   function hideEl(el) {
-    if (!el) return;
-    if ('hidden' in el) el.hidden = true;
-    el.style.display = 'none';
+    if (el && 'hidden' in el) el.hidden = true;
   }
 
   // Muestra un elemento (helper simétrico a hideEl). Restaura el display
-  // por defecto (block para div, '' para heredar del CSS).
+  // por defecto del CSS (block para div, etc.).
   function showEl(el) {
-    if (!el) return;
-    if ('hidden' in el) el.hidden = false;
-    el.style.display = '';
+    if (el && 'hidden' in el) el.hidden = false;
   }
 
   // Formatea una fecha ISO a un string legible en zona horaria local.

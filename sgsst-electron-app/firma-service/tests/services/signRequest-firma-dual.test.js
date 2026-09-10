@@ -218,3 +218,57 @@ test('signRequest.createForCompany: falla si ya existe un hijo (UNIQUE constrain
   ).get(padreResult.signRequest.id_solicitud).n;
   assert.equal(hijosCount, 1, 'debe haber exactamente 1 hijo para el padre');
 });
+
+// =====================================================================
+// Test 4 (I-AUDIT-2026-09-10): createForCompany copia el PDF original del
+// padre al path del hijo, para auditoría (trazabilidad por firmante) y
+// resiliencia (si el path del padre se borra, el hijo sigue teniendo su
+// original). ANTES el registro del hijo apuntaba al MISMO archivo del
+// padre (decisión de diseño documentada), lo que rompía la trazabilidad.
+// =====================================================================
+
+test('signRequest.createForCompany: copia el PDF original al path del hijo (I-AUDIT-2026-09-10)', () => {
+  resetDb();
+  const acuerdo = seedActiveAgreement();
+  const fs = require('fs');
+  const path = require('path');
+  const { PATHS } = require('../../src/services/storage');
+
+  const padreOpts = buildOpts(acuerdo, { id_documento: 'doc-firma-dual-pdf-copy' });
+  const padreResult = signRequestService.create({
+    ...padreOpts,
+    requiere_firma_empresa: 1,
+    representante_legal_snapshot: REP,
+  });
+
+  const hijo = signRequestService.createForCompany({
+    parent_id_solicitud: padreResult.signRequest.id_solicitud,
+    id_empresa: padreOpts.id_empresa,
+    id_documento: padreOpts.id_documento,
+    representante: REP,
+  });
+
+  // 1) El path del hijo debe ser DISTINTO al del padre (cada uno en su archivo)
+  const padrePath = padreResult.signRequest.pdf_original_path;
+  const hijoRow = db.prepare(
+    'SELECT pdf_original_path FROM gh_firmas_electronicas WHERE id_solicitud = ?'
+  ).get(hijo.id_solicitud);
+
+  assert.notStrictEqual(hijoRow.pdf_original_path, padrePath,
+    'el path del hijo debe ser DISTINTO al del padre (cada uno con su archivo)');
+
+  // 2) El path del hijo debe seguir el patrón esperado: originales/{hijo_id}.pdf
+  const expectedHijoPath = path.join(PATHS.originales, `${hijo.id_solicitud}.pdf`);
+  assert.equal(hijoRow.pdf_original_path, expectedHijoPath,
+    'el path del hijo debe ser originales/{hijo.id_solicitud}.pdf');
+
+  // 3) El archivo del hijo debe existir en disco
+  assert.ok(fs.existsSync(hijoRow.pdf_original_path),
+    `el archivo del hijo debe existir: ${hijoRow.pdf_original_path}`);
+
+  // 4) El contenido del archivo del hijo debe ser IDÉNTICO al del padre
+  const padreContent = fs.readFileSync(padrePath);
+  const hijoContent = fs.readFileSync(hijoRow.pdf_original_path);
+  assert.ok(padreContent.equals(hijoContent),
+    'el contenido del PDF del hijo debe ser idéntico al del padre');
+});

@@ -20,6 +20,7 @@ const path = require('path');
 const express = require('express');
 const router = express.Router();
 const { validateBody } = require('../middleware/validate');
+const { verifyLimiter } = require('../middleware/rateLimit');  // I-AUDIT-2026-09-10
 const publicFlow = require('../services/publicFlow');
 const signRequestService = require('../services/signRequest');
 const storage = require('../services/storage');
@@ -338,7 +339,7 @@ router.post('/api/sign/:token/reject', validateBody(rejectBody), (req, res, next
  * Acepta cualquier estado del SR (incluso PENDING, para que el firmante
  * pueda ver el estado del documento mientras espera el OTP).
  */
-router.get('/api/sign/:token/verify', (req, res, next) => {
+router.get('/api/sign/:token/verify', verifyLimiter, (req, res, next) => {
   try {
     // Resolver el token sin validar expiración (verificación debe funcionar
     // para siempre). resolveToken acepta el flag skipExpirationCheck.
@@ -364,6 +365,9 @@ router.get('/api/sign/:token/verify', (req, res, next) => {
  */
 router.post(
   '/api/sign/:token/verify-pdf',
+  // I-AUDIT-2026-09-10: rate limiter específico (30/min por IP+token)
+  // anti-enumeración y anti-DoS con PDFs grandes.
+  verifyLimiter,
   // Body parser específico con límite alto (50MB) para aceptar PDFs
   // base64-encoded. El global en server.js es 100KB para no permitir DoS
   // en el resto de endpoints. Sin este middleware local, el verify-pdf
