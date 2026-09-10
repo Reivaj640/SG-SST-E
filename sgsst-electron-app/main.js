@@ -203,18 +203,33 @@ autoUpdater.logger = log;
 autoUpdater.autoDownload = true;          // Descarga automática apenas detecta update-available
 autoUpdater.autoInstallOnAppQuit = true;  // Instala automáticamente al cerrar la app
 autoUpdater.autoRunAppAfterInstall = true;
-// 📦583 (Loop 11) — Workaround: deshabilitar differential download.
-// La versión empaquetada de builder-util-runtime tiene un bug inestable
-// que calcula el SHA512 en formatos inconsistentes (hex vs base64) durante
-// el DifferentialDownloader, causando errores "sha512 checksum mismatch"
-// falsos incluso cuando el archivo es correcto. Full download (264 MB)
-// es más lento pero 100% confiable. Si en el futuro se actualiza electron-updater
-// y se arregla el bug, se puede volver a habilitar (quitando esta línea).
-autoUpdater.disableDifferentialDownload = true;
+// 📦583 (Loop 11) — Workaround ORIGINAL: deshabilitar differential download.
+//   Bug en builder-util-runtime: SHA512 en formatos inconsistentes (hex vs
+//   base64) durante el DifferentialDownloader → "sha512 checksum mismatch"
+//   falsos. Workaround: forzar full download (264 MB) siempre.
+//
+// 🔄 RE-AUDIT-2026-09-10 (v0.1.196) — Differential downloads RE-HABILITADOS
+//   condicionalmente via env var. Razones:
+//   - Hoy descargar 391 MB por update es inaceptable para clientes con
+//     internet lento (zonas rurales Colombia, planes de datos limitados).
+//   - La versión actual de electron-updater (6.6.2) puede tener el bug
+//     YA ARREGLADO. No lo podemos saber sin probar.
+//   - Si el bug persiste, electron-updater hace fallback automático a full
+//     download cuando el diff falla (graceful degradation), así que el
+//     peor caso es: download más lento, no instalación rota.
+//   - Override con KAIR_USE_FULL_UPDATE=1 para volver al modo conservador
+//     (full download siempre). Sin env var = deltas activos (default).
+const useFullUpdate = process.env.KAIR_USE_FULL_UPDATE === '1';
+autoUpdater.disableDifferentialDownload = useFullUpdate;
+if (useFullUpdate) {
+  console.log('[UPDATER] KAIR_USE_FULL_UPDATE=1 → differential download DESHABILITADO (full download 391 MB)');
+} else {
+  console.log('[UPDATER] Differential download HABILITADO (patches ~20-50 MB). Override con KAIR_USE_FULL_UPDATE=1');
+}
 // Configurar timeout para evitar cuelgues en conexiones lentas
-autoUpdater.requestHeaders = {
-  'Cache-Control': 'no-cache'
-};
+// (P2-1 audit-2026-09-10: quitado Cache-Control: no-cache — GitHub ya devuelve
+// ETag y electron-updater lo respeta. El "no-cache" forzaba re-validación en
+// cada check, aumentando latencia y reduciendo el rate-limit efectivo.)
 autoUpdater.timeout = 30000; // 30 segundos máximo de espera para respuesta de GitHub API
 
 // En modo desarrollo, forzar uso de dev-app-update.yml para que el updater funcione
@@ -2344,7 +2359,11 @@ ipcMain.handle('get-app-version', async () => {
     return app.getVersion();
   } catch (error) {
     console.error('Error getting app version:', error);
-    return '1.0.0'; // Valor por defecto en caso de error
+    // (P2-5 audit-2026-09-10) Antes retornaba '1.0.0' como fallback. Eso era
+    // PELIGROSO porque el updater podía pensar que el cliente estaba en una
+    // versión muy vieja y forzar un update innecesario. Ahora retornamos
+    // string vacío para que el caller (renderer) decida cómo manejarlo.
+    return '';
   }
 });
 
@@ -10129,19 +10148,6 @@ app.on('window-all-closed', () => {
 // En este archivo puedes incluir el resto del código del proceso principal de tu aplicación.
 // También puedes ponerlos en archivos separados y requerirlos aquí.
 
-// --- Eventos del Auto-Updater (TEMPORALMENTE COMENTADO) ---
-// log.info('Actualización disponible.');
-// if (mainWindow) {
-//   mainWindow.webContents.send('update_available');
-// }
-
-// log.info('Actualización descargada. Lista para ser instalada.');
-// if (mainWindow) {
-//   mainWindow.webContents.send('update_downloaded');
-// }
-
-// log.error('Error en el auto-updater: ' + err.toString());
-
 // =============================================================================
 // Handler: Leer datos de ausentismo desde Excel
 // =============================================================================
@@ -14504,9 +14510,13 @@ ipcMain.on('restart_app', () => {
     // 2. Limpiar procesos secundarios inmediatamente
     cleanupProcesses();
 
+    // 🔄 RE-AUDIT-2026-09-10 (v0.1.196, P1-1) — Cerrar DB antes de quit
+    // para que las transacciones en curso se persistan al main DB WAL.
+    closeDatabaseSafely();
+
     // 3. Forzar el cierre de la aplicación para que el instalador pueda reemplazar archivos
     log.info('[UPDATER] Cerrando aplicación para instalación...', 'INFO');
-    
+
     // IMPORTANTE: En Windows, quitAndInstall necesita que la app se cierre completamente
     // Los parámetros (true, true) significan:
     // - forceQuit: true  = Forzar el cierre de la aplicación
@@ -14515,22 +14525,52 @@ ipcMain.on('restart_app', () => {
         log.info('[UPDATER] Ejecutando autoUpdater.quitAndInstall(true, true)...', 'INFO');
         autoUpdater.quitAndInstall(true, true);
     } catch (err) {
+        // 🔄 RE-AUDIT-2026-09-10 (v0.1.196, P0-3) — ANTES: solo hacía
+        // app.quit() y se perdía el update. AHORA: intenta lanzar Update.exe
+        // (Squirrel bootstrapper) manualmente como fallback. Si Update.exe
+        // no existe, al menos app.quit() deja al user en versión vieja
+        // (que SÍ funciona), no en "app cerrada sin instalar nada".
         log.error(`[UPDATER] Error en quitAndInstall: ${err.message}`, 'ERROR');
-        
-        // Fallback: Salir manualmente y esperar que el instalador se ejecute
-        log.info('[UPDATER] Intentando salida de emergencia...', 'WARN');
-        
-        // Cerrar todos los procesos de Python restantes
-        if (process.platform === 'win32') {
-            try {
-                const { execSync } = require('child_process');
-                execSync('taskkill /F /IM python.exe /T', { stdio: 'ignore' });
-            } catch (e) {
-                // Ignorar si no hay procesos Python
+        log.info('[UPDATER] Intentando fallback: lanzar Update.exe manualmente...', 'WARN');
+
+        // Buscar Update.exe en resources/update/ (Squirrel lo copia ahí)
+        // En dev: __dirname/../Update.exe (raro)
+        // En prod: process.resourcesPath/../Update.exe (junto al .exe)
+        const updateExeCandidates = app.isPackaged
+            ? [
+                path.join(process.resourcesPath, '..', 'Update.exe'),
+                path.join(path.dirname(process.execPath), 'Update.exe')
+              ]
+            : [path.join(__dirname, '..', 'Update.exe')];
+
+        let updateExeFound = null;
+        for (const candidate of updateExeCandidates) {
+            if (fs.existsSync(candidate)) {
+                updateExeFound = candidate;
+                break;
             }
         }
-        
-        // Salir de la aplicación
+
+        if (updateExeFound) {
+            try {
+                log.info(`[UPDATER] Lanzando Update.exe desde: ${updateExeFound}`, 'INFO');
+                // --processStartAndWait le dice a Squirrel que arranque la app
+                // nueva y espere a que termine antes de cerrar.
+                const { execFile } = require('child_process');
+                execFile(updateExeFound, ['--processStartAndWait', process.execPath], {
+                    detached: true,
+                    stdio: 'ignore'
+                });
+                log.info('[UPDATER] Update.exe lanzado en background', 'INFO');
+            } catch (launchErr) {
+                log.error(`[UPDATER] Lanzar Update.exe también falló: ${launchErr.message}`, 'ERROR');
+            }
+        } else {
+            log.warn('[UPDATER] Update.exe no encontrado. El user quedará en versión vieja (no se aplicará el update).', 'WARN');
+        }
+
+        // Salir de la aplicación de todos modos (Update.exe ya está corriendo
+        // en background si lo encontramos; si no, el user puede reabrir).
         app.quit();
     }
 });
@@ -18126,9 +18166,43 @@ function cleanupProcesses() {
     }
 }
 
+// 🔄 RE-AUDIT-2026-09-10 (v0.1.196, P1-1) — Cierre limpio de SQLite
+// antes de cualquier quit (auto-update, restart_app, before-quit).
+// La DB usa WAL mode (kair.db-wal, kair.db-shm). Sin checkpoint+close,
+// esos archivos pueden quedar inconsistentes si Squirrel mata el proceso
+// mientras hay transacciones en curso. SQLite recovery en el próximo open
+// resuelve la mayoría de los casos, pero con checkpoint explícito es más
+// rápido y seguro. Llamado desde before-quit SOLO (no desde
+// cleanupProcesses) para no cerrar la DB si cleanupProcesses se invoca
+// en otros contextos en el futuro.
+function closeDatabaseSafely() {
+    if (!db) {
+        console.log('[DB] No hay conexión abierta, skip close');
+        return;
+    }
+    try {
+        // 1. WAL checkpoint TRUNCATE: fuerza a flush del WAL al main DB
+        //    y trunca el archivo WAL. Hace el .wal más pequeño o vacío.
+        console.log('[DB] Ejecutando PRAGMA wal_checkpoint(TRUNCATE)...');
+        const checkpointResult = db.pragma('wal_checkpoint(TRUNCATE)');
+        console.log('[DB] wal_checkpoint result:', JSON.stringify(checkpointResult));
+        // 2. Cerrar la conexión better-sqlite3
+        console.log('[DB] Cerrando conexión SQLite...');
+        db.close();
+        db = null;
+        console.log('[DB] ✅ DB cerrada limpiamente');
+    } catch (err) {
+        console.warn('[DB] ⚠️ Error cerrando DB (no crítico):', err.message);
+        // No throw — el quit debe continuar
+    }
+}
+
 // Asegurar limpieza en cualquier intento de cierre
 app.on('before-quit', (e) => {
     cleanupProcesses();
+    // v0.1.196 (P1-1): cerrar DB después de matar procesos. Si el user
+    // tenía transacciones en curso, se persisten al main DB antes del quit.
+    closeDatabaseSafely();
 });
 
 // ==========================================================================

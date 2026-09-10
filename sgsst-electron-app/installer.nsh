@@ -12,12 +12,27 @@
   ; Esperar a que la app se cierre completamente
   Sleep 2000
 
-  ; Matar procesos de Python que puedan estar bloqueando archivos
-  ; Usamos 'ignore' para no mostrar errores si no hay procesos
-  nsExec::ExecToStack 'taskkill /F /IM python.exe'
+  ; 🔄 RE-AUDIT-2026-09-10 (v0.1.196, P1-4) — Cambio de SIGKILL a SIGTERM
+  ; primero. ANTES: taskkill /F mataba los procesos inmediatamente, sin
+  ; permitir que main.js cierre la DB, termine transacciones pendientes,
+  ; o libere handles. AHORA: primero taskkill (SIGTERM, permite cleanup),
+  ; esperamos 5s, y solo si sigue vivo forzamos SIGKILL (/F). Esto reduce
+  ; el riesgo de archivos WAL inconsistentes y work perdido en Excel.
+
+  ; Paso 1: SIGTERM a Python (permite que termine lo que esté haciendo)
+  nsExec::ExecToStack 'taskkill /IM python.exe'
   Pop $0
 
-  ; Matar cualquier instancia residual de K+AIR
+  ; Paso 2: SIGTERM a K+AIR.exe (le da tiempo a before-quit handler)
+  nsExec::ExecToStack 'taskkill /IM "K+AIR.exe"'
+  Pop $0
+
+  ; Esperar 5 segundos para que los procesos terminen limpiamente
+  Sleep 5000
+
+  ; Paso 3: Si SIGTERM no funcionó, SIGKILL como último recurso
+  nsExec::ExecToStack 'taskkill /F /IM python.exe'
+  Pop $0
   nsExec::ExecToStack 'taskkill /F /IM "K+AIR.exe"'
   Pop $0
 
