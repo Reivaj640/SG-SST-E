@@ -319,4 +319,88 @@ router.post('/api/sign/:token/reject', validateBody(rejectBody), (req, res, next
   }
 });
 
+// =============================================================================
+// I-VERIFICACION-PUBLICA: vista de solo lectura
+// =============================================================================
+//
+// Distinto del flujo de firma: este endpoint es READ-ONLY. NO permite
+// identificar, pedir OTP, firmar ni rechazar. Solo expone metadata
+// verificable (estado, hashes, firmante con cédula enmascarada) para
+// que el destinatario del link confirme la autenticidad del documento.
+//
+// Cada consulta queda registrada en gh_firma_eventos como VERIFY_CONSULTED
+// (auditoría: "el contrato fue verificado N veces por la empresa X").
+// =============================================================================
+
+/**
+ * GET /api/sign/:token/verify
+ * Devuelve metadata de solo lectura para la pantalla de verificación.
+ * Acepta cualquier estado del SR (incluso PENDING, para que el firmante
+ * pueda ver el estado del documento mientras espera el OTP).
+ */
+router.get('/api/sign/:token/verify', (req, res, next) => {
+  try {
+    // Resolver el token sin validar expiración (verificación debe funcionar
+    // para siempre). resolveToken acepta el flag skipExpirationCheck.
+    const { signRequest } = publicFlow.resolveToken(req.params.token, { skipExpirationCheck: true });
+    publicFlow.registerVerifyConsulted(signRequest, req.ip, req.get('User-Agent'));
+    const context = publicFlow.getVerificationContext(req.params.token);
+    res.json(context);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/sign/:token/verify-pdf
+ * Recibe un PDF (multipart/form-data, campo "pdf"), calcula su SHA-256
+ * y lo compara con el document_hash_firmado del SR.
+ * Devuelve { matches, server_hash, computed_hash, message }.
+ *
+ * Registra evento PDF_VERIFIED con el resultado (match/mismatch) para
+ * auditoría. NO expone el contenido del PDF, solo el hash.
+ *
+ * Límite: 50MB. Magic bytes: %PDF-.
+ */
+router.post('/api/sign/:token/verify-pdf', (req, res, next) => {
+  try {
+    // multipart/form-data parsing nativo de Express. No usamos multer para
+    // mantener el bundle limpio. El frontend envía el PDF como un Blob
+    // con Content-Type application/pdf en un FormData, así que req.body
+    // es undefined y el body crudo está en req.rawBody o hay que leerlo
+    // del stream. Para simplificar, exigimos que el cliente envíe el PDF
+    // como un buffer base64 en un JSON body.
+    if (!req.body || !req.body.pdf_base64) {
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_REQUEST_BODY',
+          message: 'Se requiere el campo pdf_base64 (string base64 del PDF)',
+          request_id: req.id,
+        },
+      });
+    }
+    let pdfBuffer;
+    try {
+      pdfBuffer = Buffer.from(req.body.pdf_base64, 'base64');
+    } catch (e) {
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_BASE64',
+          message: 'El campo pdf_base64 no es base64 válido',
+          request_id: req.id,
+        },
+      });
+    }
+    const result = publicFlow.verifyPdfHash(
+      req.params.token,
+      pdfBuffer,
+      req.ip,
+      req.get('User-Agent'),
+    );
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;

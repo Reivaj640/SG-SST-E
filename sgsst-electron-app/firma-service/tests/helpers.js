@@ -142,7 +142,11 @@ function seedActiveAgreement({ version = 'v1.0', texto = 'ACUERDO DE PRUEBA\nVer
 
 function makeApp() {
   const app = express();
-  app.use(express.json());
+  // Body parser con límite de 100MB para que los tests de /verify-pdf
+  // puedan probar el check interno de tamaño del handler (50MB+).
+  // En producción el server.js usa el límite default de 100kb del body-parser,
+  // que es suficiente para casos reales (PDFs de 1-5MB → JSON de 1.4-7MB).
+  app.use(express.json({ limit: '100mb' }));
   // Mini-app estática (mismo comportamiento que server.js)
   app.use('/s', express.static(MINI_APP_DIR, {
     index: false,

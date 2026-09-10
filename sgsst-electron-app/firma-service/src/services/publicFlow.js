@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Servicio de Flujo Público de firma.
  *
  * Maneja todas las operaciones que el trabajador hace desde la
@@ -63,7 +63,7 @@ function resolveTokenResult(ok, code, message, signRequest, estado) {
  *
  * Lanza AppError si hay algún problema (404 / 410 / 409).
  */
-function resolveToken(token) {
+function resolveToken(token, opts) {
   if (typeof token !== 'string' || token.length === 0) {
     throw new AppError(404, 'TOKEN_NOT_FOUND', 'Token no encontrado');
   }
@@ -73,6 +73,12 @@ function resolveToken(token) {
 
   if (!signRequest) {
     throw new AppError(404, 'TOKEN_NOT_FOUND', 'El token no existe');
+  }
+
+  // I-VERIFICACION-PUBLICA: el endpoint /verify debe funcionar incluso
+  // después de la fecha_expiracion, porque la consulta es READ-ONLY.
+  if (opts && opts.skipExpirationCheck) {
+    return { signRequest, estado: signRequest.estado };
   }
 
   // Verificar expiración
@@ -1682,6 +1688,210 @@ function clearResendOtpRateLimit() {
   _resendOtpTimestamps.clear();
 }
 
+// =============================================================================
+// I-VERIFICACION-PUBLICA: endpoint de solo lectura
+// =============================================================================
+
+/**
+ * Enmascara el correo del firmante para exposición pública.
+ * Ej: juan.perez@example.com → ju****@example.com
+ * (versión local de la función _maskEmailPublico de public.js, porque
+ * getVerificationContext se ejecuta desde el service layer sin acceso al scope del route file).
+ */
+function _maskEmail(email) {
+  if (typeof email !== 'string' || !email.includes('@')) return '';
+  const [local, domain] = email.split('@');
+  if (!local || !domain) return '';
+  if (local.length <= 2) return local[0] + '****@' + domain;
+  return local.slice(0, 2) + '****@' + domain;
+}
+
+/**
+ * Estado público de un sign request, listo para que la mini-app lo muestre
+ * en la pantalla de verificación. Es una vista READ-ONLY: no expone token_hash,
+ * paths internos, ni campos que permitan acciones sobre el documento.
+ *
+ * @param {string} token
+ * @returns {{
+ *   id_solicitud, id_documento, id_trabajador, id_empresa,
+ *   estado, fecha_creacion, fecha_firma, fecha_expiracion,
+ *   tipo_firma, identificacion_tipo, tipo_identificacion,
+ *   document_hash_original, document_hash_firmado, evidence_hash,
+ *   firmante: { nombre, identificacion_enmascarada, correo_enmascarado, tipo_firmante, fecha_firma },
+ *   firmante_empresa: { nombre, cargo, identificacion_enmascarada, correo, fecha_firma } | null
+ * }}
+ */
+function getVerificationContext(token) {
+  // skipExpirationCheck=true: la verificación pública debe funcionar
+  // indefinidamente (es READ-ONLY, no permite firmar ni otras acciones).
+  const { signRequest } = resolveToken(token, { skipExpirationCheck: true });
+
+  // Cédula enmascarada: primeros 6 chars del hash, mismo patrón que el PDF.
+  // El hash es determinístico (sha256(numeroIdentificacion)), por lo que dos
+  // personas que tengan la misma cédula ven la misma máscara.
+  function maskIdentificacion(tipo, hash) {
+    if (!hash) return null;
+    var prefix = (hash || '').substring(0, 6);
+    return (tipo || 'CC') + ' ' + (prefix || '***') + '…';
+  }
+
+  // Firmante principal: leer del snapshot si hay representante legal (DUAL),
+  // si no, del metadata legacy (campo id_trabajador no es nombre humano).
+  var firmante = null;
+  if (signRequest.tipo_firmante === 'EMPRESA' && signRequest.representante_legal_snapshot) {
+    try {
+      var snap = JSON.parse(signRequest.representante_legal_snapshot);
+      firmante = {
+        tipo: 'Representante Legal',
+        nombre: snap.nombre || null,
+        cargo: snap.cargo || 'Representante Legal',
+        identificacion_enmascarada: maskIdentificacion(
+          snap.tipo_identificacion || signRequest.identificacion_tipo,
+          signRequest.identificacion_numero_hash
+        ),
+        correo_enmascarado: _maskEmail(snap.correo),
+        fecha_firma: signRequest.fecha_firma,
+      };
+    } catch (e) {
+      // snapshot corrupto: caer a null
+      firmante = null;
+    }
+  } else {
+    // Firmante único (legacy). No tenemos nombre humano en metadata legacy,
+    // así que mostramos el id_trabajador como referencia.
+    firmante = {
+      tipo: 'Trabajador',
+      nombre: signRequest.id_trabajador || null,
+      cargo: null,
+      identificacion_enmascarada: maskIdentificacion(
+        signRequest.identificacion_tipo,
+        signRequest.identificacion_numero_hash
+      ),
+      correo_enmascarado: _maskEmail(signRequest.correo_verificacion),
+      fecha_firma: signRequest.fecha_firma,
+    };
+  }
+
+  // Para DUAL_FIRMADO, también exponer el firmante del padre (trabajador)
+  // si está disponible. Buscamos el SR padre por parent_id_solicitud.
+  var firmanteTrabajador = null;
+  if (signRequest.tipo_firmante === 'EMPRESA' && signRequest.parent_id_solicitud) {
+    var padreRow = db.prepare(
+      'SELECT id_trabajador, identificacion_tipo, identificacion_numero_hash, correo_verificacion, fecha_firma, metadata FROM gh_firmas_electronicas WHERE id_solicitud = ?'
+    ).get(signRequest.parent_id_solicitud);
+    if (padreRow) {
+      var nombreTrabajador = null;
+      try { nombreTrabajador = (JSON.parse(padreRow.metadata || '{}') || {}).nombre_trabajador; } catch (e) { /* noop */ }
+      firmanteTrabajador = {
+        tipo: 'Trabajador',
+        nombre: nombreTrabajador || padreRow.id_trabajador,
+        cargo: null,
+        identificacion_enmascarada: maskIdentificacion(
+          padreRow.identificacion_tipo,
+          padreRow.identificacion_numero_hash
+        ),
+        correo_enmascarado: _maskEmail(padreRow.correo_verificacion),
+        fecha_firma: padreRow.fecha_firma,
+      };
+    }
+  }
+
+  return {
+    id_solicitud: signRequest.id_solicitud,
+    id_documento: signRequest.id_documento,
+    id_trabajador: signRequest.id_trabajador,
+    id_empresa: signRequest.id_empresa,
+    estado: signRequest.estado,
+    fecha_creacion: signRequest.fecha_creacion,
+    fecha_firma: signRequest.fecha_firma,
+    fecha_expiracion: signRequest.fecha_expiracion,
+    tipo_firma: signRequest.tipo_firma,
+    identificacion_tipo: signRequest.identificacion_tipo,
+    tipo_identificacion: signRequest.tipo_identificacion,
+    document_hash_original: signRequest.document_hash_original,
+    document_hash_firmado: signRequest.document_hash_firmado,
+    evidence_hash: signRequest.evidence_hash,
+    firmante: firmante,
+    firmante_trabajador: firmanteTrabajador, // null para SRs no-duales
+    version_kair: signRequest.version_kair,
+  };
+}
+
+/**
+ * Compara el SHA-256 de un PDF subido con el document_hash_firmado del SR.
+ * Devuelve match/mismatch + ambos hashes para que la UI los muestre.
+ *
+ * NO revela el contenido del PDF, solo el hash. Registra el evento
+ * PDF_VERIFIED con el resultado (match/mismatch) para auditoría.
+ *
+ * @param {string} token
+ * @param {Buffer} pdfBuffer
+ * @param {string} ip
+ * @param {string} user_agent
+ * @returns {{ matches: boolean, server_hash: string, computed_hash: string, document_hash_original: string|null, estado: string, message: string }}
+ */
+function verifyPdfHash(token, pdfBuffer, ip, user_agent) {
+  if (!Buffer.isBuffer(pdfBuffer) || pdfBuffer.length === 0) {
+    throw new AppError(400, 'INVALID_INPUT', 'Se requiere un PDF no vacío');
+  }
+  if (pdfBuffer.length > 50 * 1024 * 1024) {
+    throw new AppError(413, 'PDF_TOO_LARGE', 'El PDF supera el límite de 50MB');
+  }
+  // Validar magic bytes del PDF
+  if (pdfBuffer.slice(0, 5).toString('latin1') !== '%PDF-') {
+    throw new AppError(400, 'NOT_A_PDF', 'El archivo no parece ser un PDF válido');
+  }
+
+  const { signRequest } = resolveToken(token, { skipExpirationCheck: true });
+  const computed = sha256(pdfBuffer);
+  const stored = signRequest.document_hash_firmado;
+  const matches = !!(stored && computed === stored);
+
+  // Registrar evento de auditoría (match o mismatch)
+  try {
+    signRequestService.registerEvent(signRequest.id, 'PDF_VERIFIED', {
+      matches: matches,
+      computed_hash: computed,
+      stored_hash: stored,
+      pdf_bytes: pdfBuffer.length,
+    }, 'sistema', ip, user_agent);
+  } catch (e) {
+    // auditoría es best-effort, no fallamos la operación si no se puede
+    // registrar (ej. SR firmada antes de que existiera la tabla eventos)
+    logger.warn('No se pudo registrar evento PDF_VERIFIED', { error: e.message });
+  }
+
+  return {
+    matches: matches,
+    server_hash: stored || null,
+    computed_hash: computed,
+    document_hash_original: signRequest.document_hash_original || null,
+    estado: signRequest.estado,
+    message: matches
+      ? '✅ El archivo coincide con el original firmado'
+      : (stored
+          ? '❌ El archivo NO coincide con el original firmado. El PDF que tienes puede haber sido alterado.'
+          : '⚠️ Este documento aún no está firmado, no hay hash para comparar'),
+  };
+}
+
+/**
+ * Registra una consulta a la página de verificación (cada vez que se abre
+ * el endpoint /verify, no solo la primera). El evento VERIFY_CONSULTED
+ * permite a RH ver "el contrato fue verificado N veces por la empresa X
+ * en tal fecha" — útil como evidencia adicional.
+ */
+function registerVerifyConsulted(signRequest, ip, user_agent) {
+  try {
+    signRequestService.registerEvent(signRequest.id, 'VERIFY_CONSULTED', {
+      estado: signRequest.estado,
+      tipo_firmante: signRequest.tipo_firmante,
+    }, 'sistema', ip, user_agent);
+  } catch (e) {
+    logger.warn('No se pudo registrar evento VERIFY_CONSULTED', { error: e.message });
+  }
+}
+
 module.exports = {
   resolveToken,
   registerOpenedIfFirst,
@@ -1694,6 +1904,12 @@ module.exports = {
   reject,
   consentAccept,
   clearResendOtpRateLimit,
+  // I-VERIFICACION-PUBLICA: contexto de solo lectura + comparación de PDF
+  // para que la mini-app muestre metadata verificable y permita al usuario
+  // subir su copia para comparar SHA-256 contra el original firmado.
+  getVerificationContext,
+  verifyPdfHash,
+  registerVerifyConsulted,
   // FASE 4 · A1.5.4-B: expuesto con prefijo _ para auditoría de consistencia
   // de correo. No es parte del contrato público, pero permite a los scripts
   // de auditoría (audit-consistency-5puntos.js, audit-multi-sr-correos.js)
