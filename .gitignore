@@ -39,3 +39,10 @@ Thumbs.db
 # Herramientas locales de BD (solo dev, no van al repo; clean-dbs BORRA datos)
 sgsst-electron-app/firma-service/scripts/clean-dbs.js
 sgsst-electron-app/firma-service/scripts/inspect-dbs.js
+
+# 📦 I-AUDIT-2026-09-10 (v0.1.194) · Archive de PDFs huérfanos (cleanup-orphan-pdfs).
+# Cuando se ejecuta el script con --yes, mueve PDFs a storage/pdf-archive/<fecha>/
+# con su manifest.json. NO van al repo: son evidencia de auditoría que vive en
+# disco (Storage/backup) pero no debe contaminar el repo con binarios grandes.
+# Si necesitas consultarlos están en storage/pdf-archive/.
+sgsst-electron-app/firma-service/storage/pdf-archive/
