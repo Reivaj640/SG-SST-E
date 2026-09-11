@@ -14,6 +14,7 @@ var GESTION_HUMANA_NAV = [
   { id: 'home',          label: 'Resumen',          shortLabel: 'Resumen',     icon: 'fa-grip',             group: 'Principal' },
   { id: 'dashboard',     label: 'Dashboard',        shortLabel: 'Dashboard',   icon: 'fa-chart-line',       group: 'Gestión' },
   { id: 'contratacion',  label: 'Contratación',     shortLabel: 'Contratación', icon: 'fa-user-plus',       group: 'Gestión' },
+  { id: 'carpetas',      label: 'Carpetas',         shortLabel: 'Carpetas',     icon: 'fa-folders',          group: 'Documentos' },
   { id: 'firma-electronica', label: 'Firma electrónica', shortLabel: 'Firma electr.', icon: 'fa-file-signature', group: 'Documentos' },
   { id: 'afiliaciones',  label: 'Afiliaciones',     shortLabel: 'Afiliaciones', icon: 'fa-shield-halved',   group: 'Gestión' },
   { id: 'personal',      label: 'Base de Personal', shortLabel: 'B. Pers.',    icon: 'fa-users',            group: 'Gestión' },
@@ -31,6 +32,7 @@ var GESTION_HUMANA_TITLES = {
   permisos:     { title: 'Permisos y Estados', subtitle: 'Incapacidades, maternidad, luto y permisos diversos' },
   afiliaciones: { title: 'Afiliaciones',     subtitle: 'EPS, Pensión, ARL y Caja de Compensación' },
   'firma-electronica': { title: 'Firma electrónica', subtitle: 'Centro de control del proceso documental y firma electrónica' },
+  carpetas:     { title: 'Carpetas',          subtitle: 'Archivo digital por trabajador (en construcción)' },
   comunicacion: { title: 'Comunicación',     subtitle: 'Anuncios y mensajes oficiales' }
 };
 
@@ -293,6 +295,12 @@ class GestionHumanaHome {
       case 'comunicacion':
         this._mountExistingView(content, 'ComunicacionComponent', 'Comunicación');
         break;
+      // 🔄 I-AUDIT-2026-09-11 (v0.1.198) · Vista de Carpetas (punto de partida).
+      // Aun NO tiene modulo real. Muestra los pasos para arrancar el modelo
+      // de datos (tabla, campos, CRUD basico) para que el user sepa que sigue.
+      case 'carpetas':
+        this._renderCarpetasView(content);
+        break;
       default:
         this._renderPlaceholder(content, this.currentView);
         break;
@@ -404,13 +412,6 @@ class GestionHumanaHome {
       view: 'afiliaciones', ready: true
     }));
     grid.appendChild(this._renderNavCard({
-      icon: 'fa-file-signature', iconColor: '#1d4ed8', iconBg: '#dbeafe',
-      title: 'Documentos y Firmas', subtitle: '7 formatos del proceso',
-      description: 'Generación y firma digital de los 7 formatos del proceso de contratación: autorización datos, hojas de vida, inducción, contrato, etc.',
-      buttonText: 'Abrir Documentos', buttonColor: '#1d4ed8',
-      view: 'documentos', ready: true
-    }));
-    grid.appendChild(this._renderNavCard({
       icon: 'fa-file-signature', iconColor: '#f59e0b', iconBg: '#fef3c7',
       title: 'Firma electrónica', subtitle: 'Centro de control por trabajador',
       description: 'Vista unificada del proceso de firma por trabajador. Tabla con estado agregado (pendiente, en proceso, completado), buscador por ID de solicitud y drill-down a expediente.',
@@ -498,6 +499,60 @@ class GestionHumanaHome {
 
     card.appendChild(body);
     return card;
+  }
+
+  // 🔄 I-AUDIT-2026-09-11 (v0.1.198) · Vista placeholder de Carpetas.
+  // Muestra los pasos para arrancar el modelo de datos. Es un punto de
+  // partida para que el user vea donde va y sepa que sigue.
+  _renderCarpetasView(content) {
+    var self = this;
+    content.innerHTML = '';
+    // Header con boton "Volver al inicio"
+    var header = document.createElement('div');
+    header.style.cssText = 'display:flex; align-items:center; gap:0.75rem; margin-bottom:1.25rem;';
+    header.innerHTML =
+      '<button id="gh-btn-volver-home" type="button" style="background:white; border:1px solid #dee2e6; color:#495057; border-radius:0.375rem; padding:0.4rem 0.75rem; font-size:0.8125rem; cursor:pointer;">' +
+        '<i class="fas fa-arrow-left"></i> Volver' +
+      '</button>' +
+      '<div style="flex:1;">' +
+        '<h1 style="margin:0; font-size:1.25rem; color:#1a1a2e;">Carpetas</h1>' +
+        '<p style="margin:0.125rem 0 0; font-size:0.8125rem; color:#5a6378;">Archivo digital por trabajador</p>' +
+      '</div>' +
+      '<span style="background:#fff3cd; color:#856404; padding:0.25rem 0.75rem; border-radius:1rem; font-size:0.7rem; font-weight:600;">⏳ Punto de partida</span>';
+    content.appendChild(header);
+    // Card central con explicacion
+    var card = document.createElement('div');
+    card.style.cssText = 'background:white; border:1px solid #e9ecef; border-radius:0.5rem; padding:1.5rem; max-width:800px; margin:0 auto;';
+    card.innerHTML =
+      '<div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:1rem;">' +
+        '<div style="width:48px; height:48px; border-radius:0.5rem; background:#dbeafe; display:flex; align-items:center; justify-content:center;">' +
+          '<i class="fas fa-folders" style="color:#1d4ed8; font-size:1.25rem;"></i>' +
+        '</div>' +
+        '<div>' +
+          '<h2 style="margin:0; font-size:1.05rem; color:#1a1a2e;">Esta vista se implementará pronto</h2>' +
+          '<p style="margin:0.125rem 0 0; font-size:0.8125rem; color:#5a6378;">Las carpetas son un concepto NUEVO de Gestión Humana (distinto al "expediente" del modal de firma electrónica).</p>' +
+        '</div>' +
+      '</div>' +
+      '<div style="margin-top:1rem; padding:1rem; background:#f8f9fa; border:1px solid #e9ecef; border-radius:0.375rem;">' +
+        '<h3 style="margin:0 0 0.625rem; font-size:0.875rem; color:#1a1a2e;">Próximos pasos para implementar:</h3>' +
+        '<ol style="margin:0; padding-left:1.25rem; color:#495057; font-size:0.8125rem; line-height:1.7;">' +
+          '<li>Definir el modelo de datos: campos mínimos (id, id_trabajador, nombre, descripcion, estado, created_at, updated_at).</li>' +
+          '<li>Crear migración SQL en <code>gestion-humana-schema-sql.js</code> (tabla <code>gh_carpetas</code>).</li>' +
+          '<li>Implementar CRUD básico en un bridge nuevo (<code>main/carpetas-bridge.js</code>).</li>' +
+          '<li>Construir UI: lista + crear + editar + ver detalle (drill-down).</li>' +
+          '<li>Integrar con base_personal (FK a la tabla de trabajadores).</li>' +
+        '</ol>' +
+      '</div>' +
+      '<div style="margin-top:1rem; padding:0.875rem 1rem; background:#dbeafe; border-radius:0.375rem; color:#1e3a8a; font-size:0.8125rem;">' +
+        '<i class="fas fa-info-circle" style="margin-right:0.375rem;"></i>' +
+        '<strong>Tip:</strong> Mientras tanto, podés usar "Base de Personal" como punto de entrada por trabajador para ver los datos individuales, y "Firma electrónica" para ver el expediente del proceso de firma.' +
+      '</div>';
+    content.appendChild(card);
+    // Wire el boton "Volver"
+    setTimeout(function () {
+      var btn = content.querySelector('#gh-btn-volver-home');
+      if (btn) btn.onclick = function () { self.currentView = 'home'; self.render(); };
+    }, 0);
   }
 
   _renderPlaceholder(content, viewId) {
