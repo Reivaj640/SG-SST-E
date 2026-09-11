@@ -425,24 +425,6 @@ class GestionHumanaHome {
       view: 'comunicacion', ready: true
     }));
     sec.appendChild(grid);
-
-    // Pipeline preview
-    var pipelinePreview = document.createElement('div');
-    pipelinePreview.style.cssText = 'margin-top:1.5rem; background:white; border:1px solid #e9ecef; border-radius:0.5rem; padding:1.25rem;';
-    pipelinePreview.innerHTML =
-      '<div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.875rem;">' +
-        '<i class="fas fa-info-circle" style="color:#0d9488;"></i>' +
-        '<strong style="color:#1a1a2e; font-size:0.875rem;">Pipeline de Contratación (6 pasos)</strong>' +
-      '</div>' +
-      '<div style="display:grid; grid-template-columns:repeat(6, 1fr); gap:0.5rem;">' +
-        this._renderPipelineStep(1, 'Memo',         'Recepción del memo') +
-        this._renderPipelineStep(2, 'Contacto',     'WhatsApp / llamada') +
-        this._renderPipelineStep(3, 'Exámenes',     'Médicos ocupacionales') +
-        this._renderPipelineStep(4, 'Documentos',   '7 formatos a firmar') +
-        this._renderPipelineStep(5, 'Afiliaciones', 'EPS, ARL, Caja') +
-        this._renderPipelineStep(6, 'Activar S400', 'Sistema interno') +
-      '</div>';
-    content.appendChild(pipelinePreview);
   }
 
   _renderKpisBar() {
@@ -516,14 +498,6 @@ class GestionHumanaHome {
 
     card.appendChild(body);
     return card;
-  }
-
-  _renderPipelineStep(num, label, desc) {
-    return '<div style="background:#f8f9fa; border-left:3px solid #0d9488; padding:0.5rem 0.625rem; border-radius:0.3rem;">' +
-      '<div style="font-size:0.65rem; font-weight:700; color:#0d9488;">' + num + '</div>' +
-      '<div style="font-size:0.75rem; font-weight:600; color:#1a1a2e;">' + label + '</div>' +
-      '<div style="font-size:0.65rem; color:#5a6378;">' + desc + '</div>' +
-    '</div>';
   }
 
   _renderPlaceholder(content, viewId) {
