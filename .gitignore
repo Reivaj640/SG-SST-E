@@ -46,3 +46,16 @@ sgsst-electron-app/firma-service/scripts/inspect-dbs.js
 # disco (Storage/backup) pero no debe contaminar el repo con binarios grandes.
 # Si necesitas consultarlos están en storage/pdf-archive/.
 sgsst-electron-app/firma-service/storage/pdf-archive/
+
+# 🔒 I-AUDIT-2026-09-10 (v0.1.197) · Backups de DB hechos con clean-gestion-humana.py.
+# Cada vez que se hace un cleanup destructivo, se genera un .db + .wal + .shm
+# en backups/gestion-humana-clean-<timestamp>/. NO van al repo: son snapshots
+# de la DB operativa que existen para restore de emergencia, no son código fuente.
+# Si necesitás restaurar, están en backups/gestion-humana-clean-*/.
+backups/
+
+# 🗑️ I-AUDIT-2026-09-10 (v0.1.197) · Carpeta temporal para mover archivos que
+# shell policies no nos dejan borrar (Remove-Item está bloqueado en este host).
+# Cualquier cosa en .trash/ está pendiente de limpieza manual o ya no se necesita.
+# NO va al repo.
+.trash/
