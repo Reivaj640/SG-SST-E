@@ -1,11 +1,12 @@
 // gestion-integral-home.js - Componente para el home del módulo "Gestión Integral"
 
 class GestionIntegralHome {
-    constructor(container, moduleName, submodules) {
+    constructor(container, moduleName, submodules, companyName) {
         this.container = container;
         this.moduleName = moduleName;
         this.submodules = submodules;
-        this.currentCompany = null;
+        // 📦748 · Aceptar currentCompany como parámetro del shell (fix: misma forma que Recursos).
+        this.currentCompany = companyName || this.getCurrentCompany() || null;
         this.gestionIntegralStats = null;  // Almacenar estadísticas reales
     }
 

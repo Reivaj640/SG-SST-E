@@ -1,9 +1,11 @@
 class RecursosHome {
-    constructor(container, moduleName, submodules) {
+    constructor(container, moduleName, submodules, companyName) {
         this.container = container;
         this.moduleName = moduleName;
         this.submodules = submodules;
-        this.currentCompany = null;
+        // 📦748 · Aceptar currentCompany como parámetro del shell (fix: módulo Recursos vacío).
+        // Fallback: getCurrentCompany() lee window.currentCompany → DOM → 'default_company'.
+        this.currentCompany = companyName || this.getCurrentCompany() || null;
         this.budgetData = null;
         this.charts = {}; // Almacenar instancias de Chart.js
     }

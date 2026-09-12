@@ -5052,7 +5052,7 @@ function showModuleHome(container, moduleName) { // 'container' ya es el <div cl
                 console.log(`[CHART-DIAG] ═══ NAVIGATE AWAY — destroying old instance ═══`);
                 window.currentGestionIntegralHome._removeFullscreenListener();
             }
-            const gestionIntegralHome = new window.GestionIntegralHome(moduleContentContainer, moduleName, submodules);
+            const gestionIntegralHome = new window.GestionIntegralHome(moduleContentContainer, moduleName, submodules, currentCompany);
             window.currentGestionIntegralHome = gestionIntegralHome; // Referencia global para filtros
             gestionIntegralHome.render();
         } else {
@@ -5061,7 +5061,7 @@ function showModuleHome(container, moduleName) { // 'container' ya es el <div cl
         }
     } else if (moduleName === "Recursos") {
         if (window.RecursosHome) {
-            const recursosHome = new window.RecursosHome(moduleContentContainer, moduleName, submodules);
+            const recursosHome = new window.RecursosHome(moduleContentContainer, moduleName, submodules, currentCompany);
             recursosHome.render();
         } else {
             console.error('RecursosHome component not found');
@@ -5077,7 +5077,7 @@ function showModuleHome(container, moduleName) { // 'container' ya es el <div cl
         }
     } else if (moduleName === "Gestión de la Salud") {
         if (window.GestionSaludHome) {
-            const gestionSaludHome = new window.GestionSaludHome(moduleContentContainer, moduleName, submodules);
+            const gestionSaludHome = new window.GestionSaludHome(moduleContentContainer, moduleName, submodules, currentCompany);
             gestionSaludHome.render();
         } else {
             console.error('GestionSaludHome component not found');
@@ -5085,7 +5085,7 @@ function showModuleHome(container, moduleName) { // 'container' ya es el <div cl
         }
     } else if (moduleName === "Gestión de Peligros y Riesgos") {
         if (window.GestionPeligrosHome) {
-            const gestionPeligrosHome = new window.GestionPeligrosHome(moduleContentContainer, moduleName, submodules);
+            const gestionPeligrosHome = new window.GestionPeligrosHome(moduleContentContainer, moduleName, submodules, currentCompany);
             gestionPeligrosHome.render();
         } else {
             console.error('GestionPeligrosHome component not found');
@@ -5093,7 +5093,7 @@ function showModuleHome(container, moduleName) { // 'container' ya es el <div cl
         }
     } else if (moduleName === "Gestión de Amenazas") {
         if (window.GestionAmenazasHome) {
-            const gestionAmenazasHome = new window.GestionAmenazasHome(moduleContentContainer, moduleName, submodules);
+            const gestionAmenazasHome = new window.GestionAmenazasHome(moduleContentContainer, moduleName, submodules, currentCompany);
             gestionAmenazasHome.render();
         } else {
             console.error('GestionAmenazasHome component not found');
@@ -5101,7 +5101,7 @@ function showModuleHome(container, moduleName) { // 'container' ya es el <div cl
         }
     } else if (moduleName === "Verificación") {
         if (window.VerificacionHome) {
-            const verificacionHome = new window.VerificacionHome(moduleContentContainer, moduleName, submodules);
+            const verificacionHome = new window.VerificacionHome(moduleContentContainer, moduleName, submodules, currentCompany);
             verificacionHome.render();
         } else {
             console.error('VerificacionHome component not found');
@@ -5109,7 +5109,7 @@ function showModuleHome(container, moduleName) { // 'container' ya es el <div cl
         }
     } else if (moduleName === "Mejoramiento") {
         if (window.MejoramientoHome) {
-            const mejoramientoHome = new window.MejoramientoHome(moduleContentContainer, moduleName, submodules);
+            const mejoramientoHome = new window.MejoramientoHome(moduleContentContainer, moduleName, submodules, currentCompany);
             mejoramientoHome.render();
         } else {
             console.error('MejoramientoHome component not found');

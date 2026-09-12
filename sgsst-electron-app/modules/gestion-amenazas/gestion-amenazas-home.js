@@ -12,7 +12,7 @@ if (!window._amenazasHomeState) {
 }
 
 class GestionAmenazasHome {
-    constructor(container, moduleName, submodules) {
+    constructor(container, moduleName, submodules, companyName) {
         this.container = container;
         this.moduleName = moduleName;
         /* this.submodules viene de RESOURCES_SUBMODULES en renderer.js.
@@ -22,7 +22,8 @@ class GestionAmenazasHome {
             '5.1.1 Plan de Prevención de Emergencias',
             '5.1.2 Examenes Medicos Brigadista'
         ];
-        this.currentCompany = null;
+        // 📦748 · Aceptar currentCompany como parámetro del shell.
+        this.currentCompany = companyName || this.getCurrentCompany() || null;
         this.widgets = {};
     }
 

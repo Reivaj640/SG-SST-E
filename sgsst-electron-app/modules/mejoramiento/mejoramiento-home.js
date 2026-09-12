@@ -6,7 +6,7 @@
 // solo incluye 7.1.1 en el módulo "Mejoramiento".
 
 class MejoramientoHome {
-    constructor(container, moduleName, submodules) {
+    constructor(container, moduleName, submodules, companyName) {
         this.container = container;
         this.moduleName = moduleName;
         /* this.submodules viene de RESOURCES_SUBMODULES[moduleName] en renderer.js,
@@ -15,7 +15,8 @@ class MejoramientoHome {
         this.submodules = (submodules && submodules.length > 0) ? submodules : [
           '7.1.1 Acciones Preventivas y Correctivas'
         ];
-        this.currentCompany = null;
+        // 📦748 · Aceptar currentCompany como parámetro del shell.
+        this.currentCompany = companyName || this.getCurrentCompany() || null;
         this.widgets = {};
         this._unsubscribe = null;
     }

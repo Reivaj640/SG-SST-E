@@ -16,11 +16,12 @@ if (!window._saludHomeState) {
 }
 
 class GestionSaludHome {
-    constructor(container, moduleName, submodules) {
+    constructor(container, moduleName, submodules, companyName) {
         this.container = container;
         this.moduleName = moduleName;
         this.submodules = submodules;
-        this.currentCompany = this.getCurrentCompany();
+        // 📦748 · Aceptar currentCompany como parámetro del shell (más robusto que solo getCurrentCompany()).
+        this.currentCompany = companyName || this.getCurrentCompany();
         this.widgets = {}; // Referencias a elementos de widgets para actualización reactiva
     }
 

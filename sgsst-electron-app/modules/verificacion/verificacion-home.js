@@ -1,11 +1,12 @@
 // verificacion-home.js - Componente para el home del módulo "Verificación"
 
 class VerificacionHome {
-    constructor(container, moduleName, submodules) {
+    constructor(container, moduleName, submodules, companyName) {
         this.container = container;
         this.moduleName = moduleName;
         this.submodules = submodules || [];
-        this.currentCompany = null;
+        // 📦748 · Aceptar currentCompany como parámetro del shell.
+        this.currentCompany = companyName || this.getCurrentCompany() || null;
         this.widgets = {};
     }
 
