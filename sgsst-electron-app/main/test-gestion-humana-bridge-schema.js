@@ -242,7 +242,13 @@ async function run() {
     'gh:select-excel', 'gh:parse-excel', 'gh:import-personal',
     // Soportes de Contratación (4) — evidencias por paso
     'gh:listar-soportes-contratacion', 'gh:subir-soporte-paso',
-    'gh:abrir-soporte-paso', 'gh:eliminar-soporte-paso'
+    'gh:abrir-soporte-paso', 'gh:eliminar-soporte-paso',
+    // I-AUDIT-2026-09-11 (Carpetas v0.2.0) · 9 handlers Documentos de Contratación
+    'gh:list-categorias-carpetas', 'gh:create-categoria-carpeta', 'gh:update-categoria-carpeta',
+    'gh:list-expedientes', 'gh:get-expediente', 'gh:list-trabajadores-disponibles',
+    'gh:subir-documento-carpeta', 'gh:abrir-documento-carpeta', 'gh:eliminar-documento-carpeta',
+    // 📦743 · Integración con Contratación — 2 handlers adicionales
+    'gh:list-documentos-contratacion-by-bp', 'gh:abrir-soporte-contratacion'
   ];
   // I-103.A1.0-D-1 · EXPECTED_HANDLERS actualizado de 55 a 59.
   // Los 4 handlers adicionales son preexistentes (registrados en commits anteriores a 1.0-C
@@ -250,7 +256,10 @@ async function run() {
   // solo lo ajustamos para que el test quede en verde con la realidad del bridge actual.
   // 📦767 · FASE 1.0-G.2 · El conteo del bridge subió a 60 (era 59 pre-G.2). El desajuste de 1
   // ya existía antes de G.2 (probablemente LEGACY-SIGN-REMOVE dejó 1 handler que no se restó).
-  _assertEq(Object.keys(registeredHandlers).length, 64, 'cantidad de handlers registrados = 64 (era 60; +4 soportes-contratacion)');
+  // I-AUDIT-2026-09-11 · Carpetas v0.2.0 añade 9 handlers. Total actual: 81 (era 70).
+  //   70 pre-Carpetas = 64 esperado (con desfase histórico de 6) + 9 Carpetas.
+  // 📦743 · +2 handlers (docs de contratación en carpeta). Total: 81.
+  _assertEq(Object.keys(registeredHandlers).length, 81, 'cantidad de handlers registrados = 81 (era 70; +9 carpetas +2 contratacion)');
   expectedHandlers.forEach(function(ch) {
     _assert(typeof registeredHandlers[ch] === 'function', 'handler "' + ch + '" registrado');
   });

@@ -352,6 +352,64 @@ CREATE TABLE IF NOT EXISTS gh_contratacion_soportes (
 CREATE INDEX IF NOT EXISTS idx_gh_soportes_contratacion ON gh_contratacion_soportes(contratacion_id);
 CREATE INDEX IF NOT EXISTS idx_gh_soportes_empresa ON gh_contratacion_soportes(empresa_id);
 CREATE INDEX IF NOT EXISTS idx_gh_soportes_paso ON gh_contratacion_soportes(contratacion_id, paso_num);
+
+-- I-AUDIT-2026-09-11 (Carpetas v0.2.0) · 3 tablas nuevas para Documentos de Contratación:
+--   - gh_carpetas_categorias: categorías DINÁMICAS gestionables por el user (NO hardcoded).
+--     Prepoblada con 4 categorías semilla (contrato/identificacion/hojavida/certificados) por empresa
+--     en el seed del bridge. El user puede crear/renombrar/desactivar más.
+--   - gh_carpetas_expedientes: cabecera del expediente (1 fila por empleado activo).
+--     Se crea automáticamente al subir el primer documento.
+--   - gh_carpetas_documentos: N archivos por categoría por empleado (FK a categoria_id, no enum).
+--     Storage filesystem (AppData/Roaming/sgsst-electron-app/gh-carpetas/<empresa>/<trabajador>/<categoria_codigo>/<archivo>).
+--     El estado (completo/incompleto/crítico) se DERIVA en el bridge con SQL agregado,
+--     NO se almacena. Regla del PDF sección 11.1: crítico SOLO si falta la categoría con codigo='contrato'.
+CREATE TABLE IF NOT EXISTS gh_carpetas_categorias (
+  id TEXT PRIMARY KEY,                       -- formato cc-{nanoid}
+  empresa_id TEXT NOT NULL,
+  codigo TEXT NOT NULL,                      -- slug estable: 'contrato', 'identificacion', 'hojavida', 'certificados', ...
+  nombre TEXT NOT NULL,                      -- texto que ve el user: 'Contrato de trabajo'
+  descripcion TEXT,
+  icono TEXT DEFAULT 'folder',              -- fa-* name (default folder)
+  orden INTEGER DEFAULT 0,                   -- para ordenar en UI
+  activo INTEGER DEFAULT 1,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE(empresa_id, codigo)
+);
+CREATE INDEX IF NOT EXISTS idx_gh_carpetas_cat_empresa ON gh_carpetas_categorias(empresa_id, activo, orden);
+
+CREATE TABLE IF NOT EXISTS gh_carpetas_expedientes (
+  id TEXT PRIMARY KEY,                       -- formato ce-{nanoid}
+  empresa_id TEXT NOT NULL,
+  trabajador_id TEXT NOT NULL,               -- FK a base_personal.id
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE(empresa_id, trabajador_id),         -- 1 expediente por empleado
+  FOREIGN KEY (trabajador_id) REFERENCES base_personal(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_gh_carpetas_exp_empresa ON gh_carpetas_expedientes(empresa_id);
+CREATE INDEX IF NOT EXISTS idx_gh_carpetas_exp_trabajador ON gh_carpetas_expedientes(trabajador_id);
+
+CREATE TABLE IF NOT EXISTS gh_carpetas_documentos (
+  id TEXT PRIMARY KEY,                       -- formato cd-{nanoid}
+  expediente_id TEXT NOT NULL,               -- FK a gh_carpetas_expedientes.id
+  empresa_id TEXT NOT NULL,                  -- denormalizado para multi-tenant filter
+  trabajador_id TEXT NOT NULL,               -- denormalizado (queries sin JOIN)
+  categoria_id TEXT NOT NULL,                -- FK a gh_carpetas_categorias.id (NO hardcoded)
+  nombre_archivo TEXT NOT NULL,              -- nombre original del archivo subido
+  ruta_archivo TEXT NOT NULL,                -- path absoluto en filesystem
+  tamano_bytes INTEGER NOT NULL,
+  mime_type TEXT,
+  subido_por TEXT,                           -- user_id (audit)
+  fecha_subida TEXT NOT NULL,                -- ISO 8601
+  activo INTEGER DEFAULT 1,                  -- soft delete
+  FOREIGN KEY (expediente_id) REFERENCES gh_carpetas_expedientes(id) ON DELETE CASCADE,
+  FOREIGN KEY (categoria_id) REFERENCES gh_carpetas_categorias(id) ON DELETE RESTRICT
+);
+CREATE INDEX IF NOT EXISTS idx_gh_carpetas_doc_empresa ON gh_carpetas_documentos(empresa_id, activo);
+CREATE INDEX IF NOT EXISTS idx_gh_carpetas_doc_exp ON gh_carpetas_documentos(expediente_id, activo, fecha_subida DESC);
+CREATE INDEX IF NOT EXISTS idx_gh_carpetas_doc_trab ON gh_carpetas_documentos(trabajador_id, activo);
+CREATE INDEX IF NOT EXISTS idx_gh_carpetas_doc_cat ON gh_carpetas_documentos(categoria_id, activo);
 `;
 
 // ========== MIGRATIONS · 📦731/📦764 + LEGACY-SIGN-REMOVE — idempotentes (se ejecutan una por una con try/catch) ==========
@@ -425,13 +483,19 @@ module.exports = {
   // Conteos esperados para validación en tests
   // (post-LEGACY-SIGN-REMOVE: -1 tabla, -3 índices)
   // (post-I-103.A1.0-D-1: +1 tabla, +4 índices)
-  EXPECTED_TABLES: 12,  // era 11, +1 gh_contratacion_soportes (soportes por paso)
-  EXPECTED_INDEXES: 43  // era 40, +3 idx_gh_soportes_*
+  EXPECTED_TABLES: 17,  // baseline 14 (SCHEMA_SQL=13 + MIGRATIONS=1 gh_eventos_personal) + 3 Carpetas
+                        //   gh_carpetas_categorias + gh_carpetas_expedientes + gh_carpetas_documentos
+  EXPECTED_INDEXES: 54  // baseline 47 (SCHEMA_SQL=43 + MIGRATIONS=4 idx_gh_eventos_*) + 7 Carpetas
                         // 3 contrataciones + 5 base_personal (era 4, +1 sede) + 1 gh_sedes
                         // + 4 vacaciones + 5 permisos + 4 documentos
                         // + 4 anuncios + 4 mensajes
                         // + 3 documentos_afiliaciones (📦760)
                         // + 3 templates (📦764)
+                        // + 3 contratacion_soportes (📦736)
                         // + 4 eventos_personal (I-103.A1.0-D-1)
+                        // + 7 carpetas (I-AUDIT-2026-09-11)
+                        // NOTA: gh_eventos_personal (I-103.A1.0-D-1) SÍ suma 1 tabla + 4 índices
+                        // (comentario histórico decía "era 12" pero ya eran 14 antes de Carpetas;
+                        //  el conteo previo de 43/12 estaba desfasado)
 };
 

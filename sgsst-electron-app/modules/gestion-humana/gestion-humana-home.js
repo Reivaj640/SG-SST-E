@@ -14,7 +14,7 @@ var GESTION_HUMANA_NAV = [
   { id: 'home',          label: 'Resumen',          shortLabel: 'Resumen',     icon: 'fa-grip',             group: 'Principal' },
   { id: 'dashboard',     label: 'Dashboard',        shortLabel: 'Dashboard',   icon: 'fa-chart-line',       group: 'Gestión' },
   { id: 'contratacion',  label: 'Contratación',     shortLabel: 'Contratación', icon: 'fa-user-plus',       group: 'Gestión' },
-  { id: 'carpetas',      label: 'Carpetas',         shortLabel: 'Carpetas',     icon: 'fa-folders',          group: 'Documentos' },
+  { id: 'carpetas',      label: 'Carpetas',         shortLabel: 'Carpetas',     icon: 'fa-folder',          group: 'Documentos' },
   { id: 'firma-electronica', label: 'Firma electrónica', shortLabel: 'Firma electr.', icon: 'fa-file-signature', group: 'Documentos' },
   { id: 'afiliaciones',  label: 'Afiliaciones',     shortLabel: 'Afiliaciones', icon: 'fa-shield-halved',   group: 'Gestión' },
   { id: 'personal',      label: 'Base de Personal', shortLabel: 'B. Pers.',    icon: 'fa-users',            group: 'Gestión' },
@@ -32,7 +32,7 @@ var GESTION_HUMANA_TITLES = {
   permisos:     { title: 'Permisos y Estados', subtitle: 'Incapacidades, maternidad, luto y permisos diversos' },
   afiliaciones: { title: 'Afiliaciones',     subtitle: 'EPS, Pensión, ARL y Caja de Compensación' },
   'firma-electronica': { title: 'Firma electrónica', subtitle: 'Centro de control del proceso documental y firma electrónica' },
-  carpetas:     { title: 'Carpetas',          subtitle: 'Archivo digital por trabajador (en construcción)' },
+  carpetas:     { title: 'Carpetas',          subtitle: 'Archivo digital por trabajador' },
   comunicacion: { title: 'Comunicación',     subtitle: 'Anuncios y mensajes oficiales' }
 };
 
@@ -299,7 +299,7 @@ class GestionHumanaHome {
       // Aun NO tiene modulo real. Muestra los pasos para arrancar el modelo
       // de datos (tabla, campos, CRUD basico) para que el user sepa que sigue.
       case 'carpetas':
-        this._renderCarpetasView(content);
+        this._mountExistingView(content, 'CarpetasComponent', 'Carpetas');
         break;
       default:
         this._renderPlaceholder(content, this.currentView);
@@ -526,7 +526,7 @@ class GestionHumanaHome {
     card.innerHTML =
       '<div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:1rem;">' +
         '<div style="width:48px; height:48px; border-radius:0.5rem; background:#dbeafe; display:flex; align-items:center; justify-content:center;">' +
-          '<i class="fas fa-folders" style="color:#1d4ed8; font-size:1.25rem;"></i>' +
+          '<i class="fas fa-folder-open" style="color:#1d4ed8; font-size:1.25rem;"></i>' +
         '</div>' +
         '<div>' +
           '<h2 style="margin:0; font-size:1.05rem; color:#1a1a2e;">Esta vista se implementará pronto</h2>' +

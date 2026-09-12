@@ -462,6 +462,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   ghListarAdjuntosCom: (payload) => ipcRenderer.invoke('gh:listar-adjuntos-comunicacion', payload),
   ghLeerAdjuntoCom: (payload) => ipcRenderer.invoke('gh:leer-adjunto-comunicacion', payload),
   ghEliminarAdjuntoCom: (payload) => ipcRenderer.invoke('gh:eliminar-adjunto-comunicacion', payload),
+  // I-AUDIT-2026-09-11 (Carpetas v0.2.0) · 9 funciones Documentos de Contratación
+  // Categorías dinámicas (gestionables por el user)
+  ghListCategoriasCarpetas: (payload) => ipcRenderer.invoke('gh:list-categorias-carpetas', payload),
+  ghCreateCategoriaCarpeta: (payload) => ipcRenderer.invoke('gh:create-categoria-carpeta', payload),
+  ghUpdateCategoriaCarpeta: (payload) => ipcRenderer.invoke('gh:update-categoria-carpeta', payload),
+  // Expedientes (lista + detalle con KPIs)
+  ghListExpedientes: (payload) => ipcRenderer.invoke('gh:list-expedientes', payload),
+  ghGetExpediente: (payload) => ipcRenderer.invoke('gh:get-expediente', payload),
+  ghListTrabajadoresDisponibles: (payload) => ipcRenderer.invoke('gh:list-trabajadores-disponibles', payload),
+  // Documentos (CRUD + storage filesystem)
+  ghSubirDocumentoCarpeta: (payload) => ipcRenderer.invoke('gh:subir-documento-carpeta', payload),
+  ghAbrirDocumentoCarpeta: (payload) => ipcRenderer.invoke('gh:abrir-documento-carpeta', payload),
+  ghEliminarDocumentoCarpeta: (payload) => ipcRenderer.invoke('gh:eliminar-documento-carpeta', payload),
+  // 📦743 · Integración con Contratación — docs automáticos en Carpetas
+  ghListDocumentosContratacionByBp: (payload) => ipcRenderer.invoke('gh:list-documentos-contratacion-by-bp', payload),
+  ghAbrirSoporteContratacion: (payload) => ipcRenderer.invoke('gh:abrir-soporte-contratacion', payload),
   // Diag (1)
   ghDiag: () => ipcRenderer.invoke('gh:diag'),
 

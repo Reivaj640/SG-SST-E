@@ -5311,7 +5311,57 @@ function registerGestionHumanaHandlers(app, deps) {
     }
   });
 
-  console.log('[' + MOD + '][INIT][SUCCESS] Bridge registrado · 5 read + 4 write-contratacion + 4 write-personal + 2 write-sedes + 6 vacaciones + 5 permisos + 5 documentos + 5 anuncios + 4 mensajes + 5 docs-afiliaciones + 5 templates + 3 import-excel + 4 soportes-contratacion + 1 diag · 59 handlers totales · LEGACY-SIGN-REMOVE (sin firma canvas)');
+  // I-AUDIT-2026-09-11 (Carpetas v0.2.0) · 9 handlers para Documentos de Contratación
+  // 📁 Categorías dinámicas (gestionables por el user) + Expedientes (1 por empleado)
+  // + Documentos (N por categoría por empleado) con storage filesystem.
+  // Patrón idéntico a gh_documentos_afiliaciones (📦760): binario en FS, metadata en BD.
+  // Storage: <userData>/gh-carpetas/<empresaId>/<trabajadorId>/<categoriaCodigo>/<ts>-<archivo>
+  ipcMainHandle('gh:list-categorias-carpetas', function (event, payload) {
+    try { return _handlerListCategoriasCarpetas(payload && payload.token, payload && payload.companyName); }
+    catch (e) { return _err('INTERNAL', e.message); }
+  });
+  ipcMainHandle('gh:create-categoria-carpeta', function (event, payload) {
+    try { return _handlerCreateCategoriaCarpeta(payload && payload.token, payload && payload.companyName, payload && payload.nombre, payload && payload.descripcion); }
+    catch (e) { return _err('INTERNAL', e.message); }
+  });
+  ipcMainHandle('gh:update-categoria-carpeta', function (event, payload) {
+    try { return _handlerUpdateCategoriaCarpeta(payload && payload.token, payload && payload.categoriaId, payload && payload.nombre, payload && payload.descripcion, payload && payload.activo, payload && payload.orden); }
+    catch (e) { return _err('INTERNAL', e.message); }
+  });
+  ipcMainHandle('gh:list-expedientes', function (event, payload) {
+    try { return _handlerListExpedientes(payload && payload.token, payload && payload.companyName, payload && payload.search, payload && payload.estado, payload && payload.page, payload && payload.pageSize); }
+    catch (e) { return _err('INTERNAL', e.message); }
+  });
+  ipcMainHandle('gh:get-expediente', function (event, payload) {
+    try { return _handlerGetExpediente(payload && payload.token, payload && payload.companyName, payload && payload.trabajadorId); }
+    catch (e) { return _err('INTERNAL', e.message); }
+  });
+  ipcMainHandle('gh:list-trabajadores-disponibles', function (event, payload) {
+    try { return _handlerListTrabajadoresDisponibles(payload && payload.token, payload && payload.companyName, payload && payload.search); }
+    catch (e) { return _err('INTERNAL', e.message); }
+  });
+  ipcMainHandle('gh:subir-documento-carpeta', function (event, payload) {
+    try { return _handlerSubirDocumentoCarpeta(payload && payload.token, payload && payload.companyName, payload && payload.trabajadorId, payload && payload.categoriaId); }
+    catch (e) { return _err('INTERNAL', e.message); }
+  });
+  ipcMainHandle('gh:abrir-documento-carpeta', function (event, payload) {
+    try { return _handlerAbrirDocumentoCarpeta(payload && payload.token, payload && payload.documentoId); }
+    catch (e) { return _err('INTERNAL', e.message); }
+  });
+  ipcMainHandle('gh:eliminar-documento-carpeta', function (event, payload) {
+    try { return _handlerEliminarDocumentoCarpeta(payload && payload.token, payload && payload.documentoId); }
+    catch (e) { return _err('INTERNAL', e.message); }
+  });
+  ipcMainHandle('gh:list-documentos-contratacion-by-bp', function (event, payload) {
+    try { return _handlerListDocumentosContratacionByBp(payload && payload.token, payload && payload.companyName, payload && payload.trabajadorId); }
+    catch (e) { return _err('INTERNAL', e.message); }
+  });
+  ipcMainHandle('gh:abrir-soporte-contratacion', function (event, payload) {
+    try { return _handlerAbrirSoporteContratacion(payload && payload.token, payload && payload.soporteId); }
+    catch (e) { return _err('INTERNAL', e.message); }
+  });
+
+  console.log('[' + MOD + '][INIT][SUCCESS] Bridge registrado · 5 read + 4 write-contratacion + 4 write-personal + 2 write-sedes + 6 vacaciones + 5 permisos + 5 documentos + 5 anuncios + 4 mensajes + 5 docs-afiliaciones + 5 templates + 3 import-excel + 4 soportes-contratacion + 1 diag + 9 carpetas + 2 carpetas-contratacion · 81 handlers totales · LEGACY-SIGN-REMOVE (sin firma canvas)');
 }
 
 registerGestionHumanaHandlers.init = function(ipcMain) {
@@ -5331,6 +5381,816 @@ registerGestionHumanaHandlers.init = function(ipcMain) {
     registerGestionHumanaHandlers._xlsx = null;
   }
 };
+
+// ========== I-AUDIT-2026-09-11 · CARPETAS v0.2.0 — Documentos de Contratación ==========
+// Módulo "Carpetas" — archivo digital por trabajador con categorías DINÁMICAS
+// (gestionables por el user, NO hardcoded). 3 tablas: gh_carpetas_categorias,
+// gh_carpetas_expedientes, gh_carpetas_documentos. El estado del expediente
+// (completo/incompleto/crítico) se DERIVA en SQL con LEFT JOIN, no se almacena.
+// Regla del PDF sección 11.1: crítico SOLO si falta la categoría con codigo='contrato'.
+
+// Constantes de validación (PDF sección 8.5)
+var _CARPETAS_EXT_OK = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'];
+var _CARPETAS_MAX_BYTES = 10 * 1024 * 1024; // 10 MB
+
+// Categorías semilla que se crean automáticamente al primer acceso por empresa.
+// Coinciden con las 4 categorías del PDF (sección 11.4) pero se almacenan en BD
+// (no hardcoded en código), así el user puede editarlas/agregar más.
+var _CARPETAS_SEED = [
+  { codigo: 'contrato',         nombre: 'Contrato de trabajo',     descripcion: 'Contrato laboral firmado', orden: 1 },
+  { codigo: 'identificacion',   nombre: 'Identificación',          descripcion: 'Cédula, pasaporte u otro documento de identidad', orden: 2 },
+  { codigo: 'hojavida',         nombre: 'Hoja de vida',            descripcion: 'CV del trabajador', orden: 3 },
+  { codigo: 'certificados',     nombre: 'Certificados de estudio', descripcion: 'Diplomas, certificaciones académicas', orden: 4 },
+  // 📦743 · Categorías derivadas del flujo de Contratación (📦736)
+  // Las docs de estos pasos del proceso de contratación se muestran automáticamente
+  // en Carpeta como "importadas" (read-only, fuente de verdad sigue en Contratación).
+  { codigo: 'afiliaciones',     nombre: 'Afiliaciones',           descripcion: 'EPS, Pensión, ARL, Caja de Compensación (del paso 5)', orden: 5 },
+  { codigo: 'examenes',         nombre: 'Exámenes médicos',        descripcion: 'Orden y resultados de exámenes (del paso 3)', orden: 6 }
+];
+
+// Slugify para auto-generar `codigo` a partir del nombre cuando el user crea
+// una categoría nueva. Solo letras/números/guión-bajo en minúsculas.
+function _carpetasSlugify(nombre) {
+  return String(nombre || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // quitar diacríticos
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 40) || 'cat_' + Date.now().toString(36);
+}
+
+// Construye la ruta de storage para un documento de Carpeta.
+// Path: <userData>/gh-carpetas/<empresaId>/<trabajadorId>/<categoriaCodigo>/<ts>-<nombreArchivo>
+function _carpetaDocPath(empresaId, trabajadorId, categoriaCodigo, nombreArchivo) {
+  var app = registerGestionHumanaHandlers._app;
+  var path = registerGestionHumanaHandlers._path;
+  if (!app || !path) return null;
+  var base = app.getPath('userData');
+  var ts = Date.now();
+  // Sanitizar nombreArchivo para FS (quitar /, \, :, etc.)
+  var safe = String(nombreArchivo || 'archivo').replace(/[\/\\:*?"<>|]/g, '_').slice(0, 120);
+  return path.join(base, 'gh-carpetas', String(empresaId), String(trabajadorId), String(categoriaCodigo), ts + '-' + safe);
+}
+
+// Seed de categorías por empresa — idempotente. Si la categoría ya existe
+// (UNIQUE(empresa_id, codigo)), INSERT OR IGNORE la skipea sin error.
+// Antes solo insertaba si count==0, lo que impedía que las categorías
+// nuevas del seed (agregadas en evoluciones del código) aparecieran en
+// empresas que ya tenían categorías del seed anterior.
+function _seedCategoriasCarpetaIfNeeded(localDb, companyKey) {
+  try {
+    var now = new Date().toISOString();
+    var stmt = localDb.prepare(
+      "INSERT OR IGNORE INTO gh_carpetas_categorias " +
+      "(id, empresa_id, codigo, nombre, descripcion, icono, orden, activo, created_at, updated_at) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)"
+    );
+    _CARPETAS_SEED.forEach(function (c) {
+      var id = _newId('cc-');
+      stmt.run(id, companyKey, c.codigo, c.nombre, c.descripcion, 'folder', c.orden, now, now);
+    });
+  } catch (e) {
+    console.warn('[' + MOD + '][seed-categorias-carpeta]', e.message);
+  }
+}
+
+// Row → objeto camelCase (categoría)
+function _rowToCategoriaCarpeta(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    empresaId: row.empresa_id,
+    codigo: row.codigo,
+    nombre: row.nombre,
+    descripcion: row.descripcion,
+    icono: row.icono,
+    orden: row.orden,
+    activo: row.activo,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+// Row → objeto camelCase (documento de carpeta)
+function _rowToDocumentoCarpeta(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    expedienteId: row.expediente_id,
+    empresaId: row.empresa_id,
+    trabajadorId: row.trabajador_id,
+    categoriaId: row.categoria_id,
+    categoriaCodigo: row.categoria_codigo,    // JOIN
+    categoriaNombre: row.categoria_nombre,    // JOIN
+    nombreArchivo: row.nombre_archivo,
+    rutaArchivo: row.ruta_archivo,
+    tamanoBytes: row.tamano_bytes,
+    mimeType: row.mime_type,
+    subidoPor: row.subido_por,
+    fechaSubida: row.fecha_subida,
+    activo: row.activo
+  };
+}
+
+// Calcula el estado DERIVADO del expediente (PDF sección 11.1).
+// Input: { categoriasActivas: [{id, codigo}], docsPorCategoria: {catId: count} }
+// Output: { estado, pct, categoriasPresentes, totalCategorias, esCritico }
+function _calcEstadoExpediente(categoriasActivas, docsPorCategoria) {
+  var presentes = categoriasActivas.filter(function (c) {
+    return (docsPorCategoria[c.id] || 0) > 0;
+  });
+  var total = categoriasActivas.length;
+  var n = presentes.length;
+  var pct = total > 0 ? Math.round((n / total) * 100) : 0;
+  // Regla del PDF: crítico SOLO si falta la categoría con codigo='contrato'
+  var tieneContrato = categoriasActivas.some(function (c) {
+    return c.codigo === 'contrato' && (docsPorCategoria[c.id] || 0) > 0;
+  });
+  var estado = n === 0 ? 'critico' : (!tieneContrato ? 'critico' : (n >= total ? 'completo' : 'incompleto'));
+  return { estado: estado, pct: pct, categoriasPresentes: n, totalCategorias: total, esCritico: estado === 'critico' };
+}
+
+/**
+ * gh:list-categorias-carpetas
+ * Lista las categorías activas de la empresa. Si no hay ninguna, siembra las 4 por defecto.
+ * Input: { token, companyName }
+ * Devuelve: { success, data: { categorias: [...] } }
+ */
+function _handlerListCategoriasCarpetas(token, companyName) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+  if (!companyName || typeof companyName !== 'string') {
+    return _err('INVALID_INPUT', 'companyName es requerido');
+  }
+  var company = _getCompanyByName(companyName);
+  if (!company) return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada');
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    _seedCategoriasCarpetaIfNeeded(localDb, company.company_key);
+    var rows = localDb.prepare(
+      "SELECT * FROM gh_carpetas_categorias WHERE empresa_id = ? AND activo = 1 ORDER BY orden, nombre"
+    ).all(company.company_key);
+    return _ok({ categorias: rows.map(_rowToCategoriaCarpeta), count: rows.length });
+  } catch (e) {
+    console.error('[' + MOD + '][list-categorias-carpetas]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:create-categoria-carpeta
+ * Crea una nueva categoría para la empresa. Auto-slugifica el nombre en codigo.
+ * Input: { token, companyName, nombre, descripcion? }
+ * Devuelve: { success, data: { categoria } }
+ */
+function _handlerCreateCategoriaCarpeta(token, companyName, nombre, descripcion) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+  if (!companyName) return _err('INVALID_INPUT', 'companyName es requerido');
+  if (!nombre || typeof nombre !== 'string' || nombre.trim().length < 2) {
+    return _err('INVALID_INPUT', 'nombre es requerido (mínimo 2 chars)');
+  }
+  var company = _getCompanyByName(companyName);
+  if (!company) return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada');
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  try {
+    var codigo = _carpetasSlugify(nombre);
+    // Si ya existe un codigo igual, agregar sufijo
+    var exists = localDb.prepare(
+      "SELECT id FROM gh_carpetas_categorias WHERE empresa_id = ? AND codigo = ?"
+    ).get(company.company_key, codigo);
+    if (exists) codigo = codigo + '_' + Date.now().toString(36).slice(-4);
+
+    var now = new Date().toISOString();
+    var id = _newId('cc-');
+    localDb.prepare(
+      "INSERT INTO gh_carpetas_categorias (id, empresa_id, codigo, nombre, descripcion, icono, orden, activo, created_at, updated_at) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)"
+    ).run(id, company.company_key, codigo, nombre.trim(), descripcion || null, 'folder', 99, now, now);
+    var row = localDb.prepare("SELECT * FROM gh_carpetas_categorias WHERE id = ?").get(id);
+    return _ok({ categoria: _rowToCategoriaCarpeta(row) });
+  } catch (e) {
+    console.error('[' + MOD + '][create-categoria-carpeta]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:update-categoria-carpeta
+ * Actualiza nombre/descripcion/activo/orden. El codigo NO se puede cambiar
+ * (es la identidad estable de la categoría, usada en storage path).
+ * Input: { token, categoriaId, nombre?, descripcion?, activo?, orden? }
+ */
+function _handlerUpdateCategoriaCarpeta(token, categoriaId, nombre, descripcion, activo, orden) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+  if (!categoriaId) return _err('INVALID_INPUT', 'categoriaId es requerido');
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+  try {
+    var row = localDb.prepare("SELECT * FROM gh_carpetas_categorias WHERE id = ?").get(categoriaId);
+    if (!row) return _err('NOT_FOUND', 'Categoría no encontrada');
+    var now = new Date().toISOString();
+    var updates = [];
+    var args = [];
+    if (typeof nombre === 'string' && nombre.trim()) { updates.push('nombre = ?'); args.push(nombre.trim()); }
+    if (typeof descripcion === 'string') { updates.push('descripcion = ?'); args.push(descripcion); }
+    if (typeof activo === 'number') { updates.push('activo = ?'); args.push(activo); }
+    if (typeof orden === 'number') { updates.push('orden = ?'); args.push(orden); }
+    if (updates.length === 0) return _err('INVALID_INPUT', 'Nada que actualizar');
+    updates.push('updated_at = ?'); args.push(now);
+    args.push(categoriaId);
+    var stmtUpd = localDb.prepare("UPDATE gh_carpetas_categorias SET " + updates.join(', ') + " WHERE id = ?");
+    stmtUpd.run.apply(stmtUpd, args);
+    var fresh = localDb.prepare("SELECT * FROM gh_carpetas_categorias WHERE id = ?").get(categoriaId);
+    return _ok({ categoria: _rowToCategoriaCarpeta(fresh) });
+  } catch (e) {
+    console.error('[' + MOD + '][update-categoria-carpeta]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:list-expedientes
+ * Lista los expedientes de la empresa con búsqueda + filtro + paginación.
+ * Devuelve también los 4 KPIs agregados (Documentos totales, Expedientes completos,
+ * Documentos faltantes, Subidas este mes) — siguen la fórmula del PDF sección 5.1.
+ * Input: { token, companyName, search?, estado?, page?, pageSize? }
+ * Devuelve: { success, data: { expedientes, count, kpis, page, total, totalPages } }
+ */
+function _handlerListExpedientes(token, companyName, search, estado, page, pageSize) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+  if (!companyName) return _err('INVALID_INPUT', 'companyName es requerido');
+  var company = _getCompanyByName(companyName);
+  if (!company) return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada');
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+
+  page = Math.max(1, parseInt(page) || 1);
+  pageSize = Math.min(100, Math.max(1, parseInt(pageSize) || 50));
+
+  try {
+    _seedCategoriasCarpetaIfNeeded(localDb, company.company_key);
+
+    // 1. Categorías activas (para calcular completitud por expediente)
+    var catRows = localDb.prepare(
+      "SELECT id, codigo FROM gh_carpetas_categorias WHERE empresa_id = ? AND activo = 1 ORDER BY orden"
+    ).all(company.company_key);
+    var categoriasActivas = catRows;
+
+    // 2. bp vinculados a contrataciones ACTIVAS de la empresa (patrón de Firma Electrónica)
+    var params = [company.company_key];
+    var where = "c.empresa_id = ?";
+    if (search && typeof search === 'string' && search.trim()) {
+      var s = '%' + search.trim().toLowerCase() + '%';
+      where += " AND (LOWER(bp.nombres || ' ' || bp.apellidos) LIKE ? OR LOWER(bp.cedula) LIKE ? OR LOWER(IFNULL(bp.cargo, '')) LIKE ?)";
+      params.push(s, s, s);
+    }
+
+    // I-AUDIT-2026-09-11 (Carpetas v0.2.0) · Solo aparecen en Carpetas los bp que
+    // tienen un proceso de contratación ACTIVO (en_proceso o completado, nunca cancelado).
+    // Esto replica el patrón de Firma Electrónica: sin contratación → sin carpeta.
+    var stmtBp = localDb.prepare(
+      "SELECT bp.id as id, bp.nombres, bp.apellidos, bp.cedula, bp.tipo_documento, bp.cargo, bp.tipo_contrato, bp.fecha_ingreso, " +
+      "       c.id as contratacion_id, c.estado as contratacion_estado, c.paso_actual as contratacion_paso " +
+      "FROM contrataciones c " +
+      "INNER JOIN base_personal bp ON bp.id = c.trabajador_id " +
+      "WHERE " + where.replace(/bp\./g, 'c.') + " AND c.estado IN ('en_proceso', 'completado') " +
+      "ORDER BY c.created_at DESC, bp.apellidos, bp.nombres"
+    );
+    var bpRows = stmtBp.all.apply(stmtBp, params);
+
+    // 3. Para cada bp: docs agrupados por categoria_id y conteo
+    var docsPorTrabajador = {}; // { bpId: { catId: count, lastTs: YYYYMMDD, totalCount, thisMonthCount } }
+    var now = new Date();
+    var yyyymm = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100;
+    var bpIds = bpRows.map(function (r) { return r.id; });
+    if (bpIds.length > 0) {
+      var placeholders = bpIds.map(function () { return '?'; }).join(',');
+      var stmtDoc = localDb.prepare(
+        "SELECT trabajador_id, categoria_id, fecha_subida FROM gh_carpetas_documentos " +
+        "WHERE empresa_id = ? AND activo = 1 AND trabajador_id IN (" + placeholders + ")"
+      );
+      var docRows = stmtDoc.all.apply(stmtDoc, [company.company_key].concat(bpIds));
+      docRows.forEach(function (d) {
+        var dpt = docsPorTrabajador[d.trabajador_id] || { cats: {}, lastTs: 0, total: 0, thisMonth: 0 };
+        dpt.cats[d.categoria_id] = (dpt.cats[d.categoria_id] || 0) + 1;
+        dpt.total += 1;
+        // fecha_subida es ISO, parsear simple para YYYYMM
+        var m = /^(\d{4})-(\d{2})/.exec(d.fecha_subida || '');
+        if (m) {
+          var ym = parseInt(m[1]) * 10000 + parseInt(m[2]) * 100;
+          if (ym >= yyyymm) dpt.thisMonth += 1;
+          if (ym > dpt.lastTs) dpt.lastTs = ym;
+        }
+        docsPorTrabajador[d.trabajador_id] = dpt;
+      });
+    }
+
+    // 4. Calcular estado por bp + agregar a lista
+    var expedientes = bpRows.map(function (bp) {
+      var dpt = docsPorTrabajador[bp.id] || { cats: {}, lastTs: 0, total: 0, thisMonth: 0 };
+      var calc = _calcEstadoExpediente(categoriasActivas, dpt.cats);
+      return {
+        trabajadorId: bp.id,
+        nombres: bp.nombres,
+        apellidos: bp.apellidos,
+        nombreCompleto: (bp.nombres || '') + ' ' + (bp.apellidos || ''),
+        cedula: bp.tipo_documento + ' ' + bp.cedula,
+        cargo: bp.cargo || '',
+        tipoContrato: bp.tipo_contrato || '',
+        fechaIngreso: bp.fecha_ingreso || null,
+        totalDocs: dpt.total,
+        categoriasPresentes: calc.categoriasPresentes,
+        totalCategorias: calc.totalCategorias,
+        pct: calc.pct,
+        estado: calc.estado,
+        lastUpdateTs: dpt.lastTs
+      };
+    });
+
+    // 5. Filtrar por estado
+    if (estado && estado !== 'todos') {
+      expedientes = expedientes.filter(function (e) { return e.estado === estado; });
+    }
+
+    // 6. KPIs agregados (PDF sección 5.1)
+    var kpis = {
+      documentosTotales: 0,
+      expedientesCompletos: 0,
+      documentosFaltantes: 0,
+      subidasEsteMes: 0
+    };
+    // Para calcular faltantes, necesitamos todos los bp (sin filtro de estado)
+    var allBpForKpis = bpRows; // ya filtrados por search pero NO por estado
+    allBpForKpis.forEach(function (bp) {
+      var dpt = docsPorTrabajador[bp.id] || { cats: {}, lastTs: 0, total: 0, thisMonth: 0 };
+      kpis.documentosTotales += dpt.total;
+      kpis.subidasEsteMes += dpt.thisMonth;
+      var calc = _calcEstadoExpediente(categoriasActivas, dpt.cats);
+      if (calc.estado === 'completo') kpis.expedientesCompletos += 1;
+      // Faltantes: categorías activas SIN docs para este bp
+      var sinDocs = categoriasActivas.filter(function (c) { return (dpt.cats[c.id] || 0) === 0; }).length;
+      kpis.documentosFaltantes += sinDocs;
+    });
+
+    // 7. Paginación
+    var total = expedientes.length;
+    var totalPages = Math.max(1, Math.ceil(total / pageSize));
+    var start = (page - 1) * pageSize;
+    var paginated = expedientes.slice(start, start + pageSize);
+
+    return _ok({
+      expedientes: paginated,
+      count: total,
+      kpis: kpis,
+      page: page,
+      pageSize: pageSize,
+      totalPages: totalPages,
+      categoriasActivas: categoriasActivas.length
+    });
+  } catch (e) {
+    console.error('[' + MOD + '][list-expedientes]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:get-expediente
+ * Devuelve el expediente completo de un trabajador con sus docs agrupados por categoría.
+ * Input: { token, companyName, trabajadorId }
+ * Devuelve: { success, data: { expediente, categorias: [{...cat, docs}], estado, pct, ... } }
+ */
+function _handlerGetExpediente(token, companyName, trabajadorId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+  if (!companyName) return _err('INVALID_INPUT', 'companyName es requerido');
+  if (!trabajadorId) return _err('INVALID_INPUT', 'trabajadorId es requerido');
+  var company = _getCompanyByName(companyName);
+  if (!company) return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada');
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+  try {
+    _seedCategoriasCarpetaIfNeeded(localDb, company.company_key);
+
+    var bp = localDb.prepare(
+      "SELECT bp.id, bp.nombres, bp.apellidos, bp.cedula, bp.tipo_documento, bp.cargo, bp.tipo_contrato, bp.fecha_ingreso, " +
+      "       c.id as contratacion_id, c.estado as contratacion_estado, c.paso_actual as contratacion_paso " +
+      "FROM contrataciones c " +
+      "INNER JOIN base_personal bp ON bp.id = c.trabajador_id " +
+      "WHERE bp.id = ? AND c.empresa_id = ? AND c.estado IN ('en_proceso', 'completado')"
+    ).get(trabajadorId, company.company_key);
+    if (!bp) return _err('NOT_FOUND', 'Trabajador no encontrado o sin contratación activa');
+
+    var catRows = localDb.prepare(
+      "SELECT * FROM gh_carpetas_categorias WHERE empresa_id = ? AND activo = 1 ORDER BY orden, nombre"
+    ).all(company.company_key);
+    var docRows = localDb.prepare(
+      "SELECT * FROM gh_carpetas_documentos WHERE empresa_id = ? AND trabajador_id = ? AND activo = 1 ORDER BY fecha_subida DESC"
+    ).all(company.company_key, trabajadorId);
+
+    // Agrupar docs de Carpeta por categoria_id
+    var docsPorCat = {};
+    docRows.forEach(function (d) {
+      docsPorCat[d.categoria_id] = docsPorCat[d.categoria_id] || [];
+      docsPorCat[d.categoria_id].push(_rowToDocumentoCarpeta(d));
+    });
+
+    // 📦743 · Mezclar con docs importados del flujo de Contratación
+    // Los docs de paso 3/4/5 se muestran como read-only en la categoría correspondiente
+    var docsContratacionPorCat = {};
+    try {
+      var stmtCt = localDb.prepare(
+        "SELECT s.id, s.paso_num, s.nombre_archivo, s.ruta_archivo, s.tamano_bytes, s.mime_type, s.fecha_subida " +
+        "FROM gh_contratacion_soportes s " +
+        "INNER JOIN contrataciones c ON c.id = s.contratacion_id " +
+        "WHERE c.trabajador_id = ? AND c.empresa_id = ? " +
+        "  AND c.estado IN ('en_proceso', 'completado') " +
+        "  AND s.paso_num IN (1, 2, 3, 4, 5) " +
+        "ORDER BY s.fecha_subida DESC"
+      );
+      var rowsCt = stmtCt.all(trabajadorId, company.company_key);
+      rowsCt.forEach(function (r) {
+        var codigo = _CARPETAS_PASO_TO_CODIGO[r.paso_num];
+        if (!codigo) return;
+        // Encontrar el categoria_id correspondiente
+        var catMatch = catRows.find(function (c) { return c.codigo === codigo; });
+        if (!catMatch) return;
+        if (!docsContratacionPorCat[catMatch.id]) docsContratacionPorCat[catMatch.id] = [];
+        docsContratacionPorCat[catMatch.id].push({
+          id: r.id,
+          pasoNum: r.paso_num,
+          nombreArchivo: r.nombre_archivo,
+          rutaArchivo: r.ruta_archivo,
+          tamanoBytes: r.tamano_bytes,
+          mimeType: r.mime_type,
+          fechaSubida: r.fecha_subida,
+          origen: 'contratacion',
+          readOnly: true
+        });
+      });
+    } catch (e) {
+      console.warn('[' + MOD + '][get-expediente] No se pudieron cargar docs de contratación:', e.message);
+    }
+
+    var catsConDocs = catRows.map(function (c) {
+      var docsPropios = docsPorCat[c.id] || [];
+      var docsImportados = docsContratacionPorCat[c.id] || [];
+      var todosDocs = docsPropios.concat(docsImportados);
+      return Object.assign(_rowToCategoriaCarpeta(c), {
+        docs: todosDocs,
+        docsPropios: docsPropios,
+        docsImportados: docsImportados,
+        count: docsPropios.length,
+        countTotal: todosDocs.length
+      });
+    });
+
+    // Estado derivado: solo cuenta docs de Carpeta (los importados NO cuentan para completar)
+    var catsCountMap = {};
+    Object.keys(docsPorCat).forEach(function (k) { catsCountMap[k] = docsPorCat[k].length; });
+    var calc = _calcEstadoExpediente(catRows, catsCountMap);
+
+    return _ok({
+      expediente: {
+        trabajadorId: bp.id,
+        nombres: bp.nombres,
+        apellidos: bp.apellidos,
+        nombreCompleto: (bp.nombres || '') + ' ' + (bp.apellidos || ''),
+        cedula: (bp.tipo_documento || 'CC') + ' ' + bp.cedula,
+        cargo: bp.cargo || '',
+        tipoContrato: bp.tipo_contrato || '',
+        fechaIngreso: bp.fecha_ingreso || null
+      },
+      categorias: catsConDocs,
+      estado: calc.estado,
+      pct: calc.pct,
+      categoriasPresentes: calc.categoriasPresentes,
+      totalCategorias: calc.totalCategorias,
+      totalDocs: docRows.length,
+      totalImportados: Object.keys(docsContratacionPorCat).reduce(function (acc, k) { return acc + docsContratacionPorCat[k].length; }, 0)
+    });
+  } catch (e) {
+    console.error('[' + MOD + '][get-expediente]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:list-trabajadores-disponibles
+ * Lista bp activos de la empresa para el <select> del modal de subida.
+ * Input: { token, companyName, search? }
+ * Devuelve: { success, data: { trabajadores: [{id, nombre, cedula, cargo}] } }
+ */
+function _handlerListTrabajadoresDisponibles(token, companyName, search) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+  if (!companyName) return _err('INVALID_INPUT', 'companyName es requerido');
+  var company = _getCompanyByName(companyName);
+  if (!company) return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada');
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+  try {
+    var params = [company.company_key];
+    var where = "c.empresa_id = ? AND c.estado IN ('en_proceso', 'completado')";
+    if (search && typeof search === 'string' && search.trim()) {
+      var s = '%' + search.trim().toLowerCase() + '%';
+      where += " AND (LOWER(bp.nombres || ' ' || bp.apellidos) LIKE ? OR LOWER(bp.cedula) LIKE ?)";
+      params.push(s, s);
+    }
+    var stmtTrab = localDb.prepare(
+      "SELECT bp.id, bp.nombres, bp.apellidos, bp.cedula, bp.cargo " +
+      "FROM contrataciones c " +
+      "INNER JOIN base_personal bp ON bp.id = c.trabajador_id " +
+      "WHERE " + where +
+      " ORDER BY c.created_at DESC, bp.apellidos, bp.nombres LIMIT 500"
+    );
+    var rows = stmtTrab.all.apply(stmtTrab, params);
+    var trabajadores = rows.map(function (r) {
+      return {
+        id: r.id,
+        nombreCompleto: (r.nombres || '') + ' ' + (r.apellidos || ''),
+        cedula: r.cedula,
+        cargo: r.cargo || ''
+      };
+    });
+    return _ok({ trabajadores: trabajadores, count: trabajadores.length });
+  } catch (e) {
+    console.error('[' + MOD + '][list-trabajadores-disponibles]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:subir-documento-carpeta
+ * Abre dialog.showOpenDialog para que el user seleccione UN archivo (PDF/Word/Excel/imagen)
+ * y lo guarda en el storage de Carpetas. Crea el expediente si no existía.
+ * Input: { token, companyName, trabajadorId, categoriaId }
+ * Devuelve: { success, data: { documento, expedienteCreado } }
+ */
+function _handlerSubirDocumentoCarpeta(token, companyName, trabajadorId, categoriaId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+  if (!companyName) return _err('INVALID_INPUT', 'companyName es requerido');
+  if (!trabajadorId) return _err('INVALID_INPUT', 'trabajadorId es requerido');
+  if (!categoriaId) return _err('INVALID_INPUT', 'categoriaId es requerido');
+  var company = _getCompanyByName(companyName);
+  if (!company) return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada');
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+  var dialog = registerGestionHumanaHandlers._dialog;
+  var fs = registerGestionHumanaHandlers._fs;
+  if (!dialog || !fs) return _err('NO_DIALOG', 'dialog/fs no disponibles');
+
+  // Validar trabajador y categoría
+  var bp = localDb.prepare(
+    "SELECT id FROM base_personal WHERE id = ? AND empresa_id = ? AND activo = 1"
+  ).get(trabajadorId, company.company_key);
+  if (!bp) return _err('NOT_FOUND', 'Trabajador no encontrado');
+  var cat = localDb.prepare(
+    "SELECT * FROM gh_carpetas_categorias WHERE id = ? AND empresa_id = ? AND activo = 1"
+  ).get(categoriaId, company.company_key);
+  if (!cat) return _err('NOT_FOUND', 'Categoría no encontrada o inactiva');
+
+  return dialog.showOpenDialog({
+    title: 'Subir documento de ' + cat.nombre,
+    filters: [
+      { name: 'Documentos', extensions: _CARPETAS_EXT_OK },
+      { name: 'Todos los archivos', extensions: ['*'] }
+    ],
+    properties: ['openFile']
+  }).then(function (result) {
+    if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+      return _ok({ canceled: true });
+    }
+    var sourcePath = result.filePaths[0];
+    var path = registerGestionHumanaHandlers._path;
+
+    // Validar extensión
+    var ext = (path.extname(sourcePath) || '').slice(1).toLowerCase();
+    if (_CARPETAS_EXT_OK.indexOf(ext) < 0) {
+      return _err('INVALID_EXT', 'Formato no permitido (' + ext + '). Usa: ' + _CARPETAS_EXT_OK.join(', '));
+    }
+    // Validar tamaño
+    var stats;
+    try { stats = fs.statSync(sourcePath); } catch (e) {
+      return _err('FILE_ERROR', 'No se pudo leer el archivo: ' + e.message);
+    }
+    if (stats.size > _CARPETAS_MAX_BYTES) {
+      return _err('FILE_TOO_LARGE', 'Supera el límite de 10 MB. Tamaño actual: ' + Math.round(stats.size / 1024 / 1024) + ' MB');
+    }
+
+    // Asegurar que existe el expediente (1 por bp)
+    var existingExp = localDb.prepare(
+      "SELECT id FROM gh_carpetas_expedientes WHERE empresa_id = ? AND trabajador_id = ?"
+    ).get(company.company_key, trabajadorId);
+    var expedienteId = existingExp ? existingExp.id : null;
+    var expedienteCreado = false;
+    var now = new Date().toISOString();
+    if (!expedienteId) {
+      expedienteId = _newId('ce-');
+      localDb.prepare(
+        "INSERT INTO gh_carpetas_expedientes (id, empresa_id, trabajador_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
+      ).run(expedienteId, company.company_key, trabajadorId, now, now);
+      expedienteCreado = true;
+    }
+
+    // Construir ruta destino y copiar
+    var destPath = _carpetaDocPath(company.company_key, trabajadorId, cat.codigo, path.basename(sourcePath));
+    if (!destPath) return _err('NO_PATH', 'No se pudo construir la ruta de destino');
+    _ensureDirSync(path.dirname(destPath));
+    try { fs.copyFileSync(sourcePath, destPath); }
+    catch (e) { return _err('COPY_ERROR', 'No se pudo copiar el archivo: ' + e.message); }
+
+    // INSERT del documento
+    var id = _newId('cd-');
+    var nombreArchivo = path.basename(sourcePath);
+    var mimeType = _guessMime(ext);
+    localDb.prepare(
+      "INSERT INTO gh_carpetas_documentos (id, expediente_id, empresa_id, trabajador_id, categoria_id, nombre_archivo, ruta_archivo, tamano_bytes, mime_type, subido_por, fecha_subida, activo) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)"
+    ).run(id, expedienteId, company.company_key, trabajadorId, categoriaId, nombreArchivo, destPath, stats.size, mimeType, auth.user ? auth.user.id : null, now);
+
+    // Update timestamp del expediente
+    localDb.prepare("UPDATE gh_carpetas_expedientes SET updated_at = ? WHERE id = ?").run(now, expedienteId);
+
+    var row = localDb.prepare(
+      "SELECT d.*, c.codigo as categoria_codigo, c.nombre as categoria_nombre FROM gh_carpetas_documentos d " +
+      "JOIN gh_carpetas_categorias c ON d.categoria_id = c.id WHERE d.id = ?"
+    ).get(id);
+    return _ok({ documento: _rowToDocumentoCarpeta(row), expedienteCreado: expedienteCreado });
+  }).catch(function (e) {
+    console.error('[' + MOD + '][subir-documento-carpeta]', e.message);
+    return _err('INTERNAL', e.message);
+  });
+}
+
+// Helper: mime-type por extensión
+function _guessMime(ext) {
+  var m = {
+    'pdf': 'application/pdf',
+    'doc': 'application/msword',
+    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'xls': 'application/vnd.ms-excel',
+    'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'png': 'image/png'
+  };
+  return m[ext] || 'application/octet-stream';
+}
+
+/**
+ * gh:abrir-documento-carpeta
+ * Abre el archivo con la app por defecto del sistema.
+ * Input: { token, documentoId }
+ */
+function _handlerAbrirDocumentoCarpeta(token, documentoId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+  if (!documentoId) return _err('INVALID_INPUT', 'documentoId es requerido');
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+  var shell = registerGestionHumanaHandlers._shell;
+  if (!shell) return _err('NO_SHELL', 'shell no disponible');
+  try {
+    var row = localDb.prepare(
+      "SELECT ruta_archivo, nombre_archivo FROM gh_carpetas_documentos WHERE id = ? AND activo = 1"
+    ).get(documentoId);
+    if (!row) return _err('NOT_FOUND', 'Documento no encontrado');
+    if (!row.ruta_archivo) return _err('NO_PATH', 'Documento sin ruta');
+    return shell.openPath(row.ruta_archivo).then(function (errMsg) {
+      if (errMsg) return _err('OPEN_FAILED', errMsg);
+      return _ok({ rutaArchivo: row.ruta_archivo, nombreArchivo: row.nombre_archivo });
+    });
+  } catch (e) {
+    console.error('[' + MOD + '][abrir-documento-carpeta]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:eliminar-documento-carpeta
+ * Soft delete (activo=0) + borra archivo FS.
+ * Input: { token, documentoId }
+ */
+function _handlerEliminarDocumentoCarpeta(token, documentoId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+  if (!documentoId) return _err('INVALID_INPUT', 'documentoId es requerido');
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+  try {
+    var row = localDb.prepare("SELECT * FROM gh_carpetas_documentos WHERE id = ?").get(documentoId);
+    if (!row) return _err('NOT_FOUND', 'Documento no encontrado');
+    if (row.ruta_archivo) _safeUnlinkSync(row.ruta_archivo);
+    localDb.prepare("UPDATE gh_carpetas_documentos SET activo = 0 WHERE id = ?").run(documentoId);
+    return _ok({ documentoId: documentoId });
+  } catch (e) {
+    console.error('[' + MOD + '][eliminar-documento-carpeta]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+// ========== 📦743 · INTEGRACIÓN CARPETAS ↔ CONTRATACIÓN ==========
+// Mapeo: paso_num del flujo de contratación → código de categoría en Carpetas
+// Documentos subidos en estos pasos se muestran automáticamente en Carpeta como
+// "importados" (read-only — la fuente de verdad sigue siendo Contratación).
+var _CARPETAS_PASO_TO_CODIGO = {
+  1: 'hojavida',         // Memo / Correo → categoría "Hoja de vida" (datos del bp en el memo inicial)
+  2: 'identificacion',   // Contacto Aspirante → categoría "Identificación" (datos de contacto del bp)
+  3: 'examenes',         // Exámenes Médicos → categoría "Exámenes médicos"
+  4: 'contrato',         // Firma de Documentos → categoría "Contrato de trabajo"
+  5: 'afiliaciones'      // Afiliaciones → categoría "Afiliaciones"
+};
+// Paso 6 (S400) NO tiene categoría en Carpeta porque es solo metadatos de activación,
+// no un documento físico que el bp entregue o firme.
+
+/**
+ * gh:list-documentos-contratacion-by-bp
+ * Devuelve los soportes de contratación vinculados al bp, mapeados por categoría de Carpeta.
+ * Output: { success, data: { categoriasConDocs: { 'categoria_codigo': [soporte, ...] } } }
+ */
+function _handlerListDocumentosContratacionByBp(token, companyName, trabajadorId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+  if (!companyName) return _err('INVALID_INPUT', 'companyName es requerido');
+  if (!trabajadorId) return _err('INVALID_INPUT', 'trabajadorId es requerido');
+  var company = _getCompanyByName(companyName);
+  if (!company) return _err('COMPANY_NOT_FOUND', 'Empresa "' + companyName + '" no encontrada');
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+  try {
+    var stmt = localDb.prepare(
+      "SELECT s.id, s.contratacion_id, s.paso_num, s.nombre_archivo, s.ruta_archivo, s.tamano_bytes, s.mime_type, s.fecha_subida, " +
+      "       c.estado as contratacion_estado " +
+      "FROM gh_contratacion_soportes s " +
+      "INNER JOIN contrataciones c ON c.id = s.contratacion_id " +
+      "WHERE c.trabajador_id = ? AND c.empresa_id = ? " +
+      "  AND c.estado IN ('en_proceso', 'completado') " +
+      "  AND s.paso_num IN (1, 2, 3, 4, 5) " +
+      "ORDER BY s.fecha_subida DESC"
+    );
+    var rows = stmt.all(trabajadorId, company.company_key);
+    // Agrupar por código de categoría
+    var porCategoria = {};
+    rows.forEach(function (r) {
+      var codigo = _CARPETAS_PASO_TO_CODIGO[r.paso_num];
+      if (!codigo) return;
+      if (!porCategoria[codigo]) porCategoria[codigo] = [];
+      porCategoria[codigo].push({
+        id: r.id,
+        pasoNum: r.paso_num,
+        contratacionId: r.contratacion_id,
+        nombreArchivo: r.nombre_archivo,
+        rutaArchivo: r.ruta_archivo,
+        tamanoBytes: r.tamano_bytes,
+        mimeType: r.mime_type,
+        fechaSubida: r.fecha_subida,
+        origen: 'contratacion',
+        readOnly: true
+      });
+    });
+    return _ok({ categoriasConDocs: porCategoria, count: rows.length });
+  } catch (e) {
+    console.error('[' + MOD + '][list-documentos-contratacion-by-bp]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
+
+/**
+ * gh:abrir-soporte-contratacion
+ * Abre un soporte del flujo de contratación con la app por defecto del SO.
+ * Input: { token, soporteId }
+ */
+function _handlerAbrirSoporteContratacion(token, soporteId) {
+  var auth = _checkAuth(token);
+  if (!auth.ok) return _err(auth.error.code, auth.error.message);
+  if (!soporteId) return _err('INVALID_INPUT', 'soporteId es requerido');
+  var localDb = _getDb();
+  if (!localDb) return _err('NO_DB', 'BD no disponible');
+  var shell = registerGestionHumanaHandlers._shell;
+  if (!shell) return _err('NO_SHELL', 'shell no disponible');
+  try {
+    var row = localDb.prepare(
+      "SELECT ruta_archivo, nombre_archivo FROM gh_contratacion_soportes WHERE id = ?"
+    ).get(soporteId);
+    if (!row) return _err('NOT_FOUND', 'Soporte no encontrado');
+    if (!row.ruta_archivo) return _err('NO_PATH', 'Soporte sin ruta');
+    return shell.openPath(row.ruta_archivo).then(function (errMsg) {
+      if (errMsg) return _err('OPEN_FAILED', errMsg);
+      return _ok({ rutaArchivo: row.ruta_archivo, nombreArchivo: row.nombre_archivo });
+    });
+  } catch (e) {
+    console.error('[' + MOD + '][abrir-soporte-contratacion]', e.message);
+    return _err('INTERNAL', e.message);
+  }
+}
 
 module.exports = {
   registerGestionHumanaHandlers: registerGestionHumanaHandlers
