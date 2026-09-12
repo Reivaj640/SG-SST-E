@@ -5492,6 +5492,43 @@ function _rowToDocumentoCarpeta(row) {
   };
 }
 
+// 📦748 · Helper: cuenta docs por categoría incluyendo importados de Contratación.
+// Devuelve { [categoriaId]: count } sumando:
+//   1. Docs propios subidos al expediente (gh_carpetas_documentos)
+//   2. Docs importados del flujo de Contratación (gh_contratacion_soportes)
+//      mapeados por paso_num → codigo de categoría (mismo _CARPETAS_PASO_TO_CODIGO).
+// La fuente de verdad de los importados sigue siendo Contratación (read-only en Carpeta),
+// pero el conteo de completitud debe reflejar lo que el user VE en la UI.
+// Usado por _handlerGetExpediente y _handlerListExpedientes para mantener consistencia.
+function _docsPorCategoriaIncluyendoImportados(localDb, empresaId, bpId, catRows) {
+  var out = {};
+  // 1. Docs propios del expediente
+  var stmtPropios = localDb.prepare(
+    "SELECT categoria_id, COUNT(*) AS n FROM gh_carpetas_documentos " +
+    "WHERE empresa_id = ? AND trabajador_id = ? AND activo = 1 GROUP BY categoria_id"
+  );
+  stmtPropios.all(empresaId, bpId).forEach(function (r) {
+    out[r.categoria_id] = (out[r.categoria_id] || 0) + r.n;
+  });
+  // 2. Docs importados del flujo de Contratación (paso 1-5)
+  var stmtImp = localDb.prepare(
+    "SELECT s.paso_num, COUNT(*) AS n FROM gh_contratacion_soportes s " +
+    "INNER JOIN contrataciones c ON c.id = s.contratacion_id " +
+    "WHERE c.trabajador_id = ? AND c.empresa_id = ? " +
+    "  AND c.estado IN ('en_proceso', 'completado') " +
+    "  AND s.paso_num IN (1, 2, 3, 4, 5) " +
+    "GROUP BY s.paso_num"
+  );
+  stmtImp.all(bpId, empresaId).forEach(function (r) {
+    var codigo = _CARPETAS_PASO_TO_CODIGO[r.paso_num];
+    if (!codigo) return;
+    var catMatch = catRows.find(function (c) { return c.codigo === codigo; });
+    if (!catMatch) return;
+    out[catMatch.id] = (out[catMatch.id] || 0) + r.n;
+  });
+  return out;
+}
+
 // Calcula el estado DERIVADO del expediente (PDF sección 11.1).
 // Input: { categoriasActivas: [{id, codigo}], docsPorCategoria: {catId: count} }
 // Output: { estado, pct, categoriasPresentes, totalCategorias, esCritico }
@@ -5690,6 +5727,26 @@ function _handlerListExpedientes(token, companyName, search, estado, page, pageS
         }
         docsPorTrabajador[d.trabajador_id] = dpt;
       });
+      // 📦748 · Agregar importados de Contratación (mapeados por paso → codigo de categoria).
+      // Query batched (1 sola) para evitar N+1 cuando hay muchos bp en el listado.
+      var stmtImp = localDb.prepare(
+        "SELECT c.trabajador_id, s.paso_num FROM gh_contratacion_soportes s " +
+        "INNER JOIN contrataciones c ON c.id = s.contratacion_id " +
+        "WHERE c.empresa_id = ? AND c.trabajador_id IN (" + placeholders + ") " +
+        "  AND c.estado IN ('en_proceso', 'completado') " +
+        "  AND s.paso_num IN (1, 2, 3, 4, 5)"
+      );
+      var impRows = stmtImp.all.apply(stmtImp, [company.company_key].concat(bpIds));
+      impRows.forEach(function (r) {
+        var codigo = _CARPETAS_PASO_TO_CODIGO[r.paso_num];
+        if (!codigo) return;
+        var catMatch = catRows.find(function (c) { return c.codigo === codigo; });
+        if (!catMatch) return;
+        var dpt = docsPorTrabajador[r.trabajador_id] || { cats: {}, lastTs: 0, total: 0, thisMonth: 0 };
+        // Solo agregar si no hay propio en esa categoría (los importados son read-only)
+        if (!dpt.cats[catMatch.id]) dpt.cats[catMatch.id] = 1;
+        docsPorTrabajador[r.trabajador_id] = dpt;
+      });
     }
 
     // 4. Calcular estado por bp + agregar a lista
@@ -5851,9 +5908,9 @@ function _handlerGetExpediente(token, companyName, trabajadorId) {
       });
     });
 
-    // Estado derivado: solo cuenta docs de Carpeta (los importados NO cuentan para completar)
-    var catsCountMap = {};
-    Object.keys(docsPorCat).forEach(function (k) { catsCountMap[k] = docsPorCat[k].length; });
+    // Estado derivado: cuenta docs propios + importados (consistente con lo que el user VE)
+    // 📦748 · Helper centralizado para que lista y detalle calculen igual.
+    var catsCountMap = _docsPorCategoriaIncluyendoImportados(localDb, company.company_key, bp.id, catRows);
     var calc = _calcEstadoExpediente(catRows, catsCountMap);
 
     return _ok({
