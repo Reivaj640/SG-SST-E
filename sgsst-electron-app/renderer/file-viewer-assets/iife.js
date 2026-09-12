@@ -1,4 +1,4 @@
-import { DEFAULT_FILE_VIEWER_CAD_RUNTIME_VERSION, DEFAULT_FILE_VIEWER_DOCX_RUNTIME_VERSION, DEFAULT_RENDERER_DEFINITIONS, DEFAULT_FILE_VIEWER_PPT_RUNTIME_VERSION, resolveFileViewerRuntimeAssetBaseUrl } from '@file-viewer/core';
+import { DEFAULT_FILE_VIEWER_CAD_RUNTIME_VERSION, DEFAULT_RENDERER_DEFINITIONS, DEFAULT_FILE_VIEWER_PPT_RUNTIME_VERSION, resolveFileViewerRuntimeAssetBaseUrl } from '@file-viewer/core';
 import FlyfishFileViewerWeb, { createViewerControllerHandle, FileViewerElement, FILE_VIEWER_ELEMENT_TAG, mountViewer as mountBaseViewer } from '@file-viewer/web';
 export * from '@file-viewer/web';
 export { createViewerControllerHandle, FileViewerElement, FILE_VIEWER_ELEMENT_TAG };
@@ -8,14 +8,17 @@ const lazyRendererLines = [
     { key: 'pdf', label: 'PDF renderer', scriptName: 'pdf.iife.js', rendererIds: ['pdf'] },
     { key: 'ofd', label: 'OFD renderer', scriptName: 'ofd.iife.js', rendererIds: ['ofd'] },
     { key: 'presentation', label: 'Presentation renderer', scriptName: 'presentation.iife.js', rendererIds: ['office-presentation-binary', 'office-presentation'] },
-    { key: 'spreadsheet', label: 'Spreadsheet renderer', scriptName: 'spreadsheet.iife.js', rendererIds: ['spreadsheet-openxml'] },
+    { key: 'spreadsheet', label: 'Spreadsheet renderer', scriptName: 'spreadsheet.iife.js', rendererIds: ['spreadsheet-openxml', 'spreadsheet-dbf'] },
+    { key: 'iwork', label: 'Apple iWork renderer', scriptName: 'iwork.iife.js', rendererIds: ['apple-pages', 'apple-numbers', 'apple-keynote'] },
+    { key: 'wordperfect', label: 'WordPerfect renderer', scriptName: 'wordperfect.iife.js', rendererIds: ['office-wordperfect'] },
+    { key: 'hangul', label: 'HWP/HWPX renderer', scriptName: 'hangul.iife.js', rendererIds: ['office-hangul'] },
     { key: 'cad', label: 'CAD renderer', scriptName: 'cad.iife.js', rendererIds: ['cad'] },
     { key: 'typst', label: 'Typst renderer', scriptName: 'typst.iife.js', rendererIds: ['typst'] },
     { key: 'drawing', label: 'Drawing renderer', scriptName: 'drawing.iife.js', rendererIds: ['drawing'] },
     { key: 'model', label: '3D model renderer', scriptName: 'model.iife.js', rendererIds: ['model'] },
     { key: 'archive', label: 'Archive renderer', scriptName: 'archive.iife.js', rendererIds: ['archive'] },
     { key: 'email', label: 'Email renderer', scriptName: 'email.iife.js', rendererIds: ['email'] },
-    { key: 'ebook', label: 'Ebook renderer', scriptName: 'ebook.iife.js', rendererIds: ['epub', 'umd'] },
+    { key: 'ebook', label: 'Ebook renderer', scriptName: 'ebook.iife.js', rendererIds: ['epub', 'ebook-fb2', 'umd'] },
     { key: 'text', label: 'Text renderer', scriptName: 'text.iife.js', rendererIds: ['code', 'markdown'] },
     { key: 'image', label: 'Image renderer', scriptName: 'image.iife.js', rendererIds: ['image'] },
     { key: 'media', label: 'Media renderer', scriptName: 'media.iife.js', rendererIds: ['audio', 'video'] },
@@ -42,6 +45,7 @@ for (const definition of DEFAULT_RENDERER_DEFINITIONS) {
     }
 }
 const DEFAULT_FULL_ASSET_BASE_URL = '/file-viewer/';
+const WEB_FULL_DOCX_RUNTIME_VERSION = '0.3.28';
 const webFullScriptPattern = /(?:@file-viewer\/web-full|flyfish-file-viewer-web-full)/;
 const initialFullScriptUrl = detectCurrentScriptUrl();
 const initialFullRendererBaseUrl = resolveScriptBaseUrl(initialFullScriptUrl) || DEFAULT_FULL_ASSET_BASE_URL;
@@ -92,7 +96,7 @@ function createFullAssetOptions(assetBaseUrl) {
         return {};
     }
     const pptAssetUrl = (path) => (`${baseUrl}${path}?file-viewer-ppt=${encodeURIComponent(DEFAULT_FILE_VIEWER_PPT_RUNTIME_VERSION)}`);
-    const docxAssetUrl = (path) => (`${baseUrl}${path}?file-viewer-docx=${encodeURIComponent(DEFAULT_FILE_VIEWER_DOCX_RUNTIME_VERSION)}`);
+    const docxAssetUrl = (path) => (`${baseUrl}${path}?file-viewer-docx=${encodeURIComponent(WEB_FULL_DOCX_RUNTIME_VERSION)}`);
     const cadAssetUrl = (path) => (`${baseUrl}${path}?file-viewer-cad=${encodeURIComponent(DEFAULT_FILE_VIEWER_CAD_RUNTIME_VERSION)}`);
     return {
         archive: {
@@ -113,6 +117,16 @@ function createFullAssetOptions(assetBaseUrl) {
         },
         drawing: {
             viewerScriptUrl: `${baseUrl}vendor/drawio/viewer-static.min.js`
+        },
+        iwork: {
+            workerUrl: `${baseUrl}vendor/iwork/iwork.worker.js`
+        },
+        hangul: {
+            workerUrl: `${baseUrl}vendor/hangul/hangul.worker.js`
+        },
+        wordPerfect: {
+            workerUrl: `${baseUrl}vendor/wordperfect/wordperfect.worker.js`,
+            wasmUrl: `${baseUrl}vendor/wordperfect/libwpd.wasm`
         },
         model: {
             workerUrl: `${baseUrl}wasm/model/occt-worker.js`,
@@ -292,9 +306,12 @@ export function withFullViewerOptions(options = {}, assetBaseUrl = defaultFullAs
         data: mergeNestedOptions(assetOptions.data, rest.data),
         docx: mergeNestedOptions(assetOptions.docx, rest.docx),
         drawing: mergeNestedOptions(assetOptions.drawing, rest.drawing),
+        hangul: mergeNestedOptions(assetOptions.hangul, rest.hangul),
+        iwork: mergeNestedOptions(assetOptions.iwork, rest.iwork),
         pdf: mergeNestedOptions(pdfDefaults, rest.pdf),
         presentation: mergeNestedOptions(assetOptions.presentation, rest.presentation),
         spreadsheet: mergeNestedOptions(assetOptions.spreadsheet, rest.spreadsheet),
+        wordPerfect: mergeNestedOptions(assetOptions.wordPerfect, rest.wordPerfect),
         typst: mergeNestedOptions(assetOptions.typst, rest.typst),
         model: mergeNestedOptions(assetOptions.model, rest.model)
     };
