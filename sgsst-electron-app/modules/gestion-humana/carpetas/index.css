@@ -286,7 +286,13 @@
 
 /* ========== GRID DE CATEGORÍAS ========== */
 .kair-detail-grid {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
+  display: grid;
+  /* 📦747 · Grid responsivo (auto-fill + minmax) — patrón del shell GH.
+   * Se adapta al ancho disponible: 6 cols en pantallas wide, 4 en laptop
+   * normal (1366-1700px), 2 en pantallas chicas. Mantiene min 280px por
+   * card para legibilidad de nombres largos de categoría y archivo. */
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
 }
 .kair-cat-card {
   background: var(--kair-surface);
