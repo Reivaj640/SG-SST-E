@@ -124,6 +124,32 @@ class GestionIntegralHome {
         document.head.appendChild(style);
     }
 
+    /**
+     * 📦754-fix · Cargar estadísticas reales de Gestión Integral.
+     * Restaurado del backup pre-rediseno (mi script Python lo eliminó al reescribir).
+     * Si el IPC `getGestionIntegralStats` no existe en window.electronAPI, el fallback
+     * seguro deja `this.gestionIntegralStats = null` y el render usa defaults.
+     */
+    async loadGestionIntegralStats() {
+        try {
+            console.log('🔄 [GestionIntegralHome] Cargando estadísticas para:', this.currentCompany);
+
+            if (window.electronAPI && window.electronAPI.getGestionIntegralStats) {
+                const result = await window.electronAPI.getGestionIntegralStats(this.currentCompany);
+                if (result.success) {
+                    this.gestionIntegralStats = result.stats;
+                    console.log('✅ [GestionIntegralHome] Estadísticas cargadas:', this.gestionIntegralStats);
+                } else {
+                    console.warn('⚠️ [GestionIntegralHome] Error cargando estadísticas:', result.error);
+                    this.gestionIntegralStats = null;
+                }
+            }
+        } catch (error) {
+            console.error('❌ [GestionIntegralHome] Error cargando estadísticas:', error);
+            this.gestionIntegralStats = null;
+        }
+    }
+
     async renderMainArea(container) {
         // 📦491-fix — Limpiar skeleton antes de pintar widgets reales
         container.innerHTML = '';
