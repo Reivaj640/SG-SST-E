@@ -19,6 +19,10 @@ Thumbs.db
 temp-*/
 tmp/
 
+# 📦730 · Scripts Python throwaway en Temp/ (no son smoke tests, son one-shot
+# de refactors como replace-recursos-render.py). Smoke tests siguen tracked.
+Temp/*.py
+
 # Archivos de configuración de IDE
 .vscode/
 .idea/
@@ -27,8 +31,11 @@ tmp/
 .npmrc
 
 # Archivos de respaldo
+# 📦730 · Patrón más flexible: cubre *.bak, *.bak-pre-rediseno-YYYYMMDD, *.backup, etc.
 *.bak
+*.bak-*
 *.backup
+*.backup-*
 
 # Entornos virtuales de Python
 Portear/.venv/

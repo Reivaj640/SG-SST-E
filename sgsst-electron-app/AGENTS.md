@@ -209,6 +209,53 @@ Las vistas usan exclusivamente el sistema BEM `kair-*` definido en `kair-canonic
 - Calendarios: `kair-cron-grid`, `kair-cron-grid__row/cell/head/corner/month/audit/hito`
 - Workflow editor: `kair-rad-editor`, `kair-rad-editor__main/sidebar`, `kair-rad-sticky-footer`, `kair-rad-side-nav__item`
 
+### K+AIR Premium Design System (v0.1.197 · 📦730)
+
+A partir de v0.1.197, los homes de módulos (Recursos, Gestión Humana, etc.) usan el sistema premium con tokens compartidos:
+
+#### Archivos del design system
+- `shared/kair-design-tokens.css` — 9 tokens CSS globales en `:root`: tipografía (`--kair-font-display` DM Sans 800, `--kair-font-ui` Manrope), radios (`--kair-radius-card/modal/control`), espacios (`--kair-spacer-*`), colores (`--kair-blue/blue-ink/mint/red/amber/ink/muted/faint/canvas/card/line`), transiciones (`--kair-transition` 180ms).
+- `shared/kair-components.css` — 14 componentes reutilizables con prefijo `kair-` (sin choque con el sistema BEM legacy).
+
+#### Componentes premium
+- `.kair-page-header` + `.kair-page-title-block` + `.kair-breadcrumb` — header con breadcrumb + H1
+- `.kair-hero-card` — card grande oscura con mensaje + score + círculo decorativo
+- `.kair-metric-card` (variantes `--danger`, `--warning`) — KPI con progress bar
+- `.kair-card` — card genérica
+- `.kair-tabs` + `.kair-tab` — tabs horizontales
+- `.kair-btn-primary` + `.kair-btn-ghost` — botones
+- `.kair-status-pill` (variantes `--ok`, `--warn`, `--danger`) — badge de estado
+- `.kair-progress` + `.kair-progress i` — barra de progreso
+- `.kair-chart` + `.kair-legend` — chart SVG
+- `.kair-task` + `.kair-task-icon` — item de lista con icono circular
+- `.kair-module` + `.kair-module-grid` — card de submódulo con flecha
+
+#### Reglas del design system
+- **Coexistencia**: los nuevos `kair-*` conviven con los legacy `--k-*` sin conflicto (prefijos distintos).
+- **Responsive fluido**: usar `clamp(min, vw, max)` + `auto-fit` / `auto-fill` para escalar entre ~600px y >1300px.
+- **Cache-bust obligatorio**: cada vez que se modifique `kair-design-tokens.css` o `kair-components.css`, bumpear `?v=YYYYMMDD-HHMM-descriptor` en `index.html`. **Lo mismo aplica a `styles.css`** que también cachea agresivamente en Electron.
+- **NO agregar `margin: 0 auto` a headers que comparten container con cards** — esto centra el bloque y lo desalinea del resto. Usar `margin: 0 lateral` + `max-width` igual al container padre.
+- **Para scroll interno en flex chain**: TODOS los niveles intermedios necesitan `flex: 1` O `height: 100%` + `min-height: 0` para que `overflow: auto` funcione. Si una clase usada en JS no tiene reglas CSS, agregarlas (caso histórico: `.k-app-layout`).
+
+#### Patrón de score compuesto del módulo
+
+El hero card "ESTADO GENERAL" del módulo Recursos usa **promedio simple de N componentes** disponibles en `resourceStats`, excluyendo los que no tienen datos:
+
+```javascript
+const componentes = [
+    inducciones.totalTrabajadores > 0 ? inducciones.porcentajeCompletado : null,
+    capacitaciones.programadas > 0 ? capacitaciones.porcentajeCumplimiento : null,
+    totalPlaneado > 0 ? cumplimientoPresupuesto : null,
+    copasst.actaMesEnCurso ? 100 : 0,    // binario mensual
+    comite.actaMesEnCurso ? 100 : 0,     // binario mensual
+    afiliacion.estado === 'ok' ? 100 : (afiliacion.estado ? 0 : null)
+];
+const score = componentes.filter(v => v !== null)
+                          .reduce((a, b) => a + b, 0) / componentes.filter(v => v !== null).length;
+```
+
+Aplicar el mismo patrón cuando se agreguen nuevos módulos al home premium.
+
 ### Comunicación
 - **Renderer ↔ Main process**: `window.electronAPI.modulo.metodo(arg).then(...)`
 - **Entre vistas**: `window.KairStore.actions.goXxx()` + `_refreshView()` en el componente

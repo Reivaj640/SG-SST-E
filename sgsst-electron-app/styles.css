@@ -5789,6 +5789,18 @@ aside:has([data-module-list]) > [data-module-list],
   overflow: hidden !important;
 }
 
+/* 📦768 — El #main-content (padre del módulo) tiene overflow-y: auto por defecto,
+   lo que hace que TODO el módulo scrollee desde el contenedor padre, no internamente.
+   Forzamos overflow: hidden en #main-content cuando contiene un módulo principal,
+   para que el scroll INTERNO sea en .gestion-integral-home (o equivalente). */
+#main-content:has(.module-content-area .gestion-integral-home),
+#main-content:has(.module-content-area .gestion-salud-home),
+#main-content:has(.module-content-area .gestion-peligros-home),
+#main-content:has(.module-content-area .gestion-amenazas-home) {
+  overflow: hidden !important;
+  overflow-y: hidden !important;
+}
+
 /* Scroll INTERNO dentro del contenedor del home (NO en el borde de la página).
    El home ya tiene su propio `height: 100%` y `display: flex`, así que solo
    cambiamos overflow-y a auto para que el contenido se pueda desplazar

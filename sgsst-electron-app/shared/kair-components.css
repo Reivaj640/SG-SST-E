@@ -1,0 +1,126 @@
+/* =====================================================
+   K+AIR · Componentes compartidos
+   Reutilizables en cualquier módulo (Recursos, GH, etc.)
+   Dependen de los tokens en kair-design-tokens.css
+   ===================================================== */
+
+/* =====================================================
+   K+AIR · Componentes compartidos
+   Reutilizables en cualquier módulo (Recursos, GH, etc.)
+   Dependen de los tokens en kair-design-tokens.css
+   Diseño fluido: escala desde ~600px hasta >1300px sin
+   mantener el mismo tamaño fijo en ambos extremos.
+   ===================================================== */
+
+/* ------- Tipografía base ------- */
+body { font-family: var(--kair-font-ui); color: var(--kair-ink); background: var(--kair-canvas); }
+h1, h2, h3, h4 { font-family: var(--kair-font-display); letter-spacing: -0.5px; }
+
+/* ------- Breadcrumb ------- */
+.kair-breadcrumb { font-size: clamp(11px, 0.85vw, 12px); color: var(--kair-muted); margin-bottom: clamp(7px, 0.8vw, 11px); }
+.kair-breadcrumb span { color: var(--kair-faint); padding: 0 6px; }
+
+/* ------- Encabezado de página (título escalado) ------- */
+/* 📦730 · Alinear a la izquierda y ocupar todo el ancho del container padre
+   (antes tenía margin: 0 auto + max-width: 1300px que centraba el bloque). */
+.kair-page-header { margin: 0 clamp(8px, 1.5vw, 16px) clamp(20px, 2.4vw, 32px); max-width: min(1400px, 100% - 24px); padding: 0; box-sizing: border-box; text-align: left; }
+.kair-page-title-block h1 { margin: 0; font: 800 clamp(22px, 2.6vw, 34px) / 1.1 var(--kair-font-display); letter-spacing: -0.05em; color: var(--kair-ink); }
+
+/* ------- Botones ------- */
+.kair-btn { border: 0; cursor: pointer; padding: 11px 17px; border-radius: var(--kair-radius-control); font: 600 13px var(--kair-font-ui); transition: var(--kair-transition); white-space: nowrap; }
+.kair-btn-primary { background: var(--kair-blue); color: #fff; box-shadow: var(--kair-shadow-soft); }
+.kair-btn-primary:hover { background: #1a4ba0; }
+.kair-btn-ghost { background: #fff; color: #536177; border: 1px solid var(--kair-line); }
+.kair-btn-ghost:hover { background: var(--kair-canvas); }
+
+/* ------- Status pill (badge de estado) ------- */
+.kair-status-pill { font-size: 10px; font-weight: 700; padding: 6px 10px; border-radius: var(--kair-radius-control); display: inline-block; }
+.kair-status-pill--ok { background: #e4f7f0; color: #16805f; }
+.kair-status-pill--warn { background: #fff5dc; color: #a56d00; }
+.kair-status-pill--danger { background: #ffe6e9; color: #a83a48; }
+
+/* ------- Metric card (3 unidades del hero strip) ------- */
+.kair-metric-card { background: var(--kair-card); border: 1px solid var(--kair-line); border-radius: var(--kair-radius-card); padding: clamp(15px, 1.6vw, 22px) clamp(15px, 1.6vw, 20px); min-height: clamp(110px, 10vw, 140px); display: flex; flex-direction: column; }
+.kair-metric-card .kair-metric-head { color: #637189; text-transform: uppercase; letter-spacing: 0.65px; font-size: clamp(9px, 0.75vw, 10px); font-weight: 700; }
+.kair-metric-card .kair-metric-value { font: 800 clamp(20px, 2.2vw, 28px) / 1 var(--kair-font-display); letter-spacing: -0.04em; margin-top: clamp(12px, 1.6vw, 21px); color: var(--kair-ink); }
+.kair-metric-card .kair-metric-value small { font: 500 clamp(12px, 1.1vw, 15px) var(--kair-font-ui); color: #8791a1; }
+.kair-metric-card .kair-metric-desc { margin: 3px 0 16px; color: var(--kair-muted); font-size: clamp(11px, 1vw, 12px); }
+.kair-metric-card .kair-progress { height: 7px; border-radius: 10px; background: #eef0f1; overflow: hidden; margin-top: auto; }
+.kair-metric-card .kair-progress i { height: 100%; display: block; border-radius: 10px; background: var(--kair-mint); }
+.kair-metric-card--danger .kair-progress i { background: var(--kair-red); }
+.kair-metric-card--warning .kair-progress i { background: var(--kair-amber); }
+
+/* ------- Hero card grande (conclusión humana + score) ------- */
+.kair-hero-card { background: var(--kair-blue-ink); color: #fff; border-radius: var(--kair-radius-modal); padding: clamp(18px, 1.9vw, 25px) clamp(18px, 2vw, 27px); min-height: clamp(110px, 10vw, 140px); position: relative; overflow: hidden; }
+.kair-hero-card::after { content: ''; position: absolute; width: clamp(140px, 16vw, 210px); height: clamp(140px, 16vw, 210px); background: rgba(50, 205, 163, 0.35); border-radius: 50%; right: -72px; top: -100px; pointer-events: none; }
+.kair-hero-card .kair-hero-eyebrow { font-size: clamp(10px, 0.85vw, 11px); letter-spacing: 0.8px; text-transform: uppercase; color: #a8b8ce; }
+.kair-hero-card h2 { font: 700 clamp(16px, 1.6vw, 21px) / 1.2 var(--kair-font-display); margin: 9px 0 5px; letter-spacing: -0.03em; color: #fff; }
+.kair-hero-card .kair-hero-msg { margin: 0; color: #c1ccdb; font-size: clamp(11px, 1vw, 13px); max-width: 260px; }
+.kair-hero-card .kair-hero-score { position: absolute; bottom: clamp(15px, 1.9vw, 24px); right: clamp(17px, 1.9vw, 25px); font: 800 clamp(22px, 2.4vw, 32px) var(--kair-font-display); color: #fff; }
+.kair-hero-card .kair-hero-score span { font: 500 clamp(10px, 0.95vw, 12px) var(--kair-font-ui); color: #9eafc6; display: block; text-align: right; margin-top: -4px; }
+
+/* ------- Card genérica ------- */
+.kair-card { background: var(--kair-card); border: 1px solid var(--kair-line); border-radius: var(--kair-radius-card); padding: clamp(14px, 1.5vw, 20px); }
+.kair-card-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: clamp(12px, 1.3vw, 18px); gap: 12px; flex-wrap: wrap; }
+.kair-card-head h3 { margin: 0; font: 700 clamp(14px, 1.3vw, 17px) var(--kair-font-display); letter-spacing: -0.03em; color: var(--kair-ink); }
+.kair-card-head .kair-card-hint { font-size: clamp(11px, 0.95vw, 12px); color: var(--kair-muted); margin-top: 5px; }
+
+/* ------- Tabs (Acumulado / Mensual) ------- */
+.kair-tabs { background: #f2f4f5; border-radius: var(--kair-radius-control); padding: 3px; display: flex; gap: 2px; }
+.kair-tabs span { font-size: 11px; color: #798397; padding: 7px 10px; cursor: pointer; }
+.kair-tabs span.kair-tab-active { background: #fff; color: #1c2d47; box-shadow: 0 2px 7px rgba(37, 56, 82, 0.08); border-radius: 9px; font-weight: 600; }
+
+/* ------- Progress bar (reutilizable) ------- */
+.kair-progress-bar { height: 7px; border-radius: 10px; background: #eef0f1; overflow: hidden; }
+.kair-progress-bar i { height: 100%; display: block; border-radius: 10px; background: var(--kair-mint); transition: width 0.4s ease; }
+
+/* ------- Health strip (hero + 3 metrics) — fluido -------
+   auto-fit + minmax garantiza que el grid se reorganice solo
+   según el ancho disponible, sin breakpoints rígidos.
+   width: 100% fuerza llenar el mainArea completo. */
+.kair-health { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: clamp(10px, 1.2vw, 16px); width: 100%; margin: 0 0 clamp(12px, 1.3vw, 17px) 0; padding: 0 clamp(4px, 0.6vw, 8px); box-sizing: border-box; }
+.kair-health > .kair-hero-card { grid-column: span 2; }
+@media (max-width: 880px) { .kair-health > .kair-hero-card { grid-column: span 1; } }
+
+/* ------- Content grid (chart + radar) — fluido -------
+   Ratio 1.5fr/1fr (60% chart, 40% radar).
+   width: 100% para forzar que ocupe TODO el ancho del mainArea,
+   igualando exactamente el ancho del health strip de arriba. */
+.kair-content { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: clamp(10px, 1.2vw, 17px); width: 100%; margin: 0; padding: 0 clamp(4px, 0.6vw, 8px); box-sizing: border-box; }
+@media (max-width: 880px) { .kair-content { grid-template-columns: 1fr; } }
+
+/* ------- Chart SVG -------
+   Altura reducida para que el card quepa sin scroll en viewport 800-900px. */
+.kair-chart { height: clamp(130px, 13vw, 170px); position: relative; border-bottom: 1px solid var(--kair-line-soft); background: repeating-linear-gradient(0deg, transparent 0 43px, #f0f2f3 44px), repeating-linear-gradient(90deg, transparent 0 75px, #f6f7f7 76px); }
+.kair-chart svg { width: 100%; height: 100%; position: absolute; inset: 0; }
+
+/* ------- Legend (debajo del chart) ------- */
+.kair-legend { display: flex; gap: clamp(12px, 1.5vw, 20px); font-size: clamp(10px, 0.9vw, 11px); color: var(--kair-muted); padding-top: clamp(10px, 1.1vw, 15px); flex-wrap: wrap; }
+.kair-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 6px; background: var(--kair-blue); }
+
+/* ------- Row title (header de card con link "Ver todo") ------- */
+.kair-row-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: clamp(10px, 1.1vw, 14px); gap: 12px; flex-wrap: wrap; }
+.kair-row-title h3 { margin: 0; font: 700 clamp(14px, 1.3vw, 17px) var(--kair-font-display); letter-spacing: -0.03em; color: var(--kair-ink); }
+.kair-row-title .kair-card-hint { font-size: clamp(11px, 0.95vw, 12px); color: var(--kair-muted); margin-top: 5px; }
+.kair-row-link { font-size: 12px; color: var(--kair-blue); font-weight: 600; text-decoration: none; }
+.kair-row-link:hover { text-decoration: underline; }
+
+/* ------- Task item (línea en radar panel) ------- */
+.kair-task { display: flex; gap: 11px; padding: clamp(8px, 0.85vw, 11px) 0; border-bottom: 1px solid var(--kair-line-soft); align-items: center; }
+.kair-task:last-child { border-bottom: none; }
+.kair-task-icon { width: 34px !important; min-width: 34px !important; max-width: 34px !important; height: 34px !important; min-height: 34px !important; max-height: 34px !important; border-radius: 11px; display: grid; place-items: center; font-size: clamp(14px, 1.2vw, 16px); flex: 0 0 34px !important; }
+.kair-task > div { flex: 1; min-width: 0; }
+.kair-task strong { display: block; font-size: clamp(12px, 1vw, 13px); color: var(--kair-ink); font-weight: 600; }
+.kair-task small { display: block; color: var(--kair-muted); font-size: clamp(10px, 0.9vw, 11px); margin-top: 3px; }
+
+/* ------- Modules grid (submódulos con flecha) — fluido -------
+   minmax reducido a 200px para que 5-6 módulos quepan SIN overflow,
+   con gap más generoso para que cada card respire. */
+.kair-modules { width: 100%; margin: clamp(12px, 1.3vw, 17px) 0 0; padding: 0 clamp(4px, 0.6vw, 8px); box-sizing: border-box; }
+.kair-module-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: clamp(10px, 1.1vw, 14px); padding-right: clamp(2px, 0.4vw, 4px); box-sizing: border-box; }
+.kair-module { border: 1px solid var(--kair-line); border-radius: 15px; padding: clamp(10px, 1vw, 14px); min-height: clamp(58px, 5.5vw, 72px); position: relative; transition: var(--kair-transition); cursor: pointer; background: var(--kair-card); }
+.kair-module:hover { border-color: #c8d7ef; box-shadow: 0 7px 18px rgba(28, 49, 92, 0.05); }
+.kair-module-n { color: var(--kair-blue); font-size: clamp(10px, 0.9vw, 11px); font-weight: 700; letter-spacing: 0.5px; }
+.kair-module strong { display: block; font: 700 clamp(12px, 1vw, 13px) var(--kair-font-display); margin-top: 7px; max-width: 160px; color: var(--kair-ink); }
+.kair-module small { color: var(--kair-muted); font-size: clamp(10px, 0.9vw, 11px); display: block; margin-top: 3px; }
+.kair-module-arrow { position: absolute; right: 14px; bottom: 13px; color: var(--kair-blue); font-size: 17px; line-height: 1; }

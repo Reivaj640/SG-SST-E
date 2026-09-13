@@ -1,0 +1,54 @@
+/* =====================================================
+   K+AIR · Design Tokens
+   Sistema visual premium — base reutilizable
+   Cargado desde index.html (alcance :root global)
+   ===================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap');
+
+:root {
+    /* Colores base — fondo y superficie */
+    --kair-canvas: #fbfcfb;       /* fondo de aplicación */
+    --kair-card:   #ffffff;       /* superficie de tarjetas */
+    --kair-soft:   #f3f6f6;       /* neutro suave (chips, divisores internos) */
+
+    /* Texto */
+    --kair-ink:    #14213d;       /* texto principal */
+    --kair-muted:  #748096;       /* texto secundario */
+    --kair-faint:  #aab1bd;       /* texto auxiliar, breadcrumbs */
+
+    /* Bordes y separadores */
+    --kair-line:   #e8ebee;       /* borde sutil por defecto */
+    --kair-line-soft: #eef0f1;   /* borde muy sutil (separadores internos) */
+
+    /* Acentos semánticos (NO decorar) */
+    --kair-blue:   #2057b8;       /* azul K+AIR — acción primaria, navegación activa, datos destacados */
+    --kair-blue-ink:  #172c4c;   /* azul oscuro para hero cards */
+    --kair-mint:   #1bb888;       /* verde — éxito, cumplimiento */
+    --kair-amber:  #e7a224;       /* ámbar — advertencia */
+    --kair-red:    #da5563;       /* rojo — riesgo */
+
+    /* Sombras muy suaves (preferir bordes a sombras) */
+    --kair-shadow-soft: 0 8px 18px rgba(32, 87, 184, 0.15);   /* botón primario */
+    --kair-shadow-card:  0 2px 7px rgba(37, 56, 82, 0.08);    /* card elevado leve */
+
+    /* Tipografía */
+    --kair-font-ui:      'DM Sans', system-ui, -apple-system, sans-serif;
+    --kair-font-display: 'Manrope', 'DM Sans', sans-serif;
+
+    /* Radios */
+    --kair-radius-card:   20px;   /* tarjetas principales */
+    --kair-radius-modal:  22px;   /* hero cards grandes */
+    --kair-radius-control: 12px;  /* botones, inputs, chips */
+    --kair-radius-pill:    999px;
+
+    /* Espaciado */
+    --kair-space-xs: 4px;
+    --kair-space-sm: 8px;
+    --kair-space-md: 16px;
+    --kair-space-lg: 24px;
+    --kair-space-xl: 32px;
+
+    /* Transiciones (animaciones discretas) */
+    --kair-transition: 180ms ease-out;
+}

@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.197] - 2026-09-12
+
+### 📦730 · Módulo Recursos: rediseño premium visual + score compuesto del módulo
+
+Aplica el rediseño visual premium (referencia `recursos-redisenado.html`) sobre el home del módulo Recursos, lo deja data-driven con score compuesto del módulo, y repara 3 bugs del layout cut-off en modo ventana.
+
+#### Cambios visuales (UI)
+
+- **Nuevo design system compartido** — `shared/kair-design-tokens.css` (2.283 bytes) con 9 tokens CSS globales en `:root` (tipografía DM Sans + Manrope, radios 20-22-12px, espacios 4-32px, transiciones 180ms) y `shared/kair-components.css` (10.611 bytes) con 14 componentes reutilizables:
+  - `.kair-page-header` + `.kair-page-title-block` (breadcrumb + H1)
+  - `.kair-hero-card` (mensaje + score, fondo azul-ink con círculo decorativo verde)
+  - `.kair-metric-card` (con variantes `--danger` / `--warning`)
+  - `.kair-card`, `.kair-tabs`, `.kair-btn-primary` / `kair-btn-ghost`
+  - `.kair-status-pill--ok` / `kair-status-pill--warn` / `kair-status-pill--danger`
+  - `.kair-progress-bar`, `.kair-chart`, `.kair-legend`, `.kair-task`, `.kair-module` + grid
+- **Header minimal**: solo breadcrumb "Inicio / Gestión / Recursos" + H1 "Recursos" (sin subtítulo/badges/botones).
+- **Hero strip**: 1 hero card "ESTADO GENERAL" + 3 metric cards (Inducciones, Plan de capacitación, Presupuesto).
+- **Chart SVG nativo**: ejecución presupuestal mensual (planeado vs ejecutado), 12 meses, sin Chart.js (eliminado del módulo).
+- **Panel "En tu radar"**: muestra hasta 3 alertas del módulo con icono + status pill (COPASST, Afiliación SSSI, Comité de Convivencia).
+- **Grid "Explorar submódulos"**: 12 cards responsivas con flecha, auto-fill + minmax(200px, 1fr).
+- **Responsive fluido**: H1, padding, gaps y heights escalan entre ~600px y >1300px viewport usando `clamp()` + `auto-fit` / `auto-fill`.
+
+#### Cambios funcionales (lógica)
+
+- **Score compuesto del módulo** — `cumplimientoGeneral` reemplaza al viejo `cumplimiento` (que era solo % ejecución presupuestal):
+  - Promedio simple de 6 componentes disponibles en `resourceStats`: inducciones %, capacitaciones %, presupuesto %, COPASST acta del mes (binario), Comité Convivencia acta del mes (binario), afiliación estado (`ok`=100, `warn`/`danger`=0).
+  - Si un componente no tiene datos, se **excluye** del cálculo (no penaliza con 0).
+  - La card "Presupuesto" sigue mostrando `cumplimientoPresupuesto` (su dato específico).
+- **Conteo completo de pendientes** — `tareasPendientes` ahora incluye: inducciones + capacitaciones + EPPs + COPASST (1 si falta acta del mes) + Comité (1 si falta acta del mes) + afiliación (1 si estado ≠ ok).
+- **Grid sin límite** — `renderSubmodulesGrid()` ahora muestra los 12 submódulos definidos en `ALL_SUBMODULES.Recursos` (antes cortaba en 6 con `.slice(0, 6)`).
+
+#### Cambios estructurales (sistema)
+
+- **Cache-bust obligatorio** en cada `?v=...` de CSS/JS que se modifica (Electron cachea agresivamente; sin esto Ctrl+R no toma cambios).
+- **Layout chain para scroll interno** — fix coordinado de 3 causas concurrentes que cortaban el contenido en modo ventana:
+  1. `styles.css` sin cache-bust → cambios al CSS no se veían.
+  2. Clase `.k-app-layout` sin reglas CSS → eslabón roto del flex chain.
+  3. Falta `min-height: 0` y altura constrained en niveles intermedios del flex chain.
+- **Override `#main-content:has(.module-content-area .gestion-integral-home) { overflow: hidden !important }`** en `styles.css` para forzar scroll interno en módulos principales.
+
+#### Archivos tocados
+
+- `shared/kair-design-tokens.css` (NUEVO)
+- `shared/kair-components.css` (NUEVO)
+- `index.html` — links a nuevos CSS con cache-bust
+- `modules/recursos/recursos-home.js` — header, renderMainArea, score compuesto, radar, grid
+- `styles.css` — fix de scroll interno en módulos principales
+- `.gitignore` — patrones `*.bak-*`, `*.backup-*`, `Temp/*.py` para excluir throwaways
+
 ## [0.1.191] - 2026-08-31
 
 ### 📦767 · I-103.A1.0 — Gestión Humana: ciclo laboral del bp cerrado (fases B a G.2.1)

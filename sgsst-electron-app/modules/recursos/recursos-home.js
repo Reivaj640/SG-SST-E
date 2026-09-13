@@ -30,20 +30,19 @@ class RecursosHome {
         // 2. Layout
         const layout = document.createElement('div');
         layout.className = 'k-app-layout';
-        layout.style.height = '100%';
+        layout.style.cssText = 'height: 100%; display: flex; flex-direction: column; min-height: 0;';
 
-        // Header
+        // Header (📦762 — minimal: solo breadcrumb + H1, escala fluido)
         const header = document.createElement('header');
-        header.className = 'k-module-header';
+        header.className = 'kair-page-header';
         header.innerHTML = `
-            <div class="k-module-title">
-                <span class="k-module-title-icon" style="color: #212529;">${SIDEBAR_ICONS.users}</span>
-                <div>
-                    <div style="color: #212529; font-weight: 600;">Módulo Recursos</div>
-                    <span style="font-size: 0.75rem; font-weight: 400; color: #6c757d;">
-                        ${this.currentCompany} / Recursos
-                    </span>
+            <div class="kair-page-title-block">
+                <div class="kair-breadcrumb">
+                    <span>Inicio</span><span>/</span>
+                    <span>Gestión</span><span>/</span>
+                    <span>Recursos</span>
                 </div>
+                <h1>Recursos</h1>
             </div>
         `;
         layout.appendChild(header);
@@ -73,8 +72,9 @@ class RecursosHome {
         // Renderizar contenido (limpia el skeleton y pinta widgets reales cuando llegan los datos)
         await this.renderMainArea(mainArea);
 
-        // Inicializar gráficos
-        setTimeout(() => this.initCharts(), 100);
+        // El rediseño premium usa SVG (renderChartPresupuesto) en vez de Chart.js.
+        // initCharts ya no aplica — los canvases budgetChart/trainingChart/inductionChart no existen en el nuevo layout.
+        // setTimeout(() => this.initCharts(), 100); // 📦762 — deshabilitado por rediseño premium
     }
 
     injectStyles() {
@@ -115,10 +115,20 @@ class RecursosHome {
                 color: var(--k-text-main);
                 background-color: var(--k-bg-app);
                 height: 100%;
+                min-height: 0;
                 display: flex;
                 flex-direction: column;
                 padding: 1.5rem;
-                overflow: hidden;
+                overflow: hidden auto;
+            }
+
+            /* 📦768 — Forzar altura y flex en .k-app-layout para que el chain funcione.
+               Sin esta regla, .k-app-layout crece con el contenido y mainArea no tiene altura. */
+            .k-app-layout {
+                height: 100%;
+                min-height: 0;
+                display: flex;
+                flex-direction: column;
             }
 
             /* Header & Botones */
@@ -171,6 +181,9 @@ class RecursosHome {
                 overflow-y: auto;
                 padding-right: 0.5rem;
                 width: 100%;
+                flex: 1 1 auto;
+                min-height: 0;
+                height: 100%;
             }
 
             /* Grid de Widgets */
@@ -506,99 +519,305 @@ margin-bottom: 0.5rem;
 
     async renderMainArea(container) {
         // 📦494-fix — cargar datos PRIMERO con el skeleton todavía visible.
-        // Antes este clear se hacía arriba (container.innerHTML = '') y eso
-        // dejaba el contenedor en blanco durante los 2-3s de loadResourceStats().
         // Ahora limpiamos recién cuando los datos ya están.
+        if (!this.resourceStats || Object.keys(this.resourceStats).length === 0) {
+            await this.loadResourceStats();
+        }
 
-        // Cargar estadísticas reales de recursos (con skeleton visible)
-        await this.loadResourceStats();
+        // 📦762 — cargar también los datos mensuales de presupuesto para el chart SVG.
+        // createBudgetWidget es un async que tiene como side-effect poblar this.budgetData.mensual.
+        if (!this.budgetData || this.budgetData.company !== this.currentCompany) {
+            // Llamamos solo por su side-effect; el widget devuelto se descarta (será GC).
+            await this.createBudgetWidget();
+        }
 
-        // 📦494-fix — Recién ahora limpiamos el skeleton, los datos ya están listos
-        // para que los widgets se pinten instantáneamente sin "blanco" intermedio.
+        // 📦494-fix — limpiar skeleton ahora que los datos están listos
         container.innerHTML = '';
 
-        const widgetsContainer = document.createElement('div');
-        widgetsContainer.className = 'widgets-container';
+        // Rediseño premium: 1 hero + 3 metrics + 1 chart SVG + radar + submódulos
+        const stats = this.resourceStats || {};
+        const inducciones = stats.inducciones || {};
+        const capacitaciones = stats.capacitaciones || {};
+        const presupuestoData = this.budgetData && this.budgetData.mensual
+            ? this.budgetData.mensual
+            : { planeado: Array(12).fill(0), ejecutado: Array(12).fill(0) };
+        const totalPlaneado = presupuestoData.planeado.reduce(function (a, b) { return a + b; }, 0);
+        const totalEjecutado = presupuestoData.ejecutado.reduce(function (a, b) { return a + b; }, 0);
+        // cumplimientoPresupuesto: dato específico de la card "Presupuesto"
+        const cumplimientoPresupuesto = totalPlaneado > 0 ? Math.round((totalEjecutado / totalPlaneado) * 100) : 0;
 
-        // Widgets Simples (Actualizados con datos reales)
-        widgetsContainer.appendChild(this.createInductionWidget());
+        // 📦730 · cumplimientoGeneral: score compuesto del módulo.
+        // Promedio simple de los % disponibles. Excluye componentes sin datos
+        // (no penaliza con 0 un componente no cargado aún).
+        const copasst = stats.copasst || {};
+        const comite = stats.comite_convivencia || {};
+        const epps = stats.epps || {};
+        const afiliacion = stats.afiliacion || {};
+        const compInducciones = inducciones.totalTrabajadores > 0 ? (inducciones.porcentajeCompletado || 0) : null;
+        const compCapacitaciones = capacitaciones.programadas > 0 ? (capacitaciones.porcentajeCumplimiento || 0) : null;
+        const compPresupuesto = totalPlaneado > 0 ? cumplimientoPresupuesto : null;
+        const compCopasst = copasst.actaMesEnCurso ? 100 : 0;        // binario mensual
+        const compComite = comite.actaMesEnCurso ? 100 : 0;           // binario mensual
+        const compAfiliacion = afiliacion.estado === 'ok' ? 100 : (afiliacion.estado ? 0 : null); // null si no hay dato
+        const compGeneralArr = [compInducciones, compCapacitaciones, compPresupuesto, compCopasst, compComite, compAfiliacion]
+            .filter(function (v) { return v !== null; });
+        const cumplimientoGeneral = compGeneralArr.length > 0
+            ? Math.round(compGeneralArr.reduce(function (a, b) { return a + b; }, 0) / compGeneralArr.length)
+            : 0;
 
-        // Crear widget de capacitaciones después de que los cálculos estén completamente completos
-        // Esperar un tick adicional para asegurar que todos los datos estén disponibles
-        await new Promise(resolve => setTimeout(resolve, 100));
-        const trainingWidget = this.createTrainingWidget();
-        widgetsContainer.appendChild(trainingWidget);
+        // 1) HERO STRIP
+        const health = document.createElement('section');
+        health.className = 'kair-health';
 
-        widgetsContainer.appendChild(this.createCopasstWidget());  // ← NUEVO: Actas COPASST
+        const hero = document.createElement('article');
+        hero.className = 'kair-hero-card';
+        const heroMsg = cumplimientoGeneral >= 80
+            ? 'Tu sistema va por buen camino.'
+            : cumplimientoGeneral >= 50
+                ? 'Hay áreas que necesitan atención este mes.'
+                : 'Atención: hay actividades críticas pendientes.';
+        // 📦730 · Tareas pendientes: ahora incluye TODOS los pendientes del módulo
+        // (inducciones, capacitaciones, EPPs, actas COPASST/Comite, afiliación)
+        const tareasPendientes = (inducciones.pendientes || 0) +
+            (capacitaciones.programadas && capacitaciones.realizadas !== undefined
+                ? Math.max(0, capacitaciones.programadas - capacitaciones.realizadas)
+                : 0) +
+            (epps.pendientes || 0) +
+            (copasst.actaMesEnCurso ? 0 : 1) +
+            (comite.actaMesEnCurso ? 0 : 1) +
+            (afiliacion.estado && afiliacion.estado !== 'ok' ? 1 : 0);
+        hero.innerHTML = ''
+            + '<div class="kair-hero-eyebrow">Estado general</div>'
+            + '<h2>' + heroMsg + '</h2>'
+            + '<p class="kair-hero-msg">Hay ' + tareasPendientes + ' actividades que necesitan atención este mes.</p>'
+            + '<div class="kair-hero-score">' + cumplimientoGeneral + '%<span>cumplimiento</span></div>';
+        health.appendChild(hero);
 
-        // Widget de Comité de Convivencia
-        widgetsContainer.appendChild(this.createComiteConvivenciaWidget());
+        const induccionesPct = inducciones.porcentajeCompletado || 0;
+        const capacitacionesPct = capacitaciones.porcentajeCumplimiento || 0;
+        health.appendChild(this.renderMetricCard({
+            label: 'Inducciones',
+            valueHTML: (inducciones.completadas || 0) + ' <small style="font:500 15px DM Sans;color:#8791a1">/ ' + (inducciones.totalTrabajadores || 0) + '</small>',
+            desc: 'Personal con inducción al día',
+            progressPct: induccionesPct,
+            variant: induccionesPct >= 70 ? 'ok' : induccionesPct >= 40 ? 'warning' : 'danger'
+        }));
+        health.appendChild(this.renderMetricCard({
+            label: 'Plan de capacitación',
+            valueHTML: (capacitaciones.realizadas || 0) + ' <small style="font:500 15px DM Sans;color:#8791a1">/ ' + (capacitaciones.programadas || 0) + '</small>',
+            desc: 'Actividades ejecutadas',
+            progressPct: capacitacionesPct,
+            variant: capacitacionesPct >= 70 ? 'ok' : capacitacionesPct >= 40 ? 'warning' : 'danger'
+        }));
+        health.appendChild(this.renderMetricCard({
+            label: 'Presupuesto',
+            valueHTML: cumplimientoPresupuesto.toFixed(1) + '<span style="font:600 16px DM Sans">%</span>',
+            desc: 'Ejecución presupuestal acumulada',
+            progressPct: cumplimientoPresupuesto,
+            variant: cumplimientoPresupuesto >= 70 ? 'ok' : cumplimientoPresupuesto >= 40 ? 'warning' : 'danger'
+        }));
+        container.appendChild(health);
 
-        // Widget de Afiliación SSSI
-        widgetsContainer.appendChild(this.createAfiliacionWidget());
+        // 2) CONTENT GRID: chart + radar
+        const content = document.createElement('section');
+        content.className = 'kair-content';
 
-        // Widget de Presupuesto (MODERNIZADO)
-        const budgetWidget = await this.createBudgetWidget();
-        widgetsContainer.appendChild(budgetWidget);
+        const chartCard = document.createElement('article');
+        chartCard.className = 'kair-card';
+        chartCard.innerHTML = ''
+            + '<div class="kair-card-head">'
+            + '  <div>'
+            + '    <h3>Ejecución presupuestal</h3>'
+            + '    <div class="kair-card-hint">Acumulado anual · presupuesto vs. ejecución real</div>'
+            + '  </div>'
+            + '</div>'
+            + '<div class="kair-chart" id="kair-chart-presupuesto"></div>'
+            + '<div class="kair-legend">'
+            + '  <span><i class="kair-dot"></i>Ejecutado real</span>'
+            + '  <span><i class="kair-dot" style="background:#d4dae3"></i>Planeado</span>'
+            + '</div>';
+        content.appendChild(chartCard);
 
-        container.appendChild(widgetsContainer);
+        const radar = document.createElement('article');
+        radar.className = 'kair-card';
+        radar.innerHTML = ''
+            + '<div class="kair-row-title">'
+            + '  <div>'
+            + '    <h3>En tu radar</h3>'
+            + '    <div class="kair-card-hint">Requieren gestión este mes</div>'
+            + '  </div>'
+            + '</div>'
+            + this.buildRadarTasks();
+        content.appendChild(radar);
+        container.appendChild(content);
 
-        // Contenedor para gráficos
-        const chartsGrid = document.createElement('div');
-        chartsGrid.className = 'charts-grid';
+        // 3) SUBMÓDULOS
+        const modules = document.createElement('section');
+        modules.className = 'kair-modules';
+        const modulesCard = document.createElement('article');
+        modulesCard.className = 'kair-card';
+        modulesCard.innerHTML = ''
+            + '<div class="kair-card-head">'
+            + '  <div>'
+            + '    <h3>Explorar submódulos</h3>'
+            + '    <div class="kair-card-hint">Gestiona la documentación y evidencias de tu sistema.</div>'
+            + '  </div>'
+            + '  <button class="kair-btn kair-btn-ghost">Ver todos</button>'
+            + '</div>'
+            + '<div class="kair-module-grid" id="kair-submodules-grid"></div>';
+        modules.appendChild(modulesCard);
+        container.appendChild(modules);
 
-        // Gráfico Principal: Ejecución Presupuestal
-        const budgetChartCard = document.createElement('div');
-        budgetChartCard.className = 'chart-card';
-        budgetChartCard.innerHTML = `
-            <div class="chart-title">
-                <span>Ejecución Presupuestal (Acumulada)</span>
-                <i class="bi bi-bar-chart-line" style="color: var(--k-primary);"></i>
-            </div>
-            <div class="canvas-container"><canvas id="budgetChart"></canvas></div>
-        `;
-        chartsGrid.appendChild(budgetChartCard);
-
-        // Gráfico 2: Capacitaciones Mensuales
-        const trainingChartCard = document.createElement('div');
-        trainingChartCard.className = 'chart-card';
-        trainingChartCard.innerHTML = `
-            <div class="chart-title">
-                <span>Capacitaciones Mensuales</span>
-                <i class="bi bi-mortarboard" style="color: var(--k-primary);"></i>
-            </div>
-            <div class="canvas-container"><canvas id="trainingChart"></canvas></div>
-        `;
-        chartsGrid.appendChild(trainingChartCard);
-
-        // Gráfico 3: Inducciones Anuales
-        const inductionChartCard = document.createElement('div');
-        inductionChartCard.className = 'chart-card';
-        inductionChartCard.innerHTML = `
-            <div class="chart-title">
-                <span>Inducciones Anuales</span>
-                <i class="bi bi-person-check" style="color: var(--k-primary);"></i>
-            </div>
-            <div class="canvas-container"><canvas id="inductionChart"></canvas></div>
-        `;
-        chartsGrid.appendChild(inductionChartCard);
-
-        container.appendChild(chartsGrid);
-
-        // Lista Submódulos
-        const submodulesContainer = document.createElement('div');
-        submodulesContainer.className = 'submodules-container';
-        submodulesContainer.innerHTML = `<h3>Submódulos</h3>`;
-
-        const submodulesList = document.createElement('div');
-        submodulesList.className = 'submodules-list';
-        this.submodules.forEach(submodule => {
-            const item = this.renderSubmoduleItem(submodule);
-            submodulesList.appendChild(item);
-        });
-        submodulesContainer.appendChild(submodulesList);
-        container.appendChild(submodulesContainer);
+        // Renderizar chart SVG y submódulos (data-driven, después del DOM)
+        this.renderChartPresupuesto(presupuestoData);
+        this.renderSubmodulesGrid();
     }
+
+    renderMetricCard(opts) {
+        var label = opts.label;
+        var valueHTML = opts.valueHTML;
+        var desc = opts.desc;
+        var progressPct = opts.progressPct;
+        var variant = opts.variant;
+        var card = document.createElement('article');
+        card.className = 'kair-metric-card' + (variant && variant !== 'ok' ? ' kair-metric-card--' + variant : '');
+        card.innerHTML = ''
+            + '<span class="kair-metric-head">' + label + '</span>'
+            + '<div class="kair-metric-value">' + valueHTML + '</div>'
+            + '<p class="kair-metric-desc">' + desc + '</p>'
+            + '<div class="kair-progress"><i style="width:' + Math.min(100, progressPct) + '%"></i></div>';
+        return card;
+    }
+
+    buildRadarTasks() {
+        var stats = this.resourceStats || {};
+        var tareas = [];
+        var copasst = stats.copasst || {};
+        if (copasst.estado === 'warn' || copasst.estado === 'danger') {
+            tareas.push({
+                icon: '◷', bg: '#eff7f5', color: '#178666',
+                title: 'Actas COPASST',
+                sub: (copasst.actasAnio || 0) + ' de 12 reuniones registradas',
+                status: 'Pendiente', statusClass: 'kair-status-pill--warn'
+            });
+        }
+        var afiliacion = stats.afiliacion || {};
+        if (afiliacion.estado === 'warn' || afiliacion.estado === 'danger') {
+            tareas.push({
+                icon: '◷', bg: '#fff5e6', color: '#c28316',
+                title: 'Afiliación a SSSI',
+                sub: 'Aún no hay planillas cargadas',
+                status: 'Pendiente', statusClass: 'kair-status-pill--warn'
+            });
+        }
+        var inducciones = stats.inducciones || {};
+        // 📦730 · Reemplazado por Comité de Convivencia (inducciones ya se muestra en su card dedicada)
+        var comite = stats.comite_convivencia || {};
+        if (comite.estado === 'warn' || comite.estado === 'danger') {
+            tareas.push({
+                icon: '◷', bg: '#f0eaff', color: '#6b3fb8',
+                title: 'Actas Comité de Convivencia',
+                sub: (comite.actasAnio || 0) + ' de 12 reuniones registradas',
+                status: 'Pendiente', statusClass: 'kair-status-pill--warn'
+            });
+        }
+        if (tareas.length === 0) {
+            tareas.push({
+                icon: '✓', bg: '#e9f3ff', color: '#2057b8',
+                title: 'Sistema estable',
+                sub: 'Sin alertas pendientes este mes',
+                status: 'Al día', statusClass: 'kair-status-pill--ok'
+            });
+        }
+        var html = '';
+        for (var i = 0; i < tareas.length && i < 3; i++) {
+            var t = tareas[i];
+            html += ''
+                + '<div class="kair-task">'
+                + '  <div class="kair-task-icon" style="background:' + t.bg + ';color:' + t.color + '">' + t.icon + '</div>'
+                + '  <div>'
+                + '    <strong>' + t.title + '</strong>'
+                + '    <small>' + t.sub + '</small>'
+                + '  </div>'
+                + '  <span class="kair-status-pill ' + t.statusClass + '">' + t.status + '</span>'
+                + '</div>';
+        }
+        return html;
+    }
+
+    renderChartPresupuesto(data) {
+        var el = document.getElementById('kair-chart-presupuesto');
+        if (!el) return;
+        var labels = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+        var W = 690, H = 220;
+        var PAD_L = 30, PAD_R = 10, PAD_T = 10, PAD_B = 20;
+        var maxArr = data.planeado.concat(data.ejecutado);
+        var maxVal = Math.max.apply(null, maxArr.concat([1]));
+        function xi(i) { return PAD_L + (i / 11) * (W - PAD_L - PAD_R); }
+        function yv(v) { return PAD_T + (1 - v / maxVal) * (H - PAD_T - PAD_B); }
+        // 📦763-fix — usar L (line-to, 1 par de coords) en lugar de C (cubic bezier, 3 pares).
+        // C sin los 6 números causa el error SVG: "Expected number, …C148.18…".
+        function pathFor(arr) {
+            var p = '';
+            for (var i = 0; i < arr.length; i++) {
+                p += (i === 0 ? 'M ' : ' L ') + xi(i).toFixed(2) + ' ' + yv(arr[i]).toFixed(2);
+            }
+            return p;
+        }
+        var planeadoPath = pathFor(data.planeado);
+        var ejecutadoPath = pathFor(data.ejecutado);
+        var labelSvg = '';
+        for (var i = 0; i < labels.length; i++) {
+            labelSvg += '<text x="' + xi(i).toFixed(2) + '" y="' + (H - 4) + '" text-anchor="middle">' + labels[i] + '</text>';
+        }
+        el.innerHTML = ''
+            + '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">'
+            + '  <defs>'
+            + '    <linearGradient id="kair-grad" x1="0" x2="0" y1="0" y2="1">'
+            + '      <stop offset="0" stop-color="#2057b8" stop-opacity=".18"/>'
+            + '      <stop offset="1" stop-color="#2057b8" stop-opacity="0"/>'
+            + '    </linearGradient>'
+            + '  </defs>'
+            + '  <path d="' + planeadoPath + ' L ' + W + ' ' + H + ' L 0 ' + H + ' Z" fill="none" stroke="#d4dae3" stroke-width="3" stroke-dasharray="5 7"/>'
+            + '  <path d="' + ejecutadoPath + ' L ' + W + ' ' + H + ' L 0 ' + H + ' Z" fill="url(#kair-grad)"/>'
+            + '  <path d="' + ejecutadoPath + '" fill="none" stroke="#2057b8" stroke-width="3.5"/>'
+            + '  <g font-family="DM Sans" font-size="10" fill="#aab1bd">' + labelSvg + '</g>'
+            + '</svg>';
+    }
+
+    renderSubmodulesGrid() {
+        var grid = document.getElementById('kair-submodules-grid');
+        if (!grid) return;
+        // 📦730 · Mostrar TODOS los submódulos del módulo (no solo los primeros 6).
+        // El grid CSS responsivo (auto-fill + minmax) se ajusta solo.
+        var items = this.submodules || [];
+        var html = '';
+        for (var i = 0; i < items.length; i++) {
+            var name = items[i];
+            var m = name.match(/^(\d+\.\d+\.\d+)/);
+            var codeStr = m ? m[1] : String(i + 1);
+            var cleanName = name.replace(/^\d+\.\d+\.\d+\s*/, '');
+            html += ''
+                + '<div class="kair-module" data-submodule="' + name + '">'
+                + '  <span class="kair-module-n">' + codeStr + '</span>'
+                + '  <strong>' + cleanName + '</strong>'
+                + '  <small>Gestión y control</small>'
+                + '  <span class="kair-module-arrow">→</span>'
+                + '</div>';
+        }
+        grid.innerHTML = html;
+        var els = grid.querySelectorAll('.kair-module');
+        for (var j = 0; j < els.length; j++) {
+            (function (el) {
+                el.onclick = function () { self_handle(this, el); };
+            })(els[j]);
+        }
+        var self = this;
+        function self_handle(el) {
+            self.handleSubmoduleClick(el.dataset.submodule);
+        }
+    }
+
 
     // Nuevo método para cargar estadísticas reales de recursos
     async loadResourceStats() {
@@ -1767,6 +1986,21 @@ parseFormattedNumber(value) {
 
     // --- CHART INITIALIZATION ---
     async initCharts() {
+        // 📦760-fix — Destruir charts anteriores antes de crear nuevos.
+        // Sin esto, al re-navegar al módulo, container.innerHTML='' borra los canvas
+        // del DOM pero las instancias de Chart.js siguen vivas con el mismo canvas ID,
+        // y new Chart(ctx, ...) tira "Canvas is already in use" con ID auto-incremental.
+        // Patrón estándar de K+AIR (verificacion, gestion-amenazas, gestion-peligros,
+        // mejoramiento, gestion-integral, gestion-salud, medicion-ausentismo).
+        ['budgetChart', 'trainingChart', 'inductionChart'].forEach(function (id) {
+            try {
+                var canvas = document.getElementById(id);
+                if (!canvas) return;
+                var existing = Chart.getChart(canvas);
+                if (existing && typeof existing.destroy === 'function') existing.destroy();
+            } catch (_) { /* canvas no existe o Chart no cargado — ignorar */ }
+        });
+
         // Configuración Global
         if (typeof Chart !== 'undefined') {
             Chart.defaults.font.family = "'Segoe UI', sans-serif";
