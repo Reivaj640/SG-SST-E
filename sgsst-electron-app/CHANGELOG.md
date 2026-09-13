@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.200] - 2026-09-13
+
+### 📦733 · Módulo Gestión de Peligros y Riesgos: rediseño premium visual + score compuesto
+
+Replica el patrón premium aplicado al módulo Gestión de la Salud (📦732) sobre el home de Gestión de Peligros y Riesgos, dejándolo data-driven con score compuesto del módulo.
+
+#### Cambios visuales (UI)
+
+- **Header minimal**: breadcrumb "Inicio / Gestión / Peligros" + H1 "Gestión de Peligros y Riesgos"
+- **Hero strip**: 1 hero card "ESTADO GENERAL" + 3 metric cards (Inspecciones, Mantenimiento, Peligros identificados)
+- **Chart SVG nativo**: 4 barras horizontales con cumplimiento por área (Inspecciones, Mantenimiento, Peligros, Mediciones) en colores diferenciados + label "X / Y (Z%)" a la derecha
+- **Panel "En tu radar"**: hasta 3 alertas (Inspecciones vencidas, Mantenimiento atrasado, EPP sin entregar)
+- **Grid "Explorar submódulos"**: cards responsivas con flecha
+- **Responsive fluido** con clamp() y auto-fill/auto-fit
+
+#### Cambios funcionales (lógica)
+
+- **Score compuesto del módulo** — `cumplimientoGeneral`:
+  - Promedio simple de 5 componentes disponibles en `peligrosStats`: Inspecciones %, Mantenimiento %, Peligros evaluados %, Mediciones realizadas %, EPP entregado %
+  - Excluye componentes sin datos
+- **Conteo completo de pendientes** — `tareasPendientes`: inspecciones vencidas + mantenimiento atrasado + EPP sin entregar
+- **`handleSubmoduleClick` agregado** (faltaba en el archivo)
+
+#### Cambios estructurales (sistema)
+
+- **CSS legacy eliminado**: ~8000 bytes de inyectStyles reducidos a ~2000
+- **Patrón de scroll interno**: `.gestion-peligros-home overflow: hidden auto + .main-area flex: 1 1 auto min-height: 0`
+- **Render legacy `renderMainArea` (sin async) eliminado**: el nuevo `async renderMainArea` lo sobrescribe
+- **Métodos legacy preservados** (refreshStats, updateWidgetsUI, createInspeccionesWidget, createMantenimientoWidget, createPeligrosWidget, createMedicionesWidget, createEPPWidget, renderInspeccionesChart, renderCumplimientoChart, renderSubmoduleItem) — disponibles para uso futuro
+- **Cache-bust bumpeado**: `GESTION-PELIGROS-20260913-v1-rediseno`
+
+#### Archivos tocados
+
+- `modules/gestion-peligros/gestion-peligros-home.js` (30KB → 35KB)
+- `index.html` (cache-bust)
+- `package.json` (0.1.199 → 0.1.200)
+- `CHANGELOG.md` (entrada 0.1.200)
+
 ## [0.1.199] - 2026-09-12
 
 ### 📦732 · Módulo Gestión de la Salud: rediseño premium visual + score compuesto
