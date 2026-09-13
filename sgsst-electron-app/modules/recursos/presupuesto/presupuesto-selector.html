@@ -249,7 +249,7 @@ HEADER ACTION BUTTONS
       <span id="header-company-text">—</span>
     </span>
     <div style="width:1px; height:24px; background:#dee2e6;"></div>
-    <button id="backToSubmodulesBtn" class="header-back-btn" title="Volver al módulo Recursos">
+    <button id="backToSubmodulesBtn" class="header-back-btn" title="Volver al inicio">
       <i class="fas fa-arrow-left"></i> Volver
     </button>
   </div>
@@ -294,6 +294,11 @@ HEADER ACTION BUTTONS
     </div>
 
     <script>
+        // 📦708 (Fase 3.5) — Helper para acceder a KairConfirm del parent (modernos)
+        function _confirmDialog() {
+            return (window.parent && window.parent.KairConfirm) ? window.parent.KairConfirm : window.KairConfirm;
+        }
+
         // Lógica de Renderizado y Eventos (Conecta con tu JS existente)
         document.addEventListener('DOMContentLoaded', function() {
             console.log('✅ [UI Selector] Inicializado. Esperando datos...');
@@ -319,7 +324,7 @@ HEADER ACTION BUTTONS
 
             // Navegación
             document.getElementById('backToSubmodulesBtn').addEventListener('click', () => {
-                window.parent.postMessage({ action: 'backToSubmodules' }, '*');
+                window.parent.postMessage({ action: 'backToHome' }, '*');
             });
 
             // Acciones de Archivo
@@ -330,14 +335,23 @@ HEADER ACTION BUTTONS
                 }
             });
 
-            document.getElementById('duplicateFileBtn')?.addEventListener('click', () => {
+            document.getElementById('duplicateFileBtn')?.addEventListener('click', async () => {
                 const selectedFile = window.parent.selectedFile;
                 if (selectedFile) {
                     const yearMatch = selectedFile.name.match(/(20\d{2})/);
                     const currentYear = yearMatch ? parseInt(yearMatch[1]) : new Date().getFullYear();
                     const nextYear = currentYear + 1;
-                    
-                    if(confirm(`¿Desea clonar este presupuesto para el año ${nextYear}? Se mantendrán las partidas pero se reiniciarán los valores ejecutados.`)) {
+
+                    // 📦708 (Fase 3.5) — Modernizado: usa KairConfirm (estilo 6.1.2)
+                    const confirmed = await _confirmDialog().confirm({
+                        title: '📋 ¿Clonar presupuesto?',
+                        message: 'Vas a clonar el presupuesto "' + selectedFile.name + '" para el año ' + nextYear + '.',
+                        details: 'Se mantendrán las partidas pero se reiniciarán los valores ejecutados.',
+                        confirmText: 'Sí, clonar',
+                        cancelText: 'Cancelar',
+                        type: 'info'
+                    });
+                    if (confirmed) {
                         window.parent.postMessage({
                             action: 'duplicate-budget-file',
                             currentFilePath: selectedFile.path,

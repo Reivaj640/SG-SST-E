@@ -1,9 +1,35 @@
 {
   "name": "sgsst-electron-app",
-  "version": "0.1.103",
+  "version": "0.1.202",
   "description": "Sistema de Gestión de Seguridad y Salud en el Trabajo",
   "main": "main.js",
   "author": "Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos.",
+  "dependencies": {
+    "@file-viewer/preset-office": "^2.2.4",
+    "@file-viewer/web": "^2.2.4",
+    "@file-viewer/web-full": "^2.2.4",
+    "accepts": "^2.0.0",
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.6.0",
+    "body-parser": "^2.2.2",
+    "core-util-is": "^1.0.3",
+    "cors": "^2.8.6",
+    "docxtemplater": "^3.68.4",
+    "electron-log": "^5.4.3",
+    "electron-squirrel-startup": "^1.0.1",
+    "electron-updater": "^6.6.2",
+    "exceljs": "^4.4.0",
+    "express": "^5.2.1",
+    "googleapis": "^173.0.0",
+    "nodemailer": "^8.0.5",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "5.4.624",
+    "pizzip": "^3.2.0",
+    "xlsx": "^0.18.5"
+  },
+  "optionalDependencies": {
+    "@napi-rs/canvas-android-arm64": "^0.1.95"
+  },
   "scripts": {
     "start": "electron .",
     "start:utf8": "chcp 65001 >nul && electron .",
@@ -17,14 +43,24 @@
     "build:linux": "electron-builder --linux",
     "dist": "electron-builder",
     "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s",
-    "docs:generate": "jsdoc -c docs/jsdoc.json",
-    "docs:watch": "nodemon --watch . --ext js --exec \"jsdoc -c docs/jsdoc.json\""
+    "docs:generate": "jsdoc -c jsdoc.json",
+    "docs:watch": "nodemon --watch . --ext js --exec \"jsdoc -c jsdoc.json\"",
+    "postinstall": "node scripts/setup-file-viewer.js",
+    "setup:file-viewer": "node scripts/setup-file-viewer.js"
   },
   "build": {
     "appId": "com.jrfsoluciones.sgsst",
     "productName": "K+AIR",
+    "artifactName": "K-AIR-Setup-${version}.${ext}",
     "copyright": "Copyright © 2025 Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos.",
-    "asar": false,
+    "asar": true,
+    "asarUnpack": [
+      "**/node_modules/better-sqlite3/**",
+      "**/node_modules/@napi-rs/canvas*/**",
+      "**/node_modules/bcryptjs/**",
+      "**/utils/**",
+      "**/components/config/**"
+    ],
     "directories": {
       "output": "dist"
     },
@@ -44,7 +80,34 @@
       "!Instructivo-Submodulos.txt",
       "!Portear/.venv/**",
       "!Portear/__pycache__/**",
-      "!Portear/python-embed/**"
+      "!Portear/python-embed/**",
+      "!.agents/**",
+      "!.claude/**",
+      "!agent/**",
+      "!.opencode/**",
+      "!skills-lock.json",
+      "!dist/**",
+      "!build/**",
+      "!**/*.bak",
+      "!**/*.blockmap",
+      "!**/*.log",
+      "!builder-debug.yml",
+      "!node_modules/@file-viewer/web/**",
+      "!node_modules/@file-viewer/renderer-typst/**",
+      "!node_modules/@file-viewer/renderer-cad/**",
+      "!node_modules/@file-viewer/renderer-model/**",
+      "!node_modules/@file-viewer/renderer-data/**",
+      "!node_modules/@file-viewer/renderer-drawing/**",
+      "!node_modules/@file-viewer/renderer-ebook/**",
+      "!node_modules/@file-viewer/renderer-eda/**",
+      "!node_modules/@file-viewer/renderer-email/**",
+      "!node_modules/@file-viewer/renderer-geo/**",
+      "!node_modules/@file-viewer/renderer-image/**",
+      "!node_modules/@file-viewer/renderer-media/**",
+      "!node_modules/@file-viewer/renderer-mindmap/**",
+      "!node_modules/@file-viewer/renderer-ofd/**",
+      "!node_modules/@file-viewer/renderer-archive/**",
+      "!node_modules/@file-viewer/ppt/**"
     ],
     "extraResources": [
       {
@@ -64,12 +127,16 @@
         "filter": [
           "**/*.py"
         ]
+      },
+      {
+        "from": "assets/K+AIR-multires.ico",
+        "to": "assets/K+AIR-multires.ico"
       }
     ],
     "win": {
       "target": "nsis",
       "icon": "assets/K+AIR-multires.ico",
-      "artifactName": "${productName}-Setup-${version}.${ext}"
+      "artifactName": "K-AIR-Setup-${version}.${ext}"
     },
     "nsis": {
       "oneClick": true,
@@ -92,15 +159,11 @@
       "icon": "assets/K+AIR-multires.ico",
       "category": "Business"
     },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "Reivaj640",
-        "repo": "SG-SST-E",
-        "private": false,
-        "releaseType": "release"
-      }
-    ]
+    "publish": {
+      "provider": "github",
+      "owner": "Reivaj640",
+      "repo": "SG-SST-E"
+    }
   },
   "devDependencies": {
     "conventional-changelog-cli": "^5.0.0",
@@ -109,33 +172,7 @@
     "ink-docstrap": "^1.3.2",
     "jsdoc": "^4.0.5",
     "minami": "^1.2.3",
-    "nodemon": "^3.1.10"
-  },
-  "dependencies": {
-    "accepts": "^2.0.0",
-    "bcryptjs": "^2.4.3",
-    "better-sqlite3": "^11.6.0",
-    "body-parser": "^2.2.2",
-    "core-util-is": "^1.0.3",
-    "cors": "^2.8.6",
-    "docxtemplater": "^3.68.4",
-    "electron-log": "^5.4.3",
-    "electron-squirrel-startup": "^1.0.1",
-    "electron-updater": "^6.6.2",
-    "exceljs": "^4.4.0",
-    "express": "^5.2.1",
-    "jquery": "^3.7.1",
-    "jquery-ui-dist": "^1.13.3",
-    "node-fetch": "^2.7.0",
-    "nodemailer": "^8.0.5",
-    "pdf-lib": "^1.17.1",
-    "pdf-parse": "^2.4.5",
-    "pizzip": "^3.2.0",
-    "request": "^2.88.2",
-    "vanilla-calendar-pro": "^3.0.5",
-    "xlsx": "^0.18.5"
-  },
-  "optionalDependencies": {
-    "@napi-rs/canvas-android-arm64": "^0.1.95"
+    "nodemon": "^3.1.10",
+    "pptxgenjs": "^4.0.1"
   }
 }

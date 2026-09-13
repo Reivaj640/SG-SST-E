@@ -1,5 +1,12 @@
 // medicion-ausentismo.js - Componente para el submódulo "3.3.6 Medición del ausentismo por causa médica"
 
+// === SHIM: KairSkeleton desde ventana padre si no esta definido localmente ===
+// Los iframes no heredan los globales del padre automaticamente; este puente
+// evita el error "KairSkeleton is not defined" en vistas cargadas dentro de iframes.
+if (typeof window.KairSkeleton === 'undefined' && typeof parent !== 'undefined' && parent !== window && parent.window && parent.window.KairSkeleton) {
+  window.KairSkeleton = parent.window.KairSkeleton;
+}
+
 class MedicionAusentismoComponent {
     constructor(container, currentCompany, moduleName, submoduleName, onBack) {
         this.container = container;
@@ -14,7 +21,151 @@ class MedicionAusentismoComponent {
         this.logMessage = (msg, type) => console.log(`[${type}] ${msg}`); // Placeholder
         this.excelInitialized = false; // Para saber si ya inicializamos el gestor de Excel
 
+        // 📦701 — Estado del caso actual en BD (después de guardar seguimiento de incapacidad)
+        this.currentCasoBdId = null;
+        this.currentCasoBdEsActualizacion = false;
+
+        // 📦459 (2026-07-02) — Estado del último load de PI-FO-076. Se llena cada vez
+        // que se llama readAusentismoData. Sirve para que el wizard seguimiento sepa
+        // si debe mostrar banner preventivo en la Sección 2 cuando los datos de
+        // incapacidad lleguen vacíos (causa: archivo no disponible).
+        // Estructura: { missing: bool, reason: string, expectedDir: string, details: string }
+        this.ausentismoFileStatus = null;
+
         this.openDocument = this.openDocument.bind(this);
+    }
+
+    /* 📦459 (2026-07-02) — Mapeo de razones de modo degradado a mensajes UI.
+       Cada razón tiene un texto amigable + sugerencia de acción para el usuario.
+       Esto centraliza los mensajes para que sean consistentes en todas las vistas
+       (Ver Ausentismo, Estadísticas, Wizard Seguimiento, Registrar Incapacidad). */
+    _getMissingFileMessage(reason, details) {
+        const messages = {
+            folder_missing: {
+                title: 'Carpeta de ausentismo no encontrada',
+                detail: 'La carpeta "Medición del ausentismo por causa médica" no existe en la raíz de la empresa. Sin ella, los datos de incapacidad no se pueden cargar.',
+                action: 'Verificar ruta de la empresa'
+            },
+            folder_unreadable: {
+                title: 'No se puede acceder a la carpeta',
+                detail: 'La carpeta existe pero no se puede leer (permisos o error de red).',
+                action: 'Verificar permisos'
+            },
+            not_found: {
+                title: 'Archivo PI-FO-076 no encontrado',
+                detail: 'La carpeta existe pero ningún archivo coincide con "PI-FO-076" o "AUSENTISMO". Puede haber sido renombrado o movido.',
+                action: 'Buscar archivo manualmente'
+            },
+            corrupt: {
+                title: 'Archivo ilegible',
+                detail: 'El archivo existe pero no se puede abrir. Puede estar corrupto o tener un formato no soportado.',
+                action: 'Re-abrir archivo en Excel'
+            },
+            unreadable: {
+                title: 'Archivo bloqueado',
+                detail: 'El archivo existe pero está bloqueado por otra aplicación (¿abierto en Excel?).',
+                action: 'Cerrar archivo en Excel'
+            }
+        };
+        const m = messages[reason] || {
+            title: 'Archivo de ausentismo no disponible',
+            detail: 'No se pudo acceder al archivo de ausentismo.',
+            action: 'Verificar estado'
+        };
+        return {
+            ...m,
+            technicalDetail: details || ''
+        };
+    }
+
+    /* 📦459 — Helper que retorna HTML del banner amarillo estandarizado.
+       Reusado en Ver Ausentismo, Estadísticas y Wizard Seguimiento (Sección 2).
+       Variantes:
+         - variant: 'info' (azul) | 'warning' (amarillo) | 'error' (rojo)
+         - compact: true para versiones inline (ej: dentro de sección de wizard)
+         - showAction: false para esconder botón "Buscar manualmente"
+         - retryMethod: nombre del método del componente a invocar al reintentar.
+           Default: 'loadSeguimientoData'. Si el banner está en vista de estadísticas
+           o ausentismo, pasar el método correspondiente. */
+    _ausentismoMissingBannerHtml(status, options) {
+        options = options || {};
+        const variant = options.variant || 'warning';
+        const compact = !!options.compact;
+        const showAction = options.showAction !== false;
+        const retryMethod = options.retryMethod || 'loadSeguimientoData';
+
+        const msg = this._getMissingFileMessage(status.reason, status.details);
+
+        const iconByVariant = {
+            warning: 'fa-exclamation-triangle',
+            error: 'fa-times-circle',
+            info: 'fa-info-circle'
+        };
+        const icon = iconByVariant[variant] || iconByVariant.warning;
+
+        const actionButton = showAction ? `
+            <button type="button" class="km-missing-banner__action" onclick="window.electronAPI.openPath('${(status.expectedDir || '').replace(/'/g, "\\'")}')">
+                <i class="fas fa-folder-open"></i> Abrir carpeta esperada
+            </button>` : '';
+
+        // El botón reintento usa guard para evitar errores si el componente ya no existe
+        const retryButton = !compact ? `
+            <button type="button" class="km-missing-banner__action km-missing-banner__action--secondary" onclick="window.medicAusentismoComponent && typeof window.medicAusentismoComponent.${retryMethod} === 'function' && window.medicAusentismoComponent.${retryMethod}()">
+                <i class="fas fa-sync-alt"></i> Reintentar
+            </button>` : '';
+
+        if (compact) {
+            return `<div class="km-missing-banner km-missing-banner--${variant} km-missing-banner--compact">
+                <i class="fas ${icon} km-missing-banner__icon"></i>
+                <div class="km-missing-banner__body">
+                    <strong>${msg.title}</strong>
+                    <small>${msg.detail}</small>
+                </div>
+                ${actionButton}
+            </div>`;
+        }
+
+        return `<div class="km-missing-banner km-missing-banner--${variant}">
+            <div class="km-missing-banner__icon-wrap"><i class="fas ${icon}"></i></div>
+            <div class="km-missing-banner__body">
+                <strong class="km-missing-banner__title">${msg.title}</strong>
+                <p class="km-missing-banner__detail">${msg.detail}</p>
+                ${msg.technicalDetail ? `<small class="km-missing-banner__tech"><i class="fas fa-wrench"></i> ${msg.technicalDetail}</small>` : ''}
+                <div class="km-missing-banner__hint"><i class="fas fa-lightbulb"></i> <strong>${msg.action}</strong></div>
+            </div>
+            <div class="km-missing-banner__actions">
+                ${actionButton}
+                ${retryButton}
+            </div>
+        </div>`;
+    }
+
+    /* 📦459 — Helper que inyecta el banner al inicio de un contenedor si el archivo
+       está en modo degradado. Retorna true si inyectó banner, false si no hizo nada.
+       Usar después de cargar datos en cualquier vista para alertar al usuario. */
+    _injectAusentismoMissingBanner(container, options) {
+        if (!container) return false;
+        if (!this.ausentismoFileStatus || !this.ausentismoFileStatus.missing) return false;
+        // Si ya existe un banner idéntico, no duplicar
+        const existing = container.querySelector('.km-missing-banner');
+        if (existing) return true;
+        const banner = document.createElement('div');
+        banner.innerHTML = this._ausentismoMissingBannerHtml(this.ausentismoFileStatus, options);
+        container.insertBefore(banner.firstElementChild, container.firstChild);
+        return true;
+    }
+
+    /* 📦443 (2026-06-25) — Helper de notificación compatible con iframe.
+       Resuelve window.parent.updateNotifier automáticamente (porque este archivo
+       se ejecuta dentro de un iframe). Usar este helper en lugar de llamar
+       window.updateNotifier directamente para garantizar compatibilidad. */
+    _notify(title, subtitle, type, autoClose) {
+        var notifier = (window.parent && window.parent.updateNotifier) || window.updateNotifier;
+        if (!notifier || typeof notifier.show !== 'function') return;
+        var opts = { type: type || 'info', title: title, subtitle: subtitle || '' };
+        if (autoClose != null) opts.autoClose = autoClose;
+        else opts.autoClose = type === 'error' ? 6000 : type === 'warning' ? 4000 : 3000;
+        notifier.show(opts);
     }
 
     render() {
@@ -26,6 +177,12 @@ class MedicionAusentismoComponent {
         if (this.iframeMessageCleanup) {
             this.iframeMessageCleanup();
             this.iframeMessageCleanup = null;
+        }
+        // 📦640 — Destruir el FAB de scroll si quedó activo de una vista anterior
+        // (p.ej. el user pasó de "ver-ausentismo" a "main" o "registrar-ausentismo").
+        if (this.scrollFab && typeof this.scrollFab.destroy === 'function') {
+            this.scrollFab.destroy();
+            this.scrollFab = null;
         }
 
         this.container.innerHTML = '';
@@ -51,6 +208,22 @@ class MedicionAusentismoComponent {
                 break;
             case 'consulta-trabajadores':
                 this.renderConsultaTrabajadoresView(this.container);
+                break;
+            // 📦462 (2026-07-03) — Vistas nuevas de Seguimiento de Gestación
+            case 'seguimiento-gestacion':
+                this.renderSeguimientoGestacionView(this.container);
+                break;
+            // 📦464 (2026-07-03) — Antesala: vista resumen de la gestante
+            // que se muestra ANTES del wizard mensual de seguimiento.
+            case 'seguimiento-gestacion-antesala':
+                this.renderGestacionAntesalaView(this.container, this._gestanteActualId);
+                break;
+            case 'seguimiento-gestacion-mensual':
+                this.renderSeguimientoMensualView(this.container, this._gestanteActualId);
+                break;
+            // 📦477 — Reportes de Seguimiento de Gestación
+            case 'seguimiento-gestacion-reportes':
+                this.renderGestacionReportesView(this.container);
                 break;
             default:
                 this.renderMainView(this.container);
@@ -106,7 +279,84 @@ class MedicionAusentismoComponent {
                         this.currentView = 'consulta-trabajadores';
                         this.render();
                         break;
+                    case 'seguimiento-gestacion':
+                        // 📦462 (2026-07-03) — Vista principal de Seguimiento de Gestación (Salud Materna)
+                        this.currentView = 'seguimiento-gestacion';
+                        this._gestanteActualId = null;
+                        this.render();
+                        break;
+                    case 'seguimiento-gestacion-antesala':
+                        // 📦464 (2026-07-03) — Antesala de seguimiento (vista resumen de la gestante)
+                        this.currentView = 'seguimiento-gestacion-antesala';
+                        this._gestanteActualId = (data.payload && data.payload.gestanteId) || null;
+                        this.render();
+                        break;
+                    case 'seguimiento-gestacion-mensual':
+                        // 📦462 (2026-07-03) — Vista de seguimiento mensual de una gestante específica
+                        this.currentView = 'seguimiento-gestacion-mensual';
+                        this._gestanteActualId = (data.payload && data.payload.gestanteId) || null;
+                        this.render();
+                        break;
+                    case 'seguimiento-gestacion-reportes':
+                        // 📦477 — Reportes de Seguimiento de Gestación (3 tipos)
+                        this.currentView = 'seguimiento-gestacion-reportes';
+                        this.render();
+                        break;
+                    case 'main':
+                        // 📦462 (2026-07-03) — Volver al home principal del módulo
+                        this.currentView = 'main';
+                        this.render();
+                        break;
                 }
+            } else if (data.type === 'ipc-invoke') {
+                // 📦459 (2026-07-02) — IPC proxy: el iframe home no tiene acceso directo
+                // al contextBridge de Electron (corre en isolated world). Proxyamos las
+                // invocaciones IPC a través de postMessage: el iframe pide, nosotros
+                // invocamos window.electronAPI[channel] y devolvemos el resultado.
+                // Esto cubre los 3 escenarios diagnosticados:
+                //   - electronAPI undefined en iframe → sin esto no hay IPC
+                //   - electronAPI existe pero getAusentismoStats falta → mismo síntoma
+                //   - IPC cuelga en el iframe → al menos tenemos logs en el parent
+                const respond = (payload) => {
+                    try {
+                        iframe.contentWindow.postMessage(payload, '*');
+                    } catch (postErr) {
+                        console.error('[ipc-invoke] No se pudo enviar respuesta al iframe:', postErr.message);
+                    }
+                };
+                if (!data || !data.channel || !data.requestId) {
+                    console.warn('[ipc-invoke] Mensaje mal formado:', data);
+                    return;
+                }
+                const api = window.electronAPI;
+                if (!api || typeof api[data.channel] !== 'function') {
+                    console.error(`[ipc-invoke] electronAPI.${data.channel} no existe en el parent`);
+                    respond({
+                        type: 'ipc-response',
+                        requestId: data.requestId,
+                        error: `electronAPI.${data.channel} no disponible en el renderer principal`
+                    });
+                    return;
+                }
+                // Invocar y responder (async para no bloquear el message handler)
+                (async () => {
+                    try {
+                        const args = Array.isArray(data.args) ? data.args : [];
+                        const result = await api[data.channel](...args);
+                        respond({
+                            type: 'ipc-response',
+                            requestId: data.requestId,
+                            result
+                        });
+                    } catch (invokeErr) {
+                        console.error(`[ipc-invoke] Error invocando ${data.channel}:`, invokeErr.message);
+                        respond({
+                            type: 'ipc-response',
+                            requestId: data.requestId,
+                            error: invokeErr.message
+                        });
+                    }
+                })();
             }
         };
 
@@ -178,7 +428,7 @@ class MedicionAusentismoComponent {
         // Verificar si el componente está disponible
         if (typeof window.RegistrarAusentismoComponent === 'undefined') {
             console.error('RegistrarAusentismoComponent no está definido');
-            alert('Error: El componente de registro de ausentismo no está disponible.');
+            this._notify('Error', 'El componente de registro de ausentismo no está disponible.', 'error', 6000);
             return;
         }
 
@@ -195,7 +445,7 @@ class MedicionAusentismoComponent {
     }
 
     handleComingSoon() {
-        alert('Esta funcionalidad estará disponible próximamente.');
+        this._notify('Próximamente', 'Esta funcionalidad estará disponible próximamente.', 'info');
     }
 
     handleSeguimientoIncapacidades() {
@@ -459,6 +709,7 @@ class MedicionAusentismoComponent {
                     <tr>
                         <th style="background: #F8FAFC; padding: 12px 15px; text-align: left; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; border-bottom: 1px solid #e2e8f0;">Empleado</th>
                         <th style="background: #F8FAFC; padding: 12px 15px; text-align: left; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; border-bottom: 1px solid #e2e8f0;">Tipo</th>
+                        <th style="background: #F8FAFC; padding: 12px 15px; text-align: left; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; border-bottom: 1px solid #e2e8f0;" title="¿Es un caso PRI formal?">PRI</th>
                         <th style="background: #F8FAFC; padding: 12px 15px; text-align: left; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; border-bottom: 1px solid #e2e8f0;">Periodo</th>
                         <th style="background: #F8FAFC; padding: 12px 15px; text-align: left; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; border-bottom: 1px solid #e2e8f0;">Avance</th>
                         <th style="background: #F8FAFC; padding: 12px 15px; text-align: left; font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; border-bottom: 1px solid #e2e8f0;">Estado</th>
@@ -467,9 +718,8 @@ class MedicionAusentismoComponent {
                 </thead>
                 <tbody id="seguimientoTableBody">
                     <tr>
-                        <td colspan="6" style="text-align: center; padding: 40px; color: #64748B;">
-                            <i class="fas fa-spinner fa-spin" style="font-size: 24px; margin-bottom: 10px;"></i>
-                            <p>Cargando seguimientos...</p>
+                        <td colspan="7" class="ks-loading-cell" style="padding: 16px;">
+                            ${KairSkeleton.table(8, 7)}
                         </td>
                     </tr>
                 </tbody>
@@ -515,7 +765,33 @@ class MedicionAusentismoComponent {
         try {
             const result = await window.electronAPI.readAusentismoData(this.currentCompany);
 
-            if (result.success && result.rows) {
+            // 📦459 (2026-07-02) — Persistir estado del archivo para uso en wizard
+            // seguimiento (banner preventivo en Sección 2). El handler puede retornar
+            // success:true con _missingFile:true (modo degradado) — eso es éxito
+            // operacional, la app sigue funcionando con BD y muestra banners.
+            if (result && result._missingFile) {
+                this.ausentismoFileStatus = {
+                    missing: true,
+                    reason: result._missingFileReason,
+                    expectedDir: result._expectedDir,
+                    details: result._details
+                };
+                console.warn('[MEDICION-AUSENT][📦459] Archivo de ausentismo no disponible:',
+                    result._missingFileReason, result._details);
+            } else if (result && result.success) {
+                this.ausentismoFileStatus = { missing: false };
+                this.ausentismoFilePath = result.file || null;
+            } else if (result && !result.success) {
+                // Error grave (empresa sin mapear, etc.) — no es modo degradado
+                this.ausentismoFileStatus = {
+                    missing: true,
+                    reason: 'unreadable',
+                    expectedDir: null,
+                    details: result.error || 'Error desconocido'
+                };
+            }
+
+            if (result.success && result.rows && !result._missingFile) {
                 // Procesar datos para seguimiento
                 const today = new Date();
                 const currentMonth = today.toLocaleString('default', { month: 'long' }).toUpperCase();
@@ -536,11 +812,60 @@ class MedicionAusentismoComponent {
                             const cedulaLimpia = reg.cedula?.replace(/,/g, '') || reg.CEDULA?.replace(/,/g, '') || '';
                             priMap.set(cedulaLimpia, reg);
                         });
+                        // 📦459 (2026-07-02) — DIAGNÓSTICO: mostrar el primer registro recibido
+                        // para ver la estructura real que llega al frontend
+                        const primer = priData.registros[0];
+                        if (primer) {
+                            console.log(`[LOAD-PRI][📦459-DEBUG] Total registros: ${priData.registros.length}`);
+                            console.log(`[LOAD-PRI][📦459-DEBUG] Cédula primer registro: ${primer.cedula}`);
+                            console.log(`[LOAD-PRI][📦459-DEBUG] Nivel raíz tiene:`, {
+                                fecha_cierre: primer.fecha_cierre,
+                                fechaCierre: primer.fechaCierre,
+                                motivo_cierre: primer.motivo_cierre,
+                                motivoCierre: primer.motivoCierre,
+                                fecha_reintegro: primer.fecha_reintegro,
+                                fechaReintegro: primer.fechaReintegro,
+                                pric_existe: !!primer.pric,
+                                pric_es_objeto: typeof primer.pric === 'object' && primer.pric !== null
+                            });
+                            if (primer.pric && typeof primer.pric === 'object') {
+                                console.log(`[LOAD-PRI][📦459-DEBUG] Dentro de pric:`, {
+                                    fechaCierre: primer.pric.fechaCierre,
+                                    motivoCierre: primer.pric.motivoCierre,
+                                    fechaReintegro: primer.pric.fechaReintegro,
+                                    fecha_cierre: primer.pric.fecha_cierre
+                                });
+                            }
+                        }
                     }
                 } catch (error) {
                     console.error('❌ ERROR cargando PRI.xlsx:', error);
                 }
                 // ================================================================
+
+                // 📦701-fix5 — Cargar también los casos de seguimiento desde SQLite
+                // (kair.db). Estos casos pueden tener seguimientos guardados que
+                // NO están en el Excel legacy, así que el cálculo del avance debe
+                // considerarlos para reflejar el estado real del caso.
+                let casosBdMap = new Map();
+                try {
+                    const segInc = window.electronAPI?.seguimientoIncapacidad ||
+                                   window.parent?.electronAPI?.seguimientoIncapacidad;
+                    if (segInc && typeof segInc.listar === 'function') {
+                        const bdResult = await segInc.listar({ empresaId: this.currentCompany });
+                        if (bdResult && bdResult.success && Array.isArray(bdResult.data)) {
+                            bdResult.data.forEach(caso => {
+                                const ced = String(caso.cedula || '').replace(/,/g, '').replace(/\./g, '').trim();
+                                if (ced) casosBdMap.set(ced, caso);
+                            });
+                            console.log('[LOAD-BD] Casos de seguimiento en BD:', casosBdMap.size);
+                        }
+                    }
+                } catch (bdErr) {
+                    console.warn('[LOAD-BD] No se pudieron cargar casos de BD (no crítico):', bdErr.message);
+                }
+                // Hacer accesible para el resto de la función
+                this._casosBdSeguimientoMap = casosBdMap;
 
                 // Convertir filas a objetos
                 const allRecords = result.rows.map(row => {
@@ -558,8 +883,8 @@ class MedicionAusentismoComponent {
 
                 // AGRUPAR incapacidades por empleado (cedula)
                 const empleadosMap = new Map();
-                
-                allRecords.forEach(record => {
+
+                allRecords.forEach((record, recordIndex) => {
                     const cedula = record['CEDULA'] || record['cedula'];
                     if (!cedula) return;
                     
@@ -582,17 +907,27 @@ class MedicionAusentismoComponent {
 
                     // === FUNCIÓN AUXILIAR para parsear fechas correctamente ===
                     // Maneja años de 2 dígitos (ej: "4/1/25" → 2025, no 1925)
-                    function parsearFecha(fechaStr) {
+                    //
+                    // 📦459 (2026-07-02) — Mejorado: cuando NO puede parsear una fecha,
+                    // loguea contexto útil para que el usuario ubique la fila en su Excel:
+                    // fila aproximada + cédula + nombre + campo. Esto facilita corregir
+                    // datos corruptos como "30/012/2017", "20222", "109/2017" que aparecen
+                    // por tipeo en el archivo fuente.
+                    //
+                    // IMPORTANTE: NO hace "best effort" (no inventa fechas). En un sistema
+                    // de salud ocupacional regulado por la Resolución 0312 de 2019, una fecha
+                    // inventada en un reporte oficial es peor que omitir la fila.
+                    function parsearFecha(fechaStr, ctx) {
                         if (!fechaStr) return null;
-                        
+
                         // Si ya es un objeto Date, retornarlo
                         if (fechaStr instanceof Date) return fechaStr;
-                        
+
                         const str = fechaStr.toString().trim();
-                        
+
                         // Intentar parsear directamente primero
                         let date = new Date(str);
-                        
+
                         // Si la fecha es inválida o el año es anterior a 2000, intentar formato DD/MM/YY o DD/MM/YYYY
                         if (isNaN(date.getTime()) || date.getFullYear() < 2000) {
                             // Intentar extraer componentes manualmente
@@ -601,22 +936,36 @@ class MedicionAusentismoComponent {
                                 const dia = parseInt(match[1], 10);
                                 const mes = parseInt(match[2], 10) - 1; // Meses en JS son 0-11
                                 let anio = parseInt(match[3], 10);
-                                
+
                                 // Si el año tiene 2 dígitos, asumir 2000s
                                 if (anio < 100) {
                                     anio = anio < 50 ? 2000 + anio : 1900 + anio;
                                 }
-                                
+
                                 date = new Date(anio, mes, dia);
                             }
                         }
-                        
+
                         // Validar que la fecha sea correcta
                         if (isNaN(date.getTime())) {
-                            console.warn(`[PARSEAR FECHA] No se pudo parsear: "${fechaStr}"`);
+                            // 📦459 — Log enriquecido con contexto para facilitar ubicación
+                            // en el Excel. La fila es aproximada (header en fila 1, datos
+                            // desde fila 2); main.js no retorna headerRowIndex, así que no
+                            // podemos calcular la fila exacta sin tocar el IPC.
+                            const filaAprox = (ctx && ctx.recordIndex != null) ? ctx.recordIndex + 2 : '?';
+                            const cedulaCtx = (ctx && ctx.cedula) ? `Cédula ${ctx.cedula}` : 'Cédula ?';
+                            const nombreCtx = (ctx && ctx.nombre) ? `(${ctx.nombre})` : '';
+                            const campoCtx = (ctx && ctx.campo) ? `campo "${ctx.campo}"` : '';
+                            console.warn(
+                                `[PARSEAR FECHA] No se pudo parsear: "${fechaStr}"` +
+                                ` — Fila ~${filaAprox} del Excel` +
+                                ` | ${cedulaCtx} ${nombreCtx}` +
+                                (campoCtx ? ` | ${campoCtx}` : '') +
+                                ` | Sugerencia: revisar la celda y corregir el formato de fecha.`
+                            );
                             return null;
                         }
-                        
+
                         return date;
                     }
 
@@ -634,8 +983,8 @@ class MedicionAusentismoComponent {
                     }
 
                     empleadosMap.get(cedula).incapacidades.push({
-                        fechaInicio: parsearFecha(fechaInicio),
-                        fechaFin: parsearFecha(fechaFin),
+                        fechaInicio: parsearFecha(fechaInicio, { recordIndex, cedula, nombre: record['NOMBRE'] || record['nombre'] || '', campo: 'F. INICIO' }),
+                        fechaFin: parsearFecha(fechaFin, { recordIndex, cedula, nombre: record['NOMBRE'] || record['nombre'] || '', campo: 'F. FIN' }),
                         diasIncapacidad: diasIncapacidad,
                         record
                     });
@@ -769,6 +1118,21 @@ class MedicionAusentismoComponent {
 
                 // Renderizar tabla
                 this.renderSeguimientoTable(this.seguimientoData);
+            } else if (result && result.success && result._missingFile) {
+                // 📦459 — Modo degradado: archivo no disponible, pero app sigue funcionando.
+                // Mostrar banner preventivo arriba de la tabla + tabla vacía con CTA.
+                console.log('[MEDICION-AUSENT][📦459] Cargando vista con banner de archivo faltante');
+                this.seguimientoData = [];
+                this.calculateKPIs();
+                this.renderSeguimientoTable([]);
+
+                // Buscar contenedor principal de la vista de seguimiento
+                const scrollWrapper = document.getElementById('seguimiento-incapacidades-scroll-wrapper');
+                const bannerContainer = scrollWrapper || this.container;
+                // Quitar banner previo si existe
+                const oldBanner = bannerContainer.querySelector('.km-missing-banner');
+                if (oldBanner) oldBanner.remove();
+                this._injectAusentismoMissingBanner(bannerContainer, { variant: 'warning' });
             } else {
                 //console.log('[DEBUG loadSeguimientoData] No hay datos o error en result');
                 this.renderSeguimientoTable([]);
@@ -872,7 +1236,11 @@ class MedicionAusentismoComponent {
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
             // 🆕 Determinar estado usando la nueva lógica con fechas de cierre
-            const estadoInfo = this.determinarEstadoCaso(incapacidadPrincipal, empleado.registroPRI);
+            // 📦701-fix5 — Pasar también el caso de la BD si existe para considerar
+            // seguimientos guardados en SQLite (no solo del Excel legacy)
+            const cedulaParaEstado = String(empleado.cedula || '').replace(/,/g, '').replace(/\./g, '').trim();
+            const casoBdEmpleadoEstado = (this._casosBdSeguimientoMap && this._casosBdSeguimientoMap.get(cedulaParaEstado)) || null;
+            const estadoInfo = this.determinarEstadoCaso(incapacidadPrincipal, empleado.registroPRI, casoBdEmpleadoEstado);
             const estado = estadoInfo.estado;
 
             //console.log(`[KPIs] ${empleado.nombre}: ${estado} (registroPRI: ${empleado.registroPRI ? 'SÍ' : 'NO'})`);
@@ -996,7 +1364,7 @@ class MedicionAusentismoComponent {
      * @param {Object} registroPRI - Registro completo desde PRI.xlsx (opcional, contiene fechas de cierre)
      * @returns {Object} { estado: string, badgeClass: string, progressClass: string }
      */
-    determinarEstadoCaso(incapacidad, registroPRI = null) {
+    determinarEstadoCaso(incapacidad, registroPRI = null, casoBD = null) {
         // Los datos del Excel de Ausentismo están en incapacidad.record
         const recordAusentismo = incapacidad?.record || {};
         
@@ -1006,43 +1374,89 @@ class MedicionAusentismoComponent {
         //console.log('[DETERMINAR ESTADO] Record Ausentismo:', recordAusentismo);
         //console.log('[DETERMINAR ESTADO] Record PRI:', recordPRI);
         
-        // === Buscar fecha de cierre en PRI.xlsx (fuente primaria) ===
-        let fechaCierreInc = null;
-        let fechaCierrePric = null;
-        
+        // === 📦459 (2026-07-02) — Detección AMPLIADA de cierre ===
+        // BUG RAÍZ: el handler Python `cargar_todos_registros_pri` devuelve los campos
+        // de cierre en camelCase DENTRO de `pric`:
+        //   recordPRI.pric.fechaCierre   (NO recordPRI.fecha_cierre)
+        //   recordPRI.pric.motivoCierre
+        //   recordPRI.pric.fechaReintegro
+        // Mi código buscaba snake_case a nivel raíz → nunca encontraba nada.
+        // AHORA busca snake_case a nivel raíz (de buscar_registros_por_cedula) Y
+        // camelCase dentro de pric (de cargar_todos_registros_pri).
+        let tieneFechaCierre = false;
+        let motivoCierreDetectado = null;
+
         if (recordPRI && Object.keys(recordPRI).length > 0) {
-            // Buscar en PRI.xlsx primero
-            fechaCierreInc = recordPRI.fecha_cierre || recordPRI.fechaCierre || null;
-            fechaCierrePric = recordPRI.pric?.fechaCierre || recordPRI.fecha_cierre_pric || null;
-        } else {
-            // Si no hay PRI, buscar en Ausentismo (backup)
-            fechaCierreInc = recordAusentismo['FECHA CIERRE'] || recordAusentismo['fecha_cierre'] || 
-                            recordAusentismo['FECHA CIERRE INC'] || recordAusentismo['fecha_cierre_inc'] || null;
-            fechaCierrePric = recordAusentismo['FECHA CIERRE PRIC'] || recordAusentismo['fecha_cierre_pric'] || null;
+            // PRI primero (fuente primaria) — 22 variantes
+            const candidatosPRI = [
+                // snake_case a nivel raíz (de buscar_registros_por_cedula)
+                recordPRI.fecha_cierre, recordPRI.fechaCierre,
+                recordPRI.fecha_cierre_pric, recordPRI.fechaCierrePric,
+                recordPRI.fecha_reintegro, recordPRI.fechaReintegro,
+                recordPRI.fecha_alta, recordPRI.fechaAlta,
+                recordPRI.fecha_cierre_seguimiento, recordPRI.fechaCierreSeguimiento,
+                recordPRI.motivo_cierre, recordPRI.motivoCierre,
+                recordPRI.estado_caso, recordPRI.estadoCaso, recordPRI.estado,
+                recordPRI['Estado Caso'], recordPRI['ESTADO'],
+                // camelCase dentro de pric (de cargar_todos_registros_pri)
+                recordPRI.pric?.fechaCierre, recordPRI.pric?.fechaCierrePric,
+                recordPRI.pric?.fechaReintegro, recordPRI.pric?.fechaAlta,
+                recordPRI.pric?.motivoCierre, recordPRI.pric?.estadoCaso,
+                // snake_case dentro de pric (por si acaso)
+                recordPRI.pric?.fecha_cierre, recordPRI.pric?.fecha_reintegro,
+                recordPRI.pric?.fecha_alta, recordPRI.pric?.motivo_cierre
+            ];
+            for (const cand of candidatosPRI) {
+                if (cand && String(cand).trim() !== '') {
+                    tieneFechaCierre = true;
+                    motivoCierreDetectado = String(cand);
+                    break;
+                }
+            }
         }
-        
-        const tieneFechaCierre = fechaCierreInc || fechaCierrePric;
+        if (!tieneFechaCierre) {
+            // Fallback al Excel de Ausentismo
+            const candidatosAus = [
+                recordAusentismo['FECHA CIERRE'], recordAusentismo['fecha_cierre'],
+                recordAusentismo['FECHA CIERRE INC'], recordAusentismo['fecha_cierre_inc'],
+                recordAusentismo['FECHA CIERRE PRIC'], recordAusentismo['fecha_cierre_pric'],
+                recordAusentismo['FECHA REINTEGRO'], recordAusentismo['fecha_reintegro'],
+                recordAusentismo['FECHA ALTA'], recordAusentismo['fecha_alta'],
+                recordAusentismo['MOTIVO CIERRE'], recordAusentismo['motivo_cierre']
+            ];
+            for (const cand of candidatosAus) {
+                if (cand && String(cand).trim() !== '') {
+                    tieneFechaCierre = true;
+                    motivoCierreDetectado = String(cand);
+                    break;
+                }
+            }
+        }
 
         // === Buscar fecha de seguimiento ===
         let fechaSeguimiento1 = null;
-        
+
         if (recordPRI && Object.keys(recordPRI).length > 0) {
             // Buscar en PRI.xlsx primero
-            fechaSeguimiento1 = recordPRI.seguimientos?.[0]?.fecha || 
-                               recordPRI.fecha_seguimiento_1 || 
+            fechaSeguimiento1 = recordPRI.seguimientos?.[0]?.fecha ||
+                               recordPRI.fecha_seguimiento_1 ||
                                recordPRI.pric?.fechaSeguimiento1 || null;
         } else {
             // Si no hay PRI, buscar en Ausentismo (backup)
             fechaSeguimiento1 = recordAusentismo['FECHA SEGUIMIENTO 1'] || recordAusentismo['fecha_seguimiento_1'] || null;
         }
-        
-        const tieneSeguimientos = fechaSeguimiento1 ? true : false;
+
+        const tieneSeguimientosExcel = fechaSeguimiento1 ? true : false;
+        // 📦701-fix5 — Si el caso de la BD tiene seguimientos (recomendaciones_count > 0),
+        // también considerarlo como "tiene seguimientos" aunque el Excel no los tenga.
+        const tieneSeguimientosBD = !!(casoBD && Number(casoBD.recomendaciones_count) > 0);
+        const tieneSeguimientos = tieneSeguimientosExcel || tieneSeguimientosBD;
 
         // === Verificar si hay cédula (siempre debería haberla si estamos en la tabla) ===
-        const tieneCedulaEnExcel = recordAusentismo['CEDULA'] || recordAusentismo['cedula'] || 
+        const tieneCedulaEnExcel = recordAusentismo['CEDULA'] || recordAusentismo['cedula'] ||
                                    recordPRI.cedula || recordPRI.CEDULA || null;
 
-        //console.log('[DETERMINAR ESTADO] fechaCierreInc:', fechaCierreInc, 'fechaCierrePric:', fechaCierrePric, 'tieneFechaCierre:', tieneFechaCierre);
+        //console.log('[DETERMINAR ESTADO] tieneFechaCierre:', tieneFechaCierre, 'motivo:', motivoCierreDetectado);
         //console.log('[DETERMINAR ESTADO] fechaSeguimiento1:', fechaSeguimiento1, 'tieneSeguimientos:', tieneSeguimientos);
         //console.log('[DETERMINAR ESTADO] tieneCedulaEnExcel:', tieneCedulaEnExcel);
 
@@ -1056,7 +1470,7 @@ class MedicionAusentismoComponent {
             estado = 'Cerrado';
             badgeClass = 'badge-finished';
             progressClass = 'success';
-            console.log('[DETERMINAR ESTADO] Estado determinado: CERRADO (tiene fecha de cierre:', tieneFechaCierre + ')');
+            console.log('[DETERMINAR ESTADO] Estado determinado: CERRADO (motivo:', motivoCierreDetectado + ')');
         }
         // Regla 2: Si tiene fecha de seguimiento → EN SEGUIMIENTO
         else if (tieneSeguimientos) {
@@ -1087,9 +1501,10 @@ class MedicionAusentismoComponent {
      * Calcula el porcentaje de avance del caso basado en hitos del proceso en PRI.xlsx
      * @param {Object} incapacidad - Objeto de incapacidad con fechaInicio, fechaFin y record
      * @param {Object} registroPRI - Registro completo desde PRI.xlsx (opcional)
+     * @param {Object} casoBD - Caso de seguimiento guardado en SQLite (opcional)
      * @returns {Object} { porcentaje: number, color: string, descripcion: string }
      */
-    calcularPorcentajeAvance(incapacidad, registroPRI = null) {
+    calcularPorcentajeAvance(incapacidad, registroPRI = null, casoBD = null) {
         const recordAusentismo = incapacidad?.record || {};
         const recordPRI = registroPRI || {};
         
@@ -1117,24 +1532,85 @@ class MedicionAusentismoComponent {
             }
         }
         
-        // === Buscar fecha de cierre ===
-        let fechaCierreInc = null;
-        let fechaCierrePric = null;
-        
+        // === 📦459 (2026-07-02) — Detección AMPLIADA de cierre (igual que determinarEstadoCaso)
+        // BUG RAÍZ: buscar_todos_registros_pri devuelve campos en camelCase dentro de pric:
+        //   recordPRI.pric.fechaCierre, recordPRI.pric.motivoCierre, etc.
+        // Por eso el cálculo de avance quedaba en 60% aunque la fecha de cierre existiera.
+        let tieneFechaCierre = false;
+
         if (recordPRI && Object.keys(recordPRI).length > 0) {
-            fechaCierreInc = recordPRI.fecha_cierre || recordPRI.fechaCierre || null;
-            fechaCierrePric = recordPRI.pric?.fechaCierre || recordPRI.fecha_cierre_pric || null;
-        } else {
-            fechaCierreInc = recordAusentismo['FECHA CIERRE'] || recordAusentismo['fecha_cierre'] || 
-                            recordAusentismo['FECHA CIERRE INC'] || recordAusentismo['fecha_cierre_inc'] || null;
-            fechaCierrePric = recordAusentismo['FECHA CIERRE PRIC'] || recordAusentismo['fecha_cierre_pric'] || null;
+            const candidatosPRI = [
+                // snake_case a nivel raíz
+                recordPRI.fecha_cierre, recordPRI.fechaCierre,
+                recordPRI.fecha_cierre_pric, recordPRI.fechaCierrePric,
+                recordPRI.fecha_reintegro, recordPRI.fechaReintegro,
+                recordPRI.fecha_alta, recordPRI.fechaAlta,
+                recordPRI.fecha_cierre_seguimiento, recordPRI.fechaCierreSeguimiento,
+                recordPRI.motivo_cierre, recordPRI.motivoCierre,
+                recordPRI.estado_caso, recordPRI.estadoCaso, recordPRI.estado,
+                recordPRI['Estado Caso'], recordPRI['ESTADO'],
+                // camelCase dentro de pric (lo que usa cargar_todos_registros_pri)
+                recordPRI.pric?.fechaCierre, recordPRI.pric?.fechaCierrePric,
+                recordPRI.pric?.fechaReintegro, recordPRI.pric?.fechaAlta,
+                recordPRI.pric?.motivoCierre, recordPRI.pric?.estadoCaso,
+                // snake_case dentro de pric (por si acaso)
+                recordPRI.pric?.fecha_cierre, recordPRI.pric?.fecha_reintegro,
+                recordPRI.pric?.fecha_alta, recordPRI.pric?.motivo_cierre
+            ];
+            for (const cand of candidatosPRI) {
+                if (cand && String(cand).trim() !== '') {
+                    tieneFechaCierre = true;
+                    break;
+                }
+            }
         }
-        
-        const tieneFechaCierre = fechaCierreInc || fechaCierrePric;
-        const cantidadSeguimientos = seguimientos.filter(s => s.fecha && s.fecha.trim() !== '').length;
-        
-        //console.log('[CALCULAR AVANCE] Seguimientos encontrados:', cantidadSeguimientos, seguimientos);
-        //console.log('[CALCULAR AVANCE] Tiene fecha de cierre:', tieneFechaCierre);
+        if (!tieneFechaCierre) {
+            const candidatosAus = [
+                recordAusentismo['FECHA CIERRE'], recordAusentismo['fecha_cierre'],
+                recordAusentismo['FECHA CIERRE INC'], recordAusentismo['fecha_cierre_inc'],
+                recordAusentismo['FECHA CIERRE PRIC'], recordAusentismo['fecha_cierre_pric'],
+                recordAusentismo['FECHA REINTEGRO'], recordAusentismo['fecha_reintegro'],
+                recordAusentismo['FECHA ALTA'], recordAusentismo['fecha_alta'],
+                recordAusentismo['MOTIVO CIERRE'], recordAusentismo['motivo_cierre']
+            ];
+            for (const cand of candidatosAus) {
+                if (cand && String(cand).trim() !== '') {
+                    tieneFechaCierre = true;
+                    break;
+                }
+            }
+        }
+        let cantidadSeguimientos = seguimientos.filter(s => s.fecha && s.fecha.trim() !== '').length;
+        // 📦701-fix5 — Si el caso tiene seguimientos guardados en SQLite, sumarlos.
+        // El Excel legacy puede NO tener los seguimientos nuevos (se guardan primero
+        // en BD). Tomar el MÁX entre el conteo del Excel y el de la BD para reflejar
+        // el estado real del caso.
+        if (casoBD && (casoBD.recomendaciones_count || casoBD.exportado_excel_fila)) {
+            const segsBd = Number(casoBD.recomendaciones_count) || 0;
+            if (segsBd > cantidadSeguimientos) {
+                cantidadSeguimientos = segsBd;
+            }
+        }
+
+        // 📦459 (2026-07-02) — DIAGNÓSTICO: mostrar qué campos de cierre encuentra y dónde
+        if (recordPRI && Object.keys(recordPRI).length > 0) {
+            const todosCandidatos = [
+                ['nivel_raiz.fecha_cierre', recordPRI.fecha_cierre],
+                ['nivel_raiz.fechaCierre', recordPRI.fechaCierre],
+                ['nivel_raiz.fecha_reintegro', recordPRI.fecha_reintegro],
+                ['nivel_raiz.fechaReintegro', recordPRI.fechaReintegro],
+                ['nivel_raiz.motivo_cierre', recordPRI.motivo_cierre],
+                ['nivel_raiz.motivoCierre', recordPRI.motivoCierre],
+                ['pric.fechaCierre', recordPRI.pric?.fechaCierre],
+                ['pric.motivoCierre', recordPRI.pric?.motivoCierre],
+                ['pric.fechaReintegro', recordPRI.pric?.fechaReintegro],
+                ['pric.fecha_cierre', recordPRI.pric?.fecha_cierre],
+                ['pric.disponible', !!recordPRI.pric]
+            ];
+            const encontrados = todosCandidatos.filter(([_, val]) => val && String(val).trim() !== '');
+            console.log(`[CALCULAR AVANCE][📦459-DEBUG] Cédula=${recordPRI.cedula || '?'} | pric_disponible=${!!recordPRI.pric} | campos_con_valor_encontrados=[${encontrados.map(([k, v]) => k + '=' + JSON.stringify(String(v).slice(0, 30))).join(', ')}]`);
+            console.log(`[CALCULAR AVANCE][📦459-DEBUG] tieneFechaCierre final: ${tieneFechaCierre} | cantidadSeguimientos: ${cantidadSeguimientos}`);
+        }
         
         // === Reglas de porcentaje de avance ===
         let porcentaje = 0;
@@ -1190,7 +1666,7 @@ class MedicionAusentismoComponent {
             console.log('[DEBUG renderSeguimientoTableWithBody] No hay datos para mostrar');
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" style="text-align: center; padding: 40px; color: #64748B;">
+                    <td colspan="7" style="text-align: center; padding: 40px; color: #64748B;">
                         <i class="fas fa-inbox" style="font-size: 48px; margin-bottom: 15px; opacity: 0.3;"></i>
                         <p>No hay seguimientos para mostrar</p>
                     </td>
@@ -1240,18 +1716,41 @@ class MedicionAusentismoComponent {
             const diasIncapacidad = incapacidadPrincipal?.diasIncapacidad || 0;
 
             // 🆕 Determinar estado usando la nueva lógica con fechas de cierre
-            const estadoInfo = this.determinarEstadoCaso(incapacidadPrincipal, empleado.registroPRI);
+            // 📦701-fix5 — Pasar también el caso de la BD si existe para considerar
+            // seguimientos guardados en SQLite (no solo del Excel legacy)
+            const cedulaParaEstado = String(empleado.cedula || '').replace(/,/g, '').replace(/\./g, '').trim();
+            const casoBdEmpleadoEstado = (this._casosBdSeguimientoMap && this._casosBdSeguimientoMap.get(cedulaParaEstado)) || null;
+            const estadoInfo = this.determinarEstadoCaso(incapacidadPrincipal, empleado.registroPRI, casoBdEmpleadoEstado);
             const estado = estadoInfo.estado;
             const badgeClass = estadoInfo.badgeClass;
             
             // 🆕 Calcular avance basado en hitos del proceso (seguimientos + cierre)
-            const avanceInfo = this.calcularPorcentajeAvance(incapacidadPrincipal, empleado.registroPRI);
+            // 📦701-fix5 — Pasar también el caso de la BD si existe (cedula normalizada)
+            const cedulaParaAvance = String(empleado.cedula || '').replace(/,/g, '').replace(/\./g, '').trim();
+            const casoBdEmpleado = (this._casosBdSeguimientoMap && this._casosBdSeguimientoMap.get(cedulaParaAvance)) || null;
+            const avanceInfo = this.calcularPorcentajeAvance(incapacidadPrincipal, empleado.registroPRI, casoBdEmpleado);
             const avancePorcentaje = avanceInfo.porcentaje;
             const avanceColor = avanceInfo.color;
             const avanceDescripcion = avanceInfo.descripcion;
 
             // Iniciales para avatar
             const initials = nombre.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+
+            // 📦 Modalidad PRI: badge "📋 PRI" si está marcado como caso PRI formal,
+            // "⚠️ Seg." para los que sólo son seguimiento de incapacidad, "○ Seg."
+            // para los que aún no están clasificados. Lee registroPRI?.casoIngresadoPRIC
+            // (mismo campo que controla el banner).
+            const priValor = (empleado.registroPRI && empleado.registroPRI.casoIngresadoPRIC
+                ? String(empleado.registroPRI.casoIngresadoPRIC).toUpperCase()
+                : '');
+            let priBadge;
+            if (priValor === 'SI') {
+                priBadge = '<span class="sp-pri-badge is-pri" title="Caso PRI formal"><i class="fas fa-clipboard-check"></i> PRI</span>';
+            } else if (priValor === 'NO') {
+                priBadge = '<span class="sp-pri-badge is-no-pri-strong" title="Seguimiento: NO es caso PRI formal">⚠ Seg.</span>';
+            } else {
+                priBadge = '<span class="sp-pri-badge is-no-pri" title="Aún sin clasificar">○ Seg.</span>';
+            }
 
             // Formatear fechas
             const periodoStr = fechaInicio && fechaFin ?
@@ -1271,6 +1770,9 @@ class MedicionAusentismoComponent {
                     </td>
                     <td style="padding: 15px;">
                         <span style="padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; background: ${tipo === 'ARL' ? '#FEF3C7' : '#DCFCE7'}; color: ${tipo === 'ARL' ? '#92400E' : '#166534'};">${tipo}</span>
+                    </td>
+                    <td style="padding: 15px;">
+                        ${priBadge}
                     </td>
                     <td style="padding: 15px;">
                         <div style="font-size: 13px; color: #1E293B;">${periodoStr}</div>
@@ -1441,7 +1943,11 @@ class MedicionAusentismoComponent {
             }
 
             // 🆕 Determinar estado usando la misma lógica con fechas de cierre
-            const estadoInfo = this.determinarEstadoCaso(incapacidadPrincipal, empleado.registroPRI);
+            // 📦701-fix5 — Pasar también el caso de la BD si existe para considerar
+            // seguimientos guardados en SQLite (no solo del Excel legacy)
+            const cedulaParaEstado = String(empleado.cedula || '').replace(/,/g, '').replace(/\./g, '').trim();
+            const casoBdEmpleadoEstado = (this._casosBdSeguimientoMap && this._casosBdSeguimientoMap.get(cedulaParaEstado)) || null;
+            const estadoInfo = this.determinarEstadoCaso(incapacidadPrincipal, empleado.registroPRI, casoBdEmpleadoEstado);
             const estado = estadoInfo.estado;
 
             console.log(`[KPIs Filtered] ${empleado.nombre}: ${estado} (Tipo: ${tipoPrincipal}, registroPRI: ${empleado.registroPRI ? 'SÍ' : 'NO'})`);
@@ -1716,33 +2222,282 @@ class MedicionAusentismoComponent {
             }, 300);
         }
 
-        // === 2. BUSCAR REGISTROS Y MOSTRAR MODAL ANTIGUO ===
-        console.log('[SEGUIMIENTO] Buscando registros existentes...');
-        window.electronAPI.buscarRegistrosCedula(cedula, this.currentCompany)
-            .then(resultado => {
-                console.log('[SEGUIMIENTO] Resultado búsqueda:', resultado);
-                console.log('[SEGUIMIENTO] success:', resultado.success);
-                console.log('[SEGUIMIENTO] registros:', resultado.registros);
-                console.log('[SEGUIMIENTO] total:', resultado.total);
-                console.log('[SEGUIMIENTO] registros.length:', resultado.registros ? resultado.registros.length : 'N/A');
+        // === 2. BUSCAR CASOS EN SQLite (PRIMERO) ===
+        // 📦701-fix4 — El flujo anterior buscaba en el Excel legacy, pero los
+        // datos ahora viven en SQLite (kair.db). Si hay un caso existente en
+        // SQLite para esta cédula, lo cargamos directamente en el panel.
+        // Si no, seguimos con el fallback de Excel legacy.
+        // 📦701-fix8 — Normalizar la cédula (viene formateada con comas/pts
+        // desde el display, ej "1,044,392,755", pero en BD está sin formato,
+        // ej "1044392755"). Sin esta normalización la query no matchea y
+        // siempre cae al fallback del Excel.
+        const cedulaNormalizada = String(cedula || '').replace(/,/g, '').replace(/\./g, '').trim();
+        console.log('[SEGUIMIENTO] Cédula normalizada para BD:', cedulaNormalizada);
 
-                if (resultado.success && resultado.registros && resultado.registros.length > 0) {
-                    // Hay registros - mostrar modal antiguo adaptado
-                    console.log('[SEGUIMIENTO] Mostrando modal de registros existentes');
-                    this.mostrarModalSeleccionRegistros(resultado.registros, {
-                        trabajador: { nombre: nombre, cedula: cedula }
-                    });
-                } else {
-                    // No hay registros - abrir panel directamente para crear nuevo
-                    console.log('[SEGUIMIENTO] No hay registros, abriendo panel para caso nuevo');
-                    this.abrirPanelSeguimientoConEmpleado(this.currentDetalleEmpleado);
+        console.log('[SEGUIMIENTO] Buscando casos existentes en SQLite (BD)...');
+        const segInc = window.electronAPI?.seguimientoIncapacidad ||
+                       window.parent?.electronAPI?.seguimientoIncapacidad;
+        const buscarEnBd = (segInc && typeof segInc.buscarPorCedula === 'function')
+            ? segInc.buscarPorCedula({ empresaId: this.currentCompany, cedula: cedulaNormalizada })
+            : Promise.resolve({ success: false, data: [], error: { code: 'NO_API', message: 'buscarPorCedula no disponible' } });
+
+        buscarEnBd
+            .then(bdResult => {
+                console.log('[SEGUIMIENTO] Resultado búsqueda BD:', bdResult);
+                if (bdResult.success && bdResult.data && bdResult.data.length > 0) {
+                    // ✅ Hay caso(s) en SQLite — cargar el más reciente
+                    const casoExistente = bdResult.data[0]; // El más reciente (ORDER BY actualizado_en DESC)
+                    console.log('[SEGUIMIENTO] ✅ Caso existente encontrado en BD:', casoExistente.id, '— abriendo panel con datos prellenados');
+                    this._abrirPanelConCasoExistente(casoExistente);
+                    return;
                 }
+
+                // No hay en SQLite — buscar fallback en Excel legacy
+                console.log('[SEGUIMIENTO] No hay casos en SQLite, buscando en Excel legacy...');
+                window.electronAPI.buscarRegistrosCedula(cedulaNormalizada, this.currentCompany)
+                    .then(resultado => {
+                        console.log('[SEGUIMIENTO] Resultado búsqueda Excel legacy:', resultado);
+
+                        if (resultado.success && resultado.registros && resultado.registros.length > 0) {
+                            console.log('[SEGUIMIENTO] Mostrando modal de registros existentes (legacy)');
+                            this.mostrarModalSeleccionRegistros(resultado.registros, {
+                                trabajador: { nombre: nombre, cedula: cedula }
+                            });
+                        } else {
+                            console.log('[SEGUIMIENTO] No hay registros en ningún lado, abriendo panel para caso nuevo');
+                            this.abrirPanelSeguimientoConEmpleado(this.currentDetalleEmpleado);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('[SEGUIMIENTO] Error buscando registros legacy:', error);
+                        this.abrirPanelSeguimientoConEmpleado(this.currentDetalleEmpleado);
+                    });
             })
             .catch(error => {
-                console.error('[SEGUIMIENTO] Error buscando registros:', error);
-                // En caso de error, abrir panel directamente
+                console.error('[SEGUIMIENTO] Error buscando en BD:', error);
+                // Si falla BD, intentar legacy
                 this.abrirPanelSeguimientoConEmpleado(this.currentDetalleEmpleado);
             });
+    }
+
+    /**
+     * 📦701-fix4 — Abre el panel de seguimiento con un caso existente cargado
+     * desde SQLite. Carga todos los datos en el formulario y marca la sección 1
+     * como "ya capturada" (bypass de validación) para que el usuario pueda
+     * continuar trabajando desde la sección 2 sin tener que re-llenar todo.
+     */
+    _abrirPanelConCasoExistente(caso) {
+        // 📦701-fix4 (CORRECCIÓN 2): El caso viene con estructura anidada
+        // del bridge (caso.trabajador.*, caso.incapacidad.*, etc.) Y con
+        // algunos campos en raíz (caso.employeeId, caso.employeeName, caso.id).
+        // El log usa los campos correctos.
+        const cedula = caso.employeeId || caso.trabajador?.cedula || caso.cedula;
+        const nombre = caso.employeeName || caso.trabajador?.nombre || caso.nombre || 'Empleado';
+        console.log('[ABRIR CASO BD] Cargando caso existente:', caso.id, '— Cédula:', cedula);
+
+        // Marcar el caso actual como cargado
+        this.currentCasoBdId = caso.id;
+        this.casoActualEsExistente = true;
+
+        // Crear el panel si no existe
+        if (!document.getElementById('seguimientoPanelBackdrop')) {
+            this.createSeguimientoPanel();
+        }
+
+        // 1. Cargar el caso completo en el formulario (PRIMERO)
+        this._cargarCasoBdEnFormulario(caso);
+
+        // 2. 📦 NO llamar a cargarDatosEnPanelSeguimiento — esa función resetea
+        // todos los campos a vacío (es para casos nuevos). Si lo hacemos,
+        // borramos todo lo que acabamos de cargar de la BD.
+        // Solo intentar autollenar campos vacíos desde la BD de personal.
+        if (this.currentDetalleEmpleado) {
+            // Solo completar campos que NO se cargaron del caso
+            this._loadDatosEmpleado(cedula);
+        }
+
+        // 3. Inicializar seguimientos con los del caso
+        this._inicializarSeguimientosDesdeCaso(caso);
+
+        // 4. Marcar la sección 1 como ya capturada
+        this._marcarSeccion1YaCapturada();
+
+        // 5. Actualizar banner PRI con el valor guardado
+        this._actualizarBannerPRI();
+
+        // 6. Actualizar progreso
+        this._aplicarReglasRequeridos();
+        this._actualizarProgresoSeccion();
+
+        // 7. 📦 Actualizar el banner BD para mostrar "Guardado en BD"
+        this._actualizarBannerBD('guardado');
+
+        // 8. Mostrar el panel
+        document.getElementById('seguimientoPanelBackdrop').classList.add('active');
+
+        // 9. Si es un caso existente, abrir directamente en sección 2
+        // (Incapacidad Temporal) para que el usuario continúe con el seguimiento.
+        setTimeout(() => {
+            const navIncapacidad = document.querySelectorAll('.sp-nav-item')[1];
+            if (navIncapacidad && !navIncapacidad.classList.contains('sp-section-dimmed')) {
+                this.showSeguimientoPanelSection('incapacidad', navIncapacidad);
+            }
+        }, 50);
+
+        // 10. Notificación al usuario
+        this.showNotification(`📂 Caso existente cargado: ${nombre}. Continúa desde "Incapacidad Temporal" para nuevos seguimientos.`, 'info', 5000);
+    }
+
+    /**
+     * 📦701-fix4 — Carga todos los campos del caso desde la BD al formulario.
+     * El bridge devuelve el caso con estructura anidada (caso.trabajador.*,
+     * caso.incapacidad.*, caso.pric.*, caso.calificacion.*), por lo que
+     * extraemos los valores de ahí y los mapeamos a los IDs del DOM.
+     */
+    _cargarCasoBdEnFormulario(caso) {
+        console.log('[CARGAR CASO BD] Caso recibido. Keys:', Object.keys(caso).join(', '));
+        const t = caso.trabajador || {};
+        const i = caso.incapacidad || {};
+        const p = caso.pric || {};
+
+        // Mapeo: campo origen → ID del DOM
+        // (Los IDs del HTML son los REALES, no los nombres de la BD)
+        const map = {
+            // Trabajador
+            't.nombre': 'sp-nombre',
+            't.cedula': 'sp-cedula',
+            't.fechaNacimiento': 'sp-fecha-nacimiento',
+            't.genero': 'sp-genero',
+            't.cargo': 'sp-cargo',
+            't.area': 'sp-area',
+            't.fechaIngreso': 'sp-fecha-ingreso',
+            't.antiguedad': 'sp-antiguedad',
+            't.tipoContrato': 'sp-tipo-contrato',
+            't.salario': 'sp-salario',
+            't.eps': 'sp-eps',
+            't.afp': 'sp-afp',
+            't.arl': 'sp-arl',
+            't.peso': 'sp-peso',
+            't.talla': 'sp-talla',
+            't.imc': 'sp-imc',
+            't.actividadesExtralaborales': 'sp-actividades-extralaborales',
+            't.tipoEvento': 'sp-tipo-evento',
+            't.tipoCargo': 'sp-tipo-cargo',
+            't.dominancia': 'sp-dominancia',
+            // Incapacidad (IDs REALES del HTML, sin "inc-" prefix)
+            'i.fechaInicio': 'sp-fecha-inicio',
+            'i.fechaFin': 'sp-fecha-fin',
+            'i.diasAcumulados': 'sp-dias-acumulados',
+            'i.codigoCie10': 'sp-codigo-cie10',
+            'i.descripcionDiagnostico': 'sp-descripcion-diagnostico',
+            'i.numeroProrrogas': 'sp-numero-prorrogas',
+            'i.fechaUltimaProrroga': 'sp-fecha-ultima-prorroga',
+            'i.cie10Dx2': 'sp-cie10-dx2',
+            'i.origenDx2': 'sp-origen-dx2',
+            'i.cie10Dx3': 'sp-cie10-dx3',
+            'i.origenDx3': 'sp-origen-dx3',
+            'i.cie10Dx1': 'sp-cie10-dx1-calificada',
+            'i.origenDX1': 'sp-origen-dx1-calificada',
+            'i.cie10Dx2_calificada': 'sp-cie10-dx2-calificada',
+            'i.origenDX2_calificada': 'sp-origen-dx2-calificada',
+            'i.cie10Dx3_calificada': 'sp-cie10-dx3-calificada',
+            'i.origenDX3_calificada': 'sp-origen-dx3-calificada',
+            'i.cie10Dx4_calificada': 'sp-cie10-dx4-calificada',
+            'i.origenDX4_calificada': 'sp-origen-dx4-calificada',
+            // PRIC
+            'p.casoIngresadoPRIC': 'sp-caso-ingresado-pric',
+            'p.mecanismoDeteccion': 'sp-mecanismo-deteccion',
+            'p.fechaIngresoPRIC': 'sp-fecha-ingreso-pric',
+            'p.fechaExamenMedico': 'sp-fecha-examen-medico',
+            'p.resultadoExamenMedico': 'sp-resultado-examen-medico',
+            'p.fechaExamenPeriodico': 'sp-fecha-examen-periodico',
+            'p.resultadoExamenPostIncapacidad': 'sp-resultado-examen-post-incapacidad',
+            'p.trabajadorRemoto': 'sp-trabajador-remoto',
+            'p.fechaInicioRemoto': 'sp-fecha-inicio-remoto',
+        };
+
+        // Función helper para resolver el valor desde notación "t.campo"
+        const get = (path) => {
+            const [obj, key] = path.split('.');
+            const source = obj === 't' ? t : (obj === 'i' ? i : (obj === 'p' ? p : caso));
+            return source ? source[key] : undefined;
+        };
+
+        // Llenar cada campo si existe
+        let filled = 0;
+        Object.keys(map).forEach(path => {
+            const el = document.getElementById(map[path]);
+            const val = get(path);
+            if (el && val !== undefined && val !== null && val !== '') {
+                el.value = val;
+                filled++;
+            }
+        });
+
+        // Caso ingresado PRIC (controla banner y bloqueo de secciones 3,4,5)
+        // 📦701-fix4 — Si la BD tiene el campo vacío, asumir 'NO' (seguimiento
+        // simple) para que el banner muestre el estado correcto al reabrir.
+        // Es consistente con el fix preventivo del guardado.
+        const casoIngresadoPricEl = document.getElementById('sp-caso-ingresado-pric');
+        if (casoIngresadoPricEl) {
+            casoIngresadoPricEl.value = p.casoIngresadoPRIC || 'NO';
+            filled++;
+        }
+
+        console.log('[CARGAR CASO BD] Formulario llenado:', filled, 'campos');
+    }
+
+    /**
+     * 📦701-fix4 — Inicializa los seguimientos del caso desde la BD.
+     * Usa `agregarSeguimiento(fecha, descripcion)` para cada registro
+     * del caso. La forma del item en el DOM es gestionada por esa función.
+     */
+    _inicializarSeguimientosDesdeCaso(caso) {
+        const container = document.getElementById('sp-seguimientos-container');
+        if (!container) return;
+        // Limpiar contenedor
+        container.innerHTML = '';
+        const lista = Array.isArray(caso.seguimientos) ? caso.seguimientos : [];
+        if (lista.length === 0) {
+            // Si no hay seguimientos, agregar uno vacío como caso nuevo
+            this.agregarSeguimiento();
+        } else {
+            // Agregar uno por cada seguimiento guardado
+            for (let i = 0; i < lista.length; i++) {
+                const s = lista[i];
+                this.agregarSeguimiento(s.fecha || '', s.descripcion || '');
+            }
+        }
+    }
+
+    /**
+     * 📦701-fix4 — Marca la sección 1 como "ya capturada" para que no
+     * requiera validación al navegar. Marca los campos como válidos y
+     * visualmente completa.
+     */
+    _marcarSeccion1YaCapturada() {
+        console.log('[SECCIÓN 1] Marcando como ya capturada (caso existente)');
+
+        // Remover la clase de required error si la tienen
+        const seccion = document.getElementById('sp-section-datos');
+        if (seccion) {
+            // Marcar todos los inputs como "touched" para que no se marquen en rojo
+            seccion.querySelectorAll('input, select, textarea').forEach(el => {
+                if (el.dataset) el.dataset.spTouched = 'true';
+                // Limpiar clases de error visuales
+                el.classList.remove('sp-field-error');
+                el.classList.add('sp-field-ok');
+            });
+        }
+
+        // Marcar el nav item de la sección 1 como "completado"
+        const navItems = document.querySelectorAll('.sp-nav-item');
+        if (navItems[0]) {
+            navItems[0].classList.add('is-section-complete');
+        }
+
+        // Bandera interna: la sección 1 ya fue capturada
+        this.seccion1YaCapturada = true;
     }
 
     renderCondicion1Detalle(nombre, cedula, incapacidadesLargas, totalDias) {
@@ -2119,6 +2874,26 @@ class MedicionAusentismoComponent {
                 }
                 .sp-nav-item i { font-size: 14px; }
 
+                /* 📦 Bloqueo de pasos: las navs futuras a la sección activa están bloqueadas
+                con candado y sin pointer-events. Solo "Siguiente" las desbloquea. */
+                .sp-nav-item.is-locked-step {
+                    opacity: 0.4;
+                    cursor: not-allowed;
+                    pointer-events: none;
+                    background: repeating-linear-gradient(
+                        -45deg,
+                        transparent,
+                        transparent 4px,
+                        rgba(100, 116, 139, 0.04) 4px,
+                        rgba(100, 116, 139, 0.04) 8px
+                    );
+                }
+                .sp-nav-item .sp-nav-lock-icon {
+                    font-size: 11px;
+                    margin-left: 4px;
+                    color: var(--sp-text-muted);
+                }
+
                 /* Área de Contenido */
                 .sp-content-area {
                     flex: 1; padding: 25px 30px; overflow-y: auto; background: #FDFEFE;
@@ -2162,6 +2937,73 @@ class MedicionAusentismoComponent {
                     background: #F9FAFB; color: var(--sp-text-main);
                 }
 
+                /* 📦 Wizard de validación — recuadro rojo universal para TODO input/select/
+                textarea vacío, sea obligatorio u opcional. La distinción "obligatorio" se
+                sigue marcando con el asterisco rojo en el label, no con el recuadro. */
+                .sp-form-control.is-empty {
+                    border-color: #EF4444 !important;
+                    background: #FEF2F2;
+                    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23EF4444' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'/><line x1='12' y1='8' x2='12' y2='12'/><line x1='12' y1='16' x2='12.01' y2='16'/></svg>");
+                    background-repeat: no-repeat;
+                    background-position: right 10px center;
+                    background-size: 14px;
+                    padding-right: 32px;
+                }
+                .sp-form-control.is-empty:focus {
+                    outline: none;
+                    border-color: #EF4444 !important;
+                    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
+                }
+
+                /* 📦 SELECTS: el ícono no debe chocar con la flecha nativa del dropdown.
+                Movemos el ícono a la izquierda de la flecha y reservamos espacio. */
+                select.sp-form-control.is-empty {
+                    padding-right: 44px;
+                    background-position: right 28px center;
+                }
+
+                /* Asterisco rojo en label cuando el campo es requerido */
+                .sp-form-label[data-required-mark="true"]::after {
+                    content: ' *';
+                    color: #EF4444;
+                    font-weight: 700;
+                }
+
+                /* Contador de completitud en el header de cada sección */
+                .sp-section-completitud {
+                    margin-left: auto; font-size: 12px; font-weight: 500;
+                    padding: 4px 10px; border-radius: 12px;
+                    background: var(--sp-secondary); color: var(--sp-text-muted);
+                    transition: all 0.25s ease;
+                }
+                .sp-section-completitud.is-complete {
+                    background: #D1FAE5; color: #065F46;
+                }
+                .sp-section-completitud.is-incomplete {
+                    background: #FEE2E2; color: #991B1B;
+                }
+
+                /* Mensaje inline de error pegado al primer campo vacío de la sección */
+                .sp-required-hint {
+                    display: block; font-size: 11.5px; color: #DC2626;
+                    margin-top: 4px; font-weight: 500;
+                }
+
+                /* Footer reorganizado con navegación de wizard */
+                .sp-panel-footer {
+                    padding: 15px 30px; border-top: 1px solid var(--sp-border); background: white;
+                    display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
+                    gap: 12px;
+                }
+                .sp-panel-footer-left { display: flex; gap: 8px; align-items: center; }
+                .sp-panel-footer-right { display: flex; gap: 8px; align-items: center; }
+                .sp-panel-footer-progress {
+                    font-size: 12px; color: var(--sp-text-muted);
+                    padding: 6px 12px; border-radius: 16px;
+                    background: var(--sp-secondary);
+                }
+                .sp-panel-footer-progress strong { color: var(--sp-text-main); font-weight: 600; }
+
                 /* Subsection */
                 .sp-subsection {
                     background: white; border: 1px solid var(--sp-border); border-radius: 8px;
@@ -2172,6 +3014,126 @@ class MedicionAusentismoComponent {
                     display: flex; align-items: center; gap: 8px;
                 }
                 .sp-subsection-title i { color: var(--sp-accent); font-size: 12px; }
+
+                /* 📦 Banner PRI — estado formal del caso (PRIC vs seguimiento simple) */
+                .sp-pri-banner {
+                    padding: 12px 30px; flex-shrink: 0;
+                    display: flex; align-items: center; gap: 12px;
+                    border-bottom: 1px solid var(--sp-border);
+                    font-size: 13px;
+                    background: var(--sp-secondary);
+                    transition: background-color 0.25s ease, border-color 0.25s ease;
+                }
+                .sp-pri-banner .sp-pri-banner-icon {
+                    width: 36px; height: 36px; border-radius: 50%;
+                    display: flex; align-items: center; justify-content: center;
+                    font-size: 16px; flex-shrink: 0;
+                }
+                .sp-pri-banner .sp-pri-banner-text { flex: 1; line-height: 1.35; }
+                .sp-pri-banner .sp-pri-banner-text strong { font-weight: 600; }
+                .sp-pri-banner .sp-pri-banner-text small { display: block; font-size: 11.5px; opacity: 0.85; margin-top: 2px; }
+
+                /* Estado 1: Caso PRI formal */
+                .sp-pri-banner.is-pri {
+                    background: linear-gradient(90deg, #ECFDF5 0%, #D1FAE5 100%);
+                    border-bottom-color: #10B981;
+                }
+                .sp-pri-banner.is-pri .sp-pri-banner-icon { background: var(--sp-accent); color: white; }
+
+                /* Estado 2: Caso con seguimiento pero NO PRI formal */
+                .sp-pri-banner.is-no-pri {
+                    background: linear-gradient(90deg, #FFFBEB 0%, #FEF3C7 100%);
+                    border-bottom-color: #F59E0B;
+                }
+                .sp-pri-banner.is-no-pri .sp-pri-banner-icon { background: #F59E0B; color: white; }
+
+                /* Estado 3: Aún sin clasificar (caso recién creado sin valor) */
+                .sp-pri-banner.is-unclassified {
+                    background: linear-gradient(90deg, #F8FAFC 0%, #F1F5F9 100%);
+                    border-bottom-color: var(--sp-border);
+                }
+                .sp-pri-banner.is-unclassified .sp-pri-banner-icon { background: #94A3B8; color: white; }
+
+                /* Botones contextuales del banner — el control de decisión vive aquí para
+                que NUNCA dependa de navegar a una sección atenuada. */
+                .sp-pri-banner .sp-pri-banner-actions {
+                    display: flex; gap: 8px; flex-shrink: 0; align-items: center;
+                }
+                .sp-pri-banner .sp-pri-banner-btn {
+                    padding: 7px 14px; border-radius: 6px; cursor: pointer;
+                    font-size: 12px; font-weight: 600; white-space: nowrap;
+                    display: inline-flex; align-items: center; gap: 6px;
+                    transition: all 0.2s; border: 1px solid transparent;
+                }
+                .sp-pri-banner .sp-pri-banner-btn.is-pri {
+                    background: var(--sp-accent); color: white;
+                }
+                .sp-pri-banner .sp-pri-banner-btn.is-pri:hover {
+                    background: #059669; transform: translateY(-1px);
+                    box-shadow: 0 4px 6px rgba(16, 185, 129, 0.25);
+                }
+                .sp-pri-banner .sp-pri-banner-btn.is-no-pri {
+                    background: white; color: #92400E; border-color: #F59E0B;
+                }
+                .sp-pri-banner .sp-pri-banner-btn.is-no-pri:hover {
+                    background: #FEF3C7; transform: translateY(-1px);
+                }
+                .sp-pri-banner .sp-pri-banner-btn.is-ghost {
+                    background: transparent; color: #4F46E5; border-color: #4F46E5;
+                }
+                .sp-pri-banner .sp-pri-banner-btn.is-ghost:hover {
+                    background: var(--sp-primary-light); transform: translateY(-1px);
+                }
+
+                /* 📦701 — Banner BD: estado del caso actual en SQLite + acciones */
+                .sp-bd-banner {
+                    display: flex; align-items: center; gap: 12px;
+                    padding: 10px 16px;
+                    border-radius: 8px;
+                    margin: 0 16px 12px;
+                    transition: all 0.2s ease;
+                }
+                .sp-bd-banner .sp-bd-banner-icon {
+                    width: 32px; height: 32px; border-radius: 6px;
+                    display: flex; align-items: center; justify-content: center;
+                    font-size: 14px; flex-shrink: 0;
+                }
+                .sp-bd-banner .sp-bd-banner-text { flex: 1; line-height: 1.35; font-size: 13px; }
+                .sp-bd-banner .sp-bd-banner-text strong { font-weight: 600; }
+                .sp-bd-banner .sp-bd-banner-text small { display: block; font-size: 11.5px; opacity: 0.8; margin-top: 2px; }
+                .sp-bd-banner .sp-bd-banner-actions { display: flex; gap: 6px; flex-shrink: 0; }
+                .sp-bd-banner.is-unsaved { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+                .sp-bd-banner.is-unsaved .sp-bd-banner-icon { background: #94a3b8; color: white; }
+                .sp-bd-banner.is-saved { background: #ecfdf5; color: #065f46; border: 1px solid #6ee7b7; }
+                .sp-bd-banner.is-saved .sp-bd-banner-icon { background: #10b981; color: white; }
+                .sp-bd-banner.is-exported { background: #eff6ff; color: #1e40af; border: 1px solid #93c5fd; }
+                .sp-bd-banner.is-exported .sp-bd-banner-icon { background: #3b82f6; color: white; }
+                .sp-bd-banner.is-error { background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; }
+                .sp-bd-banner.is-error .sp-bd-banner-icon { background: #ef4444; color: white; }
+                .sp-btn-export { background: #10b981; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; }
+                .sp-btn-export:hover:not(:disabled) { background: #059669; }
+                .sp-btn-export:disabled { background: #10b981; }
+
+                /* Atenuación — sólo aplica a Calificación PCL, que genuinamente requiere
+                ser caso PRI formal. La sección Etapas PRIC nunca se atenúa: el usuario debe
+                poder entrar a diligenciar lo que aplique sin estar bloqueado. */
+                .sp-section-dimmed { opacity: 0.45; pointer-events: none; transition: opacity 0.25s ease; }
+                .sp-section-dimmed .sp-subsection { position: relative; }
+                .sp-nav-item.is-dimmed { opacity: 0.5; }
+                .sp-nav-item.is-dimmed i { color: var(--sp-text-muted); }
+
+                /* Badge de modalidad en la tabla principal */
+                .sp-pri-badge {
+                    display: inline-flex; align-items: center; gap: 5px;
+                    padding: 3px 9px; border-radius: 12px;
+                    font-size: 11px; font-weight: 600;
+                    letter-spacing: 0.2px;
+                    white-space: nowrap;
+                }
+                .sp-pri-badge i { font-size: 11px; line-height: 1; }
+                .sp-pri-badge.is-pri { background: #D1FAE5; color: #065F46; }
+                .sp-pri-badge.is-no-pri { background: #F1F5F9; color: #64748B; }
+                .sp-pri-badge.is-no-pri-strong { background: #FEF3C7; color: #92400E; }
 
                 /* Tabla de Recomendaciones */
                 .sp-data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -2191,7 +3153,16 @@ class MedicionAusentismoComponent {
                 .sp-panel-footer {
                     padding: 15px 30px; border-top: 1px solid var(--sp-border); background: white;
                     display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
+                    gap: 12px;
                 }
+                .sp-panel-footer-left { display: flex; gap: 8px; align-items: center; }
+                .sp-panel-footer-right { display: flex; gap: 8px; align-items: center; }
+                .sp-panel-footer-progress {
+                    font-size: 12px; color: var(--sp-text-muted);
+                    padding: 6px 12px; border-radius: 16px;
+                    background: var(--sp-secondary);
+                }
+                .sp-panel-footer-progress strong { color: var(--sp-text-main); font-weight: 600; }
                 .sp-btn {
                     padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 500;
                     cursor: pointer; display: inline-flex; align-items: center; gap: 8px; border: none;
@@ -2201,6 +3172,8 @@ class MedicionAusentismoComponent {
                 .sp-btn-primary:hover { background: #4338CA; transform: translateY(-1px); box-shadow: 0 4px 6px rgba(79, 70, 229, 0.3); }
                 .sp-btn-outline { background: white; border: 1px solid var(--sp-border); color: var(--sp-text-main); }
                 .sp-btn-outline:hover { background: var(--sp-secondary); border-color: #CBD5E1; }
+                .sp-btn-outline:disabled { opacity: 0.4; cursor: not-allowed; }
+                .sp-btn-outline:disabled:hover { background: white; border-color: var(--sp-border); transform: none; box-shadow: none; }
                 .sp-btn-success { background: var(--sp-accent); color: white; }
                 .sp-btn-success:hover { background: #059669; transform: translateY(-1px); box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3); }
                 .sp-btn-sm { padding: 4px 8px; font-size: 11px; }
@@ -2235,22 +3208,52 @@ class MedicionAusentismoComponent {
                     </button>
                 </div>
 
-                <!-- Navegación Horizontal -->
+                <!-- 📦701 — Banner BD: estado del caso actual en SQLite + acciones de export -->
+                <div id="sp-bd-banner" class="sp-bd-banner is-unsaved">
+                    <div class="sp-bd-banner-icon"><i class="fas fa-database"></i></div>
+                    <div class="sp-bd-banner-text" id="sp-bd-banner-text">
+                        <strong>📦 Estado en BD: <span id="sp-bd-estado">Sin guardar</span></strong>
+                        <small id="sp-bd-banner-subtext">Guarda el caso primero. Luego puedes exportarlo a Excel con un click.</small>
+                    </div>
+                    <div class="sp-bd-banner-actions">
+                        <button class="sp-btn sp-btn-export" id="sp-btn-export-individual" onclick="window.medicAusentismoComponent.exportarCasoActualAExcel()" disabled style="opacity: 0.5; cursor: not-allowed;">
+                            <i class="fas fa-file-excel"></i> Exportar a Excel
+                        </button>
+                        <button class="sp-btn sp-btn-outline" onclick="window.medicAusentismoComponent.mostrarListaCasosBD()">
+                            <i class="fas fa-list"></i> Ver casos en BD
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 📦 Banner PRI: estado formal del caso (PRIC formal vs seguimiento simple) + control directo -->
+                <div id="sp-pri-banner" class="sp-pri-banner is-unclassified">
+                    <div class="sp-pri-banner-icon"><i class="fas fa-info-circle"></i></div>
+                    <div class="sp-pri-banner-text" id="sp-pri-banner-text">
+                        <strong>Sin clasificar aún</strong>
+                        <small>Este caso aún no tiene definido si es un seguimiento simple o un caso PRI formal.</small>
+                    </div>
+                    <div class="sp-pri-banner-actions" id="sp-pri-banner-actions">
+                        <!-- Se llenan dinámicamente según el estado (is-pri / is-no-pri / is-unclassified) -->
+                    </div>
+                </div>
+
+                <!-- Navegación Horizontal — navegación secuencial: solo se desbloquea la siguiente
+                al hacer click en "Siguiente". Click en navs futuras se ignora. -->
                 <nav class="sp-horizontal-nav">
-                    <div class="sp-nav-item active" onclick="window.medicAusentismoComponent.showSeguimientoPanelSection('datos', this)">
-                        <i class="fas fa-id-card"></i> Datos Generales
+                    <div class="sp-nav-item active" onclick="window.medicAusentismoComponent._intentarNavegarANavItem(this, 'datos')">
+                        <i class="fas fa-id-card"></i> <span>1. Datos Generales</span>
                     </div>
-                    <div class="sp-nav-item" onclick="window.medicAusentismoComponent.showSeguimientoPanelSection('incapacidad', this)">
-                        <i class="fas fa-procedures"></i> Incapacidad Temporal
+                    <div class="sp-nav-item" onclick="window.medicAusentismoComponent._intentarNavegarANavItem(this, 'incapacidad')">
+                        <i class="fas fa-procedures"></i> <span>2. Incapacidad Temporal</span>
                     </div>
-                    <div class="sp-nav-item" onclick="window.medicAusentismoComponent.showSeguimientoPanelSection('etapas', this)">
-                        <i class="fas fa-tasks"></i> Etapas PRIC
+                    <div class="sp-nav-item" onclick="window.medicAusentismoComponent._intentarNavegarANavItem(this, 'etapas')">
+                        <i class="fas fa-tasks"></i> <span>3. Etapas PRIC</span>
                     </div>
-                    <div class="sp-nav-item" onclick="window.medicAusentismoComponent.showSeguimientoPanelSection('recomendaciones', this)">
-                        <i class="fas fa-clipboard-check"></i> Seg. Recomendaciones
+                    <div class="sp-nav-item" onclick="window.medicAusentismoComponent._intentarNavegarANavItem(this, 'recomendaciones')">
+                        <i class="fas fa-clipboard-check"></i> <span>4. Seg. Recomendaciones</span>
                     </div>
-                    <div class="sp-nav-item" onclick="window.medicAusentismoComponent.showSeguimientoPanelSection('calificacion', this)">
-                        <i class="fas fa-balance-scale"></i> Calificación PCL
+                    <div class="sp-nav-item" onclick="window.medicAusentismoComponent._intentarNavegarANavItem(this, 'calificacion')">
+                        <i class="fas fa-balance-scale"></i> <span>5. Calificación PCL</span>
                     </div>
                 </nav>
 
@@ -2318,7 +3321,7 @@ class MedicionAusentismoComponent {
                                     <input type="date" id="sp-fecha-ingreso" class="sp-form-control" onchange="window.medicAusentismoComponent.calcularAntiguedad()">
                                 </div>
                                 <div class="sp-form-group">
-                                    <label class="sp-form-label">Antigüedad (Años)</label>
+                                    <label class="sp-form-label">Antigüedad (Meses)</label>
                                     <input type="number" id="sp-antiguedad" class="sp-form-control" placeholder="0">
                                 </div>
                                 <div class="sp-form-group">
@@ -2344,7 +3347,7 @@ class MedicionAusentismoComponent {
                                 </div>
                                 <div class="sp-form-group">
                                     <label class="sp-form-label">Salario Básico</label>
-                                    <input type="number" id="sp-salario" class="sp-form-control" placeholder="0">
+                                    <input type="number" id="sp-salario" class="sp-form-control" placeholder="">
                                 </div>
                             </div>
                         </div>
@@ -3092,14 +4095,28 @@ class MedicionAusentismoComponent {
 
                 </div>
 
-                <!-- Footer -->
+                <!-- Footer con navegación wizard -->
                 <div class="sp-panel-footer">
-                    <button class="sp-btn sp-btn-outline" onclick="window.medicAusentismoComponent.closeSeguimientoPanel()">
-                        <i class="fas fa-times"></i> Cancelar
-                    </button>
-                    <button class="sp-btn sp-btn-success" onclick="window.medicAusentismoComponent.saveSeguimientoData()">
-                        <i class="fas fa-save"></i> Guardar en Excel
-                    </button>
+                    <div class="sp-panel-footer-left">
+                        <button class="sp-btn sp-btn-outline" onclick="window.medicAusentismoComponent.closeSeguimientoPanel()">
+                            <i class="fas fa-times"></i> Cancelar
+                        </button>
+                    </div>
+                    <div class="sp-panel-footer-progress" id="sp-panel-progress">
+                        Sección <strong id="sp-panel-progress-current">1</strong> de <strong id="sp-panel-progress-total">5</strong> —
+                        <span id="sp-panel-progress-text">0/0 campos diligenciados</span>
+                    </div>
+                    <div class="sp-panel-footer-right">
+                        <button class="sp-btn sp-btn-outline" id="sp-btn-prev" onclick="window.medicAusentismoComponent._irASeccionAnterior()">
+                            <i class="fas fa-arrow-left"></i> Anterior
+                        </button>
+                        <button class="sp-btn sp-btn-primary" id="sp-btn-next" onclick="window.medicAusentismoComponent._irASiguienteSeccion()">
+                            Siguiente <i class="fas fa-arrow-right"></i>
+                        </button>
+                        <button class="sp-btn sp-btn-success" onclick="window.medicAusentismoComponent.saveSeguimientoData()">
+                            <i class="fas fa-save"></i> Guardar en BD
+                        </button>
+                    </div>
                 </div>
             </div>
         `;
@@ -3112,6 +4129,26 @@ class MedicionAusentismoComponent {
                 this.closeSeguimientoPanel();
             }
         });
+
+        // 📦 Banner PRI — listener "live": cualquier cambio en el campo clave dispara
+        // la re-evaluación del banner y la atenuación/desatenua ción de secciones.
+        // El listener se engancha una sola vez (porque createSeguimientoPanel sólo se
+        // llama cuando el backdrop aún no existe en el DOM).
+        const selCaso = document.getElementById('sp-caso-ingresado-pric');
+        const fIngresoPric = document.getElementById('sp-fecha-ingreso-pric');
+        if (selCaso) {
+            selCaso.addEventListener('change', () => this._actualizarBannerPRI());
+        }
+        if (fIngresoPric) {
+            fIngresoPric.addEventListener('change', () => this._actualizarBannerPRI());
+        }
+
+        // 📦 Wizard de validación: enganchar delegación de eventos sobre el panel
+        // para que cualquier input/select requerido se valide en vivo (borde rojo +
+        // asterisco en label). Se llama una sola vez al crear el panel.
+        this._setupListenersValidacion();
+        // Marcar de entrada los campos base como requeridos.
+        this._aplicarReglasRequeridos();
     }
 
     /**
@@ -3122,6 +4159,281 @@ class MedicionAusentismoComponent {
         if (backdrop) {
             backdrop.classList.remove('active');
         }
+        this.currentCasoBdId = null;
+        this.currentCasoBdEsActualizacion = false;
+    }
+
+    // ================================================================
+    // 📦701 — Métodos del banner BD: export + lista de casos
+    // ================================================================
+
+    /**
+     * Actualiza el banner BD con el estado actual del caso.
+     * @param {string} estado - 'sin-guardar' | 'guardado' | 'exportado' | 'error'
+     * @param {object} extra - datos extra (ej: fila del Excel, fecha de export)
+     */
+    _actualizarBannerBD(estado, extra) {
+        const banner = document.getElementById('sp-bd-banner');
+        const estadoEl = document.getElementById('sp-bd-estado');
+        const subtextEl = document.getElementById('sp-bd-banner-subtext');
+        const btnExport = document.getElementById('sp-btn-export-individual');
+        if (!banner || !estadoEl || !subtextEl || !btnExport) return;
+
+        if (estado === 'guardado') {
+            estadoEl.textContent = '✅ Guardado en BD';
+            subtextEl.textContent = 'El caso está en SQLite. Puedes exportarlo a Excel cuando quieras.';
+            btnExport.disabled = false;
+            btnExport.style.opacity = '1';
+            btnExport.style.cursor = 'pointer';
+            banner.className = 'sp-bd-banner is-saved';
+        } else if (estado === 'exportado') {
+            estadoEl.textContent = '✅ Guardado y exportado a Excel';
+            subtextEl.textContent = extra && extra.fila
+                ? `Exportado en fila ${extra.fila} del Excel el ${new Date().toLocaleDateString()}.`
+                : 'Exportado a Excel correctamente.';
+            btnExport.disabled = true;
+            btnExport.style.opacity = '0.5';
+            btnExport.style.cursor = 'not-allowed';
+            banner.className = 'sp-bd-banner is-exported';
+        } else if (estado === 'error') {
+            estadoEl.textContent = '❌ Error al guardar';
+            subtextEl.textContent = (extra && extra.message) || 'Error desconocido';
+            btnExport.disabled = true;
+            btnExport.style.opacity = '0.5';
+            btnExport.style.cursor = 'not-allowed';
+            banner.className = 'sp-bd-banner is-error';
+        } else {
+            estadoEl.textContent = 'Sin guardar';
+            subtextEl.textContent = 'Guarda el caso primero. Luego puedes exportarlo a Excel con un click.';
+            btnExport.disabled = true;
+            btnExport.style.opacity = '0.5';
+            btnExport.style.cursor = 'not-allowed';
+            banner.className = 'sp-bd-banner is-unsaved';
+        }
+    }
+
+    /**
+     * Exporta el caso actual (que está en BD) a Excel via Python.
+     * Marca el caso como exportado al finalizar.
+     */
+    async exportarCasoActualAExcel() {
+        if (!this.currentCasoBdId) {
+            this.showNotification('⚠️ No hay un caso guardado en BD para exportar. Guarda primero.', 'warning');
+            return;
+        }
+        const segInc = window.electronAPI?.seguimientoIncapacidad || window.parent?.electronAPI?.seguimientoIncapacidad;
+        if (!segInc?.exportarExcel) {
+            this.showNotification('❌ Error: API de export no disponible', 'error');
+            return;
+        }
+
+        this.showNotification('⏳ Exportando caso a Excel...', 'info');
+        console.log('[EXPORTAR EXCEL] Caso:', this.currentCasoBdId, 'Empresa:', this.currentCompany);
+
+        try {
+            const result = await segInc.exportarExcel({ empresaId: this.currentCompany, casoId: this.currentCasoBdId });
+            console.log('[EXPORTAR EXCEL] Resultado:', result);
+            if (result && result.success) {
+                this._actualizarBannerBD('exportado', { fila: result.data?.fila });
+                this.showNotification(`✅ Caso exportado a Excel en fila ${result.data?.fila || '?'}`, 'success');
+            } else {
+                const errorMsg = result?.error?.message || 'Error desconocido';
+                this.showNotification(`❌ Error al exportar: ${errorMsg}`, 'error');
+            }
+        } catch (e) {
+            console.error('[EXPORTAR EXCEL] Error:', e);
+            this.showNotification(`❌ Error: ${e.message}`, 'error');
+        }
+    }
+
+    /**
+     * Exporta TODOS los casos pendientes (exportado_excel_en IS NULL) a Excel.
+     */
+    async exportarTodosCasosBD() {
+        const segInc = window.electronAPI?.seguimientoIncapacidad || window.parent?.electronAPI?.seguimientoIncapacidad;
+        if (!segInc?.exportarTodos) {
+            this.showNotification('❌ Error: API no disponible', 'error');
+            return;
+        }
+        this.showNotification('⏳ Exportando TODOS los casos pendientes a Excel...', 'info');
+        try {
+            const result = await segInc.exportarTodos({ empresaId: this.currentCompany });
+            console.log('[EXPORTAR TODOS] Resultado:', result);
+            if (result && result.success) {
+                const d = result.data || {};
+                this.showNotification(`✅ Exportados: ${d.exitosos || 0} | Fallidos: ${d.fallidos || 0} | Total: ${d.total || 0}`, 'success');
+            } else {
+                this.showNotification(`❌ Error: ${result?.error?.message || 'desconocido'}`, 'error');
+            }
+        } catch (e) {
+            this.showNotification(`❌ Error: ${e.message}`, 'error');
+        }
+    }
+
+    /**
+     * Muestra un modal con la lista de todos los casos en BD para esta empresa.
+     * Cada caso tiene acciones: Re-abrir, Exportar individual, Eliminar.
+     */
+    async mostrarListaCasosBD() {
+        const segInc = window.electronAPI?.seguimientoIncapacidad || window.parent?.electronAPI?.seguimientoIncapacidad;
+        if (!segInc?.listar) {
+            this.showNotification('❌ Error: API no disponible', 'error');
+            return;
+        }
+        // Si ya existe el modal, cerrarlo
+        const existing = document.getElementById('bdCasosModalBackdrop');
+        if (existing) existing.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'bdCasosModalBackdrop';
+        modal.className = 'modal-backdrop active';
+        modal.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center;';
+        modal.innerHTML = `
+            <div style="background: white; border-radius: 8px; max-width: 1100px; width: 95%; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden;">
+                <div style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                    <h2 style="margin: 0; font-size: 18px;">
+                        <i class="fas fa-database" style="color: #174ea6;"></i> Casos en BD — ${this.currentCompany}
+                    </h2>
+                    <div style="display: flex; gap: 8px;">
+                        <button onclick="window.medicAusentismoComponent.exportarTodosCasosBD()" style="padding: 6px 12px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px;">
+                            <i class="fas fa-file-excel"></i> Exportar todos pendientes
+                        </button>
+                        <button onclick="document.getElementById('bdCasosModalBackdrop').remove()" style="padding: 6px 12px; background: #ef4444; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px;">
+                            <i class="fas fa-times"></i> Cerrar
+                        </button>
+                    </div>
+                </div>
+                <div id="bdCasosModalBody" style="padding: 16px 20px; overflow-y: auto; flex: 1;">
+                    <div style="text-align: center; padding: 40px; color: #64748b;">
+                        <i class="fas fa-spinner fa-spin" style="font-size: 32px;"></i><br>
+                        Cargando casos desde SQLite...
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        try {
+            const result = await segInc.listar({ empresaId: this.currentCompany });
+            const body = document.getElementById('bdCasosModalBody');
+            if (!result || !result.success) {
+                body.innerHTML = `<div style="text-align: center; padding: 40px; color: #ef4444;">Error: ${result?.error?.message || 'desconocido'}</div>`;
+                return;
+            }
+            const casos = result.data || [];
+            if (casos.length === 0) {
+                body.innerHTML = `<div style="text-align: center; padding: 40px; color: #64748b;">No hay casos en BD para esta empresa.</div>`;
+                return;
+            }
+            body.innerHTML = `
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                    <thead>
+                        <tr style="background: #f1f5f9; text-align: left;">
+                            <th style="padding: 8px;">Cédula</th>
+                            <th style="padding: 8px;">Nombre</th>
+                            <th style="padding: 8px;">Fechas</th>
+                            <th style="padding: 8px;">Diagnóstico</th>
+                            <th style="padding: 8px;">Estado</th>
+                            <th style="padding: 8px;">Exportado a Excel</th>
+                            <th style="padding: 8px;">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${casos.map(c => {
+                            const exportado = c.exportado_excel_en
+                                ? `<span style="color: #10b981;">✅ Fila ${c.exportado_excel_fila || '?'}</span><br><small>${new Date(c.exportado_excel_en).toLocaleDateString()}</small>`
+                                : `<span style="color: #f59e0b;">⏳ Pendiente</span>`;
+                            const fechas = (c.fecha_inicio || c.fecha_fin) ? `${c.fecha_inicio || '?'} → ${c.fecha_fin || '?'}` : '—';
+                            return `
+                                <tr style="border-bottom: 1px solid #e2e8f0;">
+                                    <td style="padding: 8px;">${this._escapeHtml(c.cedula)}</td>
+                                    <td style="padding: 8px;">${this._escapeHtml(c.nombre || '')}</td>
+                                    <td style="padding: 8px; font-size: 12px;">${fechas}</td>
+                                    <td style="padding: 8px; font-size: 12px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${this._escapeHtml(c.descripcion_diagnostico || '')}">${this._escapeHtml(c.descripcion_diagnostico || '—')}</td>
+                                    <td style="padding: 8px;"><span style="padding: 2px 8px; background: #dcfce7; color: #166534; border-radius: 12px; font-size: 11px;">${c.estado || 'activo'}</span></td>
+                                    <td style="padding: 8px;">${exportado}</td>
+                                    <td style="padding: 8px;">
+                                        <button onclick="window.medicAusentismoComponent.exportarCasoIndividualBD('${c.id}')" title="Exportar a Excel" style="padding: 4px 8px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; margin-right: 4px;">
+                                            <i class="fas fa-file-excel"></i>
+                                        </button>
+                                        <button onclick="window.medicAusentismoComponent.eliminarCasoBD('${c.id}', '${this._escapeHtml(c.nombre || '').replace(/'/g, "\\'")}')" title="Eliminar de BD" style="padding: 4px 8px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px;">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+                <div style="margin-top: 12px; font-size: 12px; color: #64748b;">
+                    Total: ${casos.length} caso(s) en BD
+                </div>
+            `;
+        } catch (e) {
+            const body = document.getElementById('bdCasosModalBody');
+            body.innerHTML = `<div style="text-align: center; padding: 40px; color: #ef4444;">Error: ${e.message}</div>`;
+        }
+    }
+
+    /**
+     * Exporta un caso individual de la lista a Excel.
+     */
+    async exportarCasoIndividualBD(casoId) {
+        const segInc = window.electronAPI?.seguimientoIncapacidad || window.parent?.electronAPI?.seguimientoIncapacidad;
+        if (!segInc?.exportarExcel) {
+            this.showNotification('❌ Error: API no disponible', 'error');
+            return;
+        }
+        this.showNotification('⏳ Exportando a Excel...', 'info');
+        try {
+            const result = await segInc.exportarExcel({ empresaId: this.currentCompany, casoId });
+            if (result && result.success) {
+                this.showNotification(`✅ Exportado en fila ${result.data?.fila || '?'}`, 'success');
+                await this.mostrarListaCasosBD(); // refrescar lista
+            } else {
+                this.showNotification(`❌ Error: ${result?.error?.message || 'desconocido'}`, 'error');
+            }
+        } catch (e) {
+            this.showNotification(`❌ Error: ${e.message}`, 'error');
+        }
+    }
+
+    /**
+     * Elimina un caso de la BD (con confirmación).
+     */
+    async eliminarCasoBD(casoId, nombre) {
+        if (!confirm(`¿Eliminar el caso de "${nombre}" de la BD?\n\nEsta acción no se puede deshacer.\n\nNota: si el caso ya estaba exportado a Excel, NO se borra del Excel.`)) {
+            return;
+        }
+        const segInc = window.electronAPI?.seguimientoIncapacidad || window.parent?.electronAPI?.seguimientoIncapacidad;
+        if (!segInc?.eliminar) {
+            this.showNotification('❌ Error: API no disponible', 'error');
+            return;
+        }
+        try {
+            const result = await segInc.eliminar({ empresaId: this.currentCompany, casoId });
+            if (result && result.success) {
+                this.showNotification('✅ Caso eliminado de BD', 'success');
+                await this.mostrarListaCasosBD(); // refrescar lista
+            } else {
+                this.showNotification(`❌ Error: ${result?.error?.message || 'desconocido'}`, 'error');
+            }
+        } catch (e) {
+            this.showNotification(`❌ Error: ${e.message}`, 'error');
+        }
+    }
+
+    /**
+     * Helper para escapar HTML y evitar XSS en los templates.
+     */
+    _escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     /**
@@ -3424,12 +4736,12 @@ class MedicionAusentismoComponent {
             document.getElementById('sp-talla').value = caso.talla || '';
             document.getElementById('sp-imc').value = caso.imc || '';
             document.getElementById('sp-actividades-extralaborales').value = caso.actividades_extralaborales || '';
-            
+
             // Calcular IMC si hay peso y talla
             if (caso.peso && caso.talla) {
                 this.calcularIMC();
             }
-            
+
             // === Datos de incapacidad ===
             if (caso.fecha_fin) {
                 try {
@@ -3439,11 +4751,25 @@ class MedicionAusentismoComponent {
                     }
                 } catch (e) { console.warn('Error cargando fecha_fin:', e); }
             }
-            
+
             document.getElementById('sp-dias-acumulados').value = caso.dias_acumulados || '';
             document.getElementById('sp-codigo-cie10').value = caso.codigo_cie10 || '';
             document.getElementById('sp-descripcion-diagnostico').value = caso.diagnostico || '';
-            
+
+            // 📦 Actualizar el banner PRI ahora que el campo sp-caso-ingresado-pric ya tiene valor.
+            // (Este campo se setea arriba en líneas previas; banner refleja el estado real del caso).
+            this._actualizarBannerPRI();
+            // 📦 Wizard: aplicar reglas (muchos condicionales solo si es PRI) y progreso.
+            this._aplicarReglasRequeridos();
+            this._actualizarProgresoSeccion();
+
+            // 📦 Auto-completar desde BD de personal para campos que el Excel pudo no
+            // tener guardados (ej: Área, AFP, Cargo, EPS). Usa la versión "if empty"
+            // para no pisar nada que ya estuviera guardado en el Excel del caso.
+            if (caso.cedula) {
+                this._loadDatosEmpleado(String(caso.cedula).trim());
+            }
+
             // Mostrar notificación
             this.showNotification(`✅ Caso cargado: ${caso.nombre} (Fila ${caso.fila})`, 'success');
             console.log('[CARGAR CASO SELECCIONADO] Datos cargados exitosamente');
@@ -3474,8 +4800,27 @@ class MedicionAusentismoComponent {
             this.cargarDatosEnPanelSeguimiento(empleadoData);
         }
 
+        // 📦 Autollenar Sección 2 (Incapacidad Temporal) desde la incapacidad que el
+        // usuario seleccionó en el modal de "Agregar Seguimiento". Si no hay una
+        // seleccionada, no hace nada (el usuario puede diligenciar a mano).
+        if (this.incapacidadSeleccionada) {
+            this._poblarSeccionIncapacidadDesdeSeleccion(this.incapacidadSeleccionada);
+        }
+
         // Inicializar seguimientos
         this.inicializarSeguimientos();
+
+        // 📦 Actualizar el banner PRI antes de mostrar el panel (caso nuevo: sin clasificar).
+        this._actualizarBannerPRI();
+        // 📦459 (2026-07-02) — Banner preventivo en Sección 2: si el archivo de
+        // ausentismo no está disponible Y la Sección 2 quedó vacía tras autollenar,
+        // mostramos un banner compacto amarillo. Caso contrario removemos cualquier
+        // banner previo (porque los datos sí están disponibles ahora).
+        this._actualizarBannerSeccion2Incapacidad();
+        // 📦 Wizard: aplicar reglas de requeridos + actualizar progreso del footer.
+        // (caso nuevo: la mayoría de campos estará vacía → borde rojo aparecerá)
+        this._aplicarReglasRequeridos();
+        this._actualizarProgresoSeccion();
 
         // Abrir el panel
         document.getElementById('seguimientoPanelBackdrop').classList.add('active');
@@ -3488,6 +4833,21 @@ class MedicionAusentismoComponent {
      * Muestra una sección específica del panel
      */
     showSeguimientoPanelSection(sectionId, navElement) {
+        // 📦705-fix2 — Defensa en profundidad: NO navegar a una sección atenuada
+        // (sección 3, 4 o 5 cuando NO es caso PRI formal). Aunque el caller
+        // debería haber validado, esto previene que cualquier otro path
+        // (ej: deep-link, debug) deje al usuario entrar a diligenciar secciones
+        // que no aplican al caso.
+        const targetSec = document.getElementById(`sp-section-${sectionId}`);
+        if (targetSec && targetSec.classList.contains('sp-section-dimmed')) {
+            this.showNotification(
+                'ℹ️ Esta sección está bloqueada porque no es caso PRI formal. ' +
+                'Si necesitas diligenciarla, click "Convertir en caso PRI formal" en el banner amarillo.',
+                'info', 6000
+            );
+            return;
+        }
+
         // Ocultar todas las secciones
         document.querySelectorAll('.sp-form-section').forEach(el => el.classList.remove('active'));
         // Mostrar la sección seleccionada
@@ -3496,6 +4856,697 @@ class MedicionAusentismoComponent {
         // Actualizar navegación
         document.querySelectorAll('.sp-nav-item').forEach(el => el.classList.remove('active'));
         navElement.classList.add('active');
+
+        // 📦 Wizard: al cambiar de sección, re-aplicar reglas + actualizar progreso
+        // + actualizar candados en las navs futuras.
+        // (setTimeout para asegurar que el cambio de display ya surtió efecto.)
+        setTimeout(() => {
+            this._aplicarReglasRequeridos();
+            this._actualizarProgresoSeccion();
+            this._aplicarBloqueoStepNav();
+        }, 0);
+    }
+
+    /**
+     * 📦 Actualiza el banner PRI según el valor del campo "sp-caso-ingresado-pric".
+     *
+     * Reglas REORGANIZADAS para evitar el deadlock anterior:
+     *  - "SI"  → banner verde; Calificación PCL habilitada.
+     *  - "NO"  → banner amarillo; Calificación PCL atenuada (no aplica).
+     *  - ""     → banner gris; Calificación PCL atenuada (mientras no defina).
+     *
+     * Importante: la sección "Etapas PRIC" NUNCA se atenúa. Su control de decisión
+     * vive duplicado en el banner (botones contextuales) para que el usuario pueda
+     * cambiar el modo sin tener que entrar a la sección ni depender de un
+     * sub-bloque específico.
+     */
+    _actualizarBannerPRI() {
+        const banner = document.getElementById('sp-pri-banner');
+        const textEl = document.getElementById('sp-pri-banner-text');
+        const actionsEl = document.getElementById('sp-pri-banner-actions');
+        if (!banner || !textEl || !actionsEl) return;
+
+        // 📦705 — Secciones y nav items que se atenúan cuando NO es caso PRI formal.
+        // Etapas PRIC, Seg. Recomendaciones y Calificación PCL solo aplican a
+        // casos PRI formales. Para seguimientos simples NO se deben diligenciar.
+        const secEtapas = document.getElementById('sp-section-etapas');
+        const secRecomendaciones = document.getElementById('sp-section-recomendaciones');
+        const secCalificacion = document.getElementById('sp-section-calificacion');
+        const navItems = document.querySelectorAll('.sp-nav-item');
+        const navEtapas = navItems[2];
+        const navRecomendaciones = navItems[3];
+        const navCalificacion = navItems[4];
+        const priSections = [secEtapas, secRecomendaciones, secCalificacion];
+        const priNavs = [navEtapas, navRecomendaciones, navCalificacion];
+
+        const sel = document.getElementById('sp-caso-ingresado-pric');
+        const fechaIngreso = document.getElementById('sp-fecha-ingreso-pric');
+        const valor = sel ? (sel.value || '').toUpperCase() : '';
+
+        // Limpiar estado anterior
+        banner.classList.remove('is-pri', 'is-no-pri', 'is-unclassified');
+        priSections.forEach(el => { if (el) el.classList.remove('sp-section-dimmed'); });
+        priNavs.forEach(el => { if (el) el.classList.remove('is-dimmed', 'is-locked-step'); });
+        // Quitar el icono de candado de los nav items
+        document.querySelectorAll('.sp-nav-lock-icon').forEach(el => el.remove());
+        actionsEl.innerHTML = ''; // limpiar botones del estado previo
+
+        if (valor === 'SI') {
+            // Estado: Caso PRI formal — todo habilitado
+            banner.classList.add('is-pri');
+            const fechaStr = fechaIngreso && fechaIngreso.value
+                ? new Date(fechaIngreso.value + 'T00:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })
+                : 'sin fecha registrada';
+            textEl.innerHTML = '<strong>📋 Caso PRI Formal</strong>' +
+                '<small>Ingreso al PRIC: ' + fechaStr + ' — Calificación PCL habilitada. Etapas PRIC siempre están disponibles.</small>';
+            // Sin botones: ya está clasificado como PRI formal.
+        } else if (valor === 'NO') {
+            // Estado: Seguimiento explícito, no PRI formal.
+            // Atenuar Etapas PRIC, Seg. Recomendaciones y Calificación PCL.
+            banner.classList.add('is-no-pri');
+            textEl.innerHTML = '<strong>⚠️ Seguimiento (no es caso PRI formal)</strong>' +
+                '<small>Las secciones 3, 4 y 5 (Etapas PRIC, Recomendaciones, Calificación PCL) están bloqueadas. Click "Convertir en caso PRI formal" para habilitarlas.</small>';
+            // Ofrecer cambiar a PRI formal (un solo botón, evita clic accidental)
+            actionsEl.innerHTML = '<button type="button" class="sp-pri-banner-btn is-ghost" onclick="window.medicAusentismoComponent._setModoPRI(\'SI\')">' +
+                '<i class="fas fa-arrow-up"></i> Convertir en caso PRI formal</button>';
+            // Atenuar secciones 3, 4 y 5 + nav items
+            priSections.forEach(el => { if (el) el.classList.add('sp-section-dimmed'); });
+            priNavs.forEach(el => {
+                if (el) {
+                    el.classList.add('is-dimmed', 'is-locked-step');
+                    // 📦705 — Icono de candado en nav items bloqueados
+                    const lockIcon = document.createElement('span');
+                    lockIcon.className = 'sp-nav-lock-icon';
+                    lockIcon.innerHTML = '<i class="fas fa-lock"></i>';
+                    el.appendChild(lockIcon);
+                }
+            });
+        } else {
+            // Estado: Sin clasificar (campo vacío) — caso nuevo o recién abierto
+            banner.classList.add('is-unclassified');
+            textEl.innerHTML = '<strong>Sin clasificar aún</strong>' +
+                '<small>Este caso aún no tiene definido si es un seguimiento simple o un caso PRI formal. Etapas 3, 4 y 5 bloqueadas hasta que definas.</small>';
+            // 2 botones: el usuario decide explícitamente
+            actionsEl.innerHTML =
+                '<button type="button" class="sp-pri-banner-btn is-pri" onclick="window.medicAusentismoComponent._setModoPRI(\'SI\')">' +
+                '<i class="fas fa-check"></i> Marcar como PRI formal</button>' +
+                '<button type="button" class="sp-pri-banner-btn is-no-pri" onclick="window.medicAusentismoComponent._setModoPRI(\'NO\')">' +
+                '<i class="fas fa-stethoscope"></i> Solo seguimiento</button>';
+            // Atenuar las 3 secciones + nav items hasta que defina
+            priSections.forEach(el => { if (el) el.classList.add('sp-section-dimmed'); });
+            priNavs.forEach(el => {
+                if (el) {
+                    el.classList.add('is-dimmed', 'is-locked-step');
+                    const lockIcon = document.createElement('span');
+                    lockIcon.className = 'sp-nav-lock-icon';
+                    lockIcon.innerHTML = '<i class="fas fa-lock"></i>';
+                    el.appendChild(lockIcon);
+                }
+            });
+        }
+    }
+
+    /**
+     * 📦 Setea el modo PRI desde el banner (botones contextuales). Sincroniza el select
+     * "sp-caso-ingresado-pric" para que el guardado en Excel use el valor correcto, y
+     * dispara la actualización del banner (que a su vez ajusta Calificación PCL).
+     *
+     * Si el campo está vacío y se elige "SI" se autocompleta la fecha de ingreso al PRIC
+     * con la fecha de hoy para no dejar el caso inconsistente.
+     */
+    _setModoPRI(modo) {
+        const sel = document.getElementById('sp-caso-ingresado-pric');
+        const fechaIngreso = document.getElementById('sp-fecha-ingreso-pric');
+        if (!sel) return;
+
+        sel.value = modo;
+        // Si eligió PRI formal y no había fecha, proponer hoy.
+        if (modo === 'SI' && fechaIngreso && !fechaIngreso.value) {
+            const hoy = new Date();
+            const yyyy = hoy.getFullYear();
+            const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+            const dd = String(hoy.getDate()).padStart(2, '0');
+            fechaIngreso.value = `${yyyy}-${mm}-${dd}`;
+        }
+        // Disparar change manualmente para que cualquier listener externo reaccione
+        // y refrescar banner + atenuaciones.
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+        this._actualizarBannerPRI();
+        // Al cambiar el modo también cambian los campos requeridos.
+        this._aplicarReglasRequeridos();
+        this._actualizarProgresoSeccion();
+
+        const etiquetas = { SI: 'caso PRI formal', NO: 'seguimiento simple' };
+        this.showNotification('Modo actualizado: ' + (etiquetas[modo] || modo), 'success');
+    }
+
+    /**
+     * 📦 Mapa de IDs de inputs/selects REQUERIDOS por sección.
+     * Separamos lo que SIEMRE es obligatorio de lo que solo aplica a casos PRI formales.
+     * Lo demás (peso, talla, AFP, salario, diagnósticos secundarios, etc.) queda libre.
+     *
+     * Notas:
+     *  - "sp-nombre" y "sp-cedula" son autollenados, pero los dejamos en la lista por
+     *    si alguien abre un caso huérfano sin datos del empleado.
+     *  - "sp-caso-ingresado-pric" (Etapa 1) es SIEMPRE requerido para bloquear el flujo
+     *    hasta que el usuario clasifique el caso (tema de la vueltita anterior).
+     */
+    _CAMPOS_REQUERIDOS_BASE = [
+        // Sección 1 — Datos Generales
+        'sp-nombre', 'sp-cedula', 'sp-genero', 'sp-cargo', 'sp-tipo-cargo',
+        'sp-area', 'sp-fecha-ingreso', 'sp-tipo-evento', 'sp-tipo-contrato', 'sp-eps',
+        // Sección 2 — Incapacidad Temporal
+        'sp-fecha-inicio', 'sp-fecha-fin', 'sp-codigo-cie10', 'sp-descripcion-diagnostico',
+        // Sección 3 — Etapas PRIC (Etapa 1 siempre)
+        'sp-caso-ingresado-pric'
+    ];
+    _CAMPOS_REQUERIDOS_SOLO_PRI = [
+        // Etapa 1 ampliada
+        'sp-mecanismo-deteccion', 'sp-fecha-ingreso-pric',
+        // Etapa 2 — Plan de Tratamiento
+        'sp-trabajador-plan-tratamiento', 'sp-objetivos-tratamiento',
+        'sp-fecha-inicio-plan', 'sp-fecha-probable-alta',
+        // Etapa 3 — Ejecución y Seguimiento
+        'sp-fecha-proxima-cita', 'sp-periodicidad-seguimiento',
+        // Etapa 4 — Reincorporación
+        'sp-fecha-reincorporacion', 'sp-tipo-reintegro',
+        // Etapa 5 — Cierre
+        'sp-fecha-cierre', 'sp-motivo-cierre',
+        // Sección 5 — Calificación PCL
+        'sp-estado-proceso-regional', 'sp-fecha-solicitud-regional'
+    ];
+
+    /**
+     * 📦 IDs de inputs que NUNCA deben mostrar la marca visual is-empty (recuadro rojo +
+     * icono) aunque estén vacíos. Son campos informativos/complementarios: si el caso
+     * no aplica (ej: no hubo prórogas, no hay DX adicional), no tiene sentido alarmar
+     * al usuario con un recuadro rojo de "obligatorio".
+     *
+     * Estos campos siguen siendo editables y pueden guardarse vacíos sin problema.
+     * Solo se EXCLUYEN de la marca visual universal.
+     *
+     * Adicionalmente, _getCamposExcluidosVacios() amplía esta lista dinámicamente:
+     *  - Si el caso NO es PRI formal, todos los _CAMPOS_REQUERIDOS_SOLO_PRI también
+     *    se excluyen (porque "fuera de scope" = no aplica a este caso).
+     *  - Si es PRI formal, esos campos SÍ muestran is-empty si están vacíos.
+     */
+    _CAMPOS_SIN_MARCA_VACIA = [
+        // Sección 2 — Prórrogas: si el caso no tuvo prórogas, no debe alarmar.
+        'sp-numero-prorrogas', 'sp-fecha-ultima-prorroga',
+        // Sección 2 — Diagnósticos adicionales: opcionales (puede haber 1 solo DX).
+        'sp-cie10-dx2', 'sp-origen-dx2', 'sp-cie10-dx3', 'sp-origen-dx3',
+        // Sección 2 — Reincorporación / cierre del seguimiento de incapacidad:
+        // todos opcionales porque solo aplican si el caso terminó.
+        'sp-adaptaciones-inc', 'sp-fecha-reincorporacion-inc', 'sp-tipo-reintegro-inc',
+        'sp-observaciones-finales-inc', 'sp-fecha-cierre-inc', 'sp-motivo-cierre-inc',
+        // Sección 3 — Etapas PRIC: campos informativos y Etapa 5 ampliada.
+        'sp-adaptaciones', 'sp-tiene-desercion', 'sp-logro-mejoria-medica',
+        'sp-anio-ultima-calificacion-pcl', 'sp-anio-seguimiento-empresa',
+        'sp-fecha-calificacion-pcl', 'sp-porcentaje-pcl-calificacion',
+        'sp-cie10-dx1-calificada', 'sp-origen-dx1',
+        'sp-cie10-dx2-calificada', 'sp-origen-dx2-calificada',
+        'sp-cie10-dx3-calificada', 'sp-origen-dx3-calificada',
+        'sp-cie10-dx4-calificada', 'sp-origen-dx4-calificada',
+        'sp-origen-caso', 'sp-ingreso-sve',
+        'sp-fecha-examen-medico', 'sp-resultado-examen-medico',
+        'sp-fecha-examen-periodico', 'sp-resultado-examen-post-incapacidad',
+        'sp-trabajador-remoto', 'sp-fecha-inicio-remoto',
+        'sp-fecha-ultimo-seguimiento', 'sp-evolucion-clinica', 'sp-adherencia',
+        'sp-fecha-reintegro', 'sp-recomendaciones-laborales',
+        'sp-fecha-vencimiento-recomendaciones', 'sp-descripcion-recomendaciones',
+        'sp-fecha-proximo-seguimiento-recomendaciones',
+        'sp-descripcion-seguimiento-1', 'sp-descripcion-seguimiento-2'
+        // Los campos de seguimiento "Fecha seguimiento 1/2" también se excluyen porque
+        // ya hay un control de "Agregar Seguimiento" para crear filas dedicadas.
+    ];
+
+    /**
+     * 📦 Devuelve el Set de IDs que deben EXCLUIRSE del recuadro rojo universal.
+     * Combina:
+     *  - _CAMPOS_SIN_MARCA_VACIA (lista base: prórogas, DX adicionales, etc.)
+     *  - Si el modo PRI es != 'SI', también se excluyen los _CAMPOS_REQUERIDOS_SOLO_PRI
+     *    (porque las Etapas 2-5 y Calificación PCL están fuera de scope).
+     *
+     * Devolver un Set permite la búsqueda O(1) en loops grandes.
+     */
+    _getCamposExcluidosVacios() {
+        const excluidos = new Set(this._CAMPOS_SIN_MARCA_VACIA);
+        const sel = document.getElementById('sp-caso-ingresado-pric');
+        const modo = sel ? (sel.value || '').toUpperCase() : '';
+        if (modo !== 'SI') {
+            // El resto del formulario (Etapas 2-5 + Calificación PCL) NO aplica
+            // si el caso no es PRI formal — no debe alarmar con recuadro rojo.
+            this._CAMPOS_REQUERIDOS_SOLO_PRI.forEach(id => excluidos.add(id));
+        }
+        return excluidos;
+    }
+
+    /**
+     * 📦 Aplica data-required="true" según el modo PRI del caso.
+     *  - Campos _CAMPOS_REQUERIDOS_BASE siempre quedan marcados.
+     *  - Campos _CAMPOS_REQUERIDOS_SOLO_PRI solo se marcan si el caso es PRI formal.
+     *  - Campos no listados quedan libres (sin validación).
+     */
+    _aplicarReglasRequeridos() {
+        // Quitar todas las marcas previas (atributo + asterisco rojo en label)
+        document.querySelectorAll('.sp-form-control[data-required="true"]').forEach(el => {
+            el.removeAttribute('data-required');
+        });
+        document.querySelectorAll('.sp-form-label[data-required-mark="true"]').forEach(el => {
+            el.removeAttribute('data-required-mark');
+        });
+
+        const aplicar = (id) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.setAttribute('data-required', 'true');
+            // Marcar el label hermano con asterisco rojo via CSS ::after
+            const group = el.closest('.sp-form-group');
+            if (group) {
+                const label = group.querySelector('.sp-form-label');
+                if (label) label.setAttribute('data-required-mark', 'true');
+            }
+        };
+
+        // Restaurar los base (siempre)
+        this._CAMPOS_REQUERIDOS_BASE.forEach(aplicar);
+
+        // Condicionales: solo si el caso es PRI formal
+        const sel = document.getElementById('sp-caso-ingresado-pric');
+        if (sel && (sel.value || '').toUpperCase() === 'SI') {
+            this._CAMPOS_REQUERIDOS_SOLO_PRI.forEach(aplicar);
+        }
+    }
+
+    /**
+     * 📦 Determina si un input/select está "vacío" para efectos de validación.
+     * Trata "Seleccione..." (placeholder de los selects) como vacío.
+     */
+    _esCampoVacio(el) {
+        if (!el || el.disabled || el.readOnly) return false;
+        const val = (el.value || '').trim();
+        if (!val) return true;
+        // En los <select> el primer <option> tiene value="" y texto "Seleccione..."
+        if (el.tagName === 'SELECT' && el.selectedIndex === 0) return true;
+        return false;
+    }
+
+    /**
+     * 📦 Valida la sección actualmente visible. Aplica el recuadro rojo universal
+     * (is-empty) a TODO control vacío de la sección, cuente o no como obligatorio.
+     * Para la lógica de "bloqueo de Siguiente" sólo considera los [data-required="true"]
+     * vacíos.
+     * Retorna { valido, vacios: [{ el, nombre }], total }.
+     */
+    _validarSeccionActual() {
+        const section = document.querySelector('.sp-form-section.active');
+        if (!section) return { valido: true, vacios: [], total: 0 };
+
+        // 📦701-fix4 — Si la sección 1 ya fue capturada (caso existente cargado
+        // desde BD), NO validar. El usuario no debería tener que re-llenar
+        // los datos de identificación.
+        if (this.seccion1YaCapturada && section.id === 'sp-section-datos') {
+            return { valido: true, vacios: [], total: 0 };
+        }
+
+        // 1) Marca universal is-empty en TODOS los .sp-form-control EXCEPTO los que están
+        // excluidos (lista base + dinámica según modo PRI).
+        const excluidos = this._getCamposExcluidosVacios();
+        const todos = section.querySelectorAll('.sp-form-control');
+        todos.forEach(el => {
+            if (excluidos.has(el.id)) {
+                el.classList.remove('is-empty');
+                return;
+            }
+            if (this._esCampoVacio(el)) el.classList.add('is-empty');
+            else el.classList.remove('is-empty');
+        });
+
+        // 2) Lista de campos OBLIGATORIOS vacíos (los que bloquean "Siguiente")
+        const requeridos = section.querySelectorAll('.sp-form-control[data-required="true"]');
+        const vacios = [];
+        const total = requeridos.length;
+
+        requeridos.forEach(el => {
+            const nombre = this._nombreAmigableDeCampo(el) || el.id;
+            if (this._esCampoVacio(el)) {
+                vacios.push({ el: el, nombre: nombre });
+            }
+        });
+
+        // Actualizar el contador visible en el section-title de la sección activa
+        this._actualizarContadorSeccion(section, total - vacios.length, total);
+
+        return { valido: vacios.length === 0, vacios, total };
+    }
+
+    /**
+     * 📦 Devuelve un nombre legible del campo para mensajes de error, p. ej.
+     * "sp-tipo-evento" → "Tipo de evento", "sp-codigo-cie10" → "Código CIE10".
+     */
+    _nombreAmigableDeCampo(el) {
+        // Buscar el label asociado (estructura: div.sp-form-group > label + input)
+        const group = el.closest('.sp-form-group');
+        if (group) {
+            const label = group.querySelector('.sp-form-label');
+            if (label) return label.textContent.trim();
+        }
+        return el.id;
+    }
+
+    /**
+     * 📦 Inserta/actualiza el contador de completitud en el section-title.
+     *   - Cuando todos los campos requeridos están diligenciados: badge verde "✓ X/X".
+     *   - Cuando faltan: badge rojo "⚠ X/Y".
+     *   - Cuando no hay campos requeridos: badge gris "○ libre".
+     */
+    _actualizarContadorSeccion(section, diligenciados, total) {
+        if (!section) return;
+        const title = section.querySelector('.sp-section-title');
+        if (!title) return;
+
+        let badge = title.querySelector('.sp-section-completitud');
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'sp-section-completitud';
+            title.appendChild(badge);
+        }
+
+        if (total === 0) {
+            badge.classList.remove('is-complete', 'is-incomplete');
+            badge.textContent = '○ sin campos obligatorios';
+            return;
+        }
+
+        if (diligenciados === total) {
+            badge.classList.add('is-complete');
+            badge.classList.remove('is-incomplete');
+            badge.textContent = '✓ ' + diligenciados + '/' + total + ' completos';
+        } else {
+            badge.classList.add('is-incomplete');
+            badge.classList.remove('is-complete');
+            badge.textContent = '⚠ ' + diligenciados + '/' + total + ' pendientes';
+        }
+    }
+
+    /**
+     * 📦 Engancha listeners live (blur + change + input) en cada input/select con
+     * data-required="true". Cada vez que el usuario sale del campo o cambia su valor,
+     * se re-valida la sección y se actualiza el contador. Se llama una sola vez al
+     * crear el panel; los nuevos data-required se enganchan dinámicamente vía
+     * delegación escuchando el DOM completo.
+     */
+    _setupListenersValidacion() {
+        const handler = (e) => {
+            const t = e.target;
+            if (!t || !t.classList || !t.classList.contains('sp-form-control')) return;
+            // Saltar campos excluidos (lista dinámica: base + modo PRI).
+            // Recalculamos la exclusión cada vez porque el modo PRI puede cambiar.
+            if (this._getCamposExcluidosVacios().has(t.id)) {
+                t.classList.remove('is-empty');
+                this._actualizarProgresoSeccion();
+                return;
+            }
+            // Marca universal is-empty (aplica a TODO control que NO esté excluido)
+            if (this._esCampoVacio(t)) t.classList.add('is-empty');
+            else t.classList.remove('is-empty');
+            // Actualizar contador del footer + progreso
+            this._actualizarProgresoSeccion();
+        };
+        // Capturamos los eventos a nivel del panel (delegación)
+        const panel = document.querySelector('.seguimiento-panel');
+        if (!panel) return;
+        panel.addEventListener('blur', handler, true);
+        panel.addEventListener('change', handler, true);
+        panel.addEventListener('input', handler, true);
+    }
+
+    /**
+     * 📦 Actualiza el contador del footer (X/Y completados de la SECCIÓN ACTUAL).
+     * También deshabilita el botón "Siguiente" si la sección actual está incompleta.
+     */
+    _actualizarProgresoSeccion() {
+        const r = this._validarSeccionActual();
+        const cur = document.getElementById('sp-panel-progress-current');
+        const total = document.getElementById('sp-panel-progress-total');
+        const txt = document.getElementById('sp-panel-progress-text');
+        const btnNext = document.getElementById('sp-btn-next');
+        const btnPrev = document.getElementById('sp-btn-prev');
+
+        if (cur && total && txt) {
+            // Calcular índice de la sección actual
+            const sections = Array.from(document.querySelectorAll('.sp-form-section'));
+            const idx = sections.findIndex(s => s.classList.contains('active'));
+            cur.textContent = String(idx >= 0 ? idx + 1 : 1);
+            total.textContent = String(sections.length);
+            const dilig = r.total === 0 ? 'libre' : (r.total - r.vacios.length) + '/' + r.total;
+            txt.textContent = (r.total === 0 ? 'Sin campos obligatorios' : dilig + ' campos diligenciados');
+        }
+        if (btnNext) {
+            // 📦701-fix5 — Deshabilitar Siguiente si:
+            // 1) No hay siguiente visible (última sección)
+            // 2) La siguiente está atenuada (sp-section-dimmed) — caso seguimiento
+            //    simple con secciones 3,4,5 bloqueadas
+            // En ambos casos el botón se ve gris y no responde
+            const sections = Array.from(document.querySelectorAll('.sp-form-section'));
+            const idx = sections.findIndex(s => s.classList.contains('active'));
+            let hasNextVisible = false;
+            if (idx >= 0) {
+                for (let i = idx + 1; i < sections.length; i++) {
+                    if (!sections[i].classList.contains('sp-section-dimmed')) {
+                        hasNextVisible = true;
+                        break;
+                    }
+                }
+            }
+            btnNext.disabled = idx < 0 || !hasNextVisible;
+        }
+        if (btnPrev) {
+            const sections = Array.from(document.querySelectorAll('.sp-form-section'));
+            const idx = sections.findIndex(s => s.classList.contains('active'));
+            btnPrev.disabled = idx <= 0;
+        }
+    }
+
+    /**
+     * 📦 Wizard: intenta avanzar a la siguiente sección. Si la actual tiene campos
+     * requeridos vacíos, los marca con borde rojo, hace focus al primero y muestra
+     * un toast de error con conteo. Si todo OK, navega a la siguiente.
+     */
+    _irASiguienteSeccion() {
+        const r = this._validarSeccionActual();
+        if (!r.valido) {
+            // Mostrar toast con conteo y nombres de los primeros 3 campos.
+            const nombres = r.vacios.slice(0, 3).map(v => v.nombre).join(', ');
+            const extra = r.vacios.length > 3 ? ` y ${r.vacios.length - 3} más` : '';
+            this.showNotification(
+                `Tienes ${r.vacios.length} campo(s) por diligenciar: ${nombres}${extra}`,
+                'error', 6000
+            );
+            // Focus + scroll al primer campo vacío
+            const primero = r.vacios[0];
+            if (primero && primero.el) {
+                try {
+                    primero.el.focus({ preventScroll: false });
+                } catch (e) {
+                    primero.el.focus();
+                }
+                primero.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            return false;
+        }
+
+        // 📦705 — Avanzar a la siguiente sección VISIBLE (no atenuada).
+        // Si la siguiente está atenuada (por ser solo seguimiento), saltarla
+        // e ir a la próxima visible. Esto respeta la lógica del banner PRI:
+        // las secciones 3/4/5 están bloqueadas si el caso no es PRI formal.
+        const sections = Array.from(document.querySelectorAll('.sp-form-section'));
+        const navItems = Array.from(document.querySelectorAll('.sp-nav-item'));
+        let idx = sections.findIndex(s => s.classList.contains('active'));
+        if (idx < 0) return true;
+        // Buscar la siguiente sección NO atenuada
+        let targetIdx = -1;
+        for (let i = idx + 1; i < sections.length; i++) {
+            if (!sections[i].classList.contains('sp-section-dimmed')) {
+                targetIdx = i;
+                break;
+            }
+        }
+        if (targetIdx < 0) {
+            // No hay siguiente sección visible — avisar y no avanzar (info, no error)
+            this.showNotification(
+                'ℹ️ Estás en la última sección disponible. Las secciones 3, 4 y 5 están bloqueadas porque no es caso PRI formal. ' +
+                'Si necesitas diligenciarlas, click "Convertir en caso PRI formal" en el banner amarillo.',
+                'info', 6000
+            );
+            return true;
+        }
+        const targetSection = sections[targetIdx];
+        const sectionId = targetSection.id.replace(/^sp-section-/, '');
+        const targetNav = navItems[targetIdx];
+        if (targetNav) {
+            this.showSeguimientoPanelSection(sectionId, targetNav);
+            this._actualizarProgresoSeccion();
+            // Scroll al top del panel
+            const contentArea = document.querySelector('.sp-content-area');
+            if (contentArea) contentArea.scrollTop = 0;
+        }
+        return true;
+    }
+
+    /**
+     * 📦 Wizard: ir a la sección anterior. Sin validación dura (porque ya llenamos
+     * la sección en la que estamos); solo navega.
+     */
+    _irASeccionAnterior() {
+        const sections = Array.from(document.querySelectorAll('.sp-form-section'));
+        const idx = sections.findIndex(s => s.classList.contains('active'));
+        if (idx <= 0) return;
+        const prevSection = sections[idx - 1];
+        const sectionId = prevSection.id.replace(/^sp-section-/, '');
+        const navItems = document.querySelectorAll('.sp-nav-item');
+        const targetNav = navItems[idx - 1];
+        if (targetNav) {
+            this.showSeguimientoPanelSection(sectionId, targetNav);
+            this._actualizarProgresoSeccion();
+            const contentArea = document.querySelector('.sp-content-area');
+            if (contentArea) contentArea.scrollTop = 0;
+        }
+    }
+
+    /**
+     * 📦 Wizard: handler único para clicks en las nav-tabs. Valida si la sección
+     * destino está desbloqueada y, si no, aborta con un toast claro.
+     *
+     * Reglas:
+     *  - idx destino <= idx actual → permitido (atrás o misma).
+     *  - idx destino === idx actual + 1 → permitido SOLO si la sección actual pasa
+     *    _validarSeccionActual(); si falla, muestra toast y hace focus al 1er vacío.
+     *  - idx destino > idx actual + 1 → NO permitido. Toast: "completa las secciones
+     *    intermedias primero". El usuario DEBE ir paso a paso con "Siguiente".
+     */
+    _intentarNavegarANavItem(navEl, sectionId) {
+        const sections = Array.from(document.querySelectorAll('.sp-form-section'));
+        const targetIdx = sections.findIndex(s => s.id === `sp-section-${sectionId}`);
+        const idxActual = sections.findIndex(s => s.classList.contains('active'));
+        if (targetIdx < 0 || idxActual < 0) return;
+
+        // Click en la misma sección: no hacer nada
+        if (targetIdx === idxActual) return;
+
+        // 📦705-fix2 — Bloquear click directo en nav items atenuados.
+        // Las secciones 3, 4, 5 (Etapas PRIC, Recomendaciones, Calificación PCL)
+        // se atenúan cuando NO es caso PRI formal. El click directo sobre su nav
+        // debe ser bloqueado igual que el botón "Siguiente" (que ya las salta).
+        // Antes solo eran visuales (opacity 0.5) y el usuario podía entrar.
+        const targetSection = sections[targetIdx];
+        if (targetSection && targetSection.classList.contains('sp-section-dimmed')) {
+            this.showNotification(
+                'ℹ️ Las secciones 3, 4 y 5 (Etapas PRIC, Recomendaciones, Calificación PCL) ' +
+                'están bloqueadas porque no es caso PRI formal. ' +
+                'Si necesitas diligenciarlas, click "Convertir en caso PRI formal" en el banner amarillo.',
+                'info', 6000
+            );
+            return;
+        }
+
+        // Click atrás: siempre permitido
+        if (targetIdx < idxActual) {
+            this.showSeguimientoPanelSection(sectionId, navEl);
+            this._actualizarProgresoSeccion();
+            const contentArea = document.querySelector('.sp-content-area');
+            if (contentArea) contentArea.scrollTop = 0;
+            return;
+        }
+
+        // Click 1 adelante: exigir validación
+        if (targetIdx === idxActual + 1) {
+            const r = this._validarSeccionActual();
+            if (!r.valido) {
+                const nombres = r.vacios.slice(0, 3).map(v => v.nombre).join(', ');
+                const extra = r.vacios.length > 3 ? ` y ${r.vacios.length - 3} más` : '';
+                this.showNotification(
+                    `Completa los ${r.vacios.length} campo(s) pendiente(s) en esta sección antes de avanzar: ${nombres}${extra}`,
+                    'error', 6000
+                );
+                const primero = r.vacios[0];
+                if (primero && primero.el) {
+                    try { primero.el.focus({ preventScroll: false }); } catch (e) { primero.el.focus(); }
+                    primero.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+                return;
+            }
+            // OK: navegar
+            this.showSeguimientoPanelSection(sectionId, navEl);
+            this._actualizarProgresoSeccion();
+            const contentArea = document.querySelector('.sp-content-area');
+            if (contentArea) contentArea.scrollTop = 0;
+            return;
+        }
+
+        // Click más adelante (salto): bloquear
+        const restantes = targetIdx - idxActual;
+        const palabra = restantes === 1 ? 'sección' : 'secciones';
+        this.showNotification(
+            `Debes avanzar paso a paso. Completa las ${restantes} ${palabra} intermedia(s) usando el botón "Siguiente" antes de saltar a "${sectionId}".`,
+            'warning', 5000
+        );
+    }
+
+    /**
+     * 📦 Aplica el candado visual a las navs futuras: idx > idxActual+1 se marcan
+     * como is-locked-step (con candado y pointer-events:none).
+     *
+     * La nav INMEDIATAMENTE SIGUIENTE a la actual se desbloquea visualmente en cuanto
+     * la sección actual cumple validación (todos los requeridos diligenciados). Eso
+     * da una pista visual de "ya podés pasar" sin permitir saltos (para saltar sigue
+     * siendo obligatorio usar el botón "Siguiente" o click directo sobre esa nav
+     * ya desbloqueada).
+     *
+     * Si la sección actual NO cumple, todas las navs desde idxActual+1 en adelante
+     * quedan bloqueadas (incluida la inmediata siguiente).
+     *
+     * Se llama automáticamente desde showSeguimientoPanelSection y desde los handlers
+     * de validación live.
+     */
+    _aplicarBloqueoStepNav() {
+        const sections = Array.from(document.querySelectorAll('.sp-form-section'));
+        const idxActual = sections.findIndex(s => s.classList.contains('active'));
+        if (idxActual < 0) return;
+
+        // Chequear si la sección actual cumple validación
+        const r = this._validarSeccionActual();
+        // Umbral de desbloqueo visual: si la actual cumple, idxActual+1 está libre.
+        // Si no, todas desde idxActual+1 quedan bloqueadas.
+        const primerIdxDesbloqueado = r.valido ? idxActual + 2 : idxActual + 1;
+
+        const navItems = document.querySelectorAll('.sp-nav-item');
+        navItems.forEach((nav, i) => {
+            if (i >= primerIdxDesbloqueado) {
+                // Bloqueada
+                nav.classList.add('is-locked-step');
+                if (!nav.querySelector('.sp-nav-lock-icon')) {
+                    const icon = document.createElement('i');
+                    icon.className = 'fas fa-lock sp-nav-lock-icon';
+                    nav.appendChild(icon);
+                }
+                if (!nav.getAttribute('title')) {
+                    nav.setAttribute('title',
+                        r.valido
+                            ? 'Completa las secciones intermedias usando "Siguiente" antes de saltar acá'
+                            : 'Completa esta sección y haz clic en "Siguiente" para desbloquear'
+                    );
+                }
+            } else {
+                // Libre
+                nav.classList.remove('is-locked-step');
+                const icon = nav.querySelector('.sp-nav-lock-icon');
+                if (icon) icon.remove();
+                if (nav.getAttribute('title') && nav.getAttribute('title').indexOf('desbloquear') >= 0) {
+                    nav.removeAttribute('title');
+                }
+            }
+        });
     }
 
     /**
@@ -3534,16 +5585,18 @@ class MedicionAusentismoComponent {
         const fechaIngreso = new Date(fechaIngresoInput.value);
         const hoy = new Date();
 
-        let anios = hoy.getFullYear() - fechaIngreso.getFullYear();
-        const mesDiferencia = hoy.getMonth() - fechaIngreso.getMonth();
+        // [📦455 v4] Calcular meses totales desde la fecha de ingreso hasta hoy.
+        // (anios * 12) + meses_transcurridos, ajustando si el dia del mes actual
+        // es menor al dia del mes de ingreso (aun no cumplio el mes completo).
+        let mesesTotales = (hoy.getFullYear() - fechaIngreso.getFullYear()) * 12
+            + (hoy.getMonth() - fechaIngreso.getMonth());
 
-        // Ajustar si aún no ha cumplido año completo
-        if (mesDiferencia < 0 || (mesDiferencia === 0 && hoy.getDate() < fechaIngreso.getDate())) {
-            anios--;
+        if (hoy.getDate() < fechaIngreso.getDate()) {
+            mesesTotales--;
         }
 
-        antiguedadInput.value = anios >= 0 ? anios : 0;
-        console.log('[SEGUIMIENTO] Antigüedad calculada:', anios, 'años');
+        antiguedadInput.value = mesesTotales >= 0 ? mesesTotales : 0;
+        console.log('[SEGUIMIENTO] Antigüedad calculada:', mesesTotales, 'meses');
     }
 
     /**
@@ -3644,7 +5697,12 @@ class MedicionAusentismoComponent {
         // Datos básicos del trabajador (SOLO nombre y cédula, lo demás vacío para caso nuevo)
         document.getElementById('sp-nombre').value = empleadoData.nombre || '';
         document.getElementById('sp-cedula').value = empleadoData.cedula || '';
-        
+
+        // [📦455 2026-07-01 v3] Auto-completar cargo, area, fecha ingreso, salario
+        // y fecha de nacimiento desde BD de personal ASEL. Misma fuente que usa
+        // Consulta de Trabajadores. Llamada async que no bloquea el modal.
+        this._loadDatosEmpleado(empleadoData.cedula);
+
         // Los demás campos se dejan VACÍOS para que el usuario los diligencie manualmente
         document.getElementById('sp-genero').value = '';
         document.getElementById('sp-cargo').value = '';
@@ -3686,6 +5744,329 @@ class MedicionAusentismoComponent {
         document.getElementById('sp-fecha-inicio-remoto').value = '';
 
         console.log('[SEGUIMIENTO][PANEL] Panel vacío para nuevo caso - solo nombre y cédula precargados');
+    }
+
+    /**
+     * [📦455 2026-07-01 v2] Auto-completar Fecha de Nacimiento desde BD de personal ASEL/Temporales.
+     * Usa el mismo endpoint que Consulta de Trabajadores (consultarTrabajadoresGlobal)
+     * con la misma robustez de parseo que formatearFecha() de ese modulo: maneja
+     * Date objects, strings ISO, strings dd/mm/yyyy y Excel serial numbers.
+     *
+     * Race-safe: si el usuario cambia de empleado antes de que llegue la respuesta,
+     * el token comparativo descarta el resultado obsoleto.
+     */
+    async _loadDatosEmpleado(cedula) {
+        if (!cedula) return;
+        // Token anti-race: descarta respuestas tardias si el usuario ya cambio de empleado.
+        this._datosEmpToken = (this._datosEmpToken || 0) + 1;
+        const myToken = this._datosEmpToken;
+        try {
+            if (!window.electronAPI || typeof window.electronAPI.consultarTrabajadoresGlobal !== 'function') {
+                return;
+            }
+            const result = await window.electronAPI.consultarTrabajadoresGlobal({
+                cedula: String(cedula).trim(),
+                nombre: '',
+                empresa: 'all'
+            });
+            // Si el usuario ya selecciono otro empleado, descartar.
+            if (myToken !== this._datosEmpToken) return;
+            if (!result || !result.success || !Array.isArray(result.data) || result.data.length === 0) {
+                return;
+            }
+            // Preferir registro ASEL (BD de personal); caer a cualquier resultado si no hay.
+            const trab = result.data.find(t => t.tipoBD === 'ASEL') || result.data[0];
+
+            // Cargo Actual
+            this._setInputValueIfEmpty('sp-cargo', trab.cargo);
+
+            // Area / Dependencia (algunas BDs usan 'departamento', otras 'ubicacion')
+            this._setInputValueIfEmpty('sp-area', trab.departamento || trab.ubicacion);
+
+            // EPS y AFP (datos utiles que normalmente faltan)
+            this._setInputValueIfEmpty('sp-eps', trab.eps);
+            this._setInputValueIfEmpty('sp-afp', trab.afp);
+
+            // Fecha de Ingreso: usar el parser robusto. Solo autollenar si el input está
+            // vacío (para no pisar lo que ya tenía guardado en el Excel del caso).
+            const fechaIngRaw = trab.fechaIngreso || trab.fecIng || trab.fecha_ingreso || '';
+            const fechaIng = this._parsearFechaNacimiento(fechaIngRaw);
+            const inputFechaIng = document.getElementById('sp-fecha-ingreso');
+            if (fechaIng && inputFechaIng && !String(inputFechaIng.value || '').trim()) {
+                inputFechaIng.value = fechaIng.toISOString().split('T')[0];
+                this.calcularAntiguedad();
+            }
+
+            // Salario: limpiar simbolos y separadores antes de asignar a input type=number.
+            // El backend puede enviarlo como '$ 1.500.000' o '1500000' o 'No disponible'.
+            // Aceptar salario >= 0 (incluyendo 0 real) y descartar solo si
+            // la BD devuelve null, vacio, "No disponible", "n/a" o "na".
+            // Solo autollenar si el input está vacío.
+            const salarioRaw = trab.salario;
+            const salarioStr = salarioRaw == null ? '' : String(salarioRaw).trim();
+            const salarioLower = salarioStr.toLowerCase();
+            const inputSalario = document.getElementById('sp-salario');
+
+            if (salarioStr === '' || salarioLower === 'no disponible' || salarioLower === 'n/a' || salarioLower === 'na') {
+                // No hay salario real en la BD: dejar el input vacio.
+            } else if (inputSalario && !String(inputSalario.value || '').trim()) {
+                const salNum = parseFloat(salarioStr.replace(/[^\d.-]/g, ''));
+                if (!isNaN(salNum) && salNum >= 0) {
+                    inputSalario.value = salNum;
+                }
+            }
+
+            // Fecha de Nacimiento: misma logica que antes (mantener compatibilidad).
+            // Solo autollenar si el input está vacío.
+            const fechaNacRaw = trab.fechaNacimiento || trab.fecNac || trab.fecha_nacimiento || '';
+            const fechaNac = this._parsearFechaNacimiento(fechaNacRaw);
+            const inputFechaNac = document.getElementById('sp-fecha-nacimiento');
+            if (fechaNac && inputFechaNac && !String(inputFechaNac.value || '').trim()) {
+                inputFechaNac.value = fechaNac.toISOString().split('T')[0];
+                this.calcularEdad();
+            }
+
+            console.log('[SEGUIMIENTO] Datos del empleado auto-cargados:', JSON.stringify({
+                cargo: !!trab.cargo,
+                area: !!(trab.departamento || trab.ubicacion),
+                fechaIngRaw: fechaIngRaw,
+                salario_raw: trab.salario,
+                salario_tipo: typeof trab.salario,
+                fechaNac: !!fechaNac
+            }));
+        } catch (err) {
+            // Silencioso: si falla la BD, el usuario puede digitar manualmente.
+            if (myToken !== this._datosEmpToken) return;
+            console.log('[SEGUIMIENTO] No se pudieron auto-cargar datos del empleado:', err && err.message ? err.message : err);
+        }
+    }
+
+    /**
+     * [📦455 v3] Helper simple: setea .value en un input por id, solo si el valor es
+     * truthy y el input existe. Usado por _loadDatosEmpleado.
+     */
+    _setInputValue(id, value) {
+        if (value == null || value === '') return;
+        const el = document.getElementById(id);
+        if (el) el.value = String(value);
+    }
+
+    /**
+     * 📦 Puebla los campos de la sección "Incapacidad Temporal" con los datos de la
+     * incapacidad que el usuario seleccionó en el modal de selección.
+     *
+     * Las fechas pueden venir como:
+     *  - string ISO 'yyyy-mm-dd'
+     *  - string 'd/m/yy' (formato corto del Excel legacy)
+     *  - Date object (cuando vienen del preview del modal)
+     *  - string YYYYMMDD sin separador
+     *
+     * El método reusa _parsearFechaNacimiento (mismo parser robusto que se usa
+     * para fecha de nacimiento del empleado desde la BD de personal).
+     */
+    _poblarSeccionIncapacidadDesdeSeleccion(sel) {
+        if (!sel) return;
+
+        // Fechas
+        const setFecha = (inputId, raw) => {
+            const el = document.getElementById(inputId);
+            if (!el || !raw) return;
+            const d = this._parsearFechaNacimiento(raw);
+            if (d && !isNaN(d.getTime())) {
+                el.value = d.toISOString().split('T')[0];
+            }
+        };
+        setFecha('sp-fecha-inicio', sel.fechaInicio);
+        setFecha('sp-fecha-fin', sel.fechaFin);
+
+        // Días acumulados: usar el dato si viene como número, si no recalcular
+        const elDias = document.getElementById('sp-dias-acumulados');
+        if (elDias && sel.dias != null && sel.dias !== '') {
+            const d = parseInt(String(sel.dias), 10);
+            if (!isNaN(d) && d > 0) elDias.value = d;
+        }
+        // Si no vino en dias y tenemos fechas válidas, recalcular
+        if (elDias && (!elDias.value || elDias.value === '')) {
+            const fi = document.getElementById('sp-fecha-inicio').value;
+            const ff = document.getElementById('sp-fecha-fin').value;
+            if (fi && ff) {
+                try {
+                    const diff = (new Date(ff) - new Date(fi)) / (1000 * 60 * 60 * 24);
+                    if (diff >= 0) elDias.value = Math.ceil(diff) + 1;
+                } catch (e) { /* silencioso */ }
+            }
+        }
+
+        // Diagnóstico
+        this._setInputValue('sp-codigo-cie10', sel.codigo);
+        this._setInputValue('sp-descripcion-diagnostico', sel.diagnostico);
+
+        console.log('[INCAPACIDAD AUTOLLENADA] sección 2 poblada desde selección:', sel);
+    }
+
+    /**
+     * 📦459 (2026-07-02) — Plan B: banner preventivo en Sección 2 del wizard.
+     *
+     * Decisión de mostrar banner:
+     *   - Si `this.ausentismoFileStatus.missing === true` Y la Sección 2 quedó
+     *     vacía (fecha inicio + fin + días + diagnóstico) → banner amarillo
+     *     compacto: "No pude autollenar la incapacidad — el archivo PI-FO-076
+     *     no está disponible. Llena los campos manualmente."
+     *   - Si los datos están disponibles → remover cualquier banner previo.
+     *
+     * Por qué compacto: el wizard ya tiene banners (PRI, progreso, validación).
+     * Un banner gigante rompería la jerarquía visual.
+     */
+    _actualizarBannerSeccion2Incapacidad() {
+        const seccion = document.getElementById('sp-section-incapacidad');
+        if (!seccion) return;
+
+        // Limpiar banner previo siempre (idempotente)
+        const oldBanner = seccion.querySelector('.km-missing-banner');
+        if (oldBanner) oldBanner.remove();
+
+        // Si archivo está OK, no hacer nada (ya removimos el banner)
+        if (!this.ausentismoFileStatus || !this.ausentismoFileStatus.missing) return;
+
+        // Verificar si Sección 2 quedó vacía tras autollenar
+        const fechaInicio = document.getElementById('sp-fecha-inicio');
+        const fechaFin = document.getElementById('sp-fecha-fin');
+        const codigoCie10 = document.getElementById('sp-codigo-cie10');
+        const descripcionDx = document.getElementById('sp-descripcion-diagnostico');
+
+        const camposClave = [fechaInicio, fechaFin, codigoCie10, descripcionDx].filter(Boolean);
+        const todosVacios = camposClave.length > 0 && camposClave.every(el => !String(el.value || '').trim());
+
+        // Solo mostrar banner si NO hay datos Y el archivo está missing
+        if (!todosVacios) return;
+
+        const titleEl = seccion.querySelector('.sp-section-title');
+        if (!titleEl) return;
+
+        // Inyectar banner compacto amarillo justo después del título
+        const banner = document.createElement('div');
+        banner.style.cssText = 'margin: 8px 0 16px 0;';
+        banner.innerHTML = this._ausentismoMissingBannerHtml(
+            {
+                reason: this.ausentismoFileStatus.reason,
+                expectedDir: this.ausentismoFileStatus.expectedDir,
+                details: this.ausentismoFileStatus.details
+            },
+            { variant: 'warning', compact: true, showAction: false }
+        );
+
+        titleEl.insertAdjacentElement('afterend', banner.firstElementChild);
+
+        console.log('[WIZARD][📦459] Banner preventivo inyectado en Sección 2 — archivo missing:', this.ausentismoFileStatus.reason);
+    }
+
+    /**
+     * Igual que _setInputValue pero SOLO escribe si el input está vacío. Usado al
+     * auto-completar desde la BD de personal después de cargar un caso existente,
+     * para no pisar un valor que ya estaba guardado en el Excel.
+     */
+    _setInputValueIfEmpty(id, value) {
+        if (value == null || value === '') return;
+        const el = document.getElementById(id);
+        if (el && !String(el.value || '').trim()) el.value = String(value);
+    }
+
+    /**
+     * [📦455 2026-07-01 v3] Parsea fechas de nacimiento en cualquier formato que
+     * venga del Excel (Date object, ISO string, dd/mm/yyyy, YYYYMMDD sin
+     * separadores, Excel serial number, timestamp ms).
+     *
+     * IMPORTANTE (v3): el caso YYYYMMDD debe probarse ANTES del fallback ISO,
+     * porque new Date('19830927') se interpreta como 19.830.927 ms desde epoch
+     * (que cae en año 1980, NO en la fecha 27-sept-1983 que el dato representa).
+     *
+     * Rechaza fechas invalidas (epoch 1970, años < 1940 o > año actual).
+     * Inspirado en formatearFecha() de consulta-trabajadores.js.
+     * @param {*} fecha - Valor crudo de la BD de personal
+     * @returns {Date|null} - Date valida o null si no se puede parsear
+     */
+    _parsearFechaNacimiento(fecha) {
+        if (fecha == null || fecha === '') return null;
+        try {
+            // Caso 1: ya es Date object
+            if (fecha instanceof Date) {
+                if (isNaN(fecha.getTime())) return null;
+                if (fecha.getFullYear() < 1940 || fecha.getFullYear() > new Date().getFullYear()) return null;
+                return fecha;
+            }
+            const str = String(fecha).trim();
+            if (!str) return null;
+
+            // ============================================================
+            // Caso 2 (v3): string YYYYMMDD (8 digitos, sin separadores) — PRIORIDAD ALTA
+            // Detecta esto ANTES de new Date() porque la conversion ISO basica
+            // interpreta '19830927' como ms (no como fecha), produciendo 1970-01-01.
+            // ============================================================
+            if (/^\d{8}$/.test(str)) {
+                const anio = parseInt(str.substring(0, 4), 10);
+                const mes = parseInt(str.substring(4, 6), 10) - 1;
+                const dia = parseInt(str.substring(6, 8), 10);
+                const d4 = new Date(anio, mes, dia);
+                if (!isNaN(d4.getTime()) && d4.getFullYear() >= 1940 && d4.getFullYear() <= new Date().getFullYear()) {
+                    return d4;
+                }
+            }
+
+            // ============================================================
+            // Caso 3: string ISO (YYYY-MM-DD o con tiempo)
+            // Solo si Caso 2 no matcheo. NOTA: la iso basica sin separadores
+            // ('19830927') no la usamos aqui porque fue atrapada por Caso 2.
+            // ============================================================
+            const isoMatch = str.match(/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}.*)?$/);
+            if (isoMatch) {
+                const date = new Date(str);
+                if (!isNaN(date.getTime()) && date.getFullYear() >= 1940 && date.getFullYear() <= new Date().getFullYear()) {
+                    return date;
+                }
+            }
+
+            // ============================================================
+            // Caso 4: string dd/mm/yyyy o dd-mm-yyyy
+            // ============================================================
+            const ddmmyyyy = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+            if (ddmmyyyy) {
+                const dia = parseInt(ddmmyyyy[1], 10);
+                const mes = parseInt(ddmmyyyy[2], 10) - 1;
+                let anio = parseInt(ddmmyyyy[3], 10);
+                if (anio < 100) anio = anio < 50 ? 2000 + anio : 1900 + anio;
+                // Solo aceptar anios en rango razonable de fechas de nacimiento.
+                if (anio >= 1940 && anio <= new Date().getFullYear()) {
+                    const d3 = new Date(anio, mes, dia);
+                    if (!isNaN(d3.getTime()) && d3.getFullYear() >= 1940 && d3.getFullYear() <= new Date().getFullYear()) {
+                        return d3;
+                    }
+                }
+            }
+
+            // ============================================================
+            // Caso 5: numero serial de Excel (eg. 28000 para 1976-08-21).
+            // Seriales Excel razonables estan entre 1 (1900) y ~60000 (año 2064).
+            // Si es > 100000 NO es serial — es otra cosa (timestamp ms o year*10000+mmdd).
+            // ============================================================
+            if (/^\d+(\.\d+)?$/.test(str)) {
+                const serial = parseFloat(str);
+                if (serial >= 1 && serial < 100000) {
+                    // Excel epoch: 1899-12-30 (corrigiendo el bug del 29-feb-1900)
+                    const ms = (serial - 25569) * 86400 * 1000;
+                    const d = new Date(ms);
+                    if (!isNaN(d.getTime()) && d.getFullYear() >= 1940 && d.getFullYear() <= new Date().getFullYear()) {
+                        return d;
+                    }
+                }
+                // Si es numero grande (timestamp ms o year*10000+mmdd NO matcheable),
+                // retornar null — mejor no asignar nada que asignar una fecha incorrecta.
+                return null;
+            }
+
+            return null;
+        } catch (e) {
+            return null;
+        }
     }
 
     /**
@@ -3894,7 +6275,10 @@ class MedicionAusentismoComponent {
                 trabajadorRemoto: document.getElementById('sp-trabajador-remoto').value,
                 fechaInicioRemoto: document.getElementById('sp-fecha-inicio-remoto').value,
                 // Etapa 1: Captura de Caso - Columnas BE(56), BF(57), BG(58)
-                casoIngresadoPRIC: document.getElementById('sp-caso-ingresado-pric').value,
+                // 📦701-fix4 — Si el campo está vacío al guardar, default a 'NO'
+                // (seguimiento simple). Evita que casos sin clasificar queden
+                // con el campo NULL en la BD, lo que rompe el banner al reabrir.
+                casoIngresadoPRIC: (document.getElementById('sp-caso-ingresado-pric').value || 'NO'),
                 mecanismoDeteccion: document.getElementById('sp-mecanismo-deteccion').value,
                 fechaIngresoPRIC: document.getElementById('sp-fecha-ingreso-pric').value,
                 // Etapa 2: Plan de Tratamiento - Columnas BH(59), BI(60), BJ(61), BK(62)
@@ -4431,16 +6815,21 @@ class MedicionAusentismoComponent {
 
     /**
      * Ejecuta el guardado real de los datos
+     * 📦701 — ANTES: iba directo a Excel (vía Python saveFollowUp).
+     *         AHORA: va a SQLite (fuente de verdad) via el bridge
+     *         seguimiento-incapacidad:guardar. El Excel se exporta después
+     *         con un botón "Exportar a Excel" desde la UI.
      */
     ejecutarGuardadoReal(seguimientoData, esActualizacion, filaObjetivo) {
-        console.log('[GUARDAR SEGUIMIENTO] Iniciando guardado en PRI.xlsx...');
+        console.log('[GUARDAR SEGUIMIENTO] 📦701 — Guardando en SQLite (fuente de verdad primaria)...');
 
         // Verificar si hay API disponible
-        const apiToUse = window.electronAPI?.saveFollowUp ||
-                        window.parent?.electronAPI?.saveFollowUp;
+        const segInc = window.electronAPI?.seguimientoIncapacidad ||
+                       window.parent?.electronAPI?.seguimientoIncapacidad;
+        const apiToUse = segInc?.guardar;
 
         if (!apiToUse) {
-            console.error('[GUARDAR SEGUIMIENTO] API saveFollowUp no disponible');
+            console.error('[GUARDAR SEGUIMIENTO] API seguimientoIncapacidad.guardar no disponible');
             this.showNotification('❌ Error: Función de guardado no disponible', 'error');
             return;
         }
@@ -4581,7 +6970,9 @@ class MedicionAusentismoComponent {
         console.log('[GUARDAR SEGUIMIENTO] Empresa:', this.currentCompany);
         
         // Llamar a la API
-        apiToUse(followUpData, this.currentCompany)
+        // 📦701 — Cambiado: ahora va al bridge seguimiento-incapacidad:guardar
+        // (SQLite como fuente de verdad). Antes iba a saveFollowUp (Excel).
+        apiToUse({ empresaId: this.currentCompany, data: followUpData })
             .then(result => {
                 console.log('[GUARDAR SEGUIMIENTO] Resultado:', result);
                 
@@ -4591,32 +6982,22 @@ class MedicionAusentismoComponent {
                 }
                 
                 if (result && result.success) {
-                    console.log('[GUARDAR SEGUIMIENTO] ✅ Datos guardados exitosamente');
-                    console.log('[GUARDAR SEGUIMIENTO] ¿Es actualización?', esActualizacion, 'Fila:', filaObjetivo);
-                    
-                    // Mostrar notificación diferente según si actualizó o creó
-                    if (esActualizacion && filaObjetivo) {
-                        // Registro existente actualizado
-                        this.showNotification(
-                            `📝 Registro ACTUALIZADO en fila ${filaObjetivo} para ${followUpData.employeeName}`, 
-                            'success'
-                        );
-                        console.log('[GUARDAR SEGUIMIENTO] 📝 Registro actualizado en fila:', filaObjetivo);
-                    } else if (result.actualizado) {
-                        // Registro existente actualizado (viene del backend)
-                        this.showNotification(
-                            `📝 Registro ACTUALIZADO en fila ${result.fila} para ${followUpData.employeeName}`, 
-                            'success'
-                        );
-                        console.log('[GUARDAR SEGUIMIENTO] 📝 Registro actualizado (backend) en fila:', result.fila);
-                    } else {
-                        // Registro nuevo creado
-                        this.showNotification(
-                            `➕ Registro CREADO para ${followUpData.employeeName}`, 
-                            'success'
-                        );
-                        console.log('[GUARDAR SEGUIMIENTO] ✅ Registro creado');
-                    }
+                    console.log('[GUARDAR SEGUIMIENTO] ✅ Datos guardados exitosamente en BD');
+                    console.log('[GUARDAR SEGUIMIENTO] EsActualizacion:', result.data?.esActualizacion, 'CasoId:', result.data?.id);
+
+                    // 📦701 — Guardar el casoId en el estado del componente para
+                    // poder exportarlo a Excel después desde el banner.
+                    this.currentCasoBdId = result.data?.id || null;
+                    this.currentCasoBdEsActualizacion = result.data?.esActualizacion || false;
+                    this._actualizarBannerBD('guardado');
+
+                    // 📦701 — Mensaje adaptado al nuevo flujo: guardado en BD,
+                    // pendiente de exportar a Excel si se desea.
+                    var mensaje = result.data?.esActualizacion
+                        ? `📝 Caso ACTUALIZADO en BD para ${followUpData.employeeName}. Click "Exportar a Excel" para sincronizar.`
+                        : `➕ Caso GUARDADO en BD para ${followUpData.employeeName}. Click "Exportar a Excel" para sincronizar.`;
+                    this.showNotification(mensaje, 'success');
+                    console.log('[GUARDAR SEGUIMIENTO] Caso id:', result.data?.id, 'esActualizacion:', result.data?.esActualizacion);
                     
                     // 🆕 ACTUALIZAR LA TABLA AUTOMÁTAMENTE DESPUÉS DE GUARDAR
                     console.log('[GUARDAR SEGUIMIENTO] 🔄 Actualizando tabla de seguimiento...');
@@ -4633,20 +7014,62 @@ class MedicionAusentismoComponent {
                         this.closeSeguimientoPanel();
                     }, 2000);
                 } else {
-                    const errorMsg = result?.error || 'Error desconocido';
-                    console.error('[GUARDAR SEGUIMIENTO] ❌ Error:', errorMsg);
+                    // 📦706-fix2 — El error del bridge viene como { code, message, details },
+                    // no como string. Extraemos .message de forma defensiva
+                    // (try/catch para manejar referencias circulares o tipos raros).
+                    const errObj = result?.error;
+                    let errorMsg = 'Error desconocido';
+                    try {
+                        if (errObj == null) {
+                            errorMsg = 'Error desconocido (sin detalles)';
+                        } else if (typeof errObj === 'string') {
+                            errorMsg = errObj;
+                        } else if (typeof errObj === 'object') {
+                            errorMsg = errObj.message
+                                || (errObj.code ? '[' + errObj.code + '] ' + JSON.stringify(errObj) : null)
+                                || JSON.stringify(errObj)
+                                || 'Error desconocido (objeto sin mensaje)';
+                        } else {
+                            errorMsg = String(errObj);
+                        }
+                    } catch (jsonErr) {
+                        // Si JSON.stringify falla (referencia circular u objeto no serializable)
+                        errorMsg = '[Error no serializable: ' + (errObj?.constructor?.name || typeof errObj) + ']';
+                    }
+                    console.error('[GUARDAR SEGUIMIENTO] ❌ Error completo (objeto result):', result);
+                    console.error('[GUARDAR SEGUIMIENTO] ❌ Error msg extraído:', errorMsg);
                     this.showNotification('❌ Error al guardar: ' + errorMsg, 'error');
                 }
             })
             .catch(error => {
-                console.error('[GUARDAR SEGUIMIENTO] ❌ Error en la llamada:', error);
-                
+                // 📦706-fix2 — Logging detallado del error de IPC.
+                // A veces error.message viene undefined o el error no es un Error nativo.
+                console.error('[GUARDAR SEGUIMIENTO] ❌ Error en la llamada (objeto):', error);
+                console.error('[GUARDAR SEGUIMIENTO] ❌ Error type:', typeof error);
+                console.error('[GUARDAR SEGUIMIENTO] ❌ Error constructor:', error?.constructor?.name);
+                console.error('[GUARDAR SEGUIMIENTO] ❌ Error stack:', error?.stack);
+
                 if (saveButton) {
                     saveButton.disabled = false;
                     saveButton.innerHTML = '<i class="fas fa-save"></i> Guardar Seguimiento';
                 }
-                
-                this.showNotification('❌ Error al guardar: ' + error.message, 'error');
+
+                // Extraer mensaje de forma defensiva
+                let errMsg = 'Error desconocido en la llamada IPC';
+                try {
+                    if (error && typeof error === 'object') {
+                        errMsg = error.message
+                            || error.toString()
+                            || JSON.stringify(error);
+                    } else if (typeof error === 'string') {
+                        errMsg = error;
+                    } else {
+                        errMsg = String(error);
+                    }
+                } catch (_) {
+                    errMsg = '[Error no serializable: ' + (error?.constructor?.name || typeof error) + ']';
+                }
+                this.showNotification('❌ Error al guardar: ' + errMsg, 'error');
             });
     }
 
@@ -4676,25 +7099,14 @@ class MedicionAusentismoComponent {
       box-sizing: border-box;
         `;
 
-        // Notificación toast
-        const notificationDiv = document.createElement('div');
-        notificationDiv.id = 'notification-toast';
-        notificationDiv.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 25px;
-            background: white;
-            border-left: 4px solid #28a745;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            border-radius: 4px;
-            z-index: 2000;
-            transform: translateX(120%);
-            transition: transform 0.3s ease;
-            font-weight: 500;
-            color: #1E293B;
-        `;
-        mainContent.appendChild(notificationDiv);
+        // 📦443 (2026-06-25) — Notificación toast ELIMINADA.
+        // Antes había un notificationDiv con position:fixed + translateX(120%)
+        // que asomaba una franja verde en la esquina superior derecha (sistema
+        // viejo de notificaciones). Ahora todo va por window.parent.updateNotifier
+        // (sistema estándar del proyecto, mismo que 6.1.3), así que ya no
+        // necesitamos este div. Si el fallback del showNotification legacy
+        // llega a buscarlo, simplemente no mostrará nada (mejor que el viejo
+        // div verde que se asomaba).
 
         // Contenedor del formulario
         const formContainer = document.createElement('div');
@@ -4984,20 +7396,27 @@ class MedicionAusentismoComponent {
             console.log('Event listeners setup started');
             console.log('Current company:', this.currentCompany);
 
+            console.log('[DEBUG] Setup búsqueda de empleado habilitado. Escribe una cédula y presiona Tab.');
+
             // 1. Autocompletar al salir del campo Cédula
             const cedulaInput = document.getElementById('cedula-input');
             if (cedulaInput) {
                 console.log('Cédula input found, adding blur event listener');
                 cedulaInput.addEventListener('blur', async () => {
                     const cedula = cedulaInput.value.trim();
+                    console.log('[DEBUG cedula blur] cedula:', cedula);
                     if (!cedula) return;
 
-                    this.showStatus(statusDiv, 'Buscando empleado...', 'info');
+                    /* 📦443 (2026-06-25) — loading=true para mostrar spinner
+                       animado durante la búsqueda asíncrona del empleado. */
+                    this.showStatus(statusDiv, 'Buscando empleado...', 'info', true);
 
                     try {
                         const result = await window.electronAPI.buscarEmpleadoPorCedula(cedula, this.currentCompany);
+                        console.log('[DEBUG buscarEmpleado] result:', JSON.stringify(result));
 
                         if (result && result.success) {
+                            console.log('[DEBUG buscarEmpleado] datos:', JSON.stringify(result.datos));
                             document.getElementById('nombre-input').value = result.datos.nombre || '';
                             document.getElementById('cargo-input').value = result.datos.cargo || '';
                             document.getElementById('departamento-input').value = result.datos.area || '';
@@ -5016,7 +7435,8 @@ class MedicionAusentismoComponent {
                                     this.currentCompany,
                                     () => {
                                         // Usuario confirmó - continuar con el registro
-                                        this.showStatus(statusDiv, 'Empleado encontrado. Puede continuar con el registro.', 'success');
+                                        /* 📦443 — Mini-tarjeta con datos del empleado en lugar de mensaje plano */
+                                        this._showEmpleadoCard(statusDiv, result.datos);
                                     },
                                     () => {
                                         // Usuario canceló - limpiar formulario
@@ -5030,7 +7450,8 @@ class MedicionAusentismoComponent {
                                 );
                             } else {
                                 // ✅ Empleado de la misma empresa
-                                this.showStatus(statusDiv, 'Empleado encontrado. Puede continuar con el registro.', 'success');
+                                /* 📦443 — Mini-tarjeta con datos del empleado en lugar de mensaje plano */
+                                this._showEmpleadoCard(statusDiv, result.datos);
                             }
                         } else {
                             this.showStatus(statusDiv, 'Empleado no encontrado. Diligencie manualmente.', 'warning');
@@ -5054,16 +7475,23 @@ class MedicionAusentismoComponent {
                     const cie10Code = codigoInput.value.trim();
                     if (!cie10Code) return;
 
-                    this.showStatus(statusDiv, 'Buscando descripción...', 'info');
+                    /* 📦443 (2026-06-25) — loading=true para mostrar spinner
+                       animado durante la búsqueda asíncrona del CIE-10. */
+                    this.showStatus(statusDiv, 'Buscando descripción...', 'info', true);
 
                     try {
                         const result = await window.electronAPI.buscarCie10Descripcion(this.currentCompany, cie10Code);
 
                         if (result && result.success) {
                             document.getElementById('descripcion-input').value = result.datos.descripcion || '';
-                            this.showStatus(statusDiv, 'Descripción encontrada.', 'success');
+                            /* 📦443 — Mensaje enriquecido con código + descripción */
+                            this.showStatus(
+                                statusDiv,
+                                '<strong>CIE-10 ' + this._escapeHtml(cie10Code) + '</strong> · ' + this._escapeHtml(result.datos.descripcion || ''),
+                                'success'
+                            );
                         } else {
-                            this.showStatus(statusDiv, 'Descripción no encontrada.', 'warning');
+                            this.showStatus(statusDiv, 'Descripción no encontrada para el código ' + cie10Code + '. Verifica o digita manualmente.', 'warning');
                             document.getElementById('descripcion-input').value = '';
                         }
                     } catch (error) {
@@ -5109,7 +7537,20 @@ class MedicionAusentismoComponent {
 
                     try {
                         const ausentismoResult = await window.electronAPI.readAusentismoData(this.currentCompany);
+                        // 📦459 (2026-07-02) — Registrar incapacidad SÍ es bloqueante (sin
+                        // archivo no podemos escribir). Distinguimos modo degradado
+                        // (_missingFile:true) para mostrar mensaje útil vs error genérico.
                         if (!ausentismoResult.success) throw new Error(ausentismoResult.error);
+                        if (ausentismoResult._missingFile) {
+                            const msg = this._getMissingFileMessage(
+                                ausentismoResult._missingFileReason,
+                                ausentismoResult._details
+                            );
+                            throw new Error(
+                                `No se puede registrar la incapacidad: ${msg.title}. ` +
+                                `${msg.action}. (${ausentismoResult._expectedDir || 'ruta desconocida'})`
+                            );
+                        }
 
                         const result = await window.electronAPI.procesarAusentismo(this.currentCompany, formData);
 
@@ -5143,15 +7584,84 @@ class MedicionAusentismoComponent {
     // --- Funciones Auxiliares para el Formulario ---
 
     /**
+     * 📦443 (2026-06-25) — Muestra una mini-tarjeta de éxito con los datos
+     * del empleado encontrado. Reemplaza el mensaje plano "Empleado
+     * encontrado" con una card visual que incluye:
+     *  - Avatar circular con las iniciales del empleado (animado)
+     *  - Check verde animado (scale-in)
+     *  - Nombre destacado
+     *  - Cédula en formato "Cédula 12345"
+     *  - Cargo · Departamento · Empresa (línea secundaria)
+     *  - Mensaje de confirmación en la parte inferior
+     * @param {HTMLElement} statusDiv - Elemento contenedor del estado
+     * @param {Object} datos - Datos del empleado (nombre, cedula, cargo, area, empresa, etc.)
+     */
+    _showEmpleadoCard(statusDiv, datos) {
+        var nombre = (datos.nombre || 'Empleado').trim();
+        var cedula = (datos.cedula || '').trim();
+        var cargo = (datos.cargo || '').trim();
+        var area = (datos.area || '').trim();
+        var empresa = (datos.empresa || datos.empresa_usuaria || '').trim();
+
+        // 📦443 (2026-06-25) — Asegurar visibilidad: display:block y limpiar
+        // estilos inline conflictivos de llamadas anteriores.
+        statusDiv.style.display = 'block';
+        statusDiv.style.removeProperty('cssText');
+        statusDiv.className = 'status-message status-message--empleado';
+
+        // Construir lista de detalles (cargo · área · empresa)
+        var detalles = [];
+        if (cargo) detalles.push('<i class="bi bi-briefcase"></i> ' + this._escapeHtml(cargo));
+        if (area) detalles.push('<i class="bi bi-geo-alt"></i> ' + this._escapeHtml(area));
+        if (empresa) detalles.push('<i class="kair-icon-building"></i> ' + this._escapeHtml(empresa));
+
+        // 📦443 (2026-06-25) — Diseño minimalista con icono de persona.
+        // Reemplaza el avatar morado por un círculo con icono bi-person-fill.
+        // El icono es universal (no requiere iniciales ni cálculo de hash)
+        // y combina mejor con el estilo general del formulario.
+        statusDiv.innerHTML =
+            '<div class="km-empleado-card">' +
+                '<div class="km-empleado-card__icon">' +
+                    '<i class="bi bi-person-fill"></i>' +
+                '</div>' +
+                '<div class="km-empleado-card__body">' +
+                    '<div class="km-empleado-card__name">' + this._escapeHtml(nombre) + '</div>' +
+                    (cedula ? '<div class="km-empleado-card__cedula"><i class="bi bi-credit-card-2-front"></i> Cédula ' + this._escapeHtml(cedula) + '</div>' : '') +
+                    (detalles.length > 0
+                        ? '<div class="km-empleado-card__details">' + detalles.join('<span class="km-empleado-card__sep">·</span>') + '</div>'
+                        : '') +
+                    '<div class="km-empleado-card__success-msg">' +
+                        '<i class="bi bi-check-circle-fill"></i> Empleado encontrado. Puede continuar con el registro.' +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+    }
+
+    /**
+     * Helper para escapar HTML y prevenir XSS en los datos del empleado
+     * (que vienen del backend y no son sanitizados).
+     */
+    _escapeHtml(str) {
+        if (str == null) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    /**
      * Muestra mensaje de estado moderno con icono y animación
      * @param {HTMLElement} statusDiv - Elemento contenedor del estado
      * @param {string} message - Mensaje a mostrar
      * @param {string} type - Tipo de estado: 'success', 'error', 'warning', 'info'
+     * @param {boolean} loading - Si true, muestra spinner animado de búsqueda
      */
-    showStatus(statusDiv, message, type) {
+    showStatus(statusDiv, message, type, loading) {
         statusDiv.style.display = 'block';
-        statusDiv.className = 'status-message';
-        
+        statusDiv.className = loading ? 'status-message status-message--loading' : 'status-message';
+
         // Definir configuración por tipo
         const config = {
             success: {
@@ -5186,7 +7696,7 @@ class MedicionAusentismoComponent {
 
         const currentConfig = config[type] || config.info;
 
-        // Aplicar estilos modernos
+        // Aplicar estilos modernos (con position:relative cuando loading para shimmer)
         statusDiv.style.cssText = `
             display: flex;
             align-items: center;
@@ -5200,25 +7710,44 @@ class MedicionAusentismoComponent {
             color: ${currentConfig.text};
             animation: slideDown 0.3s ease-out;
             margin-bottom: 20px;
+            ${loading ? 'position: relative; overflow: hidden;' : ''}
         `;
 
-        // Contenido con icono
-        statusDiv.innerHTML = `
-            <div style="
-                width: 36px;
-                height: 36px;
-                border-radius: 50%;
-                background: ${currentConfig.iconBg};
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                flex-shrink: 0;
-                color: ${currentConfig.text};
-            ">
-                ${currentConfig.icon}
-            </div>
-            <span style="flex: 1;">${message}</span>
-        `;
+        // 📦443 (2026-06-25) — Contenido con icono estático O spinner animado.
+        // Cuando loading=true (búsqueda asíncrona), mostramos:
+        // 1. Spinner de 3 anillos rotando (en lugar del icono info estático)
+        // 2. Shimmer effect de fondo (barrido de luz que indica "buscando")
+        var iconHtml;
+        if (loading) {
+            iconHtml = '<div class="km-loading-spinner km-loading-spinner--sm">' +
+                          '<div class="km-loading-spinner__ring"></div>' +
+                          '<div class="km-loading-spinner__ring"></div>' +
+                          '<div class="km-loading-spinner__ring"></div>' +
+                       '</div>';
+        } else {
+            iconHtml = '<div style="' +
+                'width: 36px;' +
+                'height: 36px;' +
+                'border-radius: 50%;' +
+                'background: ' + currentConfig.iconBg + ';' +
+                'display: flex;' +
+                'align-items: center;' +
+                'justify-content: center;' +
+                'flex-shrink: 0;' +
+                'color: ' + currentConfig.text + ';' +
+            '">' +
+                currentConfig.icon +
+            '</div>';
+        }
+
+        // Shimmer effect: capa con gradiente animado que se desplaza horizontalmente
+        var shimmerHtml = loading
+            ? '<div class="km-status-shimmer"></div>'
+            : '';
+
+        statusDiv.innerHTML = shimmerHtml +
+            '<div class="km-status-icon-wrap">' + iconHtml + '</div>' +
+            '<span style="flex: 1;">' + message + '</span>';
 
         // Agregar animación si no existe
         if (!document.getElementById('status-animations')) {
@@ -5528,49 +8057,46 @@ class MedicionAusentismoComponent {
 
     renderVerAusentismoView(container) {
         console.log('[DEBUG] renderVerAusentismoView: Iniciando renderizado de lista de registros.');
+        // 📦640 (fix5) — Restaurar `overflow: auto` que `renderMainView` (línea 232)
+        // pone en `hidden` para que el iframe del home ocupe todo. Como
+        // `container` es la misma referencia para TODAS las vistas, el `hidden`
+        // quedaba persistido y bloqueaba el scroll del wrapper/submodule-content.
+        container.style.overflow = 'auto';
+        container.style.padding = '';
         container.innerHTML = '';
 
-        // Contenedor wrapper con scroll condicional
+        // Contenedor wrapper. El scroll real lo hace el padre (.submodule-content)
+        // que tiene `overflow-y: auto` inline en renderer.js. Este wrapper solo
+        // // sirve para mantener los estilos relativos y permitir que el botón
+        // // FAB apunte a un selector estable dentro de la vista.
+        // 📦640 (fix4) — Simplificado. `height: 100%` colapsaba, `flex: 1` no
+        // limitaba. Ahora dejamos que el contenido fluya naturalmente y el
+        // scroll lo maneja el contenedor padre real.
         const scrollWrapper = document.createElement('div');
         scrollWrapper.id = 'ver-ausentismo-scroll-wrapper';
         scrollWrapper.style.cssText = `
             position: relative;
             width: 100%;
-            height: 100%;
-            overflow-y: auto;
-            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
         `;
 
         // Contenedor principal modernizado
+        // 📦640 (fix3) — Quitado `min-height: 100%` que forzaba al scrollWrapper
+        // a expandirse al contenido. Ahora el mainContent crece con su contenido
+        // y el scrollWrapper (con `overflow-y: auto`) muestra la barra interna.
         const mainContent = document.createElement('div');
         mainContent.style.cssText = `
             max-width: 100%;
             margin: 0 auto;
             padding: 20px;
             width: 100%;
-            min-height: 100%;
             box-sizing: border-box;
+            flex-shrink: 0;
         `;
 
-        // Notificación toast
-        const notificationDiv = document.createElement('div');
-        notificationDiv.id = 'notification-toast-list';
-        notificationDiv.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 25px;
-            background: white;
-            border-left: 4px solid #28a745;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            border-radius: 4px;
-            z-index: 2000;
-            transform: translateX(120%);
-            transition: transform 0.3s ease;
-            font-weight: 500;
-            color: #1E293B;
-        `;
-        mainContent.appendChild(notificationDiv);
+        // 📦443 (2026-06-25) — Notificación toast ELIMINADA (sistema legacy).
+        // Ahora todo va por window.parent.updateNotifier (estándar K+AIR).
 
         // Contenedor de la lista
         const listContainer = document.createElement('div');
@@ -5715,6 +8241,11 @@ class MedicionAusentismoComponent {
         listContainer.appendChild(filtersBar);
 
         const tableWrapper = document.createElement('div');
+        // 📦640 (fix6) — ID agregado para que el FAB apunte directamente a este
+        // contenedor (que tiene su propio overflow: auto). Antes el FAB apuntaba
+        // al `submodule-content`, que también scrollea pero mueve TODO (filtros
+        // + tabla). Apuntando al tableWrapper, el botón solo afecta la tabla.
+        tableWrapper.id = 'ausentismo-table-scroll';
         tableWrapper.className = 'ausentismo-table-wrapper';
         tableWrapper.style.cssText = `
             overflow-x: auto;
@@ -5776,13 +8307,13 @@ class MedicionAusentismoComponent {
                     <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5;">Fecha Fin</th>
                     <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5;">Código</th>
                     <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5;">Descripción</th>
+                    <th style="background-color: #f1f5f9; padding: 12px 15px; text-align: center; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #64748B; position: sticky; top: 0; z-index: 5; width: 110px;">Acciones</th>
                 </tr>
             </thead>
             <tbody id="ausentismoTableBody">
                 <tr>
-                    <td colspan="17" style="text-align: center; padding: 40px; color: #64748B;">
-                        <i class="fas fa-spinner fa-spin" style="font-size: 24px; margin-bottom: 10px;"></i>
-                        <p>Cargando registros...</p>
+                    <td colspan="18" class="ks-loading-cell" style="padding: 16px;">
+                        ${KairSkeleton.table(12, 17)}
                     </td>
                 </tr>
             </tbody>
@@ -5794,8 +8325,26 @@ class MedicionAusentismoComponent {
         scrollWrapper.appendChild(mainContent);
         container.appendChild(scrollWrapper);
 
+        // 📦640 (fix6) — Botón flotante scroll-to-top/bottom.
+        // Apuntamos al `#ausentismo-table-scroll` (el tableWrapper), que tiene
+        // `overflow-y: auto` y `max-height: calc(100vh - 400px)`. Así el botón
+        // mueve SOLO la tabla (los filtros quedan fijos arriba).
+        if (this.scrollFab && typeof this.scrollFab.destroy === 'function') {
+            this.scrollFab.destroy();
+            this.scrollFab = null;
+        }
+        if (typeof window.ScrollToTopBottomButton === 'function') {
+            this.scrollFab = new window.ScrollToTopBottomButton({
+                target: '#ausentismo-table-scroll',
+                color: '#174ea6'
+            });
+            this.scrollFab.init();
+        } else {
+            console.warn('[AUS-SCROLL-FAB] ScrollToTopBottomButton no está disponible. ¿index.html cargó modules/shared/scroll-fab.js?');
+        }
+
         // Cargar datos
-        this.loadAusentismoData(table, notificationDiv);
+        this.loadAusentismoData(table);
 
         // Setup de eventos de filtros
         setTimeout(() => {
@@ -5804,7 +8353,7 @@ class MedicionAusentismoComponent {
 
             if (applyBtn) {
                 applyBtn.addEventListener('click', () => {
-                    this.applyFilters(table, notificationDiv);
+                    this.applyFilters(table);
                 });
             }
 
@@ -5814,18 +8363,30 @@ class MedicionAusentismoComponent {
                     document.getElementById('yearFilter').value = '';
                     document.getElementById('monthFilter').value = '';
                     document.getElementById('typeFilter').value = '';
-                    this.loadAusentismoData(table, notificationDiv);
-                    this.showNotification('Filtros limpiados', 'info', 'notification-toast-list');
+                    this.loadAusentismoData(table);
+                    this.showNotification('Filtros limpiados', 'info');
                 });
             }
         }, 0);
     }
 
-    async loadAusentismoData(tableElement, notificationDiv) {
+    async loadAusentismoData(tableElement, notificationDiv) { // 📦459 — notificationDiv es legacy (DOM notification). Las notificaciones usan window.parent.updateNotifier vía showNotification().
         try {
             const result = await window.electronAPI.readAusentismoData(this.currentCompany);
 
-            if (result.success && result.rows) {
+            // 📦459 — Persistir estado del archivo (también usado por wizard seguimiento)
+            if (result && result._missingFile) {
+                this.ausentismoFileStatus = {
+                    missing: true,
+                    reason: result._missingFileReason,
+                    expectedDir: result._expectedDir,
+                    details: result._details
+                };
+            } else if (result && result.success) {
+                this.ausentismoFileStatus = { missing: false };
+            }
+
+            if (result.success && result.rows && !result._missingFile) {
                 console.log('[DEBUG] Headers del Excel:', result.headers);
                 console.log('[DEBUG] Primera fila de datos:', result.rows[0]);
                 
@@ -5837,12 +8398,12 @@ class MedicionAusentismoComponent {
 
                 this.currentAusentismoData = result.rows.map((row, index) => {
                     const rowObj = {};
-                    
+
                     // Guardar por índice numérico para acceso directo por posición
                     row.forEach((value, i) => {
                         rowObj[String(i)] = value;
                     });
-                    
+
                     // Guardar también por nombre de encabezado
                     result.headers.forEach((header, i) => {
                         const cleanHeader = header ? header.trim() : `col_${i}`;
@@ -5850,8 +8411,12 @@ class MedicionAusentismoComponent {
                         // Guardar también en minúsculas para búsqueda flexible
                         rowObj[cleanHeader.toLowerCase().replace(/\s+/g, '_')] = row[i];
                     });
-                    
+
                     rowObj.no = index + 1;
+                    // 🆕 Guardar el rowIndex real en el Excel (sin contar headers) para
+                    // que las acciones Editar/Eliminar puedan llamar a los IPC handlers
+                    // con el índice correcto incluso después de filtrar la tabla.
+                    rowObj.__rowIndex = index;
                     return rowObj;
                 });
 
@@ -5863,14 +8428,33 @@ class MedicionAusentismoComponent {
                 
                 // Actualizar filtros con datos reales
                 this.populateDynamicFilters();
+            } else if (result && result._missingFile) {
+                // 📦459 — Modo degradado: banner amarillo + empty state con CTA
+                this.renderTable(tableElement, []);
+                this.showNotification(
+                    `Archivo de ausentismo no disponible. ${this._getMissingFileMessage(result._missingFileReason, result._details).action}.`,
+                    'warning'
+                );
+                // Inyectar banner arriba del contenedor de la tabla
+                const tableContainer = tableElement.closest('.ausentismo-table-wrap, .table-container, section') || tableElement.parentElement;
+                if (tableContainer) {
+                    const oldBanner = tableContainer.querySelector('.km-missing-banner');
+                    if (oldBanner) oldBanner.remove();
+                    const wrapper = document.createElement('div');
+                    wrapper.innerHTML = this._ausentismoMissingBannerHtml(
+                        { reason: result._missingFileReason, expectedDir: result._expectedDir, details: result._details },
+                        { variant: 'warning', retryMethod: 'loadAusentismoData' }
+                    );
+                    tableContainer.insertBefore(wrapper.firstElementChild, tableContainer.firstChild);
+                }
             } else {
                 this.renderTable(tableElement, []);
-                this.showNotification('No hay registros disponibles', 'warning', notificationDiv.id);
+                this.showNotification('No hay registros disponibles', 'warning');
             }
         } catch (error) {
             console.error('Error loading ausentismo data:', error);
             this.renderTable(tableElement, []);
-            this.showNotification(`Error: ${error.message}`, 'error', notificationDiv.id);
+            this.showNotification(`Error: ${error.message}`, 'error');
         }
     }
 
@@ -5945,35 +8529,35 @@ class MedicionAusentismoComponent {
         }
     }
 
-    applyFilters(tableElement, notificationDiv) {
+    applyFilters(tableElement, notificationDiv) { // 📦459 — notificationDiv es legacy. Las notificaciones van por updateNotifier.
         const search = document.getElementById('searchFilter').value.toLowerCase();
         const year = document.getElementById('yearFilter').value;
         const month = document.getElementById('monthFilter').value;
         const type = document.getElementById('typeFilter').value;
 
         if (!this.currentAusentismoData) {
-            this.showNotification('No hay datos cargados', 'warning', notificationDiv.id);
+            this.showNotification('No hay datos cargados', 'warning');
             return;
         }
 
         let filtered = this.currentAusentismoData.filter(row => {
             const nombre = (row.NOMBRE || row['2'] || '').toLowerCase();
             const cedula = (row.CEDULA || row['3'] || '').toLowerCase();
-            
+
             // Búsqueda por nombre o cédula
             const matchesSearch = !search || nombre.includes(search) || cedula.includes(search);
-            
+
             // Filtro por año - Usar columna 14 (O) o AÑO
             const rowYear = row['14'] || row.AÑO || row.ANO || '';
             const matchesYear = !year || rowYear === year;
-            
+
             // Filtro por mes
             const matchesMonth = !month || {
                 '1': 'ENERO', '2': 'FEBRERO', '3': 'MARZO', '4': 'ABRIL',
                 '5': 'MAYO', '6': 'JUNIO', '7': 'JULIO', '8': 'AGOSTO',
                 '9': 'SEPTIEMBRE', '10': 'OCTUBRE', '11': 'NOVIEMBRE', '12': 'DICIEMBRE'
             }[month] === (row.MES || row['9'] || '').toUpperCase();
-            
+
             // Filtro por tipo (CLASE DE INCAPACIDAD) - Usar columna 11 (L)
             const rowType = (row['CLASE DE INCAPACIDAD'] || row['11'] || '').toUpperCase();
             const matchesType = !type || rowType === type;
@@ -5982,7 +8566,7 @@ class MedicionAusentismoComponent {
         });
 
         this.renderTable(tableElement, filtered);
-        this.showNotification(`${filtered.length} registros encontrados`, 'success', notificationDiv.id);
+        this.showNotification(`${filtered.length} registros encontrados`, 'success');
     }
 
     renderTable(tableElement, data) {
@@ -5992,7 +8576,7 @@ class MedicionAusentismoComponent {
         if (!data || data.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="17" style="text-align: center; padding: 40px; color: #64748B;">
+                    <td colspan="18" style="text-align: center; padding: 40px; color: #64748B;">
                         <i class="fas fa-inbox" style="font-size: 48px; margin-bottom: 15px; opacity: 0.3;"></i>
                         <p>No hay registros para mostrar</p>
                     </td>
@@ -6056,6 +8640,16 @@ class MedicionAusentismoComponent {
             // Según headers reales del Excel: "DESCRIPCION" (sin tilde en los datos procesados)
             const descripcion = row['DESCRIPCION'] || row['DESCRIPCIÓN'] || '-';
 
+            // 🆕 rowIndex del Excel para que Editar/Eliminar apunten a la fila correcta
+            // (sobrevive a los filtros porque está guardado en row.__rowIndex, no en el index del array filtrado)
+            const excelRowIndex = row.__rowIndex != null ? row.__rowIndex : index;
+            const rowJson = JSON.stringify({
+                __rowIndex: excelRowIndex,
+                no: no,
+                nombre: nombre,
+                cedula: cedula
+            }).replace(/'/g, '&#39;');
+
             return `
                 <tr style="border-bottom: 1px solid #dee2e6; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#f8fafc'" onmouseout="this.style.backgroundColor='white'">
                     <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; white-space: nowrap;">${no}</td>
@@ -6079,17 +8673,331 @@ class MedicionAusentismoComponent {
                     <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; white-space: nowrap;">${fechaFin}</td>
                     <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; white-space: nowrap;">${codigo}</td>
                     <td style="padding: 12px 15px; font-size: 14px; color: #1E293B; max-width: 200px; overflow: hidden; text-overflow: ellipsis;" title="${descripcion}">${descripcion}</td>
+                    <td style="padding: 12px 15px; text-align: center; white-space: nowrap;">
+                        <button data-row='${rowJson}' class="btn-ausentismo-edit" title="Editar este registro" style="background: #ffffff; color: #174ea6; border: 1.5px solid #174ea6; padding: 5px 9px; border-radius: 8px; cursor: pointer; font-size: 12px; margin-right: 4px; transition: background 0.15s, color 0.15s;" onmouseover="this.style.background='#eff6ff';" onmouseout="this.style.background='#ffffff';">
+                            <i class="fas fa-pen"></i>
+                        </button>
+                        <button data-row='${rowJson}' class="btn-ausentismo-delete" title="Eliminar este registro" style="background: #ffffff; color: #dc2626; border: 1.5px solid #dc2626; padding: 5px 9px; border-radius: 8px; cursor: pointer; font-size: 12px; transition: background 0.15s, color 0.15s;" onmouseover="this.style.background='#fef2f2';" onmouseout="this.style.background='#ffffff';">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
                 </tr>
             `;
         }).join('');
+
+        // 🆕 Wire up de los botones de Editar/Eliminar (delegación sobre el tbody)
+        if (tbody) {
+            tbody.onclick = (e) => {
+                const btn = e.target.closest('button.btn-ausentismo-edit, button.btn-ausentismo-delete');
+                if (!btn) return;
+                try {
+                    const rowData = JSON.parse(btn.getAttribute('data-row').replace(/&#39;/g, "'"));
+                    if (btn.classList.contains('btn-ausentismo-edit')) {
+                        this.openEditAusentismoModal(rowData);
+                    } else {
+                        this.openDeleteAusentismoConfirm(rowData);
+                    }
+                } catch (err) {
+                    console.error('[AUSENTISMO] Error parseando data-row:', err);
+                }
+            };
+        }
+    }
+
+    // =========================================================================
+    // 🆕 Editar/Eliminar fila de ausentismo (feature nueva)
+    // El `rowData` viene del data-row del botón (incluye __rowIndex del Excel)
+    // =========================================================================
+
+    /**
+     * Modal de edición. Busca la fila completa en currentAusentismoData por __rowIndex,
+     * prellena el form y al hacer submit llama al IPC update-ausentismo-row.
+     */
+    openEditAusentismoModal(rowData) {
+        const excelRowIndex = rowData.__rowIndex;
+        // Buscar la fila completa (puede haber sido filtrada, pero sigue en currentAusentismoData)
+        const fullRow = (this.currentAusentismoData || []).find(r => r.__rowIndex === excelRowIndex);
+        if (!fullRow) {
+            this.showNotification('No se encontró la fila en memoria. Recargá la tabla.', 'error');
+            return;
+        }
+
+        // 🆕 13 campos visibles (mismos labels del form de registro).
+        // Editables: 6 (Género, Clase, Tipo, F. Inicio, F. Fin, Código Diagnóstico)
+        // Bloqueados (readonly): 7 (Cédula, Nombre, Cargo, Empresa Usuaria, Área,
+        //                          Entidad, Diagnóstico) — se muestran pero no se editan.
+        // Esto alinea con el form de registro: solo se pueden corregir los datos
+        // que el user realmente tipea al registrar.
+        const generoOptions = ['Femenino', 'Masculino'];
+        const claseOptions = ['Temporal', 'Permanente Parcial', 'Permanente Total'];
+        const tipoOptions = [
+            'Enfermedad General', 'Accidente de Trabajo', 'Enfermedad Laboral',
+            'Licencia de Maternidad', 'Licencia Paternidad', 'Calamidad Doméstica',
+            'Vacaciones', 'Otros'
+        ];
+
+        const editFields = [
+            { key: 'CEDULA', label: 'Cédula del Empleado', type: 'text', readonly: true },
+            { key: 'NOMBRE', label: 'Nombre Completo', type: 'text', readonly: true },
+            { key: 'CARGO', label: 'Cargo', type: 'text', readonly: true },
+            { key: 'EMPRESA USUARIA', label: 'Empresa Usuaria', type: 'text', readonly: true },
+            { key: 'ÁREA O DPTO', label: 'Área / Departamento', type: 'text', readonly: true },
+            { key: 'GENERO', label: 'Género', type: 'select', options: generoOptions, readonly: false },
+            { key: 'CLASE DE INCAPACIDAD', label: 'Clase de Incapacidad', type: 'select', options: claseOptions, readonly: false },
+            { key: 'TIPO DE INCAPACIDAD', label: 'Tipo de Incapacidad', type: 'select', options: tipoOptions, readonly: false },
+            { key: 'CODIGO', label: 'Código CIE-10', type: 'text', placeholder: 'Ej: J00X, A050', readonly: false },
+            { key: 'ENTIDAD', label: 'Entidad (EPS/ARL)', type: 'text', readonly: true },
+            { key: 'F. INICIO', label: 'Fecha de Inicio', type: 'text', placeholder: 'M/D/YY (ej: 4/1/24)', readonly: false },
+            { key: 'F. FIN', label: 'Fecha de Finalización', type: 'text', placeholder: 'M/D/YY (ej: 4/1/24)', readonly: false },
+            { key: 'N° DIAS DE INCAPACIDAD', label: 'Días de Incapacidad', type: 'number', placeholder: 'Ej: 5', min: 1, readonly: true },
+            { key: 'DESCRIPCION', label: 'Diagnóstico / Descripción', type: 'textarea', rows: 3, readonly: false }
+        ];
+
+        // Quitar modal previo si existe
+        const prev = document.getElementById('ausentismo-edit-modal');
+        if (prev) prev.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'ausentismo-edit-modal';
+        overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(15,23,42,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 20px;';
+
+        const formHtml = editFields.map(f => {
+            // Buscar el valor por key, intentando varias variantes (con/sin tildes, lowercase)
+            const v = fullRow[f.key] || fullRow[f.key.toLowerCase()] || fullRow[f.key.replace(/[^\w°]/g, '')] || '';
+            const esc = String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+            const isReadonly = !!f.readonly;
+            const roAttr = isReadonly ? 'readonly' : '';
+            // Estilo: readonly se ve "apagado" para indicar que no se puede editar
+            const styleBase = 'padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; font-family: inherit;';
+            const styleEditable = styleBase + ' background: white;';
+            const styleReadonly = styleBase + ' background: #f1f5f9; color: #64748B; cursor: not-allowed;';
+            const fieldStyle = isReadonly ? styleReadonly : styleEditable;
+            const placeholder = f.placeholder ? `placeholder="${f.placeholder}"` : '';
+            const colspan = (f.type === 'textarea') ? 'style="grid-column: span 2;"' : '';
+            let input;
+            if (f.type === 'select') {
+                // 🆕 Generar <select> con las opciones del form. Si el valor actual del
+                // Excel no está en la lista (datos legacy como "EPS" en Clase), se
+                // agrega como option preservado para que no se rompa la edición.
+                const currentVal = String(v).trim();
+                const opts = [...f.options];
+                if (currentVal && !opts.some(o => o.toLowerCase() === currentVal.toLowerCase())) {
+                    opts.unshift(currentVal);  // opción preservada (legacy)
+                }
+                const optionsHtml = opts.map(o => {
+                    const selected = o.toLowerCase() === currentVal.toLowerCase() ? 'selected' : '';
+                    const escO = String(o).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    return `<option value="${escO}" ${selected}>${escO}</option>`;
+                }).join('');
+                input = `<select data-field="${f.key}" ${roAttr} style="${fieldStyle}">${optionsHtml}</select>`;
+            } else if (f.type === 'textarea') {
+                input = `<textarea data-field="${f.key}" ${roAttr} rows="${f.rows || 3}" ${placeholder} style="${fieldStyle} resize: vertical;">${esc}</textarea>`;
+            } else {
+                const extra = f.type === 'number' ? `min="${f.min || 0}"` : '';
+                input = `<input type="${f.type}" data-field="${f.key}" value="${esc}" ${roAttr} ${placeholder} ${extra} style="${fieldStyle}" />`;
+            }
+            return `
+                <div ${colspan} style="display: flex; flex-direction: column; gap: 4px;">
+                    <label style="font-size: 12px; font-weight: 600; color: ${isReadonly ? '#94a3b8' : '#475569'}; text-transform: uppercase;">${f.label}${isReadonly ? ' <span style="color: #94a3b8; font-weight: 400;">(bloqueado)</span>' : ''}</label>
+                    ${input}
+                </div>
+            `;
+        }).join('');
+
+        overlay.innerHTML = `
+            <div style="background: white; border-radius: 12px; max-width: 900px; width: 100%; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+                <div style="padding: 20px 25px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between;">
+                    <div>
+                        <h3 style="margin: 0; font-size: 18px; color: #1E293B;">Editar registro de ausentismo</h3>
+                        <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748B;">Fila #${rowData.no} — ${rowData.nombre} (Cédula ${rowData.cedula})</p>
+                    </div>
+                    <button id="ausentismo-edit-close" style="background: none; border: none; font-size: 20px; color: #64748B; cursor: pointer; padding: 0 8px;">&times;</button>
+                </div>
+                <form id="ausentismo-edit-form" style="padding: 20px 25px; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                    ${formHtml}
+                </form>
+                <div style="padding: 15px 25px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 10px; background: #f8fafc; border-radius: 0 0 12px 12px;">
+                    <button id="ausentismo-edit-cancel" style="padding: 10px 20px; border: 1px solid #cbd5e1; background: white; color: #475569; border-radius: 8px; cursor: pointer; font-size: 14px;">Cancelar</button>
+                    <button id="ausentismo-edit-save" style="padding: 10px 20px; border: none; background: #174ea6; color: white; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600;">Guardar cambios</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        const close = () => overlay.remove();
+        overlay.querySelector('#ausentismo-edit-close').onclick = close;
+        overlay.querySelector('#ausentismo-edit-cancel').onclick = close;
+        overlay.onclick = (e) => { if (e.target === overlay) close(); };
+
+        overlay.querySelector('#ausentismo-edit-save').onclick = async () => {
+            const saveBtn = overlay.querySelector('#ausentismo-edit-save');
+            const cancelBtn = overlay.querySelector('#ausentismo-edit-cancel');
+            const form = overlay.querySelector('#ausentismo-edit-form');
+            const fields = {};
+            // Solo enviar los campos EDITABLES (no los readonly) que EFECTIVAMENTE
+            // cambiaron respecto al valor original. Esto permite que el backend
+            // distinga entre "el user cambió el código y quiere auto-completar la
+            // descripción" vs "el user solo reenvió los valores sin tocar nada".
+            // Antes enviaba TODOS los campos, lo que rompía el auto-completado
+            // del CIE-10 (siempre parecía que la descripción había sido editada).
+            const editableKeys = new Set(editFields.filter(f => !f.readonly).map(f => f.key));
+            form.querySelectorAll('[data-field]').forEach(el => {
+                const key = el.getAttribute('data-field');
+                if (!editableKeys.has(key)) return;
+                const currentVal = String(el.value || '').trim();
+                const originalVal = String(fullRow[key] != null ? fullRow[key] : '').trim();
+                if (currentVal !== originalVal) {
+                    fields[key] = el.value;
+                }
+            });
+            // 📦 Limpieza post-debug: los logs [DEBUG-EDIT-RENDERER] sirvieron
+            // para validar el flujo durante el desarrollo. En producción, los
+            // logs del main process (con prefijo [AUS-EDIT]) son suficientes.
+
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Guardando...';
+            cancelBtn.disabled = true;  // deshabilitar Cancelar durante el save
+
+            // ⏱️ Timeout de 20s en el renderer. Si el IPC no responde (Excel
+            // bloqueado, ruta inaccesible, etc.), el user puede cerrar el
+            // modal en vez de quedarse colgado.
+            const TIMEOUT_MS = 20000;
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('TIMEOUT_RENDERER')), TIMEOUT_MS);
+            });
+
+            try {
+                const result = await Promise.race([
+                    window.electronAPI.updateAusentismoRow({
+                        companyName: this.currentCompany,
+                        rowIndex: excelRowIndex,
+                        fields: fields
+                    }),
+                    timeoutPromise
+                ]);
+
+                if (result && result.success) {
+                    this.showNotification(`Registro #${rowData.no} actualizado.`, 'success');
+                    close();
+                    // Refrescar la tabla (recarga desde el Excel para que se vea el cambio)
+                    const tableEl = document.querySelector('#ausentismoTableBody')?.closest('table');
+                    if (tableEl) await this.loadAusentismoData(tableEl);
+                } else {
+                    const code = result && result.code;
+                    const msg = (result && result.error) || 'Error desconocido';
+                    const hint = code === 'FILE_LOCKED' ? ' (cerrá Excel e intentá de nuevo)'
+                              : code === 'TIMEOUT' ? ' (el servidor de archivos tardó demasiado)'
+                              : '';
+                    this.showNotification(`Error al guardar: ${msg}${hint}`, 'error', 10000);
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = 'Guardar cambios';
+                    cancelBtn.disabled = false;
+                }
+            } catch (err) {
+                const isTimeout = err && err.message === 'TIMEOUT_RENDERER';
+                const msg = isTimeout
+                    ? `La operación tardó más de ${TIMEOUT_MS/1000}s. Probablemente el archivo Excel está bloqueado por otra app o la ruta es inaccesible.`
+                    : `Error inesperado: ${err.message}`;
+                console.error('[AUSENTISMO-EDIT-RENDERER] Error:', err);
+                this.showNotification(msg, 'error', 10000);
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Guardar cambios';
+                cancelBtn.disabled = false;
+            }
+        };
+    }
+
+    /**
+     * Modal de confirmación para eliminar. Pide confirmación al user antes de llamar al IPC.
+     */
+    openDeleteAusentismoConfirm(rowData) {
+        const excelRowIndex = rowData.__rowIndex;
+        const prev = document.getElementById('ausentismo-delete-modal');
+        if (prev) prev.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'ausentismo-delete-modal';
+        overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(15,23,42,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 20px;';
+
+        overlay.innerHTML = `
+            <div style="background: white; border-radius: 12px; max-width: 480px; width: 100%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+                <div style="padding: 20px 25px; border-bottom: 1px solid #e2e8f0;">
+                    <h3 style="margin: 0; font-size: 18px; color: #dc2626; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-exclamation-triangle"></i> Eliminar registro
+                    </h3>
+                </div>
+                <div style="padding: 20px 25px;">
+                    <p style="margin: 0 0 10px 0; font-size: 14px; color: #1E293B;">¿Eliminar el siguiente registro de ausentismo?</p>
+                    <div style="background: #f8fafc; border-left: 3px solid #dc2626; padding: 12px 15px; border-radius: 6px; margin: 12px 0;">
+                        <div style="font-size: 13px; color: #475569;"><strong>Fila #${rowData.no}</strong></div>
+                        <div style="font-size: 14px; color: #1E293B; font-weight: 600; margin-top: 4px;">${rowData.nombre}</div>
+                        <div style="font-size: 13px; color: #64748B; margin-top: 2px;">Cédula: ${rowData.cedula}</div>
+                    </div>
+                    <p style="margin: 12px 0 0 0; font-size: 13px; color: #dc2626;"><i class="fas fa-exclamation-circle"></i> Esta acción no se puede deshacer. El registro se eliminará del Excel original.</p>
+                </div>
+                <div style="padding: 15px 25px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 10px; background: #f8fafc; border-radius: 0 0 12px 12px;">
+                    <button id="ausentismo-delete-cancel" style="padding: 10px 20px; border: 1px solid #cbd5e1; background: white; color: #475569; border-radius: 8px; cursor: pointer; font-size: 14px;">Cancelar</button>
+                    <button id="ausentismo-delete-confirm" style="padding: 10px 20px; border: none; background: #dc2626; color: white; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600;">Sí, eliminar</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        const close = () => overlay.remove();
+        overlay.querySelector('#ausentismo-delete-cancel').onclick = close;
+        overlay.onclick = (e) => { if (e.target === overlay) close(); };
+
+        overlay.querySelector('#ausentismo-delete-confirm').onclick = async () => {
+            const confirmBtn = overlay.querySelector('#ausentismo-delete-confirm');
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = 'Eliminando...';
+
+            try {
+                const result = await window.electronAPI.deleteAusentismoRow({
+                    companyName: this.currentCompany,
+                    rowIndex: excelRowIndex
+                });
+
+                if (result && result.success) {
+                    this.showNotification(`Registro eliminado (${result.removedName || 'sin nombre'}).`, 'success');
+                    close();
+                    const tableEl = document.querySelector('#ausentismoTableBody')?.closest('table');
+                    if (tableEl) await this.loadAusentismoData(tableEl);
+                } else {
+                    const code = result && result.code;
+                    const msg = (result && result.error) || 'Error desconocido';
+                    this.showNotification(`Error al eliminar: ${msg}${code === 'FILE_LOCKED' ? ' (cerrá Excel e intentá de nuevo)' : ''}`, 'error', 8000);
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = 'Sí, eliminar';
+                }
+            } catch (err) {
+                this.showNotification(`Error inesperado: ${err.message}`, 'error', 8000);
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = 'Sí, eliminar';
+            }
+        };
     }
 
     showNotification(message, type = 'success', elementId = 'notification-toast') {
+        /* Buscar updateNotifier en padre (si estamos en iframe) o en window */
+        var notifier = (window.parent && window.parent.updateNotifier) || window.updateNotifier;
+        if (notifier && typeof notifier.show === 'function') {
+            notifier.show({
+                type: type,
+                title: message,
+                subtitle: '',
+                autoClose: type === 'error' ? 6000 : type === 'warning' ? 4000 : 3000
+            });
+            return;
+        }
+        /* Fallback al DOM legacy si updateNotifier no está disponible */
         const notificationDiv = document.getElementById(elementId);
         if (!notificationDiv) return;
 
         notificationDiv.textContent = message;
-        notificationDiv.style.borderLeftColor = type === 'error' ? '#dc3545' : 
+        notificationDiv.style.borderLeftColor = type === 'error' ? '#dc3545' :
                                                 type === 'warning' ? '#ffc107' : '#28a745';
         notificationDiv.style.transform = 'translateX(0)';
 
@@ -6270,6 +9178,126 @@ class MedicionAusentismoComponent {
             document.head.appendChild(styleEl);
         }
 
+        // ================================================================
+        // 📦482 — CSS EXTENDED STATS (16 métricas, 3 tabs)
+        // ================================================================
+        if (!document.getElementById('extended-stats-css')) {
+            const styleEl2 = document.createElement('style');
+            styleEl2.id = 'extended-stats-css';
+            styleEl2.textContent = `
+      .extended-stats-container { margin-top: 1.5rem; }
+      .extended-stats-container .es-empty { padding: 2rem; text-align: center; color: #6c757d; font-size: 0.9375rem; }
+      .es-tabs-header { background: #fff; border: 1px solid #dee2e6; border-radius: 0.625rem 0.625rem 0 0; padding: 1rem 1.25rem; border-bottom: none; }
+      .es-tabs-title { margin: 0 0 0.875rem 0; font-size: 1.0625rem; font-weight: 600; color: #1a1a2e; display: flex; align-items: center; gap: 0.5rem; }
+      .es-tabs-title i { color: #174ea6; }
+      .es-tabs-badge { background: #e8f0fe; color: #174ea6; font-size: 0.75rem; font-weight: 600; padding: 0.1875rem 0.625rem; border-radius: 999px; margin-left: auto; }
+      .es-tabs-nav { display: flex; gap: 0.375rem; flex-wrap: wrap; }
+      .es-tab-btn { padding: 0.5rem 0.875rem; border: 1px solid #dee2e6; background: #f8f9fa; color: #495057; border-radius: 0.4375rem; font-size: 0.8125rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4375rem; transition: all 0.15s ease; }
+      .es-tab-btn:hover { background: #e9ecef; border-color: #adb5bd; }
+      .es-tab-btn.active { background: #174ea6; border-color: #174ea6; color: #fff; box-shadow: 0 1px 3px rgba(23,78,166,0.25); }
+      .es-tabs-body { background: #fff; border: 1px solid #dee2e6; border-top: none; border-radius: 0 0 0.625rem 0.625rem; padding: 1.25rem; }
+      .es-tab-panel { display: none; animation: esFadeIn 0.2s ease-out; }
+      .es-tab-panel.active { display: block; }
+      @keyframes esFadeIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
+
+      /* Tier 1 — KPI Regulatorios */
+      .es-reg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.875rem; margin-bottom: 1.25rem; }
+      .es-reg-card { display: flex; align-items: flex-start; gap: 0.875rem; padding: 1rem; background: #fafbfc; border: 1px solid #e9ecef; border-radius: 0.5rem; transition: border-color 0.15s ease; }
+      .es-reg-card:hover { border-color: #174ea6; }
+      .es-reg-card__icon { width: 44px; height: 44px; border-radius: 0.5rem; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; flex-shrink: 0; }
+      .es-reg-card__icon.primary { background: #e8f0fe; color: #174ea6; }
+      .es-reg-card__icon.warning { background: #fff3cd; color: #856404; }
+      .es-reg-card__icon.danger { background: #f8d7da; color: #721c24; }
+      .es-reg-card__icon.muted { background: #f0f2f5; color: #6c757d; }
+      .es-reg-card__data { display: flex; flex-direction: column; min-width: 0; }
+      .es-reg-card__label { font-size: 0.75rem; font-weight: 600; color: #6c757d; text-transform: uppercase; letter-spacing: 0.025em; margin-bottom: 0.1875rem; }
+      .es-reg-card__value { font-size: 1.625rem; font-weight: 700; color: #1a1a2e; line-height: 1.15; margin-bottom: 0.25rem; }
+      .es-reg-card__sub { font-size: 0.6875rem; color: #6c757d; line-height: 1.35; }
+
+      /* Comparativa YoY */
+      .es-yoy { background: #fafbfc; border: 1px solid #e9ecef; border-radius: 0.5rem; padding: 1rem 1.25rem; }
+      .es-yoy__title { margin: 0 0 0.75rem 0; font-size: 0.9375rem; font-weight: 600; color: #1a1a2e; display: flex; align-items: center; gap: 0.5rem; }
+      .es-yoy__years { font-size: 0.75rem; color: #174ea6; background: #e8f0fe; padding: 0.125rem 0.5rem; border-radius: 999px; font-weight: 600; }
+      .es-yoy__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+      .es-yoy__cell { display: flex; flex-direction: column; gap: 0.125rem; }
+      .es-yoy__label { font-size: 0.6875rem; color: #6c757d; font-weight: 500; }
+      .es-yoy__current { font-size: 1.5rem; font-weight: 700; color: #1a1a2e; line-height: 1.2; }
+      .es-yoy__prev { font-size: 0.75rem; color: #6c757d; }
+      .es-var { font-size: 0.8125rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.125rem 0.5rem; border-radius: 0.375rem; margin-top: 0.25rem; width: fit-content; }
+      .es-var.up { background: #f8d7da; color: #721c24; }
+      .es-var.down { background: #d4edda; color: #155724; }
+      .es-var.neutral { background: #e9ecef; color: #6c757d; }
+      .es-yoy__empty { margin: 0; padding: 0.5rem; font-size: 0.8125rem; color: #6c757d; text-align: center; }
+
+      /* Tier 3 — Distribuciones */
+      .es-dist-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 0.875rem; margin-bottom: 0.875rem; }
+      .es-dist-grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 0.875rem; margin-bottom: 0.875rem; }
+      .es-dist-card { background: #fafbfc; border: 1px solid #e9ecef; border-radius: 0.5rem; padding: 1rem; }
+      .es-dist-card__head { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; padding-bottom: 0.625rem; border-bottom: 1px solid #e9ecef; }
+      .es-dist-card__head i { color: #174ea6; font-size: 1rem; }
+      .es-dist-card__head h4 { margin: 0; font-size: 0.875rem; font-weight: 600; color: #1a1a2e; flex: 1; }
+      .es-dist-card__total { font-size: 0.6875rem; color: #6c757d; font-weight: 500; }
+      .es-dist-card__body { display: flex; flex-direction: column; gap: 0.5rem; }
+      .es-bar-row { display: grid; grid-template-columns: 130px 1fr 60px; align-items: center; gap: 0.625rem; }
+      .es-bar-row__label { font-size: 0.8125rem; color: #1a1a2e; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+      .es-bar-row__label i { color: #6c757d; margin-right: 0.1875rem; }
+      .es-bar-track { height: 0.625rem; background: #e9ecef; border-radius: 999px; overflow: hidden; }
+      .es-bar-fill { height: 100%; background: linear-gradient(90deg, #174ea6 0%, #4285f4 100%); border-radius: 999px; transition: width 0.3s ease; min-width: 2px; }
+      .es-bar-fill--duration { background: linear-gradient(90deg, #6f42c1 0%, #d63384 100%); }
+      .es-bar-fill--gender.es-bar-fill--femenino { background: linear-gradient(90deg, #d63384 0%, #f06292 100%); }
+      .es-bar-fill--gender.es-bar-fill--masculino { background: linear-gradient(90deg, #174ea6 0%, #4285f4 100%); }
+      .es-bar-fill--gender.es-bar-fill--otro { background: linear-gradient(90deg, #6c757d 0%, #adb5bd 100%); }
+      .es-bar-row__count { font-size: 0.8125rem; font-weight: 600; color: #1a1a2e; text-align: right; }
+      .es-bar-row__count small { font-weight: 400; color: #6c757d; }
+
+      /* Heatmap */
+      .es-dist-card--heatmap { margin-top: 0; }
+      .es-heatmap-container { overflow-x: auto; }
+      .es-heatmap-table { width: 100%; border-collapse: separate; border-spacing: 2px; font-size: 0.75rem; }
+      .es-heatmap-th { font-weight: 600; color: #495057; padding: 0.375rem 0.25rem; text-align: center; background: #f8f9fa; border-radius: 0.25rem; font-size: 0.6875rem; }
+      .es-heatmap-cell { text-align: center; padding: 0.5rem 0.25rem; border-radius: 0.25rem; font-weight: 600; min-width: 36px; transition: transform 0.15s ease; }
+      .es-heatmap-cell:hover { transform: scale(1.05); box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 1; position: relative; }
+      .es-heatmap-legend { display: flex; align-items: center; gap: 0.25rem; justify-content: center; margin-top: 0.75rem; font-size: 0.6875rem; color: #6c757d; }
+      .es-heatmap-legend__swatch { width: 18px; height: 12px; border-radius: 0.1875rem; }
+
+      /* Tier 2 — Rankings */
+      .es-rank-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.875rem; margin-bottom: 1.25rem; }
+      .es-rank-summary__cell { display: flex; align-items: flex-start; gap: 0.75rem; padding: 1rem; background: linear-gradient(135deg, #f8f9fa 0%, #e8f0fe 100%); border: 1px solid #d6e3fc; border-radius: 0.5rem; }
+      .es-rank-summary__cell > i { font-size: 1.5rem; color: #174ea6; margin-top: 0.125rem; }
+      .es-rank-summary__value { display: block; font-size: 1.75rem; font-weight: 700; color: #1a1a2e; line-height: 1.1; }
+      .es-rank-summary__label { display: block; font-size: 0.8125rem; color: #174ea6; font-weight: 600; margin-top: 0.1875rem; }
+      .es-rank-summary__sub { display: block; font-size: 0.6875rem; color: #6c757d; margin-top: 0.125rem; }
+      .es-rank-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.875rem; }
+      .es-rank-card { background: #fafbfc; border: 1px solid #e9ecef; border-radius: 0.5rem; padding: 1rem; overflow: hidden; }
+      .es-rank-card--full { grid-column: 1 / -1; }
+      .es-rank-card h4 { margin: 0 0 0.75rem 0; font-size: 0.875rem; font-weight: 600; color: #1a1a2e; display: flex; align-items: center; gap: 0.4375rem; padding-bottom: 0.5rem; border-bottom: 1px solid #e9ecef; }
+      .es-rank-card h4 i { color: #174ea6; }
+      .es-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+      .es-table th { text-align: left; padding: 0.4375rem 0.625rem; background: #f1f3f5; color: #495057; font-weight: 600; font-size: 0.75rem; border-bottom: 1px solid #dee2e6; }
+      .es-table td { padding: 0.5rem 0.625rem; border-bottom: 1px solid #f1f3f5; color: #1a1a2e; vertical-align: middle; }
+      .es-table tbody tr:hover { background: #f8f9fa; }
+      .es-td-idx { width: 36px; color: #6c757d; font-weight: 600; }
+      .es-td-center { text-align: center; }
+      .es-td-strong { font-weight: 700; color: #174ea6; }
+      .es-td-muted { color: #6c757d; font-size: 0.75rem; }
+      .es-trab-name { font-weight: 600; color: #1a1a2e; font-size: 0.8125rem; }
+      .es-trab-meta { font-size: 0.6875rem; color: #6c757d; margin-top: 0.125rem; }
+      .es-empty-row { text-align: center; color: #6c757d; padding: 1rem; font-size: 0.8125rem; margin: 0; }
+      .es-badge { display: inline-block; padding: 0.125rem 0.5rem; border-radius: 999px; font-size: 0.6875rem; font-weight: 600; }
+      .es-badge--danger { background: #f8d7da; color: #721c24; }
+      .es-badge--warning { background: #fff3cd; color: #856404; }
+
+      /* Responsive */
+      @media (max-width: 768px) {
+        .es-rank-grid { grid-template-columns: 1fr; }
+        .es-bar-row { grid-template-columns: 90px 1fr 50px; }
+        .es-tabs-nav { gap: 0.25rem; }
+        .es-tab-btn { font-size: 0.75rem; padding: 0.4375rem 0.625rem; }
+      }
+      `;
+            document.head.appendChild(styleEl2);
+        }
+
         // Contenedor wrapper con scroll condicional
         const scrollWrapper = document.createElement('div');
         scrollWrapper.id = 'estadisticas-ausentismo-scroll-wrapper';
@@ -6301,25 +9329,8 @@ class MedicionAusentismoComponent {
       background: #f8f9fa;
     `;
 
-    // Notificación toast
-    const notificationDiv = document.createElement('div');
-    notificationDiv.id = 'notification-toast-stats';
-    notificationDiv.style.cssText = `
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      padding: 15px 25px;
-      background: white;
-      border-left: 4px solid #28a745;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-      border-radius: 4px;
-      z-index: 2000;
-      transform: translateX(120%);
-      transition: transform 0.3s ease;
-      font-weight: 500;
-      color: #1E293B;
-    `;
-    mainContent.appendChild(notificationDiv);
+    // 📦443 (2026-06-25) — Notificación toast ELIMINADA (sistema legacy).
+    // Ahora todo va por window.parent.updateNotifier (estándar K+AIR).
 
     // ================================================================
     // 1. HEADER — Card independiente
@@ -6529,11 +9540,24 @@ class MedicionAusentismoComponent {
     });
 
     mainContent.appendChild(chartsGrid);
+
+    // ================================================================
+    // 📦482 — STATS EXTENDIDAS (16 métricas) — Container con tabs
+    // Tier 1: Indicadores regulatorios
+    // Tier 2: Rankings y casos críticos
+    // Tier 3: Distribuciones avanzadas
+    // ================================================================
+    const extendedStatsContainer = document.createElement('div');
+    extendedStatsContainer.id = 'extendedStatsContainer';
+    extendedStatsContainer.className = 'extended-stats-container';
+    extendedStatsContainer.innerHTML = KairSkeleton.kpiStrip(4) + KairSkeleton.chartBars(12);
+    mainContent.appendChild(extendedStatsContainer);
+
     scrollWrapper.appendChild(mainContent);
     container.appendChild(scrollWrapper);
 
         // Cargar datos y renderizar gráficos
-        this.loadEstadisticasData(notificationDiv);
+        this.loadEstadisticasData();
 
         // Setup de eventos de filtros
         setTimeout(() => {
@@ -6542,7 +9566,7 @@ class MedicionAusentismoComponent {
 
             if (applyBtn) {
                 applyBtn.addEventListener('click', () => {
-                    this.applyStatsFilters(notificationDiv);
+                    this.applyStatsFilters();
                 });
             }
 
@@ -6552,21 +9576,21 @@ class MedicionAusentismoComponent {
                     document.getElementById('statsMonthFilter').value = '';
                     document.getElementById('statsGenderFilter').value = '';
                     document.getElementById('statsClassFilter').value = '';
-                    this.loadEstadisticasData(notificationDiv);
-                    this.showNotification('Filtros limpiados', 'info', notificationDiv.id);
+                    this.loadEstadisticasData();
+                    this.showNotification('Filtros limpiados', 'info');
                 });
             }
         }, 0);
     }
 
-    applyStatsFilters(notificationDiv) {
+    applyStatsFilters(notificationDiv) { // 📦459 — notificationDiv legacy, no se usa
         const year = document.getElementById('statsYearFilter').value;
         const month = document.getElementById('statsMonthFilter').value;
         const gender = document.getElementById('statsGenderFilter').value;
         const clase = document.getElementById('statsClassFilter').value;
 
         if (!this.currentAusentismoDataStats) {
-            this.showNotification('No hay datos cargados', 'warning', notificationDiv.id);
+            this.showNotification('No hay datos cargados', 'warning');
             return;
         }
 
@@ -6581,16 +9605,34 @@ class MedicionAusentismoComponent {
 
         this.updateStatsMetrics(filtered);
         this.renderCharts(filtered);
-        this.showNotification(`${filtered.length} registros filtrados`, 'success', notificationDiv.id);
+        // 📦XXX — Recalcular las 16 métricas extendidas (Tier 1+2+3) con la data ya filtrada.
+        // Antes: solo updateStatsMetrics y renderCharts se recalculaban, dejando Top 10 CIE-10,
+        // Top 10 días, Top 10 casos, Casos Críticos, Sospechosos de Abuso y Tasa de Re-Incidencia
+        // con los datos históricos completos. Ahora respetan el filtro de año/mes/género/clase.
+        this.currentAusentismoStatsExtended = this._calcularEstadisticasExtendidas(filtered);
+        this._renderEstadisticasTabs();
+        this.showNotification(`${filtered.length} registros filtrados`, 'success');
     }
 
-    async loadEstadisticasData(notificationDiv) {
+    async loadEstadisticasData(notificationDiv) { // 📦459 — notificationDiv legacy. Se usa this.container como fallback para inyectar banner.
         try {
             console.log('[ESTADISTICAS] Cargando datos para empresa:', this.currentCompany);
             const result = await window.electronAPI.readAusentismoData(this.currentCompany);
             console.log('[ESTADISTICAS] Resultado:', result);
 
-            if (result.success && result.rows) {
+            // 📦459 — Persistir estado del archivo
+            if (result && result._missingFile) {
+                this.ausentismoFileStatus = {
+                    missing: true,
+                    reason: result._missingFileReason,
+                    expectedDir: result._expectedDir,
+                    details: result._details
+                };
+            } else if (result && result.success) {
+                this.ausentismoFileStatus = { missing: false };
+            }
+
+            if (result.success && result.rows && !result._missingFile) {
                 const data = result.rows.map(row => {
                     const rowObj = {};
                     result.headers.forEach((header, i) => {
@@ -6607,18 +9649,815 @@ class MedicionAusentismoComponent {
 
                 this.updateStatsMetrics(data);
                 this.renderCharts(data);
-                
+
+                // 📦482 — Calcular 16 métricas extendidas (Tier 1+2+3)
+                this.currentAusentismoStatsExtended = this._calcularEstadisticasExtendidas(data);
+                // Re-renderizar vista para mostrar tabs (la primera vez)
+                this._renderEstadisticasTabs();
+
                 // Actualizar filtros dinámicos
                 this.populateStatsFilters(data);
+            } else if (result && result._missingFile) {
+                // 📦459 — Modo degradado: banner amarillo + mensaje claro
+                console.warn('[ESTADISTICAS] Archivo no disponible:', result._missingFileReason);
+                this.showNotification(
+                    `Archivo de ausentismo no disponible. ${this._getMissingFileMessage(result._missingFileReason, result._details).action}.`,
+                    'warning'
+                );
+                // Inyectar banner — usar notificationDiv si está disponible, sino this.container
+                const statsContainer = (notificationDiv && notificationDiv.closest)
+                    ? notificationDiv.closest('section, .estadisticas-container, .tab-content') || notificationDiv.parentElement
+                    : (this.container ? this.container.querySelector('.estadisticas-dashboard, .estadisticas-container') || this.container : null);
+                if (statsContainer) {
+                    const oldBanner = statsContainer.querySelector('.km-missing-banner');
+                    if (oldBanner) oldBanner.remove();
+                    const wrapper = document.createElement('div');
+                    wrapper.innerHTML = this._ausentismoMissingBannerHtml(
+                        { reason: result._missingFileReason, expectedDir: result._expectedDir, details: result._details },
+                        { variant: 'warning', retryMethod: 'loadEstadisticasData' }
+                    );
+                    statsContainer.insertBefore(wrapper.firstElementChild, statsContainer.firstChild);
+                }
+                // Poblar filtros vacíos para que la UI no se rompa
+                this.populateStatsFilters([]);
             } else {
                 console.warn('[ESTADISTICAS] No hay datos:', result);
-                this.showNotification('No hay datos para mostrar', 'warning', notificationDiv.id);
+                this.showNotification('No hay datos para mostrar', 'warning');
             }
         } catch (error) {
             console.error('[ESTADISTICAS] Error loading data:', error);
-            this.showNotification(`Error: ${error.message}`, 'error', notificationDiv.id);
+            this.showNotification(`Error: ${error.message}`, 'error');
         }
     }
+
+    /**
+     * 📦482 — Calcula las 16 métricas extendidas (Tier 1+2+3).
+     * A partir del array de filas crudo (objetos con headers como keys),
+     * devuelve un objeto con: kpisBasicos, kpisRegulatorios, distribuciones,
+     * rankings, casosCriticos, metadata.
+     *
+     * @param {Array<Object>} data - Filas del Excel de ausentismo
+     * @returns {Object} Objeto con todas las métricas calculadas
+     */
+    _calcularEstadisticasExtendidas(data) {
+        if (!data || data.length === 0) {
+            return this._estructuraVaciaExtendida();
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        // HELPERS LOCALES
+        // ════════════════════════════════════════════════════════════════
+        const norm = s => (s == null ? '' : String(s).trim());
+        const upper = s => norm(s).toUpperCase();
+        const num = v => {
+            if (v == null || v === '') return 0;
+            const n = parseFloat(String(v).replace(/[^\d.-]/g, ''));
+            return isNaN(n) ? 0 : n;
+        };
+
+        const getCol = (row, ...candidates) => {
+            for (const c of candidates) {
+                if (row[c] != null && row[c] !== '') return row[c];
+            }
+            return null;
+        };
+
+        // ════════════════════════════════════════════════════════════════
+        // MÉTRICAS BASE (ya existentes, replicadas para no tocar código viejo)
+        // ════════════════════════════════════════════════════════════════
+        const totalFilas = data.length;
+        const totalDias = data.reduce((s, r) => s + num(getCol(r, 'N° DIAS DE INCAPACIDAD', 'Nº DIAS DE INCAPACIDAD', 'N° DIAS', 'DIAS')), 0);
+        const totalEPS = data.filter(r => upper(getCol(r, 'CLASE DE INCAPACIDAD')) === 'EPS').length;
+        const totalARL = data.filter(r => upper(getCol(r, 'CLASE DE INCAPACIDAD')) === 'ARL').length;
+        const totalLicencias = data.filter(r => upper(getCol(r, 'CLASE DE INCAPACIDAD')).includes('LICENCIA')).length;
+        const femenino = data.filter(r => upper(getCol(r, 'GENERO')) === 'FEMENINO').length;
+        const masculino = data.filter(r => upper(getCol(r, 'GENERO')) === 'MASCULINO').length;
+
+        // ════════════════════════════════════════════════════════════════
+        // TRABAJADORES ÚNICOS (cedula) — base para tasas
+        // ════════════════════════════════════════════════════════════════
+        const cedulasUnicas = new Set();
+        data.forEach(r => {
+            const c = norm(getCol(r, 'CEDULA', 'CÉDULA', '4', 'Columna1'));
+            if (c) cedulasUnicas.add(c);
+        });
+        const totalTrabajadores = cedulasUnicas.size;
+
+        // ════════════════════════════════════════════════════════════════
+        // TIER 1 — INDICADORES REGULATORIOS (Decreto 1072/2015, Res. 0312/2019)
+        // ════════════════════════════════════════════════════════════════
+        // Tasa de Ausentismo = (días perdidos / días programados) × 100
+        // Aproximación: 250 días laborables/año por trabajador
+        const diasProgramados = totalTrabajadores * 250;
+        const tasaAusentismo = diasProgramados > 0
+            ? Math.round((totalDias / diasProgramados) * 100 * 10) / 10
+            : 0;
+
+        // Índice de Frecuencia (IF) = (# accidentes / # trabajadores) × 100
+        const indiceFrecuencia = totalTrabajadores > 0
+            ? Math.round((totalARL / totalTrabajadores) * 100 * 10) / 10
+            : 0;
+
+        // Índice de Severidad (IS) = (días perdidos / # trabajadores) × 100
+        const indiceSeveridad = totalTrabajadores > 0
+            ? Math.round((totalDias / totalTrabajadores) * 100 * 10) / 10
+            : 0;
+
+        // Tasa de Accidentalidad = (# AT / # trabajadores) × 100
+        const tasaAccidentalidad = totalTrabajadores > 0
+            ? Math.round((totalARL / totalTrabajadores) * 100 * 10) / 10
+            : 0;
+
+        // Comparativa YoY (vs año anterior)
+        const aniosSet = new Set();
+        data.forEach(r => {
+            const a = norm(getCol(r, 'AÑO', 'ANO'));
+            if (a && a !== '-') aniosSet.add(a);
+        });
+        const anios = Array.from(aniosSet).sort();
+        const anioActual = anios[anios.length - 1];
+        const anioAnterior = anios[anios.length - 2];
+        let comparativaYoY = null;
+        if (anioActual && anioAnterior) {
+            const dataActual = data.filter(r => norm(getCol(r, 'AÑO', 'ANO')) === anioActual);
+            const dataAnterior = data.filter(r => norm(getCol(r, 'AÑO', 'ANO')) === anioAnterior);
+            const diasActual = dataActual.reduce((s, r) => s + num(getCol(r, 'N° DIAS DE INCAPACIDAD', 'DIAS')), 0);
+            const diasAnterior = dataAnterior.reduce((s, r) => s + num(getCol(r, 'N° DIAS DE INCAPACIDAD', 'DIAS')), 0);
+            const casosActual = dataActual.length;
+            const casosAnterior = dataAnterior.length;
+            comparativaYoY = {
+                anioActual, anioAnterior,
+                diasActual, diasAnterior,
+                casosActual, casosAnterior,
+                variacionDias: diasAnterior > 0 ? Math.round(((diasActual - diasAnterior) / diasAnterior) * 100 * 10) / 10 : 0,
+                variacionCasos: casosAnterior > 0 ? Math.round(((casosActual - casosAnterior) / casosAnterior) * 100 * 10) / 10 : 0
+            };
+        }
+
+        const kpisRegulatorios = {
+            tasaAusentismo,
+            indiceFrecuencia,
+            indiceSeveridad,
+            tasaAccidentalidad,
+            comparativaYoY,
+            diasProgramados,
+            trabajadores: totalTrabajadores
+        };
+
+        // ════════════════════════════════════════════════════════════════
+        // TIER 3 — DISTRIBUCIONES
+        // ════════════════════════════════════════════════════════════════
+        // Por Área
+        const porArea = {};
+        data.forEach(r => {
+            const a = norm(getCol(r, 'ÁREA O DPTO', 'AREA O DPTO', 'DEPARTAMENTO', 'AREA'));
+            if (a) porArea[a] = (porArea[a] || 0) + 1;
+        });
+
+        // Por Empresa Usuaria (cliente)
+        const porEmpresaUsuaria = {};
+        data.forEach(r => {
+            const e = norm(getCol(r, 'EMPRESA USUARIA'));
+            if (e) porEmpresaUsuaria[e] = (porEmpresaUsuaria[e] || 0) + 1;
+        });
+
+        // Por EPS
+        const porEPS = {};
+        data.forEach(r => {
+            const e = norm(getCol(r, 'ENTIDAD', 'EPS'));
+            if (e) porEPS[e] = (porEPS[e] || 0) + 1;
+        });
+
+        // Por Tipo de incapacidad (descripción del diagnóstico CIE-10)
+        const porTipo = {};
+        data.forEach(r => {
+            const t = norm(getCol(r, 'TIPO DE INCAPACIDAD'));
+            if (t) porTipo[t] = (porTipo[t] || 0) + 1;
+        });
+
+        // Por rango de duración (1-3, 4-7, 8-15, 16-30, 31+)
+        const porRangoDuracion = { '1-3 días': 0, '4-7 días': 0, '8-15 días': 0, '16-30 días': 0, '31+ días': 0 };
+        data.forEach(r => {
+            const d = num(getCol(r, 'N° DIAS DE INCAPACIDAD', 'DIAS'));
+            if (d <= 3) porRangoDuracion['1-3 días']++;
+            else if (d <= 7) porRangoDuracion['4-7 días']++;
+            else if (d <= 15) porRangoDuracion['8-15 días']++;
+            else if (d <= 30) porRangoDuracion['16-30 días']++;
+            else porRangoDuracion['31+ días']++;
+        });
+
+        // Distribución por género
+        const porGenero = { Femenino: femenino, Masculino: masculino, Otro: totalFilas - femenino - masculino };
+
+        // Heatmap día de semana vs mes (filas = días L-V, cols = meses)
+        const heatmapDiaSemana = {
+            labelsDias: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie'],
+            labelsMeses: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
+            data: Array.from({ length: 5 }, () => new Array(12).fill(0))
+        };
+        const monthNames = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+        data.forEach(r => {
+            const mes = upper(getCol(r, 'MES'));
+            const mi = monthNames.indexOf(mes);
+            const fiStr = norm(getCol(r, 'F. INICIO'));
+            if (mi >= 0 && fiStr) {
+                let di = 0;
+                try {
+                    // Formato puede ser "7/2/24" o ISO
+                    let fecha;
+                    if (/^\d{4}-\d{2}-\d{2}/.test(fiStr)) {
+                        fecha = new Date(fiStr);
+                    } else {
+                        const parts = fiStr.split('/');
+                        if (parts.length === 3) {
+                            fecha = new Date(parseInt(parts[2]) + 2000, parseInt(parts[1]) - 1, parseInt(parts[0]));
+                        }
+                    }
+                    if (fecha && !isNaN(fecha.getTime())) {
+                        const dow = fecha.getDay(); // 0=Dom, 1=Lun, ..., 5=Vie, 6=Sab
+                        di = dow >= 1 && dow <= 5 ? dow - 1 : -1;
+                    }
+                } catch (e) { /* ignore */ }
+                if (di >= 0) heatmapDiaSemana.data[di][mi]++;
+            }
+        });
+
+        // Top 5 áreas / empresa usuaria / EPS
+        const top5 = map => Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 5)
+            .map(([k, v]) => ({ label: k, count: v }));
+        const distribuciones = {
+            porArea: top5(porArea),
+            porAreaTotal: Object.keys(porArea).length,
+            porEmpresaUsuaria: top5(porEmpresaUsuaria),
+            porEmpresaUsuariaTotal: Object.keys(porEmpresaUsuaria).length,
+            porEPS: top5(porEPS),
+            porEPSTotal: Object.keys(porEPS).length,
+            porTipo: top5(porTipo),
+            porTipoTotal: Object.keys(porTipo).length,
+            porRangoDuracion,
+            porGenero,
+            heatmapDiaSemana
+        };
+
+        // ════════════════════════════════════════════════════════════════
+        // TIER 2 — RANKINGS Y CASOS CRÍTICOS
+        // ════════════════════════════════════════════════════════════════
+        // Por trabajador (cedula → stats agregadas)
+        const porTrabajador = {};
+        data.forEach(r => {
+            const ced = norm(getCol(r, 'CEDULA', 'CÉDULA', 'Columna1'));
+            const nombre = norm(getCol(r, 'NOMBRE'));
+            if (!ced && !nombre) return;
+            const key = ced || nombre;
+            if (!porTrabajador[key]) {
+                porTrabajador[key] = {
+                    cedula: ced,
+                    nombre: nombre,
+                    cargo: norm(getCol(r, 'CARGO')),
+                    area: norm(getCol(r, 'ÁREA O DPTO', 'AREA')),
+                    genero: upper(getCol(r, 'GENERO')),
+                    totalIncapacidades: 0,
+                    totalDias: 0,
+                    ultimaIncapacidad: ''
+                };
+            }
+            porTrabajador[key].totalIncapacidades++;
+            porTrabajador[key].totalDias += num(getCol(r, 'N° DIAS DE INCAPACIDAD', 'DIAS'));
+            const fi = norm(getCol(r, 'F. INICIO'));
+            if (fi && fi > porTrabajador[key].ultimaIncapacidad) porTrabajador[key].ultimaIncapacidad = fi;
+        });
+
+        const trabajadoresArr = Object.values(porTrabajador);
+
+        // Top 10 por días perdidos
+        const top10Dias = trabajadoresArr
+            .sort((a, b) => b.totalDias - a.totalDias)
+            .slice(0, 10);
+
+        // Top 10 por cantidad de incapacidades
+        const top10Casos = trabajadoresArr
+            .sort((a, b) => b.totalIncapacidades - a.totalIncapacidades)
+            .slice(0, 10);
+
+        // Tasa de re-incidencia (% con >1 incapacidad)
+        const reincidentes = trabajadoresArr.filter(t => t.totalIncapacidades > 1).length;
+        const tasaReincidencia = totalTrabajadores > 0
+            ? Math.round((reincidentes / totalTrabajadores) * 100 * 10) / 10
+            : 0;
+
+        // Top 10 diagnósticos CIE-10
+        const cie10Map = {};
+        data.forEach(r => {
+            const codigo = norm(getCol(r, 'CODIGO'));
+            const desc = norm(getCol(r, 'DESCRIPCION'));
+            if (!codigo && !desc) return;
+            const key = codigo || desc;
+            if (!cie10Map[key]) cie10Map[key] = { codigo, descripcion: desc, count: 0, dias: 0 };
+            cie10Map[key].count++;
+            cie10Map[key].dias += num(getCol(r, 'N° DIAS DE INCAPACIDAD', 'DIAS'));
+        });
+        const top10CIE10 = Object.values(cie10Map)
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 10);
+
+        const rankings = {
+            top10Dias,
+            top10Casos,
+            top10CIE10,
+            tasaReincidencia,
+            totalReincidentes: reincidentes
+        };
+
+        // ════════════════════════════════════════════════════════════════
+        // CASOS CRÍTICOS
+        // ════════════════════════════════════════════════════════════════
+        // Críticos = incapacidades >15 días (sin importar el tipo)
+        const casosCriticosList = data
+            .filter(r => num(getCol(r, 'N° DIAS DE INCAPACIDAD', 'DIAS')) > 15)
+            .map(r => ({
+                cedula: norm(getCol(r, 'CEDULA', 'Columna1')),
+                nombre: norm(getCol(r, 'NOMBRE')),
+                cargo: norm(getCol(r, 'CARGO')),
+                dias: num(getCol(r, 'N° DIAS DE INCAPACIDAD', 'DIAS')),
+                clase: upper(getCol(r, 'CLASE DE INCAPACIDAD')),
+                tipo: norm(getCol(r, 'TIPO DE INCAPACIDAD')),
+                diagnostico: norm(getCol(r, 'DESCRIPCION')),
+                fechaInicio: norm(getCol(r, 'F. INICIO')),
+                fechaFin: norm(getCol(r, 'F. FIN')),
+                eps: norm(getCol(r, 'ENTIDAD'))
+            }))
+            .sort((a, b) => b.dias - a.dias);
+
+        // Sospechosos de abuso: >5 incapacidades en el año de duración <3 días cada una
+        const sospechososMap = {};
+        data.forEach(r => {
+            const dias = num(getCol(r, 'N° DIAS DE INCAPACIDAD', 'DIAS'));
+            if (dias > 0 && dias < 3) {
+                const ced = norm(getCol(r, 'CEDULA', 'Columna1'));
+                if (ced) sospechososMap[ced] = (sospechososMap[ced] || 0) + 1;
+            }
+        });
+        const sospechososAbuso = Object.entries(sospechososMap)
+            .filter(([_, count]) => count > 5)
+            .map(([ced, count]) => {
+                const t = porTrabajador[ced] || {};
+                return { cedula: ced, nombre: t.nombre || '(sin nombre)', count, cargo: t.cargo || '', area: t.area || '' };
+            })
+            .sort((a, b) => b.count - a.count);
+
+        const casosCriticos = {
+            activos: casosCriticosList,
+            total: casosCriticosList.length,
+            sospechososAbuso,
+            totalSospechosos: sospechososAbuso.length
+        };
+
+        // ════════════════════════════════════════════════════════════════
+        // METADATA
+        // ════════════════════════════════════════════════════════════════
+        const metadata = {
+            totalFilas,
+            totalDias,
+            totalTrabajadores,
+            totalARL,
+            totalEPS,
+            totalLicencias,
+            femenino,
+            masculino,
+            otro: totalFilas - femenino - masculino,
+            anios,
+            anioActual,
+            anioAnterior,
+            fechaGeneracion: new Date().toISOString()
+        };
+
+        return {
+            kpis: { totalIncapacidades: totalFilas, totalDias, totalEPS, totalARL, totalLicencias, femenino, masculino },
+            kpisRegulatorios,
+            distribuciones,
+            rankings,
+            casosCriticos,
+            metadata
+        };
+    }
+
+    _estructuraVaciaExtendida() {
+        return {
+            kpis: { totalIncapacidades: 0, totalDias: 0, totalEPS: 0, totalARL: 0, totalLicencias: 0, femenino: 0, masculino: 0 },
+            kpisRegulatorios: {
+                tasaAusentismo: 0, indiceFrecuencia: 0, indiceSeveridad: 0,
+                tasaAccidentalidad: 0, comparativaYoY: null,
+                diasProgramados: 0, trabajadores: 0
+            },
+            distribuciones: {
+                porArea: [], porAreaTotal: 0, porEmpresaUsuaria: [], porEmpresaUsuariaTotal: 0,
+                porEPS: [], porEPSTotal: 0, porTipo: [], porTipoTotal: 0,
+                porRangoDuracion: { '1-3 días': 0, '4-7 días': 0, '8-15 días': 0, '16-30 días': 0, '31+ días': 0 },
+                porGenero: { Femenino: 0, Masculino: 0, Otro: 0 },
+                heatmapDiaSemana: {
+                    labelsDias: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie'],
+                    labelsMeses: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
+                    data: Array.from({ length: 5 }, () => new Array(12).fill(0))
+                }
+            },
+            rankings: { top10Dias: [], top10Casos: [], top10CIE10: [], tasaReincidencia: 0, totalReincidentes: 0 },
+            casosCriticos: { activos: [], total: 0, sospechososAbuso: [], totalSospechosos: 0 },
+            metadata: { totalFilas: 0, totalDias: 0, totalTrabajadores: 0, totalARL: 0, totalEPS: 0, totalLicencias: 0, femenino: 0, masculino: 0, otro: 0, anios: [], anioActual: null, anioAnterior: null }
+        };
+    }
+
+    /**
+     * 📦482 — Pinta los 3 tabs de estadísticas extendidas (Indicadores / Distribuciones / Ranking)
+     * Lee de this.currentAusentismoStatsExtended y actualiza #extendedStatsContainer
+     */
+    _renderEstadisticasTabs() {
+        const container = document.getElementById('extendedStatsContainer');
+        if (!container) return;
+        const stats = this.currentAusentismoStatsExtended;
+        if (!stats) {
+            container.innerHTML = `
+              <div class="es-empty">
+                <i class="bi bi-info-circle"></i> No hay datos suficientes para calcular estadísticas extendidas.
+              </div>`;
+            return;
+        }
+
+        const meta = stats.metadata;
+        container.innerHTML = `
+          <div class="es-tabs-header">
+            <h3 class="es-tabs-title">
+              <i class="bi bi-bar-chart-line-fill"></i>
+              Estadísticas Extendidas
+              <span class="es-tabs-badge">${meta.totalFilas} registros</span>
+            </h3>
+            <div class="es-tabs-nav">
+              <button class="es-tab-btn active" data-es-tab="indicadores">
+                <i class="bi bi-speedometer2"></i> Indicadores Regulatorios
+              </button>
+              <button class="es-tab-btn" data-es-tab="distribuciones">
+                <i class="bi bi-pie-chart-fill"></i> Distribuciones
+              </button>
+              <button class="es-tab-btn" data-es-tab="ranking">
+                <i class="bi bi-trophy-fill"></i> Ranking & Críticos
+              </button>
+            </div>
+          </div>
+          <div class="es-tabs-body">
+            <div class="es-tab-panel active" data-es-panel="indicadores">${this._renderTabIndicadores(stats)}</div>
+            <div class="es-tab-panel" data-es-panel="distribuciones">${this._renderTabDistribuciones(stats)}</div>
+            <div class="es-tab-panel" data-es-panel="ranking">${this._renderTabRanking(stats)}</div>
+          </div>
+        `;
+
+        // Bind tab switchers
+        container.querySelectorAll('.es-tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const target = btn.getAttribute('data-es-tab');
+                container.querySelectorAll('.es-tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+                container.querySelectorAll('.es-tab-panel').forEach(p => {
+                    p.classList.toggle('active', p.getAttribute('data-es-panel') === target);
+                });
+            });
+        });
+
+        // Pintar heatmap día-semana en el panel de Distribuciones
+        this._renderHeatmapEnPanel(stats);
+    }
+
+    /** 📦482 — Tab 1: Indicadores Regulatorios (Tier 1) */
+    _renderTabIndicadores(stats) {
+        const k = stats.kpisRegulatorios;
+        const cmp = k.comparativaYoY;
+        const fmtVar = v => {
+            if (v == null || isNaN(v)) return '<span class="es-var neutral">—</span>';
+            const cls = v > 0 ? 'up' : (v < 0 ? 'down' : 'neutral');
+            const icon = v > 0 ? 'bi-arrow-up' : (v < 0 ? 'bi-arrow-down' : 'bi-dash');
+            const sign = v > 0 ? '+' : '';
+            return `<span class="es-var ${cls}"><i class="bi ${icon}"></i> ${sign}${v}%</span>`;
+        };
+        return `
+          <div class="es-reg-grid">
+            <div class="es-reg-card">
+              <div class="es-reg-card__icon primary"><i class="bi bi-percent"></i></div>
+              <div class="es-reg-card__data">
+                <span class="es-reg-card__label">Tasa de Ausentismo</span>
+                <span class="es-reg-card__value">${k.tasaAusentismo}%</span>
+                <span class="es-reg-card__sub">${k.diasProgramados.toLocaleString('es-CO')} días programados (${k.trabajadores} trab × 250)</span>
+              </div>
+            </div>
+            <div class="es-reg-card">
+              <div class="es-reg-card__icon warning"><i class="bi bi-exclamation-octagon"></i></div>
+              <div class="es-reg-card__data">
+                <span class="es-reg-card__label">Índice de Frecuencia (AT)</span>
+                <span class="es-reg-card__value">${k.indiceFrecuencia}%</span>
+                <span class="es-reg-card__sub">${k.indiceFrecuencia > 0 ? 'ARL sobre trabajadores' : 'Sin accidentes reportados'}</span>
+              </div>
+            </div>
+            <div class="es-reg-card">
+              <div class="es-reg-card__icon danger"><i class="bi bi-calendar-x"></i></div>
+              <div class="es-reg-card__data">
+                <span class="es-reg-card__label">Índice de Severidad</span>
+                <span class="es-reg-card__value">${k.indiceSeveridad}%</span>
+                <span class="es-reg-card__sub">Días perdidos / trabajadores × 100</span>
+              </div>
+            </div>
+            <div class="es-reg-card">
+              <div class="es-reg-card__icon muted"><i class="bi bi-shield-exclamation"></i></div>
+              <div class="es-reg-card__data">
+                <span class="es-reg-card__label">Tasa de Accidentalidad</span>
+                <span class="es-reg-card__value">${k.tasaAccidentalidad}%</span>
+                <span class="es-reg-card__sub">ARL como % de la plantilla</span>
+              </div>
+            </div>
+          </div>
+          ${cmp ? `
+          <div class="es-yoy">
+            <h4 class="es-yoy__title">
+              <i class="bi bi-graph-up-arrow"></i> Comparativa año a año
+              <span class="es-yoy__years">${cmp.anioAnterior} → ${cmp.anioActual}</span>
+            </h4>
+            <div class="es-yoy__grid">
+              <div class="es-yoy__cell">
+                <span class="es-yoy__label">Días perdidos</span>
+                <span class="es-yoy__current">${cmp.diasActual.toLocaleString('es-CO')}</span>
+                <span class="es-yoy__prev">vs ${cmp.diasAnterior.toLocaleString('es-CO')}</span>
+                ${fmtVar(cmp.variacionDias)}
+              </div>
+              <div class="es-yoy__cell">
+                <span class="es-yoy__label">Casos reportados</span>
+                <span class="es-yoy__current">${cmp.casosActual.toLocaleString('es-CO')}</span>
+                <span class="es-yoy__prev">vs ${cmp.casosAnterior.toLocaleString('es-CO')}</span>
+                ${fmtVar(cmp.variacionCasos)}
+              </div>
+            </div>
+          </div>` : `
+          <div class="es-yoy">
+            <p class="es-yoy__empty"><i class="bi bi-info-circle"></i> No hay datos de un año anterior para comparar.</p>
+          </div>`}
+        `;
+    }
+
+    /** 📦482 — Tab 2: Distribuciones (Tier 3) */
+    _renderTabDistribuciones(stats) {
+        const d = stats.distribuciones;
+        const renderTopBar = (titulo, items, total, kind) => {
+            if (!items || items.length === 0) return '';
+            const max = Math.max(...items.map(i => i.count));
+            const iconMap = {
+                area: 'bi-diagram-3',
+                empresa: 'bi-building',
+                eps: 'bi-hospital',
+                tipo: 'bi-clipboard2-pulse'
+            };
+            return `
+              <div class="es-dist-card">
+                <div class="es-dist-card__head">
+                  <i class="bi ${iconMap[kind]}"></i>
+                  <h4>${titulo}</h4>
+                  <span class="es-dist-card__total">${total} ${total === 1 ? 'categoría' : 'categorías'}</span>
+                </div>
+                <div class="es-dist-card__body">
+                  ${items.map(item => `
+                    <div class="es-bar-row">
+                      <span class="es-bar-row__label" title="${this._escapeHtml(item.label)}">${this._escapeHtml(item.label)}</span>
+                      <div class="es-bar-track">
+                        <div class="es-bar-fill" style="width: ${(item.count / max * 100).toFixed(1)}%;"></div>
+                      </div>
+                      <span class="es-bar-row__count">${item.count}</span>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            `;
+        };
+        const rango = d.porRangoDuracion;
+        const rangoTotal = Object.values(rango).reduce((a, b) => a + b, 0);
+        const generoTotal = d.porGenero.Femenino + d.porGenero.Masculino + d.porGenero.Otro;
+
+        return `
+          <div class="es-dist-grid">
+            ${renderTopBar('Por Área / Departamento', d.porArea, d.porAreaTotal, 'area')}
+            ${renderTopBar('Por Empresa Usuaria', d.porEmpresaUsuaria, d.porEmpresaUsuariaTotal, 'empresa')}
+            ${renderTopBar('Por EPS / Entidad', d.porEPS, d.porEPSTotal, 'eps')}
+            ${renderTopBar('Por Tipo de Incapacidad', d.porTipo, d.porTipoTotal, 'tipo')}
+          </div>
+
+          <div class="es-dist-grid-2">
+            <div class="es-dist-card">
+              <div class="es-dist-card__head">
+                <i class="bi bi-stopwatch"></i>
+                <h4>Por Rango de Duración</h4>
+                <span class="es-dist-card__total">${rangoTotal} casos</span>
+              </div>
+              <div class="es-dist-card__body">
+                ${Object.entries(rango).map(([k, v]) => {
+                    const pct = rangoTotal > 0 ? (v / rangoTotal * 100).toFixed(1) : 0;
+                    return `
+                      <div class="es-bar-row">
+                        <span class="es-bar-row__label">${k}</span>
+                        <div class="es-bar-track">
+                          <div class="es-bar-fill es-bar-fill--duration" style="width: ${pct}%;"></div>
+                        </div>
+                        <span class="es-bar-row__count">${v} <small>(${pct}%)</small></span>
+                      </div>
+                    `;
+                }).join('')}
+              </div>
+            </div>
+            <div class="es-dist-card">
+              <div class="es-dist-card__head">
+                <i class="bi bi-gender-ambiguous"></i>
+                <h4>Por Género</h4>
+                <span class="es-dist-card__total">${generoTotal} casos</span>
+              </div>
+              <div class="es-dist-card__body">
+                ${['Femenino', 'Masculino', 'Otro'].map(g => {
+                    const v = d.porGenero[g];
+                    const pct = generoTotal > 0 ? (v / generoTotal * 100).toFixed(1) : 0;
+                    const icon = g === 'Femenino' ? 'bi-gender-female' : (g === 'Masculino' ? 'bi-gender-male' : 'bi-gender-ambiguous');
+                    return `
+                      <div class="es-bar-row">
+                        <span class="es-bar-row__label"><i class="bi ${icon}"></i> ${g}</span>
+                        <div class="es-bar-track">
+                          <div class="es-bar-fill es-bar-fill--gender es-bar-fill--${g.toLowerCase()}" style="width: ${pct}%;"></div>
+                        </div>
+                        <span class="es-bar-row__count">${v} <small>(${pct}%)</small></span>
+                      </div>
+                    `;
+                }).join('')}
+              </div>
+            </div>
+          </div>
+
+          <div class="es-dist-card es-dist-card--heatmap">
+            <div class="es-dist-card__head">
+              <i class="bi bi-grid-3x3"></i>
+              <h4>Heatmap Día de Semana × Mes</h4>
+              <span class="es-dist-card__total">${stats.metadata.totalFilas} registros</span>
+            </div>
+            <div class="es-heatmap-container" id="esHeatmapContainer"></div>
+          </div>
+        `;
+    }
+
+    /** 📦482 — Tab 3: Ranking & Casos Críticos (Tier 2) */
+    _renderTabRanking(stats) {
+        const r = stats.rankings;
+        const cc = stats.casosCriticos;
+        const renderTrabajadorRow = (t, idx) => `
+          <tr>
+            <td class="es-td-idx">${idx + 1}</td>
+            <td>
+              <div class="es-trab-name">${this._escapeHtml(t.nombre || '—')}</div>
+              <div class="es-trab-meta">${this._escapeHtml(t.cargo || '')}${t.area ? ' · ' + this._escapeHtml(t.area) : ''}</div>
+            </td>
+            <td class="es-td-center">${t.totalIncapacidades}</td>
+            <td class="es-td-center es-td-strong">${t.totalDias}</td>
+            <td class="es-td-muted">${this._escapeHtml(t.ultimaIncapacidad || '—')}</td>
+          </tr>`;
+        const renderCIE10Row = (c, idx) => `
+          <tr>
+            <td class="es-td-idx">${idx + 1}</td>
+            <td><code>${this._escapeHtml(c.codigo || '—')}</code></td>
+            <td>${this._escapeHtml(c.descripcion || '—')}</td>
+            <td class="es-td-center">${c.count}</td>
+            <td class="es-td-center es-td-strong">${c.dias}</td>
+          </tr>`;
+        const renderCriticoRow = (c, idx) => `
+          <tr>
+            <td class="es-td-idx">${idx + 1}</td>
+            <td>
+              <div class="es-trab-name">${this._escapeHtml(c.nombre || '—')}</div>
+              <div class="es-trab-meta">${this._escapeHtml(c.cargo || '')}${c.eps ? ' · ' + this._escapeHtml(c.eps) : ''}</div>
+            </td>
+            <td class="es-td-center"><span class="es-badge ${c.clase === 'ARL' ? 'es-badge--danger' : 'es-badge--warning'}">${c.clase || '—'}</span></td>
+            <td>${this._escapeHtml(c.tipo || '—')}</td>
+            <td class="es-td-strong">${c.dias} días</td>
+            <td class="es-td-muted">${this._escapeHtml(c.fechaInicio || '—')}</td>
+          </tr>`;
+
+        return `
+          <div class="es-rank-summary">
+            <div class="es-rank-summary__cell">
+              <i class="bi bi-arrow-repeat"></i>
+              <div>
+                <span class="es-rank-summary__value">${r.tasaReincidencia}%</span>
+                <span class="es-rank-summary__label">Tasa de Re-incidencia</span>
+                <span class="es-rank-summary__sub">${r.totalReincidentes} trabajadores con &gt;1 incapacidad</span>
+              </div>
+            </div>
+            <div class="es-rank-summary__cell">
+              <i class="bi bi-exclamation-diamond"></i>
+              <div>
+                <span class="es-rank-summary__value">${cc.total}</span>
+                <span class="es-rank-summary__label">Casos Críticos</span>
+                <span class="es-rank-summary__sub">Incapacidades &gt; 15 días</span>
+              </div>
+            </div>
+            <div class="es-rank-summary__cell">
+              <i class="bi bi-shield-exclamation"></i>
+              <div>
+                <span class="es-rank-summary__value">${cc.totalSospechosos}</span>
+                <span class="es-rank-summary__label">Sospechosos de Abuso</span>
+                <span class="es-rank-summary__sub">&gt; 5 incapacidades cortas en el periodo</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="es-rank-grid">
+            <div class="es-rank-card">
+              <h4><i class="bi bi-calendar-week"></i> Top 10 — Más Días Perdidos</h4>
+              ${r.top10Dias.length > 0 ? `
+                <table class="es-table">
+                  <thead><tr><th>#</th><th>Trabajador</th><th class="es-td-center">Casos</th><th class="es-td-center">Días</th><th>Última</th></tr></thead>
+                  <tbody>${r.top10Dias.map(renderTrabajadorRow).join('')}</tbody>
+                </table>
+              ` : '<p class="es-empty-row">Sin datos.</p>'}
+            </div>
+            <div class="es-rank-card">
+              <h4><i class="bi bi-list-ol"></i> Top 10 — Más Incapacidades</h4>
+              ${r.top10Casos.length > 0 ? `
+                <table class="es-table">
+                  <thead><tr><th>#</th><th>Trabajador</th><th class="es-td-center">Casos</th><th class="es-td-center">Días</th><th>Última</th></tr></thead>
+                  <tbody>${r.top10Casos.map(renderTrabajadorRow).join('')}</tbody>
+                </table>
+              ` : '<p class="es-empty-row">Sin datos.</p>'}
+            </div>
+            <div class="es-rank-card es-rank-card--full">
+              <h4><i class="bi bi-clipboard2-pulse"></i> Top 10 — Diagnósticos CIE-10</h4>
+              ${r.top10CIE10.length > 0 ? `
+                <table class="es-table">
+                  <thead><tr><th>#</th><th>Código</th><th>Descripción</th><th class="es-td-center">Casos</th><th class="es-td-center">Días</th></tr></thead>
+                  <tbody>${r.top10CIE10.map(renderCIE10Row).join('')}</tbody>
+                </table>
+              ` : '<p class="es-empty-row">Sin datos.</p>'}
+            </div>
+            <div class="es-rank-card es-rank-card--full">
+              <h4><i class="bi bi-exclamation-diamond-fill"></i> Casos Críticos (&gt; 15 días)</h4>
+              ${cc.activos.length > 0 ? `
+                <table class="es-table">
+                  <thead><tr><th>#</th><th>Trabajador</th><th class="es-td-center">Clase</th><th>Tipo</th><th>Días</th><th>Inicio</th></tr></thead>
+                  <tbody>${cc.activos.slice(0, 50).map(renderCriticoRow).join('')}</tbody>
+                </table>
+                ${cc.activos.length > 50 ? `<p class="es-empty-row">Mostrando 50 de ${cc.activos.length} casos críticos.</p>` : ''}
+              ` : '<p class="es-empty-row">Sin casos críticos.</p>'}
+            </div>
+            <div class="es-rank-card es-rank-card--full">
+              <h4><i class="bi bi-shield-exclamation"></i> Sospechosos de Abuso</h4>
+              ${cc.sospechososAbuso.length > 0 ? `
+                <table class="es-table">
+                  <thead><tr><th>#</th><th>Trabajador</th><th>Cargo / Área</th><th class="es-td-center">Incap. cortas</th></tr></thead>
+                  <tbody>${cc.sospechososAbuso.map((s, i) => `
+                    <tr>
+                      <td class="es-td-idx">${i + 1}</td>
+                      <td><div class="es-trab-name">${this._escapeHtml(s.nombre)}</div><div class="es-trab-meta">${this._escapeHtml(s.cedula)}</div></td>
+                      <td>${this._escapeHtml(s.cargo || '')}${s.area ? '<br><small>' + this._escapeHtml(s.area) + '</small>' : ''}</td>
+                      <td class="es-td-center es-td-strong">${s.count}</td>
+                    </tr>`).join('')}
+                  </tbody>
+                </table>
+              ` : '<p class="es-empty-row">Sin patrones de sospecha detectados.</p>'}
+            </div>
+          </div>
+        `;
+    }
+
+    /** 📦482 — Pinta heatmap día-semana vs mes con HTML+CSS */
+    _renderHeatmapEnPanel(stats) {
+        const container = document.getElementById('esHeatmapContainer');
+        if (!container) return;
+        const h = stats.distribuciones.heatmapDiaSemana;
+        const max = Math.max(1, ...h.data.flat());
+        const cells = h.data.map((row, di) => row.map((v, mi) => {
+            const intensity = v / max;
+            const bg = v === 0
+                ? '#f8f9fa'
+                : `rgba(23, 78, 166, ${0.15 + intensity * 0.85})`;
+            const fg = intensity > 0.5 ? '#fff' : '#1a1a2e';
+            return `<td class="es-heatmap-cell" style="background:${bg};color:${fg};" title="${h.labelsDias[di]} ${h.labelsMeses[mi]}: ${v} casos">${v}</td>`;
+        }).join('')).map((rowHtml, di) => `<tr><th class="es-heatmap-th">${h.labelsDias[di]}</th>${rowHtml}</tr>`).join('');
+        container.innerHTML = `
+          <table class="es-heatmap-table">
+            <thead>
+              <tr>
+                <th></th>
+                ${h.labelsMeses.map(m => `<th class="es-heatmap-th">${m}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>${cells}</tbody>
+          </table>
+          <div class="es-heatmap-legend">
+            <span>Menos</span>
+            <span class="es-heatmap-legend__swatch" style="background:rgba(23, 78, 166, 0.15);"></span>
+            <span class="es-heatmap-legend__swatch" style="background:rgba(23, 78, 166, 0.40);"></span>
+            <span class="es-heatmap-legend__swatch" style="background:rgba(23, 78, 166, 0.70);"></span>
+            <span class="es-heatmap-legend__swatch" style="background:rgba(23, 78, 166, 1.0);"></span>
+            <span>Más</span>
+          </div>
+        `;
+    }
+
+    /** 📦482 — _escapeHtml() ya existe en línea ~6907 (helper global del componente). NO redeclarar. */
 
     /**
      * Llena los filtros de estadísticas con datos reales
@@ -6998,7 +10837,7 @@ class MedicionAusentismoComponent {
             await window.electronAPI.openPath(filePath);
         } catch (error) {
             console.error('Error al abrir el documento:', error);
-            alert('Error al abrir el documento.');
+            this._notify('Error', 'No se pudo abrir el documento.', 'error', 5000);
         }
     }
 
@@ -7034,10 +10873,10 @@ class MedicionAusentismoComponent {
     async saveCellData(rowIndex, colIndex, newValue, filePath) {
         try {
             console.log(`Guardando cambios en fila ${rowIndex}, columna ${colIndex}...`);
-            alert(`Cambios guardados: ${newValue} en fila ${rowIndex}, columna ${colIndex}`);
+            this._notify('Cambios guardados', `${newValue} en fila ${rowIndex}, columna ${colIndex}`, 'success');
         } catch (error) {
             console.error('Error al guardar cambios:', error);
-            alert(`Error al guardar cambios: ${error.message}`);
+            this._notify('Error al guardar', error.message, 'error', 6000);
         }
     }
 
@@ -7174,6 +11013,277 @@ class MedicionAusentismoComponent {
         button.innerHTML = text;
         button.addEventListener('click', onClick);
         return button;
+    }
+
+    // 📦462 (2026-07-03) — Vistas nuevas del módulo de Seguimiento de Gestación.
+    // Se renderizan como iframes para mantener el patrón existente del módulo
+    // (cada vista es autocontenida y no comparte estado JS con el padre).
+
+    /**
+     * Renderiza la vista principal de Seguimiento de Gestación
+     * (KPIs + filtros + tabla de gestantes).
+     */
+    renderSeguimientoGestacionView(container) {
+        container.style.padding = '0';
+        container.style.overflow = 'hidden';
+
+        const iframe = document.createElement('iframe');
+        iframe.src = 'modules/gestion-salud/ausentismo/gestacion-seguimiento-home.html';
+        iframe.style.cssText = 'width: 100%; height: 100%; border: none; display: block;';
+
+        const handleMessage = (event) => {
+            if (event.source !== iframe.contentWindow) return;
+            const data = event.data;
+            if (data.type === 'ausentismo-home-action') {
+                switch (data.action) {
+                    case 'seguimiento-gestacion-antesala':
+                        // 📦464 (2026-07-03) — Home ahora pide la ANTESALA en vez del wizard directo.
+                        this.currentView = 'seguimiento-gestacion-antesala';
+                        this._gestanteActualId = (data.payload && data.payload.gestanteId) || null;
+                        this.render();
+                        break;
+                    case 'seguimiento-gestacion-mensual':
+                        this.currentView = 'seguimiento-gestacion-mensual';
+                        this._gestanteActualId = (data.payload && data.payload.gestanteId) || null;
+                        this.render();
+                        break;
+                    case 'seguimiento-gestacion-reportes':
+                        // 📦477 — Botón "Ver Reportes" desde la home de Gestación
+                        this.currentView = 'seguimiento-gestacion-reportes';
+                        this.render();
+                        break;
+                    case 'main':
+                        this.currentView = 'main';
+                        this.render();
+                        break;
+                }
+            }
+        };
+
+        if (this.portalMessageCleanup) {
+            this.portalMessageCleanup();
+        }
+        window.addEventListener('message', handleMessage);
+        this.portalMessageCleanup = () => {
+            window.removeEventListener('message', handleMessage);
+        };
+
+        iframe.onload = () => {
+            try {
+                // 📦466 (2026-07-03) — Expose electronAPI del renderer principal
+                // al iframe para que pueda invocar IPC directo (gestacionCargarTodo, etc.).
+                // Patrón idéntico a renderer.js línea 5547. Sin esto, las llamadas
+                // `window.electronAPI.gestacionXxx(...)` fallan con "Cannot read
+                // properties of undefined".
+                if (iframe.contentWindow && window.electronAPI) {
+                    iframe.contentWindow.electronAPI = window.electronAPI;
+                }
+                iframe.contentWindow.postMessage({
+                    type: 'SET_COMPANY_CONTEXT',
+                    company: this.currentCompany
+                }, '*');
+            } catch (error) {
+                console.error('[seguimiento-gestacion] Error al enviar contexto al iframe:', error);
+            }
+        };
+
+        container.appendChild(iframe);
+    }
+
+    /**
+     * 📦464 (2026-07-03) — Renderiza la ANTESALA de seguimiento de gestación.
+     * Vista resumen de la gestante (KPIs + datos básicos + próximos seguimientos
+     * + historial) que se muestra ANTES del wizard mensual. Desde la antesala,
+     * el botón "Iniciar ahora" o "Nuevo Seguimiento" navega a la vista mensual.
+     *
+     * Patrón idéntico a renderSeguimientoMensualView: iframe + postMessage
+     * con SET_COMPANY_CONTEXT (company + gestanteId).
+     */
+    renderGestacionAntesalaView(container, gestanteId) {
+        container.style.padding = '0';
+        container.style.overflow = 'hidden';
+
+        const iframe = document.createElement('iframe');
+        const idParam = gestanteId ? '?id=' + encodeURIComponent(gestanteId) : '';
+        iframe.src = 'modules/gestion-salud/ausentismo/gestacion-antesala.html' + idParam;
+        iframe.style.cssText = 'width: 100%; height: 100%; border: none; display: block;';
+
+        const handleMessage = (event) => {
+            if (event.source !== iframe.contentWindow) return;
+            const data = event.data;
+            if (data.type === 'ausentismo-home-action') {
+                switch (data.action) {
+                    case 'seguimiento-gestacion-mensual':
+                        // "Iniciar ahora" desde la antesala → wizard mensual
+                        this.currentView = 'seguimiento-gestacion-mensual';
+                        this._gestanteActualId = (data.payload && data.payload.gestanteId) || gestanteId;
+                        this.render();
+                        break;
+                    case 'seguimiento-gestacion-reportes':
+                        // 📦477 — Abrir Reportes desde cualquier sub-vista de Gestación
+                        this.currentView = 'seguimiento-gestacion-reportes';
+                        this.render();
+                        break;
+                    case 'seguimiento-gestacion':
+                        // "Volver al listado" → home de seguimiento
+                        this.currentView = 'seguimiento-gestacion';
+                        this.render();
+                        break;
+                    case 'main':
+                        this.currentView = 'main';
+                        this.render();
+                        break;
+                }
+            }
+        };
+
+        if (this.portalMessageCleanup) {
+            this.portalMessageCleanup();
+        }
+        window.addEventListener('message', handleMessage);
+        this.portalMessageCleanup = () => {
+            window.removeEventListener('message', handleMessage);
+        };
+
+        iframe.onload = () => {
+            try {
+                if (iframe.contentWindow && window.electronAPI) {
+                    iframe.contentWindow.electronAPI = window.electronAPI;
+                }
+                iframe.contentWindow.postMessage({
+                    type: 'SET_COMPANY_CONTEXT',
+                    company: this.currentCompany,
+                    gestanteId: gestanteId
+                }, '*');
+            } catch (error) {
+                console.error('[seguimiento-gestacion-antesala] Error al enviar contexto al iframe:', error);
+            }
+        };
+
+        container.appendChild(iframe);
+    }
+
+    /**
+     * Renderiza la vista de seguimiento mensual de una gestante específica.
+     * Recibe el gestanteId por postMessage o por parámetro directo.
+     */
+    renderSeguimientoMensualView(container, gestanteId) {
+        container.style.padding = '0';
+        container.style.overflow = 'hidden';
+
+        const iframe = document.createElement('iframe');
+        // Pasamos el gestanteId por query string para que la vista
+        // pueda leerlo incluso si llega antes del postMessage.
+        const idParam = gestanteId ? '?id=' + encodeURIComponent(gestanteId) : '';
+        iframe.src = 'modules/gestion-salud/ausentismo/gestacion-seguimiento-mensual.html' + idParam;
+        iframe.style.cssText = 'width: 100%; height: 100%; border: none; display: block;';
+
+        const handleMessage = (event) => {
+            if (event.source !== iframe.contentWindow) return;
+            const data = event.data;
+            if (data.type === 'ausentismo-home-action') {
+                switch (data.action) {
+                    case 'seguimiento-gestacion':
+                        this.currentView = 'seguimiento-gestacion';
+                        this.render();
+                        break;
+                    case 'seguimiento-gestacion-reportes':
+                        // 📦477 — Abrir Reportes desde el wizard mensual
+                        this.currentView = 'seguimiento-gestacion-reportes';
+                        this.render();
+                        break;
+                    case 'main':
+                        this.currentView = 'main';
+                        this.render();
+                        break;
+                }
+            }
+        };
+
+        if (this.portalMessageCleanup) {
+            this.portalMessageCleanup();
+        }
+        window.addEventListener('message', handleMessage);
+        this.portalMessageCleanup = () => {
+            window.removeEventListener('message', handleMessage);
+        };
+
+        iframe.onload = () => {
+            try {
+                // 📦466 (2026-07-03) — Expose electronAPI del renderer principal
+                // al iframe (gestacion-seguimiento-mensual.html) para que pueda
+                // invocar IPC directo (gestacionObtenerGestante, gestacionGuardarSeguimiento).
+                // Patrón idéntico a renderer.js línea 5547.
+                if (iframe.contentWindow && window.electronAPI) {
+                    iframe.contentWindow.electronAPI = window.electronAPI;
+                }
+                iframe.contentWindow.postMessage({
+                    type: 'SET_COMPANY_CONTEXT',
+                    company: this.currentCompany,
+                    gestanteId: gestanteId
+                }, '*');
+            } catch (error) {
+                console.error('[seguimiento-gestacion-mensual] Error al enviar contexto al iframe:', error);
+            }
+        };
+
+        container.appendChild(iframe);
+    }
+
+    /**
+     * 📦477 — Renderiza la vista de Reportes de Seguimiento de Gestación
+     * (gestacion-reportes.html). Patrón idéntico a renderGestacionAntesalaView:
+     * iframe + postMessage + SET_COMPANY_CONTEXT.
+     */
+    renderGestacionReportesView(container) {
+        container.style.padding = '0';
+        container.style.overflow = 'hidden';
+
+        const iframe = document.createElement('iframe');
+        iframe.src = 'modules/gestion-salud/ausentismo/gestacion-reportes.html';
+        iframe.style.cssText = 'width: 100%; height: 100%; border: none; display: block;';
+
+        const handleMessage = (event) => {
+            if (event.source !== iframe.contentWindow) return;
+            const data = event.data;
+            if (!data || data.type !== 'ausentismo-home-action') return;
+            switch (data.action) {
+                case 'seguimiento-gestacion':
+                    this.currentView = 'seguimiento-gestacion';
+                    this.render();
+                    break;
+                case 'main':
+                    this.currentView = 'main';
+                    this.render();
+                    break;
+                default:
+                    // Otras acciones del iframe se ignoran aquí
+                    break;
+            }
+        };
+
+        if (this.portalMessageCleanup) this.portalMessageCleanup();
+        window.addEventListener('message', handleMessage);
+        this.portalMessageCleanup = () => window.removeEventListener('message', handleMessage);
+
+        iframe.onload = () => {
+            try {
+                // Exponer IPC al iframe (gestacion-reportes.js usa
+                // window.electronAPI.gestacionCalcularReporte y printInformeToPdf)
+                if (iframe.contentWindow && window.electronAPI) {
+                    iframe.contentWindow.electronAPI = window.electronAPI;
+                }
+                iframe.contentWindow.postMessage({
+                    type: 'SET_COMPANY_CONTEXT',
+                    company: this.currentCompany
+                    // sin gestanteId: reportes trabaja sobre todas las gestantes
+                }, '*');
+            } catch (error) {
+                console.error('[seguimiento-gestacion-reportes] Error al enviar contexto al iframe:', error);
+            }
+        };
+
+        container.appendChild(iframe);
     }
 }
 

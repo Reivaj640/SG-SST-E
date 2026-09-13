@@ -14,20 +14,47 @@ Thumbs.db
 *.log
 
 # Archivos temporales
-temp/
+# 📦773 · Antes era "temp/" pero en Windows (case-insensitive) ignoraba también Temp/
+# donde están los smoke tests del módulo. Cambiado a "temp-*/" (más específico).
+temp-*/
 tmp/
+
+# 📦730 · Scripts Python throwaway en Temp/ (no son smoke tests, son one-shot
+# de refactors como replace-recursos-render.py). Smoke tests siguen tracked.
+Temp/*.py
 
 # Archivos de configuración de IDE
 .vscode/
 .idea/
 
+# Configuracion personal de npm (no es del proyecto)
+.npmrc
+
 # Archivos de respaldo
+# 📦730 · Patrón más flexible: cubre *.bak, *.bak-pre-rediseno-YYYYMMDD, *.backup, etc.
 *.bak
+*.bak-*
 *.backup
+*.backup-*
 
 # Entornos virtuales de Python
 Portear/.venv/
 Portear/venv/
+
+# Python embebido de K+AIR (se restaura desde el instalador, NO trackear)
+# La build config en package.json ya lo excluye con !Portear/python-embed/**
+Portear/python-embed/
+Portear/python-embed.bak/
+
+# 📦526 — Backups historicos de reorganizaciones del proyecto (NO trackear).
+# Contiene versiones antiguas de archivos (.js, .css, .html) que ya fueron
+# migrados a modules/recursos/<submodulo>/<submodulo>-logic.js. La historia
+# completa se conserva en git (commit 4a5492e para backup_archivos_originales
+# y 301b054 para backup_restore) por si se necesita recuperar algo. Pero
+# no tienen razon de vivir en el repo actual: ocupan 1.25 MB, no las usa
+# nada del codigo actual, y confunden a nuevos devs.
+backup_archivos_originales/
+backup_restore/
 
 # Archivos compilados de Python
 __pycache__/
@@ -40,5 +67,64 @@ __pycache__/
 *.tmp
 *.temp
 
+# Scripts y datos de debug temporales (raíz del repo)
+# Solo ignora archivos con prefijo test-tmp-* (debug one-off).
+# Los tests reales (test-profesiograma-*, test-fixes-loop48, test-iframe-api, etc.) SÍ se trackean.
+test-tmp-*.js
+test-tmp-*.xlsx
+test-tmp-*.html
+
+# 📦773 · Scripts one-off con guión bajo al inicio (raíz de sgsst-electron-app/)
+# Patrones: __fix-test-*.js, __old-test-*.js, _*.js (inspección, scripts temporales)
+__*-*.js
+_*.js
+
+# 📦773 · Mensajes de commit temporales (raíz del repo)
+/commit-msg*.txt
+
+# 📦773 · Dirs temp-* en raíz del repo (proyectos antiguos de prueba)
+/temp-*/
+
 # Archivos de configuración generados
 config.json
+
+# 📦629 — Duplicado accidental de renderer/file-viewer-assets/ (NO usar)
+# Cuando se corre `node node_modules/@file-viewer/web-full/scripts/copy-assets.mjs`
+# (script oficial del paquete @file-viewer), copia assets a public/file-viewer/.
+# Pero nuestro proyecto Electron ya carga los assets desde renderer/file-viewer-assets/
+# (ver shared/file-viewer.js y scripts/setup-file-viewer.js). El duplicado en public/
+# NO se usa en el codigo, pesa 176.84 MB, y solo mete ruido al working tree (2910
+# archivos untracked que VS Code reporta como "U"). Si necesitas regenerar assets,
+# corre `node scripts/setup-file-viewer.js` que SI sincroniza renderer/.
+public/file-viewer/
+
+# 🐛bug-fix (2026-07-30) — Ruido regenerativo del postinstall de @file-viewer
+# El hook copy-assets.mjs de @file-viewer/web-full re-genera este JSON en
+# cada `npm install` con timestamps nuevos (generatedAt, checkedAt). Como
+# el archivo estaba trackeado, producia un diff constante sin cambios
+# funcionales. Ahora se regenera localmente pero no se commitea.
+renderer/file-viewer-assets/flyfish-viewer-assets.json
+
+# 📦629 — Documentacion temporal de mockups/disenos
+# Solo ignora el subdirectorio docs/ (mockups PNG de iconos y otros disenos).
+# Los iconos reales ya estan embebidos en renderer/bandeja-integrada/icons.js,
+# asi que el mockup de attachment-icons-mockup-svg.png ya no se necesita.
+docs/attachment-icons-mockup-svg.png
+docs/superpowers/
+
+# 📦 I-010 — Mock file temporal creado por storage-backup/e2e-multicompany.js
+# (intercepción de require('electron') para correr el bridge sin Electron runtime).
+# El script lo borra en su finally, pero por si acaso:
+/storage-backup/__mock_*.js
+/storage-backup/*.log
+
+# 📦 Cleanup 2026-09-07 — Directorios de backup temporales con archivos
+# movidos antes de un commit (scripts throwaway, .bak de sesiones anteriores,
+# audit docs, etc.). NO trackear — son de uso temporal del agente.
+/.git-archive-cleanup-*/
+
+# 📦 Cleanup 2026-09-07 — Archivos de runtime del tunnel de Firma Electrónica
+# (estado actual del proceso cloudflared, logs de operación). Se regeneran
+# en cada ejecución del tunnel y no deben commitearse.
+scripts/firma-tunnel/estado.txt
+scripts/firma-tunnel/logs/

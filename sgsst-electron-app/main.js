@@ -1,15 +1,58 @@
 // main.js - Proceso principal de la aplicación Electron
 
-const { app, BrowserWindow, ipcMain, dialog, shell, nativeTheme } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, nativeTheme, Menu } = require('electron');
+
+// 📦707-fix24 (2026-08-14) — AUMID debe setearse ANTES del primer BrowserWindow
+// para que Windows registre el ícono K+AIR en la taskbar y en la esquina
+// de la ventana. Sin esto, Windows usa el AUMID default de Electron y
+// muestra un ícono genérico (esquina borrosa + taskbar equivocado).
+// El AUMID debe coincidir con el `appUserModelId` del shortcut (.lnk)
+// y con el `appId` de electron-builder.
+app.setAppUserModelId('com.jrfsoluciones.sgsst');
 const path = require('path');
 const fsp = require('fs').promises;
 const fs = require('fs');           // Para operaciones síncronas
 const fsSync = require('fs');       // Para operaciones síncronas
 const { exec, spawn, execFile } = require('child_process'); // Asegúrate de incluir execFile
 const { promisify } = require('util');
-const xlsx = require('xlsx');
+// 📦588 # fix(defensive): wrap require('xlsx') para que la app no crashee si xlsx no esta disponible
+let xlsx = null;
+try {
+  xlsx = require('xlsx');
+} catch (e) {
+  console.warn('[MAIN] ⚠️ xlsx module not available, Excel features disabled:', e.message);
+}
 const os = require('os');
-const { autoUpdater } = require('electron-updater');
+// 📦648-fix2 — Try/catch al require de electron-updater.
+// RACE CONDITION: durante el auto-update, el instalador NSIS reemplaza
+// los archivos de la app. Si la nueva versión arranca antes de que
+// `node_modules\electron-updater` termine de copiarse, el require falla
+// y la app crashea con "Cannot find module 'electron-updater'". Ahora
+// capturamos el error y usamos un STUB no-op para que el resto del código
+// (config + listeners + checkForUpdates + downloadUpdate + quitAndInstall)
+// no crashee. La próxima vez que el user reinicie la app, el módulo ya
+// estará presente y el auto-update funcionará normal.
+let autoUpdater = null;
+try {
+  ({ autoUpdater } = require('electron-updater'));
+} catch (e) {
+  console.warn('[MAIN] ⚠️ electron-updater no disponible (probable update en curso):', e.message);
+  // Stub fallback: misma shape que el original, todas las funciones no-op.
+  // Cualquier setter de propiedad funciona (es un objeto JS normal).
+  autoUpdater = {
+    autoDownload: false,
+    autoInstallOnAppQuit: false,
+    autoRunAppAfterInstall: false,
+    disableDifferentialDownload: false,
+    requestHeaders: {},
+    timeout: 30000,
+    forceDevUpdateConfig: false,
+    on: function () { /* no-op */ },
+    checkForUpdates: function () { return Promise.resolve(null); },
+    downloadUpdate: function () { /* no-op */ },
+    quitAndInstall: function () { /* no-op */ }
+  };
+}
 const log = require('electron-log');
 const ExcelJS = require('exceljs');
 const Database = require('better-sqlite3');
@@ -44,6 +87,58 @@ const { registerIdentificacionPeligrosHandlers } = require('./main/identificacio
 const { registerRevisionAltaDireccionHandlers } = require('./main/revision-alta-direccion-bridge');
 // Importar handlers de Auditoría Anual (Submódulo 6.1.2) — F1 (2026-06-19)
 const { registerAuditoriaAnualHandlers } = require('./main/auditoria-anual-bridge');
+const { registerAccionesPreventivasCorrectivasHandlers } = require('./main/acciones-preventivas-correctivas-bridge');
+// 📦465 (2026-07-03) — Handlers de Seguimiento de Gestación (Salud Materna)
+const { registerGestacionHandlers, SCHEMA_SQL: GESTACION_SCHEMA_SQL, MIGRATIONS_SQL: GESTACION_MIGRATIONS_SQL } = require('./main/gestacion-bridge');
+// 📦701 (2026-08-11) — Handlers de Seguimiento de Incapacidad (respaldo en SQLite)
+const { registerSeguimientoIncapacidadHandlers, SCHEMA_SQL: SEG_INC_SCHEMA_SQL, MIGRATIONS_SQL: SEG_INC_MIGRATIONS_SQL } = require('./main/seguimiento-incapacidad-bridge');
+const { registerEventosCumplidosHandlers, SCHEMA_SQL: EVENTOS_CUMPLIDOS_SCHEMA_SQL } = require('./main/eventos-cumplidos-bridge');
+// K+AIR Calendar — bridge de eventos rápidos (botón calendario del header)
+const { registerEventosRapidosHandlers } = require('./main/eventos-rapidos-bridge');
+// 📦531 — Persistencia de planes de acción del submódulo 2.3.1 Evaluación Inicial
+const { registerEvaluacionActionPlansHandlers, SCHEMA_SQL: EVAL_ACTION_PLANS_SCHEMA_SQL } = require('./main/evaluacion-action-plans-bridge');
+// 📦589 — Submódulo 3.1.3 Perfiles de cargo y Profesiograma (Salud)
+const { registerProfesiogramaHandlers, SCHEMA_SQL: PROFESIOGRAMA_SCHEMA_SQL } = require('./main/profesiograma-bridge');
+// 📦702 (2026-08-13) — Permisos de Bandeja Integrada por usuario
+// Hasta ahora el iframe de Bandeja Integrada estaba disponible para todos los
+// usuarios. Con este bridge, el admin puede condicionar el acceso por usuario
+// desde Configuración > Ajustes de Usuario > Gestión de Usuario (toggle por user).
+// El admin global SIEMPRE tiene acceso (forzado en el handler).
+const { registerBandejaIntegradaPermissionsHandlers, MIGRATIONS_SQL: BANDEJA_PERMS_MIGRATIONS_SQL } = require('./main/bandeja-integrada-permissions-bridge');
+// 📦705 (2026-08-13) — Roles y Responsabilidades (estándar 1.1.2 Res. 0312 + Dto. 1072)
+const { registerRolesResponsabilidadesHandlers } = require('./main/roles-responsabilidades-bridge');
+// 📦 Bandeja Integrada — Schema SQLite para emails (threads, messages, labels, attachments)
+// Inspirado en Mail-0/Zero (https://github.com/Mail-0/Zero) — mismo patrón que
+// GESTACION_SCHEMA_SQL: CREATE TABLE IF NOT EXISTS + migraciones idempotentes.
+const { EMAIL_SCHEMA_SQL, EMAIL_MIGRATIONS_SQL } = require('./main/email-schema-sql');
+// 📦658 — FURAT (Reportes de Accidentes) — Schema + handler
+const { FURAT_SCHEMA_SQL, FURAT_MIGRATIONS_SQL } = require('./main/furat-schema-sql');
+const { registerFuratHandlers } = require('./main/furat-bridge');
+// 📦708 (2026-08-15) — Presupuesto SG-SST (1.1.3 Asignación de Recursos) — Schema + bridge
+// FASE 0: Bridge registrado, schema creado, handlers stub. La UI sigue usando
+// Excel. El bridge NO está expuesto en preload.js — los canales existen pero
+// nada los llama hasta Fase 1. Plan: docs/plans/presupuesto-bd-migration.md
+const { registerPresupuestoHandlers, SCHEMA_SQL: PRESUPUESTO_SCHEMA_SQL, MIGRATIONS_SQL: PRESUPUESTO_MIGRATIONS_SQL } = require('./main/presupuesto-bridge');
+// 📦709 (2026-08-15) — Gestión Humana (nuevo módulo top-level: Base de Personal + Contratación)
+// FASE 0: Schema con 3 tablas, bridge con 16 handlers stub + 1 diag. La UI aún
+// no existe. Plan: docs/plans/2026-08-15-gestion-humana-design.md
+const { registerGestionHumanaHandlers } = require('./main/gestion-humana-bridge');
+const { SCHEMA_SQL: GH_SCHEMA_SQL, MIGRATIONS_SQL: GH_MIGRATIONS_SQL } = require('./main/gestion-humana-schema-sql');
+// 📦101 (2026-08-20) — Firma Electrónica K+AIR v1 (I-101).
+// Cliente HTTP + safeStorage para firma-service. 13 canales `firma:*` (4 config +
+// 6 sign-request + 2 consent + 1 agreement). Patrón .init(ipcMain) como GH.
+// Plan: docs/kair-firma-integration/READY-TO-IMPLEMENT.md §D (I-101).
+// Spec: docs/gestion-humana/firma-electronica/API.md.
+const { registerFirmaHandlers } = require('./main/firma-bridge');
+// 📦2.1 + 📦2.2 (2026-09-08) — Representante Legal por empresa (K+AIR Firma Dual).
+// Tabla + bridge IPC con 4 handlers: get / upsert / delete / validateForFirma.
+// empresaId = company_key (mismo multi-tenant que gestion-humana). Plan: docs/kair-firma-dual/.
+const { registerRepLegalHandlers } = require('./main/empresa-representante-legal-bridge');
+const { SCHEMA_SQL: REPLEGAL_SCHEMA_SQL, MIGRATIONS_SQL: REPLEGAL_MIGRATIONS_SQL } = require('./main/empresa-representante-legal-schema-sql');
+// 📦537 — Sync multipc (BD local <-> .kairsync en carpeta compartida)
+const { registerSyncHandlers } = require('./main/sync-bridge');
+// 📦538 — Generador de pcId (ID unico por PC para el sync multipc)
+const pcidGenerator = require('./main/pcid-generator');
 
 // Capturar promesas no manejadas globalmente
 process.on('unhandledRejection', (reason, promise) => {
@@ -65,16 +160,76 @@ Reason: ${reason instanceof Error ? reason.stack : JSON.stringify(reason)}
   }
 }); 
 
+// --- Helper: Retry con exponential backoff para rate limiting (HTTP 429) ---
+// Usado en handlers de Gmail API para evitar quota exceeded.
+function withRetry(fn, options) {
+  options = options || {};
+  var maxRetries = options.maxRetries || 3;
+  var baseDelay = options.baseDelay || 1000;
+  var maxDelay = options.maxDelay || 30000;
+  var attempt = 0;
+
+  return new Promise(function (resolve, reject) {
+    function attemptFn() {
+      fn().then(resolve).catch(function (e) {
+        var isRateLimit = e && e.code === 429;
+        var isQuotaExceeded = e && e.message && e.message.indexOf('Quota exceeded') >= 0;
+        var isRetryable = isRateLimit || isQuotaExceeded || (e && e.code >= 500);
+
+        if (!isRetryable || attempt >= maxRetries) {
+          reject(e);
+          return;
+        }
+
+        attempt++;
+        var delay = Math.min(baseDelay * Math.pow(2, attempt - 1) + Math.random() * 1000, maxDelay);
+        console.warn('[MAIN] Rate limit/quota hit (attempt ' + attempt + '/' + maxRetries + '), reintentando en ' + Math.round(delay) + 'ms:', e.message);
+        setTimeout(attemptFn, delay);
+      });
+    }
+    attemptFn();
+  });
+}
+
 // --- Configuración del Auto-Updater ---
 log.transports.file.level = 'info';
 autoUpdater.logger = log;
-autoUpdater.autoDownload = false;
-autoUpdater.autoInstallOnAppQuit = true;
+// 📦546 — Flujo "tipo Chrome": descarga en background + instala al cerrar.
+// A) autoDownload=true: apenas detecta update-available, baja el .exe sin pedir click.
+// B) El toast del renderer (window.updateNotifier.notifyAvailable) muestra el progreso.
+// C) autoInstallOnAppQuit=true: cuando el usuario cierra la app, si hay update descargado,
+//    se instala solo. Al reabrir, ya está en la nueva versión.
+// Nota: el botón "Descargar" del panel sigue existiendo como fallback por si falla la auto-descarga.
+autoUpdater.autoDownload = true;          // Descarga automática apenas detecta update-available
+autoUpdater.autoInstallOnAppQuit = true;  // Instala automáticamente al cerrar la app
 autoUpdater.autoRunAppAfterInstall = true;
+// 📦583 (Loop 11) — Workaround ORIGINAL: deshabilitar differential download.
+//   Bug en builder-util-runtime: SHA512 en formatos inconsistentes (hex vs
+//   base64) durante el DifferentialDownloader → "sha512 checksum mismatch"
+//   falsos. Workaround: forzar full download (264 MB) siempre.
+//
+// 🔄 RE-AUDIT-2026-09-10 (v0.1.196) — Differential downloads RE-HABILITADOS
+//   condicionalmente via env var. Razones:
+//   - Hoy descargar 391 MB por update es inaceptable para clientes con
+//     internet lento (zonas rurales Colombia, planes de datos limitados).
+//   - La versión actual de electron-updater (6.6.2) puede tener el bug
+//     YA ARREGLADO. No lo podemos saber sin probar.
+//   - Si el bug persiste, electron-updater hace fallback automático a full
+//     download cuando el diff falla (graceful degradation), así que el
+//     peor caso es: download más lento, no instalación rota.
+//   - Override con KAIR_USE_FULL_UPDATE=1 para volver al modo conservador
+//     (full download siempre). Sin env var = deltas activos (default).
+const useFullUpdate = process.env.KAIR_USE_FULL_UPDATE === '1';
+autoUpdater.disableDifferentialDownload = useFullUpdate;
+if (useFullUpdate) {
+  console.log('[UPDATER] KAIR_USE_FULL_UPDATE=1 → differential download DESHABILITADO (full download 391 MB)');
+} else {
+  console.log('[UPDATER] Differential download HABILITADO (patches ~20-50 MB). Override con KAIR_USE_FULL_UPDATE=1');
+}
 // Configurar timeout para evitar cuelgues en conexiones lentas
-autoUpdater.requestHeaders = {
-  'Cache-Control': 'no-cache'
-};
+// (P2-1 audit-2026-09-10: quitado Cache-Control: no-cache — GitHub ya devuelve
+// ETag y electron-updater lo respeta. El "no-cache" forzaba re-validación en
+// cada check, aumentando latencia y reduciendo el rate-limit efectivo.)
 autoUpdater.timeout = 30000; // 30 segundos máximo de espera para respuesta de GitHub API
 
 // En modo desarrollo, forzar uso de dev-app-update.yml para que el updater funcione
@@ -125,10 +280,17 @@ async function findPython() {
 	console.log('[DEBUG] Starting Python path search');
 
 	// 1. Priorizar Python del proyecto (python-embed y .venv) antes que el del sistema
-	// Esto garantiza que se use el Python con todas las dependencias instaladas
+	// Esto garantiza que se use el Python con todas las dependencias instaladas.
+	// 📦700: cuando la app está empaquetada con asar: true, Python se copia
+	// a process.resourcesPath/python-embed/ vía extraResources (FUERA del asar,
+	// porque .exe no se puede ejecutar desde dentro de un .asar). En desarrollo
+	// está en __dirname/Portear/python-embed/.
+	const isPackaged = app && typeof app.isPackaged === 'boolean' ? app.isPackaged : false;
+	const baseDir = isPackaged ? (process.resourcesPath || __dirname) : __dirname;
 	const projectPythonPaths = [
-		path.join(__dirname, 'Portear', 'python-embed', 'python.exe'),
-		path.join(__dirname, 'Portear', '.venv', 'Scripts', 'python.exe')
+		path.join(baseDir, 'python-embed', 'python.exe'),
+		path.join(baseDir, 'Portear', 'python-embed', 'python.exe'),
+		path.join(baseDir, 'Portear', '.venv', 'Scripts', 'python.exe')
 	];
 
 	for (const p of projectPythonPaths) {
@@ -268,6 +430,15 @@ let isWindowCreated = false; // Variable para rastrear si la ventana ya ha sido 
 // --- Función de Logging Centralizada ---
 function sendLog(message, level = 'INFO') {
   console.log(`[${level}] ${message}`); // Log to main process console
+  // 📦547 — También escribir al archivo de log (vía electron-log) para que
+  // sea visible en C:\Users\<user>\AppData\Roaming\sgsst-electron-app\logs\main.log
+  // Sin esto, los mensajes de mi código (auto-updater, handlers, sync) NO
+  // aparecían en el archivo y solo se veían en consola de Electron.
+  if (log && typeof log[level.toLowerCase()] === 'function') {
+    log[level.toLowerCase()](`[${level}] ${message}`);
+  } else if (log && typeof log.info === 'function') {
+    log.info(`[${level}] ${message}`);
+  }
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('log-message', message, level);
   }
@@ -275,6 +446,11 @@ function sendLog(message, level = 'INFO') {
 
 // Ruta del archivo de configuración
 const configPath = path.join(app.getPath('userData'), 'config.json');
+
+// 📦103.A1.1 · Helper para persistir/recuperar config.companyPaths[companyKey].nit
+// Usa el patrón atómico (tmp + rename + backup) heredado de sync-config-writer.
+// Reutilizado por los handlers IPC company-nit:get / company-nit:set abajo.
+const companyConfigWriter = require('./main/company-config-writer');
 
 // ===============================
 // 🗄️ BASE DE DATOS LOCAL (SQLite)
@@ -299,6 +475,9 @@ function initDbOnce() {
 
   try {
     db = new Database(dbPath);
+    // 📦 Bandeja Integrada — Compartir la instancia con módulos en main/
+    // (email-db.js la usa para CRUD de threads/messages/labels).
+    require('./main/db-instance').setDb(db);
     db.pragma('journal_mode = WAL');
 
     db.exec(`
@@ -326,6 +505,12 @@ function initDbOnce() {
         role_id INTEGER NOT NULL,
         PRIMARY KEY (user_id, company_id, role_id)
       );
+      CREATE TABLE IF NOT EXISTS usuario_modulos (
+        user_id INTEGER NOT NULL,
+        modulo TEXT NOT NULL,
+        permitido INTEGER NOT NULL DEFAULT 1,
+        PRIMARY KEY (user_id, modulo)
+      );
       CREATE TABLE IF NOT EXISTS sessions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
@@ -334,6 +519,222 @@ function initDbOnce() {
         expires_at TEXT NOT NULL
       );
     `);
+
+    // 📦466 (2026-07-03) — Schema de Seguimiento de Gestación (Salud Materna)
+    // 2 tablas: gestaciones + seguimiento_gestacion_mensual
+    // Persistencia: SQLite central en app.getPath('userData')/kair.db
+    // FIX: estaba ADENTRO del template literal anterior — SQLite lo recibía como
+    // texto literal y nunca creaba las tablas. Todos los IPC devolvían NO_DB.
+    try {
+      db.exec(GESTACION_SCHEMA_SQL);
+      console.log('[DB] 📦466 · Tablas de gestacion creadas/verificadas');
+    } catch (gsErr) {
+      console.error('[DB] 📦466 · Error creando schema de gestacion:', gsErr.message);
+    }
+
+    // 📦468 (2026-07-04) — MIGRACIONES idempotentes sobre `gestaciones`.
+    // Cada ALTER TABLE se ejecuta individualmente con try/catch: si la columna
+    // ya existe, SQLite lanza "duplicate column" que se ignora silenciosamente.
+    // Permite evolucionar el schema sin sistema de versiones formal.
+    if (Array.isArray(GESTACION_MIGRATIONS_SQL)) {
+      var applied = 0;
+      var skipped = 0;
+      for (var mi = 0; mi < GESTACION_MIGRATIONS_SQL.length; mi++) {
+        var stmt = GESTACION_MIGRATIONS_SQL[mi];
+        try {
+          db.exec(stmt);
+          applied++;
+        } catch (migErr) {
+          // "duplicate column name" = la columna ya existe, es esperado en re-ejecuciones
+          if (/duplicate column/i.test(migErr.message)) {
+            skipped++;
+          } else {
+            console.warn('[DB] 📦468 · Migración gestacion fallida:', stmt, '-', migErr.message);
+          }
+        }
+      }
+      console.log('[DB] 📦468 · Migraciones gestacion aplicadas=' + applied + ' omitidas=' + skipped);
+    }
+
+    // 📦702 (2026-08-13) — Migraciones de permisos de Bandeja Integrada.
+    // ALTER TABLE idempotente sobre `users` (la tabla ya existe desde el
+    // schema base en líneas 395-404). Si la columna ya existe, SQLite
+    // lanza "duplicate column name" y se ignora silenciosamente.
+    if (Array.isArray(BANDEJA_PERMS_MIGRATIONS_SQL)) {
+      var bp_applied = 0;
+      var bp_skipped = 0;
+      for (var bp_i = 0; bp_i < BANDEJA_PERMS_MIGRATIONS_SQL.length; bp_i++) {
+        var bp_stmt = BANDEJA_PERMS_MIGRATIONS_SQL[bp_i];
+        try {
+          db.exec(bp_stmt);
+          bp_applied++;
+        } catch (bpErr) {
+          if (/duplicate column/i.test(bpErr.message)) {
+            bp_skipped++;
+          } else {
+            console.warn('[DB] 📦702 · Migración bandeja_perms fallida:', bp_stmt, '-', bpErr.message);
+          }
+        }
+      }
+      console.log('[DB] 📦702 · Migraciones bandeja_perms aplicadas=' + bp_applied + ' omitidas=' + bp_skipped);
+    }
+
+    // 📦498 — Schema de eventos_cumplidos (marcado del calendario).
+    // Tabla nueva, independiente de los modulos origen. Permite marcar
+    // cualquier evento del calendario (capacitacion, gestacion, reunion,
+    // etc.) como cumplido. Persistencia local, sin tocar Excel ni BD
+    // externas.
+    try {
+      db.exec(EVENTOS_CUMPLIDOS_SCHEMA_SQL);
+      console.log('[DB] 📦498 · Tabla eventos_cumplidos creada/verificada');
+    } catch (cumErr) {
+      console.error('[DB] 📦498 · Error creando tabla eventos_cumplidos:', cumErr.message);
+    }
+
+
+
+
+
+    // 📦701 (2026-08-11) — Schema de Seguimiento de Incapacidad (respaldo en SQLite).
+    // Tablas nuevas, fuente de verdad primaria. El Excel se exporta después
+    // con un botón desde la UI. Patrón idéntico a gestacion.
+    try {
+      db.exec(SEG_INC_SCHEMA_SQL);
+      console.log('[DB] 📦701 · Tablas de seguimiento_incapacidad creadas/verificadas');
+    } catch (segErr) {
+      console.error('[DB] 📦701 · Error creando schema de seguimiento_incapacidad:', segErr.message);
+    }
+    // Migraciones (vacías por ahora, el bridge es nuevo, pero dejamos el
+    // patrón para futura evolución del schema).
+    if (Array.isArray(SEG_INC_MIGRATIONS_SQL) && SEG_INC_MIGRATIONS_SQL.length > 0) {
+      var segIncApplied = 0;
+      var segIncSkipped = 0;
+      for (var smi = 0; smi < SEG_INC_MIGRATIONS_SQL.length; smi++) {
+        var segStmt = SEG_INC_MIGRATIONS_SQL[smi];
+        try {
+          db.exec(segStmt);
+          segIncApplied++;
+        } catch (segMigErr) {
+          if (/duplicate column/i.test(segMigErr.message)) {
+            segIncSkipped++;
+          } else {
+            console.warn('[DB] 📦701 · Migración seguimiento_incapacidad fallida:', segStmt, '-', segMigErr.message);
+          }
+        }
+      }
+      console.log('[DB] 📦701 · Migraciones seguimiento_incapacidad aplicadas=' + segIncApplied + ' omitidas=' + segIncSkipped);
+    }
+
+    // 📦589 — Submódulo 3.1.3 Perfiles de cargo y Profesiograma
+    // Crea las 10 tablas kp_* (profesiograma, cargo, tipo_examen, etc.)
+    try {
+      db.exec(PROFESIOGRAMA_SCHEMA_SQL);
+      console.log('[DB] 📦589 · Tablas de Profesiograma (kp_*) creadas/verificadas');
+    } catch (profErr) {
+      console.error('[DB] 📦589 · Error creando tablas de Profesiograma:', profErr.message);
+    }
+
+    // 📦531 — Schema de planes de acción de Evaluación Inicial. Persiste
+    // los planes del submódulo 2.3.1 que antes se perdían al cerrar el
+    // módulo. plan_json almacena el objeto completo (incluye seguimientos
+    // y responsables). Indice por (empresa_id, year) para queries rápidas.
+    try {
+      db.exec(EVAL_ACTION_PLANS_SCHEMA_SQL);
+      console.log('[DB] 📦531 · Tabla evaluacion_action_plans creada/verificada');
+    } catch (eapErr) {
+      console.error('[DB] 📦531 · Error creando tabla evaluacion_action_plans:', eapErr.message);
+    }
+
+    // 📦 Bandeja Integrada — Schema de emails (5 tablas: connections, threads,
+    // messages, labels, attachments). Persiste el inbox de Gmail localmente
+    // para carga instantánea y modo offline. Inspirado en el modelo de
+    // datos de Mail-0/Zero. Mismo patrón que GESTACION_SCHEMA_SQL.
+    try {
+      db.exec(EMAIL_SCHEMA_SQL);
+      console.log('[DB] 📦 Bandeja Integrada · Tablas de email (connections/threads/messages/labels/attachments) creadas/verificadas');
+    } catch (emailErr) {
+      console.error('[DB] 📦 Bandeja Integrada · Error creando schema de email:', emailErr.message);
+    }
+    // 📦658 — Schema FURAT (Reportes de Accidentes). Mismo patrón: CREATE TABLE IF NOT EXISTS.
+    try {
+      db.exec(FURAT_SCHEMA_SQL);
+      console.log('[DB] 📦658 · Tabla furat_metadata creada/verificada');
+      if (Array.isArray(FURAT_MIGRATIONS_SQL)) {
+        for (var fmi = 0; fmi < FURAT_MIGRATIONS_SQL.length; fmi++) {
+          try { db.exec(FURAT_MIGRATIONS_SQL[fmi]); } catch (fmErr) { /* skip */ }
+        }
+      }
+    } catch (furatErr) {
+      console.error('[DB] 📦658 · Error creando schema FURAT:', furatErr.message);
+    }
+    // 📦708 (2026-08-15) — Schema Presupuesto SG-SST (1.1.3 Asignación de Recursos).
+    // 3 tablas: presupuestos + presupuesto_partidas + presupuesto_valores_mensuales.
+    // Mismo patrón que FURAT_SCHEMA_SQL. Migrations vacías en v1.
+    try {
+      db.exec(PRESUPUESTO_SCHEMA_SQL);
+      console.log('[DB] 📦708 · Tablas de presupuesto (presupuestos / partidas / valores_mensuales) creadas/verificadas');
+      if (Array.isArray(PRESUPUESTO_MIGRATIONS_SQL) && PRESUPUESTO_MIGRATIONS_SQL.length > 0) {
+        for (var pmi = 0; pmi < PRESUPUESTO_MIGRATIONS_SQL.length; pmi++) {
+          try { db.exec(PRESUPUESTO_MIGRATIONS_SQL[pmi]); } catch (pmErr) { /* skip */ }
+        }
+        console.log('[DB] 📦708 · ' + PRESUPUESTO_MIGRATIONS_SQL.length + ' migraciones de presupuesto aplicadas');
+      }
+    } catch (presErr) {
+      console.error('[DB] 📦708 · Error creando schema de presupuesto:', presErr.message);
+    }
+    // 📦709 (2026-08-15) — Schema Gestión Humana (nuevo módulo: Base de Personal + Contratación)
+    // 3 tablas: contrataciones + base_personal + gh_sedes. Sin migrations en v1.
+    try {
+      db.exec(GH_SCHEMA_SQL);
+      console.log('[DB] 📦709 · Tablas de gestion-humana (contrataciones / base_personal / gh_sedes) creadas/verificadas');
+      // 📦731 · Migrations idempotentes (mismo patrón que Presupuesto). Cada ALTER se
+      // aplica individualmente; "duplicate column name" se ignora (skip).
+      if (Array.isArray(GH_MIGRATIONS_SQL) && GH_MIGRATIONS_SQL.length > 0) {
+        for (var ghmi = 0; ghmi < GH_MIGRATIONS_SQL.length; ghmi++) {
+          try { db.exec(GH_MIGRATIONS_SQL[ghmi]); }
+          catch (ghmErr) { /* skip — duplicate column / index ya existe */ }
+        }
+        console.log('[DB] 📦731 · ' + GH_MIGRATIONS_SQL.length + ' migraciones de gestion-humana aplicadas');
+      }
+    } catch (ghErr) {
+      console.error('[DB] 📦709 · Error creando schema de gestion-humana:', ghErr.message);
+    }
+    // 📦2.1 (2026-09-08) — Schema Representante Legal por empresa (K+AIR Firma Dual).
+    // 1 tabla: empresa_representante_legal. Mismo patrón que gestion-humana (try/catch + migrations idempotentes).
+    try {
+      db.exec(REPLEGAL_SCHEMA_SQL);
+      console.log('[DB] 📦2.1 · Tabla de representante legal (empresa_representante_legal) creada/verificada');
+      if (Array.isArray(REPLEGAL_MIGRATIONS_SQL) && REPLEGAL_MIGRATIONS_SQL.length > 0) {
+        for (var rlmi = 0; rlmi < REPLEGAL_MIGRATIONS_SQL.length; rlmi++) {
+          try { db.exec(REPLEGAL_MIGRATIONS_SQL[rlmi]); }
+          catch (rlmErr) { /* skip — duplicate column / index ya existe */ }
+        }
+        console.log('[DB] 📦2.1 · ' + REPLEGAL_MIGRATIONS_SQL.length + ' migraciones de representante legal aplicadas');
+      }
+    } catch (rlErr) {
+      console.error('[DB] 📦2.1 · Error creando schema de representante legal:', rlErr.message);
+    }
+    // Migraciones idempotentes para email (mismo patrón que gestacion)
+    if (Array.isArray(EMAIL_MIGRATIONS_SQL)) {
+      var emailApplied = 0;
+      var emailSkipped = 0;
+      for (var emi = 0; emi < EMAIL_MIGRATIONS_SQL.length; emi++) {
+        var emStmt = EMAIL_MIGRATIONS_SQL[emi];
+        try {
+          db.exec(emStmt);
+          emailApplied++;
+        } catch (emMigErr) {
+          if (/duplicate column/i.test(emMigErr.message)) {
+            emailSkipped++;
+          } else {
+            console.warn('[DB] 📦 Bandeja Integrada · Migración email fallida:', emStmt, '-', emMigErr.message);
+          }
+        }
+      }
+      if (emailApplied > 0 || emailSkipped > 0) {
+        console.log('[DB] 📦 Bandeja Integrada · Migraciones email aplicadas=' + emailApplied + ' omitidas=' + emailSkipped);
+      }
+    }
 
     const roleNames = ['Administrador', 'SST', 'Auditoría', 'Gerencia', 'Recursos Humanos'];
     const insertRole = db.prepare('INSERT OR IGNORE INTO roles (name) VALUES (?)');
@@ -500,15 +901,15 @@ autoUpdater.on('checking-for-update', () => {
 });
 
 // Cuando hay una actualización disponible
+// 📦503 — NO descarga automáticamente; el renderer decide cuándo bajarla
+// (botón manual en el panel del header).
 autoUpdater.on('update-available', (info) => {
   sendLog(`Actualización disponible: v${info.version}`, 'INFO');
   sendLog(`[UPDATER] Enviando evento update_available con versión: ${info.version}`, 'INFO');
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('update_available', info);
-    sendLog('[UPDATER] Enviado: update_available', 'DEBUG');
+    sendLog('[UPDATER] Enviado: update_available (sin auto-download)', 'DEBUG');
   }
-  // Iniciar descarga automáticamente
-  autoUpdater.downloadUpdate();
 });
 
 // Cuando NO hay actualizaciones
@@ -742,6 +1143,11 @@ const createWindow = () => {
     minHeight: 650, // Permite uso en pantallas 1366x768
     show: false, // Oculta hasta que loading screen complete
     icon: path.join(__dirname, 'assets', 'K+AIR-multires.ico'),
+    autoHideMenuBar: true, // 📦 Loop 47b (2026-07-21) — Oculta menú nativo por defecto.
+                           // Aparece SOLO cuando se presiona Alt (comportamiento estándar
+                           // de Windows para apps como Discord, Slack, VSCode, etc.).
+                           // En producción además se llama a Menu.setApplicationMenu(null)
+                           // para que ni siquiera aparezca con Alt (ver whenReady).
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -789,8 +1195,11 @@ const createWindow = () => {
   // Cargar el archivo HTML principal
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
 
-  // Abrir DevTools en modo desarrollo
-  // mainWindow.webContents.openDevTools();
+  // DevTools desactivado: el usuario lo abre manualmente con F12 o Ctrl+Shift+I
+  // cuando lo necesita. Antes se abría solo en cada arranque (molesto).
+  // if (!app.isPackaged) {
+  //   mainWindow.webContents.openDevTools();
+  // }
 };
 
 // Función auxiliar para búsqueda recursiva de archivos en el sistema de archivos
@@ -938,6 +1347,46 @@ ipcMain.handle('load-config', async () => {
     }
     console.error('Error loading config:', error);
     return {};
+  }
+});
+
+// 📦103.A1.1 · IPC: leer NIT de una empresa desde config.json
+// NO usa el peligroso save-config (que sobrescribe todo el config). Solo lee.
+// Retorna { success: true, data: { nit: string|null } } o { success: false, error }.
+ipcMain.handle('company-nit:get', async (event, args) => {
+  try {
+    if (!args || !args.companyKey) {
+      return { success: false, error: { code: 'NO_COMPANY', message: 'companyKey requerido' } };
+    }
+    const nit = await companyConfigWriter.readCompanyNit(configPath, args.companyKey);
+    return { success: true, data: { nit: nit } }; // nit es null si no existe
+  } catch (error) {
+    console.error('[COMPANY-NIT][GET] Error:', error);
+    return { success: false, error: { code: 'READ_FAILED', message: error.message } };
+  }
+});
+
+// 📦103.A1.1 · IPC: guardar NIT de una empresa en config.json
+// Usa company-config-writer.writeCompanyNit() que internamente:
+//   1. Normaliza el NIT (quita espacios, guiones, puntos)
+//   2. Valida (9-15 dígitos)
+//   3. Lee config.json
+//   4. Hace backup .bak
+//   5. Merge (solo actualiza nit, NO toca otros campos)
+//   6. Escritura atómica (tmp + rename)
+// NO usa el peligroso save-config. Evita el read-modify-write inseguro de la UI.
+// Nota: la serialización global de escrituras concurrentes al mismo config.json
+// queda fuera de A1.1 (es un riesgo de platform, no de A1.1).
+ipcMain.handle('company-nit:set', async (event, args) => {
+  try {
+    if (!args || !args.companyKey) {
+      return { success: false, error: { code: 'NO_COMPANY', message: 'companyKey requerido' } };
+    }
+    // writeCompanyNit ya retorna {success, data} o {success, false, error: {code, message}}
+    return await companyConfigWriter.writeCompanyNit(configPath, args.companyKey, args.nit);
+  } catch (error) {
+    console.error('[COMPANY-NIT][SET] Error:', error);
+    return { success: false, error: { code: 'WRITE_FAILED', message: error.message } };
   }
 });
 
@@ -1249,6 +1698,71 @@ ipcMain.handle('assignments-set-v1', async (event, payload = {}) => {
   }
 });
 
+// Módulos explícitos por usuario (sección "Módulos permitidos" del modal
+// Gestión de Usuario). Vacío = rige la matriz por rol (sin cambio de conducta).
+// Solo admin global puede leer/escribir los de otros usuarios.
+const MODULOS_VALIDOS = [
+  'Recursos', 'Gestión Integral', 'Gestión de la Salud', 'Gestión de Peligros y Riesgos',
+  'Gestión de Amenazas', 'Verificación', 'Mejoramiento', 'Gestión Humana'
+];
+
+ipcMain.handle('users-get-modulos', async (event, payload = {}) => {
+  try {
+    const { token, userId } = payload;
+    const sessionCheck = validateSession(token);
+    if (!sessionCheck.ok) return { success: false, error: sessionCheck.error };
+    if (!userId) {
+      return { success: false, error: { code: 'INVALID_INPUT', message: 'userId es requerido.' } };
+    }
+    const me = sessionCheck.user || {};
+    const targetId = Number(userId);
+    if (targetId !== Number(me.id) && !me.isAdmin) {
+      return { success: false, error: { code: 'PERMISSION_DENIED', message: 'Solo el administrador puede ver los módulos de otros usuarios.' } };
+    }
+    const localDb = getDb();
+    const rows = localDb.prepare('SELECT modulo, permitido FROM usuario_modulos WHERE user_id = ?').all(targetId);
+    const modulos = {};
+    rows.forEach(r => { modulos[r.modulo] = r.permitido === 1; });
+    return { success: true, data: { modulos, tieneExplicitos: rows.length > 0 } };
+  } catch (error) {
+    console.error('[USERS] Error leyendo módulos:', error);
+    return { success: false, error: { code: 'USERS_MODULOS_ERROR', message: error.message } };
+  }
+});
+
+ipcMain.handle('users-set-modulos', async (event, payload = {}) => {
+  try {
+    const { token, userId, modulos } = payload;
+    const sessionCheck = validateSession(token);
+    if (!sessionCheck.ok) return { success: false, error: sessionCheck.error };
+    const me = sessionCheck.user || {};
+    if (!me.isAdmin) {
+      return { success: false, error: { code: 'PERMISSION_DENIED', message: 'Solo el administrador global puede cambiar módulos.' } };
+    }
+    if (!userId || !modulos || typeof modulos !== 'object') {
+      return { success: false, error: { code: 'INVALID_INPUT', message: 'userId y modulos son requeridos.' } };
+    }
+    const localDb = getDb();
+    const target = localDb.prepare('SELECT id FROM users WHERE id = ?').get(Number(userId));
+    if (!target) {
+      return { success: false, error: { code: 'USER_NOT_FOUND', message: 'Usuario no encontrado.' } };
+    }
+    const tx = localDb.transaction((entries) => {
+      localDb.prepare('DELETE FROM usuario_modulos WHERE user_id = ?').run(Number(userId));
+      const ins = localDb.prepare('INSERT INTO usuario_modulos (user_id, modulo, permitido) VALUES (?, ?, ?)');
+      entries.forEach(([mod, val]) => {
+        if (!MODULOS_VALIDOS.includes(mod)) throw new Error('Módulo inválido: ' + mod);
+        ins.run(Number(userId), mod, val ? 1 : 0);
+      });
+    });
+    tx(Object.entries(modulos));
+    return { success: true };
+  } catch (error) {
+    console.error('[USERS] Error guardando módulos:', error);
+    return { success: false, error: { code: 'USERS_MODULOS_ERROR', message: error.message } };
+  }
+});
+
 ipcMain.handle('assignments-list-v1', async (event, payload = {}) => {
   try {
     const { token } = payload;
@@ -1310,6 +1824,534 @@ ipcMain.handle('assignments-list-by-user-v1', async (event, payload = {}) => {
   }
 });
 
+// ============================================================
+// ============================================================
+// F3.B — Google Gmail reader (Bandeja Integrada) — Bandeja Integrada
+// ============================================================
+// Lee correos reales de Gmail usando los tokens OAuth de F3.A.
+const googleGmail = require('./shared/google-gmail');
+
+ipcMain.handle('google-gmail:list-inbox', async (event, options) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var result = await googleGmail.listInbox(Object.assign({ configPath: configPath }, options || {}));
+    return result;
+  } catch (e) {
+    console.error('[GoogleGmail] Error en listInbox:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+ipcMain.handle('google-gmail:get-message', async (event, messageId) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var result = await googleGmail.getMessage(messageId, { configPath: configPath });
+    return result;
+  } catch (e) {
+    console.error('[GoogleGmail] Error en getMessage:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// google-gmail:mark-read — el handler unificado está más abajo (F1-Feature3 con options)
+
+// F4-fix — Obtiene el email del usuario Gmail conectado (para mostrar en el switch
+// de Configuración y en el header de Bandeja Integrada como indicador).
+ipcMain.handle('google-gmail:get-profile', async () => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var googleGmail = require('./shared/google-gmail');
+    var result = await googleGmail.getProfile(configPath);
+    return result;
+  } catch (e) {
+    console.error('[GoogleGmail] Error en getProfile:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// F1.B — Enviar un correo via Gmail API (Reply / Reply all / Forward / Nuevo).
+// Construye el raw MIME y lo envía. Después del envío, refresca el cache SQLite.
+ipcMain.handle('google-gmail:send-message', async (event, options) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var result = await googleGmail.sendMessage(Object.assign({ configPath: configPath }, options || {}));
+    // Si el envío fue OK y tenemos threadId, marcar como SENT en el cache
+    // (el background sync va a traer el nuevo mensaje al cache igual)
+    return result;
+  } catch (e) {
+    console.error('[GoogleGmail] Error en sendMessage:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// F1-Feature1 — Listar labels de Gmail (en vivo, no del cache).
+ipcMain.handle('google-gmail:list-labels', async (event) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var result = await googleGmail.listLabels(configPath);
+    return result;
+  } catch (e) {
+    console.error('[google-gmail] Error en list-labels:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// F1-Feature5 — Descargar un adjunto de un mensaje.
+ipcMain.handle('google-gmail:download-attachment', async (event, options) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var result = await googleGmail.downloadAttachment(options.messageId, options.attachmentId, configPath);
+    return result;
+  } catch (e) {
+    console.error('[google-gmail] Error en download-attachment:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// F1-Feature3 — Archivar thread (remove label INBOX).
+ipcMain.handle('google-gmail:archive-thread', async (event, options) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var auth = await googleAuth.getAuthorizedClient(configPath);
+    if (!auth) {
+      return { success: false, error: 'No autorizado' };
+    }
+    var gmail = googleAuth.getGmailClient(auth);
+    var threadId = options.threadId;
+    // Rate limiter global + retry con exponential backoff
+    await googleGmail.GmailRateLimiter.run(function () {
+      return googleGmail.withRetry(function () {
+        return gmail.users.threads.modify({
+          userId: 'me',
+          id: threadId,
+          requestBody: { removeLabelIds: ['INBOX'] }
+        });
+      }, { maxRetries: 3, baseDelay: 1000 });
+    });
+    // Actualizar cache: cambiar folder a ARCHIVED (no INBOX ni SENT)
+    try {
+      emailDb.getDb && emailDb.getDb().prepare('UPDATE email_threads SET folder = ? WHERE id = ?').run('ARCHIVED', threadId);
+    } catch (dbErr) {}
+    return { success: true };
+  } catch (e) {
+    console.error('[google-gmail] Error en archive-thread:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// F1-Feature3 — Marcar thread como leído (en Gmail API).
+ipcMain.handle('google-gmail:mark-thread-read', async (event, options) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var auth = await googleAuth.getAuthorizedClient(configPath);
+    if (!auth) {
+      return { success: false, error: 'No autorizado' };
+    }
+    var gmail = googleAuth.getGmailClient(auth);
+    var threadId = options.threadId;
+    // Rate limiter global + retry con exponential backoff
+    await googleGmail.GmailRateLimiter.run(function () {
+      return googleGmail.withRetry(function () {
+        return gmail.users.threads.modify({
+          userId: 'me',
+          id: threadId,
+          requestBody: { removeLabelIds: ['UNREAD'] }
+        });
+      }, { maxRetries: 3, baseDelay: 1000 });
+    });
+    try {
+      // 🐛bug-fix — Usar helper que actualiza has_unread del thread Y label_ids de
+      // los messages. Antes solo se actualizaba has_unread (correcto para este
+      // handler que SI recibe threadId), pero faltaba sincronizar label_ids.
+      emailDb.propagateUnreadChange && emailDb.propagateUnreadChange(threadId, false);
+    } catch (dbErr) {}
+    return { success: true };
+  } catch (e) {
+    console.error('[google-gmail] Error en mark-thread-read:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// ============================================================
+// 📦 Bandeja Integrada — Email cache (SQLite) — Fase 0
+// ============================================================
+// 3 IPCs nuevos: sync-inbox (Gmail → SQLite), get-threads (lee de SQLite),
+// get-cache-stats (totales para el footer). Inspirado en el patrón
+// driver de Mail-0/Zero pero usando IPC + SQLite directo.
+const emailDb = require('./main/email-db');
+const emailSync = require('./main/email-sync');
+
+// Sincroniza el inbox desde Gmail al cache SQLite
+ipcMain.handle('email-cache:sync-inbox', async (event, options) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var result = await emailSync.syncInbox(Object.assign({ configPath: configPath }, options || {}));
+    return result;
+  } catch (e) {
+    console.error('[email-cache] Error en sync-inbox:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// Lee los threads del cache SQLite (instantáneo, sin API call)
+ipcMain.handle('email-cache:get-threads', async (event, options) => {
+  try {
+    var threads = emailDb.getThreadsFromCache(options || {});
+    return { success: true, data: threads };
+  } catch (e) {
+    console.error('[email-cache] Error en get-threads:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// Lee un thread completo con todos sus mensajes
+ipcMain.handle('email-cache:get-thread', async (event, threadId) => {
+  try {
+    var thread = emailDb.getThreadFromCache(threadId);
+    var messages = emailDb.getMessagesFromCache(threadId);
+    return { success: true, data: { thread: thread, messages: messages } };
+  } catch (e) {
+    console.error('[email-cache] Error en get-thread:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// F1-Feature5 — Obtener adjuntos de un mensaje desde el cache local
+ipcMain.handle('email-cache:get-attachments', async (event, messageId) => {
+  try {
+    var attachments = emailDb.getAttachmentsByMessage(messageId);
+    return { success: true, data: attachments };
+  } catch (e) {
+    console.error('[email-cache] Error en get-attachments:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// Estadísticas del cache (para mostrar en el footer "X correos")
+ipcMain.handle('email-cache:get-stats', async () => {
+  try {
+    var stats = emailDb.getCacheStats();
+    return { success: true, data: stats };
+  } catch (e) {
+    console.error('[email-cache] Error en get-stats:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// F1-Feature1 — Obtener los labels de Gmail del cache SQLite
+ipcMain.handle('email-cache:get-labels', async (event, connectionId) => {
+  try {
+    var labels = emailDb.getLabelsFromCache(connectionId || null);
+    return { success: true, data: labels };
+  } catch (e) {
+    console.error('[email-cache] Error en get-labels:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// F1-Feature3 (preparación) — Marcar mensaje como leído en Gmail + cache
+ipcMain.handle('google-gmail:mark-read', async (event, options) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var auth = await googleAuth.getAuthorizedClient(configPath);
+    if (!auth) {
+      return { success: false, error: 'No autorizado' };
+    }
+    var gmail = googleAuth.getGmailClient(auth);
+    var messageId = options.messageId;
+    var markAsRead = options.read !== false;  // default: marcar como leído
+    // Retry con exponential backoff para rate limiting
+    var modifyRes = await withRetry(function () {
+      return gmail.users.messages.modify({
+        userId: 'me',
+        id: messageId,
+        requestBody: markAsRead
+          ? { removeLabelIds: ['UNREAD'] }
+          : { addLabelIds: ['UNREAD'] }
+      });
+    }, { maxRetries: 3, baseDelay: 1000 });
+    // Actualizar cache local: has_unread
+    try {
+      // 🐛bug-fix — El parametro `messageId` que llega es realmente un threadId
+      // (ver renderer.js:4488: "usamos el threadId como messageId"). El codigo
+      // anterior hacia un subquery `WHERE id = ?` sobre email_messages, que
+      // nunca encontraba nada, asi que has_unread NUNCA se actualizaba. Ahora
+      // el helper propaga correctamente el cambio a has_unread + label_ids.
+      if (markAsRead) {
+        emailDb.propagateUnreadChange && emailDb.propagateUnreadChange(messageId, false);
+      } else {
+        emailDb.propagateUnreadChange && emailDb.propagateUnreadChange(messageId, true);
+      }
+    } catch (dbErr) {
+      // No crítico
+    }
+    return { success: true, data: { id: modifyRes.data.id, labelIds: modifyRes.data.labelIds } };
+  } catch (e) {
+    console.error('[google-gmail] Error en mark-read:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// ============================================================
+// F3.C — Google Calendar sync (lectura/escritura desde Bandeja Integrada)
+// ============================================================
+// Reutiliza el cliente OAuth2 ya autorizado por F3.A. El scope de Calendar
+// ya está en shared/google-auth.js (línea 82), no requiere re-autorización.
+//   - list   → trae eventos de Google Calendar en un rango de tiempo
+//   - create → crea evento en Google Calendar, devuelve googleEventId
+//   - update → actualiza evento existente
+//   - delete → elimina evento
+//   - sync   → sync completo (pull + deduplicación por googleEventId)
+const googleCalendar = require('./shared/google-calendar');
+
+ipcMain.handle('google-calendar:list', async (event, options) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var result = await googleCalendar.listEvents(
+      configPath,
+      options && options.timeMin,
+      options && options.timeMax
+    );
+    return result;
+  } catch (err) {
+    sendLog('[MAIN] google-calendar:list error: ' + (err.message || err), 'ERROR');
+    return { success: false, error: err.message || 'Error listando eventos de Calendar' };
+  }
+});
+
+// 📦646-fix12 — Traer UN evento de Google por su ID. Safety net para el
+// edit modal cuando K+AIR no tiene attendees pero Google sí.
+ipcMain.handle('google-calendar:get', async (event, googleEventId) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var result = await googleCalendar.getEvent(configPath, googleEventId);
+    return result;
+  } catch (err) {
+    sendLog('[MAIN] google-calendar:get error: ' + (err.message || err), 'ERROR');
+    return { success: false, error: err.message || 'Error trayendo evento de Calendar' };
+  }
+});
+
+ipcMain.handle('google-calendar:create', async (event, ev) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var result = await googleCalendar.createEvent(configPath, ev || {});
+    return result;
+  } catch (err) {
+    sendLog('[MAIN] google-calendar:create error: ' + (err.message || err), 'ERROR');
+    return { success: false, error: err.message || 'Error creando evento en Calendar' };
+  }
+});
+
+ipcMain.handle('google-calendar:update', async (event, payload) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var googleEventId = payload && payload.googleEventId;
+    var ev = payload && payload.event;
+    if (!googleEventId) return { success: false, error: 'Falta googleEventId' };
+    var result = await googleCalendar.updateEvent(configPath, googleEventId, ev || {});
+    return result;
+  } catch (err) {
+    sendLog('[MAIN] google-calendar:update error: ' + (err.message || err), 'ERROR');
+    return { success: false, error: err.message || 'Error actualizando evento en Calendar' };
+  }
+});
+
+ipcMain.handle('google-calendar:delete', async (event, googleEventId) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var result = await googleCalendar.deleteEvent(configPath, googleEventId);
+    return result;
+  } catch (err) {
+    sendLog('[MAIN] google-calendar:delete error: ' + (err.message || err), 'ERROR');
+    return { success: false, error: err.message || 'Error eliminando evento en Calendar' };
+  }
+});
+
+ipcMain.handle('google-calendar:sync', async (event, options) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var result = await googleCalendar.syncFromGoogle(configPath, options || {});
+    return result;
+  } catch (err) {
+    sendLog('[MAIN] google-calendar:sync error: ' + (err.message || err), 'ERROR');
+    return { success: false, error: err.message || 'Error sincronizando con Calendar' };
+  }
+});
+
+// 📦600 — Responder a una invitación de Google Calendar (Sí / No / Tal vez).
+// Llama a events.patch con el responseStatus del attendee que matchea el userEmail.
+ipcMain.handle('google-calendar:respond', async (event, payload) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var googleEventId = payload && payload.googleEventId;
+    var responseStatus = payload && payload.responseStatus;
+    var userEmail = payload && payload.userEmail;
+    var result = await googleCalendar.respondToEvent(
+      configPath, googleEventId, responseStatus, userEmail
+    );
+    return result;
+  } catch (err) {
+    sendLog('[MAIN] google-calendar:respond error: ' + (err.message || err), 'ERROR');
+    return { success: false, error: err.message || 'Error respondiendo al evento' };
+  }
+});
+
+// 📦602 — Recibe un .ics (texto), lo parsea, crea/actualiza el evento en
+// Google Calendar y responde al organizador. Usado cuando el user hace
+// click en Sí/No/Tal vez desde el banner dentro del email viewer.
+ipcMain.handle('google-calendar:upsert-from-ics', async (event, payload) => {
+  try {
+    var configPath = getGoogleConfigPath();
+    var icsText = payload && payload.icsText;
+    var responseStatus = payload && payload.responseStatus;
+    var userEmail = payload && payload.userEmail;
+    var result = await googleCalendar.upsertFromIcs(
+      configPath, icsText, responseStatus, userEmail
+    );
+    return result;
+  } catch (err) {
+    sendLog('[MAIN] google-calendar:upsert-from-ics error: ' + (err.message || err), 'ERROR');
+    return { success: false, error: err.message || 'Error procesando el ICS' };
+  }
+});
+
+// ============================================================
+// F3.A — Google OAuth (Calendar + Gmail) — Bandeja Integrada
+// ============================================================
+// Flujo:
+//   1. UI llama a google-oauth:start → devuelve { authUrl, port, ... }
+//   2. UI abre authUrl en browser externo y arranca el callback server
+//   3. Browser redirige a http://127.0.0.1:port/oauth2callback?code=XXX
+//   4. UI llama a google-oauth:exchange con el code capturado
+//   5. Tokens se persisten en config.json
+const googleAuth = require('./shared/google-auth');
+const googleTokens = require('./shared/google-tokens');
+
+// Estado en memoria del flow activo (1 solo a la vez)
+let googleAuthFlowState = null;
+
+function getGoogleConfigPath() {
+  if (!app || !app.getPath) return null;
+  return path.join(app.getPath('userData'), 'config.json');
+}
+
+// Inicia el flow: genera la URL de autorización y arranca el callback server.
+ipcMain.handle('google-oauth:start', async () => {
+  try {
+    if (googleAuthFlowState) {
+      return { success: false, error: 'Ya hay un flow de autorización activo. Esperá o cancelá.' };
+    }
+    const flow = googleAuth.startAuth();
+    const callbackServer = googleAuth.createCallbackServer(flow.port);
+
+    googleAuthFlowState = {
+      verifier: flow.verifier,
+      expectedState: flow.state,
+      configPath: getGoogleConfigPath(),
+      server: callbackServer
+    };
+
+    return {
+      success: true,
+      data: {
+        authUrl: flow.authUrl,
+        port: flow.port,
+        redirectUri: flow.redirectUri
+      }
+    };
+  } catch (e) {
+    console.error('[GoogleOAuth] Error en start:', e);
+    return { success: false, error: e.message || 'Error iniciando OAuth' };
+  }
+});
+
+// Espera el callback del browser (Google redirige a 127.0.0.1:port/?code=XXX).
+ipcMain.handle('google-oauth:await-callback', async () => {
+  if (!googleAuthFlowState) {
+    return { success: false, error: 'No hay un flow activo. Llamá a google-oauth:start primero.' };
+  }
+  try {
+    const { code, state, error } = await googleAuthFlowState.server.promise;
+    if (error) {
+      googleAuthFlowState = null;
+      return { success: false, error: error };
+    }
+    if (!code) {
+      googleAuthFlowState = null;
+      return { success: false, error: 'No se recibió code en el callback' };
+    }
+    return { success: true, data: { code, state } };
+  } catch (e) {
+    console.error('[GoogleOAuth] Error en await-callback:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// Intercambia el code por tokens (access + refresh) y los persiste.
+ipcMain.handle('google-oauth:exchange', async (event, payload) => {
+  if (!googleAuthFlowState) {
+    return { success: false, error: 'No hay un flow activo.' };
+  }
+  try {
+    const result = await googleAuth.exchangeCode({
+      code: payload.code,
+      verifier: googleAuthFlowState.verifier,
+      expectedState: googleAuthFlowState.expectedState,
+      actualState: payload.state,
+      configPath: googleAuthFlowState.configPath
+    });
+    // Limpiar el flow
+    try { googleAuthFlowState.server.close(); } catch (e) {}
+    googleAuthFlowState = null;
+    return result;
+  } catch (e) {
+    console.error('[GoogleOAuth] Error en exchange:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// Cancela el flow activo.
+ipcMain.handle('google-oauth:cancel', async () => {
+  if (!googleAuthFlowState) {
+    return { success: true, data: { cancelled: false } };
+  }
+  try { googleAuthFlowState.server.close(); } catch (e) {}
+  googleAuthFlowState = null;
+  return { success: true, data: { cancelled: true } };
+});
+
+// Devuelve el estado de la conexión (si hay tokens válidos guardados).
+ipcMain.handle('google-oauth:status', async () => {
+  const configPath = getGoogleConfigPath();
+  const has = googleTokens.hasValidTokens(configPath);
+  const tokens = googleTokens.loadTokens(configPath);
+  return {
+    success: true,
+    data: {
+      connected: has,
+      hasRefreshToken: !!(tokens && tokens.refresh_token),
+      expiryDate: tokens ? tokens.expiry_date : null,
+      savedAt: tokens ? tokens.savedAt : null
+    }
+  };
+});
+
+// Desconecta (borra los tokens guardados).
+ipcMain.handle('google-oauth:disconnect', async () => {
+  const configPath = getGoogleConfigPath();
+  const ok = googleTokens.clearTokens(configPath);
+  return { success: ok };
+});
+
+// F3.A — Abre una URL en el browser externo del usuario. Usado por el
+// flow OAuth de Gmail para mostrar la pantalla de consentimiento de Google.
+ipcMain.on('open-external-url', async (event, url) => {
+  if (typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://'))) {
+    await shell.openExternal(url);
+  }
+});
+
 // Manejar la obtención de la versión de la aplicación
 ipcMain.handle('get-app-version', async () => {
   try {
@@ -1317,7 +2359,11 @@ ipcMain.handle('get-app-version', async () => {
     return app.getVersion();
   } catch (error) {
     console.error('Error getting app version:', error);
-    return '1.0.0'; // Valor por defecto en caso de error
+    // (P2-5 audit-2026-09-10) Antes retornaba '1.0.0' como fallback. Eso era
+    // PELIGROSO porque el updater podía pensar que el cliente estaba en una
+    // versión muy vieja y forzar un update innecesario. Ahora retornamos
+    // string vacío para que el caller (renderer) decida cómo manejarlo.
+    return '';
   }
 });
 
@@ -1330,6 +2376,63 @@ ipcMain.handle('check-for-updates-manual', async () => {
   } catch (error) {
     sendLog(`[UPDATER] Error en verificación manual: ${error.message}`, 'ERROR');
     return { success: false, error: { code: 'UPDATE_CHECK_FAILED', message: error.message } };
+  }
+});
+
+// 📦546 — Descarga manual como FALLBACK. El flujo principal es auto-descarga
+// (autoDownload=true en main.js). Este IPC queda por si la auto-descarga falla
+// y el usuario quiere reintentar desde el panel del header.
+ipcMain.handle('update:download', async () => {
+  try {
+    sendLog('[UPDATER] Usuario solicitó descarga manual de la actualización', 'INFO');
+    if (typeof autoUpdater.downloadUpdate === 'function') {
+      autoUpdater.downloadUpdate();
+      return { success: true };
+    }
+    return { success: false, error: { code: 'NOT_AVAILABLE', message: 'autoUpdater no disponible' } };
+  } catch (error) {
+    sendLog(`[UPDATER] Error iniciando descarga: ${error.message}`, 'ERROR');
+    return { success: false, error: { code: 'DOWNLOAD_FAILED', message: error.message } };
+  }
+});
+
+// 📦581 (Loop 9) — Release notes desde GitHub API.
+// Cache por 1 hora para no martillar la API. Devuelve la última release.
+// El renderer puede mostrar el body markdown (sin procesar) en el modal.
+const releaseNotesCache = { data: null, fetchedAt: 0 };
+const RELEASE_NOTES_TTL = 60 * 60 * 1000; // 1 hora
+const GITHUB_REPO = 'Reivaj640/SG-SST-E';
+
+ipcMain.handle('get-release-notes', async () => {
+  try {
+    // Devolver cache si está fresco
+    if (releaseNotesCache.data && (Date.now() - releaseNotesCache.fetchedAt) < RELEASE_NOTES_TTL) {
+      return { success: true, cached: true, data: releaseNotesCache.data };
+    }
+    // Fetch desde GitHub
+    const url = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/vnd.github+json', 'User-Agent': 'K+AIR-Updater' }
+    });
+    if (!response.ok) {
+      return { success: false, error: { code: 'HTTP_' + response.status, message: `GitHub respondió ${response.status}` } };
+    }
+    const data = await response.json();
+    // Extraer lo que nos sirve
+    const release = {
+      tagName: data.tag_name || '',
+      name: data.name || data.tag_name || '',
+      body: data.body || '',  // markdown
+      publishedAt: data.published_at || '',
+      htmlUrl: data.html_url || ''
+    };
+    releaseNotesCache.data = release;
+    releaseNotesCache.fetchedAt = Date.now();
+    sendLog(`[UPDATER] Release notes fetched: ${release.tagName}`, 'INFO');
+    return { success: true, cached: false, data: release };
+  } catch (error) {
+    sendLog(`[UPDATER] Error fetching release notes: ${error.message}`, 'ERROR');
+    return { success: false, error: { code: 'FETCH_FAILED', message: error.message } };
   }
 });
 
@@ -1346,10 +2449,13 @@ ipcMain.handle('get-app-path', async () => {
 
 // Crear acceso directo en el escritorio del usuario (Windows)
 // Nota: autoUpdater.quitAndInstall() NO recrea shortcuts, por eso este IPC existe
-ipcMain.handle('create-desktop-shortcut', async () => {
+// 📦465 (2026-07-03) — Refactor: lógica extraída a _ensureDesktopShortcut()
+// para poder invocarla desde la auto-reparación silenciosa en app.whenReady()
+// (fix para "instalación limpia o actualización no crea shortcut en escritorio").
+function _ensureDesktopShortcut() {
   try {
     if (process.platform !== 'win32') {
-      return { success: false, error: 'Esta función solo está disponible en Windows actualmente.' };
+      return { success: false, error: 'Solo disponible en Windows' };
     }
 
     const desktopPath = app.getPath('desktop');
@@ -1400,6 +2506,10 @@ ipcMain.handle('create-desktop-shortcut', async () => {
     sendLog(`[SHORTCUT] Error creando acceso directo: ${error.message}`, 'ERROR');
     return { success: false, error: error.message };
   }
+}
+
+ipcMain.handle('create-desktop-shortcut', async () => {
+  return _ensureDesktopShortcut();
 });
 
 // Verificar si ya existe el acceso directo en el escritorio
@@ -2500,7 +3610,8 @@ async function runPythonScript(scriptPath, args) {
       
       const pythonProcess = spawn(pythonPath, [scriptPath, ...args], {
         cwd: path.dirname(scriptPath),
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+        windowsHide: true
       });
 
       let stdoutData = '';
@@ -2943,6 +4054,24 @@ ipcMain.handle('open-path', async (event, pathToOpen) => {
   }
 });
 
+// Mostrar archivo en su carpeta (Explorer/Finder) — para botón "Visualizar investigación"
+ipcMain.handle('show-item-in-folder', async (event, filePath) => {
+  try {
+    if (!filePath || typeof filePath !== 'string') {
+      return { success: false, error: 'Ruta de archivo inválida' };
+    }
+    const fs = require('fs');
+    if (!fs.existsSync(filePath)) {
+      return { success: false, error: 'El archivo no existe: ' + filePath };
+    }
+    shell.showItemInFolder(filePath);
+    return { success: true };
+  } catch (error) {
+    console.error('Error en show-item-in-folder:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // Manejar lectura de archivo Excel como buffer
 ipcMain.handle('read-excel-file', async (event, filePath) => {
   try {
@@ -2974,7 +4103,15 @@ ipcMain.handle('process-excel-data', async (event, { buffer, company, period }) 
       throw new Error('No se proporcionó un buffer de archivo Excel válido');
     }
 
-    const XLSX = require('xlsx');
+    let XLSX;
+    try {
+      XLSX = require('xlsx');
+    } catch (e) {
+      return { success: false, error: { code: 'XLSX_NOT_AVAILABLE', message: 'xlsx module not available: ' + e.message } };
+    }
+    if (!XLSX) {
+      return { success: false, error: { code: 'XLSX_NOT_AVAILABLE', message: 'xlsx module not available' } };
+    }
     const workbook = XLSX.read(buffer, { type: 'buffer' });
 
     // --- LÓGICA MEJORADA: BUSCAR LA HOJA CORRECTA ---
@@ -3786,6 +4923,816 @@ ipcMain.handle('repair-plan-trabajo-excel', async (event, { filePath, templatePa
     sendLog(`[REPAIR-PLAN][ERROR] Error al reparar: ${error.message}`, 'ERROR');
     sendLog(`[REPAIR-PLAN][ERROR] Stack: ${error.stack}`, 'ERROR');
     return { success: false, error: error.message };
+  }
+});
+
+// ── K+AIR Calendar: Plan de Trabajo (placeholder v1) ──────────────────
+// TODO v2: leer el cronograma del Plan de Trabajo Anual (Excel GI-FO-062 o similar)
+// y mapear cada actividad con fecha a un evento { id, title, date, start, end, type: 'plan' }.
+// P0-CRO-AUDIT-3 (2026-09-07) — Limitación conocida: el Excel "Plan de Trabajo
+// Anual" tiene un formato variable por empresa (filas con año, actividad,
+// responsable, fecha) y NO está documentado. Implementar el mapper sin spec
+// es riesgoso. Por ahora devolvemos [] con log explícito para que el calendario
+// muestre solo las otras 11 fuentes. Requiere acción del usuario: documentar
+// el formato del Excel o aportar un archivo de muestra para implementar.
+//
+// TODO (requiere user input):
+//   1. User documenta estructura del Excel de Plan de Trabajo Anual:
+//      - ¿En qué hoja están los eventos del año actual?
+//      - ¿Qué columnas tienen (fecha, actividad, responsable, ...)?
+//      - ¿Cómo se marca si está cumplido?
+//   2. Con la spec, implementar el mapper similar a _leerCapacitacionesDeEmpresa
+//      (main.js:5299) que ya tiene el patrón para leer Excels de cronogramas.
+ipcMain.handle('plan-trabajo:get-events', async (event, range) => {
+  sendLog('[CAL-PLAN-TRABAJO] STUB — requiere spec del Excel Plan de Trabajo. Devolviendo [] hasta entonces.', 'INFO');
+  return { success: true, data: [] };
+});
+
+// ── K+AIR Calendar: Recordatorio Acta COPASST (📦522 — mensual global) ──
+// 📅 Recordatorio mensual: "Realizar Acta del COPASST" el día 1 de cada mes.
+// Recordatorio LEGAL — todas las empresas con COPASST deben levantar acta
+// mensualmente segun el Decreto 614/1984 y la Resolucion 0312/2019 (numeral
+// 1.1.6 del estandar). El recordatorio aparece el dia 1 con texto que
+// recuerda el plazo: "dentro de los primeros 5 dias habiles del mes".
+//
+// Genera 1 evento por mes en el rango. No depende de la empresa — es global.
+// El adapter del calendario lo consume. Se cachea la lista en memoria
+// (los eventos del año en curso se generan una sola vez por sesion).
+//
+// Params: { start?: 'YYYY-MM-DD', end?: 'YYYY-MM-DD' }
+// Si no se pasa rango, se generan los 12 meses del año actual.
+ipcMain.handle('recordatorio-copasst:get-events', async (event, params) => {
+  try {
+    const params2 = params || {};
+    const now = new Date();
+    const currentYear = now.getFullYear();
+
+    // Determinar rango: si no viene, usar el año completo
+    let startStr = params2.start;
+    let endStr = params2.end;
+    if (!startStr || !endStr) {
+      startStr = `${currentYear}-01-01`;
+      endStr = `${currentYear}-12-31`;
+    }
+
+    const startDate = new Date(startStr + 'T00:00:00');
+    const endDate = new Date(endStr + 'T23:59:59');
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return { success: false, error: { code: 'INVALID_INPUT', message: 'start/end inválidos' } };
+    }
+
+    const events = [];
+    // Iterar mes a mes desde el primer mes del rango hasta el ultimo
+    const cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    const endCursor = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+    while (cursor <= endCursor) {
+      const year = cursor.getFullYear();
+      const monthIdx = cursor.getMonth();
+      const monthNum = String(monthIdx + 1).padStart(2, '0');
+
+      // 📅 Si el dia 1 cae sabado (6) o domingo (0), mover al siguiente dia habil
+      // (lunes = 1, ... viernes = 5). Esto evita que el recordatorio caiga en
+      // fin de semana donde nadie lo va a ver. getDay() devuelve 0 (Dom) a 6 (Sab).
+      const dayOfWeek = cursor.getDay();
+      let adjustedDay = 1;
+      let ajusteTexto = '';
+      if (dayOfWeek === 6) {
+        // Sabado → mover al lunes (dia 3)
+        adjustedDay = 3;
+        ajusteTexto = ' (1° cae sábado, se muestra el lunes 3)';
+      } else if (dayOfWeek === 0) {
+        // Domingo → mover al lunes (dia 2)
+        adjustedDay = 2;
+        ajusteTexto = ' (1° cae domingo, se muestra el lunes 2)';
+      }
+      const dayStr = String(adjustedDay).padStart(2, '0');
+      const dateStr = `${year}-${monthNum}-${dayStr}`;
+
+      events.push({
+        id: `recordatorio-copasst-${year}-${monthNum}-${dayStr}`,
+        type: 'recordatorio_copasst',
+        title: 'Realizar Acta del COPASST',
+        date: dateStr,
+        start: '00:00',
+        end: '23:59',
+        allDay: true,
+        color: '#ea580c',
+        source: 'recordatorio_copasst',
+        meta: {
+          plazoTexto: 'Dentro de los primeros 5 días hábiles del mes' + ajusteTexto,
+          mes: monthIdx + 1,
+          year: year,
+          diaOriginal: 1,
+          diaMostrado: adjustedDay,
+          esFinDeSemana: dayOfWeek === 0 || dayOfWeek === 6,
+          norma: 'Decreto 614/1984 · Res. 0312/2019 estándar 1.1.6'
+        }
+      });
+
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+
+    return { success: true, data: events };
+  } catch (e) {
+    sendLog(`[CAL-COPASST] Error generando recordatorios: ${e.message}`, 'ERROR');
+    return { success: false, error: { code: 'GET_EVENTS_FAILED', message: e.message } };
+  }
+});
+
+// ── K+AIR Calendar: Recordatorio Acta Comite de Convivencia (📦523) ─────
+// 📅 Recordatorio TRIMESTRAL alineado con el ciclo de auto-llenado del
+// acta (main.js:11457 CONVIVENCIA_CYCLE_MONTHS = [2, 5, 8, 11]). El
+// boton "Autollenado" del modulo sugiere la proxima reunion siguiendo
+// ese mismo ciclo Feb/May/Ago/Nov, por eso el calendario refleja
+// exactamente esas 4 reuniones al ano. Aparece el dia 1 del mes del
+// ciclo (movido al lunes si cae en fin de semana), color cyan #0891b2
+// para distinguirse del naranja de COPASST.
+//
+// (Nota historica: la Res. 0312/2019 estandar 6.2.2 y la Ley 1010/2006
+// piden reuniones mensuales, pero el autofill de la app esta
+// configurado en ciclo trimestral desde su creacion — el calendario
+// refleja la configuracion real de la app, no el maximo legal. Si en
+// algun momento se cambia el autofill a mensual, sincronizar este
+// array con [1..12] tambien.)
+const CONVIVENCIA_RECORDATORIO_MONTHS = [2, 5, 8, 11]; // Feb, May, Ago, Nov
+ipcMain.handle('recordatorio-convivencia:get-events', async (event, params) => {
+  try {
+    const params2 = params || {};
+    const now = new Date();
+    const currentYear = now.getFullYear();
+
+    let startStr = params2.start;
+    let endStr = params2.end;
+    if (!startStr || !endStr) {
+      startStr = `${currentYear}-01-01`;
+      endStr = `${currentYear}-12-31`;
+    }
+
+    const startDate = new Date(startStr + 'T00:00:00');
+    const endDate = new Date(endStr + 'T23:59:59');
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return { success: false, error: { code: 'INVALID_INPUT', message: 'start/end inválidos' } };
+    }
+
+    const events = [];
+    const cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    const endCursor = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+    while (cursor <= endCursor) {
+      const year = cursor.getFullYear();
+      const monthIdx = cursor.getMonth();
+      const monthNum = monthIdx + 1; // 1-12, sin padding todavía
+
+      // Solo generar recordatorio en los meses del ciclo trimestral
+      if (!CONVIVENCIA_RECORDATORIO_MONTHS.includes(monthNum)) {
+        cursor.setMonth(cursor.getMonth() + 1);
+        continue;
+      }
+
+      const monthStr = String(monthNum).padStart(2, '0');
+
+      // Misma logica que COPASST: si dia 1 cae en fin de semana, mover al lunes
+      const dayOfWeek = cursor.getDay();
+      let adjustedDay = 1;
+      let ajusteTexto = '';
+      if (dayOfWeek === 6) {
+        adjustedDay = 3;
+        ajusteTexto = ' (1° cae sábado, se muestra el lunes 3)';
+      } else if (dayOfWeek === 0) {
+        adjustedDay = 2;
+        ajusteTexto = ' (1° cae domingo, se muestra el lunes 2)';
+      }
+      const dayStr = String(adjustedDay).padStart(2, '0');
+      const dateStr = `${year}-${monthStr}-${dayStr}`;
+
+      events.push({
+        id: `recordatorio-convivencia-${year}-${monthStr}-${dayStr}`,
+        type: 'recordatorio_convivencia',
+        title: 'Realizar Acta del Comité de Convivencia',
+        date: dateStr,
+        start: '00:00',
+        end: '23:59',
+        allDay: true,
+        color: '#0891b2',
+        source: 'recordatorio_convivencia',
+        meta: {
+          plazoTexto: 'Reunión trimestral del Comité de Convivencia' + ajusteTexto,
+          mes: monthNum,
+          year: year,
+          diaOriginal: 1,
+          diaMostrado: adjustedDay,
+          esFinDeSemana: dayOfWeek === 0 || dayOfWeek === 6,
+          ciclo: 'Trimestral (Feb, May, Ago, Nov)',
+          norma: 'Res. 0312/2019 estándar 6.2.2 · Ley 1010/2006'
+        }
+      });
+
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+
+    return { success: true, data: events };
+  } catch (e) {
+    sendLog(`[CAL-CONVIVENCIA] Error generando recordatorios: ${e.message}`, 'ERROR');
+    return { success: false, error: { code: 'GET_EVENTS_FAILED', message: e.message } };
+  }
+});
+
+// ── K+AIR Calendar: Recordatorio Actualización Presupuesto (📦524) ──────
+// 📅 Recordatorio MENSUAL con 2 eventos por mes: día 5 (cierre de los
+// "5 primeros días" del mes) y día 20 (cierre de los "20 primeros días").
+// Si la fecha cae en fin de semana se mueve al lunes siguiente (mismo
+// patrón que COPASST/Convivencia). Color emerald #10b981 (verde monetario)
+// para distinguirse del naranja COPASST y cyan Convivencia.
+//
+// Genera 24 eventos por año (2/mes × 12). No depende de empresa — es global
+// (la actualización de presupuesto es un recordatorio operativo, no legal).
+const VENTANAS_PRESUPUESTO = [
+  { day: 5,  ventana: '5 primeros días' },
+  { day: 20, ventana: '20 primeros días' }
+];
+ipcMain.handle('recordatorio-presupuesto:get-events', async (event, params) => {
+  try {
+    const params2 = params || {};
+    const now = new Date();
+    const currentYear = now.getFullYear();
+
+    let startStr = params2.start;
+    let endStr = params2.end;
+    if (!startStr || !endStr) {
+      startStr = `${currentYear}-01-01`;
+      endStr = `${currentYear}-12-31`;
+    }
+
+    const startDate = new Date(startStr + 'T00:00:00');
+    const endDate = new Date(endStr + 'T23:59:59');
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return { success: false, error: { code: 'INVALID_INPUT', message: 'start/end inválidos' } };
+    }
+
+    const events = [];
+    const cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    const endCursor = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+    while (cursor <= endCursor) {
+      const year = cursor.getFullYear();
+      const monthIdx = cursor.getMonth();
+      const monthNum = monthIdx + 1;
+      const monthStr = String(monthNum).padStart(2, '0');
+
+      for (const v of VENTANAS_PRESUPUESTO) {
+        const dayDate = new Date(year, monthIdx, v.day);
+        const dayOfWeek = dayDate.getDay();
+        let adjustedDay = v.day;
+        let ajusteTexto = '';
+        if (dayOfWeek === 6) {
+          // Sábado → lunes siguiente (v.day + 2)
+          adjustedDay = v.day + 2;
+          ajusteTexto = ` (día ${v.day} cae sábado, se muestra lunes ${adjustedDay})`;
+        } else if (dayOfWeek === 0) {
+          // Domingo → lunes siguiente (v.day + 1)
+          adjustedDay = v.day + 1;
+          ajusteTexto = ` (día ${v.day} cae domingo, se muestra lunes ${adjustedDay})`;
+        }
+        const dayStr = String(adjustedDay).padStart(2, '0');
+        const dateStr = `${year}-${monthStr}-${dayStr}`;
+
+        events.push({
+          id: `recordatorio-presupuesto-${v.ventana.replace(/\s/g, '')}-${year}-${monthStr}-${dayStr}`,
+          type: 'recordatorio_presupuesto',
+          title: `Actualización de Presupuesto (${v.ventana})`,
+          date: dateStr,
+          start: '00:00',
+          end: '23:59',
+          allDay: true,
+          color: '#10b981',
+          source: 'recordatorio_presupuesto',
+          meta: {
+            plazoTexto: `Cierre de los ${v.ventana} del mes` + ajusteTexto,
+            mes: monthNum,
+            year: year,
+            ventana: v.ventana,
+            diaOriginal: v.day,
+            diaMostrado: adjustedDay,
+            esFinDeSemana: dayOfWeek === 0 || dayOfWeek === 6,
+            ciclo: 'Mensual (día 5 y día 20)'
+          }
+        });
+      }
+
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+
+    return { success: true, data: events };
+  } catch (e) {
+    sendLog(`[CAL-PRESUPUESTO] Error generando recordatorios: ${e.message}`, 'ERROR');
+    return { success: false, error: { code: 'GET_EVENTS_FAILED', message: e.message } };
+  }
+});
+
+// ── K+AIR Calendar: Recordatorio Afiliación al SSSI (📦525) ────────────
+// 📅 Recordatorio MENSUAL: día 10 (cierre de los "10 primeros días" del
+// mes). Recordatorio LEGAL-OPERATIVO: en Colombia, la afiliación al
+// Sistema de Seguridad Social Integral (SSSI) — salud (EPS), pensión
+// (AFP), riesgos laborales (ARL) — debe mantenerse actualizada con
+// los ingresos y retiros del mes (Ley 100/1993, Decreto 1295/1994,
+// Decreto 806/1998 art. 16). El usuario tiene los 10 primeros días
+// del mes para reportar novedades de personal. Si el día 10 cae en
+// fin de semana se mueve al lunes siguiente (mismo patrón que COPASST
+// /Convivencia/Presupuesto). Color amber #f59e0b para distinguirse
+// del resto.
+//
+// Genera 12 eventos por año (1/mes × 12). No depende de empresa — es global.
+ipcMain.handle('recordatorio-afiliacion:get-events', async (event, params) => {
+  try {
+    const params2 = params || {};
+    const now = new Date();
+    const currentYear = now.getFullYear();
+
+    let startStr = params2.start;
+    let endStr = params2.end;
+    if (!startStr || !endStr) {
+      startStr = `${currentYear}-01-01`;
+      endStr = `${currentYear}-12-31`;
+    }
+
+    const startDate = new Date(startStr + 'T00:00:00');
+    const endDate = new Date(endStr + 'T23:59:59');
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return { success: false, error: { code: 'INVALID_INPUT', message: 'start/end inválidos' } };
+    }
+
+    const events = [];
+    const cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    const endCursor = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+    while (cursor <= endCursor) {
+      const year = cursor.getFullYear();
+      const monthIdx = cursor.getMonth();
+      const monthNum = monthIdx + 1;
+      const monthStr = String(monthNum).padStart(2, '0');
+
+      // 1 evento por mes: día 10 (cierre de los 10 primeros días)
+      const dayDate = new Date(year, monthIdx, 10);
+      const dayOfWeek = dayDate.getDay();
+      let adjustedDay = 10;
+      let ajusteTexto = '';
+      if (dayOfWeek === 6) {
+        // Sábado → lunes siguiente (10 + 2 = 12)
+        adjustedDay = 12;
+        ajusteTexto = ' (día 10 cae sábado, se muestra lunes 12)';
+      } else if (dayOfWeek === 0) {
+        // Domingo → lunes siguiente (10 + 1 = 11)
+        adjustedDay = 11;
+        ajusteTexto = ' (día 10 cae domingo, se muestra lunes 11)';
+      }
+      const dayStr = String(adjustedDay).padStart(2, '0');
+      const dateStr = `${year}-${monthStr}-${dayStr}`;
+
+      events.push({
+        id: `recordatorio-afiliacion-${year}-${monthStr}-${dayStr}`,
+        type: 'recordatorio_afiliacion',
+        title: 'Actualización de Afiliación al SSSI',
+        date: dateStr,
+        start: '00:00',
+        end: '23:59',
+        allDay: true,
+        color: '#f59e0b',
+        source: 'recordatorio_afiliacion',
+        meta: {
+          plazoTexto: 'Cierre de los 10 primeros días del mes para reportar novedades' + ajusteTexto,
+          mes: monthNum,
+          year: year,
+          ventana: '10 primeros días',
+          diaOriginal: 10,
+          diaMostrado: adjustedDay,
+          esFinDeSemana: dayOfWeek === 0 || dayOfWeek === 6,
+          ciclo: 'Mensual (día 10)',
+          norma: 'Ley 100/1993 · Decreto 1295/1994 · Decreto 806/1998 art. 16'
+        }
+      });
+
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+
+    return { success: true, data: events };
+  } catch (e) {
+    sendLog(`[CAL-AFILIACION] Error generando recordatorios: ${e.message}`, 'ERROR');
+    return { success: false, error: { code: 'GET_EVENTS_FAILED', message: e.message } };
+  }
+});
+
+// ── K+AIR Calendar: Recordatorio Actualización Inducciones (📦525) ──────
+// 📅 Recordatorio MENSUAL: día 2 (cierre de los "2 primeros días" del
+// mes). Recordatorio LEGAL-OPERATIVO: en Colombia, todo trabajador
+// nuevo debe recibir inducción antes de iniciar sus tareas (Decreto
+// 1072/2015 art. 2.2.4.6.11). El usuario tiene los 2 primeros días
+// del mes para actualizar el registro de inducciones del mes anterior
+// (nuevos ingresos, reinducciones, etc.). Si el día 2 cae en fin de
+// semana se mueve al lunes siguiente (mismo patrón que el resto de
+// recordatorios). Color indigo #6366f1 para distinguirse del resto.
+//
+// Genera 12 eventos por año (1/mes × 12). No depende de empresa — es global.
+ipcMain.handle('recordatorio-inducciones:get-events', async (event, params) => {
+  try {
+    const params2 = params || {};
+    const now = new Date();
+    const currentYear = now.getFullYear();
+
+    let startStr = params2.start;
+    let endStr = params2.end;
+    if (!startStr || !endStr) {
+      startStr = `${currentYear}-01-01`;
+      endStr = `${currentYear}-12-31`;
+    }
+
+    const startDate = new Date(startStr + 'T00:00:00');
+    const endDate = new Date(endStr + 'T23:59:59');
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return { success: false, error: { code: 'INVALID_INPUT', message: 'start/end inválidos' } };
+    }
+
+    const events = [];
+    const cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    const endCursor = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+    while (cursor <= endCursor) {
+      const year = cursor.getFullYear();
+      const monthIdx = cursor.getMonth();
+      const monthNum = monthIdx + 1;
+      const monthStr = String(monthNum).padStart(2, '0');
+
+      // 1 evento por mes: día 2 (cierre de los 2 primeros días)
+      const dayDate = new Date(year, monthIdx, 2);
+      const dayOfWeek = dayDate.getDay();
+      let adjustedDay = 2;
+      let ajusteTexto = '';
+      if (dayOfWeek === 6) {
+        // Sábado → lunes siguiente (2 + 2 = 4)
+        adjustedDay = 4;
+        ajusteTexto = ' (día 2 cae sábado, se muestra lunes 4)';
+      } else if (dayOfWeek === 0) {
+        // Domingo → lunes siguiente (2 + 1 = 3)
+        adjustedDay = 3;
+        ajusteTexto = ' (día 2 cae domingo, se muestra lunes 3)';
+      }
+      const dayStr = String(adjustedDay).padStart(2, '0');
+      const dateStr = `${year}-${monthStr}-${dayStr}`;
+
+      events.push({
+        id: `recordatorio-inducciones-${year}-${monthStr}-${dayStr}`,
+        type: 'recordatorio_inducciones',
+        title: 'Actualización de Inducciones',
+        date: dateStr,
+        start: '00:00',
+        end: '23:59',
+        allDay: true,
+        color: '#6366f1',
+        source: 'recordatorio_inducciones',
+        meta: {
+          plazoTexto: 'Cierre de los 2 primeros días del mes para actualizar registro de inducciones' + ajusteTexto,
+          mes: monthNum,
+          year: year,
+          ventana: '2 primeros días',
+          diaOriginal: 2,
+          diaMostrado: adjustedDay,
+          esFinDeSemana: dayOfWeek === 0 || dayOfWeek === 6,
+          ciclo: 'Mensual (día 2)',
+          norma: 'Decreto 1072/2015 art. 2.2.4.6.11'
+        }
+      });
+
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+
+    return { success: true, data: events };
+  } catch (e) {
+    sendLog(`[CAL-INDUCCIONES] Error generando recordatorios: ${e.message}`, 'ERROR');
+    return { success: false, error: { code: 'GET_EVENTS_FAILED', message: e.message } };
+  }
+});
+
+// ── K+AIR Calendar: Capacitaciones (📦495 — implementación real) ──────
+// Lee el Excel de cronograma de capacitaciones de la empresa actual y
+// devuelve cada capacitación con fecha válida como evento del calendario.
+// payload esperado: { start?: 'YYYY-MM-DD', end?: 'YYYY-MM-DD', currentCompany?: string }
+// Devuelve: { success: true, data: [{ id, title, date, start, end, type: 'capacitacion', estado }] }
+//
+// Degradación elegante: si la empresa no tiene archivo de cronograma, si Drive
+// lo tiene bloqueado, o si no encuentra la hoja del año actual, devuelve []
+// y loggea warning — el calendario sigue mostrando los otros tipos de eventos.
+// 📦543 — Helper que lee las capacitaciones de UNA empresa desde su Excel.
+// Extraido del handler original para poder llamarlo en loop cuando el scope
+// es 'all' (mostrar todas las empresas en el calendario).
+async function _leerCapacitacionesDeEmpresa(currentCompany, start, end, horas) {
+  console.log('[CAL-CAP] === _leerCapacitacionesDeEmpresa para', currentCompany, '===');
+  try {
+    if (!currentCompany || currentCompany === 'default_company') {
+      return { success: true, data: [] };
+    }
+
+    // 1. Resolver la ruta del submódulo "1.2.1 Programa de capacitación Anual"
+    let submodulePath = null;
+    try {
+      const configRaw = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+      const config = JSON.parse(configRaw);
+      const companyRoot = config.companyPaths && config.companyPaths[currentCompany];
+      const actualStructure = companyRoot && companyRoot.structure && companyRoot.structure.structure;
+      if (actualStructure) {
+        // Búsqueda específica en "1. Recursos" → submódulo que empiece con "1.2.1"
+        const resourcesFolder = actualStructure.subdirectories && actualStructure.subdirectories['1. Recursos'];
+        if (resourcesFolder) {
+          submodulePath = searchInStructure(resourcesFolder, '1.2.1');
+        }
+        // Fallback: buscar en toda la estructura
+        if (!submodulePath) {
+          submodulePath = searchInStructure(actualStructure, '1.2.1');
+        }
+      }
+    } catch (err) {
+      console.log('[CAL-CAP] ERROR leyendo config:', err.message);
+      sendLog(`[CAL-CAP] Error leyendo config: ${err.message}`, 'WARN');
+    }
+
+    if (!submodulePath) {
+      return { success: true, data: [] };
+    }
+
+    // 2. Listar la carpeta y buscar archivos de cronograma (.xlsx/.xls)
+    let files;
+    try {
+      files = await fsp.readdir(submodulePath);
+    } catch (err) {
+      return { success: true, data: [] };
+    }
+
+    const cronogramaFile = files.find(name => {
+      const lower = name.toLowerCase();
+      return lower.includes('cronograma') && (lower.endsWith('.xlsx') || lower.endsWith('.xls')) && !lower.startsWith('~$');
+    });
+
+    if (!cronogramaFile) {
+      return { success: true, data: [] };
+    }
+
+    const filePath = require('path').join(submodulePath, cronogramaFile);
+
+    // 3. Leer el Excel — usar xlsx (SheetJS) consistente con init-excel
+    let workbook;
+    try {
+      workbook = xlsx.readFile(filePath);
+    } catch (err) {
+      return { success: true, data: [] };
+    }
+
+    // 4. Buscar la hoja del año actual (preferentemente), si no, la primera Matriz Cap.*
+    const currentYear = new Date().getFullYear();
+    const matrixPatternCurrent = new RegExp(`Matriz Cap\\.\\s*${currentYear}`, 'i');
+    let sheetName = (workbook.SheetNames || []).find(n => matrixPatternCurrent.test(n));
+    if (!sheetName) {
+      sheetName = (workbook.SheetNames || []).find(n => /Matriz Cap\./i.test(n));
+    }
+    if (!sheetName) {
+      sheetName = workbook.SheetNames && workbook.SheetNames[0];
+    }
+
+    if (!sheetName) {
+      return { success: true, data: [] };
+    }
+
+    // 5. Parsear las filas de la hoja
+    const worksheet = workbook.Sheets[sheetName];
+    if (!worksheet || !worksheet['!ref']) {
+      return { success: true, data: [] };
+    }
+    const allData = xlsx.utils.sheet_to_json(worksheet, { header: 1, raw: false, defval: '' });
+
+    // 📦495-fix — Detección robusta de la fila de header.
+    const HEADER_HINTS = {
+      colNombre: ['nombre', 'capacitacion', 'capacitación', 'tema', 'descripcion', 'descripción'],
+      colFecha:  ['fecha', 'date', 'programada', 'f. programada', 'f.programada'],
+      colEstado: ['estado', 'status', 'indicador', 'ejecutado', 'realizada']
+    };
+
+    let headerRowIdx = -1;
+    let colNombre = -1, colFecha = -1, colEstado = -1;
+
+    for (let i = 0; i < Math.min(20, allData.length); i++) {
+      const row = allData[i];
+      if (!Array.isArray(row)) continue;
+      let foundNombre = -1, foundFecha = -1, foundEstado = -1;
+      for (let j = 0; j < row.length; j++) {
+        const cell = String(row[j] || '').toLowerCase().trim();
+        if (!cell) continue;
+        if (foundNombre < 0 && HEADER_HINTS.colNombre.some(h => cell.includes(h))) foundNombre = j;
+        if (foundFecha < 0 && HEADER_HINTS.colFecha.some(h => cell.includes(h))) foundFecha = j;
+        if (foundEstado < 0 && HEADER_HINTS.colEstado.some(h => cell.includes(h))) foundEstado = j;
+      }
+      const matches = [foundNombre, foundFecha, foundEstado].filter(v => v >= 0).length;
+      if (matches >= 2) {
+        headerRowIdx = i;
+        colNombre = foundNombre;
+        colFecha = foundFecha;
+        colEstado = foundEstado;
+        break;
+      }
+    }
+
+    if (headerRowIdx < 0) {
+      headerRowIdx = 5;
+      colNombre = colNombre >= 0 ? colNombre : 1;
+      colFecha  = colFecha  >= 0 ? colFecha  : 3;
+      colEstado = colEstado >= 0 ? colEstado : 8;
+    } else {
+      if (colNombre < 0) colNombre = 1;
+      if (colFecha  < 0) colFecha  = 3;
+      if (colEstado < 0) colEstado = 8;
+    }
+
+    const dataRows = allData.slice(headerRowIdx + 1);
+
+    // 6. Mapear las filas válidas a eventos
+    const events = [];
+    let skippedNoFecha = 0;
+    let skippedNoNombre = 0;
+    let skippedNoHora = 0;
+    for (let i = 0; i < dataRows.length; i++) {
+      const row = dataRows[i];
+      if (!Array.isArray(row) || row.length < Math.max(colNombre, colFecha, colEstado)) continue;
+
+      const getCell = (cell) => {
+        if (cell === null || cell === undefined) return '';
+        if (typeof cell === 'object' && cell.value !== undefined) return cell.value;
+        return String(cell);
+      };
+
+      const nombre = String(getCell(row[colNombre]) || '').trim();
+      if (!nombre || nombre.length < 3) { skippedNoNombre++; continue; }
+      if (nombre.toLowerCase().includes('nombre de la')) { skippedNoNombre++; continue; }
+      if (nombre.toLowerCase().includes('total capacitaciones')) break;
+
+      let fechaProgramada = null;
+      const fechaValue = getCell(row[colFecha]);
+      if (fechaValue) {
+        if (typeof fechaValue === 'number' && fechaValue >= 1) {
+          const utc = new Date((fechaValue - 25569) * 86400 * 1000);
+          if (!isNaN(utc.getTime())) {
+            fechaProgramada = `${utc.getUTCFullYear()}-${String(utc.getUTCMonth() + 1).padStart(2, '0')}-${String(utc.getUTCDate()).padStart(2, '0')}`;
+          }
+        } else {
+          const fStr = String(fechaValue).trim();
+          let parsed = null;
+          let m = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/.exec(fStr);
+          if (m) parsed = new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1]));
+          if (!parsed) {
+            m = /^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/.exec(fStr);
+            if (m) parsed = new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]));
+          }
+          if (!parsed) parsed = new Date(fStr);
+          if (parsed && !isNaN(parsed.getTime()) && parsed.getFullYear() >= 1900) {
+            fechaProgramada = `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+          }
+        }
+      }
+
+      if (!fechaProgramada) { skippedNoFecha++; continue; }
+
+      const estadoRaw = String(getCell(row[colEstado]) || '').trim();
+      const estado = estadoRaw || 'Pendiente';
+
+      // 📦 Fase 2 — Aplicar hora persistida en localStorage (sidecar del adapter).
+      // Mapa {nombreCapacitacion: 'HH:MM'} enviado por el renderer en cada llamada
+      // a `capacitaciones:get-events`. Si la capacitación no tiene hora persistida,
+      // el evento queda con start/end null (compat: el render del calendario le
+      // pone 09:00 por default).
+      const horasSidecar = (typeof horas === 'object' && horas) ? horas : {};
+      // 🐛bug-fix — Normalización robusta del lookup. El Excel puede tener el
+      // nombre en NFD ("ó" = "o" + U+0301) mientras que el HTML input lo guarda
+      // en NFC ("ó" = U+00F3). Visualmente iguales pero `===` falla. También
+      // manejamos: trim, espacios múltiples, y fallback case-insensitive.
+      const _normKey = (k) => (k || '').normalize('NFC').trim().replace(/\s+/g, ' ');
+      const horasNormalized = {};
+      for (const k of Object.keys(horasSidecar)) {
+        horasNormalized[_normKey(k)] = horasSidecar[k];
+      }
+      const nombreNorm = _normKey(nombre);
+      let horaGuardada = horasNormalized[nombreNorm];
+      if (!horaGuardada) {
+        // Fallback: case-insensitive
+        const lower = nombreNorm.toLowerCase();
+        for (const k of Object.keys(horasNormalized)) {
+          if (k.toLowerCase() === lower) { horaGuardada = horasNormalized[k]; break; }
+        }
+      }
+      let start = null, end = null;
+      if (horaGuardada && /^\d{2}:\d{2}$/.test(horaGuardada)) {
+        start = horaGuardada;
+        const [h, m] = horaGuardada.split(':').map(Number);
+        // 🐛bug-fix — Extraer duración del Excel. El código original tenía una
+        // variable `duracion` en otro scope que ya no existe. La leemos
+        // directamente de la celda [colDuracion] si está disponible, sino
+        // fallback a 2h.
+        let durH = 2;
+        if (typeof colDuracion !== 'undefined' && colDuracion >= 0 && row[colDuracion] != null) {
+            const rawDur = getCell(row[colDuracion]);
+            durH = parseFloat(String(rawDur).replace(/[^\d.]/g, '')) || 2;
+        }
+        const startMin = h * 60 + m;
+        const endMin = startMin + Math.round(durH * 60);
+        const endH = Math.floor(endMin / 60) % 24;
+        const endM = endMin % 60;
+        end = `${String(endH).padStart(2,'0')}:${String(endM).padStart(2,'0')}`;
+      }
+
+      // 📦 Filtro de HORA: solo incluir en el calendario las capacitaciones
+      // que tengan hora persistida en el sidecar. Las que no tienen hora
+      // quedan con start/end null y se excluyen acá. El Listado del módulo
+      // Capacitaciones sigue mostrándolas todas (la UI avisa con un toast
+      // al cargar el año si hay caps sin hora).
+      if (!start || !end) {
+        skippedNoHora++;
+        continue;
+      }
+
+      events.push({
+        // 📦543 — Prefijar id con companyKey para que cuando se mezclan
+        // empresas en scope='all' no haya colisiones de id.
+        id: 'cap-' + currentCompany + '-' + String(i + 1) + '-' + nombre.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 40),
+        title: nombre,
+        date: fechaProgramada,
+        start,
+        end,
+        type: 'capacitacion',
+        estado,
+        // 📦543 — Incluir empresa en el evento para que la UI pueda mostrarlo
+        // o agruparlo cuando se ven todas las empresas.
+        empresa: currentCompany
+      });
+    }
+
+    sendLog(`[CAL-CAP] ${events.length} eventos de capacitaciones para ${currentCompany} (omitidas: ${skippedNoNombre} sin nombre, ${skippedNoFecha} sin fecha, ${skippedNoHora} sin hora)`, 'INFO');
+    return { success: true, data: events };
+  } catch (err) {
+    console.error('[CAL-CAP] ERROR inesperado:', err.message);
+    return { success: true, data: [] };
+  }
+}
+
+// 📦543 — Handler IPC del calendario. Soporta scope='all' para mostrar
+// capacitaciones de TODAS las empresas (usado por el toggle "Todas las
+// empresas" del calendario). Para una sola empresa, llama al helper.
+ipcMain.handle('capacitaciones:get-events', async (event, payload) => {
+  console.log('[CAL-CAP] === INICIO get-events ===');
+  console.log('[CAL-CAP] payload recibido:', JSON.stringify(payload));
+
+  try {
+    // Acepta tanto un objeto {range} como un objeto directo {start, end, currentCompany}
+    const { start, end, currentCompany } = payload && typeof payload === 'object'
+      ? payload
+      : { start: (payload && payload.start), end: (payload && payload.end), currentCompany: null };
+
+    console.log('[CAL-CAP] start=', start, 'end=', end, 'currentCompany=', currentCompany);
+
+    // 📦 Fase 2 — Extraer mapa de horas del sidecar del payload. Default {}.
+    const horasSidecar = (payload && payload.horas && typeof payload.horas === 'object')
+      ? payload.horas : {};
+    console.log('[CAL-CAP] horas sidecar:', Object.keys(horasSidecar).length, 'capacitaciones con hora');
+
+    // Si hay empresa valida (no null ni 'default_company'), leer solo de ella
+    if (currentCompany && currentCompany !== 'default_company') {
+      return _leerCapacitacionesDeEmpresa(currentCompany, start, end, horasSidecar);
+    }
+
+    // 📦543 — Sin empresa actual: si el scope es 'all', leer de TODAS las
+    // empresas del config. Si no, devolver [] (comportamiento original).
+    const scope = (payload && payload.scope) || 'company';
+    if (scope !== 'all') {
+      console.log('[CAL-CAP] WARN: Sin empresa actual, devolviendo []');
+      sendLog('[CAL-CAP] Sin empresa actual, devolviendo []', 'WARN');
+      return { success: true, data: [] };
+    }
+
+    // Scope='all' → iterar todas las empresas del config
+    let config;
+    try {
+      const configRaw = await fsp.readFile(configPath, 'utf8').catch(() => '{}');
+      config = JSON.parse(configRaw);
+    } catch (err) {
+      console.log('[CAL-CAP] ERROR leyendo config para scope=all:', err.message);
+      return { success: true, data: [] };
+    }
+    const allCompanies = Object.keys((config && config.companyPaths) || {});
+    console.log('[CAL-CAP] scope=all → iterando', allCompanies.length, 'empresas:', allCompanies.join(', '));
+
+    const allEvents = [];
+    for (const company of allCompanies) {
+      const result = await _leerCapacitacionesDeEmpresa(company, start, end, horasSidecar);
+      if (result && result.success && Array.isArray(result.data)) {
+        allEvents.push.apply(allEvents, result.data);
+      }
+    }
+    sendLog(`[CAL-CAP] scope=all: ${allEvents.length} eventos totales de ${allCompanies.length} empresas`, 'INFO');
+    return { success: true, data: allEvents };
+  } catch (err) {
+    console.error('[CAL-CAP] ERROR inesperado:', err.message);
+    sendLog(`[CAL-CAP] Error inesperado: ${err.message}`, 'ERROR');
+    console.error('[CAL-CAP] Stack:', err.stack);
+    return { success: true, data: [] };
   }
 });
 
@@ -4664,7 +6611,115 @@ ipcMain.handle('convertExcelToPdf', async (event, filePath) => {
   }
 });
 
-// --- Manejadores para el Visor de Documentos ---
+// 📦481-fix — getDownloadsPath
+// Devuelve la ruta de la carpeta Downloads del usuario (donde Electron
+// guarda archivos por default si no se especifica otra). Usado por el
+// frontend de Reportes de Gestación para guardar PDFs sin requerir
+// que el usuario elija carpeta cada vez.
+ipcMain.handle('get-downloads-path', async function () {
+  try {
+    const downloadsPath = app.getPath('downloads');
+    return { success: true, path: downloadsPath };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+// 📦 PRINT-INFORME-TO-PDF: Plan B para el informe PRI (gestión de la salud / ausentismo).
+// El enfoque anterior usaba window.print() del iframe, pero Chromium tiene
+// problemas conocidos para renderizar contenido multipágina dentro de iframes
+// anidados (las páginas 2+ no se imprimen). Este handler usa el método
+// NATIVO de Electron `webContents.printToPDF()` en un BrowserWindow
+// OCULTO, que renderiza TODO el HTML correctamente y devuelve un PDF real.
+ipcMain.handle('print-informe-to-pdf', async (event, payload) => {
+  let win = null;
+  try {
+    sendLog('[MAIN][print-informe-to-pdf] Solicitud recibida', 'INFO');
+    const { html, targetFolder, filename } = payload || {};
+
+    if (!html || typeof html !== 'string') {
+      throw new Error('No se recibió HTML válido para imprimir.');
+    }
+    if (!targetFolder || !filename) {
+      throw new Error('Faltan parámetros: targetFolder y filename son requeridos.');
+    }
+
+    // Construir un HTML completo autocontenido con meta charset
+    // (Electron necesita un doctype válido para que el motor de rendering
+    //  aplique las reglas @page y page-break).
+    const fullHtml = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Informe PRI</title>
+</head>
+<body>
+${html}
+</body>
+</html>`;
+
+    sendLog('[MAIN][print-informe-to-pdf] Creando BrowserWindow oculto…', 'INFO');
+
+    // Crear ventana oculta. NO show:true para no bloquear UI. NO nodeIntegration
+    // porque este HTML no necesita Node. sandbox:true para máxima seguridad.
+    win = new BrowserWindow({
+      show: false,
+      width: 1240,
+      height: 1754, // A4 a 150 DPI aprox
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        sandbox: true,
+        offscreen: false
+      }
+    });
+
+    // Cargar el HTML como data URL (no escribimos a disco temporal, evita
+    // fugas y locks en Windows).
+    const dataUrl = 'data:text/html;charset=UTF-8,' + encodeURIComponent(fullHtml);
+    await win.loadURL(dataUrl);
+    sendLog('[MAIN][print-informe-to-pdf] HTML cargado, esperando render…', 'INFO');
+
+    // Pequeño delay para que webContents termine el primer paint del HTML
+    // (sin esto, printToPDF puede capturar antes de que los .report-page
+    //  tengan dimensiones finales).
+    await new Promise(r => setTimeout(r, 600));
+
+    // 🖨️ Método nativo de Electron: renderiza multipágina correctamente
+    // y devuelve un Buffer con los bytes del PDF.
+    const pdfBuffer = await win.webContents.printToPDF({
+      pageSize: 'A4',
+      printBackground: true,
+      landscape: false,
+      margins: { top: 0, bottom: 0, left: 0, right: 0 },
+      preferCSSPageSize: false
+    });
+
+    sendLog(`[MAIN][print-informe-to-pdf] PDF generado: ${pdfBuffer.length} bytes`, 'INFO');
+
+    // Asegurar que la carpeta destino existe (Electron corre con cwd variable)
+    await fsp.mkdir(targetFolder, { recursive: true });
+
+    const safeFilename = filename.endsWith('.pdf') ? filename : filename + '.pdf';
+    const targetPath = path.join(targetFolder, safeFilename);
+
+    await fsp.writeFile(targetPath, pdfBuffer);
+
+    sendLog(`[MAIN][print-informe-to-pdf] PDF guardado en: ${targetPath}`, 'INFO');
+
+    // Cerrar ventana oculta (en finally para garantizar cleanup)
+    return { success: true, path: targetPath, sizeBytes: pdfBuffer.length };
+  } catch (err) {
+    sendLog(`[MAIN][print-informe-to-pdf] Error: ${err.message}`, 'ERROR');
+    return { success: false, error: err.message };
+  } finally {
+    if (win && !win.isDestroyed()) {
+      try { win.close(); } catch (e) { /* ignorar errores de cierre */ }
+    }
+  }
+});
+
+
 
 ipcMain.handle('get-excel-preview', async (event, rawFilePath) => {
     sendLog(`[MAIN][get-excel-preview] Solicitud recibida para filePath: ${rawFilePath}`, 'INFO');
@@ -4787,6 +6842,117 @@ ipcMain.handle('get-pdf-preview', async (event, filePath) => {
     return { success: false, error: error.message };
   }
 });
+
+// =============================================================================
+// 📦608 — IPC genérico read-file-bytes para @file-viewer (preview de archivos
+// Office / PDF / imágenes / etc. sin pasar por LibreOffice). Lee bytes crudos
+// del archivo y los retorna como Uint8Array para que el renderer los envuelva
+// en un Blob URL y los pase al Web Component <flyfish-file-viewer>.
+//
+// Validaciones:
+//   - Ruta accesible (R_OK)
+//   - Extensión dentro de la whitelist de file-viewer
+//   - Tamaño máximo 100 MB (configurable vía env KAIR_FV_MAX_BYTES)
+// =============================================================================
+const KAIR_FV_ALLOWED_EXTS = new Set([
+  // Office
+  'pdf','docx','docm','dotx','dotm','doc','dot','rtf','odt',
+  'xlsx','xltx','xlsm','xlsb','xls','xlt','xltm','csv','tsv','ods','fods','numbers',
+  'pptx','pptm','potx','potm','ppsx','ppsm','ppt','odp',
+  // Documentos
+  'ofd','typ','typst',
+  // Imágenes
+  'gif','jpg','jpeg','bmp','tiff','tif','png','svg','webp','avif','ico','heic','heif','jxl',
+  // Media
+  'mp4','webm','m3u8','mp3','wav','ogg','opus','m4a','aac','flac',
+  // Texto/código
+  'txt','md','markdown','json','xml','yaml','yml','html','htm','css','js','ts','py','java','c','cpp','cs','go','rs','php','rb','swift','kt','sql','sh','bash','log','diff','patch','toml','ini','http','ipynb',
+  // Email
+  'eml','msg','mbox',
+  // Diagramas
+  'xmind','drawio','dio','excalidraw','mermaid','mmd','plantuml','puml',
+  // Comprimidos
+  'zip','7z','rar','tar','gz','tgz','bz2','xz','cab','iso','apk','cbz','cbr',
+  // Otros
+  'epub','ttf','otf','woff','woff2','sqlite','parquet','dxf','dwg','dwf','gltf','glb','obj','stl','ply','step','stp','iges','igs','ifc','3dm','geojson','kml','gpx'
+]);
+const KAIR_FV_MAX_BYTES = (() => {
+  const env = Number(process.env.KAIR_FV_MAX_BYTES);
+  return Number.isFinite(env) && env > 0 ? env : 100 * 1024 * 1024; // 100 MB default
+})();
+
+ipcMain.handle('read-file-bytes', async (event, rawFilePath) => {
+  sendLog(`[MAIN][read-file-bytes] Solicitud recibida para filePath: ${rawFilePath}`, 'INFO');
+
+  // Normalizar ruta (mismo patrón que get-word-preview)
+  let filePath = typeof rawFilePath === 'string' ? rawFilePath : (rawFilePath?.filePath || '');
+  let prev = '';
+  while (filePath !== prev) {
+    prev = filePath;
+    try { filePath = decodeURIComponent(filePath); } catch (_) { /* ignore */ }
+  }
+  const driveLetterMatch = filePath.match(/^([A-Za-z])[\s\-+]+:([/\\].*)$/);
+  if (driveLetterMatch) {
+    filePath = driveLetterMatch[1] + ':' + driveLetterMatch[2];
+    filePath = filePath.replace(/\\/g, '\\').replace(/\//g, '\\');
+  }
+  sendLog(`[MAIN][read-file-bytes] Ruta normalizada: ${filePath}`, 'INFO');
+
+  // Validar extensión
+  const baseName = path.basename(filePath);
+  const ext = (path.extname(baseName).slice(1) || '').toLowerCase();
+  if (!ext) {
+    return { success: false, error: `El archivo no tiene extensión: ${baseName}` };
+  }
+  if (!KAIR_FV_ALLOWED_EXTS.has(ext)) {
+    return {
+      success: false,
+      error: `Extensión no soportada por file-viewer: .${ext}. Use uno de los formatos soportados (Office, PDF, imágenes, video, etc.).`
+    };
+  }
+
+  try {
+    // Verificar acceso
+    try {
+      await fsp.access(filePath, fs.constants.R_OK);
+    } catch (accessError) {
+      sendLog(`[MAIN][read-file-bytes] Error de acceso: ${accessError.message}`, 'ERROR');
+      return { success: false, error: `El archivo no es accesible o no existe: ${filePath}. Error: ${accessError.message}` };
+    }
+
+    // Verificar tamaño antes de leer
+    const stat = await fsp.stat(filePath);
+    if (stat.size > KAIR_FV_MAX_BYTES) {
+      const sizeMB = (stat.size / 1024 / 1024).toFixed(1);
+      const limitMB = (KAIR_FV_MAX_BYTES / 1024 / 1024).toFixed(0);
+      sendLog(`[MAIN][read-file-bytes] Archivo excede tamaño máximo: ${sizeMB}MB > ${limitMB}MB`, 'ERROR');
+      return {
+        success: false,
+        error: `El archivo pesa ${sizeMB} MB, excede el límite de ${limitMB} MB. Para archivos más grandes contactá al administrador.`
+      };
+    }
+
+    // Leer bytes
+    const buffer = await fsp.readFile(filePath);
+    const bytes = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+    sendLog(`[MAIN][read-file-bytes] OK — ${baseName} (${buffer.length} bytes, .${ext})`, 'INFO');
+
+    return {
+      success: true,
+      data: {
+        bytes,            // Uint8Array (ipcRenderer lo recibe como Buffer en Node y se restaura en el renderer)
+        name: baseName,
+        ext: ext,
+        size: buffer.length
+      }
+    };
+  } catch (error) {
+    sendLog(`[MAIN][read-file-bytes] Error leyendo ${filePath}: ${error.message}`, 'ERROR');
+    return { success: false, error: error.message };
+  }
+});
+
+// --- Manejadores para el Visor de Documentos ---
 
 // --- Manejadores para el módulo de Objetivos SST ---
 
@@ -5400,6 +7566,11 @@ async function calculateAutoResultados(companyName) {
             let metaObjetivo = null;
             let metaSeveridadObjetivo = null;
             let metaMortalidadObjetivo = null;
+            // 📦562 — metas adicionales para que ausentismo/prevalencia/incidencia
+            // también calculen porcentajeReal (antes quedaban en 0)
+            let metaAusentismoObjetivo = null;
+            let metaPrevalenciaObjetivo = null;
+            let metaIncidenciaObjetivo = null;
             try {
               const giDir = path.join(rootPath, '2. Gestión Integral del SG-SST');
               if (fs.existsSync(giDir)) {
@@ -5440,7 +7611,32 @@ async function calculateAutoResultados(companyName) {
                             sendLog(`[AUTO-RESULTADOS] Meta Objetivos SST (Mortalidad): ${metaRaw} → ${metaMortalidadObjetivo}`, 'INFO');
                           }
                         }
-                        if (metaObjetivo && metaSeveridadObjetivo && metaMortalidadObjetivo) break;
+                        // 📦562 — Lectura de metas adicionales (ausentismo, prevalencia, incidencia)
+                        if (colC.indexOf('ausentismo') >= 0) {
+                          const metaRaw = String(objRows[r][4] || '').trim();
+                          const match = metaRaw.match(/[\d.]+/);
+                          if (match) {
+                            metaAusentismoObjetivo = parseFloat(match[0]);
+                            sendLog(`[AUTO-RESULTADOS] Meta Objetivos SST (Ausentismo): ${metaRaw} → ${metaAusentismoObjetivo}`, 'INFO');
+                          }
+                        }
+                        if (colC.indexOf('prevalencia') >= 0 && colC.indexOf('enfermedad') >= 0) {
+                          const metaRaw = String(objRows[r][4] || '').trim();
+                          const match = metaRaw.match(/[\d.]+/);
+                          if (match) {
+                            metaPrevalenciaObjetivo = parseFloat(match[0]);
+                            sendLog(`[AUTO-RESULTADOS] Meta Objetivos SST (Prevalencia): ${metaRaw} → ${metaPrevalenciaObjetivo}`, 'INFO');
+                          }
+                        }
+                        if (colC.indexOf('incidencia') >= 0 && colC.indexOf('enfermedad') >= 0) {
+                          const metaRaw = String(objRows[r][4] || '').trim();
+                          const match = metaRaw.match(/[\d.]+/);
+                          if (match) {
+                            metaIncidenciaObjetivo = parseFloat(match[0]);
+                            sendLog(`[AUTO-RESULTADOS] Meta Objetivos SST (Incidencia): ${metaRaw} → ${metaIncidenciaObjetivo}`, 'INFO');
+                          }
+                        }
+                        if (metaObjetivo && metaSeveridadObjetivo && metaMortalidadObjetivo && metaAusentismoObjetivo && metaPrevalenciaObjetivo && metaIncidenciaObjetivo) break;
                       }
                     }
                   }
@@ -5603,9 +7799,16 @@ async function calculateAutoResultados(companyName) {
               ? (ind.ausentismoMensual.reduce((s, m) => s + m.tasaAusentismo, 0) / ind.ausentismoMensual.length).toFixed(2)
               : 0;
 
+            // 📦562 — Calcular porcentajeReal usando metaAusentismoObjetivo (leída del Excel 2.2.1)
+            const metaAus = metaAusentismoObjetivo || 0;
+            const promAusNum = parseFloat(promAusentismo) || 0;
+            const pctAusentismo = metaAus > 0
+              ? Math.max(0, Math.min(100, Math.round((1 - promAusNum / metaAus) * 100)))
+              : 0;
+
             resultado['ausentismo'] = {
               resultado: `Tasa ausentismo promedio: ${promAusentismo}%`,
-              porcentajeReal: 0,
+              porcentajeReal: pctAusentismo,
               source: 'auto'
             };
             resultado['incapacidad'] = resultado['ausentismo'];
@@ -5616,9 +7819,17 @@ async function calculateAutoResultados(companyName) {
               const promTrab = ind.frecuenciaMensual.length > 0 ? Math.round(totalTrab / ind.frecuenciaMensual.length) : 0;
               const totalCasosEL = ind.config.prevalenciaEL || 0;
               const prevalenciaCalc = promTrab > 0 ? ((totalCasosEL / promTrab) * 100000).toFixed(2) : '0.00';
+
+              // 📦562 — Calcular porcentajeReal con metaPrevalenciaObjetivo
+              const metaPrev = metaPrevalenciaObjetivo || 0;
+              const prevNum = parseFloat(prevalenciaCalc) || 0;
+              const pctPrev = metaPrev > 0
+                ? Math.max(0, Math.min(100, Math.round((1 - prevNum / metaPrev) * 100)))
+                : 0;
+
               resultado['prevalencia'] = {
                 resultado: `Prevalencia EL: ${prevalenciaCalc} por 100.000 trabajadores (${totalCasosEL} casos / ${promTrab} prom. trabajadores)`,
-                porcentajeReal: 0,
+                porcentajeReal: pctPrev,
                 source: 'auto'
               };
             }
@@ -5629,9 +7840,17 @@ async function calculateAutoResultados(companyName) {
               const promTrabInc = ind.frecuenciaMensual.length > 0 ? Math.round(totalTrabInc / ind.frecuenciaMensual.length) : 0;
               const totalCasosNuevos = ind.config.incidenciaEL || 0;
               const incidenciaCalc = promTrabInc > 0 ? ((totalCasosNuevos / promTrabInc) * 100000).toFixed(2) : '0.00';
+
+              // 📦562 — Calcular porcentajeReal con metaIncidenciaObjetivo
+              const metaInc = metaIncidenciaObjetivo || 0;
+              const incNum = parseFloat(incidenciaCalc) || 0;
+              const pctInc = metaInc > 0
+                ? Math.max(0, Math.min(100, Math.round((1 - incNum / metaInc) * 100)))
+                : 0;
+
               resultado['incidencia'] = {
                 resultado: `Incidencia EL: ${incidenciaCalc} por 100.000 trabajadores (${totalCasosNuevos} casos nuevos / ${promTrabInc} prom. trabajadores)`,
-                porcentajeReal: 0,
+                porcentajeReal: pctInc,
                 source: 'auto'
               };
             }
@@ -7711,20 +9930,43 @@ ipcMain.on('stop-watching-capacitaciones', () => {
 // ═══════════════════════════════════════════════════════
 // FURAT - Reportes de Accidentes (Submódulo 3.2.1)
 // Handlers IPC para dashboard y biblioteca
+// (📦658 — declaración placeholder eliminada; los handlers reales se importan
+// desde ./main/furat-bridge.js arriba. Ver registerFuratHandlers(app) más abajo.)
 // ═══════════════════════════════════════════════════════
-
-function registerFuratHandlers(appInstance) {
-  sendLog('[FURAT] Registrando handlers IPC...', 'INFO');
-
-  // No necesitamos handlers adicionales porque el logic.js
-  // usa los contracts existentes (get-document-folders, get-pdf-preview, etc.)
-  // El dashboard y biblioteca se calculan en el frontend (renderer)
-
-  sendLog('[FURAT] Handlers registrados correctamente (usa contratos existentes)', 'INFO');
-}
 
 // Manejador para la creación de la ventana principal
 app.whenReady().then(() => {
+  // 📦707-fix24 (2026-08-14) — Re-setear AUMID por si Electron lo perdió durante
+  // el ready. Idempotente: si ya está seteado, es no-op.
+  app.setAppUserModelId('com.jrfsoluciones.sgsst');
+
+  // 📦465 (2026-07-03) — AUTO-REPARACIÓN DEL ACCESO DIRECTO (mejorada en 📦707-fix26)
+  // El instalador NSIS oneClick a veces no crea el .lnk (bug conocido de
+  // electron-builder ≥ 24 con .nsh custom) y electron-updater/Squirrel.Windows
+  // lo BORRA al actualizar sin recrearlo. Si detectamos que estamos en
+  // producción, SIEMPRE reescribimos el .lnk (no solo si no existe) para
+  // reflejar el path correcto del .ico. Esto arregla el caso de auto-update
+  // desde v0.1.187 (donde el .lnk apunta a una ruta inexistente) a v0.1.188+
+  // (donde el .ico está en `$INSTDIR\resources\assets/`). El user nunca se entera.
+  if (app.isPackaged && process.platform === 'win32') {
+    setImmediate(() => {
+      try {
+        const desktopShortcut = path.join(app.getPath('desktop'), 'K+AIR.lnk');
+        // 📦707-fix26 (2026-08-14) — SIEMPRE reescribir (no solo si no existe)
+        // porque el .lnk viejo puede tener un path incorrecto (ej. v0.1.187
+        // → v0.1.188: el .ico se movió de $INSTDIR\assets/ a $INSTDIR\resources\assets/,
+        // y el .lnk viejo del escritorio sigue apuntando a la ruta vieja).
+        sendLog('[SHORTCUT-AUTOFIX] Re-creando acceso directo (puede sobrescribir uno viejo con path incorrecto)...', 'INFO');
+        // 📦707-fix26 (2026-08-14) — Quitado `if (!fs.existsSync(desktopShortcut))`.
+        // Antes: solo reparaba si faltaba. Ahora: SIEMPRE reescribe para
+        // reflejar el path correcto del .ico (v0.1.188+ → $INSTDIR\resources\assets\).
+        _ensureDesktopShortcut();
+      } catch (autofixErr) {
+        sendLog(`[SHORTCUT-AUTOFIX] Error en auto-reparación: ${autofixErr.message}`, 'WARN');
+      }
+    });
+  }
+
   // Mostrar pantalla de carga inmediatamente
   createLoadingWindow();
 
@@ -7792,13 +10034,86 @@ try {
   sendLog(`[MAIN] Error registrando handlers de Auditoría Anual: ${err.message}`, 'ERROR');
 }
 
- // Registrar handlers de FURAT - Reportes de Accidentes (Submódulo 3.2.1)
-  try {
-    registerFuratHandlers(app);
-    sendLog('[MAIN] Handlers de FURAT (3.2.1) registrados correctamente', 'INFO');
-  } catch (err) {
-    sendLog(`[MAIN] Error registrando handlers de FURAT: ${err.message}`, 'ERROR');
-  }
+// Registrar handlers de Acciones Preventivas y Correctivas (Submódulo 7.1.1) — F21.41 (2026-06-21)
+try {
+  registerAccionesPreventivasCorrectivasHandlers(app, { getCompanyRootPath, getDb });
+  sendLog('[MAIN] Handlers de Acciones Preventivas y Correctivas (7.1.1) registrados correctamente', 'INFO');
+} catch (err) {
+  sendLog(`[MAIN] Error registrando handlers de Acciones Preventivas y Correctivas: ${err.message}`, 'ERROR');
+}
+
+// Registrar handlers de Seguimiento de Gestación (Salud Materna) — 📦465 (2026-07-03)
+try {
+  registerGestacionHandlers(app, { getDb });
+  // 📦701 (2026-08-11) — Seguimiento de Incapacidad: respaldo en SQLite
+  // (fuente de verdad). El Excel ahora es secundario, generado por el
+  // usuario con un botón "Exportar a Excel" desde la UI.
+  registerSeguimientoIncapacidadHandlers(app, {
+    getDb: getDb,
+    getPython: getPython,
+    obtenerRutaPri: obtenerRutaPri,
+    getPythonScriptPath: getPythonScriptPath
+  });
+  registerEventosCumplidosHandlers(app, { getDb });
+  // 📦705 (2026-08-13) — Roles y Responsabilidades (estándar 1.1.2 Res. 0312 + Dto. 1072).
+  // Reemplaza el file viewer legacy del submódulo 1.1.2 con una vista de gestión
+  // que cumple con Decreto 1072 art. 2.2.4.6.8. Schema SQLite con 3 tablas
+  // (catalogo + asignacion + divulgacion) + seed de 9 roles predefinidos.
+  registerRolesResponsabilidadesHandlers(app, { getDb });
+  // 📦702 (2026-08-13) — Permisos de Bandeja Integrada por usuario.
+  // Registra 2 handlers: users-get-bandeja-integrada-flag y
+  // users-set-bandeja-integrada-flag. validateSession se pasa para
+  // identificar al user logueado y detectar si es admin global.
+  registerBandejaIntegradaPermissionsHandlers(app, { getDb, validateSession });
+  // 📦589 — Submódulo 3.1.3 Perfiles de cargo y Profesiograma (Salud)
+  registerProfesiogramaHandlers(app, { getDb, getCompanyRootPath });
+  registerEvaluacionActionPlansHandlers(app, { getDb });
+  registerSyncHandlers(app, { getDb });
+  // 📦658 — Handlers IPC del módulo FURAT (upload-file, list-metadata)
+  registerFuratHandlers(app);
+  // 📦708 (2026-08-15) — Handlers IPC del submódulo Presupuesto (1.1.3).
+  // FASE 0: 15 canales registrados (14 stubs + 1 diag). Ninguno expuesto en
+  // preload.js todavía. La UI sigue usando el flujo viejo (Excel) intacto.
+  registerPresupuestoHandlers(app, { getDb, validateSession });
+  // 📦709 (2026-08-15) — Handlers IPC del módulo Gestión Humana (nuevo top-level).
+  // FASE 0: 16 canales registrados (15 stubs + 1 diag). Ninguno expuesto en
+  // preload.js todavía. La UI no existe aún — viene en Fases 4-6.
+  // Patrón distinto a presupuesto: usa .init(ipcMain) en vez de require('electron')
+  // para que los tests puedan inyectar el mock sin Module._resolveFilename hack.
+  registerGestionHumanaHandlers.init(ipcMain);
+  registerGestionHumanaHandlers(app, { getDb, validateSession });
+  // 📦101 (2026-08-20) — Firma Electrónica K+AIR v1 (I-101).
+  // Registra 13 canales `firma:*`. Usa safeStorage para apiKey + client_instance_id.
+  // NO pisa nada del submódulo GH; canales con prefijo distinto (`firma:` vs `gh:`).
+  registerFirmaHandlers.init(ipcMain);
+  registerFirmaHandlers(app, { appVersion: app.getVersion() });
+  // 📦2.2 (2026-09-08) — Handlers IPC del módulo Representante Legal (K+AIR Firma Dual).
+  // 5 canales: rep-legal:get / upsert / delete / validateForFirma / diag.
+  // Patrón .init(ipcMain) + register(app, { getDb, validateSession }) como GH.
+  registerRepLegalHandlers.init(ipcMain);
+  registerRepLegalHandlers(app, { getDb, validateSession });
+  // 📦538 (FIX orden init) — Generar pcId y arrancar auto-sync DESPUES de
+  // que registerSyncHandlers haya llamado a syncService.init() (setea _configPath).
+  // Si se llama antes, _getAllCompanies() retorna [] porque _configPath es null
+  // y ninguna empresa se inicia con auto-sync.
+  pcidGenerator.ensurePcId(app.getPath('userData'));
+  const syncService = require('./main/sync-service');
+  syncService.startAutoSyncForAllEnabled();
+  sendLog('[SYNC] Auto-sync multipc inicializado para empresas habilitadas', 'INFO');
+  sendLog('[MAIN] Handlers de Seguimiento de Gestación (Salud Materna) y Sync multipc registrados correctamente', 'INFO');
+} catch (err) {
+  sendLog(`[MAIN] Error registrando handlers de Gestación: ${err.message}`, 'ERROR');
+}
+
+// Registrar handlers de K+AIR Calendar — eventos rápidos (botón calendario del header)
+try {
+  registerEventosRapidosHandlers(app, { getDb });
+  sendLog('[MAIN] Handlers de K+AIR Calendar / eventos-rapidos registrados correctamente', 'INFO');
+} catch (err) {
+  sendLog(`[MAIN] Error registrando handlers de eventos-rapidos: ${err.message}`, 'ERROR');
+}
+
+ // 📦658 — Handlers FURAT ya registrados arriba (línea 9698) — bloque duplicado eliminado.
 
   // Iniciar smart polling de actualizaciones una vez que la app esté lista
   // Esperar 5 segundos para evitar conflictos con la inicialización
@@ -7832,19 +10147,6 @@ app.on('window-all-closed', () => {
 
 // En este archivo puedes incluir el resto del código del proceso principal de tu aplicación.
 // También puedes ponerlos en archivos separados y requerirlos aquí.
-
-// --- Eventos del Auto-Updater (TEMPORALMENTE COMENTADO) ---
-// log.info('Actualización disponible.');
-// if (mainWindow) {
-//   mainWindow.webContents.send('update_available');
-// }
-
-// log.info('Actualización descargada. Lista para ser instalada.');
-// if (mainWindow) {
-//   mainWindow.webContents.send('update_downloaded');
-// }
-
-// log.error('Error en el auto-updater: ' + err.toString());
 
 // =============================================================================
 // Handler: Leer datos de ausentismo desde Excel
@@ -8157,11 +10459,42 @@ ipcMain.handle('get-ausentismo-data', async (event, companyName) => {
 
 // =============================================================================
 // Handler: read-ausentismo-data (Para estadísticas - retorna todos los datos sin filtrar)
+//
+// 📦459 (2026-07-02) — Modo degradado: cuando el archivo PI-FO-076 no está disponible
+// (carpeta no existe / archivo no matchea / archivo corrupto / sin permisos), el
+// handler retorna success:true con flags informativos (_missingFile, _missingFileReason)
+// en lugar de success:false. Esto permite que las vistas SIGAN funcionando con datos
+// de BD cuando sea posible, mostrando banners claros al usuario en vez de romper.
+//
+// Razones de modo degradado:
+//   - folder_missing : la carpeta de ausentismo no existe en la raíz de la empresa
+//   - not_found      : la carpeta existe pero ningún archivo matchea PI-FO-076/AUSENTISMO
+//   - folder_unreadable: la carpeta existe pero readdir falló (permisos/red)
+//   - corrupt        : el archivo existe pero XLSX.readFile() lanzó error
+//   - unreadable     : el archivo existe pero no se puede abrir (bloqueado por otra app)
+//
+// Errores graves (success:false) se reservan para:
+//   - empresa sin ruta mapeada en config
+//   - JSON de config corrupto irrecuperable
 // =============================================================================
 ipcMain.handle('read-ausentismo-data', async (event, companyName) => {
   console.log('========================================');
   console.log(`[ESTADISTICAS][MAIN] Handler read-ausentismo-data llamado para empresa: ${companyName}`);
   sendLog(`[ESTADISTICAS] Cargando datos para estadísticas: ${companyName}`, 'INFO');
+
+  // Estructura común para modo degradado — evita repetir el "esqueleto" en cada rama
+  const degradedResponse = (reason, expectedDir, expectedFileName, details) => ({
+    success: true, // <- true a propósito: la app debe seguir, no romperse
+    headers: [],
+    rows: [],
+    file: null,
+    sheet: null,
+    _missingFile: true,
+    _missingFileReason: reason,
+    _expectedDir: expectedDir,
+    _expectedFileName: expectedFileName,
+    _details: details || null
+  });
 
   try {
     // 1. Cargar configuración
@@ -8177,72 +10510,280 @@ ipcMain.handle('read-ausentismo-data', async (event, companyName) => {
     const companyConfig = companyKey ? config.companyPaths[companyKey] : null;
 
     if (!companyConfig || !companyConfig.root) {
+      // Error grave — la empresa ni siquiera existe en config
       throw new Error(`Empresa "${companyName}" no tiene ruta mapeada`);
     }
 
-    // 3. Buscar archivo de ausentismo (PI-FO-076)
+    // 3. Calcular carpeta esperada del archivo de ausentismo (PI-FO-076)
     const ausentismoDir = path.join(
       companyConfig.root,
       '3. Gestión de la Salud',
       '3.3.6 Medición del ausentismo por causa médica'
     );
+    const expectedFileName = 'PI-FO-076*.xlsx (o cualquier archivo que contenga "AUSENTISMO")';
 
-    const files = await fsp.readdir(ausentismoDir);
-    const ausentismoFile = files.find(f => 
+    // 3a. Verificar primero si la carpeta existe — evita ensuciar logs con stacktraces
+    try {
+      const dirStat = await fsp.stat(ausentismoDir);
+      if (!dirStat.isDirectory()) {
+        console.warn(`[ESTADISTICAS] Ruta existe pero no es directorio: ${ausentismoDir}`);
+        return degradedResponse('folder_missing', ausentismoDir, expectedFileName,
+          `La ruta existe pero no es una carpeta: ${ausentismoDir}`);
+      }
+    } catch (statErr) {
+      if (statErr.code === 'ENOENT') {
+        console.warn(`[ESTADISTICAS] Carpeta de ausentismo no existe: ${ausentismoDir}`);
+        sendLog(`[WARN] Carpeta de ausentismo no encontrada: ${ausentismoDir}`, 'WARN');
+        return degradedResponse('folder_missing', ausentismoDir, expectedFileName,
+          'La carpeta de Medición del ausentismo no existe en la raíz de la empresa.');
+      }
+      // Error de permisos u otro al hacer stat
+      console.warn(`[ESTADISTICAS] No se pudo acceder a la carpeta: ${statErr.message}`);
+      return degradedResponse('folder_unreadable', ausentismoDir, expectedFileName,
+        `Error al acceder a la carpeta: ${statErr.code || statErr.message}`);
+    }
+
+    // 3b. Listar archivos de la carpeta
+    let files;
+    try {
+      files = await fsp.readdir(ausentismoDir);
+    } catch (readErr) {
+      console.warn(`[ESTADISTICAS] readdir falló: ${readErr.message}`);
+      return degradedResponse('folder_unreadable', ausentismoDir, expectedFileName,
+        `No se pudo listar la carpeta: ${readErr.code || readErr.message}`);
+    }
+
+    // 3c. Buscar archivo que matchee el patrón
+    const ausentismoFile = files.find(f =>
       f.includes('PI-FO-076') || f.includes('AUSENTISMO')
     );
 
     if (!ausentismoFile) {
-      throw new Error('No se encontró el archivo de ausentismo (PI-FO-076)');
+      console.warn(`[ESTADISTICAS] No se encontró archivo PI-FO-076 en ${ausentismoDir}. Archivos vistos: ${files.length}`);
+      sendLog(`[WARN] No se encontró PI-FO-076. Archivos en carpeta: ${files.slice(0, 5).join(', ')}${files.length > 5 ? '...' : ''}`, 'WARN');
+      return degradedResponse('not_found', ausentismoDir, expectedFileName,
+        `Se buscó el patrón "PI-FO-076" o "AUSENTISMO" en el nombre. Se encontraron ${files.length} archivos en la carpeta.`);
     }
 
     const filePath = path.join(ausentismoDir, ausentismoFile);
     console.log(`[ESTADISTICAS] Archivo encontrado: ${filePath}`);
 
-    // 4. Leer Excel con XLSX
-    const XLSX = require('xlsx');
-    const workbook = XLSX.readFile(filePath);
-    
-    // 5. Obtener hoja del año actual (o la primera que tenga datos)
-    const sheetName = workbook.SheetNames.find(name => 
+    // 4. Verificar accesibilidad del archivo antes de intentar leerlo
+    try {
+      await fsp.access(filePath, fs.constants.R_OK);
+    } catch (accErr) {
+      console.warn(`[ESTADISTICAS] Archivo no accesible: ${accErr.message}`);
+      return degradedResponse('unreadable', ausentismoDir, expectedFileName,
+        `El archivo existe pero no se puede leer (puede estar bloqueado por otra app): ${filePath}`);
+    }
+
+    // 5. Leer Excel con XLSX — capturar errores de parseo
+    let workbook;
+    try {
+      const XLSX = require('xlsx');
+      if (!XLSX) {
+        return degradedResponse('xlsx-missing', ausentismoDir, expectedFileName,
+          'El módulo xlsx no está disponible. Reinstalá la app o contactá soporte.');
+      }
+      workbook = XLSX.readFile(filePath);
+    } catch (xlsxErr) {
+      console.warn(`[ESTADISTICAS] XLSX.readFile() falló: ${xlsxErr.message}`);
+      sendLog(`[WARN] Archivo de ausentismo corrupto o ilegible: ${filePath} — ${xlsxErr.message}`, 'WARN');
+      return degradedResponse('corrupt', ausentismoDir, expectedFileName,
+        `No se pudo parsear el Excel: ${xlsxErr.message}. El archivo puede estar corrupto o tener un formato no soportado.`);
+    }
+
+    // 6. Obtener hoja del año actual (o la primera que tenga datos)
+    const sheetName = workbook.SheetNames.find(name =>
       name.includes(companyKey ? companyKey.toUpperCase() : '2024')
     ) || workbook.SheetNames[0];
+
+    if (!sheetName) {
+      console.warn(`[ESTADISTICAS] Workbook sin hojas: ${filePath}`);
+      return degradedResponse('corrupt', ausentismoDir, expectedFileName,
+        'El archivo Excel no contiene hojas.');
+    }
 
     const sheet = workbook.Sheets[sheetName];
     const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-    // 6. Encontrar encabezados (primera fila con "NOMBRE" o "CEDULA")
+    // 7. Encontrar encabezados (primera fila con "NOMBRE" o "CEDULA")
     let headerRowIndex = 0;
     for (let i = 0; i < Math.min(rawData.length, 20); i++) {
       const row = rawData[i];
-      if (row.some(cell => cell && (String(cell).includes('NOMBRE') || String(cell).includes('CEDULA')))) {
+      if (row && row.some(cell => cell && (String(cell).includes('NOMBRE') || String(cell).includes('CEDULA')))) {
         headerRowIndex = i;
         break;
       }
     }
 
-    const headers = rawData[headerRowIndex].map(h => h ? String(h).trim() : '');
+    // 📦459 — Guard: si no se encontraron headers reconocibles, devolver modo degradado
+    // (antes esto devolvía headers vacíos sin avisar — fuente de bugs silenciosos)
+    const detectedHeaders = rawData[headerRowIndex] || [];
+    const hasValidHeader = detectedHeaders.some(h => h && String(h).trim() !== '');
+    if (!hasValidHeader && rawData.length > 0) {
+      console.warn(`[ESTADISTICAS] No se detectaron headers válidos en ${filePath} (hoja: ${sheetName})`);
+      return degradedResponse('corrupt', ausentismoDir, expectedFileName,
+        `No se reconocieron encabezados (NOMBRE/CÉDULA) en la hoja "${sheetName}". El formato del archivo puede haber cambiado.`);
+    }
+
+    const headers = detectedHeaders.map(h => h ? String(h).trim() : '');
     const dataRows = rawData.slice(headerRowIndex + 1);
 
     console.log(`[ESTADISTICAS] Headers: ${headers.length} columnas`);
     console.log(`[ESTADISTICAS] Data rows: ${dataRows.length} filas`);
 
-    // 7. Retornar datos
+    // 8. Retornar datos exitosos
     return {
       success: true,
       headers,
       rows: dataRows,
       file: filePath,
-      sheet: sheetName
+      sheet: sheetName,
+      _missingFile: false
     };
 
   } catch (error) {
-    console.error('[ESTADISTICAS] Error:', error);
-    sendLog(`[ERROR] Error en read-ausentismo-data: ${error.message}`, 'ERROR');
+    // Solo errores graves llegan aquí (empresa sin mapear, JSON de config corrupto, etc.)
+    console.error('[ESTADISTICAS] Error grave en read-ausentismo-data:', error);
+    sendLog(`[ERROR] Error grave en read-ausentismo-data: ${error.message}`, 'ERROR');
     return {
       success: false,
-      error: error.message
+      error: error.message,
+      _unexpected: true
     };
+  }
+});
+
+// =============================================================================
+// Handlers: update-ausentismo-row + delete-ausentismo-row
+// Mismo patrón que `procesar-ausentismo` (form de registro): delega la
+// lectura/escritura del Excel a `actualizar_ausentismo.py` con openpyxl.
+// Beneficios:
+//   - openpyxl preserva formato visual (fórmulas, estilos) que XLSX.writeFile a veces rompe
+//   - match_header tolera "GENERO" / "GÉNERO" / "SEXO", mayúsculas, tildes
+//   - Búsqueda de hoja robusta: f"{empresa} 2024" → contiene empresa → contiene "2024" → primera
+//   - Headers de fila 7 hardcoded (donde realmente están en ASEL, no en fila 0)
+// =============================================================================
+
+// Mapeo de keys del Excel (lo que envía el renderer) a keys snake_case
+// (lo que espera actualizar_incapacidad en Python).
+const AUS_KEY_MAP = {
+  'GENERO': 'genero',
+  'CLASE DE INCAPACIDAD': 'clase_incapacidad',
+  'TIPO DE INCAPACIDAD': 'tipo_incapacidad',
+  'CODIGO': 'codigo',
+  'F. INICIO': 'fecha_inicio',
+  'F. FIN': 'fecha_finalizacion',
+  'DESCRIPCION': 'descripcion',  // Sin tilde (mismo formato que el header del Excel)
+};
+
+// Helper: spawn Python con un comando del script actualizar_ausentismo.py.
+// Mismo patrón que `procesar-ausentismo` (main.js:11204).
+function spawnAusentismoPython(comando, args) {
+  const { spawn } = require('child_process');
+  const scriptPath = getPythonScriptPath('actualizar_ausentismo.py');
+  if (!fs.existsSync(scriptPath)) {
+    return Promise.reject(new Error(`Script de Python no encontrado: ${scriptPath}`));
+  }
+  return getPython().then((pythonPath) => new Promise((resolve, reject) => {
+    const python = spawn(pythonPath, [scriptPath, comando, ...args], {
+      cwd: path.dirname(scriptPath),
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+      windowsHide: true,
+    });
+    let buffer = '';
+    python.stdout.on('data', (data) => {
+      buffer += data.toString();
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      lines.forEach((line) => {
+        line = line.trim();
+        if (!line) return;
+        try {
+          const obj = JSON.parse(line);
+          if (obj.type === 'log') {
+            console.log(`[AUS-Python] ${obj.message}`);
+          } else if (obj.type === 'result') {
+            resolve(obj.payload);
+          }
+        } catch (e) { /* línea no JSON, ignorar */ }
+      });
+    });
+    python.stderr.on('data', (data) => {
+      console.error(`[AUS-Python STDERR] ${data.toString()}`);
+    });
+    python.on('close', () => {
+      if (buffer?.trim()) {
+        try {
+          const last = JSON.parse(buffer.trim());
+          if (last.type === 'result') return resolve(last.payload);
+        } catch { /* ignore */ }
+      }
+      resolve({ success: false, error: 'Proceso Python cerrado sin resultado.' });
+    });
+    python.on('error', (err) => {
+      console.error(`[AUS-Python] Error al iniciar: ${err.message}`);
+      reject(err);
+    });
+  }));
+}
+
+ipcMain.handle('update-ausentismo-row', async (event, payload) => {
+  const { companyName, rowIndex, fields } = payload || {};
+  console.log(`[AUS-EDIT] === INICIO === empresa=${companyName} rowIndex=${rowIndex} fields=${JSON.stringify(Object.keys(fields || {}))}`);
+
+  try {
+    if (!companyName || typeof rowIndex !== 'number' || !fields || typeof fields !== 'object') {
+      return { success: false, error: 'Parámetros inválidos (companyName, rowIndex, fields requeridos).' };
+    }
+
+    // 1. Misma búsqueda de archivo que el form de registro (obtenerRutaAusentismo)
+    const filePath = await obtenerRutaAusentismo(companyName);
+    console.log(`[AUS-EDIT] Archivo: ${filePath}`);
+
+    // 2. Mapear keys del Excel → snake_case para Python
+    const datosSnake = {};
+    for (const [excelKey, snakeKey] of Object.entries(AUS_KEY_MAP)) {
+      if (excelKey in fields) datosSnake[snakeKey] = fields[excelKey] ?? '';
+    }
+    console.log(`[AUS-EDIT] Datos normalizados: ${JSON.stringify(datosSnake)}`);
+
+    // 3. Spawn Python con actualizar_incapacidad
+    return await spawnAusentismoPython('actualizar_incapacidad', [
+      companyName,
+      filePath,
+      String(rowIndex),
+      JSON.stringify(datosSnake),
+    ]);
+  } catch (err) {
+    console.error('[AUS-EDIT] ❌ Error:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('delete-ausentismo-row', async (event, payload) => {
+  const { companyName, rowIndex } = payload || {};
+  console.log(`[AUS-DEL] === INICIO === empresa=${companyName} rowIndex=${rowIndex}`);
+
+  try {
+    if (!companyName || typeof rowIndex !== 'number') {
+      return { success: false, error: 'Parámetros inválidos (companyName y rowIndex requeridos).' };
+    }
+
+    // 1. Misma búsqueda de archivo que el form de registro
+    const filePath = await obtenerRutaAusentismo(companyName);
+    console.log(`[AUS-DEL] Archivo: ${filePath}`);
+
+    // 2. Spawn Python con eliminar_incapacidad
+    return await spawnAusentismoPython('eliminar_incapacidad', [
+      companyName,
+      filePath,
+      String(rowIndex),
+    ]);
+  } catch (err) {
+    console.error('[AUS-DEL] ❌ Error:', err);
+    return { success: false, error: err.message };
   }
 });
 
@@ -8300,7 +10841,16 @@ ipcMain.handle('registro-estadistico:cargar-datos', async (event, { companyName 
     const filePath = path.join(submoduleDir, excelFile);
     console.log('[REGISTRO-EST] Leyendo:', filePath);
 
-    const XLSX = require('xlsx');
+    let XLSX;
+    try {
+      XLSX = require('xlsx');
+    } catch (e) {
+      console.warn('[REGISTRO-EST] xlsx no disponible:', e.message);
+      return { success: false, error: { code: 'XLSX_NOT_AVAILABLE', message: 'xlsx module not available' } };
+    }
+    if (!XLSX) {
+      return { success: false, error: { code: 'XLSX_NOT_AVAILABLE', message: 'xlsx module not available' } };
+    }
     const wb = XLSX.readFile(filePath);
     const ws = wb.Sheets[wb.SheetNames[0]];
     if (!ws) return { success: true, data: [], isEmpty: true, reason: 'NO_SHEET' };
@@ -8554,7 +11104,7 @@ ipcMain.handle('get-pri-seguimiento-data', async (event, companyName) => {
     // -------------------------------------------------------------------------
     // 11. Retornar datos procesados
     // -------------------------------------------------------------------------
-    const result = {
+    let result = {
       success: true,
       headers: headers || [],
       rows: rows,
@@ -8563,13 +11113,144 @@ ipcMain.handle('get-pri-seguimiento-data', async (event, companyName) => {
       companyName
     };
 
+    // -------------------------------------------------------------------------
+    // 📦701-fix6 — Combinar también con casos de la BD (kair.db)
+    // Los casos guardados en SQLite (como el flujo nuevo de seguimiento de
+    // incapacidades) NO están en PRI.xlsx. Si no los incluimos, el informe
+    // no los muestra. Aquí consultamos la BD y los convertimos al formato
+    // de array del Excel, insertándolos al final.
+    // -------------------------------------------------------------------------
+    try {
+        const segInc = require('./main/seguimiento-incapacidad-bridge');
+        // Necesitamos acceso a la BD. Usar la misma conexión que el bridge.
+        const dbInstance = require('./main/db-instance').getDb();
+        if (dbInstance) {
+            const casosBd = dbInstance.prepare(
+                'SELECT * FROM seguimiento_incapacidad_caso WHERE empresa_id = ? ORDER BY actualizado_en DESC'
+            ).all(companyKey || companyName);
+
+            // Set de cédulas ya presentes en el Excel (normalizadas)
+            const cedulasEnExcel = new Set();
+            // Mapeo de índice de columna por header
+            const colIdx = {};
+            (headers || []).forEach((h, i) => {
+                if (h) colIdx[String(h).toLowerCase().trim()] = i;
+            });
+            const idxCedula = colIdx['numero de documento de identidad'] !== undefined
+                ? colIdx['numero de documento de identidad']
+                : colIdx['número de documento de identidad'] !== undefined
+                    ? colIdx['número de documento de identidad']
+                    : colIdx['cedula'] !== undefined ? colIdx['cedula'] : -1;
+            if (idxCedula >= 0) {
+                for (const row of rows) {
+                    const ced = String(row[idxCedula] || '').replace(/[^0-9]/g, '');
+                    if (ced) cedulasEnExcel.add(ced);
+                }
+            }
+
+            // 📦701-fix7 — Calcular índices de columnas de seguimientos (fecha + descripción)
+            // El Excel tiene "SEGUIMIENTO N" en una columna y la descripción en la SIGUIENTE
+            // columna (sin header propio). Hay que llenar ambas manualmente.
+            const segFechaIdx = []; // Array de índices de columnas para fecha
+            for (let n = 1; n <= 5; n++) {
+                const idxFecha = colIdx[`seguimiento ${n}`];
+                segFechaIdx.push(idxFecha !== undefined ? idxFecha : -1);
+            }
+
+            // Convertir cada caso de BD a formato de array
+            let casosBdAgregados = 0;
+            for (const caso of casosBd) {
+                const cedLimpia = String(caso.cedula || '').replace(/[^0-9]/g, '');
+                if (!cedLimpia || cedulasEnExcel.has(cedLimpia)) continue;
+
+                // 📦701-fix7 — Consultar seguimientos de la tabla seguimiento_incapacidad_registro
+                // (antes se leía caso.seguimientos que NO existe — los seguimientos están en
+                // una tabla aparte con FK al caso)
+                let seguimientosBd = [];
+                try {
+                    seguimientosBd = dbInstance.prepare(
+                        'SELECT fecha, descripcion FROM seguimiento_incapacidad_registro ' +
+                        'WHERE caso_id = ? AND empresa_id = ? ' +
+                        "AND (tipo = 'seguimiento' OR tipo IS NULL) " +
+                        'ORDER BY fecha ASC, creado_en ASC'
+                    ).all(caso.id, caso.empresa_id);
+                } catch (segErr) {
+                    console.warn(`[PRI][MAIN] No se pudieron leer seguimientos para caso ${caso.id}:`, segErr.message);
+                }
+
+                // Crear un row con null en todas las columnas
+                const totalCols = (headers || []).length;
+                const newRow = new Array(totalCols).fill(null);
+                // Llenar las columnas conocidas según el mapeo
+                const mapear = (header, value) => {
+                    const i = colIdx[header];
+                    if (i !== undefined && value !== null && value !== undefined && value !== '') {
+                        newRow[i] = value;
+                    }
+                };
+                // Identificación
+                mapear('item', casosBdAgregados + 1);
+                mapear('tipo de evento at/el', caso.tipo_evento);
+                mapear('nombre trabajador', caso.nombre);
+                mapear('numero de documento de identidad', caso.cedula);
+                mapear('número de documento de identidad', caso.cedula);
+                mapear('género', caso.genero);
+                mapear('genero', caso.genero);
+                mapear('edad', caso.edad);
+                mapear('sede/area', caso.area);
+                mapear('sede/área', caso.area);
+                mapear('cargo', caso.cargo);
+                mapear('eps', caso.eps);
+                mapear('afp', caso.afp);
+                mapear('días incapacidad acumulados', caso.dias_acumulados);
+                mapear('fecha de inicio de incapacidad', caso.fecha_inicio);
+                mapear('fecha de finalización de incapacidad', caso.fecha_fin);
+                mapear('cie-10 de la incapacidad temporal dx 1', caso.codigo_cie10);
+                mapear('diagnostico', caso.descripcion_diagnostico);
+                mapear('origen incapacidad dx 1', caso.origen_dx1 || '');
+                // 📦701-fix7 — Segimientos: fecha en colIdx[`seguimiento N`], descripción en colIdx + 1
+                if (seguimientosBd && seguimientosBd.length > 0) {
+                    seguimientosBd.forEach((seg, i) => {
+                        if (i >= 5) return; // Máximo 5 slots en el Excel
+                        const idxFecha = segFechaIdx[i];
+                        if (idxFecha === undefined || idxFecha < 0) return;
+                        // 📦701-fix7 — Enviar fecha en formato YYYY-MM-DD (nativo)
+                        // El formatDate() del renderer lo convierte a DD/MM/YYYY.
+                        // Si mandamos DD/MM/YYYY, el new Date() no lo parsea → "Invalid Date".
+                        if (seg.fecha) {
+                            newRow[idxFecha] = seg.fecha;
+                        }
+                        // Descripción va en la columna SIGUIENTE (no tiene header propio)
+                        const idxDesc = idxFecha + 1;
+                        if (idxDesc < totalCols && seg.descripcion) {
+                            newRow[idxDesc] = seg.descripcion;
+                        }
+                    });
+                }
+                // Cierre
+                mapear('fecha de cierre', caso.fecha_cierre);
+                mapear('motivo de cierre', caso.motivo_cierre);
+                mapear('origen del caso', caso.origen_caso);
+                mapear('recomendaciones laborales vigentes', caso.recomendaciones_laborales);
+
+                result.rows.push(newRow);
+                cedulasEnExcel.add(cedLimpia);
+                casosBdAgregados++;
+                console.log(`[PRI][MAIN] 📦701-fix7 — Caso BD ${caso.nombre} (${cedLimpia}) con ${seguimientosBd.length} seguimientos`);
+            }
+            console.log(`[PRI][MAIN] 📦701-fix6 — Casos de BD agregados al informe: ${casosBdAgregados}`);
+        }
+    } catch (bdErr) {
+        console.warn('[PRI][MAIN] No se pudieron cargar casos de BD para el informe (no crítico):', bdErr.message);
+    }
+
     console.log('========================================');
     console.log('[PRI][MAIN] Datos del PRI listos para enviar:');
     console.log(`  - Éxito: ${result.success}`);
     console.log(`  - Encabezados: ${result.headers.length} columnas`);
     console.log(`  - Filas: ${result.rows.length} registros`);
-    console.log(`  - Archivo: ${priFile.path}`);
-    console.log(`  - Hoja: ${sheetName}`);
+    console.log(`  - Archivo: ${result.filePath}`);
+    console.log(`  - Hoja: ${result.sheetName}`);
     console.log('========================================');
 
     return result;
@@ -8607,7 +11288,8 @@ ipcMain.handle('buscar-empleado-por-cedula', async (event, { cedula, empresa }) 
     getPython().then(pythonPath => {
       const python = spawn(pythonPath, [scriptPath, 'buscar_empleado', cedula, empresa], {
         cwd: path.dirname(scriptPath),
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+        windowsHide: true
       });
 
       let buffer = '';
@@ -8700,7 +11382,8 @@ ipcMain.handle('buscar-cie10-descripcion', async (event, { companyName, cie10Cod
 
     const pythonProcess = spawn(pythonPath, [scriptPath, 'buscar_cie10', excelFilePath, cie10Code], {
       cwd: path.dirname(scriptPath),
-      env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+      windowsHide: true
     });
 
     return new Promise((resolve, reject) => {
@@ -8796,9 +11479,24 @@ async function obtenerRutaAusentismo(companyName) {
   const ausentismoDir = findDirFlexible(gestionSalud.subdirectories, "3.3.6 Medición del ausentismo por causa médica");
   if (!ausentismoDir) throw new Error("No se encontró submódulo de ausentismo");
 
+  // 🆕 Búsqueda inteligente (antes retornaba excelFiles[0] = PRI.xlsx en empresas
+  // como ASEL, que tienen PRI.xlsx + A-FR-31 Ausentismo Laboral.xlsx en la misma
+  // carpeta). Ahora prioriza el archivo con "AUSENTISMO" o "PI-FO-076" en el
+  // nombre; si no, agarra el primer .xlsx que NO sea PRI.
   const excelFiles = (ausentismoDir.files || []).filter(f => f.extension?.toLowerCase() === '.xlsx');
   if (excelFiles.length === 0) throw new Error('No hay archivos .xlsx en la carpeta de ausentismo.');
 
+  // 1. Buscar archivo con "AUSENTISMO" o "PI/PG/GI-FO-076" en el nombre
+  const ausFile = excelFiles.find(f =>
+    /PI-FO-076|PG-FO-076|GI-FO-076|AUSENTISMO/i.test(f.name || '')
+  );
+  if (ausFile) return ausFile.path;
+
+  // 2. Primer .xlsx que NO sea PRI
+  const nonPri = excelFiles.find(f => !/PRI/i.test(f.name || ''));
+  if (nonPri) return nonPri.path;
+
+  // 3. Fallback: el primer .xlsx
   return excelFiles[0].path;
 }
 
@@ -8902,7 +11600,8 @@ ipcMain.handle('procesar-ausentismo', async (event, empresa, formData) => {
         formDataJson  // ARG 3
       ], {
         cwd: path.dirname(scriptPath),
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+        windowsHide: true
       });
 
       let buffer = '';
@@ -9002,7 +11701,8 @@ ipcMain.handle('save-follow-up', async (event, followUpData, companyName) => {
         followUpDataJson // ARG 3
       ], {
         cwd: path.dirname(scriptPath),
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+        windowsHide: true
       });
 
       let buffer = '';
@@ -9091,7 +11791,8 @@ ipcMain.handle('buscar-registros-cedula', async (event, cedula, companyName) => 
         cedula
       ], {
         cwd: path.dirname(scriptPath),
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+        windowsHide: true
       });
 
       let buffer = '';
@@ -9176,7 +11877,8 @@ ipcMain.handle('buscar-todos-registros-pri', async (event, companyName) => {
         filePath
       ], {
         cwd: path.dirname(scriptPath),
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+        windowsHide: true
       });
 
       let buffer = '';
@@ -9305,7 +12007,8 @@ ipcMain.handle('get-follow-up-history', async (event, caseId, companyName) => {
         filePath
       ], {
         cwd: path.dirname(scriptPath),
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+        windowsHide: true
       });
 
       let buffer = '';
@@ -9441,7 +12144,9 @@ ipcMain.handle('load-follow-up-data', async (event, companyName) => {
 
         cwd: path.dirname(scriptPath),
 
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+
+        windowsHide: true
 
       });
 
@@ -11437,7 +14142,9 @@ WScript.Quit 0
       }
 
       // Ejecutar VBScript con cscript, pasando la ruta como argumento
-      const vbsProcess = spawn('cscript.exe', [vbsPath, '//Nologo', filePath]);
+      const vbsProcess = spawn('cscript.exe', [vbsPath, '//Nologo', filePath], {
+        windowsHide: true
+      });
       
       let output = '';
       let errorOutput = '';
@@ -11803,9 +14510,13 @@ ipcMain.on('restart_app', () => {
     // 2. Limpiar procesos secundarios inmediatamente
     cleanupProcesses();
 
+    // 🔄 RE-AUDIT-2026-09-10 (v0.1.196, P1-1) — Cerrar DB antes de quit
+    // para que las transacciones en curso se persistan al main DB WAL.
+    closeDatabaseSafely();
+
     // 3. Forzar el cierre de la aplicación para que el instalador pueda reemplazar archivos
     log.info('[UPDATER] Cerrando aplicación para instalación...', 'INFO');
-    
+
     // IMPORTANTE: En Windows, quitAndInstall necesita que la app se cierre completamente
     // Los parámetros (true, true) significan:
     // - forceQuit: true  = Forzar el cierre de la aplicación
@@ -11814,22 +14525,52 @@ ipcMain.on('restart_app', () => {
         log.info('[UPDATER] Ejecutando autoUpdater.quitAndInstall(true, true)...', 'INFO');
         autoUpdater.quitAndInstall(true, true);
     } catch (err) {
+        // 🔄 RE-AUDIT-2026-09-10 (v0.1.196, P0-3) — ANTES: solo hacía
+        // app.quit() y se perdía el update. AHORA: intenta lanzar Update.exe
+        // (Squirrel bootstrapper) manualmente como fallback. Si Update.exe
+        // no existe, al menos app.quit() deja al user en versión vieja
+        // (que SÍ funciona), no en "app cerrada sin instalar nada".
         log.error(`[UPDATER] Error en quitAndInstall: ${err.message}`, 'ERROR');
-        
-        // Fallback: Salir manualmente y esperar que el instalador se ejecute
-        log.info('[UPDATER] Intentando salida de emergencia...', 'WARN');
-        
-        // Cerrar todos los procesos de Python restantes
-        if (process.platform === 'win32') {
-            try {
-                const { execSync } = require('child_process');
-                execSync('taskkill /F /IM python.exe /T', { stdio: 'ignore' });
-            } catch (e) {
-                // Ignorar si no hay procesos Python
+        log.info('[UPDATER] Intentando fallback: lanzar Update.exe manualmente...', 'WARN');
+
+        // Buscar Update.exe en resources/update/ (Squirrel lo copia ahí)
+        // En dev: __dirname/../Update.exe (raro)
+        // En prod: process.resourcesPath/../Update.exe (junto al .exe)
+        const updateExeCandidates = app.isPackaged
+            ? [
+                path.join(process.resourcesPath, '..', 'Update.exe'),
+                path.join(path.dirname(process.execPath), 'Update.exe')
+              ]
+            : [path.join(__dirname, '..', 'Update.exe')];
+
+        let updateExeFound = null;
+        for (const candidate of updateExeCandidates) {
+            if (fs.existsSync(candidate)) {
+                updateExeFound = candidate;
+                break;
             }
         }
-        
-        // Salir de la aplicación
+
+        if (updateExeFound) {
+            try {
+                log.info(`[UPDATER] Lanzando Update.exe desde: ${updateExeFound}`, 'INFO');
+                // --processStartAndWait le dice a Squirrel que arranque la app
+                // nueva y espere a que termine antes de cerrar.
+                const { execFile } = require('child_process');
+                execFile(updateExeFound, ['--processStartAndWait', process.execPath], {
+                    detached: true,
+                    stdio: 'ignore'
+                });
+                log.info('[UPDATER] Update.exe lanzado en background', 'INFO');
+            } catch (launchErr) {
+                log.error(`[UPDATER] Lanzar Update.exe también falló: ${launchErr.message}`, 'ERROR');
+            }
+        } else {
+            log.warn('[UPDATER] Update.exe no encontrado. El user quedará en versión vieja (no se aplicará el update).', 'WARN');
+        }
+
+        // Salir de la aplicación de todos modos (Update.exe ya está corriendo
+        // en background si lo encontramos; si no, el user puede reabrir).
         app.quit();
     }
 });
@@ -13358,13 +16099,14 @@ ipcMain.handle('get-gestion-integral-stats', async (event, companyName) => {
     const currentYear = new Date().getFullYear();
 
     // Calcular estadísticas en paralelo (incluyendo evaluación inicial)
-    const [politica, objetivos, plan_trabajo, rendicion, evaluacion_inicial, principiosAutoResultados] = await Promise.all([
+    const [politica, objetivos, plan_trabajo, rendicion, evaluacion_inicial, principiosAutoResultados, cambios] = await Promise.all([
         calculatePoliticaStats(rootPath),
-        calculateObjetivosStats(rootPath),
+        calculateObjetivosStats(rootPath, companyName),
         calculatePlanTrabajoStats(rootPath, currentYear),
         calculateRendicionCuentasStats(rootPath),
         calculateEvaluacionInicialStats(rootPath),
-        calculatePrincipiosAutoResultados(rootPath, companyName)
+        calculatePrincipiosAutoResultados(rootPath, companyName),
+        calculateCambioStats(companyName)
     ]);
 
     const stats = {
@@ -13373,7 +16115,8 @@ ipcMain.handle('get-gestion-integral-stats', async (event, companyName) => {
         plan_trabajo,
         rendicion_cuentas: rendicion,
         evaluacion_inicial,
-        principiosAutoResultados
+        principiosAutoResultados,
+        cambios
     };
 
     sendLog(`[MAIN] Estadísticas Gestión Integral calculadas: ${JSON.stringify(stats)}`, 'DEBUG');
@@ -13427,20 +16170,20 @@ async function calculatePoliticaStats(basePath) {
     }
 
     const files = await fsp.readdir(rutaFinal);
-    const politicaFiles = files.filter(f => 
+    const politicaFiles = files.filter(f =>
         f.toLowerCase().includes('politica') && (f.endsWith('.pdf') || f.endsWith('.docx') || f.endsWith('.xlsx'))
     );
 
     if (politicaFiles.length > 0) {
         stats.documento_encontrado = true;
         stats.estado = 'Disponible';
-        
+
         // Obtener fecha del archivo más reciente
         const filePath = path.join(rutaFinal, politicaFiles[0]);
         const fileStats = await fsp.stat(filePath);
         stats.fecha = fileStats.mtime;
         stats.actualizada = (Date.now() - fileStats.mtime.getTime()) < (365 * 24 * 60 * 60 * 1000); // Menos de 1 año
-        
+
         if (stats.actualizada) {
             stats.estado = 'Actualizada';
         } else {
@@ -13455,107 +16198,476 @@ async function calculatePoliticaStats(basePath) {
 }
 
 /**
- * Calcular estadísticas de Objetivos SST
+ * 📦561 — Helpers para A1: parsear meta y valor de los indicadores
+ * cuando el porcentajeReal no está disponible (manual ni auto).
+ * Permite reflejar el cumplimiento real comparando el valor numérico
+ * contra la meta textual del Excel de objetivos.
  */
-async function calculateObjetivosStats(basePath) {
+
+// Parsear meta tipo "<1", "0", "<5", "<50", "0%", "<=10", ">=0.5"
+// Retorna { operador, valor } o null si no se puede parsear.
+function parseMetaIndicador(metaStr) {
+  if (metaStr === null || metaStr === undefined) return null;
+  var s = String(metaStr).trim();
+  if (s === '') return null;
+
+  // Quitar "%" final si está
+  s = s.replace(/%$/, '').trim();
+
+  var match;
+  if ((match = s.match(/^<=\s*([-+]?\d*\.?\d+)$/))) {
+    return { operador: 'lte', valor: parseFloat(match[1]) };
+  }
+  if ((match = s.match(/^>=\s*([-+]?\d*\.?\d+)$/))) {
+    return { operador: 'gte', valor: parseFloat(match[1]) };
+  }
+  if ((match = s.match(/^<\s*([-+]?\d*\.?\d+)$/))) {
+    return { operador: 'lt', valor: parseFloat(match[1]) };
+  }
+  if ((match = s.match(/^>\s*([-+]?\d*\.?\d+)$/))) {
+    return { operador: 'gt', valor: parseFloat(match[1]) };
+  }
+  if ((match = s.match(/^=\s*([-+]?\d*\.?\d+)$/))) {
+    return { operador: 'eq', valor: parseFloat(match[1]) };
+  }
+  if ((match = s.match(/^([-+]?\d*\.?\d+)$/))) {
+    // Sin operador = igualdad exacta
+    return { operador: 'eq', valor: parseFloat(match[1]) };
+  }
+  return null;
+}
+
+// Parsear valor tipo "0.0421", "222.2222", "0.00%", "0.00 por 100.000 trabajadores",
+// "1 mortales / 2 AT en 2026", "Tasa ausentismo promedio: 0.00%".
+// Retorna número o null si no se puede parsear.
+function parseValorIndicador(valorStr) {
+  if (valorStr === null || valorStr === undefined) return null;
+  var s = String(valorStr).trim();
+  if (s === '' || s === 'NaN' || s === 'Infinity' || s === '-Infinity') return null;
+
+  // Buscar el primer número con signo opcional y decimales.
+  // Soporta formatos: "0.0421", "0.00%", "0.00 por 100.000", "1.5 AT", "-3.2"
+  var match = s.match(/-?\d+(?:\.\d+)?/);
+  if (!match) return null;
+  var num = parseFloat(match[0]);
+  if (isNaN(num)) return null;
+  return num;
+}
+
+// Evaluar cumplimiento de un valor numérico contra una meta textual.
+// Retorna { cumple, porcentajeReal }.
+//   - "cumple": true si el valor satisface la meta
+//   - "porcentajeReal": 0-100 (escala inversa para metas con "<")
+function evaluarCumplimientoPorMeta(valorNum, metaStr) {
+  if (typeof valorNum !== 'number' || isNaN(valorNum)) {
+    return { cumple: false, porcentajeReal: 0, razon: 'valor no numérico' };
+  }
+  var meta = parseMetaIndicador(metaStr);
+  if (!meta) {
+    return { cumple: false, porcentajeReal: 0, razon: 'meta no parseable' };
+  }
+
+  // lt: meta dice "el valor debe ser MENOR a X" (ej: IF < 1)
+  //   - Si valor < X: cumple. Escala inversa: 0 → 100%, X → 70% (umbral), >X → 0%
+  //   - Si valor === X: límite. Devuelve 70% (justo en el umbral).
+  //   - Si valor > X: no cumple.
+  if (meta.operador === 'lt') {
+    if (meta.valor === 0) {
+      // Meta "<0" no tiene sentido; tratar como igualdad
+      var eqC = valorNum === 0;
+      return { cumple: eqC, porcentajeReal: eqC ? 100 : 0 };
+    }
+    if (valorNum <= meta.valor) {
+      // Escala inversa: mientras más bajo mejor
+      // valor=0 → 100%, valor=meta → 70%
+      var ratio = 1 - (valorNum / meta.valor);
+      var pct = Math.round(ratio * 100);
+      // Asegurar que valor=meta da 0% (no 70, ya que está justo en el límite)
+      // y que valores por debajo de meta dan entre 70% y 100%
+      if (valorNum === meta.valor) {
+        return { cumple: true, porcentajeReal: 0 }; // Justo en meta, no cuenta como cumplimiento
+      }
+      // Mapear: valor=0 → 100, valor=meta → 0
+      return { cumple: true, porcentajeReal: Math.max(0, Math.min(100, pct)) };
+    }
+    return { cumple: false, porcentajeReal: 0 };
+  }
+
+  // lte: menor o igual
+  if (meta.operador === 'lte') {
+    var okLte = valorNum <= meta.valor;
+    return { cumple: okLte, porcentajeReal: okLte ? 100 : 0 };
+  }
+
+  // gt: mayor
+  if (meta.operador === 'gt') {
+    var okGt = valorNum > meta.valor;
+    return { cumple: okGt, porcentajeReal: okGt ? 100 : 0 };
+  }
+
+  // gte: mayor o igual
+  if (meta.operador === 'gte') {
+    var okGte = valorNum >= meta.valor;
+    return { cumple: okGte, porcentajeReal: okGte ? 100 : 0 };
+  }
+
+  // eq: igualdad exacta
+  if (meta.operador === 'eq') {
+    var okEq = valorNum === meta.valor;
+    return { cumple: okEq, porcentajeReal: okEq ? 100 : 0 };
+  }
+
+  return { cumple: false, porcentajeReal: 0, razon: 'operador desconocido' };
+}
+
+/**
+ * Calcular estadísticas de Objetivos SST
+ * 📦560 — Reescrito: usa resultados manuales (JSON) + auto-resultados por keyword,
+ * en vez de buscar la palabra "cumplido" en una columna. Misma estructura de retorno
+ * (más `nombre` en cada principio) para compatibilidad con el widget del home.
+ *
+ * 📦561 — A1: fallback cuando no hay porcentajeReal: parsear el valor del resultado
+ * (texto como "IF promedio: 0.0421") y compararlo con la meta del Excel (como "<1")
+ * usando los helpers parseValorIndicador/parseMetaIndicador/evaluarCumplimientoPorMeta.
+ */
+async function calculateObjetivosStats(basePath, companyName) {
+  const UMBRAL_CUMPLIMIENTO = 70; // >= 70% se considera cumplido
+
+  // Keywords para auto-detectar principio (mismo set que objetivos-sst-viewer.js)
+  // 📦562 — Ampliadas con 'incidencia', 'prevalencia', 'ifa', 'incapacidad'
+  // para que el match encuentre los autoKeys correspondientes en calculateAutoResultados.
+  const KEYWORD_MAP = {
+    1: ['accidente', 'lesion', 'lesión', 'incidente', 'enfermedad laboral',
+        'accidentalidad', 'mortalidad', 'ausentismo', 'peligro', 'riesgo',
+        'severidad', 'mortal', 'eventos con les', 'frecuencia de ac',
+        'incidencia', 'prevalencia', 'ifa', 'incapacidad'],
+    2: ['legal', 'ley ', 'normativa', 'requisito legal', 'cumplimiento legal',
+        'matriz legal', 'reglamento', 'decreto', 'resolución', 'otros requisitos',
+        'cumplir con los requisitos'],
+    3: ['cliente', 'satisfacc', 'queja', 'reclamo', 'encuesta', 'calidad total',
+        'expectativa', 'lograr la satisf', 'servicio al'],
+    4: ['presupuesto', 'recurso', 'capacitac', 'competen', 'mejora continua',
+        'acciones correctiva', 'acciones preventiva', 'cronograma',
+        'ambientes de trabajo', 'ambiente sano', 'correctiva', 'preventiva', 'sano y seguro']
+  };
+
   const stats = {
     total: 0,
     cumplidos: 0,
     porcentaje: 0,
-    vencidos: 0,
     porPrincipio: {
-      1: { total: 0, cumplidos: 0, porcentaje: 0 },
-      2: { total: 0, cumplidos: 0, porcentaje: 0 },
-      3: { total: 0, cumplidos: 0, porcentaje: 0 },
-      4: { total: 0, cumplidos: 0, porcentaje: 0 }
+      1: { nombre: 'Prevención', total: 0, cumplidos: 0, porcentaje: 0 },
+      2: { nombre: 'Requisitos Legales', total: 0, cumplidos: 0, porcentaje: 0 },
+      3: { nombre: 'Satisfacción Cliente', total: 0, cumplidos: 0, porcentaje: 0 },
+      4: { nombre: 'Recursos y Mejora', total: 0, cumplidos: 0, porcentaje: 0 }
     }
   };
 
+  // Helper: auto-detectar principio por keywords en el texto
+  function autoDetectPrinciple(text) {
+    var lower = (text || '').toLowerCase();
+    var scores = { 1: 0, 2: 0, 3: 0, 4: 0 };
+    for (var pid in KEYWORD_MAP) {
+      if (!KEYWORD_MAP.hasOwnProperty(pid)) continue;
+      var words = KEYWORD_MAP[pid];
+      for (var i = 0; i < words.length; i++) {
+        if (lower.indexOf(words[i].toLowerCase()) !== -1) {
+          scores[pid]++;
+        }
+      }
+    }
+    var maxScore = 0;
+    var bestPid = 4; // Default
+    for (var p in scores) {
+      if (scores.hasOwnProperty(p) && scores[p] > maxScore) {
+        maxScore = scores[p];
+        bestPid = parseInt(p);
+      }
+    }
+    return bestPid;
+  }
+
+  // Helper: match indicador contra auto-resultados por keyword
+  // 📦562 — Ampliado con búsqueda directa del autoKey en el texto del indicador.
+  // Si el autoKey es "incidencia" y el indicador dice "Incidencia Enfermedad Laboral",
+  // matchea sin pasar por KEYWORD_MAP. Esto cubre keywords que faltaban en el map.
+  // 📦562b — FIX: si TODOS los matches tienen porcentajeReal = 0 (porque la meta no
+  // se leyó del Excel de objetivos), se asigna el match igualmente para que A1
+  // (fallback) pueda usar el valorTextoDisponible y comparar con la meta del indicador.
+  function matchAutoResultado(indicatorText, autoResultados) {
+    if (!autoResultados || Object.keys(autoResultados).length === 0) return null;
+    var lower = (indicatorText || '').toLowerCase();
+
+    var bestMatch = null;
+    var bestScore = 0;
+
+    function crearMatch(autoKey, autoVal) {
+      return {
+        porcentajeReal: autoVal.porcentajeReal,
+        source: 'auto',
+        keyword: autoKey,
+        resultado: autoVal.resultado || null  // 📦562b: propagar para A1
+      };
+    }
+
+    // ESTRATEGIA 1: búsqueda directa del autoKey en el texto del indicador
+    for (var directKey in autoResultados) {
+      if (!autoResultados.hasOwnProperty(directKey)) continue;
+      var directLower = directKey.toLowerCase();
+      if (directLower.length < 3) continue;
+      if (lower.indexOf(directLower) !== -1) {
+        var directAuto = autoResultados[directKey];
+        if (directAuto && typeof directAuto.porcentajeReal === 'number' && directAuto.porcentajeReal > bestScore) {
+          bestMatch = crearMatch(directKey, directAuto);
+          bestScore = directAuto.porcentajeReal;
+        }
+      }
+    }
+
+    // ESTRATEGIA 2: keywords del KEYWORD_MAP
+    for (var pidStr in KEYWORD_MAP) {
+      if (!KEYWORD_MAP.hasOwnProperty(pidStr)) continue;
+      var kws = KEYWORD_MAP[parseInt(pidStr)];
+      for (var k = 0; k < kws.length; k++) {
+        var kw = kws[k].toLowerCase();
+        if (lower.indexOf(kw) === -1) continue;
+        for (var autoKey in autoResultados) {
+          if (!autoResultados.hasOwnProperty(autoKey)) continue;
+          var autoLower = autoKey.toLowerCase();
+          if (autoLower.indexOf(kw) !== -1 || kw.indexOf(autoLower) !== -1) {
+            var auto = autoResultados[autoKey];
+            if (auto && typeof auto.porcentajeReal === 'number' && auto.porcentajeReal > bestScore) {
+              bestMatch = crearMatch(autoKey, auto);
+              bestScore = auto.porcentajeReal;
+            }
+          }
+        }
+      }
+    }
+
+    // 📦562b — ESTRATEGIA 3: si no se encontró match con porcentajeReal > 0,
+    // buscar matches con porcentajeReal = 0 para que A1 pueda usar el valorTexto.
+    if (bestMatch === null) {
+      for (var directKey2 in autoResultados) {
+        if (!autoResultados.hasOwnProperty(directKey2)) continue;
+        var directLower2 = directKey2.toLowerCase();
+        if (directLower2.length < 3) continue;
+        if (lower.indexOf(directLower2) !== -1) {
+          bestMatch = crearMatch(directKey2, autoResultados[directKey2]);
+          break;
+        }
+      }
+    }
+    if (bestMatch === null) {
+      for (var pidStr2 in KEYWORD_MAP) {
+        if (!KEYWORD_MAP.hasOwnProperty(pidStr2)) continue;
+        var kws2 = KEYWORD_MAP[parseInt(pidStr2)];
+        for (var k2 = 0; k2 < kws2.length; k2++) {
+          var kw2 = kws2[k2].toLowerCase();
+          if (lower.indexOf(kw2) === -1) continue;
+          for (var autoKey2 in autoResultados) {
+            if (!autoResultados.hasOwnProperty(autoKey2)) continue;
+            var autoLower2 = autoKey2.toLowerCase();
+            if (autoLower2.indexOf(kw2) !== -1 || kw2.indexOf(autoLower2) !== -1) {
+              bestMatch = crearMatch(autoKey2, autoResultados[autoKey2]);
+              break;
+            }
+          }
+          if (bestMatch !== null) break;
+        }
+        if (bestMatch !== null) break;
+      }
+    }
+
+    return bestMatch;
+  }
+
   try {
-    // Intentar múltiples nombres de carpeta (priorizar nombre corto)
-    const posiblesNombres = [
-        '2. Gestión Integral',        // Nombre corto (primero)
-        '2. Gestion Integral',        // Sin tilde
-        '2. Gestión Integral del SG-SST'  // Nombre completo
+    // 1. Buscar la carpeta de Gestión Integral
+    var posiblesNombres = [
+      '2. Gestión Integral',
+      '2. Gestion Integral',
+      '2. Gestión Integral del SG-SST'
     ];
 
-    let gestionIntegralPath = null;
-    for (const nombre of posiblesNombres) {
-        const pathIntento = path.join(basePath, nombre);
-        if (fs.existsSync(pathIntento)) {
-            gestionIntegralPath = pathIntento;
-            break;
+    var gestionIntegralPath = null;
+    for (var n = 0; n < posiblesNombres.length; n++) {
+      var pIntento = path.join(basePath, posiblesNombres[n]);
+      if (fs.existsSync(pIntento)) {
+        gestionIntegralPath = pIntento;
+        break;
+      }
+    }
+
+    if (!gestionIntegralPath) return stats;
+
+    // 2. Buscar el archivo Excel
+    var objetivosPath = path.join(gestionIntegralPath, '2.2.1 Objetivos SST');
+    var objetivosPathAlt = path.join(gestionIntegralPath, '2.2 Objetivos SST');
+    var objetivosPathAlt2 = path.join(gestionIntegralPath, '2.2 Objetivos');
+
+    var rutaFinal = null;
+    if (fs.existsSync(objetivosPath)) rutaFinal = objetivosPath;
+    else if (fs.existsSync(objetivosPathAlt)) rutaFinal = objetivosPathAlt;
+    else if (fs.existsSync(objetivosPathAlt2)) rutaFinal = objetivosPathAlt2;
+
+    if (!rutaFinal || !fs.existsSync(rutaFinal)) return stats;
+
+    var files = await fsp.readdir(rutaFinal);
+    var objetivosFiles = files.filter(function (f) {
+      return (f.endsWith('.xlsx') || f.endsWith('.xls')) && !f.startsWith('~$');
+    });
+
+    if (objetivosFiles.length === 0) return stats;
+
+    var filePath = path.join(rutaFinal, objetivosFiles[0]);
+
+    // 3. Leer el Excel (misma estructura que load-objetivos-excel-data)
+    var workbook = xlsx.readFile(filePath);
+    var sheetName = workbook.SheetNames[0];
+    var worksheet = workbook.SheetNames.length > 0 ? workbook.Sheets[sheetName] : null;
+    if (!worksheet) return stats;
+
+    // Datos desde fila 6 (índice 5) — igual que load-objetivos-excel-data
+    var data = xlsx.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+    var startIndex = 5;
+
+    var objectivesData = [];
+    for (var r = startIndex; r < data.length; r++) {
+      var row = data[r];
+      if (!row || !row[1]) continue;
+      var objectiveValue = row[1] ? row[1].toString() : '';
+      if (objectiveValue.trim() === '') continue;
+      objectivesData.push({
+        id: objectivesData.length + 1,
+        objective: objectiveValue,
+        indicator: row[2] ? row[2].toString() : '',
+        formula: row[3] ? row[3].toString() : '',
+        goal: row[4] ? row[4].toString() : '',
+        frequency: row[5] ? row[5].toString() : '',
+        responsible: row[6] ? row[6].toString() : '',
+        principleId: row[7] ? parseInt(row[7]) || null : null
+      });
+    }
+
+    if (objectivesData.length === 0) return stats;
+
+    // 4. Leer resultados manuales (JSON en misma carpeta que el Excel)
+    var resultadosManuales = {};
+    var jsonPath = path.join(path.dirname(filePath), 'resultados-objetivos.json');
+    try {
+      if (fs.existsSync(jsonPath)) {
+        var content = await fsp.readFile(jsonPath, 'utf8');
+        var parsed = JSON.parse(content);
+        resultadosManuales = (parsed && parsed.resultados) || {};
+      }
+    } catch (e) {
+      sendLog('[MAIN][Objetivos] No se pudo leer resultados manuales: ' + e.message, 'WARN');
+    }
+
+    // 5. Calcular auto-resultados (de submódulos: capacitaciones, presupuesto, etc.)
+    var autoResultados = {};
+    if (companyName) {
+      try {
+        autoResultados = await calculateAutoResultados(companyName);
+      } catch (e) {
+        sendLog('[MAIN][Objetivos] Error en calculateAutoResultados: ' + e.message, 'WARN');
+      }
+    }
+
+    // 6. Agrupar por objetivo (mismo método que objetivos-sst-viewer.js buildGroups)
+    //    Esto asegura que el groupIdx coincida con el del viewer para matchear resultados.
+    var groupMap = {};
+    var groupOrder = [];
+    objectivesData.forEach(function (item) {
+      var key = (item.objective || '').trim();
+      if (!groupMap[key]) {
+        groupMap[key] = [];
+        groupOrder.push(key);
+      }
+      groupMap[key].push(item);
+    });
+
+    // 7. Para cada grupo/indicador, calcular cumplimiento
+    var groupIdx = 0;
+    groupOrder.forEach(function (objectiveKey) {
+      var indicatorsInGroup = groupMap[objectiveKey];
+      var indIdx = 0;
+
+      indicatorsInGroup.forEach(function (ind) {
+        var compKey = groupIdx + '-' + indIdx;
+
+        // Determinar principio: manual (col H) o auto-detectado por keywords
+        var pid = ind.principleId;
+        if (!pid || pid < 1 || pid > 4) {
+          pid = autoDetectPrinciple((ind.objective || '') + ' ' + (ind.indicator || ''));
         }
-    }
 
-    if (!gestionIntegralPath) {
-        return stats;
-    }
+        // Buscar resultado manual por groupIdx-indicatorIdx
+        var manual = resultadosManuales[compKey];
+        var autoMatch = null;
+        var porcentajeReal = null;
+        var fuente = null;
+        var valorTextoDisponible = null; // 📦561 — texto del valor para parsear en A1 fallback
 
-    const objetivosPath = path.join(gestionIntegralPath, '2.2 Objetivos SST');
-    const objetivosPathAlt = path.join(gestionIntegralPath, '2.2 Objetivos');
+        if (manual && typeof manual.porcentajeReal === 'number' && manual.porcentajeReal > 0) {
+          porcentajeReal = manual.porcentajeReal;
+          fuente = 'manual';
+          valorTextoDisponible = manual.resultado || null;
+        } else {
+          // Fallback: auto-resultado por keyword
+          autoMatch = matchAutoResultado((ind.objective || '') + ' ' + (ind.indicator || ''), autoResultados);
+          if (autoMatch) {
+            porcentajeReal = autoMatch.porcentajeReal;
+            fuente = 'auto';
+            valorTextoDisponible = autoMatch.resultado || null;
+          }
+        }
 
-    const rutaFinal = fs.existsSync(objetivosPath) ? objetivosPath : objetivosPathAlt;
-
-    if (!fs.existsSync(rutaFinal)) {
-        return stats;
-    }
-
-    const files = await fsp.readdir(rutaFinal);
-    const objetivosFiles = files.filter(f => 
-        (f.endsWith('.xlsx') || f.endsWith('.xls')) && !f.startsWith('~$')
-    );
-
-    if (objetivosFiles.length > 0) {
-        const filePath = path.join(rutaFinal, objetivosFiles[0]);
-        const workbook = xlsx.readFile(filePath);
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const data = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
-
-        // Estructura Excel:
-        // B(1): Objetivo, C(2): Indicador, D(3): Fórmula, E(4): Meta,
-        // F(5): Frecuencia, G(6): Responsable, H(7): Principle ID (1-4)
-        for (let i = 1; i < data.length; i++) {
-            const row = data[i];
-            if (!row || row.length < 2) continue;
-
-            const objetivo = row[1];
-            if (!objetivo || typeof objetivo !== 'string') continue;
-            if (objetivo.toLowerCase().includes('total') || objetivo.toLowerCase().includes('objetivo')) continue;
-
-            stats.total++;
-
-            // Determinar principleId (columna H, índice 7)
-            let principleId = parseInt(row[7]) || null;
-            if (!principleId || principleId < 1 || principleId > 4) {
-                principleId = 1; // Default a principio 1
+        // 📦561 — A1: si porcentajeReal sigue siendo null o 0, intentar parsear
+        // el valor (de manual o auto) contra la meta del Excel del indicador.
+        // Esto permite que indicadores como "Frecuencia de accidentalidad" con
+        // valor 0.0421 y meta "<1" cuenten como cumplidos automáticamente.
+        if ((porcentajeReal === null || porcentajeReal === 0) && valorTextoDisponible && ind.goal) {
+          var valorNum = parseValorIndicador(valorTextoDisponible);
+          if (valorNum !== null) {
+            var evalRes = evaluarCumplimientoPorMeta(valorNum, ind.goal);
+            if (evalRes.porcentajeReal > 0) {
+              porcentajeReal = evalRes.porcentajeReal;
+              fuente = fuente ? fuente + '+meta' : 'meta';
             }
-
-            stats.porPrincipio[principleId].total++;
-
-            // Verificar estado de cumplimiento
-            const estado = (row[2] || row[3] || '').toString().toLowerCase();
-            const cumplido = estado.includes('cumplido') || estado.includes('realizado') || estado.includes('completado') || estado === 'si';
-            if (cumplido) {
-                stats.cumplidos++;
-                stats.porPrincipio[principleId].cumplidos++;
-            }
+          }
         }
 
-        // Calcular porcentajes
-        if (stats.total > 0) {
-            stats.porcentaje = Math.round((stats.cumplidos / stats.total) * 100);
+        stats.total++;
+        stats.porPrincipio[pid].total++;
+
+        // Cumplido si porcentajeReal >= umbral
+        if (porcentajeReal !== null && porcentajeReal >= UMBRAL_CUMPLIMIENTO) {
+          stats.cumplidos++;
+          stats.porPrincipio[pid].cumplidos++;
         }
-        for (const pid of [1, 2, 3, 4]) {
-            const p = stats.porPrincipio[pid];
-            if (p.total > 0) {
-                p.porcentaje = Math.round((p.cumplidos / p.total) * 100);
-            }
-        }
+
+        indIdx++;
+      });
+      groupIdx++;
+    });
+
+    // 8. Calcular porcentajes
+    if (stats.total > 0) {
+      stats.porcentaje = Math.round((stats.cumplidos / stats.total) * 100);
     }
+    for (var pid2 = 1; pid2 <= 4; pid2++) {
+      var p = stats.porPrincipio[pid2];
+      if (p.total > 0) {
+        p.porcentaje = Math.round((p.cumplidos / p.total) * 100);
+      }
+    }
+
+    sendLog('[MAIN][Objetivos] Stats calculados: ' + stats.cumplidos + '/' + stats.total +
+      ' indicadores cumplen meta (umbral ' + UMBRAL_CUMPLIMIENTO + '%)', 'DEBUG');
   } catch (error) {
-    sendLog(`[MAIN] Error calculando objetivos stats: ${error.message}`, 'WARN');
+    sendLog('[MAIN] Error calculando objetivos stats: ' + error.message, 'WARN');
   }
 
   return stats;
@@ -13640,7 +16752,15 @@ async function calculatePlanTrabajoStats(basePath, currentYear) {
     actividadesProgramadas: 197,
     porcentajeAvance: 0,
     ultimoMesRegistrado: null,
-    estado: 'warning'
+    estado: 'warning',
+    // 📦698 · FIX: conteos por CELDAS (no actividades), consistentes con el
+    // dashboard. Cada celda-mes de cada actividad cuenta 1.
+    celdasEjecutadas: 0,         // celdas 'C'
+    celdasPendientes: 0,         // celdas 'P'
+    celdasVencidas: 0,           // celdas 'P' en mes anterior al vigente
+    celdasProgramadas: 0,        // total celdas con marca (C o P)
+    porcentajeAvanceCeldas: 0,   // % = celdasEjecutadas / celdasProgramadas
+    currentMonthIdx: new Date().getMonth()
   };
 
   const mesesNombres = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
@@ -13887,10 +17007,20 @@ async function calculatePlanTrabajoStats(basePath, currentYear) {
                 const mesValor = String(row[mesCol]).trim().toLowerCase();
                 if (mesValor === 'c') {
                     tieneCompletado = true;
+                    // 📦698 · FIX: contar CELDAS (no actividades)
+                    stats.celdasEjecutadas++;
+                    stats.celdasProgramadas++;
                     // Track último mes
                     if (mIndex > ultimoMesIndex) {
                         ultimoMesIndex = mIndex;
                         stats.ultimoMesRegistrado = `${mesesNombres[mIndex].substring(0, 3)} ${currentYear}`;
+                    }
+                } else if (mesValor === 'p') {
+                    // 📦698 · FIX: contar CELDAS 'P' y vencidas
+                    stats.celdasPendientes++;
+                    stats.celdasProgramadas++;
+                    if (currentYear === new Date().getFullYear() && mIndex < stats.currentMonthIdx) {
+                        stats.celdasVencidas++;
                     }
                 }
             }
@@ -13908,12 +17038,18 @@ async function calculatePlanTrabajoStats(basePath, currentYear) {
         stats.porcentajeAvance = Math.round((stats.actividadesEjecutadas / stats.totalActividades) * 100);
     }
 
+    // 📦698 · FIX: calcular también el % por CELDAS (consistente con el dashboard)
+    if (stats.celdasProgramadas > 0) {
+        stats.porcentajeAvanceCeldas = Math.round((stats.celdasEjecutadas / stats.celdasProgramadas) * 100);
+    }
+
     // 11. Determinar estado
     if (stats.porcentajeAvance >= 80) stats.estado = 'ok';
     else if (stats.porcentajeAvance >= 50) stats.estado = 'warning';
     else stats.estado = 'danger';
 
     sendLog(`[Plan Trabajo] Total: ${stats.totalActividades}, Ejecutadas: ${stats.actividadesEjecutadas}, Avance: ${stats.porcentajeAvance}%`, 'INFO');
+    sendLog(`[Plan Trabajo] Celdas: Programadas=${stats.celdasProgramadas}, Ejecutadas=${stats.celdasEjecutadas}, Pendientes=${stats.celdasPendientes}, Vencidas=${stats.celdasVencidas}, Avance: ${stats.porcentajeAvanceCeldas}%`, 'INFO');
     sendLog(`[Plan Trabajo] Último registro: ${stats.ultimoMesRegistrado || 'N/A'}`, 'INFO');
 
   } catch (error) {
@@ -14406,6 +17542,131 @@ async function ensureGestionCambioExcel(filePath) {
 }
 
 /**
+ * 📦XXX — Clasifica un estado de cambio en una de las 5 etapas del pipeline.
+ * Misma lógica que gestion-cambio-logic.js#renderPipeline.
+ */
+function classifyCambioPipeline(estado) {
+  const e = String(estado || '').toLowerCase().trim();
+  if (e === 'solicitud' || e === 'pendiente') return 'solicitud';
+  if (e === 'en evaluación' || e === 'en evaluacion') return 'evaluacion';
+  if (e === 'aprobado' || e === 'aprobada') return 'aprobado';
+  if (e === 'en ejecución' || e === 'en ejecucion' || e === 'en proceso') return 'ejecucion';
+  if (e === 'cerrado' || e === 'cerrada' || e === 'cancelado' || e === 'cancelada' ||
+      e === 'no aprobado' || e === 'no aprobada' || e === 'completado' || e === 'completada') return 'cerrado';
+  return 'solicitud'; // catch-all para estados vacíos o desconocidos
+}
+
+/**
+ * 📦XXX — Clasifica una fecha en un bucket de antigüedad en días.
+ * Retorna null si la fecha es inválida o vacía.
+ */
+function classifyCambioAging(fecha, hoy) {
+  if (!fecha) return null;
+  let d;
+  try {
+    d = new Date(fecha);
+    if (isNaN(d.getTime())) return null;
+  } catch (e) {
+    return null;
+  }
+  const days = Math.floor((hoy.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+  if (days < 0) return '0_15'; // fechas futuras: tratar como recientes
+  if (days <= 15) return '0_15';
+  if (days <= 30) return '16_30';
+  if (days <= 60) return '31_60';
+  return '60_plus';
+}
+
+/**
+ * 📦XXX — Agrega stats a partir de un array de cambios (función pura testeable).
+ * Devuelve { pipeline: {solicitud, evaluacion, aprobado, ejecucion, cerrado},
+ *           aging: {0_15, 16_30, 31_60, 60_plus}, total, pending }
+ * - `total` cuenta todos los cambios
+ * - `pending` cuenta los que NO están cerrados (para aging)
+ */
+function aggregateCambioStats(changes, hoy) {
+  hoy = hoy || new Date();
+  const pipeline = { solicitud: 0, evaluacion: 0, aprobado: 0, ejecucion: 0, cerrado: 0 };
+  const aging = { '0_15': 0, '16_30': 0, '31_60': 0, '60_plus': 0 };
+  let total = 0;
+  let pending = 0;
+
+  if (!Array.isArray(changes)) return { pipeline, aging, total: 0, pending: 0 };
+
+  for (const ch of changes) {
+    total++;
+    const stage = classifyCambioPipeline(ch.estado);
+    pipeline[stage]++;
+
+    if (stage !== 'cerrado') {
+      pending++;
+      const bucket = classifyCambioAging(ch.fecha, hoy);
+      if (bucket) aging[bucket]++;
+    }
+  }
+
+  return { pipeline, aging, total, pending };
+}
+
+/**
+ * 📦XXX — Calcular estadísticas agregadas de Gestión del Cambio (2.11.1).
+ * Usado por el home de Gestión Integral para renderizar 2 widgets:
+ *   - Pipeline: 5 etapas (solicitud → evaluacion → aprobado → ejecucion → cerrado)
+ *   - Aging: 4 buckets de antigüedad de los cambios PENDIENTES
+ * Retorna shape: { pipeline, aging, total, pending, disponible }
+ */
+async function calculateCambioStats(companyName) {
+  const empty = {
+    pipeline: { solicitud: 0, evaluacion: 0, aprobado: 0, ejecucion: 0, cerrado: 0 },
+    aging: { '0_15': 0, '16_30': 0, '31_60': 0, '60_plus': 0 },
+    total: 0,
+    pending: 0,
+    disponible: false
+  };
+
+  try {
+    const filePath = await obtenerRutaGestionCambio(companyName);
+    if (!filePath) {
+      return empty;
+    }
+
+    await ensureGestionCambioExcel(filePath);
+
+    if (!fs.existsSync(filePath)) {
+      return empty;
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(filePath);
+    const worksheet = workbook.getWorksheet('Cambios');
+
+    if (!worksheet || worksheet.rowCount <= 1) {
+      return { ...empty, disponible: true };
+    }
+
+    applyGestionCambioColumnKeys(worksheet);
+
+    const changes = [];
+    worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      if (rowNumber === 1) return; // Saltar header
+      const fechaCell = row.getCell('fecha').value;
+      const fechaStr = fechaCell instanceof Date
+        ? fechaCell.toISOString().split('T')[0]
+        : (typeof fechaCell === 'string' ? fechaCell : null);
+      changes.push({
+        estado: row.getCell('estado').value,
+        fecha: fechaStr
+      });
+    });
+
+    return { ...aggregateCambioStats(changes), disponible: true };
+  } catch (error) {
+    sendLog(`[MAIN] Error calculando gestión del cambio stats: ${error.message}`, 'WARN');
+    return empty;
+  }
+}
+
+/**
  * Carga todos los cambios del archivo Excel.
  */
 ipcMain.handle('gestion-cambio-load-data', async (event, companyName) => {
@@ -14850,6 +18111,7 @@ function startOnlyOfficeBridge() {
 
 // --- SERVIDOR LLM PARA ANÁLISIS DE ACCIDENTES ---
 let llmServerProcess = null;
+let firmaServiceProcess = null; // firma-service auto-start (puerto 3001)
 
 // Función para limpiar procesos hijos antes de salir
 function cleanupProcesses() {
@@ -14872,6 +18134,23 @@ function cleanupProcesses() {
         llmServerProcess = null;
     }
 
+    // firma-service (auto-start puerto 3001)
+    if (firmaServiceProcess && firmaServiceProcess.exitCode === null) {
+        console.log('[MAIN] Cerrando firma-service por PID...');
+        try {
+            if (process.platform === 'win32') {
+                const { execSync } = require('child_process');
+                execSync(`taskkill /pid ${firmaServiceProcess.pid} /T /F`);
+            } else {
+                firmaServiceProcess.kill('SIGKILL');
+            }
+            console.log('[MAIN] ✅ firma-service cerrado');
+        } catch (e) {
+            console.warn('[MAIN] ⚠️ Error al cerrar firma-service (puede que ya no exista):', e.message);
+        }
+        firmaServiceProcess = null;
+    }
+
     // 2. En Windows, hacer un barrido de procesos de Python residuales
     if (process.platform === 'win32') {
         try {
@@ -14887,10 +18166,119 @@ function cleanupProcesses() {
     }
 }
 
+// 🔄 RE-AUDIT-2026-09-10 (v0.1.196, P1-1) — Cierre limpio de SQLite
+// antes de cualquier quit (auto-update, restart_app, before-quit).
+// La DB usa WAL mode (kair.db-wal, kair.db-shm). Sin checkpoint+close,
+// esos archivos pueden quedar inconsistentes si Squirrel mata el proceso
+// mientras hay transacciones en curso. SQLite recovery en el próximo open
+// resuelve la mayoría de los casos, pero con checkpoint explícito es más
+// rápido y seguro. Llamado desde before-quit SOLO (no desde
+// cleanupProcesses) para no cerrar la DB si cleanupProcesses se invoca
+// en otros contextos en el futuro.
+function closeDatabaseSafely() {
+    if (!db) {
+        console.log('[DB] No hay conexión abierta, skip close');
+        return;
+    }
+    try {
+        // 1. WAL checkpoint TRUNCATE: fuerza a flush del WAL al main DB
+        //    y trunca el archivo WAL. Hace el .wal más pequeño o vacío.
+        console.log('[DB] Ejecutando PRAGMA wal_checkpoint(TRUNCATE)...');
+        const checkpointResult = db.pragma('wal_checkpoint(TRUNCATE)');
+        console.log('[DB] wal_checkpoint result:', JSON.stringify(checkpointResult));
+        // 2. Cerrar la conexión better-sqlite3
+        console.log('[DB] Cerrando conexión SQLite...');
+        db.close();
+        db = null;
+        console.log('[DB] ✅ DB cerrada limpiamente');
+    } catch (err) {
+        console.warn('[DB] ⚠️ Error cerrando DB (no crítico):', err.message);
+        // No throw — el quit debe continuar
+    }
+}
+
 // Asegurar limpieza en cualquier intento de cierre
 app.on('before-quit', (e) => {
     cleanupProcesses();
+    // v0.1.196 (P1-1): cerrar DB después de matar procesos. Si el user
+    // tenía transacciones en curso, se persisten al main DB antes del quit.
+    closeDatabaseSafely();
 });
+
+// ==========================================================================
+// firma-service auto-start (puerto 3001) — patrón copiado de startLlmServer.
+// Solo aplica en desarrollo: el servicio aún no viaja en el instalador.
+// En producción (app empaquetada) falta la carpeta → se omite en silencio.
+// IMPORTANTE: se spawnea con el `node` del sistema (no process.execPath)
+// porque firma-service/node_modules (better-sqlite3 nativo) fue compilado
+// contra Node del sistema; correrlo con el binario de Electron rompería
+// el módulo nativo por ABI distinta.
+// ==========================================================================
+async function startFirmaService() {
+    const http = require('http');
+
+    const firmaDir = app.isPackaged
+        ? path.join(process.resourcesPath, 'firma-service')
+        : path.join(__dirname, 'firma-service');
+    if (!fs.existsSync(path.join(firmaDir, 'src', 'server.js'))) {
+        console.log('[MAIN][FIRMA] firma-service no presente en este build — se omite auto-arranque');
+        return;
+    }
+
+    const checkHealth = () => new Promise((resolve) => {
+        const req = http.request({
+            hostname: '127.0.0.1', port: 3001, path: '/health', method: 'GET', timeout: 2000
+        }, (res) => {
+            let data = '';
+            res.on('data', (c) => data += c);
+            res.on('end', () => {
+                // Solo /health da JSON con status — otro ocupante del puerto no lo tiene
+                try { resolve(!!JSON.parse(data).status); } catch (e) { resolve(false); }
+            });
+        });
+        req.on('error', () => resolve(false));
+        req.on('timeout', () => { req.destroy(); resolve(false); });
+        req.end();
+    });
+
+    try {
+        if (await checkHealth()) {
+            console.log('[MAIN][FIRMA] firma-service ya está corriendo (manual o previo) — no se duplica');
+            return;
+        }
+
+        console.log('[MAIN][FIRMA] Iniciando firma-service en background (puerto 3001)...');
+        firmaServiceProcess = spawn('node', [path.join('src', 'server.js')], {
+            cwd: firmaDir,
+            windowsHide: true,
+            stdio: 'ignore'
+        });
+        firmaServiceProcess.on('error', (err) => {
+            // Típico: 'node' no está en el PATH del sistema
+            console.error('[MAIN][FIRMA] No se pudo spawner:', err.message);
+            firmaServiceProcess = null;
+        });
+
+        // Esperar a que levante (Express + migraciones SQLite: rápido, max 15s)
+        const MAX_MS = 15000;
+        const t0 = Date.now();
+        while (Date.now() - t0 < MAX_MS) {
+            await new Promise(r => setTimeout(r, 400));
+            if (await checkHealth()) {
+                console.log('[MAIN][FIRMA] ✅ firma-service listo en ' + ((Date.now() - t0) / 1000).toFixed(1) + 's (PID ' + firmaServiceProcess.pid + ')');
+                return;
+            }
+            if (firmaServiceProcess.exitCode !== null) {
+                console.error('[MAIN][FIRMA] El proceso murió al arrancar (exit ' + firmaServiceProcess.exitCode + '). Posible: mejor-sqlite3 incompatible con el Node del PATH. Correr "npm install" dentro de firma-service.');
+                firmaServiceProcess = null;
+                return;
+            }
+        }
+        console.warn('[MAIN][FIRMA] Timeout esperando a firma-service (' + MAX_MS / 1000 + 's). Firma Electrónica no estará disponible hasta levantarlo manual.');
+    } catch (err) {
+        console.error('[MAIN][FIRMA] Error en auto-arranque:', err.message);
+    }
+}
 
 async function startLlmServer() {
     const http = require('http');
@@ -14935,8 +18323,10 @@ async function startLlmServer() {
 
         console.log('[MAIN] 🚀 Iniciando servidor LLM...');
 
-        // Obtener ruta de Python
-        const pythonPath = global.cachedPythonPath || 'python';
+        // Obtener ruta de Python — usar el resolver robusto para garantizar el Python correcto
+        // (no hacer fallback ciego a 'python' del PATH porque ese Python no tiene las dependencias
+        // del proyecto como docxtpl, pdfplumber, flask, etc.)
+        const pythonPath = await getPython();
         const serverScript = getPythonScriptPath('llm_server.py');
 
         if (!fs.existsSync(serverScript)) {
@@ -15123,7 +18513,7 @@ function normalizarTemporales(row, empresa) {
     eps: String(row['EPS/SURA'] || row['EPS'] || '').trim(),
     afp: String(row['AFP'] || '').trim(),
     porcentajeARL: String(row['% ARL'] || '').trim(),
-    salario: String(row['SALARIO'] || '').trim(),
+    salario: String(row[' SALARIO '] || '').trim(),
     fechaIngreso: row['FEC. ING.'] || null,
     fecIng: row['FEC. ING.'] || null,
     fechaNacimiento: row['FEC. NAC.'] || null,
@@ -15241,13 +18631,13 @@ ipcMain.handle('consultar-trabajadores-global', async (event, params) => {
     for (const emp of empresasABuscar) {
       const nombreEmp = emp.nombre || 'Empresa';
       console.log(`[MAIN] 🔎 Buscando en BD de: ${nombreEmp}...`);
-      
+
       const trabajadores = leerBDPersonal(emp);
       if (!trabajadores || trabajadores.length === 0) {
         console.log(`[MAIN] ⚠️ No se encontraron trabajadores para: ${nombreEmp}`);
         continue;
       }
-      
+
       console.log(`[MAIN] ✅ ${trabajadores.length} registros cargados para ${nombreEmp}. Filtrando por: "${cedula}" / "${nombre}"`);
       const filtrados = filtrarTrabajadores(trabajadores, cedula, nombre);
       console.log(`[MAIN] 🎯 Coincidencias encontradas en ${nombreEmp}: ${filtrados.length}`);
@@ -15333,6 +18723,27 @@ async function getCachedStats(cacheKey, filePaths, computeFn) {
 
 // ==========================================================================
 // Handler: Estadísticas de Ausentismo (Optimizado con Caché)
+//
+// 📦459 (2026-07-02) — Refactorizado para corregir bug de contrato + modo degradado.
+//
+// ANTES (buggy):
+//   - Handler retornaba { total, mesActual, year, mes }
+//   - Frontend pedía { pendientes, activos } → siempre quedaba en 0 por el fallback
+//   - Si archivo no existía → success:false → frontend mostraba 0 sin diagnóstico
+//   - Sin distinción entre "pendiente" (sin seguimiento) y "activo" (en seguimiento)
+//
+// AHORA:
+//   - Handler retorna { pendientes, activos, total, year, mes, _missingFile }
+//   - "Pendientes": incapacidad >15 días SIN ningún seguimiento registrado
+//   - "Activos":    incapacidad >15 días CON seguimiento(s) abierto(s) (no cerrados)
+//   - Modo degradado consistente con read-ausentismo-data: success:true con _missingFile:true
+//   - Usa la misma lógica de cruce con Seguimiento Casos Medicos.xlsx que el handler adyacente
+//
+// Reglas de clasificación (basadas en la lógica existente de get-salud-seguimientos-stats):
+//   - Solo se cuentan casos con dias > 15 (umbral de seguimiento por condición de salud)
+//   - Si NO hay registro en Seguimiento Casos Medicos.xlsx → pendiente (requiere gestión)
+//   - Si hay registro Y su último estado es 'recovered'/'recuperado'/'finalizado' → NO se cuenta
+//   - Si hay registro Y su último estado es otro (en curso, etc.) → activo
 // ==========================================================================
 ipcMain.handle('get-ausentismo-stats', async (event, companyName, mode) => {
   const ausentismoFiles = {
@@ -15342,74 +18753,570 @@ ipcMain.handle('get-ausentismo-stats', async (event, companyName, mode) => {
     "ASEL": "G:\\Mi unidad\\2. Trabajo\\1. SG-SST\\19. Asel S.A.S\\3. Gestión de la Salud\\3.3.6 Medición del ausentismo por causa médica\\A-FR-31 Ausentismo Laboral.xlsx"
   };
 
+  // 📦459 — Modo degradado: si empresa no está en el mapa O archivo no existe,
+  // retornar success:true con _missingFile:true para que el frontend muestre "—"
+  // en vez de "0" (que es engañoso — sugiere que no hay datos cuando en realidad
+  // no se pudo acceder al archivo).
+  const EMPTY_RESULT = { pendientes: 0, activos: 0, total: 0, year: new Date().getFullYear(), mes: '---' };
+
+  if (!companyName || typeof companyName !== 'string') {
+    return { success: true, data: { ...EMPTY_RESULT, _missingFile: true, _missingFileReason: 'no_company' }, _missingFile: true };
+  }
+
   const filePath = ausentismoFiles[companyName.toUpperCase()];
-  if (!filePath || !fs.existsSync(filePath)) {
-    return { success: false, error: 'Archivo no encontrado' };
+  if (!filePath) {
+    return { success: true, data: { ...EMPTY_RESULT, _missingFile: true, _missingFileReason: 'company_not_mapped', _details: `Empresa "${companyName}" no tiene ruta de ausentismo configurada` }, _missingFile: true };
+  }
+
+  try {
+    if (!fs.existsSync(filePath)) {
+      return { success: true, data: { ...EMPTY_RESULT, _missingFile: true, _missingFileReason: 'not_found', _expectedPath: filePath, _details: 'Archivo de ausentismo no encontrado en la ruta configurada' }, _missingFile: true };
+    }
+  } catch (statErr) {
+    return { success: true, data: { ...EMPTY_RESULT, _missingFile: true, _missingFileReason: 'unreadable', _expectedPath: filePath, _details: statErr.message }, _missingFile: true };
+  }
+
+  // 📦459 (2026-07-02) — Cambio de fuente de cruce:
+  //   ANTES: Seguimiento Casos Medicos.xlsx (ruta hardcoded en Documents/ o Google Drive)
+  //          → problema: si el archivo no está exactamente en esas rutas, no se encuentra
+  //            y todos los casos quedan como "pendientes" (false negatives)
+  //   AHORA: PRI.xlsx en la misma carpeta que PI-FO-076 (misma carpeta de ausentismo)
+  //          → robusto: PRI.xlsx y PI-FO-076 SIEMPRE coexisten en la misma carpeta
+  //          → consistente: usa la misma fuente que la vista de Seguimiento de Incapacidades
+  //          → sin rutas hardcoded: usa la misma búsqueda por patrón que ya tenemos
+  //
+  // Si PRI.xlsx no existe, todos los casos con dias>15 serán clasificados como
+  // "pendientes" (no "activos"), que es semánticamente correcto.
+  //
+  // NOTA: este handler NO construye `companyConfig` desde config.json (usa el mapa
+  // hardcoded `ausentismoFiles`). Por eso derivamos el directorio desde `filePath`
+  // con `path.dirname()` en vez de construirlo desde `companyConfig.root`.
+  const ausentismoDirForPri = path.dirname(filePath);
+  let followUpPath = null;
+  try {
+    const ausentismoEntries = await fsp.readdir(ausentismoDirForPri);
+    // PRI.xlsx — buscar archivo que contenga "PRI" en el nombre (exacto o con sufijo)
+    const priFile = ausentismoEntries.find(f => {
+      const upper = f.toUpperCase();
+      // Coincide con "PRI.xlsx", "PRI 2024.xlsx", "PRI_2025.xlsx", etc.
+      return upper.includes('PRI') && upper.endsWith('.XLSX') && !upper.startsWith('~$');
+    });
+    if (priFile) {
+      followUpPath = path.join(ausentismoDirForPri, priFile);
+      console.log(`[AUSENTISMO-STATS] ✓ PRI.xlsx encontrado: ${followUpPath}`);
+    } else {
+      console.warn(`[AUSENTISMO-STATS] ⚠ PRI.xlsx NO encontrado en ${ausentismoDirForPri}. Archivos vistos:`,
+        ausentismoEntries.filter(f => f.toUpperCase().endsWith('.XLSX')).join(', ') || '(ninguno)');
+    }
+  } catch (priDirErr) {
+    console.warn(`[AUSENTISMO-STATS] No se pudo leer la carpeta de ausentismo para buscar PRI.xlsx: ${priDirErr.message}`);
   }
 
   const cacheKey = `ausentismo_${companyName.toUpperCase()}`;
-  
-  const resultData = await getCachedStats(cacheKey, [filePath], async () => {
-    // Lógica de cálculo original (encapsulada para el helper)
-    const workbook = xlsx.readFile(filePath);
-    const companyNameLower = companyName.toLowerCase();
-    let sheetName = workbook.SheetNames.find(s =>
-      s.toLowerCase().includes(companyNameLower) && !s.toLowerCase().includes('cie') && !s.toLowerCase().includes('rips')
-    );
-    if (!sheetName) {
-      const yearStr = new Date().getFullYear();
-      sheetName = workbook.SheetNames.find(s => s.includes(String(yearStr)));
-    }
-    if (!sheetName) sheetName = workbook.SheetNames[0];
 
-    const worksheet = workbook.Sheets[sheetName];
-    const rawData = xlsx.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+  // 📦459 — currentYear se declara ANTES del bloque de carga para que esté
+  // disponible en el filtro de año de PRI.xlsx (FIX #4). Antes se declaraba
+  // más abajo en el bloque de clasificación, lo que causaba ReferenceError al
+  // usarlo en el loop de PRI.
+  const _today = new Date();
+  const currentYear = _today.getFullYear();
 
-    let headerRowIdx = -1, colMes = -1, colAnio = -1;
-    for (let i = 0; i < Math.min(rawData.length, 15); i++) {
-      const row = rawData[i];
-      if (!Array.isArray(row)) continue;
-      const mesIdx = row.findIndex(c => String(c || '').toUpperCase().trim() === 'MES');
-      const anioIdx = row.findIndex(c => {
-        const v = String(c || '').toUpperCase().trim().replace(/\u00d1/g, 'N').replace(/\u00f1/g, 'N');
-        return v === 'ANO' || v === 'A\u00d1O';
+  let resultData;
+  try {
+    resultData = await getCachedStats(cacheKey, [filePath, followUpPath].filter(Boolean), async () => {
+      // 1. Cargar PRI.xlsx (si existe) — fuente de verdad para seguimientos
+      let followUpData = {};
+      if (followUpPath && fs.existsSync(followUpPath)) {
+        try {
+          const workbookPRI = xlsx.readFile(followUpPath);
+          console.log(`[AUSENTISMO-STATS] PRI.xlsx tiene ${workbookPRI.SheetNames.length} hoja(s): [${workbookPRI.SheetNames.join(', ')}]`);
+          // 📦459 (2026-07-02) — BUG RAÍZ ENCONTRADO: antes usábamos SheetNames[0]
+          // (primera hoja, que suele ser "Dashboard" o portada con formato no tabular).
+          // Python usa explícitamente "Casos en seguimiento" que tiene 630 filas
+          // con las cédulas. Ahora replicamos esa lógica: buscar "Casos en
+          // seguimiento" / "Seguimiento" / "Casos" / primera hoja como fallback.
+          const PRI_SHEET_PRIORITY = [
+            'Casos en seguimiento',
+            'Seguimiento',
+            'Casos',
+            'seguimiento',
+            'casos en seguimiento'
+          ];
+          let priSheetName = null;
+          for (const candidate of PRI_SHEET_PRIORITY) {
+            if (workbookPRI.SheetNames.includes(candidate)) {
+              priSheetName = candidate;
+              break;
+            }
+          }
+          // Si ninguno matchea, usar la primera que tenga datos tabulares (no Dashboard)
+          if (!priSheetName) {
+            const sheetNoDashboard = workbookPRI.SheetNames.find(n =>
+              !/dashboard|inicio|portada|caratula/i.test(n)
+            );
+            priSheetName = sheetNoDashboard || workbookPRI.SheetNames[0];
+          }
+          console.log(`[AUSENTISMO-STATS] Usando hoja: "${priSheetName}"`);
+
+          // 📦459 (2026-07-02) — REFACTOR: en lugar de pelearnos con sheet_to_json
+          // y sus fallbacks, iteramos el sheet MANUALMENTE leyendo celdas específicas
+          // por coordenadas (igual que hace Python en cargar_todos_registros_pri).
+          //
+          // Por qué esta es la solución correcta:
+          //   1. PRI.xlsx tiene títulos en filas 1-6 y datos en fila 7+. sheet_to_json
+          //      con header:6 puede no encontrar las cédulas si los headers están en
+          //      otra fila (como en este caso — el header row puede tener otras keys).
+          //   2. Python lee por coordenadas (D{fila_idx} para cédula, AV{fila_idx}
+          //      para fechaCierre) — independiente del header de la hoja.
+          //   3. Las funciones determinarEstado() y calcularPorcentajeAvance()
+          //      esperan estructura NESTED `pric.fechaCierre`. Antes construíamos
+          //      filas planas y luego añadíamos pric con idx-based mapping (incorrecto
+          //      cuando el fallback corría). Ahora construimos ambos en una pasada.
+          //
+          // Mapeo cell → key (basado en cargar_todos_registros_pri líneas 504-545):
+          //   D=3    → cédula
+          //   AV=47  → fechaCierre
+          //   AW=48  → motivoCierre
+          //   BP=65  → fechaReintegro
+          //   CB=66  → fechaReincorporacion
+          //   CC=67  → tipoReintegro
+          //   CD=68  → adaptaciones
+          const priSheet = workbookPRI.Sheets[priSheetName];
+          const priRange = xlsx.utils.decode_range(priSheet['!ref'] || 'A1');
+
+          // Detectar dinámicamente la fila del header: primera fila que tenga
+          // "CEDULA" o "Cédula" o "IDENTIFICACION" en alguna columna. Empezamos
+          // desde fila 1 (índice 0). Típicamente será índice 6 (fila 7) según el
+          // layout conocido, pero puede variar.
+          let headerRowIdx = -1;
+          for (let r = 0; r < Math.min(priRange.e.r, 12); r++) {
+            for (let c = priRange.s.c; c <= priRange.e.c; c++) {
+              const cellAddr = xlsx.utils.encode_cell({ r, c });
+              const cell = priSheet[cellAddr];
+              if (!cell || cell.v === undefined) continue;
+              const v = String(cell.v).toUpperCase();
+              if (v.includes('CÉDULA') || v.includes('CEDULA') || v.includes('IDENTIFICACION') || v.includes('IDENTIFICACIÓN')) {
+                headerRowIdx = r;
+                break;
+              }
+            }
+            if (headerRowIdx >= 0) break;
+          }
+          // Si no se detectó header, asumir fila 7 (idx 6) por convención del proyecto
+          if (headerRowIdx < 0) {
+            console.warn('[AUSENTISMO-STATS][📦459] No se detectó fila de header por búsqueda dinámica, usando fila 7 (idx 6) por defecto');
+            headerRowIdx = 6;
+          }
+          console.log(`[AUSENTISMO-STATS][📦459] Header detectado en fila ${headerRowIdx + 1} (índice ${headerRowIdx})`);
+
+          // Construir mapa de headers: col → nombre del header
+          const headersMap = {};
+          for (let c = priRange.s.c; c <= priRange.e.c; c++) {
+            const cellAddr = xlsx.utils.encode_cell({ r: headerRowIdx, c });
+            const cell = priSheet[cellAddr];
+            headersMap[c] = cell?.v !== undefined ? String(cell.v).trim() : `col_${c}`;
+          }
+
+          // Iterar filas de datos (desde headerRowIdx + 1 hasta el final del sheet)
+          let debugCierreEncontrado = 0;
+          let debugRowsProcesados = 0;
+          let debugFilasSaltadas = 0;
+          for (let r = headerRowIdx + 1; r <= priRange.e.r; r++) {
+            // Cédula: leer celda D (col 3) directamente — igual que Python
+            const cedulaCellAddr = xlsx.utils.encode_cell({ r, c: 3 });
+            const cedulaCell = priSheet[cedulaCellAddr];
+            const cedulaRaw = cedulaCell?.v !== undefined ? String(cedulaCell.v) : '';
+            const cedulaClean = cedulaRaw.replace(/[^0-9]/g, '');
+            // 📦459 (2026-07-02) — Filtros de validación:
+            //  - Cédula vacía: saltar (igual que Python).
+            //  - Cédula <6 dígitos: probablemente basura del header row o fila de
+            //    totales (vimos "Cédula 3" con valores numéricos como fechaCierre).
+            //  - Sin nombre (col C = 2): probablemente fila espuria.
+            //  - Sin fecha_inicio (col Z = 25): fila vacía o de resumen.
+            if (!cedulaClean) { debugFilasSaltadas++; continue; }
+            if (cedulaClean.length < 6) { debugFilasSaltadas++; continue; }
+
+            const nombreCellAddr = xlsx.utils.encode_cell({ r, c: 2 });
+            const nombreCell = priSheet[nombreCellAddr];
+            const nombre = nombreCell?.v !== undefined ? String(nombreCell.v).trim() : '';
+            if (!nombre || nombre.length < 3) { debugFilasSaltadas++; continue; }
+
+            const fechaInicioCellAddr = xlsx.utils.encode_cell({ r, c: 25 });  // Z
+            const fechaInicioCell = priSheet[fechaInicioCellAddr];
+            const fechaInicioRaw = fechaInicioCell?.v !== undefined ? String(fechaInicioCell.v) : '';
+            if (!fechaInicioRaw.trim()) { debugFilasSaltadas++; continue; }
+
+            // 📦459 (2026-07-02) — Filtro de año: solo contar casos del año actual
+            // (PRI.xlsx tiene casos de años históricos como 22510880 del 2025 con
+            // fechaCierre 2025-04-27 — son "viejos" y no deben contar en el KPI
+            // del año en curso). Aceptamos fechas de inicio en el año actual.
+            //
+            // Las fechas en xlsx pueden venir como:
+            //   - Date object (si la celda tiene formato fecha y xlsx lo parsea)
+            //   - Excel serial number (más común: e.g. 46078 = 2026-01-01)
+            //   - String con formato (e.g. "1/15/2026" o "2026-01-15")
+            // Hay que manejar los 3 casos.
+            let fechaInicioYear = null;
+            const fechaInicioV = fechaInicioCell?.v;
+            if (fechaInicioV !== undefined && fechaInicioV !== null) {
+              if (fechaInicioV instanceof Date) {
+                fechaInicioYear = fechaInicioV.getFullYear();
+              } else if (typeof fechaInicioV === 'number') {
+                // Excel serial: días desde 1900-01-01 (con bug de 1900 leap year).
+                // El epoch de Excel (1900-01-01) = 25569 días desde epoch JS (1970-01-01).
+                // Usamos 25569 + (serial - 1) por el bug de 1900-02-29 que Excel asume.
+                const excelSerial = fechaInicioV;
+                // El -2 compensa: Excel cuenta 1900-01-01 como día 1, pero 1900-02-29 no existió.
+                const jsDate = new Date(Math.round((excelSerial - 25569) * 86400 * 1000));
+                if (!isNaN(jsDate.getTime())) {
+                  fechaInicioYear = jsDate.getUTCFullYear();
+                }
+              } else {
+                // String: buscar año de 4 dígitos (19xx o 20xx) — más estricto que \d{4}
+                const matchY = String(fechaInicioV).match(/\b(?:19|20)\d{2}\b/);
+                if (matchY) fechaInicioYear = parseInt(matchY[0], 10);
+              }
+            }
+            if (fechaInicioYear !== currentYear) {
+              debugFilasSaltadas++;
+              continue;
+            }
+
+            // Construir row plano con headers de la hoja (para compatibilidad con
+            // cualquier código que aún use flat keys)
+            const row = {};
+            for (let c = priRange.s.c; c <= priRange.e.c; c++) {
+              const cellAddr = xlsx.utils.encode_cell({ r, c });
+              const cell = priSheet[cellAddr];
+              row[headersMap[c]] = cell?.v !== undefined ? cell.v : '';
+            }
+
+            // Construir `pric` anidado leyendo celdas específicas (igual que Python)
+            const pric = {};
+            const PRI_CELL_MAP = [
+              { col: 47, key: 'fechaCierre' },         // AV
+              { col: 48, key: 'motivoCierre' },        // AW
+              { col: 65, key: 'fechaReintegro' },      // BP
+              { col: 66, key: 'fechaReincorporacion' },// CB
+              { col: 67, key: 'tipoReintegro' },       // CC
+              { col: 68, key: 'adaptaciones' }         // CD
+            ];
+            for (const { col, key } of PRI_CELL_MAP) {
+              const cellAddr = xlsx.utils.encode_cell({ r, c: col });
+              const cell = priSheet[cellAddr];
+              pric[key] = cell?.v !== undefined ? String(cell.v).trim() : '';
+            }
+            row.pric = pric;
+
+            // Debug: log si encontramos cierres (CARELIS 1047239028 debería aparecer)
+            if (pric.fechaCierre) {
+              debugCierreEncontrado++;
+              if (debugCierreEncontrado <= 3) {
+                console.log(`[AUSENTISMO-STATS][📦459] Cédula ${cedulaClean} (${nombre}): fechaCierre="${pric.fechaCierre}", motivoCierre="${pric.motivoCierre}" (celda AV${r + 1}/AW${r + 1})`);
+              }
+            }
+
+            // Agregar a followUpData indexado por cédula
+            if (!followUpData[cedulaClean]) followUpData[cedulaClean] = [];
+            followUpData[cedulaClean].push(row);
+            debugRowsProcesados++;
+          }
+          console.log(`[AUSENTISMO-STATS][📦459] PRI procesado: ${debugRowsProcesados} filas válidas (${debugFilasSaltadas} saltadas por filtros), ${debugCierreEncontrado} con fecha de cierre detectada vía celdas AV/AW`);
+        } catch (priErr) {
+          console.warn('[AUSENTISMO-STATS] No se pudo leer PRI.xlsx:', priErr.message);
+          // Continuar con followUpData vacío — todos los casos serán "pendientes"
+        }
+      } else {
+        console.warn('[AUSENTISMO-STATS] ⚠ Sin PRI.xlsx: todos los casos con dias>15 se clasificarán como "pendientes"');
+      }
+
+      // 📦459-FIX2 (2026-07-02) — Restaurar cruce GI-FO-076 + PRI.xlsx.
+      // Lección: solo PRI no alcanza. GI-FO-076 es la fuente de "qué
+      // incapacidades hubo este año con >15 días" (es el archivo vivo donde se
+      // registran las incapacidades nuevas). PRI es solo la fuente de "cuál está
+      // cerrada o en seguimiento". Sin GI-FO-076, no se veían los casos pendientes
+      // del año actual que aún no tienen seguimiento.
+      //
+      // Flujo:
+      //   1. Leer GI-FO-076 hoja de la empresa del año actual
+      //   2. Filtrar: cédula válida, año == currentYear, días > 15
+      //   3. Agrupar por cédula (una persona puede tener varias incapacidades)
+      //   4. Para cada cédula, cruzar con followUpData (PRI):
+      //      - pric.fechaCierre → CERRADO
+      //      - tiene seguimiento (no cerrado) → ACTIVO
+      //      - sin nada en PRI → PENDIENTE
+      let giFoEntries = [];  // [{cedula, nombre, dias, anio}]
+      if (filePath && fs.existsSync(filePath)) {
+        try {
+          const workbookAus = xlsx.readFile(filePath);
+          // Detectar hoja de la empresa (misma lógica que el otro handler
+          // get-salud-seguimientos-stats). Priorizar hojas que contengan el
+          // nombre de la empresa en lowercase y NO contengan "CIE" (que es
+          // la hoja auxiliar de códigos).
+          const companyNameLower = companyName.toLowerCase();
+          let ausSheetName = workbookAus.SheetNames.find(s => {
+            const sl = s.toLowerCase();
+            return sl.includes(companyNameLower) && !sl.includes('cie');
+          });
+          // Si no hay hoja específica de la empresa, buscar hoja "Tempoactiva <año>"
+          // o "PI-FO-076" genérica. Como fallback, tomar la segunda hoja (la primera
+          // suele ser "Dashboard" portada).
+          if (!ausSheetName) {
+            ausSheetName = workbookAus.SheetNames.find(s =>
+              !/dashboard|inicio|portada|caratula|cie/i.test(s)
+            ) || workbookAus.SheetNames[1] || workbookAus.SheetNames[0];
+          }
+          console.log(`[AUSENTISMO-STATS][📦459-FIX2] GI-FO-076 hoja: "${ausSheetName}"`);
+
+          const ausSheet = workbookAus.Sheets[ausSheetName];
+          const ausRange = xlsx.utils.decode_range(ausSheet['!ref'] || 'A1');
+
+          // Detectar header row dinámicamente: buscar fila que contenga
+          // "CEDULA" / "IDENTIFICACION" en alguna columna. Mismo patrón que
+          // usamos para PRI.xlsx.
+          let headerRowIdx = -1;
+          let cCed = -1, cDias = -1, cAnio = -1;
+          for (let r = 0; r < Math.min(ausRange.e.r, 15); r++) {
+            for (let c = ausRange.s.c; c <= ausRange.e.c; c++) {
+              const cellAddr = xlsx.utils.encode_cell({ r, c });
+              const cell = ausSheet[cellAddr];
+              if (!cell || cell.v === undefined) continue;
+              const v = String(cell.v).toUpperCase();
+              if (v.includes('CÉDULA') || v.includes('CEDULA') || v.includes('IDENTIFICACION') || v.includes('IDENTIFICACIÓN')) {
+                headerRowIdx = r;
+                cCed = c;  // 📦459-FIX2 — faltaba esta asignación (BUG detectado por test interno)
+                // Aprovechar la misma fila para detectar las otras columnas
+                for (let c2 = ausRange.s.c; c2 <= ausRange.e.c; c2++) {
+                  const addr2 = xlsx.utils.encode_cell({ r, c: c2 });
+                  const cell2 = ausSheet[addr2];
+                  if (!cell2 || cell2.v === undefined) continue;
+                  // Normalizar para matchear "AÑO" / "ANO" (la NFD decompone la tilde)
+                  const v2 = String(cell2.v).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+                  if (v2.includes('DIAS') && cDias === -1) cDias = c2;
+                  if ((v2 === 'ANO' || v2 === 'AÑO') && cAnio === -1) cAnio = c2;
+                }
+                break;
+              }
+            }
+            if (headerRowIdx >= 0) break;
+          }
+          console.log(`[AUSENTISMO-STATS][📦459-FIX2] Header GI-FO-076 fila=${headerRowIdx + 1}, cCed=${cCed}, cDias=${cDias}, cAnio=${cAnio}`);
+
+          if (headerRowIdx >= 0 && cCed !== -1 && cDias !== -1) {
+            for (let r = headerRowIdx + 1; r <= ausRange.e.r; r++) {
+              const cedulaCellAddr = xlsx.utils.encode_cell({ r, c: cCed });
+              const cedulaCell = ausSheet[cedulaCellAddr];
+              const cedulaRaw = cedulaCell?.v !== undefined ? String(cedulaCell.v) : '';
+              const cedulaClean = cedulaRaw.replace(/[^0-9]/g, '');
+              if (!cedulaClean || cedulaClean.length < 6) continue;
+
+              const diasCellAddr = xlsx.utils.encode_cell({ r, c: cDias });
+              const diasCell = ausSheet[diasCellAddr];
+              const diasRaw = diasCell?.v !== undefined ? String(diasCell.v).replace(/,/g, '') : '0';
+              const dias = parseInt(diasRaw, 10) || 0;
+              if (dias <= 15) continue;
+
+              // Año: si la columna existe, leerla; si no, asumir currentYear
+              let anioVal = currentYear;
+              if (cAnio !== -1) {
+                const anioCellAddr = xlsx.utils.encode_cell({ r, c: cAnio });
+                const anioCell = ausSheet[anioCellAddr];
+                const anioRaw = anioCell?.v !== undefined ? String(anioCell.v).trim() : '';
+                if (anioRaw) {
+                  const parsed = parseInt(anioRaw, 10);
+                  if (!isNaN(parsed)) anioVal = parsed;
+                }
+              }
+              if (anioVal !== currentYear) continue;
+
+              // Nombre (col 2 = C)
+              const nombreCellAddr = xlsx.utils.encode_cell({ r, c: 2 });
+              const nombreCell = ausSheet[nombreCellAddr];
+              const nombre = nombreCell?.v !== undefined ? String(nombreCell.v).trim() : '';
+
+              giFoEntries.push({ cedula: cedulaClean, nombre, dias, anio: anioVal });
+            }
+          }
+          console.log(`[AUSENTISMO-STATS][📦459-FIX2] GI-FO-076: ${giFoEntries.length} incapacidades del año ${currentYear} con >15 días`);
+        } catch (giFoErr) {
+          console.warn('[AUSENTISMO-STATS][📦459-FIX2] No se pudo leer GI-FO-076:', giFoErr.message);
+        }
+      } else {
+        console.warn('[AUSENTISMO-STATS][📦459-FIX2] ⚠ Sin GI-FO-076: no se puede calcular el KPI');
+      }
+
+      // Agrupar por cédula (una persona puede tener varias incapacidades en GI-FO-076,
+      // nos quedamos con la primera que aparezca que sea del año actual).
+      const giFoCedulasMap = new Map();
+      for (const inc of giFoEntries) {
+        if (!giFoCedulasMap.has(inc.cedula)) giFoCedulasMap.set(inc.cedula, inc);
+      }
+
+      // 📦459 (2026-07-02) — REFACTOR CRÍTICO: fuente de casos cambiada a PRI.xlsx.
+      //
+      // ANTES: el handler iteraba el Excel GI-FO-076 "Tempoactiva 2024" (que tiene
+      //   datos del 2024) y buscaba cada cédula en PRI.xlsx. Las cédulas del 2024
+      //   NO coinciden con las del 2026 — son personas distintas. Resultado: NUNCA
+      //   se encontraba cierre en PRI, todos los casos quedaban como PENDIENTE.
+      //
+      // AHORA: PRI.xlsx es la fuente de verdad para los casos del año actual (2026).
+      //   Iteramos `followUpData` directamente. Para cada cédula con seguimiento,
+      //   clasificamos según su estado de cierre (pric.fechaCierre / motivoCierre).
+      //   Esto replica exactamente lo que hace la vista de Seguimiento, que carga
+      //   PRI.xlsx vía Python (buscarTodosRegistrosPRI).
+      // 📦459 — currentYear viene del scope padre (declarado antes del callback
+      // para uso en el filtro de año de PRI.xlsx). NO redeclarar aquí: al hacer
+      // `const currentYear` dentro de este bloque, JS sombea la del padre y
+      // TODAS las referencias a `currentYear` dentro del callback (incluyendo
+      // las de las líneas anteriores como el filtro de año en PRI) quedan en
+      // TDZ hasta que esta línea se ejecute — pero como esta línea está
+      // DESPUÉS del filtro, el filtro revienta con
+      // "Cannot access 'currentYear' before initialization".
+      const today = new Date();
+      const MONTH_NAMES_ES = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+      const currentMonthName = MONTH_NAMES_ES[today.getMonth()];
+
+      // 📦459 — Determinar estado replicando la lógica de determinarEstadoCaso()
+      // del componente MedicionAusentismoComponent. Ahora se llama con
+      // recordAusentismo={} (vacío) y recordPRI=followUpData[cedula], porque la
+      // fuente de verdad es PRI.xlsx.
+      function determinarEstado(recordAusentismo, recordPRI) {
+        const rAus = recordAusentismo || {};
+        const rPri = recordPRI || {};
+        const tienePRI = rPri && Object.keys(rPri).length > 0;
+
+        // Detección ampliada de cierre: cubre fecha de cierre tradicional, fecha
+        // de reintegro, fecha de alta médica, motivo de cierre, y campos de estado.
+        let motivoCierreDetectado = null;
+        let fechaCierre = null;
+        if (tienePRI) {
+          const candidatosCierre = [
+            rPri.fecha_cierre, rPri.fechaCierre, rPri.pric?.fechaCierre,
+            rPri.fecha_cierre_pric, rPri.pric?.fechaCierrePric,
+            rPri.fecha_reintegro, rPri.fechaReintegro, rPri.pric?.fechaReintegro,
+            rPri.fecha_alta, rPri.fechaAlta, rPri.pric?.fechaAlta,
+            rPri.fecha_cierre_seguimiento, rPri.fechaCierreSeguimiento,
+            rPri.motivo_cierre, rPri.motivoCierre,
+            rPri.estado_caso, rPri.estadoCaso, rPri.estado,
+            rPri['Estado Caso'], rPri['ESTADO']
+          ];
+          for (const cand of candidatosCierre) {
+            if (cand && String(cand).trim() !== '') {
+              fechaCierre = cand;
+              motivoCierreDetectado = String(cand);
+              break;
+            }
+          }
+        }
+        if (!fechaCierre) {
+          const candidatosExcel = [
+            rAus['FECHA CIERRE'], rAus['fecha_cierre'],
+            rAus['FECHA CIERRE INC'], rAus['fecha_cierre_inc'],
+            rAus['FECHA CIERRE PRIC'], rAus['fecha_cierre_pric'],
+            rAus['FECHA REINTEGRO'], rAus['fecha_reintegro'],
+            rAus['FECHA ALTA'], rAus['fecha_alta'],
+            rAus['MOTIVO CIERRE'], rAus['motivo_cierre']
+          ];
+          for (const cand of candidatosExcel) {
+            if (cand && String(cand).trim() !== '') {
+              fechaCierre = cand;
+              motivoCierreDetectado = String(cand);
+              break;
+            }
+          }
+        }
+
+        if (fechaCierre) return 'CERRADO';
+
+        // Buscar fecha de seguimiento — PRI primero
+        let fechaSeguimiento = null;
+        if (tienePRI) {
+          fechaSeguimiento = rPri.seguimientos?.[0]?.fecha || rPri.fecha_seguimiento_1 || rPri.pric?.fechaSeguimiento1;
+        } else {
+          fechaSeguimiento = rAus['FECHA SEGUIMIENTO 1'] || rAus['fecha_seguimiento_1'];
+        }
+
+        if (fechaSeguimiento) return 'EN SEGUIMIENTO';
+
+        return 'SIN INICIAR';
+      }
+
+      let pendientes = 0;
+      let activos = 0;
+      let cerrados = 0;
+      let total = 0;
+      const clasificadasLog = [];
+
+      // 📦459-FIX2 (2026-07-02) — Iterar GI-FO-076 (incapacidades del año actual
+      // con >15 días) y cruzar con PRI para clasificar cada caso.
+      //
+      // Antes (FIX1) iterábamos PRI como fuente única → solo veíamos Cédulas
+      // que estaban en PRI.xlsx → perdíamos todos los casos del año que aún
+      // no tienen seguimiento (los más comunes).
+      //
+      // Ahora: GI-FO-076 es la fuente de "qué incapacidades hay que gestionar
+      // este año". PRI es la fuente de "cuál está cerrada / en seguimiento".
+      // Para cada cédula con incapacidad en GI-FO-076:
+      //   - buscar en followUpData (PRI)
+      //   - pric.fechaCierre → CERRADO
+      //   - tiene seguimiento sin cierre → ACTIVO
+      //   - sin nada en PRI → PENDIENTE
+      console.log(`[AUSENTISMO-STATS][📦459-FIX2] Clasificando ${giFoCedulasMap.size} cédulas únicas desde GI-FO-076 + cruce con PRI.xlsx`);
+
+      giFoCedulasMap.forEach((inc, cedula) => {
+        if (!inc) return;
+
+        total++;
+
+        // Buscar en PRI: tomar el row más reciente (último seguimiento)
+        const rows = followUpData[cedula];
+        const recordPRI = (rows && rows.length > 0) ? rows[rows.length - 1] : null;
+
+        // determinarEstado con recordAusentismo vacío — toda la info viene de PRI
+        const estado = determinarEstado({}, recordPRI);
+
+        if (estado === 'CERRADO') {
+          cerrados++;
+          const motivoCierre = recordPRI?.pric?.motivoCierre || recordPRI?.pric?.fechaCierre || 'cierre detectado';
+          clasificadasLog.push(`${cedula} (${inc.nombre}) → CERRADO (motivo: "${motivoCierre}")`);
+        } else if (estado === 'EN SEGUIMIENTO') {
+          activos++;
+          clasificadasLog.push(`${cedula} (${inc.nombre}) → ACTIVO (con seguimiento en PRI, sin cierre)`);
+        } else {
+          // SIN INICIAR o sin registro en PRI
+          pendientes++;
+          clasificadasLog.push(`${cedula} (${inc.nombre}) → PENDIENTE (sin seguimiento en PRI, ${inc.dias} días)`);
+        }
       });
-      if (mesIdx !== -1 && anioIdx !== -1) {
-        headerRowIdx = i; colMes = mesIdx; colAnio = anioIdx;
-        break;
+
+      // Imprimir log de diagnóstico para auditoría
+      if (clasificadasLog.length > 0) {
+        console.log(`[AUSENTISMO-STATS] 📋 Clasificación de casos (fuente: PRI.xlsx):`);
+        clasificadasLog.forEach(line => console.log(`[AUSENTISMO-STATS]   ${line}`));
+        console.log(`[AUSENTISMO-STATS] 📊 Resultado: total=${total}, pendientes=${pendientes}, activos=${activos}, cerrados=${cerrados}`);
+      } else {
+        console.log(`[AUSENTISMO-STATS] ℹ️ No hay casos en PRI.xlsx (siga usando GI-FO-076 si necesita histórico)`);
       }
-    }
-    if (headerRowIdx === -1) { colMes = 9; colAnio = 14; headerRowIdx = 6; }
 
-    const dataRows = rawData.slice(headerRowIdx + 1).filter(r => Array.isArray(r) && r.length > colAnio && r[colAnio] !== '');
-    const currentMonth = new Date().getMonth();
-    const monthNames = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
-
-    let fileYear = null;
-    for (const r of dataRows) {
-      const yr = parseInt(String(r[colAnio] || '').trim());
-      if (yr >= 2010 && yr <= 2099) { if (!fileYear || yr > fileYear) fileYear = yr; }
-    }
-
-    let totalCount = 0;
-    let monthCount = 0;
-
-    dataRows.forEach(row => {
-      const yr = parseInt(String(row[colAnio] || '').trim());
-      if (fileYear && yr === fileYear) {
-        totalCount++;
-        const mes = String(row[colMes] || '').toUpperCase().trim();
-        if (mes === monthNames[currentMonth]) monthCount++;
-      }
+      return {
+        pendientes,
+        activos,
+        cerrados,
+        total,
+        year: currentYear,
+        mes: currentMonthName,
+        _missingFile: false
+      };
     });
-
+  } catch (xlsxErr) {
+    // 📦459 — Modo degradado: archivo corrupto o error de parseo
+    console.error('[AUSENTISMO-STATS] Error procesando archivo:', xlsxErr.message);
     return {
-      total: totalCount,
-      mesActual: monthCount,
-      year: fileYear || new Date().getFullYear(),
-      mes: monthNames[currentMonth]
+      success: true,
+      data: { ...EMPTY_RESULT, _missingFile: true, _missingFileReason: 'corrupt', _expectedPath: filePath, _details: xlsxErr.message },
+      _missingFile: true
     };
-  });
+  }
 
   return { success: true, data: resultData };
 });
@@ -16333,7 +20240,16 @@ ipcMain.handle('frecuencia-accidentalidad:leer-meta-objetivo', async (event, com
 
     console.log('[FrecuenciaAccidentalidad] Leyendo meta desde:', rutaObjetivos);
 
-    const XLSX = require('xlsx');
+    let XLSX;
+    try {
+      XLSX = require('xlsx');
+    } catch (e) {
+      console.warn('[FrecuenciaAccidentalidad] xlsx no disponible:', e.message);
+      return { success: false, error: { code: 'XLSX_NOT_AVAILABLE', message: 'xlsx module not available' } };
+    }
+    if (!XLSX) {
+      return { success: false, error: { code: 'XLSX_NOT_AVAILABLE', message: 'xlsx module not available' } };
+    }
     const wb = XLSX.readFile(rutaObjetivos);
     const ws = wb.Sheets[wb.SheetNames[0]];
     if (!ws) return { success: true, data: null };
@@ -17495,10 +21411,52 @@ ipcMain.handle('incidencia:escribir-excel', async (event, mes, campos) => {
 
 // Iniciar el servidor OnlyOffice al iniciar la aplicación
 app.whenReady().then(() => {
+    // 📦707-fix24 (2026-08-14) — Idempotente, ver comentario del primer whenReady.
+    app.setAppUserModelId('com.jrfsoluciones.sgsst');
+
     createWindow();
+
+    // 📦 Loop 47b (2026-07-21) — Menú nativo oculto en producción
+    // Combinado con autoHideMenuBar: true en el BrowserWindow:
+    //   - Modo DESARROLLO: menú OCULTO por defecto, aparece con Alt (estándar Windows)
+    //   - Modo PRODUCCIÓN: menú OCULTO por defecto, aparece con Alt (mismo comportamiento)
+    // 🐛bug-fix (2026-07-30) — En producción se muestra un menú MINIMALISTA solo
+    // con opciones de debug (Recargar, Forzar Recarga, Herramientas de desarrollo)
+    // en lugar del menú default completo de Electron. El user (consultor) puede
+    // presionar Alt para ver DevTools y diagnosticar errores en la app instalada
+    // del cliente. En dev se mantiene el menú default (que ya tiene esas opciones).
+    if (app.isPackaged) {
+        // Menú debug minimalista para producción. Se muestra con Alt gracias
+        // a autoHideMenuBar: true de la BrowserWindow (comportamiento estándar
+        // de Windows: Discord, Slack, VSCode, etc.).
+        const debugMenu = Menu.buildFromTemplate([
+            {
+                label: 'Debug',
+                submenu: [
+                    { label: 'Recargar', accelerator: 'CmdOrCtrl+R', role: 'reload' },
+                    { label: 'Forzar Recarga (sin caché)', accelerator: 'CmdOrCtrl+Shift+R', role: 'forceReload' },
+                    { type: 'separator' },
+                    { label: 'Herramientas de desarrollo', accelerator: 'F12', role: 'toggleDevTools' },
+                    { type: 'separator' },
+                    { role: 'resetZoom' },
+                    { role: 'zoomIn' },
+                    { role: 'zoomOut' },
+                    { type: 'separator' },
+                    { role: 'togglefullscreen' }
+                ]
+            }
+        ]);
+        Menu.setApplicationMenu(debugMenu);
+        console.log('[MAIN] Menú debug minimalista activo (oculto, Alt para mostrar — app empaquetada / producción)');
+    } else {
+        console.log('[MAIN] Menú nativo (default) oculto por defecto, presionar Alt para mostrar — modo desarrollo');
+    }
 
     // Iniciar el servidor OnlyOffice Bridge
     startOnlyOfficeBridge();
+
+    // Auto-arranque de firma-service (solo si la carpeta existe; dev o build con el servicio incluido)
+    startFirmaService();
     
     // NOTA: El servidor LLM ya no se inicia automáticamente.
     // El análisis de accidentes usa spawn directo con Invest_APP_V_3.py

@@ -1,0 +1,46 @@
+<!-- modules/gestion-humana/permisos/index.html
+     📦758 · Vista "Permisos y Estados" — Estilo demo Tempoactiva
+     Estructura:
+       - 5 KPIs (Permisos Activos, Incapacidades, Maternidad, Paternidad, Luto)
+       - Header sección + botón "Registrar Permiso / Estado"
+       - 2 filtros dropdown (tipo + estado)
+       - Grid de cards (3 columnas) con tipo, estado, fechas, motivo, soporte, finalizar
+       - Info box "Tipos de Permisos y Licencias" con 8 tipos
+     IDs con prefijo `pe-` para evitar colisiones. -->
+
+<div class="pe-wrapper" id="pe-wrapper">
+  <div class="pe-kpi-section">
+    <div id="pe-kpi-bar" class="pe-kpi-bar"></div>
+  </div>
+
+  <div class="pe-section-head">
+    <div class="pe-section-head__text">
+      <h2 class="pe-section-head__title">Permisos y Estados del Trabajador</h2>
+      <p class="pe-section-head__subtitle">Incapacidades, maternidad, paternidad, luto y permisos diversos</p>
+    </div>
+    <button id="pe-nuevo" class="pe-btn pe-btn--primary" type="button">
+      <i class="fas fa-plus"></i> Registrar Permiso / Estado
+    </button>
+  </div>
+
+  <div class="pe-filters">
+    <select id="pe-filtro-tipo" class="pe-select">
+      <option value="all">Todos los tipos</option>
+    </select>
+    <select id="pe-filtro-estado" class="pe-select">
+      <option value="all">Todos los estados</option>
+      <option value="activo">Activos</option>
+      <option value="finalizado">Finalizados</option>
+      <option value="prorrogado">Prorrogados</option>
+    </select>
+  </div>
+
+  <div id="pe-cards" class="pe-cards"></div>
+
+  <div class="pe-info-box">
+    <div class="pe-info-box__head">
+      <h3 class="pe-info-box__title">Tipos de Permisos y Licencias</h3>
+    </div>
+    <div class="pe-info-box__grid" id="pe-tipos-info"></div>
+  </div>
+</div>

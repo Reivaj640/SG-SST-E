@@ -1,0 +1,267 @@
+<!-- modules/gestion-humana/documentos/index.html
+     📦722 · Vista "Documentos" — HTML separado (sin header secundario)
+     📦765 · Reorden: Documentos Recientes AHORA es lo 2do (después del header)
+     📦766 · Mis Templates se mueve a MODAL (botón en header) — ya no es sección permanente
+     LEGACY-SIGN-REMOVE (2026-08-20): eliminado modal "Firma Digital" con canvas.
+     La firma se hace ahora únicamente por vía electrónica (firma-service, I-101+).
+     Estructura:
+       - KPIs (4) via #doc-kpi-bar (helper GHKPIBar)
+       - Section head (título + botón "Mis Templates" (ghost) + botón "Generar Documento" (primary))
+       - Documentos recientes (tabla con tipo, trabajador, fecha, estado, fecha firma, descargar) — primero
+       - Catálogo (7 tipos de documentos) — referencia
+       - Modal "Administrar Templates" (📦766 · Mis Templates) — se abre con botón
+       - Modal "Generar Documento" con dropdown Trabajador + cards de tipos + templates
+       - Modal "Subir Template" (📦764)
+     IDs con prefijo `doc-` para evitar colisiones. -->
+
+<div class="doc-wrapper" id="doc-wrapper">
+  <!-- ═══ KPIs (4) — via helper GHKPIBar ═══ -->
+  <div class="doc-kpi-section">
+    <div id="doc-kpi-bar" class="doc-kpi-bar"></div>
+  </div>
+
+  <!-- ═══ 📦772 · SECTION HEAD (sticky al top cuando scrollea) ═══ -->
+  <div class="doc-section-head">
+    <div class="doc-section-head__text">
+      <h2 class="doc-section-head__title">Documentos</h2>
+      <p class="doc-section-head__subtitle">7 tipos de documentos del proceso de contratación — la firma es electrónica</p>
+    </div>
+    <div class="doc-section-head__actions">
+      <button id="doc-tpl-abrir" class="doc-btn doc-btn--ghost" type="button">
+        <i class="fas fa-folder-open"></i> Mis Templates
+      </button>
+      <button id="doc-generar" class="doc-btn doc-btn--primary" type="button">
+        <i class="fas fa-plus"></i> Generar Documento
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══ DOCUMENTOS RECIENTES ═══ -->
+  <div class="doc-section">
+    <h3 class="doc-section-title"><i class="fas fa-clock-rotate-left"></i> Documentos Recientes</h3>
+    <div id="doc-recientes" class="doc-recientes"></div>
+  </div>
+
+  <!-- ═══ CATÁLOGO ═══ -->
+  <div class="doc-section">
+    <h3 class="doc-section-title"><i class="fas fa-book-open"></i> Catálogo de Documentos</h3>
+    <div id="doc-catalogo" class="doc-catalogo"></div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: ADMINISTRAR TEMPLATES (📦766 · Mis Templates) ═══ -->
+<div id="doc-tpl-admin-modal" class="doc-modal" hidden>
+  <div class="doc-modal__backdrop" data-close-doc-modal="1"></div>
+  <div class="doc-modal__panel doc-modal__panel--admin">
+    <header class="doc-modal__header">
+      <h3 class="doc-modal__title"><i class="fas fa-folder-open"></i> Mis Templates</h3>
+      <button type="button" class="doc-modal__close" data-close-doc-modal="1" aria-label="Cerrar">
+        <i class="fas fa-times"></i>
+      </button>
+    </header>
+    <div class="doc-modal__body">
+      <div class="doc-tpl-admin-header">
+        <p class="doc-tpl-admin-header__text">
+          Sube tus propios .docx o .pdf para usar al generar documentos.
+          Los templates quedan en tu computador (AppData) y se copian al generar cada documento.
+        </p>
+        <button id="doc-tpl-subir" class="doc-btn doc-btn--primary" type="button">
+          <i class="fas fa-cloud-upload-alt"></i> Subir Template
+        </button>
+      </div>
+      <div id="doc-templates" class="doc-templates"></div>
+    </div>
+    <footer class="doc-modal__footer">
+      <button type="button" class="doc-btn doc-btn--ghost" data-close-doc-modal="1">Cerrar</button>
+    </footer>
+  </div>
+</div>
+
+<!-- ═══ MODAL: GENERAR DOCUMENTO (📦763 + 📦764) ═══ -->
+<div id="doc-generar-modal" class="doc-modal" hidden>
+  <div class="doc-modal__backdrop" data-close-doc-modal="1"></div>
+  <div class="doc-modal__panel doc-modal__panel--generar">
+    <header class="doc-modal__header">
+      <h3 class="doc-modal__title">Generar Documento</h3>
+      <button type="button" class="doc-modal__close" data-close-doc-modal="1" aria-label="Cerrar">
+        <i class="fas fa-times"></i>
+      </button>
+    </header>
+    <div class="doc-modal__body">
+      <div class="doc-field">
+        <label class="doc-field__label" for="doc-gen-trabajador">Trabajador <span class="doc-field__req">*</span></label>
+        <select id="doc-gen-trabajador" class="doc-field__select"></select>
+      </div>
+      <div class="doc-field">
+        <label class="doc-field__label">Tipo de documento <span class="doc-field__req">*</span></label>
+        <div id="doc-gen-tipos" class="doc-gen-tipos"></div>
+      </div>
+      <div class="doc-field" id="doc-gen-template-field" hidden>
+        <label class="doc-field__label" for="doc-gen-template">Template <span class="doc-field__req">*</span></label>
+        <select id="doc-gen-template" class="doc-field__select"></select>
+        <p class="doc-field__hint" id="doc-gen-template-hint"></p>
+      </div>
+    </div>
+    <footer class="doc-modal__footer">
+      <button type="button" class="doc-btn doc-btn--ghost" data-close-doc-modal="1">Cancelar</button>
+      <button type="button" id="doc-gen-confirm" class="doc-btn doc-btn--primary">
+        <i class="fas fa-plus"></i> Generar y Firmar
+      </button>
+    </footer>
+  </div>
+</div>
+
+<!-- ═══ MODAL: SUBIR TEMPLATE (📦764) ═══ -->
+<div id="doc-tpl-modal" class="doc-modal" hidden>
+  <div class="doc-modal__backdrop" data-close-doc-modal="1"></div>
+  <div class="doc-modal__panel doc-modal__panel--template">
+    <header class="doc-modal__header">
+      <h3 class="doc-modal__title">Subir Template</h3>
+      <button type="button" class="doc-modal__close" data-close-doc-modal="1" aria-label="Cerrar">
+        <i class="fas fa-times"></i>
+      </button>
+    </header>
+    <div class="doc-modal__body">
+      <div class="doc-field">
+        <label class="doc-field__label" for="doc-tpl-tipo">Tipo de documento <span class="doc-field__req">*</span></label>
+        <select id="doc-tpl-tipo" class="doc-field__select"></select>
+      </div>
+      <div class="doc-field">
+        <label class="doc-field__label" for="doc-tpl-nombre">Nombre del template <span class="doc-field__req">*</span></label>
+        <input id="doc-tpl-nombre" type="text" class="doc-field__input" placeholder="Ej: AUTORIZACIÓN TEMPOACTIVA v1" />
+        <p class="doc-field__hint">Nombre legible para identificar este template (puedes tener varios por tipo).</p>
+      </div>
+      <p class="doc-template-helper">
+        <i class="fas fa-info-circle"></i>
+        Al confirmar, se abrirá el explorador de archivos para que elijas el .docx o .pdf del sistema.
+        El archivo se guarda en AppData y queda disponible para usar al generar documentos.
+      </p>
+    </div>
+    <footer class="doc-modal__footer">
+      <button type="button" class="doc-btn doc-btn--ghost" data-close-doc-modal="1">Cancelar</button>
+      <button type="button" id="doc-tpl-confirm" class="doc-btn doc-btn--primary">
+        <i class="fas fa-folder-open"></i> Seleccionar archivo…
+      </button>
+    </footer>
+  </div>
+</div>
+
+<!-- ═══ MODAL: FIRMA DIGITAL — ELIMINADO en LEGACY-SIGN-REMOVE (2026-08-20) ═══
+     La firma canvas operativa interna (base64 PNG) se reemplazó por firma
+     electrónica vía firma-service (I-101+). El modal de firma en pantalla
+     ya no existe. La nueva UI de firma electrónica llegará con I-102. -->
+
+<!-- ═══ I-102.2.C · MODAL: ENVIAR DOCUMENTO A FIRMA ═══
+     Modal que permite configurar el envío de un documento a firma electrónica
+     vía firma-service. Recoge el correo del firmante y la confirmación explícita.
+     La creación de la solicitud de firma se hace en I-102.2.D (firma:sign-request:create). -->
+<div id="doc-firma-modal" class="doc-modal" hidden>
+  <div class="doc-modal__backdrop" data-close-doc-firma="1"></div>
+  <div class="doc-modal__panel doc-modal__panel--firma">
+    <header class="doc-modal__header">
+      <h3 class="doc-modal__title"><i class="fas fa-signature"></i> Enviar documento a firma</h3>
+      <button type="button" class="doc-modal__close" data-close-doc-firma="1" aria-label="Cerrar">
+        <i class="fas fa-times"></i>
+      </button>
+    </header>
+    <div class="doc-modal__body">
+      <!-- Resumen del documento (read-only) -->
+      <div class="doc-field" id="doc-firma-doc-info">
+        <label class="doc-field__label">Documento</label>
+        <div class="doc-firma-summary" id="doc-firma-doc-summary">—</div>
+      </div>
+      <!-- Resumen del firmante (read-only, viene del trabajador) -->
+      <div class="doc-field" id="doc-firma-trab-info">
+        <label class="doc-field__label">Firmante</label>
+        <div class="doc-firma-summary" id="doc-firma-trab-summary">—</div>
+      </div>
+      <!-- Correo del firmante -->
+      <div class="doc-field">
+        <label class="doc-field__label" for="doc-firma-correo">
+          Correo del firmante <span class="doc-field__req">*</span>
+        </label>
+        <input id="doc-firma-correo" type="email" class="doc-field__input"
+               placeholder="firmante@empresa.com" autocomplete="email" />
+        <p class="doc-field__hint" id="doc-firma-correo-hint">
+          El firmante recibirá un enlace único para revisar y firmar el documento.
+        </p>
+        <p class="doc-field__error" id="doc-firma-correo-error" hidden>
+          Ingresa un correo válido.
+        </p>
+      </div>
+      <!-- Checkbox de confirmación -->
+      <div class="doc-field">
+        <label class="doc-firma-confirm" for="doc-firma-confirmar">
+          <input id="doc-firma-confirmar" type="checkbox" />
+          <span>Confirmo que este documento será enviado para firma electrónica.</span>
+        </label>
+      </div>
+    </div>
+    <footer class="doc-modal__footer">
+      <button type="button" class="doc-btn doc-btn--ghost" data-close-doc-firma="1">Cancelar</button>
+      <button type="button" id="doc-firma-enviar" class="doc-btn doc-btn--primary" disabled>
+        <i class="fas fa-paper-plane"></i> Enviar a firma
+      </button>
+    </footer>
+  </div>
+</div>
+
+<!-- ═══ I-103.A1.5.3 · MODAL: ÉXITO DE SOLICITUD DE FIRMA ═══
+     Modal que se muestra cuando firma-service creó exitosamente el sign
+     request. Muestra el id de la solicitud, la URL pública única y el
+     correo del firmante. Ofrece 2 acciones:
+       1) Copiar enlace (al portapapeles)
+       2) Enviar por correo (via firma:sign-request:notify-remote,
+          A1.5.1 + A1.5.2)
+     Y un botón "Listo" para cerrar. El documento YA quedó en estado
+     'esperando_firma' en la BD local antes de abrir este modal, así que
+     cerrar este modal NO modifica la solicitud. -->
+<div id="doc-firma-success-modal" class="doc-modal" hidden>
+  <div class="doc-modal__backdrop" data-close-doc-firma-success="1"></div>
+  <div class="doc-modal__panel doc-modal__panel--success">
+    <header class="doc-modal__header doc-modal__header--success">
+      <h3 class="doc-modal__title">
+        <i class="fas fa-check-circle"></i> Solicitud de firma creada
+      </h3>
+      <button type="button" class="doc-modal__close" data-close-doc-firma-success="1" aria-label="Cerrar">
+        <i class="fas fa-times"></i>
+      </button>
+    </header>
+    <div class="doc-modal__body">
+      <!-- ID de la solicitud (read-only) -->
+      <div class="doc-field">
+        <label class="doc-field__label">ID de solicitud</label>
+        <div class="doc-firma-success-id" id="doc-firma-success-id">—</div>
+      </div>
+      <!-- URL pública (read-only + botón copiar) -->
+      <div class="doc-field">
+        <label class="doc-field__label" for="doc-firma-success-url">Enlace único para el firmante</label>
+        <div class="doc-firma-success-link">
+          <input id="doc-firma-success-url" type="text" class="doc-field__input doc-firma-success-link__input"
+                 readonly />
+          <button type="button" id="doc-firma-success-copy" class="doc-btn doc-btn--ghost doc-firma-success-link__copy"
+                  title="Copiar enlace al portapapeles">
+            <i class="fas fa-copy"></i> Copiar
+          </button>
+        </div>
+        <p class="doc-field__hint">
+          El firmante tiene 24h para abrir el enlace, identificarse con su cédula y firmar.
+        </p>
+      </div>
+      <!-- Correo del firmante (read-only) -->
+      <div class="doc-field">
+        <label class="doc-field__label" for="doc-firma-success-correo">
+          Correo del firmante
+        </label>
+        <input id="doc-firma-success-correo" type="email" class="doc-field__input" readonly />
+        <p class="doc-field__hint" id="doc-firma-success-feedback" hidden></p>
+      </div>
+    </div>
+    <footer class="doc-modal__footer">
+      <button type="button" class="doc-btn doc-btn--ghost" data-close-doc-firma-success="1">Listo</button>
+      <button type="button" id="doc-firma-success-send" class="doc-btn doc-btn--primary">
+        <i class="fas fa-paper-plane"></i> Enviar por correo
+      </button>
+    </footer>
+  </div>
+</div>

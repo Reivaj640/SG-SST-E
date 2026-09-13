@@ -1,7 +1,7 @@
 # K+AIR - Sistema de Gestión SG-SST
 
-**Versión:** 0.1.101
-**Última actualización:** 14 de junio de 2026
+**Versión:** 0.1.173 (próximo) — publicado v0.1.166
+**Última actualización:** 12 de agosto de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
 ---
@@ -12,10 +12,17 @@
 
 ### Características Principales
 
+- ✅ **Bandeja Integrada: Cliente Gmail Completo** 🆕 (v0.1.120, `📦563`): Cliente de correo profesional integrado con OAuth + SQLite cache + Gmail-look UI + 7 features. Búsqueda con operadores (`from:javier`, `has:adjunto`), adjuntos reales descargables, firma automática, sync bidireccional con Gmail, auto-refresh cada 5 min, BEM refactor con 4 componentes (`email-row`, `thread-header`, `quoted-thread`, `compose-panel` minimizable). Coexiste con K+AIR Calendar. Ver `AGENTS.md` (sección "🆕 Bandeja Integrada") para el detalle.
+- ✅ **Seguimiento de Incapacidades con SQLite + Excel** 🆕 (v0.1.166-170, `📦701+705+706+702+703+704+fix3+4+5+6+7+8`): Nuevo flujo completo de seguimiento de incapacidades (PRIC) que respalda en SQLite (kair.db) en paralelo al Excel legacy PRI.xlsx. **FASE 1** (v0.1.166): schema normalizado con 2 tablas (`seguimiento_incapacidad_caso` + `seguimiento_incapacidad_registro` con FK CASCADE), bridge IPC con 6 handlers, sincronización bidireccional SQLite ↔ Excel con botón "Exportar a Excel" desde la UI. **FASE 2+3** (v0.1.167): banner BD con 4 estados visuales (is-unsaved/saved/exported/error), lista de casos en BD, auto-hide header después de 30s. **Bugfixes críticos** (v0.1.168): schema con columnas duplicadas corregido, error "[object Object]" arreglado, búsqueda en BD primero, tabla refleja seguimientos, botón Siguiente inteligente. **Informe PRI** (v0.1.169): casos de BD incluidos con sus seguimientos (fecha en colIdx, descripción en columna adyacente sin header), timezone fix. **Cédula display vs BD** (v0.1.170): normalización en 2 capas (renderer + bridge) para que la query matchee siempre. Ver `AGENTS.md` (sección "🆕 Seguimiento de Incapacidades con SQLite") y `CONTEXT.md` para el detalle.
+- ✅ **Footer minimalista** 🆕 (v0.1.171, `📦701-fix9`): El footer negro con copyright y versión se quitó de la app principal y de la Bandeja Integrada para ganar espacio vertical (~25px en cada vista). Ahora solo aparece en la pantalla de inicio (splash + login + selección de empresa) flotando sobre el Vanta con texto blanco. Implementación con CSS puro usando `:has()` (selector moderno soportado en Electron 37 / Chromium 118+). Bonus: el selector original `.vanta-fullscreen #app-footer` NUNCA funcionó porque `vanta-fullscreen` se aplica a `.main-container` (sibling del footer, no ancestro). Trade-off: el dot de updates del footer desaparece; sigue accesible desde Configuración > Acerca de la App.
+- ✅ **Scroll interno en home de módulos** 🆕 (v0.1.172, `📦701-fix10`): En modo ventana el home de un módulo (widgets + charts + lista de submódulos) puede no caber en el viewport. Ahora tiene scroll INTERNO dentro del home con scrollbar fina (~8px) y semi-transparente, sin scrollbar externa en el borde de la página. Fix de 2 capas con CSS puro + `:has()`: padre con `overflow: hidden` + home con `overflow-y: auto` + `scrollbar-width: thin`.
+- ✅ **Bandeja Integrada: fix reply en Enviados** 🆕 (v0.1.173, `📦701-fix12`): Al abrir un correo de Enviados y hacer click en Responder/Responder a todos, el campo "Para" mostraba el email del propio user (visible como "m" por la truncación del chip). Fix: usar `getMailDisplayContact(mail)` que retorna el destinatario original en SENT, no el remitente.
+- ✅ **Menú nativo de Electron oculto** 🆕 (v0.1.130, `📦579`): La barra de menú de Windows (File / Edit / View / Window / Help) ya no se muestra por defecto. En desarrollo aparece con la tecla **Alt**; en producción está oculta totalmente. La app se ve limpia y profesional tipo SaaS (Discord, Slack, VSCode). Ver `AGENTS.md` (sección "🆕 Menú nativo de Electron oculto") para el detalle.
+- ✅ **Update UX completo** 🆕 (v0.1.131, `📦581`): Sistema de actualizaciones rediseñado estilo Claude, no invasivo. Botón-dot en el footer (OCULTO al día, azul con pulse cuando hay update, verde con halo cuando está descargado). Click en el dot abre el dropdown anclado arriba del footer. Modal "Información de actualizaciones" con badge de estado + versión instalada + última versión + última verificación + release notes de GitHub. Panel "Actualizaciones" en Configuración. Sin toasts invasivos. Ver `AGENTS.md` (sección "🆕 Update UX") para el detalle.
+- ✅ **Release flow automatizado** 🆕 (v0.1.131+, `📦585`): Scripts `scripts/release.ps1` (flujo completo: push branch → tag → push tag → build) y `scripts/fix-release.ps1` (fallback con curl si electron-builder falla). Evitan el error 422 de "Published releases must have a valid tag". Ver `AGENTS.md` (sección "🆕 Release flow automatizado") para el detalle.
 - ✅ **Multi-empresa**: Gestión de múltiples empresas con una sola experiencia UX/UI
 - ✅ **Motor Normativo Inteligente**: Escenarios normativos basados en tamaño y riesgo
-- ✅ **7 Módulos Principales**: Recursos, Gestión Integral, Salud, Peligros, Amenazas, Verificación, Mejoramiento
-- ✅ **29+ Submódulos**: Cada uno con su propia lógica y vistas especializadas
+- ✅ **9 Módulos Principales + 48 Submódulos con lógica**: Recursos (12), Gestión Integral (9), Salud (12), Peligros (4), Amenazas (2), Verificación (3), Mejoramiento (4), más `helpers` y `shared`
 - ✅ **IA Integrada**: Análisis de accidentes con LLM (Mistral 3 3B)
 - ✅ **Seguimiento PRIC**: Gestión completa de casos de incapacidad y rehabilitación
 - ✅ **Calificación PCL Dual**: Secciones separadas para Calificación Regional y Nacional (14 campos)
@@ -26,18 +33,20 @@
 - ✅ **Etapas de Reincorporación y Cierre**: Gestión completa de reincorporación laboral y cierre de casos
 - ✅ **Diagnósticos Múltiples**: Hasta 3 diagnósticos CIE-10 por caso (DX principal + DX2 + DX3)
 - ✅ **KPIs en Tiempo Real**: Actualización dinámica con filtros de año/mes
-- ✅ **Inducciones con Sincronización Automática** 🆕: Google Forms → Excel → App sin intervención manual
-- ✅ **Búsqueda Inteligente de Archivos** 🆕: Normalización de tildes y múltiples variaciones de nombres
-- ✅ **COM Automation** 🆕: VBScript para controlar Excel y actualizar Power Query automáticamente
+- ✅ **Inducciones con Sincronización Automática**: Google Forms → Excel → App sin intervención manual
+- ✅ **Búsqueda Inteligente de Archivos**: Normalización de tildes y múltiples variaciones de nombres
+- ✅ **COM Automation**: VBScript para controlar Excel y actualizar Power Query automáticamente
+- ✅ **Sistema de Skeleton Screens** (v0.1.110): API `KairSkeleton.*` con 10 componentes que reemplazan spinners genéricos por placeholders que imitan la forma del componente. Cubierto en 25 loaders en 13 vistas + 7 homes de módulo. Ver `AGENTS.md` (sección "🎨 Sistema de Skeleton Screens") para el detalle.
 - ✅ **Solo 13 archivos en raíz**: Proyecto limpio y organizado
-- ✅ **Tabla de Ausentismo 17 Columnas**: Año, Fecha Inicio, Fecha Fin, Código 🆕
-- ✅ **Filtros Dinámicos Inteligentes**: Año y tipo basados en datos reales 🆕
-- ✅ **Información de Mapeo**: Fecha y tipo de mapeo en tarjetas de empresas 🆕
-- ✅ **Portales de Bienvenida (Antesalas)** 🆕: Interfaz moderna tipo portal para submódulos clave
-- ✅ **Sistema de Notificaciones Toast** 🆕: Notificaciones modernas no intrusivas
-- ✅ **Modales Modernizados** 🆕: Diseño centrado, animaciones suaves, UX mejorada
-- ✅ **Detección Automática de Año Activo** 🆕: El sistema detecta automáticamente el año más reciente
-- ✅ **Autenticación de Usuarios** 🆕: Login obligatorio por sesión con control de acceso
+- ✅ **Tabla de Ausentismo 17 Columnas**: Año, Fecha Inicio, Fecha Fin, Código
+- ✅ **Filtros Dinámicos Inteligentes**: Año y tipo basados en datos reales
+- ✅ **Información de Mapeo**: Fecha y tipo de mapeo en tarjetas de empresas
+- ✅ **Portales de Bienvenida (Antesalas)**: Interfaz moderna tipo portal para submódulos clave
+- ✅ **Sistema de Notificaciones Toast**: Notificaciones modernas no intrusivas
+- ✅ **Modales Modernizados**: Diseño centrado, animaciones suaves, UX mejorada
+- ✅ **Detección Automática de Año Activo**: El sistema detecta automáticamente el año más reciente
+- ✅ **Autenticación de Usuarios**: Login obligatorio por sesión con control de acceso
+- ✅ **Stats extendidas de Ausentismo** 🆕 (v0.1.110): 16 métricas calculadas en una sola pasada (Tasa Ausentismo, Índice Frecuencia, Índice Severidad, Tasa Accidentalidad, Top 10 por días/casos/CIE-10, heatmap día-semana × mes, etc.)
 - ✅ **Roles por Empresa** 🆕: Asignación de perfiles por empresa (incluye Recursos Humanos)
 - ✅ **Base de Datos Local (SQLite)** 🆕: Persistencia de usuarios, roles, sesiones y asignaciones
 - ✅ **Alerta de Afiliación SSSI** 🆕: Detección automática de planillas faltantes del mes en curso
@@ -998,15 +1007,15 @@ npm run docs:generate
 npm run docs:watch
 ```
 
-**Ubicación:** `docs/api/`
+**Ubicación:** `docs-api/` (se regenera cada vez que se corre el comando) — NO se commitea
 
 ### Estado del Proyecto
 
 | Archivo | Descripción |
 |---------|-------------|
-| [docs/ESTADO_ACTUAL_REORGANIZACION.md](docs/ESTADO_ACTUAL_REORGANIZACION.md) | 18 fases de reorganización completadas |
-| [docs/CHANGELOG.md](docs/CHANGELOG.md) | Historial de cambios por versión |
-| [docs/DEPENDENCIAS.md](docs/DEPENDENCIAS.md) | Guía completa de dependencias |
+| [CHANGELOG.md](CHANGELOG.md) | Historial completo de cambios por versión |
+| [CONTEXT.md](CONTEXT.md) | Contexto del proyecto para IAs y nuevos devs |
+| [AGENTS.md](AGENTS.md) | Convenciones, arquitectura y features clave |
 
 ---
 
@@ -1071,6 +1080,30 @@ La aplicación se publica en GitHub Releases:
 - **Repositorio:** https://github.com/Reivaj640/SG-SST-E
 - **Tipo de release:** Draft
 - **Auto-updates:** Habilitadas con `electron-updater`
+
+**Flujo de release automatizado (v0.1.131+):**
+
+```powershell
+#流程 completo (con tests):
+.\scripts\release.ps1
+
+#流程 sin tests:
+.\scripts\release.ps1 -SkipTests
+```
+
+El script ejecuta 7 pasos: pre-checks → tests → `git push` branch → crea tag → **`git push` tag** (evita el 422) → verifica visibilidad → `electron-builder --publish=always`. Si electron-builder falla al subir, llama automáticamente a `fix-release.ps1` que sube los assets con `curl` directo a `uploads.github.com`. Ver `AGENTS.md` (sección "🆕 Release flow automatizado") para el detalle completo.
+
+**Publicación manual de emergencia** (si los scripts no funcionan):
+
+```powershell
+# Tag y push manual primero:
+git tag v0.1.133
+git push origin v0.1.133
+npx electron-builder --win --publish=always
+
+# Si electron-builder falla al subir el .exe (timeout):
+.\scripts\fix-release.ps1
+```
 
 ---
 
@@ -1486,24 +1519,18 @@ Se agregaron 4 columnas adicionales entre "Entidad" y "Descripción":
 
 ## 📚 Documentación
 
-### Para Nuevos Desarrolladores
-1. **[docs/START_HERE.md](docs/START_HERE.md)** - Punto de entrada único (5 min)
-2. **[CONTEXT.md](CONTEXT.md)** - Contexto para IA y nuevos desarrolladores (15 min)
-3. **[docs/01-quick-start/installation.md](docs/01-quick-start/installation.md)** - Instalación y configuración
-4. **[docs/02-architecture/ipc-contracts.md](docs/02-architecture/ipc-contracts.md)** - Contratos IPC (CRÍTICO)
+La documentación del proyecto está consolidada en **4 archivos** en la raíz:
 
-### Para Usuarios Finales
-1. **[README.md](#)** - Este archivo (visión general)
-2. **[docs/acerca-de-actualizacion.md](docs/acerca-de-actualizacion.md)** - Actualización del sistema
-3. **[docs/01-quick-start/troubleshooting.md](docs/01-quick-start/troubleshooting.md)** - Problemas comunes
+| Archivo | Para quién | Qué tiene |
+|---|---|---|
+| **[README.md](README.md)** | Vos (cliente) y devs nuevos | Qué es K+AIR, cómo se instala, características |
+| **[AGENTS.md](AGENTS.md)** | IAs (yo) | Convenciones, arquitectura, Bandeja, menú nativo, etc. |
+| **[CONTEXT.md](CONTEXT.md)** | IAs y devs | Contexto general del proyecto |
+| **[CHANGELOG.md](CHANGELOG.md)** | Todos | Historial completo de cambios por versión |
 
-### Para Mantenedores
-1. **[CHANGELOG.md](CHANGELOG.md)** - Historial de cambios por versión
-2. **[docs/05-updates/](docs/05-updates/)** - Actualizaciones detalladas
-3. **[docs/04-guides/maintenance.md](docs/04-guides/maintenance.md)** - Mantenimiento del proyecto
+**Ruta recomendada según quién sos:**
 
-### Referencia Técnica
-- **[docs/02-architecture/](docs/02-architecture/)** - Arquitectura del sistema
-- **[docs/03-modules/](docs/03-modules/)** - Documentación de módulos
-- **[docs/04-guides/](docs/04-guides/)** - Guías y tutoriales
-- **[docs/_archived/](docs/_archived/)** - Documentación archivada
+- **👤 Cliente / usuario final:** este `README.md`
+- **👨‍💻 Dev nuevo:** `README.md` → `AGENTS.md` (sección arquitectura) → código
+- **🤖 IA (Mavis, Cursor, etc.):** `AGENTS.md` (principal) + `CONTEXT.md` (contexto)
+- **🔧 Mantenedor:** `CHANGELOG.md` + commits en git

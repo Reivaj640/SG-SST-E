@@ -28,11 +28,14 @@ class SociodemograficaComponent {
 
     handleIframeMessage(event) {
         // Por seguridad, podrías verificar event.origin aquí si supieras el origen exacto del iframe
-        if (!event.data || !event.data.action) {
+        // Aceptamos mensajes con `action` (estilo viejo) o `type` (estilo nuevo / file-viewer-modal)
+        if (!event.data || (!event.data.action && !event.data.type)) {
             return; // Ignorar mensajes sin acción definida
         }
 
-        switch (event.data.action) {
+        const messageKey = event.data.action || event.data.type;
+
+        switch (messageKey) {
             case 'backToModule':
                 if (this.onBackToModuleHome) {
                     this.onBackToModuleHome();
@@ -56,9 +59,17 @@ class SociodemograficaComponent {
             case 'open-path-request':
                 this.handleOpenPathRequest(event, 'openPath');
                 break;
+            case 'open-file-viewer-modal':
+                // 📦608-fix13: el iframe pide abrir un archivo en el modal file-viewer del parent.
+                if (window.kairFV && typeof window.kairFV.openWithFileViewerFromPath === 'function' && event.data.filePath) {
+                    window.kairFV.openWithFileViewerFromPath(event.data.filePath);
+                } else if (event.data.filePath) {
+                    console.warn('[SOCIODEMOGRAFICA] No se puede abrir modal file-viewer — kairFV no disponible');
+                }
+                break;
             // Puedes añadir más casos para otros tipos de archivos o funcionalidades si es necesario
             default:
-                console.warn('Mensaje de iframe no reconocido:', event.data.action);
+                console.warn('Mensaje de iframe no reconocido:', messageKey);
                 break;
         }
     }
@@ -72,6 +83,36 @@ class SociodemograficaComponent {
                 console.error(`[sociodemografica-component.js][handleFilePreviewRequest] Error: electronAPI.${apiFunctionName} no está disponible.`);
                 throw new Error(`electronAPI.${apiFunctionName} no está disponible.`);
             }
+
+            // 📦608-fix15: para Office (Word/Excel) leemos los bytes directamente
+            // y se los mandamos al iframe en modo 'file-viewer' (208 formatos).
+            // PDF sigue usando el API viejo (base64Data → iframe PDF).
+            const ext = (filePath || '').split('.').pop().toLowerCase();
+            const isOffice = (apiFunctionName === 'getWordPreview' || apiFunctionName === 'getExcelPreview') && ext && ext !== 'pdf';
+            const useBytes = isOffice && typeof window.electronAPI.readFileBytes === 'function';
+
+            if (useBytes) {
+                const readResult = await window.electronAPI.readFileBytes(filePath);
+                if (readResult && readResult.success) {
+                    console.log(`[sociodemografica-component.js][handleFilePreviewRequest] readFileBytes OK para ${filePath} (${readResult.data.bytes.byteLength} bytes)`);
+                    event.source.postMessage({
+                        action: `${apiFunctionName}-response`,
+                        requestId,
+                        success: true,
+                        mode: 'file-viewer',
+                        data: {
+                            bytes: readResult.data.bytes,
+                            name: readResult.data.name,
+                            ext: readResult.data.ext,
+                            size: readResult.data.size,
+                            filePath: readResult.data.filePath
+                        }
+                    }, '*');
+                    return;
+                }
+                console.warn(`[sociodemografica-component.js][handleFilePreviewRequest] readFileBytes falló, fallback a API viejo:`, readResult && readResult.error);
+            }
+
             const result = await window.electronAPI[apiFunctionName](filePath);
             console.log(`[sociodemografica-component.js][handleFilePreviewRequest] Respuesta de electronAPI.${apiFunctionName} para requestId ${requestId}: success=${result.success}, error=${result.error}`);
             event.source.postMessage({

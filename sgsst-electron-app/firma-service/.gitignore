@@ -1,0 +1,51 @@
+# Variables de entorno
+.env
+.env.local
+.env.*.local
+
+# Datos locales (BD + PDFs generados)
+data/
+storage/pdfs/originales/*
+storage/pdfs/firmados/*
+storage/pdfs/constancias/*
+!storage/pdfs/originales/.gitkeep
+!storage/pdfs/firmados/.gitkeep
+!storage/pdfs/constancias/.gitkeep
+
+# Logs
+logs/
+*.log
+
+# Dependencias
+node_modules/
+
+# Archivos temporales
+tmp/
+*.tmp
+*.swp
+.DS_Store
+Thumbs.db
+
+# Cobertura de tests
+coverage/
+.nyc_output/
+
+# Scripts de verificación temporales (verificación E2E/atomicidad standalone)
+verify-*.js
+clean-verify.js
+clone-acuerdo.js
+make-test-pdf.js
+start-parallel-3738.ps1
+audit-bloque-*.js
+storage-verify-*/
+data/verify-*.sqlite
+data/verify-*.sqlite-*
+
+# 📦 I-010 — Artefactos de E2E multi-company + subagentes previos
+# storage-e2e*/ lo crea el script storage-backup/e2e-multicompany.js al arrancar
+storage-e2e*/
+storage-audit-e3/
+storage-test/
+# BD de E2E multi-company (separada de test.sqlite)
+data/e2e-test-mc.sqlite
+data/e2e-test-mc.sqlite-*

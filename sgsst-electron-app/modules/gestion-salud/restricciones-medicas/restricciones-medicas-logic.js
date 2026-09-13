@@ -928,6 +928,14 @@ RestriccionesMedicasComponent.prototype.handleIframeMessage = function(event) {
             }
             self.render();
             break;
+        case 'open-file-viewer-modal':
+            // 📦608-fix13: el iframe pide abrir el archivo en el modal file-viewer del parent
+            if (event.data && event.data.filePath && window.kairFV && typeof window.kairFV.openWithFileViewerFromPath === 'function') {
+                window.kairFV.openWithFileViewerFromPath(event.data.filePath);
+            } else if (event.data && event.data.filePath) {
+                console.warn('[RM-BRIDGE] kairFV.openWithFileViewerFromPath no disponible');
+            }
+            break;
         case 'get-pdf-preview-request':
             self._handlePreview(event, 'getPDFPreview', requestId, payload);
             break;
@@ -1055,6 +1063,20 @@ RestriccionesMedicasComponent.prototype.handleIframeMessage = function(event) {
 };
 
 RestriccionesMedicasComponent.prototype._handlePreview = async function(event, apiName, requestId, payload) {
+    // 📦608-fix15: helper genérico — para Office usa readFileBytes, para PDF usa la API vieja.
+    // El helper ya hace el postMessage de la respuesta, no lo duplicamos acá.
+    if (window.KairDocPreview && typeof window.KairDocPreview.handleRequest === 'function') {
+        try { await window.KairDocPreview.handleRequest(event, apiName); }
+        catch (e) {
+            var typeKey = apiName === 'getPDFPreview'   ? 'get-pdf-preview-response'
+                        : apiName === 'getWordPreview'  ? 'get-word-preview-response'
+                        : apiName === 'getExcelPreview' ? 'get-excel-preview-response'
+                        : apiName + '-response';
+            event.source.postMessage({ type: typeKey, requestId: requestId, payload: { success: false, error: e.message } }, '*');
+        }
+        return;
+    }
+    // Fallback al flujo viejo si el helper no está cargado
     var filePath = payload && payload.filePath;
     var typeKey = apiName === 'getPDFPreview'   ? 'get-pdf-preview-response'
                 : apiName === 'getWordPreview'  ? 'get-word-preview-response'

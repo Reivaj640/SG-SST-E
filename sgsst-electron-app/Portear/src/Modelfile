@@ -1,0 +1,18 @@
+# Modelfile para Qwen3.5-2B-MTP-GGUF optimizado para análisis 5 Porqués / Ishikawa
+# Uso: ollama create qwen-inv-at -f Modelfile
+# El archivo GGUF se referencia por ruta absoluta (Windows)
+
+FROM "D:\1. Estudio\1.1 IA\1.1.2. LLM's\Inv. AT\unslothQwen3.5-2B-MTP-GGUF\Qwen3.5-2B-UD-Q4_K_XL.gguf"
+
+# Parámetros optimizados para análisis estructurado (5 Porqués + Ishikawa)
+# Modelo opera en non-thinking mode por defecto (más rápido y determinista)
+PARAMETER temperature 0.4
+PARAMETER top_p 0.9
+PARAMETER top_k 20
+PARAMETER num_predict 4000
+PARAMETER repeat_penalty 1.1
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "<|endoftext|>"
+
+# NOTA: el SYSTEM prompt se envía dinámicamente desde llm_server.py vía /api/chat,
+# NO se incluye aquí para evitar duplicación del contexto en cada llamada.

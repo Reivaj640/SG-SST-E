@@ -1,506 +1,310 @@
-# K+AIR - Contexto del Proyecto
+# K+AIR — Contexto del Proyecto
 
-**Última actualización:** 9 de junio de 2026
-**Versión actual:** 0.1.99
+**Última actualización:** 31 de agosto de 2026
+**Versión actual:** 0.1.191 (próximo release) — publicado v0.1.190
 **Tipo:** Aplicación empresarial Electron para SG-SST (Colombia)
+**Stack:** Electron 37 + vanilla JS + Python 3.11.9 (empaquetado) + SQLite (kair.db)
+
+> **🆕 v0.1.191 (📦767 + fix — feat(gh): Ciclo Laboral 1.0 cerrado en Gestión Humana):** Cierra el ciclo laboral completo de un bp en el submódulo de Base Personal, con reglas arquitectónicas estrictas para evitar regresiones en el bypass que producía bp con `estado=retirado` sin `fecha_retiro` ni evento RETIRO. **Componentes cerrados** (10 commits en cadena 1.0-B → 1.0-G.2.1, todos en `origin/Dev-Pc`): **(1.0-B) barrera backend** — `_handlerCreateContratacion` y `_handlerMarcarPaso` detectan bp retirado y devuelven `recontratacionRequerida: true` o `RECONTRATACION_REQUERIDA`. **(1.0-C) limpiar fecha_retiro al reactivar** — `_handlerCambiarEstado` setea `fecha_retiro=NULL` en transición `retirado → activo`. **(1.0-D-1) tabla `gh_eventos_personal`** — nueva tabla con 12 columnas, 4 CHECK constraints, 4 índices, 2 FKs, prefijo `ev-` para IDs. Triggers transaccionales en `_handlerCambiarEstado` insertan evento RETIRO/REINGRESO en la misma transacción que el UPDATE del bp (atomicidad COMMIT/ROLLBACK). **(1.0-D-2) recontratación atómica** — `gh:recontratar-personal` crea CT + reactiva bp + inserta evento RECONTRATACION en una sola tx; valida que `cedula` del form coincida con la del bp. **(1.0-E) refactor + frontend modal "¿Recontratar?"** — `gh:recontratar-personal` ahora exige `contratacionData` (objeto); modal en `contratacion/index.js` con 4 acciones (Reingresar / Recontratar / Corregir cédula / Cancelar). **(1.0-F-1) soft delete puro** — `gh:delete-personal` solo `activo=0`, NO toca `estado` ni `fecha_retiro` ni inserta evento; rechaza bp activo con `BP_NOT_RETIRED`; frontend cambia "Eliminar" por "Ocultar". **(1.0-G) tests E2E integrales** — `test-gestion-humana-bridge-e2e.js` con 11 escenarios y 109 asserts (RETIRO con evento, REINGRESO, RECONTRATACION atómico, ROLLBACK ante CEDULA_MISMATCH, BP_DELETED al recontratar bp oculto, aislamiento de kair.db, las 3 fechas distintas). **(1.0-G.2) cerrar bypass `gh:update-personal`** (CRÍTICO) — `_handlerUpdatePersonal` rechaza `estado/fechaRetiro/fechaIngreso` con `PROTECTED_FIELD` (rollback atómico en payload mixto); `_handlerCreatePersonal` rechaza `fechaRetiro`; `gh:import-personal` con `CASE WHEN` estricto (no pisa `fecha_retiro` de bp existente, completa `fecha_ingreso` solo si NULL, preserva `estado` retirado); frontend borra `_openEditModal` (código muerto), `_saveDetailEdit` filtra `PROTECTED_FIELDS`, tab "Datos Laborales" muestra los 3 campos read-only (sin `data-view` para que se vean en View y Edit), botones "Retirar trabajador" / "Reingresar" en la sección Estado llaman a `ghCambiarEstado`. **(1.0-G.2.1) fix visual** — botón Reingresar/Retirar con estilo badge `bp-badge bp-badge--muted` (mismo gris que "Retirado") + `cursor:pointer` + `border:none` inline. Sin CSS nuevo. **Regla arquitectónica** (no violar en futuras sesiones de AI): `gh:cambiar-estado` es la **única autoridad** para RETIRO/REINGRESO. `gh:recontratar-personal` es la **única autoridad** para RECONTRATACION. `gh:update-personal` SOLO puede modificar datos personales/administrativos (nombres, cargo, salario, teléfono, email, dirección, banco). Está **terminantemente prohibido** usar `gh:update-personal` para `estado`, `fechaRetiro` o `fechaIngreso` — el bridge rechaza con `PROTECTED_FIELD` y rollback atómico. **`gh:create-personal` rechaza `fechaRetiro`** (un bp nuevo no puede nacer con fecha de retiro). **`gh:import-personal` (update) NUNCA puede pisar `fecha_retiro` ni el `estado` retirado de un bp existente** (solo completa `fecha_ingreso` cuando está NULL; cualquier inconsistencia entre Excel y BD se reporta como warning sin abortar). **Tests E2E** (153 asserts): 109 originales + 28 nuevos (T12-T19 protección update-personal + rollback) + 16 nuevos (T20-T25 política estricta de import). **Auditoría G.2.2** (pre-push) confirmó 0 regresiones nuevas, 514 OK / 2 FAIL preexistentes (verificados contra backup pre-G.2). **Auditoría manual M1-M5** del user: el flujo Retirar → Reingreso quedó correctamente persistido con 1 evento RETIRO + 1 evento REINGRESO en `bp-mthtoza2-owsv` (CC 1111111111). **kair.db**: 765 bp (139 activos + 626 retirados), 0 inconsistencias, 0 estados imposibles. **BP de evidencia del bypass** (`bp-mthobzc0-uvkk`, CC 9999999999) preservado como registro histórico. **Cambios totales**: 11 commits en cadena 1.0-B → 1.0-G.2.1; 5 archivos productivos modificados (`gestion-humana-bridge.js`, `gestion-humana-schema-sql.js`, 2 tests, `base-personal/index.js`); ~570 insertions / ~50 deletions; 0 cambios a `firma-service` (intacto). **Próximo paso**: si todo OK, se libera v0.1.191 con re-build del instalador. Pendiente decisión sobre `bp-mthobzc0-uvkk` (restaurar / ocultar / dejar como prueba de M1-M5).
+
+> **🆕 v0.1.188 (📦707-fix25 — fix(icons): AUMID + extraResources + path del .ico):** Fix urgente. El release v0.1.187 tenía el .ico regenerado (fill 90%) pero faltaban 3 fixes que el user "deshice manualmente" antes del release. **Causa raíz**: (1) sin AUMID (taskbar mostraba ícono genérico), (2) .ico empaquetado en el asar (shortcut del escritorio no encontraba el ícono), (3) path incorrecto en installer.nsh (apuntaba a `$INSTDIR\assets\...` que no existe en disco). **Cambios (3 archivos, +20/-3 líneas)**: (1) `main.js` — `app.setAppUserModelId('com.jrfsoluciones.sgsst')` en 3 lugares (al `require`, en los 2 `whenReady`). (2) `package.json` — nueva entrada en `build.extraResources` que copia `assets/K+AIR-multires.ico` → `resources/assets/K+AIR-multires.ico` (FUERA del asar). (3) `installer.nsh` (líneas 42 y 45) — los 2 `CreateShortcut` ahora apuntan a `$INSTDIR\resources\assets\K+AIR-multires.ico` (donde está el ícono realmente). Bump 0.1.187 → 0.1.188. **Resultado**: la próxima instalación tendrá logo K+AIR en el .lnk del escritorio y en la taskbar. **El fix solo aplica a instalaciones nuevas/reinstaladas** — la instalación actual del user (v0.1.187) sigue rota hasta que reinstale. **NO pusheado** — esperando OK del user para commit + re-build + reemplazar release v0.1.187 (o crear v0.1.188).
+
+> **🆕 v0.1.187 (📦707 — feat(icons): regenerar K+AIR-multires.ico con fill 90%):** El ícono de la esquina de la ventana, de la taskbar y del shortcut del escritorio se veía muy chico (fill 50% original). El user pidió subir el tamaño SOLO en el ícono de la ventana, sin afectar el resto (splash y header usan el KIAR256.ico separado). **Causa**: el `K+AIR-multires.ico` original tenía fill 50% del canvas (logo de 8x8 en canvas de 16x16, etc.), lo que dejaba mucho padding transparente. **Cambios (2 archivos, +2/-1)**: (1) `assets/K+AIR-multires.ico` regenerado con fill 90% (logo de 14x14 en 16x16, 28x28 en 32x32, 43x43 en 48x48, 230x230 en 256x256). Tamaño 49KB → 95KB. (2) `package.json` bump 0.1.186 → 0.1.187. **NO se modificó** el `KIAR256.ico` (sigue en su estado original con fill 50%) — se usa en el splash y header de la app, que no se ven afectados. **Por qué 2 íconos separados**: el proyecto tiene `K+AIR-multires.ico` (7 versiones, usado por Windows para ventana/taskbar/shortcut) y `KIAR256.ico` (1 versión, usado internamente por la app). Regenerando solo el multires se cumple "subir el tamaño del ícono de la ventana sin afectar al resto". **NO pusheado** — esperando OK del user.
+
+> **🆕 v0.1.186 (📦706-fix24 — feat(roles-resp): edición de matriz desde la app):** Feature nuevo. El user puede editar las 3 columnas del catálogo de Roles y Responsabilidades (Responsabilidades / Autoridad / Rendición de Cuentas) directamente desde el modal Matriz, sin tener que volver al Excel G-OD-006. **Causa**: antes el modal era solo lectura. Para ajustar el contenido había que modificar el Excel y reimportar. **Cambios (6 archivos, +200 líneas)**: (1) `main/roles-responsabilidades-bridge.js` (+50) — Handler nuevo `_handlerActualizarMatriz({id, responsabilidades, autoridad, rendicion_cuentas})` con validación estricta (id requerido, las 3 columnas requeridas, verifica que el rol exista con SELECT antes del UPDATE, strings vacíos → NULL). Registra `ipcMain.handle('roles-resp:catalogo-matriz-actualizar', ...)`. NO permite editar nombre/código/base legal (solo las 3 columnas). (2) `preload.js` (+2) — API `rolesResp.actualizarMatriz`. (3) `roles-responsabilidades-logic.js` (+4) — Case del nuevo handler. (4) `roles-responsabilidades-view.html` (+8) — Footer lectura con botón "✏️ Editar" entre "Asignar persona" y "Cerrar". Footer edición (hidden por default) con "💾 Guardar cambios" + "Cancelar". (5) `roles-responsabilidades-view.css` (+20) — Estilos `.kair-rr-textarea` (resize vertical, focus con box-shadow azul) y `.kair-rr-textarea-wrap` (fondo amarillo + dashed border para diferenciar visualmente el modo edición). (6) `roles-responsabilidades-viewer.js` (+115) — `rrState.matrizEditMode` nuevo. Funciones `_entrarModoEdicionMatriz` (reemplaza los 3 divs por textareas envueltas en wrap amarillo, focus al primer textarea), `_salirModoEdicionMatriz` (revierte los textareas a divs con los valores del state, descarta cambios), `_guardarMatriz` (llama al bridge, deshabilita botones, recarga el catálogo, vuelve a modo lectura con datos nuevos, toast de éxito/error), helpers `_reemplazarPPorTextarea` / `_reemplazarTextareaPorDiv`. `abrirModalMatriz` refactorizado para usar `_renderModalMatrizLectura` y resetear a modo lectura. `cerrarModalMatriz` ahora también sale del modo edición si quedó activo. Listeners de los 3 botones nuevos (`btnMatrizEditar`, `btnMatrizCancelar`, `btnMatrizGuardar`). **Decisiones del user**: (1) solo las 3 columnas editables (no nombre/código/base legal); (2) sin versionado — sobreescribe directo, sin tabla de historial. **Tests**: 8 tests aislados del handler con Node + better-sqlite3 (test-fix24-bridge.js): actualización válida, validación de id faltante, validación de campo faltante, NOT_FOUND de id inexistente, strings vacíos → NULL, nombre/codigo NO se modifican aunque vengan en el payload, payload null rechazado, SQL injection se guarda literal y la tabla sigue existiendo (prepared statements). **NO commiteado** — esperando OK del user.
+
+> **🆕 v0.1.186b (📦706-fix24b — refactor(roles-resp): scroll solo debajo de cumplimiento):** Ajuste de UI. Cuando hay muchas filas en Matriz o Divulgación, todo el documento scrolleaba (incluyendo el header, los tabs y el banner de cumplimiento). El user pidió que el scroll estuviera SOLO debajo del banner, sin afectar la zona fija. **Causa**: el body tenía `min-height: 100vh` y el root crecía con el contenido. El browser agregaba scroll a nivel del documento. **Cambios (2 archivos, +20 líneas)**: (1) `roles-responsabilidades-view.html` (+4) — Wrapper `<div class="kair-rr-sections-scroll">` agregado después del banner y antes de `</main>`. Envuelve las 2 secciones (Matriz y Divulgación). (2) `roles-responsabilidades-view.css` (+16) — `body { height: 100vh; overflow: hidden }` (en lugar de solo font-family). `root { height: 100% }` (en lugar de `min-height: 100vh`). `main.panelGestion` ahora es `flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column`. `.kair-rr-banner { flex-shrink: 0 }` para que no se comprima. Nuevo `.kair-rr-sections-scroll { flex: 1; min-height: 0; overflow-y: auto; padding-right: 4px; display: flex; flex-direction: column; gap: 20px }`. **Truco flexbox**: `min-height: 0` es OBLIGATORIO en los `flex children` con `overflow-y: auto` (CSS spec: por default `min-height: auto` impide la compresión). Sin esto, el wrapper no scrollea y se sale del viewport. **Resultado**: header + tabs + banner quedan fijos arriba, y SOLO el área de las 2 secciones (Matriz + Divulgación) scrollea internamente.
+
+> **🆕 v0.1.185 (📦706-fix23 — refactor(roles-resp): unificar dropzones origen y destino):** El user pidió que ambos dropzones del modal "Subir soporte" tuvieran el mismo tamaño y estilo para no desentonar. **Causa**: el destino usaba un variant `--folder` con colores diferentes (lila/azul) y se veía más pequeño. **Cambios (2 archivos, +10 líneas)**: (1) `roles-responsabilidades-view.css` — Quitada la clase `.kair-rr-dropzone--folder`. Unificado el estilo: ambos dropzones usan `.kair-rr-dropzone` con `min-height: 110px`, `display: flex; flex-direction: column; align-items: center; justify-content: center`. Cuando tienen contenido (`has-file` o `has-folder`), ambos se ven exactamente igual (verde con check). (2) `roles-responsabilidades-view.html` — Quitada la clase `kair-rr-dropzone--folder` y el `style="padding: 16px 8px"` inline del destino (y del origen, para que el CSS sea la única fuente).
+
+> **🆕 v0.1.184 (📦706-fix22 — refactor(roles-resp): modal de confirmación custom):** Reemplazo del `confirm()` nativo del navegador en `eliminarDivulgacion` por un modal custom consistente con el resto de la UI. **Causa**: el `confirm()` nativo tiene un dialog feo, sin styling, y rompe la consistencia visual. **Cambios (3 archivos, +80 líneas)**: (1) `roles-responsabilidades-view.html` — Modal `#modalConfirm` con 2 botones (Cancelar/Confirmar) y footer informativo. (2) `roles-responsabilidades-view.css` — Estilos `.kair-rr-btn--danger` (rojo #dc2626 con hover/active). (3) `roles-responsabilidades-viewer.js` — Función `_showConfirm(title, message, options)` que retorna `Promise<boolean>`. API: `acceptText` (default "Confirmar"), `acceptIcon` (default bi-check-lg), `variant` (danger o primary). Función `_hideConfirm(accepted)` que resuelve la Promise y oculta el modal. Listeners agregados en `setupModalEvents`. Refactor de `eliminarDivulgacion` para usar `_showConfirm` con variant danger + ícono bi-trash3 + acceptText Eliminar. Toast de éxito "✅ Divulgación eliminada" después de eliminar. Fallback a `window.confirm()` si el modal no existe (init temprano).
+
+> **🆕 v0.1.183 (📦706-fix21 — refactor(roles-resp): toast notifications):** Reemplazo de los 17 `alert()` nativos por un sistema de toast moderno (mismo patrón que 6.1.2 Política). **Causa**: los alerts bloquean la UI, son feos y rompen el flujo de trabajo. **Cambios (3 archivos, +95 líneas)**: (1) `roles-responsabilidades-view.html` — Container `#kToastContainer` antes del cierre del body. (2) `roles-responsabilidades-view.css` — Estilos `.kair-toast-container` y `.kair-toast` con animación slide-in/out desde la derecha, 4 tipos (success/error/warning/info) con colores y íconos. (3) `roles-responsabilidades-viewer.js` — Función `_showToast(message, type, duration)` con API simple, soporta HTML básico (`<strong>`, `<code>`, `<br>`), 4 tipos. Los 17 `alert()` fueron reemplazados 1-a-1 (validaciones → warning, errores → error con 5s, éxitos con paths → success con 6s, mensajes largos con HTML). `confirm()` se mantiene nativo. Si el container no existe (init temprano), cae a `console.log`.
+
+> **🆕 v0.1.182 (📦706-fix20 — feat(roles-resp): carpetas automáticas por trabajador):** Feature nuevo. Al hacer click en "Guardar" en el modal "Añadir trabajador para divulgación", la app crea automáticamente la carpeta `{raíz_empresa}/1. Recursos/1.1.2 Roles y Responsabilidades/[Cédula] Nombre/` donde se guardarán los PDFs de soporte. **Causa**: Decreto 1072 art. 2.2.4.6.8 requiere preservar evidencia por trabajador. **Cambios (4 archivos, +130 líneas)**: (1) `main/roles-responsabilidades-bridge.js` (+90) — Helpers `_crearCarpetaTrabajador` y `_resolverPathCarpetaTrabajador` (leen `config.json` para obtener ruta raíz, sanitizan el nombre, crean la carpeta con `fs.mkdirSync` recursive). `_handlerUpsertDivulgacion` extendido para crear la carpeta cuando se crea divulgación nueva y devolver `carpetaPath` en la respuesta. Handler nuevo `_handlerResolverCarpetaTrabajador` para que el modal Subir consulte el destino default sin crear carpetas vacías. `_app` inyectada al bridge. (2) `roles-responsabilidades-viewer.js` (+30) — `guardarTrabajador()` muestra el path creado en un alert. `subirSoporte()` resuelve la carpeta del trabajador via bridge y la usa como destino default (antes era Desktop). (3) `preload.js` (+2) — API `resolverCarpetaTrabajador`. (4) `roles-responsabilidades-logic.js` (+3) — Case del nuevo handler en el proxy. **Limpieza previa**: se borraron 5 divulgaciones y 4 documentos legacy de Tempoactiva (backup en `kair.db.backup-pre-fix20`). El user debe borrar manualmente los PDFs viejos sueltos en `1.1.2 Roles y Responsabilidades/` antes de empezar. **No hay cambios de schema ni de sync multipc** (las APIs de sync siguen igual). Si la creación de carpeta falla, el upsert igual tiene éxito (se reporta `carpetaError` en la respuesta, pero la divulgación queda guardada).
+
+> **🆕 v0.1.181 (📦706-fix19 — refactor(roles-resp): quitar tab "Documentos de soporte"):** Cleanup del v0.1.180. El tab "Documentos de soporte" quedó redundante porque el modal "Documentos del trabajador" ya lista TODOS los PDFs del trabajador con cards visuales (border-left de color por estado). **Cambios (3 archivos, ~100 líneas eliminadas)**: (1) `roles-responsabilidades-view.html` — Quitados `#tabDocumentos` y `#panelDocumentos` (27 líneas). (2) `roles-responsabilidades-viewer.js` — Quitada `renderTablaSoportes()` (50 líneas), listener del tab, carga inicial de `rrState.documentos`, estado `documentos` del state. (3) `roles-responsabilidades-view.css` — Quitados `.kair-rr-doc-icon` y `.kair-rr-doc-icon__name` (23 líneas, usados solo en el tab eliminado). **Mantenidos**: bridge `_handlerListarDocumentosDivulgacion`, API `listarDocumentosDivulgacion` en preload, y case en logic — todo se sigue usando para cargar PDFs cuando se abre el modal. **No hay cambios de BD ni de schema, solo UI**. El badge "+N anteriores" sigue funcionando porque usa `d.documento_count` del bridge (cuenta por persona desde el fix18), no de `rrState.documentos`.
+
+> **🆕 v0.1.180 (📦706-fix18 — feat(roles-resp): 1 fila por persona + modal de selección de PDFs):** Refactor del flujo multi-documento del v0.1.179 para resolver el bug que creaba una nueva divulgación cada vez que se subía un PDF del mismo trabajador. **Causa raíz**: bug del UPDATE en `_handlerUpsertDivulgacion` (9 values para 8 placeholders) + regla de `crearNueva = true` por default al subir un PDF → 2+ divulgaciones vigentes para la misma persona. **Cambios (5 archivos, ~400 líneas)**: (1) `main/roles-responsabilidades-bridge.js` — Regla simplificada: subir un PDF del mismo `persona_cedula` (sin tildar "Es nueva contratación") SIEMPRE actualiza la divulgación vigente, no crea una nueva. Solo se crea nueva con tilde explícito o si NO hay divulgación previa. Quitada la detección automática de `cargoCambio`. Bug del UPDATE corregido. Migración one-shot nueva `_consolidarDivulgacionesDuplicadas` archiva las divulgaciones viejas cuando hay duplicados. (2) `roles-responsabilidades-viewer.js` — `renderTablaDivulgacion` agrupa por `persona_cedula` y muestra 1 fila por persona. `abrirModalDocumentosTrabajador` pasa `personaCedula` al backend para listar TODOS los PDFs del trabajador. `renderModalDocumentos` rediseñado desde cero: cards con border-left de color por estado (verde=actual, gris=anterior, amarillo=corrección), click en card abre el PDF. (3) `roles-responsabilidades-view.html` — Markup del modal reemplazado. (4) `roles-responsabilidades-view.css` — Estilos `.kair-rr-doc-card` con estados visuales y scroll interno. (5) `main/sync-serializer.js` — Serialización/deserialización extendida con `periodo`, `es_nueva_contratacion`, `fecha_vigencia_hasta` para que el sync respete la regla "1 fila por persona" entre PCs.
+
+> **🆕 v0.1.179 (📦706 — feat(roles-resp): multi-documento por divulgación + header estandarizado + icon-buttons):** Extensión del 1.1.2 para que una divulgación pueda tener N PDFs (append-only, sin perder histórico). **Causa**: el Decreto 1072 art. 2.2.4.6.8 requiere preservar la evidencia de divulgación en el tiempo (cambio de cargo, reintegración). **Cambios (8 archivos, ~700 líneas nuevas, 13 tasks)**: (1) `main/roles-responsabilidades-bridge.js` (+250) — Schema: 3 columnas nuevas en divulgación + tabla nueva `divulgacion_documento` con FK + 3 índices. Backfill one-shot de `periodo` con `strftime('%Y', creado_en)`. Migración one-shot mueve los `documento_soporte_path` existentes a la tabla nueva (con `es_actual=1`, `creado_por='migration-2026-08-14'`). 2 handlers nuevos: `divulgacion-documento-listar` (lista todos los PDFs con JOIN a divulgación) y `divulgacion-documento-marcar-actual`. **Refactor del upsert** detecta cambio de cargo automáticamente (compara con divulgación vigente del mismo persona_cedula) → archiva la anterior + crea nueva. Acepta `esNuevaContratacion`, `esCorreccion`, `fechaDocumento`, `observaciones`. Refactor de `_handlerListarDivulgaciones` con subqueries para `documento_count`, `documento_actual_path`, `documento_actual_id`. 17 handlers totales. (2) `main/sync-serializer.js` (+90) — Nueva entidad `divulgacion_documento` con serialize/deserialize (INSERT OR IGNORE por id, validación de FK). (3) `preload.js` (+3 APIs) + `roles-responsabilidades-logic.js` (+2 cases). (4) `roles-responsabilidades-viewer.js` (+150) — Refactor de `cargarDatos()` carga `rrState.documentos`. `renderTablaDivulgacion()` muestra el doc vigente + badge "+N anteriores" clickeable. `renderTablaSoportes()` itera sobre documentos (1 fila por PDF) con badges Vigente/Anterior/Corrección. **Modal nuevo "Documentos del trabajador"** con lista de PDFs del trabajador (vigente primero) + Ver/Descargar por fila. **Modal Subir soporte** extendido con 2 checkboxes + 1 date + 1 textarea. (5) `roles-responsabilidades-view.html` (+30) — nuevo modal + campos extra. (6) `roles-responsabilidades-view.css` (+80) — badges + chip + checkbox styles. (7) Header estandarizado al patrón 6.1.1 (k-section-card, ícono a la izq, company + divider + back a la der, sin sticky). (8) Botones Acciones solo-íconos con tooltip (cuadrados 30x30px, alineados horizontalmente). **Patrones cross-project**: schema migration idempotente con PRAGMA + ALTER (auto-corre en próximos deploys); append-only de documentos con `es_actual` flag (último gana como vigente, anteriores quedan para auditoría); regla 1 vigente por (empresa, persona_cedula) garantizada al archivar la anterior al crear la nueva.
+
+> **🆕 v0.1.178 (📦705 — feat(roles-resp): nueva vista 1.1.2 Roles y Responsabilidades con formato Excel G-OD-006 de la empresa + 9 fixes):** Reemplazo completo del file viewer del submódulo 1.1.2 por una vista de gestión que cumple con el estándar 1.1.2 de la Resolución 0312 de 2019 y el Decreto 1072 de 2015 art. 2.2.4.6.8. **Causa**: el file viewer anterior NO satisfacía los requisitos; el informe de auditoría de Tempoactiva 2024 marcó el 1.1.2 como "No cumple". El user pidió que la matriz se parezca al formato de su empresa (Excel G-OD-006 "Matriz de Asignación y Documentación Responsabilidades y Rendición de Cuentas", REV.02 Enero 2018), 4 columnas: NIVEL / RESPONSABILIDADES / AUTORIDAD / RENDICION DE CUENTAS. **8 archivos, ~2900 líneas nuevas, 9 fixes iterativos**: (1) `main/roles-responsabilidades-bridge.js` (NUEVO, ~660 líneas) — 14 handlers IPC + schema SQLite con 3 tablas + seed de **8 roles del Excel G-OD-006** (no los 9 del Decreto 1072 originales) + 3 file dialogs nativos (origen/destino/descarga) + handler de copia con sufijo `(1)`, `(2)` si el destino ya existe + `BrowserWindow.fromWebContents()` como parent del dialog (foco correcto) + migración de schema idempotente con `PRAGMA table_info` + `ALTER TABLE ADD COLUMN` (auto-corre en próximos deploys). (2) `preload.js` (+14) — 14 APIs en `window.electronAPI.rolesResp`. (3) `main.js` (+7) — require + register. (4) `roles-responsabilidades-view.html` (NUEVO, ~250 líneas) — iframe con 2 tabs (Gestión de Roles + Documentos de soporte), banner de cumplimiento, matriz de roles con los 8 roles del Excel + estados (vigente/pendiente/N/A), **modal Matriz con 4 columnas** (Responsabilidades / Autoridad / Rendición / Base legal), matriz de divulgación con captura uno-a-uno, fecha editable, **modal "Subir soporte PDF" completo** con drag&drop zone + 2 botones Examinar (origen y destino) + chips visuales con nombre corto + tooltip con ruta completa + botón "Copiar y marcar aceptado", **tab Documentos de soporte** con badge de conteo + tabla de PDFs subidos con Ver/Descargar, exportar reporte PDF. (5) `roles-responsabilidades-viewer.js` (NUEVO, ~620 líneas). (6) `roles-responsabilidades-view.css` (NUEVO, ~470 líneas) — chips, dropzone, badges. (7) `roles-responsabilidades-logic.js` (+90) — proxy postMessage para bypassear contextIsolation. (8) `renderer.js` (+5) — filtro de ruido en consola para `kair-rr-*`. (9) `main/sync-serializer.js` (+140) — sync multipc. **8 roles predefinidos del Excel G-OD-006** (reemplazan los 9 del Decreto 1072, que se desactivan automáticamente): REPRESENTANTES DE LA ALTA DIRECCION, JEFES DE AREA, TRABAJADORES, RESPONSABLE DEL SG SST, VIGIA DE SEGURIDAD Y SALUD EN EL TRABAJO COPASST, COMITÉ DE CONVIVENCIA LABORAL, BRIGADA DE EMERGENCIAS, CONTRATISTAS. **9 fixes aplicados**: (1) migración idempotente de schema; (2) BD migrada con 8 roles Excel + 9 viejos desactivados; (3) bridge IPC via postMessage (bypassea contextIsolation); (4) listener de mensajes en `window` (no `window.parent`); (5) funciones abrirModalMatriz/cerrarMatriz que faltaban; (6) `process.env.USERNAME` no existe en iframe; (7) prompt() reemplazado por mini-modal con chips; (8) drag&drop + examinar en modal Subir soporte; (9) BrowserWindow parent para file dialogs; (10) tab Documentos de soporte con Ver/Descargar. **Patrones guardados en memoria** (cross-project): iframe + electronAPI requiere inyección manual + polling porque el `contextBridge` proxy no se transfiere entre contextos; file dialogs de Electron NECESITAN `BrowserWindow.fromWebContents()` como parent o se pierden detrás del modal HTML. **Causa**: el file viewer anterior (carpeta con PDFs sueltos) NO satisfacía los requisitos; el propio informe de auditoría de Tempoactiva 2024 marcó el 1.1.2 como "No cumple". **Cambios (8 archivos, ~2400 líneas nuevas)**: (1) `main/roles-responsabilidades-bridge.js` (NUEVO) — 10 handlers IPC + schema SQLite con 3 tablas (catalogo + asignacion + divulgacion) + seed de 9 roles predefinidos. Patrón `registerXxxHandlers(app, deps)`. Estado de divulgación **calculado automáticamente** según `documento_soporte_path IS NOT NULL` (aceptado si hay PDF, pendiente si no). Reporte PDF con `pdf-lib` (3 páginas: portada + matriz + divulgación). (2) `preload.js` (+12) — expone `window.electronAPI.rolesResp` con 10 APIs. (3) `main.js` (+7) — require + register del bridge. (4) `modules/recursos/roles-responsabilidades/roles-responsabilidades-view.html` (NUEVO) — iframe con 2 tabs (Gestión de Roles + Documentos de soporte), banner de cumplimiento con barra de progreso, matriz de roles con 9 roles + estados (vigente/pendiente/N/A), matriz de divulgación con captura manual uno-a-uno, fecha editable, modal de asignar/reasignar, modal de añadir trabajador, upload de PDF de soporte, exportar reporte PDF con diálogo de guardado. (5) `roles-responsabilidades-viewer.js` (NUEVO, ~370 líneas) — toda la lógica de la vista. (6) `roles-responsabilidades-view.css` (NUEVO) — namespace `kair-rr-*`. (7) `main/sync-serializer.js` (+140) — serialize/deserialize de las 2 tablas por empresa (el catálogo NO se sincroniza — es el mismo para todas las empresas). (8) `package.json` — bump 0.1.177 → 0.1.178. **Catálogo de 9 roles predefinidos** (basado en Decreto 1072 art. 2.2.4.6.8): Representante Legal, Responsable del SG-SST, COPASST (si >10), Comité de Convivencia (si >10), Brigadas de Emergencia, Auditor Interno, Trabajadores en General, Encargado SG-SST ante la ARL, Supervisor de Seguridad y Salud. Los roles predefinidos NO se pueden eliminar (solo desactivar), pero sí editar. CRUD completo para roles personalizados.
+
+> **🆕 v0.1.177 (📦704 — feat(ui): abreviaciones de títulos de módulos en el tablero principal):** El user pidió que los títulos de los 7 módulos del tablero principal se vieran abreviados para que entren todos en una sola fila. Los títulos largos (`Gestión Integral`, `Gestión de la Salud`, `Gestión de Peligros y Riesgos`, `Gestión de Amenazas`) se cortaban con ellipsis o bajaban a la fila 2 según el ancho de la ventana. **Cambios (1 archivo, `renderer.js`)**:
+> - **Abreviaciones (campo `shortName` agregado al array `modulesData`)** — el `name` largo se mantiene intacto porque se usa como key lógica en `moduleMap`, `moduleTaskMap`, `filterDashboardTasksByModule`, `data-module-name` / `data-module` en handlers, y match con el sidebar. Cambiar el `name` directo habría roto toda la lógica de filtrado, badges y match. Mapeo: `Recursos` → `Recursos`, `Gestión Integral` → `Gest. Integral`, `Gestión de la Salud` → `Gest Salud`, `Gestión de Peligros y Riesgos` → `Gest. Pel. y Riesgos`, `Gestión de Amenazas` → `Gest. Amenazas`, `Verificación` → `Verificación`, `Mejoramiento` → `Mejoramiento`. El render del `<h4>` ahora muestra `${mod.shortName || mod.name}` con `title="${mod.name}"` para que al hacer hover se vea el nombre completo como tooltip.
+> - **Modo ventana** (`@media (max-width: 1199px)`): `min-width: 220px → 135px`, `flex-basis: 220px → 135px`, `padding: 6px 10px → 6px 8px`, `h4 font-size: 12px → 11px`, `icon: 24px → 22px`. Cálculo: 7 cards × 135 + 6 gaps × 6 = ~981px → entra en ventanas de 1000+px. ANTES 4 módulos en fila 1 + 3 en fila 2 → DESPUÉS 7 módulos en 1 sola fila (validado visualmente por el user).
+> - **Modo maximizado** (`@media (min-width: 1200px)`): `min-width: 165px → 140px`, `flex-basis: 165px → 140px`. Cálculo: 7 cards × 140 + 6 gaps × 12 = ~1052px → entra en maximizado (1200+px). ANTES los 7 en 1 fila pero con títulos largos cortados con ellipsis → DESPUÉS los 7 en 1 fila con títulos abreviados completos.
+> - **Lo que NO cambió**: el `name` largo sigue siendo el key lógico de filtrado, badges y match con el sidebar. El subtitle sigue oculto en ventana y visible en maximizado. La lógica de filtrado (`filterDashboardTasksByModule`) sigue funcionando igual.
+> - **Nota visual menor**: en ventana, el título `Gest. Pel. y Riesgos` puede verse ligeramente truncado con ellipsis si la ventana está cerca del límite. Aceptable — el nombre completo se ve en el tooltip al hacer hover. Si se quiere siempre completo, próxima iteración puede acortar a `Gest. Peligros` o ajustar más el min-width.
+
+> **🆕 v0.1.176 (🐛 fix(bandeja): cumplido se desmarca solo ~60s después de marcar):** Bug visible del user en la Bandeja Integrada: al marcar un evento de Google Calendar (gcal-*) como cumplido, el ✓ aparecía al instante pero desaparecía ~1 minuto después sin que tocara nada. La BD SÍ tenía el registro (verificado con sqlite3 directo), el problema era de UI/render. **Causa raíz** (descubierta con test E2E con mock del adapter): el adapter del calendario SÍ construye un `cumMap` interno con los IDs `gcal-*` desde la BD y enriquece los eventos de SU lista base, **PERO el adapter NO incluye los eventos de Google Calendar en su lista base** — esos llegan al frontend DESPUÉS via `loadEventsFromGoogle()` y se concatenan al array sin enriquecer. Resultado: los `gcal-*` quedan con `cumplido: undefined` en `state.events` → `renderBigCalendar()` no muestra el ✓. El `autoRefreshInterval` cada 60s reemplaza `state.events = events` y re-triggeriza el bug. El ✓ solo se mantenía entre marcar y el primer refresh (60s) porque las líneas 2228-2231 seteaban `ev.cumplido = true` directamente en el `state.events` local. **Fix (3 archivos, +16/-0)**: (1) `shared/kair-calendar-adapter.js:290` — el adapter ahora expone el `cumMap` en la respuesta (`return { success: true, data: merged, cumMap: cumplidosMap }`). Backward-compatible: KairCalendar embebido y KairAlerts solo leen `res.data`. Version bump 1.2.0 → 1.3.0. (2) `renderer/bandeja-integrada/app.js:1158` (loadEventsFromIPC) — captura `var cumMapFromAdapter = (result && result.cumMap) || {}` después de `adapter.list()`. (3) `renderer/bandeja-integrada/app.js:1185-1198` (loadEventsFromIPC) — después de obtener `gcalEvents` via `loadEventsFromGoogle()`, los enriquece con `cumplido: true` si su `id` está en el `cumMapFromAdapter`. **Fix complementario** del UPSERT que también era parte del problema raíz: `eventos-cumplidos-bridge.js:180-186` — el UPSERT ahora incluye `empresa_id = excluded.empresa_id` (antes solo actualizaba `cumplido_en` y `nota`, así que si el frontend pasaba `empresaId=null` después de un valor real, el registro quedaba con `empresa_id=NULL` y la query `WHERE empresa_id = 'X'` nunca matcheaba). `eventos-cumplidos-bridge.js:99-122` — migración one-shot en `_ensureSchemaMigrated` que infiere la empresa del prefijo del `evento_id` para los NULLs (`SUBSTR + INSTR`, idempotente). **`_refreshCumplidosEnCalendario()` huérfano** del 📦694-fix4 ahora se llama desde el handler de marcar cumplido (`app.js:2278-2286`) como defensa en profundidad. **Test E2E con mock del adapter** (con los IDs reales de la BD del user): `gcal-5bvf8h8gnv2uikietqj29r8goc → cumplido=true` ✓ y `gcal-65nf5uvbcsmidkb8099j9qi62u → cumplido=true` ✓. **Lección guardada en agent memory (cross-project)**: cuando un adapter/componente calcula un enrichment (cumMap, colorMap, etc.) para su lista interna, EXPONER ese enrichment en la respuesta si hay OTROS consumidores (Google, sync, etc.) que también quieren enriquecer. Patrón: `return { success, data, derivedMaps }` en vez de `return { success, data }`.
+
+> **🆕 v0.1.175 (📦702 — Permisos de Bandeja Integrada por usuario):** Hasta ahora el iframe de la Bandeja Integrada estaba disponible para todos los usuarios logueados. Ahora el admin puede condicionar el acceso desde **Configuración > Gestión de Usuario** con un toggle "Acceso a Bandeja Integrada" al lado del campo Rol. **Backend** (`bandeja-integrada-permissions-bridge.js`, nuevo): 2 handlers IPC + migración idempotente (`ALTER TABLE users ADD COLUMN bandeja_integrada_enabled INTEGER NOT NULL DEFAULT 0`) + admin global SIEMPRE forzado a `enabled: true` + extensión con `userId` opcional para que admin pueda ver/modificar el flag de otros users. Validaciones: no-admin no puede consultar flags ajenos (`PERMISSION_DENIED`); admin no puede deshabilitar a otro admin (`CANNOT_MODIFY_ADMIN`). **Frontend**: `toggleBandejaIntegrada()` chequea permisos antes de abrir el iframe; si no tiene acceso, muestra alert 🔒 con instrucciones. Fail-open defensivo (si la API no está disponible, abre por defecto). **UI**: nuevo toggle switch estilo iOS en el modal de Gestión de Usuario; si rol=Admin, switch prendido+disabled con label "🔒 Siempre habilitado para administradores". **Step 5 (visibilidad del botón)**: después del primer commit del feature, el botón del sobre en el header seguía visible para users sin acceso. Causa raíz doble: (1) la función corría ANTES del login con `authToken=null`; (2) fail-open original dejaba el botón visible. Fix: fail-**CLOSED** (oculta cuando no se puede determinar) + re-evaluar después del login/logout. Admin global: backend fuerza `enabled: true` → siempre visible. No-admin con flag=0: oculto. **Bug fix crítico del bridge**: la firma era `(getDb, validateSession)` pero `main.js` la llamaba como `(app, { getDb, validateSession })` — la convención del proyecto es `(app, deps)`. Por la firma incorrecta, `_validateSession` quedaba como objeto (no función), el chequeo `typeof === 'function'` fallaba y el handler retornaba `AUTH_REQUIRED`. Síntoma visible: el alert "🔒 No tienes acceso" se mostraba incluso siendo admin. Fix de 1 línea efectiva + lección guardada en memoria cross-project.
+
+> **🆕 v0.1.175 (📅 feat(cal-cap): solo mostrar capacitaciones con hora en el calendario):** Hasta ahora el calendario de la Bandeja Integrada mostraba TODAS las capacitaciones con fecha, asignándoles 09:00 por default a las que no tenían hora en el sidecar de localStorage — llenaba el calendario de "eventos fantasma" sin horario real. Causa: el filtro del backend (`_leerCapacitacionesDeEmpresa` en `main.js`) solo descartaba caps sin fecha, no las sin hora. **Fix (3 archivos, +44/-5)**: (1) **Backend** `main.js:5377-5380`: nuevo contador `skippedNoHora` + filtro `if (!start || !end) { continue; }` antes del `events.push()`. Log mejorado con el nuevo contador. (2) **UI del modal** `capacitaciones-view.html:266-284`: input `#trainingHora` removidos `required` y `value="09:00"`. Label: "Hora *" → "Hora (opcional)". Help text nuevo. Botón nuevo `#clearTrainingHora` con SVG inline de papelera para limpiar la hora con un click. (3) **Lógica** `capacitaciones-logic.js:413, 252-265`: prefill del modal cambió a `cap.hora || ''` (string vacío si no tiene hora). Handler del botón nuevo. **Flujo end-to-end** (verificado por el user): cap con hora → aparece en calendario; editar → click 🗑️ → input vacío → Actualizar → cap desaparece del calendario (Listado sigue mostrándola con "—"). **Antes vs después**: ANTES 41 eventos capacitación visibles (todos a 09:00) → DESPUÉS solo los que tienen hora en el sidecar (2 inicialmente). **Lo que NO cambió**: el Excel no tiene columna HORA — la hora se persiste en localStorage (`kair-cap-horas`) desde el modal. Listado del módulo Capacitaciones sigue mostrando todas. Adapter del calendario no necesitó cambios. **Bug latente detectado** (no fix acá): `colDuracion` referenciada pero no definida → `durH` siempre queda en 2h.
+
+> **🆕 v0.1.174 (📦608 — File-viewer: integración completa + 6 fixes críticos):** 9 fixes iterativos al file-viewer.js y a los visualizadores de las 12 secciones (3.1.6, 1.1.1, sociodemografica, politica, copasst, comite-convivencia, capacitacion-copasst, afiliacion, trabajo-alto-riesgo, roles-responsabilidades, curso-virtual, manual-proveedores). Causa raíz triple: (1) `Ve(filename)` del bundle interpreta `#` como fragmento de URL — pasar `type` attribute explícito lo soluciona; (2) CSS del panel padre sin `min-height: 0` cortaba el documento — `:has(flyfish-file-viewer)` aplica el fix solo cuando hay file-viewer; (3) `!important` del bundle ganaba a nuestro `!important` — `setProperty(..., 'important')` lo sobrescribe. Regla cross-project guardada en memoria: cuando un hijo tiene `flex: 1`, TODOS los ancestros flex hasta el que tiene `height` definido necesitan `min-height: 0` + `overflow: hidden`.
+
+> **🆕 v0.1.173 (📦701-fix12 — Bandeja Integrada: fix reply en Enviados):** Al abrir un correo de Enviados y click en "Responder" o "Responder a todos", el campo "Para" mostraba un chip con el email del propio usuario (visible como "m" o el primer carácter porque el chip tiene `max-width: 180px` con ellipsis). **Causa raíz**: `openComposeModal()` usaba `mail.senderEmail || mail.sender` para el "To", pero en Enviados `senderEmail` es el email del PROPIO user, no el destinatario original. **Fix**: usar `getMailDisplayContact(mail)` que ya manejaba este caso correctamente (línea 301) — en SENT retorna el destinatario original, en INBOX retorna el remitente. Reply all también arreglado (antes podía incluir tu propio email en CC).
+
+> **🆕 v0.1.172 (📦701-fix10 — Scroll INTERNO en los home de módulos principales):** En modo ventana, el home de un módulo (widgets + charts + lista de submódulos) puede no caber en el viewport. **Fix de 2 capas con CSS puro** (sin tocar JS): (1) contenedor padre (`.module-content-area` + `.main-canvas`) tiene `overflow: hidden` — sin scrollbar externa; (2) contenedor del home (`.gestion-integral-home`, etc.) tiene `overflow-y: auto` con `scrollbar-width: thin` y `scrollbar-color` semi-transparente — scrollbar INTERNA de ~8px dentro del home. Cubre los 7 módulos principales (4 clases de home). Iteración: primero probé reducir tamaños (rechazado), después scroll en padre (traía scrollbar externa de vuelta), final fue `hidden` en padre + `auto` fino en home.
+
+> **🆕 v0.1.171 (📦701-fix9 — Footer minimalista: solo en pantalla de inicio, blanco sobre Vanta):** El footer negro con copyright y versión se quitó de la app principal y de la Bandeja Integrada para ganar espacio vertical (~25px en cada vista). Ahora solo aparece en la pantalla de inicio (splash + login + selección de empresa) flotando sobre el Vanta con texto blanco. **Implementación con CSS puro** usando `:has()` (selector moderno soportado en Electron 37 / Chromium 118+): `#app-footer { display: none !important; }` por defecto, `#app:has(.vanta-fullscreen) #app-footer { display: flex; position: fixed; bottom: 0; ... }` cuando hay Vanta con fondo transparente y texto blanco. El mismo patrón se aplicó al footer de la Bandeja Integrada (`.kair-footer { display: none !important; }`). **Bonus** — el bug oculto que se arregló: el selector original `.vanta-fullscreen #app-footer { display: none; }` NUNCA funcionó porque `vanta-fullscreen` se aplica a `.main-container` (sibling del footer, no ancestro). La regla con `:has()` sí matchea porque `#app` es el ancestro común. **Trade-off**: el dot de updates del footer desaparece; sigue accesible desde Configuración > Acerca de la App.
+
+> **🆕 v0.1.170 (📦701-fix8 — Seguimiento Incapacidades: fix cédula display vs BD):** Fix regresión crítica. Al reabrir un caso existente de seguimiento de incapacidades, la cédula llegaba al bridge con formato de display (`1,044,392,755`) pero en la BD está sin formato (`1044392755`). La query `WHERE cedula = '1,044,392,755'` retornaba 0 filas, el código pensaba que no había caso y abría panel para caso nuevo (vacío). **Fix defense in depth en 2 capas**: (1) renderer normaliza antes de enviar al bridge con `.replace(/,/g, '').replace(/\./g, '').trim()`; (2) bridge también normaliza dentro del handler para proteger a cualquier otro caller. **Lección guardada en memoria**: cualquier query de BD que reciba cédulas/documentos desde un input de usuario o campo display SIEMPRE debe normalizar a la entrada.
+
+> **🆕 v0.1.169 (📦701+fix6+fix7 — Informe PRI: casos de BD incluidos + timezone fix):** El handler `get-pri-seguimiento-data` solo leía casos del Excel legacy (PRI.xlsx) → los casos guardados en SQLite (vía el flujo nuevo de seguimiento de incapacidades) NO aparecían en el informe. **Fix**: el handler ahora consulta `seguimiento_incapacidad_caso WHERE empresa_id = ?` y `seguimiento_incapacidad_registro WHERE caso_id = ?` para incluir tanto el caso como sus seguimientos, mapea a las 173 columnas del Excel (convención fecha en `colIdx[seguimiento N]`, descripción en `colIdx + 1` columna adyacente sin header propio) y los inserta al final de `result.rows` evitando duplicados por cédula normalizada. **Bonus**: fix de timezone en `formatDate` del informe (`new Date("2026-04-01")` se interpretaba como UTC midnight → mostraba día anterior en Colombia UTC-5, ahora detecta YYYY-MM-DD puro y agrega `T00:00:00` para medianoche local). **Bonus 2**: `determinarEstadoCaso` ahora considera el caso de BD (LORAINNE pasa de "Sin Iniciar" a "En Seguimiento").
+
+> **🆕 v0.1.168 (📦701+705+706+fix5 — Seguimiento Incapacidades: bug fixes críticos):** Resuelve múltiples bugs introducidos en v0.1.166/v0.1.167 en el flujo de seguimiento en SQLite. **El más grave (📦701-fix3)**: schema de `seguimiento_incapacidad_caso` tenía 2 columnas duplicadas (`origen_dx2` y `origen_dx3`) en las secciones Incapacidad y Calificación — SQLite rechazaba `CREATE TABLE` con `duplicate column name: origen_dx2` y el try/catch silenciaba el error → las tablas NUNCA se creaban → cada guardar salía con `no such table`. Fix: renombrar columnas de Calificación a `origen_dx_calificada{1..4}` (más semántico). **📦701-fix4**: al reabrir caso existente se abría panel vacío (buscaba en Excel legacy, no en BD). Fix: nuevo handler `buscarPorCedula` + búsqueda en SQLite primero. **📦706-fix2**: error "[object Object]" al guardar (objeto error concatenado a string). Fix: extracción defensiva con 4 paths + try/catch para circular refs. **📦701-fix5**: tabla de seguimiento no se actualizaba con seguimientos nuevos. Fix: `calcularPorcentajeAvance` toma el MÁX entre Excel y BD. **Otros fixes**: bloqueo de click en nav atenuado, banner BD con "guardado" no "saved", default "NO" en clasificación, mapeo de IDs reales del HTML, `_expandirCaso(row, regs)` no `(empresaId, row)`, `agregarSeguimiento` no `renderSeguimientos`, alias de export en el bridge.
+
+> **🆕 v0.1.167 (📦702+703+704 — Seguimiento Incapacidades: banner BD + lista de casos + auto-hide header):** FASE 2 y 3 del flujo de seguimiento de incapacidades en SQLite. **📦702 — Banner BD**: 4 estados visuales en el panel de seguimiento (is-unsaved gris, is-saved verde, is-exported azul, is-error rojo) con texto contextual ("Guarda el caso primero. Luego puedes exportarlo a Excel con un click" cuando no hay guardado). **📦703 — Lista de casos en BD**: vista nueva que muestra todos los casos guardados en SQLite con badges de estado (Pendiente/En Seguimiento/Cerrado), columna de última modificación, botón "Cargar caso" para re-abrir. **📦704 — Auto-hide header**: el header del panel de seguimiento se oculta automáticamente después de 30s de inactividad (optimización de espacio). Solo se resetea si el count de casos sube (no en polling del mismo count).
+
+> **🆕 v0.1.166 (📦701 — Seguimiento Incapacidades: respaldo en SQLite FASE 1):** FASE 1 del nuevo flujo de seguimiento de incapacidades que respalda los datos en SQLite (kair.db) en paralelo al Excel legacy. Schema nuevo: `seguimiento_incapacidad_caso` (1 fila por caso, ~80 columnas normalizadas con UNIQUE por empresa+cedula+fechas) + `seguimiento_incapacidad_registro` (N filas por caso, FK con CASCADE, 1 fila por seguimiento con fecha/tipo/descripcion/profesional/recomendaciones/proxima_cita). Bridge IPC con 6 handlers: `guardar`, `listar`, `obtener`, `eliminar`, `exportarExcel`, `exportarTodos`. Flujo de sincronización bidireccional SQLite ↔ Excel: SQLite es la fuente de verdad, Excel se actualiza con un botón "Exportar a Excel" desde la UI. Tabla normalizada con columnas separadas (como pidió el user). No se migran datos existentes — se empieza desde hoy. Patrón de bridge: tabla principal + tabla de detalles, UNIQUE constraint por combinación natural, índices por empresa/estado/cédula, helpers `_aplanarCaso` (DB row → frontend JSON) y `_expandirCaso` (frontend JSON → DB row).
+
+> **🆕 v0.1.165 (📦700 — fix updater: asar: true):** Fix crítico del sistema de updates. Con `asar: false`, electron-updater dejaba archivos viejos sin reemplazar. Con `asar: true` + `asarUnpack` para los 5 patrones (better-sqlite3, ffmpeg, .node nativos, scripts Python, dlls), ahora el instalador reemplaza TODOS los archivos correctamente. `findPython()` usa `process.resourcesPath` cuando `app.isPackaged` para encontrar el script Python dentro del asar.
+
+> **🆕 v0.1.164 (📦699 — Dashboard: reorganización del home de empresa):** Rediseño del home de empresa con cards reagrupadas, KPIs más prominentes, jerarquía visual clara. Quick actions para los módulos más usados (Gestión de la Salud, Ausentismo, Bandeja Integrada, FURAT).
+
+> **🆕 v0.1.163 (📦698 — fix Plan de Trabajo: math del dashboard + 0 vencidas + dona del home):** Fix crítico de 3 problemas en el submódulo 2.4.1 Plan de Trabajo Anual y su reflejo en el home de Gestión Integral. **Problema 1**: la cinta del dashboard mezclaba unidades — "Programadas" contaba ACTIVIDADES (filas del plan = 106) pero "Realizadas"/"Pendientes"/"Vencidas" contaban CELDAS (marcas por mes = 115/139/0), dando la impresión de que 115 > 106 era "imposible" cuando en realidad 1 actividad con C en 2 meses = 2 celdas-C. **Problema 2**: `overdueCount` NUNCA se incrementaba (la variable existía pero el bloque para sumar 1 por celda con 'P' en mes pasado no estaba). **Problema 3**: la dona "Avance del Plan Anual SST" del home usaba `stats.actividadesEjecutadas` (38, conteo de actividades) + `actividadesProgramadas: 197` (hardcoded), mostrando 36% inconsistente con el dashboard 44%. **Fix**: 4 funciones del dashboard cuentan ahora CELDAS en lugar de actividades (Programadas/Realizadas/Pendientes/Vencidas), `overdueCount` se calcula correctamente (`P` en mes anterior al vigente, ej ago 2026 → cuenta ene-jul), el `loadSpecificYearFile` envuelve `repair-plan-trabajo-excel` en try/catch (best-effort, no aborta la carga si el template no tiene la hoja esperada), el backend `calculatePlanTrabajoStats` ahora también devuelve `celdasProgramadas/Ejecutadas/Pendientes/Vencidas/porcentajeAvanceCeldas`, y el home (`createPlanTrabajoWidget` + `createAnnualPlanChart`) consume esos nuevos campos. **Resultado Tempoactiva 2026**: dashboard `254 · 47% · 119 · 135 · 24` (suma coherente: 119+135=254 ✓, 24≤135 ✓), home `120/259 · 46%` (diferencia de 1 unidad por edge case del parser — el home usa `xlsx.readFile` directo sin aplicar la reparación de merges B:C que sí aplica el dashboard vía `process-excel-data`, documentada como follow-up futuro). **Beneficio colateral**: el fix del try/catch en `loadSpecificYearFile` también resuelve el bug donde el dashboard quedaba en blanco (0/0/0/0 + charts vacíos) cuando el template .xls no tenía la hoja esperada — antes el `callParentAPI` rechazaba la promesa y abortaba la carga completa.
+
+> **🆕 v0.1.160 (📦695 — Festivos colombianos en el calendario):** Las celdas de los 17 festivos colombianos (cobertura 2020-2030) se muestran con background sutil rosa/rojo + indicador 🇨🇴 + día en negrita roja. Click en el festivo abre mini-modal con info completa (nombre oficial, fecha larga, tipo, observación sobre el traslado si aplica). Módulo nuevo `shared/colombia-festivos.js` con algoritmo de Pascua (Meeus/Jones/Butcher) + 12 festivos fijos (8 trasladables por Ley Emiliani 51/1983 + 4 no trasladables) + 5 religiosos movibles (Jueves Santo, Viernes Santo, Ascensión, Corpus Christi, Sagrado Corazón) calculados dinámicamente desde Pascua. Cache en memoria por año. Validado 2025-2028: Pascua 2026 = 5 abril ✓, Año Nuevo 2026 jueves → 5 lunes ✓, 20 julio 2026 lunes → sin traslado ✓.
+
+> **🆕 v0.1.159 (📦694 — Bandeja Integrada: fix marcar cumplido + visual + toggle):** 4 bugfixes críticos + 1 mejora visual en el calendario de la Bandeja Integrada. **Bug 1**: el botón "Marcar cumplido" no funcionaba — el renderer enviaba `evento_id` (snake_case, como columnas SQLite) pero el bridge esperaba `eventoId` (camelCase, como las funciones del bridge). El backend rechazaba con `VALIDATION: empresaId y eventoId son requeridos` y el user solo veía un toast genérico que desaparecía a 3s. Bug en 2 de 3 call sites (`app.js` de la Bandeja y `renderer.js` del header) — `calendar-detail-panel.js` ya usaba camelCase correctamente. Fix: cambio a camelCase en ambos + helper `_normalizeCumplidoPayload()` que acepta ambos formatos (defensa en profundidad). **Bug 2**: `empresaId` rechazado cuando el toggle está en "Todas las empresas" (porque `getActiveCompanyName()` retorna null en ese modo). Fix: `empresa_id` ahora nullable con migración defensiva. **Bug 3**: sync multipc fallaba con "no such column: updated_at" y "empresa_id" — sync-serializer asumía schema incorrecto. Fix: schema real usado en queries. **Bug 4**: el cumplimiento NO se reflejaba visualmente — la Bandeja Integrada tiene su PROPIO render (`renderBigCalendar` con clases custom `kair-month-event`, `kair-allday-chip`, `kair-week-allday-chip`) y el CSS `--cumplido` solo aplicaba a `kair-cal-event-chip` del componente KairCalendar que no se usa aquí. Fix: actualiza `state.events` del Bandeja Integrada directamente + clases CSS custom con `opacity: 0.55` + `line-through`. **Mejora**: toggle dinámico — el botón del modal cambia entre "Marcar cumplido" (neutral) y "Desmarcar cumplido" (borde verde) según el estado, con toast diferenciado (success vs info). El chip del calendario se actualiza instantáneamente al toggle.
+
+> **🆕 v0.1.158 (📦692-693 — FURAT: navegación recursiva + crear/eliminar + metadata legacy):** 2 features grandes del submódulo FURAT 3.2.1. 📦692: navegación recursiva tipo explorador (click en 2019 → muestra Enero/Febrero/...; click en Enero → muestra los PDFs). `getLibraryData` ahora itera recursivamente con `scanFolderRecursive(MAX_DEPTH=5)`. Breadcrumb jerárquico con cada nivel clickeable ("Todos los Reportes > 2019 > Enero"). Crear subcarpeta dentro de carpeta actual (botón "Crear subcarpeta acá" en context menu). Eliminar carpeta con context menu (patrón de 1.1.1 responsable): recursive `fs.rm` + cleanup de metadata en DB. 📦693: editar metadata de PDFs legacy con click derecho sobre fila de tabla → modal pre-llenado → upsert con `INSERT OR REPLACE ON CONFLICT(file_path)`. Después de guardar, se refresca tabla y dashboard para que el PDF entre en los análisis (charts de tendencia, gravedad, top áreas). Ahora los PDFs viejos pueden categorizarse manualmente.
+
+> **🆕 v0.1.157 (📦690-691 — Bandeja Integrada: scroll + warnings):** 2 bugfixes en Bandeja Integrada. 📦691: preservar scroll de la lista al seleccionar un mail (3 fixes encadenados — el container `#mail-list-container` tiene overflow:hidden, el scroll real está en sub-elemento `.kair-scroll`; `loadMailBodyFromCache` se llamaba en paralelo desde `selectMail`+`renderMailDetail` causando 2-3 renders en cadena que se "pisaban" entre sí; ahora solo se actualiza el detail, no la lista, y se bloquea con flag `_loadingBody`). 📦690: silenciar warnings de `cid:` URIs en imágenes embebidas de emails HTML (reemplazados por GIF transparente 1x1 data URI de 43 bytes — el layout se preserva, no se hace request al browser).
+
+> **🆕 v0.1.156 (📦658-687 — Rediseño completo FURAT 3.2.1):** Header System v2.0 (patrón 3.1.4) + KPI Strip oficial + 40+ inline styles eliminados. Drag-and-drop estilo macOS Finder (drop zone sobre card destino). Upload con metadata + tabla SQL `furat_metadata` (índices por company/date/type/severity/area). Dashboard analítico con 4 charts: Tendencia 12 meses (LÍNEA con PUNTOS, no barras), Por tipo, Por gravedad (colores semánticos), Top áreas. Biblioteca V2: 8+ iteraciones (cards amarillas, breadcrumb unificado, drop zone on card, header card, header 3.1.4, botón "Agregar período" verde, modal crear carpeta). Sub-headers simétricos + divider + fondo gris sutil. Contenedor unificado (Carpetas + Reportes en 1 card). Migración a KAIRToast moderno + kair-fv-modal unificado (mismo visor que Bandeja Integrada, con toolbar search/zoom/pages/rotación). 3 bugfixes críticos: 📦674 handlers IPC sin `ipcMain` importado (No handler registered), 📦673 TypeError setupEventListeners:193, 📦681 CSS con clase vieja. 📦684 fix 18 warnings "Unknown message type". 📦682-683 fix scroll bloqueado en modo ventana. 📦687 análisis con mejor UX para poco data (tendencia con línea, accident_date en Últimos Reportes, ribbon "análisis preliminar"). 📦685 contenedor unificado de Biblioteca. Helper `buildChartPreliminarRibbon()` + CSS `.furat-chart-preliminar + .furat-chart-preliminar { display: none; }` previene duplicación por bug conocido.
+
+> **🆕 v0.1.155 (📦657):** Bandeja Integrada — Enviados muestra destinatario en lugar de remitente. Bug de UX clásico: en la carpeta "Enviados", la lista y el detalle mostraban el remitente (siempre "yo") en vez del destinatario. Fix backend: `getThreadsFromCache` y `getThreadFromCache` ahora hacen LEFT JOIN correlated con `email_messages` para traer `to_list`/`cc_list` del último message. Fix frontend: nuevo helper `getMailDisplayContact(mail)` que retorna el contacto correcto según carpeta; avatar/sender name/búsqueda del lista y header/panel del detalle usan el contacto correcto. En SENT, el header muestra el destinatario + "de: yo" en gris, y el panel "Mostrar detalles" tiene orden Gmail-style Para → CC → De.
+
+> **🆕 v0.1.154 (📦656):** Gráfica "Capacitaciones Mensuales" del home de Recursos ahora coincide con el submódulo. Root cause: el algoritmo del home (`getCapacitacionesChartDataForGraph`) hardcodeaba las columnas del Excel (leía `row[3]` cuando la fecha real está en `row[5]`). Fix: reescritura completa del algoritmo con auto-detección de columnas leyendo el header, parser de fecha robusto (DMY/ISO/serial date/fallback), fallback offset ±2 columnas, y filtros estrictos de fila. La gráfica del home ahora muestra exactamente lo mismo que "Ejecución Mensual" del submódulo.
+
+> **🆕 v0.1.153 (📦655):** Gmail — fix encoding tildes/eñes en subject. El raw MIME escribía el subject como UTF-8 raw, que Gmail/clients interpretaban como Latin-1 → `ejecución` → `ejecucÃ³n`. Fix: nueva `encodeMimeHeader()` que aplica RFC 2047 encoded-word (`=?UTF-8?B?<base64>?=`) a From/To/Cc/Bcc/Subject. Subjects con tildes, eñes y acentos ahora se ven correctos.
+> **🆕 v0.1.152 (📦654):** Presupuesto — tabla más compacta (font-size 0.9rem → 0.75rem, 14.4px → 12px). Celdas, headers, editables, calculadas e inputs heredan. Caben más filas sin scroll.
+> **🆕 v0.1.151 (📦653):** Presupuesto — formato inteligente de números sin ",00" cuando son enteros (0 → 0, 100 → 100, mantiene 1.234,56). Nueva `formatPct` para %. Removido sistema de notificación viejo del Presupuesto (`.k-toast` CSS, HTML `#notification`, función `showNotification`). Ahora usa `window.KAIRToast.show()` (sistema moderno unificado de toda la app, cargado también en el iframe del presupuesto).
+> **🆕 v0.1.150 (📦652):** Modal Redactar potenciado — chips estilo Gmail para destinatarios (avatar + nombre + ×) en Para/CC, mismo estilo que el item de autocomplete seleccionado (fondo azul claro con borde). Comportamiento: click en autocomplete → chip, coma/Enter/blur → chip, Backspace → borrar último, click × → eliminar. Placeholder "Para" se oculta con chip. Autocomplete con mejor visual (borde + sombra más prominentes, items con border-radius, avatar 32×32). Alineación perfecta Para↔Asunto. Quitada la línea azul de focus. X del chip sin look de botón.
+> **🆕 v0.1.149 (📦651):** Polish visual — iconos del home en gris claro (mismo color que subtítulos) + Configuración armonizada (status pill verde con dot, acciones horizontales con jerarquía, active tab con tinte sutil) + modal "Gestión de Usuario" con scroll interno (header fijo / body scrollable / footer fijo, max-height calc(100vh-40px)).
+> **🆕 v0.1.148 (📦650-ux):** Polish visual del modal Redactar — grip del resize sutil estilo Windows (14×14, 2 rayitas opacidad 0.32, sin caja blanca) + autocomplete Gmail-style compacto (`width: max-content` min 240px max 380px, anclado al input) + autocomplete SOLO en Para/CC, NO en Asunto.
+> **🆕 v0.1.147 (📦650):** Modal Redactar potenciado — resize custom desde grip top-left con `position: relative` fix (el modal NUNCA supera el área del correo) + autocomplete Gmail-style con índice de contactos desde `state.mails` + preservar espacios entre párrafos al enviar correos (multipart/alternative con text/html `white-space: pre-wrap`).
+> **🆕 v0.1.146 (📦647+648+649):** Panel "Mostrar detalles" con seguridad SPF/DKIM/DMARC/TLS (pills estilo Gmail) + fix correos leídos vuelven a aparecer como no leídos (UPSERT CASE WHEN) + fix icono del escritorio + race condition electron-updater (installer.nsh customInstall + try/catch stub).
+> **🆕 v0.1.144 (📦646 series, 13 fixes):** Fixes críticos Bandeja Integrada + Google Calendar — flicker calendario, día de la semana incorrecto, iframe adapter fallback, ID mismatch post-create, dedup con 2 keys, schema `google_event_id` + `attendees`, time zone `America/Bogota`, edit modal con attendees, safety nets.
+> **🆕 v0.1.142 (📦642):** Iconos SVG Lucide en sidebar y headers — un solo color (currentColor), más liviano y consistente.
+> **🆕 v0.1.141 (📦640):** Botón flotante scroll-to-top/bottom reutilizable + edición/eliminación de filas en tabla de ausentismo + hora visible en calendario semanal/diario.
+> **🆕 v0.1.138 (📦608):** @file-viewer — preview nativo de Office / PDF / imágenes sin Python+LibreOffice.
+> **🆕 v0.1.131 (📦581):** Update UX completo (Loops 1-10) — Claude-style, no invasivo, footer-anchored.
+> **🆕 v0.1.130 (📦579):** menú nativo de Electron oculto (loop 47b).
+> **🆕 v0.1.120 (📦563):** Bandeja Integrada (cliente Gmail con OAuth + SQLite cache + Gmail-look UI).
+>
+> Ver `AGENTS.md` (secciones "🆕 Menú nativo" y "🆕 Bandeja Integrada") para los detalles completos.
 
 ---
 
 ## 🎯 Propósito
 
-**K+AIR** es un sistema de gestión de Seguridad y Salud en el Trabajo (SG-SST) diseñado para empresas colombianas. Cumple con la Resolución 0312 de 2019 y permite gestionar múltiples empresas desde una única interfaz.
+**K+AIR** es un sistema de gestión de Seguridad y Salud en el Trabajo (SG-SST) para empresas colombianas. Cumple con la Resolución 0312 de 2019 y permite gestionar múltiples empresas desde una sola interfaz.
 
 **Usuarios objetivo:** Departamentos de SST, administración, auditoría, gerencia.
 
+**Owner:** Javier Robles F. (Prof. SG-SST - Esp. Gerencia de Proyectos)
+
 ---
 
-## 🏗️ Arquitectura (Resumen)
+## 🏗️ Arquitectura (resumen)
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    K+AIR Electron App                    │
 ├─────────────────────────────────────────────────────────┤
 │  RENDERER (Frontend)                                    │
-│  ├── index.html                                         │
-│  ├── renderer.js (Lógica de UI)                         │
-│  └── modules/ (27+ submódulos)                          │
+│  ├── index.html, renderer.js, styles.css                 │
+│  ├── modules/ (8 módulos, 48 submódulos)                │
+│  └── renderer/bandeja-integrada/ (iframe Gmail-look)    │
 ├─────────────────────────────────────────────────────────┤
 │  PRELOAD (Puente Seguro)                                │
-│  └── preload.js (78 contratos IPC expuestos)            │
+│  └── preload.js (~736 líneas, ~200 contratos IPC)       │
 ├─────────────────────────────────────────────────────────┤
 │  MAIN (Backend Electron)                                │
-│  └── main.js (78 handlers IPC)                          │
+│  ├── main.js (~20,173 líneas, 143+ handlers IPC)         │
+│  ├── shared/ (google-gmail.js, google-auth.js, etc.)    │
+│  ├── main/ (email-sync.js, db-instance.js, etc.)        │
+│  └── components/ (config, seguimiento)                  │
 ├─────────────────────────────────────────────────────────┤
 │  DATABASE                                                │
-│  └── SQLite (kair.db) - Usuarios, roles, sesiones       │
+│  └── SQLite (kair.db) en app.getPath('userData')         │
+│      Tablas: users, roles, sessions, companies, +5        │
+│      tablas de email (Bandeja Integrada)                 │
 ├─────────────────────────────────────────────────────────┤
 │  PYTHON (Portear/python-embed/)                         │
-│  ├── Python 3.11.9 empaquetado                          │
-│  ├── 79+ paquetes (pandas, openpyxl, PyMuPDF, etc.)    │
-│  └── Scripts: map_directory.py, actualizar_ausentismo   │
+│  ├── Python 3.11.9 embeddable (sin instalación)         │
+│  ├── 79+ paquetes (pandas, openpyxl, PyMuPDF, etc.)     │
+│  └── Scripts: map_directory, actualizar_ausentismo, etc. │
 └─────────────────────────────────────────────────────────┘
 ```
 
-**Tecnologías clave:**
-- Electron 37.x
-- Node.js
-- Python 3.11.9 (empaquetado)
-- SQLite (better-sqlite3)
-- React-like vanilla JS (sin framework)
+**Tecnologías clave:** Electron 37.x · Node.js · Python 3.11.9 · SQLite (better-sqlite3) · vanilla JS sin framework · BEM con prefijo `kair-`.
 
 ---
 
-## 📁 Estructura de Archivos Clave
-
-### Raíz del Proyecto
+## 📁 Archivos clave (raíz del proyecto Electron)
 
 | Archivo | Líneas | Propósito |
-|---------|--------|-----------|
-| `main.js` | ~7800 | Backend Electron, handlers IPC |
-| `preload.js` | ~180 | Contratos IPC (electronAPI) |
-| `renderer.js` | ~3200 | Lógica de UI, navegación |
+|---|---|---|
+| `main.js` | 20,173 | Backend Electron, handlers IPC |
+| `renderer.js` | 6,695 | Lógica de UI principal, navegación |
+| `preload.js` | 736 | Contratos IPC (electronAPI) |
+| `package.json` | 142 | Configuración npm + electron-builder |
 | `index.html` | 143 | Punto de entrada HTML |
-| `package.json` | 137 | Configuración npm + electron-builder |
+| `jsdoc.json` | 19 | Config JSDoc (genera doc auto con `npm run docs:generate`) |
 
-### Python (Portear/)
+---
 
-| Archivo | Propósito |
-|---------|-----------|
-| `Portear/python-embed/` | Python 3.11.9 + 79 paquetes |
-| `Portear/python-embed/python-scripts/` | Scripts de procesamiento |
-| `Portear/python-embed/python-scripts/map_directory.py` | Mapeo de directorios |
-| `Portear/python-embed/python-scripts/actualizar_ausentismo.py` | Ausentismo |
-| `Portear/python-embed/python-scripts/convert_docx_to_pdf.py` | Conversión Word→PDF |
-| `Portear/python-embed/python-scripts/convert_xlsx_to_pdf.py` | Conversión Excel→PDF |
-
-### Módulos (modules/)
+## 📂 Estructura de carpetas (resumen)
 
 ```
-modules/
-├── gestion-integral/       # Módulo 2
-├── gestion-salud/          # Módulo 3 (IA + Ausentismo)
-│   └── ausentismo/
-│       ├── medicion-ausentismo-home.html
-│       ├── medicion-ausentismo-home.js
-│       └── medicion-ausentismo.js
-├── recursos/               # Módulo 1
-└── ...
+sgsst-electron-app/
+├── AGENTS.md                  ← este archivo + convenciones para IAs
+├── README.md                  ← visión general del producto
+├── CONTEXT.md                 ← este archivo
+├── CHANGELOG.md               ← historial de versiones
+├── package.json
+├── main.js                    ← backend
+├── renderer.js                ← UI principal
+├── preload.js                 ← IPC
+├── index.html
+├── styles.css                 ← sistema visual K+AIR
+├── modules/                   ← 8 módulos, 48 submódulos
+├── renderer/bandeja-integrada/ ← cliente Gmail (iframe)
+├── shared/                    ← lógica compartida (Gmail API, etc.)
+├── main/                      ← scripts backend (email-sync, db, etc.)
+├── components/                ← componentes UI
+├── assets/                    ← iconos, imágenes
+├── Portear/                   ← Python 3.11.9 embeddable + scripts
+├── backup_archivos_originales/ ← respaldo histórico
+└── (configuración Electron, scripts auxiliares, etc.)
 ```
 
 ---
 
-## 🐍 Python Empaquetado (v0.1.80+)
+## 🆕 Bandeja Integrada (v0.1.120, 📦563)
 
-### Configuración
+Cliente Gmail profesional integrado en K+AIR, basado en Gmail API con cache local SQLite. Permite leer, enviar, responder y organizar correos sin abrir Gmail en el navegador.
+
+**Punto de entrada:** botón "Bandeja Integrada" en el header de la app.
+
+**Archivos clave:**
+- `renderer/bandeja-integrada/` — index.html + app.js (~3,400 líneas) + styles.css (~3,300 líneas) + data.js (Lucide icons)
+- `shared/google-gmail.js` — wrapper Gmail API
+- `shared/google-auth.js` — OAuth flow
+- `main/email-sync.js` — sync bidireccional
+- `main/email-schema-sql.js` — schema SQLite (5 tablas)
+
+**Detalle completo:** ver `AGENTS.md` (sección "🆕 Bandeja Integrada").
+
+---
+
+## 🆕 Menú nativo oculto (v0.1.130, 📦579)
+
+A partir de v0.1.130, la barra de menú nativa de Windows (File / Edit / View / Window / Help) ya no se muestra por defecto.
+
+- **Dev (`npm start`):** oculto por defecto, aparece con tecla **Alt** (estándar Windows)
+- **Producción (`.exe`):** oculto TOTAL, ni siquiera con Alt
+
+**Implementación:** `main.js` con `autoHideMenuBar: true` en `BrowserWindow` + `Menu.setApplicationMenu(null)` si `app.isPackaged`.
+
+**Detalle completo:** ver `AGENTS.md` (sección "🆕 Menú nativo de Electron oculto").
+
+---
+
+## 🐍 Python empaquetado (v0.1.80+)
 
 - **Versión:** Python 3.11.9 embeddable
 - **Ubicación:** `Portear/python-embed/`
-- **Configuración crítica:** `python311._pth` con `import site` descomentado
-- **Paquetes instalados en:** `Portear/python-embed/Lib/site-packages/`
-
-### Paquetes Críticos (79+)
-
-| Categoría | Paquetes |
-|-----------|----------|
-| **Datos** | pandas, numpy, python-dateutil |
-| **Word** | python-docx, docxtpl, lxml |
-| **Excel** | openpyxl, et-xmlfile |
-| **PDF** | PyMuPDF, reportlab, pillow |
-| **Servidor** | flask, jinja2, werkzeug |
-| **Automatización** | pywin32 |
-| **IA/LLM** | ~~torch~~ (excluido en v0.1.83) |
-| **Build** | pip, setuptools, wheel |
-
-### Scripts Python Principales
-
-| Script | Función |
-|--------|---------|
-| `map_directory.py` | Mapear estructura de directorios (SIN checksum desde v0.1.83) |
-| `actualizar_ausentismo.py` | Procesar archivos de ausentismo (Excel) |
-| `convert_docx_to_pdf.py` | Convertir Word a PDF |
-| `convert_xlsx_to_pdf.py` | Convertir Excel a PDF |
-| `dashboard_scanner.py` | Escanear dashboard (pandas) |
-| `copasst_acta_generator.py` | Generar actas COPASST |
-| `comite_convivencia_acta_generator.py` | Generar actas Convivencia |
+- **Paquetes:** 79+ pre-instalados (pandas, openpyxl, PyMuPDF, etc.)
+- **Scripts principales:** `map_directory.py`, `actualizar_ausentismo.py`, `convert_docx_to_pdf.py`, `convert_xlsx_to_pdf.py`, `dashboard_scanner.py`, generadores de actas COPASST/Convivencia.
+- **Limitación:** torch excluido (build de ~800 MB → ~450 MB). Si necesitás LLM local, re-habilitarlo manualmente.
 
 ---
 
-## 📊 Estado Actual (v0.1.99)
+## 📋 Convenciones críticas
 
-### ✅ Funcionalidades Operativas
+### Convención de commits (OBLIGATORIO)
 
-- [x] Python empaquetado funcional (sin instalación manual)
-- [x] Recursos locales (bootstrap-icons, font-awesome, Roboto)
-- [x] Mapeo rápido de directorios (<10 segundos)
-- [x] Ausentismo funcional (pandas)
-- [x] Conversión PDF (python-docx, openpyxl, PyMuPDF)
-- [x] Generación de actas (COPASST, Convivencia)
-- [x] Autenticación con SQLite
-- [x] Multi-empresa con escenarios normativos
-- [x] Actualizaciones automáticas desde GitHub
-- [x] **Guardado de Presupuesto** - Fórmulas compartidas preservadas 🆕
-- [x] **Inducciones con Cumplimiento Normativo** - Cálculo real basado en nómina 🆕
-- [x] **Visualizador 1.1.1 Mejorado** - Drag & drop, menú contextual, eliminar, toast 🆕
-- [x] **Soporte Responsive** - Optimizado para 1366x768 y 1536x864 🆕
-- [x] **Espaciado Compacto en Módulo Recursos** - 75% menos espacio entre widgets y gráficas 🆕
-- [x] **Login Modernizado** - Animaciones, logo K+AIR, fondo Vanta.js, íconos en inputs 🆕
-- [x] **Transición Animada Login→Interfaz** - Overlay con spinner, mensajes, progreso y check de éxito 🆕
-- [x] **Autollenado Actas COPASST** - Plan de Trabajo (mes anterior), accidentalidad enriquecida, texto formateado 🆕
-- [x] **Dashboard Plan de Trabajo (2.4.1)** - KPIs k-stats-ribbon, 6 gráficas, tabs-header empresa+periodo 🆕
-- [x] **Navegación Plan de Trabajo** - 2 flujos separados (cronograma→home, portal→módulo), patrón destroy 🆕
-- [x] **Modal Selector de Periodo** - Cierre con X y clic en fondo 🆕
+Formato: `📦<n> # <descripción en español, tono casual>`
 
-### ️ Limitaciones Temporales
+- `<n>` es **secuencial e incremental**. Verificar el último con `git log` antes de cada commit.
+- **NO** usar conventional commits (`feat:`, `fix:`, etc.)
+- Última verificación: `📦579` → siguiente es `📦580`
 
-- [ ] **IA/LLM deshabilitada** - torch excluido para reducir tamaño de build
-  - **Razón:** Build de ~800 MB → ~450 MB, tiempo 15-25 min → 8-12 min
-  - **Re-habilitar:** Eliminar `!Lib/site-packages/torch/**` de package.json
+### Reglas de código
 
-### 🔧 Mejores Recientes
+- `var` (no `let`/`const`) — compat con código legacy
+- BEM con prefijo `kair-` para CSS
+- Vanilla JS sin frameworks
+- Sin Tailwind
+- Exports a `window.X = X` al final de cada archivo
+- SIEMPRE escapar HTML con `KairUI.esc()` antes de inyectar texto del usuario
+- SIEMPRE formatear fechas con `KairHelpers.formatDate()`
+- NO commitear sin OK explícito del usuario ("dale" / "OK" / "commit")
 
-**v0.1.100 (11 de junio de 2026):**
-1. **Header Card Pattern (`k-section-card`)** - Patrón canónico de header para todos los módulos K+AIR
-2. **Migración Masiva de Headers** - 22 submódulos migrados de BEM `kair-header` a `k-section-card`
-3. **Tabs Integration** - Módulos con tabs ahora los integran DENTRO del card
-4. **Responsive Consistency** - `flex-wrap: wrap`, company oculta en mobile, padding reducido
-5. **IDs Preservados** - Ningún ID de elemento fue modificado, compatibilidad total con JS existente
-
-**v0.1.99 (9 de junio de 2026):**
-1. **Dashboard Plan de Trabajo 2.4.1** - KPIs `k-stats-ribbon` canónico, 6 gráficas (Estado, Progreso Mensual, Cumplimiento Trimestral, Estado Mensual, Categoría, Radar Anual)
-2. **Tabs-header empresa+periodo** - Reemplaza page-header legacy con BEM `.k-tabs-header`
-3. **Modal selector de periodo** - Cierra con botón X y clic en fondo (`hidePeriodSelector()`)
-4. **Navegación corregida** - Cronograma→Volver→portal home; Portal Home→Volver→menú Gestión Integral (patrón destroy)
-5. **`PlanTrabajoComponent.destroy()`** - Consistente con COPASST (null refs, cleanup script, clear container)
-6. **`goBackToModuleHome()`** - Método directo sin postMessage (evita loop del renderer)
-7. **Fix visual** - Eliminado subrayado en `.back-btn-internal:hover/focus/active`
-
-**v0.1.98 (4 de junio de 2026):**
-1. **Fix: Plan de Trabajo en actas COPASST** - Lee columna del mes anterior (norma COPASST)
-2. **Fix: Bug de mes en nombre de archivo** - Parseo directo `parseInt` vs `new Date()` (bug UTC-5)
-3. **Mejora: Texto formateado multilinea** - Numeración, iconos ✓/⏱, agrupación por estado
-4. **Mejora: Accidentalidad enriquecida** - Nombre completo, identificación, fecha DD/MM/YYYY
-5. **Fix: Nombre de archivo** - Eliminado "N°" del nombre por defecto
-
-**v0.1.90 (21 de marzo de 2026):**
-1. **Feature: Transición Animada Login→Interfaz** - Overlay con logo, spinner, mensajes y progreso
-2. **Secuencia de 8 fases** - Fade-out login, overlay, loading (4 mensajes), éxito, fade-out overlay
-3. **Personalización** - Nombre del usuario en bienvenida, mensajes dinámicos con dots animados
-4. **Accesibilidad** - Respeta `prefers-reduced-motion` para usuarios sensibles
-
-**v0.1.89 (21 de marzo de 2026):**
-1. **Feature: Login Modernizado** - Animaciones fade-in, stagger, logo K+AIR
-2. **Fondo Vanta.js** - Olas animadas con colores corporativos en login
-3. **Íconos en inputs** - Sobre (email) y candado (password) con Font Awesome
-4. **Micro-interacciones** - Hover, focus, shake, spinner de carga
-5. **Accesibilidad** - Respeta prefers-reduced-motion
-
-**v0.1.88 (21 de marzo de 2026):**
-1. **Fix: Espaciado Módulo Recursos** - Reducción de 75% en espacio entre widgets y gráficas
-2. **Estilos globales anidados** - Solucionado conflicto con `!important` en styles.css
-3. **Selectores con especificidad** - Patrón implementado para evitar conflictos futuros
-
-**v0.1.87 (20 de marzo de 2026):**
-1. **Feature: Soporte Responsive** - Optimizado para 1366x768 y 1536x864
-2. **Media queries específicas** - Ajustes progresivos por resolución
-3. **Ventana inicial optimizada** - 1200x700 (cabe en 1366x768)
-4. **Sin cambios en ≥1920x1080** - Mantiene UI original
-
-**v0.1.86 (20 de marzo de 2026):**
-1. **Feature: Drag & Drop en Visualizador 1.1.1** - Arrastrar y soltar archivos en carpetas
-2. **Feature: Menú Contextual** - Clic derecho para abrir o eliminar archivos
-3. **Feature: Modal de Confirmación** - Reemplaza `confirm()` nativo
-4. **Feature: Notificaciones Toast** - Sistema moderno K+AIR
-5. **Feature: Manejo de Errores** - Específico por tipo (EPERM, ENOENT, EACCES)
-
-**v0.1.85 (20 de marzo de 2026):**
-1. **Feature: Cumplimiento Normativo en Inducciones** - Cálculo real basado en nómina
-2. **Cálculo de pendientes** - `empleados - completadas`
-3. **Alertas inteligentes** - Óptimo (≥90%), refuerzo (≥50%), crítico (<50%)
-4. **Fallback automático** - Si no hay empleados configurados, usa histórico
-
-**v0.1.84 (20 de marzo de 2026):**
-1. **Fix: Error "Shared Formula master"** - Guardado de Presupuesto funcional
-2. **Detección de fórmulas compartidas** - Preservación automática
-3. **Cálculo de totales desde backend** - Fila TOTAL calculada automáticamente
-4. **Manejo seguro de merges** - Sin warnings por merges duplicados
-
-**v0.1.83 (19 de marzo de 2026):**
-1. **Exclusión de torch** - Reduce tamaño y tiempo de build
-2. **Eliminación de checksum** - Mapeo 1500+ segundos → <10 segundos
-3. **Recursos locales** - Sin ERR_TIMED_OUT de CDNs
-4. **waitForElement mejorado** - Retry logic con backoff exponencial
+**Detalle completo de convenciones:** ver `AGENTS.md`.
 
 ---
 
-## 🔗 Enlaces Críticos de Documentación
-
-### Para Nuevos Desarrolladores
-1. **docs/START_HERE.md** - Punto de entrada único
-2. **docs/01-quick-start/installation.md** - Instalación y configuración
-3. **docs/02-architecture/overview.md** - Arquitectura general
-
-### Para IA (Cursor, Copilot, etc.)
-1. **CONTEXT.md** (este archivo) - Contexto completo
-2. **docs/02-architecture/ipc-contracts.md** - Contratos IPC (CRÍTICO)
-3. **docs/03-modules/** - Módulos específicos
-
-### Para Usuarios Finales
-1. **README.md** (raíz) - Guía de usuario y visión general
-2. **docs/01-quick-start/troubleshooting.md** - Problemas comunes
-3. **docs/acerca-de-actualizacion.md** - Actualización del sistema
-
-### Referencia Técnica
-1. **CHANGELOG.md** - Historial de cambios por versión
-2. **docs/05-updates/** - Actualizaciones detalladas
-3. **docs/04-guides/backend-contracts.md** - Contratos backend
-
----
-
-## 📋 Convenciones de Desarrollo
-
-### Backend (main.js)
-
-```javascript
-// Todos los handlers IPC siguen este patrón:
-ipcMain.handle('nombre-handler', async (event, params) => {
-  try {
-    // 1. Validar datos
-    // 2. Ejecutar lógica
-    // 3. Retornar { success: true, data: {...} }
-  } catch (error) {
-    // Retornar { success: false, error: { code, message } }
-  }
-});
-```
-
-### Frontend (renderer.js)
-
-```javascript
-// Llamar handlers IPC:
-const result = await electronAPI.nombreHandler(params);
-if (result.success) {
-  // Usar result.data
-} else {
-  // Manejar result.error
-}
-```
-
-### Python Scripts
-
-```python
-# Todos los scripts retornan JSON por stdout:
-if __name__ == "__main__":
-    try:
-        result = process()
-        print(json.dumps(result, ensure_ascii=False))
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
-```
-
----
-
-## 🚀 Comandos de Build
+## 🚀 Comandos principales
 
 ```bash
 # Desarrollo
 npm start
 
 # Build (producción)
-export GH_TOKEN=<tu_token>
-npx electron-builder --win --publish=always
+export GH_TOKEN=<tu_token>     # ⚠️ NUNCA commitear el token
+npx.cmd electron-builder --win --publish=always
 
-# Build con Python empaquetado
-# (python-embed ya está configurado en package.json)
+# Documentación API (JSDoc)
+npm run docs:generate          # genera en ./docs-api/
+
+# Debug
+npm run debug
 ```
 
-**Tiempos estimados (v0.1.83):**
-- Build: 8-12 minutos
-- Tamaño installer: ~450 MB
+⚠️ **PowerShell:** usar `npx.cmd` (no `npx`) para evitar bloqueos de execution policy.
+
+**Tiempos de build (v0.1.83+):** 8-12 min, ~450 MB.
 
 ---
 
-## 🆕 Cambios Recientes (v0.1.93 - 25 de marzo de 2026)
+## 🔐 Seguridad — credenciales
 
-### 1. Visualizadores Modernizados (9 submódulos)
+**NUNCA** commitear credenciales. Todas en `.env` (local, no en repo):
 
-**Descripción:** Sistema unificado de gestión documental con funciones modernas replicadas en 9 visualizadores.
+- `GOOGLE_OAUTH_CLIENT_ID`
+- `GOOGLE_OAUTH_CLIENT_SECRET`
+- `GH_TOKEN` (para publish)
 
-**Submódulos Actualizados:**
-| Código | Submódulo | Funciones |
-|--------|-----------|-----------|
-| 1.1.1 | Responsable SG | Drag&Drop, Context Menu, Toast, Confirm Modal |
-| 1.1.2 | Roles y Responsabilidades | Drag&Drop, Context Menu, Toast, Confirm Modal |
-| 1.1.4 | Afiliación al SSSI | Drag&Drop, Context Menu, Toast, Confirm Modal |
-| 1.1.5 | Trabajo de Alto Riesgo | Drag&Drop, Context Menu, Toast, Confirm Modal |
-| 1.1.6 | Conformación de Copasst | Drag&Drop, Context Menu, Toast, Confirm Modal |
-| 1.1.7 | Capacitación al Copasst | Drag&Drop, Context Menu, Toast, Confirm Modal |
-| 1.1.8 | Comité de Convivencia | Drag&Drop, Context Menu, Toast, Confirm Modal |
-| 1.2.3 | Curso Virtual 50 Horas | Drag&Drop, Context Menu, Toast, Confirm Modal |
-| 1.2.4 | Manual SST Proveedores | Drag&Drop, Context Menu, Toast, Confirm Modal |
-
-**Funciones Implementadas:**
-
-1. **Drag & Drop de Archivos**
-   - Overlay visual con ícono animado bounce
-   - Subida automática de archivos soltados
-   - Manejo de múltiples archivos simultáneos
-   - Feedback con notificaciones toast
-
-2. **Menú Contextual (Clic Derecho)**
-   - Menú flotante con opciones: Abrir archivo, Eliminar archivo
-   - Posicionamiento inteligente (no sale de pantalla)
-   - Cierre con clic fuera o tecla Escape
-
-3. **Modal de Confirmación Moderno**
-   - Diseño centrado con animación slideUp
-   - Header amarillo con ícono de advertencia
-   - Nombre del archivo en caja destacada
-   - Botones Cancelar / Eliminar estilizados
-
-4. **Notificaciones Toast Modernas**
-   - 4 tipos: success, error, warning, info
-   - Iconos FontAwesome por tipo
-   - Auto-eliminación con animación fade-out (300ms)
-   - Contenedor en esquina superior derecha
-
-5. **Abrir Archivo con Aplicación Predeterminada**
-   - Opción en menú contextual
-   - Usa `electronAPI.open-file`
-   - Manejo de errores específico (EPERM, ENOENT, EACCES)
-
-**Archivos Modificados por Submódulo:**
-
-| Archivo | Líneas agregadas | Funciones |
-|---------|-----------------|-----------|
-| `[submodulo]-view.html` | ~40 | contextMenu, confirmModal, kToastContainer |
-| `[submodulo]-view.css` | ~280 | Estilos para modales, toast, drag&drop |
-| `[submodulo]-viewer.js` | ~450 | Todas las funciones modernas |
-
-**Funciones JavaScript Agregadas:**
-
-```javascript
-// Drag & Drop
-- setupDragAndDrop()
-- setupFolderDragAndDrop(folderElement, folderPath)
-- preventDefaults(e)
-- handleDragOver(e)
-- uploadFile(file, folderPath)
-- fileToBase64(file)
-
-// Context Menu
-- showContextMenu(x, y, doc)
-- hideContextMenu()
-- deleteDocument()
-- setupContextMenu()
-- openFile()
-
-// Toast Notifications
-- showToast(message, type, duration)
-
-// Confirm Modal
-- showConfirmModal(fileName, callback)
-- hideConfirmModal()
-- acceptConfirm()
-- cancelConfirm()
-- setupConfirmModal()
-```
-
-**Funciones Actualizadas:**
-
-| Función | Cambio |
-|---------|--------|
-| `setupEventListeners()` | Ahora llama a `setupDragAndDrop()` y `setupContextMenu()` |
-| `renderFolders()` | Agrega clase 'folder' y llama a `setupFolderDragAndDrop()` |
-| `renderDocuments()` | Agrega evento 'contextmenu' para clic derecho |
-
-**Impacto:**
-- **UX:** Mejora significativa en usabilidad y consistencia entre submódulos
-- **Backend:** Sin cambios (mismos contratos IPC)
-- **Temas:** Compatible con claro, oscuro (system), oscuro (legacy)
-- **Consistencia:** 9 visualizadores con misma UX/UI
+Si por error commiteás un secret, rotar inmediatamente y usar `git reset + cherry-pick` con sed-replace (hay memoria de esto en commits anteriores).
 
 ---
 
-## 🆕 Cambios Recientes (v0.1.92 - 25 de marzo de 2026)
+## 📞 Recursos
 
-### 1. Alerta de Afiliación al SSSI
-
-**Backend (`main.js`):**
-- Nueva función `calculateAfiliacionStats()` que busca planillas de afiliación en `1.1.4 Afiliación al SSSI`
-- Detección automática de archivos PDF/XLSX con "planilla" en el nombre
-- Extracción del mes desde el nombre del archivo (ej: "planilla_marzo_2026.pdf")
-- Comparación con el mes en curso y generación de alerta crítica si falta
-- Integración en `get-recursos-stats` API
-- Integración en `getDashboardAlertas()`
-
-**Frontend (`recursos-home.js`):**
-- Nueva función `calculateAfiliacionClientSide()` (espejo del backend)
-- Widget visual `createAfiliacionWidget()` con diseño consistente a presupuesto
-- Badge verde "Al día" o rojo "Pendiente"
-- Muestra mes actual y último mes registrado
-- Actualización en `loadResourceStats()`
-
-**Archivos modificados:**
-- `main.js`: `calculateAfiliacionStats()`, `get-recursos-stats`, `getDashboardAlertas()`
-- `modules/recursos/recursos-home.js`: `calculateAfiliacionClientSide()`, `createAfiliacionWidget()`, `loadResourceStats()`
-
-### 2. Dashboard con Filtros por Módulo
-
-**Panel "MÓDULOS DEL SISTEMA":**
-- Panel lateral en dashboard con lista de módulos interactiva
-- Cada módulo muestra badge con cantidad de alertas
-- Click en módulo filtra tareas del dashboard
-- Resaltado azul del módulo seleccionado
-
-**Funciones implementadas:**
-- `updateModuleSelection(moduleName)`: Actualiza visualmente módulo seleccionado
-- `filterDashboardTasksByModule(moduleName)`: Filtra tareas y actualiza UI
-- `clearFilter()`: Limpia filtro y selección de módulo
-
-**Archivos modificados:**
-- `renderer.js`: Creación del panel, `updateModuleSelection()`, `filterDashboardTasksByModule()`, `clearFilter()`
-
-### 3. Sidebar Inteligente
-
-**Problema corregido:** Botón de módulo permanecía resaltado permanentemente
-
-**Solución implementada:**
-- Limpieza de referencia `window.activeSidebarButton` en `createSidebarButtons()`
-- Limpieza en `showCompanyHomePage()` (al mostrar dashboard)
-- Limpieza en `selectCompany()` (al cambiar de empresa)
-
-**Archivos modificados:**
-- `renderer.js`: `createSidebarButtons()`, `showCompanyHomePage()`, `selectCompany()`
-
-### 4. Logs de Depuración para Alertas
-
-**Backend (`main.js`):**
-- Logs detallados para cada tipo de alerta (capacitaciones, inducciones, EPP, presupuesto, afiliación)
-- Resumen final con total de alertas generadas
-- Detalle de cada tarea con módulo, submódulo y descripción
-
-**Frontend (`recursos-home.js`):**
-- Logs en `calculateAfiliacionClientSide()` con datos para renderizar
-- Logs en `createAfiliacionWidget()` con estado visual
-- Resumen en `loadResourceStats()` con todas las estadísticas cargadas
-
-**Archivos modificados:**
-- `main.js`: `getDashboardAlertas()` con logs para cada alerta
-- `modules/recursos/recursos-home.js`: Logs en funciones de afiliación
-
----
-
-## 📞 Recursos Adicionales
-
-- **Repositorio:** https://github.com/Reivaj640/SG-SST-E
+- **Repo:** https://github.com/Reivaj640/SG-SST-E
 - **Releases:** https://github.com/Reivaj640/SG-SST-E/releases
-- **Documentación:** `/docs/`
-- **API (JSDoc):** `/docs/api/` (generado automáticamente)
+- **Branch activo:** `Dev-Pc` (production-ready), `Dev` (legacy)
+- **Owner:** Javier Robles F. (Prof. SG-SST - Esp. Gerencia de Proyectos)
 
 ---
 
-**Documento creado:** 19 de marzo de 2026  
-**Propósito:** Contexto unificado para IA y nuevos desarrolladores  
-**Mantenimiento:** Actualizar con cada cambio arquitectónico mayor
-$content
+## 🗺️ Roadmap (resumen)
+
+- **Corto plazo:** Bandeja Integrada v2 (Calendar write, templates, snooze real)
+- **Mediano plazo:** tests automatizados, CI/CD, backups de kair.db
+- **Largo plazo:** SaaS-ificación (Bandeja web con Next.js + PostgreSQL)
+
+Detalle completo en `CHANGELOG.md` y commits del repo.
+
+---
+
+**Mantenimiento:** actualizar con cada cambio arquitectónico mayor. Si un dev/IA toca algo grande, agregar entrada en `CHANGELOG.md` + commit `📦<n>` con descripción clara.

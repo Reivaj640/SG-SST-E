@@ -1,11 +1,22 @@
 // mejoramiento-home.js - Componente para el home del módulo "Mejoramiento"
 
+// F21.49 (2026-06-21) — Mejoramiento ahora SOLO tiene 7.1.1.
+// 7.1.2 / 7.1.3 / 7.1.4 ya no son submódulos activos — sus interfaces quedan reservadas
+// en modules/ pero NO se les crea UI porque la normativa (ALL_SUBMODULES en renderer.js)
+// solo incluye 7.1.1 en el módulo "Mejoramiento".
+
 class MejoramientoHome {
-    constructor(container, moduleName, submodules) {
+    constructor(container, moduleName, submodules, companyName) {
         this.container = container;
         this.moduleName = moduleName;
-        this.submodules = submodules || [];
-        this.currentCompany = null;
+        /* this.submodules viene de RESOURCES_SUBMODULES[moduleName] en renderer.js,
+           que ya está filtrado por la normativa. Para Mejoramiento ahora solo trae
+           7.1.1. Si por algún motivo el array viene vacío, fallback a 7.1.1. */
+        this.submodules = (submodules && submodules.length > 0) ? submodules : [
+          '7.1.1 Acciones Preventivas y Correctivas'
+        ];
+        // 📦748 · Aceptar currentCompany como parámetro del shell.
+        this.currentCompany = companyName || this.getCurrentCompany() || null;
         this.widgets = {};
         this._unsubscribe = null;
     }
@@ -33,7 +44,7 @@ class MejoramientoHome {
         header.className = 'k-module-header';
         header.innerHTML = `
             <div class="k-module-title">
-                <i class="bi bi-arrow-up-right-circle-fill me-2" style="color: #212529;"></i>
+                <span class="k-module-title-icon" style="color: #212529;">${SIDEBAR_ICONS.trending_up}</span>
                 <div>
                     <div style="color: #212529; font-weight: 600;">Módulo Mejoramiento</div>
                     <span style="font-size: 0.75rem; font-weight: 400; color: #6c757d;">
@@ -52,11 +63,18 @@ class MejoramientoHome {
         mainArea.className = 'main-area';
         mainArea.style.flex = '1';
 
-        this.renderMainArea(mainArea);
+        // 📦491 — Skeleton mientras Mejora Store carga stats (5 widgets + 2 charts: bar + doughnut)
+        mainArea.innerHTML = KairSkeleton.kpiStrip(5) + KairSkeleton.chartBars(12) + KairSkeleton.chartDonut();
 
         contentContainer.appendChild(mainArea);
         layout.appendChild(contentContainer);
         this.container.appendChild(layout);
+
+        // 📦491-fix — Retardo de 200ms para que el browser pinte el skeleton y el ojo lo registre
+        // antes de que JS continue con la carga. Sin esto, el skeleton se borra antes de verse.
+        await new Promise(r => setTimeout(r, 200));
+
+        this.renderMainArea(mainArea);
 
         if (window.MejoramientoStore) {
             this._unsubscribe = window.MejoramientoStore.subscribe((stats) => {
@@ -68,17 +86,23 @@ class MejoramientoHome {
     }
 
     renderMainArea(container) {
+        // 📦491-fix — Limpiar skeleton antes de pintar widgets reales
+        container.innerHTML = '';
+
+        /* F21.51 (2026-06-21) — Los 5 KPIs del home son EXACTAMENTE los mismos que
+           muestra el viewer 7.1.1 (acciones-pc-viewer.js → renderKpis):
+           total / abiertas / enProceso / cerradas / vencidas.
+           Antes había 4 widgets (711/712/713/714) + 2 globales; ahora solo 7.1.1. */
         const widgetsContainer = document.createElement('div');
         widgetsContainer.className = 'widgets-container';
 
         const cachedStats = window.MejoramientoStore ? window.MejoramientoStore.getStats() : {};
 
-        widgetsContainer.appendChild(this.createSubmoduleWidget('711', 'Acciones Preventivas y Correctivas', 'bg-success', cachedStats['711']));
-        widgetsContainer.appendChild(this.createSubmoduleWidget('712', 'Acciones de Mejora (Gerencia)', 'bg-primary', cachedStats['712']));
-        widgetsContainer.appendChild(this.createSubmoduleWidget('713', 'Acciones de Mejora (AT y EL)', 'bg-warning', cachedStats['713']));
-        widgetsContainer.appendChild(this.createSubmoduleWidget('714', 'Planes de Mejoramiento', 'bg-danger', cachedStats['714']));
-        widgetsContainer.appendChild(this.createEficaciaWidget(cachedStats._global));
-        widgetsContainer.appendChild(this.createVencidasWidget(cachedStats._global));
+        widgetsContainer.appendChild(this.createKpiWidget('total', 'Total Acciones', 'bg-primary', cachedStats));
+        widgetsContainer.appendChild(this.createKpiWidget('abiertas', 'Abiertas', 'bg-info', cachedStats));
+        widgetsContainer.appendChild(this.createKpiWidget('enProceso', 'En Proceso', 'bg-warning', cachedStats));
+        widgetsContainer.appendChild(this.createKpiWidget('cerradas', 'Cerradas', 'bg-success', cachedStats));
+        widgetsContainer.appendChild(this.createKpiWidget('vencidas', 'Vencidas', 'bg-danger', cachedStats));
 
         container.appendChild(widgetsContainer);
 
@@ -88,28 +112,28 @@ class MejoramientoHome {
         const chartAcciones = document.createElement('div');
         chartAcciones.className = 'chart-container';
         chartAcciones.innerHTML = `
-            <h3>Acciones por Mes — ${new Date().getFullYear()}</h3>
+            <h3>Acciones por Mes — 7.1.1 — ${new Date().getFullYear()}</h3>
             <div class="chart-placeholder" style="padding: 0.5rem 0;">
                 <canvas id="mejAccionesChart" style="max-height: 180px;"></canvas>
             </div>
         `;
         chartsGrid.appendChild(chartAcciones);
 
-        const chartEficacia = document.createElement('div');
-        chartEficacia.className = 'chart-container';
-        chartEficacia.innerHTML = `
-            <h3>Eficacia por Submódulo — ${new Date().getFullYear()}</h3>
+        const chartEstados = document.createElement('div');
+        chartEstados.className = 'chart-container';
+        chartEstados.innerHTML = `
+            <h3>Distribución por Estado — 7.1.1</h3>
             <div class="chart-placeholder" style="padding: 0.5rem 0;">
-                <canvas id="mejEficaciaChart" style="max-height: 180px;"></canvas>
+                <canvas id="mejEstadosChart" style="max-height: 180px;"></canvas>
             </div>
         `;
-        chartsGrid.appendChild(chartEficacia);
+        chartsGrid.appendChild(chartEstados);
 
         container.appendChild(chartsGrid);
 
         setTimeout(() => {
             this.renderAccionesChart(cachedStats);
-            this.renderEficaciaChart(cachedStats);
+            this.renderEstadosChart(cachedStats);
         }, 50);
 
         const submodulesContainer = document.createElement('div');
@@ -131,165 +155,71 @@ class MejoramientoHome {
         container.appendChild(submodulesContainer);
     }
 
-    createSubmoduleWidget(code, title, badgeClass, initialData) {
+    /**
+     * Crea un widget KPI individual para el home.
+     * `kpiKey` es la clave del campo en stats (total / abiertas / enProceso / cerradas / vencidas).
+     * `stats` es el objeto devuelto por MejoramientoStore.getStats() — ya no es por submódulo,
+     * ahora es un objeto único con los 5 KPIs de 7.1.1.
+     */
+    createKpiWidget(kpiKey, title, badgeClass, initialStats) {
         const widget = document.createElement('div');
         widget.className = 'widget k-budget-card';
 
-        let currentMode = 'year';
-        let data = initialData;
+        let data = initialStats;
+
+        const subLabel = {
+            total: 'Acciones registradas',
+            abiertas: 'Sin iniciar',
+            enProceso: 'En ejecución',
+            cerradas: 'Finalizadas',
+            vencidas: 'Requieren atención'
+        }[kpiKey] || '';
 
         const render = () => {
-            const d = data || { total: 0, pendientes: 0, enProceso: 0, implementadas: 0, vencidas: 0, mesActual: 0, year: '—', mes: '—' };
-            const value = currentMode === 'year' ? d.total : d.mesActual;
-            const badge = currentMode === 'year' ? d.year : (d.mes || '').substring(0, 3);
+            const d = data || {};
+            const total = d.total || 0;
+            const value = d[kpiKey] != null ? d[kpiKey] : 0;
+            const pct = total > 0 && kpiKey !== 'total' ? Math.round((value / total) * 100) : null;
 
             widget.innerHTML = `
                 <div class="kb-header">
                     <span class="kb-title">${title}</span>
-                    <span class="kb-badge ${badgeClass}">${badge}</span>
-                </div>
-                <div class="ausentismo-toggles">
-                    <button class="ausentismo-toggle ${currentMode === 'year' ? 'active' : ''}" data-mode="year">Año</button>
-                    <button class="ausentismo-toggle ${currentMode === 'month' ? 'active' : ''}" data-mode="month">Mes</button>
+                    <span class="kb-badge ${badgeClass}">7.1.1</span>
                 </div>
                 <div class="kb-amount" style="text-align:center;">
                     <span>${value}</span>
                 </div>
                 <div style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:4px;">
-                    Acciones registradas
+                    ${subLabel}
                 </div>
-                <div class="kb-footer">
-                    <div>
-                        <div class="kb-label">Pendientes</div>
-                        <div class="kb-value kb-exec">${d.pendientes}</div>
-                    </div>
-                    <div style="text-align:right;">
-                        <div class="kb-label">Implementadas</div>
-                        <div class="kb-value kb-rem">${d.implementadas}</div>
-                    </div>
-                </div>
-            `;
-
-            widget.querySelectorAll('.ausentismo-toggle').forEach(btn => {
-                btn.onclick = () => {
-                    currentMode = btn.dataset.mode;
-                    render();
-                };
-            });
-        };
-
-        this.widgets[code] = {
-            update: (newData) => { data = newData; render(); }
-        };
-
-        render();
-        return widget;
-    }
-
-    createEficaciaWidget(initialData) {
-        const widget = document.createElement('div');
-        widget.className = 'widget k-budget-card';
-
-        let currentMode = 'year';
-        let data = initialData;
-
-        const render = () => {
-            const d = data || { eficacia: 0, implementadas: 0, total: 0, year: '—', mes: '—' };
-            const badge = currentMode === 'year' ? d.year : (d.mes || '').substring(0, 3);
-
-            widget.innerHTML = `
-                <div class="kb-header">
-                    <span class="kb-title">Eficacia de Acciones</span>
-                    <span class="kb-badge bg-success">${badge}</span>
-                </div>
-                <div class="ausentismo-toggles">
-                    <button class="ausentismo-toggle ${currentMode === 'year' ? 'active' : ''}" data-mode="year">Año</button>
-                    <button class="ausentismo-toggle ${currentMode === 'month' ? 'active' : ''}" data-mode="month">Mes</button>
-                </div>
-                <div class="kb-amount" style="text-align:center;">
-                    <span>${d.eficacia}%</span>
-                </div>
-                <div style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:4px;">
-                    Implementadas / Total
-                </div>
+                ${pct !== null ? `
                 <div class="kb-progress-track" style="margin-bottom: 0.5rem;">
-                    <div class="kb-progress-bar" style="width: ${d.eficacia}%"></div>
+                    <div class="kb-progress-bar" style="width: ${pct}%">
+    <div class="kb-shimmer"></div>
+</div>
                 </div>
                 <div class="kb-footer">
                     <div>
-                        <div class="kb-label">Implementadas</div>
-                        <div class="kb-value kb-exec">${d.implementadas}</div>
+                        <div class="kb-label">Del total</div>
+                        <div class="kb-value kb-exec">${pct}%</div>
                     </div>
                     <div style="text-align:right;">
                         <div class="kb-label">Total</div>
-                        <div class="kb-value kb-rem">${d.total}</div>
+                        <div class="kb-value kb-rem">${total}</div>
                     </div>
                 </div>
-            `;
-
-            widget.querySelectorAll('.ausentismo-toggle').forEach(btn => {
-                btn.onclick = () => {
-                    currentMode = btn.dataset.mode;
-                    render();
-                };
-            });
-        };
-
-        this.widgets._eficacia = {
-            update: (newData) => { data = newData; render(); }
-        };
-
-        render();
-        return widget;
-    }
-
-    createVencidasWidget(initialData) {
-        const widget = document.createElement('div');
-        widget.className = 'widget k-budget-card';
-
-        let currentMode = 'year';
-        let data = initialData;
-
-        const render = () => {
-            const d = data || { vencidas: 0, pendientes: 0, enProceso: 0, year: '—', mes: '—' };
-            const badge = currentMode === 'year' ? d.year : (d.mes || '').substring(0, 3);
-
-            widget.innerHTML = `
-                <div class="kb-header">
-                    <span class="kb-title">Acciones Vencidas</span>
-                    <span class="kb-badge bg-danger">${badge}</span>
-                </div>
-                <div class="ausentismo-toggles">
-                    <button class="ausentismo-toggle ${currentMode === 'year' ? 'active' : ''}" data-mode="year">Año</button>
-                    <button class="ausentismo-toggle ${currentMode === 'month' ? 'active' : ''}" data-mode="month">Mes</button>
-                </div>
-                <div class="kb-amount" style="text-align:center;">
-                    <span>${d.vencidas}</span>
-                </div>
-                <div style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:4px;">
-                    Requieren atención inmediata
-                </div>
-                <div class="kb-footer">
-                    <div>
-                        <div class="kb-label">Pendientes</div>
-                        <div class="kb-value kb-exec">${d.pendientes}</div>
-                    </div>
+                ` : `
+                <div class="kb-footer" style="justify-content:flex-end;">
                     <div style="text-align:right;">
-                        <div class="kb-label">En Proceso</div>
-                        <div class="kb-value kb-rem">${d.enProceso}</div>
+                        <div class="kb-label">Cumplimiento</div>
+                        <div class="kb-value kb-exec">${d.cumplimiento || 0}%</div>
                     </div>
                 </div>
+                `}
             `;
-
-            widget.querySelectorAll('.ausentismo-toggle').forEach(btn => {
-                btn.onclick = () => {
-                    currentMode = btn.dataset.mode;
-                    render();
-                };
-            });
         };
 
-        this.widgets._vencidas = {
+        this.widgets[kpiKey] = {
             update: (newData) => { data = newData; render(); }
         };
 
@@ -300,17 +230,14 @@ class MejoramientoHome {
     updateWidgetsUI(stats) {
         if (!stats) return;
 
-        if (stats['711'] && this.widgets['711']) this.widgets['711'].update(stats['711']);
-        if (stats['712'] && this.widgets['712']) this.widgets['712'].update(stats['712']);
-        if (stats['713'] && this.widgets['713']) this.widgets['713'].update(stats['713']);
-        if (stats['714'] && this.widgets['714']) this.widgets['714'].update(stats['714']);
-        if (stats._global && this.widgets._eficacia) this.widgets._eficacia.update(stats._global);
-        if (stats._global && this.widgets._vencidas) this.widgets._vencidas.update(stats._global);
+        /* Los stats ahora son un objeto único (no por submódulo).
+           Los 5 KPIs del home son los mismos del viewer 7.1.1. */
+        ['total', 'abiertas', 'enProceso', 'cerradas', 'vencidas'].forEach(key => {
+            if (this.widgets[key]) this.widgets[key].update(stats);
+        });
 
-        if (stats._global) {
-            this.renderAccionesChart(stats);
-            this.renderEficaciaChart(stats);
-        }
+        this.renderAccionesChart(stats);
+        this.renderEstadosChart(stats);
     }
 
     renderAccionesChart(stats) {
@@ -319,12 +246,7 @@ class MejoramientoHome {
         if (!canvas) return;
 
         const labels = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-        const currentMonth = new Date().getMonth();
-
-        const ds711 = stats['711'] ? stats['711'].byMonth : Array(12).fill(0);
-        const ds712 = stats['712'] ? stats['712'].byMonth : Array(12).fill(0);
-        const ds713 = stats['713'] ? stats['713'].byMonth : Array(12).fill(0);
-        const ds714 = stats['714'] ? stats['714'].byMonth : Array(12).fill(0);
+        const ds = (stats && stats.byMonth) ? stats.byMonth : Array(12).fill(0);
 
         const existingChart = Chart.getChart(canvas);
         if (existingChart) existingChart.destroy();
@@ -333,21 +255,22 @@ class MejoramientoHome {
             type: 'bar',
             data: {
                 labels: labels,
-                datasets: [
-                    { label: '7.1.1', data: ds711, backgroundColor: 'rgba(40, 167, 69, 0.7)', borderColor: '#28a745', borderWidth: 1 },
-                    { label: '7.1.2', data: ds712, backgroundColor: 'rgba(23, 78, 166, 0.7)', borderColor: '#174ea6', borderWidth: 1 },
-                    { label: '7.1.3', data: ds713, backgroundColor: 'rgba(255, 193, 7, 0.7)', borderColor: '#ffc107', borderWidth: 1 },
-                    { label: '7.1.4', data: ds714, backgroundColor: 'rgba(220, 53, 69, 0.7)', borderColor: '#dc3545', borderWidth: 1 }
-                ]
+                datasets: [{
+                    label: '7.1.1 Acciones',
+                    data: ds,
+                    backgroundColor: 'rgba(23, 78, 166, 0.75)',
+                    borderColor: '#174ea6',
+                    borderWidth: 1
+                }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: true,
                 plugins: {
-                    legend: { display: true, position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12, padding: 8 } },
+                    legend: { display: false },
                     tooltip: {
                         callbacks: {
-                            label: (ctx) => ` ${ctx.dataset.label}: ${ctx.raw} acción${ctx.raw !== 1 ? 'es' : ''}`
+                            label: (ctx) => ` ${ctx.raw} acción${ctx.raw !== 1 ? 'es' : ''}`
                         }
                     }
                 },
@@ -359,21 +282,19 @@ class MejoramientoHome {
         });
     }
 
-    renderEficaciaChart(stats) {
+    renderEstadosChart(stats) {
         if (typeof Chart === 'undefined') return;
-        const canvas = document.getElementById('mejEficaciaChart');
+        const canvas = document.getElementById('mejEstadosChart');
         if (!canvas) return;
 
-        const codes = ['711', '712', '713', '714'];
-        const labels = ['7.1.1', '7.1.2', '7.1.3', '7.1.4'];
-        const colors = ['#28a745', '#174ea6', '#ffc107', '#dc3545'];
-
-        const eficaciaData = codes.map(code => {
-            const d = stats[code];
-            if (!d || d.total === 0) return 0;
-            const impl = d.implementadas + d.verificadas + d.cerradas;
-            return Math.round((impl / d.total) * 100);
-        });
+        const labels = ['Abiertas', 'En proceso', 'Cerradas', 'Vencidas'];
+        const data = [
+            stats && stats.abiertas || 0,
+            stats && stats.enProceso || 0,
+            stats && stats.cerradas || 0,
+            stats && stats.vencidas || 0
+        ];
+        const colors = ['#174ea6', '#ffc107', '#28a745', '#dc3545'];
 
         const existingChart = Chart.getChart(canvas);
         if (existingChart) existingChart.destroy();
@@ -383,7 +304,7 @@ class MejoramientoHome {
             data: {
                 labels: labels,
                 datasets: [{
-                    data: eficaciaData,
+                    data: data,
                     backgroundColor: colors.map(c => c + 'cc'),
                     borderColor: colors,
                     borderWidth: 2
@@ -396,7 +317,7 @@ class MejoramientoHome {
                     legend: { display: true, position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12, padding: 8 } },
                     tooltip: {
                         callbacks: {
-                            label: (ctx) => ` ${ctx.label}: ${ctx.raw}% eficacia`
+                            label: (ctx) => ` ${ctx.label}: ${ctx.raw} acción${ctx.raw !== 1 ? 'es' : ''}`
                         }
                     }
                 }
@@ -519,6 +440,7 @@ class MejoramientoHome {
             .k-budget-card .bg-danger { background: var(--k-danger) !important; }
             .k-budget-card .bg-primary { background: var(--k-primary) !important; }
             .k-budget-card .bg-warning { background: var(--k-warning) !important; color: #212529 !important; }
+            .k-budget-card .bg-info { background: #17a2b8 !important; }
             .k-budget-card .kb-amount { font-size: 1.4rem; font-weight: 700; color: var(--k-text-main); margin-bottom: 0.5rem; }
             .k-budget-card .kb-footer { display: flex; justify-content: space-between; margin-top: auto; padding-top: 0.5rem; border-top: 1px solid #eee; }
             .k-budget-card .kb-label { font-size: 0.6rem; color: var(--k-text-muted); text-transform: uppercase; }

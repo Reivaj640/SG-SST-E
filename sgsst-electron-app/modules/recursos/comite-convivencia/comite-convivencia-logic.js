@@ -34,13 +34,30 @@ class ComiteConvivenciaComponent {
 
     handleIframeMessage(event) {
         if (!event.data || !event.data.type) return;
+
+        // 📦608-fix15 — El iframe nos pide abrir el modal full-screen de file-viewer.
+        if (event.data.type === 'open-file-viewer-modal') {
+            const filePath = event.data.filePath;
+            if (!filePath) return;
+            if (window.kairFV && typeof window.kairFV.openWithFileViewerFromPath === 'function') {
+                window.kairFV.openWithFileViewerFromPath(filePath);
+            } else {
+                console.warn('[ComiteConvivenciaLogic] kairFV.openWithFileViewerFromPath no disponible');
+            }
+            return;
+        }
+
         if (event.data.type.endsWith('-request')) {
             const action = event.data.type.replace('-request', '');
             if (action === 'back-to-module') {
                 window.removeEventListener('message', this.handleIframeMessage);
                 this.render();
             } else {
-                this.handleStandardRequest(event, this.getApiMap()[action]);
+                const apiMap = this.getApiMap();
+                const apiName = apiMap[action];
+                if (apiName) {
+                    window.KairDocPreview.handleRequest(event, apiName);
+                }
             }
         }
     }
@@ -66,8 +83,8 @@ class ComiteConvivenciaComponent {
                 requestId,
                 payload: {
                     success: result.success,
-                    data: result.data || result, 
-                    files: result.files, 
+                    data: result.data || result,
+                    files: result.files,
                     folders: result.folders,
                     basePath: result.basePath,
                     fileName: result.fileName,

@@ -31,6 +31,21 @@ class ResponsableSgComponent {
             return;
         }
 
+        // 📦608-fix13 — El iframe (responsable-sg-viewer.js) nos pide abrir el
+        // modal full-screen de file-viewer. El iframe NO tiene window.electronAPI,
+        // así que tiene que delegarnos esta tarea. El parent SÍ tiene electronAPI
+        // y kairFV cargado, así que abrimos el modal acá.
+        if (event.data.type === 'open-file-viewer-modal') {
+            const filePath = event.data.filePath;
+            if (!filePath) return;
+            if (window.kairFV && typeof window.kairFV.openWithFileViewerFromPath === 'function') {
+                window.kairFV.openWithFileViewerFromPath(filePath);
+            } else {
+                console.warn('[ResponsableLogic] kairFV.openWithFileViewerFromPath no disponible');
+            }
+            return;
+        }
+
         // Manejar mensajes del nuevo estándar (type: 'action-request')
         if (event.data.type.endsWith('-request')) {
             const action = event.data.type.replace('-request', '');
@@ -75,7 +90,7 @@ class ResponsableSgComponent {
     async handleStandardRequest(event, apiFunctionName) {
         const { requestId, payload } = event.data;
         console.log(`[ResponsableLogic] Solicitud: ${apiFunctionName}, ID: ${requestId}`);
-        
+
         try {
             if (!window.electronAPI || typeof window.electronAPI[apiFunctionName] !== 'function') {
                 throw new Error(`API function ${apiFunctionName} not found`);
@@ -88,15 +103,59 @@ class ResponsableSgComponent {
                 apiArgs = payload.filePath;
             }
 
+            // 📦608-fix8 — Si el preview solicitado es de un archivo Office (no PDF),
+            // no usamos el IPC viejo (que convierte a PDF con LibreOffice) — en su lugar
+            // leemos los bytes crudos y los devolvemos al viewer para que renderice el
+            // <flyfish-file-viewer> directamente en su panel de preview. El viewer
+            // detecta `mode: 'file-viewer'` y monta el Web Component en su DOM.
+            const filePathStr = typeof apiArgs === 'string' ? apiArgs : (apiArgs?.filePath || '');
+            const fileExt = (filePathStr.split('.').pop() || '').toLowerCase();
+            const isOfficeRequest = (apiFunctionName === 'getExcelPreview' || apiFunctionName === 'getWordPreview')
+                && fileExt && fileExt !== 'pdf';
+
+            if (isOfficeRequest && window.electronAPI.readFileBytes) {
+                console.log(`[ResponsableLogic] 📦608: Office preview (${fileExt}) → readFileBytes`);
+                const rfb = await window.electronAPI.readFileBytes(filePathStr);
+                if (!rfb || !rfb.success) {
+                    event.source.postMessage({
+                        type: `${event.data.type.replace('-request', '')}-response`,
+                        requestId,
+                        payload: {
+                            success: false,
+                            error: (rfb && rfb.error) || 'No se pudo leer el archivo'
+                        }
+                    }, '*');
+                    return;
+                }
+                event.source.postMessage({
+                    type: `${event.data.type.replace('-request', '')}-response`,
+                    requestId,
+                    payload: {
+                        success: true,
+                        mode: 'file-viewer',
+                        data: {
+                            bytes: rfb.data.bytes,
+                            name: rfb.data.name,
+                            ext: rfb.data.ext,
+                            size: rfb.data.size,
+                            // 📦608-fix8 — path original para que el viewer pueda
+                            // "Expandir" el modal full-screen reusando el helper.
+                            filePath: filePathStr
+                        }
+                    }
+                }, '*');
+                return;
+            }
+
             const result = await window.electronAPI[apiFunctionName](apiArgs);
-            
+
             event.source.postMessage({
                 type: `${event.data.type.replace('-request', '')}-response`,
                 requestId,
                 payload: {
                     success: result.success,
-                    data: result.data || result, 
-                    files: result.files, 
+                    data: result.data || result,
+                    files: result.files,
                     folders: result.folders,
                     basePath: result.basePath,
                     fileName: result.fileName,

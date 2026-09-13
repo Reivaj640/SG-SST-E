@@ -158,6 +158,9 @@ def buscar_empleado_por_cedula(cedula, empresa):
         col_area = buscar_columna(["UBICACION", "UBICACIÓN", "AREA", "ÁREA", "DEPARTAMENTO"])
         col_genero = buscar_columna(["GENERO", "SEXO"])
         col_entidad = buscar_columna(["EPS", "SURA","EPS/SURA", "ENTIDAD"])
+        # 📦467 (2026-07-03) — ARL para autollenado en modal de Gestación (Salud Materna)
+        # Antes solo retornaba entidad/EPS; ahora también ARL si la columna existe.
+        col_arl = buscar_columna(["ARL"])
 
         result = {
             "nombre": nombre_completo or "",
@@ -167,6 +170,7 @@ def buscar_empleado_por_cedula(cedula, empresa):
             "area": (row.get(col_area) or "") if col_area else "",  # Departamento/Ubicación
             "genero": (row.get(col_genero) or "") if col_genero else "",
             "entidad": (row.get(col_entidad) or "") if col_entidad else "",  # EPS/SURA
+            "arl": (row.get(col_arl) or "") if col_arl else "",  # 📦467
             "_fila_index": int(row.name)
         }
 
@@ -544,9 +548,14 @@ def cargar_todos_registros_pri(empresa, file_path):
             tipo_reintegro = ws[f"CC{fila_idx}"].value or ""
             adaptaciones = ws[f"CD{fila_idx}"].value or ""
 
-            # Etapa 5: Cierre de Caso (columnas CE-CH)
-            fecha_cierre = str(ws[f"CE{fila_idx}"].value) if ws[f"CE{fila_idx}"].value else ""
-            motivo_cierre = ws[f"CF{fila_idx}"].value or ""
+            # 📦459 (2026-07-02) — FIX: leer de AV/AW en vez de CE/CF.
+            # BUG RAÍZ: guardar_seguimiento escribe fechaCierre/motivoCierre en AV/AW
+            # (índice 47-48, desde incapacidad.fechaCierre). Pero este handler
+            # leía de CE/CF (índice 82-83, desde pric.fechaCierre que el frontend
+            # nunca envía). Resultado: siempre retornaba vacío aunque los datos
+            # estuvieran escritos en el Excel. Ahora lee de las columnas correctas.
+            fecha_cierre = str(ws[f"AV{fila_idx}"].value) if ws[f"AV{fila_idx}"].value else ""
+            motivo_cierre = ws[f"AW{fila_idx}"].value or ""
             fecha_calificacion_pcl = str(ws[f"CG{fila_idx}"].value) if ws[f"CG{fila_idx}"].value else ""
             porcentaje_pcl_calificacion = ws[f"CH{fila_idx}"].value or ""
 
@@ -1719,6 +1728,332 @@ def registrar_incapacidad(empresa, file_path, datos):
         log(traceback.format_exc())
         return {"success": False, "error": str(e)}
 
+
+def buscar_cie10_en_hoja(file_path, cie10_code):
+    """
+    Versión silenciosa de buscar_cie10_descripcion: retorna la descripción
+    directamente, sin imprimir JSON. Usada por actualizar_incapacidad para
+    auto-completar la descripción cuando el user cambia el código CIE-10.
+    Retorna None si no encuentra el código o si hay error.
+    """
+    try:
+        if not os.path.exists(file_path) or not cie10_code:
+            return None
+        # Intentar hoja "CIE-10 PARA RIPS" primero; si no, buscar por keyword
+        sheet_name = "CIE-10 PARA RIPS"
+        try:
+            df = pd.read_excel(file_path, sheet_name=sheet_name, dtype=str, header=None)
+        except Exception:
+            # Buscar hoja alternativa que contenga CIE/DIAGNOST/ENFERM
+            try:
+                from openpyxl import load_workbook as _load_wb
+                wb_tmp = _load_wb(file_path, read_only=True)
+                candidatos = [s for s in wb_tmp.sheetnames
+                              if any(k in s.upper() for k in ["CIE", "DIAGNOST", "DIAGNÓST", "ENFERM"])]
+                wb_tmp.close()
+                if not candidatos:
+                    return None
+                cie_pref = [s for s in candidatos if "CIE" in s.upper()]
+                sheet_name = cie_pref[0] if cie_pref else candidatos[0]
+                df = pd.read_excel(file_path, sheet_name=sheet_name, dtype=str, header=None)
+            except Exception:
+                return None
+
+        if len(df.columns) < 2:
+            return None
+
+        # Normalizar código a buscar
+        codigo_limpio = str(cie10_code).strip().upper()
+        df['_cod_norm'] = df.iloc[:, 0].astype(str).str.strip().str.upper()
+        coinc = df[df['_cod_norm'] == codigo_limpio]
+        if coinc.empty:
+            # Intentar sin puntos
+            coinc = df[df['_cod_norm'].str.replace('.', '', regex=False) == codigo_limpio.replace('.', '')]
+        if coinc.empty:
+            return None
+        descripcion = coinc.iloc[0, 1]
+        return str(descripcion).strip() if descripcion and str(descripcion).strip() else None
+    except Exception as e:
+        log(f"[AUS-EDIT] Error en buscar_cie10_en_hoja: {e}")
+        return None
+
+
+def actualizar_incapacidad(empresa, file_path, row_index, datos):
+    """
+    Modifica una fila existente de incapacidad en el archivo de ausentismo.
+
+    Mismo patrón que `registrar_incapacidad`:
+    - Usa openpyxl para preservar formato
+    - Misma búsqueda de hoja (nombre empresa → año 2024 → primera hoja)
+    - Mismo `match_header` tolerante para mapear campos
+    - Lee headers de fila 7 (consistente con el form de registro)
+
+    Args:
+        empresa: nombre de la empresa
+        file_path: ruta absoluta al .xlsx
+        row_index: índice 0-based de la fila a modificar (NO incluye el header)
+        datos: dict con los campos a actualizar (mismas keys que registrar_incapacidad)
+    """
+    try:
+        log(f"[AUS-EDIT] Actualizando fila rowIndex={row_index} en: {file_path}")
+        log(f"[AUS-EDIT] Empresa: {empresa}, datos: {datos}")
+
+        # Normalizar datos del frontend (camelCase -> snake_case), igual que registrar_incapacidad
+        datos_normalizados = {
+            "cedula": datos.get("cedula", ""),
+            "nombre": datos.get("nombre", ""),
+            "cargo": datos.get("cargo", ""),
+            "area": datos.get("area", "") or datos.get("departamento", ""),
+            "departamento": datos.get("area", "") or datos.get("departamento", ""),
+            "empresa_usuaria": datos.get("empresa_usuaria", ""),
+            "genero": datos.get("genero", ""),
+            "fecha_inicio": datos.get("fecha_inicio", "") or datos.get("fechaInicio", ""),
+            "fecha_finalizacion": datos.get("fecha_finalizacion", "") or datos.get("fechaFin", ""),
+            "dias_incapacidad": datos.get("dias_incapacidad", "") or datos.get("diasIncapacidad", ""),
+            "tipo_incapacidad": datos.get("tipo_incapacidad", "") or datos.get("tipoIncapacidad", ""),
+            "clase_incapacidad": datos.get("clase_incapacidad", "") or datos.get("claseIncapacidad", ""),
+            "entidad": datos.get("entidad", ""),
+            "codigo": datos.get("codigo", ""),
+            "descripcion": datos.get("descripcion", "") or datos.get("diagnostico", ""),
+        }
+        datos = datos_normalizados
+        log(f"[AUS-EDIT] Datos normalizados: {datos}")
+
+        # Cargar el archivo con openpyxl (preserva formato)
+        wb = load_workbook(file_path)
+
+        # Buscar la hoja correcta con la misma lógica que registrar_incapacidad
+        empresa_normalizada = empresa.strip().upper()
+        nombre_hoja_esperado = f"{empresa_normalizada} 2024"
+
+        nombre_hoja_datos = None
+        if nombre_hoja_esperado in wb.sheetnames:
+            nombre_hoja_datos = nombre_hoja_esperado
+        else:
+            candidatos_empresa = [name for name in wb.sheetnames if empresa_normalizada in name.upper()]
+            if candidatos_empresa:
+                nombre_hoja_datos = candidatos_empresa[0]
+            else:
+                candidatos_2024 = [name for name in wb.sheetnames if "2024" in name]
+                if candidatos_2024:
+                    nombre_hoja_datos = candidatos_2024[0]
+                else:
+                    nombre_hoja_datos = wb.sheetnames[0]
+        log(f"[AUS-EDIT] Hoja seleccionada: '{nombre_hoja_datos}'")
+        ws = wb[nombre_hoja_datos]
+
+        # Leer headers de fila 7 (mismo que registrar_incapacidad)
+        headers = []
+        for col in range(1, ws.max_column + 1):
+            cell = ws.cell(row=7, column=col).value
+            headers.append(cell if cell else f"Columna{col}")
+        log(f"[AUS-EDIT] Headers: {headers}")
+
+        # Calcular la fila real en Excel (row_index es 0-based sin contar header)
+        # Igual que registrar_incapacidad: datos empiezan en fila 8
+        fila_excel = 8 + row_index
+        log(f"[AUS-EDIT] rowIndex={row_index} → fila Excel={fila_excel}")
+
+        if fila_excel > ws.max_row:
+            return {"success": False, "error": f"rowIndex {row_index} fuera de rango. La hoja tiene {ws.max_row - 7} filas de datos."}
+
+        # 🆕 Validación: la fila debe tener datos reales (cédula O nombre no vacíos).
+        # Bug evitado: ws.max_row incluye filas con solo formato, así que un rowIndex
+        # alto pero en zona muerta pasaba la validación anterior. Ahora verificamos
+        # que la fila realmente tenga datos antes de tocarla.
+        cedula_fila = ws.cell(row=fila_excel, column=4).value  # Columna D = CÉDULA
+        nombre_fila = ws.cell(row=fila_excel, column=3).value  # Columna C = NOMBRE
+        if not (cedula_fila and str(cedula_fila).strip()) and not (nombre_fila and str(nombre_fila).strip()):
+            return {"success": False, "error": f"rowIndex {row_index} apunta a una fila vacía (sin cédula ni nombre). No se puede modificar."}
+
+        # 🆕 Recalcular N° DIAS DE INCAPACIDAD si vienen fechas en el payload.
+        # Mismo cálculo que `registrar_incapacidad`: (fecha_fin - fecha_inicio).days + 1
+        # Acepta fechas en formato "YYYY-MM-DD" (frontend) o "M/D/YY" (Excel).
+        dias_recalculados = None
+        fi_str = datos.get("fecha_inicio", "")
+        ff_str = datos.get("fecha_finalizacion", "")
+        if fi_str and ff_str:
+            from datetime import datetime
+            # Intentar varios formatos
+            formatos = ["%Y-%m-%d", "%m/%d/%y", "%m/%d/%Y", "%d/%m/%Y", "%Y/%m/%d"]
+            fi_dt, ff_dt = None, None
+            for fmt in formatos:
+                try:
+                    fi_dt = datetime.strptime(str(fi_str).strip(), fmt)
+                    break
+                except ValueError:
+                    continue
+            for fmt in formatos:
+                try:
+                    ff_dt = datetime.strptime(str(ff_str).strip(), fmt)
+                    break
+                except ValueError:
+                    continue
+            if fi_dt and ff_dt and ff_dt >= fi_dt:
+                dias_recalculados = (ff_dt - fi_dt).days + 1
+                log(f"[AUS-EDIT] Días recalculados desde F.INICIO={fi_str} y F.FIN={ff_str}: {dias_recalculados}")
+
+        # 🆕 Auto-completar DESCRIPCION si el user cambió el CÓDIGO CIE-10 y NO
+        # envió una descripción manual. Mismo comportamiento que el form de
+        # registro: al elegir un CIE-10, la descripción se busca
+        # automáticamente en la hoja "CIE-10 PARA RIPS" del mismo archivo.
+        # Si el user escribió su propia descripción, esa tiene prioridad.
+        if datos.get("codigo") and not datos.get("descripcion"):
+            desc_auto = buscar_cie10_en_hoja(file_path, datos["codigo"])
+            if desc_auto:
+                datos["descripcion"] = desc_auto
+                log(f"[AUS-EDIT] Auto-completado: codigo='{datos['codigo']}' → descripcion='{desc_auto}'")
+            else:
+                log(f"[AUS-EDIT] No se encontró descripción automática para código='{datos.get('codigo')}'. Campo DESCRIPCION queda como está.")
+
+        # Aplicar cambios usando match_header (mismo patrón que registrar_incapacidad)
+        applied = []
+        skipped = []
+        for col_idx, header in enumerate(headers, start=1):
+            if match_header(header, "GENERO") or match_header(header, "GÉNERO") or match_header(header, "SEXO"):
+                old = ws.cell(row=fila_excel, column=col_idx).value
+                new = datos.get("genero", "")
+                if new and new != "-":
+                    ws.cell(row=fila_excel, column=col_idx, value=new)
+                    applied.append(f"col {col_idx} ({header}): '{old}' → '{new}'")
+                    log(f"[AUS-EDIT]   ✓ col {col_idx} GENERO: '{old}' → '{new}'")
+            elif match_header(header, "CLASE DE INCAPACIDAD") or match_header(header, "CLASE"):
+                old = ws.cell(row=fila_excel, column=col_idx).value
+                new = datos.get("clase_incapacidad", "")
+                if new and new != "-":
+                    ws.cell(row=fila_excel, column=col_idx, value=new)
+                    applied.append(f"col {col_idx} ({header}): '{old}' → '{new}'")
+                    log(f"[AUS-EDIT]   ✓ col {col_idx} CLASE: '{old}' → '{new}'")
+            elif match_header(header, "TIPO DE INCAPACIDAD") or match_header(header, "TIPO"):
+                old = ws.cell(row=fila_excel, column=col_idx).value
+                new = datos.get("tipo_incapacidad", "")
+                if new and new != "-":
+                    ws.cell(row=fila_excel, column=col_idx, value=new)
+                    applied.append(f"col {col_idx} ({header}): '{old}' → '{new}'")
+                    log(f"[AUS-EDIT]   ✓ col {col_idx} TIPO: '{old}' → '{new}'")
+            elif match_header(header, "F. INICIO") or match_header(header, "FECHA INICIO"):
+                old = ws.cell(row=fila_excel, column=col_idx).value
+                new = datos.get("fecha_inicio", "")
+                if new and new != "-":
+                    ws.cell(row=fila_excel, column=col_idx, value=new)
+                    applied.append(f"col {col_idx} ({header}): '{old}' → '{new}'")
+                    log(f"[AUS-EDIT]   ✓ col {col_idx} F.INICIO: '{old}' → '{new}'")
+            elif match_header(header, "F. FIN") or match_header(header, "FECHA FIN"):
+                old = ws.cell(row=fila_excel, column=col_idx).value
+                new = datos.get("fecha_finalizacion", "")
+                if new and new != "-":
+                    ws.cell(row=fila_excel, column=col_idx, value=new)
+                    applied.append(f"col {col_idx} ({header}): '{old}' → '{new}'")
+                    log(f"[AUS-EDIT]   ✓ col {col_idx} F.FIN: '{old}' → '{new}'")
+            elif match_header(header, "CODIGO") or match_header(header, "CÓDIGO"):
+                old = ws.cell(row=fila_excel, column=col_idx).value
+                new = datos.get("codigo", "")
+                if new and new != "-":
+                    ws.cell(row=fila_excel, column=col_idx, value=new)
+                    applied.append(f"col {col_idx} ({header}): '{old}' → '{new}'")
+                    log(f"[AUS-EDIT]   ✓ col {col_idx} CODIGO: '{old}' → '{new}'")
+            elif match_header(header, "DESCRIPCION") or match_header(header, "DESCRIPCIÓN") or match_header(header, "DIAGNÓSTICO") or match_header(header, "DIAGNOSTICO"):
+                # 🆕 Diagnóstico editable desde el modal
+                # Solo escribir si el user envió `descripcion` (key presente Y no vacía).
+                # Si el user NO tocó este campo, preservar el valor existente.
+                # Esto evita que se borre accidentalmente cuando el auto-complete
+                # del CIE-10 no encuentra match.
+                desc_val = datos.get("descripcion", None)
+                if desc_val is not None and str(desc_val).strip() != "" and desc_val != "-":
+                    old = ws.cell(row=fila_excel, column=col_idx).value
+                    new = str(desc_val)
+                    ws.cell(row=fila_excel, column=col_idx, value=new)
+                    applied.append(f"col {col_idx} ({header}): '{old}' → '{new}'")
+                    log(f"[AUS-EDIT]   ✓ col {col_idx} DESCRIPCION: '{old}' → '{new}'")
+            elif match_header(header, "N° DIAS DE INCAPACIDAD") or match_header(header, "NUM DIAS") or match_header(header, "DIAS INCAPACIDAD"):
+                # 🆕 Si recalculamos días desde las fechas, escribir en la columna K
+                if dias_recalculados is not None:
+                    old = ws.cell(row=fila_excel, column=col_idx).value
+                    new = str(dias_recalculados)
+                    if str(old) != new:
+                        ws.cell(row=fila_excel, column=col_idx, value=new)
+                        applied.append(f"col {col_idx} ({header}): '{old}' → '{new}'")
+                        log(f"[AUS-EDIT]   ✓ col {col_idx} DIAS: '{old}' → '{new}' (auto)")
+            # Los demás campos son readonly (no se modifican)
+
+        log(f"[AUS-EDIT] Aplicados={len(applied)}, Saltados={len(skipped)}")
+
+        # Guardar
+        wb.save(file_path)
+        log(f"[AUS-EDIT] ✅ Fila {fila_excel} actualizada, {len(applied)} campos")
+        return {"success": True, "fila": fila_excel, "applied": applied, "skipped": skipped}
+
+    except Exception as e:
+        log(f"[AUS-EDIT] ❌ Error: {str(e)}")
+        import traceback
+        log(traceback.format_exc())
+        return {"success": False, "error": str(e)}
+
+
+def eliminar_incapacidad(empresa, file_path, row_index):
+    """
+    Elimina una fila existente de incapacidad del archivo de ausentismo.
+    Mismo patrón que actualizar_incapacidad.
+    """
+    try:
+        log(f"[AUS-DEL] Eliminando fila rowIndex={row_index} en: {file_path}")
+
+        wb = load_workbook(file_path)
+
+        # Buscar la hoja con la misma lógica
+        empresa_normalizada = empresa.strip().upper()
+        nombre_hoja_esperado = f"{empresa_normalizada} 2024"
+
+        nombre_hoja_datos = None
+        if nombre_hoja_esperado in wb.sheetnames:
+            nombre_hoja_datos = nombre_hoja_esperado
+        else:
+            candidatos_empresa = [name for name in wb.sheetnames if empresa_normalizada in name.upper()]
+            if candidatos_empresa:
+                nombre_hoja_datos = candidatos_empresa[0]
+            else:
+                candidatos_2024 = [name for name in wb.sheetnames if "2024" in name]
+                if candidatos_2024:
+                    nombre_hoja_datos = candidatos_2024[0]
+                else:
+                    nombre_hoja_datos = wb.sheetnames[0]
+        log(f"[AUS-DEL] Hoja seleccionada: '{nombre_hoja_datos}'")
+        ws = wb[nombre_hoja_datos]
+
+        # Calcular fila real (datos empiezan en fila 8)
+        fila_excel = 8 + row_index
+        log(f"[AUS-DEL] rowIndex={row_index} → fila Excel={fila_excel}")
+
+        if fila_excel > ws.max_row:
+            return {"success": False, "error": f"rowIndex {row_index} fuera de rango."}
+
+        # 🆕 Validación: la fila debe tener datos reales (cédula O nombre no vacíos).
+        # Bug evitado: ws.max_row incluye filas con solo formato, así que un rowIndex
+        # alto pero en zona muerta pasaba la validación anterior. Ahora verificamos
+        # que la fila realmente tenga datos antes de borrarla.
+        cedula_fila = ws.cell(row=fila_excel, column=4).value  # Columna D = CÉDULA
+        nombre_fila = ws.cell(row=fila_excel, column=3).value  # Columna C = NOMBRE
+        if not (cedula_fila and str(cedula_fila).strip()) and not (nombre_fila and str(nombre_fila).strip()):
+            return {"success": False, "error": f"rowIndex {row_index} apunta a una fila vacía (sin cédula ni nombre). No se puede eliminar."}
+
+        # Capturar info antes de eliminar (para devolver en el resultado)
+        nombre_eliminado = ws.cell(row=fila_excel, column=3).value or "(sin nombre)"
+
+        # Eliminar la fila (openpyxl: delete_rows es 1-based)
+        ws.delete_rows(fila_excel, 1)
+        log(f"[AUS-DEL] Fila {fila_excel} ({nombre_eliminado}) eliminada")
+
+        # Guardar
+        wb.save(file_path)
+        return {"success": True, "fila": fila_excel, "nombre": nombre_eliminado}
+
+    except Exception as e:
+        log(f"[AUS-DEL] ❌ Error: {str(e)}")
+        import traceback
+        log(traceback.format_exc())
+        return {"success": False, "error": str(e)}
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print(json.dumps({"type": "result", "payload": {"success": False, "error": "Uso: python actualizar_ausentismo.py <comando> [argumentos...]"}}))
@@ -1821,6 +2156,44 @@ if __name__ == "__main__":
             print(json.dumps({"type": "result", "payload": resultado}, ensure_ascii=False))
         except Exception as e:
             print(json.dumps({"type": "result", "payload": {"success": False, "error": f"Error parsing JSON: {str(e)}"}}))
+
+    elif comando == "actualizar_incapacidad":
+        if len(sys.argv) != 6:
+            print(json.dumps({"type": "result", "payload": {"success": False, "error": "Uso: python actualizar_ausentismo.py actualizar_incapacidad <empresa> <ruta_archivo> <row_index> <json_datos>"}}))
+            sys.exit(1)
+
+        empresa = sys.argv[2]
+        file_path = sys.argv[3]
+        try:
+            row_index = int(sys.argv[4])
+        except ValueError:
+            print(json.dumps({"type": "result", "payload": {"success": False, "error": f"row_index debe ser un número entero, recibí: {sys.argv[4]}"}}))
+            sys.exit(1)
+        datos_json = sys.argv[5]
+        try:
+            datos = json.loads(datos_json)
+            resultado = actualizar_incapacidad(empresa, file_path, row_index, datos)
+            print(json.dumps({"type": "result", "payload": resultado}, ensure_ascii=False))
+        except Exception as e:
+            print(json.dumps({"type": "result", "payload": {"success": False, "error": f"Error parsing JSON: {str(e)}"}}))
+
+    elif comando == "eliminar_incapacidad":
+        if len(sys.argv) != 5:
+            print(json.dumps({"type": "result", "payload": {"success": False, "error": "Uso: python actualizar_ausentismo.py eliminar_incapacidad <empresa> <ruta_archivo> <row_index>"}}))
+            sys.exit(1)
+
+        empresa = sys.argv[2]
+        file_path = sys.argv[3]
+        try:
+            row_index = int(sys.argv[4])
+        except ValueError:
+            print(json.dumps({"type": "result", "payload": {"success": False, "error": f"row_index debe ser un número entero, recibí: {sys.argv[4]}"}}))
+            sys.exit(1)
+        try:
+            resultado = eliminar_incapacidad(empresa, file_path, row_index)
+            print(json.dumps({"type": "result", "payload": resultado}, ensure_ascii=False))
+        except Exception as e:
+            print(json.dumps({"type": "result", "payload": {"success": False, "error": f"Error en eliminar: {str(e)}"}}))
     elif comando == "guardar_seguimiento":
         if len(sys.argv) != 5:
             print(json.dumps({"type": "result", "payload": {"success": False, "error": "Uso: python actualizar_ausentismo.py guardar_seguimiento <empresa> <ruta_archivo> <json_datos_seguimiento>"}}))
@@ -1933,5 +2306,5 @@ if __name__ == "__main__":
             print(json.dumps({"type": "result", "payload": {"success": False, "error": str(e)}}))
     
     else:
-        print(json.dumps({"type": "result", "payload": {"success": False, "error": f"Comando desconocido: {comando}. Comandos válidos: 'actualizar', 'buscar_empleado', 'buscar_cie10', 'registrar_incapacidad', 'guardar_seguimiento', 'cargar_seguimientos', 'buscar_registros_por_cedula', 'cargar_todos_registros_pri'"}}))
+        print(json.dumps({"type": "result", "payload": {"success": False, "error": f"Comando desconocido: {comando}. Comandos válidos: 'actualizar', 'buscar_empleado', 'buscar_cie10', 'registrar_incapacidad', 'actualizar_incapacidad', 'eliminar_incapacidad', 'guardar_seguimiento', 'cargar_seguimientos', 'buscar_registros_por_cedula', 'cargar_todos_registros_pri'"}}))
         sys.exit(1)

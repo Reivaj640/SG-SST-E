@@ -505,28 +505,7 @@ body {
   to { transform: translateX(0); opacity: 1; } 
 }
 
-/* ── Loading ── */
-.kair-loading { 
-  display: flex; 
-  flex-direction: column;
-  align-items: center; 
-  justify-content: center; 
-  min-height: 60vh; 
-  text-align: center; 
-}
-
-.kair-spinner { 
-  width: 40px; 
-  height: 40px; 
-  border: 3px solid var(--kair-border); 
-  border-top-color: var(--kair-primary); 
-  border-radius: 50%; 
-  animation: spin 0.8s linear infinite; 
-  margin-bottom: 1rem; 
-}
-
-@keyframes spin { 
-  to { transform: rotate(360deg); } 
+/* ── Loading ── (removido en 📦490 — usa KairSkeleton.* desde shared/kair-skeleton.js) */ 
 }
 
 .kair-loading-text {

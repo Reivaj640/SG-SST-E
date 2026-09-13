@@ -36,47 +36,62 @@ var AuditoriaEditorView = (function () {
 
   function _renderHeader(audit, activeTab, completitud) {
     var progresoGlobal = Math.round((completitud.filter(Boolean).length / TABS.length) * 100);
-
-    return '<header class="kair-v3-editor-header">' +
-      '<div class="kair-v3-editor-header__row">' +
-        '<div class="kair-v3-editor-header__breadcrumb">' +
-          '<button class="k-btn k-btn-ghost k-btn-sm" id="kair-v3-editor-back" style="width:auto;height:32px;padding:0 12px;">' +
-            '<i class="bi bi-arrow-left"></i> Hub' +
-          '</button>' +
-          '<span class="kair-v3-editor-header__crumb-sep">/</span>' +
-          '<span class="kair-v3-editor-header__crumb-item">Auditorías SG-SST</span>' +
-          '<span class="kair-v3-editor-header__crumb-sep">/</span>' +
-          '<span class="kair-v3-editor-header__crumb-item">' + _esc(audit.code) + '</span>' +
-        '</div>' +
-        '<div class="kair-v3-editor-header__right">' +
-          (audit.status === 'programada' || audit.status === 'en_curso'
-            ? KairUI.Button({ id: 'kair-v3-editor-start', variant: 'secondary', size: 'sm', icon: 'play-fill', label: 'Marcar en curso' })
-            : '') +
-          (audit.status !== 'realizada' && audit.status !== 'cancelada'
-            ? KairUI.Button({ id: 'kair-v3-editor-finish', variant: 'success', size: 'sm', icon: 'check-circle-fill', label: 'Finalizar auditoría' })
-            : '') +
+    /* F16 (2026-06-20): Header estándar K+AIR · mismo patrón que HUB y 6.1.3.
+       Las tabs salen del header y van en un nav separado (debajo del header)
+       para que el header respete el estándar sin perder navegación. */
+    var company = (window.KairMockData && window.KairMockData.ACTIVE_COMPANY && window.KairMockData.ACTIVE_COMPANY.nombre) || 'Empresa';
+    return '<header class="k-module-header">' +
+      '<div class="k-header-left">' +
+        '<div class="k-header-title-group">' +
+          '<div class="k-header-main-title">' +
+            '<i class="bi bi-clipboard-check-fill"></i> ' +
+            _esc(audit.code) +
+          '</div>' +
+          '<div class="k-header-breadcrumb">' +
+            '<span>' + _esc(company) + '</span>' +
+            '<i class="bi bi-chevron-right"></i>' +
+            '<button type="button" data-back-module="1">Verificación</button>' +
+            '<i class="bi bi-chevron-right"></i>' +
+            '<button type="button" data-go-list="1">6.1.2 Auditoría Anual</button>' +
+            '<i class="bi bi-chevron-right"></i>' +
+            '<button type="button" data-go-hub="1">Gestión de Auditorías</button>' +
+            '<i class="bi bi-chevron-right"></i>' +
+            '<span class="k-breadcrumb-item active">' + _esc(audit.code) + '</span>' +
+          '</div>' +
         '</div>' +
       '</div>' +
-      '<div class="kair-v3-editor-header__title-row">' +
-        '<div class="kair-v3-editor-header__title-block">' +
-          '<h1 class="kair-v3-editor-header__title">' + _esc(audit.code) + '</h1>' +
-          '<p class="kair-v3-editor-header__subtitle">' + _esc(audit.process || '—') + '</p>' +
-        '</div>' +
+      '<div class="k-header-right">' +
         KairUI.Badge({ variant: KairHelpers.auditStatusBadge[audit.status] || 'neutral', dot: true, children: KairHelpers.auditStatusLabel[audit.status] || audit.status }) +
+        '<span class="k-sync-badge k-sync-synced" title="Datos cargados">' +
+          '<i class="bi bi-check-circle-fill"></i> Sincronizado' +
+        '</span>' +
+        '<button type="button" class="header-back-btn" data-go-hub="1" title="Volver al Hub">' +
+          '<i class="bi bi-arrow-left"></i> Hub' +
+        '</button>' +
+        (audit.status === 'programada' || audit.status === 'en_curso'
+          ? '<button type="button" class="k-btn k-btn-secondary k-btn-sm" id="kair-v3-editor-start" title="Marcar auditoría en curso">' +
+              '<i class="bi bi-play-fill"></i> Marcar en curso' +
+            '</button>'
+          : '') +
+        (audit.status !== 'realizada' && audit.status !== 'cancelada'
+          ? '<button type="button" class="k-btn k-btn-success k-btn-sm" id="kair-v3-editor-finish" title="Finalizar auditoría">' +
+              '<i class="bi bi-check-circle-fill"></i> Finalizar' +
+            '</button>'
+          : '') +
       '</div>' +
-      /* Tabs del header */
-      '<nav class="kair-v3-editor-tabs" role="tablist">' +
-        TABS.map(function (t) {
-          var active = activeTab === t.id;
-          var count = t.count ? t.count(audit) : null;
-          return '<button type="button" class="kair-v3-tab' + (active ? ' kair-v3-tab--active' : '') + '" data-set-tab="' + t.id + '">' +
-            '<i class="bi bi-' + t.icon + '"></i>' +
-            '<span>' + t.label + '</span>' +
-            (count != null ? '<span class="kair-v3-tab__badge">' + count + '</span>' : '') +
-          '</button>';
-        }).join('') +
-      '</nav>' +
-    '</header>';
+    '</header>' +
+    /* Tabs del editor · fuera del header, en nav propio */
+    '<nav class="kair-v3-editor-tabs" role="tablist">' +
+      TABS.map(function (t) {
+        var active = activeTab === t.id;
+        var count = t.count ? t.count(audit) : null;
+        return '<button type="button" class="kair-v3-tab' + (active ? ' kair-v3-tab--active' : '') + '" data-set-tab="' + t.id + '">' +
+          '<i class="bi bi-' + t.icon + '"></i>' +
+          '<span>' + t.label + '</span>' +
+          (count != null ? '<span class="kair-v3-tab__badge">' + count + '</span>' : '') +
+        '</button>';
+      }).join('') +
+    '</nav>';
   }
 
   /* ─── BANNER DE ESTADO ───────────────────────────────── */
@@ -151,7 +166,7 @@ var AuditoriaEditorView = (function () {
       '<div class="kair-v3-editor-sidebar__section">' +
         '<h4 class="kair-v3-editor-sidebar__title">Datos de la auditoría</h4>' +
         '<ul class="kair-v3-side-data">' +
-          '<li><i class="bi bi-building"></i><span>' + _esc(audit.empresa) + '</span></li>' +
+          '<li><i class="kair-icon-building"></i><span>' + _esc(audit.empresa) + '</span></li>' +
           '<li><i class="bi bi-person"></i><span>' + _esc(audit.auditorLider) + '</span></li>' +
           '<li><i class="bi bi-calendar"></i><span>Programada: ' + _esc(_fmtDate(audit.fechaProgramada)) + '</span></li>' +
           (audit.fechaEntrega ? '<li><i class="bi bi-check-circle"></i><span>Entregada: ' + _esc(_fmtDate(audit.fechaEntrega)) + '</span></li>' : '') +
@@ -415,13 +430,35 @@ var AuditoriaEditorView = (function () {
   }
 
   function _bindEvents(container, audit, activeTab) {
-    /* Volver al Hub */
-    var backBtn = document.getElementById('kair-v3-editor-back');
-    if (backBtn) backBtn.addEventListener('click', function () {
-      KairStore.actions.goHub();
-      if (window.kairAuditoriaAnual && window.kairAuditoriaAnual._refreshView) {
-        window.kairAuditoriaAnual._refreshView();
-      }
+    /* F16: Volver al Hub (data-go-hub) */
+    var goHubBtns = container.querySelectorAll('[data-go-hub]');
+    goHubBtns.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        KairStore.actions.goHub();
+        if (window.kairAuditoriaAnual && window.kairAuditoriaAnual._refreshView) {
+          window.kairAuditoriaAnual._refreshView();
+        }
+      });
+    });
+    /* F16: Ir a la lista de auditorías (data-go-list) */
+    var goListBtns = container.querySelectorAll('[data-go-list]');
+    goListBtns.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        KairStore.actions.goList();
+        if (window.kairAuditoriaAnual && window.kairAuditoriaAnual._refreshView) {
+          window.kairAuditoriaAnual._refreshView();
+        }
+      });
+    });
+    /* F17: breadcrumb "Verificación" → regresa al módulo padre */
+    var backModuleBtns = container.querySelectorAll('[data-back-module]');
+    backModuleBtns.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var inst = window.__kairAudInstance;
+        if (inst && typeof inst.backToModuleCallback === 'function') {
+          inst.backToModuleCallback();
+        }
+      });
     });
 
     /* Tabs (header y sidebar) */
@@ -440,7 +477,7 @@ var AuditoriaEditorView = (function () {
     var startBtn = document.getElementById('kair-v3-editor-start');
     if (startBtn) startBtn.addEventListener('click', function () {
       KairStore.actions.updateAuditStatus(audit.id, 'en_curso');
-      if (window.Sileo) Sileo.success({ title: 'Auditoría en curso' });
+      if (window.updateNotifier) window.updateNotifier.show({ type: 'success', title: 'Auditoría en curso' });
     });
 
     var finishBtn = document.getElementById('kair-v3-editor-finish');
@@ -458,7 +495,7 @@ var AuditoriaEditorView = (function () {
     });
     var saveBtn = document.getElementById('kair-v3-editor-save');
     if (saveBtn) saveBtn.addEventListener('click', function () {
-      if (window.Sileo) Sileo.success({ title: 'Borrador guardado', description: 'Auditoría ' + audit.code });
+      if (window.updateNotifier) window.updateNotifier.show({ type: 'success', title: 'Borrador guardado', subtitle: 'Auditoría ' + audit.code });
     });
 
     /* Acciones inline de hallazgos */
@@ -467,7 +504,7 @@ var AuditoriaEditorView = (function () {
         e.stopPropagation();
         var hId = btn.getAttribute('data-mark-verified');
         KairStore.actions.updateHallazgoEstado(hId, 'verificada');
-        if (window.Sileo) Sileo.success({ title: 'Hallazgo verificado' });
+        if (window.updateNotifier) window.updateNotifier.show({ type: 'success', title: 'Hallazgo verificado' });
         if (window.kairAuditoriaAnual && window.kairAuditoriaAnual._refreshView) {
           window.kairAuditoriaAnual._refreshView();
         }
@@ -478,7 +515,7 @@ var AuditoriaEditorView = (function () {
         e.stopPropagation();
         var hId = btn.getAttribute('data-mark-closed');
         KairStore.actions.updateHallazgoEstado(hId, 'cerrada');
-        if (window.Sileo) Sileo.success({ title: 'Hallazgo cerrado' });
+        if (window.updateNotifier) window.updateNotifier.show({ type: 'success', title: 'Hallazgo cerrado' });
         if (window.kairAuditoriaAnual && window.kairAuditoriaAnual._refreshView) {
           window.kairAuditoriaAnual._refreshView();
         }
@@ -487,16 +524,16 @@ var AuditoriaEditorView = (function () {
   }
 
   function _confirmFinish(audit) {
-    if (window.Sileo) {
-      Sileo.confirm({
+    if (window.kairAuditoriaAnual && window.kairAuditoriaAnual.showConfirm) {
+      window.kairAuditoriaAnual.showConfirm({
         title: '¿Finalizar auditoría?',
-        description: 'Se emitirá el informe y se habilitarán las firmas.',
-        confirmText: 'Finalizar',
+        message: 'Se emitirá el informe y se habilitarán las firmas.',
+        acceptLabel: 'Finalizar',
         danger: false
       }).then(function (ok) {
         if (ok) {
           KairStore.actions.updateAuditStatus(audit.id, 'realizada');
-          if (window.Sileo) Sileo.success({ title: 'Auditoría finalizada', description: 'Informe de ' + audit.code + ' emitido' });
+          if (window.updateNotifier) window.updateNotifier.show({ type: 'success', title: 'Auditoría finalizada', subtitle: 'Informe de ' + audit.code + ' emitido' });
           if (window.kairAuditoriaAnual && window.kairAuditoriaAnual._refreshView) {
             window.kairAuditoriaAnual._refreshView();
           }

@@ -1,15 +1,14 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net http://localhost:8080; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; img-src 'self' data:; font-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.gstatic.com https://fonts.googleapis.com; connect-src 'self' https://fonts.googleapis.com http://localhost:3010 http://localhost:3011 http://localhost:8080 ws://localhost:3010 ws://localhost:3011 ws://localhost:8080; frame-src 'self' http://localhost:3010 http://localhost:3011 http://localhost:8080; child-src 'self' http://localhost:3010 http://localhost:3011 http://localhost:8080; worker-src 'self' blob:; ">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net http://localhost:8080 blob:; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.gstatic.com https://fonts.googleapis.com; connect-src 'self' https://fonts.googleapis.com http://localhost:3001 http://localhost:3010 http://localhost:3011 http://localhost:8080 https://firma.k-air.com ws://localhost:3010 ws://localhost:3011 ws://localhost:8080 blob:; frame-src 'self' http://localhost:3010 http://localhost:3011 http://localhost:8080 blob:; child-src 'self' http://localhost:3010 http://localhost:3011 http://localhost:8080 blob:; worker-src 'self' blob:; object-src 'self' blob:; ">
   <title>K+AIR</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20260912-1954-styles-bust">
   <link rel="stylesheet" href="development-styles.css">
   <link rel="stylesheet" href="modules/gestion-integral/evaluacion-inicial-sg-sst/evaluacion-inicial-sg-sst.css">
   <link rel="stylesheet" href="modules/gestion-salud/investigacion-accidentes/investigacion-accidentes-view.css">
-  <link rel="stylesheet" href="node_modules/vanilla-calendar-pro/styles/index.css">
 
   <!-- Scripts para animación de fondo (Vanta.js) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
@@ -22,9 +21,36 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="assets/css/bootstrap-icons.css">
 
+  <!-- 📦713 (2026-08-15) — Módulo Gestión Humana: CSS del shell -->
+  <link rel="stylesheet" href="modules/gestion-humana/gestion-humana-home.css">
+  <!-- 📦720 (2026-08-15) — Módulo Gestión Humana: Helper KPIBar compartido -->
+  <link rel="stylesheet" href="modules/gestion-humana/shared/kpi-bar.css">
+  <!-- 📦714 (2026-08-15) — Módulo Gestión Humana: CSS por vista -->
+  <link rel="stylesheet" href="modules/gestion-humana/base-personal/index.css">
+  <!-- 📦720 (2026-08-15) — Dashboard -->
+  <link rel="stylesheet" href="modules/gestion-humana/dashboard/index.css">
+  <!-- 📦722 (2026-08-15) — Afiliaciones -->
+  <link rel="stylesheet" href="modules/gestion-humana/afiliaciones/index.css">
+  <!-- 📦722 (2026-08-15) — Documentos -->
+  <link rel="stylesheet" href="modules/gestion-humana/documentos/index.css">
+  <!-- I-103.A1.6 · Firma electrónica (Fase 1) -->
+  <link rel="stylesheet" href="modules/gestion-humana/firma-electronica/index.css">
+  <!-- 📦723 (2026-08-15) — Comunicación -->
+  <link rel="stylesheet" href="modules/gestion-humana/comunicacion/index.css">
+  <!-- 📦724 (2026-08-15) — Permisos -->
+  <link rel="stylesheet" href="modules/gestion-humana/permisos/index.css">
+  <!-- 📦725 (2026-08-15) — Vacaciones -->
+  <link rel="stylesheet" href="modules/gestion-humana/vacaciones/index.css">
+  <!-- 📦726 (2026-08-15) — Contratación -->
+  <link rel="stylesheet" href="modules/gestion-humana/contratacion/index.css">
+  <link rel="stylesheet" href="modules/gestion-humana/carpetas/index.css?v=FIX-CURRENTCOMPANY-20260912-1010">
+
   <!-- Fuentes locales (evitar timeouts de CDN) -->
   <link rel="stylesheet" href="assets/css/google-fonts.css">
   <link rel="stylesheet" href="assets/css/font-awesome.min.css">
+  <!-- 📦768 — K+AIR design tokens (overflow main-content via :has()) -->
+  <link rel="stylesheet" href="shared/kair-design-tokens.css?v=20260912-1948-main-overflow">
+  <link rel="stylesheet" href="shared/kair-components.css?v=20260912-1956-header-left">
 </head>
 <body>
 <div id="app">
@@ -49,42 +75,161 @@
           <strong>K+AIR</strong> <small> Powered by GEST-IAR</small>
         </h1>
         <div class="header-buttons">
+          <div id="header-company-label" class="header-company-label" style="display: none;">
+            <span id="header-company-name">—</span>
+          </div>
           <button id="company-home-button" class="header-btn" title="Volver al Inicio de la Empresa" style="display: none;">
-            <span class="icon-placeholder">🏠</span>
+            <span class="icon-placeholder"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
           </button>
-          <button id="calendar-button" class="header-btn" title="Calendario">
-            <span id="calendar-icon-placeholder" class="icon-placeholder">📅</span>
-          </button>
-          <button id="header-update-btn" class="header-btn header-update-btn header-update-uptodate" title="Cargando versión...">
-            <span class="icon-placeholder">🔄</span>
-            <span id="header-update-text" class="header-update-text">...</span>
+          <!-- 📦572 — Calendario viejo (K+AIR Calendar popover) RETIRADO. La Bandeja Integrada
+               tiene su propio calendario interno (mini-cal en sidebar + calendario grande en slide)
+               que usa los mismos IPC handlers y datos. Mantener solo la Bandeja Integrada como
+               entry point único de calendario+correo. -->
+          <!-- 📦563 — Bandeja Integrada (Correo + Calendario). Entry point principal de calendario
+               y correo (reemplaza al calendar-button retirado en 📦572). -->
+          <button id="bandeja-integrada-button" class="header-btn" title="Bandeja Integrada (Correo + Calendario)">
+            <span class="icon-placeholder">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="16" rx="2"/>
+                <polyline points="3 10 12 15 21 10"/>
+                <line x1="8" y1="2" x2="8" y2="6"/>
+                <line x1="16" y1="2" x2="16" y2="6"/>
+                <line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+            </span>
+            <!-- 📦563 + Alertas — Badge con conteo de eventos pendientes (mismo KairAlerts que el calendario viejo) -->
+            <span id="bandeja-integrada-badge" class="kair-cal-badge" role="status" aria-label="Eventos pendientes" hidden>0</span>
           </button>
           <button id="config-button" class="header-btn" title="Configuraciones">
-            <span id="config-icon-placeholder" class="icon-placeholder">⚙️</span>
+            <span id="config-icon-placeholder" class="icon-placeholder"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
           </button>
           <button id="llm-button" class="header-btn" title="Chat LLM">
-            <span id="llm-icon-placeholder" class="icon-placeholder">💬</span>
+            <span id="llm-icon-placeholder" class="icon-placeholder"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
           </button>
-        </div>
-        <div id="header-update-panel" class="header-update-panel" style="display:none">
-          <div class="update-progress-container">
-            <div class="update-progress-bar">
-              <div id="update-progress-fill" class="update-progress-fill"></div>
-            </div>
-            <span id="update-progress-text" class="update-progress-text">Descargando...</span>
-          </div>
-          <button id="update-install-btn" class="update-install-btn" style="display:none">Actualizar</button>
         </div>
       </div>
     </header>
 
+    <!-- Hotspot invisible para expandir el sidebar cuando está colapsado -->
+    <div id="sidebar-hotspot"></div>
+
+    <!-- 📦581 (Loop 1.6) — Dropdown de actualización (FUERA del header, position: fixed, z-index alto).
+         Antes estaba dentro del header pero quedaba detrás del Vanta por
+         el stacking context (isolation: isolate) del header. Ahora está
+         en el body, position: fixed, y JS sincroniza su posición con el botón. -->
+    <div id="kair-update-dropdown" class="kair-update-dropdown" role="menu" aria-hidden="true" hidden>
+      <div class="kair-update-dropdown__inner">
+        <div class="kair-update-dropdown__header">
+          <div class="kair-update-dropdown__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+          </div>
+          <div class="kair-update-dropdown__title">
+            <div class="kair-update-dropdown__title-main">Nueva versión disponible</div>
+            <div class="kair-update-dropdown__title-sub">K+AIR v<span data-kair-update-version>—</span></div>
+          </div>
+        </div>
+        <div class="kair-update-dropdown__body">
+          <p class="kair-update-dropdown__desc">
+            Hay una actualización lista para instalar. Se aplicará automáticamente al cerrar la aplicación,
+            o podés reiniciar ahora.
+          </p>
+          <div class="kair-update-dropdown__actions">
+            <button type="button" class="kair-update-dropdown__btn kair-update-dropdown__btn--primary" data-kair-update-action="restart">
+              Reiniciar ahora
+            </button>
+            <button type="button" class="kair-update-dropdown__btn kair-update-dropdown__btn--ghost" data-kair-update-action="dismiss">
+              Más tarde
+            </button>
+          </div>
+          <!-- 📦581 (Loop 5) — Botón "Ver detalles" abre el modal de información de versión.
+               Link pequeño, ghost-style, separado del flujo principal de acciones. -->
+          <button type="button" class="kair-update-dropdown__link" data-kair-update-action="details">
+            Ver información de versión
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 📦581 (Loop 5) — Modal "Información de actualizaciones" (user-invoked).
+         Trigger: botón "Ver información de versión" en el dropdown del header.
+         Muestra: estado actual, versión instalada, versión disponible, última verificación,
+         canal de actualización, y permite forzar un check manual.
+         UX: Claude-style, low blue tone, border-radius 12px, sin invadir. -->
+    <div id="kair-update-modal-overlay" class="kair-update-modal-overlay" hidden>
+      <div id="kair-update-modal" class="kair-update-modal" role="dialog" aria-labelledby="kair-update-modal-title" aria-modal="true">
+        <header class="kair-update-modal__header">
+          <div class="kair-update-modal__title-wrap">
+            <div class="kair-update-modal__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12.01" y2="8"/>
+              </svg>
+            </div>
+            <div>
+              <h2 id="kair-update-modal-title" class="kair-update-modal__title">Información de actualizaciones</h2>
+              <p class="kair-update-modal__subtitle">K+AIR · Sistema de actualización automática</p>
+            </div>
+          </div>
+          <button type="button" class="kair-update-modal__close" data-kair-update-action="modal-close" aria-label="Cerrar">×</button>
+        </header>
+        <div class="kair-update-modal__body">
+          <!-- Estado actual (badge grande) -->
+          <div class="kair-update-modal__state">
+            <div class="kair-update-modal__state-badge" data-kair-modal-state="uptodate">
+              <span class="kair-update-modal__state-dot" aria-hidden="true"></span>
+              <span class="kair-update-modal__state-text" data-kair-modal-state-text>Al día</span>
+            </div>
+            <p class="kair-update-modal__state-desc" data-kair-modal-state-desc>Estás usando la última versión disponible.</p>
+          </div>
+          <!-- Info en grid -->
+          <dl class="kair-update-modal__grid">
+            <div class="kair-update-modal__row">
+              <dt>Versión instalada</dt>
+              <dd data-kair-modal-current-version>—</dd>
+            </div>
+            <div class="kair-update-modal__row">
+              <dt>Última versión disponible</dt>
+              <dd data-kair-modal-latest-version>—</dd>
+            </div>
+            <div class="kair-update-modal__row">
+              <dt>Última verificación</dt>
+              <dd data-kair-modal-last-check>—</dd>
+            </div>
+            <div class="kair-update-modal__row">
+              <dt>Canal</dt>
+              <dd>Estable (releases)</dd>
+            </div>
+          </dl>
+          <!-- Nota sobre auto-update -->
+          <p class="kair-update-modal__note">
+            Las actualizaciones se descargan en segundo plano y se aplican automáticamente al cerrar la aplicación.
+          </p>
+          <!-- 📦581 (Loop 9) — Release notes (preview de GitHub) -->
+          <div id="kair-modal-release-notes-wrap" class="kair-update-modal__notes-wrap" hidden>
+            <h3 class="kair-update-modal__notes-title">Qué hay de nuevo</h3>
+            <div id="kair-modal-release-notes" class="kair-update-modal__notes">
+              <div class="kair-update-modal__notes-loading">Cargando notas de la versión…</div>
+            </div>
+          </div>
+        </div>
+        <footer class="kair-update-modal__footer">
+          <button type="button" class="kair-update-modal__btn kair-update-modal__btn--ghost" data-kair-update-action="modal-close">
+            Cerrar
+          </button>
+          <button type="button" class="kair-update-modal__btn kair-update-modal__btn--primary" data-kair-update-action="modal-check">
+            <span data-kair-modal-check-label>Buscar actualizaciones ahora</span>
+          </button>
+        </footer>
+      </div>
+    </div>
+
     <div class="main-container">
       <aside id="sidebar">
-        <div id="company-info" class="company-info">
-          <img id="company-logo" src="" alt="Logo Empresa" style="display:none;">
-          <div id="company-logo-placeholder" class="company-logo-placeholder">Logo</div>
-          <span id="company-name">Empresa</span>
-        </div>
         <nav>
           <ul id="sidebar-menu"></ul>
         </nav>
@@ -98,7 +243,21 @@
     <footer id="app-footer">
       <div class="footer-content">
         <p>© 2025 Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos.</p>
-        <span id="app-version" class="footer-version"></span>
+        <span class="footer-version-wrap">
+          <span id="app-version" class="footer-version"></span>
+          <!-- 📦581 (Loop 4b) — Botón-dot de update en el footer (opencode-style).
+               OCULTO por default (al día). Aparece al lado de la versión
+               cuando hay update (dot azul pulse) o está descargado (dot verde halo).
+               Click en el dot abre el dropdown anclado al footer. -->
+          <button id="footer-update-btn" class="footer-update-btn" type="button" title="Versión actual" aria-label="Información de actualizaciones" aria-haspopup="menu" aria-expanded="false" hidden>
+            <span class="footer-update-btn__dot" aria-hidden="true"></span>
+          </button>
+          <!-- 📦581 (Loop 8) — Disclaimer "se instalará al cerrar" al lado del dot.
+               OCULTO por default. Aparece SOLO cuando hay update (dot visible).
+               Le recuerda al user que la actualización se aplica al cerrar la app,
+               sin necesidad de hacer nada. -->
+          <span id="footer-update-disclaimer" class="footer-update-disclaimer" hidden>Se instalará al cerrar la app</span>
+        </span>
       </div>
     </footer>
   </div>
@@ -112,9 +271,6 @@
   </div>
 
   <!-- Cargar bibliotecas externas -->
-  <script src="node_modules/jquery/dist/jquery.min.js"></script>
-  <script src="node_modules/jquery-ui-dist/jquery-ui.min.js"></script>
-  <link rel="stylesheet" href="node_modules/jquery-ui-dist/jquery-ui.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="node_modules/xlsx/dist/xlsx.full.min.js"></script>
@@ -122,6 +278,8 @@
   <!-- Inicializar sistema modular -->
   <!-- ThemeManager eliminado: renderer.js maneja el tema de forma centralizada -->
   <!-- Cargar los componentes -->
+  <!-- 📦484 — Sistema centralizado de skeleton screens (KairSkeleton.*) — disponible globalmente para todos los módulos -->
+  <script src="shared/kair-skeleton.js"></script>
   <script src="modules/gestion-salud/reportes-accidentes/reportes-accidentes-logic.js"></script>
   <script src="modules/gestion-salud/restricciones-medicas/restricciones-medicas-logic.js"></script>
   <script src="modules/gestion-salud/evaluaciones-medicas/evaluaciones-medicas-logic.js"></script>
@@ -145,11 +303,31 @@
   <script src="modules/gestion-integral/evaluacion-inicial-sg-sst/evaluacion-inicial-sg-sst.js"></script>
   <script src="modules/gestion-integral/gestion-del-cambio/gestion-cambio-logic.js"></script>
   <script src="modules/gestion-salud/sociodemografica/sociodemografica-component.js"></script>
-  <script src="modules/gestion-integral/gestion-integral-home.js"></script>
-  <script src="modules/recursos/recursos-home.js"></script>
-  <script src="modules/gestion-salud/gestion-salud-home.js"></script>
-  <script src="modules/gestion-peligros/gestion-peligros-home.js"></script>
-  <script src="modules/gestion-amenazas/gestion-amenazas-home.js"></script>
+  <script src="modules/gestion-salud/perfiles-cargo-profesiograma/perfiles-cargo-profesiograma-component.js"></script>
+  <!-- 📦642 — SIDEBAR_ICONS debe cargarse ANTES de los *-home.js porque cada home
+       usa el SVG de su módulo en el header. También usado por renderer.js. -->
+  <script src="shared/sidebar-icons.js"></script>
+  <script src="modules/gestion-integral/gestion-integral-home.js?v=GESTION-INTEGRAL-20260912-v2-fix-loadstats"></script>
+  <script src="modules/recursos/recursos-home.js?v=RECURSOS-20260912-v13-no-ver-todo"></script>
+  <script src="modules/gestion-salud/gestion-salud-home.js?v=GESTION-SALUD-20260912-v1-rediseno"></script>
+  <script src="modules/gestion-peligros/gestion-peligros-home.js?v=GESTION-PELIGROS-20260913-v1-rediseno"></script>
+  <script src="modules/gestion-amenazas/gestion-amenazas-home.js?v=GESTION-AMENAZAS-20260913-v3-fix-scroll"></script>
+  <!-- 📦709 (2026-08-15) — Módulo Gestión Humana (nuevo top-level, v0.1.191) -->
+  <script src="shared/colombia-festivos.js"></script>
+  <script src="modules/gestion-humana/shared/kpi-bar.js"></script>
+  <script src="modules/gestion-humana/gestion-humana-home.js"></script>
+  <script src="modules/gestion-humana/dashboard/index.js"></script>
+  <script src="modules/gestion-humana/base-personal/index.js"></script>
+  <script src="modules/gestion-humana/contratacion/index.js"></script>
+  <script src="modules/gestion-humana/carpetas/index.js?v=FIX-CURRENTCOMPANY-20260912-1010"></script>
+  <script src="modules/gestion-humana/vacaciones/index.js"></script>
+  <script src="modules/gestion-humana/permisos/index.js"></script>
+  <script src="modules/gestion-humana/afiliaciones/index.js"></script>
+  <script src="modules/gestion-humana/documentos/index.js"></script>
+  <!-- I-103.A1.6 · Firma electrónica (Fase 1) -->
+  <script src="modules/gestion-humana/firma-electronica/index.js"></script>
+  <script src="modules/gestion-humana/comunicacion/index.js"></script>
+  <script src="modules/gestion-humana/trabajador-detalle/index.js"></script>
   <script src="modules/verificacion/verificacion-home.js"></script>
   <script src="modules/verificacion/definicion-indicadores/definicion-indicadores-service.js"></script>
   <script src="modules/verificacion/definicion-indicadores/indicadores-resultado-view.js"></script>
@@ -170,7 +348,7 @@
   <script src="modules/verificacion/revision-alta-direccion/vistas/actas-reunion.js"></script>
   <script src="modules/verificacion/revision-alta-direccion/vistas/despliegue-estrategico.js"></script>
   <script src="modules/verificacion/revision-alta-direccion/vistas/procedimiento.js"></script>
-  <script src="modules/verificacion/revision-alta-direccion/vistas/registro-documental.js"></script>
+  <!-- <script src="modules/verificacion/revision-alta-direccion/vistas/registro-documental.js"></script> -->
   <script src="modules/verificacion/revision-alta-direccion/revision-alta-direccion-component.js"></script>
   <script src="modules/mejoramiento/mejoramiento-store.js"></script>
   <script src="modules/mejoramiento/mejoramiento-home.js"></script>
@@ -187,7 +365,6 @@
   <script src="modules/recursos/capacitaciones/capacitaciones-portal-logic.js"></script>
   <script src="modules/recursos/inducciones/inducciones-logic.js"></script>
   <script src="modules/recursos/inducciones/inducciones-viewer.js"></script>
-  <script src="node_modules/vanilla-calendar-pro/index.js"></script>
   <script src="modules/gestion-integral/plan-trabajo/plan-trabajo-logic.js"></script>
   <script src="modules/gestion-integral/rendicion-cuentas/rendicion-logic.js"></script>
   <script src="modules/gestion-integral/rendicion-cuentas/rendicion-viewer.js"></script>
@@ -209,21 +386,49 @@
 <script src="modules/gestion-integral/evaluacion-seleccion/reportes.js"></script>
 <script src="modules/gestion-integral/evaluacion-seleccion/evaluacion-seleccion-component.js"></script>
 
-<!-- Submódulo 4.1.2 - Identificación de Peligros (Matriz GTC-45) -->
-<link rel="stylesheet" href="modules/gestion-peligros/identificacion-peligros/identificacion-peligros.css">
-<script src="modules/gestion-peligros/identificacion-peligros/identificacion-peligros-service.js"></script>
-<script src="modules/gestion-peligros/identificacion-peligros/matriz-view.js"></script>
-<script src="modules/gestion-peligros/identificacion-peligros/priorizacion-view.js"></script>
-<script src="modules/gestion-peligros/identificacion-peligros/indicadores-view.js"></script>
-<script src="modules/gestion-peligros/identificacion-peligros/identificacion-peligros-component.js"></script>
+<!-- Submódulo 4.1.2 - Identificación de Peligros (Matriz GTC-45)
+     v=20260623a — query string para forzar recarga del CSS y evitar
+     que Electron/Chromium sirva una version cacheada del archivo.
+     Subir la version (a, b, c...) cada vez que se cambie el CSS
+     del modulo de peligros para garantizar que los usuarios vean
+     los estilos actualizados sin tener que limpiar el cache. -->
+<link rel="stylesheet" href="modules/gestion-peligros/identificacion-peligros/kair-matriz-peligros.css?v=20260623a">
+  <script src="modules/gestion-peligros/identificacion-peligros/kair-matriz-peligros-utils.js"></script>
+  <script src="modules/gestion-peligros/identificacion-peligros/kair-matriz-peligros-service.js"></script>
+  <script src="modules/gestion-peligros/identificacion-peligros/kair-matriz-peligros-header.js"></script>
+  <script src="modules/gestion-peligros/identificacion-peligros/kair-matriz-peligros-matriz.js"></script>
+  <script src="modules/gestion-peligros/identificacion-peligros/kair-matriz-peligros-indicadores.js"></script>
+  <script src="modules/gestion-peligros/identificacion-peligros/kair-matriz-peligros-priorizacion.js"></script>
+  <script src="modules/gestion-peligros/identificacion-peligros/kair-matriz-peligros-editor.js"></script>
+  <script src="modules/gestion-peligros/identificacion-peligros/kair-matriz-peligros.js"></script>
 
-<!-- Submódulo 4.2.4 - Inspecciones Sistemáticas a las Instalaciones, Máquinas o Equipos -->
-<link rel="stylesheet" href="modules/gestion-peligros/inspecciones/inspecciones.css">
-<script src="modules/gestion-peligros/inspecciones/inspecciones-service.js"></script>
-<script src="modules/gestion-peligros/inspecciones/programa-insp.js"></script>
-<script src="modules/gestion-peligros/inspecciones/formulario-insp.js"></script>
-<script src="modules/gestion-peligros/inspecciones/historial-insp.js"></script>
-<script src="modules/gestion-peligros/inspecciones/inspecciones-component.js"></script>
+<!-- Submódulo 4.2.4 - Inspecciones Sistemáticas a las Instalaciones, Máquinas o Equipos (NUEVO MÓDULO VANILLA.JS) -->
+<!-- CSS: tokens + components + modulo inspecciones consolidados -->
+<link rel="stylesheet" href="modules/gestion-peligros/inspecciones/inspeccion.css">
+<!-- Vendors (CSP 'self', sin CDN) -->
+<script src="vendor/lucide.min.js"></script>
+<script src="vendor/jspdf.umd.min.js"></script>
+<script src="vendor/jspdf.plugin.autotable.min.js"></script>
+<!-- xlsx ya está cargado antes (línea 121) desde node_modules/xlsx/dist/xlsx.full.min.js -->
+<!-- Lib core del módulo inspecciones -->
+<script src="modules/gestion-peligros/inspecciones/inspeccion-types.js"></script>
+<script src="modules/gestion-peligros/inspecciones/inspeccion-export-engine.js"></script>
+<script src="modules/gestion-peligros/inspecciones/inspeccion-store.js"></script>
+<script src="modules/gestion-peligros/inspecciones/inspeccion-api.js"></script>
+<script src="modules/gestion-peligros/inspecciones/inspeccion-templates.js"></script>
+<script src="modules/gestion-peligros/inspecciones/inspeccion-router.js"></script>
+<!-- Vistas -->
+<script src="modules/gestion-peligros/inspecciones/views/inspeccion-dashboard.js"></script>
+<script src="modules/gestion-peligros/inspecciones/views/inspeccion-hub.js"></script>
+<script src="modules/gestion-peligros/inspecciones/views/inspeccion-historial.js"></script>
+<script src="modules/gestion-peligros/inspecciones/views/inspeccion-detalle.js"></script>
+<script src="modules/gestion-peligros/inspecciones/views/inspeccion-form-botiquin.js"></script>
+<script src="modules/gestion-peligros/inspecciones/views/inspeccion-form-extintores.js"></script>
+<script src="modules/gestion-peligros/inspecciones/views/inspeccion-form-instalaciones.js"></script>
+<script src="modules/gestion-peligros/inspecciones/views/inspeccion-form-emergencia.js"></script>
+<!-- App controller + wrapper IIFE (debe ir último para registrar window.InspeccionComponent) -->
+<script src="modules/gestion-peligros/inspecciones/inspeccion-app.js"></script>
+<script src="modules/gestion-peligros/inspecciones/inspeccion-component.js"></script>
 
 <!-- Submódulo 4.2.5 - Mantenimiento Periódico de Equipos, Instalaciones, Herramientas -->
 <link rel="stylesheet" href="modules/gestion-peligros/mantenimiento/mantenimiento.css">
@@ -234,10 +439,35 @@
 
 <!-- Sistema de Notificaciones K+AIR (módulos) -->
 <script src="assets/js/kair-toast.js"></script>
+<!-- 📦GESTION-HUMANA-TOAST — Helper estandarizado (success/error/warning/info con title+subtitle) -->
+<script src="modules/gestion-humana/shared/kair-toast-helper.js"></script>
+<!-- 📦708 — Sistema de diálogos de confirmación (modales) -->
+<script src="assets/js/kair-confirm.js"></script>
 
 <!-- Sistema de Notificaciones Moderno para Actualizaciones -->
 <script src="assets/js/update-notifications.js"></script>
-  
+
+<!-- 📦573 — K+AIR Calendar Component (kair-calendar.js/css) quitado del main app.
+     La Bandeja Integrada iframe tiene su propia copia. Solo mantenemos el adapter
+     (KairAlerts lo usa) y el calendar-detail-panel (KairAlerts lo usa para abrir
+     el detalle del evento al clickear un pendiente). -->
+  <script src="shared/kair-calendar-adapter.js?v=545"></script>
+  <script src="modules/shared/calendar-detail-panel.js?v=545"></script>
+  <!-- 📦 Alertas calendario — badge + popover de pendientes. Depende de KairCalendarAdapter y calendarDetailPanel. -->
+  <script src="shared/kair-alerts.js"></script>
+  <!-- 📦640 — ScrollToTopBottomButton (FAB reusable para scroll-to-top/bottom de tablas y paneles). -->
+  <script src="modules/shared/scroll-fab.js?v=640"></script>
+
+  <!-- 📦608 — @file-viewer (preview nativo de Office/PDF/imágenes en el browser).
+       Bundle IIFE "web-full" auto-registra el custom element <flyfish-file-viewer>
+       CON todos los renderers adentro (PDF/Word/Excel/PowerPoint/Imágenes/etc).
+       Workers/WASM/fonts viven en renderer/file-viewer-assets/.
+       La versión "web-full" es la que funciona offline sin configurar presets
+       manualmente (la "web" sin -full es solo el shell que carga renderers
+       dinámicamente, y no funciona con `<script>` tag en modo offline). -->
+  <script src="renderer/file-viewer-assets/flyfish-file-viewer-web-full.iife.js?v=UPGRADE-V3.0.2-20260912-1135"></script>
+  <script src="shared/file-viewer.js?v=UPGRADE-V3.0.2-20260912-1135"></script>
+
   <script src="renderer.js"></script>
   
   <!-- Contenedor de Notificaciones (Toast Hub) -->

@@ -8,8 +8,8 @@ class EvaluacionInicialSgSst {
         this.moduleName = moduleName;
         this.submoduleTitle = submoduleTitle;
         this.backToModuleCallback = backToModuleCallback;
- 
-        // Estado del componente
+
+        // 📦531 — Estado del componente
         this.currentFindings = [];
         this.currentData = [];
         this.currentYear = new Date().getFullYear().toString();
@@ -17,16 +17,78 @@ class EvaluacionInicialSgSst {
         this.currentPdfPath = null;
         this.submodulePath = null;
         this.activeTab = 'dashboard';
- 
+
         // Datos vacíos iniciales
         this.findingsBase = {};
         this.dataBase = {};
-        
-// Datos de planes de acción
-this.actionPlans = [];
-this.actionPlanIdCounter = 1;
-this.lastScore = 0;
+
+        // Datos de planes de acción — persistidos en SQLite desde 📦531
+        this.actionPlans = [];
+        this.lastScore = 0;
+
+        // 📦531 — Flag de debug. Poner en true para ver console.logs de flujo.
+        // Mantener en false en producción (default).
+        this._debug = false;
+
+        // 📦531 — Referencia al ResizeObserver del gauge (para cleanup en destroy)
+        this._gaugeResizeObserver = null;
+
+        // 📦531 — Flag para evitar doble-bind de event listeners en re-renders
+        this._listenersBound = false;
     }
+
+    _log(level, msg) {
+        if (!this._debug && level === 'log') return;
+        if (typeof console !== 'undefined' && console[level]) {
+            console[level]('[EvaluacionInicialSgSst] ' + msg);
+        }
+    }
+
+    /**
+     * 📦534 — Wrapper fijo para modales adjuntados al body.
+     *
+     * Por que: position: fixed en el modal-overlay falla en este Electron app
+     * porque body { overflow: hidden; height: 100vh } + otros z-index altos
+     * (loading-overlay z-index: 10000) hacen que el modal se renderice mal.
+     *
+     * Solucion: crear un wrapper position:fixed fullscreen UNA sola vez,
+     * appendear el modal como position:absolute dentro de el. Asi el modal
+     * siempre se posiciona relativo al wrapper (que SI es fixed al viewport).
+     */
+    _getModalRoot() {
+        let root = document.getElementById('k-modal-root');
+        if (!root) {
+            root = document.createElement('div');
+            root.id = 'k-modal-root';
+            root.style.cssText = [
+                'position: fixed',
+                'inset: 0',
+                'z-index: 99999',
+                'pointer-events: none'
+            ].join(';') + ';';
+            document.body.appendChild(root);
+        }
+        return root;
+    }
+
+    /**
+     * 📦534 — Inyecta ::backdrop para los <dialog> de planes de acción.
+     * Se llama una sola vez. Regla global porque los <dialog> se mueven
+     * al top layer y no se ven afectados por scoping del módulo.
+     */
+    _ensureDialogBackdropStyle() {
+        if (document.getElementById('k-modal-dialog-backdrop-style')) return;
+        const style = document.createElement('style');
+        style.id = 'k-modal-dialog-backdrop-style';
+        style.textContent = `
+            dialog.k-modal[open]::backdrop {
+                background: rgba(0, 0, 0, 0.6);
+                backdrop-filter: blur(2px);
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
 
     async render() {
         // Registrar instancia global para manejo de eventos DOM
@@ -36,6 +98,11 @@ this.lastScore = 0;
         this.container.innerHTML = '';
         this.container.className = ''; // Limpiar clases previas
         this.container.classList.add('k-module-container'); // Clase contenedora estándar
+
+        // 📦532 — El sistema de notificaciones ahora es window.KAIRToast
+        // (assets/js/kair-toast.js), el estandar del proyecto. KAIRToast
+        // gestiona su propio hub #notification-hub internamente, asi que
+        // no necesitamos un nodo toast propio en el container.
 
         const mainLayout = document.createElement('div');
         mainLayout.className = 'k-module-layout ev-inicial-sgsst';
@@ -53,12 +120,18 @@ this.lastScore = 0;
                   </div>
                 </div>
                 <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
-                  <select class="header-select" id="sourceSelect" onchange="window.currentEvaluacionInstance.updateSource()">
-                    <option value="ministerio">🏛️ Ministerio de Trabajo</option>
-                    <option value="arl">🛡️ Informe ARL</option>
-                  </select>
-                  <button class="header-action--outline" id="btn-change-pdf" onclick="window.currentEvaluacionInstance.showPdfSelectorModal()" title="Cambiar archivo PDF">
-                    <i class="bi bi-file-earmark-pdf"></i> Cambiar Archivo
+                  <!-- 📦533 — Selector simplificado: 2 botones directos.
+                       Antes habia un <select> + un boton "Cambiar Archivo" (4 pasos:
+                       cambiar dropdown + click + seleccionar PDF + procesar). Ahora
+                       2 pasos: click en el boton del source + seleccionar PDF. -->
+                  <button class="header-action--outline" id="btn-load-ministerio" onclick="window.currentEvaluacionInstance.loadPdfBySource('ministerio')" title="Cargar PDF del Ministerio de Trabajo">
+                    <i class="kair-icon-building"></i> Cargar Ministerio
+                  </button>
+                  <button class="header-action--outline" id="btn-load-arl" onclick="window.currentEvaluacionInstance.loadPdfBySource('arl')" title="Cargar PDF del informe de la ARL">
+                    <i class="bi bi-shield-check"></i> Cargar ARL
+                  </button>
+                  <button class="header-action--outline" id="btn-change-pdf" onclick="window.currentEvaluacionInstance.showPdfSelectorModal()" title="Buscar un PDF en la carpeta (auto-detecta el source)" style="display:none;">
+                    <i class="bi bi-folder2-open"></i> Explorar
                   </button>
                   <div id="loading-indicator" class="k-loading-badge" style="display:none;">
                     <span class="spinner-border spinner-border-sm"></span> Procesando...
@@ -80,9 +153,6 @@ this.lastScore = 0;
                 </button>
                 <button class="evaluacion-tab" data-tab="actions" onclick="window.currentEvaluacionInstance.switchTab('actions')">
                   <i class="bi bi-clipboard-check"></i> Planes de Acción
-                </button>
-                <button class="evaluacion-tab" data-tab="history" onclick="window.currentEvaluacionInstance.switchTab('history')">
-                  <i class="bi bi-clock-history"></i> Historial
                 </button>
               </div>
             </div>
@@ -171,7 +241,7 @@ this.lastScore = 0;
                             <h3>Detalle de Estándares</h3>
                             <input type="text" class="k-input-search" placeholder="Buscar estándar...">
                         </div>
-                        <div class="k-table-responsive">
+                        <div class="k-table-responsive k-table-scrollable">
                             <table class="k-table">
                                 <thead>
                                     <tr>
@@ -199,7 +269,7 @@ this.lastScore = 0;
                                 <i class="bi bi-plus-lg"></i> Nuevo Plan
                             </button>
                         </div>
-                        <div class="k-table-responsive">
+                        <div class="k-table-responsive k-table-scrollable">
                             <table class="k-table">
                                 <thead>
                                     <tr>
@@ -219,22 +289,11 @@ this.lastScore = 0;
                     </div>
                 </section>
 
-                <!-- VISTA: HISTORIAL -->
-                <section id="view-history" class="k-view">
-                    <div class="k-card" id="history-content">
-                        <div class="k-empty-state">
-                            <i class="bi bi-folder2-open"></i>
-                            <p>Explorando directorio...</p>
-                        </div>
-                    </div>
-                </section>
-
             </div>
-
-            <!-- Notificaciones Toast -->
-            <div id="k-toast" class="k-toast"></div>
         `;
 
+        // 📦531 — El toast ahora es externo (creado por _ensureToastNode) y
+        // sobrevive re-renders. Ya no se incluye en el template.
         this.container.appendChild(mainLayout);
 
         // Inicializar referencias y datos
@@ -243,26 +302,36 @@ this.lastScore = 0;
     }
 
     updateReferences() {
-        this.hallazgosTableBody = document.getElementById('hallazgosTableBody');
-        this.actionTableBody = document.getElementById('actionTableBody');
+        // 📦531 — DOM scope: usar this.container.querySelector en vez de
+        // getElementById global. Evita colisiones si hay otros componentes
+        // en la página con IDs similares.
+        this.hallazgosTableBody = this.container.querySelector('#hallazgosTableBody');
+        this.actionTableBody = this.container.querySelector('#actionTableBody');
 
-        const backBtn = document.getElementById('btn-back-eval');
-        if (backBtn && this.backToModuleCallback) {
-            backBtn.addEventListener('click', this.backToModuleCallback);
+        // 📦531 — Listeners con cleanup. Guardamos referencias para removerlas
+        // en destroy() si el usuario re-renderiza el módulo.
+        // (Por ahora los listeners se recrean en cada render — el DOM viejo
+        // se va con innerHTML='', pero mantenemos el patrón por seguridad.)
+        this._backHandler = this.backToModuleCallback;
+        this._viewPdfHandler = () => {
+            if (this.currentPdfPath) window.electronAPI.openPath(this.currentPdfPath);
+        };
+
+        const backBtn = this.container.querySelector('#btn-back-eval');
+        if (backBtn && this._backHandler) {
+            backBtn.addEventListener('click', this._backHandler);
         }
 
-        const btnPdf = document.getElementById('btn-view-pdf');
+        const btnPdf = this.container.querySelector('#btn-view-pdf');
         if (btnPdf) {
-            btnPdf.addEventListener('click', () => {
-                if (this.currentPdfPath) window.electronAPI.openPath(this.currentPdfPath);
-            });
+            btnPdf.addEventListener('click', this._viewPdfHandler);
         }
     }
 
     // --- LÓGICA DE NAVEGACIÓN (TABS) ---
     switchTab(tabId) {
-        console.log('[EvaluacionInicialSgSst] switchTab() - Cambiando a pestaña:', tabId);
-        
+        this._log('log', 'switchTab() - Cambiando a pestaña: ' + tabId);
+
         // 1. Actualizar botones de navegación
         const navItems = this.container.querySelectorAll('.evaluacion-tab');
         navItems.forEach(btn => {
@@ -270,20 +339,15 @@ this.lastScore = 0;
             else btn.classList.remove('active');
         });
 
-        // 2. Mostrar la sección correspondiente
+        // 2. Mostrar la sección correspondiente.
+        // 📦531 — Quitamos el style.display inline redundante. El CSS ya
+        // hace esto con .k-view { display: none } y .k-view.active.
         const views = this.container.querySelectorAll('.k-view');
-        views.forEach(view => {
-            view.classList.remove('active');
-            // Usar display none/block para asegurar limpieza visual
-            view.style.display = 'none';
-        });
+        views.forEach(view => view.classList.remove('active'));
 
         const activeView = this.container.querySelector(`#view-${tabId}`);
         if (activeView) {
-            console.log('[EvaluacionInicialSgSst] switchTab() - Vista encontrada:', activeView.id);
             activeView.classList.add('active');
-            activeView.style.display = 'block';
-            console.log('[EvaluacionInicialSgSst] switchTab() - Vista activada con display:', activeView.style.display);
 
             // Redibujar gráficos si se entra al dashboard para asegurar renderizado correcto
             if (tabId === 'dashboard' && this.currentFindings.length > 0) {
@@ -291,11 +355,10 @@ this.lastScore = 0;
                 setTimeout(() => this.updateDashboardWithRealData({ cumplimiento: this.lastScore || 0 }), 50);
             }
         } else {
-            console.error('[EvaluacionInicialSgSst] switchTab() - Vista no encontrada:', `#view-${tabId}`);
+            this._log('error', 'switchTab() - Vista no encontrada: #' + 'view-' + tabId);
         }
 
         this.activeTab = tabId;
-        console.log('[EvaluacionInicialSgSst] switchTab() - Pestaña actual actualizada a:', this.activeTab);
     }
 
     // --- LÓGICA DE DATOS ---
@@ -310,9 +373,89 @@ this.lastScore = 0;
             } else {
                 this.showToast('No se encontró la carpeta del submódulo.', 'warning');
             }
+
+            // 📦531 — Cargar planes de acción persistidos del año actual.
+            // Esto resuelve el bug crítico donde los planes se perdían al
+            // cerrar el módulo. Si los planes en memoria (this.actionPlans)
+            // ya tienen contenido, se respeta (no se pisan cambios no guardados).
+            await this._loadPersistedActionPlans();
         } catch (error) {
             console.error('Init Error:', error);
             this.showToast('Error inicializando sistema de archivos.', 'danger');
+        }
+    }
+
+    // 📦531/533 — Carga los planes persistidos de la BD para la empresa+año
+    // actuales, FILTRADOS por source (ministerio/arl) para no mezclar
+    // planes de informes diferentes. Si ya hay planes en memoria con el
+    // mismo source, hace merge (los de memoria tienen precedencia).
+    async _loadPersistedActionPlans(sourceFilter) {
+        try {
+            if (!window.electronAPI || !window.electronAPI.evaluacionActionPlans) {
+                this._log('warn', 'evaluacionActionPlans API no disponible');
+                return;
+            }
+            const empresaId = window.currentCompany;
+            if (!empresaId || empresaId === 'default_company') {
+                this._log('warn', 'No hay empresa activa para cargar planes');
+                return;
+            }
+            const res = await window.electronAPI.evaluacionActionPlans.listar({
+                empresaId: empresaId,
+                year: this.currentYear
+            });
+            if (!res || !res.success) {
+                this._log('error', 'Error listando planes persistidos: ' + (res && res.error && res.error.message));
+                return;
+            }
+            const persisted = res.data || [];
+            // 📦533 — Filtrar por source: si el usuario esta cargando un
+            // PDF del Ministerio, NO mostrar planes persistidos de ARL
+            // (y viceversa). Asi cada vista muestra SOLO lo del informe
+            // seleccionado.
+            const filtered = sourceFilter
+                ? persisted.filter(function (p) { return (p._source || 'manual') === sourceFilter || (p._source || 'manual') === 'manual'; })
+                : persisted;
+            this._log('log', 'Cargados ' + filtered.length + ' planes persistidos de ' + empresaId + '/' + this.currentYear + ' (filtrados por source=' + (sourceFilter || 'all') + ', total BD=' + persisted.length + ')');
+            // Merge: planes en memoria tienen precedencia. Solo agregamos los
+            // que no estan en memoria (por id).
+            const inMemoryIds = new Set(this.actionPlans.map(function (p) { return p.id; }));
+            for (let i = 0; i < filtered.length; i++) {
+                const p = filtered[i];
+                if (!inMemoryIds.has(p.id)) {
+                    this.actionPlans.push(p);
+                }
+            }
+        } catch (e) {
+            this._log('error', 'Excepcion cargando planes persistidos: ' + e.message);
+        }
+    }
+
+    // 📦531 — Persiste un plan en la BD. Si la operacion falla, no
+    // afecta el estado en memoria (el usuario ve el plan igual; la
+    // persistencia se reintenta en el proximo save).
+    async _persistActionPlan(plan) {
+        try {
+            if (!window.electronAPI || !window.electronAPI.evaluacionActionPlans) return;
+            const empresaId = window.currentCompany;
+            if (!empresaId || empresaId === 'default_company') {
+                this._log('warn', 'No hay empresa activa para guardar plan');
+                return;
+            }
+            const res = await window.electronAPI.evaluacionActionPlans.guardar({
+                empresaId: empresaId,
+                year: this.currentYear,
+                source: this.currentSource,
+                plan: plan
+            });
+            if (!res || !res.success) {
+                this._log('error', 'Error persistiendo plan: ' + (res && res.error && res.error.message));
+                this.showToast('No se pudo guardar el plan en disco (sigue en memoria)', 'warning');
+            } else {
+                this._log('log', 'Plan ' + plan.id + ' guardado OK');
+            }
+        } catch (e) {
+            this._log('error', 'Excepcion persistiendo plan: ' + e.message);
         }
     }
 
@@ -347,7 +490,6 @@ this.lastScore = 0;
             }
 
             console.log('[EvaluacionInicialSgSst] Total de archivos encontrados:', allFiles.length);
-            this.renderHistoryFiles(allFiles);
 
             // Filtrar solo archivos PDF
             const pdfFiles = allFiles.filter(f => f.name.toLowerCase().endsWith('.pdf'));
@@ -365,15 +507,16 @@ this.lastScore = 0;
                 }
             } else if (pdfFiles.length === 1) {
                 // Si solo hay uno, procesarlo directamente
-                console.log('[EvaluacionInicialSgSst] Procesando único PDF encontrado');
+                this._log('log', 'Procesando único PDF encontrado');
                 const reportPdf = pdfFiles[0];
                 this.currentPdfPath = reportPdf.path;
-                const titleEl = document.getElementById('source-title');
-                const metaEl = document.getElementById('source-meta');
-                const btnView = document.getElementById('btn-view-pdf');
+                // 📦531 — Scoping al container del módulo
+                const titleEl = this.container.querySelector('#source-title');
+                const metaEl = this.container.querySelector('#source-meta');
+                const btnView = this.container.querySelector('#btn-view-pdf');
 
                 if (titleEl) titleEl.textContent = reportPdf.name;
-                if (metaEl) metaEl.textContent = `Archivo detectado en: ...${reportPdf.path.slice(-30)}`;
+                if (metaEl) metaEl.textContent = 'Archivo detectado en: ...' + (reportPdf.path ? reportPdf.path.slice(-30) : '');
                 if (btnView) btnView.style.display = 'inline-flex';
 
                 // Si se forzó el modal pero solo hay 1 PDF, mostrar mensaje y procesar
@@ -382,10 +525,13 @@ this.lastScore = 0;
                 }
                 await this.processPdfData(reportPdf.path);
             } else {
-                console.warn('[EvaluacionInicialSgSst] No se encontraron archivos PDF');
-                document.getElementById('source-title').textContent = "No se encontró informe estándar";
-                document.getElementById('source-meta').textContent = "Por favor cargue un archivo PDF de evaluación (0312).";
-                
+                this._log('warn', 'No se encontraron archivos PDF');
+                // 📦531 — Scoping
+                const titleEl2 = this.container.querySelector('#source-title');
+                const metaEl2 = this.container.querySelector('#source-meta');
+                if (titleEl2) titleEl2.textContent = 'No se encontró informe estándar';
+                if (metaEl2) metaEl2.textContent = 'Por favor cargue un archivo PDF de evaluación (0312).';
+
                 if (forceShowModal) {
                     this.showToast('No se encontraron archivos PDF en la carpeta.', 'warning');
                 }
@@ -398,12 +544,22 @@ this.lastScore = 0;
     }
 
     showPdfSelector(pdfFiles) {
-        console.log('[EvaluacionInicialSgSst] showPdfSelector() - Iniciando con', pdfFiles.length, 'PDFs');
-        
+        this._log('log', 'showPdfSelector() - Iniciando con ' + pdfFiles.length + ' PDFs');
+
+        // 📦534 — Limpieza defensiva: eliminar cualquier modal PDF selector
+        // existente antes de crear uno nuevo. Evita que se acumulen modales
+        // apilados (causa "se coloca más negro" + no poder cerrar).
+        document.querySelectorAll('.k-file-selector-modal').forEach(m => m.remove());
+
         // Crear un modal estilo Copasst para seleccionar el PDF
         const modal = document.createElement('div');
         modal.className = 'k-file-selector-modal';
-        console.log('[EvaluacionInicialSgSst] showPdfSelector() - Modal creado:', modal);
+        // 📦534 — Pointer-events: el wrapper #k-modal-root tiene
+        // pointer-events:none para no bloquear el fondo. Esto se hereda
+        // a los hijos. Restauramos auto en el modal (y todos sus hijos)
+        // para que los clicks funcionen. Sin esto, el modal se ve pero
+        // no se puede clickear.
+        modal.style.cssText = 'pointer-events: auto !important;';
 
         // Agrupar PDFs por tipo
         const ministerioPdfs = pdfFiles.filter(f => f.path.toLowerCase().includes('ministerio'));
@@ -413,6 +569,25 @@ this.lastScore = 0;
             !f.path.toLowerCase().includes('arl')
         );
 
+        // 📦531 — Sin inline onclick. Usamos data-* attributes + event
+        // delegation abajo. Tambien: el conteo por carpeta va en data-count
+        // para que el JS lo actualice sin re-renderizar el HTML (evita XSS).
+        let otherItem = '';
+        if (otherPdfs.length > 0) {
+            otherItem = `
+                <div class="k-file-item" data-folder="otros">
+                    <div class="k-file-item-icon folder">
+                        <i class="fas fa-folder"></i>
+                    </div>
+                    <div class="k-file-item-info">
+                        <div class="k-file-item-name">Otros Archivos</div>
+                        <div class="k-file-item-meta">
+                            <span class="k-file-badge" data-folder-count="otros">${otherPdfs.length}</span>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
         let modalContent = `
             <div class="k-file-selector-content">
                 <div class="k-file-selector-header">
@@ -421,66 +596,54 @@ this.lastScore = 0;
                         Seleccionar PDF de Evaluación
                     </div>
                     <div>
-                        <button class="btn btn-ghost" onclick="this.closest('.k-file-selector-modal').remove()">
+                        <button class="btn btn-ghost" data-modal-close>
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
                 </div>
                 <div class="k-file-selector-body">
                     <div class="k-file-selector-sidebar">
-                        <div class="k-file-breadcrumb" id="folderBreadcrumb">
+                        <div class="k-file-breadcrumb" data-folder-breadcrumb>
                             <span class="k-file-breadcrumb-current">Raíz</span>
                         </div>
                         <div class="k-file-section-header">
                             Carpetas
                         </div>
                         <div class="k-file-section-content">
-                            <div class="k-file-item" onclick="window.currentEvaluacionInstance.navigateToFolder('ministerio')">
+                            <div class="k-file-item" data-folder="ministerio">
                                 <div class="k-file-item-icon folder">
                                     <i class="fas fa-folder"></i>
                                 </div>
                                 <div class="k-file-item-info">
                                     <div class="k-file-item-name">Ministerio de Trabajo</div>
                                     <div class="k-file-item-meta">
-                                        <span class="k-file-badge">${ministerioPdfs.length}</span>
+                                        <span class="k-file-badge" data-folder-count="ministerio">${ministerioPdfs.length}</span>
                                     </div>
                                 </div>
                             </div>
-                            <div class="k-file-item" onclick="window.currentEvaluacionInstance.navigateToFolder('arl')">
+                            <div class="k-file-item" data-folder="arl">
                                 <div class="k-file-item-icon folder">
                                     <i class="fas fa-shield-alt"></i>
                                 </div>
                                 <div class="k-file-item-info">
                                     <div class="k-file-item-name">Informe ARL</div>
                                     <div class="k-file-item-meta">
-                                        <span class="k-file-badge">${arlPdfs.length}</span>
+                                        <span class="k-file-badge" data-folder-count="arl">${arlPdfs.length}</span>
                                     </div>
                                 </div>
                             </div>
-                            ${otherPdfs.length > 0 ? `
-                            <div class="k-file-item" onclick="window.currentEvaluacionInstance.navigateToFolder('otros')">
-                                <div class="k-file-item-icon folder">
-                                    <i class="fas fa-folder"></i>
-                                </div>
-                                <div class="k-file-item-info">
-                                    <div class="k-file-item-name">Otros Archivos</div>
-                                    <div class="k-file-item-meta">
-                                        <span class="k-file-badge">${otherPdfs.length}</span>
-                                    </div>
-                                </div>
-                            </div>
-                            ` : ''}
+                            ${otherItem}
                         </div>
                     </div>
                     <div class="k-file-selector-main">
-                        <div class="k-file-go-back" id="goBackFolderBtn" onclick="window.currentEvaluacionInstance.goBackToRoot()" style="display: none;">
+                        <div class="k-file-go-back" data-go-back style="display: none;">
                             <i class="fas fa-level-up-alt" style="margin-right: 8px; transform: rotate(90deg);"></i>
                             Volver a carpetas
                         </div>
                         <div class="k-file-section-header">
                             Documentos
                         </div>
-                        <div class="k-file-section-content" id="pdfFileList">
+                        <div class="k-file-section-content" data-pdf-list>
                             <div class="k-file-empty-state">
                                 <div class="k-file-empty-icon">
                                     <i class="fas fa-folder-open"></i>
@@ -492,7 +655,7 @@ this.lastScore = 0;
                     </div>
                 </div>
                 <div class="k-file-selector-footer">
-                    <button class="btn btn-ghost" onclick="this.closest('.k-file-selector-modal').remove()">
+                    <button class="btn btn-ghost" data-modal-close>
                         Cancelar
                     </button>
                 </div>
@@ -500,176 +663,268 @@ this.lastScore = 0;
         `;
 
         modal.innerHTML = modalContent;
-        console.log('[EvaluacionInicialSgSst] showPdfSelector() - Contenido HTML asignado');
-        console.log('[EvaluacionInicialSgSst] showPdfSelector() - Adjuntando modal al document.body');
-        document.body.appendChild(modal);
-        console.log('[EvaluacionInicialSgSst] showPdfSelector() - Modal adjuntado exitosamente');
-        
+        this._getModalRoot().appendChild(modal);
+
         // Guardar referencia a los PDFs para usar en navigateToFolder
         this.pdfFilesCache = {
             ministerio: ministerioPdfs,
             arl: arlPdfs,
             otros: otherPdfs
         };
-        
+
         // Inicializar estado de navegación
         this.currentFolder = null;
+
+        // 📦531 — Event delegation (reemplaza los inline onclick que eran
+        // vulnerables a XSS). Un solo listener en el modal maneja TODOS
+        // los clicks. Lee data-* attributes para saber qué hacer.
+        modal.addEventListener('click', (e) => {
+            const t = e.target;
+            // Click en el backdrop (no en contenido) cierra
+            if (t === modal) {
+                modal.remove();
+                return;
+            }
+            // Click en botón de cerrar
+            if (t.closest('[data-modal-close]')) {
+                modal.remove();
+                return;
+            }
+            // Click en una carpeta
+            const folderItem = t.closest('[data-folder]');
+            if (folderItem) {
+                this.navigateToFolder(folderItem.dataset.folder);
+                return;
+            }
+            // Click en "volver a carpetas"
+            if (t.closest('[data-go-back]')) {
+                this.goBackToRoot();
+                return;
+            }
+            // Click en un PDF (item con data-pdf-path)
+            const pdfItem = t.closest('[data-pdf-path]');
+            if (pdfItem) {
+                this.selectPdf(pdfItem.dataset.pdfPath, pdfItem.dataset.pdfName);
+                return;
+            }
+        });
     }
-    
+
     navigateToFolder(type) {
-        const pdfs = this.pdfFilesCache[type] || [];
-        const fileList = document.getElementById('pdfFileList');
-        const breadcrumb = document.getElementById('folderBreadcrumb');
-        const goBackBtn = document.getElementById('goBackFolderBtn');
-        
+        const pdfs = (this.pdfFilesCache && this.pdfFilesCache[type]) || [];
+        // 📦531 — Scoping: usar el modal actual como root en vez de
+        // getElementById global. Esto permite multiples instancias del modal
+        // y evita colisiones con otros componentes.
+        const modal = this.container.ownerDocument.querySelector('.k-file-selector-modal') ||
+                      document.querySelector('.k-file-selector-modal');
+        if (!modal) return;
+        const fileList = modal.querySelector('[data-pdf-list]');
+        const breadcrumb = modal.querySelector('[data-folder-breadcrumb]');
+        const goBackBtn = modal.querySelector('[data-go-back]');
+
         // Actualizar estado de navegación
         this.currentFolder = type;
-        
+
         // Mostrar botón de volver
-        goBackBtn.style.display = 'flex';
-        
-        // Actualizar breadcrumb
+        if (goBackBtn) goBackBtn.style.display = 'flex';
+
+        // Actualizar breadcrumb (con textContent para evitar XSS)
         const folderNames = {
             ministerio: 'Ministerio de Trabajo',
             arl: 'Informe ARL',
             otros: 'Otros Archivos'
         };
-        
-        breadcrumb.innerHTML = `
-            <span class="k-file-breadcrumb-item" onclick="window.currentEvaluacionInstance.goBackToRoot()">Raíz</span>
-            <span class="k-file-breadcrumb-separator"><i class="fas fa-chevron-right"></i></span>
-            <span class="k-file-breadcrumb-current">${folderNames[type] || type}</span>
-        `;
-        
+        if (breadcrumb) {
+            breadcrumb.innerHTML = '';
+            const root = document.createElement('span');
+            root.className = 'k-file-breadcrumb-item';
+            root.textContent = 'Raíz';
+            root.addEventListener('click', () => this.goBackToRoot());
+            const sep = document.createElement('span');
+            sep.className = 'k-file-breadcrumb-separator';
+            sep.innerHTML = '<i class="fas fa-chevron-right"></i>';
+            const current = document.createElement('span');
+            current.className = 'k-file-breadcrumb-current';
+            current.textContent = folderNames[type] || type;
+            breadcrumb.appendChild(root);
+            breadcrumb.appendChild(sep);
+            breadcrumb.appendChild(current);
+        }
+
         if (pdfs.length === 0) {
-            fileList.innerHTML = `
-                <div class="k-file-empty-state">
-                    <div class="k-file-empty-icon">
-                        <i class="fas fa-file-pdf"></i>
-                    </div>
-                    <div class="k-file-empty-title">No hay archivos</div>
-                    <div class="k-file-empty-desc">No se encontraron archivos PDF en esta carpeta.</div>
-                </div>
-            `;
+            if (fileList) {
+                fileList.innerHTML = `
+                    <div class="k-file-empty-state">
+                        <div class="k-file-empty-icon">
+                            <i class="fas fa-file-pdf"></i>
+                        </div>
+                        <div class="k-file-empty-title">No hay archivos</div>
+                        <div class="k-file-empty-desc">No se encontraron archivos PDF en esta carpeta.</div>
+                    </div>`;
+            }
             return;
         }
-        
-        fileList.innerHTML = pdfs.map(pdf => {
-            const encodedPath = encodeURIComponent(pdf.path);
-            const encodedName = encodeURIComponent(pdf.name);
-            
-            return `
-                <div class="k-file-item" onclick="window.currentEvaluacionInstance.selectPdf(decodeURIComponent('${encodedPath}'), decodeURIComponent('${encodedName}'))">
+
+        // 📦531 — Construir items con textContent (no template literals con
+        // data del filesystem). El nombre del PDF y su path van a data-*
+        // attributes que el event delegation lee. Esto elimina el XSS
+        // completamente (un nombre con ' o < no rompe nada).
+        if (fileList) {
+            fileList.innerHTML = '';
+            const frag = document.createDocumentFragment();
+            for (let i = 0; i < pdfs.length; i++) {
+                const pdf = pdfs[i];
+                const item = document.createElement('div');
+                item.className = 'k-file-item';
+                item.setAttribute('data-pdf-path', pdf.path);
+                item.setAttribute('data-pdf-name', pdf.name);
+                item.innerHTML = `
                     <div class="k-file-item-icon pdf">
                         <i class="fas fa-file-pdf"></i>
                     </div>
                     <div class="k-file-item-info">
-                        <div class="k-file-item-name">${pdf.name}</div>
+                        <div class="k-file-item-name"></div>
                         <div class="k-file-item-meta">
-                            <span class="k-file-badge">${Math.round(pdf.size / 1024)} KB</span>
+                            <span class="k-file-badge"></span>
                         </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
+                    </div>`;
+                // textContent para evitar inyeccion
+                item.querySelector('.k-file-item-name').textContent = pdf.name;
+                item.querySelector('.k-file-badge').textContent = Math.round((pdf.size || 0) / 1024) + ' KB';
+                frag.appendChild(item);
+            }
+            fileList.appendChild(frag);
+        }
     }
-    
+
     goBackToRoot() {
-        const fileList = document.getElementById('pdfFileList');
-        const breadcrumb = document.getElementById('folderBreadcrumb');
-        const goBackBtn = document.getElementById('goBackFolderBtn');
-        
+        const modal = this.container.ownerDocument.querySelector('.k-file-selector-modal') ||
+                      document.querySelector('.k-file-selector-modal');
+        if (!modal) return;
+        const fileList = modal.querySelector('[data-pdf-list]');
+        const breadcrumb = modal.querySelector('[data-folder-breadcrumb]');
+        const goBackBtn = modal.querySelector('[data-go-back]');
+
         // Resetear estado de navegación
         this.currentFolder = null;
-        
+
         // Ocultar botón de volver
-        goBackBtn.style.display = 'none';
-        
+        if (goBackBtn) goBackBtn.style.display = 'none';
+
         // Resetear breadcrumb
-        breadcrumb.innerHTML = `
-            <span class="k-file-breadcrumb-current">Raíz</span>
-        `;
-        
+        if (breadcrumb) {
+            breadcrumb.innerHTML = '';
+            const current = document.createElement('span');
+            current.className = 'k-file-breadcrumb-current';
+            current.textContent = 'Raíz';
+            breadcrumb.appendChild(current);
+        }
+
         // Mostrar estado inicial
-        fileList.innerHTML = `
-            <div class="k-file-empty-state">
-                <div class="k-file-empty-icon">
-                    <i class="fas fa-folder-open"></i>
-                </div>
-                <div class="k-file-empty-title">Seleccione una carpeta</div>
-                <div class="k-file-empty-desc">Haga clic en una carpeta del panel izquierdo para ver los archivos PDF disponibles.</div>
-            </div>
-        `;
+        if (fileList) {
+            fileList.innerHTML = `
+                <div class="k-file-empty-state">
+                    <div class="k-file-empty-icon">
+                        <i class="fas fa-folder-open"></i>
+                    </div>
+                    <div class="k-file-empty-title">Seleccione una carpeta</div>
+                    <div class="k-file-empty-desc">Haga clic en una carpeta del panel izquierdo para ver los archivos PDF disponibles.</div>
+                </div>`;
+        }
     }
 
     selectPdf(pdfPath, pdfName) {
         // Cerrar el modal de selección de archivos
-        const modal = document.querySelector('.k-file-selector-modal');
+        const modal = this.container.ownerDocument.querySelector('.k-file-selector-modal');
         if (modal) modal.remove();
 
         // Actualizar la UI con el archivo seleccionado
         this.currentPdfPath = pdfPath;
-        const titleEl = document.getElementById('source-title');
-        const metaEl = document.getElementById('source-meta');
-        const btnView = document.getElementById('btn-view-pdf');
+        // 📦531 — Scoping al container del módulo
+        const titleEl = this.container.querySelector('#source-title');
+        const metaEl = this.container.querySelector('#source-meta');
+        const btnView = this.container.querySelector('#btn-view-pdf');
 
         if (titleEl) titleEl.textContent = pdfName;
-        if (metaEl) metaEl.textContent = `Archivo seleccionado: ...${pdfPath.slice(-30)}`;
+        if (metaEl) metaEl.textContent = 'Archivo seleccionado: ...' + (pdfPath ? pdfPath.slice(-30) : '');
         if (btnView) btnView.style.display = 'inline-flex';
 
         // Procesar el PDF seleccionado
         this.processPdfData(pdfPath);
     }
 
+    // 📦531 — Valida que el resultado del backend tenga la estructura
+    // mínima esperada. Si no, loguea y devuelve false (el caller maneja).
+    _validateProcessResult(result) {
+        if (!result || typeof result !== 'object') return false;
+        if (result.success !== true) return false;
+        if (result.findings !== undefined && !Array.isArray(result.findings)) {
+            this._log('error', 'result.findings no es array');
+            return false;
+        }
+        if (result.metrics !== undefined && (typeof result.metrics !== 'object' || result.metrics === null)) {
+            this._log('error', 'result.metrics no es objeto');
+            return false;
+        }
+        return true;
+    }
+
     async processPdfData(pdfPath) {
-        const loading = document.getElementById('loading-indicator');
+        const loading = this.container.querySelector('#loading-indicator');
         if (loading) loading.style.display = 'inline-flex';
 
         try {
-            console.log('[EvaluacionInicialSgSst] Iniciando procesamiento de PDF:', pdfPath);
+            this._log('log', 'Iniciando procesamiento de PDF: ' + pdfPath);
             const sourceType = pdfPath.toLowerCase().includes('arl') ? 'arl' : 'ministerio';
-            console.log('[EvaluacionInicialSgSst] Tipo de fuente detectado:', sourceType);
+            this._log('log', 'Tipo de fuente detectado: ' + sourceType);
+
+            // 📦533 — Reset COMPLETO del estado del PDF anterior antes de
+            // procesar el nuevo. Antes los hallazgos y planes del PDF
+            // anterior persistian en memoria, lo que causaba que al
+            // cambiar de Ministerio a ARL (o viceversa) se mostraran
+            // mezclados. Ahora cada PDF muestra SOLO sus hallazgos y planes.
+            this.currentSource = sourceType;
+            this.currentPdfPath = pdfPath;
+            this.currentFindings = [];
+            this.actionPlans = [];
+            this._log('log', 'Estado reseteado para source=' + sourceType);
 
             if (window.electronAPI && window.electronAPI.processEvaluacionPdf) {
-                console.log('[EvaluacionInicialSgSst] Llamando a processEvaluacionPdf...');
                 const result = await window.electronAPI.processEvaluacionPdf(pdfPath, sourceType);
-                console.log('[EvaluacionInicialSgSst] Resultado recibido:', result);
 
-                if (result.success) {
-                    console.log('[EvaluacionInicialSgSst] PDF procesado exitosamente');
-                    console.log('[EvaluacionInicialSgSst] Hallazgos encontrados:', result.findings?.length || 0);
-                    console.log('[EvaluacionInicialSgSst] Métricas:', result.metrics);
-                    console.log('[EvaluacionInicialSgSst] Pestaña actual:', this.activeTab);
-                    console.log('[EvaluacionInicialSgSst] Planes de acción extraídos:', result.actionPlans?.length || 0);
-                    
-                    this.currentFindings = result.findings || [];
-                    this.renderHallazgosTable();
-                    this.updateDashboardWithRealData(result.metrics);
-                    
-                    // Procesar planes de acción según el tipo de fuente
-                    if (result.source === 'arl' && result.actionPlans && result.actionPlans.length > 0) {
-                        // Para informes de ARL, usar los planes de acción extraídos
-                        console.log('[EvaluacionInicialSgSst] Procesando planes de acción de ARL');
-                        this.processArlActionPlans(result.actionPlans);
-                    } else if (result.source === 'ministerio') {
-                        // Para informes del Ministerio, generar planes automáticamente para hallazgos "no_cumple"
-                        console.log('[EvaluacionInicialSgSst] Generando planes de acción para hallazgos no_cumple');
-                        this.generateActionPlansForNoCumple();
-                    }
-                    
-                    this.renderActionPlansTable();
-                    
-                    // Cambiar a la pestaña de Planes de Acción para mostrar la tabla
-                    console.log('[EvaluacionInicialSgSst] Cambiando a pestaña de Planes de Acción');
-                    this.switchTab('actions');
-                    
-                    this.showToast('Datos procesados correctamente.', 'success');
-                } else {
-                    console.error('[EvaluacionInicialSgSst] Error procesando PDF:', result.error);
-                    this.showToast(`No se pudieron extraer datos: ${result.error || 'Error desconocido'}`, 'warning');
+                // 📦531 — Validar estructura del resultado antes de usarlo
+                if (!this._validateProcessResult(result)) {
+                    this._log('error', 'Resultado del backend invalido: ' + JSON.stringify(result).slice(0, 200));
+                    this.showToast('El backend devolvió datos con formato inesperado.', 'danger');
+                    return;
                 }
+
+                this._log('log', 'PDF procesado OK. Hallazgos=' + (result.findings ? result.findings.length : 0));
+                this.currentFindings = result.findings || [];
+                this.renderHallazgosTable();
+                this.updateDashboardWithRealData(result.metrics);
+
+                // Cargar planes persistidos de BD filtrados por source + year
+                // (best-effort: si falla, seguimos con los que estan en memoria)
+                await this._loadPersistedActionPlans(sourceType);
+
+                // Procesar planes de acción según el tipo de fuente
+                if (result.source === 'arl' && result.actionPlans && result.actionPlans.length > 0) {
+                    this._log('log', 'Procesando planes de acción de ARL');
+                    this.processArlActionPlans(result.actionPlans);
+                } else if (result.source === 'ministerio') {
+                    this._log('log', 'Generando planes de acción para hallazgos no_cumple');
+                    this.generateActionPlansForNoCumple();
+                }
+
+                this.renderActionPlansTable();
+
+                // Cambiar a la pestaña de Planes de Acción para mostrar la tabla
+                this.switchTab('actions');
+
+                this.showToast('Datos procesados correctamente.', 'success');
             } else {
-                console.error('[EvaluacionInicialSgSst] electronAPI o processEvaluacionPdf no disponible');
+                this._log('error', 'electronAPI o processEvaluacionPdf no disponible');
                 this.showToast('Error: API no disponible', 'danger');
             }
         } catch (error) {
@@ -681,57 +936,6 @@ this.lastScore = 0;
     }
 
     // --- RENDERIZADO DE COMPONENTES ---
-    renderHistoryFiles(files) {
-        const container = document.getElementById('history-content');
-        if (!container) return;
-
-        if (!files || files.length === 0) {
-            container.innerHTML = `
-                <div class="k-empty-state">
-                    <i class="bi bi-folder-x"></i>
-                    <p>Carpeta vacía</p>
-                </div>`;
-            return;
-        }
-
-        let html = `
-            <div class="k-card-header"><h3>Archivos Disponibles</h3></div>
-            <div class="k-table-responsive">
-            <table class="k-table">
-                <thead><tr><th>Tipo</th><th>Nombre del Archivo</th><th class="text-right">Acción</th></tr></thead>
-                <tbody>
-        `;
-
-        files.forEach(f => {
-            const isPdf = f.name.toLowerCase().endsWith('.pdf');
-            const isXls = f.name.toLowerCase().includes('xls');
-            let icon = '<i class="bi bi-file-earmark"></i>';
-            let colorClass = 'text-muted';
-            
-            if (isPdf) { icon = '<i class="bi bi-file-earmark-pdf-fill"></i>'; colorClass = 'text-danger'; }
-            if (isXls) { icon = '<i class="bi bi-file-earmark-excel-fill"></i>'; colorClass = 'text-success'; }
-            
-            const encodedPath = encodeURIComponent(f.path);
-            
-            html += `
-                <tr>
-                    <td class="text-center" style="font-size:1.2rem; color:var(--text-muted);"><span class="${colorClass}">${icon}</span></td>
-                    <td>
-                        <div style="font-weight:500;">${f.name}</div>
-                        <div style="font-size:0.75rem; color:var(--text-muted);">${f.path.split('\\').slice(-2, -1)[0] || 'Raíz'}</div>
-                    </td>
-                    <td class="text-right">
-                        <button class="k-btn k-btn-sm k-btn-outline" onclick="window.electronAPI.openPath(decodeURIComponent('${encodedPath}'))">
-                            Abrir <i class="bi bi-box-arrow-up-right ms-1"></i>
-                        </button>
-                    </td>
-                </tr>
-            `;
-        });
-        html += '</tbody></table></div>';
-        container.innerHTML = html;
-    }
-
     renderHallazgosTable() {
         const tbody = this.hallazgosTableBody;
         if (!tbody) return;
@@ -782,78 +986,87 @@ const pendingCount = this.actionPlans.filter(p => p.estado !== 'completado').len
 
 this.lastScore = score;
 
-const scoreEl = document.getElementById('kpi-score');
-const scorePctEl = document.getElementById('kpi-score-pct');
-const gapsEl = document.getElementById('kpi-gaps');
-const pendingEl = document.getElementById('kpi-pending');
-const chartLabel = document.getElementById('chart-score-label');
+        const scoreEl = this.container.querySelector('#kpi-score');
+        const scorePctEl = this.container.querySelector('#kpi-score-pct');
+        const gapsEl = this.container.querySelector('#kpi-gaps');
+        const pendingEl = this.container.querySelector('#kpi-pending');
+        const chartLabel = this.container.querySelector('#chart-score-label');
 
-if (scoreEl) scoreEl.textContent = score + '%';
-if (scorePctEl) scorePctEl.textContent = score + '%';
-if (chartLabel) chartLabel.textContent = score + '%';
-if (gapsEl) gapsEl.textContent = noCumplidos;
-if (pendingEl) pendingEl.textContent = pendingCount;
+        if (scoreEl) scoreEl.textContent = score + '%';
+        if (scorePctEl) scorePctEl.textContent = score + '%';
+        if (chartLabel) chartLabel.textContent = score + '%';
+        if (gapsEl) gapsEl.textContent = noCumplidos;
+        if (pendingEl) pendingEl.textContent = pendingCount;
 
-// Actualizar Gráficos
-this.drawGauge(score);
+        // Actualizar Gráficos
+        this.drawGauge(score);
+        // 📦531 — Setup del observer para resize (solo la primera vez)
+        this._setupGaugeResizeObserver();
 
-        // Simular PHVA si no hay datos detallados
-        const phvaContainer = document.getElementById('phva-chart-container');
+        // 📦531 — PHVA: si el backend trae datos reales por fase
+        // (metrics.phva = {planear, hacer, verificar, actuar}), los usamos.
+        // Si no, mostramos empty state. Ya no fabricamos datos falsos.
+        const phvaContainer = this.container.querySelector('#phva-chart-container');
         if (phvaContainer) {
-            phvaContainer.innerHTML = `
-                <div class="k-progress-group">
-                    <div class="k-progress-label"><span>PLANEAR</span><span>${Math.min(score + 10, 100)}%</span></div>
-                    <div class="k-progress-bar"><div class="k-progress-fill" style="width:${Math.min(score + 10, 100)}%; background:var(--primary);"></div></div>
-                </div>
-                <div class="k-progress-group">
-                    <div class="k-progress-label"><span>HACER</span><span>${score}%</span></div>
-                    <div class="k-progress-bar"><div class="k-progress-fill" style="width:${score}%; background:var(--success);"></div></div>
-                </div>
-                <div class="k-progress-group">
-                    <div class="k-progress-label"><span>VERIFICAR</span><span>${Math.max(score - 5, 0)}%</span></div>
-                    <div class="k-progress-bar"><div class="k-progress-fill" style="width:${Math.max(score - 5, 0)}%; background:var(--info);"></div></div>
-                </div>
-                <div class="k-progress-group">
-                    <div class="k-progress-label"><span>ACTUAR</span><span>${Math.max(score - 10, 0)}%</span></div>
-                    <div class="k-progress-bar"><div class="k-progress-fill" style="width:${Math.max(score - 10, 0)}%; background:var(--warning);"></div></div>
-                </div>
-            `;
+            const phva = metrics.phva;
+            if (phva && typeof phva === 'object'
+                && phva.planear !== undefined
+                && phva.hacer !== undefined
+                && phva.verificar !== undefined
+                && phva.actuar !== undefined) {
+                phvaContainer.innerHTML = `
+                    <div class="k-progress-group">
+                        <div class="k-progress-label"><span>PLANEAR</span><span>${Math.min(phva.planear, 100)}%</span></div>
+                        <div class="k-progress-bar"><div class="k-progress-fill" style="width:${Math.min(phva.planear, 100)}%; background:var(--primary);"></div></div>
+                    </div>
+                    <div class="k-progress-group">
+                        <div class="k-progress-label"><span>HACER</span><span>${Math.min(phva.hacer, 100)}%</span></div>
+                        <div class="k-progress-bar"><div class="k-progress-fill" style="width:${Math.min(phva.hacer, 100)}%; background:var(--success);"></div></div>
+                    </div>
+                    <div class="k-progress-group">
+                        <div class="k-progress-label"><span>VERIFICAR</span><span>${Math.min(phva.verificar, 100)}%</span></div>
+                        <div class="k-progress-bar"><div class="k-progress-fill" style="width:${Math.min(phva.verificar, 100)}%; background:var(--info);"></div></div>
+                    </div>
+                    <div class="k-progress-group">
+                        <div class="k-progress-label"><span>ACTUAR</span><span>${Math.min(phva.actuar, 100)}%</span></div>
+                        <div class="k-progress-bar"><div class="k-progress-fill" style="width:${Math.min(phva.actuar, 100)}%; background:var(--warning);"></div></div>
+                    </div>
+                `;
+            } else {
+                phvaContainer.innerHTML = '<div class="k-empty-state-small">Sin datos PHVA en el PDF</div>';
+            }
         }
     }
 
+    /**
+     * 📦533 — Selector simplificado. En vez del viejo flujo
+     * (cambiar dropdown + click "Cambiar Archivo" + seleccionar PDF),
+     * el usuario hace click directo en "Cargar Ministerio" o "Cargar ARL"
+     * y se abre el file picker (que el SO suele recordar la ultima carpeta).
+     * Si hay varios PDFs en la subcarpeta, se muestra el modal de
+     * seleccion. Si hay solo uno, se procesa directamente.
+     */
+    loadPdfBySource(source) {
+        this._log('log', 'loadPdfBySource(' + source + ')');
+        this.currentSource = source;
+        this.loadRealFiles(true);
+    }
+
+    // Mantener updateSource como wrapper retrocompatible (por si algo
+    // todavia llama el viejo handler del <select>), pero ya no se usa
+    // desde el template.
     updateSource() {
-        console.log('[EvaluacionInicialSgSst] Fuente actualizada por el usuario');
-        
-        // Obtener el valor seleccionado
-        const sourceSelect = document.getElementById('sourceSelect');
-        const yearSelect = document.getElementById('yearSelect');
-        
-        if (!sourceSelect || !yearSelect) return;
-        
-        const newSource = sourceSelect.value;
-        const newYear = yearSelect.value;
-        
-        console.log('[EvaluacionInicialSgSst] Nueva fuente:', newSource);
-        console.log('[EvaluacionInicialSgSst] Nuevo año:', newYear);
-        
-        // Actualizar estado
-        this.currentSource = newSource;
-        this.currentYear = newYear;
-        
-        // Cargar archivos nuevamente sin recargar la página
-        this.loadRealFiles();
+        this._log('warn', 'updateSource() llamado pero ya no se usa (selector simplificado)');
     }
     
     showPdfSelectorModal() {
         console.log('[EvaluacionInicialSgSst] Abriendo modal de selección de PDFs (forzando)');
-        
-        // Cerrar cualquier modal existente primero
-        const existingModal = document.querySelector('.k-file-selector-modal');
-        if (existingModal) {
-            console.log('[EvaluacionInicialSgSst] Cerrando modal existente');
-            existingModal.remove();
-        }
-        
+
+        // 📦534 — Cerrar TODOS los modales PDF selector existentes antes de
+        // crear uno nuevo. Evita que se acumulen si loadRealFiles se llama
+        // varias veces en un loop o re-render.
+        document.querySelectorAll('.k-file-selector-modal').forEach(m => m.remove());
+
         // Cargar archivos y forzar mostrar el modal
         this.loadRealFiles(true);
     }
@@ -871,9 +1084,25 @@ this.drawGauge(score);
         const isEdit = planId !== null;
         const plan = isEdit ? this.actionPlans.find(p => p.id === planId) : null;
         
-        const modal = document.createElement('div');
+        const modal = document.createElement('dialog');
         modal.className = 'k-modal';
-        
+        // 📦534 — HTML5 <dialog> con showModal(): el navegador centra
+        // automaticamente y da ::backdrop nativo. Sin position:fixed,
+        // sin wrapper, sin stacking context. Los close buttons
+        // (this.closest('.k-modal').remove()) siguen funcionando
+        // porque removemos el dialog del DOM.
+        modal.style.cssText = `
+            background: transparent !important;
+            border: none !important;
+            padding: 0 !important;
+            margin: auto !important;
+            max-width: 95vw !important;
+            max-height: 95vh !important;
+            overflow: visible !important;
+            color: inherit !important;
+            animation: ei-fadeIn 0.3s ease-in-out;
+        `;
+
         const hallazgosOptions = this.currentFindings.map(f => 
             `<option value="${f.code}">${f.code} - ${f.desc.substring(0, 50)}...</option>`
         ).join('');
@@ -936,6 +1165,8 @@ this.drawGauge(score);
         
         modal.innerHTML = modalContent;
         document.body.appendChild(modal);
+        modal.showModal();
+        this._ensureDialogBackdropStyle();
         
         // Si es edición, llenar el formulario con los datos existentes
         if (isEdit && plan) {
@@ -982,11 +1213,17 @@ this.drawGauge(score);
                     fechaModificacion: new Date().toISOString()
                 };
                 this.showToast('Plan de acción actualizado correctamente', 'success');
+                // 📦531 — Persistir en BD
+                this._persistActionPlan(this.actionPlans[planIndex]);
             }
         } else {
-            // Crear nuevo plan
+            // Crear nuevo plan — 📦531 usar crypto.randomUUID() en vez de
+            // contador (mas robusto, sin colisiones entre instancias).
+            var newId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+                ? crypto.randomUUID()
+                : 'eap-' + Date.now().toString(36) + '-' + Math.floor(Math.random() * 0xffffff).toString(16);
             const newPlan = {
-                id: this.actionPlanIdCounter++,
+                id: newId,
                 hallazgoId,
                 hallazgoCodigo: hallazgo.code,
                 hallazgoDescripcion: hallazgo.desc,
@@ -1000,13 +1237,21 @@ this.drawGauge(score);
             };
             this.actionPlans.push(newPlan);
             this.showToast('Plan de acción creado correctamente', 'success');
+            // 📦531 — Persistir en BD
+            this._persistActionPlan(newPlan);
         }
-        
+
         // Cerrar modal y actualizar tabla
         const modal = document.querySelector('.k-modal');
         if (modal) modal.remove();
-        
+
         this.renderActionPlansTable();
+
+        // 📦531 — Refrescar KPI del dashboard si esta visible (cambio
+        // de estado pendiente/completado afecta el contador).
+        if (this.activeTab === 'dashboard' || this.currentFindings.length > 0) {
+            this.updateDashboardWithRealData({ cumplimiento: this.lastScore });
+        }
     }
     
     showActionPlanDetailModal(planId) {
@@ -1020,35 +1265,28 @@ this.drawGauge(score);
         
         const hallazgo = this.currentFindings.find(f => f.code === plan.hallazgoId);
         
-        const modal = document.createElement('div');
+        const modal = document.createElement('dialog');
         modal.className = 'k-modal';
+        // 📦534 — HTML5 <dialog> con showModal(): el navegador centra
+        // automaticamente y da ::backdrop nativo. Sin position:fixed,
+        // sin wrapper, sin stacking context. Los close buttons
+        // (this.closest('.k-modal').remove()) siguen funcionando
+        // porque removemos el dialog del DOM.
         modal.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.6);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-            animation: fadeIn 0.3s ease-in-out;
+            background: transparent !important;
+            border: none !important;
+            padding: 0 !important;
+            margin: auto !important;
+            max-width: 95vw !important;
+            max-height: 95vh !important;
+            overflow: visible !important;
+            color: inherit !important;
+            animation: ei-fadeIn 0.3s ease-in-out;
         `;
-        
+
         let modalContent = `
-            <div class="k-modal-content" style="
-                background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-                padding: 2.5rem;
-                border-radius: 16px;
-                width: 90%;
-                max-width: 800px;
-                max-height: 85vh;
-                overflow-y: auto;
-                box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-                animation: slideUp 0.4s ease-out;
-            ">
-                <div class="k-modal-header" style="margin-bottom: 2rem; text-align: center;">
+            <div class="k-modal-content" style="background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);">
+                <div class="k-modal-header text-center" style="margin-bottom: 2rem;">
                     <div style="
                         display: inline-flex;
                         align-items: center;
@@ -1067,8 +1305,8 @@ this.drawGauge(score);
                     </h3>
                 </div>
                 <div class="k-modal-body">
-                    <div style="display: grid; gap: 1.5rem;">
-                        <div style="background: var(--bg-card); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border);">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                        <div style="grid-column: 1 / -1; background: var(--bg-card); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border);">
                             <h4 style="margin: 0 0 1rem 0; color: var(--primary); font-size: 1.1rem; font-weight: 600;">
                                 <i class="bi bi-list-check me-2"></i> Información del Plan
                             </h4>
@@ -1216,6 +1454,8 @@ this.drawGauge(score);
         
         modal.innerHTML = modalContent;
         document.body.appendChild(modal);
+        modal.showModal();
+        this._ensureDialogBackdropStyle();
     }
     
     showFollowUpModal(planId) {
@@ -1227,22 +1467,25 @@ this.drawGauge(score);
             return;
         }
         
-        const modal = document.createElement('div');
+        const modal = document.createElement('dialog');
         modal.className = 'k-modal';
+        // 📦534 — HTML5 <dialog> con showModal(): el navegador centra
+        // automaticamente y da ::backdrop nativo. Sin position:fixed,
+        // sin wrapper, sin stacking context. Los close buttons
+        // (this.closest('.k-modal').remove()) siguen funcionando
+        // porque removemos el dialog del DOM.
         modal.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.6);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-            animation: fadeIn 0.3s ease-in-out;
+            background: transparent !important;
+            border: none !important;
+            padding: 0 !important;
+            margin: auto !important;
+            max-width: 95vw !important;
+            max-height: 95vh !important;
+            overflow: visible !important;
+            color: inherit !important;
+            animation: ei-fadeIn 0.3s ease-in-out;
         `;
-        
+
         let modalContent = `
             <div class="k-modal-content" style="
                 background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
@@ -1255,7 +1498,7 @@ this.drawGauge(score);
                 box-shadow: 0 10px 40px rgba(0,0,0,0.2);
                 animation: slideUp 0.4s ease-out;
             ">
-                <div class="k-modal-header" style="margin-bottom: 2rem; text-align: center;">
+                <div class="k-modal-header text-center" style="margin-bottom: 2rem;">
                     <div style="
                         display: inline-flex;
                         align-items: center;
@@ -1356,6 +1599,8 @@ this.drawGauge(score);
         
         modal.innerHTML = modalContent;
         document.body.appendChild(modal);
+        modal.showModal();
+        this._ensureDialogBackdropStyle();
     }
     
     saveFollowUp(planId) {
@@ -1386,11 +1631,15 @@ this.drawGauge(score);
         
         this.actionPlans[planIndex].seguimientos.push(newSeguimiento);
         this.showToast('Seguimiento agregado correctamente', 'success');
-        
+
+        // 📦535 — Persistir en BD: antes solo se guardaba en memoria y se
+        // perdia al cerrar la app. Ahora el seguimiento sobrevive reinicios.
+        this._persistActionPlan(this.actionPlans[planIndex]);
+
         // Cerrar modal y actualizar vista de detalle
         const modal = document.querySelector('.k-modal');
         if (modal) modal.remove();
-        
+
         // Mostrar el detalle actualizado
         this.showActionPlanDetailModal(planId);
     }
@@ -1404,22 +1653,25 @@ this.drawGauge(score);
             return;
         }
         
-        const modal = document.createElement('div');
+        const modal = document.createElement('dialog');
         modal.className = 'k-modal';
+        // 📦534 — HTML5 <dialog> con showModal(): el navegador centra
+        // automaticamente y da ::backdrop nativo. Sin position:fixed,
+        // sin wrapper, sin stacking context. Los close buttons
+        // (this.closest('.k-modal').remove()) siguen funcionando
+        // porque removemos el dialog del DOM.
         modal.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.6);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-            animation: fadeIn 0.3s ease-in-out;
+            background: transparent !important;
+            border: none !important;
+            padding: 0 !important;
+            margin: auto !important;
+            max-width: 95vw !important;
+            max-height: 95vh !important;
+            overflow: visible !important;
+            color: inherit !important;
+            animation: ei-fadeIn 0.3s ease-in-out;
         `;
-        
+
         let modalContent = `
             <div class="k-modal-content" style="
                 background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
@@ -1432,7 +1684,7 @@ this.drawGauge(score);
                 box-shadow: 0 10px 40px rgba(0,0,0,0.2);
                 animation: slideUp 0.4s ease-out;
             ">
-                <div class="k-modal-header" style="margin-bottom: 2rem; text-align: center;">
+                <div class="k-modal-header text-center" style="margin-bottom: 2rem;">
                     <div style="
                         display: inline-flex;
                         align-items: center;
@@ -1544,6 +1796,8 @@ this.drawGauge(score);
         
         modal.innerHTML = modalContent;
         document.body.appendChild(modal);
+        modal.showModal();
+        this._ensureDialogBackdropStyle();
     }
     
     addResponsible(planId) {
@@ -1561,11 +1815,14 @@ this.drawGauge(score);
         
         this.actionPlans[planIndex].responsables.push(newResponsible.trim());
         this.showToast('Responsable agregado correctamente', 'success');
-        
+
+        // 📦535 — Persistir en BD: antes solo se guardaba en memoria.
+        this._persistActionPlan(this.actionPlans[planIndex]);
+
         // Cerrar modal y actualizar vista
         const modal = document.querySelector('.k-modal');
         if (modal) modal.remove();
-        
+
         this.showResponsibleModal(planId);
     }
     
@@ -1578,11 +1835,14 @@ this.drawGauge(score);
         
         this.actionPlans[planIndex].responsables.splice(responsibleIndex, 1);
         this.showToast('Responsable eliminado correctamente', 'success');
-        
+
+        // 📦535 — Persistir en BD: antes solo se guardaba en memoria.
+        this._persistActionPlan(this.actionPlans[planIndex]);
+
         // Actualizar vista
         const modal = document.querySelector('.k-modal');
         if (modal) modal.remove();
-        
+
         this.showResponsibleModal(planId);
     }
     
@@ -1590,25 +1850,51 @@ this.drawGauge(score);
         if (!confirm('¿Está seguro de que desea eliminar este plan de acción?')) {
             return;
         }
-        
+
         const planIndex = this.actionPlans.findIndex(p => p.id === planId);
         if (planIndex === -1) {
             this.showToast('Plan no encontrado', 'danger');
             return;
         }
-        
+
         this.actionPlans.splice(planIndex, 1);
         this.showToast('Plan de acción eliminado correctamente', 'success');
-        
+
+        // 📦535 — Persistir en BD: antes el plan "eliminado" volvia a
+        // aparecer al reiniciar la app porque solo se borraba de memoria.
+        // Ahora ademas de quitarlo de this.actionPlans, lo borramos de la
+        // tabla evaluacion_action_plans via IPC. Defensa cross-tenant
+        // ya esta en el bridge (WHERE id=? AND empresa_id=?).
+        if (window.electronAPI && window.electronAPI.evaluacionActionPlans) {
+            const empresaId = window.currentCompany;
+            if (empresaId && empresaId !== 'default_company') {
+                window.electronAPI.evaluacionActionPlans.eliminar({
+                    empresaId: empresaId,
+                    id: planId
+                }).then(function (res) {
+                    if (!res || !res.success) {
+                        console.warn('[EvaluacionInicialSgSst] No se pudo eliminar plan de BD:', res && res.error && res.error.message);
+                    }
+                }).catch(function (err) {
+                    console.error('[EvaluacionInicialSgSst] Error eliminando plan de BD:', err);
+                });
+            }
+        }
+
         this.renderActionPlansTable();
     }
     
     getEstadoBadge(estado) {
+        // 📦532 — El badge usa k-badge--inline para que el emoji y el texto
+        // queden en la misma linea (display: inline-flex + align-items: center).
+        // Antes se veia apilado porque el k-badge default no tiene gap ni
+        // nowrap, y el emoji ⏳/✅ con line-height alto quedaba visualmente
+        // arriba del texto.
         const badges = {
-            'pendiente': '<span class="k-badge k-badge-warning">⏳ Pendiente</span>',
-            'en_progreso': '<span class="k-badge k-badge-info">🔄 En Progreso</span>',
-            'completado': '<span class="k-badge k-badge-success">✅ Completado</span>',
-            'cancelado': '<span class="k-badge k-badge-danger">❌ Cancelado</span>'
+            'pendiente': '<span class="k-badge k-badge-warning k-badge--inline">⏳ Pendiente</span>',
+            'en_progreso': '<span class="k-badge k-badge-info k-badge--inline">🔄 En Progreso</span>',
+            'completado': '<span class="k-badge k-badge-success k-badge--inline">✅ Completado</span>',
+            'cancelado': '<span class="k-badge k-badge-danger k-badge--inline">❌ Cancelado</span>'
         };
         return badges[estado] || badges['pendiente'];
     }
@@ -1620,138 +1906,357 @@ this.drawGauge(score);
             console.error('[EvaluacionInicialSgSst] actionTableBody no encontrado');
             return;
         }
-        
+
+        // 📦533 — Separar planes con hallazgo vinculado de planes huerfanos
+        // (hallazgoId null). Los huerfanos vienen del parser del ARL que es
+        // demasiado permisivo (utils/evaluacionPdfParser.js). Los ocultamos
+        // del render normal y los mostramos en una fila colapsable al final
+        // para que el usuario los pueda ver/eliminar si quiere.
+        var normalPlans = this.actionPlans.filter(function (p) { return p.hallazgoId != null; });
+        var orphanPlans = this.actionPlans.filter(function (p) { return p.hallazgoId == null; });
+
         if (this.actionPlans.length === 0) {
             tbody.innerHTML = '<tr><td colspan="6" class="k-empty-table">No hay planes activos.</td></tr>';
             return;
         }
-        
-        console.log('[EvaluacionInicialSgSst] Renderizando', this.actionPlans.length, 'planes de acción');
-        tbody.innerHTML = this.actionPlans.map(plan => {
-            const hallazgo = this.currentFindings.find(f => f.code === plan.hallazgoId);
-            const hallazgoText = hallazgo ? `${hallazgo.code} - ${hallazgo.desc.substring(0, 30)}...` : 'No encontrado';
-            
-            return `
-                <tr>
-                    <td>${this.getEstadoBadge(plan.estado)}</td>
-                    <td>
-                        <div style="font-weight: 500;">${hallazgoText}</div>
-                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">
-                            ${plan.accion.substring(0, 50)}${plan.accion.length > 50 ? '...' : ''}
-                        </div>
-                    </td>
-                    <td>${plan.responsable}</td>
-                    <td>${new Date(plan.fechaLimite).toLocaleDateString('es-CO')}</td>
-                    <td>
-                        <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
-                            <button class="k-btn k-btn-sm k-btn-outline" onclick="window.currentEvaluacionInstance.showActionPlanDetailModal(${plan.id})" title="Ver detalle">
-                                <i class="bi bi-eye"></i>
-                            </button>
-                            <button class="k-btn k-btn-sm k-btn-outline" onclick="window.currentEvaluacionInstance.showActionPlanModal(${plan.id})" title="Editar">
-                                <i class="bi bi-pencil"></i>
-                            </button>
-                            <button class="k-btn k-btn-sm k-btn-outline" onclick="window.currentEvaluacionInstance.deleteActionPlan(${plan.id})" title="Eliminar" style="color: var(--danger); border-color: var(--danger);">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            `;
-        }).join('');
+
+        if (normalPlans.length === 0 && orphanPlans.length > 0) {
+            // Solo hay huerfanos. Mostrar el disclosure por defecto.
+            tbody.innerHTML = '<tr><td colspan="6" class="k-empty-table">' +
+                'Todos los planes extraídos del PDF actual quedaron sin hallazgo vinculado. ' +
+                'Probablemente el parser del ARL extrajo texto descriptivo en vez de planes reales. ' +
+                'Verificá el PDF o revisá el parser.</td></tr>';
+            this._renderOrphanDisclosure(tbody, orphanPlans);
+            return;
+        }
+
+        console.log('[EvaluacionInicialSgSst] Renderizando', normalPlans.length, 'planes normales +', orphanPlans.length, 'huerfanos');
+
+        var rows = normalPlans.map(function (plan) {
+            var hallazgo = this.currentFindings.find(function (f) { return f.code === plan.hallazgoId; });
+            var hallazgoCode = hallazgo ? hallazgo.code : '';
+            var hallazgoDesc = hallazgo ? hallazgo.desc : '';
+            return '<tr>' +
+                '<td>' + this.getEstadoBadge(plan.estado) + '</td>' +
+                '<td>' +
+                  '<div style="font-weight: 500;">' + hallazgoCode + '</div>' +
+                  '<div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">' + hallazgoDesc + '</div>' +
+                '</td>' +
+                '<td>' + plan.accion + '</td>' +
+                '<td>' + plan.responsable + '</td>' +
+                '<td>' + (plan.fechaLimite ? new Date(plan.fechaLimite).toLocaleDateString('es-CO') : '—') + '</td>' +
+                '<td>' +
+                  '<div style="display: flex; gap: 0.5rem; justify-content: flex-end;">' +
+                    '<button class="k-btn k-btn-sm k-btn-outline" onclick="window.currentEvaluacionInstance.showActionPlanDetailModal(\'' + plan.id + '\')" title="Ver detalle">' +
+                      '<i class="bi bi-eye"></i></button>' +
+                    '<button class="k-btn k-btn-sm k-btn-outline" onclick="window.currentEvaluacionInstance.showActionPlanModal(\'' + plan.id + '\')" title="Editar">' +
+                      '<i class="bi bi-pencil"></i></button>' +
+                    '<button class="k-btn k-btn-sm k-btn-outline" onclick="window.currentEvaluacionInstance.deleteActionPlan(\'' + plan.id + '\')" title="Eliminar" style="color: var(--danger); border-color: var(--danger);">' +
+                      '<i class="bi bi-trash"></i></button>' +
+                  '</div>' +
+                '</td>' +
+            '</tr>';
+        }.bind(this));
+
+        if (orphanPlans.length > 0) {
+            this._renderOrphanDisclosure(tbody, orphanPlans);
+        }
+
+        tbody.innerHTML = rows.join('');
+    }
+
+    /**
+     * 📦533 — Renderiza una fila colapsable al final de la tabla con los
+     * planes huerfanos (sin hallazgo vinculado). Por defecto esta fila
+     * esta colapsada (muestra solo un resumen). El usuario hace click para
+     * expandir y ver/eliminar los planes huerfanos.
+     */
+    _renderOrphanDisclosure(tbody, orphanPlans) {
+        var disclosureId = 'kair-orphan-disclosure-' + Date.now();
+        var rows = orphanPlans.map(function (plan, idx) {
+            return '<tr style="background-color: rgba(255, 193, 7, 0.08);">' +
+                '<td>' + this.getEstadoBadge(plan.estado) + '</td>' +
+                '<td colspan="2">' +
+                  '<span class="k-badge k-badge-warning k-badge--inline" title="Este plan no se vinculo a ningun hallazgo del PDF">⚠️ Plan ARL sin hallazgo</span>' +
+                '</td>' +
+                '<td>' + plan.responsable + '</td>' +
+                '<td>' + (plan.fechaLimite ? new Date(plan.fechaLimite).toLocaleDateString('es-CO') : '—') + '</td>' +
+                '<td>' +
+                  '<div style="display: flex; gap: 0.5rem; justify-content: flex-end;">' +
+                    '<button class="k-btn k-btn-sm k-btn-outline" onclick="window.currentEvaluacionInstance.showActionPlanDetailModal(\'' + plan.id + '\')" title="Ver detalle">' +
+                      '<i class="bi bi-eye"></i></button>' +
+                    '<button class="k-btn k-btn-sm k-btn-outline" onclick="window.currentEvaluacionInstance.deleteActionPlan(\'' + plan.id + '\')" title="Eliminar" style="color: var(--danger); border-color: var(--danger);">' +
+                      '<i class="bi bi-trash"></i></button>' +
+                  '</div>' +
+                '</td>' +
+            '</tr>';
+        }.bind(this));
+
+        var html = '<tr class="kair-orphan-disclosure-row">' +
+            '<td colspan="6" style="padding: 0; background-color: #fff8e1; border-left: 3px solid #ffc107;">' +
+              '<div style="padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;" onclick="document.getElementById(\'' + disclosureId + '\').classList.toggle(\'kair-collapsed\'); this.querySelector(\'i\').classList.toggle(\'bi-chevron-down\'); this.querySelector(\'i\').classList.toggle(\'bi-chevron-up\');">' +
+                '<div>' +
+                  '<i class="bi bi-chevron-down" style="margin-right: 8px; color: #856404;"></i>' +
+                  '<span style="color: #856404; font-weight: 600;">' + orphanPlans.length + ' plan(es) huerfano(s) del ARL</span>' +
+                  '<span style="color: #856404; opacity: 0.7; margin-left: 8px; font-size: 0.85rem;">(sin hallazgo vinculado, posible ruido del parser)</span>' +
+                '</div>' +
+                '<button class="k-btn k-btn-sm" style="background: #ffc107; color: #212529; border: none;" onclick="event.stopPropagation(); window.currentEvaluacionInstance._discardAllOrphans();" title="Eliminar todos los huerfanos">' +
+                  '<i class="bi bi-trash"></i> Descartar todos' +
+                '</button>' +
+              '</div>' +
+              '<div id="' + disclosureId + '" class="kair-collapsed">' +
+                '<table style="width: 100%; border-collapse: collapse;">' +
+                  rows.join('') +
+                '</table>' +
+              '</div>' +
+            '</td>' +
+        '</tr>';
+
+        tbody.insertAdjacentHTML('beforeend', html);
+    }
+
+    /**
+     * 📦533 — Descarta todos los planes huerfanos (sin hallazgo vinculado).
+     * Se llama desde el boton "Descartar todos" del disclosure.
+     */
+    _discardAllOrphans() {
+        if (!confirm('¿Eliminar todos los planes huerfanos (sin hallazgo vinculado)? Esta accion no se puede deshacer.')) {
+            return;
+        }
+        var orphansRemoved = 0;
+        this.actionPlans = this.actionPlans.filter(function (p) {
+            if (p.hallazgoId == null) {
+                orphansRemoved++;
+                // Eliminar de la BD tambien
+                if (window.electronAPI && window.electronAPI.evaluacionActionPlans) {
+                    var empresaId = window.currentCompany;
+                    if (empresaId && empresaId !== 'default_company') {
+                        window.electronAPI.evaluacionActionPlans.eliminar({
+                            empresaId: empresaId,
+                            id: p.id
+                        }).catch(function (e) { /* ignore */ });
+                    }
+                }
+                return false;
+            }
+            return true;
+        });
+        this._log('log', '_discardAllOrphans: eliminados ' + orphansRemoved + ' planes huerfanos');
+        this.renderActionPlansTable();
+        this.showToast(orphansRemoved + ' plan(es) huerfano(s) descartado(s)', 'success');
     }
     
     /**
-     * Procesa los planes de acción extraídos de un informe de ARL
+     * Procesa los planes de acción extraídos de un informe de ARL.
+     * 📦533 — NO borra los planes existentes. Hace merge: los planes del
+     * ARL se agregan a this.actionPlans sin pisar los que ya están
+     * (de cargas anteriores o de carga del Ministerio). Después llama
+     * a _ensureNoCumpleFindingsHavePlans() para garantizar que cada
+     * hallazgo no_cumple tenga su plan de acción visible.
      * @param {Array} arlActionPlans - Planes de acción extraídos del informe ARL
      */
     processArlActionPlans(arlActionPlans) {
         console.log('[EvaluacionInicialSgSst] Procesando', arlActionPlans.length, 'planes de acción de ARL');
-        
-        // Limpiar planes de acción existentes
-        this.actionPlans = [];
-        this.actionPlanIdCounter = 1;
-        
+
+        // IDs de hallazgos que ya tienen plan del ARL (se usan despues para
+        // el merge con planes auto-generados)
+        const hallazgosCubiertosPorARL = new Set();
+
         // Procesar cada plan de acción del ARL
         arlActionPlans.forEach((arlPlan, index) => {
             // Intentar encontrar un hallazgo relacionado
             let relatedHallazgo = null;
-            
+
             // Buscar por coincidencia en la descripción del hallazgo
             for (const hallazgo of this.currentFindings) {
-                if (hallazgo.status === 'no_cumple' && 
+                if (hallazgo.status === 'no_cumple' &&
                     (hallazgo.desc.toLowerCase().includes(arlPlan.accion.toLowerCase().substring(0, 50)) ||
                      arlPlan.accion.toLowerCase().includes(hallazgo.desc.toLowerCase().substring(0, 50)))) {
                     relatedHallazgo = hallazgo;
                     break;
                 }
             }
-            
-            // Crear el plan de acción
-            const actionPlan = {
-                id: this.actionPlanIdCounter++,
-                hallazgoId: relatedHallazgo ? relatedHallazgo.code : null,
-                hallazgoDesc: relatedHallazgo ? relatedHallazgo.desc : '',
-                accion: arlPlan.accion,
-                responsable: arlPlan.responsable || 'Por asignar',
-                fechaLimite: arlPlan.fechaLimite,
-                estado: arlPlan.estado || 'pendiente',
-                seguimientos: arlPlan.seguimientos || [],
-                responsables: arlPlan.responsables || []
-            };
-            
-            this.actionPlans.push(actionPlan);
-            console.log('[EvaluacionInicialSgSst] Plan de acción creado:', actionPlan.id, '- Hallazgo:', actionPlan.hallazgoId);
+
+            // Si hay un hallazgo relacionado, sobrescribir el plan existente
+            // (si lo hay) para usar la data del ARL que es más especifica.
+            if (relatedHallazgo) {
+                hallazgosCubiertosPorARL.add(relatedHallazgo.code);
+                // Buscar si ya hay un plan para este hallazgo
+                const existingIdx = this.actionPlans.findIndex(
+                    p => p.hallazgoId === relatedHallazgo.code
+                );
+                const newPlan = {
+                    id: existingIdx >= 0 ? this.actionPlans[existingIdx].id : this._generatePlanId(),
+                    hallazgoId: relatedHallazgo.code,
+                    hallazgoCodigo: relatedHallazgo.code,
+                    hallazgoDescripcion: relatedHallazgo.desc,
+                    accion: arlPlan.accion,
+                    responsable: arlPlan.responsable || 'Por asignar',
+                    fechaLimite: arlPlan.fechaLimite,
+                    estado: arlPlan.estado || 'pendiente',
+                    seguimientos: arlPlan.seguimientos || [],
+                    responsables: arlPlan.responsables || []
+                };
+                if (existingIdx >= 0) {
+                    this.actionPlans[existingIdx] = newPlan;
+                } else {
+                    this.actionPlans.push(newPlan);
+                }
+                console.log('[EvaluacionInicialSgSst] Plan ARL vinculado a hallazgo:', relatedHallazgo.code);
+            } else {
+                // Plan del ARL sin hallazgo relacionado: lo agregamos igual
+                // con hallazgoId null. Sirve para mostrar planes que el ARL
+                // extrajo pero que no pudimos vincular automaticamente.
+                const newPlan = {
+                    id: this._generatePlanId(),
+                    hallazgoId: null,
+                    hallazgoCodigo: null,
+                    hallazgoDescripcion: '',
+                    accion: arlPlan.accion,
+                    responsable: arlPlan.responsable || 'Por asignar',
+                    fechaLimite: arlPlan.fechaLimite,
+                    estado: arlPlan.estado || 'pendiente',
+                    seguimientos: arlPlan.seguimientos || [],
+                    responsables: arlPlan.responsables || [],
+                    _source: 'arl-sin-vincular'
+                };
+                this.actionPlans.push(newPlan);
+                console.log('[EvaluacionInicialSgSst] Plan ARL sin hallazgo vinculado (agregado con hallazgoId=null)');
+            }
         });
-        
-        console.log('[EvaluacionInicialSgSst] Total de planes de acción creados:', this.actionPlans.length);
-    }
-    
-    /**
-     * Genera automáticamente planes de acción para hallazgos con estado "no_cumple"
-     */
-    generateActionPlansForNoCumple() {
-        console.log('[EvaluacionInicialSgSst] Generando planes de acción para hallazgos no_cumple');
-        
-        // Limpiar planes de acción existentes
-        this.actionPlans = [];
-        this.actionPlanIdCounter = 1;
-        
-        // Filtrar hallazgos con estado "no_cumple"
-        const noCumpleFindings = this.currentFindings.filter(f => f.status === 'no_cumple');
-        console.log('[EvaluacionInicialSgSst] Hallazgos no_cumple encontrados:', noCumpleFindings.length);
-        
-        // Generar un plan de acción para cada hallazgo "no_cumple"
-        noCumpleFindings.forEach((hallazgo, index) => {
-            const actionPlan = {
-                id: this.actionPlanIdCounter++,
-                hallazgoId: hallazgo.code,
-                hallazgoDesc: hallazgo.desc,
-                accion: `Implementar acciones correctivas para cumplir con el estándar ${hallazgo.code}`,
-                responsable: 'Por asignar',
-                fechaLimite: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 días desde hoy
-                estado: 'pendiente',
-                seguimientos: [],
-                responsables: []
-            };
-            
-            this.actionPlans.push(actionPlan);
-            console.log('[EvaluacionInicialSgSst] Plan de acción generado:', actionPlan.id, '- Hallazgo:', hallazgo.code);
-        });
-        
-        console.log('[EvaluacionInicialSgSst] Total de planes de acción generados:', this.actionPlans.length);
+
+        console.log('[EvaluacionInicialSgSst] Hallazgos cubiertos por ARL:', hallazgosCubiertosPorARL.size);
+
+        // Despues de procesar el ARL, garantizar que cada hallazgo no_cumple
+        // tenga su plan visible (genera los que faltan).
+        this._ensureNoCumpleFindingsHavePlans('arl');
     }
 
-    showToast(msg, type = 'info') {
-        const t = document.getElementById("k-toast");
-        if(t) {
-            t.textContent = msg;
-            t.className = `k-toast show ${type}`;
-            setTimeout(() => t.classList.remove('show'), 3000);
+    /**
+     * Genera automáticamente planes de acción para hallazgos con estado "no_cumple".
+     * 📦533 — NO borra los planes existentes. Solo crea planes para los
+     * hallazgos no_cumple que AUN NO tienen un plan. Despues limpia los
+     * planes cuyo hallazgo ya no es no_cumple (porque el status del
+     * hallazgo cambio en una carga posterior del PDF).
+     */
+    generateActionPlansForNoCumple() {
+        console.log('[EvaluacionInicialSgSst] Generando planes de acción para hallazgos no_cumple (modo merge)');
+
+        // Limpiar planes cuyo hallazgo ya no es no_cumple (o ya no existe
+        // en currentFindings). Esto evita planes huerfanos de cargas
+        // anteriores del PDF.
+        const hallazgosMap = new Map(this.currentFindings.map(f => [f.code, f]));
+        const before = this.actionPlans.length;
+        this.actionPlans = this.actionPlans.filter(p => {
+            if (!p.hallazgoId) {
+                // Planes sin hallazgo vinculado (ej: ARL sin match) — los dejamos
+                return true;
+            }
+            const hallazgo = hallazgosMap.get(p.hallazgoId);
+            return hallazgo && hallazgo.status === 'no_cumple';
+        });
+        const removed = before - this.actionPlans.length;
+        if (removed > 0) {
+            console.log('[EvaluacionInicialSgSst] Eliminados', removed, 'planes cuyo hallazgo ya no es no_cumple');
+        }
+
+        // Delegar a la funcion unificada
+        this._ensureNoCumpleFindingsHavePlans('ministerio');
+    }
+
+    /**
+     * 📦533 — Garantiza que cada hallazgo con status='no_cumple' tenga al
+     * menos un plan de acción visible en this.actionPlans.
+     *
+     * Estrategia:
+     * 1. Calcula los hallazgos no_cumple del PDF actual
+     * 2. Calcula los hallazgos que ya tienen plan (por hallazgoId)
+     * 3. Para cada hallazgo no_cumple SIN plan: crea uno generico
+     *    (accion placeholder, responsable 'Por asignar', fecha limite +30 dias)
+     * 4. Persiste los nuevos planes en la BD
+     *
+     * Esto resuelve el bug donde cargar un PDF de ARL pisaba los planes
+     * del Ministerio: ahora ambos tipos conviven, y los hallazgos que
+     * quedaron sin cubrir tienen un plan auto-generado que el usuario
+     * puede editar (responsable, fecha, accion especifica).
+     *
+     * @param {string} source - 'ministerio' | 'arl' (para logging y
+     *                           metadata del plan auto-generado)
+     */
+    _ensureNoCumpleFindingsHavePlans(source) {
+        const noCumpleFindings = this.currentFindings.filter(f => f.status === 'no_cumple');
+        console.log('[EvaluacionInicialSgSst] [_ensureNoCumpleFindingsHavePlans] source=' + source + ' hallazgos no_cumple=' + noCumpleFindings.length);
+
+        // Set de hallazgoId que ya tienen plan en memoria
+        const hallazgosConPlan = new Set(
+            this.actionPlans
+                .map(p => p.hallazgoId)
+                .filter(id => id != null)
+        );
+
+        let created = 0;
+        for (const hallazgo of noCumpleFindings) {
+            if (hallazgosConPlan.has(hallazgo.code)) continue;
+
+            // Crear plan generico para este hallazgo no_cumple
+            const newPlan = {
+                id: this._generatePlanId(),
+                hallazgoId: hallazgo.code,
+                hallazgoCodigo: hallazgo.code,
+                hallazgoDescripcion: hallazgo.desc,
+                accion: 'Implementar acciones correctivas para cumplir con el estandar ' + hallazgo.code,
+                responsable: 'Por asignar',
+                fechaLimite: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 dias desde hoy
+                estado: 'pendiente',
+                seguimientos: [],
+                responsables: [],
+                _source: source,
+                _autoGenerated: true
+            };
+            this.actionPlans.push(newPlan);
+            created++;
+            // Persistir en la BD (best-effort: si falla, el plan queda en memoria)
+            this._persistActionPlan(newPlan);
+        }
+        if (created > 0) {
+            console.log('[EvaluacionInicialSgSst] [_ensureNoCumpleFindingsHavePlans] ' + created + ' planes auto-generados para cubrir hallazgos no_cumple');
         }
     }
 
+    /**
+     * 📦533 — Genera un ID unico para un plan. Usa crypto.randomUUID()
+     * si esta disponible, con fallback timestamp+random hex.
+     */
+    _generatePlanId() {
+        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+            return crypto.randomUUID();
+        }
+        return 'eap-' + Date.now().toString(36) + '-' + Math.floor(Math.random() * 0xffffff).toString(16);
+    }
+
+    // 📦532 — showToast ahora delega a window.KAIRToast, el estandar
+    // de notificaciones del proyecto (mismo que usan los modulos de
+    // Capacitacion, COPASST, Comite de Convivencia, etc.). Ver
+    // assets/js/kair-toast.js para la API completa (show msg, type, opts).
+    //
+    // Mantenemos showToast como wrapper para no romper los 30+ call
+    // sites que ya usan this.showToast(msg, type). KAIRToast.show()
+    // acepta los mismos tipos que usabamos antes ('success' | 'error' |
+    // 'warning' | 'info' | 'danger' → 'error').
+    showToast(msg, type = 'info') {
+        if (typeof window.KAIRToast !== 'object' || typeof window.KAIRToast.show !== 'function') {
+            // Fallback defensivo: si KAIRToast no esta disponible (ej: en
+            // un test o si se carga en orden raro), usar console.error
+            // para no perder el mensaje silenciosamente.
+            console.error('[showToast fallback] ' + type + ': ' + msg);
+            return;
+        }
+        window.KAIRToast.show(msg, type);
+    }
+
     drawGauge(value = 0) {
-        const canvas = document.getElementById('gaugeChart');
+        // 📦531 — Scoping al container
+        const canvas = this.container.querySelector('#gaugeChart');
         if (!canvas) return;
 
         // Asegurar alta resolución
@@ -1788,6 +2293,69 @@ this.drawGauge(score);
         ctx.arc(cx, cy, r, Math.PI, endAngle);
         ctx.strokeStyle = strokeColor;
         ctx.stroke();
+    }
+
+    // 📦531 — Setup del ResizeObserver para que el gauge se redibuje
+    // cuando el usuario redimensiona la ventana. Llamar una vez despues
+    // del render inicial. Cleanup en destroy().
+    _setupGaugeResizeObserver() {
+        const canvas = this.container.querySelector('#gaugeChart');
+        if (!canvas) return;
+        const parent = canvas.parentElement;
+        if (!parent || typeof ResizeObserver === 'undefined') return;
+        // Si ya hay uno, desconectarlo
+        if (this._gaugeResizeObserver) {
+            this._gaugeResizeObserver.disconnect();
+        }
+        this._gaugeResizeObserver = new ResizeObserver(() => {
+            // Redibujar con throttle basico (evita llamar varias veces
+            // en el mismo frame)
+            if (this._gaugeResizePending) return;
+            this._gaugeResizePending = true;
+            requestAnimationFrame(() => {
+                this._gaugeResizePending = false;
+                if (this.lastScore !== undefined) {
+                    this.drawGauge(this.lastScore);
+                }
+            });
+        });
+        this._gaugeResizeObserver.observe(parent);
+    }
+
+    // 📦531 — Cleanup. Llamar cuando el módulo se desmonta (ej: el
+    // usuario navega a otro módulo o submódulo). Libera observers,
+    // listeners y referencias para evitar memory leaks.
+    destroy() {
+        this._log('log', 'destroy() — limpiando recursos');
+
+        // Desconectar ResizeObserver
+        if (this._gaugeResizeObserver) {
+            this._gaugeResizeObserver.disconnect();
+            this._gaugeResizeObserver = null;
+        }
+
+        // 📦532 — El sistema de toasts es global (KAIRToast usa
+        // #notification-hub en document.body). No hay nada que limpiar
+        // local al desmontar el modulo — los toasts que sigan visibles
+        // se mantendran hasta su autoClose natural. Si quisieramos
+        // limpiarlos, hariamos window.KAIRToast (no expone dismiss
+        // actualmente; ver si se quiere agregar).
+
+        // Limpiar referencias grandes
+        this.actionPlans = [];
+        this.currentFindings = [];
+        this.pdfFilesCache = null;
+        this.hallazgosTableBody = null;
+        this.actionTableBody = null;
+        this._backHandler = null;
+        this._viewPdfHandler = null;
+
+        // Limpiar instancia global
+        if (window.currentEvaluacionInstance === this) {
+            window.currentEvaluacionInstance = null;
+        }
+
+        // El container se vacia desde el caller; no tocamos el DOM acá.
     }
 }
 
@@ -1893,8 +2461,28 @@ if (!document.getElementById('k-air-eval-styles')) {
         .k-table tr.k-row-warning { background-color: #fff3cd; border-left: 3px solid var(--warning); }
         .k-empty-table { text-align: center; padding: 2rem; color: var(--text-muted); font-style: italic; }
 
+        /* Tablas con scroll vertical propio y encabezado fijo.
+           Aplica a la tabla de estándares (~60 filas) y a la de
+           planes de acción. Evita que los títulos se pierdan al
+           hacer scroll dentro de la tabla. */
+        .k-table-scrollable { max-height: 60vh; overflow-y: auto; scrollbar-gutter: stable; }
+        .k-table-scrollable .k-table { border-collapse: separate; border-spacing: 0; }
+        .k-table-scrollable .k-table th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            background: #f8f9fa;
+            border-bottom: none;
+            box-shadow: inset 0 -2px 0 var(--border);
+        }
+
         /* BADGES & BUTTONS */
         .k-badge { padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+        /* 📦532 — Variante inline del badge: emoji + texto en la misma
+           linea (display: inline-flex + align-items: center + gap + white-space: nowrap).
+           Sin esto, el emoji quedaba visualmente arriba del texto en columnas
+           angostas (ej: Estado con 10% de ancho). */
+        .k-badge.k-badge--inline { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; line-height: 1.2; }
         .k-badge-success { background: #d4edda; color: #155724; }
         .k-badge-danger { background: #f8d7da; color: #721c24; }
         .k-btn { padding: 0.4rem 0.8rem; border-radius: 4px; font-size: 0.9rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; transition: 0.2s; border: 1px solid transparent; }
@@ -1918,12 +2506,130 @@ if (!document.getElementById('k-air-eval-styles')) {
         .text-danger { color: var(--danger) !important; }
         .text-muted { color: var(--text-muted) !important; }
 
-        /* TOAST */
-        .k-toast { visibility: hidden; min-width: 300px; background-color: #333; color: #fff; text-align: center; border-radius: 6px; padding: 12px 20px; position: fixed; z-index: 2000; bottom: 30px; right: 30px; font-size: 0.9rem; box-shadow: 0 4px 12px rgba(0,0,0,0.15); opacity: 0; transition: opacity 0.3s; }
-        .k-toast.show { visibility: visible; opacity: 1; }
-        .k-toast.success { background-color: var(--success); }
-        .k-toast.warning { background-color: var(--warning); color: #212529; }
-        .k-toast.danger { background-color: var(--danger); }
+        /* 📦534 — Reglas de modal SIN scoping + posición ABSOLUTE.
+           Los modales se adjuntan al wrapper #k-modal-root (que SI es
+           position:fixed fullscreen), NO al body. Por eso el overlay
+           usa position:absolute relativo al wrapper. Esto evita los
+           problemas de position:fixed en Electron con body overflow:hidden.
+           El CSS externo evaluacion-inicial-sg-sst.css define .k-modal
+           bajo .ev-inicial-sgsst (no aplica) y con position:fixed (tambien
+           problematico). Por eso duplicamos las reglas base aqui. */
+        .k-modal {
+            position: absolute !important;
+            inset: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            z-index: 9999 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border: none !important;
+            pointer-events: auto !important;
+            animation: ei-fadeIn 0.3s ease-in-out;
+        }
+        .k-modal-content {
+            background: var(--bg-card);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 700px;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            pointer-events: auto !important;
+            animation: ei-slideUp 0.4s ease-out;
+        }
+        .k-modal-content.k-modal-content--wide { max-width: 900px; }
+        .k-modal-header {
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        .k-modal-header.text-center {
+            text-align: center;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+        .k-modal-header h3 { margin: 0; font-size: 1.25rem; font-weight: 600; color: var(--text-dark); }
+        .k-modal-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 56px; height: 56px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark, #0d3578) 100%);
+            border-radius: 50%;
+            margin-bottom: 0.75rem;
+        }
+        .k-modal-icon i { color: white; font-size: 1.6rem; }
+        .k-modal-subtitle {
+            margin: 0;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+        .k-modal-body {
+            padding: 1.5rem 2rem;
+            overflow-y: auto;
+            flex: 1;
+        }
+        .k-modal-footer {
+            padding: 1rem 2rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+            flex-shrink: 0;
+            background: var(--bg-body);
+        }
+
+        /* 📦533 — Form SIN scoping (misma razón que modal: el form vive
+           dentro del modal que se adjunta al body, fuera del scope). */
+        .k-form-group { margin-bottom: 1.25rem; }
+        .k-form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+        .k-form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            font-size: 0.9rem;
+        }
+        .k-form-control {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-family: inherit;
+            color: var(--text-dark);
+            background: var(--bg-card);
+            transition: border-color 0.2s, box-shadow 0.2s;
+            box-sizing: border-box;
+        }
+        .k-form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1);
+        }
+        .k-form-control-sm { padding: 0.375rem 0.625rem; font-size: 0.8rem; }
+
+        @keyframes ei-fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes ei-slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 📦532 — El bloque .k-toast se elimino. Las notificaciones ahora
+           las gestiona KAIRToast (assets/js/kair-toast.js + #notification-hub). */
 
     `;
     document.head.appendChild(style);

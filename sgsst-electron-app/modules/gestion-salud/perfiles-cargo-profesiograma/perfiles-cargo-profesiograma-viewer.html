@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K+AIR | 3.1.3 Perfiles de Cargo y Profesiograma</title>
+    <!-- Iconos -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Fuentes -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- kair-* CSS del file explorer (reuso del Responsable SG) -->
+    <link rel="stylesheet" href="../../../modules/recursos/responsable-sg/responsable-sg-view.css">
+
+    <style>
+        /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+           SISTEMA VISUAL OFICIAL (K+AIR)
+           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+        :root {
+            --primary: #174ea6;
+            --primary-hover: #185abd;
+            --primary-light: #e8f0fe;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --info: #17a2b8;
+            --text-dark: #212529;
+            --text-muted: #6c757d;
+            --bg-body: #f0f2f5;
+            --bg-card: #ffffff;
+            --border: #dee2e6;
+            --radius: 0.5rem;
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.05);
+            --shadow-md: 0 5px 15px rgba(0,0,0,0.08);
+            --shadow-lg: 0 10px 25px rgba(0,0,0,0.05);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-dark);
+            font-size: 0.9rem;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ━━━ HEADER (BREADCRUMB + ACTIONS) ━━━ */
+        .app-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 1.5rem;
+            background: white;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+            gap: 1rem;
+        }
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8125rem;
+            color: var(--text-muted);
+            flex: 1;
+            min-width: 0;
+        }
+        .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+        .breadcrumb a:hover { color: var(--primary); }
+        .breadcrumb .current { color: var(--primary); font-weight: 500; }
+        .breadcrumb .sep { opacity: 0.5; }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .header-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: #f8f9fa;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.8rem;
+            color: var(--text-dark);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .header-btn:hover { background: var(--primary-light); border-color: var(--primary); color: var(--primary); }
+        .header-btn.primary { background: var(--primary); color: white; border-color: var(--primary); }
+        .header-btn.primary:hover { background: var(--primary-hover); color: white; }
+
+        /* ━━━ TABS ━━━ */
+        .tabs-bar {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            background: white;
+            border-bottom: 1px solid var(--border);
+            padding: 0 1.5rem;
+            flex-shrink: 0;
+            overflow-x: auto;
+        }
+        .tab {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 0.75rem 1rem;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid transparent;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+        .tab:hover { color: var(--primary); background: rgba(23, 78, 166, 0.04); }
+        .tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 500; }
+        .tab .badge {
+            display: inline-block;
+            padding: 1px 7px;
+            background: var(--primary-light);
+            color: var(--primary);
+            border-radius: 10px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+
+        /* ━━━ MAIN CONTENT ━━━ */
+        .app-main {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+            min-height: 0;
+        }
+        .view { display: none; }
+        .view.active { display: block; }
+        #view-explorer { padding: 0; }
+        #view-explorer iframe { display: block; }
+        /* File explorer nativo (3.1.3) — ocupa toda la altura del view */
+        #view-explorer { position: relative; height: 100%; min-height: 600px; overflow: hidden; }
+        #view-explorer .kair-root { height: 100%; }
+        #view-explorer .kair-loading { position: absolute; }
+        /* Sin header propio: el explorer arranca directo con breadcrumb + toolbar.
+           Compactar el padding del breadcrumb/toolbar y del kair-layout. */
+        #view-explorer .kair-root--no-header { padding-top: 0; }
+        #view-explorer .kair-breadcrumb { min-height: 32px; padding: 4px 12px; }
+        #view-explorer .kair-toolbar { min-height: 40px; padding: 4px 12px; }
+        #view-explorer .kair-layout { height: calc(100% - 72px); }
+
+        /* ━━━ HOME VIEW ━━━ */
+        .hero {
+            background: linear-gradient(135deg, #174ea6 0%, #1a3a6e 100%);
+            border-radius: 10px;
+            padding: 28px 36px;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 1.5rem;
+        }
+        .hero-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .hero-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.15);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.4rem;
+        }
+        .hero h2 { font-size: 1.25rem; font-weight: 600; margin: 0; }
+        .hero p { font-size: 0.875rem; opacity: 0.85; margin: 0; }
+        .hero .lead {
+            font-size: 0.8125rem;
+            opacity: 0.75;
+            max-width: 600px;
+            line-height: 1.6;
+            margin: 0;
+        }
+        .hero-cta {
+            align-self: flex-start;
+            margin-top: 8px;
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.15);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: background 0.2s;
+        }
+        .hero-cta:hover { background: rgba(255,255,255,0.25); }
+
+        /* KPI strip */
+        .kpi-strip {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-bottom: 1.5rem;
+        }
+        .kpi {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            box-shadow: var(--shadow-sm);
+        }
+        .kpi-head {
+            display: flex; align-items: center; gap: 8px;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .kpi-head i { font-size: 1rem; }
+        .kpi-value { font-size: 1.6rem; font-weight: 700; }
+        .kpi-sub { font-size: 0.7rem; color: var(--text-muted); }
+
+        /* Module cards */
+        .module-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 14px;
+        }
+        .module-card {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 18px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .module-card:hover {
+            border-color: var(--primary);
+            box-shadow: var(--shadow-md);
+            transform: translateY(-2px);
+        }
+        .module-card .icon {
+            width: 38px; height: 38px;
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            color: white;
+            font-size: 1.05rem;
+        }
+        .module-card .title { font-weight: 600; font-size: 0.95rem; }
+        .module-card .desc { font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; }
+
+        /* ━━━ TABLES ━━━ */
+        .data-card {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            box-shadow: var(--shadow-sm);
+            overflow: hidden;
+        }
+        .data-card-header {
+            padding: 14px 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .data-card-title { font-weight: 600; font-size: 0.95rem; }
+        .data-card-actions { display: flex; gap: 8px; }
+        .data-card-body { padding: 14px 18px; }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+        .data-table th {
+            text-align: left;
+            padding: 10px 12px;
+            background: #f8f9fa;
+            border-bottom: 2px solid var(--border);
+            font-weight: 600;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+        }
+        .data-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #f0f0f0;
+            vertical-align: top;
+        }
+        .data-table tr:hover td { background: #fafbfc; }
+        .data-table .empty {
+            text-align: center;
+            padding: 32px;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        /* I/P/R mini toggles */
+        .ipr-group { display: flex; gap: 4px; }
+        .ipr-cell {
+            width: 28px; height: 24px;
+            display: flex; align-items: center; justify-content: center;
+            background: #f1f3f5; color: #adb5bd;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s;
+            user-select: none;
+            border: 2px solid transparent;
+        }
+        .ipr-cell:hover { background: #e2e6ea; transform: scale(1.1); }
+        .ipr-cell.on { background: var(--success); color: white; }
+        .ipr-cell.on:hover { background: #1e7e34; }
+        .ipr-cell.dirty { border-color: var(--warning); position: relative; }
+        .ipr-cell.dirty::after {
+            content: '';
+            position: absolute;
+            top: -3px; right: -3px;
+            width: 8px; height: 8px;
+            background: var(--warning);
+            border-radius: 50%;
+            border: 1px solid white;
+        }
+
+        /* Dirty row indicator (cargo con cambios pendientes) */
+        tr.dirty-row { background: #fff8e6 !important; }
+        tr.dirty-row td:first-child::before {
+            content: '●';
+            color: var(--warning);
+            font-size: 1.2rem;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 6px 12px;
+            border: 1px solid var(--border);
+            background: white;
+            color: var(--text-dark);
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn:hover { background: #f8f9fa; }
+        .btn.primary { background: var(--primary); color: white; border-color: var(--primary); }
+        .btn.primary:hover { background: var(--primary-hover); }
+        .btn.danger { color: var(--danger); border-color: var(--danger); }
+        .btn.danger:hover { background: var(--danger); color: white; }
+        .btn.sm { padding: 4px 8px; font-size: 0.75rem; }
+
+        /* Search input */
+        .search-box {
+            display: flex; align-items: center; gap: 8px;
+            padding: 6px 10px;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            min-width: 240px;
+        }
+        .search-box i { color: var(--text-muted); }
+        .search-box input {
+            border: none; outline: none; flex: 1;
+            font-size: 0.85rem; background: transparent;
+        }
+
+        /* Tag / badge */
+        .tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 500;
+        }
+        .tag.success { background: #d4edda; color: #155724; }
+        .tag.warning { background: #fff3cd; color: #856404; }
+        .tag.danger { background: #f8d7da; color: #721c24; }
+        .tag.info { background: #d1ecf1; color: #0c5460; }
+        .tag.muted { background: #e2e3e5; color: #6c757d; }
+
+        /* Dialog overlay */
+        .dialog-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000;
+        }
+        .dialog {
+            background: white;
+            border-radius: 8px;
+            width: 100%;
+            max-width: 540px;
+            box-shadow: var(--shadow-lg);
+            display: flex; flex-direction: column;
+            max-height: 90vh;
+        }
+        .dialog-header {
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .dialog-title { font-weight: 600; font-size: 1rem; }
+        .dialog-close {
+            background: none; border: none;
+            font-size: 1.1rem; cursor: pointer; color: var(--text-muted);
+        }
+        .dialog-body {
+            padding: 18px;
+            overflow-y: auto;
+            display: flex; flex-direction: column; gap: 12px;
+        }
+        .dialog-footer {
+            padding: 12px 18px;
+            border-top: 1px solid var(--border);
+            display: flex; justify-content: flex-end; gap: 8px;
+        }
+        .form-group { display: flex; flex-direction: column; gap: 4px; }
+        .form-group label { font-size: 0.8rem; font-weight: 500; color: var(--text-dark); }
+        .form-group input, .form-group select, .form-group textarea {
+            padding: 8px 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-family: inherit;
+        }
+        .form-group textarea { resize: vertical; min-height: 60px; }
+        .form-group .required { color: var(--danger); }
+
+        /* Loading & errors */
+        .loading {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 40px;
+            color: var(--text-muted);
+            gap: 8px;
+        }
+        .loading i { font-size: 1.5rem; }
+        .toast {
+            position: fixed; bottom: 24px; right: 24px;
+            background: var(--text-dark); color: white;
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            box-shadow: var(--shadow-md);
+            z-index: 2000;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.2s;
+        }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.success { background: var(--success); }
+        .toast.error { background: var(--danger); }
+
+        /* Cargo detail panel */
+        .detail-panel {
+            background: #f8f9fa;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 14px;
+            margin-bottom: 14px;
+        }
+        .detail-panel h4 { font-size: 0.9rem; margin-bottom: 8px; color: var(--primary); }
+
+        /* Skeleton */
+        .skeleton {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 4px;
+        }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- HEADER -->
+    <div class="app-header">
+        <nav class="breadcrumb">
+            <a href="#" id="bc-modulo">Gestión de la Salud</a>
+            <span class="sep">›</span>
+            <a href="#" id="bc-sub">3.1.3</a>
+            <span class="sep">›</span>
+            <span class="current" id="bc-current">Inicio</span>
+        </nav>
+        <div class="header-actions">
+            <button class="header-btn" id="btn-import" title="Importar GI-FO-047 desde Excel">
+                <i class="fas fa-file-excel"></i>
+                <span>Importar Excel</span>
+            </button>
+            <button class="header-btn" id="btn-export" title="Exportar profesiograma a Excel">
+                <i class="fas fa-download"></i>
+                <span>Exportar Excel</span>
+            </button>
+            <button class="header-btn primary" id="btn-back">
+                <i class="fas fa-arrow-left"></i>
+                <span>Volver</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- TABS -->
+    <div class="tabs-bar">
+        <button class="tab active" data-view="home">
+            <i class="fas fa-home"></i> Inicio
+        </button>
+        <button class="tab" data-view="matriz">
+            <i class="fas fa-table"></i> Matriz de Exámenes
+            <span class="badge" id="badge-cargos">0</span>
+        </button>
+        <button class="tab" data-view="pruebas">
+            <i class="fas fa-stethoscope"></i> Descripción de Pruebas
+            <span class="badge" id="badge-pruebas">0</span>
+        </button>
+        <button class="tab" data-view="recomendaciones">
+            <i class="fas fa-exclamation-triangle"></i> Recomendaciones
+        </button>
+        <button class="tab" data-view="vacunacion">
+            <i class="fas fa-syringe"></i> Vacunación
+            <span class="badge" id="badge-vacunas">0</span>
+        </button>
+        <button class="tab" data-view="alturas">
+            <i class="fas fa-shield-alt"></i> Trabajo en Alturas
+        </button>
+        <button class="tab" data-view="explorer">
+            <i class="fas fa-folder-open"></i> Perfiles de Cargo
+        </button>
+    </div>
+
+    <!-- MAIN -->
+    <div class="app-main">
+
+        <!-- HOME -->
+        <div class="view active" id="view-home">
+            <div class="hero">
+                <div class="hero-header">
+                    <div class="hero-icon"><i class="fas fa-stethoscope"></i></div>
+                    <div>
+                        <h2>Profesiograma GI-FO-047</h2>
+                        <p>Gestión integral de exámenes médicos ocupacionales por cargo</p>
+                    </div>
+                </div>
+                <p class="lead">
+                    Administre la matriz de exámenes, pruebas complementarias, recomendaciones por
+                    factor de riesgo, esquemas de vacunación y requisitos para trabajo en alturas
+                    de su organización.
+                </p>
+                <button class="hero-cta" id="hero-cta-matriz">
+                    <i class="fas fa-th"></i> Ver Matriz de Exámenes
+                </button>
+            </div>
+
+            <div class="kpi-strip" id="kpi-strip">
+                <div class="kpi"><div class="kpi-head"><i class="fas fa-users" style="color:var(--primary)"></i> Cargos</div><div class="kpi-value skeleton" style="width:60%; height:1.4rem">&nbsp;</div></div>
+                <div class="kpi"><div class="kpi-head"><i class="fas fa-building" style="color:var(--success)"></i> Grupos Ocupacionales</div><div class="kpi-value skeleton" style="width:60%; height:1.4rem">&nbsp;</div></div>
+                <div class="kpi"><div class="kpi-head"><i class="fas fa-clipboard-list" style="color:var(--text-muted)"></i> Tipos de Examen</div><div class="kpi-value skeleton" style="width:60%; height:1.4rem">&nbsp;</div></div>
+                <div class="kpi"><div class="kpi-head"><i class="fas fa-syringe" style="color:var(--warning)"></i> Vacunas</div><div class="kpi-value skeleton" style="width:60%; height:1.4rem">&nbsp;</div></div>
+                <div class="kpi"><div class="kpi-head"><i class="fas fa-stethoscope" style="color:var(--success)"></i> Exámenes Ingreso</div><div class="kpi-value skeleton" style="width:60%; height:1.4rem">&nbsp></div></div>
+                <div class="kpi"><div class="kpi-head"><i class="fas fa-shield-alt" style="color:var(--primary)"></i> Vacunaciones Requeridas</div><div class="kpi-value skeleton" style="width:60%; height:1.4rem">&nbsp;</div></div>
+            </div>
+
+            <div class="module-grid">
+                <div class="module-card" data-view-link="matriz">
+                    <div class="icon" style="background:var(--primary)"><i class="fas fa-clipboard-list"></i></div>
+                    <div class="title">Matriz de Exámenes</div>
+                    <div class="desc">Gestión de la matriz completa de exámenes médicos por cargo con tipos Ingreso, Periódico y Retiro.</div>
+                </div>
+                <div class="module-card" data-view-link="pruebas">
+                    <div class="icon" style="background:var(--success)"><i class="fas fa-stethoscope"></i></div>
+                    <div class="title">Descripción de Pruebas</div>
+                    <div class="desc">Detalle de cada tipo de examen, personal objetivo y procedimientos por tipo de evaluación.</div>
+                </div>
+                <div class="module-card" data-view-link="recomendaciones">
+                    <div class="icon" style="background:var(--warning)"><i class="fas fa-exclamation-triangle"></i></div>
+                    <div class="title">Recomendaciones</div>
+                    <div class="desc">Recomendaciones por factor de riesgo con exámenes, pruebas específicas y restricciones.</div>
+                </div>
+                <div class="module-card" data-view-link="vacunacion">
+                    <div class="icon" style="background:var(--danger)"><i class="fas fa-syringe"></i></div>
+                    <div class="title">Vacunación</div>
+                    <div class="desc">Esquema de vacunación por cargo con recomendaciones y tipos de vacuna aplicables.</div>
+                </div>
+                <div class="module-card" data-view-link="alturas">
+                    <div class="icon" style="background:var(--text-muted)"><i class="fas fa-shield-alt"></i></div>
+                    <div class="title">Trabajo en Alturas</div>
+                    <div class="desc">Requisitos y restricciones para actividades de trabajo en alturas según hallazgos.</div>
+                </div>
+                <div class="module-card" data-action="open-explorer">
+                    <div class="icon" style="background:#6c757d"><i class="fas fa-folder-open"></i></div>
+                    <div class="title">Perfiles de Cargo</div>
+                    <div class="desc">Explorador de archivos del submódulo: navegación, preview y descarga de los perfiles y documentos asociados.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MATRIZ -->
+        <div class="view" id="view-matriz">
+            <div class="data-card">
+                <div class="data-card-header">
+                    <div class="data-card-title">Matriz de Exámenes Médicos por Cargo</div>
+                    <div class="data-card-actions">
+                        <div class="search-box">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="search-matriz" placeholder="Buscar cargo o grupo…">
+                        </div>
+                        <button class="btn sm" id="btn-new-tipo-examen-matriz" title="Agregar nuevo tipo de examen (aparecerá como nueva columna)">
+                            <i class="fas fa-plus-circle"></i> Tipo de Examen
+                        </button>
+                        <button class="btn primary sm" id="btn-new-cargo">
+                            <i class="fas fa-plus"></i> Nuevo Cargo
+                        </button>
+                    </div>
+                </div>
+                <div class="data-card-body" id="matriz-body">
+                    <div class="loading"><i class="fas fa-spinner fa-spin"></i> Cargando matriz…</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PRUEBAS -->
+        <div class="view" id="view-pruebas">
+            <!-- Sección: Tipos de Examen (columnas de la matriz) -->
+            <div class="data-card" style="margin-bottom: 1rem;">
+                <div class="data-card-header">
+                    <div class="data-card-title">
+                        <i class="fas fa-th-list" style="color:var(--primary); margin-right:6px"></i>
+                        Tipos de Examen (Columnas de la Matriz)
+                    </div>
+                    <div class="data-card-actions">
+                        <button class="btn primary sm" id="btn-new-tipo-examen" title="Agregar nuevo tipo de examen (aparecerá como nueva columna en la matriz)">
+                            <i class="fas fa-plus-circle"></i> Nuevo Tipo de Examen
+                        </button>
+                    </div>
+                </div>
+                <div class="data-card-body" id="tipos-examen-body">
+                    <div class="loading"><i class="fas fa-spinner fa-spin"></i> Cargando tipos de examen…</div>
+                </div>
+            </div>
+
+            <!-- Sección: Descripción de Pruebas Médicas -->
+            <div class="data-card">
+                <div class="data-card-header">
+                    <div class="data-card-title">Descripción de Pruebas Médicas</div>
+                    <div class="data-card-actions">
+                        <button class="btn primary sm" id="btn-new-prueba">
+                            <i class="fas fa-plus"></i> Nueva Prueba
+                        </button>
+                    </div>
+                </div>
+                <div class="data-card-body" id="pruebas-body">
+                    <div class="loading"><i class="fas fa-spinner fa-spin"></i> Cargando pruebas…</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RECOMENDACIONES -->
+        <div class="view" id="view-recomendaciones">
+            <div class="data-card">
+                <div class="data-card-header">
+                    <div class="data-card-title">Recomendaciones por Factor de Riesgo</div>
+                    <div class="data-card-actions">
+                        <button class="btn primary sm" id="btn-new-recomendacion">
+                            <i class="fas fa-plus"></i> Nueva Recomendación
+                        </button>
+                    </div>
+                </div>
+                <div class="data-card-body" id="recomendaciones-body">
+                    <div class="loading"><i class="fas fa-spinner fa-spin"></i> Cargando recomendaciones…</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VACUNACION -->
+        <div class="view" id="view-vacunacion">
+            <div class="data-card">
+                <div class="data-card-header">
+                    <div class="data-card-title">Esquema de Vacunación</div>
+                    <div class="data-card-actions">
+                        <button class="btn primary sm" id="btn-new-vacuna">
+                            <i class="fas fa-plus"></i> Nueva Vacuna
+                        </button>
+                    </div>
+                </div>
+                <div class="data-card-body" id="vacunacion-body">
+                    <div class="loading"><i class="fas fa-spinner fa-spin"></i> Cargando vacunas…</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ALTURAS -->
+        <div class="view" id="view-alturas">
+            <div class="data-card">
+                <div class="data-card-header">
+                    <div class="data-card-title">Requisitos para Trabajo en Alturas</div>
+                    <div class="data-card-actions">
+                        <button class="btn primary sm" id="btn-new-altura">
+                            <i class="fas fa-plus"></i> Nuevo Requisito
+                        </button>
+                    </div>
+                </div>
+                <div class="data-card-body" id="alturas-body">
+                    <div class="loading"><i class="fas fa-spinner fa-spin"></i> Cargando requisitos…</div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- TOAST -->
+    <div class="toast" id="toast"></div>
+
+    <!-- EXPLORER DE ARCHIVOS (Perfiles de Cargo) — file explorer nativo, mismo UI/UX que Responsable SG,
+         con branding 3.1.3 y llamadas API directas (sin iframe, sin postMessage, sin loops).
+         Sin header propio: la nav (Volver) ya está en el header del módulo 3.1.3 y el contexto
+         (Perfiles de Cargo) es claro por la pestaña activa. -->
+    <div class="view explorer-host" id="view-explorer">
+        <div class="kair-root kair-root--no-header" id="explorerRoot">
+            <nav class="kair-breadcrumb" id="exp-breadcrumb" aria-label="Ruta"></nav>
+
+            <div class="kair-toolbar">
+                <div class="kair-toolbar__left">
+                    <div class="kair-search">
+                        <i class="bi bi-search kair-search__icon"></i>
+                        <input type="text" id="exp-search-input" class="kair-search__input"
+                               placeholder="Buscar archivos..." autocomplete="off">
+                        <button class="kair-search__clear" id="exp-search-clear" title="Limpiar">
+                            <i class="bi bi-x-circle"></i>
+                        </button>
+                    </div>
+                    <div class="kair-sort">
+                        <select id="exp-sort-select" class="kair-sort__select" title="Ordenar por">
+                            <option value="name-asc">Nombre (A → Z)</option>
+                            <option value="name-desc">Nombre (Z → A)</option>
+                            <option value="size-desc">Tamaño (mayor primero)</option>
+                            <option value="size-asc">Tamaño (menor primero)</option>
+                            <option value="date-desc">Modificado (más reciente)</option>
+                            <option value="date-asc">Modificado (más antiguo)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="kair-toolbar__right">
+                    <div class="kair-stats">
+                        <span class="kair-stats__count" id="exp-doc-count">0</span>
+                        <span class="kair-stats__label">archivos</span>
+                    </div>
+                </div>
+            </div>
+
+            <main class="kair-layout">
+                <aside class="kair-sidebar" aria-label="Carpetas">
+                    <div class="kair-sidebar__head">
+                        <i class="bi bi-folder2-open"></i>
+                        <span>Carpetas</span>
+                    </div>
+                    <div class="kair-sidebar__body" id="exp-folder-list"></div>
+                </aside>
+
+                <section class="kair-main" aria-label="Documentos">
+                    <div class="kair-main__body" id="exp-file-list" data-view="list"></div>
+                    <footer class="kair-main__footer">
+                        <span id="exp-footer-count">0 archivos</span>
+                        <span class="kair-main__footer-sep">·</span>
+                        <span id="exp-footer-size">0 B</span>
+                    </footer>
+                </section>
+
+                <aside class="kair-preview" aria-label="Vista previa" data-state="empty">
+                    <div class="kair-preview__head">
+                        <div class="kair-preview__title">
+                            <i class="bi bi-file-earmark-text"></i>
+                            <span id="exp-doc-name" title="">Selecciona un documento</span>
+                        </div>
+                    </div>
+                    <div class="kair-preview__body" id="exp-preview-container">
+                        <div class="kair-empty" id="exp-empty-state">
+                            <div class="kair-empty__icon">
+                                <i class="bi bi-file-earmark-richtext"></i>
+                            </div>
+                            <h3 class="kair-empty__title">Vista previa no disponible</h3>
+                            <p class="kair-empty__desc">Selecciona un documento de la lista para visualizarlo aquí.</p>
+                        </div>
+                    </div>
+                </aside>
+            </main>
+        </div>
+
+        <!-- Loading overlay del explorer -->
+        <div class="kair-loading" id="exp-loading-overlay" aria-hidden="true">
+            <div class="kair-loading__spinner">
+                <i class="bi bi-arrow-repeat"></i>
+            </div>
+            <p class="kair-loading__text" id="exp-loading-text">Cargando...</p>
+        </div>
+
+        <!-- Toast container del explorer -->
+        <div class="kair-toast-container" id="exp-toast-container" aria-live="polite"></div>
+    </div>
+
+    <!-- DIALOG OVERLAY (se inyecta dinámicamente) -->
+    <div id="dialog-host"></div>
+
+    <script src="./perfiles-cargo-profesiograma-viewer.js"></script>
+</body>
+</html>

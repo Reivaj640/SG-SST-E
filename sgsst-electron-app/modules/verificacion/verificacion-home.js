@@ -1,11 +1,12 @@
 // verificacion-home.js - Componente para el home del módulo "Verificación"
 
 class VerificacionHome {
-    constructor(container, moduleName, submodules) {
+    constructor(container, moduleName, submodules, companyName) {
         this.container = container;
         this.moduleName = moduleName;
         this.submodules = submodules || [];
-        this.currentCompany = null;
+        // 📦748 · Aceptar currentCompany como parámetro del shell.
+        this.currentCompany = companyName || this.getCurrentCompany() || null;
         this.widgets = {};
     }
 
@@ -32,7 +33,7 @@ class VerificacionHome {
         header.className = 'k-module-header';
         header.innerHTML = `
             <div class="k-module-title">
-                <i class="bi bi-clipboard-check-fill me-2" style="color: #212529;"></i>
+                <span class="k-module-title-icon" style="color: #212529;">${SIDEBAR_ICONS.shield_check}</span>
                 <div>
                     <div style="color: #212529; font-weight: 600;">Módulo Verificación</div>
                     <span style="font-size: 0.75rem; font-weight: 400; color: #6c757d;">
@@ -51,14 +52,25 @@ class VerificacionHome {
         mainArea.className = 'main-area';
         mainArea.style.flex = '1';
 
-        this.renderMainArea(mainArea);
+        // 📦491 — Skeleton mientras cargan widgets y charts de cumplimiento (6 widgets + 2 charts: bar + doughnut)
+        mainArea.innerHTML = KairSkeleton.kpiStrip(6) + KairSkeleton.chartBars(12) + KairSkeleton.chartDonut();
 
         contentContainer.appendChild(mainArea);
         layout.appendChild(contentContainer);
         this.container.appendChild(layout);
+
+        // 📦491-fix — Retardo de 200ms para que el browser pinte el skeleton y el ojo lo registre
+        // antes de que JS continue con la carga. Sin esto, el skeleton se borra antes de verse.
+        await new Promise(r => setTimeout(r, 200));
+
+        // Pintar widgets con datos (algunos hardcoded, otros de RevisionAltaDireccionService)
+        this.renderMainArea(mainArea);
     }
 
     renderMainArea(container) {
+        // 📦491-fix — Limpiar skeleton antes de pintar widgets reales
+        container.innerHTML = '';
+
         const widgetsContainer = document.createElement('div');
         widgetsContainer.className = 'widgets-container';
 
@@ -223,7 +235,9 @@ class VerificacionHome {
                     Completados / Total
                 </div>
                 <div class="kb-progress-track" style="margin-bottom: 0.5rem;">
-                    <div class="kb-progress-bar" style="width: ${d.eficacia}%"></div>
+                    <div class="kb-progress-bar" style="width: ${d.eficacia}%">
+    <div class="kb-shimmer"></div>
+</div>
                 </div>
                 <div class="kb-footer">
                     <div>

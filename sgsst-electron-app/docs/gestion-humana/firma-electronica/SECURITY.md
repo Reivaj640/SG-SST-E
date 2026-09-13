@@ -1,0 +1,1757 @@
+# Firma Electrónica K+AIR v1 — Análisis de Seguridad
+
+**Versión del documento**: 0.1 (borrador de diseño)
+**Fecha**: 2026-08-17
+**Estado**: Borrador para revisión. Derivado de `ARCHITECTURE.md`, `DATA_MODEL.md`, `API.md` y `FLOWS.md`.
+**Documentos rectores**:
+- [`ARCHITECTURE.md`](./ARCHITECTURE.md)
+- [`DATA_MODEL.md`](./DATA_MODEL.md)
+- [`API.md`](./API.md)
+- [`FLOWS.md`](./FLOWS.md)
+
+> **Aviso legal**
+>
+> Este análisis de seguridad cubre la arquitectura **diseñada conforme
+> al marco normativo aplicable** a la firma electrónica de relaciones
+> laborales en Colombia. **No constituye asesoría jurídica ni
+> auditoría de seguridad formal.** La validación definitiva del
+> mecanismo debe realizarla un **profesional jurídico colombiano** y
+> un **auditor de seguridad** antes de producción.
+
+---
+
+## Tabla de contenidos
+
+- [1. Alcance y limitaciones](#1-alcance-y-limitaciones)
+- [2. Activos a proteger](#2-activos-a-proteger)
+- [3. Modelo STRIDE](#3-modelo-stride)
+  - [3.1 S — Spoofing (suplantación)](#31-s--spoofing-suplantación)
+  - [3.2 T — Tampering (manipulación)](#32-t--tampering-manipulación)
+  - [3.3 R — Repudiation (repudio)](#33-r--repudiation-repudio)
+  - [3.4 I — Information Disclosure (filtración)](#34-i--information-disclosure-filtración)
+  - [3.5 D — Denial of Service (denegación)](#35-d--denial-of-service-denegación)
+  - [3.6 E — Elevation of Privilege (escalada)](#36-e--elevation-of-privilege-escalada)
+- [4. Vectores de ataque específicos](#4-vectores-de-ataque-específicos)
+- [5. Defensa en profundidad](#5-defensa-en-profundidad)
+- [6. Gestión de secretos](#6-gestión-de-secretos)
+- [7. Checklist pre-producción](#7-checklist-pre-producción)
+- [8. Autorización per-empresa (D-13, I-010)](#8-autorización-per-empresa-d-13-i-010)
+- [9. Rate limit interno por empresa (I-008, C-20 v5)](#9-rate-limit-interno-por-empresa-i-008-c-20-v5)
+  - [9.1. Contexto y motivación](#91-contexto-y-motivación)
+  - [9.2. Las 4 capas](#92-las-4-capas)
+  - [9.3. Decisión de límites (720 / 240 / 480)](#93-decisión-de-límites-720--240--480)
+  - [9.4. `X-Client-Instance-Id` — OPCIONAL](#94-x-client-instance-id--opcional)
+  - [9.5. Capa 4: heurística, NO prueba de ataque](#95-capa-4-heurística-no-prueba-de-ataque)
+  - [9.6. Legacy mode — IP fallback](#96-legacy-mode--ip-fallback)
+  - [9.7. `req.id_empresa` autoritativo (nunca del body)](#97-reqid_empresa-autoritativo-nunca-del-body)
+  - [9.8. Relación con I-010: composición, no duplicación](#98-relación-con-i-010-composición-no-duplicación)
+  - [9.9. `globalLimiter` ya NO aplica a `/internal/*`](#99-globallimiter-ya-no-aplica-a-internal)
+  - [9.10. Aplicación en routers](#910-aplicación-en-routers)
+  - [9.11. Status code de rate limit](#911-status-code-de-rate-limit)
+  - [9.12. Tests (388 + 27 nuevos = 415 passing)](#912-tests-388--27-nuevos--415-passing)
+  - [9.13. Configuración por env vars](#913-configuración-por-env-vars)
+  - [9.14. Riesgos aceptados](#914-riesgos-aceptados)
+  - [9.15. Plan de migración a v2 (futuro)](#915-plan-de-migración-a-v2-futuro)
+- [10. Idempotency-Key (I-003)](#10-idempotency-key-i-003)
+  - [10.1. Contexto y motivación](#101-contexto-y-motivación)
+  - [10.2. Header `Idempotency-Key` (G1–G4)](#102-header-idempotency-key-g1g4)
+  - [10.3. Fingerprint del payload (G5–G6 refinado)](#103-fingerprint-del-payload-g5g6-refinado)
+  - [10.4. Estados y máquina de transiciones (G8 refinado)](#104-estados-y-máquina-de-transiciones-g8-refinado)
+  - [10.5. TTL de 24 horas (lazy cleanup)](#105-ttl-de-24-horas-lazy-cleanup)
+  - [10.6. Timeout de PENDING de 5 minutos (G7)](#106-timeout-de-pending-de-5-minutos-g7)
+  - [10.7. Manejo de concurrencia y race conditions](#107-manejo-de-concurrencia-y-race-conditions)
+  - [10.8. REPLAY y redacción del token (C-22, G9, G10)](#108-replay-y-redacción-del-token-c-22-g9-g10)
+  - [10.9. Separación por `id_empresa` (frontera I-003 + I-010)](#109-separación-por-id_empresa-frontera-i-003--i-010)
+  - [10.10. Amenazas cubiertas por I-003.4 (batería adversarial)](#1010-amenazas-cubiertas-por-i-0034-batería-adversarial)
+  - [10.11. Lo que NO protege la idempotencia](#1011-lo-que-no-protege-la-idempotencia)
+  - [10.12. HALLAZGO M5.4 — Edge case documentado](#1012-hallazgo-m54--edge-case-documentado)
+- [11. Pentesting post-implementación](#11-pentesting-post-implementación)
+- [12. Bug bounty (futuro)](#12-bug-bounty-futuro)
+- [13. Anexo: matriz de riesgos](#13-anexo-matriz-de-riesgos)
+
+---
+
+## 1. Alcance y limitaciones
+
+### 1.1. Alcance
+
+Este análisis cubre:
+
+- ✅ Servicio de Firma (Express) y su BD SQLite.
+- ✅ Mini-app web pública y su CSP.
+- ✅ Comunicación K+AIR ↔ Servicio.
+- ✅ Almacenamiento de PDFs, constancias y eventos.
+- ✅ Flujo de tokens y OTPs.
+- ✅ Logs y monitoreo.
+
+### 1.2. Fuera del alcance
+
+- ❌ Seguridad de la infraestructura del VPS (configuración de
+  firewall, hardening del SO, etc.) — se asume que el proveedor
+  (DigitalOcean, Hetzner, Railway, etc.) tiene su propia
+  seguridad.
+- ❌ Seguridad del correo del trabajador (compromiso del correo =
+  compromiso del OTP, asumido en el Acuerdo).
+- ❌ Seguridad física del dispositivo del trabajador.
+- ❌ Seguridad interna de K+AIR local (ya cubierta por otros
+  análisis).
+- ❌ Cumplimiento SOC 2, ISO 27001, etc. (esos son procesos
+  externos).
+
+### 1.3. Suposiciones
+
+- El VPS corre Linux actualizado con Node 20 LTS.
+- HTTPS está correctamente configurado (certificado válido,
+  TLS 1.2+).
+- El DNS de `firma.k-air.com` apunta al VPS.
+- K+AIR local está razonablemente protegido (autenticación de
+  usuario, etc.).
+
+---
+
+## 2. Activos a proteger
+
+| # | Activo | Criticidad | Justificación |
+|---|---|---|---|
+| A1 | **Tokens de firma** (en tránsito) | 🔴 Crítica | Acceso directo a la solicitud. |
+| A2 | **`token_hash`** (en BD) | 🔴 Crítica | Si se filtran + el algoritmo, riesgo de fuerza bruta. |
+| A3 | **OTPs en tránsito** | 🔴 Crítica | Si se intercepta, permite firmar. |
+| A4 | **`otp_hash` + sal** (en BD) | 🔴 Crítica | Si se filtran, fuerza bruta. |
+| A5 | **Cédulas en tránsito y en BD** | 🟠 Alta | Dato personal. Ley 1581. |
+| A6 | **PDFs originales** | 🟠 Alta | Contenido del contrato. |
+| A7 | **PDFs firmados** | 🟠 Alta | Evidencia legal. |
+| A8 | **Constancias** | 🟠 Alta | Evidencia legal. |
+| A9 | **Eventos de auditoría** | 🟠 Alta | Inmutabilidad requerida. |
+| A10 | **Acuerdo de uso (texto y hash)** | 🟠 Alta | Base del consentimiento. |
+| A11 | **API key interna** (K+AIR ↔ Servicio) | 🟠 Alta | Acceso de RH al Servicio. |
+| A12 | **BD del Servicio** (firma.sqlite) | 🔴 Crítica | Todo el notario digital. |
+| A13 | **Logs** | 🟡 Media | Si se filtran, exponen metadata. |
+| A14 | **Correo del trabajador** | 🟡 Media | Necesario para OTP. |
+
+---
+
+## 3. Modelo STRIDE
+
+STRIDE es un modelo de clasificación de amenazas de Microsoft
+aplicable a sistemas distribuidos. Lo aplicamos a cada componente
+del Servicio de Firma.
+
+### 3.1. S — Spoofing (suplantación)
+
+#### S.1. Suplantación del trabajador
+
+| Aspecto | Detalle |
+|---|---|
+| **Descripción** | Un atacante se hace pasar por el trabajador y firma un documento. |
+| **Activos** | A1, A2, A3, A4, A5 |
+| **Vector de ataque** | Interceptar el token, interceptar el OTP, conocer la cédula. |
+| **Probabilidad** | Media (depende del canal de entrega). |
+| **Impacto** | 🔴 Alto (firma en nombre de otro = falsificación). |
+| **Mitigación implementada** | (1) Token es aleatorio ≥32 chars, no enumerable. (2) Token almacenado solo como hash. (3) OTP con TTL 10 min, máx 5 intentos, hasheado con sal. (4) Cédula cotejada contra `base_personal`. (5) Manifestación explícita + checkbox. (6) Rate limiting por IP y por token. |
+| **Mitigación recomendada** | (a) Notificación a RH de intentos fallidos. (b) Detección de IPs/ubicaciones anómalas. (c) MFA opcional (SMS) en v1.1. |
+| **Riesgo residual** | 🟡 Bajo. Aceptable para v1. |
+
+#### S.2. Suplantación de RH
+
+| Aspecto | Detalle |
+|---|---|
+| **Descripción** | Un atacante con la API key interna crea solicitudes fraudulentas. |
+| **Activos** | A11, A6, A7 |
+| **Vector de ataque** | API key filtrada, MITM en la red local. |
+| **Probabilidad** | Baja (la API key está en el llavero de K+AIR). |
+| **Impacto** | 🟠 Alto. |
+| **Mitigación implementada** | (1) API key en `safeStorage` de Electron, no en disco plano. (2) HTTPS obligatorio. (3) Validación de `X-Internal-API-Key` server-side. (4) Logs de toda llamada. (5) Rate limit 1000 req/min. |
+| **Mitigación recomendada** | (a) Rotación de API key cada 90 días. (b) Alerta si la misma key se usa desde IPs muy distintas. |
+| **Riesgo residual** | 🟡 Bajo. |
+
+#### S.3. Suplantación del Servicio (phishing)
+
+| Aspecto | Detalle |
+|---|---|
+| **Descripción** | Un atacante sirve una mini-app falsa con URL parecida. |
+| **Activos** | A1, A3, A5 |
+| **Vector de ataque** | Dominio `firma-k-air.com` (con guión) en vez de `firma.k-air.com`. |
+| **Probabilidad** | Media (typosquatting). |
+| **Impacto** | 🔴 Alto. |
+| **Mitigación implementada** | (1) Dominio principal claro, comunicado en capacitación. (2) HSTS con `includeSubDomains` para que navegadores rechacen subdominios fraudulentos. (3) Certificados válidos. |
+| **Mitigación recomendada** | (a) Registro de dominios similares (`.com.co`, `.co`, con y sin guión). (b) Cert pinning en la mini-app (en v1.1). (c) Banner en la mini-app que muestra el dominio. |
+| **Riesgo residual** | 🟡 Bajo. |
+
+### 3.2. T — Tampering (manipulación)
+
+#### T.1. Modificación del PDF firmado
+
+| Aspecto | Detalle |
+|---|---|
+| **Descripción** | Un atacante modifica el PDF firmado después de la firma. |
+| **Activos** | A7, A8 |
+| **Vector de ataque** | Acceso al sistema de archivos del Servicio. |
+| **Probabilidad** | Baja (requiere acceso al VPS). |
+| **Impacto** | 🔴 Crítico. |
+| **Mitigación implementada** | (1) SHA-256 `document_hash_firmado` calculado y comparado. (2) `evidence_hash` sobre JSON canónico. (3) PDFs en directorio con permisos restrictivos. (4) Verificación posterior posible: `SHA-256(pdf) == document_hash_firmado`. |
+| **Mitigación recomendada** | (a) Monitoreo de integridad de archivos (file integrity monitoring). (b) Backups firmados con `gpg`. |
+| **Riesgo residual** | 🟢 Muy bajo. |
+
+#### T.2. Modificación de eventos de auditoría
+
+| Aspecto | Detalle |
+|---|---|
+| **Descripción** | Un atacante borra o modifica eventos. |
+| **Activos** | A9 |
+| **Vector de ataque** | Acceso a la BD. |
+| **Probabilidad** | Baja. |
+| **Impacto** | 🟠 Alto (rompe la trazabilidad). |
+| **Mitigación implementada** | (1) Tabla `gh_firma_eventos` append-only a nivel de código (no hay método `update()` ni `delete()`). (2) Constraint en BD: `id_evento_anterior` debe ser referenciable. (3) Backups diarios inmutables. |
+| **Mitigación recomendada** | (a) Trigger SQL que rechace UPDATE/DELETE en `gh_firma_eventos`. (b) Hash chain: cada evento incluye hash del anterior. |
+| **Riesgo residual** | 🟢 Muy bajo. |
+
+#### T.3. Modificación de la base de datos SQLite
+
+| Aspecto | Detalle |
+|---|---|
+| **Descripción** | Un atacante edita la BD directamente. |
+| **Activos** | A12, A2, A4 |
+| **Vector de ataque** | Acceso al archivo `firma.sqlite`. |
+| **Probabilidad** | Baja. |
+| **Impacto** | 🔴 Crítico. |
+| **Mitigación implementada** | (1) SQLite con `PRAGMA journal_mode=WAL`. (2) Permisos de archivo restrictivos. (3) Backups encriptados. (4) CHECK constraints en BD. |
+| **Mitigación recomendada** | (a) Usuario del SO con permisos mínimos. (b) Auditoría periódica de la BD. |
+| **Riesgo residual** | 🟢 Muy bajo. |
+
+#### T.4. Inyección SQL
+
+| Aspecto | Detalle |
+|---|---|
+| **Descripción** | Un atacante inyecta SQL en los inputs. |
+| **Activos** | A12, A6-A9 |
+| **Vector de ataque** | Inputs no sanitizados en endpoints. |
+| **Probabilidad** | Media (cualquier endpoint público es vector). |
+| **Impacto** | 🔴 Crítico. |
+| **Mitigación implementada** | (1) SQL parametrizado en todo el código (better-sqlite3 `prepare(...).get(...)`). (2) Validación con `zod` o `ajv` antes de cualquier query. (3) No concatenación de strings en SQL. |
+| **Mitigación recomendada** | (a) Code review obligatorio en PRs que toquen SQL. (b) Tests de fuzzing. |
+| **Riesgo residual** | 🟢 Muy bajo. |
+
+### 3.3. R — Repudiation (repudio)
+
+#### R.1. El trabajador repudia haber firmado
+
+| Aspecto | Detalle |
+|---|---|
+| **Descripción** | El trabajador dice "yo nunca firmé eso". |
+| **Activos** | Legal, reputación. |
+| **Vector de ataque** | Real (reclamaciones laborales). |
+| **Probabilidad** | Media (es un caso real en Colombia). |
+| **Impacto** | 🟠 Alto. |
+| **Mitigación implementada** | (1) Línea de tiempo de eventos con timestamp, IP, user-agent. (2) Identificación por cédula cotejada. (3) OTP al correo con hash + sal. (4) Manifestación de voluntad explícita. (5) Constancia PDF con todos los hashes. (6) `evidence_hash` verificable por terceros. (7) Correo con copia al firmante como prueba de recepción. |
+| **Mitigación recomendada** | (a) TSA (Time Stamping Authority) en v1.1 para sellos de tiempo cualificados. (b) Conservación de headers del correo original. |
+| **Riesgo residual** | 🟡 Bajo. Aceptable para v1, mejorable con TSA. |
+
+#### R.2. El empleador repudia haber enviado
+
+| Aspecto | Detalle |
+|---|---|
+| **Descripción** | RH dice "yo nunca envié esa solicitud". |
+| **Activos** | A11, logs. |
+| **Vector de ataque** | Real (reclamaciones). |
+| **Probabilidad** | Baja. |
+| **Impacto** | 🟡 Medio. |
+| **Mitigación implementada** | (1) Cada llamada interna registra `rh_user_id`. (2) Logs firmados. (3) Evento `CREATED` con metadata del usuario. |
+| **Riesgo residual** | 🟢 Muy bajo. |
+
+### 3.4. I — Information Disclosure (filtración)
+
+#### I.1. Filtración de tokens
+
+| Aspecto | Detalle |
+|---|---|
+| **Descripción** | El token se filtra (logs, backups, error message, etc.). |
+| **Activos** | A1, A2 |
+| **Vector de ataque** | Error en logs que incluya el token. |
+| **Probabilidad** | Baja. |
+| **Impacto** | 🔴 Crítico. |
+| **Mitigación implementada** | (1) Token en plano SOLO en la respuesta de creación. (2) Resto del tiempo solo `token_hash`. (3) Logs con redacción automática de tokens. (4) Mensajes de error no incluyen el token. |
+| **Mitigación recomendada** | (a) Tests que verifiquen que ningún log incluye tokens. (b) DLP (Data Loss Prevention) en logs. |
+| **Riesgo residual** | 🟢 Muy bajo. |
+
+#### I.2. Filtración de OTPs
+
+| Aspecto | Detalle |
+|---|---|
+| **Descripción** | El OTP se filtra. |
+| **Activos** | A3, A4 |
+| **Vector de ataque** | Logs, screenshots del usuario. |
+| **Probabilidad** | Baja. |
+| **Impacto** | 🔴 Crítico. |
+| **Mitigación implementada** | (1) OTP en plano SOLO en el correo y en la respuesta de `identify`. (2) Hash con sal en BD. (3) TTL corto. (4) Correo menciona "no compartas este código". |
+| **Mitigación recomendada** | (a) Redacción automática en logs. (b) Capacitación al trabajador. |
+| **Riesgo residual** | 🟢 Muy bajo. |
+
+#### I.3. Filtración de la BD
+
+| Aspecto | Detalle |
+|---|---|
+| **Descripción** | La BD completa se filtra. |
+| **Activos** | A12, A2-A10 |
+| **Vector de ataque** | Robo de backup, acceso al VPS. |
+| **Probabilidad** | Baja. |
+| **Impacto** | 🟠 Alto. |
+| **Mitigación implementada** | (1) Backups encriptados con AES-256. (2) Tokens y OTPs hasheados (no en plano). (3) Cédulas hasheadas. (4) Correos hasheados con sal en backups. (5) Logs de acceso a la BD. |
+| **Mitigación recomendada** | (a) Custodia de claves con KMS (AWS KMS, GCP KMS, etc.). (b) Alertas de acceso anómalo. |
+| **Riesgo residual** | 🟡 Bajo. |
+
+#### I.4. Filtración de PDFs
+
+| Aspecto | Detalle |
+|---|---|
+| **Descripción** | Un PDF firmado se filtra. |
+| **Activos** | A6, A7, A8 |
+| **Vector de ataque** | Robo de archivos, listado de directorios. |
+| **Probabilidad** | Baja. |
+| **Impacto** | 🟡 Medio (el firmante ya tiene copia). |
+| **Mitigación implementada** | (1) Permisos restrictivos en `/var/lib/kair-firma/pdfs/`. (2) URLs con token no enumerables. (3) Solo descarga con token válido. |
+| **Mitigación recomendada** | (a) Watermark en PDFs con identificación del solicitante. (b) Logs de descarga. |
+| **Riesgo residual** | 🟡 Bajo. |
+
+### 3.5. D — Denial of Service (denegación)
+
+#### D.1. DoS por rate limiting insuficiente
+
+| Aspecto | Detalle |
+|---|---|
+| **Descripción** | Un atacante bombardea los endpoints públicos. |
+| **Activos** | Disponibilidad. |
+| **Vector de ataque** | Bot que prueba millones de tokens. |
+| **Probabilidad** | Media. |
+| **Impacto** | 🟡 Medio. |
+| **Mitigación implementada** | (1) Rate limit por IP y por token. (2) Token ≥32 chars (2^192 espacio). (3) `helmet` + headers de seguridad. (4) Costo de bcrypt/SHA alto. |
+| **Mitigación recomendada** | (a) Cloudflare o similar en el VPS. (b) WAF. (c) Alertas de tráfico anómalo. |
+| **Riesgo residual** | 🟢 Muy bajo. |
+
+#### D.2. DoS por crecimiento de BD
+
+| Aspecto | Detalle |
+|---|---|
+| **Descripción** | La BD crece hasta llenar el disco. |
+| **Activos** | A12. |
+| **Vector de ataque** | Inserciones masivas (con API key robada). |
+| **Probabilidad** | Baja. |
+| **Impacto** | 🟡 Medio. |
+| **Mitigación implementada** | (1) Rate limit en API key. (2) Monitoreo de espacio en disco. (3) PDFs separados de la BD. |
+| **Mitigación recomendada** | (a) Cuota máxima de solicitudes por API key. (b) Limpieza periódica de PDFs antiguos. |
+| **Riesgo residual** | 🟢 Muy bajo. |
+
+#### D.3. Caída del servicio SMTP o rebote de correo
+
+| Aspecto | Detalle |
+|---|---|
+| **Descripción** | El proveedor de correo falla, o el correo del trabajador rebota (bandeja llena, dirección inválida, servidor destino caído). |
+| **Activos** | OTP, notificaciones, copia al trabajador. |
+| **Vector de ataque** | Falla externa o problema operacional, no ataque. |
+| **Probabilidad** | Media (es un proveedor externo + problemas de correo del usuario). |
+| **Impacto** | 🟠 Alto si afecta al OTP (no se puede firmar); 🟡 Medio si afecta a notificación o copia. |
+| **Mitigación implementada** | (1) Health check incluye verificación SMTP. (2) Webhook del SMTP para detectar rebotes. (3) Eventos `EMAIL_BOUNCED`, `EMAIL_RETRY_SCHEDULED`, `EMAIL_RETRY_EXHAUSTED`, `EMAIL_RESENT`. (4) Reintentos automáticos con backoff (5 min, 30 min, 2 h) hasta 3 veces. (5) **El rebote NO marca la solicitud como terminal**: RH recibe notificación y puede reenviar manualmente, corregir el correo del trabajador, o crear nueva solicitud. |
+| **Mitigación recomendada** | (a) Proveedor SMTP secundario. (b) Validación de sintaxis de correo al ingreso. (c) Verificación de correo del trabajador en el pipeline de contratación. (d) Almacenamiento del PDF en VPS como respaldo, independiente del correo. |
+| **Riesgo residual** | 🟡 Bajo. |
+
+### 3.6. E — Elevation of Privilege (escalada)
+
+#### E.1. Acceso de mini-app a endpoints internos
+
+| Aspecto | Detalle |
+|---|---|
+| **Descripción** | La mini-app intenta llamar a `/internal/...`. |
+| **Activos** | A11. |
+| **Vector de ataque** | Dev tools del navegador. |
+| **Probabilidad** | Alta (cualquier usuario con DevTools). |
+| **Impacto** | 🟢 Bajo si la API key está bien protegida. |
+| **Mitigación implementada** | (1) Middleware que valida `X-Internal-API-Key`. (2) Sin esa key, los endpoints internos retornan 401. (3) API key nunca se envía al frontend. |
+| **Riesgo residual** | 🟢 Muy bajo. |
+
+#### E.2. Token de un endpoint usado en otro
+
+| Aspecto | Detalle |
+|---|---|
+| **Descripción** | El token de `/api/sign/...` se usa en `/internal/...`. |
+| **Activos** | A1, A11. |
+| **Vector de ataque** | Inyección de tokens en otros paths. |
+| **Probabilidad** | Baja. |
+| **Impacto** | 🟢 Bajo. |
+| **Mitigación implementada** | (1) Routers separados en Express. (2) Validación cruzada: si un token llega a `/internal/`, se ignora. (3) Namespaces distintos. |
+| **Riesgo residual** | 🟢 Muy bajo. |
+
+#### E.3. Manipulación de la mini-app
+
+| Aspecto | Detalle |
+|---|---|
+| **Descripción** | El usuario manipula el JS de la mini-app. |
+| **Activos** | A1, A3, A5. |
+| **Vector de ataque** | Modificar localStorage, manipular eventos. |
+| **Probabilidad** | Alta (fácil). |
+| **Impacto** | 🟢 Bajo (el backend re-valida todo). |
+| **Mitigación implementada** | (1) Backend siempre re-valida estado. (2) Mini-app es estática, sin estado de autenticación local. (3) CSP estricta. |
+| **Riesgo residual** | 🟢 Muy bajo. |
+
+---
+
+## 4. Vectores de ataque específicos
+
+### 4.1. Ataque de fuerza bruta al token
+
+```
+Atacante prueba millones de tokens hasta dar con uno válido.
+```
+
+- **Espacio de tokens**: 32 chars alfanuméricos ≈ 2^190.
+- **A 1M de intentos/segundo**: 2^190 / 10^6 ≈ 2^170 segundos.
+- **Prácticamente imposible**. Pero el rate limit añade otra capa.
+- **Mitigación**: rate limit 60 req/min/IP + espacio enorme.
+
+### 4.2. Ataque de replay al OTP
+
+```
+Atacante intercepta un OTP usado y lo reenvía.
+```
+
+- **Mitigación**: OTP se invalida tras primer uso exitoso
+  (`estado = 'OTP_VERIFIED'`).
+- Si se reusa, el backend rechaza con `409 INVALID_STATE_TRANSITION`.
+
+### 4.3. Ataque de MitM al correo del trabajador
+
+```
+Atacante intercepta el correo con el OTP.
+```
+
+- **Vector**: comprometer el correo del trabajador.
+- **Mitigación**: HTTPS + capacitación al usuario + TTL corto.
+- **Riesgo residual**: depende del usuario. Documentado en Acuerdo.
+
+### 4.4. Ataque de timing al hash de OTP
+
+```
+Atacante mide tiempos de respuesta para adivinar OTP.
+```
+
+- **Vector**: comparar tiempos de respuesta del endpoint
+  `/verify-otp`.
+- **Mitigación**: usar `crypto.timingSafeEqual()` para comparar
+  hashes (no `===`).
+- Implementación: OBLIGATORIA en v1.
+
+```javascript
+const expected = Buffer.from(otpHashEsperado, 'hex');
+const actual = Buffer.from(otpHashCalculado, 'hex');
+if (expected.length !== actual.length) return false;
+return crypto.timingSafeEqual(expected, actual);
+```
+
+### 4.5. SSRF (Server-Side Request Forgery)
+
+```
+Atacante logra que el Servicio haga requests a sitios internos.
+```
+
+- **Vector**: cualquier endpoint que reciba una URL.
+- **Mitigación**: el Servicio NO acepta URLs del cliente. Las
+  únicas URLs externas son las de K+AIR (ya pre-configuradas).
+- **Validación**: en code review, rechazar cualquier `fetch()`
+  con URL dinámica del body.
+
+### 4.6. CSRF en endpoints internos
+
+```
+Atacante engaña a K+AIR para que ejecute acciones en su nombre.
+```
+
+- **Vector**: K+AIR local con API key, pero un atacante crea una
+  página web que engaña al usuario.
+- **Mitigación**: API key en header, no en cookie. Los endpoints
+  internos no se exponen al navegador.
+- **Riesgo residual**: muy bajo.
+
+### 4.7. Path traversal en descarga de PDFs
+
+```
+Atacante manipula el path para acceder a archivos del sistema.
+```
+
+- **Vector**: `GET /internal/sign-requests/:id/pdf-firmado`.
+- **Mitigación**: el `:id` se valida contra la BD, no se usa
+  como path directamente. El path siempre es
+  `/var/lib/kair-firma/pdfs/firmados/{id_solicitud}.pdf`.
+- **Validación**: code review + tests.
+
+---
+
+## 5. Defensa en profundidad
+
+El Servicio implementa **5 capas de defensa**:
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│ CAPA 1: RED                                                  │
+│   • HTTPS obligatorio (TLS 1.2+)                            │
+│   • HSTS con includeSubDomains                              │
+│   • Rate limit por IP (60 req/min)                          │
+│   • Cloudflare / WAF (recomendado)                           │
+└──────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌──────────────────────────────────────────────────────────────┐
+│ CAPA 2: APLICACIÓN                                           │
+│   • Validación con zod/ajv en TODOS los endpoints           │
+│   • Headers de seguridad (helmet)                            │
+│   • CSP estricta en mini-app                                 │
+│   • CORS deshabilitado (mini-app mismo origen)               │
+│   • Rate limit por token y por scope                         │
+└──────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌──────────────────────────────────────────────────────────────┐
+│ CAPA 3: AUTENTICACIÓN                                        │
+│   • Token ≥32 chars con hash SHA-256                        │
+│   • OTP con hash + sal                                       │
+│   • API key para endpoints internos (con rotación)           │
+│   • Cedula cotejada con base_personal                        │
+└──────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌──────────────────────────────────────────────────────────────┐
+│ CAPA 4: DATOS                                                │
+│   • Tokens y OTPs NUNCA en plano en BD                       │
+│   • Cédulas hasheadas (operaciones de cotejo)                │
+│   • SQL parametrizado (sin concatenación)                    │
+│   • JSON canónico para evidence_hash                         │
+│   • Cryptographic timing safe compare                        │
+└──────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌──────────────────────────────────────────────────────────────┐
+│ CAPA 5: AUDITORÍA                                            │
+│   • Eventos append-only con timestamp                        │
+│   • Logs JSON estructurados                                  │
+│   • X-Request-Id en cada request                             │
+│   • Health check con verificación de SMTP y DB               │
+│   • Backups encriptados diarios                              │
+└──────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 6. Gestión de secretos
+
+### 6.1. Inventario de secretos
+
+| Secreto | Dónde se guarda | Cómo se rota |
+|---|---|---|
+| `INTERNAL_API_KEY` | Variable de entorno | Cada 90 días (período de gracia 7d). |
+| `SMTP_PASS` | Variable de entorno | Cuando el proveedor lo permita. |
+| Sal de OTP | Generada por OTP, descartada tras uso | Por OTP. |
+| `token` (en tránsito) | Solo en la respuesta de creación | Por solicitud. |
+| OTP (en tránsito) | Solo en el correo y en la respuesta de `identify` | Por OTP. |
+| Certificados TLS | Let's Encrypt o similar | Cada 90 días (auto). |
+
+### 6.2. Variables de entorno
+
+- ✅ Todas las claves via `process.env.X`.
+- ❌ NUNCA hardcoded en código.
+- ✅ `.env` en `.gitignore`.
+- ✅ `.env.example` con claves ficticias en el repo.
+- ✅ En producción, las variables se inyectan vía el orquestador
+  (systemd, Docker secrets, etc.).
+
+### 6.3. Logs y secretos
+
+Política de redacción automática:
+
+```javascript
+function redactLog(obj) {
+  const sensitive = ['token', 'otp', 'password', 'api_key', 
+                    'internal_api_key', 'correo', 'cedula'];
+  // ... regex + redacción
+}
+```
+
+Cualquier log que pase por esta función reemplaza los valores
+sensibles con `[REDACTED]`.
+
+---
+
+## 7. Checklist pre-producción
+
+Antes de habilitar el Servicio en producción, verificar:
+
+### 7.1. Configuración
+
+- [ ] `NODE_ENV=production`
+- [ ] HTTPS configurado con certificado válido
+- [ ] HSTS habilitado
+- [ ] `helmet` configurado
+- [ ] CSP estricta en mini-app
+- [ ] Variables de entorno NO en el repo
+- [ ] `INTERNAL_API_KEY` rotada y comunicada a K+AIR
+- [ ] SMTP configurado y probado
+
+### 7.2. BD
+
+- [ ] Schema migrado
+- [ ] `PRAGMA journal_mode=WAL`
+- [ ] `PRAGMA foreign_keys=ON`
+- [ ] Backups automatizados y probados
+- [ ] Restauración desde backup probada
+
+### 7.3. Endpoints
+
+- [ ] Todos los endpoints públicos validan el token
+- [ ] Todos los endpoints internos validan la API key
+- [ ] Rate limit configurado
+- [ ] Mensajes de error NO incluyen secretos
+- [ ] Headers de seguridad en TODAS las respuestas
+
+### 7.4. Logs
+
+- [ ] Redacción automática funcionando
+- [ ] Rotación de logs configurada
+- [ ] Retención 90 días
+- [ ] Logs no se imprimen en stdout en producción
+
+### 7.5. Seguridad operacional
+
+- [ ] `npm audit` sin vulnerabilidades altas
+- [ ] `npm audit fix` aplicado donde sea seguro
+- [ ] Dependencias con versión fija (no `^`)
+- [ ] Renovación automática de certificados configurada
+- [ ] Monitoreo de uptime (UptimeRobot, Pingdom, etc.)
+- [ ] Alertas de error 5xx configuradas
+
+### 7.6. Legal
+
+- [ ] Acuerdo de uso redactado y revisado por abogado
+- [ ] Política de privacidad actualizada
+- [ ] Términos de servicio del Servicio publicados
+- [ ] Tratamiento de datos personales documentado (Ley 1581)
+
+### 7.7. Pruebas
+
+- [ ] Tests unitarios del Servicio pasando
+- [ ] Tests de integración de los endpoints pasando
+- [ ] Tests de carga (1000 firmas concurrentes)
+- [ ] Pentesting externo completado
+- [ ] Plan de respuesta a incidentes documentado
+
+---
+
+## 8. Autorización per-empresa (D-13, I-010)
+
+> **Estado**: implementado en `firma-service` v0.2.0 (I-010).
+> **Diseño completo**: ver
+> [`docs/kair-firma-integration/I-010-design.md`](../../kair-firma-integration/I-010-design.md).
+
+### 8.1. Contexto y motivación
+
+Antes de I-010, el Servicio tenía **una sola API key global** (`INTERNAL_API_KEY`).
+Cualquier actor con esa key podía firmar para **cualquier empresa**. Esto
+escala privilegios cross-company: un atacante que compromete la key
+compromete TODAS las empresas cliente.
+
+I-010 reemplaza el modelo "1 key global" por **"1 key por empresa"** con
+scope explícito de operaciones:
+
+| Aspecto | Antes (pre-I-010) | Después (I-010) |
+|---|---|---|
+| API keys | 1 global | 1 por cliente (per-empresa) |
+| Scope de empresa | Sin scope (cualquiera) | Atado a `id_empresa` |
+| Scope de operación | Todas | Declarado en `allowed_operations` |
+| Persistencia | Variable de entorno | Tabla `gh_internal_clients` con SHA-256 hash |
+| Cache | N/A | 30s en memoria |
+
+### 8.2. Tabla `gh_internal_clients`
+
+```sql
+CREATE TABLE gh_internal_clients (
+  api_key_hash TEXT PRIMARY KEY,        -- SHA-256 hex (64 chars)
+  id_empresa TEXT NOT NULL,             -- Empresa a la que está atado
+  allowed_operations TEXT NOT NULL,     -- CSV: "sign_request:create,sign_request:read"
+  description TEXT,                     -- Auditoría libre
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  revoked_at TEXT                       -- NULL = activa, ISO8601 = revocada
+);
+```
+
+**Decisiones críticas**:
+
+1. **SHA-256 en vez de bcrypt/argon2**: las API keys son strings ≥32
+   chars con **256 bits de entropía** (generadas con `crypto.randomBytes`).
+   No son contraseñas humanas. bcrypt/argon2 están diseñados para
+   contraseñas humanas (~20-40 bits efectivos) y agregan latencia
+   innecesaria. SHA-256 es suficiente y rápido.
+
+2. **`api_key_hash` como PK**: el lookup siempre es por hash, no
+   necesitamos un surrogate key. Esto simplifica el código y elimina
+   una indirección.
+
+3. **NO usar `id_empresa='*'`** para "legacy global". En su lugar, en
+   código se usa `authSource='legacy'` + `id_empresa=null`. Esto hace
+   explícita la "ausencia de identidad empresarial" y evita lógica
+   especial con wildcards en cada handler.
+
+4. **Soft-delete con `revoked_at`**: preserva el historial. Un cliente
+   que cambia de empresa puede ser revocado sin perder el registro de
+   quién usó esa key.
+
+5. **Índice parcial `idx_internal_clients_empresa_active`** con
+   `WHERE revoked_at IS NULL`: queries más rápidas sobre el set activo
+   solamente.
+
+### 8.3. Modelo de amenaza
+
+**Amenaza mitigada**: E.1 cross-company privilege escalation. Un cliente
+con la key de la empresa A intenta firmar/consultar recursos de la
+empresa B.
+
+**Vector residual**: dentro del mismo `id_empresa`, el cliente puede
+actuar sobre cualquier recurso (firma de cualquier documento de cualquier
+trabajador de su empresa). Esto es **por diseño** — el cliente es
+interno de la empresa y se asume confianza. La mitigación es
+operacional: el `id_empresa` se asigna con criterio y se monitorea el
+uso.
+
+### 8.4. `req.id_empresa` autoritativo
+
+**Regla**: `req.id_empresa` SIEMPRE viene de la identidad autenticada,
+NUNCA del body/query. Para el listado, en `client` mode IGNORAMOS
+`?id_empresa=` del query y FORZAMOS `req.id_empresa`. No hay forma de
+escapar el scope.
+
+**Razón**: si el handler usara `body.id_empresa || query.id_empresa`, un
+atacante con la key de la empresa A podría inyectar `id_empresa=B` en el
+body o query y acceder a recursos de B. `req.id_empresa` autoritativo
+cierra ese vector.
+
+**Caso excepción (legacy)**: durante la ventana de deprecation (1
+release), el listado en `legacy` mode USA `?id_empresa=` del query para
+mantener compatibilidad con K+AIR. Esto se elimina en una release futura.
+
+### 8.5. Status codes de authz
+
+| Status | Significado | Cuándo |
+|---|---|---|
+| **401 INVALID_API_KEY** | No autenticado | Header ausente, key inválida o revocada |
+| **403 FORBIDDEN** | Sin permiso de operación | Cliente autenticado, sin la operación permitida |
+| **403 EMPRESA_MISMATCH** | Cross-company | Cliente autenticado, body/query con `id_empresa` que no es la suya |
+| **404 NOT_FOUND** (silent) | Recurso no accesible | GET /:id, GET /:id/eventos cuando el recurso pertenece a OTRA empresa (no filtra existencia) |
+
+### 8.6. Cache 30s y ventana de revocación
+
+La lookup `apiKey → cliente activo` se cachea 30s en memoria (Map).
+**Implicación**: si se revoca una key, hay hasta 30s de ventana antes
+de que el cache expire y la revocación sea efectiva.
+
+**Riesgo aceptado**: un atacante con la key robada tiene 30s de uso
+después de la revocación. Mitigado por:
+
+- Rate limit 60 req/min/IP (config.rateLimit.perMinute).
+- Log de uso post-revocación detectable.
+- TTL puede bajarse a 5s si la revocación inmediata es crítica.
+
+### 8.7. Legacy compat (1 release)
+
+Durante **1 release** (v0.2.0), el sistema acepta la `INTERNAL_API_KEY`
+legacy (pre-I-010) con `authSource='legacy'`. Esto preserva la
+compatibilidad con K+AIR mientras migra a claves per-empresa.
+
+**Comportamiento legacy**:
+
+- `req.authSource = 'legacy'`
+- `req.id_empresa = null` (NO `'*'`)
+- `req.clientOperations = ['legacy']` (marca especial)
+- **El middleware NO bloquea** operaciones ni check de id_empresa.
+- **El handler hace su propio check post-lookup** si lo necesita
+  (ej. GET /:id, GET eventos).
+- **Log de deprecation warning** por cada request legacy:
+  ```
+  DEPRECATION: cliente legacy accedió endpoint protegido por requireEmpresaScope
+  ```
+
+**Plan de eliminación**:
+
+| Release | Acción |
+|---|---|
+| v0.2.0 (I-010) | Legacy mode activo. K+AIR sigue con la key global. |
+| v0.3.0 | K+AIR migra a keys per-empresa. Legacy mode sigue activo. |
+| v0.4.0 (futuro) | Se elimina el fallback legacy. Keys no encontradas en `gh_internal_clients` → 401. |
+
+### 8.8. Migración de K+AIR
+
+K+AIR debe generar 1 API key por empresa y almacenarla en
+`gh_internal_clients`:
+
+```bash
+# 1. Generar key (ejecutar una vez por empresa)
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+# Output: 4f8a2c... (64 chars hex)
+
+# 2. Calcular hash SHA-256
+node -e "console.log(require('crypto').createHash('sha256').update('4f8a2c...').digest('hex'))"
+# Output: <64 chars hex>
+
+# 3. Insertar en BD (vía admin o script)
+INSERT INTO gh_internal_clients
+  (api_key_hash, id_empresa, allowed_operations, description)
+VALUES
+  ('<hash>', '900123456', 'sign_request:create,sign_request:read,consent:create,consent:verify,audit:read',
+   'K+AIR empresa 900123456 - prod');
+```
+
+**Actualizar `secrets.enc`** en K+AIR con la nueva key (no el hash).
+La key NUNCA debe quedar en la BD; solo el hash.
+
+### 8.9. `TRUST_PROXY` — OBLIGATORIO en producción
+
+**Esta sección es crítica para la seguridad del rate limiting y de la
+cadena de custodia forense.**
+
+`config.trustProxy` controla cómo Express resuelve `req.ip` cuando hay
+un proxy reverso (nginx, Cloudflare, etc.) entre el cliente y el
+Servicio. Si está mal configurado:
+
+- Un atacante puede falsificar `X-Forwarded-For` y bypasear el rate
+  limit.
+- Los logs forenses de `ip_origen` quedan contaminados.
+- `req.ip` no refleja la IP real del cliente.
+
+**Configuración obligatoria por entorno**:
+
+| Entorno | TRUST_PROXY | Razón |
+|---|---|---|
+| **Desarrollo** (sin proxy) | `'loopback'` (default) | Solo 127.0.0.1 y ::1. No acepta X-Forwarded-For. |
+| **Producción con nginx** (1 hop) | `TRUST_PROXY=1` | El último hop (nginx). |
+| **Producción con Cloudflare** | `TRUST_PROXY=<ip-cloudflare>` | Lista explícita de IPs de Cloudflare. |
+| **Producción multi-hop** | `TRUST_PROXY=<ip-proxy-inmediato>` | Solo el proxy inmediato, no cualquiera. |
+
+**NUNCA usar `TRUST_PROXY=true`**: confía en CUALQUIER proxy,
+incluyendo el header `X-Forwarded-For` enviado por el cliente. Esto
+rompe el rate limit y la cadena de custodia.
+
+**Verificación pre-producción** (checklist §7.1):
+- [ ] `TRUST_PROXY` configurado explícitamente.
+- [ ] `TRUST_PROXY` NO es `true`.
+- [ ] El valor refleja la topología real (1 hop vs multi-hop).
+
+Ver `src/middleware/rateLimit.js` (líneas 19-25) y `src/config.js` para
+la implementación. Hallazgo documentado como P1-6.
+
+---
+
+## 9. Rate limit interno por empresa (I-008, C-20 v5)
+
+> **Estado**: implementado en `firma-service` v0.3.0 (I-008).
+> **Diseño completo**: ver este documento y `src/middleware/rateLimit.js`,
+> `src/middleware/authz.js`.
+
+### 9.1. Contexto y motivación
+
+Antes de I-008, los endpoints `/internal/*` se protegían con el rate limit
+**global** (`globalLimiter`, 60 req/min por IP) y, para creación de sign
+requests, con `signRequestLimiter` (30 req/min por IP). Esto tiene dos
+problemas:
+
+1. **Por IP, no por empresa**: una empresa con varias sucursales detrás
+   de la misma IP (NAT corporativo, VPN, etc.) comparte el bucket con
+   cualquier otra empresa en la misma IP. Inversamente, una empresa
+   con granjas de dispositivos puede bypasear el límite rotando IPs.
+
+2. **Sin defensa contra anomalías**: no hay detección de uso anómalo
+   (e.g. una key que se usa desde muchos `X-Client-Instance-Id`
+   distintos en poco tiempo, lo cual sugiere compromiso o scraping).
+
+I-008 reemplaza este modelo por **4 capas de rate limit por empresa** que
+resuelven ambos problemas, manteniendo compatibilidad con el rate limit
+público (60 req/min/IP) y con `signRequestLimiter` (30 req/min/IP,
+defensa adicional).
+
+### 9.2. Las 4 capas
+
+| # | Capa | Límite | Key | Skip | Justificación |
+|---|------|--------|-----|------|---------------|
+| 1 | **Por `id_empresa`** | 720/h | `empresa:<id_empresa>` (o `legacy-ip:<ip>` en legacy mode) | No | Autoritativa. Aísla empresas entre sí. |
+| 2 | **Por `id_empresa` + `X-Client-Instance-Id`** | 240/h | `empresa:<id>:<instance>` (o `legacy-ip:<ip>`) | Si falta `X-Client-Instance-Id` o en legacy mode | Permite rate limit por dispositivo. Opcional. |
+| 3 | **Por IP** | 480/h | `req.ip` | No | Fallback. Aplicar siempre. |
+| 4 | **Anomalía (>10 instance ids / 24h)** | 10 | `id_empresa` + set de `instance_id` | Si falta `X-Client-Instance-Id` o en legacy mode | Heurística de uso anómalo. En memoria v1. |
+
+**Capas 1, 2 y 3** usan `express-rate-limit` v7 con `MemoryStore` interna.
+**Capa 4** es una heurística custom en memoria (Map de Map).
+
+### 9.3. Decisión de límites (720 / 240 / 480)
+
+| Capa | Límite | Justificación |
+|---|---|---|
+| 1 | 720/h por empresa | Permite picos normales de RH (e.g. 12 requests/min sostenidos × 60 min = 720). Más alto que el rate limit público (60/min × 60min = 3600/h) para no limitar empresas activas legítimamente. |
+| 2 | 240/h por instance | 1 dispositivo activo ≈ 4 requests/min sostenidos. Permite uso normal (crear + consultar + estado). |
+| 3 | 480/h por IP | Balance entre defensa DoS y no limitar offices corporativos detrás de NAT. 480/h = 8 req/min promedio, con picos permitidos. |
+| 4 | 10 instance / 24h | Una empresa típica usa 1-3 dispositivos. 10 es margen amplio para sucursales y PWA sincronizadas. Más allá, alta probabilidad de anomalía. |
+
+### 9.4. `X-Client-Instance-Id` — OPCIONAL
+
+Este header identifica el dispositivo/instancia que hace la request.
+**Es opcional**: si el cliente no lo envía, las capas 2 y 4 se SKIP.
+Las capas 1 y 3 siguen aplicando.
+
+**Propósito del header**: K+AIR (o cualquier cliente) genera un UUID v4
+en la primera ejecución y lo persiste localmente. Esto permite:
+- Rate limiting por dispositivo (capa 2).
+- Detección de anomalías (capa 4): si una empresa tiene >10 instance ids
+  distintos en 24h, probablemente una key fue comprometida o hay scraping.
+
+**NO contiene PII**: el header es un identificador opaco. No incluir
+nombres, correos, IPs u otra información personal en su valor.
+
+### 9.5. Capa 4: heurística, NO prueba de ataque
+
+> **Importante**: el límite de 10 `X-Client-Instance-Id` distintos en 24h
+> es una **heurística**, no una prueba de ataque. Una empresa grande con
+> muchos dispositivos legítimos (sucursales, puntos de venta, apps móviles
+> en muchos dispositivos) podría ser flagged.
+
+En v1, el bloqueo es **aceptado** (es la opción más conservadora). En v2
+podría ser solo **alerta** (notificar al admin pero no bloquear).
+
+**Limitaciones conocidas**:
+- Estado en memoria: se pierde en restart del servicio. Aceptable para v1.
+- Cleanup lazy: las entradas > 24h se eliminan en el próximo request.
+  No hay timer periódico.
+- No distingue entre instance ids "maliciosos" y "legítimos".
+
+### 9.6. Legacy mode — IP fallback
+
+En **legacy mode** (`authSource='legacy'`, `req.id_empresa === null`):
+
+- **Capa 1** cae a `legacy-ip:<req.ip>` (NO por empresa).
+- **Capa 2** se SKIP (no hay id_empresa para componer la key).
+- **Capa 3** aplica normalmente (IP).
+- **Capa 4** se SKIP (no hay id_empresa para trackear).
+
+Esto preserva el comportamiento pre-I-008 (rate limit por IP) durante
+la ventana de deprecation legacy. Cuando se elimine el legacy mode, las
+capas 1-4 operarán exclusivamente por `id_empresa`.
+
+### 9.7. `req.id_empresa` autoritativo (nunca del body)
+
+El rate limit **LEE** `req.id_empresa` (seteado por `_runAuthz` en
+`requireEmpresaScope` o `requireEmpresaScopeAndLimit`). **NO**
+re-resuelve la API key para determinar el id_empresa.
+
+**Razón**: si authz y rate limit hicieran lookups independientes de la
+API key, podrían divergir si el cache de `internalClient` cambia entre
+el momento del authz y el del rate limit. Esto causaría que authz y rate
+limit "vean" empresas distintas para la misma request.
+
+**Defensa en profundidad**: si por alguna razón `req.id_empresa` no está
+seteado en una ruta que NO es legacy, los `keyGenerator` de las capas 1
+y 2 usan `legacy-ip:<ip>` como fallback (no crashean). El comportamiento
+queda documentado y testeado en `tests/middleware/internalServerLimiter.test.js`.
+
+### 9.8. Relación con I-010: composición, no duplicación
+
+I-008 NO duplica la lógica de authz. La compone:
+
+```
+requireEmpresaScopeAndLimit({ allowedOperations, checkIdEmpresa, rateLimit })
+  ├─ 1. _runAuthz (mismo helper que requireEmpresaScope)
+  │     ├─ 401 INVALID_API_KEY si key falta/inválida/revocada
+  │     ├─ 403 FORBIDDEN si operación no permitida
+  │     └─ 403 EMPRESA_MISMATCH si id_empresa del body !== req.id_empresa
+  │
+  └─ 2. Si authz OK → internalServerLimiter (4 capas de rate limit)
+        ├─ Capa 4 (anomalía)
+        ├─ Capa 1 (id_empresa)
+        ├─ Capa 2 (id_empresa + instance)
+        └─ Capa 3 (IP)
+```
+
+**Garantía**: si authz falla, NO se consume rate limit. Esto evita que
+un atacante con una key inválida pueda consumir tokens de otro usuario
+(sería un side channel).
+
+### 9.9. `globalLimiter` ya NO aplica a `/internal/*`
+
+A partir de I-008, `globalLimiter` (60 req/min por IP) se skipea para
+todas las rutas que empiezan con `/internal/`. El rate limit de esas rutas
+queda cubierto por `internalServerLimiter` (4 capas).
+
+`/health`, `/`, `/s/*` y `/api/sign/*` siguen aplicando el `globalLimiter`.
+`signRequestLimiter` (30 req/min por IP) sigue aplicando a
+`POST /internal/sign-requests` como **defensa adicional** (decisión del
+user, NO se elimina en I-008).
+
+### 9.10. Aplicación en routers
+
+| Router | Endpoint | ¿Usa `requireEmpresaScopeAndLimit`? |
+|---|---|---|
+| `signRequest.js` | POST /internal/sign-requests | ✅ |
+| `signRequest.js` | GET /internal/sign-requests/:id | ✅ |
+| `signRequest.js` | GET /internal/sign-requests | ✅ |
+| `internal-audit.js` | GET /internal/sign-requests/:id/eventos | ✅ |
+| `internal-audit.js` | POST /internal/sign-requests/:id/revoke | ❌ (usa `adminApiAuth`, no aplica) |
+| `consent.js` | POST /internal/consentimientos | ✅ |
+| `consent.js` | POST /internal/consentimientos/:id/verify-otp | ✅ |
+| `agreement.js` | (varios) | ❌ (público, sin per-empresa scope) |
+| `admin.js` | /internal/admin/* | ❌ (usa `adminApiAuth`, no aplica) |
+
+### 9.11. Status code de rate limit
+
+Todas las capas devuelven `429 RATE_LIMIT_EXCEEDED` con:
+
+```json
+{
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "Demasiadas solicitudes. Intenta de nuevo más tarde.",
+    "details": {
+      "limiter": "internal-capa1" | "internal-capa2" | "internal-capa3" | "anomaly",
+      "limit": <número>,
+      "window_ms": <ventana en ms>
+    },
+    "request_id": "..."
+  }
+}
+```
+
+El campo `limiter` permite al cliente identificar qué capa se disparó.
+**No revela internals** (e.g. el id_empresa o el instance id) para evitar
+side channels.
+
+### 9.12. Tests (388 + 27 nuevos = 415 passing)
+
+Los tests del rate limit interno viven en dos archivos:
+
+- `tests/middleware/authz.test.js`: 7 tests de composición
+  (`requireEmpresaScopeAndLimit`) + 8 tests adversariales
+  (cross-company, instance buckets, legacy mode, key revocada,
+  `allowed_operations`, `checkIdEmpresa`, regression).
+- `tests/middleware/internalServerLimiter.test.js`: 12 tests de las
+  4 capas (capa 1: 3 tests, capa 2: 2 tests, capa 3: 1 test,
+  capa 4: 5 tests, composición: 1 test).
+
+### 9.13. Configuración por env vars
+
+Los límites de las 4 capas son **hardcoded en producción** (no se pueden
+cambiar sin un deploy). Para entornos de tests, ajustes puntuales o
+tuning pre-producción, se aceptan env vars que se leen **al cargar el
+módulo** (`src/middleware/rateLimit.js`). NO se usa `config.js` para no
+acoplar el módulo a la config central — el módulo se mantiene
+self-contained.
+
+| Env var | Default | Capa que afecta |
+|---|---|---|
+| `RATE_LIMIT_INTERNAL_EMPRESA_PER_HOUR` | `720` | Capa 1 (id_empresa) |
+| `RATE_LIMIT_INTERNAL_EMPRESA_INSTANCE_PER_HOUR` | `240` | Capa 2 (id_empresa + instance) |
+| `RATE_LIMIT_INTERNAL_IP_PER_HOUR` | `480` | Capa 3 (IP fallback) |
+| `RATE_LIMIT_INTERNAL_ANOMALY_MAX_INSTANCES` | `10` | Capa 4 (umbral de anomalía) |
+| `RATE_LIMIT_INTERNAL_ANOMALY_WINDOW_MS` | `86400000` (24h) | Capa 4 (ventana de la heurística) |
+
+**Validación**: si una env var es inválida (no entero, o < 1), se usa
+el default. Esto evita que un typo en `.env` haga crashear el servicio
+al arrancar.
+
+**Importante para tests**: como las env vars se leen al cargar el
+módulo, deben setearse **antes** del primer `require('./rateLimit')`.
+Los tests del rate limit interno (chunk 3) usan la Opción C del
+briefing: instancian los limiters directamente con `max: 3` en lugar
+de agotar buckets de 720/240/480 requests.
+
+### 9.14. Riesgos aceptados
+
+| ID | Riesgo | Aceptación |
+|---|---|---|
+| D.4 | Empresa grande con muchos dispositivos es flagged por capa 4 | Aceptado v1; en v2 pasar a alerta |
+| D.5 | Estado de capa 4 se pierde en restart | Aceptado v1; mitigado por rate limits por IP persistentes (capas 1-3) |
+| D.6 | Bucket de capa 3 (IP) compartido entre empresas | Aceptado (es fallback; capa 1 es la autoritativa) |
+| D.7 | X-Client-Instance-Id falsificado evade capa 4 | Aceptado (es heurística; la defensa real es revocar la key en I-010) |
+
+### 9.15. Plan de migración a v2 (futuro)
+
+| Mejora | Descripción |
+|---|---|
+| Capa 4 → alerta | Notificar al admin en lugar de bloquear |
+| Persistir capa 4 | Mover el Map a BD o Redis para sobrevivir restarts |
+| Tier por operación | `audit:read` con límite más alto que `sign_request:create` |
+| Dashboard | Visualizar el uso por empresa y por instance |
+| Cleanup activo | Timer periódico en lugar de cleanup lazy |
+
+---
+
+## 10. Idempotency-Key (I-003)
+
+### 10.1. Contexto y motivación
+
+K+AIR (cliente) llama a `POST /v1/internal/sign-requests` para crear
+solicitudes de firma. El canal entre K+AIR y `firma-service` no es
+confiable por construcción: timeouts, retries automáticos del lado del
+cliente, conexiones que se cierran a mitad de request. Sin
+idempotencia, un retry podría crear **duplicados** del mismo SignRequest
+(mismo `id_trabajador`, mismo `id_documento`, misma `agreement_version`),
+lo cual deriva en:
+
+- Doble envío de correo al trabajador.
+- Múltiples tokens de firma activos.
+- Confusión en la auditoría (¿cuál es el evento canónico?).
+- Posible denegación de servicio si el operador reintenta agresivamente.
+
+I-003 introduce el header estándar HTTP `Idempotency-Key` (similar al
+de Stripe) para que K+AIR pueda hacer retries seguros. El servidor
+garantiza que **misma key + mismo payload = una sola operación** y
+devuelve el mismo resultado en cada retry.
+
+**Alcance:** aplica a `POST /v1/internal/sign-requests` (escrito por
+I-003.5 una vez cableado por I-005). **No aplica** a:
+
+- GET endpoints (son naturalmente idempotentes).
+- `/s/:id` (flujo público del trabajador).
+- Webhooks (I-201, tiene su propio mecanismo de retry).
+
+**Versión afectada:** v1. Backward compat: clientes sin el header
+siguen funcionando (G3, §10.2).
+
+### 10.2. Header `Idempotency-Key` (G1–G4)
+
+**Decisiones de diseño congeladas en I-003:**
+
+- **G1** — Nombre del header: `Idempotency-Key` (case-insensitive en
+  HTTP, pero el cliente DEBE usar esa grafía exacta). Estándar
+  propuesto por IETF (`draft-ietf-httpapi-idempotency-key-header`).
+- **G2** — Formato: UUID v4 validado por regex
+  `/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i`.
+  Máximo 255 chars (alineado con HTTP header size limits).
+- **G3** — **Opcional**: si el header no viene, el middleware hace
+  `next()` inmediatamente sin tocar la BD. Backward compat con clientes
+  pre-I-003.
+- **G4** — **Scope por empresa**: PK compuesta `(id_empresa,
+  idempotency_key)`. La misma string-key puede existir en distintas
+  empresas sin colisión. `id_empresa` viene de I-010 (D-13) — autoritativo,
+  nunca del body ni del query.
+
+**Manejo de header inválido (`IdempotencyKeyInvalid` → HTTP 400):**
+
+| Caso | Comportamiento |
+|---|---|
+| Header ausente | `next()` sin tocar BD (G3). |
+| Header presente pero string vacío `''` | 400 `IDEMPOTENCY_KEY_INVALID` (`reason: empty`). |
+| Header con > 255 chars | 400 `IDEMPOTENCY_KEY_INVALID` (`reason: too_long`). |
+| Header no es UUID v4 (regex fail) | 400 `IDEMPOTENCY_KEY_INVALID` (`reason: not_uuid_v4`). |
+| Header no es string (e.g. array) | 400 `IDEMPOTENCY_KEY_INVALID` (`reason: not_a_string`). |
+| Header con whitespace leading/trailing | HTTP parser LO TRIM (RFC 7230 §3.2.4) — key válida. |
+| Header con dos ocurrencias | Express concatena con `, ` → key inválida → 400. |
+| Header con null byte | `ERR_INVALID_CHAR` de Node HTTP parser, no llega al middleware. |
+
+### 10.3. Fingerprint del payload (G5–G6 refinado)
+
+El fingerprint es la representación canónica de la **intención** del
+cliente. Si dos requests tienen el mismo fingerprint, el servidor
+asume que es la misma operación lógica.
+
+**Decisiones de diseño:**
+
+- **G5** — Algoritmo: `SHA-256(canonical_json({...metadata, pdf_sha256}))`,
+  donde `canonical_json` ordena las keys alfabéticamente de forma
+  recursiva, no añade espacios, y **preserva el orden de los arrays**.
+- **G6 refinado** — El fingerprint **incluye** `pdf_sha256` (hex de
+  64 chars, lowercase defensivo). Esto cierra un vector de ataque:
+  si el cliente cambia el PDF pero mantiene el metadata, el
+  fingerprint cambia → 409 `IDEMPOTENCY_KEY_CONFLICT`. NO se almacena
+  el PDF binario (solo el hash), preservando la decisión original de
+  no duplicar archivos grandes.
+
+**Casos cubiertos (verificado en §S2 y §M8 de la batería adversarial):**
+
+| Caso | Mismo fingerprint |
+|---|---|
+| `{a:1, b:2}` vs `{b:2, a:1}` | ✅ Sí (orden de keys) |
+| Arrays `[1,2,3]` vs `[3,2,1]` | ❌ No (orden de arrays SÍ importa) |
+| `'ABCDEF...'` vs `'abcdef...'` (sha256 hex) | ✅ Sí (lowercase) |
+| Number `1` vs String `'1'` | ❌ No (tipo importa) |
+| `null` vs missing key | ❌ No (semántica distinta) |
+| Mismo metadata, distinto `pdf_sha256` | ❌ No (fingerprint cambia) |
+| Distinto metadata, mismo `pdf_sha256` | ❌ No (fingerprint cambia) |
+
+### 10.4. Estados y máquina de transiciones (G8 refinado)
+
+La fila de `gh_idempotency_keys` puede estar en uno de cuatro estados.
+El CHECK constraint del schema 008 valida que el valor pertenezca al
+whitelist `PENDING | COMPLETED | FAILED | TERMINAL`.
+
+```
+                  ┌──────────────┐
+   getOrCreate    │              │   handler OK
+   ────────────▶  │   PENDING    │ ────────────▶ COMPLETED  (2xx)
+                  │              │                    │
+                  │              │   handler 4xx     │   + body cacheado
+                  │              │   sin opt-in      │   + response_status
+                  │              │ ────────────▶ FAILED
+                  │              │                    │
+                  │              │   handler llama    │   + body cacheado
+                  │              │   res.idempotency  │   + response_status
+                  │              │   .terminal(b,s)  │
+                  │              │ ────────────▶ TERMINAL
+                  └──────┬───────┘
+                         │
+            5xx/uncaught│ (no transición — PENDING se mantiene
+                         │  para que el in-flight timeout recupere)
+                         ▼
+                    (sin cambio)
+```
+
+**Semántica por estado:**
+
+| Estado | Significado | ¿Retry con mismo fingerprint? | Body cacheado? |
+|---|---|---|---|
+| **PENDING** | Operación en curso o crasheó sin marcar | Solo si in-flight timeout (>5 min) | No |
+| **COMPLETED** | Operación exitosa 2xx | ✅ Sí → REPLAY (mismo body, mismo status) | Sí |
+| **FAILED** | Error 4xx recuperable (default) | ✅ Sí → nueva ejecución | No (NO se popula) |
+| **TERMINAL** | Rechazo deliberado (opt-in handler) | ❌ No, aunque fingerprint idéntico | Sí |
+
+**Decisión crítica G8 refinado**: la clasificación `TERMINAL` **NO es
+automática** para cualquier 4xx. Es decisión explícita del handler vía
+`res.idempotency.terminal(body, statusCode)` ANTES de `res.json(...)`.
+El default 4xx es `FAILED` (retry permitido). Esto evita que rechazos
+transitorios bloqueen retries legítimos.
+
+### 10.5. TTL de 24 horas (lazy cleanup)
+
+**Decisión:** `expires_at = created_at + 24h`, formato ISO 8601 estricto.
+
+**Requisito técnico explícito (no es opcional):**
+
+La columna `expires_at` se almacena en formato `YYYY-MM-DDTHH:MM:SS.mmmZ`
+(strftime ISO 8601). La columna `created_at` usa el formato default de
+SQLite (`YYYY-MM-DD HH:MM:SS`). **Comparar lexicográficamente estos
+dos formatos falla** porque `' ' (0x20) < 'T' (0x54)`. Por lo tanto:
+
+- ✅ Comparación correcta: `WHERE expires_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`
+- ❌ Comparación rota: `WHERE expires_at < datetime('now')`
+
+Esta regla está documentada en el JSDoc de
+`src/services/idempotency.js` (línea 47-51) y fue verificada
+atómicamente antes de commit.
+
+**Limpieza:** LAZY (no hay timer/cron). Se ejecuta en cada
+`getOrCreate()` y vía `cleanup()` explícito. Si la fila está
+expirada al momento del lookup, se borra y se reemplaza con un
+nuevo PENDING.
+
+**Justificación del TTL 24h:** suficiente para que un cliente que
+hizo un retry varias horas después (e.g. operador que reintenta al
+día siguiente) reciba el mismo resultado, pero corto para que la
+tabla no crezca indefinidamente.
+
+### 10.6. Timeout de PENDING de 5 minutos (G7)
+
+Una fila PENDING puede existir por dos razones legítimas:
+
+1. La operación está corriendo (handler en await).
+2. El proceso crasheó o se olvidó de cerrar la key.
+
+**Decisión G7:** Si `created_at` de una fila PENDING es **mayor a 5
+minutos**, se interpreta como crash y se permite retry limpio. El
+siguiente `getOrCreate` la reemplaza con un nuevo PENDING.
+
+**Por qué 5 minutos:** suficiente para que un handler legítimo
+(I/O de BD, envío de correo, generación de PDF) complete, pero corto
+para que un cliente que ve `IN_PROGRESS` sepa cuándo reintentar
+(`Retry-After: 300` segundos, §10.7).
+
+**Comparación de tiempo (requisito técnico explícito):**
+
+`created_at` está en formato SQLite default. Para compararlo contra
+"now - 5min" en ISO 8601, el service hace:
+
+```sql
+(strftime('%Y-%m-%dT%H:%M:%fZ', created_at)
+ < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-300 seconds'))
+```
+
+Esto convierte `created_at` a ISO 8601 antes de comparar, evitando el
+problema lexicográfico.
+
+### 10.7. Manejo de concurrencia y race conditions
+
+**Garantías:**
+
+- **Una sola ejecución del handler** por `(id_empresa, idempotency_key)`
+  mientras la fila esté PENDING. Requests concurrentes con la misma
+  key: el primero crea PENDING, los siguientes reciben 409
+  `IDEMPOTENCY_KEY_IN_PROGRESS` con header `Retry-After: <segs>`.
+- **No hay deadlocks** entre las 4 capas (authz, rate limit,
+  idempotency) — verificado en test §M1.1 (2 calls paralelos) y
+  §M1.3 (5 calls paralelos): handler corre 1 vez, resto es 409 o
+  REPLAY.
+- **PK compuesta (UNIQUE constraint)** previene INSERT duplicado. Si
+  dos requests llegan en exactamente el mismo tick, el segundo
+  recibe UNIQUE error del driver, se re-SELECT, y se propaga
+  IdempotencyKeyInProgress o IdempotencyKeyConflict según el caso
+  (verificado en §S5 y §M1).
+
+**Comportamiento ante `Retry-After`:** la cabecera HTTP se setea
+en la respuesta 409 con el tiempo restante hasta que la fila
+expiraría (mínimo 1 segundo). El cliente PUEDE reintentar después
+de ese tiempo, pero también PUEDE reintentar antes (recibirá el
+mismo 409 si la fila sigue PENDING). NO se penaliza por retries
+agresivos (eso es rate limit, I-008).
+
+### 10.8. REPLAY y redacción del token (C-22, G9, G10)
+
+**G9** — Cuando una request llega con misma key + mismo fingerprint
+y la fila está COMPLETED, el middleware:
+
+1. Parsea `response_body` (almacenado como JSON string) de vuelta a
+   objeto.
+2. Setea el header `X-Idempotency-Replay: true`.
+3. Envía `res.status(response_status).json(parsedBody)`.
+4. **NO** ejecuta el handler (verificado con counter en §M3.3).
+
+**C-22** — El token del SignRequest (`token`, `url_publica`,
+`qr_payload`) se cachea en la fila COMPLETED. En REPLAY, el cliente
+recibe el **mismo token** que recibió en la 1ª ejecución. Esto es
+crítico: si el cliente hace retry por timeout y el servidor
+re-generara el token, el cliente no podría usarlo (el token nuevo
+estaría en una fila distinta).
+
+**Recuperación explícita (I-013b)**: si el cliente perdió el token
+del 1st response, hay un endpoint dedicado
+`GET /v1/internal/sign-requests/:id` (I-002 ya provee esto) que
+permite re-fetchear la fila canónica.
+
+**G10** — Header de respuesta `X-Idempotency-Replay: true`:
+- ✅ Set en REPLAY.
+- ❌ NO set en 1ª ejecución (NEW).
+- ❌ NO set en errores (4xx, 5xx).
+- Verificado en §M3.3 y §M14 (4 escenarios).
+
+### 10.9. Separación por `id_empresa` (frontera I-003 + I-010)
+
+La PK compuesta `(id_empresa, idempotency_key)` garantiza
+**aislamiento total entre empresas**:
+
+```
+Empresa A  id_empresa=900123456  key="abc-123"  → fila #1
+Empresa B  id_empresa=900999999  key="abc-123"  → fila #2 (independiente)
+```
+
+Misma string-key en distintas empresas son **filas distintas**, no
+hay colisión. Esto fue verificado exhaustivamente en la batería
+adversarial §S1 (7 sub-tests) que cubre:
+
+- Empresa A + key + payload X → COMPLETED.
+- Empresa B + misma key + mismo payload → también COMPLETED (fila #2).
+- Empresa A + misma key + payload Y → 409 CONFLICT (no afecta B).
+- Empresa A marcada TERMINAL → Empresa B sigue REPLAY-eable.
+- Empresa A re-intenta con misma key + mismo fingerprint tras
+  TERMINAL → 409 `IDEMPOTENCY_KEY_TERMINAL` (G8 refinado, dentro
+  de A).
+
+**Fuente de `id_empresa`:** siempre `req.id_empresa` (seteado por
+`requireEmpresaScope`, I-010/D-13). **NUNCA** del body ni de query
+params. Si por alguna razón `req.id_empresa` no está presente, el
+middleware falla cerrado con 500 `INTERNAL_ERROR` (defense in depth,
+verificado en §M7).
+
+### 10.10. Amenazas cubiertas por I-003.4 (batería adversarial)
+
+68 tests adversariales (33 service-level + 35 middleware-level)
+ataques documentados en `tests/services/idempotency-adversarial.test.js`
+y `tests/middleware/idempotency-adversarial.test.js`:
+
+| Amenaza | Sección |
+|---|---|
+| Cross-company attack (misma key en 2 empresas) | §S1 |
+| JSON canonicalization (orden de keys, tipos, arrays) | §S2 |
+| pdf_sha256 case collision (G6 refinado) | §S3 |
+| TTL 24h expiry | §S4 |
+| UNIQUE constraint race (2 inserts simultáneos) | §S5 |
+| In-flight timeout boundary (4/5/6/10 min, G7) | §S6 |
+| Concurrencia HTTP (2 / 5 requests paralelos, sin doble handler) | §M1 |
+| PENDING blocking + Retry-After | §M2 |
+| REPLAY body idéntico + X-Idempotency-Replay | §M3 |
+| Header attacks (case, length, unicode, dos, null, whitespace) | §M4 |
+| 5xx/uncaught no marca FAILED (incluye HALLAZGO M5.4) | §M5 |
+| PII en responses y logs (incluye 100-requests stress) | §M6 |
+| id_empresa missing / null / empty | §M7 |
+| pdf_sha256 contribution al fingerprint + validación | §M8 |
+
+**Resultado:** 569/569 tests verdes (501 baseline + 68 adversarial),
+3 corridas consecutivas sin flakiness (post-fix: 17s, 15.6s, 15.3s).
+
+### 10.11. Lo que NO protege la idempotencia
+
+Documentar lo que la idempotencia **no** hace es tan importante como
+lo que hace, para no generar falsa sensación de seguridad.
+
+| Capacidad | Cubierta por |
+|---|---|
+| Autenticación del cliente (API key, IP, instance) | I-010 (D-13) |
+| Autorización per-empresa (allowed_operations) | I-010 (D-13) |
+| Rate limit (720/h por empresa, 240/h por instance) | I-008 (C-20 v5) |
+| Cifrado del PDF binario en storage | TLS + filesystem |
+| Validación del schema/estructura del PDF | I-012 (C-23) |
+| Detección de malware en el PDF | I-012 (C-23) |
+| Persistencia del PDF en disco | `signRequest` service |
+| Notificación al trabajador (correo, OTP) | `mailer` service |
+| Webhook delivery a K+AIR | I-201 (futuro) |
+| Audit log inmutable de eventos | I-002 + `gh_firma_eventos` |
+| Compliance con Decreto 1072 / Ley 1581 | LEGAL.md |
+
+La idempotencia es **una capa adicional** sobre las demás, no un
+reemplazo. El cliente sigue siendo responsable de:
+
+- Generar UUIDs v4 únicos por intento de SignRequest.
+- Respetar el header `Retry-After` cuando recibe 409 IN_PROGRESS.
+- No reintentar más allá del TTL 24h (el servidor habrá olvidado la
+  key).
+
+### 10.12. HALLAZGO M5.4 — Edge case documentado
+
+**Descripción:**
+
+Cuando un handler hace `res.status(201).json({...})` y **luego**
+lanza una excepción, el comportamiento observado es:
+
+1. Cliente recibe 201 (la response original).
+2. Express invoca `errorHandler` que intenta `res.status(500).json(...)`
+   sobre la response ya enviada.
+3. Internamente `res.statusCode` queda en **500** (errorHandler lo
+   setea antes de fallar al enviar) y el `captured` body en el wrap
+   de `res.json` se sobreescribe con el body del error.
+4. El lifecycle hook de `'finish'` corre con `statusCode=500` →
+   el middleware ve 5xx, no marca COMPLETED (regla "no blanket
+   FAILED", §9 / C-20 v5).
+5. La fila queda PENDING. Cliente que recibió 201 no puede hacer
+   REPLAY — una llamada subsecuente con misma key + fingerprint
+   verá 409 IN_PROGRESS en lugar del 201 cacheado.
+
+**Severidad:** edge case (handler con bug de programación que tira
+después de `res.json`). El comportamiento actual es **conservador**
+(no marca COMPLETED con state corrupto, no se arriesga a escribir
+un body incorrecto), pero deja al cliente sin opción de REPLAY.
+
+**Likelihood:** muy baja. Requiere que un handler explícitamente
+haga `res.json()` y LUEGO `throw` (patrón de bug, no de uso normal).
+En la práctica, los handlers correctos NO tiran después de
+`res.json` — el patrón canónico es tirar ANTES para que
+errorHandler decida el status.
+
+**Decisión (v1):**
+
+- ✅ **Aceptar como riesgo documentado** para v1.
+- **Razón 1:** la lógica defensiva del middleware (no escribir
+  state con datos potencialmente corruptos) es más valiosa que
+  garantizar REPLAY en un caso que nunca debería ocurrir en código
+  correcto.
+- **Razón 2:** el fix requiere instrumentación adicional
+  (capturar `statusCode` original antes de pasar a errorHandler,
+  o escuchar el evento `error` además de `finish`/`close`). Es
+  un cambio de baja prioridad con respecto al resto del bloque
+  funcional.
+- **Razón 3:** I-013b (recovery endpoint) ya provee una vía
+  explícita para que el cliente recupere el estado canónico vía
+  `GET /v1/internal/sign-requests/:id`, sin depender de REPLAY.
+
+**Plan de mitigación (post-v1):**
+
+| Paso | Descripción | Owner |
+|---|---|---|
+| Tracking | Crear ticket `TECH-DEBT: M5.4 fix en middleware` con link a este hallazgo | Mavis |
+| Diseño | Capturar `statusCode` original en variable local cuando se llama `res.json()`, usar esa variable (no `res.statusCode`) en el lifecycle hook | Mavis |
+| Test | Re-correr §M5.4 con el fix: cliente debe ver 201 Y fila COMPLETED | Mavis |
+| Eval. Production Gate | Antes del go-live: si M5.4 sigue abierto, agregar al checklist como riesgo aceptado con plan de mitigación a 30 días | Mavis |
+
+**Revisión periódica:** este hallazgo se re-evalúa en cada release
+de v1.x. Si el patrón "throw after res.json" se vuelve común
+(e.g. por adopción de un framework que lo promueva), se re-prioriza.
+
+---
+
+## 11. PDF Security (I-012)
+
+### 11.1. Contexto y motivación
+
+Cuando K+AIR crea una solicitud de firma, sube un PDF al Servicio
+(`POST /v1/internal/sign-requests`). Ese PDF será:
+
+1. Almacenado como `originales/<id_solicitud>.pdf`.
+2. Enviado al trabajador vía `GET /s/:token/document.pdf`.
+3. Firmado (overlay con metadatos), generando `firmados/<id_solicitud>.pdf`.
+4. Soporte de la constancia (`constancias/<id_solicitud>.pdf`).
+
+Antes de I-012, el Servicio confiaba en la auto-declaración del cliente:
+el `metadata.document_hash` enviado en el body era el que se persistía.
+Esto permitía que un cliente mintiera sobre el hash del PDF, o subiera
+un PDF que parecía válido pero no lo era (corrupto, cifrado, demasiado
+grande, etc.).
+
+I-012 introduce una validación estructural obligatoria en el Servicio, y
+garantiza que el hash persistido es el calculado por el servidor, no el
+declarado por el cliente.
+
+### 11.2. Lo que SÍ se hace (G11–G15) — implementado en I-012
+
+#### 11.2.1. G11 — Validación estructural
+
+Cada PDF subido pasa por `services/pdfValidator.js` (I-012.1), que usa
+`pdf-lib v1.17.1` para:
+
+- Verificar el header mágico `%PDF-` (ISO 32000-1 §7.5.2).
+- Caminar la tabla cross-reference.
+- Detectar la presencia de una entrada `/Encrypt` en el trailer.
+- Contar páginas.
+- Extraer el diccionario `/Info` (Title, Author, Subject, etc.).
+
+El servicio es una **capa pura, sin HTTP**. Lanza errores tipados con
+`code` y `details` (sin PII: nunca bytes del PDF, nunca Title/Author).
+El mapeo a HTTP vive en `middleware/pdfValidation.js` (I-012.2).
+
+**Punto crítico**: la validación ocurre **antes** de
+`services/signRequest.create()`. Si la validación falla, el PDF **nunca**
+se persiste en `storage/originales/`.
+
+#### 11.2.2. G12 — Límites configurables
+
+Cuatro variables de entorno (sección `pdf:` de `src/config.js`):
+
+| Env var | Default | Significado |
+|---|---|---|
+| `PDF_MAX_BYTES` | 52428800 (50 MB) | Tamaño máximo del buffer. Antes de cualquier parseo. |
+| `PDF_MAX_PAGES` | 200 | Máximo de páginas. |
+| `PDF_PARSE_TIMEOUT_MS` | 5000 | Timeout del parseo (Promise.race + setTimeout). |
+| `PDF_MAX_METADATA_BYTES` | 1048576 (1 MB) | Suma de bytes del `/Info` dictionary (anti metadata-bomb). |
+
+Si el buffer excede el límite de tamaño, el rechazo ocurre **antes** de
+iniciar el parseo (chequeo O(1)), protegiendo contra ataques de
+"troll" (50 MB de zeros).
+
+#### 11.2.3. G13 — Timeout y errores tipificados (HTTP 422)
+
+`Promise.race` envuelve `PDFDocument.load()` con un `setTimeout` que
+rechaza primero. Si el timeout se dispara, el servicio retorna
+`PDF_PARSE_TIMEOUT` y la promesa perdedora sigue corriendo hasta que
+termine (el PDF no será aceptado de todas formas).
+
+Seis errores tipados del service, todos mapeados a **HTTP 422** por
+`middleware/pdfValidation.js`:
+
+| code | Causa |
+|---|---|
+| `PDF_INVALID` | Buffer no parseable como PDF (header inválido, truncado, basura). |
+| `PDF_ENCRYPTED` | PDF con entrada `/Encrypt` (cifrado). pdf-lib no soporta desencriptar. Se RECHAZA, no se descifra. |
+| `PDF_TOO_LARGE` | Buffer.length > `PDF_MAX_BYTES`. |
+| `PDF_TOO_MANY_PAGES` | pageCount > `PDF_MAX_PAGES`. |
+| `PDF_PARSE_TIMEOUT` | parseo excedió `PDF_PARSE_TIMEOUT_MS`. |
+| `PDF_METADATA_TOO_LARGE` | Suma de bytes del `/Info` > `PDF_MAX_METADATA_BYTES`. |
+
+**Caso especial**: `PDF_REQUIRED` (no se envió archivo) → **HTTP 400**
+(malformed request, no unprocessable). Defense in depth: el middleware
+`upload.js` ya retorna 400 para `LIMIT_*` antes de llegar aquí, pero
+`PDF_REQUIRED` queda documentado para tests unitarios y rutas futuras
+que invoquen `pdfValidation()` directamente.
+
+#### 11.2.4. G14 — SHA-256 server-computed
+
+El hash que se persiste es el calculado por el servidor, no el declarado
+por el cliente en `metadata.document_hash`.
+
+- **Service** (`src/services/pdfValidator.js`): usa `sha256()` de
+  `src/crypto/hash.js` (mismo módulo que consume
+  `src/services/idempotency.js` y `src/services/signRequest.js`).
+- **Middleware** (`src/middleware/pdfValidation.js`): expone el resultado
+  en `req.pdfValidation.sha256` para el handler.
+- **Route** (`src/routes/signRequest.js` líneas 44-49): propaga
+  `req.pdfValidation.sha256` a `services/signRequest.create()`. El
+  handler **no** usa el `metadata.document_hash` que envió el cliente.
+
+Resultado: un cliente no puede mentir sobre el hash. Si el
+`document_hash` del body no coincide con el del PDF realmente subido, se
+rechaza en zod antes de llegar al service.
+
+#### 11.2.5. G15 — Disclaimer: pdfValidator detecta condiciones estructurales, no contenido activo
+
+`pdfValidator` es un **parser estructural**, no un control de seguridad
+del contenido. Detecta **determinadas condiciones estructurales y límites
+definidos** (header inválido, entrada `/Encrypt`, tamaño, páginas,
+timeout, tamaño de metadata). **No constituye una garantía de seguridad
+del contenido activo ni de protección contra explotación de
+vulnerabilidades del parser o del renderizador.**
+
+Un PDF que pasa la validación puede contener estructuras complejas que
+un parser específico no maneje bien, o patrones que un visor (Chromium,
+PDF.js, Adobe Reader) renderice de forma diferente a pdf-lib.
+
+**Implicaciones operativas**:
+- El contenido activo del PDF es responsabilidad del **renderizador
+  del firmante** (Chromium en la mini-app), no del Servicio.
+- Para validación más profunda del contenido se requiere una capa
+  adicional (ver §11.3).
+
+### 11.3. Lo que NO se hace (controles recomendados para producción)
+
+Esta sección documenta controles que **no** forman parte de I-012 y que
+quedan fuera del alcance del Servicio en v1. Listarlos explícitamente
+es necesario para evitar la falsa conclusión "el Servicio valida
+contenido activo del PDF".
+
+| Control | Estado | Recomendación |
+|---|---|---|
+| Análisis antivirus (AV) de los bytes del PDF | **No implementado** | Evaluar ClamAV u otro AV offline en el futuro. |
+| Sandboxing del renderizador del PDF | **No implementado** | Depende del visor (Chromium en mini-app). v1 confía en sandbox de Chromium. |
+| Detección de exploits conocidos (zero-day) del parser | **No implementado** | Depende de mantener pdf-lib actualizado y de CVEs públicos. |
+| Firma digital criptográfica del PDF (X.509, PAdES) | **Fuera de alcance v1** | El Servicio genera "constancia" del evento, no firma criptográfica del PDF. |
+| Listas de revocación (CRL) o respuestas OCSP | **Fuera de alcance v1** | Solo aplica si se usa firma criptográfica X.509. |
+| Detección de "metadata bombs" más allá de `/Info` | **No implementado** | Solo se valida el tamaño del `/Info`. Otros streams (XMP, JavaScript embebido) no se inspeccionan. |
+
+**Recomendación pre-producción**: ejecutar un pentest del Servicio con
+una batería de PDFs adversariales que incluya documentos con contenido
+activo (JavaScript, acciones PDF, streams embebidos, polyglotas
+válidos como PDF y otro formato). El pentest validará las afirmaciones
+de este documento. Ver §12 (Pentesting post-implementación).
+
+### 11.4. Disclaimers legales
+
+Esta sección documenta controles implementados en el Servicio, no
+asesoría jurídica. La validación estructural implementada en I-012 es
+un control técnico; **no certifica** que el Servicio cumpla con algún
+marco normativo específico. La validación jurídica del Servicio y su
+operación corresponde a un profesional del derecho colombiano.
+
+Ver `LEGAL.md` para el marco normativo aplicable (Ley 527 de 1999,
+Decreto 2364 de 2012, Decreto 1072 de 2015, Decreto 526 de 2021) y la
+cláusula de validación jurídica externa pendiente.
+
+### 11.5. Referencias a código
+
+- `src/services/pdfValidator.js` (526 líneas) — capa pura con pdf-lib.
+- `src/middleware/pdfValidation.js` (126 líneas) — adaptador HTTP, mapea
+  errores tipados a HTTP 422.
+- `src/config.js` líneas 100-108 (sección `pdf:`) — 4 env vars.
+- `src/routes/signRequest.js` líneas 21, 44-49 — cableado del
+  middleware y comentario explícito sobre hash server-computed.
+- `tests/services/pdfValidator.test.js` (582 líneas, 25 tests) — §S1-§S6.
+- `tests/middleware/pdfValidation.test.js` (490 líneas, 14 tests).
+- `tests/routes/signRequest-pdf-validation.test.js` (375 líneas, 8 pass
+  + 1 skip pre-existente) — integración HTTP.
+- `tests/routes/signRequest-pdf-validation-adversarial.test.js`
+  (494 líneas, 20 tests) — §M1-§M8.
+
+**Verificación post-I-012.3**: 663/664 pass, 0 fail, 1 skip pre-existente,
+3× corridas consecutivas en ~19s.
+
+---
+
+## 12. Pentesting post-implementación
+
+Antes del go-live, se recomienda contratar un **pentesting
+externo** que cubra:
+
+### 12.1. Alcance
+
+- Caja negra contra `https://firma.k-air.com`.
+- Caja gris contra los endpoints internos (con API key
+  proporcionada por el equipo).
+- Caja blanca con acceso al código.
+
+### 12.2. Áreas a probar
+
+- [ ] Inyección SQL en todos los endpoints.
+- [ ] Cross-Site Scripting (XSS) en la mini-app.
+- [ ] CSRF en endpoints internos.
+- [ ] Manipulación de tokens y OTPs.
+- [ ] Bypass del rate limit.
+- [ ] Bypass de autenticación.
+- [ ] **Bypass de autorización per-empresa** (I-010): un cliente con
+      key de empresa A intenta acceder a recursos de empresa B.
+- [ ] **Escapa de scope via query `?id_empresa=B`** en GET /sign-requests
+      (debe ser IGNORADO en client mode).
+- [ ] **Bypass del rate limit interno de 4 capas** (I-008):
+      ¿se puede bypasear X-Client-Instance-Id cambiando el valor?
+      ¿se puede bypasear req.id_empresa inyectándolo en el body?
+- [ ] **Anomalía de instance ids** (I-008, capa 4): ¿se puede evitar
+      el límite de 10 usando la misma instance repetidamente?
+- [ ] Manipulación de estados.
+- [ ] Race conditions en el commit.
+- [ ] Filtración de información en mensajes de error.
+- [ ] Seguridad de la mini-app (CSP, HTTPS, etc.).
+- [ ] Seguridad del endpoint de descarga de PDFs.
+- [ ] Validación de JSON canónico.
+- [ ] Path traversal.
+- [ ] **Hash de API key timing-safe**: comparar `constantTimeEqual`,
+      no `===`.
+
+### 12.3. Criterio de aceptación
+
+- 0 vulnerabilidades altas o críticas sin resolver.
+- Todas las vulnerabilidades medias con plan de remediación
+  documentado.
+
+---
+
+## 13. Bug bounty (futuro)
+
+En **v1.1 o v2.0** se puede considerar un programa de bug bounty:
+
+- Plataforma: HackerOne, Open Bug Bounty, etc.
+- Alcance: solo el Servicio y la mini-app.
+- Recompensas: basadas en criticidad.
+- Disclosure coordinado: 90 días antes de publicación.
+
+**No está en v1.**
+
+---
+
+## 14. Anexo: matriz de riesgos
+
+| ID | Amenaza | Probabilidad | Impacto | Riesgo | Mitigación principal | Riesgo residual |
+|---|---|---|---|---|---|---|
+| S.1 | Suplantación del trabajador | Media | Alto | 🟠 | Cédula + OTP + manifestación | 🟡 Bajo |
+| S.2 | Suplantación de RH | Baja | Alto | 🟡 | API key + HTTPS | 🟡 Bajo |
+| S.3 | Suplantación del Servicio (phishing) | Media | Alto | 🟠 | HSTS + dominio único | 🟡 Bajo |
+| T.1 | Modificación del PDF firmado | Baja | Crítico | 🟡 | SHA-256 + verificación | 🟢 Muy bajo |
+| T.2 | Modificación de eventos | Baja | Alto | 🟡 | Append-only + backups | 🟢 Muy bajo |
+| T.3 | Modificación de la BD | Baja | Crítico | 🟡 | Permisos + backups | 🟢 Muy bajo |
+| T.4 | Inyección SQL | Media | Crítico | 🟠 | SQL parametrizado + validación | 🟢 Muy bajo |
+| R.1 | Repudio del trabajador | Media | Alto | 🟠 | Eventos + hashes + correo | 🟡 Bajo |
+| R.2 | Repudio del empleador | Baja | Medio | 🟢 | rh_user_id + logs | 🟢 Muy bajo |
+| I.1 | Filtración de tokens | Baja | Crítico | 🟡 | Solo hash en BD + redacción | 🟢 Muy bajo |
+| I.2 | Filtración de OTPs | Baja | Crítico | 🟡 | Hash + sal + TTL | 🟢 Muy bajo |
+| I.3 | Filtración de la BD | Baja | Alto | 🟡 | Backups encriptados | 🟡 Bajo |
+| I.4 | Filtración de PDFs | Baja | Medio | 🟢 | Permisos + token | 🟡 Bajo |
+| D.1 | DoS por rate limit | Media | Medio | 🟡 | Rate limit + espacio | 🟢 Muy bajo |
+| D.2 | DoS por crecimiento de BD | Baja | Medio | 🟢 | Monitoreo + cuota | 🟢 Muy bajo |
+| D.3 | Caída del SMTP | Media | Alto | 🟠 | Reintentos + cola | 🟡 Bajo |
+| D.4 | Empresa grande flagged por anomalía (capa 4) | Baja | Medio | 🟢 | Aceptado v1; alerta en v2 | 🟢 Muy bajo |
+| D.5 | Estado de capa 4 se pierde en restart | Media | Bajo | 🟢 | Capas 1-3 persisten (express-rate-limit) | 🟢 Muy bajo |
+| D.6 | Bucket IP compartido entre empresas (capa 3) | Media | Bajo | 🟢 | Capa 1 es autoritativa; capa 3 es fallback | 🟢 Muy bajo |
+| D.7 | X-Client-Instance-Id falsificado evade capa 4 | Media | Bajo | 🟢 | Defensa real: revocar key en I-010 | 🟢 Muy bajo |
+| E.1 | Mini-app a internos | Alta | Bajo | 🟢 | API key + middleware | 🟢 Muy bajo |
+| E.2 | Token cruzado | Baja | Bajo | 🟢 | Routers separados | 🟢 Muy bajo |
+| E.3 | Manipulación de mini-app | Alta | Bajo | 🟢 | Backend re-valida | 🟢 Muy bajo |
+
+### Resumen ejecutivo
+
+- **5 amenazas** con riesgo 🟠 que requieren mitigación continua.
+- **9 amenazas** con riesgo 🟡 que son aceptables para v1.
+- **9 amenazas** con riesgo 🟢 que son residuales y aceptables.
+- **0 amenazas** sin mitigar.
+
+### Plan de mitigación continua
+
+| Trimestre | Acción |
+|---|---|
+| Q1 v1 | Pentesting externo, corregir hallazgos. |
+| Q2 v1 | Implementar TSA (sellos de tiempo cualificados). |
+| Q3 v1 | Cert pinning en mini-app. |
+| Q4 v1 | Revisión de la matriz de riesgos. |
+| Q1 v1.1 | Bug bounty público (si se decide). |
+
+---
+
+**Fin del documento.**
+
+Próximo: `LEGAL.md` (marco normativo expandido y consideraciones
+jurídicas).

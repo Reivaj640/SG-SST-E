@@ -101,6 +101,19 @@ class ComiteConvivenciaPortalComponent {
 
   _handleIframeMessage(event) {
     if (!event.data || !event.data.type) return;
+
+    // 📦608-fix15 — El iframe nos pide abrir el modal full-screen de file-viewer.
+    if (event.data.type === 'open-file-viewer-modal') {
+      const filePath = event.data.filePath;
+      if (!filePath) return;
+      if (window.kairFV && typeof window.kairFV.openWithFileViewerFromPath === 'function') {
+        window.kairFV.openWithFileViewerFromPath(filePath);
+      } else {
+        console.warn('[ComiteConvivenciaPortal] kairFV.openWithFileViewerFromPath no disponible');
+      }
+      return;
+    }
+
     if (event.data.type.endsWith('-request')) {
       const action = event.data.type.replace('-request', '');
       if (action === 'back-to-module') {
@@ -109,7 +122,11 @@ class ComiteConvivenciaPortalComponent {
         this.iframeMessageHandler = null;
         this.backToPortal();
       } else {
-        this._handleStandardRequest(event, this._getApiMap()[action]);
+        const apiMap = this._getApiMap();
+        const apiName = apiMap[action];
+        if (apiName) {
+          window.KairDocPreview.handleRequest(event, apiName);
+        }
       }
     }
   }

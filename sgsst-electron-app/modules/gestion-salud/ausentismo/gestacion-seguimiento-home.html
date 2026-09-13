@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K+AIR | Seguimiento de Gestación</title>
+    <link rel="stylesheet" href="../../../assets/css/font-awesome.min.css">
+    <link rel="stylesheet" href="../../../assets/css/google-fonts.css">
+    <link rel="stylesheet" href="../../../assets/css/bootstrap-icons.css">
+    <style>
+        /* ═══════════════════════════════════════════════════════════════════
+           📦463 (2026-07-03) — Refactor: header y KPIs estandarizados
+           al patrón 6.1.3 (auditoria-hub-view.js / auditoria-anual.css)
+           ═══════════════════════════════════════════════════════════════════ */
+
+        :root {
+            /* Variables CSS v3-* estándar K+AIR (alineadas con auditoria-anual.css) */
+            --v3-primary: #174ea6;
+            --v3-primary-hover: #185abd;
+            --v3-primary-soft: #e8f0fe;
+            --v3-success: #28a745;
+            --v3-success-soft: rgba(40, 167, 69, 0.1);
+            --v3-warning: #ffc107;
+            --v3-warning-soft: rgba(255, 193, 7, 0.1);
+            --v3-destructive: #dc3545;
+            --v3-destructive-soft: rgba(220, 53, 69, 0.1);
+            --v3-foreground: #212529;
+            --v3-muted-foreground: #6c757d;
+            --v3-card: #ffffff;
+            --v3-border: #dee2e6;
+            --v3-muted: #f8f9fa;
+            --v3-radius-lg: 0.625rem;
+            --v3-radius-md: 0.5rem;
+            --v3-font-sans: "Segoe UI", Roboto, sans-serif;
+
+            /* Variables locales (mantenidas para filtros y tabla) */
+            --rosa: #be185d;
+            --rosa-light: #fce7f3;
+            --rosa-bg: #fdf2f8;
+            --bg-body: #f0f2f5;
+            --text-dark: #212529;
+            --text-muted: #6c757d;
+            --shadow-sm: 0 2px 8px rgba(0,0,0,0.04);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
+
+        body {
+            font-family: var(--v3-font-sans);
+            background-color: var(--bg-body);
+            color: var(--text-dark);
+            font-size: 14px;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ════════════════════════════════════════════════════════════════════
+           HEADER ESTÁNDAR K+AIR · Patrón 6.1.3 (kair-v3-hub)
+           ════════════════════════════════════════════════════════════════════ */
+
+        .kair-v3-hub {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .k-module-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 1.5rem;
+            height: 64px;
+            background: #ffffff;
+            border-bottom: 1px solid var(--v3-border);
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            flex-shrink: 0;
+        }
+
+        .k-header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .k-header-title-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.1rem;
+            min-width: 0;
+        }
+
+        .k-header-main-title {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--v3-foreground);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-width: 0;
+        }
+
+        .k-header-main-title i {
+            color: var(--v3-primary);
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+
+        .k-header-breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            font-size: 0.72rem;
+            color: var(--v3-muted-foreground);
+            flex-wrap: wrap;
+        }
+
+        .k-header-breadcrumb button {
+            background: none;
+            border: none;
+            padding: 0;
+            font: inherit;
+            color: inherit;
+            cursor: pointer;
+        }
+
+        .k-header-breadcrumb button:hover { color: var(--v3-primary); }
+
+        .k-breadcrumb-item.active {
+            color: var(--v3-primary);
+            font-weight: 500;
+        }
+
+        .k-header-right {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            flex-shrink: 0;
+        }
+
+        .k-sync-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.3rem 0.6rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            border-radius: 2rem;
+            white-space: nowrap;
+        }
+
+        .k-sync-synced  { background: rgba(40, 167, 69, 0.1); color: #28a745; }
+        .k-sync-saving  { background: rgba(255, 193, 7, 0.1); color: #856404; }
+        .k-sync-error   { background: rgba(220, 53, 69, 0.1); color: #dc3545; }
+
+        .k-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+            padding: 0.5rem 1rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+            font-family: var(--v3-font-sans);
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+
+        .k-btn-primary  { background: var(--v3-primary); color: #fff; }
+        .k-btn-primary:hover  { background: var(--v3-primary-hover); }
+        .k-btn-sm       { padding: 0.35rem 0.75rem; font-size: 0.72rem; }
+        .k-btn-ghost    { background: transparent; color: var(--v3-muted-foreground); border: 1px solid var(--v3-border); }
+        .k-btn-ghost:hover { background: var(--v3-muted); color: var(--v3-foreground); }
+
+        .header-back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.375rem 0.75rem;
+            font: 500 0.8125rem/1.2 var(--v3-font-sans);
+            color: #5a6378;
+            background: transparent;
+            border: 1px solid var(--v3-border);
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+
+        .header-back-btn:hover {
+            background: var(--v3-primary-soft);
+            color: var(--v3-primary);
+            border-color: var(--v3-primary);
+        }
+
+        .header-back-btn i { font-size: 0.875rem; }
+
+        /* ════════════════════════════════════════════════════════════════════
+           KPI STRIP ESTÁNDAR · Patrón 6.1.3 (kair-v3-hub)
+           ════════════════════════════════════════════════════════════════════ */
+
+        .kair-v3-kpi-strip {
+            display: flex;
+            align-items: stretch;
+            background: var(--v3-card);
+            border: 1px solid var(--v3-border);
+            border-radius: var(--v3-radius-lg);
+            box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+            margin: 0 0 24px 0;  /* 📦464 · separación inferior respecto a filtros */
+        }
+
+        .kair-v3-kpi {
+            display: flex;
+            align-items: center;
+            gap: 0.875rem;
+            padding: 1.25rem 1.5rem;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .kair-v3-kpi + .kair-v3-kpi { border-left: 1px solid var(--v3-border); }
+
+        .kair-v3-kpi__icon {
+            width: 44px;
+            height: 44px;
+            border-radius: var(--v3-radius-md);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.15rem;
+            flex-shrink: 0;
+        }
+
+        .kair-v3-kpi--primary .kair-v3-kpi__icon { background: var(--v3-primary-soft); color: var(--v3-primary); }
+        .kair-v3-kpi--warning .kair-v3-kpi__icon { background: var(--v3-warning-soft); color: #856404; }
+        .kair-v3-kpi--success .kair-v3-kpi__icon { background: var(--v3-success-soft); color: var(--v3-success); }
+        .kair-v3-kpi--danger  .kair-v3-kpi__icon { background: var(--v3-destructive-soft); color: var(--v3-destructive); }
+        .kair-v3-kpi--info    .kair-v3-kpi__icon { background: rgba(23, 162, 184, 0.1); color: #17a2b8; }
+
+        .kair-v3-kpi__content {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .kair-v3-kpi__value {
+            font-size: 1.6rem;
+            font-weight: 700;
+            line-height: 1.1;
+            color: var(--v3-foreground);
+            font-family: var(--v3-font-sans);
+        }
+
+        .kair-v3-kpi__label {
+            font-size: 0.78rem;
+            color: var(--v3-muted-foreground);
+            margin-top: 2px;
+        }
+
+        .kair-v3-kpi__sub {
+            font-size: 0.72rem;
+            color: var(--v3-muted-foreground);
+            margin-top: 4px;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            font-style: italic;
+        }
+
+        .kair-v3-kpi__sub--success { color: #28a745; }
+        .kair-v3-kpi__sub--warning { color: #856404; }
+        .kair-v3-kpi__sub--danger  { color: #dc3545; }
+
+        .kair-v3-kpi__sub svg { flex-shrink: 0; }
+
+        /* ════════════════════════════════════════════════════════════════════
+           MAIN · Filters + Table (mantenido del diseño anterior)
+           ════════════════════════════════════════════════════════════════════ */
+
+        .gs-main {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+        }
+
+        .gs-filters {
+            background: white;
+            border-radius: var(--v3-radius-lg);
+            padding: 16px 20px;
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .gs-filters__title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-right: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .gs-filter {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--v3-muted);
+            border: 1px solid var(--v3-border);
+            border-radius: 0.4rem;
+            padding: 6px 10px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-family: inherit;
+        }
+        .gs-filter:hover { border-color: var(--v3-primary); background: var(--v3-primary-soft); }
+        .gs-filter.active { background: var(--rosa); color: white; border-color: var(--rosa); }
+        .gs-filter__count {
+            background: rgba(255,255,255,0.3);
+            padding: 1px 6px;
+            border-radius: 8px;
+            font-size: 0.72rem;
+            font-weight: 600;
+        }
+        .gs-filter:not(.active) .gs-filter__count { background: #e9ecef; color: var(--text-muted); }
+        .gs-search {
+            flex: 1;
+            min-width: 200px;
+            padding: 8px 12px;
+            border: 1px solid var(--v3-border);
+            border-radius: 0.4rem;
+            font-size: 0.85rem;
+            font-family: inherit;
+        }
+        .gs-search:focus { border-color: var(--rosa); outline: none; box-shadow: 0 0 0 3px rgba(190, 24, 93, 0.15); }
+
+        .gs-card {
+            background: white;
+            border-radius: var(--v3-radius-lg);
+            box-shadow: var(--shadow-sm);
+            overflow: hidden;
+        }
+        .gs-card__header {
+            padding: 14px 20px;
+            border-bottom: 1px solid #f1f3f5;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .gs-card__title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .gs-card__count {
+            background: var(--rosa-light);
+            color: var(--rosa);
+            padding: 2px 10px;
+            border-radius: 10px;
+            font-size: 0.78rem;
+            font-weight: 700;
+        }
+        .gs-table-wrap { overflow-x: auto; }
+        .gs-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .gs-table thead { background: var(--v3-muted); }
+        .gs-table th {
+            text-align: left;
+            padding: 12px 16px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            border-bottom: 1px solid var(--v3-border);
+            white-space: nowrap;
+        }
+        .gs-table td {
+            padding: 14px 16px;
+            font-size: 0.88rem;
+            border-bottom: 1px solid #f1f3f5;
+            vertical-align: middle;
+        }
+        .gs-table tr:hover { background: var(--rosa-bg); }
+        .gs-table tr:last-child td { border-bottom: none; }
+
+        .gs-empleado { display: flex; align-items: center; gap: 10px; }
+        .gs-empleado__avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--rosa-light);
+            color: var(--rosa);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.85rem;
+            flex-shrink: 0;
+        }
+        .gs-empleado__name { font-weight: 600; color: var(--text-dark); }
+        .gs-empleado__cedula { font-size: 0.75rem; color: var(--text-muted); }
+
+        .gs-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .gs-badge.bajo { background: var(--v3-success-soft); color: #155724; }
+        .gs-badge.alto { background: var(--v3-warning-soft); color: #856404; }
+        .gs-badge.muy-alto { background: var(--v3-destructive-soft); color: #721c24; }
+        .gs-badge.activo { background: var(--v3-primary-soft); color: var(--v3-primary); }
+        .gs-badge.licencia { background: #e0cffc; color: #5a189a; }
+        .gs-badge.cerrado { background: #d1ecf1; color: #0c5460; }
+
+        .gs-semanas {
+            font-family: var(--v3-font-sans);
+            font-weight: 700;
+            font-size: 1rem;
+            color: var(--rosa);
+        }
+        .gs-semanas__label { font-size: 0.7rem; color: var(--text-muted); font-weight: 400; }
+
+        .gs-progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e9ecef;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+        .gs-progress-bar__fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--rosa) 0%, #db2777 100%);
+            transition: width 0.3s;
+        }
+
+        .gs-row-actions { display: flex; gap: 6px; justify-content: flex-end; }
+        .gs-row-btn {
+            background: white;
+            border: 1px solid var(--v3-border);
+            color: var(--text-muted);
+            width: 30px;
+            height: 30px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            transition: all 0.15s;
+        }
+        .gs-row-btn:hover { border-color: var(--rosa); color: var(--rosa); background: var(--rosa-bg); }
+        .gs-row-btn.primary {
+            background: var(--rosa);
+            color: white;
+            border-color: var(--rosa);
+        }
+        /* 📦468 — Variantes danger (eliminar) y warning (cerrar/reabrir) */
+        .gs-row-btn.danger:hover { border-color: #dc3545; color: #dc3545; background: #fff5f5; }
+        .gs-row-btn.warning:hover { border-color: #f59e0b; color: #f59e0b; background: #fffbeb; }
+
+        /* 📦468 — Próximo seguimiento: ok (azul) / vencido (rojo) */
+        .gs-prox--ok      { color: var(--v3-primary); font-weight: 500; }
+        .gs-prox--vencido { color: var(--v3-destructive); font-weight: 600; }
+        .gs-prox--vencido i { animation: pulse-warn 1.6s ease-in-out infinite; }
+        @keyframes pulse-warn {
+            0%, 100% { opacity: 1; }
+            50%      { opacity: 0.45; }
+        }
+
+        .gs-empty {
+            padding: 60px 20px;
+            text-align: center;
+            color: var(--text-muted);
+        }
+        .gs-empty__icon { font-size: 3rem; color: #d1d5db; margin-bottom: 12px; }
+        .gs-empty__title { font-size: 1.05rem; font-weight: 600; color: var(--text-dark); margin-bottom: 6px; }
+        .gs-empty__desc { font-size: 0.88rem; }
+
+        @media (max-width: 768px) {
+            .k-module-header { flex-direction: column; align-items: stretch; gap: 12px; padding: 12px 1rem; height: auto; }
+            .k-header-right { justify-content: flex-end; }
+            .kair-v3-kpi-strip { flex-wrap: wrap; }
+            .kair-v3-kpi { flex: 1 1 calc(50% - 1px); border-left: none !important; }
+            .gs-filters { padding: 12px; }
+        }
+
+        /* 📦466 — Keyframes para el spinner de carga (animation:spin en JS) */
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ════════════════════════════════════════════════════════════════════
+           📦466 (2026-07-03) — Modal "Registrar Nueva Gestante"
+           Estilos para .ng-modal* (antes faltaban — modal aparecía sin estilos).
+           Tema rosa coherente con la paleta de Gestación.
+           ════════════════════════════════════════════════════════════════════ */
+
+        .ng-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .ng-modal__overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.55);
+            backdrop-filter: blur(2px);
+        }
+
+        .ng-modal__dialog {
+            position: relative;
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+            max-width: 720px;
+            width: 100%;
+            max-height: calc(100vh - 40px);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .ng-modal__header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 18px 24px;
+            border-bottom: 1px solid #f1f3f5;
+            background: linear-gradient(135deg, #fdf2f8 0%, #ffffff 100%);
+        }
+
+        .ng-modal__header i {
+            font-size: 1.25rem;
+            color: var(--rosa);
+        }
+
+        .ng-modal__title {
+            flex: 1;
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .ng-modal__close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 0 6px;
+            line-height: 1;
+            transition: color 0.15s;
+        }
+
+        .ng-modal__close:hover {
+            color: var(--rosa);
+        }
+
+        .ng-modal__body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 24px;
+        }
+
+        .ng-modal__footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            padding: 16px 24px;
+            border-top: 1px solid #f1f3f5;
+            background: #f8f9fa;
+        }
+
+        .ng-section {
+            margin-bottom: 22px;
+        }
+
+        .ng-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .ng-section__title {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: var(--rosa);
+            margin-bottom: 14px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--rosa-light);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .ng-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 14px 16px;
+        }
+
+        .ng-field {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .ng-field--full {
+            grid-column: 1 / -1;
+        }
+
+        .ng-field__label {
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .ng-field__hint {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            font-weight: 400;
+            margin-top: 2px;
+        }
+
+        .ng-req {
+            color: var(--rosa);
+            font-weight: 700;
+            margin-left: 2px;
+        }
+
+        .ng-field__input,
+        .ng-field__textarea {
+            padding: 8px 10px;
+            border: 1px solid var(--v3-border);
+            border-radius: 6px;
+            font-size: 0.88rem;
+            font-family: inherit;
+            background: #ffffff;
+            color: var(--text-dark);
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+
+        .ng-field__input:focus,
+        .ng-field__textarea:focus {
+            outline: none;
+            border-color: var(--rosa);
+            box-shadow: 0 0 0 3px rgba(190, 24, 93, 0.15);
+        }
+
+        .ng-field__textarea {
+            min-height: 70px;
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        .ng-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .ng-option {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: #f8f9fa;
+            border: 1px solid var(--v3-border);
+            border-radius: 999px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.15s;
+        }
+
+        .ng-option:hover {
+            border-color: var(--rosa);
+            background: var(--rosa-light);
+        }
+
+        .ng-option input[type="radio"] {
+            cursor: pointer;
+            accent-color: var(--rosa);
+        }
+
+        @media (max-width: 600px) {
+            .ng-grid { grid-template-columns: 1fr; }
+            .ng-modal__dialog { max-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="kair-v3-hub">
+
+    <!-- ════════════════════════════════════════════════════════════════
+         HEADER ESTÁNDAR K+AIR · Patrón 6.1.3
+         ════════════════════════════════════════════════════════════════ -->
+    <header class="k-module-header" id="kair-gs-header-card">
+        <div class="k-header-left">
+            <div class="k-header-title-group">
+                <div class="k-header-main-title">
+                    <i class="bi bi-person-hearts"></i>
+                    Seguimiento de Gestación
+                </div>
+                <div class="k-header-breadcrumb">
+                    <span id="kair-gs-bc-company">Empresa</span>
+                    <i class="bi bi-chevron-right"></i>
+                    <button type="button" data-bc="salud">Gestión de la Salud</button>
+                    <i class="bi bi-chevron-right"></i>
+                    <button type="button" data-bc="ausentismo">Medición del Ausentismo</button>
+                    <i class="bi bi-chevron-right"></i>
+                    <span class="k-breadcrumb-item active">Seguimiento de Gestación</span>
+                </div>
+            </div>
+        </div>
+        <div class="k-header-right">
+            <span class="k-sync-badge k-sync-synced" title="Datos cargados">
+                <i class="bi bi-check-circle-fill"></i> Sincronizado
+            </span>
+            <button type="button" class="header-back-btn" id="kair-gs-back" title="Volver al módulo">
+                <i class="bi bi-arrow-left"></i> Volver
+            </button>
+            <button type="button" class="k-btn k-btn-primary k-btn-sm" id="kair-gs-cta-export" title="Exportar listado a CSV">
+                <i class="bi bi-file-earmark-spreadsheet"></i> Exportar
+            </button>
+            <!-- 📦477 — Acceso al módulo de Reportes -->
+            <button type="button" class="k-btn k-btn-ghost k-btn-sm" id="kair-gs-cta-reportes" title="Ver reportes de seguimiento (Resumen Ejecutivo / Detallado / Individual)">
+                <i class="bi bi-file-earmark-bar-graph"></i> Ver Reportes
+            </button>
+            <button type="button" class="k-btn k-btn-primary k-btn-sm" id="kair-gs-cta-new" title="Registrar nueva gestante">
+                <i class="bi bi-plus-circle"></i> Registrar Gestante
+            </button>
+        </div>
+    </header>
+
+    <main class="gs-main">
+
+        <!-- ════════════════════════════════════════════════════════════════
+             KPI STRIP ESTÁNDAR · Patrón 6.1.3
+             ════════════════════════════════════════════════════════════════ -->
+        <section class="kair-v3-kpi-strip" id="kpisContainer">
+            <!-- Renderizado via JS -->
+        </section>
+
+        <!-- Filtros -->
+        <section class="gs-filters">
+            <div class="gs-filters__title">
+                <i class="fas fa-filter"></i>
+                Filtros:
+            </div>
+            <button class="gs-filter active" data-filter="estado" data-value="todas" onclick="aplicarFiltro('estado','todas', this)">
+                Todas <span class="gs-filter__count" id="cntTodas">0</span>
+            </button>
+            <button class="gs-filter" data-filter="estado" data-value="activo" onclick="aplicarFiltro('estado','activo', this)">
+                Activas <span class="gs-filter__count" id="cntActivas">0</span>
+            </button>
+            <button class="gs-filter" data-filter="estado" data-value="licencia" onclick="aplicarFiltro('estado','licencia', this)">
+                En licencia <span class="gs-filter__count" id="cntLicencia">0</span>
+            </button>
+            <button class="gs-filter" data-filter="estado" data-value="cerrado" onclick="aplicarFiltro('estado','cerrado', this)">
+                Cerradas <span class="gs-filter__count" id="cntCerradas">0</span>
+            </button>
+            <button class="gs-filter" data-filter="riesgo" data-value="alto" onclick="aplicarFiltro('riesgo','alto', this)">
+                Alto riesgo <span class="gs-filter__count" id="cntAltoRiesgo">0</span>
+            </button>
+            <input type="text" class="gs-search" id="searchInput" placeholder="Buscar por nombre o cédula..." oninput="aplicarFiltros()" />
+        </section>
+
+        <!-- Tabla -->
+        <section class="gs-card">
+            <div class="gs-card__header">
+                <div class="gs-card__title">
+                    <i class="fas fa-list" style="color: var(--rosa);"></i>
+                    Gestantes Registradas
+                    <span class="gs-card__count" id="resultadosCount">0</span>
+                </div>
+                <div style="font-size: 0.8rem; color: var(--text-muted);">
+                    <i class="bi bi-info-circle"></i>
+                    Click en una fila para ver el seguimiento mensual
+                </div>
+            </div>
+            <div class="gs-table-wrap">
+                <table class="gs-table">
+                    <thead>
+                        <tr>
+                            <th>Trabajadora</th>
+                            <th>Empresa</th>
+                            <th>Cargo</th>
+                            <th>Semanas</th>
+                            <th>FPP</th>
+                            <th>Clasificación</th>
+                            <th>Estado</th>
+                            <th>Último seg.</th>
+                            <th>Próx. seg.</th>
+                            <th style="text-align: right;">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaGestantes">
+                        <!-- Filas renderizadas via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+    </main>
+
+</div>
+
+<script src="gestacion-seguimiento-home.js"></script>
+</body>
+</html>

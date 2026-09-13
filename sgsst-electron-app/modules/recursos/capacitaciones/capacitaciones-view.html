@@ -15,7 +15,7 @@
     </div>
     <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
       <span style="display:flex; align-items:center; gap:0.375rem; font-size:0.8125rem; color:#64748B;">
-        <i class="bi bi-building" style="font-size:0.875rem;"></i>
+        <i class="kair-icon-building" style="font-size:0.875rem; flex-shrink:0;" aria-hidden="true"></i>
         <span id="header-company-text">—</span>
       </span>
       <div style="width:1px; height:24px; background:#dee2e6;"></div>
@@ -197,9 +197,12 @@
                             <th>Tipo</th>
                             <th style="min-width:130px">Fecha</th>
                             <th>Instructor</th>
+                            <th>Ubicación</th>
                             <th>Duración</th>
+                            <th style="min-width:90px">Hora</th>
                             <th>Estado</th>
-                            <th class="text-right" style="min-width:120px">Acciones</th>
+                            <th class="text-center" style="min-width:80px">Evidencia</th>
+                            <th class="text-right" style="min-width:180px">Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="trainings-table-body"></tbody>
@@ -249,7 +252,7 @@
                     </div>
                 </div>
 
-                <!-- Fila 2: Fecha y Duración -->
+                <!-- Fila 2: Fecha, Duración y Hora -->
                 <div class="k-form-grid">
                     <div>
                         <label class="k-form-label" for="trainingDate">Fecha Programada *</label>
@@ -260,17 +263,38 @@
                         <input type="number" id="trainingDuration" class="k-form-control"
                                placeholder="2" value="2" min="1">
                     </div>
+                    <div>
+                        <label class="k-form-label" for="trainingHora">Hora (opcional)</label>
+                        <div style="display:flex; gap:6px; align-items:stretch;">
+                            <input type="time" id="trainingHora" class="k-form-control"
+                                   style="flex:1;" min="06:00" max="20:00">
+                            <button type="button" id="clearTrainingHora"
+                                    title="Limpiar hora"
+                                    aria-label="Limpiar hora"
+                                    style="background:transparent; border:1px solid #d1d5db; border-radius:6px; padding:0 10px; cursor:pointer; color:#6b7280; display:flex; align-items:center; justify-content:center; min-width:38px;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                     aria-hidden="true">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <small style="display:block; margin-top:4px; color:#6b7280; font-size:0.8rem;">Sin hora → no aparece en el calendario. Click en 🗑️ para quitarla.</small>
+                    </div>
                 </div>
 
-                <!-- Fila 3: Instructor y Participantes -->
+                <!-- Fila 3: Instructor, Ubicación y Participantes -->
                 <div class="k-form-grid">
                     <div>
                         <label class="k-form-label" for="trainingInstructor">Instructor</label>
-                        <select id="trainingInstructor" class="k-form-control">
-                            <option value="Técnico">Técnico Interno</option>
-                            <option value="ARL">ARL</option>
-                            <option value="Olga Pinto">ARL - Olga Pinto</option>
-                        </select>
+                        <input type="text" id="trainingInstructor" class="k-form-control"
+                               placeholder="Nombre del instructor (libre)" autocomplete="off">
+                    </div>
+                    <div>
+                        <label class="k-form-label" for="trainingUbicacion">Ubicación</label>
+                        <input type="text" id="trainingUbicacion" class="k-form-control"
+                               placeholder="Lugar donde se realizará (libre)" autocomplete="off">
                     </div>
                     <div>
                         <label class="k-form-label" for="trainingParticipants">Participantes</label>
@@ -285,6 +309,57 @@
             <button type="button" class="k-btn k-btn-outline btn-close-modal">Cancelar</button>
             <button type="button" class="k-btn k-btn-primary" id="btn-save-training">
                 <i class="bi bi-check-lg"></i> Guardar
+            </button>
+        </div>
+
+    </div>
+</div>
+
+<!-- ======================== -->
+<!-- MODAL: EVIDENCIAS DE CAPACITACIÓN -->
+<!-- ======================== -->
+<div class="k-modal-overlay" id="evidenciaModal">
+    <div class="k-modal" style="max-width: 720px;">
+
+        <div class="k-modal-header">
+            <h3 class="k-modal-title" id="evidencia-modal-title">
+                <i class="bi bi-paperclip"></i>
+                Evidencias
+            </h3>
+            <button type="button" class="btn-close-modal" aria-label="Cerrar" data-close-evidencia>
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <div class="k-modal-body">
+            <p class="k-evidencia-cap-label" id="evidencia-cap-label">
+                <i class="bi bi-mortarboard-fill"></i>
+                <span id="evidencia-cap-name">—</span>
+            </p>
+
+            <!-- Dropzone -->
+            <label class="k-evidencia-dropzone" id="evidenciaDropzone" for="evidenciaFileInput">
+                <input type="file" id="evidenciaFileInput" multiple
+                       accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx"
+                       style="position:absolute; opacity:0; pointer-events:none; width:1px; height:1px;">
+                <i class="bi bi-cloud-arrow-up"></i>
+                <div class="k-evidencia-dropzone-title">Arrastrá archivos acá o hacé clic</div>
+                <div class="k-evidencia-dropzone-hint">Formatos: PDF, JPG, PNG, GIF, DOC, DOCX</div>
+            </label>
+
+            <!-- Lista de archivos -->
+            <div class="k-evidencia-section-title">
+                <span>Archivos cargados</span>
+                <span class="k-evidencia-count" id="evidenciaCount">0</span>
+            </div>
+            <div class="k-evidencia-list" id="evidenciaList">
+                <!-- Se llena por JS -->
+            </div>
+        </div>
+
+        <div class="k-modal-footer">
+            <button type="button" class="k-btn k-btn-outline btn-close-modal" data-close-evidencia>
+                Cerrar
             </button>
         </div>
 

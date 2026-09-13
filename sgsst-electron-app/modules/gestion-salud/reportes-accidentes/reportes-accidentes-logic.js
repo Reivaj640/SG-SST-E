@@ -17,9 +17,11 @@ class ReportesAccidentesComponent {
         const viewerFrame = document.createElement('iframe');
         viewerFrame.id = 'furat-viewer-frame';
         viewerFrame.style.width = '100%';
-        viewerFrame.style.height = '100%';
+        viewerFrame.style.minHeight = '100%';
         viewerFrame.style.border = 'none';
-        viewerFrame.scrolling = 'no';
+        viewerFrame.scrolling = 'auto';
+        // 📦683 — Permitir scroll del iframe cuando el contenido es más grande
+        viewerFrame.style.overflow = 'auto';
 
         // Construir la URL con parámetros de la empresa y módulo
         const viewerUrl = `./modules/gestion-salud/reportes-accidentes/reportes-accidentes-view.html?company=${encodeURIComponent(this.currentCompany)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
@@ -27,8 +29,10 @@ class ReportesAccidentesComponent {
 
         // Limpiar contenedor y agregar iframe
         this.container.innerHTML = '';
-        this.container.style.height = '100%';
-        this.container.style.overflow = 'hidden';
+        this.container.style.height = 'auto';
+        this.container.style.minHeight = '100%';
+        // 📦683 — Permitir scroll del contenedor cuando el iframe es más grande
+        this.container.style.overflow = 'auto';
         this.container.appendChild(viewerFrame);
 
         // Establecer comunicación entre frames
@@ -42,6 +46,17 @@ class ReportesAccidentesComponent {
             if (event.source !== viewerFrame.contentWindow) return;
 
             const data = event.data;
+
+            // 📦608-fix15 — El iframe nos pide abrir el modal full-screen de file-viewer.
+            if (data.type === 'open-file-viewer-modal') {
+                if (!data.filePath) return;
+                if (window.kairFV && typeof window.kairFV.openWithFileViewerFromPath === 'function') {
+                    window.kairFV.openWithFileViewerFromPath(data.filePath);
+                } else {
+                    console.warn('[FURAT] kairFV.openWithFileViewerFromPath no disponible');
+                }
+                return;
+            }
 
             // Manejar solicitud de regreso al módulo
             if (data.type === 'back-to-module-request') {
@@ -69,6 +84,19 @@ class ReportesAccidentesComponent {
 
         console.log(`[FURAT] API Request: ${requestType}`, payload);
 
+        // 📦608-fix15 — Previews unificados: el helper KairDocPreview hace el switch
+        // a readFileBytes para Office y postea él mismo al iframe. Retornamos antes
+        // del postMessage normal para evitar duplicar el response.
+        if (requestType === 'get-pdf-preview' || requestType === 'get-word-preview' || requestType === 'get-excel-preview') {
+            var apiName = {
+                'get-pdf-preview': 'getPDFPreview',
+                'get-word-preview': 'getWordPreview',
+                'get-excel-preview': 'getExcelPreview'
+            }[requestType];
+            window.KairDocPreview.handleRequest(event, apiName);
+            return;
+        }
+
         try {
             let result;
 
@@ -83,19 +111,6 @@ class ReportesAccidentesComponent {
                     result = await this.getLibraryData(payload);
                     break;
 
-                // Document operations (existing contracts)
-                case 'get-pdf-preview':
-                    result = await window.electronAPI.getPDFPreview(payload.filePath);
-                    break;
-
-                case 'get-excel-preview':
-                    result = await window.electronAPI.getExcelPreview(payload.filePath);
-                    break;
-
-                case 'get-word-preview':
-                    result = await window.electronAPI.getWordPreview(payload.filePath);
-                    break;
-
                 case 'download-document':
                     result = await window.electronAPI.downloadDocument(payload);
                     break;
@@ -106,6 +121,54 @@ class ReportesAccidentesComponent {
 
                 case 'open-path':
                     result = await window.electronAPI.openPath(payload);
+                    break;
+
+                // 📦658 — Upload de FURAT (drag-and-drop + file picker)
+                case 'furat-upload-file':
+                    // El frontend ya resolvió la ruta del submódulo con findSubmodulePath.
+                    // Solo necesitamos reenviar al IPC del main process.
+                    if (!payload || !payload.submodulePath) {
+                        // Fallback: resolver la ruta acá (en caso de que el frontend no la haya pasado)
+                        const pathRes = await window.electronAPI.findSubmodulePath(
+                            payload.companyName, payload.moduleName, payload.submoduleName
+                        );
+                        if (pathRes && pathRes.success) {
+                            payload.submodulePath = pathRes.path;
+                        } else {
+                            throw new Error('No se pudo resolver la ruta del submódulo');
+                        }
+                    }
+                    result = await window.electronAPI.furatUploadFile(payload);
+                    break;
+
+                // 📦658 — Listar metadata de FURAT (usado en Fase 3)
+                case 'furat-list-metadata':
+                    result = await window.electronAPI.furatListMetadata(payload.companyName);
+                    break;
+
+                // 📦659 — Dashboard analítico (Fase 3)
+                case 'furat-get-analytics':
+                    result = await window.electronAPI.furatGetAnalytics(payload.companyName);
+                    break;
+
+                // 📦680 — Crear nueva carpeta (período)
+                case 'furat-create-folder':
+                    result = await window.electronAPI.furatCreateFolder(payload);
+                    break;
+
+                // 📦692 — Eliminar carpeta (y todo su contenido)
+                case 'furat-delete-folder':
+                    result = await window.electronAPI.furatDeleteFolder(payload);
+                    break;
+
+                // 📦693 — Upsert metadata (crear o actualizar) para un PDF
+                case 'furat-upsert-metadata':
+                    result = await window.electronAPI.furatUpsertMetadata(payload);
+                    break;
+
+                // 📦693 — Obtener metadata de un solo archivo (pre-llenar el modal)
+                case 'furat-get-metadata-for-file':
+                    result = await window.electronAPI.furatGetMetadataForFile(payload);
                     break;
 
                 default:
@@ -163,6 +226,22 @@ class ReportesAccidentesComponent {
                 }
             }
 
+            // 📦687 — Cargar metadata para enriquecer los "Últimos Reportes" con accident_date
+            // (la fecha que muestra es la del accidente, no la de modificación del archivo)
+            let metadataByPath = {};
+            try {
+                const metaResult = await window.electronAPI.furatListMetadata(params.companyName);
+                if (metaResult && metaResult.success && Array.isArray(metaResult.metadata)) {
+                    metaResult.metadata.forEach(function (m) {
+                        if (m.file_path) {
+                            metadataByPath[m.file_path.toLowerCase().replace(/\\/g, '/')] = m;
+                        }
+                    });
+                }
+            } catch (err) {
+                console.warn('[FURAT] No se pudo cargar metadata para "Últimos Reportes":', err);
+            }
+
             // Calcular estadísticas
             const now = new Date();
             const currentYear = now.getFullYear();
@@ -195,17 +274,32 @@ class ReportesAccidentesComponent {
                 }
             });
 
-            // Generar reportes recientes (últimos 8 por fecha de modificación)
+            // 📦687 — Generar reportes recientes (últimos 8).
+            // Prioriza accident_date de la metadata (consistencia con el chart de tendencia).
+            // Si no hay metadata, cae a modified.
             const recentReports = allFiles
-                .sort((a, b) => {
-                    return (b.modified || 0) - (a.modified || 0);
+                .map(file => {
+                    // Buscar metadata por path normalizado
+                    const key = (file.path || '').toLowerCase().replace(/\\/g, '/');
+                    const meta = metadataByPath[key];
+                    // Fecha a mostrar: accident_date si está en metadata, sino modified
+                    const dateForSort = meta && meta.accident_date
+                        ? new Date(meta.accident_date).getTime()
+                        : (file.modified || 0);
+                    const dateForDisplay = meta && meta.accident_date
+                        ? new Date(meta.accident_date).toLocaleDateString('es-ES')
+                        : (file.modified ? new Date(file.modified).toLocaleDateString('es-ES') : '');
+                    return {
+                        name: file.name,
+                        path: file.path,
+                        date: dateForDisplay,
+                        _sortDate: dateForSort,
+                        hasMetadata: !!meta
+                    };
                 })
+                .sort((a, b) => (b._sortDate || 0) - (a._sortDate || 0))
                 .slice(0, 8)
-                .map(file => ({
-                    name: file.name,
-                    path: file.path,
-                    date: file.modified ? new Date(file.modified).toLocaleDateString('es-ES') : ''
-                }));
+                .map(({ _sortDate, hasMetadata, ...rest }) => rest); // limpiar campos internos
 
             return {
                 success: true,
@@ -246,24 +340,105 @@ class ReportesAccidentesComponent {
             const rootFolders = folderResult.folders || [];
             const rootFiles = folderResult.files || [];
 
-            // Preparar lista de carpetas con metadata
-            const folders = rootFolders.map(f => ({
-                name: f.name,
-                path: f.path,
-                parentPath: null, // Es nivel raíz
-                count: 0 // Se calculará después
-            }));
-
-            // Procesar archivos de la raíz
+            // Estructuras finales: una sola lista de carpetas (plana) con `parentPath`
+            // para que el frontend pueda renderizar el árbol por niveles, y una lista
+            // de archivos con `folderPath` apuntando a su carpeta inmediata.
+            const folders = [];   // TODAS las carpetas (raíz + subcarpetas)
             const allFiles = [];
-            
-            // Agregar archivos del nivel raíz
+
+            // 📦692-fix — Escaneo RECURSIVO de carpetas.
+            // ANTES: el bucle solo leía los archivos DIRECTOS de cada carpeta de año
+            // (readDirectory 1 nivel). Si los PDFs estaban en subcarpetas (ej:
+            // 2019/Enero/archivo.pdf), no aparecían al navegar por "2019" y la UI
+            // mostraba "No hay reportes en esta carpeta". FIX: función recursiva
+            // que desciende en cada subcarpeta, agrega folders con parentPath y
+            // cuenta archivos totales (esta carpeta + descendientes).
+            const MAX_DEPTH = 5; // seguridad contra loops infinitos
+            const scanFolderRecursive = async (folder, parentPath, depth) => {
+                // Agregar esta carpeta a la lista
+                const folderEntry = {
+                    name: folder.name,
+                    path: folder.path,
+                    parentPath: parentPath || null,
+                    count: 0 // se calcula abajo
+                };
+                folders.push(folderEntry);
+
+                if (depth >= MAX_DEPTH) {
+                    console.warn(`[FURAT] Profundidad máxima alcanzada en ${folder.path}, no se escanea más profundo`);
+                    return;
+                }
+
+                let content;
+                try {
+                    content = await window.electronAPI.readDirectory(folder.path);
+                } catch (err) {
+                    console.warn(`[FURAT] No se pudo leer carpeta ${folder.name}:`, err);
+                    return;
+                }
+                if (!content || !content.success) return;
+
+                const subFolders = content.folders || [];
+                const directFiles = content.files || [];
+
+                // 1) Procesar archivos DIRECTOS de esta carpeta
+                directFiles.forEach(f => {
+                    const ext = f.extension || f.name.split('.').pop().toLowerCase();
+                    allFiles.push({
+                        name: f.name,
+                        path: f.path,
+                        folderPath: folder.path, // apunta a la carpeta INMEDIATA
+                        extension: ext,
+                        icon: this.getIconForExtension(ext),
+                        size: f.size ? this.formatFileSize(f.size) : '',
+                        date: f.modified ? new Date(f.modified).toLocaleDateString('es-ES') : '',
+                        year: this.extractYearFromName(f.name, f.path),
+                        month: this.extractMonthFromName(f.name, f.path)
+                    });
+                });
+
+                // 2) Procesar subcarpetas recursivamente
+                for (const sub of subFolders) {
+                    await scanFolderRecursive(sub, folder.path, depth + 1);
+                }
+            };
+
+            // Escanear todas las carpetas raíz (años)
+            for (const folder of rootFolders) {
+                await scanFolderRecursive(folder, null, 0);
+            }
+
+            // Calcular `count` de cada folder = total de archivos en este folder
+            // Y en todos sus descendientes. Recorremos `allFiles` y sumamos.
+            const countByFolder = {};
+            for (const file of allFiles) {
+                if (!file.folderPath) continue;
+                // Normalizar para que el conteo coincida con `folder.path` (que también está normalizado)
+                const fp = file.folderPath.replace(/\\/g, '/').toLowerCase();
+                countByFolder[fp] = (countByFolder[fp] || 0) + 1;
+            }
+            // Propagar el conteo HACIA ARRIBA: cada padre suma los counts de sus hijos
+            const sortedFolders = folders.slice().sort((a, b) => b.path.length - a.path.length);
+            for (const folder of sortedFolders) {
+                const fp = folder.path.replace(/\\/g, '/').toLowerCase();
+                const directCount = countByFolder[fp] || 0;
+                // Sumar counts de hijos que tengan este folder como parent
+                const childCount = folders
+                    .filter(f => (f.parentPath || '').replace(/\\/g, '/').toLowerCase() === fp)
+                    .reduce((sum, child) => {
+                        const childFp = child.path.replace(/\\/g, '/').toLowerCase();
+                        return sum + (countByFolder[childFp] || 0);
+                    }, 0);
+                folder.count = directCount + childCount;
+            }
+
+            // Archivos del nivel raíz
             rootFiles.forEach(f => {
                 const ext = f.extension || f.name.split('.').pop().toLowerCase();
                 allFiles.push({
                     name: f.name,
                     path: f.path,
-                    folderPath: null, // null = nivel raíz
+                    folderPath: null,
                     extension: ext,
                     icon: this.getIconForExtension(ext),
                     size: f.size ? this.formatFileSize(f.size) : '',
@@ -272,35 +447,6 @@ class ReportesAccidentesComponent {
                     month: this.extractMonthFromName(f.name, f.path)
                 });
             });
-
-            // Leer archivos de cada subcarpeta usando read-directory
-            for (const folder of folders) {
-                try {
-                    const folderContent = await window.electronAPI.readDirectory(folder.path);
-
-                    if (folderContent.success) {
-                        const folderFiles = folderContent.files || [];
-                        folder.count = folderFiles.length;
-
-                        folderFiles.forEach(f => {
-                            const ext = f.extension || f.name.split('.').pop().toLowerCase();
-                            allFiles.push({
-                                name: f.name,
-                                path: f.path,
-                                folderPath: folder.path, // Asignar carpeta padre
-                                extension: ext,
-                                icon: this.getIconForExtension(ext),
-                                size: f.size ? this.formatFileSize(f.size) : '',
-                                date: f.modified ? new Date(f.modified).toLocaleDateString('es-ES') : '',
-                                year: this.extractYearFromName(f.name, f.path),
-                                month: this.extractMonthFromName(f.name, f.path)
-                            });
-                        });
-                    }
-                } catch (err) {
-                    console.warn(`[FURAT] No se pudo leer carpeta ${folder.name}:`, err);
-                }
-            }
 
             const availableYears = [...new Set(allFiles.map(f => f.year).filter(Boolean))].sort((a, b) => b - a);
 

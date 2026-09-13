@@ -69,6 +69,32 @@ HEADER ACTION BUTTONS
   font-family: var(--k-font-family); white-space: nowrap;
 }
 .header-action--success:hover { background: #218838; }
+.header-action--info {
+  display: inline-flex; align-items: center; gap: 0.375rem;
+  padding: 0.5rem 1rem; font-size: 0.8125rem; font-weight: 500;
+  color: white; background: #17a2b8; border: 1px solid #17a2b8;
+  border-radius: 0.5rem; cursor: pointer; transition: all 0.2s;
+  font-family: var(--k-font-family); white-space: nowrap;
+}
+.header-action--info:hover { background: #138496; border-color: #117a8b; }
+
+/* 📦708 (Fase 3.5) — Botones del modal "Info BD" */
+.bd-modal-btn {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.5rem 0.85rem; font-size: 0.8rem; font-weight: 500;
+  border-radius: 0.4rem; cursor: pointer; transition: all 0.2s;
+  font-family: var(--k-font-family); white-space: nowrap;
+  border: 1px solid transparent;
+}
+.bd-modal-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.bd-modal-btn-primary { background: var(--k-primary); color: white; }
+.bd-modal-btn-primary:hover { background: var(--k-primary-hover); }
+.bd-modal-btn-secondary { background: white; color: var(--k-primary); border-color: var(--k-primary); }
+.bd-modal-btn-secondary:hover { background: var(--k-primary-light); }
+.bd-modal-btn-warning { background: white; color: var(--k-warning); border-color: var(--k-warning); }
+.bd-modal-btn-warning:hover { background: #fff3cd; }
+.bd-modal-btn-danger { background: white; color: var(--k-danger); border-color: var(--k-danger); }
+.bd-modal-btn-danger:hover { background: #f8d7da; }
 
         /* BOTONES */
         .k-btn {
@@ -175,7 +201,7 @@ HEADER ACTION BUTTONS
   position: relative;
 }
 
-        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; table-layout: fixed; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.75rem; table-layout: fixed; }
 
         thead th {
             background: #f8f9fa; position: sticky; top: 0; z-index: 10;
@@ -247,21 +273,8 @@ HEADER ACTION BUTTONS
         .action-btn:hover { color: var(--k-primary); transform: scale(1.1); }
         .action-btn.delete-btn:hover { color: var(--k-danger); }
 
-        /* NOTIFICACIÓN */
-        .k-toast {
-            position: fixed; bottom: 2rem; right: 2rem;
-            background: white; padding: 1rem 1.5rem;
-            border-radius: var(--k-radius-lg);
-            box-shadow: 0 8px 16px rgba(0,0,0,0.12);
-            display: flex; align-items: center; gap: 0.75rem;
-            transform: translateY(150%); transition: transform 0.3s;
-            z-index: 2000; border-left: 4px solid var(--k-primary); font-weight: 500;
-        }
-        .k-toast.show { transform: translateY(0); }
-        .k-toast.success { border-left-color: var(--k-success); }
-        .k-toast.warning { border-left-color: var(--k-warning); }
-        .k-toast.error { border-left-color: var(--k-danger); }
-        .k-toast.info { border-left-color: var(--k-primary); }
+        /* NOTIFICACIÓN — 📦653 — Removido CSS viejo (.k-toast) y HTML (#notification).
+           Ahora se usa window.KAIRToast.show() de assets/js/kair-toast.js (sistema moderno unificado). */
 
         /* SPINNER */
         .spinner {
@@ -302,8 +315,11 @@ HEADER ACTION BUTTONS
       <span id="header-company-text">—</span>
     </span>
     <div style="width:1px; height:24px; background:#dee2e6;"></div>
-    <button id="backToSelectorBtn" class="header-back-btn" title="Volver al selector">
+    <button id="backToSelectorBtn" class="header-back-btn" title="Volver al inicio">
       <i class="fas fa-arrow-left"></i> Volver
+    </button>
+    <button id="bdInfoBtn" class="header-action--info" title="Ver info de Base de Datos Local (import, export, eliminar, reimportar)">
+      <i class="fas fa-database"></i> Info BD
     </button>
     <button id="addRowBtn" class="header-action--primary">
       <i class="fas fa-plus"></i> Nueva Partida
@@ -385,11 +401,11 @@ HEADER ACTION BUTTONS
 </div><!-- /.k-section-card -->
 </div>
 
-    <!-- TOAST -->
-    <div class="k-toast" id="notification">
-        <i class="fas fa-info-circle notification-icon"></i>
-        <span class="notification-message">Operación realizada</span>
-    </div>
+    <!-- 📦653 — Cargar sistema moderno de notificaciones (kair-toast.js) en el iframe
+         para que window.KAIRToast.show() esté disponible. El script también se carga
+         en el parent (index.html), pero KAIRToast es una clase que se autoinstancia
+         al final, así que no hay conflicto. -->
+    <script src="../../../assets/js/kair-toast.js"></script>
 
     <script>
         let budgetData = [];
@@ -397,6 +413,17 @@ HEADER ACTION BUTTONS
         let currentFile = null;
         let formulaCells = [];
         let hasPendingChanges = false;
+
+        // 📦708 (Fase 3.5) — Helpers para acceder a KairConfirm/KAIRToast del parent.
+        // KairConfirm y KAIRToast se crean en el parent (index.html). El iframe
+        // los accede via window.parent.* — los objetos renderizan en el DOM del parent.
+        function _confirmDialog() {
+            return (window.parent && window.parent.KairConfirm) ? window.parent.KairConfirm : window.KairConfirm;
+        }
+        function _showToast(message, type) {
+            var t = (window.parent && window.parent.KAIRToast) ? window.parent.KAIRToast : window.KAIRToast;
+            if (t) t.show(message, type || 'info');
+        }
 
         document.addEventListener('DOMContentLoaded', function() {
             setupEventListeners();
@@ -424,22 +451,37 @@ HEADER ACTION BUTTONS
                 }
 
                 if (event.data.action === 'saveComplete' || (event.data.action === 'saveBudgetChanges' && event.data.success)) {
-                    showNotification('Cambios guardados exitosamente', 'success');
+                    // 📦653 — Usar sistema moderno unificado (assets/js/kair-toast.js)
+                    window.KAIRToast.show('Cambios guardados exitosamente', 'success');
                     markNoPendingChanges();
                 } else if (event.data.action === 'saveError' || (event.data.action === 'saveBudgetChanges' && !event.data.success)) {
-                    showNotification(`Error al guardar: ${event.data.error || 'Error desconocido'}`, 'error');
+                    window.KAIRToast.show(`Error al guardar: ${event.data.error || 'Error desconocido'}`, 'error');
                 }
             });
         });
 
 function setupEventListeners() {
-  const backToSelector = () => {
-    if (!hasPendingChanges || confirm('Tiene cambios sin guardar. ¿Está seguro de que desea salir?')) {
-      window.parent.postMessage({ action: 'backToSelector' }, '*');
+  // 📦708 (Fase 3.5) — Modernizado: usa KairConfirm (estilo 6.1.2)
+  const backToSelector = async () => {
+    if (!hasPendingChanges) {
+      window.parent.postMessage({ action: 'backToHome' }, '*');
+      return;
+    }
+    const confirmed = await _confirmDialog().confirm({
+      title: '⚠️ Cambios sin guardar',
+      message: 'Tenés cambios sin guardar en este presupuesto.',
+      details: 'Si salís ahora vas a perder los cambios. ¿Querés salir de todos modos?',
+      confirmText: 'Salir sin guardar',
+      cancelText: 'Seguir editando',
+      type: 'warning'
+    });
+    if (confirmed) {
+      window.parent.postMessage({ action: 'backToHome' }, '*');
     }
   };
 
   document.getElementById('backToSelectorBtn').addEventListener('click', backToSelector);
+  document.getElementById('bdInfoBtn').addEventListener('click', openBDInfoModal);
   document.getElementById('addRowBtn').addEventListener('click', addNewRow);
   document.getElementById('saveBtn').addEventListener('click', saveChanges);
         }
@@ -448,7 +490,11 @@ function updateFileInfo() {
   if (!currentFile) return;
   const year = extractYearFromFileName(currentFile.name);
   const titleEl = document.getElementById('moduleTitle');
-  if (titleEl) titleEl.textContent = `Presupuesto ${year}`;
+  if (titleEl) {
+    // 📦708 (Fase 3) — Mostrar indicador de fuente (BD vs Excel)
+    const fuente = (currentFile.source === 'BD') ? '📦 BD' : '📄 Excel';
+    titleEl.textContent = `Presupuesto ${year} (${fuente})`;
+  }
 }
 
         function extractYearFromFileName(fileName) {
@@ -459,10 +505,19 @@ function updateFileInfo() {
         async function loadData() {
             try {
                 showLoading();
-                window.parent.postMessage({ action: 'requestBudgetData', file: currentFile }, '*');
+                // 📦708 (Fase 3) — Rutear a BD o Excel según la fuente
+                if (currentFile && currentFile.source === 'BD') {
+                    window.parent.postMessage({
+                        action: 'requestBudgetFromDB',
+                        presupuestoId: currentFile.presupuestoId
+                    }, '*');
+                } else {
+                    window.parent.postMessage({ action: 'requestBudgetData', file: currentFile }, '*');
+                }
             } catch (error) {
                 console.error('Error al cargar datos:', error);
-                showNotification(`Error al cargar datos: ${error.message}`, 'error');
+                // 📦653 — Usar sistema moderno unificado
+                window.KAIRToast.show(`Error al cargar datos: ${error.message}`, 'error');
             }
         }
 
@@ -506,10 +561,28 @@ function parseFormattedNumber(value) {
     return isNaN(parsed) ? 0 : parsed;
   }
 
+        // 📦653 — Formato inteligente: muestra decimales SOLO si el número los tiene.
+        // Antes: "0" se mostraba como "0,00", "100" como "100,00" → ocupaban espacio innecesario.
+        // Ahora: "0" → "0", "100" → "100", "50,5" → "50,5", "1234,56" → "1.234,56".
         function formatNumber(num) {
-            if (num === null || num === undefined || num === '') return '0,00';
+            if (num === null || num === undefined || num === '') return '0';
             const numberValue = isNaN(parseFloat(num)) ? 0 : parseFloat(num);
+            // Entero → sin decimales
+            if (Number.isInteger(numberValue)) {
+                return numberValue.toLocaleString('es-CO', { maximumFractionDigits: 0 });
+            }
+            // Con decimales → 2 dígitos (es-CO usa coma decimal)
             return numberValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        // 📦653 — Igual que formatNumber pero con sufijo % y respetando 2 decimales cuando los hay.
+        function formatPct(num) {
+            if (num === null || num === undefined || isNaN(parseFloat(num))) return '0%';
+            const numberValue = parseFloat(num);
+            if (Number.isInteger(numberValue)) {
+                return numberValue.toLocaleString('es-CO', { maximumFractionDigits: 0 }) + '%';
+            }
+            return numberValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
         }
 
         function renderBudgetTable() {
@@ -533,14 +606,15 @@ function parseFormattedNumber(value) {
 
                 const asignacion = parseFormattedNumber(item.asignacion || 0);
                 const ejecutado = parseFormattedNumber(item.ejecutado_acumulado || 0);
-                const pct = asignacion > 0 ? ((ejecutado / asignacion) * 100).toFixed(2) : 0;
+                // 📦653 — formatPct omite los ,00 cuando el % es entero
+                const pct = asignacion > 0 ? (ejecutado / asignacion) * 100 : 0;
 
                 row.innerHTML = `
                     <td>${isSpecial ? item.id : index + 1}</td>
                     <td>${isSpecial ? item.id : item.detalle || '-'}</td>
                     <td>${isSpecial ? `<span class="formula-cell">${formatNumber(asignacion)}</span>` : `<span onclick="makeCellEditable(event, ${index}, 'asignacion')" class="editable-cell">${formatNumber(asignacion)}</span>`}</td>
                     <td>${isSpecial ? `<span class="formula-cell">${formatNumber(ejecutado)}</span>` : `<span onclick="makeCellEditable(event, ${index}, 'ejecutado_acumulado')" class="editable-cell">${formatNumber(ejecutado)}</span>`}</td>
-                    <td id="pct_${index}">${pct}%</td>
+                    <td id="pct_${index}">${formatPct(pct)}</td>
                     ${monthHTML}
                     <td class="actions-col">
                         ${!isSpecial ? `<button class="action-btn delete-btn" onclick="deleteRow(${index})"><i class="fas fa-trash"></i></button>` : ''}
@@ -560,7 +634,8 @@ function parseFormattedNumber(value) {
 
             document.getElementById('totalPresupuesto').textContent = '$' + formatNumber(totalP);
             document.getElementById('totalEmpresa').textContent = '$' + formatNumber(totalE);
-            document.getElementById('totalArl').textContent = (totalP > 0 ? ((totalE / totalP) * 100) : 0).toFixed(2) + '%';
+            // 📦653 — formatPct omite ,00 cuando el % es entero
+            document.getElementById('totalArl').textContent = formatPct(totalP > 0 ? (totalE / totalP) * 100 : 0);
             document.getElementById('saldoDisponible').textContent = '$' + formatNumber(totalP - totalE);
         }
 
@@ -574,8 +649,17 @@ function parseFormattedNumber(value) {
             markPendingChanges();
         }
 
-        function deleteRow(index) {
-            if (confirm('¿Eliminar este ítem?')) {
+        // 📦708 (Fase 3.5) — Modernizado: usa KairConfirm (estilo 6.1.2)
+        async function deleteRow(index) {
+            const confirmed = await _confirmDialog().confirm({
+                title: '¿Eliminar esta partida?',
+                message: 'Vas a eliminar esta partida del presupuesto.',
+                details: 'Esta acción se aplica al guardar los cambios. Si querés, podés volver a agregarla después.',
+                confirmText: 'Sí, eliminar',
+                cancelText: 'Cancelar',
+                type: 'warning'
+            });
+            if (confirmed) {
                 budgetData.splice(index, 1);
                 renderBudgetTable();
                 updateSummary();
@@ -616,7 +700,8 @@ function parseFormattedNumber(value) {
         }
 
         function saveChanges() {
-            if (!hasPendingChanges) return showNotification('No hay cambios', 'info');
+            // 📦653 — Usar sistema moderno unificado
+            if (!hasPendingChanges) return window.KAIRToast.show('No hay cambios', 'info');
 
             // Convertir todo a número antes de enviar
             const dataToSave = budgetData.map(item => {
@@ -631,20 +716,328 @@ function parseFormattedNumber(value) {
 
             window.parent.postMessage({
                 action: 'saveBudgetChanges',
+                source: (currentFile && currentFile.source === 'BD') ? 'BD' : 'EXCEL',
                 file: currentFile,
+                presupuestoId: currentFile ? currentFile.presupuestoId : null,
                 data: dataToSave
             }, '*');
         }
 
-        function showNotification(msg, type = 'success') {
-            const el = document.getElementById('notification');
-            el.querySelector('.notification-message').textContent = msg;
-            el.className = `k-toast ${type} show`;
-            setTimeout(() => el.classList.remove('show'), 3000);
-        }
+        // 📦653 — Función showNotification removida. Usar window.KAIRToast.show() directamente.
+        //   El sistema moderno está en assets/js/kair-toast.js (clase KAIRToast,
+        //   instanciada como window.KAIRToast, con HTML container #notification-hub en index.html).
+        //   Tipos: 'info' | 'success' | 'warning' | 'error'.
 
         function showLoading() {
             document.getElementById('budgetTableBody').innerHTML = '<tr><td colspan="18"><div class="spinner"></div></td></tr>';
+        }
+
+        // ============================================================
+        // 📦708 (Fase 3.5) — Modal "Info BD" desde gestion view
+        // Antes esta info vivía en el home (sección "Base de Datos Local").
+        // Ahora se accede desde un botón en el header de gestion, para
+        // mantener el home limpio y dar control al usuario sobre cuándo ver el detalle.
+        // ============================================================
+
+        let _bdModalState = { hasData: false, anio: null, presupuesto: null, resumen: null };
+
+        /**
+         * Abre un modal con toda la info de Base de Datos Local.
+         * Incluye: estado, KPIs, acciones (ver resumen, editar meta, agregar partida, exportar).
+         */
+        function openBDInfoModal() {
+            // Si ya está abierto, no duplicar
+            if (document.getElementById('bd-info-modal')) return;
+            var anio = (currentFile && currentFile.anio) || new Date().getFullYear();
+            _bdModalState.anio = anio;
+
+            var overlay = document.createElement('div');
+            overlay.id = 'bd-info-modal';
+            overlay.className = 'bd-info-modal';
+            overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 2rem;';
+            overlay.innerHTML =
+                '<div style="background: white; border-radius: 12px; max-width: 800px; max-height: 90vh; overflow: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); width: 100%;">' +
+                    '<div style="padding: 1.5rem 2rem; border-bottom: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center;">' +
+                        '<h2 style="margin: 0; font-size: 1.25rem; color: #174ea6;">' +
+                            '<i class="fas fa-database" style="color: #17a2b8;"></i> Base de Datos Local (<span id="bd-modal-year">' + anio + '</span>)' +
+                        '</h2>' +
+                        '<button id="bd-modal-close" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #6c757d; padding: 0 0.5rem;">&times;</button>' +
+                    '</div>' +
+                    '<div id="bd-modal-body" style="padding: 1.5rem 2rem;">' +
+                        '<div style="text-align: center; color: #6c757d; padding: 2rem;">' +
+                            '<i class="fas fa-spinner fa-spin"></i> Verificando BD...' +
+                        '</div>' +
+                    '</div>' +
+                '</div>';
+            document.body.appendChild(overlay);
+            document.getElementById('bd-modal-close').onclick = function() { overlay.remove(); };
+            overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+
+            // Solicitar estado de BD al parent
+            window.parent.postMessage({ action: 'checkBDStatus', anio: anio }, '*');
+        }
+
+        /**
+         * Renderiza el contenido del modal con la respuesta de checkBDStatus
+         */
+        function _renderBDModalBody(data) {
+            var body = document.getElementById('bd-modal-body');
+            if (!body) return;
+            var anio = data.anio || _bdModalState.anio;
+            var yearSpan = document.getElementById('bd-modal-year');
+            if (yearSpan) yearSpan.textContent = anio;
+
+            var fmt = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+            var statusHtml = '';
+            var actionsHtml = '';
+
+            if (data.error) {
+                statusHtml = '<div style="color: #721c24; background: #f8d7da; padding: 0.75rem; border-radius: 6px;">❌ Error: ' + _escHtml(data.error.message || 'desconocido') + '</div>';
+                actionsHtml = '<p style="font-size: 0.85rem; color: #6c757d; margin-top: 1rem;">Cerrá este modal y volvé a intentarlo.</p>';
+            } else if (!data.exists) {
+                statusHtml = '<div style="color: #721c24; background: #f8d7da; padding: 0.75rem; border-radius: 6px;">❌ No hay presupuesto en la base de datos local para ' + anio + '.</div>';
+                actionsHtml = '<p style="font-size: 0.85rem; color: #6c757d; margin-top: 1rem;">Para empezar, volvé al home y usá <strong>"Importar Excel a BD"</strong> o creá uno nuevo desde <strong>"Histórico de Años"</strong>.</p>';
+            } else {
+                _bdModalState.hasData = true;
+                _bdModalState.presupuesto = data.presupuesto;
+                _bdModalState.resumen = data.resumen;
+                var p = data.presupuesto;
+                var r = data.resumen || { partidasCount: 0, totalAsignado: 0, totalEjecutado: 0, porcentaje: 0 };
+                var updated = p.actualizadoEn ? new Date(p.actualizadoEn).toLocaleString('es-CO') : '—';
+                statusHtml =
+                    '<div style="background: #d4edda; color: #155724; padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1rem;">' +
+                        '✅ Presupuesto <strong>' + _escHtml(p.nombre || 'sin nombre') + '</strong> en BD' +
+                        '<br><small>Última actualización: ' + updated + '</small>' +
+                    '</div>' +
+                    '<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1rem;">' +
+                        '<div style="background: #f8f9fa; padding: 0.75rem; border-radius: 6px;">' +
+                            '<div style="font-size: 0.65rem; text-transform: uppercase; color: #6c757d;">Partidas</div>' +
+                            '<div style="font-size: 1.1rem; font-weight: 700;">' + (r.partidasCount || '—') + '</div>' +
+                        '</div>' +
+                        '<div style="background: #f8f9fa; padding: 0.75rem; border-radius: 6px;">' +
+                            '<div style="font-size: 0.65rem; text-transform: uppercase; color: #6c757d;">Asignado</div>' +
+                            '<div style="font-size: 1.1rem; font-weight: 700; color: #174ea6;">' + (r.totalAsignado ? fmt.format(r.totalAsignado) : '—') + '</div>' +
+                        '</div>' +
+                        '<div style="background: #f8f9fa; padding: 0.75rem; border-radius: 6px;">' +
+                            '<div style="font-size: 0.65rem; text-transform: uppercase; color: #6c757d;">Ejecutado</div>' +
+                            '<div style="font-size: 1.1rem; font-weight: 700; color: #28a745;">' + (r.totalEjecutado ? fmt.format(r.totalEjecutado) : '—') + '</div>' +
+                        '</div>' +
+                        '<div style="background: #f8f9fa; padding: 0.75rem; border-radius: 6px;">' +
+                            '<div style="font-size: 0.65rem; text-transform: uppercase; color: #6c757d;">% Cumplimiento</div>' +
+                            '<div style="font-size: 1.1rem; font-weight: 700;">' + (r.porcentaje != null ? r.porcentaje.toFixed(1) + '%' : '—') + '</div>' +
+                        '</div>' +
+                    '</div>';
+                actionsHtml =
+                    '<div style="border-top: 1px solid #e9ecef; padding-top: 1rem;">' +
+                        '<p style="font-size: 0.75rem; color: #6c757d; margin: 0 0 0.75rem;">Acciones de Base de Datos</p>' +
+                        '<div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">' +
+                            '<button class="bd-modal-btn bd-modal-btn-primary" onclick="bdModalAction(\'viewResumen\')">' +
+                                '<i class="fas fa-eye"></i> Ver resumen detallado' +
+                            '</button>' +
+                            '<button class="bd-modal-btn bd-modal-btn-secondary" onclick="bdModalAction(\'editMeta\')">' +
+                                '<i class="fas fa-edit"></i> Editar nombre/notas' +
+                            '</button>' +
+                            '<button class="bd-modal-btn bd-modal-btn-secondary" onclick="bdModalAction(\'addPartida\')">' +
+                                '<i class="fas fa-plus"></i> Nueva partida' +
+                            '</button>' +
+                            '<button class="bd-modal-btn bd-modal-btn-secondary" onclick="bdModalAction(\'exportExcel\')">' +
+                                '<i class="fas fa-file-excel"></i> Exportar a Excel' +
+                            '</button>' +
+                        '</div>' +
+                    '</div>';
+            }
+            body.innerHTML = statusHtml + actionsHtml;
+        }
+
+        /**
+         * Ejecuta una acción del modal de Info BD
+         */
+        async function bdModalAction(action) {
+            if (!_bdModalState.presupuesto) {
+                _showToast('No hay presupuesto activo en BD', 'warning');
+                return;
+            }
+            var p = _bdModalState.presupuesto;
+
+            if (action === 'viewResumen') {
+                // Pide el resumen detallado al parent
+                window.parent.postMessage({ action: 'viewBDResumen', anio: p.anio }, '*');
+            } else if (action === 'editMeta') {
+                var values = await _confirmDialog().input({
+                    title: '✏️ Editar presupuesto',
+                    message: 'Cambiá el nombre y las notas del presupuesto ' + p.anio + '.',
+                    fields: [
+                        { key: 'nombre', label: 'Nombre', type: 'text', required: true, value: p.nombre || '', placeholder: 'Ej: Presupuesto SG-SST 2026' },
+                        { key: 'notas', label: 'Notas', type: 'textarea', value: p.notas || '', placeholder: 'Notas u observaciones' }
+                    ],
+                    confirmText: 'Guardar',
+                    cancelText: 'Cancelar',
+                    type: 'info'
+                });
+                if (values) {
+                    window.parent.postMessage({ action: 'updatePresupuestoMeta', presupuestoId: p.id, nombre: values.nombre, notas: values.notas || null }, '*');
+                }
+            } else if (action === 'addPartida') {
+                var addValues = await _confirmDialog().input({
+                    title: '+ Nueva Partida',
+                    message: 'Agregá una partida al presupuesto "' + (p.nombre || 'sin nombre') + '" (' + p.anio + ').',
+                    details: 'El asignado anual se distribuye uniformemente en los 12 meses. Ejecutado arranca en 0.',
+                    fields: [
+                        { key: 'concepto', label: 'Concepto', type: 'text', required: true, placeholder: 'Ej: Capacitación SG-SST' },
+                        { key: 'asignadoTotal', label: 'Asignado anual (COP)', type: 'number', placeholder: '0' },
+                        { key: 'descripcion', label: 'Descripción (opcional)', type: 'textarea' }
+                    ],
+                    confirmText: 'Crear partida',
+                    cancelText: 'Cancelar',
+                    type: 'info'
+                });
+                if (addValues) {
+                    window.parent.postMessage({ action: 'addPartidaToBD', presupuestoId: p.id, concepto: addValues.concepto, descripcion: addValues.descripcion || null, asignadoTotal: addValues.asignadoTotal || 0 }, '*');
+                }
+            } else if (action === 'exportExcel') {
+                _showToast('Generando Excel...', 'info');
+                window.parent.postMessage({ action: 'exportBudgetToExcel', presupuestoId: p.id, anio: p.anio }, '*');
+                _closeBDInfoModal();
+            }
+        }
+
+        function _closeBDInfoModal() {
+            var modal = document.getElementById('bd-info-modal');
+            if (modal) modal.remove();
+        }
+
+        function _escHtml(s) {
+            if (s == null) return '';
+            return String(s).replace(/[&<>"']/g, function(c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+            });
+        }
+
+        // Listener de postMessage para mensajes del modal BD
+        // (Los type=bd-* no entran en conflicto con el listener existente
+        // que solo procesa company/file/budgetData/saveComplete/saveError)
+        window.addEventListener('message', function(event) {
+            if (event.source !== window.parent) return;
+            var data = event.data;
+            if (!data || !data.type) return;
+            if (data.type === 'bd-status') {
+                _renderBDModalBody(data);
+            } else if (data.type === 'bd-meta-updated' || data.type === 'bd-partida-added' || data.type === 'bd-export-result') {
+                // Si el modal está abierto, cerrarlo y refrescar (re-abrirlo para ver data actualizada)
+                if (document.getElementById('bd-info-modal')) {
+                    _closeBDInfoModal();
+                    setTimeout(openBDInfoModal, 250);
+                }
+            } else if (data.type === 'bd-resumen') {
+                // El resumen detallado: mostrarlo en un sub-modal con la lista de partidas
+                if (data.success && data.data && data.data.presupuesto) {
+                    _showBDResumenSubModal(data.data);
+                }
+            }
+        });
+
+        /**
+         * Muestra el resumen detallado (lista de partidas) en un sub-modal
+         */
+        function _showBDResumenSubModal(resumen) {
+            // Si ya hay un sub-modal abierto, cerrarlo
+            var existing = document.getElementById('bd-resumen-submodal');
+            if (existing) existing.remove();
+
+            var p = resumen.presupuesto;
+            var r = resumen.resumen;
+            var partidas = resumen.partidas || [];
+            var fmt = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+
+            var rows = '';
+            if (partidas.length === 0) {
+                rows = '<tr><td colspan="5" style="padding: 1rem; text-align: center; color: #6c757d;">No hay partidas.</td></tr>';
+            } else {
+                partidas.forEach(function(partida) {
+                    var safeLabel = _escHtml(partida.concepto).replace(/'/g, "\\'");
+                    rows += '<tr style="border-bottom: 1px solid #f1f3f5;">' +
+                        '<td style="padding: 0.5rem 0.75rem; color: #6c757d;">' + partida.numero + '</td>' +
+                        '<td style="padding: 0.5rem 0.75rem;">' + _escHtml(partida.concepto) + '</td>' +
+                        '<td style="padding: 0.5rem 0.75rem; text-align: right;">' + fmt.format(partida.asignado) + '</td>' +
+                        '<td style="padding: 0.5rem 0.75rem; text-align: right;">' +
+                            '<span style="color: ' + (partida.porcentaje >= 80 ? '#28a745' : (partida.porcentaje >= 50 ? '#ffc107' : '#dc3545')) + ';">' +
+                            partida.porcentaje.toFixed(1) + '%</span>' +
+                        '</td>' +
+                        '<td style="padding: 0.5rem 0.75rem; text-align: center;">' +
+                            '<button class="bd-modal-btn bd-modal-btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.7rem;" onclick="bdModalEliminarPartida(' + partida.id + ', \'' + safeLabel + '\')" title="Eliminar (soft delete)">' +
+                                '<i class="fas fa-trash"></i>' +
+                            '</button>' +
+                        '</td>' +
+                    '</tr>';
+                });
+            }
+
+            var overlay = document.createElement('div');
+            overlay.id = 'bd-resumen-submodal';
+            overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 2rem;';
+            overlay.innerHTML =
+                '<div style="background: white; border-radius: 12px; max-width: 900px; max-height: 90vh; overflow: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); width: 100%;">' +
+                    '<div style="padding: 1.5rem 2rem; border-bottom: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center;">' +
+                        '<h2 style="margin: 0; font-size: 1.2rem; color: #174ea6;">' + _escHtml(p.nombre || 'Presupuesto') + ' (' + p.anio + ') — Resumen</h2>' +
+                        '<button id="bd-resumen-close" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #6c757d; padding: 0 0.5rem;">&times;</button>' +
+                    '</div>' +
+                    '<div style="padding: 1.5rem 2rem;">' +
+                        '<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1.5rem;">' +
+                            '<div style="background: #f8f9fa; padding: 0.75rem; border-radius: 6px;">' +
+                                '<div style="font-size: 0.65rem; text-transform: uppercase; color: #6c757d;">Asignado</div>' +
+                                '<div style="font-size: 1.05rem; font-weight: 700; color: #174ea6;">' + fmt.format(r.totalAsignado) + '</div>' +
+                            '</div>' +
+                            '<div style="background: #f8f9fa; padding: 0.75rem; border-radius: 6px;">' +
+                                '<div style="font-size: 0.65rem; text-transform: uppercase; color: #6c757d;">Ejecutado</div>' +
+                                '<div style="font-size: 1.05rem; font-weight: 700; color: #28a745;">' + fmt.format(r.totalEjecutado) + '</div>' +
+                            '</div>' +
+                            '<div style="background: #f8f9fa; padding: 0.75rem; border-radius: 6px;">' +
+                                '<div style="font-size: 0.65rem; text-transform: uppercase; color: #6c757d;">% Cumplimiento</div>' +
+                                '<div style="font-size: 1.05rem; font-weight: 700;">' + r.porcentaje.toFixed(1) + '%</div>' +
+                            '</div>' +
+                            '<div style="background: #f8f9fa; padding: 0.75rem; border-radius: 6px;">' +
+                                '<div style="font-size: 0.65rem; text-transform: uppercase; color: #6c757d;">Saldo</div>' +
+                                '<div style="font-size: 1.05rem; font-weight: 700; color: #174ea6;">' + fmt.format(r.saldo) + '</div>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div style="overflow-x: auto;">' +
+                            '<table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">' +
+                                '<thead>' +
+                                    '<tr style="background: #f1f3f5;">' +
+                                        '<th style="padding: 0.5rem 0.75rem; text-align: left;">#</th>' +
+                                        '<th style="padding: 0.5rem 0.75rem; text-align: left;">Concepto</th>' +
+                                        '<th style="padding: 0.5rem 0.75rem; text-align: right;">Asignado</th>' +
+                                        '<th style="padding: 0.5rem 0.75rem; text-align: right;">% Ejec.</th>' +
+                                        '<th style="padding: 0.5rem 0.75rem; text-align: center;">Acciones</th>' +
+                                    '</tr>' +
+                                '</thead>' +
+                                '<tbody>' + rows + '</tbody>' +
+                            '</table>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>';
+            document.body.appendChild(overlay);
+            document.getElementById('bd-resumen-close').onclick = function() { overlay.remove(); };
+            overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+        }
+
+        /**
+         * Confirma y elimina (soft delete) una partida desde el sub-modal de resumen
+         */
+        async function bdModalEliminarPartida(partidaId, label) {
+            if (!_bdModalState.presupuesto) return;
+            var display = label || ('partida #' + partidaId);
+            var confirmed = await _confirmDialog().confirm({
+                title: '¿Eliminar partida?',
+                message: 'Vas a eliminar la partida "' + display + '" del presupuesto ' + _bdModalState.presupuesto.anio + '.',
+                details: 'Esto hace un soft delete (la partida queda con activo=0 pero se preserva para histórico).',
+                confirmText: 'Sí, eliminar',
+                cancelText: 'Cancelar',
+                type: 'warning'
+            });
+            if (confirmed) {
+                window.parent.postMessage({ action: 'deletePartidaFromBD', partidaId: partidaId }, '*');
+            }
         }
     </script>
 </body>

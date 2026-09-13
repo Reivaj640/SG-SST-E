@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>K+AIR · Bandeja Integrada Correo · Calendario</title>
+  <link rel="stylesheet" href="styles.css?v=681" />
+  <!-- F2 — K+AIR Calendar CSS (compartido con el calendario viejo del header) -->
+  <link rel="stylesheet" href="../../shared/kair-calendar.css?v=545" />
+  <!--
+    K+AIR Bandeja Integrada — Vanilla JS (v4)
+    =========================================
+    Layout:
+      [Sidebar mini-cal + leyenda] [Botón flecha] [Calendario grande | Lista correos] [Lista correos | Detalle Gmail]
+
+    - Estado EXPANDED:  sidebar | flecha | calendario grande | lista correos
+    - Estado COLLAPSED: sidebar | flecha | lista correos | detalle Gmail
+
+    - Clic en la flecha alterna entre EXPANDED y COLLAPSED
+    - Clic en un correo cambia automáticamente a COLLAPSED y muestra el detalle Gmail
+
+    Integración Electron: ver README.md
+  -->
+</head>
+<body>
+  <div id="kair-app" class="kair-app">
+
+    <!-- 📦607 — Botón "Volver" flotante ELIMINADO. Ya hay 2 formas de volver:
+         (1) Tecla ESC, (2) Botón X de cerrar del header de la app principal.
+         Era redundante y ocupaba espacio valioso en la esquina superior izquierda. -->
+
+    <!-- ============== HEADER K+AIR v2.0 (limpio, sin toggle de vista) ============== -->
+    <header class="kair-header">
+      <div class="kair-header__bar">
+        <!-- Left: solo back button -->
+        <div class="kair-header__left">
+          <button class="kair-header__back" id="btn-back" aria-label="Volver" title="Volver al inicio">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+        </div>
+
+        <!-- Center: vacío -->
+        <div class="kair-header__center"></div>
+
+        <!-- Right: búsqueda, notificaciones, company, toggle empresas, acciones -->
+        <div class="kair-header__right">
+          <label class="kair-search" aria-label="Buscar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--kair-text-light);"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="search-input" placeholder="Filtrar y buscar..." />
+          </label>
+
+          <button class="kair-icon-btn" aria-label="Notificaciones" title="Notificaciones" style="position:relative;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <span style="position:absolute;top:-2px;right:-2px;width:8px;height:8px;border-radius:999px;background:var(--kair-danger);"></span>
+          </button>
+
+          <button class="kair-icon-btn" aria-label="Configuración" title="Configuración">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
+
+          <div class="kair-header__company" title="Empresa activa">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>
+            <strong id="company-name">Cargando…</strong>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--kair-text-light);"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+
+          <span class="kair-header__divider"></span>
+
+          <span class="kair-header__divider"></span>
+
+          <button class="kair-header__action--ghost" id="btn-refresh" title="Sincronizar">
+            <svg id="refresh-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            <span class="kair-hide-sm">Sincronizar</span>
+          </button>
+
+          <!-- F1-Feature4 — Editor de firma. Abre un mini modal para editar la firma
+               que se agrega automáticamente al final de cada correo. -->
+          <button class="kair-header__action--ghost" id="btn-signature" title="Editar firma de correo">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17c0-1.66 3.58-3 8-3s8 1.34 8 3v3H3v-3z"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            <span class="kair-hide-sm">Firma</span>
+          </button>
+
+          <button class="kair-header__action--primary" id="btn-compose">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span>Redactar</span>
+          </button>
+
+          <!-- 📦608 — Botón temporal de prueba para @file-viewer (PPTX/DOCX/XLSX/PDF/etc).
+               Se va a eliminar cuando integremos el flujo real en renderer.js orquestador. -->
+          <button class="kair-header__action--ghost" id="btn-fv-test" title="Probar preview de archivo con @file-viewer (PPTX, DOCX, XLSX, PDF, imágenes, etc.)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+            <span class="kair-hide-sm">Probar FV</span>
+          </button>
+          <!-- F4-fix — Indicador Gmail (read-only). El switch de Conectar/Desconectar
+               está en Configuración > Gestión de Empresas. Acá solo mostramos el
+               estado para que se vea si la conexión está funcionando. -->
+          <span class="kair-header__indicator" id="gmail-indicator" data-connected="false" title="Verificá Configuración > Gestión de Empresas para conectar Gmail">
+            <span class="kair-header__indicator-dot" id="gmail-indicator-dot"></span>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            <span class="kair-header__indicator-text" id="gmail-indicator-text">Gmail: …</span>
+          </span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ============== MAIN ============== -->
+    <main class="kair-main" id="kair-main">
+      <!-- KPI Strip Enterprise -->
+      <div class="kair-kpi-strip" id="kpi-strip"></div>
+
+      <!-- Layout principal: 3 columnas
+           [sidebar mini-cal + leyenda] [flecha] [área de contenido]
+           El área de contenido contiene:
+             - Correo (base layer, SIEMPRE renderizado): lista + detalle Gmail
+             - Calendario (overlay deslizante): entra desde la izquierda -->
+      <div class="kair-layout" id="kair-layout">
+        <!-- 1. Sidebar izquierdo: SIEMPRE visible (mini-cal + leyenda) -->
+        <aside class="kair-card kair-sidebar" id="sidebar" style="border-radius: 10px 0 0 10px;"></aside>
+
+        <!-- 2. Botón de flecha entre sidebar y área de contenido
+             data-calendar-visible="true" (default): flecha ← "cerrar calendario" (visible)
+             data-calendar-visible="false": flecha → "abrir calendario" (oculto) -->
+        <button
+          class="kair-panel-toggle"
+          id="panel-toggle"
+          data-calendar-visible="true"
+          aria-label="Ocultar calendario"
+          title="Ocultar calendario (ver correo)">
+          <svg class="kair-panel-toggle__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+
+        <!-- 3. Área de contenido: correo (base) + calendario (overlay deslizante) -->
+        <div class="kair-content-area" id="content-area" data-calendar-visible="true">
+          <!-- Correo: SIEMPRE renderizado (lista + detalle Gmail) -->
+          <div class="kair-mail-stack">
+            <div class="kair-mail-stack__list" id="mail-list-container"></div>
+            <div class="kair-mail-stack__detail" id="mail-detail-container"></div>
+          </div>
+          <!-- Calendario: overlay deslizante que entra desde la izquierda -->
+          <div class="kair-calendar-slide" id="calendar-slide" data-visible="true"></div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <footer class="kair-footer">
+        <div class="kair-footer__left">
+          <span><strong>K+AIR</strong> · Bandeja Integrada v0.1.120</span>
+          <span>·</span>
+          <span>SG-SST · Resolución 0312 de 2019</span>
+          <span>·</span>
+          <span id="footer-events-count">0 eventos visibles</span>
+        </div>
+        <div class="kair-footer__right">
+          <span id="footer-company">Empresa: Todas</span>
+          <span>·</span>
+          <span id="footer-view">Vista: Calendario + Bandeja</span>
+        </div>
+      </footer>
+    </main>
+
+    <!-- ============== MODAL CREAR EVENTO ============== -->
+    <div class="kair-modal-overlay" id="modal-overlay" hidden>
+      <div class="kair-card kair-modal" id="event-modal"></div>
+    </div>
+
+    <!-- ============== 📦608 — MODAL FILE-VIEWER (preview Office/PDF/etc) ============== -->
+    <div class="kair-fv-overlay" id="fv-overlay" hidden>
+      <div class="kair-fv-modal">
+        <header class="kair-fv-header">
+          <div class="kair-fv-header__title">
+            <span class="kair-fv-header__ext" id="fv-ext-badge">…</span>
+            <span class="kair-fv-header__name" id="fv-filename">Sin archivo</span>
+            <span class="kair-fv-header__meta" id="fv-filesize">—</span>
+          </div>
+          <div class="kair-fv-header__actions">
+            <button class="kair-fv-btn" id="fv-close-btn" title="Cerrar (ESC)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              <span>Cerrar</span>
+            </button>
+          </div>
+        </header>
+        <div class="kair-fv-body" id="fv-body">
+        </div>
+        <input type="file" id="fv-file-input" hidden
+               accept=".pptx,.ppt,.pptm,.potx,.ppsx,.odp,.docx,.doc,.docm,.dotx,.rtf,.odt,.xlsx,.xls,.xlsm,.xlsb,.csv,.ods,.pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.bmp,.tif,.tiff,.ico,.heic,.mp4,.webm,.mp3,.wav,.ogg,.m4a,.flac,.txt,.md,.json,.xml,.yaml,.yml,.csv,.tsv,.eml,.msg,.zip"
+               title="Elegir archivo para previsualizar con @file-viewer" />
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Toasts -->
+  <div class="kair-toast-container" id="toast-container"></div>
+
+  <script src="data.js"></script>
+  <!-- 📦625 — Iconos de tipos de archivo embebidos (Material Design via mallowigi/iconGenerator, MIT).
+       Expone window.KAIR_FILE_TYPE_ICONS con los SVGs como strings para usar con innerHTML.
+       Es la solución 100% confiable para evitar problemas de rutas/seguridad con <img src> en iframes de Electron. -->
+  <script src="icons.js"></script>
+  <!-- F2 — K+AIR Calendar Component (reutilizado del calendario viejo del header) -->
+  <script src="../../shared/kair-calendar.js"></script>
+  <script src="../../shared/kair-calendar-adapter.js"></script>
+  <!-- 📦695 — Festivos colombianos (Ley Emiliani + Pascua). Se carga antes
+       de app.js para que `window.ColombiaFestivos` esté disponible al init. -->
+  <script src="../../shared/colombia-festivos.js"></script>
+  <!-- 📦625 — Iconos de tipos de archivo embebidos (Material Design via mallowigi/iconGenerator, MIT).
+       Expone window.KAIR_FILE_TYPE_ICONS con los SVGs como strings para usar con innerHTML.
+       Es la solución 100% confiable para evitar problemas de rutas/seguridad con <img src> en iframes de Electron. -->
+  <script src="icons.js"></script>
+  <!-- K+AIR Bandeja Integrada — Lógica principal (monolith) -->
+  <script src="app.js"></script>
+  <!-- 📦608 — @file-viewer (preview nativo de Office/PDF/etc en el browser).
+       Bundle IIFE "web-full" auto-registra el custom element <flyfish-file-viewer>
+       CON todos los renderers adentro. La versión "web" sin -full no incluye
+       los renderers y muestra el error ".docx is in the supported matrix,
+       but Word OpenXML renderer is not assembled in this project". -->
+  <script src="../file-viewer-assets/flyfish-file-viewer-web-full.iife.js"></script>
+  <!-- 📦630 — Wrapper con window.kairFV (helper) + window.KairDocPreview.
+       CRITICO: sin este script, openAttachmentPreview cae al fallback
+       porque window.kairFV es undefined en el contexto del Bandeja. -->
+  <script src="../../shared/file-viewer.js"></script>
+</body>
+</html>

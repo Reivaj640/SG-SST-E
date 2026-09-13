@@ -610,32 +610,27 @@ class InduccionesComponent {
 
   setSyncStatus(status, text) {
     const statusEl = document.getElementById('sync-status');
-    const textEl = document.getElementById('sync-status-text');
-
-    if (statusEl) {
-      statusEl.style.display = 'inline-flex';
-      statusEl.className = 'k-sync-status';
-
-      switch (status) {
-        case 'syncing':
-          statusEl.classList.add('syncing');
-          statusEl.innerHTML = '<i class="bi bi-arrow-clockwise" style="animation:spin 1s linear infinite;"></i>';
-          break;
-        case 'synced':
-          statusEl.innerHTML = '<i class="bi bi-check-circle-fill" style="color: var(--k-success);"></i>';
-          break;
-        case 'error':
-          statusEl.classList.add('error');
-          statusEl.innerHTML = '<i class="bi bi-exclamation-circle-fill"></i>';
-          break;
-        default:
-          statusEl.innerHTML = '<i class="bi bi-check-circle-fill" style="color: var(--k-success);"></i>';
-      }
-    }
-
-    if (textEl) {
-      textEl.style.display = 'inline';
-      if (text) textEl.textContent = text;
+    if (!statusEl) return;
+    statusEl.style.display = 'inline-flex';
+    statusEl.className = 'k-sync-status';
+    statusEl.innerHTML = '';
+    switch (status) {
+      case 'syncing':
+        statusEl.classList.add('syncing');
+        statusEl.innerHTML = '<i class="bi bi-arrow-clockwise" style="animation:spin 1s linear infinite;"></i> ' +
+          (text || 'Sincronizando...');
+        break;
+      case 'synced':
+        statusEl.innerHTML = '<i class="bi bi-check-circle-fill" style="color: var(--k-success);"></i> ' +
+          (text || 'Sincronizado');
+        break;
+      case 'error':
+        statusEl.classList.add('error');
+        statusEl.innerHTML = '<i class="bi bi-exclamation-circle-fill"></i> ' + (text || 'Error');
+        break;
+      default:
+        statusEl.innerHTML = '<i class="bi bi-check-circle-fill" style="color: var(--k-success);"></i> ' +
+          (text || '');
     }
   }
 

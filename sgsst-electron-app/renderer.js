@@ -9,15 +9,27 @@ const MODULES_WITH_CALENDAR = [
 ];
 
 // Definir los botones de la barra lateral según la estructura de tu aplicación Python
+// Cada módulo incluye `subtitle` (línea descriptiva debajo del título) e `iconBg`
+// (color de fondo de la caja del icono, en formato hex) para el rediseño tipo card.
+// 📦642 (2026-08-03) — `SIDEBAR_ICONS` está definido en `shared/sidebar-icons.js`
+// (cargado en index.html ANTES de este script y ANTES de los *-home.js).
+// Mismo SVG se usa para: sidebar lateral, panel "Módulos del Sistema" del
+// dashboard, y el header "Módulo X" de cada *-home.js.
+
+// 📦642 (2026-08-03) — Iconos de módulos en SVG inline Lucide. Mismo
+// estilo outline/line que el header superior (un solo color, sin fondo).
+// El color del stroke hereda del `color` del wrapper (currentColor).
+// 📦709 (2026-08-15) — Agregado "Gestión Humana" (nuevo top-level, v0.1.191)
 const SIDEBAR_BUTTONS = [
-  { name: "Recursos", icon: "kpi.png" },
-  { name: "Gestión Integral", icon: "gestion.png" },
-  { name: "Gestión de la Salud", icon: "medico.png" },
-  { name: "Gestión de Peligros y Riesgos", icon: "identificar.png" },
-  { name: "Gestión de Amenazas", icon: "amenaza.png" },
-  { name: "Verificación", icon: "seguro-de-salud.png" },
-  { name: "Mejoramiento", icon: "ventas.png" },
-  { name: "Salir", icon: "superacion-personal.png" }
+  { name: "Recursos",                         icon: "users",          subtitle: "Capacitación, Roles",     },
+  { name: "Gestión Integral",                 icon: "file_text",      subtitle: "Política, Planes",        },
+  { name: "Gestión de la Salud",              icon: "heart_pulse",    subtitle: "Ausentismo, AT, EL",      },
+  { name: "Gestión de Peligros y Riesgos",    icon: "alert_triangle", subtitle: "IPERC, Controles",        },
+  { name: "Gestión de Amenazas",              icon: "siren",          subtitle: "Emergencias",             },
+  { name: "Verificación",                     icon: "shield_check",   subtitle: "Auditorías",              },
+  { name: "Mejoramiento",                     icon: "trending_up",    subtitle: "Acciones Correctivas",    },
+  { name: "Gestión Humana",                   icon: "user_plus",      subtitle: "Personal, Contratación",  },
+  { name: "Salir",                            icon: "log_out",        subtitle: "Cerrar sesión",           }
 ];
 
 // Submódulos para cada sección principal
@@ -95,10 +107,17 @@ const ALL_SUBMODULES = {
     "6.1.4 Planificación de la Auditoria",
   ],
   "Mejoramiento": [
+    /* F21.49 (2026-06-21) — Mejoramiento ahora SOLO tiene 7.1.1.
+       7.1.2 / 7.1.3 / 7.1.4 quedan integrados en el módulo único 7.1.1
+       (Matriz de Control Operacional GI-FO-014).
+       Por lo tanto la normativa legal ya no los activa como submódulos separados. */
     "7.1.1 Acciones Preventivas y Correctivas",
-    "7.1.2 Acciones de Mejora conforme a revisiones de la alta gerencia",
-    "7.1.3 Acciones de Mejora con base en investigaciones de AT y EL",
-    "7.1.4 Elaboración de Planes de Mejoramiento de medidas y acciones correctivas por autoridades y ARL",
+  ],
+  // 📦709 (2026-08-15) — Módulo Gestión Humana (nuevo top-level, v0.1.191).
+  // Backend completo (16 handlers), UI viene en Fases 5 y 6.
+  "Gestión Humana": [
+    "Base de Personal",
+    "Contratación",
   ]
 };
 
@@ -145,7 +164,7 @@ const SUBMODULE_PERMISSION_MAP_UI = new Map([
   ['2.13.1 elementos de proteccion personal', 'gestion-integral.plan-trabajo'],
   ['3.1.1 descripcion sociodemografica y diagnostico de condiciones de salud', 'salud.sociodemografica'],
   ['3.1.2 actividades de medicina y preventiva y promocion de la salud', 'salud.sociodemografica'],
-  ['3.1.3 perfil de cargo y profesiograma', 'salud.sociodemografica'],
+  ['3.1.3 perfil de cargo y profesiograma', 'salud.perfiles-cargo-profesiograma'],
   ['3.1.4 evaluaciones medicas', 'salud.evaluaciones-medicas'],
   ['3.1.5 custodia medica ocupacional', 'salud.sociodemografica'],
   ['3.1.6 restricciones y recomendaciones medicas', 'salud.restricciones-medicas'],
@@ -177,10 +196,11 @@ const SUBMODULE_PERMISSION_MAP_UI = new Map([
   ['6.1.2 auditoria anual', 'verificacion.general'],
   ['6.1.3 revision de la alta direccion', 'verificacion.general'],
   ['6.1.4 planificacion de la auditoria', 'verificacion.general'],
+  // 📦709 (2026-08-15) — Gestión Humana submodules
+  ['base de personal', 'gestion-humana.base-personal'],
+  ['contratacion', 'gestion-humana.contratacion'],
   ['7.1.1 acciones preventivas y correctivas', 'mejoramiento.general'],
-  ['7.1.2 acciones de mejora conforme a revisiones de la alta gerencia', 'mejoramiento.general'],
-  ['7.1.3 acciones de mejora con base en investigaciones de at y el', 'mejoramiento.general'],
-  ['7.1.4 elaboracion de planes de mejoramiento de medidas y acciones correctivas por autoridades y arl', 'mejoramiento.general']
+  /* F21.49 (2026-06-21) — 7.1.2 / 7.1.3 / 7.1.4 ya no son submódulos activos de Mejoramiento */
 ]);
 
 function getResourceForSubmodule(moduleName, submoduleName) {
@@ -230,6 +250,15 @@ function roleAllowsResource(roleName, resource) {
 }
 
 function isSubmoduleAllowed(roleName, moduleName, submoduleName) {
+  // Roles con acceso total nunca se restringen (evita auto-bloqueos).
+  const roleKey = normalizeRoleKey(roleName);
+  if (ROLE_UI_RULES[roleKey] && ROLE_UI_RULES[roleKey].allowAll) return true;
+  // Módulos explícitos del usuario (modal Gestión de Usuario).
+  // Sin marcas explícitas rige la matriz por rol (sin cambio de conducta).
+  if (userModuleOverrides && Object.keys(userModuleOverrides).length > 0 &&
+      Object.prototype.hasOwnProperty.call(userModuleOverrides, moduleName)) {
+    return !!userModuleOverrides[moduleName];
+  }
   const resource = getResourceForSubmodule(moduleName, submoduleName);
   if (!resource) return false;
   return roleAllowsResource(roleName, resource);
@@ -447,6 +476,23 @@ let currentSubmodule = null; // ✅ NUEVA VARIABLE
 // --- Auth & Sesión ---
 let authToken = null;
 let currentUser = null;
+// Módulos explícitos del user logueado (null = rige la matriz por rol).
+let userModuleOverrides = null;
+
+async function loadUserModuleOverrides() {
+  userModuleOverrides = null;
+  try {
+    if (typeof authToken === 'undefined' || !authToken) return;
+    if (!currentUser || !currentUser.id) return;
+    if (typeof window.electronAPI === 'undefined' || typeof window.electronAPI.usersGetModulos !== 'function') return;
+    const res = await window.electronAPI.usersGetModulos({ token: authToken, userId: currentUser.id });
+    if (res && res.success && res.data && res.data.tieneExplicitos) {
+      userModuleOverrides = res.data.modulos || {};
+    }
+  } catch (e) {
+    console.warn('[Permisos] No se pudieron cargar los módulos del usuario, rige la matriz por rol:', e.message);
+  }
+}
 let assignedCompanies = [];
 let companyRoleByKey = {};
 const AUTH_TOKEN_KEY = 'kair-auth-token';
@@ -455,6 +501,31 @@ let logBuffer = []; // Búfer para almacenar los logs
 let logTextareaCached = null; // Cache del textarea para evitar querySelector en cada log
 let currentCalendarInstance = null; // Para mantener una referencia a la instancia del calendario
 let currentActiveComponent = null; // Para mantener una referencia al componente activo y poder destruirlo adecuadamente
+
+// 📦507 — Cuando el usuario actualiza el programa anual de inspecciones
+// (cambia una P/C, agrega actividad, etc.) el bridge emite
+// 'inspeccion:programa:actualizado'. Si el calendario está visible lo
+// recargamos para que muestre los cambios sin tener que cerrarlo y abrirlo.
+if (window.electronAPI && window.electronAPI.inspeccionPrograma && typeof window.electronAPI.inspeccionPrograma.onProgramaActualizado === 'function') {
+  window.electronAPI.inspeccionPrograma.onProgramaActualizado(function (payload) {
+    if (currentCalendarInstance && typeof currentCalendarInstance.refresh === 'function') {
+      console.log('[INSP-CAL][PROGRAMA_ACTUALIZADO] Recargando calendario...', payload);
+      currentCalendarInstance.refresh();
+    }
+  });
+}
+
+// 📦509 — Mismo patrón para mantenimiento: cuando el usuario cambia una celda
+// MPP/MPE/MPC en el cronograma, el bridge emite 'mantenimiento:programa:actualizado'.
+// El calendario recarga si está visible. Log: [MANT-CAL][PROGRAMA_ACTUALIZADO].
+if (window.electronAPI && window.electronAPI.mantenimiento && typeof window.electronAPI.mantenimiento.onProgramaActualizado === 'function') {
+  window.electronAPI.mantenimiento.onProgramaActualizado(function (payload) {
+    if (currentCalendarInstance && typeof currentCalendarInstance.refresh === 'function') {
+      console.log('[MANT-CAL][PROGRAMA_ACTUALIZADO] Recargando calendario...', payload);
+      currentCalendarInstance.refresh();
+    }
+  });
+}
 
 // Variable para almacenar los submódulos filtrados por normativa
 let RESOURCES_SUBMODULES = ALL_SUBMODULES;
@@ -606,6 +677,8 @@ let companyNameElement;
 let companyLogoElement;
 let companyLogoPlaceholder;
 let companyHomeButton;
+let headerCompanyNameElement;
+let headerCompanyLabel;
 
 // Función para aplicar el tema globalmente
 async function applyGlobalTheme() {
@@ -710,8 +783,512 @@ document.addEventListener('DOMContentLoaded', async () => {
   companyLogoElement = document.getElementById('company-logo');
   companyLogoPlaceholder = document.getElementById('company-logo-placeholder');
   companyHomeButton = document.getElementById('company-home-button');
+  headerCompanyNameElement = document.getElementById('header-company-name');
+  headerCompanyLabel = document.getElementById('header-company-label');
 
   console.log('DOM elements found:', { contentArea, sidebarMenu, companyNameElement, companyLogoElement, companyLogoPlaceholder, companyHomeButton });
+
+  // 📦563/572 — Bandeja Integrada (Correo + Calendario) — entry point ÚNICO
+  // (reemplaza al calendar-button retirado en 📦572).
+  // Click en el botón → abre un iframe fullscreen con renderer/bandeja-integrada/index.html.
+  // Click en "Volver" del iframe → envía postMessage('bandeja-integrada-back') y el iframe se cierra.
+  const bandejaIntegradaButton = document.getElementById('bandeja-integrada-button');
+  let bandejaIntegradaFrame = null;
+
+  // F4/573 — Badge de alertas (KairAlerts) ahora apunta al #bandeja-integrada-badge
+  // (antes apuntaba al #kair-cal-badge del calendar-button retirado en 📦572).
+  // Se suscribe a onCountChange y actualiza el badge del botón de Bandeja Integrada.
+  function updateBandejaIntegradaBadge(count) {
+    var badge = document.getElementById('bandeja-integrada-badge');
+    if (!badge) return;
+    if (count <= 0) {
+      badge.hidden = true;
+      badge.textContent = '0';
+      badge.setAttribute('aria-label', 'Sin eventos pendientes');
+    } else if (count >= 100) {
+      badge.hidden = false;
+      badge.textContent = '99+';
+      badge.setAttribute('aria-label', 'Más de 99 eventos pendientes');
+    } else {
+      badge.hidden = false;
+      badge.textContent = String(count);
+      badge.setAttribute('aria-label', count + ' evento' + (count === 1 ? '' : 's') + ' pendiente' + (count === 1 ? '' : 's'));
+    }
+  }
+
+  // F4-fix — Handler del badge: al hacer click, abre el popover de "Pendientes"
+  // (mismo patrón que el calendario viejo). Usa stopPropagation para que el
+  // click NO se propague al botón padre (que abriría el iframe de Bandeja Integrada).
+  // P0-KAIRALERTS-UI (2026-09-07) — Popover grande (Bandeja pendientes) DESHABILITADO
+  // a pedido del user. Ahora solo se muestra el popover chico de kair-alerts.
+  // Para volver a activarlo, reemplazar el cuerpo de la función con el código
+  // original: showBandejaIntegradaPendientesPopover();
+  function onBandejaIntegradaBadgeClick(e) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    // P0-KAIRALERTS-UI: popover grande deshabilitado — solo se muestra el de kair-alerts.
+  }
+
+  // F4-fix — Popover de pendientes (idéntico patrón al de KairAlerts en el
+  // calendario viejo: lista de eventos vencidos o que vencen hoy, con
+  // categoría color, días vencidos, botón "Ver detalle" y "Abrir calendario
+  // completo" abajo).
+  // F4-fix: colorMap a nivel de módulo (accesible desde el handler de Ver detalle)
+  var BANDEJA_INTEGRADA_COLOR_MAP = {
+    plan: '#174ea6', capacitacion: '#28a745', auditoria: '#b8860b',
+    actualizacion: '#6c757d', formacion: '#185abd', critico: '#dc3545',
+    rapido: '#0d6efd', gestacion: '#d63384',
+    mantenimiento_programado: '#fd7e14', inspeccion: '#198754',
+    recordatorio_copasst: '#dc3545', recordatorio_convivencia: '#0891b2',
+    recordatorio_presupuesto: '#10b981', recordatorio_afiliacion: '#f59e0b',
+    recordatorio_inducciones: '#6366f1'
+  };
+
+  function showBandejaIntegradaPendientesPopover() {
+    // Cerrar si ya está abierto
+    var existing = document.getElementById('bandeja-integrada-pendientes-popover');
+    if (existing) { existing.remove(); return; }
+
+    // Obtener pendientes del API de KairAlerts
+    var pending = (window.KairAlerts && window.KairAlerts.getPendingEvents)
+      ? window.KairAlerts.getPendingEvents()
+      : [];
+
+    var pop = document.createElement('div');
+    pop.id = 'bandeja-integrada-pendientes-popover';
+    pop.className = 'kair-pendientes-popover';
+    pop.innerHTML = `
+      <div class="kair-pendientes-popover__header">
+        <span>Pendientes <span class="kair-pendientes-popover__count">${pending.length}</span></span>
+        <button class="kair-pendientes-popover__close" data-action="close" aria-label="Cerrar">×</button>
+      </div>
+      <div class="kair-pendientes-popover__list" id="bandeja-pendientes-list"></div>
+      <div class="kair-pendientes-popover__footer">
+        <button class="kair-pendientes-popover__btn" data-action="open">Abrir calendario completo</button>
+      </div>
+    `;
+    document.body.appendChild(pop);
+
+    // Posicionar cerca del botón de Bandeja Integrada
+    var btn = document.getElementById('bandeja-integrada-button');
+    if (btn) {
+      var rect = btn.getBoundingClientRect();
+      pop.style.position = 'fixed';
+      pop.style.top = (rect.bottom + 8) + 'px';
+      pop.style.right = (window.innerWidth - rect.right) + 'px';
+      pop.style.zIndex = '250000';
+    }
+
+    // Renderizar items
+    var list = pop.querySelector('#bandeja-pendientes-list');
+    if (pending.length === 0) {
+      list.innerHTML = '<div class="kair-pendientes-popover__empty">No hay eventos pendientes 🎉</div>';
+    } else {
+      pending.forEach(function (ev) {
+        var item = document.createElement('div');
+        item.className = 'kair-pendientes-popover__item';
+        // Categoría color
+        // F4-fix: usar BANDEJA_INTEGRADA_COLOR_MAP (declarado a nivel de módulo)
+        var color = BANDEJA_INTEGRADA_COLOR_MAP[ev.type || ev.category] || '#6c757d';
+        var catLabel = (ev.type || ev.category || '').toUpperCase();
+        var dateStr = ev.date || '';
+        // Calcular días vencidos
+        var diasVencidos = '';
+        if (dateStr) {
+          var d = new Date(dateStr + 'T00:00:00');
+          var hoy = new Date(); hoy.setHours(0,0,0,0);
+          var diff = Math.floor((hoy - d) / 86400000);
+          if (diff === 0) diasVencidos = 'Vence hoy';
+          else if (diff > 0) diasVencidos = 'Vencida · hace ' + diff + ' días';
+          else diasVencidos = 'En ' + (-diff) + ' días';
+        }
+        item.innerHTML = `
+          <div class="kair-pendientes-popover__item-header">
+            <span class="kair-pendientes-popover__cat" style="color:${color};">${catLabel}</span>
+            <span class="kair-pendientes-popover__dias">${diasVencidos}</span>
+          </div>
+          <div class="kair-pendientes-popover__title">${(ev.title || '(sin título)').replace(/</g, '&lt;')}</div>
+          <div class="kair-pendientes-popover__meta">${dateStr}</div>
+          <div class="kair-pendientes-popover__actions">
+            <button class="kair-pendientes-popover__btn kair-pendientes-popover__btn--primary" data-action="open-event" data-event-id="${ev.id || ''}">Ver detalle</button>
+          </div>
+        `;
+        list.appendChild(item);
+      });
+    }
+
+    // Handlers
+    pop.querySelector("[data-action='close']").addEventListener('click', function () { pop.remove(); });
+    pop.querySelector("[data-action='open']").addEventListener('click', function () { pop.remove(); showBandejaIntegrada(); });
+    pop.querySelectorAll("[data-action='open-event']").forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        // F4-fix: stopPropagation para que el click NO cierre el popover por el
+        // listener de "click fuera" antes de que el modal se abra
+        if (e) { e.preventDefault(); e.stopPropagation(); }
+        var eventId = btn.getAttribute('data-event-id');
+        // F4-fix: abrir modal de detalle con la info del evento seleccionado
+        var ev = pending.find(function (x) { return x.id === eventId; });
+        if (ev) {
+          pop.remove();
+          try {
+            // F4-fix: usar BANDEJA_INTEGRADA_COLOR_MAP (definido a nivel de módulo)
+            openBandejaIntegradaEventDetailModal(ev, BANDEJA_INTEGRADA_COLOR_MAP);
+          } catch (err) {
+            console.error('[BandejaIntegrada] Error abriendo modal de detalle:', err);
+            // Fallback: alert nativo para que al menos se vea algo
+            alert('Detalle del evento:\n\n' +
+              'Tipo: ' + (ev.type || ev.category || '—') + '\n' +
+              'Título: ' + (ev.title || '(sin título)') + '\n' +
+              'Fecha: ' + (ev.date || '—'));
+          }
+        } else {
+          console.warn('[BandejaIntegrada] No se encontró evento con id=' + eventId);
+          pop.remove();
+        }
+      });
+    });
+    // Cerrar al hacer click fuera
+    setTimeout(function () {
+      var onOutsideClick = function (ev) {
+        if (!pop.contains(ev.target) && ev.target.id !== 'bandeja-integrada-badge') {
+          pop.remove();
+          document.removeEventListener('click', onOutsideClick);
+        }
+      };
+      document.addEventListener('click', onOutsideClick);
+    }, 0);
+  }
+
+  // F4-fix — Modal de detalle de un evento desde el popover de pendientes
+  // (en el main app, NO en el iframe). Muestra la info del evento + acciones.
+  function openBandejaIntegradaEventDetailModal(ev, colorMap) {
+    console.log('[BandejaIntegrada] Abriendo modal de detalle:', {
+      id: ev && ev.id,
+      type: ev && (ev.type || ev.category),
+      title: ev && ev.title,
+      date: ev && ev.date,
+      hasColorMap: !!colorMap,
+      colorMapKeys: colorMap ? Object.keys(colorMap).length : 0
+    });
+    var existing = document.getElementById('bandeja-integrada-event-detail-modal');
+    if (existing) existing.remove();
+
+    var color = (colorMap && colorMap[ev.type || ev.category]) || '#6c757d';
+    var catLabel = (ev.type || ev.category || '').toUpperCase();
+    var dateStr = ev.date || '—';
+    var timeStr = (ev.start || '') + (ev.end ? ' - ' + ev.end : '');
+    var locationStr = ev.location || '';
+    var titleStr = ev.title || '(sin título)';
+
+    // Días vencidos
+    var diasVencidos = '';
+    if (ev.date) {
+      var d = new Date(ev.date + 'T00:00:00');
+      var hoy = new Date(); hoy.setHours(0,0,0,0);
+      var diff = Math.floor((hoy - d) / 86400000);
+      if (diff === 0) diasVencidos = 'Vence hoy';
+      else if (diff > 0) diasVencidos = 'Vencida · hace ' + diff + ' días';
+      else diasVencidos = 'En ' + (-diff) + ' días';
+    }
+
+    var modal = document.createElement('div');
+    modal.id = 'bandeja-integrada-event-detail-modal';
+    modal.className = 'kair-event-modal-overlay';
+    modal.innerHTML = `
+      <div class="kair-event-modal">
+        <div class="kair-event-modal__header" style="border-bottom: 1px solid #e5e7eb; background: #f8fafc;">
+          <span class="kair-pendientes-popover__cat" style="color:${color}; font-size: 0.75rem;">${catLabel}</span>
+          <button class="kair-event-modal__close" data-action="close" aria-label="Cerrar">×</button>
+        </div>
+        <div class="kair-event-modal__body">
+          <h2 class="kair-event-modal__title">${(titleStr).replace(/</g, '&lt;')}</h2>
+          <div class="kair-event-modal__meta">
+            <div class="kair-event-modal__meta-row">
+              <strong>Fecha:</strong> ${dateStr} ${timeStr ? '· ' + timeStr : ''}
+            </div>
+            ${diasVencidos ? '<div class="kair-event-modal__meta-row" style="color:#dc3545;"><strong>Estado:</strong> ' + diasVencidos + '</div>' : ''}
+            ${locationStr ? '<div class="kair-event-modal__meta-row"><strong>Ubicación:</strong> ' + locationStr.replace(/</g, '&lt;') + '</div>' : ''}
+            ${ev.attendees && ev.attendees.length ? '<div class="kair-event-modal__meta-row"><strong>Asistentes:</strong> ' + ev.attendees.length + '</div>' : ''}
+            ${ev.description || ev.notes ? '<div class="kair-event-modal__meta-row" style="flex-direction:column;align-items:stretch;"><strong>Notas:</strong><div class="kair-event-modal__description">' + (ev.description || ev.notes).replace(/</g, '&lt;') + '</div></div>' : ''}
+          </div>
+        </div>
+        <div class="kair-event-modal__actions">
+          <button class="kair-event-modal__btn kair-event-modal__btn--secondary" data-action="open-calendar">Ir al calendario</button>
+          <button class="kair-event-modal__btn kair-event-modal__btn--primary" data-action="mark-done">Marcar cumplido</button>
+          <button class="kair-event-modal__btn kair-event-modal__btn--secondary" data-action="close">Cerrar</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
+
+    var closeModal = function () { modal.remove(); };
+    modal.querySelector("[data-action='close']").addEventListener('click', closeModal);
+    modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+    modal.querySelector("[data-action='open-calendar']").addEventListener('click', function () {
+      closeModal();
+      showBandejaIntegrada();
+    });
+    modal.querySelector("[data-action='mark-done']").addEventListener('click', function () {
+      // Marcar como cumplido via electronAPI
+      if (window.electronAPI && window.electronAPI.eventosCumplidos && ev.id) {
+        // 📦694 — Fix: backend espera `eventoId` (camelCase), NO `evento_id` (snake_case).
+        // El bridge en `main/eventos-cumplidos-bridge.js` lee `params.eventoId` y rechaza
+        // si llega undefined. Por eso el botón "Marcar cumplido" del header fallaba.
+        window.electronAPI.eventosCumplidos.marcar({
+          eventoId: ev.id,
+          empresaId: (window.currentCompany && window.currentCompany !== 'default_company') ? window.currentCompany : null
+        }).then(function (r) {
+          if (r && r.success) {
+            toast && toast('Marcado como cumplido', titleStr, 'success');
+            closeModal();
+            // Refrescar KAirAlerts para que el badge se actualice
+            if (window.KairAlerts && window.KairAlerts.refresh) window.KairAlerts.refresh();
+          } else {
+            toast && toast('No se pudo marcar', (r && r.error) || 'Error', 'error');
+          }
+        });
+      } else {
+        toast && toast('Marcar cumplido', 'API no disponible', 'info');
+        closeModal();
+      }
+    });
+  }
+
+  // Wire-up del badge (separado del handler del botón)
+  var bandejaIntegradaBadge = document.getElementById('bandeja-integrada-badge');
+  if (bandejaIntegradaBadge) {
+    bandejaIntegradaBadge.addEventListener('click', onBandejaIntegradaBadgeClick);
+    // Estilo: cursor pointer para indicar que es clickable
+    bandejaIntegradaBadge.style.cursor = 'pointer';
+  }
+  if (typeof window.KairAlerts !== 'undefined' && window.KairAlerts.onCountChange) {
+    window.KairAlerts.onCountChange(updateBandejaIntegradaBadge);
+  } else {
+    // F4 — KairAlerts puede no estar listo aún. Reintentar cuando lo esté.
+    var _kairAlertsWait = setInterval(function() {
+      if (typeof window.KairAlerts !== 'undefined' && window.KairAlerts.onCountChange) {
+        window.KairAlerts.onCountChange(updateBandejaIntegradaBadge);
+        clearInterval(_kairAlertsWait);
+      }
+    }, 500);
+  }
+
+  // F4-fix — Toggle del botón Bandeja Integrada: si está abierto, lo cierra.
+  // Si está cerrado, lo abre. El botón está en el header de la app principal
+  // (visible siempre), así que el user puede usarlo como toggle.
+  function toggleBandejaIntegrada() {
+    if (bandejaIntegradaFrame && bandejaIntegradaFrame.style.display !== 'none') {
+      hideBandejaIntegrada();
+      return;
+    }
+    // 📦702 (2026-08-13) — Gate de permisos antes de abrir el iframe.
+    // Si el user no tiene acceso a la Bandeja Integrada, no se abre el iframe
+    // y se muestra un mensaje claro. Admin global siempre pasa (forzado en backend).
+    checkBandejaIntegradaAccess().then(function (allowed) {
+      if (allowed) {
+        showBandejaIntegrada();
+      }
+    });
+  }
+
+  // 📦702 (2026-08-13) — Chequea si el user logueado tiene acceso a Bandeja Integrada.
+  // Retorna true si puede abrir, false si está bloqueado.
+  // Fail-open defensivo: si la API no está disponible o falla, abre igual (no rompe UX).
+  async function checkBandejaIntegradaAccess() {
+    if (!window.electronAPI || !window.electronAPI.usersGetBandejaIntegradaFlag) {
+      // API no expuesta (versión vieja del preload) — fail-open
+      console.warn('[BandejaIntegrada] API de permisos no disponible, abriendo por defecto.');
+      return true;
+    }
+    try {
+      var resp = await window.electronAPI.usersGetBandejaIntegradaFlag({ token: authToken || '' });
+      if (resp && resp.success && resp.data && resp.data.enabled) {
+        return true;
+      }
+      // Sin acceso
+      logMessage('Bandeja Integrada bloqueada: user sin permiso', 'WARN');
+      alert('🔒 No tienes acceso a la Bandeja Integrada.\n\n' +
+            'Si crees que deberías tenerlo, contacta al administrador del sistema ' +
+            'para que habilite tu permiso desde Configuración > Gestión de Usuario.');
+      return false;
+    } catch (e) {
+      console.error('[BandejaIntegrada] Error chequeando permisos:', e);
+      // Fail-open: si falla la llamada, abrimos igual (la app no se rompe)
+      return true;
+    }
+  }
+
+  function showBandejaIntegrada() {
+    if (bandejaIntegradaFrame) {
+      bandejaIntegradaFrame.style.display = 'flex';
+      return;
+    }
+    bandejaIntegradaFrame = document.createElement('iframe');
+    bandejaIntegradaFrame.id = 'bandeja-integrada-frame';
+    bandejaIntegradaFrame.src = 'renderer/bandeja-integrada/index.html?v=683';
+    // F4-fix — Usar el alto REAL del header de la app principal (no un valor fijo)
+    // para que el iframe arranque justo donde termina el header, sin solaparlo.
+    var mainHeader = document.getElementById('app-header');
+    var headerHeight = mainHeader ? Math.max(mainHeader.getBoundingClientRect().height, 40) : 48;
+    bandejaIntegradaFrame.style.cssText = [
+      'position: fixed',
+      'top: ' + headerHeight + 'px',
+      'left: 0',
+      'width: 100vw',
+      'height: calc(100vh - ' + headerHeight + 'px)',
+      'border: 0',
+      // F1.5-fix2: el #app-header de la app principal tiene z-index 100000
+      // con isolation:isolate. El iframe necesita estar por encima de eso,
+      // y también por encima de .kair-cal-modal-overlay (200000) por si
+      // hay un modal del calendario viejo abierto. Usamos 200001.
+      'z-index: 200001',
+      'background: #fff',
+      'display: block'
+    ].join(';');
+    document.body.appendChild(bandejaIntegradaFrame);
+    logMessage('Bandeja Integrada abierta (iframe creado). Header height: ' + headerHeight + 'px', 'INFO');
+  }
+
+  function hideBandejaIntegrada() {
+    if (bandejaIntegradaFrame) {
+      // 📦 P1-5 fix — Llamar destroy() en el iframe ANTES de ocultarlo
+      // para limpiar listeners, intervals, timeouts y evitar memory leaks/double-fire
+      try {
+        if (bandejaIntegradaFrame.contentWindow && bandejaIntegradaFrame.contentWindow.BandejaIntegrada && typeof bandejaIntegradaFrame.contentWindow.BandejaIntegrada.destroy === 'function') {
+          bandejaIntegradaFrame.contentWindow.BandejaIntegrada.destroy();
+        }
+      } catch (e) {
+        logMessage('Error llamando destroy() en iframe: ' + e.message, 'WARN');
+      }
+      bandejaIntegradaFrame.style.display = 'none';
+      logMessage('Bandeja Integrada cerrada (iframe oculto).', 'INFO');
+    }
+  }
+
+  // Listener dedicado para mensajes del iframe de Bandeja Integrada.
+  // Usa su propio listener (separado del de Iframe Communication Logic de abajo)
+  // para que el "back" funcione aunque el iframe genérico tenga filtros.
+  window.addEventListener('message', (event) => {
+    if (!event.data || typeof event.data !== 'object') return;
+    if (event.data.type === 'bandeja-integrada-back') {
+      event.stopImmediatePropagation();
+      hideBandejaIntegrada();
+    }
+    // F4-fix — El iframe pide abrir Configuración (cuando el user hace click en
+    // el indicador Gmail del header, para ir al switch de conectar/desconectar).
+    else if (event.data.type === 'bandeja-integrada-open-config') {
+      event.stopImmediatePropagation();
+      hideBandejaIntegrada();
+      // Abrir Configuración. Si el section es "empresas", navegar a esa tab
+      if (event.data.section && typeof showSettingsPage === 'function') {
+        showSettingsPage(event.data.section);
+      } else if (typeof showSettingsPage === 'function') {
+        showSettingsPage();
+      }
+    }
+    // 📦 P1-5 fix — Confirmación visual de destroy ejecutado
+    else if (event.data.type === 'bandeja-integrada-destroyed') {
+      event.stopImmediatePropagation();
+      if (typeof updateNotifier !== 'undefined' && updateNotifier.show) {
+        updateNotifier.show({
+          type: 'info',
+          title: 'Bandeja Integrada',
+          subtitle: 'Destroy ejecutado - cleanup OK'
+        });
+      }
+    }
+  });
+
+  if (bandejaIntegradaButton) {
+    // F4-fix — Toggle: click abre o cierra (como cualquier app de bandeja).
+    // Antes solo abría — para cerrar había que hacer click en el botón de
+    // "Volver" dentro del iframe (que ahora está oculto porque el header
+    // interno del iframe está display:none).
+    bandejaIntegradaButton.addEventListener('click', toggleBandejaIntegrada);
+  } else {
+    console.warn('[BandejaIntegrada] Botón #bandeja-integrada-button no encontrado en el DOM.');
+  }
+
+  // 📦702 (2026-08-13) — Visibilidad del botón según permisos del user logueado.
+  // Si el user no tiene acceso a la Bandeja Integrada, ocultamos el botón
+  // (y el badge de alertas) del header — es más limpio UX que dejarlo
+  // visible y mostrar un alert al hacer click. Admin global siempre ve
+  // (el backend fuerza enabled=true para admin).
+  //
+  // Se llama:
+  // 1. Al cargar la app (antes del login) → oculta por fail-closed
+  // 2. Después del login exitoso → consulta backend y muestra/oculta
+  // 3. Después del logout → oculta de nuevo
+  //
+  // El gate en checkBandejaIntegradaAccess() queda como defensa en profundidad.
+  applyBandejaIntegradaVisibility(false); // al cargar: ocultar (fail-closed)
+
+  /**
+   * 📦702 (2026-08-13) — Aplica la visibilidad del botón y badge de la
+   * Bandeja Integrada según si el user logueado tiene acceso.
+   * - `allowed === true`   → muestra ambos
+   * - `allowed === false`  → oculta ambos
+   * - `allowed === undefined` → consulta el backend y decide
+   *
+   * Fail-CLOSED: si no hay token, o la API no está disponible, o la
+   * respuesta no es success → OCULTA el botón. Es más seguro: si no
+   * sabemos, no mostramos. (El admin siempre tendrá success=true con
+   * data.enabled=true por el backend, así que el admin no se ve afectado
+   * por bugs del bridge).
+   */
+  async function applyBandejaIntegradaVisibility(allowed) {
+    var btn = document.getElementById('bandeja-integrada-button');
+    var badge = document.getElementById('bandeja-integrada-badge');
+    if (!btn) return;
+
+    if (allowed === undefined) {
+      // Modo "chequear y aplicar": consulta el backend
+      // Sin token (no logueado) → ocultar
+      if (!authToken) {
+        btn.style.display = 'none';
+        if (badge) badge.style.display = 'none';
+        return;
+      }
+      if (!window.electronAPI || !window.electronAPI.usersGetBandejaIntegradaFlag) {
+        // API no disponible (versión vieja del preload) — fail-closed
+        btn.style.display = 'none';
+        if (badge) badge.style.display = 'none';
+        return;
+      }
+      try {
+        var resp = await window.electronAPI.usersGetBandejaIntegradaFlag({ token: authToken });
+        if (resp && resp.success && resp.data && resp.data.enabled) {
+          allowed = true;
+        } else {
+          // Respuesta no exitosa (auth, migración pendiente, enabled=false, etc.)
+          // → ocultar (fail-closed). El caso `enabled=false` para no-admin
+          // es el comportamiento esperado, no un error.
+          var reason = (resp && resp.data) ? 'enabled=false' : ((resp && resp.error && resp.error.code) || 'unknown');
+          console.log('[BandejaIntegrada] Sin acceso, ocultando botón. Razón:', reason);
+          allowed = false;
+        }
+      } catch (e) {
+        console.error('[BandejaIntegrada] Error chequeando visibilidad, fail-closed:', e);
+        allowed = false;
+      }
+    }
+
+    if (allowed) {
+      btn.style.display = '';
+      if (badge) badge.style.display = '';
+      console.log('[BandejaIntegrada] Botón visible (user con acceso)');
+    } else {
+      btn.style.display = 'none';
+      if (badge) badge.style.display = 'none';
+      console.log('[BandejaIntegrada] Botón oculto (user sin acceso)');
+    }
+  }
+
+  // Exponer la función para que pueda ser llamada desde el login y el logout
+  window.applyBandejaIntegradaVisibility = applyBandejaIntegradaVisibility;
 
   // --- BEGIN: Iframe Communication Logic ---
   window.addEventListener('message', async (event) => {
@@ -821,18 +1398,81 @@ document.addEventListener('DOMContentLoaded', async () => {
                   apiCallFunction = window.electronAPI.getFolderContents;
                   apiCallArgs = [payload]; // payload is the folderPath string
                   break;
+              // 📦608 — Preview unificado: si la extensión es Office (no PDF),
+              // renderizamos con @file-viewer en modal global y devolvemos un
+              // payload inocuo al módulo (PDF dummy 1x1) para que no rompa
+              // su flujo de mostrar el response en un iframe. El módulo
+              // efectivamente no muestra nada útil — el file-viewer ya está
+              // visible en el modal global. La integración limpia (que el
+              // módulo detecte `handled: 'file-viewer'` y no muestre nada)
+              // queda para una iteración futura que toque los 46 submódulos.
               case 'get-pdf-preview-request':
-                  apiCallFunction = window.electronAPI.getPDFPreview;
-                  apiCallArgs = [payload.filePath]; // Ensure payload is destructured
-                  break;
               case 'get-excel-preview-request':
-                  apiCallFunction = window.electronAPI.getExcelPreview;
-                  apiCallArgs = [payload.filePath]; // Ensure payload is destructured
+              case 'get-word-preview-request': {
+                  const _fvFilePath = (payload && payload.filePath) || '';
+                  // 📦608-fix17 — forceLegacy: bypass file-viewer y usar el flujo legacy
+                  // (getWordPreview/getExcelPreview con LibreOffice → PDF base64).
+                  // Usado por el fallback automático cuando el file-viewer falla.
+                  const _fvForceLegacy = !!(payload && payload.forceLegacy);
+                  const _fvExt = (_fvFilePath.split('.').pop() || '').toLowerCase();
+                  const _fvIsOffice = _fvExt && _fvExt !== 'pdf' &&
+                      ['pptx','ppt','pptm','potx','ppsx','odp',
+                       'xlsx','xls','xlsm','xlsb','csv','ods','fods','numbers',
+                       'docx','doc','docm','dotx','rtf','odt',
+                       'eml','msg','md','markdown','txt',
+                       'png','jpg','jpeg','gif','webp','svg','bmp','tif','tiff',
+                       // 📦608-fix — agregar formatos de código/datos que file-viewer soporta
+                       'json','xml','yaml','yml','css','html','htm',
+                       'js','ts','jsx','tsx','mjs','cjs','java','py','c','cpp','cc','h','hpp',
+                       'cs','go','rs','php','rb','swift','kt','sql','sh','bash','log',
+                       'diff','patch','toml','ini','http','ipynb',
+                       // comprimidos (preview con libarchive)
+                       'zip','7z','rar','tar','gz','tgz','bz2','xz','cab','iso','apk','cbz','cbr',
+                       // otros formatos de file-viewer que valen la pena
+                       'svgz','epub','xmind','drawio','dio','mermaid','mmd','plantuml','puml',
+                       'sqlite','parquet','ttf','otf','woff','woff2','gltf','glb'].indexOf(_fvExt) >= 0;
+
+                  if (_fvIsOffice && !_fvForceLegacy && window.kairFV && typeof window.kairFV.openWithFileViewerFromPath === 'function') {
+                      // 📦608-fix8 — Devolver los bytes del archivo al módulo para que
+                      // pueda renderizar el file-viewer directamente en su panel de
+                      // preview. El módulo detecta `mode: 'file-viewer'` y monta el
+                      // <flyfish-file-viewer> en su DOM. Si el módulo no lo soporta,
+                      // cae al flujo viejo (mostrar el PDF dummy) sin romper nada.
+                      apiCallFunction = async () => {
+                          try {
+                              const r = await window.electronAPI.readFileBytes(_fvFilePath);
+                              if (!r || !r.success) {
+                                  return { success: false, error: r && r.error || 'No se pudo leer el archivo' };
+                              }
+                              return {
+                                  success: true,
+                                  mode: 'file-viewer',
+                                  data: {
+                                      bytes: r.data.bytes,
+                                      name: r.data.name,
+                                      ext: r.data.ext,
+                                      size: r.data.size
+                                  }
+                              };
+                          } catch (e) {
+                              return { success: false, error: e.message || String(e) };
+                          }
+                      };
+                      apiCallArgs = [];
+                      break;
+                  }
+
+                  // Flujo original: PDF/Word/Excel según el type
+                  if (type === 'get-pdf-preview-request') {
+                      apiCallFunction = window.electronAPI.getPDFPreview;
+                  } else if (type === 'get-excel-preview-request') {
+                      apiCallFunction = window.electronAPI.getExcelPreview;
+                  } else if (type === 'get-word-preview-request') {
+                      apiCallFunction = window.electronAPI.getWordPreview;
+                  }
+                  apiCallArgs = [_fvFilePath];
                   break;
-              case 'get-word-preview-request':
-                  apiCallFunction = window.electronAPI.getWordPreview;
-                  apiCallArgs = [payload.filePath]; // Ensure payload is destructured
-                  break;
+              }
               case 'download-document-request':
                   apiCallFunction = window.electronAPI.downloadDocument;
                   apiCallArgs = [payload];
@@ -1093,6 +1733,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                   apiCallArgs = [payload];
                   responseType = 'investigacion-accidentes-generate-accident-report-request-response';
                   break;
+              case 'investigacion-accidentes-regenerate-analysis-request':
+                  // Manejar solicitud para regenerar análisis (completo o por nivel) con feedback del usuario
+                  apiCallFunction = window.electronAPI.regenerateAnalysis;
+                  // El payload trae { descripcion, contexto, feedback, level, currentAnalysis }
+                  apiCallArgs = [payload];
+                  responseType = 'investigacion-accidentes-regenerate-analysis-response';
+                  break;
               case 'investigacion-accidentes-get-stats-request':
                   // Manejar solicitud de estadísticas de investigaciones
                   apiCallFunction = window.electronAPI.getInvestigacionStats;
@@ -1114,6 +1761,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       apiCallFunction = window.electronAPI.getCrossReferenceData;
       apiCallArgs = [payload.companyName];
       responseType = 'investigacion-accidentes-cross-reference-data-response';
+      break;
+    case 'investigacion-accidentes-find-furat-by-name-request':
+      // Búsqueda del FURAT (PDF) en 3.2.1 por nombre — usada como fallback
+      // cuando el viewer no envía la ruta del FURAT al iframe.
+      apiCallFunction = window.electronAPI.findFuratByName;
+      apiCallArgs = [payload.companyName, payload.caseName];
+      responseType = 'investigacion-accidentes-find-furat-by-name-response';
       break;
 case 'investigacion-accidentes-read-directory-request':
                     apiCallFunction = window.electronAPI.readDirectory;
@@ -1139,6 +1793,13 @@ case 'investigacion-accidentes-read-directory-request':
       apiCallFunction = window.electronAPI.renameItem;
       apiCallArgs = [payload];
       responseType = 'investigacion-accidentes-rename-item-request-response';
+      break;
+    case 'investigacion-accidentes-show-item-in-folder-request':
+      // Abrir el explorador de Windows en la carpeta del archivo seleccionado
+      // (usado por los botones "Visualizar investigación" y "Ver en carpeta").
+      apiCallFunction = window.electronAPI.showItemInFolder;
+      apiCallArgs = [payload.filePath];
+      responseType = 'investigacion-accidentes-show-item-in-folder-request-response';
       break;
     case 'investigacion-accidentes-select-directory-request':
       apiCallFunction = window.electronAPI.selectDirectory;
@@ -1236,6 +1897,38 @@ case 'investigacion-accidentes-read-directory-request':
                       return; // No responder a mensajes de respuesta para evitar bucles
                   }
 
+                  // Mensajes manejados por componentes wrapper — no requieren
+                  // acción del renderer global. Se ignoran sin warning.
+                  if (
+                    type === 'investigacion-home-action' ||
+                    type === 'iniciar-investigacion-desde-viewer' ||
+                    type === 'open-file-viewer-modal' ||
+                    // 📦684 — FURAT: el componente reenvía via electron-api-call-request,
+                    // pero las versiones "-request" también se reciben aquí por seguridad.
+                    type === 'furat-get-dashboard-data-request' ||
+                    type === 'furat-get-analytics-request' ||
+                    type === 'furat-get-library-data-request' ||
+                    type === 'furat-list-metadata-request' ||
+                    type === 'furat-upload-file-request' ||
+                    type === 'furat-create-folder-request' ||
+                    // 📦705-fix5 (2026-08-14) — Roles y Responsabilidades 1.1.2: el
+                    // RolesResponsabilidadesComponent maneja su propio bridge via
+                    // postMessage. Estos mensajes NO deben procesarse aquí.
+                    type === 'kair-rr-bridge-call' ||
+                    type === 'kair-rr-bridge-result' ||
+                    type === 'kair-rr-iframe-ready' ||
+                    type === 'kair-rr-parent-ack' ||
+                    // 📦 P1-5 fix — Bandeja Integrada: mensajes de destroy y back
+                    type === 'bandeja-integrada-back' ||
+                    type === 'bandeja-integrada-destroyed'
+                  ) {
+                    // El componente InvestigacionAccidentesComponent maneja este mensaje
+                    // directamente. Ver: modules/gestion-salud/investigacion-accidentes/investigacion-accidentes-logic.js
+                    // open-file-viewer-modal: lo maneja ResponsableLogic (1.1.1) — ver responsable-sg-logic.js 📦608-fix13
+                    // FURAT: mensajes manejados via electron-api-call-request — ver reportes-accidentes-logic.js
+                    return;
+                  }
+
                   // Mensaje no reconocido — ignorar silenciosamente.
                   // Puede ser manejado por un componente wrapper (ej: ArchivoRetencionComponent, PoliticaComponent).
                   console.warn(`RENDERER: Unknown message type, ignorando: ${type}`);
@@ -1264,15 +1957,7 @@ case 'investigacion-accidentes-read-directory-request':
                   console.warn(`RENDERER: Target window cerrado para ${type}, omitiendo respuesta`);
                   return;
               }
-              
-              console.log('[DEBUG] Enviando respuesta a iframe:', {
-                  type: responseType,
-                  requestId: requestId,
-                  hasConfig: !!result.config,
-                  targetWindowExists: !!targetWindow,
-                  targetWindowClosed: targetWindow?.closed
-              });
-              
+
       targetWindow.postMessage({
         type: responseType,
         success: result.success,
@@ -1280,8 +1965,6 @@ case 'investigacion-accidentes-read-directory-request':
         error: result.error || null,
         requestId: requestId
       }, '*');
-              
-              console.log('[DEBUG] Respuesta enviada a iframe');
           } catch (error) {
               // Manejo de errores específico para IPC
               if (error.message && error.message.includes('Object has been destroyed')) {
@@ -1326,25 +2009,37 @@ case 'investigacion-accidentes-read-directory-request':
 
   // --- BEGIN: Collapsible Sidebar Logic ---
   const sidebar = document.getElementById('sidebar');
+  const sidebarHotspot = document.getElementById('sidebar-hotspot');
+
+  function expandSidebar() {
+    if (!sidebar) return;
+    sidebar.classList.remove('sidebar-collapsed');
+    if (sidebarHotspot) sidebarHotspot.classList.remove('active');
+    if (window.updateVantaEffect) setTimeout(window.updateVantaEffect, 100);
+  }
+
+  function collapseSidebar() {
+    if (!sidebar) return;
+    sidebar.classList.add('sidebar-collapsed');
+    if (sidebarHotspot) sidebarHotspot.classList.add('active');
+    if (window.updateVantaEffect) setTimeout(window.updateVantaEffect, 100);
+  }
+
   if (sidebar) {
     // Collapse sidebar by default
-    sidebar.classList.add('sidebar-collapsed');
+    collapseSidebar();
 
-    sidebar.addEventListener('mouseenter', () => {
-      sidebar.classList.remove('sidebar-collapsed');
-      // Actualizar la animación si existe
-      if (window.updateVantaEffect) {
-        setTimeout(window.updateVantaEffect, 100); // Pequeño retraso para que la animación se actualice después del cambio de estado
-      }
-    });
+    // Cuando el mouse entra al sidebar visible, expandir
+    sidebar.addEventListener('mouseenter', expandSidebar);
 
-    sidebar.addEventListener('mouseleave', () => {
-      sidebar.classList.add('sidebar-collapsed');
-      // Actualizar la animación si existe
-      if (window.updateVantaEffect) {
-        setTimeout(window.updateVantaEffect, 100); // Pequeño retraso para que la animación se actualice después del cambio de estado
-      }
-    });
+    // Cuando el mouse entra al hotspot (borde izquierdo cuando colapsado), expandir
+    if (sidebarHotspot) {
+      sidebarHotspot.addEventListener('mouseenter', expandSidebar);
+    }
+
+    // Cuando el mouse sale del sidebar, colapsar de nuevo
+    sidebar.addEventListener('mouseleave', collapseSidebar);
+
     console.log('Collapsible sidebar logic initialized.');
   }
   // --- END: Collapsible Sidebar Logic ---
@@ -1402,110 +2097,277 @@ if (appHeader) {
     console.log('[UPDATER] onUpdateAvailable disponible:', typeof window.electronAPI?.onUpdateAvailable);
     console.log('[UPDATER] updateNotifier disponible:', typeof window.updateNotifier);
     
-    // --- Header Update Button Elements ---
-    const headerUpdateBtn = document.getElementById('header-update-btn');
-    const headerUpdatePanel = document.getElementById('header-update-panel');
-    const headerUpdateText = document.getElementById('header-update-text');
-    const updateProgressFill = document.getElementById('update-progress-fill');
-    const updateProgressText = document.getElementById('update-progress-text');
-    const updateInstallBtn = document.getElementById('update-install-btn');
-
-    let headerUpdatePanelVisible = false;
+    // --- Footer Update Button Elements ---
+    // 📦581 (Loop 4b) — Movido del HEADER al FOOTER. La versión ya está en
+    // el footer (en #app-version), así que evitamos duplicación. El botón-dot
+    // aparece AL LADO de la versión SOLO cuando hay update. Estilo opencode.
+    // El panel viejo (header-update-panel, update-progress-*, etc.) ya no se usa.
+    const footerUpdateBtn = document.getElementById('footer-update-btn');
     let currentAppVersion = null;
 
-    // Toggle update panel when clicking the update button
-    // El botón solo es visible cuando hay update, así que el click siempre toggle del panel
-    if (headerUpdateBtn) {
-      headerUpdateBtn.addEventListener('click', () => {
-        headerUpdatePanelVisible = !headerUpdatePanelVisible;
-        if (headerUpdatePanel) {
-          headerUpdatePanel.style.display = headerUpdatePanelVisible ? 'flex' : 'none';
+    // 📦581 (Loop 5) — Estado completo del updater para alimentar el modal
+    // "Información de actualizaciones". El footer dot muestra el estado
+    // resumido (dot azul = available, dot verde = ready, oculto = al día),
+    // pero el modal necesita más detalle: última versión conocida,
+    // última vez que se chequeó, etc.
+    const updateState = {
+      state: 'uptodate',          // 'uptodate' | 'checking' | 'available' | 'ready'
+      currentVersion: null,       // versión instalada
+      latestVersion: null,        // última versión encontrada (si hay update)
+      lastCheckTime: null,        // timestamp del último check
+      isChecking: false           // true mientras hay un check manual en curso
+    };
+
+    // Toggle update dropdown when clicking the footer dot
+    // 📦581 (Loop 4b) — El botón del footer SOLO aparece cuando detecta update:
+    //  - Si está al día: OCULTO (sin ruido visual en uso normal)
+    //  - Si está buscando: OCULTO (transición interna)
+    //  - Si hay update disponible: VISIBLE (dot azul + pulse)
+    //  - Si está descargado: VISIBLE (dot verde + halo)
+    if (footerUpdateBtn) {
+      footerUpdateBtn.addEventListener('click', () => {
+        // El dropdown está en el body, position:fixed, con z-index alto.
+        // Se ancla al dot del footer (abre HACIA ARRIBA del dot).
+        const dropdown = document.getElementById('kair-update-dropdown');
+        if (!dropdown) return;
+
+        const isOpen = !dropdown.hidden;
+        if (isOpen) {
+          closeUpdateDropdown();
+        } else {
+          openUpdateDropdown();
         }
       });
     }
 
-    // Install button triggers restart
-    if (updateInstallBtn) {
-      updateInstallBtn.addEventListener('click', () => {
-        logMessage('Usuario solicitó reiniciar para instalar actualización', 'INFO');
-        window.electronAPI.restartApp && window.electronAPI.restartApp();
+    // 📦581 (Loop 2) — Handlers de los botones del dropdown
+    // "Reiniciar ahora" llama al IPC del backend para reiniciar e instalar.
+    // "Más tarde" cierra el dropdown (el banner sigue visible para recordatorio).
+    // Usamos delegación de eventos en el dropdown para que funcione aunque
+    // el botón no exista al cargar la página (defensa en profundidad).
+    const kairUpdateDropdown = document.getElementById('kair-update-dropdown');
+    if (kairUpdateDropdown) {
+      kairUpdateDropdown.addEventListener('click', (e) => {
+        const target = e.target.closest('[data-kair-update-action]');
+        if (!target) return;
+        const action = target.getAttribute('data-kair-update-action');
+        logMessage(`[UPDATER] Dropdown action: ${action}`, 'INFO');
+
+        if (action === 'restart') {
+          // Reiniciar ahora: el backend cierra la app e instala el update.
+          if (window.electronAPI && typeof window.electronAPI.restartApp === 'function') {
+            closeUpdateDropdown();
+            window.electronAPI.restartApp();
+          } else {
+            logMessage('[UPDATER] No se pudo reiniciar: electronAPI.restartApp no disponible', 'ERROR');
+          }
+        } else if (action === 'dismiss') {
+          // Más tarde: solo cerramos el dropdown. El banner sigue visible
+          // (es un recordatorio). En Loop futuro podríamos persistir el
+          // "dismiss" en localStorage para no mostrar el banner en próximas
+          // sesiones, pero por ahora es un cierre simple.
+          closeUpdateDropdown();
+        } else if (action === 'details') {
+          // 📦581 (Loop 5) — Abrir modal "Información de actualizaciones".
+          // El modal muestra el estado completo (versión, última check, etc).
+          closeUpdateDropdown();
+          openUpdateModal();
+        }
       });
     }
 
-    // Helper: Update header status (unifica los 4 estados visuales del botón)
+    // 📦581 (Loop 4b) — Funciones helper para abrir/cerrar el dropdown.
+    // El dropdown se ancla al dot del FOOTER (no del header) y abre HACIA ARRIBA
+    // (porque el footer está en la parte inferior de la pantalla).
+    function openUpdateDropdown() {
+      const dropdown = document.getElementById('kair-update-dropdown');
+      const btn = document.getElementById('footer-update-btn');
+      const footer = document.getElementById('app-footer');
+      if (!dropdown || !btn) return;
+
+      // 1) Hacer visible ANTES de medir (offsetHeight es 0 si está hidden)
+      dropdown.hidden = false;
+      dropdown.setAttribute('aria-hidden', 'false');
+      btn.setAttribute('aria-expanded', 'true');
+
+      // 2) Medir el alto real del dropdown YA visible
+      const rect = btn.getBoundingClientRect();
+      const footerRect = footer ? footer.getBoundingClientRect() : null;
+      const dropdownHeight = dropdown.offsetHeight;
+      const dropdownWidth = 340; // min-width: 320 + padding/border
+      const GAP = 16; // gap entre el dropdown y el top del footer
+
+      // 📦581 (Loop 4b fix) — Usar el TOP DEL FOOTER como referencia inferior
+      // y LIMITAR EL ALTO del dropdown al espacio disponible. Si el contenido
+      // es más grande que el espacio, hace scroll interno (overflow: auto en body).
+      const footerTop = footerRect ? footerRect.top : rect.top;
+      const availableHeight = Math.max(120, footerTop - GAP - 8); // mínimo 120px
+      dropdown.style.maxHeight = availableHeight + 'px';
+      // Re-medir con el max-height aplicado
+      const realHeight = Math.min(dropdownHeight, availableHeight);
+      const proposedTop = footerTop - realHeight - GAP;
+      const top = proposedTop > 8 ? proposedTop : 8;
+      // right: distancia desde la derecha de la ventana al borde derecho del dot
+      const right = window.innerWidth - rect.right;
+      dropdown.style.top = top + 'px';
+      dropdown.style.right = right + 'px';
+
+      // Flechita apuntando al centro del dot (si el dropdown está arriba del dot,
+      // la flecha apunta hacia ABAJO; si está abajo, hacia ARRIBA)
+      const btnCenterX = rect.left + rect.width / 2;
+      const dropdownLeftX = window.innerWidth - right - dropdownWidth;
+      const arrowPosX = btnCenterX - dropdownLeftX - 6; // -6 porque la flecha es de 12px
+      dropdown.style.setProperty('--arrow-pos-x', Math.max(8, Math.min(arrowPosX, dropdownWidth - 20)) + 'px');
+      // 📦581 (Loop 4b) — Flag CSS para que la flecha sepa si apuntar arriba o abajo
+      const direction = proposedTop > 8 ? 'up' : 'down';
+      dropdown.setAttribute('data-dropdown-direction', direction);
+    }
+
+    function closeUpdateDropdown() {
+      const dropdown = document.getElementById('kair-update-dropdown');
+      const btn = document.getElementById('footer-update-btn');
+      if (dropdown) {
+        // 📦581 (Loop 4b fix) — Blur del focus antes de poner aria-hidden=true.
+        // Si un botón del dropdown tiene focus cuando lo cerramos, el navegador
+        // bloquea aria-hidden con un warning de a11y. Quitamos el focus primero.
+        if (dropdown.contains(document.activeElement)) {
+          document.activeElement.blur();
+        }
+        dropdown.hidden = true;
+        dropdown.setAttribute('aria-hidden', 'true');
+        // Limpiar estilos inline (para que la próxima apertura calcule desde 0)
+        dropdown.style.maxHeight = '';
+        dropdown.style.top = '';
+        dropdown.style.right = '';
+      }
+      if (btn) {
+        btn.setAttribute('aria-expanded', 'false');
+      }
+    }
+
+    // Cerrar dropdown al hacer click fuera o presionar Escape
+    document.addEventListener('click', (e) => {
+      const dropdown = document.getElementById('kair-update-dropdown');
+      const btn = document.getElementById('footer-update-btn');
+      if (!dropdown || dropdown.hidden) return;
+      if (dropdown.contains(e.target)) return; // click dentro del dropdown
+      if (btn && btn.contains(e.target)) return; // click en el dot
+      closeUpdateDropdown();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const dropdown = document.getElementById('kair-update-dropdown');
+        if (dropdown && !dropdown.hidden) {
+          closeUpdateDropdown();
+        }
+      }
+    });
+
+    // Cerrar dropdown al hacer scroll (UX: no quedar con dropdown abierto si scrolleás)
+    window.addEventListener('scroll', () => {
+      const dropdown = document.getElementById('kair-update-dropdown');
+      if (dropdown && !dropdown.hidden) {
+        closeUpdateDropdown();
+      }
+    }, { passive: true });
+
+    // Helper: Update footer status (unifica los 4 estados visuales del dot)
     // Estados: 'uptodate' | 'checking' | 'available' | 'ready'
-    // Comportamiento: el botón SOLO se muestra cuando hay update real (available/ready).
-    // Cuando está al día o buscando, queda oculto — sin indicador permanente.
+    // 📦581 (Loop 4b) — El dot del footer SOLO es visible cuando hay update
+    // ('available' | 'ready'). En 'uptodate' y 'checking' el botón se oculta
+    // (atributo hidden) para no agregar ruido visual. Cuando aparece, el dot
+    // interior cambia de color: azul pulsante=disponible, verde con halo=descargado.
     function updateHeaderStatus(state, options = {}) {
-      if (!headerUpdateBtn || !headerUpdateText) return;
+      if (!footerUpdateBtn) return;
+
+      // 📦581 (Loop 5) — Sincronizar updateState para que el modal "Información
+      // de actualizaciones" tenga la misma fuente de verdad que el footer dot.
+      updateState.state = state;
+      if (options.version !== undefined) {
+        if (state === 'uptodate') {
+          updateState.currentVersion = options.version;
+        } else if (state === 'available' || state === 'ready') {
+          updateState.latestVersion = options.version;
+        }
+      }
+
+      // 📦581 (Loop 8) — Disclaimer "Se instalará al cerrar" al lado del dot
+      // Solo visible cuando hay update (available o ready)
+      const disclaimer = document.getElementById('footer-update-disclaimer');
+      const showDisclaimer = (state === 'available' || state === 'ready');
+      if (disclaimer) {
+        disclaimer.hidden = !showDisclaimer;
+        if (showDisclaimer) {
+          disclaimer.textContent = state === 'ready'
+            ? 'Lista para reiniciar'
+            : 'Se instalará al cerrar la app';
+        }
+      }
 
       // Limpiar todas las clases de estado
-      headerUpdateBtn.classList.remove(
-        'header-update-uptodate',
-        'header-update-checking',
-        'header-update-available',
-        'header-update-ready'
+      // 📦581 (Loop 4b) — Footer usa 'footer-update-ok/available/ready'.
+      // También limpiamos las legacy 'header-update-*' por si quedaron en el DOM.
+      footerUpdateBtn.classList.remove(
+        'footer-update-ok',
+        'footer-update-uptodate',
+        'footer-update-checking',
+        'footer-update-available',
+        'footer-update-ready'
       );
 
       switch (state) {
         case 'uptodate':
-          // OCULTO: no hay update, no se muestra nada en el header
-          headerUpdateBtn.style.display = 'none';
-          if (headerUpdatePanel) {
-            headerUpdatePanel.style.display = 'none';
-            headerUpdatePanelVisible = false;
+          // 📦581 (Loop 4b) — OCULTO (atributo hidden). El footer muestra
+          // solo la versión "v0.1.130" sin dot, sin ruido. Cuando hay update
+          // el case 'available'/'ready' lo hace visible con dot de color.
+          footerUpdateBtn.hidden = true;
+          footerUpdateBtn.classList.add('footer-update-ok');
+          if (currentAppVersion === null && options.version) {
+            currentAppVersion = options.version;
           }
+          footerUpdateBtn.title = options.version
+            ? `Versión ${options.version} — Click para más información`
+            : 'Click para más información';
           break;
 
         case 'checking':
-          // OCULTO durante la búsqueda (solo se ve el botón si hay update real)
-          headerUpdateBtn.style.display = 'none';
+          // 📦581 (Loop 4b) — Igual: oculto mientras busca
+          footerUpdateBtn.hidden = true;
+          footerUpdateBtn.classList.add('footer-update-checking');
           break;
 
         case 'available':
-          // VISIBLE: hay update, botón amarillo pulsante con versión
-          headerUpdateBtn.style.display = 'flex';
-          headerUpdateBtn.classList.add('header-update-available');
-          headerUpdateText.textContent = options.version ? `v${options.version}` : 'Update';
-          headerUpdateBtn.title = options.version
-            ? `Actualización v${options.version} disponible - Descargando...`
-            : 'Actualización disponible';
-          // Auto-abrir panel de descarga
-          if (headerUpdatePanel) {
-            headerUpdatePanel.style.display = 'flex';
-            headerUpdatePanelVisible = true;
-          }
-          if (updateProgressFill) updateProgressFill.style.width = '0%';
-          if (updateProgressText) updateProgressText.textContent = 'Descargando...';
-          if (updateInstallBtn) updateInstallBtn.style.display = 'none';
+          // 📦581 (Loop 4b) — VISIBLE: hay update, dot AZUL con pulse
+          footerUpdateBtn.hidden = false;
+          footerUpdateBtn.classList.add('footer-update-available');
+          footerUpdateBtn.title = options.version
+            ? `Nueva versión v${options.version} disponible — Click para ver opciones`
+            : 'Actualización disponible — Click para ver opciones';
+          // Si el dropdown estaba abierto, cerrarlo (estado cambió)
+          if (typeof closeUpdateDropdown === 'function') closeUpdateDropdown();
           break;
 
         case 'ready':
-          // VISIBLE: update listo, botón verde con botón "Actualizar"
-          headerUpdateBtn.style.display = 'flex';
-          headerUpdateBtn.classList.add('header-update-ready');
-          headerUpdateText.textContent = options.version ? `v${options.version}` : 'Listo';
-          headerUpdateBtn.title = options.version
-            ? `Actualización v${options.version} lista para instalar`
-            : 'Actualización lista';
-          if (updateProgressFill) updateProgressFill.style.width = '100%';
-          if (updateProgressText) updateProgressText.textContent = 'Descarga completa';
-          if (updateInstallBtn) updateInstallBtn.style.display = 'block';
+          // 📦581 (Loop 4b) — VISIBLE: update descargado, dot VERDE con halo
+          footerUpdateBtn.hidden = false;
+          footerUpdateBtn.classList.add('footer-update-ready');
+          footerUpdateBtn.title = options.version
+            ? `Actualización v${options.version} descargada — Click para reiniciar`
+            : 'Actualización lista para instalar';
+          // Si el dropdown estaba abierto, cerrarlo (estado cambió)
+          if (typeof closeUpdateDropdown === 'function') closeUpdateDropdown();
           break;
       }
     }
 
-    // Helper: Update progress in header (usado durante descarga)
-    function updateHeaderProgress(percent, speed) {
-      if (updateProgressFill) {
-        updateProgressFill.style.width = `${percent}%`;
-      }
-      if (updateProgressText) {
-        updateProgressText.textContent = `${percent}%${speed ? ' - ' + speed : ''}`;
-      }
-    }
+    // 📦581 (Loop 2) — updateHeaderProgress() ELIMINADO. Era del panel viejo
+    // (header-update-panel) que ya no se usa. El progreso de descarga ahora
+    // se muestra SOLO en el toast (window.updateNotifier.updateProgress).
 
-    // Wrappers de compatibilidad (para no romper otros call sites)
+    // Wrappers de compatibilidad (mantener nombres para no romper call sites
+    // legacy; la función interna ahora se llama updateHeaderStatus pero opera
+    // sobre el dot del footer)
     function showHeaderUpdateAvailable(version) { updateHeaderStatus('available', { version }); }
     function showHeaderUpdateReady(version) { updateHeaderStatus('ready', { version }); }
     function hideHeaderUpdatePanel() { updateHeaderStatus('uptodate'); }
@@ -1515,15 +2377,28 @@ if (appHeader) {
     window.electronAPI?.onUpdateChecking && window.electronAPI.onUpdateChecking(() => {
       console.log('[UPDATER] Evento recibido: update_checking');
       logMessage('Buscando actualizaciones...', 'INFO');
+      // 📦581 (Loop 5) — Trackear lastCheckTime y marcar isChecking para el modal
+      updateState.lastCheckTime = Date.now();
+      updateState.isChecking = true;
       updateHeaderStatus('checking');
     });
 
-    // Cuando hay una actualización disponible (comienza la descarga)
+    // Cuando hay una actualización disponible
+    // 📦546 — A+B+C: ahora main.js tiene autoDownload=true, así que la descarga
+    // arranca automáticamente. El toast notifica al usuario del progreso y
+    // el botón amarillo del header sigue ahí como atajo para abrir el panel.
+    // (El botón "Descargar" del panel queda como fallback por si falla la auto-descarga.)
     window.electronAPI?.onUpdateAvailable && window.electronAPI.onUpdateAvailable((info) => {
       console.log('[UPDATER] Evento recibido: update_available', info);
       logMessage(`Actualización disponible: ${info ? info.version : 'nueva versión'}`, 'INFO');
       if (info && info.version) {
+        // 📦581 (Loop 5) — Reset isChecking (el check terminó y encontró algo)
+        updateState.isChecking = false;
         updateHeaderStatus('available', { version: info.version });
+        // B) Toast moderno con barra de progreso — autoClose 0 (no se cierra solo)
+        if (window.updateNotifier && typeof window.updateNotifier.notifyAvailable === 'function') {
+          window.updateNotifier.notifyAvailable(info.version);
+        }
       }
     });
 
@@ -1531,16 +2406,31 @@ if (appHeader) {
     window.electronAPI?.onUpdateNotAvailable && window.electronAPI.onUpdateNotAvailable((info) => {
       console.log('[UPDATER] Evento recibido: update_not_available', info);
       logMessage('No hay actualizaciones disponibles', 'INFO');
-      // Volver al estado "al día" (oculta el botón)
+      // 📦581 (Loop 5) — Reset isChecking + limpiar latestVersion (búsqueda confirmó
+      // que no hay update disponible, así que la "última conocida" no aplica)
+      updateState.isChecking = false;
+      updateState.lastCheckTime = Date.now();
+      if (updateState.latestVersion && info && info.version && compareVersions(updateState.latestVersion, info.version) <= 0) {
+        updateState.latestVersion = null;
+      }
+      // Volver al estado "al día" (botón permanente con punto verde)
       updateHeaderStatus('uptodate', { version: info?.version || currentAppVersion });
+      // Si el toast de "descargando" quedó abierto por error, cerrarlo
+      if (window.updateNotifier && window.updateNotifier.currentToast) {
+        window.updateNotifier.remove(window.updateNotifier.currentToast);
+      }
     });
 
     // Progreso de descarga
     window.electronAPI?.onUpdateProgress && window.electronAPI.onUpdateProgress((data) => {
       console.log('[UPDATER] Evento recibido: update_progress', data);
-      // Update header progress (la barra dentro del panel)
+      // 📦581 (Loop 2) — updateHeaderProgress() ya no se usa (era del panel viejo).
+      // Solo actualizamos el toast de progreso (info útil para el user).
       if (data && data.percent !== undefined) {
-        updateHeaderProgress(data.percent, data.speed);
+        if (window.updateNotifier && typeof window.updateNotifier.updateProgress === 'function') {
+          var speedLabel = data.speed ? data.speed + ' MB/s' : 'Calculando...';
+          window.updateNotifier.updateProgress(data.percent, speedLabel);
+        }
       }
     });
 
@@ -1549,16 +2439,36 @@ if (appHeader) {
       console.log('[UPDATER] Evento recibido: update_downloaded', info);
       logMessage('Actualización descargada y lista para instalar', 'INFO');
       const version = info ? info.version : 'más reciente';
-      // Update header UI → estado "ready" (botón verde con botón Actualizar en panel)
+      // 📦581 (Loop 5) — Reset isChecking
+      updateState.isChecking = false;
+      // Update header UI → estado "ready" (botón permanente con badge "Listo")
       updateHeaderStatus('ready', { version });
+      // B) Toast de éxito con botón "Reiniciar e Instalar Ahora" — autoClose 0
+      // C) Al cerrar la app, autoInstallOnAppQuit=true instala la versión pendiente
+      //    aunque el usuario no abra el toast; este botón es para los que quieren
+      //    reiniciar YA sin esperar.
+      if (window.updateNotifier && typeof window.updateNotifier.notifyDownloaded === 'function') {
+        window.updateNotifier.notifyDownloaded(version, function() {
+          logMessage('Usuario solicitó reiniciar para instalar actualización (vía toast)', 'INFO');
+          window.electronAPI.restartApp && window.electronAPI.restartApp();
+        });
+      }
     });
 
     // Error en la actualización
     window.electronAPI?.onUpdateError && window.electronAPI.onUpdateError((data) => {
       console.log('[UPDATER] Evento recibido: update_error', data);
       logMessage(`Error de actualización: ${data ? data.message : 'error desconocido'}`, 'ERROR');
-      // Volver a estado oculto
+      // 📦581 (Loop 5) — Reset isChecking
+      updateState.isChecking = false;
+      updateState.lastCheckTime = Date.now();
+      // Volver al estado "al día" (botón permanente con punto verde)
       updateHeaderStatus('uptodate', { version: currentAppVersion });
+      // B) Toast de error con detalle
+      if (window.updateNotifier && typeof window.updateNotifier.notifyError === 'function') {
+        var errorMsg = data && data.message ? data.message : 'Error desconocido en la actualización';
+        window.updateNotifier.notifyError(errorMsg);
+      }
     });
 
     // Inicializar header con la versión actual (estado "al día" hasta que llegue el primer check)
@@ -1567,6 +2477,7 @@ if (appHeader) {
       window.electronAPI.getAppVersion()
         .then(version => {
           currentAppVersion = version;
+          updateState.currentVersion = version;
           updateHeaderStatus('uptodate', { version });
         })
         .catch(err => {
@@ -1576,6 +2487,242 @@ if (appHeader) {
     } else {
       updateHeaderStatus('uptodate', {});
     }
+
+    // ============================================================
+    // 📦581 (Loop 5) — Modal "Información de actualizaciones"
+    // Trigger: botón "Ver información de versión" en el dropdown del header.
+    // Render: estado completo (versión, última check, canal) + botón de check manual.
+    // UX: Claude-style, low blue tone, border-radius 12px, sin invadir.
+    // ============================================================
+
+    // Helper: comparar versiones semánticas (x.y.z). Devuelve -1, 0 o 1.
+    // Usado para detectar si la "última versión conocida" sigue siendo
+    // realmente la más reciente (o si ya hay una más nueva disponible).
+    function compareVersions(a, b) {
+      if (!a || !b) return 0;
+      const pa = a.split('.').map(n => parseInt(n, 10) || 0);
+      const pb = b.split('.').map(n => parseInt(n, 10) || 0);
+      const len = Math.max(pa.length, pb.length);
+      for (let i = 0; i < len; i++) {
+        const da = pa[i] || 0;
+        const db = pb[i] || 0;
+        if (da < db) return -1;
+        if (da > db) return 1;
+      }
+      return 0;
+    }
+
+    // Format: timestamp → "hace 3 minutos" / "hace 2 horas" / "hace 3 días"
+    function formatRelativeTime(ts) {
+      if (!ts) return 'Nunca';
+      const diff = Date.now() - ts;
+      if (diff < 30 * 1000) return 'Hace instantes';
+      if (diff < 60 * 1000) return 'Hace menos de 1 minuto';
+      if (diff < 60 * 60 * 1000) {
+        const m = Math.floor(diff / (60 * 1000));
+        return `Hace ${m} ${m === 1 ? 'minuto' : 'minutos'}`;
+      }
+      if (diff < 24 * 60 * 60 * 1000) {
+        const h = Math.floor(diff / (60 * 60 * 1000));
+        return `Hace ${h} ${h === 1 ? 'hora' : 'horas'}`;
+      }
+      const d = Math.floor(diff / (24 * 60 * 60 * 1000));
+      return `Hace ${d} ${d === 1 ? 'día' : 'días'}`;
+    }
+
+    // Open modal: muestra el overlay + renderiza el estado actual
+    function openUpdateModal() {
+      const overlay = document.getElementById('kair-update-modal-overlay');
+      if (!overlay) {
+        console.warn('[UPDATER] Modal de información no encontrado en el DOM');
+        return;
+      }
+      renderUpdateModal();
+      overlay.hidden = false;
+      // Focus en el botón de cerrar (a11y)
+      const closeBtn = overlay.querySelector('.kair-update-modal__close');
+      if (closeBtn) setTimeout(() => closeBtn.focus(), 50);
+    }
+
+    // Close modal: oculta el overlay
+    function closeUpdateModal() {
+      const overlay = document.getElementById('kair-update-modal-overlay');
+      if (overlay) overlay.hidden = true;
+    }
+
+    // Render: pinta el estado completo del modal según updateState
+    function renderUpdateModal() {
+      const overlay = document.getElementById('kair-update-modal-overlay');
+      if (!overlay) return;
+
+      const $ = (sel) => overlay.querySelector(sel);
+
+      // --- Badge de estado (pill con dot) ---
+      const stateBadge = $('[data-kair-modal-state]');
+      const stateText = $('[data-kair-modal-state-text]');
+      const stateDesc = $('[data-kair-modal-state-desc]');
+
+      // Textos por estado
+      const stateConfig = {
+        uptodate:   { text: 'Al día',                   desc: 'Estás usando la última versión disponible.' },
+        checking:   { text: 'Buscando actualizaciones…', desc: 'Consultando el servidor de releases de K+AIR.' },
+        available:  { text: 'Actualización disponible',  desc: 'Hay una nueva versión lista para descargar e instalar.' },
+        ready:      { text: 'Listo para reiniciar',      desc: 'La actualización se descargó. Se aplicará al cerrar la app o reiniciando ahora.' }
+      };
+      const cfg = stateConfig[updateState.state] || stateConfig.uptodate;
+      if (stateBadge) stateBadge.setAttribute('data-kair-modal-state', updateState.state);
+      if (stateText) stateText.textContent = cfg.text;
+      if (stateDesc) stateDesc.textContent = cfg.desc;
+
+      // --- Info grid ---
+      const currentVersionEl = $('[data-kair-modal-current-version]');
+      const latestVersionEl = $('[data-kair-modal-latest-version]');
+      const lastCheckEl = $('[data-kair-modal-last-check]');
+
+      if (currentVersionEl) {
+        currentVersionEl.textContent = updateState.currentVersion
+          ? `v${updateState.currentVersion}`
+          : '—';
+      }
+      if (latestVersionEl) {
+        if (updateState.latestVersion && compareVersions(updateState.latestVersion, updateState.currentVersion) > 0) {
+          latestVersionEl.textContent = `v${updateState.latestVersion} (nueva)`;
+        } else {
+          latestVersionEl.textContent = 'Sin actualizaciones';
+        }
+      }
+      if (lastCheckEl) {
+        lastCheckEl.textContent = formatRelativeTime(updateState.lastCheckTime);
+      }
+
+      // --- Botón "Buscar actualizaciones" (label cambia si está en checking) ---
+      const checkLabel = $('[data-kair-modal-check-label]');
+      const checkBtn = $('[data-kair-update-action="modal-check"]');
+      if (checkLabel) {
+        checkLabel.textContent = updateState.isChecking
+          ? 'Buscando…'
+          : 'Buscar actualizaciones ahora';
+      }
+      if (checkBtn) {
+        checkBtn.disabled = !!updateState.isChecking;
+      }
+
+      // 📦581 (Loop 9) — Release notes (solo si hay update)
+      const notesWrap = $('[data-kair-modal-notes-wrap]') || document.getElementById('kair-modal-release-notes-wrap');
+      if (notesWrap) {
+        const showNotes = (updateState.state === 'available' || updateState.state === 'ready');
+        notesWrap.hidden = !showNotes;
+        if (showNotes) {
+          loadReleaseNotes();
+        }
+      }
+    }
+
+    // 📦581 (Loop 9) — Fetch + render de las release notes de GitHub.
+    // Cachea el resultado en `cachedReleaseNotes` para no fetchar en cada apertura.
+    let cachedReleaseNotes = null;
+    function loadReleaseNotes() {
+      const notesEl = document.getElementById('kair-modal-release-notes');
+      if (!notesEl) return;
+      // Si ya tenemos datos en cache, renderizar inmediatamente
+      if (cachedReleaseNotes) {
+        renderReleaseNotes(cachedReleaseNotes);
+        return;
+      }
+      // Fetch
+      if (!window.electronAPI || typeof window.electronAPI.getReleaseNotes !== 'function') {
+        notesEl.innerHTML = '<div class="kair-update-modal__notes-error">No se pudo obtener las notas (API no disponible).</div>';
+        return;
+      }
+      window.electronAPI.getReleaseNotes()
+        .then(result => {
+          if (result && result.success && result.data) {
+            cachedReleaseNotes = result.data;
+            renderReleaseNotes(result.data);
+          } else {
+            notesEl.innerHTML = '<div class="kair-update-modal__notes-error">No se pudieron cargar las notas de la versión.</div>';
+          }
+        })
+        .catch(err => {
+          notesEl.innerHTML = '<div class="kair-update-modal__notes-error">Error: ' + (err && err.message || 'desconocido') + '</div>';
+        });
+    }
+
+    function renderReleaseNotes(release) {
+      const notesEl = document.getElementById('kair-modal-release-notes');
+      if (!notesEl) return;
+      // Mostrar el body (markdown sin procesar) con el tag/name como título
+      const title = release.name || release.tagName || 'Notas de la versión';
+      const body = release.body || '(Sin notas de la versión)';
+      notesEl.textContent = title + '\n\n' + body;
+    }
+
+    // Trigger: dispara un check manual (vía IPC). El backend responde con
+    // update_checking → update_available / update_not_available / update_error.
+    // El listener de onUpdateChecking ya actualiza updateState.isChecking.
+    function triggerUpdateCheck() {
+      logMessage('[UPDATER] Check manual disparado desde modal de información', 'INFO');
+      if (!window.electronAPI || typeof window.electronAPI.checkForUpdatesManual !== 'function') {
+        logMessage('[UPDATER] checkForUpdatesManual no disponible en electronAPI', 'ERROR');
+        return;
+      }
+      // Marcar isChecking YA (puede que el backend tarde unos ms en emitir
+      // el evento update_checking). Si el backend nunca responde, el user
+      // queda con "Buscando…" hasta el próximo evento.
+      updateState.isChecking = true;
+      renderUpdateModal(); // reflejar el estado "buscando" en el botón
+      window.electronAPI.checkForUpdatesManual()
+        .then(result => {
+          logMessage('[UPDATER] Check manual completado: ' + JSON.stringify(result || {}), 'INFO');
+          // El estado final lo emiten los listeners (onUpdateAvailable / NotAvailable / Error).
+          // Por las dudas, si el backend ya respondió SIN emitir un evento final,
+          // reseteamos isChecking acá para que el botón no quede en "Buscando…".
+          setTimeout(() => {
+            if (updateState.isChecking) {
+              updateState.isChecking = false;
+              renderUpdateModal();
+            }
+          }, 300);
+        })
+        .catch(err => {
+          logMessage('[UPDATER] Error en check manual: ' + (err && err.message), 'ERROR');
+          updateState.isChecking = false;
+          renderUpdateModal();
+        });
+    }
+
+    // --- Event delegation en el modal ---
+    const kairUpdateModalOverlay = document.getElementById('kair-update-modal-overlay');
+    if (kairUpdateModalOverlay) {
+      kairUpdateModalOverlay.addEventListener('click', (e) => {
+        const target = e.target.closest('[data-kair-update-action]');
+        if (!target) {
+          // Click en el overlay (no en el modal ni en un botón) → cerrar
+          if (e.target === kairUpdateModalOverlay) {
+            closeUpdateModal();
+          }
+          return;
+        }
+        const action = target.getAttribute('data-kair-update-action');
+        logMessage(`[UPDATER] Modal action: ${action}`, 'INFO');
+
+        if (action === 'modal-close') {
+          closeUpdateModal();
+        } else if (action === 'modal-check') {
+          triggerUpdateCheck();
+        }
+      });
+    }
+
+    // --- Escape cierra el modal (si está abierto) ---
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const overlay = document.getElementById('kair-update-modal-overlay');
+        if (overlay && !overlay.hidden) {
+          closeUpdateModal();
+        }
+      }
+    });
 
   } else {
     console.error('API de logging no disponible en window.electronAPI');
@@ -1612,17 +2759,22 @@ if (appHeader) {
     console.error('LLM button NOT found in DOM.');
   }
 
-  // Botón de calendario
-  const calendarButton = document.getElementById('calendar-button');
-  if (calendarButton) {
-    console.log('Found calendar button, attaching event listener.');
-    calendarButton.addEventListener('click', function(event) {
-      console.log('Calendar button clicked.');
-      event.preventDefault(); // Prevenir comportamiento por defecto
-      toggleCalendarModal(); // Esta función mostrará/ocultará el calendario
-    });
+  // 📦572 — Botón de calendario (K+AIR Calendar Component v1 — popover centralizado) RETIRADO.
+  // El calendario viejo ya no se abre desde el header de la app principal. La Bandeja Integrada
+  // tiene su propio calendario interno (mini-cal en sidebar + calendario grande en slide) que
+  // usa los mismos IPC handlers y datos. Si en el futuro se quiere re-activar, el código
+  // está disponible en el tag backup-pre-calendar-removal-2026-07-21.
+  // (NOOP: el bloque fue removido intencionalmente)
+
+  // 📦573 — Alertas calendario — Inicializar el sistema de badge + popover de
+  // pendientes. KairAlerts se suscribe al badge del botón de Bandeja Integrada
+  // (#bandeja-integrada-badge) con stopPropagation, para que el badge no abra
+  // el iframe al hacer click (solo el resto del botón abre la Bandeja Integrada).
+  if (typeof window.KairAlerts === 'object' && typeof window.KairAlerts.init === 'function') {
+    window.KairAlerts.init();
+    console.log('[K+AIR] KairAlerts inicializado.');
   } else {
-    console.error('Calendar button NOT found in DOM.');
+    console.warn('[K+AIR] KairAlerts no disponible — el badge de alertas no funcionará.');
   }
 
   // Botón de home de empresa
@@ -1640,176 +2792,6 @@ if (appHeader) {
 
   initializeAuthFlow();
 });
-
-// Variable para controlar el estado del modal del calendario
-let isCalendarModalVisible = false;
-let calendarModalElement = null;
-
-// Función para mostrar/ocultar el modal del calendario
-function toggleCalendarModal() {
-  if (isCalendarModalVisible) {
-    hideCalendarModal();
-  } else {
-    showCalendarModal();
-  }
-}
-
-// Función para mostrar el modal del calendario
-function showCalendarModal() {
-  // Eliminar el modal anterior si existe
-  if (calendarModalElement && document.body.contains(calendarModalElement)) {
-    document.body.removeChild(calendarModalElement);
-  }
-
-  // Obtener la posición del botón de calendario
-  const calendarButton = document.getElementById('calendar-button');
-  if (!calendarButton) {
-    console.error('Botón de calendario no encontrado');
-    return;
-  }
-
-  const rect = calendarButton.getBoundingClientRect();
-
-  // Crear el contenedor principal del modal
-  calendarModalElement = document.createElement('div');
-  calendarModalElement.id = 'calendar-modal';
-  calendarModalElement.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.1);
-    display: flex;
-    z-index: 9999;
-    pointer-events: auto;
-  `;
-
-  // Crear el contenedor del calendario
-  const calendarContainer = document.createElement('div');
-  calendarContainer.id = 'calendar-container';
-  // Calcular la posición para que el calendario no se salga de la pantalla
-  let calendarLeftPosition = rect.left + rect.width + 5; // Posición normal a la derecha del botón
-  const calendarWidth = 300; // Ancho del calendario
-  const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
-
-  // Si el calendario se saldría de la pantalla a la derecha, posicionarlo a la izquierda del botón
-  if (calendarLeftPosition + calendarWidth > viewportWidth) {
-    calendarLeftPosition = Math.max(0, rect.left - calendarWidth - 5); // Posicionar a la izquierda con margen
-  }
-
-  calendarContainer.style.cssText = `
-    background-color: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(10px);
-    border-radius: 8px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-    padding: 15px;
-    width: 300px;
-    height: 300px;
-    position: fixed;
-    top: ${rect.bottom + 5}px;
-    left: ${calendarLeftPosition}px; /* Posición calculada para evitar desbordamiento */
-    opacity: 0;
-    transform: scale(0.8);
-    transition: all 0.2s ease-out;
-    z-index: 10000;
-    border: 1px solid rgba(255, 255, 255, 0.3); /* Borde blanco semi-transparente */
-  `;
-
-  // Botón de cierre
-  const closeButton = document.createElement('button');
-  closeButton.innerHTML = '&times;';
-  closeButton.style.cssText = `
-    position: absolute;
-    top: 5px;
-    right: 8px;
-    background: none;
-    border: none;
-    font-size: 18px;
-    cursor: pointer;
-    color: #666;
-    padding: 0;
-    width: 20px;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 10001;
-    font-weight: bold;
-  `;
-  closeButton.addEventListener('click', hideCalendarModal);
-  calendarContainer.appendChild(closeButton);
-
-  // Contenido del calendario
-  const calendarContent = document.createElement('div');
-  calendarContent.id = 'calendar-content';
-  calendarContent.style.cssText = `
-    margin-top: 5px;
-    height: calc(100% - 10px);
-  `;
-  calendarContainer.appendChild(calendarContent);
-
-  // Agregar el contenedor del calendario al modal
-  calendarModalElement.appendChild(calendarContainer);
-
-  // Agregar el modal al body
-  document.body.appendChild(calendarModalElement);
-
-  // Inicializar el calendario en el contenedor
-  try {
-    if (window.VanillaCalendarPro) {
-      const { Calendar } = window.VanillaCalendarPro;
-      const calendar = new Calendar('#calendar-content', {
-        settings: {
-          selection: {
-            day: 'single',
-          },
-          visibility: {
-            theme: 'light',
-          }
-        }
-      });
-      calendar.init();
-    } else {
-      calendarContent.innerHTML = '<p style="color: #666; font-size: 14px; text-align: center; margin-top: 20px;">Error: Calendario no disponible.</p>';
-    }
-  } catch (error) {
-    console.error('Error al inicializar el calendario:', error);
-    calendarContent.innerHTML = '<p style="color: #666; font-size: 14px; text-align: center; margin-top: 20px;">Error al cargar el calendario.</p>';
-  }
-
-  // Activar la visibilidad con animación
-  setTimeout(() => {
-    calendarContainer.style.opacity = '1';
-    calendarContainer.style.transform = 'scale(1)';
-  }, 10);
-
-  isCalendarModalVisible = true;
-}
-
-// Función para ocultar el modal del calendario
-function hideCalendarModal() {
-  if (calendarModalElement && document.body.contains(calendarModalElement)) {
-    const calendarContainer = calendarModalElement.querySelector('#calendar-container');
-
-    // Aplicar animación de salida
-    if (calendarContainer) {
-      calendarContainer.style.transform = 'translateY(-10px) scale(0.95)';
-      calendarContainer.style.opacity = '0';
-      calendarModalElement.style.backgroundColor = 'rgba(0, 0, 0, 0)';
-
-      // Eliminar el modal después de la animación
-      setTimeout(() => {
-        if (document.body.contains(calendarModalElement)) {
-          document.body.removeChild(calendarModalElement);
-        }
-      }, 300);
-    } else {
-      document.body.removeChild(calendarModalElement);
-    }
-  }
-  isCalendarModalVisible = false;
-}
 
 // Variable para mantener el botón activo del sidebar
 let activeSidebarButton = null;
@@ -2237,6 +3219,16 @@ currentSubmodule = null;
 
 setAuthUIState(false);
 
+  // ✅ FIX bug "Bienvenido pegado": resetear KairLoadingController
+  // KairLoadingController.complete() tiene un guard `if (this.isComplete) return;`
+  // que evita que el evento `kair-loading-complete` se dispare la segunda vez.
+  // Sin este reset, después del primer login el controller queda en isComplete=true
+  // y el segundo login (auto-login con credenciales recordadas) no puede cerrar
+  // el overlay "¡Bienvenido!" → se queda pegado en la pantalla.
+  if (window.kairLoading && typeof window.kairLoading.reset === 'function') {
+    window.kairLoading.reset();
+  }
+
 const mainContainer = document.querySelector('.main-container');
 if (mainContainer) mainContainer.classList.add('vanta-fullscreen');
 
@@ -2337,6 +3329,29 @@ contentArea.innerHTML = '';
         waveSpeed: 1.20,
         zoom: 0.68
       });
+      // 2026-06-27: forzar un resize inmediato para que Vanta ocupe todo el viewport.
+      // 2026-07-01 v2: los 2 setTimeout no alcanzaban — Vanta seguia con franja
+      // blanca en el lado derecho cuando el contenedor terminaba de expandirse
+      // despues de la animacion del splash. Reforzar con multiples intentos
+      // escalonados + listener permanente de resize + ResizeObserver.
+      const triggerResize = function () {
+        if (window.vantaEffect && typeof window.vantaEffect.resize === 'function') {
+          window.vantaEffect.resize();
+        }
+      };
+      // Multiples intentos escalonados (cubre fuentes web async, fonts, transitions).
+      setTimeout(triggerResize, 50);
+      setTimeout(triggerResize, 300);
+      setTimeout(triggerResize, 1000);
+      setTimeout(triggerResize, 2500);
+      // Listener permanente: cualquier resize del window reajusta Vanta.
+      window.addEventListener('resize', triggerResize);
+      // ResizeObserver: detecta cambios del contenedor (CSS animations, flex).
+      if (typeof ResizeObserver !== 'undefined') {
+        const ro = new ResizeObserver(triggerResize);
+        const vantaEl = document.getElementById('vanta-login-container');
+        if (vantaEl) ro.observe(vantaEl);
+      }
       console.log('Vanta.js aplicado al login correctamente');
     }, 100);
   }
@@ -2406,8 +3421,17 @@ contentArea.innerHTML = '';
       // Login exitoso - ejecutar transición
       authToken = result.data.token;
       currentUser = result.data.user;
+      // Módulos explícitos del usuario (si no tiene, rige la matriz por rol).
+      await loadUserModuleOverrides();
       assignedCompanies = (result.data.companies || []).map(c => c.company_key || c.company_name || c.company_key);
       companyRoleByKey = {};
+      // 📦702 (2026-08-13) — Ahora que tenemos el token, re-evaluar la
+      // visibilidad del botón de Bandeja Integrada según el permiso del
+      // user logueado. Sin esto, el botón queda en el estado del init
+      // (oculto) y el admin no lo ve.
+      if (typeof window.applyBandejaIntegradaVisibility === 'function') {
+        window.applyBandejaIntegradaVisibility();
+      }
       (result.data.companies || []).forEach(c => {
         const key = c.company_key || c.company_name || c.display_name;
         if (key) companyRoleByKey[key] = c.role;
@@ -2473,6 +3497,7 @@ async function loadAssignedCompaniesFromSession(token) {
 async function initializeAuthFlow() {
   authToken = null;
   currentUser = null;
+  userModuleOverrides = null;
   assignedCompanies = [];
   companyRoleByKey = {};
   localStorage.removeItem(AUTH_TOKEN_KEY);
@@ -2503,62 +3528,129 @@ function initializeApp(overrideCompanies = null) {
 
 function createSidebarButtons(activeModules = null) {
   console.log('Creating sidebar buttons...', activeModules ? `Filtrando por: ${activeModules.length} módulos activos` : 'Mostrando todos');
-  
+
   // ✅ LIMPIAR REFERENCIA AL BOTÓN ACTIVO ANTERIOR (el DOM va a ser eliminado)
   if (window.activeSidebarButton) {
     console.log('⚠️ [SIDEBAR] Limpiando referencia a botón activo anterior antes de reconstruir');
     window.activeSidebarButton = null;
   }
-  
+
   // Limpiar el menú existente
   sidebarMenu.innerHTML = '';
-  // console.log('Cleared sidebar menu'); // Reducir ruido en logs
 
-  SIDEBAR_BUTTONS.forEach((item, index) => {
+  // Header de sección "MÓDULOS DEL SISTEMA" (solo cuando hay módulos, no en home)
+  const headerLi = document.createElement('li');
+  headerLi.className = 'sidebar-modules-header-li';
+  headerLi.innerHTML = '<div class="sidebar-modules-header">Módulos del Sistema</div>';
+  sidebarMenu.appendChild(headerLi);
+
+  // Separar "Salir" del resto — se renderiza como footer al final
+  const modules = SIDEBAR_BUTTONS.filter(b => b.name !== 'Salir');
+  const salir = SIDEBAR_BUTTONS.find(b => b.name === 'Salir');
+
+  modules.forEach((item) => {
     // FILTRADO DINÁMICO:
     // Si activeModules está definido (no es null), filtramos.
     // El botón "Salir" SIEMPRE se muestra.
-    // Para los demás, verificamos si su nombre está en la lista de activos.
-    if (activeModules && item.name !== "Salir" && !activeModules.includes(item.name)) {
+    if (activeModules && !activeModules.includes(item.name)) {
       return; // No crear este botón
     }
 
     const li = document.createElement('li');
-    li.className = 'sidebar-menu-item';
+    li.className = 'sidebar-module-card-li';
 
-    const button = document.createElement('button');
-    /* "Gestión de Peligros y Riesgos" tiene la clase extra para permitir texto centrado
-       (es el único módulo cuyo nombre es demasiado largo para el layout lineal). */
-    button.className = 'sidebar-menu-button' + (item.name === 'Gestión de Peligros y Riesgos' ? ' sidebar-long-label' : '');
-    button.textContent = item.name;
+    const card = document.createElement('button');
+    card.className = 'sidebar-module-card';
+    card.setAttribute('type', 'button');
+    card.setAttribute('data-module', item.name);
+    card.setAttribute('aria-label', item.name);
 
-    button.addEventListener('click', () => {
-      if (item.name === "Salir") {
-        handleLogout();
-      } else if (currentCompany) {
-        // ✅ NUEVA VALIDACIÓN: No cambiar módulo si estamos en un submódulo
+    // 📦642 — Sin caja de fondo, sin color por módulo. El SVG hereda el color
+    // del texto del sidebar (currentColor). Igual que los iconos del header
+    // (todos en un solo color, sin fondo).
+    const iconWrap = document.createElement('span');
+    iconWrap.className = 'sidebar-module-icon';
+    iconWrap.innerHTML = SIDEBAR_ICONS[item.icon] || '';
+
+    // Bloque de texto (título + subtítulo)
+    const textWrap = document.createElement('span');
+    textWrap.className = 'sidebar-module-text';
+
+    const titleEl = document.createElement('span');
+    titleEl.className = 'sidebar-module-title';
+    titleEl.textContent = item.name;
+
+    const subtitleEl = document.createElement('span');
+    subtitleEl.className = 'sidebar-module-subtitle';
+    subtitleEl.textContent = item.subtitle || '';
+
+    textWrap.appendChild(titleEl);
+    textWrap.appendChild(subtitleEl);
+
+    card.appendChild(iconWrap);
+    card.appendChild(textWrap);
+
+    card.addEventListener('click', () => {
+      if (currentCompany) {
+        // ✅ Validación: No cambiar módulo si estamos en un submódulo
         if (currentSubmodule && currentModule !== item.name) {
           console.log(`ℹ️ Ignorando click en "${item.name}" porque estamos en submódulo: "${currentSubmodule}"`);
           return;
         }
-
-        setActiveSidebarButton(button);
+        setActiveSidebarButton(card);
         showModuleContent(item.name);
       } else {
-        showCustomAlert("Por favor, selecciona una empresa antes de ingresar a un módulo.");
+        showCustomAlert('Por favor, selecciona una empresa antes de ingresar a un módulo.');
       }
     });
 
-    // Crear elemento de imagen para el icono
-    const iconImg = document.createElement('img');
-    iconImg.src = `assets/${item.icon}`;
-    iconImg.alt = item.name;
-    iconImg.className = 'sidebar-icon';
-    button.prepend(iconImg);
-
-    li.appendChild(button);
+    li.appendChild(card);
     sidebarMenu.appendChild(li);
   });
+
+  // Footer: "Salir" como card separada al final, con clase para estilo distinto
+  if (salir) {
+    const footerLi = document.createElement('li');
+    footerLi.className = 'sidebar-footer-li';
+
+    const card = document.createElement('button');
+    card.className = 'sidebar-module-card sidebar-module-card--footer';
+    card.setAttribute('type', 'button');
+    card.setAttribute('data-module', salir.name);
+    card.setAttribute('aria-label', salir.name);
+
+    // 📦642-fix — Usar SVG inline (mismo patrón que los módulos de arriba)
+    // en vez del viejo `<img src="assets/${salir.icon}">` que fallaba con
+    // ERR_FILE_NOT_FOUND porque "log_out" es el NOMBRE del icono SVG, no
+    // un archivo. La rama de arriba usa SIDEBAR_ICONS[item.icon] correctamente.
+    const iconWrap = document.createElement('span');
+    iconWrap.className = 'sidebar-module-icon';
+    iconWrap.innerHTML = SIDEBAR_ICONS[salir.icon] || '';
+
+    const textWrap = document.createElement('span');
+    textWrap.className = 'sidebar-module-text';
+
+    const titleEl = document.createElement('span');
+    titleEl.className = 'sidebar-module-title';
+    titleEl.textContent = salir.name;
+
+    const subtitleEl = document.createElement('span');
+    subtitleEl.className = 'sidebar-module-subtitle';
+    subtitleEl.textContent = salir.subtitle || '';
+
+    textWrap.appendChild(titleEl);
+    textWrap.appendChild(subtitleEl);
+
+    card.appendChild(iconWrap);
+    card.appendChild(textWrap);
+
+    card.addEventListener('click', () => {
+      handleLogout();
+    });
+
+    footerLi.appendChild(card);
+    sidebarMenu.appendChild(footerLi);
+  }
 
   console.log('Sidebar buttons created.');
 }
@@ -2742,6 +3834,13 @@ async function selectCompany(companyName, buttonElement) {
 console.log(`Selecting company: ${companyName}`);
 currentCompany = companyName;
 
+// 📦 Alertas calendario — refrescar badge al cambiar de empresa (los pendientes
+// son por empresa). El módulo puede no estar cargado aún (caso de login inicial);
+// el init() se hace en el bloque DOMContentLoaded y ya hace su propio refresh.
+if (window.KairAlerts && typeof window.KairAlerts.refresh === 'function') {
+  window.KairAlerts.refresh();
+}
+
 const mainContainerSel = document.querySelector('.main-container');
 if (mainContainerSel) mainContainerSel.classList.remove('vanta-fullscreen');
 
@@ -2749,7 +3848,10 @@ if (mainContainerSel) mainContainerSel.classList.remove('vanta-fullscreen');
   const sidebar = document.getElementById('sidebar');
   if (sidebar) {
     sidebar.classList.remove('sidebar-hidden');
-    sidebar.classList.add('sidebar-collapsed'); // Asegurar que permanezca colapsado
+    // 2026-06-27: asegurar que permanezca colapsado + activar hotspot
+    sidebar.classList.add('sidebar-collapsed');
+    const hotspot = document.getElementById('sidebar-hotspot');
+    if (hotspot) hotspot.classList.add('active');
   }
 
   // Cargar la normativa si aún no se ha hecho
@@ -2795,19 +3897,9 @@ if (mainContainerSel) mainContainerSel.classList.remove('vanta-fullscreen');
     createSidebarButtons(null);
   }
 
-  // Actualizar UI: nombre de la empresa y logo en la barra lateral
-  companyNameElement.textContent = ''; // Clear the text
-  companyNameElement.style.display = 'none'; // Hide the element
-
-  const logoPath = COMPANY_LOGOS[companyName];
-  if (logoPath) {
-    companyLogoElement.src = logoPath;
-    companyLogoElement.style.display = 'block';
-    companyLogoPlaceholder.style.display = 'none';
-  } else {
-    // Si no hay logo específico para la empresa, usar un placeholder genérico o dejarlo como está
-    companyLogoElement.style.display = 'none';
-    companyLogoPlaceholder.style.display = 'flex';
+  // Actualizar UI: nombre de la empresa en el botón Home del header
+  if (headerCompanyNameElement) {
+    headerCompanyNameElement.textContent = companyName;
   }
 
   // Actualizar estado visual de los botones de empresa
@@ -2822,6 +3914,11 @@ if (mainContainerSel) mainContainerSel.classList.remove('vanta-fullscreen');
 
   // Establecer la empresa también en el contexto global
   window.currentCompany = companyName;
+
+  // 📦 Alertas calendario — refrescar al cambiar de empresa.
+  if (window.KairAlerts && typeof window.KairAlerts.refresh === 'function') {
+    window.KairAlerts.refresh();
+  }
 
   // Destruir la animación de Vanta antes de cambiar de página
   if (window.vantaEffect && typeof window.vantaEffect.destroy === 'function') {
@@ -2839,13 +3936,20 @@ if (mainContainerSel) mainContainerSel.classList.remove('vanta-fullscreen');
 }
 
 /**
+ * Muestra/oculta el bloque de empresa activa en el header (label con nombre + botón Home).
+ */
+function setCompanyHeaderVisibility(visible) {
+  const display = visible ? 'flex' : 'none';
+  if (companyHomeButton) companyHomeButton.style.display = display;
+  if (headerCompanyLabel) headerCompanyLabel.style.display = visible ? 'flex' : 'none';
+}
+
+/**
  * Maneja el clic en el botón "Home Empresa" para regresar al dashboard de la empresa actual.
  */
 function handleCompanyHome() {
   if (!currentCompany) {
-    if (companyHomeButton) {
-      companyHomeButton.style.display = 'none';
-    }
+    setCompanyHeaderVisibility(false);
     return;
   }
   
@@ -2868,9 +3972,7 @@ function handleCompanyHome() {
   }
   
   // Ocultar botón home porque YA estamos en home
-  if (companyHomeButton) {
-    companyHomeButton.style.display = 'none';
-  }
+  setCompanyHeaderVisibility(false);
 }
 
 async function handleLogout() {
@@ -2883,14 +3985,8 @@ const mainContainerLogout = document.querySelector('.main-container');
 if (mainContainerLogout) mainContainerLogout.classList.add('vanta-fullscreen');
 
 // Resetear UI
-  if (companyNameElement) {
-    companyNameElement.textContent = 'Empresa';
-  }
-  if (companyLogoElement) {
-    companyLogoElement.style.display = 'none';
-  }
-  if (companyLogoPlaceholder) {
-    companyLogoPlaceholder.style.display = 'none';
+  if (headerCompanyNameElement) {
+    headerCompanyNameElement.textContent = '—';
   }
 
   document.querySelectorAll('.company-select-button').forEach(btn => {
@@ -2919,9 +4015,16 @@ if (mainContainerLogout) mainContainerLogout.classList.add('vanta-fullscreen');
 
   authToken = null;
   currentUser = null;
+  userModuleOverrides = null;
   assignedCompanies = [];
   companyRoleByKey = {};
   localStorage.removeItem(AUTH_TOKEN_KEY);
+  // 📦702 (2026-08-13) — Después del logout, ocultar el botón de Bandeja
+  // Integrada. No importa quién estaba logueado antes, sin token no se
+  // debe mostrar.
+  if (typeof window.applyBandejaIntegradaVisibility === 'function') {
+    window.applyBandejaIntegradaVisibility(false);
+  }
 
   // Restaurar el sidebar completo (mostrar todos los botones)
   createSidebarButtons(null);
@@ -2933,9 +4036,7 @@ if (mainContainerLogout) mainContainerLogout.classList.add('vanta-fullscreen');
   }
 
   // Ocultar botón home empresa porque NO hay empresa seleccionada
-  if (companyHomeButton) {
-    companyHomeButton.style.display = 'none';
-  }
+  setCompanyHeaderVisibility(false);
 
   renderLoginScreen();
   console.log('Usuario desconectado.');
@@ -2969,14 +4070,14 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
   console.log(`Showing dashboard for company: ${currentCompany}`);
 
   // Ocultar botón home porque YA estamos en home de empresa
-  if (companyHomeButton) {
-    companyHomeButton.style.display = 'none';
-  }
+  setCompanyHeaderVisibility(false);
 
-  // Asegurar que el sidebar permanezca colapsado
+  // Asegurar que el sidebar permanezca colapsado + activar hotspot
   const sidebar = document.getElementById('sidebar');
   if (sidebar) {
     sidebar.classList.add('sidebar-collapsed');
+    const hotspot = document.getElementById('sidebar-hotspot');
+    if (hotspot) hotspot.classList.add('active');
   }
 
   contentArea.innerHTML = '';
@@ -3039,19 +4140,26 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
   dashboardContainer.appendChild(kpiRibbon);
 
   // --- MAIN GRID ---
+  // 📦699 · FIX: layout reorganizado. Antes: 2 columnas (280px sidebar + 1fr tasks).
+  // Ahora: 2 filas (modulesRow horizontal + tasksPanel full-width). El sidebar de
+  // módulos pasa a ser una fila de cards compactas, y la lista de tareas ocupa
+  // todo el ancho debajo. Responsive con flex-wrap (módulos se acomodan a múltiples
+  // filas en ventanas angostas).
   const mainGrid = document.createElement('div');
+  mainGrid.className = 'dashboard-main-grid';
   mainGrid.style.cssText = `
     flex: 1;
     display: grid;
-    grid-template-columns: 280px 1fr;
-    grid-template-rows: 1fr;
-    gap: 20px;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+    gap: 16px;
     padding: 10px 30px 20px;
     min-height: 0;
   `;
 
-  // --- PANEL IZQUIERDO: MÓDULOS ---
-  const modulesPanel = document.createElement('aside');
+  // --- PANEL DE MÓDULOS (fila horizontal) ---
+  const modulesPanel = document.createElement('section');
+  modulesPanel.className = 'dashboard-modules-panel';
   modulesPanel.style.cssText = `
     background: white;
     border-radius: 8px;
@@ -3062,45 +4170,60 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
   `;
 
   const panelHeader = document.createElement('div');
+  panelHeader.className = 'dashboard-modules-header';
   panelHeader.style.cssText = `
-    padding: 15px; border-bottom: 1px solid #e2e8f0; font-size: 12px;
+    padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-size: 12px;
     color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;
     background: #f8fafc;
+    display: flex; align-items: center;
   `;
-  panelHeader.textContent = 'Módulos del Sistema';
+  panelHeader.innerHTML = '<i class="fas fa-th-large" style="margin-right: 8px; color: #174ea6;"></i>Módulos del Sistema';
   modulesPanel.appendChild(panelHeader);
 
   const moduleList = document.createElement('div');
   moduleList.setAttribute('data-module-list', 'true');
-  moduleList.style.cssText = 'flex: 1; overflow-y: auto; padding: 10px;';
+  moduleList.className = 'dashboard-modules-row';
+  moduleList.style.cssText = `
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 12px;
+    align-items: stretch;
+  `;
 
+  // 📦642 — Sin color por módulo. El SVG hereda currentColor del wrapper.
+  // 📦704 (2026-08-13) — shortName para el display del dashboard. El `name` largo
+  // se mantiene porque se usa como key en moduleMap, moduleTaskMap, etc. y
+  // como data-module-name / data-module en los handlers. Cambiar `name` directo
+  // rompería la lógica de filtrado, badges y match con el sidebar.
   const modulesData = [
-    { name: 'Recursos', subtitle: 'Capacitación, Roles', icon: 'fa-users-cog', badge: 'Cargando...', badgeClass: 'bg-orange', active: false },
-    { name: 'Gestión Integral', subtitle: 'Política, Planes', icon: 'fa-file-contract', badge: '-', badgeClass: 'bg-green', active: false },
-    { name: 'Gestión de la Salud', subtitle: 'Ausentismo, AT, EL', icon: 'fa-heartbeat', badge: '-', badgeClass: 'bg-green', active: false },
-    { name: 'Gestión de Peligros y Riesgos', subtitle: 'IPERC, Controles', icon: 'fa-radiation-alt', badge: '-', badgeClass: null, active: false },
-    { name: 'Gestión de Amenazas', subtitle: 'Emergencias', icon: 'fa-biohazard', badge: '-', badgeClass: null, active: false },
-    { name: 'Verificación', subtitle: 'Auditorías', icon: 'fa-check-double', badge: '-', badgeClass: null, active: false },
-    { name: 'Mejoramiento', subtitle: 'Acciones Correctivas', icon: 'fa-chart-line', badge: '-', badgeClass: null, active: false }
+    { name: 'Recursos',                       shortName: 'Recursos',                  subtitle: 'Capacitación, Roles',        icon: 'users',          badge: 'Cargando...', badgeClass: 'bg-orange', active: false },
+    { name: 'Gestión Integral',               shortName: 'Gest. Integral',            subtitle: 'Política, Planes',           icon: 'file_text',      badge: '-',          badgeClass: 'bg-green',  active: false },
+    { name: 'Gestión de la Salud',            shortName: 'Gest Salud',                subtitle: 'Ausentismo, AT, EL',         icon: 'heart_pulse',    badge: '-',          badgeClass: 'bg-green',  active: false },
+    { name: 'Gestión de Peligros y Riesgos',  shortName: 'Gest. Pel. y Riesgos',     subtitle: 'IPERC, Controles',           icon: 'alert_triangle', badge: '-',          badgeClass: null,       active: false },
+    { name: 'Gestión de Amenazas',            shortName: 'Gest. Amenazas',            subtitle: 'Emergencias',                icon: 'siren',          badge: '-',          badgeClass: null,       active: false },
+    { name: 'Verificación',                   shortName: 'Verificación',              subtitle: 'Auditorías',                 icon: 'shield_check',   badge: '-',          badgeClass: null,       active: false },
+    { name: 'Mejoramiento',                   shortName: 'Mejoramiento',              subtitle: 'Acciones Correctivas',       icon: 'trending_up',    badge: '-',          badgeClass: null,       active: false }
   ];
 
   modulesData.forEach(mod => {
     const item = document.createElement('div');
     item.setAttribute('data-module-name', mod.name);
+    item.className = 'dashboard-module-card';
     item.style.cssText = `
-      display: flex; align-items: center; padding: 12px;
-      border-radius: 6px; margin-bottom: 5px; cursor: pointer;
-      border: 1px solid transparent; transition: all 0.2s;
-      background: transparent;
-      border-color: transparent;
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 12px; min-width: 160px; flex: 1 1 160px;
+      border-radius: 6px; cursor: pointer;
+      border: 1px solid #e2e8f0; transition: all 0.2s;
+      background: #f8fafc;
     `;
     item.onmouseover = function() {
       const isActive = this.getAttribute('data-module-active') === 'true';
-      if (!isActive) { this.style.background = '#f8fafc'; this.style.borderColor = '#e2e8f0'; }
+      if (!isActive) { this.style.background = '#eff6ff'; this.style.borderColor = '#bfdbfe'; }
     };
     item.onmouseout = function() {
       const isActive = this.getAttribute('data-module-active') === 'true';
-      if (!isActive) { this.style.background = 'transparent'; this.style.borderColor = 'transparent'; }
+      if (!isActive) { this.style.background = '#f8fafc'; this.style.borderColor = '#e2e8f0'; }
     };
     item.onclick = function(e) {
       e.stopPropagation();
@@ -3108,15 +4231,15 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
     };
 
     const badgeId = `module-badge-${mod.name.replace(/\s+/g, '-').toLowerCase()}`;
-    const badgeHtml = mod.badge ? `<span id="${badgeId}" data-module="${mod.name}" style="margin-left: auto; font-size: 10px; padding: 4px 10px; border-radius: 12px; font-weight: 600; background: ${getBadgeColor(mod.badgeClass)}; color: ${getBadgeTextColor(mod.badgeClass)}; cursor: pointer; border: 1px solid rgba(0,0,0,0.1);" title="Click para ver alertas de ${mod.name}"><i class="fas fa-filter" style="font-size: 8px; margin-right: 3px;"></i>${mod.badge}</span>` : '';
+    const badgeHtml = mod.badge ? `<span id="${badgeId}" data-module="${mod.name}" style="font-size: 10px; padding: 3px 8px; border-radius: 12px; font-weight: 600; background: ${getBadgeColor(mod.badgeClass)}; color: ${getBadgeTextColor(mod.badgeClass)}; cursor: pointer; border: 1px solid rgba(0,0,0,0.1); white-space: nowrap;" title="Click para ver alertas de ${mod.name}"><i class="fas fa-filter" style="font-size: 8px; margin-right: 3px;"></i>${mod.badge}</span>` : '';
 
     item.innerHTML = `
-      <div style="width: 36px; height: 36px; border-radius: 6px; background: #f1f5f9; color: #174ea6; display: flex; align-items: center; justify-content: center; margin-right: 10px; font-size: 14px;">
-        <i class="fas ${mod.icon}"></i>
+      <div style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 13px; color: #174ea6; flex-shrink: 0;">
+        ${SIDEBAR_ICONS[mod.icon] || ''}
       </div>
-      <div style="flex: 1;">
-        <h4 style="font-size: 13px; font-weight: 600; color: #1e293b; margin-bottom: 1px;">${mod.name}</h4>
-        <span style="font-size: 11px; color: #94a3b8;">${mod.subtitle}</span>
+      <div style="flex: 1; min-width: 0; overflow: hidden;">
+        <h4 style="font-size: 12px; font-weight: 600; color: #1e293b; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${mod.name}">${mod.shortName || mod.name}</h4>
+        <span style="font-size: 10px; color: #94a3b8; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${mod.subtitle}</span>
       </div>
       ${badgeHtml}
     `;
@@ -3131,7 +4254,7 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
         filterDashboardTasksByModule(moduleName);
       };
     }
-    
+
     moduleList.appendChild(item);
   });
 
@@ -3170,8 +4293,16 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
   tasksPanel.appendChild(tasksHeader);
 
   const tasksList = document.createElement('div');
+  // 📦699 · FIX v6: container con grid + grid-auto-rows mínimo de 60px.
+  // El problema en modo ventana era que el grid con `align-content: start`
+  // y sin `grid-auto-rows` mínimo colapsaba las cards a alturas muy pequeñas
+  // (~3-4px), mostrando solo el background+border-left como líneas finas.
+  // `grid-auto-rows: minmax(60px, auto)` fuerza a cada row a tener al menos
+  // 60px de altura, y `align-content: start` alinea las rows al top del
+  // container (con overflow-y: auto hace scroll si no caben).
   tasksList.id = 'tasks-container';
-  tasksList.style.cssText = 'flex: 1; overflow-y: auto; padding: 15px 20px;';
+  tasksList.className = 'dashboard-tasks-grid';
+  tasksList.style.cssText = 'flex: 1; min-height: 0; overflow-y: auto; padding: 15px 20px; display: grid; grid-template-columns: 1fr; grid-auto-rows: minmax(60px, auto); gap: 10px; align-content: start;';
   tasksList.innerHTML = `
     <div style="text-align: center; padding: 40px; color: #94a3b8;">
       <i class="fas fa-spinner fa-spin" style="font-size: 32px; margin-bottom: 10px;"></i>
@@ -3196,6 +4327,74 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
     if (cls === 'bg-orange') return '#c2410c';
     if (cls === 'bg-green') return '#166534';
     return '#3730a3';
+  }
+
+  // 📦699 · FIX: CSS responsivo para el dashboard reorganizado.
+  // En modo ventana angosta (< 1200px) los módulos se acomodan en filas más
+  // cortas y la cinta de KPIs se comprime. En modo maximizado (>= 1200px)
+  // los 7 módulos caben en una sola fila horizontal.
+  const dashboardResponsiveStyle = document.createElement('style');
+  dashboardResponsiveStyle.id = 'dashboard-responsive-style';
+  dashboardResponsiveStyle.textContent = `
+    /* Reforzar min-height del task card para evitar colapso en modo ventana.
+       El grid-auto-rows del inline style también lo protege, pero el
+       !important aquí es defensa adicional. */
+    .task-card { min-height: 60px !important; }
+    /* Modo ventana: módulos en 2 filas más compactos (sin descripción),
+       tasks en 2 columnas (auto-fit) para ver más cards sin scroll.
+       Font-sizes reducidos en task cards para que el texto quepa mejor. */
+    @media (max-width: 1199px) {
+      .dashboard-kpi-ribbon { margin: 12px 16px 0 !important; }
+      .dashboard-kpi-ribbon .k-stats-ribbon__value { font-size: 22px !important; }
+      .dashboard-kpi-ribbon .k-stats-ribbon__label { font-size: 11px !important; }
+      /* Reducir padding del mainGrid en ventana: 10/16/10 vs 10/30/20.
+         Eso le da ~20px más de altura al tasksPanel. */
+      .dashboard-main-grid { padding: 10px 16px !important; gap: 10px !important; }
+      .dashboard-modules-row { gap: 6px !important; padding: 8px !important; }
+      /* 📦704 (2026-08-13) — Módulos en ventana: min-width 135px (antes 220px)
+         para que los 7 quepan en 1 sola fila incluso en ventanas ~1000px de ancho.
+         Con títulos abreviados (Gest. Integral, Gest Salud, etc.) entran sin
+         cortarse. Si la ventana es muy chica (< ~1000px), flex-wrap los baja
+         a fila 2, pero el caso típico es ventana ~1100-1199px → 1 fila OK. */
+      .dashboard-module-card { min-width: 135px !important; flex: 1 1 135px !important; padding: 6px 8px !important; }
+      .dashboard-module-card h4 { font-size: 11px !important; line-height: 1.2 !important; }
+      /* Ocultar el subtitle (descripción) en ventana para ahorrar altura */
+      .dashboard-module-card span { display: none !important; }
+      .dashboard-module-card > div:first-child { width: 22px !important; height: 22px !important; font-size: 11px !important; }
+      /* Tasks en 2 columnas en ventana (auto-fit, minmax 280px). */
+      .dashboard-tasks-grid { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important; gap: 8px !important; }
+      /* Task card más compacto en ventana: padding y font reducidos */
+      .task-card { min-height: 60px !important; padding: 8px 10px !important; gap: 8px !important; }
+      /* Icon del task card */
+      .task-card > div:first-child { width: 28px !important; height: 28px !important; font-size: 12px !important; }
+      /* Tags (priority + submodule): font más pequeño */
+      .task-card .tag { font-size: 9px !important; padding: 1px 5px !important; }
+      /* Title (segundo div dentro del text container): font más pequeño */
+      .task-card > div:nth-child(2) > div:nth-child(2) { font-size: 12px !important; line-height: 1.2 !important; margin-bottom: 1px !important; }
+      /* Desc (tercer div dentro del text container): font más pequeño, 1 línea */
+      .task-card > div:nth-child(2) > div:nth-child(3) { font-size: 10px !important; line-height: 1.2 !important; -webkit-line-clamp: 1 !important; }
+      /* Action arrow */
+      .task-card > div:last-child { width: 28px !important; height: 28px !important; }
+      .task-card > div:last-child i { font-size: 11px !important; }
+    }
+    /* Modo maximizado: tasks en 2 columnas (auto-fit, minmax 380px), módulos en 1 fila */
+    @media (min-width: 1200px) {
+      .dashboard-modules-row { gap: 12px !important; }
+      /* 📦704 (2026-08-13) — Reducido de 165px a 140px para asegurar 1 sola fila
+         incluso con anchos de ventana ~1250px (borde del breakpoint). Con
+         títulos abreviados el texto entra sin cortarse. */
+      .dashboard-module-card { min-width: 140px !important; flex: 1 1 140px !important; }
+      .dashboard-tasks-grid { grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)) !important; gap: 10px !important; }
+    }
+    /* 📦699 · FIX v2: el highlight rojo de tareas críticas se hace con
+       border-left + background (igual que WARNING/INFO), sin pseudo-element
+       adicional que duplicaba la barra roja en el lateral izquierdo.
+       El background #fef2f2 + border #fecaca + border-left #ef4444 dan
+       suficiente distinción visual sin romper la consistencia con las
+       demás cards. */
+  `;
+  if (!document.getElementById('dashboard-responsive-style')) {
+    document.head.appendChild(dashboardResponsiveStyle);
   }
 
   // ==========================================
@@ -3338,22 +4537,22 @@ function filterDashboardTasksByModule(moduleName) {
 function updateModuleSelection(selectedModuleName) {
   const moduleList = document.querySelector('[data-module-list]');
   if (!moduleList) return;
-  
+
   const items = moduleList.querySelectorAll('[data-module-name]');
   items.forEach(item => {
     const moduleName = item.getAttribute('data-module-name');
     const isActive = selectedModuleName && moduleName === selectedModuleName;
-    
+
     // Actualizar atributo data-module-active
     item.setAttribute('data-module-active', isActive ? 'true' : 'false');
-    
-    // Actualizar estilos
+
+    // Actualizar estilos (📦699: layout horizontal — fondo por defecto #f8fafc)
     if (isActive) {
       item.style.background = '#eff6ff';
       item.style.borderColor = '#bfdbfe';
     } else {
-      item.style.background = 'transparent';
-      item.style.borderColor = 'transparent';
+      item.style.background = '#f8fafc';
+      item.style.borderColor = '#e2e8f0';
     }
   });
   
@@ -3428,40 +4627,54 @@ function renderTasks(tasks) {
     `;
     return;
   }
-  
-  container.innerHTML = tasks.map(task => `
-    <div class="task-card ${task.priority || ''}"
+
+  // 📦699 · FIX v5: layout SIMPLIFICADO del task card. Antes usaba flex con
+  // align-items: stretch + overflow: hidden + flex children anidados, lo que
+  // causaba que las cards se colapsaran a líneas finas en modo ventana (el
+  // contenido no se renderizaba). Ahora: flex row simple de 3 elementos
+  // (icon + text + arrow) con align-items: center. Sin overflow hidden, sin
+  // flex children anidados, sin min-width: 0 que cause colapso.
+  container.innerHTML = tasks.map(task => {
+    const isCritical = (task.priority || '').toLowerCase() === 'critical';
+    const taskBg = isCritical ? '#fef2f2' : '#f8fafc';
+    const taskBgHover = isCritical ? '#fee2e2' : 'white';
+    const iconBg = isCritical ? 'rgba(254, 226, 226, 0.6)' : 'rgba(255,255,255,0.7)';
+
+    return `
+    <div class="task-card ${task.priority || ''}${isCritical ? ' task-critical' : ''}"
       data-module="${(task.module || '').replace(/"/g, '&quot;')}"
       data-submodule="${(task.submodule || '').replace(/"/g, '&quot;')}"
       onclick="navigateToModule(this.dataset.module, this.dataset.submodule)"
       style="
-      background: #f8fafc;
+      background: ${taskBg};
       border-radius: 6px;
       margin-bottom: 10px;
       border-left: 4px solid ${getTaskBorderColor(task.priority)};
       padding: 12px 15px;
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       gap: 12px;
-      transition: transform 0.1s, box-shadow 0.1s;
+      transition: transform 0.1s, box-shadow 0.1s, background 0.1s;
       cursor: pointer;
-    " onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 6px rgba(0,0,0,0.05)'; this.style.background='white';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'; this.style.background='#f8fafc';">
-      <div style="width: 36px; height: 36px; border-radius: 6px; background: #f1f5f9; color: #174ea6; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 14px;">
+      min-height: 60px;
+    " onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 6px rgba(0,0,0,0.05)'; this.style.background='${taskBgHover}';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'; this.style.background='${taskBg}';">
+      <div style="width: 36px; height: 36px; border-radius: 6px; background: ${iconBg}; color: #174ea6; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 14px;">
         <i class="${task.icon || 'fas fa-tasks'}"></i>
       </div>
-      <div style="flex: 1; min-width: 0;">
-        <div style="display: flex; gap: 8px; margin-bottom: 4px; flex-wrap: wrap;">
+      <div style="flex: 1; min-width: 0; overflow: hidden;">
+        <div style="display: flex; gap: 6px; margin-bottom: 4px; flex-wrap: wrap;">
           <span class="tag" style="font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; background: ${getTagColor(task.priority)}; color: ${getTagTextColor(task.priority)};">${task.priority ? task.priority.toUpperCase() : 'INFO'}</span>
           ${task.submodule ? `<span style="font-size: 10px; font-weight: 500; padding: 2px 6px; border-radius: 4px; background: #e0e7ff; color: #3730a3;">${task.submodule}</span>` : ''}
         </div>
-        <div style="font-size: 13px; font-weight: 600; color: #1e293b; margin-bottom: 2px;">${task.title || 'Tarea sin título'}</div>
-        <div style="font-size: 12px; color: #64748b; line-height: 1.3;">${task.desc || ''}</div>
+        <div style="font-size: 13px; font-weight: 600; color: #1e293b; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${task.title || 'Tarea sin título'}</div>
+        <div style="font-size: 12px; color: #64748b; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${task.desc || ''}</div>
       </div>
-      <button style="width: 30px; height: 30px; border-radius: 50%; border: none; background: transparent; color: #94a3b8; cursor: pointer; transition: all 0.2s; flex-shrink: 0;" onmouseover="this.style.background='#174ea6'; this.style.color='white'" onmouseout="this.style.background='transparent'; this.style.color='#94a3b8'">
-        <i class="fas fa-arrow-right"></i>
-      </button>
+      <div style="flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: transparent; color: #174ea6; transition: all 0.15s;" onmouseover="this.style.background='#174ea6'; this.style.color='white'" onmouseout="this.style.background='transparent'; this.style.color='#174ea6'">
+        <i class="fas fa-arrow-right" style="font-size: 13px;"></i>
+      </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 // Función para navegar a un módulo desde una tarea
@@ -3534,8 +4747,8 @@ function showModuleContentWithSubmodule(moduleName, submoduleName) {
   currentModule = moduleName;
 
   // Mostrar botón home empresa
-  if (companyHomeButton && currentCompany) {
-    companyHomeButton.style.display = 'flex';
+  if (currentCompany) {
+    setCompanyHeaderVisibility(true);
   }
 
   if (!contentArea) {
@@ -3675,8 +4888,8 @@ currentModule = moduleName;
   console.log(`🔍 [showModuleContent] currentModule actualizado a: ${currentModule}`);
 
   // Mostrar botón home empresa porque YA NO estamos en home
-  if (companyHomeButton && currentCompany) {
-    companyHomeButton.style.display = 'flex';
+  if (currentCompany) {
+    setCompanyHeaderVisibility(true);
   }
 
   // Verificar que contentArea exista
@@ -3839,7 +5052,7 @@ function showModuleHome(container, moduleName) { // 'container' ya es el <div cl
                 console.log(`[CHART-DIAG] ═══ NAVIGATE AWAY — destroying old instance ═══`);
                 window.currentGestionIntegralHome._removeFullscreenListener();
             }
-            const gestionIntegralHome = new window.GestionIntegralHome(moduleContentContainer, moduleName, submodules);
+            const gestionIntegralHome = new window.GestionIntegralHome(moduleContentContainer, moduleName, submodules, currentCompany);
             window.currentGestionIntegralHome = gestionIntegralHome; // Referencia global para filtros
             gestionIntegralHome.render();
         } else {
@@ -3848,15 +5061,23 @@ function showModuleHome(container, moduleName) { // 'container' ya es el <div cl
         }
     } else if (moduleName === "Recursos") {
         if (window.RecursosHome) {
-            const recursosHome = new window.RecursosHome(moduleContentContainer, moduleName, submodules);
+            const recursosHome = new window.RecursosHome(moduleContentContainer, moduleName, submodules, currentCompany);
             recursosHome.render();
         } else {
             console.error('RecursosHome component not found');
             showGenericModuleHome(moduleContentContainer, moduleName, submodules);
         }
+    } else if (moduleName === "Gestión Humana") {
+        if (window.GestionHumanaHome) {
+            const ghHome = new window.GestionHumanaHome(moduleContentContainer, moduleName, submodules, currentCompany);
+            ghHome.render();
+        } else {
+            console.error('GestionHumanaHome component not found');
+            showGenericModuleHome(moduleContentContainer, moduleName, submodules);
+        }
     } else if (moduleName === "Gestión de la Salud") {
         if (window.GestionSaludHome) {
-            const gestionSaludHome = new window.GestionSaludHome(moduleContentContainer, moduleName, submodules);
+            const gestionSaludHome = new window.GestionSaludHome(moduleContentContainer, moduleName, submodules, currentCompany);
             gestionSaludHome.render();
         } else {
             console.error('GestionSaludHome component not found');
@@ -3864,7 +5085,7 @@ function showModuleHome(container, moduleName) { // 'container' ya es el <div cl
         }
     } else if (moduleName === "Gestión de Peligros y Riesgos") {
         if (window.GestionPeligrosHome) {
-            const gestionPeligrosHome = new window.GestionPeligrosHome(moduleContentContainer, moduleName, submodules);
+            const gestionPeligrosHome = new window.GestionPeligrosHome(moduleContentContainer, moduleName, submodules, currentCompany);
             gestionPeligrosHome.render();
         } else {
             console.error('GestionPeligrosHome component not found');
@@ -3872,7 +5093,7 @@ function showModuleHome(container, moduleName) { // 'container' ya es el <div cl
         }
     } else if (moduleName === "Gestión de Amenazas") {
         if (window.GestionAmenazasHome) {
-            const gestionAmenazasHome = new window.GestionAmenazasHome(moduleContentContainer, moduleName, submodules);
+            const gestionAmenazasHome = new window.GestionAmenazasHome(moduleContentContainer, moduleName, submodules, currentCompany);
             gestionAmenazasHome.render();
         } else {
             console.error('GestionAmenazasHome component not found');
@@ -3880,7 +5101,7 @@ function showModuleHome(container, moduleName) { // 'container' ya es el <div cl
         }
     } else if (moduleName === "Verificación") {
         if (window.VerificacionHome) {
-            const verificacionHome = new window.VerificacionHome(moduleContentContainer, moduleName, submodules);
+            const verificacionHome = new window.VerificacionHome(moduleContentContainer, moduleName, submodules, currentCompany);
             verificacionHome.render();
         } else {
             console.error('VerificacionHome component not found');
@@ -3888,7 +5109,7 @@ function showModuleHome(container, moduleName) { // 'container' ya es el <div cl
         }
     } else if (moduleName === "Mejoramiento") {
         if (window.MejoramientoHome) {
-            const mejoramientoHome = new window.MejoramientoHome(moduleContentContainer, moduleName, submodules);
+            const mejoramientoHome = new window.MejoramientoHome(moduleContentContainer, moduleName, submodules, currentCompany);
             mejoramientoHome.render();
         } else {
             console.error('MejoramientoHome component not found');
@@ -3970,10 +5191,10 @@ if (mainContainerSub) mainContainerSub.classList.remove('vanta-fullscreen');
   }
   
   // Mostrar botón home empresa porque YA NO estamos en home
-  if (companyHomeButton && currentCompany) {
-    companyHomeButton.style.display = 'flex';
+  if (currentCompany) {
+    setCompanyHeaderVisibility(true);
   }
-  
+
   const currentRole = companyRoleByKey[currentCompany] || '';
   if (!isSubmoduleAllowed(currentRole, moduleName, submoduleName)) {
     showErrorMessage(container, submoduleName, 'No tienes permiso para acceder a este submódulo.');
@@ -4348,6 +5569,20 @@ showDevelopmentMessage(submoduleContentDiv, submoduleName);
         console.error('❌ SociodemograficaComponent no encontrado');
         showDevelopmentMessage(submoduleContentDiv, submoduleName);
       }
+    } else if (submoduleName === "3.1.3 Perfil de cargo y profesiograma") {
+      if (window.PerfilesCargoProfesiogramaComponent) {
+        const profesiogramaComponent = new window.PerfilesCargoProfesiogramaComponent(
+          submoduleContentDiv,
+          currentCompany,
+          moduleName,
+          submoduleName,
+          safeBackToModuleCallback
+        );
+        profesiogramaComponent.render();
+      } else {
+        console.error('❌ PerfilesCargoProfesiogramaComponent no encontrado');
+        showDevelopmentMessage(submoduleContentDiv, submoduleName);
+      }
     } else if (submoduleName === "3.1.6 Restricciones y recomendaciones médicas") {
       if (window.RestriccionesMedicasComponent) {
         const restriccionesComponent = new window.RestriccionesMedicasComponent(
@@ -4438,15 +5673,15 @@ showDevelopmentMessage(submoduleContentDiv, submoduleName);
 }
 
 } else if (submoduleName === "4.1.2 Identificación de Peligros") {
-createComponentSafely(window.IdentificacionPeligrosComponent,
+createComponentSafely(window.KairMatrizPeligros,
 submoduleContentDiv,
 currentCompany,
 moduleName,
 submoduleName,
 safeBackToModuleCallback
 );
-if (!window.IdentificacionPeligrosComponent) {
-console.error('❌ IdentificacionPeligrosComponent no encontrado');
+if (!window.KairMatrizPeligros) {
+console.error('❌ KairMatrizPeligros no encontrado');
 showDevelopmentMessage(submoduleContentDiv, submoduleName);
 }
 
@@ -4478,6 +5713,34 @@ if (!window.MantenimientoComponent) {
 
 } else if (submoduleName === "1.1.3 Asignación de Recursos") {
   showAsignacionRecursosContent(submoduleContentDiv);
+
+} else if (submoduleName === "Base de Personal" && moduleName === "Gestión Humana") {
+  // 📦709 (2026-08-15) — Placeholder Fase 5
+  createComponentSafely(window.BasePersonalComponent,
+    submoduleContentDiv,
+    currentCompany,
+    moduleName,
+    submoduleName,
+    safeBackToModuleCallback
+  );
+  if (!window.BasePersonalComponent) {
+    console.error('❌ BasePersonalComponent no encontrado');
+    showDevelopmentMessage(submoduleContentDiv, submoduleName);
+  }
+
+} else if (submoduleName === "Contratación" && moduleName === "Gestión Humana") {
+  // 📦709 (2026-08-15) — Placeholder Fase 6
+  createComponentSafely(window.ContratacionComponent,
+    submoduleContentDiv,
+    currentCompany,
+    moduleName,
+    submoduleName,
+    safeBackToModuleCallback
+  );
+  if (!window.ContratacionComponent) {
+    console.error('❌ ContratacionComponent no encontrado');
+    showDevelopmentMessage(submoduleContentDiv, submoduleName);
+  }
 
 } else if (submoduleName === "5.1.1 Plan de Prevención de Emergencias") {
       createComponentSafely(window.PlanPrevencionComponent,
@@ -5509,7 +6772,11 @@ if (mainContainerView) mainContainerView.classList.remove('vanta-fullscreen');
       });
   }
 
-  function showSettingsPage() {
+  function showSettingsPage(section) {
+    // F4-fix — Acepta parámetro opcional 'section' para navegar directo a una tab
+    // (ej: 'empresas' para abrir Config > Gestión de Empresas, donde está el
+    // switch de Gmail). Si no se pasa, muestra la tab por defecto.
+    section = section || null;
     // ✅ Pasar contentArea a hideCalendar
     hideCalendar(contentArea);
     console.log('Showing enhanced settings page...');
@@ -5549,6 +6816,28 @@ if (mainContainerView) mainContainerView.classList.remove('vanta-fullscreen');
       if (iframe.contentWindow) {
         // Pasar la API de Electron al iframe
         iframe.contentWindow.electronAPI = window.electronAPI;
+
+        // F4-fix — Si se pidió una sección específica, navegar a ella después de cargar
+        if (section && typeof iframe.contentWindow.navigateToConfigSection === 'function') {
+          setTimeout(function() {
+            try { iframe.contentWindow.navigateToConfigSection(section); } catch (e) { /* ignore */ }
+          }, 250);
+        } else if (section) {
+          // Fallback: usar el DOM directamente
+          setTimeout(function() {
+            try {
+              var targetTab = iframe.contentDocument.getElementById('tab-' + section);
+              if (targetTab) {
+                // Ocultar todas las tabs
+                iframe.contentDocument.querySelectorAll('.section-container').forEach(function(s) { s.classList.remove('active'); });
+                targetTab.classList.add('active');
+                // Scroll a la sección de Gmail
+                var gmailSection = iframe.contentDocument.getElementById('gmail-section');
+                if (gmailSection) gmailSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            } catch (e) { /* ignore */ }
+          }, 250);
+        }
 
         // Propagar el tema actual al iframe
         const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';

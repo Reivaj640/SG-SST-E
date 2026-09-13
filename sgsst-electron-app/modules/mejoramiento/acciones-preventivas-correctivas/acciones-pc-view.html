@@ -3,124 +3,363 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>K+AIR | Acciones Preventivas y Correctivas</title>
+  <title>7.1.1 · Matriz de Control Operacional</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" href="acciones-pc-view.css">
 </head>
 <body>
+  <div id="app" class="kair-app">
 
-  <!-- HEADER — k-section-card -->
-  <div class="k-section-card" style="padding:0; margin-bottom:1rem; flex-shrink:0; flex-grow:0;">
-    <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
-      <div style="display:flex; align-items:center; gap:0.75rem;">
-        <i class="bi bi-shield-check" style="color:#174ea6; font-size:1.25rem;"></i>
-        <div>
-          <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">7.1.1 Acciones Preventivas y Correctivas</h3>
-          <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Acciones derivadas de no conformidades, auditorías, quejas y observaciones</p>
+    <!-- HEADER — patrón estándar k-section-card (capacitaciones / planes-mejoramiento) -->
+    <div class="k-section-card" style="padding:0; margin-bottom:1rem; flex-shrink:0; flex-grow:0;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
+        <div style="display:flex; align-items:center; gap:0.75rem; min-width:0;">
+          <span class="kair-pill-section">7.1.1</span>
+          <i class="bi bi-clipboard-check" style="color:#174ea6; font-size:1.25rem; flex-shrink:0;"></i>
+          <div style="min-width:0;">
+            <h3 id="header-title" style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Matriz de Control Operacional</h3>
+            <p id="header-subtitle" style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Acciones correctivas, preventivas y de mejora · Formato GI-FO-014</p>
+            <ol id="header-breadcrumb" class="header-breadcrumb" hidden>
+              <li><button type="button" data-crumb="0">Acciones SG-SST</button><i class="bi bi-chevron-right header-breadcrumb-sep"></i></li>
+              <li><button type="button" data-crumb="1">Matriz de control operacional</button><i class="bi bi-chevron-right header-breadcrumb-sep"></i></li>
+              <li class="current" id="header-breadcrumb-current">Nueva acción</li>
+            </ol>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+          <span style="display:flex; align-items:center; gap:0.375rem; font-size:0.8125rem; color:#64748B;">
+            <i class="kair-icon-building" style="font-size:0.875rem;"></i>
+            <span id="header-company-text">—</span>
+          </span>
+          <div style="width:1px; height:24px; background:#dee2e6;"></div>
+          <button id="btn-back" class="header-back-btn" title="Volver al módulo Mejoramiento">
+            <i class="bi bi-arrow-left"></i> <span id="btn-back-text">Volver</span>
+          </button>
+          <button id="btn-importar" class="header-action--secondary" title="Importar desde Excel GI-FO-014">
+            <i class="bi bi-upload"></i> Importar
+          </button>
+          <button id="btn-exportar" class="header-action--ghost" title="Exportar a Excel">
+            <i class="bi bi-download"></i> Exportar
+          </button>
         </div>
       </div>
-      <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
-        <span style="display:flex; align-items:center; gap:0.375rem; font-size:0.8125rem; color:#64748B;">
-          <i class="bi bi-building" style="font-size:0.875rem;"></i>
-          <span id="header-company-text">—</span>
-        </span>
-        <div style="width:1px; height:24px; background:#dee2e6;"></div>
-        <button class="header-back-btn" onclick="window.parent.postMessage({type:'back-to-module-request'},'*')" title="Volver al módulo Mejoramiento">
-          <i class="bi bi-arrow-left"></i> Volver
-        </button>
-        <button class="header-action--secondary" onclick="openForm()" title="Crear nueva acción">
-          <i class="bi bi-plus-circle"></i> Nueva acción
-        </button>
-      </div>
     </div>
+
+    <!-- MAIN -->
+    <main class="kair-app-main" id="main-view">
+
+      <!-- KPIs -->
+      <section class="kair-fuente-bar" id="fuente-badge" aria-label="Origen de los datos"></section>
+      <section class="kair-kpis" id="kpiStrip" aria-label="Indicadores KPI">
+        <div class="kair-kpi">
+          <span class="kair-kpi__icon kair-kpi__icon--primary"><i class="bi bi-clipboard-check"></i></span>
+          <div class="kair-kpi__data">
+            <span class="kair-kpi__value" id="kpi-total">0</span>
+            <span class="kair-kpi__label">Total Acciones</span>
+          </div>
+        </div>
+        <div class="kair-kpi">
+          <span class="kair-kpi__icon kair-kpi__icon--warning"><i class="bi bi-folder"></i></span>
+          <div class="kair-kpi__data">
+            <span class="kair-kpi__value" id="kpi-abiertas">0</span>
+            <span class="kair-kpi__label">Abiertas</span>
+          </div>
+        </div>
+        <div class="kair-kpi">
+          <span class="kair-kpi__icon kair-kpi__icon--process"><i class="bi bi-arrow-repeat"></i></span>
+          <div class="kair-kpi__data">
+            <span class="kair-kpi__value" id="kpi-proceso">0</span>
+            <span class="kair-kpi__label">En proceso</span>
+          </div>
+        </div>
+        <div class="kair-kpi">
+          <span class="kair-kpi__icon kair-kpi__icon--success"><i class="bi bi-check-circle"></i></span>
+          <div class="kair-kpi__data">
+            <span class="kair-kpi__value" id="kpi-cerradas">0</span>
+            <span class="kair-kpi__label">Cerradas</span>
+          </div>
+        </div>
+        <div class="kair-kpi">
+          <span class="kair-kpi__icon kair-kpi__icon--danger"><i class="bi bi-exclamation-triangle"></i></span>
+          <div class="kair-kpi__data">
+            <span class="kair-kpi__value" id="kpi-vencidas">0</span>
+            <span class="kair-kpi__label">Vencidas</span>
+            <span class="kair-kpi__sublabel">Requiere atención</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- TABS + FILTROS -->
+      <section class="kair-toolbar">
+        <div class="kair-tabs" role="tablist" id="tabs">
+          <button class="kair-tab is-active" data-filter="TODAS" role="tab">
+            <span>Todas</span><span class="kair-tab__badge" id="tab-count-todas">0</span>
+          </button>
+          <button class="kair-tab" data-filter="ABIERTA" role="tab">
+            <span>Abiertas</span><span class="kair-tab__badge" id="tab-count-abiertas">0</span>
+          </button>
+          <button class="kair-tab" data-filter="EN PROCESO" role="tab">
+            <span>En proceso</span><span class="kair-tab__badge" id="tab-count-proceso">0</span>
+          </button>
+          <button class="kair-tab" data-filter="CERRADO" role="tab">
+            <span>Cerradas</span><span class="kair-tab__badge" id="tab-count-cerradas">0</span>
+          </button>
+        </div>
+
+        <div class="kair-filters">
+          <div class="kair-search">
+            <i class="bi bi-search"></i>
+            <input type="search" id="searchInput" placeholder="Buscar por descripción, proceso, responsable...">
+          </div>
+          <select class="kair-select" id="filterTipo">
+            <option value="">Todos los tipos</option>
+          </select>
+          <select class="kair-select" id="filterFuente">
+            <option value="">Todas las fuentes</option>
+          </select>
+          <span class="kair-count" id="resultCount">0 de 0 acciones</span>
+          <button class="kair-btn kair-btn--ghost" id="btn-reset">
+            <i class="bi bi-arrow-clockwise"></i>
+            <span>Restablecer</span>
+          </button>
+          <button class="kair-btn kair-btn--primary" id="btn-new">
+            <i class="bi bi-plus-lg"></i>
+            <span>Nueva acción</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- TABLA -->
+      <section class="kair-table-wrap">
+        <table class="kair-table" id="tabla">
+          <thead>
+            <tr>
+              <th class="kair-th-num">N°</th>
+              <th>Fecha</th>
+              <th>Descripción del hallazgo</th>
+              <th>Tipo</th>
+              <th>Proceso</th>
+              <th>Fuente</th>
+              <th>Responsable</th>
+              <th>Fecha prop.</th>
+              <th>Fecha cierre</th>
+              <th>Estado</th>
+              <th class="kair-th-acc">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </section>
+    </main>
+
+    <!-- EDITOR VIEW (oculto por defecto) -->
+    <div class="kair-editor" id="editor-view" hidden>
+      <aside class="kair-editor__sidebar">
+        <div class="kair-side-nav__title">Secciones</div>
+        <nav class="kair-side-nav" id="side-nav">
+          <button class="kair-side-nav__item is-active" data-section="datos-basicos"><i class="bi bi-info-circle"></i><span>Datos básicos</span></button>
+          <button class="kair-side-nav__item" data-section="descripcion"><i class="bi bi-card-text"></i><span>Descripción</span></button>
+          <button class="kair-side-nav__item" data-section="causas"><i class="bi bi-question-circle"></i><span>Causas (5 Porqués)</span></button>
+          <button class="kair-side-nav__item" data-section="plan-accion"><i class="bi bi-list-check"></i><span>Plan de acción</span></button>
+          <button class="kair-side-nav__item" data-section="verificacion"><i class="bi bi-shield-check"></i><span>Verificación de eficacia</span></button>
+          <button class="kair-side-nav__item" data-section="cierre"><i class="bi bi-lock"></i><span>Cierre de la acción</span></button>
+        </nav>
+
+        <div class="kair-side-info">
+          <div class="kair-side-info__row"><i class="bi bi-hash"></i><span id="side-id">ID: —</span></div>
+          <div class="kair-side-info__row"><i class="bi bi-calendar3"></i><span id="side-fecha">Fecha: —</span></div>
+          <div class="kair-side-info__row"><i class="bi bi-person"></i><span id="side-resp">—</span></div>
+          <div class="kair-side-info__row"><i class="bi bi-flag"></i><span id="side-estado">—</span></div>
+        </div>
+
+        <div class="kair-completitud">
+          <div class="kair-completitud__head">
+            <span class="kair-text-xs kair-font-bold kair-text-uppercase kair-text-muted">Completitud</span>
+            <span class="kair-text-xs kair-font-bold kair-text-primary" id="completitud-val">0/6</span>
+          </div>
+          <div class="kair-progress">
+            <div class="kair-progress__bar" id="completitud-bar" style="width: 0%;"></div>
+          </div>
+        </div>
+      </aside>
+
+      <main class="kair-editor__main">
+        <div class="kair-banner kair-banner--info" id="banner-estado">
+          <i class="bi bi-info-circle-fill"></i>
+          <div><strong>Acción abierta.</strong> Pendiente de ejecutar el plan de acción.</div>
+        </div>
+
+        <!-- 1. DATOS BÁSICOS -->
+        <section class="kair-form-section" data-section-card="datos-basicos">
+          <div class="kair-form-section__head" data-toggle="datos-basicos">
+            <h3 class="kair-form-section__title"><i class="bi bi-info-circle"></i>Datos básicos</h3>
+            <i class="bi bi-chevron-down kair-form-section__toggle"></i>
+          </div>
+          <div class="kair-form-section__body">
+            <div class="kair-grid-3">
+              <div class="kair-field">
+                <label class="kair-field__label">Fecha <span class="kair-req">*</span></label>
+                <input type="date" class="kair-field__input" data-field="fecha">
+              </div>
+              <div class="kair-field">
+                <label class="kair-field__label">Tipo de acción <span class="kair-req">*</span></label>
+                <select class="kair-field__select" data-field="tipo" id="edit-tipo"></select>
+              </div>
+              <div class="kair-field">
+                <label class="kair-field__label">Estado</label>
+                <select class="kair-field__select" data-field="estado" id="edit-estado"></select>
+              </div>
+            </div>
+            <div class="kair-grid-2">
+              <div class="kair-field">
+                <label class="kair-field__label">Proceso al que pertenece <span class="kair-req">*</span></label>
+                <input type="text" class="kair-field__input" data-field="procesoPertenece" placeholder="Ej: SG-SST, Recursos Humanos, Compras...">
+              </div>
+              <div class="kair-field">
+                <label class="kair-field__label">Proceso que solicita la acción</label>
+                <input type="text" class="kair-field__input" data-field="procesoSolicita" placeholder="Ej: Auditoría Interna SG-SST">
+              </div>
+            </div>
+            <div class="kair-grid-2">
+              <div class="kair-field">
+                <label class="kair-field__label">Responsable de ejecución <span class="kair-req">*</span></label>
+                <input type="text" class="kair-field__input" data-field="responsableEjecucion" placeholder="Nombre del responsable">
+              </div>
+              <div class="kair-field">
+                <label class="kair-field__label">Responsable de cierre</label>
+                <input type="text" class="kair-field__input" data-field="responsableCierre" placeholder="Quien verifica y cierra">
+              </div>
+            </div>
+            <div class="kair-field">
+              <label class="kair-field__label">Fuente <span class="kair-req">*</span></label>
+              <select class="kair-field__select" data-field="fuente" id="edit-fuente"></select>
+            </div>
+            <div class="kair-field">
+              <label class="kair-field__label">Sistema de gestión</label>
+              <div class="kair-check-group" id="edit-sistemas"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2. DESCRIPCIÓN -->
+        <section class="kair-form-section" data-section-card="descripcion">
+          <div class="kair-form-section__head" data-toggle="descripcion">
+            <h3 class="kair-form-section__title"><i class="bi bi-card-text"></i>Descripción de la situación</h3>
+            <i class="bi bi-chevron-down kair-form-section__toggle"></i>
+          </div>
+          <div class="kair-form-section__body">
+            <div class="kair-field">
+              <label class="kair-field__label">Descripción del hallazgo o situación <span class="kair-req">*</span></label>
+              <textarea class="kair-field__textarea" data-field="descripcion" rows="5" placeholder="Describe detalladamente la situación detectada, el contexto y los hechos relevantes..."></textarea>
+            </div>
+            <div class="kair-field">
+              <label class="kair-field__label">Observaciones</label>
+              <textarea class="kair-field__textarea" data-field="observaciones" rows="2" placeholder="Notas adicionales, referencias a otros documentos..."></textarea>
+            </div>
+          </div>
+        </section>
+
+        <!-- 3. CAUSAS (5 PORQUÉS) -->
+        <section class="kair-form-section" data-section-card="causas">
+          <div class="kair-form-section__head" data-toggle="causas">
+            <h3 class="kair-form-section__title"><i class="bi bi-question-circle"></i>Causas (5 Porqués)</h3>
+            <i class="bi bi-chevron-down kair-form-section__toggle"></i>
+          </div>
+          <div class="kair-form-section__body">
+            <div class="kair-banner kair-banner--info kair-mb-8">
+              <i class="bi bi-info-circle"></i>
+              <div>Técnica de análisis de causa raíz. Responde secuencialmente "¿por qué?" hasta llegar a la causa fundamental.</div>
+            </div>
+            <div class="kair-5porques" id="porques-list"></div>
+          </div>
+        </section>
+
+        <!-- 4. PLAN DE ACCIÓN -->
+        <section class="kair-form-section" data-section-card="plan-accion">
+          <div class="kair-form-section__head" data-toggle="plan-accion">
+            <h3 class="kair-form-section__title"><i class="bi bi-list-check"></i>Plan de acción y verificación</h3>
+            <i class="bi bi-chevron-down kair-form-section__toggle"></i>
+          </div>
+          <div class="kair-form-section__body">
+            <div class="kair-table-scroll">
+              <table class="kair-mini-table">
+                <thead>
+                  <tr>
+                    <th style="min-width:240px;">Descripción</th>
+                    <th style="width:130px;">Fecha</th>
+                    <th style="min-width:150px;">Responsable</th>
+                    <th style="width:110px;">Costo (COP)</th>
+                    <th style="width:80px;">Realizada</th>
+                    <th style="min-width:140px;">Verificó</th>
+                    <th style="width:130px;">Fecha verif.</th>
+                    <th style="width:50px;"></th>
+                  </tr>
+                </thead>
+                <tbody id="plan-body"></tbody>
+              </table>
+            </div>
+            <button class="kair-btn kair-btn--secondary" id="btn-add-actividad">
+              <i class="bi bi-plus-lg"></i><span>Agregar actividad</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- 5. VERIFICACIÓN -->
+        <section class="kair-form-section" data-section-card="verificacion">
+          <div class="kair-form-section__head" data-toggle="verificacion">
+            <h3 class="kair-form-section__title"><i class="bi bi-shield-check"></i>Verificación de la eficacia</h3>
+            <i class="bi bi-chevron-down kair-form-section__toggle"></i>
+          </div>
+          <div class="kair-form-section__body">
+            <div class="kair-field">
+              <label class="kair-field__label">Resultado de la verificación de eficacia</label>
+              <textarea class="kair-field__textarea" data-field="verificacionEficacia" rows="4" placeholder="Describe cómo se verificó que la acción implementada fue efectiva para eliminar la causa raíz y prevenir la recurrencia..."></textarea>
+              <span class="kair-field__hint">Esta sección se completa después de ejecutar el plan de acción y antes del cierre formal.</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 6. CIERRE -->
+        <section class="kair-form-section" data-section-card="cierre">
+          <div class="kair-form-section__head" data-toggle="cierre">
+            <h3 class="kair-form-section__title"><i class="bi bi-lock"></i>Cierre de la acción</h3>
+            <i class="bi bi-chevron-down kair-form-section__toggle"></i>
+          </div>
+          <div class="kair-form-section__body">
+            <div class="kair-grid-3">
+              <div class="kair-field">
+                <label class="kair-field__label">¿Cerrada?</label>
+                <div class="kair-check-group">
+                  <label class="kair-check"><input type="radio" name="cierre-cerrada" data-cierre-field="cerrada" value="true"><span>Sí</span></label>
+                  <label class="kair-check"><input type="radio" name="cierre-cerrada" data-cierre-field="cerrada" value="false" checked><span>No</span></label>
+                </div>
+              </div>
+              <div class="kair-field">
+                <label class="kair-field__label">Responsable de cierre</label>
+                <input type="text" class="kair-field__input" data-cierre-field="responsable" placeholder="Nombre del responsable">
+              </div>
+              <div class="kair-field">
+                <label class="kair-field__label">Fecha de cierre</label>
+                <input type="date" class="kair-field__input" data-cierre-field="fecha">
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer class="kair-sticky-footer">
+        <div class="kair-sticky-footer__info" id="footer-info">Sin guardar</div>
+        <div class="kair-sticky-footer__actions">
+          <button class="kair-btn kair-btn--ghost" id="btn-cancelar"><i class="bi bi-x-lg"></i><span>Cancelar</span></button>
+          <button class="kair-btn kair-btn--secondary" id="btn-guardar"><i class="bi bi-save"></i><span>Guardar</span></button>
+          <button class="kair-btn kair-btn--success" id="btn-cerrar-accion"><i class="bi bi-check2-circle"></i><span>Cerrar acción</span></button>
+        </div>
+      </footer>
+    </div>
+
+    <!-- TOAST CONTAINER (las notificaciones usan updateNotifier del proyecto) -->
+    <div id="toast-container"></div>
   </div>
-
-  <!-- STATS RIBBON -->
-  <div class="k-stats-ribbon" id="kpiStrip"></div>
-
-  <!-- TABLE -->
-  <div class="kair-table-wrap">
-    <div class="kair-table-toolbar">
-      <div class="kair-search">
-        <i class="bi bi-search kair-search__icon"></i>
-        <input type="text" id="searchInput" placeholder="Buscar por código, descripción o responsable..." oninput="renderTable()">
-      </div>
-      <select class="kair-select" id="filterStatus" onchange="renderTable()">
-        <option value="">Todos los estados</option>
-        <option value="pendiente">Pendiente</option>
-        <option value="en-proceso">En Proceso</option>
-        <option value="implementada">Implementada</option>
-        <option value="verificada">Verificada</option>
-        <option value="cerrada">Cerrada</option>
-        <option value="vencida">Vencida</option>
-      </select>
-    </div>
-    <div class="kair-table-container">
-      <table class="kair-table">
-        <thead>
-          <tr>
-            <th>Código</th>
-            <th>Tipo</th>
-            <th>Origen</th>
-            <th>Descripción</th>
-            <th>Responsable</th>
-            <th>Riesgo</th>
-            <th>Prioridad</th>
-            <th>Estado</th>
-            <th>Fecha Compromiso</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody id="tableBody"></tbody>
-      </table>
-      <div class="kair-pagination" id="pagination"></div>
-    </div>
-  </div>
-
-  <!-- FORM DIALOG -->
-  <div class="kair-overlay" id="formOverlay">
-    <div class="kair-dialog">
-      <div class="kair-dialog__header">
-        <div class="kair-dialog__title" id="formTitle">Nueva Acción</div>
-        <button class="k-btn k-btn--ghost k-btn--icon" onclick="closeForm()"><i class="bi bi-x-lg"></i></button>
-      </div>
-      <div class="kair-dialog__body">
-        <div class="kair-form" id="formFields"></div>
-      </div>
-      <div class="kair-dialog__footer">
-        <button class="k-btn k-btn--ghost" onclick="closeForm()">Cancelar</button>
-        <button class="k-btn k-btn--primary" onclick="submitForm()">Guardar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- DETAIL SHEET -->
-  <div class="kair-sheet-overlay" id="detailOverlay">
-    <div class="kair-sheet">
-      <div class="kair-sheet__header">
-        <div class="kair-sheet__title" id="detailTitle">Detalle de Acción</div>
-        <button class="k-btn k-btn--ghost k-btn--icon" onclick="closeDetail()"><i class="bi bi-x-lg"></i></button>
-      </div>
-      <div class="kair-sheet__body" id="detailBody"></div>
-      <div class="kair-sheet__footer" id="detailFooter"></div>
-    </div>
-  </div>
-
-  <!-- DELETE CONFIRMATION -->
-  <div class="kair-overlay" id="deleteOverlay">
-    <div class="kair-alert">
-      <div class="kair-alert__icon"><i class="bi bi-trash"></i></div>
-      <div class="kair-alert__title">Eliminar acción</div>
-      <div class="kair-alert__desc" id="deleteDesc">¿Está seguro que desea eliminar esta acción? Esta acción no se puede deshacer.</div>
-      <div class="kair-alert__actions">
-        <button class="k-btn k-btn--ghost" onclick="closeDelete()">Cancelar</button>
-        <button class="k-btn k-btn--primary" style="background:var(--kair-danger);border-color:var(--kair-danger);" onclick="confirmDelete()">Eliminar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- TOAST CONTAINER -->
-  <div class="k-toast-container" id="toastContainer"></div>
 
   <script src="acciones-pc-viewer.js"></script>
 </body>
