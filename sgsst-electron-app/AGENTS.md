@@ -209,9 +209,19 @@ Las vistas usan exclusivamente el sistema BEM `kair-*` definido en `kair-canonic
 - Calendarios: `kair-cron-grid`, `kair-cron-grid__row/cell/head/corner/month/audit/hito`
 - Workflow editor: `kair-rad-editor`, `kair-rad-editor__main/sidebar`, `kair-rad-sticky-footer`, `kair-rad-side-nav__item`
 
-### K+AIR Premium Design System (v0.1.197 · 📦730)
+### K+AIR Premium Design System (v0.1.204 · 📦730-737)
 
-A partir de v0.1.197, los homes de módulos (Recursos, Gestión Humana, etc.) usan el sistema premium con tokens compartidos:
+A partir de v0.1.197, los homes de módulos usan el sistema premium con tokens compartidos. **8 paquetes ya migrados** al patrón unificado (sep 2026):
+
+| 📦 | Módulo | Versión | Score compuesto |
+|----|--------|---------|------------------|
+| 📦730 | Recursos | v0.1.197 | 6 componentes (inducciones, capacitaciones, presupuesto, actas COPASST/Comité, afiliación) |
+| 📦731 | Gestión Integral | v0.1.198 | 6 componentes (Plan Anual %, Objetivos %, Evaluación Inicial %, Política ok, Rendición ok, Cambios ok) |
+| 📦732 | Gestión de la Salud | v0.1.199 | Compuesto (tasas ausentismo, accidentes, evaluaciones, seguimientos) |
+| 📦733 | Gestión de Peligros y Riesgos | v0.1.200 | 5 componentes (Inspecciones %, Mantenimiento %, Peligros evaluados %, Mediciones %, EPP %) |
+| 📦734/735 | Gestión de Amenazas | v0.1.201/202 | Cobertura documental (% submódulos con archivos) |
+| 📦736 | Verificación | v0.1.203 | Cumplimiento promedio de 4 submódulos + IPC real del ciclo activo |
+| 📦737 | Mejoramiento | v0.1.204 | % cumplimiento (cerradas/total) del viewer 7.1.1 |
 
 #### Archivos del design system
 - `shared/kair-design-tokens.css` — 9 tokens CSS globales en `:root`: tipografía (`--kair-font-display` DM Sans 800, `--kair-font-ui` Manrope), radios (`--kair-radius-card/modal/control`), espacios (`--kair-spacer-*`), colores (`--kair-blue/blue-ink/mint/red/amber/ink/muted/faint/canvas/card/line`), transiciones (`--kair-transition` 180ms).
@@ -230,16 +240,48 @@ A partir de v0.1.197, los homes de módulos (Recursos, Gestión Humana, etc.) us
 - `.kair-task` + `.kair-task-icon` — item de lista con icono circular
 - `.kair-module` + `.kair-module-grid` — card de submódulo con flecha
 
+#### Estructura canónica del home premium (todos los módulos)
+
+```javascript
+async render() {
+    // 1. injectStyles() vacío (usa design system compartido)
+    // 2. layout con flex chain: height 100% + display flex + flex-direction column + min-height 0
+    // 3. header minimal (.kair-page-header + breadcrumb + H1)
+    // 4. mainArea con skeleton + flex:1 + overflow-y:auto
+    // 5. await refreshStats() / loadCicloActivo() / IPC
+    // 6. await renderMainArea(mainArea) — premium pattern
+}
+
+async renderMainArea(container) {
+    // 1. Calcular score compuesto (promedio simple excluyendo sin datos)
+    // 2. Hero strip: 1 .kair-hero-card (score) + 3 .kair-metric-card
+    // 3. Content grid: .kair-card (chart SVG nativo) + .kair-card (panel "En tu radar")
+    // 4. Modules grid: .kair-module-grid con cards de submódulos
+}
+```
+
 #### Reglas del design system
 - **Coexistencia**: los nuevos `kair-*` conviven con los legacy `--k-*` sin conflicto (prefijos distintos).
 - **Responsive fluido**: usar `clamp(min, vw, max)` + `auto-fit` / `auto-fill` para escalar entre ~600px y >1300px.
-- **Cache-bust obligatorio**: cada vez que se modifique `kair-design-tokens.css` o `kair-components.css`, bumpear `?v=YYYYMMDD-HHMM-descriptor` en `index.html`. **Lo mismo aplica a `styles.css`** que también cachea agresivamente en Electron.
+- **Cache-bust obligatorio**: cada vez que se modifique `kair-design-tokens.css` o `kair-components.css`, bumpear `?v=YYYYMMDD-HHMM-descriptor` en `index.html`. **Lo mismo aplica a `styles.css`** y a cada `<script>` de módulo home. Bumpear `?v=YYYYMMDD-vN-rediseno` (o `-fix-*`) tras CADA cambio.
 - **NO agregar `margin: 0 auto` a headers que comparten container con cards** — esto centra el bloque y lo desalinea del resto. Usar `margin: 0 lateral` + `max-width` igual al container padre.
 - **Para scroll interno en flex chain**: TODOS los niveles intermedios necesitan `flex: 1` O `height: 100%` + `min-height: 0` para que `overflow: auto` funcione. Si una clase usada en JS no tiene reglas CSS, agregarlas (caso histórico: `.k-app-layout`).
+- **Patrón exacto del layout y mainArea** (replicado en los 8 módulos):
+
+```javascript
+const layout = document.createElement('div');
+layout.className = 'k-app-layout';
+layout.style.cssText = 'height: 100%; display: flex; flex-direction: column; min-height: 0;';
+
+const mainArea = document.createElement('div');
+mainArea.id = 'app-container';
+mainArea.className = '<nombre-modulo>-home';   // NO usar .gestion-integral-home como copia
+mainArea.style.cssText = 'flex: 1; min-height: 0; overflow-y: auto; padding: 0 1.5rem 1.5rem; box-sizing: border-box;';
+```
 
 #### Patrón de score compuesto del módulo
 
-El hero card "ESTADO GENERAL" del módulo Recursos usa **promedio simple de N componentes** disponibles en `resourceStats`, excluyendo los que no tienen datos:
+El hero card de cada módulo usa **promedio simple de N componentes** disponibles en sus stats, excluyendo los que no tienen datos:
 
 ```javascript
 const componentes = [
@@ -254,7 +296,67 @@ const score = componentes.filter(v => v !== null)
                           .reduce((a, b) => a + b, 0) / componentes.filter(v => v !== null).length;
 ```
 
-Aplicar el mismo patrón cuando se agreguen nuevos módulos al home premium.
+Tipos de componentes soportados:
+- **Continuo (% calculado)**: ej. cumplimiento de presupuesto
+- **Binario (100/0)**: ej. acta del mes en curso
+- **Inverso (100-X)**: ej. tasa de ausentismo → `100 - tasaAusentismo`
+- **Discreto (100/0/null)**: ej. estado de afiliación ok/warn/danger
+
+#### `handleSubmoduleClick` — patrón obligatorio
+
+Si el módulo tiene submódulos navegables, el handler DEBE existir (verificado en 8 paquetes):
+
+```javascript
+handleSubmoduleClick(submoduleName) {
+    const mainCanvas = document.querySelector('.main-canvas');
+    if (mainCanvas && typeof window.showSubmoduleContent === 'function') {
+        window.showSubmoduleContent(mainCanvas, this.moduleName, submoduleName);
+    } else {
+        alert('Navegando a ' + submoduleName);
+    }
+}
+```
+
+Antes de la migración, este handler faltaba en Gestión Integral (📦731) y Gestión Salud (📦732), causando clicks que no navegaban. Ahora se agrega preventivamente en cada rediseño.
+
+#### Chart SVG nativo vs Chart.js
+
+El home premium usa **SVG nativo** (no Chart.js) en `renderChart*()`:
+- Más simple (sin canvas-reuse bugs, sin init/destroy).
+- Mismo visual con menos código.
+- Métodos Chart.js legacy (`renderAuditoriasChart`, `renderCumplimientoChart`, `renderAccionesChart`, `renderEstadosChart`, `renderArchivosChart`, `renderTiposChart`, `renderInspeccionesChart`, `renderCumplimientoChart` en Peligros) quedan en el archivo por si se necesitan en otros submódulos, pero ya NO se invocan desde el home.
+
+#### Lección crítica: reescritura de archivos grandes con scripts Python (📦730-737)
+
+Cuando un módulo home tiene >30KB con muchos métodos, usar SIEMPRE este patrón en el script Python (lección aprendida en 5 paquetes):
+
+1. **Backup atómico** con `[System.IO.File]::Copy()` de .NET (Copy-Item bloqueado en PowerShell). Patrón `*.bak-pre-rediseno-YYYYMMDD` (ignorado por `.gitignore`).
+2. **Inventario pre de métodos** con regex `^\s*(?:async\s+)?(\w+)\s*\(` (NO capturar el `async`).
+3. **Reemplazar 3 rangos identificados** (no 1 reescritura masiva):
+   - Rango A: `async render()` legacy → nuevo con premium pattern
+   - Rango C: `injectStyles()` con CSS legacy → stub mínimo
+   - Rango D: métodos legacy mezclados → reconstrucción con lista EXPLÍCITA de preservados + nuevos
+4. **Inventario post de métodos** (mismo regex).
+5. **Verificación de preservación**: `preserved_expected.issubset(post_names)` debe ser True.
+6. **Verificación de duplicados por declaración exacta**: `grep -c "^\s*(async\s+)?nombreMetodo\(" archivo` para CADA método del inventario post. Debe ser exactamente 1.
+7. **Validar JS** con `node -c archivo.tmp.js` (NO `archivo.tmp` — Node no reconoce `.tmp`).
+8. **Escribir atómicamente** con `os.replace(tmp, src)`.
+
+#### Bug histórico: cierre de clase faltante
+
+El primer script Python de Gestión de Amenazas (📦734) perdió el cierre de clase `}` porque `post_block = original_lines[740:]` saltaba la línea 740 (cierre). Síntoma: `SyntaxError: Unexpected token '.'` en `window.X = X;` (línea final). Fix: incluir el cierre como `class_closure = original_lines[739]` antes del `post_block`. Lección: SIEMPRE identificar la línea de cierre de clase explícitamente.
+
+#### Bug histórico: llamadas inválidas en `updateWidgetsUI`
+
+El primer script Python de Gestión de Amenazas (📦734) eliminó `renderArchivosChart`/`renderTiposChart` como "código muerto" pero `updateWidgetsUI` los invocaba desde `refreshStats`. Síntoma: `TypeError: this.renderArchivosChart is not a function` + skeleton infinito. Fix: antes de eliminar cualquier método, hacer `grep -c "nombreMetodo"` para confirmar 0 referencias activas. Lección: aplicar el grep SIEMPRE como paso previo a la eliminación en scripts futuros.
+
+#### Bug histórico: scroll interno faltante (📦735)
+
+El primer rediseño de Gestión de Amenazas (📦734) tenía `layout.style.height = '100%'` SIN la cadena flex. Sin `display: flex; flex-direction: column; min-height: 0`, el contenido se desbordaba sin scroll. Fix: usar `cssText` con todos los estilos de flex chain. Patrón ahora documentado arriba.
+
+#### Bug histórico pre-existente: clase CSS copiada
+
+4 módulos usaban clase `.gestion-integral-home` (copia literal del CSS de Gestión Integral): Verificación (📦736), Mejoramiento (📦737), Gestión Amenazas (📦734), Gestión Integral (📦731). Renombrados a sus clases correctas (`.<módulo>-home`) en cada rediseño.
 
 ### Comunicación
 - **Renderer ↔ Main process**: `window.electronAPI.modulo.metodo(arg).then(...)`

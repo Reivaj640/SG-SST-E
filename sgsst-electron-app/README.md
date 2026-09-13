@@ -1,7 +1,7 @@
 # K+AIR - Sistema de Gestión SG-SST
 
-**Versión:** 0.1.173 (próximo) — publicado v0.1.166
-**Última actualización:** 12 de agosto de 2026
+**Versión:** 0.1.204 (desarrollo) — publicado v0.1.204
+**Última actualización:** 13 de septiembre de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
 ---
@@ -37,6 +37,7 @@
 - ✅ **Búsqueda Inteligente de Archivos**: Normalización de tildes y múltiples variaciones de nombres
 - ✅ **COM Automation**: VBScript para controlar Excel y actualizar Power Query automáticamente
 - ✅ **Sistema de Skeleton Screens** (v0.1.110): API `KairSkeleton.*` con 10 componentes que reemplazan spinners genéricos por placeholders que imitan la forma del componente. Cubierto en 25 loaders en 13 vistas + 7 homes de módulo. Ver `AGENTS.md` (sección "🎨 Sistema de Skeleton Screens") para el detalle.
+- ✅ **Rediseño premium visual de homes de módulos** 🆕 (v0.1.197-204, `📦730-737`): Los 8 homes principales del sistema (Recursos, Gestión Integral, Gestión de la Salud, Gestión de Peligros y Riesgos, Gestión de Amenazas, Verificación, Mejoramiento + Recursos v2) ahora comparten un patrón visual premium unificado basado en `shared/kair-design-tokens.css` + `shared/kair-components.css`. Cada home muestra: header minimal con breadcrumb, hero card con score compuesto del módulo (promedio simple excluyendo sin datos), 3 metric cards, 1 chart SVG nativo, panel "En tu radar" con alertas condicionales, y grid responsivo de submódulos. Reemplaza los widgets individuales + charts Chart.js legacy por una composición data-driven. Reducción promedio de ~10KB por módulo en CSS legacy eliminado. Ver `AGENTS.md` (sección "K+AIR Premium Design System") para el detalle técnico completo y las lecciones aprendidas en el proceso.
 - ✅ **Solo 13 archivos en raíz**: Proyecto limpio y organizado
 - ✅ **Tabla de Ausentismo 17 Columnas**: Año, Fecha Inicio, Fecha Fin, Código
 - ✅ **Filtros Dinámicos Inteligentes**: Año y tipo basados en datos reales
