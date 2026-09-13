@@ -48,7 +48,7 @@ class GestionAmenazasHome {
         // 2. Layout principal
         const layout = document.createElement('div');
         layout.className = 'k-app-layout';
-        layout.style.height = '100%';
+        layout.style.cssText = 'height: 100%; display: flex; flex-direction: column; min-height: 0;';
         this.container.appendChild(layout);
 
         // 3. Header minimal
@@ -68,6 +68,7 @@ class GestionAmenazasHome {
         const mainArea = document.createElement('div');
         mainArea.id = 'app-container';
         mainArea.className = 'gestion-amenazas-home';
+        mainArea.style.cssText = 'flex: 1; min-height: 0; overflow-y: auto; padding: 0 1.5rem 1.5rem; box-sizing: border-box;';
         mainArea.innerHTML = KairSkeleton.kpiStrip(4);
         layout.appendChild(mainArea);
 
@@ -272,8 +273,10 @@ class GestionAmenazasHome {
                 this.widgets[code].update(data[code]);
             }
         });
-        this.renderArchivosChart(data);
-        this.renderTiposChart(data);
+        // 📦734 · renderArchivosChart/renderTiposChart fueron reemplazados por
+        // renderChartAmenazas (SVG nativo) en el rediseño premium. El chart SVG
+        // se renderiza una sola vez en renderMainArea() y consume el cache
+        // directamente, no necesita refresh reactivo como los charts Chart.js legacy.
     }
 
     renderSubmoduleItem(name) {

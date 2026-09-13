@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.202] - 2026-09-13
+
+### 🐛📦735 · Fix patch — Gestión de Amenazas: scroll interno + llamadas inválidas
+
+Dos correcciones sobre el rediseño premium de Gestión de Amenazas (📦734 / v0.1.201):
+
+1. **`updateWidgetsUI` ya no llama a métodos inexistentes** (`renderArchivosChart` / `renderTiposChart`)
+   - El bug rompía `refreshStats()` con `TypeError`, dejando la app en skeleton infinito
+2. **Scroll interno restaurado** (cadena flex completa)
+   - `layout`: agregados `display: flex; flex-direction: column; min-height: 0`
+   - `mainArea`: agregados `flex: 1; min-height: 0; overflow-y: auto; padding: 0 1.5rem 1.5rem`
+
+#### Archivos modificados
+
+- `modules/gestion-amenazas/gestion-amenazas-home.js` — 2 edits puntuales (updateWidgetsUI + render)
+- `index.html` — cache-bust `GESTION-AMENAZAS-20260913-v3-fix-scroll`
+- `package.json` — versión `0.1.202`
+- `CHANGELOG.md` — esta entrada
+
 ## [0.1.201] - 2026-09-13
 
 ### 📦734 · Módulo Gestión de Amenazas: rediseño premium visual + score compuesto
