@@ -1,13 +1,14 @@
 // gestion-integral-home.js - Componente para el home del módulo "Gestión Integral"
+// 📦754 · Rediseño premium visual (header minimal + hero + 3 metric cards + chart + radar + grid).
 
 class GestionIntegralHome {
     constructor(container, moduleName, submodules, companyName) {
         this.container = container;
         this.moduleName = moduleName;
         this.submodules = submodules;
-        // 📦748 · Aceptar currentCompany como parámetro del shell (fix: misma forma que Recursos).
+        // 📦748 · Aceptar currentCompany como parámetro del shell (misma forma que Recursos).
         this.currentCompany = companyName || this.getCurrentCompany() || null;
-        this.gestionIntegralStats = null;  // Almacenar estadísticas reales
+        this.gestionIntegralStats = null;
     }
 
     getCurrentCompany() {
@@ -29,20 +30,19 @@ class GestionIntegralHome {
         // 2. Layout
         const layout = document.createElement('div');
         layout.className = 'k-app-layout';
-        layout.style.height = '100%';
+        layout.style.cssText = 'height: 100%; display: flex; flex-direction: column; min-height: 0;';
 
-        // Header
+        // Header (📦754 — minimal: solo breadcrumb + H1, escala fluido)
         const header = document.createElement('header');
-        header.className = 'k-module-header';
+        header.className = 'kair-page-header';
         header.innerHTML = `
-            <div class="k-module-title">
-                <span class="k-module-title-icon" style="color: #212529;">${SIDEBAR_ICONS.file_text}</span>
-                <div>
-                    <div style="color: #212529; font-weight: 600;">Módulo Gestión Integral</div>
-                    <span style="font-size: 0.75rem; font-weight: 400; color: #6c757d;">
-                        ${this.currentCompany} / Gestión Integral
-                    </span>
+            <div class="kair-page-title-block">
+                <div class="kair-breadcrumb">
+                    <span>Inicio</span><span>/</span>
+                    <span>Gestión</span><span>/</span>
+                    <span>Integral</span>
                 </div>
+                <h1>Gestión Integral</h1>
             </div>
         `;
         layout.appendChild(header);
@@ -57,8 +57,8 @@ class GestionIntegralHome {
         mainArea.className = 'main-area';
         mainArea.style.flex = '1';
 
-        // 📦491 — Skeleton mientras cargan estadísticas de Gestión Integral (5 widgets + 2 bar charts)
-        mainArea.innerHTML = KairSkeleton.kpiStrip(5) + KairSkeleton.chartBars(12) + KairSkeleton.chartBars(12);
+        // 📦491 — Skeleton mientras cargan estadísticas de Gestión Integral (4 widgets + 1 chart)
+        mainArea.innerHTML = KairSkeleton.kpiStrip(4) + KairSkeleton.chartBars(12);
 
         // 📦491-fix — Agregar al DOM ANTES del await para que el skeleton sea visible
         contentContainer.appendChild(mainArea);
@@ -75,22 +75,13 @@ class GestionIntegralHome {
         // 1. Renderizar contenido (limpia el skeleton y pinta widgets reales)
         await this.renderMainArea(mainArea);
 
-        // Listen for fullscreen changes to update chart texts
-        if (window.electronAPI?.onFullscreenChanged) {
-            this._removeFullscreenListener = window.electronAPI.onFullscreenChanged((isFullscreen) => {
-                console.log(`[CHART-DIAG] IPC fullscreen-changed received: ${isFullscreen}`);
-                this.updateChartTexts(isFullscreen);
-            });
-        }
-
-        // Set initial text state based on actual window state
-        const isMaximized = await window.electronAPI?.isMaximized() ?? false;
-        this._isMaximized = isMaximized;
-        this.updateChartTexts(isMaximized);
+        // 📦754 · El rediseño premium usa SVG (renderChartPlan) en vez de Chart.js.
+        // initCharts ya no aplica — los canvases del layout legacy no existen en el nuevo home.
+        // setTimeout(() => this.initCharts(), 100); // 📦754 — deshabilitado por rediseño premium
     }
 
     injectStyles() {
-        const styleId = 'k-air-gestion-integral-styles-v1';
+        const styleId = 'k-air-gestion-integral-styles-v2';
         const oldStyle = document.getElementById(styleId);
         if (oldStyle) oldStyle.remove();
 
@@ -98,9 +89,10 @@ class GestionIntegralHome {
         style.id = styleId;
         style.textContent = `
             /* =========================================
-               1. SISTEMA VISUAL K+AIR (OFICIAL) - GESTIÓN INTEGRAL
+               1. SISTEMA VISUAL K+AIR (OFICIAL — GESTIÓN INTEGRAL)
                ========================================= */
             .gestion-integral-home {
+                /* Scope vars legacy (compatibilidad con widgets individuales) */
                 --k-primary: #174ea6;
                 --k-primary-hover: #185abd;
                 --k-primary-light: rgba(23, 78, 166, 0.1);
@@ -110,840 +102,37 @@ class GestionIntegralHome {
                 --k-warning-light: rgba(255, 193, 7, 0.1);
                 --k-danger: #dc3545;
                 --k-danger-light: rgba(220, 53, 69, 0.1);
-                --k-bg-app: #f8f9fa;
                 --k-bg-card: #ffffff;
-                --k-border: #dee2e6;
-                --k-font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+                --k-border: #e9ecef;
                 --k-text-main: #212529;
                 --k-text-muted: #6c757d;
-                --k-radius-md: 0.375rem;
-                --k-radius-lg: 0.5rem;
-                --k-shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
-                --k-shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.08);
-                --k-header-height: 60px;
+                --k-shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
 
-                font-family: var(--k-font-family);
-                color: var(--k-text-main);
-                background-color: var(--k-bg-app);
+                /* Scroll interno (mismo patrón que Recursos) */
                 height: 100%;
-                display: flex;
-                flex-direction: column;
-                padding: 1.5rem;
-                overflow: auto;
+                overflow: hidden auto;
+                background: #f8f9fa;
+                padding: clamp(15px, 1.8vw, 22px);
+                box-sizing: border-box;
             }
-
-            /* Header & Botones */
-            .k-module-header {
-                background-color: var(--k-bg-card);
-                border-bottom: 1px solid var(--k-border);
-                padding: 0 1.5rem;
-                height: var(--k-header-height);
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                flex-shrink: 0;
-            }
-
-            .k-module-title {
-                font-size: 1.25rem;
-                font-weight: 600;
-                color: var(--k-text-main);
-                display: flex;
-                align-items: center;
-                gap: 0.75rem;
-            }
-
-            /* Main Layout */
-            .main-area {
-                display: flex;
-                flex-direction: column;
-gap: 1rem;
-overflow-y: auto;
-                padding-right: 0.5rem;
-                width: 100%;
-                flex: 1;
+            .gestion-integral-home .main-area {
+                flex: 1 1 auto;
                 min-height: 0;
-            }
-
-            /* Grid de Widgets */
-            .widgets-container {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-                gap: 1rem;
-            }
-
-            /* Widget Base */
-            .widget {
-                background: var(--k-bg-card);
-                border: 1px solid var(--k-border);
-                border-radius: var(--k-radius-lg);
-                padding: 1rem;
-                display: flex;
-                flex-direction: column;
-                position: relative;
-                box-shadow: var(--k-shadow-sm);
-                transition: transform 0.2s ease;
-                min-height: 120px;
-                overflow: hidden;
-                word-wrap: break-word;
-            }
-            .widget:hover {
-                transform: translateY(-3px);
-                box-shadow: var(--k-shadow-md);
-            }
-            .widget h4 {
-                margin: 0 0 0.5rem 0;
-                font-size: 0.65rem;
-                color: var(--k-text-muted);
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-                font-weight: 600;
-                overflow-wrap: break-word;
-            }
-            .widget-value {
-                font-size: 1.4rem;
-                font-weight: 700;
-                color: var(--k-text-main);
-                margin-bottom: 0.5rem;
-                overflow-wrap: break-word;
-                word-wrap: break-word;
-            }
-            .widget-description {
-                font-size: 0.65rem;
-                color: var(--k-text-muted);
-                overflow-wrap: break-word;
-                word-wrap: break-word;
-            }
-
-            /* =========================================
-               2. COMPONENTES K+AIR (Budget Card Style)
-               Para widgets de Plan de Trabajo y otros
-               ========================================= */
-
-            /* Budget Card Base */
-            .k-budget-card {
-                display: flex;
-                flex-direction: column;
-                justify-content: space-between;
-                overflow: hidden;
-            }
-
-            /* Header del Widget */
-            .kb-header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 0.5rem;
-            }
-
-            .kb-title {
-                font-size: 0.65rem;
-                font-weight: 600;
-                color: var(--k-text-muted);
-                text-transform: uppercase;
-            }
-
-            .kb-badge {
-                font-size: 0.7rem;
-                font-weight: 700;
-                padding: 0.15rem 0.5rem;
-                border-radius: 1rem;
-                color: white;
-            }
-
-            /* Valor Principal */
-            .kb-amount {
-                font-size: 1.4rem;
-                font-weight: 700;
-                color: var(--k-text-main);
-                margin-bottom: 0.75rem;
-                text-align: center;
-                overflow-wrap: break-word;
-                word-wrap: break-word;
-            }
-
-            /* Descripción del widget (estilo estándar) */
-            .kb-description {
-                font-size: 0.72rem;
-                color: var(--k-text-muted);
-                text-align: center;
-                margin-bottom: 4px;
-            }
-
-            /* Barra de Progreso */
-            .kb-progress-track {
-                width: 100%;
-                height: 10px;
-                background-color: #e9ecef;
-                border-radius: 5px;
-                overflow: hidden;
-                margin-bottom: 0.5rem;
-                position: relative;
-            }
-
-            .kb-progress-bar {
-                height: 100%;
-                width: 0%;
-                border-radius: 5px;
-                background-color: var(--k-success);
-                transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1), 
-                            background-color 0.3s;
-                position: relative;
-            }
-
-            /* Footer del Widget */
-            .kb-footer {
-                display: flex;
-                justify-content: space-between;
-                font-size: 0.6rem;
-                margin-top: auto;
-                padding-top: 0.5rem;
-                border-top: 1px solid var(--k-border);
-            }
-
-            .kb-label {
-                color: var(--k-text-muted);
-                font-weight: 500;
-                font-size: 0.6rem;
-            }
-
-            .kb-value {
-                font-weight: 600;
-            }
-
-            .kb-exec {
-                color: var(--k-success);
-            }
-
-            .kb-rem {
-                color: var(--k-primary);
-            }
-
-            /* Badge Colors */
-            .bg-success {
-                background-color: var(--k-success) !important;
-            }
-            .bg-warning {
-                background-color: var(--k-warning) !important;
-            }
-            .bg-danger {
-                background-color: var(--k-danger) !important;
-            }
-
-            /* Toggle Buttons (estilo estándar Gestión de la Salud) */
-            .ausentismo-toggles {
-                display: flex;
-                gap: 4px;
-                margin: 4px 0;
-                background: #f1f3f4;
-                padding: 3px;
-                border-radius: 6px;
-            }
-            .ausentismo-toggle {
-                flex: 1;
-                border: none;
-                background: transparent;
-                font-size: 0.7rem;
-                padding: 2px 6px;
-                border-radius: var(--k-radius-md);
-                cursor: pointer;
-                color: var(--k-text-muted);
-                transition: all 0.2s;
-            }
-            .ausentismo-toggle.active {
-                background: white;
-                color: var(--k-primary);
-                box-shadow: var(--k-shadow-sm);
-                font-weight: 600;
-            }
-
-            /* Secciones de Gráficos y Listas */
-            .charts-grid {
-                display: grid;
-                grid-template-columns: repeat(2, 1fr);
-                gap: 1.25rem;
-            }
-
-            .chart-container {
-                background: var(--k-bg-card);
-                border: 1px solid var(--k-border);
-                border-radius: var(--k-radius-lg);
-                padding: 1.5rem;
-                box-shadow: var(--k-shadow-sm);
-                min-height: auto;
-                display: flex;
-                flex-direction: column;
-            }
-            .chart-container h3 {
-                margin-top: 0;
-                margin-bottom: 1rem;
-                font-size: 1.1rem;
-                color: var(--k-text-main);
-            }
-
-            /* =========================================
-               GRÁFICA DE AVANCE PLAN ANUAL (DONUT)
-               ========================================= */
-            
-            .chart-header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 1.25rem;
-                padding-bottom: 1rem;
-                border-bottom: 1px solid var(--k-border);
-            }
-            
-            .chart-title {
-                margin: 0;
-                font-size: 1.2rem;
-                color: var(--k-text-main);
-                font-weight: 600;
-            }
-            
-            .chart-subtitle {
-                font-size: 0.8rem;
-                color: var(--k-text-muted);
-                margin-top: 0.35rem;
-            }
-            
-            .chart-badge {
-                display: inline-flex;
-                align-items: center;
-                gap: 0.5rem;
-                padding: 0.5rem 1rem;
-                border-radius: 2rem;
-                font-size: 0.8rem;
-                font-weight: 600;
-            }
-            
-            .chart-badge i {
-                font-size: 0.9rem;
-            }
-            
-            .chart-badge-success {
-                background: var(--k-success-light);
-                color: var(--k-success);
-            }
-            
-            .chart-badge-warning {
-                background: var(--k-warning-light);
-                color: #856404;
-            }
-            
-            .chart-badge-danger {
-                background: var(--k-danger-light);
-                color: var(--k-danger);
-            }
-            
-            .chart-content {
-                display: flex;
-                gap: 2rem;
-                flex: 1;
-                align-items: center;
-            }
-            
-            /* Fullscreen: donut auto / tarjetas max 420px centradas */
-            .chart-content.chart-fullscreen {
-                gap: 2rem;
-                min-height: 320px;
-                justify-content: center;
-            }
-            .chart-content.chart-fullscreen .donut-chart-wrapper {
-                flex: 0 0 auto;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-            }
-            .chart-content.chart-fullscreen .donut-chart-svg {
-                width: 240px;
-                height: 240px;
-            }
-            .chart-content.chart-fullscreen .donut-percentage {
-                font-size: 3.5rem;
-            }
-            .chart-content.chart-fullscreen .donut-label {
-                font-size: 1rem;
-            }
-            .chart-content.chart-fullscreen .chart-legend {
-                flex: 1;
-                min-width: 0;
-                max-width: 420px;
-                gap: 0.5rem;
-                align-items: center;
-            }
-            .chart-content.chart-fullscreen .legend-item {
-                padding: 0.6rem 1rem;
-                gap: 0.6rem;
-                max-width: 360px;
-                width: 100%;
-            }
-            .chart-content.chart-fullscreen .legend-title {
-                font-size: 0.7rem;
-            }
-            .chart-content.chart-fullscreen .legend-description {
-                font-size: 0.6rem;
-            }
-            .chart-content.chart-fullscreen .legend-value {
-                font-size: 0.85rem;
-                min-width: 25px;
-            }
-            .chart-content.chart-fullscreen .legend-dot {
-                width: 10px;
-                height: 10px;
-            }
-            
-            .donut-chart-wrapper {
-                position: relative;
-                flex-shrink: 0;
-            }
-            
-            .donut-chart-svg {
-                width: 160px;
-                height: 160px;
-                transform: rotate(-90deg);
-                filter: drop-shadow(0 4px 8px rgba(0,0,0,0.1));
-            }
-            
-            .donut-segment {
-                fill: none;
-                stroke-linecap: round;
-            }
-            
-            .donut-segment-bg {
-                stroke: #e9ecef;
-            }
-            
-            .donut-segment-progress {
-                transition: stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1),
-                            stroke 0.3s ease;
-            }
-            
-            .donut-center-text {
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                text-align: center;
-            }
-            
-            .donut-percentage {
-                font-size: 2.8rem;
-                font-weight: 700;
-                color: var(--k-text-main);
-                line-height: 1;
-            }
-            
-            .donut-label {
-                font-size: 0.75rem;
-                color: var(--k-text-muted);
-                text-transform: uppercase;
-                letter-spacing: 1px;
-                margin-top: 0.35rem;
-            }
-            
-            .chart-legend {
-                flex: 1;
-                display: flex;
-                flex-direction: column;
-                gap: 0.6rem;
-                justify-content: center;
-            }
-            
-            .legend-item {
-                display: flex;
-                align-items: center;
-                gap: 0.75rem;
-                padding: 0.75rem 1rem;
-                background: var(--k-bg-app);
-                border-radius: var(--k-radius-md);
-                border: 1px solid var(--k-border);
-                transition: all 0.2s ease;
-                cursor: pointer;
-                min-width: 0;
-            }
-            
-            .legend-item:hover {
-                border-color: var(--k-primary);
-                background: var(--k-primary-light);
-                transform: translateX(5px);
-            }
-            
-            .legend-dot {
-                width: 12px;
-                height: 12px;
-                border-radius: 50%;
-                flex-shrink: 0;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            }
-            
-            .legend-info {
-                flex: 1;
-                min-width: 0;
-            }
-            
-            .legend-title {
-                font-size: 0.75rem;
-                font-weight: 600;
-                color: var(--k-text-main);
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
-            
-            .legend-description {
-                font-size: 0.65rem;
-                color: var(--k-text-muted);
-                margin-top: 0;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
-            
-            .legend-value {
-                font-size: 1rem;
-                font-weight: 700;
-                color: var(--k-text-main);
-                text-align: right;
-                min-width: 30px;
-                flex-shrink: 0;
-            }
-
-            /* =========================================
-               GRÁFICA DE OBJETIVOS SST (BARRAS)
-               ========================================= */
-            .objetivos-chart-wrapper {
-                flex: 1;
-                display: flex;
-                flex-direction: column;
-                min-height: 0;
-                padding: 0.5rem 0;
-            }
-            .objetivos-chart-wrapper canvas {
-                flex: 1;
-                min-height: 220px;
-            }
-
-            /* Responsive para la gráfica */
-            .chart-container {
-                overflow-x: hidden;
-                max-width: 100%;
-            }
-            
-            .donut-chart-wrapper {
-                max-width: 100%;
-            }
-            
-            @media (max-width: 992px) {
-                .charts-grid {
-                    grid-template-columns: 1fr;
-                }
-                .chart-content {
-                    gap: 1.5rem;
-                }
-                .legend-item {
-                    padding: 0.6rem 0.85rem;
-                }
-            }
-            
-            @media (max-width: 768px) {
-                .charts-grid {
-                    grid-template-columns: 1fr;
-                }
-                .chart-content {
-                    flex-direction: column;
-                    align-items: center;
-                }
-                
-                .chart-stats {
-                    grid-template-columns: 1fr;
-                }
-
-                .donut-percentage {
-                    font-size: 2rem;
-                }
-
-                .chart-container {
-                    min-height: auto;
-                }
-
-                .chart-header {
-                    flex-direction: column;
-                    gap: 1rem;
-                    align-items: flex-start;
-                }
-
-                .chart-badge {
-                    align-self: flex-start;
-                }
-            }
-
-            .submodules-container {
-                background: var(--k-bg-card);
-                border: 1px solid var(--k-border);
-                border-radius: var(--k-radius-lg);
-                padding: 1.5rem;
-                box-shadow: var(--k-shadow-sm);
-            }
-            .submodules-container h3 {
-                margin-top: 0;
-                margin-bottom: 1rem;
-                font-size: 1.1rem;
-                color: var(--k-text-main);
-                padding-bottom: 1rem;
-                border-bottom: 1px solid var(--k-border);
-            }
-            .submodules-list {
-                display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-gap: 1rem;
-}
-
-/* ANULAR ESTILOS GLOBALES (styles.css) */
-.gestion-integral-home .widget { margin-bottom: 0 !important; padding: 1rem !important; }
-.gestion-integral-home .widgets-container { margin-bottom: 0 !important; }
-.gestion-integral-home .chart-container { margin-top: 0 !important; margin-bottom: 0 !important; }
-
-@media (max-width: 768px) {
-                .submodules-list {
-                    grid-template-columns: 1fr;
-                }
-            }
-            .submodule-item {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                padding: 1rem;
-                background-color: #fcfcfc;
-                border: 1px solid var(--k-border);
-                border-radius: var(--k-radius-md);
-                transition: all 0.2s ease;
-            }
-            .submodule-item:hover {
-                background-color: var(--k-primary-light);
-                border-color: var(--k-primary);
-                transform: translateX(5px);
-            }
-            .submodule-info {
-                flex: 1;
-                margin-right: 1rem;
-                min-width: 0;  /* Importante para text truncation */
-            }
-            .submodule-name {
-                font-weight: 600;
-                color: var(--k-text-main);
-                font-size: 0.95rem;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
-            }
-            .submodule-meta {
-                font-size: 0.8rem;
-                color: var(--k-text-muted);
-                margin-top: 0.2rem;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
-            }
-            .btn-ingresar {
-                background-color: var(--k-primary);
-                color: white;
-                border: none;
-                padding: 0.5rem 1.25rem;
-                border-radius: var(--k-radius-md);
-                font-weight: 500;
-                font-size: 0.9rem;
-                cursor: pointer;
-                transition: background 0.2s;
-                white-space: nowrap;
-                flex-shrink: 0;  /* El botón no se encoje */
-            }
-            .btn-ingresar:hover { background-color: var(--k-primary-hover); }
-
-            /* =========================================
-               AJUSTES RESPONSIVE GENERALES
-               ========================================= */
-            
-            /* Ajustar tamaños de fuente en tablets y móviles */
-            @media (max-width: 768px) {
-                .widget-value {
-                    font-size: 1.2rem !important;
-                }
-                
-                .kb-amount {
-                    font-size: 1.2rem !important;
-                }
-                
-                .widget h4 {
-                    font-size: 0.6rem !important;
-                }
-                
-                .kb-title {
-                    font-size: 0.6rem !important;
-                }
-                
-                .kb-badge {
-                    font-size: 0.65rem !important;
-                    padding: 0.15rem 0.4rem !important;
-                }
-                
-                .widget {
-                    padding: 0.75rem;
-                    min-height: 100px;
-                }
-                
-                .k-budget-card {
-                    min-height: auto;
-                }
-                
-                .chart-container {
-                    padding: 1rem;
-                }
-                
-                .submodule-name {
-                    font-size: 0.85rem;
-                }
-            }
-            
-            /* Ajustes para móviles pequeños */
-            @media (max-width: 480px) {
-                .gestion-integral-home {
-                    padding: 1rem;
-                }
-                
-                .widget-value {
-                    font-size: 1.1rem !important;
-                }
-                
-                .kb-amount {
-                    font-size: 1.1rem !important;
-                }
-                
-                .donut-percentage {
-                    font-size: 1.8rem;
-                }
-                
-                .legend-item {
-                    padding: 0.75rem;
-                }
-                
-                .legend-value {
-                    font-size: 1.1rem;
-                }
-            }
-            
-            /* Prevenir desbordamiento en submodules */
-            .submodule-name {
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
-                max-width: 220px;
-            }
-
-            @media (max-width: 768px) {
-                .submodule-name {
-                    max-width: 180px;
-                }
-                
-                .btn-ingresar {
-                    font-size: 0.85rem;
-                    padding: 0.45rem 1rem;
-                }
-            }
-
-            @media (max-width: 480px) {
-                .submodule-name {
-                    max-width: 160px;
-                }
-                
-                .btn-ingresar {
-                    font-size: 0.8rem;
-                    padding: 0.4rem 0.85rem;
-                }
-            }
-
-            /* =========================================
-               TEMA OSCURO (MODO SYSTEM/DARK)
-               ========================================= */
-            [data-theme="dark"] .gestion-integral-home {
-                --k-primary: #4da6ff;
-                --k-primary-hover: #66b3ff;
-                --k-primary-light: rgba(77, 166, 255, 0.15);
-                --k-success: #5cb85c;
-                --k-success-light: rgba(92, 184, 92, 0.15);
-                --k-warning: #f0ad4e;
-                --k-warning-light: rgba(240, 173, 78, 0.15);
-                --k-danger: #d9534f;
-                --k-danger-light: rgba(217, 83, 79, 0.15);
-                --k-bg-app: #1a202c;
-                --k-bg-card: #2d3748;
-                --k-border: #4a5568;
-                --k-text-main: #e9ecef;
-                --k-text-muted: #adb5bd;
-                --k-shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.3);
-                --k-shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.4);
-            }
-
-            /* =========================================
-               TEMA OSCURO (DARK-LEGACY - PALETA NEGRO/GRIS)
-               ========================================= */
-            [data-theme="dark-legacy"] .gestion-integral-home {
-                --k-primary: #9e9e9e;
-                --k-primary-hover: #bdbdbd;
-                --k-primary-light: rgba(158, 158, 158, 0.15);
-                --k-success: #4caf50;
-                --k-success-light: rgba(76, 175, 80, 0.15);
-                --k-warning: #ff9800;
-                --k-warning-light: rgba(255, 152, 0, 0.15);
-                --k-danger: #f44336;
-                --k-danger-light: rgba(244, 67, 54, 0.15);
-                --k-bg-app: #121212;
-                --k-bg-card: #1e1e1e;
-                --k-border: #404040;
-                --k-text-main: #e0e0e0;
-                --k-text-muted: #a0a0a0;
-                --k-shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.6);
-                --k-shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.8);
+                overflow-y: auto;
             }
         `;
         document.head.appendChild(style);
-    }
-
-    /**
-     * Cargar estadísticas reales de Gestión Integral
-     */
-    async loadGestionIntegralStats() {
-        try {
-            console.log('🔄 [GestionIntegralHome] Cargando estadísticas para:', this.currentCompany);
-
-            if (window.electronAPI && window.electronAPI.getGestionIntegralStats) {
-                const result = await window.electronAPI.getGestionIntegralStats(this.currentCompany);
-                if (result.success) {
-                    this.gestionIntegralStats = result.stats;
-                    console.log('✅ [GestionIntegralHome] Estadísticas cargadas:', this.gestionIntegralStats);
-                } else {
-                    console.warn('⚠️ [GestionIntegralHome] Error cargando estadísticas:', result.error);
-                    this.gestionIntegralStats = null;
-                }
-            }
-        } catch (error) {
-            console.error('❌ [GestionIntegralHome] Error cargando estadísticas:', error);
-            this.gestionIntegralStats = null;
-        }
     }
 
     async renderMainArea(container) {
         // 📦491-fix — Limpiar skeleton antes de pintar widgets reales
         container.innerHTML = '';
 
-        // Widgets con contadores específicos para Gestión Integral (USANDO DATOS REALES)
-        const widgetsContainer = document.createElement('div');
-        widgetsContainer.className = 'widgets-container';
-
-        // Obtener datos reales o usar valores por defecto
-        const politica = this.gestionIntegralStats?.politica || { estado: 'No disponible', actualizada: false };
-        const objetivos = this.gestionIntegralStats?.objetivos || { total: 0, cumplidos: 0, porcentaje: 0 };
-        const plan_trabajo = this.gestionIntegralStats?.plan_trabajo || {
+        // Stats reales del módulo (con fallbacks seguros)
+        const stats = this.gestionIntegralStats || {};
+        const politica = stats.politica || { estado: 'No disponible', actualizada: null };
+        const objetivos = stats.objetivos || { total: 0, cumplidos: 0, porcentaje: 0 };
+        const plan_trabajo = stats.plan_trabajo || {
             totalActividades: 0,
             actividadesEjecutadas: 0,
             actividadesPendientes: 0,
@@ -952,123 +141,268 @@ gap: 1rem;
             ultimoMesRegistrado: null,
             estado: 'warning'
         };
-        const rendicion = this.gestionIntegralStats?.rendicion_cuentas || { actas_realizadas: 0 };
-        const cambios = this.gestionIntegralStats?.cambios || {
+        const rendicion = stats.rendicion_cuentas || { actas_realizadas: 0 };
+        const cambios = stats.cambios || {
             pipeline: { solicitud: 0, evaluacion: 0, aprobado: 0, ejecucion: 0, cerrado: 0 },
-            aging: { '0_15': 0, '16_30': 0, '31_60': 0, '60_plus': 0 },
             total: 0,
             pending: 0,
             disponible: false
         };
-        // Estructura completa de evaluación inicial con las 3 fuentes de datos
-        const evaluacion_inicial = this.gestionIntegralStats?.evaluacion_inicial || {
+        const evaluacion = stats.evaluacion_inicial || {
             disponible: false,
-            combinado: {
-                cumplimiento: 0,
-                hallazgosCriticos: 0,
-                hallazgosParciales: 0,
-                hallazgosCumplidos: 0,
-                totalHallazgos: 0
-            },
-            ministerio: {
-                disponible: false,
-                cumplimiento: 0,
-                hallazgosCriticos: 0,
-                hallazgosParciales: 0,
-                hallazgosCumplidos: 0,
-                totalHallazgos: 0,
-                ultimoInforme: null
-            },
-            arl: {
-                disponible: false,
-                cumplimiento: 0,
-                hallazgosCriticos: 0,
-                hallazgosParciales: 0,
-                hallazgosCumplidos: 0,
-                totalHallazgos: 0,
-                ultimoInforme: null
-            }
+            combinado: { cumplimiento: 0 }
         };
 
-        console.log('[GestionIntegralHome] Datos Evaluación Inicial:', evaluacion_inicial);
+        // 📦754 · cumplimientoGeneral: score compuesto del módulo.
+        // Promedio simple de los componentes disponibles, excluyendo los sin datos.
+        const cumplimientoPlan = plan_trabajo.totalActividades > 0 ? plan_trabajo.porcentajeAvance : null;
+        const cumplimientoObjetivos = objetivos.total > 0 ? objetivos.porcentaje : null;
+        const cumplimientoEvaluacion = evaluacion.disponible ? (evaluacion.combinado.cumplimiento || 0) : null;
+        const politicaOk = politica.actualizada === true ? 100 : (politica.actualizada === false ? 0 : null);
+        const rendicionOk = rendicion.actas_realizadas > 0 ? 100 : 0;
+        const cambiosOk = cambios.total > 0 ? (cambios.pending === 0 ? 100 : 0) : null;
+        const compGeneralArr = [cumplimientoPlan, cumplimientoObjetivos, cumplimientoEvaluacion, politicaOk, rendicionOk, cambiosOk].filter(function (v) { return v !== null; });
+        const cumplimientoGeneral = compGeneralArr.length > 0
+            ? Math.round(compGeneralArr.reduce(function (a, b) { return a + b; }, 0) / compGeneralArr.length)
+            : 0;
 
-        const widget1 = this.createWidgetGestionCambioPipeline(cambios);
-        const widget2 = this.createWidgetGestionCambioAging(cambios);
-        const widget3 = this.createPlanTrabajoWidget(plan_trabajo);  // ← NUEVO: Widget moderno
-        const widget4 = this.createEvaluacionInicialWidget(evaluacion_inicial);  // ← NUEVO: Widget Evaluación Inicial
-        const widget5 = this.createWidget('Rendición de Cuentas', `${rendicion.actas_realizadas} actas`, rendicion.actas_realizadas > 0 ? 'Realizadas' : 'Sin actas');
+        // 1) HERO STRIP
+        const health = document.createElement('section');
+        health.className = 'kair-health';
 
-        widgetsContainer.appendChild(widget1);
-        widgetsContainer.appendChild(widget2);
-        widgetsContainer.appendChild(widget3);
-        widgetsContainer.appendChild(widget4);
-        widgetsContainer.appendChild(widget5);
+        const hero = document.createElement('article');
+        hero.className = 'kair-hero-card';
+        const heroMsg = cumplimientoGeneral >= 80
+            ? 'Tu sistema va por buen camino.'
+            : cumplimientoGeneral >= 50
+                ? 'Hay áreas que necesitan atención este mes.'
+                : 'Atención: hay actividades críticas pendientes.';
+        // 📦754 · Tareas pendientes: incluye TODOS los pendientes del módulo
+        const tareasPendientes = (plan_trabajo.actividadesPendientes || 0) +
+            (cambios.pending || 0) +
+            (rendicion.actas_realizadas > 0 ? 0 : 1) +
+            (politica.actualizada === false ? 1 : 0);
+        hero.innerHTML = ''
+            + '<div class="kair-hero-eyebrow">Estado general</div>'
+            + '<h2>' + heroMsg + '</h2>'
+            + '<p class="kair-hero-msg">Hay ' + tareasPendientes + ' actividades que necesitan atención este mes.</p>'
+            + '<div class="kair-hero-score">' + cumplimientoGeneral + '%<span>cumplimiento</span></div>';
+        health.appendChild(hero);
 
-        // Widget de Archivo y Retención Documental (2.5.1)
-        try {
-            if (window.electronAPI?.archivoRetencion?.getStats) {
-                const statsResult = await window.electronAPI.archivoRetencion.getStats(this.currentCompany);
-                if (statsResult?.success && statsResult?.data) {
-                    const widget6 = this.createArchivoRetencionWidget(statsResult.data);
-                    widget6.style.cursor = 'pointer';
-                    widget6.title = 'Ver dashboard de gestión documental';
-                    widget6.addEventListener('click', () => {
-                        this.openArchivoRetencionDashboard();
-                    });
-                    widgetsContainer.appendChild(widget6);
-                }
-            }
-        } catch (err) {
-            console.warn('⚠️ [GestionIntegralHome] No se pudieron cargar stats de archivo retención:', err.message);
-        }
+        const planPct = cumplimientoPlan || 0;
+        const objetivosPct = cumplimientoObjetivos || 0;
+        const evaluacionPct = cumplimientoEvaluacion || 0;
+        health.appendChild(this.renderMetricCard({
+            label: 'Plan de trabajo anual',
+            valueHTML: (plan_trabajo.actividadesEjecutadas || 0) + ' <small style="font:500 15px DM Sans;color:#8791a1">/ ' + (plan_trabajo.totalActividades || 0) + '</small>',
+            desc: 'Actividades ejecutadas',
+            progressPct: planPct,
+            variant: planPct >= 70 ? 'ok' : planPct >= 40 ? 'warning' : 'danger'
+        }));
+        health.appendChild(this.renderMetricCard({
+            label: 'Objetivos SST',
+            valueHTML: (objetivos.cumplidos || 0) + ' <small style="font:500 15px DM Sans;color:#8791a1">/ ' + (objetivos.total || 0) + '</small>',
+            desc: 'Indicadores cumplidos',
+            progressPct: objetivosPct,
+            variant: objetivosPct >= 70 ? 'ok' : objetivosPct >= 40 ? 'warning' : 'danger'
+        }));
+        health.appendChild(this.renderMetricCard({
+            label: 'Evaluación inicial',
+            valueHTML: evaluacionPct.toFixed(1) + '<span style="font:600 16px DM Sans">%</span>',
+            desc: 'Cumplimiento combinado',
+            progressPct: evaluacionPct,
+            variant: evaluacionPct >= 70 ? 'ok' : evaluacionPct >= 40 ? 'warning' : 'danger'
+        }));
+        container.appendChild(health);
 
-        container.appendChild(widgetsContainer);
+        // 2) CONTENT GRID: chart + radar
+        const content = document.createElement('section');
+        content.className = 'kair-content';
 
-        // === NUEVA GRÁFICA DE DONA PARA AVANCE DEL PLAN ANUAL ===
-        const chartsGrid = document.createElement('div');
-        chartsGrid.className = 'charts-grid';
-        const chartContainer = this.createAnnualPlanChart(plan_trabajo);
-        chartsGrid.appendChild(chartContainer);
+        const chartCard = document.createElement('article');
+        chartCard.className = 'kair-card';
+        chartCard.innerHTML = ''
+            + '<div class="kair-row-title">'
+            + '  <div>'
+            + '    <h3>Ejecución del Plan Anual</h3>'
+            + '    <div class="kair-card-hint">Avance anual · actividades programadas vs ejecutadas</div>'
+            + '  </div>'
+            + '</div>'
+            + '<div class="kair-chart" id="kair-chart-plan"></div>';
+        content.appendChild(chartCard);
 
-        // === GRÁFICA DE OBJETIVOS SST POR PRINCIPIO ===
-        // 📦562 — createObjetivosChart ya no necesita principiosAutoResultados
-        // (la barra "Indicadores (%)" se eliminó — era de otro sistema y confundía).
-        const objetivosChartContainer = this.createObjetivosChart(objetivos);
-        chartsGrid.appendChild(objetivosChartContainer);
+        const radarCard = document.createElement('article');
+        radarCard.className = 'kair-card';
+        radarCard.innerHTML = ''
+            + '<div class="kair-row-title">'
+            + '  <div>'
+            + '    <h3>En tu radar</h3>'
+            + '    <div class="kair-card-hint">Requieren gestión este mes</div>'
+            + '  </div>'
+            + '</div>'
+            + this.buildRadarTasks();
+        content.appendChild(radarCard);
 
-        container.appendChild(chartsGrid);
+        container.appendChild(content);
 
-        const submodulesContainer = document.createElement('div');
-        submodulesContainer.className = 'submodules-container';
-        
-        const submodulesTitle = document.createElement('h3');
-        submodulesTitle.textContent = 'Submódulos';
-        submodulesContainer.appendChild(submodulesTitle);
-        
-        const submodulesList = document.createElement('div');
-        submodulesList.className = 'submodules-list';
-        
-        this.submodules.forEach(submodule => {
-            const submoduleItem = this.renderSubmoduleItem(submodule);
-            submodulesList.appendChild(submoduleItem);
-        });
-        
-        submodulesContainer.appendChild(submodulesList);
-        container.appendChild(submodulesContainer);
+        // 3) GRID: módulos
+        const modules = document.createElement('section');
+        modules.className = 'kair-modules';
+        const modulesCard = document.createElement('article');
+        modulesCard.className = 'kair-card';
+        modulesCard.innerHTML = ''
+            + '<div class="kair-row-title">'
+            + '  <div>'
+            + '    <h3>Explorar submódulos</h3>'
+            + '    <div class="kair-card-hint">Gestiona la documentación y evidencias de tu sistema.</div>'
+            + '  </div>'
+            + '  <button class="kair-btn kair-btn-ghost">Ver todos</button>'
+            + '</div>'
+            + '<div class="kair-module-grid" id="kair-submodules-grid"></div>';
+        modules.appendChild(modulesCard);
+        container.appendChild(modules);
 
-        this._logChartDiagnostics(`RENDER — DOM ready (isMaximized=${this._isMaximized ?? 'pending'})`);
-        this.updateChartTexts(this._isMaximized ?? false);
+        // Renderizar chart SVG y submódulos (data-driven, después del DOM)
+        this.renderChartPlan(plan_trabajo);
+        this.renderSubmodulesGrid();
     }
 
-    /**
-     * 📦XXX — Widget de Pipeline de Gestión del Cambio (2.11.1).
-     * Esquema: misma estructura que los otros widgets del home (k-budget-card):
-     *   header (title + badge) → amount (big number) → description → progress bar
-     *   → 2 stats al fondo (Activos | Cerrados).
-     * Click → ir al módulo 2.11.1.
-     *
-     * @param {Object} data - { pipeline: {solicitud, evaluacion, aprobado, ejecucion, cerrado}, total, pending, disponible }
-     */
+    renderMetricCard(opts) {
+        var label = opts.label;
+        var valueHTML = opts.valueHTML;
+        var desc = opts.desc;
+        var progressPct = opts.progressPct;
+        var variant = opts.variant;
+        var card = document.createElement('article');
+        card.className = 'kair-metric-card' + (variant && variant !== 'ok' ? ' kair-metric-card--' + variant : '');
+        card.innerHTML = ''
+            + '<span class="kair-metric-head">' + label + '</span>'
+            + '<div class="kair-metric-value">' + valueHTML + '</div>'
+            + '<p class="kair-metric-desc">' + desc + '</p>'
+            + '<div class="kair-progress"><i style="width:' + Math.min(100, progressPct) + '%"></i></div>';
+        return card;
+    }
+
+    buildRadarTasks() {
+        var stats = this.gestionIntegralStats || {};
+        var tareas = [];
+        var politica = stats.politica || {};
+        if (politica.actualizada === false) {
+            tareas.push({
+                icon: '◷', bg: '#fff5e6', color: '#c28316',
+                title: 'Política del SG-SST',
+                sub: 'Pendiente de actualización',
+                status: 'Pendiente', statusClass: 'kair-status-pill--warn'
+            });
+        }
+        var rendicion = stats.rendicion_cuentas || {};
+        if ((rendicion.actas_realizadas || 0) === 0) {
+            tareas.push({
+                icon: '◷', bg: '#eff7f5', color: '#178666',
+                title: 'Rendición de cuentas',
+                sub: 'Aún no hay actas registradas',
+                status: 'Pendiente', statusClass: 'kair-status-pill--warn'
+            });
+        }
+        var cambios = stats.cambios || {};
+        if ((cambios.pending || 0) > 0) {
+            tareas.push({
+                icon: '◷', bg: '#f0eaff', color: '#6b3fb8',
+                title: 'Gestión del Cambio',
+                sub: cambios.pending + ' solicitudes en pipeline',
+                status: 'Pendiente', statusClass: 'kair-status-pill--warn'
+            });
+        }
+        if (tareas.length === 0) {
+            tareas.push({
+                icon: '✓', bg: '#e9f3ff', color: '#2057b8',
+                title: 'Sistema estable',
+                sub: 'Sin alertas pendientes este mes',
+                status: 'Al día', statusClass: 'kair-status-pill--ok'
+            });
+        }
+        var html = '';
+        for (var i = 0; i < tareas.length && i < 3; i++) {
+            var t = tareas[i];
+            html += ''
+                + '<div class="kair-task">'
+                + '  <div class="kair-task-icon" style="background:' + t.bg + ';color:' + t.color + '">' + t.icon + '</div>'
+                + '  <div>'
+                + '    <strong>' + t.title + '</strong>'
+                + '    <small>' + t.sub + '</small>'
+                + '  </div>'
+                + '  <span class="kair-status-pill ' + t.statusClass + '">' + t.status + '</span>'
+                + '</div>';
+        }
+        return html;
+    }
+
+    renderChartPlan(data) {
+        var el = document.getElementById('kair-chart-plan');
+        if (!el) return;
+        var porcentaje = data.porcentajeAvance || 0;
+        var total = data.totalActividades || 0;
+        var ejecutadas = data.actividadesEjecutadas || 0;
+        var pendientes = data.actividadesPendientes || 0;
+        var W = 690, H = 170;
+        var PAD_L = 30, PAD_R = 10, PAD_T = 14, PAD_B = 24;
+        // 📦754 · Línea simple de % acumulado + barra horizontal con progreso.
+        // Si en el futuro hay datos mensuales, se reemplaza por curva SVG.
+        var pctVal = Math.min(100, porcentaje);
+        var barX = PAD_L;
+        var barW = (W - PAD_L - PAD_R);
+        var barH = 22;
+        var barY = (H - PAD_B) / 2 - barH / 2;
+        var filledW = (barW * pctVal) / 100;
+
+        // Construir SVG con barra horizontal + leyenda + sub-texto
+        var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" style="width:100%;height:auto;display:block;">'
+            + '<line x1="' + PAD_L + '" y1="' + (H - PAD_B) + '" x2="' + (W - PAD_R) + '" y2="' + (H - PAD_B) + '" stroke="#e9ecef" stroke-width="1"/>'
+            + '<text x="' + PAD_L + '" y="' + (PAD_T + 14) + '" font-family="Manrope, sans-serif" font-size="12" fill="#637189">Progreso anual del Plan de Trabajo SST</text>'
+            + '<text x="' + (W - PAD_R) + '" y="' + (PAD_T + 14) + '" text-anchor="end" font-family="Manrope, sans-serif" font-size="20" font-weight="800" fill="#174ea6">' + porcentaje + '%</text>'
+            + '<rect x="' + barX + '" y="' + barY + '" width="' + barW + '" height="' + barH + '" rx="11" ry="11" fill="#eef0f1"/>'
+            + '<rect x="' + barX + '" y="' + barY + '" width="' + filledW + '" height="' + barH + '" rx="11" ry="11" fill="#174ea6"/>'
+            + '</svg>';
+
+        el.innerHTML = ''
+            + svg
+            + '<div style="display:flex;justify-content:space-between;margin-top:10px;font:500 12px Manrope;color:#637189;">'
+            + '  <span><strong style="color:#212529;">' + ejecutadas + '</strong> ejecutadas</span>'
+            + '  <span><strong style="color:#212529;">' + pendientes + '</strong> pendientes</span>'
+            + '  <span><strong style="color:#212529;">' + total + '</strong> totales</span>'
+            + '</div>';
+    }
+
+    renderSubmodulesGrid() {
+        var grid = document.getElementById('kair-submodules-grid');
+        if (!grid) return;
+        // 📦754 · Mostrar TODOS los submódulos del módulo (no solo los primeros N).
+        // El grid CSS responsivo (auto-fill + minmax) se ajusta solo.
+        var items = this.submodules || [];
+        var html = '';
+        for (var i = 0; i < items.length; i++) {
+            var name = items[i];
+            var m = name.match(/^(\d+\.\d+\.\d+)/);
+            var codeStr = m ? m[1] : String(i + 1);
+            var cleanName = name.replace(/^\d+\.\d+\.\d+\s*/, '');
+            html += ''
+                + '<div class="kair-module" data-submodule="' + name + '">'
+                + '  <span class="kair-module-n">' + codeStr + '</span>'
+                + '  <strong>' + cleanName + '</strong>'
+                + '  <small>Gestión y control</small>'
+                + '  <span class="kair-module-arrow">→</span>'
+                + '</div>';
+        }
+        grid.innerHTML = html;
+        var els = grid.querySelectorAll('.kair-module');
+        var self = this;
+        for (var j = 0; j < els.length; j++) {
+            (function (el) {
+                el.onclick = function () { self.handleSubmoduleClick(el.dataset.submodule); };
+            })(els[j]);
+        }
+    }
+
     createWidgetGestionCambioPipeline(data) {
         const widget = document.createElement('div');
         widget.className = 'widget k-budget-card';
@@ -2080,6 +1414,16 @@ gap: 1rem;
     }
     
     async renderSidebarPanel(container) {
+    }
+
+    handleSubmoduleClick(submoduleName) {
+        console.log('Navegando a submódulo:', submoduleName);
+        const mainCanvas = document.querySelector('.main-canvas');
+        if (mainCanvas && typeof window.showSubmoduleContent === 'function') {
+            window.showSubmoduleContent(mainCanvas, this.moduleName, submoduleName);
+        } else {
+            alert('Navegando a ' + submoduleName);
+        }
     }
 }
 

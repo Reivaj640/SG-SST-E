@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.198] - 2026-09-12
+
+### 📦731 · Módulo Gestión Integral: rediseño premium visual + score compuesto
+
+Replica el patrón premium aplicado al módulo Recursos (📦730) sobre el home de Gestión Integral, dejándolo data-driven con score compuesto del módulo.
+
+#### Cambios visuales (UI)
+
+- **Header minimal**: breadcrumb "Inicio / Gestión / Integral" + H1 "Gestión Integral" (sin subtítulo/badges/botones del legacy)
+- **Hero strip**: 1 hero card "ESTADO GENERAL" + 3 metric cards (Plan de trabajo anual, Objetivos SST, Evaluación inicial)
+- **Chart SVG simple**: ejecución del Plan Anual con barra horizontal (azul, 22px de alto) + leyenda "X ejecutadas · Y pendientes · Z totales"
+- **Panel "En tu radar"**: hasta 3 alertas del módulo (Política del SG-SST si desactualizada, Rendición de cuentas si 0 actas, Gestión del Cambio si hay pipeline)
+- **Grid "Explorar submódulos"**: cards responsivas con flecha, auto-fill + minmax
+- **Responsive fluido**: H1, padding, gaps y heights escalan entre ~600px y >1300px viewport usando `clamp()`
+
+#### Cambios funcionales (lógica)
+
+- **Score compuesto del módulo** — `cumplimientoGeneral`:
+  - Promedio simple de 6 componentes disponibles en `gestionIntegralStats`: Plan Anual %, Objetivos SST %, Evaluación Inicial % combinado, Política actualizada (100/0/null), Rendición de cuentas (100/0), Cambios (100/0/null)
+  - Excluye componentes sin datos (no penaliza con 0)
+- **Conteo completo de pendientes** — `tareasPendientes`:
+  - Plan Anual pendientes + cambios pendientes + rendición (1 si 0 actas) + política (1 si desactualizada)
+- **Método `handleSubmoduleClick` agregado**: faltaba en el archivo (estaba solo en Recursos); ahora el click de submódulos navega correctamente vía `window.showSubmoduleContent`
+
+#### Cambios estructurales (sistema)
+
+- **CSS legacy eliminado** — ~700 líneas de `charts-grid`, `chart-container`, `chart-header`, `donut-chart-wrapper`, `objetivos-chart-wrapper`, media queries `@media (max-width: 768px)` etc. reemplazadas por las clases `kair-*` del design system compartido (📦730)
+- **Patrón de scroll interno** — `.gestion-integral-home { height: 100%; overflow: hidden auto }` + `.main-area { flex: 1 1 auto; min-height: 0; overflow-y: auto }` (mismo patrón que Recursos en 📦730)
+- **`initCharts` deshabilitado** (línea comentada): los canvases Chart.js legacy no existen en el nuevo layout
+- **Métodos legacy preservados**: `loadGestionIntegralStats`, `createWidget`, `createWidgetGestionCambioPipeline`, `createWidgetGestionCambioAging`, `createPlanTrabajoWidget`, `createArchivoRetencionWidget`, `openArchivoRetencionDashboard`, `createEvaluacionInicialWidget`, `createAnnualPlanChart`, `createObjetivosChart` — quedan vivos para uso futuro en otros submódulos
+- **Cache-bust bumpeado** en `index.html:310` → `GESTION-INTEGRAL-20260912-v1-rediseno`
+
+#### Archivos tocados
+
+- `modules/gestion-integral/gestion-integral-home.js` (reescrito: 83KB → 62KB, -25%)
+- `index.html` (cache-bust)
+- `package.json` (0.1.197 → 0.1.198)
+- `CHANGELOG.md` (entrada 0.1.198)
+
 ## [0.1.197] - 2026-09-12
 
 ### 📦730 · Módulo Recursos: rediseño premium visual + score compuesto del módulo
