@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.204] - 2026-09-13
+
+### 📦737 · Módulo Mejoramiento: rediseño premium visual + score compuesto
+
+Replica el patrón premium aplicado a Recursos (📦730), Gestión Integral (📦731), Gestión de la Salud (📦732), Gestión de Peligros (📦733), Gestión de Amenazas (📦734/735) y Verificación (📦736) sobre el home de Mejoramiento Continuo, dejándolo data-driven con score compuesto del módulo.
+
+#### Cambios visuales (UI)
+
+- **Header minimal**: breadcrumb "Inicio / Mejoramiento" + H1 "Mejoramiento Continuo"
+- **Hero strip**: 1 hero card "CICLO DE MEJORA CONTINUA" + 3 metric cards (Total Acciones, En Proceso, Vencidas)
+- **Chart SVG nativo**: 4 barras horizontales con distribución por estado (Abiertas, En proceso, Cerradas, Vencidas) en colores diferenciados (azul/ámbar/verde/rojo)
+- **Panel "En tu radar"**: hasta 3 alertas (Acciones vencidas, Cumplimiento bajo, Acciones sin iniciar)
+- **Grid "Explorar submódulos"**: card responsiva con flecha (7.1.1 Acciones Preventivas y Correctivas)
+- **Responsive fluido** con clamp() y auto-fill/auto-fit
+
+#### Cambios funcionales (lógica)
+
+- **Score compuesto del módulo** — `cumplimiento`: % de acciones cerradas sobre el total
+- **Stats desde MejoramientoStore**: lee `window.MejoramientoStore.getStats()` (mismo objeto que consume el viewer 7.1.1 — fuente única de verdad)
+- **`handleSubmoduleClick` agregado** (faltaba en el archivo)
+- **`injectStyles()` reducido a stub** — usa design system compartido (elimina 213 líneas de CSS legacy)
+- **Bug fix pre-existente**: el archivo usaba clase `.gestion-integral-home` (copia literal) — reemplazada por `.mejoramiento-home`
+- **Subscribe eliminado**: el legacy se suscribía reactivamente al store; en el rediseño premium los stats se leen una sola vez al pintar (el home es estático, el viewer 7.1.1 sí es reactivo)
+
+#### Archivos modificados
+
+- `modules/mejoramiento/mejoramiento-home.js` (25,045 → 15,129 bytes, -9,916)
+- `index.html` — cache-bust `MEJORAMIENTO-20260913-v1-rediseno`
+- `package.json` — versión `0.1.204`
+- `CHANGELOG.md` — esta entrada
+
 ## [0.1.203] - 2026-09-13
 
 ### 📦736 · Módulo Verificación: rediseño premium visual + score compuesto
