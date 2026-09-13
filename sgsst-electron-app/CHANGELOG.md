@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.201] - 2026-09-13
+
+### 📦734 · Módulo Gestión de Amenazas: rediseño premium visual + score compuesto
+
+Replica el patrón premium aplicado a Recursos (📦730), Gestión Integral (📦731), Gestión de la Salud (📦732) y Gestión de Peligros y Riesgos (📦733) sobre el home de Gestión de Amenazas, dejándolo data-driven con score compuesto del módulo.
+
+#### Cambios visuales (UI)
+
+- **Header minimal**: breadcrumb "Inicio / Gestión / Amenazas" + H1 "Gestión de Amenazas"
+- **Hero strip**: 1 hero card "COBERTURA DOCUMENTAL" + 3 metric cards (Total Archivos, Total Carpetas, Tipos Únicos)
+- **Chart SVG nativo**: barras horizontales con archivos por submódulo (5.1.1 Plan de Prevención, 5.1.2 Exámenes Brigadista) en colores diferenciados
+- **Panel "En tu radar"**: hasta 3 alertas documentales (submódulos sin archivos, última carga >90 días, módulo sin documentación)
+- **Grid "Explorar submódulos"**: cards responsivas con flecha
+- **Responsive fluido** con clamp() y auto-fill/auto-fit
+
+#### Cambios funcionales (lógica)
+
+- **Score compuesto del módulo** — `cobertura`: % de submódulos con archivos (excluyendo errores)
+- **3 metric cards** derivados de stats reales: archivos totales, carpetas totales, tipos únicos
+- **`handleSubmoduleClick` agregado** (faltaba en el archivo legacy)
+- **`injectStyles()` reducido a stub** — usa design system compartido de `shared/kair-components.css` (elimina 296 líneas de CSS legacy hardcoded)
+
+#### Archivos modificados
+
+- `modules/gestion-amenazas/gestion-amenazas-home.js` (30,323 → 19,920 bytes, -10,403)
+- `index.html` — cache-bust `GESTION-AMENAZAS-20260913-v1-rediseno`
+- `package.json` — versión `0.1.201`
+- `CHANGELOG.md` — esta entrada
+
 ## [0.1.200] - 2026-09-13
 
 ### 📦733 · Módulo Gestión de Peligros y Riesgos: rediseño premium visual + score compuesto
