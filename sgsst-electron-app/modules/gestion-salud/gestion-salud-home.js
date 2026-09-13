@@ -1,28 +1,14 @@
 // gestion-salud-home.js - Componente para el home del módulo "Gestión de la Salud"
-
-// === SHIM: KairSkeleton desde ventana padre si no esta definido localmente ===
-// Los iframes no heredan los globales del padre automaticamente; este puente
-// evita el error "KairSkeleton is not defined" en vistas cargadas dentro de iframes.
-if (typeof window.KairSkeleton === 'undefined' && typeof parent !== 'undefined' && parent !== window && parent.window && parent.window.KairSkeleton) {
-  window.KairSkeleton = parent.window.KairSkeleton;
-}
-
-// Caché global para persistencia entre navegaciones de la misma sesión
-if (!window._saludHomeState) {
-    window._saludHomeState = {
-        cache: new Map(), // companyName -> data
-        lastUpdate: new Map() // companyName -> timestamp
-    };
-}
+// 📦754 · Rediseño premium visual (header minimal + hero + 3 metric cards + chart + radar + grid).
 
 class GestionSaludHome {
     constructor(container, moduleName, submodules, companyName) {
         this.container = container;
         this.moduleName = moduleName;
         this.submodules = submodules;
-        // 📦748 · Aceptar currentCompany como parámetro del shell (más robusto que solo getCurrentCompany()).
-        this.currentCompany = companyName || this.getCurrentCompany();
-        this.widgets = {}; // Referencias a elementos de widgets para actualización reactiva
+        // 📦748 · Aceptar currentCompany como parámetro del shell (misma forma que Recursos).
+        this.currentCompany = companyName || this.getCurrentCompany() || null;
+        this.saludStats = null;
     }
 
     getCurrentCompany() {
@@ -44,20 +30,19 @@ class GestionSaludHome {
         // 2. Layout
         const layout = document.createElement('div');
         layout.className = 'k-app-layout';
-        layout.style.height = '100%';
+        layout.style.cssText = 'height: 100%; display: flex; flex-direction: column; min-height: 0;';
 
-        // Header
+        // Header (📦754 — minimal: solo breadcrumb + H1, escala fluido)
         const header = document.createElement('header');
-        header.className = 'k-module-header';
+        header.className = 'kair-page-header';
         header.innerHTML = `
-            <div class="k-module-title">
-                <span class="k-module-title-icon" style="color: #212529;">${SIDEBAR_ICONS.heart_pulse}</span>
-                <div>
-                    <div style="color: #212529; font-weight: 600;">Módulo Gestión de la Salud</div>
-                    <span style="font-size: 0.75rem; font-weight: 400; color: #6c757d;">
-                        ${this.currentCompany} / Gestión de la Salud
-                    </span>
+            <div class="kair-page-title-block">
+                <div class="kair-breadcrumb">
+                    <span>Inicio</span><span>/</span>
+                    <span>Gestión</span><span>/</span>
+                    <span>Salud</span>
                 </div>
+                <h1>Gestión de la Salud</h1>
             </div>
         `;
         layout.appendChild(header);
@@ -72,18 +57,25 @@ class GestionSaludHome {
         mainArea.className = 'main-area';
         mainArea.style.flex = '1';
 
-        // 📦491 — Skeleton mientras cargan las 6 estadísticas de Gestión Salud en paralelo (6 widgets + 2 bar/line charts)
-        mainArea.innerHTML = KairSkeleton.kpiStrip(6) + KairSkeleton.chartBars(12) + KairSkeleton.chartBars(12);
+        // 📦491 — Skeleton mientras cargan las estadísticas de Gestión Salud
+        mainArea.innerHTML = KairSkeleton.kpiStrip(4) + KairSkeleton.chartBars(12);
 
         contentContainer.appendChild(mainArea);
         layout.appendChild(contentContainer);
         this.container.appendChild(layout);
 
-        // 3. Cargar estadísticas ANTES de pintar widgets (main.js tiene caché de disco)
+        // 200ms para que el browser pinte el skeleton
+        await new Promise(r => setTimeout(r, 200));
+
+        // 3. Cargar estadísticas reales
         await this.refreshStats();
 
-        // 4. Renderizar contenido con datos reales
-        this.renderMainArea(mainArea);
+        // 4. Renderizar contenido premium (limpia el skeleton)
+        await this.renderMainArea(mainArea);
+
+        // 📦754 · El rediseño premium usa SVG (renderChartSalud) en vez de Chart.js.
+        // renderAccidentesChart ya no aplica al home — los canvases Chart.js no existen en el nuevo layout.
+        // El método queda vivo por si se necesita en otros submódulos.
     }
 
     /**
@@ -833,79 +825,320 @@ Trabajadores con inducción al día
     }
 
     injectStyles() {
-        const styleId = 'k-salud-home-optimized-styles';
+        const styleId = 'k-air-gestion-salud-styles-v2';
         const oldStyle = document.getElementById(styleId);
         if (oldStyle) oldStyle.remove();
 
         const style = document.createElement('style');
         style.id = styleId;
         style.textContent = `
-.gestion-salud-home {
---k-primary: #174ea6;
---k-primary-light: #e8f0fe;
---k-primary-hover: #1450a1;
---k-success: #28a745;
---k-danger: #dc3545;
---k-bg-card: #ffffff;
---k-bg-app: #f8f9fa;
---k-border: #dee2e6;
---k-text-main: #212529;
---k-text-muted: #6c757d;
---k-radius-md: 0.375rem;
---k-radius-lg: 0.5rem;
---k-shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
---k-shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.08);
---k-header-height: 60px;
---k-font-family: inherit;
-padding: 1.5rem;
-background: var(--k-bg-app);
-height: 100%;
-overflow-y: auto;
-}
-            .widgets-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 0 !important; }
-            .widget { background: var(--k-bg-card); border: 1px solid var(--k-border); border-radius: var(--k-radius-lg); padding: 1rem; box-shadow: var(--k-shadow-sm); display: flex; flex-direction: column; min-height: 120px; transition: transform 0.2s ease; } .widget:hover { transform: translateY(-3px); box-shadow: var(--k-shadow-md); } .widget h4 { margin: 0 0 0.5rem 0; font-size: 0.65rem; color: var(--k-text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; } .widget-value { font-size: 1.4rem; font-weight: 700; color: var(--k-text-main); margin-bottom: 0.5rem; } .widget-description { font-size: 0.65rem; color: var(--k-text-muted); }
-            .k-budget-card .kb-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
-            .k-budget-card .kb-title { font-size: 0.65rem; font-weight: 600; color: var(--k-text-muted); text-transform: uppercase; }
-            .k-budget-card .kb-badge { font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 1rem; color: white; background-color: var(--k-success); }
-            .k-budget-card .bg-success { background: var(--k-success) !important; }
-            .k-budget-card .bg-danger { background: var(--k-danger) !important; }
-            .k-budget-card .kb-amount { font-size: 1.4rem; font-weight: 700; color: var(--k-text-main); margin-bottom: 0.5rem; }
-            .k-budget-card .kb-footer { display: flex; justify-content: space-between; margin-top: auto; padding-top: 0.5rem; border-top: 1px solid #eee; }
-            .k-budget-card .kb-label { font-size: 0.6rem; color: var(--k-text-muted); text-transform: uppercase; }
-            .k-budget-card .kb-value { font-size: 0.6rem; font-weight: 600; }
-            .kb-exec { color: var(--k-success); }
-            .kb-rem { color: var(--k-primary); }
-            
-.kb-progress-track { width: 100%; height: 10px; background: #e9ecef; border-radius: 5px; overflow: hidden; margin-bottom: 0.5rem; position: relative; }
-.kb-progress-bar { height: 100%; width: 0%; border-radius: 5px; background-color: var(--k-success); transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s; }
+            /* =========================================
+               1. SISTEMA VISUAL K+AIR (OFICIAL — GESTIÓN SALUD)
+               ========================================= */
+            .gestion-salud-home {
+                /* Scope vars legacy (compatibilidad con widgets individuales) */
+                --k-primary: #174ea6;
+                --k-primary-hover: #185abd;
+                --k-primary-light: rgba(23, 78, 166, 0.1);
+                --k-success: #28a745;
+                --k-success-light: rgba(40, 167, 69, 0.1);
+                --k-warning: #ffc107;
+                --k-warning-light: rgba(255, 193, 7, 0.1);
+                --k-danger: #dc3545;
+                --k-danger-light: rgba(220, 53, 69, 0.1);
+                --k-bg-card: #ffffff;
+                --k-border: #e9ecef;
+                --k-text-main: #212529;
+                --k-text-muted: #6c757d;
+                --k-shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
 
-            .ausentismo-toggles { display: flex; gap: 4px; margin: 4px 0; background: #f1f3f4; padding: 3px; border-radius: 6px; }
-.ausentismo-toggle { flex: 1; border: none; background: transparent; font-size: 0.7rem; padding: 2px 6px; border-radius: var(--k-radius-md); cursor: pointer; color: var(--k-text-muted); transition: all 0.2s; }
-.ausentismo-toggle.active { background: white; color: var(--k-primary); box-shadow: var(--k-shadow-sm); font-weight: 600; }
-
-            .submodules-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
-.submodule-item { display: flex; align-items: center; justify-content: space-between; padding: 1rem; background-color: #fcfcfc; border: 1px solid var(--k-border); border-radius: var(--k-radius-md); transition: all 0.2s ease; }
-.submodule-item:hover { background-color: var(--k-primary-light); border-color: var(--k-primary); transform: translateX(5px); }
-.btn-ingresar { background-color: var(--k-primary); color: white; border: none; padding: 0.5rem 1.25rem; border-radius: var(--k-radius-md); font-weight: 500; cursor: pointer; transition: background 0.2s; white-space: nowrap; }
-.btn-ingresar:hover { background-color: var(--k-primary-hover); }
-            
-            .main-area { display: flex; flex-direction: column; gap: 1rem; }
-.submodules-container { background: var(--k-bg-card); border: 1px solid var(--k-border); border-radius: var(--k-radius-lg); padding: 1.5rem; box-shadow: var(--k-shadow-sm); margin-top: 0 !important; }
-.submodules-container h3 { margin-top: 0; margin-bottom: 1rem; font-size: 1.1rem; font-weight: 600; color: var(--k-text-main); padding-bottom: 1rem; border-bottom: 1px solid var(--k-border); text-transform: uppercase; letter-spacing: 0.05em; }
-            .chart-container { background: var(--k-bg-card); border: 1px solid var(--k-border); border-radius: var(--k-radius-lg); padding: 1.5rem; box-shadow: var(--k-shadow-sm); min-height: 350px; max-height: 350px; display: flex; flex-direction: column; }
-.chart-container h3 { margin-top: 0; margin-bottom: 1rem; font-size: 1.1rem; font-weight: 600; color: var(--k-text-main); text-transform: uppercase; letter-spacing: 0.05em; }
-.chart-placeholder { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.chart-placeholder canvas { flex: 1; min-height: 0; width: 100% !important; height: 100% !important; }
-.charts-grid-salud { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-@media (max-width: 992px) { .charts-grid-salud { grid-template-columns: 1fr; } }
-
-/* ANULAR ESTILOS GLOBALES (styles.css) */
-.gestion-salud-home .widget { margin-bottom: 0 !important; padding: 1rem !important; }
-.gestion-salud-home .chart-container { margin-top: 0 !important; margin-bottom: 0 !important; }
-.gestion-salud-home .charts-grid-salud { margin-top: 0 !important; }
-`;
+                /* Scroll interno (mismo patrón que Recursos/Gestión Integral) */
+                height: 100%;
+                overflow: hidden auto;
+                background: #f8f9fa;
+                padding: clamp(15px, 1.8vw, 22px);
+                box-sizing: border-box;
+            }
+            .gestion-salud-home .main-area {
+                flex: 1 1 auto;
+                min-height: 0;
+                overflow-y: auto;
+            }
+        `;
         document.head.appendChild(style);
     }
+
+    renderMetricCard(opts) {
+        var label = opts.label;
+        var valueHTML = opts.valueHTML;
+        var desc = opts.desc;
+        var progressPct = opts.progressPct;
+        var variant = opts.variant;
+        var card = document.createElement('article');
+        card.className = 'kair-metric-card' + (variant && variant !== 'ok' ? ' kair-metric-card--' + variant : '');
+        card.innerHTML = ''
+            + '<span class="kair-metric-head">' + label + '</span>'
+            + '<div class="kair-metric-value">' + valueHTML + '</div>'
+            + '<p class="kair-metric-desc">' + desc + '</p>'
+            + '<div class="kair-progress"><i style="width:' + Math.min(100, progressPct) + '%"></i></div>';
+        return card;
+    }
+
+    buildRadarTasks() {
+        var stats = this.saludStats || {};
+        var tareas = [];
+        var examenes = stats.examenes || {};
+        if ((examenes.pendientes || 0) > 0) {
+            tareas.push({
+                icon: '◷', bg: '#fff5e6', color: '#c28316',
+                title: 'Evaluaciones médicas',
+                sub: examenes.pendientes + ' exámenes pendientes',
+                status: 'Pendiente', statusClass: 'kair-status-pill--warn'
+            });
+        }
+        var seguimientos = stats.seguimientos || {};
+        if ((seguimientos.pendientes || 0) > 0) {
+            tareas.push({
+                icon: '◷', bg: '#f0eaff', color: '#6b3fb8',
+                title: 'Seguimientos de salud',
+                sub: seguimientos.pendientes + ' seguimientos sin cerrar',
+                status: 'Pendiente', statusClass: 'kair-status-pill--warn'
+            });
+        }
+        var accidentes = stats.accidentes || {};
+        if ((accidentes.pendientes || 0) > 0) {
+            tareas.push({
+                icon: '◷', bg: '#ffe9e9', color: '#a83a48',
+                title: 'Investigación de accidentes',
+                sub: accidentes.pendientes + ' accidentes sin investigar',
+                status: 'Pendiente', statusClass: 'kair-status-pill--warn'
+            });
+        }
+        if (tareas.length === 0) {
+            tareas.push({
+                icon: '✓', bg: '#e9f3ff', color: '#2057b8',
+                title: 'Sistema estable',
+                sub: 'Sin alertas pendientes este mes',
+                status: 'Al día', statusClass: 'kair-status-pill--ok'
+            });
+        }
+        var html = '';
+        for (var i = 0; i < tareas.length && i < 3; i++) {
+            var t = tareas[i];
+            html += ''
+                + '<div class="kair-task">'
+                + '  <div class="kair-task-icon" style="background:' + t.bg + ';color:' + t.color + '">' + t.icon + '</div>'
+                + '  <div>'
+                + '    <strong>' + t.title + '</strong>'
+                + '    <small>' + t.sub + '</small>'
+                + '  </div>'
+                + '  <span class="kair-status-pill ' + t.statusClass + '">' + t.status + '</span>'
+                + '</div>';
+        }
+        return html;
+    }
+
+    renderChartSalud(indicadores) {
+        var el = document.getElementById('kair-chart-salud');
+        if (!el) return;
+        var frecuencia = indicadores.frecuencia || 0;
+        var severidad = indicadores.severidad || 0;
+        var prevalencia = indicadores.prevalencia || 0;
+        var incidencia = indicadores.incidencia || 0;
+
+        var items = [
+            { label: 'Frecuencia', value: frecuencia, color: '#174ea6' },
+            { label: 'Severidad', value: severidad, color: '#178666' },
+            { label: 'Prevalencia', value: prevalencia, color: '#c28316' },
+            { label: 'Incidencia', value: incidencia, color: '#a83a48' }
+        ];
+
+        var rowH = 28;
+        var gapY = 6;
+        var PAD_L = 110, PAD_R = 20, PAD_T = 14, PAD_B = 14;
+        var H = PAD_T + PAD_B + items.length * (rowH + gapY);
+        var W = 690;
+        var maxVal = Math.max.apply(null, items.map(function (i) { return i.value; }).concat([1]));
+        var barX = PAD_L;
+        var barW = W - PAD_L - PAD_R;
+
+        var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" style="width:100%;height:auto;display:block;">';
+        for (var i = 0; i < items.length; i++) {
+            var item = items[i];
+            var y = PAD_T + i * (rowH + gapY);
+            var barY = y;
+            var filledW = Math.max(2, (barW * item.value) / maxVal);
+            svg += '<text x="' + (PAD_L - 10) + '" y="' + (barY + rowH / 2 + 4) + '" text-anchor="end" font-family="Manrope, sans-serif" font-size="11" fill="#637189">' + item.label + '</text>';
+            svg += '<rect x="' + barX + '" y="' + barY + '" width="' + barW + '" height="' + rowH + '" rx="6" ry="6" fill="#eef0f1"/>';
+            svg += '<rect x="' + barX + '" y="' + barY + '" width="' + filledW + '" height="' + rowH + '" rx="6" ry="6" fill="' + item.color + '"/>';
+            svg += '<text x="' + (W - PAD_R) + '" y="' + (barY + rowH / 2 + 4) + '" text-anchor="end" font-family="Manrope, sans-serif" font-size="12" font-weight="700" fill="#212529">' + item.value.toFixed(2) + '</text>';
+        }
+        svg += '</svg>';
+
+        el.innerHTML = svg;
+    }
+
+    renderSubmodulesGrid() {
+        var grid = document.getElementById('kair-submodules-grid');
+        if (!grid) return;
+        var items = this.submodules || [];
+        var html = '';
+        for (var i = 0; i < items.length; i++) {
+            var name = items[i];
+            var m = name.match(/^(\d+\.\d+\.\d+)/);
+            var codeStr = m ? m[1] : String(i + 1);
+            var cleanName = name.replace(/^\d+\.\d+\.\d+\s*/, '');
+            html += ''
+                + '<div class="kair-module" data-submodule="' + name + '">'
+                + '  <span class="kair-module-n">' + codeStr + '</span>'
+                + '  <strong>' + cleanName + '</strong>'
+                + '  <small>Gestión y control</small>'
+                + '  <span class="kair-module-arrow">→</span>'
+                + '</div>';
+        }
+        grid.innerHTML = html;
+        var els = grid.querySelectorAll('.kair-module');
+        var self = this;
+        for (var j = 0; j < els.length; j++) {
+            (function (el) {
+                el.onclick = function () { self.handleSubmoduleClick(el.dataset.submodule); };
+            })(els[j]);
+        }
+    }
+
+    handleSubmoduleClick(submoduleName) {
+        console.log('Navegando a submódulo:', submoduleName);
+        const mainCanvas = document.querySelector('.main-canvas');
+        if (mainCanvas && typeof window.showSubmoduleContent === 'function') {
+            window.showSubmoduleContent(mainCanvas, this.moduleName, submoduleName);
+        } else {
+            alert('Navegando a ' + submoduleName);
+        }
+    }
+
+    async renderMainArea(container) {
+        // 📦754 · Renderizar contenido premium del módulo Gestión de la Salud.
+        container.innerHTML = '';
+
+        const stats = this.saludStats || {};
+        const inducciones = stats.inducciones || { totalTrabajadores: 0, totalInducciones: 0, completadas: 0, pendientes: 0, porcentajeCompletado: 0 };
+        const ausentismo = stats.ausentismo || { diasPerdidos: 0, totalTrabajadores: 0, tasaAusentismo: 0 };
+        const examenes = stats.examenes || { totalExamenes: 0, realizados: 0, pendientes: 0 };
+        const seguimientos = stats.seguimientos || { total: 0, completados: 0, pendientes: 0 };
+        const accidentes = stats.accidentes || { total: 0, investigados: 0, pendientes: 0 };
+        const indicadores = stats.indicadores || { frecuencia: 0, severidad: 0, prevalencia: 0, incidencia: 0 };
+
+        // 📦754 · cumplimientoGeneral: score compuesto del módulo.
+        const cumplimientoInducciones = inducciones.totalTrabajadores > 0 ? inducciones.porcentajeCompletado : null;
+        const cumplimientoExamenes = examenes.totalExamenes > 0 ? Math.round(((examenes.realizados || 0) / examenes.totalExamenes) * 100) : null;
+        const cumplimientoSeguimientos = seguimientos.total > 0 ? Math.round(((seguimientos.completados || 0) / seguimientos.total) * 100) : null;
+        const accidentesOk = accidentes.total === 0 ? 100 : (accidentes.investigados >= accidentes.total ? 100 : 0);
+        const tasaAusentismoBaja = ausentismo.totalTrabajadores > 0 ? Math.max(0, 100 - Math.round(ausentismo.tasaAusentismo || 0)) : null;
+        const compGeneralArr = [cumplimientoInducciones, cumplimientoExamenes, cumplimientoSeguimientos, accidentesOk, tasaAusentismoBaja].filter(function (v) { return v !== null; });
+        const cumplimientoGeneral = compGeneralArr.length > 0
+            ? Math.round(compGeneralArr.reduce(function (a, b) { return a + b; }, 0) / compGeneralArr.length)
+            : 0;
+
+        // 1) HERO STRIP
+        const health = document.createElement('section');
+        health.className = 'kair-health';
+
+        const hero = document.createElement('article');
+        hero.className = 'kair-hero-card';
+        const heroMsg = cumplimientoGeneral >= 80
+            ? 'Tu sistema va por buen camino.'
+            : cumplimientoGeneral >= 50
+                ? 'Hay áreas que necesitan atención este mes.'
+                : 'Atención: hay actividades críticas pendientes.';
+        const tareasPendientes = (inducciones.pendientes || 0) +
+            (examenes.pendientes || 0) +
+            (seguimientos.pendientes || 0) +
+            (accidentes.pendientes || 0);
+        hero.innerHTML = ''
+            + '<div class="kair-hero-eyebrow">Estado general</div>'
+            + '<h2>' + heroMsg + '</h2>'
+            + '<p class="kair-hero-msg">Hay ' + tareasPendientes + ' actividades que necesitan atención este mes.</p>'
+            + '<div class="kair-hero-score">' + cumplimientoGeneral + '%<span>cumplimiento</span></div>';
+        health.appendChild(hero);
+
+        const induccionesPct = cumplimientoInducciones || 0;
+        const examenesPct = cumplimientoExamenes || 0;
+        const seguimientosPct = cumplimientoSeguimientos || 0;
+        health.appendChild(this.renderMetricCard({
+            label: 'Inducciones',
+            valueHTML: (inducciones.completadas || 0) + ' <small style="font:500 15px DM Sans;color:#8791a1">/ ' + (inducciones.totalTrabajadores || 0) + '</small>',
+            desc: 'Personal con inducción al día',
+            progressPct: induccionesPct,
+            variant: induccionesPct >= 70 ? 'ok' : induccionesPct >= 40 ? 'warning' : 'danger'
+        }));
+        health.appendChild(this.renderMetricCard({
+            label: 'Evaluaciones médicas',
+            valueHTML: (examenes.realizados || 0) + ' <small style="font:500 15px DM Sans;color:#8791a1">/ ' + (examenes.totalExamenes || 0) + '</small>',
+            desc: 'Exámenes realizados',
+            progressPct: examenesPct,
+            variant: examenesPct >= 70 ? 'ok' : examenesPct >= 40 ? 'warning' : 'danger'
+        }));
+        health.appendChild(this.renderMetricCard({
+            label: 'Seguimientos',
+            valueHTML: (seguimientos.completados || 0) + ' <small style="font:500 15px DM Sans;color:#8791a1">/ ' + (seguimientos.total || 0) + '</small>',
+            desc: 'Seguimientos completados',
+            progressPct: seguimientosPct,
+            variant: seguimientosPct >= 70 ? 'ok' : seguimientosPct >= 40 ? 'warning' : 'danger'
+        }));
+        container.appendChild(health);
+
+        // 2) CONTENT GRID: chart + radar
+        const content = document.createElement('section');
+        content.className = 'kair-content';
+
+        const chartCard = document.createElement('article');
+        chartCard.className = 'kair-card';
+        chartCard.innerHTML = ''
+            + '<div class="kair-row-title">'
+            + '  <div>'
+            + '    <h3>Indicadores de Salud</h3>'
+            + '    <div class="kair-card-hint">Frecuencia · Severidad · Prevalencia · Incidencia</div>'
+            + '  </div>'
+            + '</div>'
+            + '<div class="kair-chart" id="kair-chart-salud"></div>';
+        content.appendChild(chartCard);
+
+        const radarCard = document.createElement('article');
+        radarCard.className = 'kair-card';
+        radarCard.innerHTML = ''
+            + '<div class="kair-row-title">'
+            + '  <div>'
+            + '    <h3>En tu radar</h3>'
+            + '    <div class="kair-card-hint">Requieren gestión este mes</div>'
+            + '  </div>'
+            + '</div>'
+            + this.buildRadarTasks();
+        content.appendChild(radarCard);
+
+        container.appendChild(content);
+
+        // 3) GRID: módulos
+        const modules = document.createElement('section');
+        modules.className = 'kair-modules';
+        const modulesCard = document.createElement('article');
+        modulesCard.className = 'kair-card';
+        modulesCard.innerHTML = ''
+            + '<div class="kair-row-title">'
+            + '  <div>'
+            + '    <h3>Explorar submódulos</h3>'
+            + '    <div class="kair-card-hint">Gestiona la documentación y evidencias de tu sistema.</div>'
+            + '  </div>'
+            + '  <button class="kair-btn kair-btn-ghost">Ver todos</button>'
+            + '</div>'
+            + '<div class="kair-module-grid" id="kair-submodules-grid"></div>';
+        modules.appendChild(modulesCard);
+        container.appendChild(modules);
+
+        this.renderChartSalud(indicadores);
+        this.renderSubmodulesGrid();
+    }
+
+
 }
 
 // Hacer la clase disponible globalmente

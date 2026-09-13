@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.199] - 2026-09-12
+
+### 📦732 · Módulo Gestión de la Salud: rediseño premium visual + score compuesto
+
+Replica el patrón premium aplicado al módulo Gestión Integral (📦731) sobre el home de Gestión de la Salud, dejándolo data-driven con score compuesto del módulo.
+
+#### Cambios visuales (UI)
+
+- **Header minimal**: breadcrumb "Inicio / Gestión / Salud" + H1 "Gestión de la Salud"
+- **Hero strip**: 1 hero card "ESTADO GENERAL" + 3 metric cards (Inducciones, Evaluaciones médicas, Seguimientos)
+- **Chart SVG nativo**: 4 barras horizontales con los indicadores (Frecuencia, Severidad, Prevalencia, Incidencia) en colores diferenciados (azul, verde, ámbar, rojo)
+- **Panel "En tu radar"**: hasta 3 alertas (Evaluaciones médicas pendientes, Seguimientos sin cerrar, Accidentes sin investigar)
+- **Grid "Explorar submódulos"**: cards responsivas con flecha
+- **Responsive fluido** con clamp() y auto-fill/auto-fit
+
+#### Cambios funcionales (lógica)
+
+- **Score compuesto del módulo** — `cumplimientoGeneral`:
+  - Promedio simple de 5 componentes disponibles en `saludStats`: Inducciones %, Evaluaciones %, Seguimientos %, Accidentes (100 si 0 accidentes o todos investigados), Tasa ausentismo (inversa)
+  - Excluye componentes sin datos
+- **Conteo completo de pendientes** — `tareasPendientes`: inducciones + exámenes + seguimientos + accidentes
+- **`handleSubmoduleClick` agregado** (faltaba en el archivo)
+
+#### Cambios estructurales (sistema)
+
+- **CSS legacy eliminado**: ~6000 bytes de inyectStyles reducidos a ~2000 bytes
+- **Patrón de scroll interno**: `.gestion-salud-home overflow: hidden auto + .main-area flex: 1 1 auto min-height: 0`
+- **Métodos legacy preservados** (refreshStats, updateWidgetsUI, renderAccidentesChart, renderIndicesChart, afterDraw, createSeguimientosWidget, createAusentismoWidget, createExamenesWidget, createAccidentesWidget, createRemisionesWidget, createInduccionesWidget, createWidget, renderSubmoduleItem) — disponibles para uso futuro en otros submódulos
+- **Cache-bust bumpeado**: `GESTION-SALUD-20260912-v1-rediseno`
+
+#### Archivos tocados
+
+- `modules/gestion-salud/gestion-salud-home.js` (37KB → 46KB, +23%)
+- `index.html` (cache-bust)
+- `package.json` (0.1.198 → 0.1.199)
+- `CHANGELOG.md` (entrada 0.1.199)
+
 ## [0.1.198] - 2026-09-12
 
 ### 📦731 · Módulo Gestión Integral: rediseño premium visual + score compuesto
