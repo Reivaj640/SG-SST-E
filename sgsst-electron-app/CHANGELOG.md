@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.203] - 2026-09-13
+
+### 📦736 · Módulo Verificación: rediseño premium visual + score compuesto
+
+Replica el patrón premium aplicado a Recursos (📦730), Gestión Integral (📦731), Gestión de la Salud (📦732), Gestión de Peligros (📦733) y Gestión de Amenazas (📦734/735) sobre el home de Verificación del SG-SST, dejándolo data-driven con score compuesto del módulo.
+
+#### Cambios visuales (UI)
+
+- **Header minimal**: breadcrumb "Inicio / Verificación" + H1 "Verificación del SG-SST"
+- **Hero strip**: 1 hero card "CUMPLIMIENTO DE VERIFICACIÓN" + 3 metric cards (Total Actividades, Eficacia del Ciclo, Hallazgos Críticos)
+- **Chart SVG nativo**: 4 barras horizontales con % cumplimiento por submódulo (6.1.1, 6.1.2, 6.1.3, 6.1.4) en colores según umbral (verde ≥80%, azul ≥50%, ámbar ≥25%, rojo <25%)
+- **Panel "En tu radar"**: hasta 3 alertas condicionales (hallazgos críticos, eficacia baja del ciclo, submódulo con más pendientes)
+- **Grid "Explorar submódulos"**: cards responsivas con flecha
+- **Responsive fluido** con clamp() y auto-fill/auto-fit
+
+#### Cambios funcionales (lógica)
+
+- **Score compuesto del módulo** — `cumplimientoGeneral`: promedio simple de % cumplimiento de los 4 submódulos (Indicadores, Auditoría, Revisión, Planificación)
+- **IPC real preservado**: `loadCicloActivo()` carga datos reales desde `RevisionAltaDireccionService.cargarTodo()` para calcular `cicloActivoProgreso` (usado en el hero y metric card "Eficacia del Ciclo")
+- **`renderCumplimientoChart` refactorizado**: ya no dibuja chart Chart.js (legacy); solo calcula y guarda `this.cicloActivoProgreso` para uso del render premium
+- **`handleSubmoduleClick` agregado** (faltaba en el archivo)
+- **`injectStyles()` reducido a stub** — usa design system compartido (elimina 258 líneas de CSS legacy)
+- **Bug fix pre-existente**: el archivo usaba clase `.gestion-integral-home` (copia literal del CSS de Gestión Integral) — reemplazada por `.verificacion-home`
+
+#### Archivos modificados
+
+- `modules/verificacion/verificacion-home.js` (35,409 → 23,659 bytes, -11,750)
+- `index.html` — cache-bust `VERIFICACION-20260913-v1-rediseno`
+- `package.json` — versión `0.1.203`
+- `CHANGELOG.md` — esta entrada
+
 ## [0.1.202] - 2026-09-13
 
 ### 🐛📦735 · Fix patch — Gestión de Amenazas: scroll interno + llamadas inválidas

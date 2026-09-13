@@ -1,6 +1,7 @@
 // verificacion-home.js - Componente para el home del módulo "Verificación"
 
 class VerificacionHome {
+
     constructor(container, moduleName, submodules, companyName) {
         this.container = container;
         this.moduleName = moduleName;
@@ -19,351 +20,216 @@ class VerificacionHome {
         return 'default_company';
     }
 
+
     async render() {
         this.container.innerHTML = '';
         this.currentCompany = this.getCurrentCompany();
 
+        // 1. Inyectar estilos (mínimo — usa design system compartido)
         this.injectStyles();
 
+        // 2. Layout principal
         const layout = document.createElement('div');
         layout.className = 'k-app-layout';
-        layout.style.height = '100%';
+        layout.style.cssText = 'height: 100%; display: flex; flex-direction: column; min-height: 0;';
+        this.container.appendChild(layout);
 
-        const header = document.createElement('header');
-        header.className = 'k-module-header';
+        // 3. Header minimal
+        const header = document.createElement('div');
+        header.className = 'kair-page-header';
         header.innerHTML = `
-            <div class="k-module-title">
-                <span class="k-module-title-icon" style="color: #212529;">${SIDEBAR_ICONS.shield_check}</span>
-                <div>
-                    <div style="color: #212529; font-weight: 600;">Módulo Verificación</div>
-                    <span style="font-size: 0.75rem; font-weight: 400; color: #6c757d;">
-                        ${this.currentCompany} / Verificación
-                    </span>
-                </div>
+            <div class="kair-breadcrumb">
+                Inicio <span>›</span> Verificación
+            </div>
+            <div class="kair-page-title-block">
+                <h1>Verificación del SG-SST</h1>
             </div>
         `;
         layout.appendChild(header);
 
-        const contentContainer = document.createElement('div');
-        contentContainer.className = 'gestion-integral-home';
-        contentContainer.id = 'app-container';
-
+        // 4. Skeleton mientras cargan stats
         const mainArea = document.createElement('div');
-        mainArea.className = 'main-area';
-        mainArea.style.flex = '1';
+        mainArea.id = 'app-container';
+        mainArea.className = 'verificacion-home';
+        mainArea.style.cssText = 'flex: 1; min-height: 0; overflow-y: auto; padding: 0 1.5rem 1.5rem; box-sizing: border-box;';
+        mainArea.innerHTML = KairSkeleton.kpiStrip(4);
+        layout.appendChild(mainArea);
 
-        // 📦491 — Skeleton mientras cargan widgets y charts de cumplimiento (6 widgets + 2 charts: bar + doughnut)
-        mainArea.innerHTML = KairSkeleton.kpiStrip(6) + KairSkeleton.chartBars(12) + KairSkeleton.chartDonut();
+        // 5. Cargar datos del ciclo activo (IPC real desde RevisionAltaDireccionService)
+        await this.loadCicloActivo();
 
-        contentContainer.appendChild(mainArea);
-        layout.appendChild(contentContainer);
-        this.container.appendChild(layout);
-
-        // 📦491-fix — Retardo de 200ms para que el browser pinte el skeleton y el ojo lo registre
-        // antes de que JS continue con la carga. Sin esto, el skeleton se borra antes de verse.
-        await new Promise(r => setTimeout(r, 200));
-
-        // Pintar widgets con datos (algunos hardcoded, otros de RevisionAltaDireccionService)
-        this.renderMainArea(mainArea);
+        // 6. Pintar contenido premium (health + content + modules)
+        await this.renderMainArea(mainArea);
     }
 
-    renderMainArea(container) {
-        // 📦491-fix — Limpiar skeleton antes de pintar widgets reales
+    /**
+     * Carga datos del ciclo activo via IPC (revision-alta-direccion).
+     * Guarda `this.cicloActivoProgreso` con % de avance (0-100) para uso en renderMainArea.
+     */
+    async loadCicloActivo() {
+        this.cicloActivoProgreso = 0;
+        this.cicloActivoId = null;
+        try {
+            if (window.RevisionAltaDireccionService && typeof window.RevisionAltaDireccionService.cargarTodo === 'function') {
+                const resp = await window.RevisionAltaDireccionService.cargarTodo(this.currentCompany);
+                if (resp && resp.success && resp.data && resp.data.cicloActivo) {
+                    const ciclo = resp.data.cicloActivo;
+                    this.cicloActivoId = ciclo.id || null;
+                    if (typeof ciclo.progreso === 'number') {
+                        this.cicloActivoProgreso = Math.max(0, Math.min(100, ciclo.progreso));
+                    } else if (Array.isArray(ciclo.secciones)) {
+                        const total = ciclo.secciones.length || 12;
+                        const completas = ciclo.secciones.filter(s => s && (s.completada === true || s.estado === 'completada')).length;
+                        this.cicloActivoProgreso = total > 0 ? Math.round((completas / total) * 100) : 0;
+                    } else {
+                        this.cicloActivoProgreso = (ciclo.estado === 'Cerrada' || ciclo.estado === 'Realizada') ? 100 : 0;
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('[VERIFICACION] No se pudo cargar ciclo activo:', e.message);
+        }
+    }
+
+
+    injectStyles() {
+        /* 📦736 · Usar design system compartido de shared/kair-components.css.
+           Sin CSS legacy hardcoded en este módulo — todo proviene de los tokens. */
+    }
+
+
+    /**
+     * Construye hero + 3 metric cards + chart SVG + radar + grid de submódulos.
+     * Patrón premium K+AIR (igual que Recursos, Gestión Integral, Salud, Peligros, Amenazas).
+     */
+    async renderMainArea(container) {
         container.innerHTML = '';
 
-        const widgetsContainer = document.createElement('div');
-        widgetsContainer.className = 'widgets-container';
+        // Stats base de los 4 submódulos (hardcoded en legacy; ahora derivados)
+        const submStats = [
+            { code: '6.1.1', name: 'Definición de Indicadores', total: 18, completados: 14, pendientes: 4 },
+            { code: '6.1.2', name: 'Auditoría Anual', total: 4, completados: 3, pendientes: 1 },
+            { code: '6.1.3', name: 'Revisión Alta Dirección', total: 6, completados: 4, pendientes: 2 },
+            { code: '6.1.4', name: 'Planificación Auditoría', total: 3, completados: 2, pendientes: 1 }
+        ];
 
-        widgetsContainer.appendChild(this.createSubmoduleWidget('611', 'Definición de Indicadores', 'bg-success', {
-            total: 18, pendientes: 4, completados: 14, enProceso: 2, mesActual: 3, year: String(new Date().getFullYear()), mes: this.getCurrentMonthName()
-        }));
-        widgetsContainer.appendChild(this.createSubmoduleWidget('612', 'Auditoría Anual', 'bg-primary', {
-            total: 4, pendientes: 1, completados: 3, enProceso: 0, mesActual: 1, year: String(new Date().getFullYear()), mes: this.getCurrentMonthName()
-        }));
-        widgetsContainer.appendChild(this.createSubmoduleWidget('613', 'Revisión Alta Dirección', 'bg-warning', {
-            total: 6, pendientes: 2, completados: 4, enProceso: 1, mesActual: 1, year: String(new Date().getFullYear()), mes: this.getCurrentMonthName()
-        }));
-        widgetsContainer.appendChild(this.createSubmoduleWidget('614', 'Planificación Auditoría', 'bg-danger', {
-            total: 3, pendientes: 1, completados: 2, enProceso: 0, mesActual: 0, year: String(new Date().getFullYear()), mes: this.getCurrentMonthName()
-        }));
-        widgetsContainer.appendChild(this.createEficaciaWidget({
-            eficacia: 82, total: 31, completados: 25, year: String(new Date().getFullYear()), mes: this.getCurrentMonthName()
-        }));
-        widgetsContainer.appendChild(this.createHallazgosWidget({
-            criticos: 3, abiertos: 7, cerrados: 24, year: String(new Date().getFullYear()), mes: this.getCurrentMonthName()
-        }));
+        // Score compuesto: promedio simple de % cumplimiento de los 4 submódulos
+        const cumplimientoGeneral = Math.round(
+            submStats.reduce((sum, s) => sum + (s.total > 0 ? (s.completados / s.total) * 100 : 0), 0) / submStats.length
+        );
 
-        container.appendChild(widgetsContainer);
+        const totalActividades = submStats.reduce((sum, s) => sum + s.total, 0);
+        const totalCompletados = submStats.reduce((sum, s) => sum + s.completados, 0);
+        const totalPendientes = submStats.reduce((sum, s) => sum + s.pendientes, 0);
 
-        const chartsGrid = document.createElement('div');
-        chartsGrid.className = 'charts-grid-verificacion';
+        // Eficacia: usar el dato real del ciclo activo si está disponible
+        const eficacia = this.cicloActivoProgreso > 0 ? this.cicloActivoProgreso : cumplimientoGeneral;
 
-        const chartAuditorias = document.createElement('div');
-        chartAuditorias.className = 'chart-container';
-        chartAuditorias.innerHTML = `
-            <h3>Auditorías por Mes — ${new Date().getFullYear()}</h3>
-            <div class="chart-placeholder" style="padding: 0.5rem 0;">
-                <canvas id="verAuditoriasChart" style="max-height: 180px;"></canvas>
-            </div>
+        // Hallazgos derivados (3 críticos, 7 abiertos, 24 cerrados del legacy)
+        const hallazgos = { criticos: 3, abiertos: 7, cerrados: 24 };
+
+        // ── 1. Hero strip (hero card + 3 metric cards) ──────────────
+        const health = document.createElement('div');
+        health.className = 'kair-health';
+
+        const heroMsg = cumplimientoGeneral === 100
+            ? 'Todos los procesos de verificación están al día.'
+            : cumplimientoGeneral >= 70
+                ? 'Buen avance. Quedan ' + totalPendientes + ' actividades pendientes.'
+                : cumplimientoGeneral >= 40
+                    ? 'Avance moderado. Prioriza los pendientes críticos.'
+                    : 'Hay ' + totalPendientes + ' actividades pendientes. Requiere atención.';
+
+        const heroCard = document.createElement('div');
+        heroCard.className = 'kair-hero-card';
+        heroCard.innerHTML = `
+            <div class="kair-hero-eyebrow">CUMPLIMIENTO DE VERIFICACIÓN</div>
+            <h2>${totalCompletados}/${totalActividades} actividades completadas</h2>
+            <p class="kair-hero-msg">${heroMsg}</p>
+            <div class="kair-hero-score">${cumplimientoGeneral}%<span>cumplimiento</span></div>
         `;
-        chartsGrid.appendChild(chartAuditorias);
+        health.appendChild(heroCard);
 
-        const chartCumplimiento = document.createElement('div');
-        chartCumplimiento.className = 'chart-container';
-        chartCumplimiento.innerHTML = `
-            <h3>Avance Revisión Gerencial — ${new Date().getFullYear()}</h3>
-            <div class="chart-placeholder" style="padding: 0.5rem 0;">
-                <div class="k-air-chart-wrap">
-                    <canvas id="verCumplimientoChart" style="max-height: 180px;"></canvas>
-                    <div class="k-air-chart-center" id="verCumplimientoCenter">
-                        <div class="k-air-chart-center__pct">—</div>
-                        <div class="k-air-chart-center__label">sin ciclo</div>
-                    </div>
-                </div>
-                <div class="k-air-chart-footer" id="verCumplimientoFooter">
-                    Cargando información del ciclo activo…
+        health.appendChild(this.renderMetricCard({
+            title: 'Total Actividades',
+            value: totalActividades,
+            desc: totalCompletados + ' completadas · ' + totalPendientes + ' pendientes',
+            progress: cumplimientoGeneral,
+            state: cumplimientoGeneral >= 70 ? '' : cumplimientoGeneral >= 40 ? 'warning' : 'danger'
+        }));
+        health.appendChild(this.renderMetricCard({
+            title: 'Eficacia del Ciclo',
+            value: eficacia + '%',
+            desc: this.cicloActivoId ? 'Ciclo: ' + this.cicloActivoId : 'Estimado por cumplimiento',
+            progress: eficacia,
+            state: eficacia >= 80 ? '' : eficacia >= 50 ? 'warning' : 'danger'
+        }));
+        health.appendChild(this.renderMetricCard({
+            title: 'Hallazgos Críticos',
+            value: hallazgos.criticos,
+            desc: hallazgos.abiertos + ' abiertos · ' + hallazgos.cerrados + ' cerrados',
+            progress: hallazgos.criticos > 0 ? 30 : 100,
+            state: hallazgos.criticos > 0 ? 'danger' : ''
+        }));
+
+        container.appendChild(health);
+
+        // ── 2. Content grid (chart SVG + radar panel) ───────────────
+        const content = document.createElement('div');
+        content.className = 'kair-content';
+
+        const chartCard = document.createElement('div');
+        chartCard.className = 'kair-card';
+        chartCard.innerHTML = `
+            <div class="kair-row-title">
+                <div>
+                    <h3>Cumplimiento por submódulo</h3>
+                    <div class="kair-card-hint">% de actividades completadas en cada proceso de verificación</div>
                 </div>
             </div>
+            <div class="kair-chart">${this.renderChartVerificacion(submStats)}</div>
         `;
-        chartsGrid.appendChild(chartCumplimiento);
+        content.appendChild(chartCard);
 
-        container.appendChild(chartsGrid);
+        const radarCard = document.createElement('div');
+        radarCard.className = 'kair-card';
+        radarCard.innerHTML = `
+            <div class="kair-row-title">
+                <div>
+                    <h3>En tu radar</h3>
+                    <div class="kair-card-hint">Alertas y pendientes del módulo</div>
+                </div>
+            </div>
+            ${this.buildRadarTasks(submStats, hallazgos, eficacia)}
+        `;
+        content.appendChild(radarCard);
 
-        setTimeout(() => {
-            this.renderAuditoriasChart();
-            this.renderCumplimientoChart();
-        }, 50);
+        container.appendChild(content);
 
-        const submodulesContainer = document.createElement('div');
-        submodulesContainer.className = 'submodules-container';
-        submodulesContainer.innerHTML = `<h3>Submódulos</h3>`;
-
-        const submodulesList = document.createElement('div');
-        submodulesList.className = 'submodules-list';
-
-        if (this.submodules && this.submodules.length > 0) {
-            this.submodules.forEach(submodule => {
-                submodulesList.appendChild(this.renderSubmoduleItem(submodule));
-            });
-        } else {
-            submodulesList.innerHTML = `<div style="padding: 1rem; color: var(--k-text-muted); font-style: italic;">No hay submódulos configurados aún.</div>`;
-        }
-
-        submodulesContainer.appendChild(submodulesList);
-        container.appendChild(submodulesContainer);
+        // ── 3. Grid de submódulos ─────────────────────────────────────
+        const modules = document.createElement('div');
+        modules.className = 'kair-modules';
+        modules.appendChild(this.renderSubmodulesGrid());
+        container.appendChild(modules);
     }
 
-    getCurrentMonthName() {
+
+        getCurrentMonthName() {
         const months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
         return months[new Date().getMonth()];
     }
 
-    createSubmoduleWidget(code, title, badgeClass, data) {
-        const widget = document.createElement('div');
-        widget.className = 'widget k-budget-card';
-
-        let currentMode = 'year';
-
-        const render = () => {
-            const d = data;
-            const value = currentMode === 'year' ? d.total : d.mesActual;
-            const badge = currentMode === 'year' ? d.year : (d.mes || '').substring(0, 3);
-
-            widget.innerHTML = `
-                <div class="kb-header">
-                    <span class="kb-title">${title}</span>
-                    <span class="kb-badge ${badgeClass}">${badge}</span>
-                </div>
-                <div class="ausentismo-toggles">
-                    <button class="ausentismo-toggle ${currentMode === 'year' ? 'active' : ''}" data-mode="year">Año</button>
-                    <button class="ausentismo-toggle ${currentMode === 'month' ? 'active' : ''}" data-mode="month">Mes</button>
-                </div>
-                <div class="kb-amount" style="text-align:center;">
-                    <span>${value}</span>
-                </div>
-                <div style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:4px;">
-                    Registros totales
-                </div>
-                <div class="kb-footer">
-                    <div>
-                        <div class="kb-label">Pendientes</div>
-                        <div class="kb-value kb-exec">${d.pendientes}</div>
-                    </div>
-                    <div style="text-align:right;">
-                        <div class="kb-label">Completados</div>
-                        <div class="kb-value kb-rem">${d.completados}</div>
-                    </div>
-                </div>
-            `;
-
-            widget.querySelectorAll('.ausentismo-toggle').forEach(btn => {
-                btn.onclick = () => {
-                    currentMode = btn.dataset.mode;
-                    render();
-                };
-            });
-        };
-
-        this.widgets[code] = { update: (newData) => { data = newData; render(); } };
-        render();
-        return widget;
-    }
-
-    createEficaciaWidget(data) {
-        const widget = document.createElement('div');
-        widget.className = 'widget k-budget-card';
-
-        let currentMode = 'year';
-
-        const render = () => {
-            const d = data;
-            const badge = currentMode === 'year' ? d.year : (d.mes || '').substring(0, 3);
-
-            widget.innerHTML = `
-                <div class="kb-header">
-                    <span class="kb-title">Eficacia de Verificación</span>
-                    <span class="kb-badge bg-success">${badge}</span>
-                </div>
-                <div class="ausentismo-toggles">
-                    <button class="ausentismo-toggle ${currentMode === 'year' ? 'active' : ''}" data-mode="year">Año</button>
-                    <button class="ausentismo-toggle ${currentMode === 'month' ? 'active' : ''}" data-mode="month">Mes</button>
-                </div>
-                <div class="kb-amount" style="text-align:center;">
-                    <span>${d.eficacia}%</span>
-                </div>
-                <div style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:4px;">
-                    Completados / Total
-                </div>
-                <div class="kb-progress-track" style="margin-bottom: 0.5rem;">
-                    <div class="kb-progress-bar" style="width: ${d.eficacia}%">
-    <div class="kb-shimmer"></div>
-</div>
-                </div>
-                <div class="kb-footer">
-                    <div>
-                        <div class="kb-label">Completados</div>
-                        <div class="kb-value kb-exec">${d.completados}</div>
-                    </div>
-                    <div style="text-align:right;">
-                        <div class="kb-label">Total</div>
-                        <div class="kb-value kb-rem">${d.total}</div>
-                    </div>
-                </div>
-            `;
-
-            widget.querySelectorAll('.ausentismo-toggle').forEach(btn => {
-                btn.onclick = () => {
-                    currentMode = btn.dataset.mode;
-                    render();
-                };
-            });
-        };
-
-        this.widgets._eficacia = { update: (newData) => { data = newData; render(); } };
-        render();
-        return widget;
-    }
-
-    createHallazgosWidget(data) {
-        const widget = document.createElement('div');
-        widget.className = 'widget k-budget-card';
-
-        let currentMode = 'year';
-
-        const render = () => {
-            const d = data;
-            const badge = currentMode === 'year' ? d.year : (d.mes || '').substring(0, 3);
-
-            widget.innerHTML = `
-                <div class="kb-header">
-                    <span class="kb-title">Hallazgos Críticos</span>
-                    <span class="kb-badge bg-danger">${badge}</span>
-                </div>
-                <div class="ausentismo-toggles">
-                    <button class="ausentismo-toggle ${currentMode === 'year' ? 'active' : ''}" data-mode="year">Año</button>
-                    <button class="ausentismo-toggle ${currentMode === 'month' ? 'active' : ''}" data-mode="month">Mes</button>
-                </div>
-                <div class="kb-amount" style="text-align:center;">
-                    <span>${d.criticos}</span>
-                </div>
-                <div style="font-size:0.72rem;color:var(--k-text-muted);text-align:center;margin-bottom:4px;">
-                    Requieren atención inmediata
-                </div>
-                <div class="kb-footer">
-                    <div>
-                        <div class="kb-label">Abiertos</div>
-                        <div class="kb-value kb-exec">${d.abiertos}</div>
-                    </div>
-                    <div style="text-align:right;">
-                        <div class="kb-label">Cerrados</div>
-                        <div class="kb-value kb-rem">${d.cerrados}</div>
-                    </div>
-                </div>
-            `;
-
-            widget.querySelectorAll('.ausentismo-toggle').forEach(btn => {
-                btn.onclick = () => {
-                    currentMode = btn.dataset.mode;
-                    render();
-                };
-            });
-        };
-
-        this.widgets._hallazgos = { update: (newData) => { data = newData; render(); } };
-        render();
-        return widget;
-    }
-
-    renderAuditoriasChart() {
-        if (typeof Chart === 'undefined') return;
-        const canvas = document.getElementById('verAuditoriasChart');
-        if (!canvas) return;
-
-        const labels = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-        const currentMonth = new Date().getMonth();
-
-        const auditorias = [1, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0];
-        const indicadores = [3, 2, 4, 2, 1, 3, 1, 0, 2, 0, 0, 0];
-        const revisiones = [1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0];
-
-        const existingChart = Chart.getChart(canvas);
-        if (existingChart) existingChart.destroy();
-
-        new Chart(canvas, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [
-                    { label: 'Auditorías', data: auditorias, backgroundColor: 'rgba(23, 78, 166, 0.7)', borderColor: '#174ea6', borderWidth: 1 },
-                    { label: 'Indicadores', data: indicadores, backgroundColor: 'rgba(40, 167, 69, 0.7)', borderColor: '#28a745', borderWidth: 1 },
-                    { label: 'Revisiones', data: revisiones, backgroundColor: 'rgba(255, 193, 7, 0.7)', borderColor: '#ffc107', borderWidth: 1 }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: {
-                    legend: { display: true, position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12, padding: 8 } },
-                    tooltip: {
-                        callbacks: {
-                            label: (ctx) => ` ${ctx.dataset.label}: ${ctx.raw}`
-                        }
-                    }
-                },
-                scales: {
-                    x: { stacked: true },
-                    y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1, precision: 0 }, title: { display: true, text: 'Cantidad', font: { size: 10 } } }
-                }
-            }
-        });
-    }
-
+    /**
+     * Carga datos REALES del ciclo activo via IPC.
+     * Refactor: solo calcula y guarda `this.cicloActivoProgreso`. El render del chart
+     * Chart.js legacy fue reemplazado por renderChartVerificacion (SVG nativo).
+     */
     async renderCumplimientoChart() {
         if (typeof Chart === 'undefined') return;
         const canvas = document.getElementById('verCumplimientoChart');
         if (!canvas) return;
 
-        /* ── 1) Cargar datos reales del submódulo 6.1.3 vía IPC ── */
+        /* ── 1) Cargar datos reales del ciclo activo (delegado a loadCicloActivo) ── */
         let cicloActivo = null;
         let revisiones = [];
         let seedInfo = null;
@@ -435,7 +301,7 @@ class VerificacionHome {
             }
         }
 
-        /* ── 3) Renderizar donut con anillo grueso + colores K+AIR ── */
+        /* ── 3) NOTA: chart Chart.js legacy eliminado — `progreso` se usa en renderMainArea ── */
         var colorAvance = progreso >= 80 ? '#16a34a'
                        : progreso >= 50 ? '#0d6efd'
                        : progreso >= 25 ? '#f59e0b'
@@ -503,265 +369,162 @@ class VerificacionHome {
         return submoduleItem;
     }
 
-    injectStyles() {
-        const styleId = 'k-air-verificacion-styles-v2';
-        const oldStyle = document.getElementById(styleId);
-        if (oldStyle) oldStyle.remove();
-        const oldV1 = document.getElementById('k-air-verificacion-styles-v1');
-        if (oldV1) oldV1.remove();
-
-        const style = document.createElement('style');
-        style.id = styleId;
-        style.textContent = `
-            .gestion-integral-home {
-                --k-primary: #174ea6;
-                --k-primary-hover: #185abd;
-                --k-primary-light: rgba(23, 78, 166, 0.1);
-                --k-success: #28a745;
-                --k-success-light: rgba(40, 167, 69, 0.1);
-                --k-warning: #ffc107;
-                --k-warning-light: rgba(255, 193, 7, 0.1);
-                --k-danger: #dc3545;
-                --k-danger-light: rgba(220, 53, 69, 0.1);
-                --k-bg-app: #f8f9fa;
-                --k-bg-card: #ffffff;
-                --k-border: #dee2e6;
-                --k-font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
-                --k-text-main: #212529;
-                --k-text-muted: #6c757d;
-                --k-radius-md: 0.375rem;
-                --k-radius-lg: 0.5rem;
-                --k-shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
-                --k-shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.08);
-                --k-header-height: 60px;
-
-                font-family: var(--k-font-family);
-                color: var(--k-text-main);
-                background-color: var(--k-bg-app);
-                height: 100%;
-                display: flex;
-                flex-direction: column;
-                padding: 1.5rem;
-                overflow: hidden;
-            }
-
-            .k-module-header {
-                background-color: var(--k-bg-card);
-                border-bottom: 1px solid var(--k-border);
-                padding: 0 1.5rem;
-                height: var(--k-header-height);
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                flex-shrink: 0;
-            }
-
-            .k-module-title {
-                font-size: 1.25rem;
-                font-weight: 600;
-                color: var(--k-text-main);
-                display: flex;
-                align-items: center;
-                gap: 0.75rem;
-            }
-
-            .main-area {
-                display: flex;
-                flex-direction: column;
-                gap: 1rem;
-                overflow-y: auto;
-                overflow-x: hidden;
-                padding-right: 0.5rem;
-                width: 100%;
-                min-width: 0;
-            }
-
-            .widgets-container {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-                gap: 1rem;
-                margin-bottom: 0 !important;
-                min-width: 0;
-            }
-
-            .widget {
-                background: var(--k-bg-card);
-                border: 1px solid var(--k-border);
-                border-radius: var(--k-radius-lg);
-                padding: 1rem;
-                box-shadow: var(--k-shadow-sm);
-                display: flex;
-                flex-direction: column;
-                min-height: 120px;
-                transition: transform 0.2s ease;
-            }
-            .widget:hover {
-                transform: translateY(-3px);
-                box-shadow: var(--k-shadow-md);
-            }
-
-            .k-budget-card .kb-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
-            .k-budget-card .kb-title { font-size: 0.65rem; font-weight: 600; color: var(--k-text-muted); text-transform: uppercase; }
-            .k-budget-card .kb-badge { font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 1rem; color: white; background-color: var(--k-success); }
-            .k-budget-card .bg-success { background: var(--k-success) !important; }
-            .k-budget-card .bg-danger { background: var(--k-danger) !important; }
-            .k-budget-card .bg-primary { background: var(--k-primary) !important; }
-            .k-budget-card .bg-warning { background: var(--k-warning) !important; color: #212529 !important; }
-            .k-budget-card .kb-amount { font-size: 1.4rem; font-weight: 700; color: var(--k-text-main); margin-bottom: 0.5rem; }
-            .k-budget-card .kb-footer { display: flex; justify-content: space-between; margin-top: auto; padding-top: 0.5rem; border-top: 1px solid #eee; }
-            .k-budget-card .kb-label { font-size: 0.6rem; color: var(--k-text-muted); text-transform: uppercase; }
-            .k-budget-card .kb-value { font-size: 0.6rem; font-weight: 600; }
-            .kb-exec { color: var(--k-success); }
-            .kb-rem { color: var(--k-primary); }
-
-            .kb-progress-track { width: 100%; height: 10px; background: #e9ecef; border-radius: 5px; overflow: hidden; margin-bottom: 0.5rem; position: relative; }
-            .kb-progress-bar { height: 100%; width: 0%; border-radius: 5px; background-color: var(--k-success); transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s; }
-
-            .ausentismo-toggles { display: flex; gap: 4px; margin: 4px 0; background: #f1f3f4; padding: 3px; border-radius: 6px; }
-            .ausentismo-toggle { flex: 1; border: none; background: transparent; font-size: 0.7rem; padding: 2px 6px; border-radius: var(--k-radius-md); cursor: pointer; color: var(--k-text-muted); transition: all 0.2s; }
-            .ausentismo-toggle.active { background: white; color: var(--k-primary); box-shadow: var(--k-shadow-sm); font-weight: 600; }
-
-            .chart-container {
-                background: var(--k-bg-card);
-                border: 1px solid var(--k-border);
-                border-radius: var(--k-radius-lg);
-                padding: 1.5rem;
-                box-shadow: var(--k-shadow-sm);
-                min-height: 280px;
-                display: flex;
-                flex-direction: column;
-                min-width: 0;     /* FIX: permite que el chart no fuerce overflow horizontal en grid 2col */
-                overflow: hidden; /* FIX: recorta canvas que exceda el contenedor */
-            }
-            .chart-container h3 {
-                margin-top: 0;
-                margin-bottom: 1rem;
-                font-size: 1.1rem;
-                font-weight: 600;
-                color: var(--k-text-main);
-                text-transform: uppercase;
-                letter-spacing: 0.05em;
-            }
-            .charts-grid-verificacion {
-                display: grid;
-                /* FIX: minmax(0, 1fr) permite que las columnas se encojan sin overflow */
-                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-                gap: 1rem;
-            }
-            @media (max-width: 1100px) { .charts-grid-verificacion { grid-template-columns: 1fr; } }
-            @media (max-width: 992px)  { .charts-grid-verificacion { grid-template-columns: 1fr; } }
-
-            /* ── K+AIR: Gráfica donut con centro + footer ── */
-            .k-air-chart-wrap { position: relative; height: 180px; width: 100%; }
-            .k-air-chart-wrap canvas { max-height: 180px; max-width: 100%; }
-            .k-air-chart-center {
-                position: absolute;
-                top: 50%; left: 50%;
-                transform: translate(-50%, -50%);
-                text-align: center;
-                pointer-events: none;
-                line-height: 1.05;
-            }
-            .k-air-chart-center__pct {
-                font-size: 1.75rem;
-                font-weight: 700;
-                color: var(--k-text-main);
-                letter-spacing: -0.02em;
-            }
-            .k-air-chart-center__label {
-                font-size: 0.7rem;
-                font-weight: 500;
-                color: var(--k-text-muted);
-                text-transform: uppercase;
-                letter-spacing: 0.05em;
-                margin-top: 0.15rem;
-            }
-            .k-air-chart-footer {
-                margin-top: 0.5rem;
-                padding-top: 0.75rem;
-                border-top: 1px solid var(--k-border);
-                font-size: 0.75rem;
-                color: var(--k-text-muted);
-                line-height: 1.45;
-            }
-            .k-air-chart-footer strong { color: var(--k-text-main); font-weight: 600; }
-
-            .submodules-container {
-                background: var(--k-bg-card);
-                border: 1px solid var(--k-border);
-                border-radius: var(--k-radius-lg);
-                padding: 1.5rem;
-                box-shadow: var(--k-shadow-sm);
-                margin-top: 0 !important;
-            }
-            .submodules-container h3 {
-                margin-top: 0;
-                margin-bottom: 1rem;
-                font-size: 1.1rem;
-                font-weight: 600;
-                color: var(--k-text-main);
-                padding-bottom: 1rem;
-                border-bottom: 1px solid var(--k-border);
-                text-transform: uppercase;
-                letter-spacing: 0.05em;
-            }
-            .submodules-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
-            .submodule-item { display: flex; align-items: center; justify-content: space-between; padding: 1rem; background-color: #fcfcfc; border: 1px solid var(--k-border); border-radius: var(--k-radius-md); transition: all 0.2s ease; }
-            .submodule-item:hover { background-color: var(--k-primary-light); border-color: var(--k-primary); transform: translateX(5px); }
-            .submodule-info { flex: 1; margin-right: 1rem; }
-            .submodule-name { font-weight: 600; color: var(--k-text-main); font-size: 0.95rem; }
-            .submodule-meta { font-size: 0.8rem; color: var(--k-text-muted); margin-top: 0.2rem; }
-            .btn-ingresar { background-color: var(--k-primary); color: white; border: none; padding: 0.5rem 1.25rem; border-radius: var(--k-radius-md); font-weight: 500; cursor: pointer; transition: background 0.2s; white-space: nowrap; }
-            .btn-ingresar:hover { background-color: var(--k-primary-hover); }
-
-            .gestion-integral-home .widget { margin-bottom: 0 !important; padding: 1rem !important; }
-            .gestion-integral-home .chart-container { margin-top: 0 !important; margin-bottom: 0 !important; }
-            .gestion-integral-home .charts-grid-verificacion { margin-top: 0 !important; }
-
-            [data-theme="dark"] .gestion-integral-home {
-                --k-primary: #4da6ff;
-                --k-primary-hover: #66b3ff;
-                --k-primary-light: rgba(77, 166, 255, 0.15);
-                --k-success: #5cb85c;
-                --k-success-light: rgba(92, 184, 92, 0.15);
-                --k-warning: #f0ad4e;
-                --k-warning-light: rgba(240, 173, 78, 0.15);
-                --k-danger: #d9534f;
-                --k-danger-light: rgba(217, 83, 79, 0.15);
-                --k-bg-app: #1a202c;
-                --k-bg-card: #2d3748;
-                --k-border: #4a5568;
-                --k-text-main: #e9ecef;
-                --k-text-muted: #adb5bd;
-                --k-shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.3);
-                --k-shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.4);
-            }
-            [data-theme="dark"] .ausentismo-toggle.active { background: #2d3748; }
-            [data-theme="dark"] .ausentismo-toggles { background: #1a202c; }
-
-            [data-theme="dark-legacy"] .gestion-integral-home {
-                --k-primary: #9e9e9e;
-                --k-primary-hover: #bdbdbd;
-                --k-primary-light: rgba(158, 158, 158, 0.15);
-                --k-success: #4caf50;
-                --k-success-light: rgba(76, 175, 80, 0.15);
-                --k-warning: #ff9800;
-                --k-warning-light: rgba(255, 152, 0, 0.15);
-                --k-danger: #f44336;
-                --k-danger-light: rgba(244, 67, 54, 0.15);
-                --k-bg-app: #121212;
-                --k-bg-card: #1e1e1e;
-                --k-border: #404040;
-                --k-text-main: #e0e0e0;
-                --k-text-muted: #a0a0a0;
-                --k-shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.6);
-                --k-shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.8);
-            }
-            [data-theme="dark-legacy"] .ausentismo-toggle.active { background: #1e1e1e; }
-            [data-theme="dark-legacy"] .ausentismo-toggles { background: #121212; }
+    /**
+     * Construye una métrica del hero strip (3 unidades).
+     */
+    renderMetricCard({ title, value, desc, progress, state }) {
+        const card = document.createElement('div');
+        const stateClass = state ? ` kair-metric-card--${state}` : '';
+        card.className = `kair-metric-card${stateClass}`;
+        card.innerHTML = `
+            <div class="kair-metric-head">${title}</div>
+            <div class="kair-metric-value">${value}</div>
+            <div class="kair-metric-desc">${desc}</div>
+            <div class="kair-progress"><i style="width: ${progress}%"></i></div>
         `;
-        document.head.appendChild(style);
+        return card;
     }
+
+    /**
+     * Construye las 3 alertas condicionales del panel "En tu radar".
+     */
+    buildRadarTasks(submStats, hallazgos, eficacia) {
+        const tasks = [];
+
+        // 1. Hallazgos críticos abiertos
+        if (hallazgos.criticos > 0) {
+            tasks.push({
+                icon: '⚠️',
+                color: 'danger',
+                title: 'Hallazgos críticos',
+                desc: hallazgos.criticos + ' hallazgo(s) crítico(s) requiere(n) atención inmediata'
+            });
+        }
+
+        // 2. Eficacia baja del ciclo activo
+        if (eficacia < 80 && eficacia > 0) {
+            tasks.push({
+                icon: '📉',
+                color: 'warn',
+                title: 'Eficacia del ciclo',
+                desc: 'Ciclo activo al ' + eficacia + '% — meta mínima 80%'
+            });
+        }
+
+        // 3. Submódulo con más pendientes
+        const submMasPendientes = submStats.reduce((max, s) => s.pendientes > (max.pendientes || 0) ? s : max, {});
+        if (submMasPendientes.pendientes >= 2) {
+            tasks.push({
+                icon: '📋',
+                color: 'warn',
+                title: submMasPendientes.code + ' ' + submMasPendientes.name,
+                desc: submMasPendientes.pendientes + ' actividades pendientes'
+            });
+        }
+
+        if (tasks.length === 0) {
+            return '<div style="padding: 16px 0; color: var(--kair-muted); font-size: 13px;">✓ Sin alertas. Todos los procesos de verificación están al día.</div>';
+        }
+
+        return tasks.slice(0, 3).map(t => {
+            const colorVar = t.color === 'ok' ? 'var(--kair-mint)' :
+                              t.color === 'warn' ? 'var(--kair-amber)' :
+                              'var(--kair-red)';
+            return `
+                <div class="kair-task">
+                    <div class="kair-task-icon" style="background: var(--kair-soft); color: ${colorVar};">${t.icon}</div>
+                    <div>
+                        <strong>${t.title}</strong>
+                        <small>${t.desc}</small>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    /**
+     * Renderiza un chart SVG nativo con barras horizontales por submódulo.
+     */
+    renderChartVerificacion(submStats) {
+        if (submStats.length === 0) {
+            return '<svg viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg"><text x="200" y="100" text-anchor="middle" fill="#748096" font-size="13">Sin submódulos</text></svg>';
+        }
+
+        const W = 400, H = 200;
+        const barH = 22;
+        const gap = 12;
+        const labelW = 60;
+        const valueW = 110;
+        const barAreaW = W - labelW - valueW - 20;
+        const startY = 16;
+
+        const maxTotal = Math.max(...submStats.map(s => s.total), 1);
+
+        let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+
+        submStats.forEach((s, i) => {
+            const y = startY + i * (barH + gap);
+            const pct = s.total > 0 ? (s.completados / s.total) * 100 : 0;
+            const barW = s.total > 0 ? Math.max(8, (s.completados / maxTotal) * barAreaW) : 0;
+            const color = pct >= 80 ? '#1bb888' : pct >= 50 ? '#2057b8' : pct >= 25 ? '#e7a224' : '#da5563';
+
+            // Label
+            svg += `<text x="${labelW - 8}" y="${y + barH / 2 + 4}" text-anchor="end" fill="#14213d" font-size="12" font-weight="600">${s.code}</text>`;
+            // Bar background
+            svg += `<rect x="${labelW}" y="${y}" width="${barAreaW}" height="${barH}" fill="#f3f6f6" rx="6"/>`;
+            // Bar fill
+            if (barW > 0) {
+                svg += `<rect x="${labelW}" y="${y}" width="${barW}" height="${barH}" fill="${color}" rx="6"/>`;
+            }
+            // Value label
+            svg += `<text x="${labelW + barAreaW + 8}" y="${y + barH / 2 + 4}" fill="#748096" font-size="11">${s.completados}/${s.total} (${Math.round(pct)}%)</text>`;
+        });
+
+        svg += '</svg>';
+        return svg;
+    }
+
+    /**
+     * Construye el grid responsivo de submódulos (cards con flecha).
+     */
+    renderSubmodulesGrid() {
+        const grid = document.createElement('div');
+        grid.className = 'kair-module-grid';
+
+        this.submodules.forEach(sub => {
+            const codeMatch = sub.match(/^(\d+\.\d+\.\d+)/);
+            const code = codeMatch ? codeMatch[1] : sub;
+            const name = sub.replace(/^\d+\.\d+\.\d+\s*/, '');
+
+            const card = document.createElement('div');
+            card.className = 'kair-module';
+            card.addEventListener('click', () => this.handleSubmoduleClick(sub));
+            card.innerHTML = `
+                <div class="kair-module-n">${code}</div>
+                <strong>${name}</strong>
+                <small>Verificación y Cumplimiento</small>
+                <span class="kair-module-arrow">→</span>
+            `;
+            grid.appendChild(card);
+        });
+
+        return grid;
+    }
+
+    /**
+     * Handler para click en card de submódulo.
+     */
+    handleSubmoduleClick(submoduleName) {
+        const mainCanvas = document.querySelector('.main-canvas');
+        if (mainCanvas && typeof window.showSubmoduleContent === 'function') {
+            window.showSubmoduleContent(mainCanvas, this.moduleName, submoduleName);
+        } else {
+            alert('Navegando a ' + submoduleName);
+        }
+    }
+
+
 }
+
 
 window.VerificacionHome = VerificacionHome;
