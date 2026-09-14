@@ -3540,8 +3540,8 @@ function createSidebarButtons(activeModules = null) {
 
   // Header de sección "MÓDULOS DEL SISTEMA" (solo cuando hay módulos, no en home)
   const headerLi = document.createElement('li');
-  headerLi.className = 'sidebar-modules-header-li';
-  headerLi.innerHTML = '<div class="sidebar-modules-header">Módulos del Sistema</div>';
+  headerLi.className = 'kair-nav-section-header-li';
+  headerLi.innerHTML = '<div class="kair-nav-section-header">Módulos del Sistema</div>';
   sidebarMenu.appendChild(headerLi);
 
   // Separar "Salir" del resto — se renderiza como footer al final
@@ -3557,31 +3557,30 @@ function createSidebarButtons(activeModules = null) {
     }
 
     const li = document.createElement('li');
-    li.className = 'sidebar-module-card-li';
+    li.className = 'kair-nav-card-li';
 
     const card = document.createElement('button');
-    card.className = 'sidebar-module-card';
+    card.className = 'kair-nav-card';
     card.setAttribute('type', 'button');
     card.setAttribute('data-module', item.name);
     card.setAttribute('aria-label', item.name);
 
-    // 📦642 — Sin caja de fondo, sin color por módulo. El SVG hereda el color
-    // del texto del sidebar (currentColor). Igual que los iconos del header
-    // (todos en un solo color, sin fondo).
+    // 📦738 — Sidebar premium: caja de fondo suave + color del icono coherente
+    // con el design system (kair-blue / kair-faint). El SVG hereda currentColor.
     const iconWrap = document.createElement('span');
-    iconWrap.className = 'sidebar-module-icon';
+    iconWrap.className = 'kair-nav-card__icon';
     iconWrap.innerHTML = SIDEBAR_ICONS[item.icon] || '';
 
     // Bloque de texto (título + subtítulo)
     const textWrap = document.createElement('span');
-    textWrap.className = 'sidebar-module-text';
+    textWrap.className = 'kair-nav-card__text';
 
     const titleEl = document.createElement('span');
-    titleEl.className = 'sidebar-module-title';
+    titleEl.className = 'kair-nav-card__title';
     titleEl.textContent = item.name;
 
     const subtitleEl = document.createElement('span');
-    subtitleEl.className = 'sidebar-module-subtitle';
+    subtitleEl.className = 'kair-nav-card__subtitle';
     subtitleEl.textContent = item.subtitle || '';
 
     textWrap.appendChild(titleEl);
@@ -3611,10 +3610,10 @@ function createSidebarButtons(activeModules = null) {
   // Footer: "Salir" como card separada al final, con clase para estilo distinto
   if (salir) {
     const footerLi = document.createElement('li');
-    footerLi.className = 'sidebar-footer-li';
+    footerLi.className = 'kair-nav-footer-li';
 
     const card = document.createElement('button');
-    card.className = 'sidebar-module-card sidebar-module-card--footer';
+    card.className = 'kair-nav-card kair-nav-card--footer';
     card.setAttribute('type', 'button');
     card.setAttribute('data-module', salir.name);
     card.setAttribute('aria-label', salir.name);
@@ -3624,18 +3623,18 @@ function createSidebarButtons(activeModules = null) {
     // ERR_FILE_NOT_FOUND porque "log_out" es el NOMBRE del icono SVG, no
     // un archivo. La rama de arriba usa SIDEBAR_ICONS[item.icon] correctamente.
     const iconWrap = document.createElement('span');
-    iconWrap.className = 'sidebar-module-icon';
+    iconWrap.className = 'kair-nav-card__icon';
     iconWrap.innerHTML = SIDEBAR_ICONS[salir.icon] || '';
 
     const textWrap = document.createElement('span');
-    textWrap.className = 'sidebar-module-text';
+    textWrap.className = 'kair-nav-card__text';
 
     const titleEl = document.createElement('span');
-    titleEl.className = 'sidebar-module-title';
+    titleEl.className = 'kair-nav-card__title';
     titleEl.textContent = salir.name;
 
     const subtitleEl = document.createElement('span');
-    subtitleEl.className = 'sidebar-module-subtitle';
+    subtitleEl.className = 'kair-nav-card__subtitle';
     subtitleEl.textContent = salir.subtitle || '';
 
     textWrap.appendChild(titleEl);
@@ -3656,13 +3655,14 @@ function createSidebarButtons(activeModules = null) {
 }
 
 function setActiveSidebarButton(buttonElement) {
-  // Quitar la clase 'active' del botón anterior
+  // 📦738 · Sidebar premium: estado activo con `kair-nav-card--active`
+  // Quitar la clase activa del botón anterior
   if (window.activeSidebarButton) {
-    window.activeSidebarButton.classList.remove('active');
+    window.activeSidebarButton.classList.remove('kair-nav-card--active');
   }
 
-  // Agregar la clase 'active' al nuevo botón
-  buttonElement.classList.add('active');
+  // Agregar la clase activa al nuevo botón
+  buttonElement.classList.add('kair-nav-card--active');
   window.activeSidebarButton = buttonElement;
 }
 

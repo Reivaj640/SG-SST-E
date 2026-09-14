@@ -5,6 +5,95 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.205] - 2026-09-13
+
+### 🆕📦738 · Sidebar lateral: rediseño premium visual (4 iteraciones)
+
+Migra el sidebar lateral principal ("Módulos del Sistema" + "Salir") al design system compartido. Reemplaza `.sidebar-module-card` y derivados por `.kair-nav-card` con tokens de `shared/kair-design-tokens.css`.
+
+#### Iteraciones de diseño (en orden cronológico)
+
+1. **v1-premium** — primera versión con caja de fondo en iconos y bordes en cards. **Rechazada**: "demasiado gris deprimente, no premium".
+2. **v2-noborder** — sin border visible, fondo transparente por default, iconos sin caja de fondo. **Aprobada**.
+3. **v3-hover-soft** — hover usa el mismo color `--kair-soft` que el estado activo (consistencia visual). **Aprobada**.
+4. **v4-footer-soft** — hover del botón "Salir" también usa `--kair-soft` (consistencia con módulos). **Aprobada**.
+
+#### Cambios visuales finales
+
+- **Card principal** (`.kair-nav-card`): fondo **transparente** por default, **sin border visible**, hover con `--kair-soft` (azul claro sutil).
+- **Estado activo**: fondo `--kair-soft` + título azul + icono azul. **Sin borde ni box-shadow**.
+- **Icono** (`.kair-nav-card__icon`): **sin caja de fondo** — solo el SVG con color (`--kair-blue-ink` para inactivos, `--kair-blue` para activos/hover).
+- **Tipografía**: usa `var(--kair-font-ui)` (Manrope).
+- **Transiciones**: usa `var(--kair-transition)` (180ms) consistente con los homes premium.
+
+#### Componentes nuevos (`shared/kair-sidebar.css`)
+
+- `.kair-nav-card` (button card principal)
+- `.kair-nav-card__icon` (wrapper del icono, sin caja)
+- `.kair-nav-card__icon svg` (22×22 stroke-width 1.8)
+- `.kair-nav-card__text` (columna título + subtítulo)
+- `.kair-nav-card__title` (14px, weight 700)
+- `.kair-nav-card__subtitle` (12px, weight 500, color muted)
+- `.kair-nav-card--active` (estado seleccionado)
+- `.kair-nav-card--footer` (variante "Salir")
+- `.kair-nav-card__badge` (+ variantes `--warn`, `--ok`) — badge opcional para alertas (preparado para fase futura)
+- `.kair-nav-section-header-li` + `.kair-nav-section-header` (header de sección)
+- `.kair-nav-footer-li` (separador antes de "Salir")
+
+#### Compatibilidad
+
+- **NO elimina** las clases legacy `.sidebar-module-card*` — conviven sin conflicto.
+- El panel dashboard horizontal ("Módulos del Sistema" en home) y el submenu de Bandeja Integrada **NO se migraron todavía** — quedan en legacy hasta fase futura.
+
+#### Archivos modificados
+
+- `shared/kair-sidebar.css` — **NUEVO** (5,867 bytes, 12 componentes)
+- `renderer.js` — 4 ediciones (header, card, footer, `setActiveSidebarButton`)
+- `index.html` — nuevo `<link>` con cache-bust `SIDEBAR-20260913-v4-footer-soft`
+- `package.json` — versión `0.1.205`
+- `CHANGELOG.md` — esta entrada
+
+## [0.1.205] - 2026-09-13
+
+### 🆕📦738 · Sidebar lateral: rediseño premium visual
+
+Migra el sidebar lateral principal ("Módulos del Sistema" + "Salir") al design system compartido. Reemplaza `.sidebar-module-card` y derivados por `.kair-nav-card` con tokens de `shared/kair-design-tokens.css`.
+
+#### Cambios visuales
+
+- **Card principal** (`.kair-nav-card`): fondo `--kair-card`, borde `--kair-line`, hover con `--kair-faint` + borde `--kair-blue`, **estado activo diferenciado** con `--kair-soft` + box-shadow azul (antes era gris plano sin distinción clara).
+- **Icono** (`.kair-nav-card__icon`): caja de 36×36 con fondo `--kair-faint` y color `--kair-blue`. En estado activo se invierte (fondo azul + icono blanco).
+- **Tipografía**: usa `var(--kair-font-ui)` (Manrope) en lugar de la fuente genérica legacy.
+- **Transiciones**: usa `var(--kair-transition)` (180ms) consistente con los homes premium.
+- **Estado activo claramente diferenciado**: el módulo seleccionado se ve seleccionado de verdad (antes era idéntico al hover).
+
+#### Componentes nuevos (`shared/kair-sidebar.css`)
+
+- `.kair-nav-card` (button card principal)
+- `.kair-nav-card__icon` (wrapper del icono)
+- `.kair-nav-card__icon svg` (20×20)
+- `.kair-nav-card__text` (columna título + subtítulo)
+- `.kair-nav-card__title` (14px, weight 700)
+- `.kair-nav-card__subtitle` (12px, weight 500, color muted)
+- `.kair-nav-card--active` (estado seleccionado)
+- `.kair-nav-card--footer` (variante "Salir" con border dashed)
+- `.kair-nav-card__badge` (+ variantes `--warn`, `--ok`) — badge opcional para alertas
+- `.kair-nav-section-header-li` + `.kair-nav-section-header` (header de sección)
+- `.kair-nav-footer-li` (separador antes de "Salir")
+
+#### Compatibilidad
+
+- **NO elimina** las clases legacy `.sidebar-module-card*` — conviven sin conflicto (por si otros componentes legacy las referencian).
+- **Migración gradual**: solo se migró el sidebar lateral principal. El panel dashboard horizontal ("Módulos del Sistema" en home) y el submenu de Bandeja Integrada se pueden migrar después usando los mismos componentes.
+
+#### Archivos modificados
+
+- `shared/kair-sidebar.css` — **NUEVO** (5,867 bytes, 12 componentes)
+- `renderer.js` — 4 ediciones de clases en el render del sidebar (líneas 3541-3653 + setActiveSidebarButton)
+- `index.html` — nuevo `<link>` para kair-sidebar.css
+- `package.json` — versión `0.1.205`
+- `CHANGELOG.md` — esta entrada
+
 ## [0.1.204] - 2026-09-13
 
 ### 📦737 · Módulo Mejoramiento: rediseño premium visual + score compuesto

@@ -1,6 +1,6 @@
 # K+AIR - Sistema de Gestión SG-SST
 
-**Versión:** 0.1.204 (desarrollo) — publicado v0.1.204
+**Versión:** 0.1.205 (desarrollo) — publicado v0.1.205
 **Última actualización:** 13 de septiembre de 2026
 **Autor:** Javier Robles F. Prof. SG-SST - Esp. Gerencia de Proyectos
 
@@ -38,6 +38,7 @@
 - ✅ **COM Automation**: VBScript para controlar Excel y actualizar Power Query automáticamente
 - ✅ **Sistema de Skeleton Screens** (v0.1.110): API `KairSkeleton.*` con 10 componentes que reemplazan spinners genéricos por placeholders que imitan la forma del componente. Cubierto en 25 loaders en 13 vistas + 7 homes de módulo. Ver `AGENTS.md` (sección "🎨 Sistema de Skeleton Screens") para el detalle.
 - ✅ **Rediseño premium visual de homes de módulos** 🆕 (v0.1.197-204, `📦730-737`): Los 8 homes principales del sistema (Recursos, Gestión Integral, Gestión de la Salud, Gestión de Peligros y Riesgos, Gestión de Amenazas, Verificación, Mejoramiento + Recursos v2) ahora comparten un patrón visual premium unificado basado en `shared/kair-design-tokens.css` + `shared/kair-components.css`. Cada home muestra: header minimal con breadcrumb, hero card con score compuesto del módulo (promedio simple excluyendo sin datos), 3 metric cards, 1 chart SVG nativo, panel "En tu radar" con alertas condicionales, y grid responsivo de submódulos. Reemplaza los widgets individuales + charts Chart.js legacy por una composición data-driven. Reducción promedio de ~10KB por módulo en CSS legacy eliminado. Ver `AGENTS.md` (sección "K+AIR Premium Design System") para el detalle técnico completo y las lecciones aprendidas en el proceso.
+- ✅ **Sidebar lateral premium** 🆕 (v0.1.205, `📦738`): El sidebar lateral principal ("Módulos del Sistema" + "Salir") migró al design system compartido. Define `.kair-nav-card` y 12 componentes derivados en `shared/kair-sidebar.css`. **Decisiones de diseño iterativas** (4 versiones): sin border visible, fondo transparente por default, hover y activo usan el mismo `--kair-soft` (consistencia visual), icono sin caja de fondo. Las clases legacy `.sidebar-module-card*` conviven sin conflicto. Ver `AGENTS.md` (subsección "Sidebar premium (📦738)") para el detalle de las 4 iteraciones con feedback del user.
 - ✅ **Solo 13 archivos en raíz**: Proyecto limpio y organizado
 - ✅ **Tabla de Ausentismo 17 Columnas**: Año, Fecha Inicio, Fecha Fin, Código
 - ✅ **Filtros Dinámicos Inteligentes**: Año y tipo basados en datos reales

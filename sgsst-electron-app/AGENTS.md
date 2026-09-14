@@ -209,7 +209,7 @@ Las vistas usan exclusivamente el sistema BEM `kair-*` definido en `kair-canonic
 - Calendarios: `kair-cron-grid`, `kair-cron-grid__row/cell/head/corner/month/audit/hito`
 - Workflow editor: `kair-rad-editor`, `kair-rad-editor__main/sidebar`, `kair-rad-sticky-footer`, `kair-rad-side-nav__item`
 
-### K+AIR Premium Design System (v0.1.204 · 📦730-737)
+### K+AIR Premium Design System (v0.1.205 · 📦730-738)
 
 A partir de v0.1.197, los homes de módulos usan el sistema premium con tokens compartidos. **8 paquetes ya migrados** al patrón unificado (sep 2026):
 
@@ -357,6 +357,44 @@ El primer rediseño de Gestión de Amenazas (📦734) tenía `layout.style.heigh
 #### Bug histórico pre-existente: clase CSS copiada
 
 4 módulos usaban clase `.gestion-integral-home` (copia literal del CSS de Gestión Integral): Verificación (📦736), Mejoramiento (📦737), Gestión Amenazas (📦734), Gestión Integral (📦731). Renombrados a sus clases correctas (`.<módulo>-home`) en cada rediseño.
+
+#### Sidebar premium (📦738 · v0.1.205)
+
+El sidebar lateral principal usa `.kair-nav-card` y derivados, definidos en **`shared/kair-sidebar.css`**.
+
+**Componentes**:
+- `.kair-nav-card` — button card principal (fila de navegación)
+- `.kair-nav-card__icon` — wrapper del icono SVG (22×22, stroke-width 1.8, sin caja de fondo)
+- `.kair-nav-card__text` — columna con título + subtítulo
+- `.kair-nav-card__title` — 14px, weight 700, `var(--kair-font-ui)`
+- `.kair-nav-card__subtitle` — 12px, weight 500, `var(--kair-muted)`
+- `.kair-nav-card--active` — estado seleccionado (fondo `--kair-soft`, título/icono `--kair-blue`)
+- `.kair-nav-card--footer` — variante "Salir" (sin border dashed)
+- `.kair-nav-card__badge` (+ `--warn`, `--ok`) — badge opcional preparado para alertas futuras
+- `.kair-nav-section-header-li` + `.kair-nav-section-header` — header de sección ("Módulos del Sistema")
+- `.kair-nav-footer-li` — separador antes de "Salir"
+
+**Decisión de diseño clave** (v4 final, tras 4 iteraciones con feedback del user):
+- **Fondo transparente por default** (no `--kair-card` que se veía "gris deprimente")
+- **Sin border visible** en estado normal ni activo (el border se sentía redundante)
+- **Hover y activo usan EL MISMO fondo** (`--kair-soft`): pasás el mouse sobre cualquier módulo y ya "se ve seleccionado" — consistencia visual inmediata
+- **Icono sin caja de fondo**: solo el SVG con color (`--kair-blue-ink` para inactivos, `--kair-blue` para activos/hover)
+- **Sin box-shadow en activo**: solo cambio de color de fondo + título + icono
+- **Salir**: variante footer con mismo comportamiento de hover que los módulos
+
+**Estado activo** se aplica con clase `kair-nav-card--active` (NO con `.active` legacy). El handler `setActiveSidebarButton(card)` en `renderer.js:3657` hace `classList.add('kair-nav-card--active')` / `remove`.
+
+**Compatibilidad**: las clases legacy `.sidebar-module-card*` NO se eliminaron — conviven sin conflicto por si otros componentes las referencian.
+
+**Migración futura**: el panel dashboard horizontal (`renderer.js:4180` "Módulos del Sistema" en home) y el submenu de Bandeja Integrada (`renderer/bandeja-integrada/init.js:51` `<aside class="kair-card kair-sidebar">`) aún usan legacy. Se pueden migrar después con los mismos componentes.
+
+**Iteraciones de diseño** (lección sobre UX con user):
+1. v1-premium: caja de fondo en iconos + bordes. **Rechazada**: "demasiado gris deprimente, no premium".
+2. v2-noborder: sin border, fondo transparente, iconos sin caja. **Aprobada**.
+3. v3-hover-soft: hover = activo (mismo `--kair-soft`). **Aprobada**.
+4. v4-footer-soft: hover de "Salir" = mismo `--kair-soft`. **Aprobada**.
+
+Lección: cuando se diseña con feedback iterativo, **empezar minimalista** (sin border, sin caja, sin sombra) y agregar elementos solo si el user lo pide. Es más fácil agregar que quitar.
 
 ### Comunicación
 - **Renderer ↔ Main process**: `window.electronAPI.modulo.metodo(arg).then(...)`
