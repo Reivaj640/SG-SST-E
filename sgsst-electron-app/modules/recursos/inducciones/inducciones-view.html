@@ -1,4 +1,4 @@
-<link rel="stylesheet" href="./modules/recursos/inducciones/inducciones-view.css">
+<link rel="stylesheet" href="./modules/recursos/inducciones/inducciones-view.css?v=INDUCCIONES-20260913-v4-premium-svg-aligned">
 
 <!-- NOTIFICACIONES -->
 <div class="k-toast-container" id="toastContainer"></div>
@@ -38,14 +38,14 @@
         <span id="header-company-text">—</span>
       </span>
       <div style="width:1px; height:24px; background:#dee2e6;"></div>
-      <button id="btn-back-module" class="header-back-btn" title="Volver al módulo Recursos">
+      <button id="btn-back-module" class="kair-btn kair-btn-ghost" style="display:inline-flex; align-items:center; gap:6px;" title="Volver al módulo Recursos">
         <i class="bi bi-arrow-left"></i> Volver
       </button>
-      <button id="btn-sync-manual" class="header-action--ghost" title="Sincronizar con Google Forms">
+      <button id="btn-sync-manual" class="kair-btn kair-btn-ghost" style="display:inline-flex; align-items:center; gap:6px;" title="Sincronizar con Google Forms">
         <i class="bi bi-arrow-clockwise" id="sync-icon"></i> Sincronizar
       </button>
       <span id="sync-status" class="k-sync-status" style="margin-left:0.25rem;display:none;"></span>
-      <button id="btn-export-excel" class="header-action--ghost" title="Exportar datos">
+      <button id="btn-export-excel" class="kair-btn kair-btn-ghost" style="display:inline-flex; align-items:center; gap:6px;" title="Exportar datos">
         <i class="bi bi-file-earmark-excel"></i> Exportar
       </button>
     </div>
@@ -145,53 +145,59 @@
 
   <!-- Gráficos Grid Unificado 3 columnas -->
   <div class="k-charts-grid">
-  <div class="k-chart-container">
-    <div class="k-chart-header">
-      <div class="k-chart-title">Ejecución Mensual (Realizadas vs Aprobadas)</div>
+  <div class="kair-card">
+    <div class="kair-row-title">
+      <div>
+        <h3>Ejecución Mensual</h3>
+        <div class="kair-card-hint">Realizadas vs Aprobadas por mes</div>
+      </div>
     </div>
-    <div class="k-chart-body">
-      <canvas id="mainChart"></canvas>
-    </div>
+    <div class="kair-chart"><div id="mainChart" class="kair-chart-svg"></div></div>
   </div>
-  <div class="k-chart-container">
-    <div class="k-chart-header">
-      <div class="k-chart-title">Tasa de Aprobación por Mes (%)</div>
+  <div class="kair-card">
+    <div class="kair-row-title">
+      <div>
+        <h3>Tasa de Aprobación por Mes</h3>
+        <div class="kair-card-hint">% de aprobados sobre realizados, por mes</div>
+      </div>
     </div>
-    <div class="k-chart-body">
-      <canvas id="approvalRateChart"></canvas>
-    </div>
+    <div class="kair-chart"><div id="approvalRateChart" class="kair-chart-svg"></div></div>
   </div>
-  <div class="k-chart-container">
-    <div class="k-chart-header">
-      <div class="k-chart-title">Distribución por Género</div>
+  <div class="kair-card">
+    <div class="kair-row-title">
+      <div>
+        <h3>Distribución por Género</h3>
+        <div class="kair-card-hint">Hombres vs Mujeres inducidos</div>
+      </div>
     </div>
-    <div class="k-chart-body">
-      <canvas id="genderDistChart"></canvas>
-    </div>
+    <div class="kair-chart"><div id="genderDistChart" class="kair-chart-svg"></div></div>
   </div>
-  <div class="k-chart-container">
-    <div class="k-chart-header">
-      <div class="k-chart-title">Top Cargos Inducidos</div>
+  <div class="kair-card">
+    <div class="kair-row-title">
+      <div>
+        <h3>Top Cargos Inducidos</h3>
+        <div class="kair-card-hint">Top 5 cargos con más inducciones</div>
+      </div>
     </div>
-    <div class="k-chart-body">
-      <canvas id="positionChart"></canvas>
-    </div>
+    <div class="kair-chart"><div id="positionChart" class="kair-chart-svg"></div></div>
   </div>
-  <div class="k-chart-container">
-    <div class="k-chart-header">
-      <div class="k-chart-title">Aprobación por Género (Aprobados vs Reprobados)</div>
+  <div class="kair-card">
+    <div class="kair-row-title">
+      <div>
+        <h3>Aprobación por Género</h3>
+        <div class="kair-card-hint">Aprobados vs Reprobados, segmentado por género</div>
+      </div>
     </div>
-    <div class="k-chart-body">
-      <canvas id="genderStackChart"></canvas>
-    </div>
+    <div class="kair-chart"><div id="genderStackChart" class="kair-chart-svg"></div></div>
   </div>
-  <div class="k-chart-container">
-    <div class="k-chart-header">
-      <div class="k-chart-title">Distribución de Puntajes por Rango</div>
+  <div class="kair-card">
+    <div class="kair-row-title">
+      <div>
+        <h3>Distribución de Puntajes por Rango</h3>
+        <div class="kair-card-hint">Cantidad de trabajadores en cada rango de puntaje</div>
+      </div>
     </div>
-    <div class="k-chart-body">
-      <canvas id="scoreDistChart"></canvas>
-    </div>
+    <div class="kair-chart"><div id="scoreDistChart" class="kair-chart-svg"></div></div>
   </div>
   </div>
 </section>

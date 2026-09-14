@@ -3,27 +3,27 @@
    ========================================= */
 .inducciones-container {
     /* Colores Principales - Definidos en :root para asegurar disponibilidad */
-    --k-primary: #174ea6;
-    --k-primary-hover: #185abd;
-    --k-primary-light: rgba(23, 78, 166, 0.1);
+    --kair-blue: #174ea6;
+    --kair-blue-hover: #185abd;
+    --kair-blue-light: rgba(23, 78, 166, 0.1);
 
-    --k-success: #28a745;
-    --k-success-light: rgba(40, 167, 69, 0.1);
+    --kair-mint: #28a745;
+    --kair-mint-light: rgba(40, 167, 69, 0.1);
 
-    --k-warning: #ffc107;
-    --k-warning-light: rgba(255, 193, 7, 0.1);
+    --kair-amber: #ffc107;
+    --kair-amber-light: rgba(255, 193, 7, 0.1);
 
-    --k-danger: #dc3545;
-    --k-danger-light: rgba(220, 53, 69, 0.1);
+    --kair-red: #dc3545;
+    --kair-red-light: rgba(220, 53, 69, 0.1);
 
     --k-bg-app: #f8f9fa;
     --k-bg-card: #ffffff;
-    --k-border: #dee2e6;
+    --kair-line: #dee2e6;
 
     /* Tipografía */
     --k-font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
-    --k-text-main: #212529;
-    --k-text-muted: #6c757d;
+    --kair-ink: #212529;
+    --kair-muted: #6c757d;
 
     /* Estructura */
     --k-radius-md: 0.375rem;
@@ -33,7 +33,7 @@
 
     font-family: var(--k-font-family);
     background-color: var(--k-bg-app);
-    color: var(--k-text-main);
+    color: var(--kair-ink);
     height: 100%;
     width: 100%;
     display: flex;
@@ -42,17 +42,17 @@
 }
 
 .inducciones-container[data-theme="dark"] {
-    --k-primary: #4da6ff;
-    --k-primary-hover: #66b3ff;
-    --k-primary-light: rgba(77, 166, 255, 0.15);
-    --k-success: #5cb85c;
-    --k-warning: #f0ad4e;
-    --k-danger: #d9534f;
-    --k-text-main: #e9ecef;
-    --k-text-muted: #adb5bd;
+    --kair-blue: #4da6ff;
+    --kair-blue-hover: #66b3ff;
+    --kair-blue-light: rgba(77, 166, 255, 0.15);
+    --kair-mint: #5cb85c;
+    --kair-amber: #f0ad4e;
+    --kair-red: #d9534f;
+    --kair-ink: #e9ecef;
+    --kair-muted: #adb5bd;
     --k-bg-app: #1a202c;
     --k-bg-card: #2d3748;
-    --k-border: #4a5568;
+    --kair-line: #4a5568;
     --k-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
     --k-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
 }
@@ -155,13 +155,13 @@
 }
 
 .inducciones-tab:hover {
-  color: #174ea6;
+  color: var(--kair-blue);
 }
 
 .inducciones-tab.active {
-  color: #174ea6;
+  color: var(--kair-blue);
   font-weight: 600;
-  border-bottom-color: #174ea6;
+  border-bottom-color: var(--kair-blue);
 }
 
 .inducciones-tab-badge {
@@ -174,30 +174,30 @@
   font-size: 0.6875rem;
   font-weight: 600;
   border-radius: 9px;
-  background: #e8f0fe;
-  color: #174ea6;
+  background: var(--kair-faint);
+  color: var(--kair-blue);
 }
 
 .inducciones-tab.active .inducciones-tab-badge {
-  background: #174ea6;
+  background: var(--kair-blue);
   color: #fff;
 }
 
 /* Dark theme — Header v3.0 + Tabs */
 .inducciones-container[data-theme="dark"] .k-section-card {
   background: var(--k-bg-card);
-  border-color: var(--k-border);
+  border-color: var(--kair-line);
 }
 
 .inducciones-container[data-theme="dark"] .header-back-btn {
   color: #adb5bd;
-  border-color: var(--k-border);
+  border-color: var(--kair-line);
 }
 
 .inducciones-container[data-theme="dark"] .header-back-btn:hover {
   background: rgba(77, 166, 255, 0.15);
-  color: var(--k-primary);
-  border-color: var(--k-primary);
+  color: var(--kair-blue);
+  border-color: var(--kair-blue);
 }
 
 .inducciones-container[data-theme="dark"] .header-action--ghost {
@@ -210,7 +210,7 @@
 }
 
 .inducciones-container[data-theme="dark"] .inducciones-tabs {
-  border-top-color: var(--k-border);
+  border-top-color: var(--kair-line);
 }
 
 .inducciones-container[data-theme="dark"] .inducciones-tab {
@@ -219,16 +219,16 @@
 
 .inducciones-container[data-theme="dark"] .inducciones-tab:hover,
 .inducciones-container[data-theme="dark"] .inducciones-tab.active {
-  color: var(--k-primary);
+  color: var(--kair-blue);
 }
 
 .inducciones-container[data-theme="dark"] .inducciones-tab-badge {
   background: rgba(77, 166, 255, 0.15);
-  color: var(--k-primary);
+  color: var(--kair-blue);
 }
 
 .inducciones-container[data-theme="dark"] .inducciones-tab.active .inducciones-tab-badge {
-  background: var(--k-primary);
+  background: var(--kair-blue);
   color: #fff;
 }
 
@@ -274,14 +274,14 @@
     text-decoration: none;
 }
 .k-btn-primary {
-    background-color: var(--k-primary); color: white;
+    background-color: var(--kair-blue); color: white;
     box-shadow: 0 2px 4px rgba(23, 78, 166, 0.2);
 }
-.k-btn-primary:hover { background-color: var(--k-primary-hover); transform: translateY(-1px); color: white; }
+.k-btn-primary:hover { background-color: var(--kair-blue-hover); transform: translateY(-1px); color: white; }
 .k-btn-outline {
-    background-color: transparent; border-color: var(--k-border); color: var(--k-text-main);
+    background-color: transparent; border-color: var(--kair-line); color: var(--kair-ink);
 }
-.k-btn-outline:hover { border-color: var(--k-primary); color: var(--k-primary); background-color: var(--k-primary-light); }
+.k-btn-outline:hover { border-color: var(--kair-blue); color: var(--kair-blue); background-color: var(--kair-blue-light); }
 
 /* Grids */
 .k-grid-dashboard {
@@ -293,21 +293,21 @@
 
 /* Cards */
 .k-stat-card {
-    background: var(--k-bg-card); border: 1px solid var(--k-border);
+    background: var(--k-bg-card); border: 1px solid var(--kair-line);
     border-radius: var(--k-radius-lg); padding: 1.25rem;
     display: flex; flex-direction: column; position: relative; overflow: hidden;
 }
 .k-stat-card::before {
     content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%;
 }
-.k-stat-card.primary::before { background-color: var(--k-primary); }
-.k-stat-card.success::before { background-color: var(--k-success); }
-.k-stat-card.warning::before { background-color: var(--k-warning); }
-.k-stat-card.danger::before { background-color: var(--k-danger); }
+.k-stat-card.primary::before { background-color: var(--kair-blue); }
+.k-stat-card.success::before { background-color: var(--kair-mint); }
+.k-stat-card.warning::before { background-color: var(--kair-amber); }
+.k-stat-card.danger::before { background-color: var(--kair-red); }
 
-.k-stat-label { font-size: 0.8rem; color: var(--k-text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.25rem; }
-.k-stat-value { font-size: 1.75rem; font-weight: 700; color: var(--k-text-main); line-height: 1.1; }
-.k-stat-meta { margin-top: auto; padding-top: 0.5rem; font-size: 0.8rem; color: var(--k-text-muted); }
+.k-stat-label { font-size: 0.8rem; color: var(--kair-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.25rem; }
+.k-stat-value { font-size: 1.75rem; font-weight: 700; color: var(--kair-ink); line-height: 1.1; }
+.k-stat-meta { margin-top: auto; padding-top: 0.5rem; font-size: 0.8rem; color: var(--kair-muted); }
 
 /* =========================================
    3.1 DASHBOARD — STATS RIBBON (compacto)
@@ -317,7 +317,7 @@
   align-items: center;
   gap: 0;
   background: var(--k-bg-card);
-  border: 1px solid var(--k-border);
+  border: 1px solid var(--kair-line);
   border-radius: var(--k-radius-lg);
   padding: 0;
   margin-bottom: 1.5rem;
@@ -346,28 +346,28 @@
 }
 
 .inducciones-container .k-stats-ribbon__icon.primary {
-  background: var(--k-primary-light);
-  color: var(--k-primary);
+  background: var(--kair-blue-light);
+  color: var(--kair-blue);
 }
 
 .inducciones-container .k-stats-ribbon__icon.success {
-  background: var(--k-success-light);
-  color: var(--k-success);
+  background: var(--kair-mint-light);
+  color: var(--kair-mint);
 }
 
 .inducciones-container .k-stats-ribbon__icon.danger {
-  background: var(--k-danger-light);
-  color: var(--k-danger);
+  background: var(--kair-red-light);
+  color: var(--kair-red);
 }
 
 .inducciones-container .k-stats-ribbon__icon.warning {
-  background: var(--k-warning-light);
+  background: var(--kair-amber-light);
   color: #856404;
 }
 
 .inducciones-container .k-stats-ribbon__icon.muted {
   background: #f0f2f5;
-  color: var(--k-text-muted);
+  color: var(--kair-muted);
 }
 
 .inducciones-container .k-stats-ribbon__icon.pink {
@@ -389,19 +389,19 @@
 .inducciones-container .k-stats-ribbon__value {
   font-size: 1.25rem;
   font-weight: 700;
-  color: var(--k-text-main);
+  color: var(--kair-ink);
   line-height: 1.2;
 }
 
 .inducciones-container .k-stats-ribbon__value--sm {
   font-size: 0.75rem;
   font-weight: 500;
-  color: var(--k-text-muted);
+  color: var(--kair-muted);
 }
 
 .inducciones-container .k-stats-ribbon__label {
   font-size: 0.6875rem;
-  color: var(--k-text-muted);
+  color: var(--kair-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   white-space: nowrap;
@@ -411,8 +411,8 @@
   margin-left: auto;
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--k-primary);
-  background: var(--k-primary-light);
+  color: var(--kair-blue);
+  background: var(--kair-blue-light);
   padding: 0.125rem 0.5rem;
   border-radius: 10px;
   white-space: nowrap;
@@ -422,7 +422,7 @@
 .inducciones-container .k-stats-ribbon__divider {
   width: 1px;
   height: 32px;
-  background: var(--k-border);
+  background: var(--kair-line);
   flex-shrink: 0;
 }
 
@@ -434,17 +434,17 @@
 
 .inducciones-container[data-theme="dark"] .k-stats-ribbon__icon.primary {
   background: rgba(77, 166, 255, 0.15);
-  color: var(--k-primary);
+  color: var(--kair-blue);
 }
 
 .inducciones-container[data-theme="dark"] .k-stats-ribbon__icon.success {
   background: rgba(92, 184, 92, 0.15);
-  color: var(--k-success);
+  color: var(--kair-mint);
 }
 
 .inducciones-container[data-theme="dark"] .k-stats-ribbon__icon.danger {
   background: rgba(217, 83, 79, 0.15);
-  color: var(--k-danger);
+  color: var(--kair-red);
 }
 
 .inducciones-container[data-theme="dark"] .k-stats-ribbon__icon.warning {
@@ -484,7 +484,7 @@
 }
 
 .inducciones-container[data-theme="dark"] .k-stats-ribbon__pct {
-  color: var(--k-primary);
+  color: var(--kair-blue);
   background: rgba(77, 166, 255, 0.15);
 }
 
@@ -503,14 +503,14 @@
 
 /* Charts */
 .k-chart-container {
-    background: var(--k-bg-card); border: 1px solid var(--k-border);
+    background: var(--k-bg-card); border: 1px solid var(--kair-line);
     border-radius: var(--k-radius-lg); padding: 1.5rem;
     margin-bottom: 2rem; box-shadow: var(--k-shadow-sm);
     height: 100%;
     display: flex; flex-direction: column;
 }
 .k-chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-.k-chart-title { font-size: 1.1rem; font-weight: 600; color: var(--k-text-main); }
+.k-chart-title { font-size: 1.1rem; font-weight: 600; color: var(--kair-ink); }
 
 /* BUG FIX: Contenedor del canvas para evitar desbordes */
 .k-chart-body {
@@ -520,6 +520,22 @@
   min-height: 220px;
   height: 280px;
   overflow: hidden;
+}
+
+/* 📦739 · SVG nativo reemplaza Chart.js para Inducciones. */
+.kair-chart-svg {
+  width: 100%;
+  height: 100%;
+  min-height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.kair-chart-svg svg {
+  width: 100%;
+  height: 100%;
+  max-height: 240px;
 }
 
 .k-chart-body canvas {
@@ -568,7 +584,7 @@ DASHBOARD FILTERS — Filtro Año + Género
   align-items: center;
   gap: 1rem;
   background: var(--k-bg-card);
-  border: 1px solid var(--k-border);
+  border: 1px solid var(--kair-line);
   border-radius: var(--k-radius-lg);
   padding: 0.75rem 1.25rem;
   margin-bottom: 1.5rem;
@@ -585,18 +601,18 @@ DASHBOARD FILTERS — Filtro Año + Género
 .inducciones-container .k-dashboard-filters__label {
   font-size: 0.8125rem;
   font-weight: 500;
-  color: var(--k-text-muted);
+  color: var(--kair-muted);
   white-space: nowrap;
 }
 
 .inducciones-container .k-dashboard-filters__select {
   padding: 0.375rem 2rem 0.375rem 0.75rem;
-  border: 1px solid var(--k-border);
+  border: 1px solid var(--kair-line);
   border-radius: var(--k-radius-md);
   background-color: var(--k-bg-app);
   font-size: 0.875rem;
   font-family: var(--k-font-family);
-  color: var(--k-text-main);
+  color: var(--kair-ink);
   cursor: pointer;
   appearance: auto;
   min-width: 120px;
@@ -604,20 +620,20 @@ DASHBOARD FILTERS — Filtro Año + Género
 
 .inducciones-container .k-dashboard-filters__select:focus {
   outline: none;
-  border-color: var(--k-primary);
-  box-shadow: 0 0 0 3px var(--k-primary-light);
+  border-color: var(--kair-blue);
+  box-shadow: 0 0 0 3px var(--kair-blue-light);
 }
 
 .inducciones-container .k-dashboard-filters__divider {
   width: 1px;
   height: 24px;
-  background: var(--k-border);
+  background: var(--kair-line);
   flex-shrink: 0;
 }
 
 .inducciones-container .k-dashboard-filters__count {
   font-size: 0.75rem;
-  color: var(--k-text-muted);
+  color: var(--kair-muted);
   margin-left: auto;
   white-space: nowrap;
 }
@@ -663,16 +679,16 @@ DASHBOARD FILTERS — Filtro Año + Género
 
 /* Tables */
 .k-table-container {
-    background: var(--k-bg-card); border: 1px solid var(--k-border);
+    background: var(--k-bg-card); border: 1px solid var(--kair-line);
     border-radius: var(--k-radius-lg); overflow-x: auto;
     box-shadow: var(--k-shadow-sm);
 }
 .k-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 .k-table th {
-    background-color: #fcfcfc; color: var(--k-text-muted); font-weight: 600;
-    text-align: left; padding: 1rem 1.5rem; border-bottom: 1px solid var(--k-border); white-space: nowrap;
+    background-color: #fcfcfc; color: var(--kair-muted); font-weight: 600;
+    text-align: left; padding: 1rem 1.5rem; border-bottom: 1px solid var(--kair-line); white-space: nowrap;
 }
-.k-table td { padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--k-border); vertical-align: middle; }
+.k-table td { padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--kair-line); vertical-align: middle; }
 .k-table tbody tr:hover { background-color: #fcfdff; }
 
 /* Badges */
@@ -681,26 +697,26 @@ DASHBOARD FILTERS — Filtro Año + Género
     font-size: 0.75em; font-weight: 600; line-height: 1; text-align: center;
     white-space: nowrap; vertical-align: baseline; border-radius: var(--k-radius-md);
 }
-.k-badge-success { background-color: var(--k-success-light); color: var(--k-success); }
-.k-badge-danger { background-color: var(--k-danger-light); color: var(--k-danger); }
+.k-badge-success { background-color: var(--kair-mint-light); color: var(--kair-mint); }
+.k-badge-danger { background-color: var(--kair-red-light); color: var(--kair-red); }
 
 /* Forms & Filters */
-.form-label { display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem; color: var(--k-text-main); }
+.form-label { display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem; color: var(--kair-ink); }
 .form-control {
-    width: 100%; padding: 0.6rem 0.8rem; border: 1px solid var(--k-border);
+    width: 100%; padding: 0.6rem 0.8rem; border: 1px solid var(--kair-line);
     border-radius: var(--k-radius-md); font-family: inherit; font-size: 0.9rem;
 }
-.form-control:focus { outline: none; border-color: var(--k-primary); box-shadow: 0 0 0 3px var(--k-primary-light); }
+.form-control:focus { outline: none; border-color: var(--kair-blue); box-shadow: 0 0 0 3px var(--kair-blue-light); }
 
 .k-filter-group {
     display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin-bottom: 1.5rem;
-    background: var(--k-bg-card); padding: 1rem; border: 1px solid var(--k-border);
+    background: var(--k-bg-card); padding: 1rem; border: 1px solid var(--kair-line);
     border-radius: var(--k-radius-lg); border-bottom: none;
 }
 .k-form-select {
-    padding: 0.5rem 2rem 0.5rem 1rem; border: 1px solid var(--k-border);
+    padding: 0.5rem 2rem 0.5rem 1rem; border: 1px solid var(--kair-line);
     border-radius: var(--k-radius-md); background-color: var(--k-bg-app);
-    font-size: 0.9rem; color: var(--k-text-main); cursor: pointer;
+    font-size: 0.9rem; color: var(--kair-ink); cursor: pointer;
 }
 
 /* Modal */
@@ -716,15 +732,15 @@ DASHBOARD FILTERS — Filtro Año + Género
     max-height: 90vh; display: flex; flex-direction: column;
 }
 @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-.k-modal-header { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--k-border); display: flex; justify-content: space-between; align-items: center; }
-.k-modal-title { font-size: 1.15rem; font-weight: 600; color: var(--k-primary); margin: 0; }
+.k-modal-header { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--kair-line); display: flex; justify-content: space-between; align-items: center; }
+.k-modal-title { font-size: 1.15rem; font-weight: 600; color: var(--kair-blue); margin: 0; }
 .k-modal-body { padding: 1.5rem; overflow-y: auto; }
-.k-modal-footer { padding: 1rem 1.5rem; border-top: 1px solid var(--k-border); display: flex; justify-content: flex-end; gap: 0.75rem; }
+.k-modal-footer { padding: 1rem 1.5rem; border-top: 1px solid var(--kair-line); display: flex; justify-content: flex-end; gap: 0.75rem; }
 
 /* Toasts */
 .k-toast-container { position: fixed; top: 20px; right: 20px; z-index: 2000; display: flex; flex-direction: column; gap: 10px; }
 .k-toast {
-    background: white; border-left:4px solid var(--k-primary); padding: 1rem 1.5rem;
+    background: white; border-left:4px solid var(--kair-blue); padding: 1rem 1.5rem;
     border-radius: var(--k-radius-md); box-shadow: var(--k-shadow-md);
     display: flex; align-items: center; gap: 1rem; min-width: 300px;
     animation: slideInRight 0.3s ease;
@@ -742,8 +758,8 @@ DASHBOARD FILTERS — Filtro Año + Género
    SINCRONIZACIÓN - Banner y Estado
    ========================================= */
 .k-sync-banner {
-    background: linear-gradient(135deg, var(--k-primary-light) 0%, rgba(23, 78, 166, 0.05) 100%);
-    border-bottom: 1px solid var(--k-border);
+    background: linear-gradient(135deg, var(--kair-blue-light) 0%, rgba(23, 78, 166, 0.05) 100%);
+    border-bottom: 1px solid var(--kair-line);
     padding: 0.75rem 1.5rem;
     display: flex;
     justify-content: space-between;
@@ -760,7 +776,7 @@ DASHBOARD FILTERS — Filtro Año + Género
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    color: var(--k-primary);
+    color: var(--kair-blue);
     font-weight: 500;
 }
 
@@ -785,13 +801,13 @@ DASHBOARD FILTERS — Filtro Año + Género
     align-items: center;
     gap: 0.5rem;
     padding: 0.25rem 0.75rem;
-    background: var(--k-success-light);
+    background: var(--kair-mint-light);
     border-radius: var(--k-radius-md);
 }
 
 .k-sync-status.syncing {
-    background: var(--k-warning-light);
-    color: var(--k-warning);
+    background: var(--kair-amber-light);
+    color: var(--kair-amber);
 }
 
 .k-sync-status.syncing i {
@@ -804,6 +820,6 @@ DASHBOARD FILTERS — Filtro Año + Género
 }
 
 .k-sync-status.error {
-    background: var(--k-danger-light);
-    color: var(--k-danger);
+    background: var(--kair-red-light);
+    color: var(--kair-red);
 }

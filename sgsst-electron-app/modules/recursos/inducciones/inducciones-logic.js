@@ -458,15 +458,415 @@ class InduccionesComponent {
     });
   }
 
-  initOrUpdateChart(canvasId, config) {
-    const canvas = document.getElementById(canvasId);
-    if (!canvas) return;
+  initOrUpdateChart(containerId, config) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
 
-    if (this.state.charts[canvasId]) {
-      this.state.charts[canvasId].destroy();
+    // 📦739 · Si es <div> (nuevo) → SVG nativo del design system.
+    // Si es <canvas> (legacy) → Chart.js fallback (compatibilidad otros módulos).
+    if (container.tagName === 'CANVAS' && typeof Chart !== 'undefined') {
+      if (this.state.charts[containerId]) {
+        this.state.charts[containerId].destroy();
+      }
+      this.state.charts[containerId] = new Chart(container, config);
+      return;
     }
 
-    this.state.charts[canvasId] = new Chart(canvas, config);
+    // SVG nativo
+    if (this.state.charts[containerId]) {
+      this.state.charts[containerId] = null;
+    }
+    container.innerHTML = '';
+
+    const svg = this._renderSvgChart(config);
+    if (svg) container.appendChild(svg);
+    this.state.charts[containerId] = { svg: true };
+  }
+
+  /**
+   * Genera SVG nativo según el tipo de chart.
+   * Tipos soportados: 'line', 'bar', 'doughnut', 'stackedBar'.
+   * Patrón premium K+AIR — mismo enfoque que los homes rediseñados.
+   */
+  _renderSvgChart(config) {
+    const { type, data } = config;
+    if (type === 'line') return this._svgLineChart(data);
+    if (type === 'bar') return this._svgBarChart(data);
+    if (type === 'doughnut') return this._svgDoughnutChart(data);
+    if (type === 'stackedBar') return this._svgStackedBarChart(data);
+    return null;
+  }
+
+  /** SVG line chart (1 o más polylines con grid horizontal) */
+  _svgLineChart(data) {
+    const W = 480, H = 220, padL = 36, padR = 12, padT = 16, padB = 28;
+    const labels = data.labels || [];
+    const datasets = data.datasets || [];
+    if (datasets.length === 0 || labels.length === 0) return this._svgEmpty('Sin datos');
+
+    const allValues = datasets.flatMap(d => d.data.map(v => Number(v) || 0));
+    const maxY = Math.max(...allValues, 1);
+    const stepY = Math.ceil(maxY / 5);
+    const yMax = stepY * 5;
+
+    const xStep = (W - padL - padR) / Math.max(1, labels.length - 1);
+    const yScale = (v) => H - padB - (v / yMax) * (H - padT - padB);
+
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', '100%');
+    svg.style.fontFamily = 'var(--kair-font-ui)';
+
+    // Gradientes para fill area (sutil, premium)
+    const defs = document.createElementNS(ns, 'defs');
+    datasets.forEach((ds, i) => {
+      const grad = document.createElementNS(ns, 'linearGradient');
+      grad.setAttribute('id', `inducciones-grad-${i}`);
+      grad.setAttribute('x1', '0'); grad.setAttribute('y1', '0');
+      grad.setAttribute('x2', '0'); grad.setAttribute('y2', '1');
+      const color = ds.borderColor || 'var(--kair-blue)';
+      grad.innerHTML = `<stop offset="0%" stop-color="${color}" stop-opacity="0.18"/><stop offset="100%" stop-color="${color}" stop-opacity="0.02"/>`;
+      defs.appendChild(grad);
+    });
+    svg.appendChild(defs);
+
+    // Grid horizontal
+    for (let i = 0; i <= 5; i++) {
+      const y = padT + (i / 5) * (H - padT - padB);
+      const line = document.createElementNS(ns, 'line');
+      line.setAttribute('x1', padL); line.setAttribute('x2', W - padR);
+      line.setAttribute('y1', y); line.setAttribute('y2', y);
+      line.setAttribute('stroke', 'var(--kair-line)'); line.setAttribute('stroke-width', '1');
+      svg.appendChild(line);
+
+      const txt = document.createElementNS(ns, 'text');
+      txt.setAttribute('x', padL - 6); txt.setAttribute('y', y + 4);
+      txt.setAttribute('text-anchor', 'end'); txt.setAttribute('fill', 'var(--kair-muted)');
+      txt.setAttribute('font-size', '10');
+      txt.textContent = Math.round(yMax - (i / 5) * yMax);
+      svg.appendChild(txt);
+    }
+
+    // X labels
+    labels.forEach((lbl, i) => {
+      const x = padL + i * xStep;
+      const txt = document.createElementNS(ns, 'text');
+      txt.setAttribute('x', x); txt.setAttribute('y', H - 10);
+      txt.setAttribute('text-anchor', 'middle'); txt.setAttribute('fill', 'var(--kair-muted)');
+      txt.setAttribute('font-size', '10');
+      txt.textContent = lbl;
+      svg.appendChild(txt);
+    });
+
+    // Datasets: fill area + polyline + dots
+    datasets.forEach((ds, i) => {
+      const points = ds.data.map((v, idx) => `${padL + idx * xStep},${yScale(Number(v) || 0)}`).join(' ');
+      const baseY = H - padB;
+      const areaPoints = `${padL},${baseY} ${points} ${padL + (ds.data.length - 1) * xStep},${baseY}`;
+
+      // Fill area
+      const area = document.createElementNS(ns, 'polygon');
+      area.setAttribute('points', areaPoints);
+      area.setAttribute('fill', `url(#inducciones-grad-${i})`);
+      svg.appendChild(area);
+
+      // Polyline
+      const poly = document.createElementNS(ns, 'polyline');
+      poly.setAttribute('points', points);
+      poly.setAttribute('fill', 'none');
+      poly.setAttribute('stroke', ds.borderColor || 'var(--kair-blue)');
+      poly.setAttribute('stroke-width', '2.2');
+      poly.setAttribute('stroke-linejoin', 'round');
+      poly.setAttribute('stroke-linecap', 'round');
+      svg.appendChild(poly);
+
+      // Dots
+      ds.data.forEach((v, idx) => {
+        const cx = padL + idx * xStep, cy = yScale(Number(v) || 0);
+        const dot = document.createElementNS(ns, 'circle');
+        dot.setAttribute('cx', cx); dot.setAttribute('cy', cy); dot.setAttribute('r', '3.5');
+        dot.setAttribute('fill', '#fff');
+        dot.setAttribute('stroke', ds.borderColor || 'var(--kair-blue)');
+        dot.setAttribute('stroke-width', '2');
+        svg.appendChild(dot);
+      });
+    });
+
+    // Leyenda (estilo premium — pill arriba)
+    const legendY = padT + 8;
+    let lxOffset = padL;
+    datasets.forEach((ds, i) => {
+      const labelText = ds.label || '';
+      const approxW = labelText.length * 6 + 18;
+      const txt = document.createElementNS(ns, 'text');
+      txt.setAttribute('x', lxOffset + 12); txt.setAttribute('y', legendY + 4);
+      txt.setAttribute('fill', 'var(--kair-ink)');
+      txt.setAttribute('font-size', '11');
+      txt.setAttribute('font-weight', '600');
+      const dot = document.createElementNS(ns, 'circle');
+      dot.setAttribute('cx', lxOffset + 4); dot.setAttribute('cy', legendY);
+      dot.setAttribute('r', '4');
+      dot.setAttribute('fill', ds.borderColor || 'var(--kair-blue)');
+      svg.appendChild(dot);
+      txt.textContent = labelText;
+      svg.appendChild(txt);
+      lxOffset += approxW + 14;
+    });
+
+    return svg;
+  }
+
+  /** SVG bar chart (barras verticales) */
+  _svgBarChart(data) {
+    const W = 480, H = 220, padL = 36, padR = 12, padT = 16, padB = 28;
+    const labels = data.labels || [];
+    const datasets = data.datasets || [];
+    if (datasets.length === 0 || labels.length === 0) return this._svgEmpty('Sin datos');
+
+    const ds = datasets[0];
+    const values = ds.data.map(v => Number(v) || 0);
+    const maxVal = Math.max(...values, 1);
+    const stepY = Math.ceil(maxVal / 5);
+    const yMax = stepY * 5;
+
+    const innerW = W - padL - padR;
+    const barW = innerW / labels.length * 0.6;
+    const gap = innerW / labels.length * 0.4;
+    const yScale = (v) => H - padB - (v / yMax) * (H - padT - padB);
+
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', '100%');
+    svg.style.fontFamily = 'var(--kair-font-ui)';
+
+    // Grid horizontal + Y labels
+    for (let i = 0; i <= 5; i++) {
+      const y = padT + (i / 5) * (H - padT - padB);
+      const line = document.createElementNS(ns, 'line');
+      line.setAttribute('x1', padL); line.setAttribute('x2', W - padR);
+      line.setAttribute('y1', y); line.setAttribute('y2', y);
+      line.setAttribute('stroke', 'var(--kair-line)'); line.setAttribute('stroke-width', '1');
+      svg.appendChild(line);
+
+      const txt = document.createElementNS(ns, 'text');
+      txt.setAttribute('x', padL - 6); txt.setAttribute('y', y + 4);
+      txt.setAttribute('text-anchor', 'end'); txt.setAttribute('fill', 'var(--kair-muted)');
+      txt.setAttribute('font-size', '10');
+      txt.textContent = Math.round(yMax - (i / 5) * yMax);
+      svg.appendChild(txt);
+    }
+
+    // Bars + X labels
+    labels.forEach((lbl, i) => {
+      const x = padL + i * (barW + gap) + gap / 2;
+      const y = yScale(values[i]);
+      const h = H - padB - y;
+      const rect = document.createElementNS(ns, 'rect');
+      rect.setAttribute('x', x); rect.setAttribute('y', y);
+      rect.setAttribute('width', barW); rect.setAttribute('height', Math.max(0, h));
+      rect.setAttribute('fill', ds.backgroundColor || 'var(--kair-blue)');
+      rect.setAttribute('rx', '4');
+      svg.appendChild(rect);
+
+      const txt = document.createElementNS(ns, 'text');
+      txt.setAttribute('x', x + barW / 2); txt.setAttribute('y', H - 10);
+      txt.setAttribute('text-anchor', 'middle'); txt.setAttribute('fill', 'var(--kair-muted)');
+      txt.setAttribute('font-size', '10');
+      txt.textContent = lbl;
+      svg.appendChild(txt);
+    });
+
+    return svg;
+  }
+
+  /** SVG doughnut chart (donut con leyenda lateral) */
+  _svgDoughnutChart(data) {
+    const labels = data.labels || [];
+    const dataset = data.datasets && data.datasets[0];
+    if (!dataset || labels.length === 0) return this._svgEmpty('Sin datos');
+
+    const total = dataset.data.reduce((s, v) => s + (Number(v) || 0), 0);
+    if (total === 0) return this._svgEmpty('Sin datos');
+
+    const W = 480, H = 220;
+    const cx = 110, cy = H / 2, r = 80, strokeW = 28;
+    const defaultColors = ['#2057b8', '#e7a224', '#1bb888', '#da5563', '#a855f7'];
+    const colors = dataset.backgroundColor || defaultColors;
+
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', '100%');
+    svg.style.fontFamily = 'var(--kair-font-ui)';
+
+    // Background circle
+    const bg = document.createElementNS(ns, 'circle');
+    bg.setAttribute('cx', cx); bg.setAttribute('cy', cy); bg.setAttribute('r', r);
+    bg.setAttribute('fill', 'none');
+    bg.setAttribute('stroke', 'var(--kair-faint)');
+    bg.setAttribute('stroke-width', strokeW);
+    svg.appendChild(bg);
+
+    // Donut segments
+    let cumulative = 0;
+    const circumference = 2 * Math.PI * r;
+    dataset.data.forEach((v, i) => {
+      const frac = Number(v) / total;
+      const seg = document.createElementNS(ns, 'circle');
+      seg.setAttribute('cx', cx); seg.setAttribute('cy', cy); seg.setAttribute('r', r);
+      seg.setAttribute('fill', 'none');
+      seg.setAttribute('stroke', colors[i % colors.length]);
+      seg.setAttribute('stroke-width', strokeW);
+      seg.setAttribute('stroke-dasharray', `${frac * circumference} ${circumference}`);
+      seg.setAttribute('stroke-dashoffset', `${-cumulative * circumference}`);
+      seg.setAttribute('transform', `rotate(-90 ${cx} ${cy})`);
+      svg.appendChild(seg);
+      cumulative += frac;
+    });
+
+    // Centro: total
+    const totalTxt = document.createElementNS(ns, 'text');
+    totalTxt.setAttribute('x', cx); totalTxt.setAttribute('y', cy - 2);
+    totalTxt.setAttribute('text-anchor', 'middle'); totalTxt.setAttribute('fill', 'var(--kair-ink)');
+    totalTxt.setAttribute('font-size', '22'); totalTxt.setAttribute('font-weight', '700');
+    totalTxt.textContent = total;
+    svg.appendChild(totalTxt);
+
+    const totalLbl = document.createElementNS(ns, 'text');
+    totalLbl.setAttribute('x', cx); totalLbl.setAttribute('y', cy + 16);
+    totalLbl.setAttribute('text-anchor', 'middle'); totalLbl.setAttribute('fill', 'var(--kair-muted)');
+    totalLbl.setAttribute('font-size', '10');
+    totalLbl.textContent = 'Total';
+    svg.appendChild(totalLbl);
+
+    // Leyenda lateral derecha
+    labels.forEach((lbl, i) => {
+      const ly = 30 + i * 22;
+      const swatch = document.createElementNS(ns, 'rect');
+      swatch.setAttribute('x', 220); swatch.setAttribute('y', ly - 8);
+      swatch.setAttribute('width', 10); swatch.setAttribute('height', 10);
+      swatch.setAttribute('rx', '2');
+      swatch.setAttribute('fill', colors[i % colors.length]);
+      svg.appendChild(swatch);
+
+      const lblTxt = document.createElementNS(ns, 'text');
+      lblTxt.setAttribute('x', 236); lblTxt.setAttribute('y', ly);
+      lblTxt.setAttribute('fill', 'var(--kair-ink)');
+      lblTxt.setAttribute('font-size', '11');
+      lblTxt.textContent = `${lbl} (${dataset.data[i]})`;
+      svg.appendChild(lblTxt);
+    });
+
+    return svg;
+  }
+
+  /** SVG stacked bar chart (barras verticales con segmentos apilados) */
+  _svgStackedBarChart(data) {
+    const labels = data.labels || [];
+    const datasets = data.datasets || [];
+    if (datasets.length === 0 || labels.length === 0) return this._svgEmpty('Sin datos');
+
+    const W = 480, H = 220, padL = 36, padR = 12, padT = 16, padB = 28;
+    const totals = labels.map((_, i) => datasets.reduce((s, ds) => s + (Number(ds.data[i]) || 0), 0));
+    const maxVal = Math.max(...totals, 1);
+    const stepY = Math.ceil(maxVal / 5);
+    const yMax = stepY * 5;
+
+    const innerW = W - padL - padR;
+    const barW = innerW / labels.length * 0.5;
+    const gap = innerW / labels.length * 0.5;
+    const yScale = (v) => H - padB - (v / yMax) * (H - padT - padB);
+
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', '100%');
+    svg.style.fontFamily = 'var(--kair-font-ui)';
+
+    // Grid
+    for (let i = 0; i <= 5; i++) {
+      const y = padT + (i / 5) * (H - padT - padB);
+      const line = document.createElementNS(ns, 'line');
+      line.setAttribute('x1', padL); line.setAttribute('x2', W - padR);
+      line.setAttribute('y1', y); line.setAttribute('y2', y);
+      line.setAttribute('stroke', 'var(--kair-line)'); line.setAttribute('stroke-width', '1');
+      svg.appendChild(line);
+
+      const txt = document.createElementNS(ns, 'text');
+      txt.setAttribute('x', padL - 6); txt.setAttribute('y', y + 4);
+      txt.setAttribute('text-anchor', 'end'); txt.setAttribute('fill', 'var(--kair-muted)');
+      txt.setAttribute('font-size', '10');
+      txt.textContent = Math.round(yMax - (i / 5) * yMax);
+      svg.appendChild(txt);
+    }
+
+    // Stacked bars
+    labels.forEach((lbl, i) => {
+      const x = padL + i * (barW + gap) + gap / 2;
+      let cumulative = 0;
+      datasets.forEach(ds => {
+        const v = Number(ds.data[i]) || 0;
+        if (v === 0) return;
+        const yTop = yScale(cumulative + v);
+        const h = H - padB - yTop;
+        const rect = document.createElementNS(ns, 'rect');
+        rect.setAttribute('x', x); rect.setAttribute('y', yTop);
+        rect.setAttribute('width', barW); rect.setAttribute('height', Math.max(0, h));
+        rect.setAttribute('fill', ds.backgroundColor || 'var(--kair-blue)');
+        svg.appendChild(rect);
+        cumulative += v;
+      });
+
+      // X label
+      const txt = document.createElementNS(ns, 'text');
+      txt.setAttribute('x', x + barW / 2); txt.setAttribute('y', H - 10);
+      txt.setAttribute('text-anchor', 'middle'); txt.setAttribute('fill', 'var(--kair-muted)');
+      txt.setAttribute('font-size', '10');
+      txt.textContent = lbl;
+      svg.appendChild(txt);
+    });
+
+    // Leyenda
+    const legendY = H - 2;
+    datasets.forEach((ds, i) => {
+      const txt = document.createElementNS(ns, 'text');
+      txt.setAttribute('x', padL + i * 90);
+      txt.setAttribute('y', legendY);
+      txt.setAttribute('fill', 'var(--kair-ink)');
+      txt.setAttribute('font-size', '10');
+      txt.setAttribute('font-weight', '600');
+      const rect = document.createElementNS(ns, 'rect');
+      rect.setAttribute('x', padL + i * 90 - 10); rect.setAttribute('y', legendY - 8);
+      rect.setAttribute('width', '8'); rect.setAttribute('height', '8'); rect.setAttribute('rx', '2');
+      rect.setAttribute('fill', ds.backgroundColor || 'var(--kair-blue)');
+      svg.appendChild(rect);
+      txt.textContent = ds.label;
+      svg.appendChild(txt);
+    });
+
+    return svg;
+  }
+
+  /** SVG empty state */
+  _svgEmpty(message) {
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 480 220');
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', '100%');
+    const txt = document.createElementNS(ns, 'text');
+    txt.setAttribute('x', 240); txt.setAttribute('y', 110);
+    txt.setAttribute('text-anchor', 'middle'); txt.setAttribute('fill', 'var(--kair-muted)');
+    txt.setAttribute('font-size', '13');
+    txt.textContent = message;
+    svg.appendChild(txt);
+    return svg;
   }
 
   // ============================================
