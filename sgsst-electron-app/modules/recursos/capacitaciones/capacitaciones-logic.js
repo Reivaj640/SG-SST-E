@@ -16,10 +16,15 @@ class CapacitacionesComponent {
         this.availableSheets = [];
         this.chartInstance = null;
     this.typeChartInstance = null;
+    this.planChartInstance = null;
  this._modalInBody = null;
+ this._periodModalInBody = null;
  this._confirmCallback = null;
  this._confirmModalInBody = null;
  this._isSaving = false;
+ // 📄 Paginación cliente del listado (8 filas por página)
+ this._currentPage = 1;
+ this.PAGE_SIZE = 8;
  this._evidenciaCap = null;
  this._evidenciaFiles = [];
  this._evidenciasCache = new Map();
@@ -176,10 +181,17 @@ class CapacitacionesComponent {
         window.currentCapacitacionesComponent = this;
         this.container.classList.add('capacitaciones-container');
 
-        fetch('./modules/recursos/capacitaciones/capacitaciones-view.html')
+        fetch('./modules/recursos/capacitaciones/capacitaciones-view.html?v=CAP-20260915-v11-periodo-stretch')
             .then(response => response.text())
             .then(html => {
                 this.container.innerHTML = html;
+                // 🔒 Cache-bust en runtime del CSS del submódulo: forzar una
+                // carga fresca del archivo de estilos cada vez que se abre,
+                // para evitar que la app sirva el estilo viejo desde caché.
+                var _cssLink = this.container.querySelector('link[href*="capacitaciones-view.css"]');
+                if (_cssLink) {
+                    _cssLink.href = _cssLink.href + (/\?/.test(_cssLink.href) ? '&' : '?') + 'r=' + Date.now();
+                }
                 setTimeout(() => {
                     this.updateHeaderContext();
                     this.initializeEventListeners();
@@ -249,6 +261,17 @@ class CapacitacionesComponent {
    document.body.appendChild(confirmModal);
   }
 
+  // 🆕 Modal "Nuevo período" — mismo patrón: montar en body + variables CSS
+  const periodModal = document.getElementById('periodModal');
+  if (periodModal) {
+   cssVars.forEach(varName => {
+    const value = computed.getPropertyValue(varName).trim();
+    if (value) periodModal.style.setProperty(varName, value);
+   });
+   this._periodModalInBody = periodModal;
+   document.body.appendChild(periodModal);
+  }
+
         console.log('[CapacitacionesComponent] Modal montado en document.body.');
 
         // 🆕 Wire-up del botón "Limpiar hora" (clearTrainingHora) — al hacer click,
@@ -298,6 +321,10 @@ class CapacitacionesComponent {
   if (this.typeChartInstance) {
     this.typeChartInstance.destroy();
   }
+  if (this.planChartInstance) {
+    this.planChartInstance.destroy();
+    this.planChartInstance = null;
+  }
         // ✏️ NUEVO — remover modal del body al destruir el componente
         // evita que quede huérfano en el DOM si el usuario navega a otro módulo
  if (this._modalInBody && this._modalInBody.parentNode === document.body) {
@@ -307,6 +334,10 @@ class CapacitacionesComponent {
  if (this._confirmModalInBody && this._confirmModalInBody.parentNode === document.body) {
   document.body.removeChild(this._confirmModalInBody);
   this._confirmModalInBody = null;
+ }
+ if (this._periodModalInBody && this._periodModalInBody.parentNode === document.body) {
+  document.body.removeChild(this._periodModalInBody);
+  this._periodModalInBody = null;
  }
  // Evidencias: cerrar modal y limpiar cache
  const evModal = document.getElementById('evidenciaModal');
@@ -343,8 +374,17 @@ class CapacitacionesComponent {
         document.getElementById('btn-clear-filters')?.addEventListener('click', () => this.clearFilters());
 
   // Botones de Acción del Dashboard
-  document.getElementById('btn-create-period')?.addEventListener('click', () => this.createNewPeriod());
   document.getElementById('btn-create-period-header')?.addEventListener('click', () => this.createNewPeriod());
+
+  // Radar → ir al listado completo
+  document.getElementById('link-ver-listado')?.addEventListener('click', () => this.switchView('trainings'));
+
+  // Modal "Nuevo período": crear + actualizar placeholder del nombre al cambiar vigencia
+  document.getElementById('btn-period-create')?.addEventListener('click', () => this._confirmCreatePeriod());
+  document.getElementById('period-year')?.addEventListener('change', (e) => {
+    const nameInput = document.getElementById('period-name');
+    if (nameInput) nameInput.placeholder = `Plan ${e.target.value}`;
+  });
 
   // Abrir modal en modo agregar
   const openAddModal = () => this.openModal('add');
@@ -653,6 +693,7 @@ class CapacitacionesComponent {
             // Cargar el cache de evidencias en background (no bloquea la UI)
             this._loadAllEvidenciaCounts().then(() => {
               if (this.currentView === 'trainings') this.renderTable();
+              this.renderRecentList();  // refresca la fila "Evidencias pendientes" del radar
             }).catch(err => {
               console.warn('[EVIDENCIA] No se pudo pre-cargar cache de evidencias:', err);
             });
@@ -834,6 +875,8 @@ class CapacitacionesComponent {
         });
 
     this.filteredCapacitaciones = filtered;
+    // 📄 La paginación se resetea al cambiar filtros (vuelve a la página 1)
+    this._currentPage = 1;
     this.updateDashboardStats();
     this.updateTabBadge();
     if (this.currentView === 'trainings') this.renderTable();
@@ -852,18 +895,94 @@ class CapacitacionesComponent {
 
     // --- RENDERIZADO UI ---
 
+  /**
+   * Actualiza el HERO + las 3 metric cards del dashboard premium.
+   * Usa filteredCapacitaciones (consistente con las gráficas: los filtros
+   * del listado también se reflejan aquí).
+   */
   updateDashboardStats() {
-    const total = this.filteredCapacitaciones.length;
+    const total     = this.filteredCapacitaciones.length;
     const completed = this.filteredCapacitaciones.filter(c => c.estado === 'completed').length;
-    const pending = this.filteredCapacitaciones.filter(c => c.estado === 'pending').length;
-    const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+    const pending   = this.filteredCapacitaciones.filter(c => c.estado === 'pending').length;
+    const progress  = total > 0 ? Math.round((completed / total) * 100) : 0;
+    const year      = this.currentYear || new Date().getFullYear();
 
-    document.getElementById('stat-total').textContent = total;
-    document.getElementById('stat-completed').textContent = completed;
-    document.getElementById('stat-pending').textContent = pending;
-    document.getElementById('stat-participants').textContent = 'N/D';
-    const progressEl = document.getElementById('stat-progress-text');
-    if (progressEl) progressEl.textContent = `${progress}%`;
+    // --- HERO ---
+    const eyebrowEl = document.getElementById('hero-eyebrow');
+    if (eyebrowEl) eyebrowEl.textContent = `ESTADO GENERAL · PLAN ${year}`;
+
+    const titleEl = document.getElementById('hero-title');
+    if (titleEl) {
+      let title;
+      if (total === 0) {
+        title = 'No hay actividades registradas en este período.';
+      } else if (progress < 50) {
+        title = `El plan necesita impulso: ${pending} de ${total} actividades siguen pendientes.`;
+      } else if (progress < 80) {
+        title = `El plan avanza: ${pending} de ${total} actividades siguen pendientes.`;
+      } else {
+        title = `El plan va en buen camino: quedan ${pending} de ${total} actividades.`;
+      }
+      titleEl.textContent = title;
+    }
+
+    // Próxima actividad: primera pendiente con fecha válida desde hoy (fallback: la más cercana)
+    const msgEl = document.getElementById('hero-msg');
+    if (msgEl) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const withDate = this.filteredCapacitaciones
+        .filter(c => c.estado === 'pending')
+        .map(c => ({ cap: c, d: new Date(String(c.fechaProgramada).replace(/-/g, '/')) }))
+        .filter(x => !isNaN(x.d.getTime()))
+        .sort((a, b) => a.d - b.d);
+      const next = withDate.find(x => x.d >= today) || withDate[0];
+      msgEl.textContent = next
+        ? `${completed} actividades ejecutadas · próxima: ${this.formatDate(next.cap.fechaProgramada)} · ${next.cap.nombre}`
+        : `${completed} actividades ejecutadas · sin actividades pendientes próximas`;
+    }
+
+    const scoreEl = document.getElementById('hero-score');
+    if (scoreEl) scoreEl.textContent = `${progress}%`;
+    const heroBar = document.getElementById('hero-progress-bar');
+    if (heroBar) heroBar.style.width = `${progress}%`;
+
+    // --- METRIC CARDS ---
+    const compEl = document.getElementById('metric-comp');
+    if (compEl) compEl.textContent = completed;
+    const totEl = document.getElementById('metric-total');
+    if (totEl) totEl.textContent = total;
+    const compBar = document.getElementById('metric-comp-bar');
+    if (compBar) compBar.style.width = `${progress}%`;
+
+    const pendEl = document.getElementById('metric-pend');
+    if (pendEl) pendEl.textContent = pending;
+    const pendBar = document.getElementById('metric-pend-bar');
+    if (pendBar) pendBar.style.width = total > 0 ? `${Math.round((pending / total) * 100)}%` : '0%';
+
+    // Asistencia: si hay participantes registrados, mostrar promedio; si no, N/D
+    const asistEl     = document.getElementById('metric-asist');
+    const asistDescEl = document.getElementById('metric-asist-desc');
+    const asistBar    = document.getElementById('metric-asist-bar');
+    const withParts   = this.filteredCapacitaciones.filter(c => (parseInt(c.participantes) || 0) > 0);
+    if (withParts.length > 0) {
+      const avg = Math.round(withParts.reduce((a, c) => a + (parseInt(c.participantes) || 0), 0) / withParts.length);
+      if (asistEl) asistEl.textContent = `~${avg}`;
+      if (asistDescEl) asistDescEl.textContent = 'Promedio de participantes por actividad';
+      if (asistBar) asistBar.style.width = `${Math.round((withParts.length / Math.max(1, total)) * 100)}%`;
+    } else {
+      if (asistEl) asistEl.textContent = 'N/D';
+      if (asistDescEl) asistDescEl.textContent = 'Sin datos de asistencia';
+      if (asistBar) asistBar.style.width = '0%';
+    }
+
+    this._updatePeriodBadge();
+  }
+
+  /** Badge "Período activo · {año}" del header */
+  _updatePeriodBadge() {
+    const badge = document.getElementById('badge-periodo-activo');
+    if (badge) badge.textContent = this.currentYear || '—';
   }
 
     renderTable() {
@@ -871,16 +990,22 @@ class CapacitacionesComponent {
         if (!tbody) return;
         tbody.innerHTML = '';
 
-        if (this.filteredCapacitaciones.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--k-text-muted);">No se encontraron capacitaciones</td></tr>`;
+        const total = this.filteredCapacitaciones.length;
+        const totalPages = Math.max(1, Math.ceil(total / this.PAGE_SIZE));
+        if (!this._currentPage || this._currentPage < 1) this._currentPage = 1;
+        if (this._currentPage > totalPages) this._currentPage = totalPages;
+
+        if (total === 0) {
+            tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:2rem;color:var(--k-text-muted);">No se encontraron capacitaciones</td></tr>`;
+            this._renderPagination(0, 0, 0, 1);
             return;
         }
 
-        this.filteredCapacitaciones.forEach(item => {
+        const start = (this._currentPage - 1) * this.PAGE_SIZE;
+        const pageItems = this.filteredCapacitaciones.slice(start, start + this.PAGE_SIZE);
+
+        pageItems.forEach(item => {
             const tr = document.createElement('tr');
-            const badgeClass = item.estado === 'completed' ? 'k-badge-success' : 'k-badge-warning';
-            const statusText = item.estado === 'completed' ? 'Completada' : 'Pendiente';
-            const typeBadge  = item.tipo === 'sst' ? 'k-badge-primary' : 'k-badge-info';
             const evCount    = this._evidenciasCache.get(item.id) || 0;
             const hasEv      = evCount > 0;
             const evTooltip  = hasEv ? `${evCount} archivo${evCount === 1 ? '' : 's'} de evidencia` : 'Sin evidencia';
@@ -897,15 +1022,23 @@ class CapacitacionesComponent {
                 ? `Conflicto con: ${conflicts.map(c => `"${c.nombre}" (${c.hora})`).join(', ')}`
                 : '';
 
+            const isSst = item.tipo === 'sst';
+            const typePill = isSst
+                ? '<span class="k-pill k-pill--sst"><i class="k-pill__dot"></i>SST</span>'
+                : '<span class="k-pill k-pill--pyp"><i class="k-pill__dot"></i>PYP</span>';
+            const statusPill = item.estado === 'completed'
+                ? '<span class="k-pill k-pill--success"><i class="k-pill__dot"></i>Realizada</span>'
+                : '<span class="k-pill k-pill--warning"><i class="k-pill__dot"></i>Pendiente</span>';
+
             tr.innerHTML = `
-                <td><strong${hasConflict ? ` title="${conflictTitle}"` : ''}>${item.nombre}</strong></td>
-                <td><span class="k-badge ${typeBadge}">${item.tipo.toUpperCase()}</span></td>
+                <td><span class="k-cell-name"${hasConflict ? ` title="${conflictTitle}"` : ''}>${this._esc(item.nombre)}</span></td>
+                <td>${typePill}</td>
 			<td class="k-cell-date">${this.formatDate(item.fechaProgramada)}</td>
-                <td>${item.instructor}</td>
-                <td>${item.ubicacion || ''}</td>
-                <td>${item.duracion}</td>
+                <td>${this._esc(item.instructor)}</td>
+                <td>${this._esc(item.ubicacion || '')}</td>
+                <td>${this._esc(item.duracion)}</td>
                 <td>${item.hora || '—'}</td>
-                <td><span class="k-badge ${badgeClass}">${statusText}</span></td>
+                <td>${statusPill}</td>
                 <td class="text-center">
                   <button class="k-evidencia-btn ${hasEv ? 'has-files' : ''}"
                           data-id="${item.id}"
@@ -916,22 +1049,19 @@ class CapacitacionesComponent {
                   </button>
                 </td>
 			<td class="text-right k-cell-actions"><div class="k-cell-actions__inner">
-          <button class="k-btn k-btn-outline k-btn-icon edit-btn" data-id="${item.id}" title="Editar">
+          <button class="k-action-btn edit-btn" data-id="${item.id}" title="Editar">
             <i class="bi bi-pencil"></i>
           </button>
           ${item.estado === 'pending' ? `
-          <button class="k-btn k-btn-outline k-btn-icon complete-btn"
-            style="color:var(--k-success);border-color:var(--k-success);"
+          <button class="k-action-btn k-action-btn--success complete-btn"
             data-id="${item.id}" title="Marcar como Realizada">
             <i class="bi bi-check-lg"></i>
           </button>` : `
-          <button class="k-btn k-btn-outline k-btn-icon revert-btn"
-            style="color:var(--k-warning,#ffc107);border-color:var(--k-warning,#ffc107);"
+          <button class="k-action-btn k-action-btn--warning revert-btn"
             data-id="${item.id}" title="Revertir a Pendiente">
             <i class="bi bi-arrow-counterclockwise"></i>
           </button>`}
-          <button class="k-btn k-btn-outline k-btn-icon delete-btn"
-            style="color:var(--k-danger);border-color:var(--k-danger);"
+          <button class="k-action-btn k-action-btn--danger delete-btn"
             data-id="${item.id}" title="Eliminar">
             <i class="bi bi-trash"></i>
           </button>
@@ -956,10 +1086,87 @@ class CapacitacionesComponent {
     tbody.querySelectorAll('.k-evidencia-btn').forEach(btn =>
       btn.addEventListener('click', () => this.openEvidenciaModal(parseInt(btn.dataset.id)))
     );
+
+        this._renderPagination(start, pageItems.length, total, totalPages);
     }
 
+    /** Escapa texto de usuario antes de inyectarlo como HTML */
+    _esc(s) {
+        return String(s ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    /**
+     * Footer de paginación: "Mostrando 1–8 de N actividades" + páginas numeradas.
+     * Ventana de páginas alrededor de la actual con ellipsis.
+     */
+    _renderPagination(start, count, total, totalPages) {
+        const wrap  = document.getElementById('pagination-wrap');
+        const info  = document.getElementById('pagination-info');
+        const pages = document.getElementById('pagination-pages');
+        if (!wrap || !info || !pages) return;
+
+        if (total === 0) {
+            wrap.style.display = 'none';
+            return;
+        }
+        wrap.style.display = '';
+
+        info.textContent = `Mostrando ${start + 1}–${start + count} de ${total} actividades`;
+
+        pages.innerHTML = '';
+
+        const mkBtn = (label, page, opts = {}) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'k-page-btn' + (opts.active ? ' is-active' : '');
+            btn.innerHTML = label;
+            if (opts.disabled) btn.disabled = true;
+            if (opts.title) btn.title = opts.title;
+            if (!opts.disabled && !opts.active) {
+                btn.addEventListener('click', () => {
+                    this._currentPage = page;
+                    this.renderTable();
+                });
+            }
+            return btn;
+        };
+
+        pages.appendChild(mkBtn('‹', this._currentPage - 1, { disabled: this._currentPage <= 1, title: 'Página anterior' }));
+
+        // Ventana de páginas: 1 … c-1 c c+1 … N
+        const nums = new Set([1, totalPages]);
+        for (let p = this._currentPage - 1; p <= this._currentPage + 1; p++) {
+            if (p >= 1 && p <= totalPages) nums.add(p);
+        }
+        const sorted = [...nums].sort((a, b) => a - b);
+        let prev = 0;
+        sorted.forEach(p => {
+            if (prev && p - prev > 1) {
+                const ell = document.createElement('span');
+                ell.className = 'k-page-ellipsis';
+                ell.textContent = '…';
+                pages.appendChild(ell);
+            }
+            pages.appendChild(mkBtn(String(p), p, { active: p === this._currentPage }));
+            prev = p;
+        });
+
+        pages.appendChild(mkBtn('›', this._currentPage + 1, { disabled: this._currentPage >= totalPages, title: 'Página siguiente' }));
+    }
+
+    /**
+     * Panel "En tu radar" del dashboard premium:
+     * - Hasta 3 próximas pendientes (reloj, fecha + nombre, meta tipo · ubicación, pill Programada)
+     * - Fila de evidencias pendientes (usa _evidenciasCache)
+     * El link "Ver listado completo →" vive en el HTML (id link-ver-listado).
+     */
     renderRecentList() {
-        const container = document.getElementById('recent-list');
+        const container = document.getElementById('radar-list');
         if (!container) return;
 
         const upcoming = this.filteredCapacitaciones
@@ -970,75 +1177,140 @@ class CapacitacionesComponent {
         container.innerHTML = '';
 
         if (upcoming.length === 0) {
-            container.innerHTML = '<div style="text-align:center;padding:1rem;color:var(--k-text-muted);">No hay capacitaciones próximas</div>';
-            return;
+            container.innerHTML = '<div class="cap-radar-empty">No hay capacitaciones próximas pendientes</div>';
+        } else {
+            upcoming.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'cap-radar-item';
+                const meta = `${item.tipo.toUpperCase()}${item.ubicacion ? ' · ' + item.ubicacion : ''}`;
+                div.innerHTML = `
+                    <div class="cap-radar-item__icon"><i class="bi bi-clock"></i></div>
+                    <div class="cap-radar-item__body">
+                        <div class="cap-radar-item__name">${this._esc(this.formatDate(item.fechaProgramada))} · ${this._esc(item.nombre)}</div>
+                        <div class="cap-radar-item__meta">${this._esc(meta)}</div>
+                    </div>
+                    <span class="cap-radar-pill"><i class="cap-radar-pill__dot"></i>Programada</span>
+                `;
+                container.appendChild(div);
+            });
         }
 
-        upcoming.forEach(item => {
-            const div = document.createElement('div');
-            div.className = 'k-recent-item';
-            div.innerHTML = `
-                <div>
-                    <div class="k-recent-item-title">${item.nombre}</div>
-                    <div class="k-recent-item-meta"><i class="bi bi-calendar3 me-1"></i>${this.formatDate(item.fechaProgramada)}</div>
-                </div>
-                <span class="k-badge k-badge-warning">Programada</span>
-            `;
-            container.appendChild(div);
-        });
+        // Fila "Evidencias pendientes": ejecutadas sin soporte cargado
+        const evRow   = document.getElementById('radar-evidencias');
+        const evCount = document.getElementById('radar-evidencias-count');
+        if (evRow && evCount) {
+            const sinSoporte = this.filteredCapacitaciones.filter(c =>
+                c.estado === 'completed' && (this._evidenciasCache.get(c.id) || 0) === 0
+            ).length;
+            // Solo mostrar cuando el cache ya se cargó (si no, los counts son 0 falsos)
+            const cacheLoaded = this._evidenciasCache && this._evidenciasCache.size > 0;
+            if (cacheLoaded && sinSoporte > 0) {
+                evCount.textContent = sinSoporte;
+                evRow.style.display = '';
+            } else {
+                evRow.style.display = 'none';
+            }
+        }
     }
 
     // --- ACCIONES DE ESCRITURA EN EXCEL ---
 
+    /**
+     * Abre el modal "Nuevo período de capacitación" (reemplaza el confirm simple).
+     * El nombre del período es cosmético/informativo: la hoja del Excel se
+     * nombra por año (la API duplicateCapacitacionesSheet no soporta nombre).
+     */
     async createNewPeriod() {
         if (!this.excelFilePath) {
             window.KAIRToast.show('Error: No hay archivo cargado.', 'warning');
             return;
         }
 
-        const nextYear  = Math.max(...this.availableSheets.map(s => {
+        const modal     = document.getElementById('periodModal');
+        const yearSel   = document.getElementById('period-year');
+        const nameInput = document.getElementById('period-name');
+        if (!modal || !yearSel) return;
+
+        const maxYear = Math.max(...this.availableSheets.map(s => {
             const m = s.match(/\d{4}/);
             return m ? parseInt(m[0]) : 0;
-        })) + 1;
+        }));
+        const nextYear = maxYear + 1;
 
- const baseSheet = this.availableSheets.find(s => s.includes((nextYear - 1).toString())) || this.availableSheets[0];
+        // Años ya existentes en el Excel (no se pueden duplicar)
+        const existingYears = new Set(this.availableSheets.map(s => {
+            const m = s.match(/\d{4}/);
+            return m ? parseInt(m[0]) : null;
+        }).filter(y => y !== null));
 
-  this.showConfirmModal({
-   title: 'Crear Nuevo Periodo',
-   message: `¿Crear periodo ${nextYear} duplicando la hoja "${baseSheet}"?`,
-   warning: 'Se creará una nueva hoja en el archivo Excel.',
-   acceptLabel: 'Crear Periodo',
-   acceptIcon: 'bi-calendar-plus',
-   onAccept: async () => {
-    window.KAIRToast.show(`Creando periodo ${nextYear}...`, 'info');
-    try {
-     const result = await window.electronAPI.duplicateCapacitacionesSheet({
-      filePath: this.excelFilePath,
-      currentSheetName: baseSheet,
-      newYear: nextYear
-     });
+        // Opciones de vigencia: los próximos 4 años sin hoja existente
+        yearSel.innerHTML = '';
+        let firstAvailable = null;
+        for (let y = nextYear; y <= nextYear + 4; y++) {
+            if (existingYears.has(y)) continue;
+            const opt = document.createElement('option');
+            opt.value = y;
+            opt.textContent = y;
+            yearSel.appendChild(opt);
+            if (firstAvailable === null) firstAvailable = y;
+        }
 
-     if (!result?.success) throw new Error(result?.error || 'Error desconocido');
+        if (firstAvailable === null) {
+            window.KAIRToast.show('Ya existen hojas para los próximos años.', 'info');
+            return;
+        }
+        yearSel.value = firstAvailable;
+        if (nameInput) {
+            nameInput.value = '';
+            nameInput.placeholder = `Plan ${firstAvailable}`;
+        }
 
-     window.KAIRToast.show(`Periodo ${nextYear} creado.`, 'success');
-
-     const sheetsResult = await window.electronAPI.getCapacitacionesSheets(this.excelFilePath);
-     if (sheetsResult.success) {
-      this.availableSheets = sheetsResult.sheets.filter(s => typeof s === 'string');
-      await this._populateYearFilterFromSheets();
-      const yearFilter = document.getElementById('yearFilter');
-      if (yearFilter) {
-       yearFilter.value = nextYear;
-       yearFilter.dispatchEvent(new Event('change'));
-      }
-     }
-    } catch (error) {
-     console.error('Error creating period:', error);
-     window.KAIRToast.show(`Error: ${error.message}`, 'danger');
+        modal.classList.add('open');
+        if (nameInput) nameInput.focus();
     }
-   }
-  });
-  return;
+
+    /** Ejecuta la creación del período con la vigencia elegida en el modal */
+    async _confirmCreatePeriod() {
+        const yearSel   = document.getElementById('period-year');
+        const nameInput = document.getElementById('period-name');
+        if (!yearSel || !yearSel.value) return;
+
+        const nextYear  = parseInt(yearSel.value);
+        const periodName = (nameInput?.value || '').trim() || `Plan ${nextYear}`;
+
+        // Hoja base: la del año anterior a la vigencia elegida, o la primera disponible
+        const baseSheet = this.availableSheets.find(s => s.includes((nextYear - 1).toString()))
+            || this.availableSheets[0];
+
+        const modal = document.getElementById('periodModal');
+        if (modal) modal.classList.remove('open');
+
+        window.KAIRToast.show(`Creando "${periodName}" (${nextYear})...`, 'info');
+        try {
+            const result = await window.electronAPI.duplicateCapacitacionesSheet({
+                filePath: this.excelFilePath,
+                currentSheetName: baseSheet,
+                newYear: nextYear
+            });
+
+            if (!result?.success) throw new Error(result?.error || 'Error desconocido');
+
+            window.KAIRToast.show(`Periodo ${nextYear} creado.`, 'success');
+
+            const sheetsResult = await window.electronAPI.getCapacitacionesSheets(this.excelFilePath);
+            if (sheetsResult.success) {
+                this.availableSheets = sheetsResult.sheets.filter(s => typeof s === 'string');
+                await this._populateYearFilterFromSheets();
+                const yearFilter = document.getElementById('yearFilter');
+                if (yearFilter) {
+                    yearFilter.value = nextYear;
+                    yearFilter.dispatchEvent(new Event('change'));
+                }
+            }
+        } catch (error) {
+            console.error('Error creating period:', error);
+            window.KAIRToast.show(`Error: ${error.message}`, 'danger');
+        }
     }
 
     async saveTraining() {
@@ -1274,6 +1546,66 @@ class CapacitacionesComponent {
 
     this.initializeTypeChart(isDark, textColor);
     this.initializeBarChart(isDark, textColor, gridColor);
+    this.initializePlanChart(isDark, textColor, gridColor);
+  }
+
+  /**
+   * NUEVO — Line chart "Ejecución del plan": acumulado mensual.
+   * Serie azul sólida = ejecutado real; serie gris dashed = planeado.
+   */
+  initializePlanChart(isDark, textColor, gridColor) {
+    const ctx = document.getElementById('planLineChart');
+    if (!ctx) { console.warn('[CHART] planLineChart canvas no encontrado.'); return; }
+    if (typeof Chart === 'undefined') { console.error('[CHART] Chart.js no cargado.'); return; }
+
+    if (this.planChartInstance) this.planChartInstance.destroy();
+
+    this.planChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'],
+        datasets: [
+          {
+            label: 'Ejecutado real',
+            data: Array(12).fill(0),
+            borderColor: '#2057b8',
+            backgroundColor: '#2057b8',
+            fill: false,
+            tension: 0.4,
+            borderWidth: 2.5,
+            pointRadius: 3,
+            pointBackgroundColor: '#2057b8',
+            pointBorderColor: '#2057b8'
+          },
+          {
+            label: 'Planeado',
+            data: Array(12).fill(0),
+            borderColor: isDark ? '#7d8798' : '#b6bfcc',
+            borderDash: [6, 6],
+            borderWidth: 2,
+            fill: false,
+            tension: 0.4,
+            pointRadius: 2,
+            pointBackgroundColor: isDark ? '#7d8798' : '#b6bfcc'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        resizeDelay: 200,
+        scales: {
+          y: {
+            beginAtZero: true,
+            suggestedMax: 20,
+            grid: { display: false },
+            ticks: { color: textColor, precision: 0, stepSize: 5 }
+          },
+          x: { grid: { display: false }, ticks: { color: textColor } }
+        },
+        plugins: { legend: { display: false } }  // leyenda custom en el HTML
+      }
+    });
   }
 
   initializeBarChart(isDark, textColor, gridColor) {
@@ -1288,8 +1620,8 @@ class CapacitacionesComponent {
       data: {
         labels: ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'],
         datasets: [
-          { label: 'Completadas', data: Array(12).fill(0), backgroundColor: '#174ea6', borderRadius: 4 },
-          { label: 'Pendientes', data: Array(12).fill(0), backgroundColor: '#ffc107', borderRadius: 4 }
+          { label: 'Completadas', data: Array(12).fill(0), backgroundColor: '#174ea6', borderRadius: 4, barPercentage: 0.55, categoryPercentage: 0.7 },
+          { label: 'Pendientes', data: Array(12).fill(0), backgroundColor: '#f6d9a0', borderRadius: 4, barPercentage: 0.55, categoryPercentage: 0.7 }
         ]
       },
       options: {
@@ -1297,10 +1629,10 @@ class CapacitacionesComponent {
         maintainAspectRatio: false,
         resizeDelay: 200,
         scales: {
-          y: { beginAtZero: true, grid: { display: true, color: gridColor }, ticks: { color: textColor } },
+          y: { beginAtZero: true, grid: { display: false }, ticks: { color: textColor, precision: 0, stepSize: 3 } },
           x: { grid: { display: false }, ticks: { color: textColor } }
         },
-        plugins: { legend: { position: 'bottom', labels: { color: textColor } } }
+        plugins: { legend: { display: false } }  // leyenda custom en el HTML
       }
     });
   }
@@ -1312,8 +1644,31 @@ class CapacitacionesComponent {
 
     if (this.typeChartInstance) this.typeChartInstance.destroy();
 
-    const sstColor = '#174ea6';
-    const pypColor = '#17a2b8';
+    const sstColor = '#1e4ed8';
+    const pypColor = '#b7c8ea';
+
+    // Plugin inline: número grande al centro de la dona ("{total}" + "actividades")
+    const centerTextPlugin = {
+      id: 'capCenterText',
+      afterDraw: (chart) => {
+        const { ctx: c, chartArea } = chart;
+        if (!chartArea) return;
+        const data = chart.data.datasets[0].data || [];
+        const total = data.reduce((a, b) => a + b, 0);
+        const centerX = (chartArea.left + chartArea.right) / 2;
+        const centerY = (chartArea.top + chartArea.bottom) / 2;
+        c.save();
+        c.textAlign = 'center';
+        c.textBaseline = 'middle';
+        c.font = "800 26px Manrope, 'DM Sans', sans-serif";
+        c.fillStyle = isDark ? '#e9ecef' : '#14213d';
+        c.fillText(String(total), centerX, centerY - 8);
+        c.font = "500 11px 'DM Sans', sans-serif";
+        c.fillStyle = isDark ? '#adb5bd' : '#748096';
+        c.fillText('actividades', centerX, centerY + 12);
+        c.restore();
+      }
+    };
 
     this.typeChartInstance = new Chart(ctx, {
       type: 'doughnut',
@@ -1331,10 +1686,7 @@ class CapacitacionesComponent {
         maintainAspectRatio: false,
         cutout: '65%',
         plugins: {
-          legend: {
-            position: 'bottom',
-            labels: { color: textColor, padding: 16, usePointStyle: true, pointStyleWidth: 10 }
-          },
+          legend: { display: false },  // leyenda lateral custom en el HTML (#donut-legend)
           tooltip: {
             callbacks: {
               label: function(context) {
@@ -1346,27 +1698,42 @@ class CapacitacionesComponent {
             }
           }
         }
-      }
+      },
+      plugins: [centerTextPlugin]
     });
   }
 
   updateCharts() {
+    // Acumulados mensuales (para el line chart) y por-mes (para el bar chart)
+    const completedData = Array(12).fill(0);
+    const pendingData = Array(12).fill(0);
+    const totalPerMonth = Array(12).fill(0);
+
+    this.filteredCapacitaciones.forEach(cap => {
+      const date = new Date(cap.fechaProgramada);
+      if (!isNaN(date.getTime())) {
+        const month = date.getMonth();
+        totalPerMonth[month]++;
+        if (cap.estado === 'completed') completedData[month]++;
+        else pendingData[month]++;
+      }
+    });
+
     if (this.chartInstance) {
-      const completedData = Array(12).fill(0);
-      const pendingData = Array(12).fill(0);
-
-      this.filteredCapacitaciones.forEach(cap => {
-        const date = new Date(cap.fechaProgramada);
-        if (!isNaN(date.getTime())) {
-          const month = date.getMonth();
-          if (cap.estado === 'completed') completedData[month]++;
-          else pendingData[month]++;
-        }
-      });
-
       this.chartInstance.data.datasets[0].data = completedData;
       this.chartInstance.data.datasets[1].data = pendingData;
       this.chartInstance.update();
+    }
+
+    // Line chart: series acumuladas (ejecutado real vs planeado)
+    if (this.planChartInstance) {
+      const cum = (arr) => {
+        let acc = 0;
+        return arr.map(v => (acc += v));
+      };
+      this.planChartInstance.data.datasets[0].data = cum(completedData);
+      this.planChartInstance.data.datasets[1].data = cum(totalPerMonth);
+      this.planChartInstance.update();
     }
 
     this.updateTypeChart();
@@ -1377,10 +1744,27 @@ class CapacitacionesComponent {
 
     const sstCount = this.filteredCapacitaciones.filter(c => c.tipo === 'sst').length;
     const pypCount = this.filteredCapacitaciones.filter(c => c.tipo === 'pyp').length;
+    const total = sstCount + pypCount;
 
     this.typeChartInstance.data.datasets[0].data = [sstCount, pypCount];
-        this.typeChartInstance.update();
+    this.typeChartInstance.update();
+
+    // Leyenda DEBAJO de la dona: filas "● SST ....... 12 · 63%" con separador
+    const legend = document.getElementById('donut-legend');
+    if (legend) {
+      const pct = (n) => total > 0 ? Math.round((n / total) * 100) : 0;
+      legend.innerHTML = `
+        <div class="cap-donut-legend__row">
+          <span class="cap-donut-legend__name"><i class="cap-donut-legend__dot" style="background:#1e4ed8"></i>SST</span>
+          <span class="cap-donut-legend__pct">${sstCount} · ${pct(sstCount)}%</span>
+        </div>
+        <div class="cap-donut-legend__row">
+          <span class="cap-donut-legend__name"><i class="cap-donut-legend__dot" style="background:#b7c8ea"></i>PYP</span>
+          <span class="cap-donut-legend__pct">${pypCount} · ${pct(pypCount)}%</span>
+        </div>
+      `;
     }
+  }
 
   // --- UTILIDADES ---
 
@@ -1914,7 +2298,11 @@ class CapacitacionesComponent {
   formatDate(dateString) {
         if (!dateString || dateString === 'No especificada') return '-';
         const date = new Date(dateString.replace(/-/g, '/'));
-        return date.toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' });
+        // "20 feb 2026" → "20 Feb 2026" (mes capitalizado, formato corto premium)
+        const s = date.toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' });
+        const parts = s.replace(/\./g, '').split(' ');
+        if (parts.length >= 3) parts[1] = parts[1].charAt(0).toUpperCase() + parts[1].slice(1);
+        return parts.join(' ');
     }
 }
 
