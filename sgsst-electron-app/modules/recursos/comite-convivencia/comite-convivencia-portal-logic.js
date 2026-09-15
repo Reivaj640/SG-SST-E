@@ -24,7 +24,7 @@ class ComiteConvivenciaPortalComponent {
     this.container.appendChild(portalContainer);
 
     try {
-      const response = await fetch('./modules/recursos/comite-convivencia/comite-convivencia-home.html');
+      const response = await fetch('./modules/recursos/comite-convivencia/comite-convivencia-home.html?v=CONVIVENCIA-20260915-v1-premium');
       if (response.ok) {
         const html = await response.text();
         portalContainer.innerHTML = html;
@@ -43,7 +43,7 @@ class ComiteConvivenciaPortalComponent {
     window.comiteConvivenciaPortalComponent = this;
 
     const script = document.createElement('script');
-    script.src = './modules/recursos/comite-convivencia/comite-convivencia-home.js';
+    script.src = './modules/recursos/comite-convivencia/comite-convivencia-home.js?v=CONVIVENCIA-20260915-v1-premium';
     this.portalScript = script;
 
     script.onload = () => {

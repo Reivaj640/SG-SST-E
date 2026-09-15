@@ -118,20 +118,23 @@ class CopasstComponent {
 
         const header = document.createElement('div');
         header.innerHTML = `
-<div class="k-section-card" style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem; margin-bottom:1.5rem; flex-shrink:0; flex-grow:0;">
-  <div style="display:flex; align-items:center; gap:0.75rem;">
-    <i class="fas fa-file-signature" style="color:#174ea6; font-size:1.25rem;"></i>
+<!-- HEADER PREMIUM — sin tarjeta, breadcrumb + título (patrón aprobado) -->
+<div class="pres-header" style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:0.35rem 0.2rem 1.2rem; flex-shrink:0; flex-wrap:wrap;">
+  <div style="display:flex; align-items:center; gap:0.9rem; min-width:0;">
+    <div class="pres-header__icon" style="width:44px; height:44px; border-radius:12px; background:#e3ecfb; color:var(--kair-blue,#2057b8); display:flex; align-items:center; justify-content:center; font-size:1.1rem; flex-shrink:0;">
+      <i class="fas fa-file-signature"></i>
+    </div>
     <div>
-      <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Generador de Actas COPASST</h3>
-      <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Formulario de creación de actas del comité SG-SST.</p>
+      <div class="pres-header__crumb" style="font-size:11px; color:var(--kair-faint,#aab1bd); margin-bottom:3px;">Recursos<span style="padding:0 4px;">/</span>COPASST</div>
+      <h1 style="margin:0; font:800 clamp(17px,1.7vw,23px)/1.15 var(--kair-font-display,'Segoe UI'); letter-spacing:-0.03em; color:var(--kair-ink,#14213d);">Generador de Actas COPASST</h1>
+      <p style="font-size:0.8125rem; color:var(--kair-muted,#748096); margin:2px 0 0 0;">Formulario de creación de actas del comité SG-SST.</p>
     </div>
   </div>
-  <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
-    <span style="display:flex; align-items:center; gap:0.375rem; font-size:0.8125rem; color:#64748B;">
+  <div style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
+    <span style="display:inline-flex; align-items:center; gap:0.4rem; font-size:0.8rem; font-weight:600; color:var(--kair-muted,#748096); background:var(--kair-soft,#f3f6f6); border-radius:999px; padding:0.35rem 0.8rem; max-width:260px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
       <i class="fas fa-building" style="font-size:0.875rem;"></i>
       <span id="header-company-text">${this.currentCompany || '—'}</span>
     </span>
-    <div style="width:1px; height:24px; background:#dee2e6;"></div>
     <button id="btn-back-portal" class="header-back-btn" title="Volver al Portal COPASST">
       <i class="fas fa-arrow-left"></i> Volver
     </button>
@@ -152,87 +155,94 @@ class CopasstComponent {
 
         const style = document.createElement('style');
         style.textContent = `
-.copasst-actas-container .k-section-card {
-  background: #ffffff;
-  border: 1px solid #dee2e6;
-  border-radius: 0.5rem;
-  box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.05);
-  overflow: hidden;
+/* ═══ PREMIUM v1 (2026-09-15) — Header y formulario con acabado premium ═══ */
+.copasst-actas-container .pres-header .header-back-btn {
+  padding: 0.55rem 1rem; border-radius: 10px; font-size: 0.8125rem; font-weight: 600;
+  cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;
+  border: 1px solid var(--kair-line, #e8ebee); background: #fff;
+  color: #536177; transition: all 0.18s; white-space: nowrap;
+  font-family: var(--kair-font-ui, 'Segoe UI', 'Roboto', sans-serif);
 }
+.copasst-actas-container .pres-header .header-back-btn:hover {
+  background: var(--kair-soft, #f3f6f6); color: var(--kair-blue, #2057b8);
+}
+.copasst-actas-container .pres-header .header-back-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
-.copasst-actas-container .header-back-btn {
-  padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.8125rem;
-  font-weight: 500; cursor: pointer; display: inline-flex; align-items: center;
-  gap: 0.375rem; border: 1px solid #dee2e6; background-color: #f8f9fa;
-  color: #6c757d; transition: all 0.2s; white-space: nowrap;
-  font-family: 'Segoe UI', 'Roboto', sans-serif;
+.copasst-actas-container .pres-header .header-action--primary {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.55rem 1.05rem; font-size: 0.8125rem; font-weight: 700;
+  color: #fff; background: var(--kair-blue, #2057b8); border: 0;
+  border-radius: 10px; cursor: pointer; transition: all 0.18s;
+  box-shadow: 0 8px 18px rgba(32, 87, 184, 0.15);
+  font-family: var(--kair-font-ui, 'Segoe UI', 'Roboto', sans-serif); white-space: nowrap;
 }
-.copasst-actas-container .header-back-btn:hover {
-  background-color: #e2e8f0; color: #174ea6; border-color: #174ea6;
-}
-.copasst-actas-container .header-back-btn:disabled {
-  opacity: 0.3; cursor: not-allowed;
-}
-.copasst-actas-container .header-back-btn:disabled:hover {
-  background-color: #f8f9fa; color: #6c757d; border-color: #dee2e6;
-}
-
-.copasst-actas-container .header-action--primary {
-  display: inline-flex; align-items: center; gap: 0.375rem;
-  padding: 0.5rem 1rem; font-size: 0.8125rem; font-weight: 500;
-  color: #fff; background: #174ea6; border: 1px solid #174ea6;
-  border-radius: 0.5rem; cursor: pointer; transition: background 0.15s ease;
-  font-family: 'Segoe UI', 'Roboto', sans-serif; white-space: nowrap;
-}
-.copasst-actas-container .header-action--primary:hover { background: #185abd; }
-.copasst-actas-container .header-action--primary:disabled { opacity: 0.6; cursor: not-allowed; }
-.copasst-actas-container .header-action--primary--loading {
+.copasst-actas-container .pres-header .header-action--primary:hover { background: #1a4ba0; }
+.copasst-actas-container .pres-header .header-action--primary:disabled { opacity: 0.6; cursor: not-allowed; }
+.copasst-actas-container .pres-header .header-action--primary--loading {
   pointer-events: none; position: relative; color: transparent;
 }
-.copasst-actas-container .header-action--primary--loading::after {
+.copasst-actas-container .pres-header .header-action--primary--loading::after {
   content: ''; position: absolute; width: 14px; height: 14px;
   border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff;
   border-radius: 50%; animation: kair-spin 0.6s linear infinite;
   left: 50%; top: 50%; margin-left: -7px; margin-top: -7px;
 }
 
-.copasst-actas-container .header-action--success {
-  display: inline-flex; align-items: center; gap: 0.375rem;
-  padding: 0.5rem 1rem; font-size: 0.8125rem; font-weight: 500;
-  color: #fff; background: #28a745; border: 1px solid #28a745;
-  border-radius: 0.5rem; cursor: pointer; transition: background 0.15s ease;
-  font-family: 'Segoe UI', 'Roboto', sans-serif; white-space: nowrap;
+.copasst-actas-container .pres-header .header-action--success {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.55rem 1.05rem; font-size: 0.8125rem; font-weight: 700;
+  color: #fff; background: var(--kair-mint, #1bb888); border: 0;
+  border-radius: 10px; cursor: pointer; transition: all 0.18s;
+  font-family: var(--kair-font-ui, 'Segoe UI', 'Roboto', sans-serif); white-space: nowrap;
 }
-.copasst-actas-container .header-action--success:hover { background: #218838; }
-.copasst-actas-container .header-action--success:disabled { opacity: 0.6; cursor: not-allowed; }
+.copasst-actas-container .pres-header .header-action--success:hover { background: #159b74; }
+.copasst-actas-container .pres-header .header-action--success:disabled { opacity: 0.6; cursor: not-allowed; }
 
 @keyframes kair-spin { to { transform: rotate(360deg); } }
 
-.copasst-actas-container[data-theme="dark"] .k-section-card { background: var(--k-bg-card, #2d3748); border-color: var(--k-border, #4a5568); }
-.copasst-actas-container[data-theme="dark"] .header-back-btn { color: #adb5bd; border-color: var(--k-border, #4a5568); background-color: transparent; }
-.copasst-actas-container[data-theme="dark"] .header-back-btn:hover { background: rgba(77, 166, 255, 0.15); color: var(--k-primary, #4da6ff); }
-.copasst-actas-container[data-theme="dark"] .header-action--primary { background: var(--k-primary, #4da6ff); color: #1a1a2e; }
-.copasst-actas-container[data-theme="dark"] .header-action--primary:hover { background: var(--k-primary-hover, #6db8ff); }
-.copasst-actas-container[data-theme="dark"] .header-action--success { background: var(--k-success, #28a745); color: #1a1a2e; }
-.copasst-actas-container[data-theme="dark"] .header-action--success:hover { background: var(--k-success-hover, #34ce57); }
-
-@media (max-width: 768px) {
-    .copasst-actas-container .k-section-card { flex-wrap: wrap; gap: 0.5rem; padding: 0.75rem 1rem; }
-    .copasst-actas-container .k-section-card > div:last-child { width: 100%; justify-content: flex-end; }
-}
-
-:root { --primary-color: #206A5D; --primary-hover-color: #1A564B; --bg-color: #f8f9fa; --widget-bg-color: #ffffff; --border-color: #dee2e6; }
-.acta-form-wrapper { font-family: 'Poppins', sans-serif; color: #212529; background: var(--bg-color); padding: 2rem 1.5rem; max-width: 1100px; margin: 0 auto; }
-.acta-card { background: white; border-radius: 8px; border: 1px solid var(--border-color); box-shadow: 0 2px 4px rgba(0,0,0,0.05); padding: 2rem; margin-bottom: 2rem; }
-.acta-card-title { font-size: 1.5rem; font-weight: 600; margin-top: 0; margin-bottom: 1.5rem; color: #495057; border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem; }
-.acta-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; }
+/* ─── Formulario del acta — acabado premium ─── */
+:root { --primary-color: var(--kair-blue, #2057b8); --primary-hover-color: #1a4ba0; --bg-color: var(--kair-canvas, #fbfcfb); --widget-bg-color: #ffffff; --border-color: var(--kair-line, #e8ebee); }
+.acta-form-wrapper { font-family: var(--kair-font-ui, 'Segoe UI', 'Roboto', sans-serif); color: var(--kair-ink, #14213d); background: var(--bg-color); padding: 0.35rem 0.2rem 2rem; max-width: 1100px; margin: 0 auto; }
+.acta-card { background: white; border-radius: 16px; border: 1px solid var(--border-color); box-shadow: 0 2px 7px rgba(37, 56, 82, 0.05); padding: clamp(18px, 2vw, 28px); margin-bottom: clamp(14px, 1.6vw, 22px); }
+.acta-card-title { font: 700 clamp(15px, 1.4vw, 19px) var(--kair-font-display, 'Segoe UI'); letter-spacing: -0.03em; margin-top: 0; margin-bottom: 1.25rem; color: var(--kair-ink, #14213d); border-bottom: 0; padding-bottom: 0; display: flex; align-items: center; gap: 0.6rem; }
+.acta-card-title::before { content: ''; width: 4px; height: 18px; border-radius: 4px; background: var(--kair-blue, #2057b8); flex-shrink: 0; }
+.acta-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.25rem; }
 .acta-form-group { display: flex; flex-direction: column; }
 .acta-form-group.full-width { grid-column: 1 / -1; }
-.acta-form-group label { font-size: 0.9rem; font-weight: 500; color: #6c757d; margin-bottom: 0.5rem; }
-.acta-form-group input, .acta-form-group textarea { padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: 4px; }
-.acta-dynamic-item { background: #f8f9fa; border: 1px solid var(--border-color); border-radius: 6px; padding: 1.5rem; margin-bottom: 1rem; position: relative; }
-.acta-btn-add { width: 100%; padding: 0.75rem; background: var(--primary-color); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500; }
-.acta-btn-remove { position: absolute; top: 10px; right: 10px; background: #dc3545; color: white; border: none; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; }
+.acta-form-group label { font-size: 0.8125rem; font-weight: 600; color: var(--kair-muted, #748096); margin-bottom: 0.45rem; }
+.acta-form-group input, .acta-form-group textarea {
+  padding: 0.55rem 0.75rem; border: 1px solid var(--border-color); border-radius: 10px;
+  font-family: inherit; font-size: 0.875rem; color: var(--kair-ink, #14213d);
+  background: #fff; transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.acta-form-group input:focus, .acta-form-group textarea:focus {
+  outline: none; border-color: var(--kair-blue, #2057b8);
+  box-shadow: 0 0 0 3px rgba(32, 87, 184, 0.10);
+}
+.acta-dynamic-item { background: var(--kair-soft, #f3f6f6); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; position: relative; }
+.acta-btn-add { width: 100%; padding: 0.75rem; background: #fff; color: var(--kair-blue, #2057b8); border: 1px dashed #c8d7ef; border-radius: 10px; cursor: pointer; font-weight: 700; font-size: 0.85rem; transition: all 0.18s; }
+.acta-btn-add:hover { background: #eef4fd; border-color: var(--kair-blue, #2057b8); }
+.acta-btn-remove { position: absolute; top: 10px; right: 10px; background: var(--kair-red, #da5563); color: white; border: none; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; transition: all 0.15s; }
+.acta-btn-remove:hover { transform: scale(1.08); }
+
+@media (max-width: 768px) {
+    .copasst-actas-container .pres-header { padding-bottom: 0.75rem; }
+}
+
+/* Modo oscuro — compatibilidad heredada */
+.copasst-actas-container[data-theme="dark"] .pres-header h1 { color: #e2e8f0; }
+.copasst-actas-container[data-theme="dark"] .pres-header__crumb { color: #8791a1; }
+.copasst-actas-container[data-theme="dark"] .pres-header p { color: #a0aec0; }
+.copasst-actas-container[data-theme="dark"] .pres-header .header-back-btn { color: #adb5bd; border-color: #4a5568; background: transparent; }
+.copasst-actas-container[data-theme="dark"] .pres-header .header-back-btn:hover { background: rgba(77, 166, 255, 0.15); color: #4da6ff; }
+.copasst-actas-container[data-theme="dark"] .acta-form-wrapper { background: transparent; }
+.copasst-actas-container[data-theme="dark"] .acta-card { background: #2d3748; border-color: #4a5568; }
+.copasst-actas-container[data-theme="dark"] .acta-card-title { color: #e2e8f0; }
+.copasst-actas-container[data-theme="dark"] .acta-form-group label { color: #a0aec0; }
+.copasst-actas-container[data-theme="dark"] .acta-form-group input,
+.copasst-actas-container[data-theme="dark"] .acta-form-group textarea { background: #1a202c; border-color: #4a5568; color: #e2e8f0; }
+.copasst-actas-container[data-theme="dark"] .acta-dynamic-item { background: #1a202c; border-color: #4a5568; }
+.copasst-actas-container[data-theme="dark"] .acta-btn-add { background: transparent; color: #4da6ff; border-color: #4a5568; }
 `;
         wrapper.appendChild(style);
 

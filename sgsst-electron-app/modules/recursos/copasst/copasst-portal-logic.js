@@ -24,7 +24,7 @@ portalContainer.id = 'copasst-portal-container';
 this.container.appendChild(portalContainer);
 
 try {
-const response = await fetch('./modules/recursos/copasst/copasst-home.html');
+const response = await fetch('./modules/recursos/copasst/copasst-home.html?v=COPASST-20260915-v1-premium');
 if (response.ok) {
 const html = await response.text();
 portalContainer.innerHTML = html;
@@ -43,7 +43,7 @@ window.copasstPortalContainer = portalContainer;
 window.copasstPortalComponent = this;
 
 const script = document.createElement('script');
-script.src = './modules/recursos/copasst/copasst-home.js';
+script.src = './modules/recursos/copasst/copasst-home.js?v=COPASST-20260915-v1-premium';
 this.portalScript = script;
 
 script.onload = () => {
