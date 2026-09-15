@@ -1,323 +1,425 @@
-<link rel="stylesheet" href="./modules/recursos/inducciones/inducciones-view.css?v=INDUCCIONES-20260913-v4-premium-svg-aligned">
+<link rel="stylesheet" href="./modules/recursos/inducciones/inducciones-view.css?v=INDUCCIONES-20260915-v9-strip-layout-fix">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-<!-- NOTIFICACIONES -->
-<div class="k-toast-container" id="toastContainer"></div>
+<main class="kair-page">
 
-<div class="k-app-layout">
+  <!-- ===== BREADCRUMB ===== -->
+  <nav aria-label="Ruta de navegación">
+    <ol class="kair-breadcrumb">
+      <li><a href="#" id="bc-inicio">Inicio</a></li>
+      <li class="kair-breadcrumb__sep" aria-hidden="true">/</li>
+      <li><a href="#" id="bc-gestion">Gestión</a></li>
+      <li class="kair-breadcrumb__sep" aria-hidden="true">/</li>
+      <li><a href="#" id="bc-modulo">Talento Humano</a></li>
+      <li class="kair-breadcrumb__sep" aria-hidden="true">/</li>
+      <li aria-current="page">Inducción y Reinducción</li>
+    </ol>
+  </nav>
 
-    <!-- BANNER DE SINCRONIZACIÓN -->
-    <div id="sync-banner" class="k-sync-banner" style="display: none;">
-        <div class="k-sync-banner-content">
-            <i class="bi bi-cloud-download"></i>
-            <span id="sync-banner-message">Hay nuevos registros disponibles en Google Forms</span>
-        </div>
-        <div class="k-sync-banner-actions">
-            <button class="k-btn k-btn-sm k-btn-outline" id="btn-sync-dismiss">
-                <i class="bi bi-x-lg"></i>
-            </button>
-            <button class="k-btn k-btn-sm k-btn-primary" id="btn-sync-now">
-                <i class="bi bi-arrow-clockwise"></i> Sincronizar ahora
-            </button>
-        </div>
-    </div>
-
-<!-- HEADER — Card k-section-card (tabs integrados) -->
-<div class="k-section-card" style="padding:0; margin-bottom:1.5rem; flex-shrink:0; flex-grow:0;">
-  <!-- Fila 1: contenido principal -->
-  <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
-    <div style="display:flex; align-items:center; gap:0.75rem;">
-      <i class="bi bi-person-check-fill" style="color:#174ea6; font-size:1.25rem;"></i>
+  <!-- ===== TOPBAR DEL MÓDULO ===== -->
+  <div class="kair-topbar">
+    <div class="kair-module-id">
+      <div class="kair-module-id__icon" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m16 11 2 2 4-4"/></svg>
+      </div>
       <div>
-        <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Inducción y Reinducción</h3>
-        <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Gestión de inducciones y reinducciones SG-SST.</p>
+        <h1 class="kair-module-id__title">Inducción y Reinducción</h1>
+        <p class="kair-module-id__desc">Gestión de inducciones y reinducciones SG-SST.</p>
       </div>
     </div>
-    <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
-      <span style="display:flex; align-items:center; gap:0.375rem; font-size:0.8125rem; color:#64748B;">
-        <i class="kair-icon-building" style="font-size:0.875rem;"></i>
-        <span id="header-company-text">—</span>
+    <div class="kair-topbar__actions">
+      <span class="kair-chip" id="chip-origen" title="Origen de los datos: integración Tempoactiva">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1"/></svg>
+        Tempoactiva
       </span>
-      <div style="width:1px; height:24px; background:#dee2e6;"></div>
-      <button id="btn-back-module" class="kair-btn kair-btn-ghost" style="display:inline-flex; align-items:center; gap:6px;" title="Volver al módulo Recursos">
-        <i class="bi bi-arrow-left"></i> Volver
+      <button type="button" class="kair-btn kair-btn--ghost" id="btn-volver">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
+        Volver
       </button>
-      <button id="btn-sync-manual" class="kair-btn kair-btn-ghost" style="display:inline-flex; align-items:center; gap:6px;" title="Sincronizar con Google Forms">
-        <i class="bi bi-arrow-clockwise" id="sync-icon"></i> Sincronizar
+      <button type="button" class="kair-btn kair-btn--ghost" id="btn-sync">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+        Sincronizar
       </button>
-      <span id="sync-status" class="k-sync-status" style="margin-left:0.25rem;display:none;"></span>
-      <button id="btn-export-excel" class="kair-btn kair-btn-ghost" style="display:inline-flex; align-items:center; gap:6px;" title="Exportar datos">
-        <i class="bi bi-file-earmark-excel"></i> Exportar
+      <button type="button" class="kair-btn kair-btn--ghost" id="btn-exportar">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+        Exportar
       </button>
     </div>
   </div>
 
-  <!-- Fila 2: tabs (dentro del card) -->
-  <div class="inducciones-tabs">
-    <button class="inducciones-tab active" data-view="dashboard">
-      <i class="bi bi-speedometer2"></i> Dashboard
+  <!-- ===== BANNER DE SINCRONIZACIÓN (feature real: Google Forms) ===== -->
+  <div id="sync-banner" class="kair-toolbar" style="display:none;border-color:var(--kair-blue-light);background:var(--kair-blue-soft);">
+    <span class="kair-toolbar__label" id="sync-banner-message">Hay nuevos registros disponibles en Google Forms</span>
+    <span class="kair-toolbar__spacer"></span>
+    <button type="button" class="kair-btn kair-btn--ghost" id="btn-sync-dismiss">Descartar</button>
+    <button type="button" class="kair-btn kair-btn--primary" id="btn-sync-now">Sincronizar ahora</button>
+  </div>
+
+  <!-- ===== TABS ===== -->
+  <div class="kair-tabs" role="tablist" aria-label="Vistas del módulo">
+    <button type="button" class="kair-tab is-active" id="tab-dashboard" role="tab" aria-selected="true" aria-controls="view-dashboard">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+      Dashboard
     </button>
-    <button class="inducciones-tab" data-view="list">
-      <i class="bi bi-clipboard-data"></i> Registro
-      <span class="inducciones-tab-badge" id="badge-list" style="display:none;">0</span>
+    <button type="button" class="kair-tab" id="tab-registro" role="tab" aria-selected="false" aria-controls="view-registro">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+      Registro
+      <span class="kair-tab__count" id="tab-reg-count">0</span>
     </button>
   </div>
-</div>
 
-    <!-- 3. CONTENIDO PRINCIPAL -->
-    <main class="k-main-content">
-        
-        <!-- =========================
-             VISTA 1: DASHBOARD
-             ========================= -->
-<section id="view-dashboard" class="k-view-section active">
+  <!-- ============================================================
+       VISTA · DASHBOARD
+       ============================================================ -->
+  <section class="kair-view" id="view-dashboard" role="tabpanel" aria-label="Dashboard de inducciones">
 
-  <!-- Franja de estadísticas compacta -->
-  <div class="k-stats-ribbon">
-    <div class="k-stats-ribbon__item">
-      <span class="k-stats-ribbon__icon primary"><i class="bi bi-clipboard-check"></i></span>
-      <div class="k-stats-ribbon__data">
-        <span class="k-stats-ribbon__value" id="stat-total">0</span>
-        <span class="k-stats-ribbon__label">Total Inducciones</span>
-      </div>
-      <span class="k-stats-ribbon__pct" id="stat-progress-text">0%</span>
-    </div>
-    <div class="k-stats-ribbon__divider"></div>
-    <div class="k-stats-ribbon__item">
-      <span class="k-stats-ribbon__icon success"><i class="bi bi-check-circle"></i></span>
-      <div class="k-stats-ribbon__data">
-        <span class="k-stats-ribbon__value" id="stat-approved">0</span>
-        <span class="k-stats-ribbon__label">Aprobadas</span>
-      </div>
-    </div>
-    <div class="k-stats-ribbon__divider"></div>
-    <div class="k-stats-ribbon__item">
-      <span class="k-stats-ribbon__icon danger"><i class="bi bi-x-circle"></i></span>
-      <div class="k-stats-ribbon__data">
-        <span class="k-stats-ribbon__value" id="stat-failed">0</span>
-        <span class="k-stats-ribbon__label">Reprobadas</span>
-      </div>
-    </div>
-    <div class="k-stats-ribbon__divider"></div>
-    <div class="k-stats-ribbon__item">
-      <span class="k-stats-ribbon__icon warning"><i class="bi bi-star"></i></span>
-      <div class="k-stats-ribbon__data">
-        <span class="k-stats-ribbon__value" id="stat-score">0.0</span>
-        <span class="k-stats-ribbon__label">Promedio Puntaje</span>
-      </div>
-    </div>
-    <div class="k-stats-ribbon__divider"></div>
-    <div class="k-stats-ribbon__item">
-      <span class="k-stats-ribbon__icon pink"><i class="bi bi-gender-female"></i></span>
-      <div class="k-stats-ribbon__data">
-        <span class="k-stats-ribbon__value" id="stat-gender-f">0</span>
-        <span class="k-stats-ribbon__value k-stats-ribbon__value--sm" id="stat-rate-f">0% Aprobación</span>
-      </div>
-    </div>
-    <div class="k-stats-ribbon__divider"></div>
-    <div class="k-stats-ribbon__item">
-      <span class="k-stats-ribbon__icon mint"><i class="bi bi-gender-male"></i></span>
-      <div class="k-stats-ribbon__data">
-        <span class="k-stats-ribbon__value" id="stat-gender-m">0</span>
-        <span class="k-stats-ribbon__value k-stats-ribbon__value--sm" id="stat-rate-m">0% Aprobación</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Filtros del Dashboard -->
-  <div class="k-dashboard-filters">
-    <div class="k-dashboard-filters__group">
-      <span class="k-dashboard-filters__label">Año:</span>
-      <select id="filter-year-dashboard" class="k-dashboard-filters__select">
-        <option value="">Cargando...</option>
+    <!-- Filtros del dashboard -->
+    <div class="kair-toolbar" role="group" aria-label="Filtros del dashboard">
+      <span class="kair-toolbar__label">Año:</span>
+      <select class="kair-select" id="d-anio" aria-label="Filtrar por año"></select>
+      <span class="kair-toolbar__label">Género:</span>
+      <select class="kair-select" id="d-genero" aria-label="Filtrar por género">
+        <option value="all">Todos</option>
+        <option value="H">Hombres</option>
+        <option value="M">Mujeres</option>
       </select>
+      <span class="kair-toolbar__spacer"></span>
+      <span class="kair-count" id="dash-count">0 registros</span>
     </div>
-    <div class="k-dashboard-filters__divider"></div>
-    <div class="k-dashboard-filters__group">
-      <span class="k-dashboard-filters__label">Género:</span>
-      <select id="filter-gender-dashboard" class="k-dashboard-filters__select">
-        <option value="">Todos</option>
-        <option value="Hombre">Hombre</option>
-        <option value="Mujer">Mujer</option>
+
+    <!-- Hero + KPIs en una sola fila alineada -->
+    <div class="kair-hero-strip">
+    <div class="kair-hero kair-hero--strip">
+      <div class="kair-hero__label" id="hero-label">Estado general</div>
+      <h2 class="kair-hero__title" id="hero-title">—</h2>
+      <p class="kair-hero__sub" id="hero-sub">—</p>
+      <div class="kair-hero__strip-foot">
+        <div class="kair-hero__strip-meter">
+          <span class="kair-hero__pct" id="hero-pct">—</span>
+          <div>
+            <span class="kair-hero__pct-label">Aprobación</span>
+            <div class="kair-hero__meter" role="img" aria-label="Porcentaje de aprobación">
+              <div class="kair-hero__meter-fill" id="hero-meter"></div>
+            </div>
+          </div>
+        </div>
+        <div class="kair-hero__cta">
+          <button type="button" class="kair-btn kair-btn--onnavy" id="btn-ver-reprobados">
+            Ver reprobados en el registro
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPIs (celdas del strip) -->
+      <div class="kair-kpi">
+        <div class="kair-kpi__top">
+          <span class="kair-kpi__label">Total inducciones</span>
+          <span class="kair-chip" id="kpi-total-chip">2026</span>
+        </div>
+        <div>
+          <div class="kair-kpi__value" id="kpi-total">—</div>
+          <div class="kair-kpi__bar" style="margin-top:10px"><span class="kair-kpi__fill kair-kpi__fill--blue" id="kpi-total-bar"></span></div>
+          <div class="kair-kpi__sub" style="margin-top:7px" id="kpi-total-sub">Inducciones y reinducciones registradas</div>
+        </div>
+      </div>
+      <div class="kair-kpi">
+        <div class="kair-kpi__top">
+          <span class="kair-kpi__label">Aprobadas</span>
+          <span class="kair-chip kair-chip--soft-green" id="kpi-apr-chip">—</span>
+        </div>
+        <div>
+          <div class="kair-kpi__value" id="kpi-apr">—</div>
+          <div class="kair-kpi__bar" style="margin-top:10px"><span class="kair-kpi__fill kair-kpi__fill--green" id="kpi-apr-bar"></span></div>
+          <div class="kair-kpi__sub" style="margin-top:7px">Puntaje ≥ 20 / 22</div>
+        </div>
+      </div>
+      <div class="kair-kpi">
+        <div class="kair-kpi__top">
+          <span class="kair-kpi__label">Reprobadas</span>
+          <span class="kair-chip kair-chip--soft-red" id="kpi-rep-chip">—</span>
+        </div>
+        <div>
+          <div class="kair-kpi__value" id="kpi-rep">—</div>
+          <div class="kair-kpi__bar" style="margin-top:10px"><span class="kair-kpi__fill kair-kpi__fill--red" id="kpi-rep-bar"></span></div>
+          <div class="kair-kpi__sub" style="margin-top:7px">Requieren reinducción</div>
+        </div>
+      </div>
+      <div class="kair-kpi">
+        <div class="kair-kpi__top">
+          <span class="kair-kpi__label">Promedio de puntaje</span>
+          <span class="kair-chip kair-chip--blue" id="kpi-prom-chip">/ 22</span>
+        </div>
+        <div>
+          <div class="kair-kpi__value" id="kpi-prom">—</div>
+          <div class="kair-kpi__sub" style="margin-top:auto" id="kpi-prom-sub">Rango de resultados —</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gráficas · fila 1 -->
+    <div class="kair-grid-2">
+      <div class="kair-card kair-card--chart">
+        <div class="kair-card__head">
+          <div>
+            <h3 class="kair-card__title">Ejecución mensual</h3>
+            <p class="kair-card__sub" id="sub-ejecucion">Realizadas vs aprobadas por mes</p>
+          </div>
+          <div class="kair-legend">
+            <span class="kair-legend__item"><span class="kair-legend__dot" style="background:#2057B8"></span>Realizadas</span>
+            <span class="kair-legend__item"><span class="kair-legend__dot" style="background:#1BB888"></span>Aprobadas</span>
+          </div>
+        </div>
+        <div class="kair-card__body">
+          <div class="kair-chart" id="chart-ejecucion"></div>
+        </div>
+      </div>
+      <div class="kair-card kair-card--chart">
+        <div class="kair-card__head">
+          <div>
+            <h3 class="kair-card__title">Tasa de aprobación</h3>
+            <p class="kair-card__sub">% de aprobados sobre realizados, por mes</p>
+          </div>
+          <div class="kair-legend">
+            <span class="kair-legend__item"><span class="kair-legend__dot" style="background:#2057B8"></span>Mes</span>
+            <span class="kair-legend__item"><span class="kair-legend__dot" style="background:rgba(231,162,36,.75)"></span>Bajo la meta</span>
+          </div>
+        </div>
+        <div class="kair-card__body">
+          <div class="kair-chart" id="chart-tasa"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gráficas · fila 2 -->
+    <div class="kair-grid-2">
+      <div class="kair-card kair-card--chart">
+        <div class="kair-card__head">
+          <div>
+            <h3 class="kair-card__title">Distribución por género</h3>
+            <p class="kair-card__sub">Hombres vs mujeres inducidos</p>
+          </div>
+        </div>
+        <div class="kair-card__body">
+          <div class="kair-donut-flex">
+            <div class="kair-donut-wrap">
+              <div id="donut-genero"></div>
+              <div class="kair-donut-center"><strong id="donut-total">—</strong><span id="donut-center-label">inducciones</span></div>
+            </div>
+            <div class="kair-legend kair-legend--rows" id="donut-legend"></div>
+          </div>
+        </div>
+      </div>
+      <div class="kair-card kair-card--chart">
+        <div class="kair-card__head">
+          <div>
+            <h3 class="kair-card__title">Aprobación por género</h3>
+            <p class="kair-card__sub">Aprobados vs reprobados, segmentado por género</p>
+          </div>
+          <div class="kair-legend">
+            <span class="kair-legend__item"><span class="kair-legend__dot" style="background:#2057B8"></span>Aprobados</span>
+            <span class="kair-legend__item"><span class="kair-legend__dot" style="background:rgba(218,85,99,.6)"></span>Reprobados</span>
+          </div>
+        </div>
+        <div class="kair-card__body">
+          <div class="kair-chart" id="chart-aprob-genero"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gráficas · fila 3 -->
+    <div class="kair-grid-2">
+      <div class="kair-card kair-card--chart">
+        <div class="kair-card__head">
+          <div>
+            <h3 class="kair-card__title">Top cargos inducidos</h3>
+            <p class="kair-card__sub">Los 5 cargos con más inducciones</p>
+          </div>
+        </div>
+        <div class="kair-card__body">
+          <div class="kair-hbars" id="hbars-cargos"></div>
+        </div>
+      </div>
+      <div class="kair-card kair-card--chart">
+        <div class="kair-card__head">
+          <div>
+            <h3 class="kair-card__title">Puntajes por rango</h3>
+            <p class="kair-card__sub">Cantidad de trabajadores en cada rango de puntaje</p>
+          </div>
+        </div>
+        <div class="kair-card__body">
+          <div class="kair-chart" id="chart-rangos"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- En tu radar -->
+    <div class="kair-card">
+      <div class="kair-card__head">
+        <div>
+          <h3 class="kair-card__title">En tu radar</h3>
+          <p class="kair-card__sub" id="radar-sub">Lo que merece atención este año</p>
+        </div>
+      </div>
+      <div class="kair-radar" id="radar-items"></div>
+      <div class="kair-radar__link">
+        <button type="button" id="btn-radar-registro">
+          Ver registro completo
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       VISTA · REGISTRO
+       ============================================================ -->
+  <section class="kair-view" id="view-registro" role="tabpanel" aria-label="Registro de inducciones" hidden>
+
+    <div class="kair-toolbar" role="group" aria-label="Filtros del registro">
+      <span class="kair-toolbar__label">Año:</span>
+      <select class="kair-select" id="f-anio" aria-label="Filtrar por año"></select>
+      <span class="kair-toolbar__label">Estado:</span>
+      <select class="kair-select" id="f-estado" aria-label="Filtrar por estado">
+        <option value="all">Todos</option>
+        <option value="APROBADO">Aprobados</option>
+        <option value="REPROBADO">Reprobados</option>
       </select>
+      <div class="kair-search">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" id="f-buscar" placeholder="Buscar por nombre o cédula…" aria-label="Buscar por nombre o cédula" autocomplete="off">
+      </div>
+      <button type="button" class="kair-btn kair-btn--outline" id="btn-limpiar" hidden>Limpiar</button>
+      <span class="kair-toolbar__spacer"></span>
+      <span class="kair-count" id="reg-count">0 registros</span>
+      <button type="button" class="kair-btn kair-btn--primary" id="btn-registrar">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        Registrar
+      </button>
     </div>
-    <span class="k-dashboard-filters__count" id="dashboard-filter-count">0 registros</span>
-  </div>
 
-  <!-- Gráficos Grid Unificado 3 columnas -->
-  <div class="k-charts-grid">
-  <div class="kair-card">
-    <div class="kair-row-title">
-      <div>
-        <h3>Ejecución Mensual</h3>
-        <div class="kair-card-hint">Realizadas vs Aprobadas por mes</div>
+    <div class="kair-tablewrap">
+      <div class="kair-scroll">
+        <table class="kair-table" aria-label="Registro de inducciones y reinducciones">
+          <thead>
+            <tr>
+              <th style="width:110px">Fecha</th>
+              <th>Empleado</th>
+              <th>Cargo</th>
+              <th style="width:120px">Género</th>
+              <th style="width:185px">Puntaje / 22</th>
+              <th style="width:155px">Estado</th>
+              <th class="col--actions" style="width:100px">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+        <div class="kair-empty" id="table-empty" hidden>
+          <div class="kair-empty__icon">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          </div>
+          <div class="kair-empty__title">Sin resultados</div>
+          <div class="kair-empty__sub">Ninguna inducción coincide con los filtros o la búsqueda actual.</div>
+          <button type="button" class="kair-btn kair-btn--outline" id="btn-limpiar-empty">Limpiar filtros</button>
+        </div>
+      </div>
+      <div class="kair-foot">
+        <span class="kair-foot__count" id="foot-count">—</span>
+        <div class="kair-pager" id="pager" aria-label="Paginación"></div>
       </div>
     </div>
-    <div class="kair-chart"><div id="mainChart" class="kair-chart-svg"></div></div>
-  </div>
-  <div class="kair-card">
-    <div class="kair-row-title">
-      <div>
-        <h3>Tasa de Aprobación por Mes</h3>
-        <div class="kair-card-hint">% de aprobados sobre realizados, por mes</div>
-      </div>
-    </div>
-    <div class="kair-chart"><div id="approvalRateChart" class="kair-chart-svg"></div></div>
-  </div>
-  <div class="kair-card">
-    <div class="kair-row-title">
-      <div>
-        <h3>Distribución por Género</h3>
-        <div class="kair-card-hint">Hombres vs Mujeres inducidos</div>
-      </div>
-    </div>
-    <div class="kair-chart"><div id="genderDistChart" class="kair-chart-svg"></div></div>
-  </div>
-  <div class="kair-card">
-    <div class="kair-row-title">
-      <div>
-        <h3>Top Cargos Inducidos</h3>
-        <div class="kair-card-hint">Top 5 cargos con más inducciones</div>
-      </div>
-    </div>
-    <div class="kair-chart"><div id="positionChart" class="kair-chart-svg"></div></div>
-  </div>
-  <div class="kair-card">
-    <div class="kair-row-title">
-      <div>
-        <h3>Aprobación por Género</h3>
-        <div class="kair-card-hint">Aprobados vs Reprobados, segmentado por género</div>
-      </div>
-    </div>
-    <div class="kair-chart"><div id="genderStackChart" class="kair-chart-svg"></div></div>
-  </div>
-  <div class="kair-card">
-    <div class="kair-row-title">
-      <div>
-        <h3>Distribución de Puntajes por Rango</h3>
-        <div class="kair-card-hint">Cantidad de trabajadores en cada rango de puntaje</div>
-      </div>
-    </div>
-    <div class="kair-chart"><div id="scoreDistChart" class="kair-chart-svg"></div></div>
-  </div>
-  </div>
-</section>
+  </section>
+</main>
 
-        <!-- =========================
-             VISTA 2: REGISTRO (LISTADO)
-             ========================= -->
-        <section id="view-list" class="k-view-section">
-            
-            <!-- Barra de Herramientas -->
-            <div class="k-filter-group">
-                <div style="display: flex; align-items: center; gap: 0.5rem; border-right: 1px solid var(--k-border); padding-right: 1rem;">
-                    <label style="font-size: 0.9rem; font-weight: 500;">Año:</label>
-                    <select id="filter-year-list" class="k-form-select" style="width: auto;">
-                        <option value="">Cargando...</option>
-                    </select>
-                </div>
-                
-                <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1;">
-                    <input type="text" id="search-input" class="form-control" placeholder="Buscar por nombre o cédula...">
-                    <button class="k-btn k-btn-primary" id="btn-search">
-                        <i class="bi bi-search"></i>
-                    </button>
-                </div>
-
-                <div>
-                    <button class="k-btn k-btn-primary" id="btn-open-add">
-                        <i class="bi bi-plus-lg"></i> Registrar
-                    </button>
-                </div>
+<!-- ===== MODAL · REGISTRAR / EDITAR INDUCCIÓN ===== -->
+<div class="kair-modal" id="modal-induccion" role="dialog" aria-modal="true" aria-labelledby="modal-ind-title">
+  <div class="kair-modal__panel">
+    <div class="kair-modal__head">
+      <div>
+        <h3 class="kair-modal__title" id="modal-ind-title">Registrar inducción</h3>
+        <p class="kair-modal__sub">Nueva evaluación de inducción o reinducción SG-SST.</p>
+      </div>
+      <button type="button" class="kair-modal__close" data-close aria-label="Cerrar">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form id="form-induccion" novalidate>
+      <div class="kair-modal__body">
+        <div class="kair-form-block">
+          <div class="kair-form-block__title">Datos del trabajador</div>
+          <div class="kair-form-block__desc">Información de la persona inducida.</div>
+          <div class="kair-form-grid">
+            <div class="kair-field span-2" id="fw-nombre">
+              <label class="kair-field__label" for="ind-nombre">Nombre completo <em>*</em></label>
+              <input type="text" id="ind-nombre" placeholder="Ej.: María Fernanda Ruiz Torres" maxlength="80">
+              <span class="kair-field__error">Ingresa el nombre completo.</span>
             </div>
-
-            <!-- Tabla Completa -->
-            <div class="k-table-container">
-                <table class="k-table">
-                    <thead>
-                        <tr>
-                            <th>Fecha</th>
-                            <th>Empleado</th>
-                            <th>Cédula</th>
-                            <th>Cargo</th>
-                            <th>Género</th>
-                            <th>Puntaje / 22</th>
-                            <th>Estado</th>
-                            <th style="text-align:right;">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody id="full-table-body">
-                        <!-- JS -->
-                    </tbody>
-                </table>
+            <div class="kair-field" id="fw-cedula">
+              <label class="kair-field__label" for="ind-cedula">Cédula <em>*</em></label>
+              <input type="text" id="ind-cedula" placeholder="Ej.: 1023456789" inputmode="numeric" maxlength="12">
+              <span class="kair-field__error">Cédula inválida (solo números, 6–12 dígitos).</span>
             </div>
-</section>
-
-  </main>
+            <div class="kair-field" id="fw-cargo">
+              <label class="kair-field__label" for="ind-cargo">Cargo <em>*</em></label>
+              <input type="text" id="ind-cargo" list="cargos-list" placeholder="Ej.: Cocinero" maxlength="60">
+              <datalist id="cargos-list"></datalist>
+              <span class="kair-field__error">Ingresa el cargo.</span>
+            </div>
+            <div class="kair-field" id="fw-genero">
+              <label class="kair-field__label" for="ind-genero">Género <em>*</em></label>
+              <select id="ind-genero">
+                <option value="">Selecciona…</option>
+                <option value="M">Mujer</option>
+                <option value="H">Hombre</option>
+              </select>
+              <span class="kair-field__error">Selecciona el género.</span>
+            </div>
+            <div class="kair-field" id="fw-fecha">
+              <label class="kair-field__label" for="ind-fecha">Fecha de la inducción <em>*</em></label>
+              <input type="date" id="ind-fecha">
+              <span class="kair-field__error">Selecciona la fecha.</span>
+            </div>
+          </div>
+        </div>
+        <div class="kair-form-block">
+          <div class="kair-form-block__title">Resultado de la evaluación</div>
+          <div class="kair-form-block__desc">Puntaje de la evaluación sobre 22 puntos.</div>
+          <div class="kair-form-grid">
+            <div class="kair-field" id="fw-puntaje">
+              <label class="kair-field__label" for="ind-puntaje">Puntaje <em>*</em></label>
+              <input type="number" id="ind-puntaje" placeholder="0 – 22" min="0" max="22" step="1" inputmode="numeric">
+              <span class="kair-field__error">El puntaje debe estar entre 0 y 22.</span>
+            </div>
+          </div>
+          <div class="kair-estado-preview">
+            <span class="kair-estado-preview__label" id="prev-text">Ingresa el puntaje para ver el resultado.</span>
+            <span class="kair-chip-tag" id="prev-chip" hidden><i></i><span id="prev-chip-text"></span></span>
+          </div>
+          <p class="kair-field__help" style="margin-top:9px">Se aprueba la inducción con 20 puntos o más (escala 0–22).</p>
+        </div>
+      </div>
+      <div class="kair-modal__foot">
+        <button type="button" class="kair-btn kair-btn--outline" data-close>Cancelar</button>
+        <button type="submit" class="kair-btn kair-btn--primary" id="btn-guardar-ind">Guardar</button>
+      </div>
+    </form>
+  </div>
 </div>
 
-<!-- MODAL: AGREGAR INDUCCIÓN -->
-<div class="k-modal-overlay" id="inductionModal">
-    <div class="k-modal">
-        <div class="k-modal-header">
-            <h3 class="k-modal-title" id="modalTitle">Nueva Inducción</h3>
-            <button class="k-btn k-btn-outline btn-close-modal" style="border:none;">
-                <i class="bi bi-x-lg"></i>
-            </button>
-        </div>
-        <div class="k-modal-body">
-            <form id="inductionForm">
-                <input type="hidden" id="edit-id">
-                <div style="margin-bottom: 1rem;">
-                    <label class="form-label">Fecha de Inducción</label>
-                    <input type="date" id="input-date" class="form-control" required>
-                </div>
-                <div style="margin-bottom: 1rem;">
-                    <label class="form-label">Nombre del Empleado</label>
-                    <input type="text" id="input-name" class="form-control" placeholder="Nombre completo" required>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                    <div>
-                        <label class="form-label">Cédula</label>
-                        <input type="text" id="input-idcard" class="form-control" placeholder="Número documento">
-                    </div>
-                    <div>
-                        <label class="form-label">Género</label>
-                        <select id="input-gender" class="form-control">
-                            <option value="Hombre">Hombre</option>
-                            <option value="Mujer">Mujer</option>
-                        </select>
-                    </div>
-                </div>
-                <div style="margin-bottom: 1rem;">
-                    <label class="form-label">Cargo</label>
-                    <select id="input-position" class="form-control">
-                        <option value="Supernumerario">Supernumerario</option>
-                        <option value="Cocina">Cocina</option>
-                        <option value="Operaria Integral">Operaria Integral</option>
-                        <option value="Técnico">Técnico</option>
-                        <option value="Mesera">Mesera</option>
-                        <option value="Portero">Portero</option>
-                        <option value="Administrativo">Administrativo</option>
-                    </select>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                    <div>
-                        <label class="form-label">Puntaje Obtenido</label>
-                        <input type="number" id="input-score" class="form-control" min="0" max="22" required>
-                    </div>
-                    <div>
-                        <label class="form-label">Estado</label>
-                        <select id="input-status" class="form-control">
-                            <option value="approved">Aprobado</option>
-                            <option value="failed">Reprobado</option>
-                        </select>
-                    </div>
-                </div>
-            </form>
-        </div>
-        <div class="k-modal-footer">
-            <button class="k-btn k-btn-outline btn-close-modal">Cancelar</button>
-            <button class="k-btn k-btn-primary" id="btn-save-induction">Guardar Registro</button>
-        </div>
-    </div>
+<!-- ===== TOASTS ===== -->
+<div class="kair-toasts" id="toasts" aria-live="polite"></div>
+
+<!-- ===== SKELETON DE ARRANQUE ===== -->
+<div class="kair-boot" id="ind-boot" aria-hidden="true">
+  <div class="kair-skel kair-skel--hero"></div>
+  <div class="kair-boot__kpis">
+    <div class="kair-skel"></div><div class="kair-skel"></div><div class="kair-skel"></div><div class="kair-skel"></div>
+  </div>
+  <div class="kair-boot__charts">
+    <div class="kair-skel"></div><div class="kair-skel"></div>
+  </div>
 </div>
+
