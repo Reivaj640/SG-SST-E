@@ -35,6 +35,7 @@ class RecursosHome {
         // Header (📦762 — minimal: solo breadcrumb + H1, escala fluido)
         const header = document.createElement('header');
         header.className = 'kair-page-header';
+        header.id = 'recursos-home-header';
         header.innerHTML = `
             <div class="kair-page-title-block">
                 <div class="kair-breadcrumb">
@@ -120,6 +121,17 @@ class RecursosHome {
                 flex-direction: column;
                 padding: 1.5rem;
                 overflow: hidden auto;
+            }
+
+            /* 📦763-fix — Header alineado con las tarjetas: el contenedor .gestion-integral-home
+               usa padding 1.5rem y .main-area añade 0.5rem de gutter derecho para el scrollbar.
+               El header compartido (.kair-page-header) usa márgenes vw variables que no coinciden
+               en modo ventana, así que se anula aquí con un scope exclusivo vía ID. */
+            #recursos-home-header {
+                margin: 0 0 clamp(20px, 2.4vw, 32px);
+                max-width: none;
+                padding: 0 calc(1.5rem + 0.5rem) 0 1.5rem;
+                box-sizing: border-box;
             }
 
             /* 📦768 — Forzar altura y flex en .k-app-layout para que el chain funcione.

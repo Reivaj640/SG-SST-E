@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>K+AIR | Objetivos y Metas SST - Política Vinculada</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <!-- 🎨 PREMIUM v1 — Design system compartido K+AIR -->
+    <link rel="stylesheet" href="../../../shared/kair-design-tokens.css">
+    <link rel="stylesheet" href="../../../shared/kair-components.css">
     <style>
         /* ═══════════════════════════════════════════════════════════════════════════
            VARIABLES CSS - SISTEMA VISUAL K+AIR
@@ -983,27 +986,85 @@ flex-shrink: 0;
 .k-stats-ribbon__divider { display: none; }
 .k-main-content { padding: 0.75rem; }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   PREMIUM v1 (2026-09-15) — Header sin tarjeta, hero + métricas,
+   leyenda/columnas/tabla con acabado premium (patrón aprobado).
+   ═══════════════════════════════════════════════════════════ */
+body { background: var(--kair-canvas, #fbfcfb); }
+
+/* HEADER — sin caja, breadcrumb + título */
+.pres-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.25rem 1.25rem 1.1rem; flex-shrink: 0; flex-wrap: wrap; width: 100%; max-width: 1800px; margin: 0 auto; box-sizing: border-box; }
+.pres-header__left { display: flex; align-items: center; gap: 0.9rem; min-width: 0; }
+.pres-header__icon { width: 44px; height: 44px; border-radius: 12px; background: #e3ecfb; color: var(--kair-blue, #2057b8); display: flex; align-items: center; justify-content: center; font-size: 1.15rem; flex-shrink: 0; }
+.pres-header__crumb { font-size: 11px; color: var(--kair-faint, #aab1bd); margin-bottom: 3px; }
+.pres-header__crumb span { padding: 0 4px; }
+.pres-header__title { margin: 0; font: 800 clamp(17px, 1.7vw, 23px)/1.15 var(--kair-font-display, 'Segoe UI'); letter-spacing: -0.03em; color: var(--kair-ink, #14213d); }
+.pres-header__sub { font-size: 0.8125rem; color: var(--kair-muted, #748096); margin: 2px 0 0 0; }
+.pres-header__right { display: flex; align-items: center; gap: 0.55rem; flex-wrap: wrap; }
+
+/* Botones del header — acabado premium */
+.header-back-btn, .k-refresh-auto-btn {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.55rem 1rem; border-radius: 10px; font-size: 0.8125rem; font-weight: 600;
+  color: #536177; background: #fff; border: 1px solid var(--kair-line, #e8ebee);
+  cursor: pointer; transition: all 0.18s; white-space: nowrap; font-family: var(--k-font-family);
+}
+.header-back-btn:hover, .k-refresh-auto-btn:hover { background: var(--kair-soft, #f3f6f6); color: var(--kair-blue, #2057b8); }
+.header-action--primary {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.55rem 1.05rem; border-radius: 10px; border: 0; font-size: 0.8125rem; font-weight: 700;
+  color: #fff; background: var(--kair-blue, #2057b8); cursor: pointer; transition: all 0.18s;
+  box-shadow: 0 8px 18px rgba(32, 87, 184, 0.15); white-space: nowrap; font-family: var(--k-font-family);
+}
+.header-action--primary:hover { background: #1a4ba0; }
+.k-sync-badge { border-radius: 999px; padding: 0.35rem 0.75rem; font-size: 0.7rem; font-weight: 700; }
+
+/* STRIP PREMIUM — hero (objetivos) + 2 métricas */
+.kair-premium-strip { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: clamp(10px, 1.2vw, 16px); margin-bottom: 1.1rem; flex-shrink: 0; }
+.kair-premium-strip .kair-metric-card { min-height: 0; justify-content: center; }
+.kair-premium-strip .kair-metric-value { margin-top: clamp(8px, 1vw, 14px); }
+.pres-hero-score { position: absolute; bottom: clamp(15px, 1.9vw, 24px); right: clamp(17px, 1.9vw, 25px); text-align: right; }
+.pres-hero-score .val { display: block; font: 800 clamp(22px, 2.4vw, 32px)/1 var(--kair-font-display, 'Segoe UI'); color: #fff; letter-spacing: -0.03em; }
+.pres-hero-score .lbl { display: block; font: 500 clamp(10px, 0.95vw, 12px) var(--kair-font-ui, 'Segoe UI'); color: #9eafc6; margin-top: 2px; }
+
+/* Leyenda — premium */
+.k-legend-bar { border: 1px solid var(--kair-line, #e8ebee); border-radius: 12px; box-shadow: 0 2px 7px rgba(37, 56, 82, 0.04); }
+
+/* Columnas — premium */
+.k-policy-column, .k-objectives-column { border-color: var(--kair-line, #e8ebee); border-radius: var(--kair-radius-card, 16px); box-shadow: 0 2px 7px rgba(37, 56, 82, 0.05); }
+.k-column-header { background: #fbfcfe; border-bottom: 1px solid var(--kair-line, #e8ebee); }
+.k-column-title { font-family: var(--kair-font-display, 'Segoe UI'); letter-spacing: -0.02em; }
+.k-column-title i { color: var(--kair-blue, #2057b8); }
+
+/* Tabla — premium */
+.k-data-table th { background: #fbfcfe; font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.6px; color: #8791a1; border-bottom: 1px solid var(--kair-line, #e8ebee); }
+.k-data-table tbody tr:hover { background: #f4f7fd; }
+.k-btn-success { background: var(--kair-mint, #1bb888); font-weight: 700; border-radius: 10px; }
+
+@media (max-width: 720px) { .kair-premium-strip { grid-template-columns: 1fr 1fr; } .kair-premium-strip .kair-hero-card { grid-column: 1 / -1; } }
+@media (max-width: 640px) { .kair-premium-strip { grid-template-columns: 1fr; } .pres-header__right { width: 100%; } }
     </style>
 </head>
 <body>
 
-    <!-- HEADER — Card k-section-card -->
-    <div class="k-section-card" style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem; margin-bottom:1.5rem; flex-shrink:0; flex-grow:0;">
-      <div style="display:flex; align-items:center; gap:0.75rem;">
-        <i class="bi bi-bullseye" style="color:#174ea6; font-size:1.25rem;"></i>
+    <!-- HEADER — Premium: sin tarjeta, breadcrumb + título -->
+    <div class="pres-header">
+      <div class="pres-header__left">
+        <div class="pres-header__icon"><i class="bi bi-bullseye"></i></div>
         <div>
-          <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Objetivos y Metas del SG-SST</h3>
-          <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Política vinculada y objetivos estratégicos SG-SST.</p>
+          <div class="pres-header__crumb">Gestión Integral<span>/</span>Objetivos y Metas</div>
+          <h1 class="pres-header__title">Objetivos y Metas del SG-SST</h1>
+          <p class="pres-header__sub">Política vinculada y objetivos estratégicos SG-SST.</p>
         </div>
       </div>
-      <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+      <div class="pres-header__right">
         <button class="k-refresh-auto-btn" onclick="refreshAutoResultados()" title="Recalcular resultados desde submódulos">
           <i class="bi bi-arrow-clockwise"></i> Recalcular
         </button>
         <span id="syncStatus" class="k-sync-badge k-sync-synced">
           <i class="bi bi-check-circle-fill"></i> Sincronizado
         </span>
-        <div style="width:1px; height:24px; background:#dee2e6;"></div>
         <button class="header-back-btn" onclick="backToModule()" title="Volver al módulo">
           <i class="bi bi-arrow-left"></i> Volver
         </button>
@@ -1016,31 +1077,25 @@ flex-shrink: 0;
     <!-- Main Content -->
     <main class="k-main-content">
 
-<!-- Franja de estadísticas compacta -->
-<div class="k-stats-ribbon">
-<div class="k-stats-ribbon__item">
-<span class="k-stats-ribbon__icon primary"><i class="bi bi-bullseye"></i></span>
-<div class="k-stats-ribbon__data">
-<span class="k-stats-ribbon__value" id="stat-objectives">0</span>
-<span class="k-stats-ribbon__label">Objetivos</span>
-</div>
-</div>
-<div class="k-stats-ribbon__divider"></div>
-<div class="k-stats-ribbon__item">
-<span class="k-stats-ribbon__icon success"><i class="bi bi-list-check"></i></span>
-<div class="k-stats-ribbon__data">
-<span class="k-stats-ribbon__value" id="stat-indicators">0</span>
-<span class="k-stats-ribbon__label">Indicadores</span>
-</div>
-</div>
-<div class="k-stats-ribbon__divider"></div>
-<div class="k-stats-ribbon__item">
-<span class="k-stats-ribbon__icon danger"><i class="bi bi-shield-check"></i></span>
-<div class="k-stats-ribbon__data">
-<span class="k-stats-ribbon__value" id="stat-security">0</span>
-<span class="k-stats-ribbon__label">Seguridad</span>
-</div>
-</div>
+<!-- Strip premium — Hero (Objetivos) + 2 métricas -->
+<div class="kair-premium-strip">
+  <div class="kair-hero-card">
+    <div class="kair-hero-eyebrow">Plan estratégico</div>
+    <h2>Objetivos del SG-SST</h2>
+    <p class="kair-hero-msg">Objetivos estratégicos vinculados a los principios de la política integral de SST.</p>
+    <div class="pres-hero-score">
+      <span class="val" id="stat-objectives">0</span>
+      <span class="lbl">objetivos definidos</span>
+    </div>
+  </div>
+  <div class="kair-metric-card">
+    <div class="kair-metric-head">Indicadores</div>
+    <div class="kair-metric-value" id="stat-indicators">0</div>
+  </div>
+  <div class="kair-metric-card">
+    <div class="kair-metric-head">Seguridad</div>
+    <div class="kair-metric-value" id="stat-security">0</div>
+  </div>
 </div>
 
         <!-- Leyenda -->

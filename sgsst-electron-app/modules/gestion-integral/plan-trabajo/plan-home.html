@@ -6,441 +6,262 @@
     <title>K+AIR | Portal Plan de Trabajo</title>
     <!-- Iconos -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Fuentes -->
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet">
-    
+    <link rel="stylesheet" href="../../../shared/kair-design-tokens.css">
+    <link rel="stylesheet" href="../../../shared/kair-components.css">
+
     <style>
-        /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-           SISTEMA VISUAL OFICIAL (K+AIR)
-           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-        :root {
-            --primary: #174ea6;
-            --primary-hover: #185abd;
-            --primary-light: #e8f0fe;
-            --success: #28a745;
-            --warning: #ffc107;
-            --danger: #dc3545;
-            --info: #17a2b8;
-            --text-dark: #212529;
-            --text-muted: #6c757d;
-            --bg-body: #f0f2f5;
-            --bg-card: #ffffff;
-            --border: #dee2e6;
-            --radius: 0.5rem;
-            --shadow-lg: 0 10px 25px rgba(0,0,0,0.05);
-        }
-
         * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
-        
+
         body {
-            font-family: 'Roboto', sans-serif;
-            background-color: var(--bg-body);
-            color: var(--text-dark);
+            font-family: var(--kair-font-ui, 'Manrope'), 'Segoe UI', sans-serif;
+            background: var(--kair-canvas, #fbfcfb);
+            color: var(--kair-ink, #14213d);
             font-size: 1rem;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
+            min-height: 100vh;
         }
 
-        /* PORTAL CONTENEDOR PRINCIPAL */
-        .portal-container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 2rem;
-            overflow-y: auto;
+        /* ═══════════ PORTAL PLAN DE TRABAJO — PREMIUM v1 ═══════════ */
+        .plan-portal {
+            padding: clamp(16px, 2vw, 28px);
+            animation: planFadeIn 0.4s ease-out;
         }
 
-        .portal-card {
-            background: white;
-            width: 100%;
-            max-width: 1100px;
-            border-radius: var(--radius);
-            box-shadow: var(--shadow-lg);
-            padding: 3rem;
-            text-align: center;
-            animation: fadeIn 0.5s ease-out;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
+        @keyframes planFadeIn {
+            from { opacity: 0; transform: translateY(12px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* BARRA SUPERIOR INTERNA DEL PORTAL */
-        .portal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-            padding-bottom: 1.5rem;
-            border-bottom: 1px solid #f1f3f5;
+        /* Header premium — sin caja, breadcrumb + título */
+        .plan-portal__top {
+            display: flex; align-items: flex-start; justify-content: space-between;
+            gap: 1rem; flex-wrap: wrap;
+            width: 100%; max-width: 1400px; margin: 0 auto clamp(18px, 2.2vw, 30px);
+            box-sizing: border-box;
         }
+        .plan-portal__top-left { display: flex; align-items: center; gap: 0.9rem; min-width: 0; }
+        .plan-portal__top-icon {
+            width: 44px; height: 44px; border-radius: 12px;
+            background: #e3ecfb; color: var(--kair-blue, #2057b8);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.15rem; flex-shrink: 0;
+        }
+        .plan-portal__crumb { font-size: 11px; color: var(--kair-faint, #aab1bd); margin-bottom: 3px; }
+        .plan-portal__crumb span { padding: 0 4px; }
+        .plan-portal__title {
+            margin: 0; font: 800 clamp(20px, 2.2vw, 30px)/1.12 var(--kair-font-display, 'DM Sans');
+            letter-spacing: -0.04em; color: var(--kair-ink, #14213d);
+        }
+        .plan-portal__sub {
+            color: var(--kair-muted, #748096); font-size: clamp(12px, 1vw, 14px);
+            margin: 5px 0 0 0; max-width: 640px; line-height: 1.55;
+        }
+        .plan-portal__top-right { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+        .plan-portal__pill {
+            display: inline-flex; align-items: center; gap: 6px;
+            font-size: 11px; font-weight: 700; padding: 8px 14px; border-radius: 10px;
+            background: #e4f7f0; color: #16805f; white-space: nowrap;
+        }
+        .plan-portal__back {
+            display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px;
+            font-size: 0.8125rem; font-weight: 600; color: #536177; cursor: pointer;
+            border-radius: 10px; transition: all 0.18s; background: #fff;
+            border: 1px solid var(--kair-line, #e8ebee); text-decoration: none;
+        }
+        .plan-portal__back:hover { background: var(--kair-soft, #f3f6f6); color: var(--kair-blue, #2057b8); }
 
-        .portal-logo {
-            font-family: 'Lexend', sans-serif;
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: var(--primary);
+        /* Acciones principales */
+        .plan-portal__main-actions {
+            display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem;
+            width: 100%; max-width: 1400px; margin: 0 auto;
+            box-sizing: border-box;
         }
-
-        .back-btn-internal {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 16px;
-            font-size: 0.9rem;
-            color: var(--text-muted);
-            text-decoration: none;
-            cursor: pointer;
-            border-radius: 6px;
-            transition: all 0.2s;
-            background: #f8f9fa;
-            border: 1px solid var(--border);
+        .plan-portal__main-action {
+            background: var(--kair-card, #fff);
+            border: 1px solid var(--kair-line, #e8ebee);
+            border-radius: var(--kair-radius-card, 20px);
+            box-shadow: 0 2px 7px rgba(37, 56, 82, 0.05);
+            padding: 1.6rem; cursor: pointer; transition: all 0.2s;
+            display: flex; align-items: center; gap: 1.1rem; text-align: left;
         }
-
-.back-btn-internal:hover,
-.back-btn-internal:focus,
-.back-btn-internal:active {
-  color: var(--primary);
-  background: var(--primary-light);
-  border-color: var(--primary);
-  text-decoration: none;
-}
-
-        .back-btn-internal i {
-            font-size: 0.85rem;
-        }
-
-        /* HERO SECTION */
-        .hero-title {
-            font-family: 'Lexend', sans-serif;
-            font-size: 2.5rem;
-            color: var(--text-dark);
-            margin-bottom: 0.5rem;
-        }
-        
-        .hero-subtitle {
-            color: var(--text-muted);
-            font-size: 1.1rem;
-            margin-bottom: 2.5rem;
-            max-width: 650px;
-            margin-left: auto;
-            margin-right: auto;
-            line-height: 1.6;
-        }
-        
-        /* STATUS PILL */
-        .status-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 6px 18px;
-            border-radius: 20px;
-            background: #d4edda;
-            color: #155724;
-            font-size: 0.85rem;
-            font-weight: 600;
-            margin-bottom: 2rem;
-        }
-
-        /* BOTÓN PRINCIPAL - ENTRADA AL CRONOGRAMA */
-        .main-action-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 12px;
-            padding: 1rem 3rem;
-            font-size: 1.1rem;
-            font-weight: 600;
-            background-color: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 50px;
-            cursor: pointer;
-            transition: all 0.3s;
-            box-shadow: 0 5px 15px rgba(23, 78, 166, 0.3);
-        }
-        
-        .main-action-btn:hover {
-            background-color: var(--primary-hover);
+        .plan-portal__main-action:hover {
             transform: translateY(-3px);
-            box-shadow: 0 8px 20px rgba(23, 78, 166, 0.4);
+            box-shadow: 0 10px 24px rgba(28, 49, 92, 0.10);
+            border-color: #c8d7ef;
         }
-        .main-action-btn i { font-size: 1.3rem; }
+        .plan-portal__main-action--primary {
+            background: linear-gradient(135deg, var(--kair-blue, #2057b8) 0%, var(--kair-blue-ink, #172c4c) 100%);
+            border-color: transparent;
+        }
+        .plan-portal__main-action--primary:hover { border-color: transparent; box-shadow: 0 10px 24px rgba(23, 44, 76, 0.28); }
 
-        /* SECCIÓN DE ACCIONES RÁPIDAS */
-        .quick-actions {
-            margin-top: 3.5rem;
-            text-align: left;
+        .plan-portal__main-action-icon {
+            width: 48px; height: 48px; border-radius: 12px;
+            background: var(--kair-soft, #f3f6f6); color: var(--kair-blue, #2057b8);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.25rem; flex-shrink: 0;
         }
-        
-        .quick-actions-title {
-            font-size: 1.1rem;
-            font-weight: 600;
-            margin-bottom: 1.5rem;
-            color: var(--text-dark);
-            border-bottom: 2px solid #f1f3f5;
-            padding-bottom: 0.5rem;
-            display: inline-block;
+        .plan-portal__main-action--primary .plan-portal__main-action-icon {
+            background: rgba(255,255,255,0.16); color: #fff;
         }
+        .plan-portal__main-action-icon--success { background: #e4f7f0; color: #1bb888; }
 
-        .actions-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 1.25rem;
+        .plan-portal__action-title {
+            font: 700 0.98rem var(--kair-font-display, 'DM Sans');
+            letter-spacing: -0.02em; color: var(--kair-ink, #14213d); margin-bottom: 0.3rem;
         }
+        .plan-portal__main-action--primary .plan-portal__action-title { color: #fff; }
+        .plan-portal__action-desc { font-size: 0.82rem; color: var(--kair-muted, #748096); line-height: 1.5; }
+        .plan-portal__main-action--primary .plan-portal__action-desc { color: rgba(255,255,255,0.82); }
 
-        .action-card {
-            background: #f8f9fa;
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 1.5rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-            text-align: left;
+        /* Herramientas */
+        .plan-portal__quick-actions {
+            width: 100%; max-width: 1400px; margin: clamp(22px, 2.6vw, 36px) auto 0;
+            box-sizing: border-box;
         }
-        
-        .action-card:hover {
-            border-color: var(--primary);
-            background: white;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+        .plan-portal__quick-actions-title {
+            font: 700 clamp(14px, 1.3vw, 17px) var(--kair-font-display, 'DM Sans');
+            letter-spacing: -0.03em; color: var(--kair-ink, #14213d);
+            margin-bottom: clamp(12px, 1.3vw, 18px);
+        }
+        .plan-portal__actions-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem;
+        }
+        .plan-portal__action-card {
+            background: var(--kair-card, #fff);
+            border: 1px solid var(--kair-line, #e8ebee);
+            border-radius: 16px;
+            box-shadow: 0 2px 7px rgba(37, 56, 82, 0.04);
+            padding: 1.25rem; cursor: pointer; transition: all 0.2s;
+            display: flex; flex-direction: column; align-items: flex-start; text-align: left;
+        }
+        .plan-portal__action-card:hover {
+            border-color: #c8d7ef; background: #fff;
+            box-shadow: 0 8px 20px rgba(28, 49, 92, 0.07);
             transform: translateY(-3px);
         }
+        .plan-portal__action-icon {
+            width: 40px; height: 40px; border-radius: 10px;
+            background: var(--kair-soft, #f3f6f6); color: var(--kair-blue, #2057b8);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.05rem; margin-bottom: 0.85rem;
+        }
+        .plan-portal__action-icon--success { background: #e4f7f0; color: #1bb888; }
+        .plan-portal__action-icon--warning { background: #fdf3e0; color: #d99a1f; }
+        .plan-portal__action-icon--danger  { background: #fdeaea; color: #d84c4c; }
+        .plan-portal__action-icon--info    { background: #e3ecfb; color: #2057b8; }
+        .plan-portal__action-icon--muted   { background: var(--kair-soft, #f3f6f6); color: #748096; }
+        .plan-portal__action-card .plan-portal__action-title { font-size: 0.9rem; }
 
-        .action-icon {
-            width: 42px;
-            height: 42px;
-            border-radius: 8px;
-            background: white;
-            color: var(--primary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2rem;
-            margin-bottom: 1rem;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-        
-        .action-title {
-            font-weight: 600;
-            font-size: 0.95rem;
-            margin-bottom: 0.25rem;
-            color: var(--text-dark);
-        }
-        
-        .action-desc {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            line-height: 1.4;
-        }
-
-        /* COLORES ESPECIALES POR ACCIÓN */
-        .action-icon.success { color: var(--success); }
-        .action-icon.warning { color: var(--warning); }
-        .action-icon.danger { color: var(--danger); }
-        .action-icon.info { color: var(--info); }
-        .action-icon.muted { color: var(--text-muted); }
-
-        /* GRID PRINCIPAL DE ACCIONES */
-        .main-actions {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-
-        .main-action-card {
-            background: white;
-            border: 2px solid var(--border);
-            border-radius: var(--radius);
-            padding: 2rem;
-            cursor: pointer;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            gap: 1.25rem;
-            text-align: left;
-        }
-        
-        .main-action-card:hover {
-            border-color: var(--primary);
-            box-shadow: 0 5px 20px rgba(23, 78, 166, 0.1);
-            transform: translateY(-2px);
-        }
-        
-        .main-action-card.primary {
-            background: linear-gradient(135deg, var(--primary) 0%, #2d5dc7 100%);
-            border-color: var(--primary);
-            color: white;
-        }
-        
-        .main-action-card.primary:hover {
-            box-shadow: 0 8px 25px rgba(23, 78, 166, 0.35);
-        }
-        
-        .main-action-card.primary .action-title,
-        .main-action-card.primary .action-desc {
-            color: white;
-        }
-        
-        .main-action-card.primary .action-icon {
-            background: rgba(255,255,255,0.2);
-            color: white;
-        }
-
-        .main-action-icon {
-            width: 50px;
-            height: 50px;
-            border-radius: 10px;
-            background: #f1f3f5;
-            color: var(--primary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.4rem;
-            flex-shrink: 0;
-        }
-
-        .main-action-content .action-title {
-            font-size: 1.05rem;
-            margin-bottom: 0.35rem;
-        }
-        
-        .main-action-content .action-desc {
-            font-size: 0.85rem;
-        }
-
-        /* RESPONSIVE */
+        /* Responsive */
         @media (max-width: 768px) {
-            .main-actions {
-                grid-template-columns: 1fr;
-            }
-            .hero-title {
-                font-size: 1.8rem;
-            }
-            .portal-card {
-                padding: 2rem 1.5rem;
-            }
-            .portal-header {
-                flex-direction: column;
-                gap: 1rem;
-            }
+            .plan-portal__main-actions { grid-template-columns: 1fr; }
+            .plan-portal__top { flex-direction: column; }
         }
     </style>
 </head>
 <body>
 
-    <!-- PORTAL CONTENT (SIN TOP BAR EXTERNO) -->
-    <div class="portal-container">
-        <div class="portal-card">
-            
-            <!-- BARRA SUPERIOR INTERNA -->
-            <div class="portal-header">
-                <div class="portal-logo">K+<span>AIR</span></div>
-                <a class="back-btn-internal" onclick="goBackToModule()">
-                    <i class="fas fa-arrow-left"></i>
-                    <span>Volver al Menú</span>
-                </a>
+<div class="plan-portal">
+
+    <!-- HEADER PREMIUM — sin caja, breadcrumb + título -->
+    <div class="plan-portal__top">
+        <div class="plan-portal__top-left">
+            <div class="plan-portal__top-icon"><i class="fas fa-calendar-check"></i></div>
+            <div>
+                <div class="plan-portal__crumb">Gestión Integral<span>/</span>Plan de Trabajo Anual</div>
+                <h1 class="plan-portal__title">Plan de Trabajo Anual SST</h1>
+                <p class="plan-portal__sub">Planificación anual del Sistema de Gestión: acceda al cronograma detallado, importe actividades desde Excel y genere informes ejecutivos.</p>
+            </div>
+        </div>
+        <div class="plan-portal__top-right">
+            <span class="plan-portal__pill"><i class="fas fa-check-circle"></i> Año Activo: <span id="activeYear">2025</span></span>
+            <a class="plan-portal__back" onclick="goBackToModule()">
+                <i class="fas fa-arrow-left"></i>
+                <span>Volver al Menú</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- ACCIONES PRINCIPALES -->
+    <div class="plan-portal__main-actions">
+
+        <!-- VER PLAN DE TRABAJO -->
+        <div class="plan-portal__main-action plan-portal__main-action--primary" onclick="enterCronograma()">
+            <div class="plan-portal__main-action-icon">
+                <i class="fas fa-calendar-check"></i>
+            </div>
+            <div class="plan-portal__main-action-content">
+                <div class="plan-portal__action-title">Ver Plan de Trabajo</div>
+                <div class="plan-portal__action-desc">Acceder al cronograma completo con vista de árbol, Gantt y editor mensual.</div>
+            </div>
+        </div>
+
+        <!-- IMPORTAR DESDE EXCEL -->
+        <div class="plan-portal__main-action" onclick="importFromExcel()">
+            <div class="plan-portal__main-action-icon plan-portal__main-action-icon--success">
+                <i class="fas fa-file-excel"></i>
+            </div>
+            <div class="plan-portal__main-action-content">
+                <div class="plan-portal__action-title">Importar desde Excel</div>
+                <div class="plan-portal__action-desc">Cargar actividades desde un archivo Excel compatible con la plantilla oficial.</div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- HERRAMIENTAS Y CONFIGURACIÓN -->
+    <div class="plan-portal__quick-actions">
+        <div class="plan-portal__quick-actions-title">Gestión y Configuración</div>
+
+        <div class="plan-portal__actions-grid">
+
+            <!-- EXPORTAR PLAN -->
+            <div class="plan-portal__action-card" onclick="exportPlan()">
+                <div class="plan-portal__action-icon plan-portal__action-icon--success"><i class="fas fa-file-export"></i></div>
+                <div class="plan-portal__action-title">Exportar Plan</div>
+                <div class="plan-portal__action-desc">Generar archivo Excel o PDF del plan de trabajo vigente.</div>
             </div>
 
-            <!-- STATUS PILL -->
-            <div class="status-pill">
-                <i class="fas fa-check-circle"></i> Año Activo: <span id="activeYear">2025</span>
+            <!-- PRESUPUESTO -->
+            <div class="plan-portal__action-card" onclick="openPresupuesto()">
+                <div class="plan-portal__action-icon plan-portal__action-icon--warning"><i class="fas fa-coins"></i></div>
+                <div class="plan-portal__action-title">Presupuesto Asignado</div>
+                <div class="plan-portal__action-desc">Definir y ajustar el presupuesto financiero para el año.</div>
             </div>
 
-            <!-- HERO -->
-            <h1 class="hero-title">Plan de Trabajo Anual SST</h1>
-            <p class="hero-subtitle">
-                Bienvenido al módulo de planificación. Desde aquí puedes acceder al cronograma detallado, configurar el presupuesto o generar informes ejecutivos para la gestión de Seguridad y Salud en el Trabajo.
-            </p>
-
-            <!-- ACCIONES PRINCIPALES -->
-            <div class="main-actions">
-                
-                <!-- VER PLAN DE TRABAJO -->
-                <div class="main-action-card primary" onclick="enterCronograma()">
-                    <div class="main-action-icon">
-                        <i class="fas fa-calendar-check"></i>
-                    </div>
-                    <div class="main-action-content">
-                        <div class="action-title">Ver Plan de Trabajo</div>
-                        <div class="action-desc">Acceder al cronograma completo con vista de árbol, Gantt y editor mensual.</div>
-                    </div>
-                </div>
-
-                <!-- IMPORTAR DESDE EXCEL -->
-                <div class="main-action-card" onclick="importFromExcel()">
-                    <div class="main-action-icon" style="background: #e8f5e9; color: #28a745;">
-                        <i class="fas fa-file-excel"></i>
-                    </div>
-                    <div class="main-action-content">
-                        <div class="action-title">Importar desde Excel</div>
-                        <div class="action-desc">Cargar actividades desde un archivo Excel compatible con la plantilla oficial.</div>
-                    </div>
-                </div>
-
+            <!-- CLONAR PLAN -->
+            <div class="plan-portal__action-card" onclick="clonePlan()">
+                <div class="plan-portal__action-icon"><i class="fas fa-copy"></i></div>
+                <div class="plan-portal__action-title">Clonar Plan</div>
+                <div class="plan-portal__action-desc">Crear un nuevo año tomando como base el plan actual.</div>
             </div>
 
-            <!-- GRID DE OPCIONES SECUNDARIAS -->
-            <div class="quick-actions">
-                <div class="quick-actions-title">Gestión y Configuración</div>
-                
-                <div class="actions-grid">
-                    
-                    <!-- EXPORTAR PLAN -->
-                    <div class="action-card" onclick="exportPlan()">
-                        <div class="action-icon success"><i class="fas fa-file-export"></i></div>
-                        <div class="action-title">Exportar Plan</div>
-                        <div class="action-desc">Generar archivo Excel o PDF del plan de trabajo vigente.</div>
-                    </div>
+            <!-- CONFIGURACIÓN DE PERÍODO -->
+            <div class="plan-portal__action-card" onclick="openConfigPeriodo()">
+                <div class="plan-portal__action-icon plan-portal__action-icon--muted"><i class="fas fa-calendar-alt"></i></div>
+                <div class="plan-portal__action-title">Configuración de Período</div>
+                <div class="plan-portal__action-desc">Ajustar días festivos, horarios laborales y ciclos.</div>
+            </div>
 
-                    <!-- PRESUPUESTO -->
-                    <div class="action-card" onclick="openPresupuesto()">
-                        <div class="action-icon warning"><i class="fas fa-coins"></i></div>
-                        <div class="action-title">Presupuesto Asignado</div>
-                        <div class="action-desc">Definir y ajustar el presupuesto financiero para el año.</div>
-                    </div>
+            <!-- INFORME GERENCIAL -->
+            <div class="plan-portal__action-card" onclick="generateInforme()">
+                <div class="plan-portal__action-icon plan-portal__action-icon--danger"><i class="fas fa-file-pdf"></i></div>
+                <div class="plan-portal__action-title">Informe Gerencial</div>
+                <div class="plan-portal__action-desc">Descargar resumen ejecutivo en PDF del estado actual.</div>
+            </div>
 
-                    <!-- CLONAR PLAN -->
-                    <div class="action-card" onclick="clonePlan()">
-                        <div class="action-icon"><i class="fas fa-copy"></i></div>
-                        <div class="action-title">Clonar Plan</div>
-                        <div class="action-desc">Crear un nuevo año tomando como base el plan actual.</div>
-                    </div>
-
-                    <!-- CONFIGURACIÓN DE PERÍODO -->
-                    <div class="action-card" onclick="openConfigPeriodo()">
-                        <div class="action-icon muted"><i class="fas fa-calendar-alt"></i></div>
-                        <div class="action-title">Configuración de Período</div>
-                        <div class="action-desc">Ajustar días festivos, horarios laborales y ciclos.</div>
-                    </div>
-
-                    <!-- INFORME GERENCIAL -->
-                    <div class="action-card" onclick="generateInforme()">
-                        <div class="action-icon danger"><i class="fas fa-file-pdf"></i></div>
-                        <div class="action-title">Informe Gerencial</div>
-                        <div class="action-desc">Descargar resumen ejecutivo en PDF del estado actual.</div>
-                    </div>
-
-                    <!-- RESPONSABLES -->
-                    <div class="action-card" onclick="openResponsables()">
-                        <div class="action-icon info"><i class="fas fa-users-cog"></i></div>
-                        <div class="action-title">Responsables</div>
-                        <div class="action-desc">Asignar responsables por áreas sin entrar al detalle.</div>
-                    </div>
-
-                </div>
+            <!-- RESPONSABLES -->
+            <div class="plan-portal__action-card" onclick="openResponsables()">
+                <div class="plan-portal__action-icon plan-portal__action-icon--info"><i class="fas fa-users-cog"></i></div>
+                <div class="plan-portal__action-title">Responsables</div>
+                <div class="plan-portal__action-desc">Asignar responsables por áreas sin entrar al detalle.</div>
             </div>
 
         </div>
     </div>
 
-    <script src="plan-home.js"></script>
+</div>
+
+<script src="plan-home.js"></script>
 </body>
 </html>

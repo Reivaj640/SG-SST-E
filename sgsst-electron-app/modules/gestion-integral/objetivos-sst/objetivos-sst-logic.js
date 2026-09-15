@@ -29,7 +29,7 @@ class ObjetivosSSTComponent {
         iframe.style.border = 'none';
 
         // Pasar parámetros a la nueva interfaz a través de la URL
-        const viewerUrl = `modules/gestion-integral/objetivos-sst/objetivos-sst-view.html?company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
+        const viewerUrl = `modules/gestion-integral/objetivos-sst/objetivos-sst-view.html?v=OBJETIVOS-20260915-v4-fix-strip-720&company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
         iframe.src = viewerUrl;
         
         console.log('[objetivos-sst-logic.js][render] Iframe creado con src:', viewerUrl);

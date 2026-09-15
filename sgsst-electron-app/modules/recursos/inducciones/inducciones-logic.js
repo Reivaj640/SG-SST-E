@@ -8,7 +8,8 @@
    Regla de oro: estado derivado (puntaje>=20 aprueba); refreshAll() único.
    ═══════════════════════════════════════════════════════════════════ */
 
-var INDUC_TOKEN = 'INDUCCIONES-20260915-v9-strip-layout-fix';
+var INDUC_TOKEN = 'INDUCCIONES-20260915-v12-hero-textos-fix';
+console.log('%c[Inducciones] Versión cargada: ' + INDUC_TOKEN, 'color:#2057b8;font-weight:bold');
 
 /* ---------- 0. Logging + helpers puros (sin DOM) ---------- */
 function indLog(mod, acc, st, extra) {

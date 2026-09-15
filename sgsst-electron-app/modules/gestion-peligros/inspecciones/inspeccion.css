@@ -1092,14 +1092,14 @@
 /* ============================================================
  * HERO CTA (hub view)
  * ============================================================ */
-.kair-hero {
+.kair-app .kair-hero {
   display: flex;
   align-items: center;
   gap: var(--kair-sp-6);
   padding: var(--kair-sp-8);
   flex-wrap: wrap;
 }
-.kair-hero__icon {
+.kair-app .kair-hero__icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1110,12 +1110,12 @@
   color: var(--kair-primary);
   flex-shrink: 0;
 }
-.kair-hero__title {
+.kair-app .kair-hero__title {
   font-size: var(--kair-fs-title-xl);
   font-weight: 600;
   color: var(--kair-text);
 }
-.kair-hero__desc {
+.kair-app .kair-hero__desc {
   font-size: 0.9rem;
   color: var(--kair-text-muted);
   margin-top: 6px;
