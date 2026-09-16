@@ -1388,3 +1388,55 @@ Si alguno da FAIL, parar y revisar antes de commitear. Los 2 fails preexistentes
 - ❌ NO borrar la tabla `gh_eventos_personal` ni los CHECK constraints
 - ❌ NO usar `gh:update-personal` para transiciones de ciclo (es el bypass original)
 
+---
+
+## 🆕 Cascada CSS: fugas globales y blindaje por módulo (📦746, 2026-09-16)
+
+### El problema
+
+Los CSS de varios módulos se cargan **globalmente** en `index.html` y declaran clases **sin scope** (`.kair-card`, `.kair-kpi`, `.kair-chart`, `.kair-legend`, etc.). Esas reglas filtran propiedades a módulos que no las definen, y **ganan la cascada** porque el módulo destino **no declara esas propiedades** (la especificidad solo compite por propiedad declarada, no por regla completa).
+
+Síntoma real en Inducciones: las KPI cards salían **centradas** (en vez de alineadas a la izquierda), las barras de progreso **invisibles** (el contenedor se encogía a ancho 0), y los gráficos **cortados** (labels del eje X recortados + SVG estirado).
+
+### Fuentes que fugan (cargadas en `index.html` head)
+
+| Archivo | Clases globales | Propiedades que fugan |
+|---------|-----------------|----------------------|
+| `shared/kair-components.css` | `.kair-card`, `.kair-chart`, `.kair-chart svg`, `.kair-legend` | `height:clamp(130px,13vw,170px)`, `position:absolute;inset:0`, `padding`, `border-bottom`, `background` |
+| `modules/verificacion/revision-alta-direccion/revision-alta-direccion.css` | `.kair-kpi*`, `.kair-card*`, `.kair-tabs`, `.kair-toolbar` | `align-items:center`, `white-space:nowrap`, `overflow:hidden`, `padding`, `border-bottom`, `flex-wrap` |
+| `modules/gestion-peligros/inspecciones/inspeccion.css` | `.kair-card`, `.kair-card__body`, `.kair-select` | `padding`, `width:100%` |
+| `frecuencia/severidad-accidentalidad.css` (cargados dinámicamente por `renderer.js`) | `.kair-kpi`, `.kair-card` | `align-items:center`, `text-align:center`, `margin-bottom` |
+
+### Cómo diagnosticar una fuga
+
+```bash
+# 1. ¿Quién define la clase SIN scope?
+rg -n "^\.kair-card[ ,{]" --glob "*.css" | Where-Object { $_ -notmatch "inducciones" }
+# 2. ¿Qué CSS se carga siempre?
+rg -n "\.css" index.html
+# 3. ¿El módulo realmente usa la clase que voy a tocar?
+rg -n "<clase>" modules/<ruta>/ -g "*.js" -g "*.html"
+```
+
+### Fix aplicado (patrón de blindaje)
+
+1. **Blindaje en el módulo destino** (`modules/recursos/inducciones/inducciones-view.css`, bloque `BLINDAJE anti-fugas` al final): declarar **explícitamente** las propiedades que fugan, para que ganen por especificidad (2 clases vs 1). Cubre `overflow`, `margin-bottom`, `padding`, `border-bottom`, `flex-wrap`, `height`, `position`, `inset`, `align-items`, `text-align`, `white-space`.
+2. **Limpieza de dead code** en `revision-alta-direccion.css`: el módulo usa **solo** `.kair-rad-*`; se eliminaron las reglas globales `.kair-kpi*` y `.kair-card*` (verificado con `rg` que ningún JS/HTML del módulo las usa y que otros módulos tienen las suyas propias).
+
+### Reglas para futuros módulos
+
+- **Siempre** scopear las clases nuevas bajo el contenedor del módulo (`.inducciones-container`, `.kair-rad-*`, etc.).
+- **Nunca** declarar `.kair-card`, `.kair-kpi`, `.kair-chart`, `.kair-legend`, `.kair-tabs`, `.kair-toolbar` sin scope — son nombres genéricos compartidos.
+- Si un módulo sufre un desajuste visual inexplicable (centrados, recortes, alturas fijas, padding doble), **sospechar primero de una fuga global** y aplicar el patrón de blindaje.
+- Al eliminar reglas "muertas", verificar con `rg` que el módulo no las use **y** que las clases estén cubiertas en `shared/` o en el CSS propio de cada módulo que las use.
+
+### Cache-bust Inducciones
+
+Token actual: `INDUCCIONES-20260915-v21-chart-scope-fix`. Bumpear en 4 lugares:
+- `modules/recursos/inducciones/inducciones-view.html` (línea 1, `<link>`)
+- `modules/recursos/inducciones/inducciones-logic.js` (`INDUC_TOKEN`)
+- `index.html` (2 `<script>` tags)
+- `main/test-inducciones-premium-v2.js` (3 checks)
+
+Test: `node main/test-inducciones-premium-v2.js` → debe dar **87 OK**.
+

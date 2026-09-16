@@ -1,4 +1,4 @@
-<link rel="stylesheet" href="./modules/recursos/inducciones/inducciones-view.css?v=INDUCCIONES-20260915-v12-hero-textos-fix">
+<link rel="stylesheet" href="./modules/recursos/inducciones/inducciones-view.css?v=INDUCCIONES-20260915-v21-chart-scope-fix">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -114,49 +114,40 @@
       </div>
     </div>
 
-    <!-- KPIs (celdas del strip) -->
+    <!-- KPIs (celdas del strip) — label + chip de estado + valor + sub (📦746) -->
       <div class="kair-kpi">
         <div class="kair-kpi__top">
           <span class="kair-kpi__label">Total inducciones</span>
-          <span class="kair-chip" id="kpi-total-chip">2026</span>
+          <span class="kair-chip kair-chip--soft-slate" id="kpi-total-chip">—</span>
         </div>
-        <div>
-          <div class="kair-kpi__value" id="kpi-total">—</div>
-          <div class="kair-kpi__bar" style="margin-top:10px"><span class="kair-kpi__fill kair-kpi__fill--blue" id="kpi-total-bar"></span></div>
-          <div class="kair-kpi__sub" style="margin-top:7px" id="kpi-total-sub">Inducciones y reinducciones registradas</div>
-        </div>
+        <div class="kair-kpi__value" id="kpi-total">—</div>
+        <div class="kair-kpi__sub">Inducciones y reinducciones registradas</div>
       </div>
       <div class="kair-kpi">
         <div class="kair-kpi__top">
           <span class="kair-kpi__label">Aprobadas</span>
           <span class="kair-chip kair-chip--soft-green" id="kpi-apr-chip">—</span>
         </div>
-        <div>
-          <div class="kair-kpi__value" id="kpi-apr">—</div>
-          <div class="kair-kpi__bar" style="margin-top:10px"><span class="kair-kpi__fill kair-kpi__fill--green" id="kpi-apr-bar"></span></div>
-          <div class="kair-kpi__sub" style="margin-top:7px">Puntaje ≥ 20 / 22</div>
-        </div>
+        <div class="kair-kpi__value" id="kpi-apr">—</div>
+        <div class="kair-kpi__sub">Puntaje ≥ 20 / 22</div>
+        <div class="kair-kpi__bar"><span class="kair-kpi__fill kair-kpi__fill--green" id="kpi-apr-bar"></span></div>
       </div>
       <div class="kair-kpi">
         <div class="kair-kpi__top">
           <span class="kair-kpi__label">Reprobadas</span>
           <span class="kair-chip kair-chip--soft-red" id="kpi-rep-chip">—</span>
         </div>
-        <div>
-          <div class="kair-kpi__value" id="kpi-rep">—</div>
-          <div class="kair-kpi__bar" style="margin-top:10px"><span class="kair-kpi__fill kair-kpi__fill--red" id="kpi-rep-bar"></span></div>
-          <div class="kair-kpi__sub" style="margin-top:7px">Requieren reinducción</div>
-        </div>
+        <div class="kair-kpi__value" id="kpi-rep">—</div>
+        <div class="kair-kpi__sub">Requieren reinducción</div>
+        <div class="kair-kpi__bar"><span class="kair-kpi__fill kair-kpi__fill--red" id="kpi-rep-bar"></span></div>
       </div>
       <div class="kair-kpi">
         <div class="kair-kpi__top">
           <span class="kair-kpi__label">Promedio de puntaje</span>
-          <span class="kair-chip kair-chip--blue" id="kpi-prom-chip">/ 22</span>
+          <span class="kair-chip kair-chip--soft-green" id="kpi-prom-chip">—</span>
         </div>
-        <div>
-          <div class="kair-kpi__value" id="kpi-prom">—</div>
-          <div class="kair-kpi__sub" style="margin-top:auto" id="kpi-prom-sub">Rango de resultados —</div>
-        </div>
+        <div class="kair-kpi__value" id="kpi-prom">—</div>
+        <div class="kair-kpi__sub" id="kpi-prom-sub">Rango de resultados —</div>
       </div>
     </div>
 

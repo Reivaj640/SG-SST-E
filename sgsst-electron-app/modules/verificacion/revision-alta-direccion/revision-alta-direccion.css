@@ -111,72 +111,10 @@
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   2. KPI STRIP
+   2. KPI STRIP — [📦746] reglas .kair-kpi* eliminadas (dead code).
+   El módulo usa .kair-rad-kpi*; estas reglas globales filtraban
+   align-items:center + white-space:nowrap a otros módulos (Inducciones).
    ══════════════════════════════════════════════════════════════════════ */
-
-.kair-kpi-strip {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: var(--kair-space-3);
-  padding: var(--kair-space-4) var(--kair-space-6);
-}
-
-.kair-kpi {
-  display: flex;
-  align-items: center;
-  gap: var(--kair-space-3);
-  background: var(--kair-surface);
-  border: 1px solid var(--kair-border);
-  border-radius: var(--kair-radius);
-  padding: var(--kair-space-3) var(--kair-space-4);
-  box-shadow: var(--kair-shadow-sm);
-}
-
-.kair-kpi__icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1rem;
-  color: #fff;
-  flex-shrink: 0;
-}
-
-.kair-kpi__icon--primary { background: var(--kair-primary); }
-.kair-kpi__icon--success { background: var(--kair-success); }
-.kair-kpi__icon--warning { background: var(--kair-warning); }
-.kair-kpi__icon--danger { background: var(--kair-danger); }
-.kair-kpi__icon--info { background: var(--kair-info); }
-
-.kair-kpi__content {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.kair-kpi__value {
-  font-size: 1.5rem;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.kair-kpi__label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--kair-text-muted);
-  white-space: nowrap;
-}
-
-.kair-kpi__sub {
-  font-size: 11px;
-  color: var(--kair-text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 
 /* ══════════════════════════════════════════════════════════════════════
    3. TABS NAVIGATION
@@ -255,53 +193,9 @@
   display: block;
 }
 
-/* ── Card ─────────────────────────────────────────────────────────── */
-
-.kair-card {
-  background: var(--kair-surface);
-  border: 1px solid var(--kair-border);
-  border-radius: var(--kair-radius);
-  box-shadow: var(--kair-shadow-sm);
-  overflow: hidden;
-}
-
-.kair-card__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--kair-space-4) var(--kair-space-5);
-  border-bottom: 1px solid var(--kair-border);
-  flex-wrap: wrap;
-  gap: var(--kair-space-3);
-}
-
-.kair-card__title {
-  display: flex;
-  align-items: center;
-  gap: var(--kair-space-2);
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--kair-text);
-}
-
-.kair-card__title i {
-  color: var(--kair-primary);
-}
-
-.kair-card__tools {
-  display: flex;
-  align-items: center;
-  gap: var(--kair-space-3);
-  flex-wrap: wrap;
-}
-
-.kair-card__body {
-  padding: var(--kair-space-4) var(--kair-space-5);
-}
-
-.kair-card__body--flush {
-  padding: 0;
-}
+/* ── Card — [📦746] reglas .kair-card* eliminadas (dead code).
+   El módulo usa .kair-rad-*; estas reglas globales filtraban
+   overflow:hidden + padding + border-bottom + flex-wrap a Inducciones. ── */
 
 /* ── Toolbar ──────────────────────────────────────────────────────── */
 

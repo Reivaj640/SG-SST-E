@@ -132,13 +132,16 @@
 
 /* ================= 9. KPI CARDS ================= */
 .inducciones-container .kair-grid-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
-.inducciones-container .kair-kpi{background:var(--kair-surface);border:1px solid var(--kair-border);border-radius:20px;padding:20px 22px;display:flex;flex-direction:column;justify-content:space-between;gap:12px;min-height:158px;box-shadow:var(--kair-shadow)}
+.inducciones-container .kair-kpi{background:var(--kair-surface);border:1px solid var(--kair-border);border-radius:20px;padding:20px 22px;display:flex;flex-direction:column;align-items:stretch;text-align:left;gap:10px;min-height:158px;min-width:0;overflow:hidden;box-shadow:var(--kair-shadow)}
 .inducciones-container .kair-kpi__top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
-.inducciones-container .kair-kpi__label{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--kair-text-2)}
+.inducciones-container .kair-kpi__label{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--kair-text-2);line-height:1.35;min-width:0;white-space:normal;margin-top:0}
+.inducciones-container .kair-kpi__top .kair-chip{flex-shrink:0}
+/* Blindaje: neutralizar fugas de .kair-kpi globales (hover/last-child de otros módulos) */
+.inducciones-container .kair-kpi:hover{transform:none;box-shadow:var(--kair-shadow)}
+.inducciones-container .kair-kpi:last-child{border-right:1px solid var(--kair-border)}
 .inducciones-container .kair-kpi__value{font-family:var(--kair-font-title);font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1.05;color:var(--kair-text)}
-.inducciones-container .kair-kpi__value small{font-size:15px;font-weight:700;color:var(--kair-text-3);letter-spacing:0}
-.inducciones-container .kair-kpi__sub{font-size:12px;color:var(--kair-text-2);line-height:1.4;overflow-wrap:break-word;word-wrap:break-word}
-.inducciones-container .kair-kpi__bar{height:4px;border-radius:99px;background:var(--kair-track);overflow:hidden}
+.inducciones-container .kair-kpi__sub{font-size:12px;color:var(--kair-text-2);line-height:1.4;overflow-wrap:break-word;word-wrap:break-word;white-space:normal;overflow:visible;text-overflow:clip}
+.inducciones-container .kair-kpi__bar{height:5px;border-radius:99px;background:var(--kair-track);overflow:hidden;margin-top:auto}
 .inducciones-container .kair-kpi__fill{display:block;height:100%;border-radius:99px;width:0;transition:width 220ms cubic-bezier(.4,0,.2,1)}
 .inducciones-container .kair-kpi__fill--blue{background:var(--kair-blue)}
 .inducciones-container .kair-kpi__fill--green{background:var(--kair-green)}
@@ -391,6 +394,8 @@
 .inducciones-container .kair-hero--strip .kair-hero__meter{width:110px}
 .inducciones-container .kair-hero--strip .kair-hero__cta{margin-top:0;flex-shrink:1;min-width:0}
 .inducciones-container .kair-hero--strip .kair-btn--onnavy{height:30px;font-size:12px;max-width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Chips de estado dentro de los KPI del strip: compactos para no empujar el label */
+.inducciones-container .kair-hero-strip .kair-chip{height:24px;padding:0 10px;font-size:11px;letter-spacing:0}
 /* En ventana angosta las 5 siguen en una fila: se compacta contenido (no se colapsa) */
 @media (max-width:1500px){
 .inducciones-container .kair-hero-strip{gap:12px}
@@ -399,8 +404,10 @@
 .inducciones-container .kair-hero--strip .kair-hero__pct{font-size:26px}
 .inducciones-container .kair-hero--strip .kair-hero__meter{width:90px}
 .inducciones-container .kair-hero-strip .kair-kpi{padding:16px 18px;min-height:140px}
-.inducciones-container .kair-hero-strip .kair-kpi__top{flex-wrap:wrap;row-gap:6px}
-.inducciones-container .kair-hero-strip .kair-kpi__value{font-size:24px}
+.inducciones-container .kair-hero-strip .kair-kpi__top{flex-wrap:nowrap}
+.inducciones-container .kair-hero-strip .kair-kpi__value{font-size:26px}
+.inducciones-container .kair-hero-strip .kair-kpi__bar{height:6px}
+.inducciones-container .kair-hero-strip .kair-kpi__sub{font-size:11.5px}
 .inducciones-container .kair-hero-strip .kair-kpi__label{letter-spacing:.06em}
 .inducciones-container .kair-hero--strip .kair-hero__title{overflow-wrap:break-word}
 .inducciones-container .kair-hero--strip .kair-hero__sub{overflow-wrap:break-word}
@@ -414,7 +421,36 @@
 .inducciones-container .kair-hero-strip .kair-kpi__value{font-size:22px}
 .inducciones-container .kair-hero--strip .kair-hero__title{font-size:16px}
 }
+@media (max-width:1200px){
+/* Modo ventana (Electron minWidth=1024): 5 cards en línea con font-sizes reducidos.
+   Mantiene los 5 en línea (hero + 4 KPIs) sin reorganizar a 2 filas. */
+.inducciones-container .kair-hero-strip{grid-template-columns:minmax(180px,1fr) repeat(4,minmax(120px,1fr));gap:8px}
+.inducciones-container .kair-hero--strip{padding:14px 14px}
+.inducciones-container .kair-hero--strip .kair-hero__title{font-size:15px}
+.inducciones-container .kair-hero--strip .kair-hero__sub{font-size:11px;line-height:1.4}
+.inducciones-container .kair-hero--strip .kair-hero__pct{font-size:22px}
+.inducciones-container .kair-hero--strip .kair-hero__meter{width:70px}
+.inducciones-container .kair-hero-strip .kair-kpi{padding:12px 12px;min-height:0}
+.inducciones-container .kair-hero-strip .kair-kpi__top{gap:6px}
+.inducciones-container .kair-hero-strip .kair-kpi__label{font-size:9px;letter-spacing:.04em}
+.inducciones-container .kair-hero-strip .kair-kpi__value{font-size:19px;line-height:1.1}
+.inducciones-container .kair-hero-strip .kair-chip{font-size:10px;height:22px;padding:0 8px}
+.inducciones-container .kair-hero-strip .kair-kpi__sub{font-size:10px}
+}
 @media (max-width:760px){
 .inducciones-container .kair-hero-strip{grid-template-columns:1fr}
 .inducciones-container .kair-hero--strip{grid-column:auto}
 }
+
+/* ============ BLINDAJE anti-fugas de CSS global (cargado en index.html) ============
+   shared/kair-components.css, revision-alta-direccion.css, inspeccion.css y
+   frecuencia/severidad-accidentalidad.css declaran .kair-card/.kair-chart/.kair-legend
+   SIN scope y filtran overflow/height/padding/border/position a Inducciones.
+   Declaramos esas propiedades acá para que ganen por especificidad (2 clases). */
+.inducciones-container .kair-card{overflow:visible;margin-bottom:0}
+.inducciones-container .kair-card__head{padding:0;border-bottom:none}
+.inducciones-container .kair-card__body{padding:0}
+.inducciones-container .kair-card__title{display:block}
+.inducciones-container .kair-chart{height:auto;border-bottom:none;background:none}
+.inducciones-container .kair-chart svg{position:static;inset:auto;height:auto}
+.inducciones-container .kair-legend{font-size:12px;color:var(--kair-text-2);padding-top:0}

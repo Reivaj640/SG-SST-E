@@ -74,7 +74,7 @@ class PlanTrabajoComponent {
     iframe.style.height = '100vh';
     iframe.style.border = 'none';
 
-    const viewerUrl = `./modules/gestion-integral/plan-trabajo/plan-view.html?v=PLAN-20260915-v1-premium&company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
+    const viewerUrl = `./modules/gestion-integral/plan-trabajo/plan-view.html?v=PLAN-20260916-v2-premium&company=${encodeURIComponent(this.companyName)}&module=${encodeURIComponent(this.moduleName)}&submodule=${encodeURIComponent(this.submoduleName)}`;
     iframe.src = viewerUrl;
 
     this.container.appendChild(iframe);

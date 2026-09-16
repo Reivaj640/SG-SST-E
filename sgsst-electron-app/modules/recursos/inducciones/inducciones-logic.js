@@ -8,7 +8,7 @@
    Regla de oro: estado derivado (puntaje>=20 aprueba); refreshAll() único.
    ═══════════════════════════════════════════════════════════════════ */
 
-var INDUC_TOKEN = 'INDUCCIONES-20260915-v12-hero-textos-fix';
+var INDUC_TOKEN = 'INDUCCIONES-20260915-v21-chart-scope-fix';
 console.log('%c[Inducciones] Versión cargada: ' + INDUC_TOKEN, 'color:#2057b8;font-weight:bold');
 
 /* ---------- 0. Logging + helpers puros (sin DOM) ---------- */
@@ -357,26 +357,23 @@ class InduccionesComponent {
   renderKpis(m) {
     var self = this;
     var q = function (s) { return self.q(s); };
-    var t = q('#kpi-total'); if (t) t.textContent = m.total;
-    var tc = q('#kpi-total-chip'); if (tc) tc.textContent = this._st.filters.anio === 'all' ? 'Todos' : this._st.filters.anio;
-    var ts = q('#kpi-total-sub');
-    if (ts) ts.textContent = m.total === 1 ? 'Inducción registrada' : 'Inducciones y reinducciones registradas';
-    var tb = q('#kpi-total-bar'); if (tb) tb.style.width = (m.total ? 100 : 0) + '%';
+    var t = q('#kpi-total'); if (t) t.textContent = m.total || '—';
+    var tchip = q('#kpi-total-chip');
+    if (tchip) tchip.textContent = this._st.filters.anio === 'all' ? 'Todos' : this._st.filters.anio;
     var pct = m.total ? Math.round(m.rate) : 0;
     var a = q('#kpi-apr'); if (a) a.textContent = m.apr;
-    var ac = q('#kpi-apr-chip'); if (ac) ac.textContent = m.total ? pct + '%' : '—';
+    var achip = q('#kpi-apr-chip'); if (achip) achip.textContent = m.total ? pct + '%' : '—%';
     var ab = q('#kpi-apr-bar'); if (ab) ab.style.width = pct + '%';
     var pctR = m.total ? Math.round(m.rep / m.total * 100) : 0;
     var rp = q('#kpi-rep'); if (rp) rp.textContent = m.rep;
-    var rc = q('#kpi-rep-chip'); if (rc) rc.textContent = m.total ? pctR + '%' : '—';
+    var rchip = q('#kpi-rep-chip'); if (rchip) rchip.textContent = m.total ? pctR + '%' : '—%';
     var rb = q('#kpi-rep-bar'); if (rb) rb.style.width = pctR + '%';
     var pr = q('#kpi-prom'); if (pr) pr.textContent = m.total ? m.avg.toFixed(1) : '—';
-    var chip = q('#kpi-prom-chip');
-    if (chip) {
-      if (!m.total) { chip.textContent = '/ ' + IND_PUNTAJE_MAX; chip.className = 'kair-chip kair-chip--blue'; }
-      else if (m.avg >= IND_UMBRAL_APR) { chip.textContent = 'Sobre la meta'; chip.className = 'kair-chip kair-chip--soft-green'; }
-      else if (m.avg >= 16) { chip.textContent = 'Zona media'; chip.className = 'kair-chip kair-chip--soft-amber'; }
-      else { chip.textContent = 'Bajo'; chip.className = 'kair-chip kair-chip--soft-red'; }
+    var pchip = q('#kpi-prom-chip');
+    if (pchip) {
+      var sobre = m.total && m.avg >= IND_UMBRAL_APR;
+      pchip.textContent = m.total ? (sobre ? 'Sobre la meta' : 'Bajo la meta') : '—';
+      pchip.className = 'kair-chip ' + (sobre ? 'kair-chip--soft-green' : 'kair-chip--soft-amber');
     }
     var ps = q('#kpi-prom-sub');
     if (ps) ps.textContent = m.total ? 'Rango de resultados ' + m.min + '–' + m.max : 'Rango de resultados —';

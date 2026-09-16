@@ -128,3 +128,10 @@ docs/superpowers/
 # en cada ejecución del tunnel y no deben commitearse.
 scripts/firma-tunnel/estado.txt
 scripts/firma-tunnel/logs/
+
+# 📦746 — Previews de referencia (PNGs generados para comparar diseños).
+# NO trackear: son de uso temporal del agente, se regeneran o quedan obsoletos.
+previews/
+# 📦746 — Archivos de referencia temporales (HTML/PDF copiados para comparar).
+_ref-*
+._*

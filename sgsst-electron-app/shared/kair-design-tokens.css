@@ -51,4 +51,39 @@
 
     /* Transiciones (animaciones discretas) */
     --kair-transition: 180ms ease-out;
+
+    /* =====================================================
+       Dialect extendido — submódulo Inducciones y similares
+       Tokens necesarios para .kair-hero-strip + .kair-kpi (chips con fondo suave,
+       barras de progreso, jerarquía de texto detallada). Conviven sin conflicto
+       con los tokens originales. Agregados en 📦739 (2026-09-15).
+       ===================================================== */
+
+    /* === Variantes "soft" para chips con fondo de color === */
+    --kair-blue-soft:  #eaf1fb;
+    --kair-blue-text:  #2057b8;
+    --kair-green-soft: #e6f5ef;
+    --kair-green-text: #1bb888;
+    --kair-green:      #1bb888;       /* alias de --kair-mint */
+    --kair-amber-soft: #fbf0db;
+    --kair-amber-text: #b07c1a;
+    --kair-red-soft:   #fae6e9;
+    --kair-red-text:   #da5563;
+    --kair-slate-soft: #f1f3f5;
+    --kair-slate:      #748096;
+    --kair-blue-light: #b5c8e3;       /* azul claro para barras de género */
+
+    /* === Jerarquía de texto detallada (entre ink y muted) === */
+    --kair-text:    #14213d;         /* alias de --kair-ink */
+    --kair-text-2:  #4d5b75;         /* texto secundario (entre ink y muted) */
+    --kair-text-3:  #98a2b3;         /* texto auxiliar (entre muted y faint) */
+
+    /* === Superficie + bordes + sombras === */
+    --kair-surface: #ffffff;         /* alias de --kair-card */
+    --kair-track:   #e8ebee;         /* track de barras de progreso (alias de --kair-line) */
+    --kair-shadow:  0 4px 14px rgba(37, 56, 82, 0.08);  /* sombra card estándar */
+
+    /* === Tipografía display + transition shorthand === */
+    --kair-font-title: 'Manrope', 'DM Sans', sans-serif;  /* alias de --kair-font-display */
+    --kair-t:         180ms ease-out;                     /* alias de --kair-transition */
 }
