@@ -4088,314 +4088,175 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
   mainCanvas.style.cssText = 'width: 100%; height: 100%; overflow: hidden;';
 
   // ==========================================
-  // DASHBOARD K+AIR - COMMAND CENTER
+  // DASHBOARD PREMIUM v2 (📦748)
+  // Estructura: breadcrumb + topbar + hero + KPIs + módulos + pendientes.
+  // CSS scopado bajo `.kair-dashboard` (styles.css). Datos reales del IPC.
   // ==========================================
 
+  // Iconos SVG (feather-style) + escape HTML locales al dashboard.
+  const DASH_ICO = {
+    grid: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>',
+    gridSm: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
+    building: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4M8 6h.01M16 6h.01M8 10h.01M16 10h.01M8 14h.01M16 14h.01"/></svg>',
+    refresh: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"/></svg>',
+    arrowDown: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>',
+    list: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',
+    calCheck: '<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M9 16l2 2 4-4"/></svg>',
+    arrow: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>'
+  };
+  const dashEsc = function (v) {
+    return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  };
+
   const dashboardContainer = document.createElement('div');
-  dashboardContainer.style.cssText = `
-    width: 100%;
-    height: 100%;
-    background: #f0f2f5;
-    font-family: 'Inter', sans-serif;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  `;
+  dashboardContainer.className = 'kair-dashboard';
+  dashboardContainer.id = 'kair-dashboard';
 
+  const dashPage = document.createElement('main');
+  dashPage.className = 'kair-page';
 
+  // --- Breadcrumb ---
+  const dashCrumb = document.createElement('nav');
+  dashCrumb.setAttribute('aria-label', 'Ruta de navegación');
+  dashCrumb.innerHTML = '<ol class="kair-breadcrumb"><li aria-current="page">Inicio</li></ol>';
+  dashPage.appendChild(dashCrumb);
 
-  // --- KPIs: k-stats-ribbon (estandar Capacitaciones/Inducciones) ---
-  const kpiRibbon = document.createElement('section');
-  kpiRibbon.className = 'k-stats-ribbon dashboard-kpi-ribbon';
-  kpiRibbon.style.cssText = 'margin: 20px 30px 0;';
+  // --- Topbar ---
+  const dashTopbar = document.createElement('div');
+  dashTopbar.className = 'kair-topbar';
+  dashTopbar.innerHTML =
+    '<div class="kair-module-id">' +
+      '<div class="kair-module-id__icon" aria-hidden="true">' + DASH_ICO.grid + '</div>' +
+      '<div>' +
+        '<h1 class="kair-module-id__title">Panel de Control</h1>' +
+        '<p class="kair-module-id__desc">Resumen general del estado del Sistema de Gestión SST.</p>' +
+      '</div>' +
+    '</div>' +
+    '<div class="kair-topbar__actions">' +
+      '<span class="kair-chip" id="chip-empresa" title="Empresa activa">' + DASH_ICO.building +
+        '<span id="chip-empresa-text">' + dashEsc(currentCompany || '—') + '</span>' +
+      '</span>' +
+      '<button type="button" class="kair-btn kair-btn--outline" id="btn-refresh-dash">' +
+        '<span id="btn-refresh-dash-icon">' + DASH_ICO.refresh + '</span> Actualizar' +
+      '</button>' +
+    '</div>';
+  dashPage.appendChild(dashTopbar);
 
-  const kpiItems = [
-    { id: 'kpi-accidents', icon: 'fa-shield-alt', label: 'Accidentes (Año)', colorClass: 'warning' },
-    { id: 'kpi-pric', icon: 'fa-user-injured', label: 'Casos PRIC Activos', colorClass: 'primary' },
-    { id: 'kpi-overdue', icon: 'fa-calendar-times', label: 'Documentos Vencidos', colorClass: 'danger' },
-    { id: 'kpi-compliance', icon: 'fa-chart-line', label: 'Plan de Trabajo', colorClass: 'success' }
-  ];
+  // --- Hero ---
+  const dashHero = document.createElement('article');
+  dashHero.className = 'kair-hero';
+  dashHero.id = 'hero';
+  dashHero.setAttribute('aria-live', 'polite');
+  dashHero.innerHTML =
+    '<span class="kair-hero__label">Estado General · SG-SST</span>' +
+    '<div class="kair-hero__row">' +
+      '<div>' +
+        '<h2 class="kair-hero__title" id="hero-title">—</h2>' +
+        '<p class="kair-hero__sub" id="hero-sub">—</p>' +
+        '<button type="button" class="kair-hero__cta" id="hero-cta">Ver pendientes y tareas ' + DASH_ICO.arrowDown + '</button>' +
+      '</div>' +
+      '<div class="kair-hero__aside">' +
+        '<span class="kair-hero__pct" id="hero-pct">—</span>' +
+        '<span class="kair-hero__pct-label" id="hero-pct-label">Frentes críticos</span>' +
+        '<span class="kair-hero__meter" aria-hidden="true"><span class="kair-hero__meter-fill" id="hero-meter"></span></span>' +
+      '</div>' +
+    '</div>';
+  dashPage.appendChild(dashHero);
 
-  kpiItems.forEach((kpi, index) => {
-    const item = document.createElement('div');
-    item.className = 'k-stats-ribbon__item';
-    item.innerHTML = `
-      <span class="k-stats-ribbon__icon ${kpi.colorClass}">
-        <i class="fas ${kpi.icon}"></i>
-      </span>
-      <div class="k-stats-ribbon__data">
-        <span class="k-stats-ribbon__value" id="${kpi.id}">-</span>
-        <span class="k-stats-ribbon__label">${kpi.label}</span>
-      </div>
-    `;
-    kpiRibbon.appendChild(item);
+  // --- KPIs (render JS) ---
+  const dashKpiSlot = document.createElement('section');
+  dashKpiSlot.className = 'kair-grid-kpis';
+  dashKpiSlot.id = 'kpi-slot';
+  dashKpiSlot.setAttribute('aria-label', 'Indicadores prioritarios');
+  dashPage.appendChild(dashKpiSlot);
 
-    if (index < kpiItems.length - 1) {
-      const divider = document.createElement('div');
-      divider.className = 'k-stats-ribbon__divider';
-      kpiRibbon.appendChild(divider);
-    }
-  });
+  // --- Módulos del Sistema ---
+  const dashModsSection = document.createElement('section');
+  dashModsSection.className = 'kair-card kair-section';
+  dashModsSection.innerHTML =
+    '<div class="kair-card__head kair-card__head--plain">' +
+      '<div>' +
+        '<h2 class="kair-card__title">' + DASH_ICO.gridSm + ' Módulos del Sistema</h2>' +
+        '<p class="kair-card__sub" id="mods-sub">Estado de los ciclos de gestión SG-SST.</p>' +
+      '</div>' +
+      '<span class="kair-chip kair-chip--soft-slate" id="mods-count">—</span>' +
+    '</div>' +
+    '<div class="kair-mod-grid" id="mod-grid" data-module-list="true"></div>';
+  dashPage.appendChild(dashModsSection);
 
-  dashboardContainer.appendChild(kpiRibbon);
+  // --- Pendientes y Tareas ---
+  const dashRadarSection = document.createElement('section');
+  dashRadarSection.className = 'kair-card kair-section';
+  dashRadarSection.id = 'sec-radar';
+  dashRadarSection.innerHTML =
+    '<div class="kair-card__head kair-card__head--plain" id="tasks-panel-header">' +
+      '<div>' +
+        '<h2 class="kair-card__title">' + DASH_ICO.list + ' Pendientes y Tareas</h2>' +
+        '<p class="kair-card__sub" id="radar-sub">—</p>' +
+      '</div>' +
+      '<div class="kair-seg" role="group" aria-label="Filtrar pendientes" id="seg-filtros">' +
+        '<button type="button" data-f="todos" class="is-active" aria-pressed="true">Todos <span class="kair-seg__n" id="n-todos">0</span></button>' +
+        '<button type="button" data-f="criticos" aria-pressed="false">Críticos <span class="kair-seg__n" id="n-criticos">0</span></button>' +
+        '<button type="button" data-f="hoy" aria-pressed="false">Hoy <span class="kair-seg__n" id="n-hoy">0</span></button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="kair-task-grid" id="tasks-container"></div>' +
+    '<div class="kair-empty is-hidden" id="task-empty">' +
+      '<span class="kair-empty__icon" aria-hidden="true">' + DASH_ICO.calCheck + '</span>' +
+      '<p class="kair-empty__title">Sin tareas para hoy</p>' +
+      '<p class="kair-empty__sub">No hay pendientes con vencimiento para hoy. Te recomendamos revisar los frentes críticos para priorizar la gestión.</p>' +
+      '<button type="button" class="kair-btn kair-btn--outline" id="btn-ver-todos">Ver todos los pendientes</button>' +
+    '</div>';
+  dashPage.appendChild(dashRadarSection);
 
-  // --- MAIN GRID ---
-  // 📦699 · FIX: layout reorganizado. Antes: 2 columnas (280px sidebar + 1fr tasks).
-  // Ahora: 2 filas (modulesRow horizontal + tasksPanel full-width). El sidebar de
-  // módulos pasa a ser una fila de cards compactas, y la lista de tareas ocupa
-  // todo el ancho debajo. Responsive con flex-wrap (módulos se acomodan a múltiples
-  // filas en ventanas angostas).
-  const mainGrid = document.createElement('div');
-  mainGrid.className = 'dashboard-main-grid';
-  mainGrid.style.cssText = `
-    flex: 1;
-    display: grid;
-    grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
-    gap: 16px;
-    padding: 10px 30px 20px;
-    min-height: 0;
-  `;
+  // --- Toasts ---
+  const dashToasts = document.createElement('div');
+  dashToasts.className = 'kair-toasts';
+  dashToasts.id = 'dash-toasts';
+  dashToasts.setAttribute('role', 'status');
+  dashToasts.setAttribute('aria-live', 'polite');
 
-  // --- PANEL DE MÓDULOS (fila horizontal) ---
-  const modulesPanel = document.createElement('section');
-  modulesPanel.className = 'dashboard-modules-panel';
-  modulesPanel.style.cssText = `
-    background: white;
-    border-radius: 8px;
-    border: 1px solid #e2e8f0;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  `;
-
-  const panelHeader = document.createElement('div');
-  panelHeader.className = 'dashboard-modules-header';
-  panelHeader.style.cssText = `
-    padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-size: 12px;
-    color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;
-    background: #f8fafc;
-    display: flex; align-items: center;
-  `;
-  panelHeader.innerHTML = '<i class="fas fa-th-large" style="margin-right: 8px; color: #174ea6;"></i>Módulos del Sistema';
-  modulesPanel.appendChild(panelHeader);
-
-  const moduleList = document.createElement('div');
-  moduleList.setAttribute('data-module-list', 'true');
-  moduleList.className = 'dashboard-modules-row';
-  moduleList.style.cssText = `
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    padding: 12px;
-    align-items: stretch;
-  `;
-
-  // 📦642 — Sin color por módulo. El SVG hereda currentColor del wrapper.
-  // 📦704 (2026-08-13) — shortName para el display del dashboard. El `name` largo
-  // se mantiene porque se usa como key en moduleMap, moduleTaskMap, etc. y
-  // como data-module-name / data-module en los handlers. Cambiar `name` directo
-  // rompería la lógica de filtrado, badges y match con el sidebar.
-  const modulesData = [
-    { name: 'Recursos',                       shortName: 'Recursos',                  subtitle: 'Capacitación, Roles',        icon: 'users',          badge: 'Cargando...', badgeClass: 'bg-orange', active: false },
-    { name: 'Gestión Integral',               shortName: 'Gest. Integral',            subtitle: 'Política, Planes',           icon: 'file_text',      badge: '-',          badgeClass: 'bg-green',  active: false },
-    { name: 'Gestión de la Salud',            shortName: 'Gest Salud',                subtitle: 'Ausentismo, AT, EL',         icon: 'heart_pulse',    badge: '-',          badgeClass: 'bg-green',  active: false },
-    { name: 'Gestión de Peligros y Riesgos',  shortName: 'Gest. Pel. y Riesgos',     subtitle: 'IPERC, Controles',           icon: 'alert_triangle', badge: '-',          badgeClass: null,       active: false },
-    { name: 'Gestión de Amenazas',            shortName: 'Gest. Amenazas',            subtitle: 'Emergencias',                icon: 'siren',          badge: '-',          badgeClass: null,       active: false },
-    { name: 'Verificación',                   shortName: 'Verificación',              subtitle: 'Auditorías',                 icon: 'shield_check',   badge: '-',          badgeClass: null,       active: false },
-    { name: 'Mejoramiento',                   shortName: 'Mejoramiento',              subtitle: 'Acciones Correctivas',       icon: 'trending_up',    badge: '-',          badgeClass: null,       active: false }
-  ];
-
-  modulesData.forEach(mod => {
-    const item = document.createElement('div');
-    item.setAttribute('data-module-name', mod.name);
-    item.className = 'dashboard-module-card';
-    item.style.cssText = `
-      display: flex; align-items: center; gap: 8px;
-      padding: 10px 12px; min-width: 160px; flex: 1 1 160px;
-      border-radius: 6px; cursor: pointer;
-      border: 1px solid #e2e8f0; transition: all 0.2s;
-      background: #f8fafc;
-    `;
-    item.onmouseover = function() {
-      const isActive = this.getAttribute('data-module-active') === 'true';
-      if (!isActive) { this.style.background = '#eff6ff'; this.style.borderColor = '#bfdbfe'; }
-    };
-    item.onmouseout = function() {
-      const isActive = this.getAttribute('data-module-active') === 'true';
-      if (!isActive) { this.style.background = '#f8fafc'; this.style.borderColor = '#e2e8f0'; }
-    };
-    item.onclick = function(e) {
-      e.stopPropagation();
-      filterDashboardTasksByModule(mod.name);
-    };
-
-    const badgeId = `module-badge-${mod.name.replace(/\s+/g, '-').toLowerCase()}`;
-    const badgeHtml = mod.badge ? `<span id="${badgeId}" data-module="${mod.name}" style="font-size: 10px; padding: 3px 8px; border-radius: 12px; font-weight: 600; background: ${getBadgeColor(mod.badgeClass)}; color: ${getBadgeTextColor(mod.badgeClass)}; cursor: pointer; border: 1px solid rgba(0,0,0,0.1); white-space: nowrap;" title="Click para ver alertas de ${mod.name}"><i class="fas fa-filter" style="font-size: 8px; margin-right: 3px;"></i>${mod.badge}</span>` : '';
-
-    item.innerHTML = `
-      <div style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 13px; color: #174ea6; flex-shrink: 0;">
-        ${SIDEBAR_ICONS[mod.icon] || ''}
-      </div>
-      <div style="flex: 1; min-width: 0; overflow: hidden;">
-        <h4 style="font-size: 12px; font-weight: 600; color: #1e293b; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${mod.name}">${mod.shortName || mod.name}</h4>
-        <span style="font-size: 10px; color: #94a3b8; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${mod.subtitle}</span>
-      </div>
-      ${badgeHtml}
-    `;
-
-    // Agregar event listener al badge para filtrar tareas
-    const badgeEl = item.querySelector(`#${badgeId}`);
-    if (badgeEl) {
-      badgeEl.onclick = function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        const moduleName = this.getAttribute('data-module');
-        filterDashboardTasksByModule(moduleName);
-      };
-    }
-
-    moduleList.appendChild(item);
-  });
-
-  modulesPanel.appendChild(moduleList);
-  mainGrid.appendChild(modulesPanel);
-
-  // --- PANEL DERECHO: TAREAS ---
-  const tasksPanel = document.createElement('main');
-  tasksPanel.style.cssText = `
-    background: white;
-    border-radius: 8px;
-    border: 1px solid #e2e8f0;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    min-height: 0;
-  `;
-
-  const tasksHeader = document.createElement('div');
-  tasksHeader.id = 'tasks-panel-header';
-  tasksHeader.style.cssText = `
-    padding: 15px 20px;
-    border-bottom: 1px solid #e2e8f0;
-    display: flex; justify-content: space-between; align-items: center;
-  `;
-  tasksHeader.innerHTML = `
-    <h2 style="font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; margin: 0;">
-      <i class="fas fa-tasks" style="color: #174ea6;"></i> Pendientes y Tareas
-    </h2>
-    <div style="display: flex; gap: 5px;">
-      <button class="filter-btn active" style="padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; background: #174ea6; color: white; border: none; cursor: pointer;">Todos</button>
-      <button class="filter-btn" style="padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; background: transparent; border: none; cursor: pointer; color: #64748b;">Críticos</button>
-      <button class="filter-btn" style="padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; background: transparent; border: none; cursor: pointer; color: #64748b;">Hoy</button>
-    </div>
-  `;
-  tasksPanel.appendChild(tasksHeader);
-
-  const tasksList = document.createElement('div');
-  // 📦699 · FIX v6: container con grid + grid-auto-rows mínimo de 60px.
-  // El problema en modo ventana era que el grid con `align-content: start`
-  // y sin `grid-auto-rows` mínimo colapsaba las cards a alturas muy pequeñas
-  // (~3-4px), mostrando solo el background+border-left como líneas finas.
-  // `grid-auto-rows: minmax(60px, auto)` fuerza a cada row a tener al menos
-  // 60px de altura, y `align-content: start` alinea las rows al top del
-  // container (con overflow-y: auto hace scroll si no caben).
-  tasksList.id = 'tasks-container';
-  tasksList.className = 'dashboard-tasks-grid';
-  tasksList.style.cssText = 'flex: 1; min-height: 0; overflow-y: auto; padding: 15px 20px; display: grid; grid-template-columns: 1fr; grid-auto-rows: minmax(60px, auto); gap: 10px; align-content: start;';
-  tasksList.innerHTML = `
-    <div style="text-align: center; padding: 40px; color: #94a3b8;">
-      <i class="fas fa-spinner fa-spin" style="font-size: 32px; margin-bottom: 10px;"></i>
-      <p>Cargando datos del dashboard...</p>
-    </div>
-  `;
-  tasksPanel.appendChild(tasksList);
-  mainGrid.appendChild(tasksPanel);
-  dashboardContainer.appendChild(mainGrid);
+  dashboardContainer.appendChild(dashPage);
+  dashboardContainer.appendChild(dashToasts);
   mainCanvas.appendChild(dashboardContainer);
   contentArea.appendChild(mainCanvas);
 
-  // Funciones auxiliares para colores
-  function getBadgeColor(cls) {
-    if (cls === 'bg-red') return '#fee2e2';
-    if (cls === 'bg-orange') return '#ffedd5';
-    if (cls === 'bg-green') return '#dcfce7';
-    return '#e0e7ff';
-  }
-  function getBadgeTextColor(cls) {
-    if (cls === 'bg-red') return '#b91c1c';
-    if (cls === 'bg-orange') return '#c2410c';
-    if (cls === 'bg-green') return '#166534';
-    return '#3730a3';
-  }
+  // --- Interacciones del dashboard ---
+  document.getElementById('btn-refresh-dash').addEventListener('click', function () {
+    var ic = document.getElementById('btn-refresh-dash-icon');
+    if (ic) { ic.style.transition = 'transform 650ms cubic-bezier(.4,0,.2,1)'; ic.style.transform = 'rotate(360deg)'; setTimeout(function () { ic.style.transition = 'none'; ic.style.transform = 'none'; }, 680); }
+    loadDashboardData();
+  });
+  document.getElementById('hero-cta').addEventListener('click', function () {
+    var s = document.getElementById('sec-radar');
+    if (s) s.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  document.getElementById('seg-filtros').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-f]');
+    if (!btn) return;
+    var f = btn.getAttribute('data-f');
+    this.querySelectorAll('button').forEach(function (b) {
+      var on = b === btn;
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    if (f === 'todos') { clearFilter(); }
+    else if (currentDashboardData) {
+      var list = currentDashboardData.tasks || [];
+      if (f === 'criticos') list = list.filter(function (t) { return (t.priority || '').toLowerCase() === 'critical'; });
+      if (f === 'hoy') list = list.filter(function (t) { return t.hoy === true; });
+      renderTasks(list);
+    }
+  });
+  document.getElementById('btn-ver-todos').addEventListener('click', function () {
+    var b = document.querySelector('#seg-filtros button[data-f="todos"]');
+    if (b) b.click();
+  });
 
-  // 📦699 · FIX: CSS responsivo para el dashboard reorganizado.
-  // En modo ventana angosta (< 1200px) los módulos se acomodan en filas más
-  // cortas y la cinta de KPIs se comprime. En modo maximizado (>= 1200px)
-  // los 7 módulos caben en una sola fila horizontal.
-  const dashboardResponsiveStyle = document.createElement('style');
-  dashboardResponsiveStyle.id = 'dashboard-responsive-style';
-  dashboardResponsiveStyle.textContent = `
-    /* Reforzar min-height del task card para evitar colapso en modo ventana.
-       El grid-auto-rows del inline style también lo protege, pero el
-       !important aquí es defensa adicional. */
-    .task-card { min-height: 60px !important; }
-    /* Modo ventana: módulos en 2 filas más compactos (sin descripción),
-       tasks en 2 columnas (auto-fit) para ver más cards sin scroll.
-       Font-sizes reducidos en task cards para que el texto quepa mejor. */
-    @media (max-width: 1199px) {
-      .dashboard-kpi-ribbon { margin: 12px 16px 0 !important; }
-      .dashboard-kpi-ribbon .k-stats-ribbon__value { font-size: 22px !important; }
-      .dashboard-kpi-ribbon .k-stats-ribbon__label { font-size: 11px !important; }
-      /* Reducir padding del mainGrid en ventana: 10/16/10 vs 10/30/20.
-         Eso le da ~20px más de altura al tasksPanel. */
-      .dashboard-main-grid { padding: 10px 16px !important; gap: 10px !important; }
-      .dashboard-modules-row { gap: 6px !important; padding: 8px !important; }
-      /* 📦704 (2026-08-13) — Módulos en ventana: min-width 135px (antes 220px)
-         para que los 7 quepan en 1 sola fila incluso en ventanas ~1000px de ancho.
-         Con títulos abreviados (Gest. Integral, Gest Salud, etc.) entran sin
-         cortarse. Si la ventana es muy chica (< ~1000px), flex-wrap los baja
-         a fila 2, pero el caso típico es ventana ~1100-1199px → 1 fila OK. */
-      .dashboard-module-card { min-width: 135px !important; flex: 1 1 135px !important; padding: 6px 8px !important; }
-      .dashboard-module-card h4 { font-size: 11px !important; line-height: 1.2 !important; }
-      /* Ocultar el subtitle (descripción) en ventana para ahorrar altura */
-      .dashboard-module-card span { display: none !important; }
-      .dashboard-module-card > div:first-child { width: 22px !important; height: 22px !important; font-size: 11px !important; }
-      /* Tasks en 2 columnas en ventana (auto-fit, minmax 280px). */
-      .dashboard-tasks-grid { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important; gap: 8px !important; }
-      /* Task card más compacto en ventana: padding y font reducidos */
-      .task-card { min-height: 60px !important; padding: 8px 10px !important; gap: 8px !important; }
-      /* Icon del task card */
-      .task-card > div:first-child { width: 28px !important; height: 28px !important; font-size: 12px !important; }
-      /* Tags (priority + submodule): font más pequeño */
-      .task-card .tag { font-size: 9px !important; padding: 1px 5px !important; }
-      /* Title (segundo div dentro del text container): font más pequeño */
-      .task-card > div:nth-child(2) > div:nth-child(2) { font-size: 12px !important; line-height: 1.2 !important; margin-bottom: 1px !important; }
-      /* Desc (tercer div dentro del text container): font más pequeño, 1 línea */
-      .task-card > div:nth-child(2) > div:nth-child(3) { font-size: 10px !important; line-height: 1.2 !important; -webkit-line-clamp: 1 !important; }
-      /* Action arrow */
-      .task-card > div:last-child { width: 28px !important; height: 28px !important; }
-      .task-card > div:last-child i { font-size: 11px !important; }
-    }
-    /* Modo maximizado: tasks en 2 columnas (auto-fit, minmax 380px), módulos en 1 fila */
-    @media (min-width: 1200px) {
-      .dashboard-modules-row { gap: 12px !important; }
-      /* 📦704 (2026-08-13) — Reducido de 165px a 140px para asegurar 1 sola fila
-         incluso con anchos de ventana ~1250px (borde del breakpoint). Con
-         títulos abreviados el texto entra sin cortarse. */
-      .dashboard-module-card { min-width: 140px !important; flex: 1 1 140px !important; }
-      .dashboard-tasks-grid { grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)) !important; gap: 10px !important; }
-    }
-    /* 📦699 · FIX v2: el highlight rojo de tareas críticas se hace con
-       border-left + background (igual que WARNING/INFO), sin pseudo-element
-       adicional que duplicaba la barra roja en el lateral izquierdo.
-       El background #fef2f2 + border #fecaca + border-left #ef4444 dan
-       suficiente distinción visual sin romper la consistencia con las
-       demás cards. */
-  `;
-  if (!document.getElementById('dashboard-responsive-style')) {
-    document.head.appendChild(dashboardResponsiveStyle);
-  }
+  // 📦748 — El responsive del dashboard premium vive en styles.css
+  // (bloque `.kair-dashboard`). Se eliminó el <style> legacy de 📦699.
 
   // ==========================================
   // CARGAR DATOS DINÁMICOS DEL DASHBOARD
@@ -4405,82 +4266,132 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
 
 // Función para cargar datos del dashboard
 async function loadDashboardData() {
-  console.log('🔍 [DASHBOARD] loadDashboardData INICIANDO para:', currentCompany);
-
-    const tasksContainer = document.getElementById('tasks-container');
-
-    console.log('🔍 [DASHBOARD] tasks-container:', tasksContainer);
-
+  console.log('[DASHBOARD] loadDashboardData INICIANDO para:', currentCompany);
+  const tasksContainer = document.getElementById('tasks-container');
   try {
-    console.log('🔍 [DASHBOARD] Llamando a window.electronAPI.getDashboardSummary...');
     const response = await window.electronAPI.getDashboardSummary(currentCompany);
-    console.log('🔍 [DASHBOARD] Respuesta recibida:', response);
-
     if (response.success && response.data) {
       const data = response.data;
-      
-      // Guardar datos para filtrado posterior
       currentDashboardData = data;
-      console.log('🔍 [DASHBOARD] Datos guardados en currentDashboardData:', data);
-      
-      console.log('🔍 [DASHBOARD] Datos procesados:', data);
-      console.log('🔍 [DASHBOARD] KPIs:', data.kpis);
-      console.log('🔍 [DASHBOARD] Tasks:', data.tasks);
-      console.log('🔍 [DASHBOARD] Module Status:', data.module_status);
-      console.log('🔍 [DASHBOARD] Recursos Alerts:', data.kpis?.recursos_alerts);
-
-      // Actualizar KPIs (k-stats-ribbon)
-      const kpiAccidents = document.getElementById('kpi-accidents');
-      const kpiPric = document.getElementById('kpi-pric');
-      const kpiOverdue = document.getElementById('kpi-overdue');
-      const kpiCompliance = document.getElementById('kpi-compliance');
-
-      if (kpiAccidents) kpiAccidents.textContent = data.kpis.accidents_year || '0';
-      if (kpiPric) kpiPric.textContent = data.kpis.pric_active || '0';
-      if (kpiOverdue) kpiOverdue.textContent = data.kpis.overdue_docs || '0';
-      if (kpiCompliance) kpiCompliance.textContent = (data.kpis.compliance || '0') + '%';
-
-      // Actualizar badge de notificaciones
-        const totalTasks = data.tasks ? data.tasks.length : 0;
-        console.log('🔍 [DASHBOARD] Total tasks:', totalTasks);
-
-        // Renderizar tareas
-      console.log('🔍 [DASHBOARD] Llamando a renderTasks()');
+      renderDashHero(data);
+      renderDashKpis(data);
+      renderDashModules(data);
       renderTasks(data.tasks || []);
-
-      // Actualizar badges de módulos
-      const recursosAlerts = data.kpis?.recursos_alerts || 0;
-      const gestionSaludAlerts = data.kpis?.gestion_salud_alerts || 0;
-      console.log('🔍 [DASHBOARD] Llamando a updateModuleBadges con recursos_alerts:', recursosAlerts, 'gestion_salud_alerts:', gestionSaludAlerts);
-        updateModuleBadges(data.module_status || {}, recursosAlerts, gestionSaludAlerts);
-
-        console.log('🔍 [DASHBOARD] loadDashboardData COMPLETADO');
-
+      updateModuleBadges(data.module_status || {}, data.kpis?.recursos_alerts || 0, data.kpis?.gestion_salud_alerts || 0);
+      updateFilterUI(null, (data.tasks || []).length);
+      console.log('[DASHBOARD] loadDashboardData COMPLETADO');
     } else {
       console.error('[DASHBOARD] Error en respuesta:', response.error);
       if (tasksContainer) {
-        tasksContainer.innerHTML = `
-          <div style="text-align: center; padding: 40px; color: #ef4444;">
-            <i class="fas fa-exclamation-triangle" style="font-size: 32px; margin-bottom: 10px;"></i>
-            <p>Error al cargar datos del dashboard</p>
-            <p style="font-size: 12px; margin-top: 5px;">${response.error || 'Error desconocido'}</p>
-          </div>
-        `;
+        tasksContainer.innerHTML = '<div class="kair-empty"><p class="kair-empty__title">Error al cargar datos</p><p class="kair-empty__sub">' + dashEsc(response.error || 'Error desconocido') + '</p></div>';
       }
     }
   } catch (error) {
     console.error('[DASHBOARD] Error crítico:', error);
-    console.error('[DASHBOARD] Stack:', error.stack);
     if (tasksContainer) {
-      tasksContainer.innerHTML = `
-        <div style="text-align: center; padding: 40px; color: #ef4444;">
-          <i class="fas fa-exclamation-triangle" style="font-size: 32px; margin-bottom: 10px;"></i>
-          <p>Error de conexión con el backend</p>
-          <p style="font-size: 12px; margin-top: 5px;">${error.message}</p>
-        </div>
-      `;
+      tasksContainer.innerHTML = '<div class="kair-empty"><p class="kair-empty__title">Error de conexión</p><p class="kair-empty__sub">' + dashEsc(error.message || '') + '</p></div>';
     }
   }
+}
+
+// 📦748 — Glifos SVG del dashboard premium (feather-style, sin dependencias)
+var DASH_GLYPH = {
+  activity: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
+  users: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+  filex: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9.5" y1="12.5" x2="14.5" y2="17.5"/><line x1="14.5" y1="12.5" x2="9.5" y2="17.5"/></svg>',
+  trend: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>',
+  modGrid: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
+  task: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',
+  arrow: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>',
+  info: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+  check: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+  warn: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>'
+};
+function dashEsc(v) {
+  return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+function renderDashHero(data) {
+  var tasks = data.tasks || [];
+  var crit = tasks.filter(function (t) { return (t.priority || '').toLowerCase() === 'critical'; }).length;
+  var k = data.kpis || {};
+  var acc = Number(k.accidents_year || 0);
+  var docs = Number(k.overdue_docs || 0);
+  var plan = Number(k.compliance || 0);
+  var titleEl = document.getElementById('hero-title');
+  var subEl = document.getElementById('hero-sub');
+  var pctEl = document.getElementById('hero-pct');
+  var meterEl = document.getElementById('hero-meter');
+  if (titleEl) titleEl.textContent = crit > 0
+    ? 'Tu sistema requiere atención: ' + crit + ' frentes críticos por gestionar'
+    : 'Tu sistema va por buen camino: no hay frentes críticos abiertos';
+  if (subEl) {
+    var sub = docs + ' documentos vencidos y ' + acc + (acc === 1 ? ' accidente reportado' : ' accidentes reportados') +
+      ' en el año. El plan de trabajo lleva ' + plan + '% de ejecución.';
+    if (crit > 0) { sub += ' Prioriza los ' + crit + ' frentes críticos para mantener la conformidad.'; }
+    subEl.textContent = sub;
+  }
+  if (pctEl) pctEl.textContent = String(crit);
+  if (meterEl) {
+    meterEl.className = 'kair-hero__meter-fill' + (crit > 0 ? '' : '--green');
+    meterEl.style.width = tasks.length ? Math.round(crit / tasks.length * 100) + '%' : '0%';
+  }
+}
+function renderDashKpis(data) {
+  var slot = document.getElementById('kpi-slot');
+  if (!slot) return;
+  var k = data.kpis || {};
+  var pric = Number(k.pric_active || 0);
+  var docs = Number(k.overdue_docs || 0);
+  var plan = Number(k.compliance || 0);
+  var items = [
+    { label: 'Accidentes (año)', value: (k.accidents_year || 0), suf: '', icon: DASH_GLYPH.activity, tone: '', sub: 'Eventos reportados en el año en curso.' },
+    { label: 'Casos PRIC activos', value: (k.pric_active || 0), suf: '', icon: DASH_GLYPH.users, tone: '--green', chip: { cls: 'kair-chip--soft-green', text: pric === 0 ? 'Bajo control' : 'En seguimiento' }, sub: pric === 0 ? 'Sin casos en seguimiento actualmente.' : 'Casos activos en seguimiento.' },
+    { label: 'Documentos vencidos', value: (k.overdue_docs || 0), suf: '', icon: DASH_GLYPH.filex, tone: '--red', chip: { cls: 'kair-chip--soft-red', text: 'Requieren gestión' }, sub: 'Documentos con vigencia vencida.', valueRed: docs > 0 },
+    { label: 'Plan de trabajo', value: (k.compliance || 0), suf: '%', icon: DASH_GLYPH.trend, tone: '', sub: 'Ejecución del plan vigente.', bar: { mod: '--amber', pct: plan } }
+  ];
+  slot.innerHTML = items.map(function (it) {
+    var chip = it.chip ? '<span class="kair-chip kair-chip--sm ' + it.chip.cls + '">' + dashEsc(it.chip.text) + '</span>' : '';
+    var bar = it.bar ? '<span class="kair-kpi__bar"><span class="kair-kpi__fill kair-kpi__fill' + it.bar.mod + '" data-pct="' + it.bar.pct + '"></span></span>' : '';
+    return '<article class="kair-kpi">' +
+      '<div class="kair-kpi__top"><span class="kair-kpi__label">' + dashEsc(it.label) + '</span>' +
+      '<span class="kair-kpi__icon kair-kpi__icon' + (it.tone || '') + '">' + it.icon + '</span></div>' +
+      '<div class="kair-kpi__value' + (it.valueRed ? ' kair-kpi__value--red' : '') + '">' + dashEsc(it.value) + '<small>' + dashEsc(it.suf || '') + '</small></div>' +
+      chip + bar + '<p class="kair-kpi__sub">' + dashEsc(it.sub) + '</p></article>';
+  }).join('');
+  requestAnimationFrame(function () {
+    slot.querySelectorAll('.kair-kpi__fill').forEach(function (f) {
+      f.style.width = (f.getAttribute('data-pct') || 0) + '%';
+    });
+  });
+}
+function renderDashModules(data) {
+  var grid = document.getElementById('mod-grid');
+  if (!grid) return;
+  var mods = data.modules || [
+    { name: 'Recursos', shortName: 'Recursos', subtitle: 'Capacitación, Roles' },
+    { name: 'Gestión Integral', shortName: 'Gest. Integral', subtitle: 'Política, Planes' },
+    { name: 'Gestión de la Salud', shortName: 'Gest. Salud', subtitle: 'Ausentismo, AT, EL' },
+    { name: 'Gestión de Peligros y Riesgos', shortName: 'Gest. Pel. y Riesgos', subtitle: 'IPERC, Controles' },
+    { name: 'Gestión de Amenazas', shortName: 'Gest. Amenazas', subtitle: 'Emergencias' },
+    { name: 'Verificación', shortName: 'Verificación', subtitle: 'Auditorías' },
+    { name: 'Mejoramiento', shortName: 'Mejoramiento', subtitle: 'Acciones Correctivas' }
+  ];
+  grid.innerHTML = mods.map(function (m) {
+    var name = m.name || m.shortName || '';
+    var badgeId = 'module-badge-' + name.replace(/\s+/g, '-').toLowerCase();
+    return '<button type="button" class="kair-mod" data-module-name="' + dashEsc(name) + '" data-module-active="false">' +
+      '<span class="kair-mod__top"><span class="kair-mod__icon">' + DASH_GLYPH.modGrid + '</span>' +
+      '<span class="kair-chip kair-chip--sm kair-chip--soft-slate" id="' + badgeId + '" data-module="' + dashEsc(name) + '">—</span></span>' +
+      '<span><span class="kair-mod__name">' + dashEsc(m.shortName || name) + '</span>' +
+      '<span class="kair-mod__sub">' + dashEsc(m.subtitle || '') + '</span></span></button>';
+  }).join('');
+  grid.querySelectorAll('.kair-mod').forEach(function (btn) {
+    btn.addEventListener('click', function () { filterDashboardTasksByModule(btn.getAttribute('data-module-name')); });
+  });
+  var count = document.getElementById('mods-count');
+  if (count) count.textContent = mods.length + ' módulos';
 }
 
 // Variables para el filtro de tareas
@@ -4535,28 +4446,14 @@ function filterDashboardTasksByModule(moduleName) {
  * Actualiza visualmente el módulo seleccionado en el panel de módulos
  */
 function updateModuleSelection(selectedModuleName) {
-  const moduleList = document.querySelector('[data-module-list]');
-  if (!moduleList) return;
-
-  const items = moduleList.querySelectorAll('[data-module-name]');
-  items.forEach(item => {
-    const moduleName = item.getAttribute('data-module-name');
-    const isActive = selectedModuleName && moduleName === selectedModuleName;
-
-    // Actualizar atributo data-module-active
+  const grid = document.getElementById('mod-grid');
+  if (!grid) return;
+  grid.querySelectorAll('.kair-mod').forEach(function (item) {
+    const name = item.getAttribute('data-module-name');
+    const isActive = !!selectedModuleName && name === selectedModuleName;
     item.setAttribute('data-module-active', isActive ? 'true' : 'false');
-
-    // Actualizar estilos (📦699: layout horizontal — fondo por defecto #f8fafc)
-    if (isActive) {
-      item.style.background = '#eff6ff';
-      item.style.borderColor = '#bfdbfe';
-    } else {
-      item.style.background = '#f8fafc';
-      item.style.borderColor = '#e2e8f0';
-    }
+    item.classList.toggle('is-active', isActive);
   });
-  
-  console.log(`🔍 [DASHBOARD] Módulo seleccionado actualizado: ${selectedModuleName || 'NINGUNO (limpiado)'}`);
 }
 
 /**
@@ -4584,97 +4481,65 @@ window.clearFilter = clearFilter;
  * Actualiza la UI del header para mostrar filtro activo
  */
 function updateFilterUI(moduleName, taskCount) {
-  const tasksHeader = document.querySelector('#tasks-panel-header');
-  if (!tasksHeader) return;
-
-  if (moduleName) {
-    tasksHeader.innerHTML = `
-      <h2 style="font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; margin: 0;">
-        <i class="fas fa-filter" style="color: #174ea6;"></i>
-        <span>Filtrando: ${moduleName}</span>
-        <span style="font-size: 12px; color: #64748b;">(${taskCount} tareas)</span>
-      </h2>
-      <button onclick="clearFilter()" style="padding: 6px 12px; border-radius: 12px; font-size: 11px; font-weight: 600; background: #fee2e2; color: #dc2626; border: none; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#fecaca'" onmouseout="this.style.background='#fee2e2'">
-        <i class="fas fa-times" style="margin-right: 4px;"></i> Limpiar filtro
-      </button>
-    `;
-  } else {
-    tasksHeader.innerHTML = `
-      <h2 style="font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; margin: 0;">
-        <i class="fas fa-tasks" style="color: #174ea6;"></i> Pendientes y Tareas
-      </h2>
-      <div style="display: flex; gap: 5px;">
-        <button class="filter-btn active" style="padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; background: #174ea6; color: white; border: none; cursor: pointer;">Todos</button>
-        <button class="filter-btn" style="padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; background: transparent; border: none; cursor: pointer; color: #64748b;">Críticos</button>
-        <button class="filter-btn" style="padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; background: transparent; border: none; cursor: pointer; color: #64748b;">Hoy</button>
-      </div>
-    `;
+  const seg = document.getElementById('seg-filtros');
+  const radarSub = document.getElementById('radar-sub');
+  if (seg) {
+    const btns = seg.querySelectorAll('button');
+    if (moduleName) {
+      btns.forEach(function (b) { b.classList.toggle('is-active', b.getAttribute('data-f') === 'todos'); });
+    }
+  }
+  const all = currentDashboardData && currentDashboardData.tasks ? currentDashboardData.tasks : [];
+  const crit = all.filter(function (t) { return (t.priority || '').toLowerCase() === 'critical'; }).length;
+  const hoy = all.filter(function (t) { return t.hoy === true; }).length;
+  const nT = document.getElementById('n-todos');
+  const nC = document.getElementById('n-criticos');
+  const nH = document.getElementById('n-hoy');
+  if (nT) nT.textContent = moduleName ? taskCount : all.length;
+  if (nC) nC.textContent = crit;
+  if (nH) nH.textContent = hoy;
+  if (radarSub) {
+    radarSub.textContent = moduleName
+      ? 'Filtrando por ' + moduleName + ' · ' + taskCount + ' punto(s) por gestionar.'
+      : all.length + ' puntos por gestionar · ' + crit + ' críticos · ' + hoy + ' con vencimiento hoy.';
   }
 }
 
 // Función para renderizar tareas
 function renderTasks(tasks) {
   const container = document.getElementById('tasks-container');
+  const empty = document.getElementById('task-empty');
   if (!container) return;
-  
-  if (!tasks || tasks.length === 0) {
-    container.innerHTML = `
-      <div style="text-align: center; padding: 40px; color: #10b981;">
-        <i class="fas fa-check-circle" style="font-size: 32px; margin-bottom: 10px;"></i>
-        <h3 style="font-size: 16px; margin: 0;">¡Estás al día!</h3>
-        <p style="font-size: 13px; color: #94a3b8; margin-top: 5px;">No hay pendientes críticos.</p>
-      </div>
-    `;
+  const lista = tasks || [];
+  if (lista.length === 0) {
+    container.innerHTML = '';
+    if (empty) empty.classList.remove('is-hidden');
     return;
   }
-
-  // 📦699 · FIX v5: layout SIMPLIFICADO del task card. Antes usaba flex con
-  // align-items: stretch + overflow: hidden + flex children anidados, lo que
-  // causaba que las cards se colapsaran a líneas finas en modo ventana (el
-  // contenido no se renderizaba). Ahora: flex row simple de 3 elementos
-  // (icon + text + arrow) con align-items: center. Sin overflow hidden, sin
-  // flex children anidados, sin min-width: 0 que cause colapso.
-  container.innerHTML = tasks.map(task => {
-    const isCritical = (task.priority || '').toLowerCase() === 'critical';
-    const taskBg = isCritical ? '#fef2f2' : '#f8fafc';
-    const taskBgHover = isCritical ? '#fee2e2' : 'white';
-    const iconBg = isCritical ? 'rgba(254, 226, 226, 0.6)' : 'rgba(255,255,255,0.7)';
-
-    return `
-    <div class="task-card ${task.priority || ''}${isCritical ? ' task-critical' : ''}"
-      data-module="${(task.module || '').replace(/"/g, '&quot;')}"
-      data-submodule="${(task.submodule || '').replace(/"/g, '&quot;')}"
-      onclick="navigateToModule(this.dataset.module, this.dataset.submodule)"
-      style="
-      background: ${taskBg};
-      border-radius: 6px;
-      margin-bottom: 10px;
-      border-left: 4px solid ${getTaskBorderColor(task.priority)};
-      padding: 12px 15px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      transition: transform 0.1s, box-shadow 0.1s, background 0.1s;
-      cursor: pointer;
-      min-height: 60px;
-    " onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 6px rgba(0,0,0,0.05)'; this.style.background='${taskBgHover}';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'; this.style.background='${taskBg}';">
-      <div style="width: 36px; height: 36px; border-radius: 6px; background: ${iconBg}; color: #174ea6; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 14px;">
-        <i class="${task.icon || 'fas fa-tasks'}"></i>
-      </div>
-      <div style="flex: 1; min-width: 0; overflow: hidden;">
-        <div style="display: flex; gap: 6px; margin-bottom: 4px; flex-wrap: wrap;">
-          <span class="tag" style="font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; background: ${getTagColor(task.priority)}; color: ${getTagTextColor(task.priority)};">${task.priority ? task.priority.toUpperCase() : 'INFO'}</span>
-          ${task.submodule ? `<span style="font-size: 10px; font-weight: 500; padding: 2px 6px; border-radius: 4px; background: #e0e7ff; color: #3730a3;">${task.submodule}</span>` : ''}
-        </div>
-        <div style="font-size: 13px; font-weight: 600; color: #1e293b; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${task.title || 'Tarea sin título'}</div>
-        <div style="font-size: 12px; color: #64748b; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${task.desc || ''}</div>
-      </div>
-      <div style="flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: transparent; color: #174ea6; transition: all 0.15s;" onmouseover="this.style.background='#174ea6'; this.style.color='white'" onmouseout="this.style.background='transparent'; this.style.color='#174ea6'">
-        <i class="fas fa-arrow-right" style="font-size: 13px;"></i>
-      </div>
-    </div>
-  `;
+  if (empty) empty.classList.add('is-hidden');
+  const SEV = {
+    critical: { chip: 'kair-chip--soft-red', label: 'Crítico', task: 'kair-task--critical', icon: '--red' },
+    warning: { chip: 'kair-chip--soft-amber', label: 'Atención', task: 'kair-task--warn', icon: '--amber' },
+    warn: { chip: 'kair-chip--soft-amber', label: 'Atención', task: 'kair-task--warn', icon: '--amber' },
+    info: { chip: 'kair-chip--soft-blue', label: 'Info', task: 'kair-task--info', icon: '--blue' }
+  };
+  container.innerHTML = lista.map(function (task) {
+    const key = (task.priority || 'info').toLowerCase();
+    const s = SEV[key] || SEV.info;
+    const code = task.submodule || task.module || '';
+    return '<button type="button" class="kair-task ' + s.task + '" data-module="' + dashEsc(task.module || '') + '" data-submodule="' + dashEsc(task.submodule || '') + '">' +
+      '<span class="kair-task__top"><span class="kair-chip kair-chip--sm ' + s.chip + '">' + s.label + '</span>' +
+      '<span class="kair-task__code">' + dashEsc(code) + '</span></span>' +
+      '<span class="kair-task__title">' + dashEsc(task.title || 'Tarea sin título') + '</span>' +
+      '<span class="kair-task__bottom"><span class="kair-task__icon kair-task__icon' + s.icon + '">' + DASH_GLYPH.info + '</span>' +
+      '<span class="kair-task__desc">' + dashEsc(task.desc || '') + '</span></span>' +
+      '<span class="kair-task__arrow">' + DASH_GLYPH.arrow + '</span></button>';
   }).join('');
+  container.querySelectorAll('.kair-task').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      navigateToModule(btn.getAttribute('data-module'), btn.getAttribute('data-submodule'));
+    });
+  });
 }
 
 // Función para navegar a un módulo desde una tarea
@@ -4776,21 +4641,6 @@ function showModuleContentWithSubmodule(moduleName, submoduleName) {
   showSubmoduleContent(moduleContentContainer, moduleName, submoduleName);
 }
 
-// Helper para colores de badges
-function getBadgeColor(cls) {
-  if (cls === 'bg-red') return '#fee2e2';
-  if (cls === 'bg-orange') return '#ffedd5';
-  if (cls === 'bg-green') return '#dcfce7';
-  return '#e0e7ff';
-}
-
-function getBadgeTextColor(cls) {
-  if (cls === 'bg-red') return '#b91c1c';
-  if (cls === 'bg-orange') return '#c2410c';
-  if (cls === 'bg-green') return '#166534';
-  return '#3730a3';
-}
-
 // Mapeo de claves del backend a IDs de badges en el frontend
 const MODULE_KEY_TO_BADGE_ID = {
   'recursos': 'module-badge-recursos',
@@ -4804,61 +4654,26 @@ const MODULE_KEY_TO_BADGE_ID = {
 
 // Función para actualizar badges de módulos
 function updateModuleBadges(moduleStatus, recursosAlerts = 0, gestionSaludAlerts = 0) {
-  console.log('🔍 [BADGES] updateModuleBadges llamada con:', { moduleStatus, recursosAlerts, gestionSaludAlerts });
-
   for (const [moduleName, status] of Object.entries(moduleStatus)) {
-    // Usar el mapeo para encontrar el ID correcto del badge
     const badgeId = MODULE_KEY_TO_BADGE_ID[moduleName];
     const badgeEl = document.getElementById(badgeId);
-
-    console.log(`🔍 [BADGES] Módulo: ${moduleName}, Status: ${status}, BadgeID: ${badgeId}, Elemento: ${badgeEl ? 'ENCONTRADO' : 'NO ENCONTRADO'}`);
-
-    if (badgeEl) {
-      // Para el módulo de recursos, mostrar el número real de alertas si hay
-      if (moduleName === 'recursos' && recursosAlerts > 0) {
-        badgeEl.textContent = `${recursosAlerts} Alertas`;
-        badgeEl.style.background = status === 'danger' ? '#fee2e2' : (status === 'warning' ? '#ffedd5' : '#dcfce7');
-        badgeEl.style.color = status === 'danger' ? '#b91c1c' : (status === 'warning' ? '#c2410c' : '#166534');
-        console.log(`✅ [BADGES] ${moduleName}: "${recursosAlerts} Alertas"`);
-      }
-      // Para el módulo de gestión de la salud, mostrar el número real de alertas si hay
-      else if (moduleName === 'gestion-salud' && gestionSaludAlerts > 0) {
-        badgeEl.textContent = `${gestionSaludAlerts} Alertas`;
-        badgeEl.style.background = status === 'danger' ? '#fee2e2' : (status === 'warning' ? '#ffedd5' : '#dcfce7');
-        badgeEl.style.color = status === 'danger' ? '#b91c1c' : (status === 'warning' ? '#c2410c' : '#166534');
-        console.log(`✅ [BADGES] ${moduleName}: "${gestionSaludAlerts} Alertas"`);
-      } else {
-        const statusText = status === 'danger' ? 'Alerta' : (status === 'warning' ? 'Pendiente' : 'OK');
-        const statusClass = status === 'danger' ? 'bg-red' : (status === 'warning' ? 'bg-orange' : 'bg-green');
-        badgeEl.textContent = statusText;
-        badgeEl.style.background = getBadgeColor(statusClass);
-        badgeEl.style.color = getBadgeTextColor(statusClass);
-        console.log(`✅ [BADGES] ${moduleName}: "${statusText}"`);
-      }
+    if (!badgeEl) continue;
+    badgeEl.className = 'kair-chip kair-chip--sm';
+    if (moduleName === 'recursos' && recursosAlerts > 0) {
+      badgeEl.textContent = recursosAlerts + ' alertas';
+      badgeEl.classList.add(status === 'danger' ? 'kair-chip--soft-red' : (status === 'warning' ? 'kair-chip--soft-amber' : 'kair-chip--soft-green'));
+    } else if (moduleName === 'gestion-salud' && gestionSaludAlerts > 0) {
+      badgeEl.textContent = gestionSaludAlerts + ' alertas';
+      badgeEl.classList.add(status === 'danger' ? 'kair-chip--soft-red' : (status === 'warning' ? 'kair-chip--soft-amber' : 'kair-chip--soft-green'));
     } else {
-      console.error(`❌ [BADGES] Badge NO ENCONTRADO para ${moduleName} (ID: ${badgeId})`);
+      const statusText = status === 'danger' ? 'Alerta' : (status === 'warning' ? 'Pendiente' : 'OK');
+      badgeEl.textContent = statusText;
+      badgeEl.classList.add(status === 'danger' ? 'kair-chip--soft-red' : (status === 'warning' ? 'kair-chip--soft-amber' : 'kair-chip--soft-green'));
     }
   }
 }
 
 // Helper para colores de tareas
-function getTaskBorderColor(priority) {
-  if (priority === 'critical') return '#ef4444';
-  if (priority === 'warning') return '#f59e0b';
-  return '#cbd5e1';
-}
-
-function getTagColor(priority) {
-  if (priority === 'critical') return '#fee2e2';
-  if (priority === 'warning') return '#ffedd5';
-  return '#e0e7ff';
-}
-
-function getTagTextColor(priority) {
-  if (priority === 'critical') return '#b91c1c';
-  if (priority === 'warning') return '#c2410c';
-  return '#3730a3';
-}
 
 
 let _showModuleContentLock = false;

@@ -1490,3 +1490,68 @@ node -e 'const os=require("os"),p=require("path"),{DatabaseSync}=require("node:s
 
 Nota: `better-sqlite3` está compilado para Electron → usar `node:sqlite` (nativo) para inspeccionar la DB con Node plano.
 
+---
+
+## 🆕 Dashboard Principal · Premium v2 (📦748, 2026-09-16)
+
+El **Panel de Control** (dashboard de empresa, `renderDashboard` en `renderer.js`) fue migrado al estilo **premium v2** (mismo sistema que los homes de módulo y que la referencia `kair-dashboard.html`).
+
+### Estructura (de arriba hacia abajo)
+```
+.kair-dashboard            ← contenedor (scroll interno, tokens premium)
+  .kair-page
+    nav > .kair-breadcrumb
+    .kair-topbar           ← .kair-module-id (icono + "Panel de Control") + acciones (chip empresa + Actualizar)
+    .kair-hero             ← Estado General: #hero-title, #hero-sub, #hero-pct, #hero-meter
+    .kair-grid-kpis #kpi-slot      ← 4 .kair-kpi (render JS)
+    .kair-card .kair-mod-grid #mod-grid   ← 7 .kair-mod (render JS)
+    .kair-card #sec-radar
+      #tasks-panel-header  ← título + .kair-seg #seg-filtros (Todos/Críticos/Hoy)
+      .kair-task-grid #tasks-container   ← .kair-task (render JS)
+      .kair-empty #task-empty
+  .kair-toasts #dash-toasts
+```
+
+### CSS
+Todo el CSS vive en **`styles.css`** (bloque `📦748 · DASHBOARD PREMIUM v2`), **scoped bajo `.kair-dashboard`** para no filtrar al resto de la app (lección de la cascada CSS). Los tokens `--kair-*` vienen de `shared/kair-design-tokens.css`.
+
+**Regla**: nunca agregar reglas `.kair-hero`, `.kair-kpi`, `.kair-mod`, `.kair-task`, `.kair-seg` sin el prefijo `.kair-dashboard`.
+
+### Funciones JS (top-level en `renderer.js`)
+| Función | Rol |
+|---------|-----|
+| `loadDashboardData()` | Llama a `getDashboardSummary` y orquesta los renders |
+| `renderDashHero(data)` | Título humanizado + `%` frentes críticos + meter |
+| `renderDashKpis(data)` | 4 `.kair-kpi` desde `data.kpis` |
+| `renderDashModules(data)` | 7 `.kair-mod` con chips de estado (IDs `module-badge-<name>`) |
+| `renderTasks(tasks)` | `.kair-task` con chip de severidad (`critical`→rojo, `warning`/`warn`→ámbar, resto→azul) |
+| `updateModuleBadges(status, rec, salud)` | Pinta los chips de cada `.kair-mod` |
+| `updateModuleSelection(name)` | Marca `.kair-mod.is-active` |
+| `updateFilterUI(moduleName, count)` | Conteos del `.kair-seg` + subtítulo del radar |
+| `filterDashboardTasksByModule(name)` | Filtra tareas por módulo (click en `.kair-mod`) |
+| `navigateToModule(mod, sub)` | Navega al submódulo (click en `.kair-task`) |
+
+### Datos reales (`getDashboardSummary`)
+```js
+{ success, data: {
+    kpis: { accidents_year, pric_active, overdue_docs, compliance,
+            recursos_alerts, gestion_salud_alerts },
+    tasks: [{ priority, module, submodule, title, desc, icon }],
+    module_status: { recursos: 'ok'|'warning'|'danger', ... }
+} }
+```
+
+### Cache-bust
+En `index.html`:
+- `styles.css?v=20260916-dashboard-premium`
+- `renderer.js?v=20260916-dashboard-premium` (⚠️ `renderer.js` **no tenía token** antes — se le agregó)
+
+### Lección: parchear funciones grandes con un script Node
+Para reescribir funciones de >50 líneas en `renderer.js` (7000+ líneas), usar un script Node con un helper `replaceFunction(src, signature, newCode)` que:
+1. Busca la firma exacta (`function foo(...)`).
+2. Encuentra la `{` de apertura.
+3. Cuenta llaves hasta el cierre balanceado.
+4. Reemplaza el bloque completo.
+
+Validar con `new Function(src)` ANTES de escribir, y luego `node --check renderer.js`. Fue más confiable que el edit tool para bloques de ~80 líneas.
+
