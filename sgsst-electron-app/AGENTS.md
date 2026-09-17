@@ -1555,3 +1555,68 @@ Para reescribir funciones de >50 líneas en `renderer.js` (7000+ líneas), usar 
 
 Validar con `new Function(src)` ANTES de escribir, y luego `node --check renderer.js`. Fue más confiable que el edit tool para bloques de ~80 líneas.
 
+---
+
+## 🆕 Playbook · Migrar un submódulo al estilo premium (📦749, 2026-09-16)
+
+### Sistema oficial: `shared/kair-premium.css` (scoped bajo `.kair-premium`)
+
+El **"dialecto premium"** (hero, KPI cards, chips, tasks, modules, segmented) vive en **`shared/kair-premium.css`** y está scopado bajo `.kair-premium`. Para usarlo, agregar `class="kair-premium"` al wrapper raíz del módulo/submódulo.
+
+```html
+<div class="inducciones-container kair-premium">   <!-- o .kair-dashboard kair-premium -->
+```
+
+El archivo se carga globalmente en `index.html` (junto a `kair-design-tokens.css` y `kair-components.css`).
+
+### Componentes disponibles
+
+| Clase | Qué es |
+|-------|--------|
+| `.kair-page` | contenedor de página (padding + ancho fluido) |
+| `.kair-breadcrumb` | ruta de navegación |
+| `.kair-topbar` + `.kair-module-id` (`__icon/__title/__desc`) | encabezado del módulo |
+| `.kair-chip` (+ `--soft-green/amber/red/slate/blue`, `--sm`) | pills de estado |
+| `.kair-btn` (+ `--primary/outline/ghost`) | botones |
+| `.kair-seg` (+ `__n`) | control segmentado (filtros) |
+| `.kair-grid-kpis` | grid de 4 columnas para KPI |
+| `.kair-hero` (+ `__label/__row/__title/__sub/__cta/__aside/__pct/__pct-label/__meter/__meter-fill`) | panel navy "Estado General" |
+| `.kair-kpi` (+ `__top/__label/__icon/__value/__sub/__bar/__fill`) | tarjeta de KPI |
+| `.kair-card` (+ `__head/__title/__sub`, `--plain`) | tarjeta de sección |
+| `.kair-mod-grid` + `.kair-mod` (+ `__top/__icon/__name/__sub`, `.is-active`) | grid de módulos |
+| `.kair-task-grid` + `.kair-task` (+ `--critical/--warn/--info`, `__top/__code/__title/__bottom/__icon/__desc/__arrow`) | grid de pendientes |
+| `.kair-empty` (+ `__icon/__title/__sub`) | estado vacío |
+| `.kair-toasts` + `.kair-toast` (+ `--success/warn/info/error`) | notificaciones |
+| `.kair-boot` + `.kair-skel` | skeleton de arranque |
+
+### Checklist de migración
+
+1. **Agregar `kair-premium`** al wrapper raíz (junto a la clase del módulo).
+2. **Estructura**: breadcrumb → topbar → hero → `.kair-grid-kpis` → `.kair-card` (módulos) → `.kair-card` (tareas) → toasts.
+3. **Datos**: mantener el IPC/selector existente; solo cambia el render.
+4. **Scopear** cualquier clase NUEVA específica del módulo bajo el wrapper (nunca global).
+5. **Eliminar** las copias locales de las clases del dialecto (`.kair-hero`, `.kair-kpi`, `.kair-chip`, `.kair-task`, `.kair-mod`, `.kair-seg`) — ya están en el shared.
+6. **Cache-bust**: bumpear `?v=` de `styles.css`, `renderer.js` (si aplica) y el `<script>` del módulo.
+7. **Verificar**: visual en maximizada y ventana + smoke tests.
+
+### Reglas de oro
+
+- **Nunca** declarar `.kair-hero`, `.kair-kpi`, `.kair-chip`, `.kair-task`, `.kair-mod`, `.kair-seg` sin el prefijo `.kair-premium` (o el scope del módulo).
+- **Nunca** usar `margin: 0 auto` en headers que comparten container con cards.
+- Para scroll interno: `flex: 1` + `min-height: 0` en TODOS los niveles de la cadena.
+- Si un módulo necesita un ajuste puntual, declararlo bajo su propio scope (`.mi-modulo .kair-kpi{...}`) — gana por orden de carga.
+
+### Estado de migración
+
+| Módulo | Usa `kair-premium` | Notas |
+|--------|--------------------|-------|
+| Dashboard principal | ✅ (📦749) | Piloto — referencia de implementación |
+| Inducciones | ⏳ | Dialecto propio en `inducciones-view.css` (scoped `.inducciones-container`) |
+| Plan de Trabajo | ⏳ | Dialecto propio en `plan-view.html` |
+| Otros submódulos | ⏳ | Migrar con este playbook |
+
+### Historial
+
+- **📦748**: Dashboard premium v2 (CSS scoped `.kair-dashboard` en `styles.css`).
+- **📦749**: Extracción del dialecto a `shared/kair-premium.css` scoped `.kair-premium`; dashboard migrado como piloto; `styles.css` vuelve a su rol de estilos legacy.
+

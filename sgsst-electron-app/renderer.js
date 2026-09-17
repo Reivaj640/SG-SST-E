@@ -4111,7 +4111,7 @@ if (mainContainerDash) mainContainerDash.classList.remove('vanta-fullscreen');
   };
 
   const dashboardContainer = document.createElement('div');
-  dashboardContainer.className = 'kair-dashboard';
+  dashboardContainer.className = 'kair-dashboard kair-premium';
   dashboardContainer.id = 'kair-dashboard';
 
   const dashPage = document.createElement('main');
