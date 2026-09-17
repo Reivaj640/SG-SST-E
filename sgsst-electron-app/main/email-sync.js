@@ -356,7 +356,12 @@ async function syncInbox(options) {
                   filename: att.name,
                   mime_type: att.mimeType,
                   size: att.size,
-                  attachment_id: att.attachmentId
+                  attachment_id: att.attachmentId,
+                  // 📦753 — Imágenes en línea (firma, logos): se guardan con su
+                  // Content-ID + disposición para poder resolver los `cid:` del
+                  // HTML y para NO listarlas como archivos adjuntos.
+                  content_id: att.contentId || null,
+                  disposition: att.disposition || null
                 });
               } catch (attErr) {
                 console.warn('[email-sync] Error guardando attachment:', attErr.message);

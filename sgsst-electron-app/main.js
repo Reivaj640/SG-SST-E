@@ -1897,8 +1897,34 @@ ipcMain.handle('google-gmail:list-labels', async (event) => {
 // F1-Feature5 — Descargar un adjunto de un mensaje.
 ipcMain.handle('google-gmail:download-attachment', async (event, options) => {
   try {
+    // 📦753-fix2 — Caché en disco: cada adjunto (incluidas las imágenes en línea,
+    // como la firma) se descarga UNA sola vez. Antes, cada render del lector volvía
+    // a pedirlo a la API y, como el rate limiter es de 40 req/min y el sync lo
+    // consume, la imagen tardaba ~10s en aparecer. La segunda vez es instantánea.
+    var cacheDir = path.join(app.getPath('userData'), 'email-attachments',
+      String(options.messageId || 'sin-mensaje'));
+    var cacheFile = path.join(cacheDir, String(options.attachmentId || 'sin-id') + '.b64');
+    try {
+      if (fs.existsSync(cacheFile)) {
+        var cachedB64 = fs.readFileSync(cacheFile, 'utf8');
+        if (cachedB64) {
+          return { success: true, data: { data: cachedB64, cached: true } };
+        }
+      }
+    } catch (cacheReadErr) {
+      console.warn('[google-gmail] No se pudo leer el cache de adjunto:', cacheReadErr.message);
+    }
+
     var configPath = getGoogleConfigPath();
     var result = await googleGmail.downloadAttachment(options.messageId, options.attachmentId, configPath);
+    if (result && result.success && result.data && result.data.data) {
+      try {
+        fs.mkdirSync(cacheDir, { recursive: true });
+        fs.writeFileSync(cacheFile, result.data.data, 'utf8');
+      } catch (cacheWriteErr) {
+        console.warn('[google-gmail] No se pudo cachear el adjunto:', cacheWriteErr.message);
+      }
+    }
     return result;
   } catch (e) {
     console.error('[google-gmail] Error en download-attachment:', e);

@@ -119,6 +119,8 @@ const EMAIL_SCHEMA_SQL = `
     mime_type TEXT,
     size INTEGER,
     attachment_id TEXT,                         -- Gmail attachmentId
+    content_id TEXT,                            -- 📦753 — Content-ID (imágenes en línea / cid:)
+    disposition TEXT,                           -- 📦753 — 'inline' | 'attachment'
     downloaded_path TEXT,                       -- ruta local del archivo cacheado
     downloaded_at INTEGER,
     created_at INTEGER NOT NULL
@@ -140,6 +142,11 @@ const EMAIL_MIGRATIONS_SQL = [
   // que se ignora silenciosamente.
   'ALTER TABLE email_messages ADD COLUMN raw_headers TEXT;',
   'ALTER TABLE email_messages ADD COLUMN mail_security TEXT;',
+  // 📦753 — Firma con imagen: para distinguir las imágenes EN LÍNEA (van dentro
+  // del cuerpo, resueltas por cid:) de los adjuntos reales. Sin estas columnas,
+  // la imagen de firma aparecía listada como "1 archivo adjunto".
+  'ALTER TABLE email_attachments ADD COLUMN content_id TEXT;',
+  'ALTER TABLE email_attachments ADD COLUMN disposition TEXT;',
 ];
 
 module.exports = {

@@ -1855,4 +1855,226 @@ funcione bien tras cambiar `.kair-mail-stack` a 388px, (2) el aspecto del sideba
 tarjetas en la columna de 250px, (3) contraste del modo oscuro si el padre aplica tema
 (esta capa **no** define overrides dark).
 
+---
+
+## 🆕 Bandeja Integrada · Firma de correo con imagen (📦753, 2026-09-18)
+
+El modal **"Firma de correo"** se rediseñó al estilo premium v2 y ahora permite **texto +
+imagen**. La imagen viaja **dentro del correo** (no como archivo adjunto).
+
+### Cómo viaja la imagen: inline con Content-ID (CID)
+
+Un `data:image/...;base64` dentro del HTML **no sirve**: Gmail web y la mayoría de los
+clientes lo bloquean al recibir. Un adjunto normal tampoco: el destinatario la vería como
+archivo suelto. La forma correcta es **imagen en línea**:
+
+```html
+<img src="cid:kair-firma@kair" alt="Firma" style="max-width:420px">
+```
+```mime
+Content-Type: image/png; name="firma.png"
+Content-Disposition: inline; filename="firma.png"
+Content-Transfer-Encoding: base64
+Content-ID: <kair-firma@kair>
+```
+
+Esto obliga a envolver el `multipart/alternative` en un **`multipart/related`**. La
+estructura MIME resultante (4 casos) vive en **`buildRawMessage()`**
+(`shared/google-gmail.js`), que se **extrajo de `sendMessage()` y se exportó** para poder
+testearla sin OAuth:
+
+| Caso | Estructura |
+|------|-----------|
+| Sin adjuntos ni imagen | `multipart/alternative` (text/plain + text/html) — comportamiento original |
+| Con imagen | `multipart/related` (alternative + imagen inline) |
+| Con imagen + adjuntos | `multipart/mixed` ( `related`(alternative + imagen) + adjuntos ) |
+| Solo adjuntos | `multipart/mixed` (alternative + adjuntos) — comportamiento original |
+
+**REGLA**: el `related` va SIEMPRE adentro del `mixed` y **antes** de los adjuntos; el orden
+inverso rompe la resolución del `cid:`.
+
+### Contrato IPC (sin cambios de plomería)
+
+`sendMessage()` acepta un campo nuevo opcional:
+
+```js
+window.electronAPI.googleGmail.sendMessage({
+  to, cc, subject, body, inReplyTo, references, threadId, attachments,
+  signatureImage: { name: 'firma.png', mimeType: 'image/png', data: '<base64 SIN el prefijo data:...>' }
+});
+```
+`main.js` ya reenvía las options tal cual (`Object.assign({configPath}, options)`) y
+`preload.js` también, así que **no hubo que tocar ni el IPC ni el preload**. Los otros 3
+call sites de `sendMessage` no pasan el campo → comportamiento idéntico al anterior.
+
+### Persistencia (localStorage)
+
+| Clave | Contenido |
+|-------|-----------|
+| `kair.emailSignature` | Texto de la firma (como antes) |
+| `kair.emailSignatureImage` | `{ dataUrl, mimeType, name, size }` |
+
+- **Límite: 400 KB** (`SIG_IMAGE_MAX_BYTES`) — entra cómodo en la cuota de localStorage y en
+  el peso del correo (base64 infla ~33%).
+- Formatos: PNG, JPG, WEBP, GIF (`SIG_IMAGE_MIMES`). Cualquier otro se rechaza con toast.
+- El helper `getSignatureImage()` devuelve `{name, mimeType, data}` **sin** el prefijo
+  `data:...;base64,` (el backend espera base64 puro).
+- La firma (texto e imagen) **no se agrega en reenvíos**, igual que antes.
+
+### UI del modal (premium v2)
+
+- ⚠️ **Bug corregido**: el CSS legacy pintaba `.kair-signature-modal__header` con
+  `background: #404040` y el título en blanco. La capa premium sobreescribía la tipografía
+  pero **no el fondo**, así que el título quedaba oscuro sobre oscuro. Ahora la regla premium
+  fija `background: var(--kair-surface)` + `color: var(--kair-text)`.
+- El modal pasó de 8px a **20px** de radio (`--kair-r-md`), con icono+subtítulo en el header,
+  hint azul, labels en versalitas, caja de imagen (subir / miniatura + cambiar / quitar),
+  vista previa en vivo (imagen arriba, texto abajo) y pie con "Borrar firma" en tono de
+  peligro + Cancelar + Guardar.
+- El overlay de firma mantiene `z-index: 450000` (debajo del modal de eventos 500000).
+
+### Verificación
+
+`node main/test-firma-imagen.js` → **60/60 OK**. No es un test de patrones: **ejecuta
+`buildRawMessage()` y `extractAttachments()` de verdad** y valida la estructura MIME
+(boundaries, `Content-ID`, `Content-Disposition: inline`, base64 partido en líneas de ≤76,
+orden related→adjuntos) en los 4 casos, la clasificación inline vs adjunto de las partes, más
+los checks estáticos de UI/CSS y del refresco.
+
+### 🐛 Bugs encontrados en la prueba real de envío (📦753-fix1)
+
+**1. La firma se veía como "1 archivo adjunto" y no dentro del cuerpo.** Dos causas:
+
+- **`sanitizeHtml()` reemplazaba los `cid:` por un pixel transparente 1x1** (decisión de
+  📦690 para evitar el `ERR_UNKNOWN_URL_SCHEME` en consola). Resultado: la imagen **nunca** se
+  veía. **Fix**: ahora anota el Content-ID en `data-kair-cid` (y deja el pixel como src
+  provisorio) y una función nueva, **`hydrateInlineImages(root, mail)`**, busca las partes en
+  línea del mensaje, las descarga con `googleGmail.downloadAttachment` y cambia el `src` por un
+  **data URL** (con caché en memoria por `messageId:attachmentId` para no re-descargar en cada
+  render). Se llama al final de `renderMailDetail()`.
+- **`extractAttachments()` listaba CUALQUIER parte con nombre de archivo como adjunto**, así que
+  la imagen en línea aparecía en la barra "N archivos adjuntos". **Fix**: el parser ahora
+  expone `contentId`, `disposition` e `isInline` (lee los headers `Content-ID` y
+  `Content-Disposition` de cada parte); el renderer **excluye del listado** las partes en línea y
+  `hasAttachment` solo cuenta las que no son inline (un correo con solo firma-imagen ya no
+  muestra el clip en la lista).
+
+**Persistencia**: `email_attachments` sumó las columnas `content_id` y `disposition`
+(CREATE TABLE + migración idempotente en `EMAIL_MIGRATIONS_SQL`, mismo patrón que las columnas
+de 📦647-fix2). El parser → `email-sync.js` → `email-db.saveAttachment()` las guardan.
+⚠️ **Los mensajes ya cacheados** tienen esas columnas en NULL, así que su imagen aparece como
+adjunto hasta que se re-sincronicen (el sync re-inserta los adjuntos de los últimos 25 hilos en
+cada corrida: se auto-cura solo).
+
+**2. La bandeja tardaba hasta ~2 minutos en reflejar un correo enviado.** Tres causas:
+
+- El bloque post-envío sincronizaba **siempre INBOX**, pero el correo recién enviado vive en
+  **Enviados** → no aparecía hasta el próximo auto-refresh. **Fix**: helper nuevo
+  `refreshFolderNow(folder)` (sincroniza + relee + repinta **si esa carpeta es la visible**) y el
+  post-envío refresca **la carpeta visible + SENT** al instante.
+- El auto-refresh corría **cada 60 s**. **Fix**: **30 s**.
+- Al volver a la app, `visibilitychange` solo **reiniciaba el timer** (hasta 60 s de espera).
+  **Fix**: ahora sincroniza **de inmediato**.
+
+Además, el merge de threads (preservar `messages`/`body`/`body_html`/`attachments` + las marcas
+locales de leído/destacado) que estaba **duplicado en 2 lugares** se extrajo a
+**`applyThreadsToState(threadsData)`**, usado por las 3 rutas de refresco.
+
+### 🐛 Segunda ronda de la prueba real (📦753-fix2)
+
+**1. La imagen de firma tardaba ~10 s en aparecer.** Causa raíz medida: el
+`GmailRateLimiter` (`shared/google-gmail.js`) entrega **40 tokens por ventana de 60 s** y el
+sync pide ~26 llamadas de golpe; cuando la ventana se agota, **todo** espera al próximo
+refill (hasta 60 s). Abrir un correo y traer su imagen quedaba detrás del sync. Fixes:
+
+- **Reserva de tokens para el user**: el tráfico de fondo nunca usa los últimos **8** tokens
+  (`PRIORITY_RESERVE`). `GmailRateLimiter.run(fn, { priority: true })` sí puede usarlos; el
+  sync va **sin** `priority`.
+- **Prioridad** aplicada en `downloadAttachment` (imagen/adjunto) y `sendMessage` (enviar).
+- **Caché en disco** en el handler `google-gmail:download-attachment`:
+  `userData/email-attachments/<messageId>/<attachmentId>.b64`. Cada imagen se descarga **una
+  sola vez**; después es instantánea y no consume cuota.
+- **De-duplicación** de pedidos en vuelo (`_inlineImgPending`) y **placeholder**
+  (`.kair-inline-img--loading`) mientras baja, para que no parezca que el correo no tiene imagen.
+
+**2. Correos ya leídos volvían a aparecer como NO leídos.** Causa raíz: en
+`email-db.saveMessage()` había un `UPDATE email_threads SET has_unread = 1` **incondicional**
+para cualquier mensaje que no fuera del user (Loop2-fix). Como el auto-refresh re-guarda los
+últimos 25 hilos en cada corrida, **cada sincronizado volvía a marcar como no leído** lo que
+el user ya había leído (el mark-read local se perdía; el punto azul de la lista sale de
+`thread.has_unread` → `threadToMail()`). Se notaba más al bajar el intervalo a 30 s.
+
+Fix: **`recomputeThreadUnread(threadId)`** recalcula el flag desde los labels reales
+(`label_ids LIKE '%"UNREAD"%'`, ignorando enviados y borradores) y se ejecuta **después** de
+guardar el mensaje. Un correo nuevo sin leer se sigue marcando ✓; uno ya leído no revive.
+
+### Verificación
+
+`node main/test-firma-imagen.js` → **83/83 OK** (incluye la estructura MIME real, la
+clasificación inline vs adjunto, el refresco, la reserva del rate limiter, el caché en disco,
+el recálculo del "no leído" y el envío real desde la respuesta rápida).
+
+### 🐛 Tercera ronda de la prueba real (📦753-fix3)
+
+**La respuesta rápida no enviaba nada.** El botón **"Enviar"** de la barra de respuesta del
+lector (`.kair-mail-detail__reply`) **no enviaba**: abría el redactor flotante con el texto
+prellenado (`openComposeModal("reply", mail)` + un `setTimeout` que copiaba el texto). El user
+creía que la respuesta ya había salido, cerraba el redactor, y **la respuesta nunca se enviaba
+ni aparecía en Enviados** (de ahí que el último enviado fuera el correo de prueba anterior).
+
+Fix: el botón ahora **envía directo** (como Gmail), reutilizando `sendComposedMail()`:
+
+- Resuelve el destinatario con `getMailDisplayContact(mail)` (remitente en Recibidos,
+  destinatario en Enviados), arma el asunto con `RV:` si no lo tiene, y manda
+  `isReply: true` + `threadId` para que quede **en el mismo hilo**.
+- Incluye la firma (texto + imagen) y el quote del original, igual que el redactor.
+- Deshabilita el botón con "Enviando…" y lo restaura al terminar; limpia el input si salió bien.
+- **`sendComposedMail()` ahora devuelve `true`/`false`** (antes devolvía `undefined` siempre) y
+  **`opts.closeModal` pasó a ser opcional** (`typeof === 'function'`), porque la respuesta
+  rápida no tiene modal que cerrar. Cambio backward-compatible: el redactor no usa el retorno.
+
+### 🐛 Cuarta ronda: el sync vencía a los 120 s y Enviados nunca se actualizaba (📦753-fix4)
+
+**Síntoma**: tras enviar desde la respuesta rápida, el correo no aparecía en Enviados, y en la
+consola salía `[BandejaIntegrada] Background sync failed: El sync tardó más de 120s sin
+responder`. Causa raíz **de mi propia optimización anterior** (📦753-fix2): al subir la
+frecuencia de sincronizado (30 s + foco + post-envío) el consumo superó el cupo de Gmail.
+
+**La cuenta del cupo** (esto es lo importante para no repetirlo):
+
+- `GmailRateLimiter` entrega **N tokens por ventana de 60 s** y **todo** pasa por ahí.
+- Un sync de 25 hilos cuesta **26 requests** (`messages.list` + 1 `messages.get` **por mensaje**,
+  en lotes de 3 con 500 ms de espera) → ~5 s mínimo, y ~26 tokens.
+- Con el cupo viejo (**40/min**, y encima 8 reservados → 32 para el fondo) **UN solo sync ya casi
+  agotaba la ventana**. El segundo sync (Enviados) esperaba al siguiente minuto, y si se
+  acumulaban dos ventanas **vencía a los 120 s** (timeout del handler IPC en `main.js:2020`).
+- Resultado: la carpeta Enviados quedaba con datos viejos y el correo recién enviado no
+  aparecía **aunque el envío hubiera salido bien**.
+
+**El cupo real de Gmail** es 250 unidades/usuario/segundo y `messages.get` cuesta 5 unidades →
+~3.000 lecturas/min. El valor de 40/min era ~1,3 % del cupo real (margen absurdo).
+
+Fixes:
+
+- **Cupo 40 → 120 requests/min** (`REFILL_RATE`) y **reserva del user 8 → 25**. Con eso el fondo
+  tiene ~95 tokens/min: alcanza para 3 syncs/min y sobran tokens para lo interactivo.
+- **Refresco de Enviados más barato**: después de enviar se piden **8 hilos** (el enviado es el
+  más nuevo) en vez de 25 → ~9 requests en lugar de 26.
+- **No apilar syncs por carpeta**: `_folderSyncInFlight[folder]` — si ya hay un sync corriendo
+  para esa carpeta, se reutiliza esa promesa (el auto-refresh + el post-envío + el foco podían
+  encolar 3 syncs idénticos y agotar el cupo).
+
+**Lección**: al subir la frecuencia de un refresco hay que rehacer la cuenta del cupo
+(`requests por sync × syncs por minuto ≤ tokens por ventana − reserva`). Un cupo pensado para
+"un sync cada 60 s" no aguanta "un sync cada 30 s + uno por envío + uno por foco".
+
+### Pendiente
+
+- Re-validar en pantalla: (1) que la imagen aparezca rápido y con placeholder mientras baja,
+  (2) que un correo leído **no** vuelva a marcarse como no leído tras un par de sincronizados,
+  (3) que un correo enviado aparezca **en segundos** en Enviados (respuesta rápida y redactor),
+  (4) que no vuelva a aparecer el error "El sync tardó más de 120s sin responder" en consola.
+- Cache-bust: iframe `?v=690`, `premium.css?v=20260918-firma-imagen-fix2`,
+  `app.js?v=20260918-firma-imagen-fix4`.
+
 

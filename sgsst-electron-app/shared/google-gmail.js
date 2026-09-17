@@ -38,14 +38,21 @@ const googleAuth = require('./google-auth');
 var GmailRateLimiter = (function () {
   var queue = [];
   var processing = false;
-  // 📦748 — Antes 20/min: el sync pide el detalle de CADA mensaje (1 request c/u),
-  // así que 25 correos tardaban ~75s y 50 tardaban ~2.5 min (parecía colgado).
-  // Gmail permite 250 units/user/min y messages.get cuesta 5 units → 50 req/min
-  // es el máximo seguro. Usamos 40/min (con margen).
-  var tokens = 40; // max requests per minute
+  // 📦753-fix2 — Antes 20/min, luego 40/min: el sync pide el detalle de CADA
+  // mensaje (1 request c/u), así que con 40/min DOS syncs por minuto ya agotaban
+  // la ventana → los syncs se encolaban, vencían a los 120s
+  // ("El sync tardó más de 120s sin responder") y Enviados quedaba sin actualizar.
+  // El cupo REAL de Gmail es 250 unidades/usuario/segundo y messages.get cuesta 5
+  // unidades → ~3000 lecturas/min. 120/min es ~4% del cupo real: sobra margen y
+  // alcanza para el sync de 25 hilos + las acciones del user.
+  var tokens = 120; // max requests per minute
   var lastRefill = Date.now();
-  var REFILL_RATE = 40; // tokens por minuto
+  var REFILL_RATE = 120; // tokens por minuto
   var REFILL_INTERVAL_MS = 60000; // 1 minuto
+  // 📦753-fix2 — RESERVA para el tráfico INTERACTIVO (lo que hace el user).
+  // El fondo nunca usa los últimos 25 tokens: quedan para abrir un correo (traer
+  // su imagen de firma), marcarlo leído o enviar.
+  var PRIORITY_RESERVE = 25;
 
   function refillTokens() {
     var now = Date.now();
@@ -56,19 +63,21 @@ var GmailRateLimiter = (function () {
     }
   }
 
-  function takeToken() {
+  function takeToken(isPriority) {
     refillTokens();
-    if (tokens > 0) {
+    // El tráfico de fondo no puede tocar la reserva
+    var disponibles = isPriority ? tokens : tokens - PRIORITY_RESERVE;
+    if (disponibles > 0) {
       tokens--;
       return true;
     }
     return false;
   }
 
-  function waitForToken() {
+  function waitForToken(isPriority) {
     return new Promise(function (resolve) {
       function check() {
-        if (takeToken()) {
+        if (takeToken(isPriority)) {
           resolve();
         } else {
           // Esperar hasta el siguiente refill (máx 60s, pero usualmente menos)
@@ -84,12 +93,16 @@ var GmailRateLimiter = (function () {
     /**
      * Ejecuta fn() respetando el rate limit global.
      * @param {Function} fn - async function
+     * @param {Object} [opts] - { priority: true } para acciones del user (puede
+     *   usar la reserva de tokens). El sync de fondo va sin priority.
      * @returns {Promise<any>}
      */
-    run: async function (fn) {
-      await waitForToken();
+    run: async function (fn, opts) {
+      await waitForToken(!!(opts && opts.priority));
       return fn();
-    }
+    },
+    // Diagnóstico (tests): tokens disponibles y reserva configurada.
+    _state: function () { return { tokens: tokens, reserve: PRIORITY_RESERVE }; }
   };
 })();
 
@@ -445,7 +458,10 @@ function normalizeMessage(msg, includeBody) {
     date: headers['date'] || new Date(parseInt(msg.internalDate || Date.now())).toISOString(),
     unread: unread,
     labels: labelIds,
-    hasAttachment: !!(msg.payload && msg.payload.parts && msg.payload.parts.some(function (p) { return p.filename; })),
+    // 📦753 — Solo cuenta como "tiene adjuntos" si hay al menos una parte que NO
+    // sea imagen en línea. Antes, un correo con solo la imagen de firma (inline)
+    // mostraba el clip de adjunto en la lista.
+    hasAttachment: extractAttachments(msg.payload).some(function (a) { return !a.isInline; }),
     meetingSuggestion: meetingSuggestion,
     avatarInitials: initials,
     avatarColor: avatarColor,
@@ -572,7 +588,9 @@ async function downloadAttachment(messageId, attachmentId, configPath) {
           id: attachmentId
         });
       }, { maxRetries: 3, baseDelay: 1000 });
-    });
+      // 📦753-fix2 — Acción del user (imagen de firma / adjunto al abrir un
+      // correo): puede usar la reserva de tokens para no esperar al sync.
+    }, { priority: true });
     return {
       success: true,
       data: {
@@ -642,6 +660,18 @@ function walkPartsForBody(payload, mimeType, stripHtml) {
   return '';
 }
 
+// 📦753 — Lee el valor de un header de una parte MIME (Content-ID, Content-Disposition…).
+function partHeader(part, headerName) {
+  var headers = (part && part.headers) || [];
+  var want = String(headerName).toLowerCase();
+  for (var i = 0; i < headers.length; i++) {
+    if (String(headers[i].name || '').toLowerCase() === want) {
+      return String(headers[i].value || '');
+    }
+  }
+  return '';
+}
+
 function extractAttachments(payload) {
   var atts = [];
   if (!payload || !payload.parts) return atts;
@@ -650,11 +680,21 @@ function extractAttachments(payload) {
     if (!part) return;
     // Si esta parte tiene un archivo adjunto, agregarlo
     if (part.filename && part.body && part.body.attachmentId) {
+      // 📦753 — Distinguir imágenes EN LÍNEA (van dentro del cuerpo, el HTML las
+      // referencia con src="cid:…") de los adjuntos reales. Sin esto, la firma con
+      // imagen se listaba como "1 archivo adjunto" y además no se veía en el body.
+      var contentId = partHeader(part, 'Content-ID').replace(/[<>]/g, '').trim();
+      var dispositionRaw = partHeader(part, 'Content-Disposition').toLowerCase();
+      var isInline = dispositionRaw.indexOf('inline') === 0 ||
+                     (!!contentId && dispositionRaw.indexOf('attachment') !== 0);
       atts.push({
         name: part.filename,
         size: part.body.size || 0,
         mimeType: part.mimeType || 'application/octet-stream',
-        attachmentId: part.body.attachmentId
+        attachmentId: part.body.attachmentId,
+        contentId: contentId || null,
+        disposition: isInline ? 'inline' : 'attachment',
+        isInline: isInline
       });
     }
     // Recursivamente procesar sub-partes (multipart anidados)
@@ -686,6 +726,139 @@ function stringToColor(str) {
   }
   var c = (hash & 0x00FFFFFF).toString(16);
   return ('000000' + c).slice(-6);
+}
+
+/**
+ * 📦753 — Construye el mensaje MIME crudo (raw) de un correo saliente.
+ * Se separó de sendMessage() para poder testear la estructura sin OAuth.
+ *
+ * Estructura resultante:
+ *   - sin adjuntos ni imagen → multipart/alternative
+ *   - con imagen de firma    → multipart/related (alternative + imagen inline CID)
+ *   - con adjuntos           → multipart/mixed (related|alternative + adjuntos)
+ *
+ * La imagen de firma va INLINE con `Content-ID: <kair-firma@kair>` y el HTML la
+ * referencia con `src="cid:kair-firma@kair"`. Así el destinatario la ve dentro
+ * del correo y no como un archivo adjunto suelto.
+ *
+ * @param {Object} o
+ * @param {string[]} o.headers - headers ya codificados (From/To/Subject/…)
+ * @param {string} o.body - cuerpo en texto plano (alternativa para clientes sin HTML)
+ * @param {string} o.htmlBody - cuerpo en HTML (mismo contenido, con formato)
+ * @param {Array} [o.attachments] - [{name, mimeType, data}] con data en base64 sin saltos
+ * @param {Object} [o.signatureImage] - {name, mimeType, data} con data en base64 sin saltos
+ * @returns {string} mensaje MIME completo (líneas CRLF)
+ */
+function buildRawMessage(o) {
+  o = o || {};
+  var headers = Array.isArray(o.headers) ? o.headers : [];
+  var body = o.body || '';
+  var htmlBody = o.htmlBody || '';
+  var attachments = Array.isArray(o.attachments) ? o.attachments : [];
+  var signatureImage = o.signatureImage || null;
+  var hasAttachments = attachments.length > 0;
+
+  var hasSigImage = !!(signatureImage && signatureImage.data && signatureImage.mimeType &&
+                       String(signatureImage.mimeType).indexOf('image/') === 0);
+  var SIG_CID = 'kair-firma@kair';
+  if (hasSigImage) {
+    // El HTML del cuerpo ya preserva el formato del texto (white-space: pre-wrap);
+    // acá solo se le agrega el bloque de la imagen, separado por una línea.
+    htmlBody += '<div style="margin-top:18px;padding-top:12px;border-top:1px solid #e8ebee;">' +
+      '<img src="cid:' + SIG_CID + '" alt="Firma" style="max-width:420px;height:auto;display:block;">' +
+      '</div>';
+  }
+
+  var nl = '\r\n';
+  var stamp = Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+
+  // El base64 llega del renderer SIN saltos de línea: hay que partirlo cada 76
+  // chars (estándar MIME) para que el encoding no se corrompa.
+  var b64Body = function (data) {
+    var s = String(data || '');
+    var chunks = s.match(/.{1,76}/g);
+    return (chunks ? chunks.join(nl) : s) + nl;
+  };
+  // multipart/alternative (texto plano + HTML) con su propio boundary.
+  var buildAlternative = function (boundary) {
+    var altB = boundary + '_alt';
+    return '--' + boundary + nl +
+      'Content-Type: multipart/alternative; boundary="' + altB + '"' + nl + nl +
+      '--' + altB + nl + 'Content-Type: text/plain; charset=UTF-8' + nl + nl +
+      body + nl +
+      '--' + altB + nl + 'Content-Type: text/html; charset=UTF-8' + nl + nl +
+      htmlBody + nl +
+      '--' + altB + '--' + nl;
+  };
+  // Parte de la imagen de firma (inline + Content-ID para el src="cid:").
+  var buildInlineImage = function (boundary) {
+    var sigName = String(signatureImage.name || 'firma.png').replace(/"/g, '');
+    return '--' + boundary + nl +
+      'Content-Type: ' + signatureImage.mimeType + '; name="' + sigName + '"' + nl +
+      'Content-Disposition: inline; filename="' + sigName + '"' + nl +
+      'Content-Transfer-Encoding: base64' + nl +
+      'Content-ID: <' + SIG_CID + '>' + nl + nl +
+      b64Body(signatureImage.data);
+  };
+  var buildAttachments = function (boundary) {
+    var out = '';
+    for (var i = 0; i < attachments.length; i++) {
+      var att = attachments[i];
+      var attName = String(att.name || 'archivo').replace(/"/g, '');
+      var attMime = att.mimeType || 'application/octet-stream';
+      out += '--' + boundary + nl +
+        'Content-Type: ' + attMime + '; name="' + attName + '"' + nl +
+        'Content-Disposition: attachment; filename="' + attName + '"' + nl +
+        'Content-Transfer-Encoding: base64' + nl + nl +
+        b64Body(att.data);
+    }
+    return out;
+  };
+
+  if (hasAttachments && hasSigImage) {
+    // mixed( related( alternative + imagen ) + adjuntos )
+    var mixB = '----=_KairMix_' + stamp;
+    var relB = '----=_KairRel_' + stamp;
+    return headers.join(nl) + nl +
+      'MIME-Version: 1.0' + nl +
+      'Content-Type: multipart/mixed; boundary="' + mixB + '"' + nl + nl +
+      '--' + mixB + nl +
+      'Content-Type: multipart/related; boundary="' + relB + '"; type="multipart/alternative"' + nl + nl +
+      buildAlternative(relB) +
+      buildInlineImage(relB) +
+      '--' + relB + '--' + nl +
+      buildAttachments(mixB) +
+      '--' + mixB + '--' + nl;
+  }
+  if (hasAttachments) {
+    // mixed( alternative + adjuntos ) — comportamiento original
+    var mixB2 = '----=_KairMix_' + stamp;
+    return headers.join(nl) + nl +
+      'MIME-Version: 1.0' + nl +
+      'Content-Type: multipart/mixed; boundary="' + mixB2 + '"' + nl + nl +
+      buildAlternative(mixB2) +
+      buildAttachments(mixB2) +
+      '--' + mixB2 + '--' + nl;
+  }
+  if (hasSigImage) {
+    // related( alternative + imagen )
+    var relB2 = '----=_KairRel_' + stamp;
+    return headers.concat([
+      'MIME-Version: 1.0',
+      'Content-Type: multipart/related; boundary="' + relB2 + '"; type="multipart/alternative"'
+    ]).join(nl) + nl + nl +
+      buildAlternative(relB2) +
+      buildInlineImage(relB2) +
+      '--' + relB2 + '--' + nl;
+  }
+  // Sin adjuntos ni imagen: multipart/alternative
+  var altB2 = '----=_KairBandeja_Alt_' + stamp;
+  return headers.concat([
+    'MIME-Version: 1.0',
+    'Content-Type: multipart/alternative; boundary="' + altB2 + '"'
+  ]).join(nl) + nl + nl +
+    buildAlternative(altB2) +
+    '--' + altB2 + '--' + nl;
 }
 
 /**
@@ -780,65 +953,20 @@ async function sendMessage(options) {
     }
     var htmlBody = buildHtmlFromText(body);
 
-    var raw;
-    if (attachments && attachments.length > 0) {
-      // Construir mensaje multipart/mixed con boundary (contiene multipart/alternative adentro)
-      var boundary = '----=_KairBandeja_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
-      var altBoundary = '----=_KairBandeja_Alt_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
-      // Override del header Content-Type (no incluirlo arriba, lo agregamos con boundary)
-      var headerLines = headers.join('\r\n');
-      raw = headerLines + '\r\n';
-      raw += 'MIME-Version: 1.0\r\n';
-      raw += 'Content-Type: multipart/mixed; boundary="' + boundary + '"\r\n\r\n';
-      // Parte 1: body (multipart/alternative con text/plain + text/html)
-      raw += '--' + boundary + '\r\n';
-      raw += 'Content-Type: multipart/alternative; boundary="' + altBoundary + '"\r\n\r\n';
-      // text/plain
-      raw += '--' + altBoundary + '\r\n';
-      raw += 'Content-Type: text/plain; charset=UTF-8\r\n\r\n';
-      raw += body + '\r\n';
-      // text/html
-      raw += '--' + altBoundary + '\r\n';
-      raw += 'Content-Type: text/html; charset=UTF-8\r\n\r\n';
-      raw += htmlBody + '\r\n';
-      raw += '--' + altBoundary + '--\r\n';
-      // Partes 2..N: cada attachment
-      for (var i = 0; i < attachments.length; i++) {
-        var att = attachments[i];
-        var attName = (att.name || 'archivo').replace(/"/g, '');
-        var attMime = att.mimeType || 'application/octet-stream';
-        var attData = att.data || '';
-        raw += '--' + boundary + '\r\n';
-        raw += 'Content-Type: ' + attMime + '; name="' + attName + '"\r\n';
-        raw += 'Content-Disposition: attachment; filename="' + attName + '"\r\n';
-        raw += 'Content-Transfer-Encoding: base64\r\n\r\n';
-        // El base64 viene del renderer sin saltos de línea. Gmail espera
-        // linebreaks cada 76 chars (estándar MIME). Lo partimos para que
-        // encoding funcione correctamente.
-        raw += attData.match(/.{1,76}/g).join('\r\n') + '\r\n';
-      }
-      raw += '--' + boundary + '--\r\n';
-    } else {
-      // Sin attachments: multipart/alternative con text/plain + text/html
-      var altBoundary2 = '----=_KairBandeja_Alt_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
-      var allHeaders = headers.concat([
-        'MIME-Version: 1.0',
-        'Content-Type: multipart/alternative; boundary="' + altBoundary2 + '"'
-      ]);
-      raw = allHeaders.join('\r\n') + '\r\n\r\n';
-      // text/plain
-      raw += '--' + altBoundary2 + '\r\n';
-      raw += 'Content-Type: text/plain; charset=UTF-8\r\n\r\n';
-      raw += body + '\r\n';
-      // text/html
-      raw += '--' + altBoundary2 + '\r\n';
-      raw += 'Content-Type: text/html; charset=UTF-8\r\n\r\n';
-      raw += htmlBody + '\r\n';
-      raw += '--' + altBoundary2 + '--\r\n';
-    }
+    // 📦753 — El armado del MIME vive en buildRawMessage() (nivel de módulo)
+    // para poder testear su estructura sin OAuth.
+    var raw = buildRawMessage({
+      headers: headers,
+      body: body,
+      htmlBody: htmlBody,
+      attachments: attachments,
+      signatureImage: options.signatureImage
+    });
     var encoded = encodeBase64Url(raw);
 
     // 2) Enviar via Gmail API con rate limiter global + retry
+    // 📦753-fix2 — priority: enviar es una acción del user, no debe esperar
+    // a que el sync de fondo libere tokens.
     var res = await GmailRateLimiter.run(function () {
       return withRetry(function () {
         return gmail.users.messages.send({
@@ -849,7 +977,7 @@ async function sendMessage(options) {
           }
         });
       }, { maxRetries: 3, baseDelay: 1000 });
-    });
+    }, { priority: true });
 
     return {
       success: true,
@@ -895,6 +1023,8 @@ function encodeMimeHeader(str) {
 }
 
 module.exports = {
+  buildRawMessage: buildRawMessage,
+  extractAttachments: extractAttachments,
   listInbox: listInbox,
   getMessage: getMessage,
   getProfile: getProfile,

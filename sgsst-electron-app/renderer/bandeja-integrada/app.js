@@ -458,20 +458,24 @@
             el.removeAttribute(attr.name);
             continue;
           }
-          // 📦690 — Reemplazar cid: URIs (imágenes embebidas de emails
-          // multipart/related) con un pixel transparente 1x1. El navegador
-          // no sabe resolver `cid:icon.png` (no es una URL válida → ERR_UNKNOWN_URL_SCHEME
-          // en consola, y el warning rojo satura DevTools). Reemplazamos con un
-          // data URI GIF transparente para que el request NO se haga y no aparezca
-          // el warning. La imagen embebida no se muestra, pero el resto del email
-          // (texto, links, layout) sigue funcionando. Si en el futuro queremos
-          // mapear los cid: a blob URLs de los attachments reales del mail,
-          // este es el lugar para hacerlo.
+          // 📦753 — Imágenes embebidas (multipart/related, src="cid:…").
+          // ANTES: se reemplazaban por un pixel transparente 1x1 → la imagen
+          // NUNCA se veía (caso típico: la firma con imagen). Ahora se anota el
+          // Content-ID en `data-kair-cid` y la imagen se resuelve después con
+          // hydrateInlineImages() contra las partes en línea del mensaje.
+          // El pixel se deja como src provisorio para que el navegador no intente
+          // resolver `cid:` (ERR_UNKNOWN_URL_SCHEME en consola).
           if ((name === "src" || name === "srcset" || name === "background") &&
               /^\s*cid:/i.test(value)) {
+            var cidRef = value.replace(/^\s*cid:/i, "").replace(/[<>]/g, "").trim();
             // 1x1 transparent GIF (43 bytes)
-            el.setAttribute(attr.name,
-              "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7");
+            var transparentGif = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+            if (name === "src" && cidRef) {
+              el.setAttribute("data-kair-cid", cidRef);
+              el.setAttribute("src", transparentGif);
+            } else {
+              el.setAttribute(attr.name, transparentGif);
+            }
           }
         }
       }
@@ -509,6 +513,103 @@
   //
   // Loop 40 — Ahora también soporta HTML rico (body_html de Gmail). Si el body es HTML,
   // lo sanea y lo renderiza dentro de .kair-mail-message__html (Gmail-style).
+  // 📦753 — Resuelve las imágenes EN LÍNEA de un correo (src="cid:…").
+  // El HTML del mensaje referencia la imagen por Content-ID; hay que ubicar esa
+  // parte entre las partes en línea del mensaje, descargarla y cambiar el src por
+  // un data URL para que la imagen se vea DENTRO del cuerpo (antes quedaba un
+  // pixel transparente y la firma con imagen no se veía nunca).
+  // Se cachea por (messageId, attachmentId) para no re-descargar en cada render.
+  var _inlineImgCache = {};
+  var _inlineImgPending = {};   // 📦753-fix2 — pedidos en vuelo (de-duplicación)
+  var _INLINE_CACHE_MAX = 40;
+
+  function _cacheInlineImage(key, dataUrl) {
+    var keys = Object.keys(_inlineImgCache);
+    if (keys.length >= _INLINE_CACHE_MAX) delete _inlineImgCache[keys[0]];
+    _inlineImgCache[key] = dataUrl;
+  }
+
+  function hydrateInlineImages(root, mail) {
+    if (!root || !mail) return;
+    var targets = root.querySelectorAll("[data-kair-cid]");
+    if (!targets.length) return;
+
+    // Índice de partes en línea (por Content-ID y, como respaldo, por nombre).
+    var byCid = {};
+    var addPart = function (a, messageId) {
+      if (!a) return;
+      var mime = String(a.mime_type || a.mimeType || "");
+      if (mime.indexOf("image/") !== 0) return;
+      if (String(a.disposition || "").toLowerCase() === "attachment") return;
+      var entry = { att: a, messageId: messageId };
+      var cid = String(a.content_id || a.contentId || "").trim().toLowerCase();
+      if (cid) byCid[cid] = entry;
+      var fname = String(a.filename || a.name || "").trim().toLowerCase();
+      if (fname && !byCid[fname]) byCid[fname] = entry;
+    };
+    (mail.messages || []).forEach(function (msg) {
+      (msg.attachments || []).forEach(function (a) { addPart(a, msg.id); });
+    });
+    (mail.attachments || []).forEach(function (a) { addPart(a, mail.id || mail.threadId); });
+
+    Array.prototype.forEach.call(targets, function (img) {
+      var key = String(img.getAttribute("data-kair-cid") || "").trim().toLowerCase();
+      var hit = byCid[key];
+      if (!hit) return;
+      var att = hit.att;
+      var attId = att.attachment_id || att.attachmentId;
+      if (!attId || !hit.messageId) return;
+      var cacheKey = hit.messageId + ":" + attId;
+
+      var apply = function (dataUrl) {
+        if (!dataUrl) return;
+        img.setAttribute("src", dataUrl);
+        img.removeAttribute("data-kair-cid");
+        // Evitar que una imagen grande desborde el ancho del lector.
+        if (String(img.getAttribute("style") || "").indexOf("max-width") === -1) {
+          img.setAttribute("style", (img.getAttribute("style") || "") + ";max-width:100%;height:auto;");
+        }
+      };
+
+      if (_inlineImgCache[cacheKey]) { apply(_inlineImgCache[cacheKey]); return; }
+
+      var api = getElectronAPI();
+      if (!api || !api.googleGmail || !api.googleGmail.downloadAttachment) return;
+
+      // 📦753-fix2 — Mientras baja la imagen se muestra un placeholder gris: antes
+      // no se veía NADA y parecía que el correo no tenía imagen. Además se
+      // de-duplican los pedidos en vuelo (varias partes cid: iguales o re-renders
+      // seguidos) para no gastar cuota pidiendo lo mismo dos veces.
+      img.classList.add("kair-inline-img--loading");
+      if (!img.getAttribute("alt")) img.setAttribute("alt", "Cargando imagen…");
+
+      var pending = _inlineImgPending[cacheKey];
+      if (!pending) {
+        pending = api.googleGmail.downloadAttachment({ messageId: hit.messageId, attachmentId: attId })
+          .then(function (res) {
+            if (!res || !res.success || !res.data || !res.data.data) return null;
+            var mime = res.data.mimeType || att.mime_type || "image/png";
+            var b64 = String(res.data.data).replace(/-/g, "+").replace(/_/g, "/");
+            while (b64.length % 4) b64 += "=";
+            var dataUrl = "data:" + mime + ";base64," + b64;
+            _cacheInlineImage(cacheKey, dataUrl);
+            return dataUrl;
+          })
+          .catch(function () { return null; })
+          .then(function (dataUrl) {
+            delete _inlineImgPending[cacheKey];
+            return dataUrl;
+          });
+        _inlineImgPending[cacheKey] = pending;
+      }
+      pending.then(function (dataUrl) {
+        img.classList.remove("kair-inline-img--loading");
+        // Si falló, dataUrl es null → apply() no hace nada y queda el pixel.
+        apply(dataUrl);
+      });
+    });
+  }
+
       function renderMailBodyHtml(body) {
     if (!body) return '<div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:32px 16px;color:var(--kair-text-light);"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg><p style="margin:0;font-size:0.875rem;font-weight:500;">Sin contenido en este correo</p><p style="margin:0;font-size:0.75rem;color:var(--kair-text-light);">El cuerpo del mensaje está vacío</p></div>';
 
@@ -1397,6 +1498,75 @@
   // sync tarda más que eso (rate limiter de Gmail), así que sin esto se acumulaban
   // en la cola y ninguno terminaba.
   var _syncInFlight = false;
+  // 📦753-fix — Aplica una lista de threads del cache a state.mails preservando
+  // los campos lazy-loaded (messages/body/body_html/attachments) y las marcas
+  // locales del user (leído / destacado). Un solo lugar para las 3 rutas que
+  // refrescan la lista (auto-refresh, post-envío, cambio de carpeta).
+  function applyThreadsToState(threadsData) {
+    var oldById = {};
+    for (var i = 0; i < state.mails.length; i++) {
+      oldById[state.mails[i].id] = state.mails[i];
+    }
+    state.mails = threadsData.map(function (thread) {
+      var newMail = threadToMail(thread);
+      var oldMail = oldById[newMail.id];
+      if (oldMail) {
+        if (oldMail.messages && oldMail.messages.length > 0) newMail.messages = oldMail.messages;
+        if (oldMail.body) newMail.body = oldMail.body;
+        if (oldMail.body_html) newMail.body_html = oldMail.body_html;
+        if (oldMail.attachments) newMail.attachments = oldMail.attachments;
+        if (oldMail.to_list) newMail.to_list = oldMail.to_list;
+        if (oldMail.cc_list) newMail.cc_list = oldMail.cc_list;
+        // El user ya marcó leído/destacado localmente y Gmail todavía no lo refleja
+        if (oldMail.unread === false && newMail.unread === true) newMail.unread = false;
+        if (oldMail.flagged === true && newMail.flagged === false) newMail.flagged = true;
+      }
+      return newMail;
+    });
+  }
+
+  // 📦753-fix — Refresca UNA carpeta AHORA (sincroniza + relee + repinta si esa
+  // carpeta es la que el user está viendo). Se usa al enviar un correo, para que
+  // el mensaje aparezca al instante en vez de esperar al auto-refresh.
+  // 📦753-fix4 — Syncs en vuelo por carpeta: si ya hay uno corriendo para la misma
+  // carpeta no se apila otro (el que corre refresca la lista igual). Sin esto, el
+  // auto-refresh + el post-envío + el foco podían encolar 3 syncs iguales y agotar
+  // el cupo de Gmail → syncs vencidos y Enviados sin actualizar.
+  var _folderSyncInFlight = {};
+
+  function refreshFolderNow(folder, opts) {
+    opts = opts || {};
+    var api = getElectronAPI();
+    if (!api || !api.emailCache || !api.emailCache.syncInbox) return Promise.resolve(false);
+    var target = folder || state.mailFolder || 'INBOX';
+    if (_folderSyncInFlight[target]) return _folderSyncInFlight[target];
+    var limit = opts.maxResults || 25;
+    var run = api.emailCache.syncInbox({ folder: target, maxResults: limit })
+      .then(function (r) {
+        if (!r || !r.success) return false;
+        return api.emailCache.getThreads({ folder: target, maxResults: limit });
+      })
+      .then(function (cacheResult) {
+        if (!cacheResult || !cacheResult.success || !Array.isArray(cacheResult.data)) return false;
+        // Si el user ya cambió de carpeta, no pisamos la lista visible
+        if (state.mailFolder !== target) return true;
+        applyThreadsToState(cacheResult.data);
+        console.log("[BandejaIntegrada] Refresco inmediato: " + state.mails.length + " threads (folder=" + target + ")");
+        render();
+        return true;
+      })
+      .catch(function (e) {
+        console.warn("[BandejaIntegrada] refreshFolderNow(" + target + ") falló:", e && e.message);
+        return false;
+      })
+      .then(function (res) {
+        delete _folderSyncInFlight[target];
+        return res;
+      });
+    _folderSyncInFlight[target] = run;
+    return run;
+  }
+
   function syncInboxInBackground() {
     var api = getElectronAPI();
     if (!api || !api.emailCache) return;
@@ -1423,47 +1593,10 @@
         // F1.B-fix — Solo actualizar state.mails si el cache corresponde al folder actual
         // (por si el user cambió de folder mientras se hacía el sync en background)
         if (state.mailFolder === currentFolder) {
-          // 📦603-fix — Preservar los `messages` cargados del mail viejo al reemplazarlo.
-          // ANTES: state.mails = cacheResult.data.map(threadToMail) creaba objetos
-          // nuevos sin `messages`, lo que causaba que el contenido del correo que el
-          // user estaba viendo se perdiera (renderMailDetail mostraba el mail nuevo
-          // sin messages, sin disparar loadMailBodyFromCache).
-          // AHORA: mergeamos los datos del cache con los mails existentes, preservando
-          // `messages`, `body`, `body_html`, `attachments` y otros campos lazy-loaded.
-          var oldMailsById = {};
-          for (var mi = 0; mi < state.mails.length; mi++) {
-            oldMailsById[state.mails[mi].id] = state.mails[mi];
-          }
-          state.mails = cacheResult.data.map(function (thread) {
-            var newMail = threadToMail(thread);
-            var oldMail = oldMailsById[newMail.id];
-            if (oldMail) {
-              // Preservar campos lazy-loaded del mail viejo
-              if (oldMail.messages && oldMail.messages.length > 0) {
-                newMail.messages = oldMail.messages;
-              }
-              if (oldMail.body) newMail.body = oldMail.body;
-              if (oldMail.body_html) newMail.body_html = oldMail.body_html;
-              if (oldMail.attachments) newMail.attachments = oldMail.attachments;
-              if (oldMail.to_list) newMail.to_list = oldMail.to_list;
-              if (oldMail.cc_list) newMail.cc_list = oldMail.cc_list;
-              // 🐛bug-fix — Preservar cambios locales del user (unread, flagged).
-              // ANTES: el refresh cada 1 min sobrescribia `unread` con el valor del cache
-              // (que aun tenia `true` porque el markMessageRead de Gmail podia estar
-              // pendiente). Resultado: el correo volvia a aparecer como no leido.
-              // AHORA: si el user YA lo marcó como leído localmente (unread=false)
-              // y el cache aún tiene unread=true, preservamos el local. Esto significa
-              // que la llamada a Gmail fallo o está en proceso; el user ya hizo la
-              // acción y no debe perderla. Lo mismo para `flagged` (star).
-              if (oldMail.unread === false && newMail.unread === true) {
-                newMail.unread = false;
-              }
-              if (oldMail.flagged === true && newMail.flagged === false) {
-                newMail.flagged = true;
-              }
-            }
-            return newMail;
-          });
+          // 📦753-fix — El merge (preservar messages/body/body_html/attachments y
+          // las marcas locales de leído/destacado) se movió a applyThreadsToState(),
+          // compartido con el refresco inmediato posterior al envío.
+          applyThreadsToState(cacheResult.data);
           console.log("[BandejaIntegrada] Re-cargados " + state.mails.length + " threads (folder=" + currentFolder + ")");
           render();
         } else {
@@ -1519,7 +1652,7 @@
       // Solo refrescar si la Bandeja Integrada está visible
       var isVisible = document.visibilityState === 'visible';
       if (!isVisible) return;
-      console.log("[BandejaIntegrada] Auto-refresh disparado (cada 1 min)");
+      console.log("[BandejaIntegrada] Auto-refresh disparado (cada 30s)");
       // Refrescar correos (background, no bloquea UI)
       // 📦747 — Solo si los tokens son válidos (si expiró la sesión, el sync fallaría).
       if (api.emailCache && state.gmailTokenValid) {
@@ -1536,8 +1669,8 @@
       }).catch(function (err) {
         console.warn("[BandejaIntegrada] Auto-refresh eventos falló:", err);
       });
-    }, 60 * 1000); // 1 minuto
-    console.log("[BandejaIntegrada] Auto-refresh cada 1 min activado");
+    }, 30 * 1000); // 📦753-fix — 30s (antes 60s) para que los correos nuevos aparezcan antes
+    console.log("[BandejaIntegrada] Auto-refresh cada 30s activado");
   }
   function stopAutoRefresh() {
     if (autoRefreshInterval) {
@@ -1551,6 +1684,9 @@
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === 'visible') {
       startAutoRefresh();
+      // 📦753-fix — Al VOLVER a la app, sincronizar de inmediato: antes había que
+      // esperar hasta 60s a que corriera el timer para ver los correos nuevos.
+      if (state.gmailTokenValid) syncInboxInBackground();
     } else {
       stopAutoRefresh();
     }
@@ -5204,6 +5340,17 @@
       });
     }
 
+    // 📦753 — Las imágenes EN LÍNEA (firma con imagen, logos de empresa, etc.) van
+    // DENTRO del cuerpo del correo, no son "archivos adjuntos". Se excluyen del
+    // listado y se resuelven más abajo con hydrateInlineImages(). Sin esto, la
+    // firma aparecía como "1 archivo adjunto".
+    allAttachments = allAttachments.filter(function (a) {
+      var disp = String(a.disposition || "").toLowerCase();
+      if (disp === "inline") return false;
+      if (a.content_id && disp !== "attachment") return false;
+      return true;
+    });
+
     if (allAttachments.length > 0) {
       const att = el("div", { class: "kair-mail-detail__attachments" });
       const header = el("div", { class: "kair-mail-detail__attachments-header" });
@@ -5376,28 +5523,58 @@
 
     const sendBtn = el("button", { class: "kair-header__action--primary", style: { padding: "6px 12px", fontSize: "0.75rem" } });
     sendBtn.innerHTML = `${D.ICONS.send} <span class="kair-mail-detail__reply-label">Enviar</span>`;
-    sendBtn.addEventListener("click", () => {
-      // F1.B — "Enviar" del input rápido = Reply simple
-      if (!input.value || !input.value.trim()) {
-        toast("Error", "Escribí una respuesta primero", "warning");
+    sendBtn.addEventListener("click", function () {
+      // 📦753-fix3 — ENVIAR de verdad desde la respuesta rápida.
+      // ANTES: este botón (que dice "Enviar") abría el modal de redacción con el
+      // texto prellenado. El user creía que la respuesta ya se había enviado y en
+      // realidad quedaba un borrador abierto en el redactor → la respuesta nunca
+      // salía y no aparecía en Enviados. Ahora envía directo (como Gmail), con la
+      // firma configurada, y refresca la carpeta visible + Enviados.
+      var texto = (input.value || "").trim();
+      if (!texto) {
+        toast("Falta el mensaje", "Escribí una respuesta primero", "warning");
+        input.focus();
         return;
       }
-      // Abrir el modal de compose con el texto prellenado
-      openComposeModal("reply", mail);
-      // Esperar a que el modal esté en el DOM y prellenar el body
-      setTimeout(function () {
-        var bodyEl = document.querySelector("#compose-body");
-        if (bodyEl) {
-          bodyEl.value = input.value + "\n\n" + bodyEl.value;
+      var contacto = getMailDisplayContact(mail);
+      var destino = (contacto && contacto.email) || mail.senderEmail || "";
+      if (!destino) {
+        toast("No se pudo responder", "No se determinó el destinatario del correo", "error");
+        return;
+      }
+      var asunto = String(mail.subject || "");
+      if (asunto.indexOf("RV:") !== 0) asunto = "RV: " + asunto;
+
+      var originalSendHtml = sendBtn.innerHTML;
+      sendBtn.disabled = true;
+      sendBtn.innerHTML = D.ICONS.send + ' <span class="kair-mail-detail__reply-label">Enviando…</span>';
+
+      sendComposedMail({
+        to: destino,
+        cc: "",
+        subject: asunto,
+        body: texto,
+        attachments: [],
+        isReply: true,
+        replyToMail: mail,
+        threadId: mail.threadId || mail.id || undefined
+        // Sin closeModal: la respuesta rápida no tiene modal que cerrar
+      }).then(function (ok) {
+        sendBtn.disabled = false;
+        sendBtn.innerHTML = originalSendHtml;
+        if (ok) {
+          input.value = "";
         }
-        input.value = "";
-      }, 50);
+      });
     });
     reply.appendChild(sendBtn);
 
     // FIX loop 23: reply al final del detail (después del scroll, NO dentro)
     detail.appendChild(reply);
     container.appendChild(detail);
+
+    // 📦753 — Resolver las imágenes en línea (firma con imagen, logos) del cuerpo.
+    hydrateInlineImages(detail, mail);
 
     // 📦626 — Modo compact del reply bar: cuando el reply mide <720px, ocultamos
     // los labels de los botones (mostramos solo iconos). Apariencia más limpia
@@ -5462,39 +5639,87 @@
     }
   }
 
-  // F1-Feature4 — Abre un mini modal para editar la firma de correo.
-  // La firma se guarda en localStorage["kair.emailSignature"] y se agrega
-  // automáticamente al final de cada correo (excepto forwards).
+  // 📦753 — Firma de correo: texto + IMAGEN.
+  //  · Texto  → localStorage["kair.emailSignature"]        (como antes)
+  //  · Imagen → localStorage["kair.emailSignatureImage"]   (data URL + metadatos)
+  // La imagen se envía como imagen EN LÍNEA (CID) — ver buildRawMessage() en
+  // shared/google-gmail.js —, así el destinatario la ve DENTRO del correo y no
+  // como un archivo adjunto suelto.
+  var SIG_IMAGE_KEY = "kair.emailSignatureImage";
+  var SIG_IMAGE_MAX_BYTES = 400 * 1024;   // 400 KB: entra cómodo en localStorage
+  var SIG_IMAGE_MIMES = /^image\/(png|jpeg|jpg|webp|gif)$/;
+
+  // Devuelve la firma-imagen lista para el backend ({name, mimeType, data}) o null.
+  // El backend espera el base64 SIN el prefijo "data:image/...;base64,".
+  function getSignatureImage() {
+    try {
+      var raw = localStorage.getItem(SIG_IMAGE_KEY);
+      if (!raw) return null;
+      var obj = JSON.parse(raw);
+      if (!obj || !obj.dataUrl || !obj.mimeType) return null;
+      if (!SIG_IMAGE_MIMES.test(String(obj.mimeType))) return null;
+      var parts = String(obj.dataUrl).split(",");
+      if (parts.length < 2 || !parts[1]) return null;
+      return { name: obj.name || "firma.png", mimeType: obj.mimeType, data: parts[1] };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // F1-Feature4 — Abre el modal para editar la firma de correo (texto + imagen).
+  // La firma se agrega automáticamente al final de cada correo (excepto forwards).
   function openSignatureModal() {
     // Si ya hay un modal abierto, no abrir otro
     if (document.querySelector(".kair-signature-modal")) return;
 
     var currentSig = localStorage.getItem("kair.emailSignature") || "";
+    // Imagen guardada (se copia a un borrador: recién se persiste al Guardar)
+    var draftImage = null;
+    try {
+      var rawImg = localStorage.getItem(SIG_IMAGE_KEY);
+      if (rawImg) {
+        var parsedImg = JSON.parse(rawImg);
+        if (parsedImg && parsedImg.dataUrl) draftImage = parsedImg;
+      }
+    } catch (e) { draftImage = null; }
+
     var modal = el("div", { class: "kair-signature-modal-overlay" });
     modal.innerHTML = `
       <div class="kair-signature-modal" role="dialog" aria-modal="true" aria-labelledby="sig-modal-title">
         <div class="kair-signature-modal__header">
-          <h3 id="sig-modal-title">Firma de correo</h3>
-          <button class="kair-signature-modal__close" type="button" aria-label="Cerrar" title="Cerrar">
+          <span class="kair-signature-modal__icon">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17c0-1.66 3.58-3 8-3s8 1.34 8 3v3H3v-3z"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          </span>
+          <span class="kair-signature-modal__titles">
+            <span id="sig-modal-title" class="kair-signature-modal__title">Firma de correo</span>
+            <span class="kair-signature-modal__sub">Se agrega al final de tus correos nuevos y de tus respuestas</span>
+          </span>
+          <button class="kair-signature-modal__close" type="button" aria-label="Cerrar" title="Cerrar (ESC)">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
         </div>
         <div class="kair-signature-modal__body">
-          <p class="kair-signature-modal__hint">Esta firma se agregará automáticamente al final de cada correo que envíes (no se incluye en los reenvíos).</p>
-          <label for="sig-textarea" class="kair-signature-modal__label">Tu firma</label>
+          <p class="kair-signature-modal__hint">La firma no se incluye en los reenvíos, para no duplicarla dentro del hilo.</p>
+
+          <div class="kair-signature-modal__label">Texto de la firma</div>
           <textarea
             id="sig-textarea"
             class="kair-signature-modal__textarea"
             placeholder="Ej:&#10;Javier Robles&#10;Consultor SG-SST&#10;Tel: +57 300 123 4567&#10;javier@ejemplo.com"
-            rows="8"
+            rows="6"
           >${currentSig.replace(/</g, '&lt;')}</textarea>
-          <p class="kair-signature-modal__preview-label">Vista previa:</p>
-          <div class="kair-signature-modal__preview" id="sig-preview">${currentSig ? (currentSig.replace(/</g, '&lt;').replace(/\n/g, '<br>')) : '<em style="color:var(--email-text-secondary);">(sin firma)</em>'}</div>
+
+          <div class="kair-signature-modal__label">Imagen de la firma <span class="kair-signature-modal__optional">opcional</span></div>
+          <div class="kair-signature-modal__imgbox" id="sig-imgbox"></div>
+          <input type="file" id="sig-image-input" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+
+          <div class="kair-signature-modal__label">Vista previa</div>
+          <div class="kair-signature-modal__preview" id="sig-preview"></div>
         </div>
         <div class="kair-signature-modal__footer">
-          <button class="kair-signature-modal__btn kair-signature-modal__btn--secondary" type="button" id="sig-clear">Borrar firma</button>
-          <div style="flex:1;"></div>
-          <button class="kair-signature-modal__btn kair-signature-modal__btn--secondary" type="button" id="sig-cancel">Cancelar</button>
+          <button class="kair-signature-modal__btn kair-signature-modal__btn--danger" type="button" id="sig-clear">Borrar firma</button>
+          <span class="kair-signature-modal__spacer"></span>
+          <button class="kair-signature-modal__btn" type="button" id="sig-cancel">Cancelar</button>
           <button class="kair-signature-modal__btn kair-signature-modal__btn--primary" type="button" id="sig-save">Guardar</button>
         </div>
       </div>
@@ -5503,20 +5728,86 @@
 
     var textarea = modal.querySelector("#sig-textarea");
     var preview = modal.querySelector("#sig-preview");
+    var imgBox = modal.querySelector("#sig-imgbox");
+    var fileInput = modal.querySelector("#sig-image-input");
     var closeBtn = modal.querySelector(".kair-signature-modal__close");
     var cancelBtn = modal.querySelector("#sig-cancel");
     var saveBtn = modal.querySelector("#sig-save");
     var clearBtn = modal.querySelector("#sig-clear");
 
-    // Live preview mientras se edita
-    textarea.addEventListener("input", function () {
-      var v = textarea.value;
-      if (v.trim()) {
-        preview.innerHTML = v.replace(/</g, '&lt;').replace(/\n/g, '<br>');
-      } else {
-        preview.innerHTML = '<em style="color:var(--email-text-secondary);">(sin firma)</em>';
+    function fmtBytes(n) {
+      if (n === undefined || n === null || n === "") return "";
+      return n < 1024 ? n + " B" : Math.round(n / 1024) + " KB";
+    }
+
+    // Vista previa en vivo (imagen arriba, texto abajo).
+    function renderPreview() {
+      var txt = textarea.value.trim();
+      var html = "";
+      if (draftImage && draftImage.dataUrl) {
+        html += '<img class="kair-signature-modal__preview-img" src="' + draftImage.dataUrl + '" alt="Firma">';
       }
+      if (txt) {
+        html += '<div class="kair-signature-modal__preview-txt">' + txt.replace(/</g, "&lt;").replace(/\n/g, "<br>") + '</div>';
+      }
+      preview.innerHTML = html || '<em class="kair-signature-modal__empty">Todavía no cargaste una firma</em>';
+    }
+
+    // Caja de la imagen: estado vacío (botón Subir) o cargado (miniatura + acciones).
+    function renderImgBox() {
+      if (draftImage && draftImage.dataUrl) {
+        var nm = String(draftImage.name || "firma.png").replace(/</g, "&lt;");
+        imgBox.innerHTML =
+          '<div class="kair-signature-modal__thumb"><img src="' + draftImage.dataUrl + '" alt="Imagen de firma"></div>' +
+          '<div class="kair-signature-modal__imgmeta">' +
+            '<span class="kair-signature-modal__imgname">' + nm + '</span>' +
+            '<span class="kair-signature-modal__imgsize">' + fmtBytes(draftImage.size) + ' · viaja dentro del correo</span>' +
+            '<span class="kair-signature-modal__imgactions">' +
+              '<button class="kair-signature-modal__imgbtn" type="button" id="sig-img-change">Cambiar</button>' +
+              '<button class="kair-signature-modal__imgbtn kair-signature-modal__imgbtn--danger" type="button" id="sig-img-remove">Quitar</button>' +
+            '</span>' +
+          '</div>';
+        imgBox.querySelector("#sig-img-change").addEventListener("click", function () { fileInput.click(); });
+        imgBox.querySelector("#sig-img-remove").addEventListener("click", function () {
+          draftImage = null;
+          renderImgBox();
+          renderPreview();
+        });
+      } else {
+        imgBox.innerHTML =
+          '<button class="kair-signature-modal__imgpick" type="button" id="sig-img-pick">' +
+            '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>' +
+            'Subir imagen' +
+          '</button>' +
+          '<span class="kair-signature-modal__imghint">PNG, JPG, WEBP o GIF · hasta 400 KB · se ve dentro del correo</span>';
+        imgBox.querySelector("#sig-img-pick").addEventListener("click", function () { fileInput.click(); });
+      }
+    }
+
+    fileInput.addEventListener("change", function () {
+      var file = fileInput.files && fileInput.files[0];
+      fileInput.value = "";  // permite volver a elegir el mismo archivo
+      if (!file) return;
+      if (!SIG_IMAGE_MIMES.test(file.type)) {
+        toast("Formato no soportado", "Usá PNG, JPG, WEBP o GIF", "warning");
+        return;
+      }
+      if (file.size > SIG_IMAGE_MAX_BYTES) {
+        toast("Imagen muy pesada", "El máximo es 400 KB y la tuya pesa " + fmtBytes(file.size), "warning");
+        return;
+      }
+      var reader = new FileReader();
+      reader.onload = function () {
+        draftImage = { dataUrl: reader.result, mimeType: file.type, name: file.name, size: file.size };
+        renderImgBox();
+        renderPreview();
+      };
+      reader.onerror = function () { toast("No se pudo leer la imagen", "Probá con otro archivo", "error"); };
+      reader.readAsDataURL(file);
     });
+
+    // Live preview mientras se edita el texto
+    textarea.addEventListener("input", renderPreview);
 
     var closeModal = function () {
       if (modal.parentNode) modal.parentNode.removeChild(modal);
@@ -5528,16 +5819,30 @@
     });
     clearBtn.addEventListener("click", function () {
       textarea.value = "";
-      preview.innerHTML = '<em style="color:var(--email-text-secondary);">(sin firma)</em>';
+      draftImage = null;
+      renderImgBox();
+      renderPreview();
       textarea.focus();
     });
     saveBtn.addEventListener("click", function () {
       var newSig = textarea.value.trim();
       if (newSig) {
         localStorage.setItem("kair.emailSignature", newSig);
-        toast("Firma guardada", "Se agregará automáticamente al final de tus correos", "success");
       } else {
         localStorage.removeItem("kair.emailSignature");
+      }
+      if (draftImage && draftImage.dataUrl) {
+        try {
+          localStorage.setItem(SIG_IMAGE_KEY, JSON.stringify(draftImage));
+        } catch (e) {
+          toast("No se pudo guardar la imagen", "El almacenamiento local está lleno", "error");
+        }
+      } else {
+        localStorage.removeItem(SIG_IMAGE_KEY);
+      }
+      if (newSig || (draftImage && draftImage.dataUrl)) {
+        toast("Firma guardada", "Se agregará automáticamente al final de tus correos", "success");
+      } else {
         toast("Firma eliminada", "Ya no se agregará firma a tus correos", "info");
       }
       closeModal();
@@ -5552,6 +5857,10 @@
         saveBtn.click();
       }
     });
+
+    renderImgBox();
+    renderPreview();
+
     // Auto-focus en el textarea
     setTimeout(function () {
       textarea.focus();
@@ -6252,11 +6561,11 @@
     var api = getElectronAPI();
     if (!api || !api.googleGmail || !api.googleGmail.sendMessage) {
       toast("Error", "Gmail no está conectado", "error");
-      return;
+      return false;
     }
     if (!opts.to || !opts.to.trim()) {
       toast("Error", "Falta el destinatario", "error");
-      return;
+      return false;
     }
 
     // Mostrar estado de "enviando"
@@ -6326,6 +6635,9 @@
       // F1-Feature4 — Agregar la firma al body si existe
       // La firma se guarda en localStorage y se carga al abrir la Bandeja Integrada
       var signature = localStorage.getItem("kair.emailSignature") || "";
+      // 📦753 — Firma con imagen: el backend la incrusta en el HTML como imagen
+      // en línea (CID). No se manda en reenvíos, igual que la firma de texto.
+      var signatureImage = opts.isForward ? null : getSignatureImage();
 
       // Quote del mensaje original (si es reply/forward) — el bloque HTML se concatena
       // como texto plano al body. NO usamos "De: ... Enviado: ... Para: ... Asunto: ..."
@@ -6365,7 +6677,10 @@
         references: references,
         threadId: opts.threadId || undefined,
         // Loop 38 — Pasar los adjuntos al backend
-        attachments: attachmentsPayload
+        attachments: attachmentsPayload,
+        // 📦753 — Imagen de firma (inline/CID). El backend la agrega al HTML y
+        // como parte relacionada del MIME.
+        signatureImage: signatureImage || undefined
       });
 
       if (result && result.success) {
@@ -6377,37 +6692,23 @@
         showUndoToast("Mensaje enviado", function () {
           toast("Para deshacer", "Abrí Gmail → Enviados y eliminá el mensaje manualmente", "info");
         });
-        opts.closeModal();
-        // Refrescar el cache para mostrar el nuevo mensaje
-        if (api.emailCache && api.emailCache.syncInbox) {
-          api.emailCache.syncInbox({ folder: 'INBOX', maxResults: 25 }).then(function () { // 📦 P1-2 fix: reducir de 50 a 25
-            return api.emailCache.getThreads({ folder: 'INBOX', maxResults: 25 }); // 📦 P1-2 fix: reducir de 50 a 25
-          }).then(function (cacheResult) {
-            if (cacheResult && cacheResult.success && Array.isArray(cacheResult.data)) {
-              // 🐛bug-fix — Preservar cambios locales (unread/flagged) en el refresh post-envio.
-              if (state.mails && state.mails.length > 0) {
-                var __oldMailsById = {};
-                for (var __mi = 0; __mi < state.mails.length; __mi++) {
-                  __oldMailsById[state.mails[__mi].id] = state.mails[__mi];
-                }
-                state.mails = cacheResult.data.map(function (thread) {
-                  var __newMail = threadToMail(thread);
-                  var __oldMail = __oldMailsById[__newMail.id];
-                  if (__oldMail) {
-                    if (__oldMail.unread === false && __newMail.unread === true) __newMail.unread = false;
-                    if (__oldMail.flagged === true && __newMail.flagged === false) __newMail.flagged = true;
-                  }
-                  return __newMail;
-                });
-              } else {
-                state.mails = cacheResult.data.map(threadToMail);
-              }
-              render();
-            }
-          }).catch(function (e) {
-            console.warn("[BandejaIntegrada] Error refrescando cache post-envío:", e.message);
-          });
-        }
+        // 📦753-fix3 — `closeModal` es opcional: la respuesta rápida envía sin modal.
+        if (typeof opts.closeModal === 'function') opts.closeModal();
+        // 📦753-fix — Refrescar YA y en la carpeta CORRECTA. Antes se sincronizaba
+        // únicamente INBOX, así que el correo recién enviado (que vive en Enviados)
+        // no aparecía hasta el siguiente auto-refresh → hasta ~2 minutos de demora.
+        // Ahora se refresca al instante la carpeta visible + Enviados.
+        var foldersToRefresh = [];
+        if (state.mailFolder) foldersToRefresh.push(state.mailFolder);
+        if (foldersToRefresh.indexOf('SENT') === -1) foldersToRefresh.push('SENT');
+        foldersToRefresh.forEach(function (f) {
+          // Enviados solo necesita los últimos hilos (el correo recién enviado es el
+          // más nuevo): pedir 8 en vez de 25 hace el refresco mucho más barato.
+          refreshFolderNow(f, f === 'SENT' ? { maxResults: 8 } : null);
+        });
+        // 📦753-fix3 — Devolver el resultado permite que la respuesta rápida sepa
+        // si el envío salió bien (antes devolvía undefined siempre).
+        return true;
       } else {
         var errorMsg = (result && result.error) || "Error desconocido";
         toast("Error al enviar", errorMsg, "error");
@@ -6415,6 +6716,7 @@
           sendBtn.disabled = false;
           sendBtn.innerHTML = originalText;
         }
+        return false;
       }
     } catch (e) {
       console.error("[BandejaIntegrada] Error en sendComposedMail:", e);
@@ -6424,6 +6726,7 @@
         sendBtn.innerHTML = originalText;
         sendBtn.style.display = ""; // Restaurar visibilidad
       }
+      return false;
     }
   }
 

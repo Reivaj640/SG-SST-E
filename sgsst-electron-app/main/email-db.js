@@ -343,19 +343,14 @@ function saveMessage(msg) {
   `);
   const now = Date.now();
 
-  // Loop2-fix — Marcar el thread como NO LEÍDO si el mensaje NO es del user.
-  // Si el user recibió un correo nuevo (o le respondieron), el thread debe
-  // marcarse como no leído para que aparezca con el dot azul.
-  // Si el mensaje es del user (is_sent=true), NO marcar como no leído.
-  if (msg.thread_id && !msg.is_sent) {
-    try {
-      db().prepare('UPDATE email_threads SET has_unread = 1 WHERE id = ?').run(msg.thread_id);
-    } catch (e) {
-      // No crítico, solo es un flag
-    }
-  }
+  // 📦753-fix2 — ANTES acá se forzaba `has_unread = 1` para cualquier mensaje que
+  // no fuera del user (Loop2-fix). Como el auto-refresh re-guarda los últimos 25
+  // hilos en cada corrida, CADA sincronizado volvía a marcar como NO LEÍDO un
+  // correo que el user ya había leído (el mark-read local se perdía). Ahora el
+  // flag se RECALCULA desde los labels reales de los mensajes, DESPUÉS de guardar
+  // (ver recomputeThreadUnread más abajo).
 
-  return stmt.run({
+  const result = stmt.run({
     id: msg.id,
     thread_id: msg.thread_id,
     connection_id: msg.connection_id || null,
@@ -382,6 +377,41 @@ function saveMessage(msg) {
     created_at: msg.created_at || now,
     updated_at: now
   });
+
+  // Recalcular el flag del thread con los labels que se acaban de guardar.
+  if (msg.thread_id) {
+    try {
+      recomputeThreadUnread(msg.thread_id);
+    } catch (e) {
+      // No crítico: es un flag de UI
+    }
+  }
+
+  return result;
+}
+
+/**
+ * 📦753-fix2 — Recalcula `email_threads.has_unread` a partir de los labels REALES
+ * de los mensajes del thread (es lo que alimenta el punto azul de "no leído" en la
+ * lista: `threadToMail()` → `unread: thread.has_unread`).
+ *
+ * Un thread está no leído si tiene AL MENOS UN mensaje recibido (no enviado, no
+ * borrador) con el label UNREAD. Así se respeta el mark-read del user y también
+ * se detecta correctamente un correo nuevo que llega sin leer.
+ *
+ * @param {string} threadId
+ */
+function recomputeThreadUnread(threadId) {
+  if (!threadId) return;
+  const row = db().prepare(`
+    SELECT COUNT(*) AS unread_count FROM email_messages
+    WHERE thread_id = ?
+      AND is_sent = 0
+      AND is_draft = 0
+      AND label_ids LIKE '%"UNREAD"%'
+  `).get(threadId);
+  const hasUnread = (row && row.unread_count > 0) ? 1 : 0;
+  db().prepare('UPDATE email_threads SET has_unread = ? WHERE id = ?').run(hasUnread, threadId);
 }
 
 /**
@@ -532,9 +562,9 @@ function getLabelsFromCache(connectionId) {
 function saveAttachment(att) {
   const stmt = db().prepare(`
     INSERT INTO email_attachments
-      (message_id, filename, mime_type, size, attachment_id, created_at)
+      (message_id, filename, mime_type, size, attachment_id, content_id, disposition, created_at)
     VALUES
-      (@message_id, @filename, @mime_type, @size, @attachment_id, @created_at)
+      (@message_id, @filename, @mime_type, @size, @attachment_id, @content_id, @disposition, @created_at)
   `);
   return stmt.run({
     message_id: att.message_id,
@@ -542,6 +572,10 @@ function saveAttachment(att) {
     mime_type: att.mime_type || 'application/octet-stream',
     size: att.size || 0,
     attachment_id: att.attachment_id || null,
+    // 📦753 — content_id permite resolver los `cid:` del HTML (imágenes en línea);
+    // disposition distingue 'inline' de 'attachment'.
+    content_id: att.content_id || null,
+    disposition: att.disposition || null,
     created_at: Date.now()
   });
 }
@@ -664,7 +698,7 @@ module.exports = {
   // Threads
   saveThread, getThreadsFromCache, getThreadFromCache, deleteThreadsByFolder, deleteThreadsByIds,
   // Mensajes
-  saveMessage, getMessagesFromCache, propagateUnreadChange,
+  saveMessage, getMessagesFromCache, propagateUnreadChange, recomputeThreadUnread,
   // Labels
   saveLabel, getLabelsFromCache,
   // Adjuntos (F1-Feature5)

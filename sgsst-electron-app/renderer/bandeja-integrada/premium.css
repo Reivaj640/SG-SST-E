@@ -1107,6 +1107,18 @@ html, body {
 }
 .kair-mail-detail__reply-input::placeholder { color: var(--kair-text-3); }
 
+/* 📦753-fix2 — Placeholder mientras se descarga una imagen EN LÍNEA (firma, logos).
+   Antes, durante la espera no se veía NADA y parecía que el correo no tenía imagen. */
+.kair-inline-img--loading {
+  display: inline-block;
+  min-width: 180px;
+  min-height: 64px;
+  max-width: 420px;
+  background: var(--kair-slate-soft);
+  border-radius: var(--kair-r-xs);
+  animation: kairPulse 1.4s ease-in-out infinite;
+}
+
 /* Chips de etiquetas y tags del correo */
 .kair-mail-tag,
 .kair-mail-label-chip {
@@ -1657,6 +1669,259 @@ html, body {
   background: var(--kair-blue);
   border-color: var(--kair-blue);
   color: #fff;
+}
+
+/* ── Modal de firma de correo (📦753) ──────────────────────────────────
+   El CSS legacy pintaba el header con background #404040 (gris oscuro) y el
+   título en blanco. Al pasar al premium hay que sobreescribir background Y
+   color, no solo la tipografía: si no, el título queda oscuro sobre oscuro.
+   Además: el modal era de 8px de radio (ahora 20) y se agregó la sección de
+   imagen de firma. */
+.kair-signature-modal {
+  width: 100%;
+  max-width: 560px;
+  background: var(--kair-surface);
+  border: 1px solid var(--kair-border);
+  border-radius: var(--kair-r-md);
+  box-shadow: var(--kair-sh-lg);
+  overflow: hidden;
+}
+.kair-signature-modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(20, 33, 61, .45);
+  backdrop-filter: blur(2px);
+  z-index: 450000;   /* debajo del modal de eventos (500000) y del redactor (400000) */
+}
+.kair-signature-modal__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: var(--kair-surface);
+  color: var(--kair-text);
+  border-bottom: 1px solid var(--kair-border);
+}
+.kair-signature-modal__icon {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--kair-r-xs);
+  background: var(--kair-blue-soft);
+  color: var(--kair-blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.kair-signature-modal__titles { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.kair-signature-modal__title {
+  font-family: var(--kair-font-t);
+  font-size: 15.5px;
+  font-weight: 800;
+  letter-spacing: -.01em;
+  color: var(--kair-text);
+}
+.kair-signature-modal__sub { font-size: 12px; color: var(--kair-text-3); margin-top: 1px; }
+.kair-signature-modal__body {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: calc(100vh - 230px);
+  overflow-y: auto;
+}
+.kair-signature-modal__hint {
+  font-size: 12.5px;
+  color: var(--kair-text-2);
+  background: var(--kair-blue-soft);
+  border: 1px solid var(--kair-blue-soft2);
+  border-radius: var(--kair-r-xs);
+  padding: 9px 12px;
+  margin: 0 0 4px;
+  line-height: 1.5;
+}
+.kair-signature-modal__label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--kair-text-3);
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.kair-signature-modal__optional {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--kair-text-2);
+  background: var(--kair-slate-soft);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+.kair-signature-modal__textarea {
+  width: 100%;
+  border: 1px solid var(--kair-border-2);
+  border-radius: var(--kair-r-xs);
+  padding: 12px 14px;
+  font-size: 13.5px;
+  font-family: inherit;
+  color: var(--kair-text);
+  background: var(--kair-surface);
+  resize: vertical;
+  min-height: 120px;
+  line-height: 1.55;
+  box-sizing: border-box;
+  transition: var(--kair-t);
+}
+.kair-signature-modal__textarea:focus {
+  outline: none;
+  border-color: var(--kair-blue);
+  box-shadow: 0 0 0 3px rgba(32, 87, 184, .12);
+}
+/* Sección de imagen */
+.kair-signature-modal__imgbox {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px dashed var(--kair-border-2);
+  border-radius: var(--kair-r-xs);
+  padding: 12px;
+  background: var(--kair-bg);
+}
+.kair-signature-modal__imgpick {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border-radius: var(--kair-r-xs);
+  border: 1px solid var(--kair-border-2);
+  background: var(--kair-surface);
+  color: var(--kair-blue);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: var(--kair-t);
+  flex: none;
+}
+.kair-signature-modal__imgpick:hover { background: var(--kair-blue-soft); border-color: var(--kair-blue-soft2); }
+.kair-signature-modal__imghint { font-size: 11.5px; color: var(--kair-text-3); line-height: 1.45; }
+.kair-signature-modal__thumb {
+  width: 96px;
+  height: 64px;
+  border-radius: var(--kair-r-xs);
+  border: 1px solid var(--kair-border);
+  background: var(--kair-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex: none;
+}
+.kair-signature-modal__thumb img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.kair-signature-modal__imgmeta { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.kair-signature-modal__imgname {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--kair-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kair-signature-modal__imgsize { font-size: 11.5px; color: var(--kair-text-3); }
+.kair-signature-modal__imgactions { display: flex; gap: 6px; margin-top: 4px; }
+.kair-signature-modal__imgbtn {
+  padding: 5px 11px;
+  border-radius: 8px;
+  border: 1px solid var(--kair-border-2);
+  background: var(--kair-surface);
+  color: var(--kair-text-2);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: var(--kair-t);
+}
+.kair-signature-modal__imgbtn:hover {
+  border-color: var(--kair-blue-soft2);
+  color: var(--kair-blue);
+  background: var(--kair-blue-soft);
+}
+.kair-signature-modal__imgbtn--danger { color: var(--kair-red-d); border-color: #F2C9CE; }
+.kair-signature-modal__imgbtn--danger:hover {
+  background: var(--kair-red-soft);
+  border-color: #F2C9CE;
+  color: var(--kair-red-d);
+}
+/* Vista previa */
+.kair-signature-modal__preview {
+  background: var(--kair-surface);
+  border: 1px solid var(--kair-border);
+  border-radius: var(--kair-r-xs);
+  padding: 14px;
+  min-height: 76px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.kair-signature-modal__preview-img {
+  max-width: 220px;
+  max-height: 110px;
+  height: auto;
+  object-fit: contain;
+  align-self: flex-start;
+}
+.kair-signature-modal__preview-txt { font-size: 13px; line-height: 1.55; color: var(--kair-text); }
+.kair-signature-modal__empty { font-size: 12.5px; color: var(--kair-text-3); }
+/* Pie + botones */
+.kair-signature-modal__footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--kair-border);
+  background: #FAFBFC;
+}
+.kair-signature-modal__spacer { flex: 1; }
+.kair-signature-modal__btn {
+  padding: 8px 16px;
+  border-radius: var(--kair-r-xs);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: var(--kair-t);
+  border: 1px solid var(--kair-border-2);
+  background: var(--kair-surface);
+  color: var(--kair-text-2);
+}
+.kair-signature-modal__btn:hover {
+  border-color: var(--kair-blue-soft2);
+  color: var(--kair-blue);
+  background: var(--kair-blue-soft);
+}
+.kair-signature-modal__btn--primary {
+  background: var(--kair-blue);
+  border-color: var(--kair-blue);
+  color: #fff;
+}
+.kair-signature-modal__btn--primary:hover {
+  background: var(--kair-blue-h);
+  border-color: var(--kair-blue-h);
+  color: #fff;
+}
+.kair-signature-modal__btn--danger { color: var(--kair-red-d); border-color: #F2C9CE; }
+.kair-signature-modal__btn--danger:hover {
+  background: var(--kair-red-soft);
+  border-color: #F2C9CE;
+  color: var(--kair-red-d);
 }
 
 /* ══════════ 10. REDACTOR FLOTANTE ══════════ */
