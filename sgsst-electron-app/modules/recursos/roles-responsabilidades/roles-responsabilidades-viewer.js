@@ -1,999 +1,1246 @@
-// roles-responsabilidades-viewer.js
+/**
+ * roles-responsabilidades-viewer.js
+ *
+ * Lógica de la vista del submódulo 1.1.2 Roles y Responsabilidades.
+ * Cumple con Decreto 1072 de 2015 art. 2.2.4.6.8 + Resolución 0312/2019.
+ */
+'use strict';
 
-// Variables globales
-let currentDocument = null;
-let currentViewer = null;
-let currentZoom = 100;
-let totalPages = 0;
-let currentPage = 1;
-let currentFolderPath = '';
-let pathHistory = [];
+var rrState = {
+  empresaId: null,
+  empresaNombre: null,
+  catalogo: [],
+  asignaciones: [],
+  divulgaciones: [],
+  // 📦706-fix19 (2026-08-14) — rrState.documentos eliminado. Los PDFs
+  // se cargan on-demand cuando se abre el modal de un trabajador.
+  // El badge "+N anteriores" usa d.documento_count del bridge.
+  currentTab: 'gestion',
+  editingRol: null,
+  editingDivulg: null,
+  // 📦706-fix24 (2026-08-14) — Modo edición de la matriz (Responsabilidades /
+  // Autoridad / Rendición de Cuentas). true = los 3 párrafos se muestran como
+  // textareas editables; false = modo lectura con los 3 párrafos de texto.
+  matrizEditMode: false
+};
 
-// --- START: Communication Logic ---
+function $(sel) { return document.querySelector(sel); }
+function $$(sel) { return Array.from(document.querySelectorAll(sel)); }
 
-function callParentAPI(type, payload) {
-    console.log(`[roles-responsabilidades-viewer.js][callParentAPI] Enviando solicitud al padre. Tipo: ${type}, Payload:`, payload);
-    return new Promise((resolve, reject) => {
-        const requestId = `req-${Date.now()}-${Math.random()}`;
-
-        const handleResponse = (event) => {
-            if (event.origin !== 'file://' || event.source !== window.parent) {
-                return;
-            }
-
-            const response = event.data;
-            if (response.type === `${type}-response` && response.requestId === requestId) {
-                window.removeEventListener('message', handleResponse);
-                console.log(`[roles-responsabilidades-viewer.js][callParentAPI] Respuesta recibida. Success: ${response.payload && response.payload.success}`);
-
-                if (response.payload && response.payload.success) {
-                    resolve(response.payload);
-                } else {
-                    const errorMessage = (response.payload && response.payload.error) || 'Unknown error from parent process';
-                    console.error(`[roles-responsabilidades-viewer.js][callParentAPI] Error:`, errorMessage);
-                    reject(new Error(errorMessage));
-                }
-            }
-        };
-
-        window.addEventListener('message', handleResponse);
-
-        window.parent.postMessage({
-            type: `${type}-request`,
-            payload,
-            requestId
-        }, 'file://');
-    });
-}
-// --- END: Communication Logic ---
-
-
-// Inicialización
-document.addEventListener('DOMContentLoaded', function() {
-    setupEventListeners();
-    setupDragAndDrop(); // Agregar funcionalidad drag & drop
-    setupContextMenu(); // Agregar menú contextual
-    loadFolders();
-});
-
-// Configurar event listeners
-function setupEventListeners() {
-    // Navegación Global
-    document.getElementById('backToModuleBtn').addEventListener('click', () => {
-        if (window.parent && window.parent.postMessage) {
-            window.parent.postMessage({ type: 'back-to-module-request' }, '*');
-        }
-    });
-
-    // Acciones de Documento
-    document.getElementById('downloadBtn').addEventListener('click', downloadDocument);
-    document.getElementById('printBtn').addEventListener('click', printDocument);
-    document.getElementById('closeDocBtn').addEventListener('click', closeDocument);
-
-    // Navegación Local (Carpetas)
-    document.getElementById('goBackBtn').addEventListener('click', () => goUpLevel());
-
-    // Zoom Controls
-    document.getElementById('zoomInBtn').addEventListener('click', zoomIn);
-    document.getElementById('zoomOutBtn').addEventListener('click', zoomOut);
-    document.getElementById('fitWidthBtn').addEventListener('click', fitWidth);
+// 📦706-fix21 (2026-08-14) — Toast notifications (mismo patrón que 6.1.2
+// Política). Reemplazan los `alert()` nativos con algo más profesional.
+// API: _showToast(message, type, duration)
+//   message: string (puede tener HTML básico como <strong>, <code>, <br>)
+//   type: 'success' | 'error' | 'warning' | 'info' (default: 'info')
+//   duration: ms (default: 3000). Usar 0 para que no se cierre solo.
+function _showToast(message, type, duration) {
+  type = type || 'info';
+  duration = (duration === undefined) ? 3000 : duration;
+  var container = document.getElementById('kToastContainer');
+  if (!container) {
+    // Fallback si el container no existe (ej: durante el init)
+    console.log('[TOAST ' + type.toUpperCase() + ']', message.replace(/<[^>]+>/g, ''));
+    return;
+  }
+  var icons = {
+    success: 'bi-check-circle-fill',
+    error: 'bi-x-circle-fill',
+    warning: 'bi-exclamation-triangle-fill',
+    info: 'bi-info-circle-fill'
+  };
+  var toast = document.createElement('div');
+  toast.className = 'kair-toast kair-toast--' + type;
+  toast.innerHTML =
+    '<i class="bi ' + (icons[type] || icons.info) + ' kair-toast__icon"></i>' +
+    '<span class="kair-toast__message">' + message + '</span>';
+  container.appendChild(toast);
+  if (duration > 0) {
+    setTimeout(function () {
+      toast.classList.add('is-closing');
+      setTimeout(function () {
+        if (toast.parentNode) toast.parentNode.removeChild(toast);
+      }, 320);
+    }, duration);
+  }
 }
 
-// ===============================
-// DRAG & DROP FUNCTIONALITY (Por Carpeta)
-// ===============================
+// 📦706-fix22 (2026-08-14) — Modal de confirmación custom. Reemplaza
+// el `confirm()` nativo del navegador con un modal consistente con
+// el resto del viewer. Retorna una Promise<boolean>.
+// API: _showConfirm(title, message, options)
+//   title: string (ej. "Eliminar divulgación")
+//   message: string (ej. "¿Estás seguro de eliminar esta divulgación?")
+//   options: { acceptText, acceptIcon, variant }
+//     - acceptText: texto del botón confirmar (default: "Confirmar")
+//     - acceptIcon: clase del ícono (default: "bi-check-lg")
+//     - variant: 'danger' (default) o 'primary' (para confirmaciones no destructivas)
+function _showConfirm(title, message, options) {
+  options = options || {};
+  var acceptText = options.acceptText || 'Confirmar';
+  var acceptIcon = options.acceptIcon || 'bi-check-lg';
+  var variant = options.variant || 'danger';
 
-// Configurar eventos de drag & drop
-function setupDragAndDrop() {
-    // Se configura dinámicamente en renderFolders() para cada carpeta
-    console.log('[Drag&Drop] Setup completado - se activará por carpeta');
+  return new Promise(function (resolve) {
+    var modal = document.getElementById('modalConfirm');
+    if (!modal) {
+      // Fallback al confirm() nativo si el modal no existe
+      var fallback = window.confirm(message);
+      resolve(fallback);
+      return;
+    }
+    var titleEl = document.getElementById('modalConfirmTitle');
+    var messageEl = document.getElementById('modalConfirmMessage');
+    var acceptTextEl = document.getElementById('modalConfirmAcceptText');
+    var acceptBtn = document.getElementById('btnConfirmAccept');
+
+    if (titleEl) titleEl.textContent = title;
+    if (messageEl) messageEl.textContent = message;
+    if (acceptTextEl) acceptTextEl.textContent = acceptText;
+    if (acceptBtn) {
+      // Cambiar el ícono + variant
+      var iconEl = acceptBtn.querySelector('i');
+      if (iconEl) {
+        iconEl.className = 'bi ' + acceptIcon;
+      }
+      // Toggle variant
+      acceptBtn.classList.remove('kair-rr-btn--danger', 'kair-rr-btn--primary');
+      acceptBtn.classList.add('kair-rr-btn--' + variant);
+    }
+
+    // Guardar el resolve en un atributo del modal para que los handlers
+    // puedan invocarlo
+    modal._resolveConfirm = resolve;
+    modal.removeAttribute('hidden');
+  });
 }
 
-// Configurar drag & drop en una carpeta específica
-function setupFolderDragAndDrop(folderElement, folderPath) {
-    const overlay = document.createElement('div');
-    overlay.className = 'drag-drop-overlay';
-    overlay.style.display = 'none';
-    overlay.innerHTML = `
-        <div class="drag-drop-content">
-            <i class="fas fa-cloud-upload-alt"></i>
-            <h3>Suelta aquí</h3>
-        </div>
-    `;
-
-    folderElement.appendChild(overlay);
-
-    let dragCounter = 0;
-
-    // Prevenir comportamiento por defecto
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        folderElement.addEventListener(eventName, preventDefaults, false);
-    });
-
-    // Mostrar overlay cuando se arrastra sobre la carpeta
-    folderElement.addEventListener('dragenter', (e) => {
-        dragCounter++;
-        if (dragCounter === 1) {
-            overlay.style.display = 'flex';
-            folderElement.classList.add('drag-over');
-            console.log(`[Drag&Drop] Enter en carpeta: ${folderPath}`);
-        }
-    }, false);
-
-    folderElement.addEventListener('dragover', handleDragOver, false);
-
-    folderElement.addEventListener('dragleave', (e) => {
-        dragCounter--;
-        if (dragCounter === 0) {
-            overlay.style.display = 'none';
-            folderElement.classList.remove('drag-over');
-            console.log(`[Drag&Drop] Leave en carpeta: ${folderPath}`);
-        }
-    }, false);
-
-    folderElement.addEventListener('drop', (e) => {
-        e.preventDefault();
-        overlay.style.display = 'none';
-        folderElement.classList.remove('drag-over');
-
-        const files = e.dataTransfer.files;
-
-        if (files.length === 0) {
-            showToast('No se detectaron archivos', 'warning');
-            return;
-        }
-
-        console.log(`[Drag&Drop] Archivos detectados: ${files.length} en carpeta ${folderPath}`);
-
-        // Procesar cada archivo
-        Array.from(files).forEach(file => {
-            uploadFile(file, folderPath);
-        });
-    }, false);
+function _hideConfirm(accepted) {
+  var modal = document.getElementById('modalConfirm');
+  if (!modal) return;
+  if (modal._resolveConfirm) {
+    modal._resolveConfirm(!!accepted);
+    modal._resolveConfirm = null;
+  }
+  modal.setAttribute('hidden', '');
 }
 
-function preventDefaults(e) {
+function getQueryParam(name) {
+  var params = new URLSearchParams(window.location.search);
+  return params.get(name);
+}
+
+function formatDate(iso) {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' });
+  } catch (e) {
+    return iso;
+  }
+}
+
+function escapeHtml(text) {
+  if (text == null) return '';
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+async function init() {
+  rrState.empresaId = getQueryParam('company') || getQueryParam('empresa');
+  rrState.empresaNombre = rrState.empresaId || '—';
+  // 📦705-fix11 (2026-08-14) — Header estandarizado (mismo patrón que 6.1.1).
+  // El company chip ahora está a la derecha con divider, y el subtítulo es
+  // genérico (siempre "Gestión de roles y responsabilidades del SG-SST").
+  $('#headerCompany').textContent = rrState.empresaNombre;
+  setupTabs();
+  setupModalEvents();
+  // 📦706-fix19 (2026-08-14) — El tab "Documentos de soporte" se quitó
+  // (v0.1.181). El setupTabs() ahora solo tiene el botón de Gestión + el
+  // back button. Ver setupTabs() abajo.
+  // 📦705-fix2 (2026-08-14) — Comunicación con el parent via postMessage.
+  // El approach anterior (inyectar window.electronAPI directamente) falla en
+  // Electron con contextIsolation: el proxy del contextBridge no se transfiere
+  // correctamente entre contextos. Solución: el iframe le pide al parent
+  // que invoque el IPC. El parent ya tiene el contextBridge funcionando
+  // (lo usa en sus propios handlers), así que es 100% confiable.
+  rrState.bridgeReady = new Promise(function (resolve) {
+    rrState._resolveBridgeReady = resolve;
+  });
+  // 📦705-fix4 (2026-08-14) — El listener DEBE estar en `window` (el iframe
+  // mismo), no en `window.parent`. Cuando el parent hace
+  // `iframe.contentWindow.postMessage(...)`, el mensaje se entrega al
+  // `window` del iframe. Si lo registramos en `window.parent`, el listener
+  // queda en el parent del parent (¡el grandparent!), y nunca recibimos nada.
+  // Bug detectado en consola: el parent enviaba el ack pero el viewer nunca
+  // lo procesaba → bridgeReady quedaba pendiente → "Cargando..." permanente.
+  window.addEventListener('message', _onParentMessage);
+  // Avisarle al parent que estamos listos para recibir el handshake
+  window.parent.postMessage({ type: 'kair-rr-iframe-ready', source: 'roles-resp-viewer' }, '*');
+  await rrState.bridgeReady;
+  await cargarDatos();
+}
+
+function _onParentMessage(event) {
+  if (!event.data || !event.data.type) return;
+  // Handshake: el parent confirma que tiene el electronAPI y nos lo expone
+  if (event.data.type === 'kair-rr-parent-ack' && event.data.electronAPISnapshot) {
+    rrState._electronAPISnapshot = event.data.electronAPISnapshot;
+    if (rrState._resolveBridgeReady) {
+      rrState._resolveBridgeReady();
+      rrState._resolveBridgeReady = null;
+    }
+  }
+  // Respuesta de una llamada IPC
+  if (event.data.type === 'kair-rr-bridge-result') {
+    var pending = rrState._pendingCalls && rrState._pendingCalls[event.data.callId];
+    if (pending) {
+      delete rrState._pendingCalls[event.data.callId];
+      if (event.data.error) {
+        pending.reject(new Error(event.data.error));
+      } else {
+        pending.resolve(event.data.result);
+      }
+    }
+  }
+}
+
+// 📦705-fix2 (2026-08-14) — Wrapper sobre el bridge via postMessage.
+// En lugar de copiar el proxy de electronAPI (que no funciona entre contextos
+// con contextIsolation), el iframe le pide al parent que invoque el IPC.
+// 📦705-fix9 (2026-08-14) — Timeout subido a 60s. Los file dialogs nativos
+// (showOpenDialog/showSaveDialog) pueden tardar más de 10s mientras el user
+// navega carpetas. 60s es suficiente sin bloquear la UI indefinidamente.
+function _bridgeCall(channel, payload) {
+  return new Promise(function (resolve, reject) {
+    var callId = 'call_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    rrState._pendingCalls = rrState._pendingCalls || {};
+    rrState._pendingCalls[callId] = { resolve: resolve, reject: reject };
+    window.parent.postMessage({
+      type: 'kair-rr-bridge-call',
+      source: 'roles-resp-viewer',
+      callId: callId,
+      channel: channel,
+      payload: payload
+    }, '*');
+    // Timeout de seguridad: 60s (los file dialogs pueden tardar)
+    setTimeout(function () {
+      if (rrState._pendingCalls && rrState._pendingCalls[callId]) {
+        delete rrState._pendingCalls[callId];
+        reject(new Error('Timeout: el parent no respondió a ' + channel + ' en 60s. El explorador de archivos puede haberse cerrado o no tenido foco.'));
+      }
+    }, 60000);
+  });
+}
+
+function setupTabs() {
+  // 📦706-fix19 (2026-08-14) — Tab "Documentos de soporte" eliminado.
+  // Solo queda el tab "Gestión de Roles" + el back button.
+  $('#tabGestion').addEventListener('click', function() { switchTab('gestion'); });
+  $('#backBtn').addEventListener('click', function() {
+    if (window.parent && typeof window.parent.postMessage === 'function') {
+      window.parent.postMessage({ type: 'back-to-module-request' }, '*');
+    }
+  });
+}
+
+function switchTab(tab) {
+  rrState.currentTab = tab;
+  $$('.kair-rr-tab').forEach(function(t) {
+    t.classList.toggle('is-active', t.getAttribute('data-tab') === tab);
+  });
+  $$('.kair-rr-tab-panel').forEach(function(p) {
+    p.classList.toggle('is-active', p.id === ('panel' + tab.charAt(0).toUpperCase() + tab.slice(1)));
+  });
+}
+
+function setupModalEvents() {
+  $$('[data-action="cerrar-modal-asignar"]').forEach(function(b) {
+    b.addEventListener('click', cerrarModalAsignar);
+  });
+  $$('[data-action="cerrar-modal-trabajador"]').forEach(function(b) {
+    b.addEventListener('click', cerrarModalTrabajador);
+  });
+  $$('[data-action="cerrar-modal-matriz"]').forEach(function(b) {
+    b.addEventListener('click', cerrarModalMatriz);
+  });
+  $$('[data-action="cerrar-modal-soporte"]').forEach(function(b) {
+    b.addEventListener('click', cerrarModalSoporte);
+  });
+  $$('[data-action="cerrar-modal-documentos-trabajador"]').forEach(function(b) {
+    b.addEventListener('click', cerrarModalDocumentosTrabajador);
+  });
+  // 📦706-fix22 (2026-08-14) — Listeners del modal de confirmación custom
+  $('#btnConfirmAccept').addEventListener('click', function() { _hideConfirm(true); });
+  $$('[data-action="cerrar-modal-confirm"]').forEach(function(b) {
+    b.addEventListener('click', function() { _hideConfirm(false); });
+  });
+  $('#btnGuardarAsignar').addEventListener('click', guardarAsignar);
+  $('#btnGuardarTrabajador').addEventListener('click', guardarTrabajador);
+  $('#btnGuardarSoporte').addEventListener('click', guardarSoporte);
+  $('#btnAnadirTrabajador').addEventListener('click', abrirModalTrabajador);
+  $('#btnExportarPDF').addEventListener('click', exportarPDF);
+  $('#btnMatrizAsignar').addEventListener('click', function() {
+    cerrarModalMatriz();
+    if (rrState.editingRol) abrirModalAsignar(rrState.editingRol);
+  });
+  // 📦706-fix24 (2026-08-14) — Botones de edición de la matriz
+  $('#btnMatrizEditar').addEventListener('click', _entrarModoEdicionMatriz);
+  $('#btnMatrizCancelar').addEventListener('click', _salirModoEdicionMatriz);
+  $('#btnMatrizGuardar').addEventListener('click', _guardarMatriz);
+  // 📦705-fix8 (2026-08-14) — Drag&drop + examinar del modal "Subir soporte"
+  $('#dropZoneSoporte').addEventListener('click', examinarOrigen);
+  $('#dropZoneSoporte').addEventListener('dragover', function(e) {
     e.preventDefault();
     e.stopPropagation();
-}
-
-function handleDragOver(e) {
+    $('#dropZoneSoporte').classList.add('is-dragover');
+  });
+  $('#dropZoneSoporte').addEventListener('dragleave', function(e) {
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'copy';
-}
-
-// Subir archivo
-async function uploadFile(file, folderPath) {
-    try {
-        console.log(`[Drag&Drop] Subiendo archivo: ${file.name} a ${folderPath}`);
-        showToast(`Subiendo ${file.name}...`, 'info');
-
-        // 1. Convertir file a base64
-        const base64Data = await fileToBase64(file);
-
-        // 2. Usar la ruta de la carpeta donde se soltó
-        const destinationPath = folderPath || currentFolderPath;
-
-        if (!destinationPath) {
-            showToast('No hay una carpeta seleccionada', 'error');
-            return;
-        }
-
-        // 3. Enviar al padre via postMessage
-        const result = await callParentAPI('upload-document', {
-            fileName: file.name,
-            base64Data: base64Data,
-            destinationPath: destinationPath
-        });
-
-        // 4. Mostrar resultado
-        if (result.success) {
-            showToast(result.message || 'Archivo subido exitosamente', 'success');
-
-            // 5. Recargar lista de archivos
-            await loadDocuments(destinationPath);
-        } else {
-            showToast(`Error: ${result.error}`, 'error');
-        }
-
-    } catch (error) {
-        console.error('[Drag&Drop] Error al subir archivo:', error);
-        showToast(`Error al subir archivo: ${error.message}`, 'error');
+    e.stopPropagation();
+    $('#dropZoneSoporte').classList.remove('is-dragover');
+  });
+  $('#dropZoneSoporte').addEventListener('drop', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    $('#dropZoneSoporte').classList.remove('is-dragover');
+    var files = e.dataTransfer && e.dataTransfer.files;
+    if (files && files.length > 0) {
+      var file = files[0];
+      // En Electron 32+, file.path está disponible directamente
+      var filePath = file.path || (file.name && '');
+      if (filePath) {
+        onOrigenSeleccionado(filePath, file.size, file.name);
+      } else {
+        _showToast('No se pudo obtener la ruta del archivo. Usá el botón "Examinar..."', 'warning', 4000);
+      }
     }
+  });
+  $('#btnExaminarOrigen').addEventListener('click', examinarOrigen);
+  $('#btnExaminarDestino').addEventListener('click', examinarDestino);
+  // 📦706-fix16 (2026-08-14) — Drag&drop de CARPETA en el dropzone destino
+  $('#dropZoneDestino').addEventListener('click', examinarDestino);
+  $('#dropZoneDestino').addEventListener('dragover', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    $('#dropZoneDestino').classList.add('is-dragover');
+  });
+  $('#dropZoneDestino').addEventListener('dragleave', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    $('#dropZoneDestino').classList.remove('is-dragover');
+  });
+  $('#dropZoneDestino').addEventListener('drop', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    $('#dropZoneDestino').classList.remove('is-dragover');
+    // En Electron, arrastrar una carpeta expone files[0].path directamente
+    var files = e.dataTransfer && e.dataTransfer.files;
+    if (files && files.length > 0) {
+      var folderPath = files[0].path;
+      if (folderPath) {
+        setDestino(folderPath);
+      } else {
+        _showToast('No se pudo obtener la ruta de la carpeta. Usá el botón "Examinar..."', 'warning', 4000);
+      }
+    }
+  });
 }
 
-// Convertir File a Base64
-function fileToBase64(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = error => reject(error);
+async function cargarDatos() {
+  try {
+    var catRes = await _bridgeCall('roles-resp:catalogo-listar', null);
+    if (catRes && catRes.success) {
+      rrState.catalogo = catRes.data || [];
+    } else if (catRes && catRes.error) {
+      console.error('[RolesResp] catalogo error:', catRes.error.message);
+    }
+    if (rrState.empresaId) {
+      var asigRes = await _bridgeCall('roles-resp:asignacion-listar', { empresaId: rrState.empresaId });
+      if (asigRes && asigRes.success) {
+        rrState.asignaciones = asigRes.data || [];
+      }
+      var divRes = await _bridgeCall('roles-resp:divulgacion-listar', { empresaId: rrState.empresaId });
+      if (divRes && divRes.success) {
+        rrState.divulgaciones = divRes.data || [];
+      }
+      // 📦706-fix19 (2026-08-14) — Ya no cargamos la lista de documentos
+      // al inicio. El badge "+N anteriores" se calcula desde
+      // d.documento_count (que el bridge trae por persona desde el fix18).
+      // Los documentos solo se cargan cuando se abre el modal de un
+      // trabajador (abrirModalDocumentosTrabajador).
+    }
+    renderBanner();
+    renderTablaRoles();
+    renderTablaDivulgacion();
+  } catch (e) {
+    console.error('[RolesResp] Error cargando datos:', e.message);
+    // Si falla el bridge, mostramos un mensaje claro en el banner
+    var bannerEl = $('#bannerSummary');
+    if (bannerEl) bannerEl.textContent = 'Error cargando datos: ' + e.message;
+  }
+}
+
+function renderBanner() {
+  var rolesObligatorios = rrState.catalogo.filter(function(c) { return c.obligatorio === 1; });
+  var totalRoles = rolesObligatorios.length;
+  var rolesAsignados = rrState.asignaciones.length;
+  var trabAceptados = rrState.divulgaciones.filter(function(d) {
+    return d.estado_calculado === 'aceptado' || d.estado === 'aceptado';
+  }).length;
+  var totalDivulg = rrState.divulgaciones.length;
+  var pctAsign = totalRoles > 0 ? Math.round((rolesAsignados / totalRoles) * 100) : 0;
+  var pctDiv = totalDivulg > 0 ? Math.round((trabAceptados / totalDivulg) * 100) : 0;
+  var pctGlobal = totalRoles + totalDivulg > 0 ? Math.round((pctAsign + pctDiv) / 2) : 0;
+  $('#bannerSummary').innerHTML =
+    '<strong>' + rolesAsignados + '/' + totalRoles + '</strong> roles obligatorios asignados · ' +
+    '<strong>' + trabAceptados + '/' + totalDivulg + '</strong> trabajadores con soporte PDF · ' +
+    '<strong>' + pctGlobal + '%</strong> de cumplimiento global';
+  $('#bannerProgressBar').style.width = pctGlobal + '%';
+}
+
+function renderTablaRoles() {
+  var tbody = $('#tablaRolesBody');
+  tbody.innerHTML = '';
+  rrState.catalogo.forEach(function(rol) {
+    var asignacion = rrState.asignaciones.find(function(a) { return a.rol_id === rol.id; });
+    var tr = document.createElement('tr');
+    var persona = asignacion ? asignacion.persona_nombre : '—';
+    var cedula = asignacion ? (asignacion.persona_cedula || '—') : '—';
+    var cargo = asignacion ? (asignacion.persona_cargo || '—') : '—';
+    var fecha = asignacion ? formatDate(asignacion.fecha_asignacion) : '—';
+    var estado = asignacion
+      ? '<span class="kair-rr-state kair-rr-state--vigente">✓ Vigente</span>'
+      : (rol.obligatorio === 1
+        ? '<span class="kair-rr-state kair-rr-state--pendiente">⚠ Pte</span>'
+        : '<span class="kair-rr-state kair-rr-state--na">○ N/A</span>');
+    // 📦705-fix13 (2026-08-14) — Solo íconos en la columna Acciones (mismo
+    // patrón que Documentos de soporte). El texto va al `title` (tooltip).
+    // El label del segundo botón cambia según haya asignación o no.
+    var accionLabel = asignacion ? 'Reasignar persona' : 'Asignar persona';
+    tr.innerHTML =
+      '<td><div class="rol-nombre">' + escapeHtml(rol.nombre) + '</div><div class="rol-codigo">' + escapeHtml(rol.codigo) + '</div></td>' +
+      '<td>' + escapeHtml(persona) + '</td>' +
+      '<td>' + escapeHtml(cedula) + '</td>' +
+      '<td>' + escapeHtml(cargo) + '</td>' +
+      '<td>' + fecha + '</td>' +
+      '<td>' + estado + '</td>' +
+      '<td class="kair-rr-actions-cell">' +
+        '<button class="kair-rr-icon-btn" data-action="ver-matriz" data-rol-id="' + escapeHtml(rol.id) + '" title="Ver Matriz (Responsabilidades / Autoridad / Rendición)"><i class="bi bi-table"></i></button>' +
+        '<button class="kair-rr-icon-btn" data-action="reasignar" data-rol-id="' + escapeHtml(rol.id) + '" title="' + accionLabel + '"><i class="bi bi-pencil"></i></button>' +
+      '</td>';
+    tbody.appendChild(tr);
+  });
+  $$('#tablaRolesBody button[data-action="ver-matriz"]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      abrirModalMatriz(btn.getAttribute('data-rol-id'));
     });
-}
-
-// ===============================
-// CONTEXT MENU (CLIC DERECHO)
-// ===============================
-
-let currentContextMenuDoc = null;
-
-// Mostrar menú contextual
-function showContextMenu(x, y, doc) {
-    const menu = document.getElementById('contextMenu');
-    if (!menu) return;
-
-    currentContextMenuDoc = doc;
-
-    // Posicionar menú
-    menu.style.display = 'block';
-    menu.style.left = `${x}px`;
-    menu.style.top = `${y}px`;
-
-    // Ajustar si se sale de la pantalla
-    const rect = menu.getBoundingClientRect();
-    if (rect.right > window.innerWidth) {
-        menu.style.left = `${window.innerWidth - rect.width - 10}px`;
-    }
-    if (rect.bottom > window.innerHeight) {
-        menu.style.top = `${window.innerHeight - rect.height - 10}px`;
-    }
-
-    console.log(`[ContextMenu] Mostrando menú para: ${doc.name}`);
-}
-
-// Ocultar menú contextual
-function hideContextMenu() {
-    const menu = document.getElementById('contextMenu');
-    if (menu) {
-        menu.style.display = 'none';
-    }
-    currentContextMenuDoc = null;
-}
-
-// Eliminar documento
-async function deleteDocument() {
-    if (!currentContextMenuDoc) {
-        console.error('[ContextMenu] No hay documento seleccionado');
-        showToast('No hay archivo seleccionado', 'error');
-        return;
-    }
-
-    const doc = currentContextMenuDoc;
-
-    console.log('[ContextMenu] Mostrando modal para eliminar:', doc.name);
-
-    // Mostrar modal moderno en lugar de confirm()
-    showConfirmModal(doc.name, async () => {
-        console.log('[ConfirmModal] Callback ejecutado - Eliminando archivo:', doc.path);
-
-        // Callback se ejecuta al aceptar
-        try {
-            // Cerrar el documento primero para liberar el archivo de memoria (evita EPERM)
-            console.log('[ContextMenu] Cerrando documento para liberar archivo...');
-            closeDocument();
-
-            console.log(`[ContextMenu] Eliminando archivo: ${doc.path}`);
-
-            const result = await callParentAPI('delete-document', {
-                filePath: doc.path
-            });
-
-            console.log('[ContextMenu] Resultado de eliminar:', result);
-
-            if (result.success) {
-                showToast('Archivo eliminado correctamente', 'success');
-                // Recargar lista de archivos
-                console.log('[ContextMenu] Recargando lista de archivos...');
-                await loadDocuments(currentFolderPath);
-            } else {
-                console.error('[ContextMenu] Error en respuesta:', result.error);
-
-                // Manejo específico para error EPERM (archivo en uso)
-                if (result.code === 'EPERM') {
-                    showToast(
-                        '⚠️ El archivo está abierto en otra aplicación.<br><strong>CIérralo e intenta nuevamente.</strong>',
-                        'warning',
-                        6000
-                    );
-                } else if (result.code === 'ENOENT') {
-                    showToast('El archivo no existe. Puede que ya haya sido eliminado.', 'info');
-                } else if (result.code === 'EACCES') {
-                    showToast('No tienes permisos para eliminar este archivo.', 'error');
-                } else {
-                    showToast(`Error: ${result.error}`, 'error');
-                }
-            }
-        } catch (error) {
-            console.error('[ContextMenu] Error al eliminar:', error);
-            showToast(`Error al eliminar archivo: ${error.message}`, 'error');
-        }
+  });
+  $$('#tablaRolesBody button[data-action="reasignar"]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      abrirModalAsignar(btn.getAttribute('data-rol-id'));
     });
+  });
 }
 
-// Setup de listeners para el menú contextual
-function setupContextMenu() {
-    // Cerrar menú al hacer clic en cualquier partes
-    document.addEventListener('click', () => {
-        hideContextMenu();
-    });
-
-    // Cerrar menú al presionar Escape
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            hideContextMenu();
-        }
-    });
-
-    // Setup del modal de confirmación
-    setupConfirmModal();
-
-    // Listener para el botón eliminar
-    const deleteBtn = document.getElementById('deleteFileBtn');
-    if (deleteBtn) {
-        deleteBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // Evitar que se cierre inmediatamente
-            deleteDocument();
-        });
+function renderTablaDivulgacion() {
+  var tbody = $('#tablaDivulgacionBody');
+  tbody.innerHTML = '';
+  if (rrState.divulgaciones.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:#94a3b8;">' +
+      'No hay divulgaciones registradas. Use <strong>+ Añadir trabajador</strong> para empezar.</td></tr>';
+    return;
+  }
+  // 📦706-fix18 (2026-08-14) — Agrupar por persona: 1 sola fila por
+  // persona_cedula. Tomamos la divulgacion VIGENTE (fecha_vigencia_hasta IS NULL)
+  // si existe, sino la mas reciente. Contamos TODOS los PDFs del trabajador
+  // sumando desde rrState.documentos (que ya incluye todas las divulgaciones).
+  var divulgacionesPorPersona = {};
+  rrState.divulgaciones.forEach(function (d) {
+    var key = d.persona_cedula || ('_' + d.id);
+    if (!divulgacionesPorPersona[key]) {
+      divulgacionesPorPersona[key] = d;
+      return;
     }
-
-    // Listener para el botón abrir archivo
-    const openBtn = document.getElementById('openFileBtn');
-    if (openBtn) {
-        openBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            openFile();
-        });
+    var actual = divulgacionesPorPersona[key];
+    var dVigente = !d.fecha_vigencia_hasta;
+    var aVigente = !actual.fecha_vigencia_hasta;
+    if (dVigente && !aVigente) {
+      // La nueva es vigente y la actual no → reemplazar
+      divulgacionesPorPersona[key] = d;
+    } else if (dVigente === aVigente) {
+      // Misma condicion de vigencia → quedarnos con la mas reciente
+      if (new Date(d.creado_en) > new Date(actual.creado_en)) {
+        divulgacionesPorPersona[key] = d;
+      }
     }
-}
-
-// ===============================
-// TOAST NOTIFICATIONS (K+AIR Modern Style)
-// ===============================
-
-function showToast(message, type = 'info', duration = 3000) {
-    const container = document.getElementById('kToastContainer');
-    if (!container) {
-        console.error('[Toast] Contenedor no encontrado');
-        return;
-    }
-
-    // Iconos por tipo
-    const icons = {
-        success: 'fa-check-circle',
-        error: 'fa-times-circle',
-        warning: 'fa-exclamation-circle',
-        info: 'fa-info-circle'
-    };
-
-    // Crear toast
-    const toast = document.createElement('div');
-    toast.className = `k-toast ${type}`;
-    toast.innerHTML = `
-        <i class="fas ${icons[type] || icons.info} k-toast-icon"></i>
-        <span class="k-toast-message">${message}</span>
-    `;
-
-    container.appendChild(toast);
-
-    // Auto-eliminar después del tiempo especificado
-    setTimeout(() => {
-        toast.classList.add('closing');
-        setTimeout(() => toast.remove(), 300);
-    }, duration);
-}
-
-// ===============================
-// CONFIRM MODAL (K+AIR Modern)
-// ===============================
-
-let confirmCallback = null;
-
-function showConfirmModal(fileName, callback) {
-    const modal = document.getElementById('confirmModal');
-    const fileNameEl = document.getElementById('confirmFileName');
-
-    if (!modal || !fileNameEl) {
-        console.error('[ConfirmModal] Elementos no encontrados');
-        return;
-    }
-
-    console.log('[ConfirmModal] Mostrando modal para:', fileName);
-    console.log('[ConfirmModal] Callback registrado:', !!callback);
-
-    fileNameEl.textContent = fileName;
-    confirmCallback = callback;
-
-    modal.style.display = 'flex';
-
-    // Focus en botón cancelar por seguridad
-    document.getElementById('confirmCancelBtn').focus();
-}
-
-function hideConfirmModal() {
-    const modal = document.getElementById('confirmModal');
-    if (modal) {
-        modal.style.display = 'none';
-    }
-    confirmCallback = null;
-}
-
-function acceptConfirm() {
-    console.log('[ConfirmModal] Aceptando confirmación, callback existe:', !!confirmCallback);
-    if (confirmCallback) {
-        console.log('[ConfirmModal] Ejecutando callback...');
-        confirmCallback();
+    // Si la actual es vigente y la nueva no, no la reemplazamos
+  });
+  // 📦706-fix19 (2026-08-14) — Ya no calculamos pdfCountPorPersona desde
+  // rrState.documentos (que no se carga al inicio). Usamos directamente
+  // d.documento_count que el bridge trae por persona (calculado en la
+  // subquery SQL). El badge "+N anteriores" sigue funcionando.
+  // Renderizar 1 fila por persona
+  Object.keys(divulgacionesPorPersona).forEach(function (key) {
+    var d = divulgacionesPorPersona[key];
+    var estadoTexto = d.estado_calculado === 'aceptado' || d.estado === 'aceptado'
+      ? '<span class="kair-rr-state kair-rr-state--aceptado">✓ Aceptado</span>'
+      : '<span class="kair-rr-state kair-rr-state--pendiente">⏳ Pendiente</span>';
+    // 📦706-fix19 — docCount viene del bridge (cuenta por persona, no por
+    // divulgación). docActualPath es el path del PDF vigente (es_actual=1).
+    var docCount = d.documento_count || 0;
+    var docActualPath = d.documento_actual_path || d.documento_soporte_path || null;
+    var soporte;
+    if (docCount === 0) {
+      soporte = '<button class="kair-rr-btn kair-rr-btn--small" data-action="subir-soporte" data-id="' + d.id + '"><i class="bi bi-upload"></i> Subir</button>';
     } else {
-        console.error('[ConfirmModal] No hay callback registrado');
+      var filename = docActualPath ? docActualPath.split(/[\\/]/).pop() : '—';
+      var badgeAnteriores = docCount > 1
+        ? ' <span class="kair-rr-anteriores-badge" data-action="ver-historial" data-cedula="' + escapeHtml(d.persona_cedula || '') + '" data-id="' + d.id + '" title="Ver todos los documentos del trabajador">+' + (docCount - 1) + ' anterior' + (docCount - 1 === 1 ? '' : 'es') + '</span>'
+        : '';
+      soporte = '<div class="kair-rr-soporte-cell">' +
+        '<a href="#" data-action="ver-soporte" data-path="' + escapeHtml(docActualPath || '') + '" style="color:#174ea6;font-size:12px;">📄 ' + escapeHtml(filename) + '</a>' +
+        badgeAnteriores +
+        ' <button class="kair-rr-icon-btn" data-action="subir-soporte" data-id="' + d.id + '" title="Subir otro documento (reemplaza el vigente, conserva el anterior)" style="margin-left:auto;"><i class="bi bi-plus-lg"></i></button>' +
+        '</div>';
     }
-    hideConfirmModal();
-}
-
-function cancelConfirm() {
-    hideConfirmModal();
-}
-
-function setupConfirmModal() {
-    const acceptBtn = document.getElementById('confirmAcceptBtn');
-    const cancelBtn = document.getElementById('confirmCancelBtn');
-    const modal = document.getElementById('confirmModal');
-
-    if (acceptBtn) {
-        acceptBtn.addEventListener('click', acceptConfirm);
-    }
-
-    if (cancelBtn) {
-        cancelBtn.addEventListener('click', cancelConfirm);
-    }
-
-    // Cerrar al hacer clic fuera del modal
-    if (modal) {
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                cancelConfirm();
-            }
-        });
-    }
-
-    // Cerrar con Escape
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && modal && modal.style.display === 'flex') {
-            cancelConfirm();
-        }
+    var tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td>' + escapeHtml(d.persona_nombre) + '</td>' +
+      '<td>' + escapeHtml(d.persona_cedula || '—') + '</td>' +
+      '<td>' + escapeHtml(d.persona_cargo || '—') + '</td>' +
+      '<td>' + estadoTexto + '</td>' +
+      '<td><input type="date" value="' + (d.fecha_divulgacion || '').substring(0, 10) + '" data-id="' + d.id + '" class="kair-rr-date-input" /></td>' +
+      '<td>' + soporte + '</td>' +
+      '<td><button class="kair-rr-btn kair-rr-btn--small" data-action="eliminar-divulg" data-id="' + d.id + '"><i class="bi bi-trash"></i></button></td>';
+    tbody.appendChild(tr);
+  });
+  $$('#tablaDivulgacionBody button[data-action="subir-soporte"]').forEach(function(btn) {
+    btn.addEventListener('click', function() { subirSoporte(parseInt(btn.getAttribute('data-id'), 10)); });
+  });
+  // 📦706-fix18 (2026-08-14) — Listener del link "📄 filename" en la fila
+  // de divulgación: abre el PDF en el file viewer via postMessage al parent.
+  // Sin este listener, el link no hace nada (href="#" no tiene handler).
+  $$('#tablaDivulgacionBody a[data-action="ver-soporte"]').forEach(function(a) {
+    a.addEventListener('click', function(e) {
+      e.preventDefault();
+      var path = a.getAttribute('data-path');
+      if (path) verPDFSoporte(path);
     });
-}
-
-// Abrir archivo con aplicación predeterminada
-async function openFile() {
-    if (!currentContextMenuDoc) {
-        console.error('[ContextMenu] No hay documento seleccionado');
-        showToast('No hay archivo seleccionado', 'error');
-        return;
-    }
-
-    const doc = currentContextMenuDoc;
-
-    try {
-        console.log(`[ContextMenu] Abriendo archivo: ${doc.path}`);
-
-        const result = await callParentAPI('open-file', {
-            filePath: doc.path
-        });
-
-        if (!result.success) {
-            showToast(`Error al abrir archivo: ${result.error}`, 'error');
-        }
-    } catch (error) {
-        console.error('[ContextMenu] Error al abrir:', error);
-        showToast(`Error al abrir archivo: ${error.message}`, 'error');
-    }
-
-    hideContextMenu();
-}
-
-// Cargar carpetas
-async function loadFolders() {
-    console.log('VIEWER: Iniciando loadFolders...');
-    showLoading();
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const companyName = urlParams.get('company');
-    const moduleName = urlParams.get('module');
-    const submoduleName = urlParams.get('submodule');
-
-    if (!companyName || !moduleName || !submoduleName) {
-        showNotification('Faltan parámetros en la URL', 'error');
-        hideLoading();
-        return;
-    }
-
-    try {
-        const result = await callParentAPI('get-document-folders', { companyName, moduleName, submoduleName });
-        currentFolderPath = result.basePath; 
-        pathHistory = []; 
-        
-        updateNavigationState();
-        
-        renderFolders(result.folders);
-        renderDocuments(result.files); 
-    } catch (error) {
-        showNotification(`Error al cargar contenido: ${error.message}`, 'error');
-    } finally {
-        hideLoading();
-    }
-}
-
-// Renderizar carpetas
-function renderFolders(folders) {
-    const folderList = document.getElementById('folderList');
-    folderList.innerHTML = '';
-
-    if (!folders || folders.length === 0) {
-        folderList.innerHTML = '<div style="padding:1rem; color:#999; font-size:0.85rem;">No hay carpetas.</div>';
-        return;
-    }
-
-    folders.forEach(folder => {
-        const folderItem = document.createElement('div');
-        folderItem.className = 'list-item folder'; // Agregar clase 'folder' para drag & drop
-        folderItem.dataset.path = folder.path;
-
-        const iconDiv = document.createElement('div');
-        iconDiv.className = 'item-icon folder';
-        iconDiv.innerHTML = '<i class="fas fa-folder"></i>';
-
-        const infoDiv = document.createElement('div');
-        infoDiv.className = 'item-info';
-
-        const nameDiv = document.createElement('div');
-        nameDiv.className = 'item-name';
-        nameDiv.textContent = folder.name;
-
-        infoDiv.appendChild(nameDiv);
-        folderItem.appendChild(iconDiv);
-        folderItem.appendChild(infoDiv);
-
-        folderItem.addEventListener('click', () => {
-            selectFolder(folder.path);
-        });
-
-        // Configurar drag & drop para esta carpeta específica
-        setupFolderDragAndDrop(folderItem, folder.path);
-
-        folderList.appendChild(folderItem);
+  });
+  $$('#tablaDivulgacionBody button[data-action="eliminar-divulg"]').forEach(function(btn) {
+    btn.addEventListener('click', function() { eliminarDivulgacion(parseInt(btn.getAttribute('data-id'), 10)); });
+  });
+  $$('#tablaDivulgacionBody input.kair-rr-date-input').forEach(function(input) {
+    input.addEventListener('change', function() {
+      actualizarFecha(parseInt(input.getAttribute('data-id'), 10), input.value);
     });
-}
-
-// Seleccionar carpeta
-async function selectFolder(path) {
-    try {
-        if (currentFolderPath !== path) {
-            pathHistory.push(currentFolderPath);
-        }
-
-        currentFolderPath = path;
-
-        document.querySelectorAll('.list-item').forEach(item => {
-            item.classList.remove('active');
-        });
-
-        const selectedItem = document.querySelector(`[data-path="${path}"]`);
-        if (selectedItem) {
-            selectedItem.classList.add('active');
-        }
-
-        await loadDocuments(path);
-        updateNavigationState();
-
-    } catch (error) {
-        showNotification('Error al seleccionar carpeta', 'error');
-    }
-}
-
-// Cargar documentos
-async function loadDocuments(folderPath) {
-    try {
-        const result = await callParentAPI('get-documents-in-folder', folderPath);
-        renderDocuments(result.files); 
-    } catch (error) {
-        showNotification(`Error al cargar documentos: ${error.message}`, 'error');
-    }
-}
-
-// Renderizar documentos
-function renderDocuments(documents) {
-    const documentList = document.getElementById('fileList');
-    const docCount = document.getElementById('docCount');
-
-    documentList.innerHTML = '';
-
-    if (!documents || documents.length === 0) {
-        documentList.innerHTML = '<div style="padding:1rem; color:#999; font-size:0.85rem;">Carpeta vacía.</div>';
-        if(docCount) docCount.innerText = '0';
-        return;
-    }
-
-    if(docCount) docCount.innerText = documents.length;
-
-    documents.forEach(doc => {
-        const docItem = document.createElement('div');
-        docItem.className = 'list-item';
-        docItem.dataset.path = doc.path;
-
-        const fileTypeInfo = getFileTypeInfo(doc.extension);
-
-        const iconDiv = document.createElement('div');
-        iconDiv.className = `item-icon ${fileTypeInfo.className}`;
-        iconDiv.innerHTML = `<i class="fas ${fileTypeInfo.icon}"></i>`;
-
-        const infoDiv = document.createElement('div');
-        infoDiv.className = 'item-info';
-
-        const nameDiv = document.createElement('div');
-        nameDiv.className = 'item-name';
-        nameDiv.textContent = doc.name;
-
-        const metaDiv = document.createElement('div');
-        metaDiv.className = 'item-meta';
-        metaDiv.innerHTML = `<span class="badge-type">${doc.extension.toUpperCase()}</span>`;
-
-        infoDiv.appendChild(nameDiv);
-        infoDiv.appendChild(metaDiv);
-        docItem.appendChild(iconDiv);
-        docItem.appendChild(infoDiv);
-
-        docItem.addEventListener('click', () => {
-            selectDocument(doc);
-        });
-
-        // Agregar evento de clic derecho (context menu)
-        docItem.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            showContextMenu(e.clientX, e.clientY, doc);
-        });
-
-        documentList.appendChild(docItem);
+  });
+  // 📦706-fix18 (2026-08-14) — Listener del badge "+N anteriores" pasa la
+  // cedula del trabajador (no el id de divulgacion) porque el modal ahora
+  // lista TODOS los PDFs de la persona, no de una divulgacion puntual.
+  $$('#tablaDivulgacionBody span[data-action="ver-historial"]').forEach(function(span) {
+    span.addEventListener('click', function() {
+      abrirModalDocumentosTrabajador(
+        parseInt(span.getAttribute('data-id'), 10),
+        span.getAttribute('data-cedula')
+      );
     });
+  });
 }
 
-function getFileTypeInfo(extension) {
-    const ext = extension.toLowerCase().replace('.', '');
-    
-    const types = {
-        'pdf': { className: 'pdf', icon: 'fa-file-pdf' },
-        'xls': { className: 'excel', icon: 'fa-file-excel' },
-        'xlsx': { className: 'excel', icon: 'fa-file-excel' },
-        'doc': { className: 'word', icon: 'fa-file-word' },
-        'docx': { className: 'word', icon: 'fa-file-word' },
-        'ppt': { className: 'powerpoint', icon: 'fa-file-powerpoint' },
-        'pptx': { className: 'powerpoint', icon: 'fa-file-powerpoint' },
-        'txt': { className: 'default', icon: 'fa-file-alt' }
-    };
+// 📦706-fix19 (2026-08-14) — Tab "Documentos de soporte" ELIMINADO.
+// Antes: lista plana de TODOS los PDFs con badge Vigente/Anterior/Corrección.
+// Ahora: el modal "Documentos del trabajador" (abrirModalDocumentosTrabajador)
+// muestra los PDFs agrupados por persona con cards visuales. Redundante.
+// Las funciones verPDFSoporte / descargarPDFSoporte se mantienen porque
+// las usa el modal.
 
-    return types[ext] || { className: 'default', icon: 'fa-file' };
+function verPDFSoporte(filePath) {
+  if (!filePath) return;
+  // 📦705-fix10 (2026-08-14) — El parent (roles-responsabilidades-logic.js)
+  // ya tiene un handler para `open-file-viewer-modal` que abre el kairFV.
+  // Le pedimos al parent que lo abra.
+  window.parent.postMessage({
+    type: 'open-file-viewer-modal',
+    filePath: filePath
+  }, '*');
 }
 
-// Seleccionar documento
-async function selectDocument(doc) {
-    try {
-        currentDocument = doc;
-        document.getElementById('docName').textContent = doc.name;
-        
-        const extension = doc.extension.toLowerCase().replace('.', '');
-
-        document.querySelectorAll('.list-item').forEach(i => i.classList.remove('active'));
-        const activeItem = document.querySelector(`[data-path="${doc.path}"]`);
-        if(activeItem) activeItem.classList.add('active');
-
-        showLoading();
-        document.getElementById('emptyState').style.display = 'none';
-        
-        enableDocActions(true);
-
-        if (extension === 'pdf') {
-            loadPDF(doc.path);
-        } else if (extension === 'xls' || extension === 'xlsx') {
-            loadExcel(doc.path);
-        } else if (extension === 'doc' || extension === 'docx') {
-            loadWord(doc.path);
-        } else {
-            showUnsupportedMessage(extension);
-        }
-
-    } catch (error) {
-        showNotification('Error al seleccionar documento: ' + error.message, 'error');
-        hideLoading();
-    }
-}
-
-// Cargar PDF
-async function loadPDF(filePath) {
-    try {
-        const result = await callParentAPI('get-pdf-preview', { filePath: filePath });
-        if (result.success) {
-            displayPDF(result.data);
-        } else {
-            showErrorInViewer(`Error al previsualizar PDF: ${result.error}`);
-        }
-    } catch (error) {
-        showErrorInViewer(`Error al cargar PDF: ${error.message}`);
-    }
-}
-
-// Cargar Excel
-async function loadExcel(filePath) {
-    try {
-        const result = await callParentAPI('get-excel-preview', { filePath: filePath });
-        if (result.success) {
-            displayPDF(result.data);
-        } else {
-            showErrorInViewer(`Error al previsualizar Excel: ${result.error}`);
-        }
-    } catch (error) {
-        showErrorInViewer(`Error al cargar Excel: ${error.message}`);
-    }
-}
-
-// Cargar Word
-async function loadWord(filePath) {
-    try {
-        const result = await callParentAPI('get-word-preview', { filePath: filePath });
-        if (result.success) {
-            displayPDF(result.data); 
-        } else {
-            showErrorInViewer(`Error al previsualizar Word: ${result.error}`);
-        }
-    } catch (error) {
-        showErrorInViewer(`Error al cargar Word: ${error.message}`);
-    }
-}
-
-// Mostrar PDF
-function displayPDF(pdfData) {
-    hideLoading();
-
-    const viewerContainer = document.getElementById('viewerContainer');
-    viewerContainer.style.display = 'flex';
-    document.getElementById('toolbar').classList.add('visible');
-    
-    viewerContainer.innerHTML = `<iframe id="docFrame" class="pdf-viewer" src="data:application/pdf;base64,${pdfData}"></iframe>`;
-
-    currentZoom = 100;
-    updateZoomDisplay();
-}
-
-function showUnsupportedMessage(extension) {
-    hideLoading();
-    const viewerContainer = document.getElementById('viewerContainer');
-    viewerContainer.style.display = 'flex';
-    document.getElementById('toolbar').classList.remove('visible');
-
-    viewerContainer.innerHTML = `
-        <div class="error-message">
-            <h3>Previsualización no disponible</h3>
-            <p>La previsualización interna no está disponible para archivos .${extension}.</p>
-            <p>Puede usar el botón de descarga en la barra superior para abrirlo externamente.</p>
-        </div>
-    `;
-}
-
-function showErrorInViewer(message) {
-    hideLoading();
-    const viewerContainer = document.getElementById('viewerContainer');
-    viewerContainer.style.display = 'flex';
-    document.getElementById('toolbar').classList.remove('visible');
-
-    viewerContainer.innerHTML = `
-        <div class="error-message">
-            <h3 style="color:var(--danger)">Error de Carga</h3>
-            <p>${message}</p>
-        </div>
-    `;
-}
-
-function closeDocument() {
-    currentDocument = null;
-    
-    document.getElementById('emptyState').style.display = 'block';
-    document.getElementById('viewerContainer').style.display = 'none';
-    document.getElementById('toolbar').classList.remove('visible');
-    document.getElementById('viewerContainer').innerHTML = '';
-    
-    enableDocActions(false);
-    
-    document.querySelectorAll('.list-item').forEach(i => i.classList.remove('active'));
-}
-
-function enableDocActions(enable) {
-    const btns = ['closeDocBtn', 'downloadBtn', 'printBtn'];
-    btns.forEach(id => {
-        const btn = document.getElementById(id);
-        if(btn) {
-            btn.disabled = !enable;
-            btn.style.opacity = enable ? '1' : '0.3';
-            btn.style.cursor = enable ? 'pointer' : 'not-allowed';
-        }
-    });
-}
-
-function updateNavigationState() {
-    const backBtn = document.getElementById('goBackBtn');
-    if (backBtn) {
-        backBtn.disabled = pathHistory.length === 0;
-        backBtn.style.opacity = backBtn.disabled ? '0.5' : '1';
-        backBtn.style.cursor = backBtn.disabled ? 'not-allowed' : 'pointer';
-    }
-
-    const breadcrumb = document.getElementById('breadcrumb');
-    let bcHTML = `<div class="crumb-item" onclick="resetToRoot()"><i class="fas fa-hdd"></i> Raíz</div>`;
-    
-    if (pathHistory.length > 0) {
-        const currentFolderName = currentFolderPath.split('\\').pop().split('/').pop(); 
-        bcHTML += `<div class="crumb-separator"><i class="fas fa-chevron-right"></i></div>`;
-        bcHTML += `<div class="crumb-item">${currentFolderName}</div>`;
-    }
-    
-    breadcrumb.innerHTML = bcHTML;
-}
-
-async function resetToRoot() {
-    if (pathHistory.length > 0) {
-        loadFolders(); 
-    }
-}
-
-async function goUpLevel() {
-    if (pathHistory.length > 0) {
-        const previousPath = pathHistory.pop();
-        await selectFolder(previousPath);
-        updateNavigationState();
-    }
-}
-
-// Utilidades
-function showLoading() {
-    const overlay = document.getElementById('loadingOverlay');
-    if(overlay) overlay.classList.add('active');
-}
-
-function hideLoading() {
-    const overlay = document.getElementById('loadingOverlay');
-    if(overlay) overlay.classList.remove('active');
-}
-
-function showNotification(message, type = 'success') {
-    const notification = document.getElementById('notification');
-    const messageDiv = notification.querySelector('.notification-message');
-    const icon = notification.querySelector('.notification-icon');
-
-    messageDiv.textContent = message;
-    notification.className = `notification ${type}`;
-    
-    let iconClass = 'fa-info-circle';
-    if(type === 'success') iconClass = 'fa-check-circle';
-    if(type === 'error') iconClass = 'fa-times-circle';
-    if(type === 'warning') iconClass = 'fa-exclamation-triangle';
-    
-    icon.className = `notification-icon fas ${iconClass}`;
-
-    notification.classList.add('show');
-    setTimeout(() => {
-        notification.classList.remove('show');
-    }, 3000);
-}
-
-async function downloadDocument() {
-    if (currentDocument) {
-        try {
-            showNotification('Preparando descarga...', 'info');
-            const result = await callParentAPI('download-document', currentDocument.path);
-
-            if (result.success) {
-                const binaryData = atob(result.base64Data);
-                const bytes = new Uint8Array(binaryData.length);
-                for (let i = 0; i < binaryData.length; i++) {
-                    bytes[i] = binaryData.charCodeAt(i);
-                }
-
-                const blob = new Blob([bytes], { type: 'application/octet-stream' });
-                const url = URL.createObjectURL(blob);
-
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = result.fileName;
-                document.body.appendChild(link);
-                link.click();
-
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
-
-                showNotification('Descarga completada', 'success');
-            } else {
-                showNotification(`Error: ${result.error}`, 'error');
-            }
-        } catch (error) {
-            showNotification(`Error: ${error.message}`, 'error');
-        }
-    }
-}
-
-function printDocument() {
-    if (!currentDocument) return;
-    
-    const iframe = document.getElementById('docFrame');
-    if (iframe && iframe.contentWindow) {
-        iframe.contentWindow.print();
+async function descargarPDFSoporte(filePath) {
+  if (!filePath) return;
+  try {
+    var res = await _bridgeCall('roles-resp:archivo-descargar', { sourcePath: filePath });
+    if (res && res.success && res.data) {
+      _showToast('✅ PDF descargado en:<br><code>' + res.data.path + '</code><br>(' + formatBytes(res.data.bytes) + ')', 'success', 5000);
+    } else if (res && res.error && res.error.code === 'CANCELED') {
+      // User canceló el save dialog, no hacer nada
     } else {
-        printConvertedDocument(currentDocument.path, currentDocument.extension);
+      _showToast('Error: ' + (res && res.error && res.error.message), 'error', 5000);
     }
+  } catch (e) {
+    _showToast('Error descargando: ' + e.message, 'error', 5000);
+  }
 }
 
-async function printConvertedDocument(filePath, extension) {
-    try {
-        showNotification('Preparando impresión...', 'info');
-        let result = await callParentAPI('get-pdf-preview', { filePath: filePath }); 
-        
-        const ext = extension.toLowerCase();
-        if(ext.includes('xls')) result = await callParentAPI('get-excel-preview', { filePath });
-        if(ext.includes('doc')) result = await callParentAPI('get-word-preview', { filePath });
-
-        if (result.success) {
-            const printWindow = window.open('', '_blank');
-            printWindow.document.write(
-                `<html>
-                    <body style="margin:0;">
-                        <iframe src="data:application/pdf;base64,${result.data}"
-                                style="width:100%; height:100vh; border:none;"
-                                onload="window.print(); window.onafterprint = function() { window.close(); }">
-                        </iframe>
-                    </body>
-                </html>`
-            );
-            printWindow.document.close();
-        }
-    } catch (error) {
-        showNotification('Error al imprimir', 'error');
-    }
-}
-
-function zoomIn() {
-    currentZoom += 10;
-    applyZoom();
-}
-
-function zoomOut() {
-    if (currentZoom > 20) {
-        currentZoom -= 10;
-        applyZoom();
-    }
-}
-
-function fitWidth() {
-    currentZoom = 'width'; 
-    applyZoom();
-}
-
-function updateZoomDisplay() {
-    const display = document.getElementById('zoomLevelDisplay');
-    if(display) {
-        display.innerText = (currentZoom === 'width') ? 'Ancho' : `${currentZoom}%`;
-    }
-}
-
-function applyZoom() {
-    const iframe = document.getElementById('docFrame');
-    if (!iframe) return;
-
-    updateZoomDisplay();
-
-    let src = iframe.src.split('#')[0]; 
-    let zoomParam = '';
-
-    if (currentZoom === 'width') {
-        zoomParam = '#view=FitH';
+// 📦706-fix18 (2026-08-14) — Modal de selección de PDFs del trabajador.
+// Refactor: ahora lista TODOS los PDFs del trabajador (de TODAS sus
+// divulgaciones, vigentes o archivadas), ordenados por fecha DESC.
+// Pasa personaCedula al backend para que devuelva los PDFs históricos
+// también. El user puede elegir cuál abrir haciendo click en "Ver".
+async function abrirModalDocumentosTrabajador(divulgacionId, personaCedula) {
+  if (!divulgacionId && !personaCedula) return;
+  // Buscar la divulgacion (la pasamos para mostrar el contexto del
+  // trabajador en el header del modal)
+  var div = divulgacionId
+    ? rrState.divulgaciones.find(function (d) { return d.id === divulgacionId; })
+    : null;
+  if (!div && personaCedula) {
+    // Si no hay divulgacion visible, buscar cualquier divulgacion de la persona
+    div = rrState.divulgaciones.find(function (d) { return d.persona_cedula === personaCedula; });
+  }
+  var personaNombre = div ? div.persona_nombre : '—';
+  var personaCargo = div ? div.persona_cargo : '';
+  $('#modalDocumentosTrabajadorPersona').textContent =
+    personaNombre + ' (C.C. ' + (personaCedula || '—') + ')' +
+    (personaCargo ? ' · ' + personaCargo : '');
+  $('#modalDocumentosTrabajador').removeAttribute('hidden');
+  // Cargar los PDFs del trabajador via bridge (filtra por persona_cedula)
+  try {
+    var res = await _bridgeCall('roles-resp:divulgacion-documento-listar', {
+      empresaId: rrState.empresaId,
+      personaCedula: personaCedula
+    });
+    if (res && res.success && res.data) {
+      renderModalDocumentos(res.data);
     } else {
-        zoomParam = `#zoom=${currentZoom}`;
+      $('#modalDocumentosTrabajadorList').innerHTML = '<p class="kair-rr-help">No se pudieron cargar los documentos.</p>';
     }
-    
-    iframe.src = src + zoomParam;
+  } catch (e) {
+    $('#modalDocumentosTrabajadorList').innerHTML = '<p class="kair-rr-help">Error: ' + escapeHtml(e.message) + '</p>';
+  }
+}
+
+// 📦706-fix18 (2026-08-14) — Render NUEVO del modal desde cero:
+// lista visual con cards (borde lateral de color por estado: verde=actual,
+// gris=anterior, amarillo=correccion). Cada card es clickable y abre el
+// PDF directamente. Botones Ver / Descargar como acciones secundarias.
+function renderModalDocumentos(docs) {
+  var container = $('#modalDocumentosTrabajadorList');
+  if (!docs || docs.length === 0) {
+    container.innerHTML = '<p class="kair-rr-help">Este trabajador todavía no tiene documentos de soporte.</p>';
+    return;
+  }
+  // Subtitle: "N PDFs · el más reciente primero"
+  var subtitle = container.parentElement.querySelector('.kair-rr-modal__subtitle');
+  if (subtitle) {
+    subtitle.textContent = docs.length + (docs.length === 1 ? ' PDF · más reciente primero' : ' PDFs · más reciente primero');
+  }
+  container.innerHTML = docs.map(function (doc) {
+    var stateClass = '';
+    var stateLabel = '';
+    if (doc.es_actual === 1) {
+      stateClass = 'kair-rr-doc-card--vigente';
+      stateLabel = '<span class="kair-rr-doc-state kair-rr-doc-state--vigente">Vigente</span>';
+    } else if (doc.es_correccion === 1) {
+      stateClass = 'kair-rr-doc-card--correccion';
+      stateLabel = '<span class="kair-rr-doc-state kair-rr-doc-state--correccion">Corrección</span>';
+    } else {
+      stateClass = 'kair-rr-doc-card--anterior';
+      stateLabel = '<span class="kair-rr-doc-state kair-rr-doc-state--anterior">Anterior</span>';
+    }
+    var filename = doc.filename || (doc.file_path ? doc.file_path.split(/[\\/]/).pop() : '—');
+    var fechaCarga = doc.fecha_carga ? formatDate(doc.fecha_carga) : '—';
+    var fechaDoc = doc.fecha_documento ? formatDate(doc.fecha_documento) : null;
+    var bytes = doc.bytes ? formatBytes(doc.bytes) : '';
+    return '<div class="kair-rr-doc-card ' + stateClass + '" data-action="abrir-doc" data-path="' + escapeHtml(doc.file_path || '') + '">' +
+      '<div class="kair-rr-doc-card__icon"><i class="bi bi-file-earmark-pdf"></i></div>' +
+      '<div class="kair-rr-doc-card__body">' +
+        '<div class="kair-rr-doc-card__top">' +
+          '<span class="kair-rr-doc-card__name" title="' + escapeHtml(doc.file_path || '') + '">' + escapeHtml(filename) + '</span>' +
+          stateLabel +
+        '</div>' +
+        '<div class="kair-rr-doc-card__meta">' +
+          '<span><i class="bi bi-calendar3"></i> Cargado: ' + fechaCarga + '</span>' +
+          (fechaDoc ? '<span><i class="bi bi-file-earmark-text"></i> Doc: ' + fechaDoc + '</span>' : '') +
+          (bytes ? '<span><i class="bi bi-hdd"></i> ' + bytes + '</span>' : '') +
+        '</div>' +
+        (doc.observaciones ? '<div class="kair-rr-doc-card__obs">' + escapeHtml(doc.observaciones) + '</div>' : '') +
+      '</div>' +
+      '<div class="kair-rr-doc-card__actions">' +
+        '<button class="kair-rr-icon-btn" data-action="ver-doc" data-path="' + escapeHtml(doc.file_path || '') + '" title="Ver PDF"><i class="bi bi-eye"></i></button>' +
+        '<button class="kair-rr-icon-btn" data-action="descargar-doc" data-path="' + escapeHtml(doc.file_path || '') + '" title="Descargar"><i class="bi bi-download"></i></button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+  // Listeners: click en la card abre el PDF; iconos son shortcuts
+  container.querySelectorAll('[data-action="abrir-doc"]').forEach(function (el) {
+    el.addEventListener('click', function (e) {
+      // Si el click fue en un botón, no abrir la card (el botón ya tiene su handler)
+      if (e.target.closest('button')) return;
+      var path = el.getAttribute('data-path');
+      if (path) window.parent.postMessage({ type: 'open-file-viewer-modal', filePath: path }, '*');
+    });
+  });
+  container.querySelectorAll('button[data-action="ver-doc"]').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var path = btn.getAttribute('data-path');
+      if (path) window.parent.postMessage({ type: 'open-file-viewer-modal', filePath: path }, '*');
+    });
+  });
+  container.querySelectorAll('button[data-action="descargar-doc"]').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      descargarPDFSoporte(btn.getAttribute('data-path'));
+    });
+  });
+}
+
+function cerrarModalDocumentosTrabajador() {
+  $('#modalDocumentosTrabajador').setAttribute('hidden', '');
+}
+
+function abrirModalAsignar(rolId) {
+  var rol = rrState.catalogo.find(function(c) { return c.id === rolId; });
+  if (!rol) return;
+  rrState.editingRol = rolId;
+  var asignacion = rrState.asignaciones.find(function(a) { return a.rol_id === rolId; });
+  $('#modalAsignarRol').textContent = rol.nombre + ' (' + rol.codigo + ')';
+  $('#modalAsignarTitle').textContent = asignacion ? 'Reasignar persona a rol' : 'Asignar persona a rol';
+  $('#inputAsignarNombre').value = asignacion ? asignacion.persona_nombre : '';
+  $('#inputAsignarCedula').value = asignacion ? (asignacion.persona_cedula || '') : '';
+  $('#inputAsignarCargo').value = asignacion ? (asignacion.persona_cargo || '') : '';
+  $('#inputAsignarFecha').value = (asignacion ? asignacion.fecha_asignacion : new Date().toISOString()).substring(0, 10);
+  $('#modalAsignar').removeAttribute('hidden');
+}
+
+function cerrarModalAsignar() {
+  $('#modalAsignar').setAttribute('hidden', '');
+  rrState.editingRol = null;
+}
+
+async function guardarAsignar() {
+  if (!rrState.editingRol) return;
+  var nombre = $('#inputAsignarNombre').value.trim();
+  if (!nombre) { _showToast('El nombre es obligatorio', 'warning'); return; }
+  var fecha = $('#inputAsignarFecha').value;
+  if (!fecha) { _showToast('La fecha es obligatoria', 'warning'); return; }
+  try {
+    var res = await _bridgeCall('roles-resp:asignacion-upsert', {
+      empresaId: rrState.empresaId,
+      rolId: rrState.editingRol,
+      personaNombre: nombre,
+      personaCedula: $('#inputAsignarCedula').value.trim() || null,
+      personaCargo: $('#inputAsignarCargo').value.trim() || null,
+      fechaAsignacion: fecha,
+      creadoPor: 'admin'
+    });
+    if (res && res.success) {
+      cerrarModalAsignar();
+      await cargarDatos();
+    } else {
+      _showToast('Error guardando: ' + (res && res.error && res.error.message), 'error', 5000);
+    }
+  } catch (e) {
+    console.error('[RolesResp] Error upsert asignacion:', e.message);
+    _showToast('Error: ' + e.message, 'error', 5000);
+  }
+}
+
+function abrirModalTrabajador() {
+  $('#inputTrabCedula').value = '';
+  $('#inputTrabNombre').value = '';
+  $('#inputTrabCargo').value = '';
+  $('#modalTrabajador').removeAttribute('hidden');
+}
+
+function cerrarModalTrabajador() {
+  $('#modalTrabajador').setAttribute('hidden', '');
+}
+
+// 📦705-fix3 (2026-08-14) — Modal Matriz del Excel G-OD-006 (4 columnas:
+// Responsabilidades / Autoridad / Rendición de Cuentas / Base legal).
+// Se abre al hacer click en el botón "Matriz" de la tabla de roles.
+// 📦706-fix24 (2026-08-14) — Edición de las 3 columnas desde la app
+// (sin versionado, sobreescribe directo). Botón "✏️ Editar" en el footer.
+function abrirModalMatriz(rolId) {
+  var rol = rrState.catalogo.find(function (c) { return c.id === rolId; });
+  if (!rol) {
+    console.warn('[RolesResp] abrirModalMatriz: rol no encontrado', rolId);
+    return;
+  }
+  rrState.editingRol = rolId;
+  // Siempre arranca en modo lectura. Si el modal se re-abre después de una
+  // edición, _salirModoEdicionMatriz() ya dejó el footer correcto.
+  if (rrState.matrizEditMode) {
+    _salirModoEdicionMatriz(); // safety: si quedó en true por error, resetear
+  }
+  _renderModalMatrizLectura(rol);
+  $('#modalMatriz').removeAttribute('hidden');
+}
+
+// Helper: pinta los 3 párrafos en modo lectura + muestra el footer de lectura.
+function _renderModalMatrizLectura(rol) {
+  $('#modalMatrizNombre').textContent = rol.nombre || '—';
+  $('#modalMatrizCodigo').textContent = rol.codigo || '—';
+  $('#modalMatrizResponsabilidades').textContent = rol.responsabilidades || '— (sin definir)';
+  $('#modalMatrizAutoridad').textContent = rol.autoridad || '— (sin definir)';
+  $('#modalMatrizRendicion').textContent = rol.rendicion_cuentas || '— (sin definir)';
+  $('#modalMatrizBaseLegal').textContent = rol.base_legal || '';
+  $('#modalMatrizFootLectura').removeAttribute('hidden');
+  $('#modalMatrizFootEdicion').setAttribute('hidden', '');
+}
+
+// 📦706-fix24 (2026-08-14) — Entra en modo edición: 3 textareas + footer con
+// Guardar/Cancelar. Preserva los valores actuales del rol en los textareas.
+function _entrarModoEdicionMatriz() {
+  if (!rrState.editingRol) return;
+  var rol = rrState.catalogo.find(function (c) { return c.id === rrState.editingRol; });
+  if (!rol) return;
+  rrState.matrizEditMode = true;
+  // Reemplazar los 3 <div> por <textarea> usando outerHTML (conserva el id).
+  _reemplazarPPorTextarea('modalMatrizResponsabilidades', rol.responsabilidades || '');
+  _reemplazarPPorTextarea('modalMatrizAutoridad', rol.autoridad || '');
+  _reemplazarPPorTextarea('modalMatrizRendicion', rol.rendicion_cuentas || '');
+  // Footer: ocultar lectura, mostrar edición.
+  $('#modalMatrizFootLectura').setAttribute('hidden', '');
+  $('#modalMatrizFootEdicion').removeAttribute('hidden');
+  // Foco al primer textarea para empezar a tipear de una.
+  var ta = $('#modalMatrizResponsabilidades');
+  if (ta && ta.focus) ta.focus();
+}
+
+function _reemplazarPPorTextarea(elementId, valorActual) {
+  var el = document.getElementById(elementId);
+  if (!el) return;
+  var ta = document.createElement('textarea');
+  ta.id = elementId;
+  ta.className = 'kair-rr-textarea';
+  ta.value = valorActual;
+  // wrapper amarillo solo en edición (se quita al salir)
+  var wrap = document.createElement('div');
+  wrap.className = 'kair-rr-textarea-wrap';
+  wrap.appendChild(ta);
+  el.parentNode.replaceChild(wrap, el);
+}
+
+// 📦706-fix24 (2026-08-14) — Sale de modo edición SIN guardar: revierte los
+// 3 textareas a párrafos usando los valores del state (rrState.catalogo).
+function _salirModoEdicionMatriz() {
+  if (!rrState.editingRol) return;
+  var rol = rrState.catalogo.find(function (c) { return c.id === rrState.editingRol; });
+  if (!rol) return;
+  rrState.matrizEditMode = false;
+  // Reemplazar cada <textarea> (envuelta en wrap) por un <div> con el valor
+  // ORIGINAL del state. NO leemos los textareas porque descartar cambios.
+  _reemplazarTextareaPorDiv('modalMatrizResponsabilidades', rol.responsabilidades || '— (sin definir)');
+  _reemplazarTextareaPorDiv('modalMatrizAutoridad', rol.autoridad || '— (sin definir)');
+  _reemplazarTextareaPorDiv('modalMatrizRendicion', rol.rendicion_cuentas || '— (sin definir)');
+  // Footer: ocultar edición, mostrar lectura.
+  $('#modalMatrizFootEdicion').setAttribute('hidden', '');
+  $('#modalMatrizFootLectura').removeAttribute('hidden');
+}
+
+function _reemplazarTextareaPorDiv(elementId, texto) {
+  var ta = document.getElementById(elementId);
+  if (!ta) return;
+  var div = document.createElement('div');
+  div.id = elementId;
+  div.style.whiteSpace = 'pre-line';
+  div.style.fontSize = '12px';
+  div.style.lineHeight = '1.5';
+  div.style.background = '#f8fafc';
+  div.style.padding = '10px';
+  div.style.borderRadius = '4px';
+  div.textContent = texto;
+  // El textarea está envuelto en un <div class="kair-rr-textarea-wrap">.
+  // Reemplazamos el WRAPPER por el div nuevo, así queda igual que al inicio.
+  var wrap = ta.parentNode;
+  if (wrap && wrap.classList.contains('kair-rr-textarea-wrap')) {
+    wrap.parentNode.replaceChild(div, wrap);
+  } else {
+    ta.parentNode.replaceChild(div, ta);
+  }
+}
+
+// 📦706-fix24 (2026-08-14) — Guarda los 3 textareas via bridge, recarga el
+// catálogo y refresca el modal en modo lectura con los datos nuevos.
+// Si falla, mantiene el modo edición y muestra toast de error.
+async function _guardarMatriz() {
+  if (!rrState.editingRol) return;
+  var taR = $('#modalMatrizResponsabilidades');
+  var taA = $('#modalMatrizAutoridad');
+  var taC = $('#modalMatrizRendicion');
+  if (!taR || !taA || !taC) {
+    _showToast('Error: textareas no encontrados', 'error', 5000);
+    return;
+  }
+  var payload = {
+    id: rrState.editingRol,
+    responsabilidades: taR.value,
+    autoridad: taA.value,
+    rendicion_cuentas: taC.value
+  };
+  // Deshabilitar botones mientras se guarda
+  var btnGuardar = $('#btnMatrizGuardar');
+  var btnCancelar = $('#btnMatrizCancelar');
+  if (btnGuardar) btnGuardar.disabled = true;
+  if (btnCancelar) btnCancelar.disabled = true;
+  try {
+    var res = await _bridgeCall('roles-resp:catalogo-matriz-actualizar', payload);
+    if (res && res.success) {
+      // Recargar el catálogo para que rrState.catalogo tenga los datos nuevos.
+      // Si falla el refresh, al menos actualizamos el rol en memoria para que
+      // el modal muestre los datos que el user acaba de escribir.
+      var catalogoRes = await _bridgeCall('roles-resp:catalogo-listar');
+      if (catalogoRes && catalogoRes.success && Array.isArray(catalogoRes.data)) {
+        rrState.catalogo = catalogoRes.data;
+      } else {
+        // Fallback: actualizar SOLO el rol editado en el state local
+        var idx = rrState.catalogo.findIndex(function (c) { return c.id === payload.id; });
+        if (idx >= 0) {
+          rrState.catalogo[idx].responsabilidades = payload.responsabilidades;
+          rrState.catalogo[idx].autoridad = payload.autoridad;
+          rrState.catalogo[idx].rendicion_cuentas = payload.rendicion_cuentas;
+        }
+      }
+      // Salir del modo edición: ahora _renderModalMatrizLectura leerá del
+      // state actualizado y mostrará los datos nuevos.
+      var rol = rrState.catalogo.find(function (c) { return c.id === rrState.editingRol; });
+      if (rol) {
+        rrState.matrizEditMode = false;
+        _reemplazarTextareaPorDiv('modalMatrizResponsabilidades', rol.responsabilidades || '— (sin definir)');
+        _reemplazarTextareaPorDiv('modalMatrizAutoridad', rol.autoridad || '— (sin definir)');
+        _reemplazarTextareaPorDiv('modalMatrizRendicion', rol.rendicion_cuentas || '— (sin definir)');
+        $('#modalMatrizFootEdicion').setAttribute('hidden', '');
+        $('#modalMatrizFootLectura').removeAttribute('hidden');
+      }
+      _showToast('✅ Matriz actualizada', 'success', 3000);
+    } else {
+      _showToast('Error guardando: ' + (res && res.error && res.error.message || 'desconocido'), 'error', 5000);
+      // Rehabilitar botones para que pueda reintentar
+      if (btnGuardar) btnGuardar.disabled = false;
+      if (btnCancelar) btnCancelar.disabled = false;
+    }
+  } catch (e) {
+    console.error('[RolesResp] Error guardando matriz:', e.message);
+    _showToast('Error: ' + e.message, 'error', 5000);
+    if (btnGuardar) btnGuardar.disabled = false;
+    if (btnCancelar) btnCancelar.disabled = false;
+  }
+}
+
+function cerrarModalMatriz() {
+  $('#modalMatriz').setAttribute('hidden', '');
+  // Si estaba en modo edición, descartar cambios (volver a modo lectura)
+  if (rrState.matrizEditMode) {
+    _salirModoEdicionMatriz();
+  }
+  rrState.editingRol = null;
+  rrState.matrizEditMode = false;
+}
+
+async function guardarTrabajador() {
+  var cedula = $('#inputTrabCedula').value.trim();
+  var nombre = $('#inputTrabNombre').value.trim();
+  if (!cedula || !nombre) { _showToast('Cédula y nombre son obligatorios', 'warning'); return; }
+  try {
+    var res = await _bridgeCall('roles-resp:divulgacion-upsert', {
+      empresaId: rrState.empresaId,
+      personaCedula: cedula,
+      personaNombre: nombre,
+      personaCargo: $('#inputTrabCargo').value.trim() || null,
+      fechaDivulgacion: new Date().toISOString()
+    });
+    if (res && res.success) {
+      cerrarModalTrabajador();
+      await cargarDatos();
+      // 📦706-fix20 (2026-08-14) — Mostrar al user la carpeta creada.
+      // Si la divulgación era nueva, el bridge creó la carpeta y devuelve el
+      // path. Si fue actualización, carpetaPath es null y solo decimos OK.
+      var msg = '✅ Trabajador agregado para divulgación.';
+      if (res.data && res.data.carpetaPath) {
+        msg += '<br><br>📁 Carpeta creada:<br><code>' + res.data.carpetaPath + '</code>';
+        _showToast(msg, 'success', 6000);
+      } else if (res.data && res.data.carpetaError) {
+        msg += '<br><br>⚠️ No se pudo crear la carpeta:<br><code>' + res.data.carpetaError + '</code>';
+        _showToast(msg, 'warning', 6000);
+      } else {
+        _showToast('✅ Trabajador agregado para divulgación.', 'success', 3000);
+      }
+    } else {
+      _showToast('Error guardando: ' + (res && res.error && res.error.message), 'error', 5000);
+    }
+  } catch (e) {
+    console.error('[RolesResp] Error upsert divulgacion:', e.message);
+    _showToast('Error: ' + e.message, 'error', 5000);
+  }
+}
+
+async function subirSoporte(divulgId) {
+  // 📦705-fix8 (2026-08-14) — Modal completo con drag&drop + examinar + copia
+  // a destino. El user selecciona el PDF origen (drag/drop o explorador) y la
+  // carpeta destino. La app COPIA el archivo y guarda la divulgación con el
+  // path destino (para tener una copia controlada en la carpeta de la empresa).
+  // 📦705-fix9 (2026-08-14) — Mejor visual: chips con nombre corto + tooltip
+  // con la ruta completa. Default destino: carpeta de la empresa en Google Drive.
+  var div = rrState.divulgaciones.find(function(d) { return d.id === divulgId; });
+  if (!div) return;
+  rrState.editingDivulg = divulgId;
+  rrState.origenPath = null;
+  rrState.origenBytes = null;
+  rrState.destinoPath = null;
+  $('#modalSubirSoportePersona').textContent = 'Trabajador: ' + (div.persona_nombre || '—') + ' (C.C. ' + (div.persona_cedula || '—') + ')';
+  // Reset origen chip
+  $('#chipOrigen').setAttribute('data-empty', 'true');
+  $('#chipOrigen').setAttribute('title', '');
+  $('#chipOrigenName').textContent = 'Ningún archivo seleccionado';
+  $('#chipOrigenSize').textContent = '';
+  // 📦706-fix20 — Resolver la carpeta del trabajador via bridge y usarla
+  // como destino default. Si el bridge falla, caemos a Desktop.
+  try {
+    var carpetaRes = await _bridgeCall('roles-resp:carpeta-trabajador-resolver', {
+      empresaId: rrState.empresaId,
+      personaCedula: div.persona_cedula,
+      personaNombre: div.persona_nombre
+    });
+    if (carpetaRes && carpetaRes.success && carpetaRes.data && carpetaRes.data.path) {
+      setDestino(carpetaRes.data.path);
+    } else {
+      setDestino('C:\\Users\\usuario\\Desktop');
+    }
+  } catch (eCarpeta) {
+    console.warn('[RolesResp] No se pudo resolver carpeta del trabajador:', eCarpeta.message);
+    setDestino('C:\\Users\\usuario\\Desktop');
+  }
+  $('#btnGuardarSoporte').setAttribute('disabled', '');
+  // 📦706 (2026-08-14) — Resetear campos extra del modal
+  $('#inputEsNuevaContratacion').checked = false;
+  $('#inputEsCorreccion').checked = false;
+  $('#inputFechaDocumento').value = new Date().toISOString().substring(0, 10);
+  $('#inputObservaciones').value = '';
+  $('#modalSubirSoporte').removeAttribute('hidden');
+}
+
+function cerrarModalSoporte() {
+  $('#modalSubirSoporte').setAttribute('hidden', '');
+  rrState.editingDivulg = null;
+  rrState.origenPath = null;
+  rrState.origenBytes = null;
+  rrState.destinoPath = null;
+}
+
+function onOrigenSeleccionado(filePath, bytes, name) {
+  rrState.origenPath = filePath;
+  rrState.origenBytes = bytes;
+  var filename = name || filePath.split(/[\\/]/).pop();
+  $('#chipOrigen').removeAttribute('data-empty');
+  $('#chipOrigen').setAttribute('title', filePath);  // tooltip con la ruta completa
+  $('#chipOrigenName').textContent = filename;
+  $('#chipOrigenSize').textContent = bytes ? formatBytes(bytes) : '';
+  // 📦706-fix16 (2026-08-14) — Dropzone origen refleja que hay PDF seleccionado
+  $('#dropZoneSoporte').setAttribute('data-state', 'has-file');
+  $('#dropZoneSoporte .kair-rr-dropzone__text').textContent = '✓ PDF seleccionado';
+  // Si el destino está vacío, sugerimos la carpeta del origen
+  if (!rrState.destinoPath) {
+    var sep = filePath.indexOf('\\') >= 0 ? '\\' : '/';
+    setDestino(filePath.substring(0, filePath.lastIndexOf(sep)));
+  }
+  actualizarBotonGuardar();
+}
+
+function setDestino(path) {
+  rrState.destinoPath = path;
+  if (!path) {
+    $('#chipDestino').setAttribute('data-empty', 'true');
+    $('#chipDestino').setAttribute('title', '');
+    $('#chipDestinoName').textContent = 'Sin carpeta destino';
+    // 📦706-fix16 — Dropzone destino refleja que NO hay carpeta
+    $('#dropZoneDestino').setAttribute('data-state', 'empty');
+    $('#dropZoneDestino .kair-rr-dropzone__text').textContent = 'Carpeta destino';
+    $('#dropZoneDestino .kair-rr-dropzone__subtext').textContent('arrastrá una carpeta o usá "Examinar..."');
+  } else {
+    $('#chipDestino').removeAttribute('data-empty');
+    $('#chipDestino').setAttribute('title', path);  // tooltip con la ruta completa
+    // Mostrar solo el último segmento de la ruta (la carpeta)
+    var parts = path.split(/[\\/]/).filter(function (p) { return p; });
+    var lastPart = parts.length > 0 ? parts[parts.length - 1] : path;
+    $('#chipDestinoName').textContent = lastPart;
+    // 📦706-fix16 — Dropzone destino refleja que hay carpeta seleccionada
+    $('#dropZoneDestino').setAttribute('data-state', 'has-folder');
+    $('#dropZoneDestino .kair-rr-dropzone__text').textContent = '✓ Destino: ' + lastPart;
+  }
+  actualizarBotonGuardar();
+}
+
+function actualizarBotonGuardar() {
+  if (rrState.origenPath && rrState.destinoPath) {
+    $('#btnGuardarSoporte').removeAttribute('disabled');
+  } else {
+    $('#btnGuardarSoporte').setAttribute('disabled', '');
+  }
+}
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+}
+
+async function examinarOrigen() {
+  try {
+    var res = await _bridgeCall('roles-resp:archivo-seleccionar-origen', null);
+    if (res && res.success && res.data) {
+      onOrigenSeleccionado(res.data.path, res.data.bytes, res.data.filename);
+    } else if (res && res.error && res.error.code !== 'CANCELED') {
+      _showToast('Error: ' + res.error.message, 'error', 4000);
+    }
+  } catch (e) {
+    _showToast('Error abriendo explorador: ' + e.message, 'error', 4000);
+  }
+}
+
+async function examinarDestino() {
+  try {
+    var currentPath = rrState.destinoPath || undefined;
+    var res = await _bridgeCall('roles-resp:archivo-seleccionar-destino', { defaultPath: currentPath });
+    if (res && res.success && res.data) {
+      setDestino(res.data.path);
+    } else if (res && res.error && res.error.code !== 'CANCELED') {
+      _showToast('Error: ' + res.error.message, 'error', 4000);
+    }
+  } catch (e) {
+    _showToast('Error abriendo explorador: ' + e.message, 'error', 4000);
+  }
+}
+
+async function guardarSoporte() {
+  if (!rrState.editingDivulg) return;
+  var div = rrState.divulgaciones.find(function(d) { return d.id === rrState.editingDivulg; });
+  if (!div) { cerrarModalSoporte(); return; }
+  var origen = rrState.origenPath;
+  var destino = rrState.destinoPath;
+  if (!origen) { _showToast('Seleccioná un PDF de origen (arrastrando o con "Examinar...")', 'warning'); return; }
+  if (!destino) { _showToast('Indicá la carpeta destino', 'warning'); return; }
+  if (!origen.toLowerCase().endsWith('.pdf')) { _showToast('El archivo origen debe ser un PDF (*.pdf)', 'warning'); return; }
+  // 1) Copiar el archivo al destino
+  var btn = $('#btnGuardarSoporte');
+  btn.setAttribute('disabled', '');
+  btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Copiando...';
+  try {
+    var copyRes = await _bridgeCall('roles-resp:archivo-copiar', { origen: origen, destino: destino });
+    if (!copyRes || !copyRes.success) {
+      btn.removeAttribute('disabled');
+      btn.innerHTML = '<i class="bi bi-upload"></i> Copiar y marcar aceptado';
+      _showToast('Error copiando: ' + (copyRes && copyRes.error && copyRes.error.message), 'error', 5000);
+      return;
+    }
+    // 2) Guardar la divulgación con el path destino + campos extra (📦706)
+    var esNueva = $('#inputEsNuevaContratacion').checked;
+    var esCorreccion = $('#inputEsCorreccion').checked;
+    var fechaDoc = $('#inputFechaDocumento').value;
+    var obs = $('#inputObservaciones').value.trim();
+    var res = await _bridgeCall('roles-resp:divulgacion-upsert', {
+      empresaId: rrState.empresaId,
+      personaCedula: div.persona_cedula,
+      personaNombre: div.persona_nombre,
+      personaCargo: div.persona_cargo,
+      fechaDivulgacion: new Date().toISOString(),
+      documentoSoportePath: copyRes.data.path,
+      fechaAceptacion: new Date().toISOString(),
+      esNuevaContratacion: esNueva,
+      esCorreccion: esCorreccion,
+      fechaDocumento: fechaDoc || null,
+      observaciones: obs || null,
+      creadoPor: 'admin'
+    });
+    if (res && res.success) {
+      cerrarModalSoporte();
+      await cargarDatos();
+      _showToast('✅ Soporte PDF copiado y divulgado.<br><br>Origen: <code>' + origen + '</code><br>Destino: <code>' + copyRes.data.path + '</code><br>Estado: ' + (res.data && res.data.estado ? res.data.estado : 'aceptado'), 'success', 6000);
+    } else {
+      btn.removeAttribute('disabled');
+      btn.innerHTML = '<i class="bi bi-upload"></i> Copiar y marcar aceptado';
+      _showToast('Error guardando divulgación: ' + (res && res.error && res.error.message), 'error', 5000);
+    }
+  } catch (e) {
+    btn.removeAttribute('disabled');
+    btn.innerHTML = '<i class="bi bi-upload"></i> Copiar y marcar aceptado';
+    _showToast('Error: ' + e.message, 'error', 5000);
+  }
+}
+
+async function eliminarDivulgacion(divulgId) {
+  // 📦706-fix22 (2026-08-14) — Modal de confirmación custom (reemplaza
+  // el confirm() nativo). Muestra ícono de papelera + botón "Eliminar" rojo.
+  var confirmado = await _showConfirm(
+    'Eliminar divulgación',
+    '¿Estás seguro de eliminar esta divulgación?',
+    { acceptText: 'Eliminar', acceptIcon: 'bi-trash3', variant: 'danger' }
+  );
+  if (!confirmado) return;
+  try {
+    var res = await _bridgeCall('roles-resp:divulgacion-eliminar', { id: divulgId });
+    if (res && res.success) {
+      await cargarDatos();
+      _showToast('✅ Divulgación eliminada', 'success', 3000);
+    } else {
+      _showToast('Error: ' + (res && res.error && res.error.message), 'error', 5000);
+    }
+  } catch (e) {
+    _showToast('Error: ' + e.message, 'error', 5000);
+  }
+}
+
+async function actualizarFecha(divulgId, fecha) {
+  var div = rrState.divulgaciones.find(function(d) { return d.id === divulgId; });
+  if (!div) return;
+  try {
+    await _bridgeCall('roles-resp:divulgacion-upsert', {
+      empresaId: rrState.empresaId,
+      personaCedula: div.persona_cedula,
+      personaNombre: div.persona_nombre,
+      personaCargo: div.persona_cargo,
+      fechaDivulgacion: fecha + 'T00:00:00.000Z',
+      documentoSoportePath: div.documento_soporte_path,
+      fechaAceptacion: div.fecha_aceptacion
+    });
+  } catch (e) {
+    console.error('[RolesResp] Error actualizando fecha:', e.message);
+  }
+}
+
+async function exportarPDF() {
+  if (!rrState.empresaId) { _showToast('Selecciona una empresa primero', 'warning'); return; }
+  // 📦705-fix6 (2026-08-14) — No usar `process.env.USERNAME` porque este código
+  // corre en el iframe del renderer, donde `process` no existe (eso es del
+  // main process de Node). Usamos un placeholder genérico + le pedimos al user
+  // que confirme/ajuste la ruta en el prompt.
+  var defaultName = 'C:\\Users\\usuario\\Desktop\\1.1.2_Cumplimiento_' + rrState.empresaId + '_' + new Date().toISOString().substring(0, 10) + '.pdf';
+  var outputPath = prompt('Ruta donde guardar el PDF (ajustá el "usuario" si querés):', defaultName);
+  if (!outputPath) return;
+  if (!outputPath.toLowerCase().endsWith('.pdf')) outputPath += '.pdf';
+  try {
+    var res = await _bridgeCall('roles-resp:reporte-pdf', {
+      empresaId: rrState.empresaId,
+      outputPath: outputPath
+    });
+    if (res && res.success) {
+      _showToast('✅ Reporte generado correctamente:<br><code>' + res.data.path + '</code><br>(' + res.data.bytes + ' bytes)', 'success', 6000);
+    } else {
+      _showToast('Error generando PDF: ' + (res && res.error && res.error.message), 'error', 5000);
+    }
+  } catch (e) {
+    console.error('[RolesResp] Error generando PDF:', e.message);
+    _showToast('Error: ' + e.message, 'error', 5000);
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
 }

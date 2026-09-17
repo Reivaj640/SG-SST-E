@@ -1,0 +1,56 @@
+================================================================================
+ACUERDO DEV — NO LEGAL — SOLO PRUEBAS
+================================================================================
+
+Versión:    v1.0
+Propósito:  Acuerdo de PRUEBAS para tests automatizados del flujo de firma
+            electrónica de K+AIR. NO TIENE VALIDEZ LEGAL.
+Empresa:    TEMPOACTIVA EST S.A.S.
+================================================================================
+
+ADVERTENCIA IMPORTANTE
+
+Este texto es un ACUERDO DE PRUEBAS. Ha sido generado exclusivamente
+para validar el funcionamiento del sistema de firma electrónica de
+K+AIR. NO debe usarse con datos reales de trabajadores, clientes o
+firmantes. NO constituye un acuerdo legal vinculante.
+
+Si este texto llega a un firmante real por error, debe ser rechazado.
+================================================================================
+
+
+CLÁUSULAS (NO LEGALES, SOLO PARA VALIDAR EL FLUJO)
+
+1. NATURALEZA DEL SERVICIO
+   TEMPOACTIVA EST S.A.S. (en adelante "K+AIR") provee un servicio de
+   firma electrónica de documentos laborales.
+
+2. ACEPTACIÓN
+   El firmante declara que ha leído este Acuerdo y acepta los términos
+   aquí contenidos antes de proceder a firmar cualquier documento.
+
+3. EVIDENCIA
+   K+AIR almacena:
+   - El Acuerdo versionado (este texto + su hash SHA-256).
+   - El hash del documento firmado.
+   - La evidencia criptográfica de la firma (fecha, OTP, IP, user-agent).
+   - El PDF firmado y la constancia de firma.
+
+4. CONSULTA
+   El firmante puede solicitar copia del documento firmado y de la
+   constancia de firma en cualquier momento.
+
+5. VIGENCIA
+   Este Acuerdo v1.0 está vigente desde su fecha de creación hasta que
+   se publique una nueva versión que lo desactive.
+
+6. SEGURIDAD
+   El firmante reconoce que el sistema implementa:
+   - Identificación por número de documento.
+   - Verificación por código de un solo uso (OTP) enviado al correo.
+   - Trazabilidad completa mediante eventos append-only.
+
+
+================================================================================
+FIN DEL ACUERDO DEV — v1.0
+================================================================================

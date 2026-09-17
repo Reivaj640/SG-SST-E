@@ -45,48 +45,54 @@ Vista Cronograma — Tabla editable con toggles de meses y evidencias
   return (bytes / 1048576).toFixed(1) + ' MB';
  }
 
- var CronogramaMant = {
-  companyName: null,
-  saveTimers: {},
+var CronogramaMant = {
+   companyName: null,
+   saveTimers: {},
+   _loadVersion: 0,
 
-  load: function (companyName) {
-   this.companyName = companyName;
-   _data = null;
-   _filterCategory = '';
-   _evidenceCache = {};
-   Object.keys(this.saveTimers).forEach(function (k) {
-    clearTimeout(this.saveTimers[k]);
-   }.bind(this));
-   this.saveTimers = {};
-   this.render();
-  },
+   load: function (companyName) {
+    this.companyName = companyName;
+    _data = null;
+    _filterCategory = '';
+    _evidenceCache = {};
+    Object.keys(this.saveTimers).forEach(function (k) {
+     clearTimeout(this.saveTimers[k]);
+    }.bind(this));
+    this.saveTimers = {};
+    this._loadVersion = (this._loadVersion || 0) + 1;
+    this.render();
+   },
 
-  render: function () {
-   var kpisEl = document.getElementById('kair-mnt-cronograma-kpis');
-   var filtersEl = document.getElementById('kair-mnt-cronograma-filters');
-   var tableEl = document.getElementById('kair-mnt-cronograma-table');
+   render: function () {
+    var kpisEl = document.getElementById('kair-mnt-cronograma-kpis');
+    var filtersEl = document.getElementById('kair-mnt-cronograma-filters');
+    var tableEl = document.getElementById('kair-mnt-cronograma-table');
 
-   if (!kpisEl && !tableEl) return;
+    if (!kpisEl && !tableEl) return;
 
-   kpisEl.innerHTML = '<div class="kair-mnt-loading"><div class="kair-mnt-spinner"></div><p>Cargando cronograma...</p></div>';
+    kpisEl.innerHTML = KairSkeleton.kpiStrip(4);
 
-   MantenimientoService.read(this.companyName).then(function (result) {
-    if (!result.success) {
-     if (kpisEl) kpisEl.innerHTML = '<div class="kair-mnt-empty-state"><i class="bi bi-exclamation-circle"></i><h3>Error</h3><p>' + (result.error ? result.error.message : 'No se pudo cargar') + '</p></div>';
-     if (tableEl) tableEl.innerHTML = '';
-     return;
-    }
+    var myVersion = this._loadVersion;
 
-    _data = result.data;
-    this._renderKPIs(kpisEl);
-    this._renderFilters(filtersEl);
-    this._renderTable(tableEl);
-    this._preloadEvidenceCounts();
-   }.bind(this)).catch(function (err) {
-    console.error('[4.2.5] read error:', err);
-    if (kpisEl) kpisEl.innerHTML = '<div class="kair-mnt-empty-state"><i class="bi bi-exclamation-circle"></i><h3>Error</h3><p>Error de conexión</p></div>';
-   });
-  },
+    MantenimientoService.read(this.companyName).then(function (result) {
+     if (myVersion !== this._loadVersion) return;
+     if (!result.success) {
+      if (kpisEl) kpisEl.innerHTML = '<div class="kair-mnt-empty-state"><i class="bi bi-exclamation-circle"></i><h3>Error</h3><p>' + (result.error ? result.error.message : 'No se pudo cargar') + '</p></div>';
+      if (tableEl) tableEl.innerHTML = '';
+      return;
+     }
+
+     _data = result.data;
+     this._renderKPIs(kpisEl);
+     this._renderFilters(filtersEl);
+     this._renderTable(tableEl);
+     this._preloadEvidenceCounts();
+    }.bind(this)).catch(function (err) {
+     if (myVersion !== this._loadVersion) return;
+     console.error('[4.2.5] read error:', err);
+     if (kpisEl) kpisEl.innerHTML = '<div class="kair-mnt-empty-state"><i class="bi bi-exclamation-circle"></i><h3>Error</h3><p>Error de conexión</p></div>';
+    });
+   },
 
   _renderKPIs: function (container) {
    if (!container || !_data) return;
@@ -154,7 +160,7 @@ Vista Cronograma — Tabla editable con toggles de meses y evidencias
   _renderTable: function (container) {
    if (!container) return;
    if (!_data) {
-    container.innerHTML = '<div class="kair-mnt-loading"><div class="kair-mnt-spinner"></div><p>Cargando...</p></div>';
+    container.innerHTML = KairSkeleton.list(8);
     return;
    }
 
@@ -411,7 +417,7 @@ MantenimientoService.updateField(this.companyName, rowIndex, field, value).then(
     '<input type="file" id="kair-mnt-evidence-file-input" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" style="display:none">' +
     '</div>' +
     '<div class="kair-mnt-evidence__list" id="kair-mnt-evidence-list">' +
-    '<div class="kair-mnt-loading"><div class="kair-mnt-spinner"></div><p>Cargando evidencias...</p></div>' +
+    KairSkeleton.list(6) +
     '</div>';
 
    overlay.classList.add('visible');
@@ -520,13 +526,16 @@ MantenimientoService.updateField(this.companyName, rowIndex, field, value).then(
    });
   });
 
-  listEl.querySelectorAll('[data-delete]').forEach(function (btn) {
-   btn.addEventListener('click', function () {
-    var relativePath = btn.getAttribute('data-delete');
-    if (confirm('\u00bfEliminar esta evidencia?')) {
-     self._deleteEvidence(rowIndex, relativePath);
-    }
-   });
+listEl.querySelectorAll('[data-delete]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var relativePath = btn.getAttribute('data-delete');
+      var confirmPromise = (window.KAIRUtils && typeof window.KAIRUtils.showConfirm === 'function')
+        ? window.KAIRUtils.showConfirm('¿Eliminar esta evidencia?')
+        : Promise.resolve(confirm('¿Eliminar esta evidencia?'));
+      confirmPromise.then(function (confirmed) {
+        if (confirmed) self._deleteEvidence(rowIndex, relativePath);
+      });
+    });
   });
  },
 

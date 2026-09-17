@@ -11,72 +11,94 @@
 </head>
 <body>
     <div class="furat-app">
-        <!-- Header + Tabs + KPIs -->
+        <!-- 📦678 — Header estandarizado al patrón del 3.1.4 (k-section-card + header-back-btn).
+             Mismo estilo que los módulos EMO, Gestión del Cambio, Planes, etc. -->
         <div class="k-section-card" style="padding:0; margin-bottom:1rem;">
-            <!-- Fila 1: contenido principal -->
+            <!-- Fila 1: contenido principal (título + company + volver) -->
             <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
                 <div style="display:flex; align-items:center; gap:0.75rem;">
                     <i class="fas fa-shield-alt" style="color:#174ea6; font-size:1.25rem;"></i>
                     <div>
                         <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Reportes de Accidentes</h3>
-                        <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Gestión de la Salud — 3.2.1</p>
+                        <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Gestión de la Salud — 3.2.1 · FURAT</p>
                     </div>
                 </div>
                 <div style="display:flex; align-items:center; gap:0.75rem;">
                     <span class="k-section-card__company">
-                        <i class="bi bi-building"></i>
+                        <i class="kair-icon-building"></i>
                         <span id="header-company-text">—</span>
                     </span>
                     <div class="k-section-card__divider"></div>
-                    <button class="header-back-btn" id="backBtn" title="Volver a Gestión de la Salud">
+                    <button class="header-back-btn" id="backBtn" title="Volver al módulo">
                         <i class="fas fa-arrow-left"></i> Volver
                     </button>
                 </div>
             </div>
             <!-- Fila 2: tabs integrados -->
-            <nav class="furat-tabs">
-                <button class="furat-tab furat-tab--active" data-view="dashboard">
-                    <i class="fas fa-chart-pie"></i>
+            <nav class="em-tabs" role="tablist">
+                <button class="em-tab em-tab--active" data-view="dashboard" role="tab">
+                    <i class="fas fa-chart-pie" aria-hidden="true"></i>
                     <span>Resumen</span>
                 </button>
-                <button class="furat-tab" data-view="library">
-                    <i class="fas fa-folder-open"></i>
+                <button class="em-tab" data-view="library" role="tab">
+                    <i class="fas fa-folder-open" aria-hidden="true"></i>
                     <span>Biblioteca</span>
-                </button>
-                <button class="furat-tab" data-view="viewer" id="tabViewer" style="display:none;">
-                    <i class="fas fa-file-pdf"></i>
-                    <span>Visor de Documento</span>
                 </button>
             </nav>
         </div>
 
-        <!-- KPIs -->
-        <div class="k-stats-ribbon" style="display:flex;gap:0;background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.06);padding:1rem 1.5rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem">
-            <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:.75rem">
-                <div style="width:40px;height:40px;border-radius:10px;background:rgba(23,78,166,.08);display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:#174ea6"><i class="fas fa-file-alt"></i></div>
-                <div style="display:flex;flex-direction:column"><span style="font-size:.75rem;color:#6c757d">Total FURAT</span><span style="font-size:1.5rem;font-weight:700;color:#212529" id="statTotal">—</span></div>
+        <!-- 📦658 — KPI Strip oficial (Sistema Visual v1.0) -->
+        <div class="kpi-strip" role="region" aria-label="Indicadores de reportes de accidentes">
+            <div class="kpi-strip__item">
+                <div class="kpi-strip__icon kpi-strip__icon--primary">
+                    <i class="fas fa-file-medical" aria-hidden="true"></i>
+                </div>
+                <div class="kpi-strip__content">
+                    <span class="kpi-strip__label">Total FURAT</span>
+                    <span class="kpi-strip__value" id="statTotal">—</span>
+                </div>
             </div>
-            <div style="width:1px;height:40px;background:#dee2e6;margin:0 1rem"></div>
-            <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:.75rem">
-                <div style="width:40px;height:40px;border-radius:10px;background:rgba(23,162,184,.08);display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:#17a2b8"><i class="fas fa-calendar-alt"></i></div>
-                <div style="display:flex;flex-direction:column"><span style="font-size:.75rem;color:#6c757d" id="statYearLabel">Este Año</span><span style="font-size:1.5rem;font-weight:700;color:#212529" id="statCurrentYear">—</span></div>
+            <div class="kpi-strip__divider" aria-hidden="true"></div>
+            <div class="kpi-strip__item">
+                <div class="kpi-strip__icon kpi-strip__icon--info">
+                    <i class="fas fa-calendar-alt" aria-hidden="true"></i>
+                </div>
+                <div class="kpi-strip__content">
+                    <span class="kpi-strip__label" id="statYearLabel">Este Año</span>
+                    <span class="kpi-strip__value" id="statCurrentYear">—</span>
+                </div>
             </div>
-            <div style="width:1px;height:40px;background:#dee2e6;margin:0 1rem"></div>
-            <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:.75rem">
-                <div style="width:40px;height:40px;border-radius:10px;background:rgba(255,193,7,.1);display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:#b8860b"><i class="fas fa-calendar-day"></i></div>
-                <div style="display:flex;flex-direction:column"><span style="font-size:.75rem;color:#6c757d" id="statMonthLabel">Este Mes</span><span style="font-size:1.5rem;font-weight:700;color:#212529" id="statCurrentMonth">—</span></div>
+            <div class="kpi-strip__divider" aria-hidden="true"></div>
+            <div class="kpi-strip__item">
+                <div class="kpi-strip__icon kpi-strip__icon--warning">
+                    <i class="fas fa-calendar-day" aria-hidden="true"></i>
+                </div>
+                <div class="kpi-strip__content">
+                    <span class="kpi-strip__label" id="statMonthLabel">Este Mes</span>
+                    <span class="kpi-strip__value" id="statCurrentMonth">—</span>
+                </div>
             </div>
-            <div style="width:1px;height:40px;background:#dee2e6;margin:0 1rem"></div>
-            <div style="flex:1;min-width:140px;display:flex;align-items:center;gap:.75rem">
-                <div style="width:40px;height:40px;border-radius:10px;background:rgba(40,167,69,.08);display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:#28a745"><i class="fas fa-folder"></i></div>
-                <div style="display:flex;flex-direction:column"><span style="font-size:.75rem;color:#6c757d">Carpetas</span><span style="font-size:1.5rem;font-weight:700;color:#212529" id="statFolders">—</span></div>
+            <div class="kpi-strip__divider" aria-hidden="true"></div>
+            <div class="kpi-strip__item">
+                <div class="kpi-strip__icon kpi-strip__icon--success">
+                    <i class="fas fa-folder" aria-hidden="true"></i>
+                </div>
+                <div class="kpi-strip__content">
+                    <span class="kpi-strip__label">Carpetas</span>
+                    <span class="kpi-strip__value" id="statFolders">—</span>
+                </div>
             </div>
         </div>
 
         <!-- MAIN -->
         <main class="kair-container">
             <div class="k-main-content">
-            <!-- DASHBOARD -->
+            <!-- 📦679 — Hero de bienvenida removido.
+                 Los CTAs de subida y exploración ahora están en otros lugares:
+                 - Subir: drop zone de la biblioteca o modal de upload
+                 - Explorar biblioteca: tab "Biblioteca" del header
+            -->
+            <!-- 📦658 — DASHBOARD REDISEÑADO (Patrón A: Dashboard Operacional) -->
             <section class="furat-view furat-view--active" id="viewDashboard">
                 <div class="furat-dashboard">
 
@@ -84,7 +106,8 @@
                         <div class="furat-dashboard__section furat-dashboard__section--wide">
                             <div class="furat-card">
                                 <div class="furat-card__header">
-                                    <h3><i class="fas fa-bar-chart"></i> Distribución por Año</h3>
+                                    <h3><i class="fas fa-chart-bar"></i> Distribución por Año</h3>
+                                    <span class="furat-card__hint">Click en una barra para filtrar la biblioteca</span>
                                 </div>
                                 <div class="furat-card__body">
                                     <div class="furat-year-bars" id="yearBars">
@@ -112,79 +135,161 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- 📦659 — FASE 3: Dashboard analítico (basado en metadata) -->
+                    <div class="furat-dashboard__analytics" id="dashboardAnalytics">
+                        <div class="furat-dashboard__analytics-header">
+                            <h2 class="furat-dashboard__analytics-title">
+                                <i class="fas fa-chart-line"></i> Análisis
+                            </h2>
+                            <span class="furat-dashboard__analytics-hint" id="analyticsHint">
+                                Basado en reportes con metadata completa
+                            </span>
+                        </div>
+                        <div class="furat-analytics-grid" id="analyticsGrid">
+                            <!-- 4 cards de charts: tendencia mensual, tipo, gravedad, top áreas -->
+                            <div class="furat-card furat-card--chart">
+                                <div class="furat-card__header">
+                                    <h3><i class="fas fa-chart-line"></i> Tendencia últimos 12 meses</h3>
+                                </div>
+                                <div class="furat-card__body">
+                                    <div id="chartMonthlyTrend" class="furat-chart-trend">
+                                        <div class="furat-empty-state">
+                                            <i class="fas fa-spinner fa-spin"></i>
+                                            <p>Cargando...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="furat-card furat-card--chart">
+                                <div class="furat-card__header">
+                                    <h3><i class="fas fa-exclamation-triangle"></i> Por tipo de accidente</h3>
+                                </div>
+                                <div class="furat-card__body">
+                                    <div id="chartByType" class="furat-chart-bars">
+                                        <div class="furat-empty-state">
+                                            <i class="fas fa-spinner fa-spin"></i>
+                                            <p>Cargando...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="furat-card furat-card--chart">
+                                <div class="furat-card__header">
+                                    <h3><i class="fas fa-heartbeat"></i> Por gravedad</h3>
+                                </div>
+                                <div class="furat-card__body">
+                                    <div id="chartBySeverity" class="furat-chart-severity">
+                                        <div class="furat-empty-state">
+                                            <i class="fas fa-spinner fa-spin"></i>
+                                            <p>Cargando...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="furat-card furat-card--chart">
+                                <div class="furat-card__header">
+                                    <h3><i class="fas fa-map-marker-alt"></i> Top áreas</h3>
+                                </div>
+                                <div class="furat-card__body">
+                                    <div id="chartByArea" class="furat-chart-bars">
+                                        <div class="furat-empty-state">
+                                            <i class="fas fa-spinner fa-spin"></i>
+                                            <p>Cargando...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
 
             <!-- LIBRARY -->
             <section class="furat-view" id="viewLibrary">
                 <div class="furat-library">
-                    <div class="furat-library__toolbar">
-                        <div class="furat-library__search">
-                            <div class="furat-search-box">
-                                <i class="fas fa-search"></i>
-                                <input type="text" id="searchInput" placeholder="Buscar reporte por nombre..." autocomplete="off">
-                                <button class="furat-search-box__clear" id="searchClear" style="display:none;">
-                                    <i class="fas fa-times"></i>
+                    <!-- 📦685 — Contenedor unificado: "Carpetas por año" + "Reportes" dentro de UN SOLO card.
+                         Las dos sub-secciones mantienen su header propio (para no perder contexto),
+                         pero visualmente viven dentro de un único recuadro con divider entre ambas. -->
+                    <div class="furat-library__container">
+                        <!-- Sub-sección 1: Carpetas por año -->
+                        <div class="furat-card furat-library__subsection" id="foldersSection">
+                            <div class="furat-card__header">
+                                <h3>
+                                    <i class="fas fa-folder-tree"></i>
+                                    Carpetas por año
+                                    <span class="furat-card__hint" id="foldersMeta">—</span>
+                                </h3>
+                                <button class="furat-btn furat-btn--add-period" id="addPeriodBtn" type="button" title="Crear una nueva carpeta (período)">
+                                    <i class="fas fa-folder-plus"></i>
+                                    <span>Agregar período</span>
                                 </button>
                             </div>
-                        </div>
-                        <div class="furat-library__filters">
-                            <div class="furat-filter-group">
-                                <label for="filterYear"><i class="fas fa-calendar"></i> Año</label>
-                                <select id="filterYear"><option value="">Todos</option></select>
-                            </div>
-                            <div class="furat-filter-group">
-                                <label for="filterMonth"><i class="fas fa-calendar-day"></i> Mes</label>
-                                <select id="filterMonth">
-                                    <option value="">Todos</option>
-                                    <option value="1">Enero</option><option value="2">Febrero</option>
-                                    <option value="3">Marzo</option><option value="4">Abril</option>
-                                    <option value="5">Mayo</option><option value="6">Junio</option>
-                                    <option value="7">Julio</option><option value="8">Agosto</option>
-                                    <option value="9">Septiembre</option><option value="10">Octubre</option>
-                                    <option value="11">Noviembre</option><option value="12">Diciembre</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="furat-library__breadcrumb" id="breadcrumb">
-                        <button class="furat-breadcrumb__root active" data-path="">
-                            <i class="fas fa-home"></i>
-                            <span>Todos los Reportes</span>
-                        </button>
-                    </div>
-
-                    <div class="furat-library__content">
-                        <div class="furat-folders-section" id="foldersSection" style="display:none;">
-                            <h4 class="furat-section-title" id="foldersSectionTitle">
-                                <i class="fas fa-folder"></i>
-                                <span>Carpetas</span>
-                            </h4>
-                            <div class="furat-folders-grid" id="folderList"></div>
-                        </div>
-
-                        <div class="furat-documents-section">
-                            <div class="furat-section-title-row">
-                                <h4 class="furat-section-title" id="docsSectionTitle">
-                                    <i class="fas fa-file-alt"></i>
-                                    <span>Reportes</span>
-                                    <span class="furat-badge" id="docsCount" style="display:none;">0</span>
-                                </h4>
-                                <div class="furat-section-actions">
-                                    <button class="furat-btn furat-btn--sm furat-btn--ghost" id="viewGridBtn" title="Vista cuadrícula">
-                                        <i class="fas fa-th-large"></i>
-                                    </button>
-                                    <button class="furat-btn furat-btn--sm furat-btn--ghost" id="viewListBtn" title="Vista lista">
-                                        <i class="fas fa-list"></i>
-                                    </button>
+                            <div class="furat-card__body">
+                                <div class="furat-folders-grid-v2" id="folderList"></div>
+                                <div class="furat-dropzone furat-dropzone--compact" id="dropZone" tabindex="0" role="button" aria-label="Subir nuevo reporte FURAT arrastrando o haciendo click">
+                                    <div class="furat-dropzone__icon">
+                                        <i class="fas fa-cloud-upload-alt" aria-hidden="true"></i>
+                                    </div>
+                                    <div class="furat-dropzone__text">
+                                        <p class="furat-dropzone__title">Arrastrá o hacé click para subir un FURAT</p>
+                                        <p class="furat-dropzone__subtitle">PDF, Excel, Word · max 25 MB</p>
+                                    </div>
                                 </div>
                             </div>
-                            <div id="documentList" class="furat-docs-grid">
-                                <div class="furat-empty-state furat-empty-state--large">
-                                    <i class="fas fa-folder-open"></i>
-                                    <h3>Selecciona una carpeta</h3>
-                                    <p>Explora las carpetas para ver los reportes FURAT almacenados</p>
+                        </div>
+
+                        <!-- Divisor entre sub-secciones -->
+                        <hr class="furat-library__divider" aria-hidden="true">
+
+                        <!-- Sub-sección 2: Reportes (tabla enterprise) -->
+                        <div class="furat-documents-section-v2 furat-library__subsection" id="documentsSection">
+                            <!-- 📦685-fix — Sub-header "Reportes" para simetría con "Carpetas por año".
+                                 Sin este header la sub-sección se ve "pegada" sin jerarquía visual.
+                                 El counter (X archivos) se actualiza vía JS en renderLibraryDocuments. -->
+                            <div class="furat-library__subsection-header">
+                                <h3>
+                                    <i class="fas fa-file-medical" aria-hidden="true"></i>
+                                    Reportes
+                                    <span class="furat-card__hint" id="docsCount">—</span>
+                                </h3>
+                                <div class="furat-library__subsection-header-actions"></div>
+                            </div>
+                            <!-- 📦666 — Header unificado en UNA SOLA línea: navegación → búsqueda → filtros → info.
+                                 Todo en la misma "array" horizontal, sin filas separadas.
+                                 Aparece solo cuando hay carpeta activa. -->
+                            <div class="furat-documents-header-card" id="documentsHeaderCard" hidden>
+                                <div class="furat-documents-unified-row">
+                                    <!-- 1. Navegación -->
+                                    <nav class="furat-breadcrumb-v2 furat-breadcrumb-v2--compact" id="breadcrumbInline" aria-label="Ruta de navegación">
+                                        <button class="furat-breadcrumb-v2__root" data-path="" type="button">
+                                            <i class="fas fa-home" aria-hidden="true"></i>
+                                            <span>Todos los Reportes</span>
+                                        </button>
+                                    </nav>
+                                    <!-- 2. Búsqueda -->
+                                    <div class="furat-search-v2">
+                                        <i class="fas fa-search furat-search-v2__icon" aria-hidden="true"></i>
+                                        <input type="text" id="searchInput" placeholder="Buscar reporte por nombre..." autocomplete="off">
+                                        <button class="furat-search-v2__clear" id="searchClear" type="button" aria-label="Limpiar búsqueda">
+                                            <i class="fas fa-times" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
+                                    <!-- 3. Filtros -->
+                                    <div class="furat-filter-chips" id="filterChips">
+                                        <button class="furat-chip furat-chip--active" data-year="" type="button">Todos los años</button>
+                                    </div>
+                                    <!-- 4. Info -->
+                                    <div class="furat-results-counter" id="resultsCounter">—</div>
+                                </div>
+                            </div>
+                            <div id="documentList" class="furat-table-wrapper">
+                                <div class="furat-empty-state-library">
+                                    <div class="furat-empty-state-library__icon">
+                                        <i class="fas fa-folder-open" aria-hidden="true"></i>
+                                    </div>
+                                    <h3>Explorá las carpetas para ver los reportes</h3>
+                                    <p>O usá la búsqueda para encontrar un reporte específico por nombre.</p>
                                 </div>
                             </div>
                         </div>
@@ -192,147 +297,350 @@
                 </div>
             </section>
 
-            <!-- VIEWER -->
-            <section class="furat-view" id="viewViewer">
-                <div class="furat-viewer">
-                    <div class="furat-viewer__toolbar">
-                        <div class="furat-viewer__doc-info">
-                            <button class="furat-btn furat-btn--ghost furat-btn--sm" id="viewerBackBtn" title="Volver a biblioteca">
-                                <i class="fas fa-arrow-left"></i>
-                            </button>
-                            <div class="furat-viewer__doc-title" id="documentTitle">
-                                <i class="fas fa-file-pdf"></i>
-                                <span>Selecciona un reporte</span>
-                            </div>
-                        </div>
-                        <div class="furat-viewer__controls">
-                            <div class="furat-viewer__control-group">
-                                <label for="zoomLevel">Zoom:</label>
-                                <select id="zoomLevel">
-                                    <option value="auto">Auto</option>
-                                    <option value="page-width">Ancho de página</option>
-                                    <option value="page-height">Alto de página</option>
-                                    <option value="50%">50%</option><option value="75%">75%</option>
-                                    <option value="100%">100%</option><option value="125%">125%</option>
-                                    <option value="150%">150%</option><option value="200%">200%</option>
-                                </select>
-                            </div>
-                            <div class="furat-viewer__control-group">
-                                <label for="pageOrientation">Orientación:</label>
-                                <select id="pageOrientation">
-                                    <option value="vertical">Vertical</option>
-                                    <option value="horizontal">Horizontal</option>
-                                </select>
-                            </div>
-                            <div class="furat-viewer__action-buttons">
-                                <button class="furat-btn furat-btn--sm furat-btn--primary" id="downloadBtn" title="Descargar documento">
-                                    <i class="fas fa-download"></i>
-                                    <span>Descargar</span>
-                                </button>
-                                <button class="furat-btn furat-btn--sm furat-btn--outline" id="printBtn" title="Imprimir documento">
-                                    <i class="fas fa-print"></i>
-                                    <span>Imprimir</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="furat-viewer__container">
-                        <div class="furat-loading" id="loadingDiv">
-                            <div class="furat-spinner"></div>
-                            <p>Cargando reporte...</p>
-                        </div>
-                        <div id="viewerContainer" style="display: none;"></div>
-                        <div class="furat-viewer__empty" id="viewerEmpty">
-                            <div class="furat-viewer__empty-icon">
-                                <i class="fas fa-file-pdf"></i>
-                            </div>
-                            <h3>Vista previa del documento</h3>
-                            <p>Selecciona un reporte FURAT de la biblioteca para visualizarlo aquí</p>
-                            <button class="furat-btn furat-btn--primary" id="goToLibraryBtn">
-                                <i class="fas fa-folder-open"></i>
-                                Ir a Biblioteca
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </section>
+            <!-- VIEWER (📦658: tab eliminado — el preview ahora se hace en modal) -->
             </div>
         </main>
 
-        <!-- NOTIFICATION -->
-        <div class="furat-notification" id="notification">
-            <i class="furat-notification__icon fas fa-check-circle"></i>
-            <div class="furat-notification__message">Operación completada con éxito</div>
+        <!-- 📦680 — MODAL DE CREAR NUEVA CARPETA (período) -->
+        <div id="createFolderModal" class="furat-modal hidden" role="dialog" aria-modal="true" aria-labelledby="createFolderModalTitle">
+            <div class="furat-modal__overlay" id="createFolderModalOverlay"></div>
+            <div class="furat-modal__content" style="max-width: 480px;">
+                <div class="furat-modal__header">
+                    <div class="furat-modal__title">
+                        <i class="fas fa-folder-plus" aria-hidden="true" style="color:#16a34a;"></i>
+                        <h2 id="createFolderModalTitle">Crear nueva carpeta</h2>
+                    </div>
+                    <button class="furat-modal__close" id="createFolderModalClose" aria-label="Cerrar" type="button">
+                        <i class="fas fa-times" aria-hidden="true"></i>
+                    </button>
+                </div>
+                <div class="furat-modal__body">
+                    <p style="margin: 0 0 0.875rem 0; font-size: 0.875rem; color: #64748B;">
+                        Creá una nueva carpeta (período) para guardar reportes FURAT.
+                        El nombre se usa como nombre de carpeta.
+                    </p>
+                    <p id="createFolderContext" class="furat-form__hint" style="margin: 0 0 0.75rem 0; padding: 0.5rem 0.625rem; background: var(--furat-bg-app); border-radius: 6px; font-size: 0.8125rem; color: var(--furat-text-secondary); display: none;">
+                        <i class="fas fa-folder-open" style="margin-right: 0.375rem; color: var(--furat-primary);"></i>
+                        Se creará dentro de: <strong id="createFolderParentName"></strong>
+                    </p>
+                    <form id="createFolderForm" class="furat-form" onsubmit="return false;">
+                        <div class="furat-form__field">
+                            <label class="furat-form__label" for="createFolderInput">
+                                Nombre de la carpeta <span class="furat-form__required">*</span>
+                            </label>
+                            <input type="text" class="furat-form__input" id="createFolderInput"
+                                placeholder="ej: 2026 o 2026-Q1 o HISTORICO"
+                                maxlength="100" required>
+                            <span class="furat-form__hint">Solo letras, números, guiones y guiones bajos. Máx 100 caracteres.</span>
+                        </div>
+                    </form>
+                </div>
+                <div class="furat-modal__footer">
+                    <button class="furat-btn furat-btn--secondary" id="createFolderModalCancel" type="button">Cancelar</button>
+                    <button class="furat-btn furat-btn--primary" id="createFolderModalSubmit" type="button" disabled style="background:#16a34a; border-color:#16a34a;">
+                        <i class="fas fa-folder-plus"></i>
+                        <span>Crear carpeta</span>
+                    </button>
+                </div>
+            </div>
         </div>
 
-        <!-- PREVIEW MODAL -->
-        <div id="previewModal" class="furat-preview-modal hidden">
-            <div class="furat-preview-modal__overlay" id="previewOverlay"></div>
-            <div class="furat-preview-modal__content">
-                <div class="furat-preview-modal__header">
-                    <div class="furat-preview-modal__title">
-                        <i class="fas fa-file-pdf" id="previewTitleIcon"></i>
-                        <span id="previewTitle">Previsualización</span>
+        <!-- 📦692 — CONTEXT MENU de carpetas (click derecho sobre folder card) -->
+        <div class="furat-folder-context-menu" id="folderContextMenu" role="menu" aria-hidden="true">
+            <div class="furat-folder-context-menu__header" id="folderContextMenuHeader">
+                <i class="fas fa-folder" aria-hidden="true"></i>
+                <span id="folderContextMenuName">Carpeta</span>
+            </div>
+            <div class="furat-folder-context-menu__divider"></div>
+            <button class="furat-folder-context-menu__item" id="folderContextMenuAdd" role="menuitem">
+                <i class="fas fa-folder-plus" aria-hidden="true"></i>
+                <span>Crear subcarpeta acá</span>
+            </button>
+            <button class="furat-folder-context-menu__item" id="folderContextMenuOpen" role="menuitem">
+                <i class="fas fa-folder-open" aria-hidden="true"></i>
+                <span>Abrir carpeta</span>
+            </button>
+            <div class="furat-folder-context-menu__divider"></div>
+            <button class="furat-folder-context-menu__item furat-folder-context-menu__item--danger" id="folderContextMenuDelete" role="menuitem">
+                <i class="fas fa-trash-alt" aria-hidden="true"></i>
+                <span>Eliminar carpeta</span>
+            </button>
+        </div>
+
+        <!-- 📦692 — MODAL DE CONFIRMACIÓN para eliminar carpeta -->
+        <div id="deleteFolderModal" class="furat-modal hidden" role="dialog" aria-modal="true" aria-labelledby="deleteFolderModalTitle">
+            <div class="furat-modal__overlay" id="deleteFolderModalOverlay"></div>
+            <div class="furat-modal__content" style="max-width: 480px;">
+                <div class="furat-modal__header">
+                    <div class="furat-modal__title">
+                        <i class="fas fa-trash-alt" aria-hidden="true" style="color:#dc2626;"></i>
+                        <h2 id="deleteFolderModalTitle">Eliminar carpeta</h2>
                     </div>
-                    <div class="furat-preview-modal__actions">
-                        <button class="furat-btn furat-btn--sm furat-btn--ghost" id="previewDownloadBtn" title="Descargar documento">
-                            <i class="fas fa-download"></i>
-                        </button>
-                        <button class="furat-preview-modal__close" id="closePreviewBtn" aria-label="Cerrar">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
+                    <button class="furat-modal__close" id="deleteFolderModalClose" aria-label="Cerrar" type="button">
+                        <i class="fas fa-times" aria-hidden="true"></i>
+                    </button>
                 </div>
-                <div class="furat-preview-modal__body" id="previewBody"></div>
+                <div class="furat-modal__body">
+                    <p style="margin: 0 0 0.875rem 0; font-size: 0.875rem; color: var(--furat-text-primary);">
+                        ¿Estás seguro de eliminar la carpeta <strong id="deleteFolderName"></strong>?
+                    </p>
+                    <p style="margin: 0 0 0.5rem 0; font-size: 0.8125rem; color: #dc2626;">
+                        <i class="fas fa-exclamation-triangle" aria-hidden="true" style="margin-right: 0.375rem;"></i>
+                        Se eliminarán <strong id="deleteFolderFileCount">0</strong> archivo(s) y todas las subcarpetas. Esta acción no se puede deshacer.
+                    </p>
+                </div>
+                <div class="furat-modal__footer">
+                    <button class="furat-btn furat-btn--secondary" id="deleteFolderModalCancel" type="button">Cancelar</button>
+                    <button class="furat-btn" id="deleteFolderModalSubmit" type="button" style="background:#dc2626; border-color:#dc2626; color:#fff;">
+                        <i class="fas fa-trash-alt"></i>
+                        <span>Eliminar definitivamente</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 📦693 — MODAL DE EDICIÓN DE METADATA (PDF legacy) -->
+        <div id="editMetadataModal" class="furat-modal hidden" role="dialog" aria-modal="true" aria-labelledby="editMetadataModalTitle">
+            <div class="furat-modal__overlay" id="editMetadataModalOverlay"></div>
+            <div class="furat-modal__content" style="max-width: 600px;">
+                <div class="furat-modal__header">
+                    <div class="furat-modal__title">
+                        <i class="fas fa-clipboard-list" aria-hidden="true" style="color:var(--furat-primary);"></i>
+                        <h2 id="editMetadataModalTitle">Editar metadata del reporte</h2>
+                    </div>
+                    <button class="furat-modal__close" id="editMetadataModalClose" aria-label="Cerrar" type="button">
+                        <i class="fas fa-times" aria-hidden="true"></i>
+                    </button>
+                </div>
+                <div class="furat-modal__body">
+                    <p style="margin: 0 0 0.625rem 0; font-size: 0.8125rem; color: var(--furat-text-secondary);">
+                        Archivo: <strong id="editMetadataFileName"></strong>
+                    </p>
+                    <form id="editMetadataForm" class="furat-form" onsubmit="return false;">
+                        <div class="furat-form__row" style="display:grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                            <div class="furat-form__field">
+                                <label class="furat-form__label" for="editMetadataAccidentDate">
+                                    Fecha del accidente
+                                </label>
+                                <input type="date" class="furat-form__input" id="editMetadataAccidentDate">
+                            </div>
+                            <div class="furat-form__field">
+                                <label class="furat-form__label" for="editMetadataSeverity">
+                                    Gravedad
+                                </label>
+                                <select class="furat-form__input" id="editMetadataSeverity">
+                                    <option value="">— Sin especificar —</option>
+                                    <option value="leve">Leve</option>
+                                    <option value="moderado">Moderado</option>
+                                    <option value="grave">Grave</option>
+                                    <option value="mortal">Mortal</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="furat-form__row" style="display:grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                            <div class="furat-form__field">
+                                <label class="furat-form__label" for="editMetadataAccidentType">
+                                    Tipo de accidente
+                                </label>
+                                <select class="furat-form__input" id="editMetadataAccidentType">
+                                    <option value="">— Sin especificar —</option>
+                                    <option value="caida">Caída</option>
+                                    <option value="golpe">Golpe</option>
+                                    <option value="atrapamiento">Atrapamiento</option>
+                                    <option value="corte">Corte/Herida</option>
+                                    <option value="quemadura">Quemadura</option>
+                                    <option value="esfuerzo">Esfuerzo físico</option>
+                                    <option value="exposicion">Exposición</option>
+                                    <option value="otro">Otro</option>
+                                </select>
+                            </div>
+                            <div class="furat-form__field">
+                                <label class="furat-form__label" for="editMetadataArea">
+                                    Área
+                                </label>
+                                <input type="text" class="furat-form__input" id="editMetadataArea" placeholder="ej: Producción, Almacén...">
+                            </div>
+                        </div>
+                        <div class="furat-form__field">
+                            <label class="furat-form__label" for="editMetadataReportedBy">
+                                Reportado por
+                            </label>
+                            <input type="text" class="furat-form__input" id="editMetadataReportedBy" placeholder="Nombre de quien reportó">
+                        </div>
+                        <div class="furat-form__field">
+                            <label class="furat-form__label" for="editMetadataDescription">
+                                Descripción breve
+                            </label>
+                            <textarea class="furat-form__input" id="editMetadataDescription" rows="2" placeholder="Opcional"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="furat-modal__footer">
+                    <button class="furat-btn furat-btn--secondary" id="editMetadataModalCancel" type="button">Cancelar</button>
+                    <button class="furat-btn furat-btn--primary" id="editMetadataModalSubmit" type="button">
+                        <i class="fas fa-save"></i>
+                        <span>Guardar metadata</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 📦693 — Context menu para PDFs (click derecho sobre fila de la tabla) -->
+        <div class="furat-folder-context-menu" id="documentContextMenu" role="menu" aria-hidden="true">
+            <div class="furat-folder-context-menu__header">
+                <i class="fas fa-file-pdf" aria-hidden="true"></i>
+                <span id="documentContextMenuName">Reporte</span>
+            </div>
+            <div class="furat-folder-context-menu__divider"></div>
+            <button class="furat-folder-context-menu__item" id="documentContextMenuView" role="menuitem">
+                <i class="fas fa-eye" aria-hidden="true"></i>
+                <span>Ver reporte</span>
+            </button>
+            <button class="furat-folder-context-menu__item" id="documentContextMenuEdit" role="menuitem">
+                <i class="fas fa-clipboard-list" aria-hidden="true"></i>
+                <span>Editar metadata</span>
+            </button>
+        </div>
+
+        <!-- NOTIFICATION (📦676 — migrado a KAIRToast, sistema moderno unificado.
+         El viejo div .furat-notification fue removido. Ahora se usa window.KAIRToast.show().) -->
+
+        <!-- 📦658 — MODAL DE UPLOAD DE FURAT (con metadata) -->
+        <div id="uploadModal" class="furat-modal hidden" role="dialog" aria-modal="true" aria-labelledby="uploadModalTitle">
+            <div class="furat-modal__overlay" id="uploadModalOverlay"></div>
+            <div class="furat-modal__content">
+                <div class="furat-modal__header">
+                    <div class="furat-modal__title">
+                        <i class="fas fa-cloud-upload-alt" aria-hidden="true"></i>
+                        <h2 id="uploadModalTitle">Subir nuevo reporte FURAT</h2>
+                    </div>
+                    <button class="furat-modal__close" id="uploadModalClose" aria-label="Cerrar" type="button">
+                        <i class="fas fa-times" aria-hidden="true"></i>
+                    </button>
+                </div>
+                <div class="furat-modal__body">
+                    <!-- Archivo seleccionado (preview) -->
+                    <div class="furat-modal__file-preview" id="uploadFilePreview" hidden>
+                        <div class="furat-modal__file-icon" id="uploadFileIcon">
+                            <i class="fas fa-file-pdf" aria-hidden="true"></i>
+                        </div>
+                        <div class="furat-modal__file-info">
+                            <p class="furat-modal__file-name" id="uploadFileName">archivo.pdf</p>
+                            <p class="furat-modal__file-meta" id="uploadFileMeta">2.3 MB</p>
+                        </div>
+                        <button class="furat-modal__file-remove" id="uploadFileRemove" type="button" aria-label="Quitar archivo">
+                            <i class="fas fa-times" aria-hidden="true"></i>
+                        </button>
+                    </div>
+
+                    <!-- Form de metadata -->
+                    <form id="uploadForm" class="furat-form">
+                        <div class="furat-form__row">
+                            <div class="furat-form__field">
+                                <label for="uploadAccidentDate" class="furat-form__label">Fecha del accidente <span class="furat-form__required">*</span></label>
+                                <input type="date" id="uploadAccidentDate" name="accidentDate" class="furat-form__input" required>
+                            </div>
+                            <div class="furat-form__field">
+                                <label for="uploadAccidentType" class="furat-form__label">Tipo de accidente <span class="furat-form__required">*</span></label>
+                                <select id="uploadAccidentType" name="accidentType" class="furat-form__input" required>
+                                    <option value="">Seleccionar...</option>
+                                    <option value="caida">Caída</option>
+                                    <option value="golpe">Golpe</option>
+                                    <option value="atrapamiento">Atrapamiento</option>
+                                    <option value="corte">Corte / Herida</option>
+                                    <option value="quemadura">Quemadura</option>
+                                    <option value="esfuerzo">Esfuerzo físico</option>
+                                    <option value="exposicion">Exposición a sustancia</option>
+                                    <option value="otro">Otro</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="furat-form__row">
+                            <div class="furat-form__field">
+                                <label class="furat-form__label">Gravedad <span class="furat-form__required">*</span></label>
+                                <div class="furat-form__segmented" role="radiogroup" aria-label="Gravedad del accidente">
+                                    <label class="furat-form__segmented-option">
+                                        <input type="radio" name="severity" value="leve" required>
+                                        <span>Leve</span>
+                                    </label>
+                                    <label class="furat-form__segmented-option">
+                                        <input type="radio" name="severity" value="moderado">
+                                        <span>Moderado</span>
+                                    </label>
+                                    <label class="furat-form__segmented-option">
+                                        <input type="radio" name="severity" value="grave">
+                                        <span>Grave</span>
+                                    </label>
+                                    <label class="furat-form__segmented-option">
+                                        <input type="radio" name="severity" value="mortal">
+                                        <span>Mortal</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="furat-form__row">
+                            <div class="furat-form__field">
+                                <label for="uploadArea" class="furat-form__label">Área donde ocurrió</label>
+                                <input type="text" id="uploadArea" name="area" class="furat-form__input" placeholder="Ej: Producción, Administración, Logística..." maxlength="100">
+                            </div>
+                        </div>
+
+                        <div class="furat-form__row">
+                            <div class="furat-form__field">
+                                <label for="uploadDescription" class="furat-form__label">Descripción breve</label>
+                                <textarea id="uploadDescription" name="description" class="furat-form__input furat-form__textarea" rows="3" placeholder="Ej: Trabajador se resbaló en piso mojado durante jornada..." maxlength="500"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="furat-form__row">
+                            <div class="furat-form__field">
+                                <label for="uploadReportedBy" class="furat-form__label">Reportado por</label>
+                                <input type="text" id="uploadReportedBy" name="reportedBy" class="furat-form__input" placeholder="Nombre de quien reportó" maxlength="100">
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="furat-modal__footer">
+                    <button class="furat-btn furat-btn--secondary" id="uploadModalCancel" type="button">Cancelar</button>
+                    <button class="furat-btn furat-btn--primary" id="uploadModalSubmit" type="button" disabled>
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <span>Subir FURAT</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- PREVIEW MODAL — 📦686 — Migrado a kair-fv-modal (mismo patrón que la Bandeja Integrada).
+             Mismo HTML/CSS/JS que el modal de preview del módulo de correo.
+             Permite ver PDFs, Office, imágenes, etc. con toolbar + search + zoom. -->
+        <div class="kair-fv-overlay" id="fv-overlay" hidden>
+            <div class="kair-fv-modal">
+                <header class="kair-fv-header">
+                    <div class="kair-fv-header__title">
+                        <span class="kair-fv-header__ext" id="fv-ext-badge">…</span>
+                        <span class="kair-fv-header__name" id="fv-filename">Sin archivo</span>
+                        <span class="kair-fv-header__meta" id="fv-filesize">—</span>
+                    </div>
+                    <div class="kair-fv-header__actions">
+                        <button class="kair-fv-btn" id="fv-close-btn" title="Cerrar (ESC)">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            <span>Cerrar</span>
+                        </button>
+                    </div>
+                </header>
+                <div class="kair-fv-body" id="fv-body"></div>
             </div>
         </div>
     </div>
 
-    <style>
-        .furat-preview-modal { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; }
-        .furat-preview-modal.hidden { display: none; }
-        .furat-preview-modal__overlay { position: absolute; inset: 0; background: rgba(0,0,0,.55); backdrop-filter: blur(2px); }
-        .furat-preview-modal__content {
-            position: relative; z-index: 1; display: flex; flex-direction: column;
-            width: 90vw; height: 88vh; max-width: 1120px;
-            background: var(--furat-bg-card); border-radius: var(--furat-radius-lg);
-            box-shadow: 0 24px 60px rgba(0,0,0,.35); overflow: hidden;
-        }
-        .furat-preview-modal__header {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 12px 18px; border-bottom: 1px solid var(--furat-border);
-            flex-shrink: 0; background: var(--furat-bg-card);
-        }
-        .furat-preview-modal__title {
-            display: flex; align-items: center; gap: 10px;
-            font-size: .9rem; font-weight: 500; color: var(--furat-text-primary);
-            overflow: hidden; min-width: 0;
-        }
-        .furat-preview-modal__title span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .furat-preview-modal__actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-        .furat-preview-modal__close {
-            width: 30px; height: 30px; border: none; border-radius: 50%;
-            background: transparent; cursor: pointer; color: var(--furat-text-secondary);
-            display: flex; align-items: center; justify-content: center; font-size: .9rem;
-            transition: background .15s, color .15s;
-        }
-        .furat-preview-modal__close:hover { background: var(--furat-danger-light, #fce8e8); color: var(--furat-danger, #dc3545); }
-        .furat-preview-modal__body {
-            flex: 1; overflow: hidden; display: flex;
-            flex-direction: column; align-items: center; justify-content: center;
-        }
-        .furat-preview-modal__body iframe { width: 100%; height: 100%; border: none; }
-        .furat-preview-modal__error { text-align: center; padding: 2.5rem 2rem; }
-        .furat-preview-modal__error-icon { font-size: 2.5rem; margin-bottom: 1rem; }
-        .furat-preview-modal__error h3 { margin: 0 0 .5rem; font-size: 1.1rem; color: var(--furat-text-primary); }
-        .furat-preview-modal__error p { font-size: .875rem; color: var(--furat-text-secondary); max-width: 460px; margin: .25rem auto; }
-        .furat-preview-modal__error-cmd {
-            background: var(--furat-bg-app); border: 1px solid var(--furat-border);
-            border-radius: 6px; padding: 8px 16px; font-family: monospace; font-size: .85rem;
-            color: var(--furat-text-primary); display: inline-block; margin: 8px 0;
-        }
-    </style>
-
+    <!-- 📦676 — Sistema de notificaciones moderno unificado (KAIRToast).
+         Se autoinstancia en window.KAIRToast. Mismo sistema que el resto de la app. -->
+    <script src="../../../assets/js/kair-toast.js"></script>
     <script src="reportes-accidentes-viewer.js"></script>
+    <!-- 📦608-fix15 — File-viewer bundle (IIFE web-full) + helper genérico -->
+    <script src="../../../renderer/file-viewer-assets/flyfish-file-viewer-web-full.iife.js"></script>
+    <script src="../../../shared/file-viewer.js"></script>
 </body>
 </html>

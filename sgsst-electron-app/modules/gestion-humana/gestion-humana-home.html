@@ -1,0 +1,33 @@
+<!-- modules/gestion-humana/gestion-humana-home.html
+     📦717 · Shell del módulo Gestión Humana con header K+AIR (patrón Programa de Capacitación)
+     Header unificado: icono + título + subtítulo (izq) / badge + NIT + Bell (der).
+     Tabs horizontales debajo con 9 sub-módulos (responsive: con/sin iconos según ancho).
+     Migrado de top bar (brand T + NIT) a header unificado con icono del módulo. -->
+
+<div class="gh-shell" id="gh-shell">
+  <!-- ═══ HEADER K+AIR (patrón Programa de Capacitación) ═══ -->
+  <header class="gh-header">
+    <div class="gh-header__left">
+      <h1 class="gh-header__title">
+        <i class="fas fa-people-group gh-header__icon"></i> Gestión Humana
+      </h1>
+      <p class="gh-header__subtitle">Sistema de Gestión de Personal — TEMPOACTIVA EST S.A.S.</p>
+    </div>
+    <div class="gh-header__right">
+      <button class="gh-bell-btn" id="gh-bell-btn" title="Notificaciones">
+        <i class="fas fa-bell"></i>
+        <span class="gh-bell-badge" id="gh-bell-badge"></span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ═══ TABS HORIZONTALES (9 sub-módulos, responsive) ═══ -->
+  <nav class="gh-tabs" id="gh-tabs" role="tablist">
+    <!-- tabs se inyectan via JS -->
+  </nav>
+
+  <!-- ═══ CONTENIDO: vista activa se inyecta via JS ═══ -->
+  <main class="gh-content" id="gh-content">
+    <!-- vista activa -->
+  </main>
+</div>

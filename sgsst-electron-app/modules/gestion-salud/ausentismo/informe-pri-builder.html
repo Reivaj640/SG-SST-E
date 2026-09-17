@@ -455,28 +455,106 @@
                 margin: 0;
             }
 
-            body * {
-                visibility: hidden;
+            /* Resetear ancestros flex/relative para que .report-container pueda
+            posicionarse libremente. */
+            .report-builder,
+            .builder-body,
+            .preview-area,
+            .config-sidebar {
+                position: static !important;
+                display: block !important;
+                width: auto !important;
+                height: auto !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: transparent !important;
+                border: none !important;
+                overflow: visible !important;
             }
 
-            .report-container, .report-container * {
-                visibility: visible;
+            /* Mover TODO lo que NO es el reporte a coordenadas negativas (off-screen)
+            en vez de `visibility: hidden` (que en Chromium con iframes/flex anidados
+            puede dejar contenido sin imprimir). Esto es 100% confiable.
+            Importante: NO ocultar `.report-builder` directamente porque CONTIENE
+            al `#reportContainer` adentro — ocultarlo ocultaría el reporte también. */
+            .report-builder > .builder-header,
+            .report-builder > .builder-footer,
+            .report-builder > .builder-body > .config-sidebar,
+            .report-builder > .builder-body > .preview-area > .sp-horizontal-nav,
+            .report-builder > .builder-body > .preview-area > .pagination-controls {
+                display: none !important;
             }
 
-            .report-container {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 210mm;
-                padding: 0;
+            /* Expandir el .preview-area para que ocupe todo el ancho de la página A4
+            (sin el sidebar que ya ocultamos). */
+            .report-builder,
+            .report-builder > .builder-body,
+            .report-builder > .builder-body > .preview-area {
+                display: block !important;
+                width: 100% !important;
+                height: auto !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: white !important;
+                border: none !important;
+                overflow: visible !important;
+            }
+
+            /* Posicionar el contenedor del reporte en coordenadas absolutas (no fixed).
+            `position: fixed` hace que Chromium limite la impresión a UN viewport
+            (1 sola página fija); `position: absolute` ancla al page box inicial pero
+            deja que cada `.report-page` fluya a múltiples hojas físicas con sus
+            `page-break-after: always`. */
+            #reportContainer {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 210mm !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: white !important;
+                z-index: 99999 !important;
             }
 
             .report-page {
-                box-shadow: none;
-                margin: 0;
-                page-break-after: always;
+                box-shadow: none !important;
+                margin: 0 !important;
+                /* Sintaxis MODERNA (CSS Paged Media level 3) + legacy para máxima
+                compatibilidad. La legacy `page-break-after: always` tiene bugs
+                conocidos con elementos `position: absolute` internos; `break-after: page`
+                es la versión que los navegadores modernos respetan correctamente. */
+                height: 282mm !important;
+                break-after: page !important;
+                break-before: page !important;
+                page-break-after: always !important;
+                page-break-before: always !important;
+                overflow: hidden !important;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
+                /* position:relative para que los footers absolutos internos se anclen
+                a ESTA página y no a otra hoja. */
+                position: relative !important;
+                width: 210mm !important;
+                padding: 12mm 14mm !important;
+                box-sizing: border-box !important;
+            }
+
+            /* El primer .report-page no necesita page-break-before (sería un salto
+            antes del contenido). */
+            .report-page:first-child {
+                page-break-before: auto !important;
+            }
+
+            /* El último .report-page no debe dejar hoja en blanco después. */
+            .report-page:last-child {
+                page-break-after: auto !important;
+            }
+
+            /* Forzar a que el body no tenga margen heredado del navegador */
+            html, body {
+                margin: 0 !important;
+                padding: 0 !important;
+                background: white !important;
             }
         }
     </style>
@@ -564,7 +642,7 @@
                     </div>
                     <div class="page-info" id="pageInfoText">Página 1 de 1</div>
                     <div style="display:flex; gap:5px;">
-                        <button class="btn-nav" onclick="window.print()">
+                        <button class="btn-nav" onclick="exportToPDF()">
                             <i class="fas fa-print"></i> Imprimir
                         </button>
                     </div>
@@ -776,6 +854,15 @@
                     console.log('[INFORME-PRI]   - filePath:', result.filePath);
                     console.log('[INFORME-PRI]   - companyName:', result.companyName);
 
+                    // 📦 Persistir el filePath global para que exportToPDF() (Plan B)
+                    // pueda guardar el PDF en la misma carpeta del PRI.xlsx.
+                    if (result && result.filePath) {
+                        window.priFilePath = result.filePath;
+                        // Algunos navegadores/contextos no permiten asignar directo;
+                        // usar un fallback a window.parent si hace falta.
+                        try { window.priFilePath = result.filePath; } catch (e) { /* noop */ }
+                    }
+
                     // VALIDACIÓN: Detectar si los datos son sospechosamente similares entre empresas
                     if (result.rows && result.rows.length > 0) {
                         const firstRow = result.rows[0];
@@ -899,6 +986,30 @@
                 return -1;
             }
 
+            /**
+             * 📦 Encontrar columna con patrones positivos Y filtros negativos.
+             * Sirve para evitar falsos positivos como "cargo" → "ANTIGÜEDAD EN EL CARGO ACTUAL"
+             * (que en realidad es la columna de años, no la del cargo).
+             * Si ninguna columna cumple los filtros, retorna -1.
+             */
+            function findColumnWithExclusions({ include = [], exclude = [] } = {}) {
+                for (let i = 0; i < headers.length; i++) {
+                    const header = headers[i];
+                    if (!header) continue;
+                    const headerLower = header.toString().toLowerCase();
+                    const hitsInclude = include.some(p => headerLower.includes(p.toLowerCase()));
+                    if (!hitsInclude) continue;
+                    const hitsExclude = exclude.some(p => headerLower.includes(p.toLowerCase()));
+                    if (hitsExclude) {
+                        console.log(`[INFORME-PRI] Columna ${i} ("${header}") descartada por exclusión ${JSON.stringify(exclude)}`);
+                        continue;
+                    }
+                    console.log(`[INFORME-PRI] Columna encontrada (include=${JSON.stringify(include)}): índice ${i} -> "${header}"`);
+                    return i;
+                }
+                return -1;
+            }
+
             // Mapeo de columnas basado en la estructura REAL del PRI.xlsx
             // Usamos múltiples patrones para cada columna para mayor robustez
             const colIndex = {
@@ -910,7 +1021,15 @@
                 genero: findColumnByPatterns('género', 'genero', 'sexo'),
                 edad: findColumnByPatterns('edad'),
                 area: findColumnByPatterns('sede', 'área', 'area', 'departamento'),
-                cargo: findColumnByPatterns('cargo'),
+                cargo: findColumnWithExclusions({
+                    // Buscar headers que contengan "cargo" PERO NO los que la combinan
+                    // con "antigüedad"/"años" — esos son la columna de años en el cargo,
+                    // NO el cargo en sí. Sin este filtro (issue 2026-07-01),
+                    // el matching caía en columna 10 ("ANTIGÜEDAD EN AÑOS EN EN CARGO
+                    // ACTUAL") y se mostraba "Cargo no registrado" en el PDF.
+                    include: ['cargo'],
+                    exclude: ['antigüedad', 'antiguedad', 'años', 'anos', 'tiempo', 'antigüedad en', 'antiguedad en']
+                }),
                 eps: findColumnByPatterns('eps'),
                 diasIncapacidad: findColumnByPatterns('días incapacidad acumulados', 'dias incapacidad', 'días acumulados'),
                 fechaInicio: findColumnByPatterns('fecha de inicio de incapacidad', 'fecha inicio', 'f. inicio'),
@@ -921,7 +1040,53 @@
                 estado: findColumnByPatterns('estado caso', 'motivo de cierre', 'estado'),
                 fechaCierre: 47, // Columna AV - índice fijo
                 motivoCierre: 48, // Columna AW - índice fijo
-                antiguedad: findColumnByPatterns('antigüedad', 'antiguedad', 'años en empresa'),
+                antiguedad: (() => {
+                    // Antes: findColumnByPatterns('antigüedad', 'antiguedad', 'años en empresa').
+                    // Eso matcheaba la primera columna cuya cabecera contuviera "antigüedad"
+                    // y se quedaba con ella, sin importar que otras columnas también tuvieran
+                    // datos válidos de antigüedad (ej: una en MESES que el Excel no diligenciaba,
+                    // y la otra en AÑOS). Ahora probamos varias y priorizamos la que tenga
+                    // datos en MAYORÍA de filas (heurística: la columna "viva", no la vacía).
+                    const candidateCols = [];
+                    const seen = new Set();
+                    // Recorrer headers y matchear todos los que cumplan
+                    for (let i = 0; i < headers.length; i++) {
+                        const h = (headers[i] || '').toString().toLowerCase();
+                        if (!h) continue;
+                        if (seen.has(i)) continue;
+                        const isAntiguedadLike = (
+                            (h.includes('antigüedad') || h.includes('antiguedad'))
+                            && (h.includes('empresa') || h.includes('organización') || h.includes('organizacion'))
+                        );
+                        if (isAntiguedadLike) {
+                            seen.add(i);
+                            candidateCols.push(i);
+                        }
+                    }
+                    if (candidateCols.length === 0) return -1;
+                    // Si solo hay una candidata, usarla
+                    if (candidateCols.length === 1) {
+                        console.log(`[INFORME-PRI] Antigüedad: solo una candidata col ${candidateCols[0]} -> "${headers[candidateCols[0]]}"`);
+                        return candidateCols[0];
+                    }
+                    // Si hay varias, elegir la que tenga MAYOR cantidad de filas no-vacías
+                    let bestCol = candidateCols[0];
+                    let bestNonEmpty = -1;
+                    for (const colIdx of candidateCols) {
+                        let nonEmpty = 0;
+                        for (const row of rows) {
+                            const v = row[colIdx];
+                            if (v !== null && v !== undefined && v !== '') nonEmpty++;
+                        }
+                        console.log(`[INFORME-PRI] Antigüedad candidata col ${colIdx} ("${headers[colIdx]}") tiene ${nonEmpty} filas con dato`);
+                        if (nonEmpty > bestNonEmpty) {
+                            bestNonEmpty = nonEmpty;
+                            bestCol = colIdx;
+                        }
+                    }
+                    console.log(`[INFORME-PRI] Antigüedad elegida: col ${bestCol} ("${headers[bestCol]}") con ${bestNonEmpty} filas con dato`);
+                    return bestCol;
+                })(),
                 // Seguimientos (columnas múltiples) - Estructura: header "SEGUIMIENTO N" = fecha, header null siguiente = descripción
                 seguimiento1Fecha: findColumnByPatterns('seguimiento 1'),
                 seguimiento1Desc: 30, // Columna siguiente a SEGUIMIENTO 1 (índice 29)
@@ -1060,17 +1225,26 @@
                 // Extraer recomendaciones - Iterar sobre las 10 filas posibles
                 const recomendaciones = [];
 
-                // Extraer de las filas estructuradas (índices 99-156)
+                // Extraer de las filas estructuradas (índices 99-156).
+                // 📦 INCLUIR cualquier fila que tenga AL MENOS un campo poblado:
+                // el usuario puede haber marcado "cumple: SI" sin escribir el texto, pero
+                // eso sigue siendo información válida (la recomendación se cumplió). Antes
+                // se descartaban estas filas y la sección desaparecía del informe.
                 colIndex.recomendacionesFilas.forEach((fila, idx) => {
                     const recomendacionTexto = getCellValue(fila.emitida);
                     const entidadRec = getCellValue(fila.entidad) || 'EPS/ARL';
+                    const fechaLimiteRec = getCellValue(fila.fechaLimite);
                     const cumpleRec = getCellValue(fila.cumple);
+                    const obsRec = getCellValue(fila.observacion);
 
-                    if (recomendacionTexto) {
+                    const tieneAlgo = recomendacionTexto || fechaLimiteRec || cumpleRec || obsRec;
+                    if (tieneAlgo) {
                         recomendaciones.push({
-                            recomendacion: recomendacionTexto.trim(),
+                            recomendacion: recomendacionTexto ? recomendacionTexto.trim() : '(Sin texto)',
                             entidad: entidadRec,
-                            cumple: cumpleRec || 'PENDIENTE'
+                            fechaLimite: fechaLimiteRec || '',
+                            cumple: cumpleRec || 'PENDIENTE',
+                            observacion: obsRec || ''
                         });
                     }
                 });
@@ -1108,7 +1282,34 @@
                     fechaFin: getCellValue(colIndex.fechaFin) || '',
                     fechaCierre: getCellValue(colIndex.fechaCierre) || '',
                     motivoCierre: getCellValue(colIndex.motivoCierre) || '',
-                    antiguedad: getCellValue(colIndex.antiguedad) || 'N/A',
+                    // Antigüedad: distinguir 3 casos claros (fix 2026-07-01 después del log
+                    // [DEBUG-ANTIGUEDAD] reveló que CARELIS tiene raw "0" en su celda,
+                    // no null. Mostrar "Sin antigüedad registrada" en ese caso era
+                    // incorrecto — su dato existe, sólo que es menos de 1 año).
+                    antiguedad: (() => {
+                        const raw = getCellValue(colIndex.antiguedad);
+                        // 📦 DEBUG: loggear qué hay realmente en la columna detectada
+                        if (index < 5 || (nombre && nombre.includes('CARELIS'))) {
+                            console.log(`[INFORME-PRI][DEBUG-ANTIGUEDAD] Caso ${index} (${nombre}):`,
+                                'colIndex=', colIndex.antiguedad,
+                                'header=', headers[colIndex.antiguedad],
+                                'raw=', JSON.stringify(raw),
+                                'tipo=', typeof raw);
+                        }
+                        if (!raw) return 'Sin antigüedad registrada';           // caso: null/undefined/''
+                        const trimmed = raw.trim();
+                        if (trimmed === '') return 'Sin antigüedad registrada';  // caso: solo whitespace
+                        // Parsear como número para detectar "0", "0.0", "0,0", "0 años" etc.
+                        const numeric = parseFloat(trimmed.replace(',', '.').replace(/[^\d.]/g, ''));
+                        if (!isNaN(numeric)) {
+                            if (numeric === 0) return 'Menos de 1 año';           // caso: "0" → menos de 1 año
+                            if (numeric < 1) return `Menos de 1 año (${trimmed})`; // caso: 0.x → menos de 1 año pero mostrar el valor
+                            return `${numeric} ${numeric === 1 ? 'año' : 'años'}`; // caso: "5" → "5 años"
+                        }
+                        // Si no es numérico pero tiene contenido, mostrarlo tal cual
+                        // (ej: "5 años", "Recién ingresado", etc.)
+                        return trimmed;
+                    })(),
                     seguimientos: seguimientos,
                     pcl: pclData,
                     pric: {
@@ -1455,16 +1656,22 @@
             })).sort((a, b) => b.days - a.days);
         }
 
-        function renderCaseDetailPage(c) {
+        function renderCaseDetailPage(c, pageNumOffset) {
             const statusClass = c.status === "En Seguimiento" || c.status === "Crítico" 
                 ? 'bg-warning-light' 
                 : 'bg-success-light';
+
+            // Permite inyectar el número de página GLOBAL desde el exportToPDF.
+            // Si no se pasa, default = currentPage (uso UI normal).
+            const pgo = typeof pageNumOffset === 'number' ? pageNumOffset : currentPage;
             
             // Determinar si necesitamos dos páginas
-            // Criterio: Si hay PCL O Recomendaciones con contenido, usar dos páginas
-            const hasPCLContent = reportConfig.includePCL && c.pcl && (c.pcl.fecha || c.pcl.porcentaje || c.pcl.diagnosticos?.length > 0);
-            const hasRecomendacionesContent = reportConfig.includeRecomendaciones && c.recomendaciones && c.recomendaciones.length > 0;
-            
+            // 📦 INCLUIR cualquier fila que tenga AL MENOS un campo poblado:
+            // antes se ocultaban las secciones si los datos estaban vacíos, ahora se muestran
+            // SIEMPRE que la checkbox esté tildada (con empty state si está vacía).
+            const hasPCLContent = !!reportConfig.includePCL;
+            const hasRecomendacionesContent = !!reportConfig.includeRecomendaciones;
+
             const needsTwoPages = hasPCLContent || hasRecomendacionesContent;
             
             // Página 1: Datos personales, Incapacidad, PRIC, Seguimientos
@@ -1578,7 +1785,7 @@
                 ` : ''}
 
                 <div style="position:absolute; bottom:15mm; width:calc(100% - 100px); text-align:center; font-size:8pt; color:#94A3B8; border-top:1px solid #E2E8F0; padding-top:10px;">
-                    Página ${currentPage + 1}${needsTwoPages ? ' de 2' : ''} - Detalle Individual: ${c.name} | K+AIR - Sistema de Gestión SG-SST
+                    Página ${pgo + 1} de ${totalGlobalPages()} - Detalle Individual: ${c.name} | K+AIR - Sistema de Gestión SG-SST
                 </div>
             </div>`;
 
@@ -1652,7 +1859,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            ${c.recomendaciones.map(r => `
+                            ${c.recomendaciones && c.recomendaciones.length > 0 ? c.recomendaciones.map(r => `
                                 <tr>
                                     <td style="font-weight:500;">${r.recomendacion}</td>
                                     <td>${r.entidad}</td>
@@ -1663,14 +1870,14 @@
                                         </span>
                                     </td>
                                 </tr>
-                            `).join('')}
+                            `).join('') : `<tr><td colspan="4" style="text-align:center; color:var(--text-muted); padding:30px;">No hay recomendaciones registradas para este caso</td></tr>`}
                         </tbody>
                     </table>
                     ` : ''}
 
                     <!-- Footer Página 2 -->
                     <div style="position:absolute; bottom:15mm; width:calc(100% - 100px); text-align:center; font-size:8pt; color:#94A3B8; border-top:1px solid #E2E8F0; padding-top:10px;">
-                        Página ${currentPage + 2} de 2 - Detalle Individual: ${c.name} | K+AIR - Sistema de Gestión SG-SST
+                        Página ${pgo + 2} de ${totalGlobalPages()} - Detalle Individual: ${c.name} | K+AIR - Sistema de Gestión SG-SST
                     </div>
                 </div>`;
             }
@@ -1699,7 +1906,17 @@
 
         function formatDate(dateString) {
             if (!dateString) return 'N/A';
-            const date = new Date(dateString);
+            // 📦701-fix6 — Si la fecha viene solo como "YYYY-MM-DD" (sin hora),
+            // JavaScript la interpreta como medianoche UTC, lo que en zonas
+            // horarias como Colombia (UTC-5) se ve como el DÍA ANTERIOR.
+            // Fix: si NO tiene 'T' (parte de hora), agregar 'T00:00:00' para
+            // que se interprete como medianoche LOCAL.
+            let date;
+            if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateString.trim())) {
+                date = new Date(dateString + 'T00:00:00');
+            } else {
+                date = new Date(dateString);
+            }
             return date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
         }
 
@@ -1742,15 +1959,347 @@
             alert('Función de exportación a Excel en desarrollo...\n\nEsta función generará un archivo Excel con:\n- Hoja 1: Resumen consolidado\n- Hoja 2-N: Detalle por caso');
         }
 
-        function exportToPDF() {
-            // Usar la función de impresión del navegador
-            window.print();
+        async function exportToPDF() {
+            // 📦 EXPORTAR TODO EL INFORME → PDF NATIVO (Plan B, 2026-07-01).
+            //
+            // ANTES: usábamos `window.print()` sobre el iframe + CSS off-screen para
+            // ocultar chrome del builder. PERO Chromium tiene un bug bien conocido con
+            // contenido multipágina en iframes anidados — solo imprimía la primera hoja
+            // (resumen general) y descartaba las páginas 2+.
+            //
+            // AHORA: Plan B definitivo. Construimos el HTML del reporte
+            // (resumen + cada caso), lo envolvemos en CSS de impresión estándar,
+            // y lo mandamos al MAIN PROCESS por IPC. El main process crea un
+            // BrowserWindow OCULTO y usa el método NATIVO de Electron
+            // `webContents.printToPDF()` (que NO usa el motor Chromium de printing
+            // con sus quirks) para generar el PDF multipágina real y guardarlo a disco.
+            //
+            // Resultado: TODAS las páginas se imprimen correctamente,
+            // sin pasar por el diálogo nativo de Chromium.
+
+            console.log('[INFORME-PRI] exportToPDF() invocado — casos:', casesData ? casesData.length : 0,
+                '— config:', JSON.stringify(reportConfig));
+
+            if (!casesData || casesData.length === 0) {
+                showInformeNotification('warning', 'Sin casos', 'No hay casos para imprimir en el rango seleccionado.');
+                return;
+            }
+
+            if (!window.electronAPI || typeof window.electronAPI.printInformeToPdf !== 'function') {
+                showInformeNotification(
+                    'error',
+                    'API no disponible',
+                    'printInformeToPdf no está expuesto en electronAPI. Verificá preload.js.'
+                );
+                console.error('[INFORME-PRI] window.electronAPI.printInformeToPdf no existe');
+                return;
+            }
+
+            // Calcular paginación GLOBAL: resumen (1 hoja) + cada caso (1 o 2 hojas
+            // según si tiene PCL/Recomendaciones activas).
+            let globalPage = 1;
+            const paginationPlan = [{ kind: 'summary' }]; // page 1 = resumen
+            casesData.forEach(() => {
+                const hasPCL = !!reportConfig.includePCL;
+                const hasRec = !!reportConfig.includeRecomendaciones;
+                const pages = (hasPCL || hasRec) ? 2 : 1;
+                paginationPlan.push({ kind: 'case', pages });
+            });
+
+            // Generar HTML completo con numeración correlativa para los footers.
+            let bodyHTML = renderSummaryPageGlobal(1); // página 1 = resumen
+            globalPage = 1;
+            casesData.forEach((c, idx) => {
+                const caseStartPage = globalPage + 1; // la siguiente página disponible
+                // renderCaseDetailPage con pageNumOffset = caseStartPage - 1
+                // (porque internamente usa pgo+1 y pgo+2)
+                bodyHTML += renderCaseDetailPage(c, caseStartPage - 1);
+                globalPage += paginationPlan[1 + idx].pages;
+            });
+            const totalHojas = globalPage;
+
+            // Construir el documento HTML completo con CSS de impresión embebido.
+            //
+            // Estilo final definido tras feedback del usuario (2026-07-01):
+            // - Layout limpio, sin colores de fondo que se "ensucien" (se vio B&N
+            //   y se prefirió ese look limpio al que tenía colores v0.110/0.111).
+            // - Tablas con bordes visibles (líneas en cada celda) para que se lea
+            //   claramente la estructura de filas/columnas en el PDF impreso.
+            // - printBackground: true + print-color-adjust: exact en IPC, así que
+            //   si en el futuro se agregan secciones con fondo, se conservan.
+            const printableCss = `
+                @page { size: A4 portrait; margin: 0; }
+                * { box-sizing: border-box; }
+                html, body {
+                    margin: 0; padding: 0; background: white;
+                    color: #1e293b;
+                    font-family: 'Segoe UI', -apple-system, system-ui, sans-serif;
+                    font-size: 10pt;
+                    line-height: 1.4;
+                }
+                .report-container { display: block; width: 100%; }
+
+                /* Cada hoja A4 portrait exacta (210mm x 297mm) */
+                .report-page {
+                    width: 210mm; height: 297mm;
+                    padding: 14mm 16mm; margin: 0 auto;
+                    position: relative; overflow: hidden;
+                    background: white;
+                    page-break-after: always !important;
+                    break-after: page !important;
+                }
+                .report-page:last-child {
+                    page-break-after: auto !important;
+                    break-after: auto !important;
+                }
+
+                /* Header del reporte */
+                .report-header { margin-bottom: 8mm; padding-bottom: 5mm; border-bottom: 2px solid #0f172a; }
+                .report-title-main { font-size: 16pt; margin: 0; color: #0f172a; font-weight: 700; letter-spacing: 0.5px; }
+                h1 { font-size: 14pt; margin: 4mm 0 2mm 0; }
+                h2 { font-size: 11pt; margin: 3mm 0 1.5mm 0; }
+                h3 { font-size: 10pt; margin: 2mm 0 1mm 0; }
+                p { margin: 1.5mm 0; }
+
+                /* Sección header (barras de sección) */
+                .section-header {
+                    background: #f1f5f9;
+                    color: #0f172a;
+                    font-size: 10pt;
+                    font-weight: 700;
+                    padding: 3mm 4mm;
+                    margin: 4mm 0 2mm 0;
+                    border-left: 3px solid #0f172a;
+                    border-radius: 2px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }
+
+                /* Tablas con bordes VISIBLES en celdas (feedback 2026-07-01) */
+                table.data-table, table {
+                    border-collapse: collapse !important;
+                    width: 100%;
+                    margin: 2mm 0;
+                }
+                table.data-table th,
+                table.data-table td,
+                th, td {
+                    padding: 6px 10px !important;
+                    font-size: 9pt !important;
+                    vertical-align: middle;
+                    /* Bordes explícitos en cada celda (gris medio para que se note) */
+                    border: 1px solid #94a3b8 !important;
+                }
+                table.data-table th, th {
+                    background: #f1f5f9 !important;
+                    color: #1e293b !important;
+                    font-weight: 700 !important;
+                    text-align: left !important;
+                }
+                td.label-cell {
+                    background: #fafafa !important;
+                    font-weight: 600 !important;
+                    width: 35% !important;
+                }
+
+                /* Badges (sutiles, sin colores chillones — el usuario prefirió B&N) */
+                .badge {
+                    display: inline-block;
+                    padding: 1mm 3mm;
+                    border-radius: 8px;
+                    font-size: 8.5pt;
+                    font-weight: 600;
+                    border: 1px solid #94a3b8;
+                    color: #1e293b;
+                    background: white;
+                }
+                .bg-warning-light, .bg-success-light, .bg-danger-light {
+                    background: white !important;
+                    color: #1e293b !important;
+                    border-color: #94a3b8 !important;
+                }
+
+                /* Footer dentro de cada .report-page */
+                .report-footer {
+                    position: absolute;
+                    bottom: 10mm;
+                    left: 16mm; right: 16mm;
+                    text-align: center;
+                    font-size: 8pt;
+                    color: #94a3b8;
+                    border-top: 1px solid #e2e8f0;
+                    padding-top: 6px;
+                }
+
+                strong { color: #0f172a; font-weight: 700; }
+            `;
+
+            const fullHtmlDoc = `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><title>Informe PRI</title><style>${printableCss}</style></head>
+<body><div class="report-container" id="reportContainer">${bodyHTML}</div></body>
+</html>`;
+
+            // Determinar carpeta destino: del último `filePath` conocido del backend
+            // (se guarda al cargar datos) o fallback al folder de la empresa.
+            const targetFolder = _getReportTargetFolder();
+            const ts = new Date().toISOString().replace(/[:.]/g, '-').split('T').join('_').slice(0, 19);
+            const filename = `Informe_PRI_${(window.currentCompany || 'empresa').replace(/[^\w\-]/g, '_')}_${ts}.pdf`;
+
+            // Notificar al usuario mientras se procesa (puede tardar 1-3 s).
+            showInformeNotification(
+                'info',
+                'Preparando impresión',
+                `Generando PDF multipágina con motor nativo (${totalHojas} hoja(s), ${casesData.length} caso(s))…`
+            );
+
+            try {
+                const result = await window.electronAPI.printInformeToPdf({
+                    html: fullHtmlDoc,
+                    targetFolder: targetFolder,
+                    filename: filename
+                });
+
+                if (result && result.success) {
+                    console.log('[INFORME-PRI] PDF nativo generado correctamente en:', result.path);
+                    showInformeNotification(
+                        'success',
+                        'PDF generado correctamente',
+                        `${totalHojas} hoja(s) — guardado en: ${result.path}`
+                    );
+                } else {
+                    const errMsg = (result && result.error) || 'Error desconocido';
+                    console.error('[INFORME-PRI] Error al generar PDF:', errMsg);
+                    showInformeNotification('error', 'Error al generar PDF', errMsg);
+                }
+            } catch (ipcErr) {
+                console.error('[INFORME-PRI] Excepción IPC al generar PDF:', ipcErr);
+                showInformeNotification(
+                    'error',
+                    'Error de comunicación',
+                    'Falló la llamada al proceso principal: ' + (ipcErr && ipcErr.message ? ipcErr.message : ipcErr)
+                );
+            }
         }
 
-        // Cerrar con ESC
+        /**
+         * 📦 Resuelve la carpeta destino para guardar el PDF generado.
+         * Prioridad:
+         *  1. `window.priFilePath` (guardado al cargar el reporte) → tomar su carpeta.
+         *  2. '' (el IPC validará y devolverá error descriptivo).
+         */
+        function _getReportTargetFolder() {
+            try {
+                const fp = (typeof window !== 'undefined' && window.priFilePath) || '';
+                if (fp && typeof fp === 'string') {
+                    // Strip filename (cualquier *.xlsx, *.xls, *.xlsm) → keep folder
+                    return fp.replace(/[\\/][^\\/]+\.xlsx?$/i, '').replace(/[\\/][^\\/]+\.xlsm$/i, '');
+                }
+                return '';
+            } catch (e) {
+                console.warn('[INFORME-PRI] _getReportTargetFolder() falló:', e);
+                return '';
+            }
+        }
+
+         /**
+          * 📦 Helper de notificación consistente con el sistema 6.1.3 (updateNotifier).
+          * El archivo se carga dentro de un iframe (ver `load-module-view` en
+          * renderer.js), así que `window.updateNotifier` no está disponible localmente.
+          * Hay que buscarlo en `window.parent` (o `window.opener` como fallback).
+          *
+          * Orden de búsqueda:
+          *  1. window.updateNotifier / window.KairStore.updateNotifier (mismo frame)
+          *  2. window.parent.updateNotifier / window.KairStore.updateNotifier (iframe parent)
+          *  3. window.opener.updateNotifier (si fue abierto por window.open)
+          *  4. window.showNotification (legacy)
+          *  5. alert() (último recurso visible, NO recomendado en producción pero sirve
+          *     para confirmar al usuario que la acción se ejecutó)
+          *  6. console.log (siempre, como rastro de auditoría)
+          */
+        function showInformeNotification(type, title, subtitle) {
+            const payload = { type: type, title: title, subtitle: subtitle || '' };
+            const notifier = findNotifier();
+            if (notifier && typeof notifier.show === 'function') {
+                try {
+                    notifier.show(payload);
+                    console.log(`[INFORME-PRI] Notificación enviada vía notifier: ${type} — ${title}`);
+                    return;
+                } catch (e) {
+                    console.log('[INFORME-PRI] notifier.show() lanzó error:', e && e.message);
+                }
+            }
+            // Fallback visible para confirmar al usuario
+            try {
+                alert(`${title}\n\n${subtitle || ''}`);
+            } catch (e) {
+                console.log(`[INFORME-PRI][${type}] ${title} — ${subtitle || ''}`);
+            }
+        }
+
+        /**
+         * 📦 Busca el notificador disponible en cualquier contexto donde se cargue
+         * este archivo (renderer.js, iframe, popup, etc.). Retorna el objeto con
+         * método `show()` o `null` si nada está disponible.
+         */
+        function findNotifier() {
+            const candidates = [
+                () => window.updateNotifier,
+                () => window.KairStore && window.KairStore.updateNotifier,
+                () => window.parent && window.parent.updateNotifier,
+                () => window.parent && window.parent.KairStore && window.parent.KairStore.updateNotifier,
+                () => window.opener && window.opener.updateNotifier,
+                () => window.opener && window.opener.KairStore && window.opener.KairStore.updateNotifier
+            ];
+            for (let i = 0; i < candidates.length; i++) {
+                try {
+                    const n = candidates[i]();
+                    if (n && typeof n.show === 'function') {
+                        console.log(`[INFORME-PRI] Notifier encontrado en candidate #${i + 1}`);
+                        return n;
+                    }
+                } catch (e) { /* cross-origin o no parent — ignorar */ }
+            }
+            console.log('[INFORME-PRI] No se encontró updateNotifier en ninguna ruta. ' +
+                'Available globals: ' + Object.keys(window).filter(k =>
+                    k.toLowerCase().includes('notif') || k.toLowerCase().includes('kair') ||
+                    k.toLowerCase().includes('sileo')).join(', ') || '(ninguno relevante)');
+            return null;
+        }
+
+        // Variante de renderSummaryPage que respeta el número de página GLOBAL para el footer.
+        function renderSummaryPageGlobal(pageNum) {
+            // Reusamos renderSummaryPage existente; ajustamos el footer al número global.
+            const baseHTML = renderSummaryPage();
+            return baseHTML.replace(
+                /Página \$\{currentPage \+ 1\} de \$\{totalPages\}/,
+                `Página ${pageNum} de ${totalGlobalPages()}`
+            );
+        }
+
+        // Calcula el total de hojas GLOBAL para el footer (resumen + N casos con 1 o 2 hojas c/u).
+        function totalGlobalPages() {
+            let total = 1; // 1 hoja del resumen
+            if (typeof casesData !== 'undefined' && casesData) {
+                casesData.forEach(c => {
+                    const hasPCL = typeof reportConfig !== 'undefined' && reportConfig.includePCL;
+                    const hasRec = typeof reportConfig !== 'undefined' && reportConfig.includeRecomendaciones;
+                    total += (hasPCL || hasRec) ? 2 : 1;
+                });
+            }
+            return total;
+        }
+
+        // Cerrar con ESC / Imprimir con Ctrl+P / Cmd+P → exportToPDF() (con concatenación y notifier)
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 closeReportBuilder();
+            } else if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'P')) {
+                // 📦 Interceptar Ctrl+P / Cmd+P: usar exportToPDF() en vez de window.print() directo,
+                // para que la concatenación de páginas, numeración correlativa y notificación funcionen.
+                e.preventDefault();
+                console.log('[INFORME-PRI] Atajo Ctrl+P / Cmd+P detectado, redirigiendo a exportToPDF()');
+                exportToPDF();
             }
         });
     </script>

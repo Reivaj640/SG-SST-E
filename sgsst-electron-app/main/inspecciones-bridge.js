@@ -1,1410 +1,986 @@
-const ExcelJS = require("exceljs");
-const xlsx = require("xlsx");
+/* ============================================================
+ * K+AIR · Inspecciones — Bridge IPC con file-based JSON store
+ *
+ * Handlers (9 canales, naming `modulo:accion`):
+ *   company:listar                    → store.listCompanies()
+ *   programa:obtener                  → store.getProgram(year, companyId)
+ *   programa:actualizarActividad      → store.updateActivity(id, patch)
+ *   inspeccion:listar                 → store.listInspections(filter)
+ *   inspeccion:obtener                → store.getInspection(id)
+ *   inspeccion:crear                  → store.createInspection(payload)
+ *   inspeccion:actualizar             → store.updateInspection(id, patch)
+ *   inspeccion:eliminar               → store.deleteInspection(id)
+ *   inspeccion:exportarXlsx           → exporta la inspección a .xlsx usando
+ *                                        la plantilla oficial de utils/ como
+ *                                        base (preserva bordes, fonts, fills,
+ *                                        merges y anchos de columna).
+ *                                        Aplica a los 4 tipos: instalaciones,
+ *                                        botiquin, extintores, equipos_emergencia.
+ *
+ * Backward-compat (para widgets del home de gestion-peligros):
+ *   inspecciones:get-stats(company)   → wrapper que lee del nuevo store
+ *     y retorna {totalInspecciones, completadas, pendientesMes,
+ *                tasaCumplimiento, extintoresVigentes, extintoresTotal}
+ *
+ * Persistencia: <userData>/kair-inspecciones-data.json
+ * Plantillas:    <appPath>/utils/GI-FO-*.xlsx
+ * ============================================================ */
+const { app, ipcMain, BrowserWindow } = require("electron");
 const path = require("path");
 const fs = require("fs");
+const ExcelJS = require("exceljs");
 
-const MONTHS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+const DATA_FILE = () =>
+  path.join(app.getPath("userData"), "kair-inspecciones-data.json");
 
-var _writeQueues = {};
-function _serializedWrite(filePath, writeFn) {
-  var key = filePath.toLowerCase();
-  if (!_writeQueues[key]) _writeQueues[key] = Promise.resolve();
-  _writeQueues[key] = _writeQueues[key].catch(function() {}).then(writeFn);
-  return _writeQueues[key];
+/* Las plantillas originales son .xls pero ExcelJS (que sí preserva estilos
+   al escribir .xlsx) requiere .xlsx de entrada. La conversión .xls → .xlsx
+   se hizo una sola vez con Excel vía pywin32 y queda commiteada en utils/.
+   En dev: <repo>/utils/...
+   En prod (asar=false): <appPath>/utils/... (incluida en el build por
+   la regla files: ["**\/*"] de electron-builder) */
+const TEMPLATE_BASE = () => path.join(app.getAppPath(), "utils");
+
+function fmtDate(d) {
+  try {
+    var date = typeof d === "string" ? new Date(d) : d;
+    var dd = String(date.getDate()).padStart(2, "0");
+    var mm = String(date.getMonth() + 1).padStart(2, "0");
+    var yyyy = date.getFullYear();
+    return dd + "/" + mm + "/" + yyyy;
+  } catch (e) { return String(d); }
 }
 
-const INSPECTION_TEMPLATES = {
-EXTINTOR: {
-  code: "GI-FO-026",
-  name: "Inspección de Extintores",
-  ext: ".xlsx",
-  templateFile: "GI-FO-026 INSPECCION DE EXTINTORES.xlsx",
-  sheetName: "Extintores",
-    headerFields: [
-      { key: "fecha", label: "Fecha de realización", row: 7, col: 2 },
-      { key: "inspector", label: "Realizada por", row: 8, col: 3 },
-      { key: "cargo", label: "Cargo", row: 8, col: 7 }
-    ],
- generalObservations: { row: 21, col: 1, endCol: 12 },
- dataStartRow: 12,
- dataEndRow: 19,
- defaultRowCount: 7,
- colMap: {
-      A: { field: "ubicacion", label: "UBICACIÓN", type: "text" },
-      B: { field: "numExtintor", label: "# EXTINTOR", type: "text" },
-      C: { field: "tipo", label: "Tipo", type: "text" },
-      D: { field: "capacidad", label: "Capacidad", type: "text" },
-      E: { field: "recarga", label: "Fecha Recarga", type: "text" },
-      F: { field: "vencimiento", label: "Fecha Vencimiento", type: "text" },
-      G: { field: "presion", label: "Presión manómetro", type: "select", options: ["OK","BAJO","N/A"] },
-      H: { field: "estadoCilindro", label: "Estado Cilindro", type: "select", options: ["BUENO","MALO","REGULAR","N/A"] },
-      I: { field: "pasador", label: "Pasador", type: "select", options: ["BUENO","MALO","REGULAR","N/A"] },
-      J: { field: "anilloVerificacion", label: "Anillo Verificación", type: "select", options: ["BUENO","MALO","REGULAR","N/A"] },
-      K: { field: "baseSoporte", label: "Base Soporte", type: "select", options: ["BUENO","MALO","REGULAR","N/A"] },
-      L: { field: "observaciones", label: "Observaciones", type: "text" }
-    },
-    colIndexes: { A:1, B:2, C:3, D:4, E:5, F:6, G:7, H:8, I:9, J:10, K:11, L:12 }
-  },
-INSTALACION: {
-  code: "GI-FO-025",
-  name: "Inspección de Instalaciones",
-  ext: ".xls",
-  templateFile: "GI-FO-025 INSPECCION DE INSTALACIONES.xls",
-  sheetName: "OFICINA",
- headerFields: [
- { key: "fecha", label: "Fecha", row: 6, col: 1, labelPrefix: "FECHA:" },
- { key: "lugar", label: "Lugar", row: 6, col: 6, labelPrefix: "LUGAR :" }
- ],
- signFields: [
- { key: "inspeccionadoPor", label: "Inspeccionado por", row: 37, col: 1, labelPrefix: "INSPECCIONADO POR:" },
- { key: "cargoFirma", label: "Cargo", row: 38, col: 1, labelPrefix: "CARGO:" }
- ],
-    sections: [
-      { label: "INSTALACIONES SANITARIAS", row: 11 },
-      { label: "INSTALACIONES ELÉCTRICAS", row: 15 },
-      { label: "ORDEN Y LIMPIEZA", row: 18 },
-      { label: "ERGONOMÍA E HIGIENE", row: 21 },
-      { label: "PLANTA FÍSICA", row: 28 }
-    ],
-    dataRows: [12,13,14,16,17,19,20,22,23,24,25,26,27,29,30,31,32,33,34,35],
-    colMap: {
-      A: { field: "item", label: "ITEM REVISIÓN", type: "text", readOnly: true },
-      C: { field: "si", label: "SI", type: "check", options: ["SI",""] },
-      D: { field: "no", label: "NO", type: "check", options: ["NO",""] },
-      E: { field: "na", label: "N/A", type: "check", options: ["N/A",""] },
-      F: { field: "observaciones", label: "OBSERVACIONES", type: "text" },
-      G: { field: "compromisos", label: "COMPROMISOS", type: "text" },
-      H: { field: "responsableFechas", label: "RESPONSABLE - FECHAS", type: "text" },
-      I: { field: "seguimientoEstado", label: "SEGUIMIENTO - ESTADO", type: "text" }
-    },
-    colIndexes: { A:1, C:3, D:4, E:5, F:6, G:7, H:8, I:9 }
-  },
-EMERGENCIA: {
-  code: "GI-FO-023",
-  name: "Inspección Equipos de Emergencia",
-  ext: ".xls",
-  templateFile: "GI-FO-023 INSPECCION DE EQUIPOS DE EMERGENCIA.xls",
-  sheetName: "E EMERGENCIA",
- headerFields: [
- { key: "fecha", label: "Fecha", row: 6, col: 1, labelPrefix: "FECHA:" },
- { key: "sitio", label: "Sitio de Inspección", row: 7, col: 1, labelPrefix: "SITIO DE INSPECCION:" }
- ],
-    dataStartRow: 12,
-    dataEndRow: 20,
-    colMap: {
-      A: { field: "equipo", label: "ITEMS PARA REVISAR", type: "text", readOnly: true },
-      B: { field: "bueno", label: "BUENO", type: "check", options: ["BUENO",""] },
-      C: { field: "malo", label: "MALO", type: "check", options: ["MALO",""] },
-      D: { field: "na", label: "N/A", type: "check", options: ["N/A",""] },
-      E: { field: "recomendaciones", label: "RECOMENDACIONES / COMPROMISOS", type: "text" },
-      F: { field: "responsables", label: "RESPONSABLES / FECHAS", type: "text" },
-      G: { field: "seguimiento", label: "SEGUIMIENTO / ESTATUS", type: "text" }
-    },
-    colIndexes: { A:1, B:2, C:3, D:4, E:5, F:6, G:7 }
-  },
-BOTIQUIN: {
-  code: "GI-FO-031",
-  name: "Inspección de Botiquín",
-  ext: ".xls",
-  templateFile: "GI-FO-031 INSPECCION DE BOTIQUIN DE PRIMEROS AUXILIOS.xls",
-  sheetName: "INSUMOS BASICOS PARA BOTIQUIN",
- headerFields: [
- { key: "fecha", label: "Fecha", row: 6, col: 1, labelPrefix: "FECHA:" },
- { key: "realizadoPor", label: "Realizado por", row: 6, col: 5, labelPrefix: "REALIZADO POR:" }
- ],
-    dataStartRow: 9,
-    dataEndRow: 31,
- checkRows: [
- { row: 32, field: "botiquinBuenEstado", label: "Botiquín en buen estado", type: "check", options: ["SI","NO"], valueCol: 6 },
- { row: 33, field: "higieneAdecuada", label: "Higiene adecuada del botiquín", type: "check", options: ["SI","NO"], valueCol: 6 }
- ],
-    colMap: {
-      A: { field: "numero", label: "ITEM", type: "text", readOnly: true },
-      B: { field: "elemento", label: "ELEMENTOS", type: "text", readOnly: true },
-      E: { field: "cantidad", label: "CANTIDAD", type: "text" },
-      F: { field: "fechaVencimiento", label: "FECHA DE VENCIMIENTO", type: "text" },
-      G: { field: "estadoObservacion", label: "ESTADO / OBSERVACIÓN", type: "text" }
-    },
-    colIndexes: { A:1, B:2, E:5, F:6, G:7 }
-  }
-};
-
-const PROGRAMA_SHEET_CONFIG = {
-  startRow: 9,
-  endRow: 18,
-  startCol: 7,
-  endCol: 18,
-  colMap: {
-    B: { field: "objetivoGeneral", label: "OBJETIVO GENERAL", editable: false, col: 3 },
-    C: { field: "objetivosEspecificos", label: "OBJETIVOS ESPECÍFICOS", editable: false, col: 4 },
-    D: { field: "actividades", label: "ACTIVIDADES", editable: false, col: 5 },
-    E: { field: "responsable", label: "RESPONSABLE", editable: true, col: 6 },
-    R: { field: "porcentaje", label: "%", editable: false, col: 19 },
-    S: { field: "estado", label: "ESTADO", editable: false, col: 20 },
-    T: { field: "observacionesSeguimiento", label: "OBSERVACIONES Y SEGUIMIENTO", editable: true, col: 21 }
-  }
-};
-
-const PROGRAMA_EXCELJS_ROW_OFFSET = 1;
-
-const PROGRAMA_SHEETJS_COL = {
-  objetivoGeneral: 1,
-  objetivosEspecificos: 2,
-  actividades: 3,
-  responsable: 4,
-  monthStart: 5,
-  porcentaje: 17,
-  estado: 18,
-  observacionesSeguimiento: 19,
-  kpiIndicador: 2,
-  kpiSinRealizar: 5,
-  kpiRealizadas: 5
-};
-
-function _getCompanyInspeccionesDir(companyRoot) {
-  var gestionPeligrosDir = path.join(companyRoot, "4. Gestion de Peligros y Riesgos");
-  if (!fs.existsSync(gestionPeligrosDir)) {
-    gestionPeligrosDir = path.join(companyRoot, "4. Gestión de Peligros y Riesgos");
-  }
-  if (fs.existsSync(gestionPeligrosDir)) {
-    try {
-      var entries = fs.readdirSync(gestionPeligrosDir);
-      var inspeccionesFolder = entries.find(function(f) { return f.startsWith("4.2.4"); });
-      if (inspeccionesFolder) {
-        return path.join(gestionPeligrosDir, inspeccionesFolder);
-      }
-    } catch (e) { /* ignore readdir errors */ }
-  }
-
-  var directPath = path.join(companyRoot, "4.2.4");
-  if (fs.existsSync(directPath)) return directPath;
-
-  if (fs.existsSync(companyRoot)) {
-    try {
-      var rootEntries = fs.readdirSync(companyRoot);
-      var gestionFolder = rootEntries.find(function(f) { return f.startsWith("4."); });
-      if (gestionFolder) {
-        var gestionFullPath = path.join(companyRoot, gestionFolder);
-        var subEntries = fs.readdirSync(gestionFullPath);
-        var inspFolder = subEntries.find(function(f) { return f.startsWith("4.2.4"); });
-        if (inspFolder) return path.join(gestionFullPath, inspFolder);
-      }
-    } catch (e) { /* ignore */ }
-  }
-
-  return path.join(gestionPeligrosDir, "4.2.4");
+/* Normaliza para matching: lowercase + ELIMINA todos los espacios.
+   Los items son frases únicas largas, no hay riesgo de falsos positivos;
+   esto cubre casos como "( SILLAS" vs "(SILLAS" que la plantilla trae. */
+function norm(s) {
+  return String(s || "").toLowerCase().replace(/\s+/g, "").trim();
 }
 
-function _findExcelFile(dir, pattern) {
-  if (!fs.existsSync(dir)) return null;
-  var files = fs.readdirSync(dir);
-  var match = files.find(function(f) {
-    var fullPath = path.join(dir, f);
-    try {
-      if (!fs.statSync(fullPath).isFile()) return false;
-    } catch (e) { return false; }
-    var lower = f.toLowerCase();
-    return (lower.endsWith('.xlsx') || lower.endsWith('.xls')) &&
-      f.toUpperCase().indexOf(pattern.toUpperCase()) !== -1;
+/* Helper: extrae el texto plano de una celda que puede ser string, richText
+   o null (ExcelJS devuelve distinto según el tipo de celda). */
+function cellText(cell) {
+  var v = cell && cell.value;
+  if (v == null || v === "") return "";
+  if (typeof v === "string") return v;
+  if (v && v.richText) return v.richText.map(function (rt) { return rt.text; }).join("");
+  if (v && v.text) return v.text;
+  return String(v);
+}
+
+function setText(ws, addr, val) {
+  ws.getCell(addr).value = val == null ? "" : String(val);
+}
+
+let cache = null;
+
+function load() {
+  if (cache) return cache;
+  try {
+    if (fs.existsSync(DATA_FILE())) {
+      cache = JSON.parse(fs.readFileSync(DATA_FILE(), "utf-8"));
+    } else {
+      cache = { companies: {}, programs: {}, inspections: [] };
+      save();
+    }
+  } catch (e) {
+    console.error("[K+AIRSST][STORE][LOAD][ERROR]", e);
+    cache = { companies: {}, programs: {}, inspections: [] };
+  }
+  return cache;
+}
+
+function save() {
+  try {
+    fs.writeFileSync(DATA_FILE(), JSON.stringify(cache, null, 2), "utf-8");
+  } catch (e) {
+    console.error("[K+AIRSST][STORE][SAVE][ERROR]", e);
+  }
+}
+
+function ensureCompany(companyId) {
+  var data = load();
+  if (!data.companies[companyId]) {
+    data.companies[companyId] = {
+      id: companyId,
+      name: companyId === "default" ? "K+AIR Demo S.A.S." : "Empresa K+AIR",
+      createdAt: new Date().toISOString(),
+    };
+    save();
+  } else if (companyId !== "default" &&
+             data.companies[companyId].name === "Empresa K+AIR") {
+    /* Backfill: empresas reales creadas con el placeholder genérico se
+       renombran a su propio id (mejor que el placeholder). El historial
+       refrescará los companyName de las inspecciones migradas. */
+    data.companies[companyId].name = companyId;
+    save();
+  }
+  return data.companies[companyId];
+}
+
+function ok(data) {
+  return { success: true, data };
+}
+function err(code, message) {
+  return { success: false, error: { code, message } };
+}
+
+/* ---------- Empresas ---------- */
+function listCompanies() {
+  var data = load();
+  ensureCompany("default");
+  return ok({ companies: Object.values(data.companies) });
+}
+
+/* ---------- Programa ---------- */
+var MONTHS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+
+function emptySchedule() {
+  var s = {};
+  MONTHS.forEach(function (m) { s[m] = ""; });
+  return s;
+}
+
+var GENERAL_OBJECTIVE =
+  "Garantizar la identificación, evaluación y control de los riesgos laborales en los lugares de trabajo asignados al personal en misión, promoviendo condiciones seguras y saludables que cumplan con las normativas legales y las políticas de seguridad y salud en el trabajo (SST) establecidas por la empresa.";
+
+var PROGRAM_ACTIVITIES_DEFAULT = [
+  { specificObjective: "Identificar condiciones inseguras: Realizar inspecciones periódicas en los lugares de trabajo asignados al personal para detectar posibles riesgos físicos, químicos, ergonómicos, biológicos o psicosociales.", activity: "1. Inspección gerencial", responsible: "Gerencia", inspectionType: "gerencial" },
+  { specificObjective: "Identificar condiciones inseguras: Realizar inspecciones periódicas en los lugares de trabajo asignados al personal para detectar posibles riesgos físicos, químicos, ergonómicos, biológicos o psicosociales.", activity: "3. Inspecciones de elementos de protección personal", responsible: "Responsable del SG-SST", inspectionType: "epp" },
+  { specificObjective: "Evaluar el cumplimiento normativo: Verificar que las empresas usuarias cumplan con las normativas aplicables de seguridad y salud en el trabajo, incluyendo lo estipulado en el Decreto 1072 de 2015.", activity: "2. Inspecciones de extintores", responsible: "Gerencia", inspectionType: "extintores" },
+  { specificObjective: "Evaluar el cumplimiento normativo: Verificar que las empresas usuarias cumplan con las normativas aplicables de seguridad y salud en el trabajo, incluyendo lo estipulado en el Decreto 1072 de 2015.", activity: "3. Inspecciones de botiquines", responsible: "Responsable del SG-SST", inspectionType: "botiquin" },
+  { specificObjective: "Proponer mejoras: Generar informes con hallazgos y recomendaciones específicas para la mejora de las condiciones laborales.", activity: "1. Inspección gerencial", responsible: "Gerencia", inspectionType: "gerencial" },
+  { specificObjective: "Proponer mejoras: Generar informes con hallazgos y recomendaciones específicas para la mejora de las condiciones laborales.", activity: "2. Inspecciones de instalaciones", responsible: "Responsable del SG-SST", inspectionType: "instalaciones" },
+  { specificObjective: "Promover la prevención: Fomentar una cultura de prevención mediante la sensibilización de los trabajadores en misión y de las empresas usuarias sobre la importancia de la seguridad laboral.", activity: "1. Inspección gerencial", responsible: "Gerencia", inspectionType: "gerencial" },
+  { specificObjective: "Promover la prevención: Fomentar una cultura de prevención mediante la sensibilización de los trabajadores en misión y de las empresas usuarias sobre la importancia de la seguridad laboral.", activity: "2. Inspecciones equipos de emergencias.", responsible: "Responsable del SG-SST", inspectionType: "equipos_emergencia" },
+  { specificObjective: "Promover la prevención: Fomentar una cultura de prevención mediante la sensibilización de los trabajadores en misión y de las empresas usuarias sobre la importancia de la seguridad laboral.", activity: "3. Inspecciones de elementos de protección personal", responsible: "Responsable del SG-SST", inspectionType: "epp" },
+];
+
+function getProgram(year, companyId) {
+  var data = load();
+  ensureCompany(companyId);
+  var key = companyId + ":" + year;
+  if (!data.programs[key]) {
+    data.programs[key] = {
+      id: "prog_" + Date.now(),
+      year: year,
+      companyId: companyId,
+      generalObjective: GENERAL_OBJECTIVE,
+      activities: PROGRAM_ACTIVITIES_DEFAULT.map(function (a, idx) {
+        return {
+          id: "act_" + Date.now() + "_" + idx,
+          specificObjective: a.specificObjective,
+          activity: a.activity,
+          responsible: a.responsible,
+          inspectionType: a.inspectionType,
+          monthlySchedule: emptySchedule(),
+          percentage: 0,
+          status: "Sin Iniciar",
+          observations: a.inspectionType === "gerencial" ? "Gerencia no realizó la inspección." : null
+        };
+      })
+    };
+    save();
+  }
+  return ok({ program: data.programs[key] });
+}
+
+function computePct(schedule) {
+  var programmed = 0, completed = 0;
+  MONTHS.forEach(function (m) {
+    var v = schedule[m];
+    if (v === "p" || v === "c") programmed++;
+    if (v === "c") completed++;
   });
-  return match ? path.join(dir, match) : null;
+  if (programmed === 0) return 0;
+  return Math.round((completed / programmed) * 100) / 100;
 }
 
-function _findExcelFileDeep(dir, pattern) {
-  var direct = _findExcelFile(dir, pattern);
-  if (direct) return direct;
-  if (!fs.existsSync(dir)) return null;
-  try {
-    var entries = fs.readdirSync(dir);
-  } catch (e) { return null; }
-  for (var i = 0; i < entries.length; i++) {
-    var sub = path.join(dir, entries[i]);
-    try {
-      if (fs.statSync(sub).isDirectory()) {
-        var found = _findExcelFileDeep(sub, pattern);
-        if (found) return found;
-      }
-    } catch (e) { /* skip inaccessible entries */ }
-  }
-  return null;
+function deriveStatus(schedule, pct) {
+  var hasAny = MONTHS.some(function (m) { return schedule[m] === "p" || schedule[m] === "c"; });
+  var hasCompleted = MONTHS.some(function (m) { return schedule[m] === "c"; });
+  if (!hasAny) return "Sin Iniciar";
+  if (pct >= 1 && hasCompleted) return "Ejecutado";
+  return "En Proceso";
 }
 
-function _readXlsWithSheetJs(filePath) {
-  var workbook = xlsx.readFile(filePath, { type: "file" });
-  var sheetName = workbook.SheetNames[0];
-  var ws = workbook.Sheets[sheetName];
-  return { rawData: xlsx.utils.sheet_to_json(ws, { header: 1, defval: "", raw: true }), workbook: workbook, sheetName: sheetName };
-}
-
-function _escapeRegex(s) {
- return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function _extractValueAfterLabel(cellText, labelPrefix) {
- if (!labelPrefix) return String(cellText || "").trim();
- var raw = String(cellText || "").trim();
- var re = new RegExp("^" + _escapeRegex(labelPrefix) + "\\s*");
- var val = raw.replace(re, "").replace(/_+/g, "").trim();
- if (/^[\/\-\.]+$/.test(val)) val = "";
- return val;
-}
-
-function _buildLabelCell(labelPrefix, value) {
- if (!labelPrefix) return String(value || "");
- return labelPrefix + " " + String(value || "").trim();
-}
-
-function _extractYear(val) {
- if (!val) return NaN;
- var s = String(val).trim();
- var m = s.match(/\b(20\d{2})\b/);
- if (m) return parseInt(m[1], 10);
- var n = parseInt(s, 10);
- return (!isNaN(n) && n >= 2000 && n <= 2100) ? n : NaN;
-}
-
-function _colLetterToIndex(letter) {
-  var idx = 0;
-  for (var i = 0; i < letter.length; i++) {
-    idx = idx * 26 + (letter.charCodeAt(i) - 64);
-  }
-  return idx;
-}
-
-function _createBackup(filePath, dir) {
-  if (!filePath || !fs.existsSync(filePath)) return null;
-  var backupDir = path.join(dir || path.dirname(filePath), "backup");
-  if (!fs.existsSync(backupDir)) { try { fs.mkdirSync(backupDir, { recursive: true }); } catch (e) { return null; } }
-  var ts = new Date().toISOString().replace(/[:.]/g, '-');
-  var backupPath = path.join(backupDir, path.basename(filePath) + '_' + ts + '.bak');
-  try { fs.copyFileSync(filePath, backupPath); return backupPath; } catch (e) { return null; }
-}
-
-function _convertXlsToXlsx(xlsPath) {
-  var xlsxPath = xlsPath.replace(/\.xls$/i, '.xlsx');
-  if (fs.existsSync(xlsxPath)) return xlsxPath;
-  try {
-    var wb = xlsx.readFile(xlsPath, { type: 'file' });
-    var xlsxPath = xlsPath.replace(/\.xls$/i, '.xlsx');
-    xlsx.writeFile(wb, xlsxPath, { bookType: 'xlsx' });
-    var backupDir = path.join(path.dirname(xlsPath), 'backup');
-    if (!fs.existsSync(backupDir)) { try { fs.mkdirSync(backupDir, { recursive: true }); } catch (e) {} }
-    var backupPath = path.join(backupDir, path.basename(xlsPath) + '_pre_xlsx_conversion.bak');
-    try { fs.copyFileSync(xlsPath, backupPath); } catch (e) {}
-    try { fs.unlinkSync(xlsPath); } catch (e) {}
-    return xlsxPath;
-  } catch (e) {
-    console.error('[4.2.4] Error convirtiendo .xls a .xlsx:', e.message);
-    return null;
-  }
-}
-
-function createInspeccionFile(companyRoot, type, month, year) {
-  var dir = _getCompanyInspeccionesDir(companyRoot);
-  var config = INSPECTION_TEMPLATES[type];
-  if (!config) return { success: false, error: { code: "UNKNOWN_TYPE", message: "Tipo de inspección desconocido: " + type } };
-  if (!config.templateFile) return { success: false, error: { code: "NO_TEMPLATE", message: "No hay archivo plantilla definido para " + config.name } };
-
-  var templateSrc = path.join(__dirname, '..', 'utils', config.templateFile);
-  if (!fs.existsSync(templateSrc)) return { success: false, error: { code: "TEMPLATE_NOT_FOUND", message: "Plantilla no encontrada: " + config.templateFile } };
-
-  if (!fs.existsSync(dir)) {
-    try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {
-      return { success: false, error: { code: "DIR_CREATE_ERROR", message: "No se pudo crear la carpeta de inspecciones" } };
-    }
-  }
-
-  var newFileName = config.code + ' ' + month + '-' + year + '.xlsx';
-  var destPath = path.join(dir, newFileName);
-
-  if (fs.existsSync(destPath)) {
-    return { success: true, data: { filePath: destPath, alreadyExists: true, type: type, month: month, year: year } };
-  }
-
-  try {
-    fs.copyFileSync(templateSrc, destPath);
-  } catch (e) {
-    return { success: false, error: { code: "COPY_ERROR", message: "Error copiando plantilla: " + e.message } };
-  }
-
-  if (destPath.toLowerCase().endsWith('.xls') && !destPath.toLowerCase().endsWith('.xlsx')) {
-    var converted = _convertXlsToXlsx(destPath);
-    if (!converted) {
-      try { fs.unlinkSync(destPath); } catch (e2) {}
-      return { success: false, error: { code: "CONVERT_ERROR", message: "No se pudo convertir .xls a .xlsx" } };
-    }
-    destPath = converted;
-  }
-
-  return { success: true, data: { filePath: destPath, alreadyExists: false, type: type, month: month, year: year } };
-}
-
-function listInspeccionFilesByType(companyRoot, type) {
-  var dir = _getCompanyInspeccionesDir(companyRoot);
-  var config = INSPECTION_TEMPLATES[type];
-  if (!config) return { success: true, data: { files: [], type: type } };
-  if (!fs.existsSync(dir)) return { success: true, data: { files: [], type: type } };
-
-  try {
-    var entries = fs.readdirSync(dir);
-    var files = entries.filter(function(f) {
-      var lower = f.toLowerCase();
-      return (lower.endsWith('.xlsx') || lower.endsWith('.xls'))
-        && f.toUpperCase().indexOf(config.code.toUpperCase()) !== -1;
-    }).map(function(f) {
-      var fullPath = path.join(dir, f);
-      var stats = fs.statSync(fullPath);
-      var periodMatch = f.match(/(\d{1,2})-(\d{4})/);
-      var m = periodMatch ? parseInt(periodMatch[1], 10) : null;
-      var y = periodMatch ? parseInt(periodMatch[2], 10) : null;
-      return {
-        name: f,
-        path: fullPath,
-        month: m,
-        year: y,
-        periodLabel: m && y ? MONTHS[m - 1] + ' ' + y : (y ? String(y) : 'Sin periodo'),
-        modified: stats.mtime.toISOString(),
-        size: stats.size
+function updateActivity(activityId, patch) {
+  var data = load();
+  var updated = null;
+  var targetCompanyId = null;
+  var targetYear = null;
+  Object.keys(data.programs).forEach(function (key) {
+    var program = data.programs[key];
+    var idx = program.activities.findIndex(function (a) { return a.id === activityId; });
+    if (idx >= 0) {
+      targetCompanyId = program.companyId;
+      targetYear = program.year;
+      var schedule = patch.monthlySchedule || program.activities[idx].monthlySchedule;
+      var pct = computePct(schedule);
+      var status = patch.status || deriveStatus(schedule, pct);
+      program.activities[idx] = {
+        ...program.activities[idx],
+        monthlySchedule: schedule,
+        percentage: typeof patch.percentage === "number" ? patch.percentage : pct,
+        status: status,
+        observations: patch.observations != null ? patch.observations : program.activities[idx].observations
       };
-    }).sort(function(a, b) {
-      if (a.year !== b.year) return (b.year || 0) - (a.year || 0);
-      return (b.month || 0) - (a.month || 0);
-    });
-
-    return { success: true, data: { files: files, type: type } };
-  } catch (e) {
-    return { success: false, error: { code: "READ_ERROR", message: "Error listando archivos: " + e.message } };
-  }
-}
-
-function readInspeccionExcel(companyRoot, type, filePath) {
-  var dir = _getCompanyInspeccionesDir(companyRoot);
-
-  var config = INSPECTION_TEMPLATES[type];
-  if (!config) {
-    return { success: false, error: { code: "UNKNOWN_TYPE", message: "Tipo de inspección desconocido: " + type } };
-  }
-
-  if (!filePath) {
-    if (!fs.existsSync(dir)) {
-      return { success: false, error: { code: "DIR_NOT_FOUND", message: "No se encontró la carpeta 4.2.4 para la empresa" } };
+      updated = program.activities[idx];
     }
-    filePath = _findExcelFileDeep(dir, config.code);
-    if (!filePath) filePath = _findExcelFileDeep(dir, type);
-  }
-  if (!filePath || !fs.existsSync(filePath)) {
-    return { success: false, error: { code: "FILE_NOT_FOUND", message: "No se encontró el archivo Excel para " + config.name + " en " + dir } };
-  }
-
-  try {
-    if (!fs.statSync(filePath).isFile()) {
-      return { success: false, error: { code: "NOT_A_FILE", message: "La ruta no es un archivo: " + filePath } };
-    }
-  } catch (e) {
-    return { success: false, error: { code: "STAT_ERROR", message: "No se pudo acceder al archivo: " + filePath } };
-  }
-
-  var ext = path.extname(filePath).toLowerCase();
-  var result = { items: [], headerFields: {}, generalObservations: "", checkRows: [], sections: [] };
-
-  try {
-    if (ext === ".xlsx") {
-      var wb = xlsx.readFile(filePath, { type: "file" });
-      var sn = config.sheetName || wb.SheetNames[0];
-      var sheetData = xlsx.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: "", raw: true });
-
- config.headerFields.forEach(function(hf) {
- var rowIdx = hf.row - 1;
- var colIdx = hf.col - 1;
- if (rowIdx < sheetData.length && sheetData[rowIdx]) {
- var rawCell = String(sheetData[rowIdx][colIdx] || "").trim();
- result.headerFields[hf.key] = hf.labelPrefix ? _extractValueAfterLabel(rawCell, hf.labelPrefix) : rawCell;
- }
- });
-
-      if (config.generalObservations) {
-        var obsRow = config.generalObservations.row - 1;
-        if (obsRow < sheetData.length && sheetData[obsRow]) {
-          result.generalObservations = String(sheetData[obsRow][0] || "").replace(/^OBSERVACIONES\s*:\s*/i, "").trim();
-        }
-      }
-
-      var startRow = config.dataStartRow - 1;
-      var endRow = config.dataEndRow;
-      for (var r = startRow; r < Math.min(endRow, sheetData.length); r++) {
-        var row = sheetData[r] || [];
-        var item = { row: r + 1 };
-        var hasData = false;
-        Object.keys(config.colIndexes).forEach(function(col) {
-          var field = config.colMap[col].field;
-          var colIdx = config.colIndexes[col] - 1;
-          var val = row[colIdx];
-          item[field] = val !== undefined && val !== null && val !== "" ? String(val).trim() : "";
-          if (item[field]) hasData = true;
-        });
- if (hasData) result.items.push(item);
- }
-
- if (result.items.length === 0 && config.defaultRowCount) {
- for (var di = 0; di < config.defaultRowCount; di++) {
- var emptyItem = { row: config.dataStartRow + di };
- Object.keys(config.colIndexes).forEach(function(col) {
- emptyItem[config.colMap[col].field] = "";
- });
- result.items.push(emptyItem);
- }
- }
- } else {
-      var xlsResult = _readXlsWithSheetJs(filePath);
-      var rawData = xlsResult.rawData;
-
- config.headerFields.forEach(function(hf) {
- var rowIdx = hf.row - 1;
- var colIdx = hf.col - 1;
- if (rowIdx < rawData.length && rawData[rowIdx]) {
- var rawCell = String(rawData[rowIdx][colIdx] || "").trim();
- result.headerFields[hf.key] = hf.labelPrefix ? _extractValueAfterLabel(rawCell, hf.labelPrefix) : rawCell;
- }
- });
-
- if (config.signFields) {
- result.signFields = {};
- config.signFields.forEach(function(sf) {
- var rowIdx = sf.row - 1;
- var colIdx = sf.col - 1;
- if (rowIdx < rawData.length && rawData[rowIdx]) {
- var rawVal = String(rawData[rowIdx][colIdx] || "").trim();
- if (sf.labelPrefix) {
- result.signFields[sf.key] = _extractValueAfterLabel(rawVal, sf.labelPrefix);
- } else {
- result.signFields[sf.key] = rawVal.replace(/_{2,}/g, "").trim();
- }
- }
-        });
-      }
-
-      if (config.sections) {
-        config.sections.forEach(function(sec) {
-          var rowIdx = sec.row - 1;
-          var secText = "";
-          if (rowIdx < rawData.length && rawData[rowIdx]) {
-            for (var c = 0; c < (rawData[rowIdx].length || 0); c++) {
-              if (rawData[rowIdx][c] && String(rawData[rowIdx][c]).trim()) {
-                secText = String(rawData[rowIdx][c]).trim();
-                break;
-              }
-            }
-          }
-          result.sections.push({ label: secText || sec.label, row: sec.row, type: "section" });
-        });
-      }
-
-      if (config.dataRows) {
-        config.dataRows.forEach(function(rowNum) {
-          var rowIdx = rowNum - 1;
-          var row = rawData[rowIdx] || [];
-          var item = { row: rowNum };
-          var hasData = false;
-          Object.keys(config.colIndexes).forEach(function(col) {
-            var field = config.colMap[col].field;
-            var colIdx = config.colIndexes[col] - 1;
-            var val = row[colIdx];
-            item[field] = val !== undefined && val !== null && val !== "" ? String(val).trim() : "";
-            if (item[field] && !config.colMap[col].readOnly) hasData = true;
-          });
-          item._isSection = false;
-          result.items.push(item);
-        });
-      } else {
-        var startRow2 = config.dataStartRow - 1;
-        var endRow2 = config.dataEndRow;
-        for (var r2 = startRow2; r2 < Math.min(endRow2, rawData.length); r2++) {
-          var row2 = rawData[r2] || [];
-          var item2 = { row: r2 + 1 };
-          var hasData2 = false;
-          Object.keys(config.colIndexes).forEach(function(col2) {
-            var field2 = config.colMap[col2].field;
-            var colIdx2 = config.colIndexes[col2] - 1;
-            var val2 = row2[colIdx2];
-            item2[field2] = val2 !== undefined && val2 !== null && val2 !== "" ? String(val2).trim() : "";
-            if (item2[field2]) hasData2 = true;
-          });
- if (hasData2) result.items.push(item2);
- }
- }
-
- if (result.items.length === 0 && config.defaultRowCount) {
- for (var dj = 0; dj < config.defaultRowCount; dj++) {
- var emptyItem2 = { row: config.dataStartRow + dj };
- Object.keys(config.colIndexes).forEach(function(col2) {
- emptyItem2[config.colMap[col2].field] = "";
- });
- result.items.push(emptyItem2);
- }
- }
-
- if (config.checkRows) {
- config.checkRows.forEach(function(cr) {
- var rowIdx = cr.row - 1;
- var row = rawData[rowIdx] || [];
- var val = "";
- if (cr.valueCol) {
- val = String(row[cr.valueCol - 1] || "").trim();
- } else {
- for (var c = 0; c < (row.length || 0); c++) {
- if (row[c] && String(row[c]).trim()) {
- val = String(row[c]).trim();
- break;
- }
- }
- }
- result.checkRows.push({ row: cr.row, field: cr.field, label: cr.label, value: val, type: cr.type, options: cr.options });
-        });
-      }
-    }
-
-    var headerCells = [];
-    Object.keys(config.colMap).forEach(function(col) {
-      var cm = config.colMap[col];
-      headerCells.push({ col: col, field: cm.field, label: cm.label, type: cm.type, readOnly: cm.readOnly || false, options: cm.options || null });
-    });
-
-    return {
-      success: true,
-      data: {
-        code: config.code,
-        name: config.name,
-        type: type,
-        headerFields: result.headerFields,
-        generalObservations: result.generalObservations,
-        signFields: result.signFields || null,
-        checkRows: result.checkRows.length > 0 ? result.checkRows : null,
-        sections: result.sections.length > 0 ? result.sections : null,
-        structure: {
-          headerCells: headerCells,
-      dataStartRow: config.dataStartRow != null ? config.dataStartRow : (config.dataRows ? config.dataRows[0] : null),
-      dataEndRow: config.dataEndRow != null ? config.dataEndRow : (config.dataRows ? config.dataRows[config.dataRows.length - 1] : null)
-        },
-        items: result.items,
-        _filePath: filePath
-      }
-    };
-  } catch (e) {
-    return { success: false, error: { code: "READ_ERROR", message: "Error leyendo archivo Excel: " + e.message } };
-  }
-}
-
-async function writeInspeccionExcel(companyRoot, type, formData, filePath) {
-  var dir = _getCompanyInspeccionesDir(companyRoot);
-  var config = INSPECTION_TEMPLATES[type];
-  if (!config) return { success: false, error: { code: "UNKNOWN_TYPE", message: "Tipo desconocido: " + type } };
-
-  var originalPath = filePath;
-  if (!originalPath) {
-    originalPath = _findExcelFileDeep(dir, config.code) || _findExcelFileDeep(dir, type);
-  }
-  if (!originalPath) return { success: false, error: { code: "FILE_NOT_FOUND", message: "Archivo Excel no encontrado para escritura" } };
-
-  if (originalPath.toLowerCase().endsWith('.xls') && !originalPath.toLowerCase().endsWith('.xlsx')) {
-    var converted = _convertXlsToXlsx(originalPath);
-    if (!converted) return { success: false, error: { code: "CONVERT_ERROR", message: "No se pudo convertir .xls a .xlsx" } };
-    originalPath = converted;
-  }
-
-  var capturedPath = originalPath;
-  var capturedDir = dir;
-  var capturedConfig = config;
-  return _serializedWrite(originalPath, function() {
-    return _doWriteInspeccionExcel(capturedPath, capturedDir, capturedConfig, formData);
   });
-}
-
-async function _doWriteInspeccionExcel(filePath, dir, config, formData) {
-  var backupPath = _createBackup(filePath, dir);
-
+  if (!updated) return err("NOT_FOUND", "Actividad no encontrada");
+  save();
+  /* 📦507 — Notificar al renderer para que el calendario recargue si está
+     visible. Antes el calendario quedaba con eventos stale hasta que se
+     cerraba y volvía a abrir. */
   try {
-    var workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.readFile(filePath);
-    var ws = workbook.getWorksheet(config.sheetName || 1);
-    if (!ws) {
-      if (backupPath && fs.existsSync(backupPath)) { try { fs.unlinkSync(backupPath); } catch (e) {} }
-      return { success: false, error: { code: "SHEET_NOT_FOUND", message: "Hoja no encontrada" } };
-    }
-
-    if (formData.headerFields) {
-      config.headerFields.forEach(function(hf) {
-        if (formData.headerFields[hf.key] !== undefined) {
-          ws.getCell(hf.row, hf.col).value = hf.labelPrefix ? _buildLabelCell(hf.labelPrefix, formData.headerFields[hf.key]) : formData.headerFields[hf.key];
-        }
-      });
-    }
-
-    if (formData.signFields && config.signFields) {
-      config.signFields.forEach(function(sf) {
-        if (formData.signFields[sf.key] !== undefined) {
-          ws.getCell(sf.row, sf.col).value = sf.labelPrefix ? _buildLabelCell(sf.labelPrefix, formData.signFields[sf.key]) : formData.signFields[sf.key];
-        }
-      });
-    }
-
-    var items = formData.items || [];
-    items.forEach(function(item) {
-      var rowNum = item.row || config.dataStartRow;
-      Object.keys(config.colIndexes).forEach(function(col) {
-        var field = config.colMap[col].field;
-        var colIdx = config.colIndexes[col];
-        if (item[field] !== undefined) {
-          ws.getCell(rowNum, colIdx).value = item[field];
-        }
-      });
+    BrowserWindow.getAllWindows().forEach(function (win) {
+      if (win && win.webContents && !win.isDestroyed()) {
+        win.webContents.send("inspeccion:programa:actualizado", {
+          activityId: activityId,
+          companyId: targetCompanyId,
+          year: targetYear
+        });
+      }
     });
-
-    if (formData.checkRows && config.checkRows) {
-      config.checkRows.forEach(function(cr, idx) {
-        if (formData.checkRows[idx] !== undefined) {
-          var writeCol = cr.valueCol || 1;
-          ws.getCell(cr.row, writeCol).value = formData.checkRows[idx];
-        }
-      });
-    }
-
-    if (formData.generalObservations !== undefined && config.generalObservations) {
-      ws.getCell(config.generalObservations.row, config.generalObservations.col).value =
-        "OBSERVACIONES : " + formData.generalObservations;
-    }
-
-    await workbook.xlsx.writeFile(filePath);
-
-    if (backupPath && fs.existsSync(backupPath)) {
-      try { fs.unlinkSync(backupPath); } catch (e) {}
-    }
-
-    return {
-      success: true,
-      data: { filePath: filePath, saved: true, rowCount: (formData.items || []).length }
-    };
   } catch (e) {
-    if (backupPath && fs.existsSync(backupPath)) {
-      try { fs.copyFileSync(backupPath, filePath); } catch (re) {}
-    }
-    return { success: false, error: { code: "WRITE_ERROR", message: "Error escribiendo Excel: " + e.message } };
+    console.warn("[K+AIRSST][PROGRAM][BROADCAST_FAIL]", e.message);
   }
+  return ok({ activity: updated });
 }
 
-async function writeInspeccionHeader(companyRoot, type, headerData, filePath) {
-  var dir = _getCompanyInspeccionesDir(companyRoot);
-  var config = INSPECTION_TEMPLATES[type];
-  if (!config) return { success: false, error: { code: "UNKNOWN_TYPE", message: "Tipo desconocido: " + type } };
+/* ---------- Inspecciones ---------- */
+var INSPECTION_META = {
+  botiquin: { code: "GI-FO-031", title: "Inspección de Botiquín de Primeros Auxilios" },
+  extintores: { code: "GI-FO-026", title: "Inspección de Extintores" },
+  instalaciones: { code: "GI-FO-025", title: "Inspección de Instalaciones" },
+  equipos_emergencia: { code: "GI-FO-023", title: "Inspección de Equipos de Emergencia" }
+};
 
-  var originalPath = filePath;
-  if (!originalPath) {
-    originalPath = _findExcelFileDeep(dir, config.code) || _findExcelFileDeep(dir, type);
+/* Labels humanos para los tipos de inspección que aparecen en el programa
+   anual (incluye gerencial y epp que NO son tipos del bridge de inspecciones
+   individuales — son actividades que se planifican en el programa pero no
+   generan un registro de inspección). Usado por el endpoint que alimenta
+   el calendario. */
+var INSPECTION_TYPE_LABELS = {
+  gerencial:          "Inspección Gerencial",
+  epp:                "Inspección de EPP",
+  equipos_emergencia: "Equipos de Emergencia",
+  extintores:         "Extintores",
+  botiquin:           "Botiquín",
+  instalaciones:      "Instalaciones"
+};
+
+/* Devuelve los primeros 5 días hábiles (lun-vie) de un mes.
+   monthIdx es 0-based (0=Enero, 11=Diciembre). Retorna array de strings
+   'YYYY-MM-DD' en zona horaria local (NO UTC). */
+function getFirst5BusinessDays(year, monthIdx) {
+  var dates = [];
+  var day = 1;
+  while (dates.length < 5) {
+    var date = new Date(year, monthIdx, day);
+    var dow = date.getDay(); // 0=Dom, 6=Sáb
+    if (dow !== 0 && dow !== 6) {
+      var yyyy = date.getFullYear();
+      var mm = String(date.getMonth() + 1).padStart(2, "0");
+      var dd = String(date.getDate()).padStart(2, "0");
+      dates.push(yyyy + "-" + mm + "-" + dd);
+    }
+    day++;
   }
-  if (!originalPath) return { success: false, error: { code: "FILE_NOT_FOUND", message: "Archivo Excel no encontrado" } };
+  return dates;
+}
 
-  if (originalPath.toLowerCase().endsWith('.xls') && !originalPath.toLowerCase().endsWith('.xlsx')) {
-    var converted = _convertXlsToXlsx(originalPath);
-    if (!converted) return { success: false, error: { code: "CONVERT_ERROR", message: "No se pudo convertir .xls a .xlsx" } };
-    originalPath = converted;
+/* ---------- Registry de plantillas para export XLSX ----------
+   Cada entrada define cómo llenar la plantilla oficial de un tipo de
+   inspección. La función genérica `exportXlsxFromTemplate` carga la
+   plantilla, aplica las funciones de mapping y devuelve el buffer.
+   Esto preserva borders, fonts, fills, merges y anchos de columna
+   (ExcelJS lee/escribe .xlsx preservando estilos; las plantillas
+   originales .xls se convierten una sola vez a .xlsx con Excel+pywin32).
+
+   `mapHeader(ws, insp)`     — llena celdas de cabecera (fecha, lugar, etc.)
+   `mapItems(ws, data)`      — llena filas de items del cuerpo
+   `mapFooter(ws, insp, data)` — opcional, llena celdas del pie
+   `extra(ws, insp, data)`   — opcional, pasos extra (ej. participantes) */
+var TEMPLATES = {
+
+  /* GI-FO-025: Instalaciones ----------------------------------------------
+     Cabecera: A7 = fecha, F7 = lugar
+     Items: 20 filas en col A (con categorias en 12, 16, 19, 22, 29) —
+     col C/D/E = X segun respuesta, F/G/H/I = textos
+     Pie: A38/39/40 = inspector/cargo/firma */
+  instalaciones: {
+    templateFile: "GI-FO-025 INSPECCION DE INSTALACIONES.xlsx",
+    itemRows: [13, 14, 15, 17, 18, 20, 21, 23, 24, 25, 26, 27, 28, 30, 31, 32, 33, 34, 35, 36],
+    labelCol: "A",
+    mapHeader: function (ws, insp) {
+      setText(ws, "A7", "FECHA: " + fmtDate(insp.date));
+      setText(ws, "F7", "LUGAR: " + (insp.site || ""));
+    },
+    mapItems: function (ws, data) {
+      var items = Array.isArray(data.items) ? data.items : [];
+      var byNorm = {};
+      items.forEach(function (it) { if (it && it.item) byNorm[norm(it.item)] = it; });
+      TEMPLATES.instalaciones.itemRows.forEach(function (r) {
+        var label = cellText(ws.getCell(TEMPLATES.instalaciones.labelCol + r));
+        if (!label) return;
+        var it = byNorm[norm(label)];
+        if (!it) return;
+        setText(ws, "C" + r, it.respuesta === "SI"  ? "X" : "");
+        setText(ws, "D" + r, it.respuesta === "NO"  ? "X" : "");
+        setText(ws, "E" + r, it.respuesta === "N/A" ? "X" : "");
+        setText(ws, "F" + r, it.observaciones || "");
+        setText(ws, "G" + r, it.compromisos   || "");
+        setText(ws, "H" + r, it.responsable   || "");
+        setText(ws, "I" + r, it.seguimiento   || "");
+      });
+    },
+    mapFooter: function (ws, insp, data) {
+      var inspPor = data.inspeccionadoPor || insp.performedBy || "";
+      setText(ws, "A38", "INSPECCIONADO POR: " + inspPor);
+      setText(ws, "A39", "CARGO: " + (data.cargo || insp.role || ""));
+      setText(ws, "A40", "FIRMA: " + (data.firma || inspPor));
+    }
+  },
+
+  /* GI-FO-031: Botiquin ---------------------------------------------------
+     Cabecera: A6 = fecha, E6 = realizado por
+     Items: 16 elementos en filas 9-24 (label en B/C/D por merge),
+     col E = cantidad, F = fecha vencimiento, G = estado
+     Filas 25-31 son slots extra vacíos; filas 32-33 son checks
+     (botiquin en buen estado / higiene adecuada) */
+  botiquin: {
+    templateFile: "GI-FO-031 INSPECCION DE BOTIQUIN DE PRIMEROS AUXILIOS.xlsx",
+    itemRows: [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
+    labelCol: "B",
+    mapHeader: function (ws, insp) {
+      setText(ws, "A6", "FECHA: " + fmtDate(insp.date));
+      setText(ws, "E6", "REALIZADO POR: " + (insp.performedBy || ""));
+    },
+    mapItems: function (ws, data) {
+      var items = Array.isArray(data.items) ? data.items : [];
+      var byNorm = {};
+      items.forEach(function (it) {
+        /* El form del botiquin usa el campo `item` para el nombre del
+           elemento (igual que la columna B de la plantilla). */
+        if (it && it.item) byNorm[norm(it.item)] = it;
+      });
+      TEMPLATES.botiquin.itemRows.forEach(function (r) {
+        var label = cellText(ws.getCell(TEMPLATES.botiquin.labelCol + r));
+        if (!label) return;
+        var it = byNorm[norm(label)];
+        if (!it) return;
+        setText(ws, "E" + r, it.cantidad         != null ? String(it.cantidad) : "");
+        setText(ws, "F" + r, it.fechaVencimiento || "");
+        setText(ws, "G" + r, it.estado           || "");
+      });
+    },
+    /* Checks: si el JSON trae `data.checks`, los matcheamos contra las
+       filas 32 ("Botiquin en buen estado") y 33 ("Higiene adecuada del
+       botiquin") y marcamos con X (o el valor) en col E. */
+    extra: function (ws, insp, data) {
+      var checks = Array.isArray(data.checks) ? data.checks : [];
+      if (checks.length === 0) return;
+      var byNorm = {};
+      checks.forEach(function (c) { if (c && c.label) byNorm[norm(c.label)] = c; });
+      [32, 33].forEach(function (r) {
+        var label = cellText(ws.getCell(TEMPLATES.botiquin.labelCol + r));
+        if (!label) return;
+        var c = byNorm[norm(label)];
+        if (!c) return;
+        setText(ws, "E" + r, c.value === true ? "X" : (c.value || ""));
+      });
+    }
+  },
+
+  /* GI-FO-026: Extintores -------------------------------------------------
+     Cabecera: A7 = fecha, A8 = realizado por, F8 = cargo
+     Items: 9 filas (12-20) con mapeo directo por columna:
+       A=ubicacion, B=#, C=tipo, D=capacidad, E=fechaRecarga,
+       F=fechaVencimiento, G=presion, H=estadoCilindro, I=pasador,
+       J=anillo, K=base, L=observaciones
+     Fila 21 = OBSERVACIONES (texto libre)
+     Filas siguientes = firmas (no las tocamos, el usuario firma manual) */
+  extintores: {
+    templateFile: "GI-FO-026 INSPECCION DE EXTINTORES.xlsx",
+    mapHeader: function (ws, insp) {
+      setText(ws, "A7", "Fecha de Realizacion de inspeccion: " + fmtDate(insp.date));
+      setText(ws, "A8", "Realizada por: " + (insp.performedBy || ""));
+      setText(ws, "F8", "Cargo: " + (insp.role || ""));
+    },
+    mapItems: function (ws, data) {
+      var rows = Array.isArray(data.rows) ? data.rows : [];
+      var startRow = 12;
+      var cols = ["ubicacion", "numero", "tipo", "capacidad", "fechaRecarga",
+                  "fechaVencimiento", "presion", "estadoCilindro", "pasador",
+                  "anillo", "base", "observaciones"];
+      rows.forEach(function (row, idx) {
+        if (idx >= 9) return; /* la plantilla tiene 9 slots (12-20) */
+        var r = startRow + idx;
+        cols.forEach(function (field, ci) {
+          setText(ws, String.fromCharCode(65 + ci) + r, row[field] || "");
+        });
+      });
+    },
+    extra: function (ws, insp, data) {
+      var obs = data.observaciones || insp.observations || "";
+      if (obs) setText(ws, "A22", obs);
+    }
+  },
+
+  /* GI-FO-023: Equipos de Emergencia --------------------------------------
+     Cabecera: A6 = fecha, A7 = sitio de inspeccion
+     Items: 9 filas (12-20) con label en A — col B/C/D = X segun estado
+     (BUENO/MALO/N/A), E=recomendaciones, F=responsables, G=seguimiento
+     Fila 25+ = participantes (no implementado por ahora; se llena abajo) */
+  equipos_emergencia: {
+    templateFile: "GI-FO-023 INSPECCION DE EQUIPOS DE EMERGENCIA.xlsx",
+    itemRows: [12, 13, 14, 15, 16, 17, 18, 19, 20],
+    labelCol: "A",
+    mapHeader: function (ws, insp) {
+      setText(ws, "A6", "FECHA: " + fmtDate(insp.date));
+      setText(ws, "A7", "SITIO DE INSPECCION: " + (insp.site || ""));
+    },
+    mapItems: function (ws, data) {
+      var items = Array.isArray(data.items) ? data.items : [];
+      var byNorm = {};
+      items.forEach(function (it) { if (it && it.item) byNorm[norm(it.item)] = it; });
+      TEMPLATES.equipos_emergencia.itemRows.forEach(function (r) {
+        var label = cellText(ws.getCell(TEMPLATES.equipos_emergencia.labelCol + r));
+        if (!label) return;
+        var it = byNorm[norm(label)];
+        if (!it) return;
+        setText(ws, "B" + r, it.estado === "BUENO" ? "X" : "");
+        setText(ws, "C" + r, it.estado === "MALO"  ? "X" : "");
+        setText(ws, "D" + r, it.estado === "N/A"  ? "X" : "");
+        setText(ws, "E" + r, it.recomendaciones || "");
+        setText(ws, "F" + r, it.responsables    || "");
+        setText(ws, "G" + r, it.seguimiento     || "");
+      });
+    },
+    /* Participantes: si el JSON trae `data.participantes`, los colocamos
+       a partir de la fila 25 (después del header de PARTICIPANTES). */
+    extra: function (ws, insp, data) {
+      var parts = Array.isArray(data.participantes) ? data.participantes : [];
+      if (parts.length === 0) return;
+      var startRow = 26; /* debajo del header "NOMBRE COMPLETO ... | CARGO" */
+      parts.forEach(function (p, idx) {
+        var r = startRow + idx;
+        if (r > 40) return; /* safety: no overflow */
+        setText(ws, "A" + r, p.nombre || "");
+        setText(ws, "D" + r, p.cargo   || "");
+      });
+    }
+  }
+};
+
+/* Funcion generica: carga la plantilla del tipo, aplica los mappers y
+   devuelve el .xlsx en base64. */
+async function exportXlsxFromTemplate(insp) {
+  var tpl = TEMPLATES[insp && insp.type];
+  if (!tpl) {
+    return err("NO_TEMPLATE",
+      "No hay plantilla registrada para type=" + (insp && insp.type));
   }
 
-  var capturedPath = originalPath;
-  var capturedDir = dir;
-  var capturedConfig = config;
-  return _serializedWrite(originalPath, function() {
-    return _doWriteInspeccionHeader(capturedPath, capturedDir, capturedConfig, headerData);
+  var templatePath = path.join(TEMPLATE_BASE(), tpl.templateFile);
+  if (!fs.existsSync(templatePath)) {
+    return err("TEMPLATE_NOT_FOUND",
+      "Plantilla no encontrada en runtime: " + templatePath);
+  }
+
+  var wb = new ExcelJS.Workbook();
+  try {
+    await wb.xlsx.readFile(templatePath);
+  } catch (e) {
+    return err("TEMPLATE_READ_FAILED",
+      "No se pudo leer la plantilla .xlsx: " + e.message);
+  }
+  var ws = wb.worksheets[0];
+  if (!ws) return err("TEMPLATE_EMPTY", "La plantilla no tiene hojas");
+  var data = (insp && insp.data) || {};
+
+  if (tpl.mapHeader) tpl.mapHeader(ws, insp);
+  if (tpl.mapItems)  tpl.mapItems(ws, data);
+  if (tpl.mapFooter) tpl.mapFooter(ws, insp, data);
+  if (tpl.extra)     tpl.extra(ws, insp, data);
+
+  var buf;
+  try {
+    buf = await wb.xlsx.writeBuffer();
+  } catch (e) {
+    return err("XLSX_WRITE_FAILED", "No se pudo generar el .xlsx: " + e.message);
+  }
+
+  var nodeBuf = Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
+  return ok({ xlsxBase64: nodeBuf.toString("base64") });
+}
+
+/* Migra inspecciones heredadas que quedaron con companyId="default" pero
+   fueron creadas para otra empresa. Reasigna companyId + companyName a la
+   empresa del filtro. */
+function migrateLegacyDefaultInspections(targetCompanyId, targetCompanyName) {
+  if (!targetCompanyId || targetCompanyId === "default") return false;
+  var data = load();
+
+  /* Si el caller no mandó companyName, lo tomamos del registro de empresa
+     persistido. Si tampoco existe, usamos el companyId como fallback. */
+  var resolvedName = targetCompanyName;
+  if (!resolvedName && data.companies[targetCompanyId]) {
+    resolvedName = data.companies[targetCompanyId].name;
+  }
+  if (!resolvedName) resolvedName = targetCompanyId;
+
+  var changed = false;
+  data.inspections.forEach(function (i) {
+    if (i.companyId === "default") {
+      i.companyId = targetCompanyId;
+      i.companyName = resolvedName;
+      changed = true;
+    } else if (i.companyId === targetCompanyId && resolvedName &&
+               (!i.companyName || i.companyName === "K+AIR Demo S.A.S." || i.companyName === "Empresa K+AIR")) {
+      /* Si la inspección ya está bien asignada por companyId pero el
+         companyName quedó con un placeholder heredado ("K+AIR Demo S.A.S.",
+         "Empresa K+AIR", vacío, etc.), lo normalizamos al nombre real de la
+         empresa para que la columna Empresa muestre el nombre correcto. */
+      i.companyName = resolvedName;
+      changed = true;
+    }
   });
+  if (changed) {
+    save();
+    console.log("[K+AIRSST][INSPECTION][MIGRATE] default -> " + targetCompanyId + " (name=" + resolvedName + ")");
+  }
+  return changed;
 }
 
-async function _doWriteInspeccionHeader(filePath, dir, config, headerData) {
-  var backupPath = _createBackup(filePath, dir);
+function listInspections(filter) {
+  var data = load();
 
-  try {
-    var workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.readFile(filePath);
-    var ws = workbook.getWorksheet(config.sheetName || 1);
-    if (!ws) {
-      if (backupPath && fs.existsSync(backupPath)) { try { fs.unlinkSync(backupPath); } catch (e) {} }
-      return { success: false, error: { code: "SHEET_NOT_FOUND", message: "Hoja no encontrada" } };
-    }
-
-    config.headerFields.forEach(function(hf) {
-      if (headerData[hf.key] !== undefined) {
-        ws.getCell(hf.row, hf.col).value = hf.labelPrefix ? _buildLabelCell(hf.labelPrefix, headerData[hf.key]) : headerData[hf.key];
-      }
-    });
-
-    if (headerData.generalObservations !== undefined && config.generalObservations) {
-      ws.getCell(config.generalObservations.row, config.generalObservations.col).value =
-        "OBSERVACIONES : " + headerData.generalObservations;
-    }
-
-    if (headerData.signFields && config.signFields) {
-      config.signFields.forEach(function(sf) {
-        if (headerData.signFields[sf.key] !== undefined) {
-          ws.getCell(sf.row, sf.col).value = sf.labelPrefix ? _buildLabelCell(sf.labelPrefix, headerData.signFields[sf.key]) : headerData.signFields[sf.key];
-        }
-      });
-    }
-
-    if (headerData.checkRows && config.checkRows) {
-      config.checkRows.forEach(function(cr, idx) {
-        if (headerData.checkRows[idx] !== undefined) {
-          var writeCol = cr.valueCol || 1;
-          ws.getCell(cr.row, writeCol).value = headerData.checkRows[idx];
-        }
-      });
-    }
-
-    await workbook.xlsx.writeFile(filePath);
-
-    if (backupPath && fs.existsSync(backupPath)) {
-      try { fs.unlinkSync(backupPath); } catch (e) {}
-    }
-
-    return { success: true, data: { filePath: filePath, saved: true } };
-  } catch (e) {
-    if (backupPath && fs.existsSync(backupPath)) {
-      try { fs.copyFileSync(backupPath, filePath); } catch (re) {}
-    }
-    return { success: false, error: { code: "WRITE_ERROR", message: "Error escribiendo header: " + e.message } };
+  /* Si el filtro pide una empresa específica que NO es "default" y existen
+     inspecciones heredadas bajo "default" o con companyName de demo,
+     migrarlas a esa empresa. */
+  if (filter && filter.companyId && filter.companyId !== "default") {
+    migrateLegacyDefaultInspections(filter.companyId, filter.companyName);
+    data = load();
   }
+
+  var list = data.inspections.slice();
+  if (filter && filter.type && filter.type !== "all") {
+    list = list.filter(function (i) { return i.type === filter.type; });
+  }
+  if (filter && filter.companyId) {
+    list = list.filter(function (i) { return i.companyId === filter.companyId; });
+  }
+  list.sort(function (a, b) { return new Date(b.date) - new Date(a.date); });
+  return ok({ inspections: list });
 }
 
-function listInspeccionFiles(companyRoot) {
-  var dir = _getCompanyInspeccionesDir(companyRoot);
-  if (!fs.existsSync(dir)) return { success: true, data: { files: [] } };
-
-  try {
-    var entries = fs.readdirSync(dir);
-    var files = [];
-    entries.forEach(function(f) {
-      var fullPath = path.join(dir, f);
-      try {
-        var stat = fs.statSync(fullPath);
-        if (!stat.isFile()) return;
-      } catch (e) { return; }
-      var lower = f.toLowerCase();
-      if (!lower.endsWith('.xlsx') && !lower.endsWith('.xls')) return;
-
-      var type = "DESCONOCIDO";
-      var upper = f.toUpperCase();
-      if (upper.indexOf("GI-FO-026") !== -1 || upper.indexOf("EXTINTOR") !== -1) type = "EXTINTOR";
-      else if (upper.indexOf("GI-FO-025") !== -1 || upper.indexOf("INSTALACION") !== -1) type = "INSTALACION";
-      else if (upper.indexOf("GI-FO-023") !== -1 || upper.indexOf("EMERGENCIA") !== -1) type = "EMERGENCIA";
-      else if (upper.indexOf("GI-FO-031") !== -1 || upper.indexOf("BOTIQUIN") !== -1) type = "BOTIQUIN";
-      else if (upper.indexOf("PROGRAMA") !== -1) type = "PROGRAMA";
-
-      var config = INSPECTION_TEMPLATES[type] || {};
-      files.push({
-        name: f,
-        path: fullPath,
-        type: type,
-        code: config.code || "",
-        typeName: config.name || f.replace(/\.(xlsx|xls)$/i, ""),
-        ext: path.extname(f).toLowerCase(),
-        size: fs.statSync(fullPath).size,
-        modified: fs.statSync(fullPath).mtime.toISOString()
-      });
-    });
-
-    return { success: true, data: { files: files } };
-  } catch (e) {
-    return { success: false, error: { code: "READ_ERROR", message: "Error listando archivos: " + e.message } };
-  }
+function getInspection(id) {
+  var data = load();
+  var found = data.inspections.find(function (i) { return i.id === id; });
+  if (!found) return err("NOT_FOUND", "Inspección no encontrada");
+  return ok({ inspection: found });
 }
 
-function getInspeccionFileMetadata(companyRoot, filePath) {
-  if (!fs.existsSync(filePath)) {
-    return { success: false, error: { code: "FILE_NOT_FOUND", message: "Archivo no encontrado: " + filePath } };
-  }
-
-  var fileName = path.basename(filePath).toUpperCase();
-  var type = "DESCONOCIDO";
-  if (fileName.indexOf("GI-FO-026") !== -1 || fileName.indexOf("EXTINTOR") !== -1) type = "EXTINTOR";
-  else if (fileName.indexOf("GI-FO-025") !== -1 || fileName.indexOf("INSTALACION") !== -1) type = "INSTALACION";
-  else if (fileName.indexOf("GI-FO-023") !== -1 || fileName.indexOf("EMERGENCIA") !== -1) type = "EMERGENCIA";
-  else if (fileName.indexOf("GI-FO-031") !== -1 || fileName.indexOf("BOTIQUIN") !== -1) type = "BOTIQUIN";
-  else if (fileName.indexOf("PROGRAMA") !== -1) type = "PROGRAMA";
-
-  var config = INSPECTION_TEMPLATES[type];
-  if (!config) {
-    var stat = fs.statSync(filePath);
-    return {
-      success: true,
-      data: {
-        type: type,
-        typeName: path.basename(filePath, path.extname(filePath)),
-        code: "",
-        filePath: filePath,
-        fileName: path.basename(filePath),
-        modified: stat.mtime.toISOString(),
-        headerFields: {},
-        itemsCount: 0
-      }
-    };
-  }
-
-  var readResult = readInspeccionExcel(companyRoot, type);
-  if (!readResult.success) return readResult;
-
-  var stat2 = fs.statSync(filePath);
-  return {
-    success: true,
-    data: {
-      type: type,
-      typeName: config.name,
-      code: config.code,
-      filePath: filePath,
-      fileName: path.basename(filePath),
-      modified: stat2.mtime.toISOString(),
-      headerFields: readResult.data.headerFields,
-      itemsCount: readResult.data.items.length
-    }
+function createInspection(payload) {
+  var data = load();
+  if (!INSPECTION_META[payload.type]) return err("INVALID_TYPE", "Tipo de inspección inválido");
+  if (!payload.date || !payload.performedBy) return err("MISSING_FIELDS", "Fecha y responsable son obligatorios");
+  var company = ensureCompany(payload.companyId || "default");
+  var meta = INSPECTION_META[payload.type];
+  var newInsp = {
+    id: "insp_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8),
+    type: payload.type,
+    code: meta.code,
+    title: meta.title,
+    date: payload.date,
+    performedBy: payload.performedBy,
+    role: payload.role || null,
+    site: payload.site || null,
+    companyId: payload.companyId || company.id,
+    companyName: payload.companyName || company.name,
+    status: payload.status || "Completada",
+    observations: payload.observations || null,
+    data: payload.data || {},
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   };
+  data.inspections.push(newInsp);
+  save();
+  console.log("[K+AIRSST][INSPECTION][CREATE][SUCCESS] id=" + newInsp.id + " type=" + payload.type);
+  return ok({ inspection: newInsp });
 }
 
-function _inferFrequency(months) {
-  var count = Object.values(months).filter(function(v) { return v !== null; }).length;
-  if (count >= 10) return "Mensual";
-  if (count >= 3 && count <= 5) return "Trimestral";
-  if (count >= 1 && count <= 2) return "Semestral";
-  return "Según programa";
+function updateInspection(id, patch) {
+  var data = load();
+  var idx = data.inspections.findIndex(function (i) { return i.id === id; });
+  if (idx < 0) return err("NOT_FOUND", "Inspección no encontrada");
+  data.inspections[idx] = {
+    ...data.inspections[idx],
+    date: patch.date || data.inspections[idx].date,
+    performedBy: patch.performedBy || data.inspections[idx].performedBy,
+    role: patch.role != null ? patch.role : data.inspections[idx].role,
+    site: patch.site != null ? patch.site : data.inspections[idx].site,
+    observations: patch.observations != null ? patch.observations : data.inspections[idx].observations,
+    data: patch.data || data.inspections[idx].data,
+    status: patch.status || data.inspections[idx].status,
+    updatedAt: new Date().toISOString()
+  };
+  save();
+  console.log("[K+AIRSST][INSPECTION][UPDATE][SUCCESS] id=" + id);
+  return ok({ inspection: data.inspections[idx] });
 }
 
-function readProgramaInspecciones(companyRoot, year) {
-  var dir = _getCompanyInspeccionesDir(companyRoot);
-  if (!fs.existsSync(dir)) {
-    return { success: false, error: { code: "DIR_NOT_FOUND", message: "Carpeta 4.2.4 no encontrada" } };
-  }
+function deleteInspection(id) {
+  var data = load();
+  var next = data.inspections.filter(function (i) { return i.id !== id; });
+  if (next.length === data.inspections.length) return err("NOT_FOUND", "Inspección no encontrada");
+  data.inspections = next;
+  save();
+  console.log("[K+AIRSST][INSPECTION][DELETE][SUCCESS] id=" + id);
+  return ok({ id: id });
+}
 
-  var filePath = _findExcelFileDeep(dir, "PROGRAMA DE INSPECCIONES") || _findExcelFileDeep(dir, "PROGRAMA");
-  if (!filePath) {
-    return { success: false, error: { code: "FILE_NOT_FOUND", message: "Archivo PROGRAMA DE INSPECCIONES no encontrado" } };
-  }
-
-  if (filePath.toLowerCase().endsWith('.xls') && !filePath.toLowerCase().endsWith('.xlsx')) {
-    filePath = _convertXlsToXlsx(filePath);
-    if (!filePath) {
-      return { success: false, error: { code: "CONVERT_ERROR", message: "No se pudo convertir .xls a .xlsx" } };
-    }
-  }
-
+/* ---------- Backward-compat para widgets del home ---------- */
+/* El home de gestion-peligros llama electronAPI.inspecciones.getStats(company)
+   y espera {totalInspecciones, completadas, pendientesMes, tasaCumplimiento,
+              extintoresVigentes, extintoresTotal, year, mes,
+              mensualCompletadas, mensualPendientes}. Leemos del nuevo store. */
+function getInspeccionesStats(companyName) {
   try {
-    if (!fs.statSync(filePath).isFile()) {
-      return { success: false, error: { code: "NOT_A_FILE", message: "La ruta no es un archivo: " + filePath } };
+    var data = load();
+    var companyId = companyName || "default";
+
+    /* Migrar legacy "default" -> empresa destino antes de filtrar (idempotente) */
+    if (companyId !== "default") {
+      migrateLegacyDefaultInspections(companyId, null);
+      data = load();
     }
-  } catch (e) {
-    return { success: false, error: { code: "STAT_ERROR", message: "No se pudo acceder al archivo: " + filePath } };
-  }
 
-  var rawData;
-  var merges = [];
-  var sheetName = "PROGRAMA";
-  try {
-    var xlsResult = _readXlsWithSheetJs(filePath);
-    rawData = xlsResult.rawData;
-    merges = xlsResult.workbook.Sheets[xlsResult.sheetName]['!merges'] || [];
-    sheetName = xlsResult.sheetName;
-  } catch (e) {
-    return { success: false, error: { code: "READ_ERROR", message: "Error leyendo programa: " + e.message } };
-  }
-
-  var kpiRow1 = rawData[3] || [];
-  var kpiRow2 = rawData[4] || [];
-  var indicador = kpiRow1[PROGRAMA_SHEETJS_COL.kpiIndicador] || 0;
-  var sinRealizar = kpiRow1[PROGRAMA_SHEETJS_COL.kpiSinRealizar] || 0;
-  var realizadas = kpiRow2[PROGRAMA_SHEETJS_COL.kpiRealizadas] || 0;
-
-  var activities = [];
-  var emptyCount = 0;
-
-  for (var r = PROGRAMA_SHEET_CONFIG.startRow - 1; r < Math.min(PROGRAMA_SHEET_CONFIG.endRow, rawData.length); r++) {
-    var row = rawData[r] || [];
-    var actividad = String(row[PROGRAMA_SHEETJS_COL.actividades] || "").trim();
-    if (!actividad) {
-      emptyCount++;
-      if (emptyCount >= 3 && activities.length > 0) break;
-      continue;
+    var company = data.companies[companyId];
+    if (!company) {
+      return ok({
+        totalInspecciones: 0,
+        completadas: 0,
+        pendientesMes: 0,
+        tasaCumplimiento: 0,
+        extintoresVigentes: 0,
+        extintoresTotal: 0,
+        year: new Date().getFullYear(),
+        mes: new Date().toLocaleDateString("es-CO", { month: "long" }),
+        mensualCompletadas: Array(12).fill(0),
+        mensualPendientes: Array(12).fill(0),
+        programaTotal: 0,
+        programaCompletadas: 0,
+        programaPendientes: 0
+      });
     }
-    emptyCount = 0;
-
-    var objetivoGeneral = String(row[PROGRAMA_SHEETJS_COL.objetivoGeneral] || "").trim();
-    var objetivosEspecificos = String(row[PROGRAMA_SHEETJS_COL.objetivosEspecificos] || "").trim();
-    var responsable = String(row[PROGRAMA_SHEETJS_COL.responsable] || "").trim();
-
-    var months = {};
-    for (var m = 0; m < 12; m++) {
-      var colIdx = PROGRAMA_SHEETJS_COL.monthStart + m;
-      var val = row[colIdx];
-      if (val !== undefined && val !== null && String(val).trim() !== "") {
-        var s = String(val).trim().toUpperCase();
-        if (s.indexOf("C") === 0 || s === "1" || s === "COMPLETADA" || s === "SI" || s === "SÍ") {
-          months[m] = "c";
-        } else if (s.indexOf("P") === 0 || s === "0" || s === "PENDIENTE" || s === "PROGRAMADA") {
-          months[m] = "p";
+    var insps = data.inspections.filter(function (i) { return i.companyId === companyId; });
+    var completadas = insps.filter(function (i) { return i.status === "Completada"; }).length;
+    var now = new Date();
+    var mesActual = now.getMonth();
+    var anioActual = now.getFullYear();
+    var pendientesMes = 0;
+    /* Desglose mensual: cuenta por mes del año actual, basado en i.date.
+       "Completadas" = status === "Completada"; "Pendientes" = todo lo demás. */
+    var mensualCompletadas = Array(12).fill(0);
+    var mensualPendientes = Array(12).fill(0);
+    insps.forEach(function (i) {
+      if (!i.date) return;
+      var d = new Date(i.date);
+      if (isNaN(d.getTime())) return;
+      if (d.getFullYear() === anioActual) {
+        var m = d.getMonth();
+        if (i.status === "Completada") {
+          mensualCompletadas[m] = (mensualCompletadas[m] || 0) + 1;
         } else {
-          months[m] = null;
+          mensualPendientes[m] = (mensualPendientes[m] || 0) + 1;
         }
-      } else {
-        months[m] = null;
       }
-    }
-
-    var porcentaje = row[PROGRAMA_SHEETJS_COL.porcentaje] || 0;
-    var estado = String(row[PROGRAMA_SHEETJS_COL.estado] || "").trim();
-    var observaciones = String(row[PROGRAMA_SHEETJS_COL.observacionesSeguimiento] || "").trim();
-
-    var hasAnyMonth = Object.values(months).some(function(v) { return v !== null; });
-    var actType = "INSTALACION";
-    var upperName = actividad.toUpperCase();
-    if (upperName.indexOf("EXTINTOR") !== -1) actType = "EXTINTOR";
-    else if (upperName.indexOf("EMERGENCIA") !== -1) actType = "EMERGENCIA";
-    else if (upperName.indexOf("BOTIQU") !== -1) actType = "BOTIQUIN";
-    else if (upperName.indexOf("GERENCIAL") !== -1 || upperName.indexOf("GERENC") !== -1) actType = "GERENCIAL";
-    else if (upperName.indexOf("PROTECCION") !== -1) actType = "EPP";
-
-    activities.push({
-      id: "act-prog-" + (r + 1),
-      row: r + 1,
-      objetivoGeneral: objetivoGeneral,
-      objetivosEspecificos: objetivosEspecificos,
-      actividades: actividad,
-      responsable: responsable,
-      type: actType,
-      frequency: hasAnyMonth ? _inferFrequency(months) : "Según programa",
-      months: months,
-      porcentaje: porcentaje,
-      estado: estado,
-      observacionesSeguimiento: observaciones
+      if (d.getMonth() === mesActual && d.getFullYear() === anioActual && i.status !== "Completada") {
+        pendientesMes++;
+      }
     });
-  }
-
-  var totalC = 0, totalP = 0;
-  activities.forEach(function(a) {
-    Object.values(a.months).forEach(function(v) {
-      if (v === "c") totalC++;
-      else if (v === "p") totalP++;
-    });
-  });
-
-  return {
-    success: true,
-    data: {
-      year: year || new Date().getFullYear(),
-      filePath: filePath,
-      activities: activities,
-    kpis: {
-      indicator: typeof indicador === 'number' ? Math.round(indicador * 100) / 100 : indicador,
-      computedIndicator: (totalC + totalP) > 0 ? Math.round((totalC / (totalC + totalP)) * 10000) / 100 : 0,
-      completed: totalC,
-        pending: totalP,
-        total: totalC + totalP,
-        realizadas: typeof realizadas === 'number' ? realizadas : 0,
-        sinRealizar: typeof sinRealizar === 'number' ? sinRealizar : 0
-      }
-    }
-  };
-}
-
-async function updateProgramaMonth(companyRoot, activityId, month, status) {
-  var dir = _getCompanyInspeccionesDir(companyRoot);
-  var filePath = _findExcelFileDeep(dir, "PROGRAMA DE INSPECCIONES") || _findExcelFileDeep(dir, "PROGRAMA");
-  if (!filePath) return { success: false, error: { code: "FILE_NOT_FOUND", message: "Archivo PROGRAMA no encontrado" } };
-
-  if (filePath.toLowerCase().endsWith('.xls') && !filePath.toLowerCase().endsWith('.xlsx')) {
-    filePath = _convertXlsToXlsx(filePath);
-    if (!filePath) return { success: false, error: { code: "CONVERT_ERROR", message: "No se pudo convertir .xls a .xlsx" } };
-  }
-
-  var capturedFilePath = filePath;
-  return _serializedWrite(filePath, function() {
-    return _doUpdateProgramaMonth(capturedFilePath, dir, activityId, month, status);
-  });
-}
-
-async function _doUpdateProgramaMonth(filePath, dir, activityId, month, status) {
-  var backupPath = _createBackup(filePath, dir);
-
-  try {
-    var workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.readFile(filePath);
-    var ws = workbook.getWorksheet("PROGRAMA") || workbook.worksheets[0];
-    if (!ws) {
-      if (backupPath && fs.existsSync(backupPath)) { try { fs.unlinkSync(backupPath); } catch (e) {} }
-      return { success: false, error: { code: "SHEET_NOT_FOUND", message: "Hoja no encontrada" } };
-    }
-
-    var exceljsRow = parseInt(activityId.replace("act-prog-", ""), 10);
-    var monthCol = PROGRAMA_SHEET_CONFIG.startCol + month;
-
-    var row = ws.getRow(exceljsRow);
-
-    var newValue = status === "c" ? "c" : (status === "p" ? "p" : "");
-    row.getCell(monthCol).value = newValue;
-
-    var totalC = 0, totalP = 0;
-    for (var m = 0; m < 12; m++) {
-      var cellVal = row.getCell(PROGRAMA_SHEET_CONFIG.startCol + m).value;
-      if (cellVal) {
-        var ms = String(cellVal).trim().toLowerCase();
-        if (ms === "c") totalC++;
-        else if (ms === "p") totalP++;
-      }
-    }
-    var total = totalC + totalP;
-    var pct = total > 0 ? Math.round((totalC / total) * 100) / 100 : 0;
-    var estadoVal = totalC > 0 && totalP === 0 ? "Ejecutado" : (totalP > 0 ? " Sin Iniciar" : "");
-    row.getCell(PROGRAMA_SHEET_CONFIG.colMap.R.col).value = pct;
-    row.getCell(PROGRAMA_SHEET_CONFIG.colMap.S.col).value = estadoVal;
-
-    row.commit();
-    await workbook.xlsx.writeFile(filePath);
-
-    if (backupPath && fs.existsSync(backupPath)) {
-      try { fs.unlinkSync(backupPath); } catch (e) {}
-    }
-
-    return {
-      success: true,
-      data: {
-        activities: [{
-          id: activityId,
-          porcentaje: pct,
-          estado: estadoVal
-        }]
-      }
-    };
-  } catch (e) {
-    if (backupPath && fs.existsSync(backupPath)) {
-      try { fs.copyFileSync(backupPath, filePath); } catch (re) {}
-    }
-    return { success: false, error: { code: "WRITE_ERROR", message: "Error actualizando programa: " + e.message } };
-  }
-}
-
-async function updateProgramaField(companyRoot, activityId, field, value) {
-  var dir = _getCompanyInspeccionesDir(companyRoot);
-  var filePath = _findExcelFileDeep(dir, "PROGRAMA DE INSPECCIONES") || _findExcelFileDeep(dir, "PROGRAMA");
-  if (!filePath) return { success: false, error: { code: "FILE_NOT_FOUND", message: "Archivo PROGRAMA no encontrado" } };
-
-  var colConfig = PROGRAMA_SHEET_CONFIG.colMap[
-    Object.keys(PROGRAMA_SHEET_CONFIG.colMap).find(function(k) {
-      return PROGRAMA_SHEET_CONFIG.colMap[k].field === field;
-    })
-  ];
-  if (!colConfig || !colConfig.editable) {
-    return { success: false, error: { code: "FIELD_NOT_EDITABLE", message: "Campo no editable: " + field } };
-  }
-
-  if (filePath.toLowerCase().endsWith('.xls') && !filePath.toLowerCase().endsWith('.xlsx')) {
-    filePath = _convertXlsToXlsx(filePath);
-    if (!filePath) return { success: false, error: { code: "CONVERT_ERROR", message: "No se pudo convertir .xls a .xlsx" } };
-  }
-
-  var capturedFilePath = filePath;
-  var capturedColConfig = colConfig;
-  return _serializedWrite(filePath, function() {
-    return _doUpdateProgramaField(capturedFilePath, dir, activityId, capturedColConfig, value);
-  });
-}
-
-async function _doUpdateProgramaField(filePath, dir, activityId, colConfig, value) {
-  var backupPath = _createBackup(filePath, dir);
-
-  try {
-    var workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.readFile(filePath);
-    var ws = workbook.getWorksheet("PROGRAMA") || workbook.worksheets[0];
-    if (!ws) {
-      if (backupPath && fs.existsSync(backupPath)) { try { fs.unlinkSync(backupPath); } catch (e) {} }
-      return { success: false, error: { code: "SHEET_NOT_FOUND", message: "Hoja no encontrada" } };
-    }
-
-    var exceljsRow = parseInt(activityId.replace("act-prog-", ""), 10);
-    var row = ws.getRow(exceljsRow);
-    row.getCell(colConfig.col).value = value;
-    row.commit();
-    await workbook.xlsx.writeFile(filePath);
-
-    if (backupPath && fs.existsSync(backupPath)) {
-      try { fs.unlinkSync(backupPath); } catch (e) {}
-    }
-
-    return { success: true };
-  } catch (e) {
-    if (backupPath && fs.existsSync(backupPath)) {
-      try { fs.copyFileSync(backupPath, filePath); } catch (re) {}
-    }
-    return { success: false, error: { code: "WRITE_ERROR", message: "Error actualizando campo programa: " + e.message } };
-  }
-}
-
-function getInspeccionesStats(companyRoot) {
-  var dir = _getCompanyInspeccionesDir(companyRoot);
-  if (!fs.existsSync(dir)) {
-    return { success: true, data: { totalInspecciones: 0, completadas: 0, pendientesMes: 0, tasaCumplimiento: 0, extintoresVigentes: 0, extintoresTotal: 0 } };
-  }
-
-  var programaResult = readProgramaInspecciones(companyRoot, new Date().getFullYear());
-  var currentMonth = new Date().getMonth();
-  var pendingThisMonth = 0;
-  var totalCompleted = 0;
-  var totalProgrammed = 0;
-
-  if (programaResult.success && programaResult.data.activities) {
-    programaResult.data.activities.forEach(function(a) {
-      if (a.months[currentMonth] === "p") pendingThisMonth++;
-      Object.values(a.months).forEach(function(v) {
-        if (v === "c" || v === "p") totalProgrammed++;
-        if (v === "c") totalCompleted++;
+    var tasaCumplimiento = insps.length === 0 ? 0 : Math.round((completadas / insps.length) * 1000) / 10;
+    var extintores = insps.filter(function (i) { return i.type === "extintores"; });
+    var extintoresVigentes = extintores.filter(function (i) {
+      if (!i.data || !i.data.rows) return false;
+      return i.data.rows.some(function (r) {
+        if (!r.fechaVencimiento) return false;
+        return new Date(r.fechaVencimiento) > now;
       });
+    }).length;
+
+    /* Programa anual de la empresa (mismo año actual) */
+    var programKey = companyId + ":" + anioActual;
+    var programSummary = summarizeProgram(data.programs[programKey]);
+
+    return ok({
+      totalInspecciones: insps.length,
+      completadas: completadas,
+      pendientesMes: pendientesMes,
+      tasaCumplimiento: tasaCumplimiento,
+      extintoresVigentes: extintoresVigentes,
+      extintoresTotal: extintores.length,
+      year: anioActual,
+      mes: now.toLocaleDateString("es-CO", { month: "long" }),
+      mensualCompletadas: mensualCompletadas,
+      mensualPendientes: mensualPendientes,
+      programaTotal: programSummary.programaTotal,
+      programaCompletadas: programSummary.programaCompletadas,
+      programaPendientes: programSummary.programaPendientes
+    });
+  } catch (e) {
+    console.error("[K+AIRSST][INSPECTIONS][STATS][ERROR]", e);
+    return ok({
+      totalInspecciones: 0,
+      completadas: 0,
+      pendientesMes: 0,
+      tasaCumplimiento: 0,
+      extintoresVigentes: 0,
+      extintoresTotal: 0,
+      year: new Date().getFullYear(),
+      mes: new Date().toLocaleDateString("es-CO", { month: "long" }),
+      mensualCompletadas: Array(12).fill(0),
+      mensualPendientes: Array(12).fill(0),
+      programaTotal: 0,
+      programaCompletadas: 0,
+      programaPendientes: 0
     });
   }
-
-  var extintoresResult = readInspeccionExcel(companyRoot, "EXTINTOR");
-  var vigentes = 0, totalExt = 0;
-  if (extintoresResult.success && extintoresResult.data.items) {
-    totalExt = extintoresResult.data.items.length;
-    var currentYear = new Date().getFullYear();
- vigentes = extintoresResult.data.items.filter(function(item) {
- var venc = _extractYear(item.vencimiento);
- return !isNaN(venc) && venc >= currentYear;
-    }).length;
-  }
-
-  var rate = totalProgrammed > 0 ? Math.round((totalCompleted / totalProgrammed) * 100) : 0;
-
-  return {
-    success: true,
-    data: {
-      totalInspecciones: totalCompleted,
-      completadas: totalCompleted,
-      pendientesMes: pendingThisMonth,
-      tasaCumplimiento: rate,
-      extintoresVigentes: vigentes,
-      extintoresTotal: totalExt
-    }
-  };
 }
 
-function registerInspeccionesHandlers(app, deps) {
-  var ipcMain = require("electron").ipcMain;
-  var getCompanyRootPath = deps && deps.getCompanyRootPath;
-  if (!getCompanyRootPath) {
-    throw new Error("[4.2.4] registerInspeccionesHandlers requiere deps.getCompanyRootPath");
+/* Calcula contadores del programa anual: total de actividades-mes
+   programadas (valor 'p' o 'c'), completadas ('c') y pendientes ('p').
+   Acepta el payload del programa (data.programs[key]) o null. */
+function summarizeProgram(program) {
+  if (!program || !program.activities) {
+    return { programaTotal: 0, programaCompletadas: 0, programaPendientes: 0 };
+  }
+  var total = 0, comp = 0, pend = 0;
+  program.activities.forEach(function (a) {
+    if (!a.monthlySchedule) return;
+    Object.keys(a.monthlySchedule).forEach(function (m) {
+      var v = a.monthlySchedule[m];
+      if (v === "p" || v === "c") {
+        total++;
+        if (v === "c") comp++;
+        else if (v === "p") pend++;
+      }
+    });
+  });
+  return { programaTotal: total, programaCompletadas: comp, programaPendientes: pend };
+}
+
+/* ---------- Registro de handlers IPC ---------- */
+// Firma flexible: acepta (app, deps) — usa el ipcMain importado arriba.
+// main.js llama registerInspeccionesHandlers(app, { getCompanyRootPath })
+function registerInspeccionesHandlers(_appOrIpcMain, _deps) {
+  /* 8 canales principales del nuevo módulo */
+  ipcMain.handle("company:listar", async function () {
+    try { return listCompanies(); }
+    catch (e) { console.error("[K+AIRSST][COMPANY][LIST][ERROR]", e); return err("LIST_FAILED", e.message); }
+  });
+
+  ipcMain.handle("programa:obtener", async function (event, year, companyId) {
+    try { return getProgram(year, companyId || "default"); }
+    catch (e) { console.error("[K+AIRSST][PROGRAM][GET][ERROR]", e); return err("GET_FAILED", e.message); }
+  });
+
+  // 📦543 — Helper: lee las inspecciones planificadas de UNA empresa.
+  // Extraido del handler para poder llamarlo en loop cuando el scope es 'all'.
+  function _leerInspeccionesCalendarioDeEmpresa(currentCompany, start, end) {
+    var startDate = new Date(start + "T00:00:00");
+    var endDate = new Date(end + "T23:59:59");
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return [];
+    }
+    var events = [];
+    var cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    var endCursor = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+    while (cursor <= endCursor) {
+      var year = cursor.getFullYear();
+      var monthIdx = cursor.getMonth();
+      var monthName = MONTHS[monthIdx];
+
+      var programRes = getProgram(year, currentCompany);
+      if (programRes && programRes.success && programRes.data && programRes.data.program) {
+        var program = programRes.data.program;
+        var businessDays = getFirst5BusinessDays(year, monthIdx);
+        var activityCount = 0;
+        (program.activities || []).forEach(function (act) {
+          var schedule = act.monthlySchedule || {};
+          var mesEstado = schedule[monthName];
+          if (mesEstado !== "p" && mesEstado !== "c") return;
+          var dayIdx = activityCount % 5;
+          activityCount++;
+          var dateStr = businessDays[dayIdx];
+          var tipoLabel = INSPECTION_TYPE_LABELS[act.inspectionType] || act.inspectionType || "Inspección";
+          events.push({
+            id: "insp-prog-" + currentCompany + "-" + year + "-" + monthIdx + "-" + act.id,
+            type: "inspeccion_programada",
+            title: act.activity || tipoLabel,
+            date: dateStr,
+            start: "00:00",
+            end: "23:59",
+            color: "#174ea6",
+            source: "inspecciones",
+            // 📦543 — Empresa en el nivel top para que la UI pueda filtrar/agrupar
+            empresa: currentCompany,
+            meta: {
+              actividad: act.activity || tipoLabel,
+              tipoInspeccion: act.inspectionType,
+              tipoLabel: tipoLabel,
+              responsable: act.responsible || "",
+              actividadId: act.id,
+              mes: monthName,
+              dia: dayIdx + 1,
+              empresaId: currentCompany,
+              year: year,
+              estado: mesEstado
+            }
+          });
+        });
+      }
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+    return events;
   }
 
-  ipcMain.handle("inspecciones:get-stats", async function(event, companyName) {
+  /* Devuelve los eventos del calendario para las inspecciones PLANIFICADAS
+     (monthlySchedule[Mes] === "p") del programa anual de la empresa.
+     Cada actividad planificada genera 5 eventos puntuales, uno por cada
+     uno de los primeros 5 días hábiles (lun-vie) del mes. Filtra por rango
+     y por empresa. El adapter del calendario lo consume.
+     Params: { start, end, currentCompany } (plano, NO envuelto en range).
+
+     📦543 — Soporte para scope='all': si currentCompany es null, lee de
+     TODAS las empresas del config y concatena los eventos. */
+  ipcMain.handle("inspeccion:programa:getEventsCalendario", async function (event, params) {
     try {
-      var companyRoot = await getCompanyRootPath(companyName);
-      if (!companyRoot) return { success: false, error: { code: "COMPANY_NOT_FOUND", message: "Empresa no encontrada: " + companyName } };
-      return getInspeccionesStats(companyRoot);
-    } catch (e) {
-      console.error("[4.2.4] Error en get-stats:", e);
-      return { success: false, error: { code: "INTERNAL_ERROR", message: e.message } };
-    }
-  });
-
-  ipcMain.handle("inspecciones:get-schedule", async function(event, companyName, year) {
-    try {
-      var companyRoot = await getCompanyRootPath(companyName);
-      if (!companyRoot) return { success: false, error: { code: "COMPANY_NOT_FOUND", message: "Empresa no encontrada" } };
-      return readProgramaInspecciones(companyRoot, year);
-    } catch (e) {
-      console.error("[4.2.4] Error en get-schedule:", e);
-      return { success: false, error: { code: "INTERNAL_ERROR", message: e.message } };
-    }
-  });
-
-  ipcMain.handle("inspecciones:update-month", async function(event, companyName, activityId, month, status) {
-    try {
-      var companyRoot = await getCompanyRootPath(companyName);
-      if (!companyRoot) return { success: false, error: { code: "COMPANY_NOT_FOUND", message: "Empresa no encontrada" } };
-      return await updateProgramaMonth(companyRoot, activityId, month, status);
-    } catch (e) {
-      console.error("[4.2.4] Error en update-month:", e);
-      return { success: false, error: { code: "INTERNAL_ERROR", message: e.message } };
-    }
-  });
-
-  ipcMain.handle("inspecciones:update-field", async function(event, companyName, activityId, field, value) {
-    try {
-      var companyRoot = await getCompanyRootPath(companyName);
-      if (!companyRoot) return { success: false, error: { code: "COMPANY_NOT_FOUND", message: "Empresa no encontrada" } };
-      return await updateProgramaField(companyRoot, activityId, field, value);
-    } catch (e) {
-      console.error("[4.2.4] Error en update-field:", e);
-      return { success: false, error: { code: "INTERNAL_ERROR", message: e.message } };
-    }
-  });
-
-  ipcMain.handle("inspecciones:read-excel", async function(event, companyName, type) {
-    try {
-      var companyRoot = await getCompanyRootPath(companyName);
-      if (!companyRoot) return { success: false, error: { code: "COMPANY_NOT_FOUND", message: "Empresa no encontrada" } };
-      return readInspeccionExcel(companyRoot, type);
-    } catch (e) {
-      console.error("[4.2.4] Error en read-excel:", e);
-      return { success: false, error: { code: "INTERNAL_ERROR", message: e.message } };
-    }
-  });
-
-  ipcMain.handle("inspecciones:write-excel", async function(event, companyName, type, formData) {
-    try {
-      var companyRoot = await getCompanyRootPath(companyName);
-      if (!companyRoot) return { success: false, error: { code: "COMPANY_NOT_FOUND", message: "Empresa no encontrada" } };
-      return await writeInspeccionExcel(companyRoot, type, formData);
-    } catch (e) {
-      console.error("[4.2.4] Error en write-excel:", e);
-      return { success: false, error: { code: "INTERNAL_ERROR", message: e.message } };
-    }
-  });
-
-  ipcMain.handle("inspecciones:write-header", async function(event, companyName, type, headerData) {
-    try {
-      var companyRoot = await getCompanyRootPath(companyName);
-      if (!companyRoot) return { success: false, error: { code: "COMPANY_NOT_FOUND", message: "Empresa no encontrada" } };
-      return await writeInspeccionHeader(companyRoot, type, headerData);
-    } catch (e) {
-      console.error("[4.2.4] Error en write-header:", e);
-      return { success: false, error: { code: "INTERNAL_ERROR", message: e.message } };
-    }
-  });
-
-  ipcMain.handle("inspecciones:get-template", async function(event, companyName, type) {
-    try {
-      var companyRoot = await getCompanyRootPath(companyName);
-      if (!companyRoot) return { success: false, error: { code: "COMPANY_NOT_FOUND", message: "Empresa no encontrada" } };
-      return readInspeccionExcel(companyRoot, type);
-    } catch (e) {
-      console.error("[4.2.4] Error en get-template:", e);
-      return { success: false, error: { code: "INTERNAL_ERROR", message: e.message } };
-    }
-  });
-
-  ipcMain.handle("inspecciones:list-files", async function(event, companyName) {
-    try {
-      var companyRoot = await getCompanyRootPath(companyName);
-      if (!companyRoot) return { success: false, error: { code: "COMPANY_NOT_FOUND", message: "Empresa no encontrada" } };
-      return listInspeccionFiles(companyRoot);
-    } catch (e) {
-      console.error("[4.2.4] Error en list-files:", e);
-      return { success: false, error: { code: "INTERNAL_ERROR", message: e.message } };
-    }
-  });
-
-  ipcMain.handle("inspecciones:get-file-metadata", async function(event, companyName, filePath) {
-    try {
-      var companyRoot = await getCompanyRootPath(companyName);
-      if (!companyRoot) return { success: false, error: { code: "COMPANY_NOT_FOUND", message: "Empresa no encontrada" } };
-      return getInspeccionFileMetadata(companyRoot, filePath);
-    } catch (e) {
-      console.error("[4.2.4] Error en get-file-metadata:", e);
-      return { success: false, error: { code: "INTERNAL_ERROR", message: e.message } };
-    }
-  });
-
-  ipcMain.handle("inspecciones:list", async function(event, companyName, filters) {
-    try {
-      var companyRoot = await getCompanyRootPath(companyName);
-      if (!companyRoot) return { success: false, error: { code: "COMPANY_NOT_FOUND", message: "Empresa no encontrada" } };
-      var filesResult = listInspeccionFiles(companyRoot);
-      if (!filesResult.success) return filesResult;
-
-      var items = filesResult.data.files.filter(function(f) { return f.type !== "PROGRAMA"; });
-
-      if (filters) {
-        if (filters.type) items = items.filter(function(i) { return i.type === filters.type; });
-        if (filters.search) {
-          var s = filters.search.toLowerCase();
-          items = items.filter(function(i) {
-            return (i.typeName || "").toLowerCase().indexOf(s) !== -1 ||
-              (i.name || "").toLowerCase().indexOf(s) !== -1;
-          });
-        }
-        if (filters.dateFrom) {
-          items = items.filter(function(i) { return i.modified >= filters.dateFrom; });
-        }
-        if (filters.dateTo) {
-          items = items.filter(function(i) { return i.modified <= filters.dateTo + "T23:59:59.999Z"; });
-        }
+      var start = params && params.start;
+      var end = params && params.end;
+      var currentCompany = (params && params.currentCompany) || "default";
+      if (!start || !end) {
+        return err("INVALID_INPUT", "start y end son obligatorios");
       }
 
-      return { success: true, data: { items: items, total: items.length } };
-    } catch (e) {
-      console.error("[4.2.4] Error en list:", e);
-      return { success: false, error: { code: "INTERNAL_ERROR", message: e.message } };
+      // Si hay empresa valida, leer solo de ella
+      if (currentCompany && currentCompany !== "default") {
+        return ok(_leerInspeccionesCalendarioDeEmpresa(currentCompany, start, end));
+      }
+
+      // 📦543 — Scope='all' → leer de todas las empresas del config
+      var configPath = path.join(_appOrIpcMain.getPath('userData'), 'config.json');
+      var config;
+      try {
+        var fs = require('fs');
+        var configRaw = fs.readFileSync(configPath, 'utf8');
+        config = JSON.parse(configRaw);
+      } catch (e) {
+        console.log('[INSP-CAL] ERROR leyendo config:', e.message);
+        return ok([]);
+      }
+      var allCompanies = Object.keys((config && config.companyPaths) || {});
+      console.log('[INSP-CAL] scope=all → iterando', allCompanies.length, 'empresas');
+      var allEvents = [];
+      for (var i = 0; i < allCompanies.length; i++) {
+        var evs = _leerInspeccionesCalendarioDeEmpresa(allCompanies[i], start, end);
+        allEvents.push.apply(allEvents, evs);
+      }
+      return ok(allEvents);
+    }
+    catch (e) {
+      console.error("[K+AIRSST][INSPECTION][CAL_EVENTS][ERROR]", e);
+      return err("GET_EVENTS_FAILED", e.message);
     }
   });
 
-  ipcMain.handle("inspecciones:get", async function(event, companyName, id) {
+  ipcMain.handle("programa:actualizarActividad", async function (event, activityId, patch) {
     try {
-      var companyRoot = await getCompanyRootPath(companyName);
-      if (!companyRoot) return { success: false, error: { code: "COMPANY_NOT_FOUND", message: "Empresa no encontrada" } };
-      return getInspeccionFileMetadata(companyRoot, id);
-    } catch (e) {
-      console.error("[4.2.4] Error en get:", e);
-      return { success: false, error: { code: "INTERNAL_ERROR", message: e.message } };
+      if (!activityId || typeof activityId !== "string") {
+        return err("INVALID_INPUT", "activityId es obligatorio");
+      }
+      return updateActivity(activityId, patch || {});
+    }
+    catch (e) { console.error("[K+AIRSST][PROGRAM][ACTIVITY_UPDATE][ERROR]", e); return err("UPDATE_FAILED", e.message); }
+  });
+
+  ipcMain.handle("inspeccion:listar", async function (event, filter) {
+    try { return listInspections(filter || {}); }
+    catch (e) { console.error("[K+AIRSST][INSPECTION][LIST][ERROR]", e); return err("LIST_FAILED", e.message); }
+  });
+
+  ipcMain.handle("inspeccion:obtener", async function (event, id) {
+    try {
+      if (!id) return err("INVALID_INPUT", "id es obligatorio");
+      return getInspection(id);
+    }
+    catch (e) { console.error("[K+AIRSST][INSPECTION][GET][ERROR]", e); return err("GET_FAILED", e.message); }
+  });
+
+  ipcMain.handle("inspeccion:crear", async function (event, payload) {
+    try {
+      if (!payload || typeof payload !== "object") {
+        return err("INVALID_INPUT", "payload es obligatorio");
+      }
+      return createInspection(payload);
+    }
+    catch (e) { console.error("[K+AIRSST][INSPECTION][CREATE][ERROR]", e); return err("CREATE_FAILED", e.message); }
+  });
+
+  ipcMain.handle("inspeccion:actualizar", async function (event, id, patch) {
+    try {
+      if (!id) return err("INVALID_INPUT", "id es obligatorio");
+      return updateInspection(id, patch || {});
+    }
+    catch (e) { console.error("[K+AIRSST][INSPECTION][UPDATE][ERROR]", e); return err("UPDATE_FAILED", e.message); }
+  });
+
+  ipcMain.handle("inspeccion:eliminar", async function (event, id) {
+    try {
+      if (!id) return err("INVALID_INPUT", "id es obligatorio");
+      return deleteInspection(id);
+    }
+    catch (e) { console.error("[K+AIRSST][INSPECTION][DELETE][ERROR]", e); return err("DELETE_FAILED", e.message); }
+  });
+
+  /* Exporta una inspección a .xlsx usando la plantilla oficial de su tipo
+     (instalaciones, botiquin, extintores, equipos_emergencia). Solo aplica
+     a esos 4 tipos. Devuelve el archivo serializado en base64. */
+  ipcMain.handle("inspeccion:exportarXlsx", async function (event, insp) {
+    try {
+      if (!insp || !insp.type) {
+        return err("INVALID_INPUT", "insp.type es obligatorio");
+      }
+      if (!TEMPLATES[insp.type]) {
+        return err("NO_TEMPLATE",
+          "No hay plantilla registrada para type=" + insp.type);
+      }
+      var res = await exportXlsxFromTemplate(insp);
+      if (!res.success) {
+        console.warn("[K+AIRSST][INSPECTION][EXPORT_XLSX_FROM_TEMPLATE]", res.error);
+      }
+      return res;
+    }
+    catch (e) {
+      console.error("[K+AIRSST][INSPECTION][EXPORT_XLSX_FROM_TEMPLATE][ERROR]", e);
+      return err("EXPORT_FAILED", e.message);
     }
   });
 
-  ipcMain.handle("inspecciones:delete", async function(event, companyName, id) {
-    try {
-      if (!fs.existsSync(id)) return { success: false, error: { code: "FILE_NOT_FOUND", message: "Archivo no encontrado" } };
-      var dir = _getCompanyInspeccionesDir(await getCompanyRootPath(companyName));
-      _createBackup(id, dir);
-      fs.unlinkSync(id);
-      return { success: true, data: { deleted: true, id: id } };
-    } catch (e) {
-      console.error("[4.2.4] Error en delete:", e);
-      return { success: false, error: { code: "INTERNAL_ERROR", message: e.message } };
-    }
+  /* Backward-compat: 1 canal para el home de gestion-peligros */
+  ipcMain.handle("inspecciones:get-stats", async function (event, companyName) {
+    return getInspeccionesStats(companyName);
   });
 
-  ipcMain.handle("inspecciones:create", async function(event, companyName, type, month, year) {
-    try {
-      var companyRoot = await getCompanyRootPath(companyName);
-      if (!companyRoot) return { success: false, error: { code: "COMPANY_NOT_FOUND", message: "Empresa no encontrada" } };
-      return createInspeccionFile(companyRoot, type, month, year);
-    } catch (e) {
-      console.error("[4.2.4] Error en create:", e);
-      return { success: false, error: { code: "INTERNAL_ERROR", message: e.message } };
-    }
-  });
-
-  ipcMain.handle("inspecciones:list-by-type", async function(event, companyName, type) {
-    try {
-      var companyRoot = await getCompanyRootPath(companyName);
-      if (!companyRoot) return { success: false, error: { code: "COMPANY_NOT_FOUND", message: "Empresa no encontrada" } };
-      return listInspeccionFilesByType(companyRoot, type);
-    } catch (e) {
-      console.error("[4.2.4] Error en list-by-type:", e);
-      return { success: false, error: { code: "INTERNAL_ERROR", message: e.message } };
-    }
-  });
-
-  ipcMain.handle("inspecciones:read-by-path", async function(event, companyName, type, filePath) {
-    try {
-      var companyRoot = await getCompanyRootPath(companyName);
-      if (!companyRoot) return { success: false, error: { code: "COMPANY_NOT_FOUND", message: "Empresa no encontrada" } };
-      return readInspeccionExcel(companyRoot, type, filePath);
-    } catch (e) {
-      console.error("[4.2.4] Error en read-by-path:", e);
-      return { success: false, error: { code: "INTERNAL_ERROR", message: e.message } };
-    }
-  });
-
-  ipcMain.handle("inspecciones:write-by-path", async function(event, companyName, type, formData, filePath) {
-    try {
-      var companyRoot = await getCompanyRootPath(companyName);
-      if (!companyRoot) return { success: false, error: { code: "COMPANY_NOT_FOUND", message: "Empresa no encontrada" } };
-      return await writeInspeccionExcel(companyRoot, type, formData, filePath);
-    } catch (e) {
-      console.error("[4.2.4] Error en write-by-path:", e);
-      return { success: false, error: { code: "INTERNAL_ERROR", message: e.message } };
-    }
-  });
+  console.log("[K+AIRSST][IPC][REGISTER][SUCCESS] handlers=8+1 (inspecciones nuevo contrato + get-stats legacy)");
 }
 
-module.exports = { registerInspeccionesHandlers };
+module.exports = {
+  registerInspeccionesHandlers: registerInspeccionesHandlers,
+  getInspeccionesStats: getInspeccionesStats
+};

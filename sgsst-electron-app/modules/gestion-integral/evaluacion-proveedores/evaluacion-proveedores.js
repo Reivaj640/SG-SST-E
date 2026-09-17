@@ -378,7 +378,7 @@
     </div>
     <div style="display:flex; align-items:center; gap:0.75rem;">
       <span class="k-section-card__company">
-        <i class="bi bi-building"></i>
+        <i class="kair-icon-building"></i>
         <span id="ep-header-company">${this.companyName || ''}</span>
       </span>
       <div class="k-section-card__divider"></div>
@@ -728,7 +728,7 @@
                     <div>
                         <!-- Información General -->
                         <div class="ep-detail-card">
-                            <h3><i class="bi bi-building"></i> Información General</h3>
+                            <h3><i class="kair-icon-building"></i> Información General</h3>
                             <div class="ep-info-row">
                                 <span class="ep-info-label">Razón Social:</span>
                                 <span class="ep-info-value" id="ep-detail-full-name">-</span>

@@ -1,0 +1,101 @@
+/* modules/gestion-humana/shared/kpi-bar.css
+   📦720 · Estilos del helper KPIBar compartido (patrón Programa de Capacitación)
+   Scope: prefijo `gh-kpi-` para evitar colisiones con styles.css global.
+   Patrón visual: icono circular con fondo + número grande + label + separador vertical. */
+
+.gh-kpi-bar {
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 0.5rem;
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: 100%;
+  margin-bottom: 1rem;            /* 📦728 · Espacio entre KPIs y body (todas las vistas) */
+}
+
+.gh-kpi {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* 📦749 · Tarjeta clickable (kpi con onClick) */
+.gh-kpi--clickable {
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  font: inherit;
+  color: inherit;
+  transition: background 0.15s, transform 0.1s;
+}
+.gh-kpi--clickable:hover {
+  background: #f8f9fa;
+}
+.gh-kpi--clickable:active {
+  transform: scale(0.98);
+}
+.gh-kpi--clickable:focus-visible {
+  outline: 2px solid #4a90e2;
+  outline-offset: 2px;
+}
+
+.gh-kpi__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.gh-kpi__icon i { font-size: 0.95rem; }
+
+.gh-kpi__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.gh-kpi__value {
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.gh-kpi__label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: #5a6378;
+  letter-spacing: 0.3px;
+  margin-top: 0.2rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gh-kpi__badge {
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.75rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.gh-kpi-sep {
+  width: 1px;
+  height: 28px;
+  background: #e9ecef;
+  flex-shrink: 0;
+}

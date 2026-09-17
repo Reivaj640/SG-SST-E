@@ -528,30 +528,6 @@
             font-weight: 400;
         }
 
-        .ct-toast {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 12px 20px;
-            background: white;
-            border-left: 4px solid var(--ct-primary);
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            z-index: 2000;
-            transform: translateX(120%);
-            transition: transform 0.3s ease;
-            font-size: 0.85rem;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            max-width: 350px;
-        }
-
-        .ct-toast.show { transform: translateX(0); }
-        .ct-toast.toast-error { border-left-color: var(--ct-danger); }
-        .ct-toast.toast-success { border-left-color: var(--ct-success); }
-        .ct-toast.toast-warning { border-left-color: var(--ct-warning); }
-
         @media (max-width: 768px) {
             .ct-portal-card { padding: 1.5rem; }
             .ct-hero-title { font-size: 1.4rem; }
@@ -634,11 +610,6 @@
             </div>
             <div class="ct-modal-body" id="ct-detail-body"></div>
         </div>
-    </div>
-
-    <div class="ct-toast" id="ct-toast">
-        <i class="fas fa-info-circle"></i>
-        <span id="ct-toast-message"></span>
     </div>
 
     <script src="consulta-trabajadores.js"></script>

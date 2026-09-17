@@ -24,7 +24,7 @@
                 </div>
                 <div style="display:flex; align-items:center; gap:0.75rem;">
                     <span class="k-section-card__company">
-                        <i class="bi bi-building"></i>
+                        <i class="kair-icon-building"></i>
                         <span id="header-company-text">—</span>
                     </span>
                     <div class="k-section-card__divider"></div>
@@ -237,8 +237,7 @@
                         </div>
                     </div>
                     <div class="em-viewer__container">
-                        <div class="em-loading" id="loadingDiv">
-                            <div class="em-spinner"></div>
+                        <div id="loadingDiv" style="padding:2rem;text-align:center;color:#64748b;">
                             <p>Cargando evaluación...</p>
                         </div>
                         <div id="viewerContainer" style="display: none;"></div>
@@ -277,6 +276,10 @@
                     <div class="em-preview-modal__actions">
                         <button class="em-btn em-btn--sm em-btn--ghost" id="previewDownloadBtn" title="Descargar documento">
                             <i class="fas fa-download"></i>
+                        </button>
+                        <button class="kair-preview__action--primary em-preview-modal__expand" id="previewExpandBtn" title="Ver completo" style="display:none;">
+                            <i class="fas fa-expand"></i>
+                            <span>Ver completo</span>
                         </button>
                         <button class="em-preview-modal__close" id="closePreviewBtn" aria-label="Cerrar">
                             <i class="fas fa-times"></i>
@@ -332,6 +335,10 @@
             color: var(--em-text-primary); display: inline-block; margin: 8px 0;
         }
     </style>
+
+    <!-- 📦608: bundle IIFE de @file-viewer + helper KairDocPreview -->
+    <script src="../../../renderer/file-viewer-assets/flyfish-file-viewer-web-full.iife.js"></script>
+    <script src="../../../shared/file-viewer.js"></script>
 
     <script src="evaluaciones-medicas-viewer.js"></script>
 </body>

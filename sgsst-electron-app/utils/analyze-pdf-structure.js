@@ -9,7 +9,7 @@ const path = require('path');
 // Intentar cargar pdf-parse primero
 let pdfParse;
 try {
-    pdfParse = require('pdf-parse');
+    pdfParse = require('./pdfjs-shim').default;
     console.log('[AnalyzePDF] Usando pdf-parse');
 } catch (error) {
     console.error('[AnalyzePDF] Error cargando pdf-parse:', error.message);

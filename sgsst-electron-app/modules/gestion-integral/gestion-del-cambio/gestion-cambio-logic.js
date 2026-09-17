@@ -942,4 +942,4 @@ class GestionDelCambioComponent {
 }
 
 window.GestionDelCambioComponent = GestionDelCambioComponent;
-console.log('[GestionDelCambioComponent] ✅ Registrado');
+console.log('[GestionDelCambioComponent] Registrado');

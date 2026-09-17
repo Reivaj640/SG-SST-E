@@ -6,6 +6,7 @@ const ReportesAccidentesModule = require('./reportes-accidentes');
 const InvestigacionAccidentesModule = require('./investigacion-accidentes');
 const RestriccionesMedicasModule = require('./restricciones-medicas');
 const SociodemograficaModule = require('./sociodemografica');
+const PerfilesCargoProfesiogramaModule = require('./perfiles-cargo-profesiograma');
 
 module.exports = {
     AusentismoModule,
@@ -13,5 +14,6 @@ module.exports = {
     ReportesAccidentesModule,
     InvestigacionAccidentesModule,
     RestriccionesMedicasModule,
-    SociodemograficaModule
+    SociodemograficaModule,
+    PerfilesCargoProfesiogramaModule,
 };

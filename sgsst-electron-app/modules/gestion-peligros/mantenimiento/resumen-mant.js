@@ -25,7 +25,7 @@ Vista Resumen — KPIs por categoría y estadísticas generales
    var container = document.getElementById('kair-mnt-resumen-content');
    if (!container) return;
 
-   container.innerHTML = '<div class="kair-mnt-loading"><div class="kair-mnt-spinner"></div><p>Cargando resumen...</p></div>';
+   container.innerHTML = KairSkeleton.kpiStrip(4);
 
    MantenimientoService.read(this.companyName).then(function (result) {
     if (!result.success) {

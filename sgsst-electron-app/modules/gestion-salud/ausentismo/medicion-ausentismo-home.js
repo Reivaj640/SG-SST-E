@@ -132,31 +132,182 @@ function safeSetTextContent(elementId, value, warnOnMissing = true) {
 
 async function loadStats() {
     try {
-        // Intentar obtener estadisticas desde la API de Electron si esta disponible
-        if (window.electronAPI && window.electronAPI.getAusentismoStats) {
-            const companyName = getCompanyName();
-            const stats = await window.electronAPI.getAusentismoStats(companyName);
+        console.log('[medicion-ausentismo-home][📦459-DEBUG] loadStats() entered');
+        // 📦459 (2026-07-02) — Fix iframe: este script corre dentro de un iframe.
+        // window.electronAPI del iframe es undefined (no se hereda del padre). Fallback
+        // a window.parent.electronAPI, que es el contextBridge expuesto en el renderer
+        // principal. Es seguro: ambos contextos son locales de Electron, no hay riesgo
+        // de seguridad por leer window.parent.electronAPI directamente.
+        const electronAPI = (window.electronAPI) ||
+                            (window.parent && window.parent.electronAPI) ||
+                            (window.top && window.top.electronAPI);
 
-            if (stats && stats.success) {
-                const data = stats.data || {};
-                safeSetTextContent('ausentismoPendientes', data.pendientes || 0, false);
-                safeSetTextContent('ausentismoActivos', data.activos || 0, false);
+        console.log('[medicion-ausentismo-home][📦459-DEBUG] electronAPI resuelto:', !!electronAPI,
+            '| getAusentismoStats typeof:', electronAPI ? typeof electronAPI.getAusentismoStats : 'N/A',
+            '| parent tiene electronAPI:', !!(window.parent && window.parent.electronAPI));
+
+        const companyName = getCompanyName();
+        console.log('[medicion-ausentismo-home][📦459-DEBUG] companyName:', JSON.stringify(companyName));
+
+        // 📦459 — Estrategia de invocación:
+        //   1. Si el iframe tiene acceso directo (electronAPI + getAusentismoStats), usar directo.
+        //   2. Si NO, hacer proxy vía postMessage al padre (medicion-ausentismo.js),
+        //      que sí tiene el contextBridge y puede invocar el IPC en nuestro nombre.
+        // Esto blinda el caso "iframe no hereda electronAPI" sin esperar más verificación.
+        let stats;
+        const hasDirectAccess = electronAPI && typeof electronAPI.getAusentismoStats === 'function';
+        if (hasDirectAccess) {
+            console.log('[medicion-ausentismo-home][📦459-DEBUG] Usando IPC directo (electronAPI.getAusentismoStats)');
+            stats = await electronAPI.getAusentismoStats(companyName);
+        } else if (window.parent && window.parent !== window) {
+            console.log('[medicion-ausentismo-home][📦459-DEBUG] electronAPI no accesible, usando postMessage proxy al padre...');
+            try {
+                stats = await ipcInvokeViaParent('getAusentismoStats', companyName);
+            } catch (proxyErr) {
+                console.error('[medicion-ausentismo-home][📦459-DEBUG] postMessage proxy falló:', proxyErr.message);
+                stats = null;
             }
         } else {
-            // Valores por defecto si no hay API disponible
-            safeSetTextContent('ausentismoPendientes', '0', false);
-            safeSetTextContent('ausentismoActivos', '0', false);
+            console.warn('[medicion-ausentismo-home][📦459-DEBUG] Sin acceso al padre — IPC imposible');
+            stats = null;
+        }
+
+        console.log('[medicion-ausentismo-home][📦459-DEBUG] stats recibidos:',
+            stats ? `success=${stats.success}, hasData=${!!stats.data}` : 'NULL',
+            stats && stats.data ? `| pendientes=${stats.data.pendientes}, activos=${stats.data.activos}, cerrados=${stats.data.cerrados}` : '');
+
+        if (stats && stats.success) {
+            const data = stats.data || {};
+
+            // 📦459 (2026-07-02) — Modo degradado: si el archivo de ausentismo no
+            // está disponible, mostrar "—" en vez de "0". "0" es engañoso porque
+            // sugiere "no hay casos" cuando en realidad no pudimos leer el archivo.
+            if (data._missingFile) {
+                console.warn('[medicion-ausentismo-home][📦459] Archivo de ausentismo no disponible:',
+                    data._missingFileReason, '|', data._details || '');
+                safeSetTextContent('ausentismoPendientes', '—', false);
+                safeSetTextContent('ausentismoActivos', '—', false);
+                safeSetTextContent('ausentismoCerrados', '—', false);
+                // Marcar visualmente para que se sepa que es un "no-data", no un "cero real"
+                markKpiAsUnavailable('ausentismoPendientes');
+                markKpiAsUnavailable('ausentismoActivos');
+                markKpiAsUnavailable('ausentismoCerrados');
+            } else {
+                // Datos normales: quitar marca de "no disponible" si la tenía
+                unmarkKpiAsUnavailable('ausentismoPendientes');
+                unmarkKpiAsUnavailable('ausentismoActivos');
+                unmarkKpiAsUnavailable('ausentismoCerrados');
+                const pVal = data.pendientes != null ? data.pendientes : '0';
+                const aVal = data.activos != null ? data.activos : '0';
+                const cVal = data.cerrados != null ? data.cerrados : '0';
+                safeSetTextContent('ausentismoPendientes', pVal, false);
+                safeSetTextContent('ausentismoActivos', aVal, false);
+                safeSetTextContent('ausentismoCerrados', cVal, false);
+                console.log('[medicion-ausentismo-home][📦459-DEBUG] KPIs pintados:',
+                    `Pendientes=${pVal}, Activos=${aVal}, Cerrados=${cVal}`);
+            }
+        } else if (stats && stats.success === false) {
+            // success:false — error grave del handler (no debería pasar con el refactor)
+            console.error('[medicion-ausentismo-home] Handler retornó success:false:', stats && stats.error);
+            safeSetTextContent('ausentismoPendientes', '—', false);
+            safeSetTextContent('ausentismoActivos', '—', false);
+            safeSetTextContent('ausentismoCerrados', '—', false);
+            markKpiAsUnavailable('ausentismoPendientes');
+            markKpiAsUnavailable('ausentismoActivos');
+            markKpiAsUnavailable('ausentismoCerrados');
+        } else {
+            // stats === null (proxy o electronAPI fallaron) — pintar modo degradado
+            console.warn('[medicion-ausentismo-home] No se pudieron cargar stats (ni IPC directo ni proxy). Mostrando "—".');
+            safeSetTextContent('ausentismoPendientes', '—', false);
+            safeSetTextContent('ausentismoActivos', '—', false);
+            safeSetTextContent('ausentismoCerrados', '—', false);
+            markKpiAsUnavailable('ausentismoPendientes');
+            markKpiAsUnavailable('ausentismoActivos');
+            markKpiAsUnavailable('ausentismoCerrados');
         }
     } catch (error) {
-        console.log('[medicion-ausentismo-home] Error cargando estadisticas:', error.message);
-        // En caso de error, mostrar 0
-        safeSetTextContent('ausentismoPendientes', '0', false);
-        safeSetTextContent('ausentismoActivos', '0', false);
+        console.error('[medicion-ausentismo-home] Error cargando estadisticas:', error.message, error.stack);
+        // 📦459 — Error inesperado: mostrar "—" en vez de "0" para no engañar al usuario
+        safeSetTextContent('ausentismoPendientes', '—', false);
+        safeSetTextContent('ausentismoActivos', '—', false);
+        safeSetTextContent('ausentismoCerrados', '—', false);
+        markKpiAsUnavailable('ausentismoPendientes');
+        markKpiAsUnavailable('ausentismoActivos');
+        markKpiAsUnavailable('ausentismoCerrados');
     }
+}
+
+/**
+ * 📦459 (2026-07-02) — IPC proxy vía postMessage al padre.
+ *
+ * El iframe home corre en isolated world y NO hereda el contextBridge del preload.
+ * Si `window.electronAPI` no está disponible en el iframe (ni en window.parent),
+ * podemos pedirle al renderer padre (medicion-ausentismo.js) que invoque el IPC
+ * en nuestro nombre. El padre SÍ tiene el contextBridge (cargado por su preload).
+ *
+ * Protocolo:
+ *   iframe → parent:  { type: 'ipc-invoke', requestId, channel, args }
+ *   parent → iframe:  { type: 'ipc-response', requestId, result | error }
+ *
+ * Timeout de 30s para no colgar la UI si el padre nunca responde.
+ */
+function ipcInvokeViaParent(channel, ...args) {
+    return new Promise((resolve, reject) => {
+        const requestId = `req-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const listener = (event) => {
+            const msg = event.data;
+            if (!msg || msg.type !== 'ipc-response' || msg.requestId !== requestId) return;
+            window.removeEventListener('message', listener);
+            clearTimeout(timeoutHandle);
+            if (msg.error) reject(new Error(msg.error));
+            else resolve(msg.result);
+        };
+        window.addEventListener('message', listener);
+        window.parent.postMessage({ type: 'ipc-invoke', requestId, channel, args }, '*');
+        const timeoutHandle = setTimeout(() => {
+            window.removeEventListener('message', listener);
+            reject(new Error(`Timeout (30s) esperando respuesta de ${channel} vía parent`));
+        }, 30000);
+    });
+}
+
+/**
+ * 📦459 (2026-07-02) — Marca visualmente un KPI como "datos no disponibles" para
+ * que el usuario no lo confunda con un "0" real (cero casos). Aplica opacidad
+ * reducida y un título (tooltip) explicando el motivo.
+ */
+function markKpiAsUnavailable(elementId) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    el.classList.add('kpi-unavailable');
+    el.setAttribute('title', 'Archivo de ausentismo no disponible. Los datos no se pudieron cargar.');
+    el.parentElement && el.parentElement.classList.add('kpi-card-unavailable');
+}
+
+/**
+ * 📦459 — Quita la marca visual de "no disponible" (cuando los datos vuelven OK).
+ */
+function unmarkKpiAsUnavailable(elementId) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    el.classList.remove('kpi-unavailable');
+    el.removeAttribute('title');
+    el.parentElement && el.parentElement.classList.remove('kpi-card-unavailable');
 }
 
 function getCompanyName() {
     // Obtener el nombre de la empresa desde diferentes fuentes
+    // 📦459 (2026-07-02) — Este script corre dentro de un iframe. El contexto del
+    // iframe tiene su propio window que NO hereda window.currentCompany ni
+    // window.rendererState del padre. Por eso tenemos que consultar primero
+    // window.parent (el renderer principal, donde está el estado real) y caer
+    // a fallbacks locales solo si el padre no tiene el dato.
+    if (window.parent && window.parent.currentCompany && window.parent.currentCompany !== 'default_company') {
+        return window.parent.currentCompany;
+    }
+    if (window.parent && window.parent.rendererState && window.parent.rendererState.selectedCompany) {
+        return window.parent.rendererState.selectedCompany;
+    }
     if (window.currentCompany && window.currentCompany !== 'default_company') {
         return window.currentCompany;
     }
@@ -243,10 +394,22 @@ function loadInformePriBuilder() {
     const contentArea = document.getElementById('content-area');
     if (!contentArea) {
         console.error('[HOME] No se encontro content-area');
-        alert('Error: No se pudo cargar la vista del informe');
+        // [📦453 2026-07-01] Migrado de alert() nativo a window.updateNotifier
+        // (sistema de notificaciones estandar 6.1.3 — feedback no bloqueante).
+        const notifier1 = (window.parent && window.parent.updateNotifier) || window.updateNotifier;
+        if (notifier1 && typeof notifier1.show === 'function') {
+            notifier1.show({
+                type: 'error',
+                title: 'Error cargando informe',
+                subtitle: 'No se encontro content-area. Vuelve al menu y reintenta.',
+                autoClose: 6000
+            });
+        } else {
+            alert('Error: No se pudo cargar la vista del informe');
+        }
         return;
     }
-    
+
     // Cargar el HTML del constructor
     fetch('modules/gestion-salud/ausentismo/informe-pri-builder.html')
         .then(response => {
@@ -261,7 +424,19 @@ function loadInformePriBuilder() {
         })
         .catch(error => {
             console.error('[HOME] Error cargando informe:', error);
-            alert('Error al cargar el constructor de informes: ' + error.message);
+            // [📦453 2026-07-01] Migrado de alert() nativo a window.updateNotifier
+            // (sistema de notificaciones estandar 6.1.3 — feedback no bloqueante).
+            const notifier2 = (window.parent && window.parent.updateNotifier) || window.updateNotifier;
+            if (notifier2 && typeof notifier2.show === 'function') {
+                notifier2.show({
+                    type: 'error',
+                    title: 'Error cargando constructor',
+                    subtitle: 'No se pudo cargar el constructor de informes: ' + error.message,
+                    autoClose: 6000
+                });
+            } else {
+                alert('Error al cargar el constructor de informes: ' + error.message);
+            }
         });
 }
 
@@ -276,6 +451,23 @@ function consultaTrabajadores() {
         window.parent.postMessage({
             type: 'ausentismo-home-action',
             action: 'consulta-trabajadores'
+        }, '*');
+    }
+}
+
+/**
+ * 📦461 (2026-07-03) — Abre la vista de Seguimiento de Gestación (Salud Materna).
+ * Envía mensaje al padre para que cargue la nueva vista. Por ahora, mientras se
+ * desarrolla la vista completa, el padre mostrará un toast indicando que el
+ * módulo está en construcción.
+ */
+function seguimientoGestacion() {
+    console.log('[HOME] Abriendo seguimiento de gestación...');
+
+    if (window.parent && window.parent.postMessage) {
+        window.parent.postMessage({
+            type: 'ausentismo-home-action',
+            action: 'seguimiento-gestacion'
         }, '*');
     }
 }

@@ -53,18 +53,36 @@ var AuditoriaInformesView = (function () {
   }
 
   function _renderHeader() {
-    return '<header class="kair-v3-hub-header">' +
-      '<div class="kair-v3-hub-header__left">' +
-        '<button class="k-btn k-btn-ghost k-btn-sm" id="kair-v3-inf-back" style="width:auto;height:32px;padding:0 12px;">' +
-          '<i class="bi bi-arrow-left"></i> Hub' +
-        '</button>' +
-        '<div style="margin-left:0.5rem;">' +
-          '<h1 class="kair-v3-hub-header__title">Informes y Firmas</h1>' +
-          '<p class="kair-v3-hub-header__subtitle">Generación de informes de auditoría y registro de firmas — Decreto 1072</p>' +
+    /* F16 (2026-06-20): Header estándar K+AIR · mismo patrón que HUB y 6.1.3 */
+    var company = (window.KairMockData && window.KairMockData.ACTIVE_COMPANY && window.KairMockData.ACTIVE_COMPANY.nombre) || 'Empresa';
+    return '<header class="k-module-header">' +
+      '<div class="k-header-left">' +
+        '<div class="k-header-title-group">' +
+          '<div class="k-header-main-title">' +
+            '<i class="bi bi-file-earmark-bar-graph"></i> ' +
+            'Informes y Firmas' +
+          '</div>' +
+          '<div class="k-header-breadcrumb">' +
+            '<span>' + _esc(company) + '</span>' +
+            '<i class="bi bi-chevron-right"></i>' +
+            '<button type="button" data-back-module="1">Verificación</button>' +
+            '<i class="bi bi-chevron-right"></i>' +
+            '<button type="button" data-go-hub="1">6.1.2 Auditoría Anual</button>' +
+            '<i class="bi bi-chevron-right"></i>' +
+            '<span class="k-breadcrumb-item active">Informes</span>' +
+          '</div>' +
         '</div>' +
       '</div>' +
-      '<div class="kair-v3-hub-header__right">' +
-        KairUI.Button({ id: 'kair-v3-inf-export', variant: 'ghost', size: 'sm', icon: 'download', label: 'Exportar lista' }) +
+      '<div class="k-header-right">' +
+        '<span class="k-sync-badge k-sync-synced" title="Datos cargados">' +
+          '<i class="bi bi-check-circle-fill"></i> Sincronizado' +
+        '</span>' +
+        '<button type="button" class="header-back-btn" data-go-hub="1" title="Volver al Hub del submódulo">' +
+          '<i class="bi bi-arrow-left"></i> Hub' +
+        '</button>' +
+        '<button type="button" class="k-btn k-btn-ghost k-btn-sm" data-action="export-list" title="Exportar lista a CSV">' +
+          '<i class="bi bi-download"></i> Exportar lista' +
+        '</button>' +
       '</div>' +
     '</header>';
   }
@@ -211,7 +229,7 @@ var AuditoriaInformesView = (function () {
         KairUI.Badge({ variant: meta.badge, dot: true, children: meta.label }) +
       '</div>' +
       '<div class="kair-v3-informe-card__meta">' +
-        '<span><i class="bi bi-building"></i> ' + _esc(audit.empresa || '—') + '</span>' +
+        '<span><i class="kair-icon-building"></i> ' + _esc(audit.empresa || '—') + '</span>' +
         '<span><i class="bi bi-person"></i> ' + _esc(audit.auditorLider || '—') + '</span>' +
         '<span><i class="bi bi-calendar"></i> ' + _esc(_fmtDate(audit.fechaProgramada)) + '</span>' +
         '<span><i class="bi bi-clipboard-check"></i> ' + (audit.hallazgos || []).length + ' hallazgos</span>' +
@@ -348,12 +366,25 @@ var AuditoriaInformesView = (function () {
   }
 
   function _bindEvents(container, audits) {
-    var backBtn = document.getElementById('kair-v3-inf-back');
-    if (backBtn) backBtn.addEventListener('click', function () {
-      KairStore.actions.goHub();
-      if (window.kairAuditoriaAnual && window.kairAuditoriaAnual._refreshView) {
-        window.kairAuditoriaAnual._refreshView();
-      }
+    /* F16: Volver al Hub (data-go-hub) */
+    var goHubBtns = container.querySelectorAll('[data-go-hub]');
+    goHubBtns.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        KairStore.actions.goHub();
+        if (window.kairAuditoriaAnual && window.kairAuditoriaAnual._refreshView) {
+          window.kairAuditoriaAnual._refreshView();
+        }
+      });
+    });
+    /* F17: breadcrumb "Verificación" → regresa al módulo padre */
+    var backModuleBtns = container.querySelectorAll('[data-back-module]');
+    backModuleBtns.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var inst = window.__kairAudInstance;
+        if (inst && typeof inst.backToModuleCallback === 'function') {
+          inst.backToModuleCallback();
+        }
+      });
     });
 
     var searchEl = document.getElementById('kair-v3-inf-search');
@@ -413,7 +444,7 @@ var AuditoriaInformesView = (function () {
     /* Download / Print (placeholders) */
     container.querySelectorAll('[data-download-informe], [data-print-informe]').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        if (window.Sileo) Sileo.info({ title: 'Función no disponible', description: 'En la versión enterprise, este botón exporta/imprime el informe.' });
+        if (window.updateNotifier) window.updateNotifier.show({ type: 'info', title: 'Función no disponible', subtitle: 'En la versión enterprise, este botón exporta/imprime el informe.' });
       });
     });
 
@@ -426,7 +457,7 @@ var AuditoriaInformesView = (function () {
           _rerender();
         }
         if (e.target.closest('[data-save-informe]')) {
-          if (window.Sileo) Sileo.success({ title: 'Informe guardado', description: 'Borrador del informe actualizado' });
+          if (window.updateNotifier) window.updateNotifier.show({ type: 'success', title: 'Informe guardado', subtitle: 'Borrador del informe actualizado' });
           _state.editing = null;
           if (window.kairAuditoriaAnual && window.kairAuditoriaAnual._refreshView) {
             window.kairAuditoriaAnual._refreshView();
@@ -448,11 +479,11 @@ var AuditoriaInformesView = (function () {
           var nombre = document.getElementById('kair-v3-firma-nombre');
           var cargo = document.getElementById('kair-v3-firma-cargo');
           if (!rol || !rol.value) {
-            if (window.Sileo) Sileo.error({ title: 'Selecciona un rol' });
+            if (window.updateNotifier) window.updateNotifier.show({ type: 'error', title: 'Selecciona un rol', autoClose: 6000 });
             return;
           }
           if (!nombre || !nombre.value.trim()) {
-            if (window.Sileo) Sileo.error({ title: 'Ingresa el nombre' });
+            if (window.updateNotifier) window.updateNotifier.show({ type: 'error', title: 'Ingresa el nombre', autoClose: 6000 });
             return;
           }
           KairStore.actions.addFirma(auditId, {
@@ -464,7 +495,7 @@ var AuditoriaInformesView = (function () {
             fecha: new Date().toISOString().slice(0, 10),
             firmado: false
           });
-          if (window.Sileo) Sileo.success({ title: 'Firma registrada' });
+          if (window.updateNotifier) window.updateNotifier.show({ type: 'success', title: 'Firma registrada' });
           _state.firmaDialog = null;
           if (window.kairAuditoriaAnual && window.kairAuditoriaAnual._refreshView) {
             window.kairAuditoriaAnual._refreshView();

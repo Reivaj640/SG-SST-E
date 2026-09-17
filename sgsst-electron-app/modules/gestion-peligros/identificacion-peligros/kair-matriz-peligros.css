@@ -1,0 +1,2670 @@
+/* ==========================================================================
+K+AIR — Módulo 4.1.2 Identificación de Peligros (Matriz GTC-45)
+CSS — Reconstruido desde cero basado en las imágenes de referencia
+Diseño: limpio, simple, header blanco con breadcrumb-tabs
+Namespace: km- (aislado, sin colisiones)
+========================================================================== */
+
+/* ==========================================================================
+1. TOKENS
+========================================================================== */
+.km-wrapper {
+  --km-primary: #174ea6;
+  --km-primary-hover: #185abd;
+  --km-primary-light: #e8f0fe;
+  --km-success: #28a745;
+  --km-success-light: #d4edda;
+  --km-success-dark: #1b5e20;
+  --km-warning: #ffc107;
+  --km-warning-light: #fff8e1;
+  --km-warning-dark: #b45309;
+  --km-danger: #dc3545;
+  --km-danger-light: #fee2e2;
+  --km-danger-dark: #b71c1c;
+  --km-info: #174ea6;
+  --km-info-light: #e8f0fe;
+
+  /* GTC-45 niveles (convención oficial: Nivel I = mejor/Aceptable, Nivel V = peor/Catastrófico).
+     Colores: verde (aceptable) → azul → amarillo → naranja → rojo (catastrófico) */
+  --km-nivel-I: #1b5e20;     /* verde - Aceptable */
+  --km-nivel-I-bg: #d4edda;
+  --km-nivel-II: #1976d2;    /* azul - Aceptable con control */
+  --km-nivel-II-bg: #e3f2fd;
+  --km-nivel-III: #f57f17;   /* amarillo - Mejorable */
+  --km-nivel-III-bg: #fff8e1;
+  --km-nivel-IV: #e65100;    /* naranja - No aceptable nivel 1 */
+  --km-nivel-IV-bg: #ffedd5;
+  --km-nivel-V: #b71c1c;     /* rojo - No aceptable nivel 2 */
+  --km-nivel-V-bg: #fee2e2;
+
+  --km-bg-app: #f8f9fa;
+  --km-bg-card: #ffffff;
+  --km-border: #dee2e6;
+  --km-border-light: #e9ecef;
+  --km-radius-sm: 6px;
+  --km-radius-md: 10px;
+
+  --km-text-primary: #212529;
+  --km-text-secondary: #495057;
+  --km-text-muted: #6c757d;
+  --km-text-light: #adb5bd;
+
+  --km-fs-xs: 0.75rem;
+  --km-fs-sm: 0.8125rem;
+  --km-fs-base: 0.875rem;
+  --km-fs-md: 1rem;
+  --km-fs-lg: 1.125rem;
+
+  --km-font-family: 'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
+
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: var(--km-bg-app);
+  font-family: var(--km-font-family);
+  font-size: var(--km-fs-base);
+  color: var(--km-text-primary);
+  overflow: hidden;
+}
+
+/* Pill de sección GI-FO-019 (Header System v2.0) */
+.km-wrapper .kair-header__pill--section {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  background: var(--km-primary-light);
+  color: var(--km-primary);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+.km-wrapper *, .km-wrapper *::before, .km-wrapper *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ==========================================================================
+2. HEADER ESTÁNDAR — Patrón Capacitaciones (UNA sola card: header + tabs)
+Basado en modules/recursos/capacitaciones/capacitaciones-view.html
+========================================================================== */
+.km-wrapper .km-header-card {
+  background: var(--km-bg-card);
+  border: 1px solid var(--km-border);
+  border-radius: var(--km-radius-md);
+  box-shadow: var(--km-shadow-sm);
+  margin: 16px 16px 0 16px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* F21.51 (2026-06-23) — En modo editor, el header card se separa del
+   inicio del editor (sidebar + banner + secciones) con un margin-bottom
+   mas amplio para evitar que el bloque se vea pegado al contenido. */
+.km-wrapper .km-header-card--editor {
+  margin-bottom: 20px;
+}
+
+/* Fila 1: contenido principal (icono + título/subtítulo a la izquierda, acciones a la derecha) */
+.km-wrapper .km-header-card__main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  flex-wrap: wrap;
+}
+
+.km-wrapper .km-header-card__title-block {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.km-wrapper .km-header-card__icon {
+  color: var(--km-primary);
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+.km-wrapper .km-header-card__title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.km-wrapper .km-header-card__subtitle {
+  font-size: 0.8125rem;
+  color: #64748b;
+  margin: 0.25rem 0 0 0;
+  line-height: 1.3;
+}
+
+.km-wrapper .km-header-card__right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.km-wrapper .km-header-card__company {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+  color: #64748b;
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.km-wrapper .km-header-card__divider {
+  width: 1px;
+  height: 24px;
+  background: var(--km-border);
+}
+.km-wrapper .km-header-card__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #5a6378;
+  background: transparent;
+  border: 1px solid var(--km-border);
+  border-radius: var(--km-radius-sm);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.km-wrapper .km-header-card__back:hover {
+  background: #e8f0fe;
+  color: var(--km-primary);
+  border-color: var(--km-primary);
+}
+
+/* Fila 2: tabs dentro de la misma card */
+.km-wrapper .km-header-card__tabs {
+  display: flex;
+  gap: 0;
+  border-top: 1px solid var(--km-border);
+  background: var(--km-bg-card);
+  overflow-x: auto;
+}
+.km-wrapper .km-header-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #5a6378;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.km-wrapper .km-header-tab:hover { color: var(--km-primary); }
+.km-wrapper .km-header-tab i { font-size: 1rem; }
+.km-wrapper .km-header-tab--active {
+  color: var(--km-primary);
+  font-weight: 600;
+  border-bottom-color: var(--km-primary);
+}
+.km-wrapper .km-header-tab-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  align-items: center;
+}
+
+.km-wrapper .km-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: var(--km-fs-sm);
+  font-weight: 500;
+  font-family: inherit;
+  border-radius: var(--km-radius-sm);
+  border: 1px solid var(--km-border);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  background: var(--km-bg-card);
+  color: var(--km-text-primary);
+  white-space: nowrap;
+}
+.km-wrapper .km-btn:hover { background: #f1f3f5; }
+.km-wrapper .km-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.km-wrapper .km-btn--primary {
+  background: var(--km-primary);
+  color: #ffffff;
+  border-color: var(--km-primary);
+}
+.km-wrapper .km-btn--primary:hover { background: var(--km-primary-hover); border-color: var(--km-primary-hover); }
+
+.km-wrapper .km-btn--outline {
+  background: var(--km-bg-card);
+  color: var(--km-primary);
+  border-color: var(--km-primary);
+}
+.km-wrapper .km-btn--outline:hover { background: var(--km-primary-light); }
+
+.km-wrapper .km-btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--km-text-muted);
+}
+.km-wrapper .km-btn--ghost:hover { background: #f1f3f5; color: var(--km-text-primary); }
+
+/* F21.55 (2026-06-23) — Bug #6: variante danger (rojo) usada por
+   KM.modal({danger:true}) en confirmaciones destructivas. No estaba
+   definida y el boton salia sin estilo. */
+.km-wrapper .km-btn--danger {
+  background: var(--km-danger);
+  color: #ffffff;
+  border-color: var(--km-danger);
+}
+.km-wrapper .km-btn--danger:hover { background: #c82333; border-color: #c82333; }
+
+/* 📦441 (2026-06-25) — Variante warning (ámbar) usada por el botón
+   "Reemplazar desde Excel". Visualmente más suave que --danger porque
+   la acción es destructiva pero recuperable (siempre se puede re-importar). */
+.km-wrapper .km-btn--warning {
+  background: #fffbeb;
+  color: #b45309;
+  border-color: #fcd34d;
+}
+.km-wrapper .km-btn--warning:hover {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #f59e0b;
+}
+
+/* 📦441 (2026-06-25) — Banner ámbar que avisa al usuario del desfase
+   JSON ↔ Excel. Aparece encima de la tabla de peligros con icono,
+   mensaje, botón de acción y botón cerrar. */
+.km-wrapper .km-mismatch-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 16px 16px 0 16px;
+  padding: 14px 18px;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-left: 4px solid #f59e0b;
+  border-radius: var(--km-radius-md);
+  color: #78350f;
+  font-size: var(--km-fs-sm);
+  box-shadow: var(--km-shadow-sm);
+}
+.km-wrapper .km-mismatch-banner__icon {
+  flex-shrink: 0;
+  font-size: 1.5rem;
+  color: #d97706;
+}
+.km-wrapper .km-mismatch-banner__body {
+  flex: 1 1 auto;
+  line-height: 1.45;
+}
+.km-wrapper .km-mismatch-banner__body code {
+  background: #fef3c7;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  color: #92400e;
+}
+.km-wrapper .km-mismatch-banner__close {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #b45309;
+  padding: 4px 8px;
+  font-size: 1rem;
+  border-radius: 4px;
+}
+.km-wrapper .km-mismatch-banner__close:hover {
+  background: #fde68a;
+  color: #78350f;
+}
+
+/* Tamaño pequeño — usado en el header card */
+.km-wrapper .km-btn--sm {
+  padding: 0.375rem 0.625rem;
+  font-size: 0.75rem;
+  gap: 0.375rem;
+}
+
+/* ==========================================================================
+3. VIEWS — solo una activa
+========================================================================== */
+.km-wrapper .km-view {
+  display: none;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.km-wrapper .km-view--active { display: flex; }
+
+/* ==========================================================================
+4. VISTA MATRIZ — Buscador + 3 dropdowns + Tabla plana
+========================================================================== */
+.km-wrapper .km-matriz-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: var(--km-bg-card);
+  border: 1px solid var(--km-border);
+  border-radius: var(--km-radius-md);
+  margin: 16px 16px 0 16px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  box-shadow: var(--km-shadow-sm);
+}
+
+.km-wrapper .km-search {
+  position: relative;
+  flex: 1 1 240px;
+  max-width: 360px;
+}
+.km-wrapper .km-search input {
+  width: 100%;
+  padding: 8px 12px 8px 36px;
+  border: 1px solid var(--km-border);
+  border-radius: var(--km-radius-sm);
+  font-size: var(--km-fs-sm);
+  font-family: inherit;
+  background: var(--km-bg-card);
+}
+.km-wrapper .km-search input:focus {
+  outline: none;
+  border-color: var(--km-primary);
+  box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.15);
+}
+.km-wrapper .km-search i {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--km-text-light);
+}
+
+.km-wrapper .km-select {
+  padding: 8px 32px 8px 12px;
+  border: 1px solid var(--km-border);
+  border-radius: var(--km-radius-sm);
+  font-size: var(--km-fs-sm);
+  font-family: inherit;
+  background: var(--km-bg-card);
+  cursor: pointer;
+  min-width: 160px;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23495057' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+.km-wrapper .km-matriz-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  font-size: var(--km-fs-sm);
+  color: var(--km-text-secondary);
+}
+.km-wrapper .km-matriz-info__icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--km-border);
+  border-radius: var(--km-radius-sm);
+  background: var(--km-bg-card);
+  color: var(--km-text-secondary);
+  cursor: pointer;
+}
+.km-wrapper .km-matriz-info__icon-btn:hover { background: var(--km-primary-light); color: var(--km-primary); border-color: var(--km-primary); }
+
+.km-wrapper .km-table-wrapper {
+  flex: 1;
+  overflow: auto;
+  background: var(--km-bg-card);
+  border: 1px solid var(--km-border);
+  border-radius: var(--km-radius-md);
+  margin: 20px 16px 16px 16px;
+  box-shadow: var(--km-shadow-sm);
+}
+/* 📦445/📦446 (2026-06-25) — Variante con scroll horizontal/vertical
+   automático + max-height. Usado en la vista de Priorización
+   (kair-matriz-peligros-priorizacion.js) donde hay 12 columnas y muchas
+   filas: la tabla con table-layout:fixed mide 1240px exactos (suma de
+   colgroup), y cuando el wrapper mide menos que eso (modo ventana,
+   pantallas < 1240px efectivos, sidebar abierto, etc.) aparece scroll
+   horizontal automáticamente. La barra vertical aparece cuando las filas
+   exceden max-height (calc 100vh - 260px para que quepa el sticky header
+   + footer + header global). */
+.km-wrapper .km-table-wrapper--scroll {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: calc(100vh - 260px);
+  min-height: 320px;
+  /* 📦446: hint visual sutil — sombra interna derecha que aparece cuando
+     hay contenido scrolleable a la derecha (mejora UX sin distraer). */
+  background:
+    /* shadow derecha (indicador "hay más contenido →") */
+    linear-gradient(to right, var(--km-bg-card) 30%, rgba(0,0,0,0)) left center / 20px 100% no-repeat,
+    linear-gradient(to left, var(--km-bg-card) 30%, rgba(0,0,0,0)) right center / 20px 100% no-repeat,
+    radial-gradient(farthest-side at 0 50%, rgba(0,0,0,0.08), rgba(0,0,0,0)) left center / 12px 100% no-repeat,
+    radial-gradient(farthest-side at 100% 50%, rgba(0,0,0,0.08), rgba(0,0,0,0)) right center / 12px 100% no-repeat;
+  background-attachment: local, local, scroll, scroll;
+  background-color: var(--km-bg-card);
+}
+.km-wrapper .km-table {
+  width: auto;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--km-fs-sm);
+  /* 📦446 (2026-06-25) — table-layout:fixed es CRÍTICO para que los anchos
+     definidos en <colgroup> (<col style="width:Xpx">) se respeten
+     estrictamente. Sin esto, el navegador usa table-layout:auto y reescala
+     las columnas según el contenido, IGNORANDO los anchos del colgroup
+     (PELIGRO volvía a verse ancha aunque el JS pidiera 200px).
+     También quitamos min-width:2400px porque con table-layout:fixed la
+     tabla mide = suma de anchos de columnas (1240px). Si quisiéramos más
+     ancho en una columna, ajustamos el colgroup, no el min-width. */
+  table-layout: fixed;
+}
+/* 📦440 (2026-06-25) — Tabla estilo Excel GI-FO-019:
+   - 2 filas en thead (super-encabezado con colspan + sub-encabezado)
+   - sticky en AMBAS filas para que al hacer scroll horizontal/vertical
+     el usuario siempre vea los encabezados. */
+.km-wrapper .km-table thead { position: sticky; top: 0; z-index: 5; }
+.km-wrapper .km-table thead tr { position: sticky; }
+.km-wrapper .km-table__super-header th {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+}
+.km-wrapper .km-table__sub-header th {
+  position: sticky;
+  top: 36px;
+  z-index: 6;
+}
+.km-wrapper .km-table th {
+  padding: 10px 12px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #334155;
+  background: #f1f5f9;
+  text-align: center;
+  white-space: nowrap;
+  border-bottom: 2px solid var(--km-border);
+  border-right: 1px solid #e2e8f0;
+}
+/* 📦440 — Fila super-encabezado: estilo más oscuro y diferenciado */
+.km-wrapper .km-table__super-th {
+  background: #e2e8f0 !important;
+  color: #1e293b !important;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom: 2px solid #475569;
+  padding: 12px 10px;
+  text-align: center;
+}
+.km-wrapper .km-table__th-peligro {
+  text-align: left;
+}
+/* 📦444 (2026-06-25): el td mantiene display:table-cell (default) y
+   vertical-align:middle. Los spans hijos usan display:inline-block para
+   respetar esa alineación. La clave es NO aplicar display:inline-block
+   al <td> mismo — eso rompe el layout de tabla. Por eso se quitó
+   cls:'km-table__cell-peligro' del COLS (antes se aplicaba al td Y al
+   span, dejando el td como inline-block que rompía la alineación). */
+.km-wrapper .km-table td {
+  padding: 14px;
+  border-bottom: 1px solid #e2e8f0;
+  background: var(--km-bg-card);
+  vertical-align: middle;
+  line-height: 1.5;
+}
+/* Safety net: cualquier hijo directo del td hereda vertical-align:middle
+   para casos donde un span hijo no tenga su propia regla. */
+.km-wrapper .km-table td > * {
+  vertical-align: middle;
+}
+/* Filas alternadas — fondo beige claro (como la referencia) */
+.km-wrapper .km-table tbody tr:nth-child(even) td { background: #fefce8; }
+.km-wrapper .km-table tbody tr:hover td { background: #fef3c7; }
+
+.km-wrapper .km-table__id-cell {
+  white-space: nowrap;
+}
+.km-wrapper .km-table__expand-btn {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--km-text-light);
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+.km-wrapper .km-table__expand-btn:hover { color: var(--km-primary); }
+.km-wrapper .km-table__id {
+  font-weight: 600;
+  color: var(--km-primary);
+  font-size: var(--km-fs-sm);
+  white-space: nowrap;
+}
+
+.km-wrapper .km-table__cell-peligro {
+  font-weight: 600;
+  color: var(--km-text-primary);
+  /* 📦444 (2026-06-25): usar display:inline-block en vez de block para que
+     el span respete el vertical-align:middle del <td> padre. Antes con
+     display:block el span llenaba toda la celda y el texto quedaba
+     pegado arriba, desalineado con el resto de la fila. */
+  display: inline-block;
+  max-width: 320px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  line-height: 1.4;
+  white-space: normal;
+  vertical-align: middle;
+}
+.km-wrapper .km-table__cell-peligro-empty {
+  color: var(--km-text-light);
+  font-style: italic;
+  opacity: 0.6;
+}
+
+.km-wrapper .km-table__rutinaria {
+  font-size: 0.7rem;
+  color: var(--km-text-muted);
+}
+
+.km-wrapper .km-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: var(--km-fs-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.km-wrapper .km-pill--clasif { background: var(--km-primary-light); color: var(--km-primary); }
+.km-wrapper .km-pill--clasif-empty { background: #e9ecef; color: var(--km-text-light); }
+.km-wrapper .km-pill--interp { background: var(--km-warning-light); color: var(--km-warning-dark); }
+.km-wrapper .km-pill--interp--bajo { background: var(--km-success-light); color: var(--km-success-dark); }
+.km-wrapper .km-pill--interp--medio { background: var(--km-warning-light); color: var(--km-warning-dark); }
+.km-wrapper .km-pill--interp--alto { background: var(--km-danger-light); color: var(--km-danger-dark); }
+
+.km-wrapper .km-pill--nivel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: var(--km-fs-xs);
+  padding: 0 6px;
+}
+.km-wrapper .km-pill--nivel-I { background: var(--km-nivel-I); color: #fff; }
+.km-wrapper .km-pill--nivel-II { background: var(--km-nivel-II); color: #fff; }
+.km-wrapper .km-pill--nivel-III { background: var(--km-nivel-III); color: #fff; }
+.km-wrapper .km-pill--nivel-IV { background: var(--km-nivel-IV); color: #fff; }
+.km-wrapper .km-pill--nivel-V { background: var(--km-nivel-V); color: #fff; }
+
+.km-wrapper .km-pill--acept {
+  font-size: var(--km-fs-xs);
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--km-radius-sm);
+}
+.km-wrapper .km-pill--acept-danger { background: var(--km-danger-light); color: var(--km-danger-dark); }
+.km-wrapper .km-pill--acept-warning { background: var(--km-warning-light); color: var(--km-warning-dark); }
+.km-wrapper .km-pill--acept-info { background: var(--km-info-light); color: var(--km-primary); }
+.km-wrapper .km-pill--acept-success { background: var(--km-success-light); color: var(--km-success-dark); }
+
+.km-wrapper .km-table__np { font-size: var(--km-fs-md); font-weight: 700; color: var(--km-text-primary); }
+.km-wrapper .km-table__nr { font-size: 1.125rem; font-weight: 700; color: var(--km-text-primary); }
+.km-wrapper .km-table__nr--high { color: var(--km-danger-dark); }
+
+.km-wrapper .km-table__num { font-weight: 600; }
+.km-wrapper .km-table__num--nd,
+.km-wrapper .km-table__num--ne,
+.km-wrapper .km-table__num--nc {
+  text-align: center;
+  font-weight: 600;
+}
+
+.km-wrapper .km-table__num--nd-dash,
+.km-wrapper .km-table__num--ne-dash,
+.km-wrapper .km-table__num--nc-dash { color: var(--km-text-light); }
+
+/* Celdas vacías (—) y wrap (texto largo) */
+.km-wrapper .km-table__empty { color: var(--km-text-light); font-style: italic; opacity: 0.6; }
+/* 📦444 (2026-06-25): usar display:inline-block + vertical-align:middle
+   para que el contenido se centre verticalmente con el resto de la fila.
+   Antes display:block llenaba toda la celda y el texto quedaba pegado arriba,
+   desalineado con el resto de la fila (incluso con vertical-align:middle en
+   el <td>, los hijos block no respetan esa alineación). */
+.km-wrapper .km-table__wrap {
+  display: inline-block;
+  max-width: 280px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  line-height: 1.4;
+  vertical-align: middle;
+}
+
+.km-wrapper .km-table__actions {
+  /* F439.1 (2026-06-24): mismo patrón que el fix del id-cell. Antes usaba
+     display:flex + gap + justify-content:flex-end que peleaba con el
+     vertical-align:middle heredado de la tabla, dejando los botones de
+     editar/eliminar desalineados verticalmente respecto al resto de la fila.
+     Ahora la celda se comporta como <td> normal (hereda vertical-align:middle)
+     y los botones se ponen en línea con text-align:right + inline-block. */
+  text-align: right;
+  white-space: nowrap;
+}
+.km-wrapper .km-table__action-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--km-text-light);
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 2px;
+}
+.km-wrapper .km-table__action-btn:first-child { margin-left: 0; }
+.km-wrapper .km-table__action-btn:hover { background: var(--km-primary-light); color: var(--km-primary); }
+.km-wrapper .km-table__action-btn--delete:hover { background: var(--km-danger-light); color: var(--km-danger-dark); }
+
+/* Empty state */
+.km-wrapper .km-empty {
+  text-align: center;
+  padding: 48px 16px;
+  color: var(--km-text-muted);
+}
+.km-wrapper .km-empty i { font-size: 2.5rem; color: var(--km-text-light); margin-bottom: 12px; }
+.km-wrapper .km-empty p { font-size: var(--km-fs-base); }
+
+/* ==========================================================================
+5. VISTA KPIs — 6 KPI cards + barras por sede/clasificación
+========================================================================== */
+.km-wrapper .km-kpis-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* KPI Strip — 6 cards */
+.km-wrapper .km-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0;
+  background: var(--km-bg-card);
+  border: 1px solid var(--km-border);
+  border-radius: var(--km-radius-md);
+  padding: 20px;
+  box-shadow: var(--km-shadow-sm);
+}
+.km-wrapper .km-kpi {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+  border-right: 1px solid var(--km-border-light);
+}
+.km-wrapper .km-kpi:last-child { border-right: none; }
+.km-wrapper .km-kpi__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.125rem;
+  background: var(--km-primary-light);
+  color: var(--km-primary);
+  flex-shrink: 0;
+}
+.km-wrapper .km-kpi__icon--azul { background: var(--km-primary-light); color: var(--km-primary); }
+.km-wrapper .km-kpi__icon--rojo { background: var(--km-danger-light); color: var(--km-danger-dark); }
+.km-wrapper .km-kpi__icon--amarillo { background: var(--km-warning-light); color: var(--km-warning-dark); }
+.km-wrapper .km-kpi__icon--verde { background: var(--km-success-light); color: var(--km-success-dark); }
+.km-wrapper .km-kpi__icon--info { background: var(--km-info-light); color: var(--km-primary); }
+.km-wrapper .km-kpi__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.km-wrapper .km-kpi__value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  line-height: 1.1;
+}
+.km-wrapper .km-kpi__label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--km-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+}
+.km-wrapper .km-kpi__sub {
+  font-size: 0.65rem;
+  color: var(--km-text-light);
+  line-height: 1.2;
+}
+.km-wrapper .km-kpi--rojo .km-kpi__value { color: var(--km-danger-dark); }
+
+/* Bar chart sections (por sede, por clasificación) */
+.km-wrapper .km-bar-section {
+  background: var(--km-bg-card);
+  border: 1px solid var(--km-border);
+  border-radius: var(--km-radius-md);
+  padding: 20px;
+  box-shadow: var(--km-shadow-sm);
+}
+.km-wrapper .km-bar-section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.km-wrapper .km-bar-section__title {
+  font-size: var(--km-fs-base);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.km-wrapper .km-bar-section__count {
+  font-size: var(--km-fs-xs);
+  color: var(--km-text-muted);
+  background: var(--km-border-light);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.km-wrapper .km-bar-row {
+  display: grid;
+  grid-template-columns: 160px 1fr 50px;
+  gap: 12px;
+  align-items: center;
+  padding: 6px 0;
+}
+.km-wrapper .km-bar-row__label {
+  font-size: var(--km-fs-sm);
+  color: var(--km-text-primary);
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.km-wrapper .km-bar-row__track {
+  background: var(--km-border-light);
+  border-radius: 4px;
+  overflow: hidden;
+  height: 20px;
+}
+.km-wrapper .km-bar-row__fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+.km-wrapper .km-bar-row__fill--azul { background: var(--km-primary); }
+.km-wrapper .km-bar-row__fill--verde { background: var(--km-success); }
+.km-wrapper .km-bar-row__fill--amarillo { background: var(--km-warning); }
+.km-wrapper .km-bar-row__fill--rojo { background: var(--km-danger); }
+.km-wrapper .km-bar-row__fill--naranja { background: var(--km-nivel-III); }
+.km-wrapper .km-bar-row__fill--morado { background: var(--km-nivel-V); }
+.km-wrapper .km-bar-row__fill--cyan { background: #06b6d4; }
+.km-wrapper .km-bar-row__fill--rosa { background: #ec4899; }
+.km-wrapper .km-bar-row__count {
+  font-size: var(--km-fs-sm);
+  font-weight: 600;
+  text-align: right;
+}
+
+/* ==========================================================================
+   5b. VISTA INDICADORES — Grid 2 columnas + 5 nuevos KPIs (📦448 2026-06-25)
+   ========================================================================== */
+/* Grid 2 columnas: el contenedor padre (.km-kpis-grid) decide el layout.
+   Por defecto 2 columnas; en < 1024px → 1 columna. */
+.km-wrapper .km-kpis-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+/* Variante full-width para KPIs que necesitan todo el ancho
+   (ej: stacked bar de expuestos por sede). */
+.km-wrapper .km-kpis-grid--full {
+  grid-template-columns: 1fr;
+}
+/* Card base de cada uno de los 5 nuevos KPIs */
+.km-wrapper .km-kpi-card {
+  background: var(--km-bg-card);
+  border: 1px solid var(--km-border);
+  border-radius: var(--km-radius-md);
+  padding: 20px;
+  box-shadow: var(--km-shadow-sm);
+  display: flex;
+  flex-direction: column;
+  min-width: 0; /* evita overflow en grid */
+}
+.km-wrapper .km-kpi-card__header {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--km-border-light);
+}
+.km-wrapper .km-kpi-card__title {
+  font-size: var(--km-fs-base);
+  font-weight: 700;
+  color: var(--km-text-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.km-wrapper .km-kpi-card__title i { color: var(--km-primary); }
+.km-wrapper .km-kpi-card__subtitle {
+  font-size: 0.75rem;
+  color: var(--km-text-muted);
+  margin-top: 4px;
+}
+.km-wrapper .km-kpi-card__body {
+  flex: 1;
+  min-height: 0;
+}
+.km-wrapper .km-empty-inline {
+  text-align: center;
+  color: var(--km-text-light);
+  padding: 24px 12px;
+  font-size: 0.85rem;
+}
+
+/* — KPI #1: Cobertura de controles — */
+.km-wrapper .km-coverage { display: flex; flex-direction: column; gap: 16px; }
+.km-wrapper .km-coverage__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.km-wrapper .km-coverage__icon {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  flex-shrink: 0;
+}
+.km-wrapper .km-coverage__icon--verde { background: #dcfce7; color: #166534; }
+.km-wrapper .km-coverage__icon--azul { background: #dbeafe; color: #1e40af; }
+.km-wrapper .km-coverage__icon--morado { background: #ede9fe; color: #6b21a8; }
+.km-wrapper .km-coverage__label {
+  flex: 1;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--km-text-primary);
+}
+.km-wrapper .km-coverage__pct {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--km-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.km-wrapper .km-coverage__track {
+  background: #f1f5f9;
+  border-radius: 6px;
+  height: 10px;
+  overflow: hidden;
+}
+.km-wrapper .km-coverage__bar {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.3s ease;
+}
+.km-wrapper .km-coverage__bar--ok { background: linear-gradient(90deg, #22c55e, #16a34a); }
+.km-wrapper .km-coverage__bar--mid { background: linear-gradient(90deg, #f59e0b, #d97706); }
+.km-wrapper .km-coverage__bar--low { background: linear-gradient(90deg, #ef4444, #dc2626); }
+.km-wrapper .km-coverage__meta {
+  font-size: 0.72rem;
+  color: var(--km-text-muted);
+  margin-top: 4px;
+}
+
+/* — KPI #2: Donut Rutinaria vs No rutinaria — */
+.km-wrapper .km-donut-wrap {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  justify-content: center;
+  padding: 8px 0;
+}
+.km-wrapper .km-donut { flex-shrink: 0; }
+.km-wrapper .km-donut__seg { transition: stroke-dasharray 0.3s ease; }
+.km-wrapper .km-donut__seg--si { stroke: #16a34a; }
+.km-wrapper .km-donut__seg--no { stroke: #f59e0b; }
+.km-wrapper .km-donut__seg--sc { stroke: #cbd5e1; }
+.km-wrapper .km-donut__total {
+  font-size: 1.5rem;
+  font-weight: 800;
+  fill: var(--km-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.km-wrapper .km-donut__label {
+  font-size: 0.7rem;
+  fill: var(--km-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.km-wrapper .km-donut-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.km-wrapper .km-donut-legend__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+.km-wrapper .km-donut-legend__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.km-wrapper .km-donut-legend__dot--si { background: #16a34a; }
+.km-wrapper .km-donut-legend__dot--no { background: #f59e0b; }
+.km-wrapper .km-donut-legend__dot--sc { background: #cbd5e1; }
+.km-wrapper .km-donut-legend__label {
+  flex: 1;
+  color: var(--km-text-secondary);
+}
+.km-wrapper .km-donut-legend__value {
+  font-weight: 700;
+  color: var(--km-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* — KPI #3: Distribución NR (histograma) — */
+.km-wrapper .km-nr-dist__stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 10px;
+  background: #f8fafc;
+  border-radius: var(--km-radius-sm);
+}
+.km-wrapper .km-nr-dist__stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.km-wrapper .km-nr-dist__stat-label {
+  font-size: 0.65rem;
+  color: var(--km-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+.km-wrapper .km-nr-dist__stat-value {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--km-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.km-wrapper .km-nr-dist__stat-value--warn { color: var(--km-danger); }
+.km-wrapper .km-nr-dist__bars { display: flex; flex-direction: column; gap: 10px; }
+.km-wrapper .km-nr-dist__row { display: flex; flex-direction: column; gap: 4px; }
+.km-wrapper .km-nr-dist__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+}
+.km-wrapper .km-nr-dist__range {
+  display: inline-flex;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.km-wrapper .km-nr-dist__range--verde { background: #dcfce7; color: #166534; }
+.km-wrapper .km-nr-dist__range--azul { background: #dbeafe; color: #1e40af; }
+.km-wrapper .km-nr-dist__range--amarillo { background: #fef3c7; color: #92400e; }
+.km-wrapper .km-nr-dist__range--naranja { background: #ffedd5; color: #9a3412; }
+.km-wrapper .km-nr-dist__range--rojo { background: #fee2e2; color: #991b1b; }
+.km-wrapper .km-nr-dist__label {
+  flex: 1;
+  color: var(--km-text-secondary);
+}
+.km-wrapper .km-nr-dist__value {
+  font-weight: 700;
+  color: var(--km-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.km-wrapper .km-nr-dist__track {
+  background: #f1f5f9;
+  border-radius: 4px;
+  height: 8px;
+  overflow: hidden;
+}
+.km-wrapper .km-nr-dist__bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+.km-wrapper .km-nr-dist__bar--verde { background: linear-gradient(90deg, #4ade80, #16a34a); }
+.km-wrapper .km-nr-dist__bar--azul { background: linear-gradient(90deg, #60a5fa, #2563eb); }
+.km-wrapper .km-nr-dist__bar--amarillo { background: linear-gradient(90deg, #fcd34d, #f59e0b); }
+.km-wrapper .km-nr-dist__bar--naranja { background: linear-gradient(90deg, #fb923c, #ea580c); }
+.km-wrapper .km-nr-dist__bar--rojo { background: linear-gradient(90deg, #f87171, #dc2626); }
+
+/* — KPI #4: Top cargos — */
+.km-wrapper .km-top-cargos { display: flex; flex-direction: column; gap: 12px; }
+.km-wrapper .km-top-cargos__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.km-wrapper .km-top-cargos__rank {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--km-primary-light);
+  color: var(--km-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.km-wrapper .km-top-cargos__body { flex: 1; min-width: 0; }
+.km-wrapper .km-top-cargos__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.km-wrapper .km-top-cargos__name {
+  font-size: 0.82rem;
+  color: var(--km-text-primary);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.km-wrapper .km-top-cargos__count {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--km-text-primary);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.km-wrapper .km-top-cargos__track {
+  background: #f1f5f9;
+  border-radius: 4px;
+  height: 8px;
+  overflow: hidden;
+}
+.km-wrapper .km-top-cargos__bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+.km-wrapper .km-top-cargos__bar--azul { background: linear-gradient(90deg, #60a5fa, #2563eb); }
+.km-wrapper .km-top-cargos__bar--verde { background: linear-gradient(90deg, #4ade80, #16a34a); }
+.km-wrapper .km-top-cargos__bar--amarillo { background: linear-gradient(90deg, #fcd34d, #f59e0b); }
+.km-wrapper .km-top-cargos__bar--naranja { background: linear-gradient(90deg, #fb923c, #ea580c); }
+.km-wrapper .km-top-cargos__bar--morado { background: linear-gradient(90deg, #c084fc, #9333ea); }
+
+/* — KPI #5: Expuestos por sede (stacked bar) — */
+.km-wrapper .km-exp-sede { display: flex; flex-direction: column; gap: 12px; }
+.km-wrapper .km-exp-sede__row {
+  display: grid;
+  grid-template-columns: 180px 1fr 60px;
+  gap: 12px;
+  align-items: center;
+}
+.km-wrapper .km-exp-sede__label {
+  font-size: 0.85rem;
+  color: var(--km-text-primary);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.km-wrapper .km-exp-sede__track {
+  background: #f1f5f9;
+  border-radius: 6px;
+  height: 24px;
+  overflow: hidden;
+  display: flex;
+}
+.km-wrapper .km-exp-sede__seg {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+.km-wrapper .km-exp-sede__seg--rojo { background: #dc2626; }
+.km-wrapper .km-exp-sede__seg--naranja { background: var(--km-nivel-III); }
+.km-wrapper .km-exp-sede__seg--amarillo { background: var(--km-warning); }
+.km-wrapper .km-exp-sede__seg--verde { background: var(--km-success); }
+.km-wrapper .km-exp-sede__seg--morado { background: var(--km-nivel-V); }
+.km-wrapper .km-exp-sede__total {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--km-text-primary);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.km-wrapper .km-exp-sede__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding-top: 14px;
+  margin-top: 6px;
+  border-top: 1px solid var(--km-border-light);
+  font-size: 0.78rem;
+  color: var(--km-text-muted);
+}
+.km-wrapper .km-exp-sede__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.km-wrapper .km-exp-sede__legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+.km-wrapper .km-exp-sede__legend-dot--rojo { background: #dc2626; }
+.km-wrapper .km-exp-sede__legend-dot--naranja { background: var(--km-nivel-III); }
+.km-wrapper .km-exp-sede__legend-dot--amarillo { background: var(--km-warning); }
+.km-wrapper .km-exp-sede__legend-dot--verde { background: var(--km-success); }
+.km-wrapper .km-exp-sede__legend-total {
+  margin-left: auto;
+  color: var(--km-text-secondary);
+}
+.km-wrapper .km-exp-sede__legend-total strong {
+  color: var(--km-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* — KPI A (sustituye Tareas rutinarias): Concentración de riesgo — */
+.km-wrapper .km-concentracion {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.km-wrapper .km-concentracion__hero {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.km-wrapper .km-concentracion__pct {
+  font-size: 1.7rem;
+  font-weight: 800;
+  fill: var(--km-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.km-wrapper .km-concentracion__pct--crit { fill: #dc2626; }
+.km-wrapper .km-concentracion__pct--alto { fill: #ea580c; }
+.km-wrapper .km-concentracion__pct--ok { fill: #16a34a; }
+.km-wrapper .km-concentracion__copy {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.km-wrapper .km-concentracion__title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--km-text-primary);
+}
+.km-wrapper .km-concentracion__sub {
+  font-size: 0.85rem;
+  color: var(--km-text-secondary);
+}
+.km-wrapper .km-concentracion__sub strong {
+  color: var(--km-danger);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.km-wrapper .km-concentracion__other {
+  font-size: 0.78rem;
+  color: var(--km-text-muted);
+}
+.km-wrapper .km-concentracion__other strong {
+  color: var(--km-text-secondary);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.km-wrapper .km-concentracion__breakdown {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--km-border-light);
+}
+.km-wrapper .km-concentracion__bd-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border-radius: var(--km-radius-sm);
+  border-left: 3px solid;
+}
+.km-wrapper .km-concentracion__bd-item--crit { border-left-color: #dc2626; }
+.km-wrapper .km-concentracion__bd-item--alto { border-left-color: #ea580c; }
+.km-wrapper .km-concentracion__bd-icon {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+.km-wrapper .km-concentracion__bd-item--crit .km-concentracion__bd-icon { background: #fee2e2; color: #991b1b; }
+.km-wrapper .km-concentracion__bd-item--alto .km-concentracion__bd-icon { background: #ffedd5; color: #9a3412; }
+.km-wrapper .km-concentracion__bd-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.km-wrapper .km-concentracion__bd-value {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--km-text-primary);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.km-wrapper .km-concentracion__bd-label {
+  font-size: 0.72rem;
+  color: var(--km-text-muted);
+  font-weight: 600;
+}
+
+/* — KPI D: % de expuestos por sede — */
+.km-wrapper .km-exp-pct {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.km-wrapper .km-exp-pct__row {
+  display: grid;
+  grid-template-columns: 200px 1fr 60px 80px;
+  gap: 12px;
+  align-items: center;
+}
+.km-wrapper .km-exp-pct__label {
+  font-size: 0.85rem;
+  color: var(--km-text-primary);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.km-wrapper .km-exp-pct__track {
+  background: #f1f5f9;
+  border-radius: 6px;
+  height: 22px;
+  overflow: hidden;
+}
+.km-wrapper .km-exp-pct__bar {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.3s ease;
+}
+.km-wrapper .km-exp-pct__bar--azul { background: linear-gradient(90deg, #60a5fa, #2563eb); }
+.km-wrapper .km-exp-pct__bar--verde { background: linear-gradient(90deg, #4ade80, #16a34a); }
+.km-wrapper .km-exp-pct__bar--amarillo { background: linear-gradient(90deg, #fcd34d, #f59e0b); }
+.km-wrapper .km-exp-pct__bar--naranja { background: linear-gradient(90deg, #fb923c, #ea580c); }
+.km-wrapper .km-exp-pct__bar--morado { background: linear-gradient(90deg, #c084fc, #9333ea); }
+.km-wrapper .km-exp-pct__bar--cyan { background: linear-gradient(90deg, #22d3ee, #0891b2); }
+.km-wrapper .km-exp-pct__bar--rosa { background: linear-gradient(90deg, #f472b6, #db2777); }
+.km-wrapper .km-exp-pct__value {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--km-text-primary);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.km-wrapper .km-exp-pct__count {
+  font-size: 0.78rem;
+  color: var(--km-text-muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.km-wrapper .km-exp-pct__total {
+  margin-top: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--km-border-light);
+  font-size: 0.85rem;
+  color: var(--km-text-secondary);
+  text-align: right;
+}
+.km-wrapper .km-exp-pct__total strong {
+  color: var(--km-text-primary);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 1100px) {
+  .km-wrapper .km-exp-pct__row {
+    grid-template-columns: 120px 1fr 50px 60px;
+  }
+  .km-wrapper .km-concentracion__hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* Responsive: en pantallas chicas el grid pasa a 1 columna */
+@media (max-width: 1100px) {
+  .km-wrapper .km-kpis-grid {
+    grid-template-columns: 1fr;
+  }
+  .km-wrapper .km-exp-sede__row {
+    grid-template-columns: 120px 1fr 50px;
+  }
+}
+
+/* ==========================================================================
+6. VISTA PRIORIZACIÓN — Leyenda + sub-tabs + tabla semáforo
+========================================================================== */
+.km-wrapper .km-prior-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 20px; }
+
+.km-wrapper .km-leyenda {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: var(--km-bg-card);
+  border: 1px solid var(--km-border);
+  border-radius: var(--km-radius-md);
+  font-size: var(--km-fs-sm);
+  flex-wrap: wrap;
+  box-shadow: var(--km-shadow-sm);
+}
+.km-wrapper .km-leyenda__label { font-weight: 700; color: var(--km-text-secondary); margin-right: 8px; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.05em; }
+.km-wrapper .km-leyenda__item { display: inline-flex; align-items: center; gap: 6px; }
+.km-wrapper .km-leyenda__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.km-wrapper .km-leyenda__dot--I { background: var(--km-nivel-I); }
+.km-wrapper .km-leyenda__dot--II { background: var(--km-nivel-II); }
+.km-wrapper .km-leyenda__dot--III { background: var(--km-nivel-III); }
+.km-wrapper .km-leyenda__dot--IV { background: var(--km-nivel-IV); }
+
+/* 📦447 (2026-06-25) — Botones de filtro de la leyenda.
+   Cada item es un botón clickeable que filtra la tabla semáforo por nivel.
+   - estado normal: fondo neutro, borde sutil
+   - hover: fondo se aclara, borde se marca
+   - --active: fondo del color del nivel (con transparencia), borde sólido del color
+   - --empty: opacidad reducida (nivel sin peligros en la matriz)
+   - --reset: estilo diferenciado (outline + icono), para "Todos" */
+.km-wrapper .km-leyenda__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px 7px 10px;
+  background: var(--km-bg-card);
+  border: 1.5px solid var(--km-border);
+  border-radius: 999px;
+  color: var(--km-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.km-wrapper .km-leyenda__btn:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: var(--km-text-primary);
+}
+.km-wrapper .km-leyenda__btn-label {
+  white-space: nowrap;
+  line-height: 1;
+}
+.km-wrapper .km-leyenda__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  background: #e2e8f0;
+  color: #475569;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  margin-left: 2px;
+}
+.km-wrapper .km-leyenda__btn--empty {
+  opacity: 0.5;
+  cursor: default;
+}
+.km-wrapper .km-leyenda__btn--empty:hover {
+  background: var(--km-bg-card);
+  border-color: var(--km-border);
+}
+/* 📦447 — Estados activos por nivel: cada botón toma el color de su nivel
+   para reforzar visualmente "estás filtrando por este nivel". */
+.km-wrapper .km-leyenda__btn--active[data-level="I"] {
+  background: var(--km-nivel-I-bg);
+  border-color: var(--km-nivel-I);
+  color: var(--km-nivel-I);
+  font-weight: 600;
+  box-shadow: 0 0 0 2px rgba(27, 94, 32, 0.15);
+}
+.km-wrapper .km-leyenda__btn--active[data-level="II"] {
+  background: var(--km-nivel-II-bg);
+  border-color: var(--km-nivel-II);
+  color: var(--km-nivel-II);
+  font-weight: 600;
+  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.15);
+}
+.km-wrapper .km-leyenda__btn--active[data-level="III"] {
+  background: var(--km-nivel-III-bg);
+  border-color: var(--km-nivel-III);
+  color: var(--km-nivel-III);
+  font-weight: 600;
+  box-shadow: 0 0 0 2px rgba(245, 127, 23, 0.15);
+}
+.km-wrapper .km-leyenda__btn--active[data-level="IV"] {
+  background: var(--km-nivel-IV-bg);
+  border-color: var(--km-nivel-IV);
+  color: var(--km-nivel-IV);
+  font-weight: 600;
+  box-shadow: 0 0 0 2px rgba(230, 81, 0, 0.15);
+}
+.km-wrapper .km-leyenda__btn--active .km-leyenda__count {
+  background: rgba(255, 255, 255, 0.6);
+  color: inherit;
+}
+/* 📦447 — Botón "Todos" (reset) — estilo diferenciado con borde punteado,
+   se vuelve sólido cuando está activo (sin filtro). */
+.km-wrapper .km-leyenda__btn--reset {
+  border-style: dashed;
+  background: transparent;
+}
+.km-wrapper .km-leyenda__btn--reset:hover {
+  border-style: solid;
+  background: #f8fafc;
+}
+.km-wrapper .km-leyenda__btn--reset.km-leyenda__btn--active {
+  background: #1e293b;
+  border-style: solid;
+  border-color: #1e293b;
+  color: #fff;
+  font-weight: 600;
+}
+.km-wrapper .km-leyenda__btn--reset.km-leyenda__btn--active .km-leyenda__count {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+/* 📦447 (2026-06-25) — Banner del filtro activo dentro de la card.
+   Aparece entre el header y la tabla cuando hay un filtro aplicado.
+   Muestra qué nivel está filtrando + conteo, con X para limpiar. */
+.km-wrapper .km-filter-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  margin: 12px 16px 0 16px;
+  background: linear-gradient(135deg, #e0f2fe 0%, #dbeafe 100%);
+  border: 1px solid #93c5fd;
+  border-radius: var(--km-radius-sm);
+  color: #1e40af;
+  font-size: 0.85rem;
+}
+.km-wrapper .km-filter-banner i.bi-funnel-fill {
+  color: #2563eb;
+  font-size: 1rem;
+}
+.km-wrapper .km-filter-banner strong {
+  font-weight: 700;
+}
+.km-wrapper .km-filter-banner__clear {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #1e40af;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.km-wrapper .km-filter-banner__clear:hover {
+  background: rgba(30, 64, 175, 0.1);
+  border-color: #1e40af;
+}
+
+/* 📦447 — Empty state para cuando el filtro no devuelve resultados.
+   Estilo similar a .km-empty pero con CTA inline para quitar filtro. */
+.km-wrapper .km-table-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--km-text-muted);
+}
+.km-wrapper .km-table-empty i.bi-inbox {
+  font-size: 3rem;
+  color: var(--km-text-light);
+}
+.km-wrapper .km-table-empty h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--km-text-secondary);
+  font-weight: 600;
+}
+.km-wrapper .km-table-empty p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--km-text-muted);
+  max-width: 380px;
+}
+
+.km-wrapper .km-prior-tabs {
+  display: flex;
+  gap: 8px;
+}
+.km-wrapper .km-prior-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--km-bg-card);
+  border: 1px solid var(--km-border);
+  border-radius: var(--km-radius-sm);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--km-fs-sm);
+  font-weight: 500;
+  color: var(--km-text-secondary);
+}
+.km-wrapper .km-prior-tab:hover { background: #f1f3f5; }
+.km-wrapper .km-prior-tab--active {
+  background: var(--km-primary);
+  color: #ffffff;
+  border-color: var(--km-primary);
+}
+
+.km-wrapper .km-prior-card {
+  background: var(--km-bg-card);
+  border: 1px solid var(--km-border);
+  border-radius: var(--km-radius-md);
+  overflow: hidden;
+  box-shadow: var(--km-shadow-sm);
+}
+.km-wrapper .km-prior-card__header {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--km-border);
+}
+.km-wrapper .km-prior-card__title {
+  font-size: var(--km-fs-base);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.km-wrapper .km-prior-card__count {
+  font-size: var(--km-fs-xs);
+  color: var(--km-text-muted);
+}
+
+/* ==========================================================================
+7. EDITOR — Overlay fullscreen (modal para crear/editar peligro)
+========================================================================== */
+.km-editor-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.km-editor-modal {
+  background: var(--km-bg-card);
+  border-radius: var(--km-radius-md);
+  width: 100%;
+  max-width: 640px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+.km-editor-modal__header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--km-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.km-editor-modal__title { font-size: var(--km-fs-lg); font-weight: 600; }
+.km-editor-modal__close {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--km-text-muted);
+  cursor: pointer;
+  font-size: 1.125rem;
+}
+.km-editor-modal__close:hover { color: var(--km-text-primary); }
+
+.km-editor-modal__body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+.km-editor-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+.km-editor-field { display: flex; flex-direction: column; gap: 4px; }
+.km-editor-field--full { grid-column: 1 / -1; }
+.km-editor-field__label {
+  font-size: var(--km-fs-sm);
+  font-weight: 500;
+  color: var(--km-text-primary);
+}
+.km-editor-field__required { color: var(--km-danger); }
+.km-editor-field__input,
+.km-editor-field__select,
+.km-editor-field__textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--km-border);
+  border-radius: var(--km-radius-sm);
+  font-size: var(--km-fs-sm);
+  font-family: inherit;
+  background: var(--km-bg-card);
+}
+.km-editor-field__textarea { resize: vertical; min-height: 60px; }
+.km-editor-field__input:focus,
+.km-editor-field__select:focus,
+.km-editor-field__textarea:focus {
+  outline: none;
+  border-color: var(--km-primary);
+  box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.15);
+}
+
+.km-editor-modal__footer {
+  padding: 12px 20px;
+  border-top: 1px solid var(--km-border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ==========================================================================
+8. TOASTS — notificaciones
+========================================================================== */
+.km-toast {
+  position: fixed;
+  top: 80px;
+  right: 16px;
+  z-index: 10000;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: var(--km-radius-sm);
+  background: var(--km-bg-card);
+  border: 1px solid var(--km-border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-size: var(--km-fs-sm);
+  max-width: 400px;
+  animation: km-toast-in 0.2s ease;
+}
+.km-toast--success { background: #14532d; color: #bbf7d0; border-color: #166534; }
+.km-toast--error { background: #7f1d1d; color: #fecaca; border-color: #991b1b; }
+.km-toast--warning { background: #78350f; color: #fde68a; border-color: #92400e; }
+.km-toast--info { background: #1e3a8a; color: #bfdbfe; border-color: #1e40af; }
+@keyframes km-toast-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ==========================================================================
+9. MODAL GENÉRICO
+========================================================================== */
+
+/* F21.55 (2026-06-23) — Bug #4: @keyframes para animaciones de entrada
+   del modal quickAdd. Antes solo existia km-toast-in; faltaban los
+   de modal (km-fade-in para el overlay, km-slide-up para la caja). */
+@keyframes km-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes km-slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.km-modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  right: auto !important;
+  bottom: auto !important;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  /* F21.54 (2026-06-23) — Fix robusto para position:fixed que se rompe
+     cuando hay contenedores ancestros con overflow:hidden/auto (body,
+     #main-content con overflow-y:auto, .km-wrapper con overflow:hidden,
+     .km-editor-view con overflow:hidden, .km-editor-content con
+     overflow-y:auto). En Edge/Chromium esos contenedores se vuelven
+     scroll containers y position:fixed se comporta como absolute
+     relativo al padre.
+
+     Soluciones combinadas:
+     1) Dimensiones explicitas con vw/vh + !important (resiste cualquier
+        sobrescritura por especificidad)
+     2) transform: translateZ(0) para forzar un nuevo compositing layer
+        y un containing block propio para position:fixed
+     3) contain: layout para reforzar el aislamiento
+
+     Adicionalmente, en _openQuickAdd/_closeQuickAdd (kair-matriz-peligros-editor.js)
+     se cambia temporalmente el overflow del body/html/#main-content a
+     'visible' para que no limiten el area del modal. */
+  transform: translateZ(0);
+  contain: layout;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  /* F21.55 (2026-06-23) — Bug #4: animacion de entrada al overlay
+     (fade-in 200ms). Los @keyframes km-fade-in/km-slide-up estan
+     definidos mas abajo en este archivo. */
+  animation: km-fade-in 0.2s ease forwards;
+  /* F21.56 (2026-06-23) — CAUSA RAÍZ: El modal se monta en document.body
+     (fuera de .km-wrapper), por lo que las variables CSS definidas en
+     .km-wrapper (--km-bg-card, --km-border, etc.) NO resuelven.
+     Resultado: el modal pierde colores, bordes, radios y tipografía.
+     Solución: duplicar las variables necesarias aquí para que el modal
+     y todos sus descendientes (.km-modal, .km-modal__header, etc.)
+     hereden los tokens de diseño correctamente. */
+  --km-primary: #174ea6;
+  --km-primary-hover: #185abd;
+  --km-primary-light: #e8f0fe;
+  --km-danger: #dc3545;
+  --km-bg-card: #ffffff;
+  --km-border: #dee2e6;
+  --km-radius-sm: 6px;
+  --km-radius-md: 10px;
+  --km-text-primary: #212529;
+  --km-text-muted: #6c757d;
+  --km-fs-sm: 0.8125rem;
+  --km-fs-base: 0.875rem;
+  --km-fs-md: 1rem;
+}
+.km-modal {
+  background: var(--km-bg-card);
+  border-radius: var(--km-radius-md);
+  width: 100%;
+  max-width: 520px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  animation: km-slide-up 0.2s ease;
+}
+.km-modal__header {
+  /* F21.55 (2026-06-23) — Bug #3: padding consistente con km-editor-modal */
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--km-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.km-modal__title { font-size: var(--km-fs-md); font-weight: 600; }
+.km-modal__close {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--km-text-muted);
+  border-radius: var(--km-radius-sm);
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+/* F21.55 (2026-06-23) — Bug #2: hover feedback para el boton cerrar */
+.km-modal__close:hover { background: #f1f3f5; color: var(--km-text-primary); }
+.km-modal__close:focus-visible { outline: 2px solid var(--km-primary); outline-offset: 1px; }
+.km-modal__body {
+  /* F21.55 (2026-06-23) — Bug #3 + Bug #5: padding consistente con
+     estandar K+AIR y scroll interno cuando el contenido es largo */
+  padding: 20px;
+  font-size: var(--km-fs-base);
+  flex: 1;
+  overflow-y: auto;
+}
+.km-modal__footer {
+  /* F21.55 (2026-06-23) — Bug #3: padding consistente con km-editor-modal */
+  padding: 12px 20px;
+  border-top: 1px solid var(--km-border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  background: #fafbfc;
+  border-radius: 0 0 var(--km-radius-md) var(--km-radius-md);
+  flex-shrink: 0;
+}
+
+/* F21.55 (2026-06-23) — Botones dentro del modal quickAdd: como el
+   modal se monta en document.body (fuera de .km-wrapper), los
+   selectores .km-wrapper .km-btn / .km-btn--* NO le aplican. Estos
+   selectores adicionales apuntan a los botones cuando estan dentro
+   de .km-modal, replicando el mismo estilo visual que en el resto
+   de la app. Sin esto, los botones "Cancelar" y "Crear" salen con
+   el estilo default del navegador. */
+.km-modal .km-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: var(--km-fs-sm);
+  font-weight: 500;
+  font-family: inherit;
+  border-radius: var(--km-radius-sm);
+  border: 1px solid var(--km-border);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  background: var(--km-bg-card);
+  color: var(--km-text-primary);
+  white-space: nowrap;
+}
+.km-modal .km-btn:hover { background: #f1f3f5; }
+.km-modal .km-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.km-modal .km-btn--primary {
+  background: var(--km-primary);
+  color: #ffffff;
+  border-color: var(--km-primary);
+}
+.km-modal .km-btn--primary:hover { background: var(--km-primary-hover); border-color: var(--km-primary-hover); }
+.km-modal .km-btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--km-text-muted);
+}
+.km-modal .km-btn--ghost:hover { background: #f1f3f5; color: var(--km-text-primary); }
+.km-modal .km-btn--danger {
+  background: var(--km-danger);
+  color: #ffffff;
+  border-color: var(--km-danger);
+}
+.km-modal .km-btn--danger:hover { background: #c82333; border-color: #c82333; }
+
+/* ==========================================================================
+10. DARK MODE
+========================================================================== */
+[data-theme="dark"] .km-wrapper { background: #0f172a; color: #e2e8f0; }
+[data-theme="dark"] .km-wrapper .km-header-card { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .km-wrapper .km-header-card__title { color: #f1f5f9; }
+[data-theme="dark"] .km-wrapper .km-header-card__subtitle,
+[data-theme="dark"] .km-wrapper .km-header-card__company { color: #94a3b8; }
+[data-theme="dark"] .km-wrapper .km-header-card__divider { background: #334155; }
+[data-theme="dark"] .km-wrapper .km-header-card__back { background: #0f172a; border-color: #334155; color: #94a3b8; }
+[data-theme="dark"] .km-wrapper .km-header-card__back:hover { background: #1e3a8a; color: #cfe2ff; border-color: #60a5fa; }
+[data-theme="dark"] .km-wrapper .km-header-card__tabs { border-top-color: #334155; }
+[data-theme="dark"] .km-wrapper .km-header-tab { color: #94a3b8; }
+[data-theme="dark"] .km-wrapper .km-header-tab:hover { color: #cfe2ff; }
+[data-theme="dark"] .km-wrapper .km-header-tab--active { color: #60a5fa; border-bottom-color: #60a5fa; }
+[data-theme="dark"] .km-wrapper .km-btn { background: #1e293b; border-color: #334155; color: #e2e8f0; }
+[data-theme="dark"] .km-wrapper .km-btn:hover { background: #334155; }
+[data-theme="dark"] .km-wrapper .km-matriz-toolbar { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .km-wrapper .km-table-wrapper { background: #1e293b; }
+[data-theme="dark"] .km-wrapper .km-table th { background: #0f172a; color: #94a3b8; border-bottom-color: #334155; border-right-color: #1e293b; }
+[data-theme="dark"] .km-wrapper .km-table__super-th { background: #1e293b !important; color: #cbd5e1 !important; border-bottom-color: #475569; }
+[data-theme="dark"] .km-wrapper .km-table td { background: #1e293b; color: #cbd5e1; border-bottom-color: #334155; }
+[data-theme="dark"] .km-wrapper .km-table tbody tr:hover td { background: #0f172a; }
+[data-theme="dark"] .km-wrapper .km-table__id { color: #60a5fa; }
+[data-theme="dark"] .km-wrapper .km-search input,
+[data-theme="dark"] .km-wrapper .km-select { background: #0f172a; color: #e2e8f0; border-color: #334155; }
+[data-theme="dark"] .km-wrapper .km-kpi-strip,
+[data-theme="dark"] .km-wrapper .km-bar-section,
+[data-theme="dark"] .km-wrapper .km-prior-card,
+[data-theme="dark"] .km-wrapper .km-leyenda { background: #1e293b; border-color: #334155; }
+/* 📦448 — Dark mode para los 5 nuevos KPIs */
+[data-theme="dark"] .km-wrapper .km-kpi-card { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .km-wrapper .km-kpi-card__header { border-color: #334155; }
+[data-theme="dark"] .km-wrapper .km-kpi-card__title { color: #f1f5f9; }
+[data-theme="dark"] .km-wrapper .km-coverage__track,
+[data-theme="dark"] .km-wrapper .km-nr-dist__track,
+[data-theme="dark"] .km-wrapper .km-top-cargos__track,
+[data-theme="dark"] .km-wrapper .km-exp-sede__track { background: #334155; }
+[data-theme="dark"] .km-wrapper .km-nr-dist__stats { background: #0f172a; }
+[data-theme="dark"] .km-wrapper .km-coverage__icon--verde { background: #064e3b; color: #6ee7b7; }
+[data-theme="dark"] .km-wrapper .km-coverage__icon--azul { background: #1e3a8a; color: #93c5fd; }
+[data-theme="dark"] .km-wrapper .km-coverage__icon--morado { background: #581c87; color: #d8b4fe; }
+[data-theme="dark"] .km-wrapper .km-nr-dist__range--verde { background: #064e3b; color: #6ee7b7; }
+[data-theme="dark"] .km-wrapper .km-nr-dist__range--azul { background: #1e3a8a; color: #93c5fd; }
+[data-theme="dark"] .km-wrapper .km-nr-dist__range--amarillo { background: #78350f; color: #fcd34d; }
+[data-theme="dark"] .km-wrapper .km-nr-dist__range--naranja { background: #7c2d12; color: #fdba74; }
+[data-theme="dark"] .km-wrapper .km-nr-dist__range--rojo { background: #7f1d1d; color: #fca5a5; }
+[data-theme="dark"] .km-wrapper .km-exp-sede__legend { border-color: #334155; }
+/* 📦448 — Dark mode para KPI A (concentración) y KPI D (% expuestos) */
+[data-theme="dark"] .km-wrapper .km-concentracion__breakdown { border-color: #334155; }
+[data-theme="dark"] .km-wrapper .km-concentracion__bd-item { background: #0f172a; }
+[data-theme="dark"] .km-wrapper .km-concentracion__bd-item--crit .km-concentracion__bd-icon { background: #7f1d1d; color: #fca5a5; }
+[data-theme="dark"] .km-wrapper .km-concentracion__bd-item--alto .km-concentracion__bd-icon { background: #7c2d12; color: #fdba74; }
+[data-theme="dark"] .km-wrapper .km-exp-pct__track { background: #334155; }
+[data-theme="dark"] .km-wrapper .km-exp-pct__total { border-color: #334155; }
+/* 📦447 — Dark mode para los botones de filtro de la leyenda */
+[data-theme="dark"] .km-wrapper .km-leyenda__btn { background: #0f172a; border-color: #334155; color: #cbd5e1; }
+[data-theme="dark"] .km-wrapper .km-leyenda__btn:hover { background: #1e293b; border-color: #475569; color: #f1f5f9; }
+[data-theme="dark"] .km-wrapper .km-leyenda__count { background: #334155; color: #cbd5e1; }
+[data-theme="dark"] .km-wrapper .km-filter-banner { background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); border-color: #3b82f6; color: #dbeafe; }
+[data-theme="dark"] .km-wrapper .km-filter-banner i.bi-funnel-fill { color: #93c5fd; }
+[data-theme="dark"] .km-wrapper .km-filter-banner__clear { color: #dbeafe; }
+[data-theme="dark"] .km-wrapper .km-filter-banner__clear:hover { background: rgba(219, 234, 254, 0.1); border-color: #dbeafe; }
+[data-theme="dark"] .km-wrapper .km-kpi__value,
+[data-theme="dark"] .km-wrapper .km-bar-section__title,
+[data-theme="dark"] .km-wrapper .km-prior-card__title { color: #f1f5f9; }
+[data-theme="dark"] .km-wrapper .km-kpi__label,
+[data-theme="dark"] .km-wrapper .km-bar-section__count,
+[data-theme="dark"] .km-wrapper .km-prior-card__count { color: #94a3b8; }
+[data-theme="dark"] .km-wrapper .km-bar-row__track { background: #334155; }
+[data-theme="dark"] .km-wrapper .km-editor-modal,
+[data-theme="dark"] .km-wrapper .km-modal { background: #1e293b; color: #e2e8f0; }
+[data-theme="dark"] .km-wrapper .km-editor-modal__header,
+[data-theme="dark"] .km-wrapper .km-editor-modal__footer,
+[data-theme="dark"] .km-wrapper .km-modal__header,
+[data-theme="dark"] .km-wrapper .km-modal__footer { background: #0f172a; border-color: #334155; }
+
+/* F21.55 (2026-06-23) — Bug #1 dark mode del modal quickAdd:
+   El modal se monta como hijo directo de document.body (no dentro de
+   .km-wrapper), por lo que los selectores anteriores con .km-wrapper
+   como ancestro NO aplican. Estos selectores adicionales apuntan
+   directamente al modal cuando esta fuera de .km-wrapper (caso del
+   quickAdd) y replican los mismos colores dark para mantener
+   consistencia visual entre modales. */
+[data-theme="dark"] .km-modal-overlay { background: rgba(0, 0, 0, 0.7); }
+[data-theme="dark"] .km-modal { background: #1e293b; color: #e2e8f0; }
+[data-theme="dark"] .km-modal__header,
+[data-theme="dark"] .km-modal__footer { background: #0f172a; border-color: #334155; }
+[data-theme="dark"] .km-modal__close:hover { background: #334155; color: #e2e8f0; }
+[data-theme="dark"] .km-modal__body .km-editor-field__label { color: #94a3b8; }
+[data-theme="dark"] .km-modal__body .km-editor-field__input,
+[data-theme="dark"] .km-modal__body .km-editor-field__select,
+[data-theme="dark"] .km-modal__body .km-editor-field__textarea { background: #0f172a; color: #e2e8f0; border-color: #334155; }
+[data-theme="dark"] .km-wrapper .km-editor-field__input,
+[data-theme="dark"] .km-wrapper .km-editor-field__select,
+[data-theme="dark"] .km-wrapper .km-editor-field__textarea { background: #0f172a; color: #e2e8f0; border-color: #334155; }
+
+/* ==========================================================================
+11. RESPONSIVE
+========================================================================== */
+@media (max-width: 1024px) {
+  .km-wrapper .km-kpi-strip { grid-template-columns: repeat(3, 1fr); gap: 16px 8px; }
+  .km-wrapper .km-kpi { border-right: none; padding: 0; }
+}
+@media (max-width: 768px) {
+  .km-wrapper .km-header { padding: 8px 12px; }
+  .km-wrapper .km-kpi-strip { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ==========================================================================
+12. EDITOR — Vista seccionada (5 secciones: sidebar nav + section cards + sticky footer)
+   Réplica de la imagen de referencia: panel izquierdo con navegación de
+   secciones + área central con banner, tarjetas de sección y footer pegado.
+========================================================================== */
+.km-editor-view {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "sidebar main"
+    "footer  footer";
+  width: auto;
+  height: 100%;
+  margin: 0 16px;
+  background: var(--km-bg-app);
+  overflow: hidden;
+  /* F21.52 (2026-06-23) — Margen lateral de 16px para alinear el editor
+     con el header card (que tiene margin:16px lateral). Sin esto el body
+     del editor sobresale por izquierda y derecha y se ve desalineado. */
+}
+
+/* --- Sidebar --- */
+.km-editor-sidebar {
+  grid-area: sidebar;
+  background: var(--km-bg-card);
+  border-right: 1px solid var(--km-border);
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  min-height: 0;
+}
+.km-editor-sidebar__title {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--km-text-muted);
+  letter-spacing: 0.06em;
+}
+.km-editor-side-nav {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.km-editor-side-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--km-radius-sm);
+  cursor: pointer;
+  font-size: var(--km-fs-sm);
+  color: var(--km-text-primary);
+  transition: background-color 0.12s ease;
+}
+.km-editor-side-item:hover { background: #f1f3f5; }
+.km-editor-side-icon {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  color: var(--km-text-muted);
+  font-size: 0.95rem;
+}
+.km-editor-side-label { flex: 1; }
+.km-editor-side-badge {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.km-badge { display: inline-block; }
+.km-badge--success { background: var(--km-success-light); color: var(--km-success-dark); }
+.km-badge--warning { background: var(--km-warning-light); color: var(--km-warning-dark); }
+.km-badge--info    { background: var(--km-primary-light); color: var(--km-info); }
+.km-badge--neutral { background: #e9ecef; color: var(--km-text-secondary); }
+
+.km-editor-sidebar__progress {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid var(--km-border-light);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.km-editor-sidebar__progress-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--km-text-muted);
+  letter-spacing: 0.06em;
+}
+.km-editor-sidebar__progress-count {
+  font-size: var(--km-fs-base);
+  font-weight: 700;
+  color: var(--km-primary);
+  text-align: right;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+/* F21.61 (2026-06-23) — Porcentaje granular al lado del contador X/N.
+   Mas pequeno y color secundario para que el contador X/N siga siendo
+   el dato principal, pero el % da la medida real del avance. */
+.km-editor-sidebar__progress-percent {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--km-text-muted);
+  letter-spacing: 0.02em;
+}
+.km-editor-progress {
+  width: 100%;
+  height: 6px;
+  background: var(--km-border-light);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.km-editor-progress__bar {
+  height: 100%;
+  background: var(--km-primary);
+  transition: width 0.25s ease;
+}
+
+/* --- Main area --- */
+.km-editor-main {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+}
+.km-editor-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  background: #e8f0fe;
+  border-bottom: 1px solid #c7d7f5;
+  color: #1a1a2e;
+  font-size: var(--km-fs-sm);
+  flex-shrink: 0;
+}
+.km-editor-banner i { color: var(--km-primary); font-size: 1rem; }
+.km-editor-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 28px 32px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* --- Section cards --- */
+.km-editor-section {
+  background: var(--km-bg-card);
+  border: 1px solid var(--km-border);
+  border-radius: var(--km-radius-md);
+  overflow: hidden;
+  /* F21.50 (2026-06-23) — flex-shrink:0 evita que las secciones se encojan
+     dentro del flex-column del .km-editor-content. Sin esto, las secciones
+     se comprimen y el `overflow:hidden` recorta su contenido a 1 sola fila.
+     Cada tarjeta debe mantener su altura natural completa; el scroll se
+     delega al padre .km-editor-content (overflow-y:auto). */
+  flex-shrink: 0;
+}
+.km-editor-section__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--km-border-light);
+  background: #fafbfc;
+}
+.km-editor-section__icon {
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  color: var(--km-primary);
+  font-size: 1.05rem;
+}
+.km-editor-section__title {
+  font-size: var(--km-fs-md);
+  font-weight: 600;
+  color: var(--km-text-primary);
+  margin: 0;
+}
+.km-editor-section__body {
+  padding: 18px 20px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px 16px;
+}
+
+/* El banner y resultado de evaluación abarcan todo el ancho de la sección */
+.km-editor-eval-internal-banner,
+.km-editor-resultado,
+.km-editor-grid--three {
+  grid-column: 1 / -1;
+}
+
+/* Responsive: 1 columna en pantallas estrechas */
+@media (max-width: 768px) {
+  .km-editor-section__body {
+    grid-template-columns: 1fr;
+  }
+  .km-editor-eval-internal-banner,
+  .km-editor-resultado {
+    grid-column: auto;
+  }
+}
+
+/* --- Layout editor responsive --- */
+@media (max-width: 768px) {
+  .km-editor-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr auto;
+    grid-template-areas: "sidebar" "main" "footer";
+    overflow: auto;
+  }
+  .km-editor-sidebar {
+    width: auto;
+    max-height: 220px;
+    border-right: none;
+    border-bottom: 1px solid var(--km-border-light);
+  }
+  .km-editor-main {
+    overflow: visible;
+  }
+  .km-editor-content {
+    padding: 16px 20px 24px;
+  }
+  .km-editor-field--full {
+    grid-column: auto;
+  }
+  .km-editor-grid {
+    grid-template-columns: 1fr;
+  }
+  .km-editor-resultado__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* --- Form grid + field --- */
+.km-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px 16px;
+}
+.km-editor-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.km-editor-field--full { grid-column: 1 / -1; }
+.km-editor-field__label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--km-text-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.km-editor-required { color: var(--km-danger); margin-left: 2px; }
+.km-editor-field__input,
+.km-editor-field__select,
+.km-editor-field__textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--km-border);
+  border-radius: var(--km-radius-sm);
+  font-size: var(--km-fs-sm);
+  font-family: inherit;
+  background: var(--km-bg-card);
+  color: var(--km-text-primary);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.km-editor-field__textarea { resize: vertical; min-height: 64px; }
+.km-editor-field__input:focus,
+.km-editor-field__select:focus,
+.km-editor-field__textarea:focus {
+  outline: none;
+  border-color: var(--km-primary);
+  box-shadow: 0 0 0 3px rgba(23, 78, 166, 0.15);
+}
+.km-editor-field__select-wrap {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+.km-editor-field__select-wrap > select { flex: 1; padding-right: 36px; }
+.km-editor-add-btn {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--km-border);
+  border-radius: var(--km-radius-sm);
+  background: var(--km-bg-card);
+  color: var(--km-primary);
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+.km-editor-add-btn:hover { background: var(--km-primary-light); border-color: var(--km-primary); }
+
+/* --- Evaluación preview --- */
+.km-editor-eval-preview {
+  background: #f8fafc;
+  border: 1px solid var(--km-border-light);
+  border-radius: var(--km-radius-sm);
+  padding: 14px 18px;
+}
+.km-editor-eval-preview__row {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+.km-editor-eval-preview__item { flex: 1; }
+.km-editor-eval-preview__item--nr { text-align: right; }
+.km-editor-eval-preview__label {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  color: var(--km-text-muted);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+.km-editor-eval-preview__value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--km-text-primary);
+  line-height: 1.1;
+  margin: 4px 0 2px 0;
+}
+.km-editor-eval-preview__sub {
+  font-size: var(--km-fs-xs);
+  color: var(--km-text-muted);
+}
+
+/* --- Footer --- */
+.km-editor-footer {
+  grid-area: footer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background: var(--km-bg-card);
+  border-top: 1px solid var(--km-border);
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.04);
+  flex-shrink: 0;
+  gap: 16px;
+}
+.km-editor-footer__hint {
+  font-size: var(--km-fs-sm);
+  color: var(--km-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.km-editor-footer__hint i { font-size: 1rem; color: var(--km-primary); }
+.km-editor-footer__actions { display: flex; gap: 8px; }
+
+/* --- Botón outline (para "Guardar") --- */
+.km-wrapper .km-btn--outline {
+  background: var(--km-bg-card);
+  border: 1px solid var(--km-primary);
+  color: var(--km-primary);
+}
+.km-wrapper .km-btn--outline:hover { background: var(--km-primary-light); }
+
+/* --- Dark mode para vista seccionada --- */
+[data-theme="dark"] .km-wrapper .km-editor-view { background: #0f172a; }
+[data-theme="dark"] .km-wrapper .km-editor-sidebar { background: #1e293b; border-right-color: #334155; }
+[data-theme="dark"] .km-wrapper .km-editor-side-item { color: #e2e8f0; }
+[data-theme="dark"] .km-wrapper .km-editor-side-item:hover { background: #334155; }
+[data-theme="dark"] .km-wrapper .km-editor-side-icon { color: #94a3b8; }
+[data-theme="dark"] .km-wrapper .km-editor-sidebar__title,
+[data-theme="dark"] .km-wrapper .km-editor-sidebar__progress-label { color: #94a3b8; }
+[data-theme="dark"] .km-wrapper .km-editor-sidebar__progress { border-top-color: #334155; }
+[data-theme="dark"] .km-wrapper .km-editor-progress { background: #334155; }
+[data-theme="dark"] .km-wrapper .km-editor-progress__bar { background: #60a5fa; }
+[data-theme="dark"] .km-wrapper .km-editor-banner { background: #1e3a8a; border-bottom-color: #1e40af; color: #cfe2ff; }
+[data-theme="dark"] .km-wrapper .km-editor-banner i { color: #93c5fd; }
+[data-theme="dark"] .km-wrapper .km-editor-section { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .km-wrapper .km-editor-section__head { background: #0f172a; border-bottom-color: #334155; }
+[data-theme="dark"] .km-wrapper .km-editor-section__title { color: #f1f5f9; }
+[data-theme="dark"] .km-wrapper .km-editor-section__icon { color: #60a5fa; }
+[data-theme="dark"] .km-wrapper .km-editor-field__input,
+[data-theme="dark"] .km-wrapper .km-editor-field__select,
+[data-theme="dark"] .km-wrapper .km-editor-field__textarea { background: #0f172a; border-color: #334155; color: #e2e8f0; }
+[data-theme="dark"] .km-wrapper .km-editor-add-btn { background: #0f172a; border-color: #334155; color: #93c5fd; }
+[data-theme="dark"] .km-wrapper .km-editor-add-btn:hover { background: #1e3a8a; border-color: #60a5fa; }
+[data-theme="dark"] .km-wrapper .km-editor-eval-preview { background: #0f172a; border-color: #334155; }
+[data-theme="dark"] .km-wrapper .km-editor-eval-preview__value { color: #f1f5f9; }
+[data-theme="dark"] .km-wrapper .km-editor-footer { background: #1e293b; border-top-color: #334155; }
+[data-theme="dark"] .km-wrapper .km-editor-footer__hint { color: #94a3b8; }
+[data-theme="dark"] .km-wrapper .km-btn--outline { background: #1e293b; border-color: #60a5fa; color: #93c5fd; }
+[data-theme="dark"] .km-wrapper .km-btn--outline:hover { background: #1e3a8a; }
+
+/* --- Responsive para vista seccionada --- */
+@media (max-width: 1024px) {
+  .km-editor-view { grid-template-columns: 220px 1fr; }
+  .km-editor-content { padding: 16px 20px 24px 20px; }
+}
+@media (max-width: 768px) {
+  .km-editor-view { grid-template-columns: 1fr; grid-template-areas: "main" "footer"; }
+  .km-editor-sidebar { display: none; }
+  .km-editor-grid { grid-template-columns: 1fr; }
+  .km-editor-eval-preview__row { flex-direction: column; align-items: stretch; }
+  .km-editor-eval-preview__item--nr { text-align: left; }
+}
+
+/* ==========================================================================
+13. EDITOR v2 — Banner dinámico, sidebar key data, RESULTADO panel
+   Ajustes según doc técnico (Capítulo 12).
+========================================================================== */
+
+/* --- Banner dinámico (4 variantes según NR) --- */
+.km-editor-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 20px;
+  border-bottom: 1px solid #c7d7f5;
+  font-size: var(--km-fs-sm);
+  flex-shrink: 0;
+  line-height: 1.4;
+}
+.km-editor-banner i { font-size: 1.1rem; margin-top: 1px; }
+.km-editor-banner__text { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.km-editor-banner__title { font-weight: 600; }
+.km-editor-banner__sub { font-size: var(--km-fs-xs); opacity: 0.85; }
+.km-editor-banner--info {
+  background: #e8f0fe;
+  border-bottom-color: #c7d7f5;
+  color: #1a1a2e;
+}
+.km-editor-banner--info i { color: var(--km-primary); }
+.km-editor-banner--success {
+  background: var(--km-nivel-IV-bg);
+  border-bottom-color: #a3d9a5;
+  color: var(--km-nivel-IV);
+}
+.km-editor-banner--success i { color: var(--km-nivel-IV); }
+.km-editor-banner--warning {
+  background: var(--km-nivel-II-bg);
+  border-bottom-color: #f0d68a;
+  color: var(--km-warning-dark);
+}
+.km-editor-banner--warning i { color: var(--km-warning-dark); }
+.km-editor-banner--danger {
+  background: var(--km-nivel-I-bg);
+  border-bottom-color: #f5a5a5;
+  color: var(--km-nivel-I);
+}
+.km-editor-banner--danger i { color: var(--km-nivel-I); }
+[data-theme="dark"] .km-editor-banner--info    { background: #1e3a8a; border-bottom-color: #1e40af; color: #cfe2ff; }
+[data-theme="dark"] .km-editor-banner--info i  { color: #93c5fd; }
+[data-theme="dark"] .km-editor-banner--success { background: #14532d; border-bottom-color: #166534; color: #bbf7d0; }
+[data-theme="dark"] .km-editor-banner--success i { color: #4ade80; }
+[data-theme="dark"] .km-editor-banner--warning { background: #78350f; border-bottom-color: #92400e; color: #fde68a; }
+[data-theme="dark"] .km-editor-banner--warning i { color: #fbbf24; }
+[data-theme="dark"] .km-editor-banner--danger  { background: #7f1d1d; border-bottom-color: #991b1b; color: #fecaca; }
+[data-theme="dark"] .km-editor-banner--danger i { color: #f87171; }
+
+/* --- Sidebar: check verde por sección --- */
+.km-editor-side-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  width: 20px;
+  height: 20px;
+}
+.km-editor-side-check--complete { color: var(--km-success); }
+.km-editor-side-check--partial  { color: var(--km-warning); }
+.km-editor-side-check--empty,
+.km-editor-side-check--sin-sede { color: var(--km-text-light); }
+
+/* --- Sidebar: datos clave (ID, sede, NR) --- */
+.km-editor-sidebar__keydata {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  background: #f8fafc;
+  border: 1px solid var(--km-border-light);
+  border-radius: var(--km-radius-sm);
+}
+.km-editor-keydata__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--km-fs-xs);
+}
+.km-editor-keydata__label {
+  color: var(--km-text-muted);
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.km-editor-keydata__value {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--km-text-primary);
+  font-weight: 600;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.km-editor-keydata__chip { font-size: 0.6875rem; }
+[data-theme="dark"] .km-editor-sidebar__keydata { background: #0f172a; border-color: #334155; }
+[data-theme="dark"] .km-editor-keydata__label  { color: #94a3b8; }
+[data-theme="dark"] .km-editor-keydata__value { color: #f1f5f9; }
+
+/* --- Sección Evaluación: banner interno + grid 3 cols --- */
+.km-editor-eval-internal-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #e8f0fe;
+  border: 1px solid #c7d7f5;
+  border-radius: var(--km-radius-sm);
+  color: #1a1a2e;
+  font-size: var(--km-fs-xs);
+}
+.km-editor-eval-internal-banner i { color: var(--km-primary); }
+[data-theme="dark"] .km-editor-eval-internal-banner { background: #1e3a8a; border-color: #1e40af; color: #cfe2ff; }
+[data-theme="dark"] .km-editor-eval-internal-banner i { color: #93c5fd; }
+.km-editor-grid--three { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 768px) { .km-editor-grid--three { grid-template-columns: 1fr; } }
+
+/* --- Panel RESULTADO (unificado, 4 columnas) --- */
+.km-editor-resultado {
+  background: #f8fafc;
+  border: 1px solid var(--km-border-light);
+  border-radius: var(--km-radius-sm);
+  padding: 14px 18px;
+}
+.km-editor-resultado__title {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--km-text-muted);
+  letter-spacing: 0.06em;
+  margin-bottom: 12px;
+}
+.km-editor-resultado__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 2fr;
+  gap: 18px;
+  align-items: end;
+}
+.km-editor-resultado__col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+}
+.km-editor-resultado__col--acept { align-items: flex-start; text-align: left; }
+.km-editor-resultado__value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--km-text-primary);
+  line-height: 1.1;
+}
+.km-editor-resultado__formula {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  color: var(--km-text-muted);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.km-editor-resultado__chip { font-size: 0.6875rem; margin-top: 2px; }
+[data-theme="dark"] .km-editor-resultado { background: #0f172a; border-color: #334155; }
+[data-theme="dark"] .km-editor-resultado__value { color: #f1f5f9; }
+@media (max-width: 768px) {
+  .km-editor-resultado__grid { grid-template-columns: repeat(2, 1fr); }
+}

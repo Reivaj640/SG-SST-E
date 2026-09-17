@@ -3,161 +3,324 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>K+AIR | Roles y Responsabilidades</title>
-    <!-- Iconos -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Fuentes -->
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet">
-    <!-- Estilos -->
+    <title>K+AIR · 1.1.2 Roles y Responsabilidades</title>
+    <link rel="stylesheet" href="../../../assets/css/bootstrap-icons.css">
     <link rel="stylesheet" href="roles-responsabilidades-view.css">
 </head>
-<body>
-
-    <!-- HEADER -->
-    <header class="app-header">
-        <div class="header-left">
-            <!-- Botón para volver AL MÓDULO (Global) -->
-            <button class="btn btn-ghost" id="backToModuleBtn" title="Regresar al módulo">
-                <i class="fas fa-arrow-left"></i>
-                <span style="margin-left:5px; font-weight:500;">Módulo</span>
-            </button>
-            <div class="app-title">Roles y Responsabilidades</div>
-            <span class="badge-mod">SG-SST</span>
-        </div>
-        
-        <div class="header-actions">
-            <!-- BOTÓN: CERRAR DOC -->
-            <button class="btn btn-ghost" id="closeDocBtn" title="Cerrar documento / Volver a archivos" disabled style="opacity: 0.3;">
-                <i class="fas fa-times"></i>
-                <span style="font-size: 0.85rem; margin-left:4px;">Cerrar</span>
-            </button>
-
-            <div class="divider"></div>
-
-            <!-- Botones de Acción sobre Documento -->
-            <button class="btn btn-ghost" id="downloadBtn" title="Descargar documento" disabled style="opacity: 0.3;">
-                <i class="fas fa-download"></i>
-            </button>
-            <button class="btn btn-ghost" id="printBtn" title="Imprimir documento" disabled style="opacity: 0.3;">
-                <i class="fas fa-print"></i>
-            </button>
-        </div>
-    </header>
-
-    <!-- BODY LAYOUT -->
-    <div class="app-body">
-        
-        <!-- SIDEBAR: NAVIGATION & FILES -->
-        <aside class="sidebar">
-            
-            <!-- BOTÓN DE REGRESO EN SIDEBAR -->
-            <div class="sidebar-header">
-                <button class="btn btn-ghost" id="goBackBtn" style="width:100%; justify-content:flex-start; padding-left:0;" disabled>
-                    <i class="fas fa-level-up-alt"></i> Volver a carpeta anterior
+<body class="kair-rr-body">
+    <div class="kair-rr-root">
+        <!-- HEADER + TABS — Patrón estandarizado (mismo que 6.1.1) -->
+        <div class="k-section-card kair-rr-header-card">
+            <div class="kair-rr-header-row">
+                <div class="kair-rr-header-left">
+                    <i class="bi bi-person-badge kair-rr-header-icon"></i>
+                    <div>
+                        <h3 class="kair-rr-header-title">Roles y Responsabilidades</h3>
+                        <p class="kair-rr-header-subtitle">Submódulo 1.1.2 — <span id="headerSubtitle">Gestión de roles y responsabilidades del SG-SST</span></p>
+                    </div>
+                </div>
+                <div class="kair-rr-header-actions">
+                    <span class="kair-rr-header-company"><i class="bi bi-building"></i> <span id="headerCompany">—</span></span>
+                    <div class="kair-rr-header-divider"></div>
+                    <button class="kair-rr-header-back" id="backBtn" title="Volver al módulo">
+                        <i class="bi bi-arrow-left"></i> Volver
+                    </button>
+                </div>
+            </div>
+            <nav class="kair-rr-tabs" role="tablist">
+                <button class="kair-rr-tab is-active" id="tabGestion" data-tab="gestion" role="tab">
+                    <i class="bi bi-clipboard-check"></i> Gestión de Roles
                 </button>
-            </div>
+            </nav>
+        </div>
 
-            <!-- Breadcrumb -->
-            <div class="breadcrumb-nav" id="breadcrumb">
-                <div class="crumb-item"><i class="fas fa-hdd"></i> Raíz</div>
-            </div>
-
-            <div class="list-header">
-                Carpetas
-            </div>
-            <div class="sidebar-content" id="folderList">
-                <!-- Populated by JS -->
-            </div>
-
-            <div class="list-header">
-                Documentos
-                <span id="docCount" style="font-weight: 400; text-transform: none; font-size:0.75rem;">0</span>
-            </div>
-            <div class="sidebar-content" id="fileList">
-                <!-- Populated by JS -->
-            </div>
-        </aside>
-
-        <!-- MAIN VIEWER AREA -->
-        <main class="viewer-stage">
-            
-            <!-- Empty State (Shown initially) -->
-            <div class="empty-state" id="emptyState">
-                <div class="empty-icon"><i class="fas fa-folder-open"></i></div>
-                <h2 class="empty-title">Explorador de Archivos</h2>
-                <p class="empty-desc">Seleccione una carpeta del panel izquierdo para navegar o haga clic en un archivo para visualizarlo.</p>
-            </div>
-
-            <!-- Toolbar (Shown when file selected) -->
-            <div class="viewer-toolbar" id="toolbar">
-                <div class="tool-group">
-                    <span id="docName" style="font-weight: 600; color: var(--text-dark); max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></span>
+        <!-- TAB 1: GESTIÓN DE ROLES -->
+        <main class="kair-rr-tab-panel is-active" id="panelGestion" role="tabpanel">
+            <!-- Banner de cumplimiento -->
+            <section class="kair-rr-banner">
+                <div class="kair-rr-banner__content">
+                    <h2 class="kair-rr-banner__title">CUMPLIMIENTO 1.1.2</h2>
+                    <p class="kair-rr-banner__summary" id="bannerSummary">Cargando...</p>
+                    <div class="kair-rr-banner__progress">
+                        <div class="kair-rr-banner__progress-bar" id="bannerProgressBar" style="width: 0%;"></div>
+                    </div>
                 </div>
-                <div class="tool-group">
-                    <button class="btn btn-ghost" id="zoomOutBtn" title="Reducir Zoom"><i class="fas fa-minus"></i></button>
-                    <span id="zoomLevelDisplay" style="font-size: 0.9rem; width: 50px; text-align: center;">100%</span>
-                    <button class="btn btn-ghost" id="zoomInBtn" title="Aumentar Zoom"><i class="fas fa-plus"></i></button>
-                    <div class="divider"></div>
-                    <button class="btn btn-ghost" id="fitWidthBtn" title="Ajustar a ancho"><i class="fas fa-arrows-alt-h"></i></button>
+                <div class="kair-rr-banner__actions">
+                    <button class="kair-rr-btn kair-rr-btn--primary" id="btnExportarPDF">
+                        <i class="bi bi-file-earmark-pdf"></i> Exportar Reporte PDF
+                    </button>
                 </div>
-            </div>
+            </section>
 
-            <!-- Content Area -->
-            <div class="viewer-content" id="viewerContainer" style="display: none;">
-                <!-- Iframe will be injected here -->
-            </div>
+            <!-- 📦706-fix24b (2026-08-14) — Wrapper con scroll SOLO para las 2
+                 secciones. El header y el banner quedan fijos arriba. -->
+            <div class="kair-rr-sections-scroll">
 
-            <!-- Loading Overlay -->
-            <div class="loading-overlay" id="loadingOverlay">
-                <div class="spinner"></div>
-                <p style="margin-top:10px; font-size: 0.9rem; font-weight: 500;">Cargando documento...</p>
-            </div>
+            <!-- Sección Matriz de Roles -->
+            <section class="kair-rr-section">
+                <header class="kair-rr-section__head">
+                    <h3 class="kair-rr-section__title">Matriz de Roles</h3>
+                </header>
+                <div class="kair-rr-table-wrap">
+                    <table class="kair-rr-table" id="tablaRoles">
+                        <thead>
+                            <tr>
+                                <th>Rol</th>
+                                <th>Persona</th>
+                                <th>Cédula</th>
+                                <th>Cargo</th>
+                                <th>Asignado</th>
+                                <th>Vigente</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaRolesBody"></tbody>
+                    </table>
+                </div>
+            </section>
 
+            <!-- Sección Divulgación -->
+            <section class="kair-rr-section">
+                <header class="kair-rr-section__head">
+                    <h3 class="kair-rr-section__title">Divulgación a Trabajadores</h3>
+                    <div class="kair-rr-section__actions">
+                        <button class="kair-rr-btn kair-rr-btn--small" id="btnAnadirTrabajador">
+                            <i class="bi bi-person-plus"></i> Añadir trabajador
+                        </button>
+                    </div>
+                </header>
+                <div class="kair-rr-table-wrap">
+                    <table class="kair-rr-table" id="tablaDivulgacion">
+                        <thead>
+                            <tr>
+                                <th>Trabajador</th>
+                                <th>Cédula</th>
+                                <th>Cargo</th>
+                                <th>Estado</th>
+                                <th>Fecha</th>
+                                <th>Soporte</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaDivulgacionBody"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            </div> <!-- /kair-rr-sections-scroll -->
         </main>
-
     </div>
 
-    <!-- Notification System -->
-    <div class="notification" id="notification">
-        <i class="notification-icon fas fa-check-circle"></i>
-        <div class="notification-message">Operación completada con éxito</div>
-    </div>
-
-    <!-- CONTEXTO MENU (Clic Derecho) -->
-    <div id="contextMenu" class="context-menu" style="display: none;">
-        <div class="context-menu-item" id="openFileBtn">
-            <i class="fas fa-external-link-alt"></i>
-            <span>Abrir archivo</span>
-        </div>
-        <div class="context-menu-divider"></div>
-        <div class="context-menu-item danger" id="deleteFileBtn">
-            <i class="fas fa-trash-alt"></i>
-            <span>Eliminar</span>
-        </div>
-    </div>
-
-    <!-- CONFIRM MODAL -->
-    <div id="confirmModal" class="confirm-modal" style="display: none;">
-        <div class="confirm-modal-content">
-            <div class="confirm-modal-header">
-                <i class="fas fa-exclamation-triangle"></i>
-                <h3>¿Eliminar archivo?</h3>
+    <!-- MODAL: Ver Matriz (4 columnas del Excel G-OD-006) -->
+    <div class="kair-rr-modal-overlay" id="modalMatriz" hidden>
+        <div class="kair-rr-modal" style="max-width: 800px;">
+            <header class="kair-rr-modal__head">
+                <div>
+                    <h3 id="modalMatrizNombre">—</h3>
+                    <p style="margin: 4px 0 0 0; font-size: 11px; color: #64748b;" id="modalMatrizCodigo">—</p>
+                </div>
+                <button class="kair-rr-modal__close" data-action="cerrar-modal-matriz">&times;</button>
+            </header>
+            <div class="kair-rr-modal__body" style="max-height: 60vh; overflow-y: auto;">
+                <div style="margin-bottom: 20px;">
+                    <h4 style="font-size: 12px; color: #174ea6; margin-bottom: 8px; font-weight: 700;">RESPONSABILIDADES</h4>
+                    <div id="modalMatrizResponsabilidades" style="white-space: pre-line; font-size: 12px; line-height: 1.5; background: #f8fafc; padding: 10px; border-radius: 4px;">—</div>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <h4 style="font-size: 12px; color: #174ea6; margin-bottom: 8px; font-weight: 700;">AUTORIDAD</h4>
+                    <div id="modalMatrizAutoridad" style="white-space: pre-line; font-size: 12px; line-height: 1.5; background: #f8fafc; padding: 10px; border-radius: 4px;">—</div>
+                </div>
+                <div>
+                    <h4 style="font-size: 12px; color: #174ea6; margin-bottom: 8px; font-weight: 700;">RENDICIÓN DE CUENTAS</h4>
+                    <div id="modalMatrizRendicion" style="white-space: pre-line; font-size: 12px; line-height: 1.5; background: #f8fafc; padding: 10px; border-radius: 4px;">—</div>
+                </div>
+                <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #64748b;" id="modalMatrizBaseLegal">
+                </div>
             </div>
-            <div class="confirm-modal-body">
-                <p>Estás a punto de eliminar:</p>
-                <p class="confirm-file-name" id="confirmFileName">nombre_archivo.pdf</p>
-                <p class="confirm-warning">⚠️ Esta acción no se puede deshacer.</p>
-            </div>
-            <div class="confirm-modal-footer">
-                <button class="btn btn-ghost" id="confirmCancelBtn">Cancelar</button>
-                <button class="btn btn-danger" id="confirmAcceptBtn">Eliminar</button>
-            </div>
+            <footer class="kair-rr-modal__foot" id="modalMatrizFootLectura">
+                <button class="kair-rr-btn kair-rr-btn--primary" id="btnMatrizAsignar">Asignar persona a este rol</button>
+                <button class="kair-rr-btn kair-rr-btn--ghost" id="btnMatrizEditar"><i class="bi bi-pencil"></i> Editar</button>
+                <button class="kair-rr-btn kair-rr-btn--ghost" data-action="cerrar-modal-matriz">Cerrar</button>
+            </footer>
+            <!-- 📦706-fix24 (2026-08-14) — Footer modo edición (oculto por default) -->
+            <footer class="kair-rr-modal__foot" id="modalMatrizFootEdicion" hidden>
+                <button class="kair-rr-btn kair-rr-btn--primary" id="btnMatrizGuardar"><i class="bi bi-check2"></i> Guardar cambios</button>
+                <button class="kair-rr-btn kair-rr-btn--ghost" id="btnMatrizCancelar">Cancelar</button>
+            </footer>
         </div>
     </div>
 
-    <!-- TOAST CONTAINER -->
-    <div id="kToastContainer" class="k-toast-container"></div>
+    <!-- MODAL: Asignar/Reasignar rol -->
+    <div class="kair-rr-modal-overlay" id="modalAsignar" hidden>
+        <div class="kair-rr-modal">
+            <header class="kair-rr-modal__head">
+                <h3 id="modalAsignarTitle">Asignar persona a rol</h3>
+                <button class="kair-rr-modal__close" data-action="cerrar-modal-asignar">&times;</button>
+            </header>
+            <div class="kair-rr-modal__body">
+                <p class="kair-rr-help" id="modalAsignarRol">—</p>
+                <label>Nombre completo *<input type="text" id="inputAsignarNombre" class="kair-rr-input" required /></label>
+                <label>Cédula<input type="text" id="inputAsignarCedula" class="kair-rr-input" /></label>
+                <label>Cargo<input type="text" id="inputAsignarCargo" class="kair-rr-input" /></label>
+                <label>Fecha de asignación *<input type="date" id="inputAsignarFecha" class="kair-rr-input" required /></label>
+            </div>
+            <footer class="kair-rr-modal__foot">
+                <button class="kair-rr-btn kair-rr-btn--ghost" data-action="cerrar-modal-asignar">Cancelar</button>
+                <button class="kair-rr-btn kair-rr-btn--primary" id="btnGuardarAsignar">Guardar</button>
+            </footer>
+        </div>
+    </div>
+
+    <!-- MODAL: Añadir trabajador -->
+    <div class="kair-rr-modal-overlay" id="modalTrabajador" hidden>
+        <div class="kair-rr-modal">
+            <header class="kair-rr-modal__head">
+                <h3>Añadir trabajador para divulgación</h3>
+                <button class="kair-rr-modal__close" data-action="cerrar-modal-trabajador">&times;</button>
+            </header>
+            <div class="kair-rr-modal__body">
+                <label>Cédula *<input type="text" id="inputTrabCedula" class="kair-rr-input" required /></label>
+                <label>Nombre completo *<input type="text" id="inputTrabNombre" class="kair-rr-input" required /></label>
+                <label>Cargo<input type="text" id="inputTrabCargo" class="kair-rr-input" /></label>
+            </div>
+            <footer class="kair-rr-modal__foot">
+                <button class="kair-rr-btn kair-rr-btn--ghost" data-action="cerrar-modal-trabajador">Cancelar</button>
+                <button class="kair-rr-btn kair-rr-btn--primary" id="btnGuardarTrabajador">Guardar</button>
+            </footer>
+        </div>
+    </div>
+
+    <!-- MODAL: Documentos del trabajador (v0.1.180 - NUEVO desde cero) -->
+    <div class="kair-rr-modal-overlay" id="modalDocumentosTrabajador" hidden>
+        <div class="kair-rr-modal" style="max-width: 720px;">
+            <header class="kair-rr-modal__head">
+                <div>
+                    <h3><i class="bi bi-folder2-open" style="color:#174ea6;margin-right:6px;"></i>Documentos del trabajador</h3>
+                    <p style="margin: 4px 0 0 0; font-size: 11px; color: #64748b;" id="modalDocumentosTrabajadorPersona">—</p>
+                    <p class="kair-rr-modal__subtitle" style="margin: 2px 0 0 0; font-size: 10px; color: #94a3b8; font-weight: 500;"></p>
+                </div>
+                <button class="kair-rr-modal__close" data-action="cerrar-modal-documentos-trabajador">&times;</button>
+            </header>
+            <div class="kair-rr-modal__body">
+                <div id="modalDocumentosTrabajadorList" class="kair-rr-doc-list"></div>
+            </div>
+            <footer class="kair-rr-modal__foot">
+                <button class="kair-rr-btn kair-rr-btn--ghost" data-action="cerrar-modal-documentos-trabajador">Cerrar</button>
+            </footer>
+        </div>
+    </div>
+
+    <!-- MODAL: Subir soporte PDF (con drag&drop + examinar + copia a destino) -->
+    <div class="kair-rr-modal-overlay" id="modalSubirSoporte" hidden>
+        <div class="kair-rr-modal" style="max-width: 680px;">
+            <header class="kair-rr-modal__head">
+                <div>
+                    <h3>Subir soporte PDF</h3>
+                    <p style="margin: 4px 0 0 0; font-size: 11px; color: #64748b;" id="modalSubirSoportePersona">—</p>
+                </div>
+                <button class="kair-rr-modal__close" data-action="cerrar-modal-soporte">&times;</button>
+            </header>
+            <div class="kair-rr-modal__body">
+                <!-- 📦706-fix16 (2026-08-14) — Dropzones reactivos + drag&drop destino + textarea full-width -->
+                <div class="kair-rr-step-label">1. PDF de la divulgación firmada y destino</div>
+                <div class="kair-rr-row-2col">
+                    <div>
+                        <div class="kair-rr-dropzone" id="dropZoneSoporte" data-state="empty" style="margin-bottom: 8px;">
+                            <i class="bi bi-cloud-upload kair-rr-dropzone__icon"></i>
+                            <div class="kair-rr-dropzone__text">Arrastrá el PDF acá</div>
+                            <div class="kair-rr-dropzone__subtext">o usá "Examinar..."</div>
+                        </div>
+                        <div class="kair-rr-file-row">
+                            <div class="kair-rr-chip" id="chipOrigen" data-empty="true" style="min-width: 0;">
+                                <i class="bi bi-file-earmark-pdf"></i>
+                                <span class="kair-rr-chip__name" id="chipOrigenName">Ningún archivo</span>
+                                <span class="kair-rr-chip__size" id="chipOrigenSize"></span>
+                            </div>
+                            <button class="kair-rr-btn kair-rr-btn--small" id="btnExaminarOrigen" title="Examinar PDF origen">
+                                <i class="bi bi-folder2-open"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="kair-rr-dropzone" id="dropZoneDestino" data-state="empty" style="margin-bottom: 8px;">
+                            <i class="bi bi-folder2 kair-rr-dropzone__icon"></i>
+                            <div class="kair-rr-dropzone__text">Carpeta destino</div>
+                            <div class="kair-rr-dropzone__subtext">arrastrá una carpeta o usá "Examinar..."</div>
+                        </div>
+                        <div class="kair-rr-file-row">
+                            <div class="kair-rr-chip kair-rr-chip--folder" id="chipDestino" style="min-width: 0;">
+                                <i class="bi bi-folder2"></i>
+                                <span class="kair-rr-chip__name" id="chipDestinoName">Sin carpeta</span>
+                            </div>
+                            <button class="kair-rr-btn kair-rr-btn--small" id="btnExaminarDestino" title="Examinar carpeta destino">
+                                <i class="bi bi-folder2-open"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <p class="kair-rr-help" style="margin: 4px 0 12px 0; font-size: 11px;">💡 El archivo se copia con su nombre original (o "nombre (1).pdf" si ya existe).</p>
+
+                <!-- 📦706-fix16 — Opciones + fecha + observaciones full-width -->
+                <div class="kair-rr-step-label" style="margin-top: 4px;">2. Opciones de la divulgación</div>
+                <div class="kair-rr-row-2col">
+                    <div>
+                        <label class="kair-rr-checkbox-label" style="margin-bottom: 0;">
+                            <input type="checkbox" id="inputEsNuevaContratacion" />
+                            Es nueva contratación
+                        </label>
+                        <label class="kair-rr-checkbox-label" style="margin-bottom: 0;">
+                            <input type="checkbox" id="inputEsCorreccion" />
+                            Es corrección
+                        </label>
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:11px;color:#475569;margin-bottom:4px;">Fecha del documento</label>
+                        <input type="date" id="inputFechaDocumento" class="kair-rr-input" style="margin: 0;" />
+                    </div>
+                </div>
+                <label style="display:block;margin-top:12px;margin-bottom:4px;font-size:11px;color:#475569;">Observaciones (opcional)</label>
+                <textarea id="inputObservaciones" class="kair-rr-input" rows="2" style="margin: 0; width: 100%; min-height: 50px; max-height: 100px; resize: vertical; font-family: inherit;"></textarea>
+            </div>
+            <footer class="kair-rr-modal__foot">
+                <button class="kair-rr-btn kair-rr-btn--ghost" data-action="cerrar-modal-soporte">Cancelar</button>
+                <button class="kair-rr-btn kair-rr-btn--primary" id="btnGuardarSoporte" disabled>
+                    <i class="bi bi-upload"></i> Copiar y marcar aceptado
+                </button>
+            </footer>
+        </div>
+    </div>
 
     <script src="roles-responsabilidades-viewer.js"></script>
+
+    <!-- 📦706-fix21 (2026-08-14) — Toast container (mismo patrón que
+         6.1.2 Política). Los toasts aparecen arriba a la derecha y se
+         cierran automáticamente. Reemplazan los `alert()` nativos. -->
+    <div class="kair-toast-container" id="kToastContainer" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- 📦706-fix22 (2026-08-14) — Modal de confirmación custom. Reemplaza
+         el `confirm()` nativo del navegador. Mismo patrón visual que los
+         otros modales del viewer (kair-rr-modal-overlay). -->
+    <div class="kair-rr-modal-overlay" id="modalConfirm" hidden>
+        <div class="kair-rr-modal" style="max-width: 440px;">
+            <header class="kair-rr-modal__head">
+                <div>
+                    <h3 id="modalConfirmTitle">—</h3>
+                </div>
+                <button class="kair-rr-modal__close" data-action="cerrar-modal-confirm">&times;</button>
+            </header>
+            <div class="kair-rr-modal__body" style="padding: 20px 24px;">
+                <p id="modalConfirmMessage" style="margin: 0 0 12px 0; font-size: 13px; line-height: 1.5; color: #1e293b;">—</p>
+                <p style="margin: 0; font-size: 11px; color: #94a3b8; font-style: italic;">
+                    <i class="bi bi-info-circle"></i> Esta acción no se puede deshacer.
+                </p>
+            </div>
+            <footer class="kair-rr-modal__foot">
+                <button class="kair-rr-btn kair-rr-btn--ghost" data-action="cerrar-modal-confirm" id="btnConfirmCancel">Cancelar</button>
+                <button class="kair-rr-btn kair-rr-btn--danger" id="btnConfirmAccept">
+                    <i class="bi bi-trash3"></i> <span id="modalConfirmAcceptText">Confirmar</span>
+                </button>
+            </footer>
+        </div>
+    </div>
 </body>
 </html>

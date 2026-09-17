@@ -1,0 +1,27 @@
+<!-- modules/gestion-humana/comunicacion/index.html
+     📦723 · Vista "Comunicación" — HTML separado (sin header secundario)
+     Estructura:
+       - KPIs (4) via #cm-kpi-bar
+       - Tabs (Anuncios / Mensajes)
+       - Contenido del tab activo
+     IDs con prefijo `cm-` para evitar colisiones. -->
+
+<div class="cm-wrapper" id="cm-wrapper">
+  <!-- ═══ KPIs (4) — via helper GHKPIBar ═══ -->
+  <div class="cm-kpi-section">
+    <div id="cm-kpi-bar" class="cm-kpi-bar"></div>
+  </div>
+
+  <!-- ═══ TABS ═══ -->
+  <div class="cm-tabs" id="cm-tabs">
+    <button data-tab="anuncios" class="cm-tab cm-tab--active" type="button">
+      <i class="fas fa-bullhorn"></i> Anuncios (<span id="cm-count-anuncios">0</span>)
+    </button>
+    <button data-tab="mensajes" class="cm-tab" type="button">
+      <i class="fas fa-envelope"></i> Mensajes (<span id="cm-count-mensajes">0</span>)
+    </button>
+  </div>
+
+  <!-- ═══ CONTENIDO DEL TAB ═══ -->
+  <div id="cm-content" class="cm-content"></div>
+</div>

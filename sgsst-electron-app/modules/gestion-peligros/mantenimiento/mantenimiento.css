@@ -349,8 +349,6 @@ HEADER K+AIR v3.0 — Card + Tabs (estandarizado como capacitaciones)
 @keyframes kair-mnt-spin { to { transform: rotate(360deg); } }
 
 /* LOADING / EMPTY */
-.kair-mnt-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: var(--kair-mnt-space-8); color: var(--kair-mnt-text-light); gap: var(--kair-mnt-space-3); }
-.kair-mnt-spinner { width: 32px; height: 32px; border: 3px solid var(--kair-mnt-border-light); border-top-color: var(--kair-mnt-primary); border-radius: 50%; animation: kair-mnt-spin 0.8s linear infinite; }
 .kair-mnt-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: var(--kair-mnt-space-8); color: var(--kair-mnt-text-light); text-align: center; gap: var(--kair-mnt-space-3); }
 .kair-mnt-empty-state i { font-size: 2.5rem; opacity: 0.4; }
 .kair-mnt-empty-state h3 { font-size: var(--kair-mnt-font-size-lg); color: var(--kair-mnt-text-secondary); margin: 0; }

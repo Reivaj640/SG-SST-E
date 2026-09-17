@@ -17,7 +17,10 @@ Patrón 4 Constructor: (container, currentCompany, moduleName, submoduleTitle, b
   this.moduleName = moduleName;
   this.submoduleTitle = submoduleTitle;
   this.backToModuleCallback = backToModuleCallback;
-  this.currentView = 'cronograma';
+  /* currentView=null para que el primer _navigate('cronograma') desde render()
+     NO retorne por el early return y pueda cargar la vista inicial.
+     Antes era 'cronograma' pero bloqueaba la primera carga (bug tras Fase 2). */
+  this.currentView = null;
   this.cssLoaded = false;
  }
 
@@ -82,7 +85,7 @@ Patrón 4 Constructor: (container, currentCompany, moduleName, submoduleTitle, b
   '</div>' +
   '</div>' +
   '<div class="k-mnt-header-actions">' +
-  '<span class="k-mnt-header-company" id="kair-mnt-header-company"><i class="bi bi-building"></i> <span></span></span>' +
+  '<span class="k-mnt-header-company" id="kair-mnt-header-company"><i class="kair-icon-building"></i> <span></span></span>' +
   '<div class="k-mnt-header-divider"></div>' +
   '<button id="kair-mnt-btn-back" class="header-back-btn" title="Volver al módulo">' +
   '<i class="bi bi-arrow-left"></i> Volver' +
@@ -135,7 +138,7 @@ Patrón 4 Constructor: (container, currentCompany, moduleName, submoduleTitle, b
      '<div id="kair-mnt-cronograma-table"></div>';
    case 'resumen':
     return '<div id="kair-mnt-resumen-content">' +
-     '<div class="kair-mnt-loading"><div class="kair-mnt-spinner"></div><p>Cargando resumen...</p></div>' +
+     KairSkeleton.kpiStrip(4) +
      '</div>';
    default:
     return '<div class="kair-mnt-empty-state"><i class="bi bi-inbox"></i><h3>Vista no disponible</h3></div>';
@@ -166,6 +169,7 @@ Patrón 4 Constructor: (container, currentCompany, moduleName, submoduleTitle, b
  };
 
  MantenimientoComponent.prototype._navigate = function (viewKey) {
+  if (this.currentView === viewKey) return;
   this.currentView = viewKey;
 
   var wrapper = this.container.querySelector('.kair-mnt-wrapper');

@@ -65,6 +65,72 @@ def get_normalized_value(data_dict, possible_keys, default="N/A"):
     return default
 
 
+# Normaliza el valor de un campo del FURAT para corregir artefactos del script
+# de extracción (Invest_APP_V_3.extract_pdf_data). Misma lógica que el fix
+# aplicado en el frontend (investigacion-accidentes-main.js → normalizeFieldValue).
+#
+# Problemas conocidos en datos crudos:
+#   - "No. Identificación": concatenación con dígitos basura del campo siguiente
+#     (ej: id="114326350408" 12 dígitos → debería ser "1143263504" 10 dígitos).
+#   - "Nombre Completo": el PDF tiene etiqueta "SEGUNDO APELLIDO" como primera
+#     línea + 4 partes (1er apellido, 2do apellido, 1er nombre, 2do nombre)
+#     a veces separadas por \n y otras por 3+ espacios. Se debe reordenar a
+#     "Nombre1 Nombre2 Apellido1 Apellido2".
+#   - "Cargo": el PDF antepone categoría de zona (URBANA/RURAL/ADMINISTRATIVO/
+#     OPERATIVO/etc.) antes del cargo real. Solo se debe mostrar el cargo real.
+def normalize_field_value(key, value):
+    if value is None or value == "N/A":
+        return value or "N/A"
+    s = str(value)
+
+    if key == "No. Identificación":
+        # Cédula colombiana: 6-10 dígitos. Si tiene más, descartar del final.
+        digits = re.sub(r"\D", "", s)
+        if len(digits) > 10 and re.match(r"^\d+$", digits):
+            return digits[:10]
+        return s
+
+    if key == "Nombre Completo":
+        # 1) Separar por saltos de línea Y por secuencias de 3+ espacios
+        tokens = re.split(r"\r?\n+|\s{3,}", s)
+        tokens = [re.sub(r"\s+", " ", t).strip() for t in tokens]
+        tokens = [t for t in tokens if t]
+        if not tokens:
+            return s
+        # 2) Quitar etiqueta "SEGUNDO APELLIDO" si aparece como primer elemento
+        label_patterns = re.compile(
+            r"^(PRIMER|SEGUNDO|PRIMER/SECUNDARIO|PRIMER\/SEGUNDO)\s+APELLIDO$",
+            re.IGNORECASE,
+        )
+        name_tokens = tokens[1:] if label_patterns.match(tokens[0]) else tokens
+        if len(name_tokens) < 2:
+            return " ".join(name_tokens)
+        # 3) Asumir formato PDF: [Apellidos | Nombres] y mostrar [Nombres | Apellidos]
+        half = len(name_tokens) // 2
+        apellidos = name_tokens[:half]
+        nombres = name_tokens[half:]
+        return " ".join(nombres + apellidos)
+
+    if key == "Cargo":
+        # Quitar categoría de zona (URBANA/RURAL/ADMINISTRATIVO/OPERATIVO/etc.)
+        lines = re.split(r"\r?\n+", s)
+        lines = [re.sub(r"\s+", " ", ln).strip() for ln in lines]
+        lines = [ln for ln in lines if ln]
+        if len(lines) <= 1:
+            return s
+        zonas = re.compile(
+            r"^(URBANA|RURAL|ADMINISTRATIVO?|OPERATIVO?|MIXTA|COMERCIAL|INDUSTRIAL|SERVICIOS?|PRODUCCI[ÓO]N|DIRECCI[ÓO]N|GERENCIA)$",
+            re.IGNORECASE,
+        )
+        filtered = lines[1:] if zonas.match(lines[0]) else lines
+        return " ".join(filtered)
+
+    # Otros campos: unir saltos de línea en una sola línea
+    if "\n" in s:
+        return " ".join(re.sub(r"\s+", " ", ln).strip() for ln in s.split("\n") if ln.strip())
+    return s
+
+
 def preparar_datos_para_plantilla(combined_data):
     logging.info("=== CLAVES RECIBIDAS ===")
     for key, value in combined_data.items():
@@ -214,6 +280,18 @@ def preparar_datos_para_plantilla(combined_data):
         normalized_data[standard_key] = get_normalized_value(
             combined_data, possible_keys
         )
+
+    # Aplicar normalización específica a los 3 campos problemáticos del script
+    # de extracción (mismo fix que el frontend).
+    for std_key, src_key in (
+        ("no_identificacion", "No. Identificación"),
+        ("nombre_completo", "Nombre Completo"),
+        ("cargo", "Cargo"),
+    ):
+        if normalized_data.get(std_key) and normalized_data[std_key] != "N/A":
+            normalized_data[std_key] = normalize_field_value(
+                src_key, normalized_data[std_key]
+            )
     for key, value in combined_data.items():
         if key not in key_map and key.replace(" ", "_").lower() not in key_map:
             normalized_key = (

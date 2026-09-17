@@ -60,7 +60,7 @@ DefinicionIndicadoresComponent.prototype._renderUI = function () {
           '</div>' +
         '</div>' +
         '<div class="kair-ind-header-actions">' +
-          '<span class="kair-ind-header-company" id="kair-ind-header-company"><i class="bi bi-building"></i> <span id="header-company-text">' + this._esc(this.currentCompany) + '</span></span>' +
+          '<span class="kair-ind-header-company" id="kair-ind-header-company"><i class="kair-icon-building"></i> <span id="header-company-text">' + this._esc(this.currentCompany) + '</span></span>' +
           '<div class="kair-ind-header-divider"></div>' +
           '<button class="header-back-btn" id="kair-ind-back"><i class="bi bi-arrow-left"></i> Volver</button>' +
           '<button class="header-action--ghost" id="kair-ind-export"><i class="bi bi-download"></i> Exportar</button>' +

@@ -1,0 +1,35 @@
+# =============================================================================
+# K+AIR Firma Electrónica — unidad systemd (producción VM)
+# Instalar:  sudo cp kair-firma.service /etc/systemd/system/
+#            sudo systemctl daemon-reload
+#            sudo systemctl enable --now kair-firma
+# =============================================================================
+[Unit]
+Description=K+AIR Firma Electrónica (firma-service)
+After=network.target
+# Se reinicia siempre: si la VM se reinicia o el proceso cae, vuelve solo.
+# Crítico porque el acceso del firmante depende de este proceso 24/7.
+
+[Service]
+Type=simple
+User=kairfirma
+Group=kairfirma
+WorkingDirectory=/opt/kair-firma/app
+# El .env vive en /opt/kair-firma/.env (dotenv lo carga desde el cwd o
+# desde EnvironmentFile si se declara aquí). Usamos EnvironmentFile por
+# claridad y para que el servicio falle rápido si falta el archivo.
+EnvironmentFile=/opt/kair-firma/.env
+ExecStart=/usr/bin/node src/server.js
+Restart=always
+RestartSec=5
+# --- Endurecimiento básico ---
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+# El servicio debe poder escribir en su carpeta (data, storage, backups)
+ReadWritePaths=/opt/kair-firma
+# Límite de archivos abiertos (PDFs + SQLite WAL)
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

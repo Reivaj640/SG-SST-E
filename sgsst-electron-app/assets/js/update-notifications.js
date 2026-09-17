@@ -177,47 +177,55 @@ class UpdateNotificationManager {
     /**
      * Notificación: Actualización disponible (con progreso)
      * @param {string} version - Versión disponible
+     * @deprecated 📦581 (Loop 3) — Ya NO muestra toast. La UI ahora es
+     *   el botón del header + dropdown (no invasivo). Este método se mantiene
+     *   por compatibilidad con callers viejos pero solo loguea.
      */
     notifyAvailable(version) {
         this.currentVersion = version;
-        this.show({
-            type: 'info',
-            title: `Nueva Versión ${version}`,
-            subtitle: 'Descargando en segundo plano...',
-            message: 'La aplicación se actualizará automáticamente.',
-            progress: { percent: 0 },
-            autoClose: 0
-        });
+        // 📦581 (Loop 3) — Ya no creamos toast invasivo. La info se ve en
+        // el botón del header (con ícono de descarga + pulse) y en el dropdown
+        // (al hacer click). Si querés ver el progreso, abrí el dropdown.
+        console.log('[UPDATER] notifyAvailable (no-op desde Loop 3): nueva versión ' + version);
+        // Llamamos al callback de progreso si existe, para que el progress bar
+        // (si hay alguno visible) se actualice
+        if (typeof this.onAvailable === 'function') {
+            try { this.onAvailable(version); } catch (e) { /* ignore */ }
+        }
     }
 
     /**
      * Actualizar barra de progreso
      * @param {number} percent - Porcentaje completado (0-100)
      * @param {string} speed - Velocidad de descarga
+     * @deprecated 📦581 (Loop 3) — No-op. No hay toast que actualizar.
+     *   Si en el futuro queremos mostrar progreso, lo agregamos como sub-elemento
+     *   del dropdown nuevo (no como toast separado).
      */
     updateProgress(percent, speed) {
-        if (!this.currentToast) return;
-        const fill = this.currentToast.querySelector('.progress-bar-fill');
-        const stats = this.currentToast.querySelector('.progress-stats');
-        if (fill) fill.style.width = `${percent}%`;
-        if (stats) stats.innerHTML = `<span>${percent}%</span><span>${speed || 'Calculando...'}</span>`;
+        // No-op. Si querés ver el progreso, abrí el dropdown.
+        // Mantenido por compatibilidad con callers viejos.
     }
 
     /**
      * Notificación: Actualización descargada y lista para instalar
      * @param {string} version - Versión descargada
      * @param {Function} onRestart - Función a ejecutar al reiniciar
+     * @deprecated 📦581 (Loop 3) — Ya NO muestra toast. La UI ahora es
+     *   el botón del header + dropdown. El botón "Reiniciar" del dropdown
+     *   llama a window.electronAPI.restartApp() directamente (ver Loop 2).
+     *   El callback onRestart se ignora.
      */
     notifyDownloaded(version, onRestart) {
-        this.show({
-            type: 'success',
-            title: '¡Actualización Lista!',
-            subtitle: `Versión ${version} descargada`,
-            message: 'Es necesario reiniciar la aplicación para instalar.',
-            buttonText: 'Reiniciar e Instalar Ahora',
-            onClick: onRestart,
-            autoClose: 0
-        });
+        // 📦581 (Loop 3) — Ya no creamos toast. La info se ve en el botón del
+        // header (estado "ready", color verde pulse) y en el dropdown al hacer click.
+        // El reinicio se hace desde el botón "Reiniciar ahora" del dropdown.
+        console.log('[UPDATER] notifyDownloaded (no-op desde Loop 3): v' + version + ' lista para instalar');
+        if (typeof onRestart === 'function') {
+            // No llamamos al callback automáticamente — el usuario debe decidir
+            // cuándo reiniciar haciendo click en el botón del dropdown.
+            // Si el caller quiere que se ejecute, debe usar el botón del dropdown.
+        }
     }
 
     /**
