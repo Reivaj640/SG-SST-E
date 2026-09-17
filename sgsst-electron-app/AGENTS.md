@@ -1620,3 +1620,40 @@ El archivo se carga globalmente en `index.html` (junto a `kair-design-tokens.css
 - **📦748**: Dashboard premium v2 (CSS scoped `.kair-dashboard` en `styles.css`).
 - **📦749**: Extracción del dialecto a `shared/kair-premium.css` scoped `.kair-premium`; dashboard migrado como piloto; `styles.css` vuelve a su rol de estilos legacy.
 
+---
+
+## 🆕 Especificaciones técnicas SG-SST · ST-01 a ST-08 (📦749, 2026-09-16)
+
+Contrato técnico de los **próximos submódulos** del SG-SST, derivado del PDF
+`kair-plan-trabajo-documento-tecnico` (v1.0) y **adaptado a la arquitectura Electron** de este repo.
+
+📄 **`docs/especificaciones-tecnicas-sg-sst-v1.md`**
+
+Contiene: estado actual, arquitectura y patrones obligatorios (tokens, componentes `.kair-*`,
+`.kair-screen`, contratos IPC `{ success, data }`, logging `[K+AIRxxx]`, definición de "hecho"),
+mapa de módulos y prioridades **P1/P2/P3**, las 8 especificaciones autocontenidas y el roadmap por
+fases.
+
+**Prioridades y carpeta real en el repo:**
+
+| ID | Submódulo | Prioridad | Carpeta |
+|----|-----------|-----------|---------|
+| ST-01 | Plan de Trabajo SG-SST y presupuesto | P1 | `modules/gestion-integral/plan-trabajo` (+ `modules/recursos/presupuesto`) |
+| ST-02 | Comités y Actas (COPASST / Convivencia) | P1 | `modules/recursos/copasst`, `modules/recursos/comite-convivencia` |
+| ST-03 | Afiliación al SSSI y vigencias | P1 | `modules/gestion-humana/afiliaciones`, `modules/gestion-humana/documentos` |
+| ST-04 | Incidentes, accidentes y PRIC | P2 | `modules/gestion-salud/investigacion-accidentes` |
+| ST-05 | Matriz IPERC | P2 | `modules/gestion-peligros/identificacion-peligros` |
+| ST-06 | Salud ocupacional (ausentismo y exámenes) | P2 | `modules/gestion-salud/ausentismo`, `modules/gestion-salud/evaluaciones-medicas` |
+| ST-07 | Emergencias (brigada, simulacros, recursos) | P3 | `modules/gestion-amenazas/plan-prevencion` |
+| ST-08 | Verificación y mejoramiento | P3 | `modules/verificacion/auditoria-anual`, `modules/mejoramiento/acciones-preventivas-correctivas` |
+
+**Uso:** al iniciar cualquier submódulo nuevo, leer primero su ST-xx y seguir el ciclo
+auditar → especificar → construir/verificar → documentar. Los contratos IPC propuestos
+(`getPlanTrabajo`, `getComites`, `getAfiliaciones`, `getEventos`, `getIperc`, `getSaludOcupacional`,
+`getEmergencias`, `getVerificacion`) se conectan en la fase correspondiente, con verificación
+independiente.
+
+> **Nota:** el PDF original asumía prototipos HTML autocontenidos en `public/`+`download/`. Este repo ya
+> es Electron (`modules/` + `renderer.js` + `preload.js`), y el login/splash/selección de empresa ya
+> está integrado → la "Fase 0" del PDF se reduce a conectar contratos reales faltantes.
+
