@@ -6783,9 +6783,23 @@
         }
 
         var statusRes = await window.electronAPI.google.status();
-        var connected = !!(statusRes && statusRes.success && statusRes.data && statusRes.data.connected);
+        var d = (statusRes && statusRes.success && statusRes.data) || {};
 
-        if (!connected) {
+        // 📦748 — Si hay cuenta vinculada pero los tokens ya no sirven (refresh
+        // token revocado/expirado), avisar claramente y ofrecer reconectar en vez
+        // de mostrar "Conectado" (que engañaba al usuario).
+        if (d.needsReauth) {
+          if (statusText) statusText.textContent = 'Sesión de Gmail expirada · reconectá';
+          if (statusText) statusText.classList.remove('connected');
+          if (statusDot) statusDot.style.display = 'none';
+          gmailSectionState.connected = false;
+          gmailSectionState.email = '';
+          renderGmailButtons(false);
+          gmailSectionState.loading = false;
+          return;
+        }
+
+        if (!d.connected) {
           if (statusText) statusText.textContent = 'Gmail desconectado · click para conectar';
           if (statusText) statusText.classList.remove('connected');
           if (statusDot) statusDot.style.display = 'none';
@@ -6849,10 +6863,14 @@
         }
         // Abrir el browser externo con la URL de autorización
         await window.openExternalUrl(startRes.data.authUrl);
-        // Esperar el callback
+        // 📦748 — Feedback mientras el usuario completa el consentimiento en el browser
+        if (btn) { btn.textContent = 'Esperando autorización…'; }
+        // Esperar el callback (el server tiene timeout de 5 min y ahora también
+        // falla al toque si el puerto está ocupado — ver google-auth.js)
         var cbRes = await window.electronAPI.google.awaitCallback();
         if (!cbRes || !cbRes.success || !cbRes.data || !cbRes.data.code) {
-          alert('No se recibió el código de autorización');
+          var cbErr = (cbRes && cbRes.error) || 'No se recibió el código de autorización';
+          alert('No se pudo completar la conexión con Gmail:\n\n' + cbErr);
           return;
         }
         // Intercambiar el code por tokens

@@ -188,6 +188,21 @@ async function exchangeCode(options) {
   }
 }
 
+// 📦748 — Timeout para llamadas de red a Google. Sin esto, si Google no responde
+// (red caída, proxy colgado, DNS lento), la promesa nunca resuelve ni rechaza y el
+// `google-oauth:status` de la Bandeja queda esperando para siempre → UI congelada.
+const NETWORK_TIMEOUT_MS = 10000;
+function _withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise(function (_, reject) {
+      setTimeout(function () {
+        reject(new Error((label || 'operación') + ': sin respuesta tras ' + ms + 'ms'));
+      }, ms);
+    })
+  ]);
+}
+
 /**
  * Refresca el access_token usando el refresh_token guardado.
  * Devuelve los nuevos tokens o null si falla.
@@ -205,7 +220,7 @@ async function refreshAccessToken(configPath) {
   });
 
   try {
-    const { credentials } = await oauth2Client.refreshAccessToken();
+    const { credentials } = await _withTimeout(oauth2Client.refreshAccessToken(), NETWORK_TIMEOUT_MS, 'refreshAccessToken');
     // credentials puede no incluir refresh_token (Google no lo devuelve en refresh)
     // preservamos el refresh_token viejo
     if (!credentials.refresh_token && stored.refresh_token) {
@@ -305,6 +320,24 @@ function createCallbackServer(port) {
   }
 
   server = http.createServer(handle);
+  // 📦748 — Sin este handler, si el puerto está ocupado (EADDRINUSE) `listen`
+  // falla en silencio y el callback de Google nunca llega → la UI queda en
+  // "cargando" hasta el timeout de 5 min. Con esto fallamos al toque con un
+  // mensaje claro para que el usuario sepa qué pasa.
+  server.on('error', (err) => {
+    console.error('[GoogleAuth] Error en callback server:', err.message);
+    if (resolveCallback) {
+      resolveCallback({
+        code: null,
+        state: null,
+        error: (err.code === 'EADDRINUSE')
+          ? ('El puerto ' + port + ' está ocupado por otro proceso. Cerrá esa app o reiniciá K+AIR e intentá de nuevo.')
+          : ('Error del servidor de callback: ' + err.message)
+      });
+      resolveCallback = null;
+    }
+    try { if (server) server.close(); } catch (e) {}
+  });
   server.listen(port, '127.0.0.1', () => {
     console.log(`[GoogleAuth] Callback server escuchando en http://127.0.0.1:${port}/oauth2callback`);
   });

@@ -61,8 +61,12 @@
       linkedMailId: undefined,
     },
     linkedMailSubject: undefined,
-    // F3.A — Estado de conexión Gmail (true si hay tokens válidos en config.json)
+    // F3.A — Estado de conexión Gmail.
+    // gmailConnected = hay cuenta vinculada (tokens guardados) → la app muestra
+    //   el cache real de correos aunque el sync falle.
+    // gmailTokenValid = los tokens funcionan AHORA → solo esto permite sincronizar.
     gmailConnected: false,
+    gmailTokenValid: false,
   };
 
   // ====== Atajos ======
@@ -1349,11 +1353,20 @@
           render();
         }
         // 2. Disparar sync en background (no bloquea la UI, mantiene cache fresco)
-        syncInboxInBackground();
+        // 📦747 — Solo si los tokens son válidos. Si la sesión expiró (needsReauth)
+        // el sync fallaría y mostraría un toast repetido; igual mostramos el cache real.
+        if (state.gmailTokenValid) {
+          syncInboxInBackground();
+        }
         // 3. Devolver el cache actual
         return state.mails;
       }
       // 4. Cache vacío → primer sync (esperamos el resultado)
+      // 📦747 — Sin tokens válidos no se puede sincronizar; devolvemos vacío.
+      if (!state.gmailTokenValid) {
+        console.warn("[BandejaIntegrada] Cache vacío y tokens inválidos: no se puede sincronizar. Reconectar Gmail.");
+        return [];
+      }
       console.log("[BandejaIntegrada] Cache vacío, sincronizando con Gmail por primera vez (folder=" + folder + ")...");
       var syncResult = await api.emailCache.syncInbox({ folder: folder, maxResults: 25 }); // 📦 P1-2 fix: reducir de 50 a 25
       if (syncResult && syncResult.success && syncResult.data) {
@@ -1380,9 +1393,15 @@
   // y re-renderiza para mostrar los datos actualizados (patrón "pull to refresh").
   // F1.B-fix — Usa el folder actual (no siempre INBOX), así si estamos viendo
   // "Enviados" sincroniza SENT, no INBOX.
+  // 📦748 — Guard contra syncs apilados. El auto-refresh corre cada 1 min y el
+  // sync tarda más que eso (rate limiter de Gmail), así que sin esto se acumulaban
+  // en la cola y ninguno terminaba.
+  var _syncInFlight = false;
   function syncInboxInBackground() {
     var api = getElectronAPI();
     if (!api || !api.emailCache) return;
+    if (_syncInFlight) return;   // 📦748 — ya hay un sync en curso, no apilar
+    _syncInFlight = true;
     var currentFolder = state.mailFolder || 'INBOX';
     api.emailCache.syncInbox({ folder: currentFolder, maxResults: 25 }).then(function (r) { // 📦 P1-2 fix: reducir de 50 a 25
       if (r && r.success) {
@@ -1455,6 +1474,8 @@
       console.warn("[BandejaIntegrada] Background sync error:", e.message);
       // 📦614-fix — mismo toast de error (catch por si la promesa falla con excepción)
       notifyGmailSyncError(e.message);
+    }).finally(function () {
+      _syncInFlight = false;  // 📦748 — liberar el guard
     });
   }
 
@@ -1500,7 +1521,8 @@
       if (!isVisible) return;
       console.log("[BandejaIntegrada] Auto-refresh disparado (cada 1 min)");
       // Refrescar correos (background, no bloquea UI)
-      if (api.emailCache && state.gmailConnected) {
+      // 📦747 — Solo si los tokens son válidos (si expiró la sesión, el sync fallaría).
+      if (api.emailCache && state.gmailTokenValid) {
         syncInboxInBackground();
       }
       // 📦601 — Refrescar eventos del IPC + Google Calendar en background
@@ -1688,8 +1710,17 @@
     }
     try {
       var statusRes = await api.google.status();
-      var connected = !!(statusRes && statusRes.success && statusRes.data && statusRes.data.connected);
-      if (connected) {
+      var d = (statusRes && statusRes.success && statusRes.data) || {};
+      // 📦747 — needsReauth: hay cuenta vinculada pero los tokens ya no sirven
+      // (refresh token revocado/expirado). La app SIGUE mostrando el cache real
+      // de correos; solo se avisa que hay que reconectar para volver a sincronizar.
+      if (d.needsReauth) {
+        indicator.setAttribute("data-connected", "false");
+        indicator.title = "La sesión de Gmail expiró o fue revocada · reconectá desde Configuración";
+        text.textContent = "Gmail: reconectar";
+        return;
+      }
+      if (d.connected) {
         // Intentar obtener el email del usuario
         try {
           var profileRes = await api.googleGmail.getProfile();
@@ -1700,21 +1731,17 @@
             indicator.setAttribute("data-connected", "true");
             indicator.title = "Conectado como " + email + " · click para ir a Configuración";
             text.textContent = email;
-          } else {
-            indicator.setAttribute("data-connected", "true");
-            indicator.title = "Gmail conectado · click para ir a Configuración";
-            text.textContent = "Gmail conectado";
+            return;
           }
-        } catch (e) {
-          indicator.setAttribute("data-connected", "true");
-          indicator.title = "Gmail conectado · click para ir a Configuración";
-          text.textContent = "Gmail conectado";
-        }
-      } else {
-        indicator.setAttribute("data-connected", "false");
-        indicator.title = "Gmail no conectado · click para ir a Configuración";
-        text.textContent = "Gmail: desconectado";
+        } catch (e) { /* sin perfil: cae al genérico */ }
+        indicator.setAttribute("data-connected", "true");
+        indicator.title = "Gmail conectado · click para ir a Configuración";
+        text.textContent = "Gmail conectado";
+        return;
       }
+      indicator.setAttribute("data-connected", "false");
+      indicator.title = "Gmail no conectado · click para ir a Configuración";
+      text.textContent = "Gmail: desconectado";
     } catch (e) {
       indicator.setAttribute("data-connected", "false");
       text.textContent = "Gmail: error";
@@ -1743,7 +1770,8 @@
         var statusRes = await api.google.status();
         if (statusRes && statusRes.success && statusRes.data) {
           state.gmailConnected = !!statusRes.data.connected;
-          console.log("[BandejaIntegrada][INIT] Gmail status: connected=" + state.gmailConnected);
+          state.gmailTokenValid = !!statusRes.data.tokenValid;
+          console.log("[BandejaIntegrada][INIT] Gmail status: connected=" + state.gmailConnected + " tokenValid=" + state.gmailTokenValid);
         }
       } catch (e) {
         console.warn("[BandejaIntegrada][INIT] Error checking Gmail status:", e);

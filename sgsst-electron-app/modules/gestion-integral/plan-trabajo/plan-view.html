@@ -101,7 +101,7 @@ svg{display:block;flex-shrink:0}
 ::selection{background:var(--kair-blue-soft)}
 
 /* ================= 3. PÁGINA ================= */
-.kair-page{max-width:1280px;margin:0 auto;padding:22px 28px 56px}
+.kair-page{max-width:none;margin:0 auto;padding:22px 28px 56px}
 
 /* ================= 4. TOPBAR DEL MÓDULO ================= */
 .kair-topbar{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap}
@@ -256,7 +256,7 @@ svg{display:block;flex-shrink:0}
 .kair-gantt__hint i.p{display:inline-block;width:22px;height:12px;border-radius:4px;background:var(--kair-amber);vertical-align:middle;margin-right:4px}
 .kair-gantt__scroll{overflow:auto;max-height:560px}
 .kair-gantt__table{min-width:920px}
-.kair-grow{display:grid;grid-template-columns:264px repeat(12,72px);align-items:stretch}
+.kair-grow{display:grid;grid-template-columns:264px repeat(12,minmax(72px,1fr));align-items:stretch}
 .kair-grow--head{position:sticky;top:0;z-index:6;background:var(--kair-surface);border-bottom:1px solid var(--kair-border)}
 .kair-gcell{display:flex;align-items:center;padding:0 10px;min-height:40px;border-left:1px solid var(--kair-border-soft);font-size:11.5px;font-weight:600;color:var(--kair-text-2);justify-content:center}
 .kair-grow--head .kair-gcell{min-height:38px;font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--kair-text-2)}
@@ -387,7 +387,7 @@ svg{display:block;flex-shrink:0}
 .kair-toast{
   display:flex;align-items:center;gap:9px;max-width:min(92vw,500px);
   background:var(--kair-navy);color:#fff;font-size:13px;font-weight:500;line-height:1.4;
-  padding:11px 16px;border-radius:var(--kair-md);box-shadow:0 16px 40px rgba(20,33,61,.25);
+  padding:11px 16px;border-radius:var(--kair-radius-md);box-shadow:0 16px 40px rgba(20,33,61,.25);
   animation:kair-toast-in .22s cubic-bezier(.4,0,.2,1);
 }
 .kair-toast svg{color:#8FB8F0}

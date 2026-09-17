@@ -74,6 +74,15 @@
     }
   }
 
+  // 📦747 — Log de baja prioridad. Se usa para casos ESPERADOS (ej: list() antes
+  // de que el usuario elija empresa en el arranque). Con console.debug no ensucia
+  // la consola por defecto, pero sigue disponible activando el nivel "Verbose".
+  function _debug(tag, msg) {
+    if (typeof console !== 'undefined' && console.debug) {
+      console.debug('[KairCalendarAdapter][' + tag + '] ' + msg);
+    }
+  }
+
   function _safe(fn, fallback) {
     // F2 — Defensivo: si fn() lanza síncronamente o retorna algo que no es
     // Promise (incluido undefined cuando una API no existe), devolver un
@@ -146,7 +155,7 @@
     // para que sea explícito. La UI muestra el toast "Mostrando solo la
     // empresa actual" sin tener empresa real, lo cual es confuso.
     if (scope === 'company' && !currentCompany) {
-      _warn('SCOPE_NO_COMPANY', 'scope=company pero currentCompany es null. Devolviendo [] (no hay empresa activa, no se puede filtrar).');
+      _debug('SCOPE_NO_COMPANY', 'scope=company pero currentCompany es null. Devolviendo [] (no hay empresa activa, no se puede filtrar).');
       return { success: true, data: [] };
     }
     var companyForBackend = (scope === 'all') ? null : currentCompany;

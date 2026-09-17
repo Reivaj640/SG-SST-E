@@ -1440,3 +1440,53 @@ Token actual: `INDUCCIONES-20260915-v21-chart-scope-fix`. Bumpear en 4 lugares:
 
 Test: `node main/test-inducciones-premium-v2.js` → debe dar **87 OK**.
 
+---
+
+## 🆕 Bandeja Integrada · Sincronización con Gmail (📦747-748, 2026-09-16)
+
+### Modelo de tokens (DOS conceptos, no confundir)
+
+| Concepto | Significado | Dónde vive | Se usa para |
+|----------|-------------|-----------|-------------|
+| `connected` | Hay cuenta vinculada (tokens guardados) | `config.json` → `googleOAuth` | Mostrar el **cache real** de correos (no mocks) |
+| `tokenValid` | Los tokens funcionan AHORA (refresh OK) | `config.json` → `googleOAuth` | Permitir **sincronizar** |
+| `needsReauth` | Hay cuenta pero los tokens ya no sirven | derivado (`connected && !tokenValid`) | Mostrar "Sesión expirada · Reconectar" |
+
+**Regla de oro**: `state.gmailConnected` = "hay cuenta" (carga el cache). `state.gmailTokenValid` = "puedo sincronizar". **NUNCA** usar `connected` para decidir si sincronizar, ni `tokenValid` para decidir si mostrar el cache (si no, se ven correos demo de `renderer/bandeja-integrada/data.js`).
+
+**Fuente de verdad de tokens**: `config.json` → `googleOAuth` (vía `shared/google-tokens.js`). La tabla `email_connections` (SQLite) guarda SOLO metadata (`id`, `email`, `provider`) — `saveConnection()` siempre escribe `access_token: null, refresh_token: null`. No buscar tokens ahí.
+
+### Gmail API — Rate limiter (cuello de botella real)
+
+`shared/google-gmail.js` tiene un **token bucket global** (`GmailRateLimiter`):
+- **40 req/min** (era 20). Gmail permite 250 units/user/min; `messages.get` cuesta 5 units → 50/min es el tope seguro.
+- **El sync pide 1 request por mensaje** (detalle `format:'full'`), así que el tiempo ≈ `N correos / 40` minutos.
+- **`email-sync.js` usa `maxTotalResults: 25`** (era 500 → ~25 min, parecía colgado; luego 50). 25 alcanza para poblar la lista.
+- **Nunca** subir `maxTotalResults` sin subir el rate limiter proporcionalmente.
+
+### Anti-cuelgue (timeouts obligatorios)
+
+| Capa | Timeout | Archivo |
+|------|---------|---------|
+| Refresh de token (red a Google) | 10s (`_withTimeout`) | `shared/google-auth.js` |
+| Callback server OAuth | 5 min + `server.on('error')` para EADDRINUSE | `shared/google-auth.js` |
+| IPC `email-cache:sync-inbox` | 120s (`Promise.race`) | `main.js` |
+| Guard anti-apilamiento | `_syncInFlight` | `renderer/bandeja-integrada/app.js` |
+
+**Por qué**: sin el guard, el auto-refresh (cada 1 min) lanzaba un sync nuevo cada minuto y se apilaban en la cola del rate limiter → **ninguno terminaba**. Sin el timeout del IPC, la UI quedaba en skeleton infinito.
+
+### Logs del proceso principal
+
+Los `console.log` de `main/` van a la **terminal** (no a DevTools). Para verlos en el renderer, `email-sync.js` acepta `options.log` y `main.js` le pasa `sendLog`. Los `[email-sync] syncInbox inicio/listInbox OK/FIN` ahora aparecen en DevTools con tiempos.
+
+### Diagnóstico rápido
+
+```bash
+# Estado de tokens (sin exponer secretos)
+node -e 'const os=require("os"),p=require("path"),f=require("fs");const c=JSON.parse(f.readFileSync(p.join(os.homedir(),"AppData","Roaming","sgsst-electron-app","config.json"),"utf8"));const t=c.googleOAuth||{};console.log("access:",!!t.access_token,"refresh:",!!t.refresh_token,"expiry:",t.expiry_date,"now:",Date.now());'
+# Cache de correos
+node -e 'const os=require("os"),p=require("path"),{DatabaseSync}=require("node:sqlite");const db=new DatabaseSync(p.join(os.homedir(),"AppData","Roaming","sgsst-electron-app","kair.db"),{readOnly:true});console.log(db.prepare("SELECT folder, COUNT(*) c FROM email_threads GROUP BY folder").all());'
+```
+
+Nota: `better-sqlite3` está compilado para Electron → usar `node:sqlite` (nativo) para inspeccionar la DB con Node plano.
+

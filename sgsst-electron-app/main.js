@@ -1031,11 +1031,9 @@ function checkForUpdatesSafe() {
   try {
     sendLog('[UPDATER] checkForUpdatesSafe: Iniciando verificación...', 'INFO');
 
-    // Enviar evento de verificación manualmente para asegurar que la UI responda
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('update_checking');
-    }
-
+    // 📦747 — No enviamos 'update_checking' manualmente: autoUpdater emite
+    // 'checking-for-update' (listener ~línea 893) que ya lo envía al renderer.
+    // Antes se enviaba 2 veces (manual + listener) y la UI logueaba el evento duplicado.
     const result = autoUpdater.checkForUpdates();
 
     // Manejar la promesa para evitar unhandled rejections
@@ -1985,7 +1983,17 @@ const emailSync = require('./main/email-sync');
 ipcMain.handle('email-cache:sync-inbox', async (event, options) => {
   try {
     var configPath = getGoogleConfigPath();
-    var result = await emailSync.syncInbox(Object.assign({ configPath: configPath }, options || {}));
+    // 📦748 — Timeout de seguridad. Si el sync se cuelga (red, rate limit, refresh
+    // colgado), la promesa nunca resolvía → la UI quedaba en skeleton infinito.
+    // Con esto SIEMPRE devolvemos algo dentro de 120s.
+    var result = await Promise.race([
+      emailSync.syncInbox(Object.assign({ configPath: configPath, log: sendLog }, options || {})),
+      new Promise(function (resolve) {
+        setTimeout(function () {
+          resolve({ success: false, error: 'El sync tardó más de 120s sin responder. Reintentá o revisá la conexión.' });
+        }, 120000);
+      })
+    ]);
     return result;
   } catch (e) {
     console.error('[email-cache] Error en sync-inbox:', e);
@@ -2324,15 +2332,32 @@ ipcMain.handle('google-oauth:cancel', async () => {
 // Devuelve el estado de la conexión (si hay tokens válidos guardados).
 ipcMain.handle('google-oauth:status', async () => {
   const configPath = getGoogleConfigPath();
-  const has = googleTokens.hasValidTokens(configPath);
   const tokens = googleTokens.loadTokens(configPath);
+  // 📦747 — Validación real: hasValidTokens() solo mira si existe refresh_token
+  // (asume sesión válida), pero el refresh_token puede estar revocado o expirado
+  // (apps OAuth en modo "Testing": expiran a los 7 días). getAuthorizedClient()
+  // intenta refrescar el access_token y devuelve null si ya no sirve.
+  //
+  // Dos conceptos SEPARADOS (importante):
+  //   connected  = hay una cuenta vinculada (tokens guardados) → la app puede
+  //                mostrar el cache real de correos aunque el sync falle.
+  //   tokenValid = los tokens funcionan AHORA → solo esto permite sincronizar.
+  var auth = null;
+  if (tokens && tokens.access_token) {
+    try { auth = await googleAuth.getAuthorizedClient(configPath); }
+    catch (e) { auth = null; }
+  }
+  const hasTokens = !!(tokens && tokens.access_token);
+  const tokenValid = !!auth;
   return {
     success: true,
     data: {
-      connected: has,
+      connected: hasTokens,
+      tokenValid: tokenValid,
       hasRefreshToken: !!(tokens && tokens.refresh_token),
       expiryDate: tokens ? tokens.expiry_date : null,
-      savedAt: tokens ? tokens.savedAt : null
+      savedAt: tokens ? tokens.savedAt : null,
+      needsReauth: hasTokens && !tokenValid
     }
   };
 });

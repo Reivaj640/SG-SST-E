@@ -195,6 +195,10 @@ function normalizeMessage(gMsg, threadId, connectionId) {
  */
 async function syncInbox(options) {
   options = options || {};
+  var __t0 = Date.now();  // 📦748 — timing para diagnosticar syncs lentos
+  // 📦748 — El caller (main.js) pasa sendLog para que estos mensajes también
+  // aparezcan en la consola del renderer (DevTools), no solo en la terminal.
+  var logFn = (typeof options.log === 'function') ? options.log : console.log;
   var configPath = options.configPath || (function() {
     // Fallback: intentar derivar de app.getPath si está disponible
     try { return path.join(require('electron').app.getPath('userData'), 'config.json'); }
@@ -202,6 +206,7 @@ async function syncInbox(options) {
   })();
   var folder = options.folder || 'INBOX';
   var maxResults = options.maxResults || 25; // 📦 P1-2 fix: reducir de 50 a 25 para quota
+  logFn('[email-sync] syncInbox inicio · folder=' + folder + ' maxResults=' + maxResults);
 
   if (!configPath) {
     return { success: false, error: 'configPath es requerido (no se pudo derivar del app.getPath)' };
@@ -237,9 +242,12 @@ async function syncInbox(options) {
     folder: folder,  // F1.B-fix — Pasar folder al listInbox para que use el query correcto
     maxResults: maxResults,
     extraQuery: labelIds ? ['label:' + folder.toLowerCase()] : [],
-    fetchAll: true,              // 📦 P1-1 fix: Recorrer todas las páginas automáticamente
-    maxTotalResults: 500         // Límite de seguridad
+    fetchAll: true,              // Recorrer varias páginas
+    maxTotalResults: 25          // 📦748 — Antes 500 (y luego 50). El detalle de CADA
+                                 // mensaje se pide 1×1 y el rate limiter es 40/min → 25
+                                 // correos ≈ 40s. Es lo que muestra la lista de la Bandeja.
   });
+  logFn('[email-sync] listInbox OK: ' + (listResult.data ? listResult.data.length : 0) + ' mensajes en ' + ((Date.now() - __t0) / 1000).toFixed(1) + 's');
 
   if (!listResult.success || !Array.isArray(listResult.data)) {
     return { success: false, error: 'listInbox falló: ' + (listResult.error || 'unknown') };
@@ -421,6 +429,7 @@ async function syncInbox(options) {
     console.warn('[email-sync] Error limpiando threads huerfanos:', e.message);
   }
 
+  logFn('[email-sync] syncInbox FIN · ' + synced + ' threads guardados de ' + listResult.data.length + ' · ' + ((Date.now() - __t0) / 1000).toFixed(1) + 's total');
   return {
     success: true,
     data: {

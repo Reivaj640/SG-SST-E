@@ -6,8 +6,9 @@
     <title>K+AIR | Portal Plan de Trabajo</title>
     <!-- Iconos -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="../../../shared/kair-design-tokens.css">
-    <link rel="stylesheet" href="../../../shared/kair-components.css">
+    <!-- 📦747 · Los tokens/componentes K+AIR los carga index.html globalmente (líneas 52-53).
+         Antes se referenciaban con ../../../shared/... pero este HTML se inyecta con innerHTML
+         en el documento principal, así que la ruta resolvía a /C:/shared/ (ERR_FILE_NOT_FOUND). -->
 
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
@@ -35,7 +36,7 @@
         .plan-portal__top {
             display: flex; align-items: flex-start; justify-content: space-between;
             gap: 1rem; flex-wrap: wrap;
-            width: 100%; max-width: 1400px; margin: 0 auto clamp(18px, 2.2vw, 30px);
+            width: 100%; max-width: none; margin: 0 auto clamp(18px, 2.2vw, 30px);
             box-sizing: border-box;
         }
         .plan-portal__top-left { display: flex; align-items: center; gap: 0.9rem; min-width: 0; }
@@ -72,7 +73,7 @@
         /* Acciones principales */
         .plan-portal__main-actions {
             display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem;
-            width: 100%; max-width: 1400px; margin: 0 auto;
+            width: 100%; max-width: none; margin: 0 auto;
             box-sizing: border-box;
         }
         .plan-portal__main-action {
@@ -115,7 +116,7 @@
 
         /* Herramientas */
         .plan-portal__quick-actions {
-            width: 100%; max-width: 1400px; margin: clamp(22px, 2.6vw, 36px) auto 0;
+            width: 100%; max-width: none; margin: clamp(22px, 2.6vw, 36px) auto 0;
             box-sizing: border-box;
         }
         .plan-portal__quick-actions-title {

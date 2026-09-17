@@ -38,9 +38,13 @@ const googleAuth = require('./google-auth');
 var GmailRateLimiter = (function () {
   var queue = [];
   var processing = false;
-  var tokens = 20; // max requests per minute (conservador vs 250 quota)
+  // 📦748 — Antes 20/min: el sync pide el detalle de CADA mensaje (1 request c/u),
+  // así que 25 correos tardaban ~75s y 50 tardaban ~2.5 min (parecía colgado).
+  // Gmail permite 250 units/user/min y messages.get cuesta 5 units → 50 req/min
+  // es el máximo seguro. Usamos 40/min (con margen).
+  var tokens = 40; // max requests per minute
   var lastRefill = Date.now();
-  var REFILL_RATE = 20; // tokens por minuto
+  var REFILL_RATE = 40; // tokens por minuto
   var REFILL_INTERVAL_MS = 60000; // 1 minuto
 
   function refillTokens() {

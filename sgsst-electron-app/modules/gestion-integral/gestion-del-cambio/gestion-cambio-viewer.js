@@ -69,4 +69,4 @@ class GestionDelCambioViewer {
 
 window.GestionDelCambioViewer = GestionDelCambioViewer;
 
-console.log('[GestionDelCambioViewer] ✅ Registrado en window.GestionDelCambioViewer');
+console.log('[GestionDelCambioViewer] Registrado en window.GestionDelCambioViewer');
