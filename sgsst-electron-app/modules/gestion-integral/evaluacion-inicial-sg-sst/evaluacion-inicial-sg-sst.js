@@ -68,6 +68,9 @@ class EvaluacionInicialSgSst {
             ].join(';') + ';';
             document.body.appendChild(root);
         }
+        // 📦759 — El contenedor de modales vive en el <body>, fuera del modulo. Sin esta
+        // marca se quedaba con la paleta vieja (y sin modo oscuro).
+        this._scope(root);
         return root;
     }
 
@@ -82,13 +85,47 @@ class EvaluacionInicialSgSst {
         style.id = 'k-modal-dialog-backdrop-style';
         style.textContent = `
             dialog.k-modal[open]::backdrop {
-                background: rgba(0, 0, 0, 0.6);
+                background: rgba(15, 23, 42, 0.55);
                 backdrop-filter: blur(2px);
             }
         `;
         document.head.appendChild(style);
     }
 
+
+    /**
+     * 📦759 — Color real de un token del sistema premium.
+     *
+     * Por que: el gauge se dibuja en un <canvas>, y un canvas NO entiende `var(--algo)`:
+     * hay que pasarle un color literal. Antes estaban escritos a mano en el JS
+     * (#dc3545, #ffc107, #28a745), asi que el gauge no seguia ni la paleta ni el tema
+     * oscuro. Ahora el color sale de la hoja de estilos (fuente unica de verdad) y, si
+     * por lo que sea no se puede leer, cae al valor premium de respaldo.
+     */
+    _color(token, fallback) {
+        try {
+            const host = this.container || document.documentElement;
+            const v = getComputedStyle(host).getPropertyValue(token);
+            if (v && v.trim()) return v.trim();
+        } catch (e) { /* getComputedStyle no disponible: se usa el respaldo */ }
+        return fallback;
+    }
+
+    /**
+     * 📦759 — Marca un nodo del sistema de diseño premium.
+     *
+     * El componente tiene TRES puntos de montaje y los tres necesitan los tokens y los
+     * estilos: el contenedor del modulo, el contenedor de modales (#k-modal-root, que va
+     * al <body> porque un position:fixed dentro del modulo se rompe) y los <dialog> de
+     * Planes de Accion (que tambien van al <body> y al top layer). Antes la capa de
+     * estilos solo cubria el primero, asi que los modales quedaban sin modo oscuro.
+     */
+    _scope(node) {
+        if (node && node.classList && !node.classList.contains('kair-eval-scope')) {
+            node.classList.add('kair-eval-scope');
+        }
+        return node;
+    }
 
     async render() {
         // Registrar instancia global para manejo de eventos DOM
@@ -98,6 +135,7 @@ class EvaluacionInicialSgSst {
         this.container.innerHTML = '';
         this.container.className = ''; // Limpiar clases previas
         this.container.classList.add('k-module-container'); // Clase contenedora estándar
+        this._scope(this.container); // 📦759 — tokens + estilos premium
 
         // 📦532 — El sistema de notificaciones ahora es window.KAIRToast
         // (assets/js/kair-toast.js), el estandar del proyecto. KAIRToast
@@ -113,10 +151,10 @@ class EvaluacionInicialSgSst {
               <!-- Fila 1: contenido principal -->
               <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem;">
                 <div style="display:flex; align-items:center; gap:0.75rem;">
-                  <i class="bi bi-clipboard-pulse" style="color:#174ea6; font-size:1.25rem;"></i>
+                  <i class="bi bi-clipboard-pulse" style="color:var(--ei-primary); font-size:1.25rem;"></i>
                   <div>
-                    <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:#1E293B;">Evaluación Inicial del SG-SST</h3>
-                    <p style="font-size:0.8125rem; color:#64748B; margin:0.25rem 0 0 0;">Evaluación del cumplimiento normativo SG-SST.</p>
+                    <h3 style="font-size:1.125rem; font-weight:600; margin:0; color:var(--ei-text-dark);">Evaluación Inicial del SG-SST</h3>
+                    <p style="font-size:0.8125rem; color:var(--ei-text-muted); margin:0.25rem 0 0 0;">Evaluación del cumplimiento normativo SG-SST.</p>
                   </div>
                 </div>
                 <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
@@ -592,7 +630,7 @@ class EvaluacionInicialSgSst {
             <div class="k-file-selector-content">
                 <div class="k-file-selector-header">
                     <div class="k-file-selector-title">
-                        <i class="bi bi-file-earmark-pdf-fill" style="color: var(--primary);"></i>
+                        <i class="bi bi-file-earmark-pdf-fill" style="color: var(--ei-primary);"></i>
                         Seleccionar PDF de Evaluación
                     </div>
                     <div>
@@ -968,7 +1006,7 @@ class EvaluacionInicialSgSst {
                 </td>
                 <td>${item.desc}</td>
                 <td class="text-center">${item.max}</td>
-                <td class="text-center" style="font-weight:bold; color:${isCompliant ? 'var(--success)' : 'var(--danger)'}">${item.grade}</td>
+                <td class="text-center" style="font-weight:bold; color:${isCompliant ? 'var(--ei-success)' : 'var(--ei-danger)'}">${item.grade}</td>
                 <td class="text-center">
                     <span class="k-badge ${badgeClass}">${item.status}</span>
                 </td>
@@ -1017,19 +1055,19 @@ this.lastScore = score;
                 phvaContainer.innerHTML = `
                     <div class="k-progress-group">
                         <div class="k-progress-label"><span>PLANEAR</span><span>${Math.min(phva.planear, 100)}%</span></div>
-                        <div class="k-progress-bar"><div class="k-progress-fill" style="width:${Math.min(phva.planear, 100)}%; background:var(--primary);"></div></div>
+                        <div class="k-progress-bar"><div class="k-progress-fill" style="width:${Math.min(phva.planear, 100)}%; background:var(--ei-primary);"></div></div>
                     </div>
                     <div class="k-progress-group">
                         <div class="k-progress-label"><span>HACER</span><span>${Math.min(phva.hacer, 100)}%</span></div>
-                        <div class="k-progress-bar"><div class="k-progress-fill" style="width:${Math.min(phva.hacer, 100)}%; background:var(--success);"></div></div>
+                        <div class="k-progress-bar"><div class="k-progress-fill" style="width:${Math.min(phva.hacer, 100)}%; background:var(--ei-success);"></div></div>
                     </div>
                     <div class="k-progress-group">
                         <div class="k-progress-label"><span>VERIFICAR</span><span>${Math.min(phva.verificar, 100)}%</span></div>
-                        <div class="k-progress-bar"><div class="k-progress-fill" style="width:${Math.min(phva.verificar, 100)}%; background:var(--info);"></div></div>
+                        <div class="k-progress-bar"><div class="k-progress-fill" style="width:${Math.min(phva.verificar, 100)}%; background:var(--ei-info);"></div></div>
                     </div>
                     <div class="k-progress-group">
                         <div class="k-progress-label"><span>ACTUAR</span><span>${Math.min(phva.actuar, 100)}%</span></div>
-                        <div class="k-progress-bar"><div class="k-progress-fill" style="width:${Math.min(phva.actuar, 100)}%; background:var(--warning);"></div></div>
+                        <div class="k-progress-bar"><div class="k-progress-fill" style="width:${Math.min(phva.actuar, 100)}%; background:var(--ei-warning);"></div></div>
                     </div>
                 `;
             } else {
@@ -1085,7 +1123,8 @@ this.lastScore = score;
         const plan = isEdit ? this.actionPlans.find(p => p.id === planId) : null;
         
         const modal = document.createElement('dialog');
-        modal.className = 'k-modal';
+        this._scope(modal); // 📦759 — tokens + estilos premium (el dialog vive en el body)
+        modal.className = 'k-modal kair-eval-scope';
         // 📦534 — HTML5 <dialog> con showModal(): el navegador centra
         // automaticamente y da ::backdrop nativo. Sin position:fixed,
         // sin wrapper, sin stacking context. Los close buttons
@@ -1266,7 +1305,8 @@ this.lastScore = score;
         const hallazgo = this.currentFindings.find(f => f.code === plan.hallazgoId);
         
         const modal = document.createElement('dialog');
-        modal.className = 'k-modal';
+        this._scope(modal); // 📦759 — tokens + estilos premium (el dialog vive en el body)
+        modal.className = 'k-modal kair-eval-scope';
         // 📦534 — HTML5 <dialog> con showModal(): el navegador centra
         // automaticamente y da ::backdrop nativo. Sin position:fixed,
         // sin wrapper, sin stacking context. Los close buttons
@@ -1293,71 +1333,71 @@ this.lastScore = score;
                         justify-content: center;
                         width: 60px;
                         height: 60px;
-                        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+                        background: linear-gradient(135deg, var(--ei-primary) 0%, var(--primary-dark) 100%);
                         border-radius: 50%;
                         margin-bottom: 1rem;
                         box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
                     ">
                         <i class="bi bi-clipboard-data" style="color: white; font-size: 1.8rem;"></i>
                     </div>
-                    <h3 style="margin: 0 0 0.5rem 0; color: var(--text-dark); font-size: 1.5rem; font-weight: 600;">
+                    <h3 style="margin: 0 0 0.5rem 0; color: var(--ei-text-dark); font-size: 1.5rem; font-weight: 600;">
                         Detalle del Plan de Acción
                     </h3>
                 </div>
                 <div class="k-modal-body">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-                        <div style="grid-column: 1 / -1; background: var(--bg-card); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border);">
-                            <h4 style="margin: 0 0 1rem 0; color: var(--primary); font-size: 1.1rem; font-weight: 600;">
+                        <div style="grid-column: 1 / -1; background: var(--ei-surface); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--ei-border);">
+                            <h4 style="margin: 0 0 1rem 0; color: var(--ei-primary); font-size: 1.1rem; font-weight: 600;">
                                 <i class="bi bi-list-check me-2"></i> Información del Plan
                             </h4>
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
                                 <div>
-                                    <span style="color: var(--text-muted); font-size: 0.9rem;">Estado:</span>
-                                    <span style="font-weight: 600; color: var(--text-dark); margin-left: 0.5rem;">
+                                    <span style="color: var(--ei-text-muted); font-size: 0.9rem;">Estado:</span>
+                                    <span style="font-weight: 600; color: var(--ei-text-dark); margin-left: 0.5rem;">
                                         ${this.getEstadoBadge(plan.estado)}
                                     </span>
                                 </div>
                                 <div>
-                                    <span style="color: var(--text-muted); font-size: 0.9rem;">Fecha Límite:</span>
-                                    <span style="font-weight: 600; color: var(--text-dark); margin-left: 0.5rem;">
+                                    <span style="color: var(--ei-text-muted); font-size: 0.9rem;">Fecha Límite:</span>
+                                    <span style="font-weight: 600; color: var(--ei-text-dark); margin-left: 0.5rem;">
                                         ${new Date(plan.fechaLimite).toLocaleDateString('es-CO')}
                                     </span>
                                 </div>
                             </div>
                             <div style="margin-top: 1rem;">
-                                <span style="color: var(--text-muted); font-size: 0.9rem;">Responsable:</span>
-                                <div style="font-weight: 600; color: var(--text-dark); margin-top: 0.5rem;">
+                                <span style="color: var(--ei-text-muted); font-size: 0.9rem;">Responsable:</span>
+                                <div style="font-weight: 600; color: var(--ei-text-dark); margin-top: 0.5rem;">
                                     ${plan.responsable}
                                 </div>
                             </div>
                         </div>
                         
-                        <div style="background: var(--bg-card); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border);">
-                            <h4 style="margin: 0 0 1rem 0; color: var(--primary); font-size: 1.1rem; font-weight: 600;">
+                        <div style="background: var(--ei-surface); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--ei-border);">
+                            <h4 style="margin: 0 0 1rem 0; color: var(--ei-primary); font-size: 1.1rem; font-weight: 600;">
                                 <i class="bi bi-exclamation-triangle me-2"></i> Hallazgo Asociado
                             </h4>
                             <div style="margin-top: 1rem;">
-                                <div style="background: var(--warning)15; padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem;">
-                                    <span style="font-weight: 600; color: var(--text-dark);">${hallazgo.code}</span>
+                                <div style="background: var(--ei-warning-soft); padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem;">
+                                    <span style="font-weight: 600; color: var(--ei-text-dark);">${hallazgo.code}</span>
                                     <span class="k-badge k-badge-warning" style="margin-left: 0.5rem;">${hallazgo.status}</span>
                                 </div>
-                                <div style="color: var(--text-dark); line-height: 1.6;">
+                                <div style="color: var(--ei-text-dark); line-height: 1.6;">
                                     ${hallazgo.desc}
                                 </div>
                             </div>
                         </div>
                         
-                        <div style="background: var(--bg-card); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border);">
-                            <h4 style="margin: 0 0 1rem 0; color: var(--primary); font-size: 1.1rem; font-weight: 600;">
+                        <div style="background: var(--ei-surface); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--ei-border);">
+                            <h4 style="margin: 0 0 1rem 0; color: var(--ei-primary); font-size: 1.1rem; font-weight: 600;">
                                 <i class="bi bi-clipboard-check me-2"></i> Acción Correctiva
                             </h4>
-                            <div style="margin-top: 1rem; color: var(--text-dark); line-height: 1.6;">
+                            <div style="margin-top: 1rem; color: var(--ei-text-dark); line-height: 1.6;">
                                 ${plan.accion}
                             </div>
                         </div>
                         
-                        <div style="background: var(--bg-card); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border);">
-                            <h4 style="margin: 0 0 1rem 0; color: var(--primary); font-size: 1.1rem; font-weight: 600;">
+                        <div style="background: var(--ei-surface); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--ei-border);">
+                            <h4 style="margin: 0 0 1rem 0; color: var(--ei-primary); font-size: 1.1rem; font-weight: 600;">
                                 <i class="bi bi-people me-2"></i> Responsables
                             </h4>
                             <div style="margin-top: 1rem;">
@@ -1371,15 +1411,15 @@ this.lastScore = score;
                                         border-radius: 8px;
                                         margin-bottom: 0.5rem;
                                     ">
-                                        <i class="bi bi-person-circle" style="color: var(--primary); font-size: 1.2rem;"></i>
+                                        <i class="bi bi-person-circle" style="color: var(--ei-primary); font-size: 1.2rem;"></i>
                                         <span style="font-weight: 500;">${r}</span>
                                     </div>
                                 `).join('')}
                             </div>
                         </div>
                         
-                        <div style="background: var(--bg-card); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border);">
-                            <h4 style="margin: 0 0 1rem 0; color: var(--primary); font-size: 1.1rem; font-weight: 600;">
+                        <div style="background: var(--ei-surface); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--ei-border);">
+                            <h4 style="margin: 0 0 1rem 0; color: var(--ei-primary); font-size: 1.1rem; font-weight: 600;">
                                 <i class="bi bi-clock-history me-2"></i> Seguimiento
                             </h4>
                             <div style="margin-top: 1rem;">
@@ -1389,15 +1429,15 @@ this.lastScore = score;
                                         background: var(--bg-body);
                                         border-radius: 8px;
                                         margin-bottom: 0.75rem;
-                                        border-left: 3px solid var(--primary);
+                                        border-left: 3px solid var(--ei-primary);
                                     ">
                                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                                            <span style="font-weight: 600; color: var(--text-dark);">${s.descripcion}</span>
-                                            <span style="color: var(--text-muted); font-size: 0.85rem;">${new Date(s.fecha).toLocaleDateString('es-CO')}</span>
+                                            <span style="font-weight: 600; color: var(--ei-text-dark);">${s.descripcion}</span>
+                                            <span style="color: var(--ei-text-muted); font-size: 0.85rem;">${new Date(s.fecha).toLocaleDateString('es-CO')}</span>
                                         </div>
-                                        <div style="color: var(--text-muted); font-size: 0.9rem;">${s.responsable}</div>
+                                        <div style="color: var(--ei-text-muted); font-size: 0.9rem;">${s.responsable}</div>
                                     </div>
-                                `).join('') : '<p style="color: var(--text-muted); font-style: italic;">No hay seguimientos registrados</p>'}
+                                `).join('') : '<p style="color: var(--ei-text-muted); font-style: italic;">No hay seguimientos registrados</p>'}
                             </div>
                         </div>
                     </div>
@@ -1405,7 +1445,7 @@ this.lastScore = score;
                 <div class="k-modal-footer" style="
                     margin-top: 2rem; 
                     padding-top: 1.5rem; 
-                    border-top: 1px solid var(--border); 
+                    border-top: 1px solid var(--ei-border); 
                     display: flex; 
                     justify-content: space-between; 
                     gap: 0.75rem;
@@ -1433,23 +1473,6 @@ this.lastScore = score;
                     </button>
                 </div>
             </div>
-            
-            <style>
-                @keyframes fadeIn {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
-                }
-                @keyframes slideUp {
-                    from { 
-                        opacity: 0; 
-                        transform: translateY(30px); 
-                    }
-                    to { 
-                        opacity: 1; 
-                        transform: translateY(0); 
-                    }
-                }
-            </style>
         `;
         
         modal.innerHTML = modalContent;
@@ -1468,7 +1491,8 @@ this.lastScore = score;
         }
         
         const modal = document.createElement('dialog');
-        modal.className = 'k-modal';
+        this._scope(modal); // 📦759 — tokens + estilos premium (el dialog vive en el body)
+        modal.className = 'k-modal kair-eval-scope';
         // 📦534 — HTML5 <dialog> con showModal(): el navegador centra
         // automaticamente y da ::backdrop nativo. Sin position:fixed,
         // sin wrapper, sin stacking context. Los close buttons
@@ -1505,40 +1529,40 @@ this.lastScore = score;
                         justify-content: center;
                         width: 60px;
                         height: 60px;
-                        background: linear-gradient(135deg, var(--success) 0%, #1e7e34 100%);
+                        background: linear-gradient(135deg, var(--ei-success) 0%, #1e7e34 100%);
                         border-radius: 50%;
                         margin-bottom: 1rem;
                         box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
                     ">
                         <i class="bi bi-clock-history" style="color: white; font-size: 1.8rem;"></i>
                     </div>
-                    <h3 style="margin: 0 0 0.5rem 0; color: var(--text-dark); font-size: 1.5rem; font-weight: 600;">
+                    <h3 style="margin: 0 0 0.5rem 0; color: var(--ei-text-dark); font-size: 1.5rem; font-weight: 600;">
                         Agregar Seguimiento
                     </h3>
-                    <p style="margin: 0; color: var(--text-muted); font-size: 0.95rem;">
+                    <p style="margin: 0; color: var(--ei-text-muted); font-size: 0.95rem;">
                         Registre el progreso del plan de acción
                     </p>
                 </div>
                 <div class="k-modal-body">
                     <form id="followUpForm" style="display: grid; gap: 1.5rem;">
                         <div>
-                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-dark);">
-                                Descripción <span style="color: var(--danger);">*</span>
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--ei-text-dark);">
+                                Descripción <span style="color: var(--ei-danger);">*</span>
                             </label>
-                            <textarea id="followUpDescripcion" class="k-input" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; min-height: 100px; resize: vertical;" required placeholder="Describa el progreso o novedad..."></textarea>
+                            <textarea id="followUpDescripcion" class="k-input" style="width: 100%; padding: 0.75rem; border: 1px solid var(--ei-border); border-radius: 8px; min-height: 100px; resize: vertical;" required placeholder="Describa el progreso o novedad..."></textarea>
                         </div>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
                             <div>
-                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-dark);">
-                                    Fecha <span style="color: var(--danger);">*</span>
+                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--ei-text-dark);">
+                                    Fecha <span style="color: var(--ei-danger);">*</span>
                                 </label>
-                                <input type="date" id="followUpFecha" class="k-input" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;" required>
+                                <input type="date" id="followUpFecha" class="k-input" style="width: 100%; padding: 0.75rem; border: 1px solid var(--ei-border); border-radius: 8px;" required>
                             </div>
                             <div>
-                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-dark);">
-                                    Responsable <span style="color: var(--danger);">*</span>
+                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--ei-text-dark);">
+                                    Responsable <span style="color: var(--ei-danger);">*</span>
                                 </label>
-                                <input type="text" id="followUpResponsable" class="k-input" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;" required placeholder="Nombre del responsable">
+                                <input type="text" id="followUpResponsable" class="k-input" style="width: 100%; padding: 0.75rem; border: 1px solid var(--ei-border); border-radius: 8px;" required placeholder="Nombre del responsable">
                             </div>
                         </div>
                     </form>
@@ -1546,7 +1570,7 @@ this.lastScore = score;
                 <div class="k-modal-footer" style="
                     margin-top: 2rem; 
                     padding-top: 1.5rem; 
-                    border-top: 1px solid var(--border); 
+                    border-top: 1px solid var(--ei-border); 
                     display: flex; 
                     justify-content: flex-end; 
                     gap: 0.75rem;
@@ -1567,34 +1591,6 @@ this.lastScore = score;
                     </button>
                 </div>
             </div>
-            
-            <style>
-                @keyframes fadeIn {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
-                }
-                @keyframes slideUp {
-                    from { 
-                        opacity: 0; 
-                        transform: translateY(30px); 
-                    }
-                    to { 
-                        opacity: 1; 
-                        transform: translateY(0); 
-                    }
-                }
-                .k-input {
-                    font-family: 'Segoe UI', Roboto, sans-serif;
-                    font-size: 0.95rem;
-                    color: var(--text-dark);
-                    transition: border-color 0.2s;
-                }
-                .k-input:focus {
-                    outline: none;
-                    border-color: var(--primary);
-                    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1);
-                }
-            </style>
         `;
         
         modal.innerHTML = modalContent;
@@ -1654,7 +1650,8 @@ this.lastScore = score;
         }
         
         const modal = document.createElement('dialog');
-        modal.className = 'k-modal';
+        this._scope(modal); // 📦759 — tokens + estilos premium (el dialog vive en el body)
+        modal.className = 'k-modal kair-eval-scope';
         // 📦534 — HTML5 <dialog> con showModal(): el navegador centra
         // automaticamente y da ::backdrop nativo. Sin position:fixed,
         // sin wrapper, sin stacking context. Los close buttons
@@ -1691,29 +1688,29 @@ this.lastScore = score;
                         justify-content: center;
                         width: 60px;
                         height: 60px;
-                        background: linear-gradient(135deg, var(--info) 0%, #138496 100%);
+                        background: linear-gradient(135deg, var(--ei-info) 0%, #138496 100%);
                         border-radius: 50%;
                         margin-bottom: 1rem;
                         box-shadow: 0 4px 12px rgba(23, 162, 184, 0.3);
                     ">
                         <i class="bi bi-people" style="color: white; font-size: 1.8rem;"></i>
                     </div>
-                    <h3 style="margin: 0 0 0.5rem 0; color: var(--text-dark); font-size: 1.5rem; font-weight: 600;">
+                    <h3 style="margin: 0 0 0.5rem 0; color: var(--ei-text-dark); font-size: 1.5rem; font-weight: 600;">
                         Gestionar Responsables
                     </h3>
-                    <p style="margin: 0; color: var(--text-muted); font-size: 0.95rem;">
+                    <p style="margin: 0; color: var(--ei-text-muted); font-size: 0.95rem;">
                         Agregue o elimine responsables del plan de acción
                     </p>
                 </div>
                 <div class="k-modal-body">
                     <div style="margin-bottom: 1.5rem;">
-                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-dark);">
-                            Nuevo Responsable <span style="color: var(--danger);">*</span>
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--ei-text-dark);">
+                            Nuevo Responsable <span style="color: var(--ei-danger);">*</span>
                         </label>
-                        <input type="text" id="newResponsible" class="k-input" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;" required placeholder="Nombre del responsable">
+                        <input type="text" id="newResponsible" class="k-input" style="width: 100%; padding: 0.75rem; border: 1px solid var(--ei-border); border-radius: 8px;" required placeholder="Nombre del responsable">
                     </div>
-                    <div style="background: var(--bg-card); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border);">
-                        <h4 style="margin: 0 0 1rem 0; color: var(--primary); font-size: 1.1rem; font-weight: 600;">
+                    <div style="background: var(--ei-surface); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--ei-border);">
+                        <h4 style="margin: 0 0 1rem 0; color: var(--ei-primary); font-size: 1.1rem; font-weight: 600;">
                             <i class="bi bi-people me-2"></i> Responsables Actuales
                         </h4>
                         <div style="margin-top: 1rem;">
@@ -1729,21 +1726,21 @@ this.lastScore = score;
                                     margin-bottom: 0.5rem;
                                 ">
                                     <div style="display: flex; align-items: center; gap: 0.75rem;">
-                                        <i class="bi bi-person-circle" style="color: var(--primary); font-size: 1.2rem;"></i>
+                                        <i class="bi bi-person-circle" style="color: var(--ei-primary); font-size: 1.2rem;"></i>
                                         <span style="font-weight: 500;">${r}</span>
                                     </div>
                                     <button class="k-btn k-btn-sm k-btn-outline" onclick="window.currentEvaluacionInstance.removeResponsible(${plan.id}, ${index})" style="padding: 0.25rem 0.5rem;">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </div>
-                            `).join('') : '<p style="color: var(--text-muted); font-style: italic;">No hay responsables asignados</p>'}
+                            `).join('') : '<p style="color: var(--ei-text-muted); font-style: italic;">No hay responsables asignados</p>'}
                         </div>
                     </div>
                 </div>
                 <div class="k-modal-footer" style="
                     margin-top: 2rem; 
                     padding-top: 1.5rem; 
-                    border-top: 1px solid var(--border); 
+                    border-top: 1px solid var(--ei-border); 
                     display: flex; 
                     justify-content: flex-end; 
                     gap: 0.75rem;
@@ -1764,34 +1761,6 @@ this.lastScore = score;
                     </button>
                 </div>
             </div>
-            
-            <style>
-                @keyframes fadeIn {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
-                }
-                @keyframes slideUp {
-                    from { 
-                        opacity: 0; 
-                        transform: translateY(30px); 
-                    }
-                    to { 
-                        opacity: 1; 
-                        transform: translateY(0); 
-                    }
-                }
-                .k-input {
-                    font-family: 'Segoe UI', Roboto, sans-serif;
-                    font-size: 0.95rem;
-                    color: var(--text-dark);
-                    transition: border-color 0.2s;
-                }
-                .k-input:focus {
-                    outline: none;
-                    border-color: var(--primary);
-                    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1);
-                }
-            </style>
         `;
         
         modal.innerHTML = modalContent;
@@ -1940,7 +1909,7 @@ this.lastScore = score;
                 '<td>' + this.getEstadoBadge(plan.estado) + '</td>' +
                 '<td>' +
                   '<div style="font-weight: 500;">' + hallazgoCode + '</div>' +
-                  '<div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">' + hallazgoDesc + '</div>' +
+                  '<div style="font-size: 0.8rem; color: var(--ei-text-muted); margin-top: 0.25rem;">' + hallazgoDesc + '</div>' +
                 '</td>' +
                 '<td>' + plan.accion + '</td>' +
                 '<td>' + plan.responsable + '</td>' +
@@ -1951,7 +1920,7 @@ this.lastScore = score;
                       '<i class="bi bi-eye"></i></button>' +
                     '<button class="k-btn k-btn-sm k-btn-outline" onclick="window.currentEvaluacionInstance.showActionPlanModal(\'' + plan.id + '\')" title="Editar">' +
                       '<i class="bi bi-pencil"></i></button>' +
-                    '<button class="k-btn k-btn-sm k-btn-outline" onclick="window.currentEvaluacionInstance.deleteActionPlan(\'' + plan.id + '\')" title="Eliminar" style="color: var(--danger); border-color: var(--danger);">' +
+                    '<button class="k-btn k-btn-sm k-btn-outline" onclick="window.currentEvaluacionInstance.deleteActionPlan(\'' + plan.id + '\')" title="Eliminar" style="color: var(--ei-danger); border-color: var(--ei-danger);">' +
                       '<i class="bi bi-trash"></i></button>' +
                   '</div>' +
                 '</td>' +
@@ -1985,7 +1954,7 @@ this.lastScore = score;
                   '<div style="display: flex; gap: 0.5rem; justify-content: flex-end;">' +
                     '<button class="k-btn k-btn-sm k-btn-outline" onclick="window.currentEvaluacionInstance.showActionPlanDetailModal(\'' + plan.id + '\')" title="Ver detalle">' +
                       '<i class="bi bi-eye"></i></button>' +
-                    '<button class="k-btn k-btn-sm k-btn-outline" onclick="window.currentEvaluacionInstance.deleteActionPlan(\'' + plan.id + '\')" title="Eliminar" style="color: var(--danger); border-color: var(--danger);">' +
+                    '<button class="k-btn k-btn-sm k-btn-outline" onclick="window.currentEvaluacionInstance.deleteActionPlan(\'' + plan.id + '\')" title="Eliminar" style="color: var(--ei-danger); border-color: var(--ei-danger);">' +
                       '<i class="bi bi-trash"></i></button>' +
                   '</div>' +
                 '</td>' +
@@ -1993,14 +1962,14 @@ this.lastScore = score;
         }.bind(this));
 
         var html = '<tr class="kair-orphan-disclosure-row">' +
-            '<td colspan="6" style="padding: 0; background-color: #fff8e1; border-left: 3px solid #ffc107;">' +
+            '<td colspan="6" style="padding: 0; background-color: var(--ei-warning-soft); border-left: 3px solid var(--ei-warning);">' +
               '<div style="padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;" onclick="document.getElementById(\'' + disclosureId + '\').classList.toggle(\'kair-collapsed\'); this.querySelector(\'i\').classList.toggle(\'bi-chevron-down\'); this.querySelector(\'i\').classList.toggle(\'bi-chevron-up\');">' +
                 '<div>' +
-                  '<i class="bi bi-chevron-down" style="margin-right: 8px; color: #856404;"></i>' +
-                  '<span style="color: #856404; font-weight: 600;">' + orphanPlans.length + ' plan(es) huerfano(s) del ARL</span>' +
-                  '<span style="color: #856404; opacity: 0.7; margin-left: 8px; font-size: 0.85rem;">(sin hallazgo vinculado, posible ruido del parser)</span>' +
+                  '<i class="bi bi-chevron-down" style="margin-right: 8px; color: var(--ei-warning-text);"></i>' +
+                  '<span style="color: var(--ei-warning-text); font-weight: 600;">' + orphanPlans.length + ' plan(es) huerfano(s) del ARL</span>' +
+                  '<span style="color: var(--ei-warning-text); opacity: 0.7; margin-left: 8px; font-size: 0.85rem;">(sin hallazgo vinculado, posible ruido del parser)</span>' +
                 '</div>' +
-                '<button class="k-btn k-btn-sm" style="background: #ffc107; color: #212529; border: none;" onclick="event.stopPropagation(); window.currentEvaluacionInstance._discardAllOrphans();" title="Eliminar todos los huerfanos">' +
+                '<button class="k-btn k-btn-sm" style="background: var(--ei-warning); color: var(--ei-text-dark); border: none;" onclick="event.stopPropagation(); window.currentEvaluacionInstance._discardAllOrphans();" title="Eliminar todos los huerfanos">' +
                   '<i class="bi bi-trash"></i> Descartar todos' +
                 '</button>' +
               '</div>' +
@@ -2277,17 +2246,18 @@ this.lastScore = score;
         ctx.arc(cx, cy, r, Math.PI, 2 * Math.PI);
         ctx.lineWidth = 25;
         ctx.lineCap = 'round';
-        ctx.strokeStyle = '#f1f3f5';
+        ctx.strokeStyle = this._color('--ei-track', '#eef0f1');
         ctx.stroke();
 
         // Arco valor
         const percentage = value / 100;
         const endAngle = Math.PI + (percentage * Math.PI);
 
-        // Color dinámico
-        let strokeColor = '#dc3545'; // Rojo
-        if (value > 60) strokeColor = '#ffc107'; // Amarillo
-        if (value > 85) strokeColor = '#28a745'; // Verde
+        // 📦759 — Color por umbral, leido de la paleta premium (antes eran 3 hex fijos
+        // que no seguian ni el tema oscuro ni el sistema de diseño).
+        let strokeColor = this._color('--ei-danger', '#da5563');   // Bajo
+        if (value > 60) strokeColor = this._color('--ei-warning', '#e7a224'); // Medio
+        if (value > 85) strokeColor = this._color('--ei-success', '#1bb888'); // Alto
 
         ctx.beginPath();
         ctx.arc(cx, cy, r, Math.PI, endAngle);
@@ -2359,281 +2329,18 @@ this.lastScore = score;
     }
 }
 
-// Inyección de Estilos del Sistema K+AIR (Scoped)
-if (!document.getElementById('k-air-eval-styles')) {
-    const style = document.createElement('style');
-    style.id = 'k-air-eval-styles';
-    style.textContent =
-        `
-        /*VARIABLES DEL SISTEMA */
-        :root {
-            --primary: #174ea6;
-            --primary-hover: #185abd;
-            --success: #28a745;
-            --warning: #ffc107;
-            --danger: #dc3545;
-            --info: #17a2b8;
-            --text-dark: #212529;
-            --text-muted: #6c757d;
-            --bg-body: #f8f9fa;
-            --bg-card: #ffffff;
-            --border: #dee2e6;
-            --radius: 0.375rem;
-            --shadow-sm: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
-        }
 
-        /* LAYOUT PRINCIPAL */
-        .k-module-container { height: 100%; width: 100%; background: var(--bg-body); font-family: 'Segoe UI', Roboto, sans-serif; overflow: hidden; }
-        .k-module-layout { display: flex; flex-direction: column; height: 100%; }
-
-        /* HEADER — Card k-section-card */
-        .k-section-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
-        .header-back-btn { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.75rem; font-size: 0.8125rem; font-weight: 500; color: #5a6378; background: transparent; border: 1px solid #dee2e6; border-radius: 0.375rem; cursor: pointer; transition: all 0.15s ease; }
-        .header-back-btn:hover { background: #e8f0fe; color: #174ea6; border-color: #174ea6; }
-        .header-action--outline { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.75rem; font-size: 0.8125rem; font-weight: 500; color: #5a6378; background: transparent; border: 1px solid #dee2e6; border-radius: 0.375rem; cursor: pointer; transition: all 0.15s ease; }
-        .header-action--outline:hover { background: #f0f2f5; color: #1a1a2e; }
-        .header-select { padding: 0.375rem 0.75rem; border: 1px solid #dee2e6; border-radius: 0.375rem; font-size: 0.8125rem; font-weight: 500; color: #1E293B; background: #fff; cursor: pointer; }
-
-        /* TABS — dentro del card */
-        .evaluacion-tabs { display: flex; gap: 0; margin: 0 -1.5rem; padding: 0 1.5rem; border-top: 1px solid #dee2e6; overflow-x: auto; }
-        .evaluacion-tab { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.75rem 1rem; font-size: 0.875rem; font-weight: 500; color: #5a6378; background: transparent; border: none; border-bottom: 2px solid transparent; cursor: pointer; transition: color 0.15s ease, border-color 0.15s ease; white-space: nowrap; }
-        .evaluacion-tab:hover { color: #174ea6; }
-        .evaluacion-tab.active { color: #174ea6; font-weight: 600; border-bottom-color: #174ea6; }
-
-        /* CONTENIDO */
-        .k-module-content { flex: 1; overflow-y: auto; padding: 2rem; position: relative; }
-        .k-view { display: none; animation: k-fade-in 0.3s ease-out; }
-        .k-view.active { display: block; }
-        @keyframes k-fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-        /* TOOLBAR */
-        .k-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; background: white; padding: 1rem; border-radius: var(--radius); border: 1px solid var(--border); }
-        .k-toolbar-group { display: flex; align-items: center; gap: 1rem; }
-        .k-label-muted { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
-        .k-select-sm { padding: 0.3rem 0.6rem; border-radius: 4px; border: 1px solid var(--border); font-size: 0.9rem; }
-        .k-loading-badge { font-size: 0.85rem; color: var(--primary); font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
-
-/* STATS RIBBON */
-.k-stats-ribbon { display: flex; align-items: center; gap: 0; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 0; margin-bottom: 1.5rem; box-shadow: var(--shadow-sm); overflow: hidden; }
-.k-stats-ribbon__item { display: flex; align-items: center; gap: 0.625rem; padding: 0.75rem 1.25rem; flex: 1; min-width: 0; }
-.k-stats-ribbon__icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.875rem; flex-shrink: 0; }
-.k-stats-ribbon__icon.primary { background: var(--primary-light); color: var(--primary); }
-.k-stats-ribbon__icon.danger { background: rgba(220, 53, 69, 0.1); color: var(--danger); }
-.k-stats-ribbon__icon.warning { background: rgba(255, 193, 7, 0.1); color: var(--warning); }
-.k-stats-ribbon__data { display: flex; flex-direction: column; min-width: 0; }
-.k-stats-ribbon__value { font-size: 1.25rem; font-weight: 700; color: var(--text-dark); line-height: 1.2; }
-.k-stats-ribbon__label { font-size: 0.6875rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
-.k-stats-ribbon__pct { margin-left: auto; font-size: 0.75rem; font-weight: 600; color: var(--primary); background: var(--primary-light); padding: 0.125rem 0.5rem; border-radius: 10px; white-space: nowrap; flex-shrink: 0; }
-.k-stats-ribbon__divider { width: 1px; height: 32px; background: var(--border); flex-shrink: 0; }
-@media (max-width: 768px) { .k-stats-ribbon { flex-wrap: wrap; } .k-stats-ribbon__item { flex: 1 1 45%; } .k-stats-ribbon__divider { display: none; } }
-
-        /* CHARTS GRID */
-        .k-grid-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
-        .k-flex-center { display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
-        .k-chart-label { position: absolute; top: 60%; left: 50%; transform: translate(-50%, -50%); font-size: 2rem; font-weight: 700; color: var(--text-dark); }
-
-        /* CARDS */
-        .k-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm); overflow: hidden; }
-        .k-card-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: #fff; }
-        .k-card-header h3 { margin: 0; font-size: 1rem; font-weight: 700; color: var(--text-dark); }
-        .k-card-body { padding: 1.25rem; }
-
-        /* PROGRESS BARS */
-        .k-phva-bars { display: flex; flex-direction: column; gap: 1rem; }
-        .k-progress-group { width: 100%; }
-        .k-progress-label { display: flex; justify-content: space-between; margin-bottom: 0.3rem; font-size: 0.8rem; font-weight: 600; color: var(--text-dark); }
-        .k-progress-bar { height: 8px; background: #e9ecef; border-radius: 4px; overflow: hidden; }
-        .k-progress-fill { height: 100%; border-radius: 4px; transition: width 0.6s ease; }
-
-        /* SOURCE CARD */
-        .k-card-source { padding: 1rem; display: flex; justify-content: space-between; align-items: center; }
-        .k-source-info { display: flex; align-items: center; gap: 1rem; }
-        .k-source-icon { width: 40px; height: 40px; background: #e7f1ff; color: var(--primary); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
-        .k-source-info h4 { margin: 0; font-size: 0.95rem; font-weight: 700; }
-        .k-source-info p { margin: 0; font-size: 0.8rem; color: var(--text-muted); }
-
-        /* TABLES */
-        .k-table-responsive { width: 100%; overflow-x: auto; }
-        .k-table { width: 100%; border-collapse: collapse; }
-        .k-table th { background: #f8f9fa; padding: 0.75rem 1rem; text-align: left; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; border-bottom: 2px solid var(--border); }
-        .k-table td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; color: var(--text-dark); vertical-align: middle; }
-        .k-table tr:hover { background-color: #f8f9fa; }
-        .k-table tr.k-row-warning { background-color: #fff3cd; border-left: 3px solid var(--warning); }
-        .k-empty-table { text-align: center; padding: 2rem; color: var(--text-muted); font-style: italic; }
-
-        /* Tablas con scroll vertical propio y encabezado fijo.
-           Aplica a la tabla de estándares (~60 filas) y a la de
-           planes de acción. Evita que los títulos se pierdan al
-           hacer scroll dentro de la tabla. */
-        .k-table-scrollable { max-height: 60vh; overflow-y: auto; scrollbar-gutter: stable; }
-        .k-table-scrollable .k-table { border-collapse: separate; border-spacing: 0; }
-        .k-table-scrollable .k-table th {
-            position: sticky;
-            top: 0;
-            z-index: 2;
-            background: #f8f9fa;
-            border-bottom: none;
-            box-shadow: inset 0 -2px 0 var(--border);
-        }
-
-        /* BADGES & BUTTONS */
-        .k-badge { padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
-        /* 📦532 — Variante inline del badge: emoji + texto en la misma
-           linea (display: inline-flex + align-items: center + gap + white-space: nowrap).
-           Sin esto, el emoji quedaba visualmente arriba del texto en columnas
-           angostas (ej: Estado con 10% de ancho). */
-        .k-badge.k-badge--inline { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; line-height: 1.2; }
-        .k-badge-success { background: #d4edda; color: #155724; }
-        .k-badge-danger { background: #f8d7da; color: #721c24; }
-        .k-btn { padding: 0.4rem 0.8rem; border-radius: 4px; font-size: 0.9rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; transition: 0.2s; border: 1px solid transparent; }
-        .k-btn-primary { background: var(--primary); color: white; }
-        .k-btn-primary:hover { background: var(--primary-hover); }
-        .k-btn-outline { background: white; border-color: var(--border); color: var(--text-dark); }
-        .k-btn-outline:hover { border-color: var(--primary); color: var(--primary); }
-        .k-btn-sm { padding: 0.25rem 0.5rem; font-size: 0.8rem; }
-
-        /* EMPTY STATES */
-        .k-empty-state { text-align: center; padding: 3rem; color: var(--text-muted); }
-        .k-empty-state i { font-size: 2.5rem; margin-bottom: 1rem; display: block; opacity: 0.5; }
-        .k-empty-state-small { text-align: center; padding: 1rem; font-size: 0.85rem; color: var(--text-muted); font-style: italic; }
-
-        /* UTILS */
-        .text-center { text-align: center; }
-        .text-right { text-align: right; }
-        .text-primary { color: var(--primary) !important; }
-        .text-success { color: var(--success) !important; }
-        .text-warning { color: var(--warning) !important; }
-        .text-danger { color: var(--danger) !important; }
-        .text-muted { color: var(--text-muted) !important; }
-
-        /* 📦534 — Reglas de modal SIN scoping + posición ABSOLUTE.
-           Los modales se adjuntan al wrapper #k-modal-root (que SI es
-           position:fixed fullscreen), NO al body. Por eso el overlay
-           usa position:absolute relativo al wrapper. Esto evita los
-           problemas de position:fixed en Electron con body overflow:hidden.
-           El CSS externo evaluacion-inicial-sg-sst.css define .k-modal
-           bajo .ev-inicial-sgsst (no aplica) y con position:fixed (tambien
-           problematico). Por eso duplicamos las reglas base aqui. */
-        .k-modal {
-            position: absolute !important;
-            inset: 0 !important;
-            width: 100% !important;
-            height: 100% !important;
-            background: rgba(0, 0, 0, 0.6);
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            z-index: 9999 !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            border: none !important;
-            pointer-events: auto !important;
-            animation: ei-fadeIn 0.3s ease-in-out;
-        }
-        .k-modal-content {
-            background: var(--bg-card);
-            border-radius: 16px;
-            width: 90%;
-            max-width: 700px;
-            max-height: 85vh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-            pointer-events: auto !important;
-            animation: ei-slideUp 0.4s ease-out;
-        }
-        .k-modal-content.k-modal-content--wide { max-width: 900px; }
-        .k-modal-header {
-            padding: 1.5rem 2rem;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-shrink: 0;
-        }
-        .k-modal-header.text-center {
-            text-align: center;
-            flex-direction: column;
-            gap: 0.25rem;
-        }
-        .k-modal-header h3 { margin: 0; font-size: 1.25rem; font-weight: 600; color: var(--text-dark); }
-        .k-modal-icon {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 56px; height: 56px;
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark, #0d3578) 100%);
-            border-radius: 50%;
-            margin-bottom: 0.75rem;
-        }
-        .k-modal-icon i { color: white; font-size: 1.6rem; }
-        .k-modal-subtitle {
-            margin: 0;
-            color: var(--text-muted);
-            font-size: 0.9rem;
-        }
-        .k-modal-body {
-            padding: 1.5rem 2rem;
-            overflow-y: auto;
-            flex: 1;
-        }
-        .k-modal-footer {
-            padding: 1rem 2rem;
-            border-top: 1px solid var(--border);
-            display: flex;
-            justify-content: flex-end;
-            gap: 0.75rem;
-            flex-shrink: 0;
-            background: var(--bg-body);
-        }
-
-        /* 📦533 — Form SIN scoping (misma razón que modal: el form vive
-           dentro del modal que se adjunta al body, fuera del scope). */
-        .k-form-group { margin-bottom: 1.25rem; }
-        .k-form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1.5rem;
-        }
-        .k-form-label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 600;
-            color: var(--text-dark);
-            font-size: 0.9rem;
-        }
-        .k-form-control {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            font-size: 0.9rem;
-            font-family: inherit;
-            color: var(--text-dark);
-            background: var(--bg-card);
-            transition: border-color 0.2s, box-shadow 0.2s;
-            box-sizing: border-box;
-        }
-        .k-form-control:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1);
-        }
-        .k-form-control-sm { padding: 0.375rem 0.625rem; font-size: 0.8rem; }
-
-        @keyframes ei-fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes ei-slideUp {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* 📦532 — El bloque .k-toast se elimino. Las notificaciones ahora
-           las gestiona KAIRToast (assets/js/kair-toast.js + #notification-hub). */
-
-    `;
-    document.head.appendChild(style);
-}
+// 📦759 — ACÁ HABÍA 270 LÍNEAS DE CSS INYECTADO DESDE EL JS, Y SE ELIMINARON.
+//
+// Estaba dentro de un <style> que se agregaba al <head> DESPUÉS del <link> del .css,
+// así que le ganaba en cada empate y "secuestraba" el aspecto del módulo: era la causa
+// de que editar solo la hoja de estilos no cambiara nada. Además definía un `:root`
+// GLOBAL con nombres genéricos (--primary, --text-dark, --bg-card, --border…) que se
+// filtraban a TODA la aplicación, y no tenía versión oscura.
+//
+// Todo lo que hacía falta de ese bloque vive ahora, con scope real, en:
+//   evaluacion-inicial-sg-sst-premium.css  →  .kair-eval-scope
+// que se aplica al contenedor del módulo, a #k-modal-root y a los <dialog> de Planes.
 
 // Inicialización
 window.EvaluacionInicialSgSst = EvaluacionInicialSgSst;

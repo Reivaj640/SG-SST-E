@@ -312,6 +312,102 @@ async renderMainArea(container) {
   `<script src="modules/.../x-home.js?v=...">` en `index.html`. **Cada vez que se toca un home hay
   que bumpear SU `?v=`** (📦756 lo omitió para 4 homes: recursos, amenazas, verificación y
   mejoramiento; se corrigió en 📦757). No alcanza con bumpear `styles.css`.
+- **🚨 📦759 — EVALUACIÓN INICIAL DEL SG-SST: los dos bugs de raíz que hay que no repetir.**
+  El submódulo 2.3.1 (`modules/gestion-integral/evaluacion-inicial-sg-sst/`) tenía un problema
+  de arquitectura de estilos, no de diseño. Cuando se toque cualquier submódulo viejo, buscar
+  los mismos dos patrones:
+  1. **CSS inyectado desde el `.js`.** El componente armaba 270 líneas de CSS en un `<style>`
+     al `<head>` con un `:root` **GLOBAL** (`--primary`, `--text-dark`, `--bg-card`, `--border`…)
+     y reglas `.k-*` **sin scope**. Se agregaba DESPUÉS del `<link>`, así que le ganaba al `.css`
+     en cada empate → **editar la hoja de estilos no cambiaba nada**, y esos nombres genéricos
+     se filtraban a TODA la app (otros módulos usan `--primary`). Se eliminó ese bloque; lo que
+     hacía falta de él (barra PHVA, layout, modal de archivos) vive en la hoja premium.
+     **Regla:** ningún componente inyecta CSS al `<head>`; si necesita estilos propios, van en
+     su hoja con su propio prefijo.
+  2. **Los modales viven FUERA del contenedor del módulo.** `#k-modal-root` (modal de PDF) y los
+     4 `<dialog>` de Planes de Acción se cuelgan del `<body>`. Si la capa de estilos se scopea
+     al contenedor, **los modales se quedan sin estilo y sin modo oscuro** (era exactamente lo
+     que se veía: modal blanco con el tema oscuro puesto). Solución: una sola marca,
+     `kair-eval-scope`, aplicada a los TRES puntos de montaje con `this._scope(nodo)`.
+     **Regla:** al migrar cualquier componente, listar TODOS los lugares donde appendea nodos
+     (contenedor, body, top layer) y scopear cada uno.
+  - **Bug de pestañas (preexistente, corregido).** `.k-view { display: none }` y
+    `.k-view.active { display: block }` tienen **la misma prioridad** (0,2,0); cuando empatan
+    gana la declarada más abajo. Con la regla que apaga escrita después, **la vista activa
+    quedaba invisible**: la tabla de Hallazgos y la de Planes de Acción no aparecían nunca
+    (el botón sí se marcaba, porque es otra clase). Fix: `.k-view:not(.active) { display: none }`.
+     **Regla:** nunca dejar un `display: none` genérico antes de un estado activo con la misma
+     prioridad — o se excluye el estado, o se sube la prioridad del activo.
+  - **Modo oscuro: la app tiene DOS atributos.** `theme-manager.js` aplica `data-theme="dark"`
+     (tema "Sistema" con el SO oscuro) y `data-theme="dark-legacy"` (tema "Oscuro" manual). El
+     módulo solo cubría el primero → con el tema oscuro elegido a mano quedaba claro.
+     **Siempre cubrir los dos.**
+  - **Tokens "envenenados" por la hoja base.** El `.css` base vuelve a declarar `--ei-*` en
+     `.ev-inicial-sgsst` (misma prioridad, después en la cascada), así que los alias
+     (`--ei-bg-card` → `--kair-card` → `#ffffff`) resolvían blanco en oscuro. Para las
+     superficies se usa un token propio (`--ei-surface`) y en el bloque oscuro se listan
+     selectores con prioridad extra (incluyendo el layout) más los alias `--k-*` y los
+     genéricos. **Regla:** cuando se reasignan tokens, verificar el valor *calculado* en el
+     nodo real (`getComputedStyle(el).getPropertyValue('--token')`), no confiar en el CSSOM.
+  - **El `<canvas>` no entiende `var()`.** El gauge tenía 3 hex fijos (`#dc3545`, `#ffc107`,
+     `#28a745`) y por eso no seguía ni la paleta ni el tema. Ahora usa `this._color('--ei-x', respaldo)`,
+     que lee el valor real con `getComputedStyle`.
+  - **Colores escritos a mano en el HTML.** Los `style="color: var(--text-dark)"` del template
+     usaban tokens **globales**; se cambiaron por los del módulo (`var(--ei-text-dark)`) y se
+     tokenizaron los hex sueltos. Además había un `background: var(--warning)15` (concatenación
+     inválida: el navegador la descarta en silencio).
+  - **Herramientas de verificación** (están en `.gitignore`, se crean de nuevo si hacen falta):
+     `main/_preview-evaluacion.js` renderiza el componente real con un puente simulado y saca
+     capturas en claro y oscuro; `main/_preview-modales.js` abre los 5 modales y **mide el
+     contraste** de cada texto (ratio WCAG) para detectar texto invisible. Lección del arnés:
+     con la ventana **sin mostrar**, Electron mide todo en 0 — hay que usar `win.showInactive()`.
+  - Test: `node main/test-evaluacion-inicial-premium.js` (45 checks).
+- **🚨 📦760 — ARCHIVO Y RETENCIÓN (2.5.1): el iframe y el backend del Excel tenían nombres
+  de campo DISTINTOS.** Es el bug más caro de esta familia de módulos y conviene buscarlo en
+  cualquier submódulo que hable con un Excel por `postMessage`. El iframe leía `doc.tipo` y
+  `doc.hoja`, y escribía `disposicionFinal` y `tipo`; el backend
+  (`archivo-retencion-main.js`, que lee el Excel con ExcelJS) expone OTROS nombres.
+  Consecuencias reales que tenía el módulo:
+  1. La columna **Tipo** salía siempre `—` y los KPI Documentos/Registros siempre en **0**
+     (el backend entrega `tipoDoc`/`tipoReg`/`tipoInterno`/`tipoExterno`, booleanos).
+  2. El selector **"Todas las hojas" quedaba vacío** (el backend lo llama `hojaOrigen`).
+  3. **Editar Tipo o Disposición Final no se guardaba** (el backend lee `disposicion` y
+     parsea `tipo` como texto combinado; `disposicionFinal` no existe allá).
+  **Regla:** los nombres del backend NO se usan nunca directo en la vista. Se escribe un
+  **adaptador explícito** con dos funciones, `desdeBackend()` (al leer) y `haciaBackend()`
+  (al escribir), y TODA mutación pasa por ellas. Al tocar el modelo, verificar contra
+  `leerExcelCompleto()` de `archivo-retencion-main.js` (los campos exactos que devuelve).
+  Ojo con el orden del handler `actualizar`: primero parsea `tipo` y DESPUÉS aplica los
+  booleanos individuales, así que si se mandan, tienen que ser coherentes con el texto.
+- **📦760 — Archivo y Retención pasó al diseño premium v2.** Se adoptó el prototipo
+  completo (barra superior con migas de pan, 4 tarjetas de KPI con el de archivo muerto
+  clicable, filtro por disposición, tabla con fila expandible y edición en línea,
+  paginación con números, modal por bloques, esqueleto de carga, ARIA y teclado) y se
+  **recableó al puente real** (el prototipo era una demo en memoria SIN puente).
+  - **Archivos**: el HTML quedó solo con el marcado; los estilos en
+    `archivo-retencion-view.css` y la lógica en `archivo-retencion-view.js`. Los tres
+    llevan `?v=` propio y el wrapper (`archivo-retencion.js`) versiona la URL del iframe:
+    **sin ese `v=` un rediseño no se ve hasta limpiar la caché**.
+  - **Se conservó** lo que el prototipo no traía: edición en línea en Descripción /
+    Código / Revisión / Almacenamiento, fila marcada como "sin guardar" y botón
+    **Guardar** masivo; y los atajos Ctrl+N / Ctrl+F.
+  - **Guardado masivo**: manda un `actualizar` **por fila** (no el `guardar` con la lista
+    entera). El backend aplica por `numero`, así que así no se pisan las filas que no se
+    tocaron. La respuesta se relee con `leer-todos` para que los números queden alineados.
+  - **Modo oscuro completo**: cubre `data-theme="dark"` **y** `data-theme="dark-legacy"`
+    (los dos que aplica `scripts/theme-manager.js`) y alcanza barra superior, tarjetas,
+    filtros, tabla, fila expandible, modales, paginación, avisos y esqueleto. Antes solo
+    estaba el encabezado y la franja de KPIs, y el tema oscuro manual no se aplicaba.
+  - **Layout del modal**: es una columna de 3 partes (cabecera fija + cuerpo con scroll +
+    pie fijo) con `overflow: hidden` en el contenedor y `min-height: 0` en el cuerpo. Sin
+    eso el pie se montaba encima del último campo y "Disposición final" quedaba tapado.
+  - **Herramienta**: `main/_preview-archivo.js` (en `.gitignore`) monta la vista real con
+    un puente simulado que responde con la forma EXACTA del backend, ejercita filtros,
+    búsqueda, orden, expansión, edición en línea, guardado masivo y los dos modales, y saca
+    capturas en claro y oscuro. Lección: con la ventana **sin mostrar**, Electron mide todo
+    en 0 — hay que usar `win.showInactive()`; y el puente tiene que estar inyectado **antes**
+    del script de la vista, o el primer `leer-todos` se pierde.
+  - Test: `node main/test-archivo-retencion-premium.js` (50 checks).
 - **Patrón exacto del layout y mainArea** (replicado en los 8 módulos):
 
 ```javascript
@@ -827,6 +923,8 @@ Desde v0.1.120, el proyecto tiene **tests smoke** en `sgsst-electron-app/main/te
 | `test-skeleton-encaje.js` | 26 | Encaje del esqueleto (📦756): compara radio/borde/padding/gap/alto del esqueleto contra las tarjetas reales, en los 7 homes y en el submódulo Mantenimiento |
 | `test-chart-overflow.js` | 20 | El gráfico no se sale de su tarjeta ni deforma su texto (📦757+📦758): sin alto/ancho en línea, sin `preserveAspectRatio="none"`, sin texto dentro del dibujo, los 7 homes usan `.kair-bar-chart` + `.kair-chart--flow`, y cache-bust |
 | `test-grafico-se-ve-bien.js` | 39 | Los gráficos se ven bien (📦758): **EJECUTA el código real** de los 7 homes con un DOM mínimo y verifica el HTML producido (porcentajes de cada barra, textos, filas) + las reglas CSS que impiden que se pisen |
+| `test-evaluacion-inicial-premium.js` | 45 | Evaluación Inicial del SG-SST en premium (📦759): que NO vuelva el CSS global inyectado desde el `.js`, que la capa premium cubra los 3 puntos de montaje (módulo + `#k-modal-root` + los 4 `<dialog>`), que el gauge lea sus colores de la paleta, que no queden colores en línea, que el modo oscuro cubra `dark` Y `dark-legacy`, y cache-bust |
+| `test-archivo-retencion-premium.js` | 50 | Archivo y Retención en premium (📦760): **EJECUTA la vista real** y verifica el adaptador de campos contra la forma exacta del backend (que el Tipo salga de los 4 booleanos, que la hoja se lea de `hojaOrigen`, y que el payload mande `disposicion` y no `disposicionFinal`), la estructura nueva, la edición en línea, el guardado masivo, los `type` del puente y el modo oscuro en todos los bloques |
 
 **Nota:** el total puede variar si se agregan o quitan tests. Correr los del módulo que se toca antes de commitear.
 

@@ -254,7 +254,11 @@
 }
 
 /* ── VISTAS ──────────────────────────────────────────────────────────────── */
-.ev-inicial-sgsst .k-view {
+/* 📦759 — Bug corregido: `.k-view` y `.k-view.active` tienen la MISMA prioridad, así que
+   ganaba la que estuviera declarada más abajo. Al no excluir la vista activa, el
+   `display: none` apagaba la vista recién abierta: la tabla de Hallazgos y la de Planes
+   de Acción no se veían nunca (el botón sí se marcaba). Se excluye la activa. */
+.ev-inicial-sgsst .k-view:not(.active) {
     display: none;
 }
 
