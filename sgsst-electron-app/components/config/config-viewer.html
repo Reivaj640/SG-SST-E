@@ -10,6 +10,11 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
 
+    <!-- 📦751 · Premium v2 · tokens compartidos (Manrope/DM Sans + paleta K+AIR).
+         Solo se cargan los TOKENS: la capa premium vive al final del <style>
+         scopada bajo `.kair-config` (ver bloque PREMIUM v2). -->
+    <link rel="stylesheet" href="../../shared/kair-design-tokens.css">
+
     <style>
         /* =========================================
            1. SISTEMA VISUAL & VARIABLES
@@ -1786,38 +1791,520 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        /* ═══════════════════════════════════════════════════════════════
+           📦751 · PREMIUM v2 · CAPA DE CONFIGURACIÓN
+           Todo scopado bajo `.kair-config` (clase del elemento body).
+           Remapea las variables del sistema legacy a los tokens premium
+           (shared/kair-design-tokens.css) y restylea los componentes
+           estructurales. NO toca IDs, handlers ni la lógica JS.
+           ═══════════════════════════════════════════════════════════════ */
+
+        .kair-config {
+            /* Remapeo legacy → tokens premium v2 */
+            --primary: var(--kair-blue);
+            --primary-hover: #1a4a9e;
+            --success: var(--kair-mint);
+            --warning: var(--kair-amber);
+            --danger: var(--kair-red);
+            --info: var(--kair-blue);
+            --dark: var(--kair-ink);
+
+            --bg-general: var(--kair-canvas);
+            --bg-card: var(--kair-card);
+            --border-color: var(--kair-line);
+            --border: var(--kair-line);
+            --bg-muted: var(--kair-soft);
+            --text-primary: var(--kair-ink);
+
+            --text-main: var(--kair-ink);
+            --text-muted: var(--kair-muted);
+            --text-light: #ffffff;
+
+            --font-heading: var(--kair-font-display);
+            --font-body: var(--kair-font-ui);
+
+            --shadow-sm: 0 1px 2px rgba(20, 33, 61, .03);
+            --shadow-md: var(--kair-shadow-card);
+            --shadow-lg: 0 18px 44px rgba(20, 33, 61, .18);
+            --radius: var(--kair-radius-control);
+            --radius-md: 10px;
+            --radius-lg: var(--kair-radius-card);
+
+            font-family: var(--kair-font-ui);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* --- Header System v2: breadcrumb + icono/título + tabs --- */
+        .kair-config .cfg-header {
+            flex-shrink: 0;
+            padding: 18px 28px 0;
+            background: var(--kair-canvas);
+        }
+        .kair-config .cfg-breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--kair-muted);
+            margin-bottom: 14px;
+        }
+        .kair-config .cfg-breadcrumb a {
+            color: var(--kair-muted);
+            text-decoration: none;
+            padding: 2px 5px;
+            border-radius: 6px;
+            transition: color var(--kair-transition), background var(--kair-transition);
+        }
+        .kair-config .cfg-breadcrumb a:hover {
+            color: var(--kair-blue);
+            background: var(--kair-blue-soft);
+        }
+        .kair-config .cfg-breadcrumb__sep { color: #c9d0da; }
+        .kair-config .cfg-breadcrumb .is-current {
+            color: var(--kair-ink);
+            font-weight: 600;
+            padding: 2px 5px;
+        }
+
+        .kair-config .cfg-header-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding-bottom: 18px;
+            flex-wrap: wrap;
+        }
+        .kair-config .cfg-header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+        .kair-config .cfg-header-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: var(--kair-blue-soft);
+            color: var(--kair-blue);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .kair-config .cfg-header-left h3 {
+            font-family: var(--kair-font-display);
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: -.02em;
+            line-height: 1.15;
+            color: var(--kair-ink);
+            margin: 0;
+        }
+        .kair-config .cfg-header-left p {
+            font-size: 13px;
+            color: var(--kair-muted);
+            margin: 4px 0 0;
+        }
+        .kair-config .cfg-header-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .kair-config .cfg-back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            height: 38px;
+            padding: 0 15px;
+            border-radius: 10px;
+            border: 1px solid var(--kair-line);
+            background: var(--kair-card);
+            color: var(--kair-ink);
+            font-family: var(--kair-font-ui);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background var(--kair-transition), border-color var(--kair-transition);
+        }
+        .kair-config .cfg-back-btn:hover { background: var(--kair-soft); }
+
+        /* --- Tabs (underline premium) --- */
+        .kair-config .cfg-tabs {
+            display: flex;
+            gap: 4px;
+            padding: 0;
+            border-bottom: 1px solid var(--kair-line);
+            overflow-x: auto;
+        }
+        .kair-config .cfg-tab.nav-tab {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 12px 14px;
+            font-size: 13.5px;
+            font-weight: 600;
+            color: var(--kair-muted);
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: color var(--kair-transition), border-color var(--kair-transition);
+        }
+        .kair-config .cfg-tab.nav-tab svg { opacity: .75; }
+        .kair-config .cfg-tab.nav-tab:hover { color: var(--kair-ink); }
+        .kair-config .cfg-tab.nav-tab.active {
+            color: var(--kair-blue);
+            border-bottom-color: var(--kair-blue);
+        }
+        .kair-config .cfg-tab.nav-tab.active svg { opacity: 1; }
+        .kair-config .cfg-tab.nav-tab.active::after { display: none; }
+
+        @media (max-width: 768px) {
+            .kair-config .cfg-header { padding: 14px 16px 0; }
+            .kair-config .cfg-header-left h3 { font-size: 19px; }
+            .kair-config .cfg-tab.nav-tab { padding: 11px 11px; font-size: 12.5px; }
+        }
+
+        /* --- Contenido y títulos de sección --- */
+        .kair-config .settings-content {
+            padding: 26px 28px 56px;
+            background: var(--kair-canvas);
+        }
+        .kair-config .section-container { max-width: 1200px; }
+        .kair-config .section-header { margin-bottom: 18px; }
+        .kair-config .section-title {
+            font-family: var(--kair-font-display);
+            font-size: 21px;
+            font-weight: 800;
+            letter-spacing: -.02em;
+            color: var(--kair-ink);
+            margin-bottom: 4px;
+        }
+        .kair-config .section-subtitle {
+            font-size: 13px;
+            color: var(--kair-muted);
+        }
+
+        /* --- Superficies (cards / tablas / grupos) --- */
+        .kair-config .firma-card,
+        .kair-config .ai-card,
+        .kair-config .info-card,
+        .kair-config .theme-control-group,
+        .kair-config .table-container,
+        .kair-config .sync-modal {
+            background: var(--kair-card);
+            border: 1px solid var(--kair-line);
+            border-radius: var(--kair-radius-card);
+            box-shadow: 0 1px 2px rgba(20, 33, 61, .03);
+        }
+        .kair-config .company-card {
+            background: var(--kair-card);
+            border: 1px solid var(--kair-line);
+            border-top-width: 3px;
+            border-radius: var(--kair-radius-card);
+            box-shadow: 0 1px 2px rgba(20, 33, 61, .03);
+        }
+        .kair-config .company-card.risk-I { border-top-color: var(--kair-mint); }
+        .kair-config .company-card.risk-II { border-top-color: var(--kair-blue); }
+        .kair-config .company-card.risk-III { border-top-color: var(--kair-amber); }
+        .kair-config .company-card.risk-IV { border-top-color: #fd7e14; }
+        .kair-config .company-card.risk-V { border-top-color: var(--kair-red); }
+        .kair-config .company-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 22px rgba(20, 33, 61, .07);
+        }
+        .kair-config .sync-section {
+            background: var(--kair-soft);
+            border: 1px solid var(--kair-line);
+            border-radius: 12px;
+        }
+
+        /* --- Botones --- */
+        .kair-config .btn {
+            height: 38px;
+            padding: 0 15px;
+            border-radius: 10px;
+            font-family: var(--kair-font-ui);
+            font-size: 13px;
+            font-weight: 600;
+            gap: 7px;
+            transition: background var(--kair-transition), color var(--kair-transition),
+                        border-color var(--kair-transition), box-shadow var(--kair-transition);
+        }
+        .kair-config .btn-primary {
+            background: var(--kair-blue);
+            color: #fff;
+            box-shadow: var(--kair-shadow-soft);
+        }
+        .kair-config .btn-primary:hover { background: var(--primary-hover); }
+        .kair-config .btn-outline {
+            background: var(--kair-card);
+            border: 1px solid var(--kair-line);
+            color: var(--kair-ink);
+        }
+        .kair-config .btn-outline:hover { background: var(--kair-soft); }
+        .kair-config .btn-danger-ghost {
+            background: transparent;
+            color: var(--kair-red);
+        }
+        .kair-config .btn-danger-ghost:hover { background: var(--kair-red-soft); }
+        .kair-config .btn-sm { height: 30px; padding: 0 11px; font-size: 12px; }
+
+        /* --- Tablas --- */
+        .kair-config thead { background: var(--kair-soft); }
+        .kair-config th {
+            padding: 13px 18px;
+            font-size: 10.5px;
+            font-weight: 700;
+            letter-spacing: .09em;
+            text-transform: uppercase;
+            color: var(--kair-muted);
+        }
+        .kair-config td {
+            padding: 13px 18px;
+            border-top: 1px solid var(--kair-line-soft);
+            font-size: 13.5px;
+        }
+        .kair-config tr:hover { background: #f7f9fb; }
+        .kair-config .user-avatar {
+            background: var(--kair-blue-soft);
+            color: var(--kair-blue);
+            font-weight: 700;
+        }
+
+        /* --- Chips / badges (solo forma; el color lo define cada variante) --- */
+        .kair-config .status-pill,
+        .kair-config .role-badge,
+        .kair-config .risk-badge,
+        .kair-config .normativa-pill,
+        .kair-config .map-type-badge,
+        .kair-config .firma-badge {
+            border-radius: 999px;
+            font-weight: 600;
+        }
+        .kair-config .role-badge {
+            background: var(--kair-blue-soft);
+            color: var(--kair-blue);
+        }
+
+        /* --- Iconos de tarjeta de firma --- */
+        .kair-config .firma-card__icon--service {
+            color: var(--kair-blue);
+            background: var(--kair-blue-soft);
+        }
+        .kair-config .firma-card__icon--admin {
+            color: #6d4bc4;
+            background: #f0ecfb;
+        }
+        .kair-config .dev-avatar { background: var(--kair-blue-soft); }
+        .kair-config .system-diag-row { border-bottom: 1px solid var(--kair-line-soft); }
+
+        /* --- Modales --- */
+        .kair-config .modal-overlay {
+            background: rgba(20, 33, 61, .42);
+            backdrop-filter: blur(3px);
+        }
+        .kair-config .modal-container {
+            background: var(--kair-card);
+            border: 1px solid var(--kair-line);
+            border-radius: var(--kair-radius-modal);
+            box-shadow: 0 18px 44px rgba(20, 33, 61, .18);
+        }
+        .kair-config .modal-header {
+            padding: 20px 24px 14px;
+            border-bottom: 1px solid var(--kair-line);
+        }
+        .kair-config .modal-header h3 {
+            font-family: var(--kair-font-display);
+            font-size: 17px;
+            font-weight: 800;
+            letter-spacing: -.01em;
+            color: var(--kair-ink);
+        }
+        .kair-config .modal-body { padding: 20px 24px; }
+        .kair-config .modal-footer {
+            padding: 14px 24px 20px;
+            border-top: 1px solid var(--kair-line);
+            background: var(--kair-soft);
+            border-radius: 0 0 var(--kair-radius-modal) var(--kair-radius-modal);
+        }
+
+        /* --- Formularios --- */
+        .kair-config .form-control,
+        .kair-config .firma-form-input,
+        .kair-config .ai-textarea,
+        .kair-config .sync-modal-field input[type="text"],
+        .kair-config .sync-modal-field select {
+            background: var(--kair-card);
+            border: 1px solid var(--kair-line);
+            border-radius: 10px;
+            color: var(--kair-ink);
+            font-family: var(--kair-font-ui);
+            transition: border-color var(--kair-transition), box-shadow var(--kair-transition);
+        }
+        .kair-config .form-control:focus,
+        .kair-config .firma-form-input:focus,
+        .kair-config .ai-textarea:focus {
+            outline: none;
+            border-color: var(--kair-blue);
+            box-shadow: 0 0 0 3px var(--kair-blue-soft);
+        }
+        .kair-config .form-label,
+        .kair-config .firma-form-label {
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: .02em;
+            color: var(--kair-ink);
+        }
+        .kair-config input[type="range"] { accent-color: var(--kair-blue); }
+
+        /* --- Control segmentado de tema --- */
+        .kair-config .theme-segmented {
+            background: var(--kair-soft);
+            border-radius: 12px;
+            padding: 4px;
+        }
+        .kair-config .theme-option {
+            border-radius: 9px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--kair-muted);
+        }
+        .kair-config .theme-option.active {
+            background: var(--kair-card);
+            color: var(--kair-blue);
+            box-shadow: 0 1px 3px rgba(20, 33, 61, .10);
+        }
+
+        /* --- Scrollbar premium --- */
+        .kair-config .settings-content::-webkit-scrollbar { width: 10px; }
+        .kair-config .settings-content::-webkit-scrollbar-track { background: transparent; }
+        .kair-config .settings-content::-webkit-scrollbar-thumb {
+            background: #d9dee5;
+            border: 3px solid transparent;
+            background-clip: content-box;
+            border-radius: 99px;
+        }
+        .kair-config .settings-content::-webkit-scrollbar-thumb:hover {
+            background: #c3cad4;
+            background-clip: content-box;
+        }
+
+        /* --- Variante oscura: remapeo de tokens --- */
+        [data-theme="dark"] .kair-config {
+            --bg-general: #0f1524;
+            --bg-card: #1a2334;
+            --border-color: #2b3548;
+            --border: #2b3548;
+            --bg-muted: #232e42;
+            --primary: #5b95ea;
+            --primary-hover: #7aabf0;
+            --kair-canvas: #0f1524;
+            --kair-card: #1a2334;
+            --kair-soft: #232e42;
+            --kair-line: #2b3548;
+            --kair-line-soft: #232e42;
+            --kair-ink: #e9edf5;
+            --kair-muted: #9aa7bd;
+            --kair-blue: #5b95ea;
+            --kair-blue-soft: #1e2f4d;
+            --kair-red-soft: #3a2028;
+        }
+        [data-theme="dark-legacy"] .kair-config {
+            --bg-general: #121212;
+            --bg-card: #1e1e1e;
+            --border-color: #3a3a3a;
+            --border: #3a3a3a;
+            --bg-muted: #262626;
+            --primary: #8ab4f8;
+            --primary-hover: #a8c7fa;
+            --kair-canvas: #121212;
+            --kair-card: #1e1e1e;
+            --kair-soft: #262626;
+            --kair-line: #3a3a3a;
+            --kair-line-soft: #2e2e2e;
+            --kair-ink: #e9ecef;
+            --kair-muted: #adb5bd;
+            --kair-blue: #8ab4f8;
+            --kair-blue-soft: #22303f;
+            --kair-red-soft: #3a2626;
+        }
+        [data-theme="dark"] .kair-config tr:hover,
+        [data-theme="dark-legacy"] .kair-config tr:hover { background: rgba(255, 255, 255, .035); }
+        [data-theme="dark"] .kair-config .settings-content::-webkit-scrollbar-thumb,
+        [data-theme="dark-legacy"] .kair-config .settings-content::-webkit-scrollbar-thumb { background: #3a4356; }
+        [data-theme="dark"] .kair-config .firma-card__icon--admin {
+            color: #b8a6f0;
+            background: #2c2547;
+        }
+        [data-theme="dark-legacy"] .kair-config .firma-card__icon--admin {
+            color: #b8a6f0;
+            background: #2c2547;
+        }
     </style>
 </head>
-<body>
+<body class="kair-config">
 
 <div class="app-container">
 
-    <!-- CABECERA DEL MÓDULO -->
-    <header class="module-header">
-        <div>
-            <div class="module-title">
-                <span>⚙️</span>
-                <span>Configuración del Sistema</span>
+    <!-- CABECERA — Header System v2 (breadcrumb + icono/título + tabs) -->
+    <header class="cfg-header">
+        <nav class="cfg-breadcrumb" aria-label="Ruta de navegación">
+            <a href="#" onclick="goHome(); return false;">Inicio</a>
+            <span class="cfg-breadcrumb__sep">›</span>
+            <span class="is-current">Configuración</span>
+        </nav>
+
+        <div class="cfg-header-row">
+            <div class="cfg-header-left">
+                <div class="cfg-header-icon" aria-hidden="true">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                </div>
+                <div>
+                    <h3>Configuración del Sistema</h3>
+                    <p>Gestión de empresas, usuarios, IA y apariencia de K+AIR</p>
+                </div>
             </div>
-            <div class="module-context">
-                Gestión de empresas, usuarios, IA y apariencia de K+AIR
+            <div class="cfg-header-right">
+                <button type="button" class="cfg-back-btn" onclick="goHome()">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                    Volver al inicio
+                </button>
             </div>
         </div>
-        <button class="btn btn-outline" onclick="goHome()" style="margin-left: 1rem;">
-            <span>🏠</span>
-            <span>Inicio</span>
-        </button>
-    </header>
 
-    <!-- NAVEGACIÓN DE CONFIGURACIÓN -->
-    <nav class="settings-top-nav">
-        <div class="nav-tab" onclick="switchTab('empresas', this)">Gestión de Empresas</div>
-        <div class="nav-tab" onclick="switchTab('firma', this)">Firma Electrónica</div>
-        <div class="nav-tab active" onclick="switchTab('usuarios', this)">Ajustes de Usuario</div>
-        <div class="nav-tab" onclick="switchTab('ia', this)">Configuración IA</div>
-        <div class="nav-tab" onclick="switchTab('interfaz', this)">Interfaz de Usuario</div>
-        <div class="nav-tab" onclick="switchTab('acerca', this)">Acerca de la App</div>
-    </nav>
+        <!-- Tabs (Header System v2) -->
+        <nav class="cfg-tabs settings-top-nav" role="tablist">
+            <button type="button" class="cfg-tab nav-tab" onclick="switchTab('empresas', this)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-5h6v5"/><path d="M9 11h.01M15 11h.01"/></svg>
+                Gestión de Empresas
+            </button>
+            <button type="button" class="cfg-tab nav-tab" onclick="switchTab('firma', this)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                Firma Electrónica
+            </button>
+            <button type="button" class="cfg-tab nav-tab active" onclick="switchTab('usuarios', this)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                Ajustes de Usuario
+            </button>
+            <button type="button" class="cfg-tab nav-tab" onclick="switchTab('ia', this)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg>
+                Configuración IA
+            </button>
+            <button type="button" class="cfg-tab nav-tab" onclick="switchTab('interfaz', this)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                Interfaz de Usuario
+            </button>
+            <button type="button" class="cfg-tab nav-tab" onclick="switchTab('acerca', this)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                Acerca de la App
+            </button>
+        </nav>
+    </header>
 
     <!-- ÁREA DE CONTENIDO -->
     <div class="settings-content">

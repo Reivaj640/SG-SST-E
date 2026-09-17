@@ -1611,6 +1611,7 @@ El archivo se carga globalmente en `index.html` (junto a `kair-design-tokens.css
 | Módulo | Usa `kair-premium` | Notas |
 |--------|--------------------|-------|
 | Dashboard principal | ✅ (📦749) | Piloto — referencia de implementación |
+| Configuración | ✅ (📦751) | No usa `kair-premium`: capa propia scoped `.kair-config` + Header System v2 |
 | Inducciones | ⏳ | Dialecto propio en `inducciones-view.css` (scoped `.inducciones-container`) |
 | Plan de Trabajo | ⏳ | Dialecto propio en `plan-view.html` |
 | Otros submódulos | ⏳ | Migrar con este playbook |
@@ -1619,6 +1620,7 @@ El archivo se carga globalmente en `index.html` (junto a `kair-design-tokens.css
 
 - **📦748**: Dashboard premium v2 (CSS scoped `.kair-dashboard` en `styles.css`).
 - **📦749**: Extracción del dialecto a `shared/kair-premium.css` scoped `.kair-premium`; dashboard migrado como piloto; `styles.css` vuelve a su rol de estilos legacy.
+- **📦751**: Configuración del Sistema migrada a premium v2 (capa scoped `.kair-config` + remapeo de tokens legacy; Header System v2 con breadcrumb + icono/título + tabs con subrayado; soporte dark/dark-legacy).
 
 ---
 
@@ -1656,4 +1658,73 @@ independiente.
 > **Nota:** el PDF original asumía prototipos HTML autocontenidos en `public/`+`download/`. Este repo ya
 > es Electron (`modules/` + `renderer.js` + `preload.js`), y el login/splash/selección de empresa ya
 > está integrado → la "Fase 0" del PDF se reduce a conectar contratos reales faltantes.
+
+---
+
+## 🆕 Configuración del Sistema · Premium v2 (📦751, 2026-09-16)
+
+La sección **Configuración** (`components/config/config-viewer.html`, ~7.4k líneas) se carga en un
+`<iframe>` desde `renderer.js` → `showSettingsPage()`. Fue migrada al estilo **premium v2**.
+
+### Estrategia clave: remapeo de tokens (no reescribir CSS)
+
+El diseño legacy de Configuración era **100% variable-driven**: todo su CSS y sus `style="..."` en
+línea usan `var(--primary)`, `var(--bg-card)`, `var(--text-muted)`, `var(--font-heading)`,
+`var(--radius*)`, `var(--shadow*)`. Por eso **no se reescribió el CSS existente**: se cargó
+`shared/kair-design-tokens.css` y se **remapearon esas variables** a los tokens premium dentro de
+`.kair-config` (la clase del `<body>`). Resultado: todo el CSS previo + los estilos en línea adoptan
+el look premium sin tocar el markup de las 6 secciones.
+
+```css
+.kair-config{
+  --primary: var(--kair-blue); --primary-hover:#1a4a9e;
+  --bg-general: var(--kair-canvas); --bg-card: var(--kair-card);
+  --border-color: var(--kair-line); --border: var(--kair-line);
+  --text-main: var(--kair-ink); --text-muted: var(--kair-muted);
+  --font-heading: var(--kair-font-display); --font-body: var(--kair-font-ui);
+  --radius: var(--kair-radius-control); --radius-md:10px; --radius-lg: var(--kair-radius-card);
+}
+```
+
+**Bug fix incluido**: `--border` y `--radius-md` se usaban en el archivo pero **no estaban
+definidos** (eran declaraciones inválidas); ahora quedan definidos en la capa premium.
+
+> **Técnica reutilizable**: si un módulo/legacy es variable-driven, migrar por **remapeo de tokens**
+> (1 bloque CSS) en vez de reescribir reglas una por una. Mucho menor riesgo.
+
+### Header System v2 (patrón oficial)
+
+El header sigue el patrón de `modules/recursos/capacitaciones/capacitaciones-view.html`:
+
+```
+.cfg-header                 ← transparente sobre el canvas (sin card/borde/sombra)
+  .cfg-breadcrumb           ← Inicio › Configuración (último en negrita, "Inicio" → goHome())
+  .cfg-header-row
+    .cfg-header-left        ← .cfg-header-icon (42×42, radio 12, blue-soft) + h3 + p
+    .cfg-header-right       ← .cfg-back-btn (outline)
+  .cfg-tabs                 ← tabs con subrayado: border-bottom 1px gris + activa 2px azul
+```
+
+- **Iconos en SVG inline** (feather-style, stroke 1.8-1.9). ⚠️ `config-viewer.html` **NO carga**
+  Font Awesome ni Bootstrap Icons: los `<i class="fas ...">` / `<i class="bi ...">` que quedan en el
+  archivo **no renderizan**. Para iconos nuevos usar **SVG inline**.
+- Se conservó la clase **`nav-tab`** en los botones de tab porque `switchTab()` y
+  `validateUserPermissions()` la usan (`document.querySelector('.nav-tab[onclick*="\'usuarios\'"]')`).
+  **No renombrar** `nav-tab` ni los `onclick="switchTab('x', this)"`.
+- Los IDs `tab-<seccion>` y `goHome()` también se conservaron intactos.
+
+### Modo oscuro
+
+La capa premium incluye overrides de tokens para `[data-theme="dark"]` y `[data-theme="dark-legacy"]`
+(el padre aplica el tema sobre `document.documentElement` del iframe).
+
+### Cache-bust
+
+El iframe se carga con token en `renderer.js` (`showSettingsPage`):
+`components/config/config-viewer.html?v=20260916-premium`. **Bumpear al modificar el archivo.**
+
+### Verificación
+
+`node main/test-config-premium-v2.js` → **37/37 OK** (tokens, capa premium, header v2, tabs,
+dark, integridad de llaves/HTML, cache-bust y handlers intactos).
 
